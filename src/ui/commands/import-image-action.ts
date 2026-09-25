@@ -6,6 +6,7 @@ import {
   readFileAsDataUrl,
   readImageNaturalSize,
 } from '../trace/image-loader';
+import type { ImportOutcome } from '../state/store';
 import type { ToastVariant } from '../state/toast-store';
 import { readImageDensity } from '../common/image-density';
 import {
@@ -14,6 +15,7 @@ import {
   rasterImportGeometry,
 } from '../common/image-import';
 import type { ImageDensity } from '../common/image-density';
+import { describeImportBedFit } from '../app/import-bed-fit-notice';
 import { largeImportAdvisory } from '../app/import-size-advisory';
 import {
   shouldDecodeDimensionQualifiedPng,
@@ -27,7 +29,7 @@ import type { PngImportWorkerProgress } from '../import/png-import-worker-client
  * when skipped or failed) so callers like Image Studio can chain onto it. */
 export async function importImageFile(
   file: File,
-  importRasterImage: (object: SceneObject) => void,
+  importRasterImage: (object: SceneObject) => ImportOutcome | undefined,
   pushToast: (message: string, variant?: ToastVariant) => void,
 ): Promise<SceneObject | null> {
   // F-A3: advise (never refuse) before importing a very large file — both the
@@ -50,12 +52,14 @@ export async function importImageFile(
     }
     rollback = loaded.kind === 'paged' ? loaded.rollback : null;
     const imported = await importedRasterObject(file, loaded);
-    importRasterImage(imported.object);
+    const outcome = importRasterImage(imported.object);
     rollback = null;
     pushToast(
       `Added image: ${file.name} (${describeImportedImageSize(loaded.natural, loaded.sampled)} · ${describeImportDensity(imported.geometry)})`,
       'success',
     );
+    const fitNotice = describeImportBedFit(file.name, outcome);
+    if (fitNotice !== null) pushToast(fitNotice.message, fitNotice.variant);
     return imported.object;
   } catch (err) {
     return handleFailedImport(file.name, err, rollback, pushToast);

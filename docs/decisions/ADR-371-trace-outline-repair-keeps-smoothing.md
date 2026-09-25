@@ -30,9 +30,12 @@ The 2026-09-24 tracer audit measured this on the dragon fixture
 
 ### Decision
 
-1. `generateBezier` falls back to chord/3 arms when the least-squares arms project onto the chord
-   for more than the chord's length, as it already did for degenerate arms. The split recursion
-   refits when chord/3 misses the tolerance.
+1. The recursive fitter's `generateBezier` call falls back to chord/3 arms when the least-squares
+   arms project onto the chord for more than the chord's length, as it already did for degenerate
+   arms. The split recursion refits when chord/3 misses the tolerance. The single-cubic,
+   fixed-tangent fit used by node deletion keeps its original least-squares arms: it cannot split,
+   and even a monotonic smooth arch can have overlapping control-arm projections. Both routes
+   retain the degenerate-arm fallback.
 2. A finished loop whose corner rebuild changed it carries `withoutRebuiltCorners`: the same boundary
    finished with full smoothing and no rebuilt corners. On that contour's first conflict the repair
    swaps this finish in, and backs it off only if it still conflicts.

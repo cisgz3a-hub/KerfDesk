@@ -17,6 +17,12 @@ export type CubicBezier = {
   readonly p3: Vec2;
 };
 
+type FitTangents = {
+  readonly start: Vec2;
+  readonly end: Vec2;
+  readonly canSplit: boolean;
+};
+
 // Newton reparameterization is worthwhile only when the first fit is already
 // close (Schneider's heuristic: within 4x tolerance).
 const REPARAM_TOLERANCE_FACTOR = 4;
@@ -70,6 +76,32 @@ export function sampleCubics(cubics: ReadonlyArray<CubicBezier>, closed: boolean
   const last = cubics[cubics.length - 1];
   if (!closed && last !== undefined) out.push({ x: last.p3.x, y: last.p3.y });
   return out;
+}
+
+/** Fit ONE cubic from the first to the last point whose arms keep the given
+ *  unit tangents: only the two arm lengths are solved, refined by the same
+ *  Newton passes while they reduce the error. `tangentEnd` points back from
+ *  the last point into the curve, like every end tangent here. */
+export function fitCubicWithTangents(
+  points: ReadonlyArray<Vec2>,
+  tangentStart: Vec2,
+  tangentEnd: Vec2,
+): CubicBezier | null {
+  const last = points.length - 1;
+  if (last < 1) return null;
+  const u = chordParameterize(points, 0, last);
+  const tangents = { start: tangentStart, end: tangentEnd, canSplit: false };
+  let cubic = generateBezier(points, 0, last, u, tangents);
+  let errorSq = maxFitError(points, 0, last, cubic, u).maxSq;
+  for (let pass = 0; pass < MAX_REPARAM_PASSES; pass += 1) {
+    reparameterize(points, 0, last, cubic, u);
+    const next = generateBezier(points, 0, last, u, tangents);
+    const nextErrorSq = maxFitError(points, 0, last, next, u).maxSq;
+    if (nextErrorSq >= errorSq) break;
+    cubic = next;
+    errorSq = nextErrorSq;
+  }
+  return cubic;
 }
 
 // ——— segmentation ———
@@ -149,7 +181,8 @@ function fitRecursive(
     return;
   }
   const u = chordParameterize(points, first, last);
-  let cubic = generateBezier(points, first, last, u, tangentStart, tangentEnd);
+  const tangents = { start: tangentStart, end: tangentEnd, canSplit: true };
+  let cubic = generateBezier(points, first, last, u, tangents);
   let error = maxFitError(points, first, last, cubic, u);
   if (error.maxSq <= tolerance * tolerance) {
     out.push(cubic);
@@ -158,7 +191,7 @@ function fitRecursive(
   if (error.maxSq <= tolerance * tolerance * REPARAM_TOLERANCE_FACTOR * REPARAM_TOLERANCE_FACTOR) {
     for (let pass = 0; pass < MAX_REPARAM_PASSES; pass += 1) {
       reparameterize(points, first, last, cubic, u);
-      cubic = generateBezier(points, first, last, u, tangentStart, tangentEnd);
+      cubic = generateBezier(points, first, last, u, tangents);
       error = maxFitError(points, first, last, cubic, u);
       if (error.maxSq <= tolerance * tolerance) {
         out.push(cubic);
@@ -183,9 +216,9 @@ function generateBezier(
   first: number,
   last: number,
   u: ReadonlyArray<number>,
-  t1: Vec2,
-  t2: Vec2,
+  tangents: FitTangents,
 ): CubicBezier {
+  const { start: t1, end: t2, canSplit } = tangents;
   const p0 = points[first] as Vec2;
   const p3 = points[last] as Vec2;
   let c00 = 0;
@@ -218,15 +251,17 @@ function generateBezier(
   const chord = Math.hypot(lineX, lineY);
   let armL = det !== 0 ? (x0 * c11 - x1 * c01) / det : 0;
   let armR = det !== 0 ? (c00 * x1 - c01 * x0) / det : 0;
-  // Degenerate arms fall back to Wu/Barsky's chord/3. So do arms whose
-  // projections onto the chord add up to more than the chord: the control
-  // points are out of order and the curve loops between the data points,
-  // which the point-wise error test cannot see (Paper.js PathFitter's check).
-  // The split recursion then refits if chord/3 misses the tolerance.
+  // Degenerate arms fall back to Wu/Barsky's chord/3. The recursive trace
+  // fit also rejects overlapping chord projections, which can hide loops
+  // between its sparse samples (Paper.js PathFitter's heuristic), then splits
+  // and refits when chord/3 misses tolerance. A single-cubic node-edit fit
+  // cannot split: valid smooth arches may need overlapping projections, so
+  // applying that heuristic there would flatten the retained curve.
   if (
     armL < MIN_ARM_FRACTION * chord ||
     armR < MIN_ARM_FRACTION * chord ||
-    (t1.x * lineX + t1.y * lineY) * armL - (t2.x * lineX + t2.y * lineY) * armR > chord * chord
+    (canSplit &&
+      (t1.x * lineX + t1.y * lineY) * armL - (t2.x * lineX + t2.y * lineY) * armR > chord * chord)
   ) {
     armL = chord / 3;
     armR = chord / 3;

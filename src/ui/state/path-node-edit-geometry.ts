@@ -11,6 +11,7 @@ import {
   type Polyline,
   type Vec2,
 } from '../../core/scene';
+import { deleteCurveNodes } from '../../core/geometry/curve-node-delete';
 import type { PathNodeRef } from './path-node-edit-actions';
 import { replaceCompatibilityPolylines } from './path-node-edit-path';
 
@@ -75,6 +76,15 @@ export function deletePathsNodes(
     refs.filter((ref) => ref.geometry !== 'curve'),
   );
   const nextPaths = paths.map((path, pathIndex) => {
+    const curvePath = deleteCurvePathNodes(path, pathIndex, refs);
+    if (curvePath === null) {
+      invalid = true;
+      return path;
+    }
+    if (curvePath !== path) {
+      changed = true;
+      return curvePath;
+    }
     let pathChanged = false;
     const polylines = path.polylines.map((polyline, polylineIndex) => {
       const polylineRefs = refsByPolyline.get(pathNodePolylineKey({ pathIndex, polylineIndex }));
@@ -132,14 +142,7 @@ function editCurvePathByDelta(
     curves[ref.polylineIndex] = next;
     changed = true;
   }
-  if (!changed) return null;
-  const polylines: Polyline[] = [];
-  for (const curve of curves) {
-    const flattened = flattenCurveSubpath(curve, { toleranceMm: 0.05 });
-    if (flattened.kind !== 'ok') return null;
-    polylines.push(flattened.polyline);
-  }
-  return { ...path, curves, polylines };
+  return changed ? materializeCurvePath(path, curves) : null;
 }
 
 function editCurveRef(
@@ -156,6 +159,58 @@ function editCurveRef(
         x: control.x + dx,
         y: control.y + dy,
       });
+}
+
+// Selected curve anchors reconnect through deleteCurveNodes; selected handles
+// are not nodes. Null refuses the whole delete, as a polyline that would drop
+// below its minimum does.
+function deleteCurvePathNodes(
+  path: ColoredPath,
+  pathIndex: number,
+  refs: ReadonlyArray<PathNodeRef>,
+): ColoredPath | null {
+  const sourceCurves = path.curves;
+  if (sourceCurves === undefined) return path;
+  const nodesByCurve = curveAnchorIndices(refs, pathIndex);
+  if (nodesByCurve.size === 0) return path;
+  const curves: CurveSubpath[] = [];
+  for (const [curveIndex, curve] of sourceCurves.entries()) {
+    const nodes = nodesByCurve.get(curveIndex);
+    const next = nodes === undefined ? curve : deleteCurveNodes(curve, nodes);
+    if (next === null) return null;
+    curves.push(next);
+  }
+  if (curves.every((curve, index) => curve === sourceCurves[index])) return path;
+  return materializeCurvePath(path, curves);
+}
+
+function curveAnchorIndices(
+  refs: ReadonlyArray<PathNodeRef>,
+  pathIndex: number,
+): ReadonlyMap<number, ReadonlySet<number>> {
+  const byCurve = new Map<number, Set<number>>();
+  for (const ref of refs) {
+    if (ref.geometry !== 'curve' || ref.handle !== undefined || ref.pathIndex !== pathIndex) {
+      continue;
+    }
+    const nodes = byCurve.get(ref.polylineIndex) ?? new Set<number>();
+    nodes.add(ref.pointIndex);
+    byCurve.set(ref.polylineIndex, nodes);
+  }
+  return byCurve;
+}
+
+function materializeCurvePath(
+  path: ColoredPath,
+  curves: ReadonlyArray<CurveSubpath>,
+): ColoredPath | null {
+  const polylines: Polyline[] = [];
+  for (const curve of curves) {
+    const flattened = flattenCurveSubpath(curve, { toleranceMm: 0.05 });
+    if (flattened.kind !== 'ok') return null;
+    polylines.push(flattened.polyline);
+  }
+  return { ...path, curves, polylines };
 }
 
 export function materializedPolylineToSpecPoints(

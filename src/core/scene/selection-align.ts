@@ -1,6 +1,8 @@
-import { transformedBBox, type AABB } from './hit-test';
+import type { AABB } from './hit-test';
+import type { SceneGroup } from './scene';
 import type { SceneObject, Transform } from './scene-object';
 import type { SelectionTransform } from './selection-transform';
+import { selectionUnits, type SelectionUnit } from './selection-units';
 
 export type SelectionAlignKind =
   | 'left'
@@ -22,36 +24,41 @@ export type SelectionAlignResult =
   | { readonly kind: 'ok'; readonly transforms: ReadonlyArray<SelectionTransform> }
   | { readonly kind: 'error'; readonly reason: SelectionAlignError };
 
+/**
+ * Align each unit of `objects` (see selectionUnits) to the unit that holds
+ * `edit.referenceId`, so a selected group aligns by its combined bounds and all
+ * its members move by the same delta. Without `groups` every object is its own
+ * unit.
+ */
 export function buildSelectionAlignEdit(
   objects: ReadonlyArray<SceneObject>,
   edit: SelectionAlignEdit,
+  groups: ReadonlyArray<SceneGroup> = [],
 ): SelectionAlignResult {
   if (objects.length === 0) return { kind: 'error', reason: 'empty-selection' };
-  if (objects.length < 2) return { kind: 'error', reason: 'not-enough-objects' };
-  const reference = objects.find((object) => object.id === edit.referenceId);
+  const units = selectionUnits(objects, groups);
+  if (units.length < 2) return { kind: 'error', reason: 'not-enough-objects' };
+  const reference = units.find((unit) =>
+    unit.objects.some((object) => object.id === edit.referenceId),
+  );
   if (reference === undefined) return { kind: 'error', reason: 'missing-reference' };
-  const referenceBox = transformedBBox(reference);
-  const transforms = objects
-    .filter((object) => object.id !== reference.id)
-    .map((object) =>
-      alignObjectToReference(object, transformedBBox(object), referenceBox, edit.kind),
-    )
-    .filter((item): item is SelectionTransform => item !== null);
+  const transforms = units
+    .filter((unit) => unit !== reference)
+    .flatMap((unit) => alignUnitToReference(unit, reference.box, edit.kind));
   return { kind: 'ok', transforms };
 }
 
-function alignObjectToReference(
-  object: SceneObject,
-  objectBox: AABB,
+function alignUnitToReference(
+  unit: SelectionUnit,
   referenceBox: AABB,
   kind: SelectionAlignKind,
-): SelectionTransform | null {
-  const delta = alignDelta(objectBox, referenceBox, kind);
-  if (delta.x === 0 && delta.y === 0) return null;
-  return {
+): ReadonlyArray<SelectionTransform> {
+  const delta = alignDelta(unit.box, referenceBox, kind);
+  if (delta.x === 0 && delta.y === 0) return [];
+  return unit.objects.map((object) => ({
     id: object.id,
     transform: translateTransform(object.transform, delta.x, delta.y),
-  };
+  }));
 }
 
 // Exported so box-anchor alignment (board-capture, ADR-124) can compose an

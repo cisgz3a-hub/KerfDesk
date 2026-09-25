@@ -3,8 +3,8 @@
 exports[`keeps real connected-script multi-operation plans and emitted bytes exact 1`] = `
 {
   "fingerprint": {
-    "chars": 361151,
-    "fnv1a": 833675677,
+    "chars": 361157,
+    "fnv1a": 1288690044,
     "lines": 14712,
   },
   "head": [
@@ -52,6 +52,6 @@ exports[`keeps real connected-script multi-operation plans and emitted bytes exa
     "G0 X0.000 Y0.000",
     "",
   ],
-  "utf8ByteCount": 361160,
+  "utf8ByteCount": 361157,
 }
 `;

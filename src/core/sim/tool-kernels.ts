@@ -7,6 +7,9 @@
 //   ball-nose             sphere:    dz = r − sqrt(r² − d²)
 //   v-bit                 cone:      dz = d / tan(θ/2)
 //   engraving   truncated cone:      dz = max(0, (d − tipRadius) / tan(θ/2))
+//   tapered-ball-nose  ball + flank: sphere of the tip radius out to its
+//                                    tangent point, then the cone at θ/2
+//                                    (core/cnc-tapered-ball.ts, ADR-368)
 //
 // The SAME kernels serve the H.2 simulator (stamping), H.5 roughing dilation,
 // and H.8 finishing (max-plus tip surface) — built once, deliberately.
@@ -26,6 +29,7 @@
 // behaviour and correct for a V-bit, so saved projects are unchanged.
 
 import { assertNever, type CncTool } from '../scene';
+import { taperedBallEnvelope, taperedBallHeightMm } from '../cnc-tapered-ball';
 import { CNC_MASK_EMISSION_XY_CLEARANCE_MM } from '../cnc/coordinate-representation';
 // Deep imports: these geometry leaves predate the narrow representation barrel;
 // the legacy core/cnc barrel is frozen by the public-export no-growth ratchet.
@@ -123,6 +127,10 @@ function surfaceDzAtRadiusForTool(
         const inside = Math.max(0, toolRadiusMm * toolRadiusMm - radiusMm * radiusMm);
         return toolRadiusMm - Math.sqrt(inside);
       };
+    case 'tapered-ball-nose': {
+      const envelope = taperedBallEnvelope(tool);
+      return envelope === null ? () => 0 : (radiusMm) => taperedBallHeightMm(envelope, radiusMm);
+    }
     default:
       return assertNever(tool.kind, 'CncToolKind');
   }
@@ -193,6 +201,13 @@ export function cuttingSurfaceDz(tool: CncTool, dMm: number, radiusMm: number): 
     }
     case 'v-bit': {
       return conicalSurfaceDz(tool, dMm);
+    }
+    case 'tapered-ball-nose': {
+      // Invalid ball or taper metadata previews and plans as a flat land
+      // across the full diameter, like invalid engraving tip data: the
+      // widest envelope keeps the relief dilation from ever going deeper.
+      const envelope = taperedBallEnvelope(tool);
+      return envelope === null ? 0 : taperedBallHeightMm(envelope, dMm);
     }
     default:
       return assertNever(tool.kind, 'CncToolKind');

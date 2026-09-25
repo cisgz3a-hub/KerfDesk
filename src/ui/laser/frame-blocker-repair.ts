@@ -1,8 +1,8 @@
 // In-place fixes before an ordinary Frame (maintainer, 2026-07-17: blocks ask
-// to fix in place, not dead-end in an alert; ADR-367). Start with no permit
-// runs this same Frame, so both buttons reach them. The offers used to be
-// reachable only from the checkpoint Start flow, so a plain Frame or Start
-// answered an alarm or a missing origin with a red refusal and nothing else.
+// to fix in place, not dead-end in an alert; ADR-367). Start never runs a Frame
+// and stays greyed out until one completes (ADR-372), so these offers live on
+// Frame job. They used to be reachable only from the checkpoint Start flow, so
+// a plain Frame answered an alarm or a missing origin with a red refusal only.
 //
 // Nothing here adds a refusal. Each step either clears a condition the Frame
 // would refuse for, or leaves it to be refused with the Frame's own messages,

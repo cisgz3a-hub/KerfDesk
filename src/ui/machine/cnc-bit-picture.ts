@@ -17,7 +17,8 @@ export type CncBitPictureKey =
   | 'bit-o-flute-ball-nose'
   | 'bit-v-groove'
   | 'bit-engraving-point'
-  | 'bit-engraving-flat';
+  | 'bit-engraving-flat'
+  | 'bit-tapered-ball-nose';
 
 export type CncBitPicture = {
   readonly key: CncBitPictureKey;
@@ -161,6 +162,14 @@ export function cncBitPicture(tool: CncBitPictureTool): CncBitPicture {
           'The cutting end is a full rounded nose. This generic example does not identify the flute design of your custom cutter.',
       }
     );
+  }
+  if (tool.kind === 'tapered-ball-nose') {
+    return {
+      key: 'bit-tapered-ball-nose',
+      label: 'Tapered ball-nose carving bit',
+      description:
+        'A small rounded tip blends into a long, slender taper for fine 3D relief detail. Enter its ball tip diameter, per-side taper and diameter at the top of the flutes.',
+    };
   }
   if (tool.kind === 'v-bit') {
     return {

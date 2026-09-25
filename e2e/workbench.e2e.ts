@@ -513,7 +513,7 @@ kerfDeskTest(
     await expect
       .poll(async () => serialWrites(await kerfdesk.events()).slice(writesBeforeFrame))
       .toContain('$J=G90 G21');
-    const startButton = page.getByRole('button', { name: 'Start framed job', exact: true });
+    const startButton = page.getByRole('button', { name: 'Start', exact: true });
     await expect(startButton).toBeEnabled();
     const frameNotice = page.getByRole('button', {
       name: 'Dismiss success notification: Frame complete — press Start to review and run this exact job.',

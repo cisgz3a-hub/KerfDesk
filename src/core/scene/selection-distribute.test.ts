@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import type { SceneGroup } from './scene';
 import { IDENTITY_TRANSFORM, type SceneObject, type Transform } from './scene-object';
 import { buildSelectionDistributeEdit } from './selection-distribute';
 
@@ -67,7 +68,45 @@ describe('buildSelectionDistributeEdit', () => {
 
     expect(result).toEqual({ kind: 'error', reason: 'not-enough-objects' });
   });
+
+  it('distributes a group as one item and moves its members by the same delta', () => {
+    const left = objectWithSize('left', 10, 10, { ...IDENTITY_TRANSFORM, x: 0, y: 0 });
+    const a = objectWithSize('a', 10, 10, { ...IDENTITY_TRANSFORM, x: 30, y: 0 });
+    const b = objectWithSize('b', 10, 10, { ...IDENTITY_TRANSFORM, x: 45, y: 10 });
+    const right = objectWithSize('right', 10, 10, { ...IDENTITY_TRANSFORM, x: 100, y: 0 });
+
+    const result = buildSelectionDistributeEdit(
+      [left, a, b, right],
+      { kind: 'horizontal-spacing' },
+      [GROUP_AB],
+    );
+
+    // Items 10, 25 and 10 wide across x 0..110 leave two 32.5 mm gaps.
+    expect(result).toEqual({
+      kind: 'ok',
+      transforms: [
+        { id: 'a', transform: { ...a.transform, x: 42.5 } },
+        { id: 'b', transform: { ...b.transform, x: 57.5 } },
+      ],
+    });
+  });
+
+  it('counts a group as one item when deciding whether there is enough to distribute', () => {
+    const result = buildSelectionDistributeEdit(
+      [
+        objectWithSize('left', 10, 10, IDENTITY_TRANSFORM),
+        objectWithSize('a', 10, 10, { ...IDENTITY_TRANSFORM, x: 30 }),
+        objectWithSize('b', 10, 10, { ...IDENTITY_TRANSFORM, x: 45 }),
+      ],
+      { kind: 'horizontal-centers' },
+      [GROUP_AB],
+    );
+
+    expect(result).toEqual({ kind: 'error', reason: 'not-enough-objects' });
+  });
 });
+
+const GROUP_AB: SceneGroup = { id: 'group', name: 'Group 1', objectIds: ['a', 'b'] };
 
 function objectWithSize(
   id: string,

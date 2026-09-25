@@ -83,4 +83,24 @@ describe('V-carve engraving-tool compatibility', () => {
       );
     },
   );
+
+  // ADR-368: a tapered ball nose is not a point cone. It gets the same
+  // advisory (non-blocking) incompatibility as any other non-V cutter.
+  it('names a tapered ball nose as incompatible with V-carve', () => {
+    const result = preflightWith({
+      id: 'tapered-ball',
+      name: 'Tapered ball nose',
+      kind: 'tapered-ball-nose',
+      diameterMm: 6.25,
+      tipAngleDeg: 10.8,
+      tipDiameterMm: 1.5875,
+    });
+
+    expect(result.issues).toContainEqual(
+      expect.objectContaining({
+        code: 'cnc-settings-invalid',
+        message: expect.stringContaining('V-carve requires a V-bit or angled engraving bit'),
+      }),
+    );
+  });
 });

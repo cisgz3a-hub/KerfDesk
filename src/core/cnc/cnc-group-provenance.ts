@@ -1,5 +1,6 @@
 import type { CncGroup } from '../job';
 import { isValidCncTipDiameterMm } from '../cnc-tip-diameter';
+import { isValidTaperedBallTipDiameterMm } from '../cnc-tapered-ball';
 import type { CncLayerSettings, CncTool } from '../scene';
 
 type CncGroupProvenance = Pick<
@@ -42,12 +43,26 @@ function toolProvenance(tool: CncTool, layerPrimaryTool: CncTool): CncGroupProve
   return {
     toolKind: tool.kind,
     ...(tool.tipAngleDeg === undefined ? {} : { toolTipAngleDeg: tool.tipAngleDeg }),
-    ...(tool.kind === 'engraving' && isValidCncTipDiameterMm(tool.tipDiameterMm, tool.diameterMm)
-      ? { toolTipDiameterMm: tool.tipDiameterMm }
-      : {}),
+    ...tipDiameterProvenance(tool),
     ...(tool.fluteCount === undefined ? {} : { toolFluteCount: tool.fluteCount }),
     layerPrimaryToolId: layerPrimaryTool.id,
   };
+}
+
+// Engraving records its tip flat; a tapered ball nose records its tip ball.
+// Invalid tip data is omitted, so the recorded kind shows the gap (ADR-368).
+function tipDiameterProvenance(tool: CncTool): CncGroupProvenance {
+  const tipDiameterMm = tool.tipDiameterMm;
+  if (tool.kind === 'engraving' && isValidCncTipDiameterMm(tipDiameterMm, tool.diameterMm)) {
+    return { toolTipDiameterMm: tipDiameterMm };
+  }
+  if (
+    tool.kind === 'tapered-ball-nose' &&
+    isValidTaperedBallTipDiameterMm(tipDiameterMm, tool.diameterMm)
+  ) {
+    return { toolTipDiameterMm: tipDiameterMm };
+  }
+  return {};
 }
 
 function depthProvenance(

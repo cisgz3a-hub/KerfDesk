@@ -393,12 +393,14 @@ describe('CutSettingsDialog fill density controls', () => {
             onMakeDefault={onMakeDefault}
             onMakeDefaultForAll={onMakeDefaultForAll}
             onResetToDefault={onResetToDefault}
+            makeDefaultColor="#00ff00"
           />,
         );
       });
 
+      // The button names the color it saves under, not the layer's own color.
       const makeDefault = [...host.querySelectorAll('button')].find(
-        (button) => button.textContent === 'Make Default',
+        (button) => button.textContent === 'Make Default for #00ff00',
       );
       if (!(makeDefault instanceof HTMLButtonElement)) {
         throw new Error('Make Default button missing');

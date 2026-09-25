@@ -97,7 +97,7 @@ opportunity, without an extra branding delay. It introduces no startup interacti
 - **Machine controls panel**: in Spacious layout it is docked at the far right with the same collapse/expand pattern. Both panels can be resized or hidden independently. It may be collapsed during a job because active run controls live independently in the Live Motion bar.
 - **Toasts**: share the canvas's available space (lower left of the workspace, above the live controls) or a reserved row inside the open modal — never the rails, where they hid Start/Job and the layer list. Only the newest three render. The toast body does not take pointer input, so a click or drag through it reaches the canvas; the × control dismisses it early. Success confirmations dismiss after 4 s; advisories and failures after 8 s.
 - **Placement & output**: the Machine panel groups the existing placement and output settings in a disclosure. Mouse, Space, and Enter open it without activating canvas or job shortcuts.
-- **Job actions dock**: Frame and the primary **Set up & Frame** / **Start framed job** action sit outside the settings scroller. In Compact layout the dock remains below either expanded Artwork or Machine tab. Collapsing the active panel narrows the entire sidebar to a 48 px restore strip with stacked icon tabs and hides the dock, giving that width back to the canvas; either tab expands its panel. In Spacious layout the dock sits below the expanded Machine panel. It shares the existing readiness, Frame, and Start handlers. A completed Frame for the exact reviewed job remains the sole ordinary Start policy gate; the dock adds no policy checks or machine actions, and the separate Live Motion bar is unaffected by collapse.
+- **Job actions dock**: **Frame job** and the primary **Start** action (greyed out until a clean Frame of the exact job completes) sit outside the settings scroller. In Compact layout the dock remains below either expanded Artwork or Machine tab. Collapsing the active panel narrows the entire sidebar to a 48 px restore strip with stacked icon tabs and hides the dock, giving that width back to the canvas; either tab expands its panel. In Spacious layout the dock sits below the expanded Machine panel. It shares the existing readiness, Frame, and Start handlers. A completed Frame for the exact reviewed job remains the sole ordinary Start policy gate; the dock adds no policy checks or machine actions, and the separate Live Motion bar is unaffected by collapse.
 - **Live Motion popup**: hidden while idle. During a job, frame, jog, probe, home, or other owned controller operation it appears as a floating popup — `position: fixed`, bottom-centre, above the status bar, sized by its content — so its arrival never resizes the workspace or moves the rails (ADR-207 amendment, 2026-09-19, revised 2026-09-20). It shows state/progress plus the only visible Pause, Resume, Continue, and software Abort actions on a wrapping line. Targets are at least 48 px high; Abort is labelled **ABORT JOB** or **ABORT MOTION** and remains above dialogs. While active it covers a band above the status bar, which at typical widths includes the canvas zoom buttons.
 - **Workspace layout**: the toolbar offers **Auto layout**, **Compact**, and **Spacious**, saved locally across reloads. Auto uses Compact when the viewport is at most 1439 px wide **or** 719 px high; otherwise it uses Spacious. Compact has one scrolling sidebar with keyboard-accessible **Artwork** and **Machine** tabs. Spacious shows the two independent panels. These are viewport CSS pixels, so browser zoom and display scaling affect the available space.
 - **Narrow windows**: below 960 px wide, the workspace always uses the single Compact sidebar, including when Spacious is selected. The saved Spacious preference takes effect again when the window is wide enough. Layout changes preserve the panels' existing controls and job workflow.
@@ -182,10 +182,18 @@ opportunity, without an extra branding delay. It introduces no startup interacti
 2. Toast (warning): `<filename> has no drawable content`. No state change.
 
 #### Edge — SVG is larger than the machine bed
-1. After import, the object's bounding box is checked against bed dimensions.
-2. If any part is outside bed: warning toast `Design extends beyond bed. Resize or reposition before generating G-code.`
-3. Out-of-bounds geometry shows a red dashed outline overlay on the viewport.
-4. Save G-code button is *not* disabled at this stage; preflight check at G-code generation is where it blocks (F-A8).
+1. Art that fits the bed keeps its file size, including art exactly the bed size. Only an import
+   larger than the bed in either axis is scaled down, uniformly, to fit inside 90% of the bed,
+   centered (a staggered multi-file import keeps its 10 mm offset). The margin keeps the scaled
+   outline clear of the bed edges for overscan, kerf, and Frame.
+2. A warning toast, after the import's other toasts, reports it:
+   `design.svg is larger than the 400 × 400 mm bed (1000 × 500 mm), so it was scaled to 36% to fit. Undo restores the original size.`
+   DXF, image, and STL imports follow the same rule and notice; a height-map relief keeps its
+   authored size and is only centered.
+3. The scale-to-fit is its own undo step: the first Undo returns the design to its file size,
+   centered and extending past the bed; a second Undo removes the import.
+4. Out-of-bounds geometry shows a red dashed outline overlay on the viewport.
+5. Save G-code button is *not* disabled at this stage; preflight check at G-code generation is where it blocks (F-A8).
 
 #### Edge — SVG uses unit-less coordinates
 1. SVG without explicit units (no `mm`, `cm`, `in`, `px`): treated as mm per laser-community convention.
@@ -398,6 +406,12 @@ Identical to the format-specific import flows except:
   together. Named sections reveal the applicable line, fill or image options. **Advanced cut
   settings** groups the full draft editor by purpose; **Apply settings** commits the draft and
   **Cancel** leaves the operation unchanged.
+- **Saved defaults** in Advanced cut settings offers **Make Default for #rrggbb**, which remembers
+  the operation's applied settings for the colour it names: the colour of the artwork the operation
+  was created for, or the operation's own colour when it has no artwork. New operations and **Reset
+  to Default** use the default saved for that same colour, otherwise **Make Default for All**. The
+  automatic operation colour is never matched for artwork, so a default saved for black artwork
+  does not reach other artwork whose operation happens to be black.
 - CNC settings group tool/material choices, cut/depth and feeds/passes, followed by named
   sections for holding tabs, clearing, finishing, entry/travel, saved feeds, the calculator and
   machine references. **Machine maximum** remains beside **Artwork spindle speed**. Collapsing a
@@ -671,8 +685,8 @@ other preflight finding is an advisory reported after a successful save.
 
 For **Start**, frame-first applies (ADR-228, ADR-230, ADR-232, ADR-237): the same
 seven compile-integrity codes cover unproducible or unstreamable output. Pressing
-Frame, or pressing Start without a live exact permit, prepares the candidate and
-runs the physical tool-off Frame dialog-free. Calculated bed bounds, configured
+Frame prepares the candidate and runs the physical tool-off Frame dialog-free;
+Start stays greyed out until that Frame completes and never runs one (ADR-372). Calculated bed bounds, configured
 no-go zones, and live output-setting findings travel with that exact candidate;
 they surface as warnings when the operator presses Start on the review-pending
 permit after a clean Frame. They do not refuse Frame or Start. The actual
@@ -1110,9 +1124,11 @@ Status bar messages (toasts that appear in the bar for 3 s) for non-blocking eve
 ### F-B6. Start job
 
 #### Success
-1. With no live exact permit, the ordinary primary action reads **Set up & Frame**. The user clicks
-   it while connected and idle (or invokes Cmd/Ctrl+Return). The separate **Frame job** button runs
-   the same dialog-free prepare-and-Frame path.
+1. With no live exact permit, the primary **Start** action is greyed out and the status line reads
+   **Not framed — Frame this job to unlock Start** (or why the last Frame expired). The user clicks
+   **Frame job** while connected and idle; it runs the dialog-free prepare-and-Frame path. Start
+   never launches a Frame itself, and Cmd/Ctrl+Return with no permit only says to Frame first
+   (ADR-372).
 2. App prepares the exact program and runs F-A10. A factual compile-integrity, construction-input,
    or transport failure stops before Frame and reports its fix; policy findings do not. Job Review
    does not open. Calculated bounds, no-go, controller-setting, and other advisory findings travel
@@ -1122,11 +1138,14 @@ Status bar messages (toasts that appear in the bar for 3 s) for non-blocking eve
    under G55-G59. Dispatch alone authorizes nothing: every Frame command must receive its terminal
    acknowledgement and the controller must reach final clean Idle without interruption or spatial
    session/origin drift. Advisory settings and build-info observations may refresh.
-4. Clean completion issues a one-run, review-pending `FramedRunPermit`. The controls read **Ready to
-   start — framed job unchanged**, **Start framed job**, and **Frame again**. The permit is exact and
-   one-use. Any project, output-scope, placement, or registration edit, Jog, Home,
-   origin/probe/reset/disconnect, or controller drift expires it. Camera-only UI state does not.
-5. The user clicks **Start framed job**. The app opens the single **Job Review** dialog (ADR-224,
+4. Clean completion issues a one-run, review-pending `FramedRunPermit` and enables **Start**. The
+   controls read **Ready to start — framed job unchanged**, **Start**, and **Frame again**. For a
+   split Frame (ADR-353) the permit arrives when the exact program does; the trace's own motion
+   never cancels that program. The permit is exact and one-use. Any project,
+   output-scope, placement, or registration edit, Jog, Home, origin/probe/reset/disconnect, or
+   controller drift expires it and greys Start out again, with the reason in the status line.
+   Camera-only UI state does not.
+5. The user clicks **Start**. The app opens the single **Job Review** dialog (ADR-224,
    ADR-237) against the permit's exact prepared program plus current controller state; it neither
    recompiles nor streams before confirmation. A laser controller that reports `$32=0` contributes
    the `$32` acknowledgement banner rather than refusing Frame or Start.
@@ -1221,7 +1240,7 @@ Status bar messages (toasts that appear in the bar for 3 s) for non-blocking eve
 
 #### Edge — cancel the review
 1. **Cancel** or Escape sends no job bytes. If the exact artifact and evidence remain current, the
-   review-pending permit stays armed so the operator may press **Start framed job** and review it
+   review-pending permit stays armed so the operator may press **Start** and review it
    again. Edits already made in review are ordinary project edits and are kept (undo applies as
    usual); an edit that changes the exact artifact invalidates the permit and requires Frame again.
 2. If Frame preparation selected G54 from an original G55-G59, cancelling the later Start-time
@@ -1938,7 +1957,7 @@ their archive before transmission.
    that no physical motion occurred.
 
 #### Start, recovery, replay, and discard are separate intents
-1. Ordinary **Set up & Frame**, **Start framed job**, and Ctrl+Return ignore
+1. Ordinary **Frame job**, **Start**, and Ctrl+Return ignore
    archived recovery records and use the current project's exact-artifact flow
    from line 1. Merely showing, opening, or closing recovery cannot import
    archived G-code, settings, origins, or controller observations into the live
@@ -2013,7 +2032,7 @@ their archive before transmission.
    Frame or invalidate the exact permit that Frame completion earns. Supervised recovery retains
    its separate fresh-qualification contract.
 3. Alarm and non-Idle controller states still refuse Start (the transport cannot accept a
-   stream). Frame and Start offer Home (homing enabled) or Unlock in place before refusing an
+   stream). Frame offers Home (homing enabled) or Unlock in place before refusing an
    Alarm (ADR-367), except a grblHAL E-stop alarm, which must be released first; after Unlock
    the operator sets the origin again, since Unlock does not restore the machine position.
 4. **Forget Controller** safely stops active motion when possible, closes/revokes
@@ -2470,8 +2489,12 @@ or traced image) with at least one closed polyline.
   explicitly selected and the profile has no verified or legacy-verified scan-offset calibration;
   ordinary vector layers, calibrated profiles, and explicitly saved choices retain their direction.
   The 4040-safe, Raster Image, Island Fill, and Offset Fill policies remain separate. For generic
-  Scan Line, a stored Overscan value of zero uses the bounded 5 mm generic runway default rather
-  than allowing a rapid-to-powered start; Frame includes that effective motion.
+  Scan Line, a positive stored Overscan value is the full runway wherever it fits (always at each
+  scanline's outer entry and exit), and a stored value of zero uses the bounded 5 mm generic runway
+  default rather than allowing a rapid-to-powered start; Frame includes that effective motion.
+- *Overscan above 5 mm on the 4040-safe profile*: 4040-safe Scan Line keeps its ADR-234 entry
+  runway of at most 5 mm. The Overscan field keeps the stored value and says so beside it
+  ("stored 10; 4040-safe Scan Line uses up to 5 mm"); 4040-safe Island Fill uses the full value.
 - *Very small spacing* (≤ 0.05 mm): clamped to 0.05 mm at the algorithm
   boundary so an accidental 0 doesn't generate millions of lines.
 - *Overscan near a bed edge*: Fill Overscan adds laser-off runway before
@@ -2499,6 +2522,7 @@ correct M4-mode raster G-code from Compile.
 2. App decodes the image, computes intrinsic mm-bounds from the
    image's DPI metadata (defaulting to LightBurn's 254 DPI when none —
    ADR-048), inserts a `RasterImage` SceneObject at the canvas centre.
+   An image larger than the bed is scaled down to fit, with a warning (F-A3).
 3. The image renders on the workspace via Canvas2D `drawImage` —
    real bitmap, scaled into mm-bounds. (Distinct from the Phase E
    "trace this image" flow, which converts to vectors immediately.)
@@ -2761,8 +2785,8 @@ row of the hardware status table in `docs/architecture/08-invariants-and-verific
 For a device profile with Homing disabled, a newly created or opened project
 starts in **User Origin** (2026-07-16 maintainer amendment; previously Current
 Position): User Origin cannot resolve placement until an origin exists, so the
-default flow is position the head, **Set origin here**, **Set up & Frame**, then
-**Start framed job**. The missing origin is a factual placement/compile input;
+default flow is position the head, **Set origin here**, **Frame job**, then
+**Start**. The missing origin is a factual placement/compile input;
 every ordinary placement mode still requires the exact completed Frame. The machine panel
 offers two positioning paths (per ADR-225 the **Position job** card sits last
 on the rail, below the job actions, as the hand-placement fallback):
@@ -3505,7 +3529,8 @@ explicitly marked below; the remaining controls and user-facing flows are planne
    progress toast names the current phase and Escape cancels the request.
 2. The mesh lands as a relief object at 100 mm wide (height by aspect),
    5 mm relief depth, background carved away ('floor'), on a wood-brown
-   layer created automatically. Toast reports the triangle count. The
+   layer created automatically. Toast reports the triangle count; a relief
+   larger than the bed is scaled down to fit, with a warning (F-A3). The
    worker transfers its typed mesh into the live object without expanding
    it into a boxed number array on the UI thread.
 3. The canvas shows the relief as a grayscale depth map — light = stock
@@ -3759,12 +3784,17 @@ and lifts the command's CNC-only gate.)*
 #### Success
 1. **Startup Setup > Manage bits** lists every bit (starters + custom),
    grouped by cutter family. The manual add form takes name, kind (end
-   mill / ball nose / v-bit / engraving), diameter, flute count, included angle
-   (v/engraving only), and optional engraving tip-flat diameter. Geometry
+   mill / ball nose / v-bit / engraving / tapered ball nose), diameter, flute
+   count, included angle (v/engraving only), and optional engraving tip-flat
+   diameter. A tapered ball nose instead takes its cut diameter at the top of
+   the flutes, its taper per side as sellers list it (stored doubled as the
+   included angle, ADR-368) and its required ball tip diameter; once valid,
+   the form states where the modeled taper reaches that diameter so the
+   operator can compare it with the listed cutting length. Geometry
    fields start blank and return to blank after each successful Add so a prior
    cutter's geometry cannot be reused accidentally.
-2. Add from bit catalog searches 88 modeled envelopes and 72 reference-only
-   family entries (160 entries total). A generic flat or full-radius-ball
+2. Add from bit catalog searches 96 modeled envelopes and 71 reference-only
+   family entries (167 entries total). A generic flat or full-radius-ball
    template is an operator-matched nominal diameter envelope whose gross
    geometry fits the current kernel; Add does not claim that its family source
    verifies the generated size, shank, center-cut/plunge capability, entry
@@ -3772,7 +3802,11 @@ and lifts the command's CNC-only gate.)*
    family identity, it also does not establish flute count. Exact-product
    point-V and O-flute ball-nose evidence is labeled separately; the two Amana
    ball-nose products retain their exact product diameter and shank but no
-   numeric flute count because the product source does not state one. Modeled
+   numeric flute count because the product source does not state one. Eight
+   exact-product tapered ball-nose rows (Amana and SpeTool) copy the listed
+   tip, per-side taper, cutting length and shank; their stored cut diameter is
+   where that taper ends at the listed cutting length, and they carry no flute
+   count. Modeled
    envelopes can be copied into the saved custom-bit library unless already
    built in or saved. Unsupported
    entries remain visible with their source and the reason they are
@@ -3784,8 +3818,9 @@ and lifts the command's CNC-only gate.)*
    opened, across projects. Existing project copies win an ID or catalog-identity match, so opening
    a project never replaces its saved ID or metadata with a library alias.
 4. Catalog family, optional evidenced shank/flute metadata, engraving tip-flat
-   diameter, and stable catalog identity survive both app-library persistence
-   and `.lf2` project round-trips. Generic non-O-flute envelopes carry no trusted flute count and
+   diameter, tapered ball-nose tip diameter, and stable catalog identity
+   survive both app-library persistence and `.lf2` project round-trips.
+   Generic non-O-flute envelopes carry no trusted flute count and
    make no automatic-feed claim. An explicit single/double O-flute family
    count becomes the default for material-feed calculations. Every selectable bit shows its
    effective flute count in Startup Setup; changing it there updates the draft bit metadata used by
@@ -3801,7 +3836,8 @@ and lifts the command's CNC-only gate.)*
 6. Every list row shows the canonical stored diameter and, for an angled
    cutter, the stored included angle independently of the operator-entered
    name. Engraving rows also identify a pointed tip or the stored tip-flat
-   diameter.
+   diameter. Tapered ball-nose rows show the tip diameter and the per-side
+   taper instead of the included angle.
 7. Choosing an Active bit briefly shows a dismissible **Modeled cutting
    envelope** preview. For an end mill, full-radius ball, valid point V-bit, or
    engraving bit with a valid included angle and optional valid tip flat,
@@ -3810,7 +3846,10 @@ and lifts the command's CNC-only gate.)*
    cutting length, and the shank transition are not modeled. An engraving bit
    with no stored tip flat is deliberately a true point for legacy compatibility.
    An angled cutter without a valid included angle receives a
-   readable fallback instead of an invented cone.
+   readable fallback instead of an invented cone. A tapered ball nose with a
+   valid ball tip and taper uses the same simulator profile and states where
+   the taper reaches its cut diameter; one missing either receives the same
+   readable fallback.
    If WebGL or scene initialization is unavailable, the bit name and geometry
    notice remain readable. A later render exception or WebGL context loss
    disposes the acquired scene and transitions to the same fallback. Selection
@@ -3822,7 +3861,9 @@ and lifts the command's CNC-only gate.)*
 1. Empty names and diameters outside 0.1 through 50 mm are ignored — the
    Add button does nothing until the fields are sane.
 2. V-bit and engraving-bit angles must be finite values from 1 through 179
-   degrees. An invalid Add shows an inline reason and stores no tool.
+   degrees. A tapered ball-nose taper must be 0.5 through 89.5 degrees per
+   side, and its ball tip must be above 0 and below the cut diameter. An
+   invalid Add shows an inline reason and stores no tool.
 3. An engraving tip flat is optional. When entered, it must be finite,
    non-negative, and smaller than the cutter diameter. Entry stores no invalid
    tool. A finite malformed value from hand-edited or stale persisted data stays
@@ -4040,9 +4081,12 @@ and lifts the command's CNC-only gate.)*
    separates them when the bits differ).
 2. Finishing rides the sampled max-plus tip surface in serpentine rows. A ball
    nose uses `2*sqrt(c*(2r-c))` physical-XY spacing after bounding scallop `c`
-   to [0.001 mm, bit radius]; flat bits use the larger of 0.05 mm and 40% of
-   diameter. The grid attempts that resolved spacing and its whole-row stride
-   rounds down so it does not overshoot it. This qualifies sampled finishing
+   to [0.001 mm, bit radius]. A tapered ball nose uses the same law with its
+   tip ball radius and samples a grid of at most a tenth of the tip diameter;
+   its flank lies below that sphere, so the planar cusp can only be lower, and
+   its whole flank constrains the tip (ADR-368). Flat bits use the larger of
+   0.05 mm and 40% of diameter. The grid attempts that resolved spacing and
+   its whole-row stride rounds down so it does not overshoot it. This qualifies sampled finishing
    vertices and planar cusp, not a continuous included-surface sweep or true
    along-surface scallop proof (ADR-292/294).
 3. Roughing still leaves its fixed 0.5 mm allowance (it exists FOR this
@@ -4059,9 +4103,10 @@ and lifts the command's CNC-only gate.)*
 
 #### Edge — flat reliefs / tiny scallop
 1. A flat surface skims at exactly its depth; scallop clamps to
-   [0.001 mm, bit radius]. Ball-nose spacing follows that clamped analytic
-   request; flat-tool row spacing retains its 0.05 mm floor. The established
-   Stepover editor and planner range remains 10–85%.
+   [0.001 mm, bit radius], the tip radius for a tapered ball nose. Ball-nose
+   spacing follows that clamped analytic request; flat-tool row spacing
+   retains its 0.05 mm floor. The established Stepover editor and planner
+   range remains 10–85%.
 2. Uniform and nonuniform object scale are resolved before sampling, cutter
    dilation, and row spacing. Mirror/rotation/translation are residual
    isometries. Partial terminal cells keep the exact requested interior pitch

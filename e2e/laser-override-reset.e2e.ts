@@ -34,7 +34,7 @@ test('a new raster job after Abort resets leftover overrides and burns its own s
 
   // Job 1, with the operator's live Feed/Power adjustment reported mid-run.
   await frameCurrentJob(page, kerfdesk);
-  await page.getByRole('button', { name: 'Start framed job', exact: true }).click();
+  await page.getByRole('button', { name: 'Start', exact: true }).click();
   const eventsBeforeJob1 = writeEvents(await kerfdesk.events()).length;
   await page
     .getByRole('dialog', { name: 'Review job before starting' })
@@ -70,7 +70,7 @@ test('a new raster job after Abort resets leftover overrides and burns its own s
     );
   }
   await frameCurrentJob(page, kerfdesk);
-  await page.getByRole('button', { name: 'Start framed job', exact: true }).click();
+  await page.getByRole('button', { name: 'Start', exact: true }).click();
   const review = page.getByRole('dialog', { name: 'Review job before starting' });
   await expect(review).toContainText('overrides reset to 100% at Start');
   const eventsBeforeStart = writeEvents(await kerfdesk.events()).length;
@@ -147,7 +147,7 @@ async function frameCurrentJob(page: Page, kerfdesk: KerfDeskFixture): Promise<v
     .poll(async () => serialWrites(await kerfdesk.events()).slice(before), { timeout: 60_000 })
     .toContain('$J=G90 G21');
   await kerfdesk.emitSerialLine('<Idle|MPos:0.000,0.000,0.000|WCO:0.000,0.000,0.000|FS:0,0>');
-  await expect(page.getByRole('button', { name: 'Start framed job', exact: true })).toBeEnabled({
+  await expect(page.getByRole('button', { name: 'Start', exact: true })).toBeEnabled({
     timeout: 60_000,
   });
 }

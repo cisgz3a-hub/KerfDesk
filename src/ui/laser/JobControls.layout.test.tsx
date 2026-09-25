@@ -27,10 +27,11 @@ describe('JobControls action hierarchy', () => {
     const view = await renderControls();
     try {
       expect(button(view.host, 'Preparing Frame…').disabled).toBe(true);
-      expect(button(view.host, 'Set up & Frame').disabled).toBe(true);
+      expect(button(view.host, 'Start').disabled).toBe(true);
       expect(view.host.textContent).toContain('Preparing the exact job for Frame…');
       await act(async () => useFramePreparationStore.setState({ pending: false }));
-      expect(button(view.host, 'Set up & Frame').disabled).toBe(false);
+      // Preparation ended without a permit: Start still waits for a Frame.
+      expect(button(view.host, 'Start').disabled).toBe(true);
       expect(button(view.host, 'Frame job')).toBeDefined();
     } finally {
       await view.unmount();
@@ -42,10 +43,8 @@ describe('JobControls action hierarchy', () => {
   it('orders the rail origin, then job actions, then placement, then the guide', async () => {
     const view = await renderControls();
     try {
-      expect(
-        precedes(button(view.host, 'Set origin here'), button(view.host, 'Set up & Frame')),
-      ).toBe(true);
-      expect(precedes(button(view.host, 'Set up & Frame'), startFrom(view.host))).toBe(true);
+      expect(precedes(button(view.host, 'Set origin here'), button(view.host, 'Start'))).toBe(true);
+      expect(precedes(button(view.host, 'Start'), startFrom(view.host))).toBe(true);
       expect(
         precedes(startFrom(view.host), button(view.host, 'Release motors to move by hand')),
       ).toBe(true);
@@ -54,12 +53,10 @@ describe('JobControls action hierarchy', () => {
     }
   });
 
-  it('leads the unframed job cluster with setup-and-Frame, Frame job, then Home', async () => {
+  it('leads the unframed job cluster with Start, Frame job, then Home', async () => {
     const view = await renderControls();
     try {
-      expect(precedes(button(view.host, 'Set up & Frame'), button(view.host, 'Frame job'))).toBe(
-        true,
-      );
+      expect(precedes(button(view.host, 'Start'), button(view.host, 'Frame job'))).toBe(true);
       // The default profile has homing off, so the home slot renders its
       // "Set up homing" entry; only the slot order is under test here.
       expect(precedes(button(view.host, 'Frame job'), button(view.host, 'Set up homing'))).toBe(
@@ -85,10 +82,7 @@ describe('JobControls action hierarchy', () => {
       // Placement leads the rail, so run status renders below the actions
       // that caused it — directly under Start/Frame, not above placement.
       expect(
-        precedes(
-          button(view.host, 'Set up & Frame'),
-          elementContaining(view.host, 'Framing exact job'),
-        ),
+        precedes(button(view.host, 'Start'), elementContaining(view.host, 'Framing exact job')),
       ).toBe(true);
     } finally {
       await view.unmount();
@@ -114,7 +108,7 @@ describe('JobControls action hierarchy', () => {
     try {
       expect(
         precedes(
-          button(view.host, 'Set up & Frame'),
+          button(view.host, 'Start'),
           elementContaining(view.host, 'Pause is feed hold only'),
         ),
       ).toBe(true);

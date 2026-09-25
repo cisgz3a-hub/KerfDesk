@@ -12,7 +12,7 @@ G4 P3.000
 ; cnc layer-id: L1
 ; cnc operation: v-carve; passes: 1
 ; cnc tool-id: v90
-; cnc tool-name: 90° v-bit
+; cnc tool-name: 90deg v-bit
 ; cnc tool: v-bit; diameter-mm: 6.000; angle-deg: 90.000
 ; cnc depth: per-pass-mm: 2.000
 ; cnc v-resolution-mm: auto

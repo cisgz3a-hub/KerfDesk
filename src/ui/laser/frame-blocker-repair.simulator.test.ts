@@ -33,6 +33,8 @@ import {
 } from './start-blocked-alarm-offers';
 import { SET_ORIGIN_OFFER_PROMPT } from './start-blocked-setup-offers';
 import { useStartBlockerStore } from './start-blocker-store';
+import { clearFrameExpiryNote } from './frame-expiry-note';
+import { FRAME_JOB_FIRST_MESSAGE } from './framed-run-readiness';
 import { runStartJobFlow } from './start-job-flow';
 import { runFrameNow } from './use-frame-action';
 import type * as OutputPreparationWorker from './output-preparation-worker-client';
@@ -58,6 +60,8 @@ beforeEach(() => {
   localStorage.clear();
   resetStore();
   useLaserStore.setState(initialLaserState());
+  // A permit expired by an earlier case leaves its reason for Start to show.
+  clearFrameExpiryNote();
   vi.mocked(jobAwareConfirm).mockReset().mockReturnValue(true);
   disposeReview = installAutoJobReview('confirm');
 });
@@ -126,7 +130,7 @@ function repository(): RecoveryRepository {
   });
 }
 
-describe('ordinary Frame and Start offer the in-place fixes', () => {
+describe('ordinary Frame offers the in-place fixes', () => {
   it('Frame in Alarm offers Home, homes, and completes the Frame', async () => {
     const sim = await connect(lineProject(true), { startFrom: 'absolute', anchor: 'front-left' }, [
       [22, '1'],
@@ -147,7 +151,7 @@ describe('ordinary Frame and Start offer the in-place fixes', () => {
     expect(useStartBlockerStore.getState().messages).toEqual([]);
   });
 
-  it('Start in Alarm on a machine without homing unlocks, then asks for a new origin', async () => {
+  it('Frame in Alarm on a machine without homing unlocks, then asks for a new origin', async () => {
     const sim = await connect(
       lineProject(false),
       { startFrom: 'user-origin', anchor: 'front-left' },
@@ -159,9 +163,9 @@ describe('ordinary Frame and Start offer the in-place fixes', () => {
     sim.triggerAlarm(3);
     await vi.advanceTimersByTimeAsync(1_500);
 
-    const starting = runStartJobFlow(repository());
+    const unlocking = runFrameNow();
     await vi.advanceTimersByTimeAsync(2_000);
-    await starting;
+    await unlocking;
 
     // Unlock does not restore the machine position, so the Frame stops with
     // the one next step instead of refusing for a position no report can give.
@@ -182,7 +186,7 @@ describe('ordinary Frame and Start offer the in-place fixes', () => {
     expect(useLaserStore.getState().framedRun).not.toBeNull();
   });
 
-  it('Start with User Origin and no origin offers Set origin here and frames from the head', async () => {
+  it('Frame with User Origin and no origin offers Set origin here and frames from the head', async () => {
     const sim = await connect(
       lineProject(false),
       { startFrom: 'user-origin', anchor: 'front-left' },
@@ -194,14 +198,34 @@ describe('ordinary Frame and Start offer the in-place fixes', () => {
     await useLaserStore.getState().jog({ dx: 120, dy: 80, feed: 1_000 });
     await vi.advanceTimersByTimeAsync(1_500);
 
-    const starting = runStartJobFlow(repository());
+    const framing = runFrameNow();
     await vi.advanceTimersByTimeAsync(12_000);
-    await starting;
+    await framing;
 
     expect(jobAwareConfirm).toHaveBeenCalledWith(SET_ORIGIN_OFFER_PROMPT);
     expect(sim.state().g92).toEqual({ x: 120, y: 80, z: 0 });
     expect(useLaserStore.getState().framedRun).not.toBeNull();
     expect(useStartBlockerStore.getState().messages).toEqual([]);
+  });
+
+  it('Start without a permit offers nothing and sends nothing; it points to Frame (ADR-372)', async () => {
+    const sim = await connect(lineProject(true), { startFrom: 'absolute', anchor: 'front-left' }, [
+      [22, '1'],
+      [32, '1'],
+    ]);
+    sim.triggerAlarm(3);
+    await vi.advanceTimersByTimeAsync(1_500);
+    const sentBefore = sim.outbound().join('');
+
+    const starting = runStartJobFlow(repository());
+    await vi.advanceTimersByTimeAsync(2_000);
+    await starting;
+
+    // Start is greyed out until a clean Frame; the fixes live on Frame job.
+    expect(jobAwareConfirm).not.toHaveBeenCalled();
+    expect(sim.outbound().join('').slice(sentBefore.length)).not.toMatch(/\$H|\$X/);
+    expect(useToastStore.getState().toasts.at(-1)?.message).toBe(FRAME_JOB_FIRST_MESSAGE);
+    expect(useLaserStore.getState().framedRun).toBeNull();
   });
 
   it('keeps the ordinary refusal when the operator declines the fix', async () => {
