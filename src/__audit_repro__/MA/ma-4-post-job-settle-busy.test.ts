@@ -160,8 +160,9 @@ describe('MA-4: Marlin post-job settle ignores busy keepalives', () => {
 
     const laser = useLaserStore.getState();
     // Current code: the M400 settle times out at 30 s while Marlin is still
-    // parking and printing `echo:busy: processing` every 2 s.
-    expect(laser.log.some((line) => /Post-job controller settle failed/.test(line))).toBe(false);
+    // parking and printing `echo:busy: processing` every 2 s; the run gets a
+    // controller-error notice and "completion settlement could not be confirmed".
+    expect(laser.safetyNotice).toBeNull();
     expect(laser.liveCanvasRun?.timing).toMatchObject({ kind: 'complete' });
   });
 });

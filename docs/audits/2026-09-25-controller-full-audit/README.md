@@ -70,10 +70,14 @@ To recreate them: `git clone https://github.com/<project>.git` and check out the
 
 ## If this session stops: continuing in a new session
 
-A track's findings reach the lead only when the track finishes. A track still marked
-"running" above has no saved report; its reproduction tests in `src/__audit_repro__/<ID>/` are
-kept. Re-run that track with `method.md` as its brief, after cloning the upstream sources at
-the revisions above into a scratch folder and pointing the brief's source root there.
+Each running track keeps `tracks/<ID>-partial.md` up to date with the findings it has so far
+and a "still to check" list; the lead commits and pushes those files with the reproduction
+tests in `src/__audit_repro__/<ID>/`. A finished track's report is `tracks/<ID>.md`.
+
+For a track that never finished: start from its `-partial.md` and its reproduction tests, re-run
+only its "still to check" items with `method.md` as the brief, then verify everything as for the
+finished tracks. Clone the upstream sources at the revisions above into a scratch folder first
+and point the brief's source root there.
 
 ## Remaining steps
 

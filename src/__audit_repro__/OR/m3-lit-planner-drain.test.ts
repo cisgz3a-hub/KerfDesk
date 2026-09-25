@@ -15,6 +15,11 @@
 //  - stepper.c:392-398: when the segment buffer empties, only a rate-adjusted
 //    (M4) block switches the PWM off; an M3 block leaves it on. st_go_idle()
 //    then holds for $1 ms (stepper.c:259-262; defaults.h:49 = 25 ms).
+//  - grblHAL core d7aaee3d: gcode.c:4121-4126 syncs the same S change, gcode.c:4411
+//    and coolant_control.c:57-67 sync coolant, coolant_control.c:45-53 then
+//    dwells `$673` (settings.h:457; 0 or 0.5-20 s) after turning coolant on, and
+//    stepper.c:566-573 switches the PWM off at an empty buffer only for
+//    rate-adjusted (M4) laser blocks. FluidNC v4.0.3 Stepper.cpp:234-240 is the same.
 //  - GRBL wiki "Grbl v1.1 Laser Mode": "Constant laser power mode simply keeps
 //    the laser power as programmed, regardless if the machine is moving,
 //    accelerating, or stopped." and, for CAM developers, "When using M3
@@ -142,6 +147,14 @@ describe('OR-1: M3 constant-power output never drains the planner with the beam 
   it('M8 air profile, two constant-power layers that differ in air assist', () => {
     const device: DeviceProfile = { ...DEFAULT_DEVICE_PROFILE, airAssistCommand: 'M8' };
     const job: Job = { groups: [square('A', 1, true), square('B', 1, false)] };
+    expect(litDrains(grblStrategy.emit(job, device))).toEqual([]);
+  });
+
+  it('M8 air profile, constant-power layer without air followed by one with air', () => {
+    // grblHAL applies its `$673` coolant on-delay (0.5-20 s, coolant_control.c:45-53)
+    // inside this drain, so the lit dwell lasts the whole delay there.
+    const device: DeviceProfile = { ...DEFAULT_DEVICE_PROFILE, airAssistCommand: 'M8' };
+    const job: Job = { groups: [square('A', 1, false), square('B', 1, true)] };
     expect(litDrains(grblStrategy.emit(job, device))).toEqual([]);
   });
 });

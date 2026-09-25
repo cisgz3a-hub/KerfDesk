@@ -1,27 +1,30 @@
-import { afterEach, beforeEach, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, it, vi } from 'vitest';
+import { writeFileSync } from 'node:fs';
 import { DEFAULT_DEVICE_PROFILE } from '../../core/devices';
 import { marlinStrategy } from '../../core/output/marlin-strategy';
 import { useLaserStore } from '../../ui/state/laser-store';
 import { startTestLaserJob } from '../../ui/state/laser-test-start-helpers';
+import { laserCountdownTestHandoff } from '../../ui/state/laser-countdown-test-handoff';
 import { createFifoMarlin } from './marlin-fifo-model';
 
 beforeEach(() => { vi.useFakeTimers(); vi.spyOn(console, 'error').mockImplementation(() => undefined); });
 afterEach(async () => { await useLaserStore.getState().disconnect(); vi.useRealTimers(); vi.restoreAllMocks(); });
 
-it('model: M410 + M5 I stops the beam promptly', async () => {
+it('explore fifo park', async () => {
+  const program = marlinStrategy.emit({ groups: [{ kind: 'cut', layerId: 'L1', color: '#f00', power: 50, speed: 300, passes: 1, airAssist: false, segments: [{ polyline: [{x:200,y:200},{x:260,y:200}], closed: false }] }] },
+    { ...DEFAULT_DEVICE_PROFILE, controllerKind: 'marlin', maxPowerS: 255, gcodeDialect: { dialectId: 'marlin-inline' } });
   const marlin = createFifoMarlin();
   await useLaserStore.getState().connect(marlin.adapter, { controllerKind: 'marlin', baudRate: 250000 });
   marlin.emitLine('start');
   await vi.advanceTimersByTimeAsync(1500);
-  const pts = [[50,50],[250,50],[250,55],[50,55],[50,60],[250,60],[250,65],[50,65],[50,70],[250,70]].map(([x,y]) => ({x: x!, y: y!}));
-  const program = marlinStrategy.emit({ groups: [{ kind: 'cut', layerId: 'L1', color: '#f00', power: 80, speed: 300, passes: 1, airAssist: false, segments: [{ polyline: pts, closed: false }] }] },
-    { ...DEFAULT_DEVICE_PROFILE, controllerKind: 'marlin', maxPowerS: 255, gcodeDialect: { dialectId: 'marlin-inline' } });
-  await startTestLaserJob(program, { streamingMode: 'ping-pong' });
-  await vi.advanceTimersByTimeAsync(5000);
-  const conn = await (await marlin.adapter.serial.requestPort()).open({ baudRate: 250000 });
-  const t0 = Date.now();
-  await conn.write('M410\nM5 I\n');
-  await vi.advanceTimersByTimeAsync(5 * 60_000);
-  expect(marlin.beamOnMsSince(t0)).toBeLessThan(500);
-  expect(marlin.state().plannedBlocks).toBe(0);
+  await startTestLaserJob(program, { streamingMode: 'ping-pong', ...laserCountdownTestHandoff({ gcode: program, retentionKey: 'x', capability: 'settle-only' }) });
+  const trace: string[] = [program];
+  for (let i = 0; i < 40; i++) {
+    await vi.advanceTimersByTimeAsync(5000);
+    const s = useLaserStore.getState();
+    trace.push(`t=${i*5+5}s streamer=${s.streamer?.status} op=${JSON.stringify(s.controllerOperation)} pending=${s.pendingUntrackedAcks} planned=${marlin.state().plannedBlocks} timing=${JSON.stringify(s.liveCanvasRun?.timing)} notice=${s.safetyNotice?.kind}`);
+  }
+  trace.push(JSON.stringify(useLaserStore.getState().log.slice(-12), null, 1));
+  trace.push(JSON.stringify(marlin.outbound()));
+  writeFileSync('/tmp/claude-0/-home-user-KerfDesk/e081095c-c1d0-530d-a0e1-2a645748ec6e/scratchpad/ma-fifo-park.txt', trace.join('\n'));
 });

@@ -40,6 +40,7 @@ import { useStore } from '../../ui/state/store';
 import { resetStore } from '../../ui/state/test-helpers';
 import { resolveLiveFramePlacement } from '../../ui/laser/camera-frame-placement';
 import { normalizeFrameWorkCoordinateSystem } from '../../ui/laser/frame-controller-readiness';
+import { currentWorkXy } from '../../ui/laser/frame-dispatch-support';
 
 beforeEach(() => {
   vi.useFakeTimers();
@@ -114,6 +115,56 @@ describe('CG-1: User Origin on a g92-only controller', () => {
     // Fails today: { ok: false, messages: ['The work origin is set, but the
     // controller has not reported where it is yet. ...'] }
     expect(placement.ok, JSON.stringify(placement)).toBe(true);
+  });
+});
+
+describe('CG-1: Smoothieware offset left on the board', () => {
+  it('Smoothieware: an Absolute Frame compensates the offset the board reports (MPos - WPos)', async () => {
+    const sim = await connectSmoothieIdle();
+    // A board that kept a G92 from an earlier session: Smoothieware keeps
+    // g92_offset through halt/M999 and host reconnects (Robot.cpp only resets it
+    // at boot or on G92.1, L123/L627). Its report shows the offset.
+    sim.port.emitLine(
+      '<Idle|MPos:110.0000,60.0000,0.0000|WPos:0.0000,0.0000,0.0000|F:4000.0,100.0>',
+    );
+    await pump(1);
+    useStore.setState({ jobPlacement: { startFrom: 'absolute', anchor: 'front-left' } });
+    const placement = resolveLiveFramePlacement(useStore.getState(), useLaserStore.getState());
+    // GRBL's WCO gets exactly this compensation (resolveAbsolute). Fails today:
+    // { ok: true } with no offset, so the Absolute job runs 110/60 mm off.
+    expect(placement, JSON.stringify(placement)).toMatchObject({
+      ok: true,
+      preflightMotionOffset: { x: 110, y: 60 },
+    });
+  });
+});
+
+describe('CG-1: Marlin after Set origin', () => {
+  it('Marlin: at least one placement mode can still Frame once an origin is set', async () => {
+    await connectMarlinIdle();
+    await settle(useLaserStore.getState().setOriginHere());
+    // A later Frame in the same session skips the G54 normalization (CG-2).
+    useLaserStore.setState({ activeWcs: 'G54' });
+    await pump(1_200); // a fresh M114 report after the G92
+    const laser = useLaserStore.getState();
+    expect(laser.workOriginActive).toBe(true);
+    const outcomes = (['absolute', 'current-position', 'user-origin', 'verified-origin'] as const).map(
+      (startFrom) => {
+        useStore.setState({ jobPlacement: { startFrom, anchor: 'front-left' } });
+        const placement = resolveLiveFramePlacement(useStore.getState(), laser);
+        // dispatchPreparedFrame refuses with FRAME_WORK_POSITION_UNKNOWN_MESSAGE
+        // when it cannot bind the Frame's return point.
+        const framePosition = currentWorkXy(laser);
+        return { startFrom, placement, framePosition };
+      },
+    );
+    // Fails today: absolute and current-position need a WCO, user-origin needs a
+    // WCO, and verified-origin resolves but has no work position (M114 carries
+    // no WCO and workOriginActive makes reportedWorkPositionMm return null).
+    expect(
+      outcomes.some((o) => o.placement.ok && o.framePosition !== undefined),
+      JSON.stringify(outcomes),
+    ).toBe(true);
   });
 });
 
