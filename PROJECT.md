@@ -142,7 +142,7 @@ Type and edit text directly on the canvas with the Text tool or **T**; live draf
   Grid arrays can advance variables per copy, persist each copy's sequence offset, and advance the
   cursor only after successful output under its configured policy (ADR-350, amending ADR-279).
   Live databases and circular variable imposition remain deferred.
-- Offline barcodes (ADR-372): QR Code, Data Matrix ECC 200, Code 128, Code 39, EAN-13, UPC-A and
+- Offline barcodes (ADR-386): QR Code, Data Matrix ECC 200, Code 128, Code 39, EAN-13, UPC-A and
   EAN-8 as merged, module-aligned outlines with exact quiet zones, invert for stock that marks
   light, sizing by module or overall width, and human-readable text under 1D codes. Barcode data
   can use the variable-text fields; output re-encodes it per copy and fails rather than engrave a
@@ -703,7 +703,7 @@ Reject any of these mid-development without a `PROJECT.md` revision and a `DECIS
   automatic macro triggers, and controller-program streaming outside the ordinary Start flow.
 - ~~Variable text (CSV / counter / date).~~ **Bounded offline fields shipped**; bounded offline sheet
   imposition is adopted for staged implementation (ADR-279). Live databases remain deferred
-  (ADR-164); offline barcode/QR generation shipped (ADR-372).
+  (ADR-164); offline barcode/QR generation shipped (ADR-386).
 - Host system-font enumeration. Explicitly imported user fonts are embedded in
   the project under fixed budgets and no longer depend on the host after save (ADR-164).
 

@@ -1,4 +1,4 @@
-// barcode-insert-mutation — commits a generated barcode (ADR-372). A new code
+// barcode-insert-mutation — commits a generated barcode (ADR-386). A new code
 // lands centred on the bed, unscaled, on its own Fill operation: only filled
 // modules scan, so the operation stays Fill even when the operator's layer
 // defaults would start it as a line. Editing replaces the code in place and

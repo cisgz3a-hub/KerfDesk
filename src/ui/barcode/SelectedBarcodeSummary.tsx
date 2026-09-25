@@ -1,4 +1,4 @@
-// SelectedBarcodeSummary — the artwork panel's barcode block (ADR-372): what
+// SelectedBarcodeSummary — the artwork panel's barcode block (ADR-386): what
 // the selected code encodes and how large it engraves, with the way back
 // into the barcode dialog. Barcodes re-encode rather than resize by field,
 // so the dialog, not inline fields, is where they change.

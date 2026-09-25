@@ -1,5 +1,5 @@
 // BarcodeDialogHost — mounts the barcode dialog for the open request
-// (ADR-372). Inserting starts from the last inserted settings; editing starts
+// (ADR-386). Inserting starts from the last inserted settings; editing starts
 // from the selected barcode and closes itself if that barcode disappears.
 
 import { useEffect, useMemo } from 'react';

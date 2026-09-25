@@ -1,4 +1,4 @@
-// Which barcode dialog is open (ADR-372): insert from the Tools menu or
+// Which barcode dialog is open (ADR-386): insert from the Tools menu or
 // toolbar, or edit from the properties panel or a double-click. Kept apart
 // from the project store because it is session chrome, not document state.
 // The last inserted settings seed the next insert, so a run of labels keeps

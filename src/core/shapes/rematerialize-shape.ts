@@ -5,7 +5,7 @@ import { createRectangle } from './primitives/create-rectangle';
 import { createStar } from './primitives/create-star';
 
 // Barcodes re-encode their data rather than resize by field, so they are not
-// parametric in this sense (ADR-372).
+// parametric in this sense (ADR-386).
 export type ParametricShapeSpec = Exclude<
   ShapeSpec,
   { readonly kind: 'polyline' } | { readonly kind: 'barcode' }

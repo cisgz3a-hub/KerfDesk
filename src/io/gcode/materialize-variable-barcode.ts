@@ -1,5 +1,5 @@
 // Output-time evaluation of a barcode whose data is a variable template
-// (ADR-372): the template is evaluated for this copy exactly like variable
+// (ADR-386): the template is evaluated for this copy exactly like variable
 // text, the symbol is re-encoded, and any human-readable text is drawn
 // through the same text renderer seam. A value the symbology cannot encode
 // fails the output instead of engraving the previous copy's code.

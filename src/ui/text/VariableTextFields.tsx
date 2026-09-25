@@ -7,7 +7,7 @@ export function VariableTextFields(props: {
   readonly enabled: boolean;
   readonly onEnabledChange: (enabled: boolean) => void;
   readonly onInsert: (source: string) => void;
-  /** Barcodes reuse these controls for their variable data (ADR-372). */
+  /** Barcodes reuse these controls for their variable data (ADR-386). */
   readonly label?: string;
 }): JSX.Element {
   const variables = useStore((state) => state.project.variables) ?? DEFAULT_PROJECT_VARIABLE_DATA;

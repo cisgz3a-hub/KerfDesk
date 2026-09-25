@@ -1,4 +1,4 @@
-// Barcode dialog form state (ADR-372). Numbers stay as typed until they
+// Barcode dialog form state (ADR-386). Numbers stay as typed until they
 // parse, and the preview evaluates variable data the way output does, so the
 // dialog shows the code the job would engrave, or the reason it cannot.
 

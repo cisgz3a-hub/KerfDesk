@@ -1,4 +1,4 @@
-// BarcodeFields — the barcode dialog's inputs (ADR-372): type, data with
+// BarcodeFields — the barcode dialog's inputs (ADR-386): type, data with
 // optional variable fields, error correction for QR Code, size, quiet zone,
 // invert and human-readable text. Fields a type does not use are hidden.
 

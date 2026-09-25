@@ -1,4 +1,4 @@
-// Validates a barcode shape spec (ADR-372) read from a .lf2 file. The saved
+// Validates a barcode shape spec (ADR-386) read from a .lf2 file. The saved
 // paths are the engraving authority, but the spec is what an edit or a
 // variable-data copy re-encodes, so every field must be in range.
 

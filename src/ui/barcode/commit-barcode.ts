@@ -1,4 +1,4 @@
-// Builds the barcode object from the dialog's result and commits it (ADR-372).
+// Builds the barcode object from the dialog's result and commits it (ADR-386).
 // Human-readable text is outlined with the bundled font through the same
 // renderer as variable text, so what is inserted is what output engraves.
 

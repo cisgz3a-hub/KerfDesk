@@ -2355,7 +2355,7 @@ settings and Job Review keep their existing read-only setup references.
   embedded record. This feature adds no live data source. Barcodes whose data uses variable
   fields take their own copy offset the same way (F-D7).
 
-### F-D7. Insert or edit a barcode or QR Code (ADR-372)
+### F-D7. Insert or edit a barcode or QR Code (ADR-386)
 
 **Success:**
 

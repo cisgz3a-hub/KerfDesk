@@ -1,4 +1,4 @@
-// BarcodeDialog — insert or edit a barcode (ADR-372). Every change re-encodes
+// BarcodeDialog — insert or edit a barcode (ADR-386). Every change re-encodes
 // the code for the live preview; invalid data shows why inline and disables
 // the action, so a wrong code is never inserted. Variable data previews the
 // value the next output would encode.

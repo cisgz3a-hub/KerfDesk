@@ -407,7 +407,7 @@ export type PolylineShape = {
   readonly closed: boolean;
 };
 
-// Generated barcode or 2D code (ADR-372). `data` is the literal content, or the
+// Generated barcode or 2D code (ADR-386). `data` is the literal content, or the
 // template source when `variableTemplate` is set; `paths` always encode one
 // evaluated value, and output re-evaluates variable data per copy.
 export type BarcodeSymbology =

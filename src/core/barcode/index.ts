@@ -1,4 +1,4 @@
-// core/barcode — offline barcode and 2D-code generation (ADR-372): QR Code,
+// core/barcode — offline barcode and 2D-code generation (ADR-386): QR Code,
 // Data Matrix ECC 200, Code 128, Code 39, EAN-13, UPC-A and EAN-8, laid out
 // as module-aligned outlines. Pure: no I/O; captions come through a renderer
 // the caller supplies.

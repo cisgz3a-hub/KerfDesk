@@ -1,4 +1,4 @@
-## ADR-372 - Offline barcode and QR Code generation (2026-09-24)
+## ADR-386 - Offline barcode and QR Code generation (2026-09-24)
 
 **Status:** Accepted. | **Date:** 2026-09-24
 

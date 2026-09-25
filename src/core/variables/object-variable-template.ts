@@ -1,5 +1,5 @@
 // Objects that carry variable data: text with a template, and barcodes whose
-// data is a template (ADR-372). Output, arrays and copy offsets go through
+// data is a template (ADR-386). Output, arrays and copy offsets go through
 // these helpers so both kinds re-evaluate per copy the same way.
 
 import type { Project, SceneObject, VariableTemplate } from '../scene';
