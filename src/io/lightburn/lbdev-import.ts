@@ -1,4 +1,10 @@
 import { DEFAULT_DEVICE_PROFILE, type DeviceProfile, type Origin } from '../../core/devices';
+import {
+  parsePositiveNumber,
+  type LightBurnDeviceParse,
+  type ParsedLightBurnDevice,
+} from './lbdev-device';
+import { parseLightBurnJsonDevice } from './lbdev-json';
 
 export type LightBurnImportReviewField = {
   readonly label: string;
@@ -24,19 +30,6 @@ export type LightBurnDeviceImportOptions = {
   readonly fileName?: string;
 };
 
-type ParsedLightBurnDevice = {
-  readonly name: string;
-  readonly controller?: string;
-  readonly width: number;
-  readonly height: number;
-  readonly originRaw?: string;
-  readonly origin: Origin | null;
-  readonly maxPowerS: number | null;
-  readonly startScript?: string;
-  readonly endScript?: string;
-  readonly isGrbl: boolean;
-};
-
 export function importLightBurnDeviceProfile(
   text: string,
   options: LightBurnDeviceImportOptions = {},
@@ -45,7 +38,7 @@ export function importLightBurnDeviceProfile(
     return {
       kind: 'unsupported-bundle',
       reason:
-        'LightBurn .lbzip bundles are not imported yet. Export a legacy .lbdev device instead.',
+        'LightBurn .lbzip bundles are not imported yet. Export the device as a .lbdev file instead.',
     };
   }
 
@@ -63,11 +56,12 @@ export function importLightBurnDeviceProfile(
   };
 }
 
-function parseLightBurnDevice(
-  text: string,
-):
-  | { readonly kind: 'ok'; readonly device: ParsedLightBurnDevice }
-  | { readonly kind: 'invalid'; readonly reason: string } {
+// LightBurn writes device files as JSON; the older XML form is still read.
+function parseLightBurnDevice(text: string): LightBurnDeviceParse {
+  return parseLightBurnJsonDevice(text) ?? parseLightBurnXmlDevice(text);
+}
+
+function parseLightBurnXmlDevice(text: string): LightBurnDeviceParse {
   const name =
     extractFirst(text, ['Name', 'DeviceName', 'DisplayName']) ?? 'Imported LightBurn device';
   const controller = extractFirst(text, ['Controller', 'ControllerType', 'DeviceType', 'Type']);
@@ -114,13 +108,15 @@ function lightBurnProfile(
     bedHeight: device.height,
     maxPowerS: device.maxPowerS ?? DEFAULT_DEVICE_PROFILE.maxPowerS,
     origin: device.origin ?? DEFAULT_DEVICE_PROFILE.origin,
+    ...(device.baudRate === undefined ? {} : { baudRate: device.baudRate }),
+    ...(device.airAssistCommand === undefined ? {} : { airAssistCommand: device.airAssistCommand }),
     scanningOffsets: [],
     noGoZones: [],
     evidence: [
       {
         label: 'LightBurn .lbdev import',
         status: 'user-imported',
-        note: `Imported from ${options.fileName ?? 'legacy .lbdev text'}; review before first job.`,
+        note: `Imported from ${options.fileName ?? 'LightBurn .lbdev text'}; review before first job.`,
       },
     ],
   };
@@ -156,11 +152,52 @@ function appliedLightBurnFields(device: ParsedLightBurnDevice): LightBurnImportR
       ? [{ label: 'Origin', value: device.originRaw }]
       : []),
     ...(device.maxPowerS !== null ? [{ label: 'Max S', value: String(device.maxPowerS) }] : []),
+    ...(device.baudRate === undefined
+      ? []
+      : [{ label: 'Baud rate', value: String(device.baudRate) }]),
+    ...(device.airAssistCommand === undefined
+      ? []
+      : [
+          {
+            label: 'Air assist',
+            value: device.airAssistCommand,
+            note: 'Sent only for layers with air assist on, as LightBurn does.',
+          },
+        ]),
   ];
 }
 
 function reviewLightBurnFields(device: ParsedLightBurnDevice): LightBurnImportReviewField[] {
-  return [...controllerReview(device), ...originReview(device), ...maxPowerReview(device)];
+  return [
+    ...controllerReview(device),
+    ...originReview(device),
+    ...maxPowerReview(device),
+    ...jogReview(device),
+    ...deviceCountReview(device),
+  ];
+}
+
+// OR-4: xTool's own file sets this; the firmware's `$J=` handling is not public.
+function jogReview(device: ParsedLightBurnDevice): LightBurnImportReviewField[] {
+  if (device.jogCommandDisabled !== true) return [];
+  return [
+    {
+      label: 'Jogging',
+      value: 'EnableGrblJCommand: false',
+      note: 'LightBurn does not jog this machine with $J=. KerfDesk Jog and Frame use $J=: if they fail with an error, this firmware is not compatible with $J= jogging.',
+    },
+  ];
+}
+
+function deviceCountReview(device: ParsedLightBurnDevice): LightBurnImportReviewField[] {
+  if (device.deviceCount === undefined) return [];
+  return [
+    {
+      label: 'Devices in file',
+      value: String(device.deviceCount),
+      note: 'Only the first device was imported.',
+    },
+  ];
 }
 
 function controllerReview(device: ParsedLightBurnDevice): LightBurnImportReviewField[] {
@@ -231,14 +268,6 @@ function extractFirst(text: string, tags: ReadonlyArray<string>): string | undef
     }
   }
   return undefined;
-}
-
-function parsePositiveNumber(value: string | undefined): number | null {
-  if (value === undefined) return null;
-  const match = /-?\d+(?:\.\d+)?/.exec(value);
-  if (match === null) return null;
-  const parsed = Number(match[0]);
-  return Number.isFinite(parsed) && parsed > 0 ? parsed : null;
 }
 
 function mapOrigin(value: string | undefined): Origin | null {
