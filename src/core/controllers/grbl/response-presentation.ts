@@ -148,5 +148,5 @@ export function presentAlarm(
   code: number,
 ): AlarmPresentation | null {
   if (controllerKind === 'fluidnc') return FLUIDNC_ALARMS.get(code) ?? null;
-  return describeAlarm(code);
+  return describeAlarm(code, controllerKind === 'grblhal' ? 'grblhal' : 'grbl');
 }

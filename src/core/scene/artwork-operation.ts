@@ -187,6 +187,7 @@ function shapeName(kind: string): string {
   if (kind === 'ellipse') return 'Ellipse';
   if (kind === 'polygon') return 'Polygon';
   if (kind === 'star') return 'Star';
+  if (kind === 'barcode') return 'Barcode';
   return 'Polyline';
 }
 

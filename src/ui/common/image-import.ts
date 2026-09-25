@@ -2,10 +2,11 @@ import type { Bounds } from '../../core/scene';
 import type { ImageDensity } from './image-density';
 
 const MM_PER_INCH = 25.4;
-// ADR-048: a metadata-less bitmap imports at LightBurn's reference 254 DPI
-// (0.1 mm/pixel) so a 1000 px image lands at 100 mm, matching what a LightBurn
-// switcher expects. This is the BITMAP default only; SVG px stay 96 DPI per
-// ADR-046 (that is LightBurn's separate SVG-import convention).
+// ADR-048: a metadata-less bitmap imports at 254 DPI (0.1 mm/pixel) so a
+// 1000 px image lands at 100 mm. This is KerfDesk's own choice, not LightBurn
+// parity: LightBurn staff say "There isn't a default DPI for images - that
+// setting is for SVG files only" (forum thread 173939). This is the BITMAP
+// default only; SVG px stay 96 DPI per ADR-046.
 const DEFAULT_DPI = 254;
 
 export type RasterImportGeometryInput = {

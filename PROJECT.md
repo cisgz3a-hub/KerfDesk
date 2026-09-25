@@ -141,7 +141,12 @@ Type and edit text directly on the canvas with the Text tool or **T**; live draf
 - Bounded offline variable text supports embedded CSV, serial, date/time, and cut-setting fields.
   Grid arrays can advance variables per copy, persist each copy's sequence offset, and advance the
   cursor only after successful output under its configured policy (ADR-350, amending ADR-279).
-  Live databases, circular variable imposition and barcode/QR generation remain deferred.
+  Live databases and circular variable imposition remain deferred.
+- Offline barcodes (ADR-386): QR Code, Data Matrix ECC 200, Code 128, Code 39, EAN-13, UPC-A and
+  EAN-8 as merged, module-aligned outlines with exact quiet zones, invert for stock that marks
+  light, sizing by module or overall width, and human-readable text under 1D codes. Barcode data
+  can use the variable-text fields; output re-encodes it per copy and fails rather than engrave a
+  code for the wrong value.
 
 ### Phase E — v0.5 "Image vectorize" [Shipped]
 
@@ -633,7 +638,7 @@ an assumption that every folder must have an `index.ts`.
   true }` and the existing reference-removal hook.
 - **Imported raster images (Phase E)** decoded inside a sandbox. Memory-bounded.
 - **Bundled fonts (Phase D)** stay in managed code: TTF outlines use `opentype.js`; pinned SVG centerline glyph data uses the pure TypeScript stroke parser. They are never passed to native font APIs.
-- **Electron hardening:** `contextIsolation: true`, `nodeIntegration: false`, `sandbox: true`. No preload and no IPC handlers (`ipcMain` surface). The notify-only Preview checker is one exact GET-only `app://app/api/desktop-preview-update` route, so the renderer retains `connect-src 'self'`; main performs the pinned GitHub metadata request and returns only `{ kind, version }`. `setPermissionRequestHandler` returns `false` except for `serial`, any `fileSystem*` permission (File System Access API in Electron 33+ — see commit `2965bd0`), `media` (video-only, main-frame, trusted origin — audio is denied; the machine-camera capability, ADR-107/108), and `screen-wake-lock` (holds the display awake during a job, ADR-117). CSP via `session.webRequest.onHeadersReceived` (F-9 audit fix).
+- **Electron hardening:** `contextIsolation: true`, `nodeIntegration: false`, `sandbox: true`. No preload and no IPC handlers (`ipcMain` surface). The notify-only Preview checker is one exact GET-only `app://app/api/desktop-preview-update` route, so the renderer retains `connect-src 'self'`; main performs the pinned GitHub metadata request and returns only `{ kind, version }`. Project files the operating system hands over (double-click, second launch, command line; ADR-378) use three more exact GET-only `app://app/api/desktop-project-*` routes: the renderer can read back only a path the operating system gave main, carrying main's per-install HMAC token for that exact path, and every read re-checks a canonical path to a regular file with a project extension. `setPermissionRequestHandler` returns `false` except for `serial`, any `fileSystem*` permission (File System Access API in Electron 33+ — see commit `2965bd0`), `media` (video-only, main-frame, trusted origin — audio is denied; the machine-camera capability, ADR-107/108), and `screen-wake-lock` (holds the display awake during a job, ADR-117). CSP via `session.webRequest.onHeadersReceived` (F-9 audit fix).
 - **Web hardening:** strict CSP, no inline scripts, no third-party CDNs.
 - **G-code preamble/postamble hard-coded.** `G21`, `G90`, `M3 S0` start (arm at zero power — laser-off in laser mode; primes $32=0 controllers, see grbl-strategy.ts); `M5`, park at end.
 - **No auto-update from arbitrary or unsigned channels.** The production desktop `electron-updater` feed is pinned at build time to our own `https://dl.kerfdesk.com/desktop/` origin and remains inert until production code signing is operational (ADR-024/135). Preview updater trust stays false and no unsigned executable is downloaded or run. Its separate checker accepts only a newer strict Preview tag reported by a completed, successful run of the exact Preview release workflow; that workflow's final job verifies the immutable six-asset release, checksums, manifest, and attestations. The app then shows a passive status-bar link to that exact version's public `https://github.com/cisgz3a-hub/KerfDesk/releases/tag/v<version>` page. API-provided URLs are ignored. No `quitAndInstall`; future trusted updates apply on natural quit only. Ordinary desktop close/quit waits for the application's stop handoff during an active job. Transport completion is not physical stop confirmation; forced termination, operating-system shutdown and controller behaviour require separate qualification (WORKFLOW F-DESK2).
@@ -665,7 +670,7 @@ Reject any of these mid-development without a `PROJECT.md` revision and a `DECIS
 - ~~Camera alignment, overhead camera.~~ **Scoped by ADR-107** (Camera Mode —
   staged v1 manual 4-point overlay → v2 lens calibration → v3 fiducial /
   print-and-cut → v4 capture-to-trace) — no longer out of scope.
-- ~~Rotary attachment.~~ **Scoped and shipped software-side by ADR-127/160/315**; hardware remains CLAIMED. Rotary G-code output is independent of workstation-local Labs state, while exact active-rotary raster jobs disclose the still-unqualified physical factors in Job Review.
+- ~~Rotary attachment.~~ **Scoped and shipped software-side by ADR-127/160/315/373**; hardware remains CLAIMED. Rotary G-code output is independent of workstation-local Labs state, while exact active-rotary raster jobs disclose the still-unqualified physical factors in Job Review. A roller may scale Y from its measured roller diameter, Rotary Setup can turn the part one revolution with the laser off to check the setup, and a Rotary switch beside Frame and Start shows and toggles the active mapping (ADR-373).
 - Auto-focus, Z-axis control beyond initial homing — **laser mode only**.
   Phase H CNC router mode is inherently Z-aware (plunges, depth passes,
   safe-Z retracts) — ADR-098.
@@ -699,8 +704,8 @@ Reject any of these mid-development without a `PROJECT.md` revision and a `DECIS
 - Multi-command macros, scripting, command palette, plugins, extensions, macro import/export,
   automatic macro triggers, and controller-program streaming outside the ordinary Start flow.
 - ~~Variable text (CSV / counter / date).~~ **Bounded offline fields shipped**; bounded offline sheet
-  imposition is adopted for staged implementation (ADR-279). Live databases and barcode/QR
-  generation remain deferred (ADR-164).
+  imposition is adopted for staged implementation (ADR-279). Live databases remain deferred
+  (ADR-164); offline barcode/QR generation shipped (ADR-386).
 - Host system-font enumeration. Explicitly imported user fonts are embedded in
   the project under fixed budgets and no longer depend on the host after save (ADR-164).
 

@@ -123,6 +123,7 @@ export function optionalRotarySetup(obj: Record<string, unknown>, path: string):
     requireLiteral(value, `${path}.type`, ['roller', 'chuck']),
     requirePositiveNumber(value, `${path}.mmPerRotation`),
     requirePositiveNumber(value, `${path}.objectDiameterMm`),
+    optionalPositiveNumber(value, `${path}.rollerDiameterMm`),
     optionalBoolean(value, `${path}.reverseAxis`),
   ]);
 }

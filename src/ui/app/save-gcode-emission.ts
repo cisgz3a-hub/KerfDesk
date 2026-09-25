@@ -25,6 +25,7 @@ import {
   hydratePagedRasterProject,
   projectHasPagedRasterAssets,
 } from '../import/paged-raster-hydration';
+import { projectHasVariableData } from '../../core/variables/object-variable-template';
 
 /**
  * Builds the ordinary Save output and preserves preparation failure in the
@@ -135,7 +136,5 @@ async function prepareSaveDirect(
 }
 
 function hasVariableText(project: Project): boolean {
-  return project.scene.objects.some(
-    (object) => object.kind === 'text' && object.variableTemplate !== undefined,
-  );
+  return projectHasVariableData(project);
 }

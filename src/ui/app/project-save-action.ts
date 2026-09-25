@@ -13,6 +13,7 @@ import {
   type SaveProjectOutcome,
 } from './project-save-completion';
 import { handleSalvageExportProject } from './salvage-export';
+import { rememberRecentProject } from '../recent-projects/recent-project-record';
 
 export type SaveProjectCtx = Omit<ProjectSaveOwner, 'projectSaveRequestEpoch'> & {
   readonly platform: PlatformAdapter;
@@ -47,13 +48,25 @@ export async function handleSaveProject(
       await writeOwner.write(targetResult.target, prepared.json, (error) =>
         reportProjectSaveRestoreFailure(owner, targetResult.target, error),
       );
-      return completeProjectSave(owner, targetResult.target, reuseTarget);
+      const outcome = completeProjectSave(owner, targetResult.target, reuseTarget);
+      rememberSavedProject(ctx.platform, targetResult.target, outcome);
+      return outcome;
     } catch (err) {
       return failProjectSave(owner, errorMessage(err));
     }
   } finally {
     writeOwner.release();
   }
+}
+
+// The captured bytes reached the file in both outcomes, newer edits or not.
+function rememberSavedProject(
+  platform: PlatformAdapter,
+  target: SaveTarget,
+  outcome: SaveProjectOutcome,
+): void {
+  if (outcome !== 'saved' && outcome !== 'saved-with-newer-edits') return;
+  rememberRecentProject(platform, { name: target.displayName, recentRef: target.recentRef });
 }
 
 async function reportProjectSaveRestoreFailure(

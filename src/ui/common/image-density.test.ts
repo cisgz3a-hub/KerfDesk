@@ -122,6 +122,11 @@ describe('densityFromBytes', () => {
     });
   });
 
+  it('ignores EXIF resolution with no absolute unit (ResolutionUnit 1)', () => {
+    // ExifTool EXIF tags: ResolutionUnit "1 = None, 2 = inches, 3 = cm".
+    expect(densityFromBytes(jpegWithExif(300, 300, 1))).toBeNull();
+  });
+
   it('converts EXIF cm units to DPI', () => {
     // 118 dots/cm * 2.54 = 299.72 -> 300
     expect(densityFromBytes(jpegWithExif(118, 118, 3))).toEqual({ xDpi: 300, yDpi: 300 });

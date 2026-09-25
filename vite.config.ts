@@ -83,6 +83,12 @@ export default defineConfig({
         background_color: '#f8fafc',
         display: 'standalone',
         start_url: '.',
+        // Installed from a Chromium desktop browser, the app opens .lf2
+        // projects from the file manager (ADR-378). The open window takes the
+        // file through launchQueue instead of a second copy starting. Other
+        // browsers ignore both members. LightBurn's types stay LightBurn's.
+        file_handlers: [{ action: '.', accept: { 'application/x-kerfdesk-project': ['.lf2'] } }],
+        launch_handler: { client_mode: 'focus-existing' },
         icons: [
           { src: 'favicon.svg', sizes: 'any', type: 'image/svg+xml', purpose: 'any' },
           {

@@ -207,7 +207,7 @@ describe('MaterialLibraryPanel', () => {
       expect(
         state.materialLibrary?.entries.find((entry) => entry.id.includes('clear-acrylic'))
           ?.description,
-      ).toMatch(/not recommended/i);
+      ).toMatch(/cannot cut or engrave clear acrylic/i);
       expect(state.materialLibraryDirty).toBe(false);
     } finally {
       await unmount(root, host);

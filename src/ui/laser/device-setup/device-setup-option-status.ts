@@ -3,6 +3,7 @@
 // without opening the section (ADR-240).
 
 import { profileSupportsCapability, type DeviceProfile } from '../../../core/devices';
+import { rotaryAttachmentSummary } from '../rotary-summary';
 
 export function noGoZoneStatus(profile: DeviceProfile): string {
   const zones = profile.noGoZones;
@@ -46,8 +47,7 @@ export function autofocusStatus(profile: DeviceProfile): string {
 export function rotaryStatus(profile: DeviceProfile): string {
   const rotary = profile.rotary;
   if (rotary === undefined || !rotary.enabled) return 'Off';
-  const type = rotary.type === 'roller' ? 'Roller' : 'Chuck';
-  return `${type}, Ø${rotary.objectDiameterMm} mm`;
+  return rotaryAttachmentSummary(rotary);
 }
 
 export function cameraStatus(profile: DeviceProfile): string {

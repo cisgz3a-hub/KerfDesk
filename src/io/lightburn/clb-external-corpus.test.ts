@@ -1,6 +1,7 @@
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { describe, expect, it } from 'vitest';
+import { deserializeMaterialLibrary, serializeMaterialLibrary } from '../material-library';
 import { importLightBurnClb } from './clb-import';
 
 const FIXTURE_ROOT = resolve(process.cwd(), 'src/__fixtures__/lightburn/external/clb');
@@ -28,6 +29,11 @@ describe('external LightBurn CLB compatibility corpus', () => {
       expect(first.report.warnings).toEqual([]);
       expect(first.report.unknownFields).toContain(unknownField);
       expect(first.report.unknownFields).toEqual([...first.report.unknownFields].sort());
+      // Real libraries include Thickness="-1" entries; the imported library must
+      // survive a save and reopen instead of being dropped on restart.
+      expect(deserializeMaterialLibrary(serializeMaterialLibrary(first.library))).toMatchObject({
+        kind: 'ok',
+      });
     },
   );
 

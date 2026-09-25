@@ -22,6 +22,7 @@ export type CommandFamily = (typeof COMMAND_FAMILY_ORDER)[number];
 export type CommandId =
   | 'file.new'
   | 'file.open'
+  | 'file.open-recent'
   | 'file.save'
   | 'file.save-as'
   | 'file.import'
@@ -52,6 +53,7 @@ export type CommandId =
   | 'tools.place-board'
   | 'tools.camera'
   | 'tools.box-generator'
+  | 'tools.barcode'
   | 'tools.box-fit-test'
   | 'tools.material-test'
   | 'tools.interval-test'
@@ -171,6 +173,8 @@ export type AppCommandContext = {
   readonly confirmDiscard: (action: string) => Promise<boolean>;
   readonly newProject: () => void;
   readonly openProject: () => void;
+  // Recent Projects manager (ADR-378); the File menu also lists entries inline.
+  readonly openRecentProjects: () => void;
   readonly saveProject: () => void;
   readonly saveProjectAs: () => void;
   readonly importArtwork: () => void;
@@ -205,6 +209,7 @@ export type AppCommandContext = {
   readonly cameraPanelOpen: boolean;
   readonly toggleCameraPanel: () => void;
   readonly boxGenerator: () => void;
+  readonly barcodeGenerator: () => void;
   readonly boxFitTest: () => void;
   readonly materialTest: () => void;
   readonly intervalTest: () => void;

@@ -11,6 +11,7 @@ export type CommandShellCallbacks = {
   /** Open the ADR-255 G-code Inspector without forcing a file read on the UI thread. */
   readonly requestGcodeInspector: (programName: string, source: GcodeInspectionSource) => void;
   readonly requestBoxGenerator: () => void;
+  readonly requestBarcodeGenerator: () => void;
   readonly requestBoxFitTest: () => void;
   readonly requestMaterialTest: () => void;
   readonly requestIntervalTest: () => void;

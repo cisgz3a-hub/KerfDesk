@@ -407,8 +407,49 @@ export type PolylineShape = {
   readonly closed: boolean;
 };
 
+// Generated barcode or 2D code (ADR-386). `data` is the literal content, or the
+// template source when `variableTemplate` is set; `paths` always encode one
+// evaluated value, and output re-evaluates variable data per copy.
+export type BarcodeSymbology =
+  | 'qr'
+  | 'data-matrix'
+  | 'code128'
+  | 'code39'
+  | 'ean13'
+  | 'upca'
+  | 'ean8';
+
+export type BarcodeShape = {
+  readonly kind: 'barcode';
+  readonly symbology: BarcodeSymbology;
+  readonly data: string;
+  readonly variableTemplate?: VariableTemplate;
+  // QR Code error-correction level; other symbologies ignore it.
+  readonly errorCorrection: 'L' | 'M' | 'Q' | 'H';
+  // 'module' keeps moduleMm; 'width' derives the module from widthMm, which
+  // includes the quiet zones. Either way modules stay equal-sized.
+  readonly sizeMode: 'module' | 'width';
+  readonly moduleMm: number;
+  readonly widthMm: number;
+  // Bar height of 1D symbols, human-readable text excluded.
+  readonly barHeightMm: number;
+  // Light margin around the symbol, in modules.
+  readonly quietZoneModules: number;
+  // Engrave the light modules and quiet zone (dark stock such as anodised
+  // aluminium or slate) instead of the dark modules.
+  readonly invert: boolean;
+  // Human-readable text under 1D symbols.
+  readonly showText: boolean;
+};
+
 // The parametric block.
-export type ShapeSpec = RectangleShape | EllipseShape | PolygonShape | StarShape | PolylineShape;
+export type ShapeSpec =
+  | RectangleShape
+  | EllipseShape
+  | PolygonShape
+  | StarShape
+  | PolylineShape
+  | BarcodeShape;
 
 export type ShapeObject = ObjectPowerScale & {
   readonly kind: 'shape';

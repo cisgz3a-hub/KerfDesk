@@ -9,6 +9,7 @@ import {
   type ProjectVariableData,
   type SceneObject,
 } from '../scene';
+import { objectVariableTemplate } from './object-variable-template';
 import { advanceVariableSequence, resolveVariableSequence } from './sequence';
 
 /** Same result as repeated Next, without work proportional to a persisted offset. */
@@ -49,7 +50,7 @@ function wrapped(current: number, delta: bigint, start: number, end: number): nu
 }
 
 export function variableCopyOffset(object: SceneObject): number | undefined {
-  return object.kind === 'text' ? object.variableTemplate?.sequenceOffset : undefined;
+  return objectVariableTemplate(object)?.sequenceOffset;
 }
 
 /** Shared text fields and same-value duplicates consume one slot, not one object. */
@@ -63,7 +64,7 @@ export function nextProjectVariableSequence(
     .flatMap(outputOperationLayers)
     .filter((layer) => layer.mode !== 'image');
   for (const object of scene.objects) {
-    if (object.kind !== 'text' || object.variableTemplate === undefined) continue;
+    if (objectVariableTemplate(object) === undefined) continue;
     if (!operations.some((operation) => sceneObjectUsesOperation(object, operation))) continue;
     steps = Math.max(steps, (variableCopyOffset(object) ?? 0) + 1);
   }

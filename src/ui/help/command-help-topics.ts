@@ -88,6 +88,10 @@ export const COMMAND_HELP: Readonly<Record<CommandId, CommandHelpTopic>> = {
     family: 'tools',
     tooltip: 'Generate a finger-joint box as cut-ready panels.',
   },
+  'tools.barcode': {
+    family: 'tools',
+    tooltip: 'Insert a QR Code, Data Matrix or 1D barcode as engravable outlines.',
+  },
   'tools.box-fit-test': {
     family: 'tools',
     tooltip: 'Generate fit test strips to calibrate joint clearance.',

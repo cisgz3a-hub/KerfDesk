@@ -73,7 +73,9 @@ export const CNC_MACHINE_STARTER_CATALOG: ReadonlyArray<CncMachineStarter> = [
       },
       {
         label: 'Neotronics 500 W spindle specification',
-        url: 'https://neotronics.co.za/index.php?limit=25&order=ASC&path=113_115&product_id=297&route=product%2Fproduct&sort=p.price',
+        // The category-listing form of this link (limit/order/path/sort) opened
+        // the 4040 Max page instead of the spindle when rechecked on 2026-09-24.
+        url: 'https://neotronics.co.za/index.php?product_id=297&route=product%2Fproduct',
         supports: '12,000 RPM maximum for the assumed 500 W spindle variant, not all bundles',
       },
       {

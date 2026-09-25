@@ -89,7 +89,7 @@ describe('buildAppCommands', () => {
       (command) => command.family === 'file',
     );
 
-    expect(commands).toHaveLength(13);
+    expect(commands).toHaveLength(14);
     for (const command of commands) {
       expect(command.enabled, command.id).toBe(true);
       expect(command.disabledReason, command.id).toBeUndefined();
