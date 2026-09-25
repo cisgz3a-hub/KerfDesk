@@ -1,7 +1,9 @@
 // Exploration helper for audit track RU (not a regression test): dumps the
 // bytes KerfDesk's .rd encoder produces for a few jobs so they can be decoded
-// by meerk40t's own rdjob.py in the scratchpad. Writes only to the scratchpad.
-import { writeFileSync } from 'node:fs';
+// by meerk40t's own rdjob.py (scratchpad RU/decode_with_m40t.py). Writes only
+// to the audit scratchpad and skips itself anywhere that directory is absent.
+import { existsSync, writeFileSync } from 'node:fs';
+import { dirname } from 'node:path';
 import { it } from 'vitest';
 import { encodeRdJob } from '../../core/controllers/ruida';
 import { profileCatalogEntryById } from '../../core/devices/profile-catalog';
@@ -96,7 +98,7 @@ function lineProject(): Project {
   };
 }
 
-it('dumps KerfDesk .rd bytes for decoding with meerk40t', () => {
+it.skipIf(!existsSync(dirname(OUT)))('dumps KerfDesk .rd bytes for decoding with meerk40t', () => {
   if (ruida === undefined) throw new Error('missing ruida profile');
   const device = ruida.profile;
   const out: Record<string, unknown> = {};
