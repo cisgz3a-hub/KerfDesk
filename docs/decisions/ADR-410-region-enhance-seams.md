@@ -70,9 +70,15 @@ on the pale-stroke case it shared no ink with it.
    The field names follow `sourceHasTransparency`: internal verdicts carried with one execution's
    derived options. `resolveTraceSourceOptions` itself cannot compute them, because they need the
    `trace-image` preprocessing chain and `trace-image` imports `trace-alpha` (`import/no-cycle`).
-2. **Both passes use the frozen options.** `traceImageWithBoundaryMode` resolves them once for
-   Enhance and passes them to the full trace and to `enhanceRegionPaths`, which resolves again
-   (idempotent) for callers that pass raw options. Crop mode is unchanged.
+2. **Both passes use the frozen options, resolved off the UI thread.** For Enhance,
+   `traceImageWithBoundaryMode` asks the full pass for them (`freezeSourceDecisions` on the trace
+   request). The trace worker, or the inline fallback, which is bounded to 160 000 px, resolves
+   them next to the trace, traces with them and returns them as `sourceOptions`. The zero-paths
+   retry relaxes those resolved options and still returns the unrelaxed ones. They then go to
+   `enhanceRegionPaths`, which resolves again for callers that pass raw options; on resolved
+   options that is a no-op (under 0.01 ms at 2048 x 2048). The dialog keeps the last answer per
+   decoded image and settings, so dragging or resizing the box reuses it and any settings change
+   resolves again. Crop mode is unchanged.
 3. **The crop is padded with real pixels.** The box grows by the widest neighbourhood a lane reads,
    in this image's pixels, plus 1 for bilinear reach: 8 x `pixelScale` (the sketch, auto-detail and
    faint-line window, which also covers the 3x3 median and the automatic median's two-link check),
@@ -105,11 +111,26 @@ on the pale-stroke case it shared no ink with it.
   and laser conditioning (ADR-391) see the same curves inside and outside the box.
 - The crop is up to 2 x (8 x `pixelScale` + 1) px wider and taller (2 x 33 px for Edge Detection at
   its widest), which counts against the 2x pixel budget.
-- Resolving the decisions runs on the UI thread before the worker traces. In a Node harness on a
-  1254 x 1254 image it took 3 to 20 ms for Line Art, 63 to 93 ms for Sharp and Centerline, and 400
-  to 524 ms for Smooth, whose automatic median is part of the Otsu chain.
+- Resolving the decisions adds work to the full pass, in the worker, not on the UI thread. In a
+  Node harness on a 1254 x 1254 image it took 3 to 20 ms for Line Art, 63 to 93 ms for Sharp and
+  Centerline, and 400 to 524 ms for Smooth, whose automatic median is part of the Otsu chain. At
+  the 2048 px preview limit it took 16 ms (Line Art), 82 to 90 ms (Sharp, Centerline) and 796 ms
+  (Smooth); review measured about 1.7 s for Smooth at 4000 x 3000. A superseded preview retires the worker, so
+  this work is cancelled with the trace. Moving the box does not repeat it.
+- The crop's context ring is what keeps its edge pixels right. With Line Art's detail mask, pale
+  strokes just inside the box and dark blocks 3 px outside it: the crop's mask matches the full
+  image's 2x mask exactly in the box's outer 4 px and 16 px rings (2x grid) with the padding, and
+  at IoU 0.26 and 0.75 without it. Sharp, Smooth (median forced on) and Centerline showed no
+  difference on that art or on a dark hatch straddling the box edge.
 - The automatic median's gate (impulse ratio) is still decided per image, as are the zero-paths
   retries, which the two passes take independently.
+- The border pairing only covers a shape both passes trace within 1 px of each other, inside the
+  1 px band around the interior border. A shape the 2x pass resolves differently there (a blob
+  that splits at 2x, or an original crossing the border by more than 1 px) still follows
+  containment and can be doubled or lost.
 - Tests: `region-enhance-seams.test.ts` (Otsu over a ramp for Sharp, Smooth and Centerline;
-  auto-sketch both ways; curves byte-identical outside the box; operationIds; grazing-disc census),
-  `trace-source-decisions.test.ts`, and the merge cases in `region-enhance.test.ts`.
+  auto-sketch both ways; the context ring against an unpadded control; curves byte-identical for
+  every subpath leaving the box on any side; operationIds; grazing-disc census),
+  `trace-source-decisions.test.ts`, the merge cases in `region-enhance.test.ts`, the worker and
+  client cases in `trace-worker-source-decisions.test.ts` and `use-trace-worker-client.test.ts`,
+  and the UI-thread and reuse cases in `region-enhance-trace.test.ts`.

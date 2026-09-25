@@ -20,7 +20,7 @@
 // clipped fragment always reaches into the padding and fails that test, and
 // pixels near the box edge are filtered with the surroundings the full pass
 // saw. region-merge.ts pairs the two traces of a shape that grazes the border
-// so it is neither lost nor doubled.
+// (bounds within 1 px) so that pair is neither lost nor doubled.
 //
 // The crop also inherits the full image's Otsu cut and auto-sketch verdict
 // (trace-source-decisions.ts); re-deriving them from the crop's own pixels

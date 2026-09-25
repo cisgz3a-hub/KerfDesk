@@ -25,6 +25,7 @@ import {
   boundsFromColoredPaths,
   traceImageToColoredPaths,
 } from '../../core/trace';
+import { resolveFrozenTraceSourceOptions } from '../../core/trace/trace-source-decisions';
 import type { TraceSteps } from '../../core/trace/trace-steps';
 import type { TracePhase, TraceProgress } from '../../core/trace/trace-progress';
 
@@ -32,6 +33,11 @@ export type TraceWorkerRequest = {
   readonly id: number;
   readonly image: RawImageData;
   readonly options: TraceOptions;
+  // Region Enhance (ADR-410): resolve the whole source's binarisation
+  // decisions here, trace with them, and send them back so the boxed crop
+  // re-trace can reuse them. Resolving them costs up to a full-image median
+  // plus a histogram, which must not run on the UI thread.
+  readonly freezeSourceDecisions?: boolean;
 };
 
 // A trace never hands the worker's event loop back, so a heartbeat can only
@@ -61,11 +67,14 @@ export type TraceWorkerResponse =
       readonly bounds: Bounds;
       readonly width: number;
       readonly height: number;
+      // The options this trace ran with, present when the request asked for
+      // freezeSourceDecisions.
+      readonly sourceOptions?: TraceOptions;
     }
   | { readonly id: number; readonly kind: 'error'; readonly message: string };
 
 self.onmessage = (e: MessageEvent<TraceWorkerRequest>): void => {
-  const { id, image, options } = e.data;
+  const { id, image, options, freezeSourceDecisions } = e.data;
   // Ack before any tracing work. Message events are dispatched one at a time
   // and the trace that follows never yields the worker's event loop back, so
   // reaching this line IS the start of this request's compute — which is what
@@ -76,9 +85,11 @@ self.onmessage = (e: MessageEvent<TraceWorkerRequest>): void => {
   self.postMessage(startedAck);
   void (async (): Promise<void> => {
     try {
+      const traced =
+        freezeSourceDecisions === true ? resolveFrozenTraceSourceOptions(image, options) : options;
       const paths = await traceImageToColoredPaths(
         image,
-        options,
+        traced,
         heartbeatRunner(id),
         phaseReporter(id),
       );
@@ -90,6 +101,7 @@ self.onmessage = (e: MessageEvent<TraceWorkerRequest>): void => {
         bounds,
         width: image.width,
         height: image.height,
+        ...(freezeSourceDecisions === true ? { sourceOptions: traced } : {}),
       };
       self.postMessage(response);
     } catch (err) {

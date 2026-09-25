@@ -161,6 +161,81 @@ describe('Region Enhance binarises the crop like the full pass (ADR-410)', () =>
   });
 });
 
+// Line Art's detail mask reads a 16 px window on the 2x grid. Dark blocks 3 px
+// outside every box edge darken the neighbourhood of pale strokes just inside
+// it; a crop without that context ring sees only paper there.
+describe('Region Enhance traces the crop with its neighbourhood (ADR-410)', () => {
+  const box = { x: 60, y: 60, width: 80, height: 80 };
+  const image = canvas(200, 200, (x, y) => {
+    const within = (x0: number, x1: number, y0: number, y1: number): boolean =>
+      x >= x0 && x < x1 && y >= y0 && y < y1;
+    const blocks = [
+      within(40, 57, 70, 130),
+      within(143, 160, 70, 130),
+      within(70, 130, 40, 57),
+      within(70, 130, 143, 160),
+    ];
+    if (blocks.some(Boolean)) return grey(20);
+    const strokes = [
+      within(61, 64, 65, 135),
+      within(136, 139, 65, 135),
+      within(65, 135, 61, 64),
+      within(65, 135, 136, 139),
+    ];
+    if (strokes.some(Boolean)) return [215, 170, 70];
+    if (within(10, 30, 170, 190)) return [200, 90, 60];
+    return grey(235);
+  });
+
+  // IoU over the box's outer `ring` pixels on the 2x grid; the box starts at
+  // (offset, offset) inside `mask`.
+  function ringIou(
+    mask: RawImageData,
+    offset: number,
+    reference: RawImageData,
+    ring: number,
+  ): number {
+    const width = box.width * 2;
+    const height = box.height * 2;
+    const predicted = new Uint8Array(width * height);
+    const truth = new Uint8Array(width * height);
+    for (let y = 0; y < height; y += 1) {
+      for (let x = 0; x < width; x += 1) {
+        if (x >= ring && y >= ring && x < width - ring && y < height - ring) continue;
+        const m = ((y + offset) * mask.width + x + offset) * 4;
+        const r = ((y + box.y * 2) * reference.width + x + box.x * 2) * 4;
+        predicted[y * width + x] = mask.data[m] === 0 ? 1 : 0;
+        truth[y * width + x] = reference.data[r] === 0 ? 1 : 0;
+      }
+    }
+    const metrics = compareMasks(
+      { width, height, data: predicted },
+      { width, height, data: truth },
+    );
+    expect(metrics.truePositive + metrics.falseNegative).toBeGreaterThan(0);
+    return metrics.iou;
+  }
+
+  it('Line Art edge pixels match the full image at 2x, and would not without padding', async () => {
+    const options = preset('Line Art');
+    const { call } = await enhanceCapturing(image, options, box);
+    expect(call.options.sourceAutoSketch).toBe(true);
+    const frozen = resolveFrozenTraceSourceOptions(image, options);
+    const reference = preprocessForTrace(upscaleBy(image, 2), { ...frozen, pixelScale: 2 });
+    // The crop is square and the box sits well inside the image, so the
+    // padding is the same on every side.
+    const offset = (call.image.width - box.width * 2) / 2;
+    const padded = preprocessForTrace(call.image, call.options);
+    const unpadded = preprocessForTrace(upscaleBy(cropOf(image, box), 2), call.options);
+    for (const ring of [4, 16]) {
+      expect(ringIou(padded, offset, reference, ring), `padded, ${ring} px ring`).toBe(1);
+      // Measured 0.26 (4 px ring) and 0.75 (16 px ring): the control showing
+      // that the padding, not the frozen decisions, keeps the edge.
+      expect(ringIou(unpadded, 0, reference, ring), `unpadded, ${ring} px ring`).toBeLessThan(0.9);
+    }
+  });
+});
+
 describe('Region Enhance keeps canonical curves, bindings and seams (ADR-410)', () => {
   const region = { x: 50, y: 50, width: 100, height: 100 };
   const interior = { minX: 51, minY: 51, maxX: 149, maxY: 149 };
@@ -234,12 +309,24 @@ describe('Region Enhance keeps canonical curves, bindings and seams (ADR-410)', 
       });
     }
     expect(replaced).toBeGreaterThan(0);
-    // Outside the box every subpath is the original object.
+    // Every subpath not fully inside the box, on any of its four sides, is the
+    // original object.
+    const kept = out.flatMap((path) => path.polylines);
+    let outsideCount = 0;
     for (const pl of full.flatMap((path) => path.polylines)) {
-      if (pl.points.some((p) => p.x < region.x || p.y < region.y)) {
-        expect(out.flatMap((path) => path.polylines)).toContain(pl);
-      }
+      const leavesBox = pl.points.some(
+        (p) =>
+          p.x < region.x ||
+          p.y < region.y ||
+          p.x > region.x + region.width ||
+          p.y > region.y + region.height,
+      );
+      if (!leavesBox) continue;
+      outsideCount += 1;
+      expect(kept).toContain(pl);
     }
+    // The two outside discs (one right of and below the box) and the bar.
+    expect(outsideCount).toBeGreaterThanOrEqual(3);
 
     const census = (paths: ReadonlyArray<ColoredPath>, c: { x: number; y: number }) =>
       paths

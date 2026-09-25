@@ -3294,9 +3294,10 @@ at 2× and downscaled, and its geometry is patched into the full trace
 everything crossing the box border or in the margin ring survives). The
 box is re-traced with a ring of the real neighbouring pixels around it and
 with the whole image's Otsu cut and auto-sketch choice, so the patch
-binarises exactly like its surroundings, and a shape grazing the box edge
-appears once, never twice or not at all. Fitted curves and operation
-bindings survive inside and outside the box. The preview shows the full
+binarises exactly like its surroundings, and a shape that both passes
+trace within a pixel of each other at the box edge is kept once. Fitted
+curves and operation bindings survive inside and outside the box. The
+preview shows the full
 trace with the boxed feature recovered. Commit
 (**Trace**) writes the patched paths as the traced image, reusing the
 same overlay registration as any trace.
