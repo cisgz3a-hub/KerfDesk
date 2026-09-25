@@ -112,6 +112,9 @@ export type LaserState = LaserStoreActions &
     readonly statusSequence: number;
     readonly statusObservation: ControllerObservationStamp | null;
     readonly alarmCode: number | null;
+    // The firmware printed "Reset to continue" after a critical event: only a
+    // soft reset is accepted until the reboot banner (controller-reset-required.ts).
+    readonly resetRequired?: boolean;
     readonly lastError: number | null;
     readonly lastWriteError: string | null;
     // Operator-requested coolant/air state for the manual jog-panel control.

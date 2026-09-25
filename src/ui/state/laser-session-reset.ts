@@ -25,6 +25,7 @@ type SessionScopedState = FinishedJobState &
   Pick<
     LaserState,
     | 'alarmCode'
+    | 'resetRequired'
     | 'lastError'
     | 'activeWcs'
     | 'ovCache'
@@ -77,6 +78,7 @@ export function sessionScopedJobStateReset(): SessionScopedState {
   return {
     ...finishedJobStateReset(),
     alarmCode: null,
+    resetRequired: false,
     lastError: null,
     activeWcs: null,
     ovCache: null,

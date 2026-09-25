@@ -140,6 +140,14 @@ async function holdAtToolChange(device: Device): Promise<void> {
   await useLaserStore.getState().connect(adapterFor(device));
   device.say("Grbl 1.1h ['$' for help]");
   device.say(statusLine('Idle'));
+  // The connect handshake ($$, $I, a fresh Idle) must finish before Start;
+  // a fixed wait raced it on a loaded machine.
+  await vi.waitFor(() => {
+    const state = useLaserStore.getState();
+    expect(state.controllerOperation).toBeNull();
+    expect(state.pendingUntrackedAcks).toBe(0);
+    expect(state.controllerBuildInfoObservation?.sessionEpoch).toBe(state.controllerSessionEpoch);
+  });
   await settle(50);
   await useLaserStore.getState().startJob(TWO_BIT_JOB, {
     machineKind: 'cnc',

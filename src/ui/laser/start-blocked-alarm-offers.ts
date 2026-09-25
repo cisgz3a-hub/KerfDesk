@@ -48,9 +48,16 @@ export async function offerAlarmFixForBlockedStart(
   messages: ReadonlyArray<string>,
 ): Promise<BlockedStartRepair> {
   if (messages.length === 0 || !messages.every(isAlarmRefusalMessage)) return 'unrepaired';
-  if (isGrblHalEStopAlarm(useLaserStore.getState())) return 'unrepaired';
+  const laser = useLaserStore.getState();
+  if (isGrblHalEStopAlarm(laser)) return 'unrepaired';
+  // After a critical event only a soft reset is accepted; the Alarm banner
+  // offers it (controller-reset-required.ts).
+  if (laser.resetRequired === true) return 'unrepaired';
   const homingEnabled = useStore.getState().project.device.homing.enabled;
-  return homingEnabled ? offerHomeCycle() : offerUnlock();
+  // A halted Smoothieware board refuses its Home sequence until M999, so the
+  // fix there is Unlock (controller audit 2026-09-25 CG-4).
+  const homeFromAlarm = laser.capabilities.homeFromAlarm !== false;
+  return homingEnabled && homeFromAlarm ? offerHomeCycle() : offerUnlock();
 }
 
 /** True for each of the refusal messages an alarm raises. */

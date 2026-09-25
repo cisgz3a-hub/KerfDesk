@@ -77,4 +77,10 @@ export type ControllerCapabilities = {
   // in its line buffer and corrupt the stream mid-job — the UI must not mount
   // the override controls and the send path must drop the byte (CTL-01).
   readonly overrides: boolean;
+  // Whether the homing command runs while the controller is locked in Alarm.
+  // GRBL-family `$H` is the documented way out of an alarm; a halted
+  // Smoothieware board refuses every G-code line until M999, so its Home
+  // sequence (M400 first) cannot run there (controller audit 2026-09-25
+  // CG-4). Absent means true.
+  readonly homeFromAlarm?: boolean;
 };

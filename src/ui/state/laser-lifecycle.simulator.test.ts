@@ -239,7 +239,9 @@ describe('laser lifecycle against the GRBL simulator', () => {
       trustedPositionEpoch: (positionEpoch ?? 0) + 1,
       workZReferenceEpoch: zEpoch + 1,
     });
-    await pump(50);
+    // The `ok` alone does not prove the unlock (audit HF-2): the next report
+    // that is not Alarm clears the latch.
+    await pump(1100);
     expect(useLaserStore.getState().alarmCode).toBeNull();
     expect(sim.state().locked).toBe(false);
   });

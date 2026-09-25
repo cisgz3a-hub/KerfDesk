@@ -96,7 +96,7 @@ describe('controller recovery queue ownership', () => {
     connection.setWriteHandler(async (data) => {
       if (data === '\x18') connection.emitLine('Grbl 1.1f');
     });
-    const recovered = expect(useLaserStore.getState().wakeController()).resolves.toBeUndefined();
+    const recovered = expect(useLaserStore.getState().wakeController()).resolves.toBe('idle');
     await flush();
     connection.emitLine('<Idle|MPos:0.000,0.000,0.000|FS:0,0>');
     await recovered;
@@ -123,7 +123,7 @@ describe('controller recovery queue ownership', () => {
     const connection = fakeConnection(writes);
     await connectAndDrainHandshake(connection, writes);
 
-    const recovered = expect(useLaserStore.getState().wakeController()).resolves.toBeUndefined();
+    const recovered = expect(useLaserStore.getState().wakeController()).resolves.toBe('idle');
     await flush();
     connection.emitLine('Grbl 1.1f');
     await flush();

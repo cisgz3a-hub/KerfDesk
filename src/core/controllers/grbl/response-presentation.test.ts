@@ -96,7 +96,7 @@ describe('controller-family response presentation', () => {
     expect(presentError('fluidnc', 999)).toBeNull();
   });
 
-  it('uses FluidNC alarm labels without borrowing recovery metadata', () => {
+  it('uses FluidNC alarm labels without borrowing GRBL recovery metadata', () => {
     const expected = [
       'Hard Limit',
       'Soft Limit',
@@ -118,8 +118,11 @@ describe('controller-family response presentation', () => {
       'Probe Hard Limit',
     ];
     for (const [index, title] of expected.entries()) {
-      expect(presentAlarm('fluidnc', index + 1)).toEqual({ code: index + 1, title });
+      // Only FluidNC's own reset guidance for its Critical alarms is added.
+      expect(presentAlarm('fluidnc', index + 1)).toMatchObject({ code: index + 1, title });
+      expect(presentAlarm('fluidnc', index + 1)?.detail).toBeUndefined();
     }
+    expect(presentAlarm('fluidnc', 3)?.action).toBeUndefined();
   });
 
   it('leaves existing stock and grblHAL presentation unchanged', () => {
@@ -177,6 +180,10 @@ describe('critical alarms and the texts the audit corrected', () => {
     expect(presentAlarm(kind, code)?.action).toMatch(
       /only a soft reset now: press Reset \(Ctrl-X\)/,
     );
+  });
+
+  it.each([1, 2, 13])('FluidNC ALARM:%i (Critical state) says a soft reset comes first', (code) => {
+    expect(presentAlarm('fluidnc', code)?.action).toMatch(/press Reset \(Ctrl-X\)/);
   });
 
   it('describes grblHAL error:79 and the extended codes, and keeps GRBL 1.1 at 38', () => {

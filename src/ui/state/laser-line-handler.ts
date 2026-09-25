@@ -54,7 +54,8 @@ import { settleUntrackedAck, streamOwnsTerminalAck } from './laser-stream-ack';
 import { flushStreamAcksBefore, routeStreamAck } from './laser-stream-ack-batch';
 import type { LaserState } from './laser-store';
 import { emptyControllerBuildInfoState } from './laser-controller-build-info';
-import { hasUnsettledStreamAcks } from './laser-store-helpers';
+import { hasUnsettledStreamAcks, pushLog } from './laser-store-helpers';
+import { isCriticalEventMessage, RESET_REQUIRED_MESSAGE } from './controller-reset-required';
 import { appendSystemNotice } from './laser-system-notice';
 import { inboundTranscriptEntry } from './laser-transcript';
 import {
@@ -79,6 +80,7 @@ export function handleLine(
   const state = get();
   recordInboundLine(set, refs, state, cls, line);
   captureActiveWcsFromModalReport(set, line);
+  latchResetRequired(set, cls);
   invalidateSettingsForMpgTakeover(set, refs, state, cls);
   publishDetectedSettings(set, get, refs, cls);
   // Marlin answers an operator-owned M115 with the same FIRMWARE_NAME line it
@@ -197,6 +199,21 @@ function captureActiveWcsFromModalReport(set: SetFn, line: string): void {
   if (!line.includes('[GC:')) return;
   const activeWcs = parseActiveWcsFromModalResponses([line]);
   if (activeWcs !== null) set({ activeWcs });
+}
+
+// `[MSG:Reset to continue]` (FluidNC: `[MSG:ERR: Reset to continue]`) follows a
+// critical ALARM: only a soft reset is accepted until the reboot banner
+// (controller-reset-required.ts).
+function latchResetRequired(set: SetFn, cls: ControllerEvent): void {
+  if (!isCriticalEventMessage(cls)) return;
+  set((state) =>
+    state.resetRequired === true
+      ? {}
+      : {
+          resetRequired: true,
+          log: pushLog(state, `[lf2] ${RESET_REQUIRED_MESSAGE}`),
+        },
+  );
 }
 
 function recordInboundLine(
@@ -354,6 +371,8 @@ function handleWelcomeLine(
     // controller's alarm after the banner; any other code belonged to the
     // previous boot (audit streaming-4).
     alarmCode: takeAlarmBeforeBanner(refs),
+    // The reboot is the soft reset a critical event asked for.
+    resetRequired: false,
     wcoCache: null,
     // A reset re-initializes the parser's modal state ($N runs fresh), so the
     // cached WCS selection is stale until re-qualification re-reads $G (C6).

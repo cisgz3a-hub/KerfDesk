@@ -132,8 +132,26 @@ const FLUIDNC_ALARM_ENTRIES = [
   [18, 'Probe Hard Limit'],
 ] as const;
 
+// Hard limit, soft limit and hard stop put FluidNC in its Critical state, which
+// only a reset leaves; `$X` there is acknowledged and unlocks nothing
+// (Protocol.cpp:458-470, ProcessSettings.cpp:269-286). Audit HF-2.
+const FLUIDNC_CRITICAL_ALARM_ACTIONS = new Map<number, string>([
+  [
+    1,
+    'The controller accepts only a soft reset now: press Reset (Ctrl-X). Then clear the obstruction and home or unlock.',
+  ],
+  [
+    2,
+    'The controller accepts only a soft reset now: press Reset (Ctrl-X). The position is kept, so Unlock ($X) is safe after the reset. Then check the design fits the bed.',
+  ],
+  [13, 'The controller accepts only a soft reset now: press Reset (Ctrl-X), then home or unlock.'],
+]);
+
 const FLUIDNC_ALARMS = new Map<number, AlarmPresentation>(
-  FLUIDNC_ALARM_ENTRIES.map(([code, title]) => [code, { code, title }]),
+  FLUIDNC_ALARM_ENTRIES.map(([code, title]) => {
+    const action = FLUIDNC_CRITICAL_ALARM_ACTIONS.get(code);
+    return [code, action === undefined ? { code, title } : { code, title, action }];
+  }),
 );
 
 export function presentError(

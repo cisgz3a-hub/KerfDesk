@@ -9,6 +9,10 @@ import { useLaserStore } from '../state/laser-store';
 
 export function AlarmRecoveryActions(props: {
   readonly homingEnabled: boolean;
+  // False on a driver whose Home cannot run in Alarm (a halted Smoothieware
+  // board refuses it until M999): the banner then offers Unlock first
+  // (controller audit 2026-09-25 CG-4). Omitted means true.
+  readonly homeFromAlarm?: boolean;
   readonly canUnlock: boolean;
   readonly onHome: () => void;
   readonly onConfigureHoming: () => void;
@@ -17,6 +21,22 @@ export function AlarmRecoveryActions(props: {
   const commands = useActiveDriverCommands();
   const home = commandLabels(commands.home ?? '$H');
   const unlock = commands.unlock ?? '$X';
+  if (props.homingEnabled && props.homeFromAlarm === false) {
+    return (
+      <>
+        {props.canUnlock && (
+          <button
+            type="button"
+            onClick={props.onUnlock}
+            title={`Send ${unlock} to clear the halt after you have confirmed the machine is safe. Home once it reports Idle.`}
+          >
+            {`${unlock} — Unlock`}
+          </button>
+        )}
+        <span style={alarmHintStyle}>Unlock first: this controller cannot home while halted.</span>
+      </>
+    );
+  }
   return (
     <>
       {props.homingEnabled ? (

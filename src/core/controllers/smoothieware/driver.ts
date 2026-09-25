@@ -46,6 +46,9 @@ export const smoothiewareDriver: ControllerDriver = {
     cncJobs: false,
     lowPowerFire: false,
     overrides: false,
+    // A halted board answers its Home sequence's first line (M400) with `!!`
+    // until M999 (GcodeDispatch.cpp:158-180).
+    homeFromAlarm: false,
   },
   realtime: {
     statusQuery: RT_STATUS,

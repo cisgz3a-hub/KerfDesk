@@ -6,6 +6,7 @@ import {
   type ControllerLifecycleRefs,
 } from './laser-interactive-command';
 import { controllerErrorNotice, type LaserSafetyAction } from './laser-safety-notice';
+import { resetRequiredBlockMessage } from './controller-reset-required';
 import { hasPendingControllerWrite } from './laser-start-queue-fence';
 import type { LaserState } from './laser-store';
 import {
@@ -54,8 +55,10 @@ function assertHomeReady(set: SetFn, get: GetFn, driver: ControllerDriver): Home
   const homeCommand = driver.commands.home;
   if (homeCommand === null) throw new Error('This controller has no homing command.');
   const state = get();
-  const mpgBlocked = mpgCommandBlockMessage(state);
-  if (mpgBlocked !== null) blockHome(set, get, mpgBlocked);
+  // An MPG owns the controller, or a critical event left it accepting only a
+  // soft reset (controller-reset-required.ts).
+  const ownershipBlocked = mpgCommandBlockMessage(state) ?? resetRequiredBlockMessage(state);
+  if (ownershipBlocked !== null) blockHome(set, get, ownershipBlocked);
   if (hasPendingControllerWrite(get())) {
     const message =
       'Home is blocked until the previous controller write and terminal acknowledgement settle.';

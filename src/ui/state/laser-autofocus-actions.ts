@@ -10,6 +10,7 @@ import {
 } from './laser-store-helpers';
 import { pendingTransportWriteCount } from './laser-start-queue-fence';
 import { controllerUnlockedPatch } from './laser-console-completion';
+import { resetRequiredBlockMessage } from './controller-reset-required';
 import { startControllerCommand } from './laser-interactive-command';
 
 type SetFn = (
@@ -29,6 +30,16 @@ export function autofocusActions(
       assertNoMotionOperation(set, get);
       const unlock = refs.driver.commands.unlock;
       if (unlock === null) throw new Error('This controller has no unlock command.');
+      // After a critical event the firmware answers `$X` with nothing (GRBL),
+      // error:79 (grblHAL) or an `ok` that unlocks nothing (FluidNC).
+      const resetRequired = resetRequiredBlockMessage(get());
+      if (resetRequired !== null) {
+        set((state) => ({
+          lastWriteError: resetRequired,
+          log: pushLog(state, `[lf2] Unlock blocked: ${resetRequired}`),
+        }));
+        throw new Error(resetRequired);
+      }
       // Owned like the Console's `$X`: the controller's answer decides, so an
       // `error:N` (a door still open, a locked-out build) rejects with its
       // reason instead of clearing the alarm on the bytes alone (controller
