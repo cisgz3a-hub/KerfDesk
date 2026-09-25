@@ -36,6 +36,9 @@ const MIGRATORS: Readonly<Record<number, Migrator>> = {
   6: (raw) => ({ ...raw, schemaVersion: 7 }),
   // Existing text has no copy offset and keeps its original shared context.
   7: (raw) => ({ ...raw, schemaVersion: 8 }),
+  // Legacy images keep their original pixels and external mask semantics.
+  // No owned clip is invented when promoting an existing project.
+  8: (raw) => ({ ...raw, schemaVersion: 9 }),
 };
 
 function migrateV3ToV4(raw: RawProject): RawProject | MigrationFailure {

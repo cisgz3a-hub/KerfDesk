@@ -9,6 +9,7 @@ import {
   type Project,
   type RasterImage,
   type SceneObject,
+  type Transform,
   type Vec2,
 } from '../../core/scene';
 import { CLOSURE_EPS_MM } from '../../core/scene/polyline-closure';
@@ -138,7 +139,6 @@ function exportImage(image: RasterImage, index: number, project: Project): SvgEl
     throw new Error('Image ' + image.source + ' needs embedded bitmap pixels for SVG export.');
   }
   const b = image.bounds;
-  const clip = imageClip(image, index, project);
   const element =
     '<image x="' +
     svgNumber(b.minX) +
@@ -154,8 +154,7 @@ function exportImage(image: RasterImage, index: number, project: Project): SvgEl
     xmlText(image.dataUrl) +
     '"/>';
   return {
-    markup:
-      clip === '' ? element : clip + '<g clip-path="url(#mask-' + index + ')">' + element + '</g>',
+    markup: clipImageElement(image, index, project, element),
     bounds: boundsOfPoints(
       [
         { x: b.minX, y: b.minY },
@@ -167,29 +166,59 @@ function exportImage(image: RasterImage, index: number, project: Project): SvgEl
   };
 }
 
-function imageClip(image: RasterImage, index: number, project: Project): string {
+function clipImageElement(
+  image: RasterImage,
+  index: number,
+  project: Project,
+  element: string,
+): string {
+  let markup = element;
+  if (image.imageClip !== undefined) {
+    const id = 'image-clip-' + index;
+    markup =
+      compoundClip(image.imageClip, image.transform, id) +
+      '<g clip-path="url(#' +
+      id +
+      ')">' +
+      markup +
+      '</g>';
+  }
+  const external = imageMaskClip(image, index, project);
+  return external === ''
+    ? markup
+    : external + '<g clip-path="url(#mask-' + index + ')">' + markup + '</g>';
+}
+
+function imageMaskClip(image: RasterImage, index: number, project: Project): string {
   if (image.imageMaskId === undefined) return '';
   const mask = project.scene.objects.find((object) => object.id === image.imageMaskId);
   if (mask === undefined || !('paths' in mask))
     throw new Error('The image mask is missing or is not vector artwork.');
-  // Raster masks combine every contour with even-odd parity, irrespective of
-  // artwork color or fill-rule. Separate clip children would union their holes.
-  const curves = mask.paths.flatMap((path) =>
+  // The raster pipeline ignores a mask whose last closed contour was removed.
+  if (closedMaskCurves(mask.paths).length === 0) return '';
+  return compoundClip(mask.paths, mask.transform, 'mask-' + index);
+}
+
+function closedMaskCurves(paths: readonly ColoredPath[]): CurveSubpath[] {
+  return paths.flatMap((path) =>
     path.curves === undefined
       ? path.polylines
           .filter(isClosedEnough)
           .map((polyline) => polylineToCurveSubpath({ ...polyline, closed: true }))
       : path.curves.filter(isClosedMaskCurve).map((curve) => ({ ...curve, closed: true })),
   );
-  // The raster pipeline ignores a mask whose last closed contour was removed.
-  if (curves.length === 0) return '';
+}
+
+function compoundClip(paths: readonly ColoredPath[], transform: Transform, id: string): string {
+  // All colors share one even-odd contour set. Each independent clip gets its
+  // own group so an external mask intersects the owned clip rather than XORing.
   return (
-    '<defs><clipPath id="mask-' +
-    index +
+    '<defs><clipPath id="' +
+    id +
     '" clipPathUnits="userSpaceOnUse"><path d="' +
-    svgPathData(curves) +
+    svgPathData(closedMaskCurves(paths)) +
     '" transform="' +
-    svgMatrixAttribute(mask.transform) +
+    svgMatrixAttribute(transform) +
     '" clip-rule="evenodd"/></clipPath></defs>'
   );
 }

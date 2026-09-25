@@ -1,3 +1,4 @@
+import { applySvgFragmentImport, applySvgFragmentReimport } from './svg-fragment-mutation';
 // object-insert-actions — the store slice that inserts a new SceneObject:
 // import an SVG (with Phase C re-import-in-place), upsert a text object, or
 // commit an on-canvas drawn shape (ADR-051, Phase G, B5). Extracted from
@@ -50,6 +51,8 @@ export function objectInsertActions(
 ): Pick<
   AppState,
   | 'importSvgObject'
+  | 'importSvgFragment'
+  | 'reimportSvgFragment'
   | 'reimportSvgObject'
   | 'upsertTextObject'
   | 'drawShape'
@@ -62,6 +65,7 @@ export function objectInsertActions(
 > {
   return {
     importSvgObject: importSvgObjectAction(set, get),
+    ...svgFragmentActions(set, get),
     reimportSvgObject: reimportSvgObjectAction(set, get),
     upsertTextObject: upsertTextObjectAction(set),
     drawShape: drawShapeAction(set),
@@ -275,5 +279,61 @@ export function applyLayerDefaultsToFreshLayers<T extends { readonly project: Pr
       ...result.project,
       scene: { ...result.project.scene, layers },
     },
+  };
+}
+
+function svgFragmentActions(
+  set: Setter,
+  get: Getter,
+): Pick<AppState, 'importSvgFragment' | 'reimportSvgFragment'> {
+  return {
+    importSvgFragment: (fragment, batchIndex = 0) => {
+      let outcome: ImportOutcome = { kind: 'added' };
+      set((state) => {
+        const fitted = applyImportBedFit(
+          applyLayerDefaultsToFreshLayers(
+            state.project.scene.layers,
+            applySvgFragmentImport(state, fragment, batchIndex),
+            svgStructuralDefaults(state.layerDefaults),
+            state.cncLiveCaps,
+          ),
+        );
+        outcome = fitted.outcome;
+        return fitted.state;
+      });
+      fitAllObjects(get);
+      return outcome;
+    },
+    reimportSvgFragment: (targetId, fragment) => {
+      let outcome: ImportOutcome | null = null;
+      set((state) => {
+        const next = applySvgFragmentReimport(state, targetId, fragment);
+        if (next === null) return state;
+        outcome = next.outcome;
+        return applyLayerDefaultsToFreshLayers(
+          state.project.scene.layers,
+          next.state,
+          svgStructuralDefaults(state.layerDefaults),
+          state.cncLiveCaps,
+        );
+      });
+      if (outcome !== null) fitAllObjects(get);
+      return outcome;
+    },
+  };
+}
+
+// Authored SVG fill/stroke and decoded image density determine structural
+// settings. Saved speed/power/CNC preferences must not turn an image into Line.
+function svgStructuralDefaults(defaults: LayerDefaultsState): LayerDefaultsState {
+  const settings = (value: NonNullable<LayerDefaultsState['allColors']>) => {
+    const { mode: _mode, linesPerMm: _density, ...rest } = value;
+    return rest;
+  };
+  return {
+    allColors: defaults.allColors === null ? null : settings(defaults.allColors),
+    byColor: Object.fromEntries(
+      Object.entries(defaults.byColor).map(([key, value]) => [key, settings(value)]),
+    ),
   };
 }

@@ -152,7 +152,12 @@ function DisplayRow(props: {
 
 function describe(summary: SavedLibrarySummary): string {
   const presets = `${summary.presetCount} ${summary.presetCount === 1 ? 'preset' : 'presets'}`;
-  return summary.deviceHintName === null ? presets : `${presets} · ${summary.deviceHintName}`;
+  const recipes =
+    summary.processRecipeCount === undefined
+      ? ''
+      : ` · ${summary.processRecipeCount} process recipe${summary.processRecipeCount === 1 ? '' : 's'}`;
+  const contents = `${presets}${recipes}`;
+  return summary.deviceHintName === null ? contents : `${contents} · ${summary.deviceHintName}`;
 }
 
 const rowStyle: React.CSSProperties = {

@@ -1,11 +1,5 @@
 import { DEFAULT_RASTER_LAYER_COLOR, IDENTITY_TRANSFORM, type SceneObject } from '../../core/scene';
-import {
-  burnDecodeMaxEdge,
-  extractLumaBase64,
-  loadImageAsRawData,
-  readFileAsDataUrl,
-  readImageNaturalSize,
-} from '../trace/image-loader';
+import { readFileAsDataUrl } from '../trace/image-loader';
 import type { ImportOutcome } from '../state/store';
 import type { ToastVariant } from '../state/toast-store';
 import { readImageDensity } from '../common/image-density';
@@ -20,10 +14,10 @@ import { largeImportAdvisory } from '../app/import-size-advisory';
 import {
   shouldDecodeDimensionQualifiedPng,
   shouldPageBackPng,
-  tryDecodeDimensionQualifiedPng,
-  tryDecodeQualifiedPng,
 } from '../import/qualified-png-raster';
 import type { PngImportWorkerProgress } from '../import/png-import-worker-client';
+import { freezeGif, isGif } from '../import/freeze-gif';
+import { loadImageSamples, type LoadedImageSamples } from '../import/prepare-image-samples';
 
 /** Imports the file into the scene; resolves with the created object (null
  * when skipped or failed) so callers like Image Studio can chain onto it. */
@@ -31,6 +25,7 @@ export async function importImageFile(
   file: File,
   importRasterImage: (object: SceneObject) => ImportOutcome | undefined,
   pushToast: (message: string, variant?: ToastVariant) => void,
+  options: { readonly signal?: AbortSignal } = {},
 ): Promise<SceneObject | null> {
   // F-A3: advise (never refuse) before importing a very large file — both the
   // toolbar picker and drag-drop route through here.
@@ -39,25 +34,31 @@ export async function importImageFile(
   let controls: PngImportControls | null = null;
   let rollback: (() => Promise<string | null>) | null = null;
   try {
+    assertImportActive(options.signal);
+    const gif = isGif(file);
+    file = await staticImage(file);
     // Storage ownership and worker ownership are distinct. A compressed PNG
     // can remain portable while still requiring the queued worker because its
     // encoded edge exceeds the browser canvas boundary.
     const pageBacked = shouldPageBackPng(file);
     const dimensionQualified = !pageBacked && (await shouldDecodeDimensionQualifiedPng(file));
     controls =
-      pageBacked || dimensionQualified ? createPngImportControls(file.name, pushToast) : null;
+      pageBacked || dimensionQualified
+        ? createPngImportControls(file.name, pushToast, options.signal)
+        : null;
     const loaded = await loadImageSamples(file, pageBacked, dimensionQualified, controls?.options);
-    if (loaded.kind === 'embedded' && loaded.cleanupWarning !== undefined) {
-      pushToast(loaded.cleanupWarning, 'warning');
-    }
+    warnImageCleanup(loaded, pushToast);
     rollback = loaded.kind === 'paged' ? loaded.rollback : null;
+    assertImportActive(options.signal);
     const imported = await importedRasterObject(file, loaded);
+    assertImportActive(options.signal);
     const outcome = importRasterImage(imported.object);
     rollback = null;
     pushToast(
       `Added image: ${file.name} (${describeImportedImageSize(loaded.natural, loaded.sampled)} · ${describeImportDensity(imported.geometry)})`,
       'success',
     );
+    if (gif) pushToast('GIF imported as a still image of its first frame.', 'info');
     const fitNotice = describeImportBedFit(file.name, outcome);
     if (fitNotice !== null) pushToast(fitNotice.message, fitNotice.variant);
     return imported.object;
@@ -68,26 +69,22 @@ export async function importImageFile(
   }
 }
 
-type ImageDimensions = { readonly width: number; readonly height: number };
-type LoadedImageSamples =
-  | {
-      readonly kind: 'embedded';
-      readonly natural: ImageDimensions;
-      readonly sampled: ImageDimensions;
-      readonly lumaBase64: string;
-      readonly density?: ImageDensity | null;
-      readonly cleanupWarning?: string;
-    }
-  | {
-      readonly kind: 'paged';
-      readonly natural: ImageDimensions;
-      readonly sampled: ImageDimensions;
-      readonly imageAsset: NonNullable<
-        Extract<SceneObject, { readonly kind: 'raster-image' }>['imageAsset']
-      >;
-      readonly density: ImageDensity | null;
-      readonly rollback: () => Promise<string | null>;
-    };
+function staticImage(file: File): Promise<File> {
+  return isGif(file) ? freezeGif(file) : Promise.resolve(file);
+}
+
+function assertImportActive(signal: AbortSignal | undefined): void {
+  signal?.throwIfAborted();
+}
+
+function warnImageCleanup(
+  loaded: LoadedImageSamples,
+  pushToast: (message: string, variant?: ToastVariant) => void,
+): void {
+  if (loaded.kind === 'embedded' && loaded.cleanupWarning !== undefined) {
+    pushToast(loaded.cleanupWarning, 'warning');
+  }
+}
 
 async function importedRasterObject(
   file: File,
@@ -150,38 +147,6 @@ async function handleFailedImport(
   return null;
 }
 
-async function loadImageSamples(
-  file: File,
-  pageBacked: boolean,
-  dimensionQualified: boolean,
-  options: PngImportControls['options'] | undefined,
-): Promise<LoadedImageSamples> {
-  if (pageBacked) {
-    const qualified = await tryDecodeQualifiedPng(file, options);
-    if (qualified !== null) return { kind: 'paged', ...qualified };
-  } else if (dimensionQualified) {
-    const qualified = await tryDecodeDimensionQualifiedPng(file, options);
-    if (qualified !== null) {
-      return {
-        kind: 'embedded',
-        natural: qualified.natural,
-        sampled: qualified.sampled,
-        lumaBase64: qualified.lumaBase64,
-        density: qualified.density,
-        ...(qualified.cleanupWarning === null ? {} : { cleanupWarning: qualified.cleanupWarning }),
-      };
-    }
-  }
-  const natural = await readImageNaturalSize(file);
-  const sampled = await loadImageAsRawData(file, burnDecodeMaxEdge(natural.width, natural.height));
-  return {
-    kind: 'embedded',
-    natural,
-    sampled,
-    lumaBase64: extractLumaBase64(sampled),
-  };
-}
-
 type PngImportControls = {
   readonly options: {
     readonly signal: AbortSignal;
@@ -193,8 +158,12 @@ type PngImportControls = {
 function createPngImportControls(
   name: string,
   pushToast: (message: string, variant?: ToastVariant) => void,
+  signal?: AbortSignal,
 ): PngImportControls {
   const controller = new AbortController();
+  const abort = (): void => controller.abort();
+  if (signal?.aborted === true) abort();
+  else signal?.addEventListener('abort', abort, { once: true });
   let lastPhase = '';
   const handleKeyDown = (event: KeyboardEvent): void => {
     if (event.key === 'Escape') controller.abort();
@@ -209,7 +178,10 @@ function createPngImportControls(
         pushToast(pngProgressMessage(name, progress), 'info');
       },
     },
-    dispose: () => window.removeEventListener('keydown', handleKeyDown),
+    dispose: () => {
+      window.removeEventListener('keydown', handleKeyDown);
+      signal?.removeEventListener('abort', abort);
+    },
   };
 }
 

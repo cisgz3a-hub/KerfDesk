@@ -1,4 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
+import { PROJECT_SCHEMA_VERSION } from '../../core/scene';
 import {
   materializeVariableText,
   prepareOutputSnapshot,
@@ -157,7 +158,7 @@ describe('variable grid copies', () => {
     const created = useStore.getState().project;
     const parsed = deserializeProject(serializeProject(created));
     if (parsed.kind !== 'ok') throw new Error(JSON.stringify(parsed));
-    expect(parsed.project.schemaVersion).toBe(8);
+    expect(parsed.project.schemaVersion).toBe(PROJECT_SCHEMA_VERSION);
     const rendered = await materializeVariableText(parsed.project, { now: NOW }, renderFixture);
     if (!rendered.ok) throw new Error('round-trip render failed');
     expect(textValues(rendered.project)).toEqual(textValues(created));

@@ -1,4 +1,4 @@
-/* global Blob, document, Event, EventTarget, File, MediaStream, navigator, queueMicrotask, ReadableStream, setTimeout, TextDecoder, TextEncoder, window, WritableStream */
+/* global atob, Blob, document, Event, EventTarget, File, MediaStream, navigator, queueMicrotask, ReadableStream, setTimeout, TextDecoder, TextEncoder, window, WritableStream */
 
 const BASIC_PROJECT = '__KERFDESK_E2E_PROJECT_FIXTURE__';
 
@@ -150,10 +150,14 @@ function fileHandle(file) {
   return {
     kind: 'file',
     name: file.name,
-    getFile: async () =>
-      file.kind === 'png-fixture'
-        ? generatedPngFile(file)
-        : new File([file.text ?? ''], file.name, { type: textFileType(file.name) }),
+    getFile: async () => {
+      if (file.kind === 'png-fixture') return generatedPngFile(file);
+      const contents =
+        file.base64 === undefined
+          ? (file.text ?? '')
+          : Uint8Array.from(atob(file.base64), (character) => character.charCodeAt(0));
+      return new File([contents], file.name, { type: file.mimeType ?? textFileType(file.name) });
+    },
   };
 }
 

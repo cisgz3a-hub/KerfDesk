@@ -1,0 +1,39 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<svg
+   width="80.16174074164522mm"
+   height="60.48931025860185mm"
+   viewBox="159.91912962917735 169.7553448706991 80.16174074164522 60.48931025860185"
+   overflow="visible"
+   version="1.1"
+   id="svg1"
+   xmlns:xlink="http://www.w3.org/1999/xlink"
+   xmlns="http://www.w3.org/2000/svg"
+   xmlns:svg="http://www.w3.org/2000/svg">
+  <desc
+     id="desc1">KerfDesk artwork. Text is outlined; machine settings are not included.</desc>
+  <defs
+     id="defs1">
+    <clipPath
+       id="image-clip-0"
+       clipPathUnits="userSpaceOnUse">
+      <path
+         d="M 28 34 L 1.8278059999999998 34 L -2 17.011895 L -2 4 L 28 4 Z M 6 12 L 6 20 L 12 20 L 12 12 Z"
+         transform="matrix(-1.7143346014042253 -1.0300761498201072 0.38627855618254014 -0.6428754755265844 223.51873025780776 230.75600473176706)"
+         clip-rule="evenodd"
+         id="path1" />
+    </clipPath>
+  </defs>
+  <g
+     clip-path="url(#image-clip-0)"
+     id="g1">
+    <image
+       x="-2"
+       y="4"
+       width="40"
+       height="30"
+       preserveAspectRatio="none"
+       transform="matrix(-1.7143346014042253 -1.0300761498201072 0.38627855618254014 -0.6428754755265844 223.51873025780776 230.75600473176706)"
+       xlink:href="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAgAAAAGCAIAAABxZ0isAAAADklEQVR4nGP4z8AARwwLkBDpEtmrO5UAAAAOSURBVMhS/+8wwBHpEgB50zWtvhQo1wAAAABJRU5ErkJggg=="
+       id="image1" />
+  </g>
+</svg>

@@ -1,5 +1,6 @@
 import type { ParseDxfResult } from '../../io/dxf';
 import type { ParseGcodeProgramResult } from '../../io/gcode';
+import type { ParseHpglResult } from '../../io/hpgl';
 import type { ImportWorkerRequest, ImportWorkerResponse } from './import-worker-protocol';
 import type {
   PreparedStlImportResult,
@@ -7,6 +8,7 @@ import type {
 } from './stl-import-preparation';
 import { type PackedDxfResult, unpackDxfResult } from './packed-dxf-result';
 import { type PackedGcodeResult, unpackGcodeResult } from './packed-gcode-result';
+import { type PackedHpglResult, unpackHpglResult } from './packed-hpgl-result';
 import type {
   PreparedDepthMapImportResult,
   PreparedReliefHeightfieldImportResult,
@@ -59,6 +61,20 @@ export function parseGcodeOffThread(
 ): Promise<ParseGcodeProgramResult> | null {
   const packed = request<'gcode', PackedGcodeResult>({ kind: 'gcode', blob }, 'gcode', options);
   return packed === null ? null : packed.then(unpackGcodeResult);
+}
+
+export function parseHpglOffThread(
+  blob: Blob,
+  objectId: string,
+  source: string,
+  options: ImportWorkerRequestOptions = {},
+): Promise<ParseHpglResult> | null {
+  const packed = request<'hpgl', PackedHpglResult>(
+    { kind: 'hpgl', blob, objectId, source },
+    'hpgl',
+    options,
+  );
+  return packed === null ? null : packed.then(unpackHpglResult);
 }
 
 export function parseStlOffThread(

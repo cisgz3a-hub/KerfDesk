@@ -25,6 +25,7 @@ vi.mock('../common/image-density', () => imageDensity);
 vi.mock('../import/qualified-png-raster', () => pngImport);
 
 import { importImageFile } from './import-image-action';
+import { pageArtworkObject } from '../import/page-artwork-object';
 
 describe('raster-image import resolution', () => {
   beforeEach(() => {
@@ -248,7 +249,7 @@ describe('raster-image import resolution', () => {
     );
   });
 
-  it('rolls back qualified PNG pages when scene insertion fails', async () => {
+  it('rolls back qualified document-page PNG assets when final scene insertion fails', async () => {
     const rollback = vi.fn(async () => null);
     pngImport.tryDecodeQualifiedPng.mockResolvedValue({
       natural: { width: 2, height: 1 },
@@ -275,20 +276,33 @@ describe('raster-image import resolution', () => {
       },
       rollback,
     });
-    const pushToast = vi.fn();
+    const canvas = document.createElement('canvas');
+    vi.spyOn(canvas, 'toBlob').mockImplementation((done) => done(new Blob(['png'])));
 
     await expect(
-      importImageFile(
-        new File(['png'], 'large.png', { type: 'image/png' }),
-        () => {
-          throw new Error('scene mutation failed');
+      pageArtworkObject(
+        {
+          widthMm: 50.8,
+          heightMm: 25.4,
+          vectorSvg: null,
+          thumbnail: '',
+          note: '',
+          resolutionEditable: false,
+          render: async () => canvas,
         },
-        pushToast,
+        'document.pdf — page 1',
+        'image',
+        300,
+        {
+          signal: new AbortController().signal,
+          commit: () => {
+            throw new Error('scene mutation failed');
+          },
+        },
       ),
-    ).resolves.toBeNull();
+    ).rejects.toThrow('scene mutation failed');
 
     expect(rollback).toHaveBeenCalledOnce();
-    expect(pushToast).toHaveBeenCalledWith('Could not load image: scene mutation failed', 'error');
   });
 
   it('cancels the production PNG request on Escape without falling back or mutating the scene', async () => {
@@ -341,5 +355,31 @@ describe('raster-image import resolution', () => {
     expect(imageLoader.loadImageAsRawData).not.toHaveBeenCalled();
     expect(importRasterImage).not.toHaveBeenCalled();
     expect(pushToast).toHaveBeenCalledWith('Could not load image: IndexedDB write failed', 'error');
+  });
+
+  it('passes document-dialog cancellation to the active PNG worker without fallback', async () => {
+    const controller = new AbortController();
+    pngImport.tryDecodeQualifiedPng.mockImplementation(
+      async (_file, options) =>
+        new Promise((_resolve, reject) => {
+          options.signal.addEventListener(
+            'abort',
+            () => reject(new DOMException('cancelled', 'AbortError')),
+            { once: true },
+          );
+        }),
+    );
+    const importRasterImage = vi.fn();
+    const pending = importImageFile(
+      new File(['png'], 'document.png', { type: 'image/png' }),
+      importRasterImage,
+      vi.fn(),
+      { signal: controller.signal },
+    );
+    await vi.waitFor(() => expect(pngImport.tryDecodeQualifiedPng).toHaveBeenCalledOnce());
+    controller.abort();
+    await expect(pending).resolves.toBeNull();
+    expect(importRasterImage).not.toHaveBeenCalled();
+    expect(imageLoader.loadImageAsRawData).not.toHaveBeenCalled();
   });
 });

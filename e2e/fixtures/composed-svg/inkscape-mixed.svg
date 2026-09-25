@@ -1,0 +1,75 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<svg
+   width="1100mm"
+   height="250mm"
+   viewBox="-350 75 1100 250"
+   overflow="visible"
+   version="1.1"
+   id="svg3"
+   xmlns:xlink="http://www.w3.org/1999/xlink"
+   xmlns="http://www.w3.org/2000/svg"
+   xmlns:svg="http://www.w3.org/2000/svg">
+  <desc
+     id="desc1">KerfDesk artwork. Text is outlined; machine settings are not included.</desc>
+  <g
+     id="artwork-0">
+    <title
+       id="title1">composition-mixed.svg</title>
+    <path
+       d="M -600 -50 L 500 -50 L 500 200 L -600 200 L -600 -50 Z M -40 10 L 20 10 L 20 50 L -40 50 L -40 10 Z"
+       transform="matrix(1 0 0 1 250 125)"
+       fill="#ff0000"
+       fill-rule="evenodd"
+       stroke="none"
+       id="path1" />
+  </g>
+  <defs
+     id="defs2">
+    <clipPath
+       id="image-clip-1"
+       clipPathUnits="userSpaceOnUse">
+      <path
+         d="M 28 34 L 1.8278059999999998 34 L -2 17.011895 L -2 4 L 28 4 Z M 6 12 L 6 20 L 12 20 L 12 12 Z"
+         transform="matrix(-1.7143346014042253 -1.0300761498201072 0.38627855618254014 -0.6428754755265844 170 160)"
+         clip-rule="evenodd"
+         id="path2" />
+    </clipPath>
+  </defs>
+  <g
+     clip-path="url(#image-clip-1)"
+     id="g2">
+    <image
+       x="-2"
+       y="4"
+       width="40"
+       height="30"
+       preserveAspectRatio="none"
+       transform="matrix(-1.7143346014042253 -1.0300761498201072 0.38627855618254014 -0.6428754755265844 170 160)"
+       xlink:href="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAgAAAAGCAIAAABxZ0isAAAADklEQVR4nGP4z8AARwwLkBDpEtmrO5UAAAAOSURBVMhS/+8wwBHpEgB50zWtvhQo1wAAAABJRU5ErkJggg=="
+       id="image2" />
+  </g>
+  <g
+     id="artwork-2">
+    <title
+       id="title2">composition-mixed.svg</title>
+    <path
+       d="M -160 10 L 10 100"
+       transform="matrix(1 0 0 1 250 125)"
+       fill="none"
+       stroke="#0000ff"
+       stroke-width="0.1"
+       vector-effect="non-scaling-stroke"
+       stroke-linejoin="round"
+       stroke-linecap="round"
+       id="path3" />
+  </g>
+  <image
+     x="-2"
+     y="4"
+     width="40"
+     height="30"
+     preserveAspectRatio="none"
+     transform="matrix(-1.7143346014042253 -1.0300761498201072 0.38627855618254014 -0.6428754755265844 192 165)"
+     xlink:href="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAgAAAAGCAIAAABxZ0isAAAADklEQVR4nGP4z8AARwwLkBDpEtmrO5UAAAAOSURBVMhS/+8wwBHpEgB50zWtvhQo1wAAAABJRU5ErkJggg=="
+     id="image3" />
+</svg>

@@ -1,11 +1,12 @@
 import { useState } from 'react';
 import { starterLibraryEntryForProfileId } from '../../core/material-library';
-import type { Layer } from '../../core/scene';
+import { machineKindOf, type Layer } from '../../core/scene';
 import type { MaterialLibraryDocument } from '../../io/material-library';
 import { Button } from '../kit';
 import { SavedLibrariesButton } from '../material-library/SavedLibrariesButton';
 import { MaterialPresetWizardLauncher } from '../material-library/wizard';
 import { useStore } from '../state';
+import { ProcessRecipePanel } from '../material-library/ProcessRecipePanel';
 import { buildStarterLibrary } from './material-library-builders';
 import {
   materialBindingStatus,
@@ -30,8 +31,15 @@ import {
 
 export function MaterialLibraryPanel(): JSX.Element {
   const library = useStore((state) => state.materialLibrary);
+  const kind = useStore((state) => machineKindOf(state.project.machine));
   return library === null ? (
     <EmptyMaterialLibraryPanel />
+  ) : kind === 'cnc' ? (
+    <section aria-label="Process Library" style={sectionStyle}>
+      <Header />
+      <p style={libraryNameStyle}>{library.name}</p>
+      <ProcessRecipePanel />
+    </section>
   ) : (
     <LoadedMaterialLibraryPanel library={library} />
   );
@@ -41,13 +49,15 @@ function EmptyMaterialLibraryPanel(): JSX.Element {
   const device = useStore((state) => state.project.device);
   const createLibrary = useStore((state) => state.createLibrary);
   const setMaterialLibrary = useStore((state) => state.setMaterialLibrary);
-  const starterEntry = starterLibraryEntryForProfileId(device.profileId);
+  const kind = useStore((state) => machineKindOf(state.project.machine));
+  const starterEntry = kind === 'laser' ? starterLibraryEntryForProfileId(device.profileId) : null;
   return (
-    <section aria-label="Material Library" style={sectionStyle}>
+    <section
+      aria-label={kind === 'cnc' ? 'Process Library' : 'Material Library'}
+      style={sectionStyle}
+    >
       <Header />
-      <p style={hintStyle}>
-        No material library yet. Create one, or open one from Saved Libraries.
-      </p>
+      <p style={hintStyle}>No library yet. Create one, or open one from Saved Libraries.</p>
       <div style={buttonRowStyle}>
         <Button
           aria-label="Create new material library"
@@ -101,6 +111,7 @@ function LoadedMaterialLibraryPanel(props: {
     <section aria-label="Material Library" style={sectionStyle}>
       <Header />
       <p style={libraryNameStyle}>{props.library.name}</p>
+      <ProcessRecipePanel />
       <MaterialLibrarySelectors
         layers={layers}
         presetOptions={presetOptions}
@@ -225,12 +236,13 @@ function MaterialLibrarySelectors(props: {
 }
 
 function Header(): JSX.Element {
+  const kind = useStore((state) => machineKindOf(state.project.machine));
   return (
     <div style={headerRowStyle}>
       <div
         style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}
       >
-        <h2 style={headingStyle}>Material Library</h2>
+        <h2 style={headingStyle}>{kind === 'cnc' ? 'Process Library' : 'Material Library'}</h2>
       </div>
       <SavedLibrariesButton />
     </div>

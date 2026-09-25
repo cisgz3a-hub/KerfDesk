@@ -39,6 +39,7 @@ export function fileShortcutContext(platform: PlatformAdapter): FileCtx {
     settingsCapability: laser.capabilities.settings,
     activeWcs: laser.activeWcs,
     importSvgObject: app.importSvgObject,
+    importSvgFragment: app.importSvgFragment,
     importRasterImage: app.importRasterImage,
     setProject: app.setProject,
     newProject: app.newProject,

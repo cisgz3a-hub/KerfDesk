@@ -176,6 +176,8 @@ function validateSceneObject(obj: unknown, path: string): string | null {
   if (operationIdsError !== null) return operationIdsError;
   const tabAnchorError = validateCncTabAnchors(obj['cncTabAnchors'], `${path}.cncTabAnchors`);
   if (tabAnchorError !== null) return tabAnchorError;
+  const svgImportError = validateSvgImport(obj['svgImport'], `${path}.svgImport`);
+  if (svgImportError !== null) return svgImportError;
   const kind = obj['kind'];
   if (kind === 'imported-svg') return validateVectorObject(obj, path);
   if (kind === 'text') return validateTextObject(obj, path);
@@ -186,6 +188,17 @@ function validateSceneObject(obj: unknown, path: string): string | null {
   if (kind === 'shape') return validateShapeObject(obj, path);
   if (kind === 'relief') return validateReliefObject(obj, path);
   return `missing or invalid \`${path}.kind\``;
+}
+
+function validateSvgImport(value: unknown, path: string): string | null {
+  if (value === undefined) return null;
+  if (!isObject(value)) return `missing or invalid \`${path}\``;
+  return firstError([
+    requireString(value, `${path}.id`),
+    requireString(value, `${path}.source`),
+    optionalLiteral(value, `${path}.mode`, ['line', 'fill', 'image']),
+    validateTransform(value['transform'], `${path}.transform`),
+  ]);
 }
 // H.4 (ADR-098): the embedded mesh is the carving source — a malformed or
 // non-finite mesh or canonical field/mask data must never reach the heightmap sampler.
@@ -291,6 +304,9 @@ function validateRasterObject(obj: Record<string, unknown>, path: string): strin
     optionalNumber(obj, `${path}.contrast`),
     optionalNumber(obj, `${path}.gamma`),
     optionalString(obj, `${path}.imageMaskId`),
+    obj['imageClip'] === undefined
+      ? null
+      : validateColoredPaths(obj['imageClip'], `${path}.imageClip`),
     optionalLiteral(obj, `${path}.role`, ['trace-source']),
   ]);
   if (fieldError !== null) return fieldError;

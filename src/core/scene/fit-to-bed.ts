@@ -9,7 +9,7 @@
 // that center in place, so a staggered import keeps its offset.
 
 import { transformedBounds } from './hit-test';
-import type { SceneObject } from './scene-object';
+import type { Bounds, SceneObject } from './scene-object';
 import { applyTransform } from './transform';
 
 // Oversize art has no file size that fits, so it lands inside 90% of the bed
@@ -45,6 +45,15 @@ export function fitObjectToBed(
 /** Measure the object's scaled, rotated footprint; translation is ignored. */
 export function measureBedFit(object: SceneObject, bedWidth: number, bedHeight: number): BedFit {
   const footprint = transformedBounds(object.bounds, { ...object.transform, x: 0, y: 0 });
+  return measureBoundsBedFit(footprint, bedWidth, bedHeight);
+}
+
+/** Measure a whole selection without fitting its components independently. */
+export function measureBoundsBedFit(
+  footprint: Bounds,
+  bedWidth: number,
+  bedHeight: number,
+): BedFit {
   const widthMm = footprint.maxX - footprint.minX;
   const heightMm = footprint.maxY - footprint.minY;
   const fits =

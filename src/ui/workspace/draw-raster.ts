@@ -17,6 +17,7 @@ import {
   type PartialCellGrid,
 } from '../../core/grid';
 import type { LumaAdjustments } from '../../core/raster';
+import { closedImageClipContours } from '../../core/raster/image-mask';
 import type { AABB, Layer, RasterImage, Transform as ObjTransform } from '../../core/scene';
 import { effectiveOperationForObject } from '../../core/scene/effective-operation';
 import {
@@ -140,6 +141,7 @@ export function drawRasterImage(
     readonly bounds: AABB;
     readonly transform: ObjTransform;
     readonly role?: 'trace-source';
+    readonly imageClip?: RasterImage['imageClip'];
     readonly brightness?: number;
     readonly contrast?: number;
     readonly gamma?: number;
@@ -163,6 +165,7 @@ export function drawRasterImage(
     obj.bounds,
     obj.transform,
     view,
+    obj.imageClip,
   );
 }
 
@@ -220,6 +223,7 @@ export function drawBitmapAtTransform(
   bounds: AABB,
   transform: ObjTransform,
   view: ViewTransform,
+  imageClip?: RasterImage['imageClip'],
 ): void {
   const t = transform;
   const w = bounds.maxX - bounds.minX;
@@ -230,8 +234,24 @@ export function drawBitmapAtTransform(
   const sx = (t.mirrorX ? -1 : 1) * t.scaleX * view.scale;
   const sy = (t.mirrorY ? -1 : 1) * t.scaleY * view.scale;
   ctx.scale(sx, sy);
+  if (imageClip !== undefined) clipRasterImage(ctx, imageClip);
   ctx.drawImage(bitmap, bounds.minX, bounds.minY, w, h);
   ctx.restore();
+}
+
+function clipRasterImage(
+  ctx: CanvasRenderingContext2D,
+  paths: NonNullable<RasterImage['imageClip']>,
+): void {
+  ctx.beginPath();
+  for (const contour of closedImageClipContours(paths)) {
+    const start = contour[0];
+    if (start === undefined) continue;
+    ctx.moveTo(start.x, start.y);
+    for (const point of contour.slice(1)) ctx.lineTo(point.x, point.y);
+    ctx.closePath();
+  }
+  ctx.clip('evenodd');
 }
 
 type BitmapAxisSpan = {

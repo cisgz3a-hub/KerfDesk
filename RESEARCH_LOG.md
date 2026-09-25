@@ -1528,3 +1528,43 @@ above are no longer current output behavior.
 - Reason: security fixes on compatible release lines. Vitest 3.x has no backport for [GHSA-82fw-gwwq-j7x9](https://github.com/advisories/GHSA-82fw-gwwq-j7x9), requiring paired runner/provider migration. Vitest 5 and broad unrelated tooling updates were rejected as unnecessary scope; cross-major overrides and audit suppression were rejected.
 - Compatibility: [Vitest 4 migration](https://v4.vitest.dev/guide/migration) supports existing Vite 6 and Node 22. Test helpers use concrete callable signatures. A real V8 coverage fixture checks brace inclusion and uncovered source; production coverage policy is unchanged. Frozen install retains release-age policy. Full and production-only audit results are recorded independently.
 - Details and qualification evidence: `docs/audits/2026-09-19-development-tool-advisories.md`.
+
+## 2026-09-23 - Local PDF and TIFF artwork import (ADR-357)
+
+- Evaluator: Codex. Current use case: the user requested the remaining audited format gaps,
+  including PDF/PDF-compatible AI page import and TIFF alongside BMP/GIF and clean-room HPGL.
+- Selected runtime libraries: `pdfjs-dist@6.3.289` (Apache-2.0) and `tiff@7.1.3` (MIT).
+  Their installed LICENSE files and public release sources were inspected. PDF.js is actively
+  maintained by Mozilla; TIFF 7.1.3 was released within the previous twelve months. Runtime
+  advisory and compressed-bundle evidence is recorded in the follow-up audit report.
+  Sources: https://github.com/mozilla/pdf.js/releases and https://github.com/image-js/tiff/releases.
+- Alternatives: hand-writing a general PDF renderer would miss fonts, clips and embedded images;
+  a whole-page-only renderer would discard useful editable path geometry. The selected adapter
+  keeps complete simple paths editable and explicitly renders other pages. UTIF 3.1.0 was not
+  selected because its old published release does not satisfy the current maintenance criterion.
+  Browser-native TIFF is unavailable on the supported Chromium surface. The smaller maintained
+  pure-JavaScript TIFF decoder is isolated in a worker with independent byte/pixel fixtures.
+- Architecture: heavy codecs are dynamically loaded or worker-only. PDF CMaps, fonts and codec
+  resources are local, with no CDN. The existing strict CSP is retained; WASM is disabled and
+  the upstream JavaScript codec fallbacks are used. Document JavaScript/XFA is not enabled.
+  PDF.js 6.3 removed the older isEvalSupported option; the pinned public API and installed source
+  are the authority. Sources: https://mozilla.github.io/pdf.js/api/draft/api.js.html and
+  https://github.com/mozilla/pdf.js/tree/v6.3.289.
+- Separate asset review: pdfjs-dist includes GPL-licensed Liberation 1 fallback fonts; those
+  package assets are excluded from web emission and desktop package inputs. Unmodified Liberation
+  Sans 2.1.5 is bundled under OFL-1.1 instead. Original font names, licence, exact SHA-256 hashes
+  and source release are recorded by the existing third-party font closure. CMaps (Adobe BSD),
+  Foxit/PDFium standard fonts (BSD), and JS image codecs (BSD/Apache) retain their licence texts.
+  Sources: https://github.com/liberationfonts/liberation-fonts/releases/tag/2.1.5 and
+  https://github.com/liberationfonts/liberation-fonts/blob/2.1.5/LICENSE.
+- Pixel meaning: GIF's bitmap contract uses the default/first animation frame, then saves a
+  static PNG source. BMP density is pixels/metre. TIFF decode is qualified by independent
+  fixtures for byte order, selected page, orientation, density and exact samples; unsupported
+  variants fail explicitly. Sources:
+  https://html.spec.whatwg.org/multipage/imagebitmap-and-animations.html and
+  https://learn.microsoft.com/en-us/windows/win32/api/wingdi/ns-wingdi-bitmapinfoheader.
+- Verification on 2026-09-24: the runtime advisory audit reports zero advisories; the unchanged
+  licence gate passes 56 production packages across nine licences. PDF.js's unused optional Node
+  canvas edge is removed with an exact parent/version pnpm override, keeping native canvas out
+  of the runtime closure. PDF resource gzip contribution is 2,201,129 bytes before decoder chunks;
+  ADR-357 records the alternatives and retained offline precache tradeoff.

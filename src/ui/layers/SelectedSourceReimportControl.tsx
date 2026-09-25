@@ -1,3 +1,4 @@
+import { sourceFragmentObjects } from '../state/svg-fragment-mutation';
 import type { SceneObject } from '../../core/scene';
 import {
   handleReimportSelectedArtwork,
@@ -11,6 +12,7 @@ export function SelectedSourceReimportControl(props: {
   readonly object: SceneObject | null;
 }): JSX.Element | null {
   const platform = usePlatformOptional();
+  const reimportFragment = useStore((state) => state.reimportSvgFragment);
   const reimportObject = useStore((state) => state.reimportSvgObject);
   const pushToast = useToastStore((state) => state.pushToast);
   const target = props.object;
@@ -20,7 +22,7 @@ export function SelectedSourceReimportControl(props: {
       <button
         type="button"
         className="lf-btn"
-        title="Replace only this selected source-aware object; a fresh import always appends a new object."
+        title="Replace the artwork from this source file together; a fresh import always appends."
         onClick={() =>
           void handleReimportSelectedArtwork({
             platform,
@@ -31,6 +33,9 @@ export function SelectedSourceReimportControl(props: {
                 .getState()
                 .project.scene.objects.find((candidate) => candidate.id === target.id),
             reimportObject,
+            reimportFragment,
+            getSourceObjects: () =>
+              sourceFragmentObjects(useStore.getState().project.scene, target),
             pushToast,
           })
         }
@@ -38,7 +43,7 @@ export function SelectedSourceReimportControl(props: {
         Re-import selected source…
       </button>
       <span style={hintStyle}>
-        Replaces only this selected {target.source} object. Fresh imports always append.
+        Replaces the artwork imported from {target.source}. Fresh imports always append.
       </span>
     </div>
   );

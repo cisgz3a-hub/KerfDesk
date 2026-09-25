@@ -31,16 +31,63 @@ function objectUrls() {
   return { create, revoke };
 }
 
-it('rejects a cancelled decode before starting any browser decoder', async () => {
+it.each(['png', 'gif'])(
+  'rejects a cancelled %s decode before starting any browser decoder',
+  async (format) => {
+    const controller = new AbortController();
+    controller.abort();
+    const createBitmap = vi.fn();
+    vi.stubGlobal('createImageBitmap', createBitmap);
+    const urls = objectUrls();
+    await expect(
+      loadImageAsRawData(
+        format === 'gif'
+          ? new File([], 'source.gif', { type: 'image/gif' })
+          : headerFile(4096, 2048),
+        2048,
+        controller.signal,
+      ),
+    ).rejects.toMatchObject({ name: 'AbortError' });
+    expect(createBitmap).not.toHaveBeenCalled();
+    expect(urls.create).not.toHaveBeenCalled();
+  },
+);
+
+it('cancels promptly during GIF preparation and still closes its late bitmap', async () => {
   const controller = new AbortController();
-  controller.abort();
-  const createBitmap = vi.fn();
-  vi.stubGlobal('createImageBitmap', createBitmap);
   const urls = objectUrls();
-  await expect(
-    loadImageAsRawData(headerFile(4096, 2048), 2048, controller.signal),
-  ).rejects.toMatchObject({ name: 'AbortError' });
-  expect(createBitmap).not.toHaveBeenCalled();
+  let complete!: (bitmap: ImageBitmap) => void;
+  const createBitmap = vi.fn(
+    () =>
+      new Promise<ImageBitmap>((resolve) => {
+        complete = resolve;
+      }),
+  );
+  vi.stubGlobal('createImageBitmap', createBitmap);
+  vi.spyOn(HTMLCanvasElement.prototype, 'getContext').mockReturnValue({
+    drawImage: vi.fn(),
+  } as unknown as CanvasRenderingContext2D);
+  vi.spyOn(HTMLCanvasElement.prototype, 'toBlob').mockImplementation((callback) => {
+    callback(new Blob([], { type: 'image/png' }));
+  });
+  let markClosed!: () => void;
+  const closed = new Promise<void>((resolve) => {
+    markClosed = resolve;
+  });
+  const close = vi.fn(markClosed);
+  const decoding = loadImageAsRawData(
+    new File([], 'source.gif', { type: 'image/gif' }),
+    undefined,
+    controller.signal,
+  );
+  const cancelled = expect(decoding).rejects.toMatchObject({ name: 'AbortError' });
+  expect(createBitmap).toHaveBeenCalledOnce();
+  controller.abort();
+  await cancelled;
+  complete({ close, width: 2, height: 2 } as unknown as ImageBitmap);
+  await closed;
+  expect(close).toHaveBeenCalledOnce();
+  expect(createBitmap).toHaveBeenCalledOnce();
   expect(urls.create).not.toHaveBeenCalled();
 });
 

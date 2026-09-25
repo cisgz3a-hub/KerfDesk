@@ -7,9 +7,9 @@ import { EMPTY_SCENE, type Scene } from './scene';
 import type { ProjectVariableData } from './variable-template';
 import type { PrintAndCutDesignTargets } from './print-and-cut';
 
-// v8 preserves per-copy variable sequence offsets. Older readers would repeat
-// one record on every badge if allowed to silently ignore this metadata.
-export const PROJECT_SCHEMA_VERSION = 8 as const;
+// v9 preserves owned image clips. Older readers would engrave the full source
+// bitmap if allowed to silently ignore its clip geometry.
+export const PROJECT_SCHEMA_VERSION = 9 as const;
 
 export type EmbeddedFont = {
   readonly key: string;

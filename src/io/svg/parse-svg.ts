@@ -20,12 +20,8 @@ import {
   polylineToCurveSubpath,
 } from '../../core/scene';
 import { type SvgStripCounts, sanitizeSvg } from './sanitize';
-import { applySvgMatrix, transformSvgCurveSubpath, type SvgMatrix } from './svg-curve-transform';
-import {
-  multiplySvgMatrix,
-  parseSvgTransform,
-  translateSvgMatrix,
-} from './svg-transform-attribute';
+import { applySvgMatrix, transformSvgCurveSubpath } from './svg-curve-transform';
+import { multiplySvgMatrix, translateSvgMatrix } from './svg-transform-attribute';
 import { elementToSubPaths } from './shape-to-polylines';
 import { createSvgIdResolver, type SvgIdResolver } from './svg-id-resolver';
 import { linearScaleMagnitude } from './transform-scale';
@@ -37,107 +33,26 @@ import {
   type SvgImportBudget,
 } from './svg-import-budget';
 import { resolveUnitScale } from './svg-units';
-import { inheritedSvgFillRule } from './svg-fill-rule';
+import {
+  INITIAL_PRESENTATION_STATE,
+  normalizeColor,
+  numAttr,
+  presentationStateFor,
+  type PresentationState,
+} from './svg-presentation';
+import type { ParsedSvgFragment, SvgImportEntry } from './svg-import-fragment';
+import { svgImageElement } from './svg-image-element';
 import { createSvgStyleCascade, type SvgStyleCascade } from './svg-stylesheet';
 
 export { SVG_IMPORT_LIMITS } from './svg-import-budget';
 
 export type ParseSvgResult = {
   readonly object: ImportedSvg | null;
+  readonly fragment?: ParsedSvgFragment;
   readonly stripped: SvgStripCounts;
   readonly notes: ReadonlyArray<string>;
   readonly ignoredTextElements: number;
   readonly ignoredImageElements: number;
-};
-
-const COLOR_FALLBACK = '#000000';
-
-// CSS named colors. Phase A covers the 16 HTML basic colors plus a handful of
-// common extended names. Anything else falls back to black.
-const NAMED_COLORS: Readonly<Record<string, string>> = {
-  black: '#000000',
-  silver: '#c0c0c0',
-  gray: '#808080',
-  grey: '#808080',
-  white: '#ffffff',
-  maroon: '#800000',
-  red: '#ff0000',
-  purple: '#800080',
-  fuchsia: '#ff00ff',
-  magenta: '#ff00ff',
-  green: '#008000',
-  lime: '#00ff00',
-  olive: '#808000',
-  yellow: '#ffff00',
-  navy: '#000080',
-  blue: '#0000ff',
-  teal: '#008080',
-  aqua: '#00ffff',
-  cyan: '#00ffff',
-  orange: '#ffa500',
-};
-
-function clampByte(n: number): number {
-  return Math.min(255, Math.max(0, n));
-}
-
-function byteToHex(n: number): string {
-  return clampByte(n).toString(16).padStart(2, '0');
-}
-
-function expandShortHex(s: string): string {
-  const r = s[1] ?? '0';
-  const g = s[2] ?? '0';
-  const b = s[3] ?? '0';
-  return `#${r}${r}${g}${g}${b}${b}`;
-}
-
-function tryParseRgb(s: string): string | null {
-  const m = /^rgb\(\s*(\d+)\s*,\s*(\d+)\s*,\s*(\d+)\s*\)$/.exec(s);
-  if (m === null) return null;
-  const r = byteToHex(Number.parseInt(m[1] ?? '0', 10));
-  const g = byteToHex(Number.parseInt(m[2] ?? '0', 10));
-  const b = byteToHex(Number.parseInt(m[3] ?? '0', 10));
-  return `#${r}${g}${b}`;
-}
-
-// Returns '' for "no stroke" (none / absent without default) — caller skips.
-function normalizeColor(input: string | null): string {
-  if (input === null) return '';
-  const s = input.trim().toLowerCase();
-  if (s === 'none' || s === '') return '';
-  if (s in NAMED_COLORS) return NAMED_COLORS[s] ?? COLOR_FALLBACK;
-  if (/^#[0-9a-f]{6}$/.test(s)) return s;
-  if (/^#[0-9a-f]{3}$/.test(s)) return expandShortHex(s);
-  return tryParseRgb(s) ?? COLOR_FALLBACK;
-}
-
-type Matrix = SvgMatrix;
-
-type PresentationState = {
-  readonly stroke: string | null;
-  readonly fill: string | null;
-  readonly fillRule: ColoredPath['fillRule'];
-  readonly transform: Matrix;
-  readonly hidden: boolean;
-  readonly opacity: number;
-  readonly strokeOpacity: number;
-  readonly fillOpacity: number;
-  readonly visibility: string | null;
-};
-
-const IDENTITY_MATRIX: Matrix = { a: 1, b: 0, c: 0, d: 1, e: 0, f: 0 };
-
-const INITIAL_PRESENTATION_STATE: PresentationState = {
-  stroke: null,
-  fill: null,
-  fillRule: undefined,
-  transform: IDENTITY_MATRIX,
-  hidden: false,
-  opacity: 1,
-  strokeOpacity: 1,
-  fillOpacity: 1,
-  visibility: null,
 };
 
 type PathBucket = {
@@ -152,7 +67,9 @@ type PathBucket = {
 // recursive walkers past the project's parameter-count limit.
 type WalkContext = {
   readonly byColor: Map<string, PathBucket>;
-  readonly counts: { text: number; image: number };
+  readonly entries: SvgImportEntry[];
+  readonly identity: { readonly id: string; readonly source: string };
+  readonly counts: { text: number; image: number; fillAndStroke: number };
   readonly budget: SvgImportBudget;
   readonly resolveId: SvgIdResolver;
   readonly cascadeStyles: SvgStyleCascade;
@@ -197,10 +114,15 @@ function walkElement(
   if (depth > MAX_WALK_DEPTH) return;
   const state = presentationStateFor(el, parent, context.cascadeStyles);
   const tag = el.tagName.toLowerCase();
-  if (tag === 'text' || tag === 'tspan') {
+  if (['text', 'tspan'].includes(tag)) {
     context.counts.text += 1;
-  } else if (tag === 'image') {
-    context.counts.image += 1;
+  } else if (tag === 'image' && !state.hidden) {
+    const image = svgImageElement(el, state, context.resolveId, {
+      id: context.identity.id + '-' + context.entries.length,
+      source: context.identity.source,
+    });
+    if (image === null) context.counts.image += 1;
+    else context.entries.push(image);
   } else if (NEVER_RENDERED.has(tag)) {
     return;
   } else if (tag === 'use' && !state.hidden) {
@@ -241,8 +163,9 @@ function appendUseGeometry(
 // SVG's initial fill is black, so a shape that nothing styles still paints and
 // imports exactly as an explicit fill="#000000" does. A <line> has no interior
 // and is never filled (SVG 1.1 §9.5), so it still needs a stroke.
-function initialFill(el: Element): string | null {
-  return el.tagName.toLowerCase() === 'line' ? null : '#000000';
+function visibleFillColor(el: Element, state: PresentationState): string {
+  const initial = el.tagName.toLowerCase() === 'line' ? null : '#000000';
+  return state.fillOpacity > 0 ? normalizeColor(state.fill ?? initial) : '';
 }
 
 function appendElementGeometry(el: Element, state: PresentationState, context: WalkContext): void {
@@ -252,9 +175,10 @@ function appendElementGeometry(el: Element, state: PresentationState, context: W
   const subs = elementToSubPaths(el, linearScaleMagnitude(t.a, t.b, t.c, t.d));
   if (subs.length === 0) return;
   const strokeColor = state.strokeOpacity > 0 ? normalizeColor(state.stroke) : '';
-  const fillColor = state.fillOpacity > 0 ? normalizeColor(state.fill ?? initialFill(el)) : '';
+  const fillColor = visibleFillColor(el, state);
   const color = strokeColor !== '' ? strokeColor : fillColor;
   if (color === '') return;
+  recordVectorPresentation(state, context, strokeColor, fillColor);
   // Explicit SVG rules apply to each element's compound path. Different
   // elements paint independently even when their colours/rules match.
   const key = state.fillRule === undefined ? color : `${color}:${context.byColor.size}`;
@@ -264,6 +188,8 @@ function appendElementGeometry(el: Element, state: PresentationState, context: W
     polylines: [],
     curves: [],
   };
+  const entryPolylines: Polyline[] = [];
+  const entryCurves: CurveSubpath[] = [];
   for (const sub of subs) {
     reserveSvgPolyline(color, sub.points.length, context.budget);
     const points = sub.points.map((p) => applySvgMatrix(state.transform, p));
@@ -273,13 +199,45 @@ function appendElementGeometry(el: Element, state: PresentationState, context: W
       closed: sub.closed,
     };
     bucket.polylines.push(polyline);
+    entryPolylines.push(polyline);
     bucket.curves.push(
       sub.curve === undefined
         ? polylineToCurveSubpath(polyline)
         : transformSvgCurveSubpath(sub.curve, state.transform),
     );
+    const curve = bucket.curves.at(-1);
+    if (curve !== undefined) entryCurves.push(curve);
   }
+  appendVectorEntry(
+    context,
+    {
+      color,
+      ...(state.fillRule === undefined ? {} : { fillRule: state.fillRule }),
+      polylines: entryPolylines,
+      curves: entryCurves,
+    },
+    strokeColor === '',
+  );
   context.byColor.set(key, bucket);
+}
+
+function recordVectorPresentation(
+  state: PresentationState,
+  context: WalkContext,
+  strokeColor: string,
+  fillColor: string,
+): void {
+  if (state.clips.length > 0) {
+    throw new Error(
+      'SVG vector clipping is not supported. Apply the clip to the paths before importing.',
+    );
+  }
+  if (state.unsupportedEffects.length > 0) {
+    throw new Error(
+      'SVG vector masks and filters are not supported. Apply these effects before importing.',
+    );
+  }
+  if (strokeColor !== '' && fillColor !== '') context.counts.fillAndStroke += 1;
 }
 
 function isDefinitionContainer(el: Element): boolean {
@@ -297,86 +255,6 @@ function walkReferencedDefinition(
   for (const child of Array.from(el.children)) {
     walkElement(child, state, context, depth + 1);
   }
-}
-
-function presentationStateFor(
-  el: Element,
-  parent: PresentationState,
-  cascadeStyles: SvgStyleCascade,
-): PresentationState {
-  // Parsed once and passed down: each of the eight lookups below used to re-read
-  // and re-split the whole style attribute for the same element. Matching
-  // <style> rules merge in here, so every lookup sees the winning declaration.
-  const styles = cascadeStyles(el, styleMap(el.getAttribute('style')));
-  const stroke = presentationValue(el, styles, 'stroke') ?? parent.stroke;
-  const fill = presentationValue(el, styles, 'fill') ?? parent.fill;
-  const visibility = presentationValue(el, styles, 'visibility') ?? parent.visibility;
-  const display = presentationValue(el, styles, 'display');
-  const opacity = parent.opacity * parseOpacity(presentationValue(el, styles, 'opacity'));
-  const strokeOpacity =
-    parent.strokeOpacity * parseOpacity(presentationValue(el, styles, 'stroke-opacity'));
-  const fillOpacity =
-    parent.fillOpacity * parseOpacity(presentationValue(el, styles, 'fill-opacity'));
-  const transform = multiplySvgMatrix(
-    parent.transform,
-    parseSvgTransform(presentationValue(el, styles, 'transform')),
-  );
-  const normalizedVisibility = visibility?.trim().toLowerCase();
-  const hidden =
-    parent.hidden ||
-    display?.trim().toLowerCase() === 'none' ||
-    normalizedVisibility === 'hidden' ||
-    normalizedVisibility === 'collapse' ||
-    opacity <= 0;
-
-  return {
-    stroke,
-    fill,
-    fillRule: inheritedSvgFillRule(presentationValue(el, styles, 'fill-rule'), parent.fillRule),
-    transform,
-    hidden,
-    opacity,
-    strokeOpacity,
-    fillOpacity,
-    visibility,
-  };
-}
-
-function numAttr(el: Element, name: string, fallback = 0): number {
-  const raw = el.getAttribute(name);
-  if (raw === null) return fallback;
-  const parsed = Number.parseFloat(raw);
-  return Number.isFinite(parsed) ? parsed : fallback;
-}
-
-function presentationValue(
-  el: Element,
-  styles: ReadonlyMap<string, string>,
-  name: string,
-): string | null {
-  const styleValue = styles.get(name);
-  if (styleValue !== undefined) return styleValue;
-  return el.getAttribute(name);
-}
-
-function styleMap(style: string | null): Map<string, string> {
-  const map = new Map<string, string>();
-  if (style === null) return map;
-  for (const declaration of style.split(';')) {
-    const separator = declaration.indexOf(':');
-    if (separator < 0) continue;
-    const name = declaration.slice(0, separator).trim().toLowerCase();
-    const value = declaration.slice(separator + 1).trim();
-    if (name !== '') map.set(name, value);
-  }
-  return map;
-}
-
-function parseOpacity(input: string | null): number {
-  if (input === null) return 1;
-  const value = Number.parseFloat(input);
-  if (!Number.isFinite(value)) return 1;
-  return Math.min(1, Math.max(0, value));
 }
 
 export function parseSvg(args: { svgText: string; id: string; source: string }): ParseSvgResult {
@@ -409,12 +287,21 @@ export function parseSvgDocument(
     { x: bounds.maxX, y: bounds.maxY },
   ]);
   const byColor = new Map<string, PathBucket>();
-  const counts = { text: 0, image: 0 };
+  const counts = { text: 0, image: 0, fillAndStroke: 0 };
   const budget = createSvgImportBudget();
+  const entries: SvgImportEntry[] = [];
   const cascadeStyles = createSvgStyleCascade(svgEl);
   walkGeometry(
     svgEl,
-    { byColor, counts, budget, resolveId: createSvgIdResolver(svgEl), cascadeStyles },
+    {
+      byColor,
+      counts,
+      budget,
+      entries,
+      identity: args,
+      resolveId: createSvgIdResolver(svgEl),
+      cascadeStyles,
+    },
     unitScale,
   );
 
@@ -426,7 +313,7 @@ export function parseSvgDocument(
   }));
 
   const notes: string[] = [];
-  if (paths.length === 0) notes.push('SVG has no drawable geometry');
+  if (entries.length === 0) notes.push('SVG has no drawable geometry');
   // Rule 7 / ADR-268: this used to THROW mid-walk once the polyline/point/color
   // ceilings were crossed. It now reports the same measurement and imports.
   const sizeNote = svgImportSizeNote(budget);
@@ -436,6 +323,11 @@ export function parseSvgDocument(
   }
   if (counts.image > 0) {
     notes.push(`Ignored ${counts.image} image element(s) — Phase E adds raster tracing`);
+  }
+  if (counts.fillAndStroke > 0) {
+    notes.push(
+      `SVG presentation: Imported ${counts.fillAndStroke} SVG element(s) as strokes only; their fills were omitted.`,
+    );
   }
 
   return {
@@ -450,9 +342,68 @@ export function parseSvgDocument(
             transform: IDENTITY_TRANSFORM,
             paths,
           },
+    fragment: { source: args.source, bounds, entries },
     stripped,
     notes,
     ignoredTextElements: counts.text,
     ignoredImageElements: counts.image,
+  };
+}
+
+function boundsForPolylines(polylines: readonly Polyline[]): ImportedSvg['bounds'] {
+  let minX = Infinity,
+    minY = Infinity,
+    maxX = -Infinity,
+    maxY = -Infinity;
+  for (const line of polylines)
+    for (const point of line.points) {
+      minX = Math.min(minX, point.x);
+      minY = Math.min(minY, point.y);
+      maxX = Math.max(maxX, point.x);
+      maxY = Math.max(maxY, point.y);
+    }
+  return { minX, minY, maxX, maxY };
+}
+
+function appendVectorEntry(context: WalkContext, path: ColoredPath, filled: boolean): void {
+  const mode = filled ? 'fill' : 'line';
+  const entryPath = filled ? svgFillPath(path) : path;
+  const bounds = boundsForPolylines(path.polylines);
+  const previous = context.entries.at(-1);
+  if (previous?.kind === 'imported-svg' && previous.operationOverride?.mode === mode) {
+    context.entries[context.entries.length - 1] = {
+      ...previous,
+      paths: [...previous.paths, entryPath],
+      bounds: {
+        minX: Math.min(previous.bounds.minX, bounds.minX),
+        minY: Math.min(previous.bounds.minY, bounds.minY),
+        maxX: Math.max(previous.bounds.maxX, bounds.maxX),
+        maxY: Math.max(previous.bounds.maxY, bounds.maxY),
+      },
+    };
+    return;
+  }
+  context.entries.push({
+    kind: 'imported-svg',
+    id: context.identity.id + '-' + context.entries.length,
+    source: context.identity.source,
+    bounds,
+    transform: IDENTITY_TRANSFORM,
+    operationOverride: { mode },
+    paths: [entryPath],
+  });
+}
+
+function svgFillPath(path: ColoredPath): ColoredPath {
+  // SVG fills implicitly close every subpath and default to nonzero winding.
+  // Materialize both meanings only in the new Fill fragment, keeping stroke
+  // geometry and the legacy aggregate (including its saved-project defaults).
+  return {
+    ...path,
+    fillRule: path.fillRule ?? 'nonzero',
+    polylines: path.polylines.map((line) => ({ ...line, closed: true })),
+    ...(path.curves === undefined
+      ? {}
+      : { curves: path.curves.map((curve) => ({ ...curve, closed: true })) }),
   };
 }

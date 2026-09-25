@@ -30,6 +30,7 @@ export type SavedLibrarySummary = {
   readonly name: string;
   readonly deviceHintName: string | null;
   readonly presetCount: number;
+  readonly processRecipeCount?: number;
   readonly updatedAt: number;
   readonly isActive: boolean;
 };
@@ -152,6 +153,9 @@ function summaryFor(
     name: doc.name,
     deviceHintName: doc.deviceHint?.name ?? null,
     presetCount: doc.entries.length,
+    ...((doc.processRecipes?.length ?? 0) > 0
+      ? { processRecipeCount: doc.processRecipes?.length ?? 0 }
+      : {}),
     updatedAt: entry.updatedAt,
     isActive: id === activeId,
   };

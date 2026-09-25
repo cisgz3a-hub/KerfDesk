@@ -149,6 +149,58 @@ describe('handleReimportSelectedArtwork', () => {
     expect(reimportObject).not.toHaveBeenCalled();
     expect(pushToast).not.toHaveBeenCalled();
   });
+
+  it('rejects a prepared fragment if a sibling source component changed during parsing', async () => {
+    const selected = target('original.svg');
+    const sibling = svgObj('sibling', ['#0000ff']);
+    let members: readonly SceneObject[] = [selected, sibling];
+    const reimportFragment = vi.fn();
+    parserMocks.importSvgFiles.mockImplementationOnce(
+      async (_files, _importObject, _toast, options) => {
+        members = [selected, { ...sibling, transform: { ...sibling.transform, x: 1 } }];
+        expect(() =>
+          options.importFragment({
+            source: 'revision.svg',
+            bounds: selected.bounds,
+            objects: [selected],
+          }),
+        ).toThrow(/owner changed/);
+      },
+    );
+    await handleReimportSelectedArtwork({
+      platform: platformWith({ name: 'revision.svg' }),
+      target: selected,
+      ...owner(selected),
+      getSourceObjects: () => members,
+      reimportFragment,
+      reimportObject: vi.fn(),
+      pushToast: vi.fn(),
+    });
+    expect(reimportFragment).not.toHaveBeenCalled();
+  });
+
+  it('delivers the success toast after committed replacement changes target identity', async () => {
+    const selected = target('original.svg');
+    let current: SceneObject = selected;
+    const pushToast = vi.fn();
+    const reimportObject = vi.fn(() => {
+      current = { ...selected };
+      return { kind: 'replaced' as const, source: 'revision.svg', kept: 1, added: 0, removed: 0 };
+    });
+    parserMocks.importSvgFiles.mockImplementationOnce(async (_files, importObject, toast) => {
+      importObject(selected);
+      toast('Source replaced', 'success');
+    });
+    await handleReimportSelectedArtwork({
+      platform: platformWith({ name: 'revision.svg' }),
+      target: selected,
+      getProjectDocumentEpoch: () => 0,
+      getTargetObject: () => current,
+      reimportObject,
+      pushToast,
+    });
+    expect(pushToast).toHaveBeenCalledWith('Source replaced', 'success');
+  });
 });
 
 describe('explicit re-import store history', () => {

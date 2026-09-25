@@ -9,6 +9,7 @@ import type { ImportOutcome } from '../state/store';
 import type { ToastVariant } from '../state/toast-store';
 import { importImageFile } from './import-image-action';
 import { pickPlatformImageFile } from './platform-image-files';
+import { requestPagedArtwork } from '../import/request-paged-artwork';
 
 export type ImagePickActionContext = {
   readonly platform: PlatformAdapter;
@@ -30,6 +31,20 @@ export async function runImagePickAction(ctx: ImagePickActionContext): Promise<S
     return null;
   }
   if (file === null || !owner.isCurrent()) return null;
+  if (/\.(tif|tiff)$/i.test(file.name) || file.type === 'image/tiff') {
+    try {
+      const imported = await requestPagedArtwork(
+        file,
+        'tiff',
+        owner.isCurrent,
+        ownedActions.importRasterImage,
+      );
+      return owner.isCurrent() ? imported : null;
+    } catch (error) {
+      ownedActions.pushToast('Could not import TIFF: ' + errorMessage(error), 'error');
+      return null;
+    }
+  }
   const imported = await importImageFile(
     file,
     ownedActions.importRasterImage,

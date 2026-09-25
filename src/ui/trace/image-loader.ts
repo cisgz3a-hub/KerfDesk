@@ -6,6 +6,7 @@
 // blob and awaits this loader before kicking off tracing.
 
 import type { RawImageData } from '../../core/trace';
+import { freezeGif, isGif } from '../import/freeze-gif';
 import { readImageHeader } from './image-header-reader';
 import {
   awaitTraceSignal,
@@ -77,6 +78,8 @@ export async function loadImageAsRawData(
   maxEdge: number = MAX_EDGE_PX,
   signal?: AbortSignal,
 ): Promise<RawImageData> {
+  checkTraceSignal(signal);
+  if (isGif(file)) file = await awaitTraceSignal(freezeGif(file), signal);
   checkTraceSignal(signal);
   const headerDimensions = await awaitTraceSignal(readHeaderImageDimensions(file, signal), signal);
   checkTraceSignal(signal);
@@ -178,6 +181,7 @@ function compositeChannel(value: number | undefined, opacity: number): number {
 export async function readImageNaturalSize(
   file: File,
 ): Promise<{ readonly width: number; readonly height: number }> {
+  if (isGif(file)) file = await freezeGif(file);
   const headerDimensions = await readHeaderImageDimensions(file);
   if (headerDimensions !== null) {
     assertSafeDecodeDimensions(headerDimensions);

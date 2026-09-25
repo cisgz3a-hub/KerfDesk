@@ -1,18 +1,19 @@
 import type { FileHandle, PlatformAdapter } from '../../platform/types';
 
-const IMAGE_FILE_EXTENSIONS = ['.png', '.jpg', '.jpeg'] as const;
+const IMAGE_FILE_EXTENSIONS = ['.png', '.jpg', '.jpeg', '.bmp', '.gif'] as const;
 
 export async function pickPlatformImageFile(platform: PlatformAdapter): Promise<File | null> {
-  const files = await pickPlatformImageFiles(platform, false);
+  const files = await pickPlatformImageFiles(platform, false, true);
   return files[0] ?? null;
 }
 
 export async function pickPlatformImageFiles(
   platform: PlatformAdapter,
   multiple = true,
+  includeTiff = false,
 ): Promise<ReadonlyArray<File>> {
   const handles = await platform.pickFilesForOpen({
-    accept: IMAGE_FILE_EXTENSIONS,
+    accept: includeTiff ? [...IMAGE_FILE_EXTENSIONS, '.tif', '.tiff'] : IMAGE_FILE_EXTENSIONS,
     multiple,
   });
   const files: File[] = [];

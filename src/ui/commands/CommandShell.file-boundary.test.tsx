@@ -55,13 +55,28 @@ describe('CommandShell file boundaries', () => {
 
       await clickButton(host, 'Import...');
       expect(platform.pickFilesForOpen).toHaveBeenLastCalledWith({
-        accept: ['.svg', '.dxf', '.png', '.jpg', '.jpeg', '.stl'],
+        accept: [
+          '.svg',
+          '.dxf',
+          '.pdf',
+          '.ai',
+          '.hpgl',
+          '.plt',
+          '.png',
+          '.jpg',
+          '.jpeg',
+          '.bmp',
+          '.gif',
+          '.tif',
+          '.tiff',
+          '.stl',
+        ],
         multiple: true,
       });
 
       await clickMenuCommand(host, 'Tools', 'Multi-File Trace...');
       expect(platform.pickFilesForOpen).toHaveBeenLastCalledWith({
-        accept: ['.png', '.jpg', '.jpeg'],
+        accept: ['.png', '.jpg', '.jpeg', '.bmp', '.gif'],
         multiple: true,
       });
     } finally {

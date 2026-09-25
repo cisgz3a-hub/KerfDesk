@@ -26,3 +26,7 @@
 # upstream SHA-256 provenance remains verifiable after checkout.
 src/__fixtures__/lightburn/external/clb/** -text
 src/__fixtures__/lightburn/external/lbrn/** -text
+
+# PDF-compatible Illustrator fixtures contain byte-offset tables and must retain
+# their original bytes, including the fixed-width cross-reference entries.
+e2e/fixtures/document-import-generated/*.ai binary

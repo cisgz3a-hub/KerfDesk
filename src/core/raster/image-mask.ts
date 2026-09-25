@@ -1,7 +1,9 @@
 import {
   applyTransform,
   assertNever,
+  IDENTITY_TRANSFORM,
   isClosedEnough,
+  type ColoredPath,
   type Polyline,
   type RasterImage,
   type SceneObject,
@@ -47,11 +49,26 @@ export function createImageMaskPixelTest(
   width: number,
   height: number,
 ): ((x: number, y: number) => boolean) | null {
-  if (image.imageMaskId === undefined) return null;
-  if (maskObject?.id !== image.imageMaskId) return null;
-  const contours = closedMaskContours(maskObject);
-  if (contours.length === 0) return null;
-  return createRowScanlineTest(image, contours, width, height);
+  const owned =
+    image.imageClip === undefined
+      ? null
+      : createRowScanlineTest(
+          { ...image, transform: IDENTITY_TRANSFORM },
+          closedImageClipContours(image.imageClip),
+          width,
+          height,
+        );
+  const externalContours =
+    image.imageMaskId !== undefined && maskObject?.id === image.imageMaskId
+      ? closedMaskContours(maskObject)
+      : [];
+  if (externalContours.length === 0) return owned;
+  const external = createRowScanlineTest(image, externalContours, width, height);
+  return owned === null ? external : (x, y) => owned(x, y) && external(x, y);
+}
+
+export function closedImageClipContours(paths: readonly ColoredPath[]): MaskContours {
+  return paths.flatMap((path) => path.polylines.filter(isMaskContour).map((line) => line.points));
 }
 
 // Every pixel on a scan line shares one crossing list, and both callers walk a

@@ -1,9 +1,4 @@
-import {
-  arrayPlacements,
-  combinedBBox,
-  type GridArraySpec,
-  type SceneObject,
-} from '../../core/scene';
+import { arrayPlacements, combinedBBox, type ArraySpec, type SceneObject } from '../../core/scene';
 import { variableCopyOffset } from '../../core/variables';
 import {
   objectVariableTemplate,
@@ -16,6 +11,7 @@ import {
 } from '../../io/gcode/prepare-output-snapshot';
 import type { ArrayMaterialization } from './array-actions';
 import { sceneObjectCopyClosure } from './scene-object-copy-dependencies';
+import { variableArrayMaterialization } from './variable-array-placement';
 import type { AppState } from './store';
 
 type SelectionState = Pick<AppState, 'project' | 'selectedObjectId' | 'additionalSelectedIds'>;
@@ -23,10 +19,10 @@ export type VariableArrayResult =
   | { readonly ok: true; readonly materialized: ArrayMaterialization }
   | { readonly ok: false; readonly message: string; readonly cancelled?: true };
 
-/** Render every assigned copy before deriving spacing. Never mutates or advances a cursor. */
+/** Render every assigned copy before deriving placement. Never mutates or advances a cursor. */
 export async function prepareVariableArray(
   state: SelectionState,
-  spec: GridArraySpec,
+  spec: ArraySpec,
   options: {
     readonly render: VariableTextRenderer;
     readonly clock: () => Date;
@@ -72,12 +68,10 @@ export async function prepareVariableArray(
       ),
     );
   }
-  const envelope = combinedBBox(
-    slots.flatMap((slot) => slot.filter((object) => selectedIds.has(object.id))),
-  );
-  if (envelope === null)
+  const materialized = variableArrayMaterialization(spec, selectedIds, slots);
+  if (materialized === null)
     return { ok: false, message: 'The variable copies have no rendered bounds.' };
-  return { ok: true, materialized: { bounds: envelope, sources: slots } };
+  return { ok: true, materialized };
 }
 
 function copyStride(offsets: readonly number[]): number {
