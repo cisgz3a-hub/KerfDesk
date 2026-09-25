@@ -24,7 +24,7 @@ import {
   effectivePixelScale,
   preprocessForTrace,
 } from './trace-image';
-import { downscaleTracedPaths } from './auto-upscale';
+import { restoreFromWorkingGrid } from './auto-upscale';
 import { traceCenterlineStrokePathsSteps } from './centerline/trace-centerline';
 import { isBinaryContourPreset, traceImageToContourColoredPathsSteps } from './contour-trace';
 import { traceImageToEdgePathsSteps } from './edge-trace';
@@ -233,7 +233,7 @@ async function traceUpscaledImage(
   const upscaled = withCanonicalTraceCurves(
     await dispatchTrace(enlarged.image, enlarged.options, run, undefined, enlarged.contourInput),
   );
-  return downscaleTracedPaths(upscaled, factor);
+  return restoreFromWorkingGrid(upscaled, image, enlarged.image);
 }
 
 // The backend selection shared by both the direct and the upscaled paths.

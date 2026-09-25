@@ -27,7 +27,13 @@ export class ContourBoxIndex<T extends ContourBox> {
       if (cooperate && entries.length % BUILD_CHECKPOINT_INTERVAL === 0) yield;
       entries.push({ box, x: box.minX / 2 + box.maxX / 2, y: box.minY / 2 + box.maxY / 2 });
     }
-    return new ContourBoxIndex(yield* buildNodeSteps(entries, 0, entries.length, cooperate));
+    // A drained (non-cooperative) build needs no checkpoints, so it recurses
+    // as plain calls: one generator per tree node was most of the build cost.
+    return new ContourBoxIndex(
+      cooperate
+        ? yield* buildNodeSteps(entries, 0, entries.length, cooperate)
+        : buildNode(entries, 0, entries.length),
+    );
   }
 
   /** Unordered candidates; callers restore their own observable traversal order. */
@@ -65,6 +71,24 @@ function* buildNodeSteps<T extends ContourBox>(
     ...bounds,
     left: yield* buildNodeSteps(entries, start, middle, cooperate),
     right: yield* buildNodeSteps(entries, middle, end, cooperate),
+  };
+}
+
+function buildNode<T extends ContourBox>(
+  entries: Entry<T>[],
+  start: number,
+  end: number,
+): BoxNode<T> | undefined {
+  if (start === end) return undefined;
+  const { bounds, horizontal } = measure(entries, start, end);
+  if (end - start <= LEAF_SIZE)
+    return { ...bounds, items: entries.slice(start, end).map((e) => e.box) };
+  const middle = Math.floor((start + end) / 2);
+  selectMiddle(entries, start, end, middle, horizontal ? 'x' : 'y');
+  return {
+    ...bounds,
+    left: buildNode(entries, start, middle),
+    right: buildNode(entries, middle, end),
   };
 }
 

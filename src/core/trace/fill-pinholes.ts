@@ -40,7 +40,11 @@ export function fillPinholes(image: RawImageData, pixelScale = 1): RawImageData 
   const data = new Uint8ClampedArray(image.data);
   fillEnclosedPinholes(data, ink, outside, width, height, {
     maxAreaPx: PINHOLE_MAX_AREA_PX * scale * scale,
-    maxRadiusPx: PINHOLE_MAX_RADIUS_PX * scale,
+    // The inscribed radius is a whole-pixel depth, so a fractional working
+    // grid (the supersample taper) rounds its cap up: a sliver of the capped
+    // source width is ceil(scale) pixels deep there, and on an integer grid
+    // this is the plain product.
+    maxRadiusPx: Math.ceil(PINHOLE_MAX_RADIUS_PX * scale),
   });
   return { width, height, data };
 }

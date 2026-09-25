@@ -18,7 +18,9 @@ import {
   computeUpscaleFactor,
   fitsContourSupersampleBudget,
   fitsUpscalePixelBudget,
+  restoreFromWorkingGrid,
   upscaleBy,
+  upscaleToWorkingGrid,
   upscaleDouble,
   downscaleTracedPaths,
   scaleTracedPathsUniform,
@@ -419,5 +421,61 @@ describe('Sharp preset never upscales small pixel-art sources', () => {
     });
     expect(pointCount(shipped)).toBe(pointCount(forcedOn));
     expect(JSON.stringify(shipped)).toBe(JSON.stringify(forcedOn));
+  });
+});
+
+describe('fractional working grids', () => {
+  it('is exactly upscaleBy for an integer factor', () => {
+    const src = whiteImage(5, 3);
+    setInk(src, 1, 1);
+    expect(upscaleToWorkingGrid(src, 2)).toEqual(upscaleBy(src, 2));
+    expect(upscaleToWorkingGrid(src, 1)).toEqual(src);
+  });
+
+  it('samples a rounded grid for a fractional factor and maps vectors back per axis', () => {
+    const src = whiteImage(10, 7);
+    setInk(src, 0, 0);
+    const grid = upscaleToWorkingGrid(src, 1.5);
+    expect([grid.width, grid.height]).toEqual([15, 11]);
+    // The inked corner stays ink; the far corner stays paper.
+    expect(grid.data[0]).toBe(0);
+    expect(grid.data[(11 * 15 - 1) * 4]).toBe(255);
+    const traced: ColoredPath[] = [
+      {
+        color: '#000000',
+        polylines: [{ closed: false, points: [{ x: 15, y: 11 }] }],
+        curves: [
+          {
+            start: { x: 0, y: 0 },
+            closed: false,
+            segments: [
+              {
+                kind: 'cubic',
+                control1: { x: 3, y: 11 },
+                control2: { x: 15, y: 0 },
+                to: { x: 15, y: 11 },
+              },
+            ],
+          },
+        ],
+      },
+    ];
+    const restored = restoreFromWorkingGrid(traced, src, grid);
+    // Both far edges land on the source's far edges.
+    expect(restored[0]?.polylines[0]?.points[0]).toEqual({ x: 10, y: 7 });
+    expect(restored[0]?.curves?.[0]?.segments[0]).toMatchObject({
+      control1: { x: 2, y: 7 },
+      control2: { x: 10, y: 0 },
+      to: { x: 10, y: 7 },
+    });
+  });
+
+  it('restores an integer grid exactly as downscaleTracedPaths does', () => {
+    const paths: ColoredPath[] = [
+      { color: '#000000', polylines: [{ closed: false, points: [{ x: 3, y: 9 }] }] },
+    ];
+    expect(
+      restoreFromWorkingGrid(paths, { width: 4, height: 6 }, { width: 12, height: 18 }),
+    ).toEqual(downscaleTracedPaths(paths, 3));
   });
 });

@@ -127,3 +127,36 @@ describe('trace supersample performance regression', () => {
     await expect(traceImageToColoredPaths(image, LINE_ART)).resolves.not.toHaveLength(0);
   }, 30_000);
 });
+
+describe('supersample taper near the working-pixel budget', () => {
+  // Thin 1-px strokes ask for the 2x thin-stroke supersample.
+  function thinLines(side: number): RawImageData {
+    const image = whiteImage(side, side);
+    for (const y of [150, 300, 450, 600]) paintRect(image, 100, y, side - 200, 1);
+    return image;
+  }
+
+  it('traces a band-size source on a fractional grid and restores source coordinates', async () => {
+    const edge = TRACE_PRESETS['Edge Detection']!;
+    const image = thinLines(900);
+    const plan = traceScalePlan(image, edge);
+    expect(plan.kind).toBe('upscale');
+    const factor = plan.kind === 'upscale' ? plan.factor : 1;
+    expect(factor).toBeGreaterThan(1);
+    expect(factor).toBeLessThan(2);
+    const points = (await traceImageToColoredPaths(image, edge)).flatMap((path) =>
+      path.polylines.flatMap((polyline) => polyline.points),
+    );
+    expect(points.length).toBeGreaterThan(0);
+    const xs = points.map((p) => p.x);
+    const ys = points.map((p) => p.y);
+    expect(Math.abs(Math.min(...xs) - 100)).toBeLessThan(1.5);
+    expect(Math.abs(Math.max(...xs) - 800)).toBeLessThan(1.5);
+    expect(Math.abs(Math.min(...ys) - 150)).toBeLessThan(1.5);
+    expect(Math.abs(Math.max(...ys) - 601)).toBeLessThan(1.5);
+  });
+
+  it('keeps the exact 2x grid for sources clear of the budget edge', () => {
+    expect(traceScalePlan(thinLines(800), LINE_ART)).toEqual({ kind: 'upscale', factor: 2 });
+  });
+});
