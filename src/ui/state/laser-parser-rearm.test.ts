@@ -1,10 +1,10 @@
-// Audit HF-7 repro: grblHAL keeps a refused line's error "sticky"
-// (COMPATIBILITY_LEVEL 0, the default build, whose banner is "GrblHAL ..."),
-// and KerfDesk never clears it. After one refused line (a Console typo, a `$J=`
-// past the soft limits, a `$SLP` with sleep disabled) every later G-code line
-// is refused with the same stale error:N. That includes KerfDesk's own
-// `G4 P0.01` settle marker, so the automatic release of a refused jog/Frame
-// owner (ADR-361 decision 1) fails and the owner stays wedged.
+// grblHAL keeps a refused line's error "sticky" (COMPATIBILITY_LEVEL 0, the
+// default build, whose banner is "GrblHAL ..."). After one refused line (a
+// Console typo, a `$J=` past the soft limits, a `$SLP` with sleep disabled)
+// every later G-code line is refused with the same stale error:N until
+// something clears it. That included KerfDesk's own `G4 P0.01` settle marker,
+// so the automatic release of a refused jog/Frame owner (ADR-361 decision 1)
+// failed and the owner stayed wedged.
 //
 // Upstream grblHAL core protocol.c, protocol_main_loop() at
 // d7aaee3d84b1e7010f075d395206afff038d7379:
@@ -29,21 +29,22 @@
 // jog-cancel inserts: protocol.c:214-217, 896-899, stream.h:372) or a soft
 // reset (gc_init clears last_error: gcode.c:787, gcode.h:719) clear it.
 //
-// Correct behaviour: a refused line must not make KerfDesk's later G-code-only
-// actions fail with its stale error. KerfDesk should re-arm the parser after a
-// refused non-stream line (grblHAL answers an empty line `ok` and resets
+// A refused line must not make KerfDesk's later G-code-only actions fail with
+// its stale error: KerfDesk re-arms the parser after a refused non-stream line
+// (laser-parser-rearm.ts; grblHAL answers an empty line `ok` and resets
 // last_error, l.247-248), so Set origin, Manual air, the Frame's `M5` prelude,
-// the Falcon's G1 jog and the automatic release's settle marker all run.
+// the Falcon's G1 jog and the automatic release's settle marker all run
+// (controller audit 2026-09-25 HF-7).
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import {
   createFakeSerialPort,
   type FakeSerialPort,
 } from '../../__fixtures__/controllers/fake-serial-port';
 import { FALCON_A1_PRO_GRBLHAL_PROFILE } from '../../core/devices/falcon-profiles';
-import { connectOptionsForDevice } from '../../ui/commands/connect-options';
-import { useLaserStore } from '../../ui/state/laser-store';
-import { useStore } from '../../ui/state/store';
-import { resetStore } from '../../ui/state/test-helpers';
+import { connectOptionsForDevice } from '../commands/connect-options';
+import { useLaserStore } from './laser-store';
+import { useStore } from './store';
+import { resetStore } from './test-helpers';
 
 type GrblHalLineLoop = {
   readonly port: FakeSerialPort;
@@ -217,11 +218,6 @@ describe('HF-7 grblHAL sticky last_error', () => {
     const fake = await connectGeneric();
     await jogPastSoftLimit(fake);
     await vi.advanceTimersByTimeAsync(10_000);
-    // Current code: both automatic release attempts send `G4 P0.01`, both are
-    // answered with the stale error:15, and the jog owner stays
-    // { kind: 'jog', cancelRequested: true } ("Releasing the stopped motion
-    // needs attention: error:15"): Jog, Frame, Home, origin and Start refuse as
-    // busy until Ctrl+. (0x85) or ABORT MOTION.
     expect({
       motionOperation: useLaserStore.getState().motionOperation,
       refused: fake.refused(),
@@ -231,7 +227,6 @@ describe('HF-7 grblHAL sticky last_error', () => {
   it('Set origin is not refused with the stale error of an earlier Console line', async () => {
     const fake = await connectGeneric();
     await consoleTypo(fake);
-    // Current code: rejects with the stale error:22 and marks the origin unknown.
     expect(await settle(useLaserStore.getState().setOriginHere())).toBe('resolved');
     expect(fake.refused()).toEqual([]);
   });
@@ -239,7 +234,6 @@ describe('HF-7 grblHAL sticky last_error', () => {
   it('Zero Z is not refused with the stale error of an earlier Console line', async () => {
     const fake = await connectGeneric();
     await consoleTypo(fake);
-    // Current code: `G54 G92 Z0` is answered with the stale error:22.
     expect(await settle(useLaserStore.getState().zeroZHere())).toBe('resolved');
     expect(fake.refused()).toEqual([]);
   });
@@ -253,8 +247,6 @@ describe('HF-7 grblHAL sticky last_error', () => {
     expect(fake.floodOn()).toBe(true);
     await consoleTypo(fake);
     await settle(useLaserStore.getState().setAirAssistEnabled(false), 1000);
-    // Current code: M9 is answered error:22, the pump keeps running, and the
-    // rail shows air off until a later accessory report says otherwise.
     expect({
       refused: fake.refused(),
       flood: fake.floodOn(),
@@ -270,7 +262,6 @@ describe('HF-7 grblHAL sticky last_error', () => {
     await consoleTypo(fake);
     await settle(useLaserStore.getState().setAirAssistEnabled(true), 1000);
     expect(fake.port.outbound()).toContain('M8\n');
-    // Current code: M8 is answered error:22 and never runs.
     expect({ refused: fake.refused(), flood: fake.floodOn() }).toEqual({
       refused: [],
       flood: true,
@@ -281,8 +272,6 @@ describe('HF-7 grblHAL sticky last_error', () => {
     const fake = await connectGeneric();
     await consoleTypo(fake);
     await settle(useLaserStore.getState().frame({ minX: 0, minY: 0, maxX: 20, maxY: 10 }, 3000));
-    // Current code: M5 and then both release markers are refused with
-    // error:22, and the Frame owner stays wedged.
     expect({
       refused: fake.refused(),
       motionOperation: useLaserStore.getState().motionOperation,
@@ -293,9 +282,6 @@ describe('HF-7 grblHAL sticky last_error', () => {
     const fake = await connectFalcon();
     await consoleTypo(fake);
     await settle(useLaserStore.getState().jog({ dx: 1, feed: 600 }), 2000);
-    // Current code: every jog line (M5, G21 G91, G1 ..., G90) is refused with
-    // error:22; this contract sends no `$` line or 0x85, so it stays so until
-    // Home, auto-focus, ABORT MOTION or a reconnect.
     expect(fake.executed()).toContain('G1 X1.000 F600 S0');
   });
 
@@ -303,7 +289,6 @@ describe('HF-7 grblHAL sticky last_error', () => {
     const fake = await connectFalcon();
     expect(await settle(useLaserStore.getState().releaseMotors(), 2000)).toMatch(/\$62/);
     await settle(useLaserStore.getState().jog({ dx: 1, feed: 600 }), 2000);
-    // Current code: every jog line is answered with the stale error:3.
     expect(fake.executed()).toContain('G1 X1.000 F600 S0');
   });
 });

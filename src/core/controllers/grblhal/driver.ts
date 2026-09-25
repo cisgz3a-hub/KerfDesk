@@ -17,6 +17,9 @@ export const grblHalDriver: ControllerDriver = {
     ...grblDriver.capabilities,
     // grblHAL's homing loop serves status requests (machine_limits.c:445-447).
     statusWhileHoming: true,
+    // COMPATIBILITY_LEVEL 0, the default build, latches a refused line's
+    // error (protocol.c:246-286); an empty line clears it.
+    stickyLineError: true,
   },
   commands: {
     ...grblDriver.commands,

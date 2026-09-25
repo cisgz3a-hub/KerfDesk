@@ -89,4 +89,10 @@ export type ControllerCapabilities = {
   // cannot be timed on status silence (controller audit 2026-09-25 ST-4).
   // Absent means true.
   readonly statusWhileHoming?: boolean;
+  // A refused line's error stays latched and answers every later G-code line
+  // until an empty line clears it: grblHAL at its default COMPATIBILITY_LEVEL
+  // 0 (protocol.c:246-286). KerfDesk then sends one empty line after a refusal
+  // (laser-parser-rearm.ts; controller audit 2026-09-25 HF-7). Absent means
+  // false.
+  readonly stickyLineError?: boolean;
 };

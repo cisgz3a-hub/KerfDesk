@@ -33,6 +33,9 @@ export type HandlerRefs = ControllerLifecycleRefs &
     // get().log.length on a 50 ms loop (R-L2 audit finding).
     onLineArrived: (() => void) | null;
     nextTranscriptId?: number;
+    /** The write epoch in which a refused line left the controller's error
+     *  latched (laser-parser-rearm.ts). */
+    parserRearmEpoch?: number | null;
   } & TranscriptBufferRefs &
   ControllerQualificationScheduleRefs;
 

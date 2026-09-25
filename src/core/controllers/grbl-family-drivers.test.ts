@@ -26,9 +26,11 @@ describe('GRBL-family variant drivers', () => {
     expect(grblHalDriver.realtime).toEqual(grblDriver.realtime);
     expect(grblHalDriver.commands).toEqual(nonStockGrblCommands);
     // grblHAL's homing loop serves `?`; stock GRBL's does not (audit ST-4).
+    // grblHAL latches a refused line's error until an empty line (HF-7).
     expect(grblHalDriver.capabilities).toEqual({
       ...grblDriver.capabilities,
       statusWhileHoming: true,
+      stickyLineError: true,
     });
     expect(grblDriver.capabilities.statusWhileHoming).toBe(false);
     expect(fluidncDriver.capabilities.statusWhileHoming).toBe(true);

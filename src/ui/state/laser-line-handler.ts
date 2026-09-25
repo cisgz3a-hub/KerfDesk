@@ -49,6 +49,7 @@ import {
 import type { AckSettlement, GetFn, HandlerRefs, SafeWriteFn, SetFn } from './laser-line-shared';
 import { forgetAlarmBeforeBanner, takeAlarmBeforeBanner } from './laser-reset-alarm';
 import { handleAlarmLine } from './laser-alarm-line';
+import { rearmParserWhenDrained } from './laser-parser-rearm';
 import { handleStatusLine, originUnknownAfterControllerReset } from './laser-status-line';
 import { settleUntrackedAck, streamOwnsTerminalAck } from './laser-stream-ack';
 import { flushStreamAcksBefore, routeStreamAck } from './laser-stream-ack-batch';
@@ -94,6 +95,7 @@ export function handleLine(
     return;
   }
   handleNonBannerLine(set, get, refs, safeWrite, cls, line, state);
+  if (cls.kind === 'ok' || cls.kind === 'error') rearmParserWhenDrained(set, get, refs, safeWrite);
 }
 
 function handleNonBannerLine(

@@ -9,6 +9,7 @@ import type { LaserState } from './laser-store';
 import { invalidateControllerSessionEvidence } from './laser-controller-evidence';
 import { clearCncLiveCaps } from './detected-settings-action';
 import { advanceStream } from './laser-stream-ack';
+import { noteRefusedLine } from './laser-parser-rearm';
 import type { AckSettlement, GetFn, HandlerRefs, SafeWriteFn, SetFn } from './laser-line-shared';
 
 export function handleErrorLine(
@@ -43,7 +44,11 @@ export function handleErrorLine(
     ...errorNoticePatch(state, code, raw, rejectedLine),
     ...motionErrorPatch,
   });
-  if (ackSettlement.owner === 'untracked') return;
+  if (ackSettlement.owner === 'untracked') {
+    // grblHAL latches the error for every later G-code line (HF-7).
+    noteRefusedLine(refs);
+    return;
+  }
   requestRealtimeStopAfterStreamError(set, refs, state.streamer, safeWrite);
   advanceStream(set, get, refs, safeWrite, 'error');
 }
