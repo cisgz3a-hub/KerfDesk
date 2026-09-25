@@ -13,6 +13,7 @@ type Viewer3dRenderSchedulerArgs = {
 export type Viewer3dRenderScheduler = {
   readonly requestRender: () => void;
   readonly renderNow: () => void;
+  readonly getRevision: () => number;
   readonly dispose: () => void;
 };
 
@@ -22,12 +23,14 @@ export function createViewer3dRenderScheduler(
 ): Viewer3dRenderScheduler {
   const { render, renderChangeEvents, frameApi = globalThis } = args;
   let frameId: number | null = null;
+  let revision = 0;
   const cancelPending = (): void => {
     if (frameId === null) return;
     frameApi.cancelAnimationFrame(frameId);
     frameId = null;
   };
   const requestRender = (): void => {
+    revision += 1;
     if (frameId !== null) return;
     frameId = frameApi.requestAnimationFrame(() => {
       frameId = null;
@@ -38,6 +41,7 @@ export function createViewer3dRenderScheduler(
   renderChangeEvents?.addEventListener('change', requestRender);
   return {
     requestRender,
+    getRevision: () => revision,
     renderNow: () => {
       cancelPending();
       render();
