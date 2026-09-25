@@ -12,6 +12,7 @@ import {
   type RecoveryRepositoryResult,
   type RecoveryRepositorySnapshot,
   type StoredRecoveryArtifact,
+  UNLOADED_RECOVERY_SNAPSHOT,
 } from './recovery-model';
 import {
   claimRecoveryMutation,
@@ -40,6 +41,7 @@ import { sanitizeUnhydratedRecoveryReferences } from './recovery-owner-sanitizer
 import { RecoveryRepositoryState } from './recovery-repository-state';
 import type { RecoveryAuthoritativeResetBase } from './recovery-repository-state';
 import { RecoverySnapshotCoordinator } from './recovery-snapshot-coordinator';
+import { ownRecoveryRuns, type RecoveryRunOwnership } from './recovery-run-lock';
 
 export type {
   RecoveryRepositoryOptions,
@@ -58,9 +60,11 @@ export class RecoveryRepository {
   private readonly progressCoordinator: RecoveryProgressCoordinator;
   private readonly snapshotCoordinator: RecoverySnapshotCoordinator;
   private readonly activationCoordinator: RecoveryActivationCoordinator;
+  private readonly runOwnership: RecoveryRunOwnership;
 
   constructor(private readonly options: RecoveryRepositoryOptions) {
     this.nowIso = options.nowIso ?? (() => new Date().toISOString());
+    this.runOwnership = ownRecoveryRuns(this.state, options.runLocks);
     this.artifactStore = new RecoveryArtifactStore({
       backend: options.backend,
       currentGeneration: () => this.currentGeneration(),
@@ -143,13 +147,13 @@ export class RecoveryRepository {
     runId: RunId,
     armedAtIso = this.nowIso(),
   ): Promise<RecoveryRepositoryResult<boolean>> {
-    return this.startHandoff.armFreshStart(runId, armedAtIso);
+    return this.own(runId, () => this.startHandoff.armFreshStart(runId, armedAtIso));
   }
 
   /** ADR-337: arm the Start handoff from the intent, before the execution
    * archive is built. The archive follows once the controller has accepted. */
   armFreshStartIntent = (runId: RunId, intent: JobCheckpoint, armedAtIso = this.nowIso()) =>
-    this.startHandoff.armFreshStartIntent(runId, intent, armedAtIso);
+    this.own(runId, () => this.startHandoff.armFreshStartIntent(runId, intent, armedAtIso));
 
   async armClaimedRecoveryStart(args: {
     readonly sourceRunId: RunId;
@@ -158,7 +162,7 @@ export class RecoveryRepository {
     readonly recoveryRunId: RunId;
     readonly armedAtIso?: string;
   }): Promise<RecoveryRepositoryResult<boolean>> {
-    return this.startHandoff.armClaimedRecoveryStart(args);
+    return this.own(args.recoveryRunId, () => this.startHandoff.armClaimedRecoveryStart(args));
   }
 
   async cancelPendingStart(runId: RunId): Promise<RecoveryRepositoryResult<boolean>> {
@@ -169,7 +173,7 @@ export class RecoveryRepository {
     runId: RunId,
     acceptedAtIso = this.nowIso(),
   ): Promise<RecoveryRepositoryResult<boolean>> {
-    return this.activationCoordinator.fresh(runId, acceptedAtIso);
+    return this.own(runId, () => this.activationCoordinator.fresh(runId, acceptedAtIso));
   }
 
   async updateProgress(
@@ -286,10 +290,10 @@ export class RecoveryRepository {
     readonly recoveryRunId: RunId;
     readonly acceptedAtIso?: string;
   }): Promise<RecoveryRepositoryResult<boolean>> {
-    return this.activationCoordinator.claimed({
-      ...args,
-      acceptedAtIso: args.acceptedAtIso ?? this.nowIso(),
-    });
+    const acceptedAtIso = args.acceptedAtIso ?? this.nowIso();
+    return this.own(args.recoveryRunId, () =>
+      this.activationCoordinator.claimed({ ...args, acceptedAtIso }),
+    );
   }
 
   async migrateLegacyCheckpoint(): Promise<RecoveryRepositoryResult<boolean>> {
@@ -325,18 +329,7 @@ export class RecoveryRepository {
       Math.max(this.state.snapshot.generation, this.options.generationStore.read()) + 1;
     const markerWritten = this.options.generationStore.write(generation);
     this.options.legacyStorage.clear();
-    this.state.publish(
-      {
-        loaded: true,
-        generation,
-        activeRun: null,
-        recoveryCapsule: null,
-        lastCompletedReceipt: null,
-        pendingStart: null,
-        executionHistory: [],
-      },
-      0,
-    );
+    this.state.publish({ ...UNLOADED_RECOVERY_SNAPSHOT, loaded: true, generation }, 0);
     try {
       await this.options.backend.purge(generation);
       if (!markerWritten) {
@@ -366,12 +359,18 @@ export class RecoveryRepository {
     return ok(this.state.snapshot);
   }
 
-  private async promoteStaleActiveRun(): Promise<RecoveryRepositoryResult<boolean>> {
-    if (this.state.snapshot.activeRun === null) return ok(false);
-    return this.mutateAndRefresh('promote stale active run to recovery', (slots) =>
-      promoteStaleActiveRunMutation(slots, this.nowIso()),
+  private promoteStaleActiveRun(): Promise<RecoveryRepositoryResult<boolean>> {
+    // ADR-369 Amendment 1: a run another window still streams is not stale.
+    return this.runOwnership.unlessLive(this.state.snapshot.activeRun?.runId, ok(false), (runId) =>
+      this.mutateAndRefresh('promote stale active run to recovery', (slots) =>
+        promoteStaleActiveRunMutation(slots, this.nowIso(), runId),
+      ),
     );
   }
+
+  /** Holds the run's lock (ADR-369 Amendment 1) across the write that records it. */
+  private own = <T>(runId: RunId, write: () => Promise<T>): Promise<T> =>
+    this.runOwnership.recording(runId, write);
 
   private async ensureLoaded(): Promise<RecoveryRepositoryResult<RecoveryRepositorySnapshot>> {
     return this.state.snapshot.loaded ? ok(this.state.snapshot) : this.refresh();
