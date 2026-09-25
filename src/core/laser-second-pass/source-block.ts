@@ -7,11 +7,16 @@ export type SourceBlock = {
   readonly y?: number;
   readonly f?: number;
   readonly s?: number;
+  /** G2/G3 centre offsets from the start, G17 only (ADR-407). */
+  readonly i?: number;
+  readonly j?: number;
 };
 
 const G_GROUPS = new Map([
   [0, 'motion'],
   [1, 'motion'],
+  [2, 'motion'],
+  [3, 'motion'],
   [17, 'plane'],
   [20, 'units'],
   [21, 'units'],
@@ -35,7 +40,7 @@ function modalWord(letter: 'G' | 'M', value: number, groups: Set<string>, target
   const group = (letter === 'G' ? G_GROUPS : M_GROUPS).get(value);
   if (group === undefined) {
     throw new Error(
-      `Unsupported ${letter}${value}. Selective passes support linear XY laser motion.`,
+      `Unsupported ${letter}${value}. Selective passes support XY laser motion in lines and G17 arcs.`,
     );
   }
   const key = `${letter}:${group}`;
@@ -55,7 +60,7 @@ export function readSourceBlock(line: string): SourceBlock | null {
   const g: number[] = [];
   const m: number[] = [];
   const groups = new Set<string>();
-  const axes: { x?: number; y?: number; f?: number; s?: number } = {};
+  const axes: SourceValues = {};
   for (const { letter, value } of words) {
     if (!Number.isFinite(value)) throw new Error('Source values must be finite.');
     if (letter === 'G' || letter === 'M') {
@@ -67,19 +72,21 @@ export function readSourceBlock(line: string): SourceBlock | null {
   return { g, m, ...axes };
 }
 
+type SourceValues = { x?: number; y?: number; f?: number; s?: number; i?: number; j?: number };
+
 function readValueWord(
   letter: string,
   value: number,
   groups: Set<string>,
-  axes: { x?: number; y?: number; f?: number; s?: number },
+  axes: SourceValues,
 ): void {
   if (groups.has(letter)) throw new Error(`Repeated ${letter} word in one source line.`);
   groups.add(letter);
   if (letter === 'N' && Number.isSafeInteger(value) && value >= 0) return;
-  if (!['X', 'Y', 'F', 'S'].includes(letter)) {
-    throw new Error(`Unsupported ${letter} word. Only linear XY laser motion can be repainted.`);
+  if (!['X', 'Y', 'F', 'S', 'I', 'J'].includes(letter)) {
+    throw new Error(`Unsupported ${letter} word. Only XY laser motion can be repainted.`);
   }
   if (letter === 'F' && value <= 0) throw new Error('Source feed must be greater than zero.');
   if (letter === 'S' && value < 0) throw new Error('Source power cannot be negative.');
-  axes[letter.toLowerCase() as 'x' | 'y' | 'f' | 's'] = value;
+  axes[letter.toLowerCase() as keyof SourceValues] = value;
 }

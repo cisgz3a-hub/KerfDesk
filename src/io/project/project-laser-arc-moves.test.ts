@@ -27,8 +27,17 @@ describe('laser arc switch persistence (ADR-407)', () => {
     expect(again.project.device.laserArcMoves).toBe('off');
   });
 
-  it('reads anything but off as automatic', () => {
-    for (const value of ['on', true, 1, null]) {
+  it('keeps an explicit on through a project round trip', () => {
+    const loaded = deserializeProject(projectWithArcs('on'));
+    if (loaded.kind !== 'ok') throw new Error('expected the project to load');
+    expect(loaded.project.device.laserArcMoves).toBe('on');
+    const again = deserializeProject(serializeProject(loaded.project));
+    if (again.kind !== 'ok') throw new Error('expected the project to load');
+    expect(again.project.device.laserArcMoves).toBe('on');
+  });
+
+  it('reads anything but off or on as the profile default', () => {
+    for (const value of ['yes', true, 1, null]) {
       const loaded = deserializeProject(projectWithArcs(value));
       if (loaded.kind !== 'ok') throw new Error('expected the project to load');
       expect(loaded.project.device.laserArcMoves).toBeUndefined();

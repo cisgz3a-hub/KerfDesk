@@ -2,6 +2,7 @@ export {
   arcInteriorPoints,
   arcMovesConnect,
   extendBoundsByArcMoves,
+  extendBoundsByCircularSweep,
   reverseArcMoves,
   sampleArcMoves,
   translateArcMoves,
@@ -9,6 +10,7 @@ export {
   type ArcMoveBounds,
 } from './arc-moves';
 export { arcSweep } from './arc-primitives';
+export { controllerArcChordPoints } from './controller-arc';
 export { fitArcMoves } from './fit-arc-moves';
 export type { ArcFitPlacement } from './mapped-pieces';
 export {

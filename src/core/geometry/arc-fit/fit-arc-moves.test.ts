@@ -81,6 +81,39 @@ function hausdorff(curve: CurveSubpath, moves: ReadonlyArray<ArcMove>): number {
   return worst;
 }
 
+// Turn between each move's end direction and the next move's start direction.
+function jointTurnsDeg(start: Vec2, moves: ReadonlyArray<ArcMove>): number[] {
+  const turns: number[] = [];
+  let from = start;
+  let previous: Vec2 | null = null;
+  for (const move of moves) {
+    let leave: Vec2;
+    let arrive: Vec2;
+    if (move.kind === 'line') {
+      const length = Math.hypot(move.to.x - from.x, move.to.y - from.y);
+      leave = { x: (move.to.x - from.x) / length, y: (move.to.y - from.y) / length };
+      arrive = leave;
+    } else {
+      const sign = move.clockwise ? -1 : 1;
+      const tangent = (point: Vec2): Vec2 => {
+        const rx = point.x - move.center.x;
+        const ry = point.y - move.center.y;
+        const length = Math.hypot(rx, ry);
+        return { x: (-sign * ry) / length, y: (sign * rx) / length };
+      };
+      leave = tangent(from);
+      arrive = tangent(move.to);
+    }
+    if (previous !== null) {
+      const dot = Math.max(-1, Math.min(1, previous.x * leave.x + previous.y * leave.y));
+      turns.push((Math.acos(dot) * 180) / Math.PI);
+    }
+    previous = arrive;
+    from = move.to;
+  }
+  return turns;
+}
+
 describe('fitArcMoves', () => {
   it('fits a cubic circle with arcs within the tolerance', () => {
     const circle = circleCubics(50, 40, 10);
@@ -140,6 +173,36 @@ describe('fitArcMoves', () => {
     const moves = fitArcMoves(curve, IDENTITY, TOLERANCE_MM);
     expect(moves.some((move) => move.to.x === corner.x && move.to.y === corner.y)).toBe(true);
     expect(hausdorff(curve, moves)).toBeLessThanOrEqual(TOLERANCE_MM);
+  });
+
+  it('adds no sharp joint where the source is smooth, even through a tight hairpin', () => {
+    // One cubic, smooth everywhere, whose tip is too tight for an arc (radius
+    // under 0.1 mm): chords follow it. Where the tip is wider than the
+    // tolerance they meet without a 60-degree kink; where it is narrower no
+    // joint is sharper than the G1 chords' own at the machine tolerance.
+    for (const width of [0.03, 0.06, 0.12, 0.2, 0.3, 0.5, 0.8, 1.2]) {
+      const curve: CurveSubpath = {
+        start: { x: 0, y: 0 },
+        segments: [
+          {
+            kind: 'cubic',
+            control1: { x: 6, y: 0 },
+            control2: { x: 6, y: width },
+            to: { x: 0, y: width },
+          },
+        ],
+        closed: false,
+      };
+      const moves = fitArcMoves(curve, IDENTITY, TOLERANCE_MM);
+      expect(hausdorff(curve, moves)).toBeLessThanOrEqual(TOLERANCE_MM);
+      const sharpest = Math.max(...jointTurnsDeg(curve.start, moves));
+      const chords = flattenCurveSubpath(curve, { toleranceMm: TOLERANCE_MM });
+      if (chords.kind !== 'ok') throw new Error('flatten failed');
+      const points = chords.polyline.points;
+      const g1 = points.slice(1).map((to): ArcMove => ({ kind: 'line', to }));
+      expect(sharpest).toBeLessThanOrEqual(Math.max(...jointTurnsDeg(curve.start, g1)));
+      if (width >= 0.5) expect(sharpest).toBeLessThan(60);
+    }
   });
 
   it('fits an S-curve within the tolerance under a mirrored, scaled placement', () => {

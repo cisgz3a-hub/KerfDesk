@@ -6,6 +6,7 @@ import { describe, expect, it } from 'vitest';
 import { DEFAULT_DEVICE_PROFILE, type DeviceProfile } from '../devices';
 import type { ArcMove } from '../geometry/arc-fit';
 import type { CutGroup, CutSegment, Job } from '../job';
+import { withCutArcMoves } from '../job/cut-arc-moves';
 import { parseGcodeProgram } from '../../io/gcode/parse-gcode-program';
 import { grblStrategy } from './grbl-strategy';
 
@@ -47,8 +48,8 @@ function jobWith(segment: CutSegment, group: Partial<CutGroup> = {}): Job {
   };
 }
 
-const ARC_SEGMENT: CutSegment = { polyline: chordsOf(), closed: false, arcMoves: QUARTERS };
 const PLAIN_SEGMENT: CutSegment = { polyline: chordsOf(), closed: false };
+const ARC_SEGMENT: CutSegment = withCutArcMoves(PLAIN_SEGMENT, QUARTERS);
 
 function body(gcode: string): string[] {
   return gcode.split('\n').filter((line) => /^G[0-3] /.test(line));
@@ -73,8 +74,25 @@ describe('grblStrategy laser arc moves (ADR-407)', () => {
       .emit(jobWith(PLAIN_SEGMENT, { passes: 2, airAssist: true, powerMode: 'constant' }), device)
       .split('\n');
     const notMotion = (line: string): boolean => !/^G[0-3] /.test(line);
-    expect(arcs.filter(notMotion)).toEqual(lines.filter(notMotion));
+    // The only preamble difference is the G17 plane pin, and only with arcs.
+    expect(arcs.filter(notMotion).filter((line) => line !== 'G17')).toEqual(
+      lines.filter(notMotion),
+    );
     expect(arcs.filter((line) => line.startsWith('G2 ')).length).toBe(4);
+  });
+
+  it('selects the G17 plane before the first arc, and only when the job writes arcs', () => {
+    const arcs = grblStrategy.emit(jobWith(ARC_SEGMENT), ARC_DEVICE).split('\n');
+    expect(arcs.slice(0, 6)).toEqual(['G21', 'G90', 'G54', 'G94', 'G17', 'M4 S0']);
+    const firstArc = arcs.findIndex((line) => /^G[23] /.test(line));
+    expect(arcs.indexOf('G17')).toBeGreaterThanOrEqual(0);
+    expect(arcs.indexOf('G17')).toBeLessThan(firstArc);
+    for (const device of [ARC_DEVICE, { ...ARC_DEVICE, laserArcMoves: 'off' as const }]) {
+      expect(grblStrategy.emit(jobWith(PLAIN_SEGMENT), device)).not.toMatch(/^G17$/m);
+    }
+    expect(grblStrategy.emit(jobWith(ARC_SEGMENT, { entryRunwayMm: 2 }), ARC_DEVICE)).not.toMatch(
+      /^G17$/m,
+    );
   });
 
   it('emits byte-identical G1 output where arcs are not enabled', () => {
@@ -124,14 +142,13 @@ describe('grblStrategy laser arc moves (ADR-407)', () => {
           const start = { x: 5.0004, y: 7.0003 };
           const end = { x: start.x + chord, y: start.y };
           const center = { x: start.x + half, y: start.y + (clockwise ? -rise : rise) };
-          const segment: CutSegment = {
-            polyline: [{ x: 0, y: 7 }, start, end],
-            closed: false,
-            arcMoves: [
+          const segment = withCutArcMoves(
+            { polyline: [{ x: 0, y: 7 }, start, end], closed: false },
+            [
               { kind: 'line', to: start },
               { kind: 'arc', to: end, center, clockwise },
             ],
-          };
+          );
           const parsed = parseGcodeProgram(grblStrategy.emit(jobWith(segment), ARC_DEVICE));
           if (parsed.kind !== 'ok') throw new Error(parsed.reason);
           expect(parsed.summary.cutMm).toBeLessThan(5.0004 + chord + 0.01);

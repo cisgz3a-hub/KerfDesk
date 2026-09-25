@@ -30,7 +30,7 @@ describe('LaserArcMovesRow (ADR-407)', () => {
     expect(host.querySelector('input')).toBeNull();
   });
 
-  it('switches arcs off and back to automatic', async () => {
+  it('switches arcs off and back to the profile default', async () => {
     const grbl: DeviceProfile = { ...DEFAULT_DEVICE_PROFILE, controllerKind: 'grbl-v1.1' };
     const update = await render(grbl);
     const box = host.querySelector<HTMLInputElement>('input[type="checkbox"]');
@@ -45,5 +45,29 @@ describe('LaserArcMovesRow (ADR-407)', () => {
     expect(off?.checked).toBe(false);
     await act(async () => off?.click());
     expect(again).toHaveBeenLastCalledWith({ laserArcMoves: undefined });
+  });
+
+  it('starts unticked on a brand profile and turns arcs on explicitly', async () => {
+    const brand: DeviceProfile = {
+      ...DEFAULT_DEVICE_PROFILE,
+      vendor: 'xTool',
+      controllerKind: 'grbl-v1.1',
+    };
+    const update = await render(brand);
+    const box = host.querySelector<HTMLInputElement>('input[type="checkbox"]');
+    expect(box?.checked).toBe(false);
+    await act(async () => box?.click());
+    expect(update).toHaveBeenLastCalledWith({ laserArcMoves: 'on' });
+  });
+
+  it('says G1 lines only while a rotary is enabled', async () => {
+    await render({
+      ...DEFAULT_DEVICE_PROFILE,
+      controllerKind: 'grbl-v1.1',
+      rotary: { enabled: true, type: 'roller', mmPerRotation: 100, objectDiameterMm: 40 },
+    });
+    expect(host.querySelector<HTMLInputElement>('input[type="checkbox"]')?.disabled).toBe(true);
+    expect(host.textContent).toContain('G1 lines only while the rotary is enabled');
+    expect(host.querySelector('input')?.title).not.toContain('smoother');
   });
 });

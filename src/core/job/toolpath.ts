@@ -76,6 +76,7 @@ function appendGroupSteps(
         group.color,
         group.passes,
         contourEntryOptions(group.entryRunwayMm, options),
+        group.entryRunwayMm,
       );
     case 'cnc':
       // Z-aware CNC steps (H.2): retract/travel/plunge/cut mirroring the
@@ -98,6 +99,7 @@ function appendFillGroupSteps(
       group.color,
       group.passes,
       contourEntryOptions(group.entryRunwayMm, options),
+      group.entryRunwayMm,
     );
   }
   const scanOffsetMm =
@@ -139,6 +141,7 @@ function appendContourGroupSteps(
   color: string,
   passes: number,
   entryOptions: ContourEntryOptions | null,
+  entryRunwayMm: number | undefined,
 ): Vec2 | null {
   let prevEnd = initialPrevEnd;
   for (let pass = 0; pass < passes; pass += 1) {
@@ -157,8 +160,9 @@ function appendContourGroupSteps(
         appendTravelStep(steps, prevEnd, entry, 'rapid');
         appendTravelStep(steps, entry, first, 'feed');
       }
-      // ADR-407: the emitter writes arcs only without a contour entry.
-      const burn = entryOptions === null ? cutSegmentBurnPolyline(seg) : seg.polyline;
+      // ADR-407: the emitter's own predicate decides whether arcs go out. The
+      // preview has no device; compile attached arcs only for an arc machine.
+      const burn = cutSegmentBurnPolyline(seg, { arcMovesEnabled: true, entryRunwayMm });
       steps.push({
         kind: 'cut',
         color,

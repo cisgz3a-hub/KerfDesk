@@ -75,6 +75,17 @@ export const ARC_FIT_SMOOTH_JOINT_DEG = 1;
 export const ARC_FIT_MAX_KINK_DEG = 2;
 
 /**
+ * Inside a smooth run, a straight chord must arrive within this angle of the
+ * source tangent, and every move must leave the one before it with a turn
+ * under ARC_FIT_CORNER_DEG. Arriving close to the tangent leaves the next move
+ * (an arc within the kink, another chord, or the source's own sample chord)
+ * room to meet it under the corner angle. Without these a chord bridging a
+ * feature too tight for an arc (radius under ARC_FIT_MIN_RADIUS_MM) made a
+ * sharp joint where the source curve had none.
+ */
+export const ARC_FIT_MAX_CHORD_TANGENT_DEG = 29;
+
+/**
  * Straight-segment runs break at vertices turning at least this much: the
  * tree-wide hard-corner convention (ADR-391's laser trace simplification, the
  * CNC fairing and the tracer's corner detection all pin 60 degrees).

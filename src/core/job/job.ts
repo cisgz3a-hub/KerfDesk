@@ -42,10 +42,20 @@ export type CutSegment = {
     readonly distanceMm: number;
     readonly direction: Vec3;
   };
-  /** ADR-407: the same burn as native line/arc moves from polyline[0], the
-   * last landing exactly on the polyline's last point. Laser line cuts only,
+  /** ADR-407: the same burn as native line/arc moves. Laser line cuts only,
    * on arc-capable machines; read it through validCutArcMoves. */
-  readonly arcMoves?: ReadonlyArray<ArcMove>;
+  readonly arcMoves?: CutArcMoves;
+};
+
+/** Fitted line/arc moves for a CutSegment (ADR-407), with a fingerprint of
+ * the polyline they were fitted against: they start at `from` and the last
+ * lands exactly on the polyline's last point. A reader trusts them only while
+ * the polyline still matches the fingerprint. */
+export type CutArcMoves = {
+  readonly moves: ReadonlyArray<ArcMove>;
+  readonly from: Vec2;
+  readonly pointCount: number;
+  readonly lengthMm: number;
 };
 
 export type FillSegment = CutSegment & {

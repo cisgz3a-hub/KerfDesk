@@ -19,7 +19,7 @@ import {
   normalizeCameraCalibration,
   normalizeCameraProfile,
 } from '../../core/camera';
-import { validateMachineProfileShape } from './machine-profile-shape';
+import { laserArcMovesEntry, validateMachineProfileShape } from './machine-profile-shape';
 import { optionalRotarySetup } from '../project/project-device-profile-validator';
 import { firstError } from '../project/project-shape-primitives';
 
@@ -308,7 +308,7 @@ function canonicalProfile(profile: DeviceProfile): DeviceProfile {
       ? { workerHostedStreaming: profile.workerHostedStreaming }
       : {}),
     ...(profile.airAssistRestartUnreliable === true ? { airAssistRestartUnreliable: true } : {}),
-    ...(profile.laserArcMoves === 'off' ? { laserArcMoves: 'off' as const } : {}),
+    ...laserArcMovesEntry(profile.laserArcMoves),
     rxBufferBytes: normalizeGrblRxBufferBytes(profile.rxBufferBytes),
     bedWidth: profile.bedWidth,
     bedHeight: profile.bedHeight,

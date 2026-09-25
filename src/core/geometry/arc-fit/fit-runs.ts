@@ -3,20 +3,26 @@
 // A smooth run carries a unit tangent on each side of every sample. Each step
 // starts at the last break point and takes, among four candidates, the one
 // that covers the most samples per emitted move (ties keep the simpler one):
-//   - a straight chord, wherever it stays within the bound;
+//   - a straight chord, wherever it stays within the bound and arrives within
+//     ARC_FIT_MAX_CHORD_TANGENT_DEG of the source tangent;
 //   - one arc leaving along the source tangent, arriving within
 //     ARC_FIT_MAX_KINK_DEG of the source tangent;
 //   - one arc through both ends, its centre the best fit to the samples
 //     between, meeting both source tangents within that kink;
 //   - a biarc matching both source tangents exactly (one or two moves).
 // Arcs therefore meet each other at a smooth source point with a turn of at
-// most twice the kink, and not at all at a biarc's ends. A chord is taken only
-// where it covers more of the run per move than any arc, as compile's own
-// chords do everywhere today.
+// most twice the kink, and not at all at a biarc's ends. Every candidate must
+// also leave the move before it with a turn under ARC_FIT_CORNER_DEG, so no
+// sharp joint appears where the source is smooth (short of a feature finer
+// than the sampling, where the source's own sample chord is the fallback). A
+// chord is taken only where it covers more of the run per move than any arc,
+// as compile's own chords do everywhere today.
 //
 // A straight-segment run has no tangents: its vertices are the source. Each
 // step takes a line or an arc through its two ends whose centre best fits the
-// vertices between, whichever reaches farther.
+// vertices between, whichever reaches farther. Either, when it spans several
+// source vertices, must meet the move before it under the corner angle, as
+// the source vertices inside a run do; the source edge itself always may.
 //
 // The fitted centre is Kasa's algebraic least-squares circle ("A circle
 // fitting procedure and its error analysis", IEEE Trans. Instrum. Meas.
@@ -37,7 +43,11 @@ import {
 } from './arc-primitives';
 import { biarcBetween, biarcFitsPiece } from './biarc';
 import { mergeCocircular } from './merge-cocircular';
-import { ARC_FIT_MAX_KINK_DEG } from './arc-fit-limits';
+import {
+  ARC_FIT_CORNER_DEG,
+  ARC_FIT_MAX_CHORD_TANGENT_DEG,
+  ARC_FIT_MAX_KINK_DEG,
+} from './arc-fit-limits';
 
 export type SmoothRun = {
   readonly points: ReadonlyArray<Vec2>;
@@ -48,14 +58,33 @@ export type SmoothRun = {
 };
 
 const COS_KINK = Math.cos((ARC_FIT_MAX_KINK_DEG * Math.PI) / 180);
+const COS_CHORD_TANGENT = Math.cos((ARC_FIT_MAX_CHORD_TANGENT_DEG * Math.PI) / 180);
+const COS_CORNER = Math.cos((ARC_FIT_CORNER_DEG * Math.PI) / 180);
+
+// Whether a move starting with `primitive` meets the one before it (whose end
+// tangent is `previousEnd`) with a turn under the corner angle.
+function joinsBelowCorner(previousEnd: Vec2 | null, primitive: FitPrimitive | undefined): boolean {
+  return (
+    previousEnd === null ||
+    primitive === undefined ||
+    dot(previousEnd, primitiveStartTangent(primitive)) > COS_CORNER
+  );
+}
+
+function endTangentOf(primitives: ReadonlyArray<FitPrimitive>): Vec2 | null {
+  const last = primitives[primitives.length - 1];
+  return last === undefined ? null : primitiveEndTangent(last);
+}
 
 export function fitSmoothRun(run: SmoothRun, toleranceMm: number): FitPrimitive[] {
   const last = run.points.length - 1;
   const out: FitPrimitive[] = [];
   let i = 0;
+  let previousEnd: Vec2 | null = null;
   while (i < last) {
-    const step = bestSmoothStep(run, i, toleranceMm);
+    const step = bestSmoothStep(run, i, toleranceMm, previousEnd);
     out.push(...step.primitives);
+    previousEnd = endTangentOf(step.primitives) ?? previousEnd;
     i = step.end;
   }
   return mergeCocircular(out);
@@ -64,12 +93,23 @@ export function fitSmoothRun(run: SmoothRun, toleranceMm: number): FitPrimitive[
 type Step = { readonly end: number; readonly primitives: ReadonlyArray<FitPrimitive> };
 type Candidate = (end: number) => FitPrimitive[] | null;
 
-function bestSmoothStep(run: SmoothRun, i: number, toleranceMm: number): Step {
+function bestSmoothStep(
+  run: SmoothRun,
+  i: number,
+  toleranceMm: number,
+  previousEnd: Vec2 | null,
+): Step {
   const last = run.points.length - 1;
   const start = run.points[i] as Vec2;
   let best: Step = { end: i + 1, primitives: [fitLine(start, run.points[i + 1] as Vec2)] };
   let bestCoverage = 1;
-  for (const candidate of smoothCandidates(run, i, toleranceMm)) {
+  for (const raw of smoothCandidates(run, i, toleranceMm)) {
+    const candidate: Candidate = (j) => {
+      const primitives = raw(j);
+      return primitives !== null && joinsBelowCorner(previousEnd, primitives[0])
+        ? primitives
+        : null;
+    };
     const reach = farthestReach(i, last, 1, (j) => candidate(j) !== null);
     const primitives = reach < 0 ? null : candidate(reach);
     if (primitives === null || primitives.length === 0) continue;
@@ -91,10 +131,17 @@ function smoothCandidates(run: SmoothRun, i: number, toleranceMm: number): Candi
   const smoothEnds = (primitive: FitPrimitive, j: number): boolean =>
     dot(primitiveStartTangent(primitive), leaving) >= COS_KINK &&
     dot(primitiveEndTangent(primitive), tangentsIn[j] as Vec2) >= COS_KINK;
+  // A chord must arrive within ARC_FIT_MAX_CHORD_TANGENT_DEG of the source
+  // tangent, so whatever follows (an arc within the kink, another chord, the
+  // source's own sample chord) can meet it under the corner angle; how it
+  // leaves is judged by the actual joint with the move before
+  // (joinsBelowCorner in bestSmoothStep).
+  const chordMeetsTangents = (line: FitPrimitive, j: number): boolean =>
+    dot(primitiveEndTangent(line), tangentsIn[j] as Vec2) >= COS_CHORD_TANGENT;
   return [
     (j) => {
       const line = fitLine(start, points[j] as Vec2);
-      return fits(line, j) ? [line] : null;
+      return chordMeetsTangents(line, j) && fits(line, j) ? [line] : null;
     },
     (j) => {
       const arc = arcLeavingAlong(start, leaving, points[j] as Vec2);
@@ -119,20 +166,31 @@ export function fitStraightRun(vertices: ReadonlyArray<Vec2>, toleranceMm: numbe
   const last = vertices.length - 1;
   const out: FitPrimitive[] = [];
   let i = 0;
+  let previousEnd: Vec2 | null = null;
   while (i < last) {
     const start = vertices[i] as Vec2;
     const from = i;
+    const joined = previousEnd;
+    // The source edge itself is always a move; anything longer must meet the
+    // move before it under the corner angle, as the source vertices do.
     const lineAt = (j: number): FitPrimitive | null => {
       const line = fitLine(start, vertices[j] as Vec2);
+      if (from + 1 === j) return line;
       const piece = { points: vertices, from, to: j };
-      return from + 1 === j || primitiveFitsPiece(line, piece, toleranceMm) ? line : null;
+      return joinsBelowCorner(joined, line) && primitiveFitsPiece(line, piece, toleranceMm)
+        ? line
+        : null;
     };
-    const arcAt = (j: number): FitPrimitive | null =>
-      fittedArcThrough(vertices, from, j, toleranceMm);
+    const arcAt = (j: number): FitPrimitive | null => {
+      const arc = fittedArcThrough(vertices, from, j, toleranceMm);
+      return arc !== null && joinsBelowCorner(joined, arc) ? arc : null;
+    };
     const lineReach = farthestReach(i, last, 1, (j) => lineAt(j) !== null);
     const arcReach = farthestReach(i, last, 2, (j) => arcAt(j) !== null);
     const useArc = arcReach > lineReach;
-    out.push((useArc ? arcAt(arcReach) : lineAt(lineReach)) as FitPrimitive);
+    const primitive = (useArc ? arcAt(arcReach) : lineAt(lineReach)) as FitPrimitive;
+    out.push(primitive);
+    previousEnd = primitiveEndTangent(primitive);
     i = useArc ? arcReach : lineReach;
   }
   return out;

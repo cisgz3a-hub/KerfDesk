@@ -82,15 +82,37 @@ function extendByArcExtrema(
   const radius = Math.hypot(from.x - move.center.x, from.y - move.center.y);
   const startAngle = Math.atan2(from.y - move.center.y, from.x - move.center.x);
   const sweep = arcSweep(from, move.to, move.center, move.clockwise);
-  const direction = move.clockwise ? -1 : 1;
+  extendBoundsByCircularSweep(
+    bounds,
+    move.center,
+    radius,
+    startAngle,
+    move.clockwise ? -sweep : sweep,
+  );
+}
+
+/**
+ * Extends `bounds` by the axis extremes a circular sweep from `startAngle`
+ * through `signedSweep` radians (negative clockwise) passes; the sweep's own
+ * ends are the caller's to add.
+ */
+export function extendBoundsByCircularSweep(
+  bounds: ArcMoveBounds,
+  center: Vec2,
+  radius: number,
+  startAngle: number,
+  signedSweep: number,
+): void {
+  const direction = signedSweep < 0 ? -1 : 1;
+  const sweep = Math.abs(signedSweep);
   for (let quarter = 0; quarter < 4; quarter += 1) {
     const angle = (quarter * Math.PI) / 2;
     let offset = direction * (angle - startAngle);
     offset -= Math.floor(offset / (2 * Math.PI)) * 2 * Math.PI;
     if (offset > 0 && offset < sweep) {
       extendPoint(bounds, {
-        x: move.center.x + radius * Math.cos(angle),
-        y: move.center.y + radius * Math.sin(angle),
+        x: center.x + radius * Math.cos(angle),
+        y: center.y + radius * Math.sin(angle),
       });
     }
   }

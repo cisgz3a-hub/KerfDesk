@@ -4,9 +4,9 @@
 import { assertNever } from '../scene';
 import type { DeviceProfile } from '../devices';
 import { cncPassRepresentedXyPoints } from '../cnc/cnc-pass-representation';
-import { extendBoundsByArcMoves } from '../geometry/arc-fit';
+import { laserArcMovesEnabled } from '../devices/laser-arc-moves';
 import { contourEntryPoint, type ContourEntryBounds } from './contour-entry';
-import { validCutArcMoves } from './cut-arc-moves';
+import { emittedCutArcMoves, extendBoundsByEmittedArcMoves } from './cut-arc-moves';
 import { expandFillHatchWithRunways } from './fill-runway';
 import { planFillSweeps } from './fill-sweep-plan';
 import {
@@ -114,7 +114,7 @@ function extendBoundsForGroup(
     case 'fill': {
       if (group.kind === 'fill' && group.fillStyle !== 'offset')
         return extendBoundsForFill(b, group, includeOverscanMotion, device);
-      const any = extendBoundsForCut(b, group);
+      const any = extendBoundsForCut(b, group, device);
       extendBoundsForContourEntries(b, group, includeOverscanMotion, entryBounds);
       return any;
     }
@@ -154,16 +154,25 @@ function extendBoundsForCnc(
   return any;
 }
 
-function extendBoundsForCut(b: MutableBounds, group: CutGroup | FillGroup): boolean {
+function extendBoundsForCut(
+  b: MutableBounds,
+  group: CutGroup | FillGroup,
+  device: DeviceProfile | undefined,
+): boolean {
   let any = false;
+  // ADR-407: an arc bulges past its chords; bound what the emitter writes, by
+  // the emitter's own predicate. Without a device either may go out: bound both.
+  const arcMovesEnabled = device === undefined ? null : laserArcMovesEnabled(device);
   for (const seg of group.segments) {
-    // ADR-407: an arc bulges past its chords; bound what the emitter writes.
-    const arcMoves = validCutArcMoves(seg);
+    const arcMoves = emittedCutArcMoves(seg, {
+      arcMovesEnabled: arcMovesEnabled ?? true,
+      entryRunwayMm: group.entryRunwayMm,
+    });
     const first = seg.polyline[0];
     if (arcMoves !== null && first !== undefined) {
-      extendBoundsByArcMoves(b, first, arcMoves);
+      extendBoundsByEmittedArcMoves(b, first, arcMoves);
       any = true;
-      continue;
+      if (arcMovesEnabled !== null) continue;
     }
     for (const p of seg.polyline) {
       extendBoundsForPoint(b, p);

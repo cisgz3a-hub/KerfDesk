@@ -31,6 +31,7 @@ import { laserModeWord, vectorPowerWord } from './grbl-power-modes';
 import { laserParkTarget } from './job-park-target';
 import { INTENTIONAL_LASER_OFF_MOTION_COMMENT } from '../gcode-comments';
 import { laserArcMovesEnabled } from '../devices/laser-arc-moves';
+import { jobWritesArcMoves } from '../job/cut-arc-moves';
 import { arcBurnLines } from './grbl-laser-arc-moves';
 import { operationProvenanceComment } from './operation-provenance-comment';
 
@@ -69,7 +70,7 @@ function roundedPositiveFeed(speed: number, context: string): number {
   return effectiveGcodeFeedMmPerMin(speed);
 }
 
-function preamble(dialect: GrblGcodeDialect): string {
+function preamble(dialect: GrblGcodeDialect, writesArcs: boolean): string {
   // G54 + G94 pin the modal WCS and feed mode the same way the CNC preamble
   // does (cnc-grbl-strategy.ts): GRBL's active G54-G59 selection and G93/G94
   // feed mode are modal and can be left changed by a console command or a $N
@@ -84,10 +85,12 @@ function preamble(dialect: GrblGcodeDialect): string {
   // when G1 carries S>0 — the move happens but the beam stays off. M3 S0 is
   // safe (no power) and primes the controller for any subsequent S-driven
   // cutting move.
-  return (
-    ['G21', 'G90', 'G54', 'G94', `${laserModeWord(dialect.cutPowerMode)} S0`].join(LINE_END) +
-    LINE_END
-  );
+  //
+  // G17 pins the arc plane like the WCS, and only when the job writes G2/G3
+  // (ADR-407): a stale G18/G19 reads an XY I/J arc as error:33 or swings Z.
+  const plane = writesArcs ? ['G17'] : [];
+  const words = ['G21', 'G90', 'G54', 'G94', ...plane, `${laserModeWord(dialect.cutPowerMode)} S0`];
+  return words.join(LINE_END) + LINE_END;
 }
 
 function postamble(
@@ -119,11 +122,11 @@ type SegmentEmissionContext = {
   readonly entryRunwayMm?: number | undefined;
   readonly entryBounds: ContourEntryBounds;
   /** ADR-407: the machine takes G2/G3, so fitted arc moves may be written. */
-  readonly arcMoves?: boolean;
+  readonly arcMovesEnabled: boolean;
 };
 type GroupEmissionContext = Pick<
   SegmentEmissionContext,
-  'device' | 'dialect' | 'entryBounds' | 'arcMoves'
+  'device' | 'dialect' | 'entryBounds' | 'arcMovesEnabled'
 >;
 
 function emitSegment(seg: CutSegment, context: SegmentEmissionContext): string {
@@ -479,8 +482,9 @@ function coolantTransition(from: CoolantMode, to: CoolantMode): string {
 // multi-pass group re-arms between passes.
 function emitJob(job: Job, device: DeviceProfile, options: OutputEmitOptions = {}): string {
   const dialect = emittedDialect(device, options);
+  const arcMovesEnabled = laserArcMovesEnabled(device);
   const parts: string[] = [];
-  parts.push(preamble(dialect));
+  parts.push(preamble(dialect, arcMovesEnabled && jobWritesArcMoves(job)));
   let mode: 'M3' | 'M4' | 'off' = laserModeWord(dialect.cutPowerMode);
   let coolant: CoolantMode = 'off';
   const plan = coolantPlan(job, device);
@@ -488,7 +492,6 @@ function emitJob(job: Job, device: DeviceProfile, options: OutputEmitOptions = {
     job.contourEntryBounds === undefined
       ? { widthMm: device.bedWidth, heightMm: device.bedHeight }
       : job.contourEntryBounds;
-  const arcMoves = laserArcMovesEnabled(device);
   for (const [index, group] of job.groups.entries()) {
     const wantedMode = powerModeForGroup(group, dialect);
     if (wantedMode === 'M3' && mode !== 'M3') {
@@ -506,7 +509,7 @@ function emitJob(job: Job, device: DeviceProfile, options: OutputEmitOptions = {
     const nextCoolant = plan[index] ?? 'off';
     parts.push(coolantTransition(coolant, nextCoolant));
     coolant = nextCoolant;
-    parts.push(emitAnyGroup(group, { device, dialect, entryBounds, arcMoves }));
+    parts.push(emitAnyGroup(group, { device, dialect, entryBounds, arcMovesEnabled }));
     if (group.kind === 'raster') mode = 'off'; // raster emits its own trailing M5
   }
   parts.push(coolantTransition(coolant, 'off'));
