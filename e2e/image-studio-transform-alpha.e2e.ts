@@ -47,6 +47,12 @@ test('Image Studio keeps transparent text transforms from covering the bitmap', 
   const canvas = page.getByLabel('Image Studio document canvas');
   await expect(editor).toBeVisible();
   await expect(canvas).toBeVisible();
+  // Import notifications reserve a row inside the editor. Let it disappear
+  // before fixing pixel coordinates, rather than sampling a transient layout.
+  await expect(
+    page.getByRole('button', { name: /^Dismiss success notification: Added image:/ }),
+  ).toHaveCount(0);
+  await waitForTwoFrames(page);
   await expect
     .poll(() => canvas.evaluate((element: HTMLCanvasElement) => element.width * element.height))
     .toBeGreaterThan(0);
@@ -79,8 +85,7 @@ test('Image Studio keeps transparent text transforms from covering the bitmap', 
   await textDialog.getByRole('button', { name: 'OK', exact: true }).click();
   await expect(textDialog).toHaveCount(0);
   await expect(editor.getByRole('button', { name: 'Apply', exact: true })).toBeEnabled();
-  // Text temporarily changes the options bar height. Restore the original
-  // canvas coordinates before comparing the same transparent image pixels.
+  // Compare the same canvas coordinates before and after adding text.
   await expect.poll(canvasSize).toEqual(baselineCanvasSize);
   await waitForTwoFrames(page);
 
@@ -119,6 +124,10 @@ test('Image Studio keeps transparent text transforms from covering the bitmap', 
 
   await editor.getByRole('button', { name: 'Apply', exact: true }).click();
   await expect(page.getByText('Success: Image edits applied.', { exact: true })).toBeVisible();
+  await expect(
+    page.getByRole('button', { name: 'Dismiss success notification: Image edits applied.' }),
+  ).toHaveCount(0);
+  await expect.poll(canvasSize).toEqual(baselineCanvasSize);
   await waitForTwoFrames(page);
   const applied = await imageStudioCanvasSample(page);
   expect(await canvasRgbaSamples(canvas, transparentSamples)).toEqual(expectedTransparentRgba);
