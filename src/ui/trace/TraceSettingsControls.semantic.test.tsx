@@ -255,6 +255,30 @@ describe('trace controls describe the options the engine actually receives', () 
     },
   );
 
+  it('Edge Detection offers the alpha mask, sends it to the engine and stands Invert down', async () => {
+    // White artwork on transparency: its colour matches the paper.
+    const image = paper();
+    for (let i = 3; i < image.data.length; i += 4) image.data[i] = 0;
+    fill(image, 20, 15, 30, 30, [255, 255, 255]);
+    await withControls(
+      'Edge Detection',
+      async (controls) => {
+        expect(await loopCount(image, controls.options())).toBe(0);
+        await controls.check('Trace alpha mask', true);
+        expect(controls.options()).toEqual({
+          ...TRACE_PRESETS['Edge Detection'],
+          traceTransparency: true,
+        });
+        const invert = controls.host.querySelector('[aria-label="Invert"]');
+        expect(invert instanceof HTMLInputElement && invert.disabled).toBe(true);
+        expect(await loopCount(image, controls.options())).toBe(1);
+        await controls.reset();
+        expect(controls.options()).toEqual(TRACE_PRESETS['Edge Detection']);
+      },
+      true,
+    );
+  });
+
   it('stands Invert down while the alpha mask owns detection', async () => {
     await withControls(
       'Line Art',

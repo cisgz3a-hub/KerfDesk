@@ -2525,7 +2525,10 @@ settings and Job Review keep their existing read-only setup references.
    Submitted results use their captured request's paint intent; a newer preset request still
    supersedes an older result.
    Edge Detection creates closed outlines around dark artwork and locally
-   darker detail. Adjacent dark tones may merge into one outline. Centerline follows stroke centres.
+   darker detail. Adjacent dark tones may merge into one outline. Its **Sensitivity** moves in
+   steps of 10 and **Detail** in steps of 5, and every step changes the detected outlines
+   (ADR-412). **Trace alpha mask** also applies to Edge Detection: it outlines the image's
+   transparency, and Invert is unavailable while it is on. Centerline follows stroke centres.
    Centerline's separate-end gap bridge uses source-grid distance (preset/default 3 pixels),
    converted once on enlarged working rasters, including Enhance regions. Zero disables that
    gap bridge; true-junction repairs and ring closure keep their existing separate policies.

@@ -132,15 +132,19 @@ export type TraceOptions = {
   readonly smoothness?: number;
   readonly optimize?: number;
   // Edge Detection-only controls. UI exposes these as three simple
-  // operator knobs: Sensitivity, Detail, and Minimum line.
+  // operator knobs: Sensitivity, Detail, and Minimum line (ADR-412).
+  // edgeBlurSigma carries the local-mean radius: round(sigma x 10), 4..32
+  // source px. edgeLowThresholdRatio carries the contrast delta:
+  // round(ratio x 6/0.074), 2..12 luma levels (see edge-input.ts).
   readonly edgeBlurSigma?: number;
   readonly edgeLowThresholdRatio?: number;
-  // Retained for the Sensitivity control's preset round-trip; the local mask
-  // derives its contrast delta from edgeLowThresholdRatio.
+  /** @deprecated Canny-era value; nothing reads it. Accepted so older saved
+   * options still load. */
   readonly edgeHighThresholdRatio?: number;
   // Minimum finished edge-path length in source-image pixels.
   readonly edgeMinLengthPx?: number;
-  // Canny-era compatibility value; closed-mask contours do not bridge gaps.
+  /** @deprecated Canny-era value; closed-mask contours never bridge gaps and
+   * nothing reads it. Accepted so older saved options still load. */
   readonly edgeJoinGapPx?: number;
   // undefined = selective AUTO cleanup in source pixels before enlargement;
   // true = the explicit full 3x3 median on the working raster; false = off.

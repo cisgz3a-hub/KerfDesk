@@ -38,7 +38,7 @@ export function prepareUpscaledTraceInput(
   const scaledOptions: TraceOptions = {
     ...options,
     pixelScale: factor,
-    ...(reuseCleanedEdge ? { edgeMedianFilter: false } : {}),
+    ...(reuseCleanedEdge ? reusedEdgeSourceOptions(edgeInput) : {}),
     ...(luma?.options ?? {}),
   };
   const enlarged = upscaleBy(reuseCleanedEdge ? edgeInput.source : (luma?.source ?? image), factor);
@@ -57,6 +57,15 @@ export function prepareUpscaledTraceInput(
         ? restoreEnlargedContourSupport(contourInput, preparedInput, factor)
         : preparedInput,
   };
+}
+
+// The reused Edge source is already cleaned. An alpha-mask source is already
+// opaque coverage luma (ADR-412), so the enlarged grid reads it as luma
+// rather than converting it from alpha a second time.
+function reusedEdgeSourceOptions(edgeInput: EdgeTraceInput): Partial<TraceOptions> {
+  return edgeInput.alphaMask
+    ? { edgeMedianFilter: false, traceTransparency: false }
+    : { edgeMedianFilter: false };
 }
 
 /** The input without its source-grid median stage (ADR-411). Only this module

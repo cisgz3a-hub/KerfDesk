@@ -237,17 +237,18 @@ export async function traceImageToColoredPaths(
 //   - Luma lanes run the whole documented brightness → contrast → gamma →
 //     invert chain here, so tone keeps its place before Invert.
 //   - Edge Detection never read the tone fields; it only gets the inversion.
-//   - While the alpha mask decides the ink, colour inversion cannot change
-//     it (the dialog disables Invert then), and an opaque negative would
-//     erase the transparency the mask reads, so Invert is dropped.
+//   - While the alpha mask decides the ink (every lane, Edge included since
+//     ADR-412), colour inversion cannot change it (the dialog disables
+//     Invert then), and an opaque negative would erase the transparency the
+//     mask reads, so Invert is dropped.
 function invertBeforePolicy(
   image: RawImageData,
   options: TraceOptions,
 ): { readonly image: RawImageData; readonly options: TraceOptions } {
   if (options.invert !== true) return { image, options };
   const cleared: TraceOptions = { ...options, invert: false };
-  if (options.traceMode === 'edge') return { image: invertImage(image), options: cleared };
   if (shouldTraceAlphaMask(image, options)) return { image, options: cleared };
+  if (options.traceMode === 'edge') return { image: invertImage(image), options: cleared };
   return {
     image: applyImageAdjustments(image, options),
     options: { ...cleared, brightness: 0, contrast: 0, gamma: 1 },
