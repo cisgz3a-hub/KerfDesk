@@ -114,20 +114,26 @@ Repro tests live in `src/__audit_repro__/OR/`; each fails on current code.
 - fix (local): parse the JSON `DeviceList[]` form (Width, Height, Settings.S_Scale, Settings.BaudRate,
   MirrorX/MirrorY -> origin, Settings.AirAssistM7), keep the review step.
 
-## OR-6 — Controller-readiness text is wrong for FluidNC and one comment is stale
+## OR-6 — FluidNC `$32=0` advice is not actionable, and the default M4 output is rejected there
 
-- severity: low
+- severity: low (fails closed at the preamble's `M4 S0`, before motion)
 - verdict: CONFIRMED (trace)
 - status: new
-- failure scenario: FluidNC with a PWM (non-Laser) spindle reports `$32=0`; Job Review says "Enable GRBL laser
-  mode ($32=1)", but FluidNC's `$32` is a read-only proxy of the spindle type (fix = `Laser` spindle in YAML).
-  Separately, `controller-readiness.ts:121-122` says Start refuses `max-power-mismatch`; Start demotes every
-  readiness error to a Job Review warning (`start-job-controller-policy.ts:26-30`).
-- kerfdesk evidence: `src/core/preflight/controller-readiness.ts:231-236`, `:121-122`.
+- failure scenario: FluidNC with a `PWM` spindle (no direction pin, not `Laser`) reports `$32=0`; Job Review says
+  "Enable GRBL laser mode ($32=1) before starting", but FluidNC's `$32` is a read-only proxy of the spindle type
+  and the default `grbl-dynamic` preamble's `M4 S0` is rejected with error:20, so the job stops at line 5. The
+  real remedies (a `Laser` spindle in the YAML, or a constant-power dialect) are not named. The CNC twin
+  ("Set $32=0 for spindle work", `controller-readiness.ts:178-183`) is equally unactionable on FluidNC. Separately,
+  `controller-readiness.ts:121-122` says Start refuses `max-power-mismatch`; Start demotes every readiness error
+  to a Job Review warning (`start-job-controller-policy.ts:26-30`).
+- kerfdesk evidence: `src/core/preflight/controller-readiness.ts:231-236`, `:121-122`; `src/core/output/grbl-strategy.ts:86`.
 - upstream evidence: FluidNC v4.0.3 SettingsDefinitions.cpp:146 `INT_PROXY("32", "Grbl/LaserMode",
-  spindle->isRateAdjusted())`; Settings.h:229 `setStringValue(...) override { return Error::ReadOnlySetting; }`.
+  spindle->isRateAdjusted())`; Settings.h:229 `setStringValue(...) override { return Error::ReadOnlySetting; }`;
+  GCode.cpp:654-659 (`M4` "Supported if the spindle can be reversed or laser mode is on", else
+  `Error::GcodeUnsupportedCommand`); Spindles/PWMSpindle.cpp:20 `is_reversable = _direction_pin.defined();`.
+  (grblHAL gcode.c:2628-2641 rejects M4 likewise without direction or laser capability; there `$32=1` is the right advice.)
 - reproduction: traced only.
-- fix (local): FluidNC-specific wording; fix the comment.
+- fix (local): FluidNC-specific wording (configure a `Laser` spindle or pick the constant-power dialect); fix the comment.
 
 ## OR-1 addendum
 

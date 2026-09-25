@@ -45,6 +45,33 @@ function statusLine(machine: Machine): string {
   return `<${machine}|MPos:10.000,20.000,-1.000|FS:0,0|Ov:100,100,100>`;
 }
 
+// One queued line, answered as GRBL 1.1h would. Returns the response.
+function answerLine(device: Device, line: string): string {
+  if (line.startsWith('$J=')) {
+    device.machine = 'Jog';
+    return 'ok';
+  }
+  if (line.startsWith('$')) return 'ok';
+  // protocol.c:99-101 — G-code is locked out in Alarm and Jog.
+  return device.machine === 'Jog' || device.machine === 'Alarm' ? 'error:9' : 'ok';
+}
+
+// mc_reset() during STATE_JOG raises ALARM:3; main() re-inits and prints the banner.
+function softReset(device: Device, later: (line: string) => void): void {
+  const wasMoving = device.machine === 'Jog';
+  device.machine = wasMoving ? 'Alarm' : 'Idle';
+  if (wasMoving) later('ALARM:3');
+  later("Grbl 1.1h ['$' for help]");
+  if (wasMoving) later("[MSG:'$H'|'$X' to unlock]");
+}
+
+function isHandshakeBuildInfo(data: string): boolean {
+  return (
+    data === '$I\n' &&
+    useLaserStore.getState().controllerOperation?.kind === 'connection-handshake'
+  );
+}
+
 function makeDevice(sent: string[]): Device {
   const handlers = new Set<(line: string) => void>();
   const later = (line: string): void => {
@@ -54,35 +81,12 @@ function makeDevice(sent: string[]): Device {
     machine: 'Idle',
     write: async (data) => {
       sent.push(data);
-      if (data === '?') {
-        later(statusLine(device.machine));
-        return;
-      }
-      if (data === '\x18') {
-        // mc_reset() during STATE_JOG raises ALARM:3; main() re-inits and prints the banner.
-        const wasMoving = device.machine === 'Jog';
-        device.machine = wasMoving ? 'Alarm' : 'Idle';
-        if (wasMoving) later('ALARM:3');
-        later("Grbl 1.1h ['$' for help]");
-        if (wasMoving) later("[MSG:'$H'|'$X' to unlock]");
-        return;
-      }
-      if (data === '$I\n' && useLaserStore.getState().controllerOperation?.kind === 'connection-handshake') {
-        respondToTestGrblBuildInfo(data, (line) => later(line));
-        return;
-      }
-      for (const line of data.split('\n')) {
-        if (line.trim() === '') continue;
-        if (line.startsWith('$J=')) {
-          device.machine = 'Jog';
-          later('ok');
-        } else if (line.startsWith('$')) {
-          later('ok');
-        } else if (device.machine === 'Jog' || device.machine === 'Alarm') {
-          // protocol.c:99-101 — G-code is locked out in Alarm and Jog.
-          later('error:9');
-        } else {
-          later('ok');
+      if (data === '?') later(statusLine(device.machine));
+      else if (data === '\x18') softReset(device, later);
+      else if (isHandshakeBuildInfo(data)) respondToTestGrblBuildInfo(data, later);
+      else {
+        for (const line of data.split('\n')) {
+          if (line.trim() !== '') later(answerLine(device, line));
         }
       }
     },

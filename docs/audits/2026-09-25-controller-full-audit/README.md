@@ -28,7 +28,7 @@ moved beside the code it covers as a regression test, or deleted, before the PR.
 
 | ID | scope | status |
 |---|---|---|
-| GP | GRBL 1.1 protocol: replies, status reports, errors/alarms, `$` commands, settings, probe, `$#` | running |
+| GP | GRBL 1.1 protocol: replies, status reports, errors/alarms, `$` commands, settings, probe, `$#` | reported: 8 findings (`tracks/GP.md`) |
 | ST | GRBL-family streaming: character counting, acks, errors/alarms mid-job, hold/resume, M0, settle | running |
 | HF | grblHAL, FluidNC and the Creality Falcon A1 Pro command set | running |
 | MA | Marlin: replies, M114, laser power (M3 I / fan), jog/frame, stream-side pause and stop | running |

@@ -71,7 +71,7 @@ FluidNC v4.0.3 25ae119b, FluidNC main fdc17a2c, gnea/grbl bfb67f0c). Repro tests
   alarms 1, 2, 13 ("Reset (Ctrl-X) to continue").
 
 ### HF-3 — grblHAL critical alarms (1, 2, 10, 17, 20) refuse `$X`/`$H` until reset; banner advice and error:79 give no way out
-- severity: low
+- severity: medium (controller stays locked until Disconnect, which sends Ctrl-X, or a power/reset button; no in-app guidance)
 - verdict: CONFIRMED (repro + grblHAL source)
 - status: new (partly generic: stock GRBL 1.1h also needs a reset after ALARM:1/2 — other track)
 - failure scenario: grblHAL ALARM:1 or ALARM:2 → `[MSG:Reset to continue]`, grblHAL blocks
@@ -79,7 +79,13 @@ FluidNC v4.0.3 25ae119b, FluidNC main fdc17a2c, gnea/grbl bfb67f0c). Repro tests
   event is active"). KerfDesk's banner action for alarm 1 is "Re-home the machine ($H)…", for
   alarm 2 "Check the design fits the bed…", offers Home/Unlock (both → "error:79" with no
   description) and no Reset. Only alarm 10 is special-cased (`start-blocked-alarm-offers.ts:38-70`).
-  Workaround: Disconnect (sends Ctrl-X on GRBL-family) and reconnect.
+  Workaround: Disconnect (sends Ctrl-X on GRBL-family, `laser-connection-actions.ts` →
+  `runGrblDisconnectTransaction`) and reconnect; the Alarm banner has no Reset control.
+  Falcon context: the vendor contract jogs and frames with plain `G1` (no `$J=`), and grblHAL
+  answers a `G1` past soft limits with `mc_reset()` + ALARM:2 (critical) instead of `$J=`'s
+  error:15 (`machine_limits.c:628-650` vs `motion_control.c:832-835`); KerfDesk's jog bounds
+  are warn-only (`laser-jog-warnings.ts:1-4`), so an over-travel click-jog on a Falcon with soft
+  limits enabled lands in this dead end (Falcon soft-limit setting unknown: `$$` is disabled).
 - kerfdesk evidence: `src/core/controllers/grbl/alarm-codes.ts:55-68` (actions for 1 and 2);
   `error-codes.ts` stops at 38 (no 79); `LaserWindow.tsx:290-320`.
 - upstream evidence: grblHAL `alarms.h:73-80` `alarm_is_critical` = HardLimit, SoftLimit, EStop,

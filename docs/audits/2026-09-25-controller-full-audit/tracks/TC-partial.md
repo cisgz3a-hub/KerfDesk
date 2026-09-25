@@ -1,6 +1,6 @@
 # Track TC (serial transport and connection lifecycle) - partial findings
 
-Status: in progress (checkpoint 1, 2026-09-25). Repro tests live in `src/__audit_repro__/TC/`.
+Status: complete pending hand-back (checkpoint 2, 2026-09-25). Repro tests live in `src/__audit_repro__/TC/`.
 
 ## Findings
 
@@ -56,19 +56,19 @@ Status: in progress (checkpoint 1, 2026-09-25). Repro tests live in `src/__audit
 - reproduction: `src/__audit_repro__/TC/tc-4-main-thread-port-left-open.test.ts` - both cases FAIL (`port.opened` stays true).
 - fix (local): in `handleDroppedConnection`, after `closeStreamsOnce()` settles, `await port.close().catch(() => undefined)` (a disconnected port rejects harmlessly), before or after firing close.
 
-## Checked and correct (so far)
+## Checked and correct
 
-- Line framing: LF/CRLF, splits across chunks, 64 KiB cap with discard-to-newline; invalid UTF-8 becomes U+FFFD without swallowing following ASCII bytes (node TextDecoder check); GRBL/grblHAL/FluidNC/Marlin all terminate with LF or CRLF (grblHAL stream.h `ASCII_EOL "\r\n"`, FluidNC Channel.cpp `print_msg` writes msg then "\n", Marlin serial.h `SERIAL_EOL() SERIAL_CHAR('\n')`).
-- No mid-line status interleave on FluidNC v4.0.3: every line goes through one output task queue (Protocol.cpp output_loop / Channel.cpp sendLine).
-- Web Serial read errors: Break/Framing/Parity/BufferOverrun recover on a fresh `port.readable` (spec readable getter steps; Chromium `ReceiveErrorIsFatal` returns false for them). UnknownError treated as fatal is defensible: Chromium raises SYSTEM_ERROR on the read side for a CDC-ACM unplug on Windows (serial_io_handler_win.cc OnIOCompleted comment).
-- Disconnect cleanup (ADR-361 item 3): both transports close the writer with the bounded drain before closing the port, so the GRBL-family transaction's 0x18 + M5/M9 reach the OS; GRBL/grblHAL/FluidNC resets kill spindle and coolant themselves (grbl motion_control.c mc_reset; FluidNC Protocol.cpp protocol_do_late_reset).
-- A reset banner later than the 2 s window still ends qualified (tc-check-late-reset-banner.test.ts, passing check).
-- DTR/RTS: KerfDesk never calls setSignals/getSignals; Chromium asserts DTR and RTS on open on Windows (serial_io_handler_win.cc ConfigurePortImpl: DTR_CONTROL_ENABLE, RTS_CONTROL_ENABLE). grblHAL USB prints its welcome 200 ms after DTR without rebooting (grblhal-core stream.c#L328-L333); Smoothieware prints "Smoothie\r\nok\r\n" on DTR attach (USBSerial.cpp#L324-L333). KerfDesk's first-banner adoption handles both.
-- Electron: no device permission handler (ADR-366), matching Electron docs ("If this handler is not defined, the default device permissions as granted through device selection ... will be used").
+- Line framing (shared `extractSerialLines` + `TextDecoder('utf-8', stream)` in both transports): LF and CRLF, records split across chunks, 64 KiB cap with discard to the next newline. Invalid UTF-8 becomes U+FFFD without swallowing the following ASCII byte (WHATWG decoder "restore byte to ioQueue"; node check), so a stray high byte can only spoil its own line. Chromium POSIX clears ICRNL/IGNCR and sets PARMRK, so CR arrives verbatim and a break is reported as BreakError, not a NUL in the line (serial_io_handler_posix.cc#L174-L175). All firmware terminate with LF or CRLF: GRBL report.c#L172, grblHAL stream.h#L50 `ASCII_EOL "\r\n"`, FluidNC Channel.cpp#L283-L288 `write(msg); write("\n");`, Marlin core/serial.h#L172 `SERIAL_EOL() SERIAL_CHAR('\n')`.
+- No mid-line status interleave: GRBL's `serial_write` never runs realtime work while it waits for TX space (serial.c#L86-L103), and FluidNC v4.0.3 funnels every line through one output task queue (Protocol.cpp#L101-L116 output_loop; Channel.cpp#L295-L340 sendLine).
+- Web Serial read errors: Break/Framing/Parity/BufferOverrun recover on a fresh `port.readable` (spec 4.6 readable getter; Chromium serial_port.cc#L61-L75 `ReceiveErrorIsFatal` false for them) in both transports with the shared 8-recovery budget. Treating UnknownError as fatal is defensible: Chromium raises SYSTEM_ERROR on the read side for a CDC-ACM unplug on Windows (serial_io_handler_win.cc OnIOCompleted, CancelRead(SYSTEM_ERROR) comment).
+- Write path: one writer per session, writes queued in call order (each is a whole line or one realtime byte, so a realtime byte never splits a line); safeWrite reserves the owed ack synchronously before `conn.write`; writes after close reject (main thread: released writer; worker: `session.closing`, pending writes rejected in `fireClose`).
+- Disconnect cleanup (ADR-361 item 3): both transports drain the writer with the bounded close before closing the port, so the GRBL-family 0x18 + M5/M9 reach the OS. The reset itself kills spindle and coolant (GRBL motion_control.c#L366-L374 mc_reset; FluidNC Protocol.cpp#L874-L878 protocol_do_late_reset), so M5/M9 are belt and braces. On FluidNC a reset during motion prints ALARM then `delay_ms(500)` (Protocol.cpp#L228-L232) before `allChannels.flushRx()` and the banner, so KerfDesk's 500 ms banner wait usually expires and the M5/M9 are flushed: harmless for the reason above.
+- Unplug mid-job: 'disconnect' event and fatal read both end the session; `buildPortClosePatch` marks the stream `disconnected` and raises disconnect-during-job/fire; recovery records a `disconnect` interruption without a planner backlog (controller keeps executing what it had).
+- A reset banner later than the 2 s window still ends qualified (`tc-check-late-reset-banner.test.ts`, passing check); GRBL prints the banner after its init loop clears RX (main.c#L88, #L102).
+- DTR/RTS: KerfDesk never calls setSignals/getSignals; the spec's open() leaves signal state to the OS ("Invoke the operating system to open the serial port using the connection parameters (or their defaults) specified in options"); Chromium asserts both on Windows (serial_io_handler_win.cc#L244 `fDtrControl = DTR_CONTROL_ENABLE`, #L267 `fRtsControl = RTS_CONTROL_ENABLE`). grblHAL USB prints its welcome 200 ms after DTR without rebooting (grblhal-core stream.c#L328-L333); Smoothieware prints "Smoothie\r\nok\r\n" on DTR attach (USBSerial.cpp#L324-L333); the unsolicited `ok` arrives before any owed-ack write. KerfDesk's first-banner adoption handles both (conservatively clears homing state that connect already cleared).
+- Electron: no device permission handler (ADR-366), matching the Electron docs ("If this handler is not defined, the default device permissions as granted through device selection ... will be used"); select-serial-port calls preventDefault and cancels with an empty port id; the no-port wait listens to serial-port-added/removed. Window close/quit during a job: the close guard retains the window, prepare runs Fire-off then `stopJob('app-closing')`, approve re-checks state; a Marlin (no reset) stop leaves an acknowledgeable warning.
 
-## Still to check
+## Not settled / not covered
 
-- Worker/main-thread parity details (close-subscriber isolation, port.close after a fatal read end on the main thread).
-- Electron window close / quit during a job: stop handoff ordering and air/laser off.
-- Smoothieware DTR-detach RX flush vs queued Disconnect cleanup lines (USBSerial.cpp on_main_loop).
-- FluidNC alarm_msg 500 ms delay vs KerfDesk's 500 ms reset-banner wait (cleanup lines flushed; reset already de-energizes).
+- Whether a given ESP32 FluidNC board resets or enters download mode on open depends on its auto-reset wiring; FluidTerm's own reset pulses RTS asserted with DTR deasserted (fluidterm.py#L915-L923), consistent with the classic circuit where both asserted does not hold EN or IO0 low. Not settled by firmware source.
+- Arduino bootloader timing (Optiboot) is not in the upstream tree; the 2 s window plus late-banner re-qualification covers the typical ~1-1.3 s case.
