@@ -20,6 +20,7 @@ export function SelectedShapeGeometryFields(props: {
       case 'star':
         return <StarFields spec={spec} setSpec={props.setSpec} scale={scale} />;
       case 'polyline':
+      case 'barcode':
         return null;
     }
   })();
@@ -312,7 +313,7 @@ function clampFieldValue(
 export function isParametricShapeObject(object: ShapeObject): object is ShapeObject & {
   readonly spec: ParametricShapeSpec;
 } {
-  return object.spec.kind !== 'polyline';
+  return object.spec.kind !== 'polyline' && object.spec.kind !== 'barcode';
 }
 
 // Paint (border, background, padding) comes from the .lf-pane-form scope in

@@ -7,6 +7,8 @@ import type { PlatformAdapter } from '../../platform/types';
 import { useStore } from '../state';
 import { useUiStore } from '../state/ui-store';
 import { jobAwareAlert } from '../state/job-aware-dialogs';
+import { BarcodeDialogHost } from '../barcode/BarcodeDialogHost';
+import { useBarcodeDialogStore } from '../barcode/barcode-dialog-store';
 import { BoxGeneratorHost } from '../box/BoxGeneratorHost';
 import { BoxFitTestHost } from '../box/BoxFitTestHost';
 import { useToastStore, type ToastVariant } from '../state/toast-store';
@@ -74,6 +76,7 @@ export function CommandShell(): JSX.Element {
     requestAdjustImage: () => setAdjustDialogOpen(true),
     requestGcodeInspector: gcodeInspector.open,
     requestBoxGenerator: () => setBoxGeneratorOpen(true),
+    requestBarcodeGenerator: () => useBarcodeDialogStore.getState().open({ mode: 'insert' }),
     requestBoxFitTest: () => setBoxFitTestOpen(true),
     requestMaterialTest: () => setMaterialTestDialogOpen(true),
     requestIntervalTest: () => setIntervalTestDialogOpen(true),
@@ -123,6 +126,7 @@ export function CommandShell(): JSX.Element {
         <CloseOpenFillContoursPanel onClose={() => setCloseToleranceDialogOpen(false)} />
       ) : null}
       <GcodeSaveDialogHost />
+      <BarcodeDialogHost />
       {gcodeInspector.element}
     </>
   );

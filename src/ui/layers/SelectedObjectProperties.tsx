@@ -7,6 +7,7 @@ import {
   type RasterImage,
   type SceneObject,
 } from '../../core/scene';
+import { SelectedBarcodeSummary } from '../barcode/SelectedBarcodeSummary';
 import { useStore } from '../state';
 import { ArtworkEditorTabs, type ArtworkEditorView } from './ArtworkEditorTabs';
 import { DogboneRow } from './DogboneRow';
@@ -152,6 +153,7 @@ function ArtworkAdjustmentFields(props: ArtworkPropertiesInspectorProps): JSX.El
   return (
     <div className="lf-artwork-disclosure__body">
       <h3 className="lf-operation-inspector__heading">Artwork adjustments</h3>
+      <SelectedBarcodeSummary objects={context.objects} />
       {parametricShape === null ? null : (
         <SelectedShapeGeometryFields
           object={parametricShape}

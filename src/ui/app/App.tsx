@@ -43,6 +43,7 @@ import { ProjectBedReconciliationBanner } from './ProjectBedReconciliationBanner
 import { ExternalGcodePreviewBanner } from './ExternalGcodePreviewBanner';
 import { DesktopCloseNotice } from './DesktopCloseNotice';
 import { TutorialHost } from '../tutorials/TutorialHost';
+import { RecentProjectsHost } from '../recent-projects/RecentProjectsHost';
 
 export function App(): JSX.Element {
   return (
@@ -52,6 +53,7 @@ export function App(): JSX.Element {
       <AutosaveRecoveryBanner />
       <ProjectBedReconciliationBanner />
       <ExternalGcodePreviewBanner />
+      <RecentProjectsHost />
       <main style={mainStyle}>
         <ToolStrip />
         <CanvasArea />

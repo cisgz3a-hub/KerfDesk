@@ -1,6 +1,11 @@
 import { arrayPlacements, combinedBBox, type ArraySpec, type SceneObject } from '../../core/scene';
 import { variableCopyOffset } from '../../core/variables';
 import {
+  objectVariableTemplate,
+  restoreVariableSource,
+  withVariableSequenceOffset,
+} from '../../core/variables/object-variable-template';
+import {
   materializeVariableText,
   type VariableTextRenderer,
 } from '../../io/gcode/prepare-output-snapshot';
@@ -34,14 +39,12 @@ export async function prepareVariableArray(
   if (bounds === null)
     return { ok: false, message: 'Select a design to create its variable copies.' };
   const offsets = sources.flatMap((object) =>
-    object.kind === 'text' && object.variableTemplate !== undefined
-      ? [variableCopyOffset(object) ?? 0]
-      : [],
+    objectVariableTemplate(object) === undefined ? [] : [variableCopyOffset(object) ?? 0],
   );
   if (offsets.length === 0)
     return {
       ok: false,
-      message: 'This design has no variable text. Create an ordinary array instead.',
+      message: 'This design has no variable text or barcode. Create an ordinary array instead.',
     };
   const stride = copyStride(offsets);
   const seeds = arrayPlacements(bounds, spec);
@@ -58,20 +61,11 @@ export async function prepareVariableArray(
         ok: false,
         message: `Copy ${index + 1}: ${rendered.preflight.issues.map((issue) => issue.message).join(' ')}`,
       };
-    const templates = new Map(
-      assigned.flatMap((object) =>
-        object.kind === 'text' && object.variableTemplate !== undefined
-          ? [[object.id, object.variableTemplate] as const]
-          : [],
-      ),
-    );
+    const assignedById = new Map(assigned.map((object) => [object.id, object] as const));
     slots.push(
-      rendered.project.scene.objects.map((object) => {
-        const variableTemplate = templates.get(object.id);
-        return object.kind === 'text' && variableTemplate !== undefined
-          ? { ...object, variableTemplate }
-          : object;
-      }),
+      rendered.project.scene.objects.map((object) =>
+        restoreVariableSource(object, assignedById.get(object.id)),
+      ),
     );
   }
   const materialized = variableArrayMaterialization(spec, selectedIds, slots);
@@ -91,14 +85,7 @@ function copyStride(offsets: readonly number[]): number {
 }
 
 function assignCopyOffset(object: SceneObject, delta: number): SceneObject {
-  if (object.kind !== 'text' || object.variableTemplate === undefined) return object;
-  return {
-    ...object,
-    variableTemplate: {
-      ...object.variableTemplate,
-      sequenceOffset: (variableCopyOffset(object) ?? 0) + delta,
-    },
-  };
+  return withVariableSequenceOffset(object, (variableCopyOffset(object) ?? 0) + delta);
 }
 
 function cancelled(): VariableArrayResult {

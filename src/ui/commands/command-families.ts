@@ -9,78 +9,9 @@ import { windowPanelCommands } from './window-panel-commands';
 import { rotarySetupCommand } from './rotary-command-family';
 import { labsCommand } from './labs-command-family';
 import { printAndCutCommand } from './print-cut-command-family';
-import { gcodeInspectorCommands } from './gcode-command-family';
-import { templateCommands } from './template-command-family';
 
+export { fileCommands } from './file-command-family';
 export { connectionHelpCommand, helpCommand, safetyHelpCommand } from './help-command-family';
-
-export function fileCommands(ctx: AppCommandContext): ReadonlyArray<AppCommand> {
-  return [
-    enabled(
-      'file.new',
-      'file',
-      'New',
-      'New project',
-      () => {
-        void ctx.confirmDiscard('start a new project').then((ok) => {
-          if (ok) ctx.newProject();
-        });
-      },
-      'Ctrl+N',
-    ),
-    enabled('file.open', 'file', 'Open...', 'Open project', ctx.openProject, 'Ctrl+O'),
-    enabled('file.save', 'file', 'Save', 'Save project', ctx.saveProject, 'Ctrl+S'),
-    enabled(
-      'file.save-as',
-      'file',
-      'Save As...',
-      'Save project as',
-      ctx.saveProjectAs,
-      'Ctrl+Shift+S',
-    ),
-    ...templateCommands(ctx),
-    enabled(
-      'file.import',
-      'file',
-      'Import...',
-      'Import SVG, DXF, PDF/AI, HPGL/PLT, images or STL artwork',
-      ctx.importArtwork,
-      'Ctrl+I',
-    ),
-    enabled('file.import-svg', 'file', 'Import SVG...', 'Import SVG file', ctx.importSvg),
-    enabled('file.import-dxf', 'file', 'Import DXF...', 'Import DXF drawing', ctx.importDxf),
-    enabled(
-      'file.import-image',
-      'file',
-      'Import Image...',
-      'Import PNG, JPG, BMP, GIF or TIFF image',
-      ctx.importImage,
-    ),
-    enabled(
-      'file.import-height-map',
-      'file',
-      'Import Height Map...',
-      'Import an exact grayscale PNG as CNC relief depth',
-      ctx.importHeightMap,
-    ),
-    enabled(
-      'file.save-gcode',
-      'file',
-      'Save G-code...',
-      'Export G-code',
-      ctx.saveGcode,
-      'Ctrl+Shift+E',
-    ),
-    enabled(
-      'file.export-svg',
-      'file',
-      ctx.hasSelection ? 'Export selected artwork as SVG...' : 'Export artwork as SVG...',
-      'Export selected artwork, or all artwork when nothing is selected, as SVG',
-      ctx.exportSvg,
-    ),
-    ...gcodeInspectorCommands(ctx),
-  ];
-}
 
 export function toolsCommands(ctx: AppCommandContext): ReadonlyArray<AppCommand> {
   return [
@@ -309,6 +240,13 @@ function calibrationToolCommands(ctx: AppCommandContext): ReadonlyArray<AppComma
       'Box Generator...',
       'Generate a finger-joint box as cut-ready panels.',
       ctx.boxGenerator,
+    ),
+    enabled(
+      'tools.barcode',
+      'tools',
+      'Barcode...',
+      'Insert a QR Code, Data Matrix or 1D barcode as engravable outlines.',
+      ctx.barcodeGenerator,
     ),
     enabled(
       'tools.box-fit-test',

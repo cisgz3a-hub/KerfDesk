@@ -14,11 +14,12 @@ export type ProjectOpenCompletionContext = {
   readonly pushToast: (message: string, variant?: ToastVariant) => void;
 };
 
+/** True when the file replaced the document. */
 export function completeNativeProjectOpen(
   ctx: ProjectOpenCompletionContext,
   fileName: string,
   result: ReturnType<typeof deserializeProject>,
-): void {
+): boolean {
   if (result.kind === 'ok') {
     const loadResult = ctx.setProject(result.project);
     markCapabilityAwareLoad(ctx, fileName, loadResult);
@@ -30,25 +31,27 @@ export function completeNativeProjectOpen(
       result.migratedFrom === undefined ? 'success' : 'info',
     );
     reportMachineCapabilityRepair(loadResult, ctx.pushToast);
-    return;
+    return true;
   }
   if (result.kind === 'schema-too-new') {
     jobAwareAlert(
       `This project was saved with a newer KerfDesk (schemaVersion ${result.sawVersion}). Update the app to open it.`,
     );
-    return;
+    return false;
   }
   ctx.pushToast(`Could not open ${fileName}: ${describeOpenResult(result)}`, 'error');
+  return false;
 }
 
+/** True when the file replaced the document. */
 export function completeLightBurnProjectOpen(
   ctx: ProjectOpenCompletionContext,
   fileName: string,
   result: ReturnType<typeof importLightBurnProject>,
-): void {
+): boolean {
   if (!result.ok) {
     ctx.pushToast(`Could not import ${fileName}: ${result.reason}`, 'error');
-    return;
+    return false;
   }
   const loadResult = ctx.setProject(result.project);
   ctx.markLoaded(fileName.replace(/\.lbrn2?$/i, '.lf2'), { dirty: true });
@@ -68,6 +71,7 @@ export function completeLightBurnProjectOpen(
     );
   }
   reportMachineCapabilityRepair(loadResult, ctx.pushToast);
+  return true;
 }
 
 function reportMachineCapabilityRepair(

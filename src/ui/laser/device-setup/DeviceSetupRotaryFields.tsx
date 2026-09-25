@@ -1,9 +1,18 @@
 // Draft-bound rotary attachment fields for the Machine Setup Options step.
 // Edits stay in the wizard draft; nothing reaches the live profile until the
-// final atomic Save.
+// final atomic Save. Roller scaling follows Rotary Setup (ADR-373).
 
+import { useState } from 'react';
 import type { RotarySetup, RotaryType } from '../../../core/devices';
 import { NumberField } from '../../common/NumberField';
+import {
+  editRollerDiameter,
+  editRollerScaling,
+  editRotaryFields,
+  editRotaryType,
+  startRotaryEdit,
+  type RotaryEdit,
+} from '../rotary-setup-edit';
 import { Row, numInputStyle, unitStyle } from '../device-settings-shared';
 
 export function DeviceSetupRotaryFields(props: {
@@ -11,8 +20,14 @@ export function DeviceSetupRotaryFields(props: {
   readonly onChange: (value: RotarySetup) => void;
 }): JSX.Element {
   const { value, onChange } = props;
-  const number = (field: 'objectDiameterMm' | 'mmPerRotation', next: number): void =>
-    onChange({ ...value, [field]: next });
+  // Remembers the roller diameter while scaling is off or Chuck is chosen.
+  const [parkedRoller, setParkedRoller] = useState(() => startRotaryEdit(value).parkedRoller);
+  const edit: RotaryEdit = { setup: value, parkedRoller };
+  const apply = (next: RotaryEdit): void => {
+    setParkedRoller(next.parkedRoller);
+    onChange(next.setup);
+  };
+  const scaledRoller = value.type === 'roller' && value.rollerDiameterMm !== undefined;
   return (
     <div style={bodyStyle}>
       <Row label="Rotary">
@@ -20,7 +35,7 @@ export function DeviceSetupRotaryFields(props: {
           <input
             type="checkbox"
             checked={value.enabled}
-            onChange={(event) => onChange({ ...value, enabled: event.target.checked })}
+            onChange={(event) => apply(editRotaryFields(edit, { enabled: event.target.checked }))}
             aria-label="Enable rotary attachment"
             title="Enable rotary output only while the attachment is installed and calibrated."
           />
@@ -30,7 +45,7 @@ export function DeviceSetupRotaryFields(props: {
       <Row label="Type">
         <select
           value={value.type}
-          onChange={(event) => onChange({ ...value, type: event.target.value as RotaryType })}
+          onChange={(event) => apply(editRotaryType(edit, event.target.value as RotaryType))}
           aria-label="Rotary type"
           title="Choose whether the rotary attachment uses rollers or a chuck."
         >
@@ -41,19 +56,25 @@ export function DeviceSetupRotaryFields(props: {
       <RotaryNumber
         label="Object diameter"
         value={value.objectDiameterMm}
-        onCommit={(next) => number('objectDiameterMm', next)}
+        onCommit={(next) => apply(editRotaryFields(edit, { objectDiameterMm: next }))}
       />
+      {value.type === 'roller' ? (
+        <RollerScaleRows edit={edit} scaled={scaledRoller} onEdit={apply} />
+      ) : null}
       <RotaryNumber
         label="Motion per turn"
         value={value.mmPerRotation}
-        onCommit={(next) => number('mmPerRotation', next)}
+        disabled={value.type === 'roller' && !scaledRoller}
+        onCommit={(next) => apply(editRotaryFields(edit, { mmPerRotation: next }))}
       />
       <Row label="Direction">
         <label style={inlineStyle}>
           <input
             type="checkbox"
             checked={value.reverseAxis === true}
-            onChange={(event) => onChange({ ...value, reverseAxis: event.target.checked })}
+            onChange={(event) =>
+              apply(editRotaryFields(edit, { reverseAxis: event.target.checked }))
+            }
             aria-label="Reverse rotary direction"
             title="Reverse rotary travel only if the calibration test moves in the wrong direction."
           />
@@ -68,9 +89,41 @@ export function DeviceSetupRotaryFields(props: {
   );
 }
 
+function RollerScaleRows(props: {
+  readonly edit: RotaryEdit;
+  readonly scaled: boolean;
+  readonly onEdit: (next: RotaryEdit) => void;
+}): JSX.Element {
+  const diameter = props.edit.setup.rollerDiameterMm;
+  return (
+    <>
+      <Row label="Roller scale">
+        <label style={inlineStyle}>
+          <input
+            type="checkbox"
+            checked={props.scaled}
+            onChange={(event) => props.onEdit(editRollerScaling(props.edit, event.target.checked))}
+            aria-label="Scale Y from the roller diameter"
+            title="Leave off when the controller already moves the part's surface in millimetres."
+          />
+          Scale Y from the roller diameter
+        </label>
+      </Row>
+      {diameter === undefined ? null : (
+        <RotaryNumber
+          label="Roller diameter"
+          value={diameter}
+          onCommit={(next) => props.onEdit(editRollerDiameter(props.edit, next))}
+        />
+      )}
+    </>
+  );
+}
+
 function RotaryNumber(props: {
   readonly label: string;
   readonly value: number;
+  readonly disabled?: boolean;
   readonly onCommit: (value: number) => void;
 }): JSX.Element {
   return (
@@ -81,6 +134,7 @@ function RotaryNumber(props: {
         min={0.1}
         max={100000}
         step={0.1}
+        disabled={props.disabled === true}
         onCommit={props.onCommit}
         style={numInputStyle}
       />

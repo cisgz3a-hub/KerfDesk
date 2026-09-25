@@ -16,6 +16,8 @@ import type {
 import { webCamera } from './web-camera';
 import { webSerial } from './web-serial';
 import { createHttpCameraBridge } from './camera-bridge';
+import { createLaunchQueueFileOpens } from './launch-queue-file-opens';
+import { fileHandleFromFile, webRecentFiles } from './recent-file-handles';
 import { writeSaveChunks } from './write-save-chunks';
 
 type FilePickerAcceptType = {
@@ -46,8 +48,7 @@ async function pickFilesForOpen(req: FileOpenRequest): Promise<ReadonlyArray<Fil
   }
   const out: FileHandle[] = [];
   for (const handle of handles) {
-    const file = await handle.getFile();
-    out.push({ name: file.name, size: file.size, text: () => file.text(), blob: async () => file });
+    out.push(fileHandleFromFile(handle, await handle.getFile()));
   }
   return out;
 }
@@ -125,6 +126,7 @@ function fileHandleTarget(handle: FileSystemFileHandle): SaveTarget {
   const identity: WebSaveDestination = { kind: 'file', handle };
   return {
     displayName: handle.name,
+    recentRef: { kind: 'handle', handle },
     destinationIdentity: identity,
     isSameDestination: (other) => sameWebSaveDestination(identity, other.destinationIdentity),
     write: async (data) => {
@@ -196,4 +198,6 @@ export const webAdapter: PlatformAdapter = {
   serial: webSerial,
   camera: webCamera,
   cameraBridge: createHttpCameraBridge(),
+  recentFiles: webRecentFiles,
+  externalFileOpens: createLaunchQueueFileOpens(),
 };

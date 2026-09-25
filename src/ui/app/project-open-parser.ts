@@ -1,5 +1,6 @@
 import { importLightBurnProject } from '../../io/lightburn';
 import { deserializeProject } from '../../io/project';
+import type { RecentFileRef } from '../../platform/types';
 import {
   parseLightBurnProjectOffThread,
   parseProjectOffThread,
@@ -9,7 +10,8 @@ import { resolveImportBlob, type BlobSourceFile } from '../import/import-file-bl
 import type { ToastVariant } from '../state/toast-store';
 import { mainThreadImportFallbackAdvisory } from './import-size-advisory';
 
-export type OpenProjectFile = BlobSourceFile;
+/** A chosen project file; `recentRef` lets Recent Projects reopen it. */
+export type OpenProjectFile = BlobSourceFile & { readonly recentRef?: RecentFileRef };
 
 type PushToast = (message: string, variant?: ToastVariant) => void;
 

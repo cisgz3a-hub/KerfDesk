@@ -20,7 +20,6 @@ import {
   type Project,
   type SceneObject,
 } from '../../core/scene';
-import type { deserializeProject } from '../../io/project';
 import type { PlatformAdapter, SaveTarget } from '../../platform/types';
 import type { ImportOutcome } from '../state/store';
 import type { ToastVariant } from '../state/toast-store';
@@ -47,6 +46,8 @@ import {
   type ProjectOpenCompletionContext,
 } from './project-open-completion';
 import { claimProjectOpenRequest } from './project-open-request-owner';
+import { rememberOpenedProject } from '../recent-projects/recent-project-record';
+import { chosenOrPickedProjectFiles } from './chosen-project-file';
 import {
   bindImportActionsToDocument,
   captureImportDocumentOwner,
@@ -329,9 +330,16 @@ export type OpenProjectCtx = ProjectOpenCompletionContext & {
   readonly claimProjectOpenRequest: () => number;
   readonly getProjectOpenRequestEpoch: () => number;
   readonly getProjectDocumentEpoch: () => number;
+  /** Rechecked after asynchronous reading/parsing, immediately before replacing the document. */
+  readonly stillAllowed?: () => boolean;
 };
 
-export async function handleOpenProject(ctx: OpenProjectCtx): Promise<void> {
+/** Open a project from the picker, or `chosenFile` when the operator already
+ * chose it (Recent Projects, or a file the operating system handed over). */
+export async function handleOpenProject(
+  ctx: OpenProjectCtx,
+  chosenFile?: OpenProjectFile,
+): Promise<void> {
   const owner = claimProjectOpenRequest(
     ctx.pushToast,
     ctx.claimProjectOpenRequest,
@@ -349,10 +357,12 @@ export async function handleOpenProject(ctx: OpenProjectCtx): Promise<void> {
   };
   let files: ReadonlyArray<OpenProjectFile>;
   try {
-    files = await ctx.platform.pickFilesForOpen({
-      accept: ['.lf2', '.lbrn', '.lbrn2'],
-      multiple: false,
-    });
+    files = await chosenOrPickedProjectFiles(chosenFile, () =>
+      ctx.platform.pickFilesForOpen({
+        accept: ['.lf2', '.lbrn', '.lbrn2'],
+        multiple: false,
+      }),
+    );
   } catch (err) {
     ownedCtx.pushToast(`Could not open project: ${errorMessage(err)}`, 'error');
     return;
@@ -366,15 +376,9 @@ export async function handleOpenProject(ctx: OpenProjectCtx): Promise<void> {
   );
   if (sizeAdvisory !== null) ownedCtx.pushToast(sizeAdvisory, 'warning');
   const controls = createImportWorkerControls(file.name, ownedCtx.pushToast);
-  let result: ReturnType<typeof deserializeProject>;
+  let parsed: Awaited<ReturnType<typeof parseOpenedProjectFile>>;
   try {
-    const parsed = await parseOpenedProjectFile(file, controls.options, ownedCtx.pushToast);
-    if (!owner.isCurrent()) return;
-    if (parsed.kind === 'lightburn') {
-      completeLightBurnProjectOpen(ownedCtx, file.name, parsed.result);
-      return;
-    }
-    result = parsed.result;
+    parsed = await parseOpenedProjectFile(file, controls.options, ownedCtx.pushToast);
   } catch (err) {
     ownedCtx.pushToast(
       isImportCancellation(err)
@@ -386,6 +390,18 @@ export async function handleOpenProject(ctx: OpenProjectCtx): Promise<void> {
   } finally {
     controls.dispose();
   }
-  if (!owner.isCurrent()) return;
-  completeNativeProjectOpen(ownedCtx, file.name, result);
+  if (!owner.isCurrent() || ctx.stillAllowed?.() === false) return;
+  completeOpenedFile(ownedCtx, file, parsed);
+}
+
+function completeOpenedFile(
+  ctx: OpenProjectCtx,
+  file: OpenProjectFile,
+  parsed: Awaited<ReturnType<typeof parseOpenedProjectFile>>,
+): void {
+  const opened =
+    parsed.kind === 'lightburn'
+      ? completeLightBurnProjectOpen(ctx, file.name, parsed.result)
+      : completeNativeProjectOpen(ctx, file.name, parsed.result);
+  rememberOpenedProject(ctx.platform, file, opened);
 }

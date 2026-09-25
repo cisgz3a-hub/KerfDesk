@@ -79,6 +79,19 @@ describe('device-setup option status summaries', () => {
         }),
       ),
     ).toBe('Roller, Ø60 mm');
+    expect(
+      rotaryStatus(
+        withPatch({
+          rotary: {
+            enabled: true,
+            type: 'roller',
+            mmPerRotation: 40,
+            objectDiameterMm: 188.5 / Math.PI,
+            rollerDiameterMm: 25,
+          },
+        }),
+      ),
+    ).toBe('Roller, Ø60 mm (rollers Ø25 mm)');
 
     expect(cameraStatus(withPatch({}))).toBe('Not set up');
   });

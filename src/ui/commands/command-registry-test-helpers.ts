@@ -18,6 +18,8 @@ export function baseCtx(overrides: Partial<AppCommandContext> = {}): AppCommandC
     joinPaths: vi.fn(),
     openTemplate: vi.fn(),
     saveTemplate: vi.fn(),
+    openRecentProjects: vi.fn(),
+    barcodeGenerator: vi.fn(),
     ...baseCtxAppearance(),
     ...overrides,
   } as AppCommandContext;

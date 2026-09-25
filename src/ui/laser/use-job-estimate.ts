@@ -36,6 +36,7 @@ import {
   type RuntimeCoordinatePreparation,
 } from '../use-runtime-coordinate-preparation';
 import { usePreviewJobPlacement } from '../use-preview-job-placement';
+import { projectHasVariableData } from '../../core/variables/object-variable-template';
 
 export const JOB_ESTIMATE_DEBOUNCE_MS = 250;
 
@@ -310,9 +311,7 @@ function initialEstimate(inputs: EstimateInputs, asyncSnapshot: boolean): LiveJo
 }
 
 function hasVariableText(project: Project): boolean {
-  return project.scene.objects.some(
-    (object) => object.kind === 'text' && object.variableTemplate !== undefined,
-  );
+  return projectHasVariableData(project);
 }
 
 type RecomputeEstimateArgs = {

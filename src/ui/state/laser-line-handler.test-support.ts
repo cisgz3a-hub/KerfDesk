@@ -27,6 +27,7 @@ function makeLaserStateFields() {
     autofocusBusy: false,
     probeBusy: false,
     motionOperation: null,
+    manualMotionCancelEpoch: 0,
     controllerOperation: null,
     streamer: null,
     streamerEpoch: 0,

@@ -23,6 +23,7 @@ import {
   type RuntimeCoordinatePreparation,
 } from '../use-runtime-coordinate-preparation';
 import { usePreviewJobPlacement } from '../use-preview-job-placement';
+import { projectHasVariableData } from '../../core/variables/object-variable-template';
 
 export type PreviewBuildScheduler = (work: () => void) => () => void;
 
@@ -172,9 +173,7 @@ function previewPreparationOptions(
 }
 
 function hasVariableText(project: Project): boolean {
-  return project.scene.objects.some(
-    (object) => object.kind === 'text' && object.variableTemplate !== undefined,
-  );
+  return projectHasVariableData(project);
 }
 
 // Over-budget scenes pause the synchronous preview; the ADR-244 worker

@@ -133,7 +133,9 @@ function mutation(
 }
 
 function isEditableParametricShape(object: SceneObject | undefined): object is ShapeObject {
-  return object?.kind === 'shape' && object.spec.kind !== 'polyline';
+  return (
+    object?.kind === 'shape' && object.spec.kind !== 'polyline' && object.spec.kind !== 'barcode'
+  );
 }
 
 function shapeSpecEqual(left: ShapeObject, right: ShapeObject): boolean {

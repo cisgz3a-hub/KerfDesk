@@ -12,6 +12,11 @@ export const FILE_COMMAND_HELP: Readonly<
     family: 'file',
     tooltip: 'Open a saved KerfDesk project file.',
   },
+  'file.open-recent': {
+    family: 'file',
+    tooltip:
+      'Reopen a project you recently opened or saved on this computer, and pin, remove or clear entries.',
+  },
   'file.save': {
     family: 'file',
     tooltip: 'Save the current project to its existing file.',

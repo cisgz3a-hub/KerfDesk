@@ -141,6 +141,33 @@ describe('webAdapter open picker', () => {
       webAdapter.pickFilesForOpen({ multiple: false, accept: ['.lf2'] }),
     ).rejects.toThrow(/File System Access API/);
   });
+
+  it('remembers the picked handle so Recent Projects can reopen the file', async () => {
+    const handle = {
+      kind: 'file',
+      name: 'sign.lf2',
+      getFile: vi.fn(async () => new File(['{}'], 'sign.lf2')),
+    } as unknown as FileSystemFileHandle;
+    Object.defineProperty(window, 'showOpenFilePicker', {
+      configurable: true,
+      value: vi.fn(async () => [handle]),
+    });
+
+    const [file] = await webAdapter.pickFilesForOpen({ multiple: false, accept: ['.lf2'] });
+
+    expect(file?.recentRef).toEqual({ kind: 'handle', handle });
+    expect(webAdapter.recentFiles).toBeDefined();
+  });
+});
+
+describe('webAdapter save target identity for Recent Projects', () => {
+  it('carries the chosen handle on the save target', async () => {
+    installSavePicker(writableStreamMock());
+
+    const target = await webAdapter.pickFileForSave(saveRequest);
+
+    expect(target?.recentRef).toMatchObject({ kind: 'handle', handle: { name: 'out.gcode' } });
+  });
 });
 
 function installSavePicker(writable: WritableMock): ReturnType<typeof vi.fn> {

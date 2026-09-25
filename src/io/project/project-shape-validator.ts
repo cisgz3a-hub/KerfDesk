@@ -19,6 +19,7 @@ import { validateSingleReliefSource } from './project-relief-source-authority';
 import { validateProjectJobSetup } from './project-job-setup-validator';
 import { validateOperationIds } from './project-operation-id-validator';
 import { validateProjectMachineKind } from './project-machine-kind-validator';
+import { validateBarcodeSpec } from './project-barcode-validator';
 import {
   firstError,
   isObject,
@@ -384,6 +385,7 @@ function validateShapeSpec(value: unknown, path: string): string | null {
       requireBoolean(value, `${path}.closed`),
     ]);
   }
+  if (kind === 'barcode') return validateBarcodeSpec(value, path);
   return `missing or invalid \`${path}.kind\``;
 }
 

@@ -26,6 +26,7 @@ import {
 } from './job-review-format';
 import { frameMotionFeeds } from '../../state/frame-feed-limits';
 import { buildContourEntryReviewFacts } from './job-review-contour-entry-facts';
+import { rotaryReviewSummary } from '../rotary-summary';
 
 export type JobReviewFact = {
   readonly label: string;
@@ -133,7 +134,7 @@ export function buildMachineReviewFacts(
       : [
           fact(
             'Rotary',
-            device.rotary.enabled ? 'Enabled' : 'Configured, disabled',
+            rotaryReviewSummary(device.rotary),
             device.rotary.enabled ? 'warning' : 'default',
           ),
         ]),

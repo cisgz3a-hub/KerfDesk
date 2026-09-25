@@ -107,6 +107,7 @@ const TOOLBAR_COMMANDS: ReadonlyArray<readonly [AppCommand['id'], string]> = [
   ['tools.camera', 'Camera'],
   ['tools.place-board', 'Place Board'],
   ['tools.box-generator', 'Box Generator...'],
+  ['tools.barcode', 'Barcode...'],
   ['tools.trace-image', 'Trace Image...'],
   ['tools.edit-image', 'Image Studio...'],
   ['tools.convert-to-bitmap', 'Convert to Bitmap...'],
