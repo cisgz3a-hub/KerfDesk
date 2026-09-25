@@ -2216,7 +2216,11 @@ Connecting a controller is optional, so a complete setup can be saved offline.
    profile in view. Search or **Browse all N profiles** opens the rest of the catalog. CNC-capable
    machines also have CNC presets. A profile card is one option in a radio group: a pointer
    anywhere on the card chooses that profile and copies it into the draft, while **Profile details**
-   sits outside the choice so reading the evidence selects nothing. Detected matches are
+   sits outside the choice so reading the evidence selects nothing. Choosing copies the preset
+   whole, so a later correction to the preset never reaches that copy; when a saved copy still
+   holds a value a correction replaced (the xTool D1 Pro's front-left origin, the Sculpfun S30's
+   410 x 400 mm bed), Job Review names the old and corrected values as an advisory (ADR-322
+   Amendment 1). Detected matches are
    prioritised among the remaining profiles and explain their evidence under **Profile details**,
    but generic `$$` values never establish hardware identity: "Possible match" remains the
    ceiling. Controller family, baud, output dialect,

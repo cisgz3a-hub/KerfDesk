@@ -37,6 +37,7 @@ import { detectAirAssistStartWarnings } from './air-assist-start-warnings';
 import { detectAirAssistStandbyWarnings } from './air-assist-standby-warnings';
 import { detectM7AirAssistWarnings } from './m7-air-assist-warnings';
 import { detectManualAirAssistWarnings } from './manual-air-assist-warnings';
+import { detectPresetCorrectionWarnings } from './preset-correction-warnings';
 import { detectParkOutsideFrameWarningsFromMetrics } from './park-outside-frame-warnings';
 import { detectRotaryRasterQualificationWarnings } from './rotary-raster-qualification-warnings';
 import {
@@ -110,6 +111,7 @@ export function buildJobReviewModel(args: JobReviewModelArgs): JobReviewModel {
         buildInfoObservationIsCurrent(args.laserModeStartSnapshot),
       ),
       ...detectManualAirAssistWarnings(args.prepared.prepared.job, args.project.device),
+      ...detectPresetCorrectionWarnings(args.project.device),
       ...detectAirAssistStartWarnings(
         args.prepared.prepared.job,
         args.project.device,
