@@ -131,7 +131,7 @@ function closedLoop(path: ColoredPath, index: number): Loop | null {
   if (!(area > 0)) return null;
   const scale = Math.max(1, Math.abs(minX), Math.abs(minY), Math.abs(maxX), Math.abs(maxY));
   const direction = signedArea > 0 ? 1 : -1;
-  return { index, points, minX, minY, maxX, maxY, area, direction, eps: scale * RELATIVE_EPS };
+  return { index, points, minY, maxY, area, direction, eps: scale * RELATIVE_EPS };
 }
 
 function loopPoints(path: ColoredPath, index: number): ReadonlyArray<Vec2> | null {
