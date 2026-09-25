@@ -16,14 +16,17 @@ afterEach(async () => {
     await act(async () => root.unmount());
     host.remove();
   }
-  useLaserStore.setState({ activeJobMachineKind: null });
+  useLaserStore.setState({ activeJobMachineKind: null, controllerSettings: null });
 });
 
 describe('RunningControls CNC Resume advisory', () => {
   // ADR-180 amendment: the rail no longer explains a refusal — it shows the
   // spindle-check advisory beside the (LiveMotionBar-owned) Resume action.
   it('shows the spindle-check advisory without duplicating top-bar actions', async () => {
-    useLaserStore.setState({ activeJobMachineKind: 'cnc' });
+    useLaserStore.setState({
+      activeJobMachineKind: 'cnc',
+      controllerSettings: { laserModeEnabled: false },
+    });
     const host = document.createElement('div');
     document.body.appendChild(host);
     const root = createRoot(host);
@@ -38,5 +41,20 @@ describe('RunningControls CNC Resume advisory', () => {
     expect(labels).not.toContain('ABORT');
     expect(host.textContent).toMatch(/restarts the spindle/i);
     expect(host.textContent).toMatch(/spins back up\s+engaged/i);
+  });
+
+  // CNC audit MC-1: with $32 unread (or 1), Resume restarts motion with no spin-up.
+  it('says Resume has no spin-up while the controller has not confirmed $32=0', async () => {
+    useLaserStore.setState({ activeJobMachineKind: 'cnc', controllerSettings: null });
+    const host = document.createElement('div');
+    document.body.appendChild(host);
+    const root = createRoot(host);
+    mounted.push({ host, root });
+    await act(async () => {
+      root.render(<RunningControls isStreaming={false} isPaused={true} isToolChange={false} />);
+    });
+
+    expect(host.textContent).toMatch(/NO\s+spindle spin-up/);
+    expect(host.textContent).not.toMatch(/restarts the spindle/i);
   });
 });

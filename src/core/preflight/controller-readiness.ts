@@ -163,26 +163,33 @@ function cncReadiness(
     warnings.push({ code: 'lathe-mode', message: CNC_LATHE_MODE_MESSAGE });
   } else if (controller.laserModeEnabled === undefined) {
     if (absentPolicy === 'error') {
-      errors.push({
-        code: 'laser-mode-unknown',
-        message:
-          'Controller did not report GRBL $32. KerfDesk cannot prove the controller is in router mode.',
-      });
+      errors.push({ code: 'laser-mode-unknown', message: CNC_LASER_MODE_UNKNOWN_MESSAGE });
     } else {
-      warnings.push({
-        code: 'laser-mode-unverified',
-        message:
-          "The controller's settings dump did not include $32, so router mode ($32=0) is NOT verified against the firmware. Confirm it before cutting.",
-      });
+      warnings.push({ code: 'laser-mode-unverified', message: CNC_LASER_MODE_UNVERIFIED_MESSAGE });
     }
   } else if (controller.laserModeEnabled) {
-    errors.push({
-      code: 'laser-mode-enabled',
-      message:
-        'Controller reports $32=1 (laser mode). Set $32=0 for spindle work: laser mode cuts spindle power to zero during rapids, so plunges would start with the bit not at speed.',
-    });
+    errors.push({ code: 'laser-mode-enabled', message: CNC_LASER_MODE_ENABLED_MESSAGE });
   }
   return { ok: errors.length === 0, errors, warnings };
+}
+
+// A router job with laser mode on or unconfirmed. GRBL's laser mode passes zero
+// spindle speed on every non-cutting motion and skips the spin-up delay, both
+// at the dwell after M3 and on Resume (CNC audit JR-1, MC-1: gcode.c, protocol.c).
+// Job Review opens its warning list for these (JobReviewWarnings).
+export const CNC_LASER_MODE_UNKNOWN_MESSAGE =
+  'Controller did not report GRBL $32. KerfDesk cannot prove the controller is in router mode.';
+export const CNC_LASER_MODE_UNVERIFIED_MESSAGE =
+  "The controller's settings dump did not include $32, so router mode ($32=0) is NOT verified against the firmware. Confirm it before cutting.";
+export const CNC_LASER_MODE_ENABLED_MESSAGE =
+  'Controller reports $32=1 (laser mode). Set $32=0 for spindle work: in laser mode the spindle only turns during cutting moves, so the spin-up dwell after M3 runs with it off, plunges start with the bit not at speed, and Resume after a pause restarts motion with no spin-up.';
+
+export function isCncLaserModeMessage(message: string): boolean {
+  return (
+    message === CNC_LASER_MODE_ENABLED_MESSAGE ||
+    message === CNC_LASER_MODE_UNVERIFIED_MESSAGE ||
+    message === CNC_LASER_MODE_UNKNOWN_MESSAGE
+  );
 }
 
 function laserReadiness(

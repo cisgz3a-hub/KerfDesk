@@ -80,6 +80,7 @@ afterEach(() => {
     controllerOperation: null,
     motionOperation: null,
     activeJobMachineKind: null,
+    controllerSettings: null,
     toolChangeIdleSeen: false,
     pendingToolLabel: null,
     pendingToolId: null,
@@ -189,6 +190,7 @@ describe('LiveMotionBar', () => {
     useLaserStore.setState({
       streamer: pause(streamingStreamer()),
       activeJobMachineKind: 'cnc',
+      controllerSettings: { laserModeEnabled: false },
     });
     const { host, root } = await render(<LiveMotionBar />);
     try {
@@ -197,6 +199,23 @@ describe('LiveMotionBar', () => {
       expect(resume?.title).toMatch(/restarts the spindle/i);
       expect(buttonByText(host, 'ABORT JOB')?.disabled).toBe(false);
       expect(host.textContent).toContain('JOB PAUSED');
+    } finally {
+      await act(async () => root.unmount());
+    }
+  });
+
+  // CNC audit MC-1: in laser mode GRBL skips the spin-up on Resume.
+  it('warns on Resume that there is no spin-up while $32 is not confirmed off', async () => {
+    useLaserStore.setState({
+      streamer: pause(streamingStreamer()),
+      activeJobMachineKind: 'cnc',
+      controllerSettings: { laserModeEnabled: true },
+    });
+    const { host, root } = await render(<LiveMotionBar />);
+    try {
+      const resume = buttonByText(host, 'Resume');
+      expect(resume?.disabled).toBe(false);
+      expect(resume?.title).toMatch(/NO spindle spin-up/);
     } finally {
       await act(async () => root.unmount());
     }
