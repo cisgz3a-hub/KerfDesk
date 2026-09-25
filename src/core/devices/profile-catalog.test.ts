@@ -48,7 +48,8 @@ describe('GRBL_MACHINE_PROFILE_CATALOG', () => {
 
   it('keeps a revised profile’s own catalogVersion instead of the catalog baseline', () => {
     const revised = profileCatalogEntryById('neotronics-4040-max-lt4lds-v2-20w');
-    const baseline = profileCatalogEntryById('xtool-d1-pro');
+    // The xTool D1 Pro presets carry their 2026-09-24 correction (preset-corrections.ts).
+    const baseline = profileCatalogEntryById('ortur-laser-master-3');
     if (revised === undefined || baseline === undefined) throw new Error('profiles missing');
 
     expect(revised.profile.catalogVersion).toBe('2026-09-19');
