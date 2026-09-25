@@ -233,6 +233,7 @@ describe('feature controller and workspace regressions', () => {
       setDirectionArrows: vi.fn(),
       resize: vi.fn(),
       requestRender: vi.fn(),
+      prepareToShow: vi.fn(async () => undefined),
       dispose: vi.fn(),
     };
     try {

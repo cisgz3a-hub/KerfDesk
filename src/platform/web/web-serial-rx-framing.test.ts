@@ -1,4 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
+import { READ_LOOP_SLICE_MS } from './serial-read-slice';
 import { webSerial } from './web-serial';
 
 const originalSerialDescriptor = Object.getOwnPropertyDescriptor(navigator, 'serial');
@@ -140,11 +141,21 @@ describe('webSerial raw receive framing', () => {
     const record = 'G'.repeat(ACCEPTED_RECORD_LENGTH);
     await expectRecords([fixtureBytes(`${record}\r`), fixtureBytes('\n')], [record]);
   });
+
+  it('preserves records when receive dispatch yields to a later task', async () => {
+    let now = 0;
+    vi.spyOn(performance, 'now').mockImplementation(() => now);
+    await expectRecords([fixtureBytes('ok\nerror:14\n')], ['ok', 'error:14'], () => {
+      // Spend the slice after the first record, forcing ADR-356's task yield.
+      now += READ_LOOP_SLICE_MS;
+    });
+  });
 });
 
 async function expectRecords(
   chunks: ReadonlyArray<Uint8Array>,
   expected: ReadonlyArray<string>,
+  afterRecord?: () => void,
 ): Promise<void> {
   const port = installRawPort();
   const reference = await webSerial.requestPort();
@@ -152,7 +163,10 @@ async function expectRecords(
   const connection = await reference.open({ baudRate: BAUD_RATE });
   const records: string[] = [];
   const onClose = vi.fn();
-  connection.onLine((record) => records.push(record));
+  connection.onLine((record) => {
+    records.push(record);
+    afterRecord?.();
+  });
   connection.onClose(onClose);
 
   try {
@@ -180,9 +194,8 @@ async function expectRecordsAtStreamEnd(
   try {
     for (const chunk of chunks) await deliverAndConsume(port.reader, chunk);
     port.reader.end();
-    await flushReadLoop();
+    await vi.waitFor(() => expect(onClose).toHaveBeenCalledTimes(1), { interval: 1 });
     expect(records).toEqual(expected);
-    expect(onClose).toHaveBeenCalledTimes(1);
   } finally {
     await connection.close();
   }
@@ -211,14 +224,8 @@ function splitEveryByte(value: Uint8Array): ReadonlyArray<Uint8Array> {
 async function deliverAndConsume(reader: RawReader, chunk: Uint8Array): Promise<void> {
   const previousReads = reader.read.mock.calls.length;
   reader.push(chunk);
-  await flushReadLoop();
-  // Reaching the next read proves that decoding and dispatch of this chunk finished.
-  expect(reader.read).toHaveBeenCalledTimes(previousReads + 1);
-}
-
-async function flushReadLoop(): Promise<void> {
-  await Promise.resolve();
-  await Promise.resolve();
-  await Promise.resolve();
-  await Promise.resolve();
+  // The next read follows complete dispatch, including ADR-356's task yields.
+  await vi.waitFor(() => expect(reader.read).toHaveBeenCalledTimes(previousReads + 1), {
+    interval: 1,
+  });
 }

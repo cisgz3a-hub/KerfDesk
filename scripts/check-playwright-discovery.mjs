@@ -1,5 +1,6 @@
 import { spawnSync } from 'node:child_process';
-import { readdirSync } from 'node:fs';
+import { closeSync, mkdtempSync, openSync, readdirSync, readFileSync, rmSync } from 'node:fs';
+import { tmpdir } from 'node:os';
 import { dirname, relative, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -34,19 +35,36 @@ process.stdout.write(
 );
 
 function verifyDiscovery({ expectedFiles: expected, args, label }) {
-  const result = spawnSync(process.execPath, [playwrightCli, 'test', ...args, '--list'], {
-    cwd: workspaceRoot,
-    encoding: 'utf8',
-  });
+  const captureDirectory = mkdtempSync(resolve(tmpdir(), 'kerfdesk-playwright-list-'));
+  const capturePath = resolve(captureDirectory, 'listing.txt');
+  let result;
+  let stdout;
+  try {
+    const output = openSync(capturePath, 'w');
+    try {
+      // A regular file avoids pipe buffering in Playwright's terminal reporter
+      // and spawnSync's maxBuffer limit as the browser suite grows.
+      result = spawnSync(process.execPath, [playwrightCli, 'test', ...args, '--list'], {
+        cwd: workspaceRoot,
+        encoding: 'utf8',
+        stdio: ['ignore', output, 'pipe'],
+      });
+    } finally {
+      closeSync(output);
+    }
+    stdout = readFileSync(capturePath, 'utf8');
+  } finally {
+    rmSync(captureDirectory, { recursive: true, force: true });
+  }
 
   if (result.error !== undefined) throw result.error;
   if (result.status !== 0) {
     process.stderr.write(result.stderr);
-    process.stdout.write(result.stdout);
+    process.stdout.write(stdout);
     process.exit(result.status ?? 1);
   }
 
-  const listing = result.stdout.replaceAll('\\', '/');
+  const listing = stdout.replaceAll('\\', '/');
   const discoveredFiles = new Set(
     Array.from(listing.matchAll(LISTING_FILE_PATTERN), (match) => match[1]),
   );
