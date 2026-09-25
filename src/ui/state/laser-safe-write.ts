@@ -25,6 +25,7 @@ import {
 } from './laser-store-helpers';
 import { isProbeAlarmedToolChangeHold } from './tool-change-probe-alarm';
 import { framePushWritePatch } from './laser-frame-modal-restore';
+import { toolOffAirPatch } from './laser-tool-off-air';
 
 export type SafeWriteRefs = UntrackedAckLedgerRefs &
   TranscriptBufferRefs &
@@ -216,6 +217,7 @@ function commitSuccessfulWrite(
     pendingTransportWrites: Math.max(0, (state.pendingTransportWrites ?? 0) - 1),
     ...motionTransportWritePatch(state, action, -1, motionOperationId),
     ...framePushWritePatch(state, refs.driver, line, action),
+    ...toolOffAirPatch(line, action),
     ...(source === 'job'
       ? publishJobBatch
         ? publishTranscriptPatch(refs, state)
