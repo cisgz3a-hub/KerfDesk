@@ -20,12 +20,11 @@ export function prepareUpscaledTraceInput(
 ): UpscaledTraceInput {
   // AUTO repairs source-grid impulses once; a forced median keeps its
   // working-grid order. Bilinear sampling still supplies the measured edges.
-  // The reused source already carries any Invert, so it is not applied twice.
   const reuseCleanedEdge = edgeInput !== undefined && options.edgeMedianFilter !== true;
   const scaledOptions: TraceOptions = {
     ...options,
     pixelScale: factor,
-    ...(reuseCleanedEdge ? { edgeMedianFilter: false, invert: false } : {}),
+    ...(reuseCleanedEdge ? { edgeMedianFilter: false } : {}),
   };
   const enlarged = upscaleBy(reuseCleanedEdge ? edgeInput.source : image, factor);
   const preparedInput =

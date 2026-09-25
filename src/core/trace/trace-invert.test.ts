@@ -12,6 +12,7 @@ import {
 } from '../../__fixtures__/perceptual/procedural-ink';
 import type { ColoredPath } from '../scene';
 import { traceImageToEdgePaths } from './edge-trace';
+import { adjustGamma, invertImage } from './raster-prep';
 import type { RawImageData, TraceOptions } from './trace-image';
 import { TRACE_PRESETS } from './trace-presets';
 import { traceImageToColoredPaths } from './trace-to-paths';
@@ -129,13 +130,7 @@ describe('Invert on the line trace lanes', () => {
     // A white disc on a transparent PNG, as the image loader hands it over:
     // RGB composited onto white, alpha kept. Byte inversion would make the
     // whole transparent surround ink.
-    const coverage = negative(darkDisc());
-    const data = new Uint8ClampedArray(coverage.data.length);
-    for (let i = 0; i < data.length; i += 4) {
-      data.fill(255, i, i + 3);
-      data[i + 3] = coverage.data[i] ?? 0;
-    }
-    const decoded: RawImageData = { width: 128, height: 128, data, rgbCompositedOnWhite: true };
+    const decoded = discOnTransparency(255);
 
     for (const name of FILLED_LANES) {
       const traced = await traceImageToColoredPaths(decoded, { ...preset(name), invert: true });
@@ -143,4 +138,49 @@ describe('Invert on the line trace lanes', () => {
       expect(radialRmsPx(traced), name).toBeLessThan(0.107);
     }
   });
+
+  it.each([...FILLED_LANES, 'Centerline'])(
+    '%s gives a decoded dark logo on transparency the negative it has on white',
+    async (name) => {
+      // A black disc on a transparent PNG, composited by the loader: its bytes
+      // equal the opaque dark disc, so Invert must give the same negative
+      // (the frame with the disc as its hole), never an empty trace.
+      const options = { ...preset(name), invert: true };
+      const onTransparency = await traceImageToColoredPaths(discOnTransparency(0), options);
+      const onWhite = await traceImageToColoredPaths(darkDisc(), options);
+
+      expect(polylineCount(onTransparency)).toBeGreaterThan(0);
+      if (name !== 'Centerline') expect(polylineCount(onTransparency)).toBe(2);
+      expect(onTransparency).toEqual(onWhite);
+    },
+  );
+
+  it('applies gamma before Invert, the documented adjustment order', async () => {
+    // A soft-edged disc: gamma moves its 50% iso-line, and gamma-then-invert
+    // moves it the opposite way from invert-then-gamma.
+    const luma = paper(128, 128);
+    inkDisc(luma, CX, CY, R, 12);
+    const soft = toRawImage(luma);
+    const options = preset('Line Art');
+
+    const traced = await traceImageToColoredPaths(soft, { ...options, gamma: 2, invert: true });
+    const toneFirst = await traceImageToColoredPaths(invertImage(adjustGamma(soft, 2)), options);
+    const invertFirst = await traceImageToColoredPaths(adjustGamma(invertImage(soft), 2), options);
+
+    expect(traced).toEqual(toneFirst);
+    expect(traced).not.toEqual(invertFirst);
+  });
 });
+
+/** A disc of straight grey `ink` on transparency, as the loader decodes it:
+ * alpha is the disc's anti-aliased coverage, RGB is composited onto white. */
+function discOnTransparency(ink: number): RawImageData {
+  const coverage = negative(darkDisc());
+  const data = new Uint8ClampedArray(coverage.data.length);
+  for (let i = 0; i < data.length; i += 4) {
+    const alpha = coverage.data[i] ?? 0;
+    data.fill(Math.round(255 - (alpha / 255) * (255 - ink)), i, i + 3);
+    data[i + 3] = alpha;
+  }
+  return { width: 128, height: 128, data, rgbCompositedOnWhite: true };
+}

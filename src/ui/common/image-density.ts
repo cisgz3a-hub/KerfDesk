@@ -109,6 +109,8 @@ function chunkType(view: DataView, offset: number): string {
 // often carry no JFIF at all — the EXIF APP1 (FFE1) TIFF IFD (XResolution +
 // ResolutionUnit). 0xFF fill bytes can pad between segments; skip them rather
 // than mis-reading one as a marker with a garbage length.
+// ../trace/jpeg-header.ts walks the same segments and IFD0 for Orientation;
+// merging the two walkers is a known follow-up (ADR-396).
 function jpegDensity(bytes: Uint8Array): ImageDensity | null {
   if (bytes.length < 4) return null;
   const view = viewOf(bytes);

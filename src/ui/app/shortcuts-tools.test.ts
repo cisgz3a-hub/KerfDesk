@@ -96,6 +96,31 @@ describe('handleToolShortcut - Trace Image (Alt/Option+T, LightBurn binding)', (
     expect(ctx.openTraceImage).not.toHaveBeenCalled();
   });
 
+  it('binds the QWERTY T position when macOS Option composes a character', () => {
+    const ctx = makeCtx();
+
+    // Mac Dvorak: Option on the key labelled Y (code KeyT) types a yen sign;
+    // the composed key carries no letter, so the physical position decides.
+    expect(handleToolShortcut(fakeKeydown({ key: '¥', code: 'KeyT', altKey: true }), ctx)).toBe(
+      true,
+    );
+    // Option on the key labelled T (code KeyK) types a dagger: not Alt+T.
+    expect(handleToolShortcut(fakeKeydown({ key: '†', code: 'KeyK', altKey: true }), ctx)).toBe(
+      false,
+    );
+    expect(ctx.openTraceImage).toHaveBeenCalledTimes(1);
+  });
+
+  it('binds the physical T key on a non-Latin layout', () => {
+    const ctx = makeCtx();
+
+    // Russian ЙЦУКЕН: the physical T key types the Cyrillic letter ie.
+    expect(handleToolShortcut(fakeKeydown({ key: 'е', code: 'KeyT', altKey: true }), ctx)).toBe(
+      true,
+    );
+    expect(ctx.openTraceImage).toHaveBeenCalledTimes(1);
+  });
+
   it.each([
     { name: 'AltGr (Ctrl+Alt)', ctrlKey: true },
     { name: 'Alt+Shift', shiftKey: true },

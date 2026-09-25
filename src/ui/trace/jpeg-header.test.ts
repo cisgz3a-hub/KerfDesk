@@ -29,6 +29,17 @@ describe('parseJpegHeader', () => {
     expect(parseJpegHeader(syntheticJpegBytes(options))?.orientation).toBe(1);
   });
 
+  it.each([0, 2])(
+    'ignores an Orientation entry whose count is %i, like browser decoders',
+    (count) => {
+      // A malformed entry that a browser decoder ignores must not make the
+      // loader ask for a turned size the browser will not produce.
+      const bytes = syntheticJpegBytes({ ...PHONE, orientation: 6, orientationCount: count });
+      expect(parseJpegHeader(bytes)?.orientation).toBe(1);
+      expect(jpegExifOrientation(bytes)).toBe(1);
+    },
+  );
+
   it('skips an XMP APP1 before the EXIF APP1', () => {
     const bytes = syntheticJpegBytes({ ...PHONE, orientation: 6, xmpBeforeExif: true });
     expect(parseJpegHeader(bytes)).toEqual({ stored: PHONE, orientation: 6 });

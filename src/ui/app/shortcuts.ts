@@ -366,11 +366,17 @@ const TOOL_BINDINGS: Readonly<Record<string, ToolMode>> = {
 };
 
 // Alt/Option + letter, no Ctrl/Cmd and no Shift. Windows AltGr arrives as
-// Ctrl+Alt, so it never matches. On macOS Option composes a character
-// (Option+T types a dagger, Option+M a micro sign), so e.key is not the
-// letter there; the physical key still is. The code fallback applies only
-// when the key produced no plain letter, so a layout that puts another
-// letter on that key keeps its own binding.
+// Ctrl+Alt, so it never matches. When the key types a Latin letter, that
+// letter decides (Windows/Linux Dvorak: Alt on the physical T key types y,
+// so it is not Alt+T). When it types anything else, the physical key decides,
+// named by its US-QWERTY position (e.code): macOS Option composes a
+// character (Option+T types a dagger, Option+M a micro sign) and non-Latin
+// layouts type their own script. The cost of that fallback is on macOS
+// layouts that move letters: on Mac Dvorak, Option on the key labelled Y
+// (QWERTY T position, types a yen sign) opens Trace Image, and Option on the
+// key labelled T (QWERTY K position, types a dagger) does not. The browser
+// exposes no synchronous way to recover the unmodified letter of a composed
+// key, so the QWERTY position is the documented binding there.
 function isAltLetterChord(e: KeyboardEvent, letter: string): boolean {
   if (!e.altKey || hasMeta(e) || e.shiftKey) return false;
   const key = e.key.toLowerCase();

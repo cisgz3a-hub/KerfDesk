@@ -20,6 +20,7 @@ import { resampleBuffer } from '../image-resample';
 import {
   type RawImageData,
   type TraceOptions,
+  applyImageAdjustments,
   buildImageTracerOptions,
   effectivePixelScale,
   preprocessForTrace,
@@ -35,7 +36,7 @@ import { traceScalePlan } from './trace-upscale-policy';
 import { prepareUpscaledTraceInput } from './trace-upscale-input';
 import { runTraceSteps, type TraceStepRunner, type TraceSteps } from './trace-steps';
 import { reportingTraceRunner, type TraceProgress } from './trace-progress';
-import { resolveTraceSourceOptions } from './trace-alpha';
+import { resolveTraceSourceOptions, shouldTraceAlphaMask } from './trace-alpha';
 import { traceImageToPhotoPathsSteps } from './photo-trace';
 import { invertImage } from './raster-prep';
 
@@ -154,9 +155,10 @@ export async function traceImageToColoredPaths(
   if (requestedOptions.photoDetail !== undefined) {
     return run(traceImageToPhotoPathsSteps(requestedImage, requestedOptions));
   }
-  const inverted = invertBeforePolicy(requestedImage, requestedOptions);
-  const image = inverted.image;
-  const options = resolveTraceSourceOptions(image, inverted.options);
+  const { image, options } = invertBeforePolicy(
+    requestedImage,
+    resolveTraceSourceOptions(requestedImage, requestedOptions),
+  );
   // Sparse small/thin sources trace poorly at native resolution, so their
   // scale plan supersamples them. Dense color pictures instead stay native or
   // trace on a bounded working grid so photo texture cannot multiply the
@@ -228,14 +230,26 @@ export async function traceImageToColoredPaths(
 // policy reads the source: the thin-stroke and small-source upscale triggers,
 // the detail profile and every lane classify ink as DARK luma. Inverting once
 // here makes a light-on-dark source take exactly the route, grid and
-// sub-pixel boundary field its dark-on-light twin takes. The flag is cleared
-// so no lane inverts a second time.
+// sub-pixel boundary field its dark-on-light twin takes. The flags are
+// cleared so no lane adjusts a second time.
+//   - Luma lanes run the whole documented brightness → contrast → gamma →
+//     invert chain here, so tone keeps its place before Invert.
+//   - Edge Detection never read the tone fields; it only gets the inversion.
+//   - While the alpha mask decides the ink, colour inversion cannot change
+//     it (the dialog disables Invert then), and an opaque negative would
+//     erase the transparency the mask reads, so Invert is dropped.
 function invertBeforePolicy(
   image: RawImageData,
   options: TraceOptions,
 ): { readonly image: RawImageData; readonly options: TraceOptions } {
   if (options.invert !== true) return { image, options };
-  return { image: invertImage(image), options: { ...options, invert: false } };
+  const cleared: TraceOptions = { ...options, invert: false };
+  if (options.traceMode === 'edge') return { image: invertImage(image), options: cleared };
+  if (shouldTraceAlphaMask(image, options)) return { image, options: cleared };
+  return {
+    image: applyImageAdjustments(image, options),
+    options: { ...cleared, brightness: 0, contrast: 0, gamma: 1 },
+  };
 }
 
 async function traceUpscaledImage(

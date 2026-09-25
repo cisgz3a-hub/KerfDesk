@@ -8,7 +8,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import { rasterImportGeometry } from '../common/image-import';
 import { densityFromBytes } from '../common/image-density';
 import { loadImageSamples } from '../import/prepare-image-samples';
-import { loadImageAsRawData, readImageNaturalSize } from './image-loader';
+import { fitDecodeToStoredGrid, loadImageAsRawData, readImageNaturalSize } from './image-loader';
 import { syntheticJpegBytes, syntheticJpegFile } from './jpeg-header.test-support';
 
 afterEach(() => {
@@ -93,17 +93,32 @@ describe('loadImageAsRawData honours EXIF Orientation', () => {
     },
   );
 
-  it('falls back to the element route when a bitmap comes back in the stored shape', async () => {
+  it('keeps a full-size bitmap from an engine that ignored only the resize options', async () => {
     const { draws } = recordCanvas();
-    const { close } = bitmapDecoder((w, h) => [h, w]);
+    // The engine turned the photo but returned its whole decoded frame.
+    const { close } = bitmapDecoder(() => [3024, 4032]);
     const { createObjectURL } = elementDecoder({ width: 3024, height: 4032 });
+
+    const image = await loadImageAsRawData(syntheticJpegFile({ ...PHONE, orientation: 6 }));
+
+    expect(createObjectURL).not.toHaveBeenCalled();
+    expect(close).toHaveBeenCalledTimes(1);
+    expect(image).toMatchObject({ width: 1536, height: 2048 });
+    expect(draws).toEqual([{ transform: null, size: [1536, 2048] }]);
+  });
+
+  it('turns the photo on the element route when the bitmap ignored resize and Orientation', async () => {
+    const { draws } = recordCanvas();
+    // The whole stored landscape frame: stretching it onto 1536x2048 would squash it.
+    const { close } = bitmapDecoder(() => [PHONE.width, PHONE.height]);
+    const { createObjectURL } = elementDecoder(PHONE);
 
     const image = await loadImageAsRawData(syntheticJpegFile({ ...PHONE, orientation: 6 }));
 
     expect(close).toHaveBeenCalledTimes(1);
     expect(createObjectURL).toHaveBeenCalledTimes(1);
     expect(image).toMatchObject({ width: 1536, height: 2048 });
-    expect(draws).toEqual([{ transform: null, size: [1536, 2048] }]);
+    expect(draws).toEqual([{ transform: [0, 1, -1, 0, 1536, 0], size: [2048, 1536] }]);
   });
 
   it('draws the element as decoded when the engine already turned it', async () => {
@@ -181,5 +196,30 @@ describe('import sizes use the oriented image', () => {
       xDpi: 150,
       yDpi: 300,
     });
+  });
+});
+
+describe('fitDecodeToStoredGrid (projects saved before ADR-396)', () => {
+  const decoded = (width: number, height: number) => ({
+    width,
+    height,
+    data: new Uint8ClampedArray(width * height * 4).fill(200),
+    rgbCompositedOnWhite: true,
+  });
+
+  it('resamples a turned decode back onto the saved landscape grid', () => {
+    const fitted = fitDecodeToStoredGrid(decoded(3, 4), 4, 3);
+
+    expect(fitted).toMatchObject({ width: 4, height: 3, rgbCompositedOnWhite: true });
+    expect(fitted.data.length).toBe(4 * 3 * 4);
+  });
+
+  it.each([
+    ['a decode on the saved grid', 4, 3, 4, 3],
+    ['a square grid', 3, 3, 3, 3],
+    ['a mismatch that is not a transpose', 2, 5, 4, 3],
+  ])('returns %s unchanged', (_name, w, h, savedW, savedH) => {
+    const pixels = decoded(w, h);
+    expect(fitDecodeToStoredGrid(pixels, savedW, savedH)).toBe(pixels);
   });
 });

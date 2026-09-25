@@ -76,6 +76,24 @@ describe('cropMaskedRasterImage', () => {
     expect(encoder).not.toHaveBeenCalled();
   });
 
+  it('crops a legacy turned-JPEG raster on the grid it was saved with', async () => {
+    // Imported before EXIF Orientation was honoured (ADR-396): saved 4x2 with
+    // the photo squashed into it, while the loader now decodes it turned, 2x4.
+    const { lumaBase64: _luma, ...input } = raster();
+    const rgba = new Uint8ClampedArray(4 * 2 * 4);
+    for (let i = 0; i < 8; i += 1) rgba.set([100, 100, 100, 255], i * 4);
+    vi.spyOn(imageLoader, 'loadImageAsRawData').mockResolvedValue({
+      width: 2,
+      height: 4,
+      data: rgba,
+    });
+
+    const cropped = await cropMaskedRasterImage(input, maskAt(1, 2), encode);
+
+    expect(cropped).toMatchObject({ pixelWidth: 2, pixelHeight: 2 });
+    expect(decode(cropped.lumaBase64 ?? '')).toEqual([100, 100, 100, 100]);
+  });
+
   it('rejects an embedded source with inconsistent dimensions instead of misregistering the crop', async () => {
     const { lumaBase64: _luma, ...input } = raster();
     vi.spyOn(imageLoader, 'loadImageAsRawData').mockResolvedValue({

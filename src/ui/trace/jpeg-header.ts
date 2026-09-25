@@ -110,7 +110,14 @@ function hasExifIdentifier(header: Uint8Array, offset: number): boolean {
 }
 
 // IFD0 of the TIFF block: a count, then 12-byte entries of tag, type, count
-// and a 4-byte value field that holds a SHORT in its first two bytes.
+// and a 4-byte value field that holds a SHORT in its first two bytes. An
+// Orientation entry must be exactly one SHORT; anything else is malformed
+// and treated as absent, the conservative reading, so the loader never asks
+// for a turned size a stricter browser decoder would not produce.
+//
+// image-density.ts walks the same segments and IFD0 for its DPI tags with its
+// own loop (jpegDensity/exifDensity); merging the two walkers onto these
+// helpers is a known follow-up, left out to keep this change's surface small.
 function readExifOrientation(header: Uint8Array, segment: JpegSegment): ExifOrientation | null {
   const end = Math.min(segment.nextOffset, header.byteLength);
   const tiff = segment.payloadOffset + EXIF_IDENTIFIER.length;
@@ -128,6 +135,7 @@ function readExifOrientation(header: Uint8Array, segment: JpegSegment): ExifOrie
     if (entry + IFD_ENTRY_BYTES > end) return null;
     if (view.getUint16(entry, little) !== ORIENTATION_TAG) continue;
     if (view.getUint16(entry + 2, little) !== TIFF_SHORT) return null;
+    if (view.getUint32(entry + 4, little) !== 1) return null;
     return asOrientation(view.getUint16(entry + 8, little));
   }
   return null;

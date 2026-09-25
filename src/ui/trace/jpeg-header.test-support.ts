@@ -7,6 +7,8 @@ export type SyntheticJpegOptions = {
   readonly width: number;
   readonly height: number;
   readonly orientation?: number;
+  /** The Orientation entry's value count; the specification requires 1. */
+  readonly orientationCount?: number;
   readonly byteOrder?: 'II' | 'MM';
   readonly jfifDpi?: { readonly x: number; readonly y: number };
   readonly xmpBeforeExif?: boolean;
@@ -23,7 +25,11 @@ export function syntheticJpegBytes(options: SyntheticJpegOptions): Uint8Array {
     segment(bytes, 0xe1, [...ascii('http://ns.adobe.com/xap/1.0/'), 0, ...ascii('<x:xmpmeta/>')]);
   }
   if (options.orientation !== undefined) {
-    segment(bytes, 0xe1, exifPayload(options.orientation, options.byteOrder ?? 'II'));
+    segment(
+      bytes,
+      0xe1,
+      exifPayload(options.orientation, options.byteOrder ?? 'II', options.orientationCount ?? 1),
+    );
   }
   // SOF0: precision, height, width, three components.
   segment(bytes, 0xc0, [
@@ -52,7 +58,7 @@ export function syntheticJpegFile(options: SyntheticJpegOptions, name = 'photo.j
 
 // 'Exif\0\0', then a TIFF block whose IFD0 holds Make before Orientation so
 // the reader has to walk the entries rather than read a fixed offset.
-function exifPayload(orientation: number, byteOrder: 'II' | 'MM'): number[] {
+function exifPayload(orientation: number, byteOrder: 'II' | 'MM', count: number): number[] {
   const little = byteOrder === 'II';
   const u16 = (value: number): number[] => (little ? u16le(value) : u16be(value));
   const u32 = (value: number): number[] => (little ? u32le(value) : u32be(value));
@@ -70,7 +76,7 @@ function exifPayload(orientation: number, byteOrder: 'II' | 'MM'): number[] {
     // Orientation: SHORT, count 1, value in the first two bytes.
     ...u16(0x0112),
     ...u16(3),
-    ...u32(1),
+    ...u32(count),
     ...u16(orientation),
     0,
     0,

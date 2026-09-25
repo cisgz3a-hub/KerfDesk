@@ -5,6 +5,7 @@
 // pull its pixel buffer. Caller (ImportImageDialog) holds the File
 // blob and awaits this loader before kicking off tracing.
 
+import { resampleBuffer } from '../../core/image-resample';
 import type { RawImageData } from '../../core/trace';
 import { freezeGif, isGif } from '../import/freeze-gif';
 import { readImageHeader } from './image-header-reader';
@@ -129,6 +130,27 @@ export async function loadImageAsRawData(
   }
 }
 
+/**
+ * Put a stored raster's decoded source back on the pixel grid the project
+ * saved for it. A JPEG with an axis-swapping EXIF Orientation imported before
+ * ADR-396 was saved on its stored (landscape) grid, filled with the photo
+ * squashed into it; its luminance, bounds and editor contract all use that
+ * grid. The loader now decodes it turned, so a decode that comes back as that
+ * grid transposed is resampled onto it, reproducing the pixels the project
+ * holds. Any other decode is returned unchanged.
+ */
+export function fitDecodeToStoredGrid(
+  pixels: RawImageData,
+  width: number,
+  height: number,
+): RawImageData {
+  if (width === height || pixels.width !== height || pixels.height !== width) return pixels;
+  const resampled = resampleBuffer(pixels, width, height);
+  return pixels.rgbCompositedOnWhite === true
+    ? { ...resampled, rgbCompositedOnWhite: true }
+    : resampled;
+}
+
 async function decodeResizedImageBitmap(
   file: File,
   source: ImageDimensions,
@@ -154,9 +176,13 @@ async function decodeResizedImageBitmap(
       () => undefined,
     );
     const bitmap = await awaitTraceSignal(decoded, signal);
-    if (bitmap.width === target.width && bitmap.height === target.height) return bitmap;
-    // An engine that sized the stored frame instead would be stretched onto
-    // the target below. The element route orients itself; use it instead.
+    // A conforming engine returns exactly the requested size. One that
+    // ignored the resize options returns its full decoded frame: keep it when
+    // it has the oriented aspect (the caller scales it to the target), but a
+    // frame with the stored, swapped aspect means the engine ignored the
+    // Orientation too, and stretching it onto the target would squash the
+    // photo. The element route turns such an image itself.
+    if (hasOrientedAspect(bitmap, source)) return bitmap;
     bitmap.close();
     return null;
   } catch (error) {
@@ -165,6 +191,15 @@ async function decodeResizedImageBitmap(
     // resize options. The object-URL HTMLImageElement path remains compatible.
     return null;
   }
+}
+
+// Which of the two readings of the header, turned or stored, the decoded
+// frame's aspect ratio is closer to. A square frame cannot tell them apart
+// and is kept.
+function hasOrientedAspect(frame: ImageDimensions, oriented: ImageDimensions): boolean {
+  const turnedError = Math.abs(frame.width * oriented.height - frame.height * oriented.width);
+  const storedError = Math.abs(frame.width * oriented.width - frame.height * oriented.height);
+  return turnedError <= storedError;
 }
 
 // The HTMLImageElement route. Engines that implement CSS image-orientation

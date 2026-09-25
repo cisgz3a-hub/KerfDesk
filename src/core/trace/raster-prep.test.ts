@@ -186,7 +186,7 @@ describe('invertImage', () => {
     expect(Array.from(input.data)).toEqual(before);
   });
 
-  it('inverts decoded artwork but keeps its transparent surround as paper', () => {
+  it('inverts decoded LIGHT artwork but keeps its transparent surround as paper', () => {
     // Loader representation: RGB composited onto white, alpha kept.
     // Pixels: transparent, opaque white, half-covered black (composited 127).
     const input = {
@@ -200,7 +200,35 @@ describe('invertImage', () => {
     // becomes half-covered white over paper, i.e. paper.
     expect(Array.from(output.data)).toEqual([255, 255, 255, 0, 0, 0, 0, 255, 255, 255, 255, 128]);
     expect(output.rgbCompositedOnWhite).toBe(true);
-    expect(Array.from(invertImage(output).data)).toEqual(Array.from(input.data));
+  });
+
+  it('gives decoded DARK artwork the negative it has on an opaque white background', () => {
+    // Transparent, opaque black, half-covered black (composited 127): the
+    // artwork is dark, so Invert is the negative of the image as displayed.
+    const input = {
+      width: 3,
+      height: 1,
+      data: new Uint8ClampedArray([255, 255, 255, 0, 0, 0, 0, 255, 127, 127, 127, 128]),
+      rgbCompositedOnWhite: true,
+    };
+    const onWhite = {
+      width: 3,
+      height: 1,
+      data: new Uint8ClampedArray([255, 255, 255, 255, 0, 0, 0, 255, 127, 127, 127, 255]),
+    };
+    const output = invertImage(input);
+    expect(Array.from(output.data)).toEqual([0, 0, 0, 255, 255, 255, 255, 255, 128, 128, 128, 255]);
+    expect(Array.from(output.data)).toEqual(Array.from(invertImage(onWhite).data));
+  });
+
+  it('leaves a fully transparent decoded image blank', () => {
+    const input = {
+      width: 2,
+      height: 1,
+      data: new Uint8ClampedArray([255, 255, 255, 0, 255, 255, 255, 0]),
+      rgbCompositedOnWhite: true,
+    };
+    expect(Array.from(invertImage(input).data)).toEqual(Array.from(input.data));
   });
 });
 
