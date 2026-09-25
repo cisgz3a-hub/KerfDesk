@@ -81,11 +81,13 @@ function yWords(gcode: string): number[] {
 }
 
 describe('emitGcode roller rotary diameter (ADR-373)', () => {
-  // Digests of emitGcode output captured from the code before ADR-373 (commit
-  // 9c7e63b) for these exact projects: vector + raster, forward and reversed.
+  // Digests captured before ADR-373 (9c7e63b), updated for the ASCII raster-size
+  // comment in 91c1adefa (#898). Restoring only its two "x" separators to "×"
+  // reproduces the original digests; all motion and power bytes are unchanged.
+  // These still pin the entire output: vector + raster, forward and reversed.
   it.each([
-    [false, 'b33bd1d99725f0d57b6357981d4c2ea05aa5782e5f1d33a4604250f028b738de', 3731],
-    [true, '4e80cf3342d03598e380a60e0aec4837ef334f46fb9622e4f3bb7e3a9ef62967', 3681],
+    [false, 'b6c57419b0995c2c6f28722e6da1a660b1249a231dd757f65fdca307374ac8f9', 3731],
+    [true, '509c2c08fb7c2f7c2df3d24f67379fcde70850df750eda613932b2c7e0cbb86f', 3681],
   ])(
     'keeps a roller without a roller diameter byte-identical (reverse %s)',
     (reverseAxis, digest, length) => {
