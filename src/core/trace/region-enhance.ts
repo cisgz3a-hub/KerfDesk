@@ -24,7 +24,12 @@
 // injected by the caller (the UI passes its worker-backed tracer; tests pass
 // a direct core tracer).
 
-import type { ColoredPath, Polyline } from '../scene';
+import {
+  polylineToCurveSubpath,
+  type ColoredPath,
+  type CurveSubpath,
+  type Polyline,
+} from '../scene';
 import { downscaleTracedPaths, upscaleBy } from './auto-upscale';
 import { cropRawImageData, normalizeTraceBoundary, offsetColoredPaths } from './trace-boundary';
 import type { TraceBoundary } from './trace-boundary';
@@ -82,10 +87,12 @@ export async function enhanceRegionPaths(args: EnhanceRegionArgs): Promise<Color
   const inSource = offsetColoredPaths(downscaleTracedPaths(traced, factor), region.x, region.y);
   const interior = shrinkRegion(region, REGION_EDGE_MARGIN_PX);
   const replacement = inSource
-    .map((path) => ({
-      ...path,
-      polylines: path.polylines.filter((pl) => polylineFullyInside(pl, interior)),
-    }))
+    .map((path) =>
+      pathOf(
+        path.color,
+        ringsOf(path).filter((ring) => polylineFullyInside(ring.polyline, interior)),
+      ),
+    )
     .filter((path) => path.polylines.length > 0);
   return replacePathsInRegion(args.fullTracePaths, interior, replacement);
 }
@@ -107,7 +114,8 @@ function optionsForRegionScale(options: TraceOptions, factor: number): TraceOpti
 
 /** Merge: drop existing polylines fully inside `interior`, then add the
  *  replacement polylines, folding them into the first existing path of the
- *  same colour (no duplicate colour layers). Exported for tests. */
+ *  same colour (no duplicate colour layers). Each polyline keeps its canonical
+ *  curve (ADR-405). Exported for tests. */
 export function replacePathsInRegion(
   existing: ReadonlyArray<ColoredPath>,
   interior: TraceBoundary,
@@ -116,25 +124,40 @@ export function replacePathsInRegion(
   const out: ColoredPath[] = [];
   const mergedColors = new Set<string>();
   for (const path of existing) {
-    const survivors = path.polylines.filter((pl) => !polylineFullyInside(pl, interior));
-    const additions = mergedColors.has(path.color)
-      ? []
-      : replacementPolylines(replacement, path.color);
+    const survivors = ringsOf(path).filter((ring) => !polylineFullyInside(ring.polyline, interior));
+    const additions = mergedColors.has(path.color) ? [] : replacementRings(replacement, path.color);
     mergedColors.add(path.color);
-    const polylines = [...survivors, ...additions];
-    if (polylines.length > 0) out.push({ color: path.color, polylines });
+    const rings = [...survivors, ...additions];
+    if (rings.length > 0) out.push(pathOf(path.color, rings));
   }
   for (const path of replacement) {
     if (mergedColors.has(path.color)) continue;
     mergedColors.add(path.color);
-    const polylines = replacementPolylines(replacement, path.color);
-    if (polylines.length > 0) out.push({ color: path.color, polylines });
+    const rings = replacementRings(replacement, path.color);
+    if (rings.length > 0) out.push(pathOf(path.color, rings));
   }
   return out;
 }
 
-function replacementPolylines(replacement: ReadonlyArray<ColoredPath>, color: string): Polyline[] {
-  return replacement.filter((path) => path.color === color).flatMap((path) => [...path.polylines]);
+// A polyline with the canonical curve its path carries for it, if any.
+type Ring = { readonly polyline: Polyline; readonly curve: CurveSubpath | undefined };
+
+function ringsOf(path: ColoredPath): Ring[] {
+  const curves = path.curves?.length === path.polylines.length ? path.curves : undefined;
+  return path.polylines.map((polyline, i) => ({ polyline, curve: curves?.[i] }));
+}
+
+// Curves travel with their polylines; a path mixing curved and plain rings
+// gives the plain ones straight segments, as the tracer's output does.
+function pathOf(color: string, rings: ReadonlyArray<Ring>): ColoredPath {
+  const polylines = rings.map((ring) => ring.polyline);
+  if (rings.every((ring) => ring.curve === undefined)) return { color, polylines };
+  const curves = rings.map((ring) => ring.curve ?? polylineToCurveSubpath(ring.polyline));
+  return { color, polylines, curves };
+}
+
+function replacementRings(replacement: ReadonlyArray<ColoredPath>, color: string): Ring[] {
+  return replacement.filter((path) => path.color === color).flatMap(ringsOf);
 }
 
 function shrinkRegion(region: TraceBoundary, marginPx: number): TraceBoundary {

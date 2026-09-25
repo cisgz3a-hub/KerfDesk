@@ -79,17 +79,23 @@ function ringRoundness(
   points: ReadonlyArray<{ x: number; y: number }>,
   closed: boolean,
 ): Roundness {
+  // Samples at an even arc-length step, not at the vertices: the outline's
+  // vertex density follows its curvature (ADR-405's samples stay within
+  // 0.02 px of the curve), and vertex-weighted samples would score bends
+  // more often than the arcs between them.
   const samples: Array<{ x: number; y: number }> = [];
   const count = closed ? points.length : points.length - 1;
+  let carry = 0;
   for (let i = 0; i < count; i += 1) {
     const a = points[i] as { x: number; y: number };
     const b = points[(i + 1) % points.length] as { x: number; y: number };
     const length = Math.hypot(b.x - a.x, b.y - a.y);
-    const steps = Math.max(1, Math.ceil(length / SEGMENT_SAMPLE_STEP_PX));
-    for (let s = 0; s < steps; s += 1) {
-      const u = s / steps;
+    let along = carry;
+    for (; along < length; along += SEGMENT_SAMPLE_STEP_PX) {
+      const u = along / length;
       samples.push({ x: a.x + (b.x - a.x) * u, y: a.y + (b.y - a.y) * u });
     }
+    carry = along - length;
   }
   if (samples.length === 0) return { rmsPx: Infinity, maxPx: Infinity, samples: 0 };
   // The centre comes from a least-squares CIRCLE fit, not the sample

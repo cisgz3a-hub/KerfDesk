@@ -33,6 +33,12 @@ const NEAR_POINT_EPS = 1e-9;
  * between simplified vertices is ≤ ε and stays untouched, while a spline that
  * bows further than ε into empty paper (the serif-foot "smile" overshoot) is
  * pulled back to the chord ± ε. Omit or pass Infinity to disable the cap.
+ *
+ * `chordBand`, when given, narrows that cap per chord and per side: the
+ * signed perpendicular offsets the resample may take from the chord `a->b`
+ * (left of the chord is positive). The contour tail passes the offsets of
+ * the dense sub-chain the simplification collapsed onto each chord, so a
+ * straight run cannot bow into paper while an arc keeps its sagitta.
  */
 export function fitSmoothCurve(
   points: ReadonlyArray<Vec2>,
@@ -40,11 +46,13 @@ export function fitSmoothCurve(
   corners: ReadonlySet<Vec2>,
   samplesPerSegment: number,
   deviationCapPx = Infinity,
+  chordBand?: ChordBand,
 ): Vec2[] {
   if (points.length < 3) return [...points];
   const runs = splitAtCorners(points, closed, corners);
   const out: Vec2[] = [];
-  for (const run of runs) appendRun(out, run.points, run.closed, samplesPerSegment, deviationCapPx);
+  const bound = { capPx: deviationCapPx, band: chordBand };
+  for (const run of runs) appendRun(out, run.points, run.closed, samplesPerSegment, bound);
   if (closed && out.length > 0) {
     // `out.length > 0` proves both ends are present; noUncheckedIndexedAccess
     // still types them optional, so assert past the (checked) undefined.
@@ -58,7 +66,15 @@ export function fitSmoothCurve(
   return out;
 }
 
+/** Signed offset limits from the chord `a->b` (left positive; `below` <= 0
+ *  <= `above`), or null for no limit beyond the deviation cap. */
+export type ChordBand = (
+  a: Vec2,
+  b: Vec2,
+) => { readonly below: number; readonly above: number } | null;
+
 type Run = { readonly points: Vec2[]; readonly closed: boolean };
+type SampleBound = { readonly capPx: number; readonly band: ChordBand | undefined };
 
 // Break the chain at every corner. A closed chain with no corners stays one
 // closed run; otherwise each run is an OPEN arc that starts and ends on a
@@ -122,7 +138,7 @@ function appendRun(
   run: ReadonlyArray<Vec2>,
   closed: boolean,
   samplesPerSegment: number,
-  deviationCapPx: number,
+  bound: SampleBound,
 ): void {
   if (run.length < 2) {
     for (const p of run) pushUnique(out, p);
@@ -140,37 +156,45 @@ function appendRun(
     // Emit the segment's start vertex exactly (keeps corner/endpoint objects),
     // then the interior samples. The next segment emits p2 as its start.
     pushUnique(out, p1);
+    const { below, above } = chordLimits(bound, p1, p2);
     for (let s = 1; s <= samplesPerSegment; s += 1) {
       const t = s / (samplesPerSegment + 1);
-      out.push(capDeviation(centripetalPoint(p0, p1, p2, p3, t), p1, p2, deviationCapPx));
+      out.push(capDeviation(centripetalPoint(p0, p1, p2, p3, t), p1, p2, below, above));
     }
   }
   if (!closed) pushUnique(out, run[n - 1] as Vec2);
 }
 
-// Pull a resampled sample back toward its `a->b` chord when it sits more than
-// `capPx` perpendicular from it, keeping the along-chord component. The spline
-// may smooth (deviation ≤ cap) but may not invent geometry beyond the
-// simplification tolerance — arc or corner alike. Implemented as a radial
-// clamp toward the sample's foot point on the chord line, so the correction
-// direction is toward the chord by construction (a signed-normal formulation
-// here previously moved samples AWAY on one side — the round-1 sign bug).
-function capDeviation(q: Vec2, a: Vec2, b: Vec2, capPx: number): Vec2 {
-  if (!Number.isFinite(capPx)) return q;
+// The signed offsets a sample of chord a->b may take: the deviation cap on
+// both sides, narrowed by the chord's band when one is given.
+function chordLimits(bound: SampleBound, a: Vec2, b: Vec2): { below: number; above: number } {
+  const band = bound.band?.(a, b) ?? null;
+  return {
+    below: Math.max(-bound.capPx, band?.below ?? -Infinity),
+    above: Math.min(bound.capPx, band?.above ?? Infinity),
+  };
+}
+
+// Pull a resampled sample back toward its `a->b` chord when its signed
+// perpendicular offset leaves [below, above] (left of the chord positive),
+// keeping the along-chord component. The spline may smooth (deviation within
+// the cap) but may not invent geometry beyond the simplification tolerance,
+// arc or corner alike. The correction moves the sample along the chord's
+// normal toward its foot point, so it goes toward the chord by construction
+// (a signed-normal formulation here once moved samples AWAY on one side, the
+// round-1 sign bug; the clamp below only ever shrinks the offset's size).
+function capDeviation(q: Vec2, a: Vec2, b: Vec2, below: number, above: number): Vec2 {
+  if (!Number.isFinite(below) && !Number.isFinite(above)) return q;
   const vx = b.x - a.x;
   const vy = b.y - a.y;
-  const lenSq = vx * vx + vy * vy;
-  if (lenSq < NEAR_POINT_EPS * NEAR_POINT_EPS) return q;
-  // Foot of the perpendicular from q onto the infinite line a->b.
-  const u = ((q.x - a.x) * vx + (q.y - a.y) * vy) / lenSq;
-  const fx = a.x + u * vx;
-  const fy = a.y + u * vy;
-  const dx = q.x - fx;
-  const dy = q.y - fy;
-  const dist = Math.hypot(dx, dy);
-  if (dist <= capPx) return q;
-  const scale = capPx / dist;
-  return { x: fx + dx * scale, y: fy + dy * scale };
+  const len = Math.hypot(vx, vy);
+  if (len < NEAR_POINT_EPS) return q;
+  const nx = -vy / len;
+  const ny = vx / len;
+  const offset = (q.x - a.x) * nx + (q.y - a.y) * ny;
+  const clamped = Math.min(Math.max(offset, Math.min(below, 0)), Math.max(above, 0));
+  if (clamped === offset) return q;
+  return { x: q.x + (clamped - offset) * nx, y: q.y + (clamped - offset) * ny };
 }
 
 // The control point before segment i. At an open run's first segment there is

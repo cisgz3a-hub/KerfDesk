@@ -34,6 +34,7 @@ import {
 import { fitCompactRing, sampleCompactCurve } from './compact-curve-fit';
 import { collectOutputCorners } from './centerline/curve-refine';
 import { fitSmoothCurve } from './centerline/curve-fit';
+import { denseChordBand } from './contour-chord-band';
 import { flattenStraightRuns } from './flatten-straight-runs';
 import { smoothArcNoise } from './smooth-arc-noise';
 import { curvedTraceRing, withCanonicalTraceCurves } from './trace-curves';
@@ -466,8 +467,20 @@ function finishLegacyLoop(
   // The resample's corners: the dial's, plus any hard turn of the simplified
   // outline it never saw; the fit keeps the same ones exact.
   const outputCorners = collectOutputCorners(straightened, true, corners);
+  // Fix B: each chord's resample stays within the offsets of the dense
+  // stretch Douglas-Peucker collapsed onto it, so a straight run cannot bow
+  // into paper (a binary 2 px bar grew 49% in area) while an arc keeps its
+  // sagitta (contour-chord-band.ts).
+  const band = denseChordBand(flattened, straightened, finish.pixelScale);
   const resample = (amount: number): Vec2[] =>
-    fitSmoothCurve(straightened, true, outputCorners, SPLINE_SAMPLES_PER_SEGMENT, epsilon * amount);
+    fitSmoothCurve(
+      straightened,
+      true,
+      outputCorners,
+      SPLINE_SAMPLES_PER_SEGMENT,
+      epsilon * amount,
+      band,
+    );
   return compactRefinement(
     straightened,
     resample,
@@ -523,7 +536,7 @@ function compactRefinement(
   const tangentWindow = TANGENT_WINDOW_PX * finish.pixelScale;
   const { tolerance, candidateTolerance } = tolerances;
   const ring = (amount: number): Polyline | null => {
-    const curve = fitCompactRing(target(amount), corners, NO_CORNERS, {
+    const curve = fitCompactRing(target(amount), corners, {
       tolerance: tolerance * amount,
       candidateTolerance: candidateTolerance * amount,
       tangentWindow,

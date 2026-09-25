@@ -13,6 +13,7 @@
 import { chordParameterize, solveTangentArms, type CubicBezier } from '../geometry/cubic-fit';
 import type { Vec2 } from '../scene';
 import { orthogonalError, reverseError } from './centerline/curve-fit-error';
+import { cubicSelfIntersects } from './compact-curve-shape';
 
 // Newton reparameterization passes per span; a pass that does not lower the
 // error ends the refinement (a tolerance-free rule).
@@ -23,43 +24,150 @@ const MIN_PASS_GAIN_PX = 1e-4;
 const MIN_ARM_CHORD_RATIO = 1e-3;
 const MAX_ARM_CHORD_RATIO = 2;
 const NEAR_ZERO = 1e-12;
+// A span longer than twice this many points screens its first pass on about
+// this many of them before projecting every point (see screenFirstPass).
+const SCREEN_POINTS = 48;
+// A first pass that misses by more than this multiple of the rejection
+// error gives up (see fitSpan): Newton reparameterization lowers a span's
+// error by well under this factor.
+const FIRST_PASS_GIVE_UP = 3;
 
 export type SpanFit = {
   readonly cubic: CubicBezier;
-  /** Max of point-to-curve and curve-to-chain distance, px. */
+  /** Max of point-to-curve and curve-to-chain distance, px; Infinity for a
+   *  cubic that crosses itself. */
   readonly cubicError: number;
   /** Max distance of the span from its chord, px. */
   readonly lineError: number;
   /** Span index where the cubic misses worst (split candidate). */
   readonly worstIndex: number;
+  /** False when the fit stopped once it was bound to miss (see fitSpan). */
+  readonly complete: boolean;
 };
 
 /** Fit one cubic through `span` with its end tangents fixed (`tEnd` points
  *  back from the last point into the curve), and measure the straight chord
- *  too. */
-export function fitSpan(span: ReadonlyArray<Vec2>, tStart: Vec2, tEnd: Vec2): SpanFit {
-  let u = chordParameterize(span, 0, span.length - 1);
-  let best: { cubic: CubicBezier; error: number; index: number; params: number[] } | null = null;
+ *  too. `missAbove` is the error beyond which the caller rejects the cubic
+ *  anyway: a kept pass beyond it skips the curve-to-chain check, and a first
+ *  pass off by more than `giveUpAbove` (by default
+ *  {@link FIRST_PASS_GIVE_UP} times `missAbove`) skips the Newton passes.
+ *  Such a fit is marked incomplete: its error already exceeds `missAbove`
+ *  and its cubic is not to be drawn. */
+export function fitSpan(
+  span: ReadonlyArray<Vec2>,
+  tStart: Vec2,
+  tEnd: Vec2,
+  missAbove = Infinity,
+  giveUpAbove = FIRST_PASS_GIVE_UP * missAbove,
+): SpanFit {
+  const u = chordParameterize(span, 0, span.length - 1);
+  const screened = screenFirstPass(span, u, tStart, tEnd, giveUpAbove);
+  if (screened !== null) return screened;
+  const fit = bestPass(span, u, tStart, tEnd, giveUpAbove);
+  if (fit.gaveUp || fit.error > missAbove) return missed(span, fit.cubic, fit.error, fit.index);
+  // The curve-to-chain check runs once, on the pass kept: it rejects a loop
+  // or bulge that slips between the data points.
+  const reverse = reverseError(span, fit.cubic, fit.params);
+  // A cubic that loops or cusps is never an outline, however close it runs.
+  const loops = cubicSelfIntersects(fit.cubic);
+  return {
+    cubic: fit.cubic,
+    cubicError: loops ? Infinity : Math.max(fit.error, reverse.error),
+    lineError: chordDeviation(span),
+    worstIndex: fit.error >= reverse.error ? fit.index : reverse.index,
+    complete: true,
+  };
+}
+
+type Pass = {
+  readonly cubic: CubicBezier;
+  readonly error: number;
+  readonly index: number;
+  readonly params: number[];
+};
+
+// The first pass at chord parameters, then Newton reparameterization passes
+// while they lower the error; the best pass is kept. A first pass beyond
+// `giveUpAbove` is returned at once, marked given up.
+function bestPass(
+  span: ReadonlyArray<Vec2>,
+  chordParams: ReadonlyArray<number>,
+  tStart: Vec2,
+  tEnd: Vec2,
+  giveUpAbove: number,
+): Pass & { readonly gaveUp: boolean } {
+  let u = chordParams;
+  let best: Pass | null = null;
   for (let pass = 0; pass <= MAX_REPARAM_PASSES; pass += 1) {
     const cubic = armCubic(span, u, tStart, tEnd);
     const projected = orthogonalError(span, cubic, u);
+    const current = {
+      cubic,
+      error: projected.error,
+      index: projected.index,
+      params: projected.params,
+    };
+    if (pass === 0 && projected.error > giveUpAbove) return { ...current, gaveUp: true };
     const improved = best === null || projected.error < best.error - MIN_PASS_GAIN_PX;
-    if (best === null || projected.error < best.error) {
-      best = { cubic, error: projected.error, index: projected.index, params: projected.params };
-    }
+    if (best === null || projected.error < best.error) best = current;
     if (!improved || span.length <= 2) break;
     u = projected.params;
   }
-  // The curve-to-chain check runs once, on the pass kept: it rejects a loop
-  // or bulge that slips between the data points.
-  const fit = best as { cubic: CubicBezier; error: number; index: number; params: number[] };
-  const reverse = reverseError(span, fit.cubic, fit.params);
-  return {
-    cubic: fit.cubic,
-    cubicError: Math.max(fit.error, reverse.error),
-    lineError: chordDeviation(span),
-    worstIndex: fit.error >= reverse.error ? fit.index : reverse.index,
+  return { ...(best as Pass), gaveUp: false };
+}
+
+/** The straight chord of `span` alone, as an incomplete fit (no cubic was
+ *  fitted: the caller has already chosen the line). */
+export function chordSpanFit(span: ReadonlyArray<Vec2>): SpanFit {
+  const p0 = span[0] as Vec2;
+  const p3 = span.at(-1) as Vec2;
+  const third = { x: (p3.x - p0.x) / 3, y: (p3.y - p0.y) / 3 };
+  const cubic = {
+    p0,
+    p1: { x: p0.x + third.x, y: p0.y + third.y },
+    p2: { x: p3.x - third.x, y: p3.y - third.y },
+    p3,
   };
+  return missed(span, cubic, Infinity, span.length >> 1);
+}
+
+function missed(
+  span: ReadonlyArray<Vec2>,
+  cubic: CubicBezier,
+  error: number,
+  worstIndex: number,
+): SpanFit {
+  return { cubic, cubicError: error, lineError: chordDeviation(span), worstIndex, complete: false };
+}
+
+// On a long span, the first pass's error at every few points is a lower
+// bound of its error at all of them: when that already exceeds `giveUpAbove`
+// the span gives up exactly as the full first pass would, for a fraction of
+// its projections (the split point is the worst screened point).
+function screenFirstPass(
+  span: ReadonlyArray<Vec2>,
+  u: ReadonlyArray<number>,
+  tStart: Vec2,
+  tEnd: Vec2,
+  giveUpAbove: number,
+): SpanFit | null {
+  if (!Number.isFinite(giveUpAbove) || span.length <= 2 * SCREEN_POINTS) return null;
+  const stride = Math.ceil(span.length / SCREEN_POINTS);
+  const cubic = armCubic(span, u, tStart, tEnd);
+  const points: Vec2[] = [];
+  const params: number[] = [];
+  const indices: number[] = [];
+  for (let i = 0; i < span.length - 1; i += stride) {
+    points.push(span[i] as Vec2);
+    params.push(u[i] as number);
+    indices.push(i);
+  }
+  points.push(span.at(-1) as Vec2);
+  params.push(1);
+  indices.push(span.length - 1);
+  const screen = orthogonalError(points, cubic, params);
+  if (screen.error <= giveUpAbove) return null;
+  return missed(span, cubic, screen.error, indices[screen.index] as number);
 }
 
 // Schneider's arm lengths along the fixed tangents, with the loop and

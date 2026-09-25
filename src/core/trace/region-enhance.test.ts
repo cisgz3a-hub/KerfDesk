@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
-import type { ColoredPath } from '../scene';
+import type { ColoredPath, CurveSubpath } from '../scene';
 import {
   computeRegionUpscaleFactor,
   enhanceRegionPaths,
@@ -123,6 +123,75 @@ describe('enhanceRegionPaths', () => {
     expect(polylines).toContainEqual(square(60, 60, 70, 70));
     expect(polylines).toContainEqual(square(20, 20, 30, 30)); // the re-traced loop
     expect(polylines).toHaveLength(3); // edge fragment filtered, original inside replaced
+  });
+
+  it("carries each ring's canonical curve through the downscale, offset and merge", async () => {
+    const image = blankImage(100, 100);
+    const region = { x: 10, y: 10, width: 40, height: 40 };
+    const kept = square(60, 60, 70, 70);
+    const keptCurve: CurveSubpath = {
+      start: { x: 60, y: 60 },
+      segments: [
+        {
+          kind: 'cubic',
+          control1: { x: 65, y: 58 },
+          control2: { x: 70, y: 62 },
+          to: { x: 70, y: 70 },
+        },
+      ],
+      closed: true,
+    };
+    const fullTracePaths: ColoredPath[] = [
+      {
+        color: '#000000',
+        polylines: [square(20, 20, 30, 30), kept],
+        curves: [keptCurve, keptCurve],
+      },
+    ];
+    // In upscaled crop coordinates: a curved interior ring and an edge fragment.
+    const traced: ColoredPath = {
+      color: '#000000',
+      polylines: [square(0, 10, 20, 30), square(20, 20, 40, 40)],
+      curves: [
+        {
+          start: { x: 0, y: 10 },
+          segments: [{ kind: 'line', to: { x: 20, y: 30 } }],
+          closed: true,
+        },
+        {
+          start: { x: 20, y: 20 },
+          segments: [
+            {
+              kind: 'cubic',
+              control1: { x: 30, y: 16 },
+              control2: { x: 44, y: 30 },
+              to: { x: 40, y: 40 },
+            },
+          ],
+          closed: true,
+        },
+      ],
+    };
+    const trace = vi.fn(() => Promise.resolve<ColoredPath[]>([traced]));
+    const out = await enhanceRegionPaths({ image, region, fullTracePaths, options, trace });
+    expect(out).toHaveLength(1);
+    const path = out[0] as ColoredPath;
+    expect(path.polylines).toEqual([kept, square(20, 20, 30, 30)]);
+    expect(path.curves).toEqual([
+      keptCurve,
+      {
+        start: { x: 20, y: 20 },
+        segments: [
+          {
+            kind: 'cubic',
+            control1: { x: 25, y: 18 },
+            control2: { x: 32, y: 25 },
+            to: { x: 30, y: 30 },
+          },
+        ],
+        closed: true,
+      },
+    ]);
   });
 
   it('returns the input unchanged for a degenerate region without tracing', async () => {

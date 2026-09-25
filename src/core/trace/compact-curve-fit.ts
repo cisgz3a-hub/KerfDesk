@@ -5,32 +5,34 @@
 // least error among those. Three stages:
 //
 //  1. Breaks. Decided corners (contour-corners.ts) split the ring C0 with
-//     one-sided tangents and stay exact. Knots (kept feature points) are exact
-//     joints that keep one centred tangent, so the outline stays G1 there.
-//  2. Candidate joints. Between breaks, a split-at-the-worst-point cubic fit
+//     one-sided tangents and stay exact.
+//  2. Candidate joints. Between corners, a split-at-the-worst-point cubic fit
 //     at a FIXED candidate tolerance (never the Optimize tolerance) proposes
 //     joints; each joint gets one centred tangent that every segment meeting
-//     there uses, so the curve is G1 at any joint the merge keeps.
+//     there uses, so two cubics meeting at a kept joint are exactly G1.
 //  3. Merge. A shortest-path search over those joints (own implementation of
 //     the published optimal-knot idea, M. Plass and M. Stone, "Curve-fitting
 //     with piecewise parametric cubics", SIGGRAPH 1983) picks the fewest
 //     segments, then the least summed squared error, where a segment may span
 //     several candidate pieces only while its pieces turn the same way (never
 //     across an inflection) and while every shorter extension from the same
-//     joint also fit. A span's error never depends on the tolerance, so a
-//     larger tolerance only adds feasible segments: the segment count is
-//     monotone non-increasing in Optimize. A cornerless ring tries each
-//     candidate joint as its seam.
+//     joint also fit. Whether a span fits never depends on anything but the
+//     tolerance, and a larger tolerance only adds feasible spans: for one
+//     ring the segment count is monotone non-increasing in Optimize. A
+//     cornerless ring tries each candidate joint as its seam.
 //
-// A span that is straight within the tolerance, and meets its joints along
-// their tangents (or at corners), is one line segment; a single candidate
-// piece no cubic through its joint tangents fits (a long flattened chord
-// between tilted joints) is its chord when that is closer. Pure core,
-// deterministic.
+// A span that is straight within the tolerance, and meets its joints within
+// 4 degrees of their tangents (or at corners), is one line segment; a single
+// candidate piece no cubic through its joint tangents fits (a long flattened
+// chord between tilted joints) is its chord when that is closer, with no
+// tangent check. So the outline is G1 within 4 degrees at every smooth joint
+// except such chords, and exactly G1 where two cubics meet. A cubic that
+// crosses itself is never emitted. Pure core, deterministic.
 
 import type { CurveSubpath, PathSegment, Vec2 } from '../scene';
-import { fitSpan, mod, ringTangent, type SpanFit } from './compact-curve-span';
+import { chordSpanFit, fitSpan, mod, ringTangent, type SpanFit } from './compact-curve-span';
 import { evaluateCubic } from '../geometry/cubic-fit';
+import { cubicFlatnessSteps } from './compact-curve-shape';
 
 export type CompactFitOptions = {
   /** Max orthogonal deviation of the curve from the ring, px (Optimize). */
@@ -53,14 +55,18 @@ const LINE_JOINT_COS = Math.cos((4 * Math.PI) / 180);
 const NEAR_POINT_PX = 1e-9;
 // Compatibility polyline: about one vertex per this many px along a cubic.
 const SAMPLE_STEP_PX = 1.5;
+// ...and never further than this from the cubic, px: the topology repair
+// tests these samples, so a crossing of the exact curves must show in them.
+const SAMPLE_FLATNESS_PX = 0.02;
 const MIN_CUBIC_SAMPLES = 4;
 
-// A stretch of the ring between two breaks, in unrolled indices.
-type Section = {
-  readonly from: number;
-  readonly to: number;
-  readonly fromCorner: boolean;
-  readonly toCorner: boolean;
+// A stretch of the ring between two corners, in unrolled indices.
+type Section = { readonly from: number; readonly to: number };
+
+// How the proposal estimates a joint's tangent and tells a corner.
+type JointRules = {
+  readonly tangentAt: (i: number) => Vec2;
+  readonly cornerAt: (i: number) => boolean;
 };
 
 type Evaluation = SpanFit & { readonly error: number; readonly lineOk: boolean };
@@ -78,41 +84,43 @@ type Joints = {
 type Context = {
   readonly ring: ReadonlyArray<Vec2>;
   readonly options: CompactFitOptions;
+  /** Candidate pieces the proposal accepted, by start (mod ring length) and
+   *  length: the merge's single-piece spans, fitted once. */
+  readonly pieces: Map<number, SpanFit>;
 };
 
 /** Fit a closed ring (distinct points, no repeated start) with compact
- *  segments. `corners` and `knots` are matched by object reference. Null for
- *  fewer than three distinct points. */
+ *  segments. `corners` are matched by object reference. Null for fewer than
+ *  three distinct points. */
 export function fitCompactRing(
   points: ReadonlyArray<Vec2>,
   corners: ReadonlySet<Vec2>,
-  knots: ReadonlySet<Vec2>,
   options: CompactFitOptions,
 ): CurveSubpath | null {
-  const ring = distinctRing(points, corners, knots);
+  const ring = distinctRing(points, corners);
   if (ring.length < 3) return null;
-  const ctx: Context = { ring, options };
-  const breaks: Array<{ index: number; corner: boolean }> = [];
+  const ctx: Context = { ring, options, pieces: new Map() };
+  const breaks: number[] = [];
   ring.forEach((p, index) => {
-    if (corners.has(p)) breaks.push({ index, corner: true });
-    else if (knots.has(p)) breaks.push({ index, corner: false });
+    if (corners.has(p)) breaks.push(index);
   });
   if (breaks.length === 0) return fitCornerlessRing(ctx);
   const segments: PathSegment[] = [];
   const n = ring.length;
   for (let b = 0; b < breaks.length; b += 1) {
-    const from = breaks[b] as { index: number; corner: boolean };
-    const next = breaks[(b + 1) % breaks.length] as { index: number; corner: boolean };
-    const to = next.index > from.index ? next.index : next.index + n;
-    const section = { from: from.index, to, fromCorner: from.corner, toCorner: next.corner };
-    segments.push(...fitSection(ctx, section));
+    const from = breaks[b] as number;
+    const next = breaks[(b + 1) % breaks.length] as number;
+    const to = next > from ? next : next + n;
+    segments.push(...fitSection(ctx, { from, to }));
   }
-  return { start: ring[(breaks[0] as { index: number }).index] as Vec2, segments, closed: true };
+  return { start: ring[breaks[0] as number] as Vec2, segments, closed: true };
 }
 
 /** The compatibility polyline of a compact curve: line ends only, about one
- *  vertex per 1.5 px along cubics, every joint exact. A closed curve's samples
- *  end on its start, as every closed trace ring does. */
+ *  vertex per 1.5 px along cubics and never more than 0.02 px from them
+ *  (the topology repair tests these samples for crossings), every joint
+ *  exact. A closed curve's samples end on its start, as every closed trace
+ *  ring does. */
 export function sampleCompactCurve(curve: CurveSubpath): Vec2[] {
   const out: Vec2[] = [curve.start];
   let current = curve.start;
@@ -123,7 +131,11 @@ export function sampleCompactCurve(curve: CurveSubpath): Vec2[] {
         Math.hypot(cubic.p1.x - cubic.p0.x, cubic.p1.y - cubic.p0.y) +
         Math.hypot(cubic.p2.x - cubic.p1.x, cubic.p2.y - cubic.p1.y) +
         Math.hypot(cubic.p3.x - cubic.p2.x, cubic.p3.y - cubic.p2.y);
-      const steps = Math.max(MIN_CUBIC_SAMPLES, Math.ceil(length / SAMPLE_STEP_PX));
+      const steps = Math.max(
+        MIN_CUBIC_SAMPLES,
+        Math.ceil(length / SAMPLE_STEP_PX),
+        cubicFlatnessSteps(cubic, SAMPLE_FLATNESS_PX),
+      );
       for (let s = 1; s < steps; s += 1) out.push(evaluateCubic(cubic, s / steps));
     }
     out.push(segment.to);
@@ -136,19 +148,17 @@ export function sampleCompactCurve(curve: CurveSubpath): Vec2[] {
 
 function fitSection(ctx: Context, section: Section): PathSegment[] {
   const { ring, options } = ctx;
-  const lo = section.fromCorner ? section.from : -Infinity;
-  const hi = section.toCorner ? section.to : Infinity;
-  const tangentAt = (i: number): Vec2 => ringTangent(ring, i, options.tangentWindow, lo, hi);
+  const tangentAt = (i: number): Vec2 =>
+    ringTangent(ring, i, options.tangentWindow, section.from, section.to);
   const at = [section.from];
   const tangents = new Map<number, Vec2>([
     [section.from, tangentAt(section.from)],
     [section.to, tangentAt(section.to)],
   ]);
-  proposeJoints(ctx, section.from, section.to, tangents, tangentAt, at, 0);
+  const rules = { tangentAt, cornerAt: (i: number) => i === section.from || i === section.to };
+  proposeJoints(ctx, section.from, section.to, tangents, rules, at, 0);
   at.push(section.to);
-  const joints = jointsOf(at, tangents, (t) =>
-    t === 0 ? section.fromCorner : t === at.length - 1 && section.toCorner,
-  );
+  const joints = jointsOf(at, tangents, (t) => t === 0 || t === at.length - 1);
   const evaluate = cachedEvaluator(ctx, joints, (t, k) => t * (at.length + 1) + k);
   const plan = fewestSegments(joints, evaluate, 0, at.length - 1, options.tolerance);
   return emit(plan.steps, evaluate, options.tolerance);
@@ -169,9 +179,10 @@ function fitCornerlessRing(ctx: Context): CurveSubpath {
     [n, tangentAt(0)],
   ]);
   const at = [0];
-  proposeJoints(ctx, 0, far, tangents, tangentAt, at, 0);
+  const rules = { tangentAt, cornerAt: () => false };
+  proposeJoints(ctx, 0, far, tangents, rules, at, 0);
   at.push(far);
-  proposeJoints(ctx, far, n, tangents, tangentAt, at, 0);
+  proposeJoints(ctx, far, n, tangents, rules, at, 0);
   const m = at.length;
   // Unroll twice so any seam's full turn is a contiguous joint range.
   const unrolled = [...at, ...at.map((i) => i + n), 2 * n];
@@ -198,7 +209,7 @@ function proposeJoints(
   lo: number,
   hi: number,
   tangents: Map<number, Vec2>,
-  tangentAt: (i: number) => Vec2,
+  joints: JointRules,
   out: number[],
   depth: number,
 ): void {
@@ -206,13 +217,46 @@ function proposeJoints(
   const tStart = tangents.get(lo) as Vec2;
   const tEnd = tangents.get(hi) as Vec2;
   const span = spanOf(ctx.ring, lo, hi);
-  const fit = fitSpan(span, tStart, negate(tEnd));
-  if (Math.min(fit.cubicError, fit.lineError) <= ctx.options.candidateTolerance) return;
+  const tolerance = ctx.options.candidateTolerance;
+  const straight = lineSpanFit(
+    span,
+    tStart,
+    tEnd,
+    joints.cornerAt(lo),
+    joints.cornerAt(hi),
+    tolerance,
+  );
+  // A span that misses skips its curve-to-chain check, but it always runs
+  // its Newton passes: their worst point is where it splits, and the joints
+  // decide what the merge can span (giving up after the first pass left a
+  // disc at 4 cubics for every Optimize and moved the R=900 commit-grid
+  // disc off round).
+  const fit = straight ?? fitSpan(span, tStart, negate(tEnd), tolerance, Infinity);
+  if (Math.min(fit.cubicError, fit.lineError) <= tolerance) {
+    ctx.pieces.set(pieceKey(ctx.ring.length, lo, hi), fit);
+    return;
+  }
   const split = lo + splitIndex(span, fit.worstIndex);
-  tangents.set(split, tangentAt(split));
-  proposeJoints(ctx, lo, split, tangents, tangentAt, out, depth + 1);
+  tangents.set(split, joints.tangentAt(split));
+  proposeJoints(ctx, lo, split, tangents, joints, out, depth + 1);
   out.push(split);
-  proposeJoints(ctx, split, hi, tangents, tangentAt, out, depth + 1);
+  proposeJoints(ctx, split, hi, tangents, joints, out, depth + 1);
+}
+
+// A span that is straight within `tolerance` and meets both joints along
+// their tangents (or at corners) is drawn as its chord whatever cubic might
+// fit it, so its cubic is never fitted: the chord alone, else null.
+function lineSpanFit(
+  span: ReadonlyArray<Vec2>,
+  tStart: Vec2,
+  tEnd: Vec2,
+  startCorner: boolean,
+  endCorner: boolean,
+  tolerance: number,
+): SpanFit | null {
+  if (!lineMeetsJoints(span, tStart, tEnd, startCorner, endCorner)) return null;
+  const chord = chordSpanFit(span);
+  return chord.lineError <= tolerance ? chord : null;
 }
 
 // The worst point, unless it sits at an end of a span the cubic misses badly
@@ -270,18 +314,28 @@ function cachedEvaluator(
 }
 
 function evaluateSpan(ctx: Context, joints: Joints, t: number, k: number): Evaluation {
-  const span = spanOf(ctx.ring, joints.at[t] as number, joints.at[t + k] as number);
+  const from = joints.at[t] as number;
+  const to = joints.at[t + k] as number;
+  const span = spanOf(ctx.ring, from, to);
   const tStart = joints.tangent[t] as Vec2;
   const tEnd = joints.tangent[t + k] as Vec2;
-  const fit = fitSpan(span, tStart, negate(tEnd));
-  const lineOk = lineMeetsJoints(
-    span,
-    tStart,
-    tEnd,
-    joints.corner[t] === true,
-    joints.corner[t + k] === true,
-  );
-  return { ...fit, lineOk, error: Math.min(fit.cubicError, fit.lineError) };
+  // A single piece is the proposal's accepted fit (same span, same joint
+  // tangents). A longer span stops once it cannot meet the tolerance: it is
+  // then infeasible whatever its exact error. An unfinished cubic is never
+  // drawn (its curve-to-chain and loop checks never ran); the span is a line
+  // or a miss. The tolerance is fixed per fit, so the feasible spans still
+  // only grow with it and the segment count stays monotone in Optimize.
+  // A straight span that meets its joints is its chord (as in the proposal).
+  const startCorner = joints.corner[t] === true;
+  const endCorner = joints.corner[t + k] === true;
+  const tolerance = ctx.options.tolerance;
+  const fit =
+    (k === 1 ? ctx.pieces.get(pieceKey(ctx.ring.length, from, to)) : undefined) ??
+    lineSpanFit(span, tStart, tEnd, startCorner, endCorner, tolerance) ??
+    fitSpan(span, tStart, negate(tEnd), k === 1 ? Infinity : tolerance);
+  const cubicError = fit.complete ? fit.cubicError : Infinity;
+  const lineOk = lineMeetsJoints(span, tStart, tEnd, startCorner, endCorner);
+  return { ...fit, cubicError, lineOk, error: Math.min(cubicError, fit.lineError) };
 }
 
 // A line keeps the outline G1 only when it leaves and meets each smooth joint
@@ -377,6 +431,10 @@ function emit(steps: ReadonlyArray<Step>, evaluate: Evaluate, tolerance: number)
 
 // ——— small helpers ———
 
+function pieceKey(n: number, from: number, to: number): number {
+  return mod(from, n) * (n + 1) + (to - from);
+}
+
 function turnSign(a: Vec2, b: Vec2): number {
   const turn = Math.atan2(a.x * b.y - a.y * b.x, a.x * b.x + a.y * b.y);
   if (Math.abs(turn) < NEUTRAL_TURN_RAD) return 0;
@@ -407,18 +465,13 @@ function negate(v: Vec2): Vec2 {
   return { x: -v.x, y: -v.y };
 }
 
-// Drop consecutive duplicates (keeping a marked object) and a repeated start.
-function distinctRing(
-  points: ReadonlyArray<Vec2>,
-  corners: ReadonlySet<Vec2>,
-  knots: ReadonlySet<Vec2>,
-): Vec2[] {
-  const marked = (p: Vec2): boolean => corners.has(p) || knots.has(p);
+// Drop consecutive duplicates (keeping a corner object) and a repeated start.
+function distinctRing(points: ReadonlyArray<Vec2>, corners: ReadonlySet<Vec2>): Vec2[] {
   const out: Vec2[] = [];
   for (const p of points) {
     const last = out.at(-1);
     if (last !== undefined && Math.hypot(last.x - p.x, last.y - p.y) < NEAR_POINT_PX) {
-      if (marked(p) && !marked(last)) out[out.length - 1] = p;
+      if (corners.has(p) && !corners.has(last)) out[out.length - 1] = p;
       continue;
     }
     out.push(p);
@@ -427,7 +480,7 @@ function distinctRing(
   const last = out.at(-1);
   if (first !== undefined && last !== undefined && out.length > 1) {
     if (Math.hypot(last.x - first.x, last.y - first.y) < NEAR_POINT_PX) {
-      if (marked(last) && !marked(first)) out[0] = last;
+      if (corners.has(last) && !corners.has(first)) out[0] = last;
       out.pop();
     }
   }

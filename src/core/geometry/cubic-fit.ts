@@ -335,11 +335,23 @@ function reparameterize(
  *  nearest `p`: t − (Q(t)−P)·Q'(t) / (|Q'(t)|² + (Q(t)−P)·Q''(t)). Null when
  *  the step is undefined. Unclamped; callers bound it. */
 export function newtonProjectionStep(cubic: CubicBezier, p: Vec2, t: number): number | null {
-  const q = evaluateCubic(cubic, t);
-  const d1 = cubicDerivative(cubic, t);
-  const d2 = cubicSecondDerivative(cubic, t);
-  const numerator = (q.x - p.x) * d1.x + (q.y - p.y) * d1.y;
-  const denominator = d1.x * d1.x + d1.y * d1.y + (q.x - p.x) * d2.x + (q.y - p.y) * d2.y;
+  // The point, first and second derivative in one pass with no allocation
+  // (the same arithmetic as evaluateCubic, so the same bits): the compact
+  // contour fit runs this for every point of every span pass (ADR-405).
+  const { p0, p1, p2, p3 } = cubic;
+  const m = 1 - t;
+  const b0 = m * m * m;
+  const b1 = 3 * t * m * m;
+  const b2 = 3 * t * t * m;
+  const b3 = t * t * t;
+  const qx = b0 * p0.x + b1 * p1.x + b2 * p2.x + b3 * p3.x;
+  const qy = b0 * p0.y + b1 * p1.y + b2 * p2.y + b3 * p3.y;
+  const d1x = 3 * m * m * (p1.x - p0.x) + 6 * m * t * (p2.x - p1.x) + 3 * t * t * (p3.x - p2.x);
+  const d1y = 3 * m * m * (p1.y - p0.y) + 6 * m * t * (p2.y - p1.y) + 3 * t * t * (p3.y - p2.y);
+  const d2x = 6 * m * (p2.x - 2 * p1.x + p0.x) + 6 * t * (p3.x - 2 * p2.x + p1.x);
+  const d2y = 6 * m * (p2.y - 2 * p1.y + p0.y) + 6 * t * (p3.y - 2 * p2.y + p1.y);
+  const numerator = (qx - p.x) * d1x + (qy - p.y) * d1y;
+  const denominator = d1x * d1x + d1y * d1y + (qx - p.x) * d2x + (qy - p.y) * d2y;
   if (Math.abs(denominator) < 1e-12) return null;
   return t - numerator / denominator;
 }
@@ -417,24 +429,6 @@ export function evaluateCubic(c: CubicBezier, t: number): Vec2 {
   return {
     x: b0 * c.p0.x + b1 * c.p1.x + b2 * c.p2.x + b3 * c.p3.x,
     y: b0 * c.p0.y + b1 * c.p1.y + b2 * c.p2.y + b3 * c.p3.y,
-  };
-}
-
-function cubicDerivative(c: CubicBezier, t: number): Vec2 {
-  const m = 1 - t;
-  return {
-    x:
-      3 * m * m * (c.p1.x - c.p0.x) + 6 * m * t * (c.p2.x - c.p1.x) + 3 * t * t * (c.p3.x - c.p2.x),
-    y:
-      3 * m * m * (c.p1.y - c.p0.y) + 6 * m * t * (c.p2.y - c.p1.y) + 3 * t * t * (c.p3.y - c.p2.y),
-  };
-}
-
-function cubicSecondDerivative(c: CubicBezier, t: number): Vec2 {
-  const m = 1 - t;
-  return {
-    x: 6 * m * (c.p2.x - 2 * c.p1.x + c.p0.x) + 6 * t * (c.p3.x - 2 * c.p2.x + c.p1.x),
-    y: 6 * m * (c.p2.y - 2 * c.p1.y + c.p0.y) + 6 * t * (c.p3.y - 2 * c.p2.y + c.p1.y),
   };
 }
 

@@ -66,6 +66,15 @@ function deviation(points: ReadonlyArray<Vec2>, curve: CurveSubpath): number {
   );
 }
 
+function pointToSegment(p: Vec2, a: Vec2, b: Vec2): number {
+  const vx = b.x - a.x;
+  const vy = b.y - a.y;
+  const lenSq = vx * vx + vy * vy;
+  const t =
+    lenSq === 0 ? 0 : Math.max(0, Math.min(1, ((p.x - a.x) * vx + (p.y - a.y) * vy) / lenSq));
+  return Math.hypot(p.x - a.x - t * vx, p.y - a.y - t * vy);
+}
+
 function renderDisc(r: number, wobble: number, antialiased: boolean): RawImageData {
   const size = Math.ceil(2 * (r + wobble) + 16);
   const c = size / 2 + 0.3;
@@ -99,7 +108,7 @@ describe('compact contour curves (ADR-405)', () => {
   it('fits a circle with a few G1 cubics within the tolerance', () => {
     for (const r of [8, 20, 48, 100]) {
       const points = circle(100, 100, r);
-      const curve = fitCompactRing(points, NO_MARKS, NO_MARKS, OPTIONS);
+      const curve = fitCompactRing(points, NO_MARKS, OPTIONS);
       if (curve === null) throw new Error('expected a curve');
       expect(curve.closed).toBe(true);
       expect(curve.segments.every((s) => s.kind === 'cubic')).toBe(true);
@@ -111,28 +120,33 @@ describe('compact contour curves (ADR-405)', () => {
 
   it('emits a straight run between corners as one line and keeps the corners exact', () => {
     const { points, corners } = rectangle(120, 40);
-    const curve = fitCompactRing(points, corners, NO_MARKS, OPTIONS);
+    const curve = fitCompactRing(points, corners, OPTIONS);
     expect(curve?.segments.map((s) => s.kind)).toEqual(['line', 'line', 'line', 'line']);
     for (const segment of curve?.segments ?? []) expect(corners.has(segment.to)).toBe(true);
     // The compatibility polyline holds no collinear samples along a line.
     expect(sampleCompactCurve(curve as CurveSubpath)).toHaveLength(5);
   });
 
-  it('keeps a knot as an exact joint of one shared tangent', () => {
-    const points = circle(100, 100, 48);
-    const knot = points[37] as Vec2;
-    const curve = fitCompactRing(points, NO_MARKS, new Set([knot]), OPTIONS);
+  it('samples the compatibility polyline within 0.02 px of every cubic', () => {
+    // The topology repair tests these samples; exact cubics can then only
+    // overlap where the samples come within 0.04 px, never cross visibly.
+    const curve = fitCompactRing(circle(40, 40, 6, 1.2), NO_MARKS, OPTIONS);
     if (curve === null) throw new Error('expected a curve');
-    expect(curve.start).toBe(knot);
-    const last = curve.segments.at(-1);
-    const first = curve.segments[0];
-    if (last?.kind !== 'cubic' || first?.kind !== 'cubic') throw new Error('expected cubics');
-    const inDir = { x: knot.x - last.control2.x, y: knot.y - last.control2.y };
-    const outDir = { x: first.control1.x - knot.x, y: first.control1.y - knot.y };
-    const cross = inDir.x * outDir.y - inDir.y * outDir.x;
-    expect(
-      Math.abs(cross) / (Math.hypot(inDir.x, inDir.y) * Math.hypot(outDir.x, outDir.y)),
-    ).toBeLessThan(1e-9);
+    const samples = sampleCompactCurve(curve);
+    let current = curve.start;
+    for (const segment of curve.segments) {
+      if (segment.kind === 'cubic') {
+        const c = { p0: current, p1: segment.control1, p2: segment.control2, p3: segment.to };
+        for (let s = 1; s < 200; s += 1) {
+          const p = evaluateCubic(c, s / 200);
+          const nearest = Math.min(
+            ...samples.slice(1).map((b, i) => pointToSegment(p, samples[i] as Vec2, b)),
+          );
+          expect(nearest).toBeLessThanOrEqual(0.02 + 1e-9);
+        }
+      }
+      current = segment.to;
+    }
   });
 
   it('never merges across an inflection', () => {
@@ -140,7 +154,7 @@ describe('compact contour curves (ADR-405)', () => {
     // tolerance loose enough for a few S-shaped cubics, the merge still keeps
     // at least one segment per arc.
     const points = circle(100, 100, 40, 6);
-    const curve = fitCompactRing(points, NO_MARKS, NO_MARKS, { ...OPTIONS, tolerance: 3 });
+    const curve = fitCompactRing(points, NO_MARKS, { ...OPTIONS, tolerance: 3 });
     expect(curve?.segments.length ?? 0).toBeGreaterThanOrEqual(10);
   });
 
@@ -149,7 +163,7 @@ describe('compact contour curves (ADR-405)', () => {
     for (const points of shapes) {
       let previous = Infinity;
       for (const tolerance of [0.2, 0.3, 0.45, 0.7, 1, 1.5, 2.5]) {
-        const curve = fitCompactRing(points, NO_MARKS, NO_MARKS, {
+        const curve = fitCompactRing(points, NO_MARKS, {
           ...OPTIONS,
           tolerance,
           candidateTolerance: 0.1,
