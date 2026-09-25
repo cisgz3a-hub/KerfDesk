@@ -2,7 +2,11 @@ import type { StreamerStatus } from '../../core/controllers/grbl';
 import type { JobInterruption } from '../../core/recovery';
 import { jobStopRequestMessage, type JobStopRequest } from '../state/job-stop-request';
 import type { LaserSafetyNotice } from '../state/laser-safety-notice';
-import type { StreamPlannerSnapshot } from '../state/laser-rx-capacity-evidence';
+import {
+  controllerPlannerSizeBlocks,
+  type PlannerSizeSource,
+  type StreamPlannerSnapshot,
+} from '../state/laser-rx-capacity-evidence';
 
 /** The recorded cause of a terminal stream: a safety notice names its fault;
  * without one, a stop KerfDesk was asked for (Abort, the app closing) is a
@@ -52,15 +56,27 @@ function interruptionCause(
   };
 }
 
-/** The backlog the current run's latest status report showed, if any. */
-export function currentRunPlannerBacklog(state: {
+type PlannerBacklogSource = PlannerSizeSource & {
   readonly streamerEpoch: number;
   readonly streamPlannerSnapshot?: StreamPlannerSnapshot | null;
-}): JobInterruption['plannerBacklog'] {
+  readonly streamer?: { readonly completed: number } | null;
+};
+
+/** The backlog the current run's latest status report showed. A report that
+ * showed an empty planner is still a frontier: every line acknowledged by then
+ * had run. Without such a report, the stop may have discarded the controller's
+ * whole planner of acknowledged moves (controller audit OR-3). */
+export function currentRunPlannerBacklog(
+  state: PlannerBacklogSource,
+): JobInterruption['plannerBacklog'] {
   const snapshot = state.streamPlannerSnapshot ?? null;
-  if (snapshot === null || snapshot.streamerEpoch !== state.streamerEpoch) return undefined;
-  if (snapshot.queuedBlocks === 0) return undefined;
-  return { ackedAtStatus: snapshot.ackedLines, queuedBlocks: snapshot.queuedBlocks };
+  if (snapshot !== null && snapshot.streamerEpoch === state.streamerEpoch) {
+    return { ackedAtStatus: snapshot.ackedLines, queuedBlocks: snapshot.queuedBlocks };
+  }
+  const plannerBlocks = controllerPlannerSizeBlocks(state);
+  const acked = state.streamer?.completed;
+  if (plannerBlocks === undefined || acked === undefined) return undefined;
+  return { ackedAtStatus: acked, queuedBlocks: plannerBlocks, bound: 'planner-size' };
 }
 
 function noticeKind(status: StreamerStatus, notice: LaserSafetyNotice): JobInterruption['kind'] {

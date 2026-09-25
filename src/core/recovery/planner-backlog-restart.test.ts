@@ -42,9 +42,16 @@ describe('plannerFrontierRawLine', () => {
     expect(plannerFrontierRawLine(PROGRAM, { ackedAtStatus: 6, queuedBlocks: 512 })).toBe(4);
   });
 
-  it('has no frontier for an empty backlog or before any move', () => {
-    expect(plannerFrontierRawLine(PROGRAM, { ackedAtStatus: 18, queuedBlocks: 0 })).toBeNull();
+  it('has no frontier before any move', () => {
     expect(plannerFrontierRawLine(PROGRAM, { ackedAtStatus: 3, queuedBlocks: 5 })).toBeNull();
+  });
+
+  // OR-3: a report that showed an empty planner proves every line acknowledged
+  // by then had run, so the frontier is the first move acknowledged after it.
+  it('puts the frontier of an empty backlog at the first move after the report', () => {
+    expect(plannerFrontierRawLine(PROGRAM, { ackedAtStatus: 18, queuedBlocks: 0 })).toBe(19);
+    expect(plannerFrontierRawLine(PROGRAM, { ackedAtStatus: 2, queuedBlocks: 0 })).toBe(4);
+    expect(plannerFrontierRawLine(PROGRAM, { ackedAtStatus: 24, queuedBlocks: 0 })).toBeNull();
   });
 });
 
@@ -57,7 +64,12 @@ describe('automaticRestart with a planner backlog', () => {
 
   it('restarts at the first move the discarded planner may not have run', () => {
     const restart = automaticRestart(PROGRAM, 20, aborted({ ackedAtStatus: 18, queuedBlocks: 5 }));
-    expect(restart).toEqual({ line: 14, replaysRejectedLine: false, plannerBacklogBlocks: 5 });
+    expect(restart).toEqual({
+      line: 14,
+      replaysRejectedLine: false,
+      plannerBacklogBlocks: 5,
+      plannerBacklogBasis: 'status-backlog',
+    });
   });
 
   it('keeps the acknowledgement frontier without a backlog', () => {
@@ -89,5 +101,61 @@ describe('automaticRestart with a planner backlog', () => {
     expect(
       parseOptionalJobInterruption({ ...stored, plannerBacklog: { ackedAtStatus: -1 } }),
     ).toBeNull();
+  });
+
+  it('keeps a planner-size bound through storage and rejects an unknown bound', () => {
+    const bounded = aborted({ ackedAtStatus: 20, queuedBlocks: 15, bound: 'planner-size' });
+    const stored = JSON.parse(JSON.stringify(bounded));
+    expect(parseOptionalJobInterruption(stored)).toEqual({ interruption: bounded });
+    expect(
+      parseOptionalJobInterruption({
+        ...stored,
+        plannerBacklog: { ackedAtStatus: 20, queuedBlocks: 15, bound: 'guess' },
+      }),
+    ).toBeNull();
+  });
+});
+
+// OR-3 (2026-09-25 controller audit): a planner-discarding stop without a
+// status report that showed a backlog. Adapted from the audit's reproduction
+// (src/__audit_repro__/OR/abort-restart-without-bf.test.ts).
+describe('automaticRestart without a reported backlog (OR-3)', () => {
+  const aborted = (plannerBacklog: JobInterruption['plannerBacklog']): JobInterruption => ({
+    kind: 'cancelled',
+    message: 'Stopped by the operator (Abort).',
+    ...(plannerBacklog === undefined ? {} : { plannerBacklog }),
+  });
+
+  it('steps back a whole stock GRBL planner (15 blocks) from the stop', () => {
+    // 3 setup lines + 17 moves acknowledged (raw 4..20); up to 15 were queued.
+    const restart = automaticRestart(
+      PROGRAM,
+      20,
+      aborted({ ackedAtStatus: 20, queuedBlocks: 15, bound: 'planner-size' }),
+    );
+    expect(restart).toEqual({
+      line: 6,
+      replaysRejectedLine: false,
+      plannerBacklogBlocks: 15,
+      plannerBacklogBasis: 'planner-size',
+    });
+  });
+
+  it('replays every move acknowledged after a report that showed an empty planner', () => {
+    // The report came at 10 lines (raw 1..10); 10 more were acknowledged.
+    const restart = automaticRestart(PROGRAM, 20, aborted({ ackedAtStatus: 10, queuedBlocks: 0 }));
+    expect(restart).toEqual({
+      line: 11,
+      replaysRejectedLine: false,
+      plannerBacklogBlocks: 0,
+      plannerBacklogBasis: 'after-empty-status',
+    });
+  });
+
+  it('keeps the acknowledgement frontier when the empty report was the last acknowledgement', () => {
+    expect(automaticRestart(PROGRAM, 20, aborted({ ackedAtStatus: 20, queuedBlocks: 0 }))).toEqual({
+      line: 21,
+      replaysRejectedLine: false,
+    });
   });
 });
