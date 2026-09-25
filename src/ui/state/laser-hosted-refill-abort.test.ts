@@ -7,11 +7,8 @@
 // The oracle is the byte stream the simulated controller received.
 
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import {
-  createGrblSimulator,
-  GRBL_PLANNER_BLOCKS,
-  type GrblSimulator,
-} from '../../__fixtures__/controllers';
+import { createGrblSimulator, type GrblSimulator } from '../../__fixtures__/controllers';
+import { GRBL_PLANNER_BLOCKS } from '../../__fixtures__/controllers/grbl-sim-planner';
 import { grblDriver } from '../../core/controllers';
 import { RT_SOFT_RESET } from '../../core/controllers/grbl/commands';
 import type { PlatformAdapter, SerialConnection } from '../../platform/types';

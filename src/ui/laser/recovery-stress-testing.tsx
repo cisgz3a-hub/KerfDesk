@@ -12,10 +12,10 @@ import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, expect, vi } from 'vitest';
 import {
   createGrblSimulator,
-  GRBL_PLANNER_BLOCKS,
   type CreateGrblSimulatorOptions,
   type GrblSimulator,
 } from '../../__fixtures__/controllers';
+import { GRBL_PLANNER_BLOCKS } from '../../__fixtures__/controllers/grbl-sim-planner';
 import { isSendableGcodeLine } from '../../core/controllers/grbl';
 import { DEFAULT_DEVICE_PROFILE } from '../../core/devices';
 import { rawResumeLine } from '../../core/recovery';

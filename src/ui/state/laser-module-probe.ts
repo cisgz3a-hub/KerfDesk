@@ -10,11 +10,8 @@
 // off`), which nothing on the board would ever answer; test Fire is refused,
 // and a laser job gets a Job Review warning (laser-module-readiness.ts).
 
-import {
-  selectControllerDriver,
-  type ControllerDriver,
-  type LaserModuleEvidence,
-} from '../../core/controllers';
+import { selectControllerDriver, type ControllerDriver } from '../../core/controllers';
+import type { LaserModuleEvidence } from '../../core/controllers/controller-driver';
 import {
   startControllerCommand,
   type ControllerCommandKind,

@@ -1,4 +1,4 @@
-import type { LaserModuleEvidence } from '../../core/controllers';
+import type { LaserModuleEvidence } from '../../core/controllers/controller-driver';
 import type { GrblBuildInfo } from '../../core/controllers/grbl/build-info';
 import type { ControllerReadinessResult } from '../../core/preflight';
 import { constantPowerModeWarning } from '../../core/preflight/laser-module-readiness';

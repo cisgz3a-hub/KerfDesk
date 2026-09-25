@@ -21,7 +21,7 @@ import { resolveGrblDialect, type DeviceProfile, type GrblGcodeDialect } from '.
 import { contourEntryPoint, type ContourEntryBounds } from '../job/contour-entry';
 import { offsetForSpeed } from '../job/scan-offset';
 import type { CutGroup, CutSegment, FillGroup, Group, Job, RasterGroup } from '../job';
-import { emitRasterGroupWithEnd } from '../raster';
+import { emitRasterGroupWithEnd } from '../raster/emit-raster';
 import { assertNever } from '../scene';
 import { formatGcodeFeedMmPerMin } from '../gcode/feed-word';
 import type { OutputEmitOptions, OutputStrategy } from './output-strategy';

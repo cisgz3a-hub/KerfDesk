@@ -1,6 +1,7 @@
 import type { OverrideValues, StatusReport } from '../../core/controllers/grbl';
 import type { GrblBuildInfo } from '../../core/controllers/grbl/build-info';
-import type { LaserModuleEvidence, StatusQueryCapability } from '../../core/controllers';
+import type { StatusQueryCapability } from '../../core/controllers';
+import type { LaserModuleEvidence } from '../../core/controllers/controller-driver';
 import { programForLaserModule } from '../../core/preflight/laser-module-readiness';
 import type { ControllerKind } from '../../core/devices';
 import type { CanvasJobTimingPlanResult } from '../state/canvas-job-timing-plan';
