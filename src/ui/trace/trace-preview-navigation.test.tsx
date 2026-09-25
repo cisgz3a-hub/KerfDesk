@@ -1,5 +1,5 @@
 import { act } from 'react';
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi, type Mock } from 'vitest';
 
 import {
   button,
@@ -16,12 +16,13 @@ import {
   unmountNavigationPreview,
   viewport,
   wheel,
+  type BoundaryListener,
 } from './trace-preview-navigation.test-support';
 
-let onBoundaryChange: ReturnType<typeof vi.fn>;
+let onBoundaryChange: Mock<BoundaryListener>;
 
 beforeEach(async () => {
-  onBoundaryChange = vi.fn();
+  onBoundaryChange = vi.fn<BoundaryListener>();
   await mountNavigationPreview(onBoundaryChange);
 });
 

@@ -3,6 +3,7 @@
 import { act, createElement } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 
+import type { TraceBoundary } from '../../core/trace';
 import { TracePreview } from './TracePreview';
 import { LIVE_ZOOM_SETTLE_MS } from './trace-preview-zoom';
 import type { TracePreviewState } from './use-trace-preview';
@@ -34,7 +35,7 @@ const ready: TracePreviewState = {
 };
 
 type ImageSize = { readonly width: number; readonly height: number };
-type BoundaryListener = (...args: never[]) => void;
+export type BoundaryListener = (boundary: TraceBoundary) => void;
 
 let root: Root | null = null;
 let host: HTMLDivElement | null = null;
