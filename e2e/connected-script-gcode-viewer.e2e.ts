@@ -27,6 +27,12 @@ const REQUIRED_WORKER_URL_PARTS = [
 const COMPILATION_UNAVAILABLE_PATTERN = /Background compilation unavailable/i;
 const PREVIEW_WORKER_UNAVAILABLE_PATTERN = /background preview worker could not start/i;
 
+// Keep DOM and phase diagnostics while isolating filmstrip GPU readback from
+// this responsiveness measurement. Failure screenshots remain enabled.
+test.use({
+  trace: { mode: 'retain-on-failure', screenshots: false, snapshots: true, sources: true },
+});
+
 test('real connected-script multi-operation G-code 3D reaches ready off-thread', async ({
   page,
 }, testInfo) => {

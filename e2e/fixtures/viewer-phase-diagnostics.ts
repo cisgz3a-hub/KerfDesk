@@ -56,7 +56,7 @@ async function beginCapture(page: Page) {
   try {
     await bounded(
       cdp.send('Tracing.start', {
-        categories: 'devtools.timeline,v8,blink.user_timing',
+        categories: 'devtools.timeline,v8,blink.user_timing,gpu,cc,viz,benchmark',
         transferMode: 'ReturnAsStream',
       }),
     );
