@@ -3,6 +3,7 @@ import type { CurveSubpath, PathSegment, Vec2 } from '../scene';
 import {
   explicitCurveSubpath,
   pointOnSegment,
+  sameCurveSubpath,
   sampleSegment,
   segmentAsCubics,
   segmentParameterAtLength,
@@ -140,5 +141,16 @@ describe('curve segment geometry', () => {
     });
     const open = { ...triangle, closed: false };
     expect(explicitCurveSubpath(open)).toBe(open);
+  });
+
+  it('tells a real change from rounding noise when comparing subpaths', () => {
+    const path: CurveSubpath = { start: ORIGIN, segments: [CUBIC, HALF_CIRCLE], closed: false };
+    const noise = { ...CUBIC, control1: { x: 1e-12, y: 10 } };
+    expect(sameCurveSubpath(path, { ...path, segments: [noise, HALF_CIRCLE] })).toBe(true);
+    const moved = { ...CUBIC, control1: { x: 0.001, y: 10 } };
+    expect(sameCurveSubpath(path, { ...path, segments: [moved, HALF_CIRCLE] })).toBe(false);
+    const flipped = { ...HALF_CIRCLE, sweep: false };
+    expect(sameCurveSubpath(path, { ...path, segments: [CUBIC, flipped] })).toBe(false);
+    expect(sameCurveSubpath(path, { ...path, closed: true })).toBe(false);
   });
 });

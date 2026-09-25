@@ -263,7 +263,7 @@ function editPolylineShape(
   };
 }
 
-function scenePointToObjectLocal(point: Vec2, transform: Transform): Vec2 | null {
+export function scenePointToObjectLocal(point: Vec2, transform: Transform): Vec2 | null {
   if (!isInvertibleScale(transform.scaleX) || !isInvertibleScale(transform.scaleY)) return null;
   const dx = point.x - transform.x;
   const dy = point.y - transform.y;

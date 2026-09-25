@@ -192,7 +192,7 @@ function curveAnchorIndices(
   return byCurve;
 }
 
-function materializeCurvePath(
+export function materializeCurvePath(
   path: ColoredPath,
   curves: ReadonlyArray<CurveSubpath>,
 ): ColoredPath | null {

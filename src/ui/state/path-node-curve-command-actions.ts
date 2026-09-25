@@ -15,6 +15,7 @@ import { pushUndo } from './scene-mutations';
 import { boundsForPaths } from './path-node-edit-geometry';
 import type { PathNodeRef } from './path-node-edit-actions';
 import { planCurveNodeJoin } from './path-node-curve-join-plan';
+import { pathNodeEditorActions, type PathNodeEditorActions } from './path-node-editor-actions';
 import { synchronizePolylineShapeGeometry } from './path-node-shape-sync';
 import { useToastStore } from './toast-store';
 
@@ -23,7 +24,7 @@ type CurveJoinCommandOutcome =
   | { readonly kind: 'closed' }
   | { readonly kind: 'unchanged' };
 
-export type PathNodeCurveCommandActions = {
+export type PathNodeCurveCommandActions = PathNodeEditorActions & {
   readonly smoothSelectedCurveNode: () => void;
   readonly cornerSelectedCurveNode: () => void;
   readonly convertSelectedCurveSegment: (kind: 'line' | 'cubic') => void;
@@ -36,6 +37,7 @@ type Setter = (fn: (state: AppState) => AppState | Partial<AppState>) => void;
 
 export function pathNodeCurveCommandActions(set: Setter): PathNodeCurveCommandActions {
   return {
+    ...pathNodeEditorActions(set),
     smoothSelectedCurveNode: () => set((state) => mutateSelected(state, smoothCurveNode)),
     cornerSelectedCurveNode: () => set((state) => mutateSelected(state, cornerCurveNode)),
     convertSelectedCurveSegment: (kind) =>

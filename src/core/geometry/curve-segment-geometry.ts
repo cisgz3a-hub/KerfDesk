@@ -31,6 +31,14 @@ export function explicitCurveSubpath(path: CurveSubpath): CurveSubpath {
   return { ...path, segments: [...path.segments, { kind: 'line', to: path.start }] };
 }
 
+/** Whether two subpaths have the same nodes and handles, so an edit that
+ *  produced one from the other changed nothing worth an undo step. */
+export function sameCurveSubpath(a: CurveSubpath, b: CurveSubpath): boolean {
+  if (a.closed !== b.closed || a.segments.length !== b.segments.length) return false;
+  if (!samePoint(a.start, b.start)) return false;
+  return a.segments.every((segment, index) => sameSegment(segment, b.segments[index]));
+}
+
 export function segmentStartPoint(path: CurveSubpath, segmentIndex: number): Vec2 | null {
   if (segmentIndex === 0) return path.start;
   return path.segments[segmentIndex - 1]?.to ?? null;
@@ -306,4 +314,22 @@ function clamp01(value: number): number {
 
 function samePoint(a: Vec2, b: Vec2): boolean {
   return Math.abs(a.x - b.x) <= EPSILON && Math.abs(a.y - b.y) <= EPSILON;
+}
+
+function sameSegment(a: PathSegment, b: PathSegment | undefined): boolean {
+  if (b === undefined || a.kind !== b.kind || !samePoint(a.to, b.to)) return false;
+  if (a.kind === 'cubic' && b.kind === 'cubic') {
+    return samePoint(a.control1, b.control1) && samePoint(a.control2, b.control2);
+  }
+  if (a.kind === 'elliptical-arc' && b.kind === 'elliptical-arc') return sameArc(a, b);
+  return true;
+}
+
+function sameArc(a: EllipticalArcPathSegment, b: EllipticalArcPathSegment): boolean {
+  if (a.largeArc !== b.largeArc || a.sweep !== b.sweep) return false;
+  return (
+    Math.abs(a.radiusX - b.radiusX) <= EPSILON &&
+    Math.abs(a.radiusY - b.radiusY) <= EPSILON &&
+    Math.abs(a.rotationDeg - b.rotationDeg) <= EPSILON
+  );
 }
