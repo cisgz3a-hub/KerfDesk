@@ -44,7 +44,16 @@ export function streamOwnsTerminalAck(
 ): boolean {
   if (state.streamer?.status === 'disconnected') return false;
   if (state.pendingUntrackedAcks === 0) return true;
-  return hasUnsettledStreamAcks(state.streamer);
+  return streamAwaitsTerminalAck(state.streamer);
+}
+
+// A paused stream whose lines were all answered is owed nothing: the next
+// terminal ack belongs to a line written after the pause, such as the beam-off
+// a Marlin Pause queues behind the buffered motion (MA-1). Left to the stream,
+// that ack settled nothing and the untracked ledger owed it forever.
+function streamAwaitsTerminalAck(streamer: StreamerState | null): boolean {
+  if (streamer?.status === 'paused' && streamer.inFlight.length === 0) return false;
+  return hasUnsettledStreamAcks(streamer);
 }
 
 export function settleUntrackedAck(
@@ -68,7 +77,7 @@ export function settleUntrackedAck(
     return { owner: 'untracked', motionOperationId: null };
   }
   if (state.pendingUntrackedAcks === 0) return { owner: 'stream' };
-  if (hasUnsettledStreamAcks(state.streamer)) return { owner: 'stream' };
+  if (streamAwaitsTerminalAck(state.streamer)) return { owner: 'stream' };
   const motionOperationId = consumeUntrackedAck(refs);
   set((s) => ({ pendingUntrackedAcks: Math.max(0, s.pendingUntrackedAcks - 1) }));
   return { owner: 'untracked', motionOperationId };

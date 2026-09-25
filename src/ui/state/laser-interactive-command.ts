@@ -1,6 +1,7 @@
 import type { StatusReport } from '../../core/controllers/grbl';
 import type { ControllerEvent } from '../../core/controllers';
-import type { LaserSafetyAction } from './laser-safety-notice';
+import { echoedCommandMatchesLine } from '../../core/controllers/controller-event';
+import { skippedCommandReason, type LaserSafetyAction } from './laser-safety-notice';
 import type { LaserState } from './laser-store';
 import type { TranscriptSource } from './laser-transcript';
 import {
@@ -12,6 +13,15 @@ import {
   type PauseResumeTransitionRefs,
 } from './laser-pause-resume-transition';
 import type { UntrackedAckLedgerRefs } from './laser-untracked-ack-ledger';
+import {
+  cancelControllerResetWait,
+  type ControllerResetWaitRefs,
+} from './laser-controller-reset-wait';
+
+export {
+  observeControllerResetBoundary,
+  waitForControllerResetBoundary,
+} from './laser-controller-reset-wait';
 
 type SetFn = (
   partial: Partial<LaserState> | ((state: LaserState) => Partial<LaserState> | LaserState),
@@ -35,21 +45,14 @@ export type ControllerCommandKind =
   | 'work-z-recovery';
 
 export type ControllerLifecycleRefs = ControllerStatusWaitRefs &
-  PauseResumeTransitionRefs & {
+  PauseResumeTransitionRefs &
+  ControllerResetWaitRefs & {
     controllerCommand: ControllerCommandRequest | null;
     controllerIdleWait: ControllerIdleWaitRequest | null;
-    controllerResetWait?: ControllerResetWaitRequest | null;
     // Serial-session/reset generation. Late transport promises from an older
     // epoch must not mutate the current write/ack ledgers.
     writeEpoch?: number;
   } & UntrackedAckLedgerRefs;
-
-type ControllerResetWaitRequest = {
-  readonly expectedEpoch: number;
-  readonly resolve: () => void;
-  readonly reject: (err: Error) => void;
-  readonly timer: ReturnType<typeof setTimeout>;
-};
 
 type ControllerCommandRequest = {
   readonly kind: ControllerCommandKind;
@@ -65,6 +68,8 @@ type ControllerCommandRequest = {
   timer: ReturnType<typeof setTimeout>;
   acceptingResponses: boolean;
   terminalAckSeen: boolean;
+  /** Set when the controller skipped the command; its `ok` then refuses it. */
+  refusal: string | null;
   sawActiveState: boolean;
   activeCycleSettled: boolean;
   readonly pendingResponses: Array<{
@@ -147,6 +152,7 @@ export function startControllerCommand(
       reject,
       acceptingResponses: false,
       terminalAckSeen: false,
+      refusal: null,
       sawActiveState: false,
       activeCycleSettled: false,
       pendingResponses: [],
@@ -200,10 +206,7 @@ export function consumeControllerCommandResponse(
     return response.kind !== 'status' && response.kind !== 'alarm';
   }
   if (response.kind === 'ok') {
-    request.terminalAckSeen = true;
-    if (request.completion === 'terminal' || request.activeCycleSettled) {
-      finishControllerCommand(refs, request, 'resolve');
-    }
+    acceptTerminalAck(refs, request);
     return true;
   }
   if (rejectCommandFromTerminalResponse(refs, request, response)) return true;
@@ -212,7 +215,37 @@ export function consumeControllerCommandResponse(
     observeCompositeCommandStatus(refs, request, response.report);
     return false;
   }
+  // Marlin prints `echo:busy: processing` every 2 s while a handler waits
+  // (gcode.cpp host_keepalive), e.g. M400 or G28 during a long drain (MA-4).
+  if (response.kind === 'busy') rearmActivityTimeout(refs, request);
+  if (response.kind === 'unknown-command') return noteOwnedUnknownCommand(request, response);
   request.responses.push(rawLine.trim());
+  return true;
+}
+
+function acceptTerminalAck(refs: ControllerLifecycleRefs, request: ControllerCommandRequest): void {
+  request.terminalAckSeen = true;
+  if (request.refusal !== null) {
+    finishControllerCommand(
+      refs,
+      request,
+      'reject',
+      new ControllerCommandRefusedError(request.refusal),
+    );
+  } else if (request.completion === 'terminal' || request.activeCycleSettled) {
+    finishControllerCommand(refs, request, 'resolve');
+  }
+}
+
+// Marlin answers a command its build lacks with an "Unknown command" echo and
+// then an ordinary `ok` for the same line; that `ok` refuses the command
+// (MA-12). An echo naming another command belongs to an earlier line.
+function noteOwnedUnknownCommand(
+  request: ControllerCommandRequest,
+  response: Extract<ControllerEvent, { readonly kind: 'unknown-command' }>,
+): boolean {
+  if (!echoedCommandMatchesLine(response.command, request.command)) return false;
+  request.refusal = skippedCommandReason(response);
   return true;
 }
 
@@ -299,34 +332,6 @@ export function waitForFreshIdle(
   });
 }
 
-export function waitForControllerResetBoundary(
-  refs: ControllerLifecycleRefs,
-  expectedEpoch: number,
-  timeoutMs = DEFAULT_IDLE_TIMEOUT_MS,
-): Promise<void> {
-  if (refs.controllerResetWait != null) {
-    return Promise.reject(new Error('A controller reset-boundary wait is already active.'));
-  }
-  return new Promise((resolve, reject) => {
-    const request: ControllerResetWaitRequest = {
-      expectedEpoch,
-      resolve,
-      reject,
-      timer: setTimeout(() => {
-        finishResetWait(refs, request, 'reject', 'Timed out waiting for controller reboot banner.');
-      }, timeoutMs),
-    };
-    refs.controllerResetWait = request;
-  });
-}
-
-export function observeControllerResetBoundary(refs: ControllerLifecycleRefs): void {
-  const request = refs.controllerResetWait;
-  if (request == null) return;
-  if ((refs.writeEpoch ?? 0) <= request.expectedEpoch) return;
-  finishResetWait(refs, request, 'resolve');
-}
-
 export function observeControllerIdleWait(
   set: SetFn,
   refs: ControllerLifecycleRefs,
@@ -361,8 +366,7 @@ export function cancelControllerLifecycleRefs(
   if (command !== null) finishControllerCommand(refs, command, 'reject', message);
   const idleWait = refs.controllerIdleWait;
   if (idleWait !== null) finishIdleWait(refs, idleWait, 'reject', message);
-  const resetWait = refs.controllerResetWait;
-  if (resetWait != null) finishResetWait(refs, resetWait, 'reject', message);
+  cancelControllerResetWait(refs, message);
   // Reject the encompassing transition first so teardown/Alarm/Stop remains
   // the fail-dark owner; the nested status-wait rejection must not launch a
   // duplicate reset from the transition's uncertainty handler.
@@ -389,8 +393,17 @@ function keepCommandAliveFromStatus(
   request: ControllerCommandRequest,
   report: StatusReport,
 ): void {
-  if (request.timeoutMode !== 'non-idle-status-activity') return;
   if (report.state === 'Idle' || report.state === 'Alarm' || report.state === 'Sleep') return;
+  rearmActivityTimeout(refs, request);
+}
+
+/** An activity-timed command times out only after that long without the
+ * controller showing it is working on it. */
+function rearmActivityTimeout(
+  refs: ControllerLifecycleRefs,
+  request: ControllerCommandRequest,
+): void {
+  if (request.timeoutMode !== 'non-idle-status-activity') return;
   clearTimeout(request.timer);
   request.timer = setTimeout(() => {
     finishControllerCommand(refs, request, 'reject', `${request.label} timed out.`);
@@ -408,19 +421,6 @@ function finishIdleWait(
   clearTimeout(request.timer);
   if (mode === 'resolve') request.resolve();
   else request.reject(new Error(message ?? 'Controller did not report Idle.'));
-}
-
-function finishResetWait(
-  refs: ControllerLifecycleRefs,
-  request: ControllerResetWaitRequest,
-  mode: 'resolve' | 'reject',
-  message?: string,
-): void {
-  if (refs.controllerResetWait !== request) return;
-  refs.controllerResetWait = null;
-  clearTimeout(request.timer);
-  if (mode === 'resolve') request.resolve();
-  else request.reject(new Error(message ?? 'Controller reboot boundary was not observed.'));
 }
 
 function updateOperationIdleReports(

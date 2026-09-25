@@ -192,6 +192,7 @@ function clearConnectionSessionRefs(refs: LiveRefs, preserveConnection: boolean)
   // the dead one must not surface in it (ADR-333).
   clearTranscriptBuffer(refs);
   refs.stallProbe = null;
+  refs.controllerBusyAt = null;
   refs.heartbeatProbe = null;
   refs.controllerCommand = null;
   refs.controllerIdleWait = null;

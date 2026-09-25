@@ -31,19 +31,14 @@ import {
   type LaserSafetyNotice,
 } from './laser-safety-notice';
 import {
+  disconnectStopPlan,
   retainedDisconnectSafetyNotice,
   retainedUnavailableTransportSafetyNotice,
-  safetyNoticeLeavesPhysicalStopUncertain,
   unconfirmedDisconnectStopNotice,
   withRetainedDisconnectSafety,
 } from './laser-disconnect-safety';
 import { disconnectedStatePatch } from './laser-disconnected-state';
-import {
-  buildPortClosePatch,
-  disconnectStopCommands,
-  initialLaserState,
-  pushLog,
-} from './laser-store-helpers';
+import { buildPortClosePatch, initialLaserState, pushLog } from './laser-store-helpers';
 import {
   containActiveStreamWriteFailure,
   containLostStreamHeartbeat,
@@ -352,18 +347,7 @@ async function stopBeforeDisconnect(
     await runGrblDisconnectTransaction(set, refs, safeWrite);
     return;
   }
-  const state = get();
-  const ordinaryStopCommands = disconnectStopCommands(state, refs.driver);
-  const stopCommands =
-    ordinaryStopCommands.length === 0 &&
-    state.safetyNotice !== null &&
-    safetyNoticeLeavesPhysicalStopUncertain(state.safetyNotice)
-      ? [
-          ...(refs.driver.realtime.softReset === null ? [] : [refs.driver.realtime.softReset]),
-          ...refs.driver.commands.stopLaserLines.map((line) => `${line}\n`),
-        ]
-      : ordinaryStopCommands;
-  for (const stopCommand of stopCommands) {
+  for (const stopCommand of disconnectStopPlan(get(), refs.driver).commands) {
     await safeWrite(stopCommand, 'disconnect');
   }
 }

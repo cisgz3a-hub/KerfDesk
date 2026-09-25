@@ -107,7 +107,7 @@ function inboundKind(response: ControllerEvent): TranscriptKind {
   if (response.kind === 'error') return 'error';
   if (response.kind === 'alarm') return 'alarm';
   if (response.kind === 'setting') return 'setting';
-  if (response.kind === 'message') return 'message';
+  if (response.kind === 'message' || response.kind === 'unknown-command') return 'message';
   if (response.kind === 'welcome') return 'welcome';
   return 'unknown';
 }

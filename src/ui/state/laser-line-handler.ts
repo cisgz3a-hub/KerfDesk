@@ -51,6 +51,7 @@ import { forgetAlarmBeforeBanner, takeAlarmBeforeBanner } from './laser-reset-al
 import { handleAlarmLine } from './laser-alarm-line';
 import { handleStatusLine, originUnknownAfterControllerReset } from './laser-status-line';
 import { settleUntrackedAck, streamOwnsTerminalAck } from './laser-stream-ack';
+import { noteStreamUnknownCommand, takeStreamUnknownCommand } from './laser-unknown-command';
 import { flushStreamAcksBefore, routeStreamAck } from './laser-stream-ack-batch';
 import type { LaserState } from './laser-store';
 import { emptyControllerBuildInfoState } from './laser-controller-build-info';
@@ -122,23 +123,45 @@ function handleNonBannerLine(
     return;
   }
   if (cls.kind === 'error') {
-    handleErrorLine(
-      set,
-      get,
-      refs,
-      safeWrite,
-      cls.code,
-      cls.raw,
-      ackSettlement,
-      commandConsumed ? ownedCommandLine : undefined,
-    );
+    const rejection = { code: cls.code, raw: cls.raw, halted: cls.halted === true };
+    const ownedLine = commandConsumed ? ownedCommandLine : undefined;
+    handleErrorLine(set, get, refs, safeWrite, rejection, ackSettlement, ownedLine);
     return;
   }
-  // Marlin "echo:busy:" — the controller is alive but not ready; explicitly
-  // NOT an ack, so the streamer must not advance.
-  if (cls.kind === 'busy') return;
   if (cls.kind === 'resend') {
     handleResendLine(set, get, refs, safeWrite, cls.line);
+    return;
+  }
+  handleProgressLine(set, get, refs, safeWrite, cls, ackSettlement, state);
+}
+
+// Acknowledgements and the lines that report on the one in flight.
+function handleProgressLine(
+  set: SetFn,
+  get: GetFn,
+  refs: HandlerRefs,
+  safeWrite: SafeWriteFn,
+  cls: ControllerEvent,
+  ackSettlement: AckSettlement,
+  state: LaserState,
+): void {
+  // Marlin "echo:busy:" — the controller is alive but not ready; explicitly
+  // NOT an ack, so the streamer must not advance. It still proves the line the
+  // stream waits on is being worked on (MA-9).
+  if (cls.kind === 'busy') {
+    refs.controllerBusyAt = Date.now();
+    return;
+  }
+  if (cls.kind === 'unknown-command') {
+    noteStreamUnknownCommand(refs, state, cls);
+    return;
+  }
+  // The `ok` Marlin sends for a job line it skipped (MA-12).
+  const skipped =
+    cls.kind === 'ok' && ackSettlement.owner === 'stream' ? takeStreamUnknownCommand(refs) : null;
+  if (skipped !== null) {
+    const rejection = { code: null, raw: skipped.raw, skipped };
+    handleErrorLine(set, get, refs, safeWrite, rejection, ackSettlement);
     return;
   }
   routeAcknowledgement(set, get, refs, safeWrite, cls.kind, ackSettlement, state.motionOperation);
