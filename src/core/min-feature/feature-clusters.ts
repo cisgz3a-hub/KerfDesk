@@ -3,6 +3,12 @@
 // flagged pieces that follow each other along a path (around a small round
 // hole each witness pairs different pieces), so pieces are joined with
 // union-find; each feature keeps its narrowest witness.
+//
+// The speck filter drops short features only when every witness is local to
+// one stretch of one path (a hair spike, a pixel notch). A PINCH — a witness
+// between two different paths, or between two parts of one path far apart
+// along it — is never dropped however short: two holes or two parts meeting
+// tip to tip span one chord, and the narrower the pinch the worse it is.
 
 import type { Vec2 } from '../scene';
 
@@ -30,6 +36,7 @@ export type WitnessChord = {
 };
 
 type Best = {
+  pinch: boolean;
   width: number;
   x: number;
   y: number;
@@ -41,6 +48,7 @@ type Best = {
 
 function merged(into: Best | undefined, from: Best): Best {
   if (into === undefined) return { ...from };
+  into.pinch = into.pinch || from.pinch;
   if (from.width < into.width) {
     into.width = from.width;
     into.x = from.x;
@@ -58,12 +66,14 @@ export class FeatureClusters {
   private readonly best = new Map<number, Best>();
   private readonly flagged = new Set<number>();
 
-  /** One witness: pieces p and q, chord ends P and Q, chord length `width`. */
-  record(p: number, q: number, width: number, chord: WitnessChord): void {
+  /** One witness: pieces p and q, chord ends P and Q, chord length `width`;
+   * `pinch` when the pieces are on different paths or far apart along one. */
+  record(p: number, q: number, width: number, chord: WitnessChord, pinch: boolean): void {
     this.union(p, q);
     this.flagged.add(p);
     this.flagged.add(q);
     const witness = {
+      pinch,
       width,
       x: (chord.px + chord.qx) / 2,
       y: (chord.py + chord.qy) / 2,
@@ -84,8 +94,8 @@ export class FeatureClusters {
     }
   }
 
-  /** Features whose witness chords span at least `minExtent` (the diagonal
-   * of their bounding box), narrowest first. */
+  /** Pinches, and other features whose witness chords span at least
+   * `minExtent` (the diagonal of their bounding box), narrowest first. */
   findings(minExtent: number): MinFeatureFindings {
     const features = new Map<number, Best>();
     for (const [piece, best] of this.best) {
@@ -94,6 +104,7 @@ export class FeatureClusters {
     }
     const kept = [...features.values()].filter(
       (feature) =>
+        feature.pinch ||
         Math.hypot(feature.maxX - feature.minX, feature.maxY - feature.minY) >= minExtent,
     );
     // Widths equal to a nanometre read as ties, so ties list left to right.

@@ -133,6 +133,64 @@ describe('checkProjectMinimumFeatures', () => {
     );
   });
 
+  it('checks only the edge of a traced double-line ring that the CNC profile machines', () => {
+    // A drawn line traced as a ring: a 30 mm square outer edge and an inner
+    // edge 1 mm in. Compile keeps one edge for a 3 mm bit (ADR-218), so there
+    // is no 1 mm band to warn about.
+    const ring = [rectangle(0, 0, 30, 30), rectangle(1, 1, 28, 28)];
+    for (const cutType of ['profile-on-path', 'profile-inside'] as const) {
+      const [report] = checkProjectMinimumFeatures(cncProject(cutType, ring));
+      expect(report?.analysis.widths.count).toBe(0);
+      expect(report?.analysis.gaps.count).toBe(0);
+    }
+    // Asked to machine both edges, the band is there and is reported.
+    const both = cncProject('profile-inside', ring);
+    const layers = both.scene.layers.map((layer) => ({
+      ...layer,
+      cnc: { ...DEFAULT_CNC_LAYER_SETTINGS, ...layer.cnc, lineArtContours: 'both' as const },
+    }));
+    const [report] = checkProjectMinimumFeatures({ ...both, scene: { ...both.scene, layers } });
+    expect(report?.analysis.widths.count).toBe(1);
+    expect(report?.analysis.widths.minWidthMm).toBeCloseTo(1, 9);
+  });
+
+  it('treats a plain Line operation as an assumed cut, and Kerf Offset, tabs or passes as declared', () => {
+    const intent = (layer: Partial<Layer>): string | undefined =>
+      checkProjectMinimumFeatures(
+        laserProject({ mode: 'line', ...layer }, stencilPolylines(0.1)),
+      )[0]?.cutIntent;
+    expect(intent({})).toBe('assumed');
+    expect(intent({ kerfOffsetMm: 0.075 })).toBe('declared');
+    expect(intent({ tabsEnabled: true })).toBe('declared');
+    expect(intent({ passes: 2 })).toBe('declared');
+    const fresh = checkProjectMinimumFeatures(
+      laserProject({ mode: 'line' }, stencilPolylines(0.1)),
+      { objectIds: new Set(['stencil']), declaredCutsOnly: true },
+    );
+    expect(fresh).toEqual([]);
+  });
+
+  it('keeps objects cut at the same kerf from different sources apart', () => {
+    const base = laserProject({ mode: 'line', kerfOffsetMm: 0.075 }, stencilPolylines(0.1));
+    const [first] = base.scene.objects;
+    if (first === undefined) throw new Error('fixture');
+    const overridden: SceneObject = {
+      ...artwork('copy', 'cut', stencilPolylines(0.1)),
+      operationOverride: { kerfOffsetMm: 0, passes: 2 },
+    };
+    for (const objects of [
+      [first, overridden],
+      [overridden, first],
+    ]) {
+      const reports = checkProjectMinimumFeatures({ ...base, scene: { ...base.scene, objects } });
+      expect(reports.map((report) => report.widthSource).sort()).toEqual([
+        'default-kerf',
+        'kerf-offset',
+      ]);
+      for (const report of reports) expect(report.request.thresholdMm).toBeCloseTo(0.15, 12);
+    }
+  });
+
   it('shares one budget across operations and marks the rest unchecked', () => {
     const project = laserProject({ mode: 'line', kerfOffsetMm: 0.075 }, stencilPolylines(0.1));
     const [report] = checkProjectMinimumFeatures(project, {

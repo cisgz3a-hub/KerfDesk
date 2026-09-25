@@ -16,7 +16,8 @@
 // every shape, or between open lines, is a narrow GAP (the cuts on each side
 // merge, or an outside cut cannot fit). Witnesses that share a piece, or sit
 // on consecutive pieces of one path, are one feature; features shorter than
-// half the threshold are dropped as specks. Work is counted, so a huge job
+// half the threshold are dropped as specks unless they pinch two paths (or
+// two far-apart parts of one path) together. Work is counted, so a huge job
 // stops early and says so.
 
 import {
@@ -71,6 +72,10 @@ const TOUCH_EPSILON_MM = 1e-9;
  * pixel notch), not parts, bridges or gaps. A small round hole still spans
  * its own diameter, so half the threshold keeps every hole the check is for. */
 export const MIN_EXTENT_FACTOR = 0.5;
+/** A witness between two points of one path at least this many thresholds
+ * apart along it is a pinch, never a speck: a speck's witnesses stay within
+ * about one threshold of boundary around its tip. */
+const PINCH_ARC_FACTOR = 2;
 
 type Witness = {
   readonly px: number;
@@ -171,7 +176,10 @@ class PairScanner {
     if (closest.distSq >= this.thresholdSq) return true;
     const distance = Math.sqrt(closest.distSq);
     if (distance <= TOUCH_EPSILON_MM) return true;
-    if (this.areNeighbours(p, q, closest.s, closest.t, distance)) return true;
+    const arc = this.arcBetween(p, q, closest.s, closest.t);
+    // Closer along one path than going around the witness disk takes: the
+    // same edge or a corner.
+    if (arc < NEIGHBOUR_ARC_FACTOR * distance) return true;
     const px = ax + (num(index.bx, p) - ax) * closest.s;
     const py = ay + (num(index.by, p) - ay) * closest.s;
     const qx = cx + (num(index.bx, q) - cx) * closest.t;
@@ -183,7 +191,8 @@ class PairScanner {
     const material = this.isMaterial(p, q, witness, distance / 2);
     if (material === null) return false;
     const clusters = material ? this.widthsIfRequested() : this.gapsIfRequested();
-    clusters?.record(p, q, distance, { px, py, qx, qy });
+    const pinch = arc >= PINCH_ARC_FACTOR * this.request.thresholdMm;
+    clusters?.record(p, q, distance, { px, py, qx, qy }, pinch);
     return true;
   }
 
@@ -195,10 +204,12 @@ class PairScanner {
     return this.request.checkGaps ? this.gaps : null;
   }
 
-  private areNeighbours(p: number, q: number, s: number, t: number, distance: number): boolean {
+  /** Boundary length between the chord ends along their path (the shorter
+   * way round a closed one); Infinity when they are on different paths. */
+  private arcBetween(p: number, q: number, s: number, t: number): number {
     const index = this.index;
     const path = num(index.path, p);
-    if (path !== index.path[q]) return false;
+    if (path !== index.path[q]) return Infinity;
     const along = (piece: number, fraction: number): number => {
       const length = Math.hypot(
         num(index.bx, piece) - num(index.ax, piece),
@@ -206,9 +217,8 @@ class PairScanner {
       );
       return num(index.s0, piece) + length * fraction;
     };
-    let arc = Math.abs(along(p, s) - along(q, t));
-    if (index.pathClosed[path] === true) arc = Math.min(arc, num(index.pathLength, path) - arc);
-    return arc < NEIGHBOUR_ARC_FACTOR * distance;
+    const arc = Math.abs(along(p, s) - along(q, t));
+    return index.pathClosed[path] === true ? Math.min(arc, num(index.pathLength, path) - arc) : arc;
   }
 
   private isMaterial(p: number, q: number, witness: Witness, half: number): boolean | null {

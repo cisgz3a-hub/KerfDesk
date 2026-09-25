@@ -203,4 +203,100 @@ describe('analyzeMinimumFeatures', () => {
     );
     expect(result.complete).toBe(false);
   });
+
+  it('reports a pinch between two paths however narrow it is', () => {
+    const diamond = (cx: number, r: number): MinFeaturePath => ({
+      closed: true,
+      points: [
+        { x: cx + r, y: 10 },
+        { x: cx, y: 10 + r },
+        { x: cx - r, y: 10 },
+        { x: cx, y: 10 - r },
+      ],
+    });
+    for (const pinch of [0.1, 0.05, 0.005]) {
+      // Two diamond holes in a sheet, tip to tip: the bridge between them
+      // narrows to `pinch`, a single chord long.
+      const holes = [rect(0, 0, 30, 20), diamond(10, 5), diamond(20 + pinch, 5)];
+      const stencilResult = analyzeMinimumFeatures(holes, { thresholdMm: 0.15, ...BOTH });
+      expect(stencilResult.widths.count).toBe(1);
+      expect(stencilResult.widths.minWidthMm).toBeCloseTo(pinch, 9);
+      expect(stencilResult.gaps.count).toBe(0);
+      // The same diamonds as two parts: the gap between their tips.
+      const parts = [diamond(10, 5), diamond(20 + pinch, 5)];
+      const partsResult = analyzeMinimumFeatures(parts, { thresholdMm: 0.15, ...BOTH });
+      expect(partsResult.gaps.count).toBe(1);
+      expect(partsResult.gaps.minWidthMm).toBeCloseTo(pinch, 9);
+    }
+    const corners = analyzeMinimumFeatures([rect(0, 0, 10, 10), rect(10.025, 10.025, 20, 20)], {
+      thresholdMm: 0.15,
+      ...BOTH,
+    });
+    expect(corners.gaps.count).toBe(1);
+    expect(corners.gaps.minWidthMm).toBeCloseTo(Math.SQRT2 * 0.025, 9);
+  });
+
+  it('still drops a hair spike shorter than half the kerf', () => {
+    const spiked: MinFeaturePath = {
+      closed: true,
+      points: [
+        { x: 0, y: 0 },
+        { x: 10, y: 0 },
+        { x: 10, y: 10 },
+        { x: 5.01, y: 10 },
+        { x: 5, y: 10.06 },
+        { x: 4.99, y: 10 },
+        { x: 0, y: 10 },
+      ],
+    };
+    const result = analyzeMinimumFeatures([spiked], { thresholdMm: 0.15, ...BOTH });
+    expect(result.widths.count).toBe(0);
+    expect(result.gaps.count).toBe(0);
+  });
+
+  it('reads a stacked copy of an outline as one outline', () => {
+    // The copy starts at another corner and runs the other way.
+    const copy: MinFeaturePath = {
+      closed: true,
+      points: [
+        { x: 10, y: 10 },
+        { x: 10, y: 0 },
+        { x: 0, y: 0 },
+        { x: 0, y: 10 },
+      ],
+    };
+    const result = analyzeMinimumFeatures([rect(0, 0, 10, 10), copy, rect(10.1, 0, 20, 10)], {
+      thresholdMm: 0.15,
+      ...BOTH,
+    });
+    expect(result.widths.count).toBe(0);
+    expect(result.gaps.count).toBe(1);
+    expect(result.gaps.minWidthMm).toBeCloseTo(0.1, 9);
+  });
+
+  it('checks a sheet of thousands of small parts within the default budget', () => {
+    // 60 x 60 pairs of parts 0.1 mm apart over 300 mm, loose and cut from a
+    // sheet: every gap (loose) or bridge (sheet) is found and the check
+    // completes. A ray per part along a whole grid row used to exhaust the
+    // budget after about 1,000 of the 3,600.
+    const parts: MinFeaturePath[] = [];
+    for (let i = 0; i < 60; i += 1) {
+      for (let j = 0; j < 60; j += 1) {
+        parts.push(rect(i * 5, j * 5, i * 5 + 2, j * 5 + 2));
+        parts.push(rect(i * 5 + 2.1, j * 5, i * 5 + 4, j * 5 + 2));
+      }
+    }
+    const loose = analyzeMinimumFeatures(parts, { thresholdMm: 0.15, ...BOTH });
+    expect(loose.complete).toBe(true);
+    expect(loose.gaps.count).toBe(3600);
+    expect(loose.widths.count).toBe(0);
+    const sheet = analyzeMinimumFeatures([rect(-1, -1, 301, 301), ...parts], {
+      thresholdMm: 0.15,
+      ...BOTH,
+    });
+    expect(sheet.complete).toBe(true);
+    expect(sheet.widths.count).toBe(3600);
+    expect(sheet.gaps.count).toBe(0);
+    expect(sheet.work.pairTests).toBeLessThan(1_500_000);
+  });
 });

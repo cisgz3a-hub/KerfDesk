@@ -8,14 +8,15 @@ export type MinFeatureBudget = {
   /** Path pieces indexed for the proximity search (at most two search
    * radii of cut length each). Bounds memory and index build time. */
   readonly maxPieces: number;
-  /** Candidate piece pairs, witness-disk probes and side-deciding ray
-   * crossings. Bounds the search time. */
+  /** Candidate piece pairs, witness-disk probes, and the path boxes, grid
+   * cells and edges the side-deciding rays touch. Bounds the search time. */
   readonly maxPairTests: number;
 };
 
-// Sized so a dense traced job finishes in well under a second on a laptop:
-// the owl test image traced with Line Art at 100 mm wide is 190,248 pieces and
-// 2,785,484 tests (0.4 s warm); see ADR-408 for the measurements.
+// Sized so a dense traced job finishes well inside it: the owl test image
+// traced with Line Art at 100 mm wide is 142,448 pieces and 2,211,282 tests
+// (about 0.6 s on a loaded laptop). A job that spends all of it takes up to
+// about 1.5 s; see ADR-408 for the measurements.
 export const DEFAULT_MIN_FEATURE_BUDGET: MinFeatureBudget = {
   maxPieces: 500_000,
   maxPairTests: 4_000_000,

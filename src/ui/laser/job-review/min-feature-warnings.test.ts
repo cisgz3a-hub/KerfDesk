@@ -25,6 +25,7 @@ import { buildJobReviewModel } from './job-review-model';
 import {
   detectMinFeatureWarnings,
   formatFeatureMm,
+  minFeatureReportsFor,
   minFeatureWarnings,
 } from './min-feature-warnings';
 
@@ -82,11 +83,37 @@ describe('minFeatureWarnings', () => {
     expect(warning).toContain('; also at ');
   });
 
-  it('says the kerf is assumed when nothing sets it', () => {
+  it('gives a plain Line operation one optional line, without positions or a setting to change', () => {
     const reports = checkProjectMinimumFeatures(project(stencil(0.1), { mode: 'line' }));
-    expect(minFeatureWarnings(reports)[0]).toContain(
-      'the 0.15 mm kerf (assumed; set Kerf Offset to half your measured kerf)',
+    expect(minFeatureWarnings(reports)).toEqual([
+      'Layer "Cut", only if it cuts through: 3 parts narrower than the 0.15 mm kerf ' +
+        '(a typical kerf), narrowest 0.1 mm. Ignore this if the layer scores or engraves.',
+    ]);
+  });
+
+  it('warns in full about a declared cut whose kerf is the typical default', () => {
+    const reports = checkProjectMinimumFeatures(
+      project(stencil(0.1), { mode: 'line', tabsEnabled: true }),
     );
+    const [warning] = minFeatureWarnings(reports);
+    expect(warning).toContain(
+      'Layer "Cut": 3 parts narrower than the 0.15 mm kerf (a typical kerf)',
+    );
+    expect(warning).toContain('narrowest 0.1 mm at X ');
+    expect(warning).not.toContain('Kerf Offset');
+  });
+
+  it('gives positions only for an Absolute job', () => {
+    const declared = project(stencil(0.1), { mode: 'line', kerfOffsetMm: 0.075 });
+    expect(detectMinFeatureWarnings(declared)[0]).toContain(' at X ');
+    expect(
+      detectMinFeatureWarnings(declared, { startFrom: 'absolute', anchor: 'front-left' })[0],
+    ).toContain(' at X ');
+    for (const startFrom of ['user-origin', 'verified-origin'] as const) {
+      const [warning] = detectMinFeatureWarnings(declared, { startFrom, anchor: 'front-left' });
+      expect(warning).toContain('narrowest 0.1 mm.');
+      expect(warning).not.toContain(' at X ');
+    }
   });
 
   it('warns about nothing for wide bridges or for a Fill operation', () => {
@@ -103,9 +130,9 @@ describe('minFeatureWarnings', () => {
     expect(minFeatureWarnings(reports).at(-1)).toMatch(/^Layer "Cut" was only partly checked/);
   });
 
-  it('reuses the result for the same prepared project', () => {
+  it('reuses the check for the same prepared project', () => {
     const prepared = project(stencil(0.1), { mode: 'line' });
-    expect(detectMinFeatureWarnings(prepared)).toBe(detectMinFeatureWarnings(prepared));
+    expect(minFeatureReportsFor(prepared)).toBe(minFeatureReportsFor(prepared));
   });
 
   it('formats feature widths to the hundredth', () => {

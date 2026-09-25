@@ -21,10 +21,18 @@ const UNCHECKED: MinFeatureAnalysis = {
 
 export function checkProjectMinimumFeatures(
   project: Project,
-  options: { readonly objectIds?: ReadonlySet<string>; readonly budget?: MinFeatureBudget } = {},
+  options: {
+    readonly objectIds?: ReadonlySet<string>;
+    readonly budget?: MinFeatureBudget;
+    /** Skip laser Line operations whose settings do not say they cut through. */
+    readonly declaredCutsOnly?: boolean;
+  } = {},
 ): ReadonlyArray<MinFeatureReport> {
   const remaining = { ...(options.budget ?? DEFAULT_MIN_FEATURE_BUDGET) };
-  return minFeatureTargets(project, options.objectIds).map(({ paths, ...target }) => {
+  const targets = minFeatureTargets(project, options.objectIds).filter(
+    (target) => options.declaredCutsOnly !== true || target.cutIntent === 'declared',
+  );
+  return targets.map(({ paths, ...target }) => {
     if (remaining.maxPieces <= 0 || remaining.maxPairTests <= 0) {
       return { ...target, analysis: UNCHECKED };
     }

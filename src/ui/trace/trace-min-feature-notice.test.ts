@@ -36,13 +36,15 @@ const traced: TracedImage = {
   paths: [{ color: '#ff0000', polylines: [line(10), line(10.1)] }],
 };
 
-function projectWith(mode: LayerMode): Project {
+function projectWith(mode: LayerMode, kerfOffsetMm = 0.075): Project {
   return {
     ...createProject(HEADLESS_DEVICE),
     scene: {
       ...EMPTY_SCENE,
       objects: [traced],
-      layers: [{ ...createLayer({ id: 'red', color: '#ff0000' }), name: 'Trace', mode }],
+      layers: [
+        { ...createLayer({ id: 'red', color: '#ff0000' }), name: 'Trace', mode, kerfOffsetMm },
+      ],
     },
   };
 }
@@ -52,13 +54,17 @@ describe('traceMinFeatureNotice', () => {
     const notice = traceMinFeatureNotice(projectWith('line'), 'trace-1');
     expect(notice).toBe(
       'The trace on "Trace" has 1 gap narrower than the 0.15 mm kerf (narrowest 0.1 mm) — it ' +
-        'will burn away or merge when cut. Job Review lists where; enlarge or simplify the ' +
+        'will burn away or merge when cut. Job Review lists them; enlarge or simplify the ' +
         'trace to keep them.',
     );
   });
 
   it('stays quiet for an engraved (Fill) trace', () => {
     expect(traceMinFeatureNotice(projectWith('fill'), 'trace-1')).toBeNull();
+  });
+
+  it('stays quiet on a plain Line operation, which usually scores or engraves', () => {
+    expect(traceMinFeatureNotice(projectWith('line', 0), 'trace-1')).toBeNull();
   });
 
   it('runs after the commit and skips a trace that is gone', () => {

@@ -8,6 +8,7 @@
 
 import type { Vec2 } from '../scene';
 import type { MinFeatureWorkMeter } from './feature-budget';
+import { StackedOutlines } from './stacked-outlines';
 
 export type MinFeaturePath = {
   readonly points: ReadonlyArray<Vec2>;
@@ -29,6 +30,19 @@ export type PieceIndex = {
   readonly pathLength: Float64Array;
   /** Shoelace signed area of each closed path (0 for open paths). */
   readonly pathArea: Float64Array;
+  /** Bounding box of each path. */
+  readonly pathMinX: Float64Array;
+  readonly pathMinY: Float64Array;
+  readonly pathMaxX: Float64Array;
+  readonly pathMaxY: Float64Array;
+  /** The path's own segments (before splitting into pieces) are
+   * seg*[segStart[path] .. segStart[path + 1]): a crossing count against a
+   * long straight edge costs one test, not one per piece. */
+  readonly segStart: Int32Array;
+  readonly segAx: Float64Array;
+  readonly segAy: Float64Array;
+  readonly segBx: Float64Array;
+  readonly segBy: Float64Array;
   readonly cellSize: number;
   readonly minX: number;
   readonly minY: number;
@@ -99,11 +113,13 @@ function planPaths(
   meter: MinFeatureWorkMeter,
 ): { readonly plans: PathPlan[]; readonly complete: boolean } {
   const plans: PathPlan[] = [];
+  const stacked = new StackedOutlines();
   for (const path of paths) {
     const segments = pathSegments(path);
     if (segments.length === 0) continue;
     // A closed path needs at least a triangle to enclose anything.
     const closed = path.closed && segments.length >= 3;
+    if (closed && stacked.isCopy(segments.map((segment) => segment.a))) continue;
     let pieces = 0;
     for (const segment of segments) pieces += piecesFor(segment, maxPieceLength);
     if (!meter.takePieces(pieces)) return { plans, complete: false };
@@ -138,10 +154,22 @@ export function buildPieceIndex(
   const total = plans.reduce((sum, plan) => sum + plan.pieces, 0);
   const index = allocate(plans, total, radius, complete);
   let next = 0;
+  let nextSegment = 0;
   plans.forEach((plan, pathIndex) => {
     index.pathStart[pathIndex] = next;
+    index.segStart[pathIndex] = nextSegment;
+    const box = { minX: Infinity, minY: Infinity, maxX: -Infinity, maxY: -Infinity };
     let arc = 0;
     for (const segment of plan.segments) {
+      index.segAx[nextSegment] = segment.a.x;
+      index.segAy[nextSegment] = segment.a.y;
+      index.segBx[nextSegment] = segment.b.x;
+      index.segBy[nextSegment] = segment.b.y;
+      nextSegment += 1;
+      box.minX = Math.min(box.minX, segment.a.x, segment.b.x);
+      box.minY = Math.min(box.minY, segment.a.y, segment.b.y);
+      box.maxX = Math.max(box.maxX, segment.a.x, segment.b.x);
+      box.maxY = Math.max(box.maxY, segment.a.y, segment.b.y);
       const count = piecesFor(segment, pieceLength);
       const dx = (segment.b.x - segment.a.x) / count;
       const dy = (segment.b.y - segment.a.y) / count;
@@ -159,7 +187,12 @@ export function buildPieceIndex(
     }
     index.pathLength[pathIndex] = arc;
     index.pathArea[pathIndex] = plan.closed ? signedArea(plan.segments) : 0;
+    index.pathMinX[pathIndex] = box.minX;
+    index.pathMinY[pathIndex] = box.minY;
+    index.pathMaxX[pathIndex] = box.maxX;
+    index.pathMaxY[pathIndex] = box.maxY;
   });
+  index.segStart[plans.length] = nextSegment;
   return withCells(index);
 }
 
@@ -180,6 +213,7 @@ function allocate(
   );
   const cols = Math.floor(spanX / cellSize) + 1;
   const rows = Math.floor(spanY / cellSize) + 1;
+  const segments = plans.reduce((sum, plan) => sum + plan.segments.length, 0);
   return {
     count: total,
     ax: new Float64Array(total),
@@ -192,6 +226,15 @@ function allocate(
     pathClosed: plans.map((plan) => plan.closed),
     pathLength: new Float64Array(plans.length),
     pathArea: new Float64Array(plans.length),
+    pathMinX: new Float64Array(plans.length),
+    pathMinY: new Float64Array(plans.length),
+    pathMaxX: new Float64Array(plans.length),
+    pathMaxY: new Float64Array(plans.length),
+    segStart: new Int32Array(plans.length + 1),
+    segAx: new Float64Array(segments),
+    segAy: new Float64Array(segments),
+    segBx: new Float64Array(segments),
+    segBy: new Float64Array(segments),
     cellSize,
     minX,
     minY,
