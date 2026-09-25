@@ -7,6 +7,7 @@ import type { Vec2 } from '../../scene';
 import { runTraceSteps, type TraceSteps } from '../trace-steps';
 import { EndpointGrid } from './endpoint-grid';
 import { pointAtArcDistance } from './polyline-window';
+import { arcLength } from './spur-pruning';
 import type { StrokeGraph } from './stroke-graph';
 
 /** A chain being assembled: mutable point list + liveness. */
@@ -47,19 +48,29 @@ export function* pairThroughJunctionsSteps(chains: Chain[], graph: StrokeGraph):
  *  bridge (both within ~35° of the bridge direction) may merge from up to
  *  `joinGapPx × alignedFactor` away — an aligned continuation is almost
  *  always the same drawn line interrupted by detection dropout, while a
- *  perpendicular weld almost never is. */
-export function bridgeNearbyEnds(chains: Chain[], joinGapPx: number, alignedFactor = 1): void {
-  runTraceSteps(bridgeNearbyEndsSteps(chains, joinGapPx, alignedFactor));
+ *  perpendicular weld almost never is.
+ *  When `pieceGapRatio` > 0, a gap bridges only while both pieces are more
+ *  than that many times longer than it: a dropout splits one long stroke
+ *  into long pieces, while a dashed or stitched line is short pieces
+ *  separated by deliberate gaps (ADR-397). */
+export function bridgeNearbyEnds(
+  chains: Chain[],
+  joinGapPx: number,
+  alignedFactor = 1,
+  pieceGapRatio = 0,
+): void {
+  runTraceSteps(bridgeNearbyEndsSteps(chains, joinGapPx, alignedFactor, pieceGapRatio));
 }
 
 export function* bridgeNearbyEndsSteps(
   chains: Chain[],
   joinGapPx: number,
   alignedFactor = 1,
+  pieceGapRatio = 0,
 ): TraceSteps<void> {
   if (joinGapPx <= 0) return;
   for (;;) {
-    const pair = yield* nearestBridgeableEndsSteps(chains, joinGapPx, alignedFactor);
+    const pair = yield* nearestBridgeableEndsSteps(chains, joinGapPx, alignedFactor, pieceGapRatio);
     if (pair === null) return;
     mergeEnds(pair[0], pair[1]);
   }
@@ -147,9 +158,19 @@ function* nearestBridgeableEndsSteps(
   chains: ReadonlyArray<Chain>,
   joinGapPx: number,
   alignedFactor: number,
+  pieceGapRatio: number,
 ): TraceSteps<readonly [ChainEnd, ChainEnd] | null> {
   const cooperate = yield;
   const ends = collectOpenEnds(chains);
+  const lengths = new Map<Chain, number>();
+  const lengthOf = (chain: Chain): number => {
+    let length = lengths.get(chain);
+    if (length === undefined) {
+      length = arcLength(chain.points);
+      lengths.set(chain, length);
+    }
+    return length;
+  };
   let best: readonly [ChainEnd, ChainEnd] | null = null;
   let bestDist = joinGapPx * Math.max(1, alignedFactor);
   const grid = EndpointGrid.create(ends.map(endPoint), bestDist);
@@ -165,6 +186,8 @@ function* nearestBridgeableEndsSteps(
       const forward = bridgeForwardness(a, b);
       if (forward === null) continue;
       if (!passesBridgeTier(d, joinGapPx, alignedFactor, forward)) continue;
+      if (pieceGapRatio > 0 && d * pieceGapRatio >= Math.min(lengthOf(a.chain), lengthOf(b.chain)))
+        continue;
       bestDist = d;
       best = [a, b];
     }

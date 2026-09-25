@@ -221,6 +221,51 @@ function generateBezier(
   const { start: t1, end: t2, canSplit } = tangents;
   const p0 = points[first] as Vec2;
   const p3 = points[last] as Vec2;
+  const lineX = p3.x - p0.x;
+  const lineY = p3.y - p0.y;
+  const chord = Math.hypot(lineX, lineY);
+  const arms = solveTangentArms(points, first, last, u, t1, t2);
+  let armL = arms.start;
+  let armR = arms.end;
+  // Degenerate arms fall back to Wu/Barsky's chord/3. The recursive trace
+  // fit also rejects overlapping chord projections, which can hide loops
+  // between its sparse samples (Paper.js PathFitter's heuristic), then splits
+  // and refits when chord/3 misses tolerance. A single-cubic node-edit fit
+  // cannot split: valid smooth arches may need overlapping projections, so
+  // applying that heuristic there would flatten the retained curve.
+  if (
+    armL < MIN_ARM_FRACTION * chord ||
+    armR < MIN_ARM_FRACTION * chord ||
+    (canSplit &&
+      (t1.x * lineX + t1.y * lineY) * armL - (t2.x * lineX + t2.y * lineY) * armR > chord * chord)
+  ) {
+    armL = chord / 3;
+    armR = chord / 3;
+  }
+  return {
+    p0,
+    p1: { x: p0.x + t1.x * armL, y: p0.y + t1.y * armL },
+    p2: { x: p3.x + t2.x * armR, y: p3.y + t2.y * armR },
+    p3,
+  };
+}
+
+/** Schneider's least-squares core, shared with the centreline stroke fit
+ *  (ADR-397): with P1 = P0 + a·t1 and P2 = P3 + b·t2 (t2 pointing back from
+ *  the last point), the arm lengths a, b minimising the squared parametric
+ *  residual of points[first..last] at parameters `u` solve a 2x2 system.
+ *  Returns the raw solution (0, 0 when singular); callers apply their own
+ *  degeneracy guards. */
+export function solveTangentArms(
+  points: ReadonlyArray<Vec2>,
+  first: number,
+  last: number,
+  u: ReadonlyArray<number>,
+  t1: Vec2,
+  t2: Vec2,
+): { readonly start: number; readonly end: number } {
+  const p0 = points[first] as Vec2;
+  const p3 = points[last] as Vec2;
   let c00 = 0;
   let c01 = 0;
   let c11 = 0;
@@ -246,32 +291,8 @@ function generateBezier(
     x1 += a1x * rx + a1y * ry;
   }
   const det = c00 * c11 - c01 * c01;
-  const lineX = p3.x - p0.x;
-  const lineY = p3.y - p0.y;
-  const chord = Math.hypot(lineX, lineY);
-  let armL = det !== 0 ? (x0 * c11 - x1 * c01) / det : 0;
-  let armR = det !== 0 ? (c00 * x1 - c01 * x0) / det : 0;
-  // Degenerate arms fall back to Wu/Barsky's chord/3. The recursive trace
-  // fit also rejects overlapping chord projections, which can hide loops
-  // between its sparse samples (Paper.js PathFitter's heuristic), then splits
-  // and refits when chord/3 misses tolerance. A single-cubic node-edit fit
-  // cannot split: valid smooth arches may need overlapping projections, so
-  // applying that heuristic there would flatten the retained curve.
-  if (
-    armL < MIN_ARM_FRACTION * chord ||
-    armR < MIN_ARM_FRACTION * chord ||
-    (canSplit &&
-      (t1.x * lineX + t1.y * lineY) * armL - (t2.x * lineX + t2.y * lineY) * armR > chord * chord)
-  ) {
-    armL = chord / 3;
-    armR = chord / 3;
-  }
-  return {
-    p0,
-    p1: { x: p0.x + t1.x * armL, y: p0.y + t1.y * armL },
-    p2: { x: p3.x + t2.x * armR, y: p3.y + t2.y * armR },
-    p3,
-  };
+  if (det === 0) return { start: 0, end: 0 };
+  return { start: (x0 * c11 - x1 * c01) / det, end: (c00 * x1 - c01 * x0) / det };
 }
 
 function maxFitError(
@@ -305,22 +326,31 @@ function reparameterize(
   u: number[],
 ): void {
   for (let i = first + 1; i < last; i += 1) {
-    const t = u[i - first] as number;
-    const p = points[i] as Vec2;
-    const q = evaluateCubic(cubic, t);
-    const d1 = cubicDerivative(cubic, t);
-    const d2 = cubicSecondDerivative(cubic, t);
-    const numerator = (q.x - p.x) * d1.x + (q.y - p.y) * d1.y;
-    const denominator = d1.x * d1.x + d1.y * d1.y + (q.x - p.x) * d2.x + (q.y - p.y) * d2.y;
-    if (Math.abs(denominator) < 1e-12) continue;
-    const next = t - numerator / denominator;
-    if (next > 0 && next < 1) u[i - first] = next;
+    const next = newtonProjectionStep(cubic, points[i] as Vec2, u[i - first] as number);
+    if (next !== null && next > 0 && next < 1) u[i - first] = next;
   }
+}
+
+/** One Newton-Raphson step toward the parameter of the point of `cubic`
+ *  nearest `p`: t − (Q(t)−P)·Q'(t) / (|Q'(t)|² + (Q(t)−P)·Q''(t)). Null when
+ *  the step is undefined. Unclamped; callers bound it. */
+export function newtonProjectionStep(cubic: CubicBezier, p: Vec2, t: number): number | null {
+  const q = evaluateCubic(cubic, t);
+  const d1 = cubicDerivative(cubic, t);
+  const d2 = cubicSecondDerivative(cubic, t);
+  const numerator = (q.x - p.x) * d1.x + (q.y - p.y) * d1.y;
+  const denominator = d1.x * d1.x + d1.y * d1.y + (q.x - p.x) * d2.x + (q.y - p.y) * d2.y;
+  if (Math.abs(denominator) < 1e-12) return null;
+  return t - numerator / denominator;
 }
 
 // ——— geometry helpers ———
 
-function chordParameterize(points: ReadonlyArray<Vec2>, first: number, last: number): number[] {
+export function chordParameterize(
+  points: ReadonlyArray<Vec2>,
+  first: number,
+  last: number,
+): number[] {
   const u: number[] = [0];
   for (let i = first + 1; i <= last; i += 1) {
     const a = points[i - 1] as Vec2;
@@ -378,7 +408,7 @@ function heuristicCubic(p0: Vec2, p3: Vec2, t1: Vec2, t2: Vec2): CubicBezier {
   };
 }
 
-function evaluateCubic(c: CubicBezier, t: number): Vec2 {
+export function evaluateCubic(c: CubicBezier, t: number): Vec2 {
   const m = 1 - t;
   const b0 = m * m * m;
   const b1 = 3 * t * m * m;

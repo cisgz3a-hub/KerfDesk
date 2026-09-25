@@ -36,6 +36,7 @@ import { fitCubicsThroughPoints } from './fit-cubics';
 import { flattenStraightRuns } from './flatten-straight-runs';
 import { smoothArcNoise } from './smooth-arc-noise';
 import { fittedTraceRing, withCanonicalTraceCurves } from './trace-curves';
+import { optimizationToleranceScaleFromOptimize } from './trace-optimize';
 import { contourFeatureAnchors } from './contour-feature-anchors';
 import { contourTraceInputMatches, type ContourTraceInput } from './contour-input';
 import {
@@ -103,8 +104,6 @@ const FIT_TOLERANCE_PX = 0.35;
 const FIT_TOLERANCE_ORGANIC_PX = 0.55;
 // Neutral Smoothness when the dialog value is absent or non-finite.
 const DEFAULT_SMOOTHNESS = 1;
-const DEFAULT_OPTIMIZE = 0.2;
-const OPTIMIZE_TOLERANCE_SLOPE = 0.75;
 
 /** The dialog's Smoothness knob doubles as the wobble-flattening / arc-
  *  evening strength. Default ON at the conservative 1px amplitude cap — the
@@ -122,12 +121,9 @@ export function flattenStrengthFromSmoothness(smoothness: number | undefined): n
   return Math.max(0, 6 * s - 5);
 }
 
-/** Optimize scales geometry tolerances around the established neutral 0.2. */
-export function optimizationToleranceScaleFromOptimize(optimize: number | undefined): number {
-  const value = Number.isFinite(optimize) ? (optimize as number) : DEFAULT_OPTIMIZE;
-  const bounded = Math.min(2, Math.max(0, value));
-  return Math.max(0.25, 1 + (bounded - DEFAULT_OPTIMIZE) * OPTIMIZE_TOLERANCE_SLOPE);
-}
+/** Optimize scales geometry tolerances around the established neutral 0.2
+ *  (shared with the edge and centerline finishers). */
+export { optimizationToleranceScaleFromOptimize };
 
 /** Trace filled ink regions as smooth closed outlines (holes stay hollow
  *  via even-odd filling downstream). */

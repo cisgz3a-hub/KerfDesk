@@ -139,12 +139,13 @@ describe('Centerline join distance in source pixels', () => {
   );
 
   it.each([
-    [1.9, 2],
-    [2, 2],
-    [2.1, 1],
+    [1.4, 2],
+    [1.5, 2],
+    [1.6, 1],
   ])('keeps strict threshold behaviour for source gap limit %s', (sourceGap, expectedPaths) => {
-    // The two raw chain endpoints are four working pixels apart. On a 2x
-    // grid this is a two-source-pixel gap, including the exact boundary.
+    // Tips are extended to the ink ends before bridging (ADR-397), so the
+    // join distance is the three blank working columns themselves. On a 2x
+    // grid this is a 1.5-source-pixel gap, including the exact boundary.
     const workingImage = brokenStroke(3);
     const options = { ...CENTERLINE, despeckleMinPixels: 0, fillPinholeCracks: false };
     const sourceUnits = traceCenterlineStrokePaths(workingImage, {

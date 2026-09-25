@@ -1,7 +1,8 @@
 // Centerline trace entry point (from-scratch rewrite). Pipeline:
 //   preprocess (shared threshold/despeckle) → ink mask → exact distance
 //   field → distance-ordered thinning → stroke graph → radius-aware spur
-//   pruning → junction pairing + tip extension + smoothing → polylines.
+//   pruning → junction pairing + tip extension + gap bridging + smoothing →
+//   compact cubic strokes, with round dots as circular marks (ADR-397).
 // Produces ONE open path down the middle of every stroke — the whole point
 // of centerline mode — instead of imagetracer-style double outlines.
 
@@ -19,7 +20,9 @@ import { buildStrokeGraph } from './stroke-graph';
 import { condenseJunctions } from './junction-condense';
 import { DEFAULT_SPUR_OPTIONS, pruneSpursSteps } from './spur-pruning';
 import { assembleStrokePathsSteps } from './stroke-chains';
+import { strokeCurvePolicy } from './stroke-curve-policy';
 import { closeRingEndpoints } from './loop-closure';
+import { withDotMarks } from './dot-marks';
 import { runTraceSteps, type TraceSteps } from '../trace-steps';
 
 const CENTERLINE_COLOR = '#000000';
@@ -63,10 +66,15 @@ export function* traceCenterlineStrokePathsSteps(
     // lineTolerance keeps its documented contract (higher = fewer vertices);
     // the preset default of 1 leaves the tuned epsilon unchanged.
     simplifyTolerance: options.lineTolerance,
+    curve: strokeCurvePolicy(options),
   });
+  // Dots (round, unelongated ink whose own skeleton is degenerate) have no
+  // stroke to follow; they become concentric circles that burn them solid
+  // instead of vanishing or turning into dashes.
+  const marked = withDotMarks(polylines, mask, distSq, condensed, effectivePixelScale(options));
   // Rings closed at a corner keep their endpoints a gap apart; make them
   // return to start so a stroked/engraved closed loop has no seam gap.
-  const closed = closeRingEndpoints(polylines);
+  const closed = closeRingEndpoints(marked);
   return closed.length === 0
     ? []
     : withCanonicalTraceCurves([{ color: CENTERLINE_COLOR, polylines: closed }]);
