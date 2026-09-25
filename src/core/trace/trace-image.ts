@@ -192,10 +192,7 @@ export function prepareTraceForContour(
     const cleaned = cleanBinaryMask(recovered.prepared, options, recovered.crackField);
     return { ...recovered, prepared: cleaned };
   }
-  return {
-    prepared: cleanBinaryMask(thresholded.prepared, options, field),
-    crackField: field,
-  };
+  return { prepared: cleanBinaryMask(thresholded.prepared, options, field), crackField: field };
 }
 
 // Mask cleanup is the shared tail of every preprocessing branch: despeckle

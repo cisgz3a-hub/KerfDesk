@@ -32,11 +32,10 @@ function range(min: number, max: number): OverrideRule {
   return { kind: 'number', min, max };
 }
 
-// The line presets' Invert control (`invert`, ADR-396) is listed ahead of the
-// build that adds it, so a recorded Invert is never dropped on either side of
-// that merge. Once `invert` is part of LightBurnTraceSettingOverrides the extra
-// union member is redundant and can go; the `satisfies` check must stay.
-type PersistedOverrideKey = keyof LightBurnTraceSettingOverrides | 'invert';
+// The line presets' Invert control (`invert`, ADR-396) is an ordinary
+// override key now that both branches are merged; the `satisfies` check below
+// keeps every key's persistence decided.
+type PersistedOverrideKey = keyof LightBurnTraceSettingOverrides;
 
 /**
  * How each dialog control persists: its value type and, for numbers, the range

@@ -1,10 +1,11 @@
 // The Trace dialog's operator choices in one place, seeded from the settings
 // recorded on the trace being re-traced (ADR-400) or from the defaults.
 
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import type { RasterImage, TraceSettingsRecord } from '../../core/scene';
+import type { TraceOptions } from '../../core/trace';
 import type { TraceFillStyle, TraceOutput } from './dialog-parts';
-import type { LightBurnTraceSettingOverrides } from './trace-options';
+import { mergeLightBurnTraceSettings, type LightBurnTraceSettingOverrides } from './trace-options';
 import { captureTraceSettings, restoreTraceSettings } from './trace-settings-snapshot';
 import { useBoundarySelection, type BoundarySelection } from './use-boundary-selection';
 import { useTracePreset } from './use-trace-preset';
@@ -84,4 +85,13 @@ export function useTraceDialogSettings(
         boundaryMode: boundarySelection.boundaryMode,
       }),
   };
+}
+
+/** The dialog's effective trace options: the preset merged with the operator's
+ *  overrides, memoized so the preview only re-traces when either changes. */
+export function useTraceOptions(
+  preset: TraceOptions,
+  overrides: LightBurnTraceSettingOverrides,
+): TraceOptions {
+  return useMemo(() => mergeLightBurnTraceSettings(preset, overrides), [preset, overrides]);
 }

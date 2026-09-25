@@ -6,7 +6,7 @@
 // Original needs the source bitmap kept in the scene. Pure UI pieces live in
 // dialog-parts.tsx.
 
-import { useMemo, useRef, useState, type Ref } from 'react';
+import { useRef, useState, type Ref } from 'react';
 import { IDENTITY_TRANSFORM, type RasterImage, type TracedImage } from '../../core/scene';
 import {
   DEFAULT_TRACE_OPTIONS,
@@ -20,14 +20,13 @@ import { useUiStore } from '../state/ui-store';
 import type { TraceFillStyle, TraceOutput } from './dialog-parts';
 import { rasterDisplayDataUrl } from '../workspace/draw-raster';
 import type { PendingPreparedTrace, PreparedTrace } from './prepared-trace';
-import { mergeLightBurnTraceSettings, type LightBurnTraceSettingOverrides } from './trace-options';
 import { TraceDialogView } from './TraceDialogView';
 import type { BoundaryMode } from './region-enhance-trace';
 import { BoundaryModePicker } from './BoundaryModePicker';
 import type { BoundarySelection } from './use-boundary-selection';
 import { TracePreview } from './TracePreview';
 import { conditionTracedImageForMachine } from './trace-machine-conditioning';
-import { useTraceDialogSettings } from './use-trace-dialog-settings';
+import { useTraceDialogSettings, useTraceOptions } from './use-trace-dialog-settings';
 import { resolveTraceCommitResult } from './trace-commit-result';
 import { TraceCommitGridNote, traceCommitGridForClaim } from './trace-commit-grid-note';
 import {
@@ -187,13 +186,6 @@ function DialogBody(props: DialogBodyProps): JSX.Element {
       busy={busy}
     />
   );
-}
-
-function useTraceOptions(
-  preset: TraceOptions,
-  overrides: LightBurnTraceSettingOverrides,
-): TraceOptions {
-  return useMemo(() => mergeLightBurnTraceSettings(preset, overrides), [preset, overrides]);
 }
 
 function useSelectedTracePreview(
