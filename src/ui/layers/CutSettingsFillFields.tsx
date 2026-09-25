@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { MAX_FILL_OVERSCAN_MM } from '../../core/job/compile-job-defaults';
 import type { Layer } from '../../core/scene';
 import { useStore } from '../state';
 import { CutSettingsFillDirectionPreview } from './CutSettingsFillDirectionPreview';
@@ -129,7 +130,7 @@ function FillOverscanField(props: {
         name="fillOverscanMm"
         value={props.value}
         min={0}
-        max={25}
+        max={MAX_FILL_OVERSCAN_MM}
         step={0.5}
         onChange={props.onChange}
       />

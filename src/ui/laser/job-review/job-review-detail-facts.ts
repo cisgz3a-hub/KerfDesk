@@ -8,6 +8,7 @@ import { CHIPLOAD_MATERIALS, isProfileCutType, zPassDepths } from '../../../core
 // (scripts/index-export-baseline.json) and may only shrink.
 import { cutCanFreePart } from '../../../core/cnc/cnc-tabs';
 import { findCncMachineStarterById } from '../../../core/cnc/machine-starters';
+import { MAX_FILL_OVERSCAN_MM } from '../../../core/job/compile-job-defaults';
 import type { CncLayerSettings, Layer, LayerOperationSettings } from '../../../core/scene';
 import type { MaterialLibraryDocument } from '../../../io/material-library';
 import { materialBindingStatus } from '../../layers/material-binding-status';
@@ -51,6 +52,9 @@ function fillDetail(settings: LayerOperationSettings): string {
     settings.fillBidirectional ? 'bidirectional' : 'one-way',
     ...(settings.fillCrossHatch ? ['cross-hatch'] : []),
     `stored overscan ${formatMm(settings.fillOverscanMm)} mm`,
+    ...(settings.fillOverscanMm > MAX_FILL_OVERSCAN_MM
+      ? [`applied at most ${MAX_FILL_OVERSCAN_MM} mm`]
+      : []),
     ...localScanOffsetPart(settings),
     ...powerModePart(settings),
   ].join(SEPARATOR);

@@ -58,6 +58,13 @@ describe('laserOperationDetail', () => {
     expect(laserOperationDetail(layer)).toContain('stored overscan 0 mm');
   });
 
+  it('says a stored overscan above the maximum is applied at the maximum', () => {
+    const layer: Layer = { ...baseLayer, mode: 'fill', fillOverscanMm: 50 };
+
+    expect(laserOperationDetail(layer)).toContain('stored overscan 50 mm · applied at most 25 mm');
+    expect(laserOperationDetail({ ...layer, fillOverscanMm: 25 })).not.toContain('applied');
+  });
+
   it('summarizes an image operation: dither, resolution, extras only when set', () => {
     const layer: Layer = {
       ...baseLayer,
