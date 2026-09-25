@@ -24,10 +24,10 @@ import { mergeLightBurnTraceSettings, type LightBurnTraceSettingOverrides } from
 import { TraceDialogView } from './TraceDialogView';
 import type { BoundaryMode } from './region-enhance-trace';
 import { BoundaryModePicker } from './BoundaryModePicker';
-import { useBoundarySelection } from './use-boundary-selection';
+import type { BoundarySelection } from './use-boundary-selection';
 import { TracePreview } from './TracePreview';
 import { conditionTracedImageForMachine } from './trace-machine-conditioning';
-import { useTracePreset } from './use-trace-preset';
+import { useTraceDialogSettings } from './use-trace-dialog-settings';
 import { resolveTraceCommitResult } from './trace-commit-result';
 import {
   captureTraceCommitOwner,
@@ -51,14 +51,13 @@ import { useTraceSourceFile } from './use-trace-source-file';
 export function ImportImageDialog(): JSX.Element | null {
   const dialog = useUiStore((s) => s.imageDialog);
   if (dialog === null) return null;
-  return dialog.replaceTraceId === undefined ? (
-    <DialogBody key={dialog.requestToken} seed={dialog.source} requestToken={dialog.requestToken} />
-  ) : (
+  return (
     <DialogBody
       key={dialog.requestToken}
       seed={dialog.source}
       requestToken={dialog.requestToken}
-      replaceTraceId={dialog.replaceTraceId}
+      {...(dialog.replaceTraceId === undefined ? {} : { replaceTraceId: dialog.replaceTraceId })}
+      {...(dialog.traceSettings === undefined ? {} : { traceSettings: dialog.traceSettings })}
     />
   );
 }
@@ -71,6 +70,7 @@ type TraceCommitArgs = {
   readonly traceFillStyle?: TraceFillStyle;
   readonly deleteSourceAfterTrace?: boolean;
   readonly replaceTraceId?: string;
+  readonly traceSettings?: TracedImage['traceSettings'];
   readonly boundary?: TraceBoundary | null;
   readonly boundaryMode?: BoundaryMode;
   readonly preparedTrace?: PreparedTrace;
@@ -92,6 +92,7 @@ type DialogBodyProps = {
   readonly seed: RasterImage;
   readonly requestToken: string;
   readonly replaceTraceId?: string;
+  readonly traceSettings?: TracedImage['traceSettings'];
 };
 
 function DialogBody(props: DialogBodyProps): JSX.Element {
@@ -102,14 +103,9 @@ function DialogBody(props: DialogBodyProps): JSX.Element {
   const machineKind = useStore((s) => s.project.machine?.kind ?? 'laser');
   const pushToast = useToastStore((s) => s.pushToast);
   const file = useTraceSourceFile(seed, pushToast);
-  // CNC opens on Smooth, the preset that traces cleanly on a router. It is a
-  // starting selection, not a restriction — every preset stays selectable.
-  const boundarySelection = useBoundarySelection();
-  const { preset, selectPreset } = useTracePreset(machineKind, boundarySelection.setBoundaryMode);
-  const [traceSettings, setTraceSettings] = useState<LightBurnTraceSettingOverrides>({});
-  const [traceFillStyle, setTraceFillStyle] = useState<TraceFillStyle>('scanline');
-  const [traceOutput, setTraceOutput] = useState<TraceOutput>('vector');
-  const [deleteSourceAfterTrace, setDeleteSourceAfterTrace] = useState(true);
+  // Re-trace Original opens on the settings recorded with the trace (ADR-400).
+  const choices = useTraceDialogSettings(machineKind, seed, props);
+  const boundarySelection = choices.boundarySelection;
   const [busy, setBusy] = useState(false);
   const captureLifetime = useTraceCommitLifetime(props.requestToken);
   const previewControl = useRef<TracePreviewCommitControl>(null);
@@ -124,9 +120,9 @@ function DialogBody(props: DialogBodyProps): JSX.Element {
   // not on `presetOptions` itself, because `presetOptions` is
   // re-derived from `TRACE_PRESETS[preset]` each render and would
   // otherwise be ref-unstable too.
-  const presetOptions = TRACE_PRESETS[preset] ?? DEFAULT_TRACE_OPTIONS;
-  const options = useTraceOptions(presetOptions, traceSettings);
-  const effectiveTraceOutput: TraceOutput = machineKind === 'cnc' ? 'vector' : traceOutput;
+  const presetOptions = TRACE_PRESETS[choices.preset] ?? DEFAULT_TRACE_OPTIONS;
+  const options = useTraceOptions(presetOptions, choices.traceSettings);
+  const effectiveTraceOutput: TraceOutput = machineKind === 'cnc' ? 'vector' : choices.traceOutput;
   const preview = useSelectedTracePreview(file, options, boundarySelection, seed, previewControl);
 
   const onSubmit = (): void =>
@@ -136,12 +132,13 @@ function DialogBody(props: DialogBodyProps): JSX.Element {
       seed,
       traceOutput: effectiveTraceOutput,
       machineKind,
-      traceFillStyle,
-      deleteSourceAfterTrace,
+      traceFillStyle: choices.traceFillStyle,
+      deleteSourceAfterTrace: choices.deleteSourceAfterTrace,
       boundary: boundarySelection.boundary,
       boundaryMode: boundarySelection.boundaryMode,
       preview,
       replaceTraceId: props.replaceTraceId,
+      traceSettings: choices.record(),
       traceExistingImage,
       commitRasterizedTrace,
       pushToast,
@@ -157,22 +154,22 @@ function DialogBody(props: DialogBodyProps): JSX.Element {
       source={seed}
       onClose={close}
       onSubmit={onSubmit}
-      presetName={preset}
-      onPresetChange={selectPreset}
+      presetName={choices.preset}
+      onPresetChange={choices.selectPreset}
       settings={{
         preset: presetOptions,
-        overrides: traceSettings,
+        overrides: choices.traceSettings,
         sourceHasTransparency: traceSourceHasTransparency(preview),
-        onChange: setTraceSettings,
+        onChange: choices.setTraceSettings,
       }}
       output={{
         photoShading: options.photoDetail !== undefined,
         machineKind,
-        traceOutput,
-        onTraceOutputChange: setTraceOutput,
+        traceOutput: choices.traceOutput,
+        onTraceOutputChange: choices.setTraceOutput,
         supportsFillStyle: isFilledContourTraceOptions(options),
-        traceFillStyle,
-        onTraceFillStyleChange: setTraceFillStyle,
+        traceFillStyle: choices.traceFillStyle,
+        onTraceFillStyleChange: choices.setTraceFillStyle,
       }}
       preview={
         <TracePreviewPanel
@@ -183,8 +180,8 @@ function DialogBody(props: DialogBodyProps): JSX.Element {
           submission={{ busy, output: effectiveTraceOutput }}
         />
       }
-      deleteSource={deleteSourceAfterTrace}
-      onDeleteSourceChange={setDeleteSourceAfterTrace}
+      deleteSource={choices.deleteSourceAfterTrace}
+      onDeleteSourceChange={choices.setDeleteSourceAfterTrace}
       canSubmit={file !== null && !busy}
       busy={busy}
     />
@@ -201,7 +198,7 @@ function useTraceOptions(
 function useSelectedTracePreview(
   file: File | null,
   options: TraceOptions,
-  selection: ReturnType<typeof useBoundarySelection>,
+  selection: BoundarySelection,
   seed: RasterImage,
   control: Ref<TracePreviewCommitControl>,
 ): ReturnType<typeof useTracePreview> {
@@ -232,7 +229,7 @@ function TracePreviewPanel(props: {
   readonly photoShading: boolean;
   readonly preview: ReturnType<typeof useTracePreview>;
   readonly seed: RasterImage;
-  readonly boundarySelection: ReturnType<typeof useBoundarySelection>;
+  readonly boundarySelection: BoundarySelection;
 }): JSX.Element {
   const selection = props.boundarySelection;
   return (
@@ -300,6 +297,7 @@ function submitTraceDialog(deps: {
   readonly boundaryMode: BoundaryMode;
   readonly preview: ReturnType<typeof useTracePreview>;
   readonly replaceTraceId: string | undefined;
+  readonly traceSettings: NonNullable<TracedImage['traceSettings']>;
   readonly traceExistingImage: ReturnType<typeof useStore.getState>['traceExistingImage'];
   readonly commitRasterizedTrace: ReturnType<typeof useStore.getState>['commitRasterizedTrace'];
   readonly pushToast: ReturnType<typeof useToastStore.getState>['pushToast'];
@@ -329,6 +327,7 @@ function submitTraceDialog(deps: {
     traceOutput: deps.traceOutput,
     ...submittedFillStyle(deps),
     deleteSourceAfterTrace: deps.deleteSourceAfterTrace,
+    traceSettings: deps.traceSettings,
     boundary: deps.boundary,
     boundaryMode: deps.boundaryMode,
     ...preparedTraceEntry(deps.preview),
@@ -401,6 +400,7 @@ export async function commit(args: TraceCommitArgs, ctx: TraceCommitContext): Pr
       bounds,
       transform: IDENTITY_TRANSFORM,
       paths,
+      ...(args.traceSettings === undefined ? {} : { traceSettings: args.traceSettings }),
       ...(operationOverride === undefined ? {} : { operationOverride }),
     };
     const liveProject = owner.project;

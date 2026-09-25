@@ -263,9 +263,35 @@ export type TracedImage = ObjectPowerScale & {
   readonly tracePixelHeight?: number;
   // Missing means legacy filled-contour trace.
   readonly traceMode?: 'filled-contours' | 'centerline' | 'edge';
+  // Trace dialog settings that produced this result (ADR-400). Missing means
+  // a legacy trace; Re-trace Original then opens on the defaults.
+  readonly traceSettings?: TraceSettingsRecord;
   readonly bounds: Bounds;
   readonly transform: Transform;
   readonly paths: ReadonlyArray<ColoredPath>;
+};
+
+// The Trace dialog's choices recorded on a committed trace so Re-trace
+// Original can reopen the dialog pre-filled (ADR-400). Re-trace metadata
+// only: compile, preview and output never read it. `overrides` holds the
+// operator's LightBurn-style setting overrides keyed by control; the UI owns
+// the key set and ignores keys or values it does not recognise. `boundary` is
+// in the trace source bitmap's pixel grid.
+export type TraceSettingsValue = number | boolean | string;
+
+export type TraceSettingsRecord = {
+  readonly schemaVersion: 1;
+  readonly presetName: string;
+  readonly overrides: Readonly<Record<string, TraceSettingsValue>>;
+  readonly output?: 'vector' | 'raster';
+  readonly fillStyle?: 'scanline' | 'offset' | 'island';
+  readonly boundary?: {
+    readonly x: number;
+    readonly y: number;
+    readonly width: number;
+    readonly height: number;
+  };
+  readonly boundaryMode?: 'crop' | 'enhance';
 };
 
 // Raster image for image-mode engraving, Phase F.2 (ADR-020).
@@ -325,6 +351,8 @@ export type RasterImage = ObjectPowerScale & {
   // Original bitmap retained for Re-trace Original. Rasterized trace results
   // carry this just like vector traces do; ordinary imported photos omit it.
   readonly traceSourceId?: string;
+  // Trace dialog settings of a rasterized trace result (ADR-400).
+  readonly traceSettings?: TraceSettingsRecord;
   readonly dataUrl?: string; // Embedded source for legacy/unqualified imports.
   readonly imageAsset?: PagedRasterImageAsset; // Qualified PNG source + luma page references.
   readonly pixelWidth: number;
