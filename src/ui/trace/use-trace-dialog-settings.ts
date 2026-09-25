@@ -21,7 +21,12 @@ export type TraceDialogSettingsState = {
   readonly setTraceOutput: (next: TraceOutput) => void;
   readonly deleteSourceAfterTrace: boolean;
   readonly setDeleteSourceAfterTrace: (next: boolean) => void;
-  /** The current choices as the record stored on the committed trace. */
+  /**
+   * The current choices as the record stored on the committed trace. It keeps
+   * the operator's intent, not the effective commit: CNC forces vector output
+   * and some outputs ignore the fill style, but the same project may be
+   * re-traced on a laser later, where those choices apply again (ADR-400).
+   */
   readonly record: () => TraceSettingsRecord;
 };
 

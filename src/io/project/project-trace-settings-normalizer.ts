@@ -2,29 +2,45 @@ import type { TraceSettingsRecord, TraceSettingsValue } from '../../core/scene';
 import { isObject } from './project-shape-primitives';
 
 // ADR-400: recorded Trace dialog settings are Re-trace convenience metadata,
-// never output-bearing. Like library provenance, a malformed, hostile or newer
-// snapshot is dropped as a whole so it can never refuse a project load or reach
-// the dialog half-valid; the trace itself loads unchanged and Re-trace opens on
-// the defaults. Override keys are owned by the UI, so any well-formed key with
-// a primitive value is kept (a newer build's controls survive an older save).
+// never output-bearing. Like library provenance, a structurally malformed,
+// hostile or newer (`schemaVersion` other than 1) record is dropped as a whole
+// so it can never refuse a project load; the trace itself loads unchanged and
+// Re-trace opens on the defaults. Override keys are owned by the UI: a single
+// bad override entry is dropped on its own, and any well-formed key with a
+// primitive value is kept, so a newer build's controls survive a save by this
+// one. Unknown top-level record fields are not kept.
 const MAX_OVERRIDE_ENTRIES = 64;
 const MAX_TEXT_LENGTH = 128;
 const OVERRIDE_KEY = /^[A-Za-z][A-Za-z0-9]{0,63}$/;
-const OUTPUTS = ['vector', 'raster'] as const;
-const FILL_STYLES = ['scanline', 'offset', 'island'] as const;
-const BOUNDARY_MODES = ['crop', 'enhance'] as const;
+
+// Exhaustive by construction: a value added to the record's type must be added
+// here too, or a record using it would be dropped whole on load.
+const OUTPUTS = literals({ vector: true, raster: true } satisfies Record<
+  NonNullable<TraceSettingsRecord['output']>,
+  true
+>);
+const FILL_STYLES = literals({ scanline: true, offset: true, island: true } satisfies Record<
+  NonNullable<TraceSettingsRecord['fillStyle']>,
+  true
+>);
+const BOUNDARY_MODES = literals({ crop: true, enhance: true } satisfies Record<
+  NonNullable<TraceSettingsRecord['boundaryMode']>,
+  true
+>);
 
 type Boundary = NonNullable<TraceSettingsRecord['boundary']>;
 type OptionalFields = Omit<TraceSettingsRecord, 'schemaVersion' | 'presetName' | 'overrides'>;
 
-const TRACE_RESULT_KINDS: ReadonlyArray<unknown> = ['traced-image', 'raster-image'];
-
-/** Keep a well-formed `traceSettings` only on trace results; drop it otherwise. */
+/**
+ * Keep a well-formed `traceSettings` on any scene object and drop a malformed
+ * one. The record is inert metadata that only Re-trace reads (on a traced or
+ * rasterized trace result), so it is not stripped from other kinds: an object
+ * rebuilt from a trace under another kind must stay saveable under the ADR-204
+ * drift check.
+ */
 export function withNormalizedTraceSettings(obj: Record<string, unknown>): Record<string, unknown> {
   if (!('traceSettings' in obj)) return obj;
-  const traceSettings = TRACE_RESULT_KINDS.includes(obj['kind'])
-    ? normalizeTraceSettingsRecord(obj['traceSettings'])
-    : undefined;
+  const traceSettings = normalizeTraceSettingsRecord(obj['traceSettings']);
   // Rebuild in place so a clean save stays byte-identical to its source.
   return Object.fromEntries(
     Object.entries(obj).flatMap(([key, value]) => {
@@ -53,8 +69,8 @@ function normalizeOverrides(
   if (entries.length > MAX_OVERRIDE_ENTRIES) return undefined;
   const out: Record<string, TraceSettingsValue> = {};
   for (const [key, entry] of entries) {
-    if (!OVERRIDE_KEY.test(key) || !isSettingsValue(entry)) return undefined;
-    out[key] = entry;
+    // One bad entry costs only itself; the dialog re-filters by type anyway.
+    if (OVERRIDE_KEY.test(key) && isSettingsValue(entry)) out[key] = entry;
   }
   return out;
 }
@@ -109,4 +125,8 @@ function isBoundedText(value: unknown): value is string {
 
 function isNonNegativeFinite(value: unknown): value is number {
   return typeof value === 'number' && Number.isFinite(value) && value >= 0;
+}
+
+function literals<T extends string>(map: Readonly<Record<T, unknown>>): ReadonlyArray<T> {
+  return Object.keys(map) as T[];
 }

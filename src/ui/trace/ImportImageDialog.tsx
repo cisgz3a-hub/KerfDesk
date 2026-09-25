@@ -24,7 +24,7 @@ import { mergeLightBurnTraceSettings, type LightBurnTraceSettingOverrides } from
 import { TraceDialogView } from './TraceDialogView';
 import type { BoundaryMode } from './region-enhance-trace';
 import { BoundaryModePicker } from './BoundaryModePicker';
-import type { useBoundarySelection } from './use-boundary-selection';
+import type { BoundarySelection } from './use-boundary-selection';
 import { TracePreview } from './TracePreview';
 import { conditionTracedImageForMachine } from './trace-machine-conditioning';
 import { useTraceDialogSettings } from './use-trace-dialog-settings';
@@ -103,8 +103,6 @@ function DialogBody(props: DialogBodyProps): JSX.Element {
   const machineKind = useStore((s) => s.project.machine?.kind ?? 'laser');
   const pushToast = useToastStore((s) => s.pushToast);
   const file = useTraceSourceFile(seed, pushToast);
-  // CNC opens on Smooth, the preset that traces cleanly on a router. It is a
-  // starting selection, not a restriction — every preset stays selectable.
   // Re-trace Original opens on the settings recorded with the trace (ADR-400).
   const choices = useTraceDialogSettings(machineKind, seed, props);
   const boundarySelection = choices.boundarySelection;
@@ -200,7 +198,7 @@ function useTraceOptions(
 function useSelectedTracePreview(
   file: File | null,
   options: TraceOptions,
-  selection: ReturnType<typeof useBoundarySelection>,
+  selection: BoundarySelection,
   seed: RasterImage,
   control: Ref<TracePreviewCommitControl>,
 ): ReturnType<typeof useTracePreview> {
@@ -231,7 +229,7 @@ function TracePreviewPanel(props: {
   readonly photoShading: boolean;
   readonly preview: ReturnType<typeof useTracePreview>;
   readonly seed: RasterImage;
-  readonly boundarySelection: ReturnType<typeof useBoundarySelection>;
+  readonly boundarySelection: BoundarySelection;
 }): JSX.Element {
   const selection = props.boundarySelection;
   return (

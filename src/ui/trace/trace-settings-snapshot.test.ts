@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { TraceSettingsRecord } from '../../core/scene';
+import type { LightBurnTraceSettingOverrides } from './trace-options';
 import { captureTraceSettings, restoreTraceSettings } from './trace-settings-snapshot';
 
 const GRID = { width: 100, height: 80 };
@@ -70,6 +71,51 @@ describe('trace settings snapshot (ADR-400)', () => {
       GRID,
     );
     expect(restored.overrides).toEqual({ optimize: 0.3, traceTransparency: true });
+  });
+
+  it('keeps the line presets Invert through capture and restore', () => {
+    // `invert` is the Line-preset Invert control (ADR-396). It must persist
+    // like every other control; the cast keeps this test valid on builds
+    // where the override type does not list it yet.
+    const overrides = { invert: true, smoothness: 0.8 } as LightBurnTraceSettingOverrides;
+    const captured = captureTraceSettings({
+      presetName: 'Line Art',
+      overrides,
+      output: 'vector',
+      fillStyle: 'scanline',
+      boundary: null,
+      boundaryMode: 'crop',
+    });
+    expect(captured.overrides).toEqual({ invert: true, smoothness: 0.8 });
+    expect(restoreTraceSettings(captured, GRID).overrides).toEqual({
+      invert: true,
+      smoothness: 0.8,
+    });
+    expect(restoreTraceSettings(record({ overrides: { invert: 'yes' } }), GRID).overrides).toEqual(
+      {},
+    );
+  });
+
+  it('fits restored numbers to the range the dialog control offers', () => {
+    const restored = restoreTraceSettings(
+      record({
+        overrides: {
+          smoothness: 1e6,
+          despeckleMinPixels: 1e12,
+          optimize: -4,
+          photoGamma: 0,
+          cutoffLuma: 12,
+        },
+      }),
+      GRID,
+    );
+    expect(restored.overrides).toEqual({
+      smoothness: 1.33,
+      despeckleMinPixels: 10000,
+      optimize: 0,
+      photoGamma: 0.1,
+      cutoffLuma: 12,
+    });
   });
 
   it('falls back to the default preset for a preset this build does not offer', () => {

@@ -131,6 +131,23 @@ describe('trace settings persistence (ADR-400)', () => {
     }
   });
 
+  it('loads a hand-written v8 document with a traced image and no recorded settings', () => {
+    // Written by hand in the shape a v8 build saved, independent of the
+    // current serializer, so a change to how old documents are read shows up.
+    const loaded = load(LEGACY_V8_TRACE_DOCUMENT);
+    expect(loaded.schemaVersion).toBe(PROJECT_SCHEMA_VERSION);
+    const [source, traced] = loaded.scene.objects;
+    expect(source).toMatchObject({ kind: 'raster-image', id: 'src-1', role: 'trace-source' });
+    expect(traced).toMatchObject({
+      kind: 'traced-image',
+      id: 'trace-1',
+      traceSourceId: 'src-1',
+      traceMode: 'filled-contours',
+    });
+    expect(traced).not.toHaveProperty('traceSettings');
+    expect(prepareProjectForPersistence(loaded).kind).toBe('ok');
+  });
+
   it('keeps well-formed override keys this build does not know', () => {
     const future = { ...SETTINGS, overrides: { ...SETTINGS.overrides, futureKnob: 3 } };
     const loaded = load(withRawSettings(future));
@@ -146,9 +163,6 @@ describe('trace settings persistence (ADR-400)', () => {
     ['a blank preset', { ...SETTINGS, presetName: '  ' }],
     ['an oversized preset name', { ...SETTINGS, presetName: 'x'.repeat(500) }],
     ['non-object overrides', { ...SETTINGS, overrides: [1, 2] }],
-    ['a nested override value', { ...SETTINGS, overrides: { smoothness: { deep: 1 } } }],
-    ['a null override value', { ...SETTINGS, overrides: { smoothness: null } }],
-    ['a prototype-shaped override key', { ...SETTINGS, overrides: JSON.parse('{"__proto__":1}') }],
     [
       'too many override entries',
       {
@@ -171,9 +185,91 @@ describe('trace settings persistence (ADR-400)', () => {
     expect(prepareProjectForPersistence(loaded).kind).toBe('ok');
   });
 
-  it('drops trace settings attached to an object that is not a trace result', () => {
-    const svg = { ...trace(), kind: 'imported-svg' } as unknown as SceneObject;
+  it.each([
+    ['a nested override value', { smoothness: { deep: 1 } }],
+    ['a range-shaped override value', { smoothness: [0.2, 0.8] }],
+    ['a null override value', { smoothness: null }],
+    ['an oversized text override', { smoothness: 'x'.repeat(500) }],
+    ['a prototype-shaped override key', JSON.parse('{"__proto__":1}') as object],
+    ['a malformed override key', { 'bad key': 1 }],
+  ])('drops only %s and keeps the rest of the record', (_label, bad) => {
+    const loaded = load(
+      withRawSettings({ ...SETTINGS, overrides: { ...SETTINGS.overrides, ...bad } }),
+    );
+    const restored = loaded.scene.objects[0] as TracedImage;
+    expect(restored.traceSettings).toEqual(SETTINGS);
+    expect(Object.getPrototypeOf(restored.traceSettings?.overrides)).toBe(Object.prototype);
+    expect(prepareProjectForPersistence(loaded).kind).toBe('ok');
+  });
+
+  it('keeps a well-formed record on an object rebuilt from a trace under another kind', () => {
+    // Inert metadata: stripping it on load would make such an object fail the
+    // ADR-204 save drift check and leave the project unsaveable.
+    const svg = {
+      ...trace({ traceSettings: SETTINGS }),
+      kind: 'imported-svg',
+    } as unknown as SceneObject;
+    expect(prepareProjectForPersistence(projectWith(svg)).kind).toBe('ok');
     const loaded = load(withRawSettings(SETTINGS, svg));
-    expect(loaded.scene.objects[0]).not.toHaveProperty('traceSettings');
+    expect(loaded.scene.objects[0]).toHaveProperty('traceSettings', SETTINGS);
   });
 });
+
+const LEGACY_V8_TRACE_DOCUMENT = `{
+  "schemaVersion": 8,
+  "device": {
+    "name": "Legacy GRBL 300x300",
+    "bedWidth": 300,
+    "bedHeight": 300,
+    "maxFeed": 6000,
+    "maxPowerS": 1000,
+    "capabilities": ["grbl", "wcs"],
+    "origin": "front-left",
+    "homing": { "enabled": true, "direction": "front-left" },
+    "autofocusCommand": ""
+  },
+  "workspace": { "width": 300, "height": 300, "units": "mm" },
+  "jobSetup": {
+    "placement": { "startFrom": "absolute", "anchor": "front-left" },
+    "outputScope": { "cutSelectedGraphics": false, "useSelectionOrigin": false, "selectedObjectIds": [] }
+  },
+  "notes": "",
+  "scene": {
+    "objects": [
+      {
+        "kind": "raster-image",
+        "id": "src-1",
+        "source": "logo.png",
+        "role": "trace-source",
+        "dataUrl": "data:image/png;base64,AAAA",
+        "pixelWidth": 1,
+        "pixelHeight": 1,
+        "bounds": { "minX": 0, "minY": 0, "maxX": 10, "maxY": 10 },
+        "transform": { "x": 0, "y": 0, "scaleX": 1, "scaleY": 1, "rotationDeg": 0, "mirrorX": false, "mirrorY": false },
+        "color": "#808080",
+        "dither": "floyd-steinberg",
+        "linesPerMm": 10
+      },
+      {
+        "kind": "traced-image",
+        "id": "trace-1",
+        "source": "logo.png",
+        "traceSourceId": "src-1",
+        "traceMode": "filled-contours",
+        "tracePixelWidth": 1,
+        "tracePixelHeight": 1,
+        "bounds": { "minX": 0, "minY": 0, "maxX": 10, "maxY": 10 },
+        "transform": { "x": 0, "y": 0, "scaleX": 1, "scaleY": 1, "rotationDeg": 0, "mirrorX": false, "mirrorY": false },
+        "paths": [
+          {
+            "color": "#000000",
+            "polylines": [
+              { "points": [{ "x": 0, "y": 0 }, { "x": 10, "y": 0 }, { "x": 10, "y": 10 }], "closed": true }
+            ]
+          }
+        ]
+      }
+    ],
+    "layers": []
+  }
+}`;

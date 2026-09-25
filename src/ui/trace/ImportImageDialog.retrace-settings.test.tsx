@@ -43,12 +43,18 @@ vi.mock('./use-trace-worker-client', () => ({
 
 import {
   createProject,
+  DEFAULT_CNC_MACHINE_CONFIG,
   IDENTITY_TRANSFORM,
   type Project,
   type RasterImage,
+  type SceneObject,
   type TracedImage,
 } from '../../core/scene';
-import { deserializeProject, serializeProject } from '../../io/project';
+import {
+  deserializeProject,
+  prepareProjectForPersistence,
+  serializeProject,
+} from '../../io/project';
 import { retraceOriginalAction } from '../commands/image-command-actions';
 import { useStore } from '../state';
 import { useUiStore } from '../state/ui-store';
@@ -223,6 +229,103 @@ describe('Re-trace Original keeps the committed trace settings (ADR-400)', () =>
     }
   });
 });
+
+describe('the real store keeps the recorded settings through save (ADR-400)', () => {
+  it.each(['laser', 'cnc'] as const)(
+    '%s: commit and re-trace through the store, then save and reload',
+    async (machineKind) => {
+      const seed = seedRaster();
+      const base = projectWith(seed);
+      useStore.setState({
+        project: machineKind === 'cnc' ? { ...base, machine: DEFAULT_CNC_MACHINE_CONFIG } : base,
+      });
+
+      // First trace through the real store action; keep the source so it can
+      // be re-traced.
+      useUiStore.getState().openImageDialog(seed);
+      const first = await renderDialog();
+      try {
+        await changeSelect(presetSelect(first.host), 'Sharp');
+        await changeNumber(numberInput(first.host, 'Trace Smoothness'), '0.5');
+        await setCheckbox(checkboxByLabel(first.host, 'Delete Image After trace'), false);
+        await submit(first.host);
+      } finally {
+        await first.unmount();
+      }
+      const committed = savedTrace(useStore.getState().project);
+      expect(committed.traceSettings).toMatchObject({
+        presetName: 'Sharp',
+        overrides: { smoothness: 0.5 },
+      });
+
+      // Re-trace through the real command and store, with one more edit.
+      const project = useStore.getState().project;
+      retraceOriginalAction(project, committed, useUiStore.getState().openImageDialog, vi.fn())();
+      const second = await renderDialog();
+      try {
+        expect(presetSelect(second.host).value).toBe('Sharp');
+        await changeNumber(numberInput(second.host, 'Trace Optimize'), '0.4');
+        await submit(second.host);
+      } finally {
+        await second.unmount();
+      }
+      const replaced = savedTrace(useStore.getState().project);
+      expect(replaced.id).toBe(committed.id);
+      expect(replaced.traceSettings).toMatchObject({
+        presetName: 'Sharp',
+        overrides: { smoothness: 0.5, optimize: 0.4 },
+      });
+
+      // Save exactly as the app does, then reopen.
+      const prepared = prepareProjectForPersistence(useStore.getState().project);
+      expect(prepared.kind).toBe('ok');
+      if (prepared.kind !== 'ok') return;
+      expect(savedTrace(prepared.project).traceSettings).toEqual(replaced.traceSettings);
+      const reopened = deserializeProject(prepared.json);
+      expect(reopened.kind).toBe('ok');
+      if (reopened.kind !== 'ok') return;
+      expect(savedTrace(reopened.project).traceSettings).toEqual(replaced.traceSettings);
+    },
+  );
+
+  it('keeps the settings on a rasterized trace result committed through the store', () => {
+    const seed = seedRaster();
+    useStore.setState({ project: projectWith(seed) });
+    const traceSettings = {
+      schemaVersion: 1,
+      presetName: 'Line Art',
+      overrides: { cutoffLuma: 20 },
+      output: 'raster',
+    } as const;
+    useStore.getState().commitRasterizedTrace(seed.id, {
+      ...seedRaster(),
+      id: 'raster-trace',
+      source: 'logo.png (bitmap)',
+      traceSettings,
+    });
+    const prepared = prepareProjectForPersistence(useStore.getState().project);
+    expect(prepared.kind).toBe('ok');
+    if (prepared.kind !== 'ok') return;
+    const raster = prepared.project.scene.objects.find((obj) => obj.id === 'raster-trace');
+    expect(raster).toMatchObject({ traceSourceId: seed.id, traceSettings });
+  });
+});
+
+function savedTrace(project: Project): TracedImage {
+  const trace = project.scene.objects.find(
+    (obj: SceneObject): obj is TracedImage => obj.kind === 'traced-image',
+  );
+  if (trace === undefined) throw new Error('no traced image in the project');
+  return trace;
+}
+
+async function setCheckbox(input: HTMLInputElement | null, checked: boolean): Promise<void> {
+  expect(input).toBeInstanceOf(HTMLInputElement);
+  if (input === null || input.checked === checked) return;
+  await act(async () => {
+    input.click();
+  });
+}
 
 async function renderDialog(): Promise<{
   readonly host: HTMLDivElement;
