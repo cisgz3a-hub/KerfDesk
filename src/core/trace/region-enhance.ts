@@ -22,9 +22,10 @@
 // saw. region-merge.ts pairs the two traces of a shape that grazes the border
 // (bounds within 1 px) so that pair is neither lost nor doubled.
 //
-// The crop also inherits the full image's Otsu cut and auto-sketch verdict
-// (trace-source-decisions.ts); re-deriving them from the crop's own pixels
-// made the patch binarise differently from its surroundings.
+// The crop also inherits the full image's Otsu cut, auto-sketch verdict and
+// automatic-median verdict (trace-source-decisions.ts); re-deriving them from
+// the crop's own pixels made the patch binarise differently from its
+// surroundings. The median itself runs on the crop before enlargement.
 //
 // Pure-core compliant: no I/O, no clock, no random — the tracer itself is
 // injected by the caller (the UI passes its worker-backed tracer; tests pass
@@ -33,16 +34,19 @@
 import type { ColoredPath } from '../scene';
 import { downscaleTracedPaths, upscaleBy } from './auto-upscale';
 import { edgeMaskRadiusPx } from './edge-input';
+import { autoMedianFilter } from './preprocess';
 import { replacePathsInRegion } from './region-merge';
 import { cropRawImageData, normalizeTraceBoundary, offsetColoredPaths } from './trace-boundary';
 import type { TraceBoundary } from './trace-boundary';
 import {
   SKETCH_RADIUS_PX,
+  applyImageAdjustments,
   effectivePixelScale,
   type RawImageData,
   type TraceOptions,
 } from './trace-image';
 import { resolveFrozenTraceSourceOptions } from './trace-source-decisions';
+import { medianCleanedSource } from './trace-upscale-input';
 import { fitsTraceWorkingPixelBudget } from './trace-work-budget';
 
 export { replacePathsInRegion } from './region-merge';
@@ -99,9 +103,10 @@ export async function enhanceRegionPaths(args: EnhanceRegionArgs): Promise<Color
   const padded = padRegion(region, regionContextPx(options), args.image);
   const crop = cropRawImageData(args.image, padded);
   const factor = computeRegionUpscaleFactor(crop, options);
+  const cleaned = regionMedianInput(crop, options);
   const traced = await args.trace(
-    factor > 1 ? upscaleBy(crop, factor) : crop,
-    optionsForRegionScale(options, factor),
+    factor > 1 ? upscaleBy(cleaned.image, factor) : cleaned.image,
+    optionsForRegionScale(cleaned.options, factor),
   );
   const inSource = offsetColoredPaths(downscaleTracedPaths(traced, factor), padded.x, padded.y);
   return replacePathsInRegion(
@@ -119,6 +124,25 @@ function regionContextPx(options: TraceOptions): number {
   const sketch = SKETCH_RADIUS_PX * effectivePixelScale(options);
   const edge = options.traceMode === 'edge' ? edgeMaskRadiusPx(options) : 0;
   return Math.ceil(Math.max(sketch, edge)) + 1;
+}
+
+// Smooth's automatic median repairs isolated impulses only when the whole
+// image has enough of them, and judges isolation in pixels of the grid it
+// runs on. Both are whole-source, source-scale decisions (ADR-411): the crop
+// takes the full pass's verdict and is cleaned before it is enlarged, so its
+// specks are removed exactly where the full trace removed them. The padding
+// ring covers the median's 3x3 window and two-link support search.
+function regionMedianInput(
+  crop: RawImageData,
+  options: TraceOptions,
+): { readonly image: RawImageData; readonly options: TraceOptions } {
+  const verdict = options.sourceAutoMedian;
+  if (options.medianFilter !== 'auto' || verdict === undefined) return { image: crop, options };
+  const adjusted = applyImageAdjustments(crop, options);
+  // A density floor of 0: the whole image already crossed the real one.
+  const cleaned = verdict ? autoMedianFilter(adjusted, 0) : adjusted;
+  const input = medianCleanedSource(crop, { adjusted, cleaned });
+  return { image: input.source, options: { ...options, ...input.options } };
 }
 
 function padRegion(region: TraceBoundary, pad: number, image: RawImageData): TraceBoundary {

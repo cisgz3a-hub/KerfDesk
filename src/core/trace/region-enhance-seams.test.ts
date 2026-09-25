@@ -5,7 +5,7 @@ import { maximumPointDistanceToPolyline } from '../../__fixtures__/polyline-dist
 import { flattenCurveSubpath, type ColoredPath, type Polyline } from '../scene';
 import { shouldUseSketchTrace } from './auto-sketch-trace';
 import { upscaleBy } from './auto-upscale';
-import { otsuThreshold } from './preprocess';
+import { autoMedianFilter, otsuThreshold } from './preprocess';
 import { enhanceRegionPaths } from './region-enhance';
 import type { TraceBoundary } from './trace-boundary';
 import { preprocessForTrace, type RawImageData, type TraceOptions } from './trace-image';
@@ -158,6 +158,70 @@ describe('Region Enhance binarises the crop like the full pass (ADR-410)', () =>
     const reference = preprocessForTrace(upscaleBy(image, 2), { ...options, pixelScale: 2 });
     const iou = boxMaskIou(preprocessForTrace(call.image, call.options), reference, box, image);
     expect(iou).toBeGreaterThanOrEqual(0.99);
+  });
+});
+
+// Smooth's automatic median repairs isolated impulses only when the whole
+// image has enough of them, judged in pixels of the grid it runs on. The crop
+// is enlarged 2x, where each speck is a supported 2x2 blob (ADR-411).
+describe("Region Enhance repairs the crop's impulses like the full pass (ADR-411)", () => {
+  const box = { x: 60, y: 60, width: 80, height: 80 };
+  const salted = (x: number, y: number): boolean => x % 5 === 2 && y % 5 === 2;
+  const image = canvas(200, 200, (x, y) => {
+    const block = x >= 80 && x < 120 && y >= 70 && y < 130;
+    if (block) return grey(salted(x, y) ? 255 : 0);
+    return grey(salted(x + 1, y + 3) ? 0 : 255);
+  });
+
+  it('removes the specks the full trace removed, and only those', async () => {
+    const options = { ...preset('Smooth'), despeckleMinPixels: 0, fillPinholeCracks: false };
+    const { call } = await enhanceCapturing(image, options, box);
+    expect(call.options.sourceAutoMedian).toBe(true);
+    expect(call.options.medianFilter).toBe(false);
+    const frozen = resolveFrozenTraceSourceOptions(image, options);
+    // The full pass's own cleaned source, then the crop's enlargement.
+    const reference = preprocessForTrace(upscaleBy(autoMedianFilter(image), 2), {
+      ...frozen,
+      medianFilter: false,
+      pixelScale: 2,
+    });
+    const patch = preprocessForTrace(call.image, call.options);
+    expect(boxMaskIou(patch, reference, box, image)).toBe(1);
+    // Control: the crop enlarged first keeps its specks.
+    const padded = (call.image.width / 2 - box.width) / 2;
+    const late = preprocessForTrace(
+      upscaleBy(
+        cropOf(image, {
+          x: box.x - padded,
+          y: box.y - padded,
+          width: 80 + padded * 2,
+          height: 80 + padded * 2,
+        }),
+        2,
+      ),
+      { ...frozen, pixelScale: 2 },
+    );
+    expect(boxMaskIou(late, reference, box, image)).toBeLessThan(0.97);
+  });
+
+  it("keeps the crop's specks when the whole image does not cross the floor", async () => {
+    // Twelve specks in 40,000 pixels: 0.03%. The 80 x 80 crop alone has 0.19%
+    // on its own grid, still under; the verdict, not the crop, decides.
+    const sparse = canvas(200, 200, (x, y) =>
+      grey(x >= 70 && x < 130 && y >= 90 && y < 110 && salted(x, y) && x % 10 === 2 ? 0 : 255),
+    );
+    const options = preset('Smooth');
+    const { call } = await enhanceCapturing(sparse, options, box);
+    expect(call.options.sourceAutoMedian).toBe(false);
+    expect(call.options.medianFilter).toBe(false);
+    const padded = (call.image.width / 2 - box.width) / 2;
+    const crop = cropOf(sparse, {
+      x: box.x - padded,
+      y: box.y - padded,
+      width: 80 + padded * 2,
+      height: 80 + padded * 2,
+    });
+    expect(call.image.data).toEqual(upscaleBy(crop, 2).data);
   });
 });
 

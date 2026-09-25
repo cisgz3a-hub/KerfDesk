@@ -96,6 +96,10 @@ export type TraceOptions = {
   //     intact even when the same image also contains noise. Shares the
   //     selective automatic policy used by Edge Detection.
   readonly medianFilter?: boolean | 'auto';
+  // INTERNAL full-source verdict of medianFilter 'auto' (ADR-411): true when
+  // the whole image's isolated impulses reach the density floor. An Enhance
+  // crop repairs its impulses at source scale by this verdict, not its own.
+  readonly sourceAutoMedian?: boolean;
   // despeckleMinPixels: connected-component despeckle applied AFTER
   // thresholding. Any ink region (luma<128) with fewer than N source pixels
   // gets flipped to white. Centerline uses eight-connected ink; other modes

@@ -85,4 +85,24 @@ describe('resolveFrozenTraceSourceOptions (ADR-410)', () => {
     expect(shouldUseSketchTrace(colourful, { ...frozen, autoSketchTrace: false })).toBe(false);
     expect(resolveFrozenTraceSourceOptions(colourful, frozen)).toBe(frozen);
   });
+
+  it("freezes the automatic median's whole-image verdict with the Otsu cut (ADR-411)", () => {
+    // 1-px pepper every 6 px: 2.8% of the frame, over the 0.4% density floor.
+    const specked = image(60, 60, (x, y) =>
+      x % 6 === 3 && y % 6 === 3 ? [0, 0, 0, 255] : [255, 255, 255, 255],
+    );
+    const plain = image(60, 60, () => [255, 255, 255, 255]);
+    const frozen = resolveFrozenTraceSourceOptions(specked, preset('Smooth'));
+    expect(frozen.sourceAutoMedian).toBe(true);
+    // One median pass serves both: the cut is read after the repair.
+    expect(frozen.sourceOtsuThreshold).toBe(
+      resolveFrozenTraceSourceOptions(plain, preset('Smooth')).sourceOtsuThreshold,
+    );
+    expect(resolveFrozenTraceSourceOptions(plain, preset('Smooth')).sourceAutoMedian).toBe(false);
+    expect(resolveFrozenTraceSourceOptions(specked, frozen)).toBe(frozen);
+    // Presets without the automatic median carry no verdict.
+    expect(
+      resolveFrozenTraceSourceOptions(specked, preset('Sharp')).sourceAutoMedian,
+    ).toBeUndefined();
+  });
 });

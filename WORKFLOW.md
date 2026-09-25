@@ -2503,7 +2503,10 @@ settings and Job Review keep their existing read-only setup references.
    use pixels of the decoded image grid supplied to the tracing core and preserve their separate
    preset values. If dense artwork is traced on a smaller working grid, both area thresholds are
    converted using the actual width and height ratios, without rounding the internal values.
-   The preceding UI decode cap still defines that source grid. Expand **Curve finishing** for
+   The preceding UI decode cap still defines that source grid. Smooth's automatic noise cleanup
+   also judges one-pixel specks on that grid, before any supersampling, so a small image drops the
+   same specks it would at full size. Isolated one-pixel dots, such as a fine halftone screen,
+   look exactly like noise and are dropped too; trace them with Line Art or Sharp to keep them. Expand **Curve finishing** for
    **Smoothness** and **Optimize** on filled outlines and Edge Detection, or **Transparency**
    for alpha-mask tracing. **Fill tiny holes** controls cleanup of small enclosed white marks;
    it does not bridge open gaps. Turn it off to retain those small highlights. Sliders and numeric fields stay in sync. Manual adjustments persist
@@ -3270,7 +3273,8 @@ and physical material output remain unverified.
 ### F-F5. Enhance a region of a trace (region-enhance re-trace)
 
 **ADR:** [ADR-113](DECISIONS.md#adr-113--region-enhance-re-trace-dialog-boundary-mode-trace-fidelity-2026-07-05),
-amended by [ADR-410](docs/decisions/ADR-410-region-enhance-seams.md).
+amended by [ADR-410](docs/decisions/ADR-410-region-enhance-seams.md) and
+[ADR-411](docs/decisions/ADR-411-auto-median-at-source-scale.md).
 
 **Operator intent.** A small feature inside a large raster (a tiny
 letter counter in a full logo) dropped out of the trace because it
@@ -3293,7 +3297,8 @@ at 2× and downscaled, and its geometry is patched into the full trace
 (polylines fully inside the region's shrunk interior are replaced;
 everything crossing the box border or in the margin ring survives). The
 box is re-traced with a ring of the real neighbouring pixels around it and
-with the whole image's Otsu cut and auto-sketch choice, so the patch
+with the whole image's Otsu cut, auto-sketch choice and Smooth noise-cleanup
+verdict (noise is cleaned on the source pixels before the 2× enlargement), so the patch
 binarises exactly like its surroundings, and a shape that both passes
 trace within a pixel of each other at the box edge is kept once. Fitted
 curves and operation bindings survive inside and outside the box. The

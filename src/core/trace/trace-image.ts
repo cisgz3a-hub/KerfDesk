@@ -26,7 +26,7 @@ import { finiteOr } from '../util';
 import type { CrackSubPixelField } from './contour-boundary';
 import type { TraceOptions } from './trace-option-types';
 import { fillPinholes } from './fill-pinholes';
-import { autoMedianFilter, despeckle, medianFilter, otsuThreshold } from './preprocess';
+import { applyMedian, despeckle, otsuThreshold } from './preprocess';
 import { adjustBrightness, adjustContrast, adjustGamma, invertImage } from './raster-prep';
 import { shouldUseSketchTrace } from './auto-sketch-trace';
 import { prepareAutomaticDetailMask } from './automatic-detail-mask';
@@ -129,10 +129,23 @@ export function preprocessForTrace(image: RawImageData, options: TraceOptions): 
   return prepareTraceForContour(image, options).prepared;
 }
 
+/** The luma lanes' median stage on this grid: its tone-adjusted input and
+ * cleaned output (the same object when nothing changed). Absent where the
+ * mask comes from alpha or the local-contrast sketch lanes, which skip it. */
+export type ContourMedianStage = {
+  readonly adjusted: RawImageData;
+  readonly cleaned: RawImageData;
+};
+type ContourPreparation = {
+  readonly prepared: RawImageData;
+  readonly crackField: CrackSubPixelField | null;
+  readonly median?: ContourMedianStage;
+};
+
 export function prepareTraceForContour(
   image: RawImageData,
   options: TraceOptions,
-): { readonly prepared: RawImageData; readonly crackField: CrackSubPixelField | null } {
+): ContourPreparation {
   // Fail closed on a malformed buffer: every downstream stage indexes
   // data[i..i+3] assuming length === width*height*4, so a short/oversized
   // buffer or non-integer dims would read past the array or size a wrong-shape
@@ -173,6 +186,7 @@ export function prepareTraceForContour(
     };
   }
   const prepared = applyMedian(adjusted, options.medianFilter);
+  const median = { adjusted, cleaned: prepared };
   const thresholded = applyThresholdWithIso(prepared, options);
   const field =
     thresholded.thresholdLuma === null ? null : lumaCrackField(prepared, thresholded.thresholdLuma);
@@ -183,12 +197,9 @@ export function prepareTraceForContour(
       sketchCrackField(prepared, SKETCH_RADIUS_PX * effectivePixelScale(options)),
       effectivePixelScale(options),
     );
-    return { ...recovered, prepared: cleanBinaryMask(recovered.prepared, options) };
+    return { ...recovered, median, prepared: cleanBinaryMask(recovered.prepared, options) };
   }
-  return {
-    prepared: cleanBinaryMask(thresholded.prepared, options),
-    crackField: field,
-  };
+  return { prepared: cleanBinaryMask(thresholded.prepared, options), crackField: field, median };
 }
 
 // Mask cleanup is the shared tail of every preprocessing branch: despeckle
@@ -291,16 +302,6 @@ function sketchCrackField(adjusted: RawImageData, radiusPx = SKETCH_RADIUS_PX): 
       return luma[y * width + x] ?? BACKGROUND_LUMA;
     },
   };
-}
-
-// Forced median and selective automatic cleanup have different contracts. The
-// automatic path computes and applies its result once, preserving connected ink.
-export function applyMedian(
-  image: RawImageData,
-  medianFilterOption: boolean | 'auto' | undefined,
-): RawImageData {
-  if (medianFilterOption === 'auto') return autoMedianFilter(image);
-  return medianFilterOption === true ? medianFilter(image) : image;
 }
 
 // Brightness → contrast → gamma → invert. Each is a no-op at its
