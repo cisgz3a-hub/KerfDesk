@@ -103,4 +103,31 @@ describe('SM-3: `fire off` on a board without the Laser module', () => {
     await pump(5_000);
     expect({ owed, home: await home }).toEqual({ owed: 0, home: 'homed' });
   });
+
+  it('Home by itself completes (its tool-off prefix owes nothing forever)', async () => {
+    const sim = await connectSmoothieWithoutLaserModule();
+    let outcome = 'pending';
+    void useLaserStore
+      .getState()
+      .home()
+      .then(
+        () => {
+          outcome = 'homed';
+        },
+        (error: unknown) => {
+          outcome = error instanceof Error ? error.message : String(error);
+        },
+      );
+    // Past the 120 s Home command budget, so a stranded line has timed out.
+    await pump(130_000);
+
+    // Fails today: Home's `fire off` line is never answered, so the homing
+    // cycle is never even sent, Home times out, and the owed acknowledgement
+    // stays behind to refuse the next Jog/Frame/Home/Start.
+    expect({
+      outcome,
+      homingCycles: sim.state().homingCycles,
+      owed: useLaserStore.getState().pendingUntrackedAcks,
+    }).toEqual({ outcome: 'homed', homingCycles: 1, owed: 0 });
+  });
 });

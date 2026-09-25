@@ -15,8 +15,15 @@
 // - Laser.cpp L246: `requested_power = ((float)block->s_value / (1 << 11)) / this->laser_maximum_s_value;`
 // - Robot.cpp L1034 / L1466: the raw G-code S is what reaches the planner.
 // Storing S*2048 in 12 bits keeps only its low 12 bits (S=50 -> 102400 -> 0;
-// S=255 -> 522240 -> 2048). Above S=32 the float-to-integer conversion is also
-// out of range, so no stored value can be relied on.
+// S=255 -> 522240 -> 2048). The shipped FirmwareBin/firmware.bin (GCC -O2
+// -mcpu=cortex-m3, soft float) does exactly that: at 0x113e0 it multiplies by
+// 2048.0f (0x45000000), calls roundf and libgcc's __aeabi_f2uiz (exact below
+// 2^32, byte-identical to libgcc's fixunssfsi) and stores with
+// `bfi r3, r0, #0, #12`; Laser::get_laser_power at 0x23c80 reads it back with
+// `ubfx r0, r0, #0, #12`. firedFraction below models that. (In ISO C++ the
+// float -> uint16_t conversion is undefined above S=32, so another compiler
+// need not even wrap.) The 12-bit field dates from 5c749b4a (2016-07-31); the
+// maximum_s_value option (15ddf50f, 2016-02-29) predates it.
 // https://github.com/Smoothieware/Smoothieware/blob/38e2cc083db0e4f768535a9bf2d32cdf104ea980/src/modules/robot/Block.h#L81
 // https://github.com/Smoothieware/Smoothieware/blob/38e2cc083db0e4f768535a9bf2d32cdf104ea980/src/modules/robot/Planner.cpp#L81
 // https://github.com/Smoothieware/Smoothieware/blob/38e2cc083db0e4f768535a9bf2d32cdf104ea980/src/modules/tools/laser/Laser.cpp#L246
