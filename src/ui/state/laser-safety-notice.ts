@@ -241,6 +241,11 @@ export function frameHitLimitNotice(axisLabel: string | null): LaserSafetyNotice
   return { kind: 'frame-limit', message: frameHitLimitMessage(axisLabel) };
 }
 
+/** The controller answered its Home, but reports the axes not homed (SM-6). */
+export function homeNotConfirmedNotice(reason: string): LaserSafetyNotice {
+  return { kind: 'home-unfinished', message: `Home was not confirmed. ${reason}` };
+}
+
 /** Home ended without the controller confirming it: a timeout, an alarm, or a
  *  change that voided the attempt. Not a rejection, so it is not worded as one
  *  (controller audit 2026-09-25 ST-4). */

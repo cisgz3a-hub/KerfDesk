@@ -96,6 +96,14 @@ export type LaserModuleEvidence = {
   readonly constantPowerMode: boolean | null;
 };
 
+/** How a Home is confirmed on firmware whose Home command proves nothing. */
+export type HomeVerification = {
+  /** The line that asks which axes are homed. */
+  readonly query: string;
+  /** Null when X and Y are homed; otherwise why the Home is not confirmed. */
+  readonly unhomedReason: (responses: ReadonlyArray<string>) => string | null;
+};
+
 /** One owned query, sent once per qualification, that proves whether the
  *  firmware's laser output module is loaded. */
 export type LaserModuleProbe = {
@@ -161,4 +169,7 @@ export type ControllerDriver = {
   ) => StreamPauseBeamPlan;
   /** Present when the firmware can run without its laser output module. */
   readonly laserModuleProbe?: LaserModuleProbe;
+  /** Present when the firmware's Home answers `ok` whether or not anything
+   *  homed, so KerfDesk asks which axes it homed (Smoothieware). */
+  readonly homeVerification?: HomeVerification;
 };

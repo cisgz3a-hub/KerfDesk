@@ -8,6 +8,7 @@ import {
 import { grblHomingDurationBoundMs } from '../../core/controllers/grbl/grbl-homing-duration';
 import {
   controllerErrorNotice,
+  homeNotConfirmedNotice,
   homeUnfinishedNotice,
   type LaserSafetyAction,
   type LaserSafetyNotice,
@@ -202,6 +203,8 @@ async function executeHomeSequence(
     source: 'system',
   });
   assertHomeCurrent(get(), refs, epochs);
+  await verifyHomedAxes(refs, safeWrite, driver);
+  assertHomeCurrent(get(), refs, epochs);
   set({ controllerOperation: homeOperation(epochs.operationId, 'awaiting-idle') });
   await waitForFreshIdle(refs, { kind: 'home', requiredReports: 1 });
   assertHomeCurrent(get(), refs, epochs);
@@ -222,6 +225,35 @@ function homeOriginPatch(state: LaserState): Partial<LaserState> {
     workOriginActive: keepsOrigin,
     workOriginSource: keepsOrigin ? 'unknown' : 'none',
   };
+}
+
+/** The firmware answered its Home line although it homed nothing (SM-6). */
+class HomeNotConfirmedError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = 'HomeNotConfirmedError';
+  }
+}
+
+// Firmware whose Home answers `ok` whether or not anything homed is asked which
+// axes it homed before the Home is confirmed (Smoothieware G28.6; controller
+// audit 2026-09-25 SM-6).
+async function verifyHomedAxes(
+  refs: ControllerLifecycleRefs,
+  safeWrite: SafeWriteFn,
+  driver: ControllerDriver,
+): Promise<void> {
+  const verification = driver.homeVerification;
+  if (verification === undefined) return;
+  const responses = await startControllerCommand(refs, safeWrite, {
+    kind: 'home',
+    label: 'homed axes query',
+    command: `${verification.query}\n`,
+    action: 'home',
+    source: 'system',
+  });
+  const reason = verification.unhomedReason(responses);
+  if (reason !== null) throw new HomeNotConfirmedError(reason);
 }
 
 function confirmHome(set: SetFn, get: GetFn, epochs: HomeEpochs): void {
@@ -273,6 +305,7 @@ function recordHomeFailure(set: SetFn, error: unknown, epochs: HomeEpochs): void
 // Only a line the controller answered with error:N was rejected; a timeout, an
 // alarm or a voided attempt is a Home that did not finish (audit ST-4).
 function homeFailureNotice(error: unknown, message: string): LaserSafetyNotice {
+  if (error instanceof HomeNotConfirmedError) return homeNotConfirmedNotice(message);
   if (!(error instanceof ControllerCommandRefusedError)) return homeUnfinishedNotice(message);
   const code = /^error:(\d+)$/i.exec(message.trim());
   return code === null

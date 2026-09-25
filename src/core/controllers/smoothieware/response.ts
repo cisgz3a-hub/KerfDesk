@@ -20,6 +20,7 @@ import type { ControllerEvent } from '../controller-event';
 import { parseStatusReport } from '../grbl/status-parser';
 import { parseCommaStatusReport } from './comma-status-report';
 import { SMOOTHIE_FIRE_OFF_COMPLETE, SMOOTHIE_VERSION_COMPLETE_PREFIX } from './commands';
+import { SMOOTHIE_HOMED_FLAGS_LINE_RE } from './home-verification';
 import { smoothieStatusReport } from './status-report-fields';
 
 const OK_RE = /^ok\b/i;
@@ -52,6 +53,11 @@ export function classifySmoothieResponse(line: string): ControllerEvent {
   const status = classifyStatusLine(trimmed);
   if (status !== null) return status;
   if (LASER_REPORT_RE.test(trimmed)) return { kind: 'message', tag: 'LASER', body: trimmed };
+  // G28.6 prints `X:1 Y:1 ` (Endstops.cpp:1114-1120); the Home verification
+  // reads it as a response line (home-verification.ts, audit SM-6).
+  if (SMOOTHIE_HOMED_FLAGS_LINE_RE.test(trimmed)) {
+    return { kind: 'message', tag: 'HOMED', body: trimmed };
+  }
   // GcodeDispatch prints FIRMWARE_NAME only in answer to M115, followed by
   // `ok`; it is an identity reply, never a reboot, so it must not cross the
   // controller-reset boundary a welcome banner does.

@@ -21,6 +21,7 @@ import {
   SMOOTHIE_FRAME_TOOL_OFF_LINES,
 } from './commands';
 import { prepareSmoothieConsoleCommand } from './console-command';
+import { smoothieHomeVerification } from './home-verification';
 import { smoothieLaserModuleProbe } from './laser-module';
 import { classifySmoothieResponse } from './response';
 
@@ -75,7 +76,9 @@ export const smoothiewareDriver: ControllerDriver = {
     sleep: null,
     settingsQuery: null,
     buildInfoQuery: null,
-    modalStateQuery: null,
+    // `$G` prints `[GC:...]` then `ok` (SimpleShell.cpp:218-222, 879-882), so
+    // the Frame can read the active WCS before it selects G54 (audit CG-2).
+    modalStateQuery: '$G',
     offsetsQuery: null,
     queuedStatusQuery: null,
     stopLaserLines: SMOOTHIE_STOP_LASER_LINES,
@@ -108,4 +111,6 @@ export const smoothiewareDriver: ControllerDriver = {
   // `fire off` and the M221 power modes exist only while the Laser module is
   // loaded; qualification asks the board with M221 (laser-module.ts).
   laserModuleProbe: smoothieLaserModuleProbe,
+  // `$H` answers `ok` whether or not anything homed (audit SM-6).
+  homeVerification: smoothieHomeVerification,
 };
