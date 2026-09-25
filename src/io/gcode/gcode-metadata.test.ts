@@ -41,7 +41,7 @@ function laserAssumptions(
 
 describe('gcodeMetadataHeader', () => {
   it('tracks the latest safety-relevant emitter revision', () => {
-    expect(EMITTER_REVISION).toBe('tapered-ball-nose-20260924-v1');
+    expect(EMITTER_REVISION).toBe('cnc-audit-repair-20260924-v1');
   });
 
   it('emits provenance as GRBL comment lines and ends with a newline', () => {
