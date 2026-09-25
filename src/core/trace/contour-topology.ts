@@ -88,7 +88,10 @@ type TopologyRepair = {
 };
 
 /** Move one conflicting contour a step toward its source boundary. False once
- *  it is already there. */
+ *  it is already there. A step that returns the geometry the contour already
+ *  has is passed over: it cannot resolve the conflict, and each round costs a
+ *  check of the whole drawing. The tracer's refinements are always new, so
+ *  this only shortens callers with fixed steps, like the laser commit guard. */
 function backOffContour(contour: FinishedContour, index: number, repair: TopologyRepair): boolean {
   const finish = repair.finishes[index] ?? contour;
   const attempt = repair.attempts[index] ?? 0;
@@ -102,15 +105,22 @@ function backOffContour(contour: FinishedContour, index: number, repair: Topolog
     repair.current[index] = alternate.polyline;
     return true;
   }
-  const next = attempt + 1;
-  repair.attempts[index] = next;
-  repair.current[index] =
-    next <= REFINEMENT_ATTEMPTS
-      ? finish.refine(REFINEMENT_REDUCTION ** next)
-      : next === REFINEMENT_ATTEMPTS + 1
-        ? finish.baseline
-        : contour.source;
-  return true;
+  const current = repair.current[index];
+  for (let next = attempt + 1; next <= REFINEMENT_ATTEMPTS + 2; next += 1) {
+    repair.attempts[index] = next;
+    const step = backOffStep(contour, finish, next);
+    if (step !== current) {
+      repair.current[index] = step;
+      return true;
+    }
+  }
+  return false;
+}
+
+// Weaker refinements, then the smoothed baseline, then the source boundary.
+function backOffStep(contour: FinishedContour, finish: ContourRefinement, step: number): Polyline {
+  if (step <= REFINEMENT_ATTEMPTS) return finish.refine(REFINEMENT_REDUCTION ** step);
+  return step === REFINEMENT_ATTEMPTS + 1 ? finish.baseline : contour.source;
 }
 
 function* addNestingConflictsSteps(

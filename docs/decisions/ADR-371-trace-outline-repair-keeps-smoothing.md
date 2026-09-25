@@ -41,7 +41,10 @@ The 2026-09-24 tracer audit measured this on the dragon fixture
    swaps this finish in, and backs it off only if it still conflicts.
 3. The repair halves the fit tolerance at most 4 times, to 1/16 of its starting value, before the
    smoothed baseline and then the source boundary. Later halvings barely moved the curve but each
-   cost a full check of the drawing.
+   cost a full check of the drawing. A step that returns the geometry the outline already has is
+   passed over, since it cannot resolve the conflict. The tracer's refinements are always new
+   geometry, so this changes no trace; it lets a caller whose steps are fixed, such as the laser
+   commit guard (ADR-391), reach the source boundary in one round.
 
 ### Consequences
 
@@ -61,5 +64,7 @@ The 2026-09-24 tracer audit measured this on the dragon fixture
 - Both outlines of a crossing pair still step in the same round. Stepping only the outline that has
   a finish to swap could keep more outlines at full tolerance, at the cost of extra rounds; it is not
   measured and not part of this decision.
+- Passing over repeated steps halves the laser commit guard's time on the dragon's Sharp trace at
+  100 mm wide (2.8 s to 1.3 s in this container) with identical output.
 - `cubic-fit.test.ts` pins the looping run from the dragon; `contour-repair.test.ts` pins the swap
-  before any back-off.
+  before any back-off and the passed-over repeated steps.
