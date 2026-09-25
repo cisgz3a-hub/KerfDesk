@@ -225,6 +225,25 @@ describe('trace controls describe the options the engine actually receives', () 
       expect(controls.options()).toEqual(options);
     });
   });
+
+  it('describes Centerline Smoothness and Optimize the same way in the hint and the tooltip', async () => {
+    // ADR-397: in Centerline they are the corner angle and the fit tolerance.
+    // The visible hint the input is described by must not keep the contour
+    // copy while only the hover title changes.
+    await withControls('Centerline', async (controls) => {
+      for (const [label, role] of [
+        ['Smoothness', 'corner'],
+        ['Optimize', 'fewer nodes'],
+      ] as const) {
+        const input = controls.number(label);
+        const hintId = input.getAttribute('aria-describedby') ?? '';
+        const hint = controls.host.querySelector(`[id="${hintId}"]`);
+        expect(input.title).toContain(role);
+        expect(hint?.textContent).toBe(input.title);
+      }
+      expect(controls.host.textContent).not.toContain('Smooth traced edges');
+    });
+  });
 });
 
 type Controls = {

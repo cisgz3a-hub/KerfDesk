@@ -5,37 +5,50 @@
 // shorter than the minimum chain) or tip-extended the stub across the whole
 // diameter, so every period, i-dot and round blob came out as a dash.
 //
-// A component is ROUND when its outer radius (farthest ink from its
-// centroid) is close to the radius r of the disc with its area, and its
-// distance-field peak shows no counter inside. Such a component becomes one
-// closed circular mark centred on its centroid, of radius r/2 — the midline
-// between the dot's centre and its edge. Burned on a LINE layer with
-// a beam of kerf k, the mark covers the annulus r/2 ± k/2: exactly the dot
-// when k = r, a solid spot whenever k ≥ r (every pen-sized dot at ordinary
-// engraving scale), and a ring the size of the blob for a large blob, which
-// a single-line trace cannot fill anyway. A stationary beam never fires
+// A component is a DOT only when two independent kinds of evidence agree:
+//
+//  * shape — it is compact (its outer radius is close to the radius of the
+//    disc with its area, so no concavity or open counter) and not elongated
+//    (the axis ratio of its second moments is at most 1.2, so a 1.4:1
+//    capsule is already a stroke);
+//  * skeleton — its own medial axis is degenerate: no junction, at most one
+//    open chain, and that chain no longer than the outer radius exceeds the
+//    inscribed radius (plus lattice slack). A dash, a plus sign or a small
+//    "e" with an open counter has a real skeleton and keeps its strokes.
+//
+// A dot becomes concentric closed circles centred on its centroid, spaced at
+// most one source pixel apart: n = ceil(r / pitch) circles at radii
+// (2j + 1)·r / (2n). Burned on a LINE layer with a beam of kerf k, circle j
+// covers its radius ± k/2, so the circles tile the disc of radius r exactly
+// when k = r / n and cover it solid for any k ≥ r / n — any beam at least one
+// source pixel wide (0.1 mm at the 254 DPI import default). A dot no wider
+// than a pixel gets one circle of radius r/2. A stationary beam never fires
 // (positive-motion rule), so a zero-length point mark would burn nothing;
-// the circle always has length. Elongated components (dashes, strokes) and
-// rings (an "o" has a large outer radius for its stroke) are not round and
-// keep their strokes.
+// every circle has length.
 
 import type { CurveSubpath, Polyline, Vec2 } from '../../scene';
 import { registerTraceCurve } from '../trace-curves';
 import type { InkMask } from './distance-field';
+import { arcLength } from './spur-pruning';
+import type { StrokeGraph } from './stroke-graph';
 import { sampleStrokeCurve } from './stroke-curve-fit';
 
-// A component is round when its outer radius is close to the radius of a
-// disc of the same area: a disc scores ~1, a square dot ~1.1, a 2:1 dash
-// ~1.4. The pixel slack absorbs lattice rounding of small dots.
+// Shape: the outer radius is close to the radius of a disc of the same area
+// (a disc scores ~1, a square dot ~1.1, a "C" or a ring far more). The slack
+// absorbs lattice rounding of small dots. Every px constant here is a SOURCE
+// pixel distance, scaled to the working grid, so an auto-upscaled trace
+// classifies the same ink the same way.
 const ROUND_AREA_RATIO = 1.2;
 const ROUND_AREA_SLACK_PX = 0.5;
-// ...and when the distance field agrees there is no counter inside: a ring's
-// peak distance is half its stroke, far below its outer radius, so an "o"
-// (any counter wider than ~1.5 px) keeps its ring stroke.
-const ROUND_INNER_RATIO = 2;
-const ROUND_INNER_SLACK_PX = 1.5;
-// Smallest mark radius, in source px (scaled to the working grid).
-const MIN_MARK_RADIUS_PX = 0.5;
+// Shape: second-moment axis ratio. A pixelated disc measures ~1.0; a 7x5
+// capsule (1.4:1) measures 1.25 and an 8x5 one 1.39.
+const MAX_AXIS_RATIO = 1.2;
+// Skeleton: a dot's medial stub is at most as long as its outer radius
+// exceeds its inscribed radius, plus this lattice slack.
+const SKELETON_SLACK_PX = 1.5;
+// Concentric-circle pitch and the smallest circle drawn, source px.
+const RING_PITCH_PX = 1;
+const MIN_RING_RADIUS_PX = 0.25;
 // Cubic arm for a quarter circle: 4/3·tan(π/8), max radial error 0.03%.
 const QUARTER_ARM = (4 / 3) * Math.tan(Math.PI / 8);
 
@@ -43,19 +56,73 @@ type Component = {
   count: number;
   sumX: number;
   sumY: number;
+  sumXX: number;
+  sumYY: number;
+  sumXY: number;
   maxDistSq: number;
   maxOuterSq: number;
+  junctions: number;
+  chains: number;
+  closedChains: number;
+  longestChain: number;
 };
 
-export type RoundInk = {
+type Dot = {
   readonly label: number;
   readonly centre: Vec2;
   /** Radius of the disc with the component's area, working px. */
   readonly radius: number;
 };
 
-/** 8-connected ink components, labelled 1..n (0 = paper). */
-export function labelInkComponents(mask: InkMask): { labels: Int32Array; count: number } {
+/**
+ * Replace the strokes of every dot component with its concentric circles.
+ * `skeleton` is the pruned stroke graph the strokes were assembled from. A
+ * polyline belongs to a component when all its points that land on ink land
+ * on that component; one that bridges into other ink is a real stroke and
+ * keeps the component out of the fallback.
+ */
+export function withDotMarks(
+  polylines: ReadonlyArray<Polyline>,
+  mask: InkMask,
+  distSq: Float64Array,
+  skeleton: StrokeGraph,
+  pixelScale: number,
+): Polyline[] {
+  const { labels, count } = labelInkComponents(mask);
+  const dots = findDots(mask, distSq, labels, count, skeleton, pixelScale);
+  if (dots.length === 0) return [...polylines];
+  const dotLabels = new Set(dots.map((d) => d.label));
+  const owner = polylines.map((polyline) => ownerComponent(polyline, mask.width, labels));
+  const bridged = new Set<number>();
+  for (const o of owner) {
+    if (o.kind === 'mixed') for (const label of o.labels) bridged.add(label);
+  }
+  const kept = polylines.filter((_, i) => {
+    const o = owner[i];
+    return !(o?.kind === 'single' && dotLabels.has(o.label) && !bridged.has(o.label));
+  });
+  for (const dot of dots) {
+    if (bridged.has(dot.label)) continue;
+    kept.push(...dotMarks(dot.centre, dot.radius, pixelScale));
+  }
+  return kept;
+}
+
+/** Concentric circles that burn a dot of radius `radius` (working px) solid
+ *  with any beam at least one source pixel wide (see the module comment). */
+function dotMarks(centre: Vec2, radius: number, pixelScale: number): Polyline[] {
+  const scale = Math.max(1e-6, pixelScale);
+  const n = Math.max(1, Math.ceil(radius / (RING_PITCH_PX * scale) - 1e-9));
+  const marks: Polyline[] = [];
+  for (let j = n - 1; j >= 0; j -= 1) {
+    const r = Math.max(((2 * j + 1) * radius) / (2 * n), MIN_RING_RADIUS_PX * scale);
+    marks.push(circleMark(centre, r));
+  }
+  return marks;
+}
+
+// 8-connected ink components, labelled 1..n (0 = paper).
+function labelInkComponents(mask: InkMask): { labels: Int32Array; count: number } {
   const { width, height, ink } = mask;
   const labels = new Int32Array(width * height);
   const stack: number[] = [];
@@ -91,28 +158,72 @@ function floodNeighbours(
   }
 }
 
-/** The round components of the mask (see the module comment). */
-export function findRoundInk(
+// The dot components of the mask (see the module comment).
+function findDots(
   mask: InkMask,
   distSq: Float64Array,
   labels: Int32Array,
   count: number,
-): RoundInk[] {
-  const { width } = mask;
-  const components: Component[] = Array.from({ length: count + 1 }, () => ({
+  skeleton: StrokeGraph,
+  pixelScale: number,
+): Dot[] {
+  const components = measureComponents(mask, distSq, labels, count);
+  addSkeletonEvidence(components, skeleton, mask.width, labels);
+  const scale = Math.max(1e-6, pixelScale);
+  const dots: Dot[] = [];
+  for (let label = 1; label <= count; label += 1) {
+    const c = components[label] as Component;
+    if (c.count === 0) continue;
+    // Distances run between pixel centres; the ink edge is half a pixel out.
+    const inner = Math.max(0.5, Math.sqrt(c.maxDistSq) - 0.5);
+    const outer = Math.sqrt(c.maxOuterSq) + 0.5;
+    const areaRadius = Math.sqrt(c.count / Math.PI);
+    if (outer > ROUND_AREA_RATIO * areaRadius + ROUND_AREA_SLACK_PX * scale) continue;
+    if (axisRatio(c) > MAX_AXIS_RATIO) continue;
+    if (c.junctions > 0 || c.closedChains > 0 || c.chains > 1) continue;
+    if (c.longestChain > outer - inner + SKELETON_SLACK_PX * scale) continue;
+    dots.push({ label, centre: { x: c.sumX / c.count, y: c.sumY / c.count }, radius: areaRadius });
+  }
+  return dots;
+}
+
+function emptyComponent(): Component {
+  return {
     count: 0,
     sumX: 0,
     sumY: 0,
+    sumXX: 0,
+    sumYY: 0,
+    sumXY: 0,
     maxDistSq: 0,
     maxOuterSq: 0,
-  }));
+    junctions: 0,
+    chains: 0,
+    closedChains: 0,
+    longestChain: 0,
+  };
+}
+
+function measureComponents(
+  mask: InkMask,
+  distSq: Float64Array,
+  labels: Int32Array,
+  count: number,
+): Component[] {
+  const { width } = mask;
+  const components = Array.from({ length: count + 1 }, emptyComponent);
   for (let i = 0; i < labels.length; i += 1) {
     const label = labels[i] as number;
     if (label === 0) continue;
     const c = components[label] as Component;
+    const x = (i % width) + 0.5;
+    const y = Math.floor(i / width) + 0.5;
     c.count += 1;
-    c.sumX += (i % width) + 0.5;
-    c.sumY += Math.floor(i / width) + 0.5;
+    c.sumX += x;
+    c.sumY += y;
+    c.sumXX += x * x;
+    c.sumYY += y * y;
+    c.sumXY += x * y;
     c.maxDistSq = Math.max(c.maxDistSq, distSq[i] ?? 0);
   }
   for (let i = 0; i < labels.length; i += 1) {
@@ -123,51 +234,51 @@ export function findRoundInk(
     const dy = Math.floor(i / width) + 0.5 - c.sumY / c.count;
     c.maxOuterSq = Math.max(c.maxOuterSq, dx * dx + dy * dy);
   }
-  const round: RoundInk[] = [];
-  for (let label = 1; label <= count; label += 1) {
-    const c = components[label] as Component;
-    if (c.count === 0) continue;
-    // Distances run between pixel centres; the ink edge is half a pixel out.
-    const inner = Math.max(0.5, Math.sqrt(c.maxDistSq) - 0.5);
-    const outer = Math.sqrt(c.maxOuterSq) + 0.5;
-    const areaRadius = Math.sqrt(c.count / Math.PI);
-    if (outer > ROUND_AREA_RATIO * areaRadius + ROUND_AREA_SLACK_PX) continue;
-    if (outer > ROUND_INNER_RATIO * inner + ROUND_INNER_SLACK_PX) continue;
-    round.push({ label, centre: { x: c.sumX / c.count, y: c.sumY / c.count }, radius: areaRadius });
-  }
-  return round;
+  return components;
 }
 
-/**
- * Replace the strokes of every round component with its circular mark.
- * A polyline belongs to a component when all its points that land on ink
- * land on that component; one that bridges into other ink is a real stroke
- * and keeps the component out of the fallback.
- */
-export function withDotMarks(
-  polylines: ReadonlyArray<Polyline>,
-  mask: InkMask,
-  distSq: Float64Array,
-  pixelScale: number,
-): Polyline[] {
-  const { labels, count } = labelInkComponents(mask);
-  const round = findRoundInk(mask, distSq, labels, count);
-  if (round.length === 0) return [...polylines];
-  const roundLabels = new Set(round.map((r) => r.label));
-  const owner = polylines.map((polyline) => ownerComponent(polyline, mask.width, labels));
-  const bridged = new Set<number>();
-  for (const o of owner) {
-    if (o.kind === 'mixed') for (const label of o.labels) bridged.add(label);
+// Junctions and chains of the pruned skeleton, credited to the component
+// their position lands on.
+function addSkeletonEvidence(
+  components: Component[],
+  skeleton: StrokeGraph,
+  width: number,
+  labels: Int32Array,
+): void {
+  const componentAt = (p: Vec2 | undefined): Component | undefined => {
+    if (p === undefined) return undefined;
+    const x = Math.floor(p.x);
+    const y = Math.floor(p.y);
+    if (x < 0 || y < 0 || x >= width) return undefined;
+    const label = labels[y * width + x] ?? 0;
+    return label === 0 ? undefined : components[label];
+  };
+  for (const node of skeleton.nodes) {
+    if (node.kind !== 'junction') continue;
+    const c = componentAt(node.pos);
+    if (c !== undefined) c.junctions += 1;
   }
-  const kept = polylines.filter((_, i) => {
-    const o = owner[i];
-    return !(o?.kind === 'single' && roundLabels.has(o.label) && !bridged.has(o.label));
-  });
-  for (const dot of round) {
-    if (bridged.has(dot.label)) continue;
-    kept.push(dotMark(dot.centre, Math.max(dot.radius / 2, MIN_MARK_RADIUS_PX * pixelScale)));
+  for (const chain of skeleton.chains) {
+    const c = componentAt(chain.points[chain.points.length >> 1]);
+    if (c === undefined) continue;
+    c.chains += 1;
+    if (chain.closed) c.closedChains += 1;
+    c.longestChain = Math.max(c.longestChain, arcLength(chain.points));
   }
-  return kept;
+}
+
+// Ratio of the principal axes of the component's second moments, each pixel
+// counted as a unit square (hence the 1/12 on both variances).
+function axisRatio(c: Component): number {
+  const mx = c.sumX / c.count;
+  const my = c.sumY / c.count;
+  const vxx = c.sumXX / c.count - mx * mx + 1 / 12;
+  const vyy = c.sumYY / c.count - my * my + 1 / 12;
+  const vxy = c.sumXY / c.count - mx * my;
+  const half = (vxx + vyy) / 2;
+  const spread = Math.sqrt(((vxx - vyy) / 2) ** 2 + vxy * vxy);
+  const minor = half - spread;
+  return minor > 1e-12 ? Math.sqrt((half + spread) / minor) : Infinity;
 }
 
 type Owner =
@@ -190,8 +301,8 @@ function ownerComponent(polyline: Polyline, width: number, labels: Int32Array): 
   return { kind: 'mixed', labels: seen };
 }
 
-/** A closed circle of four cubics, registered as its canonical curve. */
-export function dotMark(centre: Vec2, radius: number): Polyline {
+// A closed circle of four cubics, registered as its canonical curve.
+function circleMark(centre: Vec2, radius: number): Polyline {
   const k = QUARTER_ARM * radius;
   const at = (dx: number, dy: number): Vec2 => ({ x: centre.x + dx, y: centre.y + dy });
   const curve: CurveSubpath = {

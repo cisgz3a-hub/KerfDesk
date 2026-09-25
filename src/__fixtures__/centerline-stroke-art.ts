@@ -176,3 +176,81 @@ export function gapArt(gapPx: number): { image: RawImageData; gapPx: number } {
   }
   return { image: { width, height: width, data }, gapPx };
 }
+
+/** A horizontal capsule (a short dash with round caps) `length` px long
+ *  overall and `strokeWidthPx` wide, centred at (64, 64). */
+export function capsuleArt(length: number, strokeWidthPx: number): StrokeArt {
+  const half = (length - strokeWidthPx) / 2;
+  return renderStrokeArt(
+    `capsule ${length}x${strokeWidthPx}`,
+    [
+      open([
+        { x: 64 - half, y: 64 },
+        { x: 64 + half, y: 64 },
+      ]),
+    ],
+    strokeWidthPx,
+  );
+}
+
+/** A dashed line: `count` round-capped dashes `dashPx` long overall,
+ *  separated by `gapPx` of paper between their caps. */
+export function dashedLineArt(
+  count: number,
+  dashPx: number,
+  gapPx: number,
+  strokeWidthPx: number,
+): StrokeArt {
+  const lines: Polyline[] = [];
+  let x = 20;
+  for (let i = 0; i < count; i += 1) {
+    const half = strokeWidthPx / 2;
+    lines.push(
+      open([
+        { x: x + half, y: 64 },
+        { x: x + dashPx - half, y: 64 },
+      ]),
+    );
+    x += dashPx + gapPx;
+  }
+  return renderStrokeArt(`dashes ${dashPx}/${gapPx}x${strokeWidthPx}`, lines, strokeWidthPx);
+}
+
+/** A "+" sign `size` px across with round-capped arms. */
+export function plusArt(size: number, strokeWidthPx: number): StrokeArt {
+  const half = (size - strokeWidthPx) / 2;
+  return renderStrokeArt(
+    `plus ${size}x${strokeWidthPx}`,
+    [
+      open([
+        { x: 64 - half, y: 64 },
+        { x: 64 + half, y: 64 },
+      ]),
+      open([
+        { x: 64, y: 64 - half },
+        { x: 64, y: 64 + half },
+      ]),
+    ],
+    strokeWidthPx,
+  );
+}
+
+/** A small lowercase "e": a bar across a 320 degree arc of radius `r`. */
+export function smallEArt(r: number, strokeWidthPx: number): StrokeArt {
+  return renderStrokeArt(
+    `e r=${r}`,
+    [
+      open([
+        { x: 64 - r, y: 64 },
+        { x: 64 + r, y: 64 },
+      ]),
+      open(arcPolyline(64, 64, r, 0, -320)),
+    ],
+    strokeWidthPx,
+  );
+}
+
+/** A small "c": a 270 degree arc of radius `r`. */
+export function smallCArt(r: number, strokeWidthPx: number): StrokeArt {
+  return renderStrokeArt(`c r=${r}`, [open(arcPolyline(64, 64, r, 45, 315))], strokeWidthPx);
+}

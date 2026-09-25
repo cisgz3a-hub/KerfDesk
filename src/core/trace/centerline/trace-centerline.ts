@@ -68,9 +68,10 @@ export function* traceCenterlineStrokePathsSteps(
     simplifyTolerance: options.lineTolerance,
     curve: strokeCurvePolicy(options),
   });
-  // Round components (dots, round blobs) have no stroke to follow; they
-  // become circular marks instead of vanishing or turning into dashes.
-  const marked = withDotMarks(polylines, mask, distSq, effectivePixelScale(options));
+  // Dots (round, unelongated ink whose own skeleton is degenerate) have no
+  // stroke to follow; they become concentric circles that burn them solid
+  // instead of vanishing or turning into dashes.
+  const marked = withDotMarks(polylines, mask, distSq, condensed, effectivePixelScale(options));
   // Rings closed at a corner keep their endpoints a gap apart; make them
   // return to start so a stroked/engraved closed loop has no seam gap.
   const closed = closeRingEndpoints(marked);

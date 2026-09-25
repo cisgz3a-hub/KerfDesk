@@ -1,14 +1,15 @@
 // ADR-397 regression suite: centreline strokes reach the scene as compact
-// cubic curves, tips extend before gaps bridge, round dots become marks, and
-// Smoothness / Optimize drive the corner angle and fit tolerance.
+// cubic curves, tips extend before gaps bridge, dots become concentric marks,
+// and Smoothness / Optimize drive the corner angle and fit tolerance.
 //
-// Segment counts measured on the pre-ADR-397 pipeline (straight segments over
-// a dense Catmull-Rom resample), for the same anti-aliased fixtures:
-//   ring r=50 3px 128, S-curve 56, letter S 80, letter 8 112, letter a 108,
-//   handwriting 88.
+// Before-values were measured on the pre-ADR-397 pipeline (straight segments
+// over a dense Catmull-Rom resample), for the same anti-aliased fixtures and
+// with the same deviation measure as below.
 
 import { describe, expect, it } from 'vitest';
 import {
+  capsuleArt,
+  dashedLineArt,
   dotArt,
   gapArt,
   handwritingArt,
@@ -16,8 +17,11 @@ import {
   letter8Art,
   letterAArt,
   letterSArt,
+  plusArt,
   ringArt,
   sCurveArt,
+  smallCArt,
+  smallEArt,
   type StrokeArt,
 } from '../../../__fixtures__/centerline-stroke-art';
 import { minDistanceToPolylines } from '../../../__fixtures__/perceptual/centerline-geometry';
@@ -92,34 +96,55 @@ describe('centreline strokes as compact cubics', () => {
     const last = ring.segments.at(-1) as CurveSubpath['segments'][number];
     expect(last.to).toEqual(ring.start);
     const { max, mean } = deviation(curves, art);
-    // Before: max 0.36, mean 0.148 px.
-    expect(max).toBeLessThanOrEqual(0.4);
-    expect(mean).toBeLessThanOrEqual(0.15);
+    // Before: max 0.360, mean 0.148 px. Measured after: 0.331 / 0.103.
+    expect(max).toBeLessThanOrEqual(0.36);
+    expect(mean).toBeLessThanOrEqual(0.148);
   });
 
+  // Deviation from the analytic centreline may not get worse than before by
+  // more than MAX_SLACK_PX (worst case) or the row's mean slack. Junction and
+  // cap topology set the maxima and is shared by both pipelines; the fit adds
+  // at most its 0.25 px tolerance to the faired chain.
+  // Letter a is the one accepted mean regression (ADR-397): its stem's centre
+  // lies on a pixel edge, the faired chain settles on the pixel-centre column
+  // beside it, and the fit follows that chain where the old chords happened
+  // to cut closer to the truth (measured 0.342 -> 0.415 px mean).
+  const MAX_SLACK_PX = 0.07;
+  const MEAN_SLACK_PX = 0.02;
   it.each([
-    ['S-curve', sCurveArt(), 56],
-    ['letter S', letterSArt(), 80],
-    ['letter 8', letter8Art(), 112],
-    ['letter a', letterAArt(), 108],
-    ['handwriting', handwritingArt(), 88],
-  ] as const)('%s: at least 5x fewer segments at unchanged fidelity', (_name, art, before) => {
-    const paths = traceCenterlineStrokePaths(art.image, PRESET);
-    const curves = curvesOf(paths);
-    expect(segmentCount(curves)).toBeLessThanOrEqual(Math.floor(before / 5));
-    // Worst-case distance from the analytic centreline is set by junction
-    // topology, identical before and after (1.21-1.78 px on these fixtures);
-    // the fit adds at most its tolerance to the faired chain.
-    const { max, mean } = deviation(curves, art);
-    expect(max).toBeLessThan(1.85);
-    expect(mean).toBeLessThan(0.45);
-    // The compatibility polylines are the curves' own samples.
-    const polylines = paths.flatMap((path) => path.polylines);
-    curves.forEach((curve, index) => {
-      const polyline = polylines[index] as Polyline;
-      expect(polyline.points[0]).toEqual(curve.start);
-      expect(polyline.points.at(-1)).toEqual(curve.segments.at(-1)?.to);
-    });
+    // name, art, segments before, max before, mean before, mean slack
+    ['S-curve', sCurveArt(), 56, 1.287, 0.148, MEAN_SLACK_PX],
+    ['letter S', letterSArt(), 80, 1.213, 0.262, MEAN_SLACK_PX],
+    ['letter 8', letter8Art(), 112, 1.503, 0.314, MEAN_SLACK_PX],
+    ['letter a', letterAArt(), 108, 1.608, 0.342, 0.08],
+    ['handwriting', handwritingArt(), 88, 1.742, 0.39, MEAN_SLACK_PX],
+  ] as const)(
+    '%s: at least 5x fewer segments, deviation within slack of before',
+    (_name, art, before, maxBefore, meanBefore, meanSlack) => {
+      const paths = traceCenterlineStrokePaths(art.image, PRESET);
+      const curves = curvesOf(paths);
+      expect(segmentCount(curves)).toBeLessThanOrEqual(Math.floor(before / 5));
+      const { max, mean } = deviation(curves, art);
+      expect(max).toBeLessThanOrEqual(maxBefore + MAX_SLACK_PX);
+      expect(mean).toBeLessThanOrEqual(meanBefore + meanSlack);
+      // The compatibility polylines are the curves' own samples.
+      const polylines = paths.flatMap((path) => path.polylines);
+      curves.forEach((curve, index) => {
+        const polyline = polylines[index] as Polyline;
+        expect(polyline.points[0]).toEqual(curve.start);
+        expect(polyline.points.at(-1)).toEqual(curve.segments.at(-1)?.to);
+      });
+    },
+  );
+
+  it.each([
+    ['T', 0.666, 0.565],
+    ['Y', 0.617, 0.367],
+  ] as const)('%s junction: deviation within slack of before', (kind, maxBefore, meanBefore) => {
+    const art = junctionArt(kind);
+    const { max, mean } = deviation(curvesOf(traceCenterlineStrokePaths(art.image, PRESET)), art);
+    expect(max).toBeLessThanOrEqual(maxBefore + MAX_SLACK_PX);
+    expect(mean).toBeLessThanOrEqual(meanBefore + MEAN_SLACK_PX);
   });
 
   it('keeps branch attachments exact and straight strokes as lines at T, X and Y junctions', () => {
@@ -176,34 +201,97 @@ describe('centreline strokes as compact cubics', () => {
   });
 });
 
-describe('centreline dots and round blobs', () => {
-  it.each([1, 1.5, 2, 3, 4])('a dot of radius %s becomes one round mark at its centre', (r) => {
-    const art = dotArt(r);
-    const curves = curvesOf(
-      traceCenterlineStrokePaths(art.image, { ...PRESET, despeckleMinPixels: 0 }),
-    );
-    expect(curves).toHaveLength(1);
-    const mark = curves[0] as CurveSubpath;
-    expect(mark.closed).toBe(true);
-    expect(mark.segments).toHaveLength(4);
-    const points = flat(mark).points;
-    const cx = points.reduce((s, p) => s + p.x, 0) / points.length;
-    const cy = points.reduce((s, p) => s + p.y, 0) / points.length;
-    expect(Math.hypot(cx - 32, cy - 32)).toBeLessThan(0.35);
-    const radius = Math.hypot((points[0] as Vec2).x - cx, (points[0] as Vec2).y - cy);
-    // Half the dot's radius, never below half a pixel: a solid spot for any
-    // kerf at least the dot's radius.
-    expect(radius).toBeGreaterThanOrEqual(0.5 - 1e-9);
-    expect(radius).toBeLessThanOrEqual(Math.max(0.5, r / 2) + 0.35);
+describe('centreline dots', () => {
+  const NO_SPECK_FILTER = { ...PRESET, despeckleMinPixels: 0 };
+
+  it.each([1, 1.5, 2, 3, 4, 8])(
+    'a dot of radius %s becomes concentric circles that burn it solid',
+    (r) => {
+      const art = dotArt(r);
+      const curves = curvesOf(traceCenterlineStrokePaths(art.image, NO_SPECK_FILTER));
+      expect(curves.length).toBeGreaterThanOrEqual(1);
+      const radii: number[] = [];
+      for (const mark of curves) {
+        expect(mark.closed).toBe(true);
+        expect(mark.segments).toHaveLength(4);
+        const points = flat(mark).points;
+        const cx = points.reduce((sum, p) => sum + p.x, 0) / points.length;
+        const cy = points.reduce((sum, p) => sum + p.y, 0) / points.length;
+        expect(Math.hypot(cx - 32, cy - 32)).toBeLessThan(0.35);
+        radii.push(Math.hypot((points[0] as Vec2).x - cx, (points[0] as Vec2).y - cy));
+      }
+      radii.sort((a, b) => a - b);
+      // A beam one source pixel wide covers each circle's radius +- 0.5 px:
+      // the innermost reaches the centre, neighbours overlap, and the
+      // outermost reaches the dot's edge without passing it.
+      expect(radii[0]).toBeLessThanOrEqual(0.5 + 1e-9);
+      for (let i = 1; i < radii.length; i += 1) {
+        expect((radii[i] as number) - (radii[i - 1] as number)).toBeLessThanOrEqual(1 + 1e-9);
+      }
+      const outer = radii.at(-1) as number;
+      expect(outer + 0.5).toBeGreaterThanOrEqual(r - 0.35);
+      expect(outer).toBeLessThanOrEqual(r);
+    },
+  );
+
+  it('classifies the same dot the same way on the auto-upscaled grid', () => {
+    for (const r of [2, 4]) {
+      const art = dotArt(r);
+      const native = curvesOf(
+        traceCenterlineStrokePaths(art.image, {
+          ...NO_SPECK_FILTER,
+          autoUpscaleSmallSources: false,
+        }),
+      );
+      const upscaled = curvesOf(traceCenterlineStrokePaths(art.image, NO_SPECK_FILTER));
+      expect(native.every((curve) => curve.closed)).toBe(true);
+      expect(upscaled.every((curve) => curve.closed)).toBe(true);
+      expect(upscaled).toHaveLength(native.length);
+    }
   });
 
-  it('keeps dashes as strokes and rings as rings', () => {
-    const dash = sCurveArt(); // an elongated stroke is never a dot
-    expect(curvesOf(traceCenterlineStrokePaths(dash.image, PRESET))[0]?.closed).toBe(false);
+  it('keeps the default speck filter: dots under its 12 px area still vanish', () => {
+    // The fallback only replaces strokes the tracer produced. The Centerline
+    // preset's speck filter removes ink under 12 px of area before tracing:
+    // an anti-aliased dot of radius 1.25 px is gone, one of radius 1.5 px
+    // (12 px of ink) is the smallest that becomes a mark.
+    expect(curvesOf(traceCenterlineStrokePaths(dotArt(1.25).image, PRESET))).toHaveLength(0);
+    const kept = curvesOf(traceCenterlineStrokePaths(dotArt(1.5).image, PRESET));
+    expect(kept.length).toBeGreaterThan(0);
+    expect(kept.every((curve) => curve.closed)).toBe(true);
+  });
+
+  // Short strokes are compact too, but their own skeleton is a real stroke
+  // and they are elongated or branched: each keeps the strokes it had before
+  // the dot fallback existed.
+  it.each([
+    ['2:1 dash', capsuleArt(8, 4), 1],
+    ['9x4 dash', capsuleArt(9, 4), 1],
+    ['10x5 dash', capsuleArt(10, 5), 1],
+    ['1.6:1 dash', capsuleArt(8, 5), 1],
+    ['1.4:1 dash', capsuleArt(7, 5), 1],
+    ['13 px plus', plusArt(13, 3), 2],
+    ['small e', smallEArt(4, 2), 1],
+    ['small c', smallCArt(4, 2), 1],
+    ['smaller c', smallCArt(3, 2), 1],
+    ['dashed line, 3 px gaps', dashedLineArt(6, 10, 3, 5), 6],
+  ] as const)('a %s keeps its open strokes', (_name, art, strokes) => {
+    for (const autoUpscaleSmallSources of [false, true]) {
+      const curves = curvesOf(
+        traceCenterlineStrokePaths(art.image, { ...NO_SPECK_FILTER, autoUpscaleSmallSources }),
+      );
+      expect(curves).toHaveLength(strokes);
+      expect(curves.every((curve) => !curve.closed)).toBe(true);
+    }
+  });
+
+  it('keeps long strokes as strokes and rings as rings', () => {
+    const stroke = sCurveArt();
+    expect(curvesOf(traceCenterlineStrokePaths(stroke.image, PRESET))[0]?.closed).toBe(false);
     const small = ringArt(6, 3);
     const ring = curvesOf(traceCenterlineStrokePaths(small.image, PRESET));
     expect(ring).toHaveLength(1);
-    // A 6 px "o" keeps its centreline ring (radius 6), not a dot mark (~2.9).
+    // A 6 px "o" keeps its centreline ring (radius 6), not dot marks.
     const points = flat(ring[0] as CurveSubpath).points;
     expect(Math.min(...points.map((p) => Math.hypot(p.x - 64, p.y - 64)))).toBeGreaterThan(5);
     const short = gapArt(200); // no second stroke: one 44 px dash, 3 px wide
@@ -231,6 +319,20 @@ describe('tip extension runs before gap bridging', () => {
     expect(Math.min(...xs)).toBeLessThan(18.6);
     expect(Math.max(...xs)).toBeGreaterThan(109.4);
   });
+
+  it.each([3, 5])(
+    'a dashed line with 2 px gaps stays dashed at %s px wide (short pieces never bridge)',
+    (width) => {
+      // Tips now extend before bridging, so the 3 px join measures the paper
+      // gap. A dropout leaves long pieces either side, a dash train short
+      // ones: a gap bridges only when both pieces are over 6x longer.
+      const art = dashedLineArt(6, 10, 2, width);
+      const curves = curvesOf(
+        traceCenterlineStrokePaths(art.image, { ...PRESET, autoUpscaleSmallSources: false }),
+      );
+      expect(curves).toHaveLength(6);
+    },
+  );
 });
 
 describe('Smoothness and Optimize for Centerline', () => {

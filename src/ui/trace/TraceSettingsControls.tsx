@@ -343,7 +343,7 @@ function NumberRow(props: {
           onChange={(e) => props.onChange(clamp(Number(e.target.value), props.min, props.max))}
         />
       ) : null}
-      <p id={hintId}>{traceNumberTitle(props.label)}</p>
+      <p id={hintId}>{props.title ?? traceNumberTitle(props.label)}</p>
     </div>
   );
 }

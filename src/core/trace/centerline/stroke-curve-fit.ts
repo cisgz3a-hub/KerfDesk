@@ -22,18 +22,22 @@
 //
 // Pure core — deterministic, no I/O.
 
+import {
+  chordParameterize,
+  evaluateCubic,
+  solveTangentArms,
+  type CubicBezier,
+} from '../../geometry/cubic-fit';
 import type { CurveSubpath, PathSegment, Vec2 } from '../../scene';
 import {
   add,
   centredTangent,
   controlLength,
   distance,
-  evaluate,
   negate,
   oneSidedTangent,
   pointToSegment,
   scale,
-  type Cubic,
 } from './cubic-geometry';
 import { orthogonalError, reverseError, type FitError } from './curve-fit-error';
 
@@ -111,7 +115,7 @@ export function sampleStrokeCurve(curve: CurveSubpath): Vec2[] {
     if (segment.kind === 'cubic') {
       const cubic = { p0: current, p1: segment.control1, p2: segment.control2, p3: segment.to };
       const steps = Math.max(MIN_CUBIC_SAMPLES, Math.ceil(controlLength(cubic) / SAMPLE_STEP_PX));
-      for (let s = 1; s < steps; s += 1) out.push(evaluate(cubic, s / steps));
+      for (let s = 1; s < steps; s += 1) out.push(evaluateCubic(cubic, s / steps));
     }
     out.push(segment.to);
     current = segment.to;
@@ -272,29 +276,33 @@ function fitRecursive(
 }
 
 // Splitting at the worst point over-segments: each split is chosen for its
-// own half, never revisited. Greedily re-fit adjacent pairs over their joint
-// range with their outer tangents and keep any merge that still meets the
-// tolerance both ways.
+// own half, never revisited. One left-to-right sweep re-fits each adjacent
+// pair over their joint range with their outer tangents and keeps any merge
+// that still meets the tolerance both ways; after a merge only the new piece
+// and its neighbours are retried, so the pass stays linear in merge attempts.
 function mergePieces(run: ReadonlyArray<Vec2>, pieces: Piece[], tolerance: number): void {
-  let merged = true;
-  while (merged) {
-    merged = false;
-    for (let i = 0; i + 1 < pieces.length; i += 1) {
-      const a = pieces[i] as Piece;
-      const b = pieces[i + 1] as Piece;
-      if (!a.mergeable || !b.mergeable) continue;
-      const attempt = attemptCubic(run.slice(a.lo, b.hi + 1), a.tStart, b.tEnd, tolerance);
-      if (attempt.cubic === null) continue;
-      pieces.splice(i, 2, {
-        lo: a.lo,
-        hi: b.hi,
-        tStart: a.tStart,
-        tEnd: b.tEnd,
-        segments: [cubicSegment(attempt.cubic)],
-        mergeable: true,
-      });
-      merged = true;
+  let i = 0;
+  while (i + 1 < pieces.length) {
+    const a = pieces[i] as Piece;
+    const b = pieces[i + 1] as Piece;
+    const attempt =
+      a.mergeable && b.mergeable
+        ? attemptCubic(run.slice(a.lo, b.hi + 1), a.tStart, b.tEnd, tolerance)
+        : null;
+    if (attempt === null || attempt.cubic === null) {
+      i += 1;
+      continue;
     }
+    pieces.splice(i, 2, {
+      lo: a.lo,
+      hi: b.hi,
+      tStart: a.tStart,
+      tEnd: b.tEnd,
+      segments: [cubicSegment(attempt.cubic)],
+      mergeable: true,
+    });
+    // The grown piece may now also merge with its left neighbour.
+    if (i > 0) i -= 1;
   }
 }
 
@@ -306,8 +314,8 @@ function attemptCubic(
   tStart: Vec2,
   tEnd: Vec2,
   tolerance: number,
-): { cubic: Cubic | null; worstIndex: number } {
-  let u = chordParameters(span);
+): { cubic: CubicBezier | null; worstIndex: number } {
+  let u = chordParameterize(span, 0, span.length - 1);
   let worst: FitError = { error: Infinity, index: span.length >> 1 };
   for (let pass = 0; pass <= MAX_REPARAM_PASSES; pass += 1) {
     const cubic = leastSquaresCubic(span, u, tStart, tEnd);
@@ -346,45 +354,22 @@ function twoPointSegment(
   return reverse.error <= tolerance ? cubicSegment(cubic) : { kind: 'line', to: b };
 }
 
-// Schneider's normal equations: with P1 = P0 + a·t1 and P2 = P3 + b·t2, the
-// arm lengths minimising the squared parametric residual solve a 2x2 system.
+// Schneider's normal equations (shared solver): the arm lengths along the
+// fixed end tangents that minimise the squared parametric residual. Arms
+// longer than twice the chord make loops, never strokes; degenerate or
+// looping arms fall back to chord/3.
 function leastSquaresCubic(
   run: ReadonlyArray<Vec2>,
   u: ReadonlyArray<number>,
   t1: Vec2,
   t2: Vec2,
-): Cubic {
+): CubicBezier {
   const p0 = run[0] as Vec2;
   const p3 = run.at(-1) as Vec2;
-  let c00 = 0;
-  let c01 = 0;
-  let c11 = 0;
-  let x0 = 0;
-  let x1 = 0;
-  for (let i = 0; i < run.length; i += 1) {
-    const t = u[i] as number;
-    const m = 1 - t;
-    const b0 = m * m * m;
-    const b1 = 3 * t * m * m;
-    const b2 = 3 * t * t * m;
-    const b3 = t * t * t;
-    const ax = t1.x * b1;
-    const ay = t1.y * b1;
-    const bx = t2.x * b2;
-    const by = t2.y * b2;
-    const p = run[i] as Vec2;
-    const rx = p.x - (p0.x * (b0 + b1) + p3.x * (b2 + b3));
-    const ry = p.y - (p0.y * (b0 + b1) + p3.y * (b2 + b3));
-    c00 += ax * ax + ay * ay;
-    c01 += ax * bx + ay * by;
-    c11 += bx * bx + by * by;
-    x0 += ax * rx + ay * ry;
-    x1 += bx * rx + by * ry;
-  }
   const chord = distance(p0, p3);
-  const det = c00 * c11 - c01 * c01;
-  let armA = Math.abs(det) > 1e-12 ? (x0 * c11 - x1 * c01) / det : 0;
-  let armB = Math.abs(det) > 1e-12 ? (c00 * x1 - c01 * x0) / det : 0;
+  const arms = solveTangentArms(run, 0, run.length - 1, u, t1, t2);
+  let armA = arms.start;
+  let armB = arms.end;
   const lo = MIN_ARM_CHORD_RATIO * chord;
   const hi = MAX_ARM_CHORD_RATIO * chord;
   if (!(armA > lo && armB > lo && armA < hi && armB < hi)) {
@@ -396,16 +381,6 @@ function leastSquaresCubic(
 
 // ——— small geometry ———
 
-function chordParameters(run: ReadonlyArray<Vec2>): number[] {
-  const u = [0];
-  for (let i = 1; i < run.length; i += 1) {
-    u.push((u[i - 1] as number) + distance(run[i - 1] as Vec2, run[i] as Vec2));
-  }
-  const total = u.at(-1) as number;
-  if (total <= 0) return u.map((_, i) => i / Math.max(1, run.length - 1));
-  return u.map((value) => value / total);
-}
-
 function maxChordDeviation(run: ReadonlyArray<Vec2>): number {
   const a = run[0] as Vec2;
   const b = run.at(-1) as Vec2;
@@ -416,6 +391,6 @@ function maxChordDeviation(run: ReadonlyArray<Vec2>): number {
   return worst;
 }
 
-function cubicSegment(cubic: Cubic): PathSegment {
+function cubicSegment(cubic: CubicBezier): PathSegment {
   return { kind: 'cubic', control1: cubic.p1, control2: cubic.p2, to: cubic.p3 };
 }

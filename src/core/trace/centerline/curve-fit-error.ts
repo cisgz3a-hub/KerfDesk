@@ -2,16 +2,9 @@
 // distance from chain points to the curve, and from curve samples back to
 // the chain.
 
+import { evaluateCubic, newtonProjectionStep, type CubicBezier } from '../../geometry/cubic-fit';
 import type { Vec2 } from '../../scene';
-import {
-  controlLength,
-  derivative,
-  distance,
-  evaluate,
-  pointToSegment,
-  secondDerivative,
-  type Cubic,
-} from './cubic-geometry';
+import { controlLength, distance, pointToSegment } from './cubic-geometry';
 
 // The curve-to-chain check samples the cubic this finely (px of control
 // polygon per sample).
@@ -27,7 +20,7 @@ export type FitError = { error: number; index: number };
 // measure is the true point-to-curve distance, not the parametric residual.
 export function orthogonalError(
   run: ReadonlyArray<Vec2>,
-  cubic: Cubic,
+  cubic: CubicBezier,
   u: ReadonlyArray<number>,
 ): FitError & { params: number[] } {
   const params = [...u];
@@ -37,7 +30,7 @@ export function orthogonalError(
     const p = run[i] as Vec2;
     const t = projectParameter(cubic, p, u[i] as number);
     params[i] = t;
-    const d = distance(evaluate(cubic, t), p);
+    const d = distance(evaluateCubic(cubic, t), p);
     if (d > error) {
       error = d;
       index = i;
@@ -51,7 +44,7 @@ export function orthogonalError(
 // window keeps this linear in the run length.
 export function reverseError(
   run: ReadonlyArray<Vec2>,
-  cubic: Cubic,
+  cubic: CubicBezier,
   params: ReadonlyArray<number>,
 ): FitError {
   const samples = Math.max(4, Math.ceil(controlLength(cubic) / REVERSE_CHECK_STEP_PX));
@@ -59,7 +52,7 @@ export function reverseError(
   let error = 0;
   let worstT = 0.5;
   for (let s = 1; s < samples; s += 1) {
-    const q = evaluate(cubic, s / samples);
+    const q = evaluateCubic(cubic, s / samples);
     const lo = Math.max(0, segment - REVERSE_WINDOW_BEHIND);
     const hi = Math.min(run.length - 2, segment + REVERSE_WINDOW_AHEAD);
     let best = Infinity;
@@ -78,7 +71,7 @@ export function reverseError(
   return { error, index: nearestParamIndex(params, worstT) };
 }
 
-export function nearestParamIndex(params: ReadonlyArray<number>, t: number): number {
+function nearestParamIndex(params: ReadonlyArray<number>, t: number): number {
   let best = 0;
   let bestGap = Infinity;
   for (let i = 0; i < params.length; i += 1) {
@@ -91,18 +84,12 @@ export function nearestParamIndex(params: ReadonlyArray<number>, t: number): num
   return best;
 }
 
-export function projectParameter(cubic: Cubic, p: Vec2, t0: number): number {
+function projectParameter(cubic: CubicBezier, p: Vec2, t0: number): number {
   let t = t0;
   for (let step = 0; step < PROJECTION_NEWTON_STEPS; step += 1) {
-    const q = evaluate(cubic, t);
-    const d1 = derivative(cubic, t);
-    const d2 = secondDerivative(cubic, t);
-    const rx = q.x - p.x;
-    const ry = q.y - p.y;
-    const numerator = rx * d1.x + ry * d1.y;
-    const denominator = d1.x * d1.x + d1.y * d1.y + rx * d2.x + ry * d2.y;
-    if (Math.abs(denominator) < 1e-12) break;
-    const next = Math.min(1, Math.max(0, t - numerator / denominator));
+    const raw = newtonProjectionStep(cubic, p, t);
+    if (raw === null) break;
+    const next = Math.min(1, Math.max(0, raw));
     if (Math.abs(next - t) < 1e-9) {
       t = next;
       break;

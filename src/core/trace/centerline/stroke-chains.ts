@@ -55,6 +55,11 @@ export type ChainAssemblyOptions = {
 const SMOOTHING_PASSES = 2;
 const SIMPLIFY_EPSILON_PX = 0.45;
 const MIN_CHAIN_LENGTH_PX = 1.5;
+// A gap bridges only while both pieces are more than this many times longer
+// than it (ADR-397). With the join now measuring the drawn paper gap, a
+// dashed or stitched line (short pieces, deliberate gaps) would otherwise
+// fuse into one solid line; a dropout in a real stroke leaves long pieces.
+const BRIDGE_PIECE_GAP_RATIO = 6;
 
 export function assembleStrokePaths(
   graph: StrokeGraph,
@@ -134,7 +139,7 @@ function* joinChainsSteps(
     if (cooperate) yield;
     closeOrExtend(chain, junctions, distSq, mask, closure);
   }
-  yield* bridgeNearbyEndsSteps(chains, join.joinGapPx, join.alignedFactor);
+  yield* bridgeNearbyEndsSteps(chains, join.joinGapPx, join.alignedFactor, BRIDGE_PIECE_GAP_RATIO);
   // A bridge can join a stroke to itself through another piece; close any
   // chain whose ends now meet, as the pre-bridge pass would have.
   for (const chain of chains) {
