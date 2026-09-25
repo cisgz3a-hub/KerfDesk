@@ -72,7 +72,7 @@ function diameterError(rawValue: string): string | null {
   ) {
     return null;
   }
-  return `Enter the actual cutter diameter from ${MIN_TOOL_DIAMETER_MM} to ${MAX_TOOL_DIAMETER_MM} mm.`;
+  return `Enter the actual cutting diameter from ${MIN_TOOL_DIAMETER_MM} to ${MAX_TOOL_DIAMETER_MM} mm.`;
 }
 
 function fluteCountError(rawValue: string): string | null {

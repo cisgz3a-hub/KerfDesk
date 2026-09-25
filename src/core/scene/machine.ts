@@ -275,12 +275,13 @@ export const DEFAULT_CNC_MACHINE_PARAMS: CncMachineParams = {
   coolant: 'off',
 };
 
-// Conservative wood/MDF starting point for a 1/8 in bit — same spirit as
-// Easel's recommended settings.
+// Conservative wood/MDF starting point for a 1/8 in 2-flute bit: 1000 mm/min at
+// 12,000 RPM is about 0.04 mm chip load per tooth.
 export const DEFAULT_CNC_LAYER_SETTINGS: CncLayerSettings = {
   // ADR-256: new CNC layers cut ON the drawn line — the same reading a laser
-  // Line layer gives the path — so an unedited layer never resizes the part.
-  // Outside/inside remain explicit per-layer choices.
+  // Line layer gives the path. The bit straddles the line, so a closed cutout
+  // comes out one bit diameter smaller (a hole one diameter larger); Outside and
+  // Inside keep the drawn size and remain explicit per-layer choices.
   cutType: 'profile-on-path',
   // ADR-218: literal must match DEFAULT_LINE_ART_CONTOURS in core/cnc
   // (scene cannot import cnc without a cycle).
@@ -306,12 +307,15 @@ export const DEFAULT_CNC_LAYER_SETTINGS: CncLayerSettings = {
   // disabled ADR-250 leads and could drop a small contour's deep pass entirely.
   // Scoped to profile cut types (compile-cnc-job.ts:351) and to passes below the
   // tab top (passNeedsTabs), so pockets, engraves and shallow passes are untouched.
+  // Amendment 1 also skips them where the floor under the cut is at least one tab
+  // height thick (cutCanFreePart), since that floor already holds the part.
   tabsEnabled: true,
   tabHeightMm: 2,
   tabWidthMm: 6,
   tabsPerShape: 4,
   // ADR-251: profile/pocket cuts default to CLIMB — it leaves the clean edge on
-  // the kept part and matches Vectric/Fusion/Easel. Overridable per layer; the
+  // the kept part. Stock GRBL has no backlash compensation, so a machine with
+  // play may still want Conventional; it is overridable per layer, and the
   // "Default direction" option (unset) restores the compiler's natural winding.
   cutDirection: 'climb',
 };

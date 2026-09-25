@@ -193,6 +193,10 @@ function resolutionFromIfd(
     }
   }
   if (xRes === null) return null;
+  // ResolutionUnit 1 means "no absolute unit" (TIFF 6.0 / ExifTool: 1 = None,
+  // 2 = inches, 3 = cm). A unitless ratio gives no physical size, so the
+  // import falls back to the default density instead of reading it as DPI.
+  if (unit !== 2 && unit !== 3) return null;
   // Some legacy encoders omit YResolution. Preserve their square-density
   // meaning explicitly; when Y is present it remains independent.
   const resolvedY = yRes ?? xRes;

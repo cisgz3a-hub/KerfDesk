@@ -244,6 +244,10 @@ function exactBall(
       diameterMm,
       family: 'o-flute-ball-nose',
       shankDiameterMm,
+      // Both Amana O-flute ball-nose bits are single-flute (ToolsToday 51814
+      // spec table: Flute 1; 51818 listing: "x 1 Flute"). Leaving the count
+      // unset made feeds assume 2 flutes and double the chip load.
+      fluteCount: 1,
     },
     sourceUrl: AMANA_O_FLUTE_BALL_NOSE,
     sourceScope: 'exact-product',

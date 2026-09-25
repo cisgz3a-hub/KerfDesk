@@ -63,6 +63,9 @@ describe('LightBurn exported overscan fields', () => {
       project: { scene: { layers: [{ fillOverscanMm: 5 }] } },
       report: { warnings: [expect.stringContaining(warning)] },
     });
+    if (result.ok) {
+      expect(result.report.warnings[0]).toContain('review the default 5 mm runway');
+    }
   });
 
   it('imports enabled zero percentage without requiring a speed', () => {

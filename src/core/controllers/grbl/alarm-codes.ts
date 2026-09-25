@@ -1,13 +1,47 @@
-// GRBL v1.1 alarm codes. Source: gnea/grbl wiki "Alarm Codes".
+// GRBL-family alarm codes. Sources: gnea/grbl doc/csv/alarm_codes_en_US.csv
+// (stock GRBL v1.1, codes 1–10) and grblHAL core alarms.c (codes 1–22).
 //
-// Alarms are unrecoverable until the machine state is reset and unlocked
-// (`$X` after `Ctrl-X`). Position is "lost" — meaning the controller no
-// longer trusts its work coordinates — for alarms 1, 3, and after probes.
+// Codes 1–9 mean the same thing on both firmwares. Code 10 does not: stock
+// GRBL raises it only in ENABLE_DUAL_AXIS builds, when the second switch of a
+// dual-motor axis fails to trigger during homing, while grblHAL uses 10 for an
+// asserted E-stop (its dual-switch homing failure is 15). Stock GRBL never
+// emits 11–22, so the stock lookup falls back to the grblHAL meanings for
+// those codes rather than showing "unknown" on a mislabeled profile.
+//
+// Alarms lock out G-code until the controller is unlocked (`$X`) or homed
+// (`$H`); hard and soft limit alarms (1, 2) first need a soft reset. Position
+// is "lost" — meaning the controller no longer trusts its work coordinates —
+// whenever motion stopped abruptly or homing did not finish.
 //
 // UI surfaces these messages on the F-B9 modal. F-A10 preflight does not
 // reference these (it runs before any streaming).
 
-export type AlarmCode = 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 | 10 | 11 | 12 | 13;
+export type AlarmCode =
+  | 1
+  | 2
+  | 3
+  | 4
+  | 5
+  | 6
+  | 7
+  | 8
+  | 9
+  | 10
+  | 11
+  | 12
+  | 13
+  | 14
+  | 15
+  | 16
+  | 17
+  | 18
+  | 19
+  | 20
+  | 21
+  | 22;
+
+/** Which firmware's numbering to use where GRBL and grblHAL disagree (code 10). */
+export type AlarmFirmware = 'grbl' | 'grblhal';
 
 export type AlarmDescription = {
   readonly code: AlarmCode;
@@ -17,11 +51,11 @@ export type AlarmDescription = {
   readonly action: string; // What the user should do to recover.
 };
 
-export const ALARM_CODES: ReadonlyArray<AlarmDescription> = [
+const SHARED_ALARM_CODES: ReadonlyArray<AlarmDescription> = [
   {
     code: 1,
     title: 'Hard limit triggered',
-    detail: 'A limit switch was hit while the laser was moving.',
+    detail: 'A limit switch was hit while the machine was moving.',
     positionLost: true,
     action: 'Re-home the machine ($H) after clearing the obstruction.',
   },
@@ -70,20 +104,32 @@ export const ALARM_CODES: ReadonlyArray<AlarmDescription> = [
   {
     code: 8,
     title: 'Homing fail — could not clear limit switch',
-    detail: 'A limit switch is stuck or the machine is already at the limit.',
+    detail: 'The pull-off move after homing did not release the limit switch.',
     positionLost: true,
-    action: 'Manually move off the switch, then re-home.',
+    action: 'Increase the homing pull-off ($27) or check the switch wiring, then re-home ($H).',
   },
   {
     code: 9,
     title: 'Homing fail — could not find limit switch',
-    detail: 'The homing search ran off the end of travel.',
+    detail: 'Homing did not reach a limit switch within the search distance.',
     positionLost: true,
-    action: 'Check that the limit switch wiring is correct.',
+    action:
+      'Check the switch wiring, or increase max travel ($130–$132) or decrease pull-off ($27), then re-home ($H).',
   },
-  // 10–13 are grblHAL extensions (grblHAL core alarms.h); vanilla GRBL v1.1
-  // stops at 9 and never emits them. Unknown higher codes degrade to
-  // "Alarm N: unknown".
+];
+
+const GRBL_DUAL_AXIS_HOMING_ALARM: AlarmDescription = {
+  code: 10,
+  title: 'Homing fail — dual-axis switch',
+  detail:
+    'The second limit switch on a dual-motor axis did not trigger in time after the first. (grblHAL firmware uses alarm 10 for E-stop instead.)',
+  positionLost: true,
+  action: 'Check both limit switches on that axis and their wiring, then re-home ($H).',
+};
+
+// positionLost is conservative (true) where grblHAL's text does not say the
+// position survives: re-homing after an unexplained stop is the safe default.
+const GRBLHAL_ALARM_CODES: ReadonlyArray<AlarmDescription> = [
   {
     code: 10,
     title: 'E-stop asserted (grblHAL)',
@@ -101,7 +147,7 @@ export const ALARM_CODES: ReadonlyArray<AlarmDescription> = [
   {
     code: 12,
     title: 'Limit switch engaged (grblHAL)',
-    detail: 'A limit switch is active while the machine is trying to move.',
+    detail: 'A limit switch is engaged, so the controller will not continue until it is cleared.',
     positionLost: true,
     action: 'Move the head off the switch, then re-home ($H).',
   },
@@ -112,10 +158,90 @@ export const ALARM_CODES: ReadonlyArray<AlarmDescription> = [
     positionLost: false,
     action: 'Check the probe wiring, soft-reset, then $X to unlock.',
   },
+  {
+    code: 14,
+    title: 'Spindle at-speed timeout (grblHAL)',
+    detail: 'The spindle did not report reaching the commanded speed in time.',
+    positionLost: true,
+    action: 'Check the spindle or VFD and its at-speed signal, soft-reset, then $X to unlock.',
+  },
+  {
+    code: 15,
+    title: 'Homing fail — auto-squared axis (grblHAL)',
+    detail:
+      'The second limit switch of an auto-squared axis was not found within the search distance.',
+    positionLost: true,
+    action:
+      'Check both switches on that axis and their wiring, or increase max travel or decrease pull-off, then re-home ($H).',
+  },
+  {
+    code: 16,
+    title: 'Power-on self test failed (grblHAL)',
+    detail: 'The controller failed its power-on self test.',
+    positionLost: true,
+    action: 'Check the controller power and wiring, then power-cycle it.',
+  },
+  {
+    code: 17,
+    title: 'Motor fault (grblHAL)',
+    detail: 'A stepper driver reported a fault.',
+    positionLost: true,
+    action: 'Check the motor drivers and wiring, soft-reset, then re-home ($H).',
+  },
+  {
+    code: 18,
+    title: 'Homing fail — bad configuration (grblHAL)',
+    detail: 'The homing settings are not valid.',
+    positionLost: true,
+    action: 'Review the homing settings ($22–$27), then re-home ($H).',
+  },
+  {
+    code: 19,
+    title: 'Modbus exception (grblHAL)',
+    detail: 'A Modbus device, usually a VFD spindle, timed out or returned an error.',
+    positionLost: true,
+    action: 'Check the VFD Modbus wiring and settings, soft-reset, then $X to unlock.',
+  },
+  {
+    code: 20,
+    title: 'I/O expander failure (grblHAL)',
+    detail: 'The controller lost communication with its I/O expander.',
+    positionLost: true,
+    action: 'Check the expander connection, then power-cycle the controller.',
+  },
+  {
+    code: 21,
+    title: 'Settings storage failure (grblHAL)',
+    detail: 'The controller could not read or write its non-volatile settings storage.',
+    positionLost: true,
+    action:
+      'Power-cycle the controller, then read the settings ($$) and restore any that were lost.',
+  },
+  {
+    code: 22,
+    title: 'Buffer overflow (grblHAL)',
+    detail: 'A controller buffer overflowed.',
+    positionLost: true,
+    action: 'Soft-reset, then re-home ($H) before resuming.',
+  },
 ];
 
-const ALARMS_BY_CODE = new Map(ALARM_CODES.map((a) => [a.code, a]));
+const GRBL_ALARMS_BY_CODE = new Map<number, AlarmDescription>(
+  [
+    ...SHARED_ALARM_CODES,
+    GRBL_DUAL_AXIS_HOMING_ALARM,
+    ...GRBLHAL_ALARM_CODES.filter((alarm) => alarm.code !== 10),
+  ].map((alarm) => [alarm.code, alarm]),
+);
 
-export function describeAlarm(code: number): AlarmDescription | null {
-  return ALARMS_BY_CODE.get(code as AlarmCode) ?? null;
+const GRBLHAL_ALARMS_BY_CODE = new Map<number, AlarmDescription>(
+  [...SHARED_ALARM_CODES, ...GRBLHAL_ALARM_CODES].map((alarm) => [alarm.code, alarm]),
+);
+
+export function describeAlarm(
+  code: number,
+  firmware: AlarmFirmware = 'grbl',
+): AlarmDescription | null {
+  const table = firmware === 'grblhal' ? GRBLHAL_ALARMS_BY_CODE : GRBL_ALARMS_BY_CODE;
+  return table.get(code) ?? null;
 }

@@ -7,8 +7,9 @@
 //
 // GRBL convention recap:
 //   * Machine origin (0, 0) sits at the homing corner.
-//   * +Y always means "away from the operator" — so for front-* origins the
-//     emitted Y must be flipped from the SVG Y; for rear-* origins it's not.
+//   * On front-* origins +Y means "away from the operator", so the emitted Y
+//     must be flipped from the SVG Y; rear-* origins put machine 0 at the back
+//     with +Y toward the operator, so it's not.
 //   * +X always means "to the operator's right" — front-right / rear-right
 //     mirror X within the bed.
 //
