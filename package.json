@@ -15,9 +15,9 @@
   "type": "module",
   "main": "dist-electron/main.js",
   "scripts": {
-    "lint": "eslint .",
+    "lint": "node --max-old-space-size=4096 node_modules/eslint/bin/eslint.js .",
     "lint:electron": "eslint --config eslint.electron.config.mjs electron/**/*.ts",
-    "lint:fix": "eslint . --fix",
+    "lint:fix": "pnpm lint --fix",
     "typecheck": "node --max-old-space-size=4096 node_modules/typescript/bin/tsc --noEmit",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
