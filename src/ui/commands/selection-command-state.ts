@@ -1,6 +1,7 @@
 import { pathUsesOperation, type Layer, type Project, type Scene } from '../../core/scene';
 import { selectionUnits } from '../../core/scene/selection-units';
 import { isVectorPathObject, type VectorSceneObject } from '../../core/geometry';
+import { subpathCount } from '../../core/geometry/outer-shape-groups';
 import { isConvertibleVector, type ConvertibleVector } from '../raster/vector-to-bitmap';
 
 export function selectedObject(project: Project, selectedObjectId: string | null) {
@@ -148,8 +149,8 @@ export function selectionCanBreakApart(
   return project.scene.objects.some(
     (object) =>
       selected.has(object.id) &&
-      object.kind === 'imported-svg' &&
-      object.paths.reduce((count, path) => count + path.polylines.length, 0) > 1 &&
+      (object.kind === 'imported-svg' || object.kind === 'traced-image') &&
+      object.paths.reduce((count, path) => count + subpathCount(path), 0) > 1 &&
       object.locked !== true,
   );
 }

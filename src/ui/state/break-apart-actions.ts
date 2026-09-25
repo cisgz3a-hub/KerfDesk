@@ -9,11 +9,14 @@ import {
   type ImportedSvg,
   type Project,
   type SceneObject,
+  type TracedImage,
 } from '../../core/scene';
 import { canonicalArtworkOrder } from '../../core/artwork-order';
 import { pushUndo, type StateSlice } from './scene-mutations';
 import { selectedObjectIds } from './scene-group-actions';
 import { repairDanglingObjectDependencies, reportDependencyRepairs } from './object-delete-actions';
+import { canBreakApartTrace, splitTracedImage } from './trace-break-apart';
+import { useToastStore } from './toast-store';
 
 export type BreakApartActions = {
   readonly breakApartSelection: () => void;
@@ -48,6 +51,7 @@ function breakApartSelectionMutation(state: BreakApartState): BreakApartMutation
   if (selectedIds.length === 0) return state;
   const selected = new Set(selectedIds);
   const replacement = buildReplacementObjects(state.project.scene.objects, selected);
+  reportSingleShapeTraces(replacement.singleShapeTraces);
   if (!replacement.changed) return state;
   const [primary, ...additional] = replacement.newSelectionIds;
   const expand = (id: string): ReadonlyArray<string> => replacement.idsBySource.get(id) ?? [id];
@@ -77,38 +81,86 @@ function breakApartSelectionMutation(state: BreakApartState): BreakApartMutation
   };
 }
 
-function buildReplacementObjects(
-  objects: ReadonlyArray<SceneObject>,
-  selectedIds: ReadonlySet<string>,
-): {
+function reportSingleShapeTraces(count: number): void {
+  if (count === 0) return;
+  useToastStore
+    .getState()
+    .pushToast(
+      count === 1
+        ? 'This trace is already one shape. Holes stay with the outline around them.'
+        : `${count} traces are already one shape each. Holes stay with the outline around them.`,
+      'info',
+    );
+}
+
+type Replacement = {
   readonly objects: ReadonlyArray<SceneObject>;
   readonly newSelectionIds: ReadonlyArray<string>;
   readonly changed: boolean;
   readonly idsBySource: ReadonlyMap<string, ReadonlyArray<string>>;
-} {
+  readonly singleShapeTraces: number;
+};
+
+function buildReplacementObjects(
+  objects: ReadonlyArray<SceneObject>,
+  selectedIds: ReadonlySet<string>,
+): Replacement {
   const out: SceneObject[] = [];
   const newSelectionIds: string[] = [];
   const idsBySource = new Map<string, ReadonlyArray<string>>();
-  let changed = false;
+  let singleShapeTraces = 0;
   for (const object of objects) {
-    if (selectedIds.has(object.id) && canBreakApart(object)) {
-      const parts = splitImportedSvg(
-        object,
-        new Set([...objects.map((item) => item.id), ...newSelectionIds]),
-      );
-      out.push(...parts);
-      newSelectionIds.push(...parts.map((part) => part.id));
-      idsBySource.set(
-        object.id,
-        parts.map((part) => part.id),
-      );
-      changed = true;
-    } else {
+    const parts = selectedIds.has(object.id)
+      ? splitSelectedObject(
+          object,
+          new Set([...objects.map((item) => item.id), ...newSelectionIds]),
+        )
+      : null;
+    if (parts === null || parts.length === 0) {
+      if (parts !== null && object.kind === 'traced-image') singleShapeTraces += 1;
       out.push(object);
       if (selectedIds.has(object.id)) newSelectionIds.push(object.id);
+      continue;
     }
+    out.push(...parts);
+    newSelectionIds.push(...parts.map((part) => part.id));
+    idsBySource.set(
+      object.id,
+      parts.map((part) => part.id),
+    );
   }
-  return { objects: out, newSelectionIds, changed, idsBySource };
+  return {
+    objects: out,
+    newSelectionIds,
+    changed: idsBySource.size > 0,
+    idsBySource,
+    singleShapeTraces,
+  };
+}
+
+// Null: not splittable. Empty: a trace that is already one shape.
+function splitSelectedObject(
+  object: SceneObject,
+  reservedIds: ReadonlySet<string>,
+): ReadonlyArray<SceneObject> | null {
+  if (object.kind === 'traced-image') {
+    return canBreakApartTrace(object)
+      ? splitTracedImage(object, traceIdAllocator(object, reservedIds))
+      : null;
+  }
+  return canBreakApart(object) ? splitImportedSvg(object, reservedIds) : null;
+}
+
+function traceIdAllocator(
+  object: TracedImage,
+  reservedIds: ReadonlySet<string>,
+): (index: number) => string {
+  const taken = new Set(reservedIds);
+  return (index) => {
+    const id = uniquePartId(object.id, index, taken);
+    taken.add(id);
+    return id;
+  };
 }
 
 function canBreakApart(object: SceneObject): object is ImportedSvg {
