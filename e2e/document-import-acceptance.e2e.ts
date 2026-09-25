@@ -161,7 +161,9 @@ test('document legacy Illustrator rejection keeps the document and history uncha
   await page.screenshot({ path: info.outputPath('rejected.png') });
 });
 
-test.afterEach(async ({ kerfdesk }) => {
+test.afterEach(async ({ kerfdesk }, testInfo) => {
+  // A corpus case skipped before navigation has no initialized page fixture.
+  if (testInfo.status === 'skipped') return;
   expect((await kerfdesk.events()).filter((event) => event.kind.startsWith('serial-'))).toEqual([]);
 });
 

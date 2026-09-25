@@ -192,10 +192,10 @@ export default defineConfig({
     },
   },
   optimizeDeps: {
-    // The document worker loads these dependencies only after the first SVG
+    // Document workers load these dependencies only after the first import
     // request. Pre-bundle them so a cold dev server does not discover them
     // mid-test and reload the page while an import is in flight.
-    include: ['linkedom/worker', 'saxes', 'opentype.js'],
+    include: ['linkedom/worker', 'saxes', 'opentype.js', 'tiff'],
     esbuildOptions: {
       // Keep dev dependency pre-bundling aligned with the production build.
       // Without this, Vite's optimizer can fall back to its lower default
