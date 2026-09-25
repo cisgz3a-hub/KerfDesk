@@ -53,8 +53,8 @@ reset brings the controller back locked in Alarm was reported as a failure (HF-5
    sends a status report that is not Alarm. This is what makes FluidNC's `ok` in `Critical`
    harmless, and it applies to both unlock paths (banner and Console).
 4. **Texts.** GRBL and grblHAL `ALARM:1`/`ALARM:2` and FluidNC alarms 1, 2 and 13 say the soft
-   reset comes first. grblHAL's extended error codes 39-92 get their upstream titles
-   (errors.c), with details for 45, 46, 50 and 79.
+   reset comes first. The grblHAL error codes stock GRBL does not define (18, 19 and 39-92)
+   get their upstream titles (errors.c), with details for 45, 46, 50 and 79.
 5. **Home from Alarm is a capability.** `ControllerCapabilities.homeFromAlarm` (absent means
    true) is false for Smoothieware. There the banner and the Start fix offer lead with Unlock
    (`M999`), with the hint "Unlock first: this controller cannot home while halted."

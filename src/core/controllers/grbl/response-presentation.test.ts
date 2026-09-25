@@ -195,6 +195,14 @@ describe('critical alarms and the texts the audit corrected', () => {
     expect(presentError('grbl-v1.1', 79)).toBeNull();
   });
 
+  // grblHAL errors.c:48-49 names 18 and 19, which GRBL 1.1 leaves unused.
+  it('describes grblHAL error:18 and error:19, which stock GRBL does not define', () => {
+    expect(presentError('grblhal', 18)?.title).toBe('Reset asserted.');
+    expect(presentError('grblhal', 19)?.title).toBe('Non positive value.');
+    expect(presentError('grbl-v1.1', 18)).toBeNull();
+    expect(presentError('grbl-v1.1', 19)).toBeNull();
+  });
+
   it('names both probe directions for ALARM:4 and both stores for error:7', () => {
     expect(presentAlarm('grbl-v1.1', 4)?.detail).toMatch(/G38\.4\/G38\.5/);
     expect(presentError('grbl-v1.1', 7)?.detail).toMatch(/\$#/);

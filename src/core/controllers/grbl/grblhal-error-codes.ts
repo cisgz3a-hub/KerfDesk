@@ -1,6 +1,7 @@
-// grblHAL status codes above GRBL 1.1's 38, with grblHAL's own wording
-// (grblHAL/core errors.c at d7aaee3d84b1e7010f075d395206afff038d7379). Codes
-// 1-38 keep the shared GRBL meanings. A few carry a detail naming what the
+// grblHAL status codes GRBL 1.1 does not define, with grblHAL's own wording
+// (grblHAL/core errors.c at d7aaee3d84b1e7010f075d395206afff038d7379): 18 and
+// 19, which GRBL 1.1 leaves unused (report.h:41-43; errors.c:48-49), and every
+// code above 38. The other codes keep the shared GRBL meanings. A few carry a detail naming what the
 // operator does next (controller audit 2026-09-25 HF-3): error:79 is the answer
 // `$X` and `$H` get while a hard limit, soft limit, E-stop or motor fault still
 // holds the controller, which only a soft reset clears (system.c:1179-1181).
@@ -8,6 +9,8 @@
 import type { ErrorDescription } from './error-codes';
 
 const GRBLHAL_EXTENDED_ERROR_ENTRIES: ReadonlyArray<readonly [number, string, string?]> = [
+  [18, 'Reset asserted.'],
+  [19, 'Non positive value.'],
   [39, 'Value out of range.'],
   [40, 'G-code command not allowed when tool change is pending.'],
   [41, 'Spindle not running when motion commanded in CSS or spindle sync mode.'],
@@ -65,7 +68,7 @@ const GRBLHAL_EXTENDED_ERRORS: ReadonlyMap<number, ErrorDescription> = new Map(
   ]),
 );
 
-/** grblHAL's description of a status code above 38, or null. */
+/** grblHAL's description of a status code GRBL 1.1 does not define, or null. */
 export function describeGrblhalExtendedError(code: number): ErrorDescription | null {
   return GRBLHAL_EXTENDED_ERRORS.get(code) ?? null;
 }
