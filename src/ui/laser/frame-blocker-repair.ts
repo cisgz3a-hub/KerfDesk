@@ -34,8 +34,11 @@ export async function offerFrameBlockerFixes(): Promise<boolean> {
     if (repair === 'unrepaired') return !reportedStandingAlarm();
     // One offer per press, as the checkpoint Start allows: after Home the head
     // sits at the switches, so a missing origin is reported for the operator
-    // to position and set, never set here.
+    // to position and set, never set here. A job placed at the head stopped in
+    // the Home offer. The origin set before Home may surface only in a later
+    // report, so wait for its offset as the path below does.
     await waitForPostRepairPosition();
+    await waitForControllerStatus(placementNotWaitingOnOffset);
     return true;
   }
   await waitForControllerStatus(placementNotWaitingOnOffset);
