@@ -84,4 +84,39 @@ describe('re-importing a legacy SVG object through the real parser', () => {
     expect(operation.mode).toBe('fill');
     expect(effectiveOperationForObject(operation, object).mode).toBe('fill');
   });
+
+  it.each(['artwork', 'operation'] as const)(
+    'preserves the existing %s override and its output through re-import and history',
+    async (scope) => {
+      useStore.getState().importSvgObject({ ...svgObj('legacy', ['#000000']), source: 'logo.svg' });
+      const originalOperation = soleObjectAndOperation().operation;
+      const settings = { mode: 'fill', power: 17, speed: 900, passes: 3 } as const;
+      if (scope === 'artwork') {
+        useStore.getState().setSelectedObjectsOperationOverride(settings);
+      } else {
+        useStore
+          .getState()
+          .setObjectsOperationOverrideForOperation(['legacy'], originalOperation.id, settings);
+      }
+      const before = useStore.getState().project;
+      const originalObject = soleObjectAndOperation().object;
+      expect(originalObject.operationOverride).toBeDefined();
+      expect(effectiveOperationForObject(originalOperation, originalObject)).toMatchObject(
+        settings,
+      );
+
+      await reimportLegacyObject(FILL_ONLY_SVG);
+
+      const { object, operation } = soleObjectAndOperation();
+      expect(operation.mode).toBe('line');
+      expect(object.operationOverride).toEqual(originalObject.operationOverride);
+      expect(effectiveOperationForObject(operation, object)).toMatchObject(settings);
+      expect(object.kind === 'imported-svg' && object.paths[0]?.polylines[0]?.closed).toBe(true);
+      const after = useStore.getState().project;
+      useStore.getState().undo();
+      expect(useStore.getState().project).toEqual(before);
+      useStore.getState().redo();
+      expect(useStore.getState().project).toEqual(after);
+    },
+  );
 });

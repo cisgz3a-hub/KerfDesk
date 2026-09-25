@@ -366,6 +366,10 @@ export function applyReimport(
   const inheritedPaths = inheritPathOperationIds(existing, incoming);
   const replaced: ImportedSvg = {
     ...incomingContent,
+    // Source paint does not replace the operator's existing artwork settings.
+    ...(existing.operationOverride === undefined
+      ? {}
+      : { operationOverride: existing.operationOverride }),
     id: existing.id,
     transform: existing.transform,
     paths: inheritedPaths,
