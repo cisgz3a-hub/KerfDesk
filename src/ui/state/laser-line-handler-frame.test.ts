@@ -97,7 +97,7 @@ function makeLaserState(): LaserState {
     retryControllerQualification: async () => undefined,
     writeGrblSetting: async () => undefined,
     sendConsoleCommand: async () => undefined,
-    selectPrimaryWcsForFrame: async () => undefined,
+    selectPrimaryWcsForFrame: async () => ({ kind: 'already-g54' as const }),
     confirmProbePlateRemoved: () => undefined,
     clearTranscript: () => undefined,
     requestControllerStatus: async () => undefined,

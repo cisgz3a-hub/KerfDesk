@@ -109,6 +109,7 @@ function selectG54WithFreshIdle(): ReturnType<
   typeof vi.fn<typeof originalSelectPrimaryWcsForFrame>
 > {
   return vi.fn(async () => {
+    const previous = useLaserStore.getState().activeWcs;
     useLaserStore.setState({ activeWcs: 'G54', statusReport: null });
     setTimeout(() => {
       useLaserStore.setState((state) => ({
@@ -116,6 +117,7 @@ function selectG54WithFreshIdle(): ReturnType<
         statusReport: idleControllerStatusForFrameTest(),
       }));
     }, 0);
+    return { kind: 'selected' as const, previous };
   });
 }
 
@@ -204,7 +206,7 @@ describe('Frame WCS disclosure and completion reporting', () => {
   );
 
   it('does not write or add a normalization warning when G54 is already active', async () => {
-    const selectPrimaryWcsForFrame = vi.fn(async () => undefined);
+    const selectPrimaryWcsForFrame = vi.fn(async () => ({ kind: 'already-g54' as const }));
     const requestControllerStatus = vi.fn(async () => undefined);
     useLaserStore.setState({
       activeWcs: 'G54',
@@ -264,6 +266,7 @@ describe('Frame WCS disclosure and completion reporting', () => {
       const warning = expectedWcsNormalizationWarning('G55');
       const selectPrimaryWcsForFrame = vi.fn(async () => {
         useLaserStore.setState({ activeWcs: 'G54', statusReport: null });
+        return { kind: 'selected' as const, previous: 'G55' as const };
       });
       useLaserStore.setState({
         activeWcs: 'G55',

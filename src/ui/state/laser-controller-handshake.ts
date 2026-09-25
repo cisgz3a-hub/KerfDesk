@@ -173,6 +173,15 @@ async function qualifyConnectedController(
       controllerQualification: qualifiedController(qualificationEpoch, 'not-required'),
       log: pushLog(get(), '[lf2] Connected.'),
     });
+    // No settings read (the Falcon contract), but the active WCS is still read
+    // so a Frame never selects G54 blind (controller audit 2026-09-25 CG-2).
+    await requestTerminalOwnedActiveWcsReadback(
+      get,
+      refs,
+      safeWrite,
+      guard.expectedSessionEpoch,
+      'connection-handshake',
+    );
     return;
   }
   set({

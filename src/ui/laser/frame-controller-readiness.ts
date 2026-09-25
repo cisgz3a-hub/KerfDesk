@@ -1,3 +1,4 @@
+import type { FrameWcsSelection } from '../state/frame-wcs-selection';
 import { useLaserStore } from '../state/laser-store';
 import { hasPendingControllerWrite } from '../state/laser-start-queue-fence';
 import { waitForFreshIdleFramePosition } from './frame-position-readiness';
@@ -39,16 +40,16 @@ export function assertFramePreparationActive(signal?: AbortSignal): void {
   signal?.throwIfAborted();
 }
 
-/** Select the emitted G54 frame and retain disclosure of any named WCS change. */
+/** Select the emitted G54 frame and retain disclosure of any named WCS change.
+ *  An unknown WCS is read first; see frame-wcs-selection.ts (audit CG-2). */
 export async function normalizeFrameWorkCoordinateSystem(): Promise<FrameWcsNormalization> {
   const before = useLaserStore.getState();
-  const originalActiveWcs = before.activeWcs;
-  if (before.capabilities.transport !== 'serial' || originalActiveWcs === 'G54') {
+  if (before.capabilities.transport !== 'serial' || before.activeWcs === 'G54') {
     return { ok: true };
   }
-  const warning = knownWcsNormalizationWarning(originalActiveWcs);
+  let selection: FrameWcsSelection;
   try {
-    await before.selectPrimaryWcsForFrame();
+    selection = await before.selectPrimaryWcsForFrame();
   } catch (error) {
     return normalizationFailure(
       [
@@ -57,6 +58,8 @@ export async function normalizeFrameWorkCoordinateSystem(): Promise<FrameWcsNorm
       undefined,
     );
   }
+  if (selection.kind !== 'selected') return { ok: true };
+  const warning = knownWcsNormalizationWarning(selection.previous);
   const queueIssue = await frameControllerQueueIssue();
   if (queueIssue !== null) return normalizationFailure([queueIssue], warning);
   const afterSelectionSequence = useLaserStore.getState().statusSequence;

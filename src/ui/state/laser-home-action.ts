@@ -14,6 +14,7 @@ import {
 } from './laser-safety-notice';
 import { resetRequiredBlockMessage } from './controller-reset-required';
 import { reopenHomeAlarmReplyWindow } from './laser-home-alarm-reply';
+import { requestTerminalOwnedActiveWcsReadback } from './terminal-owned-wcs-readback';
 import { hasPendingControllerWrite } from './laser-start-queue-fence';
 import type { LaserState } from './laser-store';
 import {
@@ -116,7 +117,7 @@ function blockHome(set: SetFn, get: GetFn, message: string): never {
 export async function runHomeAction(
   set: SetFn,
   get: GetFn,
-  refs: ControllerLifecycleRefs,
+  refs: ControllerLifecycleRefs & { readonly driver: ControllerDriver },
   safeWrite: SafeWriteFn,
   driver: ControllerDriver,
 ): Promise<void> {
@@ -162,6 +163,11 @@ export async function runHomeAction(
     recordHomeFailure(set, err, epochs);
     throw err;
   }
+  // A completed Home runs the controller's startup lines ($N0/$N1), which can
+  // select another work coordinate system (gnea/grbl system.c:198; grblHAL
+  // system.c:494-500), so the WCS is read again (controller audit 2026-09-25
+  // GP-1). Non-fatal: an unread WCS is read before the next Frame selects one.
+  await requestTerminalOwnedActiveWcsReadback(get, refs, safeWrite, epochs.session, 'home');
 }
 
 async function executeHomeSequence(
@@ -225,6 +231,7 @@ function confirmHome(set: SetFn, get: GetFn, epochs: HomeEpochs): void {
       confirmedStatusSequence: observation.sequence,
     },
     alarmCode: null,
+    activeWcs: null,
     log: pushLog(state, '[lf2] Homing confirmed after fresh Idle.'),
   }));
 }

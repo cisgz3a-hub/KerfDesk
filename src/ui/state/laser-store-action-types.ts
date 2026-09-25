@@ -4,6 +4,7 @@ import type { PlatformAdapter } from '../../platform/types';
 import type { AutofocusResult } from './autofocus-action';
 import type { ConsoleCommandOptions } from './laser-console-actions';
 import type { FramedRunCandidate, FrameTraceCandidate } from './framed-run';
+import type { FrameWcsSelection } from './frame-wcs-selection';
 import type { StartJobOptions } from './laser-job-options';
 import type { JobStopReason } from './job-stop-request';
 import type { ProbeRequest } from '../../core/controllers/grbl/probe';
@@ -43,7 +44,7 @@ export type LaserStoreActions = {
   readonly sendConsoleCommand: (command: string, options?: ConsoleCommandOptions) => Promise<void>;
   /** Owned G54 selection used before preparing Frame so Frame and emitted
    * program resolve coordinates in the same canonical WCS. */
-  readonly selectPrimaryWcsForFrame: () => Promise<void>;
+  readonly selectPrimaryWcsForFrame: () => Promise<FrameWcsSelection>;
   /** One realtime status query outside the periodic poll, so a caller that
    * needs a fresh report after an owned command gets it in one round trip
    * instead of waiting for the next poll tick. Inert to the planner; a no-op

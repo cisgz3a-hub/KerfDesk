@@ -1,38 +1,32 @@
-// Audit CG-2 repro (Falcon A1 Pro contract): the Frame's G54 "normalization"
-// makes KerfDesk forget a G92 origin that is still set on the controller.
+// The Frame's G54 normalization on the Falcon A1 Pro contract keeps a G92 origin
+// that is still set on the controller (controller audit 2026-09-25 CG-2).
 //
-// The Falcon contract has settingsQuery null, so connect qualifies as
-// 'not-required' and never runs the `$G` read that seeds activeWcs
-// (laser-controller-handshake.ts qualifyConnectedController returns before
-// requestTerminalOwnedActiveWcsReadback). Every first Frame of a session then
-// finds activeWcs === null and runs selectPrimaryWcsForFrame(), which sends G54
-// and applies the Console 'coordinates-all' effect: workOriginActive=false,
-// workOriginSource='none', wcoCache=null.
-//
-// On the controller nothing changed: G54 was already active and G92 is independent
-// of the G54-G59 selection. grblHAL flags a WCO refresh only when the selected WCS
-// changes (`command_words.G12 &= g5x id changed`, grblHAL/core gcode.c L2990 and
+// The Falcon contract has no settings read, so connect used to skip the `$G`
+// read that seeds activeWcs, and every first Frame of a session sent G54 blind
+// with the Console 'coordinates-all' effect: workOriginActive=false,
+// workOriginSource='none', wcoCache=null. On the controller nothing changed: G54
+// was already active and G92 is independent of the G54-G59 selection. grblHAL
+// flags a WCO refresh only when the selected WCS changes (gcode.c L2990 and
 // L4483-L4486) and otherwise reports WCO in one idle report out of ten
-// (REPORT_WCO_REFRESH_IDLE_COUNT 10, config.h L256; report.c L1466-L1480). Stock
-// GRBL 1.1h behaves the same (gcode.c L996-L1000, report.c L602-L611).
+// (REPORT_WCO_REFRESH_IDLE_COUNT 10, config.h L256). Stock GRBL 1.1h behaves the
+// same (gcode.c L996-L1000, report.c L602-L611).
 // https://github.com/grblHAL/core/blob/d7aaee3d84b1e7010f075d395206afff038d7379/gcode.c#L2990
 // https://github.com/gnea/grbl/blob/bfb67f0c7963fe3ce4aaf8a97f9009ea5a8db36e/grbl/gcode.c#L996-L1000
 //
-// So the post-G54 report that Frame waits for normally carries no WCO, and:
-//  - Current Position placement computes the head's work position as MPos (the
-//    forgotten G92 is treated as zero) and places the job displaced by the G92 offset;
-//  - User Origin placement is refused with "Click 'Set origin here' first".
-// Correct behaviour: after the normalization the placement is exactly what it was
-// before (the controller's work origin did not change).
+// So the post-G54 report carried no WCO: Current Position placed the job
+// displaced by the G92 offset, and User Origin was refused. Now an unknown WCS is
+// read first, and a selection keeps the origin record (frame-wcs-selection.ts),
+// so the placement after the normalization is what it was before. This fake
+// answers `$G` with a bare `ok`, so the WCS stays unknown and G54 is still sent.
 
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { createFakeSerialPort, type FakeSerialPort } from '../../__fixtures__/controllers';
 import { FALCON_A1_PRO_GRBLHAL_PROFILE } from '../../core/devices/falcon-profiles';
-import { useLaserStore } from '../../ui/state/laser-store';
-import { useStore } from '../../ui/state/store';
-import { resetStore } from '../../ui/state/test-helpers';
-import { resolveLiveFramePlacement } from '../../ui/laser/camera-frame-placement';
-import { normalizeFrameWorkCoordinateSystem } from '../../ui/laser/frame-controller-readiness';
+import { useLaserStore } from '../state/laser-store';
+import { useStore } from '../state/store';
+import { resetStore } from '../state/test-helpers';
+import { resolveLiveFramePlacement } from './camera-frame-placement';
+import { normalizeFrameWorkCoordinateSystem } from './frame-controller-readiness';
 
 type Vec = { x: number; y: number; z: number };
 
@@ -142,8 +136,8 @@ describe('CG-2 (Falcon): Frame WCS normalization keeps a live G92 origin', () =>
     await settle(normalizeFrameWorkCoordinateSystem());
     expect(fw.outbound()).toContain('G54\n');
 
-    // Fails today: currentPosition becomes { x: 100, y: 50 } (MPos) because the
-    // store dropped wcoCache/workOriginActive and the fresh report had no WCO.
+    // The origin record and its offset survive the selection, though the fresh
+    // report after G54 carries no WCO.
     const after = resolveLiveFramePlacement(useStore.getState(), useLaserStore.getState());
     expect(after, JSON.stringify(after)).toMatchObject({
       ok: true,

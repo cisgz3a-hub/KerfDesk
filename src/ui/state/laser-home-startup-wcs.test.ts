@@ -1,32 +1,21 @@
-// Audit repro GP-1 (GRBL 1.1 protocol core).
-//
-// Correct behaviour: after a successful `$H`, GRBL 1.1h executes the stored
-// `$N0`/`$N1` startup blocks (system.c system_execute_line case 'H':
-// `if (!sys.abort) { sys.state = STATE_IDLE; st_go_idle(); if (line[2] == 0) {
-// system_execute_startup(line); } }`) and echoes each one as `>line:ok`
-// (report.c report_execute_startup_message). A startup block may select
-// G55-G59. The store must therefore stop trusting the active WCS it read with
-// `$G` before the Home (null it, re-read `$G`, or parse the `>...:ok` echo), so
-// Frame's G54 normalization (frame-controller-readiness.ts
-// normalizeFrameWorkCoordinateSystem) re-selects G54 before tracing. The
-// emitted laser/CNC program always selects G54 (grbl-strategy.ts preamble), so
-// a Frame traced in G55 does not match the job.
+// After a successful `$H`, GRBL 1.1h executes the stored `$N0`/`$N1` startup
+// blocks (system.c system_execute_line case 'H': `if (!sys.abort) { ...
+// if (line[2] == 0) { system_execute_startup(line); } }`) and echoes each one as
+// `>line:ok` (report.c report_execute_startup_message). A startup block may
+// select G55-G59, so the store re-reads the active WCS with an owned `$G` after
+// a Home instead of trusting the one it read before (controller audit
+// 2026-09-25 GP-1), and the Frame's G54 normalization then re-selects G54
+// before tracing. The emitted laser/CNC program always selects G54
+// (grbl-strategy.ts preamble), so a Frame traced in G55 would not match the job.
 //
 // Upstream: https://github.com/gnea/grbl/blob/bfb67f0c7963fe3ce4aaf8a97f9009ea5a8db36e/grbl/system.c#L195-L199
 //           https://github.com/gnea/grbl/blob/bfb67f0c7963fe3ce4aaf8a97f9009ea5a8db36e/grbl/report.c#L361-L367
-//           https://github.com/gnea/grbl/blob/bfb67f0c7963fe3ce4aaf8a97f9009ea5a8db36e/grbl/main.c (HOMING_INIT_LOCK: power-up in ALARM, startup blocks not run until $H)
-//
-// This test FAILS on current code: activeWcs stays 'G54' after the Home whose
-// startup block selected G55, and Frame normalization writes no G54.
 
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { PlatformAdapter, SerialConnection } from '../../platform/types';
-import { useLaserStore } from '../../ui/state/laser-store';
-import {
-  respondToTestGrblHandshake,
-  settleTestGrblHandshake,
-} from '../../ui/state/laser-test-start-helpers';
-import { normalizeFrameWorkCoordinateSystem } from '../../ui/laser/frame-controller-readiness';
+import { useLaserStore } from './laser-store';
+import { respondToTestGrblHandshake, settleTestGrblHandshake } from './laser-test-start-helpers';
+import { normalizeFrameWorkCoordinateSystem } from '../laser/frame-controller-readiness';
 
 type FakeConnection = SerialConnection & { readonly emitLine: (line: string) => void };
 
@@ -119,9 +108,9 @@ describe('GP-1: GRBL runs $N startup blocks after $H', () => {
     await useLaserStore.getState().home();
     expect(useLaserStore.getState().homingState).toBe('confirmed');
 
-    // GRBL is now in G55 (the startup block ran after homing). Correct: the
-    // store no longer claims G54.
-    expect.soft(useLaserStore.getState().activeWcs).not.toBe('G54');
+    // GRBL is now in G55 (the startup block ran after homing), and the store
+    // read it back.
+    expect(useLaserStore.getState().activeWcs).toBe('G55');
 
     // Consequence: Frame's WCS normalization must re-select G54 before tracing.
     writes.length = 0;

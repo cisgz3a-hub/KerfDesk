@@ -184,6 +184,7 @@ describe('runFrameNow framed-run authorization', () => {
             statusReport: idleControllerStatusForFrameTest(),
           }));
         }, 0);
+        return { kind: 'selected' as const, previous: 'G55' as const };
       });
       const frame = vi.fn(
         async (_bounds: JobBounds, _feed: number, candidate?: FramedRunCandidate) => {

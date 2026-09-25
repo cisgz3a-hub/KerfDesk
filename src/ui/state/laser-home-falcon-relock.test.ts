@@ -91,6 +91,13 @@ async function runFalconHome(options: {
   port.onOpen(() => setTimeout(() => port.emitLine("GrblHAL 1.1f ['$' or '$HELP' for help]"), 1));
   port.onWrite((data) => {
     if (data === '?') setTimeout(() => port.emitLine(reported), 1);
+    // The connect handshake and the post-Home re-read ask for the active WCS.
+    if (data === '$G\n') {
+      setTimeout(() => {
+        port.emitLine('[GC:G0 G54 G17 G21 G90 G94 M5 M9 T0 F0 S0]');
+        port.emitLine('ok');
+      }, 1);
+    }
   });
   await useLaserStore
     .getState()
@@ -120,7 +127,8 @@ async function runFalconHome(options: {
       (error: unknown) => (outcome = error instanceof Error ? error.message : String(error)),
     );
   await vi.advanceTimersByTimeAsync(1);
-  const commandLines = () => port.outbound().filter((line) => line.endsWith('\n'));
+  const commandLines = () =>
+    port.outbound().filter((line) => line.endsWith('\n') && line !== '$G\n');
   expect(commandLines()).toEqual(['$HX\n']);
 
   // $HX runs: grblHAL forces a <Home|...> report as homing starts.
