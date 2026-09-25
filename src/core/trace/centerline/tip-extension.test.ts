@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { minDistanceToPolylines } from '../../../__fixtures__/perceptual/centerline-geometry';
+import { CENTERLINE_TRUTH_FIXTURES } from '../../../__fixtures__/perceptual/centerline-truth';
 import type { Vec2 } from '../../scene';
 import { DEFAULT_TRACE_OPTIONS } from '../trace-image';
 import { TRACE_PRESETS } from '../trace-presets';
@@ -9,6 +10,7 @@ import { condenseJunctions } from './junction-condense';
 import { thinToMedialAxis } from './medial-thinning';
 import { pruneSpurs } from './spur-pruning';
 import { buildStrokeGraph, type StrokeGraph } from './stroke-graph';
+import { traceCenterlineStrokePaths } from './trace-centerline';
 
 function flatBar(thickness: number, vertical: boolean, reflected: boolean) {
   const width = 128;
@@ -54,6 +56,23 @@ describe('Centerline cap recovery after spur pruning', () => {
       }
     }
   }
+
+  it('walks a round cap along the stroke axis', () => {
+    // The regression bar's 9 px quarter arc leaves (32, 96) heading up and
+    // (96, 32) heading right, so its caps' axes are x = 32 and y = 32. Read
+    // from the nearest pixel, the ridge turned the tip walk 22.5° off the
+    // axis: 1.34 px off at the tip (0.69 px before ridge centring). Read
+    // between pixel centres, the tips end 0.19 px off.
+    const arc = CENTERLINE_TRUTH_FIXTURES.find((fixture) => fixture.name === 'arc')!;
+    const traced = traceCenterlineStrokePaths(arc.image, TRACE_PRESETS.Centerline!);
+    const polylines = traced.flatMap((path) => path.polylines);
+    expect(polylines).toHaveLength(1);
+    const ends = [polylines[0]!.points[0]!, polylines[0]!.points.at(-1)!];
+    const rightTip = ends.find((p) => p.x > 64)!;
+    const lowerTip = ends.find((p) => p.y > 64)!;
+    expect(Math.abs(rightTip.y - 32)).toBeLessThan(0.5);
+    expect(Math.abs(lowerTip.x - 32)).toBeLessThan(0.5);
+  });
 
   it('returns current endpoint roles and only incident nodes without mutating the input graph', () => {
     const { mask } = flatBar(17, false, false);

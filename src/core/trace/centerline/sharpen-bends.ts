@@ -7,7 +7,8 @@
 // arc's tangent intersection stands far off), replace the bend window with
 // the intersection vertex. Deliberate fillets (roundings ≳ 2 stroke radii)
 // keep their distance and stay round; centreline strokes also keep tighter
-// roundings round unless the ink shows a drawn corner (round-bend-guard.ts).
+// roundings round unless the ink shows a drawn corner (round-bend-guard.ts),
+// and never build a second corner out of one already rebuilt.
 //
 // This file is the ORCHESTRATION (the scan, the per-candidate attempt, the
 // in-place splice); the pure geometric predicates it calls live in
@@ -23,6 +24,7 @@ import {
   arcTrimIndexOn,
   bendGateReachPx,
   bendVertexAt,
+  bendVertexSpan,
   bendWindow,
   edgeLength,
   edgeLengths,
@@ -78,6 +80,9 @@ export type SharpenOptions = {
    *  stroke's full width at the rebuilt vertex, so a rounded bend in a
    *  thick stroke keeps its curve. */
   readonly keepRoundedBends?: boolean;
+  /** Centreline strokes: build no corner from points that take in a corner
+   *  already rebuilt on the chain (see `readsRebuiltCorner`). */
+  readonly oneCornerPerBend?: boolean;
 };
 
 export type SharpenedChain = {
@@ -121,7 +126,6 @@ export function* sharpenChainBendsSteps(
   options?: SharpenOptions,
 ): TraceSteps<SharpenedChain> {
   yield;
-  const keepRounded = options?.keepRoundedBends === true;
   const corners = new Set<Vec2>();
   // An anchor the chain does not carry can never be retained by any rebuild.
   if (anchorMissing(points, anchors)) return { points: [...points], corners };
@@ -131,7 +135,12 @@ export function* sharpenChainBendsSteps(
     corners.add(bend.corner);
     return true;
   };
-  const ink: ChainInk = { distSq, width, keepRounded };
+  const ink: ChainInk = {
+    distSq,
+    width,
+    keepRounded: options?.keepRoundedBends === true,
+    rebuilt: options?.oneCornerPerBend === true ? corners : undefined,
+  };
   const attempt: BendAttempt = (pts, seg, i, maxArm) => trySharpenOpen(pts, seg, i, ink, maxArm);
   const sharpened = closed
     ? yield* sharpenRingSteps(
@@ -317,12 +326,14 @@ function trySharpenOpen(
   return null;
 }
 
-// What every attempt on one chain reads besides the chain: the ink, and
-// whether a rounded bend keeps its curve.
+// What every attempt on one chain reads besides the chain: the ink, whether a
+// rounded bend keeps its curve, and, under oneCornerPerBend, the live set of
+// corners rebuilt so far.
 type ChainInk = {
   readonly distSq: Float64Array;
   readonly width: number;
   readonly keepRounded: boolean;
+  readonly rebuilt: ReadonlySet<Vec2> | undefined;
 };
 
 // One attempt's gates: the chain's ink and the stroke's largest radius near
@@ -355,11 +366,46 @@ function attemptBend(
   const bend = bendVertexAt(pts, seg, headEnd, tailStart);
   if (bend === null) return null;
   if (!wedgeFitsWindow(pts, headEnd, tailStart, bend, gates)) return null;
-  const { distSq, width, keepRounded } = gates;
-  if (keepRounded && bendIsRounded(pts, headEnd, tailStart, bend, distSq, width)) {
-    return null;
-  }
+  if (strokeRulesReject(pts, seg, headEnd, tailStart, bend, gates)) return null;
   return { from: headEnd, to: tailStart, corner: bend.vertex };
+}
+
+// The centreline-only rules: one corner per bend, and a rounded bend keeps
+// its curve.
+function strokeRulesReject(
+  pts: ReadonlyArray<Vec2>,
+  seg: Float64Array,
+  headEnd: number,
+  tailStart: number,
+  bend: BendVertex,
+  gates: BendGates,
+): boolean {
+  const { rebuilt, keepRounded, distSq, width } = gates;
+  if (rebuilt !== undefined && readsRebuiltCorner(pts, seg, headEnd, tailStart, rebuilt)) {
+    return true;
+  }
+  return keepRounded && bendIsRounded(pts, headEnd, tailStart, bend, distSq, width);
+}
+
+// A corner rebuilt earlier on this chain is where the chain turns. A candidate
+// that takes it in, inside the window it would replace or in a leg's tangent
+// chord, is that corner seen again from one of its legs. Its vertex comes from
+// a tangent read further down the other leg and lands beside the first: a
+// second corner 3 px from the first, 1.5 px off a 12 px stroke's 45° bend.
+function readsRebuiltCorner(
+  pts: ReadonlyArray<Vec2>,
+  seg: Float64Array,
+  headEnd: number,
+  tailStart: number,
+  rebuilt: ReadonlySet<Vec2>,
+): boolean {
+  if (rebuilt.size === 0) return false;
+  const { from, to } = bendVertexSpan(pts, seg, headEnd, tailStart);
+  for (let k = from; k <= to; k += 1) {
+    const p = pts[k];
+    if (p !== undefined && rebuilt.has(p)) return true;
+  }
+  return false;
 }
 
 // The wedge (leg, vertex, leg) may replace the bend window only where ink

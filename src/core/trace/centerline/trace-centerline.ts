@@ -1,7 +1,8 @@
 // Centerline trace entry point (from-scratch rewrite). Pipeline:
 //   preprocess (shared threshold/despeckle) → ink mask → exact distance
 //   field → distance-ordered thinning → stroke graph → radius-aware spur
-//   pruning → junction pairing + tip extension + gap bridging + smoothing →
+//   pruning → sub-pixel ridge centring → junction pairing + tip extension +
+//   gap bridging + smoothing →
 //   compact cubic strokes, with round dots as circular marks (ADR-405).
 // Produces ONE open path down the middle of every stroke — the whole point
 // of centerline mode — instead of imagetracer-style double outlines.
@@ -23,6 +24,7 @@ import { assembleStrokePathsSteps } from './stroke-chains';
 import { strokeCurvePolicy } from './stroke-curve-policy';
 import { closeRingEndpoints } from './loop-closure';
 import { withDotMarks } from './dot-marks';
+import { centerGraphOnRidge } from './ridge-centering';
 import { runTraceSteps, type TraceSteps } from '../trace-steps';
 
 const CENTERLINE_COLOR = '#000000';
@@ -78,7 +80,10 @@ export function* centerlineStrokesFromMaskSteps(
   });
   const condensed = condenseJunctions(pruned, distSq, mask.width);
   if (cooperate) yield;
-  const polylines = yield* assembleStrokePathsSteps(condensed, distSq, mask, {
+  // Thinning keeps whole pixels, so an even-width stroke's skeleton runs half
+  // a pixel to one side; move it onto the distance field's sub-pixel ridge.
+  const centered = centerGraphOnRidge(condensed, distSq, mask.width);
+  const polylines = yield* assembleStrokePathsSteps(centered, distSq, mask, {
     // Assembly measures the working grid; the option is a source-pixel
     // distance, so automatic enlargement must enlarge its allowance too.
     joinGapPx: (options.centerlineJoinGapPx ?? DEFAULT_JOIN_GAP_PX) * effectivePixelScale(options),
@@ -89,7 +94,8 @@ export function* centerlineStrokesFromMaskSteps(
   });
   // Dots (round, unelongated ink whose own skeleton is degenerate) have no
   // stroke to follow; they become concentric circles that burn them solid
-  // instead of vanishing or turning into dashes.
+  // instead of vanishing or turning into dashes. They are judged on the
+  // skeleton's own pixels, before centring.
   const marked = withDotMarks(polylines, mask, distSq, condensed, effectivePixelScale(options));
   const assembled = new Set(polylines);
   return { polylines: marked, marks: new Set(marked.filter((p) => !assembled.has(p))) };

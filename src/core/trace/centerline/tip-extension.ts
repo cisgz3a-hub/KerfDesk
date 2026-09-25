@@ -4,7 +4,7 @@
 // so bridges measure the drawn gap).
 
 import type { Vec2 } from '../../scene';
-import type { InkMask } from './distance-field';
+import { interpolatedRadius, type InkMask } from './distance-field';
 import type { Chain } from './junction-pairing';
 import { landmarkGrid } from './point-grid';
 import { pointAtArcDistance, radiusAtPosition } from './polyline-window';
@@ -123,7 +123,11 @@ function bestForwardStep(
     // Prefer straight continuation (current heading AND initial tangent — the
     // tangent term makes ties resolve straight instead of drifting), tie-broken
     // toward the distance ridge so the extension stays centred into the cap.
-    const score = forward + alignment + radiusAtPosition(candidate, distSq, mask.width) * 0.2;
+    // The ridge is read between pixel centres: the nearest pixel's radius
+    // jumps a whole lattice step between neighbouring candidates and turned
+    // the walk 22.5° off a round cap's axis.
+    const ridge = interpolatedRadius(distSq, mask.width, candidate.x, candidate.y);
+    const score = forward + alignment + ridge * 0.2;
     if (score > bestScore) {
       bestScore = score;
       best = candidate;

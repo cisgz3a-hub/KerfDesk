@@ -491,13 +491,37 @@ function chordAnchorIn(
   high: number,
 ): Vec2 | undefined {
   if (high - low < 1) return undefined;
+  return points[chordAnchorIndex(seg, startIdx, step, low, high)];
+}
+
+/** Index range of every point `bendVertexAt` reads for the window
+ *  `headEnd`..`tailStart`: both tangent chords and the points between. */
+export function bendVertexSpan(
+  points: ReadonlyArray<Vec2>,
+  seg: Float64Array,
+  headEnd: number,
+  tailStart: number,
+): { readonly from: number; readonly to: number } {
+  return {
+    from: chordAnchorIndex(seg, headEnd - 1, -1, 0, headEnd - 1),
+    to: chordAnchorIndex(seg, tailStart, 1, tailStart, points.length - 1),
+  };
+}
+
+function chordAnchorIndex(
+  seg: Float64Array,
+  startIdx: number,
+  step: -1 | 1,
+  low: number,
+  high: number,
+): number {
   let cum = 0;
   let idx = startIdx;
   while (idx + step >= low && idx + step <= high && cum < TANGENT_CHORD_PX) {
     cum += stepLength(seg, idx, step);
     idx += step;
   }
-  return points[idx];
+  return idx;
 }
 
 function unit(x: number, y: number): Vec2 | null {

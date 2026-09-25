@@ -219,7 +219,8 @@ function* finalizeChainsSteps(
     if (chain.closed && isJunctionArtifactLoop(chain, distSq, mask.width)) continue;
     // Thinning chamfers drawn corners and round nibs round them; rebuild the
     // vertices before simplification eats the dense points the tangent
-    // estimates need. A bend the pen drew round keeps its curve.
+    // estimates need. A bend the pen drew round keeps its curve, and a
+    // rebuilt corner is not built a second time from one of its own legs.
     const attached = attachments.get(chain);
     const sharpened = yield* sharpenChainBendsSteps(
       chain.points,
@@ -228,7 +229,7 @@ function* finalizeChainsSteps(
       mask.width,
       attached,
       undefined,
-      { keepRoundedBends: true },
+      { keepRoundedBends: true, oneCornerPerBend: true },
     );
     const pinned =
       attached === undefined ? sharpened.corners : new Set([...sharpened.corners, ...attached]);
