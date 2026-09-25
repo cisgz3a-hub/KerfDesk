@@ -36,6 +36,10 @@ export function useViewer3dModelInstallation(args: Viewer3dModelInstallationArgs
     void (async () => {
       handle.setSegments(model);
       handle.fitToBounds(model.stats.motionBounds);
+      // Let the remaining scene-sync effects apply the initial lens and markers
+      // before submitting the first frame. Revision tracking still covers later changes.
+      await Promise.resolve();
+      if (controller.signal.aborted || handleRef.current !== handle) return;
       await handle.prepareToShow(controller.signal);
       if (controller.signal.aborted || handleRef.current !== handle) return;
       drawnModelRef.current = model;
