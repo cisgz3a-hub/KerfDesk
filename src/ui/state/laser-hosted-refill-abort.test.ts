@@ -7,7 +7,11 @@
 // The oracle is the byte stream the simulated controller received.
 
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { createGrblSimulator, type GrblSimulator } from '../../__fixtures__/controllers';
+import {
+  createGrblSimulator,
+  GRBL_PLANNER_BLOCKS,
+  type GrblSimulator,
+} from '../../__fixtures__/controllers';
 import { grblDriver } from '../../core/controllers';
 import { RT_SOFT_RESET } from '../../core/controllers/grbl/commands';
 import type { PlatformAdapter, SerialConnection } from '../../platform/types';
@@ -177,7 +181,7 @@ afterEach(async () => {
 
 describe('Abort with the worker-hosted refill armed', () => {
   it('puts the soft reset on the wire without waiting for the renderer backlog', async () => {
-    const sim = createGrblSimulator({ plannerBlocks: 16, blockRetireMs: 4 });
+    const sim = createGrblSimulator({ plannerBlocks: GRBL_PLANNER_BLOCKS, blockRetireMs: 4 });
     const threads = newThreads();
     await connectAndStartHosted(sim, threads);
     // A main-thread stall: the armed worker keeps refilling, so forwarded
@@ -212,7 +216,7 @@ describe('Abort with the worker-hosted refill armed', () => {
   });
 
   it('still bounds a silent worker and reports that the Abort was not written', async () => {
-    const sim = createGrblSimulator({ plannerBlocks: 16, blockRetireMs: 4 });
+    const sim = createGrblSimulator({ plannerBlocks: GRBL_PLANNER_BLOCKS, blockRetireMs: 4 });
     const threads = newThreads();
     await connectAndStartHosted(sim, threads);
     threads.workerStalledUntil = Number.POSITIVE_INFINITY;

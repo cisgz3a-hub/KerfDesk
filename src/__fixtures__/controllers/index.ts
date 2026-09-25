@@ -13,6 +13,7 @@ export {
   type GrblSimOptions,
   type GrblSimState,
 } from './grbl-sim-machine';
+export { GRBL_PLANNER_BLOCKS } from './grbl-sim-planner';
 export { defaultGrblSimSettings, DEFAULT_GRBL_SIM_SETTINGS } from './grbl-sim-settings';
 export {
   createMarlinSimulator,
