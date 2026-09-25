@@ -77,39 +77,10 @@ export function prepareConsoleCommand(input: string): ConsoleCommandResult {
   if (isBlockedPersistentCommand(upper)) {
     return { ok: false, reason: BLOCKED_PERSISTENT_REASON };
   }
-  if (normalized === RT_STATUS) {
-    return ok('realtime-status', normalized, RT_STATUS, false, false, false);
-  }
-  if (normalized === RT_RESUME) {
-    // A lone `~` resumes a hold outside a job (a `!` or a door the operator
-    // closed). It owes no acknowledgement; a job is resumed from the rail.
-    return ok('realtime-cycle-start', normalized, RT_RESUME, false, true, false);
-  }
-  const realtimeRefusal = embeddedRealtimeRefusal(normalized);
-  if (realtimeRefusal !== null) return { ok: false, reason: realtimeRefusal };
-  if (upper === CMD_SETTINGS) return ok('settings-query', CMD_SETTINGS, `${CMD_SETTINGS}\n`);
-  if (upper === CMD_OFFSETS) return ok('offset-query', CMD_OFFSETS, `${CMD_OFFSETS}\n`);
-  if (upper === CMD_BUILD_INFO) {
-    return ok('build-info-query', CMD_BUILD_INFO, `${CMD_BUILD_INFO}\n`);
-  }
-  if (upper === CMD_MODAL_STATE) {
-    return ok('modal-state-query', CMD_MODAL_STATE, `${CMD_MODAL_STATE}\n`);
-  }
-  if (upper === CMD_UNLOCK) {
-    return ok('unlock', CMD_UNLOCK, `${CMD_UNLOCK}\n`, false, true, false, 'machine-state');
-  }
-  if (upper === CMD_CHECK_MODE) {
-    return ok(
-      'check-mode',
-      CMD_CHECK_MODE,
-      `${CMD_CHECK_MODE}\n`,
-      false,
-      true,
-      false,
-      'machine-state',
-      IDLE_OR_CHECK,
-    );
-  }
+  const realtime = prepareRealtimeCommand(normalized);
+  if (realtime !== null) return realtime;
+  const systemCommand = prepareSystemCommand(upper);
+  if (systemCommand !== null) return systemCommand;
   if (SETTING_WRITE_RE.test(compact)) {
     return ok(
       'setting-write',
@@ -127,6 +98,49 @@ export function prepareConsoleCommand(input: string): ConsoleCommandResult {
   }
   const stateEffect = commonConsoleStateEffect(compact);
   return ok('gcode', normalized, `${normalized}\n`, true, true, false, stateEffect);
+}
+
+// `?` alone is the status query and `~` alone the cycle start; any of the
+// realtime characters inside a longer line is refused (audit GP-3).
+function prepareRealtimeCommand(normalized: string): ConsoleCommandResult | null {
+  if (normalized === RT_STATUS) {
+    return ok('realtime-status', normalized, RT_STATUS, false, false, false);
+  }
+  if (normalized === RT_RESUME) {
+    // A lone `~` resumes a hold outside a job (a `!` or a door the operator
+    // closed). It owes no acknowledgement; a job is resumed from the rail.
+    return ok('realtime-cycle-start', normalized, RT_RESUME, false, true, false);
+  }
+  const refusal = embeddedRealtimeRefusal(normalized);
+  return refusal === null ? null : { ok: false, reason: refusal };
+}
+
+function prepareSystemCommand(upper: string): ConsoleCommandResult | null {
+  switch (upper) {
+    case CMD_SETTINGS:
+      return ok('settings-query', CMD_SETTINGS, `${CMD_SETTINGS}\n`);
+    case CMD_OFFSETS:
+      return ok('offset-query', CMD_OFFSETS, `${CMD_OFFSETS}\n`);
+    case CMD_BUILD_INFO:
+      return ok('build-info-query', CMD_BUILD_INFO, `${CMD_BUILD_INFO}\n`);
+    case CMD_MODAL_STATE:
+      return ok('modal-state-query', CMD_MODAL_STATE, `${CMD_MODAL_STATE}\n`);
+    case CMD_UNLOCK:
+      return ok('unlock', CMD_UNLOCK, `${CMD_UNLOCK}\n`, false, true, false, 'machine-state');
+    case CMD_CHECK_MODE:
+      return ok(
+        'check-mode',
+        CMD_CHECK_MODE,
+        `${CMD_CHECK_MODE}\n`,
+        false,
+        true,
+        false,
+        'machine-state',
+        IDLE_OR_CHECK,
+      );
+    default:
+      return null;
+  }
 }
 
 function embeddedRealtimeRefusal(line: string): string | null {
