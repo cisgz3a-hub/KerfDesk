@@ -1,46 +1,90 @@
-import { useLayoutEffect, useRef, useState } from 'react';
+import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 
-export const MIN_PREVIEW_ZOOM = 1;
-export const MAX_PREVIEW_ZOOM = 16;
+import {
+  TracePreviewZoomEngine,
+  type ClientPoint,
+  type ZoomMode,
+} from './trace-preview-zoom-engine';
+import {
+  MIN_PREVIEW_ZOOM,
+  previewZoomRange,
+  type PreviewZoomRange,
+} from './trace-preview-zoom-math';
+
+export { LIVE_ZOOM_SETTLE_MS, type ClientPoint, type ZoomMode } from './trace-preview-zoom-engine';
+
+type Size = { readonly width: number; readonly height: number };
+
+export type TracePreviewZoom = {
+  readonly zoom: number;
+  readonly range: PreviewZoomRange;
+  readonly viewportRef: React.RefObject<HTMLDivElement>;
+  /** The artwork layer that a live gesture scales before the stage re-lays. */
+  readonly lensRef: React.RefObject<HTMLDivElement>;
+  /**
+   * Zoom about `anchor`, or about the viewport centre when omitted. Returns
+   * whether the zoom changed (false at a range limit).
+   */
+  readonly zoomTo: (value: number, anchor?: ClientPoint, mode?: ZoomMode) => boolean;
+  readonly zoomBy: (factor: number, anchor?: ClientPoint, mode?: ZoomMode) => boolean;
+  /** Scroll the view by screen pixels (positive reveals content to the right/below). */
+  readonly panBy: (dx: number, dy: number) => void;
+  /** Re-lay a live gesture's zoom now (before a Boundary drag, say). */
+  readonly settle: () => void;
+};
 
 // Zoom is relative to the fitted image, not its native pixel size. Both stage
 // dimensions scale together, so contain/meet and boundary coordinates agree.
-export function useTracePreviewZoom(): {
-  readonly zoom: number;
-  readonly viewportRef: React.RefObject<HTMLDivElement>;
-  readonly zoomTo: (value: number) => void;
-} {
+// Zoom and pan are local viewing state only: nothing here reaches the trace.
+// See TracePreviewZoomEngine for the live (wheel/pinch) versus commit paths.
+export function useTracePreviewZoom(image?: Size): TracePreviewZoom {
   const [zoom, setZoom] = useState(MIN_PREVIEW_ZOOM);
   const viewportRef = useRef<HTMLDivElement>(null);
-  const pendingScroll = useRef<{ readonly left: number; readonly top: number } | null>(null);
+  const lensRef = useRef<HTMLDivElement>(null);
+  const engineRef = useRef<TracePreviewZoomEngine | null>(null);
+  engineRef.current ??= new TracePreviewZoomEngine(viewportRef, lensRef, setZoom);
+  const engine = engineRef.current;
+  const range = previewZoomRange(image, useViewportSize(viewportRef));
+  engine.range = range;
 
-  useLayoutEffect(() => {
-    const viewport = viewportRef.current;
-    const target = pendingScroll.current;
-    if (viewport === null || target === null) return;
-    viewport.scrollLeft = target.left;
-    viewport.scrollTop = target.top;
-    pendingScroll.current = null;
-  }, [zoom]);
+  useLayoutEffect(() => engine.onLaidOut(zoom), [engine, zoom]);
+  useEffect(() => () => engine.dispose(), [engine]);
+  // The range follows the measured viewport and image. When it moves (window
+  // resize, side-by-side to stacked layout, a new image), pull a zoom left
+  // outside it back to the nearest limit, about the centre of the view.
+  useLayoutEffect(() => engine.reclamp(), [engine, range.min, range.max]);
 
-  function zoomTo(value: number): void {
-    const next = Math.max(MIN_PREVIEW_ZOOM, Math.min(MAX_PREVIEW_ZOOM, value));
-    if (!Number.isFinite(next) || next === zoom) return;
-    const viewport = viewportRef.current;
-    if (viewport !== null) {
-      // Capture before shrinking the stage: the browser may clamp its current
-      // scroll offset during layout, losing the previous inspection centre.
-      pendingScroll.current = {
-        left: zoomOffset(viewport.scrollLeft, viewport.clientWidth, zoom, next),
-        top: zoomOffset(viewport.scrollTop, viewport.clientHeight, zoom, next),
-      };
-    }
-    setZoom(next);
-  }
-
-  return { zoom, viewportRef, zoomTo };
+  return {
+    zoom,
+    range,
+    viewportRef,
+    lensRef,
+    zoomTo: (value, anchor, mode) => engine.zoomTo(value, anchor, mode),
+    zoomBy: (factor, anchor, mode) => engine.zoomTo(engine.requestedZoom * factor, anchor, mode),
+    panBy: (dx, dy) => engine.panBy(dx, dy),
+    settle: () => engine.settle(),
+  };
 }
 
-function zoomOffset(offset: number, size: number, previous: number, next: number): number {
-  return next === MIN_PREVIEW_ZOOM ? 0 : (offset + size / 2) * (next / previous) - size / 2;
+function useViewportSize(viewportRef: React.RefObject<HTMLDivElement>): Size {
+  const [size, setSize] = useState<Size>({ width: 0, height: 0 });
+  useLayoutEffect(() => {
+    const viewport = viewportRef.current;
+    if (viewport === null) return undefined;
+    const measure = (): void => {
+      const next = { width: viewport.clientWidth, height: viewport.clientHeight };
+      setSize((previous) =>
+        previous.width === next.width && previous.height === next.height ? previous : next,
+      );
+    };
+    measure();
+    if (typeof ResizeObserver === 'undefined') {
+      window.addEventListener('resize', measure);
+      return () => window.removeEventListener('resize', measure);
+    }
+    const observer = new ResizeObserver(measure);
+    observer.observe(viewport);
+    return () => observer.disconnect();
+  }, [viewportRef]);
+  return size;
 }

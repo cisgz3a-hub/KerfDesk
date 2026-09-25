@@ -2457,13 +2457,20 @@ settings and Job Review keep their existing read-only setup references.
    preview budget and the selected preset starts tracing in a worker.
    The large preview and scrollable settings panel sit side by side on wide screens and stack
    on narrow screens, with Cancel and Trace kept in the footer. Compare **Original**, **Trace**,
-   or **Overlay**; use **Fit** and the zoom buttons (up to 16× the fitted view) to inspect detail.
+   or **Overlay**; use **Fit**, **1:1** (one image pixel per CSS pixel) and the zoom buttons
+   to inspect detail, from 1:1 or Fit (whichever is smaller) up to 16× Fit, or 4 screen pixels
+   per image pixel on large images (at most 64× Fit).
    Original shows the unfaded source alone. Overlay highlights the trace in blue over a faded
    source; Trace shows the actual output colours. **Fade Image** starts enabled and applies
    only to Overlay. A centred loading indicator names image preparation, tracing and geometry
    refinement as those stages run, and shows elapsed time. It remains visible while zoomed or
    panned, continues through raster conversion, and disappears on completion or error.
-   Scrollbars, a trackpad, or arrow keys in the preview pan a zoomed image.
+   The mouse wheel, Ctrl+wheel and a trackpad or touch pinch zoom about the pointer. Middle-drag,
+   Space+drag, a trackpad two-finger drag, one or two touch fingers, the scrollbars and the arrow
+   keys pan; plain primary drag still selects a Boundary. With the preview focused (clicking it
+   focuses it), **+** and **−** step the zoom, **0** fits and **1** shows 1:1. Space pans only
+   while no focused button, checkbox or text field needs it. At the smallest zoom a plain
+   wheel-out scrolls the dialog instead.
    **Show Points** displays vector vertices in a bounded viewport canvas. Overlapping markers
    combine at the current zoom; zoom in to separate them. These viewing controls do not
    restart tracing or change the committed geometry. Source, trace and boundary overlays share
@@ -2521,6 +2528,8 @@ settings and Job Review keep their existing read-only setup references.
    supersedes an older result.
    Edge Detection creates closed outlines around dark artwork and locally
    darker detail. Adjacent dark tones may merge into one outline. Centerline follows stroke centres.
+   Both commit as Line layers, so their preview draws every outline and stroke as a hairline that
+   stays one screen pixel wide at any zoom, rather than filling Edge outlines.
    Centerline's separate-end gap bridge uses source-grid distance (preset/default 3 pixels),
    converted once on enlarged working rasters, including Enhance regions. Zero disables that
    gap bridge; true-junction repairs and ring closure keep their existing separate policies.

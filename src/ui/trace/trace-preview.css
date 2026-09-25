@@ -81,6 +81,9 @@
 
 .lf-trace-preview__viewport {
   position: relative;
+  /* Flex lets auto margins centre a stage smaller than the viewport (1:1 on a
+     small source) and collapse to zero when a zoomed stage overflows. */
+  display: flex;
   flex: 1 1 0;
   min-height: 0;
   /* Reserve both scrollbar gutters so Fit and zoom share one stable extent. */
@@ -91,17 +94,35 @@
   /* Artwork is always judged against a light material-facing surface. */
   background: #fafafa;
   isolation: isolate;
+  /* Touch pans and pinches are handled by the preview itself (ADR-399). */
+  touch-action: none;
+}
+
+.lf-trace-preview__viewport:focus-visible {
+  outline: 2px solid var(--lf-accent);
+  outline-offset: -2px;
+}
+
+.lf-trace-preview__viewport[data-pan='ready'] .lf-trace-preview__stage {
+  cursor: grab;
+}
+
+.lf-trace-preview__viewport[data-pan='panning'] .lf-trace-preview__stage {
+  cursor: grabbing;
 }
 
 .lf-trace-preview__stage {
   position: relative;
-  min-width: 100%;
-  min-height: 100%;
+  flex: none;
+  margin: auto;
   overflow: hidden;
 }
 
 .lf-trace-preview__artwork {
   position: absolute;
+  /* A standing compositor layer: a live wheel/pinch zoom scales its existing
+     raster instead of repainting the trace every step (ADR-399). */
+  will-change: transform;
 }
 
 .lf-trace-preview__source,
