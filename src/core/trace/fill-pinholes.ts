@@ -42,11 +42,15 @@ const PINHOLE_MAX_AREA_PX = 120;
 /** pixelScale: supersampling factor of the mask relative to the source
  *  image. The caps are calibrated in SOURCE pixels (from the arch-house
  *  audit), so a 2x-supersampled trace scales the radius cap by 2 and the
- *  area cap by 4 to keep the same real-space semantics. */
+ *  area cap by 4 to keep the same real-space semantics.
+ *  judge: the automatic small-mark policy (small-mark-policy.ts). When
+ *  given, a component that passes all three guards is filled only if the
+ *  judge also says it is a threshold crack rather than a genuine hole. */
 export function fillPinholes(
   image: RawImageData,
   pixelScale = 1,
   saddlePolicy?: SaddlePolicyInput,
+  judge?: PinholeJudge,
 ): RawImageData {
   if (!isValidMonochrome(image)) return image;
   const scale = Number.isFinite(pixelScale) && pixelScale >= 1 ? pixelScale : 1;
@@ -71,11 +75,19 @@ export function fillPinholes(
   fillEnclosedPinholes(data, grid, outside, {
     maxAreaPx: PINHOLE_MAX_AREA_PX * scale * scale,
     maxRadiusPx: PINHOLE_MAX_RADIUS_PX * scale,
+    judge,
   });
   return { width, height, data };
 }
 
-type PinholeCaps = { readonly maxAreaPx: number; readonly maxRadiusPx: number };
+/** true = fill this enclosed thin paper component. */
+export type PinholeJudge = (component: ReadonlyArray<number>) => boolean;
+
+type PinholeCaps = {
+  readonly maxAreaPx: number;
+  readonly maxRadiusPx: number;
+  readonly judge: PinholeJudge | undefined;
+};
 
 // The binary ink map plus the saddle decision for diagonal paper steps
 // (null = paper never steps diagonally).
@@ -100,6 +112,7 @@ function fillEnclosedPinholes(
     const component = collectComponent(grid, outside, seen, start);
     if (component.length > caps.maxAreaPx) continue;
     if (!isHairlineThin(component, ink, width, height, caps.maxRadiusPx)) continue;
+    if (caps.judge !== undefined && !caps.judge(component)) continue;
     paintComponentInk(data, component);
   }
 }

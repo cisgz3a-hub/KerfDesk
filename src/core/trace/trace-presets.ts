@@ -21,9 +21,13 @@ export const TRACE_PRESETS: Readonly<Record<string, TraceOptions>> = {
     //     brightness band, inclusive 0..128.
     //   * fixedPalette [white, black] — guarantees a 2-layer output
     //     even if the input has stray non-monochrome pixels.
-    //   * despeckleMinPixels 12 — removes connected ink blobs under
-    //     12 pixels. Kills JPEG dot artefacts that survived the
-    //     threshold.
+    //   * smallMarkPolicy 'auto' — judges each ink mark under 12 source
+    //     px² and each thin enclosed paper hole on evidence (contrast,
+    //     nearby ink, size) instead of erasing / filling all of them, so
+    //     stipple, dotted rows, small text and paper holes in hatching
+    //     survive while faint threshold noise, lone dust specks and
+    //     binarisation cracks are cleaned (ADR-409). An explicit "Remove
+    //     ink specks" / "Fill tiny holes" value replaces it exactly.
     //   * pathOmit 16 — second-line defence: drops short paths the
     //     tracer might still emit at edges.
     numberOfColors: 2,
@@ -40,10 +44,10 @@ export const TRACE_PRESETS: Readonly<Record<string, TraceOptions>> = {
     ignoreLessThanPixels: 2,
     smoothness: 1,
     optimize: 0.2,
-    despeckleMinPixels: 12,
-    // Fill hairline threshold cracks enclosed in solid ink (letter-stem
-    // slivers) so they don't trace as spurious inner contours.
-    fillPinholeCracks: true,
+    // Automatic speck removal and hairline-crack fill (see above). Replaces
+    // the fixed despeckleMinPixels 12 + fillPinholeCracks true, which erased
+    // 99% of the owl drawing's 3-8 px² stipple and filled its paper holes.
+    smallMarkPolicy: 'auto',
     // Feature-aware quality path: coherent thin details (hooked apex tips,
     // pale subtitle strokes) supersample; broad art stays native and large
     // dense color pictures use a bounded working grid.
@@ -133,9 +137,9 @@ export const TRACE_PRESETS: Readonly<Record<string, TraceOptions>> = {
   },
   Smooth: {
     // For slightly noisy / hand-drawn line art. The median kills
-    // salt-and-pepper noise before threshold; despeckle catches what
-    // survives. Blur slider remains for compatibility but the median
-    // does most of the work.
+    // salt-and-pepper noise before threshold; the automatic small-mark
+    // policy catches what survives. Blur slider remains for compatibility
+    // but the median does most of the work.
     //
     // medianFilter is 'auto', NOT true: forcing the median on every input
     // melts clean small glyphs (the LANGEBAAN defect — 4-6 px letters trace
@@ -152,10 +156,12 @@ export const TRACE_PRESETS: Readonly<Record<string, TraceOptions>> = {
     fixedPalette: ['#ffffff', '#000000'],
     medianFilter: 'auto',
     useOtsuThreshold: true,
-    despeckleMinPixels: 24,
-    // Same hairline-crack cleanup as Line Art; Sharp deliberately omits it
-    // (pixel-fidelity preset — every notch matters, even a crack).
-    fillPinholeCracks: true,
+    // Same automatic speck removal and crack fill as Line Art (ADR-409). It
+    // replaces the fixed despeckleMinPixels 24 + fillPinholeCracks true, which
+    // erased genuine 5 px dots and 6 px text as well as noise. Sharp keeps
+    // its fixed keep-everything cleanup (pixel-fidelity preset — every notch
+    // matters, even a crack).
+    smallMarkPolicy: 'auto',
     // Same feature-aware 2x quality path as Line Art (Sharp opts out: bilinear
     // supersampling anti-aliases the pixel notches it exists to preserve).
     supersampleContour: true,

@@ -354,7 +354,7 @@ function traceNumberTitle(label: string): string {
     case 'Ignore Less Than':
       return 'Remove shapes and holes below this pixel area. Use 0 to keep the smallest gaps.';
     case 'Remove ink specks':
-      return 'Remove ink marks below this pixel area. Lower values keep fine detail; holes stay intact.';
+      return 'Remove ink marks below this pixel area; holes stay intact. Left unset (0), Line Art judges small marks instead: dark stipple and small text stay, faint noise and lone specks go.';
     case 'Smoothness':
       return 'Smooth traced edges to reduce jagged vector paths.';
     case 'Optimize':

@@ -262,8 +262,12 @@ describe('checkerboards never weld into a solid block (ADR-395)', () => {
     );
     const rendered = rasterizeColoredPaths(paths, BOARD, BOARD);
     const inked = rendered.data.reduce((sum, v) => sum + v, 0);
-    // A welded board covers ~100% of its area; half would already be every
-    // ink cell. Neither may happen.
-    expect(inked).toBeLessThan(0.25 * area);
+    // A welded board covers ~100% of its area; every ink cell kept separately
+    // is half of it. 1-px cells are below every speck floor and vanish; the
+    // automatic small-mark policy keeps the 4 px² cells of the 2-px board as
+    // the texture they are (ADR-409). Welding may never happen.
+    expect(inked).toBeLessThan(0.75 * area);
+    if (cell === 2) expect(inked / area).toBeCloseTo(0.5, 1);
+    else expect(inked).toBeLessThan(0.25 * area);
   });
 });

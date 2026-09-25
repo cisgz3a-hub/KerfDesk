@@ -26,6 +26,9 @@ describe('trace controls describe the options the engine actually receives', () 
       await controls.detect('faint-lines');
       expect(controls.host.querySelector('[aria-label="Trace Threshold"]')).toBeNull();
       expect(ink(preprocessForTrace(image, controls.options()))).toBe(440);
+      // Line Art's default is the automatic small-mark policy (unchecked);
+      // check then uncheck to make the explicit "never fill" choice.
+      await controls.check('Fill tiny holes', true);
       await controls.check('Fill tiny holes', false);
       await controls.selectPreset('Sharp');
       expect(controls.options().faintLineRecovery).toBe(true);
@@ -126,7 +129,8 @@ describe('trace controls describe the options the engine actually receives', () 
     fill(image, 60, 40, 3, 2, [0, 0, 0]);
     await withControls('Line Art', async (controls) => {
       expect(controls.number('Ignore Less Than').value).toBe('2');
-      expect(controls.number('Remove ink specks').value).toBe('12');
+      // Unset (shown as 0): the automatic policy removes the lone 6 px speck.
+      expect(controls.number('Remove ink specks').value).toBe('0');
       expect(ink(preprocessForTrace(image, controls.options()))).toBe(400);
       await controls.change('Ignore Less Than', 3);
       expect(ink(preprocessForTrace(image, controls.options()))).toBe(400);

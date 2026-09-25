@@ -147,7 +147,7 @@ for (const presetName of ['Centerline', 'Line Art', 'Smooth', 'Sharp', 'Edge Det
     if (preset.traceMode !== 'edge') {
       await expect(dialog.getByRole('combobox', { name: 'Trace detection' })).toHaveValue('preset');
       await expect(dialog.getByRole('spinbutton', { name: 'Remove ink specks' })).toHaveValue(
-        String(preset.despeckleMinPixels),
+        String(preset.despeckleMinPixels ?? 0),
       );
     }
     await page.waitForFunction(

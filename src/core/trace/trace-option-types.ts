@@ -102,6 +102,20 @@ export type TraceOptions = {
   // thinness + area guards keep letter counters, spacing gaps, and intended
   // thin highlights untouched. See fill-pinholes.ts.
   readonly fillPinholeCracks?: boolean;
+  // smallMarkPolicy 'auto': judge each small ink mark and each thin enclosed
+  // paper hole on evidence (local contrast against the image's ink/paper
+  // span, other ink nearby, size in SOURCE px) instead of a fixed area, so
+  // stipple, dotted rows, small text and paper holes in hatching survive
+  // while faint threshold noise, lone dust specks and binarisation cracks
+  // are cleaned. Applies only to a stage whose explicit option above is
+  // unset: an explicit despeckleMinPixels / fillPinholeCracks is honoured
+  // exactly. See small-mark-policy.ts and ADR-409.
+  readonly smallMarkPolicy?: 'auto';
+  // smallMarkAreaScale: INTERNAL — working-grid px² per source px² on the
+  // bounded downscale route (set by trace-to-paths.ts, which resets
+  // pixelScale to 1 there), so the automatic policy keeps SOURCE-pixel
+  // semantics. Callers never set this directly.
+  readonly smallMarkAreaScale?: number;
   // turnPolicy: how the filled-contour lane resolves a SADDLE — two ink
   // pixels touching only at a corner. 'connect-ink' joins them (a 1-px
   // diagonal hairline is one outline); 'connect-paper' splits them and is
