@@ -1121,6 +1121,42 @@ Status bar messages (toasts that appear in the bar for 3 s) for non-blocking eve
 #### Edge — jog target exceeds travel
 1. Controller replies `error:15`. UI logs the rejected line.
 
+### F-B5a. Momentary Fire (ADR-162, ADR-387)
+
+#### Success
+1. On a GRBL-family laser profile that does not declare a CO2 or fiber source, the user turns on
+   **Enable Fire button** in Machine Setup → Essentials → Air assist and test fire. They set
+   **Fire power** from 0.1 to 5% (default 1%), and the row shows the S value a press sends
+   (`% = S10 of S1000`). The opt-in is off by default and needs nothing in Tools → Labs.
+2. The Fire button in the jog pad shows its power as both percent and S (`1% · S10`). The
+   controller must be connected and Idle with a trusted position, with nothing else running.
+   While the user holds the button, the app sends `G1 F<feed> M3 S<n>` once. S never exceeds 5% of
+   the machine's full-power S.
+3. Each of these sends `M5`:
+   - releasing the pointer or key;
+   - the pointer leaving the button, or a cancelled pointer;
+   - the button or the window losing focus;
+   - the page going hidden;
+   - unmounting;
+   - the opt-in being turned off.
+4. Only an accepted `M5` clears the on latch. LASER OFF stays until it does.
+
+#### Empty — not set up or not available
+1. Without the opt-in, the button reads **Set up** and opens Machine Setup at the Fire row.
+2. Some profiles cannot offer Fire at all: no laser output, a controller without Fire (Marlin,
+   Smoothieware, Ruida), or a CO2 or fiber source. They show a disabled **Unavailable** button whose
+   tooltip names the reason.
+3. CNC projects have no Fire button.
+
+#### Edge — machine not ready
+1. Any of these disables the button: disconnected, alarm, MPG active, not Idle, no position report,
+   a job, a jog or Frame, a controller operation, auto-focus, probing, or an unacknowledged command.
+   Its face names the state (for example **Alarm** or **Job running**), and its tooltip says what to
+   do. A refused press writes nothing.
+2. If the Fire power rounds to S0 on the machine's S scale, Machine Setup flags it. The button reads
+   **Set up** until the power is raised.
+3. If the `M3` write fails, the button asks for `M5` at once.
+
 ### F-B6. Start job
 
 #### Success
@@ -6142,12 +6178,17 @@ as the pane's design record.
   covering the bed corners — or reuse an already-burned target — then, with the bed cleared of
   everything else and the camera live, Detect. The five X-corners are detected, the origin
   pair resolves the camera's rotation, the homography solves, and the alignment persists
-  (undoable) — the workspace overlay is immediately registered. With a lens calibration
-  present the capture is de-fisheyed first and the toast says "lens-corrected".
+  (undoable) — the workspace overlay is immediately registered. The capture is de-fisheyed
+  with the saved lens calibration first and the toast says "lens-corrected".
 - **Error / markers not found.** A cluttered bed, missing patches, or poor
   lighting produce a typed toast telling the operator what to fix; nothing
   persists. A degenerate solve (markers nearly collinear) is refused the same
   way.
+- **Empty / no lens calibration.** "Align to bed…" is disabled until the device has a
+  lens calibration ("Calibrate lens…"), for USB and network cameras alike. Its tooltip says so,
+  and no Labs switch is involved (ADR-387). Removing the calibration closes an open wizard. A
+  calibration bound to another camera or capture shape is refused at Detect with a typed
+  message, and nothing persists.
 - **Empty / no live feed.** Auto-align is disabled until an active camera
   source can produce pixel-readable frames. Machine cameras become eligible
   when the local bridge frame proxy is available (F-CAM6).
@@ -6243,8 +6284,8 @@ as the pane's design record.
 
 ### F-CAM9. Bed-alignment wizard with burn-the-target (ADR-122)
 
-- **Success / one wizard, aligned bed.** **Align to bed...** opens a guided
-  wizard: choose marker burn power/speed, burn the five-marker target through
+- **Success / one wizard, aligned bed.** Once the lens is calibrated (F-CAM4), **Align to
+  bed...** opens a guided wizard: choose marker burn power/speed, burn the five-marker target through
   the normal Start flow, wait for the stream to finish, clear the bed, capture
   a frame, detect markers, solve the homography, and persist the alignment.
 - **Error / burn not started or failed.** If readiness, preflight,

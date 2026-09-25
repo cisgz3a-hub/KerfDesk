@@ -143,8 +143,8 @@
 | ADR-158 | 2026-07-13 | Accepted | Browser smoke is independent from the release and deploy gate |
 | ADR-159 | 2026-07-13 | Accepted | Schema v2 curves are canonical and compatibility polylines are invalidated |
 | ADR-160 | 2026-07-13 | Superseded by ADR-315 | Rotary raster is an explicit experimental amendment to ADR-127 |
-| ADR-161 | 2026-07-13 | Accepted for remaining features; rotary clauses superseded by ADR-315 | Labs gates experimental laser features locally and fail closed |
-| ADR-162 | 2026-07-13 | Accepted | Low-power Fire is profile-opted, hard-capped, and momentary |
+| ADR-161 | 2026-07-13 | Accepted for Print and Cut; rotary clauses superseded by ADR-315; Fire and camera alignment clauses superseded by ADR-387 | Labs gates experimental laser features locally and fail closed |
+| ADR-162 | 2026-07-13 | Accepted; gating amended by ADR-387 | Low-power Fire is profile-opted, hard-capped, and momentary |
 | ADR-163 | 2026-07-13 | Accepted | Cut Planner exposes five persisted deterministic policies |
 | ADR-164 | 2026-07-13 | Accepted | Adopt bounded offline editing and interoperability already shipped |
 | ADR-171 | 2026-07-13 | Superseded in part (ADR-228: readiness no longer blocks Start) | Work-Z readiness uses source-qualified, epoch-bound evidence |
@@ -7901,7 +7901,7 @@ hardware CLAIMED and must not be presented as verified cylindrical photo engravi
 
 ## ADR-161 - Labs gates experimental laser features locally and fail closed
 
-**Status:** Accepted for the remaining Labs features; rotary clauses superseded by ADR-315 | **Date:** 2026-07-13
+**Status:** Accepted for the remaining Labs feature (Print and Cut); rotary clauses superseded by ADR-315; low-power Fire and camera alignment v2 clauses superseded by ADR-387 | **Date:** 2026-07-13
 
 ### Decision
 
@@ -7920,7 +7920,7 @@ requires its own profile, capability, preflight, and hardware-confidence checks.
 
 ## ADR-162 - Low-power Fire is profile-opted, hard-capped, and momentary
 
-**Status:** Accepted | **Date:** 2026-07-13
+**Status:** Accepted; the Labs and catalog-capability gates amended by ADR-387 (the caps, preconditions and laser-off paths stand) | **Date:** 2026-07-13
 
 ### Decision
 

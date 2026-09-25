@@ -4,8 +4,14 @@
 
 1. Open **Machine Setup** and choose the closest supported profile.
 2. Connect, read controller settings, and confirm the work area, origin, maximum feed, and power scale.
-3. Open **Tools > Labs** only for workflows that still use a local experimental switch.
-4. Keep low-power Fire, Print and Cut, and camera alignment v2 disabled unless the connected profile supports them. Rotary setup and G-code output do not use a Labs permission; their physical qualification remains operator-owned and is disclosed in Job Review.
+3. Open **Tools > Labs** only for Print and Cut, the one workflow that still uses a local experimental switch.
+4. Keep Print and Cut disabled unless the connected profile supports it. Rotary setup and G-code output do not use a Labs permission; their physical qualification remains operator-owned and is disclosed in Job Review. Low-power Fire and camera bed alignment left Labs (ADR-387): see below.
+
+## Momentary Fire
+
+1. On a diode laser with a GRBL-family controller, open **Machine Setup > Essentials > Air assist and test fire** and turn on **Enable Fire button**. Set **Fire power**, at most 5%. The row shows the S value a press sends.
+2. Connect and wait for Idle. Wear eye protection, then hold **Fire** in the jog pad for a dim positioning dot. Releasing sends `M5`, and so do leaving the button, switching windows, and hiding the page.
+3. When Fire cannot run, its face and tooltip say why, for example not connected, alarm, job running, not idle, or not enabled for this machine. Never enable Fire on a CO2 or fiber laser; KerfDesk refuses it for profiles that declare one.
 
 ## Rotary jobs
 
@@ -42,7 +48,7 @@
 1. Open **Camera** and start a USB camera directly, or expand **RTSP camera** for a private-network `rtsp://` source.
 2. Browser RTSP use requires `pnpm camera:bridge` in a separate terminal; KerfDesk Desktop starts the loopback bridge automatically.
 3. Open **Diagnostics** and confirm the bridge, frame proxy, FFmpeg, active source, and readable-pixel capture before calibration.
-4. Calibrate the lens, align the camera to the bed, and repeat alignment after camera position or resolution changes.
+4. Calibrate the lens, then use **Align to bed** (it opens once the lens is calibrated), and repeat alignment after camera position or resolution changes.
 5. Treat an unavailable bridge, missing FFmpeg, failed capture, or stale preview as a blocked camera workflow; reconnect and rerun Diagnostics before alignment or trace.
 
 ## Material libraries
