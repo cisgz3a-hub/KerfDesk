@@ -12,6 +12,11 @@ import type { TraceResult } from './use-trace-worker-client';
 import { traceBoundaryForWorkingGrid, type TraceGrid } from './trace-boundary-grid';
 import { checkTraceSignal } from './trace-cancellation';
 import { rawImageHasTransparency } from './raw-image-transparency';
+import {
+  traceAtCommitGrid,
+  type TraceCommitGridContext,
+  type TraceCommitPhase,
+} from './trace-commit-at-grid';
 
 export async function resolveTraceCommitResult(args: {
   readonly file: File;
@@ -19,11 +24,18 @@ export async function resolveTraceCommitResult(args: {
   readonly boundary?: TraceBoundary | null;
   readonly boundaryMode?: BoundaryMode;
   readonly preparedTrace?: PreparedTrace;
-  readonly pendingTrace?: PendingPreparedTrace;
+  readonly pendingTrace?: PendingPreparedTrace | undefined;
   readonly sourceGrid?: TraceGrid;
+  // Omitted: the commit traces the preview's grid (ADR-401).
+  readonly commitGrid?: TraceCommitGridContext | undefined;
   readonly signal?: AbortSignal | undefined;
+  readonly progress?: ((phase: TraceCommitPhase) => void) | undefined;
 }): Promise<TraceResult> {
   checkTraceSignal(args.signal);
+  const finer = await traceAtCommitGrid(args, (retry) =>
+    resolveTraceCommitResult({ ...retry, commitGrid: undefined }),
+  );
+  if (finer !== null) return finer;
   const request: TracePreparationRequest = {
     file: args.file,
     options: args.options,

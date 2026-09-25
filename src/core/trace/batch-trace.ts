@@ -8,10 +8,22 @@ export type BatchTracePhysicalSize = {
   readonly heightMm: number;
 };
 
+// A decoded image, or a loader called on the job's turn so a batch of large
+// images holds one decoded image at a time (ADR-401).
+export type BatchTraceImageSource = RawImageData | (() => Promise<RawImageData>);
+
 export type BatchTraceImageJob = {
   readonly sourceName: string;
-  readonly image: RawImageData;
+  readonly image: BatchTraceImageSource;
   readonly physicalSizeMm?: BatchTracePhysicalSize;
+  readonly options?: TraceOptions;
+  // A cheaper attempt, tried when this job's decode or trace fails and the
+  // caller's canFallBack accepts the error (ADR-401).
+  readonly fallback?: BatchTraceAttempt;
+};
+
+export type BatchTraceAttempt = {
+  readonly image: BatchTraceImageSource;
   readonly options?: TraceOptions;
 };
 
@@ -26,6 +38,16 @@ export type BatchTraceDependencies = {
     image: RawImageData,
     options: TraceOptions,
   ) => Promise<ReadonlyArray<ColoredPath>>;
+  // Whether a failed attempt may use the job's fallback; omitted, every error.
+  readonly canFallBack?: (error: unknown) => boolean;
+  // Called with the job's index before its fallback runs.
+  readonly onFallback?: (jobIndex: number, error: unknown) => void;
+};
+
+type TracedAttempt = {
+  readonly image: RawImageData;
+  readonly options: TraceOptions;
+  readonly paths: ReadonlyArray<ColoredPath>;
 };
 
 const FORBIDDEN_FILENAME_CHARS = new Set(['<', '>', ':', '"', '/', '\\', '|', '?', '*']);
@@ -37,16 +59,15 @@ export async function traceImagesToSvgFiles(
   const trace = deps.trace ?? traceImageToColoredPaths;
   const seenNames = new Map<string, number>();
   const files: BatchTraceSvgFile[] = [];
-  for (const job of jobs) {
-    const options = job.options ?? DEFAULT_TRACE_OPTIONS;
-    const paths = await trace(job.image, options);
+  for (const [index, job] of jobs.entries()) {
+    const { image, options, paths } = await traceJob(job, index, trace, deps);
     const stem = uniqueStem(safeSourceStem(job.sourceName), seenNames);
     files.push({
       filename: `${stem}-trace.svg`,
       svg: coloredPathsToSvg(
         paths,
-        job.image.width,
-        job.image.height,
+        image.width,
+        image.height,
         job.physicalSizeMm,
         options.traceMode,
       ),
@@ -54,6 +75,31 @@ export async function traceImagesToSvgFiles(
     });
   }
   return files;
+}
+
+async function traceJob(
+  job: BatchTraceImageJob,
+  index: number,
+  trace: NonNullable<BatchTraceDependencies['trace']>,
+  deps: BatchTraceDependencies,
+): Promise<TracedAttempt> {
+  try {
+    return await traceAttempt(job, trace);
+  } catch (error) {
+    const fallback = job.fallback;
+    if (fallback === undefined || deps.canFallBack?.(error) === false) throw error;
+    deps.onFallback?.(index, error);
+    return traceAttempt(fallback, trace);
+  }
+}
+
+async function traceAttempt(
+  attempt: BatchTraceAttempt,
+  trace: NonNullable<BatchTraceDependencies['trace']>,
+): Promise<TracedAttempt> {
+  const options = attempt.options ?? DEFAULT_TRACE_OPTIONS;
+  const image = typeof attempt.image === 'function' ? await attempt.image() : attempt.image;
+  return { image, options, paths: await trace(image, options) };
 }
 
 function uniqueStem(stem: string, seen: Map<string, number>): string {
