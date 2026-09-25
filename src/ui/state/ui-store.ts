@@ -11,6 +11,7 @@ import type {
   RasterImage,
   SelectionAnchor,
   ShapeObject,
+  TraceSettingsRecord,
   VariableTemplate,
   Vec2,
 } from '../../core/scene';
@@ -58,6 +59,8 @@ export type TraceImageDialogState = {
   /** Exact owner for one open Trace dialog lifetime. */
   readonly requestToken: string;
   readonly replaceTraceId?: string;
+  /** Settings recorded on the trace being re-traced (ADR-400). */
+  readonly traceSettings?: TraceSettingsRecord;
 };
 
 // Phase G (ADR-051) drawing tool-mode. 'select' is the default (select +
@@ -174,7 +177,7 @@ export type UiState = ArtworkRunOrderUiState &
     readonly imageDialog: TraceImageDialogState | null;
     readonly openImageDialog: (
       source: RasterImage,
-      options?: Pick<TraceImageDialogState, 'replaceTraceId' | 'sourceOrigin'>,
+      options?: Pick<TraceImageDialogState, 'replaceTraceId' | 'sourceOrigin' | 'traceSettings'>,
     ) => void;
     readonly closeImageDialog: () => void;
     // ADR-029 Convert to Bitmap dialog. Lives here (not CommandShell-local

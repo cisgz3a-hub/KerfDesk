@@ -237,6 +237,26 @@ describe('Trace Image raster output', () => {
     );
   });
 
+  it('records the Trace dialog settings on a raster trace result (ADR-400)', async () => {
+    const source = sourceRaster();
+    const project = projectWith(source, imageOperation());
+    const ctx = context(() => project);
+    const traceSettings = {
+      schemaVersion: 1 as const,
+      presetName: 'Line Art',
+      overrides: { smoothness: 0.5 },
+      output: 'raster' as const,
+    };
+
+    await commit({ ...commitArgs(source, 'Line Art'), traceSettings }, ctx);
+
+    expect(ctx.commitRasterizedTrace).toHaveBeenCalledWith(
+      'src-1',
+      expect.objectContaining({ traceSettings }),
+      expect.anything(),
+    );
+  });
+
   it('coerces a domain-level raster request to vectors for CNC projects', async () => {
     const source = sourceRaster();
     const operation = imageOperation();

@@ -1,4 +1,4 @@
-import type { Project, RasterImage } from '../../core/scene';
+import type { Project, RasterImage, TraceSettingsRecord } from '../../core/scene';
 import type { AppThemePreference } from '../theme/app-theme';
 import type { GcodeInspectionSource } from '../gcode-inspector';
 import type { SelectedImageMaskPair } from './image-mask-command-state';
@@ -36,7 +36,10 @@ export type CommandShellCallbacks = {
 export type CommandDialogs = {
   readonly openImageDialog: (
     source: RasterImage,
-    options?: { readonly replaceTraceId?: string },
+    options?: {
+      readonly replaceTraceId?: string;
+      readonly traceSettings?: TraceSettingsRecord;
+    },
   ) => void;
   readonly textTool: () => void;
   readonly measureTool: () => void;
