@@ -24,7 +24,10 @@ import {
 import { createCameraDirector } from './camera-director';
 import type { CameraTracking } from './camera-tracking';
 import { cameraPlacement, type CameraPreset } from './camera-presets';
-import { createViewer3dRenderScheduler } from './create-viewer3d-render-scheduler';
+import {
+  createViewer3dRenderScheduler,
+  type Viewer3dRenderScheduler,
+} from './create-viewer3d-render-scheduler';
 import type { ArrowPlacement } from './direction-arrows';
 import { createArrowMesh, disposeArrowMesh, type ArrowMesh } from './scene-arrows';
 import { boundsExtent } from './scene-furniture';
@@ -44,6 +47,7 @@ import {
 import { buildFurniture, disposeChildren, frameCamera } from './scene-furniture';
 import { resolveViewer3dTheme, type Viewer3dTheme } from './viewer3d-theme';
 import { yieldViewer3dInitialization } from './yield-viewer3d-initialization';
+import { createViewer3dFramePreparation } from './wait-for-viewer3d-gpu';
 
 export type Viewer3dSegments = Viewer3dSegmentsInput;
 
@@ -90,6 +94,8 @@ export type Viewer3dSceneHandle = {
   readonly setDirectionArrows: (placements: ReadonlyArray<ArrowPlacement> | null) => void;
   readonly resize: (width: number, height: number) => void;
   readonly requestRender: () => void;
+  /** Completes the current hidden frame before the Inspector makes it visible. */
+  readonly prepareToShow: (signal?: AbortSignal) => Promise<void>;
   readonly dispose: () => void;
 };
 
@@ -169,6 +175,7 @@ function createSceneHandle(deps: SceneHandleDeps): Viewer3dSceneHandle {
   const { three } = modules;
   const { camera, controls, render } = deps.rig;
   const renderScheduler = createViewer3dRenderScheduler({ render, renderChangeEvents: controls });
+  const preparation = createViewer3dFramePreparation(renderer.getContext(), renderScheduler);
   const director = createCameraDirector({ ...deps.rig, render: renderScheduler.requestRender });
 
   // Fat-line materials size their strokes against the drawing buffer, so the
@@ -230,10 +237,7 @@ function createSceneHandle(deps: SceneHandleDeps): Viewer3dSceneHandle {
       applyView(camera, controls, cameraPlacement(preset, lastBounds, camera.aspect));
       renderScheduler.requestRender();
     },
-    captureImage: () => {
-      renderScheduler.renderNow();
-      return renderer.domElement.toDataURL('image/png');
-    },
+    captureImage: () => captureSceneImage(renderScheduler, renderer),
     resize: (nextWidth, nextHeight) => {
       if (nextWidth <= 0 || nextHeight <= 0) return;
       viewWidth = nextWidth;
@@ -242,12 +246,19 @@ function createSceneHandle(deps: SceneHandleDeps): Viewer3dSceneHandle {
       renderScheduler.requestRender();
     },
     requestRender: renderScheduler.requestRender,
+    prepareToShow: preparation.prepareToShow,
     dispose: () => {
+      preparation.dispose();
       renderScheduler.dispose();
       director.dispose();
       disposeScene(deps, markers, arrowMesh);
     },
   };
+}
+
+function captureSceneImage(scheduler: Viewer3dRenderScheduler, renderer: WebGLRenderer): string {
+  scheduler.renderNow();
+  return renderer.domElement.toDataURL('image/png');
 }
 
 function disposeScene(
