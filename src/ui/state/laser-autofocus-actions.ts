@@ -55,6 +55,12 @@ async function runOwnedAutofocus(
 ): ReturnType<LaserState['autofocus']> {
   const block = autofocusBlockMessage(get(), refs);
   if (block !== null) return { kind: 'preflight-failed', reason: block };
+  // The command is one operator line like a Console line, so the driver's
+  // Console policy applies: Smoothieware's shell answers words such as
+  // `switch focus on` without an ok, which would leave an owed ack that fences
+  // every later command (controller audit 2026-09-25 CG-9).
+  const policy = command.trim() === '' ? null : refs.driver.prepareConsoleCommand(command);
+  if (policy !== null && !policy.ok) return { kind: 'preflight-failed', reason: policy.reason };
   const expectedSessionEpoch = get().controllerSessionEpoch;
   set({
     autofocusBusy: true,
