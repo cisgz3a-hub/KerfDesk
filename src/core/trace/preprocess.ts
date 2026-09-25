@@ -307,7 +307,13 @@ function diagonalLinks(
   const ink = new Uint8Array(image.width * image.height);
   for (let i = 0; i < ink.length; i += 1) ink[i] = lumaAt(image.data, i * 4) < 128 ? 1 : 0;
   const mask = { width: image.width, height: image.height, ink };
-  return { ink, saddles: createSaddleResolver(mask, connectivity.turnPolicy, connectivity.field) };
+  const saddles = createSaddleResolver(
+    mask,
+    connectivity.turnPolicy,
+    connectivity.field,
+    connectivity.pixelScale,
+  );
+  return { ink, saddles };
 }
 
 // BFS the connected ink region (luma < 128) starting at `startIdx`.

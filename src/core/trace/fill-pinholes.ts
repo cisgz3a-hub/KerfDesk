@@ -16,8 +16,10 @@
 //
 // Paper connectivity follows the contour walker (saddle-connectivity.ts):
 // two diagonally-touching paper pixels are one region exactly when the
-// walker joins paper at that corner. Without a policy, paper stays
-// four-connected (the Centerline pairing with its eight-connected ink).
+// walker joins paper at that corner. Without a policy, and under the
+// explicit 'connect-paper' rollback, paper stays four-connected: that is the
+// pre-ADR-395 flood (and the Centerline pairing with its eight-connected
+// ink), so 'connect-paper' reproduces the old pipeline exactly.
 //
 // Same I/O contract as despeckle: near-binary monochrome RGBA in, new
 // buffer out, input never mutated. Pure core — no I/O, no globals.
@@ -55,9 +57,14 @@ export function fillPinholes(
     width,
     height,
     inkJoinsAt:
-      saddlePolicy === undefined
+      saddlePolicy === undefined || saddlePolicy.turnPolicy === 'connect-paper'
         ? null
-        : createSaddleResolver({ width, height, ink }, saddlePolicy.turnPolicy, saddlePolicy.field),
+        : createSaddleResolver(
+            { width, height, ink },
+            saddlePolicy.turnPolicy,
+            saddlePolicy.field,
+            saddlePolicy.pixelScale,
+          ),
   };
   const outside = floodOutsideBackground(grid);
   const data = new Uint8ClampedArray(image.data);

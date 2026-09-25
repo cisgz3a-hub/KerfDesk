@@ -27,7 +27,11 @@ describe('real Arch House supersampling with local support recovery', () => {
       expect(restored.prepared.height).toBe(2048);
       const { changed, measured } = supportMetrics(enlarged, restored);
       expect(changed).toBeGreaterThan(0);
-      expect(changed).toBeLessThan(300);
+      // Base 84 / 249; ADR-395 measures 120 / 305. The enlarged mask now
+      // resolves corners from source-pixel evidence, including Smooth ties whose
+      // bilinear saddle value is the symmetric 127.5 against a cut of 128
+      // (not evidence, so paper joins), which native support restores.
+      expect(changed).toBeLessThan(320);
       expect(measured).toBeGreaterThan(100_000);
       assertUnchangedApex(enlarged, restored);
     },

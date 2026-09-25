@@ -282,14 +282,14 @@ describe('despeckle', () => {
     // four-connected rule erased the hairline pixel by pixel.
     const size = 16;
     const luma = Array.from({ length: size }, () => Array.from({ length: size }, () => 255));
-    for (let i = 0; i < 12; i += 1) (luma[i] as number[])[i] = 0;
+    for (let i = 1; i <= 12; i += 1) (luma[i] as number[])[i] = 0;
     for (let i = 0; i < 3; i += 1) (luma[13 + i] as number[])[2 + i] = 0;
     const img = gridImage(luma);
     const auto = despeckle(img, 12, { turnPolicy: 'auto', field: null });
-    for (let i = 0; i < 12; i += 1) expect(lumaOf(auto, i, i)).toBe(0);
+    for (let i = 1; i <= 12; i += 1) expect(lumaOf(auto, i, i)).toBe(0);
     for (let i = 0; i < 3; i += 1) expect(lumaOf(auto, 2 + i, 13 + i)).toBe(255);
     const paper = despeckle(img, 12, { turnPolicy: 'connect-paper' });
-    for (let i = 0; i < 12; i += 1) expect(lumaOf(paper, i, i)).toBe(255);
+    for (let i = 1; i <= 12; i += 1) expect(lumaOf(paper, i, i)).toBe(255);
     expect(despeckle(img, 12, 4).data).toEqual(paper.data);
   });
 

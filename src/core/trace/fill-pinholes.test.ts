@@ -169,4 +169,11 @@ describe('fillPinholes paper connectivity follows the saddle policy (ADR-395)', 
     expect(out[0]?.[0]).toBe('.');
     expect(out[5]?.[5]).toBe('#');
   });
+
+  it("keeps the historical flood under 'connect-paper' (the rollback value)", () => {
+    const rows = diagonalCrack(false);
+    const historical = rowsFromImage(fillPinholes(imageFromRows(rows)));
+    const rollback = fillPinholes(imageFromRows(rows), 1, { turnPolicy: 'connect-paper' });
+    expect(rowsFromImage(rollback)).toEqual(historical);
+  });
 });

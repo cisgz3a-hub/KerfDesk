@@ -70,7 +70,18 @@ function signedTotal(loops: ReadonlyArray<{ readonly area: number }>): number {
 }
 
 describe('traceBoundaryLoops saddle policy (ADR-395)', () => {
-  const hairline = ['#.....', '.#....', '..#...', '...#..', '....#.', '.....#'];
+  // Kept one pixel off the image corners: a saddle diagonally next to an
+  // image corner has no window ring and is a tie (saddle-connectivity.ts).
+  const hairline = [
+    '........',
+    '.#......',
+    '..#.....',
+    '...#....',
+    '....#...',
+    '.....#..',
+    '......#.',
+    '........',
+  ];
 
   it('connect-ink walks a diagonal pixel pair as one pinched loop', () => {
     const loops = loopsWith(['#.', '.#'], 'connect-ink');
@@ -136,11 +147,20 @@ describe('traceBoundaryLoops saddle policy (ADR-395)', () => {
     expect(loopsWith(cells, 'connect-ink')).toEqual(ink);
   });
 
-  it('gives a one-pixel checkerboard the same deterministic answer', () => {
-    const board = ['#.#.#.', '.#.#.#', '#.#.#.', '.#.#.#'];
-    const auto = loopsWith(board, 'auto');
-    expect(signedTotal(auto)).toBe(12);
-    expect(loopsWith(board, 'auto')).toEqual(auto);
+  it('gives a one-pixel checkerboard the same deterministic answer, border included', () => {
+    // Every saddle ties — also at the image corners, where the window's
+    // missing row/column is mirrored and continues the board's parity — so
+    // every ink pixel is its own unit loop, exactly the historical result.
+    for (const board of [
+      ['#.#.#.', '.#.#.#', '#.#.#.', '.#.#.#'],
+      ['#.#.#.#.', '.#.#.#.#', '#.#.#.#.', '.#.#.#.#', '#.#.#.#.', '.#.#.#.#'],
+      ['#.#.', '.#.#', '#.#.', '.#.#'],
+    ]) {
+      const auto = loopsWith(board, 'auto');
+      const inkPixels = board.join('').split('#').length - 1;
+      expect(auto.map((loop) => loop.area)).toEqual(Array.from({ length: inkPixels }, () => 1));
+      expect(auto).toEqual(loopsWith(board, 'connect-paper'));
+    }
   });
 });
 

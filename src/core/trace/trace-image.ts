@@ -130,15 +130,10 @@ export function preprocessForTrace(image: RawImageData, options: TraceOptions): 
   return prepareTraceForContour(image, options).prepared;
 }
 
-type PreparedContour = {
-  readonly prepared: RawImageData;
-  readonly crackField: CrackSubPixelField | null;
-};
-
 export function prepareTraceForContour(
   image: RawImageData,
   options: TraceOptions,
-): PreparedContour {
+): { readonly prepared: RawImageData; readonly crackField: CrackSubPixelField | null } {
   // Fail closed on a malformed buffer: every downstream stage indexes
   // data[i..i+3] assuming length === width*height*4, so a short/oversized
   // buffer or non-integer dims would read past the array or size a wrong-shape
@@ -152,7 +147,7 @@ export function prepareTraceForContour(
       options.cutoffLuma ?? 0,
       options.thresholdLuma ?? 128,
     );
-    return cleanBinaryMask({ prepared, crackField: null }, options);
+    return { prepared: cleanBinaryMask(prepared, options, null), crackField: null };
   }
   const adjusted = applyImageAdjustments(image, options);
   if (options.faintLineRecovery !== true && shouldUseSketchTrace(image, options)) {
@@ -163,7 +158,8 @@ export function prepareTraceForContour(
         sketchCrackField(adjusted, radiusPx),
         options,
       );
-      return cleanBinaryMask(recovered, options);
+      const cleaned = cleanBinaryMask(recovered.prepared, options, recovered.crackField);
+      return { ...recovered, prepared: cleaned };
     }
     const prepared = sketchTraceToMonochrome(
       adjusted,
@@ -173,7 +169,8 @@ export function prepareTraceForContour(
       // failure mode: recall 0.93 -> 0.66 measured at 2x).
       radiusPx,
     );
-    return cleanBinaryMask({ prepared, crackField: sketchCrackField(adjusted, radiusPx) }, options);
+    const crackField = sketchCrackField(adjusted, radiusPx);
+    return { prepared: cleanBinaryMask(prepared, options, crackField), crackField };
   }
   const prepared = applyMedian(adjusted, options.medianFilter);
   const thresholded = applyThresholdWithIso(prepared, options);
@@ -186,30 +183,31 @@ export function prepareTraceForContour(
       sketchCrackField(prepared, SKETCH_RADIUS_PX * effectivePixelScale(options)),
       effectivePixelScale(options),
     );
-    return cleanBinaryMask(recovered, options);
+    const cleaned = cleanBinaryMask(recovered.prepared, options, recovered.crackField);
+    return { ...recovered, prepared: cleaned };
   }
-  return cleanBinaryMask({ prepared: thresholded.prepared, crackField: field }, options);
+  return {
+    prepared: cleanBinaryMask(thresholded.prepared, options, field),
+    crackField: field,
+  };
 }
 
 // Mask cleanup is the shared tail of every preprocessing branch: despeckle
 // (ink specks → white), then pinhole-crack fill (enclosed hairline white
 // slivers → ink). Extracting it keeps preprocessForTrace under the
-// complexity cap. Both stages share the contour walker's saddle decision
-// (TraceOptions.turnPolicy, ADR-395), so a shape the walker traces as one
-// loop is judged as one component; Centerline keeps eight-connected ink
-// with four-connected paper.
-function cleanBinaryMask(input: PreparedContour, options: TraceOptions): PreparedContour {
+// complexity cap. Both share the walker's saddle decision (ADR-395).
+function cleanBinaryMask(
+  image: RawImageData,
+  options: TraceOptions,
+  crackField: CrackSubPixelField | null,
+): RawImageData {
   // Area-denominated caps scale by pixelScale² on supersampled traces so
   // their SOURCE-pixel semantics hold (a 12px speck at 2x covers 48px).
   const scale = effectivePixelScale(options);
-  const saddles = cleanupSaddlePolicy(options, input.crackField);
+  const saddles = cleanupSaddlePolicy(options, crackField);
   const minPixels = (options.despeckleMinPixels ?? 0) * scale * scale;
-  const despeckled = shouldDespeckle(options)
-    ? despeckle(input.prepared, minPixels, saddles ?? 8)
-    : input.prepared;
-  const prepared =
-    options.fillPinholeCracks === true ? fillPinholes(despeckled, scale, saddles) : despeckled;
-  return { ...input, prepared };
+  const despeckled = shouldDespeckle(options) ? despeckle(image, minPixels, saddles ?? 8) : image;
+  return options.fillPinholeCracks === true ? fillPinholes(despeckled, scale, saddles) : despeckled;
 }
 
 /** Sanitized supersampling factor (see TraceOptions.pixelScale). */

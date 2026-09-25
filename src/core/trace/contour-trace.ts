@@ -222,7 +222,7 @@ export function* contourPolylinesFromMaskSteps(
   const saddles =
     options.turnPolicy === undefined
       ? CONNECT_PAPER_AT_SADDLES
-      : createSaddleResolver(mask, options.turnPolicy, options.crackField);
+      : createSaddleResolver(mask, options.turnPolicy, options.crackField, pixelScale);
   for (const loop of traceBoundaryLoops(mask, saddles)) {
     if (cooperate) yield;
     // Area-based speckle gate — the boundary walker sees paper holes the ink
