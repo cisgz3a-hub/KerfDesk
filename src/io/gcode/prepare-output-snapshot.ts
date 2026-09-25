@@ -1,3 +1,4 @@
+import { isBarcodeObject } from '../../core/barcode';
 import type { PreflightResult } from '../../core/preflight';
 import {
   DEFAULT_PROJECT_VARIABLE_DATA,
@@ -10,6 +11,7 @@ import {
 import { evaluateVariableTemplate, type VariableEvaluationContext } from '../../core/variables';
 import { applySimilarityProject, type SimilarityTransform } from '../../core/registration';
 import { prepareOutput, type PreparedOutput, type PrepareOutputOptions } from './prepare-output';
+import { materializeVariableBarcode } from './materialize-variable-barcode';
 
 export type VariableTextRenderInput = {
   readonly text: TextObject;
@@ -144,6 +146,8 @@ async function materializeObject(
   context: VariableEvaluationContext,
   renderer: VariableTextRenderer,
 ): Promise<MaterializedObject> {
+  if (isBarcodeObject(object))
+    return materializeVariableBarcode(object, project, context, renderer);
   if (object.kind !== 'text' || object.variableTemplate === undefined) {
     return { ok: true, object };
   }

@@ -10,6 +10,7 @@ export const TOOLBAR_GROUPS: ReadonlyArray<ReadonlyArray<CommandId>> = [
     'tools.camera',
     'tools.place-board',
     'tools.box-generator',
+    'tools.barcode',
   ],
   ['tools.trace-image', 'tools.edit-image', 'tools.convert-to-bitmap'],
   ['file.save-gcode'],

@@ -5,7 +5,11 @@
 
 import { StrictMode } from 'react';
 import { createRoot } from 'react-dom/client';
-import { createDesktopPreviewUpdateAdapter, isElectronRenderer } from '../../platform/electron';
+import {
+  createDesktopPreviewUpdateAdapter,
+  createDesktopProjectFiles,
+  isElectronRenderer,
+} from '../../platform/electron';
 import type { PlatformAdapter } from '../../platform/types';
 import { webAdapter } from '../../platform/web';
 import { ErrorBoundary, type SoftwareAbort } from '../common/ErrorBoundary';
@@ -32,10 +36,16 @@ initAppTheme();
 startPagedAssetReconciliation();
 watchPagedRasterOwnership();
 
-// Reuse every web-adapter method; only override `id` so the UI can hide the
-// browser-only PWA install + desktop-download affordances inside the app.
+// Reuse every web-adapter method; override `id` so the UI can hide the
+// browser-only PWA install + desktop-download affordances inside the app. The
+// desktop app also reopens files Explorer handed over, by path (ADR-378).
 const adapter: PlatformAdapter = isElectronRenderer()
-  ? { ...webAdapter, id: 'electron', desktopUpdates: createDesktopPreviewUpdateAdapter() }
+  ? {
+      ...webAdapter,
+      id: 'electron',
+      desktopUpdates: createDesktopPreviewUpdateAdapter(),
+      ...createDesktopProjectFiles(webAdapter.recentFiles),
+    }
   : webAdapter;
 
 // If a render crash unmounts the App (and its Abort button + Ctrl+. listener),

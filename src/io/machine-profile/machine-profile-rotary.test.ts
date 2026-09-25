@@ -33,6 +33,38 @@ describe('machine profile rotary validation', () => {
     expect(result.document.profile.rotary?.mmPerRotation).toBe(360);
   });
 
+  it('round-trips a roller diameter (ADR-373)', () => {
+    const rotary = {
+      enabled: true,
+      type: 'roller' as const,
+      mmPerRotation: 40,
+      objectDiameterMm: 60,
+      rollerDiameterMm: 25,
+    };
+    const result = deserializeMachineProfileDocument(
+      serialize({ ...DEFAULT_DEVICE_PROFILE, rotary }),
+    );
+    expect(result.kind).toBe('ok');
+    if (result.kind !== 'ok') return;
+    expect(result.document.profile.rotary).toEqual(rotary);
+  });
+
+  it('rejects a rotary with a non-positive roller diameter', () => {
+    const raw = JSON.parse(serialize(DEFAULT_DEVICE_PROFILE)) as {
+      profile: Record<string, unknown>;
+    };
+    raw.profile['rotary'] = {
+      enabled: true,
+      type: 'roller',
+      mmPerRotation: 40,
+      objectDiameterMm: 60,
+      rollerDiameterMm: 0,
+    };
+    const result = deserializeMachineProfileDocument(JSON.stringify(raw));
+    expect(result.kind).toBe('invalid');
+    if (result.kind === 'invalid') expect(result.reason).toMatch(/rollerDiameterMm/);
+  });
+
   it('rejects a rotary with a non-numeric mmPerRotation', () => {
     // Hand-edited / version-drifted file: mmPerRotation as a string.
     const raw = JSON.parse(serialize(DEFAULT_DEVICE_PROFILE)) as {

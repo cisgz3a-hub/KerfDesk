@@ -16,10 +16,14 @@ export type FileHandle = {
   // Lazily read the original binary payload. Image workflows use this instead
   // of hidden DOM file inputs so all picker access stays behind PlatformAdapter.
   readonly blob?: () => Promise<Blob>;
+  /** How Recent Projects can reach this file again without browsing. */
+  readonly recentRef?: RecentFileRef;
 };
 
 export type SaveTarget = {
   readonly displayName: string;
+  /** How Recent Projects can reach the saved file again without browsing. */
+  readonly recentRef?: RecentFileRef;
   /** Adapter-owned identity used only to recognize one physical destination. */
   readonly destinationIdentity?: unknown;
   /** Compare adapter identities without opening, creating, or writing a file. */
@@ -52,6 +56,51 @@ export type FileSaveRequest = {
   /** Optional non-blocking filename surface supplied by the UI. Web directory
    * reservations use this instead of a renderer-blocking native prompt. */
   readonly chooseName?: (suggestedName: string) => Promise<string | null>;
+};
+
+// --- Recent projects and files the operating system hands over (ADR-378) ---
+
+/** A remembered file. Pickers return File System Access handles on web and
+ * desktop; a file the desktop operating system opened carries its full path
+ * and the main process's token for reading exactly that path again. */
+export type RecentFileRef =
+  | { readonly kind: 'handle'; readonly handle: FileSystemFileHandle }
+  | { readonly kind: 'desktop-path'; readonly path: string; readonly token: string };
+
+export type RecentFileOpenResult =
+  | { readonly kind: 'opened'; readonly file: FileHandle }
+  | { readonly kind: 'missing' }
+  | { readonly kind: 'denied' }
+  | { readonly kind: 'failed'; readonly message: string };
+
+/** What a check found without prompting. 'unknown' when checking would need a
+ * permission prompt or failed. */
+export type RecentFileProbe =
+  | { readonly kind: 'present'; readonly size: number; readonly modifiedMs: number }
+  | { readonly kind: 'missing' }
+  | { readonly kind: 'unknown' };
+
+export type RecentFileAdapter = {
+  /** Read a remembered file. A handle may ask for read permission, so call
+   * this from the operator's click, before any other prompt. */
+  readonly open: (ref: RecentFileRef) => Promise<RecentFileOpenResult>;
+  /** Check that the file still exists without prompting for permission. */
+  readonly probe: (ref: RecentFileRef) => Promise<RecentFileProbe>;
+  readonly isSameFile: (left: RecentFileRef, right: RecentFileRef) => Promise<boolean>;
+};
+
+export type ExternalFileOpenRequest =
+  | { readonly kind: 'file'; readonly file: FileHandle }
+  | {
+      readonly kind: 'unavailable';
+      readonly name: string;
+      readonly reason: 'missing' | 'invalid' | 'unreadable';
+    };
+
+/** Files the operating system asked KerfDesk to open (double-click, Open
+ * with). Requests that arrive before the first subscriber are held for it. */
+export type ExternalFileOpenSource = {
+  readonly subscribe: (listener: (request: ExternalFileOpenRequest) => void) => () => void;
 };
 
 // --- Serial port (Phase B) ---
@@ -271,4 +320,12 @@ export type PlatformAdapter = {
   // Installed only by the Electron renderer adapter. Main enables the endpoint
   // only for a packaged Preview; stable desktop uses its signed updater path.
   readonly desktopUpdates?: DesktopUpdateAdapter;
+
+  // Recent Projects: reopen remembered files. Absent where nothing can be
+  // reopened without browsing, so nothing is recorded.
+  readonly recentFiles?: RecentFileAdapter;
+
+  // Project files handed over by the operating system: the desktop file
+  // association, or an installed web app's file handler.
+  readonly externalFileOpens?: ExternalFileOpenSource;
 };

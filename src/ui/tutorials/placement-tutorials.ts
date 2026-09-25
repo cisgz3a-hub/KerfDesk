@@ -169,7 +169,7 @@ export const PLACEMENT_TUTORIALS: readonly Tutorial[] = [
     summary: 'Match the profile to a roller or chuck and inspect a test before engraving a wrap.',
     category: 'Machine & setup',
     machine: 'laser',
-    minutes: 4,
+    minutes: 5,
     location: 'Tools → Rotary Setup',
     prerequisites:
       'A compatible rotary installation and verified setup measurements for the machine.',
@@ -178,17 +178,24 @@ export const PLACEMENT_TUTORIALS: readonly Tutorial[] = [
       {
         title: 'Enable the intended machine profile',
         instruction:
-          'Choose Enable rotary for this machine profile, then Roller or Chuck to match the installed device. Enter the measured Object diameter for the workpiece.',
+          'Choose Enable rotary for this machine profile, then Roller or Chuck to match the installed device. Enter the measured Object diameter or its Circumference; for a tapered or soft part, use Measure with a strip where the artwork goes.',
         focus: 'Profile · type · diameter',
-        result: 'The setup shows the surface circumference associated with that diameter.',
+        result: 'The diameter and circumference stay linked, so either measurement sets both.',
       },
       {
         title: 'Check rotary travel and direction',
         instruction:
-          'For a chuck, set Motion per turn from the verified machine setup. Inspect Machine travel per revolution and use Reverse rotary direction only when needed for the installed orientation.',
-        focus: 'Travel per revolution',
+          'For a chuck, set Motion per turn from the verified machine setup. For a roller whose controller moves in motor millimetres, turn on Scale Y from the roller diameter and enter the driven roller diameter and Motion per turn. Inspect Y scale and Machine travel per revolution; use Reverse rotary direction only when needed.',
+        focus: 'Scale · travel per revolution',
         result:
           'The conversion between the flat design and rotary movement is explicit in the profile.',
+      },
+      {
+        title: 'Test the rotation',
+        instruction:
+          'With the controller connected and Idle, mark the part and choose a Test rotation button. The part turns one revolution slowly with the laser off, pauses, then turns back. If the mark does not return to the same place, adjust the measurements and test again before Apply.',
+        focus: 'Test rotation',
+        result: 'One revolution on the machine matches one revolution of the part.',
       },
       {
         title: 'Prepare a separate test project',
@@ -206,8 +213,18 @@ export const PLACEMENT_TUTORIALS: readonly Tutorial[] = [
         result: 'A real sample can confirm the chosen profile measurements for this setup.',
       },
     ],
-    tip: 'The rotary setting belongs to the machine profile. Check it again when returning to flat work or changing rotary hardware.',
-    keywords: ['rotary', 'roller', 'chuck', 'diameter', 'circumference', 'wrap', 'rotation'],
+    tip: 'The rotary setting belongs to the machine profile. The Rotary switch above Frame and Start shows whether it is on; check it when returning to flat work or changing rotary hardware.',
+    keywords: [
+      'rotary',
+      'roller',
+      'chuck',
+      'diameter',
+      'circumference',
+      'wrap',
+      'rotation',
+      'test rotation',
+      'roller diameter',
+    ],
     related: ['machine-setup', 'origin', 'preview', 'frame-start'],
   },
   {

@@ -19,6 +19,7 @@ type NumberFieldProps = {
   readonly title?: string;
   readonly onCommit: (value: number) => void;
   readonly style?: React.CSSProperties;
+  readonly disabled?: boolean;
   // Local-state fields (no store undo) can pass 0 to commit valid input immediately.
   readonly debounceMs?: number;
 } & NumberFieldRange;
@@ -45,6 +46,7 @@ export function NumberField(props: NumberFieldProps): JSX.Element {
       {...(props.positiveOnly === true ? {} : { min: props.min, max: props.max })}
       step={props.step ?? 1}
       style={props.style}
+      disabled={props.disabled}
     />
   );
 }

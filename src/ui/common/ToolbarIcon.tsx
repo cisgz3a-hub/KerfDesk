@@ -11,6 +11,7 @@ import imageDown from 'lucide-static/icons/image-down.svg?raw';
 import imageIcon from 'lucide-static/icons/image.svg?raw';
 import imagePlus from 'lucide-static/icons/image-plus.svg?raw';
 import keyboard from 'lucide-static/icons/keyboard.svg?raw';
+import qrCode from 'lucide-static/icons/qr-code.svg?raw';
 import save from 'lucide-static/icons/save.svg?raw';
 import saveAll from 'lucide-static/icons/save-all.svg?raw';
 import scanLine from 'lucide-static/icons/scan-line.svg?raw';
@@ -33,6 +34,7 @@ const TOOLBAR_ICONS: Partial<Readonly<Record<ToolbarIconKey, string>>> = {
   'tools.camera': camera,
   'tools.place-board': squareDashedPointer,
   'tools.box-generator': box,
+  'tools.barcode': qrCode,
   'tools.trace-image': scanLine,
   'tools.edit-image': imageIcon,
   'tools.convert-to-bitmap': imageDown,

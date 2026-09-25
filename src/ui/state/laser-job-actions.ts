@@ -77,6 +77,7 @@ import { armHostedRefill, releaseHostedRefill } from './laser-hosted-refill';
 import { captureHostedRefillStream } from './laser-hosted-refill-owner';
 import { JobStartTransmissionError } from './laser-start-transmission-error';
 import { createStartArmingCompletion } from './laser-start-arming-completion';
+import { cancelPendingManualMotions } from './manual-motion-intent';
 
 type SetFn = (
   partial: Partial<LaserState> | ((state: LaserState) => Partial<LaserState> | LaserState),
@@ -272,6 +273,8 @@ async function settleResetWrite(
 
 async function runStopJob(context: JobActionContext, reason?: JobStopReason): Promise<void> {
   const { set, get, refs, safeWrite, driver } = context;
+  cancelPendingManualMotions(refs);
+  set((state) => ({ manualMotionCancelEpoch: state.manualMotionCancelEpoch + 1 }));
   const softReset = driver().realtime.softReset;
   // Queued stop lines need a single writer, so a controller without a realtime
   // reset takes the hosted refill back first (ADR-334).

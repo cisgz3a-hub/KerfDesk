@@ -4,6 +4,7 @@ import { useStore } from '../state';
 import { prepareVariableArray } from '../state/prepare-variable-array';
 import { renderVariableText } from '../text/render-variable-text';
 import { ArrayDialog } from './ArrayDialog';
+import { objectVariableTemplate } from '../../core/variables/object-variable-template';
 
 export function ArrayDialogHost(props: { readonly onClose: () => void }): JSX.Element | null {
   const project = useStore((state) => state.project);
@@ -70,9 +71,7 @@ export function ArrayDialogHost(props: { readonly onClose: () => void }): JSX.El
   return (
     <ArrayDialog
       selectionBounds={bounds}
-      hasVariableText={selected.some(
-        (object) => object.kind === 'text' && object.variableTemplate !== undefined,
-      )}
+      hasVariableText={selected.some((object) => objectVariableTemplate(object) !== undefined)}
       preparing={preparing}
       {...(errorMessage === undefined ? {} : { errorMessage })}
       onCancel={close}

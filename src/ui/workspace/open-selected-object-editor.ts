@@ -1,9 +1,11 @@
 // Double-click on a selected object opens its in-place editor: a raster
 // image opens in the Image Studio (Photoshop's double-click-to-edit — the
 // toolbar "Image Studio…" button is the other entry point), a text object
-// opens the canvas text editor with its current values. Every other
-// kind is a no-op.
+// opens the canvas text editor with its current values, and a barcode opens
+// the barcode dialog. Every other kind is a no-op.
 
+import { isBarcodeObject } from '../../core/barcode';
+import { useBarcodeDialogStore } from '../barcode/barcode-dialog-store';
 import { useStore } from '../state';
 import { isModalOpen, useUiStore } from '../state/ui-store';
 import { useImageEditorStore } from '../image-editor/image-editor-store';
@@ -18,6 +20,10 @@ export function openEditorForSelectedObject(): void {
   if (obj === undefined || obj.locked === true) return;
   if (obj.kind === 'raster-image') {
     useImageEditorStore.getState().openEditor(obj);
+    return;
+  }
+  if (isBarcodeObject(obj)) {
+    useBarcodeDialogStore.getState().open({ mode: 'edit', objectId: obj.id });
     return;
   }
   if (obj.kind !== 'text') return;

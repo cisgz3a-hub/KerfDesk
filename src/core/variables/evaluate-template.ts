@@ -3,7 +3,7 @@ import {
   primaryOperationForObject,
   type Layer,
   type Project,
-  type TextObject,
+  type SceneObject,
   type VariableTemplate,
   type VariableTemplateToken,
 } from '../scene';
@@ -22,7 +22,7 @@ export type VariableEvaluationResult =
 
 export function evaluateVariableTemplate(
   template: VariableTemplate,
-  text: TextObject,
+  text: SceneObject,
   project: Project,
   context: VariableEvaluationContext,
 ): VariableEvaluationResult {
@@ -78,7 +78,7 @@ function copyEvaluationContext(
 
 function evaluateToken(
   token: VariableTemplateToken,
-  text: TextObject,
+  text: SceneObject,
   project: Project,
   context: VariableEvaluationContext,
 ): VariableEvaluationResult {
@@ -194,7 +194,7 @@ function uniqueCanonicalHeaderIndex(
 
 function evaluateCutSetting(
   field: Extract<VariableTemplateToken, { readonly kind: 'cut-setting' }>['field'],
-  text: TextObject,
+  text: SceneObject,
   project: Project,
 ): VariableEvaluationResult {
   const layer = primaryOperationForObject(text, project.scene.layers);
@@ -208,7 +208,7 @@ function evaluateCutSetting(
 function cutSettingValue(
   field: Extract<VariableTemplateToken, { readonly kind: 'cut-setting' }>['field'],
   layer: Layer,
-  text: TextObject,
+  text: SceneObject,
 ): string {
   switch (field) {
     case 'power-percent':

@@ -31,6 +31,7 @@ import {
   isIdleCanvasMotionSuperseded,
   prepareIdleCanvasMotionPlanOffThread,
 } from './idle-canvas-motion-worker-client';
+import { projectHasVariableData } from '../../core/variables/object-variable-template';
 
 export function useCanvasMotionOverlay(
   project: Project,
@@ -224,9 +225,7 @@ function useIdleCanvasMotionPlan(input: IdlePlanInput): IdlePlanSelection | null
 }
 
 function hasVariableText(project: Project): boolean {
-  return project.scene.objects.some(
-    (object) => object.kind === 'text' && object.variableTemplate !== undefined,
-  );
+  return projectHasVariableData(project);
 }
 
 export async function buildIdleCanvasMotionPlan(
