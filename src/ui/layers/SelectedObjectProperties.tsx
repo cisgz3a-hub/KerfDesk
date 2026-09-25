@@ -7,6 +7,7 @@ import {
   type RasterImage,
   type SceneObject,
 } from '../../core/scene';
+import { MaterialTestResultsLauncher } from '../calibration/MaterialTestResultsLauncher';
 import { useStore } from '../state';
 import { ArtworkEditorTabs, type ArtworkEditorView } from './ArtworkEditorTabs';
 import { DogboneRow } from './DogboneRow';
@@ -140,6 +141,7 @@ function ArtworkPropertiesInspector(props: ArtworkPropertiesInspectorProps): JSX
           objects={context.objects}
           selectionActive={context.selectionActive}
         />
+        <MaterialTestResultsLauncher objects={context.objects} />
       </div>
     </section>
   );

@@ -4,47 +4,47 @@ export const CALIBRATION_TUTORIALS: readonly Tutorial[] = [
   {
     id: 'material-test',
     title: 'Compare speed and power on material',
-    summary: 'Generate a labelled engraving grid and turn the best result into a reusable recipe.',
+    summary: 'Generate a labelled test grid and turn the best cell into a reusable preset.',
     category: 'Laser',
     machine: 'laser',
     minutes: 4,
     location: 'Tools → Material Test',
     prerequisites:
-      'Save the current project first: Generate replaces the canvas with the test grid.',
+      'Choose Add to the current design to keep your artwork, or Open as a new project to start from a blank canvas.',
     visual: 'calibration',
     steps: [
       {
         title: 'Choose what the grid compares',
         instruction:
-          'Set Rows and Columns, then Min speed, Max speed, Min power and Max power using a range appropriate to your machine and material. Speeds vary by row and powers by column.',
-        focus: 'Speed rows × power columns',
-        result: 'Each filled cell compares one speed and power combination.',
+          'Pick the Test mode, then the setting each axis varies (power, speed, interval or passes) with its start, end and count, using a range appropriate to your machine and material. Settings neither axis varies apply to every cell.',
+        focus: 'Rows vary × Columns vary',
+        result: 'Each cell compares one combination of the two settings.',
       },
       {
         title: 'Size the sample and read the feed disclosure',
         instruction:
-          'Set Cell width, Cell height and Gap to fit your test stock. Compare requested and effective feed; the machine profile can cap the requested speed, and the row labels use the effective value.',
+          'Set Cell width, Cell height and Gap to fit your test stock, and choose labels and a border. Compare requested and effective feed; the machine profile can cap the requested speed, and the speed labels use the effective value.',
         focus: 'Effective speed labels',
         result: 'You know what the labels will mean when examining the physical sample.',
       },
       {
         title: 'Generate and review the test',
         instruction:
-          'Choose Generate, inspect Preview and place the grid on the sample. To run it, complete Frame for this exact grid, choose Start to open Job Review, then use Start job after reviewing the job and warnings.',
+          'Choose Generate, inspect Preview and place the grid on the sample. To burn only an added test, keep it selected and turn on Selected artwork only. Complete Frame for this exact grid, choose Start to open Job Review, then use Start job after reviewing the job and warnings.',
         focus: 'Generate → Frame → review',
-        result: 'The test is prepared as a normal job with labelled engraving swatches.',
+        result: 'The test is prepared as a normal job with labelled swatches.',
         visual: 'frame',
       },
       {
-        title: 'Record the useful result',
+        title: 'Turn the best cell into a preset',
         instruction:
-          'Compare the finished marks and use the row and column labels to identify the chosen settings. Save the material, machine and observed result with the recipe in your material library or project notes.',
-        focus: 'Compare, label, save',
+          'Select the test and choose Pick the best cell, then click the cell that burned best. Save it as a material preset with its material and thickness, or apply its settings to an operation.',
+        focus: 'Pick, save, apply',
         result: 'A future project can start from a result observed on this material.',
         visual: 'library',
       },
     ],
-    tip: 'This generator creates filled engraving swatches. A good-looking cell does not establish a through-cut recipe.',
+    tip: 'A good-looking engraving cell does not establish a through-cut recipe. Test cuts with Line mode and the passes axis.',
     keywords: ['material test', 'power', 'speed', 'grid', 'swatch', 'engraving', 'recipe'],
     related: ['materials', 'laser-fill', 'interval-test', 'frame-start', 'project-notes'],
   },
