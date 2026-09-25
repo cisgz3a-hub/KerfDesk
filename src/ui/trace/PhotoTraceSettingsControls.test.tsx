@@ -121,6 +121,10 @@ describe('photo shading trace controls', () => {
     await controls.selectPreset(lineArtPreset);
     expect(controls.host.querySelector('[aria-label="Trace Midtones"]')).toBeNull();
     expect(controls.host.querySelector('[aria-label="Trace Invert"]')).toBeNull();
+    // Line presets now have their own Invert (light artwork on a dark
+    // ground). It starts unticked: the photo choice never inverts a line trace.
+    const lineInvert = controls.host.querySelector('[aria-label="Invert"]');
+    expect(lineInvert instanceof HTMLInputElement && !lineInvert.checked).toBe(true);
     expect(mergeLightBurnTraceSettings(lineArtPreset, controls.settings())).toEqual(lineArtPreset);
     await controls.selectPreset(photoPreset);
     expect(controls.number('Midtones').value).toBe('1.6');

@@ -6,6 +6,7 @@ import {
   type TraceBitmap,
 } from './local-contrast-mask';
 import { autoMedianFilter, medianFilter } from './preprocess';
+import { invertImage } from './raster-prep';
 import { effectivePixelScale, type RawImageData, type TraceOptions } from './trace-image';
 
 // The public Canny-era fields retain their existing local-mask mapping:
@@ -22,12 +23,17 @@ export type EdgeTraceInput = {
   readonly crackField: CrackSubPixelField;
   readonly maskOptions: LocalContrastMaskOptions;
   readonly medianFilter: boolean | undefined;
+  readonly invert: boolean;
 };
 
 /** Prepare noise cleanup, detector mask and measured boundary together. The
  * public dispatcher can reuse this native-grid work after the quality profile. */
 export function prepareEdgeTraceInput(image: RawImageData, options: TraceOptions): EdgeTraceInput {
-  const source = edgeSource(image, options.edgeMedianFilter);
+  // The local-contrast detector marks pixels DARKER than their neighbourhood,
+  // so Invert must reach it as luma: light artwork on a dark ground becomes
+  // dark artwork on a light one, with the same measured boundary field.
+  const invert = options.invert === true;
+  const source = edgeSource(invert ? invertImage(image) : image, options.edgeMedianFilter);
   const maskOptions = edgeMaskOptions(options);
   return {
     image,
@@ -35,6 +41,7 @@ export function prepareEdgeTraceInput(image: RawImageData, options: TraceOptions
     ...localContrastTraceData(source, maskOptions),
     maskOptions,
     medianFilter: options.edgeMedianFilter,
+    invert,
   };
 }
 
@@ -51,6 +58,7 @@ export function edgeTraceInputMatches(
     input.bitmap.width === image.width &&
     input.bitmap.height === image.height &&
     input.medianFilter === options.edgeMedianFilter &&
+    input.invert === (options.invert === true) &&
     input.maskOptions.radiusPx === mask.radiusPx &&
     input.maskOptions.delta === mask.delta
   );

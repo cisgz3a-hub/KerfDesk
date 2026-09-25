@@ -185,6 +185,23 @@ describe('invertImage', () => {
     invertImage(input);
     expect(Array.from(input.data)).toEqual(before);
   });
+
+  it('inverts decoded artwork but keeps its transparent surround as paper', () => {
+    // Loader representation: RGB composited onto white, alpha kept.
+    // Pixels: transparent, opaque white, half-covered black (composited 127).
+    const input = {
+      width: 3,
+      height: 1,
+      data: new Uint8ClampedArray([255, 255, 255, 0, 255, 255, 255, 255, 127, 127, 127, 128]),
+      rgbCompositedOnWhite: true,
+    };
+    const output = invertImage(input);
+    // Transparent stays paper; opaque white becomes ink; half-covered black
+    // becomes half-covered white over paper, i.e. paper.
+    expect(Array.from(output.data)).toEqual([255, 255, 255, 0, 0, 0, 0, 255, 255, 255, 255, 128]);
+    expect(output.rgbCompositedOnWhite).toBe(true);
+    expect(Array.from(invertImage(output).data)).toEqual(Array.from(input.data));
+  });
 });
 
 describe('composition with the existing preprocess chain', () => {

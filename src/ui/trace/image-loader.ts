@@ -9,6 +9,13 @@ import type { RawImageData } from '../../core/trace';
 import { freezeGif, isGif } from '../import/freeze-gif';
 import { readImageHeader } from './image-header-reader';
 import {
+  orientationCanvasTransform,
+  orientationSwapsAxes,
+  orientedDimensions,
+  parseJpegHeader,
+  type ExifOrientation,
+} from './jpeg-header';
+import {
   awaitTraceSignal,
   checkTraceSignal,
   isTraceAbort,
@@ -73,6 +80,16 @@ const MAX_SAFE_DECODE_PIXELS = 268_435_456;
 
 export type ImageDimensions = { readonly width: number; readonly height: number };
 
+// What the header says before any decode. `oriented` is the size a browser
+// displays and decodes (EXIF Orientation applied); it is the only size the
+// cap, the decoded raster and the import bounds may use. `stored` is the
+// encoded frame, kept to recognise an engine that ignored the Orientation.
+type HeaderImageInfo = {
+  readonly stored: ImageDimensions;
+  readonly oriented: ImageDimensions;
+  readonly orientation: ExifOrientation;
+};
+
 export async function loadImageAsRawData(
   file: File,
   maxEdge: number = MAX_EDGE_PX,
@@ -81,12 +98,12 @@ export async function loadImageAsRawData(
   checkTraceSignal(signal);
   if (isGif(file)) file = await awaitTraceSignal(freezeGif(file), signal);
   checkTraceSignal(signal);
-  const headerDimensions = await awaitTraceSignal(readHeaderImageDimensions(file, signal), signal);
+  const header = await awaitTraceSignal(readHeaderImageInfo(file, signal), signal);
   checkTraceSignal(signal);
-  if (headerDimensions !== null) {
-    assertSafeDecodeDimensions(headerDimensions);
-    const target = scaleToCap(headerDimensions.width, headerDimensions.height, maxEdge);
-    const resizedBitmap = await decodeResizedImageBitmap(file, headerDimensions, target, signal);
+  if (header !== null) {
+    assertSafeDecodeDimensions(header.oriented);
+    const target = scaleToCap(header.oriented.width, header.oriented.height, maxEdge);
+    const resizedBitmap = await decodeResizedImageBitmap(file, header.oriented, target, signal);
     if (resizedBitmap !== null) {
       try {
         checkTraceSignal(signal);
@@ -106,8 +123,7 @@ export async function loadImageAsRawData(
   try {
     const img = await decodeImage(url, signal);
     checkTraceSignal(signal);
-    const { width, height } = scaleToCap(img.width, img.height, maxEdge);
-    return rasterizeImage(img, width, height);
+    return rasterizeDecodedElement(img, header, maxEdge);
   } finally {
     URL.revokeObjectURL(url);
   }
@@ -122,10 +138,14 @@ async function decodeResizedImageBitmap(
   const needsResize = source.width !== target.width || source.height !== target.height;
   if (!needsResize || typeof createImageBitmap !== 'function') return null;
   try {
+    // The resize size is the ORIENTED size, so the orientation must be the
+    // image's own. Explicit rather than trusting a default the specification
+    // has changed: without it a turned phone photo came back squashed.
     const decoded = createImageBitmap(file, {
       resizeWidth: target.width,
       resizeHeight: target.height,
       resizeQuality: 'high',
+      imageOrientation: 'from-image',
     });
     void decoded.then(
       (bitmap) => {
@@ -133,7 +153,12 @@ async function decodeResizedImageBitmap(
       },
       () => undefined,
     );
-    return await awaitTraceSignal(decoded, signal);
+    const bitmap = await awaitTraceSignal(decoded, signal);
+    if (bitmap.width === target.width && bitmap.height === target.height) return bitmap;
+    // An engine that sized the stored frame instead would be stretched onto
+    // the target below. The element route orients itself; use it instead.
+    bitmap.close();
+    return null;
   } catch (error) {
     if (isTraceAbort(error)) throw error;
     // Safari/WebView variants may expose createImageBitmap without supporting
@@ -142,7 +167,41 @@ async function decodeResizedImageBitmap(
   }
 }
 
-function rasterizeImage(source: CanvasImageSource, width: number, height: number): RawImageData {
+// The HTMLImageElement route. Engines that implement CSS image-orientation
+// (Chromium 81+, Firefox 77+, Safari 13.1+) report and draw the element
+// already turned. One that reports the STORED frame of a turned JPEG has
+// ignored the Orientation, so the turn is drawn here instead: either way the
+// raster has the oriented aspect ratio the header, and so the import bounds,
+// promised.
+function rasterizeDecodedElement(
+  img: HTMLImageElement,
+  header: HeaderImageInfo | null,
+  maxEdge: number,
+): RawImageData {
+  const natural = { width: img.width, height: img.height };
+  const orientation =
+    header !== null && engineIgnoredOrientation(natural, header) ? header.orientation : 1;
+  const oriented = orientedDimensions(natural, orientation);
+  const { width, height } = scaleToCap(oriented.width, oriented.height, maxEdge);
+  return rasterizeImage(img, width, height, orientation);
+}
+
+function engineIgnoredOrientation(natural: ImageDimensions, header: HeaderImageInfo): boolean {
+  if (!orientationSwapsAxes(header.orientation)) return false;
+  const { stored } = header;
+  return (
+    stored.width !== stored.height &&
+    natural.width === stored.width &&
+    natural.height === stored.height
+  );
+}
+
+function rasterizeImage(
+  source: CanvasImageSource,
+  width: number,
+  height: number,
+  orientation: ExifOrientation = 1,
+): RawImageData {
   const canvas = document.createElement('canvas');
   canvas.width = width;
   canvas.height = height;
@@ -150,7 +209,14 @@ function rasterizeImage(source: CanvasImageSource, width: number, height: number
   if (ctx === null) {
     throw new Error('Could not create 2D canvas context for image decoding.');
   }
-  ctx.drawImage(source, 0, 0, width, height);
+  if (orientation === 1) {
+    ctx.drawImage(source, 0, 0, width, height);
+  } else {
+    ctx.setTransform(...orientationCanvasTransform(orientation, width, height));
+    const swap = orientationSwapsAxes(orientation);
+    ctx.drawImage(source, 0, 0, swap ? height : width, swap ? width : height);
+    ctx.setTransform(1, 0, 0, 1, 0, 0);
+  }
   const imgd = ctx.getImageData(0, 0, width, height);
   return compositeRgbOverWhitePreservingAlpha({
     width: imgd.width,
@@ -182,10 +248,10 @@ export async function readImageNaturalSize(
   file: File,
 ): Promise<{ readonly width: number; readonly height: number }> {
   if (isGif(file)) file = await freezeGif(file);
-  const headerDimensions = await readHeaderImageDimensions(file);
-  if (headerDimensions !== null) {
-    assertSafeDecodeDimensions(headerDimensions);
-    return headerDimensions;
+  const header = await readHeaderImageInfo(file);
+  if (header !== null) {
+    assertSafeDecodeDimensions(header.oriented);
+    return header.oriented;
   }
   const url = URL.createObjectURL(file);
   try {
@@ -226,12 +292,20 @@ function decodeImage(url: string, signal?: AbortSignal): Promise<HTMLImageElemen
   });
 }
 
-async function readHeaderImageDimensions(
+async function readHeaderImageInfo(
   file: File,
   signal?: AbortSignal,
-): Promise<ImageDimensions | null> {
+): Promise<HeaderImageInfo | null> {
   const header = await readImageHeader(file, signal);
-  return parsePngDimensions(header) ?? parseJpegDimensions(header);
+  const png = parsePngDimensions(header);
+  if (png !== null) return { stored: png, oriented: png, orientation: 1 };
+  const jpeg = parseJpegHeader(header);
+  if (jpeg === null) return null;
+  return {
+    stored: jpeg.stored,
+    oriented: orientedDimensions(jpeg.stored, jpeg.orientation),
+    orientation: jpeg.orientation,
+  };
 }
 
 /** Read only a PNG IHDR size, without invoking a browser image decoder. */
@@ -283,94 +357,6 @@ function hasPngSignature(header: Uint8Array): boolean {
     header[5] === 0x0a &&
     header[6] === 0x1a &&
     header[7] === 0x0a
-  );
-}
-
-function parseJpegDimensions(header: Uint8Array): ImageDimensions | null {
-  if (!hasJpegSignature(header)) return null;
-  for (const segment of readJpegSegments(header)) {
-    if (!isJpegStartOfFrameMarker(segment.marker)) continue;
-    return readJpegStartOfFrameDimensions(header, segment.payloadOffset);
-  }
-  return null;
-}
-
-type JpegSegment = {
-  readonly marker: number;
-  readonly payloadOffset: number;
-  readonly nextOffset: number;
-};
-
-function hasJpegSignature(header: Uint8Array): boolean {
-  return header.byteLength >= 4 && header[0] === 0xff && header[1] === 0xd8;
-}
-
-function readJpegSegments(header: Uint8Array): ReadonlyArray<JpegSegment> {
-  const segments: JpegSegment[] = [];
-  let offset = 2;
-  while (offset + 3 < header.byteLength) {
-    const next = readNextJpegSegment(header, offset);
-    if (next === null) break;
-    offset = next.nextOffset;
-    if (next.marker === null) continue;
-    segments.push(next);
-  }
-  return segments;
-}
-
-function readNextJpegSegment(
-  header: Uint8Array,
-  offset: number,
-):
-  | (JpegSegment & { readonly marker: number })
-  | { readonly marker: null; readonly nextOffset: number }
-  | null {
-  if (header[offset] !== 0xff) return { marker: null, nextOffset: offset + 1 };
-  const markerOffset = skipJpegMarkerFillBytes(header, offset);
-  const marker = header[markerOffset] ?? 0;
-  const lengthOffset = markerOffset + 1;
-  if (marker === 0xd9 || marker === 0xda) return null;
-  if (isStandaloneJpegMarker(marker)) return { marker: null, nextOffset: lengthOffset };
-  if (lengthOffset + 1 >= header.byteLength) return null;
-
-  const segmentLength = ((header[lengthOffset] ?? 0) << 8) | (header[lengthOffset + 1] ?? 0);
-  if (segmentLength < 2) return null;
-  return {
-    marker,
-    payloadOffset: lengthOffset + 2,
-    nextOffset: lengthOffset + segmentLength,
-  };
-}
-
-function skipJpegMarkerFillBytes(header: Uint8Array, offset: number): number {
-  let markerOffset = offset;
-  while (markerOffset < header.byteLength && header[markerOffset] === 0xff) {
-    markerOffset += 1;
-  }
-  return markerOffset;
-}
-
-function readJpegStartOfFrameDimensions(
-  header: Uint8Array,
-  payloadOffset: number,
-): ImageDimensions | null {
-  if (payloadOffset + 4 >= header.byteLength) return null;
-  const height = ((header[payloadOffset + 1] ?? 0) << 8) | (header[payloadOffset + 2] ?? 0);
-  const width = ((header[payloadOffset + 3] ?? 0) << 8) | (header[payloadOffset + 4] ?? 0);
-  if (width <= 0 || height <= 0) return null;
-  return { width, height };
-}
-
-function isStandaloneJpegMarker(marker: number): boolean {
-  return marker === 0x01 || (marker >= 0xd0 && marker <= 0xd7);
-}
-
-function isJpegStartOfFrameMarker(marker: number): boolean {
-  return (
-    (marker >= 0xc0 && marker <= 0xc3) ||
-    (marker >= 0xc5 && marker <= 0xc7) ||
-    (marker >= 0xc9 && marker <= 0xcb) ||
-    (marker >= 0xcd && marker <= 0xcf)
   );
 }
 

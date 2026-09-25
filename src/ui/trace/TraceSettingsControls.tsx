@@ -71,6 +71,7 @@ function EdgeTraceSettingsControls(props: TraceSettingsControlsProps): JSX.Eleme
           }
           onChange={(edgeMinimumLinePx) => set({ edgeMinimumLinePx })}
         />
+        <InvertRow {...props} />
       </div>
       <EdgeTraceModeNote />
       <details className="lf-trace-settings-details">
@@ -100,6 +101,7 @@ function FilledTraceSettingsControls(props: TraceSettingsControlsProps): JSX.Ele
         <TraceDetectionControls {...props} alphaMask={alphaMask}>
           <BrightnessBandControls {...props} />
         </TraceDetectionControls>
+        <InvertRow {...props} disabled={alphaMask} />
       </div>
       <div className="lf-trace-settings-group">
         <TraceAreaControls {...props} />
@@ -161,6 +163,21 @@ function BrightnessBandControls(props: TraceSettingsControlsProps): JSX.Element 
         onChange={(next) => set({ thresholdLuma: next })}
       />
     </>
+  );
+}
+
+// Invert picks which tones are the artwork, so it sits with detection. The
+// alpha mask ignores brightness, so Invert stands down while it is on.
+function InvertRow(
+  props: TraceSettingsControlsProps & { readonly disabled?: boolean },
+): JSX.Element {
+  return (
+    <TraceCheckboxRow
+      label="Invert"
+      checked={props.overrides.invert ?? props.preset.invert ?? false}
+      disabled={props.disabled === true}
+      onChange={(invert) => props.onChange({ ...props.overrides, invert })}
+    />
   );
 }
 

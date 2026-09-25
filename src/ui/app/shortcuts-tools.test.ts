@@ -3,6 +3,7 @@ import { handleToolShortcut, type ToolCtx } from './shortcuts';
 
 function fakeKeydown(opts: {
   readonly key: string;
+  readonly code?: string;
   readonly ctrlKey?: boolean;
   readonly metaKey?: boolean;
   readonly altKey?: boolean;
@@ -11,6 +12,7 @@ function fakeKeydown(opts: {
 }): KeyboardEvent {
   const e = new KeyboardEvent('keydown', {
     key: opts.key,
+    code: opts.code ?? '',
     ctrlKey: opts.ctrlKey ?? false,
     metaKey: opts.metaKey ?? false,
     altKey: opts.altKey ?? false,
@@ -29,8 +31,9 @@ function makeCtx(): ToolCtx & {
   readonly openConvertToBitmap: ReturnType<
     typeof vi.fn<NonNullable<ToolCtx['openConvertToBitmap']>>
   >;
+  readonly openTraceImage: ReturnType<typeof vi.fn<ToolCtx['openTraceImage']>>;
 } {
-  return { setToolMode: vi.fn(), openConvertToBitmap: vi.fn() };
+  return { setToolMode: vi.fn(), openConvertToBitmap: vi.fn(), openTraceImage: vi.fn() };
 }
 
 describe('handleToolShortcut - Measure tool', () => {
@@ -52,6 +55,79 @@ describe('handleToolShortcut - Measure tool', () => {
     expect(handled).toBe(false);
     expect(ctx.setToolMode).not.toHaveBeenCalled();
     input.remove();
+  });
+});
+
+describe('handleToolShortcut - Trace Image (Alt/Option+T, LightBurn binding)', () => {
+  it('Alt+T requests Trace Image', () => {
+    const ctx = makeCtx();
+    const event = fakeKeydown({ key: 't', code: 'KeyT', altKey: true });
+
+    expect(handleToolShortcut(event, ctx)).toBe(true);
+    expect(event.defaultPrevented).toBe(true);
+    expect(ctx.openTraceImage).toHaveBeenCalledTimes(1);
+    expect(ctx.setToolMode).not.toHaveBeenCalled();
+  });
+
+  it('Option+T on macOS, which types a dagger, still requests Trace Image', () => {
+    const ctx = makeCtx();
+
+    expect(handleToolShortcut(fakeKeydown({ key: '†', code: 'KeyT', altKey: true }), ctx)).toBe(
+      true,
+    );
+    expect(ctx.openTraceImage).toHaveBeenCalledTimes(1);
+  });
+
+  it('Option+M on macOS, which types a micro sign, still arms Measure', () => {
+    const ctx = makeCtx();
+
+    handleToolShortcut(fakeKeydown({ key: 'µ', code: 'KeyM', altKey: true }), ctx);
+
+    expect(ctx.setToolMode).toHaveBeenCalledWith({ kind: 'measure' });
+  });
+
+  it('follows the typed letter when the layout puts another letter on the T key', () => {
+    const ctx = makeCtx();
+
+    // Dvorak: the physical T key types Y, so Alt on it is not Alt+T.
+    expect(handleToolShortcut(fakeKeydown({ key: 'y', code: 'KeyT', altKey: true }), ctx)).toBe(
+      false,
+    );
+    expect(ctx.openTraceImage).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    { name: 'AltGr (Ctrl+Alt)', ctrlKey: true },
+    { name: 'Alt+Shift', shiftKey: true },
+    { name: 'Cmd+Option', metaKey: true },
+  ])('$name+T is left alone', (modifiers) => {
+    const ctx = makeCtx();
+
+    expect(
+      handleToolShortcut(fakeKeydown({ key: 't', code: 'KeyT', altKey: true, ...modifiers }), ctx),
+    ).toBe(false);
+    expect(ctx.openTraceImage).not.toHaveBeenCalled();
+  });
+
+  it('Alt+T inside an input does not open Trace Image', () => {
+    const input = document.createElement('input');
+    document.body.appendChild(input);
+    const ctx = makeCtx();
+
+    expect(handleToolShortcut(fakeKeydown({ key: 't', altKey: true, target: input }), ctx)).toBe(
+      false,
+    );
+    expect(ctx.openTraceImage).not.toHaveBeenCalled();
+    input.remove();
+  });
+
+  it('plain T still arms canvas text rather than Trace Image', () => {
+    const ctx = makeCtx();
+
+    handleToolShortcut(fakeKeydown({ key: 't', code: 'KeyT' }), ctx);
+
+    expect(ctx.setToolMode).toHaveBeenCalledWith({ kind: 'text' });
+    expect(ctx.openTraceImage).not.toHaveBeenCalled();
   });
 });
 

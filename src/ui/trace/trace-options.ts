@@ -4,7 +4,7 @@
 // the 250-line soft cap.
 //
 // The Trace Image workflow owns vector-trace controls only:
-// cutoff, threshold, ignore-small-shapes, smoothness, and optimize.
+// cutoff, threshold, invert, ignore-small-shapes, smoothness, and optimize.
 // Image-level tone edits stay in Adjust Image.
 
 import type { TraceOptions } from '../../core/trace';
@@ -15,6 +15,9 @@ export type LightBurnTraceSettingOverrides = {
   readonly photoContrast?: number;
   readonly photoGamma?: number;
   readonly photoInvert?: boolean;
+  // Line presets' Invert. Kept apart from photoInvert: each style keeps its
+  // own choice, so switching presets never inverts a trace unasked.
+  readonly invert?: boolean;
   readonly detectionMode?: TraceDetectionMode;
   readonly cutoffLuma?: number;
   readonly thresholdLuma?: number;
@@ -57,6 +60,7 @@ export function mergeLightBurnTraceSettings(
   if (settings.traceTransparency !== undefined) {
     out['traceTransparency'] = settings.traceTransparency;
   }
+  if (settings.invert !== undefined) out['invert'] = settings.invert;
   if (preset.traceMode === 'edge') {
     applyEdgeTraceSettings(out, preset, settings);
   }

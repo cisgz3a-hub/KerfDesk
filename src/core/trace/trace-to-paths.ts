@@ -37,6 +37,7 @@ import { runTraceSteps, type TraceStepRunner, type TraceSteps } from './trace-st
 import { reportingTraceRunner, type TraceProgress } from './trace-progress';
 import { resolveTraceSourceOptions } from './trace-alpha';
 import { traceImageToPhotoPathsSteps } from './photo-trace';
+import { invertImage } from './raster-prep';
 
 export { boundsFromColoredPaths } from './trace-bounds';
 
@@ -142,7 +143,7 @@ async function loadTracer(): Promise<ImageTracerModule> {
 // ready to drop into a TracedImage SceneObject — no parseSvg step in
 // between, so curve fidelity survives.
 export async function traceImageToColoredPaths(
-  image: RawImageData,
+  requestedImage: RawImageData,
   requestedOptions: TraceOptions,
   runner: TraceStepRunner = runTraceSteps,
   progress?: TraceProgress,
@@ -151,9 +152,11 @@ export async function traceImageToColoredPaths(
   // Photo tone is encoded in ribbon coverage, before any binary detection or
   // contour supersampling can discard it. The backend owns its bounded grid.
   if (requestedOptions.photoDetail !== undefined) {
-    return run(traceImageToPhotoPathsSteps(image, requestedOptions));
+    return run(traceImageToPhotoPathsSteps(requestedImage, requestedOptions));
   }
-  const options = resolveTraceSourceOptions(image, requestedOptions);
+  const inverted = invertBeforePolicy(requestedImage, requestedOptions);
+  const image = inverted.image;
+  const options = resolveTraceSourceOptions(image, inverted.options);
   // Sparse small/thin sources trace poorly at native resolution, so their
   // scale plan supersamples them. Dense color pictures instead stay native or
   // trace on a bounded working grid so photo texture cannot multiply the
@@ -219,6 +222,20 @@ export async function traceImageToColoredPaths(
   return withCanonicalTraceCurves(
     await dispatchTrace(image, options, run, edgeInput, contourInput),
   );
+}
+
+// Invert selects which polarity is artwork, so it must hold before any
+// policy reads the source: the thin-stroke and small-source upscale triggers,
+// the detail profile and every lane classify ink as DARK luma. Inverting once
+// here makes a light-on-dark source take exactly the route, grid and
+// sub-pixel boundary field its dark-on-light twin takes. The flag is cleared
+// so no lane inverts a second time.
+function invertBeforePolicy(
+  image: RawImageData,
+  options: TraceOptions,
+): { readonly image: RawImageData; readonly options: TraceOptions } {
+  if (options.invert !== true) return { image, options };
+  return { image: invertImage(image), options: { ...options, invert: false } };
 }
 
 async function traceUpscaledImage(

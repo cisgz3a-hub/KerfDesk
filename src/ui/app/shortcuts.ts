@@ -5,6 +5,8 @@ import type { SvgArtworkFragment } from '../state/svg-fragment-mutation';
 // Categories:
 //   * File: Cmd/Ctrl+N, O, S, I; Cmd/Ctrl+Shift+E for Save G-code
 //   * Edit: Cmd/Ctrl+Z, Shift+Z, Delete/Backspace, Escape
+//   * Tools: T, Cmd/Ctrl+R/E/L, Alt+M (measure), Alt+T (trace image),
+//     Cmd/Ctrl+Shift+B (convert to bitmap)
 //   * Transform: arrow keys (nudge), H/V (flip)
 //   * View: P (preview toggle)
 
@@ -221,12 +223,12 @@ function projectForPersistence(ctx: FileCtx): Project {
   });
 }
 
-type EditBinding = {
+type KeyBinding<Ctx> = {
   readonly match: (e: KeyboardEvent) => boolean;
-  readonly invoke: (c: EditCtx) => void;
+  readonly invoke: (c: Ctx) => void;
 };
 
-const EDIT_BINDINGS: ReadonlyArray<EditBinding> = [
+const EDIT_BINDINGS: ReadonlyArray<KeyBinding<EditCtx>> = [
   {
     match: (e) => hasMeta(e) && e.key.toLowerCase() === 'z' && !e.shiftKey,
     invoke: (c) => c.undo(),
@@ -349,6 +351,9 @@ export type ToolCtx = {
   // §7.4). The callback owns the gate (single convertible vector selected);
   // the matcher only routes the chord.
   readonly openConvertToBitmap: () => void;
+  // Alt/Option+T — LightBurn's Trace Image binding. The callback owns the
+  // gate (a selected image), exactly like the Tools > Trace Image command.
+  readonly openTraceImage: () => void;
 };
 
 // Ctrl/Cmd + letter arms a drawing tool, matching LightBurn (ADR-051 B7):
@@ -360,9 +365,16 @@ const TOOL_BINDINGS: Readonly<Record<string, ToolMode>> = {
   l: { kind: 'draw', shape: 'polyline' },
 };
 
-// Alt+M — Measure (no meta, no shift).
-function isMeasureChord(e: KeyboardEvent): boolean {
-  return e.altKey && !hasMeta(e) && !e.shiftKey && e.key.toLowerCase() === 'm';
+// Alt/Option + letter, no Ctrl/Cmd and no Shift. Windows AltGr arrives as
+// Ctrl+Alt, so it never matches. On macOS Option composes a character
+// (Option+T types a dagger, Option+M a micro sign), so e.key is not the
+// letter there; the physical key still is. The code fallback applies only
+// when the key produced no plain letter, so a layout that puts another
+// letter on that key keeps its own binding.
+function isAltLetterChord(e: KeyboardEvent, letter: string): boolean {
+  if (!e.altKey || hasMeta(e) || e.shiftKey) return false;
+  const key = e.key.toLowerCase();
+  return key === letter || (!/^[a-z]$/.test(key) && e.code === `Key${letter.toUpperCase()}`);
 }
 
 // Ctrl/Cmd+Shift+B — Convert to Bitmap (LightBurn §7.4).
@@ -370,21 +382,23 @@ function isConvertToBitmapChord(e: KeyboardEvent): boolean {
   return hasMeta(e) && e.shiftKey && !e.altKey && e.key.toLowerCase() === 'b';
 }
 
+const TOOL_CHORDS: ReadonlyArray<KeyBinding<ToolCtx>> = [
+  // T alone — canvas text.
+  {
+    match: (e) => !hasMeta(e) && !e.altKey && !e.shiftKey && e.key.toLowerCase() === 't',
+    invoke: (ctx) => ctx.setToolMode({ kind: 'text' }),
+  },
+  { match: (e) => isAltLetterChord(e, 'm'), invoke: (ctx) => ctx.setToolMode({ kind: 'measure' }) },
+  { match: (e) => isAltLetterChord(e, 't'), invoke: (ctx) => ctx.openTraceImage() },
+  { match: isConvertToBitmapChord, invoke: (ctx) => ctx.openConvertToBitmap() },
+];
+
 export function handleToolShortcut(e: KeyboardEvent, ctx: ToolCtx): boolean {
   if (isEditableTarget(e)) return false;
-  if (!hasMeta(e) && !e.altKey && !e.shiftKey && e.key.toLowerCase() === 't') {
+  for (const chord of TOOL_CHORDS) {
+    if (!chord.match(e)) continue;
     e.preventDefault();
-    ctx.setToolMode({ kind: 'text' });
-    return true;
-  }
-  if (isMeasureChord(e)) {
-    e.preventDefault();
-    ctx.setToolMode({ kind: 'measure' });
-    return true;
-  }
-  if (isConvertToBitmapChord(e)) {
-    e.preventDefault();
-    ctx.openConvertToBitmap();
+    chord.invoke(ctx);
     return true;
   }
   if (!hasMeta(e) || e.shiftKey || e.altKey) return false;

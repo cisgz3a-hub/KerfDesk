@@ -5,7 +5,7 @@
 //   - adjustBrightness  (delta −100..+100, 0 = no-op)
 //   - adjustContrast    (delta −100..+100, 0 = no-op)
 //   - adjustGamma       (gamma 0.1..5, 1 = no-op; clamp-protected)
-//   - invertImage       (255 − v per channel)
+//   - invertImage       (255 − v per channel; artwork-only on composited input)
 //
 // All four read RGBA input and return a new RawImageData. None mutate.
 // Composable with our existing preprocess.ts chain:
@@ -75,6 +75,25 @@ export function adjustGamma(image: RawImageData, gamma: number): RawImageData {
 // is a white-on-black logo / dark-mode screenshot and the user wants
 // it to engrave as black-on-white (the convention every laser tool
 // assumes).
+//
+// A decoder image tagged rgbCompositedOnWhite stores c = 255 - a(255 - s)
+// for straight colour s and coverage a. Inverting its bytes would turn the
+// transparent surround (c = 255, a = 0) into solid ink, so a white logo on a
+// transparent PNG traced as one filled rectangle. Inverting the ARTWORK
+// instead composites 255 - s over the same white: 255 - a*s, which in terms
+// of the stored byte is 255(2 - a) - c. Opaque pixels (a = 1) give the plain
+// 255 - c; fully transparent pixels stay paper; the map is its own inverse
+// on every valid composited byte, and the tag is kept.
 export function invertImage(image: RawImageData): RawImageData {
-  return mapRgb(image, (v) => 255 - v);
+  if (image.rgbCompositedOnWhite !== true) return mapRgb(image, (v) => 255 - v);
+  const out = new Uint8ClampedArray(image.data.length);
+  for (let i = 0; i < image.data.length; i += 4) {
+    const alpha = image.data[i + 3] ?? 255;
+    const paper = 510 - alpha;
+    out[i] = clampByte(paper - (image.data[i] ?? 0));
+    out[i + 1] = clampByte(paper - (image.data[i + 1] ?? 0));
+    out[i + 2] = clampByte(paper - (image.data[i + 2] ?? 0));
+    out[i + 3] = alpha;
+  }
+  return { width: image.width, height: image.height, data: out, rgbCompositedOnWhite: true };
 }
