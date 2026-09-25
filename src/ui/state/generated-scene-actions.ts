@@ -21,6 +21,12 @@ type GeneratedSceneSet = (fn: (state: GeneratedSceneState) => GeneratedScenePatc
 
 export type GeneratedSceneActions = {
   readonly replaceSceneWithGeneratedScene: (scene: Scene) => void;
+  /**
+   * Swaps in `scene` — the open design plus generated artwork added to it —
+   * and selects the added objects, so one undo removes them and the operator
+   * can move or burn them straight away (ADR-381).
+   */
+  readonly insertGeneratedScene: (scene: Scene, objectIds: ReadonlyArray<string>) => void;
 };
 
 export function generatedSceneActions(set: GeneratedSceneSet): GeneratedSceneActions {
@@ -34,5 +40,17 @@ export function generatedSceneActions(set: GeneratedSceneSet): GeneratedSceneAct
         redoStack: [],
         dirty: true,
       })),
+    insertGeneratedScene: (scene, objectIds) =>
+      set((state) => {
+        const [head, ...rest] = objectIds;
+        return {
+          project: { ...state.project, scene },
+          selectedObjectId: head ?? null,
+          additionalSelectedIds: new Set(rest),
+          undoStack: pushUndo(state.project, state.undoStack),
+          redoStack: [],
+          dirty: true,
+        };
+      }),
   };
 }

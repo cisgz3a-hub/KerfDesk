@@ -3,7 +3,8 @@ import { createRoot } from 'react-dom/client';
 import { Simulate } from 'react-dom/test-utils';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { DEFAULT_DEVICE_PROFILE } from '../../core/devices';
-import { compileJob, generateIntervalTestGrid, generateMaterialTestGrid } from '../../core/job';
+import { compileJob, generateIntervalTestGrid } from '../../core/job';
+import { generateMaterialTestAxesGrid } from '../../core/job/material-test-axes-grid';
 import { grblStrategy } from '../../core/output/grbl-strategy';
 import { IntervalTestDialog } from './IntervalTestDialog';
 import { MaterialTestDialog } from './MaterialTestDialog';
@@ -61,7 +62,7 @@ describe('calibration draft validation', () => {
         const grid =
           kind === 'interval'
             ? generateIntervalTestGrid(options)
-            : generateMaterialTestGrid(options);
+            : generateMaterialTestAxesGrid(options.options);
         expect(() =>
           grblStrategy.emit(compileJob(grid.scene, DEFAULT_DEVICE_PROFILE), DEFAULT_DEVICE_PROFILE),
         ).not.toThrow();
@@ -87,7 +88,7 @@ describe('calibration draft validation', () => {
       );
       try {
         const field = host.querySelector<HTMLInputElement>(
-          `input[aria-label="${kind === 'interval' ? 'Speed' : 'Min speed'}"]`,
+          `input[aria-label="${kind === 'interval' ? 'Speed' : 'Row start'}"]`,
         );
         const form = host.querySelector('form');
         if (!field || !form) throw new Error('form missing');

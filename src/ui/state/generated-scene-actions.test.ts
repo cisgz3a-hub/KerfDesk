@@ -27,4 +27,32 @@ describe('generated scene actions', () => {
     expect(useStore.getState().dirty).toBe(true);
     expect(useStore.getState().undoStack).toHaveLength(1);
   });
+
+  it('inserts generated artwork beside the design, selects it, and undoes in one step', () => {
+    useStore.getState().importSvgObject(svgObj('old', ['#ff0000']));
+    useStore.getState().selectObject('old');
+    useStore.setState({ undoStack: [], redoStack: [] });
+    const before = useStore.getState().project.scene;
+    const scene: Scene = {
+      ...before,
+      layers: [...before.layers, createLayer({ id: 'test-op', color: '#100000', mode: 'fill' })],
+      objects: [...before.objects, svgObj('cell-a', ['#100000']), svgObj('cell-b', ['#100000'])],
+    };
+
+    useStore.getState().insertGeneratedScene(scene, ['cell-a', 'cell-b']);
+
+    const state = useStore.getState();
+    expect(state.project.scene.objects.map((object) => object.id)).toEqual([
+      'old',
+      'cell-a',
+      'cell-b',
+    ]);
+    expect(state.selectedObjectId).toBe('cell-a');
+    expect([...state.additionalSelectedIds]).toEqual(['cell-b']);
+    expect(state.dirty).toBe(true);
+    expect(state.undoStack).toHaveLength(1);
+
+    useStore.getState().undo();
+    expect(useStore.getState().project.scene).toBe(before);
+  });
 });

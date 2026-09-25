@@ -51,7 +51,7 @@ const OUTCOMES: Record<CommandId, Outcome> = {
   'tools.camera': { callback: 'toggleCameraPanel' },
   'tools.box-generator': { callback: 'boxGenerator' },
   'tools.box-fit-test': { callback: 'boxFitTest' },
-  'tools.material-test': { callback: 'materialTest', guard: 'create a material test' },
+  'tools.material-test': { callback: 'materialTest' },
   'tools.interval-test': { callback: 'intervalTest', guard: 'create an interval test' },
   'tools.scan-offset-test': { callback: 'scanOffsetTest', guard: 'create a scan offset test' },
   'tools.focus-test': { special: 'unavailable' },

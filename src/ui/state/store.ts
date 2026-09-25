@@ -246,6 +246,7 @@ export type AppState = ObjectPropertiesActions &
     readonly layerDefaults: LayerDefaultsState;
 
     readonly replaceSceneWithGeneratedScene: (scene: Scene) => void;
+    readonly insertGeneratedScene: (scene: Scene, objectIds: ReadonlyArray<string>) => void;
 
     // batchOffsetIdx (default 0) shifts the imported object by 10mm × N to the
     // right and down (F-A3 multi-import). The first file in a batch passes 0,

@@ -300,7 +300,7 @@ function imageMaskCropCommand(ctx: AppCommandContext): AppCommand {
 function calibrationToolCommands(ctx: AppCommandContext): ReadonlyArray<AppCommand> {
   return [
     // Additive (inserts panels into the current scene), so no dirty-project
-    // guard — unlike the calibration grids, which replace the scene.
+    // guard — unlike the calibration grids that replace the scene.
     enabled(
       'tools.box-generator',
       'tools',
@@ -315,12 +315,15 @@ function calibrationToolCommands(ctx: AppCommandContext): ReadonlyArray<AppComma
       'Generate fit test strips to calibrate joint clearance.',
       ctx.boxFitTest,
     ),
+    // The Material Test joins the open design or opens as a new project, and
+    // the new-project path asks to save when it runs (ADR-381), so opening
+    // the dialog needs no guard.
     enabled(
       'tools.material-test',
       'tools',
       'Material Test...',
       'Create a material test grid',
-      guardedCalibrationAction(ctx, 'create a material test', ctx.materialTest),
+      ctx.materialTest,
     ),
     enabled(
       'tools.interval-test',

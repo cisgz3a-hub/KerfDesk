@@ -202,15 +202,17 @@ describe('buildAppCommands', () => {
     expect(active.active).toBe(true);
   });
 
-  it('runs Material Test through the shared dirty-project guard', async () => {
+  // ADR-381: the test joins the open design or asks to save before it opens
+  // as a new project, so the dialog itself opens without the guard.
+  it('opens Material Test without the dirty-project guard', async () => {
     const confirmDiscard = vi.fn(async () => true);
     const materialTest = vi.fn();
     const commands = buildAppCommands(baseCtx({ dirty: true, confirmDiscard, materialTest }));
 
     expect(runCommand(commandById(commands, 'tools.material-test'))).toBe(true);
-    expect(confirmDiscard).toHaveBeenCalledWith('create a material test');
     await flushMicrotasks();
-    expect(materialTest).toHaveBeenCalled();
+    expect(confirmDiscard).not.toHaveBeenCalled();
+    expect(materialTest).toHaveBeenCalledOnce();
   });
 
   it('runs Interval Test through the shared dirty-project guard', async () => {

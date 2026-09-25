@@ -1,75 +1,35 @@
-import { useState, type ChangeEvent } from 'react';
-import type { MaterialTestGridOptions } from '../../core/job';
-import { CalibrationNumberField } from './CalibrationNumberField';
+import { useState } from 'react';
+import { materialTestAxisValues } from '../../core/job/material-test-axes';
 import { Button, Dialog, DialogActions } from '../kit';
-import { persistCalibrationDraft, restoreCalibrationDraft } from './calibration-draft-storage';
-import { calibrationGridStyle } from './calibration-dialog-styles';
-import { calibrationDraftIssues } from './calibration-draft-validation';
-
-type MaterialTestDraft = {
-  readonly rows: string;
-  readonly columns: string;
-  readonly speedMin: string;
-  readonly speedMax: string;
-  readonly powerMin: string;
-  readonly powerMax: string;
-  readonly cellWidthMm: string;
-  readonly cellHeightMm: string;
-  readonly gapMm: string;
-};
-
-type MaterialTestField = {
-  readonly key: keyof MaterialTestDraft;
-  readonly label: string;
-  readonly min: number;
-  readonly max: number | undefined;
-  readonly step: number | undefined;
-};
-
-const DEFAULT_DRAFT: MaterialTestDraft = {
-  rows: '10',
-  columns: '10',
-  speedMin: '1000',
-  speedMax: '3000',
-  powerMin: '10',
-  powerMax: '40',
-  cellWidthMm: '5',
-  cellHeightMm: '5',
-  gapMm: '1',
-};
-
-const MATERIAL_TEST_DRAFT_KEY = 'laserforge.calibration.materialTestDraft.v1';
-const MATERIAL_TEST_DRAFT_FIELDS = Object.keys(DEFAULT_DRAFT) as ReadonlyArray<
-  keyof MaterialTestDraft
->;
-
-const FIELD_SPECS: ReadonlyArray<MaterialTestField> = [
-  { key: 'rows', label: 'Rows', min: 1, max: 20, step: undefined },
-  { key: 'columns', label: 'Columns', min: 1, max: 20, step: undefined },
-  { key: 'speedMin', label: 'Min speed', min: 1, max: undefined, step: undefined },
-  { key: 'speedMax', label: 'Max speed', min: 1, max: undefined, step: undefined },
-  { key: 'powerMin', label: 'Min power', min: 0, max: 100, step: undefined },
-  { key: 'powerMax', label: 'Max power', min: 0, max: 100, step: undefined },
-  { key: 'cellWidthMm', label: 'Cell width', min: 0.1, max: undefined, step: 0.1 },
-  { key: 'cellHeightMm', label: 'Cell height', min: 0.1, max: undefined, step: 0.1 },
-  { key: 'gapMm', label: 'Gap', min: 0, max: undefined, step: 0.1 },
-];
+import {
+  MaterialTestAxisRow,
+  MaterialTestFixedFields,
+  MaterialTestLayoutFields,
+  MaterialTestModeField,
+  MaterialTestPlacementField,
+  type MaterialTestFieldSetter,
+} from './MaterialTestAxisFields';
+import {
+  materialTestDraftIssues,
+  materialTestRequest,
+  numberValue,
+  persistMaterialTestDraft,
+  restoreMaterialTestDraft,
+  withAxisParameter,
+  type MaterialTestDraft,
+  type MaterialTestRequest,
+} from './material-test-draft';
 
 export function MaterialTestDialog(props: {
   readonly onCancel: () => void;
-  readonly onGenerate: (options: MaterialTestGridOptions) => void;
+  readonly onGenerate: (request: MaterialTestRequest) => void;
   readonly maxFeedMmPerMin: number;
 }): JSX.Element {
-  const [draft, setDraft] = useState(() =>
-    restoreCalibrationDraft(MATERIAL_TEST_DRAFT_KEY, DEFAULT_DRAFT, MATERIAL_TEST_DRAFT_FIELDS),
-  );
-  const issues = calibrationDraftIssues(draft, FIELD_SPECS);
-  const setField =
-    (field: keyof MaterialTestDraft) =>
-    (event: ChangeEvent<HTMLInputElement>): void => {
-      const { value } = event.target;
-      setDraft((current) => ({ ...current, [field]: value }));
-    };
+  const [draft, setDraft] = useState(restoreMaterialTestDraft);
+  const issues = materialTestDraftIssues(draft);
+  const update = (key: keyof MaterialTestDraft, value: string): void =>
+    setDraft((current) => ({ ...current, [key]: value }));
+  const setField: MaterialTestFieldSetter = (key) => (event) => update(key, event.target.value);
   // kit Dialog adds the Escape/focus-trap behavior these two dialogs were
   // missing (every other modal had it via use-dialog-a11y).
   return (
@@ -80,16 +40,41 @@ export function MaterialTestDialog(props: {
       onSubmit={(event) => {
         event.preventDefault();
         if (issues.length > 0) return;
-        persistCalibrationDraft(MATERIAL_TEST_DRAFT_KEY, draft);
-        props.onGenerate(parseDraft(draft));
+        persistMaterialTestDraft(draft);
+        props.onGenerate(materialTestRequest(draft));
       }}
-      size="sm"
+      size="md"
     >
-      <MaterialTestFields draft={draft} setField={setField} />
+      <MaterialTestModeField draft={draft} setField={setField} />
+      {(['row', 'column'] as const).map((axis) => (
+        <MaterialTestAxisRow
+          key={axis}
+          axis={axis}
+          draft={draft}
+          setField={setField}
+          onParameterChange={(parameter) =>
+            setDraft((current) => withAxisParameter(current, axis, parameter))
+          }
+        />
+      ))}
+      <MaterialTestFixedFields
+        draft={draft}
+        setField={setField}
+        onAirAssistChange={(on) => update('airAssist', on ? 'on' : 'off')}
+      />
+      <MaterialTestLayoutFields
+        draft={draft}
+        setField={setField}
+        onToggle={(key, on) => update(key, on ? 'on' : 'off')}
+      />
+      <MaterialTestPlacementField
+        placement={draft.placement}
+        onChange={(placement) => update('placement', placement)}
+      />
       {issues.length > 0 ? <p role="alert">{issues.join(' ')}</p> : null}
-      <CalibrationFeedDisclosure
-        speedMin={numberValue(draft.speedMin)}
-        speedMax={numberValue(draft.speedMax)}
+      <MaterialTestSummary
+        draft={draft}
+        valid={issues.length === 0}
         maxFeedMmPerMin={props.maxFeedMmPerMin}
       />
       <DialogActions>
@@ -102,65 +87,63 @@ export function MaterialTestDialog(props: {
   );
 }
 
-function CalibrationFeedDisclosure(props: {
-  readonly speedMin: number;
-  readonly speedMax: number;
+// Cell count, then the requested and effective feed range: the profile
+// ceiling caps fast speeds, and the burned labels show what actually ran.
+function MaterialTestSummary(props: {
+  readonly draft: MaterialTestDraft;
+  readonly valid: boolean;
   readonly maxFeedMmPerMin: number;
 }): JSX.Element {
-  const requestedLow = Math.min(props.speedMin, props.speedMax);
-  const requestedHigh = Math.max(props.speedMin, props.speedMax);
-  const effectiveLow = Math.min(requestedLow, props.maxFeedMmPerMin);
-  const effectiveHigh = Math.min(requestedHigh, props.maxFeedMmPerMin);
+  const feeds = feedRange(props.draft);
+  const effectiveLow = Math.min(feeds.low, props.maxFeedMmPerMin);
+  const effectiveHigh = Math.min(feeds.high, props.maxFeedMmPerMin);
   return (
-    <p role="status" style={{ margin: '12px 0 0', color: 'var(--lf-text-muted)', fontSize: 12 }}>
-      Requested {formatFeed(requestedLow)}–{formatFeed(requestedHigh)} mm/min; effective{' '}
-      {formatFeed(effectiveLow)}–{formatFeed(effectiveHigh)} mm/min with the active profile ceiling
-      of {formatFeed(props.maxFeedMmPerMin)} mm/min. Burned row labels show effective feed.
+    <p role="status" style={statusStyle}>
+      {props.valid ? `${gridSize(props.draft)} ` : null}
+      Requested {formatRange(feeds.low, feeds.high)} mm/min; effective{' '}
+      {formatRange(effectiveLow, effectiveHigh)} mm/min with the active profile ceiling of{' '}
+      {formatFeed(props.maxFeedMmPerMin)} mm/min.
+      {feeds.fromAxis && props.draft.labels !== 'off'
+        ? ' Burned speed labels show effective feed.'
+        : null}
     </p>
   );
 }
 
-function MaterialTestFields(props: {
-  readonly draft: MaterialTestDraft;
-  readonly setField: (
-    field: keyof MaterialTestDraft,
-  ) => (event: ChangeEvent<HTMLInputElement>) => void;
-}): JSX.Element {
-  return (
-    <div style={calibrationGridStyle}>
-      {FIELD_SPECS.map((field) => (
-        <CalibrationNumberField
-          key={field.key}
-          label={field.label}
-          value={props.draft[field.key]}
-          min={field.min}
-          max={field.max}
-          step={field.step}
-          onChange={props.setField(field.key)}
-        />
-      ))}
-    </div>
-  );
+// A passes axis holds one step per whole pass, so it can hold fewer steps
+// than the count asks for; the size shown is the grid that will be made.
+function gridSize(draft: MaterialTestDraft): string {
+  const { options } = materialTestRequest(draft);
+  const rows = materialTestAxisValues(options.rowAxis, options.mode).length;
+  const columns = materialTestAxisValues(options.columnAxis, options.mode).length;
+  return `${rows} × ${columns} = ${rows * columns} cells.`;
 }
 
-function parseDraft(draft: MaterialTestDraft): MaterialTestGridOptions {
-  return {
-    rows: numberValue(draft.rows),
-    columns: numberValue(draft.columns),
-    speedMin: numberValue(draft.speedMin),
-    speedMax: numberValue(draft.speedMax),
-    powerMin: numberValue(draft.powerMin),
-    powerMax: numberValue(draft.powerMax),
-    cellWidthMm: numberValue(draft.cellWidthMm),
-    cellHeightMm: numberValue(draft.cellHeightMm),
-    gapMm: numberValue(draft.gapMm),
-  };
+function feedRange(draft: MaterialTestDraft): {
+  readonly low: number;
+  readonly high: number;
+  readonly fromAxis: boolean;
+} {
+  const axis =
+    draft.rowParameter === 'speed'
+      ? [draft.rowStart, draft.rowEnd]
+      : draft.columnParameter === 'speed'
+        ? [draft.columnStart, draft.columnEnd]
+        : null;
+  const values = (axis ?? [draft.speed]).map(numberValue);
+  return { low: Math.min(...values), high: Math.max(...values), fromAxis: axis !== null };
 }
 
-function numberValue(value: string): number {
-  return value.trim() === '' ? Number.NaN : Number(value);
+function formatRange(low: number, high: number): string {
+  return low === high ? formatFeed(low) : `${formatFeed(low)}–${formatFeed(high)}`;
 }
 
 function formatFeed(value: number): string {
   return Number.isFinite(value) ? value.toLocaleString('en-US', { maximumFractionDigits: 3 }) : '0';
 }
+
+const statusStyle: React.CSSProperties = {
+  margin: '12px 0 0',
+  color: 'var(--lf-text-muted)',
+  fontSize: 12,
+};
