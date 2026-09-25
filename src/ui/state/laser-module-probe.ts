@@ -212,7 +212,7 @@ async function probeLaserModuleForQualification(
 
 function laserModuleLogLine(evidence: LaserModuleEvidence): string {
   if (evidence.module === 'absent') {
-    return '[lf2] Laser module not loaded: the controller printed no laser report. Jog, Frame and Home skip `fire off`; laser output is refused.';
+    return '[lf2] Laser module not loaded: the controller printed no laser report. Jog, Frame, Home and jobs skip `fire off`; Fire is refused, and a laser job runs with the laser off.';
   }
   return evidence.constantPowerMode === true
     ? '[lf2] Laser module loaded.'
