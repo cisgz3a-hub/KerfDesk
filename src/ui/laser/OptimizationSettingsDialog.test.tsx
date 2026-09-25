@@ -108,4 +108,45 @@ describe('OptimizationSettingsDialog', () => {
       await act(async () => root.unmount());
     }
   });
+
+  it('offers the closed cut start choices off by default, even under Keep source order', async () => {
+    const sourceOrder = {
+      ...DEFAULT_PROJECT_OPTIMIZATION,
+      travelPolicy: 'source-order' as const,
+      reduceTravelMoves: false,
+    };
+    const { host, root, onApply } = await renderDialog(vi.fn(), sourceOrder);
+    try {
+      const box = (name: string): HTMLInputElement => {
+        const input = host.querySelector<HTMLInputElement>(`input[name="${name}"]`);
+        if (input === null) throw new Error(`${name} missing`);
+        return input;
+      };
+      for (const name of ['bestStartPoint', 'preferCorners', 'bestDirection']) {
+        expect(box(name).checked).toBe(false);
+        expect(box(name).disabled).toBe(false);
+      }
+      await act(async () => {
+        box('bestStartPoint').checked = true;
+        Simulate.change(box('bestStartPoint'));
+      });
+      await act(async () => {
+        box('preferCorners').checked = true;
+        Simulate.change(box('preferCorners'));
+      });
+      await act(async () => {
+        const form = host.querySelector('form');
+        if (!(form instanceof HTMLFormElement)) throw new Error('form missing');
+        Simulate.submit(form);
+      });
+
+      expect(onApply).toHaveBeenCalledWith({
+        ...sourceOrder,
+        bestStartPoint: true,
+        preferCorners: true,
+      });
+    } finally {
+      await act(async () => root.unmount());
+    }
+  });
 });

@@ -241,6 +241,7 @@ function sanitizeOperationOverridePatch(patch: ObjectOperationOverride): ObjectO
   setMinimumNumber(out, 'tabSizeMm', patch.tabSizeMm, 0.01);
   setPositiveInteger(out, 'tabsPerShape', patch.tabsPerShape);
   setBoolean(out, 'tabSkipInnerShapes', patch.tabSkipInnerShapes);
+  setLineCutOptions(out, patch);
   setFiniteNumber(out, 'hatchAngleDeg', patch.hatchAngleDeg);
   setMinimumNumber(out, 'hatchSpacingMm', patch.hatchSpacingMm, 0.05);
   setNonNegativeNumber(out, 'fillOverscanMm', patch.fillOverscanMm);
@@ -261,6 +262,18 @@ function sanitizeOperationOverridePatch(patch: ObjectOperationOverride): ObjectO
   setBoolean(out, 'passThrough', patch.passThrough);
   setNonNegativeNumber(out, 'dotWidthCorrectionMm', patch.dotWidthCorrectionMm);
   return out as ObjectOperationOverride;
+}
+
+// ADR-385 Line options. An explicit 0 overcut or 'per-shape' placement is kept:
+// on an override it switches off what the operation itself asks for.
+function setLineCutOptions(out: Record<string, unknown>, patch: ObjectOperationOverride): void {
+  setNonNegativeNumber(out, 'overcutMm', patch.overcutMm);
+  if (patch.tabPlacement === 'per-shape' || patch.tabPlacement === 'spacing') {
+    out.tabPlacement = patch.tabPlacement;
+  }
+  setPositiveNumber(out, 'tabSpacingMm', patch.tabSpacingMm);
+  setPositiveInteger(out, 'tabMinPerShape', patch.tabMinPerShape);
+  setPositiveInteger(out, 'tabMaxPerShape', patch.tabMaxPerShape);
 }
 
 function setPowerMode(out: Record<string, unknown>, patch: ObjectOperationOverride): void {

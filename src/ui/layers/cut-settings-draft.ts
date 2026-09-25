@@ -7,6 +7,7 @@ import {
   MIN_RASTER_LINES_PER_MM,
 } from '../../core/raster';
 import { DITHER_ALGORITHMS, type Layer, type LayerMode } from '../../core/scene';
+import { readLineCutOptionsPatch } from './cut-settings-line-options';
 
 export type LayerPatch = Partial<Omit<Layer, 'id' | 'color'>>;
 export type CutSettingsLimits = {
@@ -52,6 +53,7 @@ export function readCutSettingsPatch(
     output: data.has('output'),
     airAssist: data.has('airAssist') ? true : layer.airAssist,
     ...lineSettings,
+    ...readLineCutOptionsPatch(data, layer, mode),
     ...fillSettings,
     ditherAlgorithm: parseDither(String(data.get('ditherAlgorithm') ?? layer.ditherAlgorithm)),
     linesPerMm,

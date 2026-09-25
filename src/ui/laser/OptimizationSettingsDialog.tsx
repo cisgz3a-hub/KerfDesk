@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import type { ProjectOptimizationSettings } from '../../core/scene';
 import { Button, Dialog, DialogActions } from '../kit';
+import { ClosedCutStartFields } from './ClosedCutStartFields';
 
 export function OptimizationSettingsDialog(props: {
   readonly settings: ProjectOptimizationSettings;
@@ -106,6 +107,7 @@ function PlannerFields(props: {
           ['job-center', 'Job center'],
         ]}
       />
+      <ClosedCutStartFields settings={settings} update={update} />
       {keepsSourceOrder ? <SourceOrderPrecedenceNote /> : null}
     </>
   );
@@ -157,7 +159,7 @@ function SourceOrderPrecedenceNote(): JSX.Element {
     <p style={precedenceNoteStyle} role="status">
       Keep source order preserves path sequence and direction inside each operation. Inside paths
       first, Path direction, and Planning start are saved but bypassed. Layer priority still
-      applies. Overlap removal, when enabled, also applies.
+      applies. Overlap removal and the closed cut start choices, when enabled, also apply.
     </p>
   );
 }

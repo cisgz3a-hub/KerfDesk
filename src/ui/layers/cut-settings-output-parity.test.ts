@@ -12,6 +12,7 @@ import {
 import { emitGcode, prepareOutput } from '../../io/gcode';
 import { estimateLiveJob } from '../laser/live-job-estimate';
 import { buildPreviewToolpath } from '../workspace/draw-preview';
+import { withPreviewCutStartMarkers } from '../workspace/preview-cut-start-markers';
 import { mapToolpathToScene } from '../workspace/preview-scene-frame';
 import { readCutSettingsPatch } from './cut-settings-draft';
 
@@ -160,12 +161,18 @@ function expectedPreviewToolpath(
   project: Project,
   prepared: Extract<ReturnType<typeof prepareOutput>, { readonly ok: true }>,
 ) {
-  return mapToolpathToScene(
-    buildToolpath(prepared.job, {
-      startPoint: { x: 0, y: 0 },
-      parkPoint: { x: 0, y: 0 },
-      scanningOffsets: project.device.scanningOffsets,
-    }),
+  // Closed Line cuts also carry their start marks (ADR-385).
+  return withPreviewCutStartMarkers(
+    mapToolpathToScene(
+      buildToolpath(prepared.job, {
+        startPoint: { x: 0, y: 0 },
+        parkPoint: { x: 0, y: 0 },
+        scanningOffsets: project.device.scanningOffsets,
+      }),
+      prepared.jobOriginOffset,
+      project.device,
+    ),
+    prepared.job,
     prepared.jobOriginOffset,
     project.device,
   );

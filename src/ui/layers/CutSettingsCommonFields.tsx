@@ -2,6 +2,7 @@ import type { Layer, LayerMode } from '../../core/scene';
 import { useStore } from '../state';
 import { CutPowerModeField } from './CutPowerModeField';
 import { LaserProcessField } from './LaserProcessField';
+import { LineOvercutField, LineTabPlacementFields } from './LineCutOptionFields';
 
 export function CutSettingsCommonFields(props: {
   readonly layer: Layer;
@@ -134,6 +135,7 @@ function LineModeFields(props: { readonly layer: Layer }): JSX.Element {
         />
         <span className="lf-field-unit">mm</span>
       </Field>
+      <LineOvercutField layer={props.layer} />
       <LineBridgeFields layer={props.layer} />
     </fieldset>
   );
@@ -180,6 +182,7 @@ function LineBridgeFields(props: { readonly layer: Layer }): JSX.Element {
           title="Set how many evenly spaced bridge gaps to add to each closed outer contour."
         />
       </Field>
+      <LineTabPlacementFields layer={props.layer} />
       <Field label="Holes">
         <input
           name="tabSkipInnerShapes"
