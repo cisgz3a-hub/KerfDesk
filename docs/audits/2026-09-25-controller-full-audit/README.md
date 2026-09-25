@@ -33,7 +33,7 @@ moved beside the code it covers as a regression test, or deleted, before the PR.
 | HF | grblHAL, FluidNC and the Creality Falcon A1 Pro command set | running |
 | MA | Marlin: replies, M114, laser power (M3 I / fan), jog/frame, stream-side pause and stop | running |
 | SM | Smoothieware: replies, halt/M999, `$H`, `fire off`, M120/M121, M221 power, status grammar | running |
-| RU | Ruida `.rd` export and UDP session, checked against meerk40t | running |
+| RU | Ruida `.rd` export and UDP session, checked against meerk40t | reported: 8 findings (`tracks/RU.md`) |
 | TC | Serial transport (web, worker, desktop) and the connect/qualify/disconnect lifecycle | running |
 | CG | Every machine control against every controller's capabilities (the gating matrix) | running |
 | OR | G-code output dialects, machine profiles, resume/recovery across controllers | running |
