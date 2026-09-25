@@ -293,7 +293,7 @@ describe('Trace Image workflow controls', () => {
     });
   });
 
-  it('does not show contour-only Smoothness and Optimize controls for Centerline', async () => {
+  it('shows Centerline Smoothness and Optimize with their corner and tolerance roles', async () => {
     await withTraceDialog(async (host) => {
       await changeSelect(presetSelect(host), 'Centerline');
       const text = host.textContent ?? '';
@@ -301,8 +301,12 @@ describe('Trace Image workflow controls', () => {
       expect(text).toContain('Remove ink specks');
       expect(host.querySelector('[aria-label="Trace Threshold"]')).toBeNull();
       expect(text).not.toContain('Ignore Less Than');
-      expect(text).not.toContain('Smoothness');
-      expect(text).not.toContain('Optimize');
+      // ADR-397: Smoothness is the centreline corner angle, Optimize its
+      // curve-fit tolerance.
+      const smoothness = host.querySelector('input[type="number"][aria-label="Trace Smoothness"]');
+      const optimize = host.querySelector('input[type="number"][aria-label="Trace Optimize"]');
+      expect(smoothness?.getAttribute('title')).toContain('corner');
+      expect(optimize?.getAttribute('title')).toContain('fewer nodes');
     });
   });
 
