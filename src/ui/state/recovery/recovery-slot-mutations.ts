@@ -316,9 +316,12 @@ export function activateClaimedRecoveryMutation(
 export function promoteStaleActiveRunMutation(
   slots: PersistedRecoverySlots,
   updatedAtIso: string,
+  expectedRunId?: RunId,
 ): SlotMutation<boolean> {
   const active = slots.activeRun;
   if (active === null) return unchanged(slots, false);
+  // The caller checked this run's owner is gone; a different run is not its to promote.
+  if (expectedRunId !== undefined && active.runId !== expectedRunId) return unchanged(slots, false);
   const revision = slots.revision + 1;
   const interruption = {
     kind: 'unknown' as const,

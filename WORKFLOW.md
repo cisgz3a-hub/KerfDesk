@@ -1980,7 +1980,11 @@ that window reconciles, once the 5 s Start owner lease has expired, into a capsu
 acknowledged lines with an `unknown` interruption, backed by the fingerprint-only stand-in; if the
 archive was already stored, that verified archive backs the capsule instead and the run is added
 to the execution history (ADR-341 Amendment 3). Supervised recovery Starts still stage and verify
-their archive before transmission.
+their archive before transmission. The window that starts a run holds a lock named for it while the
+run is pending or active. A window opened meanwhile leaves that run alone, and turns an active run
+into an **Interrupted job saved** card only when no live window holds its lock. The browser drops
+the lock when the owning window closes, reloads or crashes, so crash recovery is unchanged
+(ADR-369 Amendment 1).
 
 #### Success — resume after a crash
 1. App/tab/PC died mid-job. Operator relaunches. Recovery loads independently
@@ -2069,12 +2073,14 @@ their archive before transmission.
    the newest capsule with zero diagnostic acknowledgements and an explicit
    acceptance-unknown reason. It may be a conservative false positive when the
    app died before the first program byte, but the older source is never offered
-   after a newer Start may have changed machine state. A still-live tab renews a
-   five-second owner lease every second until its handoff closes, including while
-   it stores the execution archive after the controller has accepted the program.
-   Another tab reconciles the Start only after that lease has gone unrenewed for a
-   whole lease on its own clock, which a live tab avoids unless it is frozen for
-   several seconds (ADR-369).
+   after a newer Start may have changed machine state. For a fresh Start, a still-live
+   tab renews a five-second owner lease every second until its handoff closes,
+   including while it stores the execution archive after the controller has accepted
+   the program. Another tab reconciles the Start only after that lease has gone
+   unrenewed for a whole lease on its own clock, which a live tab avoids unless it is
+   frozen for several seconds (ADR-369). A supervised recovery Start, like this one,
+   does not renew: it stages and verifies its archive before arming, so its lease
+   covers only the Start boundary (ADR-369 item 4).
 
 #### Edge — deliberate software Abort
 1. Abort keeps the run as the newest capsule (an aborted job still requires
