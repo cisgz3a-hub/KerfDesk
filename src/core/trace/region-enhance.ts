@@ -129,9 +129,11 @@ function regionContextPx(options: TraceOptions): number {
 // Smooth's automatic median repairs isolated impulses only when the whole
 // image has enough of them, and judges isolation in pixels of the grid it
 // runs on. Both are whole-source, source-scale decisions (ADR-411): the crop
-// takes the full pass's verdict and is cleaned before it is enlarged, so its
-// specks are removed exactly where the full trace removed them. The padding
-// ring covers the median's 3x3 window and two-link support search.
+// takes the full pass's verdict and is cleaned before it is enlarged, so on
+// the native and upscale routes its specks are removed exactly where the full
+// trace removed them. (Dense art the full pass traces on a smaller grid runs
+// its median there, so the two can differ.) The padding ring covers the
+// median's 3x3 window and two-link support search.
 function regionMedianInput(
   crop: RawImageData,
   options: TraceOptions,

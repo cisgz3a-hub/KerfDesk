@@ -16,7 +16,8 @@
 // trace-image imports trace-alpha.
 
 import { shouldUseSketchTrace, sourceHasAutoSketchColour } from './auto-sketch-trace';
-import { applyMedian, otsuThreshold } from './preprocess';
+import { applyMedian } from './apply-median';
+import { otsuThreshold } from './preprocess';
 import { invertImage } from './raster-prep';
 import { resolveTraceSourceOptions, shouldTraceAlphaMask } from './trace-alpha';
 import { applyImageAdjustments, type RawImageData, type TraceOptions } from './trace-image';

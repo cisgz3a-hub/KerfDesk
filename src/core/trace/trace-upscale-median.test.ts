@@ -1,11 +1,17 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
+import * as medianStage from './apply-median';
 import { upscaleBy } from './auto-upscale';
 import { prepareContourTraceInput } from './contour-input';
+import * as contourTrace from './contour-trace';
 import * as preprocess from './preprocess';
 import type { RawImageData, TraceOptions } from './trace-image';
 import { TRACE_PRESETS } from './trace-presets';
 import { traceImageToColoredPaths } from './trace-to-paths';
-import { prepareUpscaledTraceInput, sourceMedianStage } from './trace-upscale-input';
+import {
+  prepareUpscaledTraceInput,
+  releaseMedianStage,
+  sourceMedianStage,
+} from './trace-upscale-input';
 
 // ADR-411: the automatic median runs at source resolution and the cleaned
 // source is enlarged, so a one-source-pixel impulse is judged as one pixel
@@ -133,13 +139,14 @@ describe('automatic median at source scale (ADR-411)', () => {
 
   it('runs the automatic median only on the source grid, reusing the native pass', () => {
     const noisy = withSpecks(artwork(), specks());
-    const median = vi.spyOn(preprocess, 'applyMedian');
+    const median = vi.spyOn(medianStage, 'applyMedian');
     const auto = vi.spyOn(preprocess, 'autoMedianFilter');
     const native = prepareContourTraceInput(noisy, MEDIAN_ONLY);
     prepareUpscaledTraceInput(noisy, MEDIAN_ONLY, 3, undefined, native);
     const autoCalls = median.mock.calls.filter(([, option]) => option === 'auto');
     expect(autoCalls.map(([image]) => image.width)).toEqual([SIZE]);
-    expect(auto).not.toHaveBeenCalled();
+    // The native pass's one selective median; the upscale route reuses it.
+    expect(auto.mock.calls.map(([image]) => image.width)).toEqual([SIZE]);
   });
 
   it('computes the same source median when no native pass is available', () => {
@@ -167,6 +174,64 @@ describe('automatic median at source scale (ADR-411)', () => {
     expect(enlarged.options).toMatchObject({ contrast: 0, gamma: 1, medianFilter: false });
     const stage = sourceMedianStage(noisy, toned)!;
     expect(enlarged.image.data).toEqual(upscaleBy(stage.cleaned, 2).data);
+  });
+
+  it('releases the median stage wherever no later grid resamples it', async () => {
+    const noisy = withSpecks(artwork(), specks());
+    const toned: TraceOptions = { ...MEDIAN_ONLY, brightness: 20 };
+    const native = prepareContourTraceInput(noisy, toned);
+    expect(native.median?.cleaned).not.toBe(native.median?.adjusted);
+    const released = releaseMedianStage(native);
+    expect(released.median).toBeUndefined();
+    expect(released).toMatchObject({ image: noisy, options: toned, prepared: native.prepared });
+    expect(releaseMedianStage(released)).toBe(released);
+    // The working grid's stage (a 4x tone-adjusted copy here) is not kept.
+    for (const source of [noisy, artwork()]) {
+      const working = prepareUpscaledTraceInput(source, toned, 2, undefined, native);
+      expect(working.contourInput?.prepared.width).toBe(SIZE * 2);
+      expect(working.contourInput?.median).toBeUndefined();
+    }
+    // A broad native trace (no upscale) hands the contour lane no stage.
+    const lane = vi.spyOn(contourTrace, 'traceImageToContourColoredPathsSteps');
+    const broad = paper(200);
+    for (let y = 40; y < 160; y += 1) for (let x = 40; x < 160; x += 1) paint(broad, x, y, 0);
+    await traceImageToColoredPaths(broad, { ...SMOOTH, brightness: 20 });
+    expect(lane).toHaveBeenCalledTimes(1);
+    const handed = lane.mock.calls[0]?.[2];
+    expect(handed?.prepared.width).toBe(200);
+    expect(handed?.median).toBeUndefined();
+  });
+
+  it('pins the documented halftone escape: only Sharp keeps isolated 1 px dots', () => {
+    // A 1 px dot lattice on paper and a 1 px hole lattice in ink. Smooth and
+    // Line Art drop the dots and fill the holes through despeckle and pinhole
+    // fill, with or without the median; Sharp (no median, no pinhole fill,
+    // despeckle 1) keeps both (ADR-411 item 3, WORKFLOW trace settings).
+    const dots = paper();
+    for (let y = 4; y < 60; y += 3) for (let x = 4; x < 60; x += 3) paint(dots, x, y, 0);
+    const holes = paper();
+    for (let y = 4; y < 60; y += 1) for (let x = 4; x < 60; x += 1) paint(holes, x, y, 0);
+    for (let y = 6; y < 58; y += 3) for (let x = 6; x < 58; x += 3) paint(holes, x, y, 255);
+    const count = (mask: RawImageData, ink: boolean): number => {
+      let n = 0;
+      for (let i = 0; i < mask.data.length; i += 4) if (mask.data[i]! < 128 === ink) n++;
+      return n;
+    };
+    const holeCount = 18 * 18; // 6..57 at a 3 px pitch, each 1 px
+    const paperAround = SIZE * SIZE - 56 * 56;
+    const presets = ['Smooth', 'Line Art', 'Sharp'] as const;
+    for (const name of presets) {
+      const preset = TRACE_PRESETS[name]!;
+      for (const options of [preset, { ...preset, medianFilter: false }] as TraceOptions[]) {
+        const keep = name === 'Sharp';
+        expect(count(prepareContourTraceInput(dots, options).prepared, true), name).toBe(
+          keep ? 19 * 19 : 0,
+        );
+        expect(count(prepareContourTraceInput(holes, options).prepared, false), name).toBe(
+          paperAround + (keep ? holeCount : 0),
+        );
+      }
+    }
   });
 
   it('leaves a forced median and non-median presets on their existing order', () => {

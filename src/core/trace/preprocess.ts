@@ -170,16 +170,6 @@ export function autoMedianFilter(
   return repairIsolatedMedianChanges(image, filtered, IMPULSE_NOISE_LUMA_DELTA, minimumRatio);
 }
 
-// Forced median and selective automatic cleanup have different contracts. The
-// automatic path computes and applies its result once, preserving connected ink.
-export function applyMedian(
-  image: RawImageData,
-  medianFilterOption: boolean | 'auto' | undefined,
-): RawImageData {
-  if (medianFilterOption === 'auto') return autoMedianFilter(image);
-  return medianFilterOption === true ? medianFilter(image) : image;
-}
-
 // Fraction of pixels whose luma the median changed by more than the impulse
 // delta, without distinguishing connected detail from isolated noise. Retained
 // as a raw diagnostic metric; automatic cleanup uses the structural check above.

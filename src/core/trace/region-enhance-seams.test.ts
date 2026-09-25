@@ -172,6 +172,12 @@ describe("Region Enhance repairs the crop's impulses like the full pass (ADR-411
     if (block) return grey(salted(x, y) ? 255 : 0);
     return grey(salted(x + 1, y + 3) ? 0 : 255);
   });
+  // The padded crop Region Enhance traced, cut from `source`.
+  const paddedCrop = (source: RawImageData, call: Call): RawImageData => {
+    const pad = (call.image.width / 2 - box.width) / 2;
+    const side = { width: box.width + pad * 2, height: box.height + pad * 2 };
+    return cropOf(source, { x: box.x - pad, y: box.y - pad, ...side });
+  };
 
   it('removes the specks the full trace removed, and only those', async () => {
     const options = { ...preset('Smooth'), despeckleMinPixels: 0, fillPinholeCracks: false };
@@ -188,19 +194,10 @@ describe("Region Enhance repairs the crop's impulses like the full pass (ADR-411
     const patch = preprocessForTrace(call.image, call.options);
     expect(boxMaskIou(patch, reference, box, image)).toBe(1);
     // Control: the crop enlarged first keeps its specks.
-    const padded = (call.image.width / 2 - box.width) / 2;
-    const late = preprocessForTrace(
-      upscaleBy(
-        cropOf(image, {
-          x: box.x - padded,
-          y: box.y - padded,
-          width: 80 + padded * 2,
-          height: 80 + padded * 2,
-        }),
-        2,
-      ),
-      { ...frozen, pixelScale: 2 },
-    );
+    const late = preprocessForTrace(upscaleBy(paddedCrop(image, call), 2), {
+      ...frozen,
+      pixelScale: 2,
+    });
     expect(boxMaskIou(late, reference, box, image)).toBeLessThan(0.97);
   });
 
@@ -210,18 +207,44 @@ describe("Region Enhance repairs the crop's impulses like the full pass (ADR-411
     const sparse = canvas(200, 200, (x, y) =>
       grey(x >= 70 && x < 130 && y >= 90 && y < 110 && salted(x, y) && x % 10 === 2 ? 0 : 255),
     );
-    const options = preset('Smooth');
-    const { call } = await enhanceCapturing(sparse, options, box);
+    const { call } = await enhanceCapturing(sparse, preset('Smooth'), box);
     expect(call.options.sourceAutoMedian).toBe(false);
     expect(call.options.medianFilter).toBe(false);
-    const padded = (call.image.width / 2 - box.width) / 2;
-    const crop = cropOf(sparse, {
-      x: box.x - padded,
-      y: box.y - padded,
-      width: 80 + padded * 2,
-      height: 80 + padded * 2,
-    });
+    expect(call.image.data).toEqual(upscaleBy(paddedCrop(sparse, call), 2).data);
+  });
+
+  // The next two separate the whole image's verdict from a density check on
+  // the crop's own pixels: each crop alone would decide the other way.
+  it('keeps specks packed in the box when only the crop crosses the floor', async () => {
+    // 100 specks: 0.25% of the whole image, but about 1% of the padded crop.
+    const packed = canvas(200, 200, (x, y) =>
+      grey(x >= 64 && x < 140 && y >= 64 && y < 140 && x % 8 === 0 && y % 8 === 0 ? 0 : 255),
+    );
+    expect(autoMedianFilter(packed)).toBe(packed);
+    const { call } = await enhanceCapturing(packed, preset('Smooth'), box);
+    const crop = paddedCrop(packed, call);
+    expect(autoMedianFilter(crop)).not.toBe(crop);
+    expect(call.options.sourceAutoMedian).toBe(false);
     expect(call.image.data).toEqual(upscaleBy(crop, 2).data);
+  });
+
+  it("repairs the box's few specks when only the whole image crosses the floor", async () => {
+    // 500 specks in 20 px bands at the left and right edges (1.25% of the
+    // image), far outside the padded crop, and four in the box (0.04% of it).
+    const inBox = new Set(['70,70', '100,100', '130,80', '90,130']);
+    const edge = (x: number, y: number): boolean =>
+      (x < 20 || x >= 180) && x % 4 === 1 && y % 4 === 1;
+    const noisy = canvas(200, 200, (x, y) => grey(edge(x, y) || inBox.has(`${x},${y}`) ? 0 : 255));
+    const clean = canvas(200, 200, (x, y) => grey(edge(x, y) ? 0 : 255));
+    expect(autoMedianFilter(noisy)).not.toBe(noisy);
+    const { call } = await enhanceCapturing(noisy, preset('Smooth'), box);
+    const crop = paddedCrop(noisy, call);
+    expect(autoMedianFilter(crop)).toBe(crop);
+    expect(call.options.sourceAutoMedian).toBe(true);
+    expect(call.options.medianFilter).toBe(false);
+    // The crop holds the four specks and no edge speck, and they are repaired.
+    expect(paddedCrop(clean, call).data).not.toEqual(crop.data);
+    expect(call.image.data).toEqual(upscaleBy(paddedCrop(clean, call), 2).data);
   });
 });
 

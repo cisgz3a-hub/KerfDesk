@@ -52,17 +52,31 @@ mkbitmap source was consulted.
    already feeds the frozen Otsu cut, so freezing costs no extra median. `enhanceRegionPaths`
    applies the median to the padded crop with a density floor of 0 when the verdict is true, and
    skips it when false, then enlarges. The padding ring (ADR-410) is at least 9 px, wider than the
-   median's 3x3 window plus its two-link search, so interior pixels are repaired exactly as the
-   full pass repaired them.
+   median's 3x3 window plus its two-link search. On the native and upscale routes, where the full
+   pass runs the median on the source grid, interior pixels are therefore repaired exactly as the
+   full pass repaired them. Dense artwork that the scale plan traces on a smaller working grid is
+   the exception: the full pass runs the automatic median on that grid, with that grid's own
+   density check, while the crop is cleaned at source scale by the source verdict, so the two can
+   repair different impulses (ADR-410 notes the same for its Otsu cut on grids the plan enlarges
+   or shrinks).
 3. **Isolated one-pixel dots stay a preset choice.** A one-pixel halftone dot on paper and a
    one-pixel noise speck on paper present the same neighbourhood to any detector that reads a
    pixel's surroundings: one dark pixel among light ones. A regular screen differs from noise only
    by its period over many pixels, and stochastic (FM) screens are made aperiodic on purpose, to
    look statistically like noise. A density gate cannot separate them either: a screened area is as
-   dense as heavy noise. So no impulse detector can tell them apart. Smooth removes both, now at
-   every scale; Line Art and Sharp run no median and keep single-pixel dots. The same holds for a
-   mesh of one-pixel lines with one-pixel holes, whose holes are isolated paper impulses; meshes
-   with holes of two pixels or more are connected and kept.
+   dense as heavy noise. So no impulse detector can tell them apart. The escape is Sharp: it runs
+   no median, no pinhole fill and a despeckle of 1 px, and keeps a lattice of one-pixel dots and
+   one-pixel holes. Smooth and Line Art already dropped isolated dark dots (despeckle, 24 and
+   12 px) and filled isolated paper dots in ink (pinhole fill) before this change, at every scale
+   and with or without the median, so for a crisp one-pixel lattice this decision removes nothing
+   they kept; the owl test-strip swatches that did change (Consequences) are downsampled screens,
+   which the median now reaches at source scale, before enlargement. What the
+   median adds in Smooth is limited to impulses that cleanup does not catch: specks left when
+   **Remove ink specks** or **Fill tiny holes** is lowered or off, and specks near an outline,
+   which shift its fitted position even after cleanup removes them from the mask (a 60 px block
+   with paper specks inside traces to the same subpath with or without the median, at different
+   coordinates). The same holds for a mesh of one-pixel lines with one-pixel holes, whose holes are
+   isolated paper impulses; meshes with holes of two pixels or more are connected and kept.
 
 ### Consequences
 
@@ -102,17 +116,30 @@ mkbitmap source was consulted.
   noise 2,266 to 2,303 ms, hummingbird 300 px 0.5% and 3% noise 605 to 668 and 689 to 802 ms),
   where the cleaned mask gives the contour stages different work; the machine was shared.
 - Region Enhance with Smooth on the full-size owl and hummingbird (three boxes each, clean and 1%
-  noise): IoU inside the box between the crop's 2x mask and the full pass's source-cleaned 2x mask
-  was 0.9928 to 0.9980 and is 0.9986 to 1.0000. The residual is outside the median, which matches
-  the full pass pixel for pixel in the interior (`region-enhance-seams.test.ts`); it was not
-  investigated. Freezing the verdict adds no median: Smooth already ran one for the frozen Otsu
-  cut. A crop of an image whose whole-image density is under the floor keeps its specks, as the
-  full pass kept them.
+  noise): IoU inside the box between the crop's 2x mask and a reference built in the new order
+  (the whole image cleaned at source scale, then enlarged 2x, which is what the upscale route now
+  traces) was 0.9928 to 0.9980 and is 0.9986 to 1.0000. This measures agreement with the new
+  order, so the earlier figure is lower partly by construction: the old crop followed the old
+  enlarge-then-median order. It was not measured against the full trace's own mask or paths. The
+  residual is outside the median, which matches the reference pixel for pixel in the interior
+  (`region-enhance-seams.test.ts`); it was not investigated. Freezing the verdict adds no median:
+  Smooth already ran one for the frozen Otsu cut. The whole image's verdict decides, not the
+  crop's own density: specks packed in a box of an otherwise clean image survive (the crop alone
+  would cross the floor), and a few specks in a box of an image that crosses the floor elsewhere
+  are repaired (the crop alone would not).
+- Memory: the median stage (the tone-adjusted input and the cleaned copy) is carried on the native
+  `ContourTraceInput` only for the upscale route to resample. `traceImageToColoredPaths` releases
+  it before a native trace, and `prepareUpscaledTraceInput` drops the working grid's own stage, so
+  neither route keeps an extra image-sized buffer (up to 9x the source on the working grid, twice
+  with a tone control set) alive through the contour trace.
 - Tests: `trace-upscale-median.test.ts` (impulses at 1x, 2x and 3x; the working-grid control;
   hairlines, diagonals, grating and grid at every scale; one source-grid median, reused; the
   fallback computing the same stage; tone controls kept when nothing is repaired and cleared when
   pixels are; forced median, Line Art and Centerline unchanged; a 60 px noisy source tracing like
-  its clean original with the Smooth preset), `trace-source-decisions.test.ts` (the verdict, its
-  idempotence and its absence for presets without the automatic median) and
-  `region-enhance-seams.test.ts` (the patch matches the full pass exactly inside the box, with the
-  enlarge-first control, and a sub-floor image keeps its specks).
+  its clean original with the Smooth preset; the median stage released on the native route and on
+  the working grid; Sharp keeping a one-pixel dot and hole lattice that Smooth and Line Art clean
+  up with or without the median), `trace-source-decisions.test.ts` (the verdict, its idempotence
+  and its absence for presets without the automatic median) and `region-enhance-seams.test.ts`
+  (the patch matches the new-order reference exactly inside the box, with the enlarge-first
+  control; a sub-floor image keeps its specks; and the whole image's verdict, not the crop's
+  density, decides in both directions).

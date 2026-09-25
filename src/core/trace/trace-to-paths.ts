@@ -33,7 +33,7 @@ import { prepareEdgeTraceInput, type EdgeTraceInput } from './edge-input';
 import { prepareContourTraceInput, type ContourTraceInput } from './contour-input';
 import { withCanonicalTraceCurves } from './trace-curves';
 import { traceScalePlan } from './trace-upscale-policy';
-import { prepareUpscaledTraceInput } from './trace-upscale-input';
+import { prepareUpscaledTraceInput, releaseMedianStage } from './trace-upscale-input';
 import { runTraceSteps, type TraceStepRunner, type TraceSteps } from './trace-steps';
 import { reportingTraceRunner, type TraceProgress } from './trace-progress';
 import { resolveTraceSourceOptions, shouldTraceAlphaMask } from './trace-alpha';
@@ -221,6 +221,8 @@ export async function traceImageToColoredPaths(
   if (factor > 1) {
     return traceUpscaledImage(image, options, factor, run, edgeInput, contourInput);
   }
+  // Only the upscale route resamples the median stage (ADR-411); release it.
+  contourInput = releaseMedianStage(contourInput);
   return withCanonicalTraceCurves(
     await dispatchTrace(image, options, run, edgeInput, contourInput),
   );

@@ -2506,7 +2506,9 @@ settings and Job Review keep their existing read-only setup references.
    The preceding UI decode cap still defines that source grid. Smooth's automatic noise cleanup
    also judges one-pixel specks on that grid, before any supersampling, so a small image drops the
    same specks it would at full size. Isolated one-pixel dots, such as a fine halftone screen,
-   look exactly like noise and are dropped too; trace them with Line Art or Sharp to keep them. Expand **Curve finishing** for
+   look exactly like noise. Smooth and Line Art already drop them through **Remove ink specks**
+   and **Fill tiny holes**; the noise cleanup only adds specks those leave, such as specks near
+   an outline. Trace with Sharp to keep one-pixel dots. Expand **Curve finishing** for
    **Smoothness** and **Optimize** on filled outlines and Edge Detection, or **Transparency**
    for alpha-mask tracing. **Fill tiny holes** controls cleanup of small enclosed white marks;
    it does not bridge open gaps. Turn it off to retain those small highlights. Sliders and numeric fields stay in sync. Manual adjustments persist

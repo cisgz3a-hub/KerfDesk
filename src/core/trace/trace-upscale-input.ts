@@ -42,8 +42,11 @@ export function prepareUpscaledTraceInput(
     ...(luma?.options ?? {}),
   };
   const enlarged = upscaleBy(reuseCleanedEdge ? edgeInput.source : (luma?.source ?? image), factor);
+  // The working grid's own median stage is never resampled again.
   const preparedInput =
-    contourInput === undefined ? undefined : prepareContourTraceInput(enlarged, scaledOptions);
+    contourInput === undefined
+      ? undefined
+      : releaseMedianStage(prepareContourTraceInput(enlarged, scaledOptions));
   // Gray hairlines can brighten past the cut; Otsu can also change its cut.
   // Restore admitted detail locally without losing other supersampled edges.
   return {
@@ -54,6 +57,15 @@ export function prepareUpscaledTraceInput(
         ? restoreEnlargedContourSupport(contourInput, preparedInput, factor)
         : preparedInput,
   };
+}
+
+/** The input without its source-grid median stage (ADR-411). Only this module
+ * resamples that stage; carried anywhere else it keeps one or two image-sized
+ * buffers alive for the whole contour trace. */
+export function releaseMedianStage<T extends ContourTraceInput | undefined>(input: T): T {
+  if (input?.median === undefined) return input;
+  const { median: _released, ...rest } = input;
+  return rest as T;
 }
 
 // The automatic median judges noise in pixels of the grid it runs on: the
