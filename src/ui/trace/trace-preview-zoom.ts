@@ -1,122 +1,68 @@
-import { useLayoutEffect, useRef, useState } from 'react';
+import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 
 import {
-  anchoredScrollOffset,
-  clampPreviewZoom,
+  TracePreviewZoomEngine,
+  type ClientPoint,
+  type ZoomMode,
+} from './trace-preview-zoom-engine';
+import {
   MIN_PREVIEW_ZOOM,
   previewZoomRange,
   type PreviewZoomRange,
 } from './trace-preview-zoom-math';
 
+export { LIVE_ZOOM_SETTLE_MS, type ClientPoint, type ZoomMode } from './trace-preview-zoom-engine';
+
 type Size = { readonly width: number; readonly height: number };
-type ScrollPosition = { readonly left: number; readonly top: number };
-/** A point in client (window) coordinates. */
-export type ClientPoint = { readonly clientX: number; readonly clientY: number };
 
 export type TracePreviewZoom = {
   readonly zoom: number;
   readonly range: PreviewZoomRange;
   readonly viewportRef: React.RefObject<HTMLDivElement>;
-  /** Zoom about `anchor`, or about the viewport centre when omitted. */
-  readonly zoomTo: (value: number, anchor?: ClientPoint) => void;
-  readonly zoomBy: (factor: number, anchor?: ClientPoint) => void;
+  /** The artwork layer that a live gesture scales before the stage re-lays. */
+  readonly lensRef: React.RefObject<HTMLDivElement>;
+  /**
+   * Zoom about `anchor`, or about the viewport centre when omitted. Returns
+   * whether the zoom changed (false at a range limit).
+   */
+  readonly zoomTo: (value: number, anchor?: ClientPoint, mode?: ZoomMode) => boolean;
+  readonly zoomBy: (factor: number, anchor?: ClientPoint, mode?: ZoomMode) => boolean;
   /** Scroll the view by screen pixels (positive reveals content to the right/below). */
   readonly panBy: (dx: number, dy: number) => void;
+  /** Re-lay a live gesture's zoom now (before a Boundary drag, say). */
+  readonly settle: () => void;
 };
 
 // Zoom is relative to the fitted image, not its native pixel size. Both stage
 // dimensions scale together, so contain/meet and boundary coordinates agree.
 // Zoom and pan are local viewing state only: nothing here reaches the trace.
+// See TracePreviewZoomEngine for the live (wheel/pinch) versus commit paths.
 export function useTracePreviewZoom(image?: Size): TracePreviewZoom {
   const [zoom, setZoom] = useState(MIN_PREVIEW_ZOOM);
   const viewportRef = useRef<HTMLDivElement>(null);
-  const viewportSize = useViewportSize(viewportRef);
-  const range = previewZoomRange(image, viewportSize);
-  // Rapid wheel/pinch events can arrive before React re-renders. Chain each
-  // step from the latest REQUESTED zoom and scroll, not from stale layout.
-  const zoomRef = useRef(zoom);
-  const renderedZoom = useRef(zoom);
-  const rangeRef = useRef(range);
-  rangeRef.current = range;
-  const pendingScroll = useRef<ScrollPosition | null>(null);
+  const lensRef = useRef<HTMLDivElement>(null);
+  const engineRef = useRef<TracePreviewZoomEngine | null>(null);
+  engineRef.current ??= new TracePreviewZoomEngine(viewportRef, lensRef, setZoom);
+  const engine = engineRef.current;
+  const range = previewZoomRange(image, useViewportSize(viewportRef));
+  engine.range = range;
 
-  useLayoutEffect(() => {
-    renderedZoom.current = zoom;
-    applyPendingScroll(viewportRef.current, pendingScroll);
-  }, [zoom]);
-
-  function zoomTo(value: number, anchor?: ClientPoint): void {
-    const previous = zoomRef.current;
-    const next = clampPreviewZoom(value, rangeRef.current);
-    if (!Number.isFinite(next) || next === previous) return;
-    const viewport = viewportRef.current;
-    if (viewport !== null) {
-      // Capture before shrinking the stage: the browser may clamp its current
-      // scroll offset during layout, losing the previous inspection point.
-      pendingScroll.current = anchoredScroll(viewport, pendingScroll.current, anchor, {
-        previous,
-        next,
-      });
-    }
-    zoomRef.current = next;
-    setZoom(next);
-    // Steps that return to the committed zoom before React re-renders leave no
-    // commit to wait for; the stage already has this size.
-    if (next === renderedZoom.current) applyPendingScroll(viewport, pendingScroll);
-  }
-
-  function panBy(dx: number, dy: number): void {
-    const viewport = viewportRef.current;
-    if (viewport === null || !Number.isFinite(dx) || !Number.isFinite(dy)) return;
-    const pending = pendingScroll.current;
-    if (pending !== null) {
-      pendingScroll.current = { left: pending.left + dx, top: pending.top + dy };
-      return;
-    }
-    viewport.scrollLeft += dx;
-    viewport.scrollTop += dy;
-  }
+  useLayoutEffect(() => engine.onLaidOut(zoom), [engine, zoom]);
+  useEffect(() => () => engine.dispose(), [engine]);
+  // The range follows the measured viewport and image. When it moves (window
+  // resize, side-by-side to stacked layout, a new image), pull a zoom left
+  // outside it back to the nearest limit, about the centre of the view.
+  useLayoutEffect(() => engine.reclamp(), [engine, range.min, range.max]);
 
   return {
     zoom,
     range,
     viewportRef,
-    zoomTo,
-    zoomBy: (factor, anchor) => zoomTo(zoomRef.current * factor, anchor),
-    panBy,
-  };
-}
-
-function applyPendingScroll(
-  viewport: HTMLDivElement | null,
-  pending: React.MutableRefObject<ScrollPosition | null>,
-): void {
-  const target = pending.current;
-  if (viewport === null || target === null) return;
-  viewport.scrollLeft = target.left;
-  viewport.scrollTop = target.top;
-  pending.current = null;
-}
-
-function anchoredScroll(
-  viewport: HTMLDivElement,
-  pending: ScrollPosition | null,
-  anchor: ClientPoint | undefined,
-  zoom: { readonly previous: number; readonly next: number },
-): ScrollPosition {
-  const from = pending ?? { left: viewport.scrollLeft, top: viewport.scrollTop };
-  const width = viewport.clientWidth;
-  const height = viewport.clientHeight;
-  let x = width / 2;
-  let y = height / 2;
-  if (anchor !== undefined) {
-    const rect = viewport.getBoundingClientRect();
-    x = anchor.clientX - rect.left - viewport.clientLeft;
-    y = anchor.clientY - rect.top - viewport.clientTop;
-  }
-  return {
-    left: anchoredScrollOffset({ scroll: from.left, anchor: x, size: width, ...zoom }),
-    top: anchoredScrollOffset({ scroll: from.top, anchor: y, size: height, ...zoom }),
+    lensRef,
+    zoomTo: (value, anchor, mode) => engine.zoomTo(value, anchor, mode),
+    zoomBy: (factor, anchor, mode) => engine.zoomTo(engine.requestedZoom * factor, anchor, mode),
+    panBy: (dx, dy) => engine.panBy(dx, dy),
+    settle: () => engine.settle(),
   };
 }
 

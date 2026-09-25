@@ -48,6 +48,32 @@ export function clampPreviewZoom(value: number, range: PreviewZoomRange): number
   return Math.max(range.min, Math.min(range.max, value));
 }
 
+/**
+ * Clamp a requested zoom without ever moving against the request: after the
+ * range shifted (resize, stacked layout), a zoom-out below the new minimum must
+ * not snap the view IN to that minimum, nor a zoom-in above the new maximum
+ * snap it out. Returns `current` when the clamped value would reverse direction.
+ */
+export function clampPreviewZoomToward(
+  current: number,
+  value: number,
+  range: PreviewZoomRange,
+): number {
+  const next = clampPreviewZoom(value, range);
+  if (!Number.isFinite(next)) return next;
+  if (value < current && next > current) return current;
+  if (value > current && next < current) return current;
+  return next;
+}
+
+/** The 1:1 zoom when the current range can show it, otherwise null. */
+export function reachableActualSize(range: PreviewZoomRange): number | null {
+  const actual = range.actualSize;
+  if (actual === null) return null;
+  const tolerance = ZOOM_EPSILON * Math.max(1, actual);
+  return actual >= range.min - tolerance && actual <= range.max + tolerance ? actual : null;
+}
+
 /** Button/keyboard steps double or halve, but stop at Fit when they cross it. */
 export function stepPreviewZoom(zoom: number, direction: 1 | -1): number {
   const next = direction > 0 ? zoom * 2 : zoom / 2;
@@ -84,6 +110,38 @@ export function anchoredScrollOffset(args: {
   const ratio = Math.max(0, Math.min(1, stagePoint / previousStage));
   const target = ratio * nextStage + centredMargin(size, nextStage) - anchor;
   return Math.max(0, Math.min(Math.max(0, nextStage - size), target));
+}
+
+/** A scroll offset clamped to the range of a stage `zoom` times `size`. */
+export function clampScrollOffset(offset: number, size: number, zoom: number): number {
+  if (!Number.isFinite(offset)) return 0;
+  return Math.max(0, Math.min(Math.max(0, zoom * size - size), offset));
+}
+
+/**
+ * The transform that makes a stage laid out at `rendered` zoom and scrolled to
+ * `scroll` look exactly as it will once re-laid at `target` zoom and scrolled
+ * to `targetScroll`: the stage origin moves by `x`/`y` screen px and the
+ * content scales by `scale` about that origin. Auto-margin centring counts on
+ * both sides, as in `anchoredScrollOffset`.
+ */
+export function liveLensTransform(args: {
+  readonly size: Size;
+  readonly rendered: number;
+  readonly target: number;
+  readonly scroll: { readonly left: number; readonly top: number };
+  readonly targetScroll: { readonly left: number; readonly top: number };
+}): { readonly x: number; readonly y: number; readonly scale: number } | null {
+  const { size, rendered, target, scroll, targetScroll } = args;
+  if (!positive(size.width) || !positive(size.height)) return null;
+  if (!positive(rendered) || !positive(target)) return null;
+  const shift = (length: number, from: number, to: number): number =>
+    centredMargin(length, target * length) - to - (centredMargin(length, rendered * length) - from);
+  return {
+    x: shift(size.width, scroll.left, targetScroll.left),
+    y: shift(size.height, scroll.top, targetScroll.top),
+    scale: target / rendered,
+  };
 }
 
 export function formatPreviewZoom(zoom: number): string {

@@ -120,6 +120,9 @@
 
 .lf-trace-preview__artwork {
   position: absolute;
+  /* A standing compositor layer: a live wheel/pinch zoom scales its existing
+     raster instead of repainting the trace every step (ADR-399). */
+  will-change: transform;
 }
 
 .lf-trace-preview__source,

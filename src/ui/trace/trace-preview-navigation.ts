@@ -11,6 +11,7 @@
 
 import { useEffect, useRef, useState } from 'react';
 
+import { isKeyboardActivationTarget } from '../common/keyboard-targets';
 import {
   classifyWheel,
   pinchStep,
@@ -19,7 +20,7 @@ import {
   type WheelSample,
 } from './trace-preview-gestures';
 import type { TracePreviewZoom } from './trace-preview-zoom';
-import { MIN_PREVIEW_ZOOM, stepPreviewZoom } from './trace-preview-zoom-math';
+import { MIN_PREVIEW_ZOOM, reachableActualSize, stepPreviewZoom } from './trace-preview-zoom-math';
 
 export type TracePreviewPanState = 'idle' | 'ready' | 'panning';
 
@@ -28,7 +29,7 @@ type Navigation = {
   wheelLatch: WheelLatch | null;
   space: boolean;
   hovering: boolean;
-  mousePan: { readonly id: number; x: number; y: number } | null;
+  mousePan: { readonly id: number; readonly buttons: number; x: number; y: number } | null;
   readonly touches: Map<number, Point>;
 };
 
@@ -87,13 +88,14 @@ function attachNavigation(
     [viewport, 'pointermove', pointer.move as EventListener],
     [viewport, 'pointerup', pointer.end as EventListener],
     [viewport, 'pointercancel', pointer.end as EventListener],
+    [viewport, 'lostpointercapture', pointer.end as EventListener],
     [viewport, 'mousedown', pointer.mouseDown as EventListener],
     [viewport, 'pointerenter', pointer.enter as EventListener],
     [viewport, 'pointerleave', pointer.leave as EventListener],
     [viewport, 'keydown', keys.zoomKey as EventListener],
     [document, 'keydown', keys.spaceDown as EventListener],
     [document, 'keyup', keys.spaceUp as EventListener],
-    [window, 'blur', keys.release],
+    [window, 'blur', () => releaseAll(state, sync)],
   ];
   for (const [target, type, listener, options] of listeners) {
     target.addEventListener(type, listener, options);
@@ -119,8 +121,14 @@ function onWheel(event: WheelEvent, state: Navigation, view: TracePreviewZoom): 
   const { intent, latch } = classifyWheel(sample, state.wheelLatch);
   state.wheelLatch = latch;
   if (intent === 'pan') return; // Native, inertial scrolling pans.
-  event.preventDefault(); // Also stops Ctrl+wheel from zooming the whole page.
-  view.zoomBy(wheelZoomFactor(sample), event);
+  const factor = wheelZoomFactor(sample);
+  const zoomed = view.zoomBy(factor, event, 'live');
+  // A plain wheel-out at the smallest zoom has nothing left to do here: let it
+  // scroll the dialog (stacked narrow layouts) instead of trapping the wheel.
+  // Everything else is claimed, which also stops Ctrl+wheel zooming the page
+  // and a wheel-in at the largest zoom from panning the view instead.
+  const plainZoomOutAtLimit = !zoomed && factor < 1 && !sample.ctrlKey && !sample.metaKey;
+  if (!plainZoomOutAtLimit) event.preventDefault();
 }
 
 function pointerHandlers(
@@ -137,14 +145,19 @@ function pointerHandlers(
         capture(viewport, event.pointerId);
         return;
       }
+      // Lay out any live wheel zoom first: a Boundary or pan starts on the
+      // real stage, not on the gesture's scaled bitmap.
+      view().settle();
       if (event.button !== 1 && !(event.button === 0 && state.space)) return;
-      state.mousePan = { id: event.pointerId, x: event.clientX, y: event.clientY };
+      // PointerEvent.buttons bit for the pressed button: primary 1, middle 4.
+      const buttons = event.button === 1 ? 4 : 1;
+      state.mousePan = { id: event.pointerId, buttons, x: event.clientX, y: event.clientY };
       capture(viewport, event.pointerId);
       sync();
     },
     move(event: PointerEvent): void {
       if (event.pointerType === 'touch') moveTouch(event, state, view());
-      else moveMousePan(event, state, view());
+      else if (moveMousePan(event, state, view()) === 'released') sync();
     },
     end(event: PointerEvent): void {
       state.touches.delete(event.pointerId);
@@ -165,12 +178,24 @@ function pointerHandlers(
   };
 }
 
-function moveMousePan(event: PointerEvent, state: Navigation, view: TracePreviewZoom): void {
+function moveMousePan(
+  event: PointerEvent,
+  state: Navigation,
+  view: TracePreviewZoom,
+): 'panned' | 'released' | 'ignored' {
   const pan = state.mousePan;
-  if (pan === null || pan.id !== event.pointerId) return;
+  if (pan === null || pan.id !== event.pointerId) return 'ignored';
+  // The button-up can be lost (Alt+Tab mid-drag, a capture the browser
+  // dropped). A mouse keeps one pointerId, so without this check plain hover
+  // would keep panning and the Boundary tool would stay blocked.
+  if ((event.buttons & pan.buttons) === 0) {
+    state.mousePan = null;
+    return 'released';
+  }
   view.panBy(pan.x - event.clientX, pan.y - event.clientY);
   pan.x = event.clientX;
   pan.y = event.clientY;
+  return 'panned';
 }
 
 function moveTouch(event: PointerEvent, state: Navigation, view: TracePreviewZoom): void {
@@ -185,7 +210,7 @@ function moveTouch(event: PointerEvent, state: Navigation, view: TracePreviewZoo
     // Carry the content under the old midpoint to the new one, then scale
     // about it, so the pinched feature stays under the fingers.
     view.panBy(step.pan.x, step.pan.y);
-    view.zoomBy(step.factor, { clientX: step.anchor.x, clientY: step.anchor.y });
+    view.zoomBy(step.factor, { clientX: step.anchor.x, clientY: step.anchor.y }, 'live');
     return;
   }
   if (state.touches.size === 1) view.panBy(previous.x - next.x, previous.y - next.y);
@@ -214,10 +239,12 @@ function keyHandlers(
   view: () => TracePreviewZoom,
   sync: () => void,
 ) {
+  // Space pans when the viewport has focus, or while the pointer is over it
+  // and focus is not on something Space activates or types into: a focused
+  // checkbox, button or text field keeps its own Space (keyboard access).
   const claimsSpace = (event: KeyboardEvent): boolean =>
     event.key === ' ' &&
-    !isTextEntry(event.target) &&
-    (document.activeElement === viewport || state.hovering);
+    (event.target === viewport || (state.hovering && !isKeyboardActivationTarget(event.target)));
   return {
     zoomKey(event: KeyboardEvent): void {
       if (event.ctrlKey || event.metaKey || event.altKey) return;
@@ -239,11 +266,16 @@ function keyHandlers(
       state.space = false;
       sync();
     },
-    release(): void {
-      state.space = false;
-      sync();
-    },
   };
+}
+
+function releaseAll(state: Navigation, sync: () => void): void {
+  // Focus left the window: key-ups and button-ups may never arrive.
+  state.space = false;
+  state.mousePan = null;
+  state.touches.clear();
+  state.wheelLatch = null;
+  sync();
 }
 
 function zoomKeyTarget(key: string, view: TracePreviewZoom): number | null {
@@ -257,18 +289,8 @@ function zoomKeyTarget(key: string, view: TracePreviewZoom): number | null {
     case '0':
       return MIN_PREVIEW_ZOOM;
     case '1':
-      return view.range.actualSize;
+      return reachableActualSize(view.range);
     default:
       return null;
   }
-}
-
-function isTextEntry(target: EventTarget | null): boolean {
-  if (!(target instanceof HTMLElement)) return false;
-  if (target.isContentEditable) return true;
-  if (target instanceof HTMLTextAreaElement || target instanceof HTMLSelectElement) return true;
-  if (!(target instanceof HTMLInputElement)) return false;
-  return !['range', 'checkbox', 'radio', 'button', 'submit', 'reset', 'color', 'file'].includes(
-    target.type,
-  );
 }

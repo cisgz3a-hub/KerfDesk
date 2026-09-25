@@ -2,6 +2,7 @@ import {
   formatPreviewZoom,
   isAtZoomLimit,
   MIN_PREVIEW_ZOOM,
+  reachableActualSize,
   stepPreviewZoom,
   type PreviewZoomRange,
 } from './trace-preview-zoom-math';
@@ -107,6 +108,11 @@ function ZoomControls(props: {
   const actualSize = range.actualSize;
   const nativePercent =
     actualSize === null ? '' : ` (${Math.round((zoom / actualSize) * 100)}% of image pixels)`;
+  const oneToOne = reachableActualSize(range);
+  const oneToOneTitle =
+    actualSize !== null && oneToOne === null
+      ? `1:1 would need ${formatPreviewZoom(actualSize)} times Fit, beyond this preview's ${formatPreviewZoom(range.max)} times limit.`
+      : 'Show one image pixel per CSS pixel, which is one screen pixel at 100% display scale (1 key).';
   return (
     <div className="lf-trace-preview__zoom" role="group" aria-label="Preview zoom">
       <button
@@ -146,11 +152,11 @@ function ZoomControls(props: {
       <button
         type="button"
         className="lf-btn"
-        aria-label="Actual size"
-        title="Show one image pixel per screen pixel (1 key)"
-        disabled={actualSize === null}
+        aria-label="1:1 actual size"
+        title={oneToOneTitle}
+        disabled={oneToOne === null}
         onClick={() => {
-          if (actualSize !== null) props.onChange(actualSize);
+          if (oneToOne !== null) props.onChange(oneToOne);
         }}
       >
         1:1

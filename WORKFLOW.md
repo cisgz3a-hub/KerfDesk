@@ -2455,7 +2455,7 @@ settings and Job Review keep their existing read-only setup references.
    preview budget and the selected preset starts tracing in a worker.
    The large preview and scrollable settings panel sit side by side on wide screens and stack
    on narrow screens, with Cancel and Trace kept in the footer. Compare **Original**, **Trace**,
-   or **Overlay**; use **Fit**, **1:1** (one image pixel per screen pixel) and the zoom buttons
+   or **Overlay**; use **Fit**, **1:1** (one image pixel per CSS pixel) and the zoom buttons
    to inspect detail, from 1:1 or Fit (whichever is smaller) up to 16× Fit, or 4 screen pixels
    per image pixel on large images (at most 64× Fit).
    Original shows the unfaded source alone. Overlay highlights the trace in blue over a faded
@@ -2466,7 +2466,9 @@ settings and Job Review keep their existing read-only setup references.
    The mouse wheel, Ctrl+wheel and a trackpad or touch pinch zoom about the pointer. Middle-drag,
    Space+drag, a trackpad two-finger drag, one or two touch fingers, the scrollbars and the arrow
    keys pan; plain primary drag still selects a Boundary. With the preview focused (clicking it
-   focuses it), **+** and **−** step the zoom, **0** fits and **1** shows 1:1.
+   focuses it), **+** and **−** step the zoom, **0** fits and **1** shows 1:1. Space pans only
+   while no focused button, checkbox or text field needs it. At the smallest zoom a plain
+   wheel-out scrolls the dialog instead.
    **Show Points** displays vector vertices in a bounded viewport canvas. Overlapping markers
    combine at the current zoom; zoom in to separate them. These viewing controls do not
    restart tracing or change the committed geometry. Source, trace and boundary overlays share

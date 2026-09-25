@@ -70,6 +70,7 @@ export function TracePreview(props: Props): JSX.Element {
           <PreviewFrame
             {...props}
             zoom={zoom}
+            lensRef={view.lensRef}
             view={comparison}
             isPanGesture={isPanGesture}
             hasSource={hasSource}
@@ -119,6 +120,7 @@ function isPreviewLoading(state: TracePreviewState, isRasterizing?: boolean): bo
 function PreviewFrame(
   props: Props & {
     readonly zoom: number;
+    readonly lensRef: React.RefObject<HTMLDivElement>;
     readonly view: TracePreviewView;
     readonly hasSource: boolean;
     readonly isSourceFaded: boolean;
@@ -139,6 +141,7 @@ function PreviewFrame(
       {...dragHandlers}
     >
       <div
+        ref={props.lensRef}
         className="lf-trace-preview__artwork"
         style={rectangle ?? fullStageStyle}
         data-natural-fit={imageSize === undefined}
