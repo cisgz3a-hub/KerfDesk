@@ -1,6 +1,13 @@
 // Controller recovery actions that are not normal motion/job commands.
 // Sleep wake uses GRBL soft reset (Ctrl-X), so it must invalidate any transient
 // origin/frame state just like Stop does.
+//
+// After a reset from Sleep (and after a critical alarm) GRBL, grblHAL and
+// FluidNC come back locked in Alarm by design (gnea/grbl protocol.c:49-54,
+// grblHAL protocol.c:167-173, FluidNC Protocol.cpp:1158-1159), so an Alarm
+// report or an ALARM line after the reset completes the wake: it resolves
+// 'alarm' and the Alarm banner offers Unlock or Home (controller audit
+// 2026-09-25 HF-5, CG-8).
 
 import { cancel as cancelStreamer, wipeInFlight } from '../../core/controllers/grbl';
 import type { ControllerDriver } from '../../core/controllers';
@@ -11,6 +18,7 @@ import {
 } from './laser-interactive-command';
 import type { LaserSafetyAction } from './laser-safety-notice';
 import type { LaserState } from './laser-store';
+import type { ControllerWakeOutcome } from './laser-store-action-types';
 import { invalidateControllerSessionEvidence } from './laser-controller-evidence';
 import { clearCncLiveCaps } from './detected-settings-action';
 import { pushLog } from './laser-store-helpers';
@@ -31,7 +39,7 @@ export function controllerRecoveryActions(
   driver: DriverFn,
 ): Pick<LaserState, 'wakeController'> {
   return {
-    wakeController: async () => {
+    wakeController: async (): Promise<ControllerWakeOutcome> => {
       // Soft reset is a live-transport operation, not a reconnect mechanism.
       // Guard before invalidating evidence or claiming the global recovery
       // operation so USB loss cannot deadlock the remaining controls.
@@ -49,6 +57,7 @@ export function controllerRecoveryActions(
       clearCncLiveCaps();
       cancelControllerLifecycleRefs(refs, 'Controller recovery started.');
       const resetWriteEpoch = refs.writeEpoch ?? 0;
+      let resetSent = false;
       set((state) => ({
         ...invalidateControllerSessionEvidence(state),
         controllerOperation: { kind: 'recovery', phase: 'reset', idleReports: 0 },
@@ -62,6 +71,7 @@ export function controllerRecoveryActions(
           // the old transport Promise, provided recovery still owns it.
           if (!observedOwnedRecoveryReset(get, refs, resetWriteEpoch)) throw error;
         }
+        resetSent = true;
         set((state) => ({
           statusReport: null,
           alarmCode: null,
@@ -96,7 +106,20 @@ export function controllerRecoveryActions(
               }
             : {},
         );
+        return 'idle';
       } catch (err) {
+        if (resetSent && controllerReportsAlarm(get())) {
+          set((state) => ({
+            controllerOperation:
+              state.controllerOperation?.kind === 'recovery' ? null : state.controllerOperation,
+            lastWriteError: null,
+            log: pushLog(
+              state,
+              '[lf2] Controller reset and came back locked in Alarm, as it does after Sleep or a critical alarm. Unlock or Home it.',
+            ),
+          }));
+          return 'alarm';
+        }
         const message = err instanceof Error ? err.message : String(err);
         set((state) => ({
           controllerOperation:
@@ -108,6 +131,10 @@ export function controllerRecoveryActions(
       }
     },
   };
+}
+
+function controllerReportsAlarm(state: LaserState): boolean {
+  return state.alarmCode !== null || state.statusReport?.state === 'Alarm';
 }
 
 function observedOwnedRecoveryReset(

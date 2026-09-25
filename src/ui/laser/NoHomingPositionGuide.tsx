@@ -142,8 +142,15 @@ function useGuideActions(
       setPhase('waking');
       setError(null);
       void wakeController()
-        .then(() => finishHandPosition({ setOriginHere, setJobPlacement }))
-        .then(() => {
+        .then(async (outcome) => {
+          // GRBL, grblHAL and FluidNC come back from the reset locked in Alarm
+          // by design: offer Unlock instead of setting an origin on a locked
+          // controller (controller audit 2026-09-25 HF-5).
+          if (outcome === 'alarm') {
+            setPhase('alarmed');
+            return;
+          }
+          await finishHandPosition({ setOriginHere, setJobPlacement });
           setPhase('ready');
           pushToast('Hand position is ready. Frame the job before Start.', 'success');
         })

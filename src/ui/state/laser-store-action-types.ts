@@ -10,6 +10,8 @@ import type { ProbeRequest } from '../../core/controllers/grbl/probe';
 import type { ProbeResult } from './probe-actions';
 import type { WorkZRecoveryConfirmation } from './work-z-recovery-actions';
 
+export type ControllerWakeOutcome = 'idle' | 'alarm';
+
 export type ConnectControllerOptions = {
   readonly controllerKind?: ControllerKind | undefined;
   readonly controllerCommandSet?: ControllerCommandSet | undefined;
@@ -30,7 +32,10 @@ export type LaserStoreActions = {
   readonly confirmProbePlateRemoved: () => void;
   readonly sendRealtimeOverride: (byte: RealtimeOverrideByte) => Promise<void>;
   readonly unlockAlarm: () => Promise<void>;
-  readonly wakeController: () => Promise<void>;
+  /** Soft-resets the controller and waits for it to settle. Resolves 'alarm'
+   *  when it comes back locked, as GRBL, grblHAL and FluidNC all do after a
+   *  reset from Sleep or a critical alarm (the Alarm banner then takes over). */
+  readonly wakeController: () => Promise<ControllerWakeOutcome>;
   readonly configureGrblLaserSetup: () => Promise<void>;
   readonly readMachineSettings: () => Promise<void>;
   readonly retryControllerQualification: () => Promise<void>;

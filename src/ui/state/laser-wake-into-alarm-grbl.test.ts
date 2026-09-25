@@ -1,4 +1,5 @@
-// Audit CG-8 repro: Wake from Sleep always "fails" on GRBL and grblHAL.
+// Controller audit 2026-09-25 CG-8 (regression): Wake from Sleep used to
+// "fail" on GRBL and grblHAL.
 //
 // wakeController() writes Ctrl-X and then waits for a fresh Idle report
 // (laser-controller-recovery-actions.ts), rejecting on Alarm. But both firmwares
@@ -9,21 +10,16 @@
 //     ALARM mode to ensure user homes or acknowledges".
 // https://github.com/gnea/grbl/blob/bfb67f0c7963fe3ce4aaf8a97f9009ea5a8db36e/grbl/protocol.c#L52-L54
 // https://github.com/grblHAL/core/blob/d7aaee3d84b1e7010f075d395206afff038d7379/protocol.c#L167-L173
-// So the Sleep banner's "Wake (Ctrl-X)" always ends in "Wake failed: Controller
-// entered Alarm." (the repo's grbl-sim-machine.ts reduceSoftReset returns to Idle
-// after Sleep, which hides this). Correct behaviour: a fresh ALARM lock after a
-// commanded wake is the expected completion (the next step is Unlock/Home), so
-// Wake resolves instead of reporting a failure.
+// So the Sleep banner's "Wake (Ctrl-X)" ended in "Wake failed: Controller
+// entered Alarm.". A fresh ALARM lock after a commanded wake is the expected
+// completion (the next step is Unlock/Home), so Wake resolves 'alarm'.
 
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { createFakeSerialPort, type FakeSerialPort } from '../../__fixtures__/controllers';
-import { useLaserStore } from '../../ui/state/laser-store';
-import { useStore } from '../../ui/state/store';
-import { resetStore } from '../../ui/state/test-helpers';
-import {
-  respondToTestGrblHandshake,
-  settleTestGrblHandshake,
-} from '../../ui/state/laser-test-start-helpers';
+import { useLaserStore } from './laser-store';
+import { useStore } from './store';
+import { resetStore } from './test-helpers';
+import { respondToTestGrblHandshake, settleTestGrblHandshake } from './laser-test-start-helpers';
 
 function createStockGrbl(): FakeSerialPort {
   const port = createFakeSerialPort();
@@ -117,11 +113,12 @@ describe('CG-8: Wake from Sleep on stock GRBL', () => {
         .getState()
         .wakeController()
         .then(
-          () => 'woke',
+          (result) => result,
           (error: unknown) => (error instanceof Error ? error.message : String(error)),
         ),
     );
-    // Fails today: "Controller entered Alarm."
-    expect(outcome).toBe('woke');
+    // Before the fix: "Controller entered Alarm."
+    expect(outcome).toBe('alarm');
+    expect(useLaserStore.getState().controllerOperation).toBeNull();
   });
 });

@@ -1,5 +1,5 @@
-// Audit HF-5 repro: waking a sleeping grblHAL or FluidNC controller is
-// reported as a failure, because both firmwares deliberately reboot into Alarm
+// Controller audit 2026-09-25 HF-5 (regression): waking a sleeping grblHAL or
+// FluidNC controller used to be reported as a failure, because both firmwares deliberately reboot into Alarm
 // after a reset from Sleep, while KerfDesk's wakeController waits for Idle.
 //
 // Upstream:
@@ -21,14 +21,13 @@
 // Correct behaviour: a Ctrl-X wake whose reboot lands in the firmware's
 // documented post-sleep Alarm has done its job (the controller is awake and
 // asks for Home or Unlock); Wake should resolve and hand over to the Alarm
-// banner rather than report "Controller recovery failed". Current code
-// (laser-controller-recovery-actions.ts:90-108) waits for a fresh Idle, so the
-// Alarm report (grblHAL) or the ALARM:3 line (FluidNC) rejects the wake.
+// banner rather than report "Controller recovery failed". The wake now
+// resolves 'alarm' when the controller comes back locked.
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { createFakeSerialPort } from '../../__fixtures__/controllers/fake-serial-port';
 import type { ControllerKind } from '../../core/devices';
-import { useLaserStore } from '../../ui/state/laser-store';
-import { resetStore } from '../../ui/state/test-helpers';
+import { useLaserStore } from './laser-store';
+import { resetStore } from './test-helpers';
 
 const IDLE = '<Idle|MPos:0.000,0.000,0.000|FS:0,0>';
 const SLEEP = '<Sleep|MPos:0.000,0.000,0.000|FS:0,0>';
@@ -109,7 +108,7 @@ async function wakeOutcome(firmware: Firmware): Promise<string> {
     .getState()
     .wakeController()
     .then(
-      () => (outcome = 'resolved'),
+      (result) => (outcome = result),
       (error: unknown) => (outcome = error instanceof Error ? error.message : String(error)),
     );
   await vi.advanceTimersByTimeAsync(3000);
@@ -118,14 +117,14 @@ async function wakeOutcome(firmware: Firmware): Promise<string> {
   return outcome;
 }
 
-describe('HF-5 wake from Sleep on firmwares that reboot into Alarm', () => {
-  it('grblHAL: Wake resolves when the controller reboots into its post-sleep Alarm', async () => {
-    // Current code: 'Controller entered Alarm.'
-    expect(await wakeOutcome(GRBLHAL)).toBe('resolved');
+describe('wake from Sleep on firmwares that reboot into Alarm (audit HF-5)', () => {
+  it('grblHAL: Wake resolves alarm when the controller reboots into its post-sleep Alarm', async () => {
+    expect(await wakeOutcome(GRBLHAL)).toBe('alarm');
+    expect(useLaserStore.getState().controllerOperation).toBeNull();
   });
 
-  it('FluidNC: Wake resolves when the controller prints ALARM:3 and reboots', async () => {
-    // Current code: 'ALARM:3'
-    expect(await wakeOutcome(FLUIDNC)).toBe('resolved');
+  it('FluidNC: Wake resolves alarm when the controller prints ALARM:3 and reboots', async () => {
+    expect(await wakeOutcome(FLUIDNC)).toBe('alarm');
+    expect(useLaserStore.getState().controllerOperation).toBeNull();
   });
 });

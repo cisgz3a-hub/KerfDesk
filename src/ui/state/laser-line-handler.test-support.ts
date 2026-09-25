@@ -76,7 +76,7 @@ function makeLaserStateActions() {
     probe: async () => ({ kind: 'preflight-failed', reason: 'unused' }),
     sendRealtimeOverride: async () => undefined,
     unlockAlarm: async () => undefined,
-    wakeController: async () => undefined,
+    wakeController: async () => 'idle' as const,
     jog: async () => undefined,
     jogToMachinePosition: async () => undefined,
     setAirAssistEnabled: async () => undefined,
