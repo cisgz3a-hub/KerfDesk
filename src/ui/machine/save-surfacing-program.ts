@@ -5,6 +5,7 @@ import { activeCncTool, type CncMachineConfig, type Project } from '../../core/s
 import type { PlatformAdapter } from '../../platform/types';
 import { buildGcodeMetadata } from '../app/build-info';
 import { controllerReadinessAdvisories } from '../app/controller-readiness-advisories';
+import { cncExportControllerAdvisory } from '../app/cnc-export-controller-advisory';
 import { partitionSavePreflight } from '../app/save-preflight-policy';
 import type { ToastVariant } from '../state/toast-store';
 import { startSurfacingStream } from './surfacing-worker-client';
@@ -59,6 +60,9 @@ export async function saveSurfacingProgram(options: SaveSurfacingOptions): Promi
   )) {
     warn(message);
   }
+  // The surfacing program is GRBL CNC G-code whatever the profile (CN-1).
+  const controllerAdvisory = cncExportControllerAdvisory(project.device);
+  if (controllerAdvisory !== null) warn(controllerAdvisory);
   const task = startSurfacingStream(
     {
       params: {
