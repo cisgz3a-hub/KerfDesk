@@ -15,8 +15,30 @@
 // stop, so it errs toward replaying a little that already burned rather than
 // skipping what did not.
 
+// Without a status report that shows the backlog, the stop may have discarded
+// a whole planner of acknowledged moves, so the restart steps back by the
+// controller's planner size (controller audit OR-3). `$I` or an idle `Bf`
+// gives that size when the session saw one; otherwise these usable-block
+// defaults apply:
+//  - GRBL 1.1h: BLOCK_BUFFER_SIZE 16, one kept free (planner.h:31, planner.c:500);
+//  - grblHAL: `$398` default 100 (config.h:906), all usable (planner.c:697-702);
+//  - FluidNC v4.0.3: planner_blocks default 16, one kept free
+//    (Machine/MachineConfig.h:98, Planner.cpp:445);
+//  - Smoothieware: planner_queue_size default 32 (Conveyor.cpp:77), flushed
+//    by the ^X halt Abort sends (Conveyor.cpp:89-96).
+// Marlin has none: Abort queues its stop behind accepted motion instead of
+// discarding the planner. Ruida is never streamed.
+
 import { isSendableGcodeLine } from '../controllers/grbl';
+import type { ControllerKind } from '../devices';
 import type { PlannerBacklog } from './job-interruption';
+
+export const DEFAULT_PLANNER_BLOCKS: Readonly<Partial<Record<ControllerKind, number>>> = {
+  'grbl-v1.1': 15,
+  grblhal: 100,
+  fluidnc: 15,
+  smoothieware: 32,
+};
 
 const COMMENT = /\([^)]*\)|;.*$/g;
 const AXIS_WORD = /[XYZ]\s*[-+]?(?:\d|\.\d)/i;
@@ -30,9 +52,9 @@ export function isPlannerMotionLine(line: string): boolean {
 }
 
 /** 1-based raw line of the first movement that may not have run, or null
- *  when the backlog is empty or no movement was acknowledged. */
+ *  when no such movement was acknowledged. */
 export function plannerFrontierRawLine(gcode: string, backlog: PlannerBacklog): number | null {
-  if (backlog.queuedBlocks <= 0) return null;
+  if (backlog.queuedBlocks <= 0) return firstMoveAfter(gcode, backlog.ackedAtStatus);
   // Raw line numbers of the newest `queuedBlocks` movement lines acknowledged
   // by the status report, kept in a ring.
   const ring = new Array<number>(backlog.queuedBlocks);
@@ -61,4 +83,25 @@ export function plannerFrontierRawLine(gcode: string, backlog: PlannerBacklog): 
   return moves < backlog.queuedBlocks
     ? (ring[0] ?? null)
     : (ring[moves % backlog.queuedBlocks] ?? null);
+}
+
+// An empty planner at the report: every line acknowledged by then had run, so
+// the first movement acknowledged after it is the first that may not have.
+function firstMoveAfter(gcode: string, ackedAtStatus: number): number | null {
+  let sendable = 0;
+  let rawNumber = 0;
+  let start = 0;
+  while (start <= gcode.length) {
+    const newline = gcode.indexOf('\n', start);
+    const end = newline === -1 ? gcode.length : newline;
+    const raw = gcode.slice(start, end);
+    rawNumber += 1;
+    if (isSendableGcodeLine(raw)) {
+      sendable += 1;
+      if (sendable > ackedAtStatus && isPlannerMotionLine(raw)) return rawNumber;
+    }
+    if (newline === -1) break;
+    start = newline + 1;
+  }
+  return null;
 }

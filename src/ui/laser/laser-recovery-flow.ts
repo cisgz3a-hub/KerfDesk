@@ -6,6 +6,7 @@ import { rebuildCanvasPlanForGcode, reportedWorkPositionMm } from '../state/canv
 import { canvasJobTimingPlan } from '../state/canvas-job-timing-plan';
 import { jobAwareAlert, jobAwareConfirm } from '../state/job-aware-dialogs';
 import { useLaserStore } from '../state/laser-store';
+import { currentPlannerCapacityEvidence } from '../state/laser-rx-capacity-evidence';
 import type { LaserModeStartEvidence } from '../state/laser-mode-start-evidence';
 import {
   createArchivedControllerObservation,
@@ -385,6 +386,7 @@ function controllerObservation(laser: ReturnType<typeof useLaserStore.getState>)
     activeControllerKind: laser.activeControllerKind,
     detectedControllerKind: laser.detectedControllerKind,
     controllerSessionEpoch: laser.controllerSessionEpoch,
+    plannerBlocksAtIdle: currentPlannerCapacityEvidence(laser)?.plannerBlocksFree ?? null,
   };
 }
 

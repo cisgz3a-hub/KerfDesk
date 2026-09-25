@@ -259,7 +259,7 @@ describe('grblStrategy machine compatibility dialects', () => {
     expect(out).not.toMatch(/^G1 .* S[1-9]/m);
   });
 
-  it('uses constant-power vector mode for Neotronics two-pass cuts and reasserts pass 2 power', () => {
+  it('uses constant-power vector mode for Neotronics two-pass cuts and reasserts pass 2 power on its first burn', () => {
     const out = grblStrategy.emit(
       {
         groups: [
@@ -289,14 +289,17 @@ describe('grblStrategy machine compatibility dialects', () => {
 
     expect(out).toContain('G21\nG90\nG54\nG94\nM3 S0\n; layer cut4040');
     expect(out).not.toMatch(/^M4\b/m);
+    // OR-1: no `M3 S0` re-arm between passes — it drained the planner with the
+    // pass-1 beam still lit. The controlled seek carries S0 and the first burn
+    // restates F and S.
     expect(out).toContain(
       [
         '; pass 2 of 2',
-        'M3 S0',
         'G1 X0.000 Y0.000 F800 S0 ; kerfdesk:laser-off-motion',
         'G1 X5.000 Y0.000 F1200 S600',
       ].join('\n'),
     );
+    expect(out.match(/^M3 S0$/gm)).toHaveLength(1);
   });
 
   it('uses the catalog raster laser mode for raster output', () => {

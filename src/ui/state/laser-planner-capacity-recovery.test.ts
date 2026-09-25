@@ -155,7 +155,13 @@ describe('qualified planner capacity and recovery frontier', () => {
     const { streamer, status } = afterTwentyAcks();
     const live = observe({ ...observe(quiet(), IDLE), streamer }, status);
     expect(currentRunPlannerBacklog(live)).toEqual({ ackedAtStatus: 20, queuedBlocks: 3 });
-    expect(currentRunPlannerBacklog({ ...live, streamerEpoch: 8 })).toBeUndefined();
+    // Without a snapshot of its own the new owner is bounded by the whole
+    // planner (OR-3), never by the previous run's backlog.
+    expect(currentRunPlannerBacklog({ ...live, streamerEpoch: 8 })).toEqual({
+      ackedAtStatus: 20,
+      queuedBlocks: 15,
+      bound: 'planner-size',
+    });
     const replacement = observe(
       {
         ...live,
@@ -188,15 +194,19 @@ describe('qualified planner capacity and recovery frontier', () => {
       sessionEpoch: 4,
       observedAt: 4,
     });
-    expect(currentRunPlannerBacklog(idle)).toBeUndefined();
+    // No run snapshot: the whole planner bounds the backlog (OR-3), and new-
+    // session motion never becomes the old run's backlog.
+    const bounded = { ackedAtStatus: 20, queuedBlocks: 15, bound: 'planner-size' };
+    expect(currentRunPlannerBacklog(idle)).toEqual(bounded);
     const jog = observe(idle, '<Jog|MPos:1,0,0|Bf:14,128|FS:600,0>', 5);
-    expect(currentRunPlannerBacklog(jog)).toBeUndefined();
+    expect(currentRunPlannerBacklog(jog)).toEqual(bounded);
+    // A lost link does not discard the planner, so nothing is attached.
     expect(
       checkpointInterruption('disconnected', null, null, currentRunPlannerBacklog(jog)),
     ).not.toHaveProperty('plannerBacklog');
   });
 
-  it('keeps an unknown reboot backlog unknown when the replacement session starts jogging', () => {
+  it('bounds a reboot without a backlog report by the planner, never by later motion', () => {
     const { refs, set, get } = makeLineHandlerHarness();
     const { streamer, status } = afterTwentyAcks();
     set({
@@ -211,7 +221,13 @@ describe('qualified planner capacity and recovery frontier', () => {
 
     receive('Grbl 1.1f');
     expect(get().streamer?.status).toBe('errored');
-    expect(currentRunPlannerBacklog(get())).toBeUndefined();
+    // OR-3: the reboot discarded up to a stock GRBL planner (15 blocks) of the
+    // twenty acknowledged moves, and no report showed how many.
+    expect(currentRunPlannerBacklog(get())).toEqual({
+      ackedAtStatus: 20,
+      queuedBlocks: 15,
+      bound: 'planner-size',
+    });
 
     receive(IDLE);
     expect(get().plannerCapacityEvidence).toMatchObject({ plannerBlocksFree: 15, sessionEpoch: 4 });

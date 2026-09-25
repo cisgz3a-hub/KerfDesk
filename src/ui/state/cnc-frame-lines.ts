@@ -22,6 +22,12 @@ export function isAtOrAboveSafeZ(workZMm: number, safeZMm: number): boolean {
   return workZMm >= safeZMm - SAFE_Z_EPSILON_MM;
 }
 
+// Checked before anything else (controller audit CN-2): on a controller that
+// cannot run KerfDesk CNC jobs (Marlin, Smoothieware) no CNC Frame can be built,
+// so the operator is not first sent to zero Z for it. The same fact Start
+// states as CNC_REQUIRES_GRBL_MESSAGE.
+export const CNC_FRAME_REQUIRES_GRBL_MESSAGE =
+  'CNC Frame is unavailable: KerfDesk CNC jobs require a GRBL-family controller (GRBL, grblHAL, FluidNC), and the connected controller cannot run them. Connect a GRBL-family controller, or switch the project to Laser mode.';
 export const CNC_FRAME_WORK_Z_REQUIRED_MESSAGE =
   'CNC Frame requires a current work Z zero so the bit can retract above the stock before XY motion. Zero Z or run a settled probe, then Frame again.';
 export const CNC_FRAME_RETRACT_UNSUPPORTED_MESSAGE =
@@ -47,7 +53,12 @@ export function buildCncFrameMotion(input: {
   /** Driver builder for an absolute `$J=` Z jog; undefined on drivers without one. */
   readonly buildRetract: ((zMm: number, feed: number) => string) | undefined;
   readonly zFeed: number;
+  /** The connected driver's `capabilities.cncJobs`. */
+  readonly cncJobsSupported: boolean;
 }): CncFrameMotionPlan {
+  if (!input.cncJobsSupported) {
+    return { kind: 'blocked', message: CNC_FRAME_REQUIRES_GRBL_MESSAGE };
+  }
   if (!input.hasCurrentWorkZEvidence) {
     return { kind: 'blocked', message: CNC_FRAME_WORK_Z_REQUIRED_MESSAGE };
   }

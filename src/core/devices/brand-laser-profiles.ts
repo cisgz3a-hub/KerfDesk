@@ -64,7 +64,9 @@ const XTOOL_SOURCE =
 const XTOOL_40W_SOURCE = 'https://uk.xtool.com/products/40w-laser-module-for-d1-pro';
 // xTool's own LightBurn device file for the D1 Pro sets "MirrorY": true (origin
 // at the rear, +Y toward the operator), "BaudRate": 230400 and
-// "EnableGrblJCommand": false.
+// "EnableGrblJCommand": false. Whether the closed firmware rejects `$J=` is not
+// public (controller audit OR-4, plausible only), so these profiles keep the
+// GRBL `$J=` jog and Frame and say so in their evidence note instead.
 const XTOOL_LIGHTBURN_DEVICE =
   'https://xtool.zendesk.com/hc/article_attachments/7316804567447/xTool-D1ProV3.lbdev';
 
@@ -80,7 +82,7 @@ function xtoolProfile(power: 5 | 10 | 20 | 40, bedHeight: number): DeviceProfile
       bedHeight,
       opticalPowerW: power,
       source: `${power === 40 ? XTOOL_40W_SOURCE : XTOOL_SOURCE}; ${XTOOL_LIGHTBURN_DEVICE}`,
-      note: `${power} W head on the standard frame: 430 x ${bedHeight} mm. Extension rails and other heads need their own dimensions. xTool's LightBurn device file puts the origin at the rear-left, uses 230400 baud and disables $J jogging; confirm jogging on your firmware.`,
+      note: `${power} W head on the standard frame: 430 x ${bedHeight} mm. Extension rails and other heads need their own dimensions. xTool's LightBurn device file puts the origin at the rear-left, uses 230400 baud and sets EnableGrblJCommand: false, so LightBurn does not jog it with $J=. KerfDesk's Jog and Frame use $J= jog commands: if Jog or Frame fails with an error on this firmware, the machine is not compatible with $J= jogging.`,
     }),
     origin: 'rear-left',
     homing: { enabled: false, direction: 'rear-left' },
