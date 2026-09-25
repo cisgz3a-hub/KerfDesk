@@ -30,13 +30,14 @@ describe('traceImageToContourColoredPaths', () => {
     expect(optimizationToleranceScaleFromOptimize(2)).toBeGreaterThan(1);
   });
 
-  it('makes a high Optimize value emit fewer points on curved artwork', () => {
+  it('makes a high Optimize value emit fewer segments on curved artwork', () => {
     const fixture = PERCEPTUAL_FIXTURES.find((candidate) => candidate.name === 'filled-disc');
     expect(fixture).toBeDefined();
+    // The canonical curve is the output (ADR-405); its polyline is sampling.
     const count = (optimize: number): number =>
       traceImageToContourColoredPaths(fixture!.image, { ...LINE_ART, optimize })
-        .flatMap((path) => path.polylines)
-        .reduce((total, polyline) => total + polyline.points.length, 0);
+        .flatMap((path) => path.curves ?? [])
+        .reduce((total, curve) => total + curve.segments.length, 0);
 
     expect(count(2)).toBeLessThan(count(0));
   });

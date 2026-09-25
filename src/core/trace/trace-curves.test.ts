@@ -11,7 +11,7 @@ import { sampleCubics, type CubicBezier } from './fit-cubics';
 import type { RawImageData } from './trace-image';
 import { TRACE_PRESETS } from './trace-presets';
 import { traceImageToColoredPaths } from './trace-to-paths';
-import { fittedTraceRing, withCanonicalTraceCurves } from './trace-curves';
+import { curvedTraceRing, scaleTracedPaths, withCanonicalTraceCurves } from './trace-curves';
 
 const LOOP: ReadonlyArray<CubicBezier> = [
   { p0: { x: 10, y: 10 }, p1: { x: 40, y: -10 }, p2: { x: 60, y: 30 }, p3: { x: 30, y: 40 } },
@@ -65,24 +65,53 @@ function antialiasedDisc(): RawImageData {
 }
 
 describe('canonical trace curves', () => {
-  it('samples fitted cubics as an explicit ring and keeps them as its curve', () => {
-    const ring = fittedTraceRing(LOOP);
-    const samples = sampleCubics(LOOP, true);
-    expect(ring).toEqual([...samples, samples[0]]);
-    const [path] = withCanonicalTraceCurves([withRing(ring)]);
-    expect(path?.curves).toEqual([curveOf(LOOP)]);
+  it('keeps the curve a ring carries and emits plain polylines', () => {
+    const curve = curveOf(LOOP);
+    const points = [...sampleCubics(LOOP, true), LOOP[0]?.p0 as Vec2];
+    const [path] = withCanonicalTraceCurves([
+      { color: '#000000', polylines: [curvedTraceRing(points, curve)] },
+    ]);
+    expect(path?.curves).toEqual([curve]);
+    // The carried curve is not stored twice on the output polyline.
+    expect(path?.polylines).toEqual([{ points, closed: true }]);
+    expect(Object.keys(path?.polylines[0] ?? {})).toEqual(['points', 'closed']);
   });
 
-  it('falls back to straight segments over samples a later stage copied', () => {
-    const copy = [...fittedTraceRing(LOOP)];
-    const [path] = withCanonicalTraceCurves([withRing(copy)]);
-    expect(path?.curves).toEqual([polylineToCurveSubpath({ points: copy, closed: true })]);
+  it('falls back to straight segments over a ring a later stage rebuilt', () => {
+    const ring = curvedTraceRing(sampleCubics(LOOP, true), curveOf(LOOP));
+    const rebuilt = { points: ring.points, closed: true };
+    const [path] = withCanonicalTraceCurves([withRing(rebuilt.points.slice())]);
+    expect(path?.curves).toEqual([
+      polylineToCurveSubpath({ points: rebuilt.points, closed: true }),
+    ]);
   });
 
   it('keeps curves a path already carries', () => {
     const curves = [curveOf(LOOP)];
-    const path: ColoredPath = { ...withRing(fittedTraceRing(LOOP).slice()), curves };
+    const path: ColoredPath = { ...withRing(sampleCubics(LOOP, true)), curves };
     expect(withCanonicalTraceCurves([path])[0]?.curves).toBe(curves);
+  });
+
+  it('maps carried curves exactly with independent axis scales', () => {
+    const curve = curveOf(LOOP);
+    const ring = curvedTraceRing([...sampleCubics(LOOP, true), LOOP[0]?.p0 as Vec2], curve);
+    const [path] = withCanonicalTraceCurves([withRing(ring.points.slice())]).map((p) => ({
+      ...p,
+      curves: [curve],
+    }));
+    const [scaled] = scaleTracedPaths([path as ColoredPath], 2, 3);
+    const map = (p: Vec2): Vec2 => ({ x: p.x * 2, y: p.y * 3 });
+    expect(scaled?.curves?.[0]).toEqual({
+      start: map(curve.start),
+      closed: true,
+      segments: LOOP.map((cubic) => ({
+        kind: 'cubic',
+        control1: map(cubic.p1),
+        control2: map(cubic.p2),
+        to: map(cubic.p3),
+      })),
+    });
+    expect(scaled?.polylines[0]?.points).toEqual(ring.points.map(map));
   });
 
   it('carries a measured contour cubics to the traced path', async () => {

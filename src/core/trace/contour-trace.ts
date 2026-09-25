@@ -4,14 +4,15 @@
 // the GPL-provenance potrace-derived backend (ADR-123, closing the ADR-120
 // MIT-release blocker): binarize via the shared preprocessing, walk the ink
 // boundary on the corner lattice (contour-boundary.ts), then finish each
-// closed loop with the SAME proven stage sequence the centerline tracer uses
-// (corner dial → curvature evening → arc/line evening → simplify →
-// bounded spline resample).
+// closed loop (corner dial → curvature evening → arc/line evening), and end
+// every loop in the compact fit (compact-curve-fit.ts, ADR-405): the fewest
+// cubics and lines within a tolerance, carried as the ring's canonical
+// curve. Measured loops are fitted directly; binary loops keep the
+// centerline's simplify + bounded spline resample as the shape they fit.
 
 import type { ColoredPath, Polyline, Vec2 } from '../scene';
 import {
   inkMaskFromPrepared,
-  refineChainForOutput,
   simplifyChain,
   smoothChainCurvature,
   smoothRawChain,
@@ -30,10 +31,12 @@ import {
   normalizeTurnPolicy,
   type TurnPolicy,
 } from './saddle-connectivity';
-import { fitCubicsThroughPoints } from './fit-cubics';
+import { fitCompactRing, sampleCompactCurve } from './compact-curve-fit';
+import { collectOutputCorners } from './centerline/curve-refine';
+import { fitSmoothCurve } from './centerline/curve-fit';
 import { flattenStraightRuns } from './flatten-straight-runs';
 import { smoothArcNoise } from './smooth-arc-noise';
-import { fittedTraceRing, withCanonicalTraceCurves } from './trace-curves';
+import { curvedTraceRing, withCanonicalTraceCurves } from './trace-curves';
 import { optimizationToleranceScaleFromOptimize } from './trace-optimize';
 import { contourFeatureAnchors } from './contour-feature-anchors';
 import {
@@ -76,12 +79,10 @@ export function isBinaryContourPreset(options: TraceOptions): boolean {
 // TraceOptions lineTolerance contract scales it (higher = fewer vertices).
 const SIMPLIFY_EPSILON_PX = 0.45;
 const MIN_LOOP_POINTS = 3;
-// Loop size classes for the SMOOTHING tail (corners are decided for every
-// loop by the corner dial, contour-corners.ts). Loops from this many chain
-// points up are big enough for the dense arc-noise evening and, when
-// measured, the fairing-by-fitting tail; glyph-scale loops below it keep the
-// simplify + spline tail, whose ±7px evening window would be a large fraction
-// of the feature.
+// Loop size class for the dense arc-noise evening (corners are decided for
+// every loop by the corner dial, contour-corners.ts). Loops from this many
+// chain points up are big enough for it; on glyph-scale loops below it the
+// ±7px evening window would be a large fraction of the feature.
 const ARC_EVENING_MIN_CHAIN_POINTS = 260;
 // Measured loops above this size are organic art boundaries: Whittaker-faired
 // between their corners before the looser organic fit.
@@ -90,11 +91,14 @@ const NO_CORNERS: ReadonlySet<Polyline['points'][number]> = new Set();
 // A loop whose cracks mostly interpolated is a sub-pixel MEASUREMENT (see
 // finishLoop): above this fraction the wobble stages disable for that loop.
 const SUBPIXEL_INFORMED_FRACTION = 0.3;
-// Least-squares cubic fit tolerance for the measured-loop output tail, in
-// SOURCE px (scaled by pixelScale like every px knob). ~2-3x the sub-pixel
-// measurement noise: tight enough to keep drawn features, loose enough that
-// the fit averages noise instead of chasing it.
-const FIT_TOLERANCE_PX = 0.35;
+// Compact-fit tolerance (compact-curve-fit.ts, ADR-405): the largest
+// ORTHOGONAL distance of the output curve from the chain it fits, in SOURCE px
+// (scaled by pixelScale like every px knob), at Optimize's neutral 0.2. ~2-3x
+// the sub-pixel measurement noise: tight enough to keep drawn features, loose
+// enough that the fit averages noise instead of chasing it. At 0.35 the
+// merge fitted a radius-17 disc with two half-circle cubics, 0.33 px off the
+// round; at 0.25 it takes three or four.
+const FIT_TOLERANCE_PX = 0.25;
 // Above-range (organic art) loops are Whittaker-faired BEFORE fitting
 // (fair-chain.ts, research brief #3): the penalized smoother removes ~94%
 // of the ink texture in one banded solve, so the fit sees ~0.1-0.2px
@@ -102,6 +106,16 @@ const FIT_TOLERANCE_PX = 0.35;
 // texture-chasing error splits. Tolerance-based fairing was tried twice and
 // still sawed — splitting on max error chases any bump above tolerance.
 const FIT_TOLERANCE_ORGANIC_PX = 0.55;
+// The Optimize scale at Optimize 0 (the smallest final tolerance).
+const MIN_OPTIMIZE_TOLERANCE_SCALE = optimizationToleranceScaleFromOptimize(0);
+// Candidate joints come from a fit this much tighter than that tolerance, so
+// the merge has a choice of joints to keep.
+const CANDIDATE_TOLERANCE_SHARE = 0.75;
+// Joint tangents of the compact fit are estimated over this arc, source px.
+const TANGENT_WINDOW_PX = 2;
+// Spline samples inside each simplified edge of the binary tail's resample
+// (the count the centreline refine step uses).
+const SPLINE_SAMPLES_PER_SEGMENT = 3;
 // Neutral Smoothness when the dialog value is absent or non-finite.
 const DEFAULT_SMOOTHNESS = 1;
 
@@ -364,13 +378,14 @@ function finishDenseLoop(
     dense.length >= arcMin
       ? smoothArcNoise(evened, true, corners, denoiseStrength, finish.pixelScale)
       : evened;
-  // Measured loops take the fairing-by-fitting tail: least-squares cubics
-  // THROUGH the measured points replace simplify+flatten+spline — the fit
-  // averages ~0.1px noise into fair curves with no chord joints and no
-  // per-vertex facets (research brief #2). Organic-size loops are
-  // Whittaker-faired between their corners first. Tiny glyphs keep the
-  // approved legacy tail until the fit path earns them.
-  if (subPixelInformed && dense.length >= arcMin) {
+  // Measured loops take the fairing-by-fitting tail at EVERY size: the
+  // compact fit THROUGH the measured points averages ~0.1px noise into fair
+  // curves (research brief #2). The simplify + spline tail it replaced bowed
+  // every straight edge outward (its spline passed through Douglas-Peucker
+  // vertices and a cap of ±ε let it sit ~0.3 px outside the ink): a thin AA
+  // bar gained up to 24% area (ADR-405). Organic-size loops are
+  // Whittaker-faired between their corners first.
+  if (subPixelInformed) {
     return dense.length > organicMin
       ? fitLoopTail(
           fairChainSegments(arcSmoothed, true, corners, finish.pixelScale),
@@ -380,7 +395,7 @@ function finishDenseLoop(
         )
       : fitLoopTail(arcSmoothed, corners, finish, FIT_TOLERANCE_PX);
   }
-  return finishLegacyLoop(arcSmoothed, corners, denoiseStrength, finish, pinned);
+  return finishLegacyLoop(arcSmoothed, corners, denoiseStrength, finish, featureAnchors);
 }
 
 // Taubin pre-smoothing between corner apexes: each span between two corners
@@ -406,14 +421,19 @@ function smoothBetweenCorners(points: ReadonlyArray<Vec2>, corners: ReadonlySet<
   return out;
 }
 
-// The legacy tail (binary / pixel-fidelity sources): straight-run flatten →
-// simplify → flatten → corner-aware spline resample → close the ring.
+// The binary tail (saturated / pixel-fidelity sources): straight-run flatten
+// → simplify → flatten → corner-aware spline resample, as tuned for binary
+// art, then the compact fit THROUGH that resample (ADR-405): the shape stays
+// the approved one, the output becomes a few cubics between its corners and
+// single lines along its straight runs. The shape stages run at Optimize's
+// neutral ε, so Optimize is only the final fit tolerance and the segment
+// count cannot rise with it.
 function finishLegacyLoop(
   arcSmoothed: ReadonlyArray<Polyline['points'][number]>,
   corners: ReadonlySet<Polyline['points'][number]>,
   flattenStrength: number,
   finish: LoopFinish,
-  pinned: ReadonlySet<Polyline['points'][number]>,
+  featureAnchors: ReadonlySet<Polyline['points'][number]>,
 ): ContourRefinement | null {
   // Rough source edges leave long-wavelength waviness that survives evening
   // (nominally straight stems trace wobbly); collapse curvature-safe straight
@@ -430,8 +450,10 @@ function finishLegacyLoop(
     corners.size === 0
       ? arcSmoothed
       : flattenStraightRuns(arcSmoothed, true, corners, flattenStrength, finish.pixelScale);
+  const epsilon = finish.epsilonPx / finish.fitToleranceScale;
   // Corners and feature anchors survive simplification by reference.
-  const simplified = simplifyChain(flattened, true, finish.epsilonPx, pinned);
+  const pinned = featureAnchors.size === 0 ? corners : new Set([...corners, ...featureAnchors]);
+  const simplified = simplifyChain(flattened, true, epsilon, pinned);
   if (simplified.length < MIN_LOOP_POINTS) return null;
   const straightened = flattenStraightRuns(
     simplified,
@@ -441,32 +463,81 @@ function finishLegacyLoop(
     finish.pixelScale,
   );
   if (straightened.length < MIN_LOOP_POINTS) return null;
-  // Closed rings must RETURN to their start point (ADR-100 third amendment):
-  // renderers and emitters draw points as given and never synthesise the
-  // closing edge, so a ring left "open" engraves with a seam gap.
-  return contourRefinement(straightened, (amount) =>
-    refineChainForOutput(straightened, true, corners, finish.epsilonPx * amount),
+  // The resample's corners: the dial's, plus any hard turn of the simplified
+  // outline it never saw; the fit keeps the same ones exact.
+  const outputCorners = collectOutputCorners(straightened, true, corners);
+  const resample = (amount: number): Vec2[] =>
+    fitSmoothCurve(straightened, true, outputCorners, SPLINE_SAMPLES_PER_SEGMENT, epsilon * amount);
+  return compactRefinement(
+    straightened,
+    resample,
+    outputCorners,
+    finish,
+    compactTolerances(FIT_TOLERANCE_PX, finish),
   );
 }
 
-// The measured-loop output tail: G1 cubic fit segmented at the dial's
-// corners, resampled to the polyline contract. The cubics
-// stay the ring's canonical curve (trace-curves.ts, ADR-391).
+// The measured-loop output tail: the compact fit segmented at the dial's
+// corners at the fit tolerance, which Optimize scales.
 function fitLoopTail(
   chain: ReadonlyArray<Polyline['points'][number]>,
   corners: ReadonlySet<Polyline['points'][number]>,
   finish: LoopFinish,
   tolerancePx: number,
 ): ContourRefinement | null {
-  const refine = (amount: number): Polyline['points'] =>
-    fittedTraceRing(
-      fitCubicsThroughPoints(
-        chain,
-        true,
-        corners,
-        tolerancePx * finish.pixelScale * finish.fitToleranceScale * amount,
-      ),
-    );
-  const candidate = contourRefinement(chain, refine);
-  return candidate.polyline.points.length < MIN_LOOP_POINTS ? null : candidate;
+  return compactRefinement(
+    chain,
+    () => chain,
+    corners,
+    finish,
+    compactTolerances(tolerancePx, finish),
+  );
+}
+
+// Optimize scales the final tolerance only. Candidate joints are proposed at a
+// fixed share of the tolerance Optimize 0 gives, so they never follow
+// Optimize and the merge's segment count is monotone in it (ADR-405).
+function compactTolerances(
+  tolerancePx: number,
+  finish: LoopFinish,
+): { readonly tolerance: number; readonly candidateTolerance: number } {
+  const base = tolerancePx * finish.pixelScale;
+  const floorScale = Math.min(finish.fitToleranceScale, MIN_OPTIMIZE_TOLERANCE_SCALE);
+  return {
+    tolerance: base * finish.fitToleranceScale,
+    candidateTolerance: base * floorScale * CANDIDATE_TOLERANCE_SHARE,
+  };
+}
+
+// Fit the ring's compact curve (compact-curve-fit.ts, ADR-405) through
+// `target(amount)` and carry it on the ring object itself (trace-curves.ts).
+// The topology repair's weaker refinements scale the tolerances down with
+// the target's own smoothing.
+function compactRefinement(
+  baselinePoints: ReadonlyArray<Vec2>,
+  target: (amount: number) => ReadonlyArray<Vec2>,
+  corners: ReadonlySet<Vec2>,
+  finish: LoopFinish,
+  tolerances: { readonly tolerance: number; readonly candidateTolerance: number },
+): ContourRefinement | null {
+  const tangentWindow = TANGENT_WINDOW_PX * finish.pixelScale;
+  const { tolerance, candidateTolerance } = tolerances;
+  const ring = (amount: number): Polyline | null => {
+    const curve = fitCompactRing(target(amount), corners, NO_CORNERS, {
+      tolerance: tolerance * amount,
+      candidateTolerance: candidateTolerance * amount,
+      tangentWindow,
+    });
+    if (curve === null) return null;
+    const points = sampleCompactCurve(curve);
+    return points.length - 1 < MIN_LOOP_POINTS ? null : curvedTraceRing(points, curve);
+  };
+  const polyline = ring(1);
+  if (polyline === null) return null;
+  const baseline = closeContour(baselinePoints);
+  return {
+    polyline,
+    baseline,
+    refine: (amount) => (amount === 1 ? polyline : (ring(amount) ?? baseline)),
+  };
 }
