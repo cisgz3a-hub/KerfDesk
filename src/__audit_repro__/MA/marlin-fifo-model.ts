@@ -28,6 +28,10 @@
 // - module/motion.cpp quickstop_stepper() / planner.cpp quick_stop(): M410
 //   drops every queued block, stops the current one, and discards moves for
 //   the next second (cleaning_buffer_counter); the cutter output is untouched.
+//   Planner::busy() counts that second, so planner.synchronize() (M400, M5,
+//   inline M3, and the queued M410 handler itself: quickstop_stepper() calls
+//   quick_stop() then synchronize()) waits until it has passed
+//   (planner.cpp L1678-L1705, L1735-L1739, L1803).
 // - gcode/gcode.cpp get_destination_from_command(): G0 and G1 share one
 //   feedrate (no G0_FEEDRATE in the stock configuration); in continuous mode a
 //   G1 S sets the block power and a G0 plans power 0.
@@ -70,7 +74,9 @@ export function createFifoMarlin(options: { readonly responseDelayMs?: number } 
   const handlers = new Set<(line: string) => void>();
   const outbound: string[] = [];
   let rxText = '';
-  const ring: string[] = [];
+  // Each entry is one read command; `started` marks a queued M410 whose handler
+  // has already run quickstop_stepper() and now only waits in synchronize().
+  const ring: Array<{ readonly command: string; started: boolean }> = [];
   const planner: Block[] = [];
   let executing: { block: Block; startedAt: number; timer: ReturnType<typeof setTimeout> } | null =
     null;
@@ -143,6 +149,8 @@ export function createFifoMarlin(options: { readonly responseDelayMs?: number } 
     planned = actual;
     discardMovesUntil = Date.now() + QUICKSTOP_DISCARD_MS;
     armSafetyTimeout();
+    // A handler waiting in synchronize() resumes when the window closes.
+    setTimeout(service, QUICKSTOP_DISCARD_MS);
   };
 
   const readSerial = (): void => {
@@ -163,7 +171,7 @@ export function createFifoMarlin(options: { readonly responseDelayMs?: number } 
         reply('Error:Printer halted. kill() called!');
         return;
       }
-      ring.push(command);
+      ring.push({ command, started: false });
     }
   };
 
@@ -199,8 +207,8 @@ export function createFifoMarlin(options: { readonly responseDelayMs?: number } 
     const f = w.get('F');
     if (f !== undefined && f > 0) feed = f;
     const target = {
-      x: w.has('X') ? (absolute ? w.get('X') ?? 0 : planned.x + (w.get('X') ?? 0)) : planned.x,
-      y: w.has('Y') ? (absolute ? w.get('Y') ?? 0 : planned.y + (w.get('Y') ?? 0)) : planned.y,
+      x: w.has('X') ? (absolute ? (w.get('X') ?? 0) : planned.x + (w.get('X') ?? 0)) : planned.x,
+      y: w.has('Y') ? (absolute ? (w.get('Y') ?? 0) : planned.y + (w.get('Y') ?? 0)) : planned.y,
     };
     if (continuous) {
       if (isG0) inlinePower = 0;
@@ -221,12 +229,21 @@ export function createFifoMarlin(options: { readonly responseDelayMs?: number } 
     return true;
   };
 
-  const drained = (): boolean => executing === null && planner.length === 0;
+  // Planner::busy(): blocks queued or the quickstop cleaning window running.
+  const drained = (): boolean =>
+    executing === null && planner.length === 0 && Date.now() >= discardMovesUntil;
 
   // Returns false while the head command's handler is still blocked.
-  const runCommand = (command: string): boolean => {
-    const code = command.toUpperCase();
-    if (/^G[01](?!\d)/.test(code)) {
+  const runCommand = (entry: { readonly command: string; started: boolean }): boolean => {
+    const code = entry.command.toUpperCase();
+    if (/^M410\b/.test(code)) {
+      // The queued M410 runs quickstop_stepper() again, then synchronizes.
+      if (!entry.started) {
+        entry.started = true;
+        quickstop();
+      }
+      if (!drained()) return false;
+    } else if (/^G[01](?!\d)/.test(code)) {
       if (!planMove(code, /^G0(?!\d)/.test(code))) return false;
     } else if (/^G90\b/.test(code)) absolute = true;
     else if (/^G91\b/.test(code)) absolute = false;
@@ -246,9 +263,7 @@ export function createFifoMarlin(options: { readonly responseDelayMs?: number } 
       const s = words(code).get('S');
       if (s !== undefined) inlinePower = s;
     } else if (/^M114\b/.test(code)) {
-      reply(
-        `X:${planned.x.toFixed(2)} Y:${planned.y.toFixed(2)} Z:0.00 E:0.00 Count X:0 Y:0 Z:0`,
-      );
+      reply(`X:${planned.x.toFixed(2)} Y:${planned.y.toFixed(2)} Z:0.00 E:0.00 Count X:0 Y:0 Z:0`);
     }
     reply('ok');
     return true;
@@ -308,7 +323,10 @@ export function createFifoMarlin(options: { readonly responseDelayMs?: number } 
     emitLine,
     outbound: () => [...outbound],
     beamOnMsSince: (since) => {
-      const intervals = [...beam, ...(output > 0 ? [{ from: outputSince, to: Date.now(), power: output }] : [])];
+      const intervals = [
+        ...beam,
+        ...(output > 0 ? [{ from: outputSince, to: Date.now(), power: output }] : []),
+      ];
       return intervals.reduce(
         (total, interval) => total + Math.max(0, interval.to - Math.max(interval.from, since)),
         0,

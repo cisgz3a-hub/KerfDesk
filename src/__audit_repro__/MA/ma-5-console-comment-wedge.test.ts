@@ -97,7 +97,10 @@ describe('MA-5: comment-only Console line wedges a Marlin session', () => {
     await vi.advanceTimersByTimeAsync(1_500);
     expect(useLaserStore.getState().statusReport?.state).toBe('Idle');
 
-    await useLaserStore.getState().sendConsoleCommand('; note').catch(() => undefined);
+    await useLaserStore
+      .getState()
+      .sendConsoleCommand('; note')
+      .catch(() => undefined);
     await vi.advanceTimersByTimeAsync(5_000);
 
     // Current code: the ledger still owes the comment's ack, so the next

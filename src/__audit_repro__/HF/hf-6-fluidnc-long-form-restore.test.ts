@@ -29,4 +29,15 @@ describe('HF-6 FluidNC long-form settings restore', () => {
       expect(fluidncDriver.prepareConsoleCommand(input).ok).toBe(false);
     },
   );
+
+  // Same class, both spellings: FluidNC v4.0.3 ProcessSettings.cpp:1034
+  //   new UserCommand("NVX", "Settings/Erase", Setting::eraseNVS, notIdleOrAlarm, WA);
+  // and Settings.h:136-139 eraseNVS() { nvs.erase_all(); return Error::Ok; } wipe the
+  // non-volatile store that also holds the G54-G59/G28/G30 offsets (Coordinates
+  // are NVS blobs, Settings.cpp:413-420). Current code prepares both as ordinary
+  // commands with no confirmation.
+  // https://github.com/bdring/FluidNC/blob/v4.0.3/FluidNC/src/Settings.h#L136-L139
+  it.each(['$NVX', '$Settings/Erase'])('blocks %s like $RST=', (input) => {
+    expect(fluidncDriver.prepareConsoleCommand(input).ok).toBe(false);
+  });
 });

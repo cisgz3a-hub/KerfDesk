@@ -66,7 +66,7 @@ function createStockWcoFirmware(mpos: Vec): { port: FakeSerialPort; outbound: ()
     }
     emit('ok');
   };
-  port.onOpen(() => emit('GrblHAL 1.1f [\'$\' or \'$HELP\' for help]'));
+  port.onOpen(() => emit("GrblHAL 1.1f ['$' or '$HELP' for help]"));
   port.onWrite((data) => {
     for (const ch of data) {
       if (ch === '?') {

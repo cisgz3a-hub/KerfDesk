@@ -148,16 +148,16 @@ describe('CG-1: Marlin after Set origin', () => {
     await pump(1_200); // a fresh M114 report after the G92
     const laser = useLaserStore.getState();
     expect(laser.workOriginActive).toBe(true);
-    const outcomes = (['absolute', 'current-position', 'user-origin', 'verified-origin'] as const).map(
-      (startFrom) => {
-        useStore.setState({ jobPlacement: { startFrom, anchor: 'front-left' } });
-        const placement = resolveLiveFramePlacement(useStore.getState(), laser);
-        // dispatchPreparedFrame refuses with FRAME_WORK_POSITION_UNKNOWN_MESSAGE
-        // when it cannot bind the Frame's return point.
-        const framePosition = currentWorkXy(laser);
-        return { startFrom, placement, framePosition };
-      },
-    );
+    const outcomes = (
+      ['absolute', 'current-position', 'user-origin', 'verified-origin'] as const
+    ).map((startFrom) => {
+      useStore.setState({ jobPlacement: { startFrom, anchor: 'front-left' } });
+      const placement = resolveLiveFramePlacement(useStore.getState(), laser);
+      // dispatchPreparedFrame refuses with FRAME_WORK_POSITION_UNKNOWN_MESSAGE
+      // when it cannot bind the Frame's return point.
+      const framePosition = currentWorkXy(laser);
+      return { startFrom, placement, framePosition };
+    });
     // Fails today: absolute and current-position need a WCO, user-origin needs a
     // WCO, and verified-origin resolves but has no work position (M114 carries
     // no WCO and workOriginActive makes reportedWorkPositionMm return null).
@@ -189,9 +189,9 @@ describe('CG-2: the Frame G54 normalization on g92-only controllers', () => {
     await settle(useLaserStore.getState().setOriginHere());
     expect(useLaserStore.getState().workOriginActive).toBe(true);
     useStore.setState({ jobPlacement: { startFrom: 'verified-origin', anchor: 'front-left' } });
-    expect(
-      resolveLiveFramePlacement(useStore.getState(), useLaserStore.getState()),
-    ).toMatchObject({ ok: true });
+    expect(resolveLiveFramePlacement(useStore.getState(), useLaserStore.getState())).toMatchObject({
+      ok: true,
+    });
 
     await settle(normalizeFrameWorkCoordinateSystem());
 

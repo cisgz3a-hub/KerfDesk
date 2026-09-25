@@ -25,14 +25,14 @@ import { describe, expect, it } from 'vitest';
 import { classifyMarlinResponse } from '../../core/controllers/marlin/response';
 
 describe('MA-6: Marlin M114 without a Z axis', () => {
-  it.each([
-    'X:10.00 Y:5.00 Count X:800 Y:400',
-    'X:10.00 Y:5.00 E:0.00 Count X:800 Y:400',
-  ])('parses %s as a position report', (line) => {
-    // Current code: { kind: 'unknown' }.
-    expect(classifyMarlinResponse(line)).toMatchObject({
-      kind: 'status',
-      report: { mPos: { x: 10, y: 5 } },
-    });
-  });
+  it.each(['X:10.00 Y:5.00 Count X:800 Y:400', 'X:10.00 Y:5.00 E:0.00 Count X:800 Y:400'])(
+    'parses %s as a position report',
+    (line) => {
+      // Current code: { kind: 'unknown' }.
+      expect(classifyMarlinResponse(line)).toMatchObject({
+        kind: 'status',
+        report: { mPos: { x: 10, y: 5 } },
+      });
+    },
+  );
 });

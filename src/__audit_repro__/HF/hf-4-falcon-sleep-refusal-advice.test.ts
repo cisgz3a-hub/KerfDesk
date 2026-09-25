@@ -75,7 +75,8 @@ describe('HF-4 Falcon Release motors refusal', () => {
       .sendConsoleCommand('$62=1', { confirmed: true })
       .then(
         () => (consoleResult = 'sent'),
-        (error: unknown) => (consoleResult = error instanceof Error ? error.message : String(error)),
+        (error: unknown) =>
+          (consoleResult = error instanceof Error ? error.message : String(error)),
       );
     await vi.advanceTimersByTimeAsync(2000);
     expect(consoleResult).toMatch(/does not send numeric \$ setting writes/);

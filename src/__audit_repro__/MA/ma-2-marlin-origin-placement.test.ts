@@ -99,7 +99,10 @@ describe('MA-2: Marlin Set origin makes User Origin / Current Position unresolva
     expect(laser.workOriginActive).toBe(true);
     expect(laser.wcoCache).toBeNull();
 
-    const userOrigin = resolveJobPlacement({ startFrom: 'user-origin', anchor: 'front-left' }, laser);
+    const userOrigin = resolveJobPlacement(
+      { startFrom: 'user-origin', anchor: 'front-left' },
+      laser,
+    );
     const current = resolveJobPlacement(
       { startFrom: 'current-position', anchor: 'front-left' },
       laser,

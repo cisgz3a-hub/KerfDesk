@@ -87,7 +87,10 @@ describe('CG-3: Smoothieware Abort leaves qualification pending forever', () => 
     // Fails today: { kind: 'qualifying', phase: 'reset-cleanup' } for good,
     // shown as "Controller reset detected. Waiting for fresh Idle before
     // reading settings…" and refusing supervised recovery.
-    expect(after.controllerQualification, JSON.stringify(after.controllerQualification)).toMatchObject({
+    expect(
+      after.controllerQualification,
+      JSON.stringify(after.controllerQualification),
+    ).toMatchObject({
       kind: 'qualified',
       epoch: after.controllerSessionEpoch,
     });

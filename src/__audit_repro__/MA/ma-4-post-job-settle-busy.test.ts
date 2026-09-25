@@ -80,8 +80,7 @@ describe('MA-4: Marlin post-job settle ignores busy keepalives', () => {
 
     // Marlin's host keepalive while a handler (here M400) blocks.
     const keepalive = setInterval(() => {
-      const waitingOnM400 =
-        sim.state().pendingMotions > 0 && sim.outbound().includes('M400\n');
+      const waitingOnM400 = sim.state().pendingMotions > 0 && sim.outbound().includes('M400\n');
       if (waitingOnM400) sim.port.emitLine('echo:busy: processing');
     }, 2_000);
 
@@ -107,7 +106,7 @@ describe('MA-4: Marlin post-job settle ignores busy keepalives', () => {
     expect(laser.liveCanvasRun?.timing).toMatchObject({ kind: 'complete' });
   });
 
-  it('completes KerfDesk\'s own program whose closing park runs at the cut feed', async () => {
+  it("completes KerfDesk's own program whose closing park runs at the cut feed", async () => {
     // A 60 mm cut at 300 mm/min ending at (260, 200): the emitted program
     // closes with `M5 I` then `G0 X0.000 Y0.000 S0`. Without G0_FEEDRATE that
     // park runs at the modal 300 mm/min: 328 mm, about 66 s after its `ok`.

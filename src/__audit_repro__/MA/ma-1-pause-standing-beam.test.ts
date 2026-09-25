@@ -33,7 +33,10 @@
 
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { createMarlinSimulator, type MarlinSimulator } from '../../__fixtures__/controllers';
-import { powerUpMarlin, runMarlinLines } from '../../__fixtures__/controllers/marlin-laser-power-model';
+import {
+  powerUpMarlin,
+  runMarlinLines,
+} from '../../__fixtures__/controllers/marlin-laser-power-model';
 import { grblDriver } from '../../core/controllers';
 import { DEFAULT_DEVICE_PROFILE, type DeviceProfile } from '../../core/devices';
 import type { Job } from '../../core/job';

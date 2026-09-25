@@ -22,6 +22,24 @@
 // backlog; automatic-restart-line.ts:74-80 keeps the acknowledgement frontier.
 // The simulator's own default settings table has `[10, '1']`
 // (src/__fixtures__/controllers/grbl-sim-settings.ts:12).
+//
+// The same gap on other stock controllers (added 2026-09-25, second session):
+//  - FluidNC v4.0.3 (25ae119b) SettingsDefinitions.cpp:101
+//    `new IntSetting("What to include in status report", GRBL, WG, "10",
+//    "Report/Status", 1, 0, 3)` defaults `$10` to 1, and Report.cpp:512-513
+//    prints `|Bf:` only with the Buffer bit, so stock FluidNC reports no Bf
+//    either (planner_blocks default 16, Machine/MachineConfig.h:98).
+//  - Smoothieware edge (38e2cc08) never reports a buffer field: the status
+//    string built in Kernel.cpp:177-334 has no buffer field (MPos/WPos/F/L/S,
+//    temperatures outside grbl_mode). Its `ok` is
+//    printed after ON_GCODE_RECEIVED returns (GcodeDispatch.cpp:383 then
+//    :404-421), and a G1 only returns once Conveyor::queue_head_block() has
+//    room (Conveyor.cpp:159-163) in a queue of planner_queue_size blocks,
+//    default 32 (Conveyor.cpp:77). KerfDesk's Abort sends ^X
+//    (smoothieware/driver.ts realtime.softReset), which Smoothie turns into
+//    ON_HALT (USBSerial.cpp:204-206, :304-306), and Conveyor::on_halt flushes
+//    the queue (Conveyor.cpp:89-96). Up to 32 acknowledged moves are discarded
+//    and the automatic restart still starts after them.
 
 import { describe, expect, it } from 'vitest';
 import { automaticRestart } from '../../core/recovery/automatic-restart-line';
@@ -41,6 +59,8 @@ const PROGRAM = [
   'M5',
 ].join('\n');
 const STOCK_GRBL_PLANNER_BLOCKS = 15;
+// Smoothieware Conveyor.cpp:77 planner_queue_size default.
+const SMOOTHIE_DEFAULT_QUEUE_BLOCKS = 32;
 
 describe('OR-3: Abort restart on stock GRBL ($10=1, no Bf) steps back over the planner', () => {
   it('a stock status report (no Bf) yields no backlog, and the restart skips queued moves', () => {
@@ -78,5 +98,64 @@ describe('OR-3: Abort restart on stock GRBL ($10=1, no Bf) steps back over the p
     const acked = 35;
     const restart = automaticRestart(PROGRAM, acked, aborted);
     expect(restart.line).toBeLessThanOrEqual(6 + 30 - STOCK_GRBL_PLANNER_BLOCKS);
+  });
+
+  // Added 2026-09-25 (second session). checkpoint-interruption.ts:62
+  // (`if (snapshot.queuedBlocks === 0) return undefined;`) treats a report that
+  // showed an empty planner as "no backlog". But lines acknowledged AFTER that
+  // report were queued into the planner (motion_control.c:60-68 queues a line
+  // before its `ok`) and the reset discards them (main.c:94), so the restart
+  // must start no later than the first move acknowledged after the report.
+  it('a last report with an empty planner still steps back over moves acknowledged after it', () => {
+    const backlog = currentRunPlannerBacklog({
+      streamerEpoch: 1,
+      // 5 setup lines + 15 moves acknowledged when the report showed Bf = idle
+      // capacity (nothing queued, e.g. the stream had just caught up).
+      streamPlannerSnapshot: { streamerEpoch: 1, sessionEpoch: 1, ackedLines: 20, queuedBlocks: 0 },
+    });
+    const aborted: JobInterruption = {
+      kind: 'cancelled',
+      message: 'Stopped by the operator (Abort).',
+      ...(backlog === undefined ? {} : { plannerBacklog: backlog }),
+    };
+    // 15 more moves were acknowledged (35 lines) before the Abort; none of them
+    // is proven to have run. First move acknowledged after the report: raw 21.
+    const restart = automaticRestart(PROGRAM, 35, aborted);
+    expect(restart.line).toBeLessThanOrEqual(21);
+  });
+
+  it('Smoothieware (no Bf field at all): an Abort restart skips the moves ^X flushed', () => {
+    // What Smoothieware edge prints while running (Kernel.cpp:177-334).
+    const report = parseStatusReport(
+      '<Run|MPos:36.0000,0.0000,0.0000|WPos:36.0000,0.0000,0.0000|F:1200.0,1200.0,100.0|L:0.4000|S:0.5000>',
+    );
+    if (report === null) throw new Error('status report did not parse');
+    expect(report.buffer ?? null).toBeNull();
+    const patch = statusBufferPatch(
+      {
+        streamer: { ...createStreamer(PROGRAM), status: 'streaming', completed: 42 },
+        pendingUntrackedAcks: 0,
+        controllerSessionEpoch: 1,
+        rxCapacityEvidence: null,
+        plannerCapacityEvidence: null,
+        streamerEpoch: 1,
+        streamPlannerSnapshot: null,
+      } as unknown as Parameters<typeof statusBufferPatch>[0],
+      report,
+      0,
+    );
+    const backlog = currentRunPlannerBacklog({
+      streamerEpoch: 1,
+      streamPlannerSnapshot: patch.streamPlannerSnapshot ?? null,
+    });
+    expect(backlog).toBeUndefined();
+    const aborted: JobInterruption = {
+      kind: 'cancelled',
+      message: 'Stopped by the operator (Abort).',
+    };
+    // 5 setup lines + 37 moves acknowledged (raw 6..42). With a 32-block
+    // conveyor queue the earliest move that may not have run is raw 6 + (37 - 32).
+    const restart = automaticRestart(PROGRAM, 42, aborted);
+    expect(restart.line).toBeLessThanOrEqual(6 + 37 - SMOOTHIE_DEFAULT_QUEUE_BLOCKS);
   });
 });

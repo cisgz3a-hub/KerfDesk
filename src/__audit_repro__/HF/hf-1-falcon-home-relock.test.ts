@@ -23,6 +23,13 @@
 // between-lines Alarm report as a new alarm that ends the Home; the Home should
 // finish on the settle marker and a fresh Idle.
 //
+// Timing: with status reports while homing off by default (config.h:745-753),
+// a `?` that arrives during the $HX cycle is served at motion_control.c:960,
+// still in the Homing state, so the Alarm report needs a `?` that reaches
+// grblHAL between go_home's re-lock and the start of $HY (about one host round
+// trip). KerfDesk fast-polls every 250 ms during Home, so this is a race, not
+// every Home.
+//
 // Current KerfDesk: laser-home-alarm-reply.ts only tolerates a stale Alarm reply
 // before the FIRST non-Alarm report of the whole Home; the `<Home|...>` report
 // of the `$HX` cycle closes that window, so the between-lines `<Alarm|...>` runs
@@ -71,10 +78,22 @@ describe('HF-1 Falcon $HX/$HY Home on grblHAL with homing init lock', () => {
       homingState: 'confirmed',
     });
   });
+
+  // Same re-lock when Home starts from Idle after an Unlock ($X leaves the axes
+  // unhomed, so limits_homing_required() is still true after $HX;
+  // machine_limits.c:668-673). Here the stale-Alarm window is never opened.
+  it('finishes a Home started from Idle when grblHAL re-locks between $HX and $HY', async () => {
+    // Current code: { outcome: 'Controller entered Alarm.', homingState: 'unknown' }.
+    expect(await runFalconHome({ gapAlarmReport: true, startInAlarm: false })).toEqual({
+      outcome: 'resolved',
+      homingState: 'confirmed',
+    });
+  });
 });
 
 async function runFalconHome(options: {
   readonly gapAlarmReport: boolean;
+  readonly startInAlarm?: boolean;
 }): Promise<{ readonly outcome: string; readonly homingState: string }> {
   const port = createFakeSerialPort();
   // The controller answers `?` with whatever state the firmware is in.
@@ -88,12 +107,19 @@ async function runFalconHome(options: {
     .connect(port.adapter, connectOptionsForDevice(FALCON_A1_PRO_GRBLHAL_PROFILE));
   await vi.advanceTimersByTimeAsync(1100);
 
-  // Power-up with init lock: grblHAL raises ALARM:11 (homing required).
-  reported = ALARM;
-  port.emitLine('ALARM:11');
-  port.emitLine(reported);
-  await vi.advanceTimersByTimeAsync(1);
-  expect(useLaserStore.getState().statusReport?.state).toBe('Alarm');
+  if (options.startInAlarm !== false) {
+    // Power-up with init lock: grblHAL raises ALARM:11 (homing required).
+    reported = ALARM;
+    port.emitLine('ALARM:11');
+    port.emitLine(reported);
+    await vi.advanceTimersByTimeAsync(1);
+    expect(useLaserStore.getState().statusReport?.state).toBe('Alarm');
+  } else {
+    // Unlocked earlier with $X: Idle, axes still unhomed.
+    port.emitLine(IDLE);
+    await vi.advanceTimersByTimeAsync(1);
+    expect(useLaserStore.getState().statusReport?.state).toBe('Idle');
+  }
 
   let outcome = 'pending';
   useLaserStore
