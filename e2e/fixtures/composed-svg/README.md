@@ -14,8 +14,11 @@ The first image has local bounds `[-2, 4]` to `[38, 34]`, both-axis mirroring,
 31° rotation, unequal scales 2 and 0.75, and translation `(-80, 35)`. Its compound
 even-odd clip contains a hole and intersects an ancestor clip. The mixed fixture
 also has negative coordinates, a filled vector with a hole, an open stroke, and
-an overlapping second image. Import may translate the composition as a unit;
-it must preserve physical size and registration.
+an overlapping second image. Import translates the composition as a unit. On the
+default 400 mm bed, the two 1100 mm compositions fit uniformly to 360 mm wide,
+preserving relative registration. The first Undo restores the authored 1100 mm
+size and the second removes the whole file. Redo restores both stages. The small
+clipped-only image retains its authored size and takes one Undo to remove.
 
 The browser test uses the ordinary Import and SVG Export commands with the
 existing picker fixture. Document parsing runs in a real browser Worker; no
@@ -23,7 +26,8 @@ parser or store mutation is substituted. Escape cancellation holds the second
 native bitmap decode until the key is pressed, then resumes the real decoder.
 The clear-project helper is used only between independent import attempts.
 
-Exported SVG is rendered with Chromium's native SVG implementation independently
+After undoing any automatic fit, exported SVG is rendered at matched authored
+dimensions with Chromium's native SVG implementation independently
 of KerfDesk's parser and renderer. Fewer than 0.01% of pixels may differ by over
 12 levels in any RGBA channel, allowing subpixel clipping antialiasing. Separate
 workspace samples compare visible pixels, the hole, and both clip boundaries
