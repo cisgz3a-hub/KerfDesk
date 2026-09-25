@@ -50,14 +50,14 @@ describe('explicit Centerline SVG paint', () => {
     expect(countVisibleColoredPaths(paths, 'centerline')).toBe(2);
   });
 
-  it('keeps physical dimensions, rounding and implicit filled/Edge defaults', () => {
+  it('keeps physical dimensions, rounding, the implicit filled default and Edge as a line mode', () => {
     const paths = [path([outer, inner, branch])],
       size = { widthMm: 12.3456, heightMm: 6.789 };
     const plain = coloredPathsToSvg(paths, 16, 16, size);
-    for (const mode of ['filled-contours', 'edge'] as const) {
-      expect(coloredPathsToSvg(paths, 16, 16, size, mode)).toBe(plain);
-    }
+    expect(coloredPathsToSvg(paths, 16, 16, size, 'filled-contours')).toBe(plain);
     const svg = coloredPathsToSvg(paths, 16, 16, size, 'centerline');
+    // Edge commits as a LINE layer, exactly like Centerline.
+    expect(coloredPathsToSvg(paths, 16, 16, size, 'edge')).toBe(svg);
     expect(svg).toContain('width="12.35mm" height="6.79mm"');
     expect(svg).toContain('M1.23 1 L11 1');
     expect(plain).toContain('fill-rule="evenodd"');

@@ -82,7 +82,7 @@ describe('TracePreview original image space', () => {
     const image = host.querySelector('img') as HTMLImageElement;
     Object.defineProperties(image, { naturalWidth: { value: 256 }, naturalHeight: { value: 85 } });
     for (let index = 0; index < 4; index += 1) await click('Zoom in');
-    await resize(observers.at(-1), 9600, 5760);
+    await resize(stageObservers().at(-1), 9600, 5760);
     const rectangle = artwork();
     expect(parseFloat(rectangle.style.width)).toBe(9600);
     expect(parseFloat(rectangle.style.height)).toBeCloseTo((9600 * 3333) / 10001, 8);
@@ -129,9 +129,9 @@ describe('TracePreview original image space', () => {
         </StrictMode>,
       ),
     );
-    expect(observers).toHaveLength(2);
-    const first = observers[0];
-    const current = observers[1];
+    // The viewport has its own observer (zoom range); follow the stage's.
+    expect(stageObservers()).toHaveLength(2);
+    const [first, current] = stageObservers();
     expect(first?.disconnect).toHaveBeenCalledTimes(1);
     const path = host.querySelector('#rounded-grid');
     await resize(current, 600, 400);
@@ -144,6 +144,12 @@ describe('TracePreview original image space', () => {
     expect(host.querySelector('#rounded-grid')).toBe(path);
   });
 });
+
+function stageObservers(): ResizeObserverStub[] {
+  return observers.filter((observer) =>
+    observer.target?.classList.contains('lf-trace-preview__stage'),
+  );
+}
 
 function artwork(): HTMLDivElement {
   const rectangle = host.querySelector<HTMLDivElement>('.lf-trace-preview__artwork');
