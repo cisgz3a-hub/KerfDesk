@@ -57,3 +57,104 @@ Re-read meerk40t rdjob.py at 7e82652f: `write_header` 1401-1504, `write_layer_en
 | RU-6 | confirmed | laser-command-family.ts:11-20 enables Connect on `serialSupported && !connected`; laser-connect-action.ts opens the port without a transport check. |
 | RU-7 | confirmed | emit-rd.ts: advisories are only the pre-emit ones; the post-compile zone/bounds checks run only for G-code saves. |
 | RU-8 | confirmed (latent, low) | No caller outside tests. Fix before wiring a socket; out of scope for live behaviour. |
+
+## HF — grblHAL, FluidNC, Falcon
+
+Lead re-read: grblHAL protocol.c:205-280 (sticky `last_error`, cleared by an empty line, a
+successful `$` line, ASCII_CAN or reset), config.h:96 (`COMPATIBILITY_LEVEL 0`), alarms.h:73-80,
+system.c:1175-1183 and 490-505, protocol.c:160-176, report.c:305-315, grbl.h:38-43; FluidNC v4.0.3
+ProcessSettings.cpp:269-286 and Protocol.cpp:455-475.
+
+| id | verdict | lead notes |
+|---|---|---|
+| HF-7 | confirmed (grblHAL default); plausible (Falcon) | `else if(gc_state.last_error == Status_OK …)` gates every G-code line at level 0. KerfDesk's own `G4 P0.01` release marker is G-code, so ADR-361's automatic release fails twice after a refused `$J=`. |
+| HF-3 | confirmed; merged with GP-2 | `alarm_is_critical` + `Status_NotAllowedCriticalEvent` (79) for `$X`/`$H`. Text half fixed with GP-2/GP-8. |
+| HF-2 | confirmed; merged with GP-2 | FluidNC `$X` unlocks only `State::Alarm`; Critical returns `Error::Ok`. |
+| HF-1 | plausible | grblHAL `go_home` re-enters Alarm while axes are unhomed (system.c:500-503). Race window as described. |
+| HF-6 | confirmed (low) | FluidNC long names (`Settings/Restore`, `Settings/Erase`, `NVX`) are matched case-insensitively upstream; KerfDesk blocks only `$RST=`. |
+| HF-4 | confirmed (low) | Falcon cannot write `$62`. |
+| HF-8 | confirmed (mechanism); plausible (Falcon) | grblHAL prints `Grbl 1.1f` at level ≥ 1 (report.c:310-314); detection maps it to stock GRBL. |
+| HF-5 | confirmed (low); merged with CG-8 | grblHAL protocol.c:167-173 and FluidNC Protocol.cpp:1158 re-enter Alarm after a reset from Sleep; gnea/grbl protocol.c:49-54 does the same. |
+
+## MA — Marlin
+
+Lead re-read: Marlin 2.1.2.8 queue.cpp:537-545 (M410/M112 early, EMERGENCY_PARSER off in stock),
+planner.cpp:1385-1399 and 1676-1706, M3-M5.cpp:140-156, gcode.cpp:1114-1122, parser.cpp:388-393,
+G92.cpp:60-72, Configuration.h:2228-2229, Configuration_adv.h (LASER_FEATURE, AIR_ASSIST,
+CNC_COORDINATE_SYSTEMS commented out; LASER_SAFETY_TIMEOUT_MS 1000).
+
+| id | verdict | lead notes |
+|---|---|---|
+| MA-1 | confirmed (critical) | Fan dialect: `check_axes_activity` drives the fan from the current speed with an empty planner. Inline: only dynamic mode blanks. |
+| MA-7 | confirmed (critical) | `M5` synchronizes; `M410` is acted on when read and drops the planner. Product decision: Abort sends M410 (ADR). |
+| MA-4 | confirmed | `M400` answers after the drain; busy keepalives every 2 s are dropped. |
+| MA-9 | confirmed | Same family as ST-5: the hold copy names a status report never polled. |
+| MA-12 | confirmed | `echo:Unknown command` then `ok`. Product decision (ADR). |
+| MA-3 | confirmed | Abort applies the GRBL reset patch without a reset. Reset-origin half = CG-11. |
+| MA-2 | confirmed (medium) | Marlin origin model decision (ADR) with CG-1, CG-11. |
+| MA-8 | confirmed | No G0_FEEDRATE in stock; G0 runs at the modal F. |
+| MA-5 | confirmed | queue.cpp drops comment-only lines without a reply. |
+| MA-6 | confirmed | M114 prints one label per configured axis. |
+| MA-10 | confirmed (low); reconnect effect plausible | M112/kill needs a reset or power cycle. |
+| MA-11 | confirmed (test fidelity) | Simulator is not FIFO and answers comment lines. |
+
+## SM — Smoothieware
+
+Lead re-read: Block.h:81, Planner.cpp:81, Robot.cpp:1034/1466, Laser.cpp:50-58/246,
+SimpleShell.cpp:214-253 and 872-885 (`$G` answers `[GC:…]` + `ok`), Endstops.cpp:847-853 and
+1110-1122 (G28.6), Kernel.cpp:284-295 (idle `F:` is the requested feed).
+
+| id | verdict | lead notes |
+|---|---|---|
+| SM-1 | confirmed (high) | Same root cause as CG-1: derive the offset from MPos − WPos. |
+| SM-7 | confirmed | `roundf(S*2048)` into a 12-bit field; the track's disassembly of the shipped binary agrees. Only S < 2 works. |
+| SM-6 | confirmed | `$H` prints `ok` unconditionally; G28.6 reports per-axis homed flags. |
+| SM-3 | confirmed | Laser module deletes itself when disabled; nothing answers `fire off`. |
+| SM-2 | confirmed (traced, history) | `M221 P` exists only since 971eb8cf. |
+| SM-5 | confirmed (low) | Needs a small decision (ADR): explicit feed on travel after a stopped Frame. |
+| SM-8 | confirmed (low) | Unsolicited `ALARM:` lines booked as terminal replies. |
+| SM-9 | confirmed (low, display) | Idle `F:` is the requested feed. |
+| SM-4 | confirmed (test fidelity) | |
+
+## CG — cross-firmware gating
+
+| id | verdict | lead notes |
+|---|---|---|
+| CG-12 | confirmed (high) | use-job-shortcuts.ts called `cancelJog()` without a jog-cancel byte. Fixed. |
+| CG-1 | confirmed | Smoothieware half with SM-1; Marlin half with the Marlin origin ADR. |
+| CG-2 | confirmed | Fix before GP-1 as the track orders it. Smoothieware `$G` verified in SimpleShell.cpp. |
+| CG-11 | confirmed | G92.cpp:62-70: `G92.1` exists only with CNC_COORDINATE_SYSTEMS (off in stock). |
+| CG-9 | confirmed | Fixed: auto-focus runs the driver's Console policy; `$HZ1` preset is Falcon-only. |
+| CG-3 | confirmed | Smoothieware halt prints no banner, so nothing re-arms qualification. |
+| CG-4 | confirmed (low) | |
+| CG-10 | confirmed (low) | Only M9 turns Marlin air assist off (M7-M9.cpp). |
+| CG-5 | confirmed (low, traced) | |
+| CG-7 | confirmed (low, traced) | |
+| CG-8 | merged into HF-5 | |
+
+## OR — output, profiles, recovery
+
+Lead re-read: gnea/grbl stepper.c:388-400 (only `is_pwm_rate_adjusted` blocks go dark at an
+empty buffer), gcode.c:914-930, motion_control.c:64-76 (coincident move sync in M3).
+
+| id | verdict | lead notes |
+|---|---|---|
+| OR-1 | confirmed (high) | Output change needs an ADR (it changes the 4040's qualified bytes). |
+| OR-2 | confirmed | Fixed reserves below the firmware maxima. |
+| OR-3 | confirmed | Incomplete fix of ADR-362 item 8. |
+| OR-4 | plausible | Closed firmware; nothing public settles `$J=`. Product decision recorded in the ADR. |
+| OR-5 | confirmed (low) | |
+| OR-6 | confirmed (low, traced) | FluidNC `$30`/`$32` are read-only proxies. |
+
+## CN — CNC controllers
+
+| id | verdict | lead notes |
+|---|---|---|
+| CN-1 | confirmed | Export paths say nothing about the GRBL-only CNC dialect. |
+| CN-2 | confirmed (low) | |
+| CN-3 | confirmed (low) | |
+| CN-4 | confirmed (low, wording) | |
+
+Nothing was dropped at lead level beyond the GP-8 error:14 item and the merges above. The
+tracks themselves dropped: the partial's "M5 before M9" OR-1 fix idea, CG-6 (duplicate of SM-4
+and MA-11), and the Marlin comment-only auto-focus case (unreachable).
