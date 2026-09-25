@@ -8,6 +8,7 @@ import {
 } from './fixtures/browser-responsiveness';
 import { installConnectedScriptCanvasProject } from './fixtures/install-connected-script-canvas-project';
 import { showGcodeCanvas } from './fixtures/mixed-canvas-project';
+import { withViewerPhaseDiagnostics } from './fixtures/viewer-phase-diagnostics';
 import { waitForGcodeCanvasReady } from './fixtures/wait-for-gcode-canvas-ready';
 
 const TEST_TIMEOUT_MS = 120_000;
@@ -37,29 +38,34 @@ test('real connected-script multi-operation G-code 3D reaches ready off-thread',
   await page.goto(APP_ROUTE);
   await installConnectedScriptCanvasProject(page);
 
-  await startResponsivenessProbe(page);
-  const startedAt = Date.now();
-  await showGcodeCanvas(page);
-  await waitForGcodeCanvasReady(page);
-  const compileElapsedMs = Date.now() - startedAt;
-  await page.waitForTimeout(POST_READY_OBSERVATION_MS);
-  const responsiveness = await stopResponsivenessProbe(page);
-  const hardwareConcurrency = await page.evaluate(() => navigator.hardwareConcurrency);
-  await expect(page.getByLabel(CANVAS_LABEL)).toBeVisible();
-  await expect(page.getByRole('button', { name: REFRESH_BUTTON_NAME, exact: true })).toBeEnabled();
-  await expect(page.getByLabel(PLAYBACK_LABEL, { exact: true })).toBeVisible();
+  await withViewerPhaseDiagnostics(page, testInfo, async (endPhase) => {
+    await startResponsivenessProbe(page);
+    const startedAt = Date.now();
+    await showGcodeCanvas(page);
+    await waitForGcodeCanvasReady(page);
+    const compileElapsedMs = Date.now() - startedAt;
+    await page.waitForTimeout(POST_READY_OBSERVATION_MS);
+    const responsiveness = await stopResponsivenessProbe(page);
+    await endPhase();
+    const hardwareConcurrency = await page.evaluate(() => navigator.hardwareConcurrency);
+    await expect(page.getByLabel(CANVAS_LABEL)).toBeVisible();
+    await expect(
+      page.getByRole('button', { name: REFRESH_BUTTON_NAME, exact: true }),
+    ).toBeEnabled();
+    await expect(page.getByLabel(PLAYBACK_LABEL, { exact: true })).toBeVisible();
 
-  reportViewerMeasurement({
-    testInfo,
-    compileElapsedMs,
-    hardwareConcurrency,
-    responsiveness,
-    workerUrls,
+    reportViewerMeasurement({
+      testInfo,
+      compileElapsedMs,
+      hardwareConcurrency,
+      responsiveness,
+      workerUrls,
+    });
+    expectRequiredWorkers(workerUrls);
+    expect(pageErrors).toEqual([]);
+    await expect(page.getByText(COMPILATION_UNAVAILABLE_PATTERN)).toHaveCount(0);
+    await expect(page.getByText(PREVIEW_WORKER_UNAVAILABLE_PATTERN)).toHaveCount(0);
   });
-  expectRequiredWorkers(workerUrls);
-  expect(pageErrors).toEqual([]);
-  await expect(page.getByText(COMPILATION_UNAVAILABLE_PATTERN)).toHaveCount(0);
-  await expect(page.getByText(PREVIEW_WORKER_UNAVAILABLE_PATTERN)).toHaveCount(0);
 });
 
 function reportViewerMeasurement(args: {
