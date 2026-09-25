@@ -23,12 +23,19 @@ describe('photo shading settings', () => {
   });
 
   it('isolates photo adjustments when returning to a line-art preset', () => {
-    const settings = { photoDetail: 95, photoBrightness: 20, photoContrast: -40, photoGamma: 1.8 };
+    const settings = {
+      photoDetail: 95,
+      photoBrightness: 20,
+      photoContrast: -40,
+      photoGamma: 1.8,
+      photoInvert: true,
+    };
     expect(mergeLightBurnTraceSettings(PHOTO, settings)).toMatchObject({
       photoDetail: 95,
       brightness: 20,
       contrast: -40,
       gamma: 1.8,
+      invert: true,
     });
     expect(mergeLightBurnTraceSettings(TRACE_PRESETS['Line Art']!, settings)).toEqual(
       TRACE_PRESETS['Line Art'],
@@ -53,5 +60,15 @@ describe('photo shading settings', () => {
       }),
     ).toEqual({ ...PHOTO, gamma: 1 });
     expect(mergeLightBurnTraceSettings(PHOTO, { photoGamma: -1 }).gamma).toBe(0.1);
+  });
+
+  it('starts from a neutral gamma and no inversion, and lets the preset set them', () => {
+    expect(PHOTO).toMatchObject({ gamma: 1, invert: false });
+    expect(mergeLightBurnTraceSettings(PHOTO, {})).toEqual(PHOTO);
+    const custom = { ...PHOTO, gamma: 1.3, invert: true };
+    expect(mergeLightBurnTraceSettings(custom, {})).toMatchObject({ gamma: 1.3, invert: true });
+    expect(mergeLightBurnTraceSettings(custom, { photoInvert: false })).toMatchObject({
+      invert: false,
+    });
   });
 });

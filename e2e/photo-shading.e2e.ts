@@ -91,6 +91,12 @@ test('photo shading retains portrait tones through the real worker, preview and 
         if (value === undefined) throw new Error('Portrait comparison pixel is out of bounds');
         return value;
       }
+      // sRGB decoding (CSS Color 4). Filled lines reflect in proportion to their
+      // uncovered area, so the source's tone is compared in linear light.
+      function linear(byte: number): number {
+        const c = byte / 255;
+        return c <= 0.04045 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4;
+      }
       const source = await pixels(`data:image/png;base64,${portrait}`, 512);
       const sized = svg
         .replace('width="100%"', 'width="2048"')
@@ -99,7 +105,8 @@ test('photo shading retains portrait tones through the real worker, preview and 
       let error = 0;
       let count = 0;
       // Face and hair, divided into independent 16px cells. Measure local mean
-      // tone after real SVG rendering instead of asserting only path counts.
+      // tone after real SVG rendering instead of asserting only path counts:
+      // the rendered black-and-white pixels average to the uncovered area.
       for (let y = 48; y < 192; y += 16) {
         for (let x = 160; x < 304; x += 16) {
           let truth = 0;
@@ -108,10 +115,9 @@ test('photo shading retains portrait tones through the real worker, preview and 
             for (let dx = 0; dx < 16; dx += 1) {
               const i = ((y + dy) * 512 + x + dx) * 4;
               truth +=
-                (pixelByte(source, i) * 0.2126 +
-                  pixelByte(source, i + 1) * 0.7152 +
-                  pixelByte(source, i + 2) * 0.0722) /
-                255;
+                linear(pixelByte(source, i)) * 0.2126 +
+                linear(pixelByte(source, i + 1)) * 0.7152 +
+                linear(pixelByte(source, i + 2)) * 0.0722;
             }
           }
           for (let dy = 0; dy < 64; dy += 1) {

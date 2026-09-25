@@ -3,8 +3,9 @@
 // vertex becomes a G1 endpoint, so pixel-pitch vertices with 15-25deg
 // heading jitter put a 15-80 Hz lateral-impulse train into the machine at
 // F300 — the measured chatter. At commit, and only when the project is CNC,
-// the traced polylines are refaired in physical units. Laser commits pass
-// the tracer's output through untouched.
+// the traced polylines are refaired in physical units. Laser commits keep
+// their geometry within the machine curve tolerance instead
+// (laser-trace-moves.ts, ADR-391).
 
 import { fairToolpathPolylines } from '../../core/geometry';
 import {

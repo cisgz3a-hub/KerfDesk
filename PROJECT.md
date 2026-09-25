@@ -155,9 +155,11 @@ Type and edit text directly on the canvas with the Text tool or **T**; live draf
 
 Import a raster (JPG/PNG), trace to vectors with the in-house contour/centerline/edge engine (ADR-123 — binary presets route to `contour-trace.ts`; Centerline is a shipped preset). `imagetracerjs` (Unlicense — MIT-compatible; `potrace-wasm` rejected on GPL grounds) remains only as a UI-unreachable multi-colour fallback. Traced paths become Scene objects that flow through the existing Line pipeline. See ADR-013 and ADR-123.
 
-**Photo shading (ADR-349).** A dedicated preset preserves portrait and photographic
-tones as fine filled vector lines with varying widths. Detail, Brightness and
-Contrast control the result; binary thresholding does not run. Editable vectors
+**Photo shading (ADR-349, ADR-390).** A dedicated preset preserves portrait and
+photographic tones as fine filled vector lines with varying widths; their covered
+area is one minus the source's linear-light luminance. Detail (scaled to the image
+size), Brightness, Contrast, Midtones and Invert control the result; binary
+thresholding does not run. Editable vectors
 use Fill for shaded laser output. The dialog's Raster scan output preserves
 partial pixel coverage before Image processing. CNC retains editable geometry;
 tool size and the chosen machining operation determine achievable shading.

@@ -4,3 +4,7 @@
 // ADR-015 export cap). Cross-module consumers import from here.
 export { weldOpenPolylines, type WeldOpenPolylinesOptions } from './weld-open-polylines';
 export { preparePolylineContacts } from './prepare-polyline-contacts';
+export {
+  simplifyToolpathPolyline,
+  type ToolpathSimplifyOptions,
+} from './simplify-toolpath-polyline';

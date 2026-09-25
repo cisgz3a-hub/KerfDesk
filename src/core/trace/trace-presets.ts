@@ -59,6 +59,10 @@ export const TRACE_PRESETS: Readonly<Record<string, TraceOptions>> = {
     photoDetail: 60,
     brightness: 0,
     contrast: 0,
+    // Tone is read in linear light (photo-tone.ts), so gamma 1 (Midtones in
+    // the dialog) already gives each shade the coverage it needs.
+    gamma: 1,
+    invert: false,
     numberOfColors: 2,
     pathOmit: 0,
     lineTolerance: 1,

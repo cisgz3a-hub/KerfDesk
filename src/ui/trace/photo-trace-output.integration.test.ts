@@ -57,6 +57,13 @@ const BAND_HEIGHT_MM = HEIGHT_MM / TONES.length;
 const OFFSET_MM = 10;
 const BAND_INSET_MM = 2;
 
+// Photo shading covers 1 - linear(sRGB) of each area (ADR-390). Written out
+// from CSS Color 4 so the expectation does not reuse the implementation.
+function linear(byte: number): number {
+  const c = byte / 255;
+  return c <= 0.04045 ? c / 12.92 : Math.pow((c + 0.055) / 1.055, 2.4);
+}
+
 function toneBands(): RawImageData {
   const data = new Uint8ClampedArray(WIDTH_PX * HEIGHT_PX * 4);
   for (let y = 0; y < HEIGHT_PX; y += 1) {
@@ -167,8 +174,9 @@ function expectDistinctShades(coverage: ReadonlyArray<number>): void {
   const measured = `Measured dark-to-light coverage: ${coverage.join(', ')}`;
   coverage.forEach((value, index) => {
     const tone = TONES[index] ?? 255;
-    expect(Math.abs(value - (1 - tone / 255)), measured).toBeLessThan(0.12);
-    if (index > 0) expect((coverage[index - 1] ?? 0) - value, measured).toBeGreaterThan(0.08);
+    expect(Math.abs(value - (1 - linear(tone))), measured).toBeLessThan(0.03);
+    // Linear light compresses shadows: sRGB 32 and 80 need 98.6% and 92.0%.
+    if (index > 0) expect((coverage[index - 1] ?? 0) - value, measured).toBeGreaterThan(0.05);
   });
 }
 
@@ -189,9 +197,9 @@ describe('Photo shading through committed output', () => {
     );
     const luma = Array.from(atob(raster.lumaBase64 ?? ''), (value) => value.charCodeAt(0));
     expect(luma.length).toBeGreaterThan(1000);
+    // The bitmap carries burn coverage: pale sRGB 240 reflects 87% of white.
     const mean = luma.reduce((sum, value) => sum + value, 0) / luma.length;
-    expect(mean).toBeGreaterThan(238);
-    expect(mean).toBeLessThan(242);
+    expect(Math.abs(mean - 255 * linear(240))).toBeLessThan(2);
   });
   it(
     'preserves five shades as burn coverage in default horizontal vector fill',

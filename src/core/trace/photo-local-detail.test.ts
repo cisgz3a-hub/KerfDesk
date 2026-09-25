@@ -16,6 +16,13 @@ function image(width: number, height: number, sample: (y: number) => number): Ra
   return { width, height, data };
 }
 
+// Photo shading covers 1 - linear(sRGB) of each area (ADR-390). Written out
+// from CSS Color 4 so the expectations do not reuse the implementation.
+function linear(byte: number): number {
+  const c = byte / 255;
+  return c <= 0.04045 ? c / 12.92 : Math.pow((c + 0.055) / 1.055, 2.4);
+}
+
 function trace(source: RawImageData): ColoredPath[] {
   return runTraceSteps(
     traceImageToPhotoPathsSteps(source, { ...DEFAULT_TRACE_OPTIONS, photoDetail: 100 }),
@@ -42,11 +49,11 @@ function widthAt(paths: readonly ColoredPath[], y: number): number {
 
 it('retains cell-centre contrast next to a sharp tone transition', () => {
   const paths = trace(image(1, 20, (y) => (y < 10 ? 32 : 224)));
-  expect(widthAt(paths, 9.5)).toBeCloseTo(223 / 255, 12);
-  expect(widthAt(paths, 10.5)).toBeCloseTo(31 / 255, 12);
+  expect(widthAt(paths, 9.5)).toBeCloseTo(1 - linear(32), 12);
+  expect(widthAt(paths, 10.5)).toBeCloseTo(1 - linear(224), 12);
   // Half-cell endpoints extend their own tone; they do not bleed beyond the source.
-  expect(widthAt(paths, 0.1)).toBeCloseTo(223 / 255, 12);
-  expect(widthAt(paths, 19.9)).toBeCloseTo(31 / 255, 12);
+  expect(widthAt(paths, 0.1)).toBeCloseTo(1 - linear(32), 12);
+  expect(widthAt(paths, 19.9)).toBeCloseTo(1 - linear(224), 12);
 });
 
 it('keeps complete white gaps and total tone while spending a fixed dense-geometry budget', () => {
@@ -68,7 +75,7 @@ it('keeps complete white gaps and total tone while spending a fixed dense-geomet
   }
   let expected = 0;
   expect(validBounds).toBe(true);
-  for (let i = 0; i < source.data.length; i += 4) expected += 1 - source.data[i]! / 255;
+  for (let i = 0; i < source.data.length; i += 4) expected += 1 - linear(source.data[i]!);
   expect(area / (source.width * source.height)).toBeCloseTo(
     expected / (source.width * source.height),
     10,

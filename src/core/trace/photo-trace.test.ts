@@ -22,6 +22,13 @@ function gray(width: number, height: number, value: number, alpha = 255): RawIma
   return fixture(width, height, () => [value, value, value, alpha]);
 }
 
+// sRGB decoding written out from CSS Color 4 (IEC 61966-2-1), independent of
+// the implementation, so coverage expectations are one minus linear light.
+function linear(byte: number): number {
+  const c = byte / 255;
+  return c <= 0.04045 ? c / 12.92 : Math.pow((c + 0.055) / 1.055, 2.4);
+}
+
 function trace(image: RawImageData, overrides: Partial<TraceOptions> = {}): ColoredPath[] {
   return runTraceSteps(traceImageToPhotoPathsSteps(image, { ...options, ...overrides }));
 }
@@ -67,7 +74,7 @@ describe('photo shading vectors', () => {
     (value) => {
       const image = gray(91, 67, value);
       const paths = trace(image);
-      const darkness = 1 - value / 255;
+      const darkness = 1 - linear(value);
       expect(area(paths) / (image.width * image.height)).toBeCloseTo(darkness, 10);
       expect(inkWidthAt(paths, 33.37) / image.width).toBeCloseTo(darkness, 10);
       if (value === 255) expect(paths).toEqual([]);
@@ -92,15 +99,27 @@ describe('photo shading vectors', () => {
     );
     expect(new Set(coverages.map((value) => value.toFixed(5))).size).toBe(126);
     for (let y = 0; y < coverages.length; y += 1) {
-      expect(coverages[y]).toBeCloseTo(1 - ((y + 1) * 2) / 255, 9);
+      // Mid-row widths blend neighbouring boundaries, so a curved tone
+      // response sits within a small fraction of each row's own darkness.
+      expect(Math.abs(coverages[y]! - (1 - linear((y + 1) * 2)))).toBeLessThan(2e-4);
+      if (y > 0) expect(coverages[y]).toBeLessThan(coverages[y - 1]!);
     }
     expect(coverages.at(-1)).toBeGreaterThan(0);
-    expect(area(paths) / (64 * 128)).toBeCloseTo(1 - 127 / 255, 10);
+    const meanDarkness = Array.from({ length: 128 }, (_, y) => 1 - linear(y * 2));
+    expect(area(paths) / (64 * 128)).toBeCloseTo(
+      meanDarkness.reduce((sum, value) => sum + value, 0) / 128,
+      10,
+    );
   });
 
-  it('composites partial alpha onto white while ignoring hidden transparent RGB', () => {
+  it('composites partial alpha onto white in linear light while ignoring hidden transparent RGB', () => {
+    // Alpha is covered area: black at half alpha reflects half the light
+    // (about sRGB 187), not what the byte-space composite 127 reflects.
     expect(area(trace(gray(45, 39, 0, 128))) / (45 * 39)).toBeCloseTo(128 / 255, 10);
-    expect(trace(gray(45, 39, 0, 128))).toEqual(trace(gray(45, 39, 127)));
+    expect(area(trace(gray(45, 39, 64, 128))) / (45 * 39)).toBeCloseTo(
+      (128 / 255) * (1 - linear(64)),
+      10,
+    );
     const invisible = fixture(45, 39, (x, y) => [x * 5, y * 6, (x + y) * 3, 0]);
     expect(trace(invisible)).toEqual([]);
     expect(trace(invisible, { invert: true, brightness: -100 })).toEqual([]);
@@ -109,6 +128,12 @@ describe('photo shading vectors', () => {
   it('uses colour luminance before compositing partial alpha', () => {
     const image = fixture(2, 1, (x) => (x === 0 ? [255, 0, 0, 255] : [0, 255, 0, 128]));
     expect(area(trace(image))).toBeCloseTo(1 - 0.2126 + ((1 - 0.7152) * 128) / 255, 10);
+  });
+
+  it('weights linear channels, not stored bytes, for mixed colours', () => {
+    const image = fixture(1, 1, () => [200, 90, 30, 255]);
+    const luminance = 0.2126 * linear(200) + 0.7152 * linear(90) + 0.0722 * linear(30);
+    expect(area(trace(image))).toBeCloseTo(1 - luminance, 10);
   });
 
   it('splits ribbons at completely white gaps', () => {
@@ -120,7 +145,7 @@ describe('photo shading vectors', () => {
     expect(paths[0]!.polylines).toHaveLength(2);
     expect(inkWidthAt(paths, 2.5)).toBe(0);
     expect(inkWidthAt(paths, 3.5)).toBe(0);
-    expect(area(paths)).toBeCloseTo((6 * 127) / 255, 10);
+    expect(area(paths)).toBeCloseTo(6 * (1 - linear(128)), 10);
     for (const line of paths[0]!.polylines) {
       expect(line.points.every((p) => p.y <= 2) || line.points.every((p) => p.y >= 4)).toBe(true);
     }
@@ -132,7 +157,7 @@ describe('photo shading vectors', () => {
       return [value, value, value, 255];
     });
     let expectedArea = 0;
-    for (let i = 0; i < image.data.length; i += 4) expectedArea += 1 - image.data[i]! / 255;
+    for (let i = 0; i < image.data.length; i += 4) expectedArea += 1 - linear(image.data[i]!);
     const paths = trace(image, { photoDetail: 0 });
     expect(area(paths)).toBeCloseTo(expectedArea, 7);
     for (const point of paths.flatMap((p) => p.polylines).flatMap((p) => p.points)) {
@@ -169,6 +194,34 @@ describe('photo shading vectors', () => {
     expect(trace(gray(100000, 1, 128), { photoDetail: 100 })[0]!.polylines).toHaveLength(320);
     expect(trace(gray(1, 100000, 128), { photoDetail: 100 })[0]!.polylines).toHaveLength(1);
   });
+
+  it('keeps every Detail step live on a source smaller than 320 pixels', () => {
+    // A solid source has one ribbon per column, so ribbons count columns.
+    const image = gray(200, 120, 0);
+    const columns = Array.from(
+      { length: 101 },
+      (_, detail) => trace(image, { photoDetail: detail })[0]!.polylines.length,
+    );
+    for (let detail = 1; detail <= 100; detail += 1) {
+      expect(columns[detail]).toBeGreaterThan(columns[detail - 1]!);
+    }
+    expect(columns[0]).toBe(30);
+    expect(columns[100]).toBe(200);
+  });
+
+  it.each([320, 640, 2048])(
+    'keeps the 48 to 320 line scale on a source %s pixels wide',
+    (width) => {
+      const image = gray(width, 100, 0);
+      for (const [detail, columns] of [
+        [0, 48],
+        [60, 211],
+        [100, 320],
+      ] as const) {
+        expect(trace(image, { photoDetail: detail })[0]!.polylines).toHaveLength(columns);
+      }
+    },
+  );
 
   it('is deterministic and identical through cooperative checkpoints without mutating input', () => {
     const image = fixture(79, 101, (x, y) => [x * 3, y * 2, x + y, 128 + (x % 128)]);
@@ -223,14 +276,21 @@ describe('photo shading vectors', () => {
   });
 
   it.each([
-    [{ brightness: 20 }, 115],
-    [{ contrast: 100 }, 0],
-    [{ gamma: 2 }, 128],
-    [{ invert: true }, 191],
-  ] as const)('applies the existing trace tone adjustment %j', (adjustment, adjustedGray) => {
-    const image = gray(39, 53, 64);
-    expect(area(trace(image, adjustment)) / (39 * 53)).toBeCloseTo(1 - adjustedGray / 255, 10);
-  });
+    [{}, 1 - linear(64)],
+    [{ brightness: 20 }, 1 - linear(115)],
+    [{ contrast: 100 }, 1],
+    [{ gamma: 2 }, 1 - linear(128)],
+    // Invert swaps light and dark in linear light: the lines follow the
+    // photo's luminance, so a deep shadow gets little coverage.
+    [{ invert: true }, linear(64)],
+    [{ gamma: 2, invert: true }, linear(128)],
+  ] as const)(
+    'applies the trace tone adjustment %j before linear light',
+    (adjustment, coverage) => {
+      const image = gray(39, 53, 64);
+      expect(area(trace(image, adjustment)) / (39 * 53)).toBeCloseTo(coverage, 10);
+    },
+  );
 
   it.each([NaN, Infinity, -Infinity])(
     'normalizes non-finite detail and tone inputs (%s)',

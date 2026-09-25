@@ -61,6 +61,30 @@ function circle(): CurveSubpath {
 }
 
 describe('deleteCurveNodes', () => {
+  it('keeps a broad arch when deleting the anchor between its two exact halves', () => {
+    // De Casteljau halves of (0,0), (8,4), (2,4), (10,0). The curve is
+    // monotonic along x even though its two original control arms overlap.
+    const source: CurveSubpath = {
+      start: { x: 0, y: 0 },
+      closed: false,
+      segments: [
+        { kind: 'cubic', control1: { x: 4, y: 2 }, control2: { x: 4.5, y: 3 }, to: { x: 5, y: 3 } },
+        {
+          kind: 'cubic',
+          control1: { x: 5.5, y: 3 },
+          control2: { x: 6, y: 2 },
+          to: { x: 10, y: 0 },
+        },
+      ],
+    };
+    const merged = deleteCurveNodes(source, new Set([1]));
+    expect(merged?.segments).toHaveLength(1);
+    const midpoint = cubicPoint(merged!.start, merged!.segments[0]!, 0.5);
+    // The arc-length-sampled single fit keeps the removed anchor within 0.4 mm;
+    // applying the recursive trace ordering guard flattens it by over 1.2 mm.
+    expect(Math.hypot(midpoint.x - 5, midpoint.y - 3)).toBeLessThan(0.4);
+  });
+
   it('merges the two curves around an interior anchor into one cubic on the original shape', () => {
     const source = quarterCircle();
     const removed = source.segments[0]!.to;

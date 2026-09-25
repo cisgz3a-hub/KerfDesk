@@ -3,7 +3,7 @@
 // length; horizontal fill scanlines therefore retain even very light shades.
 import { type ColoredPath } from '../scene';
 import { finiteOr } from '../util';
-import { adjustBrightness, adjustContrast, adjustGamma, invertImage } from './raster-prep';
+import { photoToneLookup } from './photo-tone';
 import { isValidRawImageData, type RawImageData, type TraceOptions } from './trace-image';
 import type { TraceSteps } from './trace-steps';
 import { photoRibbonsSteps, type PhotoGrid } from './photo-ribbons';
@@ -31,8 +31,13 @@ export function* traceImageToPhotoPathsSteps(
 
 function photoGrid(image: RawImageData, requestedDetail: number | undefined): PhotoGrid {
   const detail = Math.max(0, Math.min(100, finiteOr(requestedDetail ?? DEFAULT_PHOTO_DETAIL, 60)));
-  const bands = MIN_BANDS + ((MAX_BANDS - MIN_BANDS) * detail) / 100;
   const longest = Math.max(image.width, image.height);
+  // Detail spans what the image can hold: one band per pixel of the longest
+  // side at most. A fixed 48..320 scale left the top of the slider identical
+  // on small sources; sources of MAX_BANDS pixels or more keep that scale
+  // exactly, because the capacity factor is then exactly 1.
+  const capacity = Math.min(MAX_BANDS, longest) / MAX_BANDS;
+  const bands = (MIN_BANDS + ((MAX_BANDS - MIN_BANDS) * detail) / 100) * capacity;
   return {
     columns: Math.max(1, Math.min(image.width, Math.round((image.width / longest) * bands))),
     rows: Math.max(
@@ -42,22 +47,6 @@ function photoGrid(image: RawImageData, requestedDetail: number | undefined): Ph
   };
 }
 
-// Reuse the normal trace adjustment maths on a 256-value ramp. Applying this
-// LUT while sampling avoids allocating a full photo for every adjustment.
-function photoToneLookup(options: TraceOptions): Uint8ClampedArray {
-  const data = new Uint8ClampedArray(256 * 4);
-  for (let value = 0; value < 256; value += 1) {
-    data.fill(value, value * 4, value * 4 + 3);
-    data[value * 4 + 3] = 255;
-  }
-  let ramp: RawImageData = { width: 256, height: 1, data };
-  ramp = adjustBrightness(ramp, finiteOr(options.brightness ?? 0, 0));
-  ramp = adjustContrast(ramp, finiteOr(options.contrast ?? 0, 0));
-  ramp = adjustGamma(ramp, finiteOr(options.gamma ?? 1, 1));
-  if (options.invert === true) ramp = invertImage(ramp);
-  return ramp.data;
-}
-
 // Exact source-pixel area integration, including fractional cells at both
 // axes. Work is linear in source pixels and memory is bounded by 320 x 640
 // doubles, independent of the source dimensions. Checkpoints also occur
@@ -65,7 +54,7 @@ function photoToneLookup(options: TraceOptions): Uint8ClampedArray {
 function* sampleDarknessSteps(
   image: RawImageData,
   grid: PhotoGrid,
-  tone: Uint8ClampedArray,
+  tone: Float64Array,
 ): TraceSteps<Float64Array> {
   const cooperate = yield;
   const darkness = new Float64Array(grid.columns * grid.rows);
@@ -96,7 +85,7 @@ function* sampleDarknessSteps(
   return darkness;
 }
 
-function pixelDarkness(image: RawImageData, offset: number, tone: Uint8ClampedArray): number {
+function pixelDarkness(image: RawImageData, offset: number, tone: Float64Array): number {
   const { data } = image;
   const alpha = (data[offset + 3] ?? 0) / 255;
   if (alpha === 0) return 0;
@@ -104,16 +93,18 @@ function pixelDarkness(image: RawImageData, offset: number, tone: Uint8ClampedAr
   const r = adjustedChannel(data[offset] ?? 0, alpha, composited, tone);
   const g = adjustedChannel(data[offset + 1] ?? 0, alpha, composited, tone);
   const b = adjustedChannel(data[offset + 2] ?? 0, alpha, composited, tone);
-  // Rec. 709 luminance in byte space, then composite onto white. Integer
-  // coefficients keep neutral white at exactly zero and black at one.
-  return (((255 - r) * 2126 + (255 - g) * 7152 + (255 - b) * 722) / 2550000) * alpha;
+  // The lookup gives each channel's darkness in linear light, so Rec. 709
+  // weights give one minus relative luminance. Compositing onto white in
+  // linear light scales it by alpha, the covered area. Integer coefficients
+  // keep neutral white at exactly zero and black at one.
+  return ((r * 2126 + g * 7152 + b * 722) / 10000) * alpha;
 }
 
 function adjustedChannel(
   value: number,
   alpha: number,
   composited: boolean,
-  tone: Uint8ClampedArray,
+  tone: Float64Array,
 ): number {
   // Undo only the decoder's explicitly tagged white composite. Its byte
   // rounding can lose a small amount of source colour; alpha is applied once
@@ -121,5 +112,5 @@ function adjustedChannel(
   const straight = composited
     ? Math.max(0, Math.min(255, Math.round(255 - (255 - value) / alpha)))
     : value;
-  return tone[straight * 4] ?? 0;
+  return tone[straight] ?? 0;
 }
