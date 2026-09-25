@@ -303,7 +303,9 @@ function applyMedian(
 // Brightness → contrast → gamma → invert. Each is a no-op at its
 // neutral value (0 / 0 / 1 / false) and returns the input ref-equal,
 // so chaining is cheap when the user hasn't touched a slider.
-function applyImageAdjustments(image: RawImageData, options: TraceOptions): RawImageData {
+// traceImageToColoredPaths runs this same chain once, before its scale
+// policy, when Invert is on (ADR-396), so both entry points keep this order.
+export function applyImageAdjustments(image: RawImageData, options: TraceOptions): RawImageData {
   let out = image;
   // Non-finite brightness/contrast normalize to their neutral 0 (a NaN/Infinity
   // delta or factor otherwise clamps every channel to 0 — silent blackening);

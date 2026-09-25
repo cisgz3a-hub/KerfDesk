@@ -5,7 +5,7 @@
 //   - adjustBrightness  (delta −100..+100, 0 = no-op)
 //   - adjustContrast    (delta −100..+100, 0 = no-op)
 //   - adjustGamma       (gamma 0.1..5, 1 = no-op; clamp-protected)
-//   - invertImage       (255 − v per channel)
+//   - invertImage       (255 − v per channel; see below for composited input)
 //
 // All four read RGBA input and return a new RawImageData. None mutate.
 // Composable with our existing preprocess.ts chain:
@@ -75,6 +75,79 @@ export function adjustGamma(image: RawImageData, gamma: number): RawImageData {
 // is a white-on-black logo / dark-mode screenshot and the user wants
 // it to engrave as black-on-white (the convention every laser tool
 // assumes).
+//
+// A decoder image tagged rgbCompositedOnWhite stores c = 255 - a(255 - s)
+// for straight colour s and coverage a, so transparency has already become
+// paper-white. Invert then has two honest readings, and which one the user
+// means depends on the artwork, decided once per image:
+//
+//   - Dark (or mixed) artwork: the negative of the image as displayed on
+//     white, 255 - c, returned OPAQUE. It is byte-identical to inverting the
+//     same art on an opaque white background, so a dark logo on a transparent
+//     PNG traces the same negative (frame with the logo as a hole) in every
+//     lane, including the ones that read fully transparent pixels as paper.
+//   - Light artwork: that negative would be a solid slab (a white logo on
+//     transparency is invisible on white and its negative is all ink). The
+//     artwork itself is inverted instead and composited over the same white:
+//     255 - a*s, which in terms of the stored byte is 255(2 - a) - c. The
+//     transparent surround stays paper and the logo becomes the ink.
+//
+// "Light" means the coverage-weighted mean straight luma exceeds mid-grey:
+// sum(a*s)/sum(a) = 255 - 255*sum(255 - c)/sum(alpha) > 127.5, i.e.
+// 2*sum(255 - c) < sum(alpha) over luma bytes. An image with no artwork at
+// all counts as light, so it stays blank. Opaque pixels get 255 - c in both
+// readings, so an opaque image is unaffected by the choice. Because the
+// choice is per image, inverting twice need not restore the input.
 export function invertImage(image: RawImageData): RawImageData {
-  return mapRgb(image, (v) => 255 - v);
+  if (image.rgbCompositedOnWhite !== true || !hasPartialCoverage(image)) {
+    return mapRgb(image, (v) => 255 - v);
+  }
+  return compositedArtworkIsLight(image)
+    ? invertArtworkOverPaper(image)
+    : invertAsDisplayedOnWhite(image);
+}
+
+function hasPartialCoverage(image: RawImageData): boolean {
+  for (let i = 3; i < image.data.length; i += 4) {
+    if ((image.data[i] ?? 255) < 255) return true;
+  }
+  return false;
+}
+
+function compositedArtworkIsLight(image: RawImageData): boolean {
+  let darkness = 0;
+  let coverage = 0;
+  for (let i = 0; i < image.data.length; i += 4) {
+    const luma =
+      0.299 * (image.data[i] ?? 255) +
+      0.587 * (image.data[i + 1] ?? 255) +
+      0.114 * (image.data[i + 2] ?? 255);
+    darkness += 255 - luma;
+    coverage += image.data[i + 3] ?? 255;
+  }
+  return 2 * darkness <= coverage;
+}
+
+function invertAsDisplayedOnWhite(image: RawImageData): RawImageData {
+  const out = new Uint8ClampedArray(image.data.length);
+  for (let i = 0; i < image.data.length; i += 4) {
+    out[i] = 255 - (image.data[i] ?? 0);
+    out[i + 1] = 255 - (image.data[i + 1] ?? 0);
+    out[i + 2] = 255 - (image.data[i + 2] ?? 0);
+    out[i + 3] = 255;
+  }
+  return { width: image.width, height: image.height, data: out };
+}
+
+function invertArtworkOverPaper(image: RawImageData): RawImageData {
+  const out = new Uint8ClampedArray(image.data.length);
+  for (let i = 0; i < image.data.length; i += 4) {
+    const alpha = image.data[i + 3] ?? 255;
+    const paper = 510 - alpha;
+    out[i] = clampByte(paper - (image.data[i] ?? 0));
+    out[i + 1] = clampByte(paper - (image.data[i + 1] ?? 0));
+    out[i + 2] = clampByte(paper - (image.data[i + 2] ?? 0));
+    out[i + 3] = alpha;
+  }
+  return { width: image.width, height: image.height, data: out, rgbCompositedOnWhite: true };
 }

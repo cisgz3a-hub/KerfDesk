@@ -7,7 +7,12 @@
 import type { RgbaBuffer } from '../../core/image-edit';
 import type { RasterImage } from '../../core/scene';
 import { readRasterSourceFile } from '../import/paged-raster-source';
-import { extractLumaBase64, loadImageAsRawData, readFileAsDataUrl } from '../trace/image-loader';
+import {
+  extractLumaBase64,
+  fitDecodeToStoredGrid,
+  loadImageAsRawData,
+  readFileAsDataUrl,
+} from '../trace/image-loader';
 import type { BitmapFields } from './image-editor-types';
 
 const EDITOR_DECODE_FILENAME = 'image-studio-source';
@@ -17,9 +22,11 @@ export async function decodeRasterToBuffer(image: RasterImage): Promise<RgbaBuff
   // embedded source directly instead of routing it through fetch(dataUrl).
   const file = await readRasterSourceFile(image, EDITOR_DECODE_FILENAME);
   // Native resolution: the stored pixel dims are already inside the import
-  // caps, so the cap argument only prevents an unexpected upscale.
+  // caps, so the cap only prevents an unexpected upscale. The stored grid
+  // also holds for a turned JPEG saved before ADR-396 honoured EXIF.
   const maxEdge = Math.max(image.pixelWidth, image.pixelHeight, 1);
-  return loadImageAsRawData(file, maxEdge);
+  const decoded = await loadImageAsRawData(file, maxEdge);
+  return fitDecodeToStoredGrid(decoded, image.pixelWidth, image.pixelHeight);
 }
 
 export async function bakeBufferToBitmapFields(doc: RgbaBuffer): Promise<BitmapFields> {

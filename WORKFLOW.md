@@ -978,7 +978,9 @@ Mac uses `Cmd`, Windows/Linux web uses `Ctrl`.
 - `Cmd/Ctrl+R` - Rectangle
 - `Cmd/Ctrl+E` - Ellipse
 - `Cmd/Ctrl+L` - Line/pen
-- `Alt+M` - Measure
+- `Alt+M` - Measure (Option+M on macOS)
+- `Alt+T` - Trace Image (LightBurn's binding; Option+T on macOS; no-op unless an image is
+  selected)
 - `Cmd/Ctrl+Shift+B` - Convert to Bitmap (LightBurn's binding; no-op unless a
   single convertible vector is selected)
 

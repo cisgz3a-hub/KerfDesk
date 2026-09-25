@@ -221,6 +221,8 @@ describe('Trace Image workflow controls', () => {
         'Smoothness',
         'Optimize',
         'Trace alpha mask',
+        // Line Art offers Invert for light artwork on a dark background.
+        'Invert',
         'Line Art automatically preserves pale logo details.',
         'Fade Image',
         'Delete Image After trace',
@@ -233,7 +235,6 @@ describe('Trace Image workflow controls', () => {
         'Brightness',
         'Contrast',
         'Gamma',
-        'Invert',
       ]) {
         expect(text).not.toContain(label);
       }

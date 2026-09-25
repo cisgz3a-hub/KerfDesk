@@ -10,6 +10,8 @@
 // supported metadata is present, so the caller falls back to the default DPI
 // (254, ADR-048).
 
+import { jpegExifOrientation, orientationSwapsAxes } from '../trace/jpeg-header';
+
 const MM_NONE = null;
 const PNG_SIGNATURE = [0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a];
 
@@ -27,7 +29,16 @@ export type ImageDensity = {
 };
 
 export function densityFromBytes(bytes: Uint8Array): ImageDensity | null {
-  return pngDensity(bytes) ?? jpegDensity(bytes) ?? bmpDensity(bytes);
+  return pngDensity(bytes) ?? orientedJpegDensity(bytes) ?? bmpDensity(bytes);
+}
+
+// JFIF and EXIF densities describe the STORED frame's axes. The import sizes
+// the oriented image, so an Orientation that swaps rows and columns swaps the
+// two densities with them.
+function orientedJpegDensity(bytes: Uint8Array): ImageDensity | null {
+  const density = jpegDensity(bytes);
+  if (density === null || !orientationSwapsAxes(jpegExifOrientation(bytes))) return density;
+  return { xDpi: density.yDpi, yDpi: density.xDpi };
 }
 
 export function normalizeImageDensity(dpi: number | null): number | null {
@@ -98,6 +109,8 @@ function chunkType(view: DataView, offset: number): string {
 // often carry no JFIF at all — the EXIF APP1 (FFE1) TIFF IFD (XResolution +
 // ResolutionUnit). 0xFF fill bytes can pad between segments; skip them rather
 // than mis-reading one as a marker with a garbage length.
+// ../trace/jpeg-header.ts walks the same segments and IFD0 for Orientation;
+// merging the two walkers is a known follow-up (ADR-396).
 function jpegDensity(bytes: Uint8Array): ImageDensity | null {
   if (bytes.length < 4) return null;
   const view = viewOf(bytes);

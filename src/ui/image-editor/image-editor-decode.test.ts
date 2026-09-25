@@ -75,4 +75,15 @@ describe('decodeRasterToBuffer', () => {
     expect(file).toMatchObject({ name: 'image-studio-source', type: 'image/png' });
     expect(maxEdge).toBe(2);
   });
+
+  it('keeps the saved grid of a turned JPEG imported before ADR-396', async () => {
+    // Saved 2x1 with the photo squashed into it; the loader now decodes it turned.
+    vi.spyOn(imageLoader, 'loadImageAsRawData').mockResolvedValue({
+      width: 1,
+      height: 2,
+      data: new Uint8ClampedArray([90, 90, 90, 255, 90, 90, 90, 255]),
+    });
+
+    await expect(decodeRasterToBuffer(IMAGE)).resolves.toMatchObject({ width: 2, height: 1 });
+  });
 });

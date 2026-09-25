@@ -6,7 +6,12 @@
 // keydown is also the freshest state a shortcut could act on.
 
 import type { PlatformAdapter } from '../../platform/types';
-import { selectedConvertibleVectors, selectedObjectIds } from '../commands/selection-command-state';
+import { traceImageAction } from '../commands/image-command-actions';
+import {
+  selectedConvertibleVectors,
+  selectedObject,
+  selectedObjectIds,
+} from '../commands/selection-command-state';
 import { currentOutputScope, useStore } from '../state';
 import { useLaserStore } from '../state/laser-store';
 import { nativeBedEvidenceSnapshot } from '../state/native-bed-frame';
@@ -92,6 +97,7 @@ export function transformShortcutContext(): TransformCtx {
 export const TOOL_SHORTCUT_CONTEXT: ToolCtx = {
   setToolMode: (mode) => useUiStore.getState().setToolMode(mode),
   openConvertToBitmap,
+  openTraceImage,
 };
 
 export const VIEW_SHORTCUT_CONTEXT: ViewCtx = {
@@ -101,6 +107,17 @@ export const VIEW_SHORTCUT_CONTEXT: ViewCtx = {
   fitToSelection: () => useStore.getState().fitToSelection(),
   toggleSidePanels: () => toggleWorkspaceSidePanels(useUiStore.getState()),
 };
+
+// Alt/Option+T (LightBurn's Trace Image binding). The same action the Tools
+// command runs: it opens Trace Image only for a selected image, so with any
+// other selection the chord is a no-op, mirroring the disabled menu item.
+function openTraceImage(): void {
+  const s = useStore.getState();
+  traceImageAction(
+    selectedObject(s.project, s.selectedObjectId),
+    useUiStore.getState().openImageDialog,
+  )();
+}
 
 // Ctrl/Cmd+Shift+B (LightBurn's Convert to Bitmap binding). Same gate as the
 // Tools command: every selected object is a convertible vector — otherwise
