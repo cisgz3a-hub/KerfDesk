@@ -190,6 +190,76 @@ describe('Break Apart on a traced image', () => {
 
     expect(tracePieces().map((piece) => piece.paths[0]!.curves!.length)).toEqual([1, 1, 1, 1, 1]);
   });
+
+  it('splits an Edge trace by outer shape: its closed ink bands keep their holes', () => {
+    // Edge Detection output is filled closed contours (edge-trace.ts), not strokes.
+    const trace: TracedImage = { ...ringsAndSpeck(), traceMode: 'edge' };
+    loadScene([trace]);
+    select(trace.id);
+
+    useStore.getState().breakApartSelection();
+
+    const original = trace.paths[0]!;
+    expect(tracePieces().map((piece) => piece.paths[0]!.curves)).toEqual([
+      [original.curves![0], original.curves![3]],
+      [original.curves![1], original.curves![4]],
+      [original.curves![2]],
+    ]);
+    expect(tracePieces().every((piece) => piece.traceMode === 'edge')).toBe(true);
+  });
+
+  it('leaves an Edge trace of one ring whole', () => {
+    const ring = ringsAndSpeck();
+    const path = ring.paths[0]!;
+    const trace: TracedImage = {
+      ...ring,
+      traceMode: 'edge',
+      paths: [
+        {
+          ...path,
+          curves: [path.curves![0]!, path.curves![3]!],
+          polylines: [path.polylines[0]!, path.polylines[3]!],
+        },
+      ],
+    };
+    loadScene([trace]);
+    select(trace.id);
+    const before = useStore.getState().project;
+
+    useStore.getState().breakApartSelection();
+
+    expect(useStore.getState().project).toBe(before);
+  });
+
+  it('does no per-object scene-wide work for selected objects it cannot split', () => {
+    // Break Apart can create thousands of pieces; Select All + Break Apart
+    // again must not rebuild the scene's id set once per selected object.
+    const selectedSpecks = Array.from({ length: 300 }, (_, index) =>
+      speckObject(`speck-${index}`, index * 3),
+    );
+    let idReads = 0;
+    const watched = speckObject('watched', 0);
+    const counting = Object.defineProperty({ ...watched }, 'id', {
+      enumerable: true,
+      get: () => {
+        idReads += 1;
+        return watched.id;
+      },
+    }) as TracedImage;
+    const trace = ringsAndSpeck();
+    loadScene([counting, ...selectedSpecks, trace]);
+    useStore.setState({
+      selectedObjectId: trace.id,
+      additionalSelectedIds: new Set(selectedSpecks.map((item) => item.id)),
+    });
+    idReads = 0;
+
+    useStore.getState().breakApartSelection();
+
+    expect(tracePieces()).toHaveLength(3);
+    // A constant number of passes over the scene, not one per selected object.
+    expect(idReads).toBeLessThan(40);
+  });
 });
 
 function tracePieces(): ReadonlyArray<TracedImage> {

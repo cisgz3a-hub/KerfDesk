@@ -79,7 +79,7 @@ function breakApartCommand(ctx: AppCommandContext): AppCommand {
         'arrange.break-apart',
         'arrange',
         'Break Apart',
-        'Select an unlocked imported SVG or trace with more than one path.',
+        'Select an unlocked imported SVG or trace that has more than one outline.',
         ctx.breakApartSelection,
       );
 }

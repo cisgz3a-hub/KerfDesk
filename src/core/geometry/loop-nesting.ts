@@ -12,8 +12,11 @@
 // land on another loop. Up to nine probes spread along each loop vote, and a
 // probe on a candidate's boundary abstains for that candidate. Three probes
 // run first; the rest run only when those touch something or disagree.
+// When every vertex touches some candidate (a hole whose corners all sit on
+// its outer), edge midpoints nudged just inside the loop vote as well.
 
 import type { Vec2 } from '../scene';
+import { pointInPolygon } from './point-in-polygon';
 
 export type NestingLoop = {
   readonly points: ReadonlyArray<Vec2>;
@@ -40,6 +43,8 @@ type EdgeIndex = {
 type ProbeResult = { readonly inside: Set<number>; readonly boundary: Set<number> };
 
 const PROBES_PER_LOOP = 9;
+// Interior probes sit this fraction of an edge's length inside the loop.
+const INTERIOR_NUDGE = 1e-3;
 const QUICK_PROBES = [0, 3, 6];
 // Bands a quarter of the mean edge height tall: each edge lands in a few
 // bands and each band holds little beyond the edges near its probe.
@@ -69,7 +74,21 @@ function nearestContainer(
   const probes = settled
     ? quickResults
     : points.map((point, at) => quickResults[QUICK_PROBES.indexOf(at)] ?? probe(point));
-  return votedParent(loops, loop, probes);
+  if (!someCandidateAbstainedEverywhere(probes)) return votedParent(loops, loop, probes);
+  // Every vertex probe touched some candidate's boundary (a hole whose
+  // corners all sit on its outer). Those abstentions leave the candidate no
+  // vote at all, so add probes just inside this loop, off its vertices.
+  const interior = interiorProbePoints(loop).map(probe);
+  return votedParent(loops, loop, [...probes, ...interior]);
+}
+
+function someCandidateAbstainedEverywhere(probes: ReadonlyArray<ProbeResult>): boolean {
+  const [first, ...rest] = probes;
+  if (first === undefined) return false;
+  for (const candidate of first.boundary) {
+    if (rest.every((result) => result.boundary.has(candidate))) return true;
+  }
+  return false;
 }
 
 // Probes that touch nothing and agree on every container settle the vote.
@@ -111,6 +130,30 @@ function probePoints(loop: NestingLoop): ReadonlyArray<Vec2> {
   const probes: Vec2[] = [];
   for (let i = 0; i < loop.points.length && probes.length < PROBES_PER_LOOP; i += step) {
     probes.push(loop.points[i] as Vec2);
+  }
+  return probes;
+}
+
+// Edge midpoints nudged a small fraction of the edge length to the loop's
+// inside. A point strictly inside a loop is inside every loop that contains
+// it, and on the boundary only of a container that shares that very edge.
+// Loops nested inside this one may also claim it; they are smaller, and
+// `votedParent` only considers larger candidates.
+function interiorProbePoints(loop: NestingLoop): ReadonlyArray<Vec2> {
+  const { points } = loop;
+  const step = Math.max(1, Math.floor(points.length / PROBES_PER_LOOP));
+  const probes: Vec2[] = [];
+  for (let i = 0; i < points.length && probes.length < PROBES_PER_LOOP; i += step) {
+    const a = points[i] as Vec2;
+    const b = points[(i + 1) % points.length] as Vec2;
+    const mid = { x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 };
+    const nx = (a.y - b.y) * INTERIOR_NUDGE;
+    const ny = (b.x - a.x) * INTERIOR_NUDGE;
+    if (nx === 0 && ny === 0) continue;
+    const left = { x: mid.x + nx, y: mid.y + ny };
+    const right = { x: mid.x - nx, y: mid.y - ny };
+    if (pointInPolygon(left, points)) probes.push(left);
+    else if (pointInPolygon(right, points)) probes.push(right);
   }
   return probes;
 }

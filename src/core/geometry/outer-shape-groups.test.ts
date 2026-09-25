@@ -45,6 +45,35 @@ describe('groupSubpathsByOuterShape', () => {
     expect(groupSubpathsByOuterShape(path)).toEqual([[0, 1]]);
   });
 
+  it('keeps a hole whose every vertex lies on its outer with that outer', () => {
+    // Each vertex probe abstains for the outer; the vote must not fall
+    // through to "no container" and make the hole a solid shape.
+    const diamond: Polyline = {
+      closed: true,
+      points: [
+        { x: 1, y: 0 },
+        { x: 2, y: 1 },
+        { x: 1, y: 2 },
+        { x: 0, y: 1 },
+      ],
+    };
+    expect(groupSubpathsByOuterShape(polylinePath([square(0, 0, 2), diamond]))).toEqual([[0, 1]]);
+    // A diamond island inside that hole still starts its own shape.
+    const island: Polyline = {
+      closed: true,
+      points: [
+        { x: 1, y: 0.5 },
+        { x: 1.5, y: 1 },
+        { x: 1, y: 1.5 },
+        { x: 0.5, y: 1 },
+      ],
+    };
+    expect(groupSubpathsByOuterShape(polylinePath([square(0, 0, 2), diamond, island]))).toEqual([
+      [0, 1],
+      [2],
+    ]);
+  });
+
   it('follows nonzero winding: a same-direction inner loop is filled, not a hole', () => {
     const outer = square(0, 0, 100);
     const sameDirection = square(10, 10, 60);

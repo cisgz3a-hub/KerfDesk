@@ -1,21 +1,17 @@
 import {
   curveSubpathBounds,
-  flattenCurveSubpath,
-  DEFAULT_MACHINE_CURVE_TOLERANCE_MM,
-  type CurveSubpath,
-  type Polyline,
   type Bounds,
   type ColoredPath,
   type ImportedSvg,
   type Project,
   type SceneObject,
-  type TracedImage,
 } from '../../core/scene';
 import { canonicalArtworkOrder } from '../../core/artwork-order';
+import { subpathCount } from '../../core/geometry/outer-shape-groups';
 import { pushUndo, type StateSlice } from './scene-mutations';
 import { selectedObjectIds } from './scene-group-actions';
 import { repairDanglingObjectDependencies, reportDependencyRepairs } from './object-delete-actions';
-import { canBreakApartTrace, splitTracedImage } from './trace-break-apart';
+import { canBreakApartTrace, curvePolyline, splitTracedImage } from './trace-break-apart';
 import { useToastStore } from './toast-store';
 
 export type BreakApartActions = {
@@ -108,14 +104,10 @@ function buildReplacementObjects(
   const out: SceneObject[] = [];
   const newSelectionIds: string[] = [];
   const idsBySource = new Map<string, ReadonlyArray<string>>();
+  const allocatePartId = partIdAllocator(objects);
   let singleShapeTraces = 0;
   for (const object of objects) {
-    const parts = selectedIds.has(object.id)
-      ? splitSelectedObject(
-          object,
-          new Set([...objects.map((item) => item.id), ...newSelectionIds]),
-        )
-      : null;
+    const parts = selectedIds.has(object.id) ? splitSelectedObject(object, allocatePartId) : null;
     if (parts === null || parts.length === 0) {
       if (parts !== null && object.kind === 'traced-image') singleShapeTraces += 1;
       out.push(object);
@@ -138,46 +130,48 @@ function buildReplacementObjects(
   };
 }
 
-// Null: not splittable. Empty: a trace that is already one shape.
-function splitSelectedObject(
-  object: SceneObject,
-  reservedIds: ReadonlySet<string>,
-): ReadonlyArray<SceneObject> | null {
-  if (object.kind === 'traced-image') {
-    return canBreakApartTrace(object)
-      ? splitTracedImage(object, traceIdAllocator(object, reservedIds))
-      : null;
-  }
-  return canBreakApart(object) ? splitImportedSvg(object, reservedIds) : null;
-}
+type PartIdAllocator = (sourceId: string, index: number) => string;
 
-function traceIdAllocator(
-  object: TracedImage,
-  reservedIds: ReadonlySet<string>,
-): (index: number) => string {
-  const taken = new Set(reservedIds);
-  return (index) => {
-    const id = uniquePartId(object.id, index, taken);
+// One reserved-id set per mutation: the scene's ids, built on the first split
+// only, plus every part id handed out since. Never copied per object.
+function partIdAllocator(objects: ReadonlyArray<SceneObject>): PartIdAllocator {
+  let reserved: Set<string> | null = null;
+  return (sourceId, index) => {
+    const taken = (reserved ??= new Set(objects.map((object) => object.id)));
+    const id = uniquePartId(sourceId, index, taken);
     taken.add(id);
     return id;
   };
 }
 
+// Null: not splittable. Empty: a trace that is already one shape.
+function splitSelectedObject(
+  object: SceneObject,
+  allocatePartId: PartIdAllocator,
+): ReadonlyArray<SceneObject> | null {
+  if (object.kind === 'traced-image') {
+    return canBreakApartTrace(object)
+      ? splitTracedImage(object, (index) => allocatePartId(object.id, index))
+      : null;
+  }
+  return canBreakApart(object) ? splitImportedSvg(object, allocatePartId) : null;
+}
+
 function canBreakApart(object: SceneObject): object is ImportedSvg {
-  return object.kind === 'imported-svg' && splitUnitCount(object) > 1 && object.locked !== true;
+  return (
+    object.kind === 'imported-svg' &&
+    object.paths.reduce((count, path) => count + subpathCount(path), 0) > 1 &&
+    object.locked !== true
+  );
 }
 
 function splitImportedSvg(
   object: ImportedSvg,
-  reservedIds: ReadonlySet<string>,
+  allocatePartId: PartIdAllocator,
 ): ReadonlyArray<ImportedSvg> {
   const parts: ImportedSvg[] = [];
   for (const [index, { path, pathIndex, polylineIndex }] of splitPaths(object.paths).entries()) {
-    const id = uniquePartId(
-      object.id,
-      index,
-      new Set([...reservedIds, ...parts.map((part) => part.id)]),
-    );
+    const id = allocatePartId(object.id, index);
     parts.push({
       ...object,
       id,
@@ -220,24 +214,6 @@ function splitPaths(paths: ReadonlyArray<ColoredPath>): ReadonlyArray<SplitPath>
       polylineIndex,
     }));
   });
-}
-
-function curvePolyline(curve: CurveSubpath): Polyline {
-  const result = flattenCurveSubpath(curve, {
-    toleranceMm: DEFAULT_MACHINE_CURVE_TOLERANCE_MM,
-    segmentBudget: Number.MAX_SAFE_INTEGER,
-  });
-  if (result.kind === 'segment-budget-exceeded') {
-    throw new Error('Canonical curve flattening exceeded the JavaScript safe-integer budget.');
-  }
-  return result.polyline;
-}
-
-function splitUnitCount(object: ImportedSvg): number {
-  return object.paths.reduce(
-    (count, path) => count + (path.curves?.length ?? path.polylines.length),
-    0,
-  );
 }
 
 function uniquePartId(sourceId: string, index: number, reservedIds: ReadonlySet<string>): string {

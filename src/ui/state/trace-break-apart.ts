@@ -3,6 +3,7 @@ import {
   flattenCurveSubpath,
   type CncTabAnchor,
   type ColoredPath,
+  type CurveSubpath,
   type Polyline,
   type TracedImage,
 } from '../../core/scene';
@@ -49,9 +50,10 @@ export function splitTracedImage(
 }
 
 function pieceGeometries(object: TracedImage): ReadonlyArray<PieceGeometry> {
-  // Centerline and edge traces are strokes: a closed stroke inside another is
-  // a separate mark, not a hole.
-  const strokes = object.traceMode === 'centerline' || object.traceMode === 'edge';
+  // Centerline traces are strokes: a closed stroke inside another is a
+  // separate mark, not a hole. Edge Detection output is filled closed contours
+  // like filled-contours (edge-trace.ts), so its holes group with their outer.
+  const strokes = object.traceMode === 'centerline';
   return object.paths.flatMap((path, pathIndex) => {
     const groups = strokes
       ? Array.from({ length: subpathCount(path) }, (_, index) => [index])
@@ -85,7 +87,8 @@ function pick<T>(items: ReadonlyArray<T>, indices: ReadonlyArray<number>): T[] {
   });
 }
 
-function curvePolyline(curve: NonNullable<ColoredPath['curves']>[number]): Polyline {
+/** A canonical curve's machine-tolerance chords (the Break Apart compatibility view). */
+export function curvePolyline(curve: CurveSubpath): Polyline {
   const result = flattenCurveSubpath(curve, {
     toleranceMm: DEFAULT_MACHINE_CURVE_TOLERANCE_MM,
     segmentBudget: Number.MAX_SAFE_INTEGER,

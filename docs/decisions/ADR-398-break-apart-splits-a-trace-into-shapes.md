@@ -29,7 +29,10 @@ over the traced loops:
 1. Break Apart accepts an unlocked `traced-image` with more than one subpath (`canBreakApartTrace`,
    `ui/state/trace-break-apart.ts`). The gate and the action both count a path's canonical curves when
    present and its polylines otherwise (`subpathCount`), for imported SVGs too.
-2. A filled trace (`traceMode` `filled-contours` or absent) splits into one object per outer shape.
+2. A filled trace (`traceMode` `filled-contours`, `edge` or absent) splits into one object per outer
+   shape. Edge Detection output is filled closed contours from the same contour finisher
+   (`core/trace/edge-trace.ts`; `paths-to-svg.ts` strokes only Centerline), so each ink band keeps its
+   holes: a traced ring or letter O stays one object.
    `groupSubpathsByOuterShape` (`core/geometry/outer-shape-groups.ts`) builds the containment tree of
    the closed subpaths: each loop's parent is its smallest strictly larger container. The coverage of
    the region just inside a loop is its parent's plus that loop (one more crossing, and the loop's
@@ -46,8 +49,11 @@ over the traced loops:
    boundaries can touch at a pixel corner, so up to nine vertices spread along a loop vote, and a
    probe within 1e-9 of a candidate's boundary, relative to coordinate size, abstains for that
    candidate. Three probes run first. The rest run only when those three touch a boundary or disagree.
-4. Centerline and Edge traces are strokes: each subpath becomes its own object, and a closed stroke
-   inside another is never treated as a hole.
+   When every vertex probe abstains for some candidate (a hole whose corners all sit on its outer),
+   up to nine edge midpoints nudged 1/1000 of their edge length to the loop's inside vote as well, so
+   such a hole still finds its outer instead of becoming a solid shape.
+4. Centerline traces are strokes: each subpath becomes its own object, and a closed stroke inside
+   another is never treated as a hole.
 5. Each piece stays a `traced-image` with the original's pixel grid (`tracePixelWidth`/`Height`),
    `traceMode`, `transform`, `operationIds`, `operationOverride`, `powerScale` and path fields
    (colour, operations, fill rule, stroke). Its canonical curves are the original's, unchanged. Its
@@ -66,11 +72,18 @@ over the traced loops:
 
 ### Consequences
 
-- Burn output is unchanged. Pieces have the same transform, curves and compatibility chords as the
+- The burn area is unchanged. Pieces have the same transform, curves and compatibility chords as the
   trace, and compile's trace-specific handling (direct scanline hatching of a single even-odd traced
   path, `canHatchTraceDirectly`) still applies because the pieces are traces. The regression test
-  compiles a rotated, mirrored, non-uniformly scaled trace before and after and gets identical Line
-  moves.
+  compiles a rotated, mirrored, non-uniformly scaled single-path trace before and after and gets the
+  same set of Line moves; burn order and Fill move counts may differ. Multi-path (multi-colour)
+  traces are not verified: before the split one object's paths are unioned under nonzero, after it
+  each piece is hatched on its own, which differs only where paths of one operation overlap.
+- There is no cap or confirmation: a dense trace can become thousands of objects in one step (owl
+  Sharp 9,276). The Break Apart mutation stays linear in the scene: one reserved-id set per mutation,
+  built only when something splits. With one trace plus N unsplittable selected objects it took
+  778 / 3,730 / 18,613 ms for N = 3,000 / 6,000 / 12,000 when the set was rebuilt per selected object,
+  and 10 / 7 / 18 ms now. Store and canvas cost of that many new objects was not measured in the UI.
 - Grouping time in the same harness, first run: owl Line Art 150 ms, owl Sharp 603 ms, hummingbird
   Line Art 72 ms, hummingbird Sharp 368 ms (454,614 compatibility points on owl Sharp). A pairwise
   point-in-polygon version of the same grouping took 5,414 ms on owl Line Art.
@@ -82,11 +95,13 @@ over the traced loops:
   still a grouping, but not necessarily an exact partition.
 - Tests: `outer-shape-groups.test.ts` (scrambled nesting, side-by-side outers, a hole touching its
   outer at a corner, nonzero same-direction and reversed inner loops, curves with a misaligned
-  compatibility view, open subpaths) and `break-apart-trace.test.ts` (two rings with holes and a speck
+  compatibility view, open subpaths, a hole whose every vertex lies on its outer) and
+  `break-apart-trace.test.ts` (two rings with holes and a speck
   give three pieces with cubic curves kept, identical even-odd coverage on a 0.5 px grid and
   identical compiled Line moves, operation bindings, output overrides, z-order, groups and a single
   undo, a locked trace refused, a single ring left whole with a toast, Centerline one stroke per
-  piece).
+  piece, Edge grouped by outer shape and one Edge ring left whole, no per-object scene-wide work for
+  unsplittable selected objects).
 
 Not part of this decision: grouping holes for imported SVGs; an "Ungroup trace" that keeps pieces
 linked to the source raster for later re-tracing; splitting a Photo shading trace by tone band.

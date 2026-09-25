@@ -31,7 +31,7 @@ type Loop = NestingLoop & {
   readonly direction: number;
 };
 
-export type ShapeFillRule = 'nonzero' | 'evenodd';
+type ShapeFillRule = NonNullable<ColoredPath['fillRule']>;
 
 // Crossings and winding of the region just inside a loop.
 type Coverage = { readonly count: number; readonly winding: number };
@@ -50,13 +50,11 @@ export function subpathCount(path: ColoredPath): number {
  * Subpath indices of `path` grouped into outer shapes, each outer with its
  * direct holes. Open or degenerate subpaths form their own group. Groups are
  * ordered by their first subpath index and keep original order inside, so the
- * pieces preserve the source drawing order. `fillRule` is the path's resolved
- * rule (an absent `ColoredPath.fillRule` means even-odd outside text).
+ * pieces preserve the source drawing order. An absent `ColoredPath.fillRule`
+ * means even-odd (traces and imported artwork outside text).
  */
-export function groupSubpathsByOuterShape(
-  path: ColoredPath,
-  fillRule: ShapeFillRule = path.fillRule ?? 'evenodd',
-): ReadonlyArray<ReadonlyArray<number>> {
+export function groupSubpathsByOuterShape(path: ColoredPath): ReadonlyArray<ReadonlyArray<number>> {
+  const fillRule: ShapeFillRule = path.fillRule ?? 'evenodd';
   const count = subpathCount(path);
   const loops: Loop[] = [];
   const groupOf = new Array<number>(count);
