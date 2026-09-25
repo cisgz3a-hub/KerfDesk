@@ -118,7 +118,7 @@ function handleNonBannerLine(
     return;
   }
   if (cls.kind === 'alarm') {
-    handleAlarmLine(set, get, refs, safeWrite, cls.code);
+    handleAlarmLine(set, get, refs, safeWrite, cls);
     return;
   }
   if (cls.kind === 'error') {

@@ -242,7 +242,8 @@ function rejectCommandFromTerminalResponse(
     return true;
   }
   if (response.kind !== 'alarm') return false;
-  finishControllerCommand(refs, request, 'reject', `ALARM:${response.code}`);
+  const alarm = response.code === null ? response.raw : `ALARM:${response.code}`;
+  finishControllerCommand(refs, request, 'reject', alarm);
   return true;
 }
 
