@@ -1,6 +1,7 @@
 import type { ControllerKind } from '../../devices';
 import { describeAlarm } from './alarm-codes';
 import { describeError } from './error-codes';
+import { describeGrblhalExtendedError } from './grblhal-error-codes';
 
 export type ErrorPresentation = {
   readonly code: number;
@@ -140,6 +141,8 @@ export function presentError(
   code: number,
 ): ErrorPresentation | null {
   if (controllerKind === 'fluidnc') return FLUIDNC_ERRORS.get(code) ?? null;
+  if (controllerKind === 'grblhal')
+    return describeError(code) ?? describeGrblhalExtendedError(code);
   return describeError(code);
 }
 

@@ -163,3 +163,34 @@ describe('controller-family response presentation', () => {
     expect(presentAlarm('grbl-v1.1', 9)?.action).toContain('$130');
   });
 });
+
+// Controller audit 2026-09-25 GP-2, GP-8 and HF-3: hard and soft limits are
+// critical events that accept only a soft reset (gnea/grbl protocol.c:224-236;
+// grblHAL alarm_is_critical, error:79 for `$X`/`$H` meanwhile).
+describe('critical alarms and the texts the audit corrected', () => {
+  it.each([
+    ['grbl-v1.1', 1],
+    ['grbl-v1.1', 2],
+    ['grblhal', 1],
+    ['grblhal', 2],
+  ] as const)('%s ALARM:%i says a soft reset comes first', (kind, code) => {
+    expect(presentAlarm(kind, code)?.action).toMatch(
+      /only a soft reset now: press Reset \(Ctrl-X\)/,
+    );
+  });
+
+  it('describes grblHAL error:79 and the extended codes, and keeps GRBL 1.1 at 38', () => {
+    expect(presentError('grblhal', 79)).toMatchObject({
+      title: 'Not allowed while critical event is active.',
+    });
+    expect(presentError('grblhal', 79)?.detail).toMatch(/Reset \(Ctrl-X\)/);
+    expect(presentError('grblhal', 46)?.title).toBe('Home machine to continue.');
+    expect(presentError('grbl-v1.1', 79)).toBeNull();
+  });
+
+  it('names both probe directions for ALARM:4 and both stores for error:7', () => {
+    expect(presentAlarm('grbl-v1.1', 4)?.detail).toMatch(/G38\.4\/G38\.5/);
+    expect(presentError('grbl-v1.1', 7)?.detail).toMatch(/\$#/);
+    expect(presentError('grbl-v1.1', 11)?.detail).toMatch(/79 characters/);
+  });
+});
