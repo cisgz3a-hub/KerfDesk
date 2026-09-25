@@ -23,10 +23,10 @@ export const TRACE_PRESETS: Readonly<Record<string, TraceOptions>> = {
     //     even if the input has stray non-monochrome pixels.
     //   * smallMarkPolicy 'auto' — judges each ink mark under 12 source
     //     px² and each thin enclosed paper hole on evidence (contrast,
-    //     nearby ink, size) instead of erasing / filling all of them, so
-    //     stipple, dotted rows, small text and paper holes in hatching
-    //     survive while faint threshold noise, lone dust specks and
-    //     binarisation cracks are cleaned (ADR-409). An explicit "Remove
+    //     grey bridges, nearby dust, like marks, size) instead of erasing /
+    //     filling all of them, so stipple, dotted rows, small text and paper
+    //     holes in hatching survive while faint threshold noise, dust,
+    //     toner scatter and binarisation cracks are cleaned (ADR-409). An explicit "Remove
     //     ink specks" / "Fill tiny holes" value replaces it exactly.
     //   * pathOmit 16 — second-line defence: drops short paths the
     //     tracer might still emit at edges.

@@ -97,6 +97,27 @@ function onPaper(g: Grey, x0: number, y0: number, size: number): boolean {
   return true;
 }
 
+// A random 4-connected blob of `area` black pixels grown from (x0, y0).
+function blob(g: Grey, x0: number, y0: number, area: number, random: () => number): void {
+  const pixels = [[x0, y0]];
+  const taken = new Set([y0 * g.width + x0]);
+  const steps = [
+    [1, 0],
+    [-1, 0],
+    [0, 1],
+    [0, -1],
+  ] as const;
+  while (pixels.length < area) {
+    const [bx = 0, by = 0] = pixels[Math.floor(random() * pixels.length)] ?? [];
+    const [dx, dy] = steps[Math.floor(random() * 4)] ?? steps[0];
+    const key = (by + dy) * g.width + bx + dx;
+    if (taken.has(key)) continue;
+    taken.add(key);
+    pixels.push([bx + dx, by + dy]);
+  }
+  for (const [x = 0, y = 0] of pixels) g.luma[y * g.width + x] = 0;
+}
+
 // Rows of 2×2 dots on a 5-px pitch: the owl's stipple / a dotted row.
 function stipple(g: Grey, x0: number, y0: number, cols: number, rows: number, luma = 0): void {
   for (let r = 0; r < rows; r += 1)
@@ -193,6 +214,78 @@ describe('automatic small-mark policy (Line Art and Smooth default)', () => {
     expect(cleaned).toBe(legacy + 24);
   });
 
+  // Dark noise is as black as ink, so tone cannot remove it; what surrounds
+  // it must. Each fixture asserts no gain over the historical fixed 12 px²
+  // rule, which removed all of it.
+  it.each([false, true])('removes dark toner scatter beside a stroke (noisy: %s)', (noisy) => {
+    const random = seeded(5);
+    const g = page(220, 60);
+    paint(g, 10, 28, 200, 5, 0); // a 5-px stroke
+    for (let i = 0; i < 24; i += 1) {
+      const gap = 2 + Math.floor(random() * 3);
+      paint(g, 14 + i * 8, i % 2 === 0 ? 26 - gap : 33 + gap, 2, 2, 0);
+    }
+    const colour = seeded(9);
+    const image = rgba(g, noisy ? () => Math.round((colour() * 2 - 1) * 8) : undefined);
+    expect(components(preprocessForTrace(image, { ...LINE_ART, despeckleMinPixels: 0 }))).toBe(25);
+    expect(components(preprocessForTrace(image, LEGACY))).toBe(1);
+    expect(components(preprocessForTrace(image, LINE_ART))).toBe(1);
+  });
+
+  it('removes a dark dust cluster of mixed-size specks', () => {
+    const random = seeded(3);
+    const g = page(80, 80);
+    for (let i = 0; i < 25; i += 1) {
+      const x = 22 + Math.floor(random() * 36);
+      const y = 22 + Math.floor(random() * 36);
+      blob(g, x, y, 1 + Math.floor(random() * 9), random);
+    }
+    const image = rgba(g);
+    const legacy = components(preprocessForTrace(image, LEGACY));
+    expect(components(preprocessForTrace(image, { ...LINE_ART, despeckleMinPixels: 0 }))).toBe(
+      legacy + 14,
+    );
+    expect(components(preprocessForTrace(image, LINE_ART))).toBe(legacy);
+  });
+
+  it('removes the dark specks of a dirty scan (dense 1-9 px² dust across the page)', () => {
+    // One speck per ~105 px² around 25 strokes: the density at which the
+    // specks' neighbour counts match the owl's own fine texture, so only the
+    // dust signature (sub-floor and lone specks) can tell them apart.
+    const random = seeded(21);
+    const g = page(512, 512);
+    for (let i = 0; i < 25; i += 1)
+      paint(g, Math.floor(random() * 440), Math.floor(random() * 500), 60, 3, 0);
+    for (let i = 0; i < 2500; i += 1) {
+      const x = 5 + Math.floor(random() * 500);
+      const y = 5 + Math.floor(random() * 500);
+      blob(g, x, y, 1 + Math.floor(random() * 9), random);
+    }
+    const image = rgba(g);
+    const raw = components(preprocessForTrace(image, { ...LINE_ART, despeckleMinPixels: 0 }));
+    const legacy = components(preprocessForTrace(image, LEGACY));
+    const cleaned = components(preprocessForTrace(image, LINE_ART));
+    expect(raw - legacy).toBeGreaterThan(1500);
+    // At most 1% of the specks the fixed rule removed come back (measured: 12
+    // of 1,870, all 8-11 px² or textured marks in speck-free tiles).
+    expect(cleaned - legacy).toBeLessThanOrEqual(0.01 * (raw - legacy));
+  });
+
+  it('keeps a fragment the cut broke off a stroke when grey still joins them', () => {
+    // A hatch line leaving a stroke: a light grey neck (above the cut) and a
+    // dark 3x2 tip. Grey joins the tip to the stroke, so it is part of the
+    // drawing; the same tip across clean paper is scatter.
+    const draw = (neck: number): RawImageData => {
+      const g = page(60, 40);
+      paint(g, 5, 10, 50, 5, 0);
+      paint(g, 30, 15, 1, 2, neck);
+      paint(g, 29, 17, 3, 2, 0);
+      return rgba(g);
+    };
+    expect(inkCount(preprocessForTrace(draw(200), LINE_ART), 29, 17, 3, 2)).toBe(6);
+    expect(inkCount(preprocessForTrace(draw(255), LINE_ART), 29, 17, 3, 2)).toBe(0);
+  });
+
   it('keeps bright paper holes in solid ink and fills faint threshold cracks', () => {
     // Scanned black (luma 40); the cracks sit just above Line Art's cut of
     // 128, as the Arch House H-stem crack does (reach 0.38-0.49 of the span).
@@ -232,8 +325,9 @@ describe('automatic small-mark policy (Line Art and Smooth default)', () => {
   });
 
   it('measures areas in source pixels on a supersampled mask', () => {
-    // The same 2×2 lone speck and 3×3 lone dot, drawn 2x with areaScale 4.
-    const width = 60;
+    // The same 2×2 lone speck and 3×3 lone dot, drawn 2x with areaScale 4,
+    // far enough apart that the speck is not dust beside the dot.
+    const width = 200;
     const height = 30;
     const ink = new Uint8Array(width * height);
     const put = (x0: number, y0: number, s: number): number[] => {
@@ -246,7 +340,7 @@ describe('automatic small-mark policy (Line Art and Smooth default)', () => {
       return region;
     };
     const speck = put(5, 5, 4);
-    const dot = put(30, 5, 6);
+    const dot = put(150, 5, 6);
     const at = (areaScale: number) =>
       createSmallMarkClassifier({ width, height, ink, field: null, areaScale });
     expect(at(4).keepInkMark(speck, ink)).toBe(false);

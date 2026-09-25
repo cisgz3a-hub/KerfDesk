@@ -22,13 +22,20 @@
 //      specks that local-contrast detection flags as ink; (b) and (c) remove
 //      noise where a mid-tone area straddles the cut, and the Arch House
 //      binarisation cracks.
-//   3. Neighbourhood. Stipple, dotted rows, hatching and small text put other
-//      ink within a few pixels of each small mark; dust lies alone. An ink
-//      mark under AUTO_ISOLATED_MARK_MIN_AREA_PX with no other ink within
-//      AUTO_SUPPORT_RADIUS_PX is removed. (A paper hole is enclosed by ink by
-//      construction, so this test is ink-only.)
+//   3. Neighbourhood (small-mark-neighbourhood.ts). A dark mark's tone
+//      cannot tell a stipple dot from a toner speck, so what surrounds it
+//      decides: a mark joined to other ink by grey (a fragment of
+//      anti-aliased hatching or stipple the cut broke off) stays; otherwise
+//      a mark near unbridged dark debris (sub-floor or lone specks: the
+//      signature of a dirty scan) goes; otherwise a mark under
+//      AUTO_ISOLATED_MARK_MIN_AREA_PX stays only if its nearest neighbour
+//      within AUTO_SUPPORT_RADIUS_PX is another small (like) mark rather
+//      than a stroke (stipple, dotted rows and small text versus toner
+//      scatter in a stroke's halo). A paper hole is enclosed by ink by
+//      construction, so these tests are ink-only.
 //
-// Without a grey field (alpha masks) only 1 and 3 apply.
+// Without a grey field (alpha masks) nothing is bridged and every speck
+// counts as dark; 1 and 3 apply.
 //
 // Everything is denominated in SOURCE pixels: areaScale is mask px² per
 // source px² (pixelScale² on a supersampled trace, the working/source area
@@ -43,6 +50,13 @@
 // tracer code (ADR-017).
 
 import type { CrackSubPixelField } from './contour-boundary';
+import {
+  AUTO_BRIDGE_FRACTION,
+  AUTO_DEBRIS_TILE_PX,
+  AUTO_LIKE_MARK_MAX_AREA_PX,
+  createInkNeighbourhood,
+  type InkNeighbourhood,
+} from './small-mark-neighbourhood';
 import type { TraceOptions } from './trace-option-types';
 import type { RawImageData } from './trace-image';
 
@@ -54,13 +68,16 @@ export const AUTO_MIN_MARK_AREA_PX = 3;
 /** An isolated mark (no other ink within the support radius) is kept only
  *  from this area: a lone 3×3 dot survives, a lone 2×2 speck does not. */
 export const AUTO_ISOLATED_MARK_MIN_AREA_PX = 8;
-/** Other ink this close (source px, edge to edge) makes a mark part of a
- *  texture rather than a lone speck. */
+/** A like mark this close (source px, edge to edge) makes a mark part of a
+ *  texture rather than a lone speck; also the bridge search window. */
 export const AUTO_SUPPORT_RADIUS_PX = 5;
 /** Tone evidence, each a fraction of the image's ink-to-paper span. */
 export const AUTO_MIN_REACH_FRACTION = 0.5;
 export const AUTO_MIN_CUT_MARGIN_FRACTION = 0.04;
 export const AUTO_MIN_CONTRAST_FRACTION = 0.3;
+/** Unbridged dark debris in a mark's 3x3 debris tiles that marks the area
+ *  as dusty. */
+export const AUTO_DUST_MIN_DEBRIS = 1;
 
 // A span narrower than this is treated as this wide: below it the image has
 // no reliable ink/paper separation to normalise against.
@@ -180,6 +197,27 @@ export function createSmallMarkClassifier(input: SmallMarkClassifierInput): Smal
     current += 1;
     for (const p of pixels) stamp[p] = current;
   };
+  // Built on first use (a hole-only plan never needs it). `ink` is the
+  // pre-erasure mask despeckle hands every judgement; it is the same array
+  // each time.
+  let around: InkNeighbourhood | null = null;
+  const neighbourhood = (ink: Uint8Array): InkNeighbourhood => {
+    around ??= createInkNeighbourhood({
+      width,
+      height,
+      ink,
+      field,
+      bridgeLuma: tones === null ? null : tones.paper - AUTO_BRIDGE_FRACTION * tones.span,
+      reach: (pixels) =>
+        field === null || tones === null ? 1 : reachOf(pixels, field, width, tones) / tones.span,
+      minArea,
+      isolatedMinArea,
+      likeMaxArea: AUTO_LIKE_MARK_MAX_AREA_PX * areaScale,
+      supportPx,
+      tilePx: AUTO_DEBRIS_TILE_PX * linearScale,
+    });
+    return around;
+  };
 
   return {
     inkCandidateAreaPx: AUTO_CANDIDATE_AREA_PX * areaScale,
@@ -192,8 +230,12 @@ export function createSmallMarkClassifier(input: SmallMarkClassifierInput): Smal
           return false;
         }
       }
+      const around = neighbourhood(ink);
+      if (around.bridged(region)) return true;
+      if (around.debrisAround(region) >= AUTO_DUST_MIN_DEBRIS) return false;
       if (region.length >= isolatedMinArea) return true;
-      return hasNearbyInk(region, ink, geometry, supportPx);
+      const support = around.support(region);
+      return support.like <= supportPx && support.like <= support.stroke;
     },
     fillPaperHole: (component) => {
       if (component.length < minArea) return true;
@@ -308,56 +350,19 @@ function forRegionAndRing(
   }
 }
 
-// Is any ink pixel outside the region within `radius` (edge to edge) of the
-// region's bounding box? The box distance never exceeds the true pixel
-// distance, so a mark is never called isolated when it is not.
-function hasNearbyInk(
-  region: ReadonlyArray<number>,
-  ink: Uint8Array,
-  g: Geometry,
-  radius: number,
-): boolean {
-  const box = boundingBox(region, g.width);
-  const reach = Math.floor(radius) + 1;
-  const radius2 = radius * radius;
-  const id = g.current();
-  const yEnd = Math.min(g.height - 1, box.y1 + reach);
-  const xEnd = Math.min(g.width - 1, box.x1 + reach);
-  for (let y = Math.max(0, box.y0 - reach); y <= yEnd; y += 1) {
-    const gy = edgeGap(y, box.y0, box.y1);
-    for (let x = Math.max(0, box.x0 - reach); x <= xEnd; x += 1) {
-      const p = y * g.width + x;
-      if (ink[p] !== 1 || g.stamp[p] === id) continue;
-      const gx = edgeGap(x, box.x0, box.x1);
-      if (gx * gx + gy * gy <= radius2) return true;
-    }
-  }
-  return false;
-}
-
-// Gap between pixel v and the pixel span [lo, hi] along one axis, edge to
-// edge: a touching pixel (centre distance 1) has gap 0.
-function edgeGap(v: number, lo: number, hi: number): number {
-  return Math.max(0, (v < lo ? lo - v : v > hi ? v - hi : 0) - 1);
-}
-
-function boundingBox(
-  region: ReadonlyArray<number>,
+// How far a component's darkest pixel gets from paper toward ink, in luma.
+function reachOf(
+  pixels: ReadonlyArray<number>,
+  field: CrackSubPixelField,
   width: number,
-): { readonly x0: number; readonly y0: number; readonly x1: number; readonly y1: number } {
-  let x0 = Number.POSITIVE_INFINITY;
-  let y0 = Number.POSITIVE_INFINITY;
-  let x1 = Number.NEGATIVE_INFINITY;
-  let y1 = Number.NEGATIVE_INFINITY;
-  for (const p of region) {
+  tones: Tones,
+): number {
+  let darkest = Number.POSITIVE_INFINITY;
+  for (const p of pixels) {
     const x = p % width;
-    const y = (p - x) / width;
-    x0 = Math.min(x0, x);
-    x1 = Math.max(x1, x);
-    y0 = Math.min(y0, y);
-    y1 = Math.max(y1, y);
+    darkest = Math.min(darkest, field.lumaAt(x, (p - x) / width));
   }
-  return { x0, y0, x1, y1 };
+  return tones.paper - darkest;
 }
 
 function clampLuma(value: number): number {

@@ -104,10 +104,10 @@ export type TraceOptions = {
   readonly fillPinholeCracks?: boolean;
   // smallMarkPolicy 'auto': judge each small ink mark and each thin enclosed
   // paper hole on evidence (local contrast against the image's ink/paper
-  // span, other ink nearby, size in SOURCE px) instead of a fixed area, so
-  // stipple, dotted rows, small text and paper holes in hatching survive
-  // while faint threshold noise, lone dust specks and binarisation cracks
-  // are cleaned. Applies only to a stage whose explicit option above is
+  // span, grey bridges, nearby dust, like marks, size in SOURCE px) instead
+  // of a fixed area, so stipple, dotted rows, small text and paper holes in
+  // hatching survive while faint threshold noise, dust, toner scatter and
+  // binarisation cracks are cleaned. Applies only to a stage whose explicit option above is
   // unset: an explicit despeckleMinPixels / fillPinholeCracks is honoured
   // exactly. See small-mark-policy.ts and ADR-409.
   readonly smallMarkPolicy?: 'auto';
