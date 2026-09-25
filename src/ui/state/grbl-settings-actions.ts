@@ -4,6 +4,10 @@ import {
   type SettingsCollectorState,
 } from '../../core/controllers/grbl';
 import { grblSettingMachineKindIssue } from '../../core/controllers/grbl/grbl-setting-write';
+import {
+  settingReadbackMatches,
+  stockGrblSettingStorageIssue,
+} from '../../core/controllers/grbl/grbl-setting-storage';
 import type { ControllerDriver } from '../../core/controllers';
 import { machineKindOf, type MachineKind } from '../../core/scene';
 import { useStore } from './store';
@@ -283,7 +287,12 @@ async function writeAndVerifySetting(
   assertSettingsCommandOwnership(get);
   finishSettingsQualification(set, get, refs, qualificationEpoch);
   if (!settingWasVerified(get, id, trimmed)) {
-    throw new Error(`Controller did not report $${id}=${trimmed} after re-read.`);
+    const reported = get().grblSettingsRows.find((row) => row.id === id);
+    throw new Error(
+      reported === undefined
+        ? `Controller did not report $${id}=${trimmed} after re-read.`
+        : `Controller reports $${id}=${reported.rawValue} after re-read, not ${trimmed}: it stored a different value.`,
+    );
   }
 }
 
@@ -294,7 +303,7 @@ function assertSettingsCommandOwnership(get: GetFn): void {
 
 function settingWasVerified(get: GetFn, id: number, trimmed: string): boolean {
   return get().grblSettingsRows.some(
-    (row) => row.id === id && Number(row.rawValue) === Number(trimmed),
+    (row) => row.id === id && settingReadbackMatches(row.rawValue, Number(trimmed)),
   );
 }
 
@@ -375,10 +384,14 @@ function machineSettingsWriteBlockReason(
   }
   const machineKindIssue = grblSettingMachineKindIssue(machineKind, id, value);
   if (machineKindIssue !== null) return machineKindIssue;
-  return validateSettingValue(row, value);
+  return validateSettingValue(row, value, refs.driver.kind);
 }
 
-function validateSettingValue(row: GrblSettingRow, value: string): string | null {
+function validateSettingValue(
+  row: GrblSettingRow,
+  value: string,
+  driverKind: ControllerDriver['kind'],
+): string | null {
   const trimmed = value.trim();
   if (trimmed === '') return `${row.code} value is required.`;
   const parsed = Number(trimmed);
@@ -388,7 +401,7 @@ function validateSettingValue(row: GrblSettingRow, value: string): string | null
   }
   if (row.id === 31 && parsed < 0) return '$31 min S must be non-negative.';
   if (row.id === 30 && parsed <= 0) return '$30 max S must be positive.';
-  return null;
+  return driverKind === 'grbl-v1.1' ? stockGrblSettingStorageIssue(row.id, parsed) : null;
 }
 
 function blockRead(set: SetFn, get: GetFn, reason: string): never {
