@@ -2,7 +2,7 @@
 // (ADR-386). Inserting starts from the last inserted settings; editing starts
 // from the selected barcode and closes itself if that barcode disappears.
 
-import { useEffect, useMemo } from 'react';
+import { useEffect, useMemo, useRef } from 'react';
 import {
   defaultBarcodeSpec,
   isBarcodeObject,
@@ -18,26 +18,49 @@ import { commitBarcode } from './commit-barcode';
 
 export function BarcodeDialogHost(): JSX.Element | null {
   const request = useBarcodeDialogStore((s) => s.request);
+  const requestId = useBarcodeDialogStore((s) => s.requestId);
   if (request === null) return null;
-  return (
-    <OpenBarcodeDialog
-      key={request.mode === 'edit' ? request.objectId : 'insert'}
-      request={request}
-    />
-  );
+  return <OpenBarcodeDialog key={requestId} request={request} requestId={requestId} />;
 }
 
-function OpenBarcodeDialog(props: { readonly request: BarcodeDialogRequest }): JSX.Element | null {
+function OpenBarcodeDialog(props: {
+  readonly request: BarcodeDialogRequest;
+  readonly requestId: number;
+}): JSX.Element | null {
   const close = useBarcodeDialogStore((s) => s.close);
   const lastInserted = useBarcodeDialogStore((s) => s.lastInserted);
   const rememberInserted = useBarcodeDialogStore((s) => s.rememberInserted);
   const project = useStore((s) => s.project);
+  const documentEpoch = useStore((s) => s.projectDocumentEpoch);
   const pushToast = useToastStore((s) => s.pushToast);
-  const editing = editedBarcode(props.request, project.scene.objects);
-  const missing = props.request.mode === 'edit' && editing === undefined;
+  const openedEpoch = useRef(documentEpoch).current;
+  const mounted = useRef(true);
+  const editing = useRef(editedBarcode(props.request, project.scene.objects)).current;
+  const missing =
+    props.request.mode === 'edit' &&
+    editedBarcode(props.request, project.scene.objects) === undefined;
   useEffect(() => {
-    if (missing) close();
-  }, [missing, close]);
+    mounted.current = true;
+    return () => {
+      mounted.current = false;
+    };
+  }, []);
+  useEffect(() => {
+    if (
+      (missing || documentEpoch !== openedEpoch) &&
+      useBarcodeDialogStore.getState().requestId === props.requestId
+    )
+      close();
+  }, [missing, documentEpoch, openedEpoch, props.requestId, close]);
+  const isCurrent = (): boolean => {
+    const dialog = useBarcodeDialogStore.getState();
+    return (
+      mounted.current &&
+      dialog.request !== null &&
+      dialog.requestId === props.requestId &&
+      useStore.getState().projectDocumentEpoch === openedEpoch
+    );
+  };
   // Fixed for the dialog's lifetime: later insertions must not reset the form.
   const initial = useMemo(
     () => editing?.spec ?? lastInserted ?? defaultBarcodeSpec('qr'),
@@ -52,9 +75,17 @@ function OpenBarcodeDialog(props: { readonly request: BarcodeDialogRequest }): J
       initial={initial}
       project={project}
       subject={editing ?? standIn}
-      onCancel={close}
+      onCancel={() => {
+        if (isCurrent()) close();
+      }}
       onSubmit={async (spec, value) => {
-        const result = await commitBarcode({ spec, value, ...(editing ? { editing } : {}) });
+        const result = await commitBarcode({
+          spec,
+          value,
+          isCurrent,
+          ...(editing ? { editing } : {}),
+        });
+        if (!isCurrent()) return null;
         if (!result.ok) return result.message;
         if (editing === undefined) rememberInserted(spec);
         close();

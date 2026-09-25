@@ -13,6 +13,7 @@ export type BarcodeDialogRequest =
 
 type BarcodeDialogState = {
   readonly request: BarcodeDialogRequest | null;
+  readonly requestId: number;
   readonly lastInserted: BarcodeShape | null;
   readonly open: (request: BarcodeDialogRequest) => void;
   readonly close: () => void;
@@ -21,8 +22,10 @@ type BarcodeDialogState = {
 
 export const useBarcodeDialogStore = create<BarcodeDialogState>((set) => ({
   request: null,
+  requestId: 0,
   lastInserted: null,
-  open: (request) => set({ request }),
+  // Even reopening the same request object starts a new dialog lifetime.
+  open: (request) => set((state) => ({ request, requestId: state.requestId + 1 })),
   close: () => set({ request: null }),
   rememberInserted: (spec) => set({ lastInserted: spec }),
 }));

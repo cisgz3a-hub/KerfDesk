@@ -141,9 +141,10 @@ KerfDesk is also offline-first and avoids new dependencies.
   EAN/UPC module strings from ZXing, check digits and guard bars.
 - `barcode-layout.test.ts`, `materialize-barcode.test.ts`: the drawn outlines are
   sampled back into modules at module centres under even-odd fill and decoded by
-  reference decoders in `src/__fixtures__/barcode/`, written from the standards
-  and independent of the encoders; quiet zones, lattice alignment, invert,
-  sizing and text placement are checked the same way.
+  reference decoders in `src/__fixtures__/barcode/`. Their decoding algorithms
+  are separate, but the Code 128 decoder shares the encoder's width table, so
+  those round trips alone do not independently validate that table. Quiet
+  zones, lattice alignment, invert, sizing and text placement are also checked.
 - `src/io/gcode/materialize-variable-barcode.test.ts`,
   `src/ui/state/prepare-variable-array-barcode.test.ts`: per-copy re-encoding
   (decoded), sequence offsets, failure on an unencodable value, and SVG export.
