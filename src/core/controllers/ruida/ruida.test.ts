@@ -265,7 +265,8 @@ describe('ruida UDP session state machine', () => {
       expect(retry.toSend).not.toBeNull(); // same packet retransmitted
     }
     const dead = onRuidaResponse(state, swizzleByte(RUIDA_NAK));
-    expect(dead.state.status).toBe('errored');
+    expect(dead.state.status).toBe('failed');
+    expect(dead.state.failure).toBe('nak-retries-exhausted');
     expect(dead.toSend).toBeNull();
   });
 });
