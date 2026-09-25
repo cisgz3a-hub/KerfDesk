@@ -71,7 +71,7 @@ const SILENT_HOME_BACKSTOP_MS = 30 * 60_000;
 
 function homeLineTimeoutMs(state: LaserState, driver: ControllerDriver): number {
   if (driver.capabilities.statusWhileHoming !== false) return HOME_COMMAND_TIMEOUT_MS;
-  const bound = grblHomingDurationBoundMs(state.grblSettingsRows);
+  const bound = grblHomingDurationBoundMs(state.grblSettingsRows, driver.homingCycle);
   if (bound === null) return SILENT_HOME_BACKSTOP_MS;
   return Math.max(HOME_COMMAND_TIMEOUT_MS, bound * SILENT_HOME_MARGIN + SILENT_HOME_EXTRA_MS);
 }

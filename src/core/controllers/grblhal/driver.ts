@@ -8,6 +8,7 @@
 
 import type { ControllerDriver } from '../controller-driver';
 import { grblDriver } from '../grbl/driver';
+import { GRBLHAL_HOMING_CYCLE } from '../grbl/grbl-homing-duration';
 
 export const grblHalDriver: ControllerDriver = {
   ...grblDriver,
@@ -15,8 +16,10 @@ export const grblHalDriver: ControllerDriver = {
   label: 'grblHAL',
   capabilities: {
     ...grblDriver.capabilities,
-    // grblHAL's homing loop serves status requests (machine_limits.c:445-447).
-    statusWhileHoming: true,
+    // grblHAL's homing loop serves status requests only with "report when
+    // homing" (bit 12 of $10), off by default (machine_limits.c:336-337,
+    // config.h:751-753), so Home is timed by its $$ settings (audit ST-4).
+    statusWhileHoming: false,
     // COMPATIBILITY_LEVEL 0, the default build, latches a refused line's
     // error (protocol.c:246-286); an empty line clears it.
     stickyLineError: true,
@@ -26,4 +29,5 @@ export const grblHalDriver: ControllerDriver = {
     // grblHAL extends `$I`; do not treat a variant response as stock proof.
     buildInfoQuery: null,
   },
+  homingCycle: GRBLHAL_HOMING_CYCLE,
 };

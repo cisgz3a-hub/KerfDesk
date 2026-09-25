@@ -22,9 +22,10 @@ moment of a session, the same way.
   `$NVX` went out unguarded (HF-6).
 - **Settings writes lied.** Stock GRBL stores integer settings as `uint8_t` (settings.c:229) and
   prints floats to 3 decimals, and answers `ok` either way (GP-5).
-- **Home.** Stock GRBL answers no status query while it homes (limits.c:319-320). KerfDesk timed
-  Home on 120 s of status silence, so a long cycle failed while the machine kept homing (ST-4). A
-  Falcon per-axis Home read grblHAL's in-between Alarm as a new alarm (HF-1).
+- **Home.** Stock GRBL answers no status query while it homes (limits.c:320), and neither does
+  grblHAL at its default settings. KerfDesk timed Home on 120 s of status silence, so a long cycle
+  failed while the machine kept homing (ST-4). A Falcon per-axis Home read grblHAL's in-between
+  Alarm as a new alarm (HF-1).
 - **Status and errors.** Every Alarm report, not only the first, voided owed exchanges, so an
   operator's `$X` was rejected while GRBL went on to unlock (ST-3). grblHAL at its default
   COMPATIBILITY_LEVEL 0 repeats a refused line's error for every later G-code line until an empty
@@ -55,13 +56,17 @@ moment of a session, the same way.
 2. **Settings writes.** Stock GRBL integer and on/off values it cannot store are refused before
    sending. A write is verified at the precision the controller prints, and a difference names
    the stored value.
-3. **Home on stock GRBL** (capability `statusWhileHoming: false`). Each Home line waits for the
-   longest cycle its `$$` settings allow. For each axis: a 1.5 × `$130-$132` search and two
-   `$27` pull-offs at `$25`, a 5 × `$27` locate at `$24`, and a `$26` debounce per move. That sum
-   is × 1.5 plus 30 s, and never less than 120 s. Without `$$`, a 30-minute backstop applies.
-   GRBL itself raises `ALARM:8/9` when a switch is not found. grblHAL and FluidNC keep the 120 s
-   status-activity budget. A Home that ends without the controller's answer raises "Home did not
-   finish"; only `error:N` is reported as a rejection.
+3. **Home on stock GRBL and grblHAL** (capability `statusWhileHoming: false`). grblHAL answers `?`
+   while homing only with "report when homing" (bit 12 of `$10`) on, and it is off by default
+   (machine_limits.c:336-337). Each Home line waits for the longest cycle the `$$` settings allow.
+   For each axis on stock GRBL: a 1.5 × `$130-$132` search and two `$27` pull-offs at `$25`, a
+   5 × `$27` locate at `$24`, and a `$26` debounce per move. grblHAL locates at 10 × `$27`, `$43`
+   times, with a pull-off before and after each locate. That sum is × 1.5 plus 30 s, and never
+   less than 120 s. Without `$$`, a 30-minute backstop applies. A status report during the wait
+   still restarts it. The firmware raises `ALARM:8/9` itself when a switch is not found. FluidNC
+   homes from its main loop, keeps answering `?`, and keeps the 120 s status-activity budget. A
+   Home that ends without the controller's answer raises "Home did not finish"; only `error:N` is
+   reported as a rejection.
 4. **Alarm reports.** Only the report that enters Alarm or Sleep voids owned exchanges, owed
    acknowledgements and position evidence. The Falcon's per-axis Home reopens that window before
    each further axis.
@@ -97,7 +102,7 @@ moment of a session, the same way.
 
 - The Console and auto-focus can no longer strand an owed acknowledgement with a realtime
   character.
-- Long stock-GRBL Home cycles complete; a hung one is still bounded.
+- Long Home cycles on stock GRBL and grblHAL complete; a hung one is still bounded.
 - Disconnect on Marlin and Smoothieware can take up to 1 s longer.
 - Tests that disconnect those controllers on a fake clock advance it (`laser-disconnect-testing.ts`).
 - Regression tests: `console-command.test.ts`, `laser-store-console-realtime.test.ts`,

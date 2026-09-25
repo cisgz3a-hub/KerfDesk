@@ -236,7 +236,7 @@ function reduceRealtime(state: GrblSimState, byte: string, opts: GrblSimOptions)
   }
 }
 
-// Stock GRBL answers no status query while homing (limits.c:319 "No time to run
+// Stock GRBL answers no status query while homing (limits.c:320 "No time to run
 // protocol_execute_realtime() in this loop") or in the critical-alarm loop;
 // grblHAL answers both.
 function reportsStatus(state: GrblSimState, opts: GrblSimOptions): boolean {

@@ -88,10 +88,12 @@ export type ControllerCapabilities = {
   // CG-4). Absent means true.
   readonly homeFromAlarm?: boolean;
   // Whether the firmware answers a status query while it homes. Stock GRBL
-  // 1.1 services no realtime request inside its homing loop (limits.c:319-320,
-  // "No time to run protocol_execute_realtime() in this loop"), so its Home
-  // cannot be timed on status silence (controller audit 2026-09-25 ST-4).
-  // Absent means true.
+  // 1.1 services no realtime request inside its homing loop (limits.c:320,
+  // "No time to run protocol_execute_realtime() in this loop"), and grblHAL
+  // does so only with "report when homing" on, off by default
+  // (machine_limits.c:336-337), so their Home cannot be timed on status
+  // silence (controller audit 2026-09-25 ST-4). FluidNC homes from its main
+  // loop and keeps answering. Absent means true.
   readonly statusWhileHoming?: boolean;
   // A refused line's error stays latched and answers every later G-code line
   // until an empty line clears it: grblHAL at its default COMPATIBILITY_LEVEL

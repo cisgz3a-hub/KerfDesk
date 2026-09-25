@@ -161,7 +161,7 @@ describe('GRBL simulator fidelity against GRBL 1.1h (audit ST-2)', () => {
     expect(sim.state().machine).toBe('Alarm');
   });
 
-  it('answers no status query while homing and parses nothing until homing ends (limits.c:319)', async () => {
+  it('answers no status query while homing and parses nothing until homing ends (limits.c:320)', async () => {
     const { conn, lines } = await openSim({ homingMs: 500 });
     await conn.write('$H\nG0 X1\n');
     await pump(50);

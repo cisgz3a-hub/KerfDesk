@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { grblHomingDurationBoundMs } from './grbl-homing-duration';
+import { GRBLHAL_HOMING_CYCLE, grblHomingDurationBoundMs } from './grbl-homing-duration';
 import { settingsMapToRows } from './grbl-settings';
 
 function rows(values: Record<number, string>) {
@@ -45,5 +45,22 @@ describe('grblHomingDurationBoundMs', () => {
     const { 26: _debounce, ...withoutDebounce } = GRBL_DEFAULTS;
     void _debounce;
     expect(grblHomingDurationBoundMs(rows(withoutDebounce))).toBeCloseTo(144_720, 6);
+  });
+
+  it('times grblHAL with its 10 x $27 locate and $43 locate cycles', () => {
+    // Per axis with one locate: (1.5 * 200 + 2 * 1) / 500 + 10 * 1 / 25 =
+    // 1.004 min; three axes = 3.012 min, plus 4 debounces of 250 ms per axis.
+    const halDefaults = rows(GRBL_DEFAULTS);
+    expect(grblHomingDurationBoundMs(halDefaults, GRBLHAL_HOMING_CYCLE)).toBeCloseTo(
+      180_720 + 3_000,
+      6,
+    );
+    // $43=3: four pull-offs and three locates per axis, eight moves:
+    // (300 + 4) / 500 + 30 / 25 = 1.808 min per axis.
+    const threeLocates = rows({ ...GRBL_DEFAULTS, 43: '3' });
+    expect(grblHomingDurationBoundMs(threeLocates, GRBLHAL_HOMING_CYCLE)).toBeCloseTo(
+      3 * 1.808 * 60_000 + 8 * 3 * 250,
+      6,
+    );
   });
 });

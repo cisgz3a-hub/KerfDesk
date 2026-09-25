@@ -9,6 +9,7 @@ import type { ControllerCapabilities } from './controller-capabilities';
 import type { ControllerEvent } from './controller-event';
 import type { JogParams } from './grbl/commands';
 import type { ConsoleCommandResult } from './grbl/console-command';
+import type { HomingCycleModel } from './grbl/grbl-homing-duration';
 
 export type FrameBounds = {
   readonly minX: number;
@@ -172,4 +173,7 @@ export type ControllerDriver = {
   /** Present when the firmware's Home answers `ok` whether or not anything
    *  homed, so KerfDesk asks which axes it homed (Smoothieware). */
   readonly homeVerification?: HomeVerification;
+  /** How the firmware's homing cycle moves, for timing a Home from its `$$`
+   *  settings; absent means stock GRBL's (grbl-homing-duration.ts). */
+  readonly homingCycle?: HomingCycleModel;
 };
