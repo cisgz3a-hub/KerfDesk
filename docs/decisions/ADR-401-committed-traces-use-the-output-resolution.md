@@ -71,7 +71,9 @@ slow and indicative only.
      and the copy moved to the trace worker. Centerline needs less memory but uses the contour figure
      because its run time grows fastest. Device memory is `navigator.deviceMemory` where the browser
      reports it (Chromium and Electron report at most 8 GB) and 4 GB elsewhere. The budget never
-     exceeds 24 MP. With 8 GB reported, Line Art may trace about 11.3 MP; with none, 5.7 MP.
+     exceeds 24 MP, and Centerline's never exceeds 6 MP (`TRACE_CENTERLINE_MAX_WORKING_PIXELS`):
+     6.3 MP is the largest grid with a measured Centerline run time. With 8 GB reported, Line Art
+     may trace about 11.3 MP; with none, 5.7 MP.
 
    The grid is never coarser than the preview's. When the budget binds, the largest grid within it
    is used: a 6000 x 4000 photo placed at its import size traces at 4117 x 2745 with 8 GB, against
@@ -82,38 +84,68 @@ slow and indicative only.
    finer than the preview's, the source is decoded at that grid and traced there. A preview trace is
    reused only if it already holds that grid. The operator's size controls keep the physical meaning
    they had on the preview grid, so the commit drops the specks the preview dropped: Ignore less
-   than and the ink despeckle area scale by the square of the grid ratio; Minimum line, the
-   Centerline join gap and the edge join gap scale by the ratio. Curve-fitting tolerances are not
-   scaled. If the finer decode or trace fails for any reason other than cancellation, the commit
-   traces the preview grid and adds the notice "This device could not trace the image at full
-   resolution, so the trace uses the preview resolution."
+   than and the ink despeckle area scale by the ratio of the two grids' pixel counts; Minimum line,
+   the Centerline join gap and the edge join gap scale by the longest-edge ratio. (A width-only
+   ratio is wrong on a tall source: 100 x 30000 previews at 7 x 2048, so it reads 14.29 against
+   14.65, and gives an area factor of 204 against 209.) Curve-fitting tolerances are not scaled. If
+   the finer decode or trace fails for any reason other than cancellation, the commit traces the
+   preview grid and adds the notice "This device could not trace the image at full resolution, so
+   the trace uses the preview resolution." While the finer attempt runs, the dialog shows its
+   phases over the preview (reading the image, then the trace phases, with the elapsed time) until
+   the commit settles it.
 5. The Multi-File batch plans each file with the same function, using the import size (254 DPI, as
    `rasterImportGeometry` places it) as the output size and the project's machine for the density.
    Each file is now decoded on its turn (`BatchTraceImageJob.image` may be a loader), so a batch
-   holds one large decode at a time instead of all of them.
+   holds one large decode at a time instead of all of them. It has the same fallback as a commit:
+   a file whose finer decode or trace fails for any reason other than cancellation is traced on
+   the preview grid with the unconverted settings (`BatchTraceImageJob.fallback`) and carries the
+   same notice, and the batch continues.
 6. When the committed grid is finer, the dialog says so under the preview once the preview is
    ready, for example: "Preview: 2048 x 256 px. The committed trace uses 4096 x 512 px (the full
-   image), so it can keep detail the preview cannot show." When the budget binds, it says the grid
-   is the most the device's memory allows and gives the full size.
+   image), so it can keep detail the preview cannot show, and takes longer to trace." When the
+   budget binds, it says the grid is the most the trace style may use on this device and gives the
+   full size.
 
 ### Consequences
 
 - Sources up to 2048 px on the longest edge, including the owl and hummingbird art, are unchanged:
   their planned grid is the preview's, and the commit reuses the preview trace as before.
 - For larger sources the committed trace can differ from the preview in detail the preview could
-  not resolve. That is the purpose; the dialog note says so. Placement is unchanged: the trace
-  carries its working grid (`tracePixelWidth`, `tracePixelHeight`) and is registered over the
+  not resolve. That is the purpose; the dialog note says so. Centerline can also differ in the
+  skeleton of broad solid areas the preview did resolve: its internal thresholds are in working
+  pixels and are not converted (the 12 px spur and junction budgets, for example). In a review
+  probe an 80 px solid square traced as one diagonal on the 2048 grid and as an X on the native
+  grid; realistic 16 to 40 px strokes (T, L, +, ring) matched exactly. Placement is unchanged: the
+  trace carries its working grid (`tracePixelWidth`, `tracePixelHeight`) and is registered over the
   source's physical bounds, and the boundary box is remapped to the working grid.
-- Commits of large sources take longer and use more memory, within the budget above. Closing the
-  dialog cancels them as before; the worker's heartbeat keeps a long trace alive.
+- Commits of large sources take longer and use more memory, within the budget above. Before this
+  decision a commit reused the finished preview and cost almost nothing; now every commit of a
+  source over 2048 px decodes and traces again. A freshly imported image is placed at 10 px/mm
+  against a 20 px/mm target, so only memory or the native size bounds its grid: a 12 MP phone photo
+  always takes the finer path. Measured in Node on the shared machine, with a 4000 x 3000 synthetic
+  line-art image placed at 400 x 300 mm and 8 GB reported (preview grid 2048 x 1536, then commit
+  grid): Line Art 3.4 s then 10.2 s (3881 x 2911); Centerline 6.1 s then 9.7 s (2828 x 2121, the
+  6 MP ceiling; 20.1 s at 3881 x 2911 without it); Edge Detection 3.4 s then 9.1 s (3607 x 2705).
+  The dialog note says the commit takes longer, and the dialog shows the commit's phases. Closing
+  the dialog cancels a commit as before; the worker's heartbeat keeps a long trace alive.
+- The commit grid, and so the committed geometry, depends on the reported device memory. The same
+  file and settings can trace differently on an 8 GB Chromium device, a 4 GB one, and Firefox or
+  Safari (which report nothing, so 4 GB is assumed): a 6000 x 4000 source traces at 4117 x 2745
+  with 8 GB and at about 2911 x 1941 with none. This applies to retraces and Multi-File SVG exports
+  too. Chromium reports only a few rounded values (0.25 to 8 GB), so results are reproducible
+  within each reported tier.
 - Before and after, from `trace-commit-at-grid.test.ts`: the 4096 x 512 bars keep 10 + 10 + 10 + 10
   rings at commit (the preview grid keeps 1 + 0 + 10 + 5), and the disc's largest radial error
   falls from 0.608 to 0.471 source px.
-- Tests: `trace-commit-grid.test.ts` (density, the memory guard at 0.5 to 8 GB, the 6000 x 4000
-  budget, the output and preview bounds, Photo shading, the size-control conversion, the dialog
-  copy), `trace-commit-at-grid.test.ts` (the fixtures above, reuse of a preview trace, the fallback
-  notice, cancellation before and during the finer trace), and `multi-file-trace-action.test.ts`
-  (the batch uses the same plan and decodes one file at a time).
+- Tests: `trace-commit-grid.test.ts` (density, the memory guard at 0.5 to 8 GB, the Centerline
+  ceiling, the 6000 x 4000 budget, the output and preview bounds, Photo shading, the size-control
+  conversion including a tall source, the dialog copy), `trace-commit-at-grid.test.ts` (the
+  fixtures above, reuse of a preview trace and of a finer trace an earlier commit settled, a
+  boundary remapped to the commit grid in crop and enhance modes, the reported phases, the fallback
+  notice, cancellation before and during the finer trace), `use-trace-preview-settlement.test.tsx`
+  and `ImportImageDialog.commit-progress.test.tsx` (the dialog shows the commit's phases), and
+  `multi-file-trace-action.test.ts` (the batch uses the same plan, decodes one file at a time, and
+  falls back per file when the finer decode or trace fails, but not when it is cancelled).
 
 Not part of this decision: tiling sources beyond the budget; a finer preview; scaling the preview's
 size controls to native pixels; measuring peak memory in a browser rather than Node.

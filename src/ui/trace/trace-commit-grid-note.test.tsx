@@ -73,7 +73,7 @@ describe('TraceCommitGridNote', () => {
     const host = await render(readyPreview(TRACE_PRESETS['Line Art']!));
     expect(readImageNaturalSize).toHaveBeenCalledWith(FILE, expect.any(AbortSignal));
     expect(host.textContent).toBe(
-      'Preview: 2048 x 256 px. The committed trace uses 4096 x 512 px (the full image), so it can keep detail the preview cannot show.',
+      'Preview: 2048 x 256 px. The committed trace uses 4096 x 512 px (the full image), so it can keep detail the preview cannot show, and takes longer to trace.',
     );
   });
 

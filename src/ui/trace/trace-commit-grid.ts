@@ -43,6 +43,10 @@ export const TRACE_MEMORY_SHARE = 0.25;
 export const DEFAULT_DEVICE_MEMORY_GB = 4;
 /** Absolute ceiling, independent of device memory. */
 export const TRACE_MAX_WORKING_PIXELS = 24_000_000;
+/** Centerline's ceiling, independent of device memory: its run time grows
+ *  fastest, and 6.3 MP is the largest grid with a measured run time (the owl,
+ *  121 s). Its memory alone would allow about 11.3 MP with 8 GB. */
+export const TRACE_CENTERLINE_MAX_WORKING_PIXELS = 6_000_000;
 
 export type TraceCommitGridLimit = 'native' | 'output' | 'memory' | 'preview';
 
@@ -89,7 +93,9 @@ export function traceTargetPxPerMm(
   return TRACE_SAMPLES_PER_SPOT / spotMm;
 }
 
-/** Working-pixel budget for one trace of these options on this device. */
+/** Working-pixel budget for one trace of these options on this device. It
+ *  follows navigator.deviceMemory, so the committed geometry can differ between
+ *  devices that report different memory (ADR-401). */
 export function traceCommitPixelBudget(
   options: Pick<TraceOptions, 'traceMode'>,
   deviceMemoryGb: number | undefined,
@@ -100,7 +106,11 @@ export function traceCommitPixelBudget(
       : DEFAULT_DEVICE_MEMORY_GB;
   const bytesPerPixel = TRACE_PEAK_BYTES_PER_PIXEL[traceLane(options)];
   const pixels = Math.floor((memoryGb * 2 ** 30 * TRACE_MEMORY_SHARE) / bytesPerPixel);
-  return Math.min(TRACE_MAX_WORKING_PIXELS, pixels);
+  const ceiling =
+    traceLane(options) === 'centerline'
+      ? TRACE_CENTERLINE_MAX_WORKING_PIXELS
+      : TRACE_MAX_WORKING_PIXELS;
+  return Math.min(ceiling, pixels);
 }
 
 /** The grid context for tracing `source` placed in `project` on this device. */
@@ -188,17 +198,20 @@ export function commitGridExceedsPreview(plan: TraceCommitGridPlan): boolean {
  * The size controls an operator sets in the dialog (Ignore less than, ink
  * despeckle, Minimum line, gap joins) keep the physical meaning they had on
  * the preview grid, so the commit drops the same specks the preview dropped.
- * Areas scale by the square of the linear grid ratio and lengths by the ratio.
- * Curve-fitting tolerances are NOT scaled: they stay one working pixel, which
- * is the fidelity the finer grid exists to deliver.
+ * Lengths scale by the longest-edge ratio and areas by the ratio of the two
+ * grids' pixel counts: on a tall or narrow source the short edge is a small
+ * rounded integer, so a single-axis ratio would be off. Curve-fitting
+ * tolerances are NOT scaled: they stay one working pixel, which is the
+ * fidelity the finer grid exists to deliver.
  */
 export function traceOptionsForCommitGrid(
   options: TraceOptions,
   plan: Pick<TraceCommitGridPlan, 'grid' | 'preview'>,
 ): TraceOptions {
-  const ratio = plan.grid.width / Math.max(1, plan.preview.width);
-  if (!Number.isFinite(ratio) || ratio <= 1) return options;
-  const area = ratio * ratio;
+  const { grid, preview } = plan;
+  const ratio = Math.max(grid.width, grid.height) / Math.max(1, preview.width, preview.height);
+  const area = (grid.width * grid.height) / Math.max(1, preview.width * preview.height);
+  if (!Number.isFinite(ratio) || !Number.isFinite(area) || ratio <= 1) return options;
   return {
     ...options,
     ...scaled('despeckleMinPixels', options.despeckleMinPixels, area),
@@ -219,8 +232,8 @@ export function describeTraceCommitGrid(plan: TraceCommitGridPlan): string | nul
       ? 'the full image'
       : plan.limit === 'output'
         ? 'enough for the placed size on this machine'
-        : `the most this device's memory allows; the image is ${plan.native.width} x ${plan.native.height} px`;
-  return `Preview: ${preview} px. The committed trace uses ${commit} (${reason}), so it can keep detail the preview cannot show.`;
+        : `the most this trace style may use on this device; the image is ${plan.native.width} x ${plan.native.height} px`;
+  return `Preview: ${preview} px. The committed trace uses ${commit} (${reason}), so it can keep detail the preview cannot show, and takes longer to trace.`;
 }
 
 function traceLane(

@@ -19,7 +19,8 @@ import {
   traceOptionsForCommitGrid,
   traceTargetPxPerMm,
 } from '../trace/trace-commit-grid';
-import { traceImageWithFallback } from '../trace/use-trace-worker-client';
+import { isTraceAbort } from '../trace/trace-cancellation';
+import { isTraceRequestSuperseded, traceImageWithFallback } from '../trace/use-trace-worker-client';
 import { traceNoticeMessage, type TraceNotice } from '../trace/trace-notices';
 
 export type MultiFileTraceFile = File;
@@ -75,14 +76,21 @@ export async function buildMultiFileTraceExports(
   // every selected file is now traced regardless of size.
   for (const file of files) jobs.push(await multiFileTraceJob(file, context));
   const notices: ReadonlyArray<TraceNotice>[] = [];
+  const previewResolution = new Set<number>();
   const exports = await traceImagesToSvgFiles(jobs, {
     trace: deps.trace ?? traceWithWorkerFallback(notices),
+    // As at a dialog commit, the finer grid is an improvement, not a
+    // requirement: a file whose finer decode or trace fails is traced on the
+    // preview grid instead of aborting the batch. Cancellation still aborts.
+    canFallBack: (error) => !isTraceAbort(error) && !isTraceRequestSuperseded(error),
+    onFallback: (index) => previewResolution.add(index),
   });
   return exports.map((file, index) => {
-    const fileNotices = notices[index];
-    return fileNotices === undefined || fileNotices.length === 0
-      ? file
-      : { ...file, notices: fileNotices };
+    const fileNotices = [
+      ...(notices[index] ?? []),
+      ...(previewResolution.has(index) ? (['preview-resolution'] as const) : []),
+    ];
+    return fileNotices.length === 0 ? file : { ...file, notices: fileNotices };
   });
 }
 
@@ -114,12 +122,14 @@ async function multiFileTraceJob(
     context.options,
   );
   const finer = plan !== null && commitGridExceedsPreview(plan) ? plan : null;
+  const previewGrid = { image: () => context.loadImage(file), options: context.options };
+  if (finer === null) return { sourceName: file.name, physicalSizeMm: size, ...previewGrid };
   return {
     sourceName: file.name,
-    image: () =>
-      finer === null ? context.loadImage(file) : context.loadImage(file, finer.maxEdge),
+    image: () => context.loadImage(file, finer.maxEdge),
     physicalSizeMm: size,
-    options: finer === null ? context.options : traceOptionsForCommitGrid(context.options, finer),
+    options: traceOptionsForCommitGrid(context.options, finer),
+    fallback: previewGrid,
   };
 }
 

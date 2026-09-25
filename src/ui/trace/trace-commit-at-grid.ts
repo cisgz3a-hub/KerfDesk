@@ -4,6 +4,7 @@
 // a finer grid than the preview traced.
 
 import type { TraceBoundary, TraceOptions } from '../../core/trace';
+import type { TracePhase } from '../../core/trace/trace-progress';
 import { loadImageAsRawData, readImageNaturalSize } from './image-loader';
 import {
   matchingPreparedTrace,
@@ -34,6 +35,9 @@ export function browserDeviceMemoryGb(): number | undefined {
     : undefined;
 }
 
+/** What a finer commit is doing: decoding the source, then the trace phases. */
+export type TraceCommitPhase = 'decoding' | TracePhase;
+
 export type TraceCommitAtGridArgs = {
   readonly file: File;
   readonly options: TraceOptions;
@@ -44,6 +48,8 @@ export type TraceCommitAtGridArgs = {
   readonly sourceGrid?: TraceGrid;
   readonly commitGrid?: TraceCommitGridContext | undefined;
   readonly signal?: AbortSignal | undefined;
+  // Reported only by the finer attempt: a reused preview trace is immediate.
+  readonly progress?: ((phase: TraceCommitPhase) => void) | undefined;
 };
 
 /**
@@ -98,6 +104,7 @@ async function traceDecoded(
   args: TraceCommitAtGridArgs,
   plan: TraceCommitGridPlan,
 ): Promise<TraceResult> {
+  args.progress?.('decoding');
   const image = await loadImageAsRawData(args.file, plan.maxEdge, args.signal);
   checkTraceSignal(args.signal);
   const sourceHasTransparency = rawImageHasTransparency(image);
@@ -110,6 +117,7 @@ async function traceDecoded(
     boundary,
     args.boundaryMode ?? 'crop',
     args.signal,
+    args.progress,
   );
   return { ...result, sourceHasTransparency };
 }

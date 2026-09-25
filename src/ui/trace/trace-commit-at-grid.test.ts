@@ -14,6 +14,8 @@ import type * as ImageLoaderModule from './image-loader';
 import { loadImageAsRawData, readImageNaturalSize } from './image-loader';
 import type * as WorkerClientModule from './use-trace-worker-client';
 import { traceImageWithFallback } from './use-trace-worker-client';
+import type * as RegionEnhanceModule from './region-enhance-trace';
+import { traceImageWithBoundaryMode } from './region-enhance-trace';
 import { resolveTraceCommitResult } from './trace-commit-result';
 import { scaleToCap } from './trace-decode-cap';
 
@@ -22,6 +24,10 @@ vi.mock('./image-loader', async (importOriginal) => ({
   loadImageAsRawData: vi.fn(),
   readImageNaturalSize: vi.fn(),
 }));
+vi.mock('./region-enhance-trace', async (importOriginal) => {
+  const original = await importOriginal<typeof RegionEnhanceModule>();
+  return { ...original, traceImageWithBoundaryMode: vi.fn(original.traceImageWithBoundaryMode) };
+});
 vi.mock('./use-trace-worker-client', async (importOriginal) => ({
   ...(await importOriginal<typeof WorkerClientModule>()),
   traceImageWithFallback: vi.fn(),
@@ -145,6 +151,7 @@ beforeEach(() => {
   });
   vi.mocked(loadImageAsRawData).mockReset();
   vi.mocked(readImageNaturalSize).mockReset();
+  vi.mocked(traceImageWithBoundaryMode).mockClear();
 });
 
 describe('committed trace resolution (ADR-401)', () => {
@@ -207,6 +214,96 @@ describe('committed trace resolution (ADR-401)', () => {
     });
     expect(resolved).toBe(result);
     expect(loadImageAsRawData).not.toHaveBeenCalled();
+  });
+
+  it('reuses a trace an earlier commit settled at the finer grid, without decoding', async () => {
+    serveSource(barsFixture());
+    vi.mocked(loadImageAsRawData).mockClear();
+    const request = {
+      file: FILE,
+      options: LINE_ART,
+      boundary: null,
+      boundaryMode: 'crop' as const,
+    };
+    const finer = {
+      paths: [],
+      bounds: { minX: 0, minY: 0, maxX: 0, maxY: 0 },
+      width: 4096,
+      height: 512,
+    };
+    const progress = vi.fn();
+    const resolved = await resolveTraceCommitResult({
+      file: FILE,
+      options: LINE_ART,
+      preparedTrace: { request, result: finer },
+      commitGrid: commitGrid(409.6, 51.2),
+      progress,
+    });
+    expect(resolved).toBe(finer);
+    expect(loadImageAsRawData).not.toHaveBeenCalled();
+    expect(traceImageWithFallback).not.toHaveBeenCalled();
+    expect(progress).not.toHaveBeenCalled();
+  });
+
+  it.each(['crop', 'enhance'] as const)(
+    'remaps a boundary drawn on the seed grid to the commit grid (%s mode)',
+    async (boundaryMode) => {
+      serveSource(barsFixture());
+      // Drawn on a 2048 x 256 seed around the 2/2 px group (x 2000..3000 at 4096).
+      const committed = await resolveTraceCommitResult({
+        file: FILE,
+        options: LINE_ART,
+        boundary: { x: 1000, y: 0, width: 500, height: 256 },
+        boundaryMode,
+        sourceGrid: { width: 2048, height: 256 },
+        commitGrid: commitGrid(409.6, 51.2),
+      });
+      expect(traceImageWithBoundaryMode).toHaveBeenCalledTimes(1);
+      const call = vi.mocked(traceImageWithBoundaryMode).mock.calls[0]!;
+      expect(call[0].width).toBe(4096);
+      expect(call[2]).toEqual({ x: 2000, y: 0, width: 1000, height: 512 });
+      expect(call[3]).toBe(boundaryMode);
+      expect(committed.width).toBe(4096);
+      const points = committed.paths.flatMap((path) => path.polylines.flatMap((p) => p.points));
+      if (boundaryMode === 'crop') {
+        expect(ringsPerGroup(committed.paths, committed.width)).toEqual([0, 0, 10, 0]);
+        for (const point of points) {
+          expect(point.x).toBeGreaterThanOrEqual(2000);
+          expect(point.x).toBeLessThanOrEqual(3000);
+          expect(point.y).toBeGreaterThanOrEqual(0);
+          expect(point.y).toBeLessThanOrEqual(512);
+        }
+      } else {
+        // Enhance keeps the full trace and re-traces only the remapped region.
+        expect(ringsPerGroup(committed.paths, committed.width)).toEqual([10, 10, 10, 10]);
+      }
+    },
+    120_000,
+  );
+
+  it('reports the finer decode and the trace phases while it works', async () => {
+    serveSource(barsFixture());
+    vi.mocked(traceImageWithFallback).mockImplementation(
+      async (image, _options, _signal, progress) => {
+        progress?.('preparing');
+        progress?.('tracing');
+        progress?.('refining');
+        return {
+          paths: [],
+          bounds: { minX: 0, minY: 0, maxX: 0, maxY: 0 },
+          width: image.width,
+          height: image.height,
+        };
+      },
+    );
+    const phases: string[] = [];
+    await resolveTraceCommitResult({
+      file: FILE,
+      options: LINE_ART,
+      commitGrid: commitGrid(409.6, 51.2),
+      progress: (phase) => phases.push(phase),
+    });
+    expect(phases).toEqual(['decoding', 'preparing', 'tracing', 'refining']);
   });
 
   it('does not reuse a coarser preview trace when the output needs a finer grid', async () => {

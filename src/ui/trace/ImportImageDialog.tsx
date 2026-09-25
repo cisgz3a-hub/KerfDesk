@@ -43,7 +43,7 @@ import { useTraceCommitLifetime } from './use-trace-commit-lifetime';
 import {
   preparedTraceEntry,
   type TracePreviewCommitControl,
-  type TracePreviewSettlement,
+  type TracePreviewCommitUpdate,
 } from './use-trace-preview-settlement';
 import { isTraceRequestSuperseded } from './use-trace-worker-client';
 import { isTraceAbort, traceAbortError } from './trace-cancellation';
@@ -86,7 +86,7 @@ type TraceCommitContext = {
   readonly close: () => void;
   readonly setBusy: (v: boolean) => void;
   readonly claimOwner: () => TraceCommitClaim | null;
-  readonly settlePreview?: (outcome: TracePreviewSettlement) => void;
+  readonly settlePreview?: (outcome: TracePreviewCommitUpdate) => void;
 };
 
 type DialogBodyProps = {
@@ -376,6 +376,7 @@ export async function commit(args: TraceCommitArgs, ctx: TraceCommitContext): Pr
       sourceGrid: { width: args.seed.pixelWidth, height: args.seed.pixelHeight },
       commitGrid: traceCommitGridForClaim(ctx.claimOwner()),
       signal: ctx.signal,
+      progress: (phase) => settleTracePreview(ctx, { kind: 'progress', phase }),
     });
     const owner = ctx.claimOwner();
     if (owner === null) return;
@@ -455,7 +456,7 @@ function releaseTraceCommitBusy(ctx: TraceCommitContext): void {
   if (ctx.claimOwner() !== null) ctx.setBusy(false);
 }
 
-function settleTracePreview(ctx: TraceCommitContext, outcome: TracePreviewSettlement): void {
+function settleTracePreview(ctx: TraceCommitContext, outcome: TracePreviewCommitUpdate): void {
   ctx.settlePreview?.(outcome);
 }
 

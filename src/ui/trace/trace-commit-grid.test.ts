@@ -4,6 +4,7 @@ import { TRACE_PRESETS } from '../../core/trace';
 import { PREVIEW_MAX_EDGE_PX, scaleToCap } from './trace-decode-cap';
 import {
   DEFAULT_DEVICE_MEMORY_GB,
+  TRACE_CENTERLINE_MAX_WORKING_PIXELS,
   TRACE_MAX_WORKING_PIXELS,
   TRACE_MEMORY_SHARE,
   TRACE_PEAK_BYTES_PER_PIXEL,
@@ -56,6 +57,15 @@ describe('traceCommitPixelBudget (memory guard)', () => {
     expect(traceCommitPixelBudget(LINE_ART, Number.NaN)).toBe(
       traceCommitPixelBudget(LINE_ART, DEFAULT_DEVICE_MEMORY_GB),
     );
+  });
+
+  it('caps Centerline, whose run time grows fastest, below its memory budget', () => {
+    const centerline = traceCommitPixelBudget({ traceMode: 'centerline' }, 8);
+    expect(centerline).toBe(TRACE_CENTERLINE_MAX_WORKING_PIXELS);
+    // Memory alone would allow the contour lanes' 11.3 MP.
+    expect(traceCommitPixelBudget(LINE_ART, 8)).toBeGreaterThan(11_000_000);
+    // A small device still binds on memory first.
+    expect(traceCommitPixelBudget({ traceMode: 'centerline' }, 0.5)).toBeLessThan(centerline);
   });
 
   it('plans Edge Detection, the hungriest lane, on fewer pixels', () => {
@@ -182,6 +192,25 @@ describe('traceOptionsForCommitGrid', () => {
     expect(scaled.pixelScale).toBeUndefined();
   });
 
+  it('uses the long edge for lengths and both axes for areas on a tall source', () => {
+    // 100 x 30000: the preview is 7 x 2048, so a width-only ratio reads
+    // 100 / 7 = 14.29 against the true 30000 / 2048 = 14.65.
+    const plan = planTraceCommitGrid({
+      native: { width: 100, height: 30_000 },
+      outputMm: null,
+      targetPxPerMm: 20,
+      pixelBudget: 100_000_000,
+    });
+    expect(plan.preview).toEqual({ width: 7, height: 2048 });
+    expect(plan.grid).toEqual({ width: 100, height: 30_000 });
+    const options = { ...LINE_ART, edgeMinLengthPx: 10 };
+    const scaled = traceOptionsForCommitGrid(options, plan);
+    expect(scaled.edgeMinLengthPx).toBeCloseTo((10 * 30_000) / 2048, 9);
+    const area = (100 * 30_000) / (7 * 2048);
+    expect(scaled.ignoreLessThanPixels).toBeCloseTo((LINE_ART.ignoreLessThanPixels ?? 0) * area, 9);
+    expect(scaled.despeckleMinPixels).toBeCloseTo((LINE_ART.despeckleMinPixels ?? 0) * area, 9);
+  });
+
   it('returns the same options object on the preview grid', () => {
     const grid = { width: 1000, height: 800 };
     expect(traceOptionsForCommitGrid(LINE_ART, { grid, preview: grid })).toBe(LINE_ART);
@@ -197,18 +226,20 @@ describe('describeTraceCommitGrid', () => {
       pixelBudget: 100_000_000,
     });
     expect(describeTraceCommitGrid(plan)).toBe(
-      'Preview: 2048 x 256 px. The committed trace uses 4096 x 512 px (the full image), so it can keep detail the preview cannot show.',
+      'Preview: 2048 x 256 px. The committed trace uses 4096 x 512 px (the full image), so it can keep detail the preview cannot show, and takes longer to trace.',
     );
   });
 
-  it('names the memory limit and the full size when the budget binds', () => {
+  it('names the budget and the full size when the budget binds', () => {
     const plan = planTraceCommitGrid({
       native: { width: 6000, height: 4000 },
       outputMm: null,
       targetPxPerMm: 20,
       pixelBudget: 6_000_000,
     });
-    expect(describeTraceCommitGrid(plan)).toContain("this device's memory");
+    expect(describeTraceCommitGrid(plan)).toContain(
+      'the most this trace style may use on this device',
+    );
     expect(describeTraceCommitGrid(plan)).toContain('6000 x 4000 px');
   });
 

@@ -142,12 +142,13 @@ describe('buildMultiFileTraceExports', () => {
       traceCommitPixelBudget(TRACE_PRESETS['Line Art']!, 8),
     );
     // Options keep their preview-grid meaning on the finer grid.
-    const ratio = plan!.grid.width / plan!.preview.width;
+    const areaRatio =
+      (plan!.grid.width * plan!.grid.height) / (plan!.preview.width * plan!.preview.height);
     expect(trace.mock.calls[0]?.[1]).toEqual(
       traceOptionsForCommitGrid(TRACE_PRESETS['Line Art']!, plan!),
     );
     expect(trace.mock.calls[0]?.[1]?.despeckleMinPixels).toBeCloseTo(
-      (TRACE_PRESETS['Line Art']!.despeckleMinPixels ?? 0) * ratio * ratio,
+      (TRACE_PRESETS['Line Art']!.despeckleMinPixels ?? 0) * areaRatio,
       9,
     );
     // Each large decode is made on its turn, not all up front.
@@ -159,6 +160,68 @@ describe('buildMultiFileTraceExports', () => {
     ]);
     // The physical size is the import size, whatever grid was traced.
     expect(files[0]?.svg).toContain('width="600mm"');
+  });
+
+  it('traces a file on the preview grid when its finer decode fails, and says so', async () => {
+    const natural = { width: 6000, height: 4000 };
+    const loadImage = vi.fn(async (file: MultiFileTraceFile, maxEdge?: number) => {
+      if (file.name === 'a.png' && maxEdge !== undefined && maxEdge > PREVIEW_MAX_EDGE_PX) {
+        throw new Error('Could not allocate the decode canvas');
+      }
+      const grid = scaleToCap(natural.width, natural.height, maxEdge ?? PREVIEW_MAX_EDGE_PX);
+      return rawImage(grid.width, grid.height);
+    });
+    const trace = vi.fn(async (_image: RawImageData, _options: TraceOptions) => [SQUARE_PATH]);
+    const files = await buildMultiFileTraceExports([namedFile('a.png'), namedFile('b.png')], {
+      loadImage,
+      readNaturalSize: async () => natural,
+      trace,
+      targetPxPerMm: 20,
+      deviceMemoryGb: 8,
+    });
+
+    expect(files.map((file) => file.filename)).toEqual(['a-trace.svg', 'b-trace.svg']);
+    // a.png: the finer attempt, then the preview grid with unconverted options.
+    expect(loadImage.mock.calls[1]).toEqual([namedFile('a.png')]);
+    expect(trace.mock.calls[0]?.[0].width).toBe(PREVIEW_MAX_EDGE_PX);
+    expect(trace.mock.calls[0]?.[1]).toBe(TRACE_PRESETS['Line Art']);
+    expect(files[0]?.notices).toEqual(['preview-resolution']);
+    // b.png keeps its finer grid and has nothing to report.
+    expect(trace.mock.calls[1]?.[0].width).toBeGreaterThan(PREVIEW_MAX_EDGE_PX);
+    expect(files[1]?.notices).toBeUndefined();
+    expect(files[0]?.svg).toContain('width="600mm"');
+  });
+
+  it('falls back when the finer trace fails, but not when the trace is cancelled', async () => {
+    const natural = { width: 6000, height: 4000 };
+    const loadImage = async (_file: MultiFileTraceFile, maxEdge?: number) => {
+      const grid = scaleToCap(natural.width, natural.height, maxEdge ?? PREVIEW_MAX_EDGE_PX);
+      return rawImage(grid.width, grid.height);
+    };
+    const deps = {
+      loadImage,
+      readNaturalSize: async () => natural,
+      targetPxPerMm: 20,
+      deviceMemoryGb: 8,
+    };
+    const outOfMemory = vi.fn(async (image: RawImageData) => {
+      if (image.width > PREVIEW_MAX_EDGE_PX) throw new Error('Worker ran out of memory');
+      return [SQUARE_PATH];
+    });
+    const files = await buildMultiFileTraceExports([namedFile('a.png')], {
+      ...deps,
+      trace: outOfMemory,
+    });
+    expect(outOfMemory).toHaveBeenCalledTimes(2);
+    expect(files[0]?.notices).toEqual(['preview-resolution']);
+
+    const cancelled = vi.fn(async () => {
+      throw new DOMException('Trace cancelled', 'AbortError');
+    });
+    await expect(
+      buildMultiFileTraceExports([namedFile('a.png')], { ...deps, trace: cancelled }),
+    ).rejects.toThrow('Trace cancelled');
+    expect(cancelled).toHaveBeenCalledTimes(1);
   });
 });
 
