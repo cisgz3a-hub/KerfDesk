@@ -13,8 +13,8 @@ it('measures', async () => {
   writeFileSync(OUT, '');
   for (const fixture of REAL_GLYPH_CORPUS) {
     const rendered = await renderGlyphFixture(fixture);
-    const polylines = (rendered as unknown as { polylines?: ReadonlyArray<{ points: ReadonlyArray<{ x: number; y: number }> }> }).polylines ?? [];
-    const segments = polylines.map((p) => ({ polyline: (p as any).points ?? (p as any), closed: true }));
+    const polylines = rendered.paths.flatMap((path) => path.polylines);
+    const segments = polylines.map((p) => ({ polyline: [...p.points, ...(p.closed && p.points[0] ? [p.points[0]] : [])], closed: p.closed }));
     const job: Job = { groups: [{ kind: 'cut', layerId: 'L', color: '#000000', power: 50, speed: 1000, passes: 1, airAssist: false, powerMode: 'constant', segments } as any] };
     const gcode = grblStrategy.emit(job, DEFAULT_DEVICE_PROFILE);
     let x = 0, y = 0, moves = 0, substep = 0; const examples: string[] = [];
