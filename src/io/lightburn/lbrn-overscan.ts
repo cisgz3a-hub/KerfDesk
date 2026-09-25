@@ -1,3 +1,5 @@
+import { MAX_FILL_OVERSCAN_MM } from '../../core/job/compile-job-defaults';
+
 type LightBurnOverscan = {
   readonly distanceMm: number | null;
   readonly warnings: ReadonlyArray<string>;
@@ -25,14 +27,30 @@ export function resolveLightBurnOverscan(
   if (speedMmSec === null || speedMmSec <= 0) {
     return unresolved(layerName, 'a positive imported speed', fallbackDistanceMm);
   }
-  const distanceMm = speedMmSec * (percent / PERCENT_SCALE);
-  if (!Number.isFinite(distanceMm)) {
+  const convertedMm = speedMmSec * (percent / PERCENT_SCALE);
+  if (!Number.isFinite(convertedMm)) {
     return unresolved(layerName, 'a finite converted distance', fallbackDistanceMm);
   }
+  return convertedOverscan(layerName, percent, speedMmSec, convertedMm);
+}
+
+// A runway above the Overscan field's maximum is stored at the maximum, as a
+// job would apply it anyway (ADR-238 Amendment 3).
+function convertedOverscan(
+  layerName: string,
+  percent: number,
+  speedMmSec: number,
+  convertedMm: number,
+): LightBurnOverscan {
+  const distanceMm = Math.min(convertedMm, MAX_FILL_OVERSCAN_MM);
+  const capped =
+    distanceMm < convertedMm
+      ? `, above KerfDesk's ${MAX_FILL_OVERSCAN_MM} mm maximum, so it is stored as ${distanceMm} mm`
+      : '';
   return {
     distanceMm,
     warnings: [
-      `${layerName}: LightBurn Scan overscan ${percent}% was converted to ${distanceMm} mm at ${speedMmSec} mm/s; review it after changing speed because LaserForge stores a fixed physical runway.`,
+      `${layerName}: LightBurn Scan overscan ${percent}% was converted to ${convertedMm} mm at ${speedMmSec} mm/s${capped}; review it after changing speed because LaserForge stores a fixed physical runway.`,
     ],
   };
 }
