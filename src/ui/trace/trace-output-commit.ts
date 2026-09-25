@@ -6,6 +6,7 @@ import { checkTraceSignal } from './trace-cancellation';
 import type { TraceOutput } from './dialog-parts';
 import type { TraceCommitClaim } from './trace-commit-ownership';
 import { traceNoticeMessage, type TraceNotice } from './trace-notices';
+import { scheduleTraceMinFeatureNotice } from './trace-min-feature-notice';
 import {
   buildRasterTraceOutput,
   rasterTraceInputs,
@@ -33,7 +34,7 @@ export type TraceOutputCommitContext = {
     raster: RasterImage,
     options?: TraceExistingImageOptions,
   ) => void;
-  readonly pushToast: (message: string, variant: 'success' | 'error') => void;
+  readonly pushToast: (message: string, variant: 'success' | 'error' | 'warning') => void;
   readonly claimOwner: () => TraceCommitClaim | null;
 };
 
@@ -64,6 +65,11 @@ export async function commitTraceOutput(
   if (ctx.claimOwner() === null) return false;
   ctx.traceExistingImage(args.seed.id, traced, traceOptions);
   ctx.pushToast(traceSuccessMessage(args, traced, sourceStatus, false), 'success');
+  scheduleTraceMinFeatureNotice(
+    traced.id,
+    () => useStore.getState().project,
+    (message) => ctx.pushToast(message, 'warning'),
+  );
   return true;
 }
 

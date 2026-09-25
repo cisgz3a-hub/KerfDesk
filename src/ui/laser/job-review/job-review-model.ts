@@ -37,6 +37,7 @@ import { detectAirAssistStartWarnings } from './air-assist-start-warnings';
 import { detectAirAssistStandbyWarnings } from './air-assist-standby-warnings';
 import { detectM7AirAssistWarnings } from './m7-air-assist-warnings';
 import { detectManualAirAssistWarnings } from './manual-air-assist-warnings';
+import { detectMinFeatureWarnings } from './min-feature-warnings';
 import { detectParkOutsideFrameWarningsFromMetrics } from './park-outside-frame-warnings';
 import { detectRotaryRasterQualificationWarnings } from './rotary-raster-qualification-warnings';
 import {
@@ -130,6 +131,7 @@ export function buildJobReviewModel(args: JobReviewModelArgs): JobReviewModel {
         args.prepared.prepared.job,
       ),
       ...detectArchiveCapacityWarnings(args.prepared),
+      ...detectMinFeatureWarnings(args.prepared.prepared.project),
       ...(args.streamThroughput === undefined
         ? []
         : detectStreamThroughputWarnings({
