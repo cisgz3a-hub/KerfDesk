@@ -3201,10 +3201,23 @@ on the final Save, so Cancel/Escape at any step discards it.
   min power > power); the reason shows inline and nothing is committed.
 - **Empty (no library yet).** New material... first prompts to create
   or open a library (F-ML3); the wizard then targets that library.
-- **Edge (prefill from layer).** An optional **New from current
-  layer** entry pre-fills steps 2–3 from the selected layer's recipe
-  (the old "Create from Layer" shortcut), still fully editable before
-  Save.
+- **Edge (prefill, ADR-381).** The wizard can start prefilled, still
+  fully editable before Save:
+  - **New preset from this operation...** in the artwork inspector
+    captures every setting the selected artwork burns with, its own
+    overrides included. It is disabled for a mixed selection. On a CNC
+    machine the button saves a CNC feeds preset instead.
+  - **New preset from these settings...** in Cut Settings captures the
+    dialog's current values, applied or not.
+  - **Duplicate...** on the Materials rail copies the selected preset.
+    The description ends in "(copy)", and Save adds a new entry.
+  - **New preset from this cell...** in the Material Test results
+    (F-MT1) captures a burned cell and records where it was calibrated.
+
+  The description starts from the source, and the operator names the
+  material and thickness. With no library open, Save creates
+  "<machine> Library". Sub-layers are not captured, and the wizard says
+  so.
 
 ### F-ML3. Saved Libraries — in-app, auto-saved, browsable [Shipped — ADR-093]
 
@@ -3280,6 +3293,54 @@ last updated.
    or profile table resets the corresponding measurement draft. Renaming a profile does not.
 5. Source tests do not qualify belts, focus, optics, firmware timing, or the physical coupon. Frame
    remains the only ordinary Start guard and Job Review remains the warning surface.
+
+### F-MT1. Material Test: generate, burn, and reuse the best cell [Shipped — ADR-381; hardware burn pending]
+
+**Operator intent.** Find the settings a material needs, then keep the settings that worked,
+without losing the design they are for.
+
+**Entry.** **Tools → Material Test...** opens the dialog directly. There is no save prompt, because
+the test no longer replaces the design.
+
+1. **Set up the test.**
+   - Choose the **Test mode**: Line, Fill, Image (dithered) or Image (grayscale). Each Image cell
+     burns a five-band gray ramp.
+   - For **Rows vary** and **Columns vary**, pick power, speed, interval or passes, with a start,
+     an end and a count of up to 20. Interval needs Fill or Image. Picking the setting the other
+     axis holds swaps the two axes.
+   - **Every cell** holds the settings neither axis varies, and air assist.
+   - **Grid** holds the cell size, the gap, **Burn value labels** and **Border around the test**.
+   - The status line shows the cell count and the requested and effective feed under the profile
+     ceiling.
+   - Every value is range-checked before Generate is enabled.
+2. **Place the test.** The dialog remembers this choice.
+   - **Add to the current design** (default): the test is grouped as "Material test N", placed in
+     the free bed space nearest the machine origin (clear of artwork and enabled no-go zones), and
+     selected. One undo removes it. The notice suggests **Selected artwork only** to burn just the
+     test.
+   - **Open as a new project:** the ordinary Save / Don't Save / Cancel prompt runs first. Cancel
+     keeps the design.
+3. **Burn.** The test is an ordinary job: Preview, Frame, then Start through Job Review. Cells run
+   lowest risk first: fastest, weakest, widest interval, fewest passes.
+4. **Reuse the best cell.** Select the test. The inspector shows **Pick the best cell...**, which
+   opens the grid with its row and column values. Click the cell that burned best, or move to it
+   with the arrow keys.
+   - **New preset from this cell...** opens the material preset wizard (F-ML2) prefilled with the
+     cell's burned settings. The preset is marked calibrated, with the test, cell, machine and date.
+   - **Apply to operation** writes power, speed, passes and air assist into a chosen design
+     operation. The interval is written too when that operation has the test's mode. The
+     operation keeps its mode, and the change is undoable.
+
+**Flows.**
+
+- **Error (no room in the project).** A test that would take the project past 256 operations or
+  10,000 objects is refused with that reason. The dialog stays open, so **Open as a new project**
+  can be chosen instead.
+- **Edge (bed full or test too large).** The test is placed at the origin corner, and a warning says
+  it may overlap artwork or run past the bed.
+- **Edge (second test).** A second test gets its own ids, operation colors and name
+  ("Material test 2"), and the results show the test that is selected.
+- **Edge (old projects).** Tests generated before ADR-381 are read back the same way.
 
 ## Phase H flows (CNC router mode — ADR-098)
 
@@ -6093,7 +6154,7 @@ as the pane's design record.
 
 - **Success / one-click align.** The operator opens the "Align to bed…" wizard from the
   Camera panel. Its steps add the five-patch marker target to the project (the scene is
-  replaced by the pattern, like the other calibration generators) and burn it on scrap
+  replaced by the pattern, like the Interval and Scan Offset tests) and burn it on scrap
   covering the bed corners — or reuse an already-burned target — then, with the bed cleared of
   everything else and the camera live, Detect. The five X-corners are detected, the origin
   pair resolves the camera's rotation, the homography solves, and the alignment persists
