@@ -1,9 +1,9 @@
 import { toolbarCommand } from './fixtures/workspace-ui';
 import { createHash } from 'node:crypto';
-import { readFileSync } from 'node:fs';
+import { readFileSync, writeFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
-import type { Project } from '../src/core/scene';
-import { polylineToCurveSubpath } from '../src/core/scene/curve-path';
+import type { ColoredPath, Project } from '../src/core/scene';
+import { traceCommitFidelity } from '../src/__fixtures__/trace-commit-fidelity';
 import { TRACE_PRESETS } from '../src/core/trace/trace-presets';
 import type { TraceOptions } from '../src/core/trace/trace-image';
 import type { TraceWorkerRequest, TraceWorkerResponse } from '../src/ui/trace/trace-worker';
@@ -233,16 +233,33 @@ for (const presetName of ['Centerline', 'Line Art', 'Smooth', 'Sharp', 'Edge Det
     expect(traced.traceMode).toBe(preset.traceMode ?? 'filled-contours');
     expect([traced.tracePixelWidth, traced.tracePixelHeight]).toEqual([1254, 1254]);
     if (request.geometryJson === null) throw Error('Missing worker output geometry');
-    // Saving may omit an exactly redundant line representation. Restore that
-    // representation for this exact worker-to-saved-geometry comparison.
-    const restoredPaths = traced.paths.map((path) => ({
-      ...path,
-      curves: path.curves ?? path.polylines.map(polylineToCurveSubpath),
-    }));
-    expect(restoredPaths).toEqual(JSON.parse(request.geometryJson));
+    // ADR-391 conditions laser traces at commit: retaining all sample vertices
+    // is no longer the contract. Independently check the saved physical fidelity,
+    // contours and canonical curves without rerunning the production conditioner.
+    const fidelity = traceCommitFidelity(
+      JSON.parse(request.geometryJson) as ColoredPath[],
+      traced.paths,
+      traced.transform,
+    );
+    await testInfo.attach('dragon-commit-fidelity.json', {
+      body: JSON.stringify({
+        ...fidelity,
+        workerGeometrySha256: createHash('sha256').update(request.geometryJson).digest('hex'),
+        savedGeometrySha256: createHash('sha256')
+          .update(JSON.stringify(traced.paths))
+          .digest('hex'),
+      }),
+      contentType: 'application/json',
+    });
+    if (fidelity.issues.length > 0) {
+      // Keep full diagnostics in artifacts, never in a multi-megabyte assertion
+      // diff that can stall the GitHub reporter and its issue matchers.
+      writeFileSync(testInfo.outputPath('worker-geometry.json'), request.geometryJson);
+      writeFileSync(testInfo.outputPath('committed-project.json'), JSON.stringify(project));
+    }
+    expect(fidelity.issues).toEqual([]);
     const polylines = traced.paths.flatMap((path) => path.polylines);
     expect(polylines.length).toBe(request.polylines);
-    expect(polylines.reduce((sum, line) => sum + line.points.length, 0)).toBe(request.vertices);
     expect(
       polylines.every(
         (line) =>
@@ -257,7 +274,8 @@ for (const presetName of ['Centerline', 'Line Art', 'Smooth', 'Sharp', 'Edge Det
         bounds: traced.bounds,
         grid: [traced.tracePixelWidth, traced.tracePixelHeight],
         polylines: polylines.length,
-        vertices: request.vertices,
+        vertices: fidelity.committedVertices,
+        workerVertices: request.vertices,
       }),
       contentType: 'application/json',
     });
