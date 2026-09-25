@@ -15,10 +15,13 @@ describe('CNC pause/resume policy', () => {
 
   // CNC audit MC-1: GRBL skips the safety-door spin-up delay in laser mode, so
   // the spin-up advice holds only once the controller has confirmed $32=0.
-  it('warns that Resume has no spin-up unless the controller confirmed $32=0', () => {
+  it('distinguishes confirmed laser mode from an unreported controller setting', () => {
     expect(cncResumeAdvisoryNotice('cnc', false)).toBe(CNC_RESUME_ADVISORY_MESSAGE);
     expect(cncResumeAdvisoryNotice('cnc', true)).toBe(CNC_RESUME_LASER_MODE_ADVISORY_MESSAGE);
-    expect(cncResumeAdvisoryNotice('cnc', undefined)).toBe(CNC_RESUME_LASER_MODE_ADVISORY_MESSAGE);
+    const unknown = cncResumeAdvisoryNotice('cnc', undefined);
+    expect(unknown).toContain('Controller laser mode ($32) is unconfirmed');
+    expect(unknown).toContain('may restart motion without spindle spin-up');
+    expect(unknown).not.toContain('with NO spindle spin-up');
   });
 
   it('tells the operator a paused CNC job can be resumed', () => {

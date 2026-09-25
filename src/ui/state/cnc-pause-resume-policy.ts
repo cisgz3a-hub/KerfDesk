@@ -16,9 +16,13 @@ export const CNC_RESUME_ADVISORY_MESSAGE =
 // restarts the instant power returns, pushing a stopped bit through the cut. So
 // the advice above holds only when the controller has confirmed $32=0.
 export const CNC_RESUME_LASER_MODE_ADVISORY_MESSAGE =
-  'Laser mode ($32) is on or not confirmed off, so Resume restarts motion at once with NO ' +
+  'Laser mode ($32) is on, so Resume restarts motion at once with NO ' +
   'spindle spin-up: the stopped bit is pushed through the cut. Prefer ABORT JOB and recover ' +
   'from the Interrupted job card, and set $32=0 before cutting again.';
+
+const CNC_RESUME_UNCONFIRMED_MODE_MESSAGE =
+  'Controller laser mode ($32) is unconfirmed; Resume may restart motion without spindle spin-up. ' +
+  'Verify $32=0 before resuming, or use ABORT JOB and recover from the Interrupted job card.';
 
 const CNC_PAUSE_MESSAGE =
   'Pause stops motion in place and switches the spindle off; position is kept and the ' +
@@ -33,6 +37,7 @@ export function cncResumeAdvisoryNotice(
   laserModeEnabled: boolean | undefined,
 ): string | null {
   if (machineKind !== 'cnc') return null;
+  if (laserModeEnabled === undefined) return CNC_RESUME_UNCONFIRMED_MODE_MESSAGE;
   return laserModeEnabled === false
     ? CNC_RESUME_ADVISORY_MESSAGE
     : CNC_RESUME_LASER_MODE_ADVISORY_MESSAGE;

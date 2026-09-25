@@ -205,21 +205,27 @@ describe('LiveMotionBar', () => {
   });
 
   // CNC audit MC-1: in laser mode GRBL skips the spin-up on Resume.
-  it('warns on Resume that there is no spin-up while $32 is not confirmed off', async () => {
-    useLaserStore.setState({
-      streamer: pause(streamingStreamer()),
-      activeJobMachineKind: 'cnc',
-      controllerSettings: { laserModeEnabled: true },
-    });
-    const { host, root } = await render(<LiveMotionBar />);
-    try {
-      const resume = buttonByText(host, 'Resume');
-      expect(resume?.disabled).toBe(false);
-      expect(resume?.title).toMatch(/NO spindle spin-up/);
-    } finally {
-      await act(async () => root.unmount());
-    }
-  });
+  it.each([
+    { laserModeEnabled: true, notice: 'with NO spindle spin-up' },
+    { laserModeEnabled: undefined, notice: 'may restart motion without spindle spin-up' },
+  ])(
+    'keeps Resume available with accurate mode advice: $laserModeEnabled',
+    async ({ laserModeEnabled, notice }) => {
+      useLaserStore.setState({
+        streamer: pause(streamingStreamer()),
+        activeJobMachineKind: 'cnc',
+        controllerSettings: laserModeEnabled === undefined ? null : { laserModeEnabled },
+      });
+      const { host, root } = await render(<LiveMotionBar />);
+      try {
+        const resume = buttonByText(host, 'Resume');
+        expect(resume?.disabled).toBe(false);
+        expect(resume?.title).toContain(notice);
+      } finally {
+        await act(async () => root.unmount());
+      }
+    },
+  );
 
   it('uses an operation-specific Abort label outside a streaming job', async () => {
     useLaserStore.setState({

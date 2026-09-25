@@ -43,8 +43,8 @@ describe('RunningControls CNC Resume advisory', () => {
     expect(host.textContent).toMatch(/spins back up\s+engaged/i);
   });
 
-  // CNC audit MC-1: with $32 unread (or 1), Resume restarts motion with no spin-up.
-  it('says Resume has no spin-up while the controller has not confirmed $32=0', async () => {
+  // Unread $32 is uncertainty, not proof that the controller is in laser mode.
+  it('describes the spin-up risk conditionally while $32 is unconfirmed', async () => {
     useLaserStore.setState({ activeJobMachineKind: 'cnc', controllerSettings: null });
     const host = document.createElement('div');
     document.body.appendChild(host);
@@ -54,7 +54,8 @@ describe('RunningControls CNC Resume advisory', () => {
       root.render(<RunningControls isStreaming={false} isPaused={true} isToolChange={false} />);
     });
 
-    expect(host.textContent).toMatch(/NO\s+spindle spin-up/);
+    expect(host.textContent).toContain('may restart motion without spindle spin-up');
+    expect(host.textContent).not.toMatch(/NO\s+spindle spin-up/);
     expect(host.textContent).not.toMatch(/restarts the spindle/i);
   });
 });

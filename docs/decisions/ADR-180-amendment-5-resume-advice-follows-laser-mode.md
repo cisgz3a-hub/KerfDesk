@@ -22,8 +22,11 @@ list, and routers often keep `$32=1` after a laser session. The 2026-09-24 CNC a
 ### Decision
 
 1. The CNC Resume advisory keeps its spin-up wording only when the controller has reported `$32=0`.
-   With `$32=1`, or `$32` unreported, it says Resume restarts motion at once with no spindle
-   spin-up, and recommends **ABORT JOB** and recovery from the interrupted-job card.
+   With `$32=1`, it says Resume restarts motion at once with no spindle spin-up, and recommends
+   **ABORT JOB** and recovery from the interrupted-job card. With `$32` unreported, it says the
+   mode is unconfirmed and Resume may restart motion without spindle spin-up. It recommends
+   verifying `$32=0` before resuming, or aborting and recovering; missing evidence does not prove
+   that the controller is in laser mode.
 2. The `$32=0` wording names GRBL's fixed delay (4 s in stock GRBL) rather than "waits for it to
    reach speed".
 3. The `$32=1` Job Review warning names all three effects: the dwell after `M3` runs with the
