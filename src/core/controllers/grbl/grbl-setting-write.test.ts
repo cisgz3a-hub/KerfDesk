@@ -54,6 +54,37 @@ describe('guarded GRBL setting writes', () => {
     });
   });
 
+  // CNC audit JR-1 (ADR-180 Amendment 6): the router mirror of the laser rule.
+  // Laser mode on a spindle skips the spin-up delay and runs the M3 dwell with
+  // the spindle off, so a router project writes only a plain zero.
+  it('blocks $32=1 and any non-zero $32 for a router, from Machine Settings and the Console', () => {
+    for (const value of ['1', '1.0', '0.5', '2', '256']) {
+      expect(grblSettingMachineKindIssue('cnc', 32, value)).toContain(
+        'Router machine setup cannot write $32=1',
+      );
+      expect(grblSettingCommandMachineKindIssue('cnc', `$32=${value}`)).toContain(
+        'Router machine setup cannot write $32=1',
+      );
+    }
+    for (const value of ['0', '0.0', '00']) {
+      expect(grblSettingMachineKindIssue('cnc', 32, value)).toBeNull();
+    }
+    expect(grblSettingMachineKindIssue('cnc', 30, '12000')).toBeNull();
+    expect(
+      buildGrblSettingWrite({
+        rows,
+        id: 32,
+        confirmation: { commonSettingChecked: true },
+        backupFresh: true,
+        machineKind: 'cnc',
+        value: '1',
+      }),
+    ).toEqual({
+      kind: 'blocked',
+      reason: expect.stringContaining('Router machine setup cannot write $32=1'),
+    });
+  });
+
   it('allows common laser settings with checkbox confirmation and a current backup', () => {
     expect(
       buildGrblSettingWrite({
