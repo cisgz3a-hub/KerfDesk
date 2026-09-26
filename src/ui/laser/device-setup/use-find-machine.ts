@@ -13,6 +13,7 @@ import { useToastStore } from '../../state/toast-store';
 import {
   baudScanAnswer,
   baudScanCandidates,
+  createBaudScanOwnership,
   scanBaudRates,
   type BaudScanAnswer,
 } from './device-setup-baud-scan';
@@ -63,15 +64,23 @@ export function useFindMachine(
     pushToast(error instanceof Error ? error.message : String(error), 'error');
   const openConnection = (extra?: Partial<ConnectControllerOptions>): Promise<void> =>
     laser.connect(platform, options(extra));
+  // A failed attempt shows as the connection's own failure; the scan reads it.
+  const connectAt = (baud: number): Promise<void> =>
+    openConnection({ baudRate: baud }).catch(() => undefined);
+  const scan = useBaudScan(connectAt, laser.disconnect, baudRate);
+  // Every other connection action here takes the connection from a running scan.
   const reconnect = async (): Promise<void> => {
+    scan.stop();
     await laser.disconnect();
     await openConnection();
   };
   const find = (): void => {
+    scan.stop();
     automatic?.requestFind();
     void openConnection().catch(showError);
   };
   const choosePort = (): void => {
+    scan.stop();
     void (async () => {
       if (useLaserStore.getState().connection.kind === 'connected') await laser.disconnect();
       // After the old connection closes, so its read cannot fill the draft.
@@ -79,10 +88,10 @@ export function useFindMachine(
       await openConnection({ portSelection: 'choose' });
     })().catch(showError);
   };
-  // A failed attempt shows as the connection's own failure; the scan reads it.
-  const connectAt = (baud: number): Promise<void> =>
-    openConnection({ baudRate: baud }).catch(() => undefined);
-  const scan = useBaudScan(connectAt, laser.disconnect, baudRate);
+  const disconnect = (): void => {
+    scan.stop();
+    void laser.disconnect().catch(showError);
+  };
   useAdoptDetectedFirmware(
     mismatch,
     laser.detectedControllerKind,
@@ -102,7 +111,7 @@ export function useFindMachine(
     mismatch,
     readAgain: () => void readController(guide, driver, laser).catch(showError),
     reconnect: () => void reconnect().catch(showError),
-    disconnect: () => void laser.disconnect().catch(showError),
+    disconnect,
     scan,
     supportsSerial: platform.serial.isSupported(),
   };
@@ -132,7 +141,8 @@ function useFindLaserState() {
 // The banner named a different firmware in the same family and auto-fill
 // adopted it in the draft: reconnect once so the right driver reads it. Only
 // after Find my machine in this setup, so a connection made elsewhere is never
-// dropped by opening setup.
+// dropped by opening setup: a new machine's draft fills itself without Find,
+// but that does not make the connection Find's.
 function useAdoptDetectedFirmware(
   mismatch: boolean,
   detected: string | null,
@@ -142,7 +152,9 @@ function useAdoptDetectedFirmware(
 ): void {
   const done = useRef(false);
   const adopted =
-    automatic?.record?.status === 'applied' && automatic.record.summary.controllerKind !== null;
+    automatic?.findRequested === true &&
+    automatic.record?.status === 'applied' &&
+    automatic.record.summary.controllerKind !== null;
   useEffect(() => {
     if (done.current || !mismatch || !adopted || detected !== draftKind) return;
     done.current = true;
@@ -150,36 +162,70 @@ function useAdoptDetectedFirmware(
   }, [adopted, detected, draftKind, mismatch, reconnect]);
 }
 
+// Stop, a new scan and closing setup each retire the running scan, which then
+// touches neither the connection nor the status again.
 function useBaudScan(
   connectAt: (baudRate: number) => Promise<void>,
   disconnect: () => Promise<void>,
   currentBaud: number,
 ) {
   const [status, setStatus] = useState<BaudScanStatus>({ kind: 'idle' });
-  const cancelled = useRef(false);
-  useEffect(() => () => void (cancelled.current = true), []);
+  const [ownership] = useState(createBaudScanOwnership);
+  useEffect(() => () => ownership.retire(), [ownership]);
   const start = (): void => {
-    cancelled.current = false;
+    const retired = ownership.claim();
+    const connection = scanConnectionOwnership();
     const candidates = baudScanCandidates([currentBaud]);
+    const report = (next: BaudScanStatus): void => {
+      if (!retired()) setStatus(next);
+    };
     void scanBaudRates(
-      { connectAt, disconnect, awaitAnswer, cancelled: () => cancelled.current },
+      {
+        connectAt: (baud) => connection.open(() => connectAt(baud)),
+        disconnect,
+        awaitAnswer,
+        cancelled: () => retired() || connection.replaced(),
+      },
       candidates,
       (baudRate, index) =>
-        setStatus({ kind: 'running', baudRate, index: index + 1, of: candidates.length }),
+        report({ kind: 'running', baudRate, index: index + 1, of: candidates.length }),
     )
-      .then((result) => {
-        if (cancelled.current) return;
-        setStatus(
-          result.kind === 'none' ? { kind: 'none', tried: result.tried } : { kind: 'idle' },
-        );
-      })
-      .catch(() => setStatus({ kind: 'idle' }));
+      .then((result) =>
+        report(result.kind === 'none' ? { kind: 'none', tried: result.tried } : { kind: 'idle' }),
+      )
+      .catch(() => report({ kind: 'idle' }))
+      .finally(connection.release);
   };
   const stop = (): void => {
-    cancelled.current = true;
+    ownership.retire();
     setStatus({ kind: 'idle' });
   };
   return { status, start, stop };
+}
+
+// The connection a scan opened stays the scan's until a connect it did not
+// start begins (auto-connect on a replug, say). A replaced connection is
+// someone else's, so the scan stops without closing it.
+export function scanConnectionOwnership() {
+  let opening = false;
+  let replaced = false;
+  const release = useLaserStore.subscribe((state, previous) => {
+    const began =
+      state.connection.kind === 'connecting' && previous.connection.kind !== 'connecting';
+    if (began && !opening) replaced = true;
+  });
+  return {
+    open: async (connect: () => Promise<void>): Promise<void> => {
+      opening = true;
+      try {
+        await connect();
+      } finally {
+        opening = false;
+      }
+    },
+    replaced: (): boolean => replaced,
+    release,
+  };
 }
 
 function awaitAnswer(): Promise<BaudScanAnswer> {

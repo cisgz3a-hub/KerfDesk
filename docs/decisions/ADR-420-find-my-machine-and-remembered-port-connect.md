@@ -79,11 +79,15 @@ Platform limits that shape the design:
 6. **Adopting a firmware reconnects once.** When auto-fill adopted a firmware different from the
    one the connection used, Find reconnects once with it, so the matching driver reads the
    controller. It happens only after Find in this setup; a connection made elsewhere is never
-   dropped by opening setup.
+   dropped by opening setup. A new machine's draft may adopt the firmware by itself on open,
+   but that leaves the connection as it is and offers **Reconnect using selected profile**.
 7. **Try other speeds.** When the port opened but nothing answered, **Try other speeds**
    reconnects at 115200, 230400, 250000, 921600, 57600, 38400, 19200 and 9600 baud in turn (the
    one already tried is skipped), waits up to 4 s for an answer at each, and stops at the first
-   that answers. **Stop** ends it. It only listens and reads.
+   that answers. **Stop** ends it. It only listens and reads. Stop, a new scan, another
+   connection action in setup, closing setup, or a connect the scan did not start (auto-connect
+   after a replug) each retire the running scan, which then closes nothing: the open connection
+   is no longer the scan's.
 8. **The catalog is not auto-picked.** `$130`/`$131` are the controller's travel limits, not the
    bed: a Creality Falcon A1 Pro reports 400 × 400 mm for a 358 × 268 mm bed. Detected matches stay
    prioritised with "Possible match" as the ceiling (ADR-240 #2).

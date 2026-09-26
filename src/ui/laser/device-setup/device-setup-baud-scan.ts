@@ -30,6 +30,9 @@ export function baudScanCandidates(skip: ReadonlyArray<number>): ReadonlyArray<n
   return COMMON_BAUD_RATES.filter((baud) => !skip.includes(baud));
 }
 
+// A cancelled scan returns before its next step and never cleans up: once the
+// operator pressed Stop or connected another way, the open connection is not
+// the scan's to close. So cancellation is checked after every await.
 export async function scanBaudRates(
   link: BaudScanLink,
   candidates: ReadonlyArray<number>,
@@ -37,12 +40,14 @@ export async function scanBaudRates(
 ): Promise<BaudScanResult> {
   const tried: number[] = [];
   for (const [index, baudRate] of candidates.entries()) {
-    if (link.cancelled()) return { kind: 'cancelled' };
+    if (link.cancelled()) return CANCELLED;
     onTry(baudRate, index);
     await link.disconnect();
-    if (link.cancelled()) return { kind: 'cancelled' };
+    if (link.cancelled()) return CANCELLED;
     await link.connectAt(baudRate);
+    if (link.cancelled()) return CANCELLED;
     const answer = await link.awaitAnswer();
+    if (link.cancelled()) return CANCELLED;
     tried.push(baudRate);
     if (answer === 'answered') return { kind: 'found', baudRate };
     // A port that will not open at all will not open at another speed either.
@@ -50,6 +55,27 @@ export async function scanBaudRates(
   }
   await link.disconnect();
   return { kind: 'none', tried };
+}
+
+const CANCELLED: BaudScanResult = { kind: 'cancelled' };
+
+/** One owner per scan: `claim` starts a scan and returns its "retired" check,
+ *  which turns true once `retire` runs or a later scan claims. */
+export function createBaudScanOwnership(): {
+  readonly claim: () => () => boolean;
+  readonly retire: () => void;
+} {
+  let current = 0;
+  return {
+    claim: () => {
+      current += 1;
+      const mine = current;
+      return () => current !== mine;
+    },
+    retire: () => {
+      current += 1;
+    },
+  };
 }
 
 /** How the live connection stands for a scan attempt. */

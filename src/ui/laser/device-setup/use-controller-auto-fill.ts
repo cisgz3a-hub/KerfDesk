@@ -12,6 +12,9 @@ export type DeviceSetupAutomatic = {
   readonly record: DeviceSetupAutoFillRecord | null;
   /** True when this setup fills in reported values by itself. */
   readonly fillsItself: boolean;
+  /** The operator pressed Find my machine in this setup. Only then does Find
+   *  own the connection; a new machine fills itself without that. */
+  readonly findRequested: boolean;
   readonly undo: () => void;
   /** The operator pressed Find my machine: fill in what it reports. */
   readonly requestFind: () => void;
@@ -51,5 +54,5 @@ export function useControllerAutoFill(
     setFindRequested(true);
     setRecord(null);
   }, []);
-  return { record, fillsItself, undo, requestFind };
+  return { record, fillsItself, findRequested, undo, requestFind };
 }
