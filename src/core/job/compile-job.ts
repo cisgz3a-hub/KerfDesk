@@ -35,6 +35,7 @@ import {
 import { compileRasterGroupsForLayer } from './compile-job-raster';
 import { sharedObjectPowerScalePercent } from './compile-job-object-policy';
 import { compilationPolylines } from './compilation-polylines';
+import { laserArcFitFor } from './cut-arc-moves';
 import {
   contourEntryBoundsForDevice,
   contourEntryRunwayMm,
@@ -382,7 +383,8 @@ function appendPathSegments(
   for (const path of object.paths) {
     if (!pathUsesOperation(object, path, layer)) continue;
     const closedForKerf: Polyline[] = [];
-    for (const polyline of compilationPolylines(path, object.transform)) {
+    const withArcs = laserArcFitFor(path, object.transform, device);
+    for (const [index, polyline] of compilationPolylines(path, object.transform).entries()) {
       const points: Vec2[] = polyline.points.map((p) =>
         toMachineCoords(applyTransform(p, object.transform), device),
       );
@@ -393,7 +395,11 @@ function appendPathSegments(
         // equals its first" so the emitter (which walks points and ignores the
         // `closed` flag) draws the closing edge. DXF entities drop the seam
         // vertex, which otherwise left the final edge uncut.
-        out.push({ polyline: withClosingPoint(points, polyline.closed), closed: polyline.closed });
+        const segment = {
+          polyline: withClosingPoint(points, polyline.closed),
+          closed: polyline.closed,
+        };
+        out.push(withArcs(index, segment));
       }
     }
     // Checked: the unchecked variant flattens a clipper2 failure to an empty

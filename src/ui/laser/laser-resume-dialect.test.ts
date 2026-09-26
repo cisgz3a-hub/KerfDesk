@@ -259,7 +259,7 @@ describe.each(DIALECTS)('laser resume on $name', (dialect) => {
     expectSameBurns(dialect, job.gcode, sent, fromLine, device.maxPowerS);
   });
 
-  it('resumes a saved recovery with them, records transform 3 and replays the archive', async () => {
+  it('resumes a saved recovery with them, records transform 4 and replays the archive', async () => {
     const startJob = vi.fn(async () => undefined);
     useLaserStore.setState({ startJob });
     const repository = recoveryRepository();
@@ -272,7 +272,8 @@ describe.each(DIALECTS)('laser resume on $name', (dialect) => {
     expect(jobAwareAlert).not.toHaveBeenCalled();
     const recovered = activeArtifact(repository);
     expect(startJob).toHaveBeenCalledWith(recovered.gcode, expect.anything());
-    expect(recovered.laserResumeChain).toEqual([{ fromLine, version: 3 }]);
+    // Transform 4 (ADR-407) left these programs' resumes as transform 3 built them.
+    expect(recovered.laserResumeChain).toEqual([{ fromLine, version: 4 }]);
     expect(recovered.gcode).toMatch(dialect.rearm);
     expectSameBurns(dialect, job.gcode, recovered.gcode, fromLine, device.maxPowerS);
     expect(recoveryArtifactPreparedProgramMatches(recovered)).toBe(true);

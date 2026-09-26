@@ -13,7 +13,8 @@
 // './toolpath' importers are untouched.
 
 import type { Vec2 } from '../scene';
-import type { FillGroup, Group, Job } from './job';
+import type { CutSegment, FillGroup, Group, Job } from './job';
+import { cutSegmentBurnPolyline } from './cut-arc-moves';
 import { contourEntryPoint, type ContourEntryBounds } from './contour-entry';
 import { expandFillHatchWithRunways } from './fill-runway';
 import { planFillSweeps, type FillSweepPlan } from './fill-sweep-plan';
@@ -75,6 +76,7 @@ function appendGroupSteps(
         group.color,
         group.passes,
         contourEntryOptions(group.entryRunwayMm, options),
+        group.entryRunwayMm,
       );
     case 'cnc':
       // Z-aware CNC steps (H.2): retract/travel/plunge/cut mirroring the
@@ -97,6 +99,7 @@ function appendFillGroupSteps(
       group.color,
       group.passes,
       contourEntryOptions(group.entryRunwayMm, options),
+      group.entryRunwayMm,
     );
   }
   const scanOffsetMm =
@@ -134,10 +137,11 @@ function contourEntryOptions(
 function appendContourGroupSteps(
   steps: ToolpathStep[],
   initialPrevEnd: Vec2 | null,
-  segments: ReadonlyArray<{ readonly polyline: ReadonlyArray<Vec2> }>,
+  segments: ReadonlyArray<CutSegment>,
   color: string,
   passes: number,
   entryOptions: ContourEntryOptions | null,
+  entryRunwayMm: number | undefined,
 ): Vec2 | null {
   let prevEnd = initialPrevEnd;
   for (let pass = 0; pass < passes; pass += 1) {
@@ -156,11 +160,14 @@ function appendContourGroupSteps(
         appendTravelStep(steps, prevEnd, entry, 'rapid');
         appendTravelStep(steps, entry, first, 'feed');
       }
+      // ADR-407: the emitter's own predicate decides whether arcs go out. The
+      // preview has no device; compile attached arcs only for an arc machine.
+      const burn = cutSegmentBurnPolyline(seg, { arcMovesEnabled: true, entryRunwayMm });
       steps.push({
         kind: 'cut',
         color,
-        polyline: seg.polyline,
-        length: polylineLength(seg.polyline),
+        polyline: burn,
+        length: polylineLength(burn),
       });
       const last = seg.polyline[seg.polyline.length - 1];
       if (last !== undefined) prevEnd = last;
