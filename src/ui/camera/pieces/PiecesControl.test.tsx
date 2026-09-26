@@ -4,7 +4,7 @@
 // selection on every ticked piece as one undo step. Nothing changes before
 // Place.
 
-import { act } from 'react';
+import { act, useState } from 'react';
 import type * as FrameSource from '../frame-source';
 import { beforeEach, expect, it, vi } from 'vitest';
 import { lookAt, savedCameraModel } from '../../../core/camera/model/model-fixtures';
@@ -192,4 +192,126 @@ it('says so when no piece stands out from the bed', async () => {
   const host = await mountControl(<PiecesControl />);
   await findPieces(host);
   expect(host.textContent).toContain('No pieces found.');
+});
+function deferredFrame() {
+  let finish: (value: typeof frame) => void = () => {
+    throw new Error('Not initialized');
+  };
+  const promise = new Promise<typeof frame>((resolve) => {
+    finish = resolve;
+  });
+  return { promise, finish: () => finish(frame) };
+}
+
+async function settleCapture(finish: () => void) {
+  await act(async () => {
+    finish();
+    await new Promise((resolve) => setTimeout(resolve, 10));
+  });
+}
+
+it('Clear abandons an in-flight refresh rather than letting it republish pieces', async () => {
+  const host = await mountControl(<PiecesControl />);
+  await findPieces(host);
+  const pending = deferredFrame();
+  capture.mockReturnValueOnce(pending.promise);
+  await clickControl(host, 'Find pieces');
+  expect(usePieceScanStore.getState().finding).toBe(true);
+  await clickControl(host, 'Clear');
+  expect(usePieceScanStore.getState().scan).toBeNull();
+  await settleCapture(pending.finish);
+  expect(usePieceScanStore.getState().scan).toBeNull();
+  expect(host.textContent).not.toContain('Found 3 pieces');
+});
+
+it('an abandoned capture completion does not clear the newer capture busy state', async () => {
+  const host = await mountControl(<PiecesControl />);
+  await findPieces(host);
+  const first = deferredFrame();
+  const second = deferredFrame();
+  capture.mockReturnValueOnce(first.promise).mockReturnValueOnce(second.promise);
+  await clickControl(host, 'Find pieces');
+  await clickControl(host, 'Clear');
+  await clickControl(host, 'Find pieces');
+  expect(usePieceScanStore.getState().finding).toBe(true);
+  await settleCapture(first.finish);
+  const findingWhileSecondPending = usePieceScanStore.getState().finding;
+  await settleCapture(second.finish);
+  expect(findingWhileSecondPending).toBe(true);
+});
+
+it('changing the camera model retires old piece placements before Place', async () => {
+  const host = await mountControl(<PiecesControl />);
+  await findPieces(host);
+  const saved = useStore.getState().project.device.cameraModel;
+  if (saved === undefined) throw new Error('Missing camera model');
+  await act(async () =>
+    useStore.getState().updateDeviceProfile({
+      cameraModel: { ...saved, pose: lookAt([250, 200, -400], [250, 200.001, 0]) },
+    }),
+  );
+  const beforePlace = useStore.getState().project;
+  const button = Array.from(host.querySelectorAll('button')).find(
+    (item) => item.textContent === 'Place selection on each piece',
+  );
+  if (button !== undefined && !button.disabled) await act(async () => button.click());
+  expect(useStore.getState().project).toBe(beforePlace);
+});
+
+it('cancelling by a source change suppresses a delayed capture result', async () => {
+  const host = await mountControl(<PiecesControl />);
+  const pending = deferredFrame();
+  capture.mockReturnValueOnce(pending.promise);
+  await clickControl(host, 'Find pieces');
+  await act(async () => camera.setState({ sourceState: { kind: 'idle' } }));
+  await settleCapture(pending.finish);
+  expect(usePieceScanStore.getState().scan).toBeNull();
+  expect(usePieceScanStore.getState().finding).toBe(false);
+  expect(control(host, 'Find pieces').disabled).toBe(true);
+});
+
+it.each([
+  ['document', () => useStore.getState().newProject()],
+  ['profile', () => useStore.getState().updateDeviceProfile({ profileId: 'other-profile' })],
+  ['bed width', () => useStore.getState().updateDeviceProfile({ bedWidth: 300 })],
+  ['bed height', () => useStore.getState().updateDeviceProfile({ bedHeight: 300 })],
+  ['source', () => camera.setState({ sourceState: { kind: 'idle' } })],
+  ['source epoch', () => camera.setState((s) => ({ sourceEpoch: s.sourceEpoch + 1 }))],
+  ['material height', () => camera.getState().setSurfaceHeightMm(40)],
+  [
+    'height areas',
+    () =>
+      camera
+        .getState()
+        .addHeightArea({ id: 'box', x: 200, y: 200, width: 100, height: 100, surfaceHeightMm: 40 }),
+  ],
+] as const)(
+  'a completed scan retires on %s changes without a mounted Camera panel',
+  (_name, change) => {
+    usePieceScanStore.getState().setPieces(PIECES);
+    change();
+    expect(usePieceScanStore.getState().scan).toBeNull();
+    expect(usePieceScanStore.getState().finding).toBe(false);
+  },
+);
+
+it('unmount releases the active request immediately and a later capture cannot publish', async () => {
+  function ToggleControl() {
+    const [show, setShow] = useState(true);
+    return (
+      <>
+        <button onClick={() => setShow(false)}>Hide camera panel</button>
+        {show ? <PiecesControl /> : null}
+      </>
+    );
+  }
+  const host = await mountControl(<ToggleControl />);
+  const pending = deferredFrame();
+  capture.mockReturnValueOnce(pending.promise);
+  await clickControl(host, 'Find pieces');
+  expect(usePieceScanStore.getState().finding).toBe(true);
+  await clickControl(host, 'Hide camera panel');
+  expect(usePieceScanStore.getState().finding).toBe(false);
+  await settleCapture(pending.finish);
+  expect(usePieceScanStore.getState().scan).toBeNull();
 });

@@ -72,6 +72,11 @@ new camera geometry.
      left out are drawn faint and dashed.
    - Finding pieces turns the overlay on, so the outlines sit on the camera picture. Nothing in
      the project changes until Place.
+   - A request and its completed scan belong to the document, machine profile, camera model,
+     capture source, bed size and surface heights that measured them. Changing that context
+     clears the scan, including while the panel is closed. Clear abandons an in-flight refresh;
+     only the current request may publish results or release the busy state. Place rechecks the
+     scan identity before changing artwork.
 
 No new guards. **Find pieces** is disabled without a live camera, like **Trace from camera**,
 because there is no frame to capture (a transport precondition). Place with nothing selected,
