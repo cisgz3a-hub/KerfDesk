@@ -45,7 +45,12 @@ export function PiecesControl(): JSX.Element {
         <span>Pieces on the bed</span>
         <span style={buttonsStyle}>
           {scan === null ? null : (
-            <button type="button" className="lf-btn" onClick={clear}>
+            <button
+              type="button"
+              className="lf-btn"
+              onClick={clear}
+              title="Clear the found pieces and their outlines. The design is not changed."
+            >
               Clear
             </button>
           )}
@@ -167,7 +172,12 @@ function PieceRow(props: {
   return (
     <div style={pieceStyle} data-testid="camera-piece">
       <label style={lineStyle}>
-        <input type="checkbox" checked={props.included} onChange={props.onToggle} />
+        <input
+          type="checkbox"
+          checked={props.included}
+          onChange={props.onToggle}
+          title="Place a copy of the design on this piece."
+        />
         <strong>Piece {props.index + 1}</strong>
         <span>{pieceSizeLabel(piece)}</span>
       </label>

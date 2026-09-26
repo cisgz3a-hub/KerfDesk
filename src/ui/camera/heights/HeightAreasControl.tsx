@@ -93,7 +93,12 @@ function HeightAreaRow(props: {
         >
           Trace area
         </button>
-        <button type="button" className="lf-btn" onClick={() => remove(area.id)}>
+        <button
+          type="button"
+          className="lf-btn"
+          onClick={() => remove(area.id)}
+          title="Remove this height area; the camera picture there goes back to the material height."
+        >
           Remove
         </button>
       </div>
@@ -142,6 +147,7 @@ function NumberField(props: {
         step={0.1}
         value={round(props.value)}
         aria-label={props.ariaLabel}
+        title={props.ariaLabel}
         autoFocus={props.autoFocus}
         onChange={(event) => props.onChange(Number(event.currentTarget.value))}
         style={inputStyle}

@@ -19,12 +19,19 @@ import { canvasMouseToScene } from './view-transform';
 import { Workspace } from './Workspace';
 import { WorkspaceViewport } from './WorkspaceViewport';
 
-// jsdom has no WebGL2: a stand-in renderer records what the overlay draws with.
+// jsdom has no WebGL2: a stand-in renderer records the material-height pass
+// the overlay draws with (height areas add passes after it, ADR-441 Amd 2).
 const cameraDraws = vi.hoisted(() => [] as BedOverlayUniforms[]);
 vi.mock('../camera/overlay/bed-overlay-renderer', () => ({
   createBedOverlayRenderer: () => ({
-    draw: (_source: unknown, _width: number, _height: number, uniforms: BedOverlayUniforms) =>
-      cameraDraws.push(uniforms),
+    draw: (
+      _source: unknown,
+      _width: number,
+      _height: number,
+      passes: ReadonlyArray<BedOverlayUniforms>,
+    ) => {
+      if (passes[0] !== undefined) cameraDraws.push(passes[0]);
+    },
     clear: () => undefined,
     dispose: () => undefined,
     lost: false,
