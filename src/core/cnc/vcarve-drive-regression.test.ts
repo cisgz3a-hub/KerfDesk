@@ -282,8 +282,10 @@ describe('Dancing Script Drive V-carve regression', () => {
       passes.every((pass) => pass.kind === 'path3d' && pass.lateralFeed === 'z-rate-capped'),
     ).toBe(true);
     // Explicit source-corner retention now reaches the i stem/dot and v
-    // boundaries that the sampled graph previously rounded inward.
-    expect(passes.map(path3dMinX)).toEqual([150, 179.792, 197.165, 204.936, 210.008, 229.28]);
+    // boundaries that the sampled graph previously rounded inward. Glyph
+    // outlines reach compile as chord-optimal chords (ADR-414), which moved
+    // the i, v and e passes by at most 0.04 mm.
+    expect(passes.map(path3dMinX)).toEqual([150, 179.792, 197.175, 204.897, 210.01, 229.281]);
   });
 
   it('uses the cutting feed on flat V-carve motion while capping descending Z rate', async () => {

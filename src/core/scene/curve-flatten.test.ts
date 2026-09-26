@@ -159,8 +159,8 @@ describe('chord-optimal curve flattening (ADR-414)', () => {
 
   it('holds on the dragon Line Art cubic the midpoint test left 0.032 mm off', () => {
     // From the dragon fixture's Line Art trace at 100 mm: local trace pixels,
-    // tolerance 0.025 mm over the placement scale (100 / 1202 px).
-    const tolerance = 0.025 / (100 / 1202);
+    // tolerance 0.025 mm over the placement scale (100 mm / 1,254 px).
+    const tolerance = 0.025 / (100 / 1254);
     const from = { x: 1099.8344187702764, y: 648.5772436180724 };
     const segment: CubicPathSegment = {
       kind: 'cubic',
