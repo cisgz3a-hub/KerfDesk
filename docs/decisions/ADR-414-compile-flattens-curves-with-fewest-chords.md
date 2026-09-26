@@ -116,7 +116,15 @@ Two defects, measured on the base (`c62084959`):
   compile. Native curves change: the circles and ellipses above cut in 296 moves instead of 398.
   The connected-script V-carve fixture (DancingScript glyph cubics) emits 1,095,146 bytes instead of
   1,083,336, and the connected-script multi-operation program 14,230 lines instead of 14,712; the
-  V-carve "Drive" passes move by at most 0.04 mm (`vcarve-drive-regression.test.ts`).
+  V-carve "Drive" passes move by at most 0.04 mm (`vcarve-drive-regression.test.ts`). The V-carve
+  program grows although its outlines have fewer chords: its medial axis is computed from the
+  chords, so moving them moves the axis and every depth and feed word on it. The program gains
+  about 130 lines (44,147 to 44,277) but 11,810 bytes, so most of the growth is longer lines (more
+  words changing per move), not more moves; which feature of the new axis causes it was not
+  isolated. V-carve depth is sensitive to chord deviation by 1 / tan(half the bit angle): the full
+  0.025 mm tolerance can put a 60 degree bit up to about 0.043 mm deeper or shallower, where the
+  base's chords, using about 0.019 mm, allowed about 0.033 mm. Both are within the tolerance
+  contract; a finer V-carve depth needs a finer tolerance, not a different flattener.
 - G-code changes wherever a cubic or an arc exists, and only there. Updated pins: the
   `curve-bearing-svg` snapshot in `emit-gcode.snapshot.test.ts` (one cubic, and a semicircle the
   SVG importer stores as two cubics: 64 moves become 33, and 32 become 16 on each quarter), `prepare-output-connected-script` and
