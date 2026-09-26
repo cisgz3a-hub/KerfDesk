@@ -700,11 +700,13 @@ GRBL reports the probe input live, and KerfDesk parses it, but the Probe panel n
 
 ### MC-3: After an Abort during a cut, pass recovery still offers "Position retained"
 
-**Medium** · New · Reproduced
+**Medium** · Fixed (ADR-215 Amendment 1) · Reproduced
 
 Abort sends a soft reset. If the machine is moving, GRBL kills the steppers at speed and raises ALARM:3, "Position has likely been lost". KerfDesk records this as an ordinary cancel. With a stored G54 origin and a touch-plate Z, the work offset survives the reset, so the operator can tick "Position retained … the work offset matches" and recut a pass that is now offset by the lost steps. KerfDesk's own alarm table says ALARM:3 means "Position is lost … Re-home".
 
 **Fix.** Record a position-lost alarm raised by the stop and have the retained-position check refuse it, as it already does for a reboot. Better still, have CNC Abort send the door byte, wait briefly for the hold, then reset; in the sim that ends with no alarm and the position kept.
+
+**Status (2026-09-26).** Fixed by ADR-215 Amendment 1. Every reset KerfDesk sends against a running job (Abort, the fail-dark stop, the automatic stop after a rejected line) records whether it reached a moving machine, a run stopped by a position-losing alarm (such as a hard limit) is recorded the same way, and the retained-position check refuses both. Sending the door byte before the reset remains a follow-up.
 
 **Evidence.**
 

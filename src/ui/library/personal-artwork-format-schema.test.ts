@@ -36,7 +36,7 @@ it('keeps the v1 library envelope while carrying schema 9 clip geometry in its v
   const imported = parsePersonalArtworkLibrary(bytes);
   expect(imported).toEqual([current]);
   const restored = personalArtworkProject(imported[0]!);
-  expect(restored.schemaVersion).toBe(9);
+  expect(restored.schemaVersion).toBe(10);
   expect(restored.scene.objects).toEqual(project.scene.objects);
 });
 
@@ -45,7 +45,7 @@ it('migrates a legacy v1 library project without inventing owned clip geometry',
   const imported = parsePersonalArtworkLibrary(serializePersonalArtworkLibrary([legacy]));
   const restored = personalArtworkProject(imported[0]!);
   expect(imported).toEqual([legacy]);
-  expect(restored.schemaVersion).toBe(9);
+  expect(restored.schemaVersion).toBe(10);
   expect(restored.scene.objects).toHaveLength(1);
   expect(restored.scene.objects[0]).not.toHaveProperty('imageClip');
 });

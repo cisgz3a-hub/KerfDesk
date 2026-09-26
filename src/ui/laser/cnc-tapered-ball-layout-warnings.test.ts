@@ -23,8 +23,12 @@ const TAPERED_BALL: CncTool = {
   kind: 'tapered-ball-nose',
   diameterMm: 6.25,
   tipDiameterMm: 1.5875,
-  tipAngleDeg: 10,
+  tipAngleDeg: 10.8,
 };
+// The same bit read from a file that lost its ball tip: ADR-368 plans it as a
+// flat cylinder of the stored diameter.
+const { tipDiameterMm: _tip, ...WITHOUT_TIP } = TAPERED_BALL;
+const INCOMPLETE_TAPERED_BALL: CncTool = { ...WITHOUT_TIP, id: 'tbn-incomplete' };
 
 function rectangle(): SceneObject {
   return createRectangle({
@@ -68,41 +72,54 @@ function project(
     ...createProject(),
     machine: {
       ...DEFAULT_CNC_MACHINE_CONFIG,
-      tools: [...DEFAULT_CNC_MACHINE_CONFIG.tools, TAPERED_BALL],
+      tools: [...DEFAULT_CNC_MACHINE_CONFIG.tools, TAPERED_BALL, INCOMPLETE_TAPERED_BALL],
     },
     scene: { objects, layers: [layer] },
   };
 }
 
 describe('detectCncTaperedBallLayoutWarnings', () => {
-  it('warns when a tapered ball nose cuts an outside profile or a pocket', () => {
-    const [profile] = detectCncTaperedBallLayoutWarnings(project('profile-outside', 'tbn'));
-    expect(profile).toContain('tapered ball nose');
+  it('stays quiet when a modeled tapered ball nose sets offsets or stepover (Amendment 2)', () => {
+    for (const cutType of ['profile-outside', 'profile-inside', 'pocket'] as const) {
+      expect(detectCncTaperedBallLayoutWarnings(project(cutType, 'tbn'))).toEqual([]);
+    }
+    expect(
+      detectCncTaperedBallLayoutWarnings(project('profile-on-path', 'tbn', [relief()])),
+    ).toEqual([]);
+  });
+
+  it('warns when a tapered ball nose without its tip cuts a profile or a pocket', () => {
+    const [profile] = detectCncTaperedBallLayoutWarnings(
+      project('profile-outside', 'tbn-incomplete'),
+    );
+    expect(profile).toContain('tapered ball nose without a usable ball tip and taper');
     expect(profile).toContain('6.3 mm, at the top of the flutes');
     expect(profile).toContain('oversize with a tapered wall');
-    const [pocket] = detectCncTaperedBallLayoutWarnings(project('pocket', 'tbn'));
+    const [pocket] = detectCncTaperedBallLayoutWarnings(project('pocket', 'tbn-incomplete'));
     expect(pocket).toContain('walls land inside the line');
   });
 
-  it('warns when a tapered ball nose roughs a relief', () => {
+  it('warns when a tapered ball nose without its tip roughs a relief', () => {
     const [warning] = detectCncTaperedBallLayoutWarnings(
-      project('profile-on-path', 'tbn', [relief()]),
+      project('profile-on-path', 'tbn-incomplete', [relief()]),
     );
     expect(warning).toContain('roughing leaves ribs');
   });
 
   it('stays quiet where the diameter does not set the layout, or for other bits', () => {
     for (const cutType of ['profile-on-path', 'engrave', 'v-carve', 'drill'] as const) {
-      expect(detectCncTaperedBallLayoutWarnings(project(cutType, 'tbn'))).toEqual([]);
+      expect(detectCncTaperedBallLayoutWarnings(project(cutType, 'tbn-incomplete'))).toEqual([]);
     }
     const endMill = DEFAULT_CNC_MACHINE_CONFIG.tools.find((tool) => tool.kind === 'end-mill');
     if (endMill === undefined) throw new Error('fixture machine has no end mill');
     expect(detectCncTaperedBallLayoutWarnings(project('pocket', endMill.id))).toEqual([]);
-    expect(detectCncTaperedBallLayoutWarnings(project('pocket', 'tbn', []))).toEqual([]);
+    expect(detectCncTaperedBallLayoutWarnings(project('pocket', 'tbn-incomplete', []))).toEqual([]);
   });
 
   it('reaches Job Review through the machine warnings', () => {
-    const warnings = detectMachineJobWarnings(project('profile-outside', 'tbn'));
-    expect(warnings.some((warning) => warning.includes('tapered ball nose'))).toBe(true);
+    const warnings = detectMachineJobWarnings(project('profile-outside', 'tbn-incomplete'));
+    expect(warnings.some((warning) => warning.includes('tapered ball nose without'))).toBe(true);
+    const modeled = detectMachineJobWarnings(project('profile-outside', 'tbn'));
+    expect(modeled.some((warning) => warning.includes('tapered ball nose without'))).toBe(false);
   });
 });

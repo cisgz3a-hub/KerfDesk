@@ -48,7 +48,7 @@ describe('registration project identity', () => {
     expect(migrated).toEqual({
       kind: 'ok',
       raw: { ...legacy, schemaVersion: PROJECT_SCHEMA_VERSION },
-      steps: [5, 6, 7, 8],
+      steps: [5, 6, 7, 8, 9],
     });
     const result = deserializeProject(JSON.stringify(legacy));
     if (result.kind !== 'ok' || result.project.machine?.kind !== 'cnc')

@@ -55,6 +55,13 @@ export function contourEntryComment(entryRunwayMm: number | undefined): string {
     : ` contour-entry ${formatGcodeCoordinateMm(entryRunwayMm)} mm effective laser-off feed`;
 }
 
+// ADR-415: absent overcut adds nothing, so groups without one keep their bytes.
+export function overcutComment(overcutMm: number | undefined): string {
+  return overcutMm === undefined
+    ? ''
+    : ` overcut ${formatGcodeCoordinateMm(overcutMm)} mm on final pass`;
+}
+
 export function pushOperationProvenanceComment(
   chunks: string[],
   group: CutGroup | FillGroup,

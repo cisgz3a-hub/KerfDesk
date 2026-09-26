@@ -299,6 +299,11 @@ const LAYER_SETTING_KEYS = [
   'negativeImage',
   'passThrough',
   'dotWidthCorrectionMm',
+  'perforationEnabled',
+  'perforationCutMm',
+  'perforationSkipMm',
+  'overcutMm',
+  'imageOverscanMm',
   'subLayers',
 ] as const satisfies ReadonlyArray<keyof LayerSettingsClipboard>;
 
@@ -330,6 +335,13 @@ function layerSettingsFrom(layer: Layer): LayerSettingsClipboard {
     negativeImage: layer.negativeImage,
     passThrough: layer.passThrough,
     dotWidthCorrectionMm: layer.dotWidthCorrectionMm,
+    // Explicitly undefined when unset, so pasting settings that never used
+    // perforation, overcut or image overscan turns them off on the target.
+    perforationEnabled: layer.perforationEnabled,
+    perforationCutMm: layer.perforationCutMm,
+    perforationSkipMm: layer.perforationSkipMm,
+    overcutMm: layer.overcutMm,
+    imageOverscanMm: layer.imageOverscanMm,
     subLayers: layer.subLayers,
     ...(layer.materialBinding === undefined ? {} : { materialBinding: layer.materialBinding }),
     ...(layer.cnc === undefined ? {} : { cnc: layer.cnc }),

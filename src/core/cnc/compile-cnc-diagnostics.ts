@@ -69,5 +69,5 @@ function explicitPocketPlannerHasBasePaths(
     return polylines.some((polyline) => polyline.closed && polyline.points.length >= 3);
   }
   const tool = layerCncTool(config, settings);
-  return xyToolpathsForCutType(polylines, settings, tool.diameterMm, 0).length > 0;
+  return xyToolpathsForCutType(polylines, settings, tool, 0).length > 0;
 }

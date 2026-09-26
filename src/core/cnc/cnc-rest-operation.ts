@@ -5,6 +5,7 @@ import {
   type CncTool,
   type Polyline,
 } from '../scene';
+import { cncLayoutCutWidths } from './layout-cut-widths';
 import { pocketRasterToolpaths, pocketRingToolpaths, type PocketToolpaths } from './pocket-paths';
 import { planRestPocketToolpaths } from './rest-pocket';
 
@@ -51,14 +52,16 @@ export function resolveRestPocketOperation(
   const roughTool = resolveRoughTool(config, settings.pocketRoughToolId);
   if (roughTool.kind === 'error') return roughTool;
   const finishTool = layerCncTool(config, settings);
+  const finishWidths = cncLayoutCutWidths(finishTool, settings.depthMm, settings.depthPerPassMm);
   const rest = planRestPocketToolpaths(
     contours,
     roughTool.diameterMm,
-    finishTool.diameterMm,
+    finishWidths.wallDiameterMm,
     settings.stepoverPercent,
+    finishWidths.clearingDiameterMm,
   );
   if (!rest.ok) return restPocketError(rest.reason);
-  const roughing = pocketToolpathsForSettingsWithEvidence(contours, settings, roughTool.diameterMm);
+  const roughing = pocketToolpathsForSettingsWithEvidence(contours, settings, roughTool);
   if (roughing.toolpaths.length === 0) {
     return emptyRoughingPocketError(roughing, rest.stepoverUsed);
   }
@@ -80,28 +83,38 @@ export function resolveRestPocketOperation(
 export function pocketToolpathsForSettings(
   polylines: ReadonlyArray<Polyline>,
   settings: CncLayerSettings,
-  toolDiameterMm: number,
+  tool: CncTool,
 ): ReadonlyArray<Polyline> {
-  return pocketToolpathsForSettingsWithEvidence(polylines, settings, toolDiameterMm).toolpaths;
+  return pocketToolpathsForSettingsWithEvidence(polylines, settings, tool).toolpaths;
 }
 
+// The wall rides the cut width at the pocket's full depth and the stepover is
+// a percentage of the cut width over one depth pass. Both are the stored
+// diameter except for a tapered ball nose (ADR-368 Amendment 2).
 export function pocketToolpathsForSettingsWithEvidence(
   polylines: ReadonlyArray<Polyline>,
   settings: CncLayerSettings,
-  toolDiameterMm: number,
+  tool: CncTool,
 ): PocketToolpaths {
+  const widths = cncLayoutCutWidths(tool, settings.depthMm, settings.depthPerPassMm);
   if (settings.pocketStrategy === 'raster-x' || settings.pocketStrategy === 'raster-y') {
     return pocketRasterToolpaths(
       polylines,
-      toolDiameterMm,
+      widths.wallDiameterMm,
       settings.stepoverPercent,
       settings.pocketStrategy === 'raster-x' ? 'x' : 'y',
+      widths.clearingDiameterMm,
     );
   }
   if (settings.pocketStrategy === 'adaptive') {
     return { toolpaths: [], offsetFailed: false, passLimited: false, stepoverUsed: false };
   }
-  return pocketRingToolpaths(polylines, toolDiameterMm, settings.stepoverPercent);
+  return pocketRingToolpaths(
+    polylines,
+    widths.wallDiameterMm,
+    settings.stepoverPercent,
+    widths.clearingDiameterMm,
+  );
 }
 
 function restPocketError(

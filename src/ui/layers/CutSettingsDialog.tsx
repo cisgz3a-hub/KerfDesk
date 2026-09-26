@@ -129,6 +129,7 @@ function CutSettingsBody(props: {
           dither={dither}
           maxPower={power}
           imageLinesPerMm={imageLinesPerMm}
+          showOverscan
           onDitherChange={setDither}
           onImageLinesPerMmChange={setImageLinesPerMm}
         />

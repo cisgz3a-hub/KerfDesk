@@ -60,6 +60,12 @@ export function retainedPositionIssue(
   if (capsule.interruption.kind === 'controller-reboot') {
     return 'The controller rebooted during the incident, so its position cannot be retained. Re-establish the XY/Z zero, then choose the re-zeroed option.';
   }
+  // The work offset survives a reset that killed the steppers mid-motion, so a
+  // matching offset proves nothing about steps the motors never took
+  // (ADR-215 Amendment 1).
+  if (capsule.interruption.positionLost === true) {
+    return 'The machine was stopped while it may still have been moving, so the motors may have lost steps and the position cannot be retained. Re-home the machine, re-establish the XY/Z zero, then choose the re-zeroed option.';
+  }
   const archivedWco =
     capsule.artifact.kind === 'exact-execution'
       ? capsule.artifact.archivedControllerObservation.wco
