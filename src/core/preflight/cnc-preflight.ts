@@ -6,7 +6,7 @@
 //   1. At least one output layer exists.
 //   2. Spindle spin-up dwell is a non-negative finite duration.
 //   3. Per-layer CNC settings are sane: depth > 0, depth/pass > 0, feeds in
-//      (0, device.maxFeed], spindle RPM in (0, spindleMaxRpm].
+//      (0, CNC max feed], spindle RPM in (0, spindleMaxRpm].
 //   4. All motion fits inside the bed (shared bounds scanner).
 //   5. No-go zones are respected (shared scanner — clamps matter on a router).
 //   6. Z is up on every XY rapid; no rapid plunges (findPlungedTravelIssues).
@@ -19,6 +19,7 @@ import {
   findCncRestPocketIssues,
   findDroppedCncLayers,
 } from '../cnc';
+import { cncMaxFeedMmPerMin } from '../cnc/cnc-head-feeds';
 import { findCncVCarveEntryIssues } from '../cnc/vcarve-entry-diagnostics';
 import { isVCarveToolCompatible } from '../cnc/vcarve-tool-compatibility';
 import { machineBoundsForDevice } from '../devices';
@@ -69,7 +70,7 @@ export function runCncPreflight(
   }
   appendCncMachineIssues(config, issues);
   for (const layer of outputLayers) {
-    appendCncLayerIssues(layer, project.device.maxFeed, config, issues);
+    appendCncLayerIssues(layer, cncMaxFeedMmPerMin(project.device, config.params), config, issues);
   }
   appendSourceGeometryIssues(project, config, options, issues);
   issues.push(...findCncMotionBoundsPreflightIssues(project.device, gcode, options));

@@ -11,6 +11,7 @@ import {
   machineBoundsForDevice,
   type MachineBounds,
 } from '../../core/devices';
+import { deviceForActiveHead } from '../../core/cnc/cnc-head-feeds';
 import type { NativeXyBounds } from '../../core/devices/native-bed-frame';
 import { machineKindOf } from '../../core/scene';
 import { useStore } from '../state';
@@ -39,7 +40,7 @@ export function JogPad({ disabled }: { readonly disabled: boolean }): JSX.Elemen
   const project = useStore((s) => s.project);
   const device = project.device;
   const machineKind = machineKindOf(project.machine);
-  const maxFeed = device.maxFeed;
+  const maxFeed = deviceForActiveHead(device, project.machine).maxFeed;
   const jog = useLaserStore((s) => s.jog);
   const cancelJog = useLaserStore((s) => s.cancelJog);
   const continuousJogSupported = useLaserStore((s) => s.capabilities.jogCancel);

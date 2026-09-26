@@ -139,7 +139,11 @@ describe('CNC automatic-setting transition policy', () => {
     expect(useStore.getState().project.scene).toBe(sceneBeforeBedEdit);
     expect(cncSettings('automatic')?.feedMmPerMin).toBe(333);
 
+    // The device Max feed is the laser's; CNC reads its own (ADR-401).
     useStore.getState().updateDeviceProfile({ maxFeed: 250 });
+    expect(cncSettings('automatic')?.feedMmPerMin).toBe(333);
+
+    useStore.getState().updateCncMachine({ params: { maxFeedMmPerMin: 250 } });
 
     expect(cncSettings('automatic')).toMatchObject({
       feedMmPerMin: 250,

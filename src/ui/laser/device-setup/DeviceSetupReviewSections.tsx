@@ -1,4 +1,5 @@
 import { Fragment } from 'react';
+import { cncFramingFeedMmPerMin, cncMaxFeedMmPerMin } from '../../../core/cnc/cnc-head-feeds';
 import { Button } from '../../kit';
 import type { DeviceSetupStepProps } from './device-setup-flow';
 import { deviceSetupSupportsMachineKind } from './device-setup-flow';
@@ -93,16 +94,16 @@ function workspaceRows(state: DeviceSetupStepProps['state']): ReviewRows {
         ? `${guide.homeCommand?.split(/\r?\n/).join(' then ') ?? 'Enabled'}; recorded home: ${state.draft.homing.direction} (direction set by controller)`
         : 'Disabled',
     ],
-    [
-      'Output max / requested Frame feed',
-      `${state.draft.maxFeed} / ${state.draft.framingFeedMmPerMin} mm/min`,
-    ],
   ];
 }
 
 function laserRows(state: DeviceSetupStepProps['state']): ReviewRows {
   const fire = state.draft.fireControl;
   return [
+    [
+      'Output max / requested Frame feed',
+      `${state.draft.maxFeed} / ${state.draft.framingFeedMmPerMin} mm/min`,
+    ],
     ['Power range', `${state.draft.minPowerS}–${state.draft.maxPowerS} S`],
     ['Laser mode', state.draft.laserModeEnabled ? 'Expected on' : 'Off'],
     ['Air output', state.draft.airAssistCommand],
@@ -116,6 +117,10 @@ function laserRows(state: DeviceSetupStepProps['state']): ReviewRows {
 function cncRows(state: DeviceSetupStepProps['state']): ReviewRows {
   const params = state.cncDraft.params;
   return [
+    [
+      'Output max / requested Frame feed',
+      `${cncMaxFeedMmPerMin(state.draft, params)} / ${cncFramingFeedMmPerMin(state.draft, params)} mm/min`,
+    ],
     ['Safe Z', `${params.safeZMm} mm`],
     ['Spindle', `${params.spindleMaxRpm} RPM; ${params.spindleSpinupSec} s dwell`],
     ['Coolant', params.coolant ?? 'off'],

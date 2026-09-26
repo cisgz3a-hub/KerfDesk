@@ -33,6 +33,7 @@ import { refreshAutomaticCncFeeds, seedCncModeSwitchLayers } from './cnc-auto-se
 import { pushUndo } from './scene-mutations';
 import { nextProbeSetupState } from './probe-setup-history-identity';
 import { projectWithParkedCnc } from './parked-cnc-machine';
+import { cncMachineWithOwnFeeds } from '../../core/cnc/cnc-head-feeds';
 
 type MachineState = {
   readonly project: Project;
@@ -204,7 +205,10 @@ function machineKindStatePatch(state: MachineState, kind: MachineKind): Partial<
   const machine =
     kind === 'laser'
       ? LASER_MACHINE_CONFIG
-      : cncMachineWithReusableTools(cncBase, state.cncLibrary.customTools);
+      : cncMachineWithOwnFeeds(
+          cncMachineWithReusableTools(cncBase, state.cncLibrary.customTools),
+          state.project.device,
+        );
   const device =
     current?.kind === 'cnc'
       ? { ...state.project.device, cncSubProfile: { ...current.params } }

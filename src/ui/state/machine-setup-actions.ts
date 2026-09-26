@@ -1,3 +1,4 @@
+import { cncMachineWithOwnFeeds } from '../../core/cnc/cnc-head-feeds';
 import type { DeviceProfile } from '../../core/devices';
 import { deviceSupportsMachineKind } from '../../core/devices/device-profile';
 import type { CncMachineConfig, CncTool, MachineConfig, Project } from '../../core/scene';
@@ -70,9 +71,9 @@ function replacementState(
 ): Partial<AppState> {
   captureSetupHistoryContext(state.project, state);
   const customTools = startup?.customTools ?? state.cncLibrary.customTools;
-  const nextMachine = machineWithTools(machine, customTools);
+  const nextMachine = machineWithTools(machine, customTools, profile);
   const retainedCnc = retainedCncForSetup(state, nextMachine, retainedMachine);
-  const nextCachedCnc = cachedCncWithTools(retainedCnc, customTools);
+  const nextCachedCnc = cachedCncWithTools(retainedCnc, customTools, profile);
   const nextProfile = profileWithCncSettings(profile, nextCachedCnc);
   const scene = sceneAfterMachineSetup(
     state.project.scene,
@@ -146,8 +147,10 @@ function projectWithStartupChanges(
 function machineWithTools(
   machine: MachineConfig,
   customTools: ReadonlyArray<CncTool>,
+  profile: DeviceProfile,
 ): MachineConfig {
-  return machine.kind === 'cnc' ? cncMachineWithCustomTools(machine, customTools) : machine;
+  if (machine.kind !== 'cnc') return machine;
+  return cncMachineWithOwnFeeds(cncMachineWithCustomTools(machine, customTools), profile);
 }
 
 function retainedCncForSetup(
@@ -164,8 +167,10 @@ function retainedCncForSetup(
 function cachedCncWithTools(
   machine: CncMachineConfig | null,
   customTools: ReadonlyArray<CncTool>,
+  profile: DeviceProfile,
 ): CncMachineConfig | null {
-  return machine === null ? null : cncMachineWithCustomTools(machine, customTools);
+  if (machine === null) return null;
+  return cncMachineWithOwnFeeds(cncMachineWithCustomTools(machine, customTools), profile);
 }
 
 function profileWithCncSettings(

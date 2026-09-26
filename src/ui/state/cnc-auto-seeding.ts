@@ -14,6 +14,7 @@ import {
   type Project,
   type Scene,
 } from '../../core/scene';
+import { cncHeadDevice } from '../../core/cnc/cnc-head-feeds';
 import type { DeviceProfile } from '../../core/devices';
 
 export type CncAutoSeedContext = {
@@ -116,7 +117,7 @@ function refreshMaterialRecipeLayer(
       ? (tool.fluteCount ?? DEFAULT_ASSUMED_FLUTE_COUNT)
       : source.fluteCount;
   const patch = resolveCncMaterialFeedPatch({
-    profile: context.device,
+    profile: cncHeadDevice(context.device, context.machine.params),
     tool,
     materialKey: source.materialKey,
     spindleRpm: settings.spindleRpm,

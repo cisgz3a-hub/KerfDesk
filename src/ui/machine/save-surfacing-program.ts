@@ -1,3 +1,4 @@
+import { cncMaxFeedMmPerMin } from '../../core/cnc/cnc-head-feeds';
 import { SURFACING_DEFAULT_DEPTH_PER_PASS_MM } from '../../core/cnc/surfacing';
 import type { ControllerSettingsSnapshot, ReadinessSettingsCapability } from '../../core/preflight';
 import { standaloneCncSetupAdvisories } from '../../core/preflight/standalone-cnc-preflight';
@@ -69,8 +70,8 @@ export async function saveSurfacingProgram(options: SaveSurfacingOptions): Promi
         ...inputs,
         bitDiameterMm: tool.diameterMm,
         depthPerPassMm: SURFACING_DEFAULT_DEPTH_PER_PASS_MM,
-        feedMmPerMin: Math.min(2500, project.device.maxFeed),
-        plungeMmPerMin: Math.min(600, project.device.maxFeed),
+        feedMmPerMin: Math.min(2500, cncMaxFeedMmPerMin(project.device, machine.params)),
+        plungeMmPerMin: Math.min(600, cncMaxFeedMmPerMin(project.device, machine.params)),
         spindleRpm: machine.params.spindleMaxRpm,
         spindleSpinupSec: machine.params.spindleSpinupSec,
         safeZMm: machine.params.safeZMm,

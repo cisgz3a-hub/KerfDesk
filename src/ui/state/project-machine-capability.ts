@@ -8,6 +8,7 @@ import {
   type MachineKind,
   type Project,
 } from '../../core/scene';
+import { cncMachineWithOwnFeeds } from '../../core/cnc/cnc-head-feeds';
 import { cncMachineWithReusableTools } from './machine-actions';
 import { projectWithParkedCnc } from './parked-cnc-machine';
 
@@ -47,14 +48,19 @@ function loadedProjectResolution(
   if (project.machine?.kind !== 'cnc') {
     const parked = project.parkedCncMachine;
     const cachedCncMachine =
-      parked === undefined ? null : cncMachineWithReusableTools(parked, customTools);
+      parked === undefined
+        ? null
+        : cncMachineWithOwnFeeds(cncMachineWithReusableTools(parked, customTools), project.device);
     return {
       project: projectWithParkedCnc(project, cachedCncMachine),
       cachedCncMachine,
       loadResult: { kind: 'loaded' },
     };
   }
-  const machine = cncMachineWithReusableTools(project.machine, customTools);
+  const machine = cncMachineWithOwnFeeds(
+    cncMachineWithReusableTools(project.machine, customTools),
+    project.device,
+  );
   return {
     project: projectWithParkedCnc(
       machine === project.machine ? project : { ...project, machine },
