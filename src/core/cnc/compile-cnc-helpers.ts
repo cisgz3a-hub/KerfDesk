@@ -1,4 +1,4 @@
-import type { CncPass } from '../job';
+import type { CncContourPass, CncPass } from '../job';
 import type { CncCutType, CncLayerSettings, CncTool, Polyline, Vec2 } from '../scene';
 import { vcarveRegionBuckets } from './vcarve-region-order';
 
@@ -11,7 +11,7 @@ export type CncGroupCompileOptions = {
 const MIN_FEED_MM_PER_MIN = 1;
 const COORD_EPS = 1e-9;
 
-export function contourPassFromPolyline(polyline: Polyline, zMm: number): CncPass {
+export function contourPassFromPolyline(polyline: Polyline, zMm: number): CncContourPass {
   return { kind: 'contour', zMm, polyline: ensureRingClosure(polyline), closed: polyline.closed };
 }
 

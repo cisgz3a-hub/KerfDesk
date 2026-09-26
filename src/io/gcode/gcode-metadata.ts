@@ -63,9 +63,10 @@ export type GcodeMetadata = {
  * tabs measured from the stock bottom when the stock thickness is set, and
  * ADR-368 amendment 2's tapered ball-nose pocket and profile offsets, tab
  * windows, and pocket and relief-roughing stepover sized by the cut width at
- * depth.
+ * depth, and ADR-289 amendment 1's relief roughing rings that end where they
+ * start and levels cleared to their centre above 50% stepover.
  */
-export const EMITTER_REVISION = 'tapered-ball-cut-width-20260926-v1';
+export const EMITTER_REVISION = 'relief-ring-seams-and-cores-20260927-v1';
 
 // Machine-specific assumption lines (ADR-103 defect fix): router exports
 // previously carried the laser-worded `$32=1 (laser mode)` banner. The S

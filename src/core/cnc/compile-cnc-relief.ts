@@ -36,10 +36,12 @@ import {
   type ReliefObject,
   sceneObjectUsesOperation,
   type SceneObject,
+  type Vec2,
 } from '../scene';
 import { kernelForTool } from '../sim';
 import { coolantFields } from './coolant-fields';
 import { cncGroupProvenance } from './cnc-group-provenance';
+import { contourPassFromPolyline } from './compile-cnc-helpers';
 import { zPassArrayMaterializationError } from './depth-passes';
 import { enforceCutDirection, parkFields } from './motion-polish';
 import { reliefMachineSpaceGeometry, reliefMachineSpaceTransform } from './relief-machine-space';
@@ -373,23 +375,24 @@ function appendReliefPasses(
   if (result.kind === 'relief-materialization-failed') return result;
   for (const pass of result.ladder.passes) {
     if (pass.kind !== 'contour') continue;
-    const mapped = {
-      ...pass,
-      polyline: pass.polyline.map((p) =>
-        toMachineCoords(applyTransform(p, residualTransform), device),
-      ),
-    };
+    const mapped = pass.polyline.map((p) =>
+      toMachineCoords(applyTransform(p, residualTransform), device),
+    );
     const directed = enforceCutDirection(
-      [{ points: mapped.polyline, closed: mapped.closed }],
+      [{ points: mapped, closed: pass.closed }],
       settings.cutDirection ?? DEFAULT_CNC_LAYER_SETTINGS.cutDirection ?? 'climb',
       'pocket',
       machineFrameHandedness(device.origin),
     )[0];
     if (directed === undefined) continue;
-    passes.push({
-      ...mapped,
-      polyline: directed.points,
-    });
+    // The ladder closes each ring on its first point, and direction
+    // enforcement then moves the start to the middle of the longest segment.
+    // That leaves the old closing point as a repeated vertex mid-ring and ends
+    // the ring at the corner before its new start, half that segment short
+    // (ADR-289 Amendment 1). Drop the repeat and close the ring at its new
+    // start, as pocket rings are closed.
+    const points = withoutRepeatedPoints(directed.points);
+    passes.push(contourPassFromPolyline({ ...directed, points }, pass.zMm));
   }
   return {
     kind: 'compiled',
@@ -398,6 +401,13 @@ function appendReliefPasses(
     stepoverUsed: true,
     plan: result.plan,
   };
+}
+
+function withoutRepeatedPoints(points: ReadonlyArray<Vec2>): ReadonlyArray<Vec2> {
+  return points.filter((point, index) => {
+    const previous = points[index - 1];
+    return previous === undefined || previous.x !== point.x || previous.y !== point.y;
+  });
 }
 
 function cap(feedMmPerMin: number, maxFeed: number): number {
