@@ -24,39 +24,43 @@
 //        a checkerboard look identical. Near the image border each axis of
 //        the window shrinks symmetrically to what still fits (never counting
 //        the walker's out-of-image paper, which would make every shape look
-//        thin at an edge). A 4×4 tie widens the vote to the 6×6 and then
-//        the 8×8 window (ADR-403 amendment 1), each centred on the corner
-//        and shrunk at the border the same way. A wider window counts only
-//        the ring it adds, and that ring decides only when at least 7/8 of
-//        it is one colour: two marks kissing on a page join, but the rim of
-//        a checkerboard patch (cells one side, page the other) stays a tie.
-//        A window centred on a checkerboard corner ties at every size, so
-//        a checkerboard ties everywhere, border included, with one
-//        exception: in a small patch (4-6 px across) the 4×4 window is the
-//        balanced patch itself and the wider rings are page, so its
-//        central corners join ink, as the minority rule intends for a tiny
-//        dither cluster. The one blind spot is a corner diagonally next to
-//        an image corner: only its own 2×2 block fits, so it is a tie.
-//     2. A tie through the 8×8 window (two equal shapes kissing at a
-//        corner, a checkerboard) is structurally symmetric. Where the
-//        pre-threshold crack field shows a genuine anti-aliasing ramp in
-//        the 2×2 block (not saturated, and still agreeing with the mask),
-//        the asymptotic decider of Nielson & Hamann (1991) settles it:
-//        evaluate the bilinear interpolant of the four threshold residuals
-//        at its saddle point; ink joins iff that value lies on the ink side
-//        of the cut by more than GREY_SADDLE_MARGIN_LUMA. Otherwise paper
-//        joins (the historical answer). The margin matters: a SYMMETRIC
-//        saddle's bilinear value is just the block mean, so a fine
-//        checkerboard (or a bilinear enlargement of a binary one, which is
-//        how small sources reach the 2x trace) sits within a luma level of
-//        a mid cut (127.5 against 128) and its sign is noise, not evidence.
-//   The window outranks the decider on purpose. Bilinear reconstruction
+//        thin at an edge). A window centred on a checkerboard corner ties,
+//        and so does the one blind spot: a corner diagonally next to an
+//        image corner, where only its own 2×2 block fits.
+//     2. A 4×4 tie (two equal shapes kissing at a corner, a checkerboard) is
+//        structurally symmetric. Where the pre-threshold crack field shows
+//        a genuine anti-aliasing ramp in the 2×2 block (not saturated, and
+//        still agreeing with the mask), the asymptotic decider of Nielson &
+//        Hamann (1991) settles it: evaluate the bilinear interpolant of the
+//        four threshold residuals at its saddle point; ink joins iff that
+//        value lies on the ink side of the cut by more than
+//        GREY_SADDLE_MARGIN_LUMA. The margin matters: a SYMMETRIC saddle's
+//        bilinear value is just the block mean, so a fine checkerboard (or
+//        a bilinear enlargement of a binary one, which is how small sources
+//        reach the 2x trace) sits within a luma level of a mid cut (127.5
+//        against 128) and its sign is noise, not evidence.
+//     3. With no grey evidence (a binary source, a saturated block), the
+//        vote widens to the 6×6 and then the 8×8 window (ADR-403 amendment
+//        1), each centred on the corner and shrunk at the border the same
+//        way. A wider window counts only the ring it adds, and that ring
+//        decides only when at least 7/8 of it is one colour: two marks
+//        kissing on a page join, but the rim of a checkerboard patch (cells
+//        one side, page the other) stays a tie. A checkerboard ties at
+//        every size, border included, with one exception: in a small patch
+//        (4-6 px across) the 4×4 window is the balanced patch itself and
+//        the wider rings are page, so its central corners join ink, as the
+//        minority rule intends for a tiny dither cluster. Grey evidence goes
+//        before the wider rings because it is measured at the corner itself:
+//        on the photo ties both could settle it disagreed with the ring 13-42%
+//        of the time, and putting it first held or improved every fixture.
+//     4. Otherwise paper joins (the historical answer).
+//   The 4×4 window outranks the decider on purpose. Bilinear reconstruction
 //   systematically under-reads ridges: on a one-pixel anti-aliased diagonal
 //   (core 24, flanks 195) the true box-filtered value at the shared corner
 //   equals the core, but the bilinear saddle is the midpoint ≈110 — so at a
 //   low cut (Otsu picked 25 beside a solid square) the decider alone
 //   shattered the line into 56 islands. A decided thin feature is kept;
-//   grey evidence decides only what the structure cannot.
+//   grey evidence decides only what the 4×4 structure cannot.
 //
 // Written from the papers' mathematics and our own design (ADR-403); no
 // third-party tracer code.
@@ -113,7 +117,8 @@ export type SaddlePolicyInput = {
 
 // Vote window half-sizes in SOURCE pixels, tried in order: the corner's 2×2
 // block plus a one-pixel ring is 4×4 (two pixels either side of the
-// corner); a tie there widens to 6×6 and then 8×8 (ADR-403 amendment 1).
+// corner); a tie there that grey evidence cannot settle widens to 6×6 and
+// then 8×8 (ADR-403 amendment 1).
 // The 2×2 block alone is always balanced, so the vote starts at 4×4.
 const VOTE_RADII_SOURCE_PX: ReadonlyArray<number> = [2, 3, 4];
 // A widened ring decides only when |ink − paper| over it is at least 3/4 of
@@ -157,17 +162,19 @@ export function createSaddleResolver(
   const scale = Number.isFinite(pixelScale) ? Math.max(1, Math.round(pixelScale)) : 1;
   const radii = VOTE_RADII_SOURCE_PX.map((radius) => radius * scale);
   return (x, y) => {
-    const balance = minorityVote(mask, x, y, radii);
-    if (balance !== 0) return balance < 0;
+    const local = minorityVote(mask, x, y, radii, 0, 1);
+    if (local !== 0) return local < 0;
     const grey = field === undefined || field === null ? null : greySaddle(mask, field, x, y);
-    return grey ?? false;
+    if (grey !== null) return grey;
+    return minorityVote(mask, x, y, radii, 1, radii.length) < 0;
   };
 }
 
-/** Signed minority evidence at corner (x,y); 0 when nothing decides.
- *  Negative means ink is the local minority. The first window (4×4 source
- *  px) decides whenever it is unbalanced. After a tie, each wider window
- *  from `radii` counts only the RING it adds to the previous window, and
+/** Signed minority evidence at corner (x,y) from the windows radii[from]
+ *  up to, not including, radii[to]; 0 when none decides. Negative means
+ *  ink is the local minority. The first window (4×4 source px) decides
+ *  whenever it is unbalanced. Each wider window counts only the RING it
+ *  adds to the window before it (radii[from − 1], clamped alike), and
  *  that ring decides only when at least 7/8 of it is one colour
  *  (4·|ring balance| ≥ 3·ring area): isolated marks on a page or pinholes
  *  in solid ink have a near-uniform ring, while the rim of a checkerboard
@@ -182,12 +189,21 @@ export function createSaddleResolver(
  *  would add an empty ring, so the vote ends. Each pixel is read at most
  *  once: a full tie costs at most 64 reads at scale 1 (16 + 20 + 28),
  *  times scale², and a mixed ring stops early. */
-function minorityVote(mask: InkMask, x: number, y: number, radii: ReadonlyArray<number>): number {
-  let previousRx = 0;
-  let previousRy = 0;
-  for (const radius of radii) {
-    const rx = Math.max(1, Math.min(radius, x, mask.width - x));
-    const ry = Math.max(1, Math.min(radius, y, mask.height - y));
+function minorityVote(
+  mask: InkMask,
+  x: number,
+  y: number,
+  radii: ReadonlyArray<number>,
+  from: number,
+  to: number,
+): number {
+  const inner = from > 0 ? (radii[from - 1] ?? 0) : 0;
+  let previousRx = inner > 0 ? halfSize(inner, x, mask.width) : 0;
+  let previousRy = inner > 0 ? halfSize(inner, y, mask.height) : 0;
+  for (let index = from; index < to; index += 1) {
+    const radius = radii[index] ?? 0;
+    const rx = halfSize(radius, x, mask.width);
+    const ry = halfSize(radius, y, mask.height);
     if (rx === previousRx && ry === previousRy) break;
     const ringArea = 4 * (rx * ry - previousRx * previousRy);
     // The first window decides on any imbalance; a wider ring needs
@@ -199,6 +215,12 @@ function minorityVote(mask: InkMask, x: number, y: number, radii: ReadonlyArray<
     previousRy = ry;
   }
   return 0;
+}
+
+/** A window half-size on one axis: the radius, shrunk so the window stays
+ *  centred on corner coordinate c inside [0, extent). */
+function halfSize(radius: number, c: number, extent: number): number {
+  return Math.max(1, Math.min(radius, c, extent - c));
 }
 
 /** Ink minus paper over the window of half-sizes (rx, ry) centred on

@@ -140,8 +140,8 @@ describe('saddle connectivity — binary 4×4 minority window', () => {
     expect(isSaddle(marks, 4, 4)).toBe(true);
     expect(createSaddleResolver(marks, 'auto')(4, 4)).toBe(true);
     // The same contact between two paper pinholes in solid ink: paper is the
-    // 6×6 minority and keeps its diagonal, even where grey evidence in the
-    // block would have joined the ink (the window outranks the decider).
+    // 6×6 minority and keeps its diagonal. Grey evidence at the corner still
+    // goes first, so an anti-aliased block that says ink joins the ink.
     const holes = maskFrom([
       '########',
       '########',
@@ -160,7 +160,8 @@ describe('saddle connectivity — binary 4×4 minority window', () => {
       }),
     );
     expect(isSaddle(holes, 4, 4)).toBe(true);
-    expect(createSaddleResolver(holes, 'auto', fieldFrom(greyInk, 128))(4, 4)).toBe(false);
+    expect(createSaddleResolver(holes, 'auto')(4, 4)).toBe(false);
+    expect(createSaddleResolver(holes, 'auto', fieldFrom(greyInk, 128))(4, 4)).toBe(true);
     expect(createSaddleResolver(holes, 'connect-ink')(4, 4)).toBe(true);
   });
 
@@ -225,10 +226,10 @@ describe('saddle connectivity — binary 4×4 minority window', () => {
     expect(createSaddleResolver(kiss, 'auto')(3, 3)).toBe(false);
   });
 
-  it('leaves the grey decider and the tie-break only what 8×8 cannot decide', () => {
+  it('lets grey evidence settle a 4×4 tie before the wider rings', () => {
     // A 1-px checkerboard ties through 8×8 at every corner. With a
     // symmetric binary block the tie-break keeps paper joined; an
-    // anti-aliased block past the margin still lets the decider join ink.
+    // anti-aliased block past the margin lets the decider join ink.
     const board = checkerboard(10, 10);
     const binary = createSaddleResolver(board, 'auto');
     expect(binary(5, 5)).toBe(false);
@@ -236,9 +237,9 @@ describe('saddle connectivity — binary 4×4 minority window', () => {
       Array.from({ length: 10 }, (_, x) => ((x + y) % 2 === 0 ? 30 : 225)),
     );
     expect(createSaddleResolver(board, 'auto', fieldFrom(rows, 131))(5, 5)).toBe(true);
-    // The same decider evidence is not consulted where a wider window
-    // decides: two 3×3 marks kissing on a page join at 8×8 even though the
-    // saturated-free grey block below says paper.
+    // Two 3×3 marks kissing on a page tie at 4×4 and join at 8×8 on the
+    // mask alone. Grey evidence measured at the corner goes first (ADR-403
+    // amendment 1): the anti-aliased block below says paper, so paper joins.
     const marks = maskFrom([
       '..........',
       '..........',
@@ -258,7 +259,22 @@ describe('saddle connectivity — binary 4×4 minority window', () => {
         return marks.ink[y * 10 + x] === 1 ? 0 : 255;
       }),
     );
-    expect(createSaddleResolver(marks, 'auto', fieldFrom(greyPaper, 128))(5, 5)).toBe(true);
+    expect(createSaddleResolver(marks, 'auto', fieldFrom(greyPaper, 128))(5, 5)).toBe(false);
+    expect(createSaddleResolver(marks, 'auto')(5, 5)).toBe(true);
+    // Without grey evidence the wider ring decides: a saturated (binary)
+    // block, or a symmetric one whose saddle value sits on the cut.
+    const binaryLuma = Array.from({ length: 10 }, (_, y) =>
+      Array.from({ length: 10 }, (_, x) => (marks.ink[y * 10 + x] === 1 ? 0 : 255)),
+    );
+    expect(createSaddleResolver(marks, 'auto', fieldFrom(binaryLuma, 128))(5, 5)).toBe(true);
+    const onCut = binaryLuma.map((row, y) =>
+      row.map((luma, x) => {
+        if ((x === 4 && y === 4) || (x === 5 && y === 5)) return 100;
+        if ((x === 4 && y === 5) || (x === 5 && y === 4)) return 156;
+        return luma;
+      }),
+    );
+    expect(createSaddleResolver(marks, 'auto', fieldFrom(onCut, 128))(5, 5)).toBe(true);
   });
 
   it('lets a wider ring decide only when at least 7/8 of it is one colour', () => {
