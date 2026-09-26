@@ -11,6 +11,7 @@ import {
   OriginCornerRow,
 } from '../DeviceProfileFields';
 import { Row } from '../device-settings-shared';
+import { PresetCorrectionOffer } from '../PresetCorrectionOffer';
 import type { DeviceSetupStepProps } from './device-setup-flow';
 import { machineSetupControllerGuide } from './machine-setup-controller-guide';
 
@@ -32,6 +33,7 @@ export function DeviceSetupConfirmStep({ state, dispatch }: DeviceSetupStepProps
       <NameRow device={state.draft} update={update} />
       <BedRows device={state.draft} update={update} />
       <OriginCornerRow device={state.draft} update={update} />
+      <PresetCorrectionOffer device={state.draft} update={update} />
       <Row label="Homing">
         <label style={inlineStyle}>
           <input

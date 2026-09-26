@@ -11,6 +11,6 @@ export function detectPresetCorrectionWarnings(
       `This machine profile is a copy of the ${correction.presetName} preset saved before ` +
       `the preset was corrected: it still has ${correction.before}, and the preset now uses ` +
       `${correction.now}. If your machine matches the preset, ${correction.effect}. ` +
-      'Check it in Machine Setup before starting.',
+      'Machine Setup offers the corrected value in one click; check it before starting.',
   );
 }
