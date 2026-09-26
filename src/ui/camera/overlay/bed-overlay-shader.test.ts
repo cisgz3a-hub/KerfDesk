@@ -9,6 +9,7 @@ import {
   type CameraPose,
   type LensModel,
 } from '../../../core/camera/model/camera-model';
+import { surfaceHeightAt, type SurfaceHeightArea } from '../../../core/camera/model/height-areas';
 import { lookAt, overheadPose, wideLens } from '../../../core/camera/model/model-fixtures';
 import { computeView } from '../../workspace/view-transform';
 import {
@@ -16,6 +17,8 @@ import {
   BED_OVERLAY_FRAME_SAMPLER,
   BED_OVERLAY_UNIFORM_KINDS,
   BED_OVERLAY_VERTEX_SHADER,
+  bedOverlayCompositeCoord,
+  bedOverlayPasses,
   bedOverlaySampleCoord,
   bedOverlayUniforms,
   type BedOverlayTexCoord,
@@ -193,6 +196,93 @@ describe('bed overlay shader maths', () => {
     });
     expect(odd.uCanvasSize).toEqual([1000, 1]);
     expect(odd.uPixelRatio).toBe(1);
+  });
+});
+
+describe('bed overlay height-area passes', () => {
+  const lens = wideLens();
+  const pose = overheadPose();
+  const areas: ReadonlyArray<SurfaceHeightArea> = [
+    { id: 'lid', x: 150, y: 150, width: 150, height: 150, surfaceHeightMm: 25 },
+    { id: 'box', x: 60, y: 60, width: 140, height: 120, surfaceHeightMm: 40 },
+    { id: 'hole', x: 320, y: 40, width: 50, height: 50, surfaceHeightMm: 0 },
+    { id: 'off-bed', x: 450, y: 20, width: 40, height: 40, surfaceHeightMm: 10 },
+  ];
+
+  function passesFor(heightAreas: ReadonlyArray<SurfaceHeightArea>, baseMm = 3) {
+    return bedOverlayPasses({
+      lens,
+      pose,
+      surfaceHeightMm: baseMm,
+      heightAreas,
+      view: VIEW,
+      canvasWidthPx: CANVAS_WIDTH,
+      canvasHeightPx: CANVAS_HEIGHT,
+      devicePixelRatio: DPR,
+      bedWidthMm: BED,
+      bedHeightMm: BED,
+      opacity: 0.8,
+    });
+  }
+
+  it('shows every bed point at the height surfaceHeightAt picks for it', () => {
+    const passes = passesFor(areas);
+    const seen = new Map<number, number>();
+    for (let fragY = 0.5; fragY < CANVAS_HEIGHT; fragY += 29) {
+      for (let fragX = 0.5; fragX < CANVAS_WIDTH; fragX += 31) {
+        const bed = bedUnder(fragX, fragY);
+        const height = surfaceHeightAt(areas, bed.x, bed.y, 3);
+        const expected = modelTexCoord(lens, pose, bed.x, bed.y, height);
+        expectSameCoord(bedOverlayCompositeCoord(passes, fragX, fragY), expected);
+        if (expected !== null) seen.set(height, (seen.get(height) ?? 0) + 1);
+      }
+    }
+    // Every height, the overlap included, was really drawn.
+    for (const height of [0, 3, 25, 40]) expect(seen.get(height) ?? 0).toBeGreaterThan(5);
+  });
+
+  it('paints the lowest area first and leaves out areas that miss the bed', () => {
+    const passes = passesFor(areas);
+    expect(passes.map((pass) => pass.uSurfaceZ)).toEqual(
+      [3, 0, 25, 40].map((height) => bedPoint(0, 0, height).z),
+    );
+    expect(passes[0]?.uClip).toEqual([0, 0, BED, BED]);
+    expect(passes[3]?.uClip).toEqual([60, 60, 200, 180]);
+  });
+
+  it('cuts an area that hangs off the bed to the bed', () => {
+    const passes = passesFor([
+      { id: 'edge', x: 380, y: -10, width: 50, height: 30, surfaceHeightMm: 8 },
+    ]);
+    expect(passes[1]?.uClip).toEqual([380, 0, BED, 20]);
+  });
+
+  it('draws nothing in an area where the camera cannot see, rather than the material below', () => {
+    // Low over the origin corner, this camera sees the near half of the bed only.
+    const lowOverCorner = lookAt([0, 0, -150], [0, 0, 0]);
+    const far: SurfaceHeightArea = {
+      id: 'far',
+      x: 0,
+      y: 0,
+      width: BED,
+      height: BED,
+      surfaceHeightMm: 0,
+    };
+    const passes = bedOverlayPasses({
+      lens,
+      pose: lowOverCorner,
+      surfaceHeightMm: 0,
+      heightAreas: [far],
+      view: VIEW,
+      canvasWidthPx: CANVAS_WIDTH,
+      canvasHeightPx: CANVAS_HEIGHT,
+      devicePixelRatio: DPR,
+      bedWidthMm: BED,
+      bedHeightMm: BED,
+      opacity: 1,
+    });
+    const { fragX, fragY } = fragmentOver(400, 400);
+    expect(bedOverlayCompositeCoord(passes, fragX, fragY)).toBeNull();
   });
 });
 

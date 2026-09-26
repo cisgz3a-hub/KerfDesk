@@ -5,9 +5,9 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { overheadPose, wideLens } from '../../../core/camera/model/model-fixtures';
 import { createBedOverlayRenderer } from './bed-overlay-renderer';
-import { bedOverlayUniforms } from './bed-overlay-shader';
+import { bedOverlayPasses, bedOverlayUniforms } from './bed-overlay-shader';
 
-const UNIFORMS = bedOverlayUniforms({
+const UNIFORM_ARGS = {
   lens: wideLens(),
   pose: overheadPose(),
   surfaceHeightMm: 0,
@@ -18,7 +18,8 @@ const UNIFORMS = bedOverlayUniforms({
   bedWidthMm: 400,
   bedHeightMm: 400,
   opacity: 1,
-});
+};
+const UNIFORMS = [bedOverlayUniforms(UNIFORM_ARGS)];
 
 // A frame source is opaque to the renderer; the fake context never reads it.
 const FRAME = {} as TexImageSource;
@@ -89,6 +90,30 @@ describe('createBedOverlayRenderer', () => {
     renderer?.draw(FRAME, 1280, 720, UNIFORMS);
     expect(spy('drawArrays')).toHaveBeenCalledWith('TRIANGLES', 0, 3);
     expect([canvas.width, canvas.height]).toEqual([64, 48]);
+  });
+
+  it('uploads the frame once and draws one triangle per height-area pass', () => {
+    const { gl, spy } = fakeWebgl2();
+    const renderer = createBedOverlayRenderer(canvasWith(gl));
+    const passes = bedOverlayPasses({
+      ...UNIFORM_ARGS,
+      heightAreas: [
+        { id: 'box', x: 50, y: 50, width: 100, height: 80, surfaceHeightMm: 30 },
+        { id: 'sheet', x: 200, y: 200, width: 100, height: 100, surfaceHeightMm: 3 },
+      ],
+    });
+    renderer?.draw(FRAME, 1280, 720, passes);
+    expect(passes).toHaveLength(3);
+    expect(spy('texImage2D')).toHaveBeenCalledTimes(1);
+    expect(spy('drawArrays')).toHaveBeenCalledTimes(3);
+  });
+
+  it('clears instead of drawing when there are no passes', () => {
+    const { gl, spy } = fakeWebgl2();
+    const renderer = createBedOverlayRenderer(canvasWith(gl));
+    renderer?.draw(FRAME, 1280, 720, []);
+    expect(spy('drawArrays')).not.toHaveBeenCalled();
+    expect(spy('clear')).toHaveBeenCalledTimes(1);
   });
 
   it('clears instead of drawing when the frame is empty or cannot be uploaded', () => {

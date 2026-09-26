@@ -10,6 +10,7 @@
 import { create } from 'zustand';
 import type { RgbaImage } from '../../core/camera/rgba-image';
 import type { CameraCaptureBinding } from '../../core/camera/camera-capture-binding';
+import type { SurfaceHeightArea } from '../../core/camera/model/height-areas';
 import type { CameraAdapter, CameraDevice } from '../../platform/types';
 import {
   createCameraSourceActions,
@@ -56,6 +57,11 @@ export type CameraStore = CameraSourceActions & {
   // Top surface currently being viewed/placed on, measured above machine bed.
   // The camera model corrects the picture to this height (ADR-440).
   readonly surfaceHeightMm: number;
+  // Rectangles of the bed whose top stands at its own height, such as a box
+  // beside the sheet; the overlay and the trace use them there (ADR-441
+  // Amendment 2). Ephemeral, like the material height: they describe what is
+  // on the bed now.
+  readonly heightAreas: ReadonlyArray<SurfaceHeightArea>;
   // Each calibration ring's measured error drawn over the overlay (ADR-441
   // Amendment 1), so the operator sees where on the bed the camera is trusted.
   readonly accuracyMapVisible: boolean;
@@ -77,6 +83,9 @@ export type CameraStore = CameraSourceActions & {
     capture?: CameraCaptureBinding | null,
   ) => void;
   readonly setSurfaceHeightMm: (heightMm: number) => void;
+  readonly addHeightArea: (area: SurfaceHeightArea) => void;
+  readonly updateHeightArea: (id: string, patch: HeightAreaPatch) => void;
+  readonly removeHeightArea: (id: string) => void;
   readonly setAccuracyMapVisible: (on: boolean) => void;
   readonly activatePlacement: () => void;
   readonly deactivatePlacement: () => void;
@@ -85,6 +94,8 @@ export type CameraStore = CameraSourceActions & {
   readonly refreshCameras: (camera: CameraAdapter | undefined) => Promise<void>;
   readonly selectCamera: (deviceId: string) => void;
 };
+
+export type HeightAreaPatch = Partial<Omit<SurfaceHeightArea, 'id'>>;
 
 // Reselection policy on a device-list refresh: keep a still-valid deliberate
 // selection; else restore the remembered camera (the overhead one, not the
@@ -120,6 +131,7 @@ export const useCameraStore = create<CameraStore>((set, get) => ({
   overlayStill: null,
   overlayStillCapture: null,
   surfaceHeightMm: 0,
+  heightAreas: [],
   accuracyMapVisible: false,
   placementActive: false,
   confirmedPositionEpoch: null,
@@ -131,7 +143,17 @@ export const useCameraStore = create<CameraStore>((set, get) => ({
     set({ overlayOpacityPercent: Math.max(0, Math.min(100, percent)) }),
   setOverlayStill: (frame, capture = null) =>
     set({ overlayStill: frame, overlayStillCapture: frame === null ? null : capture }),
-  setSurfaceHeightMm: (heightMm) => set({ surfaceHeightMm: clampFinite(heightMm, 0, 500) }),
+  setSurfaceHeightMm: (heightMm) =>
+    set({ surfaceHeightMm: clampFinite(heightMm, 0, MAX_SURFACE_HEIGHT_MM) }),
+  addHeightArea: (area) => set((s) => ({ heightAreas: [...s.heightAreas, sanitizedArea(area)] })),
+  updateHeightArea: (id, patch) =>
+    set((s) => ({
+      heightAreas: s.heightAreas.map((area) =>
+        area.id === id ? sanitizedArea({ ...area, ...patch }) : area,
+      ),
+    })),
+  removeHeightArea: (id) =>
+    set((s) => ({ heightAreas: s.heightAreas.filter((area) => area.id !== id) })),
   setAccuracyMapVisible: (on) => set({ accuracyMapVisible: on }),
   activatePlacement: () => set({ placementActive: true }),
   deactivatePlacement: () =>
@@ -153,6 +175,21 @@ export const useCameraStore = create<CameraStore>((set, get) => ({
     set({ selectedDeviceId: deviceId });
   },
 }));
+
+const MAX_SURFACE_HEIGHT_MM = 500;
+
+// Number fields can hand over NaN or a negative size mid-edit; keep the stored
+// area drawable (the same treatment as the material height field).
+function sanitizedArea(area: SurfaceHeightArea): SurfaceHeightArea {
+  return {
+    id: area.id,
+    x: Number.isFinite(area.x) ? area.x : 0,
+    y: Number.isFinite(area.y) ? area.y : 0,
+    width: clampFinite(area.width, 0, Number.MAX_VALUE),
+    height: clampFinite(area.height, 0, Number.MAX_VALUE),
+    surfaceHeightMm: clampFinite(area.surfaceHeightMm, 0, MAX_SURFACE_HEIGHT_MM),
+  };
+}
 
 function clampFinite(value: number, min: number, max: number): number {
   if (!Number.isFinite(value)) return min;

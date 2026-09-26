@@ -1,6 +1,7 @@
 // WebGL2 host for the bed overlay shader (ADR-440): owns one context on the
 // overlay canvas, one program and one frame texture, and redraws the whole
-// canvas from the latest camera frame on every draw() call.
+// canvas from the latest camera frame on every draw() call, one pass for the
+// bed and one for each height area (ADR-441 Amendment 2).
 //
 // The canvas is composited over the workspace by the page, so the drawing
 // buffer is cleared to transparent and the shader writes premultiplied colour
@@ -18,16 +19,16 @@ import {
 
 export type BedOverlayRenderer = {
   /**
-   * Upload `source` and redraw. The canvas backing store is kept at
-   * uniforms.uCanvasSize so the shader's y flip always matches it. A frame that
-   * cannot be uploaded clears the overlay instead of throwing, so a stale image
-   * never stays registered on the bed.
+   * Upload `source` once and draw every pass over it, in order. The canvas
+   * backing store is kept at the first pass's uCanvasSize so the shader's y
+   * flip always matches it. A frame that cannot be uploaded clears the overlay
+   * instead of throwing, so a stale image never stays registered on the bed.
    */
   draw(
     source: TexImageSource,
     sourceWidth: number,
     sourceHeight: number,
-    uniforms: BedOverlayUniforms,
+    passes: ReadonlyArray<BedOverlayUniforms>,
   ): void;
   /** Make the overlay fully transparent. */
   clear(): void;
@@ -92,14 +93,15 @@ export function createBedOverlayRenderer(canvas: HTMLCanvasElement): BedOverlayR
     get lost() {
       return lost || (!disposed && gl.isContextLost());
     },
-    draw(source, sourceWidth, sourceHeight, uniforms) {
+    draw(source, sourceWidth, sourceHeight, passes) {
       const res = live();
       if (res === null) return;
-      if (!(sourceWidth > 0 && sourceHeight > 0)) {
+      const first = passes[0];
+      if (first === undefined || !(sourceWidth > 0 && sourceHeight > 0)) {
         clearCanvas(gl);
         return;
       }
-      drawFrame(gl, canvas, res, source, uniforms);
+      drawFrame(gl, canvas, res, source, first.uCanvasSize, passes);
     },
     clear() {
       if (live() !== null) clearCanvas(gl);
@@ -133,9 +135,10 @@ function drawFrame(
   canvas: HTMLCanvasElement,
   res: GpuResources,
   source: TexImageSource,
-  uniforms: BedOverlayUniforms,
+  canvasSize: readonly [number, number],
+  passes: ReadonlyArray<BedOverlayUniforms>,
 ): void {
-  const [width, height] = uniforms.uCanvasSize;
+  const [width, height] = canvasSize;
   if (canvas.width !== width) canvas.width = width;
   if (canvas.height !== height) canvas.height = height;
   gl.viewport(0, 0, gl.drawingBufferWidth, gl.drawingBufferHeight);
@@ -144,9 +147,13 @@ function drawFrame(
   gl.bindTexture(gl.TEXTURE_2D, res.texture);
   if (!uploadFrame(gl, source)) return;
   gl.useProgram(res.program);
-  applyUniforms(gl, res.locations, uniforms);
   gl.bindVertexArray(res.vertexArray);
-  gl.drawArrays(gl.TRIANGLES, 0, 3);
+  // Blending stays off, so each pass overwrites what the passes before it
+  // wrote inside its own clip rectangle.
+  for (const uniforms of passes) {
+    applyUniforms(gl, res.locations, uniforms);
+    gl.drawArrays(gl.TRIANGLES, 0, 3);
+  }
 }
 
 function uploadFrame(gl: WebGL2RenderingContext, source: TexImageSource): boolean {

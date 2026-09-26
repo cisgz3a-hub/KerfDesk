@@ -5,11 +5,21 @@
 // parallax exactly; the CSS matrix3d it replaces could only apply one
 // homography, which no fisheye lens obeys.
 //
+// Height areas (ADR-441 Amendment 2) are drawn as extra passes: the first
+// pass covers the bed at the material height, then each area, lowest first,
+// redraws its own rectangle at its own height. There is no blending, so the
+// last pass over a pixel owns it and the highest area ends on top.
+//
 // Pure: GLSL source, uniform packing and a CPU mirror of the fragment maths.
 // The mirror exists so tests can hold the shader to the camera model itself
 // (projectWorldPoint) rather than to a restatement of it.
 
 import { bedPoint, type CameraPose, type LensModel } from '../../../core/camera/model/camera-model';
+import {
+  areasLowestFirst,
+  clipAreaToBed,
+  type SurfaceHeightArea,
+} from '../../../core/camera/model/height-areas';
 import type { FisheyeDistortion } from '../../../core/camera/fisheye';
 import type { Mat3 } from '../../../core/camera/homography';
 import { rodriguesToMatrix } from '../../../core/camera/rodrigues';
@@ -43,9 +53,12 @@ export type BedOverlayUniforms = {
   /** Workspace view (CSS px): canvasPx = offset + mm * scale. */
   readonly uViewScale: number;
   readonly uViewOffset: Pair;
-  /** Bed rectangle in mm: the overlay draws only inside [0, w] x [0, h]. */
-  readonly uBedSize: Pair;
-  /** World z of the surface being viewed (z points into the bed, so -height). */
+  /**
+   * The bed rectangle this pass draws, in mm: minX, minY, maxX, maxY. The first
+   * pass covers the whole bed; a height area's pass covers only the area.
+   */
+  readonly uClip: Quad;
+  /** World z of the surface this pass shows (z points into the bed, so -height). */
   readonly uSurfaceZ: number;
   /** World-to-camera rotation, column-major (see ColumnMajorMat3). */
   readonly uRotation: ColumnMajorMat3;
@@ -70,7 +83,7 @@ export const BED_OVERLAY_UNIFORM_KINDS = {
   uPixelRatio: 'float',
   uViewScale: 'float',
   uViewOffset: 'vec2',
-  uBedSize: 'vec2',
+  uClip: 'vec4',
   uSurfaceZ: 'float',
   uRotation: 'mat3',
   uTranslation: 'vec3',
@@ -98,8 +111,11 @@ void main() {
 // Output is PREMULTIPLIED alpha (rgb * opacity, opacity), matching the WebGL
 // canvas default premultipliedAlpha: true, so the page compositor blends it over
 // the workspace with no extra pass. Camera frames are opaque, so the texture's
-// own alpha is ignored. Constants and discards match camera-model.ts and
-// fisheye.ts; bedOverlaySampleCoord below mirrors this line for line.
+// own alpha is ignored. Outside its clip rectangle a pass leaves the pixel to
+// the passes before it; inside, it writes transparent where the camera cannot
+// see the point, so a lower pass never shows through at the wrong height.
+// Constants match camera-model.ts and fisheye.ts; bedOverlaySampleCoord below
+// mirrors this line for line.
 export const BED_OVERLAY_FRAGMENT_SHADER = `#version 300 es
 precision highp float;
 
@@ -108,7 +124,7 @@ uniform vec2 uCanvasSize;
 uniform float uPixelRatio;
 uniform float uViewScale;
 uniform vec2 uViewOffset;
-uniform vec2 uBedSize;
+uniform vec4 uClip;
 uniform float uSurfaceZ;
 uniform mat3 uRotation;
 uniform vec3 uTranslation;
@@ -140,14 +156,15 @@ float fisheyeScale(float r, vec4 k) {
 void main() {
   vec2 css = vec2(gl_FragCoord.x, uCanvasSize.y - gl_FragCoord.y) / uPixelRatio;
   vec2 bed = (css - uViewOffset) / uViewScale;
-  if (!inside(bed, uBedSize)) discard;
+  if (!inside(bed - uClip.xy, uClip.zw - uClip.xy)) discard;
+  outColor = vec4(0.0);
   vec3 cam = uRotation * vec3(bed, uSurfaceZ) + uTranslation;
-  if (!(cam.z > MIN_DEPTH)) discard;
+  if (!(cam.z > MIN_DEPTH)) return;
   vec2 ab = cam.xy / cam.z;
   float s = fisheyeScale(length(ab), uDistortion);
   vec2 pixel = uFocal * (ab * s) + uPrincipal;
   vec2 uv = (pixel + 0.5) / uFrameSize;
-  if (!inside(uv, vec2(1.0))) discard;
+  if (!inside(uv, vec2(1.0))) return;
   outColor = vec4(texture(uFrame, uv).rgb * uOpacity, uOpacity);
 }
 `;
@@ -167,6 +184,28 @@ export type BedOverlayUniformArgs = {
   readonly opacity: number;
 };
 
+/**
+ * Every pass of one overlay draw: the whole bed at the material height, then
+ * each height area that touches the bed, lowest first (see the file header).
+ */
+export function bedOverlayPasses(
+  args: BedOverlayUniformArgs & { readonly heightAreas: ReadonlyArray<SurfaceHeightArea> },
+): ReadonlyArray<BedOverlayUniforms> {
+  const base = bedOverlayUniforms(args);
+  const passes: BedOverlayUniforms[] = [base];
+  for (const area of areasLowestFirst(args.heightAreas)) {
+    const clip = clipAreaToBed(area, args.bedWidthMm, args.bedHeightMm);
+    if (clip === null) continue;
+    passes.push({
+      ...base,
+      uClip: [clip.x, clip.y, clip.x + clip.width, clip.y + clip.height],
+      uSurfaceZ: bedPoint(0, 0, area.surfaceHeightMm).z,
+    });
+  }
+  return passes;
+}
+
+/** The single pass that shows the whole bed at `surfaceHeightMm`. */
 export function bedOverlayUniforms(args: BedOverlayUniformArgs): BedOverlayUniforms {
   const { lens, pose, view } = args;
   const k = lens.intrinsics;
@@ -175,7 +214,7 @@ export function bedOverlayUniforms(args: BedOverlayUniformArgs): BedOverlayUnifo
     uPixelRatio: positiveOr(args.devicePixelRatio, 1),
     uViewScale: view.scale,
     uViewOffset: [view.offsetX, view.offsetY],
-    uBedSize: [args.bedWidthMm, args.bedHeightMm],
+    uClip: [0, 0, args.bedWidthMm, args.bedHeightMm],
     // Taken from the model rather than restated, so the height sign has one owner.
     uSurfaceZ: bedPoint(0, 0, args.surfaceHeightMm).z,
     uRotation: columnMajor(rodriguesToMatrix(pose.rvec)),
@@ -194,20 +233,42 @@ const MIN_DEPTH = 1e-6;
 const RADIUS_EPSILON = 1e-9;
 
 /**
- * CPU mirror of BED_OVERLAY_FRAGMENT_SHADER: the texture coordinate the shader
- * samples for the fragment at gl_FragCoord (fragX, fragY) (device px, origin
- * bottom-left, pixel centres at +0.5), or null where the shader discards.
+ * CPU mirror of the whole draw: the texture coordinate shown at gl_FragCoord
+ * (fragX, fragY) once every pass has run, or null where the pixel stays
+ * transparent. The last pass whose clip covers the fragment owns it.
+ */
+export function bedOverlayCompositeCoord(
+  passes: ReadonlyArray<BedOverlayUniforms>,
+  fragX: number,
+  fragY: number,
+): BedOverlayTexCoord | null {
+  let shown: BedOverlayTexCoord | null = null;
+  for (const pass of passes) {
+    if (bedOverlayPassCovers(pass, fragX, fragY)) shown = bedOverlaySampleCoord(pass, fragX, fragY);
+  }
+  return shown;
+}
+
+/** True where the pass writes the fragment, rather than discarding it. */
+export function bedOverlayPassCovers(u: BedOverlayUniforms, fragX: number, fragY: number): boolean {
+  const bed = bedUnderFragment(u, fragX, fragY);
+  const [minX, minY, maxX, maxY] = u.uClip;
+  return inside(bed.x - minX, bed.y - minY, maxX - minX, maxY - minY);
+}
+
+/**
+ * CPU mirror of BED_OVERLAY_FRAGMENT_SHADER for one pass: the texture
+ * coordinate the shader samples for the fragment at gl_FragCoord (fragX,
+ * fragY) (device px, origin bottom-left, pixel centres at +0.5), or null where
+ * it discards or writes transparent.
  */
 export function bedOverlaySampleCoord(
   u: BedOverlayUniforms,
   fragX: number,
   fragY: number,
 ): BedOverlayTexCoord | null {
-  const cssX = fragX / u.uPixelRatio;
-  const cssY = (u.uCanvasSize[1] - fragY) / u.uPixelRatio;
-  const bedX = (cssX - u.uViewOffset[0]) / u.uViewScale;
-  const bedY = (cssY - u.uViewOffset[1]) / u.uViewScale;
-  if (!inside(bedX, bedY, u.uBedSize[0], u.uBedSize[1])) return null;
+  if (!bedOverlayPassCovers(u, fragX, fragY)) return null;
+  const { x: bedX, y: bedY } = bedUnderFragment(u, fragX, fragY);
   // GLSL mat3 * vec3 over column-major storage.
   const m = u.uRotation;
   const t = u.uTranslation;
@@ -225,6 +286,19 @@ export function bedOverlaySampleCoord(
   const texV = (pixelY + 0.5) / u.uFrameSize[1];
   if (!inside(texU, texV, 1, 1)) return null;
   return { u: texU, v: texV };
+}
+
+function bedUnderFragment(
+  u: BedOverlayUniforms,
+  fragX: number,
+  fragY: number,
+): { readonly x: number; readonly y: number } {
+  const cssX = fragX / u.uPixelRatio;
+  const cssY = (u.uCanvasSize[1] - fragY) / u.uPixelRatio;
+  return {
+    x: (cssX - u.uViewOffset[0]) / u.uViewScale,
+    y: (cssY - u.uViewOffset[1]) / u.uViewScale,
+  };
 }
 
 // Written so NaN fails the test, as the shader's comparisons do.

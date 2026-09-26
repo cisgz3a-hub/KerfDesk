@@ -6516,7 +6516,7 @@ as the pane's design record.
 - **Edge / another camera.** A photo from another camera or with another crop is not compared;
   the result says why and the new calibration can still be saved.
 
-### F-CAM3. Corrected camera overlay (ADR-440)
+### F-CAM3. Corrected camera overlay (ADR-440, ADR-441 Amendment 2)
 
 - **Success / overlay on canvas.** With a saved calibration, the canvas shows the camera picture
   through the camera model: lens distortion and parallax are undone per pixel on the GPU, and the
@@ -6524,6 +6524,13 @@ as the pane's design record.
   (freeze the current frame, LightBurn's Update Overlay model) and **Live** for any camera kind.
 - **Material surface height.** Enter the material's top height above the bed; the overlay and
   camera trace show the bed as seen at that height, so the material's edges line up.
+- **Object heights.** **Add height area** gives part of the bed its own height, for an object that
+  stands above the material such as a box. With objects selected, the area starts around them
+  with a 10 mm margin; otherwise it starts as a 100 mm square in the middle of the bed. The area's
+  height, X, Y, width and depth are edited in its row, and **Remove** drops it. The overlay shows
+  each area at its own height, with a dashed outline and "Area n: h mm" on the canvas. Where areas
+  overlap the highest wins, and an area lower than the material (an opening in the sheet) still
+  wins inside itself. Areas are not saved with the project (ADR-441 Amendment 2).
 - **Accuracy map.** **Accuracy map on/off** draws every calibration ring over the picture where
   it was engraved, coloured by its measured error (green, amber, red; hollow when the fit left it
   out). A dashed outline marks the target's area, outside which the picture is extrapolated. The
@@ -6551,16 +6558,20 @@ as the pane's design record.
   Projects and machine profiles holding the old lens calibration and four-corner or marker
   alignment load without them; the Camera panel shows calibration pending.
 
-### F-CAM5. Trace from camera (ADR-110, ADR-440)
+### F-CAM5. Trace from camera (ADR-110, ADR-440, ADR-441 Amendment 2)
 
 - **Success / trace in place.** With a saved calibration and a live camera, the operator places an
   object on the bed and presses **Trace from camera**: the frame is flattened top-down onto the bed
   at the material surface height and opened in the normal Trace dialog. The traced vectors land
   where the object physically sits.
+- **Success / heights and one area.** Inside each height area the frame is flattened at that
+  area's own height. **Trace area** in an area's row traces only that area, at 8 px/mm instead of
+  4 px/mm (lower for a very large area, never below 4 px/mm), and the vectors land inside it
+  (ADR-441 Amendment 2).
 - **Error / another camera or shape.** The capture is refused with a toast saying which, never
   traced through the wrong geometry.
-- **Empty / no feed or calibration.** The button is disabled without a live camera; without a
-  calibration the overlay row (and the button) is absent.
+- **Empty / no feed or calibration.** **Trace from camera** and **Trace area** are disabled without
+  a live camera; without a calibration the overlay row (and the buttons) is absent.
 - **Edge / encoder failure.** A platform without 2D canvas support fails typed ('could not build
   the bed image') instead of half-completing.
 

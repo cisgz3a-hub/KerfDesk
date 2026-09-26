@@ -1,7 +1,8 @@
 // WorkspaceCameraOverlay — the camera picture drawn onto the workspace canvas
 // through the saved camera model (ADR-107, ADR-440): every canvas pixel shows
-// the camera pixel that sees that bed point at the material's surface height,
-// so lens distortion and parallax are undone exactly and artwork can be placed
+// the camera pixel that sees that bed point at the material's surface height
+// (or its height area's own height, ADR-441 Amendment 2), so lens distortion
+// and parallax are undone exactly and artwork can be placed
 // over the real material. It shares the drawable stage's grid cell, measures
 // its own box (the canvas's box) and recomputes the same fit-to-bed view the
 // canvas renderer uses, so the picture tracks zoom and pan. Sources, in
@@ -16,6 +17,7 @@ import { useUiStore } from '../state/ui-store';
 import { computeView } from '../workspace/view-transform';
 import { CameraAccuracyMap } from './accuracy/CameraAccuracyMap';
 import { CameraSourceView } from './CameraSourceView';
+import { HeightAreaOutlines } from './heights/HeightAreaOutlines';
 import type { LiveCaptureElement } from './frame-capture';
 import {
   useBedOverlayDrawing,
@@ -61,6 +63,14 @@ function ModelOverlay(props: { readonly model: CameraModelRecord }): JSX.Element
           height={scene.cssHeight}
         />
       ) : null}
+      {scene === null ? null : (
+        <HeightAreaOutlines
+          areas={scene.heightAreas}
+          view={scene.view}
+          width={scene.cssWidth}
+          height={scene.cssHeight}
+        />
+      )}
       {liveSource === null ? null : (
         // The live element only feeds the overlay's texture; it is never seen.
         <div style={hiddenSourceStyle}>
@@ -81,6 +91,7 @@ function useOverlayScene(model: CameraModelRecord, box: ElementSize | null): Ove
   const bedHeightMm = useStore((s) => s.project.device.bedHeight);
   const opacityPercent = useCameraStore((s) => s.overlayOpacityPercent);
   const surfaceHeightMm = useCameraStore((s) => s.surfaceHeightMm);
+  const heightAreas = useCameraStore((s) => s.heightAreas);
   const zoomFactor = useUiStore((s) => s.zoomFactor);
   const panX = useUiStore((s) => s.panX);
   const panY = useUiStore((s) => s.panY);
@@ -94,6 +105,7 @@ function useOverlayScene(model: CameraModelRecord, box: ElementSize | null): Ove
       bedWidthMm,
       bedHeightMm,
       surfaceHeightMm,
+      heightAreas,
       opacity: opacityPercent / 100,
     };
   }, [
@@ -103,6 +115,7 @@ function useOverlayScene(model: CameraModelRecord, box: ElementSize | null): Ove
     bedHeightMm,
     opacityPercent,
     surfaceHeightMm,
+    heightAreas,
     zoomFactor,
     panX,
     panY,

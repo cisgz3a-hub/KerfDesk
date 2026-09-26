@@ -20,14 +20,23 @@ import { cameraCaptureBindingForFrame } from './frame-source';
 import type { BedOverlayUniforms } from './overlay/bed-overlay-shader';
 import { WorkspaceCameraOverlay } from './WorkspaceCameraOverlay';
 
-type Draw = { readonly source: unknown; readonly uniforms: BedOverlayUniforms };
+type Draw = {
+  readonly source: unknown;
+  /** The first pass: the whole bed at the material height. */
+  readonly uniforms: BedOverlayUniforms | undefined;
+  readonly passes: ReadonlyArray<BedOverlayUniforms>;
+};
 const gl = vi.hoisted(() => ({ available: true, draws: [] as Draw[], clears: 0 }));
 vi.mock('./overlay/bed-overlay-renderer', () => ({
   createBedOverlayRenderer: () =>
     gl.available
       ? {
-          draw: (source: unknown, _w: number, _h: number, uniforms: BedOverlayUniforms) =>
-            gl.draws.push({ source, uniforms }),
+          draw: (
+            source: unknown,
+            _w: number,
+            _h: number,
+            passes: ReadonlyArray<BedOverlayUniforms>,
+          ) => gl.draws.push({ source, uniforms: passes[0], passes }),
           clear: () => {
             gl.clears += 1;
           },
@@ -100,6 +109,7 @@ beforeEach(() => {
     overlayStill: null,
     overlayStillCapture: null,
     surfaceHeightMm: 12,
+    heightAreas: [],
     accuracyMapVisible: false,
     sourceState: { kind: 'idle' },
   });
@@ -189,6 +199,30 @@ describe('WorkspaceCameraOverlay', () => {
     render();
     act(() => useCameraStore.setState({ surfaceHeightMm: 30 }));
     expect(gl.draws.at(-1)?.uniforms.uSurfaceZ).toBe(-30);
+  });
+
+  it('draws each height area as its own pass and outlines it on the canvas', () => {
+    saveModel();
+    useCameraStore.setState({ overlayStill: still() });
+    render();
+    expect(gl.draws.at(-1)?.passes).toHaveLength(1);
+    expect(container.querySelector('[data-testid="camera-height-areas"]')).toBeNull();
+    act(() =>
+      useCameraStore.getState().addHeightArea({
+        id: 'box',
+        x: 40,
+        y: 60,
+        width: 100,
+        height: 80,
+        surfaceHeightMm: 35,
+      }),
+    );
+    const passes = gl.draws.at(-1)?.passes ?? [];
+    expect(passes.map((pass) => pass.uSurfaceZ)).toEqual([-12, -35]);
+    expect(passes[1]?.uClip).toEqual([40, 60, 140, 140]);
+    const outline = container.querySelector('[data-testid="camera-height-areas"]');
+    expect(outline?.querySelectorAll('rect')).toHaveLength(1);
+    expect(outline?.textContent).toBe('Area 1: 35 mm');
   });
 
   it('says why a still of another shape or from another camera is not drawn', () => {

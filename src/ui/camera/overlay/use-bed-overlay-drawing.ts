@@ -1,12 +1,13 @@
 // Keeps the bed overlay canvas drawn (ADR-440): owns the WebGL2 renderer for
 // the canvas, redraws right after any render that changed the view, the
-// opacity or the frame, and, for a live camera, on animation frames that show
+// opacity, the heights or the frame, and, for a live camera, on animation frames that show
 // a new picture, so a still or a paused feed costs nothing between changes.
 // The camera model is applied to the frame's real size on every draw, so a
 // camera that changes resolution mid-session stays registered.
 
 import { useEffect, useRef, useState } from 'react';
 import type { CameraModelRecord } from '../../../core/camera/model/camera-model-record';
+import type { SurfaceHeightArea } from '../../../core/camera/model/height-areas';
 import type { RgbaImage } from '../../../core/camera/rgba-image';
 import type { ViewTransform } from '../../workspace/view-transform';
 import { cameraModelForFrame } from '../camera-model-frame';
@@ -14,7 +15,7 @@ import type { LiveCaptureElement } from '../frame-capture';
 import { cameraCaptureBindingForFrame, type ActiveCameraSource } from '../frame-source';
 import type { CameraCaptureBinding } from '../../../core/camera/camera-capture-binding';
 import { createBedOverlayRenderer, type BedOverlayRenderer } from './bed-overlay-renderer';
-import { bedOverlayUniforms } from './bed-overlay-shader';
+import { bedOverlayPasses } from './bed-overlay-shader';
 
 export type OverlayFrame =
   | {
@@ -36,6 +37,8 @@ export type OverlayScene = {
   readonly bedWidthMm: number;
   readonly bedHeightMm: number;
   readonly surfaceHeightMm: number;
+  /** Rectangles drawn at their own height over the material height (ADR-441 Amendment 2). */
+  readonly heightAreas: ReadonlyArray<SurfaceHeightArea>;
   readonly opacity: number;
 };
 
@@ -147,10 +150,11 @@ function drawOverlay(
     return fitted.message;
   }
   const pixelRatio = window.devicePixelRatio > 0 ? window.devicePixelRatio : 1;
-  const uniforms = bedOverlayUniforms({
+  const passes = bedOverlayPasses({
     lens: fitted.lens,
     pose: fitted.pose,
     surfaceHeightMm: scene.surfaceHeightMm,
+    heightAreas: scene.heightAreas,
     view: scene.view,
     canvasWidthPx: scene.cssWidth * pixelRatio,
     canvasHeightPx: scene.cssHeight * pixelRatio,
@@ -159,7 +163,7 @@ function drawOverlay(
     bedHeightMm: scene.bedHeightMm,
     opacity: scene.opacity,
   });
-  renderer.draw(textureSource(frame), size.width, size.height, uniforms);
+  renderer.draw(textureSource(frame), size.width, size.height, passes);
   return null;
 }
 

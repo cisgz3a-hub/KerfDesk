@@ -113,8 +113,7 @@ export async function photographTarget(args: {
           targetHeightMm: settings.sheetThicknessMm,
         });
   const bedImage = warpFrameToBedImage(raw, outcome.lens, outcome.pose, {
-    bedWidthMm: args.bedWidthMm,
-    bedHeightMm: args.bedHeightMm,
+    region: { x: 0, y: 0, width: args.bedWidthMm, height: args.bedHeightMm },
     pixelsPerMm: REVIEW_PIXELS_PER_MM,
     surfaceHeightMm: settings.sheetThicknessMm,
   });

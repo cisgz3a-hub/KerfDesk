@@ -1,7 +1,8 @@
 // OverlayControls — the Camera panel's workspace-overlay row (ADR-107,
 // LightBurn "Camera Control" parity): show/hide on canvas, a fade slider, the
-// still-vs-live source choice and the material's surface height, which the
-// camera model uses to undo parallax exactly (ADR-440). Camera placement
+// still-vs-live source choice, the material's surface height, which the
+// camera model uses to undo parallax exactly (ADR-440), and height areas for
+// objects that stand above the material (ADR-441 Amendment 2). Camera placement
 // stays latched after hiding the image so its status remains visible until
 // the operator exits it.
 
@@ -10,6 +11,7 @@ import { useCameraStore } from '../state/camera-store';
 import { useCameraPlacementControls } from './use-camera-placement-controls';
 import { TraceFromCameraButton } from './TraceFromCameraButton';
 import { AccuracyMapToggle } from './accuracy/AccuracyMapToggle';
+import { HeightAreasControl } from './heights/HeightAreasControl';
 
 export function OverlayControls(): JSX.Element | null {
   const model = useStore((s) => s.project.device.cameraModel);
@@ -37,6 +39,7 @@ function CalibratedOverlayControls(): JSX.Element {
       />
       {placement.active ? <CameraPlacementStatus placement={placement} /> : null}
       <SurfaceHeightControl heightMm={surfaceHeightMm} onChange={setSurfaceHeightMm} />
+      <HeightAreasControl />
       <FadeControl opacity={opacity} onChange={setOpacity} />
     </div>
   );
