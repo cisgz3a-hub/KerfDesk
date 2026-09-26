@@ -166,15 +166,15 @@ export function hasImpulseNoise(image: RawImageData): boolean {
 }
 
 /** Selective automatic cleanup; computes the median only once. An explicit
- * medianFilter:true keeps using the full median's historical behaviour. */
-export function autoMedianFilter(image: RawImageData): RawImageData {
+ * medianFilter:true keeps using the full median's historical behaviour.
+ * `minimumRatio` 0 repairs every isolated impulse: a crop whose whole source
+ * already crossed the density floor (ADR-411). */
+export function autoMedianFilter(
+  image: RawImageData,
+  minimumRatio = IMPULSE_NOISE_MIN_RATIO,
+): RawImageData {
   const filtered = medianFilter(medianSourceOverPaper(image));
-  return repairIsolatedMedianChanges(
-    image,
-    filtered,
-    IMPULSE_NOISE_LUMA_DELTA,
-    IMPULSE_NOISE_MIN_RATIO,
-  );
+  return repairIsolatedMedianChanges(image, filtered, IMPULSE_NOISE_LUMA_DELTA, minimumRatio);
 }
 
 // Fraction of pixels whose luma the median changed by more than the impulse

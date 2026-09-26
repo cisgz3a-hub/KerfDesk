@@ -2534,7 +2534,12 @@ settings and Job Review keep their existing read-only setup references.
    use pixels of the decoded image grid supplied to the tracing core and preserve their separate
    preset values. If dense artwork is traced on a smaller working grid, both area thresholds are
    converted using the actual width and height ratios, without rounding the internal values.
-   The preceding UI decode cap still defines that source grid. Expand **Curve finishing** for
+   The preceding UI decode cap still defines that source grid. Smooth's automatic noise cleanup
+   also judges one-pixel specks on that grid, before any supersampling, so a small image drops the
+   same specks it would at full size. Isolated one-pixel dots, such as a fine halftone screen,
+   look exactly like noise. Smooth and Line Art already drop them through **Remove ink specks**
+   and **Fill tiny holes**; the noise cleanup only adds specks those leave, such as specks near
+   an outline. Trace with Sharp to keep one-pixel dots. Expand **Curve finishing** for
    **Smoothness** and **Optimize** on filled outlines and Edge Detection, or **Transparency**
    for alpha-mask tracing. **Fill tiny holes** controls cleanup of small enclosed white marks;
    it does not bridge open gaps. Turn it off to retain those small highlights. Sliders and numeric fields stay in sync. Manual adjustments persist
@@ -2551,7 +2556,13 @@ settings and Job Review keep their existing read-only setup references.
    Submitted results use their captured request's paint intent; a newer preset request still
    supersedes an older result.
    Edge Detection creates closed outlines around dark artwork and locally
-   darker detail. Adjacent dark tones may merge into one outline. Centerline follows stroke centres.
+   darker detail. Adjacent dark tones may merge into one outline. Its **Sensitivity** moves in
+   steps of 10 and **Detail** in steps of 5; every step is a different detector setting (faint
+   detail appears or drops out; hard black-on-white art may not change) (ADR-412). A typed value
+   between steps shows the step being traced once the field loses focus. **Trace alpha mask**
+   also applies to Edge Detection: it outlines the image's transparency, and Invert is
+   unavailable while it is on. Semi-transparent regions (shadows, glows) are outlined like grey
+   tones; a 16%-opacity shadow still outlines at Sensitivity 0. Centerline follows stroke centres.
    Both commit as Line layers, so their preview draws every outline and stroke as a hairline that
    stays one screen pixel wide at any zoom, rather than filling Edge outlines.
    Centerline's separate-end gap bridge uses source-grid distance (preset/default 3 pixels),
@@ -3309,7 +3320,9 @@ and physical material output remain unverified.
 
 ### F-F5. Enhance a region of a trace (region-enhance re-trace)
 
-**ADR:** [ADR-113](DECISIONS.md#adr-113--region-enhance-re-trace-dialog-boundary-mode-trace-fidelity-2026-07-05).
+**ADR:** [ADR-113](DECISIONS.md#adr-113--region-enhance-re-trace-dialog-boundary-mode-trace-fidelity-2026-07-05),
+amended by [ADR-410](docs/decisions/ADR-410-region-enhance-seams.md) and
+[ADR-411](docs/decisions/ADR-411-auto-median-at-source-scale.md).
 
 **Operator intent.** A small feature inside a large raster (a tiny
 letter counter in a full logo) dropped out of the trace because it
@@ -3331,7 +3344,14 @@ re-runs: the full image is traced, the boxed source region is re-traced
 at 2× and downscaled, and its geometry is patched into the full trace
 (polylines fully inside the region's shrunk interior are replaced;
 everything crossing the box border or in the margin ring survives). The
-preview shows the full trace with the boxed feature recovered. Commit
+box is re-traced with a ring of the real neighbouring pixels around it and
+with the whole image's Otsu cut, auto-sketch choice and Smooth noise-cleanup
+verdict (noise is cleaned on the source pixels before the 2× enlargement), so the patch
+binarises exactly like its surroundings, and a shape that both passes
+trace within a pixel of each other at the box edge is kept once. Fitted
+curves and operation bindings survive inside and outside the box. The
+preview shows the full
+trace with the boxed feature recovered. Commit
 (**Trace**) writes the patched paths as the traced image, reusing the
 same overlay registration as any trace.
 

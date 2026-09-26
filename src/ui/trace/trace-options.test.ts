@@ -12,6 +12,7 @@ import {
   mergeLightBurnTraceSettings,
   relaxAggressivePreprocessing,
 } from './trace-options';
+import { edgeContrastDelta, edgeSourceRadiusPx } from '../../core/trace/edge-input';
 
 const LINE_ART = TRACE_PRESETS['Line Art'] as TraceOptions;
 const SMOOTH = TRACE_PRESETS['Smooth'] as TraceOptions;
@@ -98,7 +99,7 @@ describe('mergeLightBurnTraceSettings', () => {
     expect(merged.useOtsuThreshold).toBe(true);
   });
 
-  it('maps simple Edge Detection controls to Canny options', () => {
+  it('maps simple Edge Detection controls onto the detector settings', () => {
     const merged = mergeLightBurnTraceSettings(EDGE, {
       edgeSensitivity: 85,
       edgeDetail: 20,
@@ -106,28 +107,27 @@ describe('mergeLightBurnTraceSettings', () => {
     });
 
     expect(merged.traceMode).toBe('edge');
-    expect(merged.edgeHighThresholdRatio).toBeLessThan(EDGE.edgeHighThresholdRatio ?? 0.2);
+    // 85 takes the nearest stop, 90: delta 3. Detail 20: radius 20.
+    expect(edgeContrastDelta(merged)).toBe(3);
+    expect(edgeSourceRadiusPx(merged)).toBe(20);
     expect(merged.edgeLowThresholdRatio).toBeLessThan(EDGE.edgeLowThresholdRatio ?? 0.08);
     expect(merged.edgeBlurSigma).toBeGreaterThan(EDGE.edgeBlurSigma ?? 1.2);
-    // Join gap scales WITH blur (heavier smoothing widens Canny dropouts);
-    // lower Detail must therefore RAISE the gap, never collapse it below the
-    // preset the way the old outline-era [0.5, 2] mapping did.
-    expect(merged.edgeJoinGapPx).toBeGreaterThan(EDGE.edgeJoinGapPx ?? 5);
     expect(merged.edgeMinLengthPx).toBe(9);
+    // The dialog no longer writes the Canny-era values nothing reads.
+    expect(merged).not.toHaveProperty('edgeHighThresholdRatio');
+    expect(merged).not.toHaveProperty('edgeJoinGapPx');
   });
 
-  it('roundtrips displayed Edge Detection defaults back to the preset Canny values', () => {
+  it('roundtrips displayed Edge Detection defaults back to the preset values', () => {
+    expect(edgeSensitivityFromOptions(EDGE)).toBe(60);
+    expect(edgeDetailFromOptions(EDGE)).toBe(60);
     const merged = mergeLightBurnTraceSettings(EDGE, {
       edgeSensitivity: edgeSensitivityFromOptions(EDGE),
       edgeDetail: edgeDetailFromOptions(EDGE),
       edgeMinimumLinePx: EDGE.edgeMinLengthPx ?? 3,
     });
 
-    expect(merged.edgeLowThresholdRatio).toBe(EDGE.edgeLowThresholdRatio);
-    expect(merged.edgeHighThresholdRatio).toBe(EDGE.edgeHighThresholdRatio);
-    expect(merged.edgeBlurSigma).toBe(EDGE.edgeBlurSigma);
-    expect(merged.edgeJoinGapPx).toBe(EDGE.edgeJoinGapPx);
-    expect(merged.edgeMinLengthPx).toBe(EDGE.edgeMinLengthPx);
+    expect(merged).toEqual(EDGE);
   });
 
   it('ignores Edge Detection controls for non-edge presets', () => {

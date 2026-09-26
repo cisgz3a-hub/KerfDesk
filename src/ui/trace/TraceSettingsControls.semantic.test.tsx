@@ -1,14 +1,14 @@
 import { act } from 'react';
 import { createRoot } from 'react-dom/client';
 import { describe, expect, it } from 'vitest';
-import { TRACE_PRESETS, type RawImageData, type TraceOptions } from '../../core/trace';
+import { TRACE_PRESETS, type TraceOptions } from '../../core/trace';
 import {
   flattenStrengthFromSmoothness,
   optimizationToleranceScaleFromOptimize,
 } from '../../core/trace/contour-trace';
 import { preprocessForTrace } from '../../core/trace/trace-image';
-import { traceImageToColoredPaths } from '../../core/trace/trace-to-paths';
 import { TraceSettingsControls } from './TraceSettingsControls';
+import { fill, ink, loopCount, paper } from './trace-controls-test-helpers';
 import { mergeLightBurnTraceSettings, type LightBurnTraceSettingOverrides } from './trace-options';
 
 (
@@ -259,6 +259,30 @@ describe('trace controls describe the options the engine actually receives', () 
     },
   );
 
+  it('Edge Detection offers the alpha mask, sends it to the engine and stands Invert down', async () => {
+    // White artwork on transparency: its colour matches the paper.
+    const image = paper();
+    for (let i = 3; i < image.data.length; i += 4) image.data[i] = 0;
+    fill(image, 20, 15, 30, 30, [255, 255, 255]);
+    await withControls(
+      'Edge Detection',
+      async (controls) => {
+        expect(await loopCount(image, controls.options())).toBe(0);
+        await controls.check('Trace alpha mask', true);
+        expect(controls.options()).toEqual({
+          ...TRACE_PRESETS['Edge Detection'],
+          traceTransparency: true,
+        });
+        const invert = controls.host.querySelector('[aria-label="Invert"]');
+        expect(invert instanceof HTMLInputElement && invert.disabled).toBe(true);
+        expect(await loopCount(image, controls.options())).toBe(1);
+        await controls.reset();
+        expect(controls.options()).toEqual(TRACE_PRESETS['Edge Detection']);
+      },
+      true,
+    );
+  });
+
   it('stands Invert down while the alpha mask owns detection', async () => {
     await withControls(
       'Line Art',
@@ -378,36 +402,4 @@ async function withControls(
     await act(async () => root.unmount());
     host.remove();
   }
-}
-
-function paper(gray = 255): RawImageData {
-  const data = new Uint8ClampedArray(80 * 60 * 4);
-  for (let i = 0; i < data.length; i += 4) data.set([gray, gray, gray, 255], i);
-  return { width: 80, height: 60, data };
-}
-
-function fill(
-  image: RawImageData,
-  x0: number,
-  y0: number,
-  width: number,
-  height: number,
-  rgb: readonly [number, number, number],
-): void {
-  for (let y = y0; y < y0 + height; y += 1) {
-    for (let x = x0; x < x0 + width; x += 1) {
-      image.data.set([...rgb, 255], (y * image.width + x) * 4);
-    }
-  }
-}
-
-function ink(image: RawImageData): number {
-  let count = 0;
-  for (let i = 0; i < image.data.length; i += 4) if (image.data[i] === 0) count += 1;
-  return count;
-}
-
-async function loopCount(image: RawImageData, options: TraceOptions): Promise<number> {
-  const paths = await traceImageToColoredPaths(image, options);
-  return paths.reduce((count, path) => count + path.polylines.length, 0);
 }

@@ -206,7 +206,10 @@ describe('automatic small-mark policy (Line Art and Smooth default)', () => {
     // per-channel noise alone keeps the global cut. Local contrast does flag
     // the faint specks as ink: with no speck cleanup they are all there.
     for (let y = 60; y < 100; y += 1)
-      for (let x = 60; x < 150; x += 1) image.data[(y * g.width + x) * 4] += 48;
+      for (let x = 60; x < 150; x += 1) {
+        const i = (y * g.width + x) * 4;
+        image.data[i] = (image.data[i] ?? 0) + 48;
+      }
     const raw = components(preprocessForTrace(image, { ...LINE_ART, despeckleMinPixels: 0 }));
     const legacy = components(preprocessForTrace(image, LEGACY));
     const cleaned = components(preprocessForTrace(image, LINE_ART));

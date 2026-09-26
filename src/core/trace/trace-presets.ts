@@ -115,15 +115,14 @@ export const TRACE_PRESETS: Readonly<Record<string, TraceOptions>> = {
     blurRadius: 0,
     blurDelta: 0,
     lineFilter: true,
-    fixedPalette: ['#ffffff', '#000000'],
-    useOtsuThreshold: true,
-    despeckleMinPixels: 12,
+    // The detector's two settings (ADR-412): neighbourhood radius 12 source
+    // px (Detail 60) and contrast delta 6 luma levels (Sensitivity 60). No
+    // palette, Otsu or despeckle entry: the local-contrast detector reads
+    // none of them; Minimum line is Edge's speck filter.
     edgeBlurSigma: 1.2,
     edgeLowThresholdRatio: 0.08,
-    edgeHighThresholdRatio: 0.2,
     // Minimum finished outline length, including its closing edge.
     edgeMinLengthPx: 12,
-    edgeJoinGapPx: 5,
     // undefined = AUTO median: applied only when impulse noise is detected,
     // so clean art keeps its small features (see edge-trace.ts).
     // Same feature-aware 2x quality path as Line Art. The edge lane shares the
