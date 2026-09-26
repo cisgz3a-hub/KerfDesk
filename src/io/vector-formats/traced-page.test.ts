@@ -217,9 +217,7 @@ describe('traced page: a fitted side under 3 pt is the same page in every format
   const heightPt = pointsOutward(1059, { exponent: -3, step: 0.001 });
 
   it('SVG: the viewBox is grown to 3 pt on the grid', async () => {
-    expect(await bar('svg')).toContain(
-      ' viewBox="0 0 50 1.059" width="50mm" height="1.059mm"',
-    );
+    expect(await bar('svg')).toContain(' viewBox="0 0 50 1.059" width="50mm" height="1.059mm"');
   });
 
   it('PDF: the MediaBox is the SVG page, with no centring offset', async () => {

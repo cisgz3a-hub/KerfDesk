@@ -93,8 +93,6 @@ describe('Multi-File Trace page choice', () => {
     const margin = marginInput();
     if (margin === null) throw new Error('No margin input.');
     typeInto(margin, '3.5');
-    // A value the page cannot take leaves the last valid margin in place.
-    typeInto(margin, '-2');
     typeInto(margin, '2.5');
     expect(await submitAndReadOutput()).toEqual({
       format: 'svg',
@@ -107,5 +105,45 @@ describe('Multi-File Trace page choice', () => {
     mount();
     expect(pageSelect().value).toBe('artwork');
     expect(marginInput()?.value).toBe('2.5');
+  });
+
+  it.each(['-2', '1001'])('blocks the trace while the margin field shows %s', async (text) => {
+    mount();
+    act(() => {
+      pageSelect().value = 'artwork';
+      pageSelect().dispatchEvent(new Event('change', { bubbles: true }));
+    });
+    const margin = marginInput();
+    if (margin === null) throw new Error('No margin input.');
+    typeInto(margin, '3.5');
+    typeInto(margin, text);
+    expect(margin.getAttribute('aria-invalid')).toBe('true');
+    expect(margin.validity.valid).toBe(false);
+    const submit = [...document.querySelectorAll('button')].find(
+      (button) => button.textContent === 'Choose Images...',
+    );
+    act(() => submit?.click());
+    await act(async () => {
+      await new Promise((resolve) => setTimeout(resolve, 0));
+    });
+    expect(runMultiFileTrace).not.toHaveBeenCalled();
+    // Correcting the field clears the error and the trace runs with the shown margin.
+    typeInto(margin, '4');
+    expect(margin.getAttribute('aria-invalid')).toBe('false');
+    expect(await submitAndReadOutput()).toMatchObject({ page: { fit: 'artwork', marginMm: 4 } });
+  });
+
+  it('treats a cleared margin field as no margin', async () => {
+    mount();
+    act(() => {
+      pageSelect().value = 'artwork';
+      pageSelect().dispatchEvent(new Event('change', { bubbles: true }));
+    });
+    const margin = marginInput();
+    if (margin === null) throw new Error('No margin input.');
+    typeInto(margin, '3.5');
+    typeInto(margin, '');
+    expect(margin.getAttribute('aria-invalid')).toBe('false');
+    expect(await submitAndReadOutput()).toMatchObject({ page: { fit: 'artwork', marginMm: 0 } });
   });
 });

@@ -716,7 +716,7 @@ marks later edits as unapproved without changing the existing Frame/Start policy
    colour, circular arcs as exact bulges, cubics and elliptical arcs flattened within 0.01 mm.
    Bitmaps and reliefs have no DXF form; they are left out and the completion message counts them.
 2. **Tools → Multi-File Trace...** first asks for the preset, format (SVG, DXF, PDF, EPS or
-   GeoJSON), coordinate precision and, for SVG, whether to group each shape with its holes;
+   GeoJSON), coordinate precision and, for SVG, **Group islands** (each shape with its holes);
    **Choose Images...** then picks the files. Each image is saved as `<name>-trace.<format>` on the
    traced image's page, lower-left corner as the origin (ADR-455). **Page → Fit to artwork**
    instead trims the page to the exact traced curves plus a **Margin (mm)**; the millimetre scale

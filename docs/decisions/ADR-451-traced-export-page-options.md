@@ -33,7 +33,13 @@ from Potrace's documented behaviour only; no Potrace source was consulted (ADR-1
    writer draws: the larger of one source pixel (the SVG stroke) and 0.1 mm (the PDF/EPS
    hairline), so a stroke on the fitted edge is not clipped. The margin is added on every side.
    On a physical page the box is rounded outward to the export grid (the Precision choice), so
-   the artwork moves by a whole number of grid steps; a side is never shorter than one step.
+   the artwork moves by a whole number of grid steps. A side shorter than 3 pt (1.0583 mm, the
+   PDF 1.4 minimum page side that the PDF and EPS writers enforce) grows to 3 pt on whole grid
+   steps, centred on the artwork (an odd extra step goes to the high side), so a thin trace such
+   as a Centerline straight line gets the same page in every format instead of a 3 pt PDF/EPS
+   page around a thinner SVG, DXF or GeoJSON page. A side is never shorter than one grid step.
+   The core copies of the 3 pt minimum and the 0.1 mm hairline are pinned to the io writer
+   constants by `traced-page.test.ts`, because core cannot import io.
 4. **Physical size stays exact.** Only the page and the offset change: the artwork is translated
    so the fitted page's corner is the origin, and millimetres per source pixel (from the image
    density, `rasterImportGeometry`) are unchanged, as is the SVG stroke width of one source pixel.
@@ -48,7 +54,8 @@ from Potrace's documented behaviour only; no Potrace source was consulted (ADR-1
    the same way. No format records the offset back to the source image; a user who needs
    registration with the image keeps *Image size*.
 6. **Group islands for File > Export artwork as SVG.** The command now opens a short *Export SVG*
-   dialog with a *Group islands* checkbox (off by default, remembered for the session) and a
+   dialog with a *Group islands* checkbox (off by default, remembered for the session; Multi-File
+   Trace uses the same label and tooltip for its SVG grouping option) and a
    *Choose File...* button that opens the save picker inside the submit click, so the browser's
    user activation still covers it. Checked, the export passes `groupContours: true` to
    `exportSceneSvg`; unchecked, it passes no options, so the file is unchanged. PDF, EPS, DXF and
@@ -66,12 +73,17 @@ from Potrace's documented behaviour only; no Potrace source was consulted (ADR-1
   5 mm below its control points gives SVG `viewBox="0 0 60 25"` (control-point bounds would give
   30), a PDF MediaBox and EPS bounding boxes of 60 x 25 mm in points, DXF and GeoJSON coordinates
   measured from the fitted corner, and an unchanged one-pixel SVG stroke with the Centerline
-  stroke allowance.
+  stroke allowance. A 0.2 mm tall bar with no margin gives SVG `viewBox="0 0 50 1.059"`, the same
+  height as the PDF MediaBox and EPS HiResBoundingBox (no centring offset in either), and DXF and
+  GeoJSON coordinates on that grown page. The core hairline and minimum-side constants equal the
+  io writer constants.
 - `src/core/trace/traced-page-box.test.ts`: exact extent, outward grid rounding with a margin,
-  the stroke allowance for coarse and fine pixels, pixel pages, invalid margins, and the untouched
-  default.
+  the stroke allowance for coarse and fine pixels, the 3 pt minimum side (centred, odd step high,
+  a dot, a coarse grid, pixel pages untouched), invalid margins, and the untouched default.
 - `src/ui/commands/MultiFileTraceDialog.page.test.tsx`: default sends no page option; Fit to
-  artwork shows the margin, ignores an invalid entry, sends the page and is remembered.
+  artwork shows the margin, sends the page and is remembered; a margin of -2 or 1001 marks the
+  field invalid and the form does not submit until it is corrected; a cleared field means no
+  margin, so the trace never runs with a margin other than the one shown.
 - `src/ui/commands/ExportSvgDialog.test.tsx`, `src/ui/app/export-artwork-svg-group.test.ts`: the
   dialog opens only from the command, exports inside the click, sends no options by default and
   `groupContours: true` when checked, and remembers the choice.

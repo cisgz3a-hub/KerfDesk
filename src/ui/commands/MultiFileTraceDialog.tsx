@@ -130,10 +130,10 @@ export function MultiFileTraceDialog(props: {
           <input
             type="checkbox"
             checked={settings.groupContours}
-            title="Put each shape and its holes in their own group so editors select them together."
+            title="Put each filled shape and its holes in their own group so editors select them together."
             onChange={(event) => update({ groupContours: event.currentTarget.checked })}
           />
-          <span>Group each shape with its holes</span>
+          <span>Group islands</span>
         </label>
       ) : null}
       <div className="lf-dialog-body">

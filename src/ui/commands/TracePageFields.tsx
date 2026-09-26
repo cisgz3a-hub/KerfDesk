@@ -20,11 +20,14 @@ export function tracePageOutput(settings: TracePageSettings): {
     : {};
 }
 
+/** A blank field means no margin; a value the page cannot take is null. */
 function parseMargin(text: string): number | null {
-  if (text.trim() === '') return null;
+  if (text.trim() === '') return 0;
   const value = Number(text);
   return Number.isFinite(value) && value >= 0 && value <= MAX_TRACED_PAGE_MARGIN_MM ? value : null;
 }
+
+const MARGIN_RANGE_MESSAGE = `Enter a margin from 0 to ${MAX_TRACED_PAGE_MARGIN_MM} mm.`;
 
 export function TracePageFields(props: {
   readonly value: TracePageSettings;
@@ -62,10 +65,14 @@ export function TracePageFields(props: {
             aria-label="Page margin"
             title="Space added around the traced shapes on every side of the page."
             value={marginText}
+            aria-invalid={parseMargin(marginText) === null}
             onChange={(event) => {
               const text = event.currentTarget.value;
               setMarginText(text);
               const margin = parseMargin(text);
+              // An invalid field blocks the form's submit, so the trace never
+              // runs with a margin other than the one shown.
+              event.currentTarget.setCustomValidity(margin === null ? MARGIN_RANGE_MESSAGE : '');
               if (margin !== null) props.onChange({ marginMm: margin });
             }}
           />
