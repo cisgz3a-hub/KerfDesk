@@ -10,6 +10,7 @@
 import {
   DEFAULT_CNC_MACHINE_CONFIG,
   LASER_MACHINE_CONFIG,
+  machineKindOf,
   type CncMachineConfig,
   type CncMachineParams,
   type CncStock,
@@ -33,6 +34,7 @@ import { refreshAutomaticCncFeeds, seedCncModeSwitchLayers } from './cnc-auto-se
 import { pushUndo } from './scene-mutations';
 import { nextProbeSetupState } from './probe-setup-history-identity';
 import { projectWithParkedCnc } from './parked-cnc-machine';
+import { modeSwitchState } from './mode-switch-settings';
 import { cncMachineWithOwnFeeds } from '../../core/cnc/cnc-head-feeds';
 
 type MachineState = {
@@ -226,8 +228,14 @@ function machineKindStatePatch(state: MachineState, kind: MachineKind): Partial<
         })
       : preparedScene;
   const cachedCncMachine = current?.kind === 'cnc' ? current : state.cachedCncMachine;
+  const switched = modeSwitchState(
+    projectWithParkedCnc({ ...state.project, device, machine, scene }, cachedCncMachine),
+    state.jobPlacement,
+    machineKindOf(current),
+    kind,
+  );
   return {
-    project: projectWithParkedCnc({ ...state.project, device, machine, scene }, cachedCncMachine),
+    ...switched,
     cachedCncMachine,
     undoStack: pushUndo(state.project, state.undoStack),
     redoStack: [],

@@ -1,4 +1,4 @@
-// ADR-401: CNC keeps its own Max feed and Frame speed in the CNC step.
+// ADR-416: CNC keeps its own Max feed and Frame speed in the CNC step.
 import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { Simulate } from 'react-dom/test-utils';
@@ -44,7 +44,7 @@ function field(label: string): HTMLInputElement {
   return node;
 }
 
-describe('Machine Setup CNC speeds (ADR-401)', () => {
+describe('Machine Setup CNC speeds (ADR-416)', () => {
   it('shows the device speeds for a CNC setup that has none of its own yet', () => {
     renderStep(DEFAULT_CNC_MACHINE_CONFIG);
 

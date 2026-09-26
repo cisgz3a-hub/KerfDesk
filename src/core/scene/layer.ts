@@ -69,7 +69,10 @@ export type Layer = LayerOperationSettings & {
   /** Runtime-only binding identity on a materialized legacy sub-operation. */
   readonly bindingOperationId?: string;
   readonly visible: boolean;
+  // The active mode's Output switch. The other mode's waits in `parkedOutput`
+  // and the two change places on every Laser/CNC switch (ADR-416).
   readonly output: boolean;
+  readonly parkedOutput?: boolean;
   readonly subLayers: ReadonlyArray<LayerSubLayer>;
   readonly materialBinding?: LinkedMaterialBinding;
   /** Identifies generated calibration coupons so the 4040 direction policy can

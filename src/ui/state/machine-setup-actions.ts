@@ -1,7 +1,13 @@
 import { cncMachineWithOwnFeeds } from '../../core/cnc/cnc-head-feeds';
 import type { DeviceProfile } from '../../core/devices';
 import { deviceSupportsMachineKind } from '../../core/devices/device-profile';
-import type { CncMachineConfig, CncTool, MachineConfig, Project } from '../../core/scene';
+import {
+  machineKindOf,
+  type CncMachineConfig,
+  type CncTool,
+  type MachineConfig,
+  type Project,
+} from '../../core/scene';
 import { jobPlacementAfterProfileSelection } from '../job-placement';
 import { sceneAfterMachineSetup } from './cnc-machine-setup-scene';
 import { projectWithStockMaterial } from './cnc-project-material';
@@ -10,6 +16,7 @@ import {
   type CncStartupOperationDraft,
 } from './cnc-startup-setup';
 import { cncMachineWithCustomTools } from './machine-actions';
+import { modeSwitchState } from './mode-switch-settings';
 import { projectWithParkedCnc } from './parked-cnc-machine';
 import { nextProbeSetupState } from './probe-setup-history-identity';
 import { pushUndo } from './scene-mutations';
@@ -82,18 +89,25 @@ function replacementState(
     nextMachine,
     state.cncLiveCaps,
   );
-  const setupProject = projectWithParkedCnc(
-    projectWithStartupChanges(
-      projectWithMachine(state.project, nextProfile, nextMachine, scene),
-      state.cncLiveCaps,
-      startup,
+  // A setup that changes the mode swaps in that mode's placement and Output
+  // switches, as the Laser/CNC toggle does (ADR-416).
+  const switched = modeSwitchState(
+    projectWithParkedCnc(
+      projectWithStartupChanges(
+        projectWithMachine(state.project, nextProfile, nextMachine, scene),
+        state.cncLiveCaps,
+        startup,
+      ),
+      nextCachedCnc,
     ),
-    nextCachedCnc,
+    state.jobPlacement,
+    machineKindOf(state.project.machine),
+    nextMachine.kind,
   );
   return {
-    ...nextProbeSetupState(setupProject, state.probeSetupEpoch),
+    ...nextProbeSetupState(switched.project, state.probeSetupEpoch),
     jobPlacement: jobPlacementAfterProfileSelection(
-      state.jobPlacement,
+      switched.jobPlacement,
       state.project.device,
       nextProfile,
     ),

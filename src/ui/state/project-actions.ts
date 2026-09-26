@@ -1,6 +1,7 @@
 import { createProject, machineKindOf, type Project } from '../../core/scene';
 import { loneSelectableArtworkId } from './lone-selectable-artwork';
 import { currentMaterialLibraryState } from './material-library-actions';
+import { modeSwitchState } from './mode-switch-settings';
 import { projectWithParkedCnc } from './parked-cnc-machine';
 import {
   resolveProjectMachineCapability,
@@ -105,10 +106,15 @@ function keepCurrentMachinePatch(
   // Keeping a laser machine parks the opened file's CNC setup, not drops it.
   const parked =
     openedMachine?.kind === 'cnc' ? openedMachine : (state.project.parkedCncMachine ?? null);
-  const project = projectWithParkedCnc(kept, parked);
+  const switched = modeSwitchState(
+    projectWithParkedCnc(kept, parked),
+    state.jobPlacement,
+    machineKindOf(openedMachine),
+    machineKindOf(kept.machine),
+  );
   return {
-    project,
-    cachedCncMachine: project.parkedCncMachine ?? state.cachedCncMachine,
+    ...switched,
+    cachedCncMachine: switched.project.parkedCncMachine ?? state.cachedCncMachine,
     projectBedReconciliation: null,
     dirty: true,
   };

@@ -35,20 +35,25 @@ export type ProjectOptimizationSettings = {
   readonly startPoint: 'machine-origin' | 'job-lower-left' | 'job-center';
 };
 
+export type ProjectJobPlacement = {
+  readonly startFrom: 'absolute' | 'current-position' | 'user-origin' | 'verified-origin';
+  readonly anchor:
+    | 'front-left'
+    | 'front-center'
+    | 'front-right'
+    | 'center-left'
+    | 'center'
+    | 'center-right'
+    | 'back-left'
+    | 'back-center'
+    | 'back-right';
+};
+
 export type ProjectJobSetup = {
-  readonly placement: {
-    readonly startFrom: 'absolute' | 'current-position' | 'user-origin' | 'verified-origin';
-    readonly anchor:
-      | 'front-left'
-      | 'front-center'
-      | 'front-right'
-      | 'center-left'
-      | 'center'
-      | 'center-right'
-      | 'back-left'
-      | 'back-center'
-      | 'back-right';
-  };
+  // The active mode's placement. The other mode's waits in `parkedPlacement`
+  // and the two change places on every Laser/CNC switch (ADR-416).
+  readonly placement: ProjectJobPlacement;
+  readonly parkedPlacement?: ProjectJobPlacement;
   readonly outputScope: {
     readonly cutSelectedGraphics: boolean;
     readonly useSelectionOrigin: boolean;

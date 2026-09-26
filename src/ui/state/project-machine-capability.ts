@@ -10,6 +10,7 @@ import {
 } from '../../core/scene';
 import { cncMachineWithOwnFeeds } from '../../core/cnc/cnc-head-feeds';
 import { cncMachineWithReusableTools } from './machine-actions';
+import { projectForModeSwitch } from './mode-switch-settings';
 import { projectWithParkedCnc } from './parked-cnc-machine';
 
 export type ProjectMachineCapabilityLoadResult =
@@ -76,12 +77,14 @@ function projectForKind(
   machineKind: MachineKind,
   customTools: ReadonlyArray<CncTool>,
 ): Project {
-  if (machineKind === machineKindOf(project.machine)) return project;
+  const currentKind = machineKindOf(project.machine);
+  if (machineKind === currentKind) return project;
+  const switched = projectForModeSwitch(project, currentKind, machineKind);
   if (machineKind === 'laser') {
     const parked = project.machine?.kind === 'cnc' ? project.machine : null;
-    return projectWithParkedCnc({ ...project, machine: LASER_MACHINE_CONFIG }, parked);
+    return projectWithParkedCnc({ ...switched, machine: LASER_MACHINE_CONFIG }, parked);
   }
-  return { ...project, machine: cncMachineFor(project, customTools) };
+  return { ...switched, machine: cncMachineFor(project, customTools) };
 }
 
 function cncMachineFor(project: Project, customTools: ReadonlyArray<CncTool>): CncMachineConfig {

@@ -1,4 +1,4 @@
-import { LAYER_DEFAULTS, type Layer } from '../../core/scene';
+import { LAYER_DEFAULTS, type Layer, type MachineKind } from '../../core/scene';
 import { normalizeLayer } from '../../io/project/normalize-layer';
 import { validateProjectLayer } from '../../io/project/project-layer-shape-validator';
 import type { LayerDefaultsState } from '../state/layer-default-actions';
@@ -7,7 +7,7 @@ import type { LayerDefaultsState } from '../state/layer-default-actions';
 // and never carries a CNC block. New CNC operations take their bit, feeds and
 // depth from Startup Setup and the stock material instead, so a laser default
 // can never turn every new router cut into the last CNC operation it saw.
-export type LayerDefaultSettings = Partial<Omit<Layer, 'id' | 'color' | 'cnc'>>;
+export type LayerDefaultSettings = Partial<Omit<Layer, 'id' | 'color' | 'cnc' | 'parkedOutput'>>;
 
 type StorageLike = Pick<Storage, 'getItem' | 'setItem' | 'removeItem'>;
 
@@ -15,27 +15,42 @@ type StorageLike = Pick<Storage, 'getItem' | 'setItem' | 'removeItem'>;
 // a reusable setting. A saved 'baseline' marker would let every new layer skip
 // the verified-offset rule for bidirectional scanning (scan-direction-policy.ts),
 // so neither is captured, and neither is applied from an older saved default.
-export function captureLayerDefaultSettings(layer: Layer): LayerDefaultSettings {
+// Its Output value is the laser Output switch: `output` in Laser mode,
+// `parkedOutput` in CNC mode (ADR-416), so CNC's switch is never saved or set.
+export function captureLayerDefaultSettings(
+  layer: Layer,
+  machineKind: MachineKind = 'laser',
+): LayerDefaultSettings {
   const {
     id: _id,
     color: _color,
     scanOffsetCalibrationMode: _calibrationMode,
     bindingOperationId: _bindingOperationId,
     cnc: _cnc,
+    output,
+    parkedOutput,
     ...settings
   } = layer;
-  return settings;
+  return { ...settings, output: machineKind === 'cnc' ? (parkedOutput ?? output) : output };
 }
 
-export function applyLayerDefaultSettings(layer: Layer, settings: LayerDefaultSettings): Layer {
+export function applyLayerDefaultSettings(
+  layer: Layer,
+  settings: LayerDefaultSettings,
+  machineKind: MachineKind = 'laser',
+): Layer {
   const {
     scanOffsetCalibrationMode: _calibrationMode,
     bindingOperationId: _bindingOperationId,
+    output,
     ...artwork
   } = settings;
+  const laserOutput =
+    output === undefined ? {} : machineKind === 'cnc' ? { parkedOutput: output } : { output };
   return {
     ...layer,
     ...withoutCncBlock(artwork),
+    ...laserOutput,
     id: layer.id,
     color: layer.color,
   };

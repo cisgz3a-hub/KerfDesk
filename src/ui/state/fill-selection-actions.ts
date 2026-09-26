@@ -10,6 +10,7 @@ import {
   type Project,
   type Scene,
   type SceneObject,
+  machineKindOf,
 } from '../../core/scene';
 import { applyLayerDefaultSettings } from '../layers/layer-default-settings';
 import { defaultSettingsForOperation, type LayerDefaultsState } from './layer-default-actions';
@@ -83,7 +84,7 @@ function isolateSelectionToNewFillOperation(
     created.operation,
   );
   const withDefaults = {
-    ...applyLayerDefaultSettings(created.operation, defaults),
+    ...applyLayerDefaultSettings(created.operation, defaults, machineKindOf(state.project.machine)),
     mode: 'fill' as const,
   };
   const machine = state.project.machine;

@@ -142,7 +142,7 @@ describe('handleSaveTiledGcode', () => {
   // export, so it must now be SHOWN once for the set rather than silently
   // dropped — otherwise the fix trades a refusal for silence.
   // Tiled Save is CNC only, and laser-only pre-emit findings such as the
-  // laser-off seek feed never reach a router job (ADR-401). Every CNC pre-emit
+  // laser-off seek feed never reach a router job (ADR-416). Every CNC pre-emit
   // finding refuses the save instead (blocking-codes.ts).
   it('does not toast a laser-only pre-emit advisory after a tiled CNC save', async () => {
     const base = tiledCncProject();

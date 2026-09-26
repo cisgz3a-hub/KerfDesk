@@ -33,6 +33,7 @@ export function validateProjectLayer(layer: unknown, path: string): string | nul
     requirePositiveInteger(layer, `${path}.passes`),
     requireBoolean(layer, `${path}.visible`),
     requireBoolean(layer, `${path}.output`),
+    optionalBoolean(layer, `${path}.parkedOutput`),
     optionalBoolean(layer, `${path}.airAssist`),
     optionalNumber(layer, `${path}.kerfOffsetMm`),
     optionalBoolean(layer, `${path}.tabsEnabled`),
