@@ -50,14 +50,17 @@ async function traceWith(
 }
 
 const target = uniformNoiseImage(96, 192);
+// Photo shading and Centerline never run the contour topology repair, so for
+// them only the output hash is compared.
+const REPAIRING_PRESETS = new Set(['Line Art', 'Edge Detection', 'Smooth', 'Sharp']);
 const ring = PERCEPTUAL_FIXTURES.find((fixture) => fixture.name === 'ring-annulus')!.image;
 
 describe('trace independence', () => {
-  it.each(['Line Art', 'Sharp'])(
+  it.each(['Line Art', 'Photo shading', 'Centerline', 'Edge Detection', 'Smooth', 'Sharp'])(
     '%s: a trace after other traces equals the same trace in a fresh module instance',
     async (preset) => {
       const fresh = await traceWith(await freshTracer(), target, preset);
-      expect(fresh.rounds.length).toBeGreaterThan(0);
+      expect(fresh.rounds.length > 0).toBe(REPAIRING_PRESETS.has(preset));
 
       const tracer = await freshTracer();
       await traceWith(tracer, uniformNoiseImage(80, 7), 'Sharp');
