@@ -109,4 +109,35 @@ describe('traced containment forest persistence (ADR-406)', () => {
       expect(carriedSubpathParents(reloadedPath(json))).toEqual([-1, 0, 1]);
     }
   });
+
+  it('loads a save written before the forest existed, with no forest', () => {
+    const json = serializeProject(projectWith({ color: '#000000', polylines }));
+    expect(json).not.toContain('subpathNesting');
+    const path = reloadedPath(json);
+    expect(path.polylines).toHaveLength(3);
+    expect(carriedSubpathParents(path)).toBeNull();
+  });
+
+  it.each<[string, unknown]>([
+    ['a non-array parents list', { parents: 'x', geometryKey: 'k' }],
+    ['a parent after its child', { parents: [-1, 2, 0], geometryKey: 'k' }],
+    ['a missing key', { parents: [-1, 0, 1] }],
+    ['a stale key', null],
+  ])('loads a save whose forest has %s and ignores the forest', (_name, broken) => {
+    const nested = withSubpathNesting({ color: '#000000', polylines }, [-1, 0, 1]);
+    const saved = JSON.parse(serializeProject(projectWith(nested))) as {
+      scene: { objects: Array<{ paths: Array<Record<string, unknown>> }> };
+    };
+    const savedPath = saved.scene.objects[0]!.paths[0]!;
+    if (broken === null) {
+      // The geometry moved after the forest was written.
+      const rings = savedPath['polylines'] as Array<{ points: Array<{ x: number }> }>;
+      rings[2]!.points[0]!.x += 1;
+    } else {
+      savedPath['subpathNesting'] = broken;
+    }
+    const path = reloadedPath(JSON.stringify(saved));
+    expect(path.polylines).toHaveLength(3);
+    expect(carriedSubpathParents(path)).toBeNull();
+  });
 });

@@ -201,42 +201,47 @@ describe('traced containment forest (ADR-406)', () => {
     expectFillRulesAgree(path, 64, 64);
   });
 
-  it('a dense blob field: forest consistent, fill rules agree, Break Apart unchanged', () => {
-    let state = 7;
-    const next = (): number => {
-      state = (Math.imul(state, 1103515245) + 12345) >>> 0;
-      return state / 4294967296;
-    };
-    const blobs = [
-      // Two wide rings, so blobs land inside holes inside holes.
-      { x: 42, y: 44, r: 40, hole: 0.8 },
-      { x: 82, y: 80, r: 34, hole: 0.75 },
-      ...Array.from({ length: 60 }, () => ({
-        x: next() * 120,
-        y: next() * 120,
-        r: 2.5 + next() * 6,
-        hole: next() * 0.6,
-      })),
-    ];
-    const image = imageOf(120, 120, (x, y) => {
-      let covers = 0;
-      for (const blob of blobs) {
-        const d = Math.hypot(x - blob.x, y - blob.y);
-        if (d < blob.r && d >= blob.r * blob.hole) covers += 1;
+  // Three full traces of a 120 px field: well past the default 5 s on a busy runner.
+  it(
+    'a dense blob field: forest consistent, fill rules agree, Break Apart unchanged',
+    { timeout: 60_000 },
+    () => {
+      let state = 7;
+      const next = (): number => {
+        state = (Math.imul(state, 1103515245) + 12345) >>> 0;
+        return state / 4294967296;
+      };
+      const blobs = [
+        // Two wide rings, so blobs land inside holes inside holes.
+        { x: 42, y: 44, r: 40, hole: 0.8 },
+        { x: 82, y: 80, r: 34, hole: 0.75 },
+        ...Array.from({ length: 60 }, () => ({
+          x: next() * 120,
+          y: next() * 120,
+          r: 2.5 + next() * 6,
+          hole: next() * 0.6,
+        })),
+      ];
+      const image = imageOf(120, 120, (x, y) => {
+        let covers = 0;
+        for (const blob of blobs) {
+          const d = Math.hypot(x - blob.x, y - blob.y);
+          if (d < blob.r && d >= blob.r * blob.hole) covers += 1;
+        }
+        return covers % 2 === 1;
+      });
+      for (const preset of PRESETS) {
+        const path = trace(image, preset);
+        const depths = expectConsistentForest(path);
+        // Smooth's larger speckle floor drops the smallest islands.
+        expect(Math.max(...depths)).toBeGreaterThanOrEqual(preset === 'Smooth' ? 1 : 2);
+        expect(depths.length).toBeGreaterThan(20);
+        expectFillRulesAgree(path, 120, 120);
+        // The carried forest and the probe vote agree on this drawing.
+        expect(groupSubpathsByOuterShape(path)).toEqual(
+          groupSubpathsByOuterShape(withoutSubpathNesting(path)),
+        );
       }
-      return covers % 2 === 1;
-    });
-    for (const preset of PRESETS) {
-      const path = trace(image, preset);
-      const depths = expectConsistentForest(path);
-      // Smooth's larger speckle floor drops the smallest islands.
-      expect(Math.max(...depths)).toBeGreaterThanOrEqual(preset === 'Smooth' ? 1 : 2);
-      expect(depths.length).toBeGreaterThan(20);
-      expectFillRulesAgree(path, 120, 120);
-      // The carried forest and the probe vote agree on this drawing.
-      expect(groupSubpathsByOuterShape(path)).toEqual(
-        groupSubpathsByOuterShape(withoutSubpathNesting(path)),
-      );
-    }
-  });
+    },
+  );
 });

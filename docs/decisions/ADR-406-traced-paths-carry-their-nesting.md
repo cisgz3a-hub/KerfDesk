@@ -126,7 +126,41 @@ Options considered:
 
 ### Measurements
 
-[filled below]
+Bake-off harness (owl and hummingbird, TRACE_AUDIT-gated, one timing run), this decision
+(`7f88e6375`) against ADR-405 (`a4e3954a4`) and main (`fa8939b8d`). Crossings are the harness's
+proper crossings of the output flattened within 0.02 source px.
+
+| art / preset | IoU main / ADR-405 / this | crossings main / ADR-405 / this |
+| --- | --- | --- |
+| owl Line Art | 0.8655 / 0.8947 / 0.8947 | 2 / 1 / 0 |
+| owl Line Art, luma | 0.8655 / 0.8947 / 0.8947 | 2 / 1 / 0 |
+| owl Sharp | 0.9164 / 0.9231 / 0.9231 | 0 / 96 / 0 |
+| owl Smooth | 0.8389 / 0.8795 / 0.8794 | 0 / 4 / 2 |
+| hummingbird Line Art | 0.8147 / 0.8448 / 0.8448 | 0 / 0 / 0 |
+| hummingbird Line Art, luma | 0.8490 / 0.8839 / 0.8839 | 1 / 3 / 2 |
+| hummingbird Sharp | 0.9129 / 0.9186 / 0.9187 | 2 / 68 / 0 |
+| hummingbird Smooth | 0.8204 / 0.8600 / 0.8600 | 0 / 1 / 0 |
+
+- **The curves do not cross.** A probe flattening the same curves within 0.001 px found 0
+  crossings in all nine owl, owl@2x and hummingbird cases (Line Art, luma, Sharp, Smooth). The 2 + 2
+  the bake-off still counts are flattening artefacts: in hummingbird luma two adjacent segments leave
+  a spike tip 0.24 px long, in Smooth owl two legs of one ring pass within less than 0.02 px, and
+  two independent 0.02 px flattenings of them cross. Owl@2x shows a few such artefacts in Line
+  Art and Sharp at 0.02 px and none at 0.001 px.
+- **Output size:** segments +0.0 to +0.2 percent (owl Line Art 34760 to 34819), contour counts
+  unchanged; Sharp SVG bytes fall 3 to 4 percent, IoU moves by at most 0.0001.
+- **Cost of the curve guard**, same process, guard off then on, two runs each: owl Line Art 9.6-10.3
+  to 10.3-10.4 s (+0 to 9 percent), owl Sharp 12.7-13.1 to 15.0-15.2 s (+15 to 19 percent),
+  hummingbird Line Art 6.0-6.1 to 6.6-6.9 s (+10 to 13 percent), hummingbird Sharp 8.2-9.2 to
+  9.8-10.0 s (+9 to 20 percent). The forest itself is one integer sweep per pixel row and does not
+  show above noise. The bake-off's single timing run (noisy, other worktrees active) read owl Line
+  Art 8.4 to 10.0 s and hummingbird Line Art 5.4 to 6.5 s against ADR-405.
+- **Tests:** six nested square bands (depths 0 to 5, outers first) and B, 8 and @ glyph topologies
+  and islands inside holes in all three presets; a thin hollow C whose bounds-centre probe reads
+  depths `[0, 0]` without the forest and `[0, 1]` with it (inside-first order of the compiled job
+  flips the same way); a 62-blob field with rings inside holes; even-odd and nonzero agree at every
+  sample of every fixture; saves without the field, with a malformed field or with moved geometry
+  load and fall back to the probe.
 
 ### Consequences
 
