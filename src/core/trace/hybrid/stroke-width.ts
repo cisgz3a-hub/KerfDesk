@@ -17,12 +17,27 @@ const WINDOW_PX = 6;
 export type StrokeWidthProfile = {
   readonly medianPx: number;
   readonly spreadPx: number;
+  /** Clean cross-sections: where each sample sits and how far (px, along
+   *  `normal`) the true centre of the ink lies from it. */
+  readonly sections: ReadonlyArray<CrossSection>;
+};
+
+export type CrossSection = {
+  readonly p: Vec2;
+  readonly normal: Vec2;
+  readonly offsetPx: number;
 };
 
 /** Widths across the stroke, or null when it is too short to say. Widths are
  *  measured every half pixel, then averaged over a few-pixel window: a
  *  diagonal hairline's staircase makes single cross-sections swing by a pixel
- *  even when the pen width never changed. */
+ *  even when the pen width never changed.
+ *
+ *  A cross-section that runs off the end of its march is measuring another
+ *  line (at a junction the normal runs along the line that meets this one),
+ *  not this stroke. It, and the samples within half a gate width of it (the
+ *  junction's fillet), are dropped, and windows only average unbroken runs of
+ *  clean samples; so a steady pen line that meets another keeps its width. */
 export function strokeWidthProfile(
   points: ReadonlyArray<Vec2>,
   mask: InkMask,
@@ -30,26 +45,65 @@ export function strokeWidthProfile(
 ): StrokeWidthProfile | null {
   const samples = resample(points, SAMPLE_STEP_PX);
   const limit = maxWidthPx * 2 + 2;
-  const widths: number[] = [];
+  const measured: Array<(CrossSection & { readonly widthPx: number }) | null> = [];
   for (let i = 0; i < samples.length; i += 1) {
     const p = samples[i];
     const normal = normalAt(samples, i);
     if (p === undefined || normal === null) continue;
-    widths.push(march(mask, p, normal, limit) + march(mask, p, negate(normal), limit));
+    const ahead = march(mask, p, normal, limit);
+    const behind = march(mask, p, negate(normal), limit);
+    measured.push(
+      ahead >= limit || behind >= limit
+        ? null
+        : { p, normal, offsetPx: (ahead - behind) / 2, widthPx: ahead + behind },
+    );
   }
+  const clean = dropNearDirty(measured, Math.ceil(Math.max(1, maxWidthPx / 2) / SAMPLE_STEP_PX));
   const window = Math.max(1, Math.round(WINDOW_PX / SAMPLE_STEP_PX));
-  if (widths.length < window) return null;
-  const means: number[] = [];
-  let sum = 0;
-  for (let i = 0; i < widths.length; i += 1) {
-    sum += widths[i] ?? 0;
-    if (i >= window) sum -= widths[i - window] ?? 0;
-    if (i >= window - 1) means.push(sum / window);
-  }
-  means.sort((a, b) => a - b);
+  const means = windowMeans(clean, window);
+  const sections = clean.filter((s): s is NonNullable<typeof s> => s !== null);
+  // Too few clean samples for one window: the raw widths still say something
+  // when there are a couple of pixels of them.
+  const values =
+    means.length > 0 ? means : sections.length >= 4 ? sections.map((s) => s.widthPx) : [];
+  if (values.length === 0) return null;
+  values.sort((a, b) => a - b);
   const at = (q: number): number =>
-    means[Math.min(means.length - 1, Math.floor(q * means.length))] ?? 0;
-  return { medianPx: at(0.5), spreadPx: at(0.9) - at(0.1) };
+    values[Math.min(values.length - 1, Math.floor(q * values.length))] ?? 0;
+  return { medianPx: at(0.5), spreadPx: at(0.9) - at(0.1), sections };
+}
+
+function dropNearDirty<T>(items: ReadonlyArray<T | null>, reach: number): Array<T | null> {
+  const out = [...items];
+  items.forEach((item, i) => {
+    if (item !== null) return;
+    for (let k = Math.max(0, i - reach); k <= Math.min(items.length - 1, i + reach); k += 1) {
+      out[k] = null;
+    }
+  });
+  return out;
+}
+
+// Sliding means over each unbroken run of clean widths.
+function windowMeans(
+  sections: ReadonlyArray<{ readonly widthPx: number } | null>,
+  window: number,
+): number[] {
+  const means: number[] = [];
+  let run: number[] = [];
+  let sum = 0;
+  for (const section of [...sections, null]) {
+    if (section === null) {
+      run = [];
+      sum = 0;
+      continue;
+    }
+    run.push(section.widthPx);
+    sum += section.widthPx;
+    if (run.length > window) sum -= run[run.length - 1 - window] ?? 0;
+    if (run.length >= window) means.push(sum / window);
+  }
+  return means;
 }
 
 function resample(points: ReadonlyArray<Vec2>, step: number): Vec2[] {

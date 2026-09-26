@@ -38,7 +38,10 @@ import { contourFinishOptionsFor, contourPolylinesFromMaskSteps } from '../conto
 import { clipCurveOutsideRegion } from './clip-stroke-curves';
 import { discUnionSteps } from './disc-union';
 import { HYBRID_FILL_COLOR, HYBRID_STROKE_COLOR } from './hybrid-paths';
-import { constantStrokeWidthPx, strokeWidthProfile } from './stroke-width';
+import { isCompactBlob } from './compact-blob';
+import { recentredStroke } from './recentre-stroke';
+import { densePoints, floodEightConnected, pathLength } from './stroke-geometry';
+import { constantStrokeWidthPx, strokeWidthProfile, type StrokeWidthProfile } from './stroke-width';
 
 /** Max stroke width in source pixels when the caller supplies none. */
 export const DEFAULT_HYBRID_MAX_STROKE_WIDTH_PX = 4;
@@ -48,13 +51,12 @@ const SEED_MARGIN_PX = 0.5;
 // Width groups share a ColoredPath when their widths round alike (px).
 const WIDTH_QUANTUM_PX = 0.25;
 // A stroke whose measured pen width exceeds the gate by more than this (px)
-// is ink the pen could not have drawn: it goes to the fill (the measurement
-// resolves widths to about half a pixel).
-const OVERWIDE_TOLERANCE_PX = 0.5;
+// is ink the pen could not have drawn: it goes to the fill. One width quantum:
+// a stroke never carries a width that rounds above the Max stroke width, and
+// the same test decides an isolated line and one running into a shape.
+const OVERWIDE_TOLERANCE_PX = WIDTH_QUANTUM_PX;
 // How far (px) a stroke's cut end reaches on into the fill (see reachIntoFill).
 const JUNCTION_REACH_PX = 1;
-// Spacing (px) of the stroke samples that place a stroke's discs.
-const DISC_STEP_PX = 0.5;
 
 export function traceHybridPaths(image: RawImageData, options: TraceOptions): ColoredPath[] {
   return runTraceSteps(traceHybridPathsSteps(image, options));
@@ -71,7 +73,10 @@ export function* traceHybridPathsSteps(
   if (!mask.ink.includes(1)) return [];
   const distSq = yield* squaredDistanceFieldSteps(mask);
   const scale = effectivePixelScale(options);
-  const maxWidthPx = hybridMaxStrokeWidthPx(options) * scale;
+  // The 1 px floor applies on the working grid, after commit scaling, so a
+  // sub-pixel preview gate is not inflated before it is scaled up.
+  const maxWidthPx = Math.max(1, hybridMaxStrokeWidthPx(options) * scale);
+  const profileOf = profileCache(mask, maxWidthPx);
   // A w-pixel line's centre pixel sits (w + 1) / 2 from the paper.
   const gateRadius = (maxWidthPx + 1) / 2;
   const cores = yield* discUnionSteps({
@@ -84,6 +89,7 @@ export function* traceHybridPathsSteps(
   const { wide, strokes } = yield* withOverwideStrokesFilled(centre, mask, distSq, cores, {
     gateRadius,
     maxWidthPx,
+    profileOf,
   });
   const fillMask = yield* fillMaskSteps(mask, distSq, wide, strokes);
   const outlines =
@@ -94,8 +100,22 @@ export function* traceHybridPathsSteps(
     ...(outlines.length === 0
       ? []
       : withCanonicalTraceCurves([{ color: HYBRID_FILL_COLOR, polylines: outlines }])),
-    ...strokePaths(strokes, mask, maxWidthPx),
+    ...strokePaths(strokes, profileOf),
   ];
+}
+
+type ProfileOf = (stroke: KeptStroke) => StrokeWidthProfile | null;
+
+// Each stroke's width profile, measured once: the overwide filter and the
+// width grouping both read it, and an unclipped stroke keeps its points
+// array across the second clipping pass.
+function profileCache(mask: InkMask, maxWidthPx: number): ProfileOf {
+  const cache = new WeakMap<ReadonlyArray<Vec2>, StrokeWidthProfile | null>();
+  return (stroke) => {
+    const points = stroke.polyline.points;
+    if (!cache.has(points)) cache.set(points, strokeWidthProfile(points, mask, maxWidthPx));
+    return cache.get(points) ?? null;
+  };
 }
 
 export function hybridMaxStrokeWidthPx(options: TraceOptions): number {
@@ -127,27 +147,6 @@ function wideCoreRadii(mask: InkMask, distSq: Float64Array, gateRadius: number):
   return radiusSq;
 }
 
-// Breadth-first eight-neighbour flood from `queue` (already claimed by the
-// caller). `claim` returns true when it takes a neighbour into the region.
-function floodEightConnected(
-  width: number,
-  height: number,
-  queue: number[],
-  claim: (index: number) => boolean,
-): void {
-  // The array iterator reads the live length, so pushed pixels are visited.
-  for (const i of queue) {
-    const x = i % width;
-    const y = (i - x) / width;
-    for (let ny = Math.max(0, y - 1); ny <= Math.min(height - 1, y + 1); ny += 1) {
-      for (let nx = Math.max(0, x - 1); nx <= Math.min(width - 1, x + 1); nx += 1) {
-        const n = ny * width + nx;
-        if (claim(n)) queue.push(n);
-      }
-    }
-  }
-}
-
 type Centre = { readonly polylines: Polyline[]; readonly marks: ReadonlySet<Polyline> };
 
 // The disc gate reads the inscribed radius at pixel centres, so a pen line
@@ -162,12 +161,17 @@ function* withOverwideStrokesFilled(
   mask: InkMask,
   distSq: Float64Array,
   cores: Uint8Array,
-  gate: { readonly gateRadius: number; readonly maxWidthPx: number },
+  gate: {
+    readonly gateRadius: number;
+    readonly maxWidthPx: number;
+    readonly profileOf: ProfileOf;
+  },
 ): TraceSteps<{ wide: Uint8Array; strokes: KeptStroke[] }> {
   const strokes = clippedStrokes(centre, mask, cores, gate.gateRadius);
   const overwide = strokes.filter((stroke) => {
     if (stroke.mark) return false;
-    const profile = strokeWidthProfile(stroke.polyline.points, mask, gate.maxWidthPx);
+    if (isCompactBlob(stroke.polyline.points, mask, distSq, gate)) return true;
+    const profile = gate.profileOf(stroke);
     return profile !== null && profile.medianPx > gate.maxWidthPx + OVERWIDE_TOLERANCE_PX;
   });
   if (overwide.length === 0) return { wide: cores, strokes };
@@ -349,23 +353,26 @@ function componentsHoldingWideInk(
 // Strokes without a steady width share one path; each steady pen width gets
 // its own path carrying strokeWidthMm (local units: working pixels here, the
 // object transform takes them to millimetres like every other coordinate).
-function strokePaths(
-  strokes: ReadonlyArray<KeptStroke>,
-  mask: InkMask,
-  maxWidthPx: number,
-): ColoredPath[] {
+// A stroke that carries a width is recentred on its ink first: the skeleton
+// of an even-width line sits on a pixel-centre row, half a pixel off, which a
+// hairline never showed but a round-pen outline burns.
+function strokePaths(strokes: ReadonlyArray<KeptStroke>, profileOf: ProfileOf): ColoredPath[] {
   const plain: KeptStroke[] = [];
   const byWidth = new Map<number, KeptStroke[]>();
   for (const stroke of strokes) {
-    const width = stroke.mark
-      ? undefined
-      : constantStrokeWidthPx(strokeWidthProfile(stroke.polyline.points, mask, maxWidthPx));
-    if (width === undefined) {
+    const profile = stroke.mark ? null : profileOf(stroke);
+    const width = constantStrokeWidthPx(profile);
+    if (width === undefined || profile === null) {
       plain.push(stroke);
       continue;
     }
     const key = Math.max(WIDTH_QUANTUM_PX, Math.round(width / WIDTH_QUANTUM_PX) * WIDTH_QUANTUM_PX);
-    byWidth.set(key, [...(byWidth.get(key) ?? []), stroke]);
+    let group = byWidth.get(key);
+    if (group === undefined) {
+      group = [];
+      byWidth.set(key, group);
+    }
+    group.push(recentredStroke(stroke, profile.sections));
   }
   const paths: ColoredPath[] = [];
   if (plain.length > 0) paths.push(strokePath(plain));
@@ -381,32 +388,4 @@ function strokePath(strokes: ReadonlyArray<KeptStroke>): ColoredPath {
     polylines: strokes.map((s) => s.polyline),
     curves: strokes.map((s) => s.curve),
   };
-}
-
-// The polyline's vertices plus points every half pixel along each segment: a
-// straight stroke's fitted polyline is just its two ends, but every pixel it
-// crosses needs its disc.
-function* densePoints(points: ReadonlyArray<Vec2>): Generator<Vec2> {
-  const first = points[0];
-  if (first !== undefined) yield first;
-  for (let i = 1; i < points.length; i += 1) {
-    const a = points[i - 1];
-    const b = points[i];
-    if (a === undefined || b === undefined) continue;
-    const steps = Math.ceil(Math.hypot(b.x - a.x, b.y - a.y) / DISC_STEP_PX);
-    for (let k = 1; k <= steps; k += 1) {
-      const t = k / steps;
-      yield { x: a.x + (b.x - a.x) * t, y: a.y + (b.y - a.y) * t };
-    }
-  }
-}
-
-function pathLength(points: ReadonlyArray<Vec2>): number {
-  let length = 0;
-  for (let i = 1; i < points.length; i += 1) {
-    const a = points[i - 1];
-    const b = points[i];
-    if (a !== undefined && b !== undefined) length += Math.hypot(b.x - a.x, b.y - a.y);
-  }
-  return length;
 }

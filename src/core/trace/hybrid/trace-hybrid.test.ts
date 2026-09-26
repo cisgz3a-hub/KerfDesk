@@ -287,3 +287,81 @@ describe('Line + fill trace', () => {
     expect(strokes(paths).flatMap((p) => p.polylines)).toHaveLength(1);
   });
 });
+
+describe('Line + fill review fixes', () => {
+  // Every pen width a trace carries, in px.
+  function widths(paths: ReadonlyArray<ColoredPath>): Array<number | undefined> {
+    return strokes(paths).flatMap((p) => p.polylines.map(() => p.strokeWidthMm));
+  }
+
+  it('keeps the width of steady 3 px strokes that meet at a T or an I', () => {
+    for (const stem of [30, 60, 100]) {
+      const t = canvas(120, 140);
+      pen(t, { x: 10, y: 20.5 }, { x: 110, y: 20.5 }, 3);
+      pen(t, { x: 60.5, y: 20.5 }, { x: 60.5, y: 20.5 + stem }, 3);
+      const got = widths(traceHybridPaths(toImage(t), HYBRID));
+      expect(got.length).toBeGreaterThanOrEqual(2);
+      for (const w of got) expect(w).toBeCloseTo(3, 0);
+    }
+    const i = canvas(120, 140);
+    pen(i, { x: 10, y: 15.5 }, { x: 110, y: 15.5 }, 3);
+    pen(i, { x: 10, y: 125.5 }, { x: 110, y: 125.5 }, 3);
+    pen(i, { x: 60.5, y: 15.5 }, { x: 60.5, y: 125.5 }, 3);
+    const got = widths(traceHybridPaths(toImage(i), HYBRID));
+    expect(got.length).toBeGreaterThanOrEqual(3);
+    for (const w of got) expect(w).toBeCloseTo(3, 0);
+  });
+
+  it('never burns a round dot wider than the gate as an open dash', () => {
+    for (const r of [2.5, 2.6, 2.7, 2.8, 2.9, 3.0]) {
+      for (const offset of [0, 0.25, 0.5, 0.75]) {
+        const c = canvas(20, 20);
+        const centre = { x: 10 + offset, y: 10 + offset / 2 };
+        pen(c, centre, centre, 2 * r);
+        const paths = traceHybridPaths(toImage(c), HYBRID);
+        const open = strokes(paths).flatMap((p) => p.polylines.filter((pl) => !pl.closed));
+        expect(open, `r=${r} offset=${offset}`).toEqual([]);
+        expect(paths.length, `r=${r} offset=${offset}`).toBeGreaterThan(0);
+      }
+    }
+  });
+
+  it('decides a line just over the gate the same way alone and running into a shape', () => {
+    for (const deg of [0, 15, 30, 45]) {
+      const kinds: string[] = [];
+      for (const attached of [false, true]) {
+        const c = canvas(140, 100);
+        const a = (deg * Math.PI) / 180;
+        const end = { x: 20 + 60 * Math.cos(a), y: 50 + 60 * Math.sin(a) };
+        pen(c, { x: 20, y: 50 }, end, 4.5);
+        if (attached) {
+          const ex = Math.round(end.x);
+          const ey = Math.round(end.y);
+          rect(c, ex - 5, ey - 20, ex + 25, ey + 20);
+        }
+        const paths = traceHybridPaths(toImage(c), HYBRID);
+        for (const w of widths(paths)) if (w !== undefined) expect(w).toBeLessThanOrEqual(4.25);
+        kinds.push(strokes(paths).length > 0 ? 'stroke' : 'fill');
+      }
+      expect(kinds[0], `${deg} deg`).toBe(kinds[1]);
+    }
+  });
+
+  it('centres a width-carrying stroke on its ink, not on a pixel row', () => {
+    for (const [w, centreY] of [
+      [2, 45],
+      [3, 45.5],
+      [4, 45],
+    ] as const) {
+      const c = canvas(90, 90);
+      pen(c, { x: 15, y: centreY }, { x: 75, y: centreY }, w);
+      const [path] = strokes(traceHybridPaths(toImage(c), HYBRID));
+      expect(path?.strokeWidthMm).toBe(w);
+      for (const p of path?.polylines[0]?.points ?? [])
+        expect(Math.abs(p.y - centreY)).toBeLessThan(0.2);
+      for (const curve of path?.curves ?? []) {
+        expect(Math.abs(curve.start.y - centreY)).toBeLessThan(0.2);
+      }
+    }
+  });
+});
