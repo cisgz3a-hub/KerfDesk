@@ -255,7 +255,7 @@ tail and follow that staircase; see Known gaps.
     Incremental span evaluation (reusing the previous extension's parameters) is the next lever;
     the exact part of it is done (Amendment 1), and the fit is no longer where most of the gap is.
     The topology repair's exact savings are Amendment 2, and its memory and the corner legs are
-    Amendment 3; what remains is the sample count.
+    Amendments 3 and 4; what remains is the sample count.
 - Node editing, SVG export, bounds and the laser commit read the carried cubics; the downscale and
   Region Enhance routes no longer lose them.
 
@@ -410,3 +410,60 @@ Status against the targets: not met. Owl Line Art is about 1.5x main and above t
 peak memory. The fit is about 44% of the perf-noise-512 trace in a CPU profile and has no known
 exact saving left (Amendment 1). The rest still grows with the sample count (2.62M points against
 main's 0.97M on perf-noise-1024).
+
+### Amendment 4 - on-demand edges, corner coverage and curve subdivision, same output (2026-09-27)
+
+A heap snapshot taken after round 0 of the topology repair (perf-noise-256, 116 MB live) showed
+one object per contour edge in two places: the contact cache's edge index, and the crossing index
+that membership builds for boundaries the cache has not lent it. Each crossing edge was a spread
+`{minX, minY, maxX, maxY, a, b}` with a property array and four boxed bounds. Five changes remove
+those objects and some finishing and curve-contact work without changing a coordinate:
+
+- The box index can be built over a flat bounds array with an item factory
+  (`ContourBoxIndex.overBoundsSteps`), and `overlapIdsSteps` walks overlapping pairs by item
+  number. Contour edges (`contour-edges.ts`) keep the ring's points and edge count; an edge object
+  is made only when something asks for one. The contact cache tests each pair from the points by
+  index and makes edges only for pairs that meet. The boxes, tree, pairs and contact choices are
+  the same.
+- Membership's own crossing index is now that edge index. It also holds horizontal edges and drops
+  a repeated closing point, which gives the same winding: a horizontal edge never crosses the ray,
+  and the dropped point adds only a horizontal edge. Cubic pieces for the curve guard are written
+  as a literal of known shape instead of a spread, so their fields stay in the object.
+- The wedge coverage behind the measured-apex field check (`contour-corner-field.ts`) computes its
+  row and column products once per pixel, by the same operations, so each of the 64 sample tests
+  compares the same two values. Its memo keys integer pixels by number.
+- `chainWithCorners` finds the corner after a crack through a typed array instead of a `Map`, and
+  steps the ring index from the same start.
+- The curve meet test (`compact-curve-meet.ts`) carries each piece's box and flatness through
+  subdivision. The box is taken once, when the piece is made, by the same `min` and `max`. The
+  flatness is measured the first time it is needed, so the piece that is kept while the other is
+  halved is not measured again.
+
+Equivalence instrument: the same FNV hash of every polyline vertex and curve coordinate, after
+each change, on owl Line Art, Sharp and Smooth, hummingbird Line Art and perf-noise-192, -256 and
+-512. perf-noise-1024 was checked at the end. The topology, membership, contact, box-index,
+corner and curve-contact test files pass.
+
+Measured (node bundles, one process per run, runs interleaved; owl from three interleaved
+rounds on a lightly loaded machine; wall times vary by about 15% between runs of the same code):
+
+| Case | Amendment 3 (`de96e0da7`) | After | main (`fa8939b8d`) |
+|---|---|---|---|
+| owl Line Art, whole trace | 5.3 to 6.1 s | 5.0 to 5.5 s | 3.5 to 3.7 s |
+| owl Line Art, peak RSS | 584 to 605 MB | 528 to 598 MB | 532 to 581 MB |
+| perf-noise-512 Line Art, whole trace | 19.1 to 20.0 s | 18.5 to 19.4 s | 10.7 to 11.3 s |
+| perf-noise-512 Line Art, peak RSS | 1,323 to 1,338 MB | 1,136 to 1,231 MB | 711 to 734 MB |
+| perf-noise-1024 Line Art, whole trace | 89 s | 80 s | 48 s |
+| perf-noise-1024 Line Art, peak RSS | 4.27 GB | 3.68 GB | 2.35 GB |
+
+On owl Line Art, timing wrappers show where the rest goes (they add their own overhead):
+finishing takes about 2.3 s, of which the fit is about 1.8 s and the corner dial's leg candidates
+about 0.8 s. The topology repair takes about 1.9 s, of which about 1.3 s is round 0. A CPU
+profile's self time for `chainWithCorners` (0.2 s) was misattributed: timed directly, it is
+23 ms.
+
+Status against the targets: owl Line Art's peak memory is now within main's run-to-run range, so
+that part of the memory target is met there. perf-noise-512 and -1024 still peak at 1.6x main,
+because live data grows with the 2.7x sample count; about a third of the round-0 heap on
+perf-noise-256 is boxed point coordinates. The time targets are still not met: owl is about 1.45x
+main, and perf-noise-1024 is 1.7x main.
