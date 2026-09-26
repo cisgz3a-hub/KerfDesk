@@ -70,9 +70,9 @@ Sierra variants).
 
 | ID | Gap | LightBurn | KerfDesk today | Size | Status |
 |---|---|---|---|---|---|
-| LBG-C01 | Perforation (cut length and skip length) on Line layers | `R/CutSettingsEditor/LineMode/` | Missing | S-M | BATCH 4 |
-| LBG-C02 | Overcut past the start of closed shapes | `R/CutSettingsEditor/LineMode/` | Missing for laser (CNC dogbone only) | S | BATCH 4 |
-| LBG-C03 | Image overscan you can set per operation | `R/CutSettingsEditor/ImageMode/` | Fixed 5 mm (`DEFAULT_OVERSCAN_MM`, `src/core/job/compile-job-raster.ts`) | S | BATCH 4 |
+| LBG-C01 | Perforation (cut length and skip length) on Line layers | `R/CutSettingsEditor/LineMode/` | Missing | S-M | Built (ADR-415) |
+| LBG-C02 | Overcut past the start of closed shapes | `R/CutSettingsEditor/LineMode/` | Missing for laser (CNC dogbone only) | S | Built (ADR-415) |
+| LBG-C03 | Image overscan you can set per operation | `R/CutSettingsEditor/ImageMode/` | Fixed 5 mm (`DEFAULT_OVERSCAN_MM`, `src/core/job/compile-job-raster.ts`) | S | Built (ADR-415). Follow-up: map LightBurn's perforation, overcut and overscan fields in `.lbrn`/`.clb` import |
 | LBG-C04 | Best start point and "choose corners" for closed shapes | `R/OptimizationSettings/` | Closed shapes start at their drawn start point (`src/core/job/segment-entry-index.ts`) | M | open |
 | LBG-C05 | Tabs: click-placed laser tabs, even spacing, maximum count, tab cut power | `R/AddTabs/` | Count, size and skip-inner only (`src/core/geometry/tabs-bridges.ts`) | M | open |
 | LBG-C06 | Image scan angle 0/90/180 and Angle Increment per pass | `R/CutSettingsEditor/ImageMode/` | Images always scan along X (`src/core/raster/raster-sweep-plan.ts`) | M-L | open |
@@ -156,7 +156,7 @@ Each batch is one pull request with its own decision record, tests and WORKFLOW.
 - **Batch 3 — everyday editing:** LBG-T01, LBG-T02, LBG-T03, LBG-F01, LBG-F02, LBG-F04. No G-code
   changes. Built in ADR-410.
 - **Batch 4 — Line and Image cut settings:** LBG-C01, LBG-C02, LBG-C03. Changes G-code only when an
-  operation turns one of them on.
+  operation turns one of them on. Built in ADR-415.
 - **Next candidates, in order:** LBG-T05, LBG-T07, LBG-T15, LBG-F03, LBG-F08, LBG-F12, LBG-C07,
   LBG-M02, LBG-M07, LBG-I04 (small, daily use), then LBG-C04, LBG-C05, LBG-I01, LBG-I02, LBG-C06,
   LBG-T04, LBG-T06, LBG-T08, LBG-T09, LBG-F06.

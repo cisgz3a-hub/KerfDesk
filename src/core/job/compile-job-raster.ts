@@ -19,9 +19,9 @@ import {
   operationOverrideForObject,
 } from '../scene/effective-operation';
 import type { JobDiagnostic, RasterGroup } from './job';
-import { DEFAULT_OVERSCAN_MM } from './compile-job-defaults';
 import { streamedRasterRowProvider } from './compile-job-raster-stream';
 import { effectiveObjectMinPowerPercent, effectiveObjectPowerPercent } from './object-power-scale';
+import { imageOverscanMmFor } from './operation-cut-extras';
 import { rasterBoundsInMachineCoords, type RasterMachineBounds } from './raster-bounds';
 import { decodeRasterLuma } from './raster-luma-decode';
 import { isRotatedRaster, rotatedMaskedRasterLuma } from './raster-rotated-sample';
@@ -143,7 +143,7 @@ function compileRasterGroup(
     pixelWidth,
     pixelHeight,
     bounds,
-    overscanMm: DEFAULT_OVERSCAN_MM,
+    overscanMm: imageOverscanMmFor(layer),
     dotWidthCorrectionMm: clamp(layer.dotWidthCorrectionMm, 0, lineIntervalMm),
     bidirectional: scanDirection.bidirectional,
     scanDirection,

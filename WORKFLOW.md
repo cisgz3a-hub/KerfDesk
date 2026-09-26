@@ -687,6 +687,22 @@ marks later edits as unapproved without changing the existing Frame/Start policy
 - `Scene.artworkOrder` keeps flattened object IDs for schema compatibility; run-unit grouping is a
   deterministic derivation and introduces no project-size cap beyond the existing scene budget.
 
+### F-A7a. Perforation, overcut and image overscan (ADR-415)
+
+1. **Advanced cut settings → Line detail → Perforation**: **Enable**, **Cut** and **Skip** (mm) cut
+   every line of the operation as dashes with uncut gaps. Closed shapes keep a full gap before their
+   start point, so no dash is longer than Cut and no gap shorter than Skip. Perforation applies after
+   kerf and tabs.
+2. **Overcut** (mm, 0 is off) keeps cutting past the start of each closed shape on the final pass
+   only, retracing its first edges, so the seam is cut through. Shapes opened by tabs or perforation
+   are not overcut.
+3. **Advanced cut settings → Image detail → Overscan** (0 to 25 mm, default 5) sets the laser-off
+   run-up at both ends of every scan line. The note under it says how much run-up this machine needs
+   to reach the operation's saved speed.
+4. Job Review lists these settings on the operation's detail line when they are set. Preview, Frame,
+   the time estimate and every output format follow them. With none set, output is unchanged.
+5. Material presets do not store them; applying a preset keeps what the operation has.
+
 ---
 
 ### F-A8. Preview

@@ -124,6 +124,36 @@ describe('operation settings clipboard', () => {
     expect(useStore.getState().undoStack).toHaveLength(0);
     expect(useStore.getState().dirty).toBe(false);
   });
+
+  it('pastes perforation, overcut and image overscan, and clears them from a plain source', () => {
+    arrangeTwoOperations();
+    const [sourceId, targetId] = operationIdsFor('O1');
+    if (sourceId === undefined || targetId === undefined) throw new Error('operations missing');
+    const extras = {
+      perforationEnabled: true,
+      perforationCutMm: 4,
+      perforationSkipMm: 0.5,
+      overcutMm: 1,
+      imageOverscanMm: 8,
+    };
+    useStore.getState().setLayerParam(sourceId, extras);
+    useStore.getState().copyLayerSettings(sourceId);
+    useStore.getState().pasteLayerSettings(targetId);
+    expect(operation(targetId)).toMatchObject(extras);
+
+    useStore.getState().setLayerParam(sourceId, {
+      perforationEnabled: undefined,
+      perforationCutMm: undefined,
+      perforationSkipMm: undefined,
+      overcutMm: undefined,
+      imageOverscanMm: undefined,
+    });
+    useStore.getState().copyLayerSettings(sourceId);
+    useStore.getState().pasteLayerSettings(targetId);
+    expect(operation(targetId)?.perforationEnabled).toBeUndefined();
+    expect(operation(targetId)?.overcutMm).toBeUndefined();
+    expect(operation(targetId)?.imageOverscanMm).toBeUndefined();
+  });
 });
 
 function arrangeTwoOperations(): void {
