@@ -373,27 +373,40 @@ function appendReliefPasses(
   const residualTransform = reliefMachineSpaceTransform(relief.transform).residualTransform;
   const result = reliefLadderFor(relief, settings, tool);
   if (result.kind === 'relief-materialization-failed') return result;
-  for (const pass of result.ladder.passes) {
-    if (pass.kind !== 'contour') continue;
-    const mapped = pass.polyline.map((p) =>
-      toMachineCoords(applyTransform(p, residualTransform), device),
-    );
-    const directed = enforceCutDirection(
-      [{ points: mapped, closed: pass.closed }],
-      settings.cutDirection ?? DEFAULT_CNC_LAYER_SETTINGS.cutDirection ?? 'climb',
-      'pocket',
-      machineFrameHandedness(device.origin),
-    )[0];
-    if (directed === undefined) continue;
+  const rings = result.ladder.passes.filter(
+    (pass): pass is CncContourPass => pass.kind === 'contour',
+  );
+  // The ladder cuts each level from the inside out, so every ring but the
+  // innermost meets its new stock outside itself, as a pocket ring does, and
+  // takes the pocket winding.
+  // One call orients the whole relief: the ladder winds every outer boundary
+  // positive and every island negative, which lets the call mirror the islands
+  // (ADR-252). Oriented one at a time, each island ring took an outer
+  // boundary's winding (ADR-427). A layer without a direction gets the
+  // default, Climb, since the ladder's own windings say nothing about the stock.
+  const directed = enforceCutDirection(
+    rings.map((pass) => ({
+      points: pass.polyline.map((p) =>
+        toMachineCoords(applyTransform(p, residualTransform), device),
+      ),
+      closed: pass.closed,
+    })),
+    settings.cutDirection ?? DEFAULT_CNC_LAYER_SETTINGS.cutDirection ?? 'climb',
+    'pocket',
+    machineFrameHandedness(device.origin),
+  );
+  rings.forEach((pass, index) => {
+    const ring = directed[index];
+    if (ring === undefined) return;
     // The ladder closes each ring on its first point, and direction
     // enforcement then moves the start to the middle of the longest segment.
     // That leaves the old closing point as a repeated vertex mid-ring and ends
     // the ring at the corner before its new start, half that segment short
     // (ADR-289 Amendment 1). Drop the repeat and close the ring at its new
     // start, as pocket rings are closed.
-    const points = withoutRepeatedPoints(directed.points);
-    passes.push(contourPassFromPolyline({ ...directed, points }, pass.zMm));
-  }
+    const points = withoutRepeatedPoints(ring.points);
+    passes.push(contourPassFromPolyline({ ...ring, points }, pass.zMm));
+  });
   return {
     kind: 'compiled',
     offsetFailed: result.ladder.offsetFailed,

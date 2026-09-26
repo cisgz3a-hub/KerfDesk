@@ -68,9 +68,10 @@ export type GcodeMetadata = {
  * inside it, and ADR-289 amendment 1's relief roughing rings that end where
  * they start and levels cleared to their centre above 50% stepover, and
  * ADR-154 amendment 2's adaptive pocket finishing rings that end where they
- * start.
+ * start, and ADR-427's relief roughing levels cut from the inside out with
+ * every ring in the requested direction and islands mirrored.
  */
-export const EMITTER_REVISION = 'adaptive-finish-ring-seams-20260927-v1';
+export const EMITTER_REVISION = 'relief-rings-inside-out-climb-20260927-v1';
 
 // Machine-specific assumption lines (ADR-103 defect fix): router exports
 // previously carried the laser-worded `$32=1 (laser mode)` banner. The S

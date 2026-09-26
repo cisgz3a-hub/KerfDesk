@@ -3937,11 +3937,16 @@ explicitly marked below; the remaining controls and user-facing flows are planne
    the layer's physical stepover: a percentage of the bit diameter, or for a
    tapered ball nose of the width it cuts over one level (ADR-368 Amendment 2).
    Each ring ends where it started. Above a 50% stepover, the stock a level's
-   rings leave standing (the level's centre, cusps between rings) is cleared
-   right after them (ADR-289 Amendment 1).
+   rings would leave standing (the level's centre, cusps between rings) gets
+   its own cleanup passes (ADR-289 Amendment 1).
 2. Passes run depth-major (whole level before stepping down) as a
-   clearing group — before any profile cuts. The preview's removal
-   shading shows the terraced relief forming.
+   clearing group — before any profile cuts. Each level is cut like a
+   pocket, from the inside out: the cleanup passes, then the innermost ring,
+   and the level's boundary ring last, one stepover deep along the wall.
+   Every ring follows the layer's cut direction, Climb unless the layer says
+   Conventional, and rings around an island run the opposite way to keep that
+   direction (ADR-427). The preview's removal shading shows the terraced
+   relief forming.
 3. Emitted G-code passes the plunged-travel invariant; scale is resolved
    before cutter geometry, then mirror/rotate/move placement is honored.
 

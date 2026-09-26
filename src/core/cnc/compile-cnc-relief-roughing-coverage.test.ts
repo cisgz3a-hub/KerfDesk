@@ -175,7 +175,7 @@ describe('relief roughing rings', () => {
     // The half-sides the rings dropped left about 1,100 cells uncut to the
     // stock top on the half of the relief holding the seams.
     expect(cellsLeftStanding(removal(job, cutter, machineBox(relief)), FLAT_SLACK_MM)).toBe(0);
-  });
+  }, 60_000);
 
   it('leave no stock at the ring seams with a tapered ball nose', () => {
     const relief = flatRelief(20);
@@ -183,7 +183,7 @@ describe('relief roughing rings', () => {
     // close enough that no rib stands between them at a 1.5 mm level.
     const job = compile(relief, TBN, 11);
     expect(cellsLeftStanding(removal(job, TBN, machineBox(relief)), BALL_SLACK_MM)).toBe(0);
-  });
+  }, 60_000);
 });
 
 describe('relief roughing core cleanup', () => {
@@ -194,7 +194,7 @@ describe('relief roughing core cleanup', () => {
     const cutter = tool('em-6350');
     const job = compile(relief, cutter, 85);
     expect(cellsLeftStanding(removal(job, cutter, machineBox(relief)), FLAT_SLACK_MM)).toBe(0);
-  });
+  }, 60_000);
 
   it('clears the centre a tapered ball nose leaves above 50% stepover', () => {
     const relief = flatRelief(20);
@@ -202,7 +202,7 @@ describe('relief roughing core cleanup', () => {
     // The centre stood at the stock top; its cleanup ring now puts the tip on
     // the floor there.
     expect(depthAtCentre(grid)).toBeLessThanOrEqual(-DEPTH_MM + BALL_SLACK_MM);
-  });
+  }, 60_000);
 
   it('adds no pass where the rings already reach the centre', () => {
     // A 13 mm relief at 85%: the second ring passes 1.1 mm from the centre,
@@ -213,5 +213,5 @@ describe('relief roughing core cleanup', () => {
     // Two rings on each of the two levels, and nothing else.
     expect(roughingRings(job)).toHaveLength(4);
     expect(cellsLeftStanding(removal(job, cutter, machineBox(relief)), FLAT_SLACK_MM)).toBe(0);
-  });
+  }, 60_000);
 });

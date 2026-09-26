@@ -20,3 +20,26 @@ export function isCounterClockwise(polyline: Polyline): boolean {
 export function reversedPolyline(polyline: Polyline): Polyline {
   return { ...polyline, points: [...polyline.points].reverse() };
 }
+
+/**
+ * The contours of ONE offset or boolean result, all reversed when the largest
+ * winds negative, so the outer boundaries come out positive and the holes
+ * negative. One result's holes always wind opposite its outer boundaries, and
+ * its largest contour is an outer boundary, but the engines disagree on the
+ * sign: marching squares winds outer boundaries positive, the offset engine
+ * negative. Contours from different results can be compared only after this.
+ */
+export function withOuterContoursPositive(
+  contours: ReadonlyArray<Polyline>,
+): ReadonlyArray<Polyline> {
+  let largestArea = 0;
+  let sign = 0;
+  for (const contour of contours) {
+    const area = signedAreaMm2(contour.points);
+    if (Math.abs(area) > largestArea) {
+      largestArea = Math.abs(area);
+      sign = Math.sign(area);
+    }
+  }
+  return sign < 0 ? contours.map((contour) => reversedPolyline(contour)) : contours;
+}

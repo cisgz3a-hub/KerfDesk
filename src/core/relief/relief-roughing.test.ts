@@ -2,8 +2,9 @@ import { describe, expect, it } from 'vitest';
 import { DEFAULT_DEVICE_PROFILE } from '../devices';
 import { compileCncJob } from '../cnc/compile-cnc-job';
 import { cncGrblStrategy } from '../output';
+import { signedAreaMm2 } from '../geometry/polyline-orientation';
 import { findPlungedTravelIssues } from '../invariants';
-import { computeJobBounds } from '../job';
+import { computeJobBounds, type CncContourPass } from '../job';
 import {
   createLayer,
   DEFAULT_CNC_LAYER_SETTINGS,
@@ -179,6 +180,30 @@ describe('reliefRoughingPasses', () => {
       }
     }
     expect(violations).toBe(0);
+  });
+
+  it('cuts each level from the inside out, outer boundaries positive and islands negative', () => {
+    // The first level is a band around the pyramid's top: ring 0 is the band's
+    // boundary, ring 1 lies one stepover in, and each has an outer boundary
+    // and an island ring around the top (ADR-427).
+    const result = heightmapOf(pyramidRelief());
+    if (result.kind !== 'ok') throw new Error(result.reason);
+    const passes = reliefRoughingPasses(result.heightmap, {
+      tool: FLAT_TOOL,
+      reliefDepthMm: 4,
+      depthPerPassMm: 1.5,
+      stepoverPercent: 40,
+    });
+    const areas = passes
+      .filter((pass): pass is CncContourPass => pass.kind === 'contour' && pass.zMm === -1.5)
+      .map((pass) => signedAreaMm2(pass.polyline));
+    const outers = areas.filter((area) => area > 0);
+    const islands = areas.filter((area) => area < 0);
+    expect(outers).toHaveLength(2);
+    expect(islands).toHaveLength(2);
+    // Ring 1 first: its outer boundary is the smaller, its island ring the larger.
+    expect(outers[0]).toBeLessThan(outers[1] ?? 0);
+    expect(islands[0]).toBeLessThan(islands[1] ?? 0);
   });
 
   it('is deterministic', () => {

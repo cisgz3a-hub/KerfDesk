@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { buildOffsetLadder, insetContoursChecked } from '../geometry/offset-ladder';
 import { pointInPolygon } from '../geometry/point-in-polygon';
 import { differenceClosedPolylinesChecked } from '../geometry/polygon-difference';
+import { signedAreaMm2 } from '../geometry/polyline-orientation';
 import { roundStrokeOutline } from '../geometry/round-stroke-outline';
 import type { Polyline, Vec2 } from '../scene';
 import { reliefCoreCleanup } from './relief-core-cleanup';
@@ -125,6 +126,27 @@ describe('reliefCoreCleanup', () => {
           for (const point of path.points) expect(insideRegion(point, region)).toBe(true);
         }
       }
+    }
+  });
+
+  it('winds each piece like the rings: outer boundaries positive, holes negative', () => {
+    // The compiler orients these paths with the rings in one call, which
+    // tells islands apart by winding (ADR-427). The centre ring comes from the
+    // offset engine, which winds an outer boundary negative.
+    const [centre] = cleanupFor([square(0, 20)], 85).cleanup.paths;
+    expect(signedAreaMm2(centre?.points ?? [])).toBeGreaterThan(0);
+    // At 150% the stock left around a round island is traced as annuli: an
+    // outer boundary and a hole around the island each.
+    const traces = cleanupFor([square(0, 40), circle(20, 20, 6, true)], 150).cleanup.paths;
+    const areas = traces.map((path) => signedAreaMm2(path.points));
+    const holes = traces.filter((_, index) => (areas[index] ?? 0) < 0);
+    expect(holes.length).toBeGreaterThan(0);
+    for (const hole of holes) {
+      const inside = hole.points[0] ?? { x: Number.NaN, y: Number.NaN };
+      const outer = traces.filter(
+        (path, index) => (areas[index] ?? 0) > 0 && pointInPolygon(inside, path.points),
+      );
+      expect(outer.length).toBeGreaterThan(0);
     }
   });
 

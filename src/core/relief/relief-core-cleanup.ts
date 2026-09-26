@@ -24,9 +24,16 @@
 // Every added path lies inside the level's tool-centre region: stock the rings
 // leave is at least a cutter radius inside its boundary, which ring 0's sweep
 // covers, so no path leaves the region the dilated heightmap proved safe.
+//
+// The roughing planner cuts these paths before the level's rings, as the
+// pocket planner cuts its leftover cores first (ADR-427). Each piece's paths
+// come from one offset or boolean result and are wound like the rings: outer
+// boundaries positive, holes negative, so islands can be told apart when the
+// compiler orients them for the cut direction.
 
 import { offsetClosedPolylinesWithRoundJoinsChecked } from '../geometry/kerf-offset';
 import { insetContoursChecked, type OffsetLadder } from '../geometry/offset-ladder';
+import { withOuterContoursPositive } from '../geometry/polyline-orientation';
 import {
   differenceClosedPolylinesChecked,
   normalizeClosedPolylineTreeEvenOddChecked,
@@ -46,7 +53,8 @@ const RING_BISECT_TOLERANCE_MM = 0.01;
 const MAX_CLEANUP_ROUNDS = 4096;
 
 export type ReliefCoreCleanup = {
-  // Closed paths to cut after the level's regular rings, round by round.
+  // Closed paths that clear what the level's regular rings leave, round by
+  // round; each piece's outer boundaries wind positive and its holes negative.
   readonly paths: ReadonlyArray<Polyline>;
   // True when a sweep, subtraction or grouping failed, so the level may still
   // hold stock. Advisory only, like the ladder's own failure (rule 7).
@@ -86,7 +94,11 @@ function clearStock(uncut: ReadonlyArray<Polyline>, cutRadiusMm: number): Relief
     const stock = thickPieces(area);
     if (stock === null) {
       // Stock the engine cannot sort is traced once as it stands, and reported.
-      return { paths: [...paths, ...area], offsetFailed: true, passLimited: false };
+      return {
+        paths: [...paths, ...withOuterContoursPositive(area)],
+        offsetFailed: true,
+        passLimited: false,
+      };
     }
     if (stock.length === 0) return { paths, offsetFailed: false, passLimited: false };
     const added = stock.flatMap((piece) => piecePaths(piece, cutRadiusMm));
@@ -107,9 +119,9 @@ function piecePaths(piece: ReadonlyArray<Polyline>, cutRadiusMm: number): Readon
   if (centre.ring.length > 0 && centre.insetMm <= cutRadiusMm) {
     const missed = uncutArea(piece, centre.ring, cutRadiusMm);
     const rest = missed === null ? null : thickPieces(missed);
-    if (rest !== null && rest.length === 0) return centre.ring;
+    if (rest !== null && rest.length === 0) return withOuterContoursPositive(centre.ring);
   }
-  return piece;
+  return withOuterContoursPositive(piece);
 }
 
 // The part of the region no regular ring reaches. Ring 0 is the region's own

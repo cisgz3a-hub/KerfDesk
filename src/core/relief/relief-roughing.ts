@@ -14,14 +14,23 @@
 // relief-core-cleanup.ts then adds the paths that clear what the rings leave,
 // as the pocket planner does (ADR-289 Amendment 1).
 //
+// Each level is cut from the inside out, as the pocket planner cuts (ADR-427):
+// the core cleanup, then the innermost ring, and the region boundary (ring 0)
+// last. Every ring but the innermost then meets its new stock outside itself,
+// where the pocket winding puts it on the climb side, and ring 0 finishes the
+// level's wall one stepover deep instead of slotting a full cutter width along
+// it.
+//
 // Output passes are contour passes in heightmap physical mm (origin at the
 // heightmap's min corner, y down), each ring closed back to its first point.
-// The compiler has already folded object XY scale into that grid, so only its
-// residual isometry and device origin remain. Depth-major: every ring of one
-// level, outside in, then its core cleanup, before the next level. Pure and
-// deterministic.
+// Outer boundaries wind positive and islands negative on every level, which
+// lets the compiler tell islands apart when it orients the rings for the cut
+// direction (ADR-252). The compiler has already folded object XY scale into
+// that grid, so only its residual isometry and device origin remain.
+// Depth-major: every pass of one level before the next. Pure and deterministic.
 
 import { buildOffsetLadder, insetContoursChecked } from '../geometry/offset-ladder';
+import { withOuterContoursPositive } from '../geometry/polyline-orientation';
 import { partialDualCoordinate } from '../grid';
 import type { CncContourPass, CncPass } from '../job';
 import type { CncTool, Polyline } from '../scene';
@@ -166,7 +175,16 @@ function appendLevelRings(
   // is 0, which the offset engine returns unchanged.
   const ladder = buildOffsetLadder(usable, MAX_RINGS_PER_LEVEL, (step) => step * stepMm);
   const cleanup = reliefCoreCleanup(usable, ladder, stepMm, cutRadiusMm);
-  for (const polyline of [...ladder.rings.flat(), ...cleanup.paths]) {
+  // Inside out (ADR-427): the cleanup's deepest round first, as the pocket
+  // planner cuts its leftover cores first, then the rings innermost first.
+  // Marching squares winds ring 0's outer boundaries positive and the offset
+  // engine winds the deeper rings' negative, so each ring is brought to the
+  // cleanup's convention.
+  const insideOut = [
+    ...[...cleanup.paths].reverse(),
+    ...[...ladder.rings].reverse().flatMap((ring) => withOuterContoursPositive(ring)),
+  ];
+  for (const polyline of insideOut) {
     if (polyline.points.length < MIN_RING_POINTS) continue;
     passes.push({ kind: 'contour', zMm: levelZ, polyline: closeRing(polyline), closed: true });
   }
