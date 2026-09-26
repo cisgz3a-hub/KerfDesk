@@ -169,10 +169,8 @@ describe('curve endpoint joining', () => {
     // exact trace is its flattening at 1e-7, and the ends must swap.
     const original = flattenedPhysicalPoints(arc, transform);
     const reversed = flattenedPhysicalPoints(result.curve, transform);
-    expect(reversed[0]?.x).toBeCloseTo(original.at(-1)?.x ?? Number.NaN, 8);
-    expect(reversed[0]?.y).toBeCloseTo(original.at(-1)?.y ?? Number.NaN, 8);
-    expect(reversed.at(-1)?.x).toBeCloseTo(original[0]?.x ?? Number.NaN, 8);
-    expect(reversed.at(-1)?.y).toBeCloseTo(original[0]?.y ?? Number.NaN, 8);
+    expectSamePoint(reversed[0], original.at(-1));
+    expectSamePoint(reversed.at(-1), original[0]);
     const originalTrace = flattenedPhysicalPoints(arc, transform, 1e-7);
     const reversedTrace = flattenedPhysicalPoints(result.curve, transform, 1e-7);
     for (const point of reversed) {
@@ -263,4 +261,11 @@ function distanceToPolyline(point: Vec2, polyline: ReadonlyArray<Vec2>): number 
     nearest = Math.min(nearest, Math.hypot(point.x - a.x - t * dx, point.y - a.y - t * dy));
   }
   return nearest;
+}
+
+function expectSamePoint(actual: Vec2 | undefined, expected: Vec2 | undefined): void {
+  expect(actual).toBeDefined();
+  expect(expected).toBeDefined();
+  expect(actual?.x).toBeCloseTo(expected?.x ?? Number.NaN, 8);
+  expect(actual?.y).toBeCloseTo(expected?.y ?? Number.NaN, 8);
 }

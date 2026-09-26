@@ -11,10 +11,10 @@
 //
 // Each piece takes the longest chord that fits (a greedy walk over the curve
 // parameter; with a monotone fit test the greedy count is the minimum for
-// chords whose ends lie on the curve), then a bisection on the tolerance finds
-// the smallest error that still needs that many chords, so the chords share
-// the error evenly instead of leaving a short last chord. The first point of
-// a segment is its start and the last is its end, exactly.
+// chords whose ends lie on the curve). That many chords at equal parameter
+// steps are used when they all fit (always for a circular arc); otherwise the
+// last two greedy chords are evened out so no sliver is left at the end. The
+// first point of a segment is its start and the last is its end, exactly.
 
 import type { CubicPathSegment, Vec2 } from './scene-object';
 
