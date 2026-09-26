@@ -226,3 +226,44 @@ first-insertion order fails 3 of 5 tests. Swapping the per-vertex direction orde
 or S before N) does NOT fail: by the time the outer loop reaches a saddle vertex, one of its two
 out-edges has always been consumed by a loop that started at an earlier vertex, so that order
 is not observable on any fuzzed mask. The exact order is kept anyway.
+
+**Rank 5, thinning mechanics (`centerline/medial-thinning.ts`, `centerline/erosion-queue.ts`).**
+Pop order is the thinning algorithm, so the queue still returns the least (squared distance,
+neighbour tie, pixel index) every time. What changed is how it finds that entry:
+- Keys are direct-addressed. Each distinct distance in the field gets a dense rank (an
+  `Int32Array` table when the largest distance is below 2^23, otherwise a binary search over the
+  sorted distinct values). The ranks are computed once per thinning and shared by both passes.
+  Buckets live at `[rank][tie]`, and a cursor finds the least non-empty key. The cursor only
+  moves back when a push lands below it. This replaces the per-push `Map` lookup and the key heap.
+- An entry pushed while an identical (pixel, tie) entry is still pending is dropped. It would pop
+  straight after its twin. If the first pop erodes the pixel, the second finds it gone, and
+  eroded pixels never come back. If the first pop refuses, nothing has changed before the second
+  pop, so it refuses too. Either way the second pop does nothing.
+- Ring configurations, neighbour requeues and the maximal-disc test read interior pixels through
+  per-width index deltas. Border pixels use flat `Int8Array` offset tables. This replaces
+  destructuring the offset tuples.
+
+Lazy seeding was dropped because it is not output-identical. A pixel seeded with a full ring
+(tie 0) can become erodable after lower-distance neighbours erode. Its seed entry then pops
+before its re-queued, higher-tie entries. Skipping or deferring that seed changes the erosion
+order. Seeding stays one pass through the cheaper push.
+
+Proof:
+- `medial-thinning-parity.test.ts` compares skeletons byte for byte against the frozen 952fb13e3
+  thinning and queue (`medial-thinning-reference.test-support.ts`,
+  `erosion-queue-reference.test-support.ts`). It covers 4000 fuzzed masks, 1000 stroke ribbons of
+  width 1 to 6 (even widths leave the 2 px ridge that the neighbour tie exists for), 160 px
+  blob, border, line, dense and all-ink grids, fields scaled by 2^22 (the binary-search rank
+  path), arbitrary small-integer keys, and non-integer keys (the comparator-heap path).
+- `erosion-queue.test.ts` checks the pop sequence against a comparator model that keeps one
+  pending copy per exact duplicate.
+- `src/__fixtures__/perceptual/trace-parity-thinning.test.ts` (gated on `TRACE_PARITY=1`) checks
+  every mask the tracer thins from the oracle corpus.
+- Mutations:
+  - Swapping two interior ring bits fails all 5 skeleton tests.
+  - Deduplicating by pixel alone, ignoring the tie, fails 8 tests.
+  - Never clearing the pending bit fails the 3 queue tests. The thinning never re-pushes an
+    identical entry after its pop in a way that changes the skeleton, so the skeleton tests
+    still pass.
+  - A cursor that never moves back fails the queue tests and hangs the thinning.
+- Oracle: 36/36 light cases plus the corpus thinning check (62/62 with the unit parity tests).
