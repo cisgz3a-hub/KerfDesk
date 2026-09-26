@@ -1,13 +1,16 @@
-import { boxesOverlap, type ContourBox } from './contour-bounds';
+import type { ContourBox } from './contour-bounds';
 import { runTraceSteps, type TraceSteps } from './trace-steps';
 
-// Every node has one shape. A leaf lists `order[start, end)`; an inner node
-// has children and start = end = -1.
-type BoxNode = ContourBox & {
-  readonly left: BoxNode | undefined;
-  readonly right: BoxNode | undefined;
-  readonly start: number;
-  readonly end: number;
+// The tree's nodes are numbered in the order the build finishes them, so the
+// root is the last. Node `k`'s box is `nodeBounds[4k, 4k + 4)`. An inner node
+// has `first[k] = left` and `second[k] = right`; a leaf lists
+// `order[~first[k], second[k])`, its `first` being negative. Flat arrays keep
+// the nodes' bounds out of the heap: the topology repair holds an index for
+// every ring it has seen.
+type Nodes = {
+  readonly bounds: Float64Array;
+  readonly first: Int32Array;
+  readonly second: Int32Array;
 };
 // The boxes' bounds and centres, by box, and the box order the build
 // partitions. Only `order` moves, by the same swaps an array of entries would
@@ -28,7 +31,8 @@ const NODE_CHECKPOINT_INTERVAL = 32;
 /** Immutable finite boxes. Queries retain inclusive boundary contacts. */
 export class ContourBoxIndex<T extends ContourBox> {
   private constructor(
-    private readonly root: BoxNode | undefined,
+    private readonly root: number,
+    private readonly nodes: Nodes,
     private readonly boxes: ReadonlyArray<T>,
     private readonly bounds: Float64Array,
     private readonly order: Int32Array,
@@ -66,33 +70,56 @@ export class ContourBoxIndex<T extends ContourBox> {
       entries.y[i] = minY / 2 + maxY / 2;
       entries.order[i] = i;
     }
-    const root = yield* buildTreeSteps(entries, cooperate);
-    return new ContourBoxIndex(root, boxes, bounds, entries.order);
+    const size = nodeCount(count, new Map());
+    const nodes: Nodes = {
+      bounds: new Float64Array(4 * size),
+      first: new Int32Array(size),
+      second: new Int32Array(size),
+    };
+    const root = yield* buildTreeSteps(entries, nodes, cooperate);
+    return new ContourBoxIndex(root, nodes, boxes, bounds, entries.order);
   }
 
   /** Unordered candidates; callers restore their own observable traversal order. */
   query(box: ContourBox): T[] {
     const result: T[] = [];
-    const pending = this.root === undefined ? [] : [this.root];
+    if (this.root < 0) return result;
+    const { bounds: nodeBounds, first, second } = this.nodes;
+    const minX = box.minX,
+      minY = box.minY,
+      maxX = box.maxX,
+      maxY = box.maxY;
+    const pending = [this.root];
     while (pending.length > 0) {
-      const node = pending.pop() as BoxNode;
-      if (!boxesOverlap(node, box)) continue;
-      if (node.start >= 0) this.collectLeaf(node, box, result);
+      const node = pending.pop() as number;
+      const at = 4 * node;
+      if (
+        !(
+          (nodeBounds[at + 2] as number) >= minX &&
+          maxX >= (nodeBounds[at] as number) &&
+          (nodeBounds[at + 3] as number) >= minY &&
+          maxY >= (nodeBounds[at + 1] as number)
+        )
+      ) {
+        continue;
+      }
+      const left = first[node] as number;
+      if (left < 0) this.collectLeaf(~left, second[node] as number, box, result);
       else {
-        if (node.left !== undefined) pending.push(node.left);
-        if (node.right !== undefined) pending.push(node.right);
+        pending.push(left);
+        pending.push(second[node] as number);
       }
     }
     return result;
   }
 
-  private collectLeaf(leaf: BoxNode, box: ContourBox, result: T[]): void {
+  private collectLeaf(start: number, end: number, box: ContourBox, result: T[]): void {
     const { boxes, bounds, order } = this;
     const minX = box.minX,
       minY = box.minY,
       maxX = box.maxX,
       maxY = box.maxY;
-    for (let i = leaf.start; i < leaf.end; i += 1) {
+    for (let i = start; i < end; i += 1) {
       const item = order[i] as number;
       const at = 4 * item;
       if (
@@ -115,51 +142,63 @@ export class ContourBoxIndex<T extends ContourBox> {
     visit: (item: T, otherItem: U) => void,
     cooperate: boolean,
   ): TraceSteps<void> {
-    if (this.root === undefined || other.root === undefined) return;
-    const mine: BoxNode[] = [this.root];
-    const theirs: BoxNode[] = [other.root];
+    if (this.root < 0 || other.root < 0) return;
+    const { bounds: mineBounds, first: mineFirst, second: mineSecond } = this.nodes;
+    const { bounds: theirBounds, first: theirFirst, second: theirSecond } = other.nodes;
+    const mine: number[] = [this.root];
+    const theirs: number[] = [other.root];
     let visited = 0;
     while (mine.length > 0) {
-      const a = mine.pop() as BoxNode;
-      const b = theirs.pop() as BoxNode;
-      if (!boxesOverlap(a, b)) continue;
+      const a = mine.pop() as number;
+      const b = theirs.pop() as number;
+      if (!nodesOverlap(mineBounds, a, theirBounds, b)) continue;
       if (cooperate && ++visited % PAIR_CHECKPOINT_INTERVAL === 0) yield;
-      if (a.start >= 0 && b.start >= 0) {
-        this.visitLeafPairs(a, other, b, visit);
-      } else if (b.start >= 0 || (a.start < 0 && wider(a, b))) {
-        pushChildren(a, b, mine, theirs);
+      const aFirst = mineFirst[a] as number;
+      const bFirst = theirFirst[b] as number;
+      if (aFirst < 0 && bFirst < 0) {
+        this.visitLeafPairs(~aFirst, mineSecond[a] as number, other, b, visit);
+      } else if (bFirst < 0 || (aFirst >= 0 && wider(mineBounds, a, theirBounds, b))) {
+        // Descend this tree: its node is the wider, or the other's is a leaf.
+        mine.push(aFirst);
+        theirs.push(b);
+        mine.push(mineSecond[a] as number);
+        theirs.push(b);
       } else {
-        pushOtherChildren(a, b, mine, theirs);
+        mine.push(a);
+        theirs.push(bFirst);
+        mine.push(a);
+        theirs.push(theirSecond[b] as number);
       }
     }
   }
 
   private visitLeafPairs<U extends ContourBox>(
-    leaf: BoxNode,
+    start: number,
+    end: number,
     other: ContourBoxIndex<U>,
-    otherLeaf: BoxNode,
+    otherLeaf: number,
     visit: (item: T, otherItem: U) => void,
   ): void {
     const { boxes, bounds, order } = this;
-    const { boxes: otherBoxes, bounds: otherBounds, order: otherOrder } = other;
-    for (let i = leaf.start; i < leaf.end; i += 1) {
+    const { boxes: otherBoxes, bounds: otherBounds, order: otherOrder, nodes } = other;
+    const leafAt = 4 * otherLeaf;
+    const leafMinX = nodes.bounds[leafAt] as number,
+      leafMinY = nodes.bounds[leafAt + 1] as number,
+      leafMaxX = nodes.bounds[leafAt + 2] as number,
+      leafMaxY = nodes.bounds[leafAt + 3] as number;
+    const otherStart = ~(nodes.first[otherLeaf] as number);
+    const otherEnd = nodes.second[otherLeaf] as number;
+    for (let i = start; i < end; i += 1) {
       const item = order[i] as number;
       const at = 4 * item;
       const minX = bounds[at] as number,
         minY = bounds[at + 1] as number,
         maxX = bounds[at + 2] as number,
         maxY = bounds[at + 3] as number;
-      if (
-        !(
-          maxX >= otherLeaf.minX &&
-          otherLeaf.maxX >= minX &&
-          maxY >= otherLeaf.minY &&
-          otherLeaf.maxY >= minY
-        )
-      ) {
+      if (!(maxX >= leafMinX && leafMaxX >= minX && maxY >= leafMinY && leafMaxY >= minY)) {
         continue;
       }
-      for (let j = otherLeaf.start; j < otherLeaf.end; j += 1) {
+      for (let j = otherStart; j < otherEnd; j += 1) {
         const otherItem = otherOrder[j] as number;
         const to = 4 * otherItem;
         if (
@@ -177,31 +216,50 @@ export class ContourBoxIndex<T extends ContourBox> {
 
 const PAIR_CHECKPOINT_INTERVAL = 256;
 
-function wider(a: ContourBox, b: ContourBox): boolean {
-  return a.maxX - a.minX + (a.maxY - a.minY) >= b.maxX - b.minX + (b.maxY - b.minY);
+function nodesOverlap(aBounds: Float64Array, a: number, bBounds: Float64Array, b: number): boolean {
+  const at = 4 * a,
+    bt = 4 * b;
+  return (
+    (aBounds[at + 2] as number) >= (bBounds[bt] as number) &&
+    (bBounds[bt + 2] as number) >= (aBounds[at] as number) &&
+    (aBounds[at + 3] as number) >= (bBounds[bt + 1] as number) &&
+    (bBounds[bt + 3] as number) >= (aBounds[at + 1] as number)
+  );
 }
 
-function pushChildren(a: BoxNode, b: BoxNode, mine: BoxNode[], theirs: BoxNode[]): void {
-  for (const child of [a.left, a.right]) {
-    if (child === undefined) continue;
-    mine.push(child);
-    theirs.push(b);
-  }
+function wider(aBounds: Float64Array, a: number, bBounds: Float64Array, b: number): boolean {
+  const at = 4 * a,
+    bt = 4 * b;
+  const aSpan =
+    (aBounds[at + 2] as number) -
+    (aBounds[at] as number) +
+    ((aBounds[at + 3] as number) - (aBounds[at + 1] as number));
+  const bSpan =
+    (bBounds[bt + 2] as number) -
+    (bBounds[bt] as number) +
+    ((bBounds[bt + 3] as number) - (bBounds[bt + 1] as number));
+  return aSpan >= bSpan;
 }
 
-function pushOtherChildren(a: BoxNode, b: BoxNode, mine: BoxNode[], theirs: BoxNode[]): void {
-  for (const child of [b.left, b.right]) {
-    if (child === undefined) continue;
-    mine.push(a);
-    theirs.push(child);
-  }
+// Nodes in a tree over `count` boxes: the build halves every range longer
+// than LEAF_SIZE. The ranges at one depth differ by at most one in length, so
+// few lengths recur and the memo keeps this logarithmic.
+function nodeCount(count: number, memo: Map<number, number>): number {
+  if (count === 0) return 0;
+  if (count <= LEAF_SIZE) return 1;
+  const known = memo.get(count);
+  if (known !== undefined) return known;
+  const half = Math.floor(count / 2);
+  const total = 1 + nodeCount(half, memo) + nodeCount(count - half, memo);
+  memo.set(count, total);
+  return total;
 }
 
 type BuildFrame = {
   readonly start: number;
   readonly end: number;
   middle: number;
-  left: BoxNode | undefined;
+  left: number;
   stage: 0 | 1 | 2;
 };
 
@@ -209,20 +267,24 @@ type BuildFrame = {
 // but on an explicit stack inside one generator: a recursive generator pays
 // one resumption per level for every checkpoint, which dominated the build.
 // Each node still partitions only its own range, so the tree is the same.
+// Returns the root's number, or -1 for no boxes.
 function* buildTreeSteps<T extends ContourBox>(
   entries: Entries<T>,
+  nodes: Nodes,
   cooperate: boolean,
-): TraceSteps<BoxNode | undefined> {
-  if (entries.order.length === 0) return undefined;
+): TraceSteps<number> {
+  if (entries.order.length === 0) return -1;
   const stack: BuildFrame[] = [frame(0, entries.order.length)];
-  let built: BoxNode | undefined;
+  let built = -1;
+  let next = 0;
   let visited = 0;
   while (stack.length > 0) {
     const top = stack[stack.length - 1] as BuildFrame;
     if (top.stage === 0) {
       if (cooperate && visited++ % NODE_CHECKPOINT_INTERVAL === 0) yield;
       if (top.end - top.start <= LEAF_SIZE) {
-        built = leaf(entries, top.start, top.end);
+        built = leaf(entries, nodes, next, top.start, top.end);
+        next += 1;
         stack.pop();
         continue;
       }
@@ -236,7 +298,8 @@ function* buildTreeSteps<T extends ContourBox>(
       top.stage = 2;
       stack.push(frame(top.middle, top.end));
     } else {
-      built = join(top.left as BoxNode, built as BoxNode);
+      built = join(nodes, next, top.left, built);
+      next += 1;
       stack.pop();
     }
   }
@@ -244,25 +307,32 @@ function* buildTreeSteps<T extends ContourBox>(
 }
 
 function frame(start: number, end: number): BuildFrame {
-  return { start, end, middle: start, left: undefined, stage: 0 };
+  return { start, end, middle: start, left: -1, stage: 0 };
 }
 
 // A node's bounds are its children's, joined: min and max are exact and
 // order-free, so this is the box of all its items without revisiting them.
-function join(left: BoxNode, right: BoxNode): BoxNode {
-  return {
-    minX: Math.min(left.minX, right.minX),
-    minY: Math.min(left.minY, right.minY),
-    maxX: Math.max(left.maxX, right.maxX),
-    maxY: Math.max(left.maxY, right.maxY),
-    left,
-    right,
-    start: -1,
-    end: -1,
-  };
+function join(nodes: Nodes, node: number, left: number, right: number): number {
+  const { bounds } = nodes;
+  const at = 4 * node,
+    l = 4 * left,
+    r = 4 * right;
+  bounds[at] = Math.min(bounds[l] as number, bounds[r] as number);
+  bounds[at + 1] = Math.min(bounds[l + 1] as number, bounds[r + 1] as number);
+  bounds[at + 2] = Math.max(bounds[l + 2] as number, bounds[r + 2] as number);
+  bounds[at + 3] = Math.max(bounds[l + 3] as number, bounds[r + 3] as number);
+  nodes.first[node] = left;
+  nodes.second[node] = right;
+  return node;
 }
 
-function leaf<T>(entries: Entries<T>, start: number, end: number): BoxNode {
+function leaf<T>(
+  entries: Entries<T>,
+  nodes: Nodes,
+  node: number,
+  start: number,
+  end: number,
+): number {
   let minX = Infinity,
     minY = Infinity,
     maxX = -Infinity,
@@ -275,7 +345,14 @@ function leaf<T>(entries: Entries<T>, start: number, end: number): BoxNode {
     maxX = Math.max(maxX, bounds[at + 2] as number);
     maxY = Math.max(maxY, bounds[at + 3] as number);
   }
-  return { minX, minY, maxX, maxY, left: undefined, right: undefined, start, end };
+  const at = 4 * node;
+  nodes.bounds[at] = minX;
+  nodes.bounds[at + 1] = minY;
+  nodes.bounds[at + 2] = maxX;
+  nodes.bounds[at + 3] = maxY;
+  nodes.first[node] = ~start;
+  nodes.second[node] = end;
+  return node;
 }
 
 function splitsHorizontally<T>(entries: Entries<T>, start: number, end: number): boolean {
