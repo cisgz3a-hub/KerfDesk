@@ -22,6 +22,8 @@ export type CommandShellCallbacks = {
   readonly requestQuickNest: () => void;
   readonly requestUnionSilhouette: () => void;
   readonly requestJoinPaths: () => void;
+  /** Open the ADR-410 Offset Shapes dialog. */
+  readonly requestOffsetShapes: () => void;
   readonly requestPrintAndCut: () => void;
   readonly requestRotarySetup: () => void;
   readonly requestLabsSettings: () => void;
@@ -58,6 +60,7 @@ export type CommandDialogs = {
   readonly printAndCutFeatureEnabled: boolean;
   readonly printAndCutProfileSupported: boolean;
   readonly printAndCut: () => void;
+  readonly wireframeActive: boolean;
 };
 
 export type CommandSelection = {

@@ -1,4 +1,5 @@
 import type { CommandFamily, CommandId } from '../commands/command-types';
+import { EDITING_TOOLS_COMMAND_HELP } from './editing-tools-command-help';
 import { FILE_COMMAND_HELP } from './file-command-help';
 
 export type CommandHelpTopic = {
@@ -8,6 +9,7 @@ export type CommandHelpTopic = {
 
 export const COMMAND_HELP: Readonly<Record<CommandId, CommandHelpTopic>> = {
   ...FILE_COMMAND_HELP,
+  ...EDITING_TOOLS_COMMAND_HELP,
   'edit.undo': {
     family: 'edit',
     tooltip: 'Undo the most recent scene edit.',

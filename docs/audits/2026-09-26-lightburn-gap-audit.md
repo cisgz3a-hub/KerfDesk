@@ -42,9 +42,9 @@ Sierra variants).
 
 | ID | Gap | LightBurn | KerfDesk today | Size | Status |
 |---|---|---|---|---|---|
-| LBG-T01 | Move Selected Objects to the bed centre, corners and edges | `R/MoveSelectedObjects/` | Only typed positions with the anchor picker (`src/ui/commands/TransformAnchorPicker.tsx`) | S | BATCH 3 |
-| LBG-T02 | Rotate 90° clockwise and counter-clockwise commands | `R/TransformControls/` | Rotate handle and numeric R field only (`src/ui/workspace/rotate-handle.ts`, `NumericEditsBar.tsx`) | S | BATCH 3 |
-| LBG-T03 | Offset Shapes: Both directions, Round/Bevel/Corner joins, delete original, open paths, Tools menu entry | `R/OffsetShapes/` | Outward or inward copy of closed shapes, round joins only (`src/ui/layers/OffsetPathsRow.tsx`, `src/core/geometry/vector-path-booleans.ts`) | S | BATCH 3 |
+| LBG-T01 | Move Selected Objects to the bed centre, corners and edges | `R/MoveSelectedObjects/` | Built: Arrange → Move to bed, nine positions (ADR-410). Move to the laser position is still open; it needs Frame's machine-to-scene mapping | S | built (ADR-410) |
+| LBG-T02 | Rotate 90° clockwise and counter-clockwise commands | `R/TransformControls/` | Built: Arrange menu and `.` / `,`, exact quarter turns (ADR-410) | S | built (ADR-410) |
+| LBG-T03 | Offset Shapes: Both directions, Round/Bevel/Corner joins, delete original, open paths, Tools menu entry | `R/OffsetShapes/` | Built: Tools → Offset Shapes... with a live preview (ADR-410). Optimize / Simplify results is still open | S | built (ADR-410) |
 | LBG-T04 | Trim Shapes (click a segment to delete it back to the intersections) | `R/TrimShapes/` | Planned stub in Design Studio only (`src/ui/design-studio/design-tool.ts`) | M-L | open |
 | LBG-T05 | Apply Path to Text alignment (X left/middle/right, Y top/middle/bottom) | `R/ApplyPathToText/` | Guide, start offset and reverse only (`src/core/text/text-on-path.ts`) | S | open |
 | LBG-T06 | Warp (4 point) and Deform (16 point) | `R/WarpDeform/` | Missing; `src/core/camera/homography.ts` exists for reuse | M | open |
@@ -119,10 +119,10 @@ Sierra variants).
 
 | ID | Gap | LightBurn | KerfDesk today | Size | Status |
 |---|---|---|---|---|---|
-| LBG-F01 | Paste in Place | `R/UI/EditMenu/` | Paste always offsets 10 mm (`PASTE_OFFSET_MM`, `src/ui/state/scene-clipboard-actions.ts`) | S | BATCH 3 |
-| LBG-F02 | Invert Selection, Select Open Shapes on every layer | `R/UI/EditMenu/` | Missing; open contours can be selected on Fill layers only | S | BATCH 3 |
+| LBG-F01 | Paste in Place | `R/UI/EditMenu/` | Built: Edit → Paste in Place, `Ctrl/Cmd+Shift+V` (ADR-410) | S | built (ADR-410) |
+| LBG-F02 | Invert Selection, Select Open Shapes on every layer | `R/UI/EditMenu/` | Built: Edit menu, `Ctrl/Cmd+Shift+I` for Invert (ADR-410) | S | built (ADR-410) |
 | LBG-F03 | Select Contained, Select Smaller Than | `R/UI/EditMenu/` | Missing | S | open |
-| LBG-F04 | Filled or Wireframe view toggle | `R/ViewStyle/` | Fill artwork always draws filled (`src/ui/workspace/object-display.ts`) | S | BATCH 3 |
+| LBG-F04 | Filled or Wireframe view toggle | `R/ViewStyle/` | Built: Window → Wireframe View, `Alt+W` (ADR-410) | S | built (ADR-410) |
 | LBG-F05 | Pasting SVG or images copied from other apps | `R/UI/EditMenu/` | In-app clipboard only | M | open |
 | LBG-F06 | Snapping to nodes, midpoints, centres and intersections; settable grid and distance | `R/Snapping/` | Bounding-box edges and centres, fixed 10 mm grid and 2 mm distance (`src/ui/workspace/snapping.ts`) | M | open |
 | LBG-F07 | Guidelines dragged from the rulers | `R/AutomaticGuidelines/` | Missing | M-L | open |
@@ -154,7 +154,7 @@ These are recorded project rules, not oversights. Each needs Johann's call befor
 Each batch is one pull request with its own decision record, tests and WORKFLOW.md entries.
 
 - **Batch 3 — everyday editing:** LBG-T01, LBG-T02, LBG-T03, LBG-F01, LBG-F02, LBG-F04. No G-code
-  changes.
+  changes. Built in ADR-410.
 - **Batch 4 — Line and Image cut settings:** LBG-C01, LBG-C02, LBG-C03. Changes G-code only when an
   operation turns one of them on.
 - **Next candidates, in order:** LBG-T05, LBG-T07, LBG-T15, LBG-F03, LBG-F08, LBG-F12, LBG-C07,

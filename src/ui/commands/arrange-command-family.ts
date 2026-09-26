@@ -1,4 +1,5 @@
 import { disabled, enabled, type AppCommand, type AppCommandContext } from './command-types';
+import { placementCommands } from './editing-tools-commands';
 
 export function arrangeCommands(ctx: AppCommandContext): ReadonlyArray<AppCommand> {
   const align = ALIGN_COMMANDS.map((spec) =>
@@ -33,6 +34,7 @@ export function arrangeCommands(ctx: AppCommandContext): ReadonlyArray<AppComman
     breakApartCommand(ctx),
     flipHorizontalCommand(ctx),
     flipVerticalCommand(ctx),
+    ...placementCommands(ctx),
   ];
 }
 

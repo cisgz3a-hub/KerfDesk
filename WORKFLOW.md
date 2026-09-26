@@ -304,6 +304,17 @@ destination and cannot overwrite the template source.
 #### All — Cmd/Ctrl+A
 1. Selects every object in the scene.
 
+#### Invert — Cmd/Ctrl+Shift+I (ADR-410)
+1. **Edit → Invert Selection** selects every unlocked object on a visible operation that is not
+   selected now, and deselects the rest. Groups stay whole.
+2. With nothing selected it selects everything Select All would.
+
+#### Open shapes — Edit → Select Open Shapes (ADR-410)
+1. Selects every unlocked object on a visible operation, on any operation mode, that has a path of
+   two or more points whose ends do not meet.
+2. A notice reports how many objects and open paths were found and points to **Tools → Join
+   paths...**. When nothing is open, the notice says so and the selection is kept.
+
 #### Deselect — Escape or click in empty space
 1. Selection cleared. Status bar updates: `Nothing selected`.
 2. A stationary right click in empty space also clears selection, then opens the empty-workspace
@@ -391,6 +402,20 @@ destination and cannot overwrite the template source.
 - `Arrange → Flip Vertical` (`V`)
 - Operates around selection's center.
 
+#### Rotate 90° — menu / shortcut (ADR-410)
+- `Arrange → Rotate 90° Clockwise` (`.`) and `Arrange → Rotate 90° Counter-clockwise` (`,`).
+- The selection turns as one body about the centre of its combined bounds; four turns return it
+  exactly to where it started. One undo step. Locked or hidden artwork does not move.
+- `Cmd/Ctrl+.` stays Abort; the rotate keys ignore any chord with Cmd or Ctrl.
+
+#### Move to bed — menu (ADR-410)
+- `Arrange → Move to bed` → **Bed Center**, **Top Left**, **Top**, **Top Right**, **Left**,
+  **Right**, **Bottom Left**, **Bottom**, **Bottom Right**.
+- The matching point of the selection's bounds lands on the same point of the bed. The edge entries
+  put the selection against that edge, centred along it. One undo step; the layout inside the
+  selection is kept.
+- No shortcut: LightBurn's `P` is KerfDesk's Preview.
+
 #### Edge — transform pushes object out of bed
 - Permitted (user may be temporarily repositioning).
 - Out-of-bounds geometry gains the red dashed overlay (F-A3 edge).
@@ -436,6 +461,32 @@ destination and cannot overwrite the template source.
    tab indices are retained. The node toolbar's two-anchor Join keeps its existing workflow.
 4. Both tools support laser and CNC artwork, commit one undo transaction, and leave the project
    unchanged on invalid or empty results. They do not operate a machine.
+
+### F-A6c. Offset Shapes (ADR-410)
+
+1. Select vector artwork and choose **Tools → Offset Shapes...**. Locked artwork is left out.
+2. Set **Offset distance (mm)**, then **Direction** (**Outward**, **Inward**, **Both**) and
+   **Corner style** (**Round**, **Bevel**, **Corner**). **Outer shapes only** ignores holes and
+   shapes inside other shapes. **Delete original objects** removes the selection once the offset
+   is added.
+3. The dialog draws the selection in grey, the outward result in the accent colour and the inward
+   result in green, and lists each result's size. The selection is offset as one design.
+4. Open lines offset outward into a closed outline around the line, with caps that follow the
+   corner style. **Inward** needs a closed shape; with only open lines the dialog says so and
+   **Offset** is unavailable. A collapsed inward offset is explained the same way.
+5. **Offset** adds one new object per direction, each on its own operation copied from the first
+   selected object, selects them and closes the dialog. Everything, including Delete original
+   objects, is one undo step. Under **Both**, if only the inward half collapses, the outward half
+   is added with a notice.
+6. The dialog reopens with the settings last applied in this session. **Cancel** or Escape changes
+   nothing. The properties-panel offset (ADR-103) remains the quick one-field version.
+
+### F-A6d. Filled or wireframe view (ADR-410)
+
+1. **Window → Wireframe View** (`Alt+W`) draws Fill artwork as outlines in its operation colour,
+   so overlaps and stray paths show. The menu item shows a check while it is on.
+2. It changes the canvas only: output, Preview and saved projects are unchanged. It resets to
+   Filled when the app restarts.
 
 ### F-A7. Artwork Operations panel
 
@@ -986,8 +1037,10 @@ Mac uses `Cmd`, Windows/Linux web uses `Ctrl`.
 - `Cmd/Ctrl+X` — Cut selected objects to the scene clipboard
 - `Cmd/Ctrl+C` — Copy selected objects to the scene clipboard
 - `Cmd/Ctrl+V` — Paste the scene clipboard (offset from the source)
+- `Cmd/Ctrl+Shift+V` — Paste in Place: paste at the position the artwork was copied from (ADR-410)
 - `Cmd/Ctrl+D` — Duplicate selection in place (LightBurn parity)
 - `Cmd/Ctrl+A` — Select all
+- `Cmd/Ctrl+Shift+I` — Invert selection (ADR-410)
 - `Delete` / `Backspace` — Delete selected
 - `Escape` — Deselect / cancel current operation
 
@@ -996,6 +1049,7 @@ Mac uses `Cmd`, Windows/Linux web uses `Ctrl`.
 - Shift+Arrow — Nudge 10 mm
 - `H` — Flip horizontal
 - `V` — Flip vertical
+- `.` / `,` — Rotate 90° clockwise / counter-clockwise (ADR-410)
 
 #### Tools
 - `T` - Type and edit text on the canvas (when a text field does not own keyboard input)
@@ -1008,6 +1062,7 @@ Mac uses `Cmd`, Windows/Linux web uses `Ctrl`.
 
 #### View
 - `P` — Toggle preview
+- `Alt+W` — Filled or wireframe view (ADR-410)
 - `F` — Fit to bed
 - `Shift+F` — Fit to selection (falls back to all-objects, then bed)
 - `+` / `=` — Zoom in

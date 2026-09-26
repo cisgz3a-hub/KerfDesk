@@ -17,6 +17,12 @@ import {
   type SelectionFlipAxis,
   type Transform,
 } from '../../core/scene';
+import {
+  buildSelectionMoveToBedEdit,
+  buildSelectionQuarterTurnEdit,
+  type QuarterTurnDirection,
+} from '../../core/scene/selection-placement';
+import type { SelectionAnchor } from '../../core/scene/selection-transform';
 import type { AppState } from './store';
 import { pushUndo } from './scene-mutations';
 import { applyCenterArtworkInRegistrationJigSet } from './registration-jig-artwork-actions';
@@ -32,6 +38,10 @@ export type SelectionTransformActions = {
   readonly distributeSelection: (kind: SelectionDistributeKind) => void;
   readonly nudgeSelection: (dx: number, dy: number) => void;
   readonly flipSelection: (axis: SelectionFlipAxis) => void;
+  // ADR-410: Rotate 90° about the selection centre (+1 clockwise on screen).
+  readonly rotateSelectionQuarterTurn: (direction: QuarterTurnDirection) => void;
+  // ADR-410: Move Selected Objects to the bed centre, a corner or an edge.
+  readonly moveSelectionToBed: (anchor: SelectionAnchor) => void;
   // ADR-057: proportionally fit the selected artwork in the first jig outline,
   // retaining it there and copying the fitted layout into every remaining outline.
   readonly centerSelectionInRegistrationBox: () => void;
@@ -54,6 +64,9 @@ export function selectionTransformActions(set: Setter): SelectionTransformAction
     distributeSelection: (kind) => set((state) => applySelectionDistributeToState(state, kind)),
     nudgeSelection: (dx, dy) => set((state) => applySelectionNudgeToState(state, dx, dy)),
     flipSelection: (axis) => set((state) => applySelectionFlipToState(state, axis)),
+    rotateSelectionQuarterTurn: (direction) =>
+      set((state) => applySelectionQuarterTurnToState(state, direction)),
+    moveSelectionToBed: (anchor) => set((state) => applySelectionMoveToBedToState(state, anchor)),
     centerSelectionInRegistrationBox: () =>
       set((state) => applyCenterArtworkInRegistrationJigSet(state)),
     alignSelectionToRegistrationBox: (anchor) =>
@@ -152,6 +165,31 @@ function applySelectionFlipToState(
 ): AppState | Partial<AppState> {
   const ids = selectedObjectIds(state);
   const result = buildSelectionFlipEdit(selectedObjects(state.project.scene, ids), axis);
+  if (result.kind === 'error') return state;
+  return applySelectionTransformsToState(state, result.transforms);
+}
+
+function applySelectionQuarterTurnToState(
+  state: AppState,
+  direction: QuarterTurnDirection,
+): AppState | Partial<AppState> {
+  const objects = selectedObjects(state.project.scene, selectedObjectIds(state));
+  const result = buildSelectionQuarterTurnEdit(objects, direction);
+  if (result.kind === 'error') return state;
+  return applySelectionTransformsToState(state, result.transforms);
+}
+
+function applySelectionMoveToBedToState(
+  state: AppState,
+  anchor: SelectionAnchor,
+): AppState | Partial<AppState> {
+  const objects = selectedObjects(state.project.scene, selectedObjectIds(state));
+  const { bedWidth, bedHeight } = state.project.device;
+  const result = buildSelectionMoveToBedEdit(
+    objects,
+    { width: bedWidth, height: bedHeight },
+    anchor,
+  );
   if (result.kind === 'error') return state;
   return applySelectionTransformsToState(state, result.transforms);
 }

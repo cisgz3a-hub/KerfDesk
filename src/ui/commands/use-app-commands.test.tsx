@@ -223,6 +223,7 @@ function callbacks(): CommandShellCallbacks {
     requestQuickNest: doNothing,
     requestUnionSilhouette: doNothing,
     requestJoinPaths: doNothing,
+    requestOffsetShapes: doNothing,
     requestPrintAndCut: doNothing,
     requestRotarySetup: doNothing,
     requestLabsSettings: doNothing,

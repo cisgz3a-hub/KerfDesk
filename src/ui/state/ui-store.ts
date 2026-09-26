@@ -110,6 +110,10 @@ export type UiState = ArtworkRunOrderUiState &
     readonly setScrubberT: (next: number) => void;
     readonly showPreviewTravel: boolean;
     readonly setShowPreviewTravel: (next: boolean) => void;
+    // ADR-410: draw Fill artwork as outlines (LightBurn's Wireframe view).
+    // Display only and session-only, so a forgotten toggle never outlives the app.
+    readonly wireframeView: boolean;
+    readonly toggleWireframeView: () => void;
     readonly showCanvasStartMarkers: boolean;
     readonly setShowCanvasStartMarkers: (next: boolean) => void;
     readonly previewPlaying: boolean;
@@ -285,6 +289,8 @@ export const useUiStore = create<UiState>((set) => ({
   setScrubberT: (next) => set({ scrubberT: clamp01(next) }),
   showPreviewTravel: true,
   setShowPreviewTravel: (next) => set({ showPreviewTravel: next }),
+  wireframeView: false,
+  toggleWireframeView: () => set((state) => ({ wireframeView: !state.wireframeView })),
   showCanvasStartMarkers: readCanvasStartMarkersVisible(),
   setShowCanvasStartMarkers: (next) => {
     writeCanvasStartMarkersVisible(next);
