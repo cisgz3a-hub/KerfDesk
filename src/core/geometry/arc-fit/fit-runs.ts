@@ -32,7 +32,7 @@
 // the exact two-sided check in arc-piece-check.ts.
 
 import type { Vec2 } from '../../scene';
-import { primitiveFitsPiece } from './arc-piece-check';
+import { primitiveFitsPiece, type ArcFitTolerance } from './arc-piece-check';
 import {
   arcAbout,
   arcLeavingAlong,
@@ -76,7 +76,7 @@ function endTangentOf(primitives: ReadonlyArray<FitPrimitive>): Vec2 | null {
   return last === undefined ? null : primitiveEndTangent(last);
 }
 
-export function fitSmoothRun(run: SmoothRun, toleranceMm: number): FitPrimitive[] {
+export function fitSmoothRun(run: SmoothRun, toleranceMm: ArcFitTolerance): FitPrimitive[] {
   const last = run.points.length - 1;
   const out: FitPrimitive[] = [];
   let i = 0;
@@ -96,7 +96,7 @@ type Candidate = (end: number) => FitPrimitive[] | null;
 function bestSmoothStep(
   run: SmoothRun,
   i: number,
-  toleranceMm: number,
+  toleranceMm: ArcFitTolerance,
   previousEnd: Vec2 | null,
 ): Step {
   const last = run.points.length - 1;
@@ -122,7 +122,7 @@ function bestSmoothStep(
   return best;
 }
 
-function smoothCandidates(run: SmoothRun, i: number, toleranceMm: number): Candidate[] {
+function smoothCandidates(run: SmoothRun, i: number, toleranceMm: ArcFitTolerance): Candidate[] {
   const { points, tangentsIn, tangentsOut } = run;
   const start = points[i] as Vec2;
   const leaving = tangentsOut[i] as Vec2;
@@ -162,7 +162,10 @@ function smoothCandidates(run: SmoothRun, i: number, toleranceMm: number): Candi
   ];
 }
 
-export function fitStraightRun(vertices: ReadonlyArray<Vec2>, toleranceMm: number): FitPrimitive[] {
+export function fitStraightRun(
+  vertices: ReadonlyArray<Vec2>,
+  toleranceMm: ArcFitTolerance,
+): FitPrimitive[] {
   const last = vertices.length - 1;
   const out: FitPrimitive[] = [];
   let i = 0;
@@ -234,7 +237,7 @@ function fittedArcThrough(
   points: ReadonlyArray<Vec2>,
   from: number,
   to: number,
-  toleranceMm: number,
+  toleranceMm: ArcFitTolerance,
 ): FitPrimitive | null {
   const start = points[from] as Vec2;
   const end = points[to] as Vec2;
