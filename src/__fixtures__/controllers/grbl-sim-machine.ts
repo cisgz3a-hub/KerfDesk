@@ -2,88 +2,75 @@
 // plus its own scheduled events, returns the next state and a list of timed
 // effects (lines to emit, events to schedule). No timers, no I/O — the glue in
 // grbl-simulator.ts owns the clock, which keeps this reducer unit-testable and
-// deterministic.
+// deterministic. Line parsing lives in grbl-sim-lines.ts.
 //
-// Fidelity notes (deliberate simplifications, documented so tests don't lie):
-//  * Acks are immediate HERE, but no longer only here: this reducer models the
-//    parser, not the serial main loop, so it still answers every line at once.
-//    Real GRBL stops acking when the planner fills, and that back-pressure is
-//    now modelled one layer out by `grbl-sim-backpressure.ts` — opt in with
-//    `createGrblSimulator({ plannerBlocks: 16 })` (ADR-265). Without that
-//    option the simulator still acks instantly and cannot reproduce a buffer
-//    overrun, so a streaming test that does not opt in is not testing flow
-//    control.
-//  * `$$`, `$I`, `$#` and `$G` are answered immediately. Real GRBL runs
-//    `protocol_buffer_synchronize()` first, which waits for the planner to
-//    drain completely — a longer stall than a full planner causes.
+// Modelled after gnea/grbl 1.1h (bfb67f0c) where the controller audit
+// (2026-09-25, ST-2) found the model more forgiving than the firmware:
+//  * G-code is locked out in Jog and Alarm with error:9 (protocol.c:99-101).
+//  * The main loop parses no line while it is blocked (grblSimParsesLines):
+//    inside a G4 or M0 (below), in a completed feed hold or door (the suspend
+//    loop, protocol.c:208, :546), while homing ($H runs to completion inside
+//    system_execute_line), asleep, or in a critical alarm. Host lines wait in
+//    the RX ring meanwhile.
+//  * G4 waits for the planner to drain, then dwells, then answers `ok`
+//    (motion_control.c:195-200). M0 waits for the drain, then holds (Hold:0)
+//    and answers `ok` only after cycle start (gcode.c:1084-1090).
+//  * A software safety door (0x84) with no door input reports Door:0 once
+//    parked (system.c:87-93 system_check_safety_door_ajar() is false without
+//    ENABLE_SAFETY_DOOR_INPUT_PIN; report.c:491-500).
+//  * ALARM:1 and ALARM:2 (hard and soft limit) print `[MSG:Reset to continue]`
+//    and loop until a soft reset, answering no status query (protocol.c:226-236).
+//  * A soft reset from Alarm or Sleep comes back in Alarm with the unlock
+//    message (main.c keeps the prior state; protocol.c:49-54), as grblHAL
+//    (protocol.c:167-174) and FluidNC (Protocol.cpp:1158) do.
+//  * The planner holds 15 usable blocks (grbl-sim-planner.ts) and the RX ring
+//    128 bytes (grbl-sim-rx-window.ts); every byte above 0x7F is realtime.
+// `firmware: 'grblhal'` adds grblHAL behaviour: status reports in a critical
+// alarm (and while homing with `reportWhenHoming`, off by default:
+// machine_limits.c:336-337, :445-447), `$X`/`$H` answered error:79 in a
+// critical alarm, the sticky G-code error (protocol.c:245-286) and a CRLF pair
+// read as one end of line.
+//
+// Remaining simplifications, documented so tests don't lie:
+//  * Acks are immediate unless `createGrblSimulator({ plannerBlocks })` opts in
+//    to the bounded planner (grbl-sim-backpressure.ts, ADR-265).
+//  * A feed hold or door completes at once (no Hold:1 / Door:2 deceleration,
+//    no Door:3 restore delays), `!` in Jog holds instead of cancelling the jog,
+//    `!` from Idle is ignored, and M3-M9 do not wait for the planner to drain.
+//  * A soft reset with motion still queued raises ALARM:3 even from a completed
+//    hold, and a reset during homing raises ALARM:3 rather than ALARM:6.
+//  * `$$`, `$I`, `$#` and `$G` are answered immediately in every state.
 //  * Motion position is applied at command time; state stays Run/Jog until the
 //    scheduled motion-finished event, then reports Idle.
-//  * Boot is unlocked by default (vendor-typical); vanilla homing-init-lock
-//    can be approximated with triggerAlarm + locked boots in a future knob.
+//  * Boot is unlocked by default (vendor-typical).
 
+import { formatVec3, SIM_ZERO_VEC3 } from './grbl-sim-gcode';
+import { reduceGrblSimLine } from './grbl-sim-lines';
 import {
-  addVec3,
-  formatVec3,
-  hasGWord,
-  leadingGWord,
-  parseMotionWords,
-  resolveTarget,
-  SIM_ZERO_VEC3,
-  type SimVec3,
-} from './grbl-sim-gcode';
+  emit,
+  startDwell,
+  totalWco,
+  type GrblSimEffect,
+  type GrblSimEvent,
+  type GrblSimMachineLabel,
+  type GrblSimOptions,
+  type GrblSimReaction,
+  type GrblSimState,
+  type GrblSimTimedEvent,
+} from './grbl-sim-state';
 
-export type GrblSimMachineLabel =
-  | 'Idle'
-  | 'Run'
-  | 'Jog'
-  | 'Hold'
-  | 'Door'
-  | 'Alarm'
-  | 'Home'
-  | 'Sleep';
-
-export type GrblSimState = {
-  readonly machine: GrblSimMachineLabel;
-  readonly locked: boolean;
-  readonly mpos: SimVec3;
-  readonly g92: SimVec3 | null;
-  readonly g54: SimVec3 | null;
-  readonly isAbsolute: boolean;
-  readonly feed: number;
-  readonly spindle: number;
-  readonly pendingMotions: number;
-  readonly isHomed: boolean;
-  readonly settings: ReadonlyMap<number, string>;
-};
-
-export type GrblSimEvent =
-  | { readonly kind: 'rx-realtime'; readonly byte: string }
-  | { readonly kind: 'rx-line'; readonly line: string }
-  | { readonly kind: 'motion-finished' }
-  | { readonly kind: 'homing-finished' };
-
-export type GrblSimEffect =
-  | { readonly kind: 'emit'; readonly line: string; readonly afterMs: number }
-  | { readonly kind: 'schedule'; readonly event: GrblSimEvent; readonly afterMs: number };
-
-export type GrblSimReaction = {
-  readonly state: GrblSimState;
-  readonly effects: ReadonlyArray<GrblSimEffect>;
-};
-
-export type GrblSimRejectRule = {
-  readonly pattern: RegExp;
-  readonly errorCode: number;
-};
-
-export type GrblSimOptions = {
-  readonly firmwareBanner: string;
-  readonly responseDelayMs: number;
-  readonly motionMs: number;
-  readonly homingMs: number;
-  readonly alarmOnResetDuringMotion: boolean;
-  readonly rejectLines: ReadonlyArray<GrblSimRejectRule>;
-};
+export type {
+  GrblSimEffect,
+  GrblSimEvent,
+  GrblSimFirmware,
+  GrblSimMachineLabel,
+  GrblSimOptions,
+  GrblSimPendingLine,
+  GrblSimReaction,
+  GrblSimRejectRule,
+  GrblSimState,
+  GrblSimTimedEvent,
+} from './grbl-sim-state';
 
 export const DEFAULT_GRBL_SIM_OPTIONS: GrblSimOptions = {
   firmwareBanner: "Grbl 1.1f ['$' for help]",
@@ -92,7 +79,16 @@ export const DEFAULT_GRBL_SIM_OPTIONS: GrblSimOptions = {
   homingMs: 5,
   alarmOnResetDuringMotion: true,
   rejectLines: [],
+  firmware: 'grbl',
 };
+
+const UNLOCK_MESSAGE = "[MSG:'$H'|'$X' to unlock]";
+const LINE_BLOCKING_STATES: ReadonlySet<GrblSimMachineLabel> = new Set([
+  'Hold',
+  'Door',
+  'Home',
+  'Sleep',
+]);
 
 export function initialGrblSimState(settings: ReadonlyMap<number, string>): GrblSimState {
   return {
@@ -107,6 +103,10 @@ export function initialGrblSimState(settings: ReadonlyMap<number, string>): Grbl
     pendingMotions: 0,
     isHomed: false,
     settings,
+    pendingLine: null,
+    critical: false,
+    lastError: null,
+    resetEpoch: 0,
   };
 }
 
@@ -115,38 +115,23 @@ export function reduceGrblSim(
   event: GrblSimEvent,
   opts: GrblSimOptions,
 ): GrblSimReaction {
-  switch (event.kind) {
-    case 'rx-realtime':
-      return reduceRealtime(state, event.byte, opts);
-    case 'rx-line':
-      return reduceLine(state, event.line, opts);
-    case 'motion-finished': {
-      const pendingMotions = Math.max(0, state.pendingMotions - 1);
-      const settlesToIdle =
-        pendingMotions === 0 && (state.machine === 'Run' || state.machine === 'Jog');
-      return {
-        state: { ...state, pendingMotions, machine: settlesToIdle ? 'Idle' : state.machine },
-        effects: [],
-      };
-    }
-    case 'homing-finished':
-      return {
-        state: {
-          ...state,
-          machine: 'Idle',
-          locked: false,
-          isHomed: true,
-          mpos: SIM_ZERO_VEC3,
-          pendingMotions: 0,
-        },
-        effects: [emit('ok', opts)],
-      };
-  }
+  if (event.kind === 'rx-realtime') return reduceRealtime(state, event.byte, opts);
+  if (event.kind === 'rx-line') return reduceGrblSimLine(state, event.line, opts);
+  if (event.kind === 'alarm') return reduceAlarm(state, event.code, opts);
+  if (event.epoch !== undefined && event.epoch !== state.resetEpoch) return { state, effects: [] };
+  return reduceTimedEvent(state, event, opts);
+}
+
+/** Whether the main loop reads the next host line now (see header). */
+export function grblSimParsesLines(state: GrblSimState, opts: GrblSimOptions): boolean {
+  if (state.pendingLine !== null) return false;
+  if (state.critical) return opts.firmware === 'grblhal';
+  return !LINE_BLOCKING_STATES.has(state.machine);
 }
 
 export function statusReportLine(state: GrblSimState): string {
   const label =
-    state.machine === 'Hold' ? 'Hold:0' : state.machine === 'Door' ? 'Door:1' : state.machine;
+    state.machine === 'Hold' ? 'Hold:0' : state.machine === 'Door' ? 'Door:0' : state.machine;
   const isMoving = state.machine === 'Run' || state.machine === 'Jog' || state.machine === 'Hold';
   const feed = isMoving ? Math.round(state.feed) : 0;
   const spindle = isMoving ? Math.round(state.spindle) : 0;
@@ -155,28 +140,111 @@ export function statusReportLine(state: GrblSimState): string {
   return `<${label}|MPos:${formatVec3(state.mpos)}|FS:${feed},${spindle}|WCO:${formatVec3(wco)}${stoppedAccessories}>`;
 }
 
-function totalWco(state: GrblSimState): SimVec3 {
-  return addVec3(state.g54 ?? SIM_ZERO_VEC3, state.g92 ?? SIM_ZERO_VEC3);
+function reduceTimedEvent(
+  state: GrblSimState,
+  event: GrblSimTimedEvent,
+  opts: GrblSimOptions,
+): GrblSimReaction {
+  if (event.kind === 'motion-finished') return reduceMotionFinished(state);
+  if (event.kind === 'homing-finished') return reduceHomingFinished(state, opts);
+  const pending = state.pendingLine;
+  if (pending?.kind !== 'dwell' || pending.phase !== 'delay') return { state, effects: [] };
+  return { state: { ...state, pendingLine: null }, effects: [emit('ok', opts)] };
 }
 
-function emit(line: string, opts: GrblSimOptions): GrblSimEffect {
-  return { kind: 'emit', line, afterMs: opts.responseDelayMs };
+function reduceMotionFinished(state: GrblSimState): GrblSimReaction {
+  const pendingMotions = Math.max(0, state.pendingMotions - 1);
+  const settlesToIdle =
+    pendingMotions === 0 && (state.machine === 'Run' || state.machine === 'Jog');
+  const next: GrblSimState = {
+    ...state,
+    pendingMotions,
+    machine: settlesToIdle ? 'Idle' : state.machine,
+  };
+  return pendingMotions === 0 ? continueSyncedLine(next) : { state: next, effects: [] };
+}
+
+// The planner drained under a line that waited for it: G4 starts its dwell and
+// M0 enters its feed hold (Hold:0) until cycle start.
+function continueSyncedLine(state: GrblSimState): GrblSimReaction {
+  const pending = state.pendingLine;
+  if (pending?.phase !== 'sync') return { state, effects: [] };
+  if (pending.kind === 'dwell') return startDwell(state, pending.seconds);
+  return {
+    state: { ...state, machine: 'Hold', pendingLine: { kind: 'program-pause', phase: 'hold' } },
+    effects: [],
+  };
+}
+
+function reduceHomingFinished(state: GrblSimState, opts: GrblSimOptions): GrblSimReaction {
+  if (state.machine !== 'Home') return { state, effects: [] };
+  return {
+    state: {
+      ...state,
+      machine: 'Idle',
+      locked: false,
+      isHomed: true,
+      mpos: SIM_ZERO_VEC3,
+      pendingMotions: 0,
+    },
+    effects: [emit('ok', opts)],
+  };
+}
+
+function reduceAlarm(state: GrblSimState, code: number, opts: GrblSimOptions): GrblSimReaction {
+  const critical = code === 1 || code === 2;
+  return {
+    state: {
+      ...state,
+      machine: 'Alarm',
+      locked: true,
+      critical,
+      pendingMotions: 0,
+      pendingLine: null,
+      resetEpoch: state.resetEpoch + 1,
+    },
+    effects: [
+      emit(`ALARM:${code}`, opts),
+      ...(critical ? [emit('[MSG:Reset to continue]', opts)] : []),
+    ],
+  };
 }
 
 function reduceRealtime(state: GrblSimState, byte: string, opts: GrblSimOptions): GrblSimReaction {
-  if (byte === '?') return { state, effects: [emit(statusReportLine(state), opts)] };
-  if (byte === '!') {
-    const holds = state.machine === 'Run' || state.machine === 'Jog';
-    return { state: holds ? { ...state, machine: 'Hold' } : state, effects: [] };
+  switch (byte) {
+    case '?':
+      return {
+        state,
+        effects: reportsStatus(state, opts) ? [emit(statusReportLine(state), opts)] : [],
+      };
+    case '!': {
+      const holds = state.machine === 'Run' || state.machine === 'Jog';
+      return { state: holds ? { ...state, machine: 'Hold' } : state, effects: [] };
+    }
+    case '\x84':
+      return reduceSafetyDoor(state);
+    case '~':
+      return reduceCycleStart(state, opts);
+    case '\x18':
+      return reduceSoftReset(state, opts);
+    case '\x85':
+      return state.machine === 'Jog'
+        ? { state: { ...state, machine: 'Idle', pendingMotions: 0 }, effects: [] }
+        : { state, effects: [] };
+    default:
+      // Overrides and unassigned bytes above 0x7F: taken off the stream, not modelled.
+      return { state, effects: [] };
   }
-  if (byte === '\x84') return reduceSafetyDoor(state);
-  if (byte === '~') return reduceCycleStart(state);
-  if (byte === '\x18') return reduceSoftReset(state, opts);
-  if (byte === '\x85') {
-    if (state.machine !== 'Jog') return { state, effects: [] };
-    return { state: { ...state, machine: 'Idle', pendingMotions: 0 }, effects: [] };
-  }
-  return { state, effects: [] };
+}
+
+// Stock GRBL answers no status query while homing (limits.c:320 "No time to run
+// protocol_execute_realtime() in this loop") or in the critical-alarm loop.
+// grblHAL answers in a critical alarm, and while homing only with "report when
+// homing" on (machine_limits.c:336-337, :445-447).
+function reportsStatus(state: GrblSimState, opts: GrblSimOptions): boolean {
+  const grblHal = opts.firmware === 'grblhal';
+  if (state.machine === 'Home') return grblHal && opts.reportWhenHoming === true;
+  return grblHal || !state.critical;
 }
 
 function reduceSafetyDoor(state: GrblSimState): GrblSimReaction {
@@ -187,8 +255,14 @@ function reduceSafetyDoor(state: GrblSimState): GrblSimReaction {
   };
 }
 
-function reduceCycleStart(state: GrblSimState): GrblSimReaction {
+function reduceCycleStart(state: GrblSimState, opts: GrblSimOptions): GrblSimReaction {
   if (state.machine !== 'Hold' && state.machine !== 'Door') return { state, effects: [] };
+  const pending = state.pendingLine;
+  if (pending?.kind === 'program-pause' && pending.phase === 'hold') {
+    // M0 synced before it held, so nothing is queued: the resume ends the
+    // suspend and gc_execute_line returns, which is when M0's `ok` goes out.
+    return { state: { ...state, machine: 'Idle', pendingLine: null }, effects: [emit('ok', opts)] };
+  }
   return {
     state: { ...state, machine: state.pendingMotions > 0 ? 'Run' : 'Idle' },
     effects: [],
@@ -201,7 +275,6 @@ function reduceSoftReset(state: GrblSimState, opts: GrblSimOptions): GrblSimReac
     state.machine === 'Jog' ||
     state.machine === 'Home' ||
     state.pendingMotions > 0;
-  const alarms = wasMoving && opts.alarmOnResetDuringMotion;
   const base: GrblSimState = {
     ...state,
     pendingMotions: 0,
@@ -209,8 +282,12 @@ function reduceSoftReset(state: GrblSimState, opts: GrblSimOptions): GrblSimReac
     // Soft reset clears the volatile G92 offset (GRBL v1.1 behavior); the
     // persistent G54 offset survives.
     g92: null,
+    pendingLine: null,
+    critical: false,
+    lastError: null,
+    resetEpoch: state.resetEpoch + 1,
   };
-  if (alarms) {
+  if (wasMoving && opts.alarmOnResetDuringMotion) {
     // Firmware order: protocol_exec_rt_system reports the abort alarm, then
     // returns on EXEC_RESET; the reboot prints the banner and, because the
     // state is Alarm, protocol_main_loop adds the unlock message. Emitting the
@@ -218,218 +295,18 @@ function reduceSoftReset(state: GrblSimState, opts: GrblSimOptions): GrblSimReac
     const effects: GrblSimEffect[] = [
       emit('ALARM:3', opts),
       emit(opts.firmwareBanner, opts),
-      emit("[MSG:'$H'|'$X' to unlock]", opts),
+      emit(UNLOCK_MESSAGE, opts),
     ];
     return { state: { ...base, machine: 'Alarm', locked: true }, effects };
+  }
+  if (state.machine === 'Alarm' || state.machine === 'Sleep') {
+    return {
+      state: { ...base, machine: 'Alarm', locked: true },
+      effects: [emit(opts.firmwareBanner, opts), emit(UNLOCK_MESSAGE, opts)],
+    };
   }
   return {
     state: { ...base, machine: 'Idle', locked: false },
     effects: [emit(opts.firmwareBanner, opts)],
-  };
-}
-
-function reduceLine(state: GrblSimState, line: string, opts: GrblSimOptions): GrblSimReaction {
-  if (state.machine === 'Sleep') return { state, effects: [] };
-  const reject = opts.rejectLines.find((rule) => rule.pattern.test(line));
-  if (reject !== undefined) return { state, effects: [emit(`error:${reject.errorCode}`, opts)] };
-  if (line === '') return { state, effects: [emit('ok', opts)] };
-  if (line.startsWith('$')) return reduceDollarLine(state, line, opts);
-  return reduceGcodeLine(state, line, opts);
-}
-
-function reduceDollarLine(
-  state: GrblSimState,
-  line: string,
-  opts: GrblSimOptions,
-): GrblSimReaction {
-  return (
-    reduceDollarControl(state, line, opts) ??
-    reduceDollarQuery(state, line, opts) ??
-    reduceDollarWrite(state, line, opts)
-  );
-}
-
-function reduceDollarControl(
-  state: GrblSimState,
-  line: string,
-  opts: GrblSimOptions,
-): GrblSimReaction | null {
-  if (line === '$H') {
-    if (state.settings.get(22) !== '1') return { state, effects: [emit('error:5', opts)] };
-    return {
-      state: { ...state, machine: 'Home', pendingMotions: 0 },
-      effects: [{ kind: 'schedule', event: { kind: 'homing-finished' }, afterMs: opts.homingMs }],
-    };
-  }
-  if (line === '$X') {
-    return {
-      state: {
-        ...state,
-        locked: false,
-        machine: state.machine === 'Alarm' ? 'Idle' : state.machine,
-      },
-      effects: [emit('[MSG:Caution: Unlocked]', opts), emit('ok', opts)],
-    };
-  }
-  if (line === '$SLP') {
-    return {
-      state: { ...state, machine: 'Sleep', spindle: 0, pendingMotions: 0 },
-      effects: [emit('ok', opts)],
-    };
-  }
-  return null;
-}
-
-function reduceDollarQuery(
-  state: GrblSimState,
-  line: string,
-  opts: GrblSimOptions,
-): GrblSimReaction | null {
-  if (line === '$$') {
-    const effects: GrblSimEffect[] = [...state.settings.entries()].map(([id, value]) =>
-      emit(`$${id}=${value}`, opts),
-    );
-    effects.push(emit('ok', opts));
-    return { state, effects };
-  }
-  if (line === '$I') {
-    return {
-      state,
-      effects: [
-        emit('[VER:1.1f.20170801:LASERFORGE-SIM]', opts),
-        emit('[OPT:V,15,128]', opts),
-        emit('ok', opts),
-      ],
-    };
-  }
-  if (line === '$#') {
-    const wco = formatVec3(totalWco(state));
-    return {
-      state,
-      effects: [
-        emit(`[G54:${formatVec3(state.g54 ?? SIM_ZERO_VEC3)}]`, opts),
-        emit(`[G92:${wco}]`, opts),
-        emit('ok', opts),
-      ],
-    };
-  }
-  if (line === '$G') {
-    return {
-      state,
-      effects: [emit('[GC:G0 G54 G17 G21 G90 G94 M5 M9 T0 F0 S0]', opts), emit('ok', opts)],
-    };
-  }
-  return null;
-}
-
-function reduceDollarWrite(
-  state: GrblSimState,
-  line: string,
-  opts: GrblSimOptions,
-): GrblSimReaction {
-  const settingWrite = /^\$(\d+)=(.*)$/.exec(line);
-  if (settingWrite !== null) {
-    const id = Number.parseInt(settingWrite[1] ?? '', 10);
-    const next = new Map(state.settings);
-    next.set(id, settingWrite[2] ?? '');
-    return { state: { ...state, settings: next }, effects: [emit('ok', opts)] };
-  }
-  if (line.startsWith('$J=')) return reduceJogLine(state, line, opts);
-  if (line.startsWith('$RST')) return { state, effects: [emit('ok', opts)] };
-  return { state, effects: [emit('error:3', opts)] };
-}
-
-function reduceJogLine(state: GrblSimState, line: string, opts: GrblSimOptions): GrblSimReaction {
-  if (state.locked) return { state, effects: [emit('error:9', opts)] };
-  if (state.machine !== 'Idle' && state.machine !== 'Jog') {
-    return { state, effects: [emit('error:8', opts)] };
-  }
-  const words = parseMotionWords(line.slice('$J='.length));
-  if (!words.hasMotion || words.feed === null) return { state, effects: [emit('error:22', opts)] };
-  const isAbsolute = words.setsAbsolute ?? false;
-  const target = resolveTarget(state.mpos, totalWco(state), words, isAbsolute);
-  return {
-    state: {
-      ...state,
-      machine: 'Jog',
-      mpos: target,
-      feed: words.feed,
-      pendingMotions: state.pendingMotions + 1,
-    },
-    effects: [
-      emit('ok', opts),
-      { kind: 'schedule', event: { kind: 'motion-finished' }, afterMs: opts.motionMs },
-    ],
-  };
-}
-
-function reduceGcodeLine(state: GrblSimState, line: string, opts: GrblSimOptions): GrblSimReaction {
-  if (state.locked) return { state, effects: [emit('error:9', opts)] };
-  const g = leadingGWord(line);
-  if (hasGWord(line, 92.1)) {
-    return { state: { ...state, g92: null }, effects: [emit('ok', opts)] };
-  }
-  if (hasGWord(line, 92)) return { state: applyG92(state, line), effects: [emit('ok', opts)] };
-  if (hasGWord(line, 10)) return { state: applyG10(state, line), effects: [emit('ok', opts)] };
-  const words = parseMotionWords(line);
-  const isAbsolute = words.setsAbsolute ?? state.isAbsolute;
-  let next: GrblSimState = {
-    ...state,
-    isAbsolute,
-    feed: words.feed ?? state.feed,
-    spindle: spindleAfterLine(state.spindle, line, words.spindle),
-  };
-  const effects: GrblSimEffect[] = [emit('ok', opts)];
-  const isMotionLine = words.hasMotion && (g === 0 || g === 1 || g === null);
-  if (isMotionLine) {
-    next = {
-      ...next,
-      mpos: resolveTarget(state.mpos, totalWco(state), words, isAbsolute),
-      machine: 'Run',
-      pendingMotions: state.pendingMotions + 1,
-    };
-    effects.push({ kind: 'schedule', event: { kind: 'motion-finished' }, afterMs: opts.motionMs });
-  }
-  return { state: next, effects };
-}
-
-function spindleAfterLine(current: number, line: string, sWord: number | null): number {
-  if (/(?:^|\s)[Mm]5(?:\s|$)/.test(line)) return 0;
-  return sWord ?? current;
-}
-
-function applyG92(state: GrblSimState, line: string): GrblSimState {
-  // G92 X<v> declares the current position to be work-coordinate <v> on that
-  // axis: g92Offset = mpos - g54 - v. Axes not mentioned keep their offset.
-  const words = parseMotionWords(line);
-  const g54 = state.g54 ?? SIM_ZERO_VEC3;
-  const prior = state.g92 ?? SIM_ZERO_VEC3;
-  return {
-    ...state,
-    g92: {
-      x: words.x === null ? prior.x : state.mpos.x - g54.x - words.x,
-      y: words.y === null ? prior.y : state.mpos.y - g54.y - words.y,
-      z: words.z === null ? prior.z : state.mpos.z - g54.z - words.z,
-    },
-  };
-}
-
-function applyG10(state: GrblSimState, line: string): GrblSimState {
-  // G10 L20 P1 X<v>: set G54 so the current position reads <v>; G10 L2 P1
-  // X<v>: set the G54 offset to <v> directly. Only P1 (G54) is modeled.
-  const words = parseMotionWords(line);
-  const isL20 = /[Ll]20/.test(line);
-  const prior = state.g54 ?? SIM_ZERO_VEC3;
-  const axis = (mpos: number, prev: number, word: number | null): number => {
-    if (word === null) return prev;
-    return isL20 ? mpos - word : word;
-  };
-  return {
-    ...state,
-    g54: {
-      x: axis(state.mpos.x, prior.x, words.x),
-      y: axis(state.mpos.y, prior.y, words.y),
-      z: axis(state.mpos.z, prior.z, words.z),
-    },
   };
 }

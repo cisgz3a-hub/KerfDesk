@@ -1,4 +1,4 @@
-// Synthetic scenes for the Line Art light-solid tests (ADR-393): flat colour
+// Synthetic scenes for the Line Art light-solid tests (ADR-401): flat colour
 // squares, noise models, photographed-paper shadows and drawn-on surfaces.
 import type { RawImageData } from '../core/trace/trace-image';
 import { blank, rect } from './auto-detail-trace';
@@ -117,7 +117,7 @@ export function sheetWithDrawing(sheet: Rgb): RawImageData {
 }
 
 /** Ink pixels the sheet's pencil drawing covers before any noise: 500 on the
- *  circle plus 180 on the line. (Four-connected despeckle, before ADR-395,
+ *  circle plus 180 on the line. (Four-connected despeckle, before ADR-403,
  *  erased 216 of the circle's diagonal-arc pixels and left 464.) */
 export const SHEET_DRAWING_PX = 680;
 

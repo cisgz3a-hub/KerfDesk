@@ -129,8 +129,10 @@ export type HostedStreamRefill = {
 };
 
 export type SerialConnection = {
-  // Write a string (UTF-8) to the port. Resolves when the bytes have been
-  // queued to the OS — does not wait for the device to ack.
+  // Write a string to the port, one byte per character (not UTF-8: GRBL's
+  // realtime commands are single bytes above 0x7F; see encodeWireBytes in
+  // platform/web/serial-wire.ts). Resolves when the bytes have been queued to
+  // the OS — does not wait for the device to ack. Reads decode UTF-8.
   readonly write: (data: string) => Promise<void>;
   // Subscribe to line events (incoming data split on '\n', \r stripped).
   // Returns an unsubscribe function.

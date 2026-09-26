@@ -40,7 +40,7 @@ describe('Sharp fine source marks', () => {
   it('still lets the operator remove these marks explicitly', async () => {
     const source = fineMarks(false);
     // Ignore 4 removes the detached 1-3px hatch marks. The 24-pixel diagonal
-    // is ONE component under the contour saddle policy (ADR-395), so it
+    // is ONE component under the contour saddle policy (ADR-403), so it
     // survives as one outline instead of being erased pixel by pixel.
     const hatchGone = await traceImageToColoredPaths(source, {
       ...TRACE_PRESETS.Sharp!,

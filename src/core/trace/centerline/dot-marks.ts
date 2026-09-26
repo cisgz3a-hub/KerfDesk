@@ -1,4 +1,4 @@
-// Dot and round-blob fallback for centreline strokes (ADR-397).
+// Dot and round-blob fallback for centreline strokes (ADR-405).
 //
 // A round ink component has no stroke to follow: its medial axis is a point
 // or a pixel-scale stub. The stroke pipeline either dropped it (a stub

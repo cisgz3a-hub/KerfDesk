@@ -116,6 +116,33 @@ describe('handleSaveRd', () => {
     }
   });
 
+  // Audit RU-7: Save checks the .rd moves in the frame Save G-code uses. With
+  // no trusted controller-to-bed offset (no confirmed homing on this profile)
+  // an enabled zone is reported as not checkable instead of skipped silently.
+  it('toasts the no-go zone advisory in the Save G-code frame', async () => {
+    const base = ruidaLineProject();
+    const zone = { id: 'z', name: 'Clamp', enabled: true, x: 300, y: 300, width: 10, height: 10 };
+    const project: Project = { ...base, device: { ...base.device, noGoZones: [zone] } };
+    const target: SaveTarget = { displayName: 'job.rd', write: async () => undefined };
+    const messages: string[] = [];
+    const ctx: SaveGcodeCtx = {
+      platform: mockPlatform(async () => target),
+      project,
+      savedName: null,
+      pushToast: (message) => messages.push(message),
+    };
+
+    await handleSaveRd(ctx, { ok: true });
+
+    expect(
+      messages.filter((message) => message.includes('No-go zones cannot be checked')),
+    ).toHaveLength(1);
+    // The machine frame would have found this zone clear of the line.
+    const machineFrame = emitRdFile(project);
+    if (!machineFrame.ok) throw new Error('fixture should emit ok');
+    expect(machineFrame.advisories).toEqual([]);
+  });
+
   it('alerts and writes nothing when the job cannot be emitted', async () => {
     let picked = false;
     const ctx: SaveGcodeCtx = {

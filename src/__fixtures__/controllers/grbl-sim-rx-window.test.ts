@@ -16,7 +16,8 @@ import {
 describe('grbl-sim-rx-window', () => {
   it('pins the firmware buffer sizes read from grbl and grblHAL source', () => {
     expect(GRBL_RX_BUFFER_BYTES).toBe(128);
-    expect(GRBL_RX_USABLE_BYTES).toBe(127);
+    // The ring is RX_BUFFER_SIZE + 1 bytes with one kept empty (serial.c:24).
+    expect(GRBL_RX_USABLE_BYTES).toBe(128);
     expect(GRBLHAL_RX_BUFFER_BYTES).toBe(1024);
   });
 
@@ -48,14 +49,40 @@ describe('grbl-sim-rx-window', () => {
     expect(rxBytesInUse(taken.window)).toBe(5);
   });
 
-  it('frees exactly the consumed line, strips CR, and leaves the remainder queued', () => {
-    const window = acceptRxBytes(createRxWindow(), 'G1 X1\r\nG1 X2\n');
+  it('frees exactly the consumed line and leaves the remainder queued', () => {
+    const window = acceptRxBytes(createRxWindow(), 'G1 X1\nG1 X2\n');
     const first = takeRxLine(window);
     expect(first.line).toBe('G1 X1');
     expect(rxBytesInUse(first.window)).toBe(6);
     const second = takeRxLine(first.window);
     expect(second.line).toBe('G1 X2');
     expect(rxBytesInUse(second.window)).toBe(0);
+  });
+
+  // grbl protocol.c:79 ends a line at '\n' OR '\r', so CRLF is a line plus an
+  // empty line (each answered `ok`); grblHAL reads a CRLF or LFCR pair as one
+  // end of line (protocol.c:227-233). Audit ST-2.
+  it('ends a line at every CR or LF on stock GRBL', () => {
+    let window = acceptRxBytes(createRxWindow(), 'G1 X1\r\nG1 X2\r');
+    const lines: Array<string | null> = [];
+    for (let index = 0; index < 4; index += 1) {
+      const taken = takeRxLine(window);
+      window = taken.window;
+      lines.push(taken.line);
+    }
+    expect(lines).toEqual(['G1 X1', '', 'G1 X2', null]);
+    expect(rxBytesInUse(window)).toBe(0);
+  });
+
+  it('reads a CRLF or LFCR pair as one end of line on grblHAL, and a doubled LF as an empty line', () => {
+    let window = acceptRxBytes(createRxWindow(), 'G1 X1\r\nG1 X2\n\rG1 X3\n\n');
+    const lines: Array<string | null> = [];
+    for (let index = 0; index < 5; index += 1) {
+      const taken = takeRxLine(window, 'pair');
+      window = taken.window;
+      lines.push(taken.line);
+    }
+    expect(lines).toEqual(['G1 X1', 'G1 X2', 'G1 X3', '', null]);
   });
 
   it('wedges when the terminator itself is dropped — the real overrun failure', () => {

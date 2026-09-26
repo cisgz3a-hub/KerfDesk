@@ -35,6 +35,14 @@ const ABORT = { jobStopRequest: { reason: 'operator', streamerEpoch: 0 } } as co
 // The last status report before the terminal: two planner blocks behind ack 3.
 const PLANNER_SNAPSHOT = { streamerEpoch: 0, sessionEpoch: 0, ackedLines: 3, queuedBlocks: 2 };
 const PLANNER_BACKLOG = { ackedAtStatus: 3, queuedBlocks: 2 };
+// No status report showed this run's backlog: the stop may have discarded
+// GRBL's whole planner (15 usable blocks) of acknowledged moves, so the record
+// steps back by it from the ack the tracker first saw (controller audit OR-3).
+const PLANNER_SIZE_BOUND = {
+  ackedAtStatus: ACKED_AT_TERMINAL,
+  queuedBlocks: 15,
+  bound: 'planner-size',
+} as const;
 
 type Case = {
   readonly name: string;
@@ -65,21 +73,21 @@ const CASES: ReadonlyArray<Case> = [
     status: 'errored',
     atTerminal: { safetyNotice: REJECTION },
     whileWaiting: ['trailing ok', { safetyNotice: null }],
-    recorded: REJECTED_INTERRUPTION,
+    recorded: { ...REJECTED_INTERRUPTION, plannerBacklog: PLANNER_SIZE_BOUND },
   },
   {
     name: 'a controller error followed by cable loss',
     status: 'errored',
     atTerminal: { safetyNotice: REJECTION },
     whileWaiting: ['trailing ok', 'port closes'],
-    recorded: REJECTED_INTERRUPTION,
+    recorded: { ...REJECTED_INTERRUPTION, plannerBacklog: PLANNER_SIZE_BOUND },
   },
   {
     name: 'a controller error whose stream disappears after the acknowledgement',
     status: 'errored',
     atTerminal: { safetyNotice: REJECTION },
     whileWaiting: ['trailing ok', { safetyNotice: null }, 'stream disappears'],
-    recorded: REJECTED_INTERRUPTION,
+    recorded: { ...REJECTED_INTERRUPTION, plannerBacklog: PLANNER_SIZE_BOUND },
   },
   {
     name: 'a disconnect the operator then acknowledges',
@@ -95,7 +103,7 @@ const CASES: ReadonlyArray<Case> = [
     status: 'errored',
     atTerminal: ABORT,
     whileWaiting: [{ safetyNotice: writeFailedNotice('stop') }],
-    recorded: ABORT_INTERRUPTION,
+    recorded: { ...ABORT_INTERRUPTION, plannerBacklog: PLANNER_SIZE_BOUND },
   },
   {
     name: 'a controller error with a planner backlog the operator then acknowledges',

@@ -3,8 +3,11 @@ import {
   buildGrblFrameJogLines,
   buildGrblFrameRetract,
 } from '../../core/controllers/grbl/frame-lines';
+import { marlinDriver } from '../../core/controllers/marlin/driver';
+import { smoothiewareDriver } from '../../core/controllers/smoothieware/driver';
 import {
   CNC_FRAME_POSITION_REQUIRED_MESSAGE,
+  CNC_FRAME_REQUIRES_GRBL_MESSAGE,
   CNC_FRAME_RETRACT_UNSUPPORTED_MESSAGE,
   CNC_FRAME_WORK_Z_REQUIRED_MESSAGE,
   buildCncFrameMotion,
@@ -20,12 +23,14 @@ function plan(overrides: {
   readonly hasCurrentWorkZEvidence: boolean;
   readonly buildRetract?: ((zMm: number, feed: number) => string) | undefined;
   readonly zFeed?: number;
+  readonly cncJobsSupported?: boolean;
 }): CncFrameMotionPlan {
   return buildCncFrameMotion({
     perimeter: PERIMETER,
     safeZMm: SAFE_Z,
     zFeed: overrides.zFeed ?? FEED,
     buildRetract: 'buildRetract' in overrides ? overrides.buildRetract : buildGrblFrameRetract,
+    cncJobsSupported: overrides.cncJobsSupported ?? true,
     ...overrides,
   });
 }
@@ -65,6 +70,7 @@ describe('buildCncFrameMotion', () => {
         hasCurrentWorkZEvidence: true,
         buildRetract: buildGrblFrameRetract,
         zFeed: FEED,
+        cncJobsSupported: true,
       }),
     ).toEqual({ kind: 'ready', lines: [...PERIMETER, returnLine] });
   });
@@ -120,4 +126,26 @@ describe('buildCncFrameMotion', () => {
   it('adds neither a retract nor a restore when the bit is already at safe Z', () => {
     expect(motion({ preFrameWorkZMm: SAFE_Z, hasCurrentWorkZEvidence: true })).toEqual(PERIMETER);
   });
+
+  // CN-2 (2026-09-25 controller audit): adapted from the audit's reproduction
+  // test. The same refusal
+  // as before (Marlin and Smoothieware have no retract builder), checked first
+  // and worded as the real reason.
+  it.each([marlinDriver, smoothiewareDriver])(
+    'refuses $label with the GRBL-family reason before asking for work Z',
+    (driver) => {
+      expect(driver.capabilities.cncJobs).toBe(false);
+      for (const hasCurrentWorkZEvidence of [false, true]) {
+        expect(
+          plan({
+            preFrameWorkZMm: hasCurrentWorkZEvidence ? 0 : null,
+            hasCurrentWorkZEvidence,
+            buildRetract: driver.commands.buildFrameRetract,
+            cncJobsSupported: driver.capabilities.cncJobs,
+          }),
+        ).toEqual({ kind: 'blocked', message: CNC_FRAME_REQUIRES_GRBL_MESSAGE });
+      }
+      expect(CNC_FRAME_REQUIRES_GRBL_MESSAGE).toMatch(/GRBL-family/);
+    },
+  );
 });

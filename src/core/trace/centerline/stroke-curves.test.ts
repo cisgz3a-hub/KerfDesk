@@ -1,8 +1,8 @@
-// ADR-397 regression suite: centreline strokes reach the scene as compact
+// ADR-405 regression suite: centreline strokes reach the scene as compact
 // cubic curves, tips extend before gaps bridge, dots become concentric marks,
 // and Smoothness / Optimize drive the corner angle and fit tolerance.
 //
-// Before-values were measured on the pre-ADR-397 pipeline (straight segments
+// Before-values were measured on the pre-ADR-405 pipeline (straight segments
 // over a dense Catmull-Rom resample), for the same anti-aliased fixtures and
 // with the same deviation measure as below.
 
@@ -105,7 +105,7 @@ describe('centreline strokes as compact cubics', () => {
   // more than MAX_SLACK_PX (worst case) or the row's mean slack. Junction and
   // cap topology set the maxima and is shared by both pipelines; the fit adds
   // at most its 0.25 px tolerance to the faired chain.
-  // Letter a is the one accepted mean regression (ADR-397): its stem's centre
+  // Letter a is the one accepted mean regression (ADR-405): its stem's centre
   // lies on a pixel edge, the faired chain settles on the pixel-centre column
   // beside it, and the fit follows that chain where the old chords happened
   // to cut closer to the truth (measured 0.342 -> 0.415 px mean).
@@ -306,7 +306,7 @@ describe('tip extension runs before gap bridging', () => {
     [3, 2],
     [4, 2],
   ])('a %s px break in a 3 px stroke yields %s stroke(s) under the 3 px join', (gap, strokes) => {
-    // Before ADR-397 every one of these stayed broken: the skeleton ends sat a
+    // Before ADR-405 every one of these stayed broken: the skeleton ends sat a
     // stroke radius inside each tip, so a 1 px break measured ~4 px.
     const art = gapArt(gap);
     const lines = traceCenterlineStrokePaths(art.image, {

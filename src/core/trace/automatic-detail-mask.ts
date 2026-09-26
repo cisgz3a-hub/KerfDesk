@@ -3,7 +3,7 @@ import { lightSolidIso } from './light-solid-fill';
 import type { RawImageData, TraceOptions } from './trace-image';
 
 /** Automatic recovery adds local detail to the preset's brightness band, and
- * fills light solids that the local test alone would hollow (ADR-393).
+ * fills light solids that the local test alone would hollow (ADR-401).
  * Deliberate Sketch remains local contrast only, including shadow removal. */
 export function prepareAutomaticDetailMask(
   image: RawImageData,

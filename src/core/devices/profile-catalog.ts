@@ -126,7 +126,9 @@ const GENERIC_SMOOTHIEWARE_PROFILE: DeviceProfile = {
   bedWidth: 300,
   bedHeight: 200,
   // Smoothie's laser module scales S against laser_module_maximum_s_value,
-  // default 1.0 — power words are fractions (S0.500 = 50%).
+  // default 1.0 — power words are fractions (S0.500 = 50%). The planner keeps
+  // S in 12-bit 1.11 fixed point, so 1 is the only scale that works
+  // (smoothie-power-scale.ts).
   maxPowerS: 1,
   minPowerS: 0,
   capabilities: ['laser-output', 'wcs', 'no-go-zones'],
@@ -134,7 +136,7 @@ const GENERIC_SMOOTHIEWARE_PROFILE: DeviceProfile = {
     {
       label: 'Smoothieware laser module conventions',
       status: 'simulator-tested',
-      note: 'Smoothieware V1 laser module: match laser_module_maximum_s_value (default 1.0) and set laser_module_minimum_power to 0 so S0 feed moves remain dark. Power mode uses M221 P, not GRBL M3/M4. Status uses ?, halt recovery uses M999; realtime pause/resume is not offered because transport/configuration support varies. Source checked 2026-09-19: https://smoothieware.org/laser.html. Simulator coverage only; no hardware qualification.',
+      note: 'Smoothieware V1 laser module: set laser_module_maximum_s_value 1.0 (the firmware default) and keep Full-power S at 1, because the planner stores every S word in 12-bit 1.11 fixed point and any S of 2 or more wraps (Block.h s_value:12, Planner.cpp L81). Set laser_module_minimum_power to 0 so S0 feed moves remain dark. Power mode uses M221 P, not GRBL M3/M4; M221 P needs edge 971eb8cf (2021-06-15) or newer, and older builds run constant-power layers speed-proportional. Status uses ?, halt recovery uses M999; realtime pause/resume is not offered because transport/configuration support varies. Sources checked 2026-09-25: https://smoothieware.org/laser.html and Smoothieware edge 38e2cc08 Block.h, Planner.cpp and Laser.cpp. Simulator coverage only; no hardware qualification.',
     },
   ],
 };

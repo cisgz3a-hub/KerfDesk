@@ -18,6 +18,7 @@ import {
 import { jobAwareAlert } from '../state/job-aware-dialogs';
 import type { SaveGcodeCtx } from './file-actions';
 import { advanceExportVariables } from './advance-export-variables';
+import { savePreflightFrameOptions } from './save-gcode-emission';
 import { captureProjectOutputSnapshot } from '../laser/project-output-snapshot';
 import type { OutputSnapshotRequest } from '../laser/output-preparation-protocol';
 
@@ -32,6 +33,9 @@ export async function handleSaveRd(
   const options: EmitRdOptions = {
     ...(placement.jobOrigin === undefined ? {} : { jobOrigin: placement.jobOrigin }),
     ...(ctx.outputScope === undefined ? {} : { outputScope: ctx.outputScope }),
+    // The frame Save G-code checks in, so a .rd export warns exactly as a
+    // G-code save of the same placement would (audit RU-7).
+    ...savePreflightFrameOptions(ctx, placement),
   };
   if (
     snapshot === undefined &&

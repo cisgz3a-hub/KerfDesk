@@ -130,7 +130,7 @@ describe('planner backlog on the recorded cause', () => {
     );
   });
 
-  it('reads only the current run snapshot with a backlog', () => {
+  it('reads only the current run snapshot', () => {
     const snapshot = { streamerEpoch: 7, sessionEpoch: 3, ackedLines: 400, queuedBlocks: 380 };
     expect(currentRunPlannerBacklog({ streamerEpoch: 7, streamPlannerSnapshot: snapshot })).toEqual(
       backlog,
@@ -138,11 +138,54 @@ describe('planner backlog on the recorded cause', () => {
     expect(
       currentRunPlannerBacklog({ streamerEpoch: 8, streamPlannerSnapshot: snapshot }),
     ).toBeUndefined();
+  });
+
+  // OR-3: an empty planner at the last report is a frontier, not "no information".
+  it('keeps a report that showed an empty planner as a frontier', () => {
+    const snapshot = { streamerEpoch: 7, sessionEpoch: 3, ackedLines: 400, queuedBlocks: 0 };
+    expect(currentRunPlannerBacklog({ streamerEpoch: 7, streamPlannerSnapshot: snapshot })).toEqual(
+      { ackedAtStatus: 400, queuedBlocks: 0 },
+    );
+  });
+
+  // OR-3: without a report that showed the backlog, bound it by the whole planner.
+  it('bounds a run without a backlog report by the controller planner size', () => {
+    const run = { streamerEpoch: 7, streamPlannerSnapshot: null, streamer: { completed: 35 } };
+    // Stock GRBL 1.1h and FluidNC print no Bf at $10=1: 15 usable blocks.
+    expect(currentRunPlannerBacklog({ ...run, activeControllerKind: 'grbl-v1.1' })).toEqual({
+      ackedAtStatus: 35,
+      queuedBlocks: 15,
+      bound: 'planner-size',
+    });
+    expect(currentRunPlannerBacklog({ ...run, activeControllerKind: 'fluidnc' })).toMatchObject({
+      queuedBlocks: 15,
+    });
+    // Smoothieware never reports a buffer; its conveyor queue is 32 blocks.
+    expect(
+      currentRunPlannerBacklog({ ...run, activeControllerKind: 'smoothieware' }),
+    ).toMatchObject({ queuedBlocks: 32 });
+    // `$I` from this session reports the build's own planner (grbl-Mega: 35).
     expect(
       currentRunPlannerBacklog({
-        streamerEpoch: 7,
-        streamPlannerSnapshot: { ...snapshot, queuedBlocks: 0 },
+        ...run,
+        activeControllerKind: 'grbl-v1.1',
+        controllerSessionEpoch: 2,
+        controllerBuildInfo: {
+          protocolVersion: '1.1h',
+          buildRevision: '20190830',
+          userInfo: '',
+          optionCodes: [],
+          plannerBufferBlocks: 35,
+          rxBufferBytes: 255,
+        },
+        controllerBuildInfoObservation: { sessionEpoch: 2, observedAt: 1 },
       }),
-    ).toBeUndefined();
+    ).toMatchObject({ queuedBlocks: 35 });
+    // Marlin's Abort sends M410, which drops its 15-block planner (ADR-395).
+    expect(currentRunPlannerBacklog({ ...run, activeControllerKind: 'marlin' })).toMatchObject({
+      queuedBlocks: 15,
+    });
+    // Ruida is never streamed.
+    expect(currentRunPlannerBacklog({ ...run, activeControllerKind: 'ruida' })).toBeUndefined();
   });
 });

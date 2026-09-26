@@ -33,6 +33,9 @@ function useSettingsAutoRead(): { readonly note: string | null; readonly phase: 
   const lastSettingsReadAt = useLaserStore((s) => s.lastSettingsReadAt);
   const readMachineSettings = useLaserStore((s) => s.readMachineSettings);
   const readBlockReason = useLaserStore(machineSettingsReadBlockReason);
+  // No settings query (Marlin, Smoothieware, the Falcon contract): nothing to
+  // auto-read, and a read would only mark qualification (controller audit CG-7).
+  const canRead = useLaserStore((s) => s.capabilities.settings !== 'none');
   const [phase, setPhase] = useState<AutoReadPhase>('waiting');
   const [autoReadError, setAutoReadError] = useState<string | null>(null);
   const attemptedSession = useRef<number | null>(null);
@@ -51,6 +54,7 @@ function useSettingsAutoRead(): { readonly note: string | null; readonly phase: 
       return;
     }
     if (
+      !canRead ||
       connectionKind !== 'connected' ||
       readBlockReason !== null ||
       attemptedSession.current === controllerSessionEpoch
@@ -88,6 +92,7 @@ function useSettingsAutoRead(): { readonly note: string | null; readonly phase: 
       active = false;
     };
   }, [
+    canRead,
     connectionKind,
     controllerSessionEpoch,
     lastSettingsReadAt,
@@ -97,7 +102,7 @@ function useSettingsAutoRead(): { readonly note: string | null; readonly phase: 
 
   return {
     phase,
-    note: autoReadNote({ connectionKind, phase, readBlockReason, autoReadError }),
+    note: canRead ? autoReadNote({ connectionKind, phase, readBlockReason, autoReadError }) : null,
   };
 }
 

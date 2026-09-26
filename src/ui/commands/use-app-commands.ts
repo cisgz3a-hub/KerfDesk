@@ -5,7 +5,7 @@ import { machineKindOf } from '../../core/scene';
 import { resetWorkspaceLayout, toggleWorkspaceSidePanels } from '../app/workspace-panel-actions';
 import { usePlatform } from '../app/platform-context';
 import { editImageAction } from './edit-image-action';
-import { connectOptionsForDevice } from './connect-options';
+import { connectOptionsForDevice, hasFileOnlyTransport } from './connect-options';
 import { railPanelCommandContext } from './command-context-helpers';
 import { useCommandStoreState } from './use-command-store-state';
 import { useStore } from '../state';
@@ -192,6 +192,7 @@ function connectionCommandContext(
     dirty: app.dirty,
     savedName: app.savedName,
     serialSupported: platform.serial.isSupported(),
+    fileOnlyTransport: hasFileOnlyTransport(app.project.device),
     connected: laser.connection.kind === 'connected',
     machineBusy:
       laser.autofocusBusy ||

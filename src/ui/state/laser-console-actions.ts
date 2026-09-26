@@ -1,5 +1,4 @@
 import type { PreparedConsoleCommand, SettingsCollectorState } from '../../core/controllers/grbl';
-import type { ActiveWorkCoordinateSystem } from '../../core/controllers/grbl/work-offset-readback';
 import { grblSettingCommandMachineKindIssue } from '../../core/controllers/grbl/grbl-setting-write';
 import type { ControllerDriver } from '../../core/controllers';
 import { consoleSettingWriteIssue } from '../../core/controllers/console-setting-writes';
@@ -19,6 +18,13 @@ import {
   consoleCommandNeedsFreshIdle,
 } from './console-command-readiness';
 import { isOwnedControllerIdentityCommand, writeConsoleCommand } from './console-command-transport';
+import {
+  canSelectFrameWcs,
+  frameWcsSelectionPatch,
+  readUnknownActiveWcs,
+  trackConsoleWcs,
+  type FrameWcsSelection,
+} from './frame-wcs-selection';
 import { startControllerCommand, type ControllerLifecycleRefs } from './laser-interactive-command';
 import {
   beginConsoleSettingsRead,
@@ -130,7 +136,14 @@ async function selectPrimaryWcsForFrame(
   get: GetFn,
   refs: ConsoleActionRefs,
   write: ConsoleWriteFn,
-): Promise<void> {
+): Promise<FrameWcsSelection> {
+  // Read before selecting, and keep the origin record (frame-wcs-selection.ts).
+  if (!canSelectFrameWcs(refs.driver)) return { kind: 'not-selectable' };
+  await readUnknownActiveWcs(get, refs, (line, action, source) =>
+    write(line, action, source ?? 'system'),
+  );
+  const previous = get().activeWcs;
+  if (previous === 'G54') return { kind: 'already-g54' };
   const prepared = refs.driver.prepareConsoleCommand('G54');
   if (!prepared.ok) throw new Error(prepared.reason);
   const stateEffect = prepared.command.stateEffect;
@@ -162,10 +175,8 @@ async function selectPrimaryWcsForFrame(
       source: 'system',
     },
   );
-  set((state) => ({
-    ...consoleStateEffectPatch(state, stateEffect, prepared.command.normalized),
-    activeWcs: 'G54',
-  }));
+  set((state) => frameWcsSelectionPatch(state, previous));
+  return { kind: 'selected', previous };
 }
 
 async function dispatchPreparedConsoleCommand(
@@ -188,9 +199,9 @@ async function dispatchPreparedConsoleCommand(
   }
   if (settingsQuery) finishConsoleSettingsRead(set, get, refs);
   applyConsoleStateEffect(set, command);
-  // Track the operator's active WCS selection so save/start advisories can
-  // warn when it is not the G54 that emission pins (audit C6).
-  trackConsoleWcsSelection(set, command.normalized);
+  await trackConsoleWcs(set, get, refs, command, (line, action, next) =>
+    write(line, action, next ?? 'system'),
+  );
   if (reportUnitsWrite) await rereadSettingsAfterReportUnitsWrite(set, get, refs, write);
 }
 
@@ -281,20 +292,6 @@ async function confirmFreshConsoleIdle(
   } catch (error) {
     block(set, get, refs, error instanceof Error ? error.message : String(error));
   }
-}
-
-function trackConsoleWcsSelection(set: SetFn, normalized: string): void {
-  const wcsSelection = consoleWcsSelection(normalized);
-  if (wcsSelection !== null) set({ activeWcs: wcsSelection });
-}
-
-// The last G54-G59 word in a console command is the WCS it leaves active. GRBL
-// status never reports which WCS is active, so this console echo is how the app
-// learns the operator selected a non-G54 frame.
-function consoleWcsSelection(normalized: string): ActiveWorkCoordinateSystem | null {
-  const matches = normalized.toUpperCase().match(/\bG5[4-9]\b/g);
-  const last = matches?.at(-1);
-  return last === undefined ? null : (last as ActiveWorkCoordinateSystem);
 }
 
 function consoleStateEffectPatch(

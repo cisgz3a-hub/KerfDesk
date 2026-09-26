@@ -129,6 +129,36 @@ describe('alarm recovery offer', () => {
     expect(vi.mocked(useLaserStore.getState().unlockAlarm)).not.toHaveBeenCalled();
   });
 
+  // Controller audit 2026-09-25 CG-4: a halted Smoothieware board answers its
+  // Home sequence's first line with `!!`, so the fix there is Unlock (M999).
+  it('unlocks instead of homing on a controller that cannot home while halted', async () => {
+    const project = createProject();
+    useStore.setState({
+      project: {
+        ...project,
+        device: { ...project.device, homing: { ...project.device.homing, enabled: true } },
+      },
+    });
+    useLaserStore.setState({
+      capabilities: { ...original.capabilities, unlock: true, homeFromAlarm: false },
+    });
+    await expect(offerFixForBlockedStart([STATUS_ALARM_START_MESSAGE])).resolves.toBe('handled');
+    expect(vi.mocked(useLaserStore.getState().unlockAlarm)).toHaveBeenCalledTimes(1);
+    expect(vi.mocked(useLaserStore.getState().home)).not.toHaveBeenCalled();
+  });
+
+  // Controller audit 2026-09-25 GP-2: after a critical event only a soft reset
+  // is accepted, which the Alarm banner offers; Home and Unlock are not.
+  it('offers nothing while the controller requires a soft reset', async () => {
+    useLaserStore.setState({
+      capabilities: { ...original.capabilities, unlock: true },
+      resetRequired: true,
+    });
+    await expect(offerFixForBlockedStart([STATUS_ALARM_START_MESSAGE])).resolves.toBe('unrepaired');
+    expect(jobAwareConfirm).not.toHaveBeenCalled();
+    useLaserStore.setState({ resetRequired: false });
+  });
+
   it('keeps the block when the operator declines the unlock', async () => {
     useLaserStore.setState({ capabilities: { ...original.capabilities, unlock: true } });
     vi.mocked(jobAwareConfirm).mockReturnValue(false);

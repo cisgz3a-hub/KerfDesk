@@ -1,4 +1,4 @@
-// Small cubic and polyline geometry for the centreline curve fit (ADR-397).
+// Small cubic and polyline geometry for the centreline curve fit (ADR-405).
 
 // Cubic evaluation and the least-squares core come from the shared fitter
 // (core/geometry/cubic-fit.ts); these are the tangent estimates and chain

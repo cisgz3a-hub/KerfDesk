@@ -1,4 +1,4 @@
-// Commit-time decode and trace at the grid ADR-401 plans from the physical
+// Commit-time decode and trace at the grid ADR-409 plans from the physical
 // output. The preview-grid path (reusing the preview's result) stays in
 // trace-commit-result.ts; this module only takes over when the plan asks for
 // a finer grid than the preview traced.

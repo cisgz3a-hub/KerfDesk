@@ -107,7 +107,7 @@ function inboundKind(response: ControllerEvent): TranscriptKind {
   if (response.kind === 'error') return 'error';
   if (response.kind === 'alarm') return 'alarm';
   if (response.kind === 'setting') return 'setting';
-  if (response.kind === 'message') return 'message';
+  if (response.kind === 'message' || response.kind === 'unknown-command') return 'message';
   if (response.kind === 'welcome') return 'welcome';
   return 'unknown';
 }
@@ -140,6 +140,11 @@ function decoded(
       : { decoded: desc.detail === undefined ? desc.title : `${desc.title}: ${desc.detail}` };
   }
   if (response.kind === 'alarm') {
+    if (response.code === null) {
+      return {
+        decoded: 'Controller alarm: the controller halted and refuses motion until unlocked.',
+      };
+    }
     const desc = presentAlarm(controllerKind, response.code);
     return desc === null
       ? { decoded: `Alarm ${response.code}` }

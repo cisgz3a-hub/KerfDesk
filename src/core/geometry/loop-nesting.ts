@@ -1,4 +1,4 @@
-// Nearest-container search for non-crossing closed loops (ADR-398).
+// Nearest-container search for non-crossing closed loops (ADR-406).
 //
 // Pairwise point-in-polygon tests are quadratic in boundary length: on a
 // dense trace (the 1254 px owl, about 2,200 loops) nearly every small loop

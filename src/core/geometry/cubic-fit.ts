@@ -251,7 +251,7 @@ function generateBezier(
 }
 
 /** Schneider's least-squares core, shared with the centreline stroke fit
- *  (ADR-397): with P1 = P0 + a·t1 and P2 = P3 + b·t2 (t2 pointing back from
+ *  (ADR-405): with P1 = P0 + a·t1 and P2 = P3 + b·t2 (t2 pointing back from
  *  the last point), the arm lengths a, b minimising the squared parametric
  *  residual of points[first..last] at parameters `u` solve a 2x2 system.
  *  Returns the raw solution (0, 0 when singular); callers apply their own

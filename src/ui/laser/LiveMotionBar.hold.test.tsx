@@ -85,6 +85,24 @@ describe('LiveMotionBar controller holding the program', () => {
     }
   });
 
+  // Controller audit ST-5: a spindle spin-up `G4 P` is the controller doing
+  // what it was told, not holding the program.
+  it('names a programmed dwell as a dwell', async () => {
+    useLaserStore.setState({
+      streamer: streamingStreamer(),
+      statusReport: idleReport(),
+      streamHold: { ...hold(), dwellSeconds: 15 },
+    });
+    const { host, root } = await render(<LiveMotionBar />);
+    try {
+      expect(host.textContent).toContain('DWELLING (SPINDLE SPIN-UP)');
+      expect(host.textContent).toContain("running the program's 15 s G4 dwell (12 s so far)");
+      expect(host.textContent).not.toContain('HOLDING PROGRAM');
+    } finally {
+      await act(async () => root.unmount());
+    }
+  });
+
   it('adds the standby-timer hint on a Creality Falcon profile', async () => {
     useStore.getState().updateDeviceProfile({
       ...useStore.getState().project.device,

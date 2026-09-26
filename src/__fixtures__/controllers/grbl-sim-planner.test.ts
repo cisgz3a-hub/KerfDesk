@@ -26,7 +26,9 @@ function saturate(capacity: number): GrblSimPlanner {
 
 describe('grbl-sim-planner', () => {
   it('pins the planner depths read from grbl and grblHAL source', () => {
-    expect(GRBL_PLANNER_BLOCKS).toBe(16);
+    // BLOCK_BUFFER_SIZE 16 with one slot always empty (planner.c:250-254,
+    // 498-502): an idle GRBL 1.1h reports Bf:15,128 (audit ST-2).
+    expect(GRBL_PLANNER_BLOCKS).toBe(15);
     expect(GRBLHAL_PLANNER_BLOCKS).toBe(100);
   });
 

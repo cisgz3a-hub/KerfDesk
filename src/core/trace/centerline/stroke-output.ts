@@ -1,4 +1,4 @@
-// Finished stroke output (ADR-397): the corner set, the cubic fit and the
+// Finished stroke output (ADR-405): the corner set, the cubic fit and the
 // registered compatibility polyline for one assembled chain.
 
 import type { Polyline, Vec2 } from '../../scene';
@@ -6,7 +6,7 @@ import { registerTraceCurve } from '../trace-curves';
 import { collectOutputCorners } from './curve-refine';
 import { fitStrokeCurve, sampleStrokeCurve } from './stroke-curve-fit';
 
-/** How finished chains become canonical cubic curves (ADR-397). */
+/** How finished chains become canonical cubic curves (ADR-405). */
 export type StrokeCurvePolicy = {
   /** Maximum distance of the fitted curve from the faired centreline, px. */
   readonly fitTolerancePx?: number;
@@ -22,7 +22,7 @@ export type StrokeCurvePolicy = {
 /** The fit tolerance at the neutral Optimize, in working px. */
 export const DEFAULT_STROKE_FIT_TOLERANCE_PX = 0.25;
 
-// The finished stroke as compact cubics (ADR-397). Douglas-Peucker still
+// The finished stroke as compact cubics (ADR-405). Douglas-Peucker still
 // decides WHERE the corners are — its sparse vertices carry the turn evidence
 // the corner test was tuned on — but the curve is fitted to the dense faired
 // chain those vertices came from, within the fit tolerance. Corners stay

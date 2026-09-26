@@ -1,4 +1,4 @@
-// ADR-397: centreline traces now carry open (and closed) cubic subpaths. The
+// ADR-405: centreline traces now carry open (and closed) cubic subpaths. The
 // laser move conditioning, the compile flattening and the CNC fairing must all
 // accept them and keep the stroke's ends where the tracer put them.
 

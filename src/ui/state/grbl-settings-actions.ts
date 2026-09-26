@@ -1,11 +1,7 @@
-import {
-  idleCollector,
-  type GrblSettingRow,
-  type SettingsCollectorState,
-} from '../../core/controllers/grbl';
-import { grblSettingMachineKindIssue } from '../../core/controllers/grbl/grbl-setting-write';
+import { idleCollector, type SettingsCollectorState } from '../../core/controllers/grbl';
+import { settingReadbackMatches } from '../../core/controllers/grbl/grbl-setting-storage';
 import type { ControllerDriver } from '../../core/controllers';
-import { machineKindOf, type MachineKind } from '../../core/scene';
+import { machineKindOf } from '../../core/scene';
 import { useStore } from './store';
 import { requestTerminalOwnedActiveWcsReadback } from './terminal-owned-wcs-readback';
 import {
@@ -15,7 +11,6 @@ import {
 } from './detected-settings-action';
 import {
   failedControllerQualificationPatch,
-  qualifiedController,
   qualifyingController,
 } from './laser-controller-qualification';
 import { startControllerCommand, type ControllerLifecycleRefs } from './laser-interactive-command';
@@ -25,7 +20,9 @@ import { mpgCommandBlockMessage, pushLog } from './laser-store-helpers';
 import type { LaserState } from './laser-store';
 import type { TranscriptSource } from './laser-transcript';
 import { machineSettingsReadBlockReason } from './machine-settings-read-readiness';
+import { machineSettingsWriteBlockReason } from './machine-settings-write-readiness';
 import { beginReportUnitsWrite, retainControllerReportUnits } from './controller-report-units';
+import { requalifyWithoutSettingsDump } from './laser-module-probe';
 import {
   emptyControllerBuildInfoState,
   readControllerBuildInfo,
@@ -78,15 +75,7 @@ async function readMachineSettingsAction(
   if (blocked !== null) return blockRead(set, get, blocked);
   const qualificationEpoch = get().controllerSessionEpoch;
   if (settingsQuery === null) {
-    set((state) => ({
-      controllerQualification: qualifiedController(qualificationEpoch, 'not-required'),
-      lastWriteError: null,
-      log: pushLog(
-        state,
-        `[lf2] ${refs.driver.label} does not require a controller settings dump.`,
-      ),
-    }));
-    return;
+    return requalifyWithoutSettingsDump(set, get, refs, write, qualificationEpoch);
   }
   beginSettingsCollection(refs, qualificationEpoch);
   set({
@@ -283,7 +272,12 @@ async function writeAndVerifySetting(
   assertSettingsCommandOwnership(get);
   finishSettingsQualification(set, get, refs, qualificationEpoch);
   if (!settingWasVerified(get, id, trimmed)) {
-    throw new Error(`Controller did not report $${id}=${trimmed} after re-read.`);
+    const reported = get().grblSettingsRows.find((row) => row.id === id);
+    throw new Error(
+      reported === undefined
+        ? `Controller did not report $${id}=${trimmed} after re-read.`
+        : `Controller reports $${id}=${reported.rawValue} after re-read, not ${trimmed}: it stored a different value.`,
+    );
   }
 }
 
@@ -294,7 +288,7 @@ function assertSettingsCommandOwnership(get: GetFn): void {
 
 function settingWasVerified(get: GetFn, id: number, trimmed: string): boolean {
   return get().grblSettingsRows.some(
-    (row) => row.id === id && Number(row.rawValue) === Number(trimmed),
+    (row) => row.id === id && settingReadbackMatches(row.rawValue, Number(trimmed)),
   );
 }
 
@@ -350,45 +344,6 @@ function finishSettingsQualification(
       'The controller settings response was empty. Retry reading controller settings.',
     ),
   );
-}
-
-function machineSettingsWriteBlockReason(
-  state: LaserState,
-  refs: GrblSettingsActionRefs,
-  machineKind: MachineKind,
-  id: number,
-  value: string,
-): string | null {
-  const readBlocked = machineSettingsReadBlockReason(state, {
-    settingsCollectionActive: refs.settingsCollector.kind === 'collecting',
-  });
-  if (readBlocked !== null) return readBlocked;
-  if (state.statusReport?.state !== 'Idle') {
-    return 'Machine must report Idle before writing firmware settings.';
-  }
-  if (state.grblSettingsRows.length === 0 || state.lastSettingsReadAt === null) {
-    return 'Read and export a controller settings backup before writing firmware settings.';
-  }
-  const row = state.grblSettingsRows.find((candidate) => candidate.id === id);
-  if (row === undefined || row.writeRisk === 'unknown' || row.writeRisk === 'read-only') {
-    return `Cannot write unknown or read-only GRBL setting $${id}.`;
-  }
-  const machineKindIssue = grblSettingMachineKindIssue(machineKind, id, value);
-  if (machineKindIssue !== null) return machineKindIssue;
-  return validateSettingValue(row, value);
-}
-
-function validateSettingValue(row: GrblSettingRow, value: string): string | null {
-  const trimmed = value.trim();
-  if (trimmed === '') return `${row.code} value is required.`;
-  const parsed = Number(trimmed);
-  if (!Number.isFinite(parsed)) return `${row.code} value must be numeric.`;
-  if (row.id === 32 && trimmed !== '0' && trimmed !== '1') {
-    return '$32 laser mode must be 0 or 1.';
-  }
-  if (row.id === 31 && parsed < 0) return '$31 min S must be non-negative.';
-  if (row.id === 30 && parsed <= 0) return '$30 max S must be positive.';
-  return null;
 }
 
 function blockRead(set: SetFn, get: GetFn, reason: string): never {

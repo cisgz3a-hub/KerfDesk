@@ -1,6 +1,7 @@
 import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, describe, expect, it, vi } from 'vitest';
+import { grblDriver, smoothiewareDriver } from '../../../core/controllers';
 import { NEOTRONICS_4040_MAX_LT4LDS_V2_PROFILE } from '../../../core/devices';
 import { FALCON_COMPATIBLE_PROFILE } from '../../../core/devices/falcon-profiles';
 import type { PlatformAdapter } from '../../../platform/types';
@@ -55,6 +56,7 @@ afterEach(() => {
   useStore.getState().newProject();
   useLaserStore.setState({
     connection: { kind: 'disconnected' },
+    capabilities: grblDriver.capabilities,
     statusReport: null,
     controllerSessionEpoch: 0,
     fireActive: false,
@@ -109,6 +111,28 @@ describe('SuperConsoleSettingsPane', () => {
     expect(readMachineSettings).toHaveBeenCalledTimes(1);
     expect(host.textContent).toContain('Read / Backup Controller Settings');
     expect(host.textContent).not.toContain('Auto-read skipped');
+    await unmount();
+  });
+
+  // Controller audit CG-7: Marlin, Smoothieware and the Falcon contract have no
+  // settings query, so a read would read nothing.
+  it('neither auto-reads nor offers Read ($$) on a controller without a settings query', async () => {
+    const readMachineSettings = vi.fn(async () => undefined);
+    useLaserStore.setState({
+      connection: { kind: 'connected' },
+      capabilities: smoothiewareDriver.capabilities,
+      statusReport: { state: 'Idle' } as LaserState['statusReport'],
+      controllerSessionEpoch: 5,
+      readMachineSettings,
+    } as Partial<ReturnType<typeof useLaserStore.getState>>);
+    const { host, unmount } = await renderPane();
+    expect(readMachineSettings).not.toHaveBeenCalled();
+    expect([...host.querySelectorAll('button')].map((b) => b.textContent)).not.toContain(
+      'Read ($$)',
+    );
+    expect(host.textContent).toContain('has no settings query');
+    expect(host.textContent).not.toContain('Reads live controller settings with');
+    expect(host.textContent).not.toContain('Auto-read');
     await unmount();
   });
 

@@ -21,7 +21,7 @@
 const MAX_EDGE_PX = 2048;
 // The live preview keeps this cap so it stays interactive. A committed trace
 // and a Multi-File batch no longer share it: they decode the grid
-// planTraceCommitGrid (trace-commit-grid.ts, ADR-401) chooses from the
+// planTraceCommitGrid (trace-commit-grid.ts, ADR-409) chooses from the
 // physical output and a memory budget, which is never coarser than this one.
 // Their size controls are converted so they drop what the preview dropped.
 export const PREVIEW_MAX_EDGE_PX = MAX_EDGE_PX;

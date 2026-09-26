@@ -2,7 +2,12 @@
 // all, the `ok` the firmware withholds while that planner is full.
 //
 // Firmware ground truth, read from gnea/grbl v1.1 source on 2026-07-27:
-//  * `grbl/planner.h`: `#define BLOCK_BUFFER_SIZE 16` (15 with USE_LINE_NUMBERS).
+//  * `grbl/planner.h`: `#define BLOCK_BUFFER_SIZE 16` (15 with USE_LINE_NUMBERS),
+//    and the ring keeps one slot empty: `plan_check_full_buffer()` is true when
+//    `block_buffer_tail == next_buffer_head` (planner.c:250-254) and
+//    `plan_get_block_buffer_available()` counts `BLOCK_BUFFER_SIZE-1`
+//    (planner.c:498-502), so 15 blocks are usable — an idle `$I`/status
+//    reports `Bf:15,128`.
 //  * `grbl/motion_control.c` `mc_line()` opens with a spin loop:
 //      do {
 //        protocol_execute_realtime();
@@ -27,8 +32,9 @@
 // reads nothing else until a slot frees. Hence a single `withheldAck`, not a
 // queue of them.
 
-/** Planner depth on stock grbl 1.1 (`BLOCK_BUFFER_SIZE`). */
-export const GRBL_PLANNER_BLOCKS = 16;
+/** Usable planner blocks on stock grbl 1.1 (`BLOCK_BUFFER_SIZE` 16, one slot
+ * always empty). */
+export const GRBL_PLANNER_BLOCKS = 15;
 
 /** grblHAL's default planner depth (`$398` / `DEFAULT_PLANNER_BUFFER_BLOCKS`). */
 export const GRBLHAL_PLANNER_BLOCKS = 100;

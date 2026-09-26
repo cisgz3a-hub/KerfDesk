@@ -94,7 +94,7 @@
   /* Artwork is always judged against a light material-facing surface. */
   background: #fafafa;
   isolation: isolate;
-  /* Touch pans and pinches are handled by the preview itself (ADR-399). */
+  /* Touch pans and pinches are handled by the preview itself (ADR-407). */
   touch-action: none;
 }
 
@@ -121,7 +121,7 @@
 .lf-trace-preview__artwork {
   position: absolute;
   /* A standing compositor layer: a live wheel/pinch zoom scales its existing
-     raster instead of repainting the trace every step (ADR-399). */
+     raster instead of repainting the trace every step (ADR-407). */
   will-change: transform;
 }
 

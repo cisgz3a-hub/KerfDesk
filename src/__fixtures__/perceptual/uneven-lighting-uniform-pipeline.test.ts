@@ -1,8 +1,8 @@
-// Pipeline-level proof that background flattening (ADR-394) leaves uniform
+// Pipeline-level proof that background flattening (ADR-402) leaves uniform
 // pages on the exact historical path. Each fixture is traced twice through
 // the real preprocessing chain (adjustments, median, the Smooth supersample,
 // the detail detector's own pass): once as shipped, and once with
-// levelForAutomaticThreshold forced to identity, which is the pre-ADR-394
+// levelForAutomaticThreshold forced to identity, which is the pre-ADR-402
 // chain (applyThresholdWithIso then runs its own Otsu cut on the unmodified
 // luma). The traced paths must be identical. A ramp page is the positive
 // control: there the two runs must differ, so the bypass is known to bite.
@@ -78,7 +78,7 @@ async function traceBoth(
   }
 }
 
-describe('uniform pages trace exactly as before ADR-394', () => {
+describe('uniform pages trace exactly as before ADR-402', () => {
   const uniform: Array<[string, RawImageData]> = [
     ...PERCEPTUAL_FIXTURES.map((f): [string, RawImageData] => [f.name, f.image]),
     ...[LOGO_LIKE_TRACE_FIXTURE, HOLLOW_LOGO_TRACE_FIXTURE, SKETCH_CONTRAST_TRACE_FIXTURE].map(

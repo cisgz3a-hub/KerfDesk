@@ -14,7 +14,7 @@
 // every one of their polylines, closed or open, is stroked rather than filled.
 // Strokes are hairlines (vector-effect="non-scaling-stroke"): a burned line's
 // width is the beam's kerf, not a fraction of the source image, so zooming the
-// preview must not thicken it over the detail being inspected (ADR-399).
+// preview must not thicken it over the detail being inspected (ADR-407).
 //
 // One <path> per ColoredPath; subpaths within a path are concatenated
 // in the same `d` attribute, separated by `M` move commands. Closed

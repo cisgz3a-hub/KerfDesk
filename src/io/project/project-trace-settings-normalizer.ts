@@ -1,7 +1,7 @@
-import type { TraceSettingsRecord, TraceSettingsValue } from '../../core/scene';
+import type { TraceSettingsRecord, TraceSettingsValue } from '../../core/scene/scene-object';
 import { isObject } from './project-shape-primitives';
 
-// ADR-400: recorded Trace dialog settings are Re-trace convenience metadata,
+// ADR-408: recorded Trace dialog settings are Re-trace convenience metadata,
 // never output-bearing. Like library provenance, a structurally malformed,
 // hostile or newer (`schemaVersion` other than 1) record is dropped as a whole
 // so it can never refuse a project load; the trace itself loads unchanged and

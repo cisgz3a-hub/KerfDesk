@@ -7,6 +7,10 @@
 // frames — never `statusReport.wco`, which is null on most frames
 // because GRBL only emits WCO every Nth report. Reading raw `wco` here
 // would flicker between "machine 0,0" and "custom" 29 frames out of 30.
+//
+// The F/S row shows live values only. Smoothieware's resting report carries
+// the requested feed, which its classifier drops (controller audit SM-9), so
+// the row appears while it runs, with its `S:` value and live `L:` power.
 
 import { hasCustomOrigin, useLaserStore } from '../state/laser-store';
 import {
@@ -48,6 +52,12 @@ export function StatusDisplay(): JSX.Element {
       {feedMmPerMin !== null && (
         <div style={feedRowStyle}>
           <strong>F:</strong> {feedMmPerMin} mm/min <strong>S:</strong> {report.spindle ?? 0}
+          {report.laserPowerPercent != null && (
+            <>
+              {' '}
+              <strong>L:</strong> {Number(report.laserPowerPercent.toFixed(1))}%
+            </>
+          )}
         </div>
       )}
     </div>

@@ -69,6 +69,10 @@ export type ArchivedControllerObservationV1 = {
   readonly activeControllerKind?: ControllerKind;
   readonly detectedControllerKind?: ControllerKind | null;
   readonly controllerSessionEpoch?: number;
+  /** Planner blocks free at an Idle `Bf` report with nothing in flight, in the
+   *  run's controller session: the usable planner size. Null when no report
+   *  carried `Bf`; absent on records written before it was kept (OR-2). */
+  readonly plannerBlocksAtIdle?: number | null;
 };
 
 export type ArchivedControllerObservationInput = Omit<

@@ -76,6 +76,9 @@ export type StatusReport = {
   readonly wPos: { x: number; y: number; z: number } | null;
   readonly feed: number | null;
   readonly spindle: number | null;
+  /** Live laser output in percent of full power, from Smoothieware's `L:`
+   *  field (reported only while running). Optional; GRBL has no such field. */
+  readonly laserPowerPercent?: number | null;
   /** Optional controller executing-line number from `Ln:`. Stock GRBL builds
    * commonly omit it; consumers must never depend on it being present. */
   readonly executingLineNumber?: number | null;

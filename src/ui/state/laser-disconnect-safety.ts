@@ -1,7 +1,13 @@
 import type { ControllerDriver } from '../../core/controllers';
-import { disconnectStopUnconfirmedNotice, type LaserSafetyNotice } from './laser-safety-notice';
+import { driverQuickStops, noResetStopLines } from './laser-quick-stop';
+import {
+  disconnectStopUnconfirmedNotice,
+  isControllerHaltedNotice,
+  quickStopUnconfirmedNotice,
+  type LaserSafetyNotice,
+} from './laser-safety-notice';
 import type { LaserState } from './laser-store';
-import { isActiveJob } from './laser-store-helpers';
+import { disconnectStopCommands, isActiveJob } from './laser-store-helpers';
 
 type WriteFailedAction = Extract<LaserSafetyNotice, { readonly kind: 'write-failed' }>['action'];
 
@@ -21,12 +27,45 @@ const PHYSICAL_STOP_UNCERTAIN_WRITE_ACTIONS: ReadonlySet<WriteFailedAction> = ne
   'stream',
 ]);
 
+/** The lines Disconnect or Forget writes before closing the port of a
+ * controller outside the GRBL family, and whether they quick-stop it. A
+ * controller that stops with quickstop lines (Marlin) gets them whenever a
+ * job, a motion, a controller operation or a lit beam may still be running, as
+ * ABORT MOTION sends them (MA-7). Otherwise, with nothing else to send, a
+ * notice that leaves the physical stop uncertain still gets the driver's stop. */
+export function disconnectStopPlan(
+  state: LaserState,
+  driver: ControllerDriver,
+): { readonly commands: ReadonlyArray<string>; readonly quickStopped: boolean } {
+  const softReset = driver.realtime.softReset;
+  if (softReset === null && driverQuickStops(driver) && disconnectNeedsPhysicalStop(state)) {
+    const fireOff = state.fireActive ? ['M5\n'] : [];
+    return { commands: [...fireOff, ...noResetStopLines(driver, state)], quickStopped: true };
+  }
+  const ordinary = disconnectStopCommands(state, driver);
+  const uncertain =
+    ordinary.length === 0 &&
+    state.safetyNotice !== null &&
+    safetyNoticeLeavesPhysicalStopUncertain(state.safetyNotice);
+  const commands = !uncertain
+    ? ordinary
+    : softReset === null
+      ? noResetStopLines(driver, state)
+      : [softReset, ...driver.commands.stopLaserLines.map((line) => `${line}\n`)];
+  return { commands, quickStopped: false };
+}
+
 export function unconfirmedDisconnectStopNotice(
   state: LaserState,
   driver: ControllerDriver,
 ): LaserSafetyNotice | null {
   if (driver.realtime.softReset !== null || !disconnectNeedsPhysicalStop(state)) return null;
-  return disconnectStopUnconfirmedNotice();
+  // A halted controller (Marlin kill()) ran none of the stop lines; it still
+  // needs its reset button or a power cycle (MA-10).
+  if (isControllerHaltedNotice(state.safetyNotice)) return state.safetyNotice;
+  return disconnectStopPlan(state, driver).quickStopped
+    ? quickStopUnconfirmedNotice()
+    : disconnectStopUnconfirmedNotice();
 }
 
 export function retainedDisconnectSafetyNotice(state: LaserState): LaserSafetyNotice | null {

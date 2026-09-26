@@ -9,6 +9,8 @@
 //     controller flips into dynamic-power mode before the first burn.
 //     Cut groups in the same job re-issue their own M3 at start; the
 //     dispatcher (compile-job in F.2.d) is responsible for ordering.
+//     After a constant-power (M3) group the caller defers that opening past
+//     the first row's laser-off travel (`deferredEntry`, OR-1).
 //   - Pixel rows sweep bidirectionally: active rows alternate
 //     left-to-right, then right-to-left. Run-length compression: a G1
 //     emits only when the dithered S changes from the previous pixel,
@@ -101,19 +103,72 @@ export type EmitRasterInput = {
   readonly powerPercent?: number;
   /** Deterministic compiler-owned facts for an object-local operation override. */
   readonly effectiveOperationComment?: string;
+  /**
+   * The preceding constant-power (M3) group may have left the beam lit
+   * (2026-09-25 controller audit, OR-1). The group's opening `M5` and arm then
+   * follow its first laser-off travel, after `entryLines` (the caller's held
+   * mode and air changes), so the planner drain they force happens dark.
+   */
+  readonly deferredEntry?: { readonly entryLines: ReadonlyArray<string> };
+  /**
+   * When an M3 group ends on a burn, leave its closing `M5` to the caller, which
+   * writes it after the next laser-off move (OR-1). The result reports it.
+   */
+  readonly deferClosingM5WhenLit?: boolean;
+};
+
+export type RasterGroupEnd = {
+  /** The closing `M5` was left to the caller (see `deferClosingM5WhenLit`). */
+  readonly closingM5Deferred: boolean;
 };
 
 export function emitRasterGroup(input: EmitRasterInput): string {
   return [...emitRasterGroupChunks(input)].join('');
 }
 
-export function* emitRasterGroupChunks(input: EmitRasterInput): Generator<string> {
+/** The group's G-code together with how it ended. */
+export function emitRasterGroupWithEnd(
+  input: EmitRasterInput,
+): RasterGroupEnd & { readonly gcode: string } {
+  const chunks: string[] = [];
+  const generator = emitRasterGroupChunks(input);
+  let next = generator.next();
+  while (next.done !== true) {
+    chunks.push(next.value);
+    next = generator.next();
+  }
+  return { gcode: chunks.join(''), closingM5Deferred: next.value.closingM5Deferred };
+}
+
+type RasterEmissionState = {
+  /** Opening lines still waiting for the first laser-off travel (OR-1). */
+  heldOpening: string | null;
+  /** Under M3, the last written line is a burn: a stop now would be lit. */
+  endsLit: boolean;
+};
+
+export function* emitRasterGroupChunks(input: EmitRasterInput): Generator<string, RasterGroupEnd> {
   validate(input);
   yield `${headerComment(input)}${LINE_END}`;
   // M5 first so we don't get stuck in M3 from a preceding cut group.
   // Then M4 S0 to arm dynamic-power mode at zero output.
+  const opening = [`M5${LINE_END}`, `${input.laserModeCommand ?? 'M4'} S0${LINE_END}`];
+  const state: RasterEmissionState = {
+    heldOpening: heldOpeningText(input, opening),
+    endsLit: false,
+  };
+  if (state.heldOpening === null) yield* opening;
+  yield* emitRasterPasses(input, state);
+  // A blank image has no travel to follow: the opening goes here.
+  if (state.heldOpening !== null) yield state.heldOpening;
+  if (state.endsLit && input.deferClosingM5WhenLit === true) return { closingM5Deferred: true };
+  // Trailing M5 so any subsequent cut group starts from a known
+  // mode-off state. The cut group will re-issue its own M3.
   yield `M5${LINE_END}`;
-  yield `${input.laserModeCommand ?? 'M4'} S0${LINE_END}`;
+  return { closingM5Deferred: false };
+}
+
+function* emitRasterPasses(input: EmitRasterInput, state: RasterEmissionState): Generator<string> {
   const feed = effectiveGcodeFeedMmPerMin(input.feedMmPerMin);
   const pixelWidthMm = (input.bounds.maxX - input.bounds.minX) / input.width;
   const pixelHeightMm = (input.bounds.maxY - input.bounds.minY) / input.height;
@@ -157,7 +212,7 @@ export function* emitRasterGroupChunks(input: EmitRasterInput): Generator<string
         // the next bounded lead-in crosses the remainder with the laser off —
         // the raster analogue of ADR-035 (ADR-039), without path reversal.
         // F rides only the very first G1 of the whole group.
-        yield `${emitSpanSweep(
+        const sweep = emitSpanSweep(
           input,
           worldY,
           pixelWidthMm,
@@ -166,15 +221,30 @@ export function* emitRasterGroupChunks(input: EmitRasterInput): Generator<string
           reverse,
           sweepPlan,
           dotWidthCorrectionMm,
-        )}${LINE_END}`;
+        );
+        yield sweepText(sweep.lines, state);
+        state.endsLit = sweep.endsLit;
         feedEmitted = true;
       }
       emittedRowCount += 1;
     }
   }
-  // Trailing M5 so any subsequent cut group starts from a known
-  // mode-off state. The cut group will re-issue its own M3.
-  yield `M5${LINE_END}`;
+}
+
+function heldOpeningText(input: EmitRasterInput, opening: ReadonlyArray<string>): string | null {
+  const entry = input.deferredEntry;
+  if (entry === undefined) return null;
+  return [...entry.entryLines.map((line) => `${line}${LINE_END}`), ...opening].join('');
+}
+
+// The first sweep's travel is the group's first laser-off move: a held opening
+// follows it (OR-1).
+function sweepText(lines: ReadonlyArray<string>, state: RasterEmissionState): string {
+  const heldOpening = state.heldOpening;
+  if (heldOpening === null) return `${lines.join(LINE_END)}${LINE_END}`;
+  state.heldOpening = null;
+  const [travel, ...rest] = lines;
+  return `${travel ?? ''}${LINE_END}${heldOpening}${rest.map((line) => `${line}${LINE_END}`).join('')}`;
 }
 
 function* inputRowsInProviderOrder(
@@ -230,6 +300,12 @@ function sweepExtents(
   };
 }
 
+type RasterSweepEmission = {
+  readonly lines: ReadonlyArray<string>;
+  /** Under M3 the sweep ends on a burn, so a stop right after it would be lit. */
+  readonly endsLit: boolean;
+};
+
 function emitSpanSweep(
   input: EmitRasterInput,
   worldY: number,
@@ -239,7 +315,13 @@ function emitSpanSweep(
   reverse: boolean,
   sweepPlan: RasterRowSweepPlan,
   dotWidthCorrectionMm: number,
-): string {
+): RasterSweepEmission {
+  // Under M3 a motion line that does not move the head drains GRBL's planner
+  // with the beam still at the last run's power (GRBL motion_control.c:67-76,
+  // grblHAL motion_control.c:182-190), so no zero-length move is written there,
+  // laser-off or not (2026-09-25 controller audit, OR-1). Under M4 the stop is
+  // dark and the historical bytes stay.
+  const constantPower = input.laserModeCommand === 'M3';
   const style = motionWordStyleFor(input.compactMotionWords ?? false);
   // One writer per row: every row opens with a travel that states its motion
   // word and both axes, so nothing is ever held across a row boundary.
@@ -271,10 +353,11 @@ function emitSpanSweep(
   // A controlled G1 seek changes modal F, unlike G0. Reassert the engraving
   // feed on the first runway/burn move after every such seek.
   let shouldEmitFeed = emitFeed || input.controlledLaserOffTravelFeedMmPerMin !== undefined;
+  let endsOnBurn = false;
   const pushRun = (x: number, s: number): void => {
     const targetX = x + rowShiftX;
     const controllerTargetX = rasterControllerCoordinateMm(targetX);
-    if (s > 0 && controllerTargetX === controllerHeadX) return;
+    if ((s > 0 || constantPower) && controllerTargetX === controllerHeadX) return;
     lines.push(
       formatRunG1(
         targetX,
@@ -291,6 +374,7 @@ function emitSpanSweep(
     shouldEmitFeed = false;
     prevS = s;
     controllerHeadX = controllerTargetX;
+    endsOnBurn = s > 0;
   };
   if (sweepPlan.leadInMm > 0) {
     pushRun(reverse ? activeEndX : activeStartX, 0);
@@ -300,13 +384,30 @@ function emitSpanSweep(
   }
   // Exit overscan with S0 so the diode is dark during deceleration. The
   // corrected path already emits a final S0 at the active edge when overscan is
-  // disabled; avoid a duplicate zero-length move in that case.
-  if (sweepPlan.leadOutMm > 0 || dotWidthCorrectionMm <= 0) {
-    lines.push(
-      formatLaserOffG1(endX + rowShiftX, feed, input.modalFeedrate ?? true, writer, style),
-    );
+  // disabled; avoid a duplicate zero-length move in that case. Under M3 a close
+  // that would not move the head (no overscan, or an internal island's exit at
+  // its burn edge) is left out: the next row's travel or the closing M5 turns
+  // the beam off instead.
+  const closeX = endX + rowShiftX;
+  if (
+    writesRowClose(sweepPlan.leadOutMm > 0 || dotWidthCorrectionMm <= 0, constantPower, {
+      closeX,
+      controllerHeadX,
+    })
+  ) {
+    lines.push(formatLaserOffG1(closeX, feed, input.modalFeedrate ?? true, writer, style));
+    endsOnBurn = false;
   }
-  return lines.join(LINE_END);
+  return { lines, endsLit: constantPower && endsOnBurn };
+}
+
+function writesRowClose(
+  wanted: boolean,
+  constantPower: boolean,
+  head: { readonly closeX: number; readonly controllerHeadX: number },
+): boolean {
+  if (!wanted) return false;
+  return !constantPower || rasterControllerCoordinateMm(head.closeX) !== head.controllerHeadX;
 }
 
 function formatLaserOffTravel(
@@ -335,9 +436,10 @@ function formatLaserOffTravel(
   );
 }
 
-// The row's closing move. Its X word is written even when the head already
-// sits there, so the line stays a motion block that darkens the beam rather
-// than a bare modal `S0`.
+// The row's closing move. Under M4 its X word is written even when the head
+// already sits there, so the line stays a motion block that darkens the beam
+// rather than a bare modal `S0` (under M3 that zero-length close is not
+// written at all; see emitSpanSweep).
 function formatLaserOffG1(
   x: number,
   feed: number,

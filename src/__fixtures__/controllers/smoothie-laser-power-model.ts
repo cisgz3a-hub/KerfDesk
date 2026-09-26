@@ -6,10 +6,15 @@
 //    any other uppercase line without a G, M, T or S command does nothing;
 //  - Laser.cpp: `fire <percent>` drives the beam at that power whatever the
 //    motion (manual mode) until `fire off`/`fire 0`. `M221 S` sets the power
-//    scale in percent and P > 0 disables proportional power, both at once. A
+//    scale in percent and P > 0 disables proportional power, both at once
+//    (builds before 971eb8cf, 2021-06-15, ignore P and stay proportional). A
 //    G1/G2/G3 block fires at s_value / laser_module_maximum_s_value x scale
 //    (x the speed ratio when proportional); a G0 block never fires; a halt
 //    ends manual fire but keeps the scale;
+//  - Block.h L81 / Planner.cpp L81: each planned block keeps S as
+//    `uint16_t s_value:12`, 1.11 fixed point. The shipped firmware.bin rounds
+//    S x 2048 to an unsigned integer and keeps its low 12 bits, so only
+//    0 <= S < 2 survives (S255 is stored as 1.0; S50 as 0) — audit SM-7;
 //  - Robot.cpp: S is modal on G0-G3 lines and s_value powers up at
 //    laser_module_default_power (0.8). F sets the seek rate on a G0 line and
 //    the feed rate on G1-G3. M3 and M5 change nothing while the laser module
@@ -40,6 +45,11 @@ export type SmoothieLaserModel = {
   scale: number;
   /** Laser.cpp disable_auto_power, inverted. */
   proportional: boolean;
+  /** False for builds before 971eb8cf, where M221 has no P word. */
+  readonly constantPowerMode: boolean;
+  /** False when the Laser module is not loaded: no beam, and nothing answers
+   *  `fire` or M221 (Laser.cpp L51-L74). Robot still tracks S and position. */
+  readonly laserModule: boolean;
   /** Robot s_value. */
   sValue: number;
   readonly maximumS: number;
@@ -64,12 +74,19 @@ const DEFAULT_RATE_MM_PER_MIN = 4000;
 const DEFAULT_S_VALUE = 0.8;
 
 export function powerUpSmoothie(
-  options: { readonly position?: SmoothiePoint; readonly maximumS?: number } = {},
+  options: {
+    readonly position?: SmoothiePoint;
+    readonly maximumS?: number;
+    readonly constantPowerMode?: boolean;
+    readonly laserModule?: boolean;
+  } = {},
 ): SmoothieLaserModel {
   return {
     manualFire: 0,
     scale: 1,
     proportional: true,
+    constantPowerMode: options.constantPowerMode ?? true,
+    laserModule: options.laserModule ?? true,
     sValue: DEFAULT_S_VALUE,
     maximumS: options.maximumS ?? 1,
     feedRate: DEFAULT_RATE_MM_PER_MIN,
@@ -118,7 +135,8 @@ export function executeSmoothieLine(model: SmoothieLaserModel, raw: string, line
 
 function executeShellLine(model: SmoothieLaserModel, text: string): void {
   const [name, argument] = text.split(/\s+/);
-  if (name !== 'fire' || argument === undefined || argument === 'status') return;
+  if (!model.laserModule || name !== 'fire') return;
+  if (argument === undefined || argument === 'status') return;
   model.manualFire = argument === 'off' ? 0 : Math.min(100, Math.max(0, Number(argument))) / 100;
 }
 
@@ -142,11 +160,11 @@ function executeCommand(model: SmoothieLaserModel, words: ReadonlyArray<Word>, l
 const NO_EFFECT_G: ReadonlySet<number> = new Set([4, 21, 54, 55, 56, 57, 58, 59, 94]);
 
 function executeMCode(model: SmoothieLaserModel, code: number, words: ReadonlyArray<Word>): void {
-  if (code === 221) {
+  if (code === 221 && model.laserModule) {
     const scale = wordValue(words, 'S');
     const p = wordValue(words, 'P');
     if (scale !== undefined) model.scale = scale / 100;
-    if (p !== undefined) model.proportional = p <= 0;
+    if (p !== undefined && model.constantPowerMode) model.proportional = p <= 0;
   } else if (code === 7) model.mist = true;
   else if (code === 8) model.flood = true;
   else if (code === 9) {
@@ -199,9 +217,20 @@ function blockPower(
   g: number,
 ): { readonly power: number; readonly mode: SmoothieBurn['mode'] } {
   if (model.manualFire > 0) return { power: model.manualFire, mode: 'manual' };
-  if (g === 0) return { power: 0, mode: 'constant' };
-  const power = Math.min(1, Math.max(0, (model.sValue / model.maximumS) * model.scale));
+  if (g === 0 || !model.laserModule) return { power: 0, mode: 'constant' };
+  const stored = plannedSValue(model.sValue);
+  const power = Math.min(1, Math.max(0, (stored / model.maximumS) * model.scale));
   return { power, mode: model.proportional ? 'proportional' : 'constant' };
+}
+
+/** The S a planned block actually carries: Planner.cpp L81 stores
+ *  `roundf(S * 2048)` through libgcc's unsigned conversion (0 below 1, the
+ *  exact integer below 2^32) into a 12-bit field, and Laser.cpp L246 reads it
+ *  back divided by 2048. */
+export function plannedSValue(s: number): number {
+  const rounded = Math.round(s * 2048);
+  const unsigned = rounded < 1 ? 0 : Math.min(rounded, 0xffffffff);
+  return (unsigned % 4096) / 2048;
 }
 
 function axis(model: SmoothieLaserModel, current: number, word: number | undefined): number {

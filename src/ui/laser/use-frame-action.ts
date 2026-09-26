@@ -1,5 +1,5 @@
 import { frameBoundsSignature } from '../../core/job';
-import type { OutputScope, Project } from '../../core/scene';
+import { machineKindOf, type OutputScope, type Project } from '../../core/scene';
 import { currentOutputScope, useStore } from '../state';
 import {
   framedRunControllerSnapshot,
@@ -51,6 +51,7 @@ import {
   reportFramePreparationRefusal,
   reportFrameRefusal,
   requireFrameControllerQueue,
+  requireFrameControllerRunsMachineKind,
   waitForFrameOutcome,
 } from './frame-dispatch-support';
 import {
@@ -131,6 +132,7 @@ export async function prepareTransientFrameController(
   ensureFramedRunInvalidationSubscriptions();
   clearStartBlockers();
   if (!(await requireFrameControllerQueue())) return null;
+  if (!requireFrameControllerRunsMachineKind(machineKindOf(project.machine))) return null;
   const wcsNormalization = await normalizeFrameWorkCoordinateSystem();
   if (!wcsNormalization.ok) {
     reportFramePreparationRefusal(wcsNormalization.messages, wcsNormalization.warning);
@@ -191,6 +193,9 @@ export async function dispatchLaserSecondPassFrame(
  * owns before compiling anything. */
 async function prepareFrameContext(): Promise<FrameContext | null> {
   if (!(await requireFrameControllerQueue())) return null;
+  if (!requireFrameControllerRunsMachineKind(machineKindOf(useStore.getState().project.machine))) {
+    return null;
+  }
   const wcsNormalization = await normalizeFrameWorkCoordinateSystem();
   if (!wcsNormalization.ok) {
     reportFramePreparationRefusal(wcsNormalization.messages, wcsNormalization.warning);

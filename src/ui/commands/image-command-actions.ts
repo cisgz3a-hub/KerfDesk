@@ -1,4 +1,5 @@
-import type { Project, RasterImage, TraceSettingsRecord } from '../../core/scene';
+import type { Project, RasterImage } from '../../core/scene';
+import type { TraceSettingsRecord } from '../../core/scene/scene-object';
 import { cropMaskedRasterImage } from '../raster/crop-image';
 import { useStore } from '../state';
 import type { SelectedImageMaskPair } from './image-mask-command-state';
@@ -56,7 +57,7 @@ export function retraceOriginalAction(
       );
       return;
     }
-    // Reopen on the settings recorded with this trace (ADR-400).
+    // Reopen on the settings recorded with this trace (ADR-408).
     openImageDialog(source, {
       replaceTraceId: selected.id,
       ...(selected.traceSettings === undefined ? {} : { traceSettings: selected.traceSettings }),

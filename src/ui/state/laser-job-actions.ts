@@ -1,16 +1,13 @@
-// laser-job-actions — Start / Pause / Resume / Abort, extracted from
-// laser-store.ts when it hit the ADR-015 size cap. Same shape as the other
+// laser-job-actions — Start / Pause / Resume / Abort (laser-job-stop.ts),
+// extracted from laser-store.ts when it hit the ADR-015 size cap. Same shape as the other
 // action modules (autofocus-action, origin-actions): a factory that receives
 // the store's set/get plus the connection-bound safe write. Type-only
 // LaserState import — no runtime cycle.
 
 import {
-  cancel as cancelStreamer,
   continueToolChange as continueToolChangeStreamer,
   createStreamer,
-  markErrored,
   step,
-  wipeInFlight,
 } from '../../core/controllers/grbl';
 import { isToolChangeLine } from '../../core/controllers/grbl/streamer';
 import type { ControllerDriver } from '../../core/controllers';
@@ -22,8 +19,6 @@ import {
   refreshCncLiveStartState,
 } from './cnc-live-start-readiness';
 import { invalidateAccessoryObservation } from './cnc-accessory-readiness';
-import { invalidateControllerSessionEvidence } from './laser-controller-evidence';
-import { clearCncLiveCaps } from './detected-settings-action';
 import {
   assertActiveDriverAcceptsMachineKind,
   assertCncSetupAttested,
@@ -31,23 +26,15 @@ import {
   assertProgramHasSendableLine,
   assertStartControllerEvidence,
 } from './laser-start-program-assertions';
-import { startControllerCommand, type ControllerLifecycleRefs } from './laser-interactive-command';
-import { cancelPauseResumeTransition } from './laser-pause-resume-transition';
-import { armResetCleanup, resetCleanupLines, type ResetCleanupRefs } from './laser-reset-cleanup';
-import { finishedJobStateReset, frameProofReset } from './laser-session-reset';
-import type { JobStopReason } from './job-stop-request';
-import {
-  disconnectStopUnconfirmedNotice,
-  writeFailedNotice,
-  type LaserSafetyAction,
-} from './laser-safety-notice';
+import { startControllerCommand } from './laser-interactive-command';
+import { frameProofReset } from './laser-session-reset';
+import type { LaserSafetyAction } from './laser-safety-notice';
 import {
   hasPendingControllerWrite,
   startPendingControllerMessage,
 } from './laser-start-queue-fence';
 import {
   assertAutofocusIdle,
-  isActiveJob,
   mpgCommandBlockMessage,
   pushLog,
   setupCommandBlockMessage,
@@ -58,42 +45,37 @@ import type { LaserState, StartJobOptions } from './laser-store';
 import { normalizeStartJobOptions } from './laser-job-options';
 import { effectiveStartStreamOptions } from './laser-job-effective-stream-options';
 import { validatedStartJobTimingPlan } from './laser-job-timing-handoff';
-import {
-  liveCanvasExecutionAcceptedPatch,
-  liveCanvasLifecyclePatch,
-  liveCanvasStartPatch,
-} from './live-canvas-run';
+import { liveCanvasExecutionAcceptedPatch, liveCanvasStartPatch } from './live-canvas-run';
 import { runConfirmedPauseJob, runConfirmedResumeJob } from './laser-job-pause-resume';
+import { runStopJob, type JobStopContext } from './laser-job-stop';
 import {
   containActiveStreamWriteFailure,
   streamWriteOwner,
 } from './laser-stream-heartbeat-containment';
 import { consumeClaimedFramedRun } from './framed-run-start-consumption';
-import { originUnknownAfterControllerReset } from './laser-status-line';
 import { refreshLaserLiveStartState } from './laser-live-start-readiness';
 import { laserStartOverrideReset } from './laser-start-override-reset';
-import type { SerialConnection } from '../../platform/types';
 import { armHostedRefill, releaseHostedRefill } from './laser-hosted-refill';
 import { captureHostedRefillStream } from './laser-hosted-refill-owner';
 import { JobStartTransmissionError } from './laser-start-transmission-error';
 import { createStartArmingCompletion } from './laser-start-arming-completion';
-import { cancelPendingManualMotions } from './manual-motion-intent';
+import type { TranscriptSource } from './laser-transcript';
 
 type SetFn = (
   partial: Partial<LaserState> | ((state: LaserState) => Partial<LaserState> | LaserState),
 ) => void;
 type GetFn = () => LaserState;
-type SafeWriteFn = (line: string, action?: LaserSafetyAction) => Promise<void>;
+type SafeWriteFn = (
+  line: string,
+  action?: LaserSafetyAction,
+  source?: TranscriptSource,
+) => Promise<void>;
 type DriverFn = () => ControllerDriver;
 type StartSetupEpoch = CncControllerEpoch;
 type JobActionContext = {
   readonly set: SetFn;
   readonly get: GetFn;
-  readonly refs: ResetCleanupRefs &
-    ControllerLifecycleRefs & {
-      readonly driver: ControllerDriver;
-      readonly connection?: SerialConnection | null;
-    };
+  readonly refs: JobStopContext['refs'];
   readonly safeWrite: SafeWriteFn;
   readonly driver: DriverFn;
 };
@@ -250,101 +232,6 @@ async function prepareStartBoundary(
   assertStartControllerEvidence(machineKind, options, gcode);
   assertGcodeFitsController(gcode, effectiveOptions, driver().kind);
   return effectiveOptions;
-}
-
-// Web Serial can deliver the commanded boot banner before write() settles.
-// That observed reset boundary is stronger evidence than the stale transport
-// promise; only rethrow when no reboot was observed. A port that closed under
-// the write proves nothing was delivered.
-async function settleResetWrite(
-  context: JobActionContext,
-  resetWrite: Promise<void>,
-  resetWriteEpoch: number,
-): Promise<void> {
-  try {
-    await resetWrite;
-  } catch (error) {
-    const portClosed = context.refs.connection == null;
-    if (!portClosed && (context.refs.writeEpoch ?? 0) > resetWriteEpoch) return;
-    if (portClosed) context.set({ safetyNotice: writeFailedNotice('stop') });
-    throw error;
-  }
-}
-
-async function runStopJob(context: JobActionContext, reason?: JobStopReason): Promise<void> {
-  const { set, get, refs, safeWrite, driver } = context;
-  cancelPendingManualMotions(refs);
-  set((state) => ({ manualMotionCancelEpoch: state.manualMotionCancelEpoch + 1 }));
-  const softReset = driver().realtime.softReset;
-  // Queued stop lines need a single writer, so a controller without a realtime
-  // reset takes the hosted refill back first (ADR-334).
-  if (softReset === null) await releaseHostedRefill(refs);
-  const transitionCancellationMessage =
-    'Pause or Resume was cancelled because the operator requested Abort.';
-  cancelPauseResumeTransition(refs, transitionCancellationMessage);
-  if (softReset !== null) {
-    clearCncLiveCaps();
-    const resetWriteEpoch = refs.writeEpoch ?? 0;
-    const cleanupLines = resetCleanupLines(driver());
-    // Freeze host refill before the first wire await. If the transport write
-    // fails, the controller may still be executing its old buffer; keeping an
-    // errored (active) streamer leaves Abort visible without sending more job
-    // bytes. Arm cleanup first so an immediate boot banner cannot outrun it.
-    set((state) => ({
-      ...invalidateControllerSessionEvidence(state),
-      streamer: state.streamer === null ? null : markErrored(state.streamer),
-      // Recovery reads this beside the errored stream so the saved cause is
-      // the requested stop, not an unexplained end (ADR-341 Amendment 3).
-      ...(reason === undefined || state.streamer === null
-        ? {}
-        : { jobStopRequest: { reason, streamerEpoch: state.streamerEpoch } }),
-    }));
-    armResetCleanup(refs, safeWrite, cleanupLines);
-    // The reset goes to the transport before the hosted refill is taken back.
-    // A worker that receives it retires its own refill queue (ADR-334 §4), so
-    // awaiting the release first only put the Abort byte behind every line
-    // the renderer had yet to process, and behind a handshake timer that
-    // closes the port. The release still runs, after the reset is posted, so
-    // a silent worker is bounded exactly as before.
-    const resetWrite = safeWrite(softReset, 'stop');
-    void resetWrite.catch(() => undefined);
-    await releaseHostedRefill(refs);
-    await settleResetWrite(context, resetWrite, resetWriteEpoch);
-  }
-  if (softReset === null) {
-    // Marlin-style controllers have no realtime planner reset. M5/M107 are
-    // queued behind motion already accepted by firmware, so cancelling the
-    // host streamer is not proof that the physical machine stopped. Preserve
-    // an explicit operator warning before the first await; a transport failure
-    // may replace it with the stronger write-failed notice.
-    if (isActiveJob(get().streamer)) {
-      set({ safetyNotice: disconnectStopUnconfirmedNotice() });
-    }
-    try {
-      for (const line of driver().commands.stopLaserLines) await safeWrite(`${line}\n`, 'stop');
-    } catch {
-      // Best effort if the transport is already gone.
-    }
-  }
-  set((state) => ({
-    // Abort ends the run, so its machine kind and any tool-change bits it never
-    // reached are no longer the operator's pending work.
-    ...finishedJobStateReset(),
-    wcoCache: null,
-    accessoryCache: null,
-    airAssistOn: false,
-    // ADR-228 amendment: Abort during a frame must kill the proof directly —
-    // an aborted trace was not completed, whatever the side effects imply.
-    ...frameProofReset(),
-    ...originUnknownAfterControllerReset(state),
-    streamer:
-      state.streamer === null
-        ? state.streamer
-        : softReset !== null
-          ? wipeInFlight(cancelStreamer(state.streamer))
-          : cancelStreamer(state.streamer),
-    ...liveCanvasLifecyclePatch(state, 'stopped'),
-  }));
 }
 
 function prepareInitialStream(

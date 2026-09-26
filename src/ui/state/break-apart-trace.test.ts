@@ -18,7 +18,7 @@ import { useStore } from './store';
 import { resetStore } from './test-helpers';
 import { useToastStore } from './toast-store';
 
-// ADR-398: Break Apart works directly on a trace, one object per outer shape.
+// ADR-406: Break Apart works directly on a trace, one object per outer shape.
 
 const TRACE_TRANSFORM = {
   x: 12.5,

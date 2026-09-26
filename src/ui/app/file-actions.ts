@@ -32,6 +32,7 @@ import { importDxfFiles } from './dxf-import-action';
 import { handleSaveTiledGcode } from './save-tiled-gcode';
 import { advanceExportVariables } from './advance-export-variables';
 import { controllerReadinessAdvisories } from './controller-readiness-advisories';
+import { cncProjectExportAdvisories } from './cnc-export-controller-advisory';
 import { importSourceSizeAdvisory } from './import-size-advisory';
 import { prepareGcodeSave } from './prepare-gcode-save';
 import { detectCompiledVCarveDepthWarnings } from '../laser/cnc-compiled-depth-warnings';
@@ -244,11 +245,10 @@ async function saveOrdinaryGcode(
   // with the post-save advisories. The confirm was raised on every save
   // ATTEMPT, so reporting it only after a successful write would tell the
   // operator less than the refusal did whenever the picker is cancelled.
-  for (const advisory of controllerReadinessAdvisories(
-    ctx.project,
-    ctx.controllerSettings,
-    ctx.settingsCapability,
-  )) {
+  for (const advisory of [
+    ...controllerReadinessAdvisories(ctx.project, ctx.controllerSettings, ctx.settingsCapability),
+    ...cncProjectExportAdvisories(ctx.project),
+  ]) {
     ctx.pushToast(advisory, 'warning');
   }
   // Production calls this from the Save as button with a prebuilt

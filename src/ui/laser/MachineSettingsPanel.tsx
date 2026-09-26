@@ -32,6 +32,9 @@ export function MachineSettingsPanel(props: MachineSettingsPanelProps = {}): JSX
   const lastSettingsReadAt = useLaserStore((s) => s.lastSettingsReadAt);
   const readMachineSettings = useLaserStore((s) => s.readMachineSettings);
   const readDisabledReason = useLaserStore(machineSettingsReadBlockReason);
+  // Marlin, Smoothieware, the Falcon contract and Ruida have no settings query:
+  // a read there reads nothing (controller audit CG-7).
+  const canRead = useLaserStore((s) => s.capabilities.settings !== 'none');
   const pushToast = useToastStore((s) => s.pushToast);
   const context =
     props.context ?? machineSettingsContextForProfile(project.device, project.machine);
@@ -64,8 +67,9 @@ export function MachineSettingsPanel(props: MachineSettingsPanelProps = {}): JSX
       >
         Read / Backup Controller Settings
       </summary>
-      <MachineSettingsNotice context={context} />
+      <MachineSettingsNotice context={context} canRead={canRead} />
       <MachineSettingsActions
+        canRead={canRead}
         onRead={handleRead}
         onExport={handleExport}
         readDisabledReason={readDisabledReason}
@@ -80,6 +84,7 @@ export function MachineSettingsPanel(props: MachineSettingsPanelProps = {}): JSX
 }
 
 function MachineSettingsActions(props: {
+  readonly canRead: boolean;
   readonly onRead: () => void;
   readonly onExport: () => void;
   readonly readDisabledReason: string | null;
@@ -95,15 +100,17 @@ function MachineSettingsActions(props: {
   );
   return (
     <div style={buttonRowStyle}>
-      <button
-        type="button"
-        onClick={props.onRead}
-        disabled={props.readDisabledReason !== null}
-        title={readHelp.title}
-        data-help-id={readHelp['data-help-id']}
-      >
-        Read ($$)
-      </button>
+      {props.canRead ? (
+        <button
+          type="button"
+          onClick={props.onRead}
+          disabled={props.readDisabledReason !== null}
+          title={readHelp.title}
+          data-help-id={readHelp['data-help-id']}
+        >
+          Read ($$)
+        </button>
+      ) : null}
       <button
         type="button"
         onClick={props.onExport}
@@ -119,11 +126,18 @@ function MachineSettingsActions(props: {
 
 function MachineSettingsNotice(props: {
   readonly context: MachineSettingsPresentationContext;
+  readonly canRead: boolean;
 }): JSX.Element {
   return (
     <p style={noticeStyle}>
-      Reads live controller settings with <code>$$</code>. Read-only in this version; export a
-      backup before changing firmware.
+      {props.canRead ? (
+        <>
+          Reads live controller settings with <code>$$</code>. Read-only in this version; export a
+          backup before changing firmware.
+        </>
+      ) : (
+        'The connected controller has no settings query, so there are no live settings to read here. Change its settings with the firmware’s own configuration tools.'
+      )}
       <br />
       {machineSettingsContextNotice(props.context)}
     </p>

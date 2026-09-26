@@ -1,4 +1,4 @@
-// Analytic stroke art for the centerline curve-output tests (ADR-397). Each
+// Analytic stroke art for the centerline curve-output tests (ADR-405). Each
 // fixture is dark ink on white whose centreline is known by construction: a
 // pixel's coverage is the 4x4-supersampled fraction of its area lying within
 // strokeWidth/2 of the analytic centreline, so edges are anti-aliased the way

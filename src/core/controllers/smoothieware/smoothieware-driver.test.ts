@@ -20,9 +20,6 @@ describe('classifySmoothieResponse', () => {
       kind: 'error',
       code: null,
     });
-    expect(classifySmoothieResponse('ALARM: Kill button pressed')).toMatchObject({
-      kind: 'error',
-    });
     expect(classifySmoothieResponse('Smoothie command shell')).toMatchObject({ kind: 'welcome' });
     expect(classifySmoothieResponse('Smoothie Running @120MHz')).toMatchObject({
       kind: 'welcome',
@@ -30,6 +27,65 @@ describe('classifySmoothieResponse', () => {
     expect(
       classifySmoothieResponse('<Idle|MPos:0.0000,0.0000,0.0000|WPos:0.0000,0.0000,0.0000>'),
     ).toMatchObject({ kind: 'status' });
+  });
+
+  // Controller audit SM-8. Smoothieware prints these on its own when it halts,
+  // or before the command's own ok (Endstops.cpp L420-L430 and L895-L902,
+  // KillButton.cpp L53-L64, USBSerial.cpp L302-L314, ZProbe.cpp L492-L496):
+  // none of them answers a line.
+  it('reads every ALARM: line as a code-less alarm event, not a terminal reply', () => {
+    for (const line of [
+      'ALARM: Hard limit +X',
+      'ALARM: Kill button pressed - reset, $X or M999 to clear HALT',
+      'ALARM: Abort during cycle',
+      'ALARM: Homing fail',
+      'ALARM: Probe fail',
+    ]) {
+      expect(classifySmoothieResponse(line)).toEqual({ kind: 'alarm', code: null, raw: line });
+    }
+    // Real replies stay terminal: the halted `!!`/`error:Alarm lock` and
+    // GcodeDispatch's error lines (GcodeDispatch.cpp L158-L180, L385-L403).
+    for (const line of ['!!', 'error:Alarm lock', 'Error: unknown', 'error:Unsupported command']) {
+      expect(classifySmoothieResponse(line)).toMatchObject({
+        kind: 'error',
+        code: null,
+        raw: line,
+      });
+    }
+  });
+
+  it('reads the M221 laser report as a response line for the Laser module probe', () => {
+    for (const line of [
+      'Laser power: 100.00 %, disable auto power: 0, PWM frequency: 50000.000000 Hz',
+      'Laser power scale at 100.00 %',
+    ]) {
+      expect(classifySmoothieResponse(line)).toEqual({ kind: 'message', tag: 'LASER', body: line });
+    }
+  });
+
+  // Controller audit SM-9: Kernel.cpp L206-L302 prints the live feed and
+  // `L:`/`S:` only while running; at rest the first F component is the
+  // requested feed.
+  it('drops the resting requested feed and reads S and L from the running report', () => {
+    const idle = classifySmoothieResponse(
+      '<Idle|MPos:1.0000,2.0000,0.0000|WPos:1.0000,2.0000,0.0000|F:4000.0,100.0>',
+    );
+    expect(idle).toMatchObject({
+      kind: 'status',
+      report: { state: 'Idle', feed: null, spindle: null, laserPowerPercent: null },
+    });
+    const run = classifySmoothieResponse(
+      '<Run|MPos:1.0000,2.0000,0.0000|WPos:1.0000,2.0000,0.0000|F:1500.0,1500.0,100.0|L:37.5000|S:0.5000>',
+    );
+    expect(run).toMatchObject({
+      kind: 'status',
+      report: { state: 'Run', feed: 1500, spindle: 0.5, laserPowerPercent: 37.5 },
+    });
+    // Without the Laser module Smoothieware reports the spindle S at rest too.
+    const spindle = classifySmoothieResponse(
+      '<Idle|MPos:0.0000,0.0000,0.0000|WPos:0.0000,0.0000,0.0000|F:4000.0,100.0|S:12000.00>',
+    );
+    expect(spindle).toMatchObject({ report: { feed: null, spindle: 12000 } });
   });
 
   it('reads the M115 identity reply as a message, not a reboot banner', () => {

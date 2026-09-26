@@ -69,7 +69,7 @@ function signedTotal(loops: ReadonlyArray<{ readonly area: number }>): number {
   return loops.reduce((sum, loop) => sum + loop.area, 0);
 }
 
-describe('traceBoundaryLoops saddle policy (ADR-395)', () => {
+describe('traceBoundaryLoops saddle policy (ADR-403)', () => {
   // Kept one pixel off the image corners: a saddle diagonally next to an
   // image corner has no window ring and is a tie (saddle-connectivity.ts).
   const hairline = [

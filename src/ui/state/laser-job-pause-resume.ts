@@ -42,12 +42,24 @@ import { mpgCommandBlockMessage, pushLog } from './laser-store-helpers';
 import type { SerialConnection } from '../../platform/types';
 import { armHostedRefill, releaseHostedRefill } from './laser-hosted-refill';
 import { captureHostedRefillStream } from './laser-hosted-refill-owner';
+import {
+  assertStreamPauseResumeReady,
+  queueStreamPauseBeamOff,
+  restoreStreamPauseBeam,
+  streamPausePlan,
+  streamSidePauseMessage,
+} from './laser-stream-pause-beam';
+import type { TranscriptSource } from './laser-transcript';
 
 type SetFn = (
   partial: Partial<LaserState> | ((state: LaserState) => Partial<LaserState> | LaserState),
 ) => void;
 type GetFn = () => LaserState;
-type SafeWriteFn = (line: string, action?: LaserSafetyAction) => Promise<void>;
+type SafeWriteFn = (
+  line: string,
+  action?: LaserSafetyAction,
+  source?: TranscriptSource,
+) => Promise<void>;
 
 type PauseResumeContext = {
   readonly set: SetFn;
@@ -107,7 +119,12 @@ export async function runConfirmedPauseJob(context: PauseResumeContext): Promise
   }
   if (pauseByte === null) {
     freezeStreamer(context);
-    context.get().pushSystemNotice(`[lf2] ${PAUSE_UNSUPPORTED_MESSAGE}`);
+    // Marlin: a beam-off queued behind the buffered motion (MA-1).
+    const plan = streamPausePlan(context.get(), activeDriver);
+    const message =
+      plan === null ? PAUSE_UNSUPPORTED_MESSAGE : streamSidePauseMessage(plan.offLines);
+    context.get().pushSystemNotice(`[lf2] ${message}`);
+    await queueStreamPauseBeamOff(context, plan);
     return;
   }
   await runOwnedPauseResumeTransition(context, 'pause', timeoutMessage, async (token) => {
@@ -144,6 +161,7 @@ export async function runConfirmedResumeJob(context: PauseResumeContext): Promis
   // for SAFETY_DOOR_SPINDLE_DELAY (4.0s stock) so the cutter is back at speed
   // before the interrupted move continues.
   const activeDriver = context.driver();
+  assertStreamPauseResumeReady(context, activeDriver);
   const laserJob = context.get().activeJobMachineKind !== 'cnc';
   const confirmedDoorResume = activeDriver.realtime.safetyDoor !== null;
   const controlSession = context.get().controllerSessionEpoch;
@@ -180,6 +198,8 @@ export async function runConfirmedResumeJob(context: PauseResumeContext): Promis
         command: resumeByte,
         action: 'resume',
       });
+    } else {
+      await restoreStreamPauseBeam(context, activeDriver, token);
     }
     assertResumeCommandOwnership(context);
     finishedWithoutRefill = await refillResumedStream(context, {

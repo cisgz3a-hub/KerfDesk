@@ -12,63 +12,54 @@
 // Postamble: M5, then `G0 X0 Y0 S0` to park at origin.
 // LightBurn divergence (LIGHTBURN-STUDY §8): stock GRBL headers there are
 // units/positioning only, with M3/M4 issued per cut layer — ours pre-arms.
+//
+// Constant-power (M3) output never makes the controller drain its planner
+// while the beam may still be lit mid-job (2026-09-25 controller audit, OR-1):
+// see grbl-output-cursor.ts for the rules and upstream evidence.
 
 import { resolveGrblDialect, type DeviceProfile, type GrblGcodeDialect } from '../devices';
 import { contourEntryPoint, type ContourEntryBounds } from '../job/contour-entry';
-import { expandFillHatchWithRunways } from '../job/fill-runway';
-import { planFillSweeps, type FillSweepPlan } from '../job/fill-sweep-plan';
-import type { FillSpan } from '../job/fill-sweeps';
 import { offsetForSpeed } from '../job/scan-offset';
 import type { CutGroup, CutSegment, FillGroup, Group, Job, RasterGroup } from '../job';
-import { emitRasterGroup as emitRasterGroupGcode } from '../raster';
+import { emitRasterGroupWithEnd } from '../raster/emit-raster';
 import { assertNever } from '../scene';
-import { formatGcodeCoordinateMm } from '../gcode';
-import { effectiveGcodeFeedMmPerMin, formatGcodeFeedMmPerMin } from '../gcode/feed-word';
+import { formatGcodeFeedMmPerMin } from '../gcode/feed-word';
 import type { OutputEmitOptions, OutputStrategy } from './output-strategy';
 import { bridgedAirGapIndices } from './air-assist-hold';
-import { fillRunwayCommentText } from './fill-runway-comment';
+import { emitScanlineFillGroup } from './grbl-fill-emission';
+import {
+  LINE_END,
+  contourEntryComment,
+  feedComment,
+  joinedLines,
+  laserOffRunwayLine,
+  laserOffSeekLine,
+  pushOperationProvenanceComment,
+  roundedPositiveFeed,
+  scaleS,
+} from './grbl-laser-lines';
+import {
+  createLaserOutputCursor,
+  emittedHead,
+  heldLinesBeforeBurn,
+  laserOffMoveLines,
+  noteBurn,
+  noteLaserOffMove,
+  noteRasterGroupEnd,
+  releaseHeldLines,
+  takeHeldLines,
+  transitionLinesNow,
+  type EmittedHead,
+  type LaserOutputCursor,
+} from './grbl-output-cursor';
 import { laserModeWord, vectorPowerWord } from './grbl-power-modes';
 import { laserParkTarget } from './job-park-target';
-import { INTENTIONAL_LASER_OFF_MOTION_COMMENT } from '../gcode-comments';
 import { laserArcMovesEnabled } from '../devices/laser-arc-moves';
 import { jobWritesArcMoves } from '../job/cut-arc-moves';
-import { arcBurnLines } from './grbl-laser-arc-moves';
+import { arcSegmentBurns } from './grbl-laser-arc-moves';
 import { operationProvenanceComment } from './operation-provenance-comment';
 
-const LINE_END = '\n';
 type CoolantMode = 'off' | 'M7' | 'M8';
-
-function scaleS(powerPercent: number, maxPowerS: number): number {
-  return Math.round((powerPercent / 100) * maxPowerS);
-}
-
-function laserOffSeekLine(
-  x: number,
-  y: number,
-  device: DeviceProfile,
-  dialect: GrblGcodeDialect,
-): string {
-  if (device.controlledLaserOffTravelFeedMmPerMin !== undefined) {
-    const feed = roundedPositiveFeed(
-      device.controlledLaserOffTravelFeedMmPerMin,
-      'Controlled laser-off travel',
-    );
-    return `G1 X${formatGcodeCoordinateMm(x)} Y${formatGcodeCoordinateMm(y)} F${formatGcodeFeedMmPerMin(feed)} S0 ; ${INTENTIONAL_LASER_OFF_MOTION_COMMENT}`;
-  }
-  const base = `G0 X${formatGcodeCoordinateMm(x)} Y${formatGcodeCoordinateMm(y)}`;
-  return dialect.requiresS0OnRapid ? `${base} S0` : base;
-}
-
-function laserOffRunwayLine(x: number, y: number, feed: number): string {
-  return `G1 X${formatGcodeCoordinateMm(x)} Y${formatGcodeCoordinateMm(y)} F${formatGcodeFeedMmPerMin(feed)} S0 ; ${INTENTIONAL_LASER_OFF_MOTION_COMMENT}`;
-}
-
-function roundedPositiveFeed(speed: number, context: string): number {
-  if (!Number.isFinite(speed) || speed <= 0) {
-    throw new Error(`${context}: speed must be finite and > 0`);
-  }
-  return effectiveGcodeFeedMmPerMin(speed);
-}
 
 function preamble(dialect: GrblGcodeDialect, writesArcs: boolean): string {
   // G54 + G94 pin the modal WCS and feed mode the same way the CNC preamble
@@ -121,57 +112,75 @@ type SegmentEmissionContext = {
   readonly dialect: GrblGcodeDialect;
   readonly entryRunwayMm?: number | undefined;
   readonly entryBounds: ContourEntryBounds;
+  readonly cursor: LaserOutputCursor;
   /** ADR-432: the machine takes G2/G3, so fitted arc moves may be written. */
   readonly arcMovesEnabled: boolean;
 };
 type GroupEmissionContext = Pick<
   SegmentEmissionContext,
-  'device' | 'dialect' | 'entryBounds' | 'arcMovesEnabled'
+  'device' | 'dialect' | 'entryBounds' | 'cursor' | 'arcMovesEnabled'
 >;
 
-function emitSegment(seg: CutSegment, context: SegmentEmissionContext): string {
+function emitSegment(seg: CutSegment, context: SegmentEmissionContext): string[] {
   const first = seg.polyline[0];
   // A one-point polyline has nothing to cut — emitting its rapid alone would
   // be a pointless stray G0 (defense in depth; producers filter these).
-  if (first === undefined || seg.polyline.length < 2) {
-    return '';
-  }
-  const burnLines = arcBurnLines(seg, first, context) ?? polylineBurnLines(seg, first, context);
+  if (first === undefined || seg.polyline.length < 2) return [];
+  const burns = segmentBurnLines(seg, first, context);
   // If the entire segment collapses at emit precision, omit its laser-off seek
   // as well; it has no executable burn motion to position for.
-  if (burnLines.length === 0) return '';
-  return [...segmentApproachLines(seg, first, context), ...burnLines].join(LINE_END) + LINE_END;
+  if (burns === null) return [];
+  const { cursor, device, dialect } = context;
+  const lines = [
+    ...segmentApproachLines(seg, first, context),
+    ...heldLinesBeforeBurn(cursor, { start: first, firstTarget: burns.firstTarget }, (x, y) =>
+      laserOffSeekLine(x, y, device, dialect),
+    ),
+    ...burns.lines,
+  ];
+  if (context.s > 0) noteBurn(cursor, burns.end);
+  else noteLaserOffMove(cursor, burns.end);
+  return lines;
 }
 
-function polylineBurnLines(
+function segmentBurnLines(
   seg: CutSegment,
   first: { readonly x: number; readonly y: number },
   context: SegmentEmissionContext,
-): string[] {
+): SegmentBurns | null {
+  // Fitted arc moves (ADR-432) replace the polyline when this output writes them.
+  const arcs = arcSegmentBurns(seg, first, context);
+  if (arcs !== null)
+    return arcs.firstTarget === null ? null : { ...arcs, firstTarget: arcs.firstTarget };
   const { s, feed, dialect } = context;
-  const burnLines: string[] = [];
-  let headX = formatGcodeCoordinateMm(first.x);
-  let headY = formatGcodeCoordinateMm(first.y);
-  let burnEmitted = false;
+  const lines: string[] = [];
+  let head = emittedHead(first.x, first.y);
+  let firstTarget: SegmentBurns['firstTarget'] | null = null;
   for (let i = 1; i < seg.polyline.length; i += 1) {
     const pt = seg.polyline[i];
     if (pt === undefined) continue;
-    const targetX = formatGcodeCoordinateMm(pt.x);
-    const targetY = formatGcodeCoordinateMm(pt.y);
+    const target = emittedHead(pt.x, pt.y);
     // Formatting is part of the executable artifact: points that differ in
     // memory can collapse to one machine coordinate at 3 dp. Never emit a
     // stationary positive-power G1, and keep F/S for the first real move.
-    if (targetX === headX && targetY === headY) continue;
+    if (target.x === head.x && target.y === head.y) continue;
+    const burnEmitted = firstTarget !== null;
     const feedWord =
       !burnEmitted || !dialect.modalFeedrate ? ` F${formatGcodeFeedMmPerMin(feed)}` : '';
     const sWord = !burnEmitted || dialect.emitSOnEveryBurnMove ? ` S${s}` : '';
-    burnLines.push(`G1 X${targetX} Y${targetY}${feedWord}${sWord}`);
-    burnEmitted = true;
-    headX = targetX;
-    headY = targetY;
+    lines.push(`G1 X${target.x} Y${target.y}${feedWord}${sWord}`);
+    firstTarget ??= pt;
+    head = target;
   }
-  return burnLines;
+  return firstTarget === null ? null : { lines, end: head, firstTarget };
 }
+
+type SegmentBurns = {
+  readonly lines: ReadonlyArray<string>;
+  readonly end: EmittedHead;
+  /** Where the first emitted burn goes (it starts at the segment's first point). */
+  readonly firstTarget: { readonly x: number; readonly y: number };
+};
 
 // ADR-239: with an entry runway, seek to the tangential entry point instead of
 // the ink edge, then ramp to the first vertex laser-off at burn feed. The ramp
@@ -183,220 +192,89 @@ function segmentApproachLines(
   first: { readonly x: number; readonly y: number },
   context: SegmentEmissionContext,
 ): string[] {
+  const { cursor, device, dialect } = context;
   const entry =
     context.entryRunwayMm === undefined
       ? null
       : contourEntryPoint(seg.polyline, context.entryRunwayMm, context.entryBounds);
+  const firstHead = emittedHead(first.x, first.y);
   if (entry === null) {
-    return [laserOffSeekLine(first.x, first.y, context.device, context.dialect)];
+    return laserOffMoveLines(
+      cursor,
+      firstHead,
+      laserOffSeekLine(first.x, first.y, device, dialect),
+    );
   }
   return [
-    laserOffSeekLine(entry.x, entry.y, context.device, context.dialect),
-    laserOffRunwayLine(first.x, first.y, context.feed),
+    ...laserOffMoveLines(
+      cursor,
+      emittedHead(entry.x, entry.y),
+      laserOffSeekLine(entry.x, entry.y, device, dialect),
+    ),
+    ...laserOffMoveLines(cursor, firstHead, laserOffRunwayLine(first.x, first.y, context.feed)),
   ];
 }
 
 function emitGroup(group: CutGroup, context: GroupEmissionContext): string {
-  const { device, dialect } = context;
-  const s = scaleS(group.power, device.maxPowerS);
+  const s = scaleS(group.power, context.device.maxPowerS);
   const feed = roundedPositiveFeed(group.speed, `Layer ${group.layerId}`);
   const chunks: string[] = [];
   chunks.push(
     `; layer ${group.layerId} color ${group.color} power ${group.power}% ${feedComment(group, feed)} passes ${group.passes}${contourEntryComment(group.entryRunwayMm)}`,
   );
   pushOperationProvenanceComment(chunks, group);
+  const segmentContext = { ...context, s, feed, entryRunwayMm: group.entryRunwayMm };
   for (let p = 0; p < group.passes; p += 1) {
     chunks.push(`; pass ${p + 1} of ${group.passes}`);
-    // Re-arm with the GROUP's effective mode: a dynamic-override layer must
-    // stay M4 on every pass, and the intra-group word must match what
-    // emitJob's modal tracker armed before the group — a dialect-default M3
-    // here silently flipped later groups to constant power (audit P2-1).
-    if (p > 0) chunks.push(`${vectorPowerWord(group, dialect)} S0`);
+    // No re-arm between passes (OR-1). The power word cannot change inside a
+    // group: emitJob arms the group's effective word (layer override or dialect
+    // default, audit P2-1) before its first pass, and every positioning move
+    // already carries S0. The old `M3 S0`/`M4 S0` here drained the planner:
+    // under M3 with the previous pass's last burn still lit, under M4 at the
+    // cost of a full stop, and Marlin's `M5 I`/`M3 I S0` derived from it
+    // stopped the head with continuous inline power on.
     for (const seg of group.segments) {
-      const segText = emitSegment(seg, {
-        ...context,
-        s,
-        feed,
-        entryRunwayMm: group.entryRunwayMm,
-      });
-      if (segText.length > 0) chunks.push(segText.replace(/\n$/, ''));
-    }
-  }
-  return chunks.join(LINE_END) + LINE_END;
-}
-
-function emitFillGroup(group: FillGroup, groupContext: GroupEmissionContext): string {
-  if ((group.fillStyle ?? 'scanline') === 'offset') return emitOffsetFillGroup(group, groupContext);
-  const { device, dialect } = groupContext;
-  const s = scaleS(group.power, device.maxPowerS);
-  const feed = roundedPositiveFeed(group.speed, `Layer ${group.layerId}`);
-  const chunks: string[] = [];
-  const overscanText = fillRunwayCommentText(group, formatGcodeCoordinateMm);
-  chunks.push(
-    `; fill layer ${group.layerId} color ${group.color} power ${group.power}% ${feedComment(group, feed)} passes ${group.passes} ${overscanText}`,
-  );
-  pushOperationProvenanceComment(chunks, group);
-  // Each scanline's nearby runs become continuous G1 sweeps with S0 gaps
-  // (ADR-034); wide gaps split into independently planned sweeps (ADR-035).
-  // Generic Scan Line gives every sweep bounded feed-matched laser-off entry
-  // and exit motion. The 4040 plan retains its qualified bounded-entry policy.
-  const scanOffsetMm =
-    group.bidirectionalScanOffsetMm ?? offsetForSpeed(device.scanningOffsets, feed);
-  const sweepPlans = planFillSweeps(group, scanOffsetMm);
-  const context = { s, feed, device, dialect };
-  for (let p = 0; p < group.passes; p += 1) {
-    chunks.push(`; pass ${p + 1} of ${group.passes}`);
-    for (const plan of sweepPlans) {
-      const text = emitFillSweep(plan, context);
-      if (text.length > 0) chunks.push(text);
+      const lines = emitSegment(seg, segmentContext);
+      if (lines.length > 0) chunks.push(lines.join(LINE_END));
     }
   }
   return chunks.join(LINE_END) + LINE_END;
 }
 
 function emitOffsetFillGroup(group: FillGroup, context: GroupEmissionContext): string {
-  const { device } = context;
-  const s = scaleS(group.power, device.maxPowerS);
+  const s = scaleS(group.power, context.device.maxPowerS);
   const feed = roundedPositiveFeed(group.speed, `Layer ${group.layerId}`);
   const chunks: string[] = [];
   chunks.push(
     `; offset fill layer ${group.layerId} color ${group.color} power ${group.power}% ${feedComment(group, feed)} passes ${group.passes}${contourEntryComment(group.entryRunwayMm)}`,
   );
   pushOperationProvenanceComment(chunks, group);
+  const segmentContext = { ...context, s, feed, entryRunwayMm: group.entryRunwayMm };
   for (let p = 0; p < group.passes; p += 1) {
     chunks.push(`; pass ${p + 1} of ${group.passes}`);
     for (const seg of group.segments) {
-      const segText = emitSegment(seg, {
-        ...context,
-        s,
-        feed,
-        entryRunwayMm: group.entryRunwayMm,
-      });
-      if (segText.length > 0) chunks.push(segText.replace(/\n$/, ''));
+      const lines = emitSegment(seg, segmentContext);
+      if (lines.length > 0) chunks.push(lines.join(LINE_END));
     }
   }
   return chunks.join(LINE_END) + LINE_END;
-}
-
-function feedComment(group: CutGroup | FillGroup, effectiveFeed: number): string {
-  return group.requestedSpeed === undefined
-    ? `speed ${effectiveFeed} mm/min`
-    : `speed ${effectiveFeed} mm/min effective (requested ${group.requestedSpeed} mm/min)`;
-}
-
-function contourEntryComment(entryRunwayMm: number | undefined): string {
-  return entryRunwayMm === undefined
-    ? ''
-    : ` contour-entry ${formatGcodeCoordinateMm(entryRunwayMm)} mm effective laser-off feed`;
-}
-
-function pushOperationProvenanceComment(chunks: string[], group: CutGroup | FillGroup): void {
-  const comment = operationProvenanceComment(group);
-  if (comment !== undefined) chunks.push(`; ${comment}`);
-}
-
-// One planned sweep. Seek to its entry runway with the device's laser-off
-// travel policy, traverse the runway in rapid/controlled or feed-matched mode,
-// then keep one G1 chain across ink and S0 holes. G-code S is modal, so every
-// span re-asserts its value.
-type FillSweepEmissionContext = {
-  readonly s: number;
-  readonly feed: number;
-  readonly device: DeviceProfile;
-  readonly dialect: GrblGcodeDialect;
-};
-
-function emitFillSweep(plan: FillSweepPlan, context: FillSweepEmissionContext): string {
-  const spans = plan.sweep.spans;
-  const first = spans[0];
-  const last = spans[spans.length - 1];
-  if (first === undefined || last === undefined) return '';
-  const run = expandFillHatchWithRunways([first.start, last.end], plan);
-  if (run === null) return '';
-  const lines: string[] = [
-    laserOffSeekLine(run.leadStart.x, run.leadStart.y, context.device, context.dialect),
-  ];
-  if (plan.leadInMm > 0) {
-    lines.push(runwayLine(run.burnStart, plan, context));
-  }
-  for (const line of sweepSpanLines(spans, context.s, context.feed, context.dialect)) {
-    lines.push(line);
-  }
-  if (plan.leadOutMm > 0) {
-    lines.push(runwayLine(run.leadEnd, plan, context));
-  }
-  return lines.join(LINE_END);
-}
-
-function runwayLine(
-  target: FillSpan['start'],
-  plan: FillSweepPlan,
-  context: FillSweepEmissionContext,
-): string {
-  if (plan.runwayMotion === 'rapid') {
-    return laserOffSeekLine(target.x, target.y, context.device, context.dialect);
-  }
-  return laserOffRunwayLine(target.x, target.y, context.feed);
-}
-
-// The G1 chain for one sweep: burn each ink span (S{s}), blank each interior
-// gap (S0). F rides only the first emitted G1 (modal). A head tracker skips any
-// move whose target equals the current position at emit precision (3 dp), so a
-// degenerate span never emits a stationary beam-on G1 and two touching spans
-// never emit a zero-length gap — defense in depth for PROJECT.md #3 ("positive
-// S only on a moving G1"). The live producer already filters sub-epsilon runs
-// (fill-hatching SCANLINE_EPS); this guards the contract at the emitter too
-// (audit 2026-06-03).
-function sweepSpanLines(
-  spans: ReadonlyArray<FillSpan>,
-  s: number,
-  feed: number,
-  dialect: GrblGcodeDialect,
-): string[] {
-  const first = spans[0];
-  if (first === undefined) return [];
-  const lines: string[] = [];
-  // Fill sweeps keep the verbose spelling. Their G1s are whole spans — metres
-  // of motion per line at the emitter's 5 mm minimum runway — so the planner
-  // cannot starve on them and the bytes buy nothing (ADR-332). Raster rows,
-  // one short G1 per power change, are where compaction pays.
-  // Head starts where the planned runway move left it: the first span's start.
-  let headX = formatGcodeCoordinateMm(first.start.x);
-  let headY = formatGcodeCoordinateMm(first.start.y);
-  let feedEmitted = false;
-  const moveTo = (x: number, y: number, sWord: string): void => {
-    const fx = formatGcodeCoordinateMm(x);
-    const fy = formatGcodeCoordinateMm(y);
-    if (fx === headX && fy === headY) return; // zero-length at emit precision — skip
-    const feedWord =
-      feedEmitted && dialect.modalFeedrate ? '' : ` F${formatGcodeFeedMmPerMin(feed)}`;
-    feedEmitted = true;
-    lines.push(`G1 X${fx} Y${fy}${feedWord} ${sWord}`);
-    headX = fx;
-    headY = fy;
-  };
-  for (let i = 0; i < spans.length; i += 1) {
-    const span = spans[i];
-    if (span === undefined) continue;
-    moveTo(span.end.x, span.end.y, `S${s}`);
-    const next = spans[i + 1];
-    if (next !== undefined) moveTo(next.start.x, next.start.y, 'S0');
-  }
-  return lines;
 }
 
 // F.2.d: raster groups emit through the dedicated raster path
 // (emit-raster.ts), which handles the M4 flip + per-pixel S
 // modulation. The strategy stays one-arm-per-kind so adding new
 // group types lights up the exhaustiveness check.
-function emitRasterGroupHere(
-  group: RasterGroup,
-  device: DeviceProfile,
-  dialect: GrblGcodeDialect,
-): string {
+//
+// A raster group writes its own opening (`M5`, arm) and closing `M5`. While a
+// preceding M3 burn may still be lit, the opening and the held air change
+// follow the group's first laser-off travel, and an M3 group that ends on a
+// burn leaves its closing `M5` for the next laser-off move (OR-1).
+function emitRasterGroupHere(group: RasterGroup, context: GroupEmissionContext): string {
+  const { device, dialect, cursor } = context;
   const feed = roundedPositiveFeed(group.speed, `Layer ${group.layerId}`);
   const operationComment = operationProvenanceComment(group);
-  return emitRasterGroupGcode({
+  const deferEntry = cursor.litAtStop;
+  const emission = emitRasterGroupWithEnd({
     sValues: group.sValues,
     ...(group.rowProvider !== undefined ? { rowProvider: group.rowProvider } : {}),
     ...(group.rowProviderOrder !== undefined ? { rowProviderOrder: group.rowProviderOrder } : {}),
@@ -422,7 +300,11 @@ function emitRasterGroupHere(
     color: group.color,
     powerPercent: group.power,
     ...(operationComment === undefined ? {} : { effectiveOperationComment: operationComment }),
+    ...(deferEntry ? { deferredEntry: { entryLines: takeHeldLines(cursor) } } : {}),
+    deferClosingM5WhenLit: true,
   });
+  noteRasterGroupEnd(cursor, emission.closingM5Deferred);
+  return emission.gcode;
 }
 
 function emitAnyGroup(group: Group, context: GroupEmissionContext): string {
@@ -430,9 +312,11 @@ function emitAnyGroup(group: Group, context: GroupEmissionContext): string {
     case 'cut':
       return emitGroup(group, context);
     case 'fill':
-      return emitFillGroup(group, context);
+      return (group.fillStyle ?? 'scanline') === 'offset'
+        ? emitOffsetFillGroup(group, context)
+        : emitScanlineFillGroup(group, context);
     case 'raster':
-      return emitRasterGroupHere(group, context.device, context.dialect);
+      return emitRasterGroupHere(group, context);
     case 'cnc':
       // CNC jobs are emitted by cncGrblStrategy; emit-gcode routes by the
       // project's machine kind. A cnc group reaching the laser strategy is a
@@ -466,11 +350,24 @@ function coolantPlan(job: Job, device: DeviceProfile): ReadonlyArray<CoolantMode
   return wanted.map((mode, index) => (bridged.has(index) ? held : mode));
 }
 
-function coolantTransition(from: CoolantMode, to: CoolantMode): string {
-  if (from === to) return '';
-  if (to === 'off') return `M9${LINE_END}`;
-  if (from !== 'off') return `M9${LINE_END}${to}${LINE_END}`;
-  return `${to}${LINE_END}`;
+function coolantTransitionLines(from: CoolantMode, to: CoolantMode): string[] {
+  if (from === to) return [];
+  if (to === 'off') return ['M9'];
+  if (from !== 'off') return ['M9', to];
+  return [to];
+}
+
+// Restore constant power for vector cutting with `M3 S0`. Arming dynamic power
+// from constant mode clears M3 first (mirrors emit-raster's "M5 so we don't stay
+// stuck in M3"), then `M4 S0`. Coming from a raster group the controller already
+// issued its trailing M5, so `M4 S0` alone suffices (no redundant second M5).
+function modeChangeLines(
+  mode: 'M3' | 'M4' | 'off',
+  wantedMode: 'M3' | 'M4' | 'group-managed',
+): string[] {
+  if (wantedMode === 'M3' && mode !== 'M3') return ['M3 S0'];
+  if (wantedMode === 'M4' && mode !== 'M4') return mode === 'M3' ? ['M5', 'M4 S0'] : ['M4 S0'];
+  return [];
 }
 
 // Laser power mode is modal and spans groups. The preamble arms the dialect's
@@ -478,8 +375,9 @@ function coolantTransition(from: CoolantMode, to: CoolantMode): string {
 // dialect/kind default. Dialects that use M4 for fill get GRBL's dynamic scaling
 // by actual/programmed feed, while the M4-incompatible profile remains on M3.
 // Raster manages its own mode internally and ends in M5. A flip is emitted only
-// when the effective mode changes, and the same effective mode is used when a
-// multi-pass group re-arms between passes.
+// when the effective mode changes. Mode and air changes go before the group
+// unless an M3 burn may still be lit; the cursor then holds them until the
+// group's first laser-off move (OR-1).
 function emitJob(job: Job, device: DeviceProfile, options: OutputEmitOptions = {}): string {
   const dialect = emittedDialect(device, options);
   const arcMovesEnabled = laserArcMovesEnabled(device);
@@ -487,6 +385,7 @@ function emitJob(job: Job, device: DeviceProfile, options: OutputEmitOptions = {
   parts.push(preamble(dialect, arcMovesEnabled && jobWritesArcMoves(job)));
   let mode: 'M3' | 'M4' | 'off' = laserModeWord(dialect.cutPowerMode);
   let coolant: CoolantMode = 'off';
+  const cursor = createLaserOutputCursor(mode);
   const plan = coolantPlan(job, device);
   const entryBounds =
     job.contourEntryBounds === undefined
@@ -494,25 +393,24 @@ function emitJob(job: Job, device: DeviceProfile, options: OutputEmitOptions = {
       : job.contourEntryBounds;
   for (const [index, group] of job.groups.entries()) {
     const wantedMode = powerModeForGroup(group, dialect);
-    if (wantedMode === 'M3' && mode !== 'M3') {
-      // Restore constant power for vector cutting.
-      parts.push('M3 S0' + LINE_END);
-      mode = 'M3';
-    } else if (wantedMode === 'M4' && mode !== 'M4') {
-      // Arm dynamic power. Coming from constant mode, clear M3 first (mirrors
-      // emit-raster's "M5 so we don't stay stuck in M3"), then M4 S0. Coming
-      // from a raster group the controller already issued its trailing M5, so
-      // M4 S0 alone suffices (no redundant second M5).
-      parts.push((mode === 'M3' ? 'M5' + LINE_END : '') + 'M4 S0' + LINE_END);
-      mode = 'M4';
-    }
     const nextCoolant = plan[index] ?? 'off';
-    parts.push(coolantTransition(coolant, nextCoolant));
+    const transition = [
+      ...modeChangeLines(mode, wantedMode),
+      ...coolantTransitionLines(coolant, nextCoolant),
+    ];
+    parts.push(joinedLines(transitionLinesNow(cursor, transition)));
+    if (wantedMode !== 'group-managed') mode = wantedMode;
     coolant = nextCoolant;
-    parts.push(emitAnyGroup(group, { device, dialect, entryBounds, arcMovesEnabled }));
-    if (group.kind === 'raster') mode = 'off'; // raster emits its own trailing M5
+    parts.push(emitAnyGroup(group, { device, dialect, entryBounds, cursor, arcMovesEnabled }));
+    if (group.kind === 'raster') mode = 'off'; // raster ends in M5, written or held
   }
-  parts.push(coolantTransition(coolant, 'off'));
+  // Job end: held lines, air off and M5 follow the last burn, and the park
+  // runs after them. Under M3 that stops the head with the beam still lit:
+  // no laser-off move is left to take the drain before the laser is switched
+  // off. The stop is inherent to constant power and is deliberately left as is
+  // (OR-1).
+  parts.push(joinedLines(releaseHeldLines(cursor)));
+  parts.push(joinedLines(coolantTransitionLines(coolant, 'off')));
   // A raster group last in the job already issued its trailing M5, so the
   // postamble must not emit a redundant second one (mode === 'off').
   parts.push(postamble(mode === 'off', device, dialect, options.finishPosition));

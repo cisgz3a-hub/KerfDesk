@@ -5,6 +5,7 @@ import { cameraPlacementGeometryIssue } from '../camera/camera-surface-height';
 import type { useCameraStore } from '../state/camera-store';
 import type { useLaserStore } from '../state/laser-store';
 import { isActiveJob } from '../state/laser-store-helpers';
+import { connectedLaserModuleEvidence } from '../state/laser-module-probe';
 
 /** Every controller and camera fact a Start preparation compiles against, as
  * one by-value snapshot. It is what the request carries into the preparation
@@ -31,6 +32,7 @@ export function machineSnapshot(
     controllerBuildInfoObservation: laser.controllerBuildInfoObservation,
     controllerSettings: laser.controllerSettings,
     controllerSettingsObservation: laser.controllerSettingsObservation,
+    laserModuleReport: connectedLaserModuleEvidence(laser),
     wcoCache: laser.wcoCache,
     activeWcs: laser.activeWcs,
     ovCache: laser.ovCache,

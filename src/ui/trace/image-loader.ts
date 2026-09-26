@@ -115,7 +115,7 @@ export async function loadImageAsRawData(
 /**
  * Put a stored raster's decoded source back on the pixel grid the project
  * saved for it. A JPEG with an axis-swapping EXIF Orientation imported before
- * ADR-396 was saved on its stored (landscape) grid, filled with the photo
+ * ADR-404 was saved on its stored (landscape) grid, filled with the photo
  * squashed into it; its luminance, bounds and editor contract all use that
  * grid. The loader now decodes it turned, so a decode that comes back as that
  * grid transposed is resampled onto it, reproducing the pixels the project

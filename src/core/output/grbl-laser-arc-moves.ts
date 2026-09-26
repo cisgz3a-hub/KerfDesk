@@ -26,17 +26,26 @@ export type BurnWordContext = {
 
 const ARC_CHORD_FALLBACK_SAGITTA_MM = 0.002;
 
+/** The burn lines of a segment's fitted arc moves, where they leave the head
+ *  (at controller precision), and the first emitted move's end (null when
+ *  every move collapses onto the head). */
+export type ArcSegmentBurns = {
+  readonly lines: ReadonlyArray<string>;
+  readonly end: { readonly x: string; readonly y: string };
+  readonly firstTarget: Vec2 | null;
+};
+
 /**
- * The burn lines for a segment's fitted arc moves, or null when this output
+ * The burns for a segment's fitted arc moves, or null when this output
  * writes the polyline instead (see emittedCutArcMoves).
  */
-export function arcBurnLines(
+export function arcSegmentBurns(
   segment: CutSegment,
   first: Vec2,
   context: BurnWordContext & CutArcEmission,
-): string[] | null {
+): ArcSegmentBurns | null {
   const moves = emittedCutArcMoves(segment, context);
-  return moves === null ? null : arcMoveBurnLines(first, moves, context);
+  return moves === null ? null : arcMoveBurns(first, moves, context);
 }
 
 export function arcMoveBurnLines(
@@ -44,9 +53,18 @@ export function arcMoveBurnLines(
   moves: ReadonlyArray<ArcMove>,
   context: BurnWordContext,
 ): string[] {
+  return [...arcMoveBurns(start, moves, context).lines];
+}
+
+function arcMoveBurns(
+  start: Vec2,
+  moves: ReadonlyArray<ArcMove>,
+  context: BurnWordContext,
+): ArcSegmentBurns {
   const lines: string[] = [];
   let headX = formatGcodeCoordinateMm(start.x);
   let headY = formatGcodeCoordinateMm(start.y);
+  let firstTarget: Vec2 | null = null;
   const moveTo = (motion: string, point: Vec2, offsetWords = ''): void => {
     const x = formatGcodeCoordinateMm(point.x);
     const y = formatGcodeCoordinateMm(point.y);
@@ -56,6 +74,7 @@ export function arcMoveBurnLines(
       first || !context.dialect.modalFeedrate ? ` F${formatGcodeFeedMmPerMin(context.feed)}` : '';
     const sWord = first || context.dialect.emitSOnEveryBurnMove ? ` S${context.s}` : '';
     lines.push(`${motion} X${x} Y${y}${offsetWords}${feedWord}${sWord}`);
+    firstTarget ??= point;
     headX = x;
     headY = y;
   };
@@ -78,5 +97,5 @@ export function arcMoveBurnLines(
     }
     from = move.to;
   }
-  return lines;
+  return { lines, end: { x: headX, y: headY }, firstTarget };
 }

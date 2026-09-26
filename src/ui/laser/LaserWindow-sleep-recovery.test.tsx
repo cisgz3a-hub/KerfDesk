@@ -34,7 +34,7 @@ afterEach(() => {
 describe('LaserWindow Sleep recovery', () => {
   it('shows an in-app wake control when GRBL reports Sleep', async () => {
     const originalWake = useLaserStore.getState().wakeController;
-    const wake = vi.fn(async () => undefined);
+    const wake = vi.fn(async () => 'idle' as const);
     useLaserStore.setState({
       connection: { kind: 'connected' },
       statusReport: {

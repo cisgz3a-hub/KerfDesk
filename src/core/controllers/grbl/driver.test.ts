@@ -88,6 +88,7 @@ describe('grblDriver', () => {
       lowPowerFire: true,
       overrides: true,
       startProtocol: 'grbl-live',
+      statusWhileHoming: false,
     });
   });
 

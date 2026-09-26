@@ -3,21 +3,40 @@
 // attribution pushed that file past the 400-line cap.
 
 import { wipeInFlight, type StreamerState } from '../../core/controllers/grbl';
+import { driverQuickStops, noResetStopLines, quickStopPatch } from './laser-quick-stop';
 import { armResetCleanup, resetCleanupLines } from './laser-reset-cleanup';
-import { controllerErrorNotice, type ControllerErrorContext } from './laser-safety-notice';
+import {
+  controllerErrorNotice,
+  controllerHaltedNotice,
+  skippedCommandNotice,
+  type ControllerErrorContext,
+  type LaserSafetyNotice,
+  type SkippedCommand,
+} from './laser-safety-notice';
 import type { LaserState } from './laser-store';
 import { invalidateControllerSessionEvidence } from './laser-controller-evidence';
+import { requalifyAfterHaltingReset } from './laser-controller-qualification';
 import { clearCncLiveCaps } from './detected-settings-action';
 import { advanceStream } from './laser-stream-ack';
+import { noteRefusedLine } from './laser-parser-rearm';
 import type { AckSettlement, GetFn, HandlerRefs, SafeWriteFn, SetFn } from './laser-line-shared';
+
+/** What the controller answered instead of accepting a line. */
+export type ControllerRejection = {
+  readonly code: number | null;
+  readonly raw: string | undefined;
+  /** The firmware halted itself and needs a reset or power cycle (MA-10). */
+  readonly halted?: boolean;
+  /** Marlin skipped the line as an unknown command (MA-12). */
+  readonly skipped?: SkippedCommand;
+};
 
 export function handleErrorLine(
   set: SetFn,
   get: GetFn,
   refs: HandlerRefs,
   safeWrite: SafeWriteFn,
-  code: number | null,
-  raw: string | undefined,
+  rejection: ControllerRejection,
   ackSettlement: AckSettlement,
   ownedCommandLine?: string,
 ): void {
@@ -36,15 +55,22 @@ export function handleErrorLine(
       ? { motionOperation: { ...state.motionOperation, cancelRequested: true } }
       : {};
   set({
-    lastError: code,
+    lastError: rejection.code,
     frameVerification: null,
     framedRun: null,
     frameTrace: null,
-    ...errorNoticePatch(state, code, raw, rejectedLine),
+    ...errorNoticePatch(state, rejection, rejectedLine),
     ...motionErrorPatch,
   });
-  if (ackSettlement.owner === 'untracked') return;
-  requestRealtimeStopAfterStreamError(set, refs, state.streamer, safeWrite);
+  if (ackSettlement.owner === 'untracked') {
+    // grblHAL latches the error for every later G-code line (HF-7).
+    noteRefusedLine(refs);
+    return;
+  }
+  // A halted controller runs nothing more, so no stop line is written to it.
+  if (rejection.halted !== true) {
+    requestRealtimeStopAfterStreamError(set, get, refs, state, safeWrite);
+  }
   advanceStream(set, get, refs, safeWrite, 'error');
 }
 
@@ -73,12 +99,14 @@ export function handleResendLine(
       : { motionOperation: { ...current.motionOperation, cancelRequested: true } }),
     ...errorNoticePatch(
       current,
-      null,
-      `Resend:${requestedLine} — line-number retransmission is not supported`,
+      {
+        code: null,
+        raw: `Resend:${requestedLine} — line-number retransmission is not supported`,
+      },
       undefined,
     ),
   });
-  requestRealtimeStopAfterStreamError(set, refs, current.streamer, safeWrite);
+  requestRealtimeStopAfterStreamError(set, get, refs, current, safeWrite);
   advanceStream(set, get, refs, safeWrite, 'error');
 }
 
@@ -89,18 +117,34 @@ export function handleResendLine(
 // terminal the error is expected, and an existing notice is the root cause
 // the operator still needs to read (first notice wins, as in the settle
 // failure path).
+// A halted controller (Marlin kill()) is never an echo of a requested stop, and
+// what it needs — its reset button or a power cycle — overrides earlier advice.
 function errorNoticePatch(
   state: LaserState,
-  code: number | null,
-  raw: string | undefined,
+  rejection: ControllerRejection,
   rejectedLine: string | undefined,
 ): Partial<Pick<LaserState, 'safetyNotice'>> {
+  if (rejection.halted === true) {
+    return { safetyNotice: controllerHaltedNotice(rejection.raw ?? 'kill() called') };
+  }
   if (isStoppedStreamErrorEcho(state.streamer)) return {};
-  return {
-    safetyNotice:
-      state.safetyNotice ??
-      controllerErrorNotice(code, controllerErrorContext(state), raw, rejectedLine),
-  };
+  return { safetyNotice: state.safetyNotice ?? rejectionNotice(state, rejection, rejectedLine) };
+}
+
+function rejectionNotice(
+  state: LaserState,
+  rejection: ControllerRejection,
+  rejectedLine: string | undefined,
+): LaserSafetyNotice {
+  if (rejection.skipped !== undefined && rejectedLine !== undefined) {
+    return skippedCommandNotice(rejection.skipped, rejectedLine);
+  }
+  return controllerErrorNotice(
+    rejection.code,
+    controllerErrorContext(state),
+    rejection.raw,
+    rejectedLine,
+  );
 }
 
 function isStoppedStreamErrorEcho(streamer: StreamerState | null): boolean {
@@ -109,27 +153,31 @@ function isStoppedStreamErrorEcho(streamer: StreamerState | null): boolean {
 
 function requestRealtimeStopAfterStreamError(
   set: SetFn,
+  get: GetFn,
   refs: HandlerRefs,
-  streamer: StreamerState | null,
+  state: LaserState,
   safeWrite: SafeWriteFn,
 ): void {
+  const streamer = state.streamer;
   const streamCanStillHaveBufferedMotion =
     streamer !== null && ['streaming', 'paused', 'done', 'tool-change'].includes(streamer.status);
   if (!streamCanStillHaveBufferedMotion) return;
   const driver = refs.driver;
   const softReset = driver.realtime.softReset;
   if (softReset === null) {
-    // No reset byte (Marlin): the RX buffer was not wiped, so beam-off goes
-    // out immediately and its acks queue behind the in-flight job lines.
+    // No reset byte (Marlin): the controller's quickstop lines (M107, M410,
+    // M5 I, and M9 when air may be on) go out at once, as Abort sends them;
+    // their acks queue behind the in-flight job lines (MA-7).
+    const lines = noResetStopLines(driver, state);
+    if (driverQuickStops(driver)) set((current) => quickStopPatch(current));
     void (async () => {
-      for (const line of driver.commands.stopLaserLines) {
-        await safeWrite(`${line}\n`, 'stop', 'system');
-      }
+      for (const line of lines) await safeWrite(line, 'stop', 'system');
     })().catch(() => undefined);
     return;
   }
   clearCncLiveCaps();
   set((state) => invalidateControllerSessionEvidence(state));
+  requalifyAfterHaltingReset(set, get, refs, driver.capabilities);
   // Arm before the realtime write, exactly like operator Abort. Web Serial can
   // reject its promise after the reset byte reached the controller and a boot
   // banner can arrive immediately; pre-arming preserves that evidence race and

@@ -44,7 +44,10 @@ function LaserMachineStep({
       <div style={introStyle}>
         <strong>Laser output</strong>
         <span>
-          Full-power S is the controller value for 100% power. Match it to your controller settings.
+          Full-power S is the controller value for 100% power.{' '}
+          {state.draft.controllerKind === 'smoothieware'
+            ? 'Smoothieware holds it at 1.'
+            : 'Match it to your controller settings.'}
         </span>
       </div>
       <LaserPowerRows

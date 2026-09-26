@@ -1,5 +1,5 @@
 // Paper-surface fit for background flattening (background-flatten.ts,
-// ADR-394): a robust, Gaussian-weighted local plane through the cells that
+// ADR-402): a robust, Gaussian-weighted local plane through the cells that
 // are currently classed as paper, evaluated at every cell of the coarse grid.
 // Own design (ADR-120/123): nothing here is taken from any implementation.
 //

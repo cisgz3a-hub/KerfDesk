@@ -95,6 +95,29 @@ describe('owned controller Work-Z recovery', () => {
     vi.restoreAllMocks();
   });
 
+  // Controller audit 2026-09-25 GP-6: `$#` prints inches under `$13=1`
+  // (gnea/grbl print.c printFloat_CoordValue); the evidence is in mm.
+  it('stores an inch `$#` readback as millimetres when the controller reports inches', async () => {
+    const connection = makeConnection((data, conn) => {
+      respondToTestGrblBuildInfo(data, conn.emitLine);
+      respondToWorkZQuery(data, conn, () => undefined, [
+        '[G54:0.000,0.000,0.000]',
+        '[G55:0.1575,0.1969,-0.2500]',
+      ]);
+    });
+    await connectAndSettle(connection);
+    useLaserStore.setState((state) => ({
+      controllerSettings: { ...state.controllerSettings, reportInches: true },
+    }));
+
+    await useLaserStore.getState().recoverWorkZFromController({
+      activeToolId: DEFAULT_CNC_MACHINE_CONFIG.toolId,
+      controllerOffsetRepresentsStockTop: true,
+    });
+
+    expect(useLaserStore.getState().workZZeroEvidence?.offsetZMm).toBeCloseTo(-6.35, 6);
+  });
+
   it('owns $G and $# replies before creating tool-bound evidence', async () => {
     const writes: string[] = [];
     const connection = makeConnection((data, conn) => {

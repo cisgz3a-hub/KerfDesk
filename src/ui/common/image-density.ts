@@ -110,7 +110,7 @@ function chunkType(view: DataView, offset: number): string {
 // ResolutionUnit). 0xFF fill bytes can pad between segments; skip them rather
 // than mis-reading one as a marker with a garbage length.
 // ../trace/jpeg-header.ts walks the same segments and IFD0 for Orientation;
-// merging the two walkers is a known follow-up (ADR-396).
+// merging the two walkers is a known follow-up (ADR-404).
 function jpegDensity(bytes: Uint8Array): ImageDensity | null {
   if (bytes.length < 4) return null;
   const view = viewOf(bytes);

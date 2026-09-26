@@ -10,7 +10,7 @@ import {
 import { groupSubpathsByOuterShape, subpathCount } from '../../core/geometry/outer-shape-groups';
 import { boundsFromColoredPaths } from '../../core/trace/trace-bounds';
 
-// ADR-398: Break Apart on a trace yields one object per outer shape, each
+// ADR-406: Break Apart on a trace yields one object per outer shape, each
 // carrying its own holes. Pieces stay traced images in the same pixel grid
 // under the same transform, so their curves, fill rule, operations and burn
 // are the original's; only the re-trace link is dropped.

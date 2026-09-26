@@ -237,7 +237,7 @@ describe('Trace Image raster output', () => {
     );
   });
 
-  it('records the Trace dialog settings on a raster trace result (ADR-400)', async () => {
+  it('records the Trace dialog settings on a raster trace result (ADR-408)', async () => {
     const source = sourceRaster();
     const project = projectWith(source, imageOperation());
     const ctx = context(() => project);

@@ -26,7 +26,7 @@ export async function resolveTraceCommitResult(args: {
   readonly preparedTrace?: PreparedTrace;
   readonly pendingTrace?: PendingPreparedTrace | undefined;
   readonly sourceGrid?: TraceGrid;
-  // Omitted: the commit traces the preview's grid (ADR-401).
+  // Omitted: the commit traces the preview's grid (ADR-409).
   readonly commitGrid?: TraceCommitGridContext | undefined;
   readonly signal?: AbortSignal | undefined;
   readonly progress?: ((phase: TraceCommitPhase) => void) | undefined;

@@ -31,6 +31,24 @@ describe('detectControllerFromBanner', () => {
     );
   });
 
+  // Audit HF-8: grblHAL at COMPATIBILITY_LEVEL >= 1 prints "Grbl 1.1f ['$' for
+  // help]" (report.c:310-314; GRBL_VERSION is "1.1f" at every level, grbl.h:38-43).
+  it('reads the stock "Grbl 1.1f" banner as grblHAL when the grblHAL driver runs', () => {
+    const banner = "Grbl 1.1f ['$' for help]";
+    expect(detectControllerFromBanner(banner, 'grblhal')).toBe('grblhal');
+    expect(detectControllerFromBanner(banner, 'grbl-v1.1')).toBe('grbl-v1.1');
+    expect(detectControllerFromBanner(banner, 'fluidnc')).toBe('grbl-v1.1');
+    expect(detectControllerFromBanner(banner)).toBe('grbl-v1.1');
+  });
+
+  it('keeps other GRBL versions and FluidNC unambiguous on a grblHAL driver', () => {
+    expect(detectControllerFromBanner("Grbl 1.1h ['$' for help]", 'grblhal')).toBe('grbl-v1.1');
+    expect(detectControllerFromBanner('Grbl 0.9j', 'grblhal')).toBe('grbl-v1.1');
+    expect(detectControllerFromBanner("Grbl 3.9 [FluidNC v4.0.3 '$' for help]", 'grblhal')).toBe(
+      'fluidnc',
+    );
+  });
+
   it('returns null for non-banner lines', () => {
     expect(detectControllerFromBanner('ok')).toBeNull();
     expect(detectControllerFromBanner('<Idle|MPos:0.000,0.000,0.000|FS:0,0>')).toBeNull();

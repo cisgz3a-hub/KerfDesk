@@ -1,4 +1,4 @@
-// ADR-400: Trace dialog settings recorded on a trace result persist through
+// ADR-408: Trace dialog settings recorded on a trace result persist through
 // .lf2 save/load. They are Re-trace metadata, so older files without them load
 // unchanged and a malformed or newer record is dropped instead of refusing the
 // project.
@@ -10,8 +10,8 @@ import {
   type RasterImage,
   type SceneObject,
   type TracedImage,
-  type TraceSettingsRecord,
 } from '../../core/scene';
+import type { TraceSettingsRecord } from '../../core/scene/scene-object';
 import { PROJECT_SCHEMA_VERSION } from '../../core/scene/project';
 import { deserializeProject } from './deserialize-project';
 import { prepareProjectForPersistence } from './prepare-project-persistence';
@@ -102,7 +102,7 @@ function withRawSettings(value: unknown, object: SceneObject = trace()): string 
   return JSON.stringify(raw);
 }
 
-describe('trace settings persistence (ADR-400)', () => {
+describe('trace settings persistence (ADR-408)', () => {
   it('round-trips recorded settings on vector and raster trace results byte-for-byte', () => {
     const original = projectWith(
       trace({ traceSettings: SETTINGS }),

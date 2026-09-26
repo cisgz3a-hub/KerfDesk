@@ -138,7 +138,7 @@ describe('fillPinholes', () => {
   });
 });
 
-describe('fillPinholes paper connectivity follows the saddle policy (ADR-395)', () => {
+describe('fillPinholes paper connectivity follows the saddle policy (ADR-403)', () => {
   // A one-pixel diagonal paper crack running from the open background into
   // solid ink. Every crack pixel touches the next only at a corner.
   function diagonalCrack(enclosed: boolean): string[] {

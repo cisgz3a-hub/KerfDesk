@@ -19,6 +19,16 @@ function atToolChange(gcode = `M0\n${longRefillJob()}`) {
     streamer: step(createStreamer(gcode, { rxBufferBytes: 11, toolChangePause: true })).state,
     activeJobMachineKind: 'cnc',
     toolChangeIdleSeen: true,
+    // Continue hands the controller back only while it reports Idle (audit ST-1).
+    statusReport: {
+      state: 'Idle',
+      subState: null,
+      mPos: { x: 0, y: 0, z: 0 },
+      wPos: null,
+      feed: 0,
+      spindle: 0,
+      wco: null,
+    },
     workZZeroEvidence: { source: 'manual-zero', referenceEpoch: 0, toolId: 'bit-2' },
     pendingToolId: 'bit-2',
   });
