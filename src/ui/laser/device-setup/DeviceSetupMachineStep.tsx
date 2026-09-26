@@ -9,6 +9,7 @@ import {
   FireControlRow,
   LaserPowerRows,
 } from '../DeviceProfilePowerFields';
+import { LaserArcMovesRow } from '../LaserArcMovesRow';
 import { deviceSetupSupportsMachineKind, type DeviceSetupStepProps } from './device-setup-flow';
 import { DeviceSetupCncMachineStep } from './DeviceSetupCncMachineStep';
 import type { DeviceSetupHighlight } from './machine-setup-dialog-store';
@@ -55,6 +56,7 @@ function LaserMachineStep({
         update={update}
         grblLabels={driver.capabilities.settings === 'grbl-dollar'}
       />
+      <LaserArcMovesRow device={state.draft} update={update} />
       <details
         className="lf-setup-disclosure lf-setup-disclosure--nested"
         open={highlight === 'air-assist'}

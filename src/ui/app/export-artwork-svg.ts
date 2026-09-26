@@ -83,7 +83,10 @@ export async function handleExportArtworkSvg(ctx: ExportArtworkSvgContext): Prom
   }
 }
 
-function exportProjectSelection(project: Project, ids: readonly string[] | undefined): Project {
+export function exportProjectSelection(
+  project: Project,
+  ids: readonly string[] | undefined,
+): Project {
   if (ids === undefined) return project;
   const selected = new Set(ids);
   const objects = new Map(project.scene.objects.map((object) => [object.id, object]));

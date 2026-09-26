@@ -2,12 +2,15 @@ import type { ColoredPath } from '../../core/scene';
 import {
   DEFAULT_TRACE_OPTIONS,
   TRACE_PRESETS,
-  traceImagesToSvgFiles,
+  traceImagesToVectorFiles,
+  type BatchTraceFile,
   type BatchTraceImageJob,
-  type BatchTraceSvgFile,
+  type BatchTraceOutput,
+  type BatchTraceSkip,
   type RawImageData,
   type TraceOptions,
 } from '../../core/trace';
+import { tracedLayersToDxf } from '../../io/dxf/export-dxf';
 import type { PlatformAdapter } from '../../platform/types';
 import { rasterImportGeometry } from '../common/image-import';
 import type { ToastVariant } from '../state/toast-store';
@@ -24,8 +27,12 @@ import { isTraceRequestSuperseded, traceImageWithFallback } from '../trace/use-t
 import { traceNoticeMessage, type TraceNotice } from '../trace/trace-notices';
 
 export type MultiFileTraceFile = File;
-export type MultiFileTraceExport = BatchTraceSvgFile & {
+export type MultiFileTraceExport = BatchTraceFile & {
   readonly notices?: ReadonlyArray<TraceNotice>;
+};
+export type MultiFileTraceBatch = {
+  readonly files: ReadonlyArray<MultiFileTraceExport>;
+  readonly skipped: ReadonlyArray<BatchTraceSkip>;
 };
 
 export type MultiFileTraceDeps = {
@@ -38,17 +45,21 @@ export type MultiFileTraceDeps = {
     image: RawImageData,
     options: TraceOptions,
   ) => Promise<ReadonlyArray<ColoredPath>>;
-  readonly write?: (file: BatchTraceSvgFile) => Promise<boolean> | boolean;
+  readonly write?: (file: BatchTraceFile) => Promise<boolean> | boolean;
+  /** Trace settings for every image (default: the Line Art preset). */
   readonly options?: TraceOptions;
   // The project's machine density; omitted, the default spot's (ADR-409).
   readonly targetPxPerMm?: number;
   readonly deviceMemoryGb?: number;
+  /** File format, precision and contour grouping. */
+  readonly output?: BatchTraceOutput;
 };
 
 type PushToast = (message: string, variant?: ToastVariant) => void;
 
+export const DEFAULT_MULTI_FILE_TRACE_PRESET = 'Line Art';
 const DEFAULT_MULTI_FILE_TRACE_OPTIONS: TraceOptions =
-  TRACE_PRESETS['Line Art'] ?? DEFAULT_TRACE_OPTIONS;
+  TRACE_PRESETS[DEFAULT_MULTI_FILE_TRACE_PRESET] ?? DEFAULT_TRACE_OPTIONS;
 
 type MultiFileJobContext = {
   readonly loadImage: NonNullable<MultiFileTraceDeps['loadImage']>;
@@ -61,7 +72,7 @@ type MultiFileJobContext = {
 export async function buildMultiFileTraceExports(
   files: ReadonlyArray<MultiFileTraceFile>,
   deps: MultiFileTraceDeps = {},
-): Promise<ReadonlyArray<MultiFileTraceExport>> {
+): Promise<MultiFileTraceBatch> {
   const context: MultiFileJobContext = {
     loadImage: deps.loadImage ?? loadImageAsRawData,
     readNatural:
@@ -77,21 +88,30 @@ export async function buildMultiFileTraceExports(
   for (const file of files) jobs.push(await multiFileTraceJob(file, context));
   const notices: ReadonlyArray<TraceNotice>[] = [];
   const previewResolution = new Set<number>();
-  const exports = await traceImagesToSvgFiles(jobs, {
-    trace: deps.trace ?? traceWithWorkerFallback(notices),
-    // As at a dialog commit, the finer grid is an improvement, not a
-    // requirement: a file whose finer decode or trace fails is traced on the
-    // preview grid instead of aborting the batch. Cancellation still aborts.
-    canFallBack: (error) => !isTraceAbort(error) && !isTraceRequestSuperseded(error),
-    onFallback: (index) => previewResolution.add(index),
-  });
-  return exports.map((file, index) => {
-    const fileNotices = [
-      ...(notices[index] ?? []),
-      ...(previewResolution.has(index) ? (['preview-resolution'] as const) : []),
-    ];
-    return fileNotices.length === 0 ? file : { ...file, notices: fileNotices };
-  });
+  const result = await traceImagesToVectorFiles(
+    jobs,
+    {
+      trace: deps.trace ?? traceWithWorkerFallback(notices),
+      writeDxf: tracedLayersToDxf,
+      // As at a dialog commit, the finer grid is an improvement, not a
+      // requirement: a file whose finer decode or trace fails is traced on the
+      // preview grid instead of aborting the batch. Cancellation still aborts.
+      canFallBack: (error) => !isTraceAbort(error) && !isTraceRequestSuperseded(error),
+      onFallback: (index) => previewResolution.add(index),
+    },
+    deps.output ?? {},
+  );
+  return {
+    skipped: result.skipped,
+    files: result.files.map((file) => {
+      // Notices are recorded per traced job, including skipped ones.
+      const fileNotices = [
+        ...(notices[file.sourceIndex] ?? []),
+        ...(previewResolution.has(file.sourceIndex) ? (['preview-resolution'] as const) : []),
+      ];
+      return fileNotices.length === 0 ? file : { ...file, notices: fileNotices };
+    }),
+  };
 }
 
 // One batch job on the same working-grid policy as a dialog commit (ADR-409):
@@ -156,18 +176,33 @@ export async function runMultiFileTrace(
 ): Promise<void> {
   if (files.length === 0) return;
   try {
-    const svgFiles = await buildMultiFileTraceExports(files, deps);
-    if (svgFiles.length === 0) return;
-    assertTraceProducedVisiblePaths(svgFiles);
+    const batch = await buildMultiFileTraceExports(files, deps);
+    const skippedText = skippedMessage(batch.skipped);
     const write = deps.write ?? missingTraceExportWriter;
-    const { written, notices } = await writeTraceExports(svgFiles, write);
-    if (written === 0) return;
-    const summary = `Traced ${written} ${written === 1 ? 'image' : 'images'} to SVG.`;
-    pushToast([summary, ...notices.map(traceNoticeMessage)].join(' '), 'success');
+    const { written, notices } = await writeTraceExports(batch.files, write);
+    if (written === 0) {
+      if (skippedText !== '') pushToast(skippedText, 'warning');
+      return;
+    }
+    const format = (batch.files[0]?.format ?? 'svg').toUpperCase();
+    const summary = `Traced ${written} ${written === 1 ? 'image' : 'images'} to ${format}.`;
+    const message = [summary, skippedText, ...notices.map(traceNoticeMessage)]
+      .filter((part) => part !== '')
+      .join(' ');
+    pushToast(message, skippedText === '' ? 'success' : 'warning');
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
     pushToast(`Could not trace images: ${message}`, 'error');
   }
+}
+
+function skippedMessage(skipped: ReadonlyArray<BatchTraceSkip>): string {
+  if (skipped.length === 0) return '';
+  const names = skipped.map((skip) => skip.sourceName).join(', ');
+  return (
+    `Skipped ${skipped.length} ${skipped.length === 1 ? 'image' : 'images'} with no visible paths` +
+    ` (${names}); try Trace Image with an adjusted threshold or import as Image instead.`
+  );
 }
 
 async function writeTraceExports(
@@ -184,26 +219,17 @@ async function writeTraceExports(
   return { written, notices: [...notices] };
 }
 
-export async function writeTraceSvgFileWithPlatform(
+export async function writeTraceFileWithPlatform(
   platform: PlatformAdapter,
-  file: BatchTraceSvgFile,
+  file: BatchTraceFile,
 ): Promise<boolean> {
   const target = await platform.pickFileForSave({
     suggestedName: file.filename,
-    extensions: ['.svg'],
+    extensions: [file.format === 'dxf' ? '.dxf' : '.svg'],
   });
   if (target === null) return false;
-  await target.write(file.svg);
+  await target.write(file.text);
   return true;
-}
-
-function assertTraceProducedVisiblePaths(files: ReadonlyArray<BatchTraceSvgFile>): void {
-  const emptyFiles = files.filter((file) => file.pathCount === 0);
-  if (emptyFiles.length === 0) return;
-  const filenames = emptyFiles.map((file) => file.filename).join(', ');
-  throw new Error(
-    `Trace produced no visible paths for ${filenames}. Try Trace Image with adjusted threshold or import as Image instead.`,
-  );
 }
 
 function missingTraceExportWriter(): never {
@@ -214,7 +240,7 @@ function traceWithWorkerFallback(
   notices: ReadonlyArray<TraceNotice>[],
 ): NonNullable<MultiFileTraceDeps['trace']> {
   // The batch core traces in source order. Keep each result's notices beside
-  // its SVG so cancelled saves cannot attach a warning to a different file.
+  // its job so cancelled saves cannot attach a warning to a different file.
   return async (image, options) => {
     const result = await traceImageWithFallback(image, options);
     notices.push(result.notices ?? []);

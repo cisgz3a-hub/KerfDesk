@@ -10,6 +10,7 @@ import { handleUnifiedArtworkImport } from '../app/import-dispatch';
 import { openProjectCommand } from './open-project-command';
 import { openTemplateCommand, saveTemplateCommand } from './template-command-actions';
 import { handleImportHeightMaps } from '../app/height-map-import-action';
+import { handleExportArtworkDxf } from '../app/export-artwork-dxf';
 import { handleExportArtworkSvg } from '../app/export-artwork-svg';
 import type { PlatformAdapter } from '../../platform/types';
 import type { CommandShellCallbacks } from './app-command-context-types';
@@ -36,6 +37,7 @@ type FileCommandContext = Pick<
   | 'importHeightMap'
   | 'saveGcode'
   | 'exportSvg'
+  | 'exportDxf'
   | 'openGcodePreview'
   | 'inspectCurrentGcode'
 >;
@@ -102,6 +104,16 @@ export function fileCommandContext(
     exportSvg: () => {
       const current = useStore.getState();
       void handleExportArtworkSvg({
+        platform,
+        project: current.project,
+        selectedIds: selectedObjectIds(current.selectedObjectId, current.additionalSelectedIds),
+        savedName: current.savedName,
+        pushToast,
+      });
+    },
+    exportDxf: () => {
+      const current = useStore.getState();
+      void handleExportArtworkDxf({
         platform,
         project: current.project,
         selectedIds: selectedObjectIds(current.selectedObjectId, current.additionalSelectedIds),

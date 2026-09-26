@@ -32,6 +32,7 @@ const OUTCOMES: Record<CommandId, Outcome> = {
   'file.import-height-map': { callback: 'importHeightMap' },
   'file.save-gcode': { callback: 'saveGcode' },
   'file.export-svg': { callback: 'exportSvg' },
+  'file.export-dxf': { callback: 'exportDxf' },
   'file.open-gcode': { callback: 'openGcodePreview' },
   'file.inspect-gcode': { callback: 'inspectCurrentGcode' },
   'edit.undo': { callback: 'undo' },

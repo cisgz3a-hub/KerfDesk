@@ -10,6 +10,7 @@
 // vector path) filter on kind. The emit strategy dispatches based on kind.
 
 import { representedCncCoordinateMm } from '../cnc/coordinate-representation';
+import type { ArcMove } from '../geometry/arc-fit';
 import { sampleCircularArcPoints } from '../geometry/arc-representation';
 import type { RasterPowerValues } from '../raster/raster-power-values';
 import {
@@ -41,6 +42,20 @@ export type CutSegment = {
     readonly distanceMm: number;
     readonly direction: Vec3;
   };
+  /** ADR-432: the same burn as native line/arc moves. Laser line cuts only,
+   * on arc-capable machines; read it through validCutArcMoves. */
+  readonly arcMoves?: CutArcMoves;
+};
+
+/** Fitted line/arc moves for a CutSegment (ADR-432), with a fingerprint of
+ * the polyline they were fitted against: they start at `from` and the last
+ * lands exactly on the polyline's last point. A reader trusts them only while
+ * the polyline still matches the fingerprint. */
+export type CutArcMoves = {
+  readonly moves: ReadonlyArray<ArcMove>;
+  readonly from: Vec2;
+  readonly pointCount: number;
+  readonly lengthMm: number;
 };
 
 export type FillSegment = CutSegment & {

@@ -5,7 +5,7 @@ import {
   buildMultiFileTraceExports,
   runMultiFileTrace,
   type MultiFileTraceFile,
-  writeTraceSvgFileWithPlatform,
+  writeTraceFileWithPlatform,
 } from './multi-file-trace-action';
 import { PREVIEW_MAX_EDGE_PX, scaleToCap } from '../trace/trace-decode-cap';
 import {
@@ -79,7 +79,7 @@ describe('buildMultiFileTraceExports', () => {
     });
     const trace = vi.fn(async () => [SQUARE_PATH]);
 
-    const files = await buildMultiFileTraceExports(
+    const { files } = await buildMultiFileTraceExports(
       [namedFile('logo.png'), namedFile('photo.jpg')],
       { loadImage, trace },
     );
@@ -89,8 +89,9 @@ describe('buildMultiFileTraceExports', () => {
     expect(trace).toHaveBeenNthCalledWith(1, logo, TRACE_PRESETS['Line Art']);
     expect(trace).toHaveBeenNthCalledWith(2, photo, TRACE_PRESETS['Line Art']);
     expect(files.map((file) => file.filename)).toEqual(['logo-trace.svg', 'photo-trace.svg']);
-    expect(files[0]?.svg).toContain('viewBox="0 0 4 3"');
-    expect(files[1]?.svg).toContain('viewBox="0 0 6 5"');
+    // The page is the image at its import size (default density), in mm.
+    expect(files[0]?.text).toContain('viewBox="0 0 0.4 0.3"');
+    expect(files[1]?.text).toContain('viewBox="0 0 0.6 0.5"');
   });
 
   // Rule 7 / ADR-228: this batch used to skip any file over 25 MB SILENTLY —
@@ -103,7 +104,7 @@ describe('buildMultiFileTraceExports', () => {
     const loadImage = vi.fn(async () => rawImage(4, 3));
     const trace = vi.fn(async () => [SQUARE_PATH]);
 
-    const files = await buildMultiFileTraceExports([oversized, small], { loadImage, trace });
+    const { files } = await buildMultiFileTraceExports([oversized, small], { loadImage, trace });
 
     expect(loadImage).toHaveBeenCalledTimes(2);
     expect(files.map((file) => file.filename)).toEqual(['oversized-trace.svg', 'small-trace.svg']);
@@ -121,7 +122,7 @@ describe('buildMultiFileTraceExports', () => {
       events.push(`trace ${image.width}`);
       return [SQUARE_PATH];
     });
-    const files = await buildMultiFileTraceExports([namedFile('a.png'), namedFile('b.png')], {
+    const { files } = await buildMultiFileTraceExports([namedFile('a.png'), namedFile('b.png')], {
       loadImage,
       readNaturalSize: async () => natural,
       trace,
@@ -147,10 +148,9 @@ describe('buildMultiFileTraceExports', () => {
     expect(trace.mock.calls[0]?.[1]).toEqual(
       traceOptionsForCommitGrid(TRACE_PRESETS['Line Art']!, plan!),
     );
-    expect(trace.mock.calls[0]?.[1]?.despeckleMinPixels).toBeCloseTo(
-      (TRACE_PRESETS['Line Art']!.despeckleMinPixels ?? 0) * areaRatio,
-      9,
-    );
+    // Line Art despeckles by the automatic small-mark policy (ADR-434), whose
+    // areas scale with the grid's pixel count.
+    expect(trace.mock.calls[0]?.[1]?.smallMarkAreaScale).toBeCloseTo(areaRatio, 9);
     // Each large decode is made on its turn, not all up front.
     expect(events).toEqual([
       'load a.png',
@@ -159,7 +159,7 @@ describe('buildMultiFileTraceExports', () => {
       `trace ${plan!.grid.width}`,
     ]);
     // The physical size is the import size, whatever grid was traced.
-    expect(files[0]?.svg).toContain('width="600mm"');
+    expect(files[0]?.text).toContain('width="600mm"');
   });
 
   it('traces a file on the preview grid when its finer decode fails, and says so', async () => {
@@ -172,7 +172,7 @@ describe('buildMultiFileTraceExports', () => {
       return rawImage(grid.width, grid.height);
     });
     const trace = vi.fn(async (_image: RawImageData, _options: TraceOptions) => [SQUARE_PATH]);
-    const files = await buildMultiFileTraceExports([namedFile('a.png'), namedFile('b.png')], {
+    const { files } = await buildMultiFileTraceExports([namedFile('a.png'), namedFile('b.png')], {
       loadImage,
       readNaturalSize: async () => natural,
       trace,
@@ -189,7 +189,7 @@ describe('buildMultiFileTraceExports', () => {
     // b.png keeps its finer grid and has nothing to report.
     expect(trace.mock.calls[1]?.[0].width).toBeGreaterThan(PREVIEW_MAX_EDGE_PX);
     expect(files[1]?.notices).toBeUndefined();
-    expect(files[0]?.svg).toContain('width="600mm"');
+    expect(files[0]?.text).toContain('width="600mm"');
   });
 
   it('falls back when the finer trace fails, but not when the trace is cancelled', async () => {
@@ -208,7 +208,7 @@ describe('buildMultiFileTraceExports', () => {
       if (image.width > PREVIEW_MAX_EDGE_PX) throw new Error('Worker ran out of memory');
       return [SQUARE_PATH];
     });
-    const files = await buildMultiFileTraceExports([namedFile('a.png')], {
+    const { files } = await buildMultiFileTraceExports([namedFile('a.png')], {
       ...deps,
       trace: outOfMemory,
     });
@@ -270,15 +270,15 @@ describe('runMultiFileTrace', () => {
   });
 
   it('exports physical SVG dimensions from the source image size, not the sampled trace grid', async () => {
-    const files = await buildMultiFileTraceExports([namedFile('logo.png')], {
+    const { files } = await buildMultiFileTraceExports([namedFile('logo.png')], {
       loadImage: async () => rawImage(500, 250),
       readNaturalSize: async () => ({ width: 1000, height: 500 }),
       trace: async () => [SQUARE_PATH],
     });
 
-    expect(files[0]?.svg).toContain('viewBox="0 0 500 250"');
-    expect(files[0]?.svg).toContain('width="100mm"');
-    expect(files[0]?.svg).toContain('height="50mm"');
+    expect(files[0]?.text).toContain('viewBox="0 0 100 50"');
+    expect(files[0]?.text).toContain('width="100mm"');
+    expect(files[0]?.text).toContain('height="50mm"');
   });
 
   it('keeps cancelled file picks silent', async () => {
@@ -322,95 +322,98 @@ describe('runMultiFileTrace', () => {
     expect(pushToast).toHaveBeenCalledWith('Could not trace images: decode failed', 'error');
   });
 
-  it('does not write transparent SVGs when tracing produces no visible paths', async () => {
+  it.each([
+    ['empty.png', []],
+    ['empty-groups.png', [{ color: '#000000', polylines: [] }]],
+    ['transparent.png', [ZERO_AREA_PATH]],
+    ['blank.png', [BACKGROUND_PATH]],
+  ] as const)('skips %s with a notice instead of writing a blank file', async (name, paths) => {
     const pushToast = vi.fn();
     const write = vi.fn();
 
-    await runMultiFileTrace([namedFile('empty.png')], pushToast, {
-      loadImage: async () => rawImage(2, 2),
-      trace: async () => [],
-      write,
-    });
-
-    expect(write).not.toHaveBeenCalled();
-    expect(pushToast).toHaveBeenCalledWith(
-      'Could not trace images: Trace produced no visible paths for empty-trace.svg. Try Trace Image with adjusted threshold or import as Image instead.',
-      'error',
-    );
-  });
-
-  it('does not write SVGs when trace returns only non-renderable path groups', async () => {
-    const pushToast = vi.fn();
-    const write = vi.fn();
-
-    await runMultiFileTrace([namedFile('empty-groups.png')], pushToast, {
-      loadImage: async () => rawImage(2, 2),
-      trace: async () => [{ color: '#000000', polylines: [] }],
-      write,
-    });
-
-    expect(write).not.toHaveBeenCalled();
-    expect(pushToast).toHaveBeenCalledWith(
-      'Could not trace images: Trace produced no visible paths for empty-groups-trace.svg. Try Trace Image with adjusted threshold or import as Image instead.',
-      'error',
-    );
-  });
-
-  it('does not write SVGs when trace returns only zero-area geometry', async () => {
-    const pushToast = vi.fn();
-    const write = vi.fn();
-
-    await runMultiFileTrace([namedFile('transparent.png')], pushToast, {
+    await runMultiFileTrace([namedFile(name)], pushToast, {
       loadImage: async () => rawImage(4, 4),
-      trace: async () => [ZERO_AREA_PATH],
+      trace: async () => [...paths],
       write,
     });
 
     expect(write).not.toHaveBeenCalled();
     expect(pushToast).toHaveBeenCalledWith(
-      'Could not trace images: Trace produced no visible paths for transparent-trace.svg. Try Trace Image with adjusted threshold or import as Image instead.',
-      'error',
+      `Skipped 1 image with no visible paths (${name}); try Trace Image with an adjusted threshold or import as Image instead.`,
+      'warning',
     );
   });
 
-  it('does not write blank-looking SVGs when trace returns only white background geometry', async () => {
+  it('writes the other images when one image in the batch is blank and reports the skip', async () => {
     const pushToast = vi.fn();
-    const write = vi.fn();
+    const written: string[] = [];
+    const write = vi.fn(async (file: { readonly filename: string }) => {
+      written.push(file.filename);
+      return true;
+    });
+    const trace = vi
+      .fn()
+      .mockResolvedValueOnce([SQUARE_PATH])
+      .mockResolvedValueOnce([BACKGROUND_PATH])
+      .mockResolvedValueOnce([SQUARE_PATH]);
 
-    await runMultiFileTrace([namedFile('blank.png')], pushToast, {
+    await runMultiFileTrace(
+      [namedFile('logo.png'), namedFile('blank.png'), namedFile('badge.png')],
+      pushToast,
+      { loadImage: async () => rawImage(4, 4), trace, write },
+    );
+
+    expect(written).toEqual(['logo-trace.svg', 'badge-trace.svg']);
+    expect(pushToast).toHaveBeenCalledWith(
+      'Traced 2 images to SVG. Skipped 1 image with no visible paths (blank.png); try Trace Image with an adjusted threshold or import as Image instead.',
+      'warning',
+    );
+  });
+
+  it('uses the chosen preset and writes DXF files when asked', async () => {
+    const pushToast = vi.fn();
+    const write = vi.fn(async () => true);
+    const trace = vi.fn(async () => [SQUARE_PATH]);
+    const options = TRACE_PRESETS['Smooth'];
+
+    await runMultiFileTrace([namedFile('logo.png')], pushToast, {
       loadImage: async () => rawImage(4, 4),
-      trace: async () => [BACKGROUND_PATH],
+      trace,
       write,
+      ...(options === undefined ? {} : { options }),
+      output: { format: 'dxf' },
     });
 
-    expect(write).not.toHaveBeenCalled();
-    expect(pushToast).toHaveBeenCalledWith(
-      'Could not trace images: Trace produced no visible paths for blank-trace.svg. Try Trace Image with adjusted threshold or import as Image instead.',
-      'error',
+    expect(trace).toHaveBeenCalledWith(rawImage(4, 4), options);
+    expect(write).toHaveBeenCalledWith(
+      expect.objectContaining({ filename: 'logo-trace.dxf', format: 'dxf' }),
     );
+    const file = (write.mock.calls[0] as unknown as [{ readonly text: string }])[0];
+    expect(file.text).toContain('LWPOLYLINE');
+    expect(pushToast).toHaveBeenCalledWith('Traced 1 image to DXF.', 'success');
   });
 });
 
-describe('writeTraceSvgFileWithPlatform', () => {
-  it('saves traced SVG output through PlatformAdapter', async () => {
+describe('writeTraceFileWithPlatform', () => {
+  it.each([
+    ['svg', 'logo-trace.svg', '.svg'],
+    ['dxf', 'logo-trace.dxf', '.dxf'],
+  ] as const)('saves traced %s output through PlatformAdapter', async (format, name, ext) => {
     const write = vi.fn();
-    const pickFileForSave = vi.fn(async () => ({ displayName: 'logo-trace.svg', write }));
+    const pickFileForSave = vi.fn(async () => ({ displayName: name, write }));
 
-    const saved = await writeTraceSvgFileWithPlatform(
+    const saved = await writeTraceFileWithPlatform(
       {
         id: 'mock',
         pickFilesForOpen: async () => [],
         pickFileForSave,
         serial: { isSupported: () => false, requestPort: async () => null },
       },
-      { filename: 'logo-trace.svg', svg: '<svg />', pathCount: 1 },
+      { filename: name, format, text: 'content', pathCount: 1, sourceIndex: 0 },
     );
 
     expect(saved).toBe(true);
-    expect(pickFileForSave).toHaveBeenCalledWith({
-      suggestedName: 'logo-trace.svg',
-      extensions: ['.svg'],
-    });
-    expect(write).toHaveBeenCalledWith('<svg />');
+    expect(pickFileForSave).toHaveBeenCalledWith({ suggestedName: name, extensions: [ext] });
+    expect(write).toHaveBeenCalledWith('content');
   });
 });

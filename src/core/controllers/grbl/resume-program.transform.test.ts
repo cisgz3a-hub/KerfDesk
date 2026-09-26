@@ -36,10 +36,54 @@ function resume(gcode: string, fromLine: number, transform?: LaserResumeTransfor
   return result;
 }
 
+describe('laser resume transform 4 (ADR-432)', () => {
+  const ARCS = [
+    'G21',
+    'G90',
+    'G54',
+    'G94',
+    'G17',
+    'M4 S0',
+    'G0 X10.000 Y20.000 S0',
+    'G2 X20.000 Y30.000 I10.000 J0.000 F1500 S500',
+    'G2 X30.000 Y20.000 I0.000 J-10.000',
+    'M5',
+  ].join('\n');
+
+  it('re-selects G17 before re-entry into an arc program', () => {
+    const lines = resume(ARCS, 9).lines;
+    expect(lines.slice(0, 6)).toEqual([
+      '; KerfDesk resume preamble',
+      'G21',
+      'G90',
+      'G54',
+      'G94',
+      'G17',
+    ]);
+    expect(resume(ARCS, 9, 3).lines).not.toContain('G17');
+  });
+
+  it('pins G17 for a tail with arcs when the program named no plane', () => {
+    const unnamed = ARCS.split('\n')
+      .filter((line) => line !== 'G17')
+      .join('\n');
+    expect(resume(unnamed, 8).lines.slice(0, 6)).toContain('G17');
+  });
+
+  it('re-selects the plane the program had, and adds nothing without one or arcs', () => {
+    const g18 = ['G21', 'G90', 'G18', 'M4 S0', 'G0 X0 Y0 S0', 'G1 X10 Y0 F1500 S300', 'M5'].join(
+      '\n',
+    );
+    expect(resume(g18, 6).lines.slice(0, 6)).toContain('G18');
+    expect(resume(RASTER_WITH_AIR, 7).lines).toEqual(resume(RASTER_WITH_AIR, 7, 3).lines);
+  });
+});
+
 describe('laser resume transform 2', () => {
   it('builds what new resumes of GRBL-family programs build', () => {
-    // Transform 3 changed only Smoothieware and Marlin programs (ADR-364).
-    expect(LASER_RESUME_TRANSFORM_VERSION).toBe(3);
+    // Transform 3 changed only Smoothieware and Marlin programs (ADR-364);
+    // transform 4 only pins the plane of programs with arcs or a plane word.
+    expect(LASER_RESUME_TRANSFORM_VERSION).toBe(4);
     expect(resume(RASTER_WITH_AIR, 7).lines).toEqual(resume(RASTER_WITH_AIR, 7, 2).lines);
   });
 

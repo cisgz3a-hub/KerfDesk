@@ -39,6 +39,7 @@ export type CommandId =
   | 'file.import-height-map'
   | 'file.save-gcode'
   | 'file.export-svg'
+  | 'file.export-dxf'
   | 'file.open-gcode'
   | 'file.inspect-gcode'
   | 'edit.undo'
@@ -198,6 +199,7 @@ export type AppCommandContext = EditingToolsCommandContext & {
   readonly inspectCurrentGcode: () => void;
   readonly saveGcode: () => void;
   readonly exportSvg: () => void;
+  readonly exportDxf: () => void;
   readonly undo: () => void;
   readonly redo: () => void;
   readonly selectAll: () => void;

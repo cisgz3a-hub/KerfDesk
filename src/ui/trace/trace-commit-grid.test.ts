@@ -181,7 +181,11 @@ describe('traceOptionsForCommitGrid', () => {
       grid: { width: 4096, height: 512 },
       preview: { width: 2048, height: 256 },
     });
-    expect(scaled.despeckleMinPixels).toBe((LINE_ART.despeckleMinPixels ?? 0) * 4);
+    // Line Art's ink despeckle is the automatic small-mark policy (ADR-434):
+    // its areas scale instead of an explicit despeckle area.
+    expect(LINE_ART.smallMarkPolicy).toBe('auto');
+    expect(scaled.despeckleMinPixels).toBeUndefined();
+    expect(scaled.smallMarkAreaScale).toBe(4);
     expect(scaled.ignoreLessThanPixels).toBe((LINE_ART.ignoreLessThanPixels ?? 0) * 4);
     expect(scaled.edgeMinLengthPx).toBe(20);
     expect(scaled.centerlineJoinGapPx).toBe(6);
@@ -208,7 +212,9 @@ describe('traceOptionsForCommitGrid', () => {
     expect(scaled.edgeMinLengthPx).toBeCloseTo((10 * 30_000) / 2048, 9);
     const area = (100 * 30_000) / (7 * 2048);
     expect(scaled.ignoreLessThanPixels).toBeCloseTo((LINE_ART.ignoreLessThanPixels ?? 0) * area, 9);
-    expect(scaled.despeckleMinPixels).toBeCloseTo((LINE_ART.despeckleMinPixels ?? 0) * area, 9);
+    expect(scaled.smallMarkAreaScale).toBeCloseTo(area, 9);
+    const explicit = traceOptionsForCommitGrid({ ...LINE_ART, despeckleMinPixels: 12 }, plan);
+    expect(explicit.despeckleMinPixels).toBeCloseTo(12 * area, 9);
   });
 
   it('returns the same options object on the preview grid', () => {

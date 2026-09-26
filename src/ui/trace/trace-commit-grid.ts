@@ -196,7 +196,7 @@ export function commitGridExceedsPreview(plan: TraceCommitGridPlan): boolean {
 
 /**
  * The size controls an operator sets in the dialog (Ignore less than, ink
- * despeckle, Minimum line, gap joins) keep the physical meaning they had on
+ * despeckle or the automatic small-mark policy, Minimum line, gap joins) keep the physical meaning they had on
  * the preview grid, so the commit drops the same specks the preview dropped.
  * Lengths scale by the longest-edge ratio and areas by the ratio of the two
  * grids' pixel counts: on a tall or narrow source the short edge is a small
@@ -216,6 +216,12 @@ export function traceOptionsForCommitGrid(
     ...options,
     ...scaled('despeckleMinPixels', options.despeckleMinPixels, area),
     ...scaled('ignoreLessThanPixels', options.ignoreLessThanPixels, area),
+    // The automatic small-mark policy (ADR-434) judges areas in the pixels of
+    // the grid it was tuned on; scale it like the explicit despeckle so the
+    // commit keeps the marks the preview kept.
+    ...(options.smallMarkPolicy === 'auto'
+      ? { smallMarkAreaScale: (options.smallMarkAreaScale ?? 1) * area }
+      : {}),
     ...scaled('edgeMinLengthPx', options.edgeMinLengthPx, ratio),
     ...scaled('edgeJoinGapPx', options.edgeJoinGapPx, ratio),
     ...scaled('centerlineJoinGapPx', options.centerlineJoinGapPx, ratio),

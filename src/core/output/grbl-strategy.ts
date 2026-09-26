@@ -56,11 +56,14 @@ import {
 } from './grbl-output-cursor';
 import { laserModeWord, vectorPowerWord } from './grbl-power-modes';
 import { laserParkTarget } from './job-park-target';
+import { laserArcMovesEnabled } from '../devices/laser-arc-moves';
+import { jobWritesArcMoves } from '../job/cut-arc-moves';
+import { arcSegmentBurns } from './grbl-laser-arc-moves';
 import { operationProvenanceComment } from './operation-provenance-comment';
 
 type CoolantMode = 'off' | 'M7' | 'M8';
 
-function preamble(dialect: GrblGcodeDialect): string {
+function preamble(dialect: GrblGcodeDialect, writesArcs: boolean): string {
   // G54 + G94 pin the modal WCS and feed mode the same way the CNC preamble
   // does (cnc-grbl-strategy.ts): GRBL's active G54-G59 selection and G93/G94
   // feed mode are modal and can be left changed by a console command or a $N
@@ -75,10 +78,12 @@ function preamble(dialect: GrblGcodeDialect): string {
   // when G1 carries S>0 — the move happens but the beam stays off. M3 S0 is
   // safe (no power) and primes the controller for any subsequent S-driven
   // cutting move.
-  return (
-    ['G21', 'G90', 'G54', 'G94', `${laserModeWord(dialect.cutPowerMode)} S0`].join(LINE_END) +
-    LINE_END
-  );
+  //
+  // G17 pins the arc plane like the WCS, and only when the job writes G2/G3
+  // (ADR-432): a stale G18/G19 reads an XY I/J arc as error:33 or swings Z.
+  const plane = writesArcs ? ['G17'] : [];
+  const words = ['G21', 'G90', 'G54', 'G94', ...plane, `${laserModeWord(dialect.cutPowerMode)} S0`];
+  return words.join(LINE_END) + LINE_END;
 }
 
 function postamble(
@@ -110,10 +115,12 @@ type SegmentEmissionContext = {
   readonly entryRunwayMm?: number | undefined;
   readonly entryBounds: ContourEntryBounds;
   readonly cursor: LaserOutputCursor;
+  /** ADR-432: the machine takes G2/G3, so fitted arc moves may be written. */
+  readonly arcMovesEnabled: boolean;
 };
 type GroupEmissionContext = Pick<
   SegmentEmissionContext,
-  'device' | 'dialect' | 'entryBounds' | 'cursor'
+  'device' | 'dialect' | 'entryBounds' | 'cursor' | 'arcMovesEnabled'
 >;
 
 function emitSegment(seg: CutSegment, context: SegmentEmissionContext): string[] {
@@ -139,6 +146,18 @@ function emitSegment(seg: CutSegment, context: SegmentEmissionContext): string[]
 }
 
 function segmentBurnLines(
+  seg: CutSegment,
+  first: { readonly x: number; readonly y: number },
+  context: SegmentEmissionContext,
+): SegmentBurns | null {
+  // Fitted arc moves (ADR-432) replace the polyline when this output writes them.
+  const arcs = arcSegmentBurns(seg, first, context);
+  if (arcs !== null)
+    return arcs.firstTarget === null ? null : { ...arcs, firstTarget: arcs.firstTarget };
+  return polylineSegmentBurns(seg, first, context);
+}
+
+function polylineSegmentBurns(
   seg: CutSegment,
   first: { readonly x: number; readonly y: number },
   context: SegmentEmissionContext,
@@ -372,8 +391,9 @@ function modeChangeLines(
 // group's first laser-off move (OR-1).
 function emitJob(job: Job, device: DeviceProfile, options: OutputEmitOptions = {}): string {
   const dialect = emittedDialect(device, options);
+  const arcMovesEnabled = laserArcMovesEnabled(device);
   const parts: string[] = [];
-  parts.push(preamble(dialect));
+  parts.push(preamble(dialect, arcMovesEnabled && jobWritesArcMoves(job)));
   let mode: 'M3' | 'M4' | 'off' = laserModeWord(dialect.cutPowerMode);
   let coolant: CoolantMode = 'off';
   const cursor = createLaserOutputCursor(mode);
@@ -392,7 +412,7 @@ function emitJob(job: Job, device: DeviceProfile, options: OutputEmitOptions = {
     parts.push(joinedLines(transitionLinesNow(cursor, transition)));
     if (wantedMode !== 'group-managed') mode = wantedMode;
     coolant = nextCoolant;
-    parts.push(emitAnyGroup(group, { device, dialect, entryBounds, cursor }));
+    parts.push(emitAnyGroup(group, { device, dialect, entryBounds, cursor, arcMovesEnabled }));
     if (group.kind === 'raster') mode = 'off'; // raster ends in M5, written or held
   }
   // Job end: held lines, air off and M5 follow the last burn, and the park

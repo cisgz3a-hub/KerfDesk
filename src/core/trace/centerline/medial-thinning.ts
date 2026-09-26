@@ -12,6 +12,7 @@
 
 import type { InkMask } from './distance-field';
 import { runTraceSteps, type TraceSteps } from '../trace-steps';
+import { bucketErosionQueue, type ErosionQueue } from './erosion-queue';
 
 // Ring positions around a pixel, clockwise from top-left.
 const RING_OFFSETS: ReadonlyArray<readonly [number, number]> = [
@@ -66,19 +67,32 @@ function* thinPassSteps(
   anchors: Uint8Array | null,
 ): TraceSteps<void> {
   const cooperate = yield;
-  const heap: number[] = [];
+  const queue = erosionQueue(distSq);
   for (let i = 0; i < skeleton.length; i += 1) {
     if ((i & 127) === 0 && cooperate) yield;
-    if ((skeleton[i] ?? 0) === 1) heapPush(heap, packEntry(skeleton, width, height, i), distSq);
+    if ((skeleton[i] ?? 0) === 1) queue.push(packEntry(skeleton, width, height, i));
   }
   let work = 0;
-  while (heap.length > 0) {
+  while (queue.size() > 0) {
     if ((work++ & 127) === 0 && cooperate) yield;
-    const index = unpackIndex(heapPop(heap, distSq));
+    const index = unpackIndex(queue.pop());
     if (!isErodable(skeleton, width, height, index, anchors)) continue;
     skeleton[index] = 0;
-    requeueNeighbours(skeleton, width, height, distSq, heap, index);
+    requeueNeighbours(skeleton, width, height, queue, index);
   }
+}
+
+// The comparator heap keys on the field directly; integer fields (every
+// field the tracer builds) take the equivalent bucket queue.
+function erosionQueue(distSq: Float64Array): ErosionQueue {
+  const buckets = bucketErosionQueue(distSq);
+  if (buckets !== null) return buckets;
+  const heap: number[] = [];
+  return {
+    push: (entry) => heapPush(heap, entry, distSq),
+    pop: () => heapPop(heap, distSq),
+    size: () => heap.length,
+  };
 }
 
 function isErodable(
@@ -100,8 +114,7 @@ function requeueNeighbours(
   skeleton: Uint8Array,
   width: number,
   height: number,
-  distSq: Float64Array,
-  heap: number[],
+  queue: ErosionQueue,
   index: number,
 ): void {
   const x = index % width;
@@ -112,7 +125,7 @@ function requeueNeighbours(
     if (nx < 0 || ny < 0 || nx >= width || ny >= height) continue;
     const ni = ny * width + nx;
     if ((skeleton[ni] ?? 0) === 1) {
-      heapPush(heap, packEntry(skeleton, width, height, ni), distSq);
+      queue.push(packEntry(skeleton, width, height, ni));
     }
   }
 }

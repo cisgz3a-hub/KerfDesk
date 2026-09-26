@@ -20,6 +20,7 @@ export function baseCtx(overrides: Partial<AppCommandContext> = {}): AppCommandC
     saveTemplate: vi.fn(),
     openRecentProjects: vi.fn(),
     barcodeGenerator: vi.fn(),
+    exportDxf: vi.fn(),
     ...baseCtxEditingTools(),
     ...baseCtxAppearance(),
     ...overrides,

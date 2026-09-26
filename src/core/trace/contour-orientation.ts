@@ -25,9 +25,50 @@ function dyadic(value: number): Dyadic {
   };
 }
 
+// Floating-point filter in front of the exact determinant (Shewchuk, "Adaptive
+// Precision Floating-Point Arithmetic and Fast Robust Geometric Predicates",
+// 1997): each coordinate difference is rounded once and so keeps its exact
+// sign, and when the rounded determinant clears (3 + 16u)u times the sum of
+// its two products' magnitudes (u = 2^-53) its sign is the exact sign. Only
+// near-degenerate triples, products too small for that bound to hold, and
+// non-finite input fall through to the exact dyadic evaluation below, so the
+// answer is always the exact one.
+const UNIT_ROUNDOFF = 2 ** -53;
+const ORIENTATION_ERROR_BOUND = (3 + 16 * UNIT_ROUNDOFF) * UNIT_ROUNDOFF;
+// Keep the filter away from gradual underflow, where rounding is no longer
+// relative and the bound above does not hold.
+const MIN_FILTERED_PRODUCT = 2 ** -900;
+
+/** The orientation sign when a double evaluation proves it, else 0 (unknown;
+ *  a true zero is never reported here). */
+function filteredOrientation(
+  ax: number,
+  ay: number,
+  bx: number,
+  by: number,
+  cx: number,
+  cy: number,
+): number {
+  const left = (bx - ax) * (cy - ay);
+  const right = (by - ay) * (cx - ax);
+  const magnitudeLeft = Math.abs(left);
+  const magnitudeRight = Math.abs(right);
+  if (!(magnitudeLeft >= MIN_FILTERED_PRODUCT && magnitudeRight >= MIN_FILTERED_PRODUCT)) return 0;
+  const determinant = left - right;
+  const bound = ORIENTATION_ERROR_BOUND * (magnitudeLeft + magnitudeRight);
+  if (determinant > bound) return 1;
+  if (-determinant > bound) return -1;
+  return 0;
+}
+
 /** Exact orientation sign for finite trace coordinates. */
 export function contourOrientation(a: Vec2, b: Vec2, c: Vec2): number {
-  return exactOrientation([a.x, a.y, b.x, b.y, c.x, c.y].map(dyadic));
+  const { x: ax, y: ay } = a;
+  const { x: bx, y: by } = b;
+  const { x: cx, y: cy } = c;
+  const filtered = filteredOrientation(ax, ay, bx, by, cx, cy);
+  if (filtered !== 0) return filtered;
+  return exactOrientation([ax, ay, bx, by, cx, cy].map(dyadic));
 }
 
 /** Cache only binary64 decompositions, never an approximate determinant. */
@@ -35,6 +76,8 @@ export class ContourOrientation {
   private readonly points = new WeakMap<Vec2, PreparedPoint>();
 
   sign(a: Vec2, b: Vec2, c: Vec2): number {
+    const filtered = filteredOrientation(a.x, a.y, b.x, b.y, c.x, c.y);
+    if (filtered !== 0) return filtered;
     return exactOrientation([
       ...this.coordinates(a),
       ...this.coordinates(b),

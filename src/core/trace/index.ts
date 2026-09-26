@@ -36,8 +36,17 @@ export {
 export { isBinaryContourPreset } from './contour-trace';
 export { traceCenterlineStrokePaths } from './centerline';
 export { coloredPathsToSvg } from './paths-to-svg';
-export type { BatchTraceDependencies, BatchTraceImageJob, BatchTraceSvgFile } from './batch-trace';
-export { traceImagesToSvgFiles } from './batch-trace';
+export type {
+  BatchTraceDependencies,
+  BatchTraceFile,
+  BatchTraceFormat,
+  BatchTraceImageJob,
+  BatchTraceOutput,
+  BatchTraceResult,
+  BatchTraceSkip,
+} from './batch-trace';
+export { traceImagesToVectorFiles } from './batch-trace';
+export type { TracedLayer, TracedVectorOptions } from './batch-trace-svg';
 export type { EnhanceRegionArgs, RegionTraceFn } from './region-enhance';
 export { enhanceRegionPaths } from './region-enhance';
 export type { TraceBoundary } from './trace-boundary';

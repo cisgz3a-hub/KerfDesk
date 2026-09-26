@@ -12,8 +12,10 @@ import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
-import type { RawImageData } from '../../core/trace';
-import { canTraceInline, traceImage } from './use-trace-worker-client';
+import type { RawImageData, TraceOptions } from '../../core/trace';
+import { TRACE_PRESETS } from '../../core/trace/trace-presets';
+import { resolveFrozenTraceSourceOptions } from '../../core/trace/trace-source-decisions';
+import { canTraceInline, traceImage, traceImageWithFallback } from './use-trace-worker-client';
 import type { TraceWorkerRequest, TraceWorkerResponse } from './trace-worker';
 
 // Build a tiny synthetic image — single black pixel surrounded by
@@ -313,5 +315,82 @@ describe('traceImage worker timeout (P2-A)', () => {
     } finally {
       vi.useRealTimers();
     }
+  });
+});
+
+describe('traceImage freezeSourceDecisions (ADR-435)', () => {
+  const otsuOptions: TraceOptions = { ...traceOptions, useOtsuThreshold: true };
+
+  it('resolves, traces with and returns the frozen options inline', async () => {
+    const source = tinyImage();
+    const frozen = resolveFrozenTraceSourceOptions(source, otsuOptions);
+    expect(frozen.sourceOtsuThreshold).toBeDefined();
+
+    const asked = await traceImage(source, otsuOptions, undefined, undefined, {
+      freezeSourceDecisions: true,
+    });
+    const plain = await traceImage(source, otsuOptions);
+
+    expect(asked.sourceOptions).toEqual(frozen);
+    expect(plain).not.toHaveProperty('sourceOptions');
+  });
+
+  it('asks the worker for them and surfaces its answer', async () => {
+    vi.resetModules();
+    let sent: TraceWorkerRequest | undefined;
+    const answer = { ...otsuOptions, sourceOtsuThreshold: 91 };
+    class DecidingWorker {
+      onmessage: ((e: MessageEvent<TraceWorkerResponse>) => void) | null = null;
+      onerror: (() => void) | null = null;
+
+      postMessage(request: TraceWorkerRequest): void {
+        sent = request;
+        const response: TraceWorkerResponse = {
+          id: request.id,
+          kind: 'ok',
+          paths: [],
+          bounds: { minX: 0, minY: 0, maxX: 0, maxY: 0 },
+          width: request.image.width,
+          height: request.image.height,
+          ...(request.freezeSourceDecisions === true ? { sourceOptions: answer } : {}),
+        };
+        queueMicrotask(() => {
+          this.onmessage?.({ data: response } as MessageEvent<TraceWorkerResponse>);
+        });
+      }
+
+      terminate(): void {
+        /* healthy worker is reused */
+      }
+    }
+    vi.stubGlobal('Worker', DecidingWorker);
+    const client = await import('./use-trace-worker-client');
+
+    const result = await client.traceImage(tinyImage(), otsuOptions, undefined, undefined, {
+      freezeSourceDecisions: true,
+    });
+
+    expect(sent?.freezeSourceDecisions).toBe(true);
+    expect(sent?.options).toEqual(otsuOptions);
+    expect(result.sourceOptions).toEqual(answer);
+  });
+
+  it("keeps the first pass's frozen options through the zero-paths relaxed retry", async () => {
+    const preset = TRACE_PRESETS['Sharp'];
+    if (preset === undefined) throw new Error('Missing Sharp preset');
+    const options = { ...preset, despeckleMinPixels: 4 };
+    const data = new Uint8ClampedArray(16 * 16 * 4).fill(255);
+    for (const y of [7, 8]) data.set([0, 0, 0, 255], (y * 16 + 7) * 4);
+    const speck: RawImageData = { width: 16, height: 16, data };
+    const frozen = resolveFrozenTraceSourceOptions(speck, options);
+    expect(frozen.sourceOtsuThreshold).toBeDefined();
+
+    const result = await traceImageWithFallback(speck, options, undefined, undefined, {
+      freezeSourceDecisions: true,
+    });
+
+    expect(result.notices).toEqual(['relaxed-settings']);
+    expect(result.paths.length).toBeGreaterThan(0);
+    expect(result.sourceOptions).toEqual(frozen);
   });
 });

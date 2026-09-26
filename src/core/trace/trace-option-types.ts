@@ -4,6 +4,8 @@
 // existing `import { ..., type TraceOptions } from './trace-image'` sites are
 // unchanged.
 
+import type { ColourLayerOptions } from './colour-layer-options';
+
 export type TraceOptions = {
   // Photo shading traces continuous tones as black filled ribbons. Presence
   // selects the photo backend; 0..100 controls the bounded detail grid. Shades
@@ -16,6 +18,10 @@ export type TraceOptions = {
   // for single-pass vector engraving. Edge detection uses local contrast
   // to find full-colour artwork and traces closed outlines around its ink.
   readonly traceMode?: 'filled-contours' | 'centerline' | 'edge';
+  // Colour layers (ADR-430): presence selects the colour-layer backend, which
+  // quantises the image to a few flat colours and traces one filled path per
+  // colour with shared boundaries (colour-layer-trace.ts).
+  readonly colourLayers?: ColourLayerOptions;
   // Number of color quantization buckets. 2 = black-and-white,
   // suitable for most laser engraving. Higher values produce more
   // layers and (usually) more visual fidelity. Range 2-16.
@@ -62,6 +68,10 @@ export type TraceOptions = {
   readonly sourceHasTransparency?: boolean;
   readonly sketchTrace?: boolean;
   readonly autoSketchTrace?: boolean;
+  // INTERNAL full-source auto-sketch verdict (ADR-435), carried like
+  // sourceHasTransparency so an Enhance crop binarises as the full pass did.
+  // Read only while autoSketchTrace is on; absent = decide on the image given.
+  readonly sourceAutoSketch?: boolean;
   // Explicit faint-line detection adds coherent narrow local-contrast strokes
   // to this preset's actual brightness/Otsu mask, retaining its solid areas.
   // Alpha tracing takes precedence; UI manual/sketch detection clears this flag.
@@ -77,6 +87,10 @@ export type TraceOptions = {
   // image's luma histogram (Otsu 1979) instead of a fixed value.
   // Used only when explicit cutoffLuma / thresholdLuma are absent.
   readonly useOtsuThreshold?: boolean;
+  // INTERNAL full-source Otsu cut (ADR-435), read only while useOtsuThreshold
+  // is on, so an Enhance crop cuts where the full pass cut. Dropping
+  // useOtsuThreshold (the relaxed retry) drops it with it.
+  readonly sourceOtsuThreshold?: number;
   // medianFilter: 3×3 median filter (RGBA → greyscale) applied
   // BEFORE thresholding. Kills salt-and-pepper noise and JPEG
   // artefacts without rounding off real edges the way a Gaussian
@@ -88,6 +102,10 @@ export type TraceOptions = {
   //     intact even when the same image also contains noise. Shares the
   //     selective automatic policy used by Edge Detection.
   readonly medianFilter?: boolean | 'auto';
+  // INTERNAL full-source verdict of medianFilter 'auto' (ADR-436): true when
+  // the whole image's isolated impulses reach the density floor. An Enhance
+  // crop repairs its impulses at source scale by this verdict, not its own.
+  readonly sourceAutoMedian?: boolean;
   // despeckleMinPixels: connected-component despeckle applied AFTER
   // thresholding. Any ink region (luma<128) with fewer than N source pixels
   // gets flipped to white. Centerline uses eight-connected ink; other modes
@@ -102,6 +120,22 @@ export type TraceOptions = {
   // thinness + area guards keep letter counters, spacing gaps, and intended
   // thin highlights untouched. See fill-pinholes.ts.
   readonly fillPinholeCracks?: boolean;
+  // smallMarkPolicy 'auto': judge each small ink mark and each thin enclosed
+  // paper hole on evidence (local contrast against the image's ink/paper
+  // span, grey bridges, nearby dust, like marks, size in SOURCE px) instead
+  // of a fixed area, so stipple, dotted rows, small text and paper holes in
+  // hatching survive while faint threshold noise, dust, toner scatter and
+  // binarisation cracks are cleaned. Applies only to a stage whose explicit option above is
+  // unset: an explicit despeckleMinPixels / fillPinholeCracks is honoured
+  // exactly. See small-mark-policy.ts and ADR-434.
+  readonly smallMarkPolicy?: 'auto';
+  // smallMarkAreaScale: INTERNAL — working-grid px² per source px² on the
+  // bounded downscale route (set by trace-to-paths.ts, which resets
+  // pixelScale to 1 there), so the automatic policy keeps SOURCE-pixel
+  // semantics; a commit on a grid finer than the preview multiplies in the
+  // commit/preview area ratio (trace-commit-grid.ts, ADR-409). Operators never
+  // set this.
+  readonly smallMarkAreaScale?: number;
   // turnPolicy: how the filled-contour lane resolves a SADDLE — two ink
   // pixels touching only at a corner. 'connect-ink' joins them (a 1-px
   // diagonal hairline is one outline); 'connect-paper' splits them and is
@@ -132,15 +166,19 @@ export type TraceOptions = {
   readonly smoothness?: number;
   readonly optimize?: number;
   // Edge Detection-only controls. UI exposes these as three simple
-  // operator knobs: Sensitivity, Detail, and Minimum line.
+  // operator knobs: Sensitivity, Detail, and Minimum line (ADR-437).
+  // edgeBlurSigma carries the local-mean radius: round(sigma x 10), 4..32
+  // source px. edgeLowThresholdRatio carries the contrast delta:
+  // round(ratio x 6/0.074), 2..12 luma levels (see edge-input.ts).
   readonly edgeBlurSigma?: number;
   readonly edgeLowThresholdRatio?: number;
-  // Retained for the Sensitivity control's preset round-trip; the local mask
-  // derives its contrast delta from edgeLowThresholdRatio.
+  /** @deprecated Canny-era value; nothing reads it. Accepted so older saved
+   * options still load. */
   readonly edgeHighThresholdRatio?: number;
   // Minimum finished edge-path length in source-image pixels.
   readonly edgeMinLengthPx?: number;
-  // Canny-era compatibility value; closed-mask contours do not bridge gaps.
+  /** @deprecated Canny-era value; closed-mask contours never bridge gaps and
+   * nothing reads it. Accepted so older saved options still load. */
   readonly edgeJoinGapPx?: number;
   // undefined = selective AUTO cleanup in source pixels before enlargement;
   // true = the explicit full 3x3 median on the working raster; false = off.

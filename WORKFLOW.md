@@ -794,6 +794,9 @@ marks later edits as unapproved without changing the existing Frame/Start policy
    It resolves current variable text, outlines text, preserves physical millimetre size and
    canonical curves, embeds original bitmap pixels, and includes image masks and transforms.
    Machine settings and generated toolpaths are excluded; the production cursor does not advance.
+   Vector coordinates are rounded so each point lies within half a 0.001 mm grid diagonal of its
+   true position, and the page is the exact extent of the drawn curves, not their control points
+   (ADR-431).
 3. Cancellation writes nothing. Missing image pixels, unsupported 3D relief or invalid geometry
    report an error without claiming a successful partial export. A write error reports its reason.
 4. Re-import preserves the supported vector/image composition, physical size and image clips
@@ -802,6 +805,18 @@ marks later edits as unapproved without changing the existing Frame/Start policy
 5. Explicit **Re-import source** replaces the complete originally imported SVG composition in one
    Undo step. Unambiguous unchanged components retain settings; changed or ambiguous components
    receive new operations. Copies are independent of the original source's replacement set.
+
+### F-A9c. Export artwork as DXF; Multi-File Trace formats (ADR-431)
+
+1. **File → Export artwork as DXF...** (or **Export selected artwork as DXF...**) writes the
+   selection or scene's vector artwork as a millimetre DXF: one polyline per contour, one layer per
+   colour, circular arcs as exact bulges, cubics and elliptical arcs flattened within 0.01 mm.
+   Bitmaps and reliefs have no DXF form; they are left out and the completion message counts them.
+2. **Tools → Multi-File Trace...** first asks for the preset, format (SVG or DXF), coordinate
+   precision and, for SVG, whether to group each shape with its holes; **Choose Images...** then
+   picks the files. Each image is saved as `<name>-trace.svg` or `<name>-trace.dxf`.
+3. An image whose trace has nothing visible writes no file; the rest of the batch is still saved
+   and the completion message names the skipped images.
 
 ### F-A9b. Remove overlapping laser lines (ADR-350)
 
@@ -2628,6 +2643,15 @@ settings and Job Review keep their existing read-only setup references.
    geometry-only limit explains that lowering DPI cannot fix it. CNC keeps the editable shapes;
    choose an appropriate machining operation and tool size for their widths. This is a line
    halftone treatment; Image mode also offers grayscale and dithered photo engraving.
+   **Colour layers** splits flat-colour artwork into a few colours (**Colours**: Auto or 2 to 8,
+   counting the paper) and traces one filled layer per colour; neighbouring colours share one
+   edge with no gap or overlap (ADR-430). **Cut-out** burns each colour only in its own area;
+   **Stacked** also fills each colour under the darker colours above it. The paper colour is left
+   untraced unless **Trace background colour** is ticked; only a light border colour counts as
+   paper, so light-on-dark art traces every colour. The swatches show the traced colours,
+   lightest first. On commit each colour gets its own operation; on a laser each starts at a power
+   set by its darkness (a mid-dark or darker colour keeps the operation's power), which the
+   operator can edit. Paper (near-white, or the traced background) starts with output off.
    For line artwork, choose **Detection** explicitly: the preset's automatic detection, a **Manual brightness band**,
    **Faint lines (keep solid areas)**, or **Sketch (local contrast)**. Faint lines adds coherent
    pale strokes to the preset's solid ink while rejecting isolated pale specks. Sketch uses
@@ -2637,7 +2661,12 @@ settings and Job Review keep their existing read-only setup references.
    use pixels of the decoded image grid supplied to the tracing core and preserve their separate
    preset values. If dense artwork is traced on a smaller working grid, both area thresholds are
    converted using the actual width and height ratios, without rounding the internal values.
-   The preceding UI decode cap still defines that source grid. Expand **Curve finishing** for
+   The preceding UI decode cap still defines that source grid. Smooth's automatic noise cleanup
+   also judges one-pixel specks on that grid, before any supersampling, so a small image drops the
+   same specks it would at full size. Isolated one-pixel dots, such as a fine halftone screen,
+   look exactly like noise. Smooth and Line Art already drop them through **Remove ink specks**
+   and **Fill tiny holes**; the noise cleanup only adds specks those leave, such as specks near
+   an outline. Trace with Sharp to keep one-pixel dots. Expand **Curve finishing** for
    **Smoothness** and **Optimize** on filled outlines and Edge Detection, or **Transparency**
    for alpha-mask tracing. **Fill tiny holes** controls cleanup of small enclosed white marks;
    it does not bridge open gaps. Turn it off to retain those small highlights. Sliders and numeric fields stay in sync. Manual adjustments persist
@@ -2654,7 +2683,13 @@ settings and Job Review keep their existing read-only setup references.
    Submitted results use their captured request's paint intent; a newer preset request still
    supersedes an older result.
    Edge Detection creates closed outlines around dark artwork and locally
-   darker detail. Adjacent dark tones may merge into one outline. Centerline follows stroke centres.
+   darker detail. Adjacent dark tones may merge into one outline. Its **Sensitivity** moves in
+   steps of 10 and **Detail** in steps of 5; every step is a different detector setting (faint
+   detail appears or drops out; hard black-on-white art may not change) (ADR-437). A typed value
+   between steps shows the step being traced once the field loses focus. **Trace alpha mask**
+   also applies to Edge Detection: it outlines the image's transparency, and Invert is
+   unavailable while it is on. Semi-transparent regions (shadows, glows) are outlined like grey
+   tones; a 16%-opacity shadow still outlines at Sensitivity 0. Centerline follows stroke centres.
    Both commit as Line layers, so their preview draws every outline and stroke as a hairline that
    stays one screen pixel wide at any zoom, rather than filling Edge outlines.
    Centerline's separate-end gap bridge uses source-grid distance (preset/default 3 pixels),
@@ -3412,7 +3447,9 @@ and physical material output remain unverified.
 
 ### F-F5. Enhance a region of a trace (region-enhance re-trace)
 
-**ADR:** [ADR-113](DECISIONS.md#adr-113--region-enhance-re-trace-dialog-boundary-mode-trace-fidelity-2026-07-05).
+**ADR:** [ADR-113](DECISIONS.md#adr-113--region-enhance-re-trace-dialog-boundary-mode-trace-fidelity-2026-07-05),
+amended by [ADR-435](docs/decisions/ADR-435-region-enhance-seams.md) and
+[ADR-436](docs/decisions/ADR-436-auto-median-at-source-scale.md).
 
 **Operator intent.** A small feature inside a large raster (a tiny
 letter counter in a full logo) dropped out of the trace because it
@@ -3434,7 +3471,14 @@ re-runs: the full image is traced, the boxed source region is re-traced
 at 2× and downscaled, and its geometry is patched into the full trace
 (polylines fully inside the region's shrunk interior are replaced;
 everything crossing the box border or in the margin ring survives). The
-preview shows the full trace with the boxed feature recovered. Commit
+box is re-traced with a ring of the real neighbouring pixels around it and
+with the whole image's Otsu cut, auto-sketch choice and Smooth noise-cleanup
+verdict (noise is cleaned on the source pixels before the 2× enlargement), so the patch
+binarises exactly like its surroundings, and a shape that both passes
+trace within a pixel of each other at the box edge is kept once. Fitted
+curves and operation bindings survive inside and outside the box. The
+preview shows the full
+trace with the boxed feature recovered. Commit
 (**Trace**) writes the patched paths as the traced image, reusing the
 same overlay registration as any trace.
 

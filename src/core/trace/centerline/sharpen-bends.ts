@@ -9,18 +9,22 @@
 // keep their distance and stay round.
 //
 // This file is the ORCHESTRATION (the scan, the per-candidate attempt, the
-// closed-ring rotation); the pure geometric predicates it calls live in
+// in-place splice); the pure geometric predicates it calls live in
 // bend-geometry.ts.
 
 import type { Vec2 } from '../../scene';
 import { runTraceSteps, type TraceSteps } from '../trace-steps';
 import {
+  MAX_BEND_WINDOW_ARM_PX,
   MAX_VERTEX_OFFSET_FACTOR,
   apexReachScale,
   apexSupportedByInk,
-  arcLengthOf,
+  arcTrimIndexOn,
+  bendGateReachPx,
   bendVertexAt,
   bendWindow,
+  edgeLength,
+  edgeLengths,
   legIsStraight,
   netTurnAcross,
   pointToSegment,
@@ -28,7 +32,7 @@ import {
   turnIsConcentrated,
   vertexHugsChain,
 } from './bend-geometry';
-import { arcTrimIndex } from './polyline-window';
+import { sharpenRingSteps, type RingBend, type RingBendJudge } from './ring-bend-scan';
 
 const QUICK_TURN_GATE_RAD = (20 * Math.PI) / 180;
 // One corner per physical corner: after a rebuild, nearby candidates (the
@@ -38,14 +42,33 @@ const QUICK_TURN_GATE_RAD = (20 * Math.PI) / 180;
 // adjacent edge. A rebuilt vertex landing this close to an existing corner
 // is the same corner and is dropped.
 const CORNER_MIN_SEPARATION_PX = 2.5;
-// A closed chain's window may not swallow the whole loop: cap the arm so two
-// corners of a tiny feature can't trim each other away.
-const CLOSED_ARM_LENGTH_DIVISOR = 6;
-// Iteration budget: a base allowance plus one chain-length per replacement
-// (each closed replacement rotates the array and restarts the scan). The
-// base absorbs the no-replacement scan; the floor keeps small chains fair.
-const GUARD_BASE_BUDGET = 64;
+// Replacement budget: one corner per two points, with a floor for short chains.
 const MIN_REPLACEMENT_BUDGET = 8;
+// Whole-trace attempt budget, per working-raster pixel: a worst-case bound,
+// not a tuning knob. Every attempt is a bounded neighbourhood of gate walks,
+// so the corner rebuild of one trace costs at most this many of them. Traced
+// art stays far inside it (measured peak: owl 0.043 attempts/px in Edge
+// Detection; hummingbird 0.033; every perceptual fixture 0.025 or less),
+// while colour noise thresholded into meandering boundaries asks for
+// 0.12-0.14/px. The floor exempts small rasters outright (a 192² noise
+// trace needs ~20k attempts, a few hundred milliseconds).
+const ATTEMPTS_PER_WORKING_PIXEL = 0.1;
+const MIN_ATTEMPT_BUDGET = 32_768;
+
+/** Shared corner-rebuild allowance for one trace (see createBendBudget). */
+export type BendBudget = { attemptsLeft: number };
+
+/** The corner-rebuild allowance of a trace over `workingPixels` pixels. Once
+ *  spent, remaining chains keep their dense geometry (no rebuilt corners);
+ *  the curve finisher's own hard-turn pins still apply to them. */
+export function createBendBudget(workingPixels: number): BendBudget {
+  return {
+    attemptsLeft: Math.max(
+      MIN_ATTEMPT_BUDGET,
+      Math.ceil(workingPixels * ATTEMPTS_PER_WORKING_PIXEL),
+    ),
+  };
+}
 
 export type SharpenedChain = {
   readonly points: Vec2[];
@@ -56,9 +79,9 @@ export type SharpenedChain = {
   readonly corners: ReadonlySet<Vec2>;
 };
 
-/** Sharpen concentrated bends of a chain. Closed chains are handled by
- *  rotation (a closed polyline is rotation-invariant), so ring corners
- *  sharpen exactly like open-chain corners. */
+/** Sharpen concentrated bends of a chain. A closed chain is judged with the
+ *  ring centred on each candidate (a closed polyline is rotation-invariant),
+ *  so ring corners sharpen exactly like open-chain corners. */
 export function sharpenChainBends(
   points: ReadonlyArray<Vec2>,
   closed: boolean,
@@ -69,84 +92,149 @@ export function sharpenChainBends(
   return runTraceSteps(sharpenChainBendsSteps(points, closed, distSq, width, anchors));
 }
 
+// Open chains take one forward pass: an accepted bend is spliced into the
+// chain in place and the scan resumes just past the new vertex. Rings re-centre
+// on each rebuilt corner and rescan (ring-bend-scan.ts), judging each
+// candidate on its bounded stretch of ring and skipping rescans of vertices
+// whose stretch no rebuild has touched. Neither copies the chain per
+// candidate.
 export function* sharpenChainBendsSteps(
   points: ReadonlyArray<Vec2>,
   closed: boolean,
   distSq: Float64Array,
   width: number,
   anchors?: ReadonlySet<Vec2>,
+  budget?: BendBudget,
 ): TraceSteps<SharpenedChain> {
-  const cooperate = yield;
-  let pts = [...points];
+  yield;
   const corners = new Set<Vec2>();
-  let closedMaxArm: number | undefined;
-  let i = 1;
-  // Every closed-chain replacement restarts the scan (the returned array is
-  // rotated), so the iteration budget must grow with each replacement — a
-  // fixed multiple of n exhausts mid-scan on rings with many drawn corners
-  // (a gear or star) and silently leaves the rest chamfered. Replacements
-  // themselves are finite: the vertex-gain guard makes each corner fire once.
-  let guard = pts.length * 2 + GUARD_BASE_BUDGET;
-  let replacementsLeft = Math.max(MIN_REPLACEMENT_BUDGET, Math.ceil(pts.length / 2));
-  while (guard > 0) {
-    if (cooperate) yield;
-    guard -= 1;
-    if (i >= (closed ? pts.length : pts.length - 1)) break;
-    if (quickTurnAt(pts, i, closed) < QUICK_TURN_GATE_RAD) {
-      i += 1;
-      continue;
-    }
-    const bent = closed
-      ? trySharpenClosed(
-          pts,
-          i,
-          distSq,
-          width,
-          (closedMaxArm ??= arcLengthOf(pts) / CLOSED_ARM_LENGTH_DIVISOR),
-        )
-      : trySharpenOpen(pts, i, distSq, width);
-    if (!acceptableBend(bent, corners, anchors)) {
-      i += 1;
-      continue;
-    }
-    pts = bent.points;
-    // Candidates only read this chain. Reuse its exact, ordered length sum
-    // until a successful replacement adopts a different (rotated) chain.
-    closedMaxArm = undefined;
-    corners.add(bent.corner);
-    replacementsLeft -= 1;
-    if (replacementsLeft <= 0) break;
-    guard += pts.length;
-    // A closed replacement returns a ROTATED array — earlier indices now hold
-    // unscanned points, so restart. Open arrays keep their prefix; skip ahead.
-    i = closed ? 1 : bent.resumeAt;
-  }
-  return { points: pts, corners };
+  // An anchor the chain does not carry can never be retained by any rebuild.
+  if (anchorMissing(points, anchors)) return { points: [...points], corners };
+  const replacements = Math.max(MIN_REPLACEMENT_BUDGET, Math.ceil(points.length / 2));
+  const addCorner = (chain: ReadonlyArray<Vec2>, bend: BendResult): boolean => {
+    if (!acceptableBend(chain, bend, corners, anchors)) return false;
+    corners.add(bend.corner);
+    return true;
+  };
+  const sharpened = closed
+    ? yield* sharpenRingSteps(points, ringJudge(distSq, width, addCorner, budget), replacements)
+    : yield* sharpenOpenSteps([...points], distSq, width, addCorner, replacements, budget);
+  return { points: sharpened, corners };
 }
 
-function dropsAnchor(points: ReadonlyArray<Vec2>, anchors: ReadonlySet<Vec2> | undefined): boolean {
+function ringJudge(
+  distSq: Float64Array,
+  width: number,
+  accept: (pts: ReadonlyArray<Vec2>, bend: BendResult) => boolean,
+  budget: BendBudget | undefined,
+): RingBendJudge {
+  return {
+    spend: () => spend(budget),
+    admits: (pts, i) => quickTurnAt(pts, i, true) >= QUICK_TURN_GATE_RAD,
+    reachPx: (pts, i) => bendGateReachPx(pts, i, distSq, width, MAX_GATE_ARM_PX),
+    maxGateArmPx: MAX_GATE_ARM_PX,
+    attempt: (stretch, seg, at, maxArm) => trySharpenOpen(stretch, seg, at, distSq, width, maxArm),
+    accept,
+  };
+}
+
+function* sharpenOpenSteps(
+  pts: Vec2[],
+  distSq: Float64Array,
+  width: number,
+  accept: (pts: ReadonlyArray<Vec2>, bend: BendResult) => boolean,
+  replacements: number,
+  budget: BendBudget | undefined,
+): TraceSteps<Vec2[]> {
+  const cooperate = yield;
+  let replacementsLeft = replacements;
+  let seg = edgeLengths(pts);
+  let i = 1;
+  while (i < pts.length - 1) {
+    if (cooperate) yield;
+    if (quickTurnAt(pts, i, false) < QUICK_TURN_GATE_RAD) {
+      i += 1;
+      continue;
+    }
+    if (!spend(budget)) break;
+    const bent = trySharpenOpen(pts, seg, i, distSq, width);
+    if (bent === null || !accept(pts, bent)) {
+      i += 1;
+      continue;
+    }
+    seg = spliceOpen(pts, seg, bent);
+    replacementsLeft -= 1;
+    if (replacementsLeft <= 0) break;
+    i = bent.from + 1;
+  }
+  return pts;
+}
+
+// Replace chain positions [from, to) with the corner, in place, and keep the
+// edge lengths in step: only the corner's two edges are new.
+function spliceOpen(pts: Vec2[], seg: Float64Array, bent: BendResult): Float64Array {
+  const count = bent.to - bent.from;
+  pts.splice(bent.from, count, bent.corner);
+  seg.copyWithin(bent.from + 1, bent.from + count);
+  const next = seg.subarray(0, seg.length - count + 1);
+  if (bent.from > 0) next[bent.from - 1] = edgeLength(pts, bent.from - 1, bent.from);
+  if (bent.from + 1 < pts.length) next[bent.from] = edgeLength(pts, bent.from, bent.from + 1);
+  return next;
+}
+
+/** Take one attempt from the budget; false once it is spent. */
+function spend(budget: BendBudget | undefined): boolean {
+  if (budget === undefined) return true;
+  if (budget.attemptsLeft <= 0) return false;
+  budget.attemptsLeft -= 1;
+  return true;
+}
+
+function anchorMissing(pts: ReadonlyArray<Vec2>, anchors: ReadonlySet<Vec2> | undefined): boolean {
   if (anchors === undefined || anchors.size === 0) return false;
-  const retained = new Set(points);
-  return [...anchors].some((anchor) => !retained.has(anchor));
+  const present = new Set(pts);
+  for (const anchor of anchors) if (!present.has(anchor)) return true;
+  return false;
 }
 
 function acceptableBend(
-  bent: BendResult | null,
+  pts: ReadonlyArray<Vec2>,
+  bent: BendResult,
   corners: ReadonlySet<Vec2>,
   anchors: ReadonlySet<Vec2> | undefined,
-): bent is BendResult {
-  return (
-    bent !== null &&
-    !tooCloseToExistingCorner(bent.corner, corners) &&
-    !dropsAnchor(bent.points, anchors)
-  );
+): boolean {
+  return !tooCloseToExistingCorner(bent.corner, corners) && !removesAnchor(pts, bent, anchors);
 }
 
-type BendResult = {
-  readonly points: Vec2[];
-  readonly resumeAt: number;
-  readonly corner: Vec2;
-};
+/** A bend replaces chain positions [from, to) with its corner vertex. For a
+ *  ring the positions are logical: they may run below 0 or past n and wrap. */
+type BendResult = RingBend;
+
+function removesAnchor(
+  pts: ReadonlyArray<Vec2>,
+  bent: BendResult,
+  anchors: ReadonlySet<Vec2> | undefined,
+): boolean {
+  if (anchors === undefined || anchors.size === 0) return false;
+  const n = pts.length;
+  for (let k = bent.from; k < bent.to; k += 1) {
+    const p = pts[((k % n) + n) % n];
+    if (p !== undefined && anchors.has(p) && !keptElsewhere(pts, p, bent)) return true;
+  }
+  return false;
+}
+
+// A chain may carry one point object more than once (a centerline junction
+// shared by both ends); the anchor survives while any copy stays outside the
+// window.
+function keptElsewhere(pts: ReadonlyArray<Vec2>, p: Vec2, bent: BendResult): boolean {
+  const n = pts.length;
+  const removed = bent.to - bent.from;
+  for (let k = 0; k < n - removed; k += 1) {
+    if (pts[(((bent.to + k) % n) + n) % n] === p) return true;
+  }
+  return false;
+}
 
 function tooCloseToExistingCorner(vertex: Vec2, corners: ReadonlySet<Vec2>): boolean {
   for (const c of corners) {
@@ -170,25 +258,31 @@ const RETRY_ARMS_PX = [6, 9, 12] as const;
 const RETRY_MIN_TURN_RAD = (90 * Math.PI) / 180;
 const RETRY_NEAR_SPAN_PX = 3;
 const RETRY_MIN_NEAR_TURN_RAD = (60 * Math.PI) / 180;
+// The widest tangent arm any attempt may use (base window or retry).
+const MAX_GATE_ARM_PX = Math.max(MAX_BEND_WINDOW_ARM_PX, ...RETRY_ARMS_PX);
 
+// `seg` holds the chain's edge lengths (see edgeLengths).
 function trySharpenOpen(
   pts: ReadonlyArray<Vec2>,
+  seg: Float64Array,
   i: number,
   distSq: Float64Array,
   width: number,
   maxArm = Infinity,
 ): BendResult | null {
-  const window = bendWindow(pts, i, distSq, width);
+  const window = bendWindow(pts, seg, i, distSq, width);
   const baseArm = Math.min(window.arm, maxArm);
-  const base = attemptBend(pts, i, baseArm, window.maxRadius, distSq, width);
+  const base = attemptBend(pts, seg, i, baseArm, window.maxRadius, distSq, width);
   if (base !== null) return base;
-  const nearTurn = netTurnAcross(pts, i, RETRY_NEAR_SPAN_PX);
+  const nearTurn = netTurnAcross(pts, seg, i, RETRY_NEAR_SPAN_PX);
   if (nearTurn === null || nearTurn < RETRY_MIN_NEAR_TURN_RAD) return null;
   for (const armPx of RETRY_ARMS_PX) {
     if (armPx <= baseArm || armPx > maxArm) continue;
-    const turn = netTurnAcross(pts, i, armPx);
+    // Cheapest decisive test first, so attemptBend need not repeat it.
+    if (!legsAreStraight(pts, seg, i, armPx)) continue;
+    const turn = netTurnAcross(pts, seg, i, armPx);
     if (turn === null || turn < RETRY_MIN_TURN_RAD) continue;
-    const bent = attemptBend(pts, i, armPx, window.maxRadius, distSq, width);
+    const bent = attemptBend(pts, seg, i, armPx, window.maxRadius, distSq, width, true);
     if (bent !== null) return bent;
   }
   return null;
@@ -196,27 +290,30 @@ function trySharpenOpen(
 
 function attemptBend(
   pts: ReadonlyArray<Vec2>,
+  seg: Float64Array,
   i: number,
   arm: number,
   maxRadius: number,
   distSq: Float64Array,
   width: number,
+  legsChecked = false,
 ): BendResult | null {
   const p = pts[i];
   if (p === undefined) return null;
   // The legs are ranges of `pts`, not copies of it. Every gate below reads a
-  // neighbourhood of the candidate, and only an ACCEPTED bend materializes a
-  // chain — which matters because the scan asks this of every vertex, and
-  // slicing two legs out per ask made a dense closed contour quadratic.
-  const headEnd = arcTrimIndex(pts, 0, i, 'tail', arm);
-  const tailStart = arcTrimIndex(pts, i, pts.length - 1, 'head', arm);
-  if (headEnd < 2 || pts.length - tailStart < 2) return null;
+  // neighbourhood of the candidate, and only an ACCEPTED bend changes the
+  // chain — which matters because the scan asks this of every vertex.
   // A drawn corner has straight legs and its turn CONCENTRATED at the
   // vertex; a glyph-scale curve (radius near the window size) passes the leg
-  // test but turns uniformly, so the concentration gate rejects it.
-  if (!legIsStraight(pts, i, arm, 'before') || !legIsStraight(pts, i, arm, 'after')) return null;
-  if (!turnIsConcentrated(pts, i, arm)) return null;
-  const bend = bendVertexAt(pts, headEnd, tailStart);
+  // test but turns uniformly, so the concentration gate rejects it. Every
+  // gate is a pure test, so the one that rejects most candidates (the legs)
+  // runs first.
+  if (!legsChecked && !legsAreStraight(pts, seg, i, arm)) return null;
+  const headEnd = arcTrimIndexOn(seg, 0, i, 'tail', arm);
+  const tailStart = arcTrimIndexOn(seg, i, pts.length - 1, 'head', arm);
+  if (headEnd < 2 || pts.length - tailStart < 2) return null;
+  if (!turnIsConcentrated(pts, seg, i, arm)) return null;
+  const bend = bendVertexAt(pts, seg, headEnd, tailStart);
   if (bend === null) return null;
   const wedge = wedgeInkSupport(pts, headEnd, tailStart, bend.vertex, distSq, width);
   if (wedge === null) return null;
@@ -228,11 +325,16 @@ function attemptBend(
   ) {
     return null;
   }
-  return {
-    points: [...pts.slice(0, headEnd), bend.vertex, ...pts.slice(tailStart)],
-    resumeAt: headEnd + 1,
-    corner: bend.vertex,
-  };
+  return { from: headEnd, to: tailStart, corner: bend.vertex };
+}
+
+function legsAreStraight(
+  pts: ReadonlyArray<Vec2>,
+  seg: Float64Array,
+  i: number,
+  arm: number,
+): boolean {
+  return legIsStraight(pts, seg, i, arm, 'before') && legIsStraight(pts, seg, i, arm, 'after');
 }
 
 // Physical gate: ink must accompany BOTH wedge legs to the apex. The
@@ -279,41 +381,4 @@ function replacementCoversRemoved(
     if (d > tolerancePx) return false;
   }
   return true;
-}
-
-// Rotate the closed chain so the candidate sits mid-array, then reuse the
-// open-chain logic there. The result stays closed; its start point moves,
-// which a closed polyline doesn't care about.
-function trySharpenClosed(
-  pts: ReadonlyArray<Vec2>,
-  i: number,
-  distSq: Float64Array,
-  width: number,
-  maxArm: number,
-): BendResult | null {
-  const mid = Math.floor(pts.length / 2);
-  const shift = (i - mid + pts.length) % pts.length;
-  // Centre the candidate so the open-chain gates retain their exact boundary
-  // rules. This still copies one whole ring per admitted candidate; only the
-  // tangent legs below are read by index without copies.
-  return trySharpenOpen(rotateRing(pts, shift), mid, distSq, width, maxArm);
-}
-
-// One allocation and one pass. The scan rotates the ring once per candidate
-// vertex to centre it, so on a dense contour this runs thousands of times over
-// thousands of points; `[...pts.slice(shift), ...pts.slice(0, shift)]` built
-// three arrays and copied every point twice to produce the same order.
-function rotateRing(pts: ReadonlyArray<Vec2>, shift: number): Vec2[] {
-  const n = pts.length;
-  const rotated: Vec2[] = new Array<Vec2>(n);
-  let write = 0;
-  for (let read = shift; read < n; read += 1) {
-    const p = pts[read];
-    if (p !== undefined) rotated[write++] = p;
-  }
-  for (let read = 0; read < shift; read += 1) {
-    const p = pts[read];
-    if (p !== undefined) rotated[write++] = p;
-  }
-  return rotated;
 }

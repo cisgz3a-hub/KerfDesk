@@ -8,7 +8,7 @@ import { shouldUseSketchTrace } from './auto-sketch-trace';
 import { contourDetailProfile, type ContourDetailProfile } from './contour-detail-detector';
 import { isBinaryContourPreset } from './contour-trace';
 import type { RawImageData, TraceOptions } from './trace-image';
-import { fitsTraceWorkingPixelBudget } from './trace-work-budget';
+import { fitsTraceWorkingPixelBudget, taperedSupersampleFactor } from './trace-work-budget';
 import type { EdgeTraceInput } from './edge-input';
 import type { ContourTraceInput } from './contour-input';
 import { shouldTraceAlphaMask } from './trace-alpha';
@@ -29,6 +29,8 @@ export type TraceScalePlan =
 
 /**
  * Returns the supersample factor selected for a trace, or 1 for native size.
+ * Near the working-pixel budget the factor may be fractional (see
+ * taperedSupersampleFactor).
  * Small/thin-source triggers retain their historical factors. The contour
  * quality trigger adds 2x only for coherent narrow mask detail. Upscaling
  * remains bilinear: prior bicubic and monotone-cubic trials regressed the
@@ -67,6 +69,9 @@ export function traceScalePlan(
   let factor = Math.max(thinFactor, smallFactor, detailFactor);
 
   while (factor > 1 && !fitsTraceWorkingPixelBudget(image, factor, options)) factor -= 1;
+  // Just below the budget edge the factor eases toward native (fractional).
+  const tapered = taperedSupersampleFactor(image, factor, options);
+  if (tapered !== null) factor = tapered;
   return factor > 1 ? { kind: 'upscale', factor } : { kind: 'native' };
 }
 

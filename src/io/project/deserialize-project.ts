@@ -15,6 +15,7 @@ import {
   streamingModeForController,
 } from '../../core/devices';
 import { isBidirectionalScanPolicy } from '../../core/devices/device-profile';
+import { laserArcMovesEntry } from '../../core/devices/laser-arc-moves';
 import { normalizeScanOffsetCalibrationStatus } from '../../core/devices/scan-offset-profile';
 import { normalizeCameraProfile, type CameraProfile } from '../../core/camera';
 import {
@@ -276,6 +277,7 @@ function normalizeDevice(dev: Record<string, unknown>): Record<string, unknown> 
       DEFAULT_DEVICE_PROFILE.laserModeEnabled,
     ),
     airAssistCommand: normalizeAirAssistCommand(dev['airAssistCommand']),
+    laserArcMoves: laserArcMovesEntry(dev['laserArcMoves']).laserArcMoves, // ADR-432
     ...compatibleControllerFields,
     scanningOffsets,
     bidirectionalScanPolicy: isBidirectionalScanPolicy(dev['bidirectionalScanPolicy'])

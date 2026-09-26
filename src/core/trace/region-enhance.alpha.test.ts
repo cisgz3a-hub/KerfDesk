@@ -27,7 +27,9 @@ it('carries full-source alpha into the actual injected region tracer before supe
   });
   expect(calls).toHaveLength(1);
   const call = calls[0]!;
-  expect(call.image).toMatchObject({ width: 56, height: 56 });
+  // The 28 px box plus a 9 px context ring each side (ADR-435), still inside
+  // the opaque plate, supersampled 2x.
+  expect(call.image).toMatchObject({ width: 92, height: 92 });
   expect(call.image.data.buffer).not.toBe(image.data.buffer);
   expect(call.options).toMatchObject({
     traceTransparency: true,
@@ -39,7 +41,7 @@ it('carries full-source alpha into the actual injected region tracer before supe
   const foreground = Array.from(call.prepared.data).filter(
     (value, index) => index % 4 === 0 && value === 0,
   ).length;
-  expect(foreground).toBe(56 * 56);
+  expect(foreground).toBe(92 * 92);
   expect(alphaForegroundAt(enhanced, 32, 32)).toBe(true);
   expect(image.data).toEqual(before);
   expect(options).toEqual({ ...TRACE_PRESETS['Sharp'], traceTransparency: true });

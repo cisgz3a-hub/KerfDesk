@@ -27,7 +27,10 @@ import type { CrackSubPixelField } from './contour-boundary';
 import { cleanupSaddlePolicy } from './saddle-connectivity';
 import type { TraceOptions } from './trace-option-types';
 import { fillPinholes } from './fill-pinholes';
-import { autoMedianFilter, despeckle, medianFilter, otsuThreshold } from './preprocess';
+import { hexToRgba } from './hex-to-rgba';
+import { smallMarkCleanupPlan } from './small-mark-policy';
+import { applyMedian } from './apply-median';
+import { despeckle, otsuThreshold } from './preprocess';
 import { levelForAutomaticThreshold } from './background-flatten';
 import { adjustBrightness, adjustContrast, adjustGamma, invertImage } from './raster-prep';
 import { shouldUseSketchTrace } from './auto-sketch-trace';
@@ -131,10 +134,23 @@ export function preprocessForTrace(image: RawImageData, options: TraceOptions): 
   return prepareTraceForContour(image, options).prepared;
 }
 
+/** The luma lanes' median stage on this grid: its tone-adjusted input and
+ * cleaned output (the same object when nothing changed). Absent where the
+ * mask comes from alpha or the local-contrast sketch lanes, which skip it. */
+export type ContourMedianStage = {
+  readonly adjusted: RawImageData;
+  readonly cleaned: RawImageData;
+};
+type ContourPreparation = {
+  readonly prepared: RawImageData;
+  readonly crackField: CrackSubPixelField | null;
+  readonly median?: ContourMedianStage;
+};
+
 export function prepareTraceForContour(
   image: RawImageData,
   options: TraceOptions,
-): { readonly prepared: RawImageData; readonly crackField: CrackSubPixelField | null } {
+): ContourPreparation {
   // Fail closed on a malformed buffer: every downstream stage indexes
   // data[i..i+3] assuming length === width*height*4, so a short/oversized
   // buffer or non-integer dims would read past the array or size a wrong-shape
@@ -174,10 +190,15 @@ export function prepareTraceForContour(
     return { prepared: cleanBinaryMask(prepared, options, crackField), crackField };
   }
   const prepared = applyMedian(adjusted, options.medianFilter);
+  const median = { adjusted, cleaned: prepared };
   // The automatic cut levels detectably uneven lighting first (ADR-402); the
   // crack field then interpolates the same luma that was cut. Uniform pages,
-  // and explicit Cutoff/Threshold values, get `prepared` itself back.
-  const level = levelForAutomaticThreshold(prepared, options);
+  // explicit Cutoff/Threshold values, and a region carrying the whole
+  // source's frozen cut (ADR-435) get `prepared` itself back.
+  const frozenCut = options.sourceOtsuThreshold !== undefined;
+  const level = frozenCut
+    ? { source: prepared, threshold: null }
+    : levelForAutomaticThreshold(prepared, options);
   const leveled = level.source;
   const thresholded = applyThresholdWithIso(leveled, options, level.threshold);
   const field =
@@ -190,9 +211,10 @@ export function prepareTraceForContour(
       effectivePixelScale(options),
     );
     const cleaned = cleanBinaryMask(recovered.prepared, options, recovered.crackField);
-    return { ...recovered, prepared: cleaned };
+    return { ...recovered, median, prepared: cleaned };
   }
-  return { prepared: cleanBinaryMask(thresholded.prepared, options, field), crackField: field };
+  const cleanedMask = cleanBinaryMask(thresholded.prepared, options, field);
+  return { prepared: cleanedMask, crackField: field, median };
 }
 
 // Mask cleanup is the shared tail of every preprocessing branch: despeckle
@@ -204,13 +226,14 @@ function cleanBinaryMask(
   options: TraceOptions,
   crackField: CrackSubPixelField | null,
 ): RawImageData {
-  // Area-denominated caps scale by pixelScale² on supersampled traces so
-  // their SOURCE-pixel semantics hold (a 12px speck at 2x covers 48px).
-  const scale = effectivePixelScale(options);
+  // Area caps scale by pixelScale² on supersampled traces so their SOURCE-
+  // pixel semantics hold (a 12px speck at 2x covers 48px). See ADR-434.
   const saddles = cleanupSaddlePolicy(options, crackField);
-  const minPixels = (options.despeckleMinPixels ?? 0) * scale * scale;
-  const despeckled = shouldDespeckle(options) ? despeckle(image, minPixels, saddles ?? 8) : image;
-  return options.fillPinholeCracks === true ? fillPinholes(despeckled, scale, saddles) : despeckled;
+  const plan = smallMarkCleanupPlan(image, options, crackField, isBinaryMask(options));
+  const despeckled =
+    plan.ink === null ? image : despeckle(image, plan.ink.minPixels, saddles ?? 8, plan.ink.keep);
+  if (plan.holes === null) return despeckled;
+  return fillPinholes(despeckled, effectivePixelScale(options), saddles, plan.holes.fill);
 }
 
 /** Sanitized supersampling factor (see TraceOptions.pixelScale). */
@@ -255,7 +278,12 @@ function applyThresholdWithIso(
     };
   }
   if (options.useOtsuThreshold === true) {
-    const thresholdLuma = automaticCut ?? otsuThreshold(prepared);
+    // A derived region carries the whole source's cut (ADR-435).
+    const frozen = options.sourceOtsuThreshold;
+    const thresholdLuma =
+      frozen !== undefined && Number.isFinite(frozen)
+        ? frozen
+        : (automaticCut ?? otsuThreshold(prepared));
     return {
       prepared: thresholdToMonochrome(prepared, thresholdLuma),
       thresholdLuma,
@@ -297,16 +325,6 @@ function sketchCrackField(adjusted: RawImageData, radiusPx = SKETCH_RADIUS_PX): 
   };
 }
 
-// Forced median and selective automatic cleanup have different contracts. The
-// automatic path computes and applies its result once, preserving connected ink.
-function applyMedian(
-  image: RawImageData,
-  medianFilterOption: boolean | 'auto' | undefined,
-): RawImageData {
-  if (medianFilterOption === 'auto') return autoMedianFilter(image);
-  return medianFilterOption === true ? medianFilter(image) : image;
-}
-
 // Brightness → contrast → gamma → invert. Each is a no-op at its
 // neutral value (0 / 0 / 1 / false) and returns the input ref-equal,
 // so chaining is cheap when the user hasn't touched a slider.
@@ -339,9 +357,7 @@ export function applyImageAdjustments(image: RawImageData, options: TraceOptions
 // Despeckle only makes sense on binary data — otherwise the luma<128
 // classification inside despeckle splits a non-binary image in two
 // arbitrarily, eroding mid-tones the user wanted to keep.
-function shouldDespeckle(options: TraceOptions): boolean {
-  const min = options.despeckleMinPixels;
-  if (min === undefined || min <= 1) return false;
+function isBinaryMask(options: TraceOptions): boolean {
   return (
     options.traceTransparency === true ||
     options.sketchTrace === true ||
@@ -351,7 +367,8 @@ function shouldDespeckle(options: TraceOptions): boolean {
   );
 }
 
-const SKETCH_RADIUS_PX = 8;
+/** Local-contrast window of sketch and auto-detail masks, in SOURCE pixels. */
+export const SKETCH_RADIUS_PX = 8;
 const SKETCH_CONTRAST_BIAS = 8;
 
 function sketchTraceToMonochrome(image: RawImageData, radiusPx = SKETCH_RADIUS_PX): RawImageData {
@@ -539,22 +556,4 @@ export function thresholdBandToMonochrome(
 
 function lumaByte(r: number, g: number, b: number): number {
   return Math.round(0.299 * r + 0.587 * g + 0.114 * b);
-}
-
-// Convert '#rrggbb' (or '#rgb') to {r, g, b, a} as imagetracerjs
-// expects. Tolerates malformed input by falling back to black.
-function hexToRgba(hex: string): { r: number; g: number; b: number; a: number } {
-  const cleaned = hex.replace('#', '').trim();
-  const expanded =
-    cleaned.length === 3
-      ? cleaned
-          .split('')
-          .map((c) => c + c)
-          .join('')
-      : cleaned;
-  const r = Number.parseInt(expanded.slice(0, 2), 16);
-  const g = Number.parseInt(expanded.slice(2, 4), 16);
-  const b = Number.parseInt(expanded.slice(4, 6), 16);
-  const valid = Number.isFinite(r) && Number.isFinite(g) && Number.isFinite(b);
-  return valid ? { r, g, b, a: 255 } : { r: 0, g: 0, b: 0, a: 255 };
 }

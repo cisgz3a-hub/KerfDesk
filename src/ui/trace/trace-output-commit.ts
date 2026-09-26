@@ -1,4 +1,5 @@
 import type { Project, RasterImage, TracedImage } from '../../core/scene';
+import type { TraceOptions } from '../../core/trace';
 import type { TraceExistingImageOptions } from '../state/scene-mutations';
 import { projectWithCameraTraceSource } from '../state/camera-trace-import';
 import { useStore } from '../state/store';
@@ -6,6 +7,7 @@ import { checkTraceSignal } from './trace-cancellation';
 import type { TraceOutput } from './dialog-parts';
 import type { TraceCommitClaim } from './trace-commit-ownership';
 import { traceNoticeMessage, type TraceNotice } from './trace-notices';
+import { scheduleTraceMinFeatureNotice } from './trace-min-feature-notice';
 import {
   buildRasterTraceOutput,
   rasterTraceInputs,
@@ -19,6 +21,9 @@ export type TraceOutputCommitArgs = {
   readonly deleteSourceAfterTrace?: boolean;
   readonly replaceTraceId?: string;
   readonly notices?: ReadonlyArray<TraceNotice>;
+  /** The trace's options; a colour-layer trace gives each colour its own
+   *  operation with a darkness-ordered power (ADR-430). */
+  readonly options?: Pick<TraceOptions, 'colourLayers'>;
 };
 
 export type TraceOutputCommitContext = {
@@ -33,7 +38,7 @@ export type TraceOutputCommitContext = {
     raster: RasterImage,
     options?: TraceExistingImageOptions,
   ) => void;
-  readonly pushToast: (message: string, variant: 'success' | 'error') => void;
+  readonly pushToast: (message: string, variant: 'success' | 'error' | 'warning') => void;
   readonly claimOwner: () => TraceCommitClaim | null;
 };
 
@@ -62,8 +67,14 @@ export async function commitTraceOutput(
     return commitRasterTraceOutput(args, ctx, traced, outputProject, traceOptions, sourceStatus);
   }
   if (ctx.claimOwner() === null) return false;
-  ctx.traceExistingImage(args.seed.id, traced, traceOptions);
-  ctx.pushToast(traceSuccessMessage(args, traced, sourceStatus, false), 'success');
+  ctx.traceExistingImage(args.seed.id, traced, withColourLayerOutput(traceOptions, args));
+  const cnc = liveProject.machine?.kind === 'cnc';
+  ctx.pushToast(traceSuccessMessage(args, traced, sourceStatus, false, cnc), 'success');
+  scheduleTraceMinFeatureNotice(
+    traced.id,
+    () => useStore.getState().project,
+    (message) => ctx.pushToast(message, 'warning'),
+  );
   return true;
 }
 
@@ -106,7 +117,7 @@ async function commitRasterTraceOutput(
     return false;
   }
   ctx.commitRasterizedTrace(args.seed.id, raster, traceOptions);
-  ctx.pushToast(traceSuccessMessage(args, traced, sourceStatus, true), 'success');
+  ctx.pushToast(traceSuccessMessage(args, traced, sourceStatus, true, false), 'success');
   return true;
 }
 
@@ -147,14 +158,42 @@ async function buildOwnedRaster(
   }
 }
 
+// A colour-layer trace gives each colour's operation a darkness-ordered power
+// (ADR-430); the store needs to know which output the powers are for and
+// whether the paper was traced (its operation starts with output off).
+function withColourLayerOutput(
+  options: TraceExistingImageOptions,
+  args: TraceOutputCommitArgs,
+): TraceExistingImageOptions {
+  const colourLayers = args.options?.colourLayers;
+  if (colourLayers === undefined) return options;
+  return {
+    ...options,
+    colourLayers: {
+      output: colourLayers.output ?? 'cut-out',
+      paperTraced: colourLayers.keepBackground === true,
+    },
+  };
+}
+
 function traceSuccessMessage(
   args: TraceOutputCommitArgs,
   traced: TracedImage,
   sourceStatus: string,
   raster: boolean,
+  cnc: boolean,
 ): string {
   const colorCount = traced.paths.length;
   const output = raster ? ' as a raster scan' : '';
-  const summary = `Traced ${args.seed.source}${output} — ${colorCount} color${colorCount === 1 ? '' : 's'}, ${sourceStatus}`;
+  // CNC operation power is not a tone, so a CNC commit keeps its powers
+  // (colour-layer-power.ts) and the toast must not claim otherwise.
+  const layers = `${colorCount} colour layer${colorCount === 1 ? '' : 's'}`;
+  const colours =
+    args.options?.colourLayers !== undefined && !raster
+      ? cnc
+        ? layers
+        : `${layers}, power set by darkness`
+      : `${colorCount} color${colorCount === 1 ? '' : 's'}`;
+  const summary = `Traced ${args.seed.source}${output} — ${colours}, ${sourceStatus}`;
   return [summary, ...(args.notices ?? []).map(traceNoticeMessage)].join('. ');
 }

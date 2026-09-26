@@ -4,6 +4,7 @@ import {
 } from '../gcode/coordinate-format';
 import type { Vec2 } from '../scene';
 import { firstContourIntervals, type OwnedInterval } from './cut-overlap-intervals';
+import { withoutArcMoves } from './cut-arc-moves';
 import type { CutGroup, CutSegment } from './job';
 
 const SCALE = 10 ** GCODE_COORDINATE_DECIMAL_PLACES;
@@ -132,7 +133,7 @@ function retainContourSpans(
       last.push(end);
     else pieces.push([start, end]);
   }
-  return pieces.map((polyline) => ({ ...segment, polyline, closed: false }));
+  return pieces.map((polyline) => ({ ...withoutArcMoves(segment), polyline, closed: false }));
 }
 
 function ownedSpans(edge: Edge, intervals: ReadonlyArray<OwnedInterval>): Span[] {

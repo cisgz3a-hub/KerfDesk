@@ -8,8 +8,19 @@
 // Image-level tone edits stay in Adjust Image.
 
 import type { TraceOptions } from '../../core/trace';
+import {
+  EDGE_CONTRAST_DELTA_MAX,
+  edgeBlurSigmaForRadius,
+  edgeContrastDelta,
+  edgeLowThresholdRatioForDelta,
+  edgeSourceRadiusPx,
+} from '../../core/trace/edge-input';
+import {
+  mergeColourLayerSettings,
+  type ColourLayerSettingOverrides,
+} from './colour-layer-settings';
 
-export type LightBurnTraceSettingOverrides = {
+export type LightBurnTraceSettingOverrides = ColourLayerSettingOverrides & {
   readonly photoDetail?: number;
   readonly photoBrightness?: number;
   readonly photoContrast?: number;
@@ -35,8 +46,6 @@ export type LightBurnTraceSettingOverrides = {
 
 export type TraceDetectionMode = 'preset' | 'manual' | 'sketch' | 'faint-lines';
 
-export const DEFAULT_EDGE_SENSITIVITY = 50;
-export const DEFAULT_EDGE_DETAIL = 68;
 export const DEFAULT_EDGE_MINIMUM_LINE_PX = 3;
 
 export function mergeLightBurnTraceSettings(
@@ -44,6 +53,7 @@ export function mergeLightBurnTraceSettings(
   settings: LightBurnTraceSettingOverrides,
 ): TraceOptions {
   if (preset.photoDetail !== undefined) return mergePhotoSettings(preset, settings);
+  if (preset.colourLayers !== undefined) return mergeColourLayerSettings(preset, settings);
   const out: Record<string, unknown> = { ...preset };
   applyDetectionSettings(out, preset, settings);
   if (settings.ignoreLessThanPixels !== undefined) {
@@ -155,39 +165,48 @@ function applyManualDetection(
   out['thresholdLuma'] = clampByte(settings.thresholdLuma ?? preset.thresholdLuma ?? 128);
 }
 
+// Sensitivity and Detail offer one stop per detector setting (ADR-437):
+// Sensitivity moves in steps of 10 over 11 contrast deltas (0 -> 12 luma
+// levels, 100 -> 2); Detail in steps of 5 over 21 neighbourhood radii
+// (0 -> 24 source px, 100 -> 4). A value between stops takes the nearest one.
+export const EDGE_SENSITIVITY_STEP = 10;
+export const EDGE_DETAIL_STEP = 5;
+const EDGE_DETAIL_RADIUS_AT_ZERO_PX = 24;
+
 export function edgeSensitivityFromOptions(options: TraceOptions): number {
-  const high = options.edgeHighThresholdRatio ?? 0.2;
-  return clamp(Math.round(((0.32 - high) / (0.32 - 0.05)) * 100), 0, 100);
+  return (EDGE_CONTRAST_DELTA_MAX - edgeContrastDelta(options)) * EDGE_SENSITIVITY_STEP;
 }
 
 export function edgeDetailFromOptions(options: TraceOptions): number {
-  const blur = options.edgeBlurSigma ?? 1.2;
-  return clamp(Math.round(((2.5 - blur) / (2.5 - 0.6)) * 100), 0, 100);
+  const stops = EDGE_DETAIL_RADIUS_AT_ZERO_PX - edgeSourceRadiusPx(options);
+  return clamp(stops * EDGE_DETAIL_STEP, 0, 100);
 }
 
+function edgeDeltaForSensitivity(sensitivity: number): number {
+  return EDGE_CONTRAST_DELTA_MAX - Math.round(clamp(sensitivity, 0, 100) / EDGE_SENSITIVITY_STEP);
+}
+
+function edgeRadiusForDetail(detail: number): number {
+  return EDGE_DETAIL_RADIUS_AT_ZERO_PX - Math.round(clamp(detail, 0, 100) / EDGE_DETAIL_STEP);
+}
+
+// `out` already holds the preset's fields. A stop that lands on the preset's
+// own detector setting keeps the preset value untouched.
 function applyEdgeTraceSettings(
   out: Record<string, unknown>,
   preset: TraceOptions,
   settings: LightBurnTraceSettingOverrides,
 ): void {
-  if (
-    settings.edgeSensitivity !== undefined &&
-    settings.edgeSensitivity !== edgeSensitivityFromOptions(preset)
-  ) {
-    const thresholds = edgeSensitivityToThresholds(settings.edgeSensitivity);
-    out['edgeLowThresholdRatio'] = thresholds.low;
-    out['edgeHighThresholdRatio'] = thresholds.high;
-  } else {
-    copyIfDefined(out, 'edgeLowThresholdRatio', preset.edgeLowThresholdRatio);
-    copyIfDefined(out, 'edgeHighThresholdRatio', preset.edgeHighThresholdRatio);
+  if (settings.edgeSensitivity !== undefined) {
+    const delta = edgeDeltaForSensitivity(settings.edgeSensitivity);
+    if (delta !== edgeContrastDelta(preset)) {
+      out['edgeLowThresholdRatio'] = edgeLowThresholdRatioForDelta(delta);
+    }
   }
-  if (settings.edgeDetail !== undefined && settings.edgeDetail !== edgeDetailFromOptions(preset)) {
-    const detail = edgeDetailToCanny(settings.edgeDetail);
-    out['edgeBlurSigma'] = detail.blurSigma;
-    out['edgeJoinGapPx'] = detail.joinGapPx;
-  } else {
-    copyIfDefined(out, 'edgeBlurSigma', preset.edgeBlurSigma);
-    copyIfDefined(out, 'edgeJoinGapPx', preset.edgeJoinGapPx);
+  if (settings.edgeDetail !== undefined) {
+    const radius = edgeRadiusForDetail(settings.edgeDetail);
+    if (radius !== edgeSourceRadiusPx(preset))
+      out['edgeBlurSigma'] = edgeBlurSigmaForRadius(radius);
   }
   if (settings.edgeMinimumLinePx !== undefined) {
     out['edgeMinLengthPx'] = Math.max(0, settings.edgeMinimumLinePx);
@@ -196,56 +215,25 @@ function applyEdgeTraceSettings(
   }
 }
 
-function edgeSensitivityToThresholds(sensitivity: number): {
-  readonly low: number;
-  readonly high: number;
-} {
-  const t = clamp(sensitivity, 0, 100) / 100;
-  const high = roundRatio(0.32 + (0.05 - 0.32) * t);
-  return { low: roundRatio(high * 0.4), high };
-}
-
-// Join gap scales WITH blur: Canny's detection dropouts widen with the blur
-// kernel, so heavier smoothing needs a proportionally longer bridge. The
-// ratio is anchored so the preset default (blur 1.2, joinGap 5) round-trips
-// exactly at the default Detail position — the old fixed [0.5, 2] range was
-// calibrated for the deleted outline backend and collapsed the preset's
-// join gap the moment Detail moved at all.
-const EDGE_JOIN_GAP_PX_PER_BLUR_SIGMA = 5 / 1.2;
-
-function edgeDetailToCanny(detail: number): {
-  readonly blurSigma: number;
-  readonly joinGapPx: number;
-} {
-  const t = clamp(detail, 0, 100) / 100;
-  const blurSigma = roundRatio(2.5 + (0.6 - 2.5) * t);
-  return {
-    blurSigma,
-    joinGapPx: roundRatio(blurSigma * EDGE_JOIN_GAP_PX_PER_BLUR_SIGMA),
-  };
-}
-
-function copyIfDefined<T extends keyof TraceOptions>(
-  out: Record<string, unknown>,
-  key: T,
-  value: TraceOptions[T],
-): void {
-  if (value !== undefined) out[key] = value;
-}
-
-// True when the options stack any of the three preset features that
-// can collapse a near-uniform image to zero paths: Otsu histogram
-// binarization, fixedPalette, or despeckle.
+// True when the options stack any of the preset features that can
+// collapse a near-uniform image to zero paths: Otsu histogram
+// binarization, fixedPalette, despeckle, or the automatic small-mark
+// cleanup (ADR-434), which can erase art made only of small marks.
 export function hasAggressivePreprocessing(options: TraceOptions): boolean {
   if (options.photoDetail !== undefined) return false;
-  // Edge mode never runs the shared preprocessing (local contrast reads the raw
-  // image), so relaxing these flags cannot change its output — a zero-paths
-  // retry would just repeat the identical multi-second pipeline.
+  // Edge's local-contrast detector reads none of these (older saved options
+  // may still carry them), so relaxing them cannot change its output — a
+  // zero-paths retry would just repeat the identical multi-second pipeline.
   if (options.traceMode === 'edge') return false;
+  // Colour layers (ADR-430) own their speck rule: a missing despeckle reads as
+  // the same 12 px default, so a "relaxed" retry would repeat the identical
+  // colour pipeline and falsely report relaxed settings.
+  if (options.colourLayers !== undefined) return false;
   return (
     options.useOtsuThreshold === true ||
     options.fixedPalette !== undefined ||
-    (options.despeckleMinPixels !== undefined && options.despeckleMinPixels > 1)
+    (options.despeckleMinPixels !== undefined && options.despeckleMinPixels > 1) ||
+    options.smallMarkPolicy === 'auto'
   );
 }
 
@@ -259,10 +247,17 @@ export function hasAggressivePreprocessing(options: TraceOptions): boolean {
 // colorquantcycles:1 disabling every recovery), committing a full-frame
 // rectangle instead of an honest "no paths". The retry must stay on the
 // same backend; only Otsu, despeckle, and pathOmit relax.
+//
+// smallMarkPolicy goes with despeckle (ADR-434): an unset despeckle means
+// "automatic" while the policy is on, so deleting despeckle alone would
+// re-run the same automatic cleanup (or turn an explicit value back into
+// auto) instead of relaxing it. Without the policy the retry erases no ink
+// specks and fills no pinholes the user did not ask for explicitly.
 export function relaxAggressivePreprocessing(options: TraceOptions): TraceOptions {
   const next: Record<string, unknown> = { ...options };
   delete next['useOtsuThreshold'];
   delete next['despeckleMinPixels'];
+  delete next['smallMarkPolicy'];
   next['pathOmit'] = 0;
   return next as TraceOptions;
 }
@@ -280,8 +275,4 @@ function clampMin(value: number, min: number): number {
 function clamp(value: number, min: number, max: number): number {
   if (!Number.isFinite(value)) return min;
   return Math.max(min, Math.min(max, value));
-}
-
-function roundRatio(value: number): number {
-  return Number(value.toFixed(4));
 }
