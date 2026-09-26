@@ -7,6 +7,7 @@ import {
 import type {
   Cut3DOffscreenWorkerRequest,
   Cut3DOffscreenWorkerResponse,
+  Cut3DPresentationSource,
 } from './cut3d-offscreen-worker-protocol';
 
 type ActiveRenderer = {
@@ -16,7 +17,10 @@ type ActiveRenderer = {
 
 let active: ActiveRenderer | null = null;
 let initializingSessionId: number | null = null;
+type SurfaceRequest = Extract<Cut3DOffscreenWorkerRequest, { readonly kind: 'surface' }>;
+
 let pendingResize: Extract<Cut3DOffscreenWorkerRequest, { readonly kind: 'resize' }> | null = null;
+let pendingSurface: SurfaceRequest | null = null;
 let presentedRevision = 0;
 
 self.onmessage = (event: MessageEvent<Cut3DOffscreenWorkerRequest>): void => {
@@ -27,6 +31,8 @@ self.onmessage = (event: MessageEvent<Cut3DOffscreenWorkerRequest>): void => {
     disposeSession(request.sessionId);
   } else if (request.kind === 'resize') {
     resize(request);
+  } else if (request.kind === 'surface') {
+    surface(request);
   } else {
     control(request);
   }
@@ -38,6 +44,7 @@ async function initialize(
   disposeActive();
   initializingSessionId = request.sessionId;
   pendingResize = null;
+  pendingSurface = null;
   presentedRevision = 0;
   try {
     const renderer = await createCut3DOffscreenRenderer({
@@ -54,6 +61,7 @@ async function initialize(
     if (active?.sessionId !== request.sessionId) return;
     presented(request.sessionId, 'initial', 0);
     post({ kind: 'ready', sessionId: request.sessionId });
+    applyPendingSurface(request.sessionId);
   } catch (error) {
     fail(request.sessionId, error instanceof Error ? error.message : String(error));
   }
@@ -78,6 +86,28 @@ function control(
   if (didRender) presented(request.sessionId, 'control', request.inputId);
 }
 
+function surface(request: SurfaceRequest): void {
+  if (active?.sessionId === request.sessionId) void replaceSurface(request);
+  else if (initializingSessionId === request.sessionId) pendingSurface = request;
+}
+
+async function replaceSurface(request: SurfaceRequest): Promise<void> {
+  const target = active;
+  if (target?.sessionId !== request.sessionId) return;
+  try {
+    const shown = await target.renderer.replaceSurface(request.mesh, request.stockThicknessMm);
+    if (shown && active === target) presented(request.sessionId, 'surface', request.surfaceId);
+  } catch (error) {
+    fail(request.sessionId, error instanceof Error ? error.message : String(error));
+  }
+}
+
+function applyPendingSurface(sessionId: number): void {
+  const surfaceRequest = pendingSurface;
+  pendingSurface = null;
+  if (surfaceRequest?.sessionId === sessionId) void replaceSurface(surfaceRequest);
+}
+
 function applyPendingResize(sessionId: number): void {
   const resizeRequest = pendingResize;
   pendingResize = null;
@@ -96,11 +126,7 @@ function run(sessionId: number, action: () => void): boolean {
   }
 }
 
-function presented(
-  sessionId: number,
-  source: 'initial' | 'control' | 'resize',
-  inputId: number,
-): void {
+function presented(sessionId: number, source: Cut3DPresentationSource, inputId: number): void {
   if (active?.sessionId !== sessionId && initializingSessionId !== sessionId) return;
   presentedRevision += 1;
   post({ kind: 'presented', sessionId, revision: presentedRevision, source, inputId });
@@ -116,6 +142,7 @@ function disposeSession(sessionId: number): void {
   if (initializingSessionId === sessionId) initializingSessionId = null;
   if (active?.sessionId === sessionId) disposeActive();
   pendingResize = null;
+  pendingSurface = null;
 }
 
 function disposeActive(): void {

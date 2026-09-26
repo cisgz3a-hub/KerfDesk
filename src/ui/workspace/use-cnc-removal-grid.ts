@@ -30,6 +30,21 @@ export function useCncRemovalGrid(
   toolpath: PreviewToolpath | null,
   scrubberT: number,
 ): RemovalGrid | null {
+  return useCncRemovalGridState(project, previewMode, toolpath, scrubberT).grid;
+}
+
+export type CncRemovalGridState = {
+  readonly grid: RemovalGrid | null;
+  /** A newer grid is being prepared; null grid then means "not yet", not "none". */
+  readonly pending: boolean;
+};
+
+export function useCncRemovalGridState(
+  project: Project,
+  previewMode: boolean,
+  toolpath: PreviewToolpath | null,
+  scrubberT: number,
+): CncRemovalGridState {
   const machine = project.machine;
   const cncMachine = machine?.kind === 'cnc' ? machine : null;
   const device = project.device;
@@ -45,6 +60,16 @@ export function useCncRemovalGrid(
     let cancelled = false;
     const controller = new AbortController();
     const jobOriginOffset = { x: jobOriginOffsetX, y: jobOriginOffsetY };
+    // Keyed even when empty, so a failed or unavailable grid reads as settled.
+    const settle = (grid: RemovalGrid | null): void =>
+      setState({
+        device,
+        machine: cncMachine,
+        toolpath,
+        scrubFraction: quantT,
+        jobOriginOffset,
+        grid,
+      });
     const pending = prepareCncRemovalGridOffThread(
       {
         device,
@@ -56,24 +81,16 @@ export function useCncRemovalGrid(
       controller.signal,
     );
     if (pending === null) {
-      setState(null);
+      settle(null);
       return;
     }
     void pending.then(
       (grid) => {
-        if (cancelled) return;
-        setState({
-          device,
-          machine: cncMachine,
-          toolpath,
-          scrubFraction: quantT,
-          jobOriginOffset,
-          grid,
-        });
+        if (!cancelled) settle(grid);
       },
       (error: unknown) => {
         if (cancelled || isCncRemovalGridSuperseded(error)) return;
-        setState(null);
+        settle(null);
       },
     );
     return () => {
@@ -82,6 +99,8 @@ export function useCncRemovalGrid(
     };
   }, [previewMode, cncMachine, device, toolpath, quantT, jobOriginOffsetX, jobOriginOffsetY]);
 
+  const eligible =
+    previewMode && cncMachine !== null && toolpath !== null && toolpath.totalLength > 0;
   if (
     !matchesRemovalGridState(
       state,
@@ -93,9 +112,9 @@ export function useCncRemovalGrid(
       jobOriginOffsetY,
     )
   ) {
-    return null;
+    return { grid: null, pending: eligible };
   }
-  return state.grid;
+  return { grid: state.grid, pending: false };
 }
 
 function removalGridPlacement(toolpath: PreviewToolpath | null): Vec2 {

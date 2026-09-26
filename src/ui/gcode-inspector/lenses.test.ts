@@ -2,7 +2,16 @@ import { describe, expect, it } from 'vitest';
 import { buildProgramTime, type MotionLimits } from '../../core/gcode-time';
 import { buildGcodeRenderModel, SEG_KIND, type GcodeRenderModel } from '../../core/gcode-view';
 import type { Viewer3dTheme } from '../viewer3d';
-import { DEFAULT_LENS_ID, LENS_IDS, lensColorFn, lensLegend, rgbCss } from './lenses';
+import { rgbTriple } from '../viewer3d';
+import { renderedLineCss } from '../viewer3d/segment-buckets';
+import {
+  DEFAULT_LENS_ID,
+  defaultLensFor,
+  LENS_IDS,
+  lensColorFn,
+  lensLegend,
+  rgbCss,
+} from './lenses';
 
 const THEME: Viewer3dTheme = {
   background: 0x000000,
@@ -156,6 +165,45 @@ describe('lensLegend', () => {
   it('falls back to a note when a lens has no data', () => {
     const { model, time } = built('G21 G90\nM3 S0\nM5');
     expect(lensLegend(model, time, 'feed', THEME).kind).toBe('note');
+  });
+
+  it('shows the colours the lines render, traversal excepted (ADR-425)', () => {
+    const { model, time } = built();
+    const legend = lensLegend(model, time, 'kind', THEME);
+    if (legend.kind !== 'swatches') throw new Error('expected swatches');
+    const colorOf = new Map(legend.entries.map((entry) => [entry.label, entry.color]));
+    expect(colorOf.get('Cut')).toBe(renderedLineCss(rgbTriple(THEME.cut)));
+    expect(colorOf.get('Cut')).toBe('rgb(151, 209, 255)');
+    // The thin traversal line is colour-managed, so it draws its hex exactly.
+    expect(colorOf.get('Traversal')).toBe('#cc4444');
+  });
+
+  it('draws the ramp through the colours the lines blend', () => {
+    const { model, time } = built();
+    const feed = lensLegend(model, time, 'feed', THEME);
+    if (feed.kind !== 'ramp') throw new Error('expected ramp');
+    expect(feed.stops.length).toBeGreaterThan(2);
+    expect(feed.stops[0]).toBe(renderedLineCss([0.24, 0.42, 0.85]));
+    expect(feed.stops.at(-1)).toBe(renderedLineCss([0.98, 0.76, 0.19]));
+  });
+});
+
+describe('defaultLensFor', () => {
+  const RASTER = ['G21 G90', 'M4', 'G0 X0 Y0', 'G1 X10 S200 F3000', 'G1 X20 S800', 'M5'];
+
+  it('opens a flat laser program with varying power on the power lens', () => {
+    expect(defaultLensFor(built(RASTER.join('\n')).model, 'laser')).toBe('power');
+    expect(defaultLensFor(built(RASTER.join('\n')).model)).toBe('power');
+  });
+
+  it('keeps depth for multi-depth programs and every CNC program', () => {
+    expect(defaultLensFor(built().model, 'laser')).toBe('depth');
+    expect(defaultLensFor(built(RASTER.join('\n')).model, 'cnc')).toBe('depth');
+  });
+
+  it('keeps depth for a flat program cut at one power', () => {
+    const flat = ['G21 G90', 'M3 S500', 'G0 X0 Y0', 'G1 X10 F600', 'G1 Y10', 'M5'];
+    expect(defaultLensFor(built(flat.join('\n')).model, 'laser')).toBe('depth');
   });
 });
 

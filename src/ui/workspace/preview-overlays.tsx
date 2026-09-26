@@ -57,17 +57,24 @@ export function PreviewStatusOverlays(props: {
   readonly project: Project;
   readonly toolpath: Toolpath;
   readonly resolution?: RemovalGridResolution;
+  /** A bit the cut shading draws at an assumed angle (ADR-425). */
+  readonly tipAngleNotice?: string;
 }): JSX.Element | null {
   const model = useMemo(
     () => previewStatusOverlayModel(props.project, props.toolpath),
     [props.project, props.toolpath],
   );
   const hasResolutionNotice = props.resolution !== undefined && props.resolution.reason !== null;
-  if (!model.visible && !hasResolutionNotice) return null;
+  if (!model.visible && !hasResolutionNotice && props.tipAngleNotice === undefined) return null;
   return (
     <div style={stackStyle}>
       <PreviewIssueBanner issue={model.primaryIssue} />
       <PreviewResolutionBanner label="2D cut shading" resolution={props.resolution} />
+      {props.tipAngleNotice === undefined ? null : (
+        <div className="lf-banner lf-banner--warning" style={bannerStyle} role="status">
+          {props.tipAngleNotice}
+        </div>
+      )}
       {model.displayDecimation !== null ? (
         <RoutePreviewDisplayBanner decimation={model.displayDecimation} style={bannerStyle} />
       ) : null}

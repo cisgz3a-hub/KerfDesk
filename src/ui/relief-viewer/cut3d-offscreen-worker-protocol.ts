@@ -28,7 +28,19 @@ export type Cut3DOffscreenWorkerRequest =
       readonly heightPx: number;
       readonly pixelRatio: number;
     }
+  | {
+      // A recomputed cut replaces the surface in place: same canvas, same
+      // renderer, and the operator's camera unless the stock itself changed.
+      readonly kind: 'surface';
+      readonly sessionId: number;
+      readonly surfaceId: number;
+      /** Null keeps the worker's mesh; its buffers were transferred already. */
+      readonly mesh: ReliefSurfaceMeshWithNormals | null;
+      readonly stockThicknessMm: number;
+    }
   | { readonly kind: 'dispose'; readonly sessionId: number };
+
+export type Cut3DPresentationSource = 'initial' | 'control' | 'resize' | 'surface';
 
 export type Cut3DOffscreenWorkerResponse =
   | { readonly kind: 'ready'; readonly sessionId: number }
@@ -36,7 +48,7 @@ export type Cut3DOffscreenWorkerResponse =
       readonly kind: 'presented';
       readonly sessionId: number;
       readonly revision: number;
-      readonly source: 'initial' | 'control' | 'resize';
+      readonly source: Cut3DPresentationSource;
       readonly inputId: number;
     }
   | { readonly kind: 'error'; readonly sessionId: number; readonly message: string };
@@ -82,7 +94,10 @@ function isPresentedResponse(
     value.kind === 'presented' &&
     isPositiveSafeInteger(value.revision) &&
     isNonNegativeSafeInteger(value.inputId) &&
-    (value.source === 'initial' || value.source === 'control' || value.source === 'resize')
+    (value.source === 'initial' ||
+      value.source === 'control' ||
+      value.source === 'resize' ||
+      value.source === 'surface')
   );
 }
 

@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import type { GcodeInspectionSource } from './gcode-inspection-source';
+import type { GcodeInspectionContext, GcodeInspectionSource } from './gcode-inspection-source';
 import { inspectGcodeText } from './gcode-inspector-parse';
 import { inspectGcodeOffThread } from './gcode-inspector-worker-client';
 import type { GcodeInspectorWorkerResult } from './gcode-inspector-worker-protocol';
@@ -78,14 +78,17 @@ async function inspectGcodeOnMainThread(
   return {
     result: inspectGcodeText(text, source),
     source:
-      source.kind === 'text'
-        ? source
-        : {
-            kind: 'text',
-            text,
-            machineKind: source.machineKind,
-            laserPowerControl: source.laserPowerControl,
-          },
+      source.kind === 'text' ? source : { ...inspectionContextOf(source), kind: 'text', text },
+  };
+}
+
+function inspectionContextOf(source: GcodeInspectionSource): GcodeInspectionContext {
+  return {
+    ...(source.machineKind === undefined ? {} : { machineKind: source.machineKind }),
+    ...(source.laserPowerControl === undefined
+      ? {}
+      : { laserPowerControl: source.laserPowerControl }),
+    ...(source.timing === undefined ? {} : { timing: source.timing }),
   };
 }
 

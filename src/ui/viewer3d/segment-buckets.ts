@@ -143,3 +143,43 @@ export function rgbTriple(color: number): readonly [number, number, number] {
 export function cssHexColor(color: number): string {
   return `#${color.toString(16).padStart(6, '0')}`;
 }
+
+/**
+ * The CSS colour a vertex-coloured fat line actually shows on screen.
+ *
+ * LineMaterial reads vertex colours as linear light and encodes them to sRGB
+ * on output, so a triple taken straight from an sRGB hex renders lighter than
+ * that hex: cut blue #4fa3ff shows as #97d1ff. The Classic look keeps those
+ * lighter lines on purpose (ADR-425), so a legend describing them must apply
+ * the same encoding or its swatches never match the toolpath.
+ */
+export function renderedLineCss(rgb: readonly [number, number, number]): string {
+  const channel = (value: number): number =>
+    Math.round(linearToSrgb(Math.min(1, Math.max(0, value))) * 255);
+  return `rgb(${channel(rgb[0])}, ${channel(rgb[1])}, ${channel(rgb[2])})`;
+}
+
+/** Stops for a CSS gradient matching a linearly blended line-colour ramp. */
+export function renderedLineRampStops(
+  from: readonly [number, number, number],
+  to: readonly [number, number, number],
+  count = 7,
+): ReadonlyArray<string> {
+  const stops: string[] = [];
+  for (let index = 0; index < count; index += 1) {
+    const t = count <= 1 ? 0 : index / (count - 1);
+    stops.push(
+      renderedLineCss([
+        from[0] + (to[0] - from[0]) * t,
+        from[1] + (to[1] - from[1]) * t,
+        from[2] + (to[2] - from[2]) * t,
+      ]),
+    );
+  }
+  return stops;
+}
+
+// IEC 61966-2-1 sRGB transfer function, the same one three.js applies.
+function linearToSrgb(value: number): number {
+  return value <= 0.0031308 ? value * 12.92 : 1.055 * value ** (1 / 2.4) - 0.055;
+}

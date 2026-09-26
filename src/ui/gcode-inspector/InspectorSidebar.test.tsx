@@ -68,6 +68,7 @@ function sidebar(model: GcodeRenderModel, time: ProgramTimeModel, seconds: numbe
       theme={THEME}
       playhead={playheadAtTime(model, time.segTimeEndSec, seconds)}
       time={time}
+      timedFor={null}
       findings={[]}
       lens="kind"
       onLensChange={() => undefined}

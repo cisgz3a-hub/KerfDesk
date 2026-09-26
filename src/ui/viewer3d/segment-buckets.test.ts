@@ -1,6 +1,13 @@
 import { describe, expect, it } from 'vitest';
 import { SEG_KIND } from '../../core/gcode-view';
-import { buildSegmentBuckets, cssHexColor, revealCount, rgbTriple } from './segment-buckets';
+import {
+  buildSegmentBuckets,
+  cssHexColor,
+  renderedLineCss,
+  renderedLineRampStops,
+  revealCount,
+  rgbTriple,
+} from './segment-buckets';
 import type { Viewer3dTheme } from './viewer3d-theme';
 
 const THEME: Viewer3dTheme = {
@@ -66,5 +73,17 @@ describe('color helpers', () => {
     expect(rgbTriple(0xff8000)).toEqual([1, 128 / 255, 0]);
     expect(cssHexColor(0x00a1ff)).toBe('#00a1ff');
     expect(cssHexColor(0x000012)).toBe('#000012');
+  });
+
+  it('reports the colour a vertex-coloured line renders, not its theme hex (ADR-425)', () => {
+    // Raw triples are read as linear and encoded to sRGB on output.
+    expect(renderedLineCss(rgbTriple(0x4fa3ff))).toBe('rgb(151, 209, 255)');
+    expect(renderedLineCss([0, 0, 0])).toBe('rgb(0, 0, 0)');
+    expect(renderedLineCss([1, 1, 1])).toBe('rgb(255, 255, 255)');
+  });
+
+  it('samples a ramp as the lines blend it, endpoints included', () => {
+    const stops = renderedLineRampStops([0, 0, 0], [1, 1, 1], 3);
+    expect(stops).toEqual(['rgb(0, 0, 0)', 'rgb(188, 188, 188)', 'rgb(255, 255, 255)']);
   });
 });

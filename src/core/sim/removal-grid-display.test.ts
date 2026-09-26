@@ -78,4 +78,41 @@ describe('downsampleRemovalGrid', () => {
     expect([...small.depth]).toEqual([0, 0]);
     expect([...small.inclusion!]).toEqual([0, 0]);
   });
+
+  describe('material left inside a cut (ADR-425)', () => {
+    // 12 × 3 cells at 1 mm, downsampled by 3: one output row of four cells.
+    function groove(depthAt: (col: number) => number): RemovalGrid {
+      const grid = gridWithDepths(12, 3, 1);
+      for (let row = 0; row < 3; row += 1) {
+        for (let col = 0; col < 12; col += 1) grid.depth[row * 12 + col] = depthAt(col);
+      }
+      return grid;
+    }
+
+    it('keeps a tab shorter than two display cells standing in its groove', () => {
+      // Floor at -6 with a 4 mm tab at -3 from x = 1 to 5: no output block is
+      // all tab, so deepest-only pooling showed an unbroken groove.
+      const grid = groove((col) => (col >= 1 && col < 5 ? -3 : -6));
+      const small = downsampleRemovalGrid(grid, 4);
+      expect([...small.depth]).toEqual([-3, -3, -6, -6]);
+    });
+
+    it('still shows a thin cut in uncut stock at its full depth', () => {
+      const grid = groove((col) => (col === 4 ? -2 : 0));
+      const small = downsampleRemovalGrid(grid, 4);
+      expect([...small.depth]).toEqual([0, -2, 0, 0]);
+    });
+
+    it('keeps sloped blocks at their deepest point', () => {
+      const grid = groove((col) => -1 - col * 0.5);
+      const small = downsampleRemovalGrid(grid, 4);
+      expect([...small.depth]).toEqual([-2, -3.5, -5, -6.5]);
+    });
+
+    it('breaks an even split toward the deeper level', () => {
+      const grid = gridWithDepths(2, 2, 1);
+      grid.depth.set([-3, -6, -3, -6]);
+      expect([...downsampleRemovalGrid(grid, 1).depth]).toEqual([-6]);
+    });
+  });
 });

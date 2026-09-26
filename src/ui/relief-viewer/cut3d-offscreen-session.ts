@@ -34,9 +34,10 @@ const CLONE_ERROR_REASON = 'The background 3D renderer returned an unreadable re
 
 export class Cut3DOffscreenSession {
   readonly canvas: HTMLCanvasElement;
-  readonly mesh: ReliefSurfaceMeshWithNormals;
-  readonly stockThicknessMm: number;
   readonly sessionId: number;
+  private mesh: ReliefSurfaceMeshWithNormals;
+  private stockThicknessMm: number;
+  private surfaceId = 0;
 
   private readonly worker: Cut3DWorkerPort;
   private readonly deferred: Deferred;
@@ -82,17 +83,27 @@ export class Cut3DOffscreenSession {
     return this.referenceCount;
   }
 
-  isCompatible(
-    canvas: HTMLCanvasElement,
-    mesh: ReliefSurfaceMeshWithNormals,
-    stockThicknessMm: number,
-  ): boolean {
+  /** A live session keeps its canvas; a new surface is swapped in, not remounted. */
+  canHost(canvas: HTMLCanvasElement): boolean {
     return (
-      this.canvas === canvas &&
-      this.mesh === mesh &&
-      this.stockThicknessMm === stockThicknessMm &&
-      (this.state.kind === 'starting' || this.state.kind === 'ready')
+      this.canvas === canvas && (this.state.kind === 'starting' || this.state.kind === 'ready')
     );
+  }
+
+  showSurface(mesh: ReliefSurfaceMeshWithNormals, stockThicknessMm: number): void {
+    if (mesh === this.mesh && stockThicknessMm === this.stockThicknessMm) return;
+    const isNewMesh = mesh !== this.mesh;
+    this.mesh = mesh;
+    this.stockThicknessMm = stockThicknessMm;
+    this.surfaceId += 1;
+    const request: Cut3DOffscreenWorkerRequest = {
+      kind: 'surface',
+      sessionId: this.sessionId,
+      surfaceId: this.surfaceId,
+      mesh: isNewMesh ? mesh : null,
+      stockThicknessMm,
+    };
+    this.send(request, isNewMesh ? meshBuffers(mesh) : []);
   }
 
   attach(
@@ -155,12 +166,7 @@ export class Cut3DOffscreenSession {
         stockThicknessMm: this.stockThicknessMm,
         ...viewport,
       };
-      this.worker.postMessage(request, [
-        offscreen,
-        this.mesh.positions.buffer,
-        this.mesh.indices.buffer,
-        this.mesh.normals.buffer,
-      ]);
+      this.worker.postMessage(request, [offscreen, ...meshBuffers(this.mesh)]);
     } catch (error) {
       this.fail(error instanceof Error ? error.message : String(error));
     }
@@ -196,16 +202,26 @@ export class Cut3DOffscreenSession {
     response: Extract<Cut3DOffscreenWorkerResponse, { readonly kind: 'presented' }>,
   ): void {
     const expectedState = response.source === 'initial' ? 'starting' : 'ready';
-    if (this.state.kind !== expectedState || !this.backpressure.presented(response)) {
+    if (this.state.kind !== expectedState || !this.acceptPresentation(response)) {
       this.fail(CLONE_ERROR_REASON);
       return;
     }
     this.canvas.dataset.frameRevision = String(response.revision);
   }
 
-  private send(request: Cut3DOffscreenWorkerRequest): void {
+  // Surfaces are latest-wins in the worker, so only an id already sent is valid.
+  private acceptPresentation(
+    response: Extract<Cut3DOffscreenWorkerResponse, { readonly kind: 'presented' }>,
+  ): boolean {
+    if (response.source !== 'surface') return this.backpressure.presented(response);
+    if (response.inputId < 1 || response.inputId > this.surfaceId) return false;
+    this.canvas.dataset.surfaceRevision = String(response.inputId);
+    return true;
+  }
+
+  private send(request: Cut3DOffscreenWorkerRequest, transfer: Transferable[] = []): void {
     try {
-      this.worker.postMessage(request);
+      this.worker.postMessage(request, transfer);
     } catch (error) {
       this.fail(error instanceof Error ? error.message : String(error));
     }
@@ -239,6 +255,10 @@ export class Cut3DOffscreenSession {
     }
     this.worker.terminate();
   }
+}
+
+function meshBuffers(mesh: ReliefSurfaceMeshWithNormals): Transferable[] {
+  return [mesh.positions.buffer, mesh.indices.buffer, mesh.normals.buffer];
 }
 
 function createDeferred(): Deferred {

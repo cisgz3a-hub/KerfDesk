@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { buildProgramTime } from '../../core/gcode-time';
 import { buildGcodeRenderModel, type GcodeRenderModel } from '../../core/gcode-view';
 import { droRows, statsRows } from './inspector-readouts';
 
@@ -41,6 +42,20 @@ describe('statsRows', () => {
     expect(byLabel.get('Power range')).toBe('600');
     expect(byLabel.get('Z levels')).toBe('1 (deepest -2 mm)');
     expect(byLabel.get('Segments')).toBe('4');
+  });
+
+  it('says whose limits the estimated time assumes (ADR-425)', () => {
+    const parsed = model(PROGRAM);
+    const time = buildProgramTime(parsed, {
+      accelMmPerSec2: 500,
+      junctionDeviationMm: 0.01,
+      maxFeedMmPerMin: 6000,
+    });
+    const timedFor = (name: string | null): string | undefined =>
+      statsRows(parsed, time, name).find((row) => row.label === 'Timed for')?.value;
+    expect(timedFor('Shop laser')).toBe('Shop laser');
+    expect(timedFor(null)).toBe('Stock GRBL limits');
+    expect(statsRows(parsed).some((row) => row.label === 'Timed for')).toBe(false);
   });
 });
 

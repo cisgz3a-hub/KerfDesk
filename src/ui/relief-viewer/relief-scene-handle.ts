@@ -121,13 +121,22 @@ function capturePngDataUrl(input: {
 }): string {
   const { renderer, camera, canvas, render, scale } = input;
   const previous = { width: canvas.clientWidth, height: canvas.clientHeight };
-  const size = screenshotSize(previous.width, previous.height, scale);
+  const size = screenshotSize(previous.width, previous.height, scale, maxCaptureSidePx(renderer));
   resizeTo(renderer, camera, size);
   render();
   const dataUrl = renderer.domElement.toDataURL('image/png');
   resizeTo(renderer, camera, previous);
   render();
   return dataUrl;
+}
+
+// The buffer is the CSS size times the pixel ratio; keep it inside what the
+// GPU allocates, and inside 8192 px so the PNG stays a file people can send.
+const MAX_CAPTURE_BUFFER_PX = 8192;
+
+function maxCaptureSidePx(renderer: WebGLRenderer): number {
+  const gpu = Math.min(MAX_CAPTURE_BUFFER_PX, renderer.capabilities.maxTextureSize);
+  return gpu / Math.max(1, renderer.getPixelRatio());
 }
 
 function resizeTo(
