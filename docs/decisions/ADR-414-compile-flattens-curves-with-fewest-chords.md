@@ -1,4 +1,4 @@
-## ADR-414 - Compile flattens curves with the fewest chords within the tolerance (2026-09-26)
+## ADR-414 - Compile flattens curves with near-fewest chords within the tolerance (2026-09-26)
 
 **Status:** Accepted. | **Date:** 2026-09-26
 
@@ -44,13 +44,17 @@ Two defects, measured on the base (`c62084959`):
    between A and B this is the exact largest distance; when it runs past an end, the overrun is
    added as the hypotenuse of the two worst values, an upper bound. A zero-length chord (a closed
    cubic loop) is bounded by the farthest control point of the piece, which contains it.
-2. **Fewest chords.** From each vertex, the chord runs to the farthest point that fits. Within a
-   short piece the error grows with the square of the chord's length, so each probe steps by the
-   square root of the error ratio, kept inside a bracket of the longest fitting and shortest failing
-   ends found so far and bisected when the step leaves it. A chord that fits with at least 98% of the
-   tolerance is taken (its length is within about 1% of the longest). When a sub-chord of a fitting
-   chord always fits, choosing the farthest end at every step gives the fewest chords whose vertices
-   lie on the curve: any other solution's k-th vertex is never ahead of the greedy k-th vertex.
+2. **Near-fewest chords.** From each vertex, the chord runs nearly to the farthest point that
+   fits. Within a short piece the error grows with the square of the chord's length, so each probe
+   steps by the square root of the error ratio, kept inside a bracket of the longest fitting and
+   shortest failing ends found so far and bisected when the step leaves it. The search stops at the
+   first fitting chord that uses at least 98% of the tolerance (its length is within about 1% of the
+   longest), that ends the segment, or whose end is within 2^-8 of its length of a failing end; so
+   it does not always take the farthest fitting end. The count is near-minimal, not minimal. It
+   would be minimal only if the search took the farthest end and the fit test were monotone (every
+   sub-chord of a fitting chord fits, so no other solution's k-th vertex is ahead of the greedy
+   k-th vertex); loops and cusps can break monotonicity. The tolerance bound (item 1) holds for
+   every chord regardless.
 3. **Even chords.** If that count of chords at equal parameter steps also fits, those are emitted
    (every circular arc qualifies, since its chord error depends only on the step, and equal steps
    flatten a curve and its reverse to the same vertices). Otherwise the vertex before the last is

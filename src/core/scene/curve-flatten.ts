@@ -9,12 +9,14 @@
 // form angle pair). A piece that runs past either end of its chord adds that
 // overrun, so the bound holds against the segment, not only its line.
 //
-// Each piece takes the longest chord that fits (a greedy walk over the curve
-// parameter; with a monotone fit test the greedy count is the minimum for
-// chords whose ends lie on the curve). That many chords at equal parameter
-// steps are used when they all fit (always for a circular arc); otherwise the
-// last two greedy chords are evened out so no sliver is left at the end. The
-// first point of a segment is its start and the last is its end, exactly.
+// Each piece takes nearly the longest chord that fits (a greedy walk over the
+// curve parameter, stopping once a chord uses 98% of the tolerance). The count
+// is near-minimal: it is the minimum for chords whose ends lie on the curve only
+// with the farthest end and a monotone fit test, which loops and cusps break.
+// That many chords at equal parameter steps are used when they all fit (always
+// for a circular arc); otherwise the last two greedy chords are evened out so
+// no sliver is left at the end. The first point of a segment is its start and
+// the last is its end, exactly.
 
 import type { CubicPathSegment, Vec2 } from './scene-object';
 
