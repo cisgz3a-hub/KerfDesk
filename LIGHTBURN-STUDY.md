@@ -11,6 +11,11 @@ ADR-027's "a divergence is a defect unless the ledger records it" rule unauditab
 **Rebuild started:** 2026-07-25. **Status: PARTIAL** — sections marked **NOT YET RESEARCHED** have no
 entries yet. Do not read an empty section as "no divergence".
 
+**Feature gaps** (LightBurn features KerfDesk lacks, with the build plan) are tracked separately in
+[docs/audits/2026-09-26-lightburn-gap-audit.md](docs/audits/2026-09-26-lightburn-gap-audit.md).
+Its image findings update G-01, G-02 and G-04 below: Halftone and a line-screen filter now exist in
+Image Studio but not as image modes, and image scan angle is confirmed missing.
+
 ---
 
 ## Provenance rules
