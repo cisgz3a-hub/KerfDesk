@@ -1,7 +1,12 @@
 import { describe, expect, it } from 'vitest';
 import type { CurveSubpath } from '../scene';
 import type { TracedLayer, TracedSvgPage } from './batch-trace-svg';
-import { fittedPageBox, placeTracedLayers, TRACED_HAIRLINE_MM } from './traced-page-box';
+import {
+  fittedPageBox,
+  MIN_TRACED_PAGE_SIDE_MM,
+  placeTracedLayers,
+  TRACED_HAIRLINE_MM,
+} from './traced-page-box';
 
 // Page units (mm here). A closed cubic dome whose control points reach y = 10
 // while the curve peaks at y = 15 (t = 1/2), on a straight base at y = 30.
@@ -66,6 +71,65 @@ describe('fittedPageBox', () => {
     expect(fittedPageBox(LAYERS, MM_PAGE, 'filled-contours', -3, 0.01)?.minX).toBe(20);
     expect(fittedPageBox(LAYERS, MM_PAGE, 'filled-contours', Number.NaN, 0.01)?.minX).toBe(20);
     expect(fittedPageBox([], MM_PAGE, 'filled-contours', 1, 0.01)).toBeNull();
+  });
+});
+
+describe('fittedPageBox: the 3 pt minimum page side', () => {
+  // A 50 mm long, 0.2 mm tall filled bar: y 30..30.2 mm.
+  const BAR: CurveSubpath = {
+    start: { x: 20, y: 30 },
+    closed: true,
+    segments: [
+      { kind: 'line', to: { x: 70, y: 30 } },
+      { kind: 'line', to: { x: 70, y: 30.2 } },
+      { kind: 'line', to: { x: 20, y: 30.2 } },
+    ],
+  };
+  const bar: ReadonlyArray<TracedLayer> = [{ color: '#000000', curves: [BAR] }];
+
+  it('is 3 pt in millimetres', () => {
+    expect(MIN_TRACED_PAGE_SIDE_MM * (72 / 25.4)).toBeCloseTo(3, 12);
+  });
+
+  it('grows a thin side to 3 pt on whole grid steps, centred on the artwork', () => {
+    // 3 pt = 1.0583 mm: 106 steps of 0.01 mm. The 20 steps of artwork get 43
+    // steps below and 43 above, so the page is y 29.57..30.63.
+    const box = fittedPageBox(bar, MM_PAGE, 'filled-contours', 0, 0.01);
+    expect(box).toEqual({ minX: 20, minY: 29.57, maxX: 70, maxY: 30.63 });
+    // An odd extra step goes to the high side: 1059 steps of 0.001 mm.
+    const fine = fittedPageBox(bar, MM_PAGE, 'filled-contours', 0, 0.001);
+    expect(fine).toEqual({ minX: 20, minY: 29.571, maxX: 70, maxY: 30.63 });
+    expect((fine?.maxY ?? 0) - (fine?.minY ?? 0)).toBeGreaterThanOrEqual(MIN_TRACED_PAGE_SIDE_MM);
+  });
+
+  it('grows both sides of a single dot and keeps one step on a coarse grid', () => {
+    const dot: CurveSubpath = {
+      start: { x: 5, y: 5 },
+      closed: false,
+      segments: [{ kind: 'line', to: { x: 5, y: 5 } }],
+    };
+    const layers: ReadonlyArray<TracedLayer> = [{ color: '#000000', curves: [dot] }];
+    const fine: TracedSvgPage = { ...MM_PAGE, physicalSizeMm: { widthMm: 2, heightMm: 1 } };
+    // Stroke allowance 0.05 mm: 4.95..5.05, grown to 1.06 mm around it.
+    expect(fittedPageBox(layers, fine, 'centerline', 0, 0.01)).toEqual({
+      minX: 4.47,
+      minY: 4.47,
+      maxX: 5.53,
+      maxY: 5.53,
+    });
+    // A 10 mm grid: one step already exceeds 3 pt.
+    expect(fittedPageBox(layers, fine, 'centerline', 0, 10)).toEqual({
+      minX: 0,
+      minY: 0,
+      maxX: 10,
+      maxY: 10,
+    });
+  });
+
+  it('leaves a page with no physical size alone', () => {
+    const pixels: TracedSvgPage = { pixelWidth: 200, pixelHeight: 100 };
+    const box = fittedPageBox(bar, pixels, 'filled-contours', 0, 0.01);
+    expect((box?.maxY ?? 0) - (box?.minY ?? 0)).toBeCloseTo(0.2, 12);
   });
 });
 

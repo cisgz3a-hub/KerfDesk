@@ -23,6 +23,7 @@ import { curveSubpathBounds } from '../scene/curve-path';
 import { transformCurveSubpathExact } from '../vector-export/affine-curves';
 import {
   DEFAULT_EXPORT_PRECISION_MM,
+  type DecimalGrid,
   decimalGridAtMost,
   formatGridIndex,
   outwardGridIndices,
@@ -41,9 +42,18 @@ export type TracedPageLayout = {
 /**
  * The widest stroke a traced writer draws on a physical page, in mm: the PDF
  * and EPS hairline (io vector-artwork VECTOR_STROKE_WIDTH_MM). The SVG draws
- * one source pixel, which is also covered.
+ * one source pixel, which is also covered. The io test traced-page.test.ts
+ * keeps it equal to VECTOR_STROKE_WIDTH_MM.
  */
 export const TRACED_HAIRLINE_MM = 0.1;
+
+/**
+ * The smallest page side, in mm: 3 pt, the PDF 1.4 minimum that the io PDF
+ * and EPS writers enforce (vector-artwork MIN_PAGE_SIDE_PT). A fitted physical
+ * page never goes below it, so every format gets the same page. The io test
+ * traced-page.test.ts keeps both constants equal.
+ */
+export const MIN_TRACED_PAGE_SIDE_MM = (3 * 25.4) / 72;
 
 /** A page rectangle in page units (mm when physical, else px), Y down. */
 export type TracedPageBox = {
@@ -113,16 +123,29 @@ export function fittedPageBox(
   };
   if (!physical) return raw;
   const grid = decimalGridAtMost(precisionMm ?? DEFAULT_EXPORT_PRECISION_MM);
-  const x = outwardGridIndices(raw.minX, raw.maxX, grid);
-  const y = outwardGridIndices(raw.minY, raw.maxY, grid);
-  // Keep at least one grid step on each side so a single dot still has a page.
+  const x = atLeastMinimumSide(outwardGridIndices(raw.minX, raw.maxX, grid), grid);
+  const y = atLeastMinimumSide(outwardGridIndices(raw.minY, raw.maxY, grid), grid);
   const onGrid = (index: number): number => Number(formatGridIndex(index, grid));
-  return {
-    minX: onGrid(x.lo),
-    minY: onGrid(y.lo),
-    maxX: onGrid(Math.max(x.hi, x.lo + 1)),
-    maxY: onGrid(Math.max(y.hi, y.lo + 1)),
-  };
+  return { minX: onGrid(x.lo), minY: onGrid(y.lo), maxX: onGrid(x.hi), maxY: onGrid(y.hi) };
+}
+
+/**
+ * Grow a side shorter than the smallest PDF page side to that side, rounded
+ * outward to whole grid steps and centred on the artwork (the extra odd step
+ * goes to the high side). The PDF and EPS writers grow a caller's page to the
+ * same minimum, so without this a thin fitted page (a Centerline trace of a
+ * straight line) would be a different page in PDF/EPS than in SVG, DXF and
+ * GeoJSON. At least one grid step always remains, so a single dot has a page.
+ */
+function atLeastMinimumSide(
+  side: { readonly lo: number; readonly hi: number },
+  grid: DecimalGrid,
+): { readonly lo: number; readonly hi: number } {
+  const minimum = Math.max(1, Math.ceil(MIN_TRACED_PAGE_SIDE_MM / grid.step - 1e-9));
+  const length = side.hi - side.lo;
+  if (length >= minimum) return side;
+  const lo = side.lo - Math.floor((minimum - length) / 2);
+  return { lo, hi: lo + minimum };
 }
 
 // Grid values are at most 4 decimals, so 12 places strip binary noise from the difference.

@@ -14,9 +14,15 @@ import {
   type TraceOptions,
 } from '../../core/trace';
 import type { BatchTraceOutput } from '../../core/trace/batch-trace';
+import { MIN_TRACED_PAGE_SIDE_MM, TRACED_HAIRLINE_MM } from '../../core/trace/traced-page-box';
 import { tracedLayersToDxf } from '../dxf/export-dxf';
 import { writeTracedDrawing } from './traced-drawing';
-import { PT_PER_MM } from './vector-artwork';
+import {
+  MIN_PAGE_SIDE_PT,
+  PT_PER_MM,
+  pointsOutward,
+  VECTOR_STROKE_WIDTH_MM,
+} from './vector-artwork';
 
 // 200 x 100 px at 0.5 mm per pixel: a 100 x 50 mm image page.
 const IMAGE: RawImageData = { width: 200, height: 100, data: new Uint8ClampedArray(200 * 100 * 4) };
@@ -171,5 +177,76 @@ describe('traced page: fit to artwork', () => {
     expect(svg).toContain('stroke-width="0.5"');
     // Centerline adds half the widest hairline (one 0.5 mm pixel) around the extent.
     expect(svg).toContain(' viewBox="0 0 60.5 25.5" width="60.5mm" height="25.5mm"');
+  });
+});
+
+describe('traced page: core constants mirror the io writers', () => {
+  // Core cannot import io, so these tests are the only link between the copies.
+  it('the stroke allowance hairline is the PDF/EPS stroke width', () => {
+    expect(TRACED_HAIRLINE_MM).toBe(VECTOR_STROKE_WIDTH_MM);
+  });
+
+  it('the minimum fitted page side is the PDF/EPS minimum page side', () => {
+    expect(MIN_TRACED_PAGE_SIDE_MM * PT_PER_MM).toBeCloseTo(MIN_PAGE_SIDE_PT, 12);
+  });
+});
+
+describe('traced page: a fitted side under 3 pt is the same page in every format', () => {
+  // A filled bar 100 px long and 0.4 px (0.2 mm) tall: x 20..70, y 30..30.2 mm.
+  const BAR: ColoredPath = {
+    color: '#000000',
+    polylines: [],
+    curves: [
+      {
+        start: { x: 40, y: 60 },
+        closed: true,
+        segments: [
+          { kind: 'line', to: { x: 140, y: 60 } },
+          { kind: 'line', to: { x: 140, y: 60.4 } },
+          { kind: 'line', to: { x: 40, y: 60.4 } },
+        ],
+      },
+    ],
+  };
+  const fitted = { page: { fit: 'artwork', marginMm: 0 } } as const;
+  const bar = (format: BatchTraceFormat): Promise<string> =>
+    traceFile(format, fitted, DEFAULT_TRACE_OPTIONS, [BAR]);
+  // 3 pt = 1.0583 mm: 1059 steps on the default 0.001 mm grid, 429 steps
+  // below the bar and 430 above, so the bar spans 0.43..0.63 mm (Y up).
+  const heightMm = 1.059;
+  const heightPt = pointsOutward(1059, { exponent: -3, step: 0.001 });
+
+  it('SVG: the viewBox is grown to 3 pt on the grid', async () => {
+    expect(await bar('svg')).toContain(
+      ' viewBox="0 0 50 1.059" width="50mm" height="1.059mm"',
+    );
+  });
+
+  it('PDF: the MediaBox is the SVG page, with no centring offset', async () => {
+    const pdf = await bar('pdf');
+    const [x0, y0, w, h] = numbersAfter(pdf, /\/MediaBox \[([^\]]+)\]/);
+    expect([x0, y0]).toEqual([0, 0]);
+    expect(w).toBeCloseTo(50 * PT_PER_MM, 3);
+    expect(h).toBe(heightPt);
+    expect(h).toBeGreaterThanOrEqual(MIN_PAGE_SIDE_PT);
+    expect(h).toBeCloseTo(heightMm * PT_PER_MM, 3);
+    expect(pdf).not.toMatch(/ [1-9][0-9.]* [0-9.]+ cm|[0-9.]+ [1-9][0-9.]* cm/);
+  });
+
+  it('EPS: the HiResBoundingBox is the SVG page, with no centring offset', async () => {
+    const eps = await bar('eps');
+    const [x0, y0, w, h] = numbersAfter(eps, /%%HiResBoundingBox:([^\n]+)/);
+    expect([x0, y0]).toEqual([0, 0]);
+    expect(w).toBeCloseTo(50 * PT_PER_MM, 3);
+    expect(h).toBe(heightPt);
+    expect(eps).not.toMatch(/[1-9][0-9.]* [0-9.]+ translate|[0-9.]+ [1-9][0-9.]* translate/);
+  });
+
+  it('DXF and GeoJSON: the bar sits where the grown page puts it', async () => {
+    const { ys } = dxfPoints(await bar('dxf'));
+    expect(Math.min(...ys)).toBeCloseTo(0.43, 9);
+    expect(Math.max(...ys)).toBeCloseTo(0.63, 9);
+    const positions = geoJsonPositions(await bar('geojson'));
+    expect(Math.min(...positions.map((p) => p[1]))).toBeCloseTo(0.43, 9);
   });
 });
