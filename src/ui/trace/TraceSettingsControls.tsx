@@ -12,9 +12,8 @@ import { TraceDetectionControls } from './TraceDetectionControls';
 import { TraceCheckboxRow } from './TraceCheckboxRow';
 import { NumberRow } from './TraceNumberRow';
 import { PhotoTraceSettingsControls } from './PhotoTraceSettingsControls';
+import { TraceAreaControls } from './TraceAreaControls';
 import { ColourLayerTraceSettingsControls } from './ColourLayerTraceSettingsControls';
-import { useStore } from '../state';
-import { HYBRID_MAX_STROKE_WIDTH_MM_RANGE, hybridMaxStrokeWidthMm } from './hybrid-stroke-width';
 import { DiagonalContactsControl } from './DiagonalContactsControl';
 
 type TraceSettingsControlsProps = {
@@ -205,58 +204,6 @@ function InvertRow(
       checked={props.overrides.invert ?? props.preset.invert ?? false}
       disabled={props.disabled === true}
       onChange={(invert) => props.onChange({ ...props.overrides, invert })}
-    />
-  );
-}
-
-function TraceAreaControls(props: TraceSettingsControlsProps): JSX.Element {
-  const set = (patch: LightBurnTraceSettingOverrides): void =>
-    props.onChange({ ...props.overrides, ...patch });
-  return (
-    <>
-      <NumberRow
-        label="Remove ink specks"
-        min={0}
-        max={10000}
-        step={1}
-        value={props.overrides.despeckleMinPixels ?? props.preset.despeckleMinPixels ?? 0}
-        onChange={(despeckleMinPixels) => set({ despeckleMinPixels })}
-      />
-      {props.preset.traceMode !== 'centerline' ? (
-        <NumberRow
-          label="Ignore Less Than"
-          min={0}
-          max={10000}
-          step={1}
-          value={props.overrides.ignoreLessThanPixels ?? props.preset.ignoreLessThanPixels ?? 0}
-          onChange={(ignoreLessThanPixels) => set({ ignoreLessThanPixels })}
-        />
-      ) : null}
-      {props.preset.traceMode === 'hybrid' ? <HybridStrokeWidthRow {...props} /> : null}
-      <TraceCheckboxRow
-        label="Fill tiny holes"
-        checked={props.overrides.fillPinholeCracks ?? props.preset.fillPinholeCracks ?? false}
-        onChange={(fillPinholeCracks) => set({ fillPinholeCracks })}
-      />
-    </>
-  );
-}
-
-// Line + fill (ADR-443): ink up to this wide on the placed artwork burns
-// once down its centre; wider ink stays a filled outline.
-function HybridStrokeWidthRow(props: TraceSettingsControlsProps): JSX.Element {
-  const device = useStore((s) => s.project.device);
-  const machineKind = useStore((s) => s.project.machine?.kind);
-  return (
-    <NumberRow
-      label="Max stroke width"
-      min={HYBRID_MAX_STROKE_WIDTH_MM_RANGE.min}
-      max={HYBRID_MAX_STROKE_WIDTH_MM_RANGE.max}
-      step={0.05}
-      value={hybridMaxStrokeWidthMm(props.overrides, device, machineKind)}
-      onChange={(hybridMaxStrokeWidthMm) =>
-        props.onChange({ ...props.overrides, hybridMaxStrokeWidthMm })
-      }
     />
   );
 }

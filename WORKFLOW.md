@@ -2789,9 +2789,16 @@ settings and Job Review keep their existing read-only setup references.
    an outline. Trace with Sharp to keep one-pixel dots. Expand **Curve finishing** for
    **Smoothness** and **Optimize** on filled outlines and Edge Detection, or **Transparency**
    for alpha-mask tracing. **Fill tiny holes** controls cleanup of small enclosed white marks;
-   it does not bridge open gaps. Turn it off to retain those small highlights. Sliders and numeric fields stay in sync. Manual adjustments persist
-   when switching presets; **Settings edited** identifies this state, and **Reset trace settings**
-   restores the selected preset's defaults. Automatic Line Art detail
+   it does not bridge open gaps. **Remove ink specks** and **Fill tiny holes** each have an
+   **Auto** box (on by default in Line Art and Smooth): Auto judges every small mark and hole on
+   its tone and surroundings; untick it to set an exact value, where a typed 0 removes nothing
+   and an unticked Fill fills nothing (ADR-434 Amendment 1). To keep those small highlights,
+   untick Fill's Auto and leave **Fill tiny holes** unticked. On Centerline and Sharp, unticking
+   Auto again restores the preset's own value. Sliders and numeric fields stay in sync. Switching presets keeps manual
+   adjustments except those the new preset sets itself (its Smoothness, Optimize, Ignore Less
+   Than, speck and hole choices; Smoothness and Optimize also reset when entering or leaving
+   Centerline); detection choices carry over. **Settings edited** identifies this state, and
+   **Reset trace settings** restores the selected preset's defaults. Automatic Line Art detail
    recovery retains the preset's brightness-selected solid ink and adds locally darker detail.
    Changes are debounced; the
    newest request supersedes and cancels any older trace still running.
