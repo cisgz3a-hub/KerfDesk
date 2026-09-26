@@ -14,6 +14,31 @@ export type ContourEdges = ContourBox & {
   readonly index: ContourBoxIndex<ContourEdge>;
 };
 
+// An edge's box is read from its ends, not stored: four stored bounds are four
+// boxed doubles per edge, and the topology repair keeps an edge for every
+// sample of every ring it has seen. Math.min and Math.max of the same two
+// values give the same box a stored copy would.
+class Edge implements ContourEdge {
+  constructor(
+    readonly a: Vec2,
+    readonly b: Vec2,
+    readonly index: number,
+    readonly count: number,
+  ) {}
+  get minX(): number {
+    return Math.min(this.a.x, this.b.x);
+  }
+  get minY(): number {
+    return Math.min(this.a.y, this.b.y);
+  }
+  get maxX(): number {
+    return Math.max(this.a.x, this.b.x);
+  }
+  get maxY(): number {
+    return Math.max(this.a.y, this.b.y);
+  }
+}
+
 /** Prepare one immutable boundary, retaining the original implicit closure. */
 export function* contourEdgesSteps(points: ReadonlyArray<Vec2>): TraceSteps<ContourEdges | null> {
   const cooperate = yield;
@@ -28,16 +53,7 @@ export function* contourEdgesSteps(points: ReadonlyArray<Vec2>): TraceSteps<Cont
     const a = points[i],
       b = points[(i + 1) % count];
     if (a === undefined || b === undefined) continue;
-    edges.push({
-      minX: Math.min(a.x, b.x),
-      minY: Math.min(a.y, b.y),
-      maxX: Math.max(a.x, b.x),
-      maxY: Math.max(a.y, b.y),
-      a,
-      b,
-      index: i,
-      count,
-    });
+    edges.push(new Edge(a, b, i, count));
   }
   const bounds = unionContourBoxes(edges);
   if (!finiteContourBox(bounds)) return null;
