@@ -17,7 +17,7 @@ import { cancel as cancelStreamer, markErrored, wipeInFlight } from '../../core/
 import type { ControllerDriver } from '../../core/controllers';
 import type { SerialConnection } from '../../platform/types';
 import { clearCncLiveCaps } from './detected-settings-action';
-import type { JobStopReason } from './job-stop-request';
+import { streamResetRecord, type JobStopReason } from './job-stop-request';
 import { invalidateControllerSessionEvidence } from './laser-controller-evidence';
 import {
   requalifyAfterHaltingReset,
@@ -25,7 +25,10 @@ import {
 } from './laser-controller-qualification';
 import { releaseHostedRefill } from './laser-hosted-refill';
 import type { ControllerLifecycleRefs } from './laser-interactive-command';
-import { cancelPauseResumeTransition } from './laser-pause-resume-transition';
+import {
+  cancelPauseResumeTransition,
+  hasPauseResumeTransition,
+} from './laser-pause-resume-transition';
 import {
   driverQuickStops,
   isAirOffLine,
@@ -85,11 +88,14 @@ export async function runStopJob(context: JobStopContext, reason?: JobStopReason
   // Queued stop lines need a single writer, so a controller without a realtime
   // reset takes the hosted refill back first (ADR-334).
   if (softReset === null) await releaseHostedRefill(refs);
+  // Read before the cancel below clears it: a hold or restart still settling
+  // means the last status report may not show the machine moving.
+  const pauseResumeSettling = hasPauseResumeTransition(refs);
   cancelPauseResumeTransition(refs, TRANSITION_CANCELLATION_MESSAGE);
   const outcome =
     softReset === null
       ? await stopWithoutReset(context)
-      : await stopWithReset(context, softReset, reason);
+      : await stopWithReset(context, softReset, reason, pauseResumeSettling);
   set((state) => ({
     // Abort ends the run, so its machine kind and any tool-change bits it never
     // reached are no longer the operator's pending work.
@@ -117,6 +123,7 @@ async function stopWithReset(
   context: JobStopContext,
   softReset: string,
   reason: JobStopReason | undefined,
+  pauseResumeSettling: boolean,
 ): Promise<StopOutcome> {
   const { set, refs, safeWrite, driver } = context;
   clearCncLiveCaps();
@@ -134,6 +141,12 @@ async function stopWithReset(
     ...(reason === undefined || state.streamer === null
       ? {}
       : { jobStopRequest: { reason, streamerEpoch: state.streamerEpoch } }),
+    // And whether the reset may kill the steppers mid-motion (ADR-215
+    // Amendment 1): decided now, because ALARM:3 arrives after the stream
+    // is recorded as stopped.
+    ...(state.streamer === null
+      ? {}
+      : { streamReset: streamResetRecord(state, pauseResumeSettling) }),
   }));
   requalifyAfterHaltingReset(set, context.get, refs, driver().capabilities);
   armResetCleanup(refs, safeWrite, cleanupLines);

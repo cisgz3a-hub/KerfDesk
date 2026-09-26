@@ -169,6 +169,53 @@ function MenuItem(props: {
 type MenuGroupLayout = { readonly label: string; readonly ids: ReadonlyArray<CommandId> };
 
 const MENU_GROUPS: Partial<Record<CommandFamily, ReadonlyArray<MenuGroupLayout>>> = {
+  arrange: [
+    {
+      label: 'Align',
+      ids: [
+        'arrange.align-left',
+        'arrange.align-center-x',
+        'arrange.align-right',
+        'arrange.align-top',
+        'arrange.align-center-y',
+        'arrange.align-bottom',
+        'arrange.align-centers',
+      ],
+    },
+    {
+      label: 'Distribute',
+      ids: [
+        'arrange.distribute-horizontal-centers',
+        'arrange.distribute-horizontal-spacing',
+        'arrange.distribute-vertical-centers',
+        'arrange.distribute-vertical-spacing',
+      ],
+    },
+    {
+      label: 'Rotate & flip',
+      ids: [
+        'arrange.rotate-90-cw',
+        'arrange.rotate-90-ccw',
+        'arrange.flip-horizontal',
+        'arrange.flip-vertical',
+      ],
+    },
+    {
+      label: 'Move to bed',
+      ids: [
+        'arrange.move-to-bed-center',
+        'arrange.move-to-bed-nw',
+        'arrange.move-to-bed-n',
+        'arrange.move-to-bed-ne',
+        'arrange.move-to-bed-w',
+        'arrange.move-to-bed-e',
+        'arrange.move-to-bed-sw',
+        'arrange.move-to-bed-s',
+        'arrange.move-to-bed-se',
+      ],
+    },
+    { label: 'Layout', ids: ['arrange.array', 'arrange.quick-nest', 'arrange.break-apart'] },
+  ],
   window: [
     {
       label: 'Panels',
@@ -183,6 +230,7 @@ const MENU_GROUPS: Partial<Record<CommandFamily, ReadonlyArray<MenuGroupLayout>>
       label: 'View',
       ids: [
         'window.toggle-preview',
+        'window.toggle-wireframe',
         'window.fit-view',
         'window.project-notes',
         'window.undo-history',
@@ -240,6 +288,7 @@ const MENU_GROUPS: Partial<Record<CommandFamily, ReadonlyArray<MenuGroupLayout>>
         'tools.weld',
         'tools.union-silhouette',
         'tools.join-paths',
+        'tools.offset-shapes',
         'tools.subtract',
         'tools.intersect',
         'tools.exclude',

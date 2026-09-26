@@ -57,6 +57,7 @@ import {
 } from './layer-actions';
 import { fillSelectionActions, type FillSelectionActions } from './fill-selection-actions';
 import { vectorPathActions, type VectorPathActions } from './vector-path-actions';
+import { editingToolsActions, type EditingToolsActions } from './editing-tools-actions';
 import {
   closeOpenFillContoursActions,
   type CloseOpenFillContoursActions,
@@ -171,6 +172,7 @@ export type AppState = ObjectPropertiesActions &
   BreakApartActions &
   FillSelectionActions &
   VectorPathActions &
+  EditingToolsActions &
   CloseOpenFillContoursActions &
   ObjectDeleteActions &
   SceneClipboardActions &
@@ -447,6 +449,7 @@ export const useStore = create<AppState>((set, get) => ({
   ...airAssistDefaultActions(set, get),
   ...fillSelectionActions(set),
   ...vectorPathActions(set),
+  ...editingToolsActions(set),
   ...closeOpenFillContoursActions(set),
   ...layerDefaultActions(set),
   ...materialLibraryActions(set),

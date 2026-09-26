@@ -17,6 +17,7 @@ import type { LaserState } from './laser-store';
 import { invalidateControllerSessionEvidence } from './laser-controller-evidence';
 import { requalifyAfterHaltingReset } from './laser-controller-qualification';
 import { clearCncLiveCaps } from './detected-settings-action';
+import { streamResetRecord } from './job-stop-request';
 import { advanceStream } from './laser-stream-ack';
 import { noteRefusedLine } from './laser-parser-rearm';
 import type { AckSettlement, GetFn, HandlerRefs, SafeWriteFn, SetFn } from './laser-line-shared';
@@ -176,7 +177,12 @@ function requestRealtimeStopAfterStreamError(
     return;
   }
   clearCncLiveCaps();
-  set((state) => invalidateControllerSessionEvidence(state));
+  // The reset kills the steppers if the controller is still running the
+  // moves it buffered before the rejection (ADR-215 Amendment 1).
+  set((state) => ({
+    ...invalidateControllerSessionEvidence(state),
+    streamReset: streamResetRecord(state),
+  }));
   requalifyAfterHaltingReset(set, get, refs, driver.capabilities);
   // Arm before the realtime write, exactly like operator Abort. Web Serial can
   // reject its promise after the reset byte reached the controller and a boot
