@@ -16,8 +16,8 @@ export const MACHINE_SETUP_TUTORIALS: readonly Tutorial[] = [
       {
         title: 'Choose your machine',
         instruction:
-          'On Machine, choose Laser only, CNC only or Laser + CNC. If the controller is connected, Set up automatically lists what it reported and Use detected values copies those readings into the draft. Pick a laser profile by clicking anywhere on its card, using search or Browse all profiles, or choose a CNC preset. Check Controller and connection settings. Connecting is optional; you can also set up offline.',
-        focus: 'Machine · automatic setup · profile',
+          'On Machine, plug the machine in by USB, switch it on and press Find my machine. KerfDesk reads its firmware, work area, speed and power range and fills them into the draft, listing each change with one Undo. Then check Laser only, CNC only or Laser + CNC, and pick a laser profile by clicking anywhere on its card, using search or Browse all profiles, or choose a CNC preset. To set up offline, choose Set up without connecting.',
+        focus: 'Machine · Find my machine · profile',
         result: 'The draft setup has the correct kind of machine and controller.',
       },
       {
@@ -65,7 +65,8 @@ export const MACHINE_SETUP_TUTORIALS: readonly Tutorial[] = [
     category: 'Machine & setup',
     machine: 'all',
     minutes: 3,
-    location: 'Machine controls → Connect, or Machine Setup → Machine → Connect and detect',
+    location:
+      'Machine controls → Machine connection → Connect, or Machine Setup → Machine → Find my machine',
     prerequisites:
       'A supported serial controller and the appropriate machine profile. File-only profiles use export instead.',
     visual: 'machine',
@@ -73,7 +74,7 @@ export const MACHINE_SETUP_TUTORIALS: readonly Tutorial[] = [
       {
         title: 'Check the selected controller',
         instruction:
-          'Open Machine Setup and check the controller selection and connection settings. Close other software that already owns the same serial port.',
+          'Open Machine Setup and press Find my machine, or check the controller under Connection options. Close other software that already owns the same serial port.',
         focus: 'Selected controller',
         result: 'The connection attempt targets the driver and device you intend to use.',
         visual: 'settings',
@@ -81,7 +82,7 @@ export const MACHINE_SETUP_TUTORIALS: readonly Tutorial[] = [
       {
         title: 'Choose the device',
         instruction:
-          'Choose Connect and select the controller in the serial picker. Wait for the app to finish connecting and reading the controller information.',
+          'Choose Connect. The first time, select the controller in the serial picker; after that Connect reuses the same port, and Connect automatically in the ⋯ menu connects when KerfDesk starts or the machine is plugged in. Use a different port… in that menu always shows the picker.',
         focus: 'Connect',
         result: 'The connection status changes and controller replies become available.',
       },
@@ -94,7 +95,7 @@ export const MACHINE_SETUP_TUTORIALS: readonly Tutorial[] = [
         visual: 'console',
       },
     ],
-    tip: 'Disconnect closes the current link while keeping permission. Forget device also removes the browser permission. Neither action establishes the work origin.',
+    tip: 'Disconnect closes the current link while keeping permission. Forget Controller, in the ⋯ menu, also removes the browser permission and the remembered port. Neither action establishes the work origin.',
     keywords: [
       'connect',
       'serial',

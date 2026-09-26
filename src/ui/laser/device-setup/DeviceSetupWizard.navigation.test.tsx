@@ -27,7 +27,7 @@ afterEach(() => {
 
 describe('DeviceSetupWizard step navigation', () => {
   it.each<[DeviceSetupStep, string, number]>([
-    ['connect', 'Connect and detect', 1],
+    ['connect', 'Connection options', 1],
     ['options', 'Accessories and calibration', 2],
     ['cnc-setup', 'CNC job setup', 2],
   ])(
@@ -71,7 +71,7 @@ describe('DeviceSetupWizard step navigation', () => {
     });
 
     try {
-      await openSetupDisclosure(host, 'Controller and connection settings');
+      await openSetupDisclosure(host, 'Connection options');
       await changeSelect(host, 'Controller firmware', 'marlin');
       await act(async () => stepButton(host, 3, 'Review & save').click());
       expect(host.textContent).toContain('Step 3 of 3');

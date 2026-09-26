@@ -22,6 +22,11 @@ export type ConnectControllerOptions = {
    * a runtime that cannot transfer the port's streams keeps the main-thread
    * transport and the job streams exactly as it always has. */
   readonly hostedStreaming?: boolean | undefined;
+  /** Which port to open (ADR-420). 'remembered', the default, reuses the port
+   * the operator picked before when exactly one fits and shows the picker
+   * otherwise; 'choose' always shows the picker; 'automatic' never does and
+   * ends quietly when no remembered port is attached. */
+  readonly portSelection?: 'remembered' | 'choose' | 'automatic' | undefined;
 };
 
 export type LaserStoreActions = {
