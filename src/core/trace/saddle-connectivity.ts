@@ -28,25 +28,28 @@
 //        the 8×8 window (ADR-403 amendment 1), each centred on the corner
 //        and shrunk at the border the same way. A wider window counts only
 //        the ring it adds, and that ring decides only when at least 7/8 of
-//        it is one colour: two marks kissing on a page join, but the rim
-//        of a checkerboard patch (cells one side, page the other) stays a
-//        tie. A window centred on a checkerboard corner
-//        ties at any size, so a checkerboard ties everywhere, border
-//        included. The one blind spot is a corner diagonally next to an
-//        image corner: only its own 2×2 block fits, so it is a tie.
+//        it is one colour: two marks kissing on a page join, but the rim of
+//        a checkerboard patch (cells one side, page the other) stays a tie.
+//        A window centred on a checkerboard corner ties at every size, so
+//        a checkerboard ties everywhere, border included, with one
+//        exception: in a small patch (4-6 px across) the 4×4 window is the
+//        balanced patch itself and the wider rings are page, so its
+//        central corners join ink, as the minority rule intends for a tiny
+//        dither cluster. The one blind spot is a corner diagonally next to
+//        an image corner: only its own 2×2 block fits, so it is a tie.
 //     2. A tie through the 8×8 window (two equal shapes kissing at a
 //        corner, a checkerboard) is structurally symmetric. Where the
-//        pre-threshold crack field shows a genuine anti-aliasing ramp in the 2×2 block (not saturated, and
-//        still agreeing with the mask), the asymptotic decider of Nielson &
-//        Hamann (1991) settles it: evaluate the bilinear interpolant of the
-//        four threshold residuals at its saddle point; ink joins iff that
-//        value lies on the ink side of the cut by more than
-//        GREY_SADDLE_MARGIN_LUMA. Otherwise paper joins (the historical
-//        answer). The margin matters: a SYMMETRIC saddle's bilinear value is
-//        just the block mean, so a fine checkerboard (or a bilinear
-//        enlargement of a binary one, which is how small sources reach the 2x
-//        trace) sits within a luma level of a mid cut (127.5 against 128) and
-//        its sign is noise, not evidence.
+//        pre-threshold crack field shows a genuine anti-aliasing ramp in
+//        the 2×2 block (not saturated, and still agreeing with the mask),
+//        the asymptotic decider of Nielson & Hamann (1991) settles it:
+//        evaluate the bilinear interpolant of the four threshold residuals
+//        at its saddle point; ink joins iff that value lies on the ink side
+//        of the cut by more than GREY_SADDLE_MARGIN_LUMA. Otherwise paper
+//        joins (the historical answer). The margin matters: a SYMMETRIC
+//        saddle's bilinear value is just the block mean, so a fine
+//        checkerboard (or a bilinear enlargement of a binary one, which is
+//        how small sources reach the 2x trace) sits within a luma level of
+//        a mid cut (127.5 against 128) and its sign is noise, not evidence.
 //   The window outranks the decider on purpose. Bilinear reconstruction
 //   systematically under-reads ridges: on a one-pixel anti-aliased diagonal
 //   (core 24, flanks 195) the true box-filtered value at the shared corner
@@ -176,39 +179,68 @@ export function createSaddleResolver(
  *  Saddle corners lie strictly inside the lattice (out-of-image pixels are
  *  paper, so a border corner is never a saddle), hence each half-size is at
  *  least 1. Once the border stops both axes from growing, a wider radius
- *  would add an empty ring, so the vote ends. */
+ *  would add an empty ring, so the vote ends. Each pixel is read at most
+ *  once: a full tie costs at most 64 reads at scale 1 (16 + 20 + 28),
+ *  times scale², and a mixed ring stops early. */
 function minorityVote(mask: InkMask, x: number, y: number, radii: ReadonlyArray<number>): number {
   let previousRx = 0;
   let previousRy = 0;
-  let previousBalance = 0;
   for (const radius of radii) {
     const rx = Math.max(1, Math.min(radius, x, mask.width - x));
     const ry = Math.max(1, Math.min(radius, y, mask.height - y));
     if (rx === previousRx && ry === previousRy) break;
-    const balance = windowInkBalance(mask, x, y, rx, ry);
-    if (previousRx === 0) {
-      if (balance !== 0) return balance;
-    } else {
-      const ring = balance - previousBalance;
-      const ringArea = 4 * (rx * ry - previousRx * previousRy);
-      if (4 * Math.abs(ring) >= RING_DECISIVE_QUARTERS * ringArea) return ring;
-    }
+    const ringArea = 4 * (rx * ry - previousRx * previousRy);
+    // The first window decides on any imbalance; a wider ring needs
+    // 4·|ring| ≥ 3·area.
+    const need = previousRx === 0 ? 1 : Math.ceil((RING_DECISIVE_QUARTERS * ringArea) / 4);
+    const ring = ringInkBalance(mask, x, y, rx, ry, previousRx, previousRy, need);
+    if (Math.abs(ring) >= need) return ring;
     previousRx = rx;
     previousRy = ry;
-    previousBalance = balance;
   }
   return 0;
 }
 
 /** Ink minus paper over the window of half-sizes (rx, ry) centred on
- *  corner (x,y); the caller keeps the window inside the image. */
-function windowInkBalance(mask: InkMask, x: number, y: number, rx: number, ry: number): number {
+ *  corner (x,y), minus the inner window (irx, iry) already counted (0, 0
+ *  for none), so each pixel is read once however far the vote widens.
+ *  Returns 0 as soon as the rows left cannot bring |balance| up to `need`
+ *  (a mixed ring, e.g. on a checkerboard, stops after a row or two). The
+ *  caller keeps the window inside the image and the inner window inside
+ *  it. */
+function ringInkBalance(
+  mask: InkMask,
+  x: number,
+  y: number,
+  rx: number,
+  ry: number,
+  irx: number,
+  iry: number,
+  need: number,
+): number {
+  const { ink, width } = mask;
   let balance = 0;
+  let remaining = 4 * (rx * ry - irx * iry);
   for (let py = y - ry; py < y + ry; py += 1) {
-    for (let px = x - rx; px < x + rx; px += 1) {
-      balance += inkAt(mask, px, py) === 1 ? 1 : -1;
+    const row = py * width;
+    const skipsInner = py >= y - iry && py < y + iry;
+    if (skipsInner) {
+      balance += spanInkBalance(ink, row + x - rx, row + x - irx);
+      balance += spanInkBalance(ink, row + x + irx, row + x + rx);
+      remaining -= 2 * (rx - irx);
+    } else {
+      balance += spanInkBalance(ink, row + x - rx, row + x + rx);
+      remaining -= 2 * rx;
     }
+    if (Math.abs(balance) + remaining < need) return 0;
   }
+  return balance;
+}
+
+/** Ink minus paper over mask indices [from, to). */
+function spanInkBalance(ink: InkMask['ink'], from: number, to: number): number {
+  let balance = 0;
+  for (let i = from; i < to; i += 1) balance += (ink[i] ?? 0) === 0 ? -1 : 1;
   return balance;
 }
 
@@ -221,8 +253,9 @@ const BLOCK: ReadonlyArray<Corner> = [
 ];
 
 /** Asymptotic decider on the threshold residual r = luma − threshold (ink
- *  where r < 0; r = 0 lies on the cut and agrees with either class). With the block's residuals r00, r10, r01, r11 at the four
- *  pixel centres, the bilinear interpolant's saddle value is
+ *  where r < 0; r = 0 lies on the cut and agrees with either class). With
+ *  the block's residuals r00, r10, r01, r11 at the four pixel centres,
+ *  the bilinear interpolant's saddle value is
  *      (r00·r11 − r10·r01) / (r00 + r11 − r10 − r01).
  *  Its sign says which diagonal the continuous iso-line keeps connected.
  *  Returns null when the field carries no information for this block. */
