@@ -1,9 +1,9 @@
 import type { Polyline, Vec2 } from '../scene';
 import { unionContourBoxes } from './contour-bounds';
 import {
+  adjacentContourEdgeIndices,
+  contourEdge,
   contourEdgesSteps,
-  adjacentContourEdges,
-  type ContourEdge,
   type ContourEdges,
 } from './contour-edges';
 import {
@@ -112,26 +112,34 @@ function* findContactsSteps(
   const choices: ContactChoices = { minX: null, minY: null };
   // Every overlapping edge pair is tested, each once with `a`'s edge first.
   // The earliest contact is a minimum under a total order, so the order the
-  // pairs arrive in cannot change the choice.
-  yield* a.index.overlapPairsSteps(
+  // pairs arrive in cannot change the choice. Edges are made only for pairs
+  // that meet.
+  const aPoints = a.points,
+    aCount = a.count,
+    bPoints = b.points,
+    bCount = b.count;
+  yield* a.index.overlapIdsSteps(
     b.index,
-    (first, second) => {
-      if (skipContact(first, second, sameLoop)) return;
-      if (edgesMeet(first, second, orientation)) rememberContact(choices, first, second, sameLoop);
+    (i, j) => {
+      // Within one loop each unordered pair is tested once, from its lower edge.
+      if (sameLoop && (j <= i || adjacentContourEdgeIndices(i, j, aCount))) return;
+      const a0 = aPoints[i] as Vec2,
+        a1 = aPoints[i + 1 === aCount ? 0 : i + 1] as Vec2,
+        b0 = bPoints[j] as Vec2,
+        b1 = bPoints[j + 1 === bCount ? 0 : j + 1] as Vec2;
+      if (
+        orientation.sign(a0, a1, b0) * orientation.sign(a0, a1, b1) <= 0 &&
+        orientation.sign(b0, b1, a0) * orientation.sign(b0, b1, a1) <= 0
+      ) {
+        rememberContact(
+          choices,
+          contourEdge(aPoints, i, aCount),
+          contourEdge(bPoints, j, bCount),
+          sameLoop,
+        );
+      }
     },
     cooperate,
   );
   return choices;
-}
-
-// Within one loop each unordered pair is tested once, from its lower edge.
-function skipContact(first: ContourEdge, second: ContourEdge, sameLoop: boolean): boolean {
-  return sameLoop && (second.index <= first.index || adjacentContourEdges(first, second));
-}
-
-function edgesMeet(a: ContourEdge, b: ContourEdge, orientation: ContourOrientation): boolean {
-  return (
-    orientation.sign(a.a, a.b, b.a) * orientation.sign(a.a, a.b, b.b) <= 0 &&
-    orientation.sign(b.a, b.b, a.a) * orientation.sign(b.a, b.b, a.b) <= 0
-  );
 }

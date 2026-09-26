@@ -14,10 +14,9 @@ type Nodes = {
 };
 // The boxes' bounds and centres, by box, and the box order the build
 // partitions. Only `order` moves, by the same swaps an array of entries would
-// make, and no leaf's range moves once the leaf is built. The bounds are read
-// once, here: queries test these flat copies instead of each item's fields.
-type Entries<T> = {
-  readonly boxes: ReadonlyArray<T>;
+// make, and no leaf's range moves once the leaf is built. Queries test the
+// flat bounds, never an item's fields, so items can be made on demand.
+type Entries = {
   readonly bounds: Float64Array;
   readonly x: Float64Array;
   readonly y: Float64Array;
@@ -33,7 +32,7 @@ export class ContourBoxIndex<T extends ContourBox> {
   private constructor(
     private readonly root: number,
     private readonly nodes: Nodes,
-    private readonly boxes: ReadonlyArray<T>,
+    private readonly item: (index: number) => T,
     private readonly bounds: Float64Array,
     private readonly order: Int32Array,
   ) {}
@@ -47,27 +46,37 @@ export class ContourBoxIndex<T extends ContourBox> {
   ): TraceSteps<ContourBoxIndex<T>> {
     const cooperate = yield;
     const count = boxes.length;
-    const entries: Entries<T> = {
-      boxes,
-      bounds: new Float64Array(4 * count),
+    const bounds = new Float64Array(4 * count);
+    for (let i = 0; i < count; i += 1) {
+      if (cooperate && i % BUILD_CHECKPOINT_INTERVAL === 0) yield;
+      const box = boxes[i] as T;
+      bounds[4 * i] = box.minX;
+      bounds[4 * i + 1] = box.minY;
+      bounds[4 * i + 2] = box.maxX;
+      bounds[4 * i + 3] = box.maxY;
+    }
+    return yield* ContourBoxIndex.overBoundsSteps(bounds, (index) => boxes[index] as T);
+  }
+
+  /** An index over the boxes `bounds[4i, 4i + 4)` (minX, minY, maxX, maxY),
+   *  whose items are made on demand by `item(i)`, so a caller with many small
+   *  items need not keep one object per box. The index keeps `bounds`. */
+  static *overBoundsSteps<T extends ContourBox>(
+    bounds: Float64Array,
+    item: (index: number) => T,
+  ): TraceSteps<ContourBoxIndex<T>> {
+    const cooperate = yield;
+    const count = bounds.length >> 2;
+    const entries: Entries = {
+      bounds,
       x: new Float64Array(count),
       y: new Float64Array(count),
       order: new Int32Array(count),
     };
-    const { bounds } = entries;
     for (let i = 0; i < count; i += 1) {
       if (cooperate && i % BUILD_CHECKPOINT_INTERVAL === 0) yield;
-      const box = boxes[i] as T;
-      const minX = box.minX,
-        minY = box.minY,
-        maxX = box.maxX,
-        maxY = box.maxY;
-      bounds[4 * i] = minX;
-      bounds[4 * i + 1] = minY;
-      bounds[4 * i + 2] = maxX;
-      bounds[4 * i + 3] = maxY;
-      entries.x[i] = minX / 2 + maxX / 2;
-      entries.y[i] = minY / 2 + maxY / 2;
+      entries.x[i] = (bounds[4 * i] as number) / 2 + (bounds[4 * i + 2] as number) / 2;
+      entries.y[i] = (bounds[4 * i + 1] as number) / 2 + (bounds[4 * i + 3] as number) / 2;
       entries.order[i] = i;
     }
     const size = nodeCount(count, new Map());
@@ -77,7 +86,7 @@ export class ContourBoxIndex<T extends ContourBox> {
       second: new Int32Array(size),
     };
     const root = yield* buildTreeSteps(entries, nodes, cooperate);
-    return new ContourBoxIndex(root, nodes, boxes, bounds, entries.order);
+    return new ContourBoxIndex(root, nodes, item, bounds, entries.order);
   }
 
   /** Unordered candidates; callers restore their own observable traversal order. */
@@ -114,7 +123,7 @@ export class ContourBoxIndex<T extends ContourBox> {
   }
 
   private collectLeaf(start: number, end: number, box: ContourBox, result: T[]): void {
-    const { boxes, bounds, order } = this;
+    const { item: make, bounds, order } = this;
     const minX = box.minX,
       minY = box.minY,
       maxX = box.maxX,
@@ -128,7 +137,7 @@ export class ContourBoxIndex<T extends ContourBox> {
         (bounds[at + 3] as number) >= minY &&
         maxY >= (bounds[at + 1] as number)
       ) {
-        result.push(boxes[item] as T);
+        result.push(make(item));
       }
     }
   }
@@ -140,6 +149,18 @@ export class ContourBoxIndex<T extends ContourBox> {
   *overlapPairsSteps<U extends ContourBox>(
     other: ContourBoxIndex<U>,
     visit: (item: T, otherItem: U) => void,
+    cooperate: boolean,
+  ): TraceSteps<void> {
+    const mine = this.item,
+      theirs = other.item;
+    yield* this.overlapIdsSteps(other, (a, b) => visit(mine(a), theirs(b)), cooperate);
+  }
+
+  /** overlapPairsSteps by item number: `visit(i, j)` for item `i` here and
+   *  item `j` of `other`, without making either item. */
+  *overlapIdsSteps<U extends ContourBox>(
+    other: ContourBoxIndex<U>,
+    visit: (item: number, otherItem: number) => void,
     cooperate: boolean,
   ): TraceSteps<void> {
     if (this.root < 0 || other.root < 0) return;
@@ -177,10 +198,10 @@ export class ContourBoxIndex<T extends ContourBox> {
     end: number,
     other: ContourBoxIndex<U>,
     otherLeaf: number,
-    visit: (item: T, otherItem: U) => void,
+    visit: (item: number, otherItem: number) => void,
   ): void {
-    const { boxes, bounds, order } = this;
-    const { boxes: otherBoxes, bounds: otherBounds, order: otherOrder, nodes } = other;
+    const { bounds, order } = this;
+    const { bounds: otherBounds, order: otherOrder, nodes } = other;
     const leafAt = 4 * otherLeaf;
     const leafMinX = nodes.bounds[leafAt] as number,
       leafMinY = nodes.bounds[leafAt + 1] as number,
@@ -207,7 +228,7 @@ export class ContourBoxIndex<T extends ContourBox> {
           maxY >= (otherBounds[to + 1] as number) &&
           (otherBounds[to + 3] as number) >= minY
         ) {
-          visit(boxes[item] as T, otherBoxes[otherItem] as U);
+          visit(item, otherItem);
         }
       }
     }
@@ -268,11 +289,7 @@ type BuildFrame = {
 // one resumption per level for every checkpoint, which dominated the build.
 // Each node still partitions only its own range, so the tree is the same.
 // Returns the root's number, or -1 for no boxes.
-function* buildTreeSteps<T extends ContourBox>(
-  entries: Entries<T>,
-  nodes: Nodes,
-  cooperate: boolean,
-): TraceSteps<number> {
+function* buildTreeSteps(entries: Entries, nodes: Nodes, cooperate: boolean): TraceSteps<number> {
   if (entries.order.length === 0) return -1;
   const stack: BuildFrame[] = [frame(0, entries.order.length)];
   let built = -1;
@@ -326,13 +343,7 @@ function join(nodes: Nodes, node: number, left: number, right: number): number {
   return node;
 }
 
-function leaf<T>(
-  entries: Entries<T>,
-  nodes: Nodes,
-  node: number,
-  start: number,
-  end: number,
-): number {
+function leaf(entries: Entries, nodes: Nodes, node: number, start: number, end: number): number {
   let minX = Infinity,
     minY = Infinity,
     maxX = -Infinity,
@@ -355,7 +366,7 @@ function leaf<T>(
   return node;
 }
 
-function splitsHorizontally<T>(entries: Entries<T>, start: number, end: number): boolean {
+function splitsHorizontally(entries: Entries, start: number, end: number): boolean {
   const { x: xs, y: ys, order } = entries;
   let lowX = Infinity,
     lowY = Infinity,
