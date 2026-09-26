@@ -1,8 +1,9 @@
+import fc from 'fast-check';
 import { describe, expect, it } from 'vitest';
 import type { CncTool } from '../scene';
 import type { Heightmap } from './heightmap';
 import { reliefRoughingPasses } from './relief-roughing';
-import { reliefRoughingLevels } from './relief-roughing-levels';
+import { reliefRoughingLevels, type ReliefRoughingLevel } from './relief-roughing-levels';
 
 const CELLS = 24;
 const CELL_MM = 0.5;
@@ -89,3 +90,83 @@ describe('reliefRoughingPasses levels (ADR-422)', () => {
     expect(Math.min(...levels)).toBeCloseTo(-2.5, 6);
   });
 });
+
+describe('reliefRoughingLevels fine steps (ADR-422 Amendment 1)', () => {
+  const center = (CELLS - 1) / 2;
+  const pyramid = map((x, y) => -0.25 * Math.max(Math.abs(x - center), Math.abs(y - center)));
+
+  it('adds a band every fine step below each ladder level, down to the next', () => {
+    const levels = reliefRoughingLevels(pyramid, pyramid.depth, [-1, -2, -3], 0.5, 0.4);
+
+    expect(levels.map((level) => level.zMm)).toEqual(
+      [-0.4, -0.8, -1, -1.4, -1.8, -2, -2.4, -2.8, -2.875].map((z) => expect.closeTo(z, 6)),
+    );
+    expect(levels.map((level) => level.bandFloorMm)).toEqual(
+      [-0.8, -1, null, -1.8, -2, null, -2.8, -2.875, null].map((z) =>
+        z === null ? null : expect.closeTo(z, 6),
+      ),
+    );
+    // Every band's stock still stands at the ladder level above it.
+    expect(levels.map((level) => level.sliceTopMm)).toEqual([0, 0, 0, -1, -1, -1, -2, -2, -2]);
+  });
+
+  it('adds nothing when the fine step is no finer than the ladder', () => {
+    const plain = reliefRoughingLevels(pyramid, pyramid.depth, [-1, -2, -3], 0.5);
+    expect(reliefRoughingLevels(pyramid, pyramid.depth, [-1, -2, -3], 0.5, 1)).toEqual(plain);
+  });
+
+  it('lets a fine level stand in for a flat it already reaches', () => {
+    const tips = map((x, y) => plateau(x, y) + 0.5);
+    const levels = reliefRoughingLevels(tips, tips.depth, [-1, -2, -3], 0.5, 0.4);
+
+    expect(levels.map((level) => level.zMm)).toEqual(
+      [-0.4, -0.8, -1, -1.4, -1.8, -2, -2.4, -2.5].map((z) => expect.closeTo(z, 6)),
+    );
+  });
+
+  it('leaves no cell more than a fine step above its tip', () => {
+    fc.assert(
+      fc.property(
+        fc.array(
+          fc.record({
+            x: fc.integer({ min: 0, max: CELLS - 1 }),
+            y: fc.integer({ min: 0, max: CELLS - 1 }),
+            slope: fc.double({ min: 0.05, max: 1, noNaN: true }),
+          }),
+          { minLength: 1, maxLength: 3 },
+        ),
+        fc.double({ min: 0.5, max: 2, noNaN: true }),
+        fc.double({ min: 0.1, max: 1, noNaN: true }),
+        (cones, depthPerPassMm, fineStepMm) => {
+          const tips = map((x, y) =>
+            Math.max(-4, ...cones.map((c) => -c.slope * Math.hypot(x - c.x, y - c.y))),
+          );
+          const ladder: number[] = [];
+          for (let z = -depthPerPassMm; z > -4 - depthPerPassMm; z -= depthPerPassMm) {
+            ladder.push(z);
+          }
+          const levels = reliefRoughingLevels(tips, tips.depth, ladder, 0.5, fineStepMm);
+          for (const tip of tips.depth) {
+            if (!(tip < -1e-6)) continue;
+            // Cells no level holds stay at stock top.
+            const deepest = Math.min(
+              0,
+              ...levels.filter((level) => covers(level, tip)).map((level) => level.zMm),
+            );
+            // The last band above a ladder level may sit up to the minimum
+            // flat step (0.05 mm) more than a fine step above the level.
+            expect(deepest - tip).toBeLessThanOrEqual(fineStepMm + 0.05 + 1e-6);
+          }
+        },
+      ),
+      { numRuns: 40 },
+    );
+  });
+});
+
+// Whether a level's region holds a cell with this tip, as the roughing planner
+// selects it.
+function covers(level: ReliefRoughingLevel, tip: number): boolean {
+  if (tip > level.zMm + 1e-6) return false;
+  return level.bandFloorMm === null || tip > level.bandFloorMm + 1e-6;
+}

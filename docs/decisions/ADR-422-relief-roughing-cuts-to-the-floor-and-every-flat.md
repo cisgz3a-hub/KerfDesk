@@ -41,7 +41,8 @@ allowance, and the plateau top (tip -2.5, between -1.5 and -3) kept 1.5 mm.
 - The pyramid roughing snapshot gains the floor level: two small loops at the corners, where the
   pyramid reaches its full depth.
 - Terraces on slopes remain: a sloped surface has no flat to add a level at. Intermediate levels
-  or raster roughing (Fusion's fine stepdown, Vectric's 3D Raster) are the planned remedy.
+  or raster roughing (Fusion's fine stepdown, Vectric's 3D Raster) are the planned remedy;
+  Amendment 1 adds the intermediate levels as an opt-in slope step.
 - Tests: `relief-roughing-levels.test.ts` checks the floor level, a banded flat level, a flat
   within the minimum step, a pyramid (no flats), stock top, and the plateau and floor levels in
   the emitted passes.

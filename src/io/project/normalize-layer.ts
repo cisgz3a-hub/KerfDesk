@@ -135,6 +135,7 @@ function optionalCncLayerFields(raw: Record<string, unknown>): Record<string, un
       RELIEF_FINISH_STRATEGIES,
     ),
     ...enumPassthrough('reliefRasterAxis', raw['reliefRasterAxis'], RELIEF_RASTER_AXES),
+    ...positiveNumberPassthrough('reliefFineStepMm', raw['reliefFineStepMm']),
     ...(isPositiveNumber(raw['rampEntryDeg']) ? { rampEntryDeg: raw['rampEntryDeg'] } : {}),
     ...positiveNumberPassthrough('vCarveRampEntryDeg', raw['vCarveRampEntryDeg']),
     ...booleanPassthrough('vCarveFlatDepthEnabled', raw['vCarveFlatDepthEnabled']),

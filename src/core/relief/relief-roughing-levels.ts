@@ -12,6 +12,12 @@
 //   lying clearly between two levels, gets a level of its own. It clears only
 //   its band, the cells the next level down will not reach, so it adds one
 //   thin slice where the flat is instead of re-clearing everything deeper.
+//
+// Amendment 1 adds a third, opt-in: fine steps. A slope between two ladder
+// levels keeps a terrace up to one depth per pass tall. With a fine step set,
+// band levels every fine step below each ladder level clear only the slope
+// cells between them, so the terrace is at most one fine step tall and the
+// open floor is not cut again.
 
 import type { Heightmap } from './heightmap';
 
@@ -24,7 +30,8 @@ const LEVEL_EPS = 1e-6;
 export type ReliefRoughingLevel = {
   readonly zMm: number;
   // Only cells deeper than this (the next level down) are cleared at a flat
-  // level; null for a ladder level, which clears every cell it may reach.
+  // or fine level; null for a ladder level, which clears every cell it may
+  // reach.
   readonly bandFloorMm: number | null;
   // Where the stock under this level's region stands before the level cuts:
   // the ladder level above it.
@@ -36,17 +43,20 @@ export function reliefRoughingLevels(
   dilated: Float32Array,
   ladder: ReadonlyArray<number>,
   toolRadiusMm: number,
+  fineStepMm?: number,
 ): ReadonlyArray<ReliefRoughingLevel> {
   const floorMm = deepestTip(map, dilated);
   if (!(floorMm < -LEVEL_EPS)) return [];
   const planned = ladder.filter((z) => z > floorMm + LEVEL_EPS);
   if (ladder.some((z) => z <= floorMm + LEVEL_EPS)) planned.push(floorMm);
+  const fine = fineHeights(planned, fineStepMm);
   const flats = flatHeights(map, dilated, toolRadiusMm).filter((flat) =>
-    isBetweenLevels(flat, planned),
+    isBetweenLevels(flat, [...planned, ...fine]),
   );
   const all = [
-    ...planned.map((z) => ({ z, flat: false })),
-    ...flats.map((z) => ({ z, flat: true })),
+    ...planned.map((z) => ({ z, band: false })),
+    ...fine.map((z) => ({ z, band: true })),
+    ...flats.map((z) => ({ z, band: true })),
   ];
   all.sort((a, b) => b.z - a.z);
   const levels: ReliefRoughingLevel[] = [];
@@ -57,12 +67,27 @@ export function reliefRoughingLevels(
     const below = all[index + 1];
     levels.push({
       zMm: level.z,
-      bandFloorMm: level.flat ? (below?.z ?? floorMm) : null,
+      bandFloorMm: level.band ? (below?.z ?? floorMm) : null,
       sliceTopMm,
     });
-    if (!level.flat) sliceTopMm = level.z;
+    if (!level.band) sliceTopMm = level.z;
   }
   return levels;
+}
+
+// Amendment 1: a band level every fine step below stock top and below each
+// ladder level, down to clearly above the next ladder level.
+function fineHeights(planned: ReadonlyArray<number>, fineStepMm: number | undefined): number[] {
+  if (fineStepMm === undefined || !(fineStepMm > 0)) return [];
+  const heights: number[] = [];
+  let top = 0;
+  for (const bottom of [...planned].sort((a, b) => b - a)) {
+    for (let step = 1; top - step * fineStepMm > bottom + MIN_FLAT_STEP_MM; step += 1) {
+      heights.push(top - step * fineStepMm);
+    }
+    top = bottom;
+  }
+  return heights;
 }
 
 function deepestTip(map: Heightmap, dilated: Float32Array): number {
@@ -128,8 +153,8 @@ function isInteriorOfFlat(map: Heightmap, keys: Float64Array, index: number, key
   );
 }
 
-// A flat earns a level when the lowest ladder level that reaches it (the one
-// that would otherwise leave it stock) sits clearly above it.
+// A flat earns a level when the lowest level that reaches it (the one that
+// would otherwise leave it stock) sits clearly above it.
 function isBetweenLevels(flatMm: number, planned: ReadonlyArray<number>): boolean {
   let reaching = 0;
   for (const z of planned) {

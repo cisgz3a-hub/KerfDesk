@@ -10,7 +10,7 @@
 // nonuniform object scale.
 
 import { toMachineCoords, type DeviceProfile } from '../devices';
-import type { CncContourPass, CncGroup, CncPass } from '../job';
+import type { CncGroup, CncPass } from '../job';
 // Deep type import: core/job's barrel is a ratcheted over-cap legacy barrel
 // (scripts/index-export-baseline.json) and may only shrink.
 import type { CncReliefPlanningEvidence } from '../job/job';
@@ -19,6 +19,7 @@ import { DEFAULT_RELIEF_SCALLOP_MM } from '../relief';
 // (scripts/index-export-baseline.json) and may only shrink, so the ladder
 // variant cannot be added to it.
 import { reliefRoughingLadder, type ReliefRoughingLadder } from '../relief/relief-roughing';
+import { reliefRoughingMotion } from '../relief/relief-roughing-motion';
 import { reliefScallopBallRadiusMm } from '../relief/relief-finishing';
 import { reliefFinishingPlan, reliefFinishRowSpacingMm } from '../relief/relief-finishing-strategy';
 import type { Heightmap } from '../relief/heightmap';
@@ -44,9 +45,8 @@ import {
 import { kernelForTool } from '../sim';
 import { coolantFields } from './coolant-fields';
 import { cncGroupProvenance } from './cnc-group-provenance';
-import { contourPassFromPolyline } from './compile-cnc-helpers';
 import { zPassArrayMaterializationError } from './depth-passes';
-import { enforceCutDirection, parkFields } from './motion-polish';
+import { parkFields } from './motion-polish';
 import { reliefMachineSpaceGeometry, reliefMachineSpaceTransform } from './relief-machine-space';
 import { machineFrameHandedness } from './machine-frame-handedness';
 
@@ -108,7 +108,7 @@ export function compileReliefGroupsForLayer(
     };
   }
   const tool = layerCncTool(config, settings);
-  const passes: CncContourPass[] = [];
+  const passes: CncPass[] = [];
   const plans: CncReliefPlanningEvidence[] = [];
   let offsetFailed = false;
   let passLimited = false;
@@ -170,6 +170,12 @@ function reliefGroup(
     // Relief roughing/finishing follows the surface continuously; the emitter's
     // per-pass retract mode does not apply (ADR-253).
     retractBetweenPasses: false,
+    // Roughing ramps into each level from the one above (ADR-424); recorded
+    // as the group's entry. Its ramps carry no entryRamp marker: they start
+    // on stock the level above has cleared, not below an uncut top.
+    ...(cutType === 'relief-rough' && settings.rampEntryDeg !== undefined
+      ? { rampEntryDeg: settings.rampEntryDeg }
+      : {}),
     passes,
   };
 }
@@ -218,13 +224,14 @@ function reliefFinishingGroup(
       scallopMm,
     });
     const residual = machineSpace.residualTransform;
+    const wallOnRight = materialOnRightInMap(residual, device, settings);
     for (const pass of reliefFinishingPlan(heightmap.heightmap, {
       tool: finishTool,
       kernel: kernelForTool(finishTool, heightmap.heightmap.mmPerCell),
       scallopMm,
       strategy,
       rasterAxis: settings.reliefRasterAxis ?? 'x',
-      wallOnRight: waterlineWallOnRight(residual, device, settings),
+      wallOnRight,
     })) {
       if (pass.kind !== 'path3d') continue;
       const points = pass.points.map((p) => ({
@@ -251,11 +258,12 @@ function reliefFinishingGroup(
   };
 }
 
-// ADR-423: which side of travel the wall should be on, in heightmap numbers,
-// for the layer's cut direction. Climb keeps the material right of travel on
-// the physical bed (motion-polish.ts); the placement and the machine frame may
-// each mirror that.
-function waterlineWallOnRight(
+// ADR-423, ADR-424: which side of travel the material should be on, in
+// heightmap numbers, for the layer's cut direction: the wall a waterline pass
+// follows, or the stock a roughing ring cuts. Climb keeps the material right
+// of travel on the physical bed (motion-polish.ts); the placement and the
+// machine frame may each mirror that.
+function materialOnRightInMap(
   residualTransform: Transform,
   device: DeviceProfile,
   settings: CncLayerSettings,
@@ -349,6 +357,7 @@ function reliefLadderFor(
     ...(settings.finishAllowanceMm === undefined
       ? {}
       : { allowanceMm: settings.finishAllowanceMm }),
+    ...(settings.reliefFineStepMm === undefined ? {} : { fineStepMm: settings.reliefFineStepMm }),
   });
   return {
     kind: 'compiled',
@@ -402,7 +411,7 @@ export function reliefOffsetLadderFailed(
 }
 
 function appendReliefPasses(
-  passes: CncContourPass[],
+  passes: CncPass[],
   relief: ReliefObject,
   settings: CncLayerSettings,
   device: DeviceProfile,
@@ -419,26 +428,21 @@ function appendReliefPasses(
   const residualTransform = reliefMachineSpaceTransform(relief.transform).residualTransform;
   const result = reliefLadderFor(relief, settings, tool);
   if (result.kind === 'relief-materialization-failed') return result;
-  for (const pass of result.ladder.passes) {
-    if (pass.kind !== 'contour') continue;
-    const mapped = pass.polyline.map((p) =>
-      toMachineCoords(applyTransform(p, residualTransform), device),
-    );
-    const directed = enforceCutDirection(
-      [{ points: mapped, closed: pass.closed }],
-      settings.cutDirection ?? DEFAULT_CNC_LAYER_SETTINGS.cutDirection ?? 'climb',
-      'pocket',
-      machineFrameHandedness(device.origin),
-    )[0];
-    if (directed === undefined) continue;
-    // The ladder closes each ring on its first point, and direction
-    // enforcement then moves the start to the middle of the longest segment.
-    // That leaves the old closing point as a repeated vertex mid-ring and ends
-    // the ring at the corner before its new start, half that segment short
-    // (ADR-289 Amendment 1). Drop the repeat and close the ring at its new
-    // start, as pocket rings are closed.
-    const points = withoutRepeatedPoints(directed.points);
-    passes.push(contourPassFromPolyline({ ...directed, points }, pass.zMm));
+  const place = (p: Vec2): Vec2 => toMachineCoords(applyTransform(p, residualTransform), device);
+  // ADR-424: inside out, linked where the link stays in the proven region,
+  // every loop in the layer's cut direction and closed at its own start, and
+  // ramped in when the layer sets a ramp angle.
+  const motion = reliefRoughingMotion(result.ladder.levels, {
+    stockOnRight: materialOnRightInMap(residualTransform, device, settings),
+    cutWidthMm: result.ladder.cutWidthMm,
+    ...(settings.rampEntryDeg === undefined ? {} : { rampAngleDeg: settings.rampEntryDeg }),
+  });
+  for (const pass of motion) {
+    if (pass.kind === 'contour') {
+      passes.push({ ...pass, polyline: pass.polyline.map(place) });
+    } else if (pass.kind === 'path3d') {
+      passes.push({ ...pass, points: pass.points.map((p) => ({ ...place(p), z: p.z })) });
+    }
   }
   return {
     kind: 'compiled',
@@ -447,13 +451,6 @@ function appendReliefPasses(
     stepoverUsed: true,
     plan: result.plan,
   };
-}
-
-function withoutRepeatedPoints(points: ReadonlyArray<Vec2>): ReadonlyArray<Vec2> {
-  return points.filter((point, index) => {
-    const previous = points[index - 1];
-    return previous === undefined || previous.x !== point.x || previous.y !== point.y;
-  });
 }
 
 function cap(feedMmPerMin: number, maxFeed: number): number {

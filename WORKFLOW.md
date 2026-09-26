@@ -3851,9 +3851,24 @@ explicitly marked below; the remaining controls and user-facing flows are planne
    Ladder levels below the deepest tip become one level at it, so the floor
    keeps exactly the allowance, and a flat the ladder would overshoot by more
    than 0.05 mm gets a level of its own that clears only its band (ADR-422).
+   With a **Slope step** set, band levels that far apart between the
+   depth-per-pass levels cut only the slopes between them, so a slope keeps
+   terraces no taller than the step instead of a whole pass (ADR-422
+   Amendment 1). 0 or unset is off.
 2. Passes run depth-major (whole level before stepping down) as a
    clearing group — before any profile cuts. The preview's removal
    shading shows the terraced relief forming.
+   Within a level each connected piece is cut inside out, starting in its
+   middle and widening one stepover at a time, and of the pieces ready the
+   one nearest the bit comes next (ADR-424). Every ring keeps its stock on
+   the side the layer's cut direction asks for, round islands as well as
+   outlines. The bit stays down between rings when the straight move to the
+   next ring is no longer than one cut width and stays where the level may
+   cut, or, between a piece's outline and its islands, stays inside that
+   already cleared piece; otherwise it lifts. With a ramp angle set (the
+   layer's Ramp entry, or **Roughing ramp** where the cut type has none),
+   each run of linked rings descends along its first ring from the level
+   above instead of plunging; a ring shorter than one cut width plunges.
 3. Emitted G-code passes the plunged-travel invariant; scale is resolved
    before cutter geometry, then mirror/rotate/move placement is honored.
 

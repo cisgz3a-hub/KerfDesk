@@ -2,7 +2,8 @@ import { describe, expect, it } from 'vitest';
 import type { CncPass } from '../job';
 import type { CncTool } from '../scene';
 import type { Heightmap } from './heightmap';
-import { reliefRoughingPasses } from './relief-roughing';
+import { reliefRoughingLadder, reliefRoughingPasses } from './relief-roughing';
+import { reliefRoughingMotion } from './relief-roughing-motion';
 
 // Relief roughing keeps its stock allowance in 3D, on walls as well as floors
 // (ADR-412), and leaves no uncut core when the stepover is wider than the
@@ -38,12 +39,18 @@ function pitMap(sizeMm: number, pitMm: number, depthMm: number, wallSlope: numbe
 }
 
 type Point = { readonly x: number; readonly y: number };
+type Sample = Point & { readonly z: number };
 
-// Vertices plus segment midpoints and quarter points of every contour pass.
-function pathSamples(pass: CncPass): ReadonlyArray<Point> {
-  if (pass.kind !== 'contour') return [];
-  const out: Point[] = [];
-  const points = pass.polyline;
+// Vertices plus segment midpoints and quarter points of every contour pass,
+// or of a ramped path3d pass with its own heights.
+function pathSamples(pass: CncPass): ReadonlyArray<Sample> {
+  const points: ReadonlyArray<Sample> =
+    pass.kind === 'contour'
+      ? pass.polyline.map((point) => ({ ...point, z: pass.zMm }))
+      : pass.kind === 'path3d'
+        ? pass.points
+        : [];
+  const out: Sample[] = [];
   for (let index = 0; index < points.length; index += 1) {
     const a = points[index];
     const b = points[index + 1];
@@ -51,9 +58,39 @@ function pathSamples(pass: CncPass): ReadonlyArray<Point> {
     out.push(a);
     if (b === undefined) continue;
     for (const t of [0.25, 0.5, 0.75])
-      out.push({ x: a.x + t * (b.x - a.x), y: a.y + t * (b.y - a.y) });
+      out.push({ x: a.x + t * (b.x - a.x), y: a.y + t * (b.y - a.y), z: a.z + t * (b.z - a.z) });
   }
   return out;
+}
+
+// The lowest clearance of the flat tip above any model sample within the
+// cutter radius plus `allowanceMm` of its axis, over every sampled position.
+function worstClearanceMm(
+  map: Heightmap,
+  passes: ReadonlyArray<CncPass>,
+  allowanceMm: number,
+): number {
+  let worstMm = Number.POSITIVE_INFINITY;
+  const reach = RADIUS_MM + allowanceMm;
+  for (const pass of passes) {
+    for (const point of pathSamples(pass)) {
+      const minI = Math.max(0, Math.floor((point.x - reach) / MM_PER_CELL));
+      const maxI = Math.min(map.widthCells - 1, Math.ceil((point.x + reach) / MM_PER_CELL));
+      const minJ = Math.max(0, Math.floor((point.y - reach) / MM_PER_CELL));
+      const maxJ = Math.min(map.heightCells - 1, Math.ceil((point.y + reach) / MM_PER_CELL));
+      for (let j = minJ; j <= maxJ; j += 1) {
+        for (let i = minI; i <= maxI; i += 1) {
+          const distance = Math.hypot(
+            (i + 0.5) * MM_PER_CELL - point.x,
+            (j + 0.5) * MM_PER_CELL - point.y,
+          );
+          if (distance > reach) continue;
+          worstMm = Math.min(worstMm, point.z - (map.depth[j * map.widthCells + i] ?? 0));
+        }
+      }
+    }
+  }
+  return worstMm;
 }
 
 function distanceToSegment(p: Point, a: Point, b: Point): number {
@@ -82,28 +119,54 @@ describe('relief roughing — stock allowance in 3D', () => {
     // cutter axis must sit at least the allowance below the flat tip. Thin
     // levels put some ring right against the wall (a vertical-only allowance
     // measured 0.25 mm here, no allowance -0.55 mm).
-    let worstMm = Number.POSITIVE_INFINITY;
-    const reach = RADIUS_MM + allowanceMm;
-    for (const pass of passes) {
-      if (pass.kind !== 'contour') continue;
-      for (const point of pathSamples(pass)) {
-        const minI = Math.max(0, Math.floor((point.x - reach) / MM_PER_CELL));
-        const maxI = Math.min(map.widthCells - 1, Math.ceil((point.x + reach) / MM_PER_CELL));
-        const minJ = Math.max(0, Math.floor((point.y - reach) / MM_PER_CELL));
-        const maxJ = Math.min(map.heightCells - 1, Math.ceil((point.y + reach) / MM_PER_CELL));
-        for (let j = minJ; j <= maxJ; j += 1) {
-          for (let i = minI; i <= maxI; i += 1) {
-            const distance = Math.hypot(
-              (i + 0.5) * MM_PER_CELL - point.x,
-              (j + 0.5) * MM_PER_CELL - point.y,
-            );
-            if (distance > reach) continue;
-            worstMm = Math.min(worstMm, pass.zMm - (map.depth[j * map.widthCells + i] ?? 0));
-          }
-        }
-      }
-    }
+    const worstMm = worstClearanceMm(map, passes, allowanceMm);
     expect(worstMm).toBeGreaterThanOrEqual(allowanceMm - 1e-6);
+  });
+
+  it('keeps it through the links and ramps between rings (ADR-424)', () => {
+    const allowanceMm = 0.5;
+    const map = pitMap(24, 16, 6, Math.tan((70 * Math.PI) / 180));
+    const ladder = reliefRoughingLadder(map, {
+      tool: TOOL,
+      reliefDepthMm: 6,
+      depthPerPassMm: 0.3,
+      stepoverPercent: 40,
+      allowanceMm,
+    });
+    const passes = reliefRoughingMotion(ladder.levels, {
+      stockOnRight: true,
+      cutWidthMm: ladder.cutWidthMm,
+      rampAngleDeg: 3,
+    });
+
+    // Fewer passes than rings: the rest are joined at depth.
+    expect(passes.length).toBeLessThan(ladder.passes.length);
+    expect(passes.some((pass) => pass.kind === 'path3d')).toBe(true);
+    expect(worstClearanceMm(map, passes, allowanceMm)).toBeGreaterThanOrEqual(allowanceMm - 1e-6);
+  });
+
+  it('keeps it on the fine steps down a slope and their links (ADR-422 Amendment 1)', () => {
+    const allowanceMm = 0.5;
+    const map = pitMap(24, 16, 6, Math.tan((30 * Math.PI) / 180));
+    const options = {
+      tool: TOOL,
+      reliefDepthMm: 6,
+      depthPerPassMm: 1.5,
+      stepoverPercent: 40,
+      allowanceMm,
+    };
+    const ladder = reliefRoughingLadder(map, { ...options, fineStepMm: 0.3 });
+    const passes = reliefRoughingMotion(ladder.levels, {
+      stockOnRight: true,
+      cutWidthMm: ladder.cutWidthMm,
+      rampAngleDeg: 3,
+    });
+
+    // Bands between the ladder levels, more of them than the ladder has.
+    expect(ladder.levels.length).toBeGreaterThan(
+      2 * reliefRoughingLadder(map, options).levels.length,
+    );
+    expect(worstClearanceMm(map, passes, allowanceMm)).toBeGreaterThanOrEqual(allowanceMm - 1e-6);
   });
 });
 

@@ -114,6 +114,9 @@ export type CncLayerSettings = {
   readonly reliefFinishStrategy?: 'raster' | 'raster-waterline';
   // ADR-423 raster direction. Absent = 'x' (rows along X).
   readonly reliefRasterAxis?: 'x' | 'y';
+  // ADR-422 Amendment 1 fine step on slopes: relief roughing adds band levels
+  // this far apart between its depth-per-pass levels. Absent = off.
+  readonly reliefFineStepMm?: number;
   // Motion polish (H.9), both opt-in — absent keeps pre-H.9 output:
   // descend into cuts along the path at this angle instead of plunging.
   readonly rampEntryDeg?: number;

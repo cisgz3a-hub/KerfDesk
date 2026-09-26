@@ -28,6 +28,7 @@ describe('ReliefLayerRows', () => {
             reliefFinishToolId: 'missing-finisher',
           }}
           onCommit={onCommit}
+          onCommitSettings={vi.fn()}
         />,
       );
     });
@@ -109,14 +110,94 @@ describe('ReliefLayerRows', () => {
       pocket.host.remove();
     }
   });
+
+  it('offers a roughing ramp only where the cut type has no ramp row (ADR-424)', async () => {
+    const onCommitSettings = vi.fn();
+    const drill = await renderRows(
+      { ...DEFAULT_CNC_LAYER_SETTINGS, cutType: 'drill', rampEntryDeg: 3 },
+      vi.fn(),
+      onCommitSettings,
+    );
+    try {
+      const ramp = drill.host.querySelector('input[aria-label="Roughing ramp for #ff0000"]');
+      if (!(ramp instanceof HTMLInputElement)) throw new Error('ramp input missing');
+      expect(ramp.value).toBe('3');
+      await act(async () => {
+        const setter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')?.set;
+        setter?.call(ramp, '0');
+        ramp.dispatchEvent(new Event('input', { bubbles: true }));
+        ramp.dispatchEvent(new FocusEvent('focusout', { bubbles: true }));
+      });
+      // 0 plunges, so the angle is removed rather than stored as 0.
+      const committed = onCommitSettings.mock.calls.at(-1)?.[0] as CncLayerSettings | undefined;
+      expect(committed?.cutType).toBe('drill');
+      expect(committed !== undefined && 'rampEntryDeg' in committed).toBe(false);
+    } finally {
+      await act(async () => drill.root.unmount());
+      drill.host.remove();
+    }
+    const engrave = await renderRows(
+      { ...DEFAULT_CNC_LAYER_SETTINGS, cutType: 'engrave' },
+      vi.fn(),
+    );
+    try {
+      expect(
+        engrave.host.querySelector('input[aria-label="Roughing ramp for #ff0000"]'),
+      ).toBeNull();
+    } finally {
+      await act(async () => engrave.root.unmount());
+      engrave.host.remove();
+    }
+  });
+
+  it('stores a slope step and removes it at 0 (ADR-422 Amendment 1)', async () => {
+    const onCommitSettings = vi.fn();
+    const rows = await renderRows(
+      { ...DEFAULT_CNC_LAYER_SETTINGS, cutType: 'pocket', reliefFineStepMm: 0.3 },
+      vi.fn(),
+      onCommitSettings,
+    );
+    try {
+      const field = rows.host.querySelector('input[aria-label="Slope step for #ff0000"]');
+      if (!(field instanceof HTMLInputElement)) throw new Error('slope step input missing');
+      expect(field.value).toBe('0.3');
+      const enter = async (value: string) =>
+        act(async () => {
+          const setter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')?.set;
+          setter?.call(field, value);
+          field.dispatchEvent(new Event('input', { bubbles: true }));
+          field.dispatchEvent(new FocusEvent('focusout', { bubbles: true }));
+        });
+      await enter('0.25');
+      expect(onCommitSettings.mock.calls.at(-1)?.[0]).toMatchObject({ reliefFineStepMm: 0.25 });
+      await enter('0');
+      const committed = onCommitSettings.mock.calls.at(-1)?.[0] as CncLayerSettings | undefined;
+      expect(committed?.cutType).toBe('pocket');
+      expect(committed !== undefined && 'reliefFineStepMm' in committed).toBe(false);
+    } finally {
+      await act(async () => rows.root.unmount());
+      rows.host.remove();
+    }
+  });
 });
 
-async function renderRows(settings: CncLayerSettings, onCommit: (patch: object) => void) {
+async function renderRows(
+  settings: CncLayerSettings,
+  onCommit: (patch: object) => void,
+  onCommitSettings: (settings: CncLayerSettings) => void = vi.fn(),
+) {
   const host = document.createElement('div');
   document.body.appendChild(host);
   const root = createRoot(host);
   await act(async () => {
-    root.render(<ReliefLayerRows layer={LAYER} settings={settings} onCommit={onCommit} />);
+    root.render(
+      <ReliefLayerRows
+        layer={LAYER}
+        settings={settings}
+        onCommit={onCommit}
+        onCommitSettings={onCommitSettings}
+      />,
+    );
   });
   return { host, root };
 }

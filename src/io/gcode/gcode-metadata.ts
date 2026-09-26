@@ -70,9 +70,11 @@ export type GcodeMetadata = {
  * 3D carving batches: ADR-412's exact relief contact and 3D roughing
  * allowance, ADR-413's per-slice cutter reach, ADR-414's STL orientation,
  * ADR-421's stay-down finishing at the exact row spacing, ADR-422's floor and
- * flat roughing levels, and ADR-423's waterline finishing and raster along Y.
+ * flat roughing levels, and ADR-423's waterline finishing and raster along Y,
+ * and ADR-424's relief roughing cut inside out with links at depth, climb round
+ * islands and ramped entries, and ADR-422 amendment 1's slope steps.
  */
-export const EMITTER_REVISION = 'relief-exact-contact-and-waterline-20260926-v1';
+export const EMITTER_REVISION = 'relief-linked-roughing-20260926-v1';
 
 // Machine-specific assumption lines (ADR-103 defect fix): router exports
 // previously carried the laser-worded `$32=1 (laser mode)` banner. The S

@@ -23,6 +23,7 @@ export function ReliefLayerRows(props: {
   readonly layer: Layer;
   readonly settings: CncLayerSettings;
   readonly onCommit: (patch: Partial<CncLayerSettings>) => void;
+  readonly onCommitSettings: (settings: CncLayerSettings) => void;
 }): JSX.Element {
   return (
     <>
@@ -32,7 +33,12 @@ export function ReliefLayerRows(props: {
         shapes only.
       </div>
       <ReliefScallopRow layer={props.layer} settings={props.settings} onCommit={props.onCommit} />
-      <ReliefStrategyRows layer={props.layer} settings={props.settings} onCommit={props.onCommit} />
+      <ReliefStrategyRows
+        layer={props.layer}
+        settings={props.settings}
+        onCommit={props.onCommit}
+        onCommitSettings={props.onCommitSettings}
+      />
     </>
   );
 }

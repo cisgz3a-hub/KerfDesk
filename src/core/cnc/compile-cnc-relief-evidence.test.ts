@@ -22,23 +22,37 @@ vi.mock('../relief/relief-roughing', async (importOriginal) => ({
 const { compileCncJob, finalizeCncCompilationArtifact, prepareBoundCncCompilation } =
   await import('./compile-cnc-job');
 
-const RELIEF_PASS: CncPass = {
-  kind: 'contour',
-  zMm: -1,
-  closed: true,
-  polyline: [
-    { x: 0, y: 0 },
-    { x: 10, y: 0 },
-    { x: 10, y: 10 },
-    { x: 0, y: 10 },
-    { x: 0, y: 0 },
-  ],
-};
+const SQUARE = [
+  { x: 0, y: 0 },
+  { x: 10, y: 0 },
+  { x: 10, y: 10 },
+  { x: 0, y: 10 },
+  { x: 0, y: 0 },
+];
+
+const RELIEF_PASS: CncPass = { kind: 'contour', zMm: -1, closed: true, polyline: SQUARE };
+
+// The same square as the ladder's per-level paths, which the compiler orders
+// and links (ADR-424).
+const RELIEF_SQUARE = { closed: true, points: SQUARE };
+const RELIEF_LEVELS = [
+  {
+    zMm: -1,
+    sliceTopMm: 0,
+    region: [RELIEF_SQUARE],
+    linkRegion: [RELIEF_SQUARE],
+    rings: [[RELIEF_SQUARE]],
+    cleanup: [],
+    cleanupStockInside: [],
+  },
+];
 
 beforeEach(() => {
   roughingLadder.mockReset();
   roughingLadder.mockReturnValue({
     passes: [RELIEF_PASS],
+    levels: RELIEF_LEVELS,
+    cutWidthMm: 3.175,
     offsetFailed: false,
     passLimited: false,
   });
@@ -55,6 +69,8 @@ describe('compiled relief roughing evidence', () => {
   it('uses the exact compiling ladder and keeps sidecar evidence out of G-code bytes', () => {
     roughingLadder.mockReturnValue({
       passes: [RELIEF_PASS],
+      levels: RELIEF_LEVELS,
+      cutWidthMm: 3.175,
       offsetFailed: true,
       passLimited: true,
     });
