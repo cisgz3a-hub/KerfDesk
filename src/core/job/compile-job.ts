@@ -45,6 +45,7 @@ import { hasExecutableFillSweep } from './fill-group-emission';
 import { buildFillGroup } from './fill-group-build';
 import { collectFillSegmentsForLayer, islandFillGroupsForLayer } from './layer-fill';
 import type { CutSegment, Group, Job, JobDiagnostic } from './job';
+import { lineOvercutFields, perforateLineSegments } from './line-cut-extras';
 import { offsetFillDiagnostics } from './offset-fill-diagnostics';
 import { commonVectorGroupFields } from './vector-group-fields';
 import { resolveFillScanDirection } from './scan-direction-policy';
@@ -250,6 +251,7 @@ function vectorGroupsForLayer(
         ...common,
         kind: 'cut' as const,
         ...(entryRunwayMm === undefined ? {} : { entryRunwayMm }),
+        ...lineOvercutFields(layer, line.segments),
         segments: line.segments,
       },
     ],
@@ -317,14 +319,13 @@ function collectLineSegmentsForLayer(
   for (const obj of objects) {
     if (appendSegmentsFromObject(obj, layer, device, out)) kerfOffsetFailed = true;
   }
-  if (!layer.tabsEnabled) return { segments: out, kerfOffsetFailed };
-  return {
-    segments: applyAutomaticTabsToPolylines(
-      out.map((segment) => ({ points: segment.polyline, closed: segment.closed })),
-      layer,
-    ).map((polyline) => ({ polyline: polyline.points, closed: polyline.closed })),
-    kerfOffsetFailed,
-  };
+  const tabbed = layer.tabsEnabled
+    ? applyAutomaticTabsToPolylines(
+        out.map((segment) => ({ points: segment.polyline, closed: segment.closed })),
+        layer,
+      ).map((polyline) => ({ polyline: polyline.points, closed: polyline.closed }))
+    : out;
+  return { segments: perforateLineSegments(tabbed, layer), kerfOffsetFailed };
 }
 
 // Returns true when the kerf offset failed for this object, so the caller can

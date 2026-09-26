@@ -8,7 +8,12 @@ import { CHIPLOAD_MATERIALS, isProfileCutType, zPassDepths } from '../../../core
 // (scripts/index-export-baseline.json) and may only shrink.
 import { cutCanFreePart } from '../../../core/cnc/cnc-tabs';
 import { findCncMachineStarterById } from '../../../core/cnc/machine-starters';
-import { MAX_FILL_OVERSCAN_MM } from '../../../core/job/compile-job-defaults';
+import {
+  imageOverscanMmFor,
+  overcutMmFor,
+  perforationPatternFor,
+} from '../../../core/job/operation-cut-extras';
+import { DEFAULT_OVERSCAN_MM, MAX_FILL_OVERSCAN_MM } from '../../../core/job/compile-job-defaults';
 import {
   DEFAULT_CNC_STOCK,
   type CncLayerSettings,
@@ -44,6 +49,7 @@ function lineDetail(settings: LayerOperationSettings): string {
     `Kerf ${formatMm(settings.kerfOffsetMm)} mm`,
     `stored contour entry target ${formatMm(settings.fillOverscanMm)} mm`,
     laserTabsPart(settings),
+    ...lineCutExtrasParts(settings),
     ...(settings.passThrough ? ['pass-through'] : []),
     `min power ${settings.minPower}%`,
     ...powerModePart(settings),
@@ -78,8 +84,25 @@ function imageDetail(settings: LayerOperationSettings): string {
     ...(settings.dotWidthCorrectionMm !== 0
       ? [`dot width ${formatMm(settings.dotWidthCorrectionMm)} mm`]
       : []),
+    ...(imageOverscanMmFor(settings) !== DEFAULT_OVERSCAN_MM
+      ? [`overscan ${formatMm(imageOverscanMmFor(settings))} mm`]
+      : []),
     ...localScanOffsetPart(settings),
   ].join(SEPARATOR);
+}
+
+// ADR-415: shown only when set, so operations that never used them read as before.
+function lineCutExtrasParts(settings: LayerOperationSettings): ReadonlyArray<string> {
+  const perforation = perforationPatternFor(settings);
+  const overcutMm = overcutMmFor(settings);
+  return [
+    ...(perforation === null
+      ? []
+      : [
+          `perforated ${formatMm(perforation.cutMm)} mm cut / ${formatMm(perforation.skipMm)} mm skip`,
+        ]),
+    ...(overcutMm > 0 ? [`overcut ${formatMm(overcutMm)} mm on final pass`] : []),
+  ];
 }
 
 function localScanOffsetPart(settings: LayerOperationSettings): ReadonlyArray<string> {

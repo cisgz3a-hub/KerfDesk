@@ -15,7 +15,7 @@ import { OriginTransactionCancelledError } from '../state/laser-origin-transacti
 import { sleepUnavailableReason } from '../state/controller-sleep';
 
 // ADR-053 P4 — releasing motors ($SLP) is hard to undo cleanly (waking needs a
-// soft-reset that clears G92), so confirm and spell out the correct order:
+// soft-reset, which clears G92 on stock GRBL and FluidNC), so confirm and spell out the correct order:
 // release -> hand-move -> Wake (Ctrl-X) -> Set origin LAST.
 const SET_PERSISTENT_ORIGIN_CONFIRM =
   'Set persistent G54 origin?\n\n' +

@@ -8,6 +8,7 @@ import {
 import type { CncPass } from '../job';
 import { passNeedsTabs, settingsWithStockTabGate, tabTopZMm } from './cnc-tabs';
 import { tabRampedPoints } from './cnc-tab-ramp';
+import { cncLayoutCutWidths } from './layout-cut-widths';
 import {
   contourPassFromPolyline,
   isProfileCutType,
@@ -91,13 +92,15 @@ export function passesForCncLayerWithEvidence(
     return { ...raw, passes: [] };
   }
 
+  // The finishing wall and the tab windows ride the same offset as the
+  // toolpaths above: the cut width at the full depth (ADR-368 Amendment 2).
   const passes = passesForDepths(
     polylines,
     contours,
     toolpaths,
     depths,
     settings,
-    tool.diameterMm,
+    cncLayoutCutWidths(tool, settings.depthMm, settings.depthPerPassMm).wallDiameterMm,
     allowanceMm,
     handedness,
     sourceContours,
@@ -157,7 +160,7 @@ function rawToolpathsForLayer(
       stepoverUsed: restOperation.stepoverUsed,
     };
   }
-  return xyToolpathsForCutTypeWithEvidence(contours, settings, tool.diameterMm, allowanceMm);
+  return xyToolpathsForCutTypeWithEvidence(contours, settings, tool, allowanceMm);
 }
 
 type CncLayerToolpathsResult = {
@@ -183,7 +186,7 @@ function passesForDepths(
   toolpaths: ReadonlyArray<Polyline>,
   depths: ReadonlyArray<number>,
   settings: CncLayerSettings,
-  toolDiameterMm: number,
+  wallDiameterMm: number,
   allowanceMm: number,
   handedness: FrameHandedness,
   sourceContours: ReadonlyArray<CollectedCncContour>,
@@ -201,17 +204,17 @@ function passesForDepths(
     return profilePassesWithFinishAllowance(
       contours,
       settings,
-      toolDiameterMm,
+      wallDiameterMm,
       toolpaths,
       handedness,
       sourceContours,
-      (part) => contourMajorPasses(part, depths, settings, toolDiameterMm, manualTabCenters),
+      (part) => contourMajorPasses(part, depths, settings, wallDiameterMm, manualTabCenters),
     );
   }
   if (settings.cutType === 'pocket') {
     return sourceRegionMajorDepthPasses(sourcePolylines, toolpaths, depths);
   }
-  return contourMajorPasses(toolpaths, depths, settings, toolDiameterMm, manualTabCenters);
+  return contourMajorPasses(toolpaths, depths, settings, wallDiameterMm, manualTabCenters);
 }
 
 // ADR-218: select the surviving edge of a traced double-line ring before
@@ -235,36 +238,37 @@ export function lineArtContoursForLayer(
 export function xyToolpathsForCutType(
   polylines: ReadonlyArray<Polyline>,
   settings: CncLayerSettings,
-  toolDiameterMm: number,
+  tool: CncTool,
   allowanceMm: number,
 ): ReadonlyArray<Polyline> {
-  return xyToolpathsForCutTypeWithEvidence(polylines, settings, toolDiameterMm, allowanceMm)
-    .toolpaths;
+  return xyToolpathsForCutTypeWithEvidence(polylines, settings, tool, allowanceMm).toolpaths;
 }
 
+// Side-offset profiles offset by the cut width at the full depth, which is the
+// stored diameter for every bit except a tapered ball nose (ADR-368
+// Amendment 2); pockets derive their own widths from the same settings.
 export function xyToolpathsForCutTypeWithEvidence(
   polylines: ReadonlyArray<Polyline>,
   settings: CncLayerSettings,
-  toolDiameterMm: number,
+  tool: CncTool,
   allowanceMm: number,
 ): CncLayerToolpathsResult {
+  const wallMm = cncLayoutCutWidths(tool, settings.depthMm, settings.depthPerPassMm).wallDiameterMm;
   switch (settings.cutType) {
     case 'profile-outside':
       return completeToolpaths(
-        orderInnerFirst(
-          profileToolpathPolylines(polylines, 'outside', toolDiameterMm, allowanceMm),
-        ),
+        orderInnerFirst(profileToolpathPolylines(polylines, 'outside', wallMm, allowanceMm)),
       );
     case 'profile-inside':
       return completeToolpaths(
-        orderInnerFirst(profileToolpathPolylines(polylines, 'inside', toolDiameterMm, allowanceMm)),
+        orderInnerFirst(profileToolpathPolylines(polylines, 'inside', wallMm, allowanceMm)),
       );
     case 'profile-on-path':
       return completeToolpaths(
-        orderInnerFirst(profileToolpathPolylines(polylines, 'on-path', toolDiameterMm)),
+        orderInnerFirst(profileToolpathPolylines(polylines, 'on-path', tool.diameterMm)),
       );
     case 'pocket':
-      return pocketToolpathsForSettingsWithEvidence(polylines, settings, toolDiameterMm);
+      return pocketToolpathsForSettingsWithEvidence(polylines, settings, tool);
     case 'engrave':
       return completeToolpaths(
         polylines.filter((polyline) => polyline.points.length >= 2 && hasFinitePoints(polyline)),

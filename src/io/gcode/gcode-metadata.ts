@@ -60,9 +60,14 @@ export type GcodeMetadata = {
  * air changes after a group's first laser-off seek, a 1 mm dark step where a
  * group starts on the last burn, no zero-length M3 raster row close), and
  * Marlin G0 travel carrying its own feed, and ADR-258 amendment 3's holding
- * tabs measured from the stock bottom when the stock thickness is set.
+ * tabs measured from the stock bottom when the stock thickness is set, and
+ * ADR-368 amendment 2's tapered ball-nose pocket and profile offsets, tab
+ * windows, and pocket and relief-roughing stepover sized by the cut width at
+ * depth, and ADR-159 amendment 2's SVG arcs imported as cubics that meet the
+ * arc at each segment midpoint instead of sitting up to 0.196% of the radius
+ * inside it.
  */
-export const EMITTER_REVISION = 'tabs-from-stock-bottom-20260926-v1';
+export const EMITTER_REVISION = 'svg-arcs-on-the-arc-20260926-v1';
 
 // Machine-specific assumption lines (ADR-103 defect fix): router exports
 // previously carried the laser-worded `$32=1 (laser mode)` banner. The S

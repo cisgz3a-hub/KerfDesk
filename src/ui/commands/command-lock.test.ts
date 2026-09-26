@@ -143,6 +143,15 @@ function baseCtx(overrides: Partial<AppCommandContext> = {}): AppCommandContext 
     showAbout: vi.fn(),
     showConnectionHelp: vi.fn(),
     showSafety: vi.fn(),
+    pasteInPlace: vi.fn(),
+    invertSelection: vi.fn(),
+    selectOpenShapes: vi.fn(),
+    canOffsetShapes: false,
+    offsetShapes: vi.fn(),
+    rotateSelectionQuarterTurn: vi.fn(),
+    moveSelectionToBed: vi.fn(),
+    wireframeActive: false,
+    toggleWireframe: vi.fn(),
     ...overrides,
   };
 }

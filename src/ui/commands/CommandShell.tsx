@@ -38,6 +38,7 @@ import { ScanOffsetCommandDialog } from './ScanOffsetCommandDialog';
 import { IntervalDialog, MaterialDialog } from './CalibrationGridDialogs';
 import { GcodeSaveDialog } from '../app/GcodeSaveDialog';
 import { VectorRepairDialogHost } from './VectorRepairDialogHost';
+import { OffsetShapesDialogHost } from './OffsetShapesDialogHost';
 
 type SettingsDialogKind =
   | 'optimization'
@@ -45,6 +46,7 @@ type SettingsDialogKind =
   | 'nest'
   | 'union'
   | 'join'
+  | 'offset'
   | 'print-cut'
   | 'labs'
   | 'rotary'
@@ -85,6 +87,7 @@ export function CommandShell(): JSX.Element {
     requestQuickNest: () => setSettingsDialog('nest'),
     requestUnionSilhouette: () => setSettingsDialog('union'),
     requestJoinPaths: () => setSettingsDialog('join'),
+    requestOffsetShapes: () => setSettingsDialog('offset'),
     requestPrintAndCut: () => setSettingsDialog('print-cut'),
     requestRotarySetup: () => setSettingsDialog('rotary'),
     requestLabsSettings: () => setSettingsDialog('labs'),
@@ -158,6 +161,7 @@ function SettingsDialogHost(props: {
   if (props.current === 'nest') return <QuickNestDialogHost onClose={props.onClose} />;
   if (props.current === 'union' || props.current === 'join')
     return <VectorRepairDialogHost kind={props.current} onClose={props.onClose} />;
+  if (props.current === 'offset') return <OffsetShapesDialogHost onClose={props.onClose} />;
   if (props.current === 'print-cut') return <PrintAndCutDialogHost onClose={props.onClose} />;
   if (props.current === 'labs') return <LabsSettingsDialog onClose={props.onClose} />;
   if (props.current === 'rotary') return <RotarySetupHost onClose={props.onClose} />;

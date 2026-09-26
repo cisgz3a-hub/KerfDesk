@@ -13,7 +13,11 @@ import { currentJobStopRequest } from '../state/job-stop-request';
 import { settledCleanly } from '../state/post-job-clean-settle';
 import { useToastStore } from '../state/toast-store';
 import { useLaserSecondPassUiStore } from '../state/laser-second-pass-ui-store';
-import { checkpointInterruption, currentRunPlannerBacklog } from './checkpoint-interruption';
+import {
+  checkpointInterruption,
+  currentRunPlannerBacklog,
+  runStopMayHaveLostPosition,
+} from './checkpoint-interruption';
 import {
   checkpointArchiveHandoffIsCurrent,
   pendingCheckpointArchiveHandoff,
@@ -164,6 +168,7 @@ class JobCheckpointTracker {
       state.safetyNotice,
       currentJobStopRequest(state),
       currentRunPlannerBacklog(state),
+      runStopMayHaveLostPosition(state),
     );
     this.previous = { runId, status: streamer.status, completed: streamer.completed };
 
@@ -444,6 +449,7 @@ function disappearedStreamInterruption(
       state.safetyNotice,
       currentJobStopRequest(state),
       currentRunPlannerBacklog(state),
+      runStopMayHaveLostPosition(state),
     ) ?? {
       kind: state.connection.kind === 'connected' ? 'unknown' : 'disconnect',
       message:

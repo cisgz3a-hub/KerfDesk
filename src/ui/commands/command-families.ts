@@ -5,6 +5,7 @@ import { cameraCommand } from './camera-command-family';
 import { placeBoardCommand } from './board-capture-command-family';
 import { adjustImageCommand, processedRasterToolCommands } from './command-raster-family';
 import { vectorBooleanCommands } from './vector-boolean-commands';
+import { offsetShapesCommand, wireframeCommand } from './editing-tools-commands';
 import { windowPanelCommands } from './window-panel-commands';
 import { rotarySetupCommand } from './rotary-command-family';
 import { labsCommand } from './labs-command-family';
@@ -56,6 +57,7 @@ export function toolsCommands(ctx: AppCommandContext): ReadonlyArray<AppCommand>
     convertToPathCommand(ctx),
     weldCommand(ctx),
     ...vectorBooleanCommands(ctx),
+    offsetShapesCommand(ctx),
     ctx.hasFillableSelection
       ? enabled(
           'tools.fill-selection',
@@ -324,6 +326,7 @@ export function windowCommands(ctx: AppCommandContext): ReadonlyArray<AppCommand
   };
   return [
     previewCommand,
+    wireframeCommand(ctx),
     ...windowPanelCommands(ctx),
     enabled(
       'window.fit-view',

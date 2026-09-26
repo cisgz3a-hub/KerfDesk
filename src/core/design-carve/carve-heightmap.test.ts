@@ -23,6 +23,15 @@ const FLAT_ENGRAVER: CncTool = {
   tipAngleDeg: 90,
   tipDiameterMm: 0.4,
 };
+// Amana 46282: 6.25 mm across the top of the flutes, 1/16" ball, 5.4 deg per side.
+const TAPERED_BALL: CncTool = {
+  id: 'tbn',
+  name: 'Tapered ball nose',
+  kind: 'tapered-ball-nose',
+  diameterMm: 6.25,
+  tipAngleDeg: 10.8,
+  tipDiameterMm: 1.5875,
+};
 
 const CELL_MM = 0.5;
 
@@ -153,6 +162,19 @@ describe('designCarveHeightmap', () => {
     );
     expect(depthAtMm(map, 10, 5)).toBeCloseTo(-6, 5); // slot on the path
     expect(depthAtMm(map, 10, 10)).toBe(0); // interior untouched
+  });
+
+  it('slots a tapered ball-nose profile on the compiler offset, at its cut width', () => {
+    // ADR-368 Amendment 2: 3 mm deep, the bit cuts 2.01 mm wide at the stock
+    // surface, so the compiler offsets by 1.01 mm rather than half the 6.25 mm top.
+    const outside = layer({ id: 'L', cutType: 'profile-outside', depthMm: 3, toolId: 'tbn' });
+    const map = designCarveHeightmap({
+      ...input({ entities: [rect('r', 'L', 5, 5, 10)], layers: [outside] }),
+      tools: [END_MILL, TAPERED_BALL],
+    });
+    expect(depthAtMm(map, 4.5, 10)).toBeCloseTo(-3, 5); // inside the slot
+    expect(depthAtMm(map, 5.5, 10)).toBe(0); // the part keeps its drawn size
+    expect(depthAtMm(map, 2.5, 10)).toBe(0); // past the cut width; the top diameter reached it
   });
 
   it('drills a bit-diameter hole at a circle centre and ignores other shapes', () => {

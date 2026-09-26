@@ -5,8 +5,11 @@
 // decide whether the Reset button is enabled.
 //
 // Design (per ADR-021):
-//   - G92 is the default. Transient, session-scoped. GRBL auto-clears on alarm /
-//     soft-reset / power-cycle. Matches LightBurn / LaserGRBL UX.
+//   - G92 is the default. Matches LightBurn / LaserGRBL UX. Stock GRBL and
+//     FluidNC clear it on every soft reset and power cycle; grblHAL at its
+//     default COMPATIBILITY_LEVEL keeps it through both ($384 off: gcode.c:787,
+//     :833-838). KerfDesk forgets the origin at a reset either way and
+//     re-learns it from the next report's WCO (laser-status-position.ts).
 //   - Advanced persistent origin uses G10 L20/L2 P1 against G54 and requires
 //     Idle before writing controller coordinate storage.
 //   - GRBL-family actions select G54 in the same parsed block as G92; firmware
@@ -108,9 +111,9 @@ export async function clearPersistentOrigin(
 /**
  * Send `$SLP` to put GRBL to sleep, de-energizing the steppers so the operator
  * can push the gantry by hand (ADR-053 P4). The controller then ignores commands
- * until a soft-reset, which clears the G92 origin — so the store action that
- * wraps this also drops the cached origin and any Verified Frame, and the
- * operator must Set origin again after waking.
+ * until a soft-reset, which clears the G92 origin on stock GRBL and FluidNC (not
+ * on grblHAL) — so the store action that wraps this also drops the cached
+ * origin and any Verified Frame until the next report shows the offset again.
  */
 export async function releaseMotors(safeWrite: (line: string) => Promise<void>): Promise<void> {
   await safeWrite(`${CMD_SLEEP}\n`);

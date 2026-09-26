@@ -189,6 +189,14 @@ opportunity, without an extra branding delay. It introduces no startup interacti
 6. Image clips follow the same rules: a missing `clipPathUnits` is `userSpaceOnUse` and a missing
    `clip-rule` is `nonzero`. KerfDesk's own exported image clips keep their curves.
 
+#### Edge — SVG path arcs
+1. A path's `A` arcs import as cubic curves of at most a quarter turn each. Each curve's midpoint
+   lies on the arc, and nowhere does a curve stray more than 0.027% of the arc's larger radius,
+   always outward: 0.027 mm on a 100 mm radius (ADR-159 Amendment 2). `<circle>`, `<ellipse>` and
+   rounded `<rect>` elements import as outlines sampled on the true curve.
+2. Artwork imported before that amendment keeps its arcs, up to 0.196% of the radius inside the arc
+   (0.2 mm on a 100 mm radius), until **Re-import source** replaces them.
+
 #### Error — file is not an SVG
 1. On drop, file type is checked by MIME and by content sniff (first 200 bytes).
 2. If not SVG: toast (error variant, red): `Not a valid SVG: <filename>`. No state change.
@@ -304,6 +312,17 @@ destination and cannot overwrite the template source.
 #### All — Cmd/Ctrl+A
 1. Selects every object in the scene.
 
+#### Invert — Cmd/Ctrl+Shift+I (ADR-410)
+1. **Edit → Invert Selection** selects every unlocked object on a visible operation that is not
+   selected now, and deselects the rest. Groups stay whole.
+2. With nothing selected it selects everything Select All would.
+
+#### Open shapes — Edit → Select Open Shapes (ADR-410)
+1. Selects every unlocked object on a visible operation, on any operation mode, that has a path of
+   two or more points whose ends do not meet.
+2. A notice reports how many objects and open paths were found and points to **Tools → Join
+   paths...**. When nothing is open, the notice says so and the selection is kept.
+
 #### Deselect — Escape or click in empty space
 1. Selection cleared. Status bar updates: `Nothing selected`.
 2. A stationary right click in empty space also clears selection, then opens the empty-workspace
@@ -391,6 +410,20 @@ destination and cannot overwrite the template source.
 - `Arrange → Flip Vertical` (`V`)
 - Operates around selection's center.
 
+#### Rotate 90° — menu / shortcut (ADR-410)
+- `Arrange → Rotate 90° Clockwise` (`.`) and `Arrange → Rotate 90° Counter-clockwise` (`,`).
+- The selection turns as one body about the centre of its combined bounds; four turns return it
+  exactly to where it started. One undo step. Locked or hidden artwork does not move.
+- `Cmd/Ctrl+.` stays Abort; the rotate keys ignore any chord with Cmd or Ctrl.
+
+#### Move to bed — menu (ADR-410)
+- `Arrange → Move to bed` → **Bed Center**, **Top Left**, **Top**, **Top Right**, **Left**,
+  **Right**, **Bottom Left**, **Bottom**, **Bottom Right**.
+- The matching point of the selection's bounds lands on the same point of the bed. The edge entries
+  put the selection against that edge, centred along it. One undo step; the layout inside the
+  selection is kept.
+- No shortcut: LightBurn's `P` is KerfDesk's Preview.
+
 #### Edge — transform pushes object out of bed
 - Permitted (user may be temporarily repositioning).
 - Out-of-bounds geometry gains the red dashed overlay (F-A3 edge).
@@ -436,6 +469,32 @@ destination and cannot overwrite the template source.
    tab indices are retained. The node toolbar's two-anchor Join keeps its existing workflow.
 4. Both tools support laser and CNC artwork, commit one undo transaction, and leave the project
    unchanged on invalid or empty results. They do not operate a machine.
+
+### F-A6c. Offset Shapes (ADR-410)
+
+1. Select vector artwork and choose **Tools → Offset Shapes...**. Locked artwork is left out.
+2. Set **Offset distance (mm)**, then **Direction** (**Outward**, **Inward**, **Both**) and
+   **Corner style** (**Round**, **Bevel**, **Corner**). **Outer shapes only** ignores holes and
+   shapes inside other shapes. **Delete original objects** removes the selection once the offset
+   is added.
+3. The dialog draws the selection in grey, the outward result in the accent colour and the inward
+   result in green, and lists each result's size. The selection is offset as one design.
+4. Open lines offset outward into a closed outline around the line, with caps that follow the
+   corner style. **Inward** needs a closed shape; with only open lines the dialog says so and
+   **Offset** is unavailable. A collapsed inward offset is explained the same way.
+5. **Offset** adds one new object per direction, each on its own operation copied from the first
+   selected object, selects them and closes the dialog. Everything, including Delete original
+   objects, is one undo step. Under **Both**, if only the inward half collapses, the outward half
+   is added with a notice.
+6. The dialog reopens with the settings last applied in this session. **Cancel** or Escape changes
+   nothing. The properties-panel offset (ADR-103) remains the quick one-field version.
+
+### F-A6d. Filled or wireframe view (ADR-410)
+
+1. **Window → Wireframe View** (`Alt+W`) draws Fill artwork as outlines in its operation colour,
+   so overlaps and stray paths show. The menu item shows a check while it is on.
+2. It changes the canvas only: output, Preview and saved projects are unchanged. It resets to
+   Filled when the app restarts.
 
 ### F-A7. Artwork Operations panel
 
@@ -635,6 +694,22 @@ marks later edits as unapproved without changing the existing Frame/Start policy
   a shared operation before independent ordering.
 - `Scene.artworkOrder` keeps flattened object IDs for schema compatibility; run-unit grouping is a
   deterministic derivation and introduces no project-size cap beyond the existing scene budget.
+
+### F-A7a. Perforation, overcut and image overscan (ADR-415)
+
+1. **Advanced cut settings → Line detail → Perforation**: **Enable**, **Cut** and **Skip** (mm) cut
+   every line of the operation as dashes with uncut gaps. Closed shapes keep a full gap before their
+   start point, so no dash is longer than Cut and no gap shorter than Skip. Perforation applies after
+   kerf and tabs.
+2. **Overcut** (mm, 0 is off) keeps cutting past the start of each closed shape on the final pass
+   only, retracing its first edges, so the seam is cut through. Shapes opened by tabs or perforation
+   are not overcut.
+3. **Advanced cut settings → Image detail → Overscan** (0 to 25 mm, default 5) sets the laser-off
+   run-up at both ends of every scan line. The note under it says how much run-up this machine needs
+   to reach the operation's saved speed.
+4. Job Review lists these settings on the operation's detail line when they are set. Preview, Frame,
+   the time estimate and every output format follow them. With none set, output is unchanged.
+5. Material presets do not store them; applying a preset keeps what the operation has.
 
 ---
 
@@ -1001,8 +1076,10 @@ Mac uses `Cmd`, Windows/Linux web uses `Ctrl`.
 - `Cmd/Ctrl+X` — Cut selected objects to the scene clipboard
 - `Cmd/Ctrl+C` — Copy selected objects to the scene clipboard
 - `Cmd/Ctrl+V` — Paste the scene clipboard (offset from the source)
+- `Cmd/Ctrl+Shift+V` — Paste in Place: paste at the position the artwork was copied from (ADR-410)
 - `Cmd/Ctrl+D` — Duplicate selection in place (LightBurn parity)
 - `Cmd/Ctrl+A` — Select all
+- `Cmd/Ctrl+Shift+I` — Invert selection (ADR-410)
 - `Delete` / `Backspace` — Delete selected
 - `Escape` — Deselect / cancel current operation
 
@@ -1011,6 +1088,7 @@ Mac uses `Cmd`, Windows/Linux web uses `Ctrl`.
 - Shift+Arrow — Nudge 10 mm
 - `H` — Flip horizontal
 - `V` — Flip vertical
+- `.` / `,` — Rotate 90° clockwise / counter-clockwise (ADR-410)
 
 #### Tools
 - `T` - Type and edit text on the canvas (when a text field does not own keyboard input)
@@ -1025,6 +1103,7 @@ Mac uses `Cmd`, Windows/Linux web uses `Ctrl`.
 
 #### View
 - `P` — Toggle preview
+- `Alt+W` — Filled or wireframe view (ADR-410)
 - `F` — Fit to bed
 - `Shift+F` — Fit to selection (falls back to all-objects, then bed)
 - `+` / `=` — Zoom in
@@ -1930,8 +2009,10 @@ authorization, Frame proof, controller command, or safety boundary.
   itself, not on a button, so a keystroke meant for the field being edited cannot answer it;
   Tab reaches both buttons. Reloading saved history,
   an interrupted/aborted job, and a CNC completion do not produce the darkening prompt.
-- **Paint a second pass…** in the Machine panel remains available after dismissing the prompt.
-  The completed-run selector also offers older retained completions. When a completed run
+- **Paint a second pass…** in the Machine panel reopens the same job after dismissing the
+  prompt, until another job starts. It offers only the job that just finished: there is no
+  list of older jobs, and a later job that is aborted or interrupted removes the button
+  rather than bringing back an older one (ADR-341 Amendment 4). When the finished run
   was a recovery or a painted pass, the preview follows its independently verified retained
   ancestor so the original full engraving is available where that archive still exists.
   The current artwork document is never replaced or recompiled by this workflow.
@@ -1982,10 +2063,11 @@ authorization, Frame proof, controller command, or safety boundary.
   provenance. A disconnect can therefore resume the derived pass without regenerating the
   full original job. Uncertain first writes keep the attempted run, even if the transport
   closes before reporting the write failure; the old offer is not silently restored.
-- Painted drafts for the 20 most recently edited sources are retained locally, keyed to each
-  exact run and fingerprint. Storage failure is disclosed and preserves prior saved drafts.
-  Drafts and bounded execution history are different: history
-  still retains at most 20 terminal runs within 100 MiB, with its existing protected slots.
+- The painted draft of the last edited job is retained locally, keyed to its exact run and
+  fingerprint; painting another job replaces it (ADR-341 Amendment 4). Storage failure is
+  disclosed and preserves the prior saved draft. Drafts and the execution history are
+  different: the **Execution archive** under History & recovery still retains at most 20
+  terminal runs within 100 MiB for export and recovery, with its existing protected slots.
 - Supported inputs are the flat XY laser image, fill and vector programs KerfDesk generates
   for GRBL, grblHAL and FluidNC. Marlin and Smoothieware programs are refused with a message
   naming the controller, and their completed runs get no darkening prompt and no Machine-panel
@@ -2272,7 +2354,10 @@ Connecting a controller is optional, so a complete setup can be saved offline.
    whole, so a later correction to the preset never reaches that copy; when a saved copy still
    holds a value a correction replaced (the xTool D1 Pro's front-left origin, the Sculpfun S30's
    410 x 400 mm bed), Job Review names the old and corrected values as an advisory (ADR-322
-   Amendment 1). Detected matches are
+   Amendment 1), and Machine Setup shows a **Preset correction** row under Origin with one click
+   to use the corrected value (ADR-322 Amendment 2). Nothing is applied on its own. A preset's
+   content is pinned to its `catalogVersion`, so a preset change has to bump the version. Detected
+   matches are
    prioritised among the remaining profiles and explain their evidence under **Profile details**,
    but generic `$$` values never establish hardware identity: "Possible match" remains the
    ceiling. Controller family, baud, output dialect,
@@ -3701,13 +3786,23 @@ explicitly marked below; the remaining controls and user-facing flows are planne
 1. Open polylines cannot be offset; they are cut on-path (documented
    fallback), closed shapes on the same layer still offset normally.
 
-#### Warning — a tapered ball nose sets pocket or profile offsets
-1. A tapered ball nose is modelled for relief finishing (ADR-368), but pocket and
-   profile offsets, and relief roughing, still step by its widest diameter at the
-   top of the flutes. When one is the main bit of a pocket, an inside or outside
-   profile, or a relief, Job Review warns that the result comes out off-size or
-   ribbed and suggests a flat end mill or the 3D removal preview (ADR-368
-   Amendment 1). The warning never blocks save or Start.
+#### Edge — a tapered ball nose sets pocket or profile offsets
+1. A tapered ball nose's stored diameter is its widest, at the top of the flutes, and
+   it cuts narrower at any shallower depth. Outside and inside profiles and pockets
+   offset by the width it cuts at the operation's full depth, so the wall meets the
+   drawn line at the stock surface and follows the taper and then the ball below it.
+   An outside part is its drawn size at the top face and larger below; a hole is its
+   drawn size at the top face and smaller below. Every depth pass rides that one path
+   (ADR-368 Amendment 2).
+2. Pocket rings and raster sweeps, and relief roughing rings, step by the stepover
+   percentage of the width the bit cuts in one depth pass, so no rib stands between
+   them. Tab windows add the full-depth cut width to the tab width, so a bridge is never
+   narrower than requested. The 3D removal preview shows the taper and the ball corner.
+3. A tapered ball nose without a usable ball tip and taper is planned as a flat
+   cylinder of its stored diameter. When one is the main bit of a pocket, an inside
+   or outside profile, or a relief, Job Review warns that the result comes out
+   off-size or ribbed and asks for the bit's tip and taper or a flat end mill
+   (ADR-368 Amendments 1 and 2). The warning never blocks save or Start.
 
 ### F-CNC3. CNC preflight and save G-code
 
@@ -3787,7 +3882,8 @@ explicitly marked below; the remaining controls and user-facing flows are planne
    heightmap cells, then the map is dilated by the active bit's footprint
    plus a 0.5 mm finishing allowance, sliced into Z levels by the layer's
    depth-per-pass, and each level's region fills with concentric rings at
-   the layer's physical stepover.
+   the layer's physical stepover: a percentage of the bit diameter, or for a
+   tapered ball nose of the width it cuts over one level (ADR-368 Amendment 2).
 2. Passes run depth-major (whole level before stepping down) as a
    clearing group — before any profile cuts. The preview's removal
    shading shows the terraced relief forming.
@@ -4127,7 +4223,10 @@ and lifts the command's CNC-only gate.)*
    count becomes the default for material-feed calculations. Every selectable bit shows its
    effective flute count in Startup Setup; changing it there updates the draft bit metadata used by
    the read-only Artwork calculator. Final Save refreshes material-recipe values for operations
-   resolved through that cutter; manual numeric values remain exact.
+   resolved through that cutter; manual numeric values remain exact. A saved copy of a catalog bit
+   that predates a catalog correction offers the corrected value beside its flute count. The Amana
+   O-flute ball-nose bits saved with no flute count offer **Use 1 flute**, and Job Review warns when
+   the job runs such a copy (ADR-322 Amendment 2).
 5. Deleting a custom bit stages its removal from the saved library, open machine, and Tool Plan.
    Final **Save machine setup** commits that removal as the same project undo entry; **Cancel** keeps
    the live library and project unchanged.
@@ -4277,7 +4376,8 @@ and lifts the command's CNC-only gate.)*
 2. Between sections the G-code retracts, stops the spindle (M5), parks,
    and pauses on M0 with comments naming the next bit. GRBL holds until
    cycle start; the streaming UI's Resume continues the job.
-3. Geometry offsets use each layer's OWN bit diameter.
+3. Geometry offsets use each layer's OWN bit diameter, or a tapered ball nose's
+   cut width at the layer depth (ADR-368 Amendment 2).
 
 #### Error — v-carve layer with a flat bit
 1. Job Review warns with the layer's bit named (not just the machine bit), but
@@ -5363,8 +5463,10 @@ as the pane's design record.
 5. The operator confirms four physical facts — cutter clear, spindle stopped,
    workholding unchanged, tool installed/intact/Z-zeroed — and chooses position
    evidence: **retained** (enabled only with session-continuity evidence: the
-   interruption was not a controller reboot AND the live work offset matches
-   the offset archived with the run) or **re-zeroed**.
+   interruption was not a controller reboot, did not stop a moving machine by
+   a reset (Abort, or the automatic stop after a rejected line) or by a
+   position-losing alarm such as a hard limit (ADR-215 Amendment 1), AND the live work offset matches the offset archived with the
+   run) or **re-zeroed**.
 6. Start generates a NEW recovery job — safe-Z retract → spindle start with its
    full spin-up dwell → rapid to the boundary pass start → plunge at plunge
    feed into already-cut kerf → recut that pass → every later pass and
@@ -7565,8 +7667,9 @@ the edge it sits on, and a midpoint over the same edge.
    sketch draws on its top face in each layer's colour, and the carve renders
    live underneath — pockets flat-floor, v-carves groove by boundary distance
    with the layer's v-bit angle, profiles slot at bit diameter on the offset
-   side, drills bore at circle centres, and depths at the stock thickness
-   read as through cuts.
+   side (a tapered ball nose at its cut width at the layer depth, the offset
+   the compiler uses), drills bore at circle centres, and depths at the stock
+   thickness read as through cuts.
 2. The left button always belongs to the armed tool — draw, select, and move
    exactly as in 2D, from any camera angle (the pointer lands on the stock
    plane). Middle drag pans, Shift+middle or right drag orbits, the wheel

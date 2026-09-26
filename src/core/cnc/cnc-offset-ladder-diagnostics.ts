@@ -38,9 +38,11 @@ import {
   type Scene,
 } from '../scene';
 import { collectLayerPolylines } from './collect-cnc-contours';
-import { resolveRestPocketOperation } from './cnc-rest-operation';
+import {
+  pocketToolpathsForSettingsWithEvidence,
+  resolveRestPocketOperation,
+} from './cnc-rest-operation';
 import { reliefOffsetLadderDiagnostics } from './compile-cnc-relief';
-import { pocketRasterToolpaths, pocketRingToolpaths } from './pocket-paths';
 import { vcarveClearancePocket } from './vcarve-clearance';
 import { vcarveEffectiveDepthMm } from './vcarve-depth';
 import { vcarveMedialPasses } from './vcarve-medial';
@@ -200,9 +202,8 @@ function pocketLadderDiagnosticKinds(
   const restCompletion = restPocketCompletion(polylines, settings, config);
   if (restCompletion !== 'complete') kinds.add(restCompletion);
   const roughTool = toolById(config, settings.pocketRoughToolId);
-  const diameters = [tool.diameterMm, ...(roughTool === null ? [] : [roughTool.diameterMm])];
-  for (const diameterMm of diameters) {
-    const status = pocketStrategyStatus(polylines, settings, diameterMm);
+  for (const pocketTool of [tool, ...(roughTool === null ? [] : [roughTool])]) {
+    const status = pocketStrategyStatus(polylines, settings, pocketTool);
     if (status.offsetFailed) kinds.add('geometry-failed');
     if (status.passLimited) kinds.add('pass-limit');
   }
@@ -221,23 +222,16 @@ function restPocketCompletion(
   return rest.passLimited ? 'pass-limit' : 'complete';
 }
 
+// The same pocket planner compile runs, with the same cutter widths.
 function pocketStrategyStatus(
   polylines: ReadonlyArray<Polyline>,
   settings: CncLayerSettings,
-  toolDiameterMm: number,
+  tool: CncTool,
 ): { readonly offsetFailed: boolean; readonly passLimited: boolean } {
   if (settings.pocketStrategy === 'adaptive') {
     return { offsetFailed: false, passLimited: false };
   }
-  if (settings.pocketStrategy === 'raster-x' || settings.pocketStrategy === 'raster-y') {
-    return pocketRasterToolpaths(
-      polylines,
-      toolDiameterMm,
-      settings.stepoverPercent,
-      settings.pocketStrategy === 'raster-x' ? 'x' : 'y',
-    );
-  }
-  return pocketRingToolpaths(polylines, toolDiameterMm, settings.stepoverPercent);
+  return pocketToolpathsForSettingsWithEvidence(polylines, settings, tool);
 }
 
 function vcarveDiagnosticKinds(

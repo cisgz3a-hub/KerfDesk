@@ -53,7 +53,7 @@ import type {
   StreamPlannerSnapshot,
 } from './laser-rx-capacity-evidence';
 import type { StreamHold } from './laser-stream-hold';
-import type { JobStopRequest } from './job-stop-request';
+import type { JobStopRequest, StreamReset } from './job-stop-request';
 import type { TranscriptBufferRefs } from './laser-transcript-buffer';
 import type { PauseResumeTransitionState } from './laser-pause-resume-transition';
 import { overrideActions } from './override-actions';
@@ -144,6 +144,10 @@ export type LaserState = LaserStoreActions &
     /** Why KerfDesk stopped the stream of `streamerEpoch`, when it was asked
      * to (Abort, or the app closing); read through currentJobStopRequest. */
     readonly jobStopRequest?: JobStopRequest | null;
+    /** The soft reset KerfDesk sent against the stream of `streamerEpoch`,
+     * and whether it may have cost position; read through
+     * currentStreamResetMayLosePosition (ADR-215 Amendment 1). */
+    readonly streamReset?: StreamReset | null;
     readonly pauseResumeTransition: PauseResumeTransitionState | null;
     /** Immutable recovery/replay ownership for the current streamer. */
     readonly activeRunId: RunId | null;
@@ -208,8 +212,9 @@ export type LaserState = LaserStoreActions &
      * the UI needs the *last non-null* value cached here, not the raw
      * StatusReport.wco which is null on most frames. Updated by the
      * line-handler when a WCO-bearing status arrives; cleared on
-     * disconnect, alarm, and soft reset (all of which clear G92 in
-     * GRBL itself). UI reads `wcoCache`, NEVER `statusReport.wco`.
+     * disconnect, alarm, and soft reset until the next WCO frame (stock
+     * GRBL clears G92 there; grblHAL keeps it). UI reads `wcoCache`,
+     * NEVER `statusReport.wco`.
      */
     readonly wcoCache: WorkCoordinateOffset | null;
     // The work coordinate system the operator has selected via the console

@@ -1,10 +1,12 @@
 import { disabled, enabled, type AppCommand, type AppCommandContext } from './command-types';
+import { pasteInPlaceCommand, selectionEditCommands } from './editing-tools-commands';
 
 export function editCommands(ctx: AppCommandContext): ReadonlyArray<AppCommand> {
   return [
     undoCommand(ctx),
     redoCommand(ctx),
     enabled('edit.select-all', 'edit', 'Select All', 'Select all artwork', ctx.selectAll, 'Ctrl+A'),
+    ...selectionEditCommands(ctx),
     selectionCommand(
       ctx,
       'edit.copy',
@@ -22,6 +24,7 @@ export function editCommands(ctx: AppCommandContext): ReadonlyArray<AppCommand> 
       'Ctrl+X',
     ),
     pasteCommand(ctx),
+    pasteInPlaceCommand(ctx),
     groupCommand(ctx),
     ungroupCommand(ctx),
     lockSelectionCommand(ctx),

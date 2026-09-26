@@ -19,6 +19,7 @@
 
 import { resolveGrblDialect, type DeviceProfile, type GrblGcodeDialect } from '../devices';
 import { contourEntryPoint, type ContourEntryBounds } from '../job/contour-entry';
+import { cutSegmentsForPass, finalPassCutSegments } from '../job/cut-pass-segments';
 import { offsetForSpeed } from '../job/scan-offset';
 import type { CutGroup, CutSegment, FillGroup, Group, Job, RasterGroup } from '../job';
 import { emitRasterGroupWithEnd } from '../raster/emit-raster';
@@ -30,6 +31,7 @@ import { emitScanlineFillGroup } from './grbl-fill-emission';
 import {
   LINE_END,
   contourEntryComment,
+  overcutComment,
   feedComment,
   joinedLines,
   laserOffRunwayLine,
@@ -228,10 +230,11 @@ function emitGroup(group: CutGroup, context: GroupEmissionContext): string {
   const feed = roundedPositiveFeed(group.speed, `Layer ${group.layerId}`);
   const chunks: string[] = [];
   chunks.push(
-    `; layer ${group.layerId} color ${group.color} power ${group.power}% ${feedComment(group, feed)} passes ${group.passes}${contourEntryComment(group.entryRunwayMm)}`,
+    `; layer ${group.layerId} color ${group.color} power ${group.power}% ${feedComment(group, feed)} passes ${group.passes}${contourEntryComment(group.entryRunwayMm)}${overcutComment(group.finalPassOvercutMm)}`,
   );
   pushOperationProvenanceComment(chunks, group);
   const segmentContext = { ...context, s, feed, entryRunwayMm: group.entryRunwayMm };
+  const finalPass = finalPassCutSegments(group);
   for (let p = 0; p < group.passes; p += 1) {
     chunks.push(`; pass ${p + 1} of ${group.passes}`);
     // No re-arm between passes (OR-1). The power word cannot change inside a
@@ -241,7 +244,7 @@ function emitGroup(group: CutGroup, context: GroupEmissionContext): string {
     // under M3 with the previous pass's last burn still lit, under M4 at the
     // cost of a full stop, and Marlin's `M5 I`/`M3 I S0` derived from it
     // stopped the head with continuous inline power on.
-    for (const seg of group.segments) {
+    for (const seg of cutSegmentsForPass(group, finalPass, p, group.passes)) {
       const lines = emitSegment(seg, segmentContext);
       if (lines.length > 0) chunks.push(lines.join(LINE_END));
     }

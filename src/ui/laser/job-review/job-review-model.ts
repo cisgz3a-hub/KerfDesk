@@ -44,6 +44,7 @@ import { detectM7AirAssistWarnings } from './m7-air-assist-warnings';
 import { detectManualAirAssistWarnings } from './manual-air-assist-warnings';
 import { detectMinFeatureWarnings } from './min-feature-warnings';
 import { detectPresetCorrectionWarnings } from './preset-correction-warnings';
+import { detectStaleCatalogBitWarnings } from './stale-catalog-bit-warnings';
 import { detectParkOutsideFrameWarningsFromMetrics } from './park-outside-frame-warnings';
 import { detectRotaryRasterQualificationWarnings } from './rotary-raster-qualification-warnings';
 import {
@@ -120,6 +121,7 @@ export function buildJobReviewModel(args: JobReviewModelArgs): JobReviewModel {
       ),
       ...detectManualAirAssistWarnings(args.prepared.prepared.job, args.project.device),
       ...detectPresetCorrectionWarnings(args.project.device),
+      ...detectStaleCatalogBitWarnings(args.project, args.prepared.cncToolPlan),
       ...detectAirAssistStartWarnings(
         args.prepared.prepared.job,
         args.project.device,

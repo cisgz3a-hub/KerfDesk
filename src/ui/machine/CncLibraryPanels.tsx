@@ -13,6 +13,7 @@ import { useToastStore } from '../state/toast-store';
 import { RailSection } from '../kit';
 import { AddCncBitForm } from './AddCncBitForm';
 import { CncBitCatalogPanel } from './CncBitCatalogPanel';
+import { staleCatalogBitCorrections } from './cnc-bit-catalog-corrections';
 import {
   deleteButtonStyle,
   fluteInputStyle,
@@ -114,6 +115,12 @@ function CncToolManagerRow(props: {
           style={fluteInputStyle}
         />
       )}
+      {props.onChangeFluteCount === undefined ? null : (
+        <CatalogBitCorrectionOffer
+          tool={props.tool}
+          onChangeFluteCount={props.onChangeFluteCount}
+        />
+      )}
       {props.custom ? (
         <button
           type="button"
@@ -130,6 +137,30 @@ function CncToolManagerRow(props: {
         </button>
       ) : null}
     </li>
+  );
+}
+
+// ADR-322 Amendment 2: a saved copy of a catalog bit that predates a catalog
+// correction says so beside its flute count, with the fix one click away.
+function CatalogBitCorrectionOffer(props: {
+  readonly tool: CncMachineConfig['tools'][number];
+  readonly onChangeFluteCount: (toolId: string, fluteCount: number) => void;
+}): JSX.Element | null {
+  const [correction] = staleCatalogBitCorrections(props.tool);
+  const fluteCount = correction?.patch.fluteCount;
+  if (correction === undefined || fluteCount === undefined) return null;
+  return (
+    <button
+      type="button"
+      onClick={() => props.onChangeFluteCount(props.tool.id, fluteCount)}
+      aria-label={`Use the catalog's ${correction.now} for ${props.tool.name}`}
+      title={
+        `The catalog now lists ${correction.now} for this bit. This copy was saved with ` +
+        `${correction.before}, so ${correction.effect}.`
+      }
+    >
+      Use {correction.now}
+    </button>
   );
 }
 

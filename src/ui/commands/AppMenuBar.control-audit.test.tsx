@@ -9,7 +9,7 @@ import type { AppCommandContext, CommandId } from './command-types';
 
 type Outcome = {
   readonly callback?: keyof AppCommandContext;
-  readonly args?: readonly string[];
+  readonly args?: ReadonlyArray<string | number>;
   readonly guard?: string;
   readonly url?: string;
   readonly special?: 'tutorials' | 'unavailable';
@@ -41,6 +41,9 @@ const OUTCOMES: Record<CommandId, Outcome> = {
   'edit.copy': { callback: 'copySelection' },
   'edit.cut': { callback: 'cutSelection' },
   'edit.paste': { callback: 'pasteClipboard' },
+  'edit.paste-in-place': { callback: 'pasteInPlace' },
+  'edit.invert-selection': { callback: 'invertSelection' },
+  'edit.select-open-shapes': { callback: 'selectOpenShapes' },
   'edit.group': { callback: 'groupSelection' },
   'edit.ungroup': { callback: 'ungroupSelection' },
   'edit.lock-selection': { callback: 'lockSelection' },
@@ -77,6 +80,7 @@ const OUTCOMES: Record<CommandId, Outcome> = {
   'tools.weld': { callback: 'weldSelection' },
   'tools.union-silhouette': { callback: 'unionSilhouette' },
   'tools.join-paths': { callback: 'joinPaths' },
+  'tools.offset-shapes': { callback: 'offsetShapes' },
   'tools.subtract': { callback: 'subtractSelection' },
   'tools.intersect': { callback: 'intersectSelection' },
   'tools.exclude': { callback: 'excludeSelection' },
@@ -112,10 +116,22 @@ const OUTCOMES: Record<CommandId, Outcome> = {
   'arrange.quick-nest': { callback: 'quickNest' },
   'arrange.flip-horizontal': { callback: 'flipHorizontal' },
   'arrange.flip-vertical': { callback: 'flipVertical' },
+  'arrange.rotate-90-cw': { callback: 'rotateSelectionQuarterTurn', args: [1] },
+  'arrange.rotate-90-ccw': { callback: 'rotateSelectionQuarterTurn', args: [-1] },
+  'arrange.move-to-bed-center': { callback: 'moveSelectionToBed', args: ['c'] },
+  'arrange.move-to-bed-nw': { callback: 'moveSelectionToBed', args: ['nw'] },
+  'arrange.move-to-bed-n': { callback: 'moveSelectionToBed', args: ['n'] },
+  'arrange.move-to-bed-ne': { callback: 'moveSelectionToBed', args: ['ne'] },
+  'arrange.move-to-bed-w': { callback: 'moveSelectionToBed', args: ['w'] },
+  'arrange.move-to-bed-e': { callback: 'moveSelectionToBed', args: ['e'] },
+  'arrange.move-to-bed-sw': { callback: 'moveSelectionToBed', args: ['sw'] },
+  'arrange.move-to-bed-s': { callback: 'moveSelectionToBed', args: ['s'] },
+  'arrange.move-to-bed-se': { callback: 'moveSelectionToBed', args: ['se'] },
   'laser.connect': { callback: 'connectLaser' },
   'laser.disconnect': { callback: 'disconnectLaser' },
   'laser.home': { callback: 'homeLaser' },
   'window.toggle-preview': { callback: 'togglePreview' },
+  'window.toggle-wireframe': { callback: 'toggleWireframe' },
   'window.toggle-layers-panel': { callback: 'toggleLayersPanel' },
   'window.toggle-machine-panel': { callback: 'toggleMachinePanel' },
   'window.toggle-side-panels': { callback: 'toggleSidePanels' },

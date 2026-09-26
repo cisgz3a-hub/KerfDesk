@@ -116,6 +116,11 @@ export function assertPauseResumeTransitionOwner(
   );
 }
 
+/** A Pause or Resume is still settling on the controller. */
+export function hasPauseResumeTransition(refs: PauseResumeTransitionRefs): boolean {
+  return refs.pauseResumeTransition != null;
+}
+
 export function ownsPauseResumeTransition(
   refs: PauseResumeTransitionRefs,
   token: PauseResumeTransitionToken,
