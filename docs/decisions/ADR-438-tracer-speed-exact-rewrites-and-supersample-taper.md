@@ -267,3 +267,48 @@ Proof:
     still pass.
   - A cursor that never moves back fails the queue tests and hangs the thinning.
 - Oracle: 36/36 light cases plus the corpus thinning check (62/62 with the unit parity tests).
+  On the final code (ranks 2, 4 and 5 together) the heavy gate passed 76/76. That covers the 60
+  oracle cases, the corpus distance-field and thinning checks, and the distance-field, boundary
+  walk and thinning fuzz suites. It also covers rank 2 after its lint-only helper split.
+
+**Measurements (speed wave 2).** All numbers come from `scripts/trace-bench.mjs`: 5 alternating
+rounds, with the side that runs first switching each round, on one heavily shared machine. Other
+agents' vitest runs were active, so absolute times are inflated 2-10x and swing from run to run.
+An earlier A/A smoke (same code on both sides) gave ratios between 0.857 and 1.333, so a single
+ratio inside that band is noise. The table gives new/base of the best times, with the median
+ratio in brackets. Every row reported `identical true`: the serialised trace hash matched on
+both sides.
+
+| Comparison                  | Case        | Line Art      | Sharp         | Centerline    |
+| --------------------------- | ----------- | ------------- | ------------- | ------------- |
+| 952fb13e3 -> rank 2         | owl         | 1.036 (0.962) | 1.070 (1.143) | 0.974 (0.960) |
+|                             | hummingbird | 0.988 (0.975) | 1.050 (0.976) | 0.996 (1.042) |
+|                             | noise1024   | 1.004 (0.954) | 1.222 (1.093) | 1.006 (1.079) |
+|                             | sparse4096  | 0.898 (0.828) | 0.631 (0.624) | 0.936 (0.912) |
+| rank 2 -> rank 4            | owl         | 0.891 (0.890) | 0.865 (0.904) | not run       |
+|                             | hummingbird | 0.978 (0.969) | 0.890 (0.902) | not run       |
+|                             | noise1024   | 0.873 (0.895) | 0.887 (0.970) | not run       |
+|                             | sparse4096  | 0.981 (0.920) | 0.971 (1.051) | not run       |
+| 952fb13e3 -> rank 5 (all)   | owl         |               |               | 0.937 (0.965) |
+|                             | hummingbird |               |               | 0.965 (0.965) |
+|                             | noise1024   |               |               | 0.904 (0.951) |
+|                             | sparse4096  |               |               | 0.828 (0.809) |
+| rank 4 -> rank 5            | owl         |               |               | 0.971 (0.898) |
+|                             | hummingbird |               |               | 0.932 (0.928) |
+|                             | noise1024   |               |               | 0.930 (1.007) |
+|                             | sparse4096  |               |               | 0.915 (0.976) |
+
+Reading:
+- The rank 2 distance field clearly pays only where it dominates, on the sparse 4096 page
+  (Sharp 0.63). On owl, hummingbird and noise1024 it is within noise. The noise1024 Sharp row
+  (1.22) is inside the A/A band, and the rank 4 and rank 5 rows re-ran rank 2's code as their
+  base without a comparable slowdown.
+- The rank 4 boundary walk gives a consistent 0.87-0.98 on the contour presets. That is
+  suggestive, not proven: each row is inside the A/A band on its own.
+- Rank 5 moves Centerline by 0.91-0.97 (best) end to end. The thinning is only part of a
+  Centerline trace. Isolated, in one process, alternating best-of-9 against the frozen copy, the
+  thinning takes 0.75x the time on a 1200 px stroke page (median 0.75x). Log:
+  `lfbake/speed2/thin-bench-r5.log`, outside the repo.
+- None of this changes the size of the gap to Potrace. Owl Line Art is still seconds, not a
+  quarter-second. The remaining plan ranks, workers and topology repair are where that gap
+  lives.
