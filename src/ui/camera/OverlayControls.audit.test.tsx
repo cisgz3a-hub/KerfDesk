@@ -110,3 +110,24 @@ it('camera Trace captures at the input boundary and opens a bed-sized source in 
   });
   expect(camera.getState().placementActive).toBe(true);
 });
+
+it('offers the accuracy map only for a calibration saved with its rings, and toggles it', async () => {
+  camera.setState({ accuracyMapVisible: false });
+  const bare = await mountControl(<OverlayControls />);
+  expect(bare.textContent).not.toContain('Accuracy map');
+  const device = useStore.getState().project.device;
+  const model = device.cameraModel;
+  if (model === undefined) throw new Error('fixture has a camera model');
+  await act(async () =>
+    useStore.getState().updateDeviceProfile({
+      cameraModel: {
+        ...model,
+        accuracy: { ...model.accuracy, marks: [{ x: 2, y: 2, dxMm: 0.1, dyMm: 0 }] },
+      },
+    }),
+  );
+  await clickControl(bare, 'Accuracy map off');
+  expect(camera.getState().accuracyMapVisible).toBe(true);
+  await clickControl(bare, 'Accuracy map on');
+  expect(camera.getState().accuracyMapVisible).toBe(false);
+});

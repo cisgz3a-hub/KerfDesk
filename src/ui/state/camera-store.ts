@@ -56,6 +56,9 @@ export type CameraStore = CameraSourceActions & {
   // Top surface currently being viewed/placed on, measured above machine bed.
   // The camera model corrects the picture to this height (ADR-440).
   readonly surfaceHeightMm: number;
+  // Each calibration ring's measured error drawn over the overlay (ADR-441
+  // Amendment 1), so the operator sees where on the bed the camera is trusted.
+  readonly accuracyMapVisible: boolean;
   // Latches once the aligned overlay is used for physical placement. Hiding
   // the image does not silently discard the safety contract; the operator
   // exits placement mode explicitly after finishing camera-based layout.
@@ -74,6 +77,7 @@ export type CameraStore = CameraSourceActions & {
     capture?: CameraCaptureBinding | null,
   ) => void;
   readonly setSurfaceHeightMm: (heightMm: number) => void;
+  readonly setAccuracyMapVisible: (on: boolean) => void;
   readonly activatePlacement: () => void;
   readonly deactivatePlacement: () => void;
   readonly confirmPositionEpoch: (epoch: number) => void;
@@ -116,6 +120,7 @@ export const useCameraStore = create<CameraStore>((set, get) => ({
   overlayStill: null,
   overlayStillCapture: null,
   surfaceHeightMm: 0,
+  accuracyMapVisible: false,
   placementActive: false,
   confirmedPositionEpoch: null,
 
@@ -127,6 +132,7 @@ export const useCameraStore = create<CameraStore>((set, get) => ({
   setOverlayStill: (frame, capture = null) =>
     set({ overlayStill: frame, overlayStillCapture: frame === null ? null : capture }),
   setSurfaceHeightMm: (heightMm) => set({ surfaceHeightMm: clampFinite(heightMm, 0, 500) }),
+  setAccuracyMapVisible: (on) => set({ accuracyMapVisible: on }),
   activatePlacement: () => set({ placementActive: true }),
   deactivatePlacement: () =>
     set({ placementActive: false, overlayVisible: false, confirmedPositionEpoch: null }),

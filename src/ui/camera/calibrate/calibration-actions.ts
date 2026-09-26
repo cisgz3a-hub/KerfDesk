@@ -6,6 +6,8 @@
 
 import { toGrayImage } from '../../../core/camera/gray';
 import { warpFrameToBedImage } from '../../../core/camera/model/bed-image';
+import type { BedArea } from '../../../core/camera/model/camera-model-accuracy';
+import type { CameraModelRecord } from '../../../core/camera/model/camera-model-record';
 import { bedTargetLayout, type BedTargetArea } from '../../../core/camera/target/bed-target';
 import { generateCameraBedTarget } from '../../../core/job/camera-bed-target-pattern';
 import type { Project } from '../../../core/scene';
@@ -18,6 +20,7 @@ import {
 import { calibrationFailureMessage, cameraModelFromCalibration } from './calibration-result';
 import type { CalibrationResult, CalibrationSettings } from './camera-calibration-store';
 import { runBedCalibration } from './run-bed-calibration';
+import { checkSavedCalibration } from './saved-calibration-check';
 import { runTransientCameraJob } from './transient-camera-job';
 
 // The review picture only needs to show the rings clearly.
@@ -62,6 +65,10 @@ export async function photographTarget(args: {
   readonly settings: CalibrationSettings;
   readonly bedWidthMm: number;
   readonly bedHeightMm: number;
+  /** Where the target was engraved when that is known; else from the margin. */
+  readonly area?: BedArea;
+  /** The calibration saved before this photo, to measure on it. */
+  readonly saved?: CameraModelRecord;
   readonly signal?: AbortSignal;
   readonly now?: () => Date;
 }): Promise<PhotoOutcome> {
@@ -70,9 +77,8 @@ export async function photographTarget(args: {
   if (raw === null) {
     return { kind: 'failed', message: 'Could not take a photo. Check that the camera is running.' };
   }
-  const layout = bedTargetLayout({
-    area: targetAreaForBed(args.bedWidthMm, args.bedHeightMm, settings.marginMm),
-  });
+  const area = args.area ?? targetAreaForBed(args.bedWidthMm, args.bedHeightMm, settings.marginMm);
+  const layout = bedTargetLayout({ area });
   const outcome = await runBedCalibration(
     {
       frame: toGrayImage(raw),
@@ -87,12 +93,25 @@ export async function photographTarget(args: {
   if (outcome.kind === 'failed') {
     return { kind: 'failed', message: calibrationFailureMessage(outcome.reason) };
   }
+  const capture = cameraCaptureBindingForFrame(args.source, raw.width, raw.height);
   const record = cameraModelFromCalibration({
     calibration: outcome,
-    capture: cameraCaptureBindingForFrame(args.source, raw.width, raw.height),
+    capture,
     targetHeightMm: settings.sheetThicknessMm,
+    targetArea: area,
     calibratedAt: (args.now ?? (() => new Date()))(),
   });
+  const savedCheck =
+    args.saved === undefined
+      ? null
+      : checkSavedCalibration({
+          saved: args.saved,
+          capture,
+          frameWidth: raw.width,
+          frameHeight: raw.height,
+          marks: outcome.markErrors,
+          targetHeightMm: settings.sheetThicknessMm,
+        });
   const bedImage = warpFrameToBedImage(raw, outcome.lens, outcome.pose, {
     bedWidthMm: args.bedWidthMm,
     bedHeightMm: args.bedHeightMm,
@@ -107,6 +126,7 @@ export async function photographTarget(args: {
       bedImage,
       cameraHeightSigmaMm: outcome.cameraHeightSigmaMm,
       usedMeasuredHeight: settings.cameraHeightMm !== null,
+      savedCheck,
     },
   };
 }

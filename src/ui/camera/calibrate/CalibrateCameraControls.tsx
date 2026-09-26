@@ -1,5 +1,6 @@
 // CalibrateCameraControls — the Camera panel's calibration row (ADR-441):
-// opens the one-photo calibration wizard and says how the saved calibration
+// opens the one-photo calibration wizard, or a check of the saved calibration
+// against a new photo (Amendment 1), and says how the saved calibration
 // measured, so the operator sees at a glance whether the camera is ready.
 
 import { useStore } from '../../state';
@@ -9,6 +10,7 @@ import { useCameraCalibrationStore } from './camera-calibration-store';
 
 export function CalibrateCameraControls(): JSX.Element {
   const openWizard = useCameraCalibrationStore((s) => s.openWizard);
+  const openCheck = useCameraCalibrationStore((s) => s.openCheck);
   const model = useStore((s) => s.project.device.cameraModel);
   return (
     <div style={columnStyle}>
@@ -21,6 +23,16 @@ export function CalibrateCameraControls(): JSX.Element {
         >
           {model === undefined ? 'Calibrate camera…' : 'Recalibrate camera…'}
         </button>
+        {model === undefined ? null : (
+          <button
+            type="button"
+            className="lf-btn"
+            onClick={() => openCheck(model)}
+            title="Take one photo of the target from the last calibration, still where it was engraved, and see whether the camera has moved."
+          >
+            Check camera…
+          </button>
+        )}
       </div>
       {model === undefined ? null : (
         <p style={noteStyle}>

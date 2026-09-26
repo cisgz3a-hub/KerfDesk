@@ -6482,7 +6482,7 @@ as the pane's design record.
   picker only. It never opens hardware or prompts for permission. A non-permission `AbortError`
   is shown as a retryable open failure rather than mislabeled as denial.
 
-### F-CAM2. One-photo camera calibration (ADR-441)
+### F-CAM2. One-photo camera calibration (ADR-441, Amendment 1)
 
 - **Success / calibrated.** **Calibrate camera…** opens the wizard. The operator covers the bed
   with one flat sheet, enters its thickness and, optionally, the camera lens height by tape
@@ -6505,6 +6505,16 @@ as the pane's design record.
   entered, the result asks for a tape-measured height so thick material lines up.
 - **Edge / minimized wizard.** The wizard can minimize into a small non-modal panel so the
   operator can watch the camera and reach the machine while the target engraves.
+- **Check / has the camera moved?** With a calibration saved, **Check camera…** opens the wizard
+  at the photo, using the saved target's area and height. The photo is measured against the saved
+  calibration. The result says either that the camera has not moved, or how far and which way on
+  the canvas the saved calibration is off. The suggested button is **Keep saved calibration**
+  when the camera has not moved and **Save new calibration** when it has; both are always offered.
+  Any recalibration while a calibration is saved shows the same comparison.
+- **Edge / sheet moved since engraving.** The check cannot tell a moved sheet from a moved camera;
+  the photo step says the sheet must lie where it was engraved, and **Back** engraves a new one.
+- **Edge / another camera.** A photo from another camera or with another crop is not compared;
+  the result says why and the new calibration can still be saved.
 
 ### F-CAM3. Corrected camera overlay (ADR-440)
 
@@ -6514,6 +6524,10 @@ as the pane's design record.
   (freeze the current frame, LightBurn's Update Overlay model) and **Live** for any camera kind.
 - **Material surface height.** Enter the material's top height above the bed; the overlay and
   camera trace show the bed as seen at that height, so the material's edges line up.
+- **Accuracy map.** **Accuracy map on/off** draws every calibration ring over the picture where
+  it was engraved, coloured by its measured error (green, amber, red; hollow when the fit left it
+  out). A dashed outline marks the target's area, outside which the picture is extrapolated. The
+  button is absent for a calibration saved without its rings (ADR-441 Amendment 1).
 - **Network camera resource changed.** The camera calibration distinguishes the exact URL query,
   including an empty query, as well as its redacted host/path. A channel or substream change
   therefore cannot reuse another feed's geometry. The recorded identity uses a private app-local

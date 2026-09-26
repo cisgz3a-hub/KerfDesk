@@ -14,6 +14,7 @@ import { useStore } from '../state';
 import { useCameraStore } from '../state/camera-store';
 import { useUiStore } from '../state/ui-store';
 import { computeView } from '../workspace/view-transform';
+import { CameraAccuracyMap } from './accuracy/CameraAccuracyMap';
 import { CameraSourceView } from './CameraSourceView';
 import type { LiveCaptureElement } from './frame-capture';
 import {
@@ -46,11 +47,20 @@ function ModelOverlay(props: { readonly model: CameraModelRecord }): JSX.Element
   }, [still, stillCapture, liveSource, liveElement]);
   const scene = useOverlayScene(props.model, box);
   const { unsupported, issue } = useBedOverlayDrawing(canvas, frame, scene);
+  const accuracyMapVisible = useCameraStore((s) => s.accuracyMapVisible);
   const notice = unsupported ? UNSUPPORTED_NOTICE : issue;
 
   return (
     <div ref={boxRef} style={boxStyle} aria-hidden={notice === null}>
       <canvas ref={setCanvas} style={canvasStyle} />
+      {accuracyMapVisible && scene !== null ? (
+        <CameraAccuracyMap
+          model={props.model}
+          view={scene.view}
+          width={scene.cssWidth}
+          height={scene.cssHeight}
+        />
+      ) : null}
       {liveSource === null ? null : (
         // The live element only feeds the overlay's texture; it is never seen.
         <div style={hiddenSourceStyle}>

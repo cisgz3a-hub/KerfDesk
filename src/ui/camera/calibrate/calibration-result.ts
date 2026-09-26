@@ -4,6 +4,7 @@
 // operator decides whether it is good enough for their work (ADR-228).
 
 import type { CameraCaptureBinding } from '../../../core/camera/camera-capture-binding';
+import { savedMarkErrors, type BedArea } from '../../../core/camera/model/camera-model-accuracy';
 import type { CameraModelRecord } from '../../../core/camera/model/camera-model-record';
 import type {
   BedCalibration,
@@ -14,6 +15,7 @@ export function cameraModelFromCalibration(args: {
   readonly calibration: BedCalibration;
   readonly capture: CameraCaptureBinding | null;
   readonly targetHeightMm: number;
+  readonly targetArea: BedArea;
   readonly calibratedAt: Date;
 }): CameraModelRecord {
   const { calibration } = args;
@@ -28,6 +30,8 @@ export function cameraModelFromCalibration(args: {
       foundMarks: calibration.foundMarks,
       expectedMarks: calibration.expectedMarks,
       targetHeightMm: args.targetHeightMm,
+      targetArea: args.targetArea,
+      marks: savedMarkErrors(calibration.markErrors),
     },
     calibratedAt: args.calibratedAt.toISOString(),
   };

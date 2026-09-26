@@ -61,7 +61,8 @@ export function useCalibrationPhoto(): CalibrationPhotoControls {
           current.project.device === app.project.device &&
           source.sourceEpoch === camera.sourceEpoch &&
           source.sourceState === camera.sourceState &&
-          useCameraCalibrationStore.getState().settings === wizard.settings
+          useCameraCalibrationStore.getState().settings === wizard.settings &&
+          useCameraCalibrationStore.getState().targetArea === wizard.targetArea
         );
       },
       step: { kind: 'photo', status: { kind: 'running' } },
@@ -74,6 +75,10 @@ export function useCalibrationPhoto(): CalibrationPhotoControls {
         settings: wizard.settings,
         bedWidthMm: app.project.device.bedWidth,
         bedHeightMm: app.project.device.bedHeight,
+        ...(wizard.targetArea === null ? {} : { area: wizard.targetArea }),
+        ...(app.project.device.cameraModel === undefined
+          ? {}
+          : { saved: app.project.device.cameraModel }),
         signal: run.controller.signal,
       });
       publish(

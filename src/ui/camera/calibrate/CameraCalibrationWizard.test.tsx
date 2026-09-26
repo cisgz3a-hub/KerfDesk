@@ -39,10 +39,13 @@ const source = {
 function result(overrides: Partial<CalibrationResult> = {}): CalibrationResult {
   return {
     record: savedCameraModel(),
-    markErrors: [{ x: 45, y: 45, dxMm: 0.05, dyMm: -0.02, rejected: false }],
+    markErrors: [
+      { x: 45, y: 45, pixel: { x: 90, y: 90 }, dxMm: 0.05, dyMm: -0.02, rejected: false },
+    ],
     bedImage: null,
     cameraHeightSigmaMm: 2,
     usedMeasuredHeight: false,
+    savedCheck: null,
     ...overrides,
   };
 }
@@ -234,6 +237,59 @@ describe('camera calibration photo ownership', () => {
     await clickControl(document.body, 'Save calibration');
     expect(useStore.getState().project.device.cameraModel).toEqual(savedCameraModel());
     expect(photographTarget).toHaveBeenCalledOnce();
+  });
+
+  it('checks the saved calibration on the target it was measured on, and keeps it', async () => {
+    const area = { x: 10, y: 10, width: 380, height: 380 };
+    const saved = savedCameraModel();
+    const model = {
+      ...saved,
+      accuracy: { ...saved.accuracy, targetHeightMm: 6, targetArea: area },
+    };
+    await act(async () => useStore.getState().updateDeviceProfile({ cameraModel: model }));
+    useCameraStore.setState({ sourceState: { kind: 'live', source } });
+    const drift = { rmsMm: 0.1, maxMm: 0.2, meanDxMm: 0.02, meanDyMm: 0, marks: 90 };
+    vi.mocked(photographTarget).mockResolvedValue({
+      kind: 'ok',
+      result: result({ savedCheck: { kind: 'measured', drift, saved: model } }),
+    });
+    await act(async () => useCameraCalibrationStore.getState().openCheck(model));
+    await mountControl(<CameraCalibrationWizard />);
+    expect(document.body.textContent).toContain('must lie exactly where it was engraved');
+    await clickControl(document.body, 'Take photo');
+    expect(photographTarget).toHaveBeenCalledWith(
+      expect.objectContaining({
+        area,
+        saved: model,
+        settings: expect.objectContaining({ sheetThicknessMm: 6 }),
+      }),
+    );
+    expect(document.body.textContent).toContain(
+      'The camera has not moved since it was calibrated.',
+    );
+    expect(control(document.body, 'Keep saved calibration').className).toContain('lf-btn--primary');
+    await clickControl(document.body, 'Keep saved calibration');
+    expect(useStore.getState().project.device.cameraModel).toBe(model);
+    expect(useCameraCalibrationStore.getState().open).toBe(false);
+  });
+
+  it('suggests saving the new calibration when the saved one is off', async () => {
+    const saved = savedCameraModel();
+    await act(async () => useStore.getState().updateDeviceProfile({ cameraModel: saved }));
+    useCameraStore.setState({ sourceState: { kind: 'live', source } });
+    const drift = { rmsMm: 2.1, maxMm: 2.6, meanDxMm: -2, meanDyMm: 0.4, marks: 90 };
+    vi.mocked(photographTarget).mockResolvedValue({
+      kind: 'ok',
+      result: result({ savedCheck: { kind: 'measured', drift, saved } }),
+    });
+    await act(async () => useCameraCalibrationStore.getState().openCheck(saved));
+    await mountControl(<CameraCalibrationWizard />);
+    await clickControl(document.body, 'Take photo');
+    expect(document.body.textContent).toContain('The saved calibration is off by about 2.1 mm.');
+    expect(document.body.textContent).toContain('2.0 mm to the left and 0.4 mm lower');
+    expect(control(document.body, 'Save new calibration').className).toContain('lf-btn--primary');
+    await clickControl(document.body, 'Save new calibration');
+    expect(useStore.getState().project.device.cameraModel).toEqual(savedCameraModel());
   });
 
   it.each(['cancel', 'close'] as const)(

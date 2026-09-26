@@ -9,17 +9,10 @@ import {
   type CameraCaptureBinding,
 } from '../camera-capture-binding';
 import type { FisheyeDistortion } from '../fisheye';
+import { normalizeCameraModelAccuracy, type CameraModelAccuracy } from './camera-model-accuracy';
 import { cameraCentre, scaleLens, type CameraPose, type LensModel } from './camera-model';
 
-export type CameraModelAccuracy = {
-  /** Root-mean-square distance between each engraved ring and where the model puts it, mm. */
-  readonly rmsErrorMm: number;
-  readonly maxErrorMm: number;
-  readonly foundMarks: number;
-  readonly expectedMarks: number;
-  /** Surface height of the engraved target the fit was measured at, mm. */
-  readonly targetHeightMm: number;
-};
+export type { CameraModelAccuracy } from './camera-model-accuracy';
 
 export type CameraModelRecord = {
   readonly version: 1;
@@ -63,7 +56,7 @@ export function normalizeCameraModelRecord(value: unknown): CameraModelRecord | 
   if (!isRecord(value) || value['version'] !== 1) return undefined;
   const lens = normalizeLens(value['lens']);
   const pose = normalizePose(value['pose']);
-  const accuracy = normalizeAccuracy(value['accuracy']);
+  const accuracy = normalizeCameraModelAccuracy(value['accuracy']);
   const calibratedAt = value['calibratedAt'];
   if (lens === undefined || pose === undefined || accuracy === undefined) return undefined;
   if (typeof calibratedAt !== 'string' || calibratedAt.length === 0) return undefined;
@@ -120,25 +113,6 @@ function normalizePose(value: unknown): CameraPose | undefined {
   };
 }
 
-function normalizeAccuracy(value: unknown): CameraModelAccuracy | undefined {
-  if (!isRecord(value)) return undefined;
-  const rmsErrorMm = nonNegative(value['rmsErrorMm']);
-  const maxErrorMm = nonNegative(value['maxErrorMm']);
-  const foundMarks = nonNegative(value['foundMarks']);
-  const expectedMarks = nonNegative(value['expectedMarks']);
-  const targetHeightMm = nonNegative(value['targetHeightMm']);
-  if (
-    rmsErrorMm === undefined ||
-    maxErrorMm === undefined ||
-    foundMarks === undefined ||
-    expectedMarks === undefined ||
-    targetHeightMm === undefined
-  ) {
-    return undefined;
-  }
-  return { rmsErrorMm, maxErrorMm, foundMarks, expectedMarks, targetHeightMm };
-}
-
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value);
 }
@@ -150,11 +124,6 @@ function finite(value: unknown): number | undefined {
 function positive(value: unknown): number | undefined {
   const n = finite(value);
   return n !== undefined && n > 0 ? n : undefined;
-}
-
-function nonNegative(value: unknown): number | undefined {
-  const n = finite(value);
-  return n !== undefined && n >= 0 ? n : undefined;
 }
 
 function finiteTuple(value: unknown, length: number): number[] | undefined {

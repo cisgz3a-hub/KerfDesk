@@ -28,6 +28,9 @@ export function CalibrationSetupStep(props: { readonly note: string | null }): J
   const rings = bedTargetLayout({ area }).marks.length;
 
   const engrave = async (): Promise<void> => {
+    // A new target is engraved where the margin puts it, whatever area an
+    // earlier target (a check of the saved calibration) had.
+    useCameraCalibrationStore.setState({ targetArea: null });
     const earlierJob = useLaserStore.getState().streamer;
     setStep({ kind: 'engraving', started: false, earlierJob });
     const started = await engraveCalibrationTarget(settings);

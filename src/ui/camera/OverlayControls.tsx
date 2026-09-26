@@ -9,6 +9,7 @@ import { useStore } from '../state';
 import { useCameraStore } from '../state/camera-store';
 import { useCameraPlacementControls } from './use-camera-placement-controls';
 import { TraceFromCameraButton } from './TraceFromCameraButton';
+import { AccuracyMapToggle } from './accuracy/AccuracyMapToggle';
 
 export function OverlayControls(): JSX.Element | null {
   const model = useStore((s) => s.project.device.cameraModel);
@@ -79,6 +80,7 @@ function OverlayActionRow(props: {
         Live
       </button>
       <TraceFromCameraButton />
+      <AccuracyMapToggle />
       {props.placement.active ? <ExitPlacementButton onExit={props.placement.exit} /> : null}
     </div>
   );

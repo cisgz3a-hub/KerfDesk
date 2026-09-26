@@ -26,6 +26,11 @@ const record: CameraModelRecord = {
     foundMarks: 98,
     expectedMarks: 100,
     targetHeightMm: 3,
+    targetArea: { x: 5, y: 5, width: 390, height: 390 },
+    marks: [
+      { x: 25, y: 25, dxMm: 0.05, dyMm: -0.02 },
+      { x: 65, y: 25, dxMm: 1.4, dyMm: 0.3, rejected: true },
+    ],
   },
   calibratedAt: '2026-09-26T15:00:00.000Z',
 };
@@ -34,6 +39,12 @@ describe('normalizeCameraModelRecord', () => {
   it('round-trips a saved record through JSON', () => {
     const restored = normalizeCameraModelRecord(JSON.parse(JSON.stringify(record)));
     expect(restored).toEqual(record);
+  });
+
+  it('keeps a record saved without its rings or target area', () => {
+    const { marks: _marks, targetArea: _area, ...summary } = record.accuracy;
+    const bare = { ...record, accuracy: summary };
+    expect(normalizeCameraModelRecord(bare)).toEqual(bare);
   });
 
   it('keeps a record saved without a capture binding', () => {
@@ -55,6 +66,24 @@ describe('normalizeCameraModelRecord', () => {
     ['a negative error', { ...record, accuracy: { ...record.accuracy, rmsErrorMm: -1 } }],
     ['an empty calibration time', { ...record, calibratedAt: '' }],
     ['a broken capture binding', { ...record, capture: { version: 2 } }],
+    [
+      'a ring without an error',
+      { ...record, accuracy: { ...record.accuracy, marks: [{ x: 1, y: 2, dxMm: 0.1 }] } },
+    ],
+    [
+      'a ring rejected with a non-boolean',
+      {
+        ...record,
+        accuracy: { ...record.accuracy, marks: [{ x: 1, y: 2, dxMm: 0, dyMm: 0, rejected: 1 }] },
+      },
+    ],
+    [
+      'an empty target area',
+      {
+        ...record,
+        accuracy: { ...record.accuracy, targetArea: { x: 0, y: 0, width: 0, height: 5 } },
+      },
+    ],
   ])('rejects %s', (_label, value) => {
     expect(normalizeCameraModelRecord(value)).toBeUndefined();
   });

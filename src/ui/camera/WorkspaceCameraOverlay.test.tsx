@@ -100,6 +100,7 @@ beforeEach(() => {
     overlayStill: null,
     overlayStillCapture: null,
     surfaceHeightMm: 12,
+    accuracyMapVisible: false,
     sourceState: { kind: 'idle' },
   });
   container = document.createElement('div');
@@ -162,6 +163,25 @@ describe('WorkspaceCameraOverlay', () => {
       expect(container.querySelector('[role="status"]')).toBeNull();
     },
   );
+
+  it('draws the accuracy map over the picture only when it is switched on', () => {
+    const model = savedCameraModel(USB);
+    const withRings = {
+      ...model,
+      accuracy: { ...model.accuracy, marks: [{ x: 25, y: 25, dxMm: 0.1, dyMm: 0 }] },
+    };
+    const project = useStore.getState().project;
+    useStore.setState({
+      project: { ...project, device: { ...project.device, cameraModel: withRings } },
+    });
+    useCameraStore.setState({ overlayStill: still() });
+    render();
+    expect(container.querySelector('[data-testid="camera-accuracy-map"]')).toBeNull();
+    act(() => useCameraStore.getState().setAccuracyMapVisible(true));
+    expect(container.querySelectorAll('[data-testid="camera-accuracy-map"] circle')).toHaveLength(
+      1,
+    );
+  });
 
   it('redraws when the material height changes', () => {
     saveModel();

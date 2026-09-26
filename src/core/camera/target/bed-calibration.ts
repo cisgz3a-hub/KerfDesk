@@ -36,6 +36,8 @@ export type BedCalibrationInput = {
 export type MarkError = {
   readonly x: number;
   readonly y: number;
+  /** Where the ring was found in the photo, px. */
+  readonly pixel: { readonly x: number; readonly y: number };
   /** Where the fitted model puts the detected ring, minus where it was engraved (mm). */
   readonly dxMm: number;
   readonly dyMm: number;
@@ -105,6 +107,7 @@ export function calibrateFromBedTarget(
     return {
       x: c.mark.x,
       y: c.mark.y,
+      pixel: c.pixel,
       dxMm: seen === null ? Number.NaN : seen.x - c.mark.x,
       dyMm: seen === null ? Number.NaN : seen.y - c.mark.y,
       rejected: Number.isNaN(residuals[i] ?? Number.NaN),

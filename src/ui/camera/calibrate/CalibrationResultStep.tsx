@@ -8,14 +8,20 @@ import type { MarkError } from '../../../core/camera/target/bed-calibration';
 import { useStore } from '../../state';
 import { calibrationGrade, type CalibrationGrade } from './calibration-result';
 import { useCameraCalibrationStore, type CalibrationResult } from './camera-calibration-store';
+import {
+  FAIR_RING_MM,
+  GOOD_RING_MM,
+  REJECTED_RING_COLOUR,
+  ringErrorColour,
+} from '../accuracy/ring-error-colour';
 import { RgbaCanvas } from './RgbaCanvas';
+import { savedCalibrationVerdict } from './saved-calibration-check';
+import { SavedCalibrationCheckNote } from './SavedCalibrationCheckNote';
 import { columnStyle, noteStyle, rowStyle } from './wizard-styles';
 
 // Above this the photo alone leaves the camera height loose enough to shift
 // thick material by a visible amount (ADR-440).
 const HEIGHT_ADVICE_SIGMA_MM = 10;
-const GOOD_RING_MM = 0.25;
-const FAIR_RING_MM = 0.6;
 
 export function CalibrationResultStep(props: {
   readonly result: CalibrationResult;
@@ -24,41 +30,72 @@ export function CalibrationResultStep(props: {
   const { result } = props;
   const { record } = result;
   const grade = calibrationGrade(record);
-  const setStep = useCameraCalibrationStore((s) => s.setStep);
+  const checking = useCameraCalibrationStore((s) => s.mode) === 'check';
+  const check =
+    result.savedCheck === null ? null : <SavedCalibrationCheckNote check={result.savedCheck} />;
 
   return (
     <div style={columnStyle}>
+      {checking ? check : null}
       <p style={{ margin: 0, fontWeight: 600, color: TONE_COLORS[grade.tone] }}>{grade.headline}</p>
       <AccuracyFigures result={result} />
       {grade.advice === null ? null : <p style={noteStyle}>{grade.advice}</p>}
       {heightAdvice(result)}
+      {checking ? null : check}
       <BedAccuracyMap result={result} />
-      <div style={rowStyle}>
+      <ResultActions result={result} checking={checking} save={props.save} />
+    </div>
+  );
+}
+
+// A check that finds the camera where it was makes keeping the saved
+// calibration the suggested action; anything else suggests saving the new one.
+function ResultActions(props: {
+  readonly result: CalibrationResult;
+  readonly checking: boolean;
+  readonly save: (result: CalibrationResult) => void;
+}): JSX.Element {
+  const { savedCheck } = props.result;
+  const closeWizard = useCameraCalibrationStore((s) => s.closeWizard);
+  const setStep = useCameraCalibrationStore((s) => s.setStep);
+  const unchanged = savedCheck?.kind === 'measured' && !savedCalibrationVerdict(savedCheck).moved;
+  const keepFirst = props.checking && unchanged;
+  return (
+    <div style={rowStyle}>
+      <button
+        type="button"
+        className={keepFirst ? 'lf-btn' : 'lf-btn lf-btn--primary'}
+        onClick={() => props.save(props.result)}
+        title="Save this calibration to the machine profile and show the corrected camera on the canvas."
+      >
+        {savedCheck === null ? 'Save calibration' : 'Save new calibration'}
+      </button>
+      {savedCheck === null ? null : (
         <button
           type="button"
-          className="lf-btn lf-btn--primary"
-          onClick={() => props.save(result)}
-          title="Save this calibration to the machine profile and show the corrected camera on the canvas."
+          className={keepFirst ? 'lf-btn lf-btn--primary' : 'lf-btn'}
+          onClick={closeWizard}
+          title="Close without changing the saved calibration."
         >
-          Save calibration
+          Keep saved calibration
         </button>
-        <button
-          type="button"
-          className="lf-btn"
-          onClick={() => setStep({ kind: 'photo', status: { kind: 'idle' } })}
-          title="Discard this result and take the photo again."
-        >
-          Take photo again
-        </button>
-        <button
-          type="button"
-          className="lf-btn"
-          onClick={() => setStep({ kind: 'setup', note: null })}
-          title="Discard this result and change the target settings or engrave a new target."
-        >
-          Change settings
-        </button>
-      </div>
+      )}
+      <button
+        type="button"
+        className="lf-btn"
+        onClick={() => setStep({ kind: 'photo', status: { kind: 'idle' } })}
+        title="Discard this result and take the photo again."
+      >
+        Take photo again
+      </button>
+      <button
+        type="button"
+        className="lf-btn"
+        onClick={() => setStep({ kind: 'setup', note: null })}
+        title="Discard this result and change the target settings or engrave a new target."
+      >
+        Change settings
+      </button>
     </div>
   );
 }
@@ -144,18 +181,12 @@ function RingMark(props: { readonly mark: MarkError; readonly bedWidth: number }
         cy={mark.y}
         r={radius * 1.4}
         fill="none"
-        stroke="var(--lf-danger-fg)"
+        stroke={REJECTED_RING_COLOUR}
         strokeWidth={radius / 2}
       />
     );
   }
-  const fill =
-    error <= GOOD_RING_MM
-      ? 'var(--lf-success-fg)'
-      : error <= FAIR_RING_MM
-        ? 'var(--lf-warning-fg)'
-        : 'var(--lf-danger-fg)';
-  return <circle cx={mark.x} cy={mark.y} r={radius} fill={fill} />;
+  return <circle cx={mark.x} cy={mark.y} r={radius} fill={ringErrorColour(error)} />;
 }
 
 const TONE_COLORS: Readonly<Record<CalibrationGrade['tone'], string>> = {

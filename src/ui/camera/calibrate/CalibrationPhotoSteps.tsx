@@ -64,15 +64,16 @@ export function PhotoStep(props: {
 }): JSX.Element {
   const sourceState = useCameraStore((s) => s.sourceState);
   const setStep = useCameraCalibrationStore((s) => s.setStep);
+  const checking = useCameraCalibrationStore((s) => s.mode) === 'check';
   const { take, cancel } = props;
   const running = props.status.kind === 'running';
 
   return (
     <div style={columnStyle}>
       <p style={noteStyle}>
-        Leave the engraved sheet exactly where it is. Move the laser head to a corner so it does not
-        cover the three solid discs in the middle, light the bed evenly, and put the lid where it
-        normally sits when you work.
+        {checking ? CHECK_GUIDANCE : 'Leave the engraved sheet exactly where it is. '}
+        Move the laser head to a corner so it does not cover the three solid discs in the middle,
+        light the bed evenly, and put the lid where it normally sits when you work.
       </p>
       {sourceState.kind === 'live' ? (
         <CameraSourceView source={sourceState.source} />
@@ -115,3 +116,8 @@ export function PhotoStep(props: {
     </div>
   );
 }
+
+// The check compares the photo with where the rings were engraved, so a
+// sheet moved since then reads as a moved camera.
+const CHECK_GUIDANCE =
+  'The target sheet from the last calibration must lie exactly where it was engraved. If it has moved or is gone, go Back and engrave a new one. ';

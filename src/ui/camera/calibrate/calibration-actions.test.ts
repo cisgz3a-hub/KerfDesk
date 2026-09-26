@@ -7,7 +7,11 @@
 import { beforeAll, describe, expect, it, vi } from 'vitest';
 import type * as FrameSource from '../frame-source';
 import type { CameraCaptureBinding } from '../../../core/camera/camera-capture-binding';
-import { overheadPose, wideLens } from '../../../core/camera/model/model-fixtures';
+import {
+  overheadPose,
+  savedCameraModel,
+  wideLens,
+} from '../../../core/camera/model/model-fixtures';
 import type { RgbaImage } from '../../../core/camera/rgba-image';
 import { bedTargetLayout } from '../../../core/camera/target/bed-target';
 import { renderTargetScene } from '../../../core/camera/target/target-render-fixtures';
@@ -93,6 +97,28 @@ describe('photographTarget', () => {
     });
     expect(bedImage).toMatchObject({ width: BED, height: BED });
     expect(outcome.result.usedMeasuredHeight).toBe(false);
+    expect(outcome.result.savedCheck).toBeNull();
+    expect(record.accuracy.targetArea).toEqual(targetAreaForBed(BED, BED, SETTINGS.marginMm));
+    expect(record.accuracy.marks?.length).toBe(record.accuracy.foundMarks);
+  }, 20_000);
+
+  it('measures the saved calibration on the same photo', async () => {
+    vi.mocked(captureSourceFrame).mockResolvedValueOnce(photo);
+    // The saved model is the camera that rendered the photo, at another size.
+    const outcome = await photographTarget({
+      source,
+      settings: SETTINGS,
+      bedWidthMm: BED,
+      bedHeightMm: BED,
+      saved: savedCameraModel(),
+    });
+    expect(outcome.kind).toBe('ok');
+    if (outcome.kind !== 'ok') return;
+    const check = outcome.result.savedCheck;
+    expect(check?.kind).toBe('measured');
+    if (check?.kind !== 'measured') return;
+    expect(check.drift.marks).toBeGreaterThanOrEqual(80);
+    expect(check.drift.rmsMm).toBeLessThan(0.3);
   }, 20_000);
 
   it('says what to check when the photo shows no target', async () => {
