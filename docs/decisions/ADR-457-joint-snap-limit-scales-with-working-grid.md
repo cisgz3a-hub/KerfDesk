@@ -48,7 +48,16 @@ leg at (41.50, 0.10).
   and 2x outputs have the same vertex count with every vertex within 0.05 source px of the 1x
   output. All three cases fail on the previous code.
 - Bake-off (harness v3, regression set plus `owl-2x`, contestants P-default and O-default, one
-  timing run), before = a10013827, after = this change: BAKEOFF_RESULTS_PLACEHOLDER
+  timing run), before = a10013827, after = this change: all 80 fixtures give identical metrics
+  for both contestants (O-default mean IoU 0.94738 before and after), and all 160 output SVGs under
+  `work/` are byte-identical. 20 of the fixtures trace O-default on a 2x upscaled grid
+  (thin-bars, text-small, text-large, topology, hairlines, small-features, ramp-linear,
+  ramp-vignette, text-lowres, two calibration cases). None of them has a shared joint whose
+  line intersection lies between 2 and 4 grid px from its vertex, so none changes. Owl, owl-2x
+  and hummingbird trace on a native grid (owl-2x's requested 2x is reduced to 1x by the work
+  budget), so they cannot change, and they do not. There is no regression. The change is only
+  visible where the sweep above shows it: gentle bends between noisy straights on a supersampled
+  grid.
 
 ### Consequences
 
