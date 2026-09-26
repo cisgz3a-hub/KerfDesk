@@ -1,5 +1,5 @@
 import type { ColoredPath } from '../../core/scene';
-import { TRACE_NODE_KINDS, traceNodes } from './trace-point-nodes';
+import { TRACE_NODE_KINDS, traceNodes, type TraceNodes } from './trace-point-nodes';
 
 const MAX_CANVAS_PIXELS = 4_194_304;
 const MAX_CANVAS_EDGE = 4096;
@@ -48,8 +48,8 @@ export function tracePointsBitmapSize(
 
 /** View-only node markers (trace-point-nodes.ts): squares for corner nodes,
  * circles for smooth nodes and for polyline samples of paths without curves.
- * Nearby screen overlaps share a marker; original coordinates remain
- * untouched. Bounded paint batches avoid building another enormous native
+ * Nearby screen overlaps share a marker, and a corner wins its cell over a
+ * round marker; original coordinates remain untouched. Bounded paint batches avoid building another enormous native
  * path for a dense photo. Returns the number of markers drawn. */
 export function paintTracePoints(
   context: CanvasRenderingContext2D,
@@ -79,10 +79,46 @@ export function paintTracePoints(
   const occupied = new Uint8Array(columns * rows);
   const marginX = (MARKER_RADIUS + MARKER_STROKE) * view.scaleX;
   const marginY = (MARKER_RADIUS + MARKER_STROKE) * view.scaleY;
-  let drawn = 0;
-  const { count, coordinates, kinds } = traceNodes(paths);
+  const nodes = traceNodes(paths);
+  const cells: DensityCells = { occupied, columns, rows, cellSize };
+  const marker: MarkerWindow = { view, marginX, marginY };
   context.beginPath();
+  // Corners claim their density cells first, so a corner square is never
+  // hidden behind a neighbouring round marker that happens to come earlier in
+  // path order; round markers then fill the cells that are still free.
+  let drawn = paintMarkers(context, nodes, cells, marker, true, 0);
+  drawn = paintMarkers(context, nodes, cells, marker, false, drawn);
+  flushMarkers(context);
+  return drawn;
+}
+
+type DensityCells = {
+  readonly occupied: Uint8Array;
+  readonly columns: number;
+  readonly rows: number;
+  readonly cellSize: number;
+};
+
+type MarkerWindow = {
+  readonly view: TracePointsWindow;
+  readonly marginX: number;
+  readonly marginY: number;
+};
+
+function paintMarkers(
+  context: CanvasRenderingContext2D,
+  nodes: TraceNodes,
+  cells: DensityCells,
+  marker: MarkerWindow,
+  corners: boolean,
+  alreadyDrawn: number,
+): number {
+  const { count, coordinates, kinds } = nodes;
+  const { occupied, columns, rows, cellSize } = cells;
+  const { view, marginX, marginY } = marker;
+  let drawn = alreadyDrawn;
   for (let node = 0; node < count; node += 1) {
+    if ((kinds[node] === CORNER_CODE) !== corners) continue;
     const pointX = coordinates[node * 2] as number;
     const pointY = coordinates[node * 2 + 1] as number;
     const x = pointX * view.scaleX - view.left;
@@ -93,7 +129,7 @@ export function paintTracePoints(
     const cell = row * columns + column;
     if (occupied[cell] !== 0) continue;
     occupied[cell] = 1;
-    if (kinds[node] === CORNER_CODE) {
+    if (corners) {
       context.rect(
         pointX - CORNER_HALF_SIDE,
         pointY - CORNER_HALF_SIDE,
@@ -107,7 +143,6 @@ export function paintTracePoints(
     drawn += 1;
     if (drawn % PAINT_BATCH === 0) flushMarkers(context);
   }
-  flushMarkers(context);
   return drawn;
 }
 

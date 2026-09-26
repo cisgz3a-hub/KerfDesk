@@ -56,11 +56,13 @@ describe('TracePreview comparison and inspection', () => {
     await render();
     expect(button('Trace').getAttribute('aria-label')).toBe('Show trace result');
     expect(button('Overlay').getAttribute('aria-pressed')).toBe('true');
-    expect(stage().querySelector('[aria-label="Trace points"]')).toBeNull();
+    expect(stage().querySelector('[aria-label="Trace nodes"]')).toBeNull();
     await click('Show Points');
     const trace = host.querySelector('#preview-line');
-    const points = host.querySelector('[aria-label="Trace points"]');
+    const points = host.querySelector('[aria-label="Trace nodes"]');
     expect(points).toBeInstanceOf(HTMLCanvasElement);
+    // The marker legend reaches assistive tech as the accessible description.
+    expect(points?.getAttribute('title')).toMatch(/Squares mark corner nodes; circles mark smooth/);
     const image = source();
 
     await click('Original');
@@ -76,7 +78,7 @@ describe('TracePreview comparison and inspection', () => {
     await click('Overlay');
     expect(image.hidden).toBe(false);
     expect(host.querySelector('#preview-line')).toBe(trace);
-    expect(host.querySelector('[aria-label="Trace points"]')).toBe(points);
+    expect(host.querySelector('[aria-label="Trace nodes"]')).toBe(points);
   });
 
   it('starts with a faded comparison and remembers its preference without fading Original', async () => {

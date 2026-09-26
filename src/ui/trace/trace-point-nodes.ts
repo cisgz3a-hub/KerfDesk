@@ -1,7 +1,8 @@
 // The trace preview's Show Points markers: the vector's real nodes, the
 // anchors a user edits after commit. Canonical curves (ColoredPath.curves)
 // give each subpath's start plus every segment's end point, so the marker
-// count follows Optimize and Smoothness. A path without curves has only its
+// count follows Optimize (and Smoothness only where it changes the fitted
+// segments; see ADR-447). A path without curves has only its
 // compatibility polyline, whose samples are the only points it can show.
 // Control handles are not markers (ADR-447).
 
@@ -23,7 +24,8 @@ export const TRACE_NODE_KINDS: ReadonlyArray<TraceNodeKind> = ['corner', 'smooth
 /** Flat, cache-friendly node list: x/y pairs and a kind code per node. */
 export type TraceNodes = {
   readonly count: number;
-  readonly coordinates: Float64Array;
+  /** x/y pairs; single precision is ample for view-only markers. */
+  readonly coordinates: Float32Array;
   readonly kinds: Uint8Array;
 };
 
@@ -40,7 +42,7 @@ export function traceNodes(paths: ReadonlyArray<ColoredPath>): TraceNodes {
   const cached = cache.get(paths);
   if (cached !== undefined) return cached;
   const count = traceNodeCount(paths);
-  const coordinates = new Float64Array(count * 2);
+  const coordinates = new Float32Array(count * 2);
   const kinds = new Uint8Array(count);
   let index = 0;
   const push = (point: Vec2, kind: TraceNodeKind): void => {
@@ -64,7 +66,8 @@ export function traceNodes(paths: ReadonlyArray<ColoredPath>): TraceNodes {
   return nodes;
 }
 
-/** Node count for the status line; matches what Show Points paints. */
+/** Node count for the status line: the node set Show Points paints before
+ *  density thinning merges markers that share a screen cell. */
 export function traceNodeCount(paths: ReadonlyArray<ColoredPath>): number {
   const cached = cache.get(paths);
   if (cached !== undefined) return cached.count;
@@ -102,19 +105,16 @@ function visitCurveNodes(
   curve: CurveSubpath,
   push: (point: Vec2, kind: TraceNodeKind) => void,
 ): void {
-  // A closed subpath that stops short of its start closes with an implicit
-  // straight edge; that edge is a real neighbour of the first and last nodes.
-  const implicitClose = curve.closed && curve.segments.length > 0 && !closesOnStart(curve);
-  const segments: ReadonlyArray<PathSegment> = implicitClose
-    ? [...curve.segments, { kind: 'line', to: curve.start }]
-    : curve.segments;
-  const route = { start: curve.start, segments };
+  const { segments } = curve;
+  const closing = implicitClosingEdge(curve);
+  const route: Route = { start: curve.start, segments, closing };
+  const routeLength = segments.length + (closing === null ? 0 : 1);
   const total = curveNodeTotal(curve);
-  const wraps = curve.closed && segments.length > 0;
+  const wraps = curve.closed && routeLength > 0;
   for (let node = 0; node < total; node += 1) {
     const point = node === 0 ? curve.start : (segments[node - 1] as PathSegment).to;
-    const incomingIndex = node > 0 ? node - 1 : wraps ? segments.length - 1 : -1;
-    const outgoingIndex = node < segments.length ? node : -1;
+    const incomingIndex = node > 0 ? node - 1 : wraps ? routeLength - 1 : -1;
+    const outgoingIndex = node < routeLength ? node : -1;
     const kind =
       incomingIndex < 0 || outgoingIndex < 0
         ? 'corner'
@@ -123,48 +123,102 @@ function visitCurveNodes(
   }
 }
 
-type Route = { readonly start: Vec2; readonly segments: ReadonlyArray<PathSegment> };
+/** A closed subpath that stops short of its start closes with an implicit
+ *  straight edge; that edge is a real neighbour of the first and last nodes.
+ *  It is indexed virtually (one object per subpath) rather than copied in. */
+function implicitClosingEdge(curve: CurveSubpath): PathSegment | null {
+  return curve.closed && curve.segments.length > 0 && !closesOnStart(curve)
+    ? { kind: 'line', to: curve.start }
+    : null;
+}
+
+type Route = {
+  readonly start: Vec2;
+  readonly segments: ReadonlyArray<PathSegment>;
+  /** The implicit closing edge, at index segments.length; null when none. */
+  readonly closing: PathSegment | null;
+};
+
+type MutableVec = { x: number; y: number };
+
+// Scratch tangents reused for every joint: a huge trace builds its node list
+// without allocating per joint.
+const incomingTangent: MutableVec = { x: 0, y: 0 };
+const outgoingTangent: MutableVec = { x: 0, y: 0 };
 
 function jointKind(route: Route, incomingIndex: number, outgoingIndex: number): TraceNodeKind {
-  const incoming = route.segments[incomingIndex] as PathSegment;
-  const outgoing = route.segments[outgoingIndex] as PathSegment;
+  const incoming = routeSegment(route, incomingIndex);
+  const outgoing = routeSegment(route, outgoingIndex);
   if (incoming.kind === 'line' && outgoing.kind === 'line') return 'corner';
-  const before = segmentTangents(segmentStart(route, incomingIndex), incoming).end;
-  const after = segmentTangents(segmentStart(route, outgoingIndex), outgoing).start;
+  setEndTangent(segmentStart(route, incomingIndex), incoming, incomingTangent);
+  setStartTangent(segmentStart(route, outgoingIndex), outgoing, outgoingTangent);
+  const before = incomingTangent;
+  const after = outgoingTangent;
   const lengths = Math.hypot(before.x, before.y) * Math.hypot(after.x, after.y);
   if (lengths <= EPSILON) return 'corner';
   return (before.x * after.x + before.y * after.y) / lengths >= SMOOTH_COS ? 'smooth' : 'corner';
 }
 
+function routeSegment(route: Route, index: number): PathSegment {
+  return index < route.segments.length
+    ? (route.segments[index] as PathSegment)
+    : (route.closing as PathSegment);
+}
+
 function segmentStart(route: Route, index: number): Vec2 {
-  return index === 0 ? route.start : (route.segments[index - 1] as PathSegment).to;
+  return index === 0 ? route.start : routeSegment(route, index - 1).to;
+}
+
+/** Direction of travel leaving `from` along the segment. */
+function setStartTangent(from: Vec2, segment: PathSegment, out: MutableVec): void {
+  switch (segment.kind) {
+    case 'line':
+      setDirection(out, segment.to, from);
+      return;
+    case 'cubic':
+      if (setDirection(out, segment.control1, from)) return;
+      if (setDirection(out, segment.control2, from)) return;
+      setDirection(out, segment.to, from);
+      return;
+    case 'elliptical-arc':
+      setArcTangent(from, segment, out, 'start');
+      return;
+  }
+}
+
+/** Direction of travel arriving at the segment's end. */
+function setEndTangent(from: Vec2, segment: PathSegment, out: MutableVec): void {
+  switch (segment.kind) {
+    case 'line':
+      setDirection(out, segment.to, from);
+      return;
+    case 'cubic':
+      if (setDirection(out, segment.to, segment.control2)) return;
+      if (setDirection(out, segment.to, segment.control1)) return;
+      setDirection(out, segment.to, from);
+      return;
+    case 'elliptical-arc':
+      setArcTangent(from, segment, out, 'end');
+      return;
+  }
+}
+
+function setArcTangent(
+  from: Vec2,
+  arc: Extract<PathSegment, { readonly kind: 'elliptical-arc' }>,
+  out: MutableVec,
+  end: 'start' | 'end',
+): void {
+  const tangents = arcTangents(from, arc);
+  if (tangents === null) {
+    setDirection(out, arc.to, from);
+    return;
+  }
+  out.x = tangents[end].x;
+  out.y = tangents[end].y;
 }
 
 type Tangents = { readonly start: Vec2; readonly end: Vec2 };
-
-/** Direction of travel leaving `from` and arriving at the segment's end. */
-function segmentTangents(from: Vec2, segment: PathSegment): Tangents {
-  const chord = difference(segment.to, from);
-  switch (segment.kind) {
-    case 'line':
-      return { start: chord, end: chord };
-    case 'cubic':
-      return {
-        start: firstNonZero(
-          difference(segment.control1, from),
-          difference(segment.control2, from),
-          chord,
-        ),
-        end: firstNonZero(
-          difference(segment.to, segment.control2),
-          difference(segment.to, segment.control1),
-          chord,
-        ),
-      };
-    case 'elliptical-arc':
-      return arcTangents(from, segment) ?? { start: chord, end: chord };
-  }
-}
 
 /** End tangents of an SVG elliptical arc via its centre parameterization. */
 function arcTangents(
@@ -205,15 +259,11 @@ function arcTangents(
   };
 }
 
-function firstNonZero(...candidates: ReadonlyArray<Vec2>): Vec2 {
-  for (const candidate of candidates) {
-    if (Math.abs(candidate.x) > EPSILON || Math.abs(candidate.y) > EPSILON) return candidate;
-  }
-  return { x: 0, y: 0 };
-}
-
-function difference(a: Vec2, b: Vec2): Vec2 {
-  return { x: a.x - b.x, y: a.y - b.y };
+/** Sets `out` to a - b; true when that direction is not degenerate. */
+function setDirection(out: MutableVec, a: Vec2, b: Vec2): boolean {
+  out.x = a.x - b.x;
+  out.y = a.y - b.y;
+  return Math.abs(out.x) > EPSILON || Math.abs(out.y) > EPSILON;
 }
 
 function samePoint(a: Vec2, b: Vec2): boolean {

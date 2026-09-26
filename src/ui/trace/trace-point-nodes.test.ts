@@ -170,6 +170,53 @@ describe('trace preview nodes', () => {
     });
   });
 
+  it('lets a corner win a shared density cell over a round marker that comes first', () => {
+    // One smooth G1 joint at (10,0) and, in a later path, a square corner a
+    // fraction of a pixel away: at fit zoom they share one 2px cell.
+    const smoothFirst: CurveSubpath = {
+      start: { x: 0, y: 0 },
+      closed: false,
+      segments: [
+        {
+          kind: 'cubic',
+          control1: { x: 3, y: 0 },
+          control2: { x: 7, y: 0 },
+          to: { x: 10, y: 0 },
+        },
+        {
+          kind: 'cubic',
+          control1: { x: 13, y: 0 },
+          control2: { x: 17, y: 0 },
+          to: { x: 30, y: 0 },
+        },
+      ],
+    };
+    const cornerLater: CurveSubpath = {
+      start: { x: 10.2, y: 0.2 },
+      closed: false,
+      segments: [{ kind: 'line', to: { x: 10.2, y: 20 } }],
+    };
+    const paths = curvePath(smoothFirst, cornerLater);
+    expect(kindsOf(paths)).toEqual(['corner', 'smooth', 'corner', 'corner', 'corner']);
+    const fit: TracePointsWindow = {
+      left: 0,
+      top: 0,
+      width: 40,
+      height: 30,
+      scaleX: 1,
+      scaleY: 1,
+    };
+    // The open ends at (0,0), (30,0), (10.2,20) are squares; the (10,0) cell
+    // shows the corner at (10.2,0.2), not the smooth joint that came first.
+    expect(paintedMarkers(paths, fit)).toEqual({ drawn: 4, round: 0, square: 4 });
+    // Zoomed in far enough to separate them, both markers show.
+    expect(paintedMarkers(paths, zoomedWindow(40, 30, 16))).toEqual({
+      drawn: 5,
+      round: 1,
+      square: 4,
+    });
+  });
+
   it('reads arc tangents: a circle of two arcs is smooth, an arc meeting a line square-on is a corner', () => {
     const circle: CurveSubpath = {
       start: { x: 0, y: 50 },
