@@ -115,9 +115,10 @@ export type SaddlePolicyInput = {
 const VOTE_RADII_SOURCE_PX: ReadonlyArray<number> = [2, 3, 4];
 // A widened ring decides only when |ink − paper| over it is at least 3/4 of
 // its area, i.e. at least 7/8 of the ring is one colour (4·|b| ≥ 3·area).
-// Measured (ADR-403 amendment 1): at 3/4 of the ring one colour, the rim of
-// a 2-px checkerboard patch on a page still welded (topology.clean outers
-// 40 → 17); isolated marks and pinholes have a uniform ring and pass.
+// Measured (ADR-403 amendment 1): looser tests (any unbalanced window, or a
+// whole window 3/4 one colour) welded the rim of a 2-px checkerboard patch
+// on a page (topology.clean outers 40 → 17, truth 40); isolated marks and
+// pinholes have a uniform ring and still decide.
 const RING_DECISIVE_QUARTERS = 3;
 // A grey tie is only settled when the bilinear saddle value clears the cut
 // by more than this many luma levels. Any binary pattern that is symmetric
