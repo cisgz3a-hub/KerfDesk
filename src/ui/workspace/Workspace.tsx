@@ -232,6 +232,7 @@ function useWorkspaceDraw(args: WorkspaceDrawArgs): void {
   // Phase G (B6): the pen tool's in-progress polyline (also redraws per click /
   // cursor move).
   const penDraft = useUiStore((s) => s.penDraft);
+  const wireframe = useUiStore((s) => s.wireframeView);
   const [rasterRedrawTick, setRasterRedrawTick] = useState(0);
   const colorScheme = useCanvasColorScheme();
   const previewBackgroundKey = useMemo(
@@ -256,6 +257,7 @@ function useWorkspaceDraw(args: WorkspaceDrawArgs): void {
       selectionMarquee,
       measureDraft,
       snapGuides,
+      wireframe,
     });
     // `args` is recreated by Workspace; its consumed fields are listed below.
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -287,6 +289,7 @@ function useWorkspaceDraw(args: WorkspaceDrawArgs): void {
     penDraft,
     selectionMarquee,
     snapGuides,
+    wireframe,
   ]);
 }
 
@@ -303,6 +306,7 @@ function drawWorkspaceScene(
     readonly selectionMarquee: ReturnType<typeof useUiStore.getState>['selectionMarquee'];
     readonly measureDraft: ReturnType<typeof useUiStore.getState>['measureDraft'];
     readonly snapGuides: ReturnType<typeof useUiStore.getState>['snapGuides'];
+    readonly wireframe: boolean;
   },
 ): void {
   drawScene(ctx, canvas.width, canvas.height, args.project, {
@@ -328,6 +332,7 @@ function drawWorkspaceScene(
     ...(state.snapGuides.length === 0 ? {} : { snapGuides: state.snapGuides }),
     ...(args.cncTabLayerColor === undefined ? {} : { cncTabLayerColor: args.cncTabLayerColor }),
     ...(args.artworkRunFocus === null ? {} : { artworkRunFocus: args.artworkRunFocus }),
+    wireframe: state.wireframe,
   });
 }
 

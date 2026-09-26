@@ -6,6 +6,12 @@ import {
   MAX_RASTER_LINES_PER_MM,
   MIN_RASTER_LINES_PER_MM,
 } from '../../core/raster';
+import {
+  DEFAULT_PERFORATION_CUT_MM,
+  DEFAULT_PERFORATION_SKIP_MM,
+  imageOverscanMmFor,
+  MAX_IMAGE_OVERSCAN_MM,
+} from '../../core/job/operation-cut-extras';
 import { DITHER_ALGORITHMS, type Layer, type LayerMode } from '../../core/scene';
 
 export type LayerPatch = Partial<Omit<Layer, 'id' | 'color'>>;
@@ -18,6 +24,9 @@ const MAX_KERF_OFFSET_MM = 10;
 const MIN_TAB_SIZE_MM = 0.01;
 const MAX_TAB_SIZE_MM = 100;
 const MAX_TABS_PER_SHAPE = 100;
+export const MAX_OVERCUT_MM = 50;
+export const MIN_PERFORATION_MM = 0.01;
+export const MAX_PERFORATION_MM = 100;
 
 export function readCutSettingsPatch(
   data: FormData,
@@ -52,6 +61,8 @@ export function readCutSettingsPatch(
     output: data.has('output'),
     airAssist: data.has('airAssist') ? true : layer.airAssist,
     ...lineSettings,
+    ...readLineExtrasPatch(data, layer, mode),
+    ...readImageOverscanPatch(data, layer, mode),
     ...fillSettings,
     ditherAlgorithm: parseDither(String(data.get('ditherAlgorithm') ?? layer.ditherAlgorithm)),
     linesPerMm,
@@ -138,6 +149,44 @@ function readLineSettingsPatch(data: FormData, layer: Layer, mode: LayerMode): L
       Math.floor(numberField(data, 'tabsPerShape', layer.tabsPerShape, 1, MAX_TABS_PER_SHAPE)),
     ),
     tabSkipInnerShapes: data.has('tabSkipInnerShapes'),
+  };
+}
+
+// ADR-415. The controls exist only in Cut Settings and only for their own
+// process; a form without them (another process, the material wizard) leaves
+// the operation's stored values untouched.
+function readLineExtrasPatch(data: FormData, layer: Layer, mode: LayerMode): LayerPatch {
+  if (mode !== 'line' || !data.has('perforationCutMm')) return {};
+  return {
+    overcutMm: numberField(data, 'overcutMm', layer.overcutMm ?? 0, 0, MAX_OVERCUT_MM),
+    perforationEnabled: data.has('perforationEnabled'),
+    perforationCutMm: numberField(
+      data,
+      'perforationCutMm',
+      layer.perforationCutMm ?? DEFAULT_PERFORATION_CUT_MM,
+      MIN_PERFORATION_MM,
+      MAX_PERFORATION_MM,
+    ),
+    perforationSkipMm: numberField(
+      data,
+      'perforationSkipMm',
+      layer.perforationSkipMm ?? DEFAULT_PERFORATION_SKIP_MM,
+      MIN_PERFORATION_MM,
+      MAX_PERFORATION_MM,
+    ),
+  };
+}
+
+function readImageOverscanPatch(data: FormData, layer: Layer, mode: LayerMode): LayerPatch {
+  if (mode !== 'image' || !data.has('imageOverscanMm')) return {};
+  return {
+    imageOverscanMm: numberField(
+      data,
+      'imageOverscanMm',
+      imageOverscanMmFor(layer),
+      0,
+      MAX_IMAGE_OVERSCAN_MM,
+    ),
   };
 }
 

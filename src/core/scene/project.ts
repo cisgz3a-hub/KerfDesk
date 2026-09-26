@@ -9,7 +9,9 @@ import type { PrintAndCutDesignTargets } from './print-and-cut';
 
 // v9 preserves owned image clips. Older readers would engrave the full source
 // bitmap if allowed to silently ignore its clip geometry.
-export const PROJECT_SCHEMA_VERSION = 9 as const;
+// v10 adds perforation and overcut (ADR-415). An older reader would ignore them
+// and cut straight through a perforated line.
+export const PROJECT_SCHEMA_VERSION = 10 as const;
 
 export type EmbeddedFont = {
   readonly key: string;

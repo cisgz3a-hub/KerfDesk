@@ -122,6 +122,17 @@ describe('object display resolution', () => {
     expect(faint.styleKey).not.toBe(design.styleKey);
   });
 
+  it('outlines Fill artwork in its operation colour in wireframe mode (ADR-410)', () => {
+    const object = traced([square(10)]);
+    const design = resolveObjectDisplay(object, layers('fill'), view, undefined, 'design');
+    const wireframe = resolveObjectDisplay(object, layers('fill'), view, undefined, 'wireframe');
+    expect(wireframe.paths[0]?.paint).toEqual({ kind: 'stroke', color: '#000000', output: true });
+    // A different style key makes a cached sprite of the filled artwork redraw.
+    expect(wireframe.styleKey).not.toBe(design.styleKey);
+    const line = resolveObjectDisplay(object, layers('line'), view, undefined, 'wireframe');
+    expect(line.paths[0]?.paint).toEqual({ kind: 'stroke', color: '#000000', output: true });
+  });
+
   it('skips paths whose operation is hidden and strokes orphan colours as themselves', () => {
     const hidden = sceneLayerVisibility.lookup([
       { ...createLayer({ id: '#000000', color: '#000000' }), visible: false },

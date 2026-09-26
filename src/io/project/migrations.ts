@@ -39,6 +39,8 @@ const MIGRATORS: Readonly<Record<number, Migrator>> = {
   // Legacy images keep their original pixels and external mask semantics.
   // No owned clip is invented when promoting an existing project.
   8: (raw) => ({ ...raw, schemaVersion: 9 }),
+  // Existing operations have no perforation or overcut and cut as before.
+  9: (raw) => ({ ...raw, schemaVersion: 10 }),
 };
 
 function migrateV3ToV4(raw: RawProject): RawProject | MigrationFailure {

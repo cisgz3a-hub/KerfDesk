@@ -38,6 +38,25 @@ describe('laserOperationDetail', () => {
     );
   });
 
+  it('adds perforation and overcut to a line operation only when set', () => {
+    const layer: Layer = {
+      ...baseLayer,
+      perforationEnabled: true,
+      perforationCutMm: 3,
+      perforationSkipMm: 1,
+      overcutMm: 1.5,
+    };
+    expect(laserOperationDetail(layer)).toBe(
+      'Kerf 0 mm · stored contour entry target 5 mm · tabs off · perforated 3 mm cut / 1 mm skip · overcut 1.5 mm on final pass · min power 0%',
+    );
+  });
+
+  it('shows an image overscan that differs from the 5 mm default', () => {
+    const image: Layer = { ...baseLayer, mode: 'image' };
+    expect(laserOperationDetail(image)).not.toContain('overscan');
+    expect(laserOperationDetail({ ...image, imageOverscanMm: 12 })).toContain('overscan 12 mm');
+  });
+
   it('summarizes a fill operation: style, hatch, direction, overscan', () => {
     const layer: Layer = { ...baseLayer, mode: 'fill', fillCrossHatch: true };
     expect(laserOperationDetail(layer)).toBe(

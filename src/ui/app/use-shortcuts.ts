@@ -15,6 +15,7 @@ import { useEffect, useRef } from 'react';
 import { isModalOpen, useUiStore } from '../state/ui-store';
 import { useCanvasTextStore } from '../text/canvas-text-store';
 import { usePlatform } from './platform-context';
+import { editingToolShortcutContext, handleEditingToolShortcut } from './editing-tool-shortcuts';
 import {
   editShortcutContext,
   fileShortcutContext,
@@ -44,6 +45,7 @@ export function useShortcuts(): void {
     };
     const onTransformViewKey = (e: KeyboardEvent): void => {
       if (keyboardOwnedElsewhere()) return;
+      if (handleEditingToolShortcut(e, editingToolShortcutContext())) return;
       if (handleTransformShortcut(e, transformShortcutContext())) return;
       handleViewShortcut(e, VIEW_SHORTCUT_CONTEXT);
     };
