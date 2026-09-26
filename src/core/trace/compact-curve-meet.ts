@@ -66,19 +66,49 @@ export function pieceBox(piece: CurvePiece): {
  * starts and meeting at that joint does not count.
  */
 export function piecesMeet(a: CurvePiece, b: CurvePiece, sharedJoint: boolean): boolean {
-  return meet(a, b, sharedJoint, 0);
+  return meet(part(a.p0, a.p1, a.p2, a.p3), part(b.p0, b.p1, b.p2, b.p3), sharedJoint, 0);
 }
 
 /** Whether a piece crosses or touches itself away from its own ends. */
 export function pieceMeetsItself(piece: CurvePiece): boolean {
-  return selfMeet(piece, 0);
+  return selfMeet(part(piece.p0, piece.p1, piece.p2, piece.p3), 0);
 }
 
-function meet(a: CurvePiece, b: CurvePiece, shared: boolean, depth: number): boolean {
-  if (!boxesOverlap(a, b)) return false;
+// A piece during subdivision, with its box (pieceBox) and, once measured,
+// its flatness: a piece kept while the other is halved is not measured again.
+type Part = CurvePiece & {
+  readonly minX: number;
+  readonly minY: number;
+  readonly maxX: number;
+  readonly maxY: number;
+  flat: number;
+};
+
+function part(p0: Vec2, p1: Vec2, p2: Vec2, p3: Vec2): Part {
+  return {
+    p0,
+    p1,
+    p2,
+    p3,
+    minX: Math.min(p0.x, p1.x, p2.x, p3.x),
+    minY: Math.min(p0.y, p1.y, p2.y, p3.y),
+    maxX: Math.max(p0.x, p1.x, p2.x, p3.x),
+    maxY: Math.max(p0.y, p1.y, p2.y, p3.y),
+    flat: Number.NaN,
+  };
+}
+
+// NaN until measured; a NaN flatness is measured again, to the same NaN.
+function flatnessOf(piece: Part): number {
+  if (Number.isNaN(piece.flat)) piece.flat = flatness(piece);
+  return piece.flat;
+}
+
+function meet(a: Part, b: Part, shared: boolean, depth: number): boolean {
+  if (!partsOverlap(a, b)) return false;
   if (shared && separatedAtJoint(a, b)) return false;
-  const flatA = flatness(a);
-  const flatB = flatness(b);
+  const flatA = flatnessOf(a);
+  const flatB = flatnessOf(b);
   if ((flatA <= LEAF_FLATNESS_PX && flatB <= LEAF_FLATNESS_PX) || depth >= MAX_DEPTH) {
     // Leaves at a shared joint meet there, which does not count.
     return !shared && chordDistance(a, b) <= flatA + flatB;
@@ -92,14 +122,18 @@ function meet(a: CurvePiece, b: CurvePiece, shared: boolean, depth: number): boo
   return meet(a, left, shared, depth + 1) || meet(a, right, false, depth + 1);
 }
 
+function partsOverlap(a: Part, b: Part): boolean {
+  return a.maxX >= b.minX && b.maxX >= a.minX && a.maxY >= b.minY && b.maxY >= a.minY;
+}
+
 // Halve a piece that is not yet flat; of two, the larger.
-function halveFirst(a: CurvePiece, b: CurvePiece, flatA: number, flatB: number): boolean {
+function halveFirst(a: Part, b: Part, flatA: number, flatB: number): boolean {
   if (flatB <= LEAF_FLATNESS_PX) return true;
   return flatA > LEAF_FLATNESS_PX && span(a) >= span(b);
 }
 
-function selfMeet(piece: CurvePiece, depth: number): boolean {
-  if (depth >= MAX_DEPTH || flatness(piece) <= LEAF_FLATNESS_PX) return false;
+function selfMeet(piece: Part, depth: number): boolean {
+  if (depth >= MAX_DEPTH || flatnessOf(piece) <= LEAF_FLATNESS_PX) return false;
   if (monotoneAlongChord(piece)) return false;
   const [left, right] = halve(piece);
   return (
@@ -148,17 +182,6 @@ function monotoneAlongChord(piece: CurvePiece): boolean {
   return along(p1) >= 0 && along(p2) >= along(p1) && along(p3) >= along(p2);
 }
 
-function boxesOverlap(a: CurvePiece, b: CurvePiece): boolean {
-  const boxA = pieceBox(a);
-  const boxB = pieceBox(b);
-  return (
-    boxA.maxX >= boxB.minX &&
-    boxB.maxX >= boxA.minX &&
-    boxA.maxY >= boxB.minY &&
-    boxB.maxY >= boxA.minY
-  );
-}
-
 function flatness(piece: CurvePiece): number {
   return Math.max(
     pointSegmentDistance(piece.p1, piece.p0, piece.p3),
@@ -166,12 +189,11 @@ function flatness(piece: CurvePiece): number {
   );
 }
 
-function span(piece: CurvePiece): number {
-  const box = pieceBox(piece);
-  return Math.max(box.maxX - box.minX, box.maxY - box.minY);
+function span(piece: Part): number {
+  return Math.max(piece.maxX - piece.minX, piece.maxY - piece.minY);
 }
 
-function halve(piece: CurvePiece): [CurvePiece, CurvePiece] {
+function halve(piece: CurvePiece): [Part, Part] {
   const { p0, p1, p2, p3 } = piece;
   const p01 = mid(p0, p1);
   const p12 = mid(p1, p2);
@@ -179,10 +201,7 @@ function halve(piece: CurvePiece): [CurvePiece, CurvePiece] {
   const p012 = mid(p01, p12);
   const p123 = mid(p12, p23);
   const p0123 = mid(p012, p123);
-  return [
-    { p0, p1: p01, p2: p012, p3: p0123 },
-    { p0: p0123, p1: p123, p2: p23, p3 },
-  ];
+  return [part(p0, p01, p012, p0123), part(p0123, p123, p23, p3)];
 }
 
 function mid(a: Vec2, b: Vec2): Vec2 {
