@@ -48,7 +48,12 @@ crossing level needs the two plateaus, not the kernel.
    -0.003 IoU. With the deadband that fixture is byte-identical to base.
 6. **Rejected level estimators.** Block means (an opposite edge's ramp pulls them; stars.scan -0.003
    IoU), block medians (a clean 8 px bar widened by 3.5% area), extrapolating up to 0.5 px past a
-   pixel centre on blurred ramps, and blocks one width further out were all measured worse.
+   pixel centre on blurred ramps, and blocks one width further out were all measured worse. A
+   trimmed extreme (the second darkest / second lightest value of the block) was measured
+   against the residual-loss fixtures and set aside as a wash. It turned solid-gold.scan from -0.0003
+   into a +0.0007/+0.0012 gain (Smooth/Sharp). But solid-dark-noise.scan stayed at -0.0007,
+   rounded-rects.clean stayed at -0.0004, and the gains on solid-dark-noise.clean and topology.scan
+   Sharp shrank.
 
 ### Rejected: a per-component ribbon level
 
