@@ -246,7 +246,7 @@ describe('TracePreview status', () => {
     );
   });
 
-  it('announces an error and reports result polylines and stored points when ready', async () => {
+  it('announces an error and reports result paths and vector nodes when ready', async () => {
     await render({ state: { kind: 'error', message: 'Image could not be traced.' } });
     expect(host.querySelector('[role="alert"]')?.textContent).toBe(
       'Preview failed: Image could not be traced.',
@@ -255,7 +255,7 @@ describe('TracePreview status', () => {
     expect(host.querySelector('[role="alert"]')).toBeNull();
     const status = host.querySelector('[role="status"]');
     expect(status?.textContent).toContain('2 paths');
-    expect(status?.textContent).toContain('4 points');
+    expect(status?.textContent).toContain('4 nodes');
     expect(status?.textContent).toContain('200 × 100 px');
   });
 
@@ -263,7 +263,7 @@ describe('TracePreview status', () => {
     await render({ state: { ...ready, paths: [], svg: '<svg viewBox="0 0 200 100"/>' } });
     const status = host.querySelector('[role="status"]');
     expect(status?.textContent).toContain('No trace paths found.');
-    expect(status?.textContent).toContain('0 points');
+    expect(status?.textContent).toContain('0 nodes');
   });
 });
 

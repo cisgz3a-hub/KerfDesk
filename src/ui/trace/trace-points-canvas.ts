@@ -1,10 +1,14 @@
 import type { ColoredPath } from '../../core/scene';
+import { TRACE_NODE_KINDS, traceNodes } from './trace-point-nodes';
 
 const MAX_CANVAS_PIXELS = 4_194_304;
 const MAX_CANVAS_EDGE = 4096;
 const MARKER_RADIUS = 1.6;
+// A corner square's half-side; its area roughly matches the round marker's.
+const CORNER_HALF_SIDE = 1.4;
 const MARKER_STROKE = 0.45;
 const PAINT_BATCH = 512;
+const CORNER_CODE = TRACE_NODE_KINDS.indexOf('corner');
 const DENSITY_CELL_PX = 2;
 
 export type TracePointsWindow = {
@@ -42,9 +46,11 @@ export function tracePointsBitmapSize(
   };
 }
 
-/** View-only density markers. Nearby screen overlaps share a marker; original
- * coordinates and every point in the trace remain untouched. Bounded paint
- * batches avoid building another enormous native path for a dense photo. */
+/** View-only node markers (trace-point-nodes.ts): squares for corner nodes,
+ * circles for smooth nodes and for polyline samples of paths without curves.
+ * Nearby screen overlaps share a marker; original coordinates remain
+ * untouched. Bounded paint batches avoid building another enormous native
+ * path for a dense photo. Returns the number of markers drawn. */
 export function paintTracePoints(
   context: CanvasRenderingContext2D,
   paths: ReadonlyArray<ColoredPath>,
@@ -74,24 +80,32 @@ export function paintTracePoints(
   const marginX = (MARKER_RADIUS + MARKER_STROKE) * view.scaleX;
   const marginY = (MARKER_RADIUS + MARKER_STROKE) * view.scaleY;
   let drawn = 0;
+  const { count, coordinates, kinds } = traceNodes(paths);
   context.beginPath();
-  for (const path of paths) {
-    for (const polyline of path.polylines) {
-      for (const point of polyline.points) {
-        const x = point.x * view.scaleX - view.left;
-        const y = point.y * view.scaleY - view.top;
-        if (!intersectsWindow(x, y, view, marginX, marginY)) continue;
-        const column = Math.max(0, Math.min(columns - 1, Math.floor(x / cellSize) + 1));
-        const row = Math.max(0, Math.min(rows - 1, Math.floor(y / cellSize) + 1));
-        const cell = row * columns + column;
-        if (occupied[cell] !== 0) continue;
-        occupied[cell] = 1;
-        context.moveTo(point.x + MARKER_RADIUS, point.y);
-        context.arc(point.x, point.y, MARKER_RADIUS, 0, 2 * Math.PI);
-        drawn += 1;
-        if (drawn % PAINT_BATCH === 0) flushMarkers(context);
-      }
+  for (let node = 0; node < count; node += 1) {
+    const pointX = coordinates[node * 2] as number;
+    const pointY = coordinates[node * 2 + 1] as number;
+    const x = pointX * view.scaleX - view.left;
+    const y = pointY * view.scaleY - view.top;
+    if (!intersectsWindow(x, y, view, marginX, marginY)) continue;
+    const column = Math.max(0, Math.min(columns - 1, Math.floor(x / cellSize) + 1));
+    const row = Math.max(0, Math.min(rows - 1, Math.floor(y / cellSize) + 1));
+    const cell = row * columns + column;
+    if (occupied[cell] !== 0) continue;
+    occupied[cell] = 1;
+    if (kinds[node] === CORNER_CODE) {
+      context.rect(
+        pointX - CORNER_HALF_SIDE,
+        pointY - CORNER_HALF_SIDE,
+        2 * CORNER_HALF_SIDE,
+        2 * CORNER_HALF_SIDE,
+      );
+    } else {
+      context.moveTo(pointX + MARKER_RADIUS, pointY);
+      context.arc(pointX, pointY, MARKER_RADIUS, 0, 2 * Math.PI);
     }
+    drawn += 1;
+    if (drawn % PAINT_BATCH === 0) flushMarkers(context);
   }
   flushMarkers(context);
   return drawn;
