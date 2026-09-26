@@ -53,6 +53,13 @@ function square(): ImportedSvg {
 }
 
 function tabRiseCount(depthMm: number, stockThicknessMm: number): number {
+  return compiledPasses(depthMm, stockThicknessMm).reduce(
+    (count, pass) => count + risesIn(pass),
+    0,
+  );
+}
+
+function compiledPasses(depthMm: number, stockThicknessMm: number): ReadonlyArray<CncPass> {
   const cnc: CncLayerSettings = {
     ...DEFAULT_CNC_LAYER_SETTINGS,
     cutType: 'profile-outside',
@@ -68,9 +75,18 @@ function tabRiseCount(depthMm: number, stockThicknessMm: number): number {
     DEFAULT_DEVICE_PROFILE,
     configWithStock(stockThicknessMm),
   );
-  return job.groups
-    .flatMap((group) => (group.kind === 'cnc' ? group.passes : []))
-    .reduce((count, pass) => count + risesIn(pass), 0);
+  return job.groups.flatMap((group) => (group.kind === 'cnc' ? group.passes : []));
+}
+
+/** The highest Z the tab rises reach: the tab top the machine cuts to. */
+function tabTopZ(depthMm: number, stockThicknessMm: number): number {
+  const riseZs = compiledPasses(depthMm, stockThicknessMm).flatMap((pass) =>
+    pass.kind === 'path3d'
+      ? pass.points.filter((point, index) => index > 0 && point.z > pass.points[index - 1]!.z)
+      : [],
+  );
+  if (riseZs.length === 0) throw new Error('Expected tab rises.');
+  return Math.max(...riseZs.map((point) => point.z));
 }
 
 function risesIn(pass: CncPass): number {
@@ -104,5 +120,28 @@ describe('stock-aware holding tabs (ADR-258 amendment 1)', () => {
   it('treats a floor exactly one tab height thick as holding the part', () => {
     expect(cutCanFreePart(17, TAB_HEIGHT_MM, 19)).toBe(false);
     expect(cutCanFreePart(17.5, TAB_HEIGHT_MM, 19)).toBe(true);
+  });
+});
+
+// ADR-258 amendment 3 (CNC audit TP-1): with a set stock thickness a kept tab is
+// one tab height above the stock bottom, so cutting on into the spoilboard no
+// longer thins it or drops it below the stock (6 mm stock, 2 mm tabs: top -4).
+describe('tabs measured from the stock bottom (ADR-258 amendment 3)', () => {
+  it('keeps full-height tabs when the cut runs 0.5 mm into the spoilboard', () => {
+    expect(tabTopZ(6.5, 6)).toBeCloseTo(-4, 6);
+  });
+
+  it('keeps tabs in the stock when the overcut is deeper than the tab height', () => {
+    // Measured from the cut floor this top was -6.15, below the -6 stock bottom.
+    expect(tabTopZ(8.15, 6)).toBeCloseTo(-4, 6);
+  });
+
+  it('measures a cut that stops just short of the stock bottom the same way', () => {
+    expect(tabTopZ(5.5, 6)).toBeCloseTo(-4, 6);
+  });
+
+  it('keeps the cut-floor rule while the stock thickness is still the shipped default', () => {
+    const stock = DEFAULT_CNC_MACHINE_CONFIG.stock.thicknessMm;
+    expect(tabTopZ(stock + 0.5, stock)).toBeCloseTo(-(stock + 0.5 - TAB_HEIGHT_MM), 6);
   });
 });

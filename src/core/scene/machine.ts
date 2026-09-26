@@ -308,7 +308,8 @@ export const DEFAULT_CNC_LAYER_SETTINGS: CncLayerSettings = {
   // Scoped to profile cut types (compile-cnc-job.ts:351) and to passes below the
   // tab top (passNeedsTabs), so pockets, engraves and shallow passes are untouched.
   // Amendment 1 also skips them where the floor under the cut is at least one tab
-  // height thick (cutCanFreePart), since that floor already holds the part.
+  // height thick (cutCanFreePart), since that floor already holds the part, and
+  // Amendment 3 measures a kept tab from the stock bottom when the stock is set.
   tabsEnabled: true,
   tabHeightMm: 2,
   tabWidthMm: 6,

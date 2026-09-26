@@ -3605,6 +3605,17 @@ explicitly marked below; the remaining controls and user-facing flows are planne
    thickness (ADR-258 Amendment 2). A value left from thicker stock would otherwise free the
    parts on the final pass with no tabs. The warning never blocks save or Start.
 
+#### Edge — tabs on a cut that reaches or passes the stock bottom (ADR-258 Amendment 3)
+1. With Stock thickness set, a kept tab is one tab height of material above the stock bottom,
+   however far the cut runs on into the spoilboard. On 6 mm stock, 2 mm tabs top out at Z-4 for a
+   6.5 mm and an 8.15 mm cut alike, and for a 5.5 mm cut that stops just short of the bottom. Job
+   Review's layer line says "above the stock bottom".
+2. The shipped Stock thickness reads as never set, so it still measures tabs up from the cut floor,
+   and extra depth thins them. The spoilboard warning then says how much of each tab stays in the
+   stock, or that the tabs sit below it and the part comes free, and asks for Stock thickness. With
+   Stock thickness set, it says the tabs stay full height and that this relies on the thickness
+   being right.
+
 #### Empty
 1. An operation with no bound geometry compiles to no passes and is skipped; no G-code group is
    emitted for it.
