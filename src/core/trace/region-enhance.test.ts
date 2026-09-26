@@ -220,10 +220,11 @@ describe('enhanceRegionPaths', () => {
         curves: [keptCurve, keptCurve],
       },
     ];
-    // In upscaled crop coordinates: a curved interior ring and an edge fragment.
+    // In upscaled crop coordinates (the crop starts at the 9 px context ring,
+    // source x = 1 + crop x / 2): a curved interior ring and an edge fragment.
     const traced: ColoredPath = {
       color: '#000000',
-      polylines: [square(0, 10, 20, 30), square(20, 20, 40, 40)],
+      polylines: [square(0, 10, 20, 30), square(38, 38, 58, 58)],
       curves: [
         {
           start: { x: 0, y: 10 },
@@ -231,13 +232,13 @@ describe('enhanceRegionPaths', () => {
           closed: true,
         },
         {
-          start: { x: 20, y: 20 },
+          start: { x: 38, y: 38 },
           segments: [
             {
               kind: 'cubic',
-              control1: { x: 30, y: 16 },
-              control2: { x: 44, y: 30 },
-              to: { x: 40, y: 40 },
+              control1: { x: 48, y: 34 },
+              control2: { x: 62, y: 48 },
+              to: { x: 58, y: 58 },
             },
           ],
           closed: true,

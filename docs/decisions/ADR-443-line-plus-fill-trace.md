@@ -165,3 +165,13 @@ length of every emitted path in working px, which is what a LINE-mode pass trave
   line drawn at exactly the Max stroke width can measure up to half a pixel over it at 45 degrees
   and fill. The measurement is right about the pixels; set the Max stroke width a little above the
   pen width. On the commit grid (2 samples per spot) that is a small fraction of the gate.
+
+### Amendment 1 - a cut end closes against the finished outline (2026-09-27)
+
+With the corner dial (ADR-439) the contour finisher can smooth more of the junction bump off the fill
+outline than the one-pixel reach covers: a 4 px pen line meeting a block at 20 degrees left its
+reached end 0.6 px outside the square outline. After the fill is traced, each cut end still outside
+the outline walks on along its arrival direction in 0.25 px steps, over ink only and at most the
+gate radius, and stops at the first point inside (`hybrid/junction-close.ts`). The seam rule is
+unchanged: no paper between stroke and fill, and the end burns at most one step past the outline
+beyond the reach.

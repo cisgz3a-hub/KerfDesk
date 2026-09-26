@@ -72,8 +72,10 @@ export class ContourMembership {
   ): TraceSteps<number> {
     // A lent index answers from the first query; otherwise the first query
     // scans and a second builds the crossing index.
-    const lent = this.indexed?.(points)?.index;
-    if (lent !== undefined) contour.index ??= lent;
+    if (contour.index === undefined) {
+      const lent = this.indexed?.(points)?.index;
+      if (lent !== undefined) contour.index = lent;
+    }
     if (contour.scanned || contour.index !== undefined) {
       contour.index ??= yield* crossingIndexSteps(points);
       return rayWinding(point, contour.index, this.orientation);
