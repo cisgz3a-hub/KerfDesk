@@ -60,6 +60,11 @@ from Potrace's documented behaviour only; no Potrace source was consulted (ADR-1
    user activation still covers it. Checked, the export passes `groupContours: true` to
    `exportSceneSvg`; unchecked, it passes no options, so the file is unchanged. PDF, EPS, DXF and
    GeoJSON have no group structure, so the option is SVG-only, as in Multi-File Trace.
+   The SVG writer only splits compounds whose boundaries it can prove simple and separated
+   before applying even-odd nesting. Crossing, duplicate or touching boundaries, unsuccessful
+   curve flattening, or exhausted bounded analysis retain the original compound in one group.
+   Nested nonzero-winding compounds also remain intact; disjoint nonzero islands can split.
+   This fallback preserves the original geometry and paint and never refuses an export.
 7. **Rotation and stretch are not added.** Potrace's rotation and stretch options exist because
    it has no scene; here the traced artwork is a scene object whose transform (rotate, scale,
    skew) already reaches File > Export artwork in every format. Multi-File Trace writes the
