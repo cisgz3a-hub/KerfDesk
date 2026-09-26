@@ -37,6 +37,7 @@ import {
   type DecimalGrid,
 } from '../../core/vector-export/decimal-grid';
 import { arcToCubics } from '../svg/flatten-curves';
+import { filledCurvesKept } from './collapsed-ring-subtrees';
 import { svgObjectMatrix } from '../svg/export-svg-paths';
 import { paintedPathBounds } from './painted-path-bounds';
 
@@ -191,10 +192,16 @@ export function gridCommands(curve: CurveSubpath, page: PreparedPage): GridComma
  */
 export function itemPathCommands(item: VectorPaintItem, page: PreparedPage): string[] {
   const n = (index: number): string => formatGridIndex(index, page.grid);
+  const curves = item.curves.filter((curve) => curve.segments.length > 0);
+  const paths = curves.map((curve) => gridCommands(curve, page));
+  // A filled contour whose control points collapse onto one grid line paints
+  // nothing; it is left out together with every contour nested in it, so none
+  // of them paints with the opposite fill (ADR-444 Amendment 1).
+  const kept = item.paint === 'fill' ? filledCurvesKept(curves, paths.map(commandPoints)) : null;
   const out: string[] = [];
-  for (const curve of item.curves) {
-    if (curve.segments.length === 0) continue;
-    for (const command of gridCommands(curve, page)) {
+  for (const [index, commands] of paths.entries()) {
+    if (kept !== null && kept[index] !== true) continue;
+    for (const command of commands) {
       if (command.op === 'close') out.push('h');
       else if (command.op === 'cubic') {
         const { c1, c2, p } = command;
@@ -204,6 +211,16 @@ export function itemPathCommands(item: VectorPaintItem, page: PreparedPage): str
     }
   }
   return out;
+}
+
+function commandPoints(commands: ReadonlyArray<GridCommand>): GridPoint[] {
+  return commands.flatMap((command) =>
+    command.op === 'close'
+      ? []
+      : command.op === 'cubic'
+        ? [command.c1, command.c2, command.p]
+        : [command.p],
+  );
 }
 
 /** Points per millimetre. */

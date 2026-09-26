@@ -51,8 +51,10 @@ type RingInfo = {
 };
 
 /**
- * Rings are open (the first point is not repeated), have at least three
- * points and are not collinear. Output polygons keep input order of outers.
+ * Rings are open (the first point is not repeated) and have at least three
+ * points that are not all collinear. A ring with zero net area is not simple
+ * (the result marks its item as crossing). Output polygons keep input
+ * order of outers.
  */
 export function fillRegionPolygons(
   rings: ReadonlyArray<ReadonlyArray<GridPoint>>,

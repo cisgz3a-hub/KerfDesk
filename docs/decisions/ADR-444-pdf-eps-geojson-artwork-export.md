@@ -149,3 +149,79 @@ consulted.
 - A default artwork-extent PDF or EPS page contains its actual quantized cubic geometry, plus 0.05 mm
   per side for strokes, and is never smaller than 3 pt. Arc-to-cubic approximation can extend
   beyond the source arc; only the painted page grows, while the source grid stays unchanged.
+
+### Amendment 1 - A grid-collapsed filled contour takes its subtree with it (2026-09-27)
+
+**Context.** Item 5 says a ring that collapses on the grid is dropped with its holes, but the
+GeoJSON writer did not do that. `openRing` returned null for a collapsed ring before nesting ran,
+so only that ring was dropped. A contour nested inside it could still snap to a real polygon: for
+example, a band about one grid step wide whose snapped corners fall on one line, with a hole
+whose snapped points do not. That hole then had no container. It was classed as an outer ring and
+written as a filled polygon, so paper became ink under both fill rules, with any island in it
+written as its hole. In the same way, an island inside a collapsed hole became a hole of the outer
+ring under even-odd, so ink became paper.
+
+PDF and EPS had the same defect in painted form. They write every contour's snapped control
+points and let the fill rule decide. A contour whose control points all snap onto one line paints
+no area and adds no winding, so the hole nested in it was painted as ink by the viewer. For a
+polygon contour the control points are its vertices, so this is exactly the GeoJSON collapse
+condition, not a rare curve case: on the fixture below the PDF content stream held the
+zero-area band followed by the hole's parallelogram, filled.
+
+Two fixes were considered:
+
+- (a) Decide nesting on the unsnapped geometry, then drop a collapsed contour together with its
+  whole subtree.
+- (b) Keep a collapsed outer ring and write a minimal valid polygon for it.
+
+GeoJSON must drop a collapsed ring, because RFC 7946 rings need four positions and an area.
+Option (b) would invent ink the source does not have, a polygon at least one grid step wide where
+the snapped band has none. Option (a) keeps the writers consistent with each other and follows
+one rule, stated here on its own terms: **no orphans** - a contour is only ever dropped together
+with everything nested inside it. (The tracer states the same invariant for admitted hairline
+loops in ADR-458 Amendment 1, proposed on branch `claude/tl-hairline-collapse` and not yet on
+main; this amendment does not depend on it.) Everything in a dropped subtree lies inside the
+collapsed contour. Per-axis rounding can collapse a contour up to about one grid diagonal
+(sqrt(2) grid steps) wide, so what is lost is at most that wide: the same order of error as the
+snapping itself.
+
+**Decision.** Option (a), in all three writers. `collapsed-ring-subtrees.ts` holds the rule:
+
+- A filled contour has **collapsed** when its written grid points (GeoJSON: snapped flattened
+  points; PDF/EPS: snapped move, line and Bezier control points) are fewer than three distinct
+  points or all collinear (`collapsesOnGrid`). A Bezier lies in the hull of its control points,
+  so such a contour paints nothing. Zero net area alone is not collapse: a symmetric bow-tie or
+  figure-eight whose snapped points are not collinear crosses itself. It is kept (GeoJSON sends
+  it down the existing crossing path, so the item is written `unmerged`; PDF/EPS paint it as
+  before) and it is never used as a container.
+- `contoursKeptAfterCollapse` takes the unsnapped flattened contours (flattened at 0.01 mm for
+  PDF/EPS, at the export tolerance for GeoJSON). For each collapsed contour that encloses any
+  area there, it drops every contour whose bounding box fits inside that contour's box, none of
+  whose vertices is outside it (nonzero winding), and none of whose edges properly crosses one of
+  its edges. So a contour that crosses the collapsed contour is kept, whichever vertex it starts
+  at, and a contour sharing only boundary with it from outside is kept. A contour lying wholly on
+  the boundary is a duplicate and collapses with it. Nesting is transitive for nested-or-disjoint
+  contours, so this removes the whole subtree: holes, their islands, and so on.
+- The GeoJSON writer then runs `fillRegionPolygons` on the rings that remain, as before. PDF and
+  EPS (`itemPathCommands`) omit the dropped subpaths of a filled item; stroked items are
+  unchanged, so a collapsed contour is still stroked.
+
+When nothing collapses, nothing changes, so the sample goldens are byte-identical. The SVG and
+DXF writers are not changed by this amendment and still write every contour, so an SVG viewer can
+still paint a hole nested in a collapsed contour as ink; bringing SVG under the same rule is left
+to a follow-up.
+
+**Evidence.** `src/io/vector-formats/geojson-collapsed-ring.test.ts` uses a 1 mm grid with an
+explicit page. It checks a band 0.98 mm wide along y = x/2, whose corners all snap to (0,0) or
+(8,4), with a hole inside it that snaps to a parallelogram and an island inside the hole that
+snaps to a triangle. Under even-odd and under nonzero, only a disjoint square is written to
+GeoJSON and only that square is painted in the PDF and EPS files. On the base, the hole was
+written (and painted) as a filled polygon. A second case puts the same band as a hole inside a
+large square, with the island inside the band; the outer stays solid, where on the base, under
+even-odd, the island became a hole. A control case scales the nest 10x; nothing collapses and the
+band keeps its hole. A triangle of 5.8 mm2 that crosses the band with one vertex inside it is kept
+for each of its three start vertices (the first version of this fix dropped it when it started
+inside the band). Squares in both lobes of a zero-area bow-tie are kept, whether the bow-tie's
+unsnapped area is slightly off zero or exactly zero, and the item is marked `unmerged` (the first
+version dropped both squares). Unit cases pin `collapsesOnGrid`, a contour touching the band only
+along its boundary (kept) and a duplicate of the band (dropped).

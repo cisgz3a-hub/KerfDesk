@@ -20,10 +20,14 @@
 // out, so the polygons show what the PDF and EPS files paint. Rings follow
 // the right-hand rule of section 3.1.6 (exterior counterclockwise, holes
 // clockwise, in the y-up frame). Every ring is closed (first position =
-// last) and has at least four positions; rings that collapse on the grid are
-// dropped. Contours that cross one another are not merged: that item's
-// polygons are written as separate features marked "unmerged": true, so the
-// file never claims an invalid MultiPolygon, and the caller is told.
+// last) and has at least four positions; a ring that collapses on the grid
+// (its snapped points collinear) is dropped together with every contour
+// nested inside it (nesting decided on the unsnapped contours,
+// collapsed-ring-subtrees, as the PDF and EPS writers do), so no hole or
+// island is orphaned and written with the wrong fill. Contours that cross one
+// another are not merged: that item's polygons are written as separate
+// features marked "unmerged": true, so the file never claims an invalid
+// MultiPolygon, and the caller is told.
 // Stroked items become LineString / MultiLineString features (a closed
 // contour's line ends where it starts). A bbox member (section 5) gives the
 // written extent.
@@ -37,6 +41,7 @@ import {
   type VectorPaintItem,
   type VectorWriteOptions,
 } from './vector-artwork';
+import { collapsesOnGrid, contoursKeptAfterCollapse } from './collapsed-ring-subtrees';
 import { fillRegionPolygons, twiceSignedArea } from './fill-region-rings';
 
 export const DEFAULT_GEOJSON_FLATTEN_TOLERANCE_MM = 0.01;
@@ -144,9 +149,14 @@ function filledPolygons(
   page: PreparedPage,
   tolerance: number,
 ): { polygons: Position[][][]; crossing: boolean } {
-  const rings = curves
-    .map((curve) => openRing(curve, page, tolerance))
-    .filter((ring): ring is GridPoint[] => ring !== null);
+  const sources = curves.map((curve) => flattened(curve, tolerance));
+  const snapped = sources.map((points) => openRing(points, page));
+  // A ring that collapses on the grid (collinear or fewer than three points)
+  // goes with its whole subtree, decided on the unsnapped contours, so no hole
+  // or island inside it is orphaned. A self-crossing ring with zero net area
+  // has not collapsed: it stays, and fillRegionPolygons reports the crossing.
+  const kept = contoursKeptAfterCollapse(sources, snapped.map(collapsesOnGrid));
+  const rings = snapped.filter((_, index) => kept[index] === true);
   const region = fillRegionPolygons(rings, fillRule);
   const closedRing = (index: number, counterclockwise: boolean): Position[] => {
     const ring = rings[index] as GridPoint[];
@@ -159,30 +169,15 @@ function filledPolygons(
   return { polygons, crossing: region.crossing };
 }
 
-/** An open ring on the grid (first point not repeated), or null when it collapses. */
-function openRing(curve: CurveSubpath, page: PreparedPage, tolerance: number): GridPoint[] | null {
-  const points = dedupe(flattened(curve, tolerance).map(page.toGrid));
+/** An open ring on the grid (first point not repeated, consecutive duplicates removed). */
+function openRing(flat: ReadonlyArray<Vec2>, page: PreparedPage): GridPoint[] {
+  const points = dedupe(flat.map(page.toGrid));
   const first = points[0];
   const last = points[points.length - 1];
   if (first !== undefined && last !== undefined && samePoint(first, last) && points.length > 1) {
     points.pop();
   }
-  if (points.length < 3 || !hasPaintedArea(points)) return null;
   return points;
-}
-
-// A self-crossing contour can paint two opposite-winding lobes whose signed
-// areas cancel. Only collinearity proves a zero-area ring has no ink; retain
-// every other case for the crossing-contour warning rather than dropping it.
-function hasPaintedArea(points: ReadonlyArray<GridPoint>): boolean {
-  if (twiceSignedArea(points) !== 0) return true;
-  const first = points[0];
-  const second = points[1];
-  if (first === undefined || second === undefined) return false;
-  return points.some(
-    (point) =>
-      (second.x - first.x) * (point.y - first.y) !== (second.y - first.y) * (point.x - first.x),
-  );
 }
 
 function lineString(curve: CurveSubpath, page: PreparedPage, tolerance: number): Position[] | null {
