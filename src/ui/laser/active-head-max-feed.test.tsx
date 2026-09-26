@@ -3,7 +3,10 @@
 import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { deserializeProject } from '../../io/project/deserialize-project';
+import { prepareProjectForPersistence } from '../../io/project/prepare-project-persistence';
 import { applyDetectedSettingsPatch } from '../state/detected-settings-action';
+import { projectWithCurrentJobSetup } from '../state/project-job-setup';
 import { useLaserStore } from '../state/laser-store';
 import { useStore } from '../state/store';
 import { resetStore } from '../state/test-helpers';
@@ -69,6 +72,50 @@ describe('detected controller settings go to the head in use', () => {
 
     useStore.getState().setMachineKind('cnc');
     expect(cncMaxFeed()).toBe(6000);
+  });
+});
+
+function saveAndReopen(): void {
+  const prepared = prepareProjectForPersistence(projectWithCurrentJobSetup(useStore.getState()));
+  if (prepared.kind !== 'ok') throw new Error(prepared.reason);
+  const opened = deserializeProject(prepared.json);
+  if (opened.kind !== 'ok') throw new Error('expected the saved project to reopen');
+  resetStore();
+  useStore.getState().setProject(opened.project);
+}
+
+describe('detected settings in CNC mode keep Undo whole', () => {
+  function applyHomingOffInCnc(): void {
+    const { homing } = useStore.getState().project.device;
+    useStore.getState().updateDeviceProfile({ homing: { ...homing, enabled: true } });
+    useStore.getState().setMachineKind('cnc');
+    useStore.getState().setJobPlacement({ startFrom: 'absolute', anchor: 'front-left' });
+    applyDetectedSettingsPatch({ homing: { ...homing, enabled: false } });
+    expect(useStore.getState().jobPlacement.startFrom).toBe('user-origin');
+  }
+
+  it('restores the live placement with the project through Undo and Redo', () => {
+    applyHomingOffInCnc();
+
+    useStore.getState().undo();
+    expect(useStore.getState().project.device.homing.enabled).toBe(true);
+    expect(useStore.getState().jobPlacement.startFrom).toBe('absolute');
+
+    useStore.getState().redo();
+    expect(useStore.getState().project.device.homing.enabled).toBe(false);
+    expect(useStore.getState().jobPlacement.startFrom).toBe('user-origin');
+  });
+
+  it('saves the restored placement after Undo', () => {
+    applyHomingOffInCnc();
+    useStore.getState().undo();
+
+    saveAndReopen();
+    expect(useStore.getState().project.machine?.kind).toBe('cnc');
+    expect(useStore.getState().jobPlacement).toEqual({
+      startFrom: 'absolute',
+      anchor: 'front-left',
+    });
   });
 });
 

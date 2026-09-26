@@ -51,6 +51,7 @@ leaks and give each head its own copy of those, with bed, origin, homing and con
    countdown and Job Review read CNC's own values through `core/cnc/cnc-head-feeds.ts`.
    Controller values applied outside Machine Setup follow the head in use: in CNC mode the
    reported max rate is CNC's Max feed, and the laser's Max feed, S range and laser mode stay.
+   One Undo reverts it with the live placement (`active-head-max-feed.test.tsx`).
    A CNC setup saved before this change has none, so the device values apply until the setup is
    first made or opened, when they are copied onto it. Machine Setup edits them in the CNC step;
    the laser's stay in the Work area step, shown only when the setup includes a laser.
@@ -76,4 +77,4 @@ leaks and give each head its own copy of those, with bed, origin, homing and con
   `layer-default-actions.test.ts`, `cnc-machine-starter-seeding.test.ts`,
   `import-actions.defaults.test.ts`, `parked-cnc-machine.test.ts`, `cnc-head-feeds.test.ts`,
   `cnc-own-feeds.test.ts`, `DeviceSetupCncMachineStep.speeds.test.tsx`,
-  `save-tiled-gcode.test.ts`, `mode-switch-settings.test.ts`, `active-head-max-feed.test.tsx`.
+  `save-tiled-gcode.test.ts`, `mode-switch-settings.test.ts`.

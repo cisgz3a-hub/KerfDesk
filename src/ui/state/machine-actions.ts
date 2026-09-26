@@ -22,11 +22,7 @@ import {
 import type { CncMachinePreset } from '../../core/cnc';
 import type { CncMachineStarterLiveCaps } from '../../core/cnc/machine-starters';
 import type { DeviceProfile } from '../../core/devices';
-import {
-  jobPlacementAfterDeviceChange,
-  jobPlacementAfterProfileSelection,
-  type JobPlacementSettings,
-} from '../job-placement';
+import { jobPlacementAfterDeviceChange, jobPlacementAfterProfileSelection } from '../job-placement';
 import type { CncLibrary } from './cnc-library-persistence';
 import { projectWithStockMaterial } from './cnc-project-material';
 import { applyCncTextDefaultsForScene } from './cnc-text-defaults';
@@ -36,16 +32,14 @@ import { nextProbeSetupState } from './probe-setup-history-identity';
 import { projectWithParkedCnc } from './parked-cnc-machine';
 import { modeSwitchState } from './mode-switch-settings';
 import { cncMachineWithOwnFeeds } from '../../core/cnc/cnc-head-feeds';
+import { captureSetupHistoryContext, type SetupHistoryContext } from './setup-history-context';
 
-type MachineState = {
+type MachineState = SetupHistoryContext & {
   readonly project: Project;
   readonly undoStack: ReadonlyArray<Project>;
   readonly redoStack: ReadonlyArray<Project>;
   readonly dirty: boolean;
-  readonly jobPlacement: JobPlacementSettings;
-  readonly cachedCncMachine: CncMachineConfig | null;
   readonly cncLiveCaps: CncMachineStarterLiveCaps | null;
-  readonly probeSetupEpoch: number;
   // App-level custom bits (H.7) merge into every CNC session's tool list.
   readonly cncLibrary: CncLibrary;
 };
@@ -249,6 +243,9 @@ function cncMachineSetupStatePatch(
 ): Partial<MachineState> {
   const machine = state.project.machine;
   if (machine?.kind !== 'cnc') return {};
+  // A device change can move live placement (homing off turns Absolute into
+  // User Origin); Undo/Redo must restore it with the project.
+  captureSetupHistoryContext(state.project, state);
   const baseDevice = patch.deviceProfile ?? state.project.device;
   const device: DeviceProfile = { ...baseDevice, ...patch.devicePatch };
   const params = { ...machine.params, ...patch.paramsPatch };
