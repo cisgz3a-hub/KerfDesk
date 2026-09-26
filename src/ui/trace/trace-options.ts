@@ -73,11 +73,16 @@ export function mergeLightBurnTraceSettings(
     out['traceTransparency'] = settings.traceTransparency;
   }
   if (settings.invert !== undefined) out['invert'] = settings.invert;
-  if (settings.turnPolicy !== undefined) out['turnPolicy'] = settings.turnPolicy;
+  Object.assign(out, turnPolicySetting(settings));
   if (preset.traceMode === 'edge') {
     applyEdgeTraceSettings(out, preset, settings);
   }
   return out as TraceOptions;
+}
+
+// Diagonal contacts (ADR-450); ignored by the lanes that do not resolve corners.
+function turnPolicySetting(settings: LightBurnTraceSettingOverrides): Partial<TraceOptions> {
+  return settings.turnPolicy === undefined ? {} : { turnPolicy: settings.turnPolicy };
 }
 
 function mergePhotoSettings(
