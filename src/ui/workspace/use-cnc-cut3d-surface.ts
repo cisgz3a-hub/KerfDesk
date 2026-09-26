@@ -1,10 +1,11 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import type { ReliefSurfaceMeshWithNormals } from '../../core/relief/relief-surface-mesh';
 import type { RemovalGrid } from '../../core/sim';
 import {
   isCncRemovalGridSuperseded,
   prepareCncCut3DSurfaceOffThread,
 } from './cnc-removal-grid-worker-client';
+import { createCoalescedJob, type CoalescedOutcome } from './coalesced-preview-job';
 
 export type CncCut3DSurfaceState =
   | { readonly kind: 'idle' }
@@ -28,9 +29,11 @@ type ReadySurface = Extract<CncCut3DSurfaceState, { readonly kind: 'ready' }>;
 const IDLE: CncCut3DSurfaceState = { kind: 'idle' };
 const LOADING: StoredState['value'] = { kind: 'loading' };
 
-/** Lazy, latest-only surface preparation for the explicit Cut 3D dialog.
- * While a newer grid is prepared the last surface stays up, so the open
- * viewer keeps its canvas and camera instead of dropping to a spinner. */
+/** Lazy surface preparation for the explicit Cut 3D dialog. While a newer
+ * grid is prepared the last surface stays up, so the open viewer keeps its
+ * canvas and camera instead of dropping to a spinner. A newer grid waits for
+ * the running surface rather than cancelling it (ADR-425), so playback on a
+ * slow machine still swaps new surfaces in. */
 export function useCncCut3DSurface(
   grid: RemovalGrid | null,
   active: boolean,
@@ -39,58 +42,64 @@ export function useCncCut3DSurface(
   const [lastReady, setLastReady] = useState<ReadySurface | null>(null);
   const nextRevision = useRef(0);
 
+  const job = useMemo(() => {
+    if (!active) return null;
+    return createCoalescedJob<RemovalGrid, ReliefSurfaceMeshWithNormals>(
+      (target, signal) => prepareCncCut3DSurfaceOffThread(target, signal),
+      (target, outcome) => {
+        if (outcome.kind !== 'done') {
+          setStored({ grid: target, value: unavailable(outcome) });
+          return;
+        }
+        nextRevision.current += 1;
+        const ready: ReadySurface = {
+          kind: 'ready',
+          mesh: outcome.value,
+          revision: nextRevision.current,
+          updating: false,
+        };
+        setStored({ grid: target, value: ready });
+        setLastReady(ready);
+      },
+      isCncRemovalGridSuperseded,
+    );
+  }, [active]);
+
   useEffect(() => {
-    if (!active || grid === null) {
+    if (job === null) {
       setStored(null);
       setLastReady(null);
       return;
     }
-    let cancelled = false;
-    const controller = new AbortController();
-    setStored({ grid, value: LOADING });
-    const pending = prepareCncCut3DSurfaceOffThread(grid, controller.signal);
-    if (pending === null) {
-      setStored({
-        grid,
-        value: { kind: 'unavailable', reason: 'Background 3D preparation is unavailable.' },
-      });
+    return () => job.cancel();
+  }, [job]);
+  useEffect(() => {
+    if (job === null) return;
+    if (grid !== null) {
+      job.request(grid);
       return;
     }
-    void pending.then(
-      (mesh) => {
-        if (!cancelled) {
-          nextRevision.current += 1;
-          const ready: ReadySurface = {
-            kind: 'ready',
-            mesh,
-            revision: nextRevision.current,
-            updating: false,
-          };
-          setStored({ grid, value: ready });
-          setLastReady(ready);
-        }
-      },
-      (error: unknown) => {
-        if (cancelled || isCncRemovalGridSuperseded(error)) return;
-        setStored({
-          grid,
-          value: {
-            kind: 'unavailable',
-            reason:
-              error instanceof Error
-                ? error.message
-                : 'Background 3D preparation did not complete.',
-          },
-        });
-      },
-    );
-    return () => {
-      cancelled = true;
-      controller.abort();
-    };
-  }, [active, grid]);
+    job.cancel();
+    setStored(null);
+    setLastReady(null);
+  }, [job, grid]);
 
   if (!active || grid === null) return IDLE;
   const value = stored?.grid === grid ? stored.value : LOADING;
   return value.kind === 'loading' && lastReady !== null ? { ...lastReady, updating: true } : value;
+}
+
+function unavailable(
+  outcome: Exclude<CoalescedOutcome<unknown>, { readonly kind: 'done' }>,
+): Extract<CncCut3DSurfaceState, { readonly kind: 'unavailable' }> {
+  if (outcome.kind === 'unavailable') {
+    return { kind: 'unavailable', reason: 'Background 3D preparation is unavailable.' };
+  }
+  return {
+    kind: 'unavailable',
+    reason:
+      outcome.error instanceof Error
+        ? outcome.error.message
+        : 'Background 3D preparation did not complete.',
+  };
 }

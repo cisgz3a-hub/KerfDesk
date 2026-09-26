@@ -2,12 +2,13 @@
 // stamping can take seconds after toolpath preparation, so no render/effect in
 // the browser realm calls computeCncRemovalGrid directly.
 
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import type { CncMachineConfig, Project } from '../../core/scene';
 import type { Vec2 } from '../../core/scene';
 import type { RemovalGrid } from '../../core/sim';
 import type { PreviewToolpath } from './preview-status';
 import { previewJobOriginOffset } from './preview-scene-frame';
+import { createCoalescedJob } from './coalesced-preview-job';
 import {
   isCncRemovalGridSuperseded,
   prepareCncRemovalGridOffThread,
@@ -52,81 +53,71 @@ export function useCncRemovalGridState(
   const { x: jobOriginOffsetX, y: jobOriginOffsetY } = removalGridPlacement(toolpath);
   const [state, setState] = useState<RemovalGridState | null>(null);
 
-  useEffect(() => {
+  // One job per preview session. A scrubber step asks it for a newer fraction
+  // without cancelling the grid it is preparing (ADR-425): on a slow machine
+  // playback outruns the worker, and cancelling meant no grid ever arrived.
+  const job = useMemo(() => {
     if (!previewMode || cncMachine === null || toolpath === null || toolpath.totalLength <= 0) {
+      return null;
+    }
+    const jobOriginOffset = { x: jobOriginOffsetX, y: jobOriginOffsetY };
+    return createCoalescedJob<number, RemovalGrid | null>(
+      (scrubFraction, signal) =>
+        prepareCncRemovalGridOffThread(
+          { device, machine: cncMachine, toolpath, scrubFraction, jobOriginOffset },
+          signal,
+        ),
+      // Keyed even when empty, so a failed or unavailable grid reads as settled.
+      (scrubFraction, outcome) =>
+        setState({
+          device,
+          machine: cncMachine,
+          toolpath,
+          scrubFraction,
+          jobOriginOffset,
+          grid: outcome.kind === 'done' ? outcome.value : null,
+        }),
+      isCncRemovalGridSuperseded,
+    );
+  }, [previewMode, cncMachine, device, toolpath, jobOriginOffsetX, jobOriginOffsetY]);
+
+  useEffect(() => {
+    if (job === null) {
       setState(null);
       return;
     }
-    let cancelled = false;
-    const controller = new AbortController();
-    const jobOriginOffset = { x: jobOriginOffsetX, y: jobOriginOffsetY };
-    // Keyed even when empty, so a failed or unavailable grid reads as settled.
-    const settle = (grid: RemovalGrid | null): void =>
-      setState({
-        device,
-        machine: cncMachine,
-        toolpath,
-        scrubFraction: quantT,
-        jobOriginOffset,
-        grid,
-      });
-    const pending = prepareCncRemovalGridOffThread(
-      {
-        device,
-        machine: cncMachine,
-        toolpath,
-        scrubFraction: quantT,
-        jobOriginOffset,
-      },
-      controller.signal,
-    );
-    if (pending === null) {
-      settle(null);
-      return;
-    }
-    void pending.then(
-      (grid) => {
-        if (!cancelled) settle(grid);
-      },
-      (error: unknown) => {
-        if (cancelled || isCncRemovalGridSuperseded(error)) return;
-        settle(null);
-      },
-    );
-    return () => {
-      cancelled = true;
-      controller.abort();
-    };
-  }, [previewMode, cncMachine, device, toolpath, quantT, jobOriginOffsetX, jobOriginOffsetY]);
+    return () => job.cancel();
+  }, [job]);
+  useEffect(() => {
+    job?.request(quantT);
+  }, [job, quantT]);
 
-  const eligible =
-    previewMode && cncMachine !== null && toolpath !== null && toolpath.totalLength > 0;
+  const eligible = job !== null;
   if (
-    !matchesRemovalGridState(
+    !matchesRemovalGridSession(
       state,
       device,
       cncMachine,
       toolpath,
-      quantT,
       jobOriginOffsetX,
       jobOriginOffsetY,
     )
   ) {
     return { grid: null, pending: eligible };
   }
-  return { grid: state.grid, pending: false };
+  // An earlier fraction's grid stays up while the newest one is prepared.
+  return { grid: state.grid, pending: state.scrubFraction !== quantT };
 }
 
 function removalGridPlacement(toolpath: PreviewToolpath | null): Vec2 {
   return toolpath === null ? { x: 0, y: 0 } : previewJobOriginOffset(toolpath);
 }
 
-function matchesRemovalGridState(
+function matchesRemovalGridSession(
   state: RemovalGridState | null,
   device: Project['device'],
   machine: CncMachineConfig | null,
   toolpath: PreviewToolpath | null,
-  scrubFraction: number,
   jobOriginOffsetX: number,
   jobOriginOffsetY: number,
 ): state is RemovalGridState {
@@ -135,7 +126,6 @@ function matchesRemovalGridState(
     state.device === device &&
     state.machine === machine &&
     state.toolpath === toolpath &&
-    state.scrubFraction === scrubFraction &&
     state.jobOriginOffset.x === jobOriginOffsetX &&
     state.jobOriginOffset.y === jobOriginOffsetY
   );

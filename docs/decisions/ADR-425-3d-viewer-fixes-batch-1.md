@@ -73,6 +73,14 @@ The audit found six places where a viewer said something untrue or lost the oper
       request; superseded content is disposed without a presentation acknowledgement.
    - A transferred canvas cannot be transferred twice. So the dialog shell gives a fresh canvas
      only after a renderer failure, which lets the next surface start over.
+   - A newer input waits instead of cancelling the running job (`createCoalescedJob`). Playback
+     moves the scrubber faster than a slow machine prepares a grid, and each step used to cancel
+     the running grid and restart the worker, so no grid, and no surface, ever arrived. Now the
+     running grid finishes, is shown, and then only the newest step runs. The surface hook does
+     the same with grids. A new toolpath, machine or device, or closing the preview, still cancels.
+   - In the shared preview worker a grid and a surface no longer cancel each other. The other kind
+     waits for the running one, and only the newest waiting request is kept. A request of the
+     same kind still replaces the running one.
 5. **Display pooling keeps material left inside a cut.** A display block that lies wholly below the
    stock top and is two flat levels (at least 90% of its samples within 0.01 mm of its highest or
    its deepest value) shows the level most of the block has. A tie goes to the deeper level. Every
@@ -94,7 +102,10 @@ The audit found six places where a viewer said something untrue or lost the oper
   one, so a program meant for another machine is not silently timed as if it were for this one.
 - Cut 3D keeps one canvas and one worker for as long as it is open. During playback only the content
   is rebuilt; the lights and the camera stay.
-- The 2D depth shading is unchanged. It is drawn from the full grid, not the display copy.
+- The 2D depth shading is drawn from the full grid, not the display copy. While the next step's
+  grid is prepared it keeps the last one, where it used to go blank between steps.
+- On a slow machine playback shows the cut a step or more behind the scrubber, and catches up when
+  playback stops. Before, it showed nothing until playback stopped.
 - The axis triad still marks the stock's min-XY corner. Placing it at the work origin needs the
   preview's scene frame carried into the 3D stage. That belongs with the shared engine in batch 2,
   and this batch does not attempt it.
@@ -116,6 +127,9 @@ The audit found six places where a viewer said something untrue or lost the oper
   - The dialog shell keeps its canvas across new scenes and replaces it only after a failure.
   - `useCncRemovalGridState` reports pending, and then settled after a worker failure.
     `useCncCut3DSurface` keeps the last mesh with `updating: true`.
+  - While the scrubber moves, the grid and surface hooks let the running job finish without
+    aborting it, then prepare only the newest input. The worker client queues a surface behind a
+    running grid on the same worker, and keeps only the newest queued request.
   - Downsampling keeps a 4 mm tab that deepest-only pooling erased. It keeps a one-cell groove in
     stock and keeps slopes at their deepest.
   - `screenshotSize` fits a 1900 x 1000 view at 4x on a 2x screen to 4096 x 2155.
@@ -124,7 +138,9 @@ The audit found six places where a viewer said something untrue or lost the oper
   are released without presentation acknowledgement.
 - Browser (`e2e/cut3d-surface-swap.e2e.ts`): after Cut 3D is ready, two controlled scrub changes
   each produce a later surface revision while the original canvas stays connected and only one
-  render worker is ever created. Starting playback before initial preparation finishes does not
-  guarantee a later surface swap on a busy runner.
+  render worker is ever created.
+- Playback on a slow machine: the original playback form of that check, run with the browser CPU
+  slowed six times, failed before the coalescing change (Cut 3D took 54 s to open and no surface
+  swapped in while playback ran) and passes with it (Cut 3D opens in about 7 s and swaps).
   The existing Cut 3D suites (`cnc-3d-viewer-ab`, `depth-map-relief-worker`) still pass. A manual
   check with an orbited camera showed the same view before and after a new surface.

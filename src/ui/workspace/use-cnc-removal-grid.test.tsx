@@ -117,12 +117,40 @@ describe('useCncRemovalGridState', () => {
     await act(async () => fail?.(new Error('worker stopped')));
     expect(observedState).toEqual({ grid: null, pending: false });
   });
+
+  it('finishes the running grid while playback moves on, then prepares the newest step', async () => {
+    let finish: ((grid: RemovalGrid | null) => void) | null = null;
+    workerMocks.prepare
+      .mockReturnValueOnce(
+        new Promise<RemovalGrid | null>((resolve) => {
+          finish = resolve;
+        }),
+      )
+      .mockResolvedValueOnce(NEXT_GRID);
+    await renderState(0.25);
+    await renderState(0.5);
+    await renderState(0.75);
+    expect(workerMocks.prepare).toHaveBeenCalledOnce();
+    const signal = workerMocks.prepare.mock.calls[0]?.[1] as AbortSignal | undefined;
+    expect(signal?.aborted).toBe(false);
+
+    await act(async () => finish?.(GRID));
+    expect(workerMocks.prepare).toHaveBeenCalledTimes(2);
+    expect(workerMocks.prepare.mock.calls[1]?.[0]).toMatchObject({ scrubFraction: 0.75 });
+    expect(observedState).toEqual({ grid: NEXT_GRID, pending: false });
+  });
 });
+
+const NEXT_GRID: RemovalGrid = { ...GRID, depth: new Float32Array([-2]) };
+
+async function renderState(scrubberT: number): Promise<void> {
+  await act(async () => root.render(<StateHarness scrubberT={scrubberT} />));
+}
 
 let observedState: ReturnType<typeof useCncRemovalGridState> | null = null;
 
-function StateHarness(): null {
-  observedState = useCncRemovalGridState(PROJECT, true, TOOLPATH, 1);
+function StateHarness(props: { readonly scrubberT?: number }): null {
+  observedState = useCncRemovalGridState(PROJECT, true, TOOLPATH, props.scrubberT ?? 1);
   return null;
 }
 

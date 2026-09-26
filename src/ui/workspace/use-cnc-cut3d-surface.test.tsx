@@ -103,6 +103,30 @@ describe('useCncCut3DSurface', () => {
     expect(observed).toEqual({ kind: 'ready', mesh: next, revision: 2, updating: false });
   });
 
+  it('lets the running surface finish while newer grids arrive, then builds the newest', async () => {
+    let finish: ((mesh: ReliefSurfaceMeshWithNormals) => void) | null = null;
+    const next = { ...MESH, positions: new Float32Array([0, 0, -3]) };
+    workerMocks.prepare
+      .mockReturnValueOnce(
+        new Promise<ReliefSurfaceMeshWithNormals>((resolve) => {
+          finish = resolve;
+        }),
+      )
+      .mockResolvedValueOnce(next);
+    const newest = { ...GRID, depth: new Float32Array([-3]) };
+    await render(true);
+    await render(true, { ...GRID, depth: new Float32Array([-2]) });
+    await render(true, newest);
+    expect(workerMocks.prepare).toHaveBeenCalledOnce();
+    const signal = workerMocks.prepare.mock.calls[0]?.[1] as AbortSignal | undefined;
+    expect(signal?.aborted).toBe(false);
+
+    await act(async () => finish?.(MESH));
+    expect(workerMocks.prepare).toHaveBeenCalledTimes(2);
+    expect(workerMocks.prepare.mock.calls[1]?.[0]).toBe(newest);
+    expect(observed).toEqual({ kind: 'ready', mesh: next, revision: 2, updating: false });
+  });
+
   it('reports a recoverable unavailable state instead of running on the UI thread', async () => {
     workerMocks.prepare.mockReturnValueOnce(null);
     await render(true);
