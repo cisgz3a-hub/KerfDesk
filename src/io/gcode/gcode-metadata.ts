@@ -67,11 +67,13 @@ export type GcodeMetadata = {
  * arc at each segment midpoint instead of sitting up to 0.196% of the radius
  * inside it, and ADR-289 amendment 1's relief roughing rings that end where
  * they start and levels cleared to their centre above 50% stepover, and
- * ADR-432's native laser G2/G3 arcs with represented-arc validation and G17,
+ * ADR-432's native laser G2/G3 arcs with represented-arc validation and G17, and
+ * ADR-154 amendment 2's adaptive pocket finishing rings that end where they
+ * start,
  * and tracer batch 3's bounded chord flattening with canonical shared seams
  * and width-bearing Line + fill output (2026-09-27).
  */
-export const EMITTER_REVISION = 'trace-hybrid-chord-flatten-20260927-v1';
+export const EMITTER_REVISION = 'trace-hybrid-chords-laser-arcs-adaptive-rings-20260927-v1';
 
 // Machine-specific assumption lines (ADR-103 defect fix): router exports
 // previously carried the laser-worded `$32=1 (laser mode)` banner. The S

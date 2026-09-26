@@ -66,7 +66,7 @@ describe('useCncCut3DSurface', () => {
     expect(observed.kind).toBe('loading');
     expect(workerMocks.prepare).toHaveBeenCalledWith(GRID, expect.any(AbortSignal));
     await act(async () => finish?.(MESH));
-    expect(observed).toEqual({ kind: 'ready', mesh: MESH, revision: 1 });
+    expect(observed).toEqual({ kind: 'ready', mesh: MESH, revision: 1, updating: false });
   });
 
   it('cancels a closing dialog and suppresses its delayed completion', async () => {
@@ -85,6 +85,48 @@ describe('useCncCut3DSurface', () => {
     expect(observed.kind).toBe('idle');
   });
 
+  it('keeps the last surface up while a newer grid is prepared (ADR-425)', async () => {
+    let finish: ((mesh: ReliefSurfaceMeshWithNormals) => void) | null = null;
+    workerMocks.prepare.mockResolvedValueOnce(MESH).mockReturnValueOnce(
+      new Promise<ReliefSurfaceMeshWithNormals>((resolve) => {
+        finish = resolve;
+      }),
+    );
+    await render(true);
+    expect(observed).toEqual({ kind: 'ready', mesh: MESH, revision: 1, updating: false });
+
+    await render(true, { ...GRID, depth: new Float32Array([-2]) });
+    expect(observed).toEqual({ kind: 'ready', mesh: MESH, revision: 1, updating: true });
+
+    const next = { ...MESH, positions: new Float32Array([0, 0, -2]) };
+    await act(async () => finish?.(next));
+    expect(observed).toEqual({ kind: 'ready', mesh: next, revision: 2, updating: false });
+  });
+
+  it('lets the running surface finish while newer grids arrive, then builds the newest', async () => {
+    let finish: ((mesh: ReliefSurfaceMeshWithNormals) => void) | null = null;
+    const next = { ...MESH, positions: new Float32Array([0, 0, -3]) };
+    workerMocks.prepare
+      .mockReturnValueOnce(
+        new Promise<ReliefSurfaceMeshWithNormals>((resolve) => {
+          finish = resolve;
+        }),
+      )
+      .mockResolvedValueOnce(next);
+    const newest = { ...GRID, depth: new Float32Array([-3]) };
+    await render(true);
+    await render(true, { ...GRID, depth: new Float32Array([-2]) });
+    await render(true, newest);
+    expect(workerMocks.prepare).toHaveBeenCalledOnce();
+    const signal = workerMocks.prepare.mock.calls[0]?.[1] as AbortSignal | undefined;
+    expect(signal?.aborted).toBe(false);
+
+    await act(async () => finish?.(MESH));
+    expect(workerMocks.prepare).toHaveBeenCalledTimes(2);
+    expect(workerMocks.prepare.mock.calls[1]?.[0]).toBe(newest);
+    expect(observed).toEqual({ kind: 'ready', mesh: next, revision: 2, updating: false });
+  });
+
   it('reports a recoverable unavailable state instead of running on the UI thread', async () => {
     workerMocks.prepare.mockReturnValueOnce(null);
     await render(true);
@@ -95,11 +137,11 @@ describe('useCncCut3DSurface', () => {
   });
 });
 
-async function render(active: boolean): Promise<void> {
-  await act(async () => root.render(<Harness active={active} />));
+async function render(active: boolean, grid: RemovalGrid = GRID): Promise<void> {
+  await act(async () => root.render(<Harness active={active} grid={grid} />));
 }
 
-function Harness(props: { readonly active: boolean }): null {
-  observed = useCncCut3DSurface(GRID, props.active);
+function Harness(props: { readonly active: boolean; readonly grid: RemovalGrid }): null {
+  observed = useCncCut3DSurface(props.grid, props.active);
   return null;
 }

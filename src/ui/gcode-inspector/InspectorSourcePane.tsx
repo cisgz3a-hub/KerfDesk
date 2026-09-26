@@ -15,6 +15,7 @@ import { explainLine } from './word-glossary';
 const ROW_HEIGHT_PX = 18;
 const OVERSCAN_ROWS = 12;
 const DEFAULT_VIEWPORT_PX = 320;
+const MIN_GUTTER_DIGITS = 4;
 
 const CATEGORY_BADGE: Readonly<Record<number, string>> = {
   [LINE_CATEGORY.motion]: 'move',
@@ -103,6 +104,7 @@ export function InspectorSourcePane(props: {
                 badge={CATEGORY_BADGE[props.categories[line] ?? LINE_CATEGORY.blank] ?? ''}
                 isActive={line === props.activeLine}
                 isSelected={line === props.selectedLine}
+                gutterWidth={gutterWidthFor(props.sourceIndex.starts.length)}
                 onSelect={props.onSelectLine}
               />
             );
@@ -121,6 +123,7 @@ function SourceRow(props: {
   readonly badge: string;
   readonly isActive: boolean;
   readonly isSelected: boolean;
+  readonly gutterWidth: string;
   readonly onSelect: (line: number) => void;
 }): JSX.Element {
   return (
@@ -134,11 +137,16 @@ function SourceRow(props: {
         background: rowBackground(props.isActive, props.isSelected),
       }}
     >
-      <span style={gutterStyle}>{props.line + 1}</span>
+      <span style={{ ...gutterStyle, width: props.gutterWidth }}>{props.line + 1}</span>
       <span style={badgeStyle}>{props.badge}</span>
       <span style={textStyle}>{props.text === '' ? ' ' : props.text}</span>
     </button>
   );
+}
+
+// Wide enough for the program's last line number: a 44 px gutter clipped 7+ digits.
+function gutterWidthFor(lineCount: number): string {
+  return `${Math.max(MIN_GUTTER_DIGITS, String(lineCount).length) + 1}ch`;
 }
 
 function SourceError(props: { readonly error: string | null }): JSX.Element | null {
@@ -234,7 +242,6 @@ const rowStyle: React.CSSProperties = {
 };
 
 const gutterStyle: React.CSSProperties = {
-  width: 44,
   flexShrink: 0,
   textAlign: 'right',
   color: 'var(--lf-text-faint)',

@@ -119,8 +119,8 @@ Platform limits that shape the design:
   `connectionAttempt`, the revision of the latest connect attempt or intentional disconnect.
 - `device-setup-accept-detected.ts` holds the accept rule and the per-head change rows;
   `device-setup-accept-detected.test.ts` pins the laser, CNC and Laser + CNC cases.
-- The rail's detected-settings toast outside setup still writes the device profile only, so in
-  CNC mode it changes the laser's Max feed; routing it per head is left for a follow-up.
+- The rail's detected-settings apply outside setup follows the head in use too: in CNC mode the
+  reported rate goes to CNC's own Max feed (#945, ADR-416).
 - Locators change: `Connect…` is `Connect`; Forget Controller is in the **More connection options**
   menu; `Connect and detect` and `Set up automatically` are gone; `Run read-only checks` is
   `Read again`; `Controller and connection settings` is `Connection options`.

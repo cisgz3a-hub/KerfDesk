@@ -24,6 +24,8 @@ import type {
   ReliefHeightmapWorkerResult,
 } from './cnc-removal-grid-worker-protocol';
 
+type MainResult = RemovalGrid | ReliefSurfaceMeshWithNormals | null;
+
 type GridRequest = Omit<
   Extract<CncRemovalGridWorkerRequest, { readonly kind: 'grid' }>,
   'id' | 'kind'
@@ -59,6 +61,8 @@ export function createCncPreviewWorkerClient(): CncPreviewWorkerClient {
 class CncPreviewWorkerClientRuntime implements CncPreviewWorkerClient {
   private workerInstance: Worker | null = null;
   private mainPending: MainPending | null = null;
+  private mainQueued: { readonly request: MainRequest; readonly pending: MainPending } | null =
+    null;
   private nextRequestId = 0;
   private readonly reliefQueue: ReliefPreviewQueue;
 
@@ -73,7 +77,6 @@ class CncPreviewWorkerClientRuntime implements CncPreviewWorkerClient {
 
   prepareGrid(request: GridRequest, signal?: AbortSignal): Promise<RemovalGrid | null> | null {
     if (signal?.aborted === true) return Promise.reject(abortError());
-    this.supersede(new CncRemovalGridSupersededError());
     return this.submitMain({ id: this.nextId(), kind: 'grid', ...request }, signal);
   }
 
@@ -82,7 +85,6 @@ class CncPreviewWorkerClientRuntime implements CncPreviewWorkerClient {
     signal?: AbortSignal,
   ): Promise<ReliefSurfaceMeshWithNormals> | null {
     if (signal?.aborted === true) return Promise.reject(abortError());
-    this.supersede(new CncRemovalGridSupersededError());
     return this.submitMain({ id: this.nextId(), kind: 'surface', grid }, signal);
   }
 
@@ -111,6 +113,7 @@ class CncPreviewWorkerClientRuntime implements CncPreviewWorkerClient {
   }
 
   resetForTests(): void {
+    this.dropQueuedMain(new CncRemovalGridSupersededError());
     this.supersede(new CncRemovalGridSupersededError());
     this.retireWorker();
     this.nextRequestId = 0;
@@ -124,32 +127,67 @@ class CncPreviewWorkerClientRuntime implements CncPreviewWorkerClient {
     request: Extract<MainRequest, { readonly kind: 'surface' }>,
     signal?: AbortSignal,
   ): Promise<ReliefSurfaceMeshWithNormals> | null;
-  private submitMain(
-    request: MainRequest,
-    signal?: AbortSignal,
-  ): Promise<RemovalGrid | ReliefSurfaceMeshWithNormals | null> | null {
-    const worker = this.ensureWorker();
-    if (worker === null) return null;
-    if (request.kind === 'grid') {
-      return this.postMain<RemovalGrid | null>(worker, request, (resolve, reject) => {
-        this.bindMain({
-          id: request.id,
-          kind: request.kind,
-          resolve,
-          reject,
-          ...(signal === undefined ? {} : { signal }),
-        });
+  private submitMain(request: MainRequest, signal?: AbortSignal): Promise<MainResult> | null {
+    // A grid and a surface feed each other while playback runs (ADR-425).
+    // Killing the running one for the other meant a slow machine finished
+    // neither, so the other kind waits its turn. Same kind is still latest-only.
+    const active = this.mainPending;
+    if (active !== null && active.kind !== request.kind) {
+      return new Promise<MainResult>((resolve, reject) => {
+        this.queueMain(request, mainPendingFor(request, resolve, reject, signal));
       });
     }
-    return this.postMain<ReliefSurfaceMeshWithNormals>(worker, request, (resolve, reject) => {
-      this.bindMain({
-        id: request.id,
-        kind: request.kind,
-        resolve,
-        reject,
-        ...(signal === undefined ? {} : { signal }),
-      });
+    this.supersede(new CncRemovalGridSupersededError());
+    const worker = this.ensureWorker();
+    if (worker === null) return null;
+    return new Promise<MainResult>((resolve, reject) => {
+      this.startMain(worker, request, mainPendingFor(request, resolve, reject, signal));
     });
+  }
+
+  private queueMain(request: MainRequest, pending: MainPending): void {
+    this.dropQueuedMain(new CncRemovalGridSupersededError());
+    const signal = pending.signal;
+    if (signal === undefined) {
+      this.mainQueued = { request, pending };
+      return;
+    }
+    const abortListener = (): void => {
+      if (this.mainQueued?.pending.id !== pending.id) return;
+      this.dropQueuedMain(abortError());
+    };
+    signal.addEventListener('abort', abortListener, { once: true });
+    this.mainQueued = { request, pending: { ...pending, abortListener } };
+  }
+
+  private dropQueuedMain(error: Error): void {
+    const queued = this.mainQueued;
+    if (queued === null) return;
+    this.mainQueued = null;
+    detachMainAbort(queued.pending);
+    queued.pending.reject(error);
+  }
+
+  private startQueuedMain(): void {
+    const queued = this.mainQueued;
+    if (queued === null || this.mainPending !== null) return;
+    this.mainQueued = null;
+    detachMainAbort(queued.pending);
+    const worker = this.ensureWorker();
+    if (worker === null) {
+      queued.pending.reject(new Error('CNC preview worker is unavailable'));
+      return;
+    }
+    this.startMain(worker, queued.request, queued.pending);
+  }
+
+  private startMain(worker: Worker, request: MainRequest, pending: MainPending): void {
+    this.bindMain(pending);
+    try {
+      worker.postMessage(request);
+    } catch (error) {
+      this.failWorker(worker, asError(error));
+    }
   }
 
   private bindMain(active: MainPending): void {
@@ -161,21 +199,6 @@ class CncPreviewWorkerClientRuntime implements CncPreviewWorkerClient {
     const bound: MainPending = { ...active, abortListener };
     active.signal.addEventListener('abort', abortListener, { once: true });
     this.mainPending = bound;
-  }
-
-  private postMain<T>(
-    worker: Worker,
-    request: MainRequest,
-    bind: (resolve: (value: T) => void, reject: (error: Error) => void) => void,
-  ): Promise<T> {
-    return new Promise<T>((resolve, reject) => {
-      bind(resolve, reject);
-      try {
-        worker.postMessage(request);
-      } catch (error) {
-        this.failWorker(worker, asError(error));
-      }
-    });
   }
 
   private nextId(): number {
@@ -215,6 +238,7 @@ class CncPreviewWorkerClientRuntime implements CncPreviewWorkerClient {
     else if (active.kind === 'surface' && response.kind === 'surface') {
       active.resolve(response.surface);
     } else active.reject(new Error('CNC preview worker returned a mismatched response'));
+    this.startQueuedMain();
     this.reliefQueue.pump();
   }
 
@@ -226,6 +250,7 @@ class CncPreviewWorkerClientRuntime implements CncPreviewWorkerClient {
     this.reliefQueue.failActive(error);
     this.retireWorker();
     active?.reject(error);
+    this.startQueuedMain();
     this.reliefQueue.pump();
   }
 
@@ -236,6 +261,7 @@ class CncPreviewWorkerClientRuntime implements CncPreviewWorkerClient {
     detachMainAbort(active);
     this.retireWorker();
     active.reject(abortError());
+    this.startQueuedMain();
     this.reliefQueue.pump();
   }
 
@@ -270,4 +296,16 @@ function abortError(): Error {
 
 function asError(error: unknown): Error {
   return error instanceof Error ? error : new Error(String(error));
+}
+
+function mainPendingFor(
+  request: MainRequest,
+  resolve: (value: MainResult) => void,
+  reject: (error: Error) => void,
+  signal: AbortSignal | undefined,
+): MainPending {
+  const cancellation = signal === undefined ? {} : { signal };
+  return request.kind === 'grid'
+    ? { id: request.id, kind: 'grid', resolve, reject, ...cancellation }
+    : { id: request.id, kind: 'surface', resolve, reject, ...cancellation };
 }
