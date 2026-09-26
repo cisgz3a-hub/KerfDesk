@@ -1,10 +1,6 @@
 import { clamp } from '../math';
-import {
-  carrySubpathNesting,
-  transformCurveSubpathUniform,
-  type Bounds,
-  type ColoredPath,
-} from '../scene';
+import { transformCurveSubpathUniform, type Bounds, type ColoredPath } from '../scene';
+import { carrySubpathNesting } from '../scene/subpath-nesting';
 import type { RawImageData } from './trace-image';
 
 export type TraceBoundary = {

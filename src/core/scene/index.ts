@@ -73,7 +73,6 @@ export type {
   SceneObject,
   ShapeObject,
   ShapeSpec,
-  SubpathNesting,
   TextAlignment,
   TextObject,
   TracedImage,
@@ -88,15 +87,6 @@ export {
   polylineToCurveSubpath,
   transformCurveSubpathUniform,
 } from './curve-path';
-export {
-  carriedSubpathDepths,
-  carriedSubpathParents,
-  carrySubpathNesting,
-  subsetSubpathNesting,
-  subpathGeometryKey,
-  withSubpathNesting,
-  withoutSubpathNesting,
-} from './subpath-nesting';
 export {
   breakCurveAtNode,
   cornerCurveNode,

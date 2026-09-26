@@ -23,11 +23,11 @@
 
 import {
   DEFAULT_MACHINE_CURVE_TOLERANCE_MM,
-  carriedSubpathParents,
   flattenCurveSubpath,
   type ColoredPath,
   type Vec2,
 } from '../scene';
+import { carriedSubpathParents } from '../scene/subpath-nesting';
 import { nearestContainers, type NestingLoop } from './loop-nesting';
 import { signedAreaMm2 } from './polyline-orientation';
 

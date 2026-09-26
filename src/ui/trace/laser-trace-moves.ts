@@ -11,7 +11,6 @@
 
 import {
   DEFAULT_MACHINE_CURVE_TOLERANCE_MM,
-  carrySubpathNesting,
   flattenCurveSubpath,
   polylineToCurveSubpath,
   type ColoredPath,
@@ -19,6 +18,7 @@ import {
   type Polyline,
   type Transform,
 } from '../../core/scene';
+import { carrySubpathNesting } from '../../core/scene/subpath-nesting';
 import { simplifyToolpathPolyline, type ToolpathSimplifyOptions } from '../../core/toolpath';
 import { preserveLaserTraceTopology } from './laser-trace-topology';
 

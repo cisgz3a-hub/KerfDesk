@@ -1,13 +1,12 @@
 import { describe, expect, it } from 'vitest';
 import { groupSubpathsByOuterShape } from '../geometry/outer-shape-groups';
 import { containmentDepths } from '../job/containment-depth';
+import { type ColoredPath, type Vec2 } from '../scene';
 import {
   carriedSubpathDepths,
   carriedSubpathParents,
   withoutSubpathNesting,
-  type ColoredPath,
-  type Vec2,
-} from '../scene';
+} from '../scene/subpath-nesting';
 import { traceImageToContourColoredPaths } from './contour-trace';
 import type { RawImageData, TraceOptions } from './trace-image';
 import { TRACE_PRESETS } from './trace-presets';

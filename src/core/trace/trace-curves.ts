@@ -7,7 +7,6 @@
 // without a curve and gets straight segments over its points.
 
 import {
-  carrySubpathNesting,
   polylineToCurveSubpath,
   type ColoredPath,
   type CurveSubpath,
@@ -15,6 +14,7 @@ import {
   type Polyline,
   type Vec2,
 } from '../scene';
+import { carrySubpathNesting } from '../scene/subpath-nesting';
 
 /** A finished trace ring and, when it was fitted, its canonical curve. The
  *  points are the curve's compatibility sampling. */

@@ -14,7 +14,8 @@
 // opened span is the smallest loop around it: its parent. One sweep of every
 // row costs O(E log E) for E vertical cracks and uses no floating point.
 
-import { withSubpathNesting, type ColoredPath, type Polyline, type Vec2 } from '../scene';
+import { type ColoredPath, type Polyline, type Vec2 } from '../scene';
+import { withSubpathNesting } from '../scene/subpath-nesting';
 import { withCanonicalTraceCurves } from './trace-curves';
 
 /** A closed lattice walk, as `traceBoundaryLoops` returns it. */

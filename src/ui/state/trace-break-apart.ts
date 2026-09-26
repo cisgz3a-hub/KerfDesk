@@ -2,13 +2,13 @@ import { isHybridStrokePath } from '../../core/trace/hybrid/hybrid-paths';
 import {
   DEFAULT_MACHINE_CURVE_TOLERANCE_MM,
   flattenCurveSubpath,
-  subsetSubpathNesting,
   type CncTabAnchor,
   type ColoredPath,
   type CurveSubpath,
   type Polyline,
   type TracedImage,
 } from '../../core/scene';
+import { subsetSubpathNesting } from '../../core/scene/subpath-nesting';
 import { groupSubpathsByOuterShape, subpathCount } from '../../core/geometry/outer-shape-groups';
 import { boundsFromColoredPaths } from '../../core/trace/trace-bounds';
 

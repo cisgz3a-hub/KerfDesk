@@ -4,12 +4,12 @@ import {
   DEFAULT_PROJECT_OPTIMIZATION,
   IDENTITY_TRANSFORM,
   createLayer,
-  withSubpathNesting,
   type ColoredPath,
   type Polyline,
   type TracedImage,
   type Vec2,
 } from '../scene';
+import { withSubpathNesting } from '../scene/subpath-nesting';
 import { compileJob } from './compile-job';
 import type { CutGroup } from './job';
 import { optimizePaths } from './optimize-paths';

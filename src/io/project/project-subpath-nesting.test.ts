@@ -1,16 +1,15 @@
 import { describe, expect, it } from 'vitest';
 import {
   IDENTITY_TRANSFORM,
-  carriedSubpathParents,
   createLayer,
   createProject,
-  withSubpathNesting,
   type ColoredPath,
   type CurveSubpath,
   type Polyline,
   type Project,
   type TracedImage,
 } from '../../core/scene';
+import { carriedSubpathParents, withSubpathNesting } from '../../core/scene/subpath-nesting';
 import { deserializeProject } from './deserialize-project';
 import { prepareProjectForAutosave } from './prepare-project-autosave';
 import { prepareProjectForPersistence } from './prepare-project-persistence';

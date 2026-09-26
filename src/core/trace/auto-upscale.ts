@@ -13,13 +13,13 @@
 
 import { transformVectorCurve } from '../geometry/vector-curve-transform';
 import {
-  carrySubpathNesting,
   IDENTITY_TRANSFORM,
   transformCurveSubpathUniform,
   type ColoredPath,
   type Polyline,
   type Vec2,
 } from '../scene';
+import { carrySubpathNesting } from '../scene/subpath-nesting';
 import type { RawImageData } from './trace-image';
 
 // Above this source area we do NOT supersample. Rationale: quadrupling an

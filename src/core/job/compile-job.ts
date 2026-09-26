@@ -16,7 +16,6 @@ import { applyAutomaticTabsBySource } from '../geometry/tabs-bridges';
 import {
   applyTransform,
   assertNever,
-  carriedSubpathDepths,
   type ColoredPath,
   type Layer,
   layerOperationSettingsEqual,
@@ -29,6 +28,7 @@ import {
   type Vec2,
   withClosingPoint,
 } from '../scene';
+import { carriedSubpathDepths } from '../scene/subpath-nesting';
 import {
   effectiveOperationForObject,
   operationOverrideForObject,
@@ -412,7 +412,9 @@ function appendPathSegments(
         // Only closed contours are nodes of the forest; an open subpath
         // keeps probing every container, its own path's included.
         const known = polyline.closed ? nesting(subpathIndex) : undefined;
-        out.push(withArcs(subpathIndex, known === undefined ? segment : { ...segment, nesting: known }));
+        out.push(
+          withArcs(subpathIndex, known === undefined ? segment : { ...segment, nesting: known }),
+        );
       }
     }
     // Checked: the unchecked variant flattens a clipper2 failure to an empty
