@@ -68,7 +68,13 @@ export function* ringPiecesSteps(polyline: Polyline, id: number): TraceSteps<Rin
     bounds.maxX = Math.max(bounds.maxX, box.maxX);
     bounds.maxY = Math.max(bounds.maxY, box.maxY);
     if (isStraight(piece)) straights.push(piece.p0.x, piece.p0.y, piece.p3.x, piece.p3.y, index);
-    else cubics.push({ ...piece, ...box, index });
+    // Written out rather than spread: a literal of known shape keeps every
+    // field in the object, where a spread moves some to a property array.
+    else {
+      const { p0, p1, p2, p3 } = piece;
+      const { minX, minY, maxX, maxY } = box;
+      cubics.push({ p0, p1, p2, p3, minX, minY, maxX, maxY, index });
+    }
   }
   return { ...bounds, id, cubics, straights, count: raw.length, closed: polyline.closed };
 }

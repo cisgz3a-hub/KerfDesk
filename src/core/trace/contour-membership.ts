@@ -1,7 +1,7 @@
 import type { Vec2 } from '../scene';
 import { contourBox, finiteContourBox, type ContourBox } from './contour-bounds';
 import { ContourBoxIndex } from './contour-box-index';
-import type { ContourEdges } from './contour-edges';
+import { contourEdgesSteps, type ContourEdges } from './contour-edges';
 import { ContourOrientation, insideContour } from './contour-orientation';
 import { runTraceSteps, type TraceSteps } from './trace-steps';
 
@@ -134,17 +134,11 @@ function* scannedWindingSteps(
   return winding;
 }
 
+// The boundary's own edge index (contour-edges.ts), which makes its edges on
+// demand: every edge is in it, which gives the same winding (rayWinding).
 function* crossingIndexSteps(
   points: ReadonlyArray<Vec2>,
 ): TraceSteps<ContourBoxIndex<CrossingEdge>> {
-  const cooperate = yield;
-  const edges: CrossingEdge[] = [];
-  for (let i = 0; i < points.length; i += 1) {
-    if (cooperate && i % 256 === 0) yield;
-    const a = points[i];
-    const b = points[(i + 1) % points.length];
-    if (a === undefined || b === undefined || a.y === b.y) continue;
-    edges.push({ ...contourBox([a, b]), a, b });
-  }
-  return yield* ContourBoxIndex.createSteps(edges);
+  const edges = yield* contourEdgesSteps(points);
+  return edges?.index ?? (yield* ContourBoxIndex.createSteps<CrossingEdge>([]));
 }
