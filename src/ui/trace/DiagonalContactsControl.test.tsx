@@ -4,6 +4,7 @@
 import { act } from 'react';
 import { createRoot } from 'react-dom/client';
 import { describe, expect, it } from 'vitest';
+import type { TraceSettingsRecord } from '../../core/scene/scene-object';
 import { TRACE_PRESETS, type TraceOptions } from '../../core/trace';
 import { TraceSettingsControls } from './TraceSettingsControls';
 import { fill, loopCount, paper } from './trace-controls-test-helpers';
@@ -100,7 +101,11 @@ describe('Diagonal contacts control (ADR-450)', () => {
     expect(record.overrides).toEqual({ turnPolicy: 'connect-paper' });
     expect(restoreTraceSettings(record, grid).overrides).toEqual({ turnPolicy: 'connect-paper' });
 
-    const older = { schemaVersion: 1, presetName: 'Sharp', overrides: { smoothness: 0.5 } };
+    const older: TraceSettingsRecord = {
+      schemaVersion: 1,
+      presetName: 'Sharp',
+      overrides: { smoothness: 0.5 },
+    };
     const restored = restoreTraceSettings(older, grid);
     expect(restored.overrides).toEqual({ smoothness: 0.5 });
     const sharp = TRACE_PRESETS['Sharp'] as TraceOptions;
