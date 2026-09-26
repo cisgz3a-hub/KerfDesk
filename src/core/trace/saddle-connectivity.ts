@@ -26,8 +26,11 @@
 //        the walker's out-of-image paper, which would make every shape look
 //        thin at an edge). A 4×4 tie widens the vote to the 6×6 and then
 //        the 8×8 window (ADR-403 amendment 1), each centred on the corner
-//        and shrunk at the border the same way; the first window that is
-//        not balanced decides. A window centred on a checkerboard corner
+//        and shrunk at the border the same way. A wider window counts only
+//        the ring it adds, and that ring decides only when at least 7/8 of
+//        it is one colour: two marks kissing on a page join, but the rim
+//        of a checkerboard patch (cells one side, page the other) stays a
+//        tie. A window centred on a checkerboard corner
 //        ties at any size, so a checkerboard ties everywhere, border
 //        included. The one blind spot is a corner diagonally next to an
 //        image corner: only its own 2×2 block fits, so it is a tie.
@@ -110,6 +113,12 @@ export type SaddlePolicyInput = {
 // corner); a tie there widens to 6×6 and then 8×8 (ADR-403 amendment 1).
 // The 2×2 block alone is always balanced, so the vote starts at 4×4.
 const VOTE_RADII_SOURCE_PX: ReadonlyArray<number> = [2, 3, 4];
+// A widened ring decides only when |ink − paper| over it is at least 3/4 of
+// its area, i.e. at least 7/8 of the ring is one colour (4·|b| ≥ 3·area).
+// Measured (ADR-403 amendment 1): at 3/4 of the ring one colour, the rim of
+// a 2-px checkerboard patch on a page still welded (topology.clean outers
+// 40 → 17); isolated marks and pinholes have a uniform ring and pass.
+const RING_DECISIVE_QUARTERS = 3;
 // A grey tie is only settled when the bilinear saddle value clears the cut
 // by more than this many luma levels. Any binary pattern that is symmetric
 // about the corner (a checkerboard, or its bilinear enlargement on the 2x
@@ -151,27 +160,41 @@ export function createSaddleResolver(
   };
 }
 
-/** Ink minus paper over the first unbalanced window centred on corner
- *  (x,y), trying the half-sizes in `radii` in order; 0 when every window
- *  ties. Negative means ink is the local minority. Near the border each
- *  axis's half-size shrinks to what fits inside the image on both sides, so
- *  every window stays centred on the corner: mirror-symmetric patterns (a
- *  checkerboard of any cell size) stay tied, and the walker's out-of-image
- *  paper never makes a shape look thin. Saddle corners lie strictly inside
- *  the lattice (out-of-image pixels are paper, so a border corner is never
- *  a saddle), hence each half-size is at least 1. Once the border stops
- *  both axes from growing, a wider radius would recount the same window. */
+/** Signed minority evidence at corner (x,y); 0 when nothing decides.
+ *  Negative means ink is the local minority. The first window (4×4 source
+ *  px) decides whenever it is unbalanced. After a tie, each wider window
+ *  from `radii` counts only the RING it adds to the previous window, and
+ *  that ring decides only when at least 7/8 of it is one colour
+ *  (4·|ring balance| ≥ 3·ring area): isolated marks on a page or pinholes
+ *  in solid ink have a near-uniform ring, while the rim of a checkerboard
+ *  patch (cells on one side, page on the other) has a mixed ring and stays
+ *  a tie. Near the border each axis's half-size shrinks to what fits inside
+ *  the image on both sides, so every window stays centred on the corner:
+ *  mirror-symmetric patterns (a checkerboard of any cell size) stay tied,
+ *  and the walker's out-of-image paper never makes a shape look thin.
+ *  Saddle corners lie strictly inside the lattice (out-of-image pixels are
+ *  paper, so a border corner is never a saddle), hence each half-size is at
+ *  least 1. Once the border stops both axes from growing, a wider radius
+ *  would add an empty ring, so the vote ends. */
 function minorityVote(mask: InkMask, x: number, y: number, radii: ReadonlyArray<number>): number {
   let previousRx = 0;
   let previousRy = 0;
+  let previousBalance = 0;
   for (const radius of radii) {
     const rx = Math.max(1, Math.min(radius, x, mask.width - x));
     const ry = Math.max(1, Math.min(radius, y, mask.height - y));
     if (rx === previousRx && ry === previousRy) break;
+    const balance = windowInkBalance(mask, x, y, rx, ry);
+    if (previousRx === 0) {
+      if (balance !== 0) return balance;
+    } else {
+      const ring = balance - previousBalance;
+      const ringArea = 4 * (rx * ry - previousRx * previousRy);
+      if (4 * Math.abs(ring) >= RING_DECISIVE_QUARTERS * ringArea) return ring;
+    }
     previousRx = rx;
     previousRy = ry;
-    const balance = windowInkBalance(mask, x, y, rx, ry);
-    if (balance !== 0) return balance;
+    previousBalance = balance;
   }
   return 0;
 }

@@ -261,6 +261,48 @@ describe('saddle connectivity — binary 4×4 minority window', () => {
     expect(createSaddleResolver(marks, 'auto', fieldFrom(greyPaper, 128))(5, 5)).toBe(true);
   });
 
+  it('lets a wider ring decide only when at least 7/8 of it is one colour', () => {
+    // A 12×12 patch of 2-px checkerboard cells on a 20×20 page (the
+    // topology.clean fixture's pattern). Next to the patch rim the wider
+    // rings hold cells on one side and page on the other: (6,6) adds 15 of
+    // 20 paper at 6×6 and 21 of 28 at 8×8 (3/4, not 7/8), so every rim
+    // corner stays a tie and the tie-break keeps the cells apart. Counting
+    // whole windows instead (6×6: 13 ink of 36) welded the rim.
+    const patch = maskFrom(
+      Array.from({ length: 20 }, (_, y) =>
+        Array.from({ length: 20 }, (_, x) => {
+          if (x < 4 || x >= 16 || y < 4 || y >= 16) return '.';
+          return (((x - 4) >> 1) + ((y - 4) >> 1)) % 2 === 0 ? '#' : '.';
+        }).join(''),
+      ),
+    );
+    const resolve = createSaddleResolver(patch, 'auto');
+    for (const [x, y] of [
+      [6, 6],
+      [6, 8],
+      [8, 6],
+      [6, 14],
+      [14, 14],
+      [12, 14],
+    ] as const) {
+      expect(isSaddle(patch, x, y)).toBe(true);
+      expect(resolve(x, y)).toBe(false);
+    }
+    // One stray speck in an otherwise empty ring is still decisive: two
+    // 2×2 marks kissing at (4,4) with a paper-ring speck (19 of 20 paper).
+    const specked = maskFrom([
+      '........',
+      '.#......',
+      '..##....',
+      '..##....',
+      '....##..',
+      '....##..',
+      '........',
+      '........',
+    ]);
+    expect(createSaddleResolver(specked, 'auto')(4, 4)).toBe(true);
+  });
+
   it('honours the explicit policies regardless of evidence', () => {
     const mask = maskFrom(['#.', '.#']);
     expect(createSaddleResolver(mask, 'connect-ink')(1, 1)).toBe(true);
