@@ -112,7 +112,8 @@ export function createWorkerSerialConnection(args: {
     void endSession(link);
   };
   session.handover = createWorkerRefillHandover({
-    post: (message) => link.bridge.postMessage(message),
+    // A program's buffers are transferred, never copied (ADR-354 Amendment 3).
+    post: (message, transfer) => link.bridge.postMessage(message, transfer),
     timeoutMs: link.timeoutMs,
     onWriteError: (handler) => subscribe(session.writeErrorSubs, handler),
     fail,

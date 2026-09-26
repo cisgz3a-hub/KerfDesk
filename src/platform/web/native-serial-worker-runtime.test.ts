@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
 import { createStreamer, step } from '../../core/controllers/grbl';
 import { createNativeSerialWorkerRuntime } from './native-serial-worker-runtime';
+import { encodeProgramLines } from './serial-program-buffer';
 import type { NativeSerialWorkerResponse } from './native-serial-worker-protocol';
 
 const IDENTITY = { usbVendorId: 0x1a86, usbProductId: 0x7523 };
@@ -114,11 +115,14 @@ describe('worker-owned native serial transport', () => {
     const first = step(createStreamer('G1 X1.000\nG1 X2.000\nG1 X3.000\n', { rxBufferBytes: 11 }));
     h.runtime.handle({ kind: 'write', id: 2, data: first.toSend });
     await flush();
+    // The program crosses once in its own message (ADR-354 Amendment 3).
+    const { queued, ...position } = first.state;
+    h.runtime.handle({ kind: 'program', programId: 1, ...encodeProgramLines(queued) });
     h.runtime.handle({ kind: 'prepare-arm', id: 3 });
     h.push('ok\nok\n');
     await flush();
     expect(h.bytes).toEqual(['G1 X1.000\n']);
-    h.runtime.handle({ kind: 'arm', id: 3, streamer: first.state });
+    h.runtime.handle({ kind: 'arm', id: 3, programId: 1, position });
     await flush();
     expect(h.bytes).toEqual(['G1 X1.000\n', 'G1 X2.000\n', 'G1 X3.000\n']);
     expect(h.posted).toContainEqual({ kind: 'write-ack', id: 2 });

@@ -1,6 +1,7 @@
 ## ADR-354 Amendment 2 - The worker handover deadline grows with the program it carries (2026-09-25)
 
-**Status:** Accepted. | **Date:** 2026-09-25
+**Status:** Accepted; superseded by Amendment 3, which sends the program once per run and
+restores the plain deadline. | **Date:** 2026-09-25
 
 ### Context
 

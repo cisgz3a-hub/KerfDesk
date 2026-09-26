@@ -27,6 +27,11 @@ for (const scenario of ['before-prepare', 'at-barrier', 'across-release'] as con
     ).toBe(true);
     expect(result.transferredStreams).toBe(2);
     expect(result.streamsLockedAfterTransfer).toBe(true);
+    // The program crossed once, moved rather than copied, and the arm carried
+    // only the position (ADR-354 Amendment 3).
+    expect(result.programMessages).toBe(1);
+    expect(result.programBytesLeftAfterTransfer).toBe(0);
+    expect(result.largestArmChars).toBeLessThan(1_000);
     expect(result.writes).toEqual(result.programLines);
     expect(result.delivered).toEqual(result.expectedInbound);
     expect(result.completed).toBe(6);
@@ -138,6 +143,9 @@ async function runWorkerScenario(args: {
   let deferKind: SerialWorkerRequest['kind'] | null = null;
   const held: SerialWorkerRequest[] = [];
   let transferredStreams = 0;
+  let programMessages = 0;
+  let programBytesLeftAfterTransfer = -1;
+  let largestArmChars = 0;
   let terminated = false;
   let closed = false;
   let portClosed = false;
@@ -154,10 +162,19 @@ async function runWorkerScenario(args: {
     timeoutMs: args.scenario === 'timeout' ? 500 : 5_000,
     bridge: {
       postMessage: (message, transfer) => {
+        if (message.kind === 'arm')
+          largestArmChars = Math.max(largestArmChars, JSON.stringify(message).length);
         if (message.kind === deferKind) held.push(message);
         else {
-          transferredStreams += transfer?.length ?? 0;
-          worker.postMessage(message, (transfer ?? []) as Transferable[]);
+          const moved = (transfer ?? []) as Transferable[];
+          transferredStreams += moved.filter(
+            (item) => item instanceof ReadableStream || item instanceof WritableStream,
+          ).length;
+          worker.postMessage(message, moved);
+          if (message.kind === 'program') {
+            programMessages += 1;
+            programBytesLeftAfterTransfer = message.bytes.byteLength + message.offsets.byteLength;
+          }
         }
         changed();
       },
@@ -304,6 +321,9 @@ async function runWorkerScenario(args: {
     writeErrors,
     capturedCompleted,
     transferredStreams,
+    programMessages,
+    programBytesLeftAfterTransfer,
+    largestArmChars,
     streamsLockedAfterTransfer,
     completed: main.completed,
     status: main.status,
