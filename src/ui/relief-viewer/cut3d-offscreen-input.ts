@@ -1,3 +1,5 @@
+// Deep import: the viewer3d barrel is capped at 20 exports by its index contract.
+import { viewer3dDragAction } from '../viewer3d/viewer3d-controls';
 import type { Cut3DOffscreenControl } from './cut3d-offscreen-worker-protocol';
 import { installViewer3DKeyboardInput } from './viewer3d-keyboard-input';
 
@@ -13,11 +15,8 @@ export type Cut3DOffscreenInput = {
   readonly dispose: () => void;
 };
 
-type DragKind = 'pan' | 'rotate' | 'zoom';
+type DragKind = 'pan' | 'rotate';
 
-const LEFT_BUTTON = 0;
-const MIDDLE_BUTTON = 1;
-const RIGHT_BUTTON = 2;
 const MIN_VIEWPORT_PX = 1;
 
 /** Proxies only compact pointer, wheel, and viewport values into the worker. */
@@ -112,13 +111,13 @@ export function measureViewport(canvas: HTMLCanvasElement): Cut3DViewportSize {
   };
 }
 
+// The shared mouse map of every 3D view (ADR-426); the wheel zooms.
 function dragKindForButton(button: number): DragKind | null {
-  if (button === LEFT_BUTTON) return 'pan';
-  if (button === MIDDLE_BUTTON) return 'zoom';
-  if (button === RIGHT_BUTTON) return 'rotate';
-  return null;
+  const action = viewer3dDragAction(button);
+  if (action === null) return null;
+  return action === 'orbit' ? 'rotate' : 'pan';
 }
 
 function controlForDrag(kind: DragKind, deltaX: number, deltaY: number): Cut3DOffscreenControl {
-  return kind === 'zoom' ? { kind, deltaY } : { kind, deltaX, deltaY };
+  return { kind, deltaX, deltaY };
 }

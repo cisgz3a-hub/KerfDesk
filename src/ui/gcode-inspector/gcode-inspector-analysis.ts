@@ -5,6 +5,7 @@ import {
   type ProgramFinding,
 } from '../../core/gcode-view';
 import type { GcodeInspectionContext } from './gcode-inspection-source';
+import type { ProgramToolMark } from './program-tools';
 
 // Stock GRBL kinematics, only for a program with no device to time it for.
 const STOCK_LIMITS: MotionLimits = {
@@ -19,6 +20,8 @@ export type GcodeInspectorAnalysis = {
   readonly findings: ReadonlyArray<ProgramFinding>;
   /** Whose kinematics the time assumes: a device profile name, or null for stock GRBL. */
   readonly timedFor: string | null;
+  /** Tools the program names in comments, for the Tool lens and Studio (ADR-426). */
+  readonly toolMarks: ReadonlyArray<ProgramToolMark>;
 };
 
 /** Derives the Inspector timeline and informational health report. The time
@@ -26,6 +29,7 @@ export type GcodeInspectorAnalysis = {
 export function analyzeGcodeModel(
   model: GcodeRenderModel,
   context: GcodeInspectionContext = {},
+  toolMarks: ReadonlyArray<ProgramToolMark> = [],
 ): GcodeInspectorAnalysis {
   const timing = context.timing;
   return {
@@ -36,5 +40,6 @@ export function analyzeGcodeModel(
     }),
     findings: findProgramIssues(model),
     timedFor: timing?.deviceName ?? null,
+    toolMarks,
   };
 }

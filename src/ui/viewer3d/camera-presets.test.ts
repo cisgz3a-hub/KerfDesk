@@ -41,13 +41,20 @@ describe('cameraPlacement', () => {
     }
   });
 
-  it('places Top directly above, looking straight down', () => {
+  it('places Top above the job, looking down to within a tenth of a degree, still Z-up', () => {
     const view = cameraPlacement('top', BOUNDS);
+    const offset = new Vector3(
+      view.position.x - view.target.x,
+      view.position.y - view.target.y,
+      view.position.z - view.target.z,
+    );
     expect(view.position.x).toBeCloseTo(50, 6);
-    expect(view.position.y).toBeCloseTo(30, 6);
     expect(view.position.z).toBeGreaterThan(0);
-    // +Z up would be degenerate looking down the Z axis.
-    expect(view.up).toEqual({ x: 0, y: 1, z: 0 });
+    // A hair toward the operator (-Y) keeps the Z-up orbit from degenerating,
+    // so +Y still reads as "up the screen" and the orbit never flips.
+    expect(view.position.y).toBeLessThan(30);
+    expect(offset.angleTo(new Vector3(0, 0, 1))).toBeLessThan((0.1 * Math.PI) / 180);
+    expect(view.up).toEqual({ x: 0, y: 0, z: 1 });
   });
 
   it('places Front on -Y and Right on +X, both Z-up', () => {

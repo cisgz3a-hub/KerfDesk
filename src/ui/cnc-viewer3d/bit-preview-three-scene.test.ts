@@ -15,6 +15,7 @@ vi.mock('./viewer3d-tool', () => ({
 
 const rendererSpies = {
   dispose: vi.fn(),
+  forceContextLoss: vi.fn(),
   render: vi.fn(),
   setClearColor: vi.fn(),
   setPixelRatio: vi.fn(),
@@ -26,11 +27,15 @@ const lightPositionSet = vi.fn();
 let rendererShouldThrow = false;
 
 class FakeRenderer {
-  constructor() {
+  readonly domElement: HTMLCanvasElement;
+
+  constructor(parameters: { readonly canvas: HTMLCanvasElement }) {
     if (rendererShouldThrow) throw new Error('no WebGL context');
+    this.domElement = parameters.canvas;
   }
 
   readonly dispose = rendererSpies.dispose;
+  readonly forceContextLoss = rendererSpies.forceContextLoss;
   readonly render = rendererSpies.render;
   readonly setClearColor = rendererSpies.setClearColor;
   readonly setPixelRatio = rendererSpies.setPixelRatio;
@@ -123,6 +128,22 @@ describe('createBitPreviewThreeScene', () => {
     expect(sceneSpies.remove).toHaveBeenNthCalledWith(3, expect.any(FakeLight));
     expect(meshSpies.dispose).toHaveBeenCalledTimes(1);
     expect(rendererSpies.dispose).toHaveBeenCalledTimes(1);
+    // The canvas is off the page, so its context is handed back at once.
+    expect(rendererSpies.forceContextLoss).toHaveBeenCalledTimes(1);
+  });
+
+  it('keeps the context of a canvas still on the page for the next renderer', async () => {
+    const canvas = document.createElement('canvas');
+    document.body.appendChild(canvas);
+    try {
+      const result = await createBitPreviewThreeScene(canvas, tool, vi.fn(), async () => fakeThree);
+      if (result.kind !== 'ok') throw new Error('expected a scene handle');
+      result.handle.dispose();
+      expect(rendererSpies.dispose).toHaveBeenCalledTimes(1);
+      expect(rendererSpies.forceContextLoss).not.toHaveBeenCalled();
+    } finally {
+      canvas.remove();
+    }
   });
 
   it('releases every acquired resource when initial rendering fails', async () => {
