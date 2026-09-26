@@ -33,6 +33,20 @@ describe('trace parity canonical hash', () => {
     );
   });
 
+  it('refuses a Map, Set, Date or class instance instead of hashing it as {}', () => {
+    class Point {
+      constructor(readonly x: number) {}
+    }
+    for (const opaque of [new Map([[1, 2]]), new Set([1]), new Date(0), new Point(1)]) {
+      expect(() => canonicalTraceHash([{ color: '#000000', extra: opaque }])).toThrow(
+        /only plain objects/,
+      );
+    }
+    expect(canonicalTraceText([Object.assign(Object.create(null) as object, { a: 1 })])).toBe(
+      '[{"a":1}]',
+    );
+  });
+
   it('changes when a real trace is reordered, loses a curve or moves one point', async () => {
     const disc = PERCEPTUAL_FIXTURES.find((fixture) => fixture.name === 'ring-annulus')!;
     const paths = (await traceImageToColoredPaths(

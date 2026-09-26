@@ -5,9 +5,9 @@
 // This module serialises a trace canonically (sorted object keys, numbers in
 // their round-trip decimal form with -0 kept distinct, array order kept) and
 // hashes it, and it defines the oracle corpus: the five perceptual fixtures,
-// three seeded synthetic noise images and, when the lab folder is present,
-// the owl and hummingbird. Real art never enters the repository; see
-// trace-parity-oracle.test.ts for the env gates.
+// three seeded synthetic noise images, five small edge shapes and, when the
+// lab folder is present, the owl and hummingbird. Real art never enters the
+// repository; see trace-parity-oracle.test.ts for the env gates.
 
 import { createHash, type Hash } from 'node:crypto';
 import { existsSync } from 'node:fs';
@@ -85,6 +85,68 @@ export function valueNoiseImage(size: number, cell: number, seed: number): RawIm
   return { width: size, height: size, data };
 }
 
+type Rgba = readonly [number, number, number, number];
+
+function paintedImage(width: number, height: number, paint: (x: number, y: number) => Rgba) {
+  const data = new Uint8ClampedArray(width * height * 4);
+  for (let y = 0; y < height; y += 1) {
+    for (let x = 0; x < width; x += 1) {
+      data.set(paint(x, y), (y * width + x) * 4);
+    }
+  }
+  return { width, height, data } satisfies RawImageData;
+}
+
+const INK: Rgba = [20, 20, 20, 255];
+const PAPER: Rgba = [245, 245, 245, 255];
+
+// Cheap shapes the perceptual fixtures and square noise miss: a non-square
+// odd size, 1-pixel-wide rasters in both orientations, alpha coverage, and a
+// page whose ink runs off every edge.
+export function edgeShapeCases(): ReadonlyArray<ParityCase> {
+  const stripe = (t: number): Rgba => (t % 7 < 4 ? INK : PAPER);
+  return [
+    {
+      name: 'noise37x113',
+      heavy: false,
+      image: () => {
+        const random = mulberry32(37);
+        return paintedImage(37, 113, () => [
+          (random() * 256) | 0,
+          (random() * 256) | 0,
+          (random() * 256) | 0,
+          255,
+        ]);
+      },
+    },
+    { name: 'column1x50', heavy: false, image: () => paintedImage(1, 50, (_x, y) => stripe(y)) },
+    { name: 'row50x1', heavy: false, image: () => paintedImage(50, 1, (x) => stripe(x)) },
+    {
+      // Opaque ink disc fading to fully transparent, over transparent black.
+      name: 'alpha-disc',
+      heavy: false,
+      image: () =>
+        paintedImage(120, 90, (x, y) => {
+          const r = Math.hypot(x - 60, y - 45);
+          const alpha = r < 20 ? 255 : r > 40 ? 0 : Math.round((255 * (40 - r)) / 20);
+          return alpha === 0 ? [0, 0, 0, 0] : [30, 30, 30, alpha];
+        }),
+    },
+    {
+      // Ink everywhere except a paper window holding an ink bar and a dot.
+      name: 'ink-border-page',
+      heavy: false,
+      image: () =>
+        paintedImage(200, 150, (x, y) => {
+          const window = x >= 30 && x < 170 && y >= 25 && y < 125;
+          const bar = x >= 60 && x < 140 && y >= 70 && y < 80;
+          const dot = Math.hypot(x - 100, y - 45) < 6;
+          return !window || bar || dot ? INK : PAPER;
+        }),
+    },
+  ];
+}
+
 function labImage(name: string): ParityCase | undefined {
   const path = `${PARITY_LAB_DIR}/inputs/${name}.png`;
   if (!existsSync(path)) return undefined;
@@ -98,6 +160,7 @@ export function parityCases(): ReadonlyArray<ParityCase> {
     image: () => fixture.image,
   }));
   cases.push({ name: 'noise192', heavy: false, image: () => uniformNoiseImage(192, 192) });
+  cases.push(...edgeShapeCases());
   for (const lab of [labImage('owl'), labImage('hummingbird')]) if (lab) cases.push(lab);
   cases.push({ name: 'noise1024', heavy: true, image: () => uniformNoiseImage(1024, 1024) });
   cases.push({ name: 'value1024', heavy: true, image: () => valueNoiseImage(1024, 3, 7) });
@@ -110,6 +173,8 @@ function canonicalNumber(value: number): string {
 
 // Feeds `value` into `sink` canonically. Object keys are sorted; `undefined`
 // members are skipped (JSON semantics); arrays and typed arrays keep order.
+// Only plain objects are walked: a Map, Set, Date or class instance would
+// serialise as `{}` and hide its contents from the gate, so it throws.
 function writeCanonical(value: unknown, sink: (chunk: string) => void): void {
   if (value === null || value === undefined) {
     sink('null');
@@ -120,28 +185,40 @@ function writeCanonical(value: unknown, sink: (chunk: string) => void): void {
   } else if (typeof value === 'boolean') {
     sink(value ? 'true' : 'false');
   } else if (Array.isArray(value) || ArrayBuffer.isView(value)) {
-    const items = value as ArrayLike<unknown>;
-    sink('[');
-    for (let i = 0; i < items.length; i += 1) {
-      if (i > 0) sink(',');
-      writeCanonical(items[i], sink);
-    }
-    sink(']');
+    writeCanonicalItems(value as ArrayLike<unknown>, sink);
   } else if (typeof value === 'object') {
-    const record = value as Record<string, unknown>;
-    const keys = Object.keys(record)
-      .filter((key) => record[key] !== undefined)
-      .sort();
-    sink('{');
-    keys.forEach((key, index) => {
-      if (index > 0) sink(',');
-      sink(`${JSON.stringify(key)}:`);
-      writeCanonical(record[key], sink);
-    });
-    sink('}');
+    writeCanonicalRecord(value, sink);
   } else {
     throw new Error(`trace parity: cannot serialise a ${typeof value}`);
   }
+}
+
+function writeCanonicalItems(items: ArrayLike<unknown>, sink: (chunk: string) => void): void {
+  sink('[');
+  for (let i = 0; i < items.length; i += 1) {
+    if (i > 0) sink(',');
+    writeCanonical(items[i], sink);
+  }
+  sink(']');
+}
+
+function writeCanonicalRecord(value: object, sink: (chunk: string) => void): void {
+  const prototype = Object.getPrototypeOf(value) as unknown;
+  if (prototype !== Object.prototype && prototype !== null) {
+    const kind = (value as { constructor?: { name?: string } }).constructor?.name ?? 'object';
+    throw new Error(`trace parity: cannot serialise a ${kind}; only plain objects are walked`);
+  }
+  const record = value as Record<string, unknown>;
+  const keys = Object.keys(record)
+    .filter((key) => record[key] !== undefined)
+    .sort();
+  sink('{');
+  keys.forEach((key, index) => {
+    if (index > 0) sink(',');
+    sink(`${JSON.stringify(key)}:`);
+    writeCanonical(record[key], sink);
+  });
+  sink('}');
 }
 
 // The whole canonical text; use only for small results or a first-failure dump.
