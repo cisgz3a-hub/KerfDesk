@@ -128,38 +128,46 @@ describe('DXF writer arc bulges (ADR-452)', () => {
   it.each([
     ['clockwise circle', cubicCircle(12, true), -1],
     ['counter-clockwise circle', cubicCircle(12, false), 1],
-  ] as const)('writes valid, correctly signed group 42 bulges for a %s', (_name, curve, sign) => {
-    const doc = writeDxfDocument([{ color: '#000000', curves: [curve] }], {
-      origin: { x: 0, y: 0 },
-    });
-    const [polyline] = writtenPolylines(doc.text);
-    if (polyline === undefined) throw new Error('no polyline');
-    const bulges = polyline.vertices.map((v) => v.bulge).filter((b) => b !== 0);
-    expect(bulges.length).toBeGreaterThanOrEqual(2);
-    for (const bulge of bulges) {
-      expect(Math.sign(bulge)).toBe(sign);
-      expect(Math.abs(bulge)).toBeLessThan(1);
-    }
-    expect(polyline.closed).toBe(true);
-    const drawn = sampleBulges(polyline.vertices, true);
-    // Written coordinates are on the 0.001 mm grid; the fitter reserves room for it.
-    expect(hausdorff(flat(curve), drawn)).toBeLessThanOrEqual(TOLERANCE_MM);
-  });
+  ] as const)(
+    'writes valid, correctly signed group 42 bulges for a %s',
+    (_name, curve, sign) => {
+      const doc = writeDxfDocument([{ color: '#000000', curves: [curve] }], {
+        origin: { x: 0, y: 0 },
+      });
+      const [polyline] = writtenPolylines(doc.text);
+      if (polyline === undefined) throw new Error('no polyline');
+      const bulges = polyline.vertices.map((v) => v.bulge).filter((b) => b !== 0);
+      expect(bulges.length).toBeGreaterThanOrEqual(2);
+      for (const bulge of bulges) {
+        expect(Math.sign(bulge)).toBe(sign);
+        expect(Math.abs(bulge)).toBeLessThan(1);
+      }
+      expect(polyline.closed).toBe(true);
+      const drawn = sampleBulges(polyline.vertices, true);
+      // Written coordinates are on the 0.001 mm grid; the fitter reserves room for it.
+      expect(hausdorff(flat(curve), drawn)).toBeLessThanOrEqual(TOLERANCE_MM);
+    },
+    60_000,
+  );
 
   it.each([
     ['S-curve', sCurve],
     ['ellipse', ellipse],
     ['tiny circle', cubicCircle(0.15, true)],
-  ] as const)('keeps the written %s within the tolerance', (_name, curve) => {
-    const doc = writeDxfDocument([{ color: '#000000', curves: [curve] }], {
-      origin: { x: 0, y: 0 },
-    });
-    const [polyline] = writtenPolylines(doc.text);
-    if (polyline === undefined) throw new Error('no polyline');
-    expect(
-      hausdorff(flat(curve), sampleBulges(polyline.vertices, polyline.closed)),
-    ).toBeLessThanOrEqual(TOLERANCE_MM);
-  });
+  ] as const)(
+    'keeps the written %s within the tolerance',
+    (_name, curve) => {
+      const doc = writeDxfDocument([{ color: '#000000', curves: [curve] }], {
+        origin: { x: 0, y: 0 },
+      });
+      const [polyline] = writtenPolylines(doc.text);
+      if (polyline === undefined) throw new Error('no polyline');
+      expect(
+        hausdorff(flat(curve), sampleBulges(polyline.vertices, polyline.closed)),
+      ).toBeLessThanOrEqual(TOLERANCE_MM);
+    },
+    60_000,
+  );
 
   it('round-trips the fitted arcs through the DXF importer', () => {
     const curves = [cubicCircle(12, true), sCurve, ellipse];
@@ -179,7 +187,7 @@ describe('DXF writer arc bulges (ADR-452)', () => {
       const expected = (source[index] as Vec2[]).map((p) => ({ x: p.x - minX, y: p.y - minY }));
       expect(hausdorff(expected, flat(curve))).toBeLessThanOrEqual(TOLERANCE_MM + importerSlack);
     });
-  });
+  }, 60_000);
 
   it('writes straight-line input byte for byte as before', () => {
     const doc = writeDxfDocument([

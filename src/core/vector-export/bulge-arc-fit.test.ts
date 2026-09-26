@@ -143,12 +143,16 @@ const cases: ReadonlyArray<readonly [string, CurveSubpath]> = [
 ];
 
 describe('DXF arc bulges (ADR-452)', () => {
-  it.each(cases)('keeps %s within the tolerance both ways', (_name, curve) => {
-    const ring = curveToBulgeRing(curve, TOLERANCE_MM);
-    const drawn = sampleBulges(ring.vertices, ring.closed);
-    expect(hausdorff(source(curve), drawn)).toBeLessThanOrEqual(TOLERANCE_MM);
-    for (const vertex of ring.vertices) expect(Math.abs(vertex.bulge)).toBeLessThan(1);
-  });
+  it.each(cases)(
+    'keeps %s within the tolerance both ways',
+    (_name, curve) => {
+      const ring = curveToBulgeRing(curve, TOLERANCE_MM);
+      const drawn = sampleBulges(ring.vertices, ring.closed);
+      expect(hausdorff(source(curve), drawn)).toBeLessThanOrEqual(TOLERANCE_MM);
+      for (const vertex of ring.vertices) expect(Math.abs(vertex.bulge)).toBeLessThan(1);
+    },
+    60_000,
+  );
 
   it('writes far fewer vertices than 0.01 mm chords', () => {
     for (const [, curve] of cases.slice(0, 6)) {

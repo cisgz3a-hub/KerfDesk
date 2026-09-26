@@ -40,8 +40,17 @@ cuts each arc into (0.002 to 0.008 mm), which a CAD file does not have.
 3. **`bulge-rings.ts`** keeps lines as zero-bulge vertices and circular arcs as their exact bulge,
    now split into equal parts of at most a half circle (|bulge| <= 1) when the arc sweeps more,
    and hands every curved run to the fitter. Ring closure, the closed flag, per-colour layers and
-   fill-rule semantics are unchanged (the writer emits rings as before). A tolerance under the
-   fitter's 0.001 mm source sampling is raised to it.
+   fill-rule semantics are unchanged (the writer emits rings as before).
+4. **Chord fallback** (`core/vector-export/bulge-chords.ts`, ADR-431's chord writer moved out
+   unchanged). A curved run is written as those chords instead of the fit when the chords take
+   no more vertices than the fit, or when the tolerance is under `MIN_ARC_FIT_TOLERANCE_MM`
+   (0.004 mm): the fitter's reserves take 0.003 mm, and below 0.004 mm its remaining budget is
+   too small to be worth fitting (at 0.003 mm and under it is zero or negative, and its line
+   check squares the bound, so it would not hold). The chords hold any tolerance down to ADR-431's
+   1e-6 mm floor, so `curveToleranceMm` is honoured for every value, and a file never has more
+   vertices than the chord writer gave it. A non-finite tolerance uses the 0.01 mm default, and a
+   curved segment with a non-finite coordinate, radius or rotation throws instead of writing
+   wrong geometry (lines are written as before).
 
 Clean room (ADR-120/123): no Potrace source was opened; only its documented DXF behaviour.
 
@@ -52,14 +61,17 @@ Clean room (ADR-120/123): no Potrace source was opened; only its documented DXF 
 
   | Image / preset | Cubics / lines traced | Chord vertices | Arc vertices (bulges) | Chord bytes | Arc bytes | Worst distance (mm) | Write (ms) |
   |---|---|---|---|---|---|---|---|
-  | owl / Line Art | 17,285 / 165,571 | 230,206 | 206,670 (14,102) | 5,751,687 | 5,549,521 | 0.00789 | 1,484 |
-  | owl / Smooth | 16,736 / 112,562 | 178,344 | 154,299 (14,344) | 4,589,540 | 4,382,500 | 0.00781 | 1,591 |
-  | hummingbird / Smooth | 12,468 / 85,647 | 133,730 | 116,014 (9,966) | 3,455,333 | 3,290,887 | 0.00779 | 1,068 |
-  | hummingbird / Line Art | 0 / 177,949 | 177,949 | 177,949 (0) | 4,373,218 | 4,373,218 | 0 | 672 |
+  | owl / Line Art | 17,285 / 165,571 | 230,206 | 206,670 (14,102) | 5,751,687 | 5,549,521 | 0.00789 | 1,380 |
+  | owl / Smooth | 16,736 / 112,562 | 178,344 | 154,299 (14,344) | 4,589,540 | 4,382,500 | 0.00781 | 1,039 |
+  | hummingbird / Smooth | 12,468 / 85,647 | 133,730 | 116,014 (9,966) | 3,455,333 | 3,290,887 | 0.00779 | 875 |
+  | hummingbird / Line Art | 0 / 177,949 | 177,949 | 177,949 (0) | 4,373,218 | 4,373,218 | 0 | 431 |
 
   "Chord" is ADR-431's writer on the same geometry (its 0.01 mm midpoint subdivision, written
   through the unchanged line path); the worst distance is the two-sided distance between each ring's
-  exactly sampled bulges and its densely flattened source, over every ring. The saving is in the
+  exactly sampled bulges and its densely flattened source, over every ring, measured on the rings
+  before the 0.001 mm coordinate grid (the fitter's 0.002 mm rounding reserve covers the grid; the
+  in-repo tests check the written, gridded text separately). The numbers are the same with and
+  without the chord fallback of decision 4: on these images the fit never took more vertices. The saving is in the
   curved runs only: 23,536 / 24,045 / 17,716 fewer vertices, where the chord writer spent on average
   3.7 to 3.9 vertices per cubic (13,317 / 13,691 / 9,516 of which remain, about 0.8 per cubic, one
   in seven or more of them a line). The traced output is dominated by straight segments, which stay
@@ -76,6 +88,17 @@ Clean room (ADR-120/123): no Potrace source was opened; only its documented DXF 
   values are plain decimals, signed with the ring and under 1 in magnitude; the sampled polylines
   stay within 0.01 mm of the source after the grid; the fitted arcs round-trip through `parseDxf`;
   and straight-line input writes a file whose SHA-256 equals the chord writer's at `952fb13e3`.
+  `bulge-rings-limits.test.ts` holds tolerances of 0.0005 to 0.004 mm on an S-curve and an
+  ellipse, checks that no ring has more vertices than the chords (including 2500 mm circles and
+  2000 x 1500 mm ellipses), and covers non-finite tolerances and coordinates.
+- Limits. The fit inherits the ADR-432 radius range, 0.1 to 1000 mm (`ARC_FIT_MIN_RADIUS_MM`,
+  `ARC_FIT_MAX_RADIUS_MM`, chosen for GRBL's 3-decimal I/J words and float32 arithmetic, not for
+  CAD). A curve outside it is fitted with lines, and where that takes more vertices than the
+  chords (for example an ellipse of elliptical arcs with 2000 x 1500 mm semi-axes, measured at
+  1,140 fitted against 997 chord vertices at 0.01 mm), decision 4 writes the chords. So there are
+  no arcs for radii outside that range, and none for any curve under a 0.004 mm tolerance; those
+  files are exactly as large as under ADR-431. Giving the CAD path its own radius range would
+  mean threading limits through the shared arc primitives, which is left for later.
 - Not verified here: opening the files in AutoCAD, LibreCAD or another CAD/CAM program.
 - A coarser `precisionMm` (0.01 or 0.1 mm) moves arcs by its own grid error beyond the fit, as it
   already moved chords under ADR-431.

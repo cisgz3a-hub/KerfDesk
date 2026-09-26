@@ -9,35 +9,49 @@
 //                          parts of at most a half circle each
 //   * cubics and         → each run of consecutive ones is fitted with lines
 //     elliptical arcs      and circular arcs within `toleranceMm` of the true
-//                          curve both ways (bulge-arc-fit.ts, ADR-452)
+//                          curve both ways (bulge-arc-fit.ts, ADR-452), or
+//                          written as ADR-431's chords (bulge-chords.ts) when
+//                          those take fewer vertices or the tolerance is
+//                          below the fitter's floor
 //
+// Non-finite curve coordinates throw instead of writing wrong geometry; a
+// non-finite tolerance uses the default.
 // Input coordinates are the app's Y-down frame; bulge signs are already
 // expressed for the Y-up frame the writer produces by mirroring Y.
 //
 // Pure-core compliant: no clock, no random, no I/O, no DOM.
 
 import type {
+  CubicPathSegment,
   CurveSubpath,
   EllipticalArcPathSegment,
   PathSegment,
   Vec2,
 } from '../scene/scene-object';
 import { fittedCurveEdges, splitCircularBulge, type BulgeEdge } from './bulge-arc-fit';
+import { chordCurveEdges } from './bulge-chords';
+
+export { segmentDistance } from './bulge-chords';
 
 export type BulgeVertex = { readonly x: number; readonly y: number; readonly bulge: number };
 export type BulgeRing = { readonly vertices: ReadonlyArray<BulgeVertex>; readonly closed: boolean };
 
 /** Published default: 0.01 mm, a tenth of a typical 0.1 mm laser spot. */
 export const DEFAULT_DXF_CURVE_TOLERANCE_MM = 0.01;
+/** ADR-431's floor: the chord subdivision holds any tolerance down to it. */
+const MIN_TOLERANCE_MM = 1e-6;
 /**
- * The arc fitter samples its source within 0.001 mm; a tighter request is
- * raised to it (the fit then falls back to those sample chords).
+ * Smallest tolerance the arc fit gets: its source sampling (0.001 mm) and
+ * rounding (0.002 mm) reserves leave it at least 0.001 mm of fit. Below it
+ * every curved run is written as chords.
  */
-const MIN_TOLERANCE_MM = 0.001;
+export const MIN_ARC_FIT_TOLERANCE_MM = 0.004;
 const CIRCULAR_RELATIVE_EPSILON = 1e-9;
 
 export function curveToBulgeRing(curve: CurveSubpath, toleranceMm: number): BulgeRing {
-  const tolerance = Math.max(MIN_TOLERANCE_MM, toleranceMm);
+  const tolerance = Number.isFinite(toleranceMm)
+    ? Math.max(MIN_TOLERANCE_MM, toleranceMm)
+    : DEFAULT_DXF_CURVE_TOLERANCE_MM;
   const vertices: { x: number; y: number; bulge: number }[] = [
     { x: curve.start.x, y: curve.start.y, bulge: 0 },
   ];
@@ -51,10 +65,11 @@ export function curveToBulgeRing(curve: CurveSubpath, toleranceMm: number): Bulg
   let run: PathSegment[] = [];
   let runStart = current;
   const flushRun = (): void => {
-    if (run.length > 0) addEdges(fittedCurveEdges(runStart, run, tolerance));
+    if (run.length > 0) addEdges(curvedRunEdges(runStart, run, tolerance));
     run = [];
   };
   for (const segment of curve.segments) {
+    if (segment.kind !== 'line') assertFiniteCurve(current, segment);
     const bulge = segment.kind === 'elliptical-arc' ? circularBulge(current, segment) : null;
     if (segment.kind === 'line' || bulge !== null) {
       flushRun();
@@ -71,6 +86,29 @@ export function curveToBulgeRing(curve: CurveSubpath, toleranceMm: number): Bulg
   }
   flushRun();
   return { vertices, closed: curve.closed };
+}
+
+// The fitted edges, unless chords take fewer vertices (radii outside the
+// fitter's 0.1 to 1000 mm, or very flat curves) or the tolerance is too
+// tight for the fit. Both hold the tolerance and end at the run's end.
+function curvedRunEdges(
+  from: Vec2,
+  run: ReadonlyArray<PathSegment>,
+  toleranceMm: number,
+): ReadonlyArray<BulgeEdge> {
+  const chords = chordCurveEdges(from, run, toleranceMm);
+  if (toleranceMm < MIN_ARC_FIT_TOLERANCE_MM) return chords;
+  const fitted = fittedCurveEdges(from, run, toleranceMm);
+  return fitted.length <= chords.length ? fitted : chords;
+}
+
+function assertFiniteCurve(from: Vec2, segment: CubicPathSegment | EllipticalArcPathSegment): void {
+  const values =
+    segment.kind === 'cubic'
+      ? [segment.control1.x, segment.control1.y, segment.control2.x, segment.control2.y]
+      : [segment.radiusX, segment.radiusY, segment.rotationDeg];
+  values.push(from.x, from.y, segment.to.x, segment.to.y);
+  if (!values.every(Number.isFinite)) throw new Error('A curve has a non-finite coordinate.');
 }
 
 /**
@@ -91,14 +129,4 @@ export function circularBulge(from: Vec2, segment: EllipticalArcPathSegment): nu
   // SVG sweep=1 turns toward +angle in the Y-down frame, which is clockwise
   // once Y is mirrored — a negative DXF bulge.
   return (segment.sweep ? -1 : 1) * Math.tan(included / 4);
-}
-
-/** Distance from `p` to the closed segment a–b. */
-export function segmentDistance(p: Vec2, a: Vec2, b: Vec2): number {
-  const dx = b.x - a.x;
-  const dy = b.y - a.y;
-  const lengthSq = dx * dx + dy * dy;
-  const t =
-    lengthSq === 0 ? 0 : Math.max(0, Math.min(1, ((p.x - a.x) * dx + (p.y - a.y) * dy) / lengthSq));
-  return Math.hypot(a.x + t * dx - p.x, a.y + t * dy - p.y);
 }
