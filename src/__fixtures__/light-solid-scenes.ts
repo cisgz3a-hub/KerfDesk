@@ -116,8 +116,10 @@ export function sheetWithDrawing(sheet: Rgb): RawImageData {
   return image;
 }
 
-/** Ink pixels the sheet's pencil drawing covers before any noise. */
-export const SHEET_DRAWING_PX = 464;
+/** Ink pixels the sheet's pencil drawing covers before any noise: 500 on the
+ *  circle plus 180 on the line. (Four-connected despeckle, before ADR-395,
+ *  erased 216 of the circle's diagonal-arc pixels and left 464.) */
+export const SHEET_DRAWING_PX = 680;
 
 /** A light plate (260×160, inset 20) carrying eight dark "T" glyphs, plus a
  *  red corner mark that makes the image colourful. */
