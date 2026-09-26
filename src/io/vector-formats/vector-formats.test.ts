@@ -5,6 +5,7 @@ import type { CurveSubpath, Vec2 } from '../../core/scene';
 import { writeEpsDocument } from './eps-writer';
 import { writeGeoJsonDocument } from './geojson-writer';
 import { PT_PER_MM_TEXT, writePdfDocument } from './pdf-writer';
+import { writeTracedDrawing } from './traced-drawing';
 import { PT_PER_MM, type VectorPaintItem } from './vector-artwork';
 
 // A small curved, holed artwork in scene millimetres (Y down): a rounded
@@ -307,6 +308,35 @@ describe('GeoJSON writer', () => {
     const topmost = Math.max(...waveLine.map((p) => p[1] as number));
     expect(topmost).toBeLessThanOrEqual(2 * WAVE_MAX_Y - 80 + HALF_DIAGONAL_MM);
     expect(topmost).toBeGreaterThan(2 * WAVE_MAX_Y - 80 - 0.01 - HALF_DIAGONAL_MM);
+  });
+});
+
+describe('Multi-File Trace drawings', () => {
+  const layers = [{ color: '#000000', curves: [squareHole] }];
+  const page = { pageWidth: 50, pageHeight: 40, precisionMm: 0.01 };
+
+  it('uses the traced page, not the artwork extent, with the lower-left origin', () => {
+    const pdf = writeTracedDrawing('pdf', layers, { ...page, strokeOnly: false });
+    expect(pdf).toContain('/MediaBox [0 0 ' + (50 * PT_PER_MM).toFixed(4) + ' ');
+    // Scene (14, 9) on a 40 mm page is (14, 31) with y up.
+    expect(pdf).toContain('\n14 31 m\n');
+    expect(pdf).toContain('\nf*\n');
+    const eps = writeTracedDrawing('eps', layers, { ...page, strokeOnly: true });
+    expect(eps).toContain('%%BoundingBox: 0 0 142 114');
+    expect(eps).toContain('\nstroke\n');
+    const geo = JSON.parse(writeTracedDrawing('geojson', layers, { ...page, strokeOnly: false }));
+    expect(geo.features[0].geometry).toEqual({
+      type: 'Polygon',
+      coordinates: [
+        [
+          [14, 31],
+          [14, 23],
+          [22, 23],
+          [22, 31],
+          [14, 31],
+        ],
+      ],
+    });
   });
 });
 

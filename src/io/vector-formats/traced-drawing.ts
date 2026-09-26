@@ -1,0 +1,28 @@
+// Multi-File Trace output as PDF, EPS or GeoJSON (ADR-455). The page is the
+// traced image's page, so every file of a batch shares the source image's
+// frame: its lower-left corner is the origin, as in the DXF output.
+
+import type { BatchTraceDrawingFormat, TracedLayer, TracedVectorOptions } from '../../core/trace';
+import { writeEpsDocument } from './eps-writer';
+import { writeGeoJsonDocument } from './geojson-writer';
+import { writePdfDocument } from './pdf-writer';
+import { tracedLayerItems, type VectorWriteOptions } from './vector-artwork';
+
+export function writeTracedDrawing(
+  format: BatchTraceDrawingFormat,
+  layers: ReadonlyArray<TracedLayer>,
+  options: TracedVectorOptions & {
+    readonly pageWidth: number;
+    readonly pageHeight: number;
+    readonly strokeOnly: boolean;
+  },
+): string {
+  const items = tracedLayerItems(layers, options.strokeOnly);
+  const write: VectorWriteOptions = {
+    ...(options.precisionMm === undefined ? {} : { precisionMm: options.precisionMm }),
+    page: { minX: 0, minY: 0, maxX: options.pageWidth, maxY: options.pageHeight },
+  };
+  if (format === 'pdf') return writePdfDocument(items, write).text;
+  if (format === 'eps') return writeEpsDocument(items, write).text;
+  return writeGeoJsonDocument(items, write).text;
+}

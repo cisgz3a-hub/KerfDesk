@@ -23,7 +23,15 @@ export type BatchTraceImageJob = {
   readonly options?: TraceOptions;
 };
 
-export type BatchTraceFormat = 'svg' | 'dxf';
+export type BatchTraceFormat = 'svg' | 'dxf' | 'pdf' | 'eps' | 'geojson';
+
+/** Formats written by the io-layer vector writer (ADR-455). */
+export type BatchTraceDrawingFormat = 'pdf' | 'eps' | 'geojson';
+
+/** Human label for a batch format ("GeoJSON", "PDF"). */
+export function batchTraceFormatLabel(format: BatchTraceFormat): string {
+  return format === 'geojson' ? 'GeoJSON' : format.toUpperCase();
+}
 
 export type BatchTraceFile = {
   readonly filename: string;
@@ -63,6 +71,20 @@ export type BatchTraceDependencies = {
     layers: ReadonlyArray<TracedLayer>,
     options: TracedVectorOptions & { readonly pageHeight: number },
   ) => string;
+  /**
+   * PDF / EPS / GeoJSON serializer (io layer, ADR-455). Receives visible
+   * layers in page units (Y down), the page size, and whether every contour
+   * is a stroke (Centerline). Required only for those formats.
+   */
+  readonly writeDrawing?: (
+    format: BatchTraceDrawingFormat,
+    layers: ReadonlyArray<TracedLayer>,
+    options: TracedVectorOptions & {
+      readonly pageWidth: number;
+      readonly pageHeight: number;
+      readonly strokeOnly: boolean;
+    },
+  ) => string;
 };
 
 const FORBIDDEN_FILENAME_CHARS = new Set(['<', '>', ':', '"', '/', '\\', '|', '?', '*']);
@@ -95,10 +117,7 @@ export async function traceImagesToVectorFiles(
     files.push({
       filename: `${stem}-trace.${format}`,
       format,
-      text:
-        format === 'dxf'
-          ? requireDxfWriter(deps)(layers, { ...output, pageHeight: pageHeight(page) })
-          : tracedLayersToSvg(layers, page, options.traceMode, output),
+      text: tracedFileText(format, layers, page, options.traceMode, deps, output),
       pathCount: layers.length,
       sourceIndex,
     });
@@ -120,6 +139,28 @@ function tracedPage(
 /** Page height in the layers' units: millimetres when known, else pixels. */
 function pageHeight(page: TracedSvgPage): number {
   return page.physicalSizeMm?.heightMm ?? page.pixelHeight;
+}
+
+function tracedFileText(
+  format: BatchTraceFormat,
+  layers: ReadonlyArray<TracedLayer>,
+  page: TracedSvgPage,
+  traceMode: TraceOptions['traceMode'],
+  deps: BatchTraceDependencies,
+  output: BatchTraceOutput,
+): string {
+  if (format === 'svg') return tracedLayersToSvg(layers, page, traceMode, output);
+  if (format === 'dxf')
+    return requireDxfWriter(deps)(layers, { ...output, pageHeight: pageHeight(page) });
+  if (deps.writeDrawing === undefined) {
+    throw new Error(batchTraceFormatLabel(format) + ' output is not available here.');
+  }
+  return deps.writeDrawing(format, layers, {
+    ...output,
+    pageWidth: page.physicalSizeMm?.widthMm ?? page.pixelWidth,
+    pageHeight: pageHeight(page),
+    strokeOnly: traceMode === 'centerline',
+  });
 }
 
 function requireDxfWriter(

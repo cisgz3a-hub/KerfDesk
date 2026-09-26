@@ -50,7 +50,7 @@ export function toolsCommands(ctx: AppCommandContext): ReadonlyArray<AppCommand>
       'tools.multi-file-trace',
       'tools',
       'Multi-File Trace...',
-      'Trace multiple image files to SVG or DXF exports',
+      'Trace multiple image files to SVG, DXF, PDF, EPS or GeoJSON exports',
       ctx.multiFileTrace,
     ),
     convertToPathCommand(ctx),
