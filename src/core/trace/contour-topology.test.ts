@@ -49,7 +49,7 @@ describe('contour finishing topology', () => {
     });
     const [a, b] = paths.flatMap((path) => path.polylines);
     // Two 40px squares one paper column apart: the corner dial keeps both
-    // squares pixel-exact, so the traced gap is the drawn one (ADR-404).
+    // squares pixel-exact, so the traced gap is the drawn one (ADR-439).
     expect(contourGap(a!, b!)).toBe(1);
   });
 });

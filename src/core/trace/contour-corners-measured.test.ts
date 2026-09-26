@@ -1,4 +1,4 @@
-// Corner dial on MEASURED loops (ADR-404): an anti-aliased source's crack
+// Corner dial on MEASURED loops (ADR-439): an anti-aliased source's crack
 // chain is the field's iso-line, which rounds every apex. The dial must still
 // find the drawn apex (confirmed by the field, contour-corner-field.ts), must
 // not invent one where the drawing is rounded, and must keep the inner corners

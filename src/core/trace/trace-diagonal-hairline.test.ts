@@ -103,7 +103,7 @@ type PresetName = (typeof PRESETS)[number];
 //    ribbon as a coarse polygon (13 points for 69 px) that cuts the
 //    staircase's outer pixels. Potrace 1.16 measures 0.870 binary and
 //    0.863 / 0.887 AA. Owner: the contour finishing tail.
-// Since ADR-405 every measured (anti-aliased) ribbon ends in the compact fit
+// Since ADR-440 every measured (anti-aliased) ribbon ends in the compact fit
 // instead of the simplify + spline tail, whose spline bowed each edge ~0.3 px
 // outward. Binary cells now all reach recall 1.000 (Line Art, Smooth) or
 // 0.942 (Sharp). The AA cells follow the measured iso-line itself, which on a

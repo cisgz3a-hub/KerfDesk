@@ -38,7 +38,7 @@ describe('restoring contours from a rounded working grid', () => {
         expect(after[index]!.x / image.width).toBeCloseTo(point.x / working.width, 12);
         expect(after[index]!.y / image.height).toBeCloseTo(point.y / working.height, 12);
       }
-      // The fitted curves survive the restore (ADR-405): each control point
+      // The fitted curves survive the restore (ADR-440): each control point
       // is the working trace's, mapped by the two axis scales.
       const workingCurves = reference.flatMap((path) => path.curves ?? []);
       const restoredCurves = restored.flatMap((path) => path.curves ?? []);

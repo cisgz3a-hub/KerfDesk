@@ -115,7 +115,7 @@ function optionsForRegionScale(options: TraceOptions, factor: number): TraceOpti
 /** Merge: drop existing polylines fully inside `interior`, then add the
  *  replacement polylines, folding them into the first existing path of the
  *  same colour (no duplicate colour layers). Each polyline keeps its canonical
- *  curve (ADR-405). Exported for tests. */
+ *  curve (ADR-440). Exported for tests. */
 export function replacePathsInRegion(
   existing: ReadonlyArray<ColoredPath>,
   interior: TraceBoundary,

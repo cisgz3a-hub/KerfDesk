@@ -80,7 +80,7 @@ function ringRoundness(
   closed: boolean,
 ): Roundness {
   // Samples at an even arc-length step, not at the vertices: the outline's
-  // vertex density follows its curvature (ADR-405's samples stay within
+  // vertex density follows its curvature (ADR-440's samples stay within
   // 0.02 px of the curve), and vertex-weighted samples would score bends
   // more often than the arcs between them.
   const samples: Array<{ x: number; y: number }> = [];

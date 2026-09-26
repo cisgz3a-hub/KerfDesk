@@ -8,7 +8,7 @@
 // same double; nearer a boundary, or outside [2^-300, 1], it defers to
 // `x ** 3` itself. A replay of 2e7 cubes matched `x ** 3` in every bit, and
 // the unit test pins that. About 2-3x faster in the cubic fit's arm solve
-// (ADR-405 speed amendment).
+// (ADR-440 speed amendment).
 
 const SPLIT = 134217729; // 2^27 + 1: Veltkamp's splitter for doubles
 const BOUNDARY_BAND = 2 ** -57;

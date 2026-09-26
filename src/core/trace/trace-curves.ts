@@ -1,4 +1,4 @@
-// Canonical curves for trace output (ADR-391, ADR-405). The contour finisher
+// Canonical curves for trace output (ADR-391, ADR-440). The contour finisher
 // fits every ring with compact cubic and line segments; those segments become
 // the path's curves, so compile and export flatten them once at their own
 // tolerance. The curve rides EXPLICITLY on the ring object it describes
@@ -20,7 +20,7 @@ import {
  *  points are the curve's compatibility sampling. */
 export type TraceRing = Polyline & { readonly curve?: CurveSubpath };
 
-// The centreline's fitted strokes (ADR-397), keyed by the exact sample array
+// The centreline's fitted strokes (ADR-405), keyed by the exact sample array
 // its finisher returns. A stage that copies the array falls back to straight
 // segments over the copy.
 const registeredCurves = new WeakMap<ReadonlyArray<Vec2>, CurveSubpath>();
@@ -36,7 +36,7 @@ export function traceRingCurve(polyline: Polyline): CurveSubpath | undefined {
 }
 
 /** Remember `curve` as the canonical curve of the exact sample array
- *  `points` (the centreline's fitted open and closed strokes, ADR-397). */
+ *  `points` (the centreline's fitted open and closed strokes, ADR-405). */
 export function registerTraceCurve(points: ReadonlyArray<Vec2>, curve: CurveSubpath): void {
   registeredCurves.set(points, curve);
 }

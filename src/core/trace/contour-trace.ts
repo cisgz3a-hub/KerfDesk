@@ -5,7 +5,7 @@
 // MIT-release blocker): binarize via the shared preprocessing, walk the ink
 // boundary on the corner lattice (contour-boundary.ts), then finish each
 // closed loop (corner dial → curvature evening → arc/line evening), and end
-// every loop in the compact fit (compact-curve-fit.ts, ADR-405): the fewest
+// every loop in the compact fit (compact-curve-fit.ts, ADR-440): the fewest
 // cubics and lines within a tolerance, carried as the ring's canonical
 // curve. Measured loops are fitted directly; binary loops keep the
 // centerline's simplify + bounded spline resample as the shape they fit.
@@ -98,7 +98,7 @@ const NO_CORNERS: ReadonlySet<Polyline['points'][number]> = new Set();
 // A loop whose cracks mostly interpolated is a sub-pixel MEASUREMENT (see
 // finishLoop): above this fraction the wobble stages disable for that loop.
 const SUBPIXEL_INFORMED_FRACTION = 0.3;
-// Compact-fit tolerance (compact-curve-fit.ts, ADR-405): the largest
+// Compact-fit tolerance (compact-curve-fit.ts, ADR-440): the largest
 // ORTHOGONAL distance of the output curve from the chain it fits, in SOURCE px
 // (scaled by pixelScale like every px knob), at Optimize's neutral 0.2. ~2-3x
 // the sub-pixel measurement noise: tight enough to keep drawn features, loose
@@ -227,7 +227,7 @@ export function* contourPolylinesFromMaskSteps(
 }
 
 /** The finished outlines in boundary scan order, with their containment forest
- *  from the raw lattice loops (contour-nesting.ts, ADR-406). */
+ *  from the raw lattice loops (contour-nesting.ts, ADR-441). */
 export function* contourRingsFromMaskSteps(
   mask: InkMask,
   options: ContourFinishOptions,
@@ -405,7 +405,7 @@ function finishDenseLoop(
   // curves (research brief #2). The simplify + spline tail it replaced bowed
   // every straight edge outward (its spline passed through Douglas-Peucker
   // vertices and a cap of ±ε let it sit ~0.3 px outside the ink): a thin AA
-  // bar gained up to 24% area (ADR-405). Organic-size loops are
+  // bar gained up to 24% area (ADR-440). Organic-size loops are
   // Whittaker-faired between their corners first.
   if (subPixelInformed) {
     return dense.length > organicMin
@@ -445,7 +445,7 @@ function smoothBetweenCorners(points: ReadonlyArray<Vec2>, corners: ReadonlySet<
 
 // The binary tail (saturated / pixel-fidelity sources): straight-run flatten
 // → simplify → flatten → corner-aware spline resample, as tuned for binary
-// art, then the compact fit THROUGH that resample (ADR-405): the shape stays
+// art, then the compact fit THROUGH that resample (ADR-440): the shape stays
 // the approved one, the output becomes a few cubics between its corners and
 // single lines along its straight runs. The shape stages run at Optimize's
 // neutral ε, so Optimize is only the final fit tolerance and the segment
@@ -530,7 +530,7 @@ function fitLoopTail(
 
 // Optimize scales the final tolerance only. Candidate joints are proposed at a
 // fixed share of the tolerance Optimize 0 gives, so they never follow
-// Optimize and the merge's segment count is monotone in it (ADR-405).
+// Optimize and the merge's segment count is monotone in it (ADR-440).
 function compactTolerances(
   tolerancePx: number,
   finish: LoopFinish,
@@ -543,7 +543,7 @@ function compactTolerances(
   };
 }
 
-// Fit the ring's compact curve (compact-curve-fit.ts, ADR-405) through
+// Fit the ring's compact curve (compact-curve-fit.ts, ADR-440) through
 // `target(amount)` and carry it on the ring object itself (trace-curves.ts).
 // The topology repair's weaker refinements scale the tolerances down with
 // the target's own smoothing.

@@ -1,4 +1,4 @@
-// Corner dial (ADR-404): Smoothness decides which boundary turns are corners,
+// Corner dial (ADR-439): Smoothness decides which boundary turns are corners,
 // on every loop, before any smoothing. s = 0 is the exact pixel polygon, the
 // slider maximum has no corners, and the corner count never rises with s.
 
@@ -286,7 +286,7 @@ describe('pixel-exact corners through the whole trace', () => {
       ),
     ];
     // The 1/128 px saddle inset must separate the diagonal contacts under
-    // every saddle policy the walker can use (ADR-395).
+    // every saddle policy the walker can use (ADR-403).
     for (const turnPolicy of ['auto', 'connect-ink', 'connect-paper'] as const) {
       const options: TraceOptions = { ...TRACE_PRESETS.Sharp!, smoothness: 0, turnPolicy };
       for (const { image, mask } of sprites) {

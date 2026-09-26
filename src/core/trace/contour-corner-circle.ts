@@ -1,4 +1,4 @@
-// One-circle model for the corner dial (ADR-404): the algebraic least-squares
+// One-circle model for the corner dial (ADR-439): the algebraic least-squares
 // circle (Kåsa 1976) through a run of crack points, used to tell a digitized
 // or wobbly arc from a corner (contour-corner-legs.ts) and a circle's own
 // digitization steps from drawn pixel detail (contour-corner-lattice.ts).

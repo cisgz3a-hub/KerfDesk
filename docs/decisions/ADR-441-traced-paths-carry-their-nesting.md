@@ -1,8 +1,8 @@
-## ADR-406 - Traced paths carry their nesting, and the crossing guard sees the curves (2026-09-26)
+## ADR-441 - Traced paths carry their nesting, and the crossing guard sees the curves (2026-09-26)
 
 **Status:** Accepted. | **Date:** 2026-09-26
 
-This builds on ADR-405 (traced contours reach the scene as compact curves) and ADR-398 (Break Apart
+This builds on ADR-440 (traced contours reach the scene as compact curves) and ADR-406 (Break Apart
 splits a trace into shapes). It changes what the binary filled-contour tracer (Line Art, Smooth,
 Sharp) returns, how inside-first cutting and Break Apart learn which outline holds which, and what
 the contour topology repair checks. Compile output for scenes without traced nesting, bounds, Frame
@@ -10,7 +10,7 @@ and Start (PROJECT.md non-negotiable 21, ADRs 228, 230, 232 and 237) are untouch
 
 ### Context
 
-Measured on the branch base (`claude/tl-geometry-core` at `a4e3954a4`, ADR-405 applied) and on main
+Measured on the branch base (`claude/tl-geometry-core` at `a4e3954a4`, ADR-440 applied) and on main
 (`fa8939b8d`) with the Potrace bake-off harness (TRACE_AUDIT-gated, untracked; Potrace 1.16 run out
 of process only to measure its output):
 
@@ -21,11 +21,11 @@ of process only to measure its output):
   target's bounds must be inside the container. That probe is wrong for a concave target: the hole
   of an outlined C has its bounds centre in the C's mouth, outside the outline, so the hole was
   ordered as a second outer and could be cut after the outline that holds it. Break Apart
-  (ADR-398) rebuilt nesting a second way, by a vote of vertex probes.
+  (ADR-406) rebuilt nesting a second way, by a vote of vertex probes.
 - **The orientation comment was wrong.** `contour-boundary.ts` said outer loops run
   counter-clockwise on screen. The walker keeps ink on the right of travel in y-down coordinates,
   so a single ink pixel is walked east, south, west, north: clockwise on screen, shoelace area +1.
-- **The crossing guard checked the samples, not the curves.** Since ADR-405 a ring's canonical
+- **The crossing guard checked the samples, not the curves.** Since ADR-440 a ring's canonical
   output is its cubics; the topology repair tested their compatibility samples, evenly spaced in
   the curve parameter. Three shapes of crossing hid between samples:
   - Hooks: on rings a pixel or two across, the joint tangent (estimated over +-2 px) can point
@@ -120,7 +120,7 @@ Options considered:
    checks this against a from-scratch run). Line against line stays with the sample test, which is
    exact for straight edges, and a path with no fitted curve (the laser commit guard) skips the
    check.
-   The samples themselves go back to ADR-405's even sampling (about one vertex per 1.5 px, within
+   The samples themselves go back to ADR-440's even sampling (about one vertex per 1.5 px, within
    0.02 px): a first version of this decision refined the samples instead (recursive halving,
    finer next to spikes). That still missed lens crossings thinner than its 0.02 px sampling
    error, and it grew the stored compatibility polylines by 30 to 55 percent and Sharp trace time
@@ -129,10 +129,10 @@ Options considered:
 ### Measurements
 
 Bake-off harness (owl and hummingbird, TRACE_AUDIT-gated, one timing run), this decision
-(`7f88e6375`) against ADR-405 (`a4e3954a4`) and main (`fa8939b8d`). Crossings are the harness's
+(`7f88e6375`) against ADR-440 (`a4e3954a4`) and main (`fa8939b8d`). Crossings are the harness's
 proper crossings of the output flattened within 0.02 source px.
 
-| art / preset | IoU main / ADR-405 / this | crossings main / ADR-405 / this |
+| art / preset | IoU main / ADR-440 / this | crossings main / ADR-440 / this |
 | --- | --- | --- |
 | owl Line Art | 0.8655 / 0.8947 / 0.8947 | 2 / 1 / 0 |
 | owl Line Art, luma | 0.8655 / 0.8947 / 0.8947 | 2 / 1 / 0 |
@@ -160,7 +160,7 @@ proper crossings of the output flattened within 0.02 source px.
   +17 to 28 percent, so take about +25 percent for noisy art. Halftone, anti-aliased rings and
   checker art stay within noise. The forest itself is one integer sweep per pixel row and does not
   show above noise. The bake-off's single timing run (noisy, other worktrees active) read owl Line
-  Art 8.4 to 10.0 s and hummingbird Line Art 5.4 to 6.5 s against ADR-405.
+  Art 8.4 to 10.0 s and hummingbird Line Art 5.4 to 6.5 s against ADR-440.
 - **Tests:** six nested square bands (depths 0 to 5, outers first) and B, 8 and @ glyph topologies
   and islands inside holes in all three presets; a thin hollow C whose bounds-centre probe reads
   depths `[0, 0]` without the forest and `[0, 1]` with it (inside-first order of the compiled job

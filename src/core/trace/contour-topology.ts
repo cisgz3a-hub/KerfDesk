@@ -60,7 +60,7 @@ export function* preserveContourTopologySteps(
   for (;;) {
     const conflicts = yield* intersectingContourLoopsSteps(current, contacts);
     // The fitted curves themselves, which can meet between their samples
-    // (ADR-406). Rings without a fitted curve are exact in their samples.
+    // (ADR-441). Rings without a fitted curve are exact in their samples.
     for (const index of yield* curves.conflictsSteps(current)) conflicts.add(index);
     yield* addNestingConflictsSteps(
       contours,

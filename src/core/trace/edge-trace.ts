@@ -74,7 +74,7 @@ export function* traceImageToEdgePathsSteps(
         toleranceScale,
       fitToleranceScale: toleranceScale,
       // Same Smoothness → corner dial and flatten-strength ramp as the
-      // contour lane (ADR-404).
+      // contour lane (ADR-439).
       flattenStrength: flattenStrengthFromSmoothness(options.smoothness),
       cornerThresholdPx: cornerThresholdFromSmoothness(options.smoothness),
       pixelScale: scale,

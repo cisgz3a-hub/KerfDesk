@@ -1,4 +1,4 @@
-## ADR-404 - Smoothness decides contour corners, before any smoothing (2026-09-25)
+## ADR-439 - Smoothness decides contour corners, before any smoothing (2026-09-25)
 
 **Status:** Accepted. | **Date:** 2026-09-25
 
@@ -144,7 +144,7 @@ on r = 4, 6 and 8, and none from r = 20.
 
 Sprites at s = 0 (Sharp, Hausdorff distance from the pixel boundary): 4x4 0.481 -> 0.000, L-shape
 0.542 -> 0.000, 10x10 face with diagonal contacts 0.685 -> 0.008 (the saddle step), the same under
-all three saddle policies (auto, connect-ink, connect-paper; ADR-395).
+all three saddle policies (auto, connect-ink, connect-paper; ADR-403).
 
 Real art (owl 1254 px, hummingbird), potrace bake-off, IoU against the 4x iso-contour reference
 (Potrace 1.16 defaults: owl 0.8916, hummingbird 0.8901), main then this change:

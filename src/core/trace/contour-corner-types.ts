@@ -1,5 +1,5 @@
 // Shared types and leg constants of the corner dial (contour-corners.ts,
-// ADR-404).
+// ADR-439).
 
 import type { Vec2 } from '../scene';
 import type { CrackSubPixelField } from './saddle-connectivity';

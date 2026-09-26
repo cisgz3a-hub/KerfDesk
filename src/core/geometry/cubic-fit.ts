@@ -340,7 +340,7 @@ function reparameterize(
 export function newtonProjectionStep(cubic: CubicBezier, p: Vec2, t: number): number | null {
   // The point, first and second derivative in one pass with no allocation
   // (the same arithmetic as evaluateCubic, so the same bits): the compact
-  // contour fit runs this for every point of every span pass (ADR-405).
+  // contour fit runs this for every point of every span pass (ADR-440).
   const { p0, p1, p2, p3 } = cubic;
   const m = 1 - t;
   const b0 = m * m * m;

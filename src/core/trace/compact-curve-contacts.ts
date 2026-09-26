@@ -1,7 +1,7 @@
-// The crossing guard on the canonical curves (ADR-406).
+// The crossing guard on the canonical curves (ADR-441).
 //
 // The contour topology repair tests each finished ring's compatibility
-// samples. Since ADR-405 a fitted ring's output is its cubics, and those can
+// samples. Since ADR-440 a fitted ring's output is its cubics, and those can
 // cross, touch or loop between samples: a hook where a cubic runs past its end
 // and turns back, two legs of a spike bending into each other, two outlines
 // passing through each other in a lens thinner than the sampling error. This

@@ -1,4 +1,4 @@
-// Corner dial for the contour tracer (ADR-404): the ONE stage that decides
+// Corner dial for the contour tracer (ADR-439): the ONE stage that decides
 // which boundary turns are corners, before any smoothing touches the loop.
 //
 // Every loop — binary or anti-aliased, any length — is scanned on its raw

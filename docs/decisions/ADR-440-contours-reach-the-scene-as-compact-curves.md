@@ -1,16 +1,16 @@
-## ADR-405 - Traced contours reach the scene as compact curves (2026-09-26)
+## ADR-440 - Traced contours reach the scene as compact curves (2026-09-26)
 
 **Status:** Accepted. | **Date:** 2026-09-26
 
 This extends ADR-391, which kept the contour finisher's fitted cubics as canonical curves only for
-measured loops of at least 260 chain points, and builds on ADR-404's corner dial. It changes the
+measured loops of at least 260 chain points, and builds on ADR-439's corner dial. It changes the
 finishing tail of the filled-contour tracer (Line Art, Smooth, Sharp) and of the Edge lane that
 shares it. The tracer still returns closed rings with canonical curves; bounds, compile, Frame and
 Start contracts (PROJECT.md non-negotiable 21, ADRs 228, 230, 232 and 237) are untouched.
 
 ### Context
 
-Measured on the base (`claude/tl-geometry-core` at `4aa8bbde3`, ADR-404 applied) and on main
+Measured on the base (`claude/tl-geometry-core` at `4aa8bbde3`, ADR-439 applied) and on main
 (`fa8939b8d`) with the Potrace bake-off harness (TRACE_AUDIT-gated, untracked; Potrace 1.16 run
 out of process only to measure its output):
 
@@ -23,7 +23,7 @@ out of process only to measure its output):
 - **Thin shapes grew.** Any measured loop under 260 x pixelScale points took the legacy tail.
   Douglas-Peucker turns each corner of a bar into two ~45 degree vertices, the spline bows outward
   along every edge and its ±epsilon cap lets it sit ~0.3 px outside the ink: the thin-bars fixture
-  gained 22% area (IoU 0.780 on main, 0.798 with ADR-404; Potrace 0.838), a 100 x 8 anti-aliased
+  gained 22% area (IoU 0.780 on main, 0.798 with ADR-439; Potrace 0.838), a 100 x 8 anti-aliased
   bar +8.3% area.
 - **Curves were lost by copying.** The fitted cubics rode a WeakMap keyed by the sample array; the
   dense-colour downscale route rebuilt its polylines, so the hummingbird traced as 112,343 lines and
@@ -36,7 +36,7 @@ out of process only to measure its output):
 1. **Compact fit for every loop** (`core/trace/compact-curve-fit.ts`, `compact-curve-span.ts`, own
    implementation). A ring becomes the fewest cubic and line segments whose orthogonal distance from
    the ring stays within one tolerance, then the least summed squared error among those:
-   - Breaks: ADR-404's corners split the ring C0 with one-sided tangents (a parabola through the
+   - Breaks: ADR-439's corners split the ring C0 with one-sided tangents (a parabola through the
      corner and the points one and two window-halves along, window 2 source px) and stay exact.
    - Candidate joints: a split-at-the-worst-point cubic fit at a candidate tolerance that never
      follows Optimize (0.75 x the tolerance Optimize 0 gives). Each joint gets one centred tangent
@@ -53,7 +53,7 @@ out of process only to measure its output):
      a closed-form test solves B(s) = B(t) for s != t through the sum and product of the two
      parameters (own derivation). Within tolerance such a loop is invisible to both distance
      checks; without the test Edge Detection drew one on a binary 3 px C-arc at Optimize 1 and 2.
-   - Work bounds (ADR-405 review). The first version re-fitted every merge extension from scratch
+   - Work bounds (ADR-440 review). The first version re-fitted every merge extension from scratch
      and made contour traces 2.5 to 3.4x slower than the tail it replaced. Now a single candidate
      piece is the proposal's own fit (same span, same joint tangents); a span straight within the
      tolerance that meets its joints along their tangents is its chord without a cubic fit; a merge
@@ -102,14 +102,14 @@ out of process only to measure its output):
 4. **Binary loops keep their approved shape, compactly, and their size (Fix B).** Loops without
    sub-pixel information keep dense flatten, simplify, flatten and the corner-aware spline resample
    (at the neutral epsilon), and the compact fit then runs through that resample, with the
-   resample's corners (ADR-404's plus any hard turn of the simplified outline) as breaks. The
+   resample's corners (ADR-439's plus any hard turn of the simplified outline) as breaks. The
    resample is bounded chord by chord (`contour-chord-band.ts`, own design): each spline sample of
    a simplified chord stays within the signed range of perpendicular offsets its own dense stretch
    takes from that chord, and on a chord of 32 source px or more also on the side the stretch
    bulges, at most twice the stretch's mean offset (an arc's mean offset is 2/3 of its sagitta;
    staircase wobble averages out). Without the band a thin binary bar whose end caps collapse to
    two ~45 degree vertices (no corner pinned) had each long side bowed outward by the spline: a
-   2 px bar at 0 degrees on Line Art's 2x route was +41% area on the ADR-404 base and +49% with the
+   2 px bar at 0 degrees on Line Art's 2x route was +41% area on the ADR-439 base and +49% with the
    first compact fit, and is +2.3% now. The mean bound only applies to long chords: on the 15 to
    30 px chords of a simplified ring of radius 60 to 90 px, a chord's mean mostly says where
    Douglas-Peucker put its two vertices on the wobble, and bounding by it made the
@@ -122,7 +122,7 @@ out of process only to measure its output):
    elliptical arc falls back to straight segments). Region Enhance (downscale, offset and the
    merge into the full trace) keeps each ring's curve with its polyline, including the rings of the
    full trace it keeps; it used to rebuild every path as polylines only. The centreline's
-   registration by sample array (ADR-397) is unchanged.
+   registration by sample array (ADR-405) is unchanged.
 
 ### Measurements
 
@@ -152,7 +152,7 @@ final state after the review fixes (run `out-geo-2review`):
 
 Binary thin bars (unit probe: a 120 px bar, 200 x 200 image, area of the exact curves against the
 ink pixel count; the bake-off has no binary thin-bar fixture, `contour-thin-shapes.test.ts` holds
-these cells). ADR-404 base / first compact fit / this:
+these cells). ADR-439 base / first compact fit / this:
 
 | Bar | Line Art | Smooth |
 |---|---|---|
@@ -162,7 +162,7 @@ these cells). ADR-404 base / first compact fit / this:
 | 4 px, 30 degrees | +19.7% / +21.5% / +2.3% | +31.6% / +31.6% / +5.6% |
 | 6 px, 30 degrees | +15.0% / +18.5% / +3.2% | +26.7% / +27.4% / +1.0% |
 
-Sharp's binary bars stay within 1.5% throughout. Two cells stay worse than on the ADR-404 base:
+Sharp's binary bars stay within 1.5% throughout. Two cells stay worse than on the ADR-439 base:
 Smooth's 1.5 and 2 px bars at 30 degrees (+9.1 / +7.0% there, +14.2 / +10.7% now). Smooth's 2x
 route measures them as the bilinear enlargement of their staircase, so they take the measured fit
 tail and follow that staircase; see Known gaps.
@@ -177,11 +177,11 @@ tail and follow that staircase; see Known gaps.
 - Segments at the laser commit tolerance (0.25 px, `g1SegmentsAtCommitTol0_25px`): discs 193 (main
   304, Potrace 193), thin-bars 272 (main 612, Potrace 220), owl 87,869 (main 129,650, Potrace
   114,159), hummingbird 53,099 (main 112,343, Potrace 80,157).
-- Trace time, warm, `traceImageToColoredPaths` in one process on this machine (base = ADR-404
+- Trace time, warm, `traceImageToColoredPaths` in one process on this machine (base = ADR-439
   `4aa8bbde3` and first compact fit `882d81115` as the review measured them; this = the review
   fixes, same method):
 
-  | Image, preset | ADR-404 base | First compact fit | This |
+  | Image, preset | ADR-439 base | First compact fit | This |
   |---|---|---|---|
   | owl, Line Art | 4.0 s | 10.3 s | 7.1 s |
   | owl, Smooth | 3.4 s | 8.0 s | 5.8 s |
@@ -205,7 +205,7 @@ tail and follow that staircase; see Known gaps.
   the R=900 commit-grid disc and laser-move tests) pass. `contour-roundness` now samples the
   outline at an even arc-length step instead of at its vertices plus fill-ins: the 0.02 px sampling
   puts vertices where the curve bends, and vertex-weighted samples scored the same curve 0.035 px
-  worse. Hairline cells (ADR-395): every binary Line Art and Smooth cell scores recall 1.000;
+  worse. Hairline cells (ADR-403): every binary Line Art and Smooth cell scores recall 1.000;
   anti-aliased Line Art 30 / 60 degrees score recall 0.938 / 0.875 at precision 0.987 / 1.000
   (IoU 0.926 / 0.875, was 0.597 / 0.619 at precision 0.611 / 0.629), so their recall floor moves
   to 0.85 with a 0.95 precision floor. Sharp's binary 30 / 60 degree cells keep recall 0.942 at
@@ -216,14 +216,14 @@ tail and follow that staircase; see Known gaps.
 - Traces are far more compact everywhere and the output is the canonical curve; the compatibility
   polyline is its sampling, close enough that its crossings are the curve's.
 - On the clean analytic fixtures, the apex and Hausdorff increases (wedges, stars, s-curve, the
-  sub-pixel calibration box) come from ADR-404's corner dial, not this tail: the ADR-404 base with
+  sub-pixel calibration box) come from ADR-439's corner dial, not this tail: the ADR-439 base with
   the old tail measures the same (wedges 1.775, stars 1.853, calibration 0.763 px). That does not
-  hold for every scan variant. Against the ADR-404 base (`out-geo-step1`) this step moves
+  hold for every scan variant. Against the ADR-439 base (`out-geo-step1`) this step moves
   small-squares scan Hausdorff 0.90 to 0.99 px (1.08 with the first compact fit), wedges scan 2.43
   to 2.56 (Potrace 1.92) and stars scan 2.28 to 2.39; rotated-rects scan went 0.94 to 1.02 with the
   first fit and is 0.91 now.
 - Accepted regression, with its owner: Smooth's anti-aliased 1 px hairline beside the broad square
-  (ADR-395 cells) scores recall 0.775 / 0.887 at 30 / 60 degrees, precision 1.000; the ADR-404 base
+  (ADR-403 cells) scores recall 0.775 / 0.887 at 30 / 60 degrees, precision 1.000; the ADR-439 base
   scored 0.887 / 0.887, and Potrace 0.887 at 60 degrees. The outline now follows the measured
   iso-line exactly, and with the square in the image Smooth's automatic (Otsu) level puts that
   iso-line on a 0.6 px ribbon inside the 128-cut truth pixels; the old tail's recall came from
@@ -246,9 +246,9 @@ tail and follow that staircase; see Known gaps.
     despite fewer native segments: text-large 3,109 against 2,962, thin-bars 272 against 220,
     hairlines binary 253 against 45, small-squares scan 247 against 189, rotated-rects scan 123
     against 87, stars scan 172 against 132. Compile flattens cubics by midpoint subdivision
-    (ADR-391, ADR-397), which emits more chords than the tolerance needs; chord-optimal flattening
+    (ADR-391, ADR-405), which emits more chords than the tolerance needs; chord-optimal flattening
     is the follow-up that closes this.
-  - Trace time is still 1.5 to 1.9x the ADR-404 base on large art (table above) and 2.9x main on
+  - Trace time is still 1.5 to 1.9x the ADR-439 base on large art (table above) and 2.9x main on
     uniform noise. Faster candidate proposal (coarse early exits, capped spans, fewer Newton passes,
     giving up after one pass) was measured and rejected: each changed the candidate joints enough
     to fail the R=900 commit-grid, filled-disc Optimize, Edge-dial or hairline instruments.
@@ -316,7 +316,7 @@ Status against the speed targets (owl Line Art at most 4.0 s, perf-noise-1024 at
 not above main): not met. The fit is now about a quarter of the trace (owl 22%, noise 26%), so even
 a free fit leaves both traces well above the targets and above main. The rest is outside the fit and not yet profiled (the likely
 owners are the 0.02 px compatibility sampling that the topology repair and the curve contacts of
-ADR-406 test, and the memory that sampling and the carried cubics hold: peak RSS is 2.8x main on
+ADR-441 test, and the memory that sampling and the carried cubics hold: peak RSS is 2.8x main on
 perf-noise-1024).
 Within the fit, about 75% of the remaining projection work is the candidate proposal's split-at-
 worst recursion, whose joints decide the output; the earlier proposal shortcuts moved joints and

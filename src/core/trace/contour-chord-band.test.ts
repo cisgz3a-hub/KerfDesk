@@ -21,7 +21,7 @@ function offsetFrom(p: Vec2, a: Vec2, b: Vec2): number {
   return ((p.x - a.x) * -(b.y - a.y) + (p.y - a.y) * (b.x - a.x)) / len;
 }
 
-describe('dense chord bands for the binary resample (ADR-405)', () => {
+describe('dense chord bands for the binary resample (ADR-440)', () => {
   it('holds a long straight run with staircase wobble on its chord', () => {
     const { dense, vertices } = wobblyBar(120, 3);
     const band = denseChordBand(dense, vertices)(vertices[0] as Vec2, vertices[1] as Vec2);

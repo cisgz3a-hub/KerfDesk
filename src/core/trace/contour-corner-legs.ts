@@ -1,4 +1,4 @@
-// Leg evidence for the corner dial (ADR-404): two straight legs meeting at a
+// Leg evidence for the corner dial (ADR-439): two straight legs meeting at a
 // turn, their intersection as the apex, and the rounding cost of that corner.
 
 import type { Vec2 } from '../scene';

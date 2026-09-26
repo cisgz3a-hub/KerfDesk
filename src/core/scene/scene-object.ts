@@ -74,7 +74,7 @@ export type ColoredPath = {
   // subsystem; serializers always materialize this field for saved projects.
   readonly curves?: ReadonlyArray<CurveSubpath>;
   // Containment forest of the closed subpaths, written by the contour tracer
-  // (ADR-406). Optional and derived: readers use it only through
+  // (ADR-441). Optional and derived: readers use it only through
   // `carriedSubpathParents`, which ignores it once the geometry changes.
   readonly subpathNesting?: SubpathNesting;
 };

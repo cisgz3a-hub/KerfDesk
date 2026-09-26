@@ -104,7 +104,7 @@ function segmentCount(image: RawImageData, optimize: number): number {
     .reduce((total, curve) => total + curve.segments.length, 0);
 }
 
-describe('compact contour curves (ADR-405)', () => {
+describe('compact contour curves (ADR-440)', () => {
   it('fits a circle with a few G1 cubics within the tolerance', () => {
     for (const r of [8, 20, 48, 100]) {
       const points = circle(100, 100, r);

@@ -19,7 +19,7 @@
 // bounds, so any container that passed the original test necessarily contains
 // the probe point and is therefore registered in the probe point's cell.
 //
-// CARRIED NESTING (ADR-406): the probe is the centre of the target's bounds,
+// CARRIED NESTING (ADR-441): the probe is the centre of the target's bounds,
 // which misses when the target is concave (the centre of a C-shaped hole lies
 // in its mouth, outside the outline around it). A traced path knows its own
 // nesting exactly, and its segments carry it: contours of the same forest are

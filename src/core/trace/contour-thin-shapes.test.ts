@@ -1,9 +1,9 @@
-// Thin shapes through the whole filled-contour pipeline (ADR-405 review).
+// Thin shapes through the whole filled-contour pipeline (ADR-440 review).
 //
 // Binary thin bars: the binary tail's Catmull-Rom resample bowed each long
 // side of a bar toward its end caps, and the compact fit through it could
 // add its own tolerance on the same side. A binary 2 px bar on Line Art's
-// 2x route gained 41% area on the ADR-404 base and 49% with the first
+// 2x route gained 41% area on the ADR-439 base and 49% with the first
 // compact fit; 4 px bars at 15 and 30 degrees 20-25%. The dense chord band
 // (contour-chord-band.ts) keeps every long side on its run.
 //
@@ -129,7 +129,7 @@ const BAR_CELLS = (['Line Art', 'Smooth'] as const).flatMap((preset) =>
   ).map(([width, degrees]) => ({ preset: preset as string, width, degrees })),
 );
 
-describe('thin shapes keep their size and their topology (ADR-405)', () => {
+describe('thin shapes keep their size and their topology (ADR-440)', () => {
   it.each([
     ...BAR_CELLS,
     { preset: 'Sharp', width: 2, degrees: 15 },
@@ -142,7 +142,7 @@ describe('thin shapes keep their size and their topology (ADR-405)', () => {
       const outlines = paths.flatMap((path) => path.curves ?? []);
       expect(outlines).toHaveLength(1);
       const change = area(flatten(outlines[0] as CurveSubpath, 64)) / inkPixels(image) - 1;
-      // ADR-404 base: +41% (2 px, 0°), +20..50% (3-6 px at 15-30°) on Line Art
+      // ADR-439 base: +41% (2 px, 0°), +20..50% (3-6 px at 15-30°) on Line Art
       // and Smooth.
       const [low, high] = preset === 'Sharp' ? [-0.03, 0.03] : [-0.1, 0.08];
       expect(change).toBeGreaterThanOrEqual(low);

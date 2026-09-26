@@ -1,4 +1,4 @@
-// Compact canonical curves for traced contours (ADR-405).
+// Compact canonical curves for traced contours (ADR-440).
 //
 // A finished contour ring becomes the FEWEST cubic and line segments whose
 // orthogonal distance from the ring stays within one tolerance, then the

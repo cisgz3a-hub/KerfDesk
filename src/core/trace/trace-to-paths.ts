@@ -201,7 +201,7 @@ export async function traceImageToColoredPaths(
       pixelScale: 1,
     };
     const traced = await dispatchTrace(workingImage, workingOptions, run);
-    // Only binary contours take this route. Their canonical curves (ADR-405)
+    // Only binary contours take this route. Their canonical curves (ADR-440)
     // are mapped with their polylines, so the restored trace keeps its
     // cubics. The resampler covers each axis independently, and rounded
     // working height need not have the same ratio as width.

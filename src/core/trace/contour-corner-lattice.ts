@@ -1,4 +1,4 @@
-// Lattice evidence for the corner dial (ADR-404): every turn of a binary pixel
+// Lattice evidence for the corner dial (ADR-439): every turn of a binary pixel
 // staircase, pixel features (caps no longer than their flanks), and the
 // lattice vertices a straight leg may not cross.
 

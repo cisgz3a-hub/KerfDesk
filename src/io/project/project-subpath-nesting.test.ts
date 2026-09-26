@@ -16,7 +16,7 @@ import { prepareProjectForAutosave } from './prepare-project-autosave';
 import { prepareProjectForPersistence } from './prepare-project-persistence';
 import { serializeProject } from './serialize-project';
 
-// ADR-406: a trace's containment forest is an optional, derived field. A
+// ADR-441: a trace's containment forest is an optional, derived field. A
 // schema-v9 project keeps it through save and load with no version change,
 // in full, compact and autosave form, curved subpaths or not.
 
@@ -70,7 +70,7 @@ function reloadedPath(json: string): ColoredPath {
   return object.paths[0] as ColoredPath;
 }
 
-describe('traced containment forest persistence (ADR-406)', () => {
+describe('traced containment forest persistence (ADR-441)', () => {
   it.each<[string, ColoredPath]>([
     ['straight subpaths', { color: '#000000', polylines }],
     [

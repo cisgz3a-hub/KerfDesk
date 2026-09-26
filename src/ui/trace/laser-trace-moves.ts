@@ -61,7 +61,7 @@ export function simplifyTracedPathsForLaser(
   };
   const candidates = paths.map((path) => conditionPath(path, moves));
   // The topology check keeps every crossing and nesting relation of the
-  // source, subpath for subpath, so a traced forest (ADR-406) carries.
+  // source, subpath for subpath, so a traced forest (ADR-441) carries.
   return preserveLaserTraceTopology(paths, candidates, placement).map((path, index) =>
     path === paths[index] ? path : carrySubpathNesting(paths[index] as ColoredPath, path),
   );

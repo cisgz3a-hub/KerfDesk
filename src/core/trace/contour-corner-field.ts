@@ -1,4 +1,4 @@
-// Field evidence for a measured corner apex (corner dial, ADR-404).
+// Field evidence for a measured corner apex (corner dial, ADR-439).
 //
 // A measured crack chain is the iso-line of the pre-threshold field, and an
 // anti-aliased source is (close to) a box-filtered picture of the drawn shape.
