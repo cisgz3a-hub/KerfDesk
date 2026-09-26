@@ -189,6 +189,14 @@ opportunity, without an extra branding delay. It introduces no startup interacti
 6. Image clips follow the same rules: a missing `clipPathUnits` is `userSpaceOnUse` and a missing
    `clip-rule` is `nonzero`. KerfDesk's own exported image clips keep their curves.
 
+#### Edge — SVG path arcs
+1. A path's `A` arcs import as cubic curves of at most a quarter turn each. Each curve's midpoint
+   lies on the arc, and nowhere does a curve stray more than 0.027% of the arc's larger radius,
+   always outward: 0.027 mm on a 100 mm radius (ADR-159 Amendment 2). `<circle>`, `<ellipse>` and
+   rounded `<rect>` elements import as outlines sampled on the true curve.
+2. Artwork imported before that amendment keeps its arcs, up to 0.196% of the radius inside the arc
+   (0.2 mm on a 100 mm radius), until **Re-import source** replaces them.
+
 #### Error — file is not an SVG
 1. On drop, file type is checked by MIME and by content sniff (first 200 bytes).
 2. If not SVG: toast (error variant, red): `Not a valid SVG: <filename>`. No state change.

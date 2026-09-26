@@ -12,19 +12,28 @@
 // hint, and avoided as soon as the Identify step assigns a real profile.)
 
 import type { DeviceProfile } from '../../../core/devices';
+import type { MachineKind } from '../../../core/scene';
 
-export function deviceProfileSignature(profile: DeviceProfile): string {
+// Laser and CNC are set up separately (spindle, safe Z and CNC speed limits are
+// their own values), so setting up one never marks the other as done. Laser
+// keeps the original signature so existing marks survive.
+export function deviceProfileSignature(
+  profile: DeviceProfile,
+  machineKind: MachineKind = 'laser',
+): string {
   const id = profile.profileId ?? profile.name;
-  return `${id}:${profile.bedWidth}x${profile.bedHeight}:${profile.controllerKind ?? 'grbl-v1.1'}`;
+  const base = `${id}:${profile.bedWidth}x${profile.bedHeight}:${profile.controllerKind ?? 'grbl-v1.1'}`;
+  return machineKind === 'cnc' ? `${base}:cnc` : base;
 }
 
 export function shouldPromptDeviceSetup(input: {
   readonly connected: boolean;
   readonly device: DeviceProfile;
+  readonly machineKind?: MachineKind;
   readonly configured: ReadonlySet<string>;
 }): boolean {
   // Only nudge when actually connected — an unconfigured profile sitting idle
   // with no controller is not actionable.
   if (!input.connected) return false;
-  return !input.configured.has(deviceProfileSignature(input.device));
+  return !input.configured.has(deviceProfileSignature(input.device, input.machineKind));
 }

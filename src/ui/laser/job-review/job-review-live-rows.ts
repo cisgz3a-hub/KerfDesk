@@ -3,6 +3,7 @@
 // snapshots in; keeping the mapping here keeps the sections dumb and the
 // logic unit-testable without rendering.
 
+import { deviceForActiveHead } from '../../../core/cnc/cnc-head-feeds';
 import type { OverrideValues, StatusReport } from '../../../core/controllers/grbl';
 import type { ActiveWorkCoordinateSystem } from '../../../core/controllers/grbl/work-offset-readback';
 import type { ControllerKind } from '../../../core/devices';
@@ -97,14 +98,13 @@ export function buildMachineReviewFacts(
   controllerSettings: ControllerSettingsSnapshot | null = null,
   startFrom?: JobOriginPlacement['startFrom'],
 ): ReadonlyArray<JobReviewFact> {
-  const device = project.device;
+  // Max feed and Frame feed are the active head's own (CNC keeps its own).
+  const device = deviceForActiveHead(project.device, project.machine);
   const shared: JobReviewFact[] = [
     fact('Bed', `${formatMm(device.bedWidth)} × ${formatMm(device.bedHeight)} mm`),
     fact('Machine origin', device.origin.split('-').join(' ')),
     fact('Output max feed', `${formatMm(device.maxFeed)} mm/min (profile compile ceiling)`),
-    frameFeedFact(project, controllerSettings),
-    fact('G-code dialect', device.gcodeDialect.dialectId),
-    scanOffsetProvenanceFact(project),
+    frameFeedFact(device.framingFeedMmPerMin, controllerSettings),
   ];
   const machine = project.machine;
   if (machineKindOf(machine) === 'cnc' && machine?.kind === 'cnc') {
@@ -125,8 +125,12 @@ export function buildMachineReviewFacts(
       fact('Park after job', parkLabel(machine.params, startFrom)),
     ];
   }
+  // The G-code dialect and the raster scan-offset table shape laser output
+  // only; CNC output is GRBL router G-code whatever the laser dialect (ADR-399).
   return [
     ...shared,
+    fact('G-code dialect', device.gcodeDialect.dialectId),
+    scanOffsetProvenanceFact(project),
     fact('Laser power scale', `S max $30 = ${device.maxPowerS}`),
     fact(
       'Air assist command',
@@ -180,10 +184,9 @@ function scanOffsetProvenanceFact(project: Project): JobReviewFact {
 }
 
 function frameFeedFact(
-  project: Project,
+  requested: number,
   controllerSettings: ControllerSettingsSnapshot | null,
 ): JobReviewFact {
-  const requested = project.device.framingFeedMmPerMin;
   const effective = frameMotionFeeds(requested, controllerSettings).xyMmPerMin;
   const xLimit = liveLimitLabel(controllerSettings?.maxFeedX);
   const yLimit = liveLimitLabel(controllerSettings?.maxFeedY);

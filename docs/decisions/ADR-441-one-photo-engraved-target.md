@@ -37,9 +37,9 @@ coordinates typed in.
    each ring's error in bed mm, RMS and worst error, rings found of rings expected, and the camera
    height with its sigma. An optional tape-measured camera height is a prior (sigma 15 mm).
 5. **Wizard** (`ui/camera/calibrate/`): Setup (sheet thickness, optional camera height, power,
-   speed, margin), then **Engrave target**, which streams the target as a temporary job through the
-   normal Frame, review and Start path without touching the project or undo history, or **Target
-   already engraved**. The photo step shows the live camera and **Take photo**; the solve runs in a
+   speed, margin), then **Engrave target**, which streams the target as a temporary laser job
+   (in CNC mode too, per ADR-416) through the normal Frame, review and Start path without touching
+   the project or undo history, or **Target already engraved**. The photo step shows the live camera and **Take photo**; the solve runs in a
    worker and can be cancelled. The result shows the grade, the four figures and the photo flattened
    onto the bed with every ring coloured by its error. **Save calibration** is always available: a
    rough fit is described with what to fix, never refused (ADR-228). Saving turns the overlay on.

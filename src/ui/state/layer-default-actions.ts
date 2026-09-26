@@ -1,4 +1,10 @@
-import { updateLayer, type Layer, type Project, type SceneObject } from '../../core/scene';
+import {
+  machineKindOf,
+  updateLayer,
+  type Layer,
+  type Project,
+  type SceneObject,
+} from '../../core/scene';
 import {
   applyLayerDefaultSettings,
   captureLayerDefaultSettings,
@@ -59,7 +65,10 @@ export function layerDefaultActions(set: LayerDefaultActionSet): LayerDefaultsAc
             ...state.layerDefaults,
             byColor: {
               ...state.layerDefaults.byColor,
-              [defaultColorForOperation(scene.objects, layer)]: captureLayerDefaultSettings(layer),
+              [defaultColorForOperation(scene.objects, layer)]: captureLayerDefaultSettings(
+                layer,
+                machineKindOf(state.project.machine),
+              ),
             },
           },
         };
@@ -71,7 +80,7 @@ export function layerDefaultActions(set: LayerDefaultActionSet): LayerDefaultsAc
         return {
           layerDefaults: {
             ...state.layerDefaults,
-            allColors: captureLayerDefaultSettings(layer),
+            allColors: captureLayerDefaultSettings(layer, machineKindOf(state.project.machine)),
           },
         };
       }),
@@ -88,7 +97,7 @@ export function layerDefaultActions(set: LayerDefaultActionSet): LayerDefaultsAc
         const scene = updateLayer(
           state.project.scene,
           layerId,
-          applyLayerDefaultSettings(layer, defaults),
+          applyLayerDefaultSettings(layer, defaults, machineKindOf(state.project.machine)),
         );
         if (scene === state.project.scene) return {};
         return {

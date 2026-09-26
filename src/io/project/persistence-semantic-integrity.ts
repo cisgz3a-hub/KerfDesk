@@ -23,6 +23,7 @@ function persistedSemantics(value: unknown): unknown {
     optimization: value['optimization'],
     notes: value['notes'],
     machine: value['machine'],
+    parkedCncMachine: value['parkedCncMachine'],
     variables: value['variables'],
     embeddedFonts: value['embeddedFonts'],
     printAndCutTargets: value['printAndCutTargets'],
