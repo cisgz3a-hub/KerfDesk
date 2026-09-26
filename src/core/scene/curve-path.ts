@@ -195,6 +195,34 @@ function flattenArc(
   return flattenEllipseChords(from, segment.to, arc, tolerance, budget);
 }
 
+/** The arc's direction at one end, taken analytically from its centre
+ *  parametrisation (never from flattened samples, whose spacing the flattener
+ *  chooses). `start` points along travel from `from`; `end` points from
+ *  `segment.to` back into the arc. Not normalised. A degenerate arc (zero radius)
+ *  is its chord, as the flattener draws it; null when the arc has no length. */
+export function ellipticalArcEndDirection(
+  from: Vec2,
+  segment: EllipticalArcPathSegment,
+  side: 'start' | 'end',
+): Vec2 | null {
+  const arc = endpointArc(from, segment);
+  if (arc === null) {
+    if (samePoint(from, segment.to)) return null;
+    const chord = { x: segment.to.x - from.x, y: segment.to.y - from.y };
+    return side === 'start' ? chord : { x: -chord.x, y: -chord.y };
+  }
+  const theta = side === 'start' ? arc.theta1 : arc.theta1 + arc.delta;
+  const travel = Math.sign(arc.delta) * (side === 'start' ? 1 : -1);
+  const cosPhi = Math.cos(arc.rotationRad);
+  const sinPhi = Math.sin(arc.rotationRad);
+  const dx = -arc.radiusX * Math.sin(theta);
+  const dy = arc.radiusY * Math.cos(theta);
+  return {
+    x: travel * (dx * cosPhi - dy * sinPhi),
+    y: travel * (dx * sinPhi + dy * cosPhi),
+  };
+}
+
 function segmentExtrema(from: Vec2, segment: PathSegment): Vec2[] {
   if (segment.kind === 'line') return [segment.to];
   if (segment.kind === 'cubic') return cubicExtrema(from, segment);

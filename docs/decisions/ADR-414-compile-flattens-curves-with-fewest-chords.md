@@ -5,7 +5,8 @@
 This takes up the change ADR-391 and ADR-397 both left out ("chord-optimal cubic flattening in
 compile"). It changes how every cubic and elliptical-arc segment becomes straight moves, for laser
 and CNC alike. Line segments, the tolerance (`DEFAULT_MACHINE_CURVE_TOLERANCE_MM`, 0.025 mm at the
-placement's largest axis scale) and the callers are unchanged. The Frame-first contract (PROJECT.md
+placement's largest axis scale) and the callers are unchanged, except Edit Nodes Delete, which read
+an arc's end tangent off the flattened samples (see Consequences). The Frame-first contract (PROJECT.md
 non-negotiable 21, ADRs 228, 230, 232 and 237) is untouched: Frame, Start, Job Review, the estimate
 and the G-code Inspector all read the compiled job, which is where the new chords appear.
 
@@ -120,6 +121,13 @@ Two defects, measured on the base (`c62084959`):
   expecting reversed vertices. `vector-path-weld.test.ts` compares the welded outline's area to two
   decimals, the resolution its 0.001 mm union grid allows, and now also checks that the coarse
   compatibility polyline would fail it.
+- Edit Nodes Delete (`curve-node-delete.ts`) took an elliptical arc's end tangent from the first
+  three flattened samples with a one-sided second-order difference, which is second-order only when
+  the samples sit at equal angles, as the old arc flattener placed them. Uneven chords made it
+  first-order: on a 100 x 2 ellipse rotated 30 degrees, merging two arcs gave a cubic whose start
+  handle was 2.27 degrees off the arc. The tangent now comes analytically from the arc's centre
+  parametrisation (`ellipticalArcEndDirection` in `curve-path.ts`), and a test pins that case to
+  within 0.01 degrees. No other caller reads tangents or spacing from flattened samples.
 - Cost: flattening every compiled path of the dragon's Centerline trace takes about 28 ms against
   6 ms (median of five warm runs in Node), the owl's Line Art 48 ms against 10 ms; the dragon's
   laser commit, which flattens several times for its topology check, about 100 ms against 28 ms.

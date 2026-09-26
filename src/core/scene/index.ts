@@ -84,6 +84,7 @@ export type {
 export {
   DEFAULT_MACHINE_CURVE_TOLERANCE_MM,
   curveSubpathBounds,
+  ellipticalArcEndDirection,
   flattenColoredPathCurves,
   flattenCurveSubpath,
   polylineToCurveSubpath,

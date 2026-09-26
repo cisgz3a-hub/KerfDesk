@@ -10,6 +10,7 @@
 import {
   assertNever,
   curveNodeCount,
+  ellipticalArcEndDirection,
   flattenCurveSubpath,
   type CurveSubpath,
   type EllipticalArcPathSegment,
@@ -25,7 +26,6 @@ const FIT_SAMPLES_PER_SEGMENT = 24;
 // Flatten tolerances relative to the geometry's size: fine enough for the fit
 // to see the true curve, far inside the flattening segment budget.
 const SAMPLE_TOLERANCE_RATIO = 1e-4;
-const ARC_TANGENT_TOLERANCE_RATIO = 1e-5;
 const EPSILON = 1e-9;
 
 type Piece = { readonly from: Vec2; readonly segment: PathSegment };
@@ -187,24 +187,12 @@ function pieceTangent(piece: Piece, side: 'start' | 'end'): Vec2 | null {
   }
 }
 
-// Arcs store no handles. Read the tangent off the canonical flattener's
-// uniform-angle samples with a one-sided second-order difference, so it
-// matches the arc exactly as preview and output draw it.
+// Arcs store no handles. Take the tangent analytically from the arc's centre
+// parametrisation: the flattener spaces its samples to fit the tolerance, not
+// at equal angles, so a finite difference over them is not second-order.
 function arcTangent(from: Vec2, arc: EllipticalArcPathSegment, side: 'start' | 'end'): Vec2 | null {
-  const radius = Math.max(Math.abs(arc.radiusX), Math.abs(arc.radiusY), distance(from, arc.to) / 2);
-  const flattened = flattenCurveSubpath(
-    { start: from, segments: [arc], closed: false },
-    { toleranceMm: radius * ARC_TANGENT_TOLERANCE_RATIO },
-  );
-  if (flattened.kind !== 'ok') return null;
-  const points = flattened.polyline.points;
-  const [p0, p1, p2] = side === 'start' ? points : [...points].reverse();
-  if (p0 === undefined || p1 === undefined) return null;
-  if (p2 === undefined) return direction(p0, p1);
-  return direction(p0, {
-    x: p0.x + 4 * (p1.x - p0.x) - (p2.x - p0.x),
-    y: p0.y + 4 * (p1.y - p0.y) - (p2.y - p0.y),
-  });
+  const tangent = ellipticalArcEndDirection(from, arc, side);
+  return tangent === null ? null : direction({ x: 0, y: 0 }, tangent);
 }
 
 function firstDirection(from: Vec2, targets: ReadonlyArray<Vec2>): Vec2 | null {
