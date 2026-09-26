@@ -23,4 +23,12 @@ describe('Shortcuts dialog completeness (UI-07)', () => {
       expect(keys).toContain(chord);
     }
   });
+
+  it('documents Alt+T for Trace Image in the dialog and WORKFLOW', () => {
+    const keys = shortcutFamilies('laser').flatMap((family) => family.rows.map((row) => row.keys));
+    const workflow = readFileSync(resolve(process.cwd(), 'WORKFLOW.md'), 'utf8');
+
+    expect(keys).toContain('Alt+T');
+    expect(workflow).toContain('`Alt+T` - Trace Image');
+  });
 });

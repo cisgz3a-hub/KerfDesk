@@ -23,6 +23,8 @@ function traceCheckboxTitle(label: string): string {
   switch (label) {
     case 'Fill tiny holes':
       return 'Fill enclosed hairline holes in solid ink. Turn off to keep tiny highlights and slots; open gaps stay open.';
+    case 'Invert':
+      return 'Trace light artwork on a dark background: light areas become the traced shapes. Transparent areas stay background.';
     case 'Trace alpha mask':
       return 'Only changes images with transparent pixels; opaque images trace the same.';
     default:

@@ -20,6 +20,7 @@ import { type ConvertibleVector } from '../raster/vector-to-bitmap';
 import { usePlatform } from '../app/platform-context';
 import { useImportDragDrop } from '../app/use-import-drag-drop';
 import { Toolbar } from '../common/Toolbar';
+import { traceTargetPxPerMm } from '../trace/trace-commit-grid';
 import { AppMenuBar } from './AppMenuBar';
 import { CloseOpenFillContoursDialog } from './CloseOpenFillContoursDialog';
 import { ConvertBitmapDialogHost } from './ConvertBitmapDialogHost';
@@ -327,8 +328,10 @@ async function pickAndRunMultiFileTrace(
     pushToast(`Could not choose trace images: ${errMsg(err)}`, 'error');
     return;
   }
+  const { project } = useStore.getState();
   await runMultiFileTrace(files, pushToast, {
     write: (file) => writeTraceSvgFileWithPlatform(platform, file),
+    targetPxPerMm: traceTargetPxPerMm(project.device, project.machine?.kind),
   });
 }
 

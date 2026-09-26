@@ -102,6 +102,18 @@ export type TraceOptions = {
   // thinness + area guards keep letter counters, spacing gaps, and intended
   // thin highlights untouched. See fill-pinholes.ts.
   readonly fillPinholeCracks?: boolean;
+  // turnPolicy: how the filled-contour lane resolves a SADDLE — two ink
+  // pixels touching only at a corner. 'connect-ink' joins them (a 1-px
+  // diagonal hairline is one outline); 'connect-paper' splits them and is
+  // the rollback value: walker, despeckle and pinhole fill all behave
+  // exactly as before ADR-403. 'auto' (default) decides each corner: the
+  // colour that is the minority in the surrounding 4×4 source-pixel window
+  // keeps its diagonal; exact ties use the bilinear asymptotic decider where
+  // the source has anti-aliased grey levels clearly off the cut, else split
+  // the ink. Despeckle and pinhole fill use the same decision so connectivity is
+  // consistent end to end. See saddle-connectivity.ts and ADR-403.
+  // Centerline and Edge ignore it.
+  readonly turnPolicy?: 'auto' | 'connect-ink' | 'connect-paper';
   // supersampleContour: opt into feature-aware quality supersampling for the
   // binary contour presets. Cleaned masks with coherent 1-3px detail trace at
   // 2x and scale back down; broad solid art stays at native resolution, while

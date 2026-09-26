@@ -182,6 +182,7 @@ describe('image-loader header guards', () => {
       resizeWidth: 2048,
       resizeHeight: 1024,
       resizeQuality: 'high',
+      imageOrientation: 'from-image',
     });
     expect(createObjectURL).not.toHaveBeenCalled();
     expect(bitmap.close).toHaveBeenCalledTimes(1);

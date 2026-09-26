@@ -183,3 +183,40 @@ describe('traceImagesToSvgFiles', () => {
     expect(files[0]?.svg).not.toContain('<path ');
   });
 });
+
+describe('traceImagesToSvgFiles fallback (ADR-409)', () => {
+  it('traces a job with its fallback when its own attempt fails, and reports it', async () => {
+    const onFallback = vi.fn();
+    const trace = vi.fn(async (image: RawImageData, _options: TraceOptions) => {
+      if (image.width > 4) throw new Error('out of memory');
+      return [SQUARE_PATH];
+    });
+    const files = await traceImagesToSvgFiles(
+      [
+        { sourceName: 'big.png', image: rawImage(8, 8), fallback: { image: rawImage(4, 4) } },
+        { sourceName: 'small.png', image: rawImage(4, 4) },
+      ],
+      { trace, onFallback },
+    );
+    expect(files.map((file) => file.filename)).toEqual(['big-trace.svg', 'small-trace.svg']);
+    expect(files[0]?.svg).toContain('viewBox="0 0 4 4"');
+    expect(onFallback).toHaveBeenCalledTimes(1);
+    expect(onFallback.mock.calls[0]?.[0]).toBe(0);
+  });
+
+  it('rethrows when the job has no fallback or the caller refuses the error', async () => {
+    const trace = vi.fn(async () => {
+      throw new Error('cancelled');
+    });
+    await expect(
+      traceImagesToSvgFiles([{ sourceName: 'a.png', image: rawImage(4, 4) }], { trace }),
+    ).rejects.toThrow('cancelled');
+    await expect(
+      traceImagesToSvgFiles(
+        [{ sourceName: 'a.png', image: rawImage(8, 8), fallback: { image: rawImage(4, 4) } }],
+        { trace, canFallBack: () => false },
+      ),
+    ).rejects.toThrow('cancelled');
+    expect(trace).toHaveBeenCalledTimes(2);
+  });
+});

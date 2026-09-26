@@ -314,3 +314,27 @@ it('unmount invalidates a captured result and pending decoder', async () => {
   expect(traces).toHaveLength(0);
   root = createRoot(host);
 });
+
+it('shows a finer commit phase on the captured request until the commit settles it', async () => {
+  const p = base();
+  await render(p);
+  const settle = control.current!.capture();
+  await act(async () => settle({ kind: 'progress', phase: 'decoding' }));
+  expect(state!).toMatchObject({ kind: 'decoding' });
+  const startedAt = state!.kind === 'decoding' ? state!.startedAt : undefined;
+  expect(startedAt).toEqual(expect.any(Number));
+  await act(async () => settle({ kind: 'progress', phase: 'tracing' }));
+  // One elapsed clock for the whole commit.
+  expect(state!).toMatchObject({ kind: 'tracing', phase: 'tracing', startedAt });
+  await act(async () => settle({ kind: 'ready', result: full }));
+  expect(state!).toMatchObject({ kind: 'ready', paths: full.paths });
+  // A late phase from the finished commit cannot hide its result.
+  await act(async () => settle({ kind: 'progress', phase: 'refining' }));
+  expect(state!.kind).toBe('ready');
+  // Nor can a phase from a commit whose request was replaced.
+  const stale = control.current!.capture();
+  await render({ ...p, options: { ...p.options, thresholdLuma: 129 } });
+  const pending = state!;
+  await act(async () => stale({ kind: 'progress', phase: 'tracing' }));
+  expect(state!).toBe(pending);
+});

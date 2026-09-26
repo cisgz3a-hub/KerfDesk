@@ -9,12 +9,18 @@ import type { TraceGrid } from './trace-boundary-grid';
 import type { TracePreviewState } from './use-trace-preview';
 import { isTraceRequestSuperseded, type TraceResult } from './use-trace-worker-client';
 import { isTraceAbort } from './trace-cancellation';
+import type { TraceCommitPhase } from './trace-commit-at-grid';
 
 export type TracePreviewSettlement =
   | { readonly kind: 'ready'; readonly result: TraceResult }
   | { readonly kind: 'error'; readonly error: unknown };
+/** A settlement, or a finer commit's progress on the captured request: the
+ * preview shows the phase until the commit settles it (ADR-409). */
+export type TracePreviewCommitUpdate =
+  | TracePreviewSettlement
+  | { readonly kind: 'progress'; readonly phase: TraceCommitPhase };
 export type TracePreviewCommitControl = {
-  readonly capture: () => (outcome: TracePreviewSettlement) => void;
+  readonly capture: () => (outcome: TracePreviewCommitUpdate) => void;
   readonly preparation?: () => PendingPreparedTrace | undefined;
 };
 type PreviewOwner = {
@@ -58,16 +64,23 @@ export function useTracePreviewSettlement(
         // A newer request advances the token and remains free to supersede it.
         settled.current = token;
         let completed = false;
+        let startedAt: number | undefined;
+        const current = (): boolean =>
+          !completed &&
+          epoch === submission.current &&
+          token === latest.current.token.current &&
+          sameOwner(captured, latest.current);
         return (outcome) => {
-          if (
-            completed ||
-            epoch !== submission.current ||
-            token !== latest.current.token.current ||
-            !sameOwner(captured, latest.current)
-          )
-            return;
+          if (!current()) return;
           if (outcome.kind === 'error' && isTraceRequestSuperseded(outcome.error)) return;
           if (captured.request === null) return;
+          if (outcome.kind === 'progress') {
+            startedAt ??= Date.now();
+            captured.setState(
+              commitProgressPreview(outcome.phase, startedAt, captured.sourceHasTransparency()),
+            );
+            return;
+          }
           completed = true;
           settled.current = token;
           captured.settlePreparation?.(outcome);
@@ -86,6 +99,16 @@ export function useTracePreviewSettlement(
     [],
   );
   return settled;
+}
+
+function commitProgressPreview(
+  phase: TraceCommitPhase,
+  startedAt: number,
+  sourceHasTransparency: boolean | undefined,
+): TracePreviewState {
+  return phase === 'decoding'
+    ? { kind: 'decoding', startedAt }
+    : { kind: 'tracing', phase, startedAt, sourceHasTransparency };
 }
 
 function failedTracePreview(error: unknown): TracePreviewState {

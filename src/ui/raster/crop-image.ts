@@ -9,7 +9,11 @@ import {
   type PagedRasterAssetReader,
 } from '../import/paged-raster-hydration';
 import { readRasterSourceFile } from '../import/paged-raster-source';
-import { extractLumaBase64, loadImageAsRawData } from '../trace/image-loader';
+import {
+  extractLumaBase64,
+  fitDecodeToStoredGrid,
+  loadImageAsRawData,
+} from '../trace/image-loader';
 import { lumaToBitmap, type BitmapFields } from './luma-bitmap';
 
 type PixelCrop = {
@@ -135,7 +139,11 @@ async function readCropLuma(
   // Older embedded images may lack luminance. Recover their actual pixels;
   // missing or corrupt source data must never become a successful white crop.
   const file = await readRasterSourceFile(image, 'crop-image-source');
-  const pixels = await loadImageAsRawData(file, Math.max(width, height));
+  const pixels = fitDecodeToStoredGrid(
+    await loadImageAsRawData(file, Math.max(width, height)),
+    width,
+    height,
+  );
   if (pixels.width !== width || pixels.height !== height) {
     throw new Error('Image source dimensions do not match the selected image.');
   }

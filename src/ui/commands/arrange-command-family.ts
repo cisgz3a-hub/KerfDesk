@@ -74,14 +74,14 @@ function breakApartCommand(ctx: AppCommandContext): AppCommand {
         'arrange.break-apart',
         'arrange',
         'Break Apart',
-        'Split selected imported SVG paths into separate objects',
+        'Split into separate objects. A trace splits into one object per shape, holes included.',
         ctx.breakApartSelection,
       )
     : disabled(
         'arrange.break-apart',
         'arrange',
         'Break Apart',
-        'Select an imported SVG with more than one path.',
+        'Select an unlocked imported SVG or trace that has more than one outline.',
         ctx.breakApartSelection,
       );
 }
