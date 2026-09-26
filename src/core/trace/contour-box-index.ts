@@ -9,6 +9,8 @@ type BoxNode<T> = ContourBox & {
 type Entry<T> = { readonly box: T; readonly x: number; readonly y: number };
 const LEAF_SIZE = 8;
 const BUILD_CHECKPOINT_INTERVAL = 256;
+// Nodes built between checkpoints; a leaf holds up to LEAF_SIZE items.
+const NODE_CHECKPOINT_INTERVAL = 32;
 
 /** Immutable finite boxes. Queries retain inclusive boundary contacts. */
 export class ContourBoxIndex<T extends ContourBox> {
@@ -27,7 +29,7 @@ export class ContourBoxIndex<T extends ContourBox> {
       if (cooperate && entries.length % BUILD_CHECKPOINT_INTERVAL === 0) yield;
       entries.push({ box, x: box.minX / 2 + box.maxX / 2, y: box.minY / 2 + box.maxY / 2 });
     }
-    return new ContourBoxIndex(yield* buildNodeSteps(entries, 0, entries.length, cooperate));
+    return new ContourBoxIndex(yield* buildTreeSteps(entries, cooperate));
   }
 
   /** Unordered candidates; callers restore their own observable traversal order. */
@@ -120,21 +122,59 @@ function pushOtherChildren<T, U>(
   }
 }
 
-function* buildNodeSteps<T extends ContourBox>(
+type BuildFrame<T> = {
+  readonly start: number;
+  readonly end: number;
+  middle: number;
+  left: BoxNode<T> | undefined;
+  stage: 0 | 1 | 2;
+};
+
+// The tree is built depth first, left before right, as a recursion would,
+// but on an explicit stack inside one generator: a recursive generator pays
+// one resumption per level for every checkpoint, which dominated the build.
+// Each node still partitions only its own range, so the tree is the same.
+function* buildTreeSteps<T extends ContourBox>(
   entries: Entry<T>[],
-  start: number,
-  end: number,
   cooperate: boolean,
 ): TraceSteps<BoxNode<T> | undefined> {
-  if (start === end) return undefined;
-  if (cooperate) yield;
-  if (end - start <= LEAF_SIZE) return leaf(entries, start, end);
-  const middle = Math.floor((start + end) / 2);
-  selectMiddle(entries, start, end, middle, splitsHorizontally(entries, start, end) ? 'x' : 'y');
-  const left = (yield* buildNodeSteps(entries, start, middle, cooperate)) as BoxNode<T>;
-  const right = (yield* buildNodeSteps(entries, middle, end, cooperate)) as BoxNode<T>;
-  // A node's bounds are its children's, joined: min and max are exact and
-  // order-free, so this is the box of all its items without revisiting them.
+  if (entries.length === 0) return undefined;
+  const stack: BuildFrame<T>[] = [frame(0, entries.length)];
+  let built: BoxNode<T> | undefined;
+  let visited = 0;
+  while (stack.length > 0) {
+    const top = stack[stack.length - 1] as BuildFrame<T>;
+    if (top.stage === 0) {
+      if (cooperate && visited++ % NODE_CHECKPOINT_INTERVAL === 0) yield;
+      if (top.end - top.start <= LEAF_SIZE) {
+        built = leaf(entries, top.start, top.end);
+        stack.pop();
+        continue;
+      }
+      top.middle = Math.floor((top.start + top.end) / 2);
+      const axis = splitsHorizontally(entries, top.start, top.end) ? 'x' : 'y';
+      selectMiddle(entries, top.start, top.end, top.middle, axis);
+      top.stage = 1;
+      stack.push(frame(top.start, top.middle));
+    } else if (top.stage === 1) {
+      top.left = built;
+      top.stage = 2;
+      stack.push(frame(top.middle, top.end));
+    } else {
+      built = join(top.left as BoxNode<T>, built as BoxNode<T>);
+      stack.pop();
+    }
+  }
+  return built;
+}
+
+function frame<T>(start: number, end: number): BuildFrame<T> {
+  return { start, end, middle: start, left: undefined, stage: 0 };
+}
+
+// A node's bounds are its children's, joined: min and max are exact and
+// order-free, so this is the box of all its items without revisiting them.
+function join<T>(left: BoxNode<T>, right: BoxNode<T>): BoxNode<T> {
   return {
     minX: Math.min(left.minX, right.minX),
     minY: Math.min(left.minY, right.minY),
