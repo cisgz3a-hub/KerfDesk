@@ -171,6 +171,13 @@ export type SerialAdapter = {
   readonly isSupported: () => boolean;
   // Prompt the user to pick a serial port. Resolves to null when cancelled.
   readonly requestPort: () => Promise<SerialPortRef | null>;
+  // Ports the operator picked before and that are attached now. Listing them
+  // shows no picker and opens nothing, so Connect can reuse the machine's port
+  // without asking again (ADR-420). Absent on a platform without the list.
+  readonly grantedPorts?: () => Promise<ReadonlyArray<SerialPortRef>>;
+  // A picked port was plugged in or unplugged. The handler re-reads
+  // grantedPorts(); it never opens a port by itself.
+  readonly onGrantedPortsChange?: (handler: () => void) => () => void;
 };
 
 // --- Camera (Camera Mode, ADR-107) ---

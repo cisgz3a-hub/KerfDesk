@@ -17,9 +17,10 @@ const STAGES: Record<
 > = {
   identify: {
     title: 'Machine',
-    hint: 'Choose a starting point',
+    hint: 'Find it or choose it',
     heading: 'Let’s set up your machine.',
-    description: 'Choose your machine type, then a profile. You can also enter your own settings.',
+    description:
+      'Connect it and KerfDesk fills in what the controller reports, or choose the type and a profile yourself.',
   },
   confirm: {
     title: 'Essentials',
@@ -131,9 +132,7 @@ function SetupActions(props: ShellProps): JSX.Element {
         Cancel without saving
       </Button>
       <DialogActions>
-        {stage === 'identify' ? (
-          <span className="lf-setup-footer-note">You can set up offline</span>
-        ) : (
+        {stage === 'identify' ? null : (
           <Button
             onClick={() => props.dispatch({ kind: 'back' })}
             disabled={props.saving}
