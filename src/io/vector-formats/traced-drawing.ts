@@ -1,6 +1,7 @@
 // Multi-File Trace output as PDF, EPS or GeoJSON (ADR-455). The page is the
-// traced image's page, so every file of a batch shares the source image's
-// frame: its lower-left corner is the origin, as in the DXF output.
+// traced page: the source image by default, so every file of a batch shares
+// the image's frame, or the artwork plus a margin (ADR-451). Its lower-left
+// corner is the origin, as in the DXF output.
 
 import type { BatchTraceDrawingFormat, TracedLayer, TracedVectorOptions } from '../../core/trace';
 import { writeEpsDocument } from './eps-writer';

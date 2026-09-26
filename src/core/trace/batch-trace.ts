@@ -6,6 +6,7 @@ import {
   type TracedSvgPage,
   type TracedVectorOptions,
 } from './batch-trace-svg';
+import { placeTracedLayers, type TracedPageLayout } from './traced-page-box';
 import { traceImageToColoredPaths } from './trace-to-paths';
 import { DEFAULT_TRACE_OPTIONS, type RawImageData, type TraceOptions } from './trace-image';
 
@@ -65,6 +66,8 @@ export type BatchTraceResult = {
 
 export type BatchTraceOutput = TracedVectorOptions & {
   readonly format?: BatchTraceFormat;
+  /** Page: the source image (default) or the artwork plus a margin (ADR-451). */
+  readonly page?: TracedPageLayout;
 };
 
 export type BatchTraceDependencies = {
@@ -126,12 +129,19 @@ export async function traceImagesToVectorFiles(
   const skipped: BatchTraceSkip[] = [];
   for (const [sourceIndex, job] of jobs.entries()) {
     const { image, options, paths } = await traceJob(job, sourceIndex, trace, deps);
-    const page = tracedPage(image, job.physicalSizeMm);
-    const layers = tracedLayers(paths, page, options.traceMode);
-    if (layers.length === 0) {
+    const imagePage = tracedPage(image, job.physicalSizeMm);
+    const traced = tracedLayers(paths, imagePage, options.traceMode);
+    if (traced.length === 0) {
       skipped.push({ sourceName: job.sourceName, reason: 'no-visible-paths' });
       continue;
     }
+    const { layers, page } = placeTracedLayers(
+      traced,
+      imagePage,
+      options.traceMode,
+      output.page,
+      output.precisionMm,
+    );
     const stem = uniqueStem(safeSourceStem(job.sourceName), seenNames);
     files.push({
       filename: `${stem}-trace.${format}`,
@@ -157,7 +167,7 @@ function tracedPage(
 
 /** Page height in the layers' units: millimetres when known, else pixels. */
 function pageHeight(page: TracedSvgPage): number {
-  return page.physicalSizeMm?.heightMm ?? page.pixelHeight;
+  return page.size?.height ?? page.physicalSizeMm?.heightMm ?? page.pixelHeight;
 }
 
 function tracedFileText(
@@ -176,7 +186,7 @@ function tracedFileText(
   }
   return deps.writeDrawing(format, layers, {
     ...output,
-    pageWidth: page.physicalSizeMm?.widthMm ?? page.pixelWidth,
+    pageWidth: page.size?.width ?? page.physicalSizeMm?.widthMm ?? page.pixelWidth,
     pageHeight: pageHeight(page),
     strokeOnly: traceMode === 'centerline',
   });
