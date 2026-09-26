@@ -64,7 +64,36 @@ export function flattenCubicChords(
   budget: number,
 ): Vec2[] | null {
   if (!allFinite([from, segment.control1, segment.control2, segment.to])) return null;
-  return fewestChords(cubicCurve(from, segment), tolerance, budget);
+  if (!flattensReversed(from, segment)) {
+    return fewestChords(cubicCurve(from, segment), tolerance, budget);
+  }
+  // A seam two filled paths share is the same cubic walked in opposite
+  // directions. The greedy walk depends on its direction, so both sides
+  // flatten the one canonical direction and read it back reversed; otherwise
+  // their chords would cross and leave slivers of overlap and gap.
+  const reversed = fewestChords(
+    cubicCurve(segment.to, {
+      kind: 'cubic',
+      control1: segment.control2,
+      control2: segment.control1,
+      to: from,
+    }),
+    tolerance,
+    budget,
+  );
+  if (reversed === null) return null;
+  return [...reversed.slice(0, -1).reverse(), segment.to];
+}
+
+/** The canonical direction starts at the lexicographically smaller end. */
+function flattensReversed(from: Vec2, segment: CubicPathSegment): boolean {
+  const order = comparePoints(from, segment.to);
+  if (order !== 0) return order > 0;
+  return comparePoints(segment.control1, segment.control2) > 0;
+}
+
+function comparePoints(a: Vec2, b: Vec2): number {
+  return a.x !== b.x ? a.x - b.x : a.y - b.y;
 }
 
 export function flattenEllipseChords(

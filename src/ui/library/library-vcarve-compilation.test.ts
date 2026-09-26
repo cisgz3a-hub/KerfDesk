@@ -81,9 +81,12 @@ describe('design-library V-carve compilation', () => {
 
     // Final-coordinate containment reserves 0.000707 mm radially. At 30°
     // that is about 0.00264 mm of depth before conservative Z quantization.
-    expect(passDepths).toEqual([-0.5, -1, -1.5, -1.51, -0.5, -0.988]);
-    expect(gcode).toContain('Z-1.510');
-    expect(gcode).toContain('Z-0.988');
+    // ADR-442 chords sit up to 0.025 mm inside the Apple's curves, which
+    // shrinks the widest inscribed radius by ~0.01 mm (~0.04 mm of depth), so
+    // the deepest point no longer needs a separate -1.5 mm step.
+    expect(passDepths).toEqual([-0.5, -1, -1.471, -0.5, -0.99]);
+    expect(gcode).toContain('Z-1.471');
+    expect(gcode).toContain('Z-0.990');
     expect(gcode).toMatch(/^G1?X-?\d+\.\d{3}Y-?\d+\.\d{3}Z-?\d+\.\d{3}/m);
   });
 

@@ -163,14 +163,17 @@ describe('vector clip containment proof', () => {
       '<path d="M10 0.05 L90 0.05" fill="none" stroke="black"/>',
     );
     // The clip's edge dips below the line in the middle, so only its ends remain.
+    // The curve crosses y = 0.05 at x = 14.64 and 85.36. Its chords (ADR-442)
+    // lie on the clip's outer side within the tolerance, and the edge is almost
+    // parallel to the line there, so the cut moves inward by a few units.
     const pieces = result.object?.paths[0]?.polylines ?? [];
     expect(pieces).toHaveLength(2);
     const [left, right] = pieces.map((piece) => piece.points.map((point) => point.x));
     expect(left?.[0]).toBe(10);
-    expect(left?.at(-1)).toBeGreaterThan(14);
-    expect(left?.at(-1)).toBeLessThan(17);
-    expect(right?.[0]).toBeGreaterThan(83);
-    expect(right?.[0]).toBeLessThan(86);
+    expect(left?.at(-1)).toBeGreaterThan(14.6);
+    expect(left?.at(-1)).toBeLessThan(25);
+    expect(right?.[0]).toBeGreaterThan(75);
+    expect(right?.[0]).toBeLessThan(85.4);
     expect(right?.at(-1)).toBe(90);
   });
 

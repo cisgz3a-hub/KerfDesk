@@ -159,7 +159,8 @@ describe('DXF arc bulges (ADR-452)', () => {
       const ring = curveToBulgeRing(curve, TOLERANCE_MM);
       const chords = flattenCurveSubpath(curve, { toleranceMm: TOLERANCE_MM });
       if (chords.kind !== 'ok') throw new Error('flatten failed');
-      expect(ring.vertices.length * 3).toBeLessThan(chords.polyline.points.length);
+      // ADR-442's near-fewest chords narrowed the margin from 3x to about 2.4x.
+      expect(ring.vertices.length * 2).toBeLessThan(chords.polyline.points.length);
     }
   });
 
