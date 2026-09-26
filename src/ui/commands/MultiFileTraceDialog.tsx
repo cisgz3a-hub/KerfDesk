@@ -1,5 +1,6 @@
 import { useState } from 'react';
-import { TRACE_PRESETS, type BatchTraceFormat } from '../../core/trace';
+import { TRACE_PRESETS } from '../../core/trace';
+import type { BatchTraceFormat } from '../../core/trace/batch-trace';
 import { DEFAULT_EXPORT_PRECISION_MM } from '../../core/vector-export/decimal-grid';
 import type { PlatformAdapter } from '../../platform/types';
 import { usePlatform } from '../app/platform-context';

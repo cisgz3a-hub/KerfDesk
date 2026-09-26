@@ -5,11 +5,10 @@ import {
   traceImagesToVectorFiles,
   type BatchTraceFile,
   type BatchTraceImageJob,
-  type BatchTraceOutput,
-  type BatchTraceSkip,
   type RawImageData,
   type TraceOptions,
 } from '../../core/trace';
+import type { BatchTraceOutput, BatchTraceSkip } from '../../core/trace/batch-trace';
 import { tracedLayersToDxf } from '../../io/dxf/export-dxf';
 import type { PlatformAdapter } from '../../platform/types';
 import { rasterImportGeometry } from '../common/image-import';

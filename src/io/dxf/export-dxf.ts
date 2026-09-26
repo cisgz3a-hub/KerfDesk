@@ -9,7 +9,7 @@ import {
   type SceneObject,
 } from '../../core/scene';
 import { err, ok, type Result } from '../../core/result';
-import type { TracedLayer, TracedVectorOptions } from '../../core/trace';
+import type { TracedLayer, TracedVectorOptions } from '../../core/trace/batch-trace-svg';
 import { transformCurveSubpathExact } from '../../core/vector-export/affine-curves';
 import { svgObjectMatrix } from '../svg/export-svg-paths';
 import { writeDxfDocument, type DxfWriteOptions } from './dxf-writer';
