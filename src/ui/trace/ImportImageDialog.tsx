@@ -26,7 +26,7 @@ import { BoundaryModePicker } from './BoundaryModePicker';
 import type { BoundarySelection } from './use-boundary-selection';
 import { TracePreview } from './TracePreview';
 import { conditionTracedImageForMachine } from './trace-machine-conditioning';
-import { useTraceDialogSettings, useTraceOptions } from './use-trace-dialog-settings';
+import { useDialogTraceOptions, useTraceDialogSettings } from './use-trace-dialog-settings';
 import { resolveTraceCommitResult } from './trace-commit-result';
 import { TraceCommitGridNote, traceCommitGridForClaim } from './trace-commit-grid-note';
 import {
@@ -121,7 +121,7 @@ function DialogBody(props: DialogBodyProps): JSX.Element {
   // re-derived from `TRACE_PRESETS[preset]` each render and would
   // otherwise be ref-unstable too.
   const presetOptions = TRACE_PRESETS[choices.preset] ?? DEFAULT_TRACE_OPTIONS;
-  const options = useTraceOptions(presetOptions, choices.traceSettings);
+  const options = useDialogTraceOptions(presetOptions, choices.traceSettings, seed);
   const effectiveTraceOutput: TraceOutput = machineKind === 'cnc' ? 'vector' : choices.traceOutput;
   const preview = useSelectedTracePreview(file, options, boundarySelection, seed, previewControl);
 
