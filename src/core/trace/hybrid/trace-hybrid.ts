@@ -9,11 +9,12 @@
 // pen line that runs into a solid shape keeps one continuous centre line; the
 // stroke is then clipped where it enters the wide region.
 //
-// Junction rule: a clipped stroke ENDS ON the wide region's boundary, and the
-// fill outline is traced from the wide region plus the thin ink no kept stroke
-// accounts for. The seam therefore has no gap (the stroke reaches the fill
-// edge) and at most the pen's round cap — half a stroke width — burns twice
-// over the fill. Clipped leftovers shorter than the stroke's own width (the
+// Junction rule: a clipped stroke is cut on the wide region's boundary and
+// its cut end reaches 1 px on into the fill (reachIntoFill), and the fill
+// outline is traced from the wide region plus the thin ink no kept stroke
+// accounts for. The seam therefore has no gap (the stroke touches or enters
+// the fill outline) and at most the reach plus the pen's round cap burns
+// twice over the fill. Clipped leftovers shorter than the stroke's own width (the
 // medial stubs a square corner grows) are not strokes; their ink returns to
 // the fill so corners stay square.
 
@@ -155,7 +156,7 @@ type Centre = { readonly polylines: Polyline[]; readonly marks: ReadonlySet<Poly
 // Measuring each stroke straight across catches it: a stroke measurably
 // wider than the Max stroke width joins the wide region as the union of its
 // inscribed discs, and the strokes are clipped again against that region, so
-// a thin stroke running into it still ends on the fill edge (rule 4).
+// a thin stroke running into it still ends on the fill edge (ADR rule 5).
 function* withOverwideStrokesFilled(
   centre: Centre,
   mask: InkMask,
