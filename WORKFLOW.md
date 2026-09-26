@@ -3840,12 +3840,14 @@ explicitly marked below; the remaining controls and user-facing flows are planne
    depth-per-pass, and each level's region fills with concentric rings at
    the layer's physical stepover: a percentage of the bit diameter, or for a
    tapered ball nose of the width it cuts over one level (ADR-368 Amendment 2).
+   Each ring ends where it started (ADR-289 Amendment 1).
    The allowance holds in 3D: roughing plans with the bit widened sideways by
    the allowance plus the contour clearance, so steep walls keep their stock
    too, and each ring point clears the model surface between samples as well
    as at them (ADR-412). When the stepover is wider than the bit reaches on
-   that level's slice, extra closed passes cut the cores the rings missed
-   (ADR-413).
+   that level's slice (ADR-413), the stock the level's rings leave standing
+   (its centre, cusps between rings) is cleared right after them (ADR-289
+   Amendment 1).
    Ladder levels below the deepest tip become one level at it, so the floor
    keeps exactly the allowance, and a flat the ladder would overshoot by more
    than 0.05 mm gets a level of its own that clears only its band (ADR-422).

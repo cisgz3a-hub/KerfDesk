@@ -10,16 +10,20 @@
 // deviation from pocketToolpathRings, which would double-count the radius).
 // The stepover is a percentage of the cut width over one level, which is the
 // stored diameter except for a tapered ball nose: its rings then overlap
-// inside every level instead of leaving ribs (ADR-368 Amendment 2).
+// inside every level instead of leaving ribs (ADR-368 Amendment 2). When the
+// stepover is wider than the cutter reaches on a level's slice (ADR-413), the
+// innermost ring can stop short of the level's centre; relief-core-cleanup.ts
+// then adds the paths that clear what the rings leave, as the pocket planner
+// does (ADR-289 Amendment 1).
 //
 // Output passes are contour passes in heightmap physical mm (origin at the
-// heightmap's min corner, y down). The compiler has already folded object XY
-// scale into that grid, so only its residual isometry and device origin remain.
-// Depth-major: every ring of one level before the next. Pure and deterministic.
+// heightmap's min corner, y down), each ring closed back to its first point.
+// The compiler has already folded object XY scale into that grid, so only its
+// residual isometry and device origin remain. Depth-major: every ring of one
+// level, outside in, then its core cleanup, before the next level. Pure and
+// deterministic.
 
 import { buildOffsetLadder, insetContoursChecked } from '../geometry/offset-ladder';
-import { differenceClosedPolylinesChecked } from '../geometry/polygon-difference';
-import { roundStrokeOutline } from '../geometry/round-stroke-outline';
 import { partialDualCoordinate } from '../grid';
 import type { CncContourPass, CncPass } from '../job';
 import type { CncTool, Polyline } from '../scene';
@@ -29,6 +33,7 @@ import { cncLayoutCutWidths } from '../cnc/layout-cut-widths';
 import { dilateHeightmapByTool } from './heightmap-tool-offset';
 import type { Heightmap } from './heightmap';
 import { marchingSquares } from './marching-squares';
+import { reliefCoreCleanup } from './relief-core-cleanup';
 import { reliefRoughingLevels } from './relief-roughing-levels';
 
 // Material intentionally left everywhere for the finishing pass (H.8).
@@ -37,9 +42,6 @@ const LEVEL_EPS = 1e-6;
 const MIN_STEPOVER_PERCENT = 10;
 const MAX_RINGS_PER_LEVEL = 4096;
 const MIN_RING_POINTS = 3;
-// Each cleanup round traces the boundary of the stock the previous rounds
-// left; a stepover up to one diameter needs one round, wider spacing a few.
-const MAX_CORE_CLEANUP_ROUNDS = 4;
 // Halvings of the cutter radius when finding its reach on one slice: far
 // below the 0.001 mm emit grid for any cutter.
 const CUT_RADIUS_BISECTIONS = 40;
@@ -128,7 +130,8 @@ export function reliefRoughingLadder(
 // How far from its path the cutter clears a whole slice: the widest radius
 // whose cutting surface stays within the slice above the tip. A flat end mill
 // reaches its full radius; a ball or tapered ball nose less on a thin slice,
-// where a wider stepover would leave ribs the full slice tall (ADR-413).
+// where a wider stepover would leave ribs the full slice tall (ADR-413). The
+// core cleanup sizes every ring's sweep by it (ADR-289 Amendment 1).
 function sliceCutRadiusMm(law: ToolKernel, sliceMm: number): number {
   const radius = law.radiusMm;
   if (law.surfaceDzAtRadius(radius) <= sliceMm) return radius;
@@ -206,23 +209,14 @@ function appendLevelRings(
   // Deeper rings shrink inward by the stepover until they vanish. Step 0's inset
   // is 0, which the offset engine returns unchanged.
   const ladder = buildOffsetLadder(usable, MAX_RINGS_PER_LEVEL, (step) => step * stepMm);
-  const emitted: Polyline[] = [];
-  for (const ring of ladder.rings) {
-    for (const polyline of ring) {
-      if (polyline.points.length < MIN_RING_POINTS) continue;
-      emitted.push(polyline);
-      passes.push({ kind: 'contour', zMm: levelZ, polyline: closeRing(polyline), closed: true });
-    }
+  const cleanup = reliefCoreCleanup(usable, ladder, stepMm, cutRadiusMm);
+  for (const polyline of [...ladder.rings.flat(), ...cleanup.paths]) {
+    if (polyline.points.length < MIN_RING_POINTS) continue;
+    passes.push({ kind: 'contour', zMm: levelZ, polyline: closeRing(polyline), closed: true });
   }
-  if (ladder.offsetFailed) return { offsetFailed: true, passLimited: false };
-  if (stepMm > cutRadiusMm && !ladder.capped) {
-    const cores = remainingLevelCores(usable, emitted, 2 * cutRadiusMm);
-    for (const polyline of cores.toolpaths) {
-      passes.push({ kind: 'contour', zMm: levelZ, polyline: closeRing(polyline), closed: true });
-    }
-    if (cores.offsetFailed) return { offsetFailed: true, passLimited: false };
-  }
-  if (!ladder.capped) return { offsetFailed: false, passLimited: false };
+  const offsetFailed = ladder.offsetFailed || cleanup.offsetFailed;
+  if (offsetFailed) return { offsetFailed, passLimited: false };
+  if (!ladder.capped) return { offsetFailed, passLimited: cleanup.passLimited };
 
   // buildOffsetLadder stops immediately after its last permitted non-empty
   // ring. Probe the next inset once to classify the stop, but never append this
@@ -230,35 +224,6 @@ function appendLevelRings(
   const lookahead = insetContoursChecked(usable, MAX_RINGS_PER_LEVEL * stepMm);
   if (lookahead.offsetFailed) return { offsetFailed: true, passLimited: false };
   return { offsetFailed: false, passLimited: lookahead.contours.length > 0 };
-}
-
-// ADR-413: a stepover wider than the cutter's reach can leave the last ring of a
-// level (or a lobe that split off and vanished between two insets) farther
-// from the region's middle than the cutter reaches, so a pillar of stock up to
-// the full relief depth stands inside a level the roughing reports as cleared
-// and the finishing bit plunges into it. As for pockets (ADR-098 amendment of
-// 2026-09-05), subtract the cutter's actual sweep from the tool-center region
-// and trace what is left, keeping the operator's ring spacing. Every traced
-// boundary lies inside the region, so it inherits the rings' surface proof.
-function remainingLevelCores(
-  region: ReadonlyArray<Polyline>,
-  emitted: ReadonlyArray<Polyline>,
-  cutWidthMm: number,
-): { readonly toolpaths: ReadonlyArray<Polyline>; readonly offsetFailed: boolean } {
-  const toolpaths: Polyline[] = [];
-  let swept: ReadonlyArray<Polyline> = emitted;
-  for (let round = 0; round < MAX_CORE_CLEANUP_ROUNDS && swept.length > 0; round += 1) {
-    const cleared = roundStrokeOutline(swept, cutWidthMm);
-    if (cleared === null) return { toolpaths, offsetFailed: true };
-    const remaining = differenceClosedPolylinesChecked(region, cleared);
-    if (remaining.kind === 'error') return { toolpaths, offsetFailed: true };
-    const cores = remaining.value.filter((core) => core.points.length >= MIN_RING_POINTS);
-    if (cores.length === 0) break;
-    const traced = cores.map((core) => ({ ...core, closed: true }));
-    toolpaths.push(...traced);
-    swept = [...swept, ...traced];
-  }
-  return { toolpaths, offsetFailed: false };
 }
 
 function closeRing(polyline: Polyline): ReadonlyArray<{ x: number; y: number }> {

@@ -28,13 +28,28 @@ the top of its flutes.
    the widest radius whose cutting surface stays within the slice above the tip, by bisection on
    the tool's own `surfaceDzAtRadius`. A flat end mill reaches its full radius.
 2. When the stepover is wider than that reach and the level's ring ladder ended by running out of
-   interior (not at its ring limit), the planner subtracts the rings' swept area,
-   `roundStrokeOutline(rings, 2 * reach)`, from the level's tool-center region and traces what is
-   left as extra closed passes at that level. It repeats on what those passes leave, up to four
-   rounds. Every traced boundary lies inside the region, so it inherits the rings' surface
-   clearance (ADR-412).
+   interior (not at its ring limit), the level's leftover stock is cleared by ADR-289
+   Amendment 1's planner (`relief-core-cleanup.ts`), with this reach as the radius each ring and
+   cleanup path sweeps. That planner subtracts the rings' actual sweep from the level's tool-center
+   region and gives each leftover piece its deepest-inset ring or a trace around it, round by
+   round. Every path lies inside the region, so it inherits the rings' surface clearance
+   (ADR-412).
 3. An offset or difference failure is reported through the level's existing `offsetFailed`
-   warning. It never refuses output (rule 7).
+   warning, and stock left after the planner's round budget through `passLimited`. Neither
+   refuses output (rule 7).
+
+#### Reconciliation with ADR-289 Amendment 1
+
+This ADR first shipped its own cleanup: a trace around whatever the rings' sweep missed, up to
+four rounds. ADR-289 Amendment 1 (#942) added a relief core cleanup at the same point, sized by the
+stepover's cut width. Keeping both would cut each core twice, so one planner remains:
+Amendment 1's, which gives a core a single small ring instead of a trace and drops hairlines
+thinner than 0.02 mm. It reads this ADR's per-slice reach instead of the cut width, which
+supersedes Amendment 1's item 3 sentence "the cleanup reads the same cut width as the stepover".
+For a flat end mill both are the tool radius, and for a tapered ball nose on a full slice they
+agree. They differ on the thin slices ADR-422's floor and flat levels add, and for a ball nose:
+sized by the cut width, a 3.175 mm ball at 45% on 0.5 mm slices still left floor points 1.36 mm
+from the nearest path against its 1.16 mm reach.
 
 ### Consequences
 
@@ -43,6 +58,7 @@ the top of its flutes.
 - `relief-roughing-3d.test.ts` checks that every deep floor point of a pit is within the cutter's
   reach of the last level's path, for an end mill at 75% and 90% and for a ball nose at 45% on
   0.5 mm slices. Without the cleanup the 90% case left points 1.61 mm from the path, and sizing
-  the ball's cleanup by its radius left points 1.36 mm away against a 1.16 mm reach.
+  the ball's cleanup by its radius left points 1.36 mm away against a 1.16 mm reach, with this
+  ADR's first planner and with Amendment 1's alike.
 - A tapered ball nose now gets cleanup on levels where its narrow tip cannot bridge the stepover,
   independently of how its stepover is sized.
