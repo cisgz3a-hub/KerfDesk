@@ -62,6 +62,61 @@ describe('hosted refill after tool-change Continue', () => {
     expect(harness.safeWrite).toHaveBeenCalledTimes(writes);
   });
 
+  // Audit SER-1: every Continue used to copy the whole program to the worker
+  // under the handshake deadline (ADR-354 Amendment 3).
+  it('re-arms from the program the worker already holds after the run reaches its M0', async () => {
+    const harness = refillResumeHarness();
+    opened.push(harness);
+    const gcode = `G1 X1.000\nG1 X2.000\nM0\n${longRefillJob()}`;
+    harness.set({
+      streamer: step(createStreamer(gcode, { rxBufferBytes: 11, toolChangePause: true })).state,
+      activeJobMachineKind: 'cnc',
+    });
+    const arming = harness.hosted.arm(() => harness.get().streamer);
+    harness.ready();
+    await arming;
+    expect(harness.programs).toHaveLength(1);
+    // The worker refills the second move, reaches the M0 and gives the refill back.
+    harness.emitLine('ok');
+    harness.emitLine('ok');
+    await flushRefillTasks();
+    expect(harness.get().streamer?.status).toBe('tool-change');
+    expect(harness.hosted.isArmed()).toBe(false);
+    harness.set({
+      toolChangeIdleSeen: true,
+      statusReport: {
+        state: 'Idle',
+        subState: null,
+        mPos: { x: 0, y: 0, z: 0 },
+        wPos: null,
+        feed: 0,
+        spindle: 0,
+        wco: null,
+      },
+      workZZeroEvidence: {
+        source: 'manual-zero',
+        referenceEpoch: harness.get().workZReferenceEpoch,
+        toolId: 'bit-2',
+      },
+      pendingToolId: 'bit-2',
+    });
+    harness.sent.length = 0;
+
+    const continuing = harness.actions.continueToolChange();
+    await flushRefillTasks();
+    harness.ready();
+    await continuing;
+
+    expect(harness.safeWrite).toHaveBeenCalledWith('G1 X1.000\n', 'resume');
+    expect(harness.sent.map((message) => message.kind)).toEqual(['prepare-arm', 'arm']);
+    expect(harness.programs).toHaveLength(1);
+    const arm = harness.sent.at(-1);
+    expect(arm).toMatchObject({ kind: 'arm', programId: harness.programs[0] });
+    expect(arm).not.toHaveProperty('streamer');
+    expect(harness.adopted.at(-1)).toMatchObject({ status: 'streaming', queueIndex: 4 });
+    expect(harness.hosted.isArmed()).toBe(true);
+  });
+
   it('does not host a section that enters the next M0 hold within its first window', async () => {
     const harness = atToolChange('M0\nM5\nM0\nG1 X8.000');
     await harness.actions.continueToolChange();

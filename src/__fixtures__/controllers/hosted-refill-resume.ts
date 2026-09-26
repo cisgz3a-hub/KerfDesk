@@ -1,7 +1,10 @@
 import { vi } from 'vitest';
-import { createStreamer, step, type StreamerState } from '../../core/controllers/grbl';
+import { createStreamer, step } from '../../core/controllers/grbl';
 import type { SerialConnection } from '../../platform/types';
-import type { SerialWorkerRequest } from '../../platform/web/serial-worker-protocol';
+import type {
+  SerialWorkerRequest,
+  StreamPosition,
+} from '../../platform/web/serial-worker-protocol';
 import { createWorkerRefillHandover } from '../../platform/web/worker-refill-handover';
 import { cancelControllerLifecycleRefs } from '../../ui/state/laser-interactive-command';
 import { jobActions } from '../../ui/state/laser-job-actions';
@@ -24,7 +27,11 @@ export async function flushRefillTasks(): Promise<void> {
 export function refillResumeHarness() {
   const { refs, set, get } = makeLineHandlerHarness();
   const sent: SerialWorkerRequest[] = [];
-  const adopted: StreamerState[] = [];
+  // An arm carries the position only; its program crossed once, in a
+  // `program` message of its own (ADR-354 Amendment 3). `programs` is never
+  // cleared, so a test can see which run sent one.
+  const adopted: StreamPosition[] = [];
+  const programs: number[] = [];
   let onWrite: ((data: string) => Promise<void> | void) | null = null;
   let controllerState = 'Run';
   let releaseHeld = false;
@@ -36,10 +43,11 @@ export function refillResumeHarness() {
     onWriteError: () => () => undefined,
     post: (message) => {
       sent.push(message);
+      if (message.kind === 'program') programs.push(message.programId);
       if (message.kind === 'release' && !releaseHeld)
         handover.receive({ kind: 'released', id: message.id });
       if (message.kind === 'arm') {
-        adopted.push(message.streamer);
+        adopted.push(message.position);
         handover.receive({ kind: 'armed', id: message.id });
       }
     },
@@ -79,6 +87,7 @@ export function refillResumeHarness() {
     connection,
     sent,
     adopted,
+    programs,
     safeWrite,
     emitLine,
     ready,

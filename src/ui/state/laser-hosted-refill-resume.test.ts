@@ -60,6 +60,24 @@ describe('hosted refill after confirmed Pause and Resume', () => {
     expect(harness.get().streamer?.completed).toBe(3);
   });
 
+  // Audit SER-1: every Resume used to copy the whole program to the worker
+  // under the handshake deadline (ADR-354 Amendment 3).
+  it('re-arms from the program the worker already holds, sending only the position', async () => {
+    const harness = await paused();
+    expect(harness.programs).toHaveLength(1);
+    const resume = harness.actions.resumeJob();
+    await flushRefillTasks();
+    harness.ready();
+    await resume;
+
+    expect(harness.sent.map((message) => message.kind)).toEqual(['prepare-arm', 'arm']);
+    expect(harness.programs).toHaveLength(1);
+    const arm = harness.sent.at(-1);
+    expect(arm).toMatchObject({ kind: 'arm', programId: harness.programs[0] });
+    expect(arm).not.toHaveProperty('streamer');
+    expect(harness.hosted.isArmed()).toBe(true);
+  });
+
   it('captures an ACK crossing prepare/ready and suppresses duplicate refills after arm', async () => {
     const harness = await paused();
     const resume = harness.actions.resumeJob();

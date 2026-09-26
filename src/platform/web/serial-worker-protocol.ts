@@ -8,8 +8,17 @@
 // prepare-arm pauses line delivery. The renderer drains all lines preceding
 // ready, captures its current state, and suppresses its own refill before
 // sending arm. The worker adopts that state before resuming line delivery.
+//
+// The program itself crosses once per run, in a `program` message whose two
+// buffers are transferred rather than copied. An arm names it and carries only
+// the position, so its size and the worker's work to adopt it do not grow with
+// the job (ADR-354 Amendment 3).
 
 import type { StreamerState } from '../../core/controllers/grbl';
+import type { ProgramBuffers } from './serial-program-buffer';
+
+/** Everything a refill needs from the stream except the program it reads. */
+export type StreamPosition = Omit<StreamerState, 'queued'>;
 
 export type SerialWorkerRequest =
   /** Hand over the opened port's duplex streams. Both are transferred. */
@@ -27,8 +36,18 @@ export type SerialWorkerRequest =
   | { readonly kind: 'write'; readonly id: number; readonly data: string }
   /** Stop forwarding lines and establish a snapshot barrier. */
   | { readonly kind: 'prepare-arm'; readonly id: number }
-  /** Adopt the position captured at the matching ready barrier. */
-  | { readonly kind: 'arm'; readonly id: number; readonly streamer: StreamerState }
+  /** A run's program, once per run. Both buffers are transferred. It replaces
+   *  any program the worker held; later arms name it by `programId`. */
+  | ({ readonly kind: 'program'; readonly programId: number } & ProgramBuffers)
+  /** Adopt the position captured at the matching ready barrier, reading lines
+   *  from the program `programId` names. A worker that does not hold that
+   *  program answers `refill-stopped` instead of `armed`. */
+  | {
+      readonly kind: 'arm';
+      readonly id: number;
+      readonly programId: number;
+      readonly position: StreamPosition;
+    }
   /** Give the refill back to the main thread (pause, resume, tool change,
    * abort, or any other status change it owns). */
   | { readonly kind: 'release'; readonly id: number }
@@ -41,8 +60,16 @@ export type SerialWorkerResponse =
   /** All lines before this snapshot barrier have already been forwarded. */
   | { readonly kind: 'ready'; readonly id: number }
   | { readonly kind: 'armed'; readonly id: number }
-  | { readonly kind: 'released'; readonly id: number }
-  /** Controller reset/takeover or write failure stopped autonomous refill. */
+  | {
+      readonly kind: 'released';
+      readonly id: number;
+      /** The program the worker let go of, because the stream it released had
+       *  ended and can never be armed again. */
+      readonly retiredProgram?: number;
+    }
+  /** Controller reset/takeover, a write failure, or an arm naming a program
+   *  the worker does not hold stopped autonomous refill. The worker lets go of
+   *  its program too. */
   | { readonly kind: 'refill-stopped' }
   | { readonly kind: 'write-ack'; readonly id: number }
   | { readonly kind: 'write-error'; readonly id: number; readonly message: string }

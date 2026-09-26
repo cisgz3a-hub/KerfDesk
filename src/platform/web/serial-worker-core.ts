@@ -14,6 +14,10 @@
 // The one transport fact it reports is how its read stream ended: a line error
 // that left the port open (`read-error`), or an end it cannot read past
 // (`closed`, after letting go of both streams).
+//
+// It also holds the run's program, which crossed once as transferred buffers
+// (ADR-354 Amendment 3). Every arm names that program and carries only the
+// position, so a Resume or tool-change Continue does not send the job again.
 
 import type { StreamerState } from '../../core/controllers/grbl';
 // Deep import: the grbl barrel is at its public-export ratchet.
@@ -21,7 +25,9 @@ import { pumpInboundLine } from '../../core/controllers/grbl/stream-pump';
 import { classifyResponse } from '../../core/controllers/grbl/response';
 import { detectControllerFromBanner } from '../../core/controllers/detect-controller';
 import { RT_SOFT_RESET } from '../../core/controllers/grbl/commands';
+import { isTerminal } from '../../core/controllers/grbl/streamer';
 import { closeWriterBounded } from './bounded-writer-close';
+import { decodeProgramLines } from './serial-program-buffer';
 import {
   createReadRecoveryBudget,
   recoverableReadErrorName,
@@ -40,16 +46,21 @@ export type SerialWorkerCore = {
   readonly handle: (request: SerialWorkerRequest) => void;
   /** The stream position this worker currently refills, for assertions. */
   readonly armedStreamer: () => StreamerState | null;
+  /** The id of the program this worker holds, for assertions. */
+  readonly heldProgram: () => number | null;
   /** Resolves once the current read loop has ended, for assertions. */
   readonly readLoop: () => Promise<void> | null;
   /** Releases both stream locks before reporting the transport closed. */
   readonly close: () => Promise<void>;
 };
 
+type HeldProgram = { readonly id: number; readonly lines: ReadonlyArray<string> };
+
 type WorkerState = {
   reader: ReadableStreamDefaultReader<Uint8Array> | null;
   writer: WritableStreamDefaultWriter<Uint8Array> | null;
   streamer: StreamerState | null;
+  program: HeldProgram | null;
   loop: Promise<void> | null;
   barrier: Promise<void> | null;
   resume: (() => void) | null;
@@ -68,6 +79,7 @@ export function createSerialWorkerCore(deps: SerialWorkerCoreDeps): SerialWorker
     reader: null,
     writer: null,
     streamer: null,
+    program: null,
     loop: null,
     barrier: null,
     resume: null,
@@ -84,6 +96,7 @@ export function createSerialWorkerCore(deps: SerialWorkerCoreDeps): SerialWorker
       else handleRequest(state, deps, request);
     },
     armedStreamer: () => state.streamer,
+    heldProgram: () => state.program?.id ?? null,
     readLoop: () => state.loop,
     close: () => closeCore(state, deps, state.loop),
   };
@@ -109,17 +122,7 @@ function handleRequest(
       startReading(state, deps, request.readable);
       return;
     case 'write':
-      // Disconnect and write-failure containment can reset without waiting
-      // for release. A reset invalidates this queue before its banner arrives.
-      if (request.data.includes(RT_SOFT_RESET) && state.streamer !== null) {
-        state.streamer = null;
-        deps.post({ kind: 'refill-stopped' });
-      }
-      void writeBytes(state, request.data).then(
-        () => deps.post({ kind: 'write-ack', id: request.id }),
-        (error: unknown) =>
-          deps.post({ kind: 'write-error', id: request.id, message: describeError(error) }),
-      );
+      write(state, deps, request);
       return;
     case 'prepare-arm':
       state.armId = request.id;
@@ -128,21 +131,90 @@ function handleRequest(
       });
       deps.post({ kind: 'ready', id: request.id });
       return;
+    case 'program':
+      // Nothing here grows with the job: the buffers were transferred, and a
+      // line is decoded only when the refill reaches it.
+      state.program = holdProgram(request);
+      return;
     case 'arm':
-      if (state.armId !== request.id) return;
-      state.streamer = request.streamer;
-      deps.post({ kind: 'armed', id: request.id });
-      resumeLines(state);
+      adopt(state, deps, request);
       return;
     case 'release':
-      state.streamer = null;
-      deps.post({ kind: 'released', id: request.id });
-      resumeLines(state);
+      release(state, deps, request.id);
       return;
     case 'close':
       void closeCore(state, deps, state.loop);
       return;
   }
+}
+
+function write(
+  state: WorkerState,
+  deps: SerialWorkerCoreDeps,
+  request: Extract<SerialWorkerRequest, { readonly kind: 'write' }>,
+): void {
+  // Disconnect and write-failure containment can reset without waiting
+  // for release. A reset invalidates this queue before its banner arrives.
+  if (request.data.includes(RT_SOFT_RESET) && state.streamer !== null) {
+    stopRefill(state);
+    deps.post({ kind: 'refill-stopped' });
+  }
+  void writeBytes(state, request.data).then(
+    () => deps.post({ kind: 'write-ack', id: request.id }),
+    (error: unknown) =>
+      deps.post({ kind: 'write-error', id: request.id, message: describeError(error) }),
+  );
+}
+
+function holdProgram(
+  request: Extract<SerialWorkerRequest, { readonly kind: 'program' }>,
+): HeldProgram | null {
+  const lines = decodeProgramLines(request);
+  return lines === null ? null : { id: request.programId, lines };
+}
+
+// A position is never refilled without its own program. An arm naming one this
+// worker does not hold hands the refill straight back, before any held line is
+// forwarded, so the main thread keeps writing and no line is sent twice or
+// skipped; its next arm sends the program again.
+function adopt(
+  state: WorkerState,
+  deps: SerialWorkerCoreDeps,
+  request: Extract<SerialWorkerRequest, { readonly kind: 'arm' }>,
+): void {
+  if (state.armId !== request.id) return;
+  const program = state.program;
+  if (program?.id === request.programId) {
+    state.streamer = { ...request.position, queued: program.lines };
+    deps.post({ kind: 'armed', id: request.id });
+  } else {
+    stopRefill(state);
+    deps.post({ kind: 'refill-stopped' });
+  }
+  resumeLines(state);
+}
+
+// Pause, a tool change and Resume release a live stream and arm it again, so
+// the program stays. A stream that has ended can never be armed again, so its
+// program goes with it, and the reply says so for the main thread's record.
+function release(state: WorkerState, deps: SerialWorkerCoreDeps, id: number): void {
+  const ended = state.streamer !== null && isTerminal(state.streamer.status);
+  const retiredProgram = ended ? state.program?.id : undefined;
+  state.streamer = null;
+  if (retiredProgram === undefined) {
+    deps.post({ kind: 'released', id });
+  } else {
+    state.program = null;
+    deps.post({ kind: 'released', id, retiredProgram });
+  }
+  resumeLines(state);
+}
+
+// Every `refill-stopped` also retires the program: the main thread forgets it
+// on the same message and sends it again with its next arm.
+function stopRefill(state: WorkerState): void {
+  state.streamer = null;
+  state.program = null;
 }
 
 function resumeLines(state: WorkerState): void {
@@ -160,7 +232,7 @@ async function writeBytes(state: WorkerState, data: string): Promise<void> {
 
 function handleLine(state: WorkerState, deps: SerialWorkerCoreDeps, line: string): void {
   const invalidated = state.streamer !== null && invalidatesRefill(line);
-  if (invalidated) state.streamer = null;
+  if (invalidated) stopRefill(state);
   if (state.streamer !== null) {
     const pumped = pumpInboundLine(state.streamer, line);
     state.streamer = pumped.streamer;
@@ -168,7 +240,7 @@ function handleLine(state: WorkerState, deps: SerialWorkerCoreDeps, line: string
       void writeBytes(state, pumped.toSend).catch((error: unknown) => {
         // The main thread owns containment: it holds the safety notice, the
         // quarantine and the fail-dark path.
-        state.streamer = null;
+        stopRefill(state);
         deps.post({ kind: 'stream-write-error', message: describeError(error) });
         deps.post({ kind: 'refill-stopped' });
       });
@@ -274,7 +346,7 @@ function closeCore(
 ): Promise<void> {
   if (state.closing !== null) return state.closing;
   state.closed = true;
-  state.streamer = null;
+  stopRefill(state);
   resumeLines(state);
   state.closing = Promise.resolve()
     .then(() => releaseOnce(state))
