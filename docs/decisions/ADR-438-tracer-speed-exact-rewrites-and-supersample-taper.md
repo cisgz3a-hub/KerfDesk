@@ -185,3 +185,44 @@ process. Findings:
 
 No code change was needed, and none was made. The 187 against 69 difference is put down to
 measuring different code, not to state leaking between traces.
+
+### Amendment 2 (2026-09-27): output-identical cuts, speed wave 2
+
+Each cut below leaves the serialised trace byte-identical: the Amendment 1 parity oracle
+(`TRACE_PARITY=1`, plus `TRACE_PARITY_HEAVY=1` when the machine has 4 GB free) matches the hashes
+frozen from 952fb13e3 in all six presets, and each cut has its own differential proof against a
+frozen copy of the code it replaces. The frozen copies live in `*.test-support.ts` files, never
+in production code. Shared fuzz masks come from `src/core/trace/mask-fuzz.test-support.ts`
+(dense and sparse noise, blobs and rings, 1 px lines, ink on the border, checkerboard saddles,
+all-ink, all-paper, 1xN and Nx1 shapes).
+
+**Rank 2, whole-grid distance field (`centerline/distance-field.ts`).** The column pass
+transforms a 0/INF indicator, and the lower envelope of parabolas that are all rooted at 0 is
+exactly the squared distance to the nearest background pixel in the column (INF when the column
+has none). Two row-major integer sweeps (down, then up, keeping a per-column run length) now give
+those values, which removes the strided per-column envelope. The row envelope is unchanged in
+operation order; it no longer needs a max(width, height) scratch, and the virtual border clamp
+is folded into its write-back. Proof: `distance-field-parity.test.ts` compares every element with
+`Object.is` against the frozen field on 3000 fuzzed masks, 300 px all-ink, all-paper, border and
+blob grids, degenerate grids (0x0, 0x5, 1x40, 40x1) and masks holding values other than 0 and 1;
+`src/__fixtures__/perceptual/trace-parity-distance-field.test.ts` (gated on `TRACE_PARITY=1`)
+does the same for every mask the tracer builds from the oracle corpus in all six presets. A
+mutation (border clamp off by one) fails both. Oracle: 60/60 heavy before a lint-only split of
+the function into per-row helpers, and 36/36 light plus the corpus-mask check after it.
+
+**Rank 4, boundary walk as direction bits (`contour-boundary.ts`).** `Map<vertex, Set<dir>>` is
+replaced by a `Uint8Array` of four direction bits per lattice vertex plus the list of vertices in
+the order their first edge was found. Loops start at vertices in that order, each with its
+earliest-inserted remaining direction. Raster order inserts a vertex's edges W, N, S, E (from
+pixels (x-1,y-1), (x,y-1), (x-1,y), (x,y)), so the new walker reproduces the Map and Set
+iteration exactly, including after deletions, which never reorder either structure. Only
+`collectBoundaryEdges`, `walkLoop`, `nextDirection` and the two-line start loop in
+`traceBoundaryLoops` changed, so geometry-core's nesting-forest edit should merge cleanly. Proof:
+`contour-boundary-parity.test.ts` deep-equals the loops (order, start, points, area) against the
+frozen Map walker on 10 000 fuzzed masks with the default saddle rule, 3000 more with
+paper-joining, ink-joining and position-hashed saddle resolvers, large 160 px masks, non-0/1
+mask values and short ink arrays. Mutations: walking the vertices in raster order instead of
+first-insertion order fails 3 of 5 tests. Swapping the per-vertex direction order (E before W,
+or S before N) does NOT fail: by the time the outer loop reaches a saddle vertex, one of its two
+out-edges has always been consumed by a loop that started at an earlier vertex, so that order
+is not observable on any fuzzed mask. The exact order is kept anyway.
