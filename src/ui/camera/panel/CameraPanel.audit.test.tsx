@@ -16,9 +16,11 @@ import {
   mountControl,
 } from '../../image-editor/control-audit-test-support';
 import { useCameraStore as camera } from '../../state/camera-store';
+import { savedCameraModel } from '../../../core/camera/model/model-fixtures';
+import { useStore } from '../../state';
 import { resetStore } from '../../state/test-helpers';
 import { useTutorialStore } from '../../tutorials/tutorial-store';
-import { useCameraWizardStore } from '../wizard/camera-wizard-store';
+import { useCameraCalibrationStore } from '../calibrate/camera-calibration-store';
 import { CameraPanel } from './CameraPanel';
 import { CameraDiagnostics } from './CameraDiagnostics';
 import { UsbCameraSection } from './UsbCameraSection';
@@ -54,7 +56,7 @@ beforeEach(() => {
   camera.setState(initial);
   capture.mockReset();
   snapshot.mockReset();
-  useCameraWizardStore.getState().closeWizard();
+  useCameraCalibrationStore.getState().closeWizard();
   localStorage.clear();
 });
 afterEach(() => {
@@ -79,7 +81,34 @@ it('opens the camera lesson, persists the larger panel preference and closes the
   expect(host.querySelector('[role="dialog"]')).toBeNull();
 });
 
-it('starts USB through the adapter, reports denial, starts a fake stream, opens calibration and stops it', async () => {
+it('opens the one-photo calibration from the panel', async () => {
+  camera.setState({ panelOpen: true, machineCamera: { kind: 'not-found' } });
+  const host = await mountControl(wrap(<CameraPanel />));
+  await clickControl(host, 'Calibrate camera…');
+  expect(useCameraCalibrationStore.getState().open).toBe(true);
+  expect(document.body.textContent).toContain('Engrave target');
+});
+
+it('keeps a running camera when the panel closes while the calibrated overlay shows it', async () => {
+  const stop = vi.fn();
+  const usb = {
+    kind: 'usb' as const,
+    stream: { stream: {} as MediaStream, sourceId: 'audit-usb', resizeMode: 'none' as const, stop },
+  };
+  useStore.getState().updateDeviceProfile({ cameraModel: savedCameraModel() });
+  camera.setState({
+    panelOpen: true,
+    machineCamera: { kind: 'not-found' },
+    sourceState: { kind: 'live', source: usb },
+    overlayVisible: true,
+  });
+  const host = await mountControl(wrap(<CameraPanel />));
+  await clickControl(host, 'Close camera panel');
+  expect(camera.getState().sourceState.kind).toBe('live');
+  expect(stop).not.toHaveBeenCalled();
+});
+
+it('starts USB through the adapter, reports denial, starts a fake stream and stops it', async () => {
   const stop = vi.fn();
   const stream: CameraStream = {
     stream: {} as MediaStream,
@@ -98,15 +127,12 @@ it('starts USB through the adapter, reports denial, starts a fake stream, opens 
     discoverNetworkCamera: async () => null,
   };
   const host = await mountControl(wrap(<UsbCameraSection camera={adapter} />));
-  expect(control(host, 'Calibrate lens…').disabled).toBe(true);
   await clickControl(host, 'Start USB camera');
   expect(openStream).toHaveBeenCalledTimes(1);
   expect(camera.getState().sourceState.kind).toBe('denied');
   expect(host.textContent).toContain('Permission denied');
   await clickControl(host, 'Start USB camera');
   expect(camera.getState().sourceState).toMatchObject({ kind: 'live', source: { kind: 'usb' } });
-  await clickControl(host, 'Calibrate lens…');
-  expect(useCameraWizardStore.getState().open).toBe(true);
   await clickControl(host, 'Stop camera');
   expect(camera.getState().sourceState.kind).toBe('idle');
   expect(stop).toHaveBeenCalledTimes(1);
@@ -140,10 +166,14 @@ it('opens RTSP details and connects the entered URL through a fake bridge before
   });
   await clickControl(host, 'Connect');
   expect(probe).toHaveBeenCalledWith({ url: 'rtsp://camera.invalid/live' });
-  expect(camera.getState().sourceState).toMatchObject({
-    kind: 'live',
-    source: { kind: 'machine-rtsp' },
-  });
+  // Going live awaits the WebCrypto query fingerprint, which one act() flush
+  // does not always outlast when the whole suite runs.
+  await vi.waitFor(() =>
+    expect(camera.getState().sourceState).toMatchObject({
+      kind: 'live',
+      source: { kind: 'machine-rtsp' },
+    }),
+  );
   await clickControl(host, 'Stop');
   expect(camera.getState().sourceState.kind).toBe('idle');
 });

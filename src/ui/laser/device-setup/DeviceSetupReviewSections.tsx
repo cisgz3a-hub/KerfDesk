@@ -153,7 +153,7 @@ function safetyRows(state: DeviceSetupStepProps['state']): ReviewRows {
       ['Rotary', state.draft.rotary?.enabled === true ? 'Enabled' : 'Disabled'],
       [
         'Camera',
-        state.draft.cameraAlignment === undefined ? 'Alignment pending / unchanged' : 'Aligned',
+        state.draft.cameraModel === undefined ? 'Calibration pending / unchanged' : 'Calibrated',
       ],
     );
   }

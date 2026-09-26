@@ -52,9 +52,7 @@ export function rotaryStatus(profile: DeviceProfile): string {
 
 export function cameraStatus(profile: DeviceProfile): string {
   if (profile.cameraProfile === undefined) return 'Not set up';
-  if (profile.cameraCalibration === undefined) return 'Lens calibration pending';
-  if (profile.cameraAlignment === undefined) return 'Bed alignment pending';
-  return 'Aligned';
+  return profile.cameraModel === undefined ? 'Calibration pending' : 'Calibrated';
 }
 
 function formatScale(value: number): string {

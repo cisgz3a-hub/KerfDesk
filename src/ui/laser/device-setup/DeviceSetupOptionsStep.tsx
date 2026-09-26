@@ -154,14 +154,13 @@ function CameraStatusBody({ profile }: { readonly profile: DeviceProfile }): JSX
       <dl style={definitionStyle}>
         <dt>Camera profile</dt>
         <dd>{profile.cameraProfile === undefined ? 'Not selected' : 'Configured'}</dd>
-        <dt>Lens calibration</dt>
-        <dd>{profile.cameraCalibration === undefined ? 'Pending' : 'Saved'}</dd>
-        <dt>Bed alignment</dt>
-        <dd>{profile.cameraAlignment === undefined ? 'Pending' : 'Saved'}</dd>
+        <dt>Calibration</dt>
+        <dd>{profile.cameraModel === undefined ? 'Pending' : 'Saved'}</dd>
       </dl>
       <p style={mutedStyle}>
-        Camera capture and four-point alignment require the live camera view, so use Camera Setup
-        after saving this machine draft. Existing calibration remains attached to the profile.
+        Calibration takes one photo of an engraved target through the live camera, so use the Camera
+        panel after saving this machine draft. An existing calibration stays attached to the
+        profile.
       </p>
     </>
   );

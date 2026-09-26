@@ -1,6 +1,7 @@
 import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, describe, expect, it, vi } from 'vitest';
+import { savedCameraModel } from '../../core/camera/model/model-fixtures';
 import { createLayer, createProject, EMPTY_SCENE, IDENTITY_TRANSFORM } from '../../core/scene';
 import { useStore } from '../state';
 import { useCameraStore } from '../state/camera-store';
@@ -24,14 +25,7 @@ function installProject(): void {
       device: {
         ...base.device,
         homing: { ...base.device.homing, enabled: true },
-        cameraAlignment: {
-          homography: [1, 0, 0, 0, 1, 0, 0, 0, 1],
-          frameWidth: 640,
-          frameHeight: 480,
-          basis: 'raw',
-          alignedAt: 1,
-          planeHeightMm: 0,
-        },
+        cameraModel: savedCameraModel(),
       },
       scene: {
         ...EMPTY_SCENE,

@@ -1,84 +1,109 @@
-// DOM tests for the workspace overlay wiring: it renders nothing without a
-// persisted alignment (or when hidden), and projects a captured still through
-// the alignment homography + view transform when present. The live-video
-// source path shares CameraOverlay, which has its own tests.
+// DOM tests for the workspace overlay wiring (ADR-440): nothing without a
+// saved camera model or when hidden; a still or the live element is drawn
+// through the model with the workspace view; a frame the model cannot place
+// says why instead of drawing a misplaced picture. jsdom has no WebGL2, so a
+// stand-in renderer records each draw.
 
 import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import type { CameraAlignment, CameraCalibration, RgbaImage } from '../../core/camera';
+import type { CameraCaptureBinding } from '../../core/camera/camera-capture-binding';
+import { savedCameraModel, wideLens } from '../../core/camera/model/model-fixtures';
+import type { RgbaImage } from '../../core/camera/rgba-image';
 import { createProject } from '../../core/scene';
 import { useStore } from '../state';
 import { useCameraStore } from '../state/camera-store';
+import { useUiStore } from '../state/ui-store';
+import { computeView } from '../workspace/view-transform';
+import type { LiveCaptureElement } from './frame-capture';
+import type { BedOverlayUniforms } from './overlay/bed-overlay-shader';
 import { WorkspaceCameraOverlay } from './WorkspaceCameraOverlay';
+
+type Draw = { readonly source: unknown; readonly uniforms: BedOverlayUniforms };
+const gl = vi.hoisted(() => ({ available: true, draws: [] as Draw[], clears: 0 }));
+vi.mock('./overlay/bed-overlay-renderer', () => ({
+  createBedOverlayRenderer: () =>
+    gl.available
+      ? {
+          draw: (source: unknown, _w: number, _h: number, uniforms: BedOverlayUniforms) =>
+            gl.draws.push({ source, uniforms }),
+          clear: () => {
+            gl.clears += 1;
+          },
+          dispose: () => undefined,
+          lost: false,
+        }
+      : null,
+}));
+const liveElement = vi.hoisted(() => ({ current: null as LiveCaptureElement | null }));
+vi.mock('./CameraSourceView', async () => {
+  const { useEffect } = await import('react');
+  return {
+    CameraSourceView: (props: { onElement?: (element: LiveCaptureElement | null) => void }) => {
+      const { onElement } = props;
+      useEffect(() => {
+        onElement?.(liveElement.current);
+        return () => onElement?.(null);
+      }, [onElement]);
+      return null;
+    },
+  };
+});
 
 (
   globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT?: boolean }
 ).IS_REACT_ACT_ENVIRONMENT = true;
 
-const ALIGNMENT: CameraAlignment = {
-  homography: [0.2, 0, 10, 0, 0.2, 5, 0, 0, 1],
-  frameWidth: 1280,
-  frameHeight: 720,
-  basis: 'raw',
-  alignedAt: 0,
-  planeHeightMm: 0,
+const BOX = { width: 800, height: 600 };
+const USB: CameraCaptureBinding = {
+  version: 1,
+  sourceKind: 'usb',
+  sourceId: 'overhead',
+  width: 1280,
+  height: 720,
+  resizeMode: 'none',
 };
 
-const RECTIFIED_ALIGNMENT: CameraAlignment = { ...ALIGNMENT, basis: 'rectified' };
-
-const CALIBRATION: CameraCalibration = {
-  intrinsics: { fx: 3, fy: 3, cx: 2, cy: 2 },
-  distortion: [0.3, -0.05, 0.01, -0.002],
-  imageWidth: 4,
-  imageHeight: 4,
-  rmsPx: 0.3,
-  calibratedAt: 0,
-};
-
-const STILL: RgbaImage = {
-  data: new Uint8ClampedArray(4 * 4 * 4).fill(200),
-  width: 4,
-  height: 4,
-};
-
-const CAPTURE = {
-  version: 1 as const,
-  sourceKind: 'machine-jpeg' as const,
-  sourceId: 'http://192.168.10.1/frame.jpg',
-  width: 4,
-  height: 4,
-  resizeMode: 'unknown' as const,
-};
+// Half the calibrated resolution, same 16:9 shape.
+function still(width = 640, height = 360): RgbaImage {
+  return { data: new Uint8ClampedArray(width * height * 4).fill(200), width, height };
+}
 
 let container: HTMLDivElement;
 let root: Root;
 
 beforeEach(() => {
-  // jsdom cannot measure layout; give the overlay box a real-looking rect so
-  // the view transform computes (the canvas-area box the overlay covers).
+  gl.available = true;
+  gl.draws.length = 0;
+  gl.clears = 0;
+  liveElement.current = null;
+  // jsdom cannot measure layout; give the overlay box the canvas area's size.
   vi.spyOn(HTMLDivElement.prototype, 'getBoundingClientRect').mockReturnValue({
+    ...BOX,
     x: 0,
     y: 0,
     top: 0,
     left: 0,
-    right: 800,
-    bottom: 600,
-    width: 800,
-    height: 600,
+    right: BOX.width,
+    bottom: BOX.height,
     toJSON: () => ({}),
-  } as DOMRect);
+  });
+  const project = createProject();
+  useStore.setState({
+    project: { ...project, device: { ...project.device, bedWidth: 400, bedHeight: 400 } },
+  });
+  useUiStore.setState({ zoomFactor: 1.5, panX: 20, panY: -10 });
+  useCameraStore.setState({
+    overlayVisible: true,
+    overlayOpacityPercent: 60,
+    overlayStill: null,
+    overlayStillCapture: null,
+    surfaceHeightMm: 12,
+    sourceState: { kind: 'idle' },
+  });
   container = document.createElement('div');
   document.body.appendChild(container);
   root = createRoot(container);
-  useCameraStore.setState({
-    overlayVisible: true,
-    overlayOpacityPercent: 50,
-    overlayStill: null,
-    overlayStillCapture: null,
-    surfaceHeightMm: 0,
-    sourceState: { kind: 'idle' },
-  });
 });
 
 afterEach(() => {
@@ -87,86 +112,100 @@ afterEach(() => {
   vi.restoreAllMocks();
 });
 
-function setAlignment(
-  alignment: CameraAlignment | undefined,
-  calibration?: CameraCalibration,
-): void {
-  const project = createProject();
+function saveModel(): void {
+  const project = useStore.getState().project;
   useStore.setState({
-    project: {
-      ...project,
-      device:
-        alignment === undefined
-          ? project.device
-          : {
-              ...project.device,
-              cameraAlignment: alignment,
-              ...(calibration === undefined ? {} : { cameraCalibration: calibration }),
-            },
-    },
+    project: { ...project, device: { ...project.device, cameraModel: savedCameraModel(USB) } },
   });
 }
 
+function render(): void {
+  act(() => root.render(<WorkspaceCameraOverlay />));
+}
+
 describe('WorkspaceCameraOverlay', () => {
-  it('renders nothing without a persisted alignment', () => {
-    setAlignment(undefined);
-    useCameraStore.setState({ overlayStill: STILL });
-    act(() => root.render(<WorkspaceCameraOverlay />));
+  it('renders nothing without a saved camera model', () => {
+    useCameraStore.setState({ overlayStill: still() });
+    render();
     expect(container.innerHTML).toBe('');
   });
 
   it('renders nothing when the overlay is hidden', () => {
-    setAlignment(ALIGNMENT);
-    useCameraStore.setState({ overlayStill: STILL, overlayVisible: false });
-    act(() => root.render(<WorkspaceCameraOverlay />));
+    saveModel();
+    useCameraStore.setState({ overlayStill: still(), overlayVisible: false });
+    render();
     expect(container.innerHTML).toBe('');
   });
 
-  it('projects a captured still through the alignment and view', () => {
-    setAlignment(ALIGNMENT);
-    useCameraStore.setState({ overlayStill: STILL });
-    act(() => root.render(<WorkspaceCameraOverlay />));
-    const canvas = container.querySelector('canvas');
-    expect(canvas).not.toBeNull();
-    expect(canvas!.style.transform).toContain('matrix3d(');
-    expect(canvas!.style.opacity).toBe('0.5');
-    expect(canvas!.style.pointerEvents).toBe('none');
-  });
-
-  it('renders nothing when there is neither a still nor a live stream', () => {
-    setAlignment(ALIGNMENT);
-    act(() => root.render(<WorkspaceCameraOverlay />));
-    expect(container.innerHTML).toBe('');
-  });
-
-  it('de-fisheyes the still for a rectified alignment with calibration (R2)', () => {
-    setAlignment(RECTIFIED_ALIGNMENT, CALIBRATION);
-    useCameraStore.setState({ overlayStill: STILL });
-    act(() => root.render(<WorkspaceCameraOverlay />));
-    // Still drawn (rectified), no basis-mismatch notice.
-    expect(container.querySelector('canvas')).not.toBeNull();
+  it('draws a still through the model at its own size, the surface height and the workspace view', () => {
+    saveModel();
+    useCameraStore.setState({
+      overlayStill: still(),
+      overlayStillCapture: { ...USB, width: 640, height: 360 },
+    });
+    render();
+    const drawn = gl.draws.at(-1)?.uniforms;
+    const view = computeView(BOX.width, BOX.height, 400, 400, {
+      zoomFactor: 1.5,
+      panX: 20,
+      panY: -10,
+    });
+    expect(drawn?.uFrameSize).toEqual([640, 360]);
+    expect(drawn?.uFocal[0]).toBeCloseTo(wideLens().intrinsics.fx / 2, 9);
+    expect(drawn?.uSurfaceZ).toBe(-12);
+    expect(drawn?.uOpacity).toBeCloseTo(0.6, 9);
+    expect(drawn?.uViewScale).toBeCloseTo(view.scale, 9);
+    expect(drawn?.uViewOffset).toEqual([view.offsetX, view.offsetY]);
     expect(container.querySelector('[role="status"]')).toBeNull();
   });
 
-  it('shows a basis-mismatch notice instead of a mis-registered overlay (R2)', () => {
-    // A rectified alignment with no calibration cannot be de-fisheyed for display.
-    setAlignment(RECTIFIED_ALIGNMENT);
-    useCameraStore.setState({ overlayStill: STILL });
-    act(() => root.render(<WorkspaceCameraOverlay />));
-    expect(container.querySelector('canvas')).toBeNull();
-    const notice = container.querySelector('[role="status"]');
-    expect(notice).not.toBeNull();
-    expect(notice!.textContent).toContain('captured still');
+  it('redraws when the material height changes', () => {
+    saveModel();
+    useCameraStore.setState({ overlayStill: still() });
+    render();
+    act(() => useCameraStore.setState({ surfaceHeightMm: 30 }));
+    expect(gl.draws.at(-1)?.uniforms.uSurfaceZ).toBe(-30);
   });
 
-  it('shows a setup warning instead of an overlay captured from another camera', () => {
-    setAlignment({ ...ALIGNMENT, capture: CAPTURE });
-    useCameraStore.setState({
-      overlayStill: STILL,
-      overlayStillCapture: { ...CAPTURE, sourceId: 'http://192.168.10.2/frame.jpg' },
-    });
-    act(() => root.render(<WorkspaceCameraOverlay />));
-    expect(container.querySelector('canvas')).toBeNull();
-    expect(container.textContent).toContain('different camera');
+  it('says why a still of another shape or from another camera is not drawn', () => {
+    saveModel();
+    useCameraStore.setState({ overlayStill: still(400, 400) });
+    render();
+    expect(gl.draws).toHaveLength(0);
+    expect(container.textContent).toContain('a different shape from the 1280 × 720');
+
+    act(() =>
+      useCameraStore.setState({
+        overlayStill: still(),
+        overlayStillCapture: { ...USB, sourceId: 'laptop-lid' },
+      }),
+    );
+    expect(gl.draws).toHaveLength(0);
+    expect(container.textContent).toContain('belongs to a different camera');
+  });
+
+  it('draws the live camera element when there is no still', () => {
+    saveModel();
+    const video = document.createElement('video');
+    Object.defineProperties(video, { videoWidth: { value: 1280 }, videoHeight: { value: 720 } });
+    liveElement.current = video;
+    const stream = {
+      stream: {} as MediaStream,
+      sourceId: 'overhead',
+      resizeMode: 'none' as const,
+      stop: vi.fn(),
+    };
+    useCameraStore.setState({ sourceState: { kind: 'live', source: { kind: 'usb', stream } } });
+    render();
+    expect(gl.draws.at(-1)?.source).toBe(video);
+    expect(gl.draws.at(-1)?.uniforms.uFrameSize).toEqual([1280, 720]);
+  });
+
+  it('explains when the browser cannot draw the corrected picture', () => {
+    gl.available = false;
+    saveModel();
+    useCameraStore.setState({ overlayStill: still() });
+    render();
+    expect(container.textContent).toContain('WebGL2');
   });
 });

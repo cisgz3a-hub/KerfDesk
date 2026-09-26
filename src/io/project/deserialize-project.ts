@@ -1,7 +1,7 @@
 // deserializeProject - parses a .lf2 string and returns a typed Project, or a
 // structured error describing why it cannot be loaded.
 
-import { normalizeCameraAlignment, normalizeCameraCalibration } from '../../core/camera';
+import { normalizeCameraModelRecord } from '../../core/camera/model/camera-model-record';
 import { isChiploadMaterialKey } from '../../core/cnc';
 import {
   DEFAULT_DEVICE_PROFILE,
@@ -250,8 +250,11 @@ function normalizeDevice(dev: Record<string, unknown>): Record<string, unknown> 
     rxBufferBytes: normalizeGrblRxBufferBytes(dev['rxBufferBytes']),
     gcodeDialect: normalizeGcodeDialectSelection(dev['gcodeDialect']),
   });
+  // The old lens calibration and bed alignment were never trustworthy
+  // (ADR-440): leave them behind so a reload cannot bring them back.
+  const { cameraCalibration: _oldLens, cameraAlignment: _oldAlignment, ...current } = dev;
   const normalized = {
-    ...dev,
+    ...current,
     ...optionalDeviceFlags(dev),
     accelMmPerSec2: numberOrDefault(dev['accelMmPerSec2'], DEFAULT_DEVICE_PROFILE.accelMmPerSec2),
     junctionDeviationMm: numberOrDefault(
@@ -283,10 +286,9 @@ function normalizeDevice(dev: Record<string, unknown>): Record<string, unknown> 
       dev['controlledLaserOffTravelFeedMmPerMin'] <= dev['maxFeed']
         ? dev['controlledLaserOffTravelFeedMmPerMin']
         : undefined,
-    // Override (not merge) the raw value so a malformed persisted calibration is
+    // Override (not merge) the raw value so a malformed persisted camera model is
     // dropped to undefined rather than trusted; JSON.stringify omits the undefined.
-    cameraCalibration: normalizeCameraCalibration(dev['cameraCalibration']),
-    cameraAlignment: normalizeCameraAlignment(dev['cameraAlignment']),
+    cameraModel: normalizeCameraModelRecord(dev['cameraModel']),
     fireControl: normalizeLaserFireControl(dev['fireControl']),
     noGoZones: Array.isArray(dev['noGoZones']) ? dev['noGoZones'] : [],
     ...(dev['cameraProfile'] !== undefined

@@ -1,6 +1,6 @@
 // camera-store — ephemeral Zustand store for Camera Mode (ADR-107/116): the
-// active camera source (USB stream or bridge-proxied machine camera) plus the
-// 4-point manual alignment flow. Not project data and not undoable, so it
+// active camera source (USB stream or bridge-proxied machine camera) and the
+// workspace overlay preferences. Not project data and not undoable, so it
 // lives outside the project store (like ui-store).
 //
 // I/O actions take the platform adapters as arguments (the same dependency-
@@ -8,14 +8,8 @@
 // testable with fakes and never imports platform/web directly.
 
 import { create } from 'zustand';
-import {
-  addAlignmentPoint,
-  beginAlignment,
-  type AlignmentState,
-  type RgbaImage,
-} from '../../core/camera';
+import type { RgbaImage } from '../../core/camera/rgba-image';
 import type { CameraCaptureBinding } from '../../core/camera/camera-capture-binding';
-import type { Vec2 } from '../../core/scene';
 import type { CameraAdapter, CameraDevice } from '../../platform/types';
 import {
   createCameraSourceActions,
@@ -46,22 +40,21 @@ export type CameraStore = CameraSourceActions & {
   readonly usbAvailability: UsbCameraAvailability;
   // Store-owned listener cleanup/release for the exact active USB stream.
   readonly usbSourceRelease: (() => void) | null;
-  readonly alignment: AlignmentState;
   // Bumped on every stop/restart so an in-flight start that resolves late can
   // tell it has been superseded and release its now-orphaned stream.
   readonly sourceEpoch: number;
   // The machine-integrated camera found by the bridge's server-side probe.
   readonly machineCamera: MachineCameraState;
 
-  // Workspace overlay preferences (ephemeral; the alignment itself persists
-  // on the device profile). `overlayStill` is a captured frame shown instead
+  // Workspace overlay preferences (ephemeral; the camera model itself
+  // persists on the device profile). `overlayStill` is a captured frame shown instead
   // of the live video — LightBurn's "Update Overlay" model.
   readonly overlayVisible: boolean;
   readonly overlayOpacityPercent: number;
   readonly overlayStill: RgbaImage | null;
   readonly overlayStillCapture: CameraCaptureBinding | null;
   // Top surface currently being viewed/placed on, measured above machine bed.
-  // Kept separate from the alignment plane so perspective can be compensated.
+  // The camera model corrects the picture to this height (ADR-440).
   readonly surfaceHeightMm: number;
   // Latches once the aligned overlay is used for physical placement. Hiding
   // the image does not silently discard the safety contract; the operator
@@ -87,9 +80,6 @@ export type CameraStore = CameraSourceActions & {
   readonly detectSupport: (camera: CameraAdapter | undefined) => void;
   readonly refreshCameras: (camera: CameraAdapter | undefined) => Promise<void>;
   readonly selectCamera: (deviceId: string) => void;
-  readonly beginAlignment: (targets: ReadonlyArray<Vec2>) => void;
-  readonly addAlignmentPoint: (pixel: Vec2) => void;
-  readonly resetAlignment: () => void;
 };
 
 // Reselection policy on a device-list refresh: keep a still-valid deliberate
@@ -118,7 +108,6 @@ export const useCameraStore = create<CameraStore>((set, get) => ({
   sourceState: { kind: 'idle' },
   usbAvailability: { kind: 'available' },
   usbSourceRelease: null,
-  alignment: { kind: 'idle' },
   sourceEpoch: 0,
   machineCamera: { kind: 'idle' },
 
@@ -157,13 +146,6 @@ export const useCameraStore = create<CameraStore>((set, get) => ({
     savePreferredCameraId(deviceId);
     set({ selectedDeviceId: deviceId });
   },
-
-  beginAlignment: (targets) => set({ alignment: beginAlignment(targets) }),
-
-  addAlignmentPoint: (pixel) =>
-    set((state) => ({ alignment: addAlignmentPoint(state.alignment, pixel) })),
-
-  resetAlignment: () => set({ alignment: { kind: 'idle' } }),
 }));
 
 function clampFinite(value: number, min: number, max: number): number {
