@@ -122,7 +122,9 @@ function DialogBody(props: DialogBodyProps): JSX.Element {
   // otherwise be ref-unstable too.
   const presetOptions = TRACE_PRESETS[choices.preset] ?? DEFAULT_TRACE_OPTIONS;
   const options = useDialogTraceOptions(presetOptions, choices.traceSettings, seed);
-  const effectiveTraceOutput: TraceOutput = machineKind === 'cnc' ? 'vector' : choices.traceOutput;
+  // Line + fill is vector-only (ADR-454): a raster scan would outline its fills.
+  const vectorOnly = machineKind === 'cnc' || options.traceMode === 'hybrid';
+  const effectiveTraceOutput: TraceOutput = vectorOnly ? 'vector' : choices.traceOutput;
   const preview = useSelectedTracePreview(file, options, boundarySelection, seed, previewControl);
 
   const onSubmit = (): void =>
@@ -165,7 +167,8 @@ function DialogBody(props: DialogBodyProps): JSX.Element {
       output={{
         photoShading: options.photoDetail !== undefined,
         machineKind,
-        traceOutput: choices.traceOutput,
+        traceOutput: effectiveTraceOutput,
+        rasterUnavailable: options.traceMode === 'hybrid',
         onTraceOutputChange: choices.setTraceOutput,
         supportsFillStyle: isFilledContourTraceOptions(options),
         traceFillStyle: choices.traceFillStyle,

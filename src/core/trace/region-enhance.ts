@@ -24,7 +24,7 @@
 // injected by the caller (the UI passes its worker-backed tracer; tests pass
 // a direct core tracer).
 
-import type { ColoredPath, Polyline } from '../scene';
+import type { ColoredPath, CurveSubpath, Polyline } from '../scene';
 import { downscaleTracedPaths, upscaleBy } from './auto-upscale';
 import { cropRawImageData, normalizeTraceBoundary, offsetColoredPaths } from './trace-boundary';
 import type { TraceBoundary } from './trace-boundary';
@@ -107,34 +107,62 @@ function optionsForRegionScale(options: TraceOptions, factor: number): TraceOpti
 
 /** Merge: drop existing polylines fully inside `interior`, then add the
  *  replacement polylines, folding them into the first existing path of the
- *  same colour (no duplicate colour layers). Exported for tests. */
+ *  same kind (no duplicate layers). A kind is the colour plus a stroke's pen
+ *  width and pen transform, so Line + fill's per-width stroke groups
+ *  (ADR-454) keep their widths; fitted curves travel with their polylines
+ *  when every merged path has them. Exported for tests. */
 export function replacePathsInRegion(
   existing: ReadonlyArray<ColoredPath>,
   interior: TraceBoundary,
   replacement: ReadonlyArray<ColoredPath>,
 ): ColoredPath[] {
   const out: ColoredPath[] = [];
-  const mergedColors = new Set<string>();
+  const merged = new Set<string>();
   for (const path of existing) {
-    const survivors = path.polylines.filter((pl) => !polylineFullyInside(pl, interior));
-    const additions = mergedColors.has(path.color)
-      ? []
-      : replacementPolylines(replacement, path.color);
-    mergedColors.add(path.color);
-    const polylines = [...survivors, ...additions];
-    if (polylines.length > 0) out.push({ color: path.color, polylines });
+    const key = mergeKey(path);
+    const survivors = piecesOf(path).filter((pc) => !polylineFullyInside(pc.polyline, interior));
+    const additions = merged.has(key) ? [] : replacementPieces(replacement, key);
+    merged.add(key);
+    pushMerged(out, path, [...survivors, ...additions]);
   }
   for (const path of replacement) {
-    if (mergedColors.has(path.color)) continue;
-    mergedColors.add(path.color);
-    const polylines = replacementPolylines(replacement, path.color);
-    if (polylines.length > 0) out.push({ color: path.color, polylines });
+    const key = mergeKey(path);
+    if (merged.has(key)) continue;
+    merged.add(key);
+    pushMerged(out, path, replacementPieces(replacement, key));
   }
   return out;
 }
 
-function replacementPolylines(replacement: ReadonlyArray<ColoredPath>, color: string): Polyline[] {
-  return replacement.filter((path) => path.color === color).flatMap((path) => [...path.polylines]);
+type Piece = { readonly polyline: Polyline; readonly curve: CurveSubpath | undefined };
+
+function mergeKey(path: ColoredPath): string {
+  const t = path.strokeTransform;
+  const pen = t === undefined ? '' : `${t.a},${t.b},${t.c},${t.d}`;
+  return `${path.color}|${path.strokeWidthMm ?? ''}|${pen}`;
+}
+
+function piecesOf(path: ColoredPath): Piece[] {
+  const curves = path.curves?.length === path.polylines.length ? path.curves : undefined;
+  return path.polylines.map((polyline, i) => ({ polyline, curve: curves?.[i] }));
+}
+
+function replacementPieces(replacement: ReadonlyArray<ColoredPath>, key: string): Piece[] {
+  return replacement.filter((path) => mergeKey(path) === key).flatMap(piecesOf);
+}
+
+function pushMerged(out: ColoredPath[], template: ColoredPath, pieces: Piece[]): void {
+  if (pieces.length === 0) return;
+  const curves = pieces.map((pc) => pc.curve);
+  out.push({
+    color: template.color,
+    polylines: pieces.map((pc) => pc.polyline),
+    ...(curves.every((c): c is CurveSubpath => c !== undefined) ? { curves } : {}),
+    ...(template.strokeWidthMm === undefined ? {} : { strokeWidthMm: template.strokeWidthMm }),
+    ...(template.strokeTransform === undefined
+      ? {}
+      : { strokeTransform: template.strokeTransform }),
+  });
 }
 
 function shrinkRegion(region: TraceBoundary, marginPx: number): TraceBoundary {

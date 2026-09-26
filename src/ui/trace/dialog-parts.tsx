@@ -122,6 +122,8 @@ export function TraceOutputFields(props: {
   readonly photoShading?: boolean;
   readonly machineKind: 'laser' | 'cnc';
   readonly traceOutput: TraceOutput;
+  /** Line + fill: Raster scan would outline its fills (ADR-454). */
+  readonly rasterUnavailable?: boolean;
   readonly onTraceOutputChange: (output: TraceOutput) => void;
   readonly supportsFillStyle: boolean;
   readonly traceFillStyle: TraceFillStyle;
@@ -138,6 +140,7 @@ export function TraceOutputFields(props: {
           value={props.traceOutput}
           onChange={props.onTraceOutputChange}
           photoShading={props.photoShading === true}
+          rasterUnavailable={props.rasterUnavailable === true}
         />
       )}
       {showFillStyle ? (
@@ -158,9 +161,13 @@ export function TraceOutputFields(props: {
 
 export function TraceOutputPicker(props: {
   readonly photoShading?: boolean;
+  readonly rasterUnavailable?: boolean;
   readonly value: TraceOutput;
   readonly onChange: (next: TraceOutput) => void;
 }): JSX.Element {
+  const hint = props.rasterUnavailable
+    ? 'Line + fill makes editable vectors: a line operation for the strokes and a fill operation for the solid shapes.'
+    : traceOutputHint(props.photoShading === true, props.value);
   return (
     <div className="lf-trace-output-field">
       <label>
@@ -173,20 +180,25 @@ export function TraceOutputPicker(props: {
           onChange={(e) => props.onChange(e.target.value === 'raster' ? 'raster' : 'vector')}
         >
           <option value="vector">Editable vectors</option>
-          <option value="raster">Raster scan</option>
+          <option value="raster" disabled={props.rasterUnavailable === true}>
+            Raster scan
+          </option>
         </select>
       </label>
-      <p className="lf-trace-hint">
-        {props.photoShading
-          ? props.value === 'vector'
-            ? 'Editable filled lines reproduce the photo’s shades. Use a fill operation to keep the shading.'
-            : 'Engraves the shaded line pattern with image scan motion.'
-          : props.value === 'vector'
-            ? 'Editable paths for line or fill operations.'
-            : 'Black-and-white traced artwork engraved with image scan motion. Original grayscale shading is not retained.'}
-      </p>
+      <p className="lf-trace-hint">{hint}</p>
     </div>
   );
+}
+
+function traceOutputHint(photoShading: boolean, value: TraceOutput): string {
+  if (photoShading) {
+    return value === 'vector'
+      ? 'Editable filled lines reproduce the photo’s shades. Use a fill operation to keep the shading.'
+      : 'Engraves the shaded line pattern with image scan motion.';
+  }
+  return value === 'vector'
+    ? 'Editable paths for line or fill operations.'
+    : 'Black-and-white traced artwork engraved with image scan motion. Original grayscale shading is not retained.';
 }
 
 export function TraceFillStylePicker(props: {
