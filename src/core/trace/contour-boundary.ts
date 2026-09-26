@@ -42,11 +42,10 @@ export function traceBoundaryLoops(
 ): BoundaryLoop[] {
   const edges = collectBoundaryEdges(mask);
   const loops: BoundaryLoop[] = [];
-  for (const [start, dirs] of edges) {
-    while (dirs.size > 0) {
-      const firstDir = dirs.values().next().value;
-      if (firstDir === undefined) break;
-      loops.push(walkLoop(mask, edges, start, firstDir, saddles));
+  for (const start of edges.order) {
+    while (edges.bits[start] !== 0) {
+      const firstDir = firstInsertedDirection(edges.bits[start] as number);
+      loops.push(walkLoop(mask, edges.bits, start, firstDir, saddles));
     }
   }
   return loops;
@@ -153,17 +152,35 @@ function crackCrossing(
   return Math.min(SUBPIXEL_T_MAX, Math.max(SUBPIXEL_T_MIN, t));
 }
 
-type EdgeMap = Map<number, Set<number>>;
+// The out-edges of every lattice vertex as 4 direction bits (bit d = travel
+// direction d), plus the vertices in the order their first edge was found.
+// This replaces a Map<vertex, Set<direction>> and reproduces its iteration
+// exactly (ADR-438 amendment, speed wave 2): loops start at vertices in
+// first-insertion order, each with its earliest-inserted remaining direction.
+type EdgeLattice = {
+  readonly bits: Uint8Array;
+  readonly order: ReadonlyArray<number>;
+};
 
-function collectBoundaryEdges(mask: InkMask): EdgeMap {
+// Raster order adds a vertex's edges from pixel (x-1,y-1) [W], (x,y-1) [N],
+// (x-1,y) [S], then (x,y) [E]; that is the per-vertex insertion order.
+function firstInsertedDirection(bits: number): number {
+  if ((bits & 4) !== 0) return 2;
+  if ((bits & 8) !== 0) return 3;
+  if ((bits & 2) !== 0) return 1;
+  return 0;
+}
+
+function collectBoundaryEdges(mask: InkMask): EdgeLattice {
   const { width, height } = mask;
-  const edges: EdgeMap = new Map();
   const stride = width + 1;
+  const bits = new Uint8Array(stride * (height + 1));
+  const order: number[] = [];
   const add = (x: number, y: number, dir: number): void => {
     const key = y * stride + x;
-    const set = edges.get(key);
-    if (set === undefined) edges.set(key, new Set([dir]));
-    else set.add(dir);
+    const current = bits[key] as number;
+    if (current === 0) order.push(key);
+    bits[key] = current | (1 << dir);
   };
   for (let y = 0; y < height; y += 1) {
     for (let x = 0; x < width; x += 1) {
@@ -175,12 +192,12 @@ function collectBoundaryEdges(mask: InkMask): EdgeMap {
       if (inkAt(mask, x - 1, y) === 0) add(x, y + 1, 3); // left side, travel N
     }
   }
-  return edges;
+  return { bits, order };
 }
 
 function walkLoop(
   mask: InkMask,
-  edges: EdgeMap,
+  bits: Uint8Array,
   startKey: number,
   startDir: number,
   saddles: SaddleResolver,
@@ -191,7 +208,7 @@ function walkLoop(
   let key = startKey;
   let dir = startDir;
   do {
-    consumeEdge(edges, key, dir);
+    bits[key] = (bits[key] as number) & ~(1 << dir); // consume the edge
     const x = key % stride;
     const y = (key - x) / stride;
     const nx = x + (DIR_X[dir] as number);
@@ -200,7 +217,7 @@ function walkLoop(
     // Shoelace accumulates over the directed edge (x,y)→(nx,ny).
     area += x * ny - nx * y;
     key = ny * stride + nx;
-    dir = nextDirection(edges, key, dir, saddles, stride);
+    dir = nextDirection(bits, key, dir, saddles, stride);
   } while (!(key === startKey && dir === startDir) && dir !== -1);
   return { points, area: area / 2 };
 }
@@ -214,31 +231,26 @@ function walkLoop(
 // the loops touch at the corner point but never cross, and the mid-crack
 // chains stay ~0.71px apart there.
 function nextDirection(
-  edges: EdgeMap,
+  bits: Uint8Array,
   key: number,
   incomingDir: number,
   saddles: SaddleResolver,
   stride: number,
 ): number {
-  const set = edges.get(key);
-  if (set === undefined || set.size === 0) return -1;
+  const out = bits[key] ?? 0;
+  if (out === 0) return -1;
   const right = (incomingDir + 1) % 4;
   const left = (incomingDir + 3) % 4;
-  if (set.has(right) && set.has(left)) {
+  const hasRight = (out & (1 << right)) !== 0;
+  const hasLeft = (out & (1 << left)) !== 0;
+  if (hasRight && hasLeft) {
     const x = key % stride;
     return saddles(x, (key - x) / stride) ? left : right;
   }
-  if (set.has(right)) return right;
-  if (set.has(incomingDir)) return incomingDir;
-  if (set.has(left)) return left;
+  if (hasRight) return right;
+  if ((out & (1 << incomingDir)) !== 0) return incomingDir;
+  if (hasLeft) return left;
   return -1;
-}
-
-function consumeEdge(edges: EdgeMap, key: number, dir: number): void {
-  const set = edges.get(key);
-  if (set === undefined) return;
-  set.delete(dir);
-  if (set.size === 0) edges.delete(key);
 }
 
 function inkAt(mask: InkMask, x: number, y: number): number {
