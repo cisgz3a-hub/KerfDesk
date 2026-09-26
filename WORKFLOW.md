@@ -720,7 +720,10 @@ marks later edits as unapproved without changing the existing Frame/Start policy
    **Choose Images...** then picks the files. Each image is saved as `<name>-trace.<format>` on the
    traced image's page, lower-left corner as the origin (ADR-455). **Page → Fit to artwork**
    instead trims the page to the exact traced curves plus a **Margin (mm)**; the millimetre scale
-   is unchanged and the DXF and GeoJSON origin moves to the fitted page's corner (ADR-451).
+   is unchanged and the DXF and GeoJSON origin moves to the fitted page's corner (ADR-451). A
+   fitted side under 3 pt (the smallest PDF page) grows to 3 pt, centred, in every format. A
+   Margin field that is blank means no margin; a negative value or one over 1000 mm is marked
+   invalid and **Choose Images...** waits until it is corrected.
 3. An image whose trace has nothing visible writes no file; the rest of the batch is still saved
    and the completion message names the skipped images.
 
