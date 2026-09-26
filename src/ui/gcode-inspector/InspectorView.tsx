@@ -190,6 +190,7 @@ function Readouts(props: {
       theme={s.theme}
       playhead={s.playhead}
       time={s.time}
+      timedFor={s.timedFor}
       findings={s.findings}
       lens={s.lens}
       onLensChange={s.setLens}

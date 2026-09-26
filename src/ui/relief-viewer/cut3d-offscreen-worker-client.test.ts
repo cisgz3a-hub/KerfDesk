@@ -250,4 +250,87 @@ describe('Cut 3D offscreen worker client', () => {
     expect(firstCanvas).not.toBe(secondCanvas);
     expect(workers).toHaveLength(0);
   });
+
+  it('swaps a recomputed surface into the live canvas instead of remounting (ADR-425)', async () => {
+    const worker = new FakeWorker();
+    const createWorker = vi.fn(() => worker);
+    const microtasks: Array<() => void> = [];
+    const deps = {
+      canCreateWorker: () => true,
+      createWorker,
+      scheduleMicrotask: (callback: () => void) => microtasks.push(callback),
+    };
+    const transfer = vi.fn(() => offscreen());
+    const canvas = transferableCanvas(transfer);
+    const firstAbort = new AbortController();
+    const first = createCut3DOffscreenCoordinator(MESH, 6, deps).buildScene(
+      canvas,
+      firstAbort.signal,
+      vi.fn(),
+    );
+    emitReady(worker);
+    expect((await first).kind).toBe('ok');
+
+    // React releases the old scene and builds the new one in the same commit.
+    const next = { ...MESH, positions: new Float32Array(MESH.positions) };
+    firstAbort.abort();
+    const second = createCut3DOffscreenCoordinator(next, 6, deps).buildScene(
+      canvas,
+      new AbortController().signal,
+      vi.fn(),
+    );
+    drain(microtasks);
+    expect((await second).kind).toBe('ok');
+
+    expect(transfer).toHaveBeenCalledOnce();
+    expect(createWorker).toHaveBeenCalledOnce();
+    expect(worker.terminate).not.toHaveBeenCalled();
+    const surface = requestOfKind(worker, 'surface');
+    expect(surface).toMatchObject({ sessionId: 1, surfaceId: 1, mesh: next, stockThicknessMm: 6 });
+    expect(worker.transfers.at(-1)).toEqual([
+      next.positions.buffer,
+      next.indices.buffer,
+      next.normals.buffer,
+    ]);
+
+    worker.emit({ kind: 'presented', sessionId: 1, revision: 3, source: 'surface', inputId: 1 });
+    expect(canvas.dataset.surfaceRevision).toBe('1');
+    expect(canvas.dataset.sceneState).toBe('ready');
+  });
+
+  it('re-sends only the thickness when the same, already transferred mesh is re-shown', async () => {
+    const worker = new FakeWorker();
+    const deps = dependencies(worker);
+    const canvas = transferableCanvas(() => offscreen());
+    const first = createCut3DOffscreenCoordinator(MESH, 6, deps).buildScene(
+      canvas,
+      new AbortController().signal,
+      vi.fn(),
+    );
+    emitReady(worker);
+    await first;
+    void createCut3DOffscreenCoordinator(MESH, 12, deps).buildScene(
+      canvas,
+      new AbortController().signal,
+      vi.fn(),
+    );
+    expect(requestOfKind(worker, 'surface')).toMatchObject({ mesh: null, stockThicknessMm: 12 });
+    expect(worker.transfers.at(-1)).toEqual([]);
+  });
+
+  it('fails unavailable on a surface acknowledgement it never requested', async () => {
+    const worker = new FakeWorker();
+    const reportFailure = vi.fn();
+    const ready = createCut3DOffscreenCoordinator(MESH, 6, dependencies(worker)).buildScene(
+      transferableCanvas(() => offscreen()),
+      new AbortController().signal,
+      reportFailure,
+    );
+    emitReady(worker);
+    await ready;
+    worker.emit({ kind: 'presented', sessionId: 1, revision: 2, source: 'surface', inputId: 1 });
+    expect(reportFailure).toHaveBeenCalledWith(
+      'The background 3D renderer returned an unreadable response.',
+    );
+  });
 });

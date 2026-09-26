@@ -46,18 +46,24 @@ function slug(value: string): string {
  * @param width Current viewport width in CSS pixels.
  * @param height Current viewport height in CSS pixels.
  * @param scale Requested multiplier.
+ * @param maxSidePx Longest side the drawing buffer may take, in CSS pixels
+ *   (the GPU limit divided by the device pixel ratio). A high-DPI screen at 4x
+ *   otherwise asks for a buffer the GPU refuses and the file comes back blank.
  * @returns Integer pixel dimensions, clamped to a size a GPU will allocate.
  */
 export function screenshotSize(
   width: number,
   height: number,
   scale: number,
+  maxSidePx = Number.POSITIVE_INFINITY,
 ): { readonly width: number; readonly height: number } {
   const clamped = Math.min(MAX_SCREENSHOT_SCALE, Math.max(1, scale));
+  const longest = Math.max(width, height) * clamped;
+  const fit = longest > maxSidePx ? maxSidePx / longest : 1;
   // A zero-sized framebuffer throws in WebGL and a fractional one is silently
   // floored by the driver, so round up — a 1px pane still produces a file.
-  return {
-    width: Math.max(1, Math.ceil(width * clamped)),
-    height: Math.max(1, Math.ceil(height * clamped)),
-  };
+  // Floor when fitting, so rounding never pushes past the limit.
+  const size = (value: number): number =>
+    Math.max(1, fit < 1 ? Math.floor(value * clamped * fit) : Math.ceil(value * clamped));
+  return { width: size(width), height: size(height) };
 }
