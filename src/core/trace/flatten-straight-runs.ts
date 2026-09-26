@@ -50,7 +50,9 @@ const OUTLIER_FRACTION = 0.05;
 // the same amplitude as edge noise, so aggressiveness is a CALLER choice
 // (the trace dialog's Smoothness knob), not a constant.
 const BASE_MAX_DEVIATION_PX = 1.0;
-// Below this the flattener is effectively off; skip the scan.
+// Below this the flattener is effectively off; skip the scan. Source pixels,
+// compared against the UNSCALED budget (ADR-457): against the scaled one, a
+// strength in [0.1, 0.2) was off at 1x and on at 1.5x/2x.
 const MIN_ACTIVE_DEVIATION_PX = 0.2;
 // The line model may lose to the quadratic-arc model by this factor and
 // still count as straight: an unbiased-noise run fits the quadratic slightly
@@ -100,8 +102,11 @@ export function flattenStraightRuns(
   // match the 1x tuning (an unscaled 1px cap at 2x is 0.5px real — boundary
   // nicks the flattener used to erase survive, the H-crossbar defect).
   const scale = Number.isFinite(pixelScale) && pixelScale >= 1 ? pixelScale : 1;
-  const maxDeviationPx = BASE_MAX_DEVIATION_PX * Math.max(0, strength) * scale;
-  if (points.length < 4 || maxDeviationPx < MIN_ACTIVE_DEVIATION_PX) return [...points];
+  // The activity gate reads the source-pixel budget, so the same strength is
+  // on or off at every scale (and bit-for-bit the old test at 1x).
+  const sourceDeviationPx = BASE_MAX_DEVIATION_PX * Math.max(0, strength);
+  if (points.length < 4 || sourceDeviationPx < MIN_ACTIVE_DEVIATION_PX) return [...points];
+  const maxDeviationPx = sourceDeviationPx * scale;
   const ring = closed ? rotateToFarthest(points) : [...points];
   // OPEN chain endpoints are pinned like corners (they are real geometry).
   // A closed ring's seam anchor is NOT: it is an arbitrary bookkeeping

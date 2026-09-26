@@ -26,9 +26,9 @@ function wobblyBend(turnDeg: number, step: number, wobble: number, phase: number
 
 // Trace the source-pixel artwork on a working grid `scale` times finer and
 // map the result back to source pixels.
-function flattenAtScale(source: ReadonlyArray<Vec2>, scale: number): Vec2[] {
+function flattenAtScale(source: ReadonlyArray<Vec2>, scale: number, strength = 1): Vec2[] {
   const grid = source.map((p) => ({ x: p.x * scale, y: p.y * scale }));
-  return flattenStraightRuns(grid, false, new Set(), 1, scale).map((p) => ({
+  return flattenStraightRuns(grid, false, new Set(), strength, scale).map((p) => ({
     x: p.x / scale,
     y: p.y / scale,
   }));
@@ -62,6 +62,27 @@ describe('flattenStraightRuns joint snap scale invariance (ADR-457)', () => {
         out.forEach((p, i) => {
           const r = (reference as Vec2[])[i] as Vec2;
           expect(Math.hypot(p.x - r.x, p.y - r.y)).toBeLessThanOrEqual(0.05);
+        });
+      }
+    },
+  );
+});
+
+describe('flattenStraightRuns activity gate scale invariance (ADR-457)', () => {
+  // Smoothness ~0.86 gives strength 0.15: a 0.15 source-px budget, under the
+  // 0.2 px activity floor. The flattener must stay off on every grid; gating
+  // the SCALED budget turned it on at 1.5x/2x (0.225 and 0.3 grid px).
+  it.each([0.1, 0.15, 0.19])(
+    'leaves the chain untouched at strength %s on every grid',
+    (strength) => {
+      const source: Vec2[] = [];
+      for (let k = 0; k <= 40; k += 1) source.push({ x: k, y: 0.08 * Math.sin(k * 2.3) });
+      for (const scale of SCALES) {
+        const out = flattenAtScale(source, scale, strength);
+        expect(out.length).toBe(source.length);
+        out.forEach((p, i) => {
+          const r = source[i] as Vec2;
+          expect(Math.hypot(p.x - r.x, p.y - r.y)).toBeLessThan(1e-9);
         });
       }
     },
