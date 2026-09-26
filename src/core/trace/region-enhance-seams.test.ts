@@ -125,7 +125,7 @@ describe('Region Enhance binarises the crop like the full pass (ADR-435)', () =>
       const options = preset(name);
       // The crop's own histogram would cut far below the page's.
       expect(otsuThreshold(cropOf(image, region))).toBeLessThan(otsuThreshold(image) - 50);
-      // The page is unevenly lit, so the automatic cut levels it (ADR-394):
+      // The page is unevenly lit, so the automatic cut levels it (ADR-402):
       // no single global cut exists to freeze, and each pass levels its grid.
       expect(otsuBinarization(image).flattened).toBe(true);
       const { call } = await enhanceCapturing(image, options, region);

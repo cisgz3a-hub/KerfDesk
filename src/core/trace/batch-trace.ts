@@ -15,7 +15,7 @@ export type BatchTracePhysicalSize = {
 };
 
 // A decoded image, or a loader called on the job's turn so a batch of large
-// images holds one decoded image at a time (ADR-401).
+// images holds one decoded image at a time (ADR-409).
 export type BatchTraceImageSource = RawImageData | (() => Promise<RawImageData>);
 
 export type BatchTraceImageJob = {
@@ -24,7 +24,7 @@ export type BatchTraceImageJob = {
   readonly physicalSizeMm?: BatchTracePhysicalSize;
   readonly options?: TraceOptions;
   // A cheaper attempt, tried when this job's decode or trace fails and the
-  // caller's canFallBack accepts the error (ADR-401).
+  // caller's canFallBack accepts the error (ADR-409).
   readonly fallback?: BatchTraceAttempt;
 };
 

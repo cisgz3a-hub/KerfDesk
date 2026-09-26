@@ -191,7 +191,7 @@ export function prepareTraceForContour(
   }
   const prepared = applyMedian(adjusted, options.medianFilter);
   const median = { adjusted, cleaned: prepared };
-  // The automatic cut levels detectably uneven lighting first (ADR-394); the
+  // The automatic cut levels detectably uneven lighting first (ADR-402); the
   // crack field then interpolates the same luma that was cut. Uniform pages,
   // explicit Cutoff/Threshold values, and a region carrying the whole
   // source's frozen cut (ADR-435) get `prepared` itself back.
@@ -220,7 +220,7 @@ export function prepareTraceForContour(
 // Mask cleanup is the shared tail of every preprocessing branch: despeckle
 // (ink specks → white), then pinhole-crack fill (enclosed hairline white
 // slivers → ink). Extracting it keeps preprocessForTrace under the
-// complexity cap. Both share the walker's saddle decision (ADR-395).
+// complexity cap. Both share the walker's saddle decision (ADR-403).
 function cleanBinaryMask(
   image: RawImageData,
   options: TraceOptions,
@@ -329,7 +329,7 @@ function sketchCrackField(adjusted: RawImageData, radiusPx = SKETCH_RADIUS_PX): 
 // neutral value (0 / 0 / 1 / false) and returns the input ref-equal,
 // so chaining is cheap when the user hasn't touched a slider.
 // traceImageToColoredPaths runs this same chain once, before its scale
-// policy, when Invert is on (ADR-396), so both entry points keep this order.
+// policy, when Invert is on (ADR-404), so both entry points keep this order.
 export function applyImageAdjustments(image: RawImageData, options: TraceOptions): RawImageData {
   let out = image;
   // Non-finite brightness/contrast normalize to their neutral 0 (a NaN/Infinity

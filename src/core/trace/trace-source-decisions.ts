@@ -70,7 +70,7 @@ function freezeMedianDecisions(image: RawImageData, options: TraceOptions): Trac
   };
 }
 
-// A page whose uneven lighting the automatic cut flattens (ADR-394) has no
+// A page whose uneven lighting the automatic cut flattens (ADR-402) has no
 // single global cut to freeze: each pass levels its own grid instead.
 function frozenOtsuCut(prepared: RawImageData): Pick<TraceOptions, 'sourceOtsuThreshold'> {
   if (otsuBinarization(prepared).flattened) return {};
@@ -98,7 +98,7 @@ function runsAutoMedian(image: RawImageData, options: TraceOptions): boolean {
 }
 
 // traceImageToColoredPaths applies Invert before any policy reads the source
-// (ADR-396): Edge gets the plain inversion, the luma lanes the whole tone
+// (ADR-404): Edge gets the plain inversion, the luma lanes the whole tone
 // chain. The auto-sketch count must see the image those lanes see.
 function polarisedSource(image: RawImageData, options: TraceOptions): RawImageData {
   if (options.invert !== true) return image;

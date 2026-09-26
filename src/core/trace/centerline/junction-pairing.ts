@@ -56,7 +56,7 @@ export function* pairThroughJunctionsSteps(chains: Chain[], graph: StrokeGraph):
  *  When `pieceGapRatio` > 0, a gap bridges only while both pieces are more
  *  than that many times longer than it: a dropout splits one long stroke
  *  into long pieces, while a dashed or stitched line is short pieces
- *  separated by deliberate gaps (ADR-397). */
+ *  separated by deliberate gaps (ADR-405). */
 export function bridgeNearbyEnds(
   chains: Chain[],
   joinGapPx: number,
@@ -77,7 +77,7 @@ export function* bridgeNearbyEndsSteps(
   // Each round bridges the closest bridgeable pair (ties to the pair first in
   // chain order); the queue re-measures only the chains each merge changes.
   // A merge changes only its two chains' lengths, so the piece-length cache
-  // forgets exactly those (ADR-397's dash guard reads the merged length).
+  // forgets exactly those (ADR-405's dash guard reads the merged length).
   const reach = joinGapPx * Math.max(1, alignedFactor);
   const lengths = new Map<Chain, number>();
   const lengthOf = (chain: Chain): number => {

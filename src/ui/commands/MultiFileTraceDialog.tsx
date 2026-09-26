@@ -170,7 +170,7 @@ export async function pickAndRunMultiFileTrace(
   const { project } = useStore.getState();
   await runMultiFileTrace(files, pushToast, {
     ...(options === undefined ? {} : { options }),
-    // Trace each file on the grid its placed size needs (ADR-401).
+    // Trace each file on the grid its placed size needs (ADR-409).
     targetPxPerMm: traceTargetPxPerMm(project.device, project.machine?.kind),
     output: {
       format: settings.format,

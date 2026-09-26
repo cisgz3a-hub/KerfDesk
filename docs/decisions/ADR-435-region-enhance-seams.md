@@ -53,7 +53,7 @@ on the pale-stroke case it shared no ink with it.
    `core/trace/trace-source-decisions.ts`). It runs `resolveTraceSourceOptions`, then, unless the
    trace is Photo shading or an alpha mask:
    - `sourceAutoSketch`: the auto-sketch verdict on the whole image (as Invert presents it to the
-     lanes, ADR-396), set only while `autoSketchTrace` is on. `shouldUseSketchTrace` reads it before
+     lanes, ADR-404), set only while `autoSketchTrace` is on. `shouldUseSketchTrace` reads it before
      counting pixels. The literal suggestion, `sketchTrace: true` with `autoSketchTrace: false`, was
      rejected: `sketchTrace: true` selects the pure sketch mask, not the automatic detail mask that
      a positive auto verdict uses, so it would change the full trace.
@@ -135,9 +135,9 @@ on the pale-stroke case it shared no ink with it.
   client cases in `trace-worker-source-decisions.test.ts` and `use-trace-worker-client.test.ts`,
   and the UI-thread and reuse cases in `region-enhance-trace.test.ts`.
 
-### Integration with ADR-394 (background flattening)
+### Integration with ADR-402 (background flattening)
 
-ADR-394 levels a detectably uneven page before the automatic cut, so the full trace of the
+ADR-402 levels a detectably uneven page before the automatic cut, so the full trace of the
 lighting ramp above no longer inks the dark paper and there is no single global cut to freeze.
 `resolveFrozenTraceSourceOptions` therefore leaves `sourceOtsuThreshold` unset when the whole
 image would be flattened, and each pass levels its own grid; when the cut is frozen, the

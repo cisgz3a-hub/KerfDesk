@@ -104,7 +104,7 @@ function DialogBody(props: DialogBodyProps): JSX.Element {
   const machineKind = useStore((s) => s.project.machine?.kind ?? 'laser');
   const pushToast = useToastStore((s) => s.pushToast);
   const file = useTraceSourceFile(seed, pushToast);
-  // Re-trace Original opens on the settings recorded with the trace (ADR-400).
+  // Re-trace Original opens on the settings recorded with the trace (ADR-408).
   const choices = useTraceDialogSettings(machineKind, seed, props);
   const boundarySelection = choices.boundarySelection;
   const [busy, setBusy] = useState(false);

@@ -1,4 +1,4 @@
-// ADR-393: the automatic (Line Art) detail mask fills light solids that the
+// ADR-401: the automatic (Line Art) detail mask fills light solids that the
 // local-contrast test alone would hollow, without filling paper or counters,
 // and colour promotion needs spatially coherent colour.
 import { describe, expect, it } from 'vitest';
@@ -38,7 +38,7 @@ async function traceSummary(image: RawImageData) {
   return { contours: paths.flatMap((p) => p.polylines).length, ink };
 }
 
-describe('automatic detail mask fills light solids (ADR-393)', () => {
+describe('automatic detail mask fills light solids (ADR-401)', () => {
   // Luma: red 87, blue 67, black 0 already sit in the 0..128 band; gold 160,
   // orange 158, tan 185 and light blue 205 used to trace as a ~7 px ring.
   it.each([
@@ -123,7 +123,7 @@ describe('automatic detail mask fills light solids (ADR-393)', () => {
   });
 });
 
-describe('automatic colour promotion needs spatially coherent colour (ADR-393)', () => {
+describe('automatic colour promotion needs spatially coherent colour (ADR-401)', () => {
   it('ignores per-pixel chroma noise on grey art', () => {
     for (const grey of [60, 185, 200, 230]) {
       for (const noise of [8, 10, 12, 16]) {

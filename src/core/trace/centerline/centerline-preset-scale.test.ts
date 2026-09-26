@@ -87,7 +87,7 @@ describe('Centerline preset connectivity', () => {
 
     // The 12-pixel diagonal meets the area threshold; the 11-pixel diagonal
     // and lone speck remain noise. Filled contours now judge the diagonal as
-    // their walker traces it — one hairline (ADR-395) — so they agree with
+    // their walker traces it — one hairline (ADR-403) — so they agree with
     // Centerline; the historical four-connected rule is still available.
     const fixedLineArt = { ...TRACE_PRESETS['Line Art']!, despeckleMinPixels: 12 };
     expect(lowerInkPixels(preprocessForTrace(image, CENTERLINE))).toBe(12);
@@ -145,7 +145,7 @@ describe('Centerline join distance in source pixels', () => {
     [1.5, 2],
     [1.6, 1],
   ])('keeps strict threshold behaviour for source gap limit %s', (sourceGap, expectedPaths) => {
-    // Tips are extended to the ink ends before bridging (ADR-397), so the
+    // Tips are extended to the ink ends before bridging (ADR-405), so the
     // join distance is the three blank working columns themselves. On a 2x
     // grid this is a 1.5-source-pixel gap, including the exact boundary.
     const workingImage = brokenStroke(3);

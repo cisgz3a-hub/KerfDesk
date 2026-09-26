@@ -187,7 +187,7 @@ export type ContourFinishOptions = {
   /** Pre-threshold field for sub-pixel crack interpolation; omitted = plain
    *  mid-crack vertices (binary-only callers like the edge lane). */
   readonly crackField?: CrackSubPixelField;
-  /** Saddle policy (ADR-395), matching the one the mask cleanup used.
+  /** Saddle policy (ADR-403), matching the one the mask cleanup used.
    *  Omitted = the historical rule (ink four-connected), as the edge lane. */
   readonly turnPolicy?: TurnPolicy;
 };

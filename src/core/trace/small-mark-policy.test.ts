@@ -202,7 +202,7 @@ describe('automatic small-mark policy (Line Art and Smooth default)', () => {
     const noise = (): number => Math.round((random() * 2 - 1) * 8);
     const image = rgba(g, noise);
     // A red-tinted block keeps Line Art on local-contrast detection: since
-    // ADR-393 only spatially coherent colour promotes, and uncorrelated
+    // ADR-401 only spatially coherent colour promotes, and uncorrelated
     // per-channel noise alone keeps the global cut. Local contrast does flag
     // the faint specks as ink: with no speck cleanup they are all there.
     for (let y = 60; y < 100; y += 1)

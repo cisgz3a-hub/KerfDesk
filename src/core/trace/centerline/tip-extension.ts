@@ -1,6 +1,6 @@
 // Tip extension for assembled centreline chains. The skeleton stops about
 // one stroke radius short of every ink tip; each true open end is walked
-// forward through the ink to the tip (ADR-397 runs this before gap bridging,
+// forward through the ink to the tip (ADR-405 runs this before gap bridging,
 // so bridges measure the drawn gap).
 
 import type { Vec2 } from '../../scene';

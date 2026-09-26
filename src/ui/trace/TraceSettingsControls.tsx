@@ -238,7 +238,7 @@ function TraceAreaControls(props: TraceSettingsControlsProps): JSX.Element {
   );
 }
 
-// Centerline gives the two knobs their corner / tolerance roles (ADR-397).
+// Centerline gives the two knobs their corner / tolerance roles (ADR-405).
 const CENTERLINE_SMOOTHNESS_TITLE =
   'Higher values round more bends into curves; 0 keeps every bend as a corner.';
 const CENTERLINE_OPTIMIZE_TITLE =

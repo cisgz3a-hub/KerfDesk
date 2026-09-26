@@ -101,9 +101,9 @@ sits in a tile with no debris, still passes. That is the residue measured below.
 
 ### Measurements
 
-Bake-off, one timing run each. "Main" is origin/main `fa8939b` (before ADR-395). "First" is the
+Bake-off, one timing run each. "Main" is origin/main `fa8939b` (before ADR-403). "First" is the
 first version of this policy (tone tests plus "any ink within 5 px"). "Final" is this record's
-rule set. Both are on the ADR-395 base, so they include ADR-395's smaller effect (about +0.012 owl
+rule set. Both are on the ADR-403 base, so they include ADR-403's smaller effect (about +0.012 owl
 Line Art IoU). Census cells give two counts: blobs retained at all, then blobs whose traced area is
 within 50% of the source blob (abs50).
 

@@ -36,7 +36,7 @@ export type MultiFileTraceBatch = {
 };
 
 export type MultiFileTraceDeps = {
-  // maxEdge is the planned working grid (ADR-401); omitted, the preview cap.
+  // maxEdge is the planned working grid (ADR-409); omitted, the preview cap.
   readonly loadImage?: (file: MultiFileTraceFile, maxEdge?: number) => Promise<RawImageData>;
   readonly readNaturalSize?: (
     file: MultiFileTraceFile,
@@ -48,7 +48,7 @@ export type MultiFileTraceDeps = {
   readonly write?: (file: BatchTraceFile) => Promise<boolean> | boolean;
   /** Trace settings for every image (default: the Line Art preset). */
   readonly options?: TraceOptions;
-  // The project's machine density; omitted, the default spot's (ADR-401).
+  // The project's machine density; omitted, the default spot's (ADR-409).
   readonly targetPxPerMm?: number;
   readonly deviceMemoryGb?: number;
   /** File format, precision and contour grouping. */
@@ -114,7 +114,7 @@ export async function buildMultiFileTraceExports(
   };
 }
 
-// One batch job on the same working-grid policy as a dialog commit (ADR-401):
+// One batch job on the same working-grid policy as a dialog commit (ADR-409):
 // the placed size is the import size, and the image is decoded on its turn so
 // the batch holds one large decode at a time.
 async function multiFileTraceJob(

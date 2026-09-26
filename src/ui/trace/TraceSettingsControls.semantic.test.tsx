@@ -296,7 +296,7 @@ describe('trace controls describe the options the engine actually receives', () 
   });
 
   it('describes Centerline Smoothness and Optimize the same way in the hint and the tooltip', async () => {
-    // ADR-397: in Centerline they are the corner angle and the fit tolerance.
+    // ADR-405: in Centerline they are the corner angle and the fit tolerance.
     // The visible hint the input is described by must not keep the contour
     // copy while only the hover title changes.
     await withControls('Centerline', async (controls) => {

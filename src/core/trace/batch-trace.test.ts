@@ -341,7 +341,7 @@ describe('traceImagesToVectorFiles', () => {
   });
 });
 
-describe('traceImagesToVectorFiles fallback (ADR-401)', () => {
+describe('traceImagesToVectorFiles fallback (ADR-409)', () => {
   it('traces a job with its fallback when its own attempt fails, and reports it', async () => {
     const onFallback = vi.fn();
     const trace = vi.fn(async (image: RawImageData, _options: TraceOptions) => {
