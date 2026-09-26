@@ -1,42 +1,39 @@
-// Canonical curves → polyline vertices with DXF bulges (ADR-431).
+// Canonical curves → polyline vertices with DXF bulges (ADR-431, ADR-452).
 //
 // DXF LWPOLYLINE vertices carry a bulge: tan(θ/4) of the included angle of a
 // circular arc from that vertex to the next, positive when the arc turns
 // counter-clockwise in the DXF (Y-up) frame, 0 for a straight edge.
 //
 //   * line               → one vertex, bulge 0 (exact)
-//   * circular arc       → one vertex with its exact bulge (no fitting)
-//   * cubic              → flattened by midpoint subdivision until both
-//                          control points lie within `toleranceMm` of the
-//                          chord SEGMENT. The cubic lies in its control
-//                          hull and segment distance is convex, so the
-//                          flattened chord stays within `toleranceMm` of the
-//                          curve in both directions (Hausdorff bound).
-//   * elliptical arc     → flattened by the shared parametric arc flattener,
-//                          whose step keeps rMax·(1 − cos(Δt/2)) ≤ tolerance;
-//                          the ellipse is a contraction of its major circle,
-//                          so that circle's sagitta bounds the deviation.
+//   * circular arc       → its exact bulge (no fitting), split into equal
+//                          parts of at most a half circle each
+//   * cubics and         → each run of consecutive ones is fitted with lines
+//     elliptical arcs      and circular arcs within `toleranceMm` of the true
+//                          curve both ways (bulge-arc-fit.ts, ADR-452)
 //
 // Input coordinates are the app's Y-down frame; bulge signs are already
 // expressed for the Y-up frame the writer produces by mirroring Y.
 //
 // Pure-core compliant: no clock, no random, no I/O, no DOM.
 
-import { flattenCurveSubpath } from '../scene/curve-path';
 import type {
-  CubicPathSegment,
   CurveSubpath,
   EllipticalArcPathSegment,
+  PathSegment,
   Vec2,
 } from '../scene/scene-object';
+import { fittedCurveEdges, splitCircularBulge, type BulgeEdge } from './bulge-arc-fit';
 
 export type BulgeVertex = { readonly x: number; readonly y: number; readonly bulge: number };
 export type BulgeRing = { readonly vertices: ReadonlyArray<BulgeVertex>; readonly closed: boolean };
 
 /** Published default: 0.01 mm, a tenth of a typical 0.1 mm laser spot. */
 export const DEFAULT_DXF_CURVE_TOLERANCE_MM = 0.01;
-const MIN_TOLERANCE_MM = 1e-6;
-const MAX_SUBDIVISION_DEPTH = 24;
+/**
+ * The arc fitter samples its source within 0.001 mm; a tighter request is
+ * raised to it (the fit then falls back to those sample chords).
+ */
+const MIN_TOLERANCE_MM = 0.001;
 const CIRCULAR_RELATIVE_EPSILON = 1e-9;
 
 export function curveToBulgeRing(curve: CurveSubpath, toleranceMm: number): BulgeRing {
@@ -44,25 +41,35 @@ export function curveToBulgeRing(curve: CurveSubpath, toleranceMm: number): Bulg
   const vertices: { x: number; y: number; bulge: number }[] = [
     { x: curve.start.x, y: curve.start.y, bulge: 0 },
   ];
+  const addEdges = (edges: ReadonlyArray<BulgeEdge>): void => {
+    for (const edge of edges) {
+      (vertices[vertices.length - 1] as { bulge: number }).bulge = edge.bulge;
+      vertices.push({ x: edge.to.x, y: edge.to.y, bulge: 0 });
+    }
+  };
   let current = curve.start;
+  let run: PathSegment[] = [];
+  let runStart = current;
+  const flushRun = (): void => {
+    if (run.length > 0) addEdges(fittedCurveEdges(runStart, run, tolerance));
+    run = [];
+  };
   for (const segment of curve.segments) {
-    if (segment.kind === 'line') vertices.push({ ...segment.to, bulge: 0 });
-    else if (segment.kind === 'cubic') {
-      for (const point of flattenCubic(current, segment, tolerance))
-        vertices.push({ ...point, bulge: 0 });
+    const bulge = segment.kind === 'elliptical-arc' ? circularBulge(current, segment) : null;
+    if (segment.kind === 'line' || bulge !== null) {
+      flushRun();
+      addEdges(
+        segment.kind === 'line' || bulge === 0
+          ? [{ to: segment.to, bulge: 0 }]
+          : splitCircularBulge(current, segment.to, bulge as number),
+      );
     } else {
-      const bulge = circularBulge(current, segment);
-      if (bulge !== null) {
-        (vertices[vertices.length - 1] as { bulge: number }).bulge = bulge;
-        vertices.push({ ...segment.to, bulge: 0 });
-      } else {
-        for (const point of flattenEllipticalArc(current, segment, tolerance)) {
-          vertices.push({ ...point, bulge: 0 });
-        }
-      }
+      if (run.length === 0) runStart = current;
+      run.push(segment);
     }
     current = segment.to;
   }
+  flushRun();
   return { vertices, closed: curve.closed };
 }
 
@@ -84,53 +91,6 @@ export function circularBulge(from: Vec2, segment: EllipticalArcPathSegment): nu
   // SVG sweep=1 turns toward +angle in the Y-down frame, which is clockwise
   // once Y is mirrored — a negative DXF bulge.
   return (segment.sweep ? -1 : 1) * Math.tan(included / 4);
-}
-
-function flattenCubic(from: Vec2, segment: CubicPathSegment, tolerance: number): Vec2[] {
-  const out: Vec2[] = [];
-  subdivide(from, segment.control1, segment.control2, segment.to, tolerance, 0, out);
-  return out;
-}
-
-function subdivide(
-  p0: Vec2,
-  p1: Vec2,
-  p2: Vec2,
-  p3: Vec2,
-  tolerance: number,
-  depth: number,
-  out: Vec2[],
-): void {
-  const flat = Math.max(segmentDistance(p1, p0, p3), segmentDistance(p2, p0, p3)) <= tolerance;
-  if (flat || depth >= MAX_SUBDIVISION_DEPTH) {
-    out.push(p3);
-    return;
-  }
-  const p01 = mid(p0, p1);
-  const p12 = mid(p1, p2);
-  const p23 = mid(p2, p3);
-  const p012 = mid(p01, p12);
-  const p123 = mid(p12, p23);
-  const m = mid(p012, p123);
-  subdivide(p0, p01, p012, m, tolerance, depth + 1, out);
-  subdivide(m, p123, p23, p3, tolerance, depth + 1, out);
-}
-
-function flattenEllipticalArc(
-  from: Vec2,
-  segment: EllipticalArcPathSegment,
-  tolerance: number,
-): ReadonlyArray<Vec2> {
-  const result = flattenCurveSubpath(
-    { start: from, segments: [segment], closed: false },
-    { toleranceMm: tolerance },
-  );
-  if (result.kind !== 'ok') throw new Error('An elliptical arc needs too many DXF vertices.');
-  return result.polyline.points.slice(1);
-}
-
-function mid(a: Vec2, b: Vec2): Vec2 {
-  return { x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 };
 }
 
 /** Distance from `p` to the closed segment a–b. */

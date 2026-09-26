@@ -10,7 +10,7 @@
 //   2 (1 - T0.T1) d^2 + 2 (v.t) d - v.v = 0,  v = P1 - P0, t = T0 + T1.
 
 import type { Vec2 } from '../../scene';
-import { primitiveFitsPiece } from './arc-piece-check';
+import { primitiveFitsPiece, type ArcFitTolerance } from './arc-piece-check';
 import { arcLeavingAlong, reversePrimitive, unit, type FitPrimitive } from './arc-primitives';
 
 export type Biarc = {
@@ -61,7 +61,7 @@ export function biarcBetween(p0: Vec2, t0: Vec2, p1: Vec2, t1: Vec2): Biarc | nu
 export function biarcFitsPoints(
   biarc: Biarc,
   points: ReadonlyArray<Vec2>,
-  toleranceMm: number,
+  toleranceMm: ArcFitTolerance,
 ): boolean {
   return biarcFitsPiece(biarc, points, 0, points.length - 1, toleranceMm);
 }
@@ -71,7 +71,7 @@ export function biarcFitsPiece(
   points: ReadonlyArray<Vec2>,
   from: number,
   to: number,
-  toleranceMm: number,
+  toleranceMm: ArcFitTolerance,
 ): boolean {
   const { junction, junctionTangent } = biarc;
   const side = (point: Vec2): number =>
