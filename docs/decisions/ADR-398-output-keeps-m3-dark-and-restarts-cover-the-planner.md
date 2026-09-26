@@ -76,7 +76,8 @@ track.
 ### Consequences
 
 - Constant-power jobs on GRBL, grblHAL and FluidNC no longer mark pass seams or dwell lit through
-  an air delay. Their G-code changes; the snapshot updates are part of this decision.
+  an air delay. Their G-code changes; the snapshot updates are part of this decision, and the
+  header's emitter revision advances to `controller-audit-repair-20260925-v1`.
 - A laser restart after an Abort or stream error may repeat up to a planner's worth of moves.
 - Marlin estimates and run times agree.
 - Regression tests (with the lit-drain checker in `grbl-lit-drain-checker.ts`):

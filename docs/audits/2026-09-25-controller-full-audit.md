@@ -1461,7 +1461,7 @@ Under M3 the beam keeps its programmed power whether the head moves or not. Seve
 
 On stock GRBL 1.1h the stepper routine then holds for the `$1` idle-lock time, 25 ms by default, before the next line can switch the beam off: a burn dot at every pass seam of a multi-pass cut. After an air change the beam stays lit until the next move starts. Where an air on-delay is set (grblHAL `$673`, 0.5 to 20 s; FluidNC `coolant/delay_ms`, up to 10 s), that includes the whole delay: burn-through and a fire risk. The Neotronics 4040 profile cuts in M3 by default, and GRBL Compatible uses M3 for everything. The default M4 output goes dark whenever the head stops.
 
-**Fix.** No re-arm between the passes of one group, since the power word cannot change there. Under M3 a laser-off seek to the current position is not written. After an M3 burn, a group's mode and air changes wait until after its first laser-off seek; where the next group starts exactly where the last burn ended, a 1 mm laser-off move along its first edge and back takes the stop dark. M3 raster writes no zero-length row close. The job end (`M9`/`M5` after the last burn) is inherent to M3 and unchanged. This changes the 4040's qualified bytes, which the ADR records (`308a24c`, test `09edd64`, ADR-398).
+**Fix.** No re-arm between the passes of one group, since the power word cannot change there. Under M3 a laser-off seek to the current position is not written. After an M3 burn, a group's mode and air changes wait until after its first laser-off seek; where the next group starts exactly where the last burn ended, a 1 mm laser-off move along its first edge and back takes the stop dark. M3 raster writes no zero-length row close. The job end (`M9`/`M5` after the last burn) is inherent to M3 and unchanged. This changes the 4040's qualified bytes, which the ADR records, and the emitter revision in the file header advances with it (`308a24c`, test `09edd64`, revision `e83e80c`, ADR-398).
 
 **Evidence.**
 
@@ -1926,7 +1926,7 @@ I then re-checked every finding against the code and the upstream line myself, a
 
 Checking the fixes against the source again for this report found gaps in four of them, and each entry includes the follow-up fix: grblHAL homes as silently as stock GRBL at its default settings (ST-4, ST-2), Marlin's new quick stop drops the planner a restart must step back over (OR-3), the Laser/CNC toggle and controller list still said nothing (CN-2), and the Marlin simulator planned one move too many (MA-11). grblHAL's error codes 18 and 19, which stock GRBL does not define, now get grblHAL's own text as well (`5dbbac0`).
 
-Each fix landed with a regression test beside the code it covers. The reproduction tests were moved there or deleted, so none remains under `src/__audit_repro__/`. The full suite passes (__TEST_FILES__ files, __TESTS__ tests), and so does `pnpm release:check`.
+Each fix landed with a regression test beside the code it covers. The reproduction tests were moved there or deleted, so none remains under `src/__audit_repro__/`. The full suite passes (2,711 test files and 19,779 tests; 14 files and 22 tests skipped, as at the audited commit), and so does `pnpm release:check`.
 
 ### Limits
 
