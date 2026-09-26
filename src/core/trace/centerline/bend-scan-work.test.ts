@@ -5,7 +5,7 @@
 // to measure them, which made one closed contour quadratic in its own length.
 // The tangent legs now use index walks, each candidate is judged on a bounded
 // stretch of ring rather than a rotated copy of it, and a rebuilt corner only
-// re-queues the candidates whose stretch it touched (ADR-392).
+// re-queues the candidates whose stretch it touched (ADR-413).
 
 import { describe, expect, it, vi } from 'vitest';
 import type { Vec2 } from '../../scene';
