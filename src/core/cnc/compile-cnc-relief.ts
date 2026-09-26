@@ -20,6 +20,7 @@ import { DEFAULT_RELIEF_SCALLOP_MM } from '../relief';
 // variant cannot be added to it.
 import { reliefRoughingLadder, type ReliefRoughingLadder } from '../relief/relief-roughing';
 import { reliefRoughingMotion } from '../relief/relief-roughing-motion';
+import { ReliefLevelArrayMaterializationError } from '../relief/relief-roughing-level-materialization';
 import { reliefScallopBallRadiusMm } from '../relief/relief-finishing';
 import { reliefFinishingPlan, reliefFinishRowSpacingMm } from '../relief/relief-finishing-strategy';
 import type { Heightmap } from '../relief/heightmap';
@@ -349,16 +350,24 @@ function reliefLadderFor(
   if (heightmap.kind === 'error') {
     return reliefMaterializationFailure(relief.source, heightmap.reason);
   }
-  const ladder = reliefRoughingLadder(heightmap.heightmap, {
-    tool,
-    reliefDepthMm: relief.reliefDepthMm,
-    depthPerPassMm: settings.depthPerPassMm,
-    stepoverPercent: settings.stepoverPercent,
-    ...(settings.finishAllowanceMm === undefined
-      ? {}
-      : { allowanceMm: settings.finishAllowanceMm }),
-    ...(settings.reliefFineStepMm === undefined ? {} : { fineStepMm: settings.reliefFineStepMm }),
-  });
+  let ladder: ReliefRoughingLadder;
+  try {
+    ladder = reliefRoughingLadder(heightmap.heightmap, {
+      tool,
+      reliefDepthMm: relief.reliefDepthMm,
+      depthPerPassMm: settings.depthPerPassMm,
+      stepoverPercent: settings.stepoverPercent,
+      ...(settings.finishAllowanceMm === undefined
+        ? {}
+        : { allowanceMm: settings.finishAllowanceMm }),
+      ...(settings.reliefFineStepMm === undefined ? {} : { fineStepMm: settings.reliefFineStepMm }),
+    });
+  } catch (error) {
+    if (error instanceof ReliefLevelArrayMaterializationError) {
+      return reliefMaterializationFailure(relief.source, error.message);
+    }
+    throw error;
+  }
   return {
     kind: 'compiled',
     ladder,
