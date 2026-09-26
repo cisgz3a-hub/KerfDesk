@@ -25,7 +25,8 @@ list against current `main` and keeps it in the repository.
 
 Statuses: **MISSING** (nothing a user can reach), **PARTIAL** (present, named sub-options missing),
 **DECISION** (a recorded project rule blocks it; needs the maintainer), **IN #924** (the open
-tracing program owns it), **BATCH n** (scheduled below).
+tracing program owns it), **CAMERA THREAD** (the project's Camera feature rebuild thread owns it),
+**BATCH n** (scheduled below).
 
 ## Already at parity or better
 
@@ -113,7 +114,7 @@ Sierra variants).
 | LBG-M10 | Interval Test dithered-image variant | `R/IntervalTest/` | Fill swatches only | S | open |
 | LBG-M11 | Auto-home on connect | `R/DeviceSettings/BasicSettings/` | Frame offers Home when alarmed (ADR-367) | S | open |
 | LBG-M12 | Focus Test | `R/FocusTest/` | Disabled placeholder command | M-L | DECISION (laser Z out of scope) |
-| LBG-M13 | Several cameras per device | `https://docs.lightburnsoftware.com/2.1/Reference/UI/CamerasWindow/` | One camera per device profile | L | open |
+| LBG-M13 | Several cameras per device | `https://docs.lightburnsoftware.com/2.1/Reference/UI/CamerasWindow/` | One camera per device profile | L | CAMERA THREAD |
 
 ## Gaps: files, editing, view, settings and text
 
@@ -160,3 +161,7 @@ Each batch is one pull request with its own decision record, tests and WORKFLOW.
 - **Next candidates, in order:** LBG-T05, LBG-T07, LBG-T15, LBG-F03, LBG-F08, LBG-F12, LBG-C07,
   LBG-M02, LBG-M07, LBG-I04 (small, daily use), then LBG-C04, LBG-C05, LBG-I01, LBG-I02, LBG-C06,
   LBG-T04, LBG-T06, LBG-T08, LBG-T09, LBG-F06.
+- **Not in these batches:** the Camera feature rebuild thread owns LBG-M13 (several cameras per
+  device) and is also building camera print-and-cut, trace from the camera image and object
+  detection. LBG-M09 (Print and Cut out of Labs) stays unscheduled here until that work lands, so
+  the two do not change the same flow at once.
