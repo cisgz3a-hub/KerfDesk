@@ -12,7 +12,9 @@
 //   2. otsuThreshold — picks the optimal binary cutoff from the
 //      image's luma histogram by maximising between-class variance
 //      (Otsu, 1979). Auto-adapts to bright/dark sources where the
-//      naive 128 cutoff under- or over-burns.
+//      naive 128 cutoff under- or over-burns. otsuSeparation also
+//      reports Otsu's separability measure (η), which the uneven-
+//      lighting fallback in background-flatten.ts compares.
 //   3. despeckle — connected-component flood fills the binarised
 //      image and removes ink regions smaller than `minPixels`. Kills
 //      the tiny black dots imagetracerjs invents on JPEG artefacts.
@@ -33,6 +35,11 @@
 
 import type { RawImageData } from './trace-image';
 import { medianSourceOverPaper, repairIsolatedMedianChanges } from './auto-median';
+import {
+  createSaddleResolver,
+  type SaddlePolicyInput,
+  type SaddleResolver,
+} from './saddle-connectivity';
 
 // ITU-R BT.601 luma weights. Matches thresholdToMonochrome in
 // trace-image.ts so the threshold cutoff is consistent regardless
@@ -41,7 +48,7 @@ const LUMA_R = 0.299;
 const LUMA_G = 0.587;
 const LUMA_B = 0.114;
 
-function lumaAt(data: Uint8ClampedArray, pixelOffset: number): number {
+export function lumaAt(data: Uint8ClampedArray, pixelOffset: number): number {
   const r = data[pixelOffset] ?? 0;
   const g = data[pixelOffset + 1] ?? 0;
   const b = data[pixelOffset + 2] ?? 0;
@@ -203,13 +210,30 @@ function rawLumaAt(data: Uint8ClampedArray, pixelOffset: number): number {
 // between-class variance of the source's histogram. For bimodal
 // inputs (a clear foreground + background) the result is the optimal
 // binary threshold; for unimodal inputs it picks a sensible boundary
-// that minimises misclassification. Far better than the fixed-128
-// default for images shot under uneven lighting or with a coloured
-// background.
+// that minimises misclassification. A single global cut cannot follow
+// uneven lighting; background-flatten.ts handles that case before this
+// runs (see otsuBinarization).
 //
 // Implementation follows the cumulative-sum form (linear in pixel
 // count + 256 histogram passes). Returns a value in [0, 255].
 export function otsuThreshold(image: RawImageData): number {
+  return otsuSeparation(image).threshold;
+}
+
+export type OtsuSeparation = {
+  /** Cutoff in thresholdToMonochrome's convention: luma < threshold is ink. */
+  readonly threshold: number;
+  /** Otsu's separability η = σ²_between / σ²_total at the chosen cut, in
+   *  [0, 1]; 0 for a single-valued image. Near 1 means two tight, well
+   *  separated populations; a smooth ramp split in two scores about 0.75. */
+  readonly separability: number;
+  /** Mean luma above the cut minus mean luma below it. */
+  readonly contrast: number;
+};
+
+/** Otsu's cut plus the goodness measures defined by Otsu (1979), computed from
+ *  one histogram pass. The threshold is identical to otsuThreshold. */
+export function otsuSeparation(image: RawImageData): OtsuSeparation {
   const hist = new Uint32Array(256);
   let total = 0;
   for (let i = 0; i < image.data.length; i += 4) {
@@ -217,13 +241,18 @@ export function otsuThreshold(image: RawImageData): number {
     hist[luma] = (hist[luma] ?? 0) + 1;
     total += 1;
   }
-  if (total === 0) return 128;
+  if (total === 0) return { threshold: 128, separability: 0, contrast: 0 };
+  return otsuFromHistogram(hist, total);
+}
+
+function otsuFromHistogram(hist: Uint32Array, total: number): OtsuSeparation {
   let sumTotal = 0;
   for (let t = 0; t < 256; t += 1) sumTotal += t * (hist[t] ?? 0);
   let sumB = 0;
   let wB = 0;
   let maxVar = 0;
   let bestT = 0;
+  let contrast = 0;
   for (let t = 0; t < 256; t += 1) {
     wB += hist[t] ?? 0;
     if (wB === 0) continue;
@@ -236,6 +265,7 @@ export function otsuThreshold(image: RawImageData): number {
     if (varBetween > maxVar) {
       maxVar = varBetween;
       bestT = t;
+      contrast = mF - mB;
     }
   }
   // bestT is the largest luma still classified as ink. thresholdToMonochrome
@@ -243,7 +273,18 @@ export function otsuThreshold(image: RawImageData): number {
   // <= bestT to be ink and pixels with luma > bestT to be background. The
   // cutoff that satisfies that is bestT + 1. Clamp at 255 just in case
   // (degenerate inputs where everything is at 255 already).
-  return Math.min(255, bestT + 1);
+  const threshold = Math.min(255, bestT + 1);
+  const spread = totalScatter(hist, sumTotal / total);
+  // varBetween is wB·wF·Δ² in counts; σ²_between/σ²_total = it / (N · scatter).
+  const separability = spread === 0 ? 0 : Math.min(1, maxVar / (total * spread));
+  return { threshold, separability, contrast };
+}
+
+// Σ count·(luma − mean)², the histogram's total scatter.
+function totalScatter(hist: Uint32Array, mean: number): number {
+  let scatter = 0;
+  for (let t = 0; t < 256; t += 1) scatter += (hist[t] ?? 0) * (t - mean) * (t - mean);
+  return scatter;
 }
 
 // Connected-component despeckle on a binary (or near-binary) image.
@@ -253,24 +294,30 @@ export function otsuThreshold(image: RawImageData): number {
 // tiny holes" — preserving hole topology is critical for letters
 // like O / B / R / etc.
 //
-// Contours use four-connected ink; Centerline opts into eight-connectivity
-// so a diagonal stroke is one component rather than a row of isolated specks.
+// Connectivity must match the stage that consumes the mask. Centerline opts
+// into eight-connectivity so a diagonal stroke is one component rather than a
+// row of isolated specks. Contours pass their saddle policy instead
+// (saddle-connectivity.ts): two diagonally-touching ink pixels are one
+// region exactly when the contour walker will trace them as one loop, so a
+// 1-px diagonal hairline the walker keeps is never erased pixel by pixel.
+// Plain 4 remains the historical four-connected rule.
 // BFS using a single Uint8 visited mask + an index queue. O(N) total
 // work for N pixels regardless of region count.
 export function despeckle(
   image: RawImageData,
   minPixels: number,
-  connectivity: 4 | 8 = 4,
+  connectivity: 4 | 8 | SaddlePolicyInput = 4,
 ): RawImageData {
   if (minPixels <= 1) return image;
   const { width: w, height: h } = image;
   const out = new Uint8ClampedArray(image.data);
   const visited = new Uint8Array(w * h);
+  const diagonal = diagonalLinks(image, connectivity);
   for (let startIdx = 0; startIdx < w * h; startIdx += 1) {
     if (visited[startIdx] !== 0) continue;
     visited[startIdx] = 1;
     if (lumaAt(out, startIdx * 4) >= 128) continue; // background pixel — skip
-    const region = bfsInkRegion(out, visited, w, h, startIdx, connectivity);
+    const region = bfsInkRegion(out, visited, w, h, startIdx, diagonal);
     if (region.length < minPixels) {
       eraseRegion(out, region);
     }
@@ -278,16 +325,42 @@ export function despeckle(
   return { width: w, height: h, data: out };
 }
 
+// Which diagonal ink steps join a region: none (4), all (8), or those whose
+// saddle corner the contour policy resolves in favour of ink. A diagonal
+// step whose corner is NOT a saddle (one of the two in-between pixels is
+// ink) is always allowed — those pixels are four-connected through it.
+type DiagonalLinks =
+  | 'none'
+  | 'all'
+  | { readonly ink: Uint8Array; readonly saddles: SaddleResolver };
+
+function diagonalLinks(
+  image: RawImageData,
+  connectivity: 4 | 8 | SaddlePolicyInput,
+): DiagonalLinks {
+  if (connectivity === 4) return 'none';
+  if (connectivity === 8) return 'all';
+  const ink = new Uint8Array(image.width * image.height);
+  for (let i = 0; i < ink.length; i += 1) ink[i] = lumaAt(image.data, i * 4) < 128 ? 1 : 0;
+  const mask = { width: image.width, height: image.height, ink };
+  const saddles = createSaddleResolver(
+    mask,
+    connectivity.turnPolicy,
+    connectivity.field,
+    connectivity.pixelScale,
+  );
+  return { ink, saddles };
+}
+
 // BFS the connected ink region (luma < 128) starting at `startIdx`.
-// Marks every visited cell in `visited`. Diagonal neighbours participate only
-// for callers whose stroke topology uses eight-connected ink.
+// Marks every visited cell in `visited`.
 function bfsInkRegion(
   out: Uint8ClampedArray,
   visited: Uint8Array,
   w: number,
   h: number,
   startIdx: number,
-  connectivity: 4 | 8,
+  diagonal: DiagonalLinks,
 ): number[] {
   const region: number[] = [startIdx];
   const queue: number[] = [startIdx];
@@ -299,14 +372,39 @@ function bfsInkRegion(
     visitNeighbour(out, visited, w, h, cx + 1, cy, region, queue);
     visitNeighbour(out, visited, w, h, cx, cy - 1, region, queue);
     visitNeighbour(out, visited, w, h, cx, cy + 1, region, queue);
-    if (connectivity === 8) {
-      visitNeighbour(out, visited, w, h, cx - 1, cy - 1, region, queue);
-      visitNeighbour(out, visited, w, h, cx + 1, cy - 1, region, queue);
-      visitNeighbour(out, visited, w, h, cx - 1, cy + 1, region, queue);
-      visitNeighbour(out, visited, w, h, cx + 1, cy + 1, region, queue);
+    if (diagonal === 'none') continue;
+    for (const [sx, sy] of DIAGONAL_STEPS) {
+      if (!diagonalStepJoins(diagonal, w, cx, cy, sx, sy)) continue;
+      visitNeighbour(out, visited, w, h, cx + sx, cy + sy, region, queue);
     }
   }
   return region;
+}
+
+const DIAGONAL_STEPS: ReadonlyArray<readonly [number, number]> = [
+  [-1, -1],
+  [1, -1],
+  [-1, 1],
+  [1, 1],
+];
+
+function diagonalStepJoins(
+  diagonal: DiagonalLinks,
+  w: number,
+  cx: number,
+  cy: number,
+  sx: number,
+  sy: number,
+): boolean {
+  if (diagonal === 'all') return true;
+  if (diagonal === 'none') return false;
+  const nx = cx + sx;
+  const ny = cy + sy;
+  // Out-of-image targets are rejected by visitNeighbour; the in-between
+  // pixels of an in-image target are always in the image.
+  if (nx < 0 || nx >= w || ny < 0 || ny * w >= diagonal.ink.length) return false;
+  if ((diagonal.ink[cy * w + nx] ?? 0) === 1 || (diagonal.ink[ny * w + cx] ?? 0) === 1) return true;
+  return diagonal.saddles(Math.max(cx, nx), Math.max(cy, ny));
 }
 
 function visitNeighbour(

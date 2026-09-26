@@ -13,7 +13,11 @@ export type TracePreviewBoundaryProps = {
 type DragPoint = { readonly x: number; readonly y: number };
 type StageMouseEvent = React.MouseEvent<HTMLDivElement>;
 
-export function useTracePreviewBoundary(props: TracePreviewBoundaryProps): {
+export function useTracePreviewBoundary(
+  props: TracePreviewBoundaryProps,
+  // Space+drag and middle-drag pan the view; they must not start a Boundary.
+  isPanGesture: () => boolean = () => false,
+): {
   readonly activeBoundary: TraceBoundary | null;
   readonly onMouseDown: (event: StageMouseEvent) => void;
   readonly onMouseMove: (event: StageMouseEvent) => void;
@@ -38,7 +42,8 @@ export function useTracePreviewBoundary(props: TracePreviewBoundaryProps): {
     if (
       props.boundaryDisabled === true ||
       event.button !== 0 ||
-      props.onBoundaryChange === undefined
+      props.onBoundaryChange === undefined ||
+      isPanGesture()
     )
       return;
     const point = imagePointFromMouse(event, props.imageSize);

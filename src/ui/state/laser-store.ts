@@ -208,8 +208,9 @@ export type LaserState = LaserStoreActions &
      * the UI needs the *last non-null* value cached here, not the raw
      * StatusReport.wco which is null on most frames. Updated by the
      * line-handler when a WCO-bearing status arrives; cleared on
-     * disconnect, alarm, and soft reset (all of which clear G92 in
-     * GRBL itself). UI reads `wcoCache`, NEVER `statusReport.wco`.
+     * disconnect, alarm, and soft reset until the next WCO frame (stock
+     * GRBL clears G92 there; grblHAL keeps it). UI reads `wcoCache`,
+     * NEVER `statusReport.wco`.
      */
     readonly wcoCache: WorkCoordinateOffset | null;
     // The work coordinate system the operator has selected via the console

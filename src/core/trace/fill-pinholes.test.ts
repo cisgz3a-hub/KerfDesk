@@ -137,3 +137,43 @@ describe('fillPinholes', () => {
     expect(rowsFromImage(fillPinholes(imageFromRows(rows), 2))).toEqual(rows);
   });
 });
+
+describe('fillPinholes paper connectivity follows the saddle policy (ADR-403)', () => {
+  // A one-pixel diagonal paper crack running from the open background into
+  // solid ink. Every crack pixel touches the next only at a corner.
+  function diagonalCrack(enclosed: boolean): string[] {
+    const rows = solidBlock(14, 14).map((row) => row.split(''));
+    const start = enclosed ? 3 : 0;
+    for (let i = start; i < 10; i += 1) (rows[i] as string[])[i] = '.';
+    return rows.map((row) => row.join(''));
+  }
+
+  it('leaves a crack that reaches the open background diagonally', () => {
+    // Paper is the window minority at every crack corner, so the walker
+    // joins the crack to the outside — it is a notch, not an enclosed
+    // pinhole, and it must stay (guard 1: ENCLOSED).
+    const rows = diagonalCrack(false);
+    const out = fillPinholes(imageFromRows(rows), 1, { turnPolicy: 'auto', field: null });
+    expect(rowsFromImage(out)).toEqual(rows);
+  });
+
+  it('still fills the same crack when it is enclosed by ink', () => {
+    const out = fillPinholes(imageFromRows(diagonalCrack(true)), 1, { turnPolicy: 'auto' });
+    expect(rowsFromImage(out)).toEqual(solidBlock(14, 14));
+  });
+
+  it('keeps the historical four-connected paper rule without a policy', () => {
+    // Four-connected, every crack pixel is its own enclosed 1-px pinhole
+    // except the one on the border row.
+    const out = rowsFromImage(fillPinholes(imageFromRows(diagonalCrack(false))));
+    expect(out[0]?.[0]).toBe('.');
+    expect(out[5]?.[5]).toBe('#');
+  });
+
+  it("keeps the historical flood under 'connect-paper' (the rollback value)", () => {
+    const rows = diagonalCrack(false);
+    const historical = rowsFromImage(fillPinholes(imageFromRows(rows)));
+    const rollback = fillPinholes(imageFromRows(rows), 1, { turnPolicy: 'connect-paper' });
+    expect(rowsFromImage(rollback)).toEqual(historical);
+  });
+});

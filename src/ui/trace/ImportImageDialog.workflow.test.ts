@@ -221,6 +221,8 @@ describe('Trace Image workflow controls', () => {
         'Smoothness',
         'Optimize',
         'Trace alpha mask',
+        // Line Art offers Invert for light artwork on a dark background.
+        'Invert',
         'Line Art automatically preserves pale logo details.',
         'Fade Image',
         'Delete Image After trace',
@@ -233,7 +235,6 @@ describe('Trace Image workflow controls', () => {
         'Brightness',
         'Contrast',
         'Gamma',
-        'Invert',
       ]) {
         expect(text).not.toContain(label);
       }
@@ -293,7 +294,7 @@ describe('Trace Image workflow controls', () => {
     });
   });
 
-  it('does not show contour-only Smoothness and Optimize controls for Centerline', async () => {
+  it('shows Centerline Smoothness and Optimize with their corner and tolerance roles', async () => {
     await withTraceDialog(async (host) => {
       await changeSelect(presetSelect(host), 'Centerline');
       const text = host.textContent ?? '';
@@ -301,8 +302,12 @@ describe('Trace Image workflow controls', () => {
       expect(text).toContain('Remove ink specks');
       expect(host.querySelector('[aria-label="Trace Threshold"]')).toBeNull();
       expect(text).not.toContain('Ignore Less Than');
-      expect(text).not.toContain('Smoothness');
-      expect(text).not.toContain('Optimize');
+      // ADR-405: Smoothness is the centreline corner angle, Optimize its
+      // curve-fit tolerance.
+      const smoothness = host.querySelector('input[type="number"][aria-label="Trace Smoothness"]');
+      const optimize = host.querySelector('input[type="number"][aria-label="Trace Optimize"]');
+      expect(smoothness?.getAttribute('title')).toContain('corner');
+      expect(optimize?.getAttribute('title')).toContain('fewer nodes');
     });
   });
 

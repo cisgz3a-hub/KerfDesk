@@ -32,6 +32,7 @@ import { normalizeCncTools } from './normalize-cnc-tools';
 import { normalizeLayer } from './normalize-layer';
 import { normalizeTileRegistration } from './normalize-tile-registration';
 import { normalizeLibraryAssetProvenance } from './project-library-provenance-normalizer';
+import { withNormalizedTraceSettings } from './project-trace-settings-normalizer';
 import { validateProjectShape } from './project-shape-validator';
 import { recoveredCncDevicePatch } from './project-cnc-sub-profile-recovery';
 import { normalizeProjectJobSetup } from './project-job-setup-normalizer';
@@ -418,10 +419,11 @@ function normalizeSceneObject(obj: unknown): unknown {
     obj['kind'] === 'imported-svg'
       ? normalizeLibraryAssetProvenance(rawLibraryProvenance)
       : undefined;
-  const normalized =
+  const normalized = withNormalizedTraceSettings(
     libraryProvenance === undefined
       ? withoutLibraryProvenance
-      : { ...withoutLibraryProvenance, libraryProvenance };
+      : { ...withoutLibraryProvenance, libraryProvenance },
+  );
   if (obj['kind'] !== 'text') return normalized;
   if (typeof obj['letterSpacing'] === 'number') return normalized;
   return { ...normalized, letterSpacing: DEFAULT_TEXT_LETTER_SPACING };

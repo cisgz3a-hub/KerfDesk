@@ -109,7 +109,12 @@ export async function buildRasterTraceOutput(
     },
     signal,
   );
-  return { ...raster, id: traced.id };
+  // Keep the recorded Trace settings so Re-trace Original reopens on them (ADR-408).
+  return {
+    ...raster,
+    id: traced.id,
+    ...(traced.traceSettings === undefined ? {} : { traceSettings: traced.traceSettings }),
+  };
 }
 
 // Integrate across ribbon widths, including rotated and mirrored placements.

@@ -408,9 +408,9 @@ export function buildPortClosePatch(state: LaserState): Partial<LaserState> {
     controllerQualification: disconnectedControllerQualification(state.controllerSessionEpoch + 1),
     grblSettingsRows: [],
     lastSettingsReadAt: null,
-    // GRBL clears G92 on the reset that fires when the port closes; persistent
-    // G54 can survive, but the cached WCO is no longer trustworthy until a
-    // fresh status frame arrives.
+    // Stock GRBL clears G92 on the reset that fires when the port closes;
+    // grblHAL keeps it and persistent G54 survives, so the cached WCO is no
+    // longer trustworthy until a fresh status frame arrives.
     wcoCache: null,
     accessoryCache: null,
     mpgActive: null,

@@ -33,7 +33,8 @@ export function processedRasterToolCommands(ctx: AppCommandContext): ReadonlyArr
       'Save Processed Bitmap...',
       'Save selected image after layer processing',
     ),
-    rasterToolCommand(ctx, 'tools.trace-image', 'Trace Image...', 'Trace selected image'),
+    // Alt+T is LightBurn's Trace Image binding (handled in app/shortcuts.ts).
+    rasterToolCommand(ctx, 'tools.trace-image', 'Trace Image...', 'Trace selected image', 'Alt+T'),
     retraceOriginalCommand(ctx),
   ];
 }
@@ -61,11 +62,12 @@ function rasterToolCommand(
   id: RasterToolCommandId,
   label: string,
   title: string,
+  shortcut?: string,
 ): AppCommand {
   const invoke = rasterToolInvoke(ctx, id);
   return ctx.hasRasterSelection
-    ? enabled(id, 'tools', label, title, invoke)
-    : disabled(id, 'tools', label, 'Select an image first.', invoke);
+    ? enabled(id, 'tools', label, title, invoke, shortcut)
+    : disabled(id, 'tools', label, 'Select an image first.', invoke, shortcut);
 }
 
 function rasterToolInvoke(ctx: AppCommandContext, id: RasterToolCommandId): () => void {

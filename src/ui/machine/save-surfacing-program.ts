@@ -6,7 +6,7 @@ import { activeCncTool, type CncMachineConfig, type Project } from '../../core/s
 import type { PlatformAdapter } from '../../platform/types';
 import { buildGcodeMetadata } from '../app/build-info';
 import { controllerReadinessAdvisories } from '../app/controller-readiness-advisories';
-import { cncExportControllerAdvisory } from '../app/cnc-export-controller-advisory';
+import { pushCncExportControllerMessages } from '../app/cnc-export-controller-advisory';
 import { partitionSavePreflight } from '../app/save-preflight-policy';
 import type { ToastVariant } from '../state/toast-store';
 import { startSurfacingStream } from './surfacing-worker-client';
@@ -47,10 +47,10 @@ export async function saveSurfacingProgram(options: SaveSurfacingOptions): Promi
   } = options;
   const tool = activeCncTool(machine);
   const reported = new Set<string>();
-  const warn = (message: string): void => {
+  const warn = (message: string, variant: ToastVariant = 'warning'): void => {
     if (reported.has(message) || !options.isCurrent()) return;
     reported.add(message);
-    pushToast(message, 'warning');
+    pushToast(message, variant);
   };
   // Setup advisories remain visible even if the destination picker is cancelled.
   for (const issue of standaloneCncSetupAdvisories(project.device)) warn(issue.message);
@@ -62,8 +62,7 @@ export async function saveSurfacingProgram(options: SaveSurfacingOptions): Promi
     warn(message);
   }
   // The surfacing program is GRBL CNC G-code whatever the profile (CN-1).
-  const controllerAdvisory = cncExportControllerAdvisory(project.device);
-  if (controllerAdvisory !== null) warn(controllerAdvisory);
+  pushCncExportControllerMessages(project.device, controllerSettings, warn);
   const task = startSurfacingStream(
     {
       params: {

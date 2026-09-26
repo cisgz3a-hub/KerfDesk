@@ -71,6 +71,7 @@ function EdgeTraceSettingsControls(props: TraceSettingsControlsProps): JSX.Eleme
           }
           onChange={(edgeMinimumLinePx) => set({ edgeMinimumLinePx })}
         />
+        <InvertRow {...props} />
       </div>
       <EdgeTraceModeNote />
       <details className="lf-trace-settings-details">
@@ -100,18 +101,17 @@ function FilledTraceSettingsControls(props: TraceSettingsControlsProps): JSX.Ele
         <TraceDetectionControls {...props} alphaMask={alphaMask}>
           <BrightnessBandControls {...props} />
         </TraceDetectionControls>
+        <InvertRow {...props} disabled={alphaMask} />
       </div>
       <div className="lf-trace-settings-group">
         <TraceAreaControls {...props} />
       </div>
-      {props.preset.traceMode !== 'centerline' ? (
-        <details className="lf-trace-settings-details">
-          <summary tabIndex={0} title="Adjust edge smoothing and path simplification.">
-            Curve finishing
-          </summary>
-          <ContourGeometryControls {...props} />
-        </details>
-      ) : null}
+      <details className="lf-trace-settings-details">
+        <summary tabIndex={0} title="Adjust edge smoothing and path simplification.">
+          Curve finishing
+        </summary>
+        <ContourGeometryControls {...props} />
+      </details>
       <details className="lf-trace-settings-details">
         <summary tabIndex={0} title="Trace an image's transparency instead of its brightness.">
           Transparency
@@ -164,6 +164,21 @@ function BrightnessBandControls(props: TraceSettingsControlsProps): JSX.Element 
   );
 }
 
+// Invert picks which tones are the artwork, so it sits with detection. The
+// alpha mask ignores brightness, so Invert stands down while it is on.
+function InvertRow(
+  props: TraceSettingsControlsProps & { readonly disabled?: boolean },
+): JSX.Element {
+  return (
+    <TraceCheckboxRow
+      label="Invert"
+      checked={props.overrides.invert ?? props.preset.invert ?? false}
+      disabled={props.disabled === true}
+      onChange={(invert) => props.onChange({ ...props.overrides, invert })}
+    />
+  );
+}
+
 function TraceAreaControls(props: TraceSettingsControlsProps): JSX.Element {
   const set = (patch: LightBurnTraceSettingOverrides): void =>
     props.onChange({ ...props.overrides, ...patch });
@@ -196,7 +211,14 @@ function TraceAreaControls(props: TraceSettingsControlsProps): JSX.Element {
   );
 }
 
+// Centerline gives the two knobs their corner / tolerance roles (ADR-405).
+const CENTERLINE_SMOOTHNESS_TITLE =
+  'Higher values round more bends into curves; 0 keeps every bend as a corner.';
+const CENTERLINE_OPTIMIZE_TITLE =
+  'Higher values let curves stray further from the stroke centre for fewer nodes.';
+
 function ContourGeometryControls(props: TraceSettingsControlsProps): JSX.Element {
+  const centerline = props.preset.traceMode === 'centerline';
   const set = (patch: LightBurnTraceSettingOverrides): void => {
     props.onChange({ ...props.overrides, ...patch });
   };
@@ -209,6 +231,7 @@ function ContourGeometryControls(props: TraceSettingsControlsProps): JSX.Element
         step={0.01}
         value={traceValue(props.preset, props.overrides, 'smoothness')}
         onChange={(smoothness) => set({ smoothness })}
+        {...(centerline ? { title: CENTERLINE_SMOOTHNESS_TITLE } : {})}
       />
       <NumberRow
         label="Optimize"
@@ -217,6 +240,7 @@ function ContourGeometryControls(props: TraceSettingsControlsProps): JSX.Element
         step={0.01}
         value={traceValue(props.preset, props.overrides, 'optimize')}
         onChange={(optimize) => set({ optimize })}
+        {...(centerline ? { title: CENTERLINE_OPTIMIZE_TITLE } : {})}
       />
     </>
   );
@@ -296,6 +320,7 @@ function NumberRow(props: {
   readonly step: number;
   readonly value: number;
   readonly onChange: (next: number) => void;
+  readonly title?: string;
 }): JSX.Element {
   const inputId = useId();
   const hintId = useId();
@@ -317,7 +342,7 @@ function NumberRow(props: {
             onChange={(e) => props.onChange(clamp(Number(e.target.value), props.min, props.max))}
             aria-label={`Trace ${props.label}`}
             aria-describedby={hintId}
-            title={traceNumberTitle(props.label)}
+            title={props.title ?? traceNumberTitle(props.label)}
           />
           {unit === undefined ? null : <span>{unit}</span>}
         </span>
@@ -330,12 +355,12 @@ function NumberRow(props: {
           step={props.step}
           value={props.value}
           aria-label={`Trace ${props.label} slider`}
-          title={traceNumberTitle(props.label)}
+          title={props.title ?? traceNumberTitle(props.label)}
           aria-describedby={hintId}
           onChange={(e) => props.onChange(clamp(Number(e.target.value), props.min, props.max))}
         />
       ) : null}
-      <p id={hintId}>{traceNumberTitle(props.label)}</p>
+      <p id={hintId}>{props.title ?? traceNumberTitle(props.label)}</p>
     </div>
   );
 }

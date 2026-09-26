@@ -1,4 +1,11 @@
-import { MAX_PREVIEW_ZOOM, MIN_PREVIEW_ZOOM } from './trace-preview-zoom';
+import {
+  formatPreviewZoom,
+  isAtZoomLimit,
+  MIN_PREVIEW_ZOOM,
+  reachableActualSize,
+  stepPreviewZoom,
+  type PreviewZoomRange,
+} from './trace-preview-zoom-math';
 
 export type TracePreviewView = 'original' | 'trace' | 'overlay';
 
@@ -7,6 +14,7 @@ type Props = {
   readonly hasSource: boolean;
   readonly hasTrace: boolean;
   readonly zoom: number;
+  readonly zoomRange: PreviewZoomRange;
   readonly isSourceFaded: boolean;
   readonly shouldShowPoints: boolean;
   readonly hasBoundary: boolean;
@@ -23,7 +31,7 @@ export function TracePreviewControls(props: Props): JSX.Element {
     <>
       <div className="lf-trace-preview__toolbar">
         <ViewControls view={props.view} hasSource={props.hasSource} onChange={props.onViewChange} />
-        <ZoomControls zoom={props.zoom} onChange={props.onZoomChange} />
+        <ZoomControls zoom={props.zoom} range={props.zoomRange} onChange={props.onZoomChange} />
       </div>
       <div className="lf-trace-preview__options" role="group" aria-label="Preview overlays">
         {props.hasSource ? (
@@ -93,40 +101,65 @@ function ViewControls(props: {
 
 function ZoomControls(props: {
   readonly zoom: number;
+  readonly range: PreviewZoomRange;
   readonly onChange: (zoom: number) => void;
 }): JSX.Element {
+  const { zoom, range } = props;
+  const actualSize = range.actualSize;
+  const nativePercent =
+    actualSize === null ? '' : ` (${Math.round((zoom / actualSize) * 100)}% of image pixels)`;
+  const oneToOne = reachableActualSize(range);
+  const oneToOneTitle =
+    actualSize !== null && oneToOne === null
+      ? `1:1 would need ${formatPreviewZoom(actualSize)} times Fit, beyond this preview's ${formatPreviewZoom(range.max)} times limit.`
+      : 'Show one image pixel per CSS pixel, which is one screen pixel at 100% display scale (1 key).';
   return (
     <div className="lf-trace-preview__zoom" role="group" aria-label="Preview zoom">
       <button
         type="button"
         className="lf-btn"
         aria-label="Zoom out"
-        title="Halve preview magnification, down to Fit."
-        disabled={props.zoom <= MIN_PREVIEW_ZOOM}
-        onClick={() => props.onChange(props.zoom / 2)}
+        title="Halve preview magnification (− key, or wheel down over the preview)."
+        disabled={zoom <= range.min || isAtZoomLimit(zoom, range.min)}
+        onClick={() => props.onChange(stepPreviewZoom(zoom, -1))}
       >
         −
       </button>
-      <span aria-label="Preview magnification" title="Magnification relative to Fit">
-        {props.zoom}×
+      <span
+        aria-label="Preview magnification"
+        title={`Magnification relative to Fit${nativePercent}`}
+      >
+        {formatPreviewZoom(zoom)}×
       </span>
       <button
         type="button"
         className="lf-btn"
         aria-label="Zoom in"
-        title="Double preview magnification, up to 16 times Fit."
-        disabled={props.zoom >= MAX_PREVIEW_ZOOM}
-        onClick={() => props.onChange(props.zoom * 2)}
+        title={`Double preview magnification, up to ${formatPreviewZoom(range.max)} times Fit (+ key, or wheel up over the preview).`}
+        disabled={zoom >= range.max || isAtZoomLimit(zoom, range.max)}
+        onClick={() => props.onChange(stepPreviewZoom(zoom, 1))}
       >
         +
       </button>
       <button
         type="button"
         className="lf-btn"
-        title="Fit the entire image in the preview"
+        title="Fit the entire image in the preview (0 key)"
         onClick={() => props.onChange(MIN_PREVIEW_ZOOM)}
       >
         Fit
+      </button>
+      <button
+        type="button"
+        className="lf-btn"
+        aria-label="1:1 actual size"
+        title={oneToOneTitle}
+        disabled={oneToOne === null}
+        onClick={() => {
+          if (oneToOne !== null) props.onChange(oneToOne);
+        }}
+      >
+        1:1
       </button>
     </div>
   );

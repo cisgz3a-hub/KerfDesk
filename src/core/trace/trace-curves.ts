@@ -35,6 +35,14 @@ export function fittedTraceRing(cubics: ReadonlyArray<CubicBezier>): Vec2[] {
   return points;
 }
 
+/** Remember `curve` as the canonical curve of the exact sample array
+ *  `points` (the centreline's fitted open and closed strokes, ADR-405). The
+ *  same identity rule applies: a stage that copies the array falls back to
+ *  straight segments over the copy. */
+export function registerTraceCurve(points: ReadonlyArray<Vec2>, curve: CurveSubpath): void {
+  fittedRingCurves.set(points, curve);
+}
+
 /** Give every trace path its canonical curves: the fitter's cubics for rings
  *  that came from the fitter, straight segments over the polyline otherwise.
  *  Curves already present are kept. */

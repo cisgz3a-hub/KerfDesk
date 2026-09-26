@@ -10,15 +10,17 @@
 import type { DeviceProfile } from './device-profile';
 import { profileCatalogEntryById } from './profile-catalog';
 
+type CorrectableFields = Pick<DeviceProfile, 'origin' | 'bedWidth' | 'bedHeight'>;
+
 type PresetCorrection = {
   readonly profileIds: ReadonlyArray<string>;
   readonly before: string;
   readonly now: string;
   readonly effect: string;
+  /** The fields the correction changed; their preset values are the fix. */
+  readonly fields: ReadonlyArray<keyof CorrectableFields>;
   readonly predates: (device: CorrectableFields) => boolean;
 };
-
-type CorrectableFields = Pick<DeviceProfile, 'origin' | 'bedWidth' | 'bedHeight'>;
 
 // #894, 2026-09-24. xTool's LightBurn device file for the D1 Pro sets
 // "MirrorY": true, and the S30's product page gives a 380 x 385 mm area.
@@ -28,6 +30,7 @@ const PRESET_CORRECTIONS: ReadonlyArray<PresetCorrection> = [
     before: 'origin front-left',
     now: 'rear-left',
     effect: 'jobs come out mirrored front to back',
+    fields: ['origin'],
     predates: (device) => device.origin === 'front-left',
   },
   {
@@ -35,6 +38,7 @@ const PRESET_CORRECTIONS: ReadonlyArray<PresetCorrection> = [
     before: 'bed 410 x 400 mm',
     now: '380 x 385 mm',
     effect: 'a job near the edge can run past the real travel',
+    fields: ['bedWidth', 'bedHeight'],
     predates: (device) => device.bedWidth === 410 && device.bedHeight === 400,
   },
 ];
@@ -44,6 +48,8 @@ export type StalePresetCorrection = {
   readonly before: string;
   readonly now: string;
   readonly effect: string;
+  /** The preset's corrected values, for Machine Setup's one-click offer. */
+  readonly patch: Partial<CorrectableFields>;
 };
 
 /** The corrections a saved preset copy still predates; empty for any other profile. */
@@ -56,5 +62,11 @@ export function stalePresetCorrections(
   if (preset === undefined) return [];
   return PRESET_CORRECTIONS.filter(
     (correction) => correction.profileIds.includes(profileId) && correction.predates(device),
-  ).map(({ before, now, effect }) => ({ presetName: preset.name, before, now, effect }));
+  ).map(({ before, now, effect, fields }) => ({
+    presetName: preset.name,
+    before,
+    now,
+    effect,
+    patch: Object.fromEntries(fields.map((field) => [field, preset[field]])),
+  }));
 }
