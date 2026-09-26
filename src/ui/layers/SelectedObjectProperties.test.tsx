@@ -47,6 +47,14 @@ async function choose(select: HTMLSelectElement, value: string): Promise<void> {
   });
 }
 
+async function chooseProcess(host: HTMLElement, group: string, mode: string): Promise<void> {
+  const radio = host.querySelector(
+    `[role="radiogroup"][aria-label="${group}"] input[value="${mode}"]`,
+  );
+  if (!(radio instanceof HTMLInputElement)) throw new Error(`${group} ${mode} missing`);
+  await act(async () => radio.click());
+}
+
 function rectangle(id: string) {
   return createRectangle({
     id,
@@ -167,9 +175,7 @@ describe('SelectedObjectProperties', () => {
       if (!(chooser instanceof HTMLSelectElement)) throw new Error('artwork chooser missing');
       expect(chooser.options).toHaveLength(2);
       await choose(chooser, 'O2');
-      const mode = host.querySelector('select[aria-label="Mode for inspected artwork"]');
-      if (!(mode instanceof HTMLSelectElement)) throw new Error('operation mode missing');
-      await choose(mode, 'fill');
+      await chooseProcess(host, 'Mode for inspected artwork', 'fill');
 
       const state = useStore.getState();
       expect(state.selectedObjectId).toBeNull();
@@ -342,9 +348,7 @@ describe('SelectedObjectProperties', () => {
     useStore.getState().selectObject('O2');
     const { host, root } = await render();
     try {
-      const mode = host.querySelector('select[aria-label="Mode for selected objects"]');
-      if (!(mode instanceof HTMLSelectElement)) throw new Error('selected mode control missing');
-      await choose(mode, 'fill');
+      await chooseProcess(host, 'Mode for selected objects', 'fill');
 
       const state = useStore.getState();
       expect(state.project.scene.layers.find((layer) => layer.name === 'O1')?.mode).toBe('line');

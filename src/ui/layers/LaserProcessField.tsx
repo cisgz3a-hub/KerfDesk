@@ -1,18 +1,27 @@
 import { useId } from 'react';
 import type { LayerMode } from '../../core/scene';
 
-const PROCESS_COPY: Record<LayerMode, { readonly label: string; readonly description: string }> = {
+const LASER_MODES = ['line', 'fill', 'image'] as const;
+const MIXED_PROCESS_HINT = 'Choose one process to use for all selected artwork.';
+
+const PROCESS_COPY: Record<
+  LayerMode,
+  { readonly label: string; readonly short: string; readonly description: string }
+> = {
   line: {
     label: 'Line · cut or score outlines',
+    short: 'Line',
     description:
       'Follow vector outlines. Use power, speed and passes to cut through or mark a line.',
   },
   fill: {
     label: 'Fill · engrave solid areas',
+    short: 'Fill',
     description: 'Engrave inside closed shapes. Spacing controls how densely the area is filled.',
   },
   image: {
     label: 'Image · engrave photos',
+    short: 'Image',
     description:
       'Turn image brightness into laser dots or shades with a choice of image treatments.',
   },
@@ -27,26 +36,18 @@ export function LaserProcessField(props: {
   readonly onChange: (mode: LayerMode) => void;
   readonly help?: React.ReactNode;
   readonly compact?: boolean;
-  readonly children?: React.ReactNode;
 }): JSX.Element {
   const descriptionId = useId();
-  const description = props.mixed
-    ? 'Choose one process to use for all selected artwork.'
-    : PROCESS_COPY[props.mode].description;
+  if (props.compact) return <LaserProcessChoice {...props} />;
+  const description = props.mixed ? MIXED_PROCESS_HINT : PROCESS_COPY[props.mode].description;
   return (
-    <div className={`lf-laser-process${props.compact ? ' lf-laser-process--compact' : ''}`}>
-      {props.compact ? null : (
-        <div className="lf-laser-process__heading">
-          <span className="lf-laser-section-title">Laser process</span>
-          {props.help}
-        </div>
-      )}
+    <div className="lf-laser-process">
+      <div className="lf-laser-process__heading">
+        <span className="lf-laser-section-title">Laser process</span>
+        {props.help}
+      </div>
       <div className="lf-laser-process__choice">
-        {props.compact ? (
-          <span className="lf-laser-section-title">Process</span>
-        ) : (
-          <ProcessIllustration mode={props.mode} mixed={props.mixed === true} />
-        )}
+        <ProcessIllustration mode={props.mode} mixed={props.mixed === true} />
         <select
           className="lf-select"
           name={props.name}
@@ -62,29 +63,55 @@ export function LaserProcessField(props: {
               Mixed
             </option>
           ) : null}
-          {(['line', 'fill', 'image'] as const).map((mode) => (
+          {LASER_MODES.map((mode) => (
             <option key={mode} value={mode}>
               {PROCESS_COPY[mode].label}
             </option>
           ))}
         </select>
       </div>
-      {props.children}
-      {props.compact ? (
-        <details className="lf-inspector-help">
-          <summary title="Show guidance for the selected laser process.">
-            About this process
-          </summary>
-          <p id={descriptionId} className="lf-laser-help">
-            {description}
-          </p>
-          {props.help}
-        </details>
-      ) : (
-        <p id={descriptionId} className="lf-laser-help">
-          {description}
-        </p>
-      )}
+      <p id={descriptionId} className="lf-laser-help">
+        {description}
+      </p>
+    </div>
+  );
+}
+
+// The inspector's process picker: three labelled buttons that never truncate.
+// Each button's tooltip carries the description the dialog shows as text.
+function LaserProcessChoice(props: {
+  readonly mode: LayerMode;
+  readonly mixed?: boolean;
+  readonly ariaLabel: string;
+  readonly onChange: (mode: LayerMode) => void;
+}): JSX.Element {
+  const name = useId();
+  return (
+    <div className="lf-laser-process-choice">
+      <div role="radiogroup" aria-label={props.ariaLabel} className="lf-process-segments">
+        {LASER_MODES.map((mode) => {
+          const checked = props.mixed !== true && props.mode === mode;
+          return (
+            <label
+              key={mode}
+              className="lf-process-segment"
+              data-checked={checked ? 'true' : undefined}
+              title={PROCESS_COPY[mode].description}
+            >
+              <input
+                type="radio"
+                name={name}
+                value={mode}
+                checked={checked}
+                onChange={() => props.onChange(mode)}
+              />
+              <ProcessIllustration mode={mode} mixed={false} />
+              <span>{PROCESS_COPY[mode].short}</span>
+            </label>
+          );
+        })}
+      </div>
+      {props.mixed ? <p className="lf-laser-help">{MIXED_PROCESS_HINT}</p> : null}
     </div>
   );
 }

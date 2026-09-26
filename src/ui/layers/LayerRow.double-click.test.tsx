@@ -42,7 +42,7 @@ describe('compact operation row and selected operation settings', () => {
       expect(useUiStore.getState().activeLayerColor).toBe('#000000');
       expect(row.getAttribute('aria-current')).toBe('true');
       expect(row.querySelector('select')).toBeNull();
-      expect(row.textContent).not.toContain('Advanced cut settings');
+      expect(row.textContent).not.toContain('More cut settings');
     } finally {
       await mounted.unmount();
     }
@@ -139,9 +139,7 @@ function operationActivation(row: HTMLElement): HTMLButtonElement {
 }
 
 function advancedButton(host: HTMLElement): HTMLButtonElement {
-  const button = [...host.querySelectorAll('button')].find(
-    (candidate) => candidate.textContent === 'Advanced cut settings',
-  );
+  const button = host.querySelector('button[aria-label="More cut settings"]');
   if (!(button instanceof HTMLButtonElement)) throw new Error('advanced settings button missing');
   return button;
 }

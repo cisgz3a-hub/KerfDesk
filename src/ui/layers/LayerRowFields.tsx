@@ -27,7 +27,6 @@ export type LayerOperationControlTarget = {
 type LayerRowSettingsFieldsProps = {
   readonly layer: Layer;
   readonly operationTarget: LayerOperationControlTarget;
-  readonly compact?: boolean;
 };
 
 export function LayerRowSettingsFields(props: LayerRowSettingsFieldsProps): JSX.Element {
@@ -36,6 +35,7 @@ export function LayerRowSettingsFields(props: LayerRowSettingsFieldsProps): JSX.
   return (
     <>
       <LaserEssentialsFields {...props} />
+      <ScanDirectionField layer={layer} operationTarget={operationTarget} />
       {!operationTarget.mixedFields?.mode ? (
         <details className="lf-laser-options">
           <summary title="Show extra settings for the selected laser process">
@@ -89,7 +89,9 @@ export function LayerRowSettingsFields(props: LayerRowSettingsFieldsProps): JSX.
   );
 }
 
-function LaserEssentialsFields(props: LayerRowSettingsFieldsProps): JSX.Element {
+export function LaserEssentialsFields(
+  props: LayerRowSettingsFieldsProps & { readonly compact?: boolean },
+): JSX.Element {
   const { layer, operationTarget } = props;
   // Keyed on the operation, not reconcileKey: that changes with every committed
   // value, which would drop the request the moment its capped value is saved.
@@ -101,7 +103,7 @@ function LaserEssentialsFields(props: LayerRowSettingsFieldsProps): JSX.Element 
   return (
     <section
       className={`lf-laser-essentials${props.compact ? ' lf-laser-essentials--compact' : ''}`}
-      aria-label="Power, speed, passes and scan direction"
+      aria-label="Power, speed and passes"
     >
       {props.compact ? null : <h4 className="lf-laser-section-title">Essential settings</h4>}
       <div className="lf-laser-essentials__grid">
@@ -111,7 +113,7 @@ function LaserEssentialsFields(props: LayerRowSettingsFieldsProps): JSX.Element 
         <FieldRow label="Speed" unit="mm/min">
           <SpeedInput layer={layer} operationTarget={operationTarget} ceiling={speedCeiling} />
         </FieldRow>
-        <FieldRow label="Passes" unit="times">
+        <FieldRow label="Passes">
           <PassesInput layer={layer} operationTarget={operationTarget} />
         </FieldRow>
       </div>
@@ -120,12 +122,11 @@ function LaserEssentialsFields(props: LayerRowSettingsFieldsProps): JSX.Element 
         ceiling={speedCeiling}
         onRaise={(speed) => operationTarget.commit({ speed })}
       />
-      <ScanDirectionField layer={layer} operationTarget={operationTarget} />
     </section>
   );
 }
 
-function FieldRow(props: {
+export function FieldRow(props: {
   readonly label: string;
   readonly unit?: string;
   readonly children: React.ReactNode;
@@ -177,11 +178,11 @@ function FillFields(props: {
 }
 
 // Scan direction is the one process option that changes job time enough to sit
-// beside Power/Speed/Passes: operators flip it per job, so it stays on the
-// always-visible card rather than inside the collapsed options disclosure.
+// beside Power/Speed/Passes: operators flip it per job, so it stays visible as a
+// one-line switch (ADR-430); its explanation is the tooltip.
 // Fill and image keep their own stored flags, so this switches on the mode, and
 // renders nothing for line cuts or a selection with mixed modes.
-function ScanDirectionField(props: {
+export function ScanDirectionField(props: {
   readonly layer: Layer;
   readonly operationTarget: LayerOperationControlTarget;
 }): JSX.Element | null {
@@ -189,11 +190,13 @@ function ScanDirectionField(props: {
   if (operationTarget.mixedFields?.mode === true) return null;
   if (operationTarget.settings.mode === 'line') return null;
   const image = operationTarget.settings.mode === 'image';
-  const title = image
-    ? 'Alternate raster rows in both directions. Turn off while diagnosing scan-offset drift.'
-    : 'Scan alternating fill lines in both directions to reduce travel time.';
+  const title = `${
+    image
+      ? 'Alternate raster rows in both directions. Turn off while diagnosing scan-offset drift.'
+      : 'Scan alternating fill lines in both directions to reduce travel time.'
+  } Needs a calibrated scan offset to keep edges aligned.`;
   return (
-    <label className="lf-laser-scan-direction" title={title}>
+    <label className="lf-laser-toggle" title={title}>
       <input
         type="checkbox"
         {...mixedCheckboxProps(
@@ -217,18 +220,12 @@ function ScanDirectionField(props: {
         )}`}
         title={title}
       />
-      <span>
-        <strong>Scan both ways</strong>
-        <span className="lf-laser-help">
-          Engrave on the return pass too. Cuts travel time; needs a calibrated scan offset to keep
-          edges aligned.
-        </span>
-      </span>
+      <span>Scan both ways</span>
     </label>
   );
 }
 
-function HatchAngleInput(props: {
+export function HatchAngleInput(props: {
   readonly layer: Layer;
   readonly operationTarget: LayerOperationControlTarget;
 }): JSX.Element {
@@ -257,7 +254,7 @@ function HatchAngleInput(props: {
   );
 }
 
-function HatchSpacingInput(props: {
+export function HatchSpacingInput(props: {
   readonly layer: Layer;
   readonly operationTarget: LayerOperationControlTarget;
 }): JSX.Element {
