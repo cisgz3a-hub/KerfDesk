@@ -21,9 +21,10 @@
 // the right-hand rule of section 3.1.6 (exterior counterclockwise, holes
 // clockwise, in the y-up frame). Every ring is closed (first position =
 // last) and has at least four positions; a ring that collapses on the grid
-// is dropped together with every contour nested inside it (nesting decided
-// on the unsnapped contours, collapsed-ring-subtrees), so no hole or island
-// is orphaned and written with the wrong fill. Contours that cross one
+// (its snapped points collinear) is dropped together with every contour
+// nested inside it (nesting decided on the unsnapped contours,
+// collapsed-ring-subtrees, as the PDF and EPS writers do), so no hole or
+// island is orphaned and written with the wrong fill. Contours that cross one
 // another are not merged: that item's polygons are written as separate
 // features marked "unmerged": true, so the file never claims an invalid
 // MultiPolygon, and the caller is told.
@@ -40,7 +41,7 @@ import {
   type VectorPaintItem,
   type VectorWriteOptions,
 } from './vector-artwork';
-import { contoursKeptAfterCollapse } from './collapsed-ring-subtrees';
+import { collapsesOnGrid, contoursKeptAfterCollapse } from './collapsed-ring-subtrees';
 import { fillRegionPolygons, twiceSignedArea } from './fill-region-rings';
 
 export const DEFAULT_GEOJSON_FLATTEN_TOLERANCE_MM = 0.01;
@@ -150,15 +151,12 @@ function filledPolygons(
 ): { polygons: Position[][][]; crossing: boolean } {
   const sources = curves.map((curve) => flattened(curve, tolerance));
   const snapped = sources.map((points) => openRing(points, page));
-  // A ring that collapses on the grid goes with its whole subtree, decided on
-  // the unsnapped contours, so no hole or island inside it is orphaned.
-  const kept = contoursKeptAfterCollapse(
-    sources,
-    snapped.map((ring) => ring === null),
-  );
-  const rings = snapped.filter(
-    (ring, index): ring is GridPoint[] => ring !== null && kept[index] === true,
-  );
+  // A ring that collapses on the grid (collinear or fewer than three points)
+  // goes with its whole subtree, decided on the unsnapped contours, so no hole
+  // or island inside it is orphaned. A self-crossing ring with zero net area
+  // has not collapsed: it stays, and fillRegionPolygons reports the crossing.
+  const kept = contoursKeptAfterCollapse(sources, snapped.map(collapsesOnGrid));
+  const rings = snapped.filter((_, index) => kept[index] === true);
   const region = fillRegionPolygons(rings, fillRule);
   const closedRing = (index: number, counterclockwise: boolean): Position[] => {
     const ring = rings[index] as GridPoint[];
@@ -168,18 +166,20 @@ function filledPolygons(
     closedRing(polygon.outer, true),
     ...polygon.holes.map((hole) => closedRing(hole, false)),
   ]);
-  return { polygons, crossing: region.crossing };
+  // A kept ring with zero net area is not simple (a bow-tie, or a retraced
+  // spike whose edges only overlap): never claim a valid geometry for it.
+  const notSimple = rings.some((ring) => twiceSignedArea(ring) === 0);
+  return { polygons, crossing: region.crossing || notSimple };
 }
 
-/** An open ring on the grid (first point not repeated), or null when it collapses. */
-function openRing(flat: ReadonlyArray<Vec2>, page: PreparedPage): GridPoint[] | null {
+/** An open ring on the grid (first point not repeated, consecutive duplicates removed). */
+function openRing(flat: ReadonlyArray<Vec2>, page: PreparedPage): GridPoint[] {
   const points = dedupe(flat.map(page.toGrid));
   const first = points[0];
   const last = points[points.length - 1];
   if (first !== undefined && last !== undefined && samePoint(first, last) && points.length > 1) {
     points.pop();
   }
-  if (points.length < 3 || twiceSignedArea(points) === 0) return null;
   return points;
 }
 

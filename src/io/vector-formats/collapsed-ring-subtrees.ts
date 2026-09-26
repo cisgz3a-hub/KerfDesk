@@ -1,21 +1,31 @@
-// Grid-collapsed contours leave no orphans in GeoJSON (ADR-444 Amendment 1).
+// Grid-collapsed contours leave no orphans (ADR-444 Amendment 1).
 //
-// The GeoJSON writer flattens each closed contour and snaps it to the export
-// grid. A very thin contour can collapse there (its snapped points become
-// collinear or fewer than three) while a contour nested inside it still snaps
-// to a real polygon. Dropping only the collapsed ring would leave that inner
-// ring without its container: a hole would be classed as an outer ring and
-// paper would be written as ink, or an island would become a hole.
+// Each filled contour is snapped to the export grid: GeoJSON snaps its
+// flattened points, PDF and EPS snap its path's control points. A very thin
+// contour can collapse there (its written points become collinear or fewer
+// than three, so it encloses no area) while a contour nested inside it still
+// snaps to a real polygon. Dropping only the collapsed contour (GeoJSON) or
+// painting it with no area (PDF, EPS) would leave that inner contour without
+// its container: a hole would be painted as ink, or an island as paper.
 //
-// Nesting is therefore decided on the unsnapped flattened contours, where the
-// collapsed contour still encloses its children, and a collapsed contour is
-// dropped together with every contour inside it (its holes, their islands,
-// and so on). This is the no-orphan rule of ADR-458 Amendment 1: a ring is
-// only ever dropped with its whole subtree. Everything in that subtree lies
-// inside the collapsed contour, which is thinner than the grid, so the
-// dropped region is thinner than the grid as well.
+// No-orphan rule: a contour is only ever dropped together with everything
+// nested inside it. Nesting is decided on the unsnapped flattened contours,
+// where the collapsed contour still encloses its children, and a collapsed
+// contour is dropped with its whole subtree (its holes, their islands, and so
+// on). Everything dropped lies inside the collapsed contour, whose snapped
+// area is zero, so what is lost is at most about one grid diagonal wide.
+//
+// A contour whose written points are not collinear but whose net area is zero
+// (a symmetric bow-tie or figure-eight) has NOT collapsed: it crosses itself,
+// is kept, and is never used as a container here.
 
-import type { Vec2 } from '../../core/scene';
+import { flattenCurveSubpath, type CurveSubpath, type Vec2 } from '../../core/scene';
+
+/** Flattening tolerance (mm) for the containment test only; nothing is written from it. */
+const CONTAINMENT_TOLERANCE_MM = 0.01;
+
+/** A written grid point (structurally vector-artwork's GridPoint). */
+type GridXY = { readonly x: number; readonly y: number };
 
 type Box = {
   readonly minX: number;
@@ -24,11 +34,38 @@ type Box = {
   readonly maxY: number;
 };
 
+/** Whether written grid points enclose no area: fewer than three distinct points, or all collinear. */
+export function collapsesOnGrid(points: ReadonlyArray<GridXY>): boolean {
+  const first = points[0];
+  if (first === undefined) return true;
+  const second = points.find((p) => p.x !== first.x || p.y !== first.y);
+  if (second === undefined) return true;
+  const dx = second.x - first.x;
+  const dy = second.y - first.y;
+  return points.every((p) => dx * (p.y - first.y) - dy * (p.x - first.x) === 0);
+}
+
+/**
+ * Which filled contours to write, given each contour's written grid points:
+ * a contour is kept when its written points do not collapse and it lies
+ * inside no collapsed contour.
+ */
+export function filledCurvesKept(
+  curves: ReadonlyArray<CurveSubpath>,
+  written: ReadonlyArray<ReadonlyArray<GridXY>>,
+): boolean[] {
+  const collapsed = written.map(collapsesOnGrid);
+  if (!collapsed.includes(true)) return collapsed.map(() => true);
+  return contoursKeptAfterCollapse(curves.map(unsnappedPolyline), collapsed);
+}
+
 /**
  * Which contours to keep. `sources` are the unsnapped flattened contours (any
  * frame; a mirror does not change containment), `collapsed[i]` says contour i
  * collapsed on the grid. A contour is kept when it did not collapse and lies
- * inside no collapsed contour.
+ * inside no collapsed contour. A contour that crosses a collapsed contour
+ * (a probe outside it, or an edge crossing one of its edges) is not inside it
+ * and is kept.
  */
 export function contoursKeptAfterCollapse(
   sources: ReadonlyArray<ReadonlyArray<Vec2>>,
@@ -52,6 +89,13 @@ export function contoursKeptAfterCollapse(
   return keep;
 }
 
+function unsnappedPolyline(curve: CurveSubpath): Vec2[] {
+  const result = flattenCurveSubpath(curve, { toleranceMm: CONTAINMENT_TOLERANCE_MM });
+  if (result.kind === 'ok') return [...result.polyline.points];
+  // Over the segment budget: the end points still give a usable outline.
+  return [curve.start, ...curve.segments.map((segment) => segment.to)];
+}
+
 /** Whether a closed polyline encloses any area at all. */
 function encloses(points: ReadonlyArray<Vec2>): boolean {
   if (points.length < 3) return false;
@@ -65,16 +109,16 @@ function encloses(points: ReadonlyArray<Vec2>): boolean {
 }
 
 /**
- * Whether `inner` lies inside `outer`, decided by the first vertex of `inner`
- * that is not on `outer`'s boundary. A contour lying wholly on the boundary is
- * a duplicate of the collapsed contour and collapses with it.
+ * Whether `inner` lies wholly inside `outer`: no vertex of `inner` is outside
+ * `outer`, and no edge of `inner` properly crosses an edge of `outer`. The
+ * answer never depends on where `inner` starts. A contour lying wholly on the
+ * boundary is a duplicate of the collapsed contour and collapses with it.
+ * (Vertices only: a shared vertex tests exactly as on the boundary, an edge
+ * midpoint need not.)
  */
 function liesInside(inner: ReadonlyArray<Vec2>, outer: ReadonlyArray<Vec2>): boolean {
-  for (const point of inner) {
-    const side = windingSide(point, outer);
-    if (side !== 'boundary') return side === 'inside';
-  }
-  return true;
+  if (inner.some((point) => windingSide(point, outer) === 'outside')) return false;
+  return !edgesCross(inner, outer);
 }
 
 function windingSide(p: Vec2, ring: ReadonlyArray<Vec2>): 'inside' | 'outside' | 'boundary' {
@@ -91,6 +135,22 @@ function windingSide(p: Vec2, ring: ReadonlyArray<Vec2>): 'inside' | 'outside' |
     } else if (b.y <= p.y && cross < 0) wn -= 1;
   }
   return wn !== 0 ? 'inside' : 'outside';
+}
+
+/** Whether an edge of `p` properly crosses an edge of `q` (each strictly separates the other). */
+function edgesCross(p: ReadonlyArray<Vec2>, q: ReadonlyArray<Vec2>): boolean {
+  const turn = (a: Vec2, b: Vec2, c: Vec2): number =>
+    Math.sign((b.x - a.x) * (c.y - a.y) - (b.y - a.y) * (c.x - a.x));
+  for (let i = 0; i < p.length; i += 1) {
+    const a = p[i] as Vec2;
+    const b = p[(i + 1) % p.length] as Vec2;
+    for (let j = 0; j < q.length; j += 1) {
+      const c = q[j] as Vec2;
+      const d = q[(j + 1) % q.length] as Vec2;
+      if (turn(a, b, c) * turn(a, b, d) < 0 && turn(c, d, a) * turn(c, d, b) < 0) return true;
+    }
+  }
+  return false;
 }
 
 function boxOf(points: ReadonlyArray<Vec2>): Box {

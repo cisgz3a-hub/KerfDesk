@@ -8,8 +8,10 @@
 
 import { describe, expect, it } from 'vitest';
 import type { CurveSubpath, Vec2 } from '../../core/scene';
-import { contoursKeptAfterCollapse } from './collapsed-ring-subtrees';
+import { collapsesOnGrid, contoursKeptAfterCollapse } from './collapsed-ring-subtrees';
+import { writeEpsDocument } from './eps-writer';
 import { writeGeoJsonDocument } from './geojson-writer';
+import { writePdfDocument } from './pdf-writer';
 import type { VectorFillRule, VectorPaintItem } from './vector-artwork';
 
 /** Closed polygon contour from page points (y up), in the given order. */
@@ -70,12 +72,10 @@ const oriented = (points: Vec2[], ccw: boolean): CurveSubpath =>
   contour(points, counterclockwise(points) !== ccw);
 
 type Feature = { geometry: { type: string; coordinates: unknown } };
+const PAGE_OPTIONS = { precisionMm: 1, page: { minX: -10, minY: -20, maxX: 30, maxY: 20 } };
 function polygonsOf(fillRule: VectorFillRule, curves: CurveSubpath[]): number[][][][] {
   const item: VectorPaintItem = { color: '#000000', paint: 'fill', fillRule, curves };
-  const document = writeGeoJsonDocument([item], {
-    precisionMm: 1,
-    page: { minX: -10, minY: -20, maxX: 30, maxY: 20 },
-  });
+  const document = writeGeoJsonDocument([item], PAGE_OPTIONS);
   const { features } = JSON.parse(document.text) as { features: Feature[] };
   return features.flatMap((feature) =>
     feature.geometry.type === 'Polygon'
@@ -160,5 +160,157 @@ describe('contoursKeptAfterCollapse', () => {
       { x: 10, y: 5 },
     ];
     expect(contoursKeptAfterCollapse([line, BAND_HOLE], [true, false])).toEqual([false, true]);
+  });
+});
+
+// A triangle of 5.8 mm² with only its vertex (4, 2) inside the band: it
+// crosses the band and must be kept whichever vertex it starts at.
+const CROSSING: Vec2[] = [
+  { x: 4, y: 2 },
+  { x: 8, y: -0.4 },
+  { x: 8, y: 2.5 },
+];
+const rotate = (points: Vec2[], by: number): Vec2[] => [
+  ...points.slice(by),
+  ...points.slice(0, by),
+];
+
+describe('a collapsed contour drops only what lies wholly inside it', () => {
+  for (const fillRule of ['evenodd', 'nonzero'] as const) {
+    for (const start of [0, 1, 2]) {
+      it(`keeps a triangle crossing the collapsed band (${fillRule}, start ${start})`, () => {
+        const polygons = polygonsOf(fillRule, [
+          oriented(BAND, true),
+          contour(rotate(CROSSING, start)),
+          oriented(square(12, 0, 2), true),
+        ]);
+        const triangle = ringKey([
+          [14, 22],
+          [18, 20],
+          [18, 23],
+          [14, 22],
+        ]);
+        expect(shape(polygons)).toEqual([[gridSquare(12, 0, 2)], [triangle]].sort());
+      });
+    }
+
+    it(`keeps islands in the lobes of a zero-area bow-tie (${fillRule})`, () => {
+      // Snaps to (0,0) (10,10) (10,0) (0,10): zero net area, but not
+      // collinear. It crosses itself and is not a collapsed container.
+      for (const corner of [
+        { x: 10, y: 0.1 },
+        { x: 10.1, y: 0 },
+      ]) {
+        const bowTie = [{ x: 0, y: 0 }, { x: 10, y: 10 }, corner, { x: 0, y: 10 }];
+        const item: VectorPaintItem = {
+          color: '#000000',
+          paint: 'fill',
+          fillRule,
+          curves: [
+            contour(bowTie),
+            oriented(square(0.5, 4, 2), false),
+            oriented(square(7.5, 4, 2), false),
+            oriented(square(12, 0, 2), true),
+          ],
+        };
+        const document = writeGeoJsonDocument([item], PAGE_OPTIONS);
+        const keys = new Set(
+          (JSON.parse(document.text) as { features: Feature[] }).features.flatMap((feature) =>
+            (feature.geometry.type === 'Polygon'
+              ? [feature.geometry.coordinates as number[][][]]
+              : (feature.geometry.coordinates as number[][][][])
+            ).flatMap((polygon) => polygon.map(ringKey)),
+          ),
+        );
+        expect(
+          keys.has(
+            ringKey([
+              [11, 24],
+              [13, 24],
+              [13, 26],
+              [11, 26],
+              [11, 24],
+            ]),
+          ),
+        ).toBe(true);
+        expect(
+          keys.has(
+            ringKey([
+              [18, 24],
+              [20, 24],
+              [20, 26],
+              [18, 26],
+              [18, 24],
+            ]),
+          ),
+        ).toBe(true);
+        expect(document.unmergedItemCount).toBe(1);
+      }
+    });
+  }
+});
+
+describe('PDF and EPS drop a collapsed contour with its subtree, as GeoJSON does', () => {
+  /** The grid points each subpath starts at ("x y m"). */
+  const moves = (text: string): string[] =>
+    [...text.matchAll(/(-?\d+(?:\.\d+)?) (-?\d+(?:\.\d+)?) m(?=\s)/g)].map(
+      (match) => `${match[1]},${match[2]}`,
+    );
+
+  for (const fillRule of ['evenodd', 'nonzero'] as const) {
+    it(`paints neither the hole nor its island of a collapsed band (${fillRule})`, () => {
+      const item: VectorPaintItem = {
+        color: '#000000',
+        paint: 'fill',
+        fillRule,
+        curves: [
+          oriented(BAND, true),
+          oriented(BAND_HOLE, false),
+          oriented(HOLE_ISLAND, true),
+          oriented(square(12, 0, 2), true),
+        ],
+      };
+      // Only the lone square is painted; before, the hole's parallelogram
+      // (starting at 11 20 or 11 21) was painted as ink.
+      expect(moves(writePdfDocument([item], PAGE_OPTIONS).text)).toEqual(['22,20']);
+      expect(moves(writeEpsDocument([item], PAGE_OPTIONS).text)).toEqual(['22,20']);
+      expect(shape(polygonsOf(fillRule, item.curves as CurveSubpath[]))).toEqual([
+        [gridSquare(12, 0, 2)],
+      ]);
+    });
+  }
+
+  it('still strokes a collapsed contour: only fills drop it', () => {
+    const item: VectorPaintItem = {
+      color: '#000000',
+      paint: 'stroke',
+      fillRule: 'evenodd',
+      curves: [oriented(BAND, true), oriented(BAND_HOLE, false)],
+    };
+    expect(moves(writePdfDocument([item], PAGE_OPTIONS).text)).toHaveLength(2);
+  });
+});
+
+describe('collapse and containment details', () => {
+  it('treats only collinear or degenerate written points as collapsed', () => {
+    const p = (x: number, y: number): Vec2 => ({ x, y });
+    expect(collapsesOnGrid([])).toBe(true);
+    expect(collapsesOnGrid([p(1, 1), p(1, 1), p(1, 1)])).toBe(true);
+    expect(collapsesOnGrid([p(0, 0), p(8, 4), p(4, 2), p(0, 0)])).toBe(true);
+    // A bow-tie has zero net area but is not collapsed.
+    expect(collapsesOnGrid([p(0, 0), p(10, 10), p(10, 0), p(0, 10)])).toBe(false);
+  });
+
+  it('keeps a contour that touches the collapsed band only along its boundary', () => {
+    // Shares the band's lower edge; every other probe is outside the band.
+    const touching = [BAND[0] as Vec2, BAND[1] as Vec2, { x: 8, y: -3 }];
+    expect(contoursKeptAfterCollapse([BAND, touching], [true, false])).toEqual([false, true]);
+  });
+
+  it('drops a duplicate lying wholly on the collapsed boundary', () => {
+    expect(contoursKeptAfterCollapse([BAND, [...BAND].reverse()], [true, false])).toEqual([
+      false,
+      false,
+    ]);
   });
 });
