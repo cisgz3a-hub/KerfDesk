@@ -1,6 +1,7 @@
 // OriginRow — Set / Reset work origin (ADR-021) + Release motors (ADR-053 P4),
 // extracted from JobControls.tsx when it hit the ADR-015 size cap.
 
+import { deviceForActiveHead } from '../../core/cnc/cnc-head-feeds';
 import { type JobStartMode } from '../../core/job';
 import { useStore } from '../state';
 import { jobAwareConfirm } from '../state/job-aware-dialogs';
@@ -296,7 +297,9 @@ function GoToWorkZeroButton(props: {
   const wcoCache = useLaserStore((state) => state.wcoCache);
   const reportInches = useLaserStore((state) => state.controllerSettings?.reportInches === true);
   const idle = useLaserStore((state) => state.statusReport?.state === 'Idle');
-  const maxFeed = useStore((state) => state.project.device.maxFeed);
+  const maxFeed = useStore(
+    (state) => deviceForActiveHead(state.project.device, state.project.machine).maxFeed,
+  );
   const requestedFeed = useJogControlPreferences((state) => state.requestedFeedMmPerMin);
   const pushToast = useToastStore((state) => state.pushToast);
   const ready = !props.busy && props.hasCustom && wcoCache !== null && idle;

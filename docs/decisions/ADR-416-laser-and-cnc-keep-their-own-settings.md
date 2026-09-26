@@ -47,11 +47,13 @@ leaks and give each head its own copy of those, with bed, origin, homing and con
 4. **CNC has its own Max feed and Frame speed** (`CncMachineParams.maxFeedMmPerMin`,
    `framingFeedMmPerMin`, mirrored in `DeviceProfile.cncSubProfile`). The device profile's Max
    feed and Frame speed are the laser's. CNC compile, preflight, the feed calculators, machine
-   starters, surfacing, Frame, the jog pad and Job Review read CNC's own values through
-   `core/cnc/cnc-head-feeds.ts`. A CNC setup saved before this change has none, so the device
-   values apply until the setup is first made or opened, when they are copied onto it. Machine
-   Setup edits them in the CNC step; the laser's stay in the Work area step, shown only when the
-   setup includes a laser.
+   starters, surfacing, Frame, the jog pad, Go to work zero, board capture jogs, the live
+   countdown and Job Review read CNC's own values through `core/cnc/cnc-head-feeds.ts`.
+   Controller values applied outside Machine Setup follow the head in use: in CNC mode the
+   reported max rate is CNC's Max feed, and the laser's Max feed, S range and laser mode stay.
+   A CNC setup saved before this change has none, so the device values apply until the setup is
+   first made or opened, when they are copied onto it. Machine Setup edits them in the CNC step;
+   the laser's stay in the Work area step, shown only when the setup includes a laser.
 5. **Job placement and the Output switch are per mode.** `jobSetup.placement` and `layer.output`
    still hold the active mode's value, so every reader is unchanged. The other mode's value waits
    in `jobSetup.parkedPlacement` and `layer.parkedOutput`, and the two change places on every
@@ -74,4 +76,4 @@ leaks and give each head its own copy of those, with bed, origin, homing and con
   `layer-default-actions.test.ts`, `cnc-machine-starter-seeding.test.ts`,
   `import-actions.defaults.test.ts`, `parked-cnc-machine.test.ts`, `cnc-head-feeds.test.ts`,
   `cnc-own-feeds.test.ts`, `DeviceSetupCncMachineStep.speeds.test.tsx`,
-  `save-tiled-gcode.test.ts`, `mode-switch-settings.test.ts`.
+  `save-tiled-gcode.test.ts`, `mode-switch-settings.test.ts`, `active-head-max-feed.test.tsx`.

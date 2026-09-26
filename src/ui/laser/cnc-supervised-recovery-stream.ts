@@ -1,3 +1,4 @@
+import { deviceForActiveHead } from '../../core/cnc/cnc-head-feeds';
 import { streamingModeForController } from '../../core/devices';
 import type { Job } from '../../core/job';
 import { cncToolPlan } from '../state/cnc-tool-plan';
@@ -69,7 +70,7 @@ export async function streamCncRecoveryProgram(
   const canvasPlan = recoveryCanvasPlan(planned, initialPosition);
   const jobTimingPlan = canvasJobTimingPlan(
     planned.gcode,
-    planned.source.project.device,
+    deviceForActiveHead(planned.source.project.device, planned.source.project.machine),
     initialPosition,
     {
       machineKind: 'cnc',
