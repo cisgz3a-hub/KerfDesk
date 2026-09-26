@@ -79,3 +79,37 @@ describe('dilateHeightmapByTool exclusion', () => {
     expect(dilateHeightmapByTool(map, kernel, 0)[0]).toBeGreaterThanOrEqual(exactConstraint);
   });
 });
+
+describe('dilateHeightmapByTool rows and columns (ADR-421)', () => {
+  it('computes only the requested rows and columns and leaves the rest at stock top', () => {
+    const widthCells = 8;
+    const heightCells = 6;
+    const depth = new Float32Array(widthCells * heightCells);
+    for (let j = 0; j < heightCells; j += 1) {
+      for (let i = 0; i < widthCells; i += 1) depth[j * widthCells + i] = -3 + 0.9 * i;
+    }
+    const map: Heightmap = {
+      widthCells,
+      heightCells,
+      widthMm: widthCells,
+      heightMm: heightCells,
+      mmPerCell: 1,
+      depth: Float32Array.from(depth, (value) => Math.min(0, value)),
+    };
+    const ball: CncTool = { id: 'ball', name: 'ball', kind: 'ball-nose', diameterMm: 3 };
+    const kernel = kernelForTool(ball, 1);
+    const exact = dilateHeightmapByTool(map, kernel, 0);
+    const lattice = dilateHeightmapByTool(map, kernel, 0, { betweenSamples: false });
+    const rows = Uint8Array.from([0, 1, 0, 0, 1, 0]);
+    const columns = Uint8Array.from([1, 0, 0, 0, 0, 0, 0, 1]);
+    const partial = dilateHeightmapByTool(map, kernel, 0, { rows, columns });
+
+    expect([...exact].some((value, index) => value > (lattice[index] ?? 0))).toBe(true);
+    for (let j = 0; j < heightCells; j += 1) {
+      for (let i = 0; i < widthCells; i += 1) {
+        const computed = rows[j] === 1 || columns[i] === 1;
+        expect(partial[j * widthCells + i]).toBe(computed ? exact[j * widthCells + i] : 0);
+      }
+    }
+  });
+});

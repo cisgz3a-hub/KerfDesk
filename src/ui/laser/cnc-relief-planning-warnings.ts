@@ -3,13 +3,10 @@
 // cap, refuse, or authorize a plan.
 
 import type { Job } from '../../core/job';
-import {
-  DEFAULT_RELIEF_SCALLOP_MM,
-  MAX_HEIGHTMAP_CELLS,
-  scallopRowSpacingMm,
-} from '../../core/relief';
-// Deep import: core/relief's barrel is a ratcheted over-cap legacy barrel.
+import { DEFAULT_RELIEF_SCALLOP_MM, MAX_HEIGHTMAP_CELLS } from '../../core/relief';
+// Deep imports: core/relief's barrel is a ratcheted over-cap legacy barrel.
 import { reliefScallopBallRadiusMm } from '../../core/relief/relief-finishing';
+import { reliefFinishRowSpacingMm } from '../../core/relief/relief-finishing-strategy';
 import {
   DEFAULT_CNC_LAYER_SETTINGS,
   sceneObjectUsesOperation,
@@ -200,7 +197,11 @@ function sourceReliefScallopWarnings(project: Project): ReadonlyArray<string> {
               layer.name,
               scallopMm,
               ball,
-              scallopRowSpacingMm(finishTool, scallopMm),
+              reliefFinishRowSpacingMm(
+                finishTool,
+                scallopMm,
+                settings.reliefFinishStrategy ?? 'raster',
+              ),
             ),
           ]
         : [],

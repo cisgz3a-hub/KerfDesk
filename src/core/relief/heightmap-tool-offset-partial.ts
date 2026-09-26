@@ -10,7 +10,6 @@ import {
 } from '../grid';
 import { CNC_MASK_EMISSION_Z_CLEARANCE_MM } from '../cnc/precision';
 import type { ToolKernel } from '../sim';
-import { cuttingSurfaceDz } from '../sim/cutting-surface';
 import type { Heightmap } from './heightmap';
 
 const TOOL_DISTANCE_TOLERANCE_ULPS = 16;
@@ -148,11 +147,7 @@ export function partialExcludedConstraint(
         ) - pathUncertaintyMm,
       );
       if (distanceMm > kernel.radiusMm + tolerance) continue;
-      const dz = cuttingSurfaceDz(
-        kernel.tool,
-        Math.min(kernel.radiusMm, distanceMm),
-        kernel.radiusMm,
-      );
+      const dz = kernel.surfaceDzAtRadius(Math.min(kernel.radiusMm, distanceMm));
       best = Math.max(best, CNC_MASK_EMISSION_Z_CLEARANCE_MM - dz);
     }
   }
@@ -236,7 +231,7 @@ function surfaceCandidate(context: SurfaceContext, nx: number, ny: number): numb
     partialCellCenter(map, 'y', ny) - context.centerY,
   );
   if (distanceMm > kernel.radiusMm + context.tolerance) return Number.NEGATIVE_INFINITY;
-  const dz = cuttingSurfaceDz(kernel.tool, Math.min(kernel.radiusMm, distanceMm), kernel.radiusMm);
+  const dz = kernel.surfaceDzAtRadius(Math.min(kernel.radiusMm, distanceMm));
   return (map.depth[neighbor] ?? 0) - dz;
 }
 

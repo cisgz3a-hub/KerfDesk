@@ -4,6 +4,7 @@
 import { sceneObjectUsesOperation, type CncLayerSettings, type Layer } from '../../core/scene';
 import { NumberField as ClearableNumberField } from '../common/NumberField';
 import { useStore } from '../state';
+import { cutTypeShowsCutDirection, ReliefStrategyRows } from './CncReliefStrategyRows';
 
 // Relief roughing (H.5) reads depth-per-pass + stepover from the layer but
 // takes total depth from the relief object — CncLayerFields keys its
@@ -31,6 +32,7 @@ export function ReliefLayerRows(props: {
         shapes only.
       </div>
       <ReliefScallopRow layer={props.layer} settings={props.settings} onCommit={props.onCommit} />
+      <ReliefStrategyRows layer={props.layer} settings={props.settings} onCommit={props.onCommit} />
     </>
   );
 }
@@ -67,10 +69,7 @@ export function MotionPolishRows(props: {
   readonly onCommitSettings: (settings: CncLayerSettings) => void;
 }): JSX.Element {
   const isVCarve = props.settings.cutType === 'v-carve';
-  const showCutDirection =
-    props.settings.cutType === 'profile-outside' ||
-    props.settings.cutType === 'profile-inside' ||
-    props.settings.cutType === 'pocket';
+  const showCutDirection = cutTypeShowsCutDirection(props.settings.cutType);
   return (
     <>
       {showCutDirection ? (

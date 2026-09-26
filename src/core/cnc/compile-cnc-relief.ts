@@ -14,12 +14,14 @@ import type { CncContourPass, CncGroup, CncPass } from '../job';
 // Deep type import: core/job's barrel is a ratcheted over-cap legacy barrel
 // (scripts/index-export-baseline.json) and may only shrink.
 import type { CncReliefPlanningEvidence } from '../job/job';
-import { DEFAULT_RELIEF_SCALLOP_MM, reliefFinishingPasses, scallopRowSpacingMm } from '../relief';
+import { DEFAULT_RELIEF_SCALLOP_MM } from '../relief';
 // Deep import: core/relief's barrel is a ratcheted over-cap legacy barrel
 // (scripts/index-export-baseline.json) and may only shrink, so the ladder
 // variant cannot be added to it.
 import { reliefRoughingLadder, type ReliefRoughingLadder } from '../relief/relief-roughing';
 import { reliefScallopBallRadiusMm } from '../relief/relief-finishing';
+import { reliefFinishingPlan, reliefFinishRowSpacingMm } from '../relief/relief-finishing-strategy';
+import type { Heightmap } from '../relief/heightmap';
 import { reliefObjectToHeightmap } from '../relief/relief-object-to-heightmap';
 import {
   reliefMaterializationFailure,
@@ -36,10 +38,13 @@ import {
   type ReliefObject,
   sceneObjectUsesOperation,
   type SceneObject,
+  type Transform,
+  type Vec2,
 } from '../scene';
 import { kernelForTool } from '../sim';
 import { coolantFields } from './coolant-fields';
 import { cncGroupProvenance } from './cnc-group-provenance';
+import { contourPassFromPolyline } from './compile-cnc-helpers';
 import { zPassArrayMaterializationError } from './depth-passes';
 import { enforceCutDirection, parkFields } from './motion-polish';
 import { reliefMachineSpaceGeometry, reliefMachineSpaceTransform } from './relief-machine-space';
@@ -49,13 +54,21 @@ const MIN_FEED_MM_PER_MIN = 1;
 const ROUGHING_CELL_TOOL_FRACTION = 8;
 // Finishing samples finer than roughing: quality lives in the skim.
 const FINISHING_CELL_TOOL_FRACTION = 10;
+// Tolerates rowSpacing / finestCell landing a rounding error above a whole
+// number, which would otherwise add a needless extra subdivision.
+const ROW_SUBDIVISION_SLACK = 1e-9;
 
 function finishingCellSizeMm(rowSpacingMm: number, tool: CncTool): number {
   // A tapered ball nose finishes with its tip ball, so the grid resolves that
   // ball exactly as it would a ball nose of the same diameter (ADR-368).
   const ballRadiusMm = reliefScallopBallRadiusMm(tool);
   const contactDiameterMm = ballRadiusMm === null ? tool.diameterMm : 2 * ballRadiusMm;
-  return Math.min(rowSpacingMm, contactDiameterMm / FINISHING_CELL_TOOL_FRACTION);
+  const finestCellMm = contactDiameterMm / FINISHING_CELL_TOOL_FRACTION;
+  // ADR-421: the largest cell no coarser than the finest one that divides the
+  // row spacing into whole rows, so the rows land at the requested spacing
+  // instead of rounding down to the next whole row.
+  const rowsPerStride = Math.max(1, Math.ceil(rowSpacingMm / finestCellMm - ROW_SUBDIVISION_SLACK));
+  return rowSpacingMm / rowsPerStride;
 }
 
 // Roughing group (H.5) plus — when the layer names a finishing bit — the
@@ -183,7 +196,8 @@ function reliefFinishingGroup(
   const finishTool = config.tools.find((tool) => tool.id === settings.reliefFinishToolId);
   if (finishTool === undefined) return { kind: 'compiled', group: null, plans: [] };
   const scallopMm = settings.reliefScallopMm ?? DEFAULT_RELIEF_SCALLOP_MM;
-  const rowSpacingMm = scallopRowSpacingMm(finishTool, scallopMm);
+  const strategy = settings.reliefFinishStrategy ?? 'raster';
+  const rowSpacingMm = reliefFinishRowSpacingMm(finishTool, scallopMm, strategy);
   const passes: CncPass[] = [];
   const plans: CncReliefPlanningEvidence[] = [];
   for (const relief of reliefs) {
@@ -199,32 +213,25 @@ function reliefFinishingGroup(
       return reliefMaterializationFailure(relief.source, heightmap.reason);
     }
     plans.push({
-      layerId: layer.id,
-      source: relief.source,
-      stage: 'finishing',
-      widthCells: heightmap.heightmap.widthCells,
-      heightCells: heightmap.heightmap.heightCells,
-      cellSizeMm: heightmap.heightmap.mmPerCell,
-      toolDiameterMm: finishTool.diameterMm,
-      toolKind: finishTool.kind,
-      ...finishingTipEvidence(finishTool),
+      ...finishingGridEvidence(layer, relief, heightmap.heightmap, finishTool),
       rowSpacingMm,
       scallopMm,
     });
-    const kernel = kernelForTool(finishTool, heightmap.heightmap.mmPerCell);
-    for (const pass of reliefFinishingPasses(heightmap.heightmap, {
+    const residual = machineSpace.residualTransform;
+    for (const pass of reliefFinishingPlan(heightmap.heightmap, {
       tool: finishTool,
-      kernel,
+      kernel: kernelForTool(finishTool, heightmap.heightmap.mmPerCell),
       scallopMm,
+      strategy,
+      rasterAxis: settings.reliefRasterAxis ?? 'x',
+      wallOnRight: waterlineWallOnRight(residual, device, settings),
     })) {
       if (pass.kind !== 'path3d') continue;
-      passes.push({
-        ...pass,
-        points: pass.points.map((p) => ({
-          ...toMachineCoords(applyTransform(p, machineSpace.residualTransform), device),
-          z: p.z,
-        })),
-      });
+      const points = pass.points.map((p) => ({
+        ...toMachineCoords(applyTransform(p, residual), device),
+        z: p.z,
+      }));
+      passes.push({ ...pass, points });
     }
   }
   if (passes.length === 0) return { kind: 'compiled', group: null, plans };
@@ -241,6 +248,47 @@ function reliefFinishingGroup(
       passes,
       layerCncTool(config, settings),
     ),
+  };
+}
+
+// ADR-423: which side of travel the wall should be on, in heightmap numbers,
+// for the layer's cut direction. Climb keeps the material right of travel on
+// the physical bed (motion-polish.ts); the placement and the machine frame may
+// each mirror that.
+function waterlineWallOnRight(
+  residualTransform: Transform,
+  device: DeviceProfile,
+  settings: CncLayerSettings,
+): boolean {
+  const place = (x: number, y: number): Vec2 =>
+    toMachineCoords(applyTransform({ x, y }, residualTransform), device);
+  const origin = place(0, 0);
+  const alongX = place(1, 0);
+  const alongY = place(0, 1);
+  const determinant =
+    (alongX.x - origin.x) * (alongY.y - origin.y) - (alongX.y - origin.y) * (alongY.x - origin.x);
+  const keepsSides = determinant * machineFrameHandedness(device.origin) > 0;
+  const climb =
+    (settings.cutDirection ?? DEFAULT_CNC_LAYER_SETTINGS.cutDirection ?? 'climb') === 'climb';
+  return keepsSides === climb;
+}
+
+function finishingGridEvidence(
+  layer: Layer,
+  relief: ReliefObject,
+  heightmap: Heightmap,
+  tool: CncTool,
+): CncReliefPlanningEvidence {
+  return {
+    layerId: layer.id,
+    source: relief.source,
+    stage: 'finishing',
+    widthCells: heightmap.widthCells,
+    heightCells: heightmap.heightCells,
+    cellSizeMm: heightmap.mmPerCell,
+    toolDiameterMm: tool.diameterMm,
+    toolKind: tool.kind,
+    ...finishingTipEvidence(tool),
   };
 }
 
@@ -373,23 +421,24 @@ function appendReliefPasses(
   if (result.kind === 'relief-materialization-failed') return result;
   for (const pass of result.ladder.passes) {
     if (pass.kind !== 'contour') continue;
-    const mapped = {
-      ...pass,
-      polyline: pass.polyline.map((p) =>
-        toMachineCoords(applyTransform(p, residualTransform), device),
-      ),
-    };
+    const mapped = pass.polyline.map((p) =>
+      toMachineCoords(applyTransform(p, residualTransform), device),
+    );
     const directed = enforceCutDirection(
-      [{ points: mapped.polyline, closed: mapped.closed }],
+      [{ points: mapped, closed: pass.closed }],
       settings.cutDirection ?? DEFAULT_CNC_LAYER_SETTINGS.cutDirection ?? 'climb',
       'pocket',
       machineFrameHandedness(device.origin),
     )[0];
     if (directed === undefined) continue;
-    passes.push({
-      ...mapped,
-      polyline: directed.points,
-    });
+    // The ladder closes each ring on its first point, and direction
+    // enforcement then moves the start to the middle of the longest segment.
+    // That leaves the old closing point as a repeated vertex mid-ring and ends
+    // the ring at the corner before its new start, half that segment short
+    // (ADR-289 Amendment 1). Drop the repeat and close the ring at its new
+    // start, as pocket rings are closed.
+    const points = withoutRepeatedPoints(directed.points);
+    passes.push(contourPassFromPolyline({ ...directed, points }, pass.zMm));
   }
   return {
     kind: 'compiled',
@@ -398,6 +447,13 @@ function appendReliefPasses(
     stepoverUsed: true,
     plan: result.plan,
   };
+}
+
+function withoutRepeatedPoints(points: ReadonlyArray<Vec2>): ReadonlyArray<Vec2> {
+  return points.filter((point, index) => {
+    const previous = points[index - 1];
+    return previous === undefined || previous.x !== point.x || previous.y !== point.y;
+  });
 }
 
 function cap(feedMmPerMin: number, maxFeed: number): number {

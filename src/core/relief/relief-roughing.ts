@@ -1,6 +1,7 @@
 // reliefRoughingPasses — waterline roughing of a heightmap (Phase H.5,
-// ADR-098/ADR-289). For each Z level from zPassDepths, cells whose dilated
-// sampled tool-center target lies at or below the level form the region the tool
+// ADR-098/ADR-289). For each Z level from zPassDepths, plus one at the floor
+// and one at every flat between levels (ADR-422), cells whose dilated sampled
+// tool-center target lies at or below the level form the region the tool
 // must clear at that level; marching squares turns the region into closed
 // contours, and concentric inward rings at the stepover spacing fill it.
 //
@@ -9,12 +10,18 @@
 // deviation from pocketToolpathRings, which would double-count the radius).
 // The stepover is a percentage of the cut width over one level, which is the
 // stored diameter except for a tapered ball nose: its rings then overlap
-// inside every level instead of leaving ribs (ADR-368 Amendment 2).
+// inside every level instead of leaving ribs (ADR-368 Amendment 2). When the
+// stepover is wider than the cutter reaches on a level's slice (ADR-413), the
+// innermost ring can stop short of the level's centre; relief-core-cleanup.ts
+// then adds the paths that clear what the rings leave, as the pocket planner
+// does (ADR-289 Amendment 1).
 //
 // Output passes are contour passes in heightmap physical mm (origin at the
-// heightmap's min corner, y down). The compiler has already folded object XY
-// scale into that grid, so only its residual isometry and device origin remain.
-// Depth-major: every ring of one level before the next. Pure and deterministic.
+// heightmap's min corner, y down), each ring closed back to its first point.
+// The compiler has already folded object XY scale into that grid, so only its
+// residual isometry and device origin remain. Depth-major: every ring of one
+// level, outside in, then its core cleanup, before the next level. Pure and
+// deterministic.
 
 import { buildOffsetLadder, insetContoursChecked } from '../geometry/offset-ladder';
 import { partialDualCoordinate } from '../grid';
@@ -26,6 +33,8 @@ import { cncLayoutCutWidths } from '../cnc/layout-cut-widths';
 import { dilateHeightmapByTool } from './heightmap-tool-offset';
 import type { Heightmap } from './heightmap';
 import { marchingSquares } from './marching-squares';
+import { reliefCoreCleanup } from './relief-core-cleanup';
+import { reliefRoughingLevels } from './relief-roughing-levels';
 
 // Material intentionally left everywhere for the finishing pass (H.8).
 export const DEFAULT_RELIEF_ALLOWANCE_MM = 0.5;
@@ -33,6 +42,9 @@ const LEVEL_EPS = 1e-6;
 const MIN_STEPOVER_PERCENT = 10;
 const MAX_RINGS_PER_LEVEL = 4096;
 const MIN_RING_POINTS = 3;
+// Halvings of the cutter radius when finding its reach on one slice: far
+// below the 0.001 mm emit grid for any cutter.
+const CUT_RADIUS_BISECTIONS = 40;
 // Exhausting the current 16-case marching-squares table, the farthest point on
 // a produced segment from its nearest selected center occurs in cases 7/11/13/14:
 // sqrt((3/4)^2 + (1/4)^2) cells. The mask kernel expands by this amount so the
@@ -74,16 +86,20 @@ export function reliefRoughingLadder(
   if (!(options.reliefDepthMm > 0) || !(options.tool.diameterMm > 0)) {
     return { passes: [], offsetFailed: false, passLimited: false };
   }
+  const allowanceMm = reliefAllowanceMm(options.allowanceMm);
+  // ADR-412: plan with the cutter widened by the allowance plus the dual-grid
+  // clearance, then lift by the allowance. Every ring point lies within that
+  // clearance of a selected center, so the real cutter keeps at least the
+  // allowance from the surface in 3D: on a wall as well as on a floor. The
+  // widened law also covers excluded-mask stock, so no separate mask path
+  // uncertainty is added.
   const kernel: ToolKernel = kernelForTool(
     options.tool,
     map.mmPerCell,
-    MARCHING_SQUARES_CENTER_CLEARANCE_CELLS * map.mmPerCell,
+    0,
+    allowanceMm + MARCHING_SQUARES_CENTER_CLEARANCE_CELLS * map.mmPerCell,
   );
-  const dilated = dilateHeightmapByTool(
-    map,
-    kernel,
-    options.allowanceMm ?? DEFAULT_RELIEF_ALLOWANCE_MM,
-  );
+  const dilated = dilateHeightmapByTool(map, kernel, allowanceMm);
   const { clearingDiameterMm } = cncLayoutCutWidths(
     options.tool,
     options.reliefDepthMm,
@@ -93,13 +109,45 @@ export function reliefRoughingLadder(
   const passes: CncContourPass[] = [];
   let offsetFailed = false;
   let passLimited = false;
-  for (const level of zPassDepths(options.reliefDepthMm, options.depthPerPassMm)) {
-    const contours = levelContoursMm(map, dilated, level);
-    const completion = appendLevelRings(passes, contours, level, stepMm);
+  const toolLaw = kernelForTool(options.tool, map.mmPerCell);
+  // ADR-422: the ladder plus a level at the floor and at every flat.
+  const levels = reliefRoughingLevels(
+    map,
+    dilated,
+    zPassDepths(options.reliefDepthMm, options.depthPerPassMm),
+    clearingDiameterMm / 2,
+  );
+  for (const level of levels) {
+    const contours = levelContoursMm(map, dilated, level.zMm, level.bandFloorMm);
+    const cutRadiusMm = sliceCutRadiusMm(toolLaw, level.sliceTopMm - level.zMm);
+    const completion = appendLevelRings(passes, contours, level.zMm, stepMm, cutRadiusMm);
     offsetFailed = offsetFailed || completion.offsetFailed;
     passLimited = passLimited || completion.passLimited;
   }
   return { passes, offsetFailed, passLimited };
+}
+
+// How far from its path the cutter clears a whole slice: the widest radius
+// whose cutting surface stays within the slice above the tip. A flat end mill
+// reaches its full radius; a ball or tapered ball nose less on a thin slice,
+// where a wider stepover would leave ribs the full slice tall (ADR-413). The
+// core cleanup sizes every ring's sweep by it (ADR-289 Amendment 1).
+function sliceCutRadiusMm(law: ToolKernel, sliceMm: number): number {
+  const radius = law.radiusMm;
+  if (law.surfaceDzAtRadius(radius) <= sliceMm) return radius;
+  let low = 0;
+  let high = radius;
+  for (let step = 0; step < CUT_RADIUS_BISECTIONS; step += 1) {
+    const middle = (low + high) / 2;
+    if (law.surfaceDzAtRadius(middle) <= sliceMm) low = middle;
+    else high = middle;
+  }
+  return low;
+}
+
+function reliefAllowanceMm(allowanceMm: number | undefined): number {
+  const value = allowanceMm ?? DEFAULT_RELIEF_ALLOWANCE_MM;
+  return Number.isFinite(value) && value > 0 ? value : 0;
 }
 
 function stepoverMm(stepoverPercent: number, toolDiameterMm: number): number {
@@ -111,16 +159,20 @@ function stepoverMm(stepoverPercent: number, toolDiameterMm: number): number {
 }
 
 // Region at a level: dilated target at or below the level (the tool must
-// reach this deep here eventually — clear it now, one slice at a time).
+// reach this deep here eventually — clear it now, one slice at a time). A flat
+// level's band stops above the next level, which clears the rest (ADR-422).
 function levelContoursMm(
   map: Heightmap,
   dilated: Float32Array,
   levelZ: number,
+  bandFloorZ: number | null,
 ): ReadonlyArray<Polyline> {
   const mask = new Uint8Array(map.widthCells * map.heightCells);
+  const floor = bandFloorZ === null ? Number.NEGATIVE_INFINITY : bandFloorZ + LEVEL_EPS;
   let any = false;
   for (let i = 0; i < mask.length; i += 1) {
-    if (map.inclusion?.[i] !== 0 && (dilated[i] ?? 0) <= levelZ + LEVEL_EPS) {
+    const tip = dilated[i] ?? 0;
+    if (map.inclusion?.[i] !== 0 && tip <= levelZ + LEVEL_EPS && tip > floor) {
       mask[i] = 1;
       any = true;
     }
@@ -147,23 +199,24 @@ function appendLevelRings(
   contours: ReadonlyArray<Polyline>,
   levelZ: number,
   stepMm: number,
+  cutRadiusMm: number,
 ): ReliefLevelCompletion {
   const usable = contours.filter((c) => c.points.length >= MIN_RING_POINTS);
   if (usable.length === 0) return { offsetFailed: false, passLimited: false };
-  // Ring 0 = the dual-grid region boundary. The mask-aware dilation expands its
-  // excluded-cell envelope by the exact worst displacement of this marching-
-  // squares table, so every boundary segment remains inside the mask proof.
+  // Ring 0 = the dual-grid region boundary. The widened dilation covers every
+  // point within this marching-squares table's worst displacement of a
+  // selected center, so every boundary segment remains inside the proof.
   // Deeper rings shrink inward by the stepover until they vanish. Step 0's inset
   // is 0, which the offset engine returns unchanged.
   const ladder = buildOffsetLadder(usable, MAX_RINGS_PER_LEVEL, (step) => step * stepMm);
-  for (const ring of ladder.rings) {
-    for (const polyline of ring) {
-      if (polyline.points.length < MIN_RING_POINTS) continue;
-      passes.push({ kind: 'contour', zMm: levelZ, polyline: closeRing(polyline), closed: true });
-    }
+  const cleanup = reliefCoreCleanup(usable, ladder, stepMm, cutRadiusMm);
+  for (const polyline of [...ladder.rings.flat(), ...cleanup.paths]) {
+    if (polyline.points.length < MIN_RING_POINTS) continue;
+    passes.push({ kind: 'contour', zMm: levelZ, polyline: closeRing(polyline), closed: true });
   }
-  if (ladder.offsetFailed) return { offsetFailed: true, passLimited: false };
-  if (!ladder.capped) return { offsetFailed: false, passLimited: false };
+  const offsetFailed = ladder.offsetFailed || cleanup.offsetFailed;
+  if (offsetFailed) return { offsetFailed, passLimited: false };
+  if (!ladder.capped) return { offsetFailed, passLimited: cleanup.passLimited };
 
   // buildOffsetLadder stops immediately after its last permitted non-empty
   // ring. Probe the next inset once to classify the stop, but never append this

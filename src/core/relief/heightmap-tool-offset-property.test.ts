@@ -72,8 +72,18 @@ function exactExtentMap(
   };
 }
 
+// The sampled lattice alone, which the brute-force references reproduce.
+const LATTICE = { betweenSamples: false } as const;
+
 function expectSameBits(actual: Float32Array, expected: Float32Array): void {
   expect(new Uint32Array(actual.buffer)).toEqual(new Uint32Array(expected.buffer));
+}
+
+// ADR-412's contact only ever raises a tip above the sampled lattice.
+function expectNeverLower(actual: Float32Array, lattice: Float32Array): void {
+  for (let index = 0; index < lattice.length; index += 1) {
+    expect(actual[index] ?? 0).toBeGreaterThanOrEqual(lattice[index] ?? 0);
+  }
 }
 
 describe('partial-edge dilation equivalence', () => {
@@ -93,11 +103,20 @@ describe('partial-edge dilation equivalence', () => {
           const kernel = kernelForTool(tool, map.mmPerCell, map.mmPerCell / 7);
           const allowanceMm = allowanceMicrons / 1_000;
           const expected = bruteForcePhysicalDilation(map, kernel, allowanceMm);
-          const actual = dilateHeightmapByToolWithMaskEvidence(map, kernel, allowanceMm);
+          const actual = dilateHeightmapByToolWithMaskEvidence(map, kernel, allowanceMm, LATTICE);
 
           expectSameBits(actual.tipDepth, expected.tipDepth);
           expect(actual.touchesExcluded).toEqual(expected.touchesExcluded);
-          expectSameBits(dilateHeightmapByTool(map, kernel, allowanceMm), expected.tipDepth);
+          expectSameBits(
+            dilateHeightmapByTool(map, kernel, allowanceMm, LATTICE),
+            expected.tipDepth,
+          );
+
+          const withContact = bruteForcePhysicalDilation(map, kernel, allowanceMm, true);
+          const full = dilateHeightmapByToolWithMaskEvidence(map, kernel, allowanceMm);
+          expectSameBits(full.tipDepth, withContact.tipDepth);
+          expect(full.touchesExcluded).toEqual(expected.touchesExcluded);
+          expectNeverLower(full.tipDepth, actual.tipDepth);
         }),
         { numRuns: PROPERTY_RUNS },
       );
@@ -111,10 +130,14 @@ describe('partial-edge dilation equivalence', () => {
         const kernel = kernelForTool(tool, map.mmPerCell, map.mmPerCell / 9);
         const allowanceMm = allowance / 1_000;
         const expected = legacyRegularDilation(map, kernel, allowanceMm);
-        const actual = dilateHeightmapByToolWithMaskEvidence(map, kernel, allowanceMm);
+        const actual = dilateHeightmapByToolWithMaskEvidence(map, kernel, allowanceMm, LATTICE);
 
         expectSameBits(actual.tipDepth, expected.tipDepth);
         expect(actual.touchesExcluded).toEqual(expected.touchesExcluded);
+        expectSameBits(
+          dilateHeightmapByTool(map, kernel, allowanceMm),
+          legacyRegularDilation(map, kernel, allowanceMm, true).tipDepth,
+        );
       }),
       { numRuns: PROPERTY_RUNS },
     );
@@ -140,6 +163,7 @@ describe('partial-edge dilation equivalence', () => {
       maskSweepCandidateSpanCells: 0,
       maskPathUncertaintyMm: 0,
       maskSweepPathUncertaintyMm: 0,
+      horizontalGrowthMm: 0,
     };
     const map: Heightmap = {
       widthCells: 2,
