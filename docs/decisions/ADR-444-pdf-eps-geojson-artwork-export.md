@@ -137,3 +137,55 @@ consulted.
   file, the help and the toast.
 - An exported PDF or EPS page can be up to 0.05 mm per side larger than the geometry, and never
   smaller than 3 pt; the exact geometry bounds remain the GeoJSON `bbox` and the grid page.
+
+### Amendment 1 - A grid-collapsed GeoJSON ring takes its subtree with it (2026-09-27)
+
+**Context.** Item 5 says a ring that collapses on the grid is dropped with its holes, but the
+writer did not do that. `openRing` returned null for a collapsed ring before nesting ran, so
+only that ring was dropped. A contour nested inside it could still snap to a real polygon: for
+example, a band under one grid step wide whose snapped corners fall on one line, with a hole whose
+snapped points do not. That hole then had no container. It was classed as an outer ring and
+written as a filled polygon, so paper became ink under both fill rules, with any island in it
+written as its hole. In the same way, an island inside a collapsed hole became a hole of the outer
+ring under even-odd, so ink became paper.
+
+Two fixes were considered:
+
+- (a) Decide nesting on the unsnapped geometry, then drop a collapsed ring together with its
+  whole subtree.
+- (b) Keep a collapsed outer ring and write a minimal valid polygon for it.
+
+The SVG, PDF, EPS and DXF writers never drop a closed contour on their own: they write every
+contour's snapped points and leave the painting to the fill rule. A zero-area contour paints
+nothing there. GeoJSON must drop a collapsed ring, because RFC 7946 rings need four positions
+and an area. Option (b) would invent ink the source does not have, a polygon at least one grid
+step wide where the true band is thinner. Option (a) follows ADR-458 Amendment 1's no-orphan
+invariant: a ring is only ever dropped together with everything nested inside it. Everything in
+that subtree lies inside the collapsed contour, which is itself thinner than the grid, so what is
+lost is also thinner than the grid. This is the same order of error as the snapping itself.
+
+**Decision.** Option (a). `collapsed-ring-subtrees.ts` (`contoursKeptAfterCollapse`) takes the
+unsnapped flattened contours and the list of contours that collapsed. For each collapsed contour
+that encloses any area, it drops every contour whose bounding box fits inside that contour's box
+and whose first vertex off that contour's boundary lies inside it (by the nonzero winding test).
+Nesting is transitive for nested-or-disjoint contours, so this removes the whole subtree: holes,
+their islands, and so on. A contour lying wholly on the boundary is a duplicate and collapses with
+it. `fillRegionPolygons` then runs on the rings that remain, as before. When nothing collapses,
+nothing changes, so the sample goldens are byte-identical.
+
+The PDF and EPS files are left as they are. They snap Bezier control points rather than
+flattened positions, so a thin band there keeps its curves at viewer resolution. In the rare case
+where all of a contour's control points snap onto one line, that contour paints nothing and adds
+no winding, so a contour nested in it can still paint with the opposite fill in the viewer. That
+residual is at most about two grid steps wide and is not changed here.
+
+**Evidence.** `src/io/vector-formats/geojson-collapsed-ring.test.ts` uses a 1 mm grid with an
+explicit page. It checks a band 0.98 mm wide along y = x/2, whose corners all snap to (0,0) or
+(8,4), with a hole inside it that snaps to a parallelogram and an island inside the hole that
+snaps to a triangle. Under even-odd and under nonzero, only a disjoint square is written. On the
+base, the hole was written as a filled polygon with the island as its hole. A second case puts the
+same band as a hole inside a large square, with the island inside the band. The outer stays solid;
+on the base, under even-odd, the island became a hole. A control case scales the same nest 10x.
+Nothing collapses there, and the result is a band polygon with one hole plus the island polygon.
+Unit cases check that `contoursKeptAfterCollapse` drops the collapsed contour and everything inside
+it and nothing else, and that it ignores a collapsed contour that encloses no area.

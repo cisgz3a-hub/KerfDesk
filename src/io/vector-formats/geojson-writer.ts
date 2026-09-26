@@ -20,10 +20,13 @@
 // out, so the polygons show what the PDF and EPS files paint. Rings follow
 // the right-hand rule of section 3.1.6 (exterior counterclockwise, holes
 // clockwise, in the y-up frame). Every ring is closed (first position =
-// last) and has at least four positions; rings that collapse on the grid are
-// dropped. Contours that cross one another are not merged: that item's
-// polygons are written as separate features marked "unmerged": true, so the
-// file never claims an invalid MultiPolygon, and the caller is told.
+// last) and has at least four positions; a ring that collapses on the grid
+// is dropped together with every contour nested inside it (nesting decided
+// on the unsnapped contours, collapsed-ring-subtrees), so no hole or island
+// is orphaned and written with the wrong fill. Contours that cross one
+// another are not merged: that item's polygons are written as separate
+// features marked "unmerged": true, so the file never claims an invalid
+// MultiPolygon, and the caller is told.
 // Stroked items become LineString / MultiLineString features (a closed
 // contour's line ends where it starts). A bbox member (section 5) gives the
 // written extent.
@@ -37,6 +40,7 @@ import {
   type VectorPaintItem,
   type VectorWriteOptions,
 } from './vector-artwork';
+import { contoursKeptAfterCollapse } from './collapsed-ring-subtrees';
 import { fillRegionPolygons, twiceSignedArea } from './fill-region-rings';
 
 export const DEFAULT_GEOJSON_FLATTEN_TOLERANCE_MM = 0.01;
@@ -144,9 +148,17 @@ function filledPolygons(
   page: PreparedPage,
   tolerance: number,
 ): { polygons: Position[][][]; crossing: boolean } {
-  const rings = curves
-    .map((curve) => openRing(curve, page, tolerance))
-    .filter((ring): ring is GridPoint[] => ring !== null);
+  const sources = curves.map((curve) => flattened(curve, tolerance));
+  const snapped = sources.map((points) => openRing(points, page));
+  // A ring that collapses on the grid goes with its whole subtree, decided on
+  // the unsnapped contours, so no hole or island inside it is orphaned.
+  const kept = contoursKeptAfterCollapse(
+    sources,
+    snapped.map((ring) => ring === null),
+  );
+  const rings = snapped.filter(
+    (ring, index): ring is GridPoint[] => ring !== null && kept[index] === true,
+  );
   const region = fillRegionPolygons(rings, fillRule);
   const closedRing = (index: number, counterclockwise: boolean): Position[] => {
     const ring = rings[index] as GridPoint[];
@@ -160,8 +172,8 @@ function filledPolygons(
 }
 
 /** An open ring on the grid (first point not repeated), or null when it collapses. */
-function openRing(curve: CurveSubpath, page: PreparedPage, tolerance: number): GridPoint[] | null {
-  const points = dedupe(flattened(curve, tolerance).map(page.toGrid));
+function openRing(flat: ReadonlyArray<Vec2>, page: PreparedPage): GridPoint[] | null {
+  const points = dedupe(flat.map(page.toGrid));
   const first = points[0];
   const last = points[points.length - 1];
   if (first !== undefined && last !== undefined && samePoint(first, last) && points.length > 1) {
