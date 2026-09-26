@@ -243,7 +243,7 @@ describe('independent camera Print and Cut ownership probes', () => {
       () => useStore.getState().updateDeviceProfile({ profileId: 'replacement-profile' }),
     ],
     ['source-epoch', () => useCameraStore.setState((s) => ({ sourceEpoch: s.sourceEpoch + 1 }))],
-  ] as const)('does not stamp an old frame with a changed %s', async (name, change) => {
+  ] as const)('does not stamp an old frame with a changed %s', async (_name, change) => {
     const host = await mountControl(<PrintAndCutDialogHost onClose={() => undefined} />);
     await clickControl(host, 'Use selected marks');
     const pending = deferred();
