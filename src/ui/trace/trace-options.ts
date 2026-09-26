@@ -42,6 +42,8 @@ export type LightBurnTraceSettingOverrides = ColourLayerSettingOverrides & {
   readonly edgeSensitivity?: number;
   readonly edgeDetail?: number;
   readonly edgeMinimumLinePx?: number;
+  // Diagonal contacts (ADR-450): the filled-contour lane's turn policy.
+  readonly turnPolicy?: TraceOptions['turnPolicy'];
 };
 
 export type TraceDetectionMode = 'preset' | 'manual' | 'sketch' | 'faint-lines';
@@ -71,6 +73,7 @@ export function mergeLightBurnTraceSettings(
     out['traceTransparency'] = settings.traceTransparency;
   }
   if (settings.invert !== undefined) out['invert'] = settings.invert;
+  if (settings.turnPolicy !== undefined) out['turnPolicy'] = settings.turnPolicy;
   if (preset.traceMode === 'edge') {
     applyEdgeTraceSettings(out, preset, settings);
   }

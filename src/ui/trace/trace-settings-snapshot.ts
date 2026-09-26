@@ -51,6 +51,13 @@ const COLOUR_LAYER_OUTPUTS: ReadonlyArray<string> = Object.keys({
   stacked: true,
 } satisfies Record<ColourLayerOutput, true>);
 
+// Diagonal contacts (ADR-450). A record without the key restores as Auto.
+const TURN_POLICIES: ReadonlyArray<string> = Object.keys({
+  auto: true,
+  'connect-ink': true,
+  'connect-paper': true,
+} satisfies Record<NonNullable<LightBurnTraceSettingOverrides['turnPolicy']>, true>);
+
 /**
  * How each dialog control persists: its value type and, for numbers, the range
  * the dialog's control offers (TraceSettingsControls.tsx,
@@ -82,6 +89,7 @@ export const TRACE_OVERRIDE_RULES = {
   colourCount: { kind: 'count-or-auto', min: MIN_COLOUR_LAYERS, max: MAX_COLOUR_LAYERS },
   colourLayerOutput: { kind: 'choice', values: COLOUR_LAYER_OUTPUTS },
   keepBackground: BOOLEAN,
+  turnPolicy: { kind: 'choice', values: TURN_POLICIES },
 } as const satisfies Record<PersistedOverrideKey, OverrideRule>;
 
 // Exhaustive by construction, like the rules above.

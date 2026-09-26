@@ -14,6 +14,7 @@ import { TraceCheckboxRow } from './TraceCheckboxRow';
 import { PhotoTraceSettingsControls } from './PhotoTraceSettingsControls';
 import { traceNumberTitle } from './trace-number-title';
 import { ColourLayerTraceSettingsControls } from './ColourLayerTraceSettingsControls';
+import { DiagonalContactsControl } from './DiagonalContactsControl';
 
 type TraceSettingsControlsProps = {
   readonly preset: TraceOptions;
@@ -109,6 +110,7 @@ function FilledTraceSettingsControls(props: TraceSettingsControlsProps): JSX.Ele
           Curve finishing
         </summary>
         <ContourGeometryControls {...props} />
+        <DiagonalContactsControl {...props} />
       </details>
       <TransparencyDetails {...props} alpha={alpha} />
       <ResetTraceSettingsButton overrides={props.overrides} onChange={props.onChange} />
