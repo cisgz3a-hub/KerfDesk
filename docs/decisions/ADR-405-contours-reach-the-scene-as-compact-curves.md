@@ -255,7 +255,8 @@ tail and follow that staircase; see Known gaps.
     Incremental span evaluation (reusing the previous extension's parameters) is the next lever;
     the exact part of it is done (Amendment 1), and the fit is no longer where most of the gap is.
     The topology repair's exact savings are Amendment 2, and its memory and the corner legs are
-    Amendments 3 and 4; what remains is the sample count.
+    Amendments 3 and 4; Amendment 5 counts where the fit's work goes. What remains is the sample
+    count and the proposal's Newton passes.
 - Node editing, SVG export, bounds and the laser commit read the carried cubics; the downscale and
   Region Enhance routes no longer lose them.
 
@@ -467,3 +468,42 @@ that part of the memory target is met there. perf-noise-512 and -1024 still peak
 because live data grows with the 2.7x sample count; about a third of the round-0 heap on
 perf-noise-256 is boxed point coordinates. The time targets are still not met: owl is about 1.45x
 main, and perf-noise-1024 is 1.7x main.
+
+### Amendment 5 - distance roots only where they decide, same output (2026-09-27)
+
+Counting the fit's work on owl Line Art (2,472 ring fits, 395k ring points, no ring fitted twice
+with the same input) shows where it goes. The joint proposal makes 101k span fits over 2.76M span
+points, and their Newton passes project 9.17M points: about 80% of the fit's projection work. The
+merge's 45k decision fits project 2.24M points, and 15k more reuse the proposal's passes. A
+proposal span runs its passes until they stop improving, because its worst point decides where it
+splits, and that decides the joints the merge can use. So the proposal's cost cannot be cut
+without moving joints, and that changes the output.
+
+Two exact changes:
+
+- The projection pass, the reverse check's window minimum and the chord deviation compare each
+  squared distance with the square of the running maximum (or minimum), with a margin of 1e-9.
+  They take the root (`hypot2`) only where it can change the result. The square and `hypot2` each
+  round by a few ulps (about 1e-15 relative), far inside the margin, so a skipped point could not
+  have won the comparison. No pruning is done below 1e-150, where squares lose relative precision.
+  New tests in `compact-curve-project.test.ts` compare the chord deviation and the reverse check
+  with unpruned references over exact ties and five decades of scale. The existing
+  projection-pass reference test also still passes.
+- The corner legs' straightness test fits the leg's line without computing the residual, which it
+  never reads (`legLine` in `contour-corner-legs.ts`); `fitLeg` adds the residual to the same
+  sums.
+
+Equivalence instrument: the whole-trace hash of every polyline vertex and curve coordinate is
+unchanged on owl Line Art, Sharp and Smooth, hummingbird Line Art and perf-noise-192, -256, -512
+and -1024 (`84472a71`).
+
+Measured (node bundles, interleaved, one process per run): owl Line Art fit time fell from
+1.73-1.76 s to 1.66-1.68 s over three rounds. Whole-trace time on owl (5.1 to 5.3 s before, 5.1 to
+5.2 s after) and
+on perf-noise-512 moved less than the run-to-run noise. perf-noise-1024 took 92 s against 97 s
+back to back, with peak RSS unchanged at 3.66 GB, on a machine more loaded than in Amendment 4.
+
+Status against the targets: unchanged. Owl Line Art is about 1.45x main, perf-noise-1024 about
+1.7x main in time and 1.6x in memory. No exact lever of more than a few percent is known. The
+remaining cost is in the proposal's passes, which are 80% of the fit, and in the topology repair's
+work on the 0.02 px sampling. Both can only be reduced by a change to the output.
