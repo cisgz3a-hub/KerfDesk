@@ -1,29 +1,16 @@
 import { useEffect, useRef, useState } from 'react';
-import { laserSecondPassSupportsController } from '../../../core/laser-second-pass/source-family';
 import { Dialog, DialogActions } from '../../kit';
 import { useLaserStore } from '../../state/laser-store';
 import { useLaserSecondPassUiStore } from '../../state/laser-second-pass-ui-store';
-import type {
-  ExecutionArtifactV1,
-  RecoveryRepository,
-  RecoveryRepositorySnapshot,
-} from '../../state/recovery';
+import type { RecoveryRepository } from '../../state/recovery';
 import { isModalOpen, useUiStore } from '../../state/ui-store';
 import { useRecoveryRepositorySelection } from '../../state/use-recovery-repository';
 import { jobControlsBusy } from '../job-controls-busy';
-
-/** Only a flat laser run whose program the transformer can read is offered;
- * a Marlin or Smoothieware completion would lead straight to a refusal. */
-function secondPassOfferable(artifact: ExecutionArtifactV1): boolean {
-  return (
-    artifact.machineKind === 'laser' &&
-    laserSecondPassSupportsController(artifact.prepared.project.device.controllerKind)
-  );
-}
-
-function selectLastCompletedReceipt(snapshot: RecoveryRepositorySnapshot) {
-  return snapshot.lastCompletedReceipt;
-}
+import {
+  anotherRunHoldsTheStream,
+  secondPassOfferable,
+  selectLastCompletedReceipt,
+} from './second-pass-offer';
 
 export function SecondPassCompletionPrompt(props: {
   repository: RecoveryRepository;
@@ -33,7 +20,7 @@ export function SecondPassCompletionPrompt(props: {
   const request = useLaserSecondPassUiStore((s) => s.editorRequest);
   const dismiss = useLaserSecondPassUiStore((s) => s.dismissCompletion);
   const openEditor = useLaserSecondPassUiStore((s) => s.openEditor);
-  const activeRunId = useLaserStore((s) => s.activeRunId);
+  const superseded = useLaserStore((s) => runId !== null && anotherRunHoldsTheStream(s, runId));
   const busy = useLaserStore(
     (s) =>
       jobControlsBusy(s.streamer?.status, s.motionOperation, s.controllerOperation) ||
@@ -48,14 +35,14 @@ export function SecondPassCompletionPrompt(props: {
 
   useEffect(() => {
     if (!runId) return;
-    if ((activeRunId !== null && activeRunId !== runId) || (matching && !offerable)) {
+    if (superseded || (matching && !offerable)) {
       dismiss(runId);
     } else if (offerable && !busy && !modalOpen && !request) {
       if (presentedRunId !== runId)
         returnFocusTo.current = document.activeElement as HTMLElement | null;
       setPresentedRunId(runId);
     }
-  }, [runId, activeRunId, matching, offerable, busy, modalOpen, request, dismiss, presentedRunId]);
+  }, [runId, superseded, matching, offerable, busy, modalOpen, request, dismiss, presentedRunId]);
 
   // modalOpen gates the initial presentation only: this Dialog itself then
   // registers as a modal. Hydrated receipts alone never set completionRunId.
@@ -70,12 +57,14 @@ export function SecondPassCompletionPrompt(props: {
         Paint the parts you want to engrave again or cut deeper, erase any spill, and adjust power
         for each area. Keep the workpiece and work origin in their original positions.
       </p>
-      <p>You can also open Paint a second pass later from the Machine panel.</p>
+      <p>
+        Until you start another job, you can also open Paint a second pass from the Machine panel.
+      </p>
       <DialogActions>
         <button
           className="lf-btn"
           onClick={() => dismiss(runId)}
-          title="Close this offer. The saved job remains available for a second pass later."
+          title="Close this offer. Until you start another job, Paint a second pass in the Machine panel opens this job."
         >
           Not now
         </button>

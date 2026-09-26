@@ -336,6 +336,52 @@ test('holds the completion offer behind an open dialog and shows it once that di
   expect(refusals()).toEqual([]);
 });
 
+test('opens the finished job from the Machine panel and withdraws it once a later job is aborted', async ({
+  page,
+  kerfdesk,
+}) => {
+  test.setTimeout(120_000);
+  const refusals = collectRefusals(page);
+  page.on('dialog', (dialog) => void dialog.accept());
+  await connectAndHome(page, kerfdesk);
+  await frameCurrentJob(page, kerfdesk);
+  await kerfdesk.setAutoAcknowledge(false);
+  const complete = page.getByRole('dialog', { name: 'Job complete', exact: true });
+  const paint = page.getByRole('button', { name: 'Paint a second pass…', exact: true });
+  const workbench = page.getByRole('dialog', { name: 'Paint a second pass', exact: true });
+  const baselineLines = serialWriteLineCount(await kerfdesk.events());
+  await page.getByRole('button', { name: 'Start', exact: true }).click();
+  await confirmJobReview(page, kerfdesk);
+  await drainHeldSerialWrites(page, kerfdesk, baselineLines, 400);
+  await kerfdesk.emitSerialLine(IDLE);
+  await complete.getByRole('button', { name: 'Not now', exact: true }).click();
+  await expect(complete).toHaveCount(0);
+  // No history picker: the button opens the job that just finished.
+  await expect(page.getByLabel('Completed job for a second pass')).toHaveCount(0);
+  await paint.click();
+  await expect(
+    workbench.getByRole('img', { name: 'Paint second-pass areas on the saved engraving' }),
+  ).toBeVisible();
+  await workbench.getByRole('button', { name: 'Close', exact: true }).click();
+  await expect(workbench).toHaveCount(0);
+
+  // A later job that does not finish leaves no job to darken. The earlier
+  // completion is not offered in its place.
+  await kerfdesk.setAutoAcknowledge(true);
+  await frameCurrentJob(page, kerfdesk);
+  await kerfdesk.setAutoAcknowledge(false);
+  await page.getByRole('button', { name: 'Start', exact: true }).click();
+  await confirmJobReview(page, kerfdesk);
+  await expect(page.getByRole('button', { name: 'Pause', exact: true })).toBeVisible();
+  await kerfdesk.setAutoAcknowledge(true);
+  await page.getByRole('button', { name: 'ABORT JOB', exact: true }).click();
+  await expect(page.getByRole('button', { name: 'Start', exact: true })).toBeVisible();
+  await kerfdesk.emitSerialLine(IDLE);
+  await expect(paint).toHaveCount(0);
+  await expect(complete).toHaveCount(0);
+  expect(refusals()).toEqual([]);
+});
+
 test('resumes an image engraving interrupted 150 lines in, finishes it and offers darkening of the original image', async ({
   page,
   kerfdesk,
