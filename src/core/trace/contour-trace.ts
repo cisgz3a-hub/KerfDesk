@@ -22,6 +22,7 @@ import { runTraceSteps, type TraceSteps } from './trace-steps';
 import {
   midCrackChainWithStats,
   traceBoundaryLoops,
+  type BoundaryLoop,
   type CrackSubPixelField,
 } from './contour-boundary';
 import { fairChainSegments } from './fair-chain';
@@ -53,10 +54,10 @@ import {
   separateSaddleApexes,
   type CornerChain,
 } from './contour-corners';
+import { ADMITTED_LOOP_MIN_POINTS, admittedLoopFallback } from './admitted-loop-simplify';
 import { contourTraceInputMatches, type ContourTraceInput } from './contour-input';
 import {
   closeContour,
-  contourRefinement,
   preserveContourTopologySteps,
   type ContourRefinement,
   type FinishedContour,
@@ -94,7 +95,7 @@ export function isBinaryContourPreset(options: TraceOptions): boolean {
 // Same base simplification epsilon as the centerline finisher; the
 // TraceOptions lineTolerance contract scales it (higher = fewer vertices).
 const SIMPLIFY_EPSILON_PX = 0.45;
-const MIN_LOOP_POINTS = 3;
+const MIN_LOOP_POINTS = ADMITTED_LOOP_MIN_POINTS;
 // Loop size class for the dense arc-noise evening (corners are decided for
 // every loop by the corner dial, contour-corners.ts). Loops from this many
 // chain points up are big enough for it; on glyph-scale loops below it the
@@ -278,14 +279,24 @@ export function* contourRingsFromMaskSteps(
     if (cooperate) yield;
     // Area-based speckle gate — the boundary walker sees paper holes the ink
     // despeckle never touched, so both loop polarities are filtered here.
-    if (Math.abs(loop.area) < options.minAreaPx) continue;
-    const finished = finishLoop(loop.points, finish);
-    if (finished === null) continue;
-    contours.push(finished);
+    if (!isAdmittedLoop(loop, options.minAreaPx)) continue;
+    // No-orphan invariant (ADR-458 amendment 1): finishing and topology
+    // repair return exactly one ring per admitted loop, with its source
+    // orientation and nesting, so a hole never outlives its outer.
+    contours.push(finishLoop(loop.points, finish));
     kept.push(index);
   }
   const polylines = yield* preserveContourTopologySteps(contours);
   return { polylines, parents: parents === null ? null : keptForest(parents, kept) };
+}
+
+/** The area policy for boundary loops. A loop that encloses nothing is never
+ *  admitted. Enclosed area shrinks strictly down the nesting (a loop's area
+ *  includes everything inside it), so this rule drops a loop only together
+ *  with every loop nested inside it (ADR-458 amendment 1). */
+export function isAdmittedLoop(loop: BoundaryLoop, minAreaPx: number): boolean {
+  const area = Math.abs(loop.area);
+  return area > 0 && area >= minAreaPx;
 }
 
 type LoopFinish = {
@@ -309,8 +320,7 @@ function featureAnchorsForLoop(
     : NO_CORNERS;
 }
 
-function finishLoop(staircase: ReadonlyArray<Vec2>, finish: LoopFinish): FinishedContour | null {
-  if (staircase.length < MIN_LOOP_POINTS) return null;
+function finishLoop(staircase: ReadonlyArray<Vec2>, finish: LoopFinish): FinishedContour {
   // Mid-crack first (lattice steps become ≤45° bends; sub-pixel interpolated
   // when the pre-threshold field is available).
   const crack = midCrackChainWithStats(staircase, finish.crackField);
@@ -341,9 +351,11 @@ function finishLoop(staircase: ReadonlyArray<Vec2>, finish: LoopFinish): Finishe
   // The area policy has already admitted this boundary. A tolerance larger
   // than the loop can collapse the finishing tail to two anchors; Optimize
   // must not become another area-removal control. Retain the measured crack
-  // boundary in that case (one bounded fallback, no new fitting search), and
-  // include it in the same topology repair as every other admitted contour.
-  const retainCracks = (): ContourRefinement => contourRefinement(crack.points, () => crack.points);
+  // boundary in that case as a compact outline (ADR-458: one bounded
+  // fallback, no new fitting search), and include it in the same topology
+  // repair as every other admitted contour.
+  const retainCracks = (): ContourRefinement =>
+    admittedLoopFallback(crack.points, finish.epsilonPx);
   const retained = finishDenseLoop(staircase, spliced, subPixelInformed, finish) ?? retainCracks();
   const source = closeContour(crack.points);
   if (spliced.corners.size === 0) return { ...retained, source };
