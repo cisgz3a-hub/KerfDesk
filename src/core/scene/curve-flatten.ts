@@ -61,6 +61,7 @@ export function flattenCubicChords(
   tolerance: number,
   budget: number,
 ): Vec2[] | null {
+  if (!allFinite([from, segment.control1, segment.control2, segment.to])) return null;
   return fewestChords(cubicCurve(from, segment), tolerance, budget);
 }
 
@@ -71,7 +72,15 @@ export function flattenEllipseChords(
   tolerance: number,
   budget: number,
 ): Vec2[] | null {
+  const angles = [arc.radiusX, arc.radiusY, arc.rotationRad, arc.theta1, arc.delta];
+  if (!allFinite([from, to, arc.center]) || !angles.every(Number.isFinite)) return null;
   return fewestChords(ellipseCurve(from, to, arc), tolerance, budget);
+}
+
+// Geometry that is not finite has no chord error. It is refused (the caller
+// reports the segment budget exceeded), never drawn as one straight move.
+function allFinite(points: ReadonlyArray<Vec2>): boolean {
+  return points.every((point) => Number.isFinite(point.x) && Number.isFinite(point.y));
 }
 
 function fewestChords(curve: ChordCurve, tolerance: number, budget: number): Vec2[] | null {
@@ -114,6 +123,7 @@ function greedyChords(curve: ChordCurve, tolerance: number, limit: number): Chor
   while (t0 < 1) {
     if (points.length >= limit) return null;
     const t1 = longestFit(curve, t0, from, step, tolerance);
+    if (Number.isNaN(t1)) return null;
     const to = t1 >= 1 ? curve.end : curve.point(t1);
     points.push(to);
     ends.push(t1);
@@ -185,6 +195,7 @@ function fitsBetter(candidate: Split, current: Split, tolerance: number): boolea
  * longest that does. Probes follow the square-law model of the error from
  * the previous probe, kept inside the bracket of the longest fitting and the
  * shortest failing end found so far, and bisect when the model leaves it.
+ * NaN when a chord error is not finite (overflow): the caller refuses.
  */
 function longestFit(
   curve: ChordCurve,
@@ -198,7 +209,8 @@ function longestFit(
   let probe = Math.min(1, t0 + guess);
   for (let count = 0; count < MAX_PROBES; count += 1) {
     const error = chordErrorTo(curve, t0, probe, from);
-    const fit = !Number.isFinite(error) || error <= tolerance;
+    if (!Number.isFinite(error)) return Number.NaN;
+    const fit = error <= tolerance;
     if (fit) low = probe;
     else high = probe;
     if (fit && (probe >= 1 || !(error < tolerance * ACCEPT_SHARE))) return probe;

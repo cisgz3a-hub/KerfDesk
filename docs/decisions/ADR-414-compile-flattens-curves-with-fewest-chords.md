@@ -59,10 +59,14 @@ Two defects, measured on the base (`c62084959`):
    changes and both chords are checked.
 4. **Unchanged contracts.** The first vertex is the segment start and the last is its end, exactly
    (the arc's end was computed before and could differ in the last bits). Every vertex lies on the
-   curve, so the flattened bounds stay inside `curveSubpathBounds`. Output is deterministic. A chord
-   whose error cannot be computed because the geometry is not finite is kept as one move, where the
-   midpoint splitter divided it to its depth cap of 2^24 pieces. The step floor of 2^-24 in the
-   curve parameter, the segment budget and its refusal are unchanged.
+   curve, so the flattened bounds stay inside `curveSubpathBounds`. Output is deterministic.
+   Geometry that is not finite (a NaN or infinite control point, radius or angle), or a chord error
+   that overflows, is refused as `segment-budget-exceeded`, never drawn as a straight move. The
+   midpoint splitter refused it the same way, by dividing to its depth cap of 2^24 pieces and
+   running out of budget; the refusal is now immediate, also for callers with an unlimited budget.
+   Upstream guards (the path-data parser's finite numbers, the `.lf2` finiteness check) already
+   keep such geometry out. The step floor of 2^-24 in the curve parameter, the segment budget and
+   its refusal are unchanged.
 
 ### Consequences
 
