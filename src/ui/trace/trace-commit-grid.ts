@@ -196,7 +196,7 @@ export function commitGridExceedsPreview(plan: TraceCommitGridPlan): boolean {
 
 /**
  * The size controls an operator sets in the dialog (Ignore less than, ink
- * despeckle, Minimum line, gap joins) keep the physical meaning they had on
+ * despeckle, Minimum line, gap joins, Line + fill's Max stroke width) keep the physical meaning they had on
  * the preview grid, so the commit drops the same specks the preview dropped.
  * Lengths scale by the longest-edge ratio and areas by the ratio of the two
  * grids' pixel counts: on a tall or narrow source the short edge is a small
@@ -219,6 +219,7 @@ export function traceOptionsForCommitGrid(
     ...scaled('edgeMinLengthPx', options.edgeMinLengthPx, ratio),
     ...scaled('edgeJoinGapPx', options.edgeJoinGapPx, ratio),
     ...scaled('centerlineJoinGapPx', options.centerlineJoinGapPx, ratio),
+    ...scaled('hybridMaxStrokeWidthPx', options.hybridMaxStrokeWidthPx, ratio),
   };
 }
 
@@ -240,7 +241,8 @@ function traceLane(
   options: Pick<TraceOptions, 'traceMode'>,
 ): keyof typeof TRACE_PEAK_BYTES_PER_PIXEL {
   if (options.traceMode === 'edge') return 'edge';
-  if (options.traceMode === 'centerline') return 'centerline';
+  // Line + fill runs the centreline lane over the whole mask (ADR-454).
+  if (options.traceMode === 'centerline' || options.traceMode === 'hybrid') return 'centerline';
   return 'contour';
 }
 
