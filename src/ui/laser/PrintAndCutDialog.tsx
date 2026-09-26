@@ -2,13 +2,30 @@ import { useState } from 'react';
 import { solveTwoPointRegistration } from '../../core/registration';
 import type { PrintAndCutDesignTargets, Vec2 } from '../../core/scene';
 import { Button, Dialog, DialogActions, NumberInput } from '../kit';
+import type { CaptureSource } from '../state/print-cut-session-store';
+
+/** Finding both printed marks in one camera picture (ADR-443). */
+export type PrintAndCutCamera = {
+  /** A saved camera model: the dialog shows the camera row. */
+  readonly offered: boolean;
+  /** And a live camera, so there is a frame to capture. */
+  readonly available: boolean;
+  readonly finding: boolean;
+  readonly message: string | null;
+  readonly onFind: (targets: PrintAndCutDesignTargets) => void;
+};
 
 export function PrintAndCutDialog(props: {
   readonly initialTargets: PrintAndCutDesignTargets;
   readonly firstMachinePoint: Vec2 | null;
   readonly secondMachinePoint: Vec2 | null;
+  readonly firstSource?: CaptureSource | null;
+  readonly secondSource?: CaptureSource | null;
   readonly captureEnabled: boolean;
   readonly captureFrameNotice?: string | null;
+  /** The centres of the two selected objects, when exactly two are selected. */
+  readonly selectionTargets?: PrintAndCutDesignTargets | null;
+  readonly camera?: PrintAndCutCamera;
   readonly onCapture: (which: 'first' | 'second') => void;
   readonly onCancel: () => void;
   readonly onApply: (targets: PrintAndCutDesignTargets) => void;
@@ -37,11 +54,15 @@ export function PrintAndCutDialog(props: {
         props.onApply(targets);
       }}
     >
+      {props.selectionTargets !== undefined ? (
+        <SelectionTargetsRow selectionTargets={props.selectionTargets} onUse={setTargets} />
+      ) : null}
       <div style={gridStyle}>
         <TargetRow
           label="Target 1"
           target={targets.first}
           machine={props.firstMachinePoint}
+          source={props.firstSource ?? null}
           captureEnabled={props.captureEnabled}
           onChange={(axis, value) => setCoordinate('first', axis, value)}
           onCapture={() => props.onCapture('first')}
@@ -50,11 +71,15 @@ export function PrintAndCutDialog(props: {
           label="Target 2"
           target={targets.second}
           machine={props.secondMachinePoint}
+          source={props.secondSource ?? null}
           captureEnabled={props.captureEnabled}
           onChange={(axis, value) => setCoordinate('second', axis, value)}
           onCapture={() => props.onCapture('second')}
         />
       </div>
+      {props.camera?.offered === true ? (
+        <CameraMarksRow camera={props.camera} onFind={() => props.camera?.onFind(targets)} />
+      ) : null}
       {props.captureFrameNotice != null ? (
         <p style={warningStyle}>{props.captureFrameNotice}</p>
       ) : null}
@@ -89,6 +114,7 @@ function TargetRow(props: {
   readonly label: string;
   readonly target: Vec2;
   readonly machine: Vec2 | null;
+  readonly source: CaptureSource | null;
   readonly captureEnabled: boolean;
   readonly onChange: (axis: 'x' | 'y', value: string) => void;
   readonly onCapture: () => void;
@@ -113,11 +139,7 @@ function TargetRow(props: {
         />
       </label>
       <div style={captureStyle}>
-        <span>
-          {props.machine === null
-            ? 'Not captured'
-            : `Machine ${props.machine.x.toFixed(3)}, ${props.machine.y.toFixed(3)}`}
-        </span>
+        <span>{capturedLabel(props.machine, props.source)}</span>
         <Button disabled={!props.captureEnabled} onClick={props.onCapture}>
           Capture head
         </Button>
@@ -126,6 +148,76 @@ function TargetRow(props: {
   );
 }
 
+function capturedLabel(point: Vec2 | null, source: CaptureSource | null): string {
+  if (point === null) return 'Not captured';
+  return source === 'camera'
+    ? `Camera ${point.x.toFixed(2)}, ${point.y.toFixed(2)}`
+    : `Machine ${point.x.toFixed(3)}, ${point.y.toFixed(3)}`;
+}
+
+// Sets both design targets to the centres of the two selected objects, which
+// are normally the two marks drawn in the design.
+function SelectionTargetsRow(props: {
+  readonly selectionTargets: PrintAndCutDesignTargets | null;
+  readonly onUse: (targets: PrintAndCutDesignTargets) => void;
+}): JSX.Element {
+  const [hint, setHint] = useState<string | null>(null);
+  return (
+    <div style={selectionRowStyle}>
+      <Button
+        onClick={() => {
+          if (props.selectionTargets === null) {
+            setHint('Select the two marks in the design first, then use them as the targets.');
+            return;
+          }
+          setHint(null);
+          props.onUse(props.selectionTargets);
+        }}
+      >
+        Use selected marks
+      </Button>
+      <span style={noteStyle}>
+        {hint ?? 'Targets at the centres of the two selected objects, the left one first.'}
+      </span>
+    </div>
+  );
+}
+
+function CameraMarksRow(props: {
+  readonly camera: PrintAndCutCamera;
+  readonly onFind: () => void;
+}): JSX.Element {
+  const { camera } = props;
+  const note = camera.available
+    ? 'Finds both printed marks in one camera picture, at the material height set in the Camera panel.'
+    : 'Turn the camera on in the Camera panel to find the marks with it.';
+  return (
+    <div style={cameraStyle}>
+      <div style={rowStyle}>
+        <Button disabled={!camera.available || camera.finding} onClick={props.onFind}>
+          {camera.finding ? 'Finding marks…' : 'Find marks with camera'}
+        </Button>
+        <span style={noteStyle}>{note}</span>
+      </div>
+      {camera.message !== null ? (
+        <p role="status" style={messageStyle}>
+          {camera.message}
+        </p>
+      ) : null}
+    </div>
+  );
+}
+
+const rowStyle: React.CSSProperties = {
+  display: 'flex',
+  alignItems: 'center',
+  gap: 8,
+  flexWrap: 'wrap',
+};
+const selectionRowStyle: React.CSSProperties = { ...rowStyle, margin: '0 0 10px' };
+const cameraStyle: React.CSSProperties = { display: 'grid', gap: 4, margin: '10px 0 0' };
+const noteStyle: React.CSSProperties = { color: 'var(--lf-text-muted)', fontSize: 12 };
+const messageStyle: React.CSSProperties = { fontSize: 12, margin: 0 };
 const gridStyle: React.CSSProperties = { display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 };
 const fieldsetStyle: React.CSSProperties = {
   display: 'grid',

@@ -6773,6 +6773,27 @@ as the pane's design record.
 - **Empty / no feed.** **Find pieces** is disabled without a live camera; without a calibration
   the section is absent.
 
+### F-CAM10. Print and Cut marks found by the camera (ADR-443)
+
+- **Success / register a printed sheet.** With Print and Cut on in Labs, a saved calibration and a
+  live camera, the operator lays the printed sheet on the bed and sets the material height in the
+  Camera panel. In the design, they select the two registration marks, open **Print and Cut** and
+  press **Use selected marks**, then **Find marks with camera**. Both points fill in as **Camera
+  x, y**, and the dialog reports the measured spacing, print scale and turn. **Apply
+  registration** registers the design on the sheet. The head never moves.
+- **Success / mixed.** **Capture head** still works on either target, so a camera point can be
+  replaced by jogging onto that mark.
+- **Edge / repeated marks.** When other pairs of marks are the same distance apart, the pair
+  nearest the design's targets is used and the dialog says how many others fitted.
+- **Edge / no pair.** When no two marks are the design's spacing apart (within 2 %), the points
+  stay as they were and the dialog says how many mark-like shapes the camera saw, and what to
+  check.
+- **Edge / trust changes.** After a reconnect, reset or frame change, the points must be captured
+  again, as with head captures; **Find marks with camera** does it in one click.
+- **Empty / no selection or no feed.** **Use selected marks** without two selected objects says
+  to select the marks first. **Find marks with camera** is disabled without a live camera, and
+  without a calibration it is absent.
+
 ---
 
 ## Desktop app (Windows + macOS Preview) flows

@@ -2,10 +2,14 @@ import { create } from 'zustand';
 import { solveTwoPointRegistration, type SimilarityTransform } from '../../core/registration';
 import type { PrintAndCutDesignTargets, Project, Vec2 } from '../../core/scene';
 
+/** Where a registration point came from: the head jogged onto the mark, or the camera (ADR-443). */
+export type CaptureSource = 'head' | 'camera';
+
 type CapturedPoint = {
   readonly point: Vec2;
   readonly epoch: number;
   readonly coordinateFrameKey?: string;
+  readonly source?: CaptureSource;
 };
 
 type PrintCutSessionState = {
@@ -16,6 +20,7 @@ type PrintCutSessionState = {
     point: Vec2,
     epoch: number,
     coordinateFrameKey?: string,
+    source?: CaptureSource,
   ) => void;
   readonly clear: () => void;
 };
@@ -23,12 +28,13 @@ type PrintCutSessionState = {
 export const usePrintCutSessionStore = create<PrintCutSessionState>((set) => ({
   first: null,
   second: null,
-  capture: (which, point, epoch, coordinateFrameKey) =>
+  capture: (which, point, epoch, coordinateFrameKey, source) =>
     set({
       [which]: {
         point,
         epoch,
         ...(coordinateFrameKey === undefined ? {} : { coordinateFrameKey }),
+        ...(source === undefined ? {} : { source }),
       },
     }),
   clear: () => set({ first: null, second: null }),

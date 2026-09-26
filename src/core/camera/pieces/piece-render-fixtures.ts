@@ -1,8 +1,9 @@
-// Test support (ADR-442): pictures of blanks lying on a honeycomb bed, either
-// already flattened top-down or as a camera sees them. The camera picture
-// back-projects every pixel through the real camera model at the blank's
-// height, so the finder is tested on geometry, not on a shortcut. Not
-// shipped code.
+// Test support (ADR-442, ADR-443): pictures of blanks, or printed sheets with
+// marks, lying on a honeycomb bed, either already flattened top-down or as a
+// camera sees them. The camera picture back-projects every pixel through the
+// real camera model at each piece's height, so the finders are tested on
+// geometry, not on a shortcut. The first piece listed that covers a point is
+// the one seen there. Not shipped code.
 
 import type { BedArea } from '../model/camera-model-accuracy';
 import { bedMapper, type CameraPose, type LensModel } from '../model/camera-model';
@@ -21,6 +22,12 @@ export type RenderedPiece = (
       readonly angleDeg: number;
     }
   | { readonly kind: 'disc'; readonly centre: Point; readonly radius: number }
+  | {
+      readonly kind: 'ring';
+      readonly centre: Point;
+      readonly outerRadius: number;
+      readonly innerRadius: number;
+    }
   | { readonly kind: 'polygon'; readonly points: ReadonlyArray<Point> }
 ) & {
   readonly colour: Colour;
@@ -117,6 +124,10 @@ function pieceColour(pieces: ReadonlyArray<RenderedPiece>, x: number, y: number)
 }
 
 function covers(piece: RenderedPiece, x: number, y: number): boolean {
+  if (piece.kind === 'ring') {
+    const d = Math.hypot(x - piece.centre.x, y - piece.centre.y);
+    return d >= piece.innerRadius && d <= piece.outerRadius;
+  }
   if (piece.kind === 'disc')
     return Math.hypot(x - piece.centre.x, y - piece.centre.y) <= piece.radius;
   if (piece.kind === 'polygon') return insidePolygon(piece.points, x, y);

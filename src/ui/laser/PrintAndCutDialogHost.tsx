@@ -2,13 +2,18 @@ import { useStore } from '../state';
 import { useLaserStore } from '../state/laser-store';
 import { usePrintCutSessionStore } from '../state/print-cut-session-store';
 import { useToastStore } from '../state/toast-store';
+import { targetsFromSelection } from './print-cut-camera';
 import { capturedMachinePointToScene } from './print-cut-capture-frame';
 import { PrintAndCutDialog } from './PrintAndCutDialog';
+import { usePrintCutCamera } from './use-print-cut-camera';
 import { nativeBedCaptureFrameKey, resolveNativeBedFrame } from '../state/native-bed-frame';
 
 export function PrintAndCutDialogHost(props: { readonly onClose: () => void }): JSX.Element {
   const project = useStore((state) => state.project);
   const setTargets = useStore((state) => state.setPrintAndCutTargets);
+  const selectedObjectId = useStore((state) => state.selectedObjectId);
+  const additionalSelectedIds = useStore((state) => state.additionalSelectedIds);
+  const camera = usePrintCutCamera();
   const laser = useLaserStore();
   const session = usePrintCutSessionStore();
   const pushToast = useToastStore((state) => state.pushToast);
@@ -29,7 +34,7 @@ export function PrintAndCutDialogHost(props: { readonly onClose: () => void }): 
       nativeFrame,
     );
     if (scenePoint === null) return;
-    session.capture(which, scenePoint, epoch, coordinateFrameKey);
+    session.capture(which, scenePoint, epoch, coordinateFrameKey, 'head');
   };
   return (
     <PrintAndCutDialog
@@ -41,7 +46,17 @@ export function PrintAndCutDialogHost(props: { readonly onClose: () => void }): 
       }
       firstMachinePoint={capturedPointForFrame(session.first, epoch, coordinateFrameKey)}
       secondMachinePoint={capturedPointForFrame(session.second, epoch, coordinateFrameKey)}
+      firstSource={session.first?.source ?? null}
+      secondSource={session.second?.source ?? null}
       captureEnabled={captureEnabled}
+      selectionTargets={targetsFromSelection(project, selectedObjectId, additionalSelectedIds)}
+      camera={{
+        offered: camera.offered,
+        available: camera.available,
+        finding: camera.finding,
+        message: camera.message,
+        onFind: (targets) => void camera.find(targets),
+      }}
       captureFrameNotice={
         nativeFrame === null
           ? 'Registration uses controller-relative positions. Physical bed location is unverified; keep the same origin and check the Frame.'

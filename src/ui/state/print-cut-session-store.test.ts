@@ -24,6 +24,16 @@ describe('print-and-cut session trust', () => {
     });
   });
 
+  it('records whether the head or the camera placed each point, and solves both alike', () => {
+    const session = usePrintCutSessionStore.getState();
+    session.capture('first', { x: 100, y: 50 }, 3, 'bed', 'camera');
+    session.capture('second', { x: 110, y: 50 }, 3, 'bed');
+    const state = usePrintCutSessionStore.getState();
+    expect(state.first?.source).toBe('camera');
+    expect(state.second?.source).toBeUndefined();
+    expect(resolvePrintCutRegistration(project, 3, state, 'bed').kind).toBe('valid');
+  });
+
   it('stores and removes design targets as undoable project edits', () => {
     const initial = createProject();
     useStore.setState({ project: initial, undoStack: [], redoStack: [], dirty: false });
