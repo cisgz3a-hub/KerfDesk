@@ -9,6 +9,8 @@
 import type { ProgramTimeModel } from '../../core/gcode-time';
 import { SEG_KIND, type GcodeRenderModel } from '../../core/gcode-view';
 import { cssHexColor, rgbTriple, type Viewer3dTheme } from '../viewer3d';
+// Deep import: the viewer3d barrel is capped at 20 exports by its index contract.
+import { renderedLineCss, renderedLineRampStops } from '../viewer3d/segment-buckets';
 import { buildDepthLensScale, DEPTH_RAMP_DEEP, DEPTH_RAMP_SHALLOW, type Rgb } from './depth-lens';
 
 /** Stable lens identifiers in the order presented by both viewer controls. */
@@ -16,8 +18,38 @@ export const LENS_IDS = ['depth', 'tool', 'kind', 'feed', 'power', 'planner'] as
 /** A supported semantic colour mode for G-code 3D segments. */
 export type LensId = (typeof LENS_IDS)[number];
 
-/** Initial colour mode for every newly opened G-code 3D view. */
+/** Initial colour mode for a G-code 3D view whose program says nothing else. */
 export const DEFAULT_LENS_ID: LensId = 'depth';
+
+// Below this spread every cut sits on one plane (a laser job, a single-depth
+// engrave), so Depth / pass would paint the whole program one colour.
+const FLAT_DEPTH_SPAN_MM = 0.001;
+
+/**
+ * The lens a newly opened program starts on (ADR-425). A non-CNC program that
+ * cuts on one plane with varying S is a raster photo or a multi-power job:
+ * Depth would show it as a single-colour block, so it opens on Power. CNC
+ * programs and everything else open on Depth / pass. The operator's own pick
+ * always wins over this.
+ */
+export function defaultLensFor(model: GcodeRenderModel, machineKind?: 'laser' | 'cnc'): LensId {
+  if (machineKind === 'cnc') return DEFAULT_LENS_ID;
+  const scale = buildDepthLensScale(model);
+  const flat = scale === null || scale.shallowMm - scale.deepMm < FLAT_DEPTH_SPAN_MM;
+  return flat && cutPowerVaries(model) ? 'power' : DEFAULT_LENS_ID;
+}
+
+function cutPowerVaries(model: GcodeRenderModel): boolean {
+  let first: number | null = null;
+  for (let index = 0; index < model.segmentCount; index += 1) {
+    if (model.segKind[index] === SEG_KIND.travel) continue;
+    const power = model.segPower[index];
+    if (power === undefined || !Number.isFinite(power)) continue;
+    if (first === null) first = power;
+    else if (power !== first) return true;
+  }
+  return false;
+}
 
 export const LENS_LABEL: Readonly<Record<LensId, string>> = {
   kind: 'Move kind',
@@ -28,6 +60,10 @@ export const LENS_LABEL: Readonly<Record<LensId, string>> = {
   planner: 'Reached feed',
 };
 
+// Legend colours describe what the lines SHOW. Solid moves are vertex-coloured
+// fat lines, which render lighter than their theme hex (ADR-425), so their
+// swatches go through renderedLineCss. Traversal is a thin colour-managed
+// line that renders its hex exactly.
 export type LegendSwatch = {
   readonly label: string;
   readonly color: string;
@@ -41,8 +77,8 @@ export type LensLegend =
       readonly from: string;
       readonly to: string;
       readonly note: string;
-      readonly fromColor: string;
-      readonly toColor: string;
+      /** CSS colours left to right, as the lines render them. */
+      readonly stops: ReadonlyArray<string>;
     }
   | { readonly kind: 'note'; readonly note: string };
 
@@ -98,8 +134,7 @@ export function lensLegend(
     from: formatValue(range.min, lens),
     to: formatValue(range.max, lens),
     note: LENS_LABEL[lens],
-    fromColor: rgbCss(RAMP_LOW),
-    toColor: rgbCss(RAMP_HIGH),
+    stops: renderedLineRampStops(RAMP_LOW, RAMP_HIGH),
   };
 }
 
@@ -157,11 +192,11 @@ function kindSwatches(model: GcodeRenderModel, theme: Viewer3dTheme): ReadonlyAr
     counts.set(kind, (counts.get(kind) ?? 0) + 1);
   }
   return [
-    { label: 'Cut', color: cssHexColor(theme.cut), count: counts.get(SEG_KIND.cut) ?? 0 },
-    { label: 'Plunge', color: cssHexColor(theme.plunge), count: counts.get(SEG_KIND.plunge) ?? 0 },
+    { label: 'Cut', color: lineCss(theme.cut), count: counts.get(SEG_KIND.cut) ?? 0 },
+    { label: 'Plunge', color: lineCss(theme.plunge), count: counts.get(SEG_KIND.plunge) ?? 0 },
     {
       label: 'Retract',
-      color: cssHexColor(theme.retract),
+      color: lineCss(theme.retract),
       count: counts.get(SEG_KIND.retract) ?? 0,
     },
     {
@@ -178,7 +213,7 @@ function toolSwatches(model: GcodeRenderModel, theme: Viewer3dTheme): ReadonlyAr
     if (model.segKind[index] === SEG_KIND.travel) travel += 1;
   }
   return [
-    { label: 'Toolpath', color: cssHexColor(theme.cut), count: model.segmentCount - travel },
+    { label: 'Toolpath', color: lineCss(theme.cut), count: model.segmentCount - travel },
     { label: 'Traversal', color: cssHexColor(theme.travel), count: travel },
   ];
 }
@@ -191,9 +226,8 @@ function depthLegend(model: GcodeRenderModel): LensLegend {
     kind: 'ramp',
     from: `Shallow ${formatDepth(scale.shallowMm)}`,
     to: `Deep ${formatDepth(scale.deepMm)}`,
-    note: `${scale.levelCount} depth ${levelWord}, light blue to muted red`,
-    fromColor: rgbCss(DEPTH_RAMP_SHALLOW),
-    toColor: rgbCss(DEPTH_RAMP_DEEP),
+    note: `${scale.levelCount} depth ${levelWord}, pale blue to pale red`,
+    stops: renderedLineRampStops(DEPTH_RAMP_SHALLOW, DEPTH_RAMP_DEEP),
   };
 }
 
@@ -206,9 +240,17 @@ function plannerSwatches(
     if (time.segFeedLimited[index] === 1) limited += 1;
   }
   return [
-    { label: 'Reached feed', color: rgbCss(REACHED_RGB), count: model.segmentCount - limited },
-    { label: 'Below set feed', color: rgbCss(LIMITED_RGB), count: limited },
+    {
+      label: 'Reached feed',
+      color: renderedLineCss(REACHED_RGB),
+      count: model.segmentCount - limited,
+    },
+    { label: 'Below set feed', color: renderedLineCss(LIMITED_RGB), count: limited },
   ];
+}
+
+function lineCss(color: number): string {
+  return renderedLineCss(rgbTriple(color));
 }
 
 export function rgbCss(rgb: Rgb): string {

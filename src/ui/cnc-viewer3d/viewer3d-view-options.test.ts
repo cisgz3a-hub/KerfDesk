@@ -108,4 +108,10 @@ describe('screenshotSize', () => {
     expect(screenshotSize(0, 0, 2)).toEqual({ width: 1, height: 1 });
     expect(screenshotSize(100.5, 50.2, 1)).toEqual({ width: 101, height: 51 });
   });
+
+  it('fits the longest side inside the buffer the GPU allows, keeping the aspect', () => {
+    // 1900 x 1000 CSS px at 4x on a 2x screen asks for a 15200 px buffer.
+    expect(screenshotSize(1900, 1000, 4, 8192 / 2)).toEqual({ width: 4096, height: 2155 });
+    expect(screenshotSize(300, 200, 2, 4096)).toEqual({ width: 600, height: 400 });
+  });
 });

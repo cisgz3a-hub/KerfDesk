@@ -1,11 +1,12 @@
 import type { CncHelicalContourPass, CncPass } from '../job';
-import type { CncCutDirection, CncLayerSettings, CncTool, Polyline } from '../scene';
+import type { CncCutDirection, CncLayerSettings, CncTool, Polyline, Vec2 } from '../scene';
 import {
   planAdaptivePocket,
   type AdaptivePocketPlan,
   type AdaptivePocketSequence,
 } from './adaptive-pocket';
 import { verifyAdaptivePocket, type AdaptivePocketVerification } from './adaptive-pocket-verifier';
+import { contourPassFromPolyline } from './compile-cnc-helpers';
 import {
   buildVCarveSourceRegionLayout,
   vcarveSourceRegionRankFromLayout,
@@ -89,7 +90,15 @@ export function adaptivePocketPasses(
               direction.handedness,
             );
       for (const ring of finishRings) {
-        passes.push({ kind: 'contour', zMm, polyline: ring.points, closed: true });
+        // The planner closes each finishing ring on its first point, and
+        // direction enforcement then moves the start to the middle of the
+        // longest segment. That leaves the old closing point as a repeated
+        // vertex mid-ring and ends the ring at the corner before its new
+        // start, half that segment short (ADR-154 Amendment 2). Drop the
+        // repeat and close the ring at its new start, as pocket rings are
+        // closed.
+        const points = withoutRepeatedPoints(ring.points);
+        passes.push(contourPassFromPolyline({ ...ring, points }, zMm));
       }
     }
   }
@@ -115,6 +124,13 @@ export function adaptivePocketPassesForSettings(
           : { cutDirection: settings.cutDirection, handedness },
       )
     : [];
+}
+
+function withoutRepeatedPoints(points: ReadonlyArray<Vec2>): ReadonlyArray<Vec2> {
+  return points.filter((point, index) => {
+    const previous = points[index - 1];
+    return previous === undefined || previous.x !== point.x || previous.y !== point.y;
+  });
 }
 
 function roughingPass(
