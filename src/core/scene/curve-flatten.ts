@@ -77,8 +77,29 @@ export function flattenEllipseChords(
 function fewestChords(curve: ChordCurve, tolerance: number, budget: number): Vec2[] | null {
   const chords = greedyChords(curve, tolerance, budget);
   if (chords === null) return null;
+  if (chords.points.length < 2) return chords.points;
+  const even = evenChords(curve, chords.points.length, tolerance);
+  if (even !== null) return even;
   balanceLastPair(curve, chords, tolerance);
   return chords.points;
+}
+
+/**
+ * The same number of chords at equal parameter steps, when every one fits.
+ * A circular arc always does (its chord error depends only on the step), and
+ * equal steps flatten a curve and its reverse to the same vertices.
+ */
+function evenChords(curve: ChordCurve, count: number, tolerance: number): Vec2[] | null {
+  const points: Vec2[] = [];
+  let from = curve.start;
+  for (let index = 1; index <= count; index += 1) {
+    const t = index / count;
+    const to = index === count ? curve.end : curve.point(t);
+    if (!(curve.chordError((index - 1) / count, t, from, to) <= tolerance)) return null;
+    points.push(to);
+    from = to;
+  }
+  return points;
 }
 
 type Chords = { readonly points: Vec2[]; readonly ends: number[] };

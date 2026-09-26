@@ -123,9 +123,9 @@ const EXPECTED_REGION_COUNT = 12;
 // Final-grid containment and retained cutting/surface transitions add necessary
 // detail. Mapped-first capsule searches preserve compaction within the existing
 // certificate budget; ownership, region count and index reuse stay unchanged.
-const EXPECTED_GCODE_CODE_UNITS = 1_083_336;
-const EXPECTED_GCODE_SHA256 = 'e211745f82754855ebd20683a3c19f256e877488282b2df34c60a7c84ea26740';
-const EXPECTED_GCODE_UTF8_BYTES = 1_083_336;
+const EXPECTED_GCODE_CODE_UNITS = 1_095_146;
+const EXPECTED_GCODE_SHA256 = 'f937f5790a9e6c6e661c44e4094844f8fc7e8a375018e7fcf06d77269c22a74f';
+const EXPECTED_GCODE_UTF8_BYTES = 1_095_146;
 const GCODE_REVIEW_EDGE_LINES = 16;
 const GCODE_REVIEW_SAMPLES = 12;
 const TEST_TIMEOUT_MS = 180_000;
