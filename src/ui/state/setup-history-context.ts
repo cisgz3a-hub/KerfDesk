@@ -1,7 +1,7 @@
 import type { Project } from '../../core/scene';
 import type { AppState } from './store';
 
-type SetupHistoryContext = Pick<
+export type SetupHistoryContext = Pick<
   AppState,
   | 'jobPlacement'
   | 'outputScopeSettings'
@@ -13,7 +13,7 @@ type SetupHistoryContext = Pick<
 
 const contexts = new WeakMap<Project, SetupHistoryContext>();
 
-export function captureSetupHistoryContext(project: Project, state: AppState): void {
+export function captureSetupHistoryContext(project: Project, state: SetupHistoryContext): void {
   contexts.set(project, {
     jobPlacement: structuredClone(state.jobPlacement),
     outputScopeSettings: structuredClone(state.outputScopeSettings),

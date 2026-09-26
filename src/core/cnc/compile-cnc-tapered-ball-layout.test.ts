@@ -327,13 +327,10 @@ describe('tapered ball-nose relief roughing', () => {
 
     // Between the rings the floor stands no higher than a scallop; the
     // widest-diameter stepover left ribs 0.77 mm wide standing to the top of
-    // each 1.5 mm level. Measured on the half away from the ring seams: every
-    // ring here starts mid-way along its top side, and relief roughing drops
-    // the half-side from the ring's last corner back to that seam for any
-    // cutter (a separate, pre-existing defect this amendment does not change).
+    // each 1.5 mm level. That includes the half of the relief holding the ring
+    // seams, now that each ring closes back on its start (ADR-289 Amendment 1).
     const box = machineBox(relief);
-    const lowerHalf = { ...box, maxY: (box.minY + box.maxY) / 2 };
-    const floor = floorResidual(cells(removal(job, lowerHalf, FLOOR_CELL_MM)), box, 2, -3);
+    const floor = floorResidual(cells(removal(job, box, FLOOR_CELL_MM)), box, 2, -3);
     expect(floor.cells).toBeGreaterThan(1000);
     expect(floor.highestMm).toBeLessThanOrEqual(NO_RIB_MM);
   });
