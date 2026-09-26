@@ -38,6 +38,7 @@ import {
   type CncGroupCompileOptions,
 } from './compile-cnc-helpers';
 import { compileReliefGroupsForLayer } from './compile-cnc-relief';
+import { cncHeadDevice } from './cnc-head-feeds';
 import { orderGroupsIntoToolSections } from './cnc-tool-sections';
 import { collectLayerContours, layerPolylinesFromContours } from './collect-cnc-contours';
 import type { CollectedCncContour } from './cnc-manual-tab-mapping';
@@ -144,10 +145,12 @@ export function prepareBoundCncCompilation(
 
 function compileCncSnapshot(
   scene: Scene,
-  device: DeviceProfile,
+  sharedDevice: DeviceProfile,
   config: CncMachineConfig,
   vcarveLayers: CncCompilationEvidence['vcarveLayers'],
 ): CncJobCompilationResult {
+  // Feeds cap at CNC's own Max feed, never the laser's.
+  const device = cncHeadDevice(sharedDevice, config.params);
   const clearingGroups: CncGroup[] = [];
   const profileGroups: CncGroup[] = [];
   const stepoverOperations: CncStepoverCompilationEvidence[] = [];

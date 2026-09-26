@@ -1,5 +1,6 @@
 import type { JogParams, RealtimeOverrideByte } from '../../core/controllers/grbl';
 import type { ControllerCommandSet, ControllerKind } from '../../core/devices/device-profile';
+import type { Project } from '../../core/scene';
 import type { PlatformAdapter } from '../../platform/types';
 import type { AutofocusResult } from './autofocus-action';
 import type { ConsoleCommandOptions } from './laser-console-actions';
@@ -65,6 +66,9 @@ export type LaserStoreActions = {
     },
     feed: number,
     candidate?: FramedRunCandidate,
+    /** The job being framed when no run candidate is passed (a recovery
+     * Frame). Laser or CNC Frame motion follows this job, not the open canvas. */
+    jobProject?: Project,
   ) => Promise<void>;
   /** Physically trace a job's bounds before its exact program exists. Same
    * motion and completion boundary as `frame`, but a clean completion records

@@ -120,7 +120,7 @@ describe('per-color defaults follow the artwork color', () => {
     expect(Object.keys(restoreLayerDefaults(localStorage, profile)?.byColor ?? {})).toEqual([RED]);
   });
 
-  it('gives a new image operation the CNC default saved for the same image color', () => {
+  it('never gives a new image operation the CNC block of a default saved for its color', () => {
     useStore.getState().setMachineKind('cnc');
     useStore.getState().importRasterImage(raster('first'));
     const first = operationFor('first');
@@ -130,7 +130,9 @@ describe('per-color defaults follow the artwork color', () => {
 
     useStore.getState().importRasterImage(raster('second'));
 
-    expect(operationFor('second').color).not.toBe(first.color);
-    expect(operationFor('second').cnc).toMatchObject({ depthMm: 7, feedMmPerMin: 432 });
+    const second = operationFor('second');
+    expect(second.color).not.toBe(first.color);
+    expect(second.cnc?.depthMm).not.toBe(7);
+    expect(second.cnc?.feedMmPerMin).not.toBe(432);
   });
 });

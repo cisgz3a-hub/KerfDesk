@@ -1,6 +1,7 @@
+import { cncMaxFeedMmPerMin } from '../../core/cnc/cnc-head-feeds';
 import type { CncMachineStarterLiveCaps } from '../../core/cnc/machine-starters';
 import type { DeviceProfile } from '../../core/devices';
-import type { MachineConfig, Project, Scene } from '../../core/scene';
+import type { CncMachineParams, MachineConfig, Project, Scene } from '../../core/scene';
 import { refreshAutomaticCncFeeds, seedCncModeSwitchLayers } from './cnc-auto-seeding';
 import { applyCncTextDefaultsForScene } from './cnc-text-defaults';
 
@@ -46,7 +47,10 @@ export function sceneAfterDeviceProfileChange(
   machine: MachineConfig | undefined,
   liveCaps: CncMachineStarterLiveCaps | null,
 ): Scene {
-  if (machine?.kind !== 'cnc' || !cncAutomaticInputsChanged(previousProfile, nextProfile)) {
+  if (
+    machine?.kind !== 'cnc' ||
+    !cncAutomaticInputsChanged(previousProfile, nextProfile, machine.params)
+  ) {
     return scene;
   }
   return refreshAutomaticCncFeeds(scene, {
@@ -80,11 +84,17 @@ export function projectAfterDeviceProfileChange(
   };
 }
 
-function cncAutomaticInputsChanged(previous: DeviceProfile, next: DeviceProfile): boolean {
+// CNC's own Max feed is on its params, so a laser Max feed edit changes
+// nothing here unless an older CNC setup still falls back to the device value.
+function cncAutomaticInputsChanged(
+  previous: DeviceProfile,
+  next: DeviceProfile,
+  params: CncMachineParams,
+): boolean {
   return (
     previous.profileId !== next.profileId ||
     previous.machineFamily !== next.machineFamily ||
-    previous.maxFeed !== next.maxFeed ||
+    cncMaxFeedMmPerMin(previous, params) !== cncMaxFeedMmPerMin(next, params) ||
     previous.cncSubProfile?.spindleMaxRpm !== next.cncSubProfile?.spindleMaxRpm
   );
 }

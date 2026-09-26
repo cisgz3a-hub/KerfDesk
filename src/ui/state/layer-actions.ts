@@ -12,6 +12,7 @@ import {
   type Project,
   type Scene,
   updateLayer,
+  machineKindOf,
 } from '../../core/scene';
 import { recolorLayer } from '../../core/scene/scene';
 import { applyLayerDefaultSettings } from '../layers/layer-default-settings';
@@ -162,10 +163,14 @@ function createManualLayerAction(set: LayerActionSet): LayerActions['createManua
         state.project.scene.objects,
         created,
       );
-      const base = applyLayerDefaultSettings(created, defaults);
+      const base = applyLayerDefaultSettings(
+        created,
+        defaults,
+        machineKindOf(state.project.machine),
+      );
       const machine = state.project.machine;
       const layer =
-        machine?.kind === 'cnc' && defaults.cnc === undefined
+        machine?.kind === 'cnc'
           ? seedFreshCncLayer(base, {
               device: state.project.device,
               machine,

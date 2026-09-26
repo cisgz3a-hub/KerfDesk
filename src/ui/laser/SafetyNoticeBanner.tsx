@@ -20,6 +20,7 @@ const SAFETY_NOTICE_TITLES: Record<LaserSafetyNotice['kind'], string> = {
   'controller-reboot': 'Controller rebooted mid-job',
   'frame-limit': 'Frame hit a machine limit',
   'home-unfinished': 'Home did not finish',
+  'cnc-pause-lift-failed': 'Pause and lift stopped',
 };
 
 type Props = {

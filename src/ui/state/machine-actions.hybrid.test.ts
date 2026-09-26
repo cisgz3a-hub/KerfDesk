@@ -34,7 +34,13 @@ describe('hybrid machine mode switching', () => {
     const restored = useStore.getState().project.machine;
     expect(restored?.kind).toBe('cnc');
     if (restored?.kind !== 'cnc') throw new Error('expected CNC mode');
-    expect(restored.params).toEqual(persistedParams);
+    // CNC takes its own Max feed and Frame speed from the device on first use.
+    const { device } = useStore.getState().project;
+    expect(restored.params).toEqual({
+      ...persistedParams,
+      maxFeedMmPerMin: device.maxFeed,
+      framingFeedMmPerMin: device.framingFeedMmPerMin,
+    });
 
     useStore.getState().updateCncMachine({ params: { safeZMm: 19 } });
     expect(useStore.getState().project.device.cncSubProfile?.safeZMm).toBe(19);

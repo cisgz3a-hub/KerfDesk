@@ -1,6 +1,13 @@
+import { cncMachineWithOwnFeeds } from '../../core/cnc/cnc-head-feeds';
 import type { DeviceProfile } from '../../core/devices';
 import { deviceSupportsMachineKind } from '../../core/devices/device-profile';
-import type { CncMachineConfig, CncTool, MachineConfig, Project } from '../../core/scene';
+import {
+  machineKindOf,
+  type CncMachineConfig,
+  type CncTool,
+  type MachineConfig,
+  type Project,
+} from '../../core/scene';
 import { jobPlacementAfterProfileSelection } from '../job-placement';
 import { sceneAfterMachineSetup } from './cnc-machine-setup-scene';
 import { projectWithStockMaterial } from './cnc-project-material';
@@ -9,6 +16,8 @@ import {
   type CncStartupOperationDraft,
 } from './cnc-startup-setup';
 import { cncMachineWithCustomTools } from './machine-actions';
+import { modeSwitchState } from './mode-switch-settings';
+import { projectWithParkedCnc } from './parked-cnc-machine';
 import { nextProbeSetupState } from './probe-setup-history-identity';
 import { pushUndo } from './scene-mutations';
 import { captureSetupHistoryContext } from './setup-history-context';
@@ -69,9 +78,9 @@ function replacementState(
 ): Partial<AppState> {
   captureSetupHistoryContext(state.project, state);
   const customTools = startup?.customTools ?? state.cncLibrary.customTools;
-  const nextMachine = machineWithTools(machine, customTools);
+  const nextMachine = machineWithTools(machine, customTools, profile);
   const retainedCnc = retainedCncForSetup(state, nextMachine, retainedMachine);
-  const nextCachedCnc = cachedCncWithTools(retainedCnc, customTools);
+  const nextCachedCnc = cachedCncWithTools(retainedCnc, customTools, profile);
   const nextProfile = profileWithCncSettings(profile, nextCachedCnc);
   const scene = sceneAfterMachineSetup(
     state.project.scene,
@@ -80,15 +89,25 @@ function replacementState(
     nextMachine,
     state.cncLiveCaps,
   );
-  const setupProject = projectWithStartupChanges(
-    projectWithMachine(state.project, nextProfile, nextMachine, scene),
-    state.cncLiveCaps,
-    startup,
+  // A setup that changes the mode swaps in that mode's placement and Output
+  // switches, as the Laser/CNC toggle does (ADR-416).
+  const switched = modeSwitchState(
+    projectWithParkedCnc(
+      projectWithStartupChanges(
+        projectWithMachine(state.project, nextProfile, nextMachine, scene),
+        state.cncLiveCaps,
+        startup,
+      ),
+      nextCachedCnc,
+    ),
+    state.jobPlacement,
+    machineKindOf(state.project.machine),
+    nextMachine.kind,
   );
   return {
-    ...nextProbeSetupState(setupProject, state.probeSetupEpoch),
+    ...nextProbeSetupState(switched.project, state.probeSetupEpoch),
     jobPlacement: jobPlacementAfterProfileSelection(
-      state.jobPlacement,
+      switched.jobPlacement,
       state.project.device,
       nextProfile,
     ),
@@ -142,8 +161,10 @@ function projectWithStartupChanges(
 function machineWithTools(
   machine: MachineConfig,
   customTools: ReadonlyArray<CncTool>,
+  profile: DeviceProfile,
 ): MachineConfig {
-  return machine.kind === 'cnc' ? cncMachineWithCustomTools(machine, customTools) : machine;
+  if (machine.kind !== 'cnc') return machine;
+  return cncMachineWithOwnFeeds(cncMachineWithCustomTools(machine, customTools), profile);
 }
 
 function retainedCncForSetup(
@@ -160,8 +181,10 @@ function retainedCncForSetup(
 function cachedCncWithTools(
   machine: CncMachineConfig | null,
   customTools: ReadonlyArray<CncTool>,
+  profile: DeviceProfile,
 ): CncMachineConfig | null {
-  return machine === null ? null : cncMachineWithCustomTools(machine, customTools);
+  if (machine === null) return null;
+  return cncMachineWithOwnFeeds(cncMachineWithCustomTools(machine, customTools), profile);
 }
 
 function profileWithCncSettings(

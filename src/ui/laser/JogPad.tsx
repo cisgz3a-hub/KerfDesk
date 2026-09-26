@@ -11,6 +11,7 @@ import {
   machineBoundsForDevice,
   type MachineBounds,
 } from '../../core/devices';
+import { deviceForActiveHead } from '../../core/cnc/cnc-head-feeds';
 import type { NativeXyBounds } from '../../core/devices/native-bed-frame';
 import { machineKindOf } from '../../core/scene';
 import { useStore } from '../state';
@@ -39,7 +40,7 @@ export function JogPad({ disabled }: { readonly disabled: boolean }): JSX.Elemen
   const project = useStore((s) => s.project);
   const device = project.device;
   const machineKind = machineKindOf(project.machine);
-  const maxFeed = device.maxFeed;
+  const maxFeed = deviceForActiveHead(device, project.machine).maxFeed;
   const jog = useLaserStore((s) => s.jog);
   const cancelJog = useLaserStore((s) => s.cancelJog);
   const continuousJogSupported = useLaserStore((s) => s.capabilities.jogCancel);
@@ -48,6 +49,11 @@ export function JogPad({ disabled }: { readonly disabled: boolean }): JSX.Elemen
   const signs = useMemo(() => jogAxisSignsForOrigin(device.origin), [device.origin]);
   const bounds = useMemo(() => machineBoundsForDevice(device), [device]);
   const focusReady = focusJogReady(device, machineKind);
+  // Manual Air sends the laser profile's air output (M7/M8), which on a router
+  // is a coolant relay. CNC keeps the button only to switch off air that was
+  // left on from Laser mode.
+  const airAssistOn = useLaserStore((s) => s.airAssistOn);
+  const showManualAir = machineKind === 'laser' || airAssistOn;
 
   const sendVector = useCallback(
     (vector: JogVector): void => {
@@ -94,7 +100,7 @@ export function JogPad({ disabled }: { readonly disabled: boolean }): JSX.Elemen
           onJog={sendVector}
           onCancel={cancelContinuousJog}
         />
-        <JogPadAirAssist />
+        {showManualAir ? <JogPadAirAssist /> : null}
         <MomentaryFireControl />
       </div>
       <FocusJogControls

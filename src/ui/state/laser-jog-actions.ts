@@ -66,7 +66,8 @@ export function jogActions(
     jogToMachinePosition: (x, y, feed) => runJogToMachinePosition(context, x, y, feed),
     jog: (params) => runJog(context, params),
     cancelJog: () => runCancelJog(set, get, refs, safeWrite),
-    frame: (bounds, feed, candidate) => runFrame(context, bounds, feed, candidate),
+    frame: (bounds, feed, candidate, jobProject) =>
+      runFrame(context, bounds, feed, candidate, jobProject),
     traceFrame: (bounds, feed, candidate) => runFrame(context, bounds, feed, candidate),
   };
 }
@@ -175,6 +176,7 @@ async function runFrame(
   bounds: Parameters<LaserState['frame']>[0],
   feed: number,
   candidate: Parameters<LaserState['frame']>[2] | Parameters<LaserState['traceFrame']>[2],
+  jobProject?: Parameters<LaserState['frame']>[3],
 ): Promise<void> {
   const { set, get, refs, safeWrite } = context;
   assertAutofocusIdle(get());
@@ -183,7 +185,7 @@ async function runFrame(
   const cancelGeneration = await confirmUncancelledFreshIdle(context, 'frame');
   // A new physical Frame voids every earlier proof, traced or permitted.
   set({ frameVerification: null, framedRun: null, frameTrace: null });
-  const plan = buildFrameDispatchPlan(refs, get, bounds, feed, candidate);
+  const plan = buildFrameDispatchPlan(refs, get, bounds, feed, candidate, jobProject);
   if (plan.kind === 'blocked') {
     set({ lastWriteError: plan.message, log: pushLog(get(), `[lf2] ${plan.message}`) });
     throw new Error(plan.message);

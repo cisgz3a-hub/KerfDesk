@@ -1,5 +1,7 @@
 import { useEffect } from 'react';
 import type { DeviceProfile } from '../../../core/devices';
+import { machineKindOf } from '../../../core/scene';
+import { useStore } from '../../state';
 import {
   browserLocalStorage,
   loadConfiguredSignatures,
@@ -40,6 +42,9 @@ function persistConfiguredProfile(profile: DeviceProfile): void {
   const storage = browserLocalStorage();
   if (storage === null) return;
   const configured = new Set(loadConfiguredSignatures(storage));
-  configured.add(deviceProfileSignature(profile));
+  // Save has already applied the setup, so the project's mode is the one set up.
+  configured.add(
+    deviceProfileSignature(profile, machineKindOf(useStore.getState().project.machine)),
+  );
   persistConfiguredSignatures(storage, configured);
 }

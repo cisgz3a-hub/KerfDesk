@@ -1,3 +1,5 @@
+import { cncFramingFeedMmPerMin, cncMaxFeedMmPerMin } from '../../../core/cnc/cnc-head-feeds';
+import type { DeviceProfile } from '../../../core/devices';
 import {
   isCncCoolantMode,
   type CncMachineConfig,
@@ -34,6 +36,11 @@ export function DeviceSetupCncMachineStep(props: {
         </span>
       </div>
       <CncParameterRows machine={props.machine} updateParams={updateParams} setParams={setParams} />
+      <CncSpeedRows
+        device={props.state.draft}
+        machine={props.machine}
+        updateParams={updateParams}
+      />
       <div style={warningStyle}>
         <strong>Hardware check required:</strong> confirm a powered Z is installed, Z-positive moves
         away from the stock, Safe Z clears clamps, M3/S reaches the expected RPM, the dwell is long
@@ -104,6 +111,38 @@ function CncParameterRows(props: {
         </Row>
       </MachineSetupFieldAnchor>
       <ParkRows machine={machine} setParams={props.setParams} />
+    </>
+  );
+}
+
+// CNC's own speeds (the laser's are in the Work area step). A setup saved
+// before the split shows the shared device values until one is edited.
+function CncSpeedRows(props: {
+  readonly device: DeviceProfile;
+  readonly machine: CncMachineConfig;
+  readonly updateParams: (patch: Partial<CncMachineParams>) => void;
+}): JSX.Element {
+  const { device, machine, updateParams } = props;
+  return (
+    <>
+      <MachineNumberRow
+        label="CNC output max feed"
+        unit="mm/min"
+        value={cncMaxFeedMmPerMin(device, machine.params)}
+        min={1}
+        max={100000}
+        step={100}
+        onCommit={(maxFeedMmPerMin) => updateParams({ maxFeedMmPerMin })}
+      />
+      <MachineNumberRow
+        label="CNC frame feed"
+        unit="mm/min"
+        value={cncFramingFeedMmPerMin(device, machine.params)}
+        min={1}
+        max={100000}
+        step={100}
+        onCommit={(framingFeedMmPerMin) => updateParams({ framingFeedMmPerMin })}
+      />
     </>
   );
 }

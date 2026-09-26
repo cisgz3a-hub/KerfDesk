@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { DEFAULT_DEVICE_PROFILE } from '../../core/devices';
+import { DEFAULT_DEVICE_PROFILE, DEFAULT_ROTARY_SETUP, rotaryYLimitMm } from '../../core/devices';
 import { createProject } from '../../core/scene';
 import type { PlatformAdapter, SerialConnection } from '../../platform/types';
 import { useLaserStore } from './laser-store';
@@ -100,6 +100,28 @@ describe('jog configured-machine-bounds warning', () => {
     expect(writes.filter((line) => line.startsWith('$J=')).length).toBe(1);
     expect(useToastStore.getState().toasts.at(-1)?.variant).toBe('warning');
   });
+
+  it.each(['laser', 'cnc'] as const)(
+    'applies the rotary Y limit to jog warnings only in laser mode (%s)',
+    async (mode) => {
+      const rotary = { ...DEFAULT_ROTARY_SETUP, enabled: true, objectDiameterMm: 20 };
+      const limit = rotaryYLimitMm(rotary);
+      expect(limit + 10).toBeLessThan(300);
+      const connection = makeConnection(async () => undefined);
+      configureDevice('rear-left');
+      const project = useStore.getState().project;
+      useStore.setState({ project: { ...project, device: { ...project.device, rotary } } });
+      if (mode === 'cnc') useStore.getState().setMachineKind('cnc');
+      await connectIdleAt(connection, 50, 50);
+
+      await useLaserStore.getState().jog({ dy: limit + 10 - 50, feed: 1000 });
+
+      const warned = useToastStore
+        .getState()
+        .toasts.some((toast) => /outside the configured machine bounds/i.test(toast.message));
+      expect(warned).toBe(mode === 'laser');
+    },
+  );
 
   // Audit jog-home-origin-3: after $H, stock GRBL reports machine space in
   // negative numbers (gnea/grbl config.h). Without a verified native frame that
