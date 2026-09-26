@@ -126,9 +126,10 @@ Two defects, measured on the base (`c62084959`):
 - A path and its reverse flatten to the same vertices when equal steps fit (every circle); an
   eccentric ellipse arc or an uneven cubic may put them elsewhere on the same curve, within the same
   tolerance. `curve-join.test.ts` now checks a reversed arc against the curve itself instead of
-  expecting reversed vertices. `vector-path-weld.test.ts` compares the welded outline's area to two
-  decimals, the resolution its 0.001 mm union grid allows, and now also checks that the coarse
-  compatibility polyline would fail it.
+  expecting reversed vertices. `vector-path-weld.test.ts` bounds the welded outline's area change by
+  what its 0.001 mm union grid can cause (perimeter times half a grid diagonal, about 0.018 mm²;
+  measured 0.0005 mm²), and checks that the coarse compatibility polyline differs by more than
+  0.1 mm².
 - Edit Nodes Delete (`curve-node-delete.ts`) took an elliptical arc's end tangent from the first
   three flattened samples with a one-sided second-order difference, which is second-order only when
   the samples sit at equal angles, as the old arc flattener placed them. Uneven chords made it
