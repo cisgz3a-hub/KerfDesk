@@ -706,7 +706,7 @@ marks later edits as unapproved without changing the existing Frame/Start policy
    Machine settings and generated toolpaths are excluded; the production cursor does not advance.
    Vector coordinates are rounded so each point lies within half a 0.001 mm grid diagonal of its
    true position, and the page is the exact extent of the drawn curves, not their control points
-   (ADR-403).
+   (ADR-431).
 3. Cancellation writes nothing. Missing image pixels, unsupported 3D relief or invalid geometry
    report an error without claiming a successful partial export. A write error reports its reason.
 4. Re-import preserves the supported vector/image composition, physical size and image clips
@@ -716,7 +716,7 @@ marks later edits as unapproved without changing the existing Frame/Start policy
    Undo step. Unambiguous unchanged components retain settings; changed or ambiguous components
    receive new operations. Copies are independent of the original source's replacement set.
 
-### F-A9c. Export artwork as DXF; Multi-File Trace formats (ADR-403)
+### F-A9c. Export artwork as DXF; Multi-File Trace formats (ADR-431)
 
 1. **File → Export artwork as DXF...** (or **Export selected artwork as DXF...**) writes the
    selection or scene's vector artwork as a millimetre DXF: one polyline per contour, one layer per
@@ -2542,7 +2542,7 @@ settings and Job Review keep their existing read-only setup references.
    halftone treatment; Image mode also offers grayscale and dithered photo engraving.
    **Colour layers** splits flat-colour artwork into a few colours (**Colours**: Auto or 2 to 8,
    counting the paper) and traces one filled layer per colour; neighbouring colours share one
-   edge with no gap or overlap (ADR-402). **Cut-out** burns each colour only in its own area;
+   edge with no gap or overlap (ADR-430). **Cut-out** burns each colour only in its own area;
    **Stacked** also fills each colour under the darker colours above it. The paper colour is left
    untraced unless **Trace background colour** is ticked; only a light border colour counts as
    paper, so light-on-dark art traces every colour. The swatches show the traced colours,
@@ -2582,7 +2582,7 @@ settings and Job Review keep their existing read-only setup references.
    Edge Detection creates closed outlines around dark artwork and locally
    darker detail. Adjacent dark tones may merge into one outline. Its **Sensitivity** moves in
    steps of 10 and **Detail** in steps of 5; every step is a different detector setting (faint
-   detail appears or drops out; hard black-on-white art may not change) (ADR-412). A typed value
+   detail appears or drops out; hard black-on-white art may not change) (ADR-437). A typed value
    between steps shows the step being traced once the field loses focus. **Trace alpha mask**
    also applies to Edge Detection: it outlines the image's transparency, and Invert is
    unavailable while it is on. Semi-transparent regions (shadows, glows) are outlined like grey
@@ -3345,8 +3345,8 @@ and physical material output remain unverified.
 ### F-F5. Enhance a region of a trace (region-enhance re-trace)
 
 **ADR:** [ADR-113](DECISIONS.md#adr-113--region-enhance-re-trace-dialog-boundary-mode-trace-fidelity-2026-07-05),
-amended by [ADR-410](docs/decisions/ADR-410-region-enhance-seams.md) and
-[ADR-411](docs/decisions/ADR-411-auto-median-at-source-scale.md).
+amended by [ADR-435](docs/decisions/ADR-435-region-enhance-seams.md) and
+[ADR-436](docs/decisions/ADR-436-auto-median-at-source-scale.md).
 
 **Operator intent.** A small feature inside a large raster (a tiny
 letter counter in a full logo) dropped out of the trace because it

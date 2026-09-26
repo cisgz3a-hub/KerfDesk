@@ -1,4 +1,4 @@
-// Compact, exact SVG path data for vector export (ADR-403).
+// Compact, exact SVG path data for vector export (ADR-431).
 //
 // Two encodings:
 //   * full precision (grid === null): absolute commands, every coordinate

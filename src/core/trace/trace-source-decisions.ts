@@ -1,10 +1,10 @@
-// Whole-source binarisation decisions, frozen for derived regions (ADR-410).
+// Whole-source binarisation decisions, frozen for derived regions (ADR-435).
 //
 // Three luma-lane decisions are made from the pixels a trace is handed, not
 // from the settings: Otsu's cut (Sharp, Smooth, Centerline, and any preset
 // with useOtsuThreshold) reads the histogram, Line Art's auto-sketch trigger
 // counts coloured pixels against a floor, and Smooth's automatic median fires
-// only when isolated impulses reach a fraction of the frame (ADR-411). Region
+// only when isolated impulses reach a fraction of the frame (ADR-436). Region
 // Enhance traces a crop — supersampled to four times the pixels — so each can
 // come out differently from the full pass it patches, and the patch then
 // binarises differently from its surroundings. Resolving them once on the
@@ -56,7 +56,7 @@ function freezeAutoSketch(image: RawImageData, options: TraceOptions): TraceOpti
 // local-contrast detector never reads it. It rides in its own field, not
 // thresholdLuma, so the zero-paths retry that drops Otsu still drops it.
 // The automatic median's verdict (does this whole image carry enough
-// isolated impulses to repair?) is read from the same median pass (ADR-411).
+// isolated impulses to repair?) is read from the same median pass (ADR-436).
 function freezeMedianDecisions(image: RawImageData, options: TraceOptions): TraceOptions {
   const otsu = readsOtsuCut(image, options) && options.sourceOtsuThreshold === undefined;
   const median = runsAutoMedian(image, options) && options.sourceAutoMedian === undefined;

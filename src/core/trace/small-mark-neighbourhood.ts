@@ -1,4 +1,4 @@
-// Neighbourhood evidence for the automatic small-mark policy (ADR-409).
+// Neighbourhood evidence for the automatic small-mark policy (ADR-434).
 //
 // A dark mark's tone cannot tell a stipple dot from a toner speck: both are
 // ink-black. What differs is what surrounds them, and the policy reads three

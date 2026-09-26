@@ -292,7 +292,7 @@ describe('runTrace stale-result guard (P2-A)', () => {
       setState,
     });
 
-    // The 410 px working box plus a 9 px context ring each side (ADR-410),
+    // The 410 px working box plus a 9 px context ring each side (ADR-435),
     // supersampled 2x.
     expect(traceImageWithFallback).toHaveBeenNthCalledWith(
       2,
@@ -385,7 +385,7 @@ describe('runTrace stale-result guard (P2-A)', () => {
         height: 20,
       })
       // Region re-trace of the box plus its context ring (the whole 20x20
-      // image, ADR-410) supersampled to 40x40; downscaled /2, offset (0,0).
+      // image, ADR-435) supersampled to 40x40; downscaled /2, offset (0,0).
       .mockResolvedValueOnce({
         paths: [
           {

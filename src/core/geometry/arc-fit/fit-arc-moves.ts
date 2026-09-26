@@ -1,5 +1,5 @@
 // Fits one canonical subpath with line and circular-arc moves in machine
-// millimetres (ADR-407). The moves start where the subpath starts and end
+// millimetres (ADR-432). The moves start where the subpath starts and end
 // where it ends; every corner the subpath has (a joint turning more than the
 // smooth-joint angle between curves, or at least the corner angle between
 // lines) is a move end at its exact mapped position. What the controller

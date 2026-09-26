@@ -318,7 +318,7 @@ describe('traceImage worker timeout (P2-A)', () => {
   });
 });
 
-describe('traceImage freezeSourceDecisions (ADR-410)', () => {
+describe('traceImage freezeSourceDecisions (ADR-435)', () => {
   const otsuOptions: TraceOptions = { ...traceOptions, useOtsuThreshold: true };
 
   it('resolves, traces with and returns the frozen options inline', async () => {

@@ -1,4 +1,4 @@
-// Stacked copies of a closed outline for the minimum-feature check (ADR-408).
+// Stacked copies of a closed outline for the minimum-feature check (ADR-433).
 // Imports often carry the same outline twice. The cut is the same line cut
 // again, but filled even-odd the copy cancels its twin and turns one part into
 // a phantom gap, so the check keeps only the first copy. Only exact copies

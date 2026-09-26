@@ -168,7 +168,7 @@ export function hasImpulseNoise(image: RawImageData): boolean {
 /** Selective automatic cleanup; computes the median only once. An explicit
  * medianFilter:true keeps using the full median's historical behaviour.
  * `minimumRatio` 0 repairs every isolated impulse: a crop whose whole source
- * already crossed the density floor (ADR-411). */
+ * already crossed the density floor (ADR-436). */
 export function autoMedianFilter(
   image: RawImageData,
   minimumRatio = IMPULSE_NOISE_MIN_RATIO,

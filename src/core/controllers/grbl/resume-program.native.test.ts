@@ -79,7 +79,7 @@ const GRBL = 'G21\nG90\nM8\nM4 S0\nG0 X0 Y0 S0\nG1 X10 Y0 F1500 S300\nX20 S200\n
 
 describe('laser resume transform 3', () => {
   it('leaves GRBL-family programs without arcs or a plane word as transform 2 did', () => {
-    // Transform 4 (ADR-407) only adds the plane pin, which this program lacks.
+    // Transform 4 (ADR-432) only adds the plane pin, which this program lacks.
     expect(LASER_RESUME_TRANSFORM_VERSION).toBe(4);
     for (const fromLine of [5, 6, 7, 8]) {
       expect(resume(GRBL, fromLine)).toEqual(resume(GRBL, fromLine, undefined, 2));

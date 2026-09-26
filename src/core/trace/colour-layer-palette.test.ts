@@ -1,5 +1,5 @@
 // Palette, background and dispatch behaviour of the colour-layer trace
-// (ADR-402); the geometry tests live in colour-layer-trace.test.ts.
+// (ADR-430); the geometry tests live in colour-layer-trace.test.ts.
 import { describe, expect, it } from 'vitest';
 import type { RawImageData } from './trace-image';
 import { isColourLayerTrace } from './colour-layer-trace';

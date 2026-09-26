@@ -1,4 +1,4 @@
-// G1/G2/G3 burn lines for a laser segment carrying fitted arc moves (ADR-407).
+// G1/G2/G3 burn lines for a laser segment carrying fitted arc moves (ADR-432).
 //
 // Power, feed and modal words follow the G1 path exactly: F and S ride the
 // first emitted burn move (every move when the dialect asks), and a move that

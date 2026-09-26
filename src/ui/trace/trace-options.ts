@@ -165,7 +165,7 @@ function applyManualDetection(
   out['thresholdLuma'] = clampByte(settings.thresholdLuma ?? preset.thresholdLuma ?? 128);
 }
 
-// Sensitivity and Detail offer one stop per detector setting (ADR-412):
+// Sensitivity and Detail offer one stop per detector setting (ADR-437):
 // Sensitivity moves in steps of 10 over 11 contrast deltas (0 -> 12 luma
 // levels, 100 -> 2); Detail in steps of 5 over 21 neighbourhood radii
 // (0 -> 24 source px, 100 -> 4). A value between stops takes the nearest one.
@@ -218,14 +218,14 @@ function applyEdgeTraceSettings(
 // True when the options stack any of the preset features that can
 // collapse a near-uniform image to zero paths: Otsu histogram
 // binarization, fixedPalette, despeckle, or the automatic small-mark
-// cleanup (ADR-409), which can erase art made only of small marks.
+// cleanup (ADR-434), which can erase art made only of small marks.
 export function hasAggressivePreprocessing(options: TraceOptions): boolean {
   if (options.photoDetail !== undefined) return false;
   // Edge's local-contrast detector reads none of these (older saved options
   // may still carry them), so relaxing them cannot change its output — a
   // zero-paths retry would just repeat the identical multi-second pipeline.
   if (options.traceMode === 'edge') return false;
-  // Colour layers (ADR-402) own their speck rule: a missing despeckle reads as
+  // Colour layers (ADR-430) own their speck rule: a missing despeckle reads as
   // the same 12 px default, so a "relaxed" retry would repeat the identical
   // colour pipeline and falsely report relaxed settings.
   if (options.colourLayers !== undefined) return false;
@@ -248,7 +248,7 @@ export function hasAggressivePreprocessing(options: TraceOptions): boolean {
 // rectangle instead of an honest "no paths". The retry must stay on the
 // same backend; only Otsu, despeckle, and pathOmit relax.
 //
-// smallMarkPolicy goes with despeckle (ADR-409): an unset despeckle means
+// smallMarkPolicy goes with despeckle (ADR-434): an unset despeckle means
 // "automatic" while the policy is on, so deleting despeckle alone would
 // re-run the same automatic cleanup (or turn an explicit value back into
 // auto) instead of relaxing it. Without the policy the retry erases no ink

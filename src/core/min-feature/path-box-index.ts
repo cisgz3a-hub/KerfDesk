@@ -1,5 +1,5 @@
 // Which closed paths can enclose a point, for the minimum-feature check's
-// inside/outside rays (ADR-408). A closed path whose bounding box does not
+// inside/outside rays (ADR-433). A closed path whose bounding box does not
 // contain a point crosses any ray from it an even number of times, so only
 // the paths whose box contains the point decide its parity. Boxes are kept in
 // a coarse grid; a box spanning many coarse cells (a stencil sheet, a traced

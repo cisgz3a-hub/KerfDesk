@@ -1,4 +1,4 @@
-// Exact affine images of canonical curves (ADR-403).
+// Exact affine images of canonical curves (ADR-431).
 //
 // Lines and cubics map by their points. An elliptical arc maps to another
 // elliptical arc: with A = L · R(phi) · diag(rx, ry) (L the linear part of the

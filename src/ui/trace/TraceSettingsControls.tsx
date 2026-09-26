@@ -122,7 +122,7 @@ type AlphaMaskState = {
   readonly checked: boolean;
 };
 
-// Every line preset, Edge Detection included (ADR-412), can trace the alpha
+// Every line preset, Edge Detection included (ADR-437), can trace the alpha
 // mask; it only applies once the source is known to carry transparency.
 function alphaMaskState(props: TraceSettingsControlsProps): AlphaMaskState {
   const checking = props.sourceHasTransparency === undefined;
@@ -346,7 +346,7 @@ function NumberRow(props: {
   readonly max: number;
   readonly step: number;
   readonly value: number;
-  readonly snapToStep?: boolean; // show the traced stop once typing ends (ADR-412)
+  readonly snapToStep?: boolean; // show the traced stop once typing ends (ADR-437)
   readonly onChange: (next: number) => void;
   readonly title?: string;
 }): JSX.Element {

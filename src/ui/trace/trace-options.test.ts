@@ -152,7 +152,7 @@ describe('hasAggressivePreprocessing', () => {
     expect(hasAggressivePreprocessing(LINE_ART)).toBe(true);
   });
 
-  it('is true when only the automatic small-mark cleanup is on (ADR-409)', () => {
+  it('is true when only the automatic small-mark cleanup is on (ADR-434)', () => {
     const bare: TraceOptions = {
       numberOfColors: 2,
       pathOmit: 8,
@@ -225,13 +225,13 @@ describe('relaxAggressivePreprocessing', () => {
     ['Line Art', LINE_ART],
     ['Smooth', SMOOTH],
     ['Line Art with an explicit speck value', { ...LINE_ART, despeckleMinPixels: 12 }],
-  ])('turns the small-mark cleanup OFF for %s, not back to automatic (ADR-409)', (_, preset) => {
+  ])('turns the small-mark cleanup OFF for %s, not back to automatic (ADR-434)', (_, preset) => {
     const relaxed = relaxAggressivePreprocessing(preset);
     expect(relaxed.smallMarkPolicy).toBeUndefined();
     expect(relaxed.despeckleMinPixels).toBeUndefined();
   });
 
-  it('recovers small-mark-only art on the zero-paths retry (ADR-409)', async () => {
+  it('recovers small-mark-only art on the zero-paths retry (ADR-434)', async () => {
     // A sparse grid of 3x2 black dots, 9 px apart: no dot has a like mark
     // within the support radius, so the automatic cleanup removes them all
     // and the trace is empty. The relaxed retry must bring them back.

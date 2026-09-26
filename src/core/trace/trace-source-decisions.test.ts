@@ -23,7 +23,7 @@ const colourful = image(40, 40, (x, y) =>
   x < 10 && y < 10 ? [220, 150, 60, 255] : [255, 255, 255, 255],
 );
 
-describe('resolveFrozenTraceSourceOptions (ADR-410)', () => {
+describe('resolveFrozenTraceSourceOptions (ADR-435)', () => {
   it('freezes the Otsu cut of Otsu presets and is idempotent', () => {
     // A continuous histogram: exactly the cut the native pass derives.
     const shaded = image(256, 4, (x) => [x, x, x, 255]);
@@ -86,7 +86,7 @@ describe('resolveFrozenTraceSourceOptions (ADR-410)', () => {
     expect(resolveFrozenTraceSourceOptions(colourful, frozen)).toBe(frozen);
   });
 
-  it("freezes the automatic median's whole-image verdict with the Otsu cut (ADR-411)", () => {
+  it("freezes the automatic median's whole-image verdict with the Otsu cut (ADR-436)", () => {
     // 1-px pepper every 6 px: 2.8% of the frame, over the 0.4% density floor.
     const specked = image(60, 60, (x, y) =>
       x % 6 === 3 && y % 6 === 3 ? [0, 0, 0, 255] : [255, 255, 255, 255],

@@ -5,7 +5,7 @@ import type { TracePreviewState } from './use-trace-preview';
 export function tracePreviewFacts(preview: TracePreviewState): {
   /** Whether the traced source has transparency, once known. */
   readonly sourceHasTransparency: boolean | undefined;
-  /** The traced colours, for the Colour layers swatches (ADR-402). */
+  /** The traced colours, for the Colour layers swatches (ADR-430). */
   readonly previewColours: ReadonlyArray<string> | undefined;
 } {
   return {

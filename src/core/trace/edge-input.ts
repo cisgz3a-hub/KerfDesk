@@ -10,7 +10,7 @@ import { invertImage } from './raster-prep';
 import { shouldTraceAlphaMask } from './trace-alpha';
 import { effectivePixelScale, type RawImageData, type TraceOptions } from './trace-image';
 
-// The detector has two parameters (ADR-412). Both are carried by the
+// The detector has two parameters (ADR-437). Both are carried by the
 // Canny-era option fields so saved options keep their exact output:
 //   delta  = round(edgeLowThresholdRatio x 6/0.074), an integer 2..12 luma levels;
 //   radius = round(edgeBlurSigma x 10), an integer 4..32 source pixels.

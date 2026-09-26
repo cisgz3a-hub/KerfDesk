@@ -1,4 +1,4 @@
-// ADR-407: a job whose contours go out as G2/G3 keeps the prepared preview
+// ADR-432: a job whose contours go out as G2/G3 keeps the prepared preview
 // route, which draws the arcs, and never pays for a plan route it would throw
 // away: the v1 plan draws arcs with the display parser's chords, so the two
 // routes cannot agree at emitted precision.
@@ -46,7 +46,7 @@ function prepared(job: Job) {
   return { ok: true as const, project: createProject(), job, jobOriginOffset: { x: 0, y: 0 } };
 }
 
-describe('preview route for arc jobs (ADR-407)', () => {
+describe('preview route for arc jobs (ADR-432)', () => {
   it('keeps the prepared route for a job that writes arcs', () => {
     expect(ARCS.arcMoves).toBeDefined();
     const job = jobWith(ARCS);

@@ -30,7 +30,7 @@ type OverrideRule =
   | { readonly kind: 'number'; readonly min: number; readonly max: number }
   | { readonly kind: 'boolean' }
   | { readonly kind: 'detection' }
-  // Colour layers' Colours control: 'auto' or a whole count in range (ADR-402).
+  // Colour layers' Colours control: 'auto' or a whole count in range (ADR-430).
   | { readonly kind: 'count-or-auto'; readonly min: number; readonly max: number }
   | { readonly kind: 'choice'; readonly values: ReadonlyArray<string> };
 

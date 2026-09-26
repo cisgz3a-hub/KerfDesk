@@ -1,4 +1,4 @@
-// Scene artwork → DXF (ADR-403). Artwork interchange only: geometry and
+// Scene artwork → DXF (ADR-431). Artwork interchange only: geometry and
 // colour, no machine settings, toolpaths or operation side effects.
 
 import {

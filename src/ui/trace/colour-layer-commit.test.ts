@@ -1,4 +1,4 @@
-// Committing a Colour layers trace (ADR-402): every colour becomes its own
+// Committing a Colour layers trace (ADR-430): every colour becomes its own
 // operation, and each laser operation starts at a power set by its colour's
 // darkness.
 import { describe, expect, it } from 'vitest';

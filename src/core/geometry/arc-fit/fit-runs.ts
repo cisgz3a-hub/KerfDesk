@@ -1,4 +1,4 @@
-// Greedy line/arc fitting over one run of sampled source (ADR-407).
+// Greedy line/arc fitting over one run of sampled source (ADR-432).
 //
 // A smooth run carries a unit tangent on each side of every sample. Each step
 // starts at the last break point and takes, among four candidates, the one

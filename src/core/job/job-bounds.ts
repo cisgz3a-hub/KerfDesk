@@ -160,7 +160,7 @@ function extendBoundsForCut(
   device: DeviceProfile | undefined,
 ): boolean {
   let any = false;
-  // ADR-407: an arc bulges past its chords; bound what the emitter writes, by
+  // ADR-432: an arc bulges past its chords; bound what the emitter writes, by
   // the emitter's own predicate. Without a device either may go out: bound both.
   const arcMovesEnabled = device === undefined ? null : laserArcMovesEnabled(device);
   for (const seg of group.segments) {
@@ -200,7 +200,7 @@ function extendBoundsForFill(
   device: DeviceProfile | undefined,
 ): boolean {
   const usesPlannedBurnBounds = group.fillRunwayPolicy === 'feed-matched-every-sweep';
-  // Scanline fills never go out as arcs (ADR-407 writes arcs only for Line
+  // Scanline fills never go out as arcs (ADR-432 writes arcs only for Line
   // cuts and offset fills), so their outlines bound as drawn polylines.
   let any = usesPlannedBurnBounds ? false : extendBoundsForPolylines(b, group);
   const scanOffsetMm = group.bidirectionalScanOffsetMm ?? scanOffsetForGroup(device, group.speed);

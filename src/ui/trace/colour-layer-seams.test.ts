@@ -1,5 +1,5 @@
 // Shared colour boundaries survive laser conditioning and compile flattening
-// (ADR-402 on top of ADR-391): curved, anti-aliased seams between inks stay
+// (ADR-430 on top of ADR-391): curved, anti-aliased seams between inks stay
 // free of gaps and overlaps in the moves the machine would run.
 import { describe, expect, it } from 'vitest';
 import { IDENTITY_TRANSFORM, type ColoredPath, type TracedImage } from '../../core/scene';

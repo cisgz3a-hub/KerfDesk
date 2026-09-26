@@ -1,4 +1,4 @@
-// An arc as a GRBL-family controller executes it (ADR-407): mc_arc
+// An arc as a GRBL-family controller executes it (ADR-432): mc_arc
 // (grbl/motion_control.c, gnea/grbl master) splits it into
 // floor(|0.5 x travel x r| / sqrt(tol x (2r - tol))) equal-angle chords, where
 // tol is the `$12` arc tolerance, and ends on the programmed target. Timing

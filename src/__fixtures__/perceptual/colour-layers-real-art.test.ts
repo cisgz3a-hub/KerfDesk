@@ -1,4 +1,4 @@
-// Smoke run of the colour-layer backend (ADR-402) on real line art. The
+// Smoke run of the colour-layer backend (ADR-430) on real line art. The
 // images are not part of the repository: set COLOUR_LAYER_ART_DIR to a folder
 // holding owl.png and hummingbird.png to run it; otherwise it skips.
 import { existsSync } from 'node:fs';

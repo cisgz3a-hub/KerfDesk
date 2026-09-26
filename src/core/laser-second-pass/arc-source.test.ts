@@ -1,4 +1,4 @@
-// ADR-407: laser output on arc-capable GRBL profiles carries G2/G3. The
+// ADR-432: laser output on arc-capable GRBL profiles carries G2/G3. The
 // painted second pass reads each arc as the chords mc_arc runs for it, so the
 // darkening offer made for those controllers still builds a pass.
 
@@ -82,7 +82,7 @@ const PAINT_ALL: LaserSecondPassSelection = {
   strokes: [{ id: 'all', mode: 'paint', radiusMm: 30, powerScale: 1, points: [MACHINE_CENTER] }],
 };
 
-describe('painted second pass over an arc program (ADR-407)', () => {
+describe('painted second pass over an arc program (ADR-432)', () => {
   it('builds a pass from the G2/G3 program a GRBL arc profile writes', () => {
     expect(laserSecondPassSupportsController(ARC_DEVICE.controllerKind)).toBe(true);
     const gcode = circleProgram(ARC_DEVICE);

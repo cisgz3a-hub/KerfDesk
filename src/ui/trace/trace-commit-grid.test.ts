@@ -181,7 +181,7 @@ describe('traceOptionsForCommitGrid', () => {
       grid: { width: 4096, height: 512 },
       preview: { width: 2048, height: 256 },
     });
-    // Line Art's ink despeckle is the automatic small-mark policy (ADR-409):
+    // Line Art's ink despeckle is the automatic small-mark policy (ADR-434):
     // its areas scale instead of an explicit despeckle area.
     expect(LINE_ART.smallMarkPolicy).toBe('auto');
     expect(scaled.despeckleMinPixels).toBeUndefined();

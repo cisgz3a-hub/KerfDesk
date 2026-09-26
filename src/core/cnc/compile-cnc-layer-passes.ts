@@ -216,7 +216,7 @@ function passesForDepths(
 
 // ADR-218: select the surviving edge of a traced double-line ring before
 // offsetting. Pairing remains provenance-scoped (ADR-277). The minimum-feature
-// check (ADR-408) reads the same selection.
+// check (ADR-433) reads the same selection.
 export function lineArtContoursForLayer(
   polylines: ReadonlyArray<Polyline>,
   settings: CncLayerSettings,

@@ -1,5 +1,5 @@
 // Which geometry the minimum-feature check reads, and against what width
-// (ADR-408). Only cutting operations are checked: laser Line operations
+// (ADR-433). Only cutting operations are checked: laser Line operations
 // against the kerf, CNC profile and pocket operations against the bit.
 // Fill, Image, engrave, V-carve, drill and relief operations are skipped —
 // their marks are not parts that can fall apart.

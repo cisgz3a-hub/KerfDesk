@@ -27,7 +27,7 @@ it('carries full-source alpha into the actual injected region tracer before supe
   });
   expect(calls).toHaveLength(1);
   const call = calls[0]!;
-  // The 28 px box plus a 9 px context ring each side (ADR-410), still inside
+  // The 28 px box plus a 9 px context ring each side (ADR-435), still inside
   // the opaque plate, supersampled 2x.
   expect(call.image).toMatchObject({ width: 92, height: 92 });
   expect(call.image.data.buffer).not.toBe(image.data.buffer);

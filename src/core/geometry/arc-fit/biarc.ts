@@ -1,4 +1,4 @@
-// Biarcs (ADR-407): two circular arcs, tangent to each other at a junction,
+// Biarcs (ADR-432): two circular arcs, tangent to each other at a junction,
 // joining two points with prescribed unit tangents. Among the one-parameter
 // family this uses the equal-tangent-length biarc of Bolton ("Biarc curves",
 // Computer-Aided Design 7(2):89-92, 1975): control points A = P0 + d T0 and

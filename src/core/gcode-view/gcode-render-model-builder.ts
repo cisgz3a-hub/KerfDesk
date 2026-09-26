@@ -62,7 +62,7 @@ type BuildContext = {
   readonly skipped: SkippedMotion[];
   readonly unsupported: UnsupportedWordMap;
   recognizedWords: number;
-  controllerArcBudgetRelief: number; // mc_arc chords maxSegments does not count (ADR-407)
+  controllerArcBudgetRelief: number; // mc_arc chords maxSegments does not count (ADR-432)
 };
 
 export type GcodeRenderModelBuilder = {

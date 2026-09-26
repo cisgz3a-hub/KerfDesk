@@ -1,4 +1,4 @@
-// Sub-pixel placement of the colour-layer boundary chains (ADR-402). Own
+// Sub-pixel placement of the colour-layer boundary chains (ADR-430). Own
 // design. Each crack of a chain sits between two pixels of different colours;
 // reading those pixels' source colours as coverage mixtures of the two region
 // colours moves the crack's midpoint to where the edge really lies. Chain

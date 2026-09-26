@@ -21,7 +21,7 @@ export type ProgramTimingOptions = {
   readonly baudRate?: number;
   readonly hostToolChangePauses?: boolean;
   readonly fanPower?: boolean;
-  /** GRBL-family laser timing interpolates arcs as mc_arc does (ADR-407). */
+  /** GRBL-family laser timing interpolates arcs as mc_arc does (ADR-432). */
   readonly controllerArcToleranceMm?: number;
 };
 

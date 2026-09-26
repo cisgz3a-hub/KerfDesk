@@ -1,4 +1,4 @@
-// Colour quantisation for the colour-layer trace (ADR-402). Own design:
+// Colour quantisation for the colour-layer trace (ADR-430). Own design:
 // every pixel is converted to OKLab (colour-oklab.ts), an automatic or
 // requested palette is chosen by weighted k-means (colour-palette.ts), each
 // pixel takes its nearest palette colour, the label map is cleaned of

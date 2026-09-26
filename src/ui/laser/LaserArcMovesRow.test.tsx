@@ -24,7 +24,7 @@ async function render(device: DeviceProfile, update = vi.fn()): Promise<typeof u
   return update;
 }
 
-describe('LaserArcMovesRow (ADR-407)', () => {
+describe('LaserArcMovesRow (ADR-432)', () => {
   it('is hidden where the output never carries arcs', async () => {
     await render(DEFAULT_DEVICE_PROFILE);
     expect(host.querySelector('input')).toBeNull();

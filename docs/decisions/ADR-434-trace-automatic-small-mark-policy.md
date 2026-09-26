@@ -1,4 +1,4 @@
-## ADR-409 - Line Art and Smooth judge small marks on evidence, not a fixed area (2026-09-25)
+## ADR-434 - Line Art and Smooth judge small marks on evidence, not a fixed area (2026-09-25)
 
 **Status:** Accepted. | **Date:** 2026-09-25
 

@@ -1,4 +1,4 @@
-// ADR-410: Region Enhance patches must binarise and join like the full pass.
+// ADR-435: Region Enhance patches must binarise and join like the full pass.
 import { describe, expect, it } from 'vitest';
 import { compareMasks } from '../../__fixtures__/perceptual/compare';
 import { maximumPointDistanceToPolyline } from '../../__fixtures__/polyline-distance';
@@ -115,7 +115,7 @@ function lightingRamp(): RawImageData {
   });
 }
 
-describe('Region Enhance binarises the crop like the full pass (ADR-410)', () => {
+describe('Region Enhance binarises the crop like the full pass (ADR-435)', () => {
   const region = { x: 150, y: 40, width: 70, height: 90 };
 
   it.each(['Sharp', 'Smooth', 'Centerline'])(
@@ -163,8 +163,8 @@ describe('Region Enhance binarises the crop like the full pass (ADR-410)', () =>
 
 // Smooth's automatic median repairs isolated impulses only when the whole
 // image has enough of them, judged in pixels of the grid it runs on. The crop
-// is enlarged 2x, where each speck is a supported 2x2 blob (ADR-411).
-describe("Region Enhance repairs the crop's impulses like the full pass (ADR-411)", () => {
+// is enlarged 2x, where each speck is a supported 2x2 blob (ADR-436).
+describe("Region Enhance repairs the crop's impulses like the full pass (ADR-436)", () => {
   const box = { x: 60, y: 60, width: 80, height: 80 };
   const salted = (x: number, y: number): boolean => x % 5 === 2 && y % 5 === 2;
   const image = canvas(200, 200, (x, y) => {
@@ -251,7 +251,7 @@ describe("Region Enhance repairs the crop's impulses like the full pass (ADR-411
 // Line Art's detail mask reads a 16 px window on the 2x grid. Dark blocks 3 px
 // outside every box edge darken the neighbourhood of pale strokes just inside
 // it; a crop without that context ring sees only paper there.
-describe('Region Enhance traces the crop with its neighbourhood (ADR-410)', () => {
+describe('Region Enhance traces the crop with its neighbourhood (ADR-435)', () => {
   const box = { x: 60, y: 60, width: 80, height: 80 };
   const image = canvas(200, 200, (x, y) => {
     const within = (x0: number, x1: number, y0: number, y1: number): boolean =>
@@ -323,7 +323,7 @@ describe('Region Enhance traces the crop with its neighbourhood (ADR-410)', () =
   });
 });
 
-describe('Region Enhance keeps canonical curves, bindings and seams (ADR-410)', () => {
+describe('Region Enhance keeps canonical curves, bindings and seams (ADR-435)', () => {
   const region = { x: 50, y: 50, width: 100, height: 100 };
   const interior = { minX: 51, minY: 51, maxX: 149, maxY: 149 };
   const radius = 4;

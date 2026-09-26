@@ -1,4 +1,4 @@
-## ADR-402 - Colour layers: trace colour artwork into one layer per colour with shared edges (2026-09-25)
+## ADR-430 - Colour layers: trace colour artwork into one layer per colour with shared edges (2026-09-25)
 
 **Status:** Accepted. | **Date:** 2026-09-25
 

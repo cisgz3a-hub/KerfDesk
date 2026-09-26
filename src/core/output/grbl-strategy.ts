@@ -87,7 +87,7 @@ function preamble(dialect: GrblGcodeDialect, writesArcs: boolean): string {
   // cutting move.
   //
   // G17 pins the arc plane like the WCS, and only when the job writes G2/G3
-  // (ADR-407): a stale G18/G19 reads an XY I/J arc as error:33 or swings Z.
+  // (ADR-432): a stale G18/G19 reads an XY I/J arc as error:33 or swings Z.
   const plane = writesArcs ? ['G17'] : [];
   const words = ['G21', 'G90', 'G54', 'G94', ...plane, `${laserModeWord(dialect.cutPowerMode)} S0`];
   return words.join(LINE_END) + LINE_END;
@@ -121,7 +121,7 @@ type SegmentEmissionContext = {
   readonly dialect: GrblGcodeDialect;
   readonly entryRunwayMm?: number | undefined;
   readonly entryBounds: ContourEntryBounds;
-  /** ADR-407: the machine takes G2/G3, so fitted arc moves may be written. */
+  /** ADR-432: the machine takes G2/G3, so fitted arc moves may be written. */
   readonly arcMovesEnabled: boolean;
 };
 type GroupEmissionContext = Pick<

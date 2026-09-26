@@ -21,7 +21,7 @@ type SourceState = {
   unit: number;
   absolute: boolean;
   rapid: boolean;
-  /** G2 or G3 while the modal motion is an arc (ADR-407), else null. */
+  /** G2 or G3 while the modal motion is an arc (ADR-432), else null. */
   arc: 2 | 3 | null;
   mode: 3 | 4;
   enabled: boolean;
@@ -298,7 +298,7 @@ function processBlock(
 }
 
 /** Visits exact double-precision linear motion without constructing a full route.
- * G2/G3 arcs arrive as the chords the controller runs for them (ADR-407). */
+ * G2/G3 arcs arrive as the chords the controller runs for them (ADR-432). */
 export function visitLaserSecondPassSource(
   sourceGcode: string,
   initial: LaserSecondPassPoint | undefined,

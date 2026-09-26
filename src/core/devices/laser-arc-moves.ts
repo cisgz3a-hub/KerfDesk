@@ -1,5 +1,5 @@
 // Whether the laser GRBL emitter may write G2/G3 arcs for this machine
-// (ADR-407). Arcs are native motion on the GRBL family: GRBL 1.1, grblHAL and
+// (ADR-432). Arcs are native motion on the GRBL family: GRBL 1.1, grblHAL and
 // FluidNC all execute G2/G3 in the XY plane with I/J offsets. A profile that
 // names no controller, any other controller, a vendor command set and the
 // qualified 4040-safe dialect (its tangential contour entries follow the first

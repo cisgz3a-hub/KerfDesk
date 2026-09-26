@@ -8,7 +8,7 @@ import {
   GRBL_DEFAULT_ARC_TOLERANCE_MM,
 } from './controller-arc-points';
 
-describe('controllerArcPoints (ADR-407)', () => {
+describe('controllerArcPoints (ADR-432)', () => {
   it('splits an arc into as many chords as mc_arc does', () => {
     const radius = 10;
     const sweep = Math.PI / 2;

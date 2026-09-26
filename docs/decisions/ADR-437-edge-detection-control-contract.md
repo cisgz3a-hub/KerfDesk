@@ -1,4 +1,4 @@
-## ADR-412 - Edge Detection's controls match its detector (2026-09-25)
+## ADR-437 - Edge Detection's controls match its detector (2026-09-25)
 
 **Status:** Accepted. | **Date:** 2026-09-25
 

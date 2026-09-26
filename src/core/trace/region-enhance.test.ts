@@ -75,7 +75,7 @@ describe('replacePathsInRegion', () => {
   });
 });
 
-describe('replacePathsInRegion keeps canonical data and pairs border shapes (ADR-410)', () => {
+describe('replacePathsInRegion keeps canonical data and pairs border shapes (ADR-435)', () => {
   const interior = { x: 10, y: 10, width: 40, height: 40 };
 
   it('keeps curves and operationIds of survivors and returns untouched paths as-is', () => {
@@ -163,7 +163,7 @@ describe('enhanceRegionPaths', () => {
       },
     ];
     // The injected tracer sees the 40x40 box plus a 9 px context ring
-    // (source 1..59, ADR-410) upscaled 2x, and answers in UPSCALED CROP
+    // (source 1..59, ADR-435) upscaled 2x, and answers in UPSCALED CROP
     // coordinates: a genuine interior loop plus a fragment hugging the crop
     // edge (x=0), which a real tracer produces when a larger shape is clipped
     // by the crop.

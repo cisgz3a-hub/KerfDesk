@@ -160,7 +160,7 @@ function appendContourGroupSteps(
         appendTravelStep(steps, prevEnd, entry, 'rapid');
         appendTravelStep(steps, entry, first, 'feed');
       }
-      // ADR-407: the emitter's own predicate decides whether arcs go out. The
+      // ADR-432: the emitter's own predicate decides whether arcs go out. The
       // preview has no device; compile attached arcs only for an arc machine.
       const burn = cutSegmentBurnPolyline(seg, { arcMovesEnabled: true, entryRunwayMm });
       steps.push({

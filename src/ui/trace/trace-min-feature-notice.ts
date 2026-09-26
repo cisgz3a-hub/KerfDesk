@@ -1,4 +1,4 @@
-// Post-commit minimum-feature notice (ADR-408). After a trace lands on a
+// Post-commit minimum-feature notice (ADR-433). After a trace lands on a
 // cutting operation, check just the new artwork and, when it has parts or gaps
 // narrower than the kerf or bit, say so once — before the operator reaches
 // Job Review, where the full list with positions lives. Advisory only.

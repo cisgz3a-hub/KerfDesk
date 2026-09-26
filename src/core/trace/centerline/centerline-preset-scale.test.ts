@@ -95,7 +95,7 @@ describe('Centerline preset connectivity', () => {
     expect(
       lowerInkPixels(preprocessForTrace(image, { ...fixedLineArt, turnPolicy: 'connect-paper' })),
     ).toBe(0);
-    // Line Art's default automatic policy (ADR-409) judges the same regions:
+    // Line Art's default automatic policy (ADR-434) judges the same regions:
     // an 11-pixel full-contrast hairline is a mark, a lone pixel is not.
     expect(lowerInkPixels(preprocessForTrace(image, TRACE_PRESETS['Line Art']!))).toBe(23);
   });

@@ -1,4 +1,4 @@
-// Colour-layer trace backend (ADR-402): split an image into N flat colours and
+// Colour-layer trace backend (ADR-430): split an image into N flat colours and
 // trace every colour as its own filled path, with neighbouring colours sharing
 // one identical boundary. Own design:
 //   1. quantise in OKLab (colour-quantize.ts) and detect the paper colour;

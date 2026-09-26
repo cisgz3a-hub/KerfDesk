@@ -1,4 +1,4 @@
-// ADR-407. On a controller family known to execute G2/G3 (GRBL 1.1, grblHAL,
+// ADR-432. On a controller family known to execute G2/G3 (GRBL 1.1, grblHAL,
 // FluidNC), laser line cuts along curves can be written as native arcs. The
 // switch starts at the profile's default (on for firmware-family profiles, off
 // for brand machine profiles whose firmware build is not established) and is

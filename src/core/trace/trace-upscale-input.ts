@@ -63,7 +63,7 @@ export function prepareUpscaledTraceInput(
 }
 
 // The reused Edge source is already cleaned. An alpha-mask source is already
-// opaque coverage luma (ADR-412), so the enlarged grid reads it as luma
+// opaque coverage luma (ADR-437), so the enlarged grid reads it as luma
 // rather than converting it from alpha a second time.
 function reusedEdgeSourceOptions(edgeInput: EdgeTraceInput): Partial<TraceOptions> {
   return edgeInput.alphaMask
@@ -71,7 +71,7 @@ function reusedEdgeSourceOptions(edgeInput: EdgeTraceInput): Partial<TraceOption
     : { edgeMedianFilter: false };
 }
 
-/** The input without its source-grid median stage (ADR-411). Only this module
+/** The input without its source-grid median stage (ADR-436). Only this module
  * resamples that stage; carried anywhere else it keeps one or two image-sized
  * buffers alive for the whole contour trace. */
 export function releaseMedianStage<T extends ContourTraceInput | undefined>(input: T): T {
@@ -86,7 +86,7 @@ export function releaseMedianStage<T extends ContourTraceInput | undefined>(inpu
 // pixels support each other, so on the working grid the same speck is no
 // longer isolated and survives. The luma lanes therefore run it once at
 // source resolution (mkbitmap's filter-before-scale order) and enlarge the
-// cleaned pixels; the working grid skips it (ADR-411). Repaired pixels already
+// cleaned pixels; the working grid skips it (ADR-436). Repaired pixels already
 // carry the tone adjustments the median ran after, so those are cleared;
 // with nothing repaired the source and its adjustments pass on unchanged.
 function sourceGridMedian(

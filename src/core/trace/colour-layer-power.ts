@@ -1,4 +1,4 @@
-// Per-colour operation power for a colour-layer trace (ADR-402).
+// Per-colour operation power for a colour-layer trace (ADR-430).
 //
 // Darker colours should burn darker, so each colour's power follows its
 // absolute darkness D = 1 - L, with L the OKLab lightness (0 black .. 1

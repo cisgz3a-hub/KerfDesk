@@ -52,7 +52,7 @@ export type TraceResult = {
   readonly sourceHasTransparency?: boolean;
   // The options the first pass traced with, the whole source's binarisation
   // decisions resolved into them. Present exactly when the request asked for
-  // freezeSourceDecisions (ADR-410).
+  // freezeSourceDecisions (ADR-435).
   readonly sourceOptions?: TraceOptions;
 };
 

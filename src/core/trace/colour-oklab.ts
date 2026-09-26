@@ -1,4 +1,4 @@
-// sRGB <-> OKLab conversions for the colour-layer trace (ADR-402). OKLab is
+// sRGB <-> OKLab conversions for the colour-layer trace (ADR-430). OKLab is
 // B. Ottosson's published perceptual colour space ("A perceptual color space
 // for image processing", 2020); the matrices below are the published ones.
 // sRGB transfer per IEC 61966-2-1. Pure core.

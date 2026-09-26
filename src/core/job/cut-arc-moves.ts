@@ -1,4 +1,4 @@
-// Native arc moves for laser line cuts (ADR-407).
+// Native arc moves for laser line cuts (ADR-432).
 //
 // Compile keeps every CutSegment polyline exactly as before: the chords of the
 // canonical curve at the machine curve tolerance. When the machine accepts
@@ -128,7 +128,7 @@ export function validCutArcMoves(segment: CutSegment): ReadonlyArray<ArcMove> | 
   return arcMovesConnect(first, stored.moves, last) ? stored.moves : null;
 }
 
-/** How the laser output writes a group's contours (ADR-407). */
+/** How the laser output writes a group's contours (ADR-432). */
 export type CutArcEmission = {
   /** laserArcMovesEnabled for the emitting machine. */
   readonly arcMovesEnabled: boolean;

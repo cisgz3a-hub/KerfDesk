@@ -1,4 +1,4 @@
-// ADR-407: compile attaches fitted arc moves to laser line cuts on
+// ADR-432: compile attaches fitted arc moves to laser line cuts on
 // arc-capable machines, and every stage that rewrites a cut keeps them
 // exact or drops them; bounds follow the arcs, not their chords.
 
@@ -95,7 +95,7 @@ function only(group: CutGroup): CutSegment {
   return segment;
 }
 
-describe('compile attaches laser arc moves (ADR-407)', () => {
+describe('compile attaches laser arc moves (ADR-432)', () => {
   it('fits a circle with a few arcs and leaves the compiled chords untouched', () => {
     const withArcs = only(compileCut(ARC_DEVICE));
     const without = only(compileCut({ ...ARC_DEVICE, laserArcMoves: 'off' }));
@@ -156,7 +156,7 @@ function cutJob(segments: ReadonlyArray<CutSegment>): Job {
   };
 }
 
-describe('readers of cut arc moves (ADR-407)', () => {
+describe('readers of cut arc moves (ADR-432)', () => {
   it('bounds a half-turn by its apex, not its chord hull', () => {
     expect(computeJobBounds(cutJob([HALF_TURN_SEGMENT]))).toEqual({
       minX: 10,

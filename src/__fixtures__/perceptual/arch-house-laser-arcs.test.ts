@@ -1,4 +1,4 @@
-// Native G2/G3 arcs for traced laser output (ADR-407). Traces the Arch House
+// Native G2/G3 arcs for traced laser output (ADR-432). Traces the Arch House
 // logo with Line Art, commits it 100 mm wide the way the trace dialog does,
 // and compiles it for a GRBL 1.1 laser. Pins: far fewer burn moves than the G1
 // program for the same trace; what GRBL executes (each arc as mc_arc's chords
@@ -219,7 +219,7 @@ function expectCornersKept(curve: CurveSubpath, segment: CutSegment, traced: Tra
   }
 }
 
-describe('Arch House laser arcs (ADR-407)', () => {
+describe('Arch House laser arcs (ADR-432)', () => {
   it(
     'burns with far fewer moves as G2/G3, within the tolerance as executed',
     { timeout: 240_000 },

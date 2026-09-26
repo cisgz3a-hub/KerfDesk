@@ -77,7 +77,7 @@ export type TraceExistingImageOptions = {
   readonly cameraSource?: RasterImage;
   readonly deleteSourceAfterTrace?: boolean;
   readonly replaceTraceId?: string;
-  /** Colour-layer trace (ADR-402): set each colour's laser operation power
+  /** Colour-layer trace (ADR-430): set each colour's laser operation power
    *  by darkness; paper colours start with output off. */
   readonly colourLayers?: ColourLayerCommit;
 };

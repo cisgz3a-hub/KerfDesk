@@ -12,7 +12,7 @@ import { GRBL_MACHINE_PROFILE_CATALOG } from './profile-catalog';
 
 const grbl: DeviceProfile = { ...DEFAULT_DEVICE_PROFILE, controllerKind: 'grbl-v1.1' };
 
-describe('laser arc capability (ADR-407)', () => {
+describe('laser arc capability (ADR-432)', () => {
   it('enables arcs on generic profiles of the named GRBL family only', () => {
     expect(laserArcMovesEnabled(grbl)).toBe(true);
     expect(laserArcMovesEnabled({ ...grbl, controllerKind: 'grblhal' })).toBe(true);

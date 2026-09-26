@@ -1,4 +1,4 @@
-// Outer-contour / hole grouping by containment (ADR-403).
+// Outer-contour / hole grouping by containment (ADR-431).
 //
 // A closed contour's nesting depth is the number of other closed contours
 // that contain it. Under the even-odd rule, even depth is ink (an outer

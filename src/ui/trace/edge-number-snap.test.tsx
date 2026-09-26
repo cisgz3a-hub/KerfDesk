@@ -5,7 +5,7 @@ import { TRACE_PRESETS } from '../../core/trace';
 import { TraceSettingsControls } from './TraceSettingsControls';
 import { mergeLightBurnTraceSettings, type LightBurnTraceSettingOverrides } from './trace-options';
 
-// ADR-412: Edge Sensitivity and Detail have one detector setting per stop, so
+// ADR-437: Edge Sensitivity and Detail have one detector setting per stop, so
 // a typed value between stops must not stay on screen as if it were traced.
 describe('Edge Sensitivity and Detail number boxes', () => {
   it('show the stop being traced once a typed value loses focus', async () => {

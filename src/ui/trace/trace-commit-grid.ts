@@ -216,7 +216,7 @@ export function traceOptionsForCommitGrid(
     ...options,
     ...scaled('despeckleMinPixels', options.despeckleMinPixels, area),
     ...scaled('ignoreLessThanPixels', options.ignoreLessThanPixels, area),
-    // The automatic small-mark policy (ADR-409) judges areas in the pixels of
+    // The automatic small-mark policy (ADR-434) judges areas in the pixels of
     // the grid it was tuned on; scale it like the explicit despeckle so the
     // commit keeps the marks the preview kept.
     ...(options.smallMarkPolicy === 'auto'

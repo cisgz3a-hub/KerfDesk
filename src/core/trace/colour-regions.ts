@@ -1,4 +1,4 @@
-// Shared-boundary planar map of a colour label image (ADR-402). Own design.
+// Shared-boundary planar map of a colour label image (ADR-430). Own design.
 //
 // Every boundary between two differently-labelled pixels is a unit "crack" on
 // the pixel-corner lattice. Lattice vertices where three or more cracks meet

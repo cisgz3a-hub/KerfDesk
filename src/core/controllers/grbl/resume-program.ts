@@ -248,7 +248,7 @@ function buildPreamble(
   ];
 }
 
-// Transform 4 pins the arc plane like the WCS (ADR-407): the plane the program
+// Transform 4 pins the arc plane like the WCS (ADR-432): the plane the program
 // selected, or G17 when the tail replays G2/G3 and the program named none.
 function resumePlane(
   state: LaserResumeModalState,

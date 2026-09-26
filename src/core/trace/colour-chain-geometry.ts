@@ -1,4 +1,4 @@
-// Finishing one colour-layer boundary chain into curves (ADR-402). Own design:
+// Finishing one colour-layer boundary chain into curves (ADR-430). Own design:
 // the chain's mid-crack points, moved to their measured sub-pixel edge
 // (colour-chain-offsets.ts), are smoothed with a light Taubin filter while
 // persistent lattice corners and junctions stay pinned, then fitted with

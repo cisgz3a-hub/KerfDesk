@@ -136,7 +136,7 @@ function radialRms(paths: ReadonlyArray<ColoredPath>, centre: number, radius: nu
   return Math.sqrt(sum / points.length);
 }
 
-describe('Edge Detection alpha mask (ADR-412)', () => {
+describe('Edge Detection alpha mask (ADR-437)', () => {
   it('outlines white art on transparency that the luma detector cannot see', async () => {
     const image = discOnTransparent(400, 120, 255);
     expect(await traceImageToColoredPaths(image, edge)).toEqual([]);

@@ -5,7 +5,7 @@ vi.mock('./use-trace-worker-client', () => ({
 }));
 
 // Spy on the histogram so a test can prove the UI thread never computes the
-// whole image's Otsu cut in Enhance mode (ADR-410).
+// whole image's Otsu cut in Enhance mode (ADR-435).
 vi.mock('../../core/trace/preprocess', async (importOriginal) => {
   const actual = await importOriginal<typeof Preprocess>();
   return { ...actual, otsuThreshold: vi.fn(actual.otsuThreshold) };
@@ -146,7 +146,7 @@ describe('traceImageWithBoundaryMode — enhance mode', () => {
       },
     ];
     // The region re-trace runs on the SUPERSAMPLED crop. The box plus its
-    // context ring (ADR-410) covers the whole 20x20 image, and
+    // context ring (ADR-435) covers the whole 20x20 image, and
     // computeRegionUpscaleFactor returns 2, so the injected tracer sees a 40x40
     // buffer and its output is downscaled by 2 then offset by the padded
     // origin (0,0): (18,18)->(9,9); (22,22)->(11,11) — inside the interior.
@@ -233,7 +233,7 @@ describe('traceImageWithBoundaryMode — enhance mode', () => {
   });
 });
 
-describe('traceImageWithBoundaryMode � frozen decisions stay off the UI thread (ADR-410)', () => {
+describe('traceImageWithBoundaryMode � frozen decisions stay off the UI thread (ADR-435)', () => {
   const otsuOptions: TraceOptions = { ...options, useOtsuThreshold: true };
   const blank = (): RawImageData => ({
     width: 20,

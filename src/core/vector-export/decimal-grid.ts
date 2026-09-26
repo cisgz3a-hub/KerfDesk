@@ -1,4 +1,4 @@
-// Exact decimal quantization for vector export (ADR-403).
+// Exact decimal quantization for vector export (ADR-431).
 //
 // A coordinate is snapped to an integer multiple of a power-of-ten step and
 // printed from that integer, so the text never carries binary-float noise

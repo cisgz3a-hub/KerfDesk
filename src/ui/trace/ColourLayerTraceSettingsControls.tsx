@@ -1,4 +1,4 @@
-// Dialog controls for the Colour layers preset (ADR-402): palette size,
+// Dialog controls for the Colour layers preset (ADR-430): palette size,
 // cut-out vs stacked output, background, speck size, and a swatch preview of
 // the traced colours with the power each colour's operation will start at.
 

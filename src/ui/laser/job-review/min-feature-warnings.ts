@@ -1,4 +1,4 @@
-// Minimum-feature advisories (ADR-408): cut geometry narrower than the kerf,
+// Minimum-feature advisories (ADR-433): cut geometry narrower than the kerf,
 // beam or bit that cuts it. Warnings only — like every Job Review policy
 // finding they inform the operator and never refuse Frame or Start (rule 7).
 //
@@ -162,7 +162,7 @@ export function minFeatureWarnings(
 }
 
 // The review model is rebuilt at Confirm from the same prepared project, and
-// the check can take a few hundred milliseconds on a dense trace (ADR-408).
+// the check can take a few hundred milliseconds on a dense trace (ADR-433).
 const reportsByProject = new WeakMap<Project, ReadonlyArray<MinFeatureReport>>();
 
 /** The minimum-feature reports for the exact prepared (output-scoped) project. */

@@ -1,12 +1,12 @@
 // Small-mark policy — decides which tiny ink marks and tiny paper holes in a
-// binarised trace mask are genuine art and which are noise (ADR-409).
+// binarised trace mask are genuine art and which are noise (ADR-434).
 //
 // A fixed area cut cannot tell them apart: stipple dots, dotted rows, 6 px
 // text and paper holes in dense hatching are the same size as scanner dust
 // and threshold cracks. The historical Line Art cleanup (erase ink under
 // 12 px², fill every thin enclosed hole) therefore erased almost all of an
 // ink drawing's fine texture. 'auto' judges each small mark on evidence that
-// separates the two classes on measured art (numbers: ADR-409):
+// separates the two classes on measured art (numbers: ADR-434):
 //
 //   1. Size floor. Marks under AUTO_MIN_MARK_AREA_PX source px² are dropped
 //      (holes filled): a 1-2 px² mark is not a shape a laser can render.
@@ -83,7 +83,7 @@ export const AUTO_DUST_MIN_DEBRIS = 1;
 // no reliable ink/paper separation to normalise against.
 const MIN_TONE_SPAN_LUMA = 64;
 
-/** What the mask cleanup does with small marks for these options (ADR-409).
+/** What the mask cleanup does with small marks for these options (ADR-434).
  *  ink: erase ink regions under minPixels (mask px) unless keep says so;
  *  holes: fill thin enclosed paper components where fill says so (absent:
  *  every candidate). null = the stage does not run. A stage whose explicit

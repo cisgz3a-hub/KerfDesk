@@ -17,7 +17,7 @@ function projectWithArcs(laserArcMoves: unknown): string {
   return JSON.stringify(raw);
 }
 
-describe('laser arc switch persistence (ADR-407)', () => {
+describe('laser arc switch persistence (ADR-432)', () => {
   it('keeps an explicit off through a project round trip', () => {
     const loaded = deserializeProject(projectWithArcs('off'));
     if (loaded.kind !== 'ok') throw new Error('expected the project to load');

@@ -14,7 +14,7 @@ export function shouldUseSketchTrace(
   if (options.autoSketchTrace !== true) return false;
   // A derived region (Enhance crop) inherits the full source's verdict: the
   // colour-pixel floor is a count, so a crop, and its 4x-pixel supersample,
-  // can cross it where the whole image did not (ADR-410).
+  // can cross it where the whole image did not (ADR-435).
   return options.sourceAutoSketch ?? hasEnoughColourForAutoSketch(image);
 }
 

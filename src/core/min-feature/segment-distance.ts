@@ -1,5 +1,5 @@
 // Exact closest points between two line segments, and point-to-segment
-// distance, for the minimum-feature check (ADR-408). Plain vector algebra:
+// distance, for the minimum-feature check (ADR-433). Plain vector algebra:
 // minimise |A + s·u − (C + t·v)|² over s, t ∈ [0, 1] by solving the 2×2
 // normal equations, then clamping each parameter to its segment and re-solving
 // the other, which is exact because the objective is convex in each variable.

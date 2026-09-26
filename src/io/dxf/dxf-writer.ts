@@ -1,4 +1,4 @@
-// DXF writer for vector artwork (ADR-403), written from the published
+// DXF writer for vector artwork (ADR-431), written from the published
 // Autodesk DXF reference: AC1018 (AutoCAD 2004) ASCII DXF, millimetres
 // ($INSUNITS 4), one closed or open LWPOLYLINE per contour, one layer per
 // artwork colour carrying both the nearest ACI (group 62) and the exact

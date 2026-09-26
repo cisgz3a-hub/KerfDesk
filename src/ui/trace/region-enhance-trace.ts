@@ -27,7 +27,7 @@ import type { TraceProgress } from '../../core/trace/trace-progress';
 
 export type BoundaryMode = 'crop' | 'enhance';
 
-// The whole-source decisions (ADR-410) depend only on the source pixels and
+// The whole-source decisions (ADR-435) depend only on the source pixels and
 // the settings. The preview re-traces the same decoded image while the
 // operator drags or resizes the box, so reuse them across those re-traces
 // instead of paying the worker's full-image median and histogram again.
@@ -59,7 +59,7 @@ export async function traceImageWithBoundaryMode(
   }
   // The full pass and the region re-trace share one set of whole-image
   // binarisation decisions (Otsu cut, auto-sketch verdict), so the patch
-  // cuts exactly where its surroundings did (ADR-410). The full pass resolves
+  // cuts exactly where its surroundings did (ADR-435). The full pass resolves
   // them next to its trace, off the UI thread, and returns them; resolving
   // already-resolved options again is a cheap no-op.
   const key = JSON.stringify(requestedOptions);

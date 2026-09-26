@@ -272,7 +272,7 @@ describe.each(DIALECTS)('laser resume on $name', (dialect) => {
     expect(jobAwareAlert).not.toHaveBeenCalled();
     const recovered = activeArtifact(repository);
     expect(startJob).toHaveBeenCalledWith(recovered.gcode, expect.anything());
-    // Transform 4 (ADR-407) left these programs' resumes as transform 3 built them.
+    // Transform 4 (ADR-432) left these programs' resumes as transform 3 built them.
     expect(recovered.laserResumeChain).toEqual([{ fromLine, version: 4 }]);
     expect(recovered.gcode).toMatch(dialect.rearm);
     expectSameBurns(dialect, job.gcode, recovered.gcode, fromLine, device.maxPowerS);

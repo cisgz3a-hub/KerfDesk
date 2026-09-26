@@ -9,7 +9,7 @@
 // then drops both (a hole in the artwork) or keeps both (a doubled outline
 // that an even-odd fill turns into a hole). A re-traced subpath whose bounds
 // match an original's within REGION_MATCH_TOLERANCE_PX near the border is the
-// same shape, so it follows the original's verdict (ADR-410).
+// same shape, so it follows the original's verdict (ADR-435).
 //
 // Every surviving subpath keeps its canonical curve and its path keeps its
 // operationIds, strokes and fill rule; a path nothing touched is returned as

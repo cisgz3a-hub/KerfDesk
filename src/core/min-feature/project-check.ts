@@ -1,4 +1,4 @@
-// Minimum-feature check over a whole project or one fresh trace (ADR-408).
+// Minimum-feature check over a whole project or one fresh trace (ADR-433).
 // One work budget covers every checked operation, so a job with many cutting
 // layers is bounded as a whole; operations left when it runs out are reported
 // as unchecked rather than silently passed.

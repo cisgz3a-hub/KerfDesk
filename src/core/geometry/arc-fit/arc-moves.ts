@@ -1,4 +1,4 @@
-// Line/arc move sequences as consumers read them (ADR-407): the checks a
+// Line/arc move sequences as consumers read them (ADR-432): the checks a
 // stored sequence must pass before anything trusts it, exact bounds including
 // arc extrema, dense sampling for previews, reversal and translation.
 

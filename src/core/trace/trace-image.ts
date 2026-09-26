@@ -194,7 +194,7 @@ export function prepareTraceForContour(
   // The automatic cut levels detectably uneven lighting first (ADR-394); the
   // crack field then interpolates the same luma that was cut. Uniform pages,
   // explicit Cutoff/Threshold values, and a region carrying the whole
-  // source's frozen cut (ADR-410) get `prepared` itself back.
+  // source's frozen cut (ADR-435) get `prepared` itself back.
   const frozenCut = options.sourceOtsuThreshold !== undefined;
   const level = frozenCut
     ? { source: prepared, threshold: null }
@@ -227,7 +227,7 @@ function cleanBinaryMask(
   crackField: CrackSubPixelField | null,
 ): RawImageData {
   // Area caps scale by pixelScale² on supersampled traces so their SOURCE-
-  // pixel semantics hold (a 12px speck at 2x covers 48px). See ADR-409.
+  // pixel semantics hold (a 12px speck at 2x covers 48px). See ADR-434.
   const saddles = cleanupSaddlePolicy(options, crackField);
   const plan = smallMarkCleanupPlan(image, options, crackField, isBinaryMask(options));
   const despeckled =
@@ -278,7 +278,7 @@ function applyThresholdWithIso(
     };
   }
   if (options.useOtsuThreshold === true) {
-    // A derived region carries the whole source's cut (ADR-410).
+    // A derived region carries the whole source's cut (ADR-435).
     const frozen = options.sourceOtsuThreshold;
     const thresholdLuma =
       frozen !== undefined && Number.isFinite(frozen)

@@ -1,4 +1,4 @@
-// Limits for fitting line and circular-arc moves to laser output (ADR-407).
+// Limits for fitting line and circular-arc moves to laser output (ADR-432).
 //
 // The deviation budget splits the machine curve tolerance
 // (DEFAULT_MACHINE_CURVE_TOLERANCE_MM, 0.025 mm) that compile's G1 chords

@@ -1,4 +1,4 @@
-// ADR-407: the laser GRBL emitter writes fitted arc moves as G2/G3 on
+// ADR-432: the laser GRBL emitter writes fitted arc moves as G2/G3 on
 // arc-capable machines, with the G1 path's power, feed and modal semantics,
 // and stays byte-identical G1 everywhere else.
 
@@ -55,7 +55,7 @@ function body(gcode: string): string[] {
   return gcode.split('\n').filter((line) => /^G[0-3] /.test(line));
 }
 
-describe('grblStrategy laser arc moves (ADR-407)', () => {
+describe('grblStrategy laser arc moves (ADR-432)', () => {
   it('writes G2/G3 with I/J from the rounded start and F/S on the first burn move only', () => {
     expect(body(grblStrategy.emit(jobWith(ARC_SEGMENT), ARC_DEVICE))).toEqual([
       'G0 X10.000 Y20.000 S0',

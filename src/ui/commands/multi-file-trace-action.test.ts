@@ -148,7 +148,7 @@ describe('buildMultiFileTraceExports', () => {
     expect(trace.mock.calls[0]?.[1]).toEqual(
       traceOptionsForCommitGrid(TRACE_PRESETS['Line Art']!, plan!),
     );
-    // Line Art despeckles by the automatic small-mark policy (ADR-409), whose
+    // Line Art despeckles by the automatic small-mark policy (ADR-434), whose
     // areas scale with the grid's pixel count.
     expect(trace.mock.calls[0]?.[1]?.smallMarkAreaScale).toBeCloseTo(areaRatio, 9);
     // Each large decode is made on its turn, not all up front.

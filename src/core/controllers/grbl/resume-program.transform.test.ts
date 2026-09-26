@@ -36,7 +36,7 @@ function resume(gcode: string, fromLine: number, transform?: LaserResumeTransfor
   return result;
 }
 
-describe('laser resume transform 4 (ADR-407)', () => {
+describe('laser resume transform 4 (ADR-432)', () => {
   const ARCS = [
     'G21',
     'G90',

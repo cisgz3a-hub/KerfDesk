@@ -1,5 +1,5 @@
 // A G17 I/J arc of the source program as the chords GRBL runs for it
-// (ADR-407). KerfDesk's laser output writes G2/G3 on arc-enabled GRBL-family
+// (ADR-432). KerfDesk's laser output writes G2/G3 on arc-enabled GRBL-family
 // machines; the painted second pass repaints the path the controller
 // executed, so it reads each arc as mc_arc's chords at the stock `$12` and
 // refuses what GRBL refuses.

@@ -1,5 +1,5 @@
 // Path pieces and their uniform-grid index for the minimum-feature check
-// (ADR-408). Every path segment is split into pieces no longer than twice the
+// (ADR-433). Every path segment is split into pieces no longer than twice the
 // search radius (short enough that one long edge does not join every feature
 // along it into one), and the grid cell is at least the radius, so every
 // piece within the radius of another lies in a small block of cells around

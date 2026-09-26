@@ -1,4 +1,4 @@
-## ADR-407 - Laser line cuts reach GRBL as native arcs (2026-09-25)
+## ADR-432 - Laser line cuts reach GRBL as native arcs (2026-09-25)
 
 **Status:** Accepted. | **Date:** 2026-09-25
 

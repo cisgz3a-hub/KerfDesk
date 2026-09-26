@@ -1,4 +1,4 @@
-// Which side of a cut boundary holds material (ADR-408). Closed paths fill
+// Which side of a cut boundary holds material (ADR-433). Closed paths fill
 // even-odd, as the traced and imported artwork is drawn: a point is material
 // when an odd number of closed paths enclose it. The side of one piece is
 // decided locally — the region just inside a closed path is material when an

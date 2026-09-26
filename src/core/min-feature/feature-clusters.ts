@@ -1,4 +1,4 @@
-// Groups minimum-feature witnesses into features (ADR-408). Two witnesses that
+// Groups minimum-feature witnesses into features (ADR-433). Two witnesses that
 // share a path piece describe the same bridge, strip or gap, and so do two
 // flagged pieces that follow each other along a path (around a small round
 // hole each witness pairs different pieces), so pieces are joined with

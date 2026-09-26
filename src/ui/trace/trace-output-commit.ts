@@ -22,7 +22,7 @@ export type TraceOutputCommitArgs = {
   readonly replaceTraceId?: string;
   readonly notices?: ReadonlyArray<TraceNotice>;
   /** The trace's options; a colour-layer trace gives each colour its own
-   *  operation with a darkness-ordered power (ADR-402). */
+   *  operation with a darkness-ordered power (ADR-430). */
   readonly options?: Pick<TraceOptions, 'colourLayers'>;
 };
 
@@ -159,7 +159,7 @@ async function buildOwnedRaster(
 }
 
 // A colour-layer trace gives each colour's operation a darkness-ordered power
-// (ADR-402); the store needs to know which output the powers are for and
+// (ADR-430); the store needs to know which output the powers are for and
 // whether the paper was traced (its operation starts with output off).
 function withColourLayerOutput(
   options: TraceExistingImageOptions,

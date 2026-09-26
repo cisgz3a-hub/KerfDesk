@@ -26,7 +26,7 @@ export const TRACE_PRESETS: Readonly<Record<string, TraceOptions>> = {
     //     grey bridges, nearby dust, like marks, size) instead of erasing /
     //     filling all of them, so stipple, dotted rows, small text and paper
     //     holes in hatching survive while faint threshold noise, dust,
-    //     toner scatter and binarisation cracks are cleaned (ADR-409). An explicit "Remove
+    //     toner scatter and binarisation cracks are cleaned (ADR-434). An explicit "Remove
     //     ink specks" / "Fill tiny holes" value replaces it exactly.
     //   * pathOmit 16 — second-line defence: drops short paths the
     //     tracer might still emit at edges.
@@ -115,7 +115,7 @@ export const TRACE_PRESETS: Readonly<Record<string, TraceOptions>> = {
     blurRadius: 0,
     blurDelta: 0,
     lineFilter: true,
-    // The detector's two settings (ADR-412): neighbourhood radius 12 source
+    // The detector's two settings (ADR-437): neighbourhood radius 12 source
     // px (Detail 60) and contrast delta 6 luma levels (Sensitivity 60). No
     // palette, Otsu or despeckle entry: the local-contrast detector reads
     // none of them; Minimum line is Edge's speck filter.
@@ -155,7 +155,7 @@ export const TRACE_PRESETS: Readonly<Record<string, TraceOptions>> = {
     fixedPalette: ['#ffffff', '#000000'],
     medianFilter: 'auto',
     useOtsuThreshold: true,
-    // Same automatic speck removal and crack fill as Line Art (ADR-409). It
+    // Same automatic speck removal and crack fill as Line Art (ADR-434). It
     // replaces the fixed despeckleMinPixels 24 + fillPinholeCracks true, which
     // erased genuine 5 px dots and 6 px text as well as noise. Sharp keeps
     // its fixed keep-everything cleanup (pixel-fidelity preset — every notch
@@ -199,7 +199,7 @@ export const TRACE_PRESETS: Readonly<Record<string, TraceOptions>> = {
     // are intentional pixel geometry here, not a small-scale tracing artefact.
   },
   'Colour layers': {
-    // One filled layer per flat colour (ADR-402): OKLab quantisation to an
+    // One filled layer per flat colour (ADR-430): OKLab quantisation to an
     // automatic palette (or the dialog's 2-8 colours), paper colour excluded,
     // neighbouring colours sharing one boundary. The imagetracerjs fields
     // below are inert on this backend; despeckleMinPixels is the area below

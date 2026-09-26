@@ -1,4 +1,4 @@
-## ADR-403 - Vector export writes canonical curves on a millimetre grid, and DXF (2026-09-25)
+## ADR-431 - Vector export writes canonical curves on a millimetre grid, and DXF (2026-09-25)
 
 **Status:** Accepted. | **Date:** 2026-09-25
 

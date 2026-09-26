@@ -17,7 +17,7 @@ export function dedicatedTraceSteps(
   // contour supersampling can discard it. The backend owns its bounded grid.
   if (options.photoDetail !== undefined) return traceImageToPhotoPathsSteps(image, options);
   // Colour layers read colour, not luma, and own their bounded working grid
-  // (ADR-402).
+  // (ADR-430).
   if (isColourLayerTrace(options)) return traceColourLayersSteps(image, options);
   return undefined;
 }

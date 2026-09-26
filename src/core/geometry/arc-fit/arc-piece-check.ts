@@ -1,5 +1,5 @@
 // Exact two-sided deviation check between one fitted primitive and the piece
-// of sampled source it replaces (ADR-407). `points` is the source polyline
+// of sampled source it replaces (ADR-432). `points` is the source polyline
 // from the primitive's start to its end.
 //
 // Line: distance to a segment is a convex function, so along each source chord

@@ -18,7 +18,7 @@ export type LaserResumeWcs = 'G54' | 'G55' | 'G56' | 'G57' | 'G58' | 'G59';
  *    (ADR-364). Transforms 1 and 2 always wrote GRBL's, which left those
  *    programs dark. A GRBL-family program resumes exactly as in transform 2.
  * 4: re-selects the arc plane (G17/G18/G19) the program had active, or G17
- *    when the replayed tail holds G2/G3 and the program named none (ADR-407):
+ *    when the replayed tail holds G2/G3 and the program named none (ADR-432):
  *    a plane left changed by a console command or `$N` startup block would
  *    otherwise run an XY I/J arc in the wrong plane. A program with neither a
  *    plane word nor an arc resumes exactly as in transform 3.

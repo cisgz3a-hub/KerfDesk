@@ -1,4 +1,4 @@
-// One vector ColoredPath → SVG markup for the artwork exporter (ADR-403).
+// One vector ColoredPath → SVG markup for the artwork exporter (ADR-431).
 //
 // Coordinates stay in the object's local frame under its transform matrix,
 // so tiny scales far from the origin keep their physical size. Precision is

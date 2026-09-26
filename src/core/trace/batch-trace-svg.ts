@@ -1,4 +1,4 @@
-// Standalone SVG for one Multi-File Trace result (ADR-403).
+// Standalone SVG for one Multi-File Trace result (ADR-431).
 //
 // Serializes the canonical trace curves (ColoredPath.curves: lines and
 // cubics), not the dense compatibility polylines, in millimetres on a

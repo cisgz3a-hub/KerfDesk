@@ -1,4 +1,4 @@
-// Line and circular-arc primitives for arc fitting (ADR-407), with the three
+// Line and circular-arc primitives for arc fitting (ADR-432), with the three
 // constructions the fitter uses: the arc leaving a point along a tangent
 // through a second point, the arc through two points about a given centre,
 // and a straight line. Every constructor applies the radius and sweep limits.

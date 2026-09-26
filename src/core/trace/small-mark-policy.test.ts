@@ -1,4 +1,4 @@
-// Automatic small-mark policy (ADR-409): tiny ink marks and tiny paper holes
+// Automatic small-mark policy (ADR-434): tiny ink marks and tiny paper holes
 // are judged on evidence, not a fixed area. The fixtures mirror the bake-off
 // cases that forced the design: stipple and paper holes in hatching are the
 // same size as the speckle fixture's noise, so area alone cannot separate them.

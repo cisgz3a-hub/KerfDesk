@@ -150,7 +150,7 @@ describe('trace settings snapshot (ADR-400)', () => {
     expect(restored.boundaryMode).toBe('crop');
   });
 
-  it('keeps the Colour layers controls and reopens their boundary in Crop mode (ADR-402)', () => {
+  it('keeps the Colour layers controls and reopens their boundary in Crop mode (ADR-430)', () => {
     const restored = restoreTraceSettings(
       record({
         presetName: 'Colour layers',

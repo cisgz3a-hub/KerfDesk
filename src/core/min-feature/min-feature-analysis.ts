@@ -1,4 +1,4 @@
-// Minimum-feature check (ADR-408): where is cut geometry narrower than the
+// Minimum-feature check (ADR-433): where is cut geometry narrower than the
 // kerf, beam or tool that cuts it?
 //
 // Local width is the diameter of a maximal inscribed disk — twice the

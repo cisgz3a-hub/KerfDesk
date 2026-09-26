@@ -33,7 +33,7 @@ export type TraceWorkerRequest = {
   readonly id: number;
   readonly image: RawImageData;
   readonly options: TraceOptions;
-  // Region Enhance (ADR-410): resolve the whole source's binarisation
+  // Region Enhance (ADR-435): resolve the whole source's binarisation
   // decisions here, trace with them, and send them back so the boxed crop
   // re-trace can reuse them. Resolving them costs up to a full-image median
   // plus a histogram, which must not run on the UI thread.

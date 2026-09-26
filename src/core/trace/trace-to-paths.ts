@@ -208,7 +208,7 @@ export async function traceImageToColoredPaths(
   if (factor > 1) {
     return traceUpscaledImage(image, options, factor, run, edgeInput, contourInput);
   }
-  // Only the upscale route resamples the median stage (ADR-411); release it.
+  // Only the upscale route resamples the median stage (ADR-436); release it.
   contourInput = releaseMedianStage(contourInput);
   return withCanonicalTraceCurves(
     await dispatchTrace(image, options, run, edgeInput, contourInput),
@@ -225,7 +225,7 @@ export async function traceImageToColoredPaths(
 //     invert chain here, so tone keeps its place before Invert.
 //   - Edge Detection never read the tone fields; it only gets the inversion.
 //   - While the alpha mask decides the ink (every lane, Edge included since
-//     ADR-412), colour inversion cannot change it (the dialog disables
+//     ADR-437), colour inversion cannot change it (the dialog disables
 //     Invert then), and an opaque negative would erase the transparency the
 //     mask reads, so Invert is dropped.
 function invertBeforePolicy(

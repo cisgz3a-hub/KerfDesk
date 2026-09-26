@@ -1,4 +1,4 @@
-// Canonical curves → polyline vertices with DXF bulges (ADR-403).
+// Canonical curves → polyline vertices with DXF bulges (ADR-431).
 //
 // DXF LWPOLYLINE vertices carry a bulge: tan(θ/4) of the included angle of a
 // circular arc from that vertex to the next, positive when the arc turns

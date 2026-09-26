@@ -16,7 +16,7 @@
 // Only the region SHRUNK by a margin is replaced: existing polylines fully
 // inside it are dropped, re-traced ones fully inside it are merged in (by
 // colour), and everything crossing it keeps its original geometry. The crop
-// is traced with a padding ring of real neighbouring pixels (ADR-410), so a
+// is traced with a padding ring of real neighbouring pixels (ADR-435), so a
 // clipped fragment always reaches into the padding and fails that test, and
 // pixels near the box edge are filtered with the surroundings the full pass
 // saw. region-merge.ts pairs the two traces of a shape that grazes the border
@@ -95,7 +95,7 @@ export async function enhanceRegionPaths(args: EnhanceRegionArgs): Promise<Color
   const region = normalizeTraceBoundary(args.region, args.image.width, args.image.height);
   if (region === null) return [...args.fullTracePaths];
   // Otsu's cut and the auto-sketch trigger are whole-image decisions; a crop
-  // must inherit them, not re-derive them from its own pixels (ADR-410).
+  // must inherit them, not re-derive them from its own pixels (ADR-435).
   const options = resolveFrozenTraceSourceOptions(args.image, args.options);
   // Trace the box with the neighbourhood its filters read, so pixels near the
   // box edge see the same surroundings as in the full pass. Subpaths reaching
@@ -128,7 +128,7 @@ function regionContextPx(options: TraceOptions): number {
 
 // Smooth's automatic median repairs isolated impulses only when the whole
 // image has enough of them, and judges isolation in pixels of the grid it
-// runs on. Both are whole-source, source-scale decisions (ADR-411): the crop
+// runs on. Both are whole-source, source-scale decisions (ADR-436): the crop
 // takes the full pass's verdict and is cleaned before it is enlarged, so on
 // the native and upscale routes its specks are removed exactly where the full
 // trace removed them. (Dense art the full pass traces on a smaller grid runs

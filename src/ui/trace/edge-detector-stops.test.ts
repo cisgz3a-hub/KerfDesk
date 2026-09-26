@@ -1,4 +1,4 @@
-// Edge Detection's operator contract (ADR-412): every Sensitivity and Detail
+// Edge Detection's operator contract (ADR-437): every Sensitivity and Detail
 // stop the dialog offers is its own detector setting, and options saved by
 // older builds (Canny-era fields, the palette/Otsu/despeckle entries the
 // preset used to carry) still load and trace exactly as before.
@@ -22,7 +22,7 @@ import {
 
 const EDGE = TRACE_PRESETS['Edge Detection'] as TraceOptions;
 
-// Options as the Edge preset and dialog wrote them before ADR-412.
+// Options as the Edge preset and dialog wrote them before ADR-437.
 const LEGACY_EDGE: TraceOptions = {
   ...EDGE,
   fixedPalette: ['#ffffff', '#000000'],
@@ -116,7 +116,7 @@ describe('Edge Detection slider stops', () => {
 
 describe('Edge Detection legacy options', () => {
   it('keeps the detector setting every older stored ratio produced', () => {
-    // Values the pre-ADR-412 dialog wrote at Sensitivity 0, the preset, and 100.
+    // Values the pre-ADR-437 dialog wrote at Sensitivity 0, the preset, and 100.
     expect(edgeContrastDelta({ ...EDGE, edgeLowThresholdRatio: 0.128 })).toBe(10);
     expect(edgeContrastDelta({ ...EDGE, edgeLowThresholdRatio: 0.08 })).toBe(6);
     expect(edgeContrastDelta({ ...EDGE, edgeLowThresholdRatio: 0.02 })).toBe(2);

@@ -1,5 +1,5 @@
 // Splits one canonical subpath, already mapped to machine millimetres, into
-// the runs the arc fitter works on (ADR-407):
+// the runs the arc fitter works on (ADR-432):
 //   - smooth runs: curve pieces (cubics, elliptical arcs) and any lines joined
 //     to them with a tangent turn of at most ARC_FIT_SMOOTH_JOINT_DEG, sampled
 //     densely with their exact tangents;

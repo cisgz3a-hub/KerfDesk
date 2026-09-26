@@ -1,5 +1,5 @@
 // A canonical subpath mapped into machine millimetres piece by piece, and the
-// dense sampling of each piece the fitter checks against (ADR-407).
+// dense sampling of each piece the fitter checks against (ADR-432).
 //
 // Lines and cubics map exactly under the affine placement (map the control
 // points). An elliptical arc is flattened in its local frame at the source

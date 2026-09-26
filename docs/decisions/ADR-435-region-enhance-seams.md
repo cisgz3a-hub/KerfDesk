@@ -1,4 +1,4 @@
-## ADR-410 - Region Enhance patches binarise and join like the full trace (2026-09-25)
+## ADR-435 - Region Enhance patches binarise and join like the full trace (2026-09-25)
 
 **Status:** Accepted. | **Date:** 2026-09-25
 

@@ -1,4 +1,4 @@
-// Speck absorption of the colour-layer label map (ADR-402).
+// Speck absorption of the colour-layer label map (ADR-430).
 import { describe, expect, it } from 'vitest';
 import { absorbSmallRegions } from './colour-label-cleanup';
 

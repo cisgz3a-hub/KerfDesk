@@ -13,7 +13,7 @@ import {
   sourceMedianStage,
 } from './trace-upscale-input';
 
-// ADR-411: the automatic median runs at source resolution and the cleaned
+// ADR-436: the automatic median runs at source resolution and the cleaned
 // source is enlarged, so a one-source-pixel impulse is judged as one pixel
 // whatever working grid the contour lane later traces on.
 
@@ -78,7 +78,7 @@ function inkInCell(mask: RawImageData, x: number, y: number, factor: number): nu
   return ink;
 }
 
-describe('automatic median at source scale (ADR-411)', () => {
+describe('automatic median at source scale (ADR-436)', () => {
   it.each([1, 2, 3])('removes 1-source-px impulses identically at %ix', (factor) => {
     const clean = artwork();
     const list = specks();
@@ -206,7 +206,7 @@ describe('automatic median at source scale (ADR-411)', () => {
     // A 1 px dot lattice on paper and a 1 px hole lattice in ink. Smooth and
     // Line Art drop the dots and fill the holes through despeckle and pinhole
     // fill, with or without the median; Sharp (no median, no pinhole fill,
-    // despeckle 1) keeps both (ADR-411 item 3, WORKFLOW trace settings).
+    // despeckle 1) keeps both (ADR-436 item 3, WORKFLOW trace settings).
     const dots = paper();
     for (let y = 4; y < 60; y += 3) for (let x = 4; x < 60; x += 3) paint(dots, x, y, 0);
     const holes = paper();

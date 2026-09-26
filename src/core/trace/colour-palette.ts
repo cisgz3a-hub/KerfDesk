@@ -1,4 +1,4 @@
-// Palette selection for the colour-layer trace (ADR-402). Own design, built
+// Palette selection for the colour-layer trace (ADR-430). Own design, built
 // from standard published pieces:
 //   - OKLab (B. Ottosson, "A perceptual color space for image processing",
 //     2020) so distances approximate visible colour difference;

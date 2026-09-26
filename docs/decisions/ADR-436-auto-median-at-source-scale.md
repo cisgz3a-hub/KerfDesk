@@ -1,9 +1,9 @@
-## ADR-411 - Smooth's automatic median runs at source scale (2026-09-25)
+## ADR-436 - Smooth's automatic median runs at source scale (2026-09-25)
 
 **Status:** Accepted. | **Date:** 2026-09-25
 
 This refines the selective automatic median (`medianFilter: 'auto'`, used by the Smooth preset) and
-amends ADR-410, whose consequences said "The automatic median's gate (impulse ratio) is still
+amends ADR-435, whose consequences said "The automatic median's gate (impulse ratio) is still
 decided per image". The median's own rules are unchanged: a pixel is written back only when the
 3x3 median moves it by more than 40 luma and it has fewer than 3 eight-connected like-valued
 supporters within two links, and only when such isolated changes reach 0.4% of the frame. Forced
@@ -51,13 +51,13 @@ mkbitmap source was consulted.
    repairs anything) for luma lanes with `medianFilter: 'auto'`, from the same median pass that
    already feeds the frozen Otsu cut, so freezing costs no extra median. `enhanceRegionPaths`
    applies the median to the padded crop with a density floor of 0 when the verdict is true, and
-   skips it when false, then enlarges. The padding ring (ADR-410) is at least 9 px, wider than the
+   skips it when false, then enlarges. The padding ring (ADR-435) is at least 9 px, wider than the
    median's 3x3 window plus its two-link search. On the native and upscale routes, where the full
    pass runs the median on the source grid, interior pixels are therefore repaired exactly as the
    full pass repaired them. Dense artwork that the scale plan traces on a smaller working grid is
    the exception: the full pass runs the automatic median on that grid, with that grid's own
    density check, while the crop is cleaned at source scale by the source verdict, so the two can
-   repair different impulses (ADR-410 notes the same for its Otsu cut on grids the plan enlarges
+   repair different impulses (ADR-435 notes the same for its Otsu cut on grids the plan enlarges
    or shrinks).
 3. **Isolated one-pixel dots stay a preset choice.** A one-pixel halftone dot on paper and a
    one-pixel noise speck on paper present the same neighbourhood to any detector that reads a

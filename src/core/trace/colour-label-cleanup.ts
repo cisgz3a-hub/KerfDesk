@@ -1,4 +1,4 @@
-// Label-map cleanup for the colour-layer trace (ADR-402). Own design. After
+// Label-map cleanup for the colour-layer trace (ADR-430). Own design. After
 // every pixel takes its nearest palette colour:
 //   1. 1-px-wide mixtures between two other palette colours (anti-aliasing
 //      along their seam) are given back to the nearer of the two;

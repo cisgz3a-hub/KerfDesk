@@ -1,4 +1,4 @@
-// Dialog overrides for the Colour layers preset (ADR-402), merged onto the
+// Dialog overrides for the Colour layers preset (ADR-430), merged onto the
 // preset's options. Kept apart from trace-options.ts so the line presets'
 // merge stays untouched.
 

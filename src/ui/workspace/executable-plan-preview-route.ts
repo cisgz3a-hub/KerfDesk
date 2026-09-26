@@ -61,7 +61,7 @@ export function planPreviewRouteEligible(args: {
   ) {
     return false;
   }
-  // ADR-407: the v1 plan draws G2/G3 with the display parser's chords and
+  // ADR-432: the v1 plan draws G2/G3 with the display parser's chords and
   // declares arc-true lengths, so its route can never match the prepared
   // route at emitted precision. Skip the emission, plan and comparison an arc
   // job would only throw away; the prepared route draws the arcs.

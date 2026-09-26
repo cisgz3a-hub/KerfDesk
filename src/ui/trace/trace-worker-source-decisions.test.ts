@@ -1,5 +1,5 @@
 // Region Enhance asks the worker to resolve the whole source's binarisation
-// decisions next to the full trace (ADR-410), so the UI thread never pays for
+// decisions next to the full trace (ADR-435), so the UI thread never pays for
 // the full-image median and histogram they need.
 
 import { afterEach, describe, expect, it, vi } from 'vitest';
@@ -58,7 +58,7 @@ async function send(request: TraceWorkerRequest): Promise<TraceWorkerResponse[]>
   return posted;
 }
 
-describe('trace worker source decisions (ADR-410)', () => {
+describe('trace worker source decisions (ADR-435)', () => {
   it('traces with the frozen options and returns them when asked', async () => {
     const source = image();
     const frozen = resolveFrozenTraceSourceOptions(source, options);

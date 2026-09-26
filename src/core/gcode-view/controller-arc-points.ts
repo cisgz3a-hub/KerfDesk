@@ -1,4 +1,4 @@
-// Arc interpolation the way a GRBL-family controller executes it (ADR-407),
+// Arc interpolation the way a GRBL-family controller executes it (ADR-432),
 // for timing: the planner sees each mc_arc chord as one block, so its junction
 // speeds, not the coarser display sampling, decide how fast an arc runs.
 

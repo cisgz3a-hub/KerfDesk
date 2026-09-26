@@ -18,7 +18,7 @@ export type TraceOptions = {
   // for single-pass vector engraving. Edge detection uses local contrast
   // to find full-colour artwork and traces closed outlines around its ink.
   readonly traceMode?: 'filled-contours' | 'centerline' | 'edge';
-  // Colour layers (ADR-402): presence selects the colour-layer backend, which
+  // Colour layers (ADR-430): presence selects the colour-layer backend, which
   // quantises the image to a few flat colours and traces one filled path per
   // colour with shared boundaries (colour-layer-trace.ts).
   readonly colourLayers?: ColourLayerOptions;
@@ -68,7 +68,7 @@ export type TraceOptions = {
   readonly sourceHasTransparency?: boolean;
   readonly sketchTrace?: boolean;
   readonly autoSketchTrace?: boolean;
-  // INTERNAL full-source auto-sketch verdict (ADR-410), carried like
+  // INTERNAL full-source auto-sketch verdict (ADR-435), carried like
   // sourceHasTransparency so an Enhance crop binarises as the full pass did.
   // Read only while autoSketchTrace is on; absent = decide on the image given.
   readonly sourceAutoSketch?: boolean;
@@ -87,7 +87,7 @@ export type TraceOptions = {
   // image's luma histogram (Otsu 1979) instead of a fixed value.
   // Used only when explicit cutoffLuma / thresholdLuma are absent.
   readonly useOtsuThreshold?: boolean;
-  // INTERNAL full-source Otsu cut (ADR-410), read only while useOtsuThreshold
+  // INTERNAL full-source Otsu cut (ADR-435), read only while useOtsuThreshold
   // is on, so an Enhance crop cuts where the full pass cut. Dropping
   // useOtsuThreshold (the relaxed retry) drops it with it.
   readonly sourceOtsuThreshold?: number;
@@ -102,7 +102,7 @@ export type TraceOptions = {
   //     intact even when the same image also contains noise. Shares the
   //     selective automatic policy used by Edge Detection.
   readonly medianFilter?: boolean | 'auto';
-  // INTERNAL full-source verdict of medianFilter 'auto' (ADR-411): true when
+  // INTERNAL full-source verdict of medianFilter 'auto' (ADR-436): true when
   // the whole image's isolated impulses reach the density floor. An Enhance
   // crop repairs its impulses at source scale by this verdict, not its own.
   readonly sourceAutoMedian?: boolean;
@@ -127,7 +127,7 @@ export type TraceOptions = {
   // hatching survive while faint threshold noise, dust, toner scatter and
   // binarisation cracks are cleaned. Applies only to a stage whose explicit option above is
   // unset: an explicit despeckleMinPixels / fillPinholeCracks is honoured
-  // exactly. See small-mark-policy.ts and ADR-409.
+  // exactly. See small-mark-policy.ts and ADR-434.
   readonly smallMarkPolicy?: 'auto';
   // smallMarkAreaScale: INTERNAL — working-grid px² per source px² on the
   // bounded downscale route (set by trace-to-paths.ts, which resets
@@ -166,7 +166,7 @@ export type TraceOptions = {
   readonly smoothness?: number;
   readonly optimize?: number;
   // Edge Detection-only controls. UI exposes these as three simple
-  // operator knobs: Sensitivity, Detail, and Minimum line (ADR-412).
+  // operator knobs: Sensitivity, Detail, and Minimum line (ADR-437).
   // edgeBlurSigma carries the local-mean radius: round(sigma x 10), 4..32
   // source px. edgeLowThresholdRatio carries the contrast delta:
   // round(ratio x 6/0.074), 2..12 luma levels (see edge-input.ts).

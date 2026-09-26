@@ -1,4 +1,4 @@
-// Colour-layer trace options (ADR-402). Kept in their own module so the
+// Colour-layer trace options (ADR-430). Kept in their own module so the
 // TraceOptions type can reference them without importing the backend.
 
 /** How each colour's filled paths relate to the others.

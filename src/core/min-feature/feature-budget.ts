@@ -1,4 +1,4 @@
-// Work budget for the minimum-feature check (ADR-408). The check is an
+// Work budget for the minimum-feature check (ADR-433). The check is an
 // advisory that runs while Job Review opens and after a trace commit, both on
 // the main thread, so its cost must be bounded by counted work units rather
 // than by wall-clock time (core is clock-free). When a budget runs out the
@@ -16,7 +16,7 @@ export type MinFeatureBudget = {
 // Sized so a dense traced job finishes well inside it: the owl test image
 // traced with Line Art at 100 mm wide is 142,448 pieces and 2,211,282 tests
 // (about 0.6 s on a loaded laptop). A job that spends all of it takes up to
-// about 1.5 s; see ADR-408 for the measurements.
+// about 1.5 s; see ADR-433 for the measurements.
 export const DEFAULT_MIN_FEATURE_BUDGET: MinFeatureBudget = {
   maxPieces: 500_000,
   maxPairTests: 4_000_000,

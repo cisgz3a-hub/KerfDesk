@@ -1,4 +1,4 @@
-## ADR-413 - Tracer speed: output-identical rewrites, a corner-rebuild budget and a supersample taper (2026-09-25)
+## ADR-438 - Tracer speed: output-identical rewrites, a corner-rebuild budget and a supersample taper (2026-09-25)
 
 **Status:** Accepted. | **Date:** 2026-09-25
 

@@ -7,7 +7,7 @@ export type SourceBlock = {
   readonly y?: number;
   readonly f?: number;
   readonly s?: number;
-  /** G2/G3 centre offsets from the start, G17 only (ADR-407). */
+  /** G2/G3 centre offsets from the start, G17 only (ADR-432). */
   readonly i?: number;
   readonly j?: number;
 };
