@@ -36,6 +36,8 @@ function partialMap(
 describe('relief partial terminal cells', () => {
   it('places finishing centers inside the exact physical extent', () => {
     const map = partialMap(1, 0.3, 0.3, 4, 1);
+    // Alternate the depth so point reduction (ADR-421) keeps every center.
+    map.depth.set([-1, -0.5, -1, -0.5]);
     const passes = reliefFinishingPasses(map, {
       tool: POINT_TOOL,
       kernel: kernelForTool(POINT_TOOL, map.mmPerCell),

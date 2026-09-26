@@ -13,11 +13,14 @@
 // its flank lies below that sphere's continuation beyond the tangent point,
 // so the planar ridge can only be lower than requested (ADR-368). The emitted
 // stride is the largest whole number of sampled rows no greater than that
-// request. The CNC compiler materializes an exact grid no coarser than that
-// spacing; for an externally supplied coarser map, one row is irreducible and
-// the requested scallop is not qualified.
+// request. The CNC compiler sizes its grid so that request is a whole number of
+// rows (ADR-421); for an externally supplied coarser map, one row is
+// irreducible and the requested scallop is not qualified.
 // Flat bits use the established fixed fraction of their diameter. Rows
-// alternate direction (serpentine).
+// alternate direction (serpentine). Without a mask, the rows are linked along
+// their shared edge column into one stay-down path; every path loses the
+// vertices a straight segment can replace without cutting lower
+// (relief-finishing-path.ts).
 
 import type { ToolKernel } from '../sim';
 import type { CncPass } from '../job';
@@ -26,18 +29,20 @@ import { taperedBallEnvelope } from '../cnc-tapered-ball';
 import { partialCellCenter } from '../grid';
 import { dilateHeightmapByToolWithMaskEvidence } from './heightmap-tool-offset';
 import type { Heightmap } from './heightmap';
+import { reduceFinishingPath, type FinishingPoint } from './relief-finishing-path';
 
 export const DEFAULT_RELIEF_SCALLOP_MM = 0.025;
 const FLAT_TOOL_STEPOVER_FRACTION = 0.4;
 const MIN_FLAT_ROW_SPACING_MM = 0.05;
+// A compiler grid sized to a whole number of rows (ADR-421) must not lose a
+// row to the rounding of rowSpacing / mmPerCell.
+const ROW_STRIDE_RELATIVE_SLACK = 1e-9;
 
 export type ReliefFinishingOptions = {
   readonly tool: CncTool;
   readonly kernel: ToolKernel;
   readonly scallopMm: number;
 };
-
-type FinishingPoint = { readonly x: number; readonly y: number; readonly z: number };
 
 export function reliefFinishingPasses(
   map: Heightmap,
@@ -46,12 +51,12 @@ export function reliefFinishingPasses(
   const { widthCells, heightCells, mmPerCell } = map;
   if (widthCells < 1 || heightCells < 1) return [];
   const rowSpacingMm = scallopRowSpacingMm(options.tool, options.scallopMm);
-  const rowStep = Math.max(1, Math.floor(rowSpacingMm / mmPerCell));
-  if (map.inclusion !== undefined) {
+  const rowStep = finishingRowStep(rowSpacingMm, mmPerCell);
+  if (map.inclusion !== undefined && map.inclusion.includes(0)) {
     const selected = selectMaskedFinishingCells(map, map.inclusion, rowStep);
     const rows = maskedRows(map, selected);
     const dilation = dilateHeightmapByToolWithMaskEvidence(map, options.kernel, 0, {
-      exactRows: rowFlags(heightCells, rows),
+      rows: rowFlags(heightCells, rows),
     });
     return maskedFinishingPasses(map, dilation.tipDepth, rows, selected, dilation.touchesExcluded);
   }
@@ -64,34 +69,63 @@ export function reliefFinishingPasses(
   for (let row = 0; row < heightCells; row += rowStep) rows.push(row);
   const farRow = heightCells - 1;
   if (rows[rows.length - 1] !== farRow) rows.push(farRow);
-  // Only emitted rows need the exact surface contact (ADR-412).
-  const tip = dilateHeightmapByToolWithMaskEvidence(map, options.kernel, 0, {
-    exactRows: rowFlags(heightCells, rows),
+  // Only emitted rows and the edge columns that link them are read, so only
+  // they are computed (ADR-421).
+  const edgeColumns = new Uint8Array(widthCells);
+  edgeColumns[0] = 1;
+  edgeColumns[widthCells - 1] = 1;
+  // A mask that excludes nothing plans exactly as no mask.
+  const { inclusion: _allIncluded, ...unmasked } = map;
+  const tip = dilateHeightmapByToolWithMaskEvidence(unmasked, options.kernel, 0, {
+    rows: rowFlags(heightCells, rows),
+    columns: edgeColumns,
   }).tipDepth;
-
   const passes: CncPass[] = [];
+  appendFinishingRun(passes, linkedSerpentine(map, tip, rows));
+  return passes;
+}
+
+// The planned row stride, in whole sampled rows, no wider than the request.
+export function finishingRowStep(rowSpacingMm: number, mmPerCell: number): number {
+  return Math.max(1, Math.floor((rowSpacingMm / mmPerCell) * (1 + ROW_STRIDE_RELATIVE_SLACK)));
+}
+
+// ADR-421: one stay-down serpentine. Row k ends on the edge column where row
+// k + 1 starts, and the link between them follows that column's tip samples.
+function linkedSerpentine(
+  map: Heightmap,
+  tip: Float32Array,
+  rows: ReadonlyArray<number>,
+): ReadonlyArray<FinishingPoint> {
+  const { widthCells } = map;
+  const points: FinishingPoint[] = [];
   let leftToRight = true;
+  let previousRow = -1;
   for (const row of rows) {
-    const y = partialCellCenter(map, 'y', row);
-    let points: Array<{ x: number; y: number; z: number }> = [];
-    for (let i = 0; i < widthCells; i += 1) {
-      const col = leftToRight ? i : widthCells - 1 - i;
-      const index = row * widthCells + col;
-      if (map.inclusion?.[index] === 0) {
-        appendFinishingRun(passes, points);
-        points = [];
-        continue;
-      }
-      points.push({
-        x: partialCellCenter(map, 'x', col),
-        y,
-        z: tip[index] ?? 0,
-      });
+    const edge = leftToRight ? 0 : widthCells - 1;
+    for (let link = previousRow + 1; previousRow >= 0 && link < row; link += 1) {
+      points.push(finishingSample(map, tip, edge, link));
     }
-    appendFinishingRun(passes, points);
+    for (let i = 0; i < widthCells; i += 1) {
+      points.push(finishingSample(map, tip, leftToRight ? i : widthCells - 1 - i, row));
+    }
+    previousRow = row;
     leftToRight = !leftToRight;
   }
-  return passes;
+  return points;
+}
+
+function finishingSample(
+  map: Heightmap,
+  tip: Float32Array,
+  col: number,
+  row: number,
+): FinishingPoint {
+  return {
+    x: partialCellCenter(map, 'x', col),
+    y: partialCellCenter(map, 'y', row),
+    z: tip[row * map.widthCells + col] ?? 0,
+  };
 }
 
 function rowFlags(heightCells: number, rows: ReadonlyArray<number>): Uint8Array {
@@ -206,7 +240,12 @@ function rowHasSelection(selected: Uint8Array, row: number, widthCells: number):
 
 function appendFinishingRun(passes: CncPass[], points: ReadonlyArray<FinishingPoint>): void {
   if (points.length >= 2) {
-    passes.push({ kind: 'path3d', points, closed: false, lateralFeed: 'z-rate-capped' });
+    passes.push({
+      kind: 'path3d',
+      points: reduceFinishingPath(points),
+      closed: false,
+      lateralFeed: 'z-rate-capped',
+    });
     return;
   }
   const point = points[0];

@@ -3,6 +3,8 @@ import { kernelForTool, type ToolKernel } from '../sim';
 import type { CncTool } from '../scene';
 import type { Heightmap } from './heightmap';
 import { reliefFinishingPasses, scallopRowSpacingMm } from './relief-finishing';
+import { finishingRows, rowDirection } from './relief-finishing-test-rows';
+import { dilateHeightmapByTool } from './heightmap-tool-offset';
 
 const BALL_NOSE: CncTool = { id: 'bn', name: 'ball', kind: 'ball-nose', diameterMm: 3.175 };
 const SMALL_BALL_NOSE: CncTool = {
@@ -61,16 +63,6 @@ function pyramidMap(depthMm: number, cells = 40, mmPerCell = 0.5): Heightmap {
   };
 }
 
-function rowDirectionSign(
-  pass: ReturnType<typeof reliefFinishingPasses>[number] | undefined,
-): number {
-  if (pass?.kind !== 'path3d') throw new Error('path3d row expected');
-  const first = pass.points[0];
-  const last = pass.points.at(-1);
-  if (first === undefined || last === undefined) throw new Error('row points expected');
-  return Math.sign(last.x - first.x);
-}
-
 function surfaceAt(map: Heightmap, x: number, y: number): number {
   const cx = Math.min(map.widthCells - 1, Math.max(0, Math.floor(x / map.mmPerCell)));
   const cy = Math.min(map.heightCells - 1, Math.max(0, Math.floor(y / map.mmPerCell)));
@@ -111,11 +103,10 @@ describe('reliefFinishingPasses', () => {
       kernel: kernelForTool(END_MILL, 0.5),
       scallopMm: 0.025,
     });
-    const last = passes.at(-1);
-    if (last?.kind !== 'path3d') throw new Error('path3d row expected');
-    expect(last.points[0]?.y).toBeCloseTo((19 + 0.5) * 0.5, 9);
+    const rows = finishingRows(passes);
+    expect(rows.at(-1)?.y).toBeCloseTo((19 + 0.5) * 0.5, 9);
     // Serpentine alternation must survive the appended row.
-    expect(rowDirectionSign(last)).toBe(-rowDirectionSign(passes.at(-2)));
+    expect(rowDirection(rows.at(-1))).toBe(-rowDirection(rows.at(-2)));
   });
 
   it('does not duplicate the final row when the stride lands on it', () => {
@@ -125,12 +116,9 @@ describe('reliefFinishingPasses', () => {
       kernel: kernelForTool(END_MILL, 0.5),
       scallopMm: 0.025,
     });
-    const last = passes.at(-1);
-    const previous = passes.at(-2);
-    if (last?.kind !== 'path3d' || previous?.kind !== 'path3d') {
-      throw new Error('path3d rows expected');
-    }
-    expect(last.points[0]?.y).not.toBeCloseTo(previous.points[0]?.y ?? 0, 9);
+    const rows = finishingRows(passes);
+    expect(rows.at(-1)?.y).toBeCloseTo((18 + 0.5) * 0.5, 9);
+    expect(rows.at(-1)?.y).not.toBeCloseTo(rows.at(-2)?.y ?? 0, 9);
   });
 
   it('skims a flat surface at exactly its depth on every sample', () => {
@@ -163,14 +151,46 @@ describe('reliefFinishingPasses', () => {
     }
   });
 
+  it('links unmasked rows into one stay-down path on exact tip samples (ADR-421)', () => {
+    const map = pyramidMap(5);
+    const passes = reliefFinishingPasses(map, {
+      tool: BALL_NOSE,
+      kernel: kernelForTool(BALL_NOSE, map.mmPerCell),
+      scallopMm: 0.025,
+    });
+    const exact = dilateHeightmapByTool(map, kernelForTool(BALL_NOSE, map.mmPerCell), 0);
+    const path = passes[0];
+    if (path?.kind !== 'path3d') throw new Error('one stay-down path expected');
+
+    expect(passes).toHaveLength(1);
+    expect(finishingRows(passes).length).toBeGreaterThan(2);
+    const lastColumnX = (map.widthCells - 0.5) * map.mmPerCell;
+    for (let index = 1; index < path.points.length; index += 1) {
+      const from = path.points[index - 1];
+      const to = path.points[index];
+      if (from === undefined || to === undefined) continue;
+      // Every move is along a row or down an edge column, never a diagonal.
+      if (from.y !== to.y) {
+        expect(to.x).toBe(from.x);
+        expect([0.5 * map.mmPerCell, lastColumnX]).toContain(to.x);
+      }
+    }
+    for (const point of path.points) {
+      const col = Math.round(point.x / map.mmPerCell - 0.5);
+      const row = Math.round(point.y / map.mmPerCell - 0.5);
+      expect(point.z).toBe(exact[row * map.widthCells + col]);
+    }
+  });
+
   it('serpentines: consecutive rows run in opposite X directions', () => {
     const passes = reliefFinishingPasses(flatMap(-1), {
       tool: BALL_NOSE,
       kernel: kernelForTool(BALL_NOSE, 0.5),
       scallopMm: 0.025,
     });
-    expect(passes.length).toBeGreaterThanOrEqual(2);
-    expect(rowDirectionSign(passes[0])).toBe(-rowDirectionSign(passes[1]));
+    const rows = finishingRows(passes);
+    expect(rows.length).toBeGreaterThanOrEqual(2);
+    expect(rowDirection(rows[0])).toBe(-rowDirection(rows[1]));
   });
 
   it('smaller scallop targets produce more rows', () => {
@@ -184,7 +204,7 @@ describe('reliefFinishingPasses', () => {
       kernel: kernelForTool(BALL_NOSE, 0.5),
       scallopMm: 0.005,
     });
-    expect(fine.length).toBeGreaterThan(coarse.length);
+    expect(finishingRows(fine).length).toBeGreaterThan(finishingRows(coarse).length);
   });
 
   it('omits flat-tool centers whose physical footprint enters excluded stock', () => {
@@ -249,9 +269,9 @@ describe('reliefFinishingPasses', () => {
     });
     const lobe = passes.find((pass) => pass.kind === 'path3d' && pass.points[0]?.y === 0.75);
 
+    // The flat lobe row keeps only its end vertices (ADR-421 point reduction).
     expect(lobe?.kind === 'path3d' ? lobe.points : []).toEqual([
       { x: 1.75, y: 0.75, z: -2 },
-      { x: 1.25, y: 0.75, z: -2 },
       { x: 0.75, y: 0.75, z: -2 },
     ]);
   });
@@ -327,9 +347,11 @@ describe('reliefFinishingPasses', () => {
   });
 
   it('uses the requested row stride and component far row for a vertical strip', () => {
+    // The excluded second column keeps this on the masked planner; a mask that
+    // excludes nothing plans as an unmasked stay-down path (ADR-421).
     const map = {
-      ...flatMap(-2, 1, 7, 0.25),
-      inclusion: new Uint8Array(7).fill(1),
+      ...flatMap(-2, 2, 7, 0.25),
+      inclusion: Uint8Array.from({ length: 14 }, (_, index) => (index % 2 === 0 ? 1 : 0)),
     };
     const passes = reliefFinishingPasses(map, {
       tool: END_MILL,
@@ -365,12 +387,7 @@ describe('reliefFinishingPasses', () => {
       kernel: kernelForTool(BALL_NOSE, map.mmPerCell),
       scallopMm,
     });
-    const rowYs = passes.map((pass) => {
-      if (pass.kind !== 'path3d' || pass.points[0] === undefined) {
-        throw new Error('path3d row expected');
-      }
-      return pass.points[0].y;
-    });
+    const rowYs = finishingRows(passes).map((row) => row.y);
     const gaps = rowYs.slice(1).map((y, index) => y - (rowYs[index] ?? y));
     const maxGap = Math.max(...gaps);
     const radius = BALL_NOSE.diameterMm / 2;

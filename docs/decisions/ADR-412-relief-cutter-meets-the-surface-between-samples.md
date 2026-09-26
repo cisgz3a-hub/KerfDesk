@@ -47,8 +47,8 @@ the finishing pass was meant to clean up.
 2. The contact is applied after the existing lattice and mask constraints in
    `dilateHeightmapByTool` and `dilateHeightmapByToolWithMaskEvidence`, so it can only raise a
    tip. `betweenSamples: false` keeps the lattice alone for the bit-exact reference tests.
-   `exactRows` limits the contact to the rows finishing actually cuts; the other rows keep the
-   lattice value and are never emitted.
+   Finishing computes only the rows it cuts (and, since ADR-421, the edge columns that link
+   them); it never reads the others.
 3. **Allowance in 3D.** Roughing plans with the cutter widened horizontally by the allowance plus
    the marching-squares clearance (`sqrt(10)/4` cells), using the law `dz(max(0, r - g))`, and
    then lifts the result by the allowance. Every ring point lies within that clearance of a
@@ -78,7 +78,7 @@ the finishing pass was meant to clean up.
   different contact.
 - Compile time grows. Dilating a 1,200 x 1,200 map with a 0.1 mm ball went from 0.47 s to 2.9 s
   on a plane and from 0.45 s to 6.2 s on a steep wavy surface; the bench relief compiles in about
-  0.6 s instead of 0.37 s. Finishing refines only its emitted rows, which cut the slowest existing
+  0.6 s instead of 0.37 s. Finishing computes only its emitted rows, which cut the slowest existing
   test (0.1 mm ball, 0.005 mm scallop) from 3.3 s to 1.3 s.
 - Roughing leaves slightly more stock on walls, and a level can end a little higher next to a
   wall. The emitted roughing G-code of the pyramid snapshot changed accordingly.

@@ -24,6 +24,7 @@ import { zPassDepths } from '../cnc/depth-passes';
 import { dilateHeightmapByTool } from './heightmap-tool-offset';
 import type { Heightmap } from './heightmap';
 import { marchingSquares } from './marching-squares';
+import { reliefRoughingLevels } from './relief-roughing-levels';
 
 // Material intentionally left everywhere for the finishing pass (H.8).
 export const DEFAULT_RELIEF_ALLOWANCE_MM = 0.5;
@@ -97,14 +98,19 @@ export function reliefRoughingLadder(
   let offsetFailed = false;
   let passLimited = false;
   const toolLaw = kernelForTool(options.tool, map.mmPerCell);
-  let previousLevel = 0;
-  for (const level of zPassDepths(options.reliefDepthMm, options.depthPerPassMm)) {
-    const contours = levelContoursMm(map, dilated, level);
-    const cutRadiusMm = sliceCutRadiusMm(toolLaw, previousLevel - level);
-    const completion = appendLevelRings(passes, contours, level, stepMm, cutRadiusMm);
+  // ADR-422: the ladder plus a level at the floor and at every flat.
+  const levels = reliefRoughingLevels(
+    map,
+    dilated,
+    zPassDepths(options.reliefDepthMm, options.depthPerPassMm),
+    options.tool.diameterMm / 2,
+  );
+  for (const level of levels) {
+    const contours = levelContoursMm(map, dilated, level.zMm, level.bandFloorMm);
+    const cutRadiusMm = sliceCutRadiusMm(toolLaw, level.sliceTopMm - level.zMm);
+    const completion = appendLevelRings(passes, contours, level.zMm, stepMm, cutRadiusMm);
     offsetFailed = offsetFailed || completion.offsetFailed;
     passLimited = passLimited || completion.passLimited;
-    previousLevel = level;
   }
   return { passes, offsetFailed, passLimited };
 }
@@ -140,16 +146,20 @@ function stepoverMm(stepoverPercent: number, toolDiameterMm: number): number {
 }
 
 // Region at a level: dilated target at or below the level (the tool must
-// reach this deep here eventually — clear it now, one slice at a time).
+// reach this deep here eventually — clear it now, one slice at a time). A flat
+// level's band stops above the next level, which clears the rest (ADR-422).
 function levelContoursMm(
   map: Heightmap,
   dilated: Float32Array,
   levelZ: number,
+  bandFloorZ: number | null,
 ): ReadonlyArray<Polyline> {
   const mask = new Uint8Array(map.widthCells * map.heightCells);
+  const floor = bandFloorZ === null ? Number.NEGATIVE_INFINITY : bandFloorZ + LEVEL_EPS;
   let any = false;
   for (let i = 0; i < mask.length; i += 1) {
-    if (map.inclusion?.[i] !== 0 && (dilated[i] ?? 0) <= levelZ + LEVEL_EPS) {
+    const tip = dilated[i] ?? 0;
+    if (map.inclusion?.[i] !== 0 && tip <= levelZ + LEVEL_EPS && tip > floor) {
       mask[i] = 1;
       any = true;
     }

@@ -3756,6 +3756,9 @@ explicitly marked below; the remaining controls and user-facing flows are planne
    as at them (ADR-412). When the stepover is wider than the bit reaches on
    that level's slice, extra closed passes cut the cores the rings missed
    (ADR-413).
+   Ladder levels below the deepest tip become one level at it, so the floor
+   keeps exactly the allowance, and a flat the ladder would overshoot by more
+   than 0.05 mm gets a level of its own that clears only its band (ADR-422).
 2. Passes run depth-major (whole level before stepping down) as a
    clearing group — before any profile cuts. The preview's removal
    shading shows the terraced relief forming.
@@ -4385,12 +4388,20 @@ and lifts the command's CNC-only gate.)*
    tip ball radius and samples a grid of at most a tenth of the tip diameter;
    its flank lies below that sphere, so the planar cusp can only be lower, and
    its whole flank constrains the tip (ADR-368). Flat bits use the larger of
-   0.05 mm and 40% of diameter. The grid attempts that resolved spacing and
-   its whole-row stride rounds down so it does not overshoot it. This qualifies finishing
+   0.05 mm and 40% of diameter. The grid cell divides that resolved spacing
+   into whole rows no coarser than a tenth of the contact diameter, so rows
+   land at the requested spacing; the whole-row stride still rounds down so it
+   never overshoots it (ADR-421). This qualifies finishing
    vertices against the piecewise-linear surface and the planar cusp, not the
    XY chord between vertices, subcell detail, or true along-surface scallop
    (ADR-292/294/412).
-3. Roughing still leaves its fixed 0.5 mm allowance (it exists FOR this
+3. Without a mask, the rows form one stay-down path: each row steps to the
+   next along its edge column's own tip samples instead of retracting and
+   plunging. A vertex is dropped only where the straight move replacing it
+   stays at or above it by no more than 0.002 mm, so the reduced path clears
+   everything the sampled one did (ADR-421). A mask that excludes cells keeps
+   one pass per run.
+4. Roughing still leaves its fixed 0.5 mm allowance (it exists FOR this
    pass); finishing consumes it down to the true surface.
 
 #### Error — unknown finishing bit id

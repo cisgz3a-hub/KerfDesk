@@ -36,11 +36,16 @@ export type HeightmapDilationOptions = {
    */
   readonly betweenSamples?: boolean;
   /**
-   * Rows (1 per row index) that need the exact contact; the rest keep the
-   * sampled lattice value. Finishing cuts only every few rows, so it refines
-   * only those. Absent: every row.
+   * Rows (1 per row index) to compute. Finishing reads only the rows it cuts,
+   * so it skips the rest: a skipped cell reads as stock top (0) and never as
+   * touching excluded stock. Absent: every row.
    */
-  readonly exactRows?: Uint8Array;
+  readonly rows?: Uint8Array;
+  /**
+   * Columns (1 per column index) also computed in every row, whatever `rows`
+   * says: finishing links its rows along its edge columns (ADR-421).
+   */
+  readonly columns?: Uint8Array;
 };
 
 export function dilateHeightmapByTool(
@@ -88,16 +93,16 @@ function dilateHeightmap(
       : undefined;
   const contact = options.betweenSamples === false ? null : createSurfaceContactField(map, kernel);
   for (let cy = 0; cy < heightCells; cy += 1) {
-    const rowContact =
-      options.exactRows === undefined || options.exactRows[cy] === 1 ? contact : null;
+    const wholeRow = options.rows === undefined || options.rows[cy] === 1;
     for (let cx = 0; cx < widthCells; cx += 1) {
       const center = cy * widthCells + cx;
       if (inclusion?.[center] === 0) continue;
+      if (!wholeRow && options.columns?.[cx] !== 1) continue;
       storeTipDepth(
         out,
         outBits,
         center,
-        dilatedCell(map, kernel, cx, cy, allowanceMm, touchesExcluded, center, rowContact),
+        dilatedCell(map, kernel, cx, cy, allowanceMm, touchesExcluded, center, contact),
         inclusion !== undefined,
       );
     }

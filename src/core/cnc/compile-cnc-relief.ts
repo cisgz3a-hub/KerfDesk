@@ -49,13 +49,21 @@ const MIN_FEED_MM_PER_MIN = 1;
 const ROUGHING_CELL_TOOL_FRACTION = 8;
 // Finishing samples finer than roughing: quality lives in the skim.
 const FINISHING_CELL_TOOL_FRACTION = 10;
+// Tolerates rowSpacing / finestCell landing a rounding error above a whole
+// number, which would otherwise add a needless extra subdivision.
+const ROW_SUBDIVISION_SLACK = 1e-9;
 
 function finishingCellSizeMm(rowSpacingMm: number, tool: CncTool): number {
   // A tapered ball nose finishes with its tip ball, so the grid resolves that
   // ball exactly as it would a ball nose of the same diameter (ADR-368).
   const ballRadiusMm = reliefScallopBallRadiusMm(tool);
   const contactDiameterMm = ballRadiusMm === null ? tool.diameterMm : 2 * ballRadiusMm;
-  return Math.min(rowSpacingMm, contactDiameterMm / FINISHING_CELL_TOOL_FRACTION);
+  const finestCellMm = contactDiameterMm / FINISHING_CELL_TOOL_FRACTION;
+  // ADR-421: the largest cell no coarser than the finest one that divides the
+  // row spacing into whole rows, so the rows land at the requested spacing
+  // instead of rounding down to the next whole row.
+  const rowsPerStride = Math.max(1, Math.ceil(rowSpacingMm / finestCellMm - ROW_SUBDIVISION_SLACK));
+  return rowSpacingMm / rowsPerStride;
 }
 
 // Roughing group (H.5) plus — when the layer names a finishing bit — the
