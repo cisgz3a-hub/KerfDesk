@@ -13,16 +13,22 @@ import { TraceDetectionControls } from './TraceDetectionControls';
 import { TraceCheckboxRow } from './TraceCheckboxRow';
 import { PhotoTraceSettingsControls } from './PhotoTraceSettingsControls';
 import { traceNumberTitle } from './trace-number-title';
+import { ColourLayerTraceSettingsControls } from './ColourLayerTraceSettingsControls';
 
 type TraceSettingsControlsProps = {
   readonly preset: TraceOptions;
   readonly overrides: LightBurnTraceSettingOverrides;
   readonly sourceHasTransparency?: boolean | undefined;
   readonly onChange: (next: LightBurnTraceSettingOverrides) => void;
+  /** Colours of the current preview trace (Colour layers swatches). */
+  readonly previewColours?: ReadonlyArray<string> | undefined;
 };
 
 export function TraceSettingsControls(props: TraceSettingsControlsProps): JSX.Element {
   if (props.preset.photoDetail !== undefined) return <PhotoTraceSettingsControls {...props} />;
+  if (props.preset.colourLayers !== undefined) {
+    return <ColourLayerTraceSettingsControls {...props} />;
+  }
   return props.preset.traceMode === 'edge' ? (
     <EdgeTraceSettingsControls {...props} />
   ) : (

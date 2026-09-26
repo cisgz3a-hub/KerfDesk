@@ -25,6 +25,8 @@ function traceCheckboxTitle(label: string): string {
       return 'Fill every enclosed hairline hole in solid ink; open gaps stay open. Line Art and Smooth start unticked and fill only faint threshold cracks automatically; once you tick or untick it, ticked fills every hole and unticked fills none.';
     case 'Invert':
       return 'Trace light artwork on a dark background: light areas become the traced shapes. Transparent areas stay background.';
+    case 'Trace background colour':
+      return 'Also trace the paper colour as its own layer. Its operation starts with output off, so the paper is still not burned until you turn it on.';
     case 'Trace alpha mask':
       return 'Only changes images with transparent pixels; opaque images trace the same.';
     default:

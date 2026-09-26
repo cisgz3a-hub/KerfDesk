@@ -11,6 +11,7 @@ export const VISIBLE_TRACE_PRESET_NAMES = [
   'Sharp',
   'Centerline',
   'Edge Detection',
+  'Colour layers',
 ] as const;
 export const DEFAULT_TRACE_PRESET_NAME = 'Line Art';
 // CNC starts on Smooth; every other preset remains available.
@@ -30,6 +31,8 @@ const PRESET_DESCRIPTIONS: Readonly<Record<string, string>> = {
     'One path along the middle of each stroke. Useful for single-stroke lettering and linework.',
   'Edge Detection':
     'Outlines around dark artwork and local detail. Neighbouring dark tones may merge.',
+  'Colour layers':
+    'Splits colour artwork into a few flat colours, one layer and operation each. Neighbouring colours share their edges exactly.',
 };
 
 export function TraceDialogHeader(props: {
@@ -112,6 +115,7 @@ export function PresetPicker(props: {
 
 function presetGeometryLabel(preset: string): string {
   if (preset === 'Photo shading') return 'Shaded vectors';
+  if (preset === 'Colour layers') return 'Filled colour regions';
   return preset === 'Centerline' ? 'Single paths' : 'Closed outlines';
 }
 

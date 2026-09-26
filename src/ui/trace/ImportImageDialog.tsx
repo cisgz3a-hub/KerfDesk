@@ -38,6 +38,7 @@ import {
 } from './trace-commit-ownership';
 import { commitTraceOutput } from './trace-output-commit';
 import { useTracePreview } from './use-trace-preview';
+import { tracePreviewFacts } from './trace-preview-facts';
 import { useTraceCommitLifetime } from './use-trace-commit-lifetime';
 import {
   preparedTraceEntry,
@@ -159,7 +160,7 @@ function DialogBody(props: DialogBodyProps): JSX.Element {
       settings={{
         preset: presetOptions,
         overrides: choices.traceSettings,
-        sourceHasTransparency: traceSourceHasTransparency(preview),
+        ...tracePreviewFacts(preview),
         onChange: choices.setTraceSettings,
       }}
       output={{
@@ -176,7 +177,7 @@ function DialogBody(props: DialogBodyProps): JSX.Element {
           preview={preview}
           seed={seed}
           boundarySelection={boundarySelection}
-          photoShading={options.photoDetail !== undefined}
+          wholeContours={options.photoDetail !== undefined || options.colourLayers !== undefined}
           submission={{ busy, output: effectiveTraceOutput }}
         />
       }
@@ -209,17 +210,10 @@ function isFilledContourTraceOptions(options: TraceOptions): boolean {
   return options.traceMode !== 'centerline' && options.traceMode !== 'edge';
 }
 
-function traceSourceHasTransparency(
-  preview: ReturnType<typeof useTracePreview>,
-): boolean | undefined {
-  return preview.kind === 'tracing' || preview.kind === 'ready'
-    ? preview.sourceHasTransparency
-    : undefined;
-}
-
 function TracePreviewPanel(props: {
   readonly submission: { readonly busy: boolean; readonly output: TraceOutput };
-  readonly photoShading: boolean;
+  /** Enhance replaces whole contours; photo ribbons and colour regions need Crop. */
+  readonly wholeContours: boolean;
   readonly preview: ReturnType<typeof useTracePreview>;
   readonly seed: RasterImage;
   readonly boundarySelection: BoundarySelection;
@@ -245,7 +239,7 @@ function TracePreviewPanel(props: {
         <BoundaryModePicker
           value={selection.boundaryMode}
           onChange={selection.setBoundaryMode}
-          allowEnhance={!props.photoShading}
+          allowEnhance={!props.wholeContours}
           disabled={props.submission.busy}
         />
       ) : null}

@@ -9,6 +9,11 @@ import { normalizeTraceBoundary, TRACE_PRESETS, type TraceBoundary } from '../..
 import { VISIBLE_TRACE_PRESET_NAMES, type TraceFillStyle, type TraceOutput } from './dialog-parts';
 import type { BoundaryMode } from './region-enhance-trace';
 import type { LightBurnTraceSettingOverrides, TraceDetectionMode } from './trace-options';
+import {
+  MAX_COLOUR_LAYERS,
+  MIN_COLOUR_LAYERS,
+  type ColourLayerOutput,
+} from '../../core/trace/colour-layer-options';
 
 export type TraceDialogSettings = {
   readonly presetName: string;
@@ -24,7 +29,10 @@ export type RestoredTraceSettings = Partial<TraceDialogSettings>;
 type OverrideRule =
   | { readonly kind: 'number'; readonly min: number; readonly max: number }
   | { readonly kind: 'boolean' }
-  | { readonly kind: 'detection' };
+  | { readonly kind: 'detection' }
+  // Colour layers' Colours control: 'auto' or a whole count in range (ADR-402).
+  | { readonly kind: 'count-or-auto'; readonly min: number; readonly max: number }
+  | { readonly kind: 'choice'; readonly values: ReadonlyArray<string> };
 
 const BOOLEAN = { kind: 'boolean' } as const;
 
@@ -36,6 +44,12 @@ function range(min: number, max: number): OverrideRule {
 // override key now that both branches are merged; the `satisfies` check below
 // keeps every key's persistence decided.
 type PersistedOverrideKey = keyof LightBurnTraceSettingOverrides;
+
+// Exhaustive by construction, like the rules below.
+const COLOUR_LAYER_OUTPUTS: ReadonlyArray<string> = Object.keys({
+  'cut-out': true,
+  stacked: true,
+} satisfies Record<ColourLayerOutput, true>);
 
 /**
  * How each dialog control persists: its value type and, for numbers, the range
@@ -65,6 +79,9 @@ export const TRACE_OVERRIDE_RULES = {
   edgeSensitivity: range(0, 100),
   edgeDetail: range(0, 100),
   edgeMinimumLinePx: range(0, 1000),
+  colourCount: { kind: 'count-or-auto', min: MIN_COLOUR_LAYERS, max: MAX_COLOUR_LAYERS },
+  colourLayerOutput: { kind: 'choice', values: COLOUR_LAYER_OUTPUTS },
+  keepBackground: BOOLEAN,
 } as const satisfies Record<PersistedOverrideKey, OverrideRule>;
 
 // Exhaustive by construction, like the rules above.
@@ -104,9 +121,10 @@ export function restoreTraceSettings(
   if (record === undefined) return {};
   const presetName = knownPresetName(record.presetName);
   const boundary = normalizeTraceBoundary(record.boundary, sourceGrid.width, sourceGrid.height);
-  // Enhance replaces whole contours; photo ribbons need Crop.
-  const photo = TRACE_PRESETS[presetName ?? '']?.photoDetail !== undefined;
-  const boundaryMode: BoundaryMode = photo ? 'crop' : (record.boundaryMode ?? 'crop');
+  // Enhance replaces whole contours; photo ribbons and colour regions need Crop.
+  const preset = TRACE_PRESETS[presetName ?? ''];
+  const cropOnly = preset?.photoDetail !== undefined || preset?.colourLayers !== undefined;
+  const boundaryMode: BoundaryMode = cropOnly ? 'crop' : (record.boundaryMode ?? 'crop');
   return {
     ...(presetName === undefined ? {} : { presetName }),
     // sanitizeOverrides keeps only entries whose value fits the control.
@@ -142,10 +160,30 @@ function acceptOverride(
   rule: OverrideRule,
   value: TraceSettingsValue,
 ): TraceSettingsValue | undefined {
-  if (rule.kind === 'number') {
-    if (typeof value !== 'number' || !Number.isFinite(value)) return undefined;
-    return Math.min(rule.max, Math.max(rule.min, value));
+  switch (rule.kind) {
+    case 'number':
+      return fitted(value, rule.min, rule.max);
+    case 'count-or-auto':
+      return value === 'auto' ? value : fitted(value, rule.min, rule.max, Math.round);
+    case 'boolean':
+      return typeof value === 'boolean' ? value : undefined;
+    case 'choice':
+      return oneOf(value, rule.values);
+    case 'detection':
+      return oneOf(value, DETECTION_MODES);
   }
-  if (rule.kind === 'boolean') return typeof value === 'boolean' ? value : undefined;
-  return typeof value === 'string' && DETECTION_MODES.includes(value) ? value : undefined;
+}
+
+function fitted(
+  value: TraceSettingsValue,
+  min: number,
+  max: number,
+  snap: (n: number) => number = (n) => n,
+): number | undefined {
+  if (typeof value !== 'number' || !Number.isFinite(value)) return undefined;
+  return Math.min(max, Math.max(min, snap(value)));
+}
+
+function oneOf(value: TraceSettingsValue, values: ReadonlyArray<string>): string | undefined {
+  return typeof value === 'string' && values.includes(value) ? value : undefined;
 }

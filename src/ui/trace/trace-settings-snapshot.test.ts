@@ -149,4 +149,27 @@ describe('trace settings snapshot (ADR-400)', () => {
     );
     expect(restored.boundaryMode).toBe('crop');
   });
+
+  it('keeps the Colour layers controls and reopens their boundary in Crop mode (ADR-402)', () => {
+    const restored = restoreTraceSettings(
+      record({
+        presetName: 'Colour layers',
+        overrides: { colourCount: 11.4, colourLayerOutput: 'stacked', keepBackground: true },
+        boundary: { x: 1, y: 1, width: 10, height: 10 },
+        boundaryMode: 'enhance',
+      }),
+      GRID,
+    );
+    expect(restored.overrides).toEqual({
+      colourCount: 8,
+      colourLayerOutput: 'stacked',
+      keepBackground: true,
+    });
+    expect(restored.boundaryMode).toBe('crop');
+    const auto = restoreTraceSettings(
+      record({ overrides: { colourCount: 'auto', colourLayerOutput: 'glued' } }),
+      GRID,
+    );
+    expect(auto.overrides).toEqual({ colourCount: 'auto' });
+  });
 });

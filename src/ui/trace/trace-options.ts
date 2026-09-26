@@ -15,8 +15,12 @@ import {
   edgeLowThresholdRatioForDelta,
   edgeSourceRadiusPx,
 } from '../../core/trace/edge-input';
+import {
+  mergeColourLayerSettings,
+  type ColourLayerSettingOverrides,
+} from './colour-layer-settings';
 
-export type LightBurnTraceSettingOverrides = {
+export type LightBurnTraceSettingOverrides = ColourLayerSettingOverrides & {
   readonly photoDetail?: number;
   readonly photoBrightness?: number;
   readonly photoContrast?: number;
@@ -49,6 +53,7 @@ export function mergeLightBurnTraceSettings(
   settings: LightBurnTraceSettingOverrides,
 ): TraceOptions {
   if (preset.photoDetail !== undefined) return mergePhotoSettings(preset, settings);
+  if (preset.colourLayers !== undefined) return mergeColourLayerSettings(preset, settings);
   const out: Record<string, unknown> = { ...preset };
   applyDetectionSettings(out, preset, settings);
   if (settings.ignoreLessThanPixels !== undefined) {
@@ -220,6 +225,10 @@ export function hasAggressivePreprocessing(options: TraceOptions): boolean {
   // may still carry them), so relaxing them cannot change its output — a
   // zero-paths retry would just repeat the identical multi-second pipeline.
   if (options.traceMode === 'edge') return false;
+  // Colour layers (ADR-402) own their speck rule: a missing despeckle reads as
+  // the same 12 px default, so a "relaxed" retry would repeat the identical
+  // colour pipeline and falsely report relaxed settings.
+  if (options.colourLayers !== undefined) return false;
   return (
     options.useOtsuThreshold === true ||
     options.fixedPalette !== undefined ||
