@@ -356,8 +356,10 @@ function freshToolChangeIdlePatch(
   return drainedIdleHold ? { toolChangeIdleSeen: true } : {};
 }
 
-// After an alarm or reset the controller has dropped G92; a persistent G54
-// origin may survive but is unverified until the next WCO frame.
+// After an alarm or reset stock GRBL and FluidNC have dropped G92, while grblHAL
+// keeps it (gcode.c:787) and a persistent G54 origin survives everywhere. So the
+// origin is forgotten here and re-learned from the next WCO frame, which every
+// GRBL-family firmware sends right after its banner (grblHAL report.c:309).
 export function originUnknownAfterControllerReset(
   state: LaserState,
 ): Pick<
