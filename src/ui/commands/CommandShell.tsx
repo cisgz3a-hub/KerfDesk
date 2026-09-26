@@ -7,6 +7,7 @@ import { useStore } from '../state';
 import { useUiStore } from '../state/ui-store';
 import { jobAwareAlert } from '../state/job-aware-dialogs';
 import { BarcodeDialogHost } from '../barcode/BarcodeDialogHost';
+import { ExportSvgDialogHost } from './ExportSvgDialog';
 import { useBarcodeDialogStore } from '../barcode/barcode-dialog-store';
 import { BoxGeneratorHost } from '../box/BoxGeneratorHost';
 import { BoxFitTestHost } from '../box/BoxFitTestHost';
@@ -125,6 +126,7 @@ export function CommandShell(): JSX.Element {
       ) : null}
       <GcodeSaveDialogHost />
       <BarcodeDialogHost />
+      <ExportSvgDialogHost />
       {gcodeInspector.element}
     </>
   );

@@ -164,7 +164,7 @@ export const COMMAND_HELP: Readonly<Record<CommandId, CommandHelpTopic>> = {
   'tools.multi-file-trace': {
     family: 'tools',
     tooltip:
-      'Trace multiple image files with one preset to standalone SVG, DXF, PDF, EPS or GeoJSON files without changing the workspace. Images with nothing to trace are skipped and listed.',
+      'Trace multiple image files with one preset to standalone SVG, DXF, PDF, EPS or GeoJSON files without changing the workspace. The page is the image size or fits the artwork with a margin. Images with nothing to trace are skipped and listed.',
   },
   'tools.convert-to-path': {
     family: 'tools',

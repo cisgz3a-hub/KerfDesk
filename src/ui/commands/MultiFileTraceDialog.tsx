@@ -12,8 +12,14 @@ import {
   writeTraceFileWithPlatform,
 } from './multi-file-trace-action';
 import { pickPlatformImageFiles } from './platform-image-files';
+import {
+  DEFAULT_TRACE_PAGE_SETTINGS,
+  TracePageFields,
+  tracePageOutput,
+  type TracePageSettings,
+} from './TracePageFields';
 
-export type MultiFileTraceSettings = {
+export type MultiFileTraceSettings = TracePageSettings & {
   readonly presetName: string;
   readonly format: BatchTraceFormat;
   readonly groupContours: boolean;
@@ -26,6 +32,7 @@ let lastSettings: MultiFileTraceSettings = {
   format: 'svg',
   groupContours: false,
   precisionMm: DEFAULT_EXPORT_PRECISION_MM,
+  ...DEFAULT_TRACE_PAGE_SETTINGS,
 };
 
 type Choice = { readonly value: string; readonly label: string };
@@ -117,6 +124,7 @@ export function MultiFileTraceDialog(props: {
         choices={PRECISION_CHOICES}
         onChange={(step) => update({ precisionMm: Number(step) })}
       />
+      <TracePageFields value={settings} onChange={update} />
       {settings.format === 'svg' ? (
         <label className="lf-field">
           <input
@@ -175,6 +183,7 @@ export async function pickAndRunMultiFileTrace(
       format: settings.format,
       groupContours: settings.groupContours,
       precisionMm: settings.precisionMm,
+      ...tracePageOutput(settings),
     },
     write: (file) => writeTraceFileWithPlatform(platform, file),
   });

@@ -71,7 +71,7 @@ export const FILE_COMMAND_HELP: Readonly<
   'file.export-svg': {
     family: 'file',
     tooltip:
-      'Export selected artwork as SVG, or all artwork when nothing is selected. Text is outlined and images are embedded; production serials do not advance.',
+      'Export selected artwork as SVG, or all artwork when nothing is selected. Text is outlined and images are embedded; production serials do not advance. Group islands keeps each shape with its holes.',
   },
   'file.export-dxf': {
     family: 'file',
