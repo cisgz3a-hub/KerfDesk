@@ -110,7 +110,10 @@ describe('automatic detail mask fills light solids (ADR-393)', () => {
           image.data[4 * (y * width + x) + c] = base[c]! + Math.round(rnd() * 24 - 12);
       }
     expect(shouldUseSketchTrace(image, LINE_ART)).toBe(true);
-    const { prepared } = prepareTraceForContour(image, LINE_ART);
+    // Pin the explicit speck cleanup so this checks the light-solid fill
+    // alone; the automatic small-mark policy (ADR-409) is tested on its own.
+    const pinned = { ...LINE_ART, despeckleMinPixels: 12, fillPinholeCracks: true };
+    const { prepared } = prepareTraceForContour(image, pinned);
     let filled = 0;
     for (let y = 0; y < width; y++)
       for (let x = 0; x < width; x++)
