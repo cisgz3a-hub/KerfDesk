@@ -14,6 +14,7 @@ import { useTracePreviewZoom } from './trace-preview-zoom';
 import { useTracePreviewNavigation } from './trace-preview-navigation';
 import { useTracePreviewImageSpace } from './trace-preview-image-space';
 import { TracePointsOverlay } from './TracePointsOverlay';
+import { traceNodeCount } from './trace-point-nodes';
 import { TracePreviewLoading } from './TracePreviewLoading';
 import './trace-preview.css';
 
@@ -220,7 +221,7 @@ function PreviewStatus({ state }: { readonly state: TracePreviewState }): JSX.El
               ? 'No trace paths found.'
               : `Trace ready · ${countLabel(counts.paths, 'path')}`}
             {' · '}
-            {countLabel(counts.points, 'point')}
+            {countLabel(counts.nodes, 'node')}
           </span>
           <span className="lf-trace-preview__dimensions">
             {state.width} × {state.height} px
@@ -233,17 +234,15 @@ function PreviewStatus({ state }: { readonly state: TracePreviewState }): JSX.El
   );
 }
 
+// Nodes are the vector's editable anchors, the same set Show Points paints
+// (trace-point-nodes.ts), so the count follows Optimize and Smoothness.
 function countPreviewGeometry(paths: ReadyPreview['paths'] | undefined): {
   readonly paths: number;
-  readonly points: number;
+  readonly nodes: number;
 } {
   let pathCount = 0;
-  let pointCount = 0;
-  for (const path of paths ?? []) {
-    pathCount += path.polylines.length;
-    for (const polyline of path.polylines) pointCount += polyline.points.length;
-  }
-  return { paths: pathCount, points: pointCount };
+  for (const path of paths ?? []) pathCount += path.curves?.length ?? path.polylines.length;
+  return { paths: pathCount, nodes: paths === undefined ? 0 : traceNodeCount(paths) };
 }
 
 function countLabel(count: number, noun: string): string {

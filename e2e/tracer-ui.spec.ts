@@ -55,7 +55,7 @@ test('inspects a trace without restarting the worker, edits with sliders, and co
   await dialog.getByRole('button', { name: 'Zoom in', exact: true }).click();
   await expect(dialog.getByLabel('Preview magnification')).toHaveText('2×');
   await dialog.getByRole('button', { name: 'Show Points', exact: true }).click();
-  await expect(dialog.getByLabel('Trace points')).toBeVisible();
+  await expect(dialog.getByLabel('Trace nodes')).toBeVisible();
   await dialog.getByRole('button', { name: 'Show overlay' }).click();
   await expect(ink).toHaveCSS('fill', comparisonColour);
   await expect(source).toHaveCSS('opacity', '0.2');
