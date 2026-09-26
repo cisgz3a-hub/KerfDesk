@@ -1,24 +1,14 @@
 import { act } from 'react';
-import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, describe, expect, it } from 'vitest';
-import type { PlatformAdapter } from '../../../platform/types';
-import { PlatformProvider } from '../../app/platform-context';
 import { useStore } from '../../state';
 import { useLaserStore } from '../../state/laser-store';
 import { resetStore } from '../../state/test-helpers';
-import { DeviceSetupWizard } from './DeviceSetupWizard';
 import { openSetupDisclosure } from './device-setup-test-helpers';
+import { renderWizard } from './device-setup-wizard.test-support';
 
 (
   globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT?: boolean }
 ).IS_REACT_ACT_ENVIRONMENT = true;
-
-const adapter: PlatformAdapter = {
-  id: 'mock',
-  pickFilesForOpen: async () => [],
-  pickFileForSave: async () => null,
-  serial: { isSupported: () => true, requestPort: async () => null },
-};
 
 afterEach(() => {
   resetStore();
@@ -56,7 +46,6 @@ describe('DeviceSetupWizard router commit', () => {
     });
     const view = await renderWizard();
     try {
-      await openSetupDisclosure(view.host, 'Connect and detect');
       await act(async () => input(view.host, 'Use S maximum as spindle RPM').click());
       await act(async () => button(view.host, 'Use detected values').click());
       await act(async () => button(view.host, 'Check essentials').click());
@@ -102,8 +91,7 @@ describe('DeviceSetupWizard router commit', () => {
           lastSettingsReadAt: null,
         });
       });
-      await openSetupDisclosure(view.host, 'Connect and detect');
-      expect(view.host.textContent).toContain('KerfDesk reads its work area');
+      expect(view.host.textContent).toContain('Find your machine');
       expect(view.host.textContent).not.toContain('Use detected values');
       await act(async () => button(view.host, 'Check essentials').click());
       expect(input(view.host, 'Bed width (mm)').value).not.toBe('750');
@@ -119,7 +107,7 @@ describe('DeviceSetupWizard router commit', () => {
     useStore.getState().setMachineKind('cnc');
     const view = await renderWizard();
     try {
-      await openSetupDisclosure(view.host, 'Controller and connection settings');
+      await openSetupDisclosure(view.host, 'Connection options');
       expect(view.host.querySelector('[aria-label="Laser G-code output dialect"]')).not.toBeNull();
       expect(view.host.querySelector('[aria-label="G-code output dialect"]')).toBeNull();
       expect(view.host.textContent).toContain('Laser output dialect');
@@ -136,7 +124,7 @@ describe('DeviceSetupWizard router commit', () => {
     useStore.getState().setMachineKind('cnc');
     const view = await renderWizard();
     try {
-      await openSetupDisclosure(view.host, 'Controller and connection settings');
+      await openSetupDisclosure(view.host, 'Connection options');
       expect(controllerOptionLabels(view.host)).toEqual([
         'GRBL v1.1',
         'grblHAL',
@@ -153,7 +141,7 @@ describe('DeviceSetupWizard router commit', () => {
   it('lists controllers by name alone in a laser-only setup', async () => {
     const view = await renderWizard();
     try {
-      await openSetupDisclosure(view.host, 'Controller and connection settings');
+      await openSetupDisclosure(view.host, 'Connection options');
       expect(controllerOptionLabels(view.host)).toContain('Marlin');
       expect(controllerOptionLabels(view.host).join()).not.toContain('laser only');
     } finally {
@@ -166,30 +154,6 @@ function controllerOptionLabels(host: HTMLElement): ReadonlyArray<string> {
   const select = host.querySelector('select[aria-label="Controller firmware"]');
   if (!(select instanceof HTMLSelectElement)) throw new Error('controller select missing');
   return [...select.options].map((option) => option.textContent ?? '');
-}
-
-async function renderWizard(): Promise<{
-  readonly host: HTMLDivElement;
-  readonly unmount: () => Promise<void>;
-}> {
-  const host = document.createElement('div');
-  document.body.appendChild(host);
-  let root: Root | null = null;
-  await act(async () => {
-    root = createRoot(host);
-    root.render(
-      <PlatformProvider adapter={adapter}>
-        <DeviceSetupWizard onClose={() => undefined} />
-      </PlatformProvider>,
-    );
-  });
-  return {
-    host,
-    unmount: async () => {
-      if (root !== null) await act(async () => root?.unmount());
-      host.remove();
-    },
-  };
 }
 
 function button(host: HTMLElement, label: string): HTMLButtonElement {

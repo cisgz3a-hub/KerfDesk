@@ -9,11 +9,10 @@ import type { ColoredPath } from '../../core/scene';
 import {
   DEFAULT_TRACE_OPTIONS,
   traceImagesToVectorFiles,
-  type BatchTraceFormat,
   type RawImageData,
   type TraceOptions,
 } from '../../core/trace';
-import type { BatchTraceOutput } from '../../core/trace/batch-trace';
+import type { BatchTraceFormat, BatchTraceOutput } from '../../core/trace/batch-trace';
 import { MIN_TRACED_PAGE_SIDE_MM, TRACED_HAIRLINE_MM } from '../../core/trace/traced-page-box';
 import { tracedLayersToDxf } from '../dxf/export-dxf';
 import { writeTracedDrawing } from './traced-drawing';

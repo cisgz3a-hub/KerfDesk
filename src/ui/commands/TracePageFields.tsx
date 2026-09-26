@@ -2,7 +2,7 @@
 // the traced artwork plus a margin in millimetres.
 
 import { useState } from 'react';
-import { MAX_TRACED_PAGE_MARGIN_MM, type TracedPageFit } from '../../core/trace';
+import { MAX_TRACED_PAGE_MARGIN_MM, type TracedPageFit } from '../../core/trace/traced-page-box';
 
 export type TracePageSettings = {
   readonly pageFit: TracedPageFit;

@@ -86,8 +86,11 @@ function warnJogTargetOutsideConfiguredBounds(
   target: Point,
 ): void {
   const baseBounds = machineBoundsForDevice(device);
-  const bounds = isRotaryActive(device.rotary)
-    ? { ...baseBounds, minY: 0, maxY: rotaryYLimitMm(device.rotary) }
+  // Rotary is a laser attachment (never applied to CNC output), so a router
+  // jog keeps the bed's own Y range.
+  const rotary = useStore.getState().project.machine?.kind === 'cnc' ? undefined : device.rotary;
+  const bounds = isRotaryActive(rotary)
+    ? { ...baseBounds, minY: 0, maxY: rotaryYLimitMm(rotary) }
     : baseBounds;
   if (
     target.x >= bounds.minX &&

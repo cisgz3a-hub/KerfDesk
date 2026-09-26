@@ -1,3 +1,4 @@
+import { deviceForActiveHead } from '../../core/cnc/cnc-head-feeds';
 import { jobAwareAlert } from '../state/job-aware-dialogs';
 import type { RecoveryCapsule } from '../state/recovery';
 import type { RecoveryWorkBounds } from './laser-recovery-picker-model';
@@ -16,7 +17,8 @@ export async function frameRemainingRecoveryArea(
   try {
     const controller = await prepareTransientFrameController(project);
     if (controller === null) return;
-    await controller.laser.frame(bounds, project.device.framingFeedMmPerMin);
+    const { framingFeedMmPerMin } = deviceForActiveHead(project.device, project.machine);
+    await controller.laser.frame(bounds, framingFeedMmPerMin, undefined, project);
   } catch (error) {
     jobAwareAlert(
       `Cannot frame the remaining area:\n\n${error instanceof Error ? error.message : String(error)}`,

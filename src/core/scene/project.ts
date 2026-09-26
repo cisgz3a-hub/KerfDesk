@@ -2,7 +2,7 @@
 // device profile, workspace dimensions, and the scene. Pure; never mutated.
 
 import { DEFAULT_DEVICE_PROFILE, type DeviceProfile } from '../devices';
-import type { MachineConfig } from './machine';
+import type { CncMachineConfig, MachineConfig } from './machine';
 import { EMPTY_SCENE, type Scene } from './scene';
 import type { ProjectVariableData } from './variable-template';
 import type { PrintAndCutDesignTargets } from './print-and-cut';
@@ -37,20 +37,25 @@ export type ProjectOptimizationSettings = {
   readonly startPoint: 'machine-origin' | 'job-lower-left' | 'job-center';
 };
 
+export type ProjectJobPlacement = {
+  readonly startFrom: 'absolute' | 'current-position' | 'user-origin' | 'verified-origin';
+  readonly anchor:
+    | 'front-left'
+    | 'front-center'
+    | 'front-right'
+    | 'center-left'
+    | 'center'
+    | 'center-right'
+    | 'back-left'
+    | 'back-center'
+    | 'back-right';
+};
+
 export type ProjectJobSetup = {
-  readonly placement: {
-    readonly startFrom: 'absolute' | 'current-position' | 'user-origin' | 'verified-origin';
-    readonly anchor:
-      | 'front-left'
-      | 'front-center'
-      | 'front-right'
-      | 'center-left'
-      | 'center'
-      | 'center-right'
-      | 'back-left'
-      | 'back-center'
-      | 'back-right';
-  };
+  // The active mode's placement. The other mode's waits in `parkedPlacement`
+  // and the two change places on every Laser/CNC switch (ADR-416).
+  readonly placement: ProjectJobPlacement;
+  readonly parkedPlacement?: ProjectJobPlacement;
   readonly outputScope: {
     readonly cutSelectedGraphics: boolean;
     readonly useSelectionOrigin: boolean;
@@ -80,6 +85,10 @@ export type Project = {
   readonly notes: string;
   // Absent on laser projects saved before CNC support — treated as laser.
   readonly machine?: MachineConfig;
+  // The CNC setup (stock, bits, params, tiling) kept while the project is in
+  // Laser mode, so saving a laser job does not throw the router setup away.
+  // Never present while `machine` is CNC.
+  readonly parkedCncMachine?: CncMachineConfig;
   readonly scene: Scene;
 };
 

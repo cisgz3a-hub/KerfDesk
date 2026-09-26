@@ -2,15 +2,17 @@ import type { ColoredPath } from '../../core/scene';
 import {
   DEFAULT_TRACE_OPTIONS,
   TRACE_PRESETS,
-  batchTraceFormatLabel,
   traceImagesToVectorFiles,
   type BatchTraceFile,
   type BatchTraceImageJob,
-  type BatchTraceOutput,
-  type BatchTraceSkip,
   type RawImageData,
   type TraceOptions,
 } from '../../core/trace';
+import {
+  batchTraceFormatLabel,
+  type BatchTraceOutput,
+  type BatchTraceSkip,
+} from '../../core/trace/batch-trace';
 import { tracedLayersToDxf } from '../../io/dxf/export-dxf';
 import { writeTracedDrawing } from '../../io/vector-formats/traced-drawing';
 import type { PlatformAdapter } from '../../platform/types';

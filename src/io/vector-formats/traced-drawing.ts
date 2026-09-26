@@ -3,7 +3,8 @@
 // the image's frame, or the artwork plus a margin (ADR-451). Its lower-left
 // corner is the origin, as in the DXF output.
 
-import type { BatchTraceDrawingFormat, TracedLayer, TracedVectorOptions } from '../../core/trace';
+import type { BatchTraceDrawingFormat } from '../../core/trace/batch-trace';
+import type { TracedLayer, TracedVectorOptions } from '../../core/trace/batch-trace-svg';
 import { writeEpsDocument } from './eps-writer';
 import { writeGeoJsonDocument } from './geojson-writer';
 import { writePdfDocument } from './pdf-writer';

@@ -26,7 +26,7 @@ import {
 } from '../../core/scene';
 import { effectiveOperationForObject } from '../../core/scene/effective-operation';
 import { err, ok, type Result } from '../../core/result';
-import type { TracedLayer } from '../../core/trace';
+import type { TracedLayer } from '../../core/trace/batch-trace-svg';
 import { transformCurveSubpathExact } from '../../core/vector-export/affine-curves';
 import {
   DEFAULT_EXPORT_PRECISION_MM,

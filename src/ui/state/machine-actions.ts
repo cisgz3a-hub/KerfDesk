@@ -1,14 +1,16 @@
 // machine-actions — switch the project between laser and CNC machine kinds
 // and edit the CNC machine setup (stock, active bit, safe Z, spindle).
 //
-// The CNC config is cached in (non-persisted) store state when the operator
-// toggles back to laser, so flipping laser → cnc → laser → cnc round-trips
-// stock/bit choices within a session. Per-layer CNC settings live on the
+// The CNC config is cached in store state and parked on the project when the
+// operator toggles back to laser, so flipping laser → cnc → laser → cnc
+// round-trips stock/bit choices, within a session and through a Laser-mode
+// save (parked-cnc-machine.ts). Per-layer CNC settings live on the
 // Layer itself (layer.cnc) and are edited through the existing setLayerParam.
 
 import {
   DEFAULT_CNC_MACHINE_CONFIG,
   LASER_MACHINE_CONFIG,
+  machineKindOf,
   type CncMachineConfig,
   type CncMachineParams,
   type CncStock,
@@ -20,27 +22,24 @@ import {
 import type { CncMachinePreset } from '../../core/cnc';
 import type { CncMachineStarterLiveCaps } from '../../core/cnc/machine-starters';
 import type { DeviceProfile } from '../../core/devices';
-import {
-  jobPlacementAfterDeviceChange,
-  jobPlacementAfterProfileSelection,
-  type JobPlacementSettings,
-} from '../job-placement';
+import { jobPlacementAfterDeviceChange, jobPlacementAfterProfileSelection } from '../job-placement';
 import type { CncLibrary } from './cnc-library-persistence';
 import { projectWithStockMaterial } from './cnc-project-material';
 import { applyCncTextDefaultsForScene } from './cnc-text-defaults';
 import { refreshAutomaticCncFeeds, seedCncModeSwitchLayers } from './cnc-auto-seeding';
 import { pushUndo } from './scene-mutations';
 import { nextProbeSetupState } from './probe-setup-history-identity';
+import { projectWithParkedCnc } from './parked-cnc-machine';
+import { modeSwitchState } from './mode-switch-settings';
+import { cncMachineWithOwnFeeds } from '../../core/cnc/cnc-head-feeds';
+import { captureSetupHistoryContext, type SetupHistoryContext } from './setup-history-context';
 
-type MachineState = {
+type MachineState = SetupHistoryContext & {
   readonly project: Project;
   readonly undoStack: ReadonlyArray<Project>;
   readonly redoStack: ReadonlyArray<Project>;
   readonly dirty: boolean;
-  readonly jobPlacement: JobPlacementSettings;
-  readonly cachedCncMachine: CncMachineConfig | null;
   readonly cncLiveCaps: CncMachineStarterLiveCaps | null;
-  readonly probeSetupEpoch: number;
   // App-level custom bits (H.7) merge into every CNC session's tool list.
   readonly cncLibrary: CncLibrary;
 };
@@ -193,6 +192,9 @@ export function machineActions(set: MachineSet, get: MachineGet): MachineActions
 }
 
 function machineKindStatePatch(state: MachineState, kind: MachineKind): Partial<MachineState> {
+  // The toggle swaps live placement and the CNC cache as well as the project.
+  // Undo/Redo must restore them together, like a Machine Setup save.
+  captureSetupHistoryContext(state.project, state);
   const current = state.project.machine;
   const cachedBase = state.cachedCncMachine ?? DEFAULT_CNC_MACHINE_CONFIG;
   const cncBase =
@@ -202,7 +204,10 @@ function machineKindStatePatch(state: MachineState, kind: MachineKind): Partial<
   const machine =
     kind === 'laser'
       ? LASER_MACHINE_CONFIG
-      : cncMachineWithReusableTools(cncBase, state.cncLibrary.customTools);
+      : cncMachineWithOwnFeeds(
+          cncMachineWithReusableTools(cncBase, state.cncLibrary.customTools),
+          state.project.device,
+        );
   const device =
     current?.kind === 'cnc'
       ? { ...state.project.device, cncSubProfile: { ...current.params } }
@@ -219,9 +224,16 @@ function machineKindStatePatch(state: MachineState, kind: MachineKind): Partial<
           liveCaps: state.cncLiveCaps,
         })
       : preparedScene;
+  const cachedCncMachine = current?.kind === 'cnc' ? current : state.cachedCncMachine;
+  const switched = modeSwitchState(
+    projectWithParkedCnc({ ...state.project, device, machine, scene }, cachedCncMachine),
+    state.jobPlacement,
+    machineKindOf(current),
+    kind,
+  );
   return {
-    project: { ...state.project, device, machine, scene },
-    cachedCncMachine: current?.kind === 'cnc' ? current : state.cachedCncMachine,
+    ...switched,
+    cachedCncMachine,
     undoStack: pushUndo(state.project, state.undoStack),
     redoStack: [],
     dirty: true,
@@ -234,6 +246,9 @@ function cncMachineSetupStatePatch(
 ): Partial<MachineState> {
   const machine = state.project.machine;
   if (machine?.kind !== 'cnc') return {};
+  // A device change can move live placement (homing off turns Absolute into
+  // User Origin); Undo/Redo must restore it with the project.
+  captureSetupHistoryContext(state.project, state);
   const baseDevice = patch.deviceProfile ?? state.project.device;
   const device: DeviceProfile = { ...baseDevice, ...patch.devicePatch };
   const params = { ...machine.params, ...patch.paramsPatch };

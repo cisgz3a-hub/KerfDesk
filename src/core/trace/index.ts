@@ -35,26 +35,9 @@ export {
 } from './trace-to-paths';
 export { isBinaryContourPreset } from './contour-trace';
 export { traceCenterlineStrokePaths } from './centerline';
-export { DEFAULT_HYBRID_MAX_STROKE_WIDTH_PX, traceHybridPaths } from './hybrid/trace-hybrid';
-export { HYBRID_FILL_COLOR, HYBRID_STROKE_COLOR, isHybridStrokePath } from './hybrid/hybrid-paths';
 export { coloredPathsToSvg } from './paths-to-svg';
-export type {
-  BatchTraceDependencies,
-  BatchTraceFile,
-  BatchTraceDrawingFormat,
-  BatchTraceFormat,
-  BatchTraceImageJob,
-  BatchTraceOutput,
-  BatchTraceResult,
-  BatchTraceSkip,
-} from './batch-trace';
-export { batchTraceFormatLabel, traceImagesToVectorFiles } from './batch-trace';
-export type { TracedLayer, TracedVectorOptions } from './batch-trace-svg';
-export {
-  MAX_TRACED_PAGE_MARGIN_MM,
-  type TracedPageFit,
-  type TracedPageLayout,
-} from './traced-page-box';
+export type { BatchTraceDependencies, BatchTraceFile, BatchTraceImageJob } from './batch-trace';
+export { traceImagesToVectorFiles } from './batch-trace';
 export type { EnhanceRegionArgs, RegionTraceFn } from './region-enhance';
 export { enhanceRegionPaths } from './region-enhance';
 export type { TraceBoundary } from './trace-boundary';

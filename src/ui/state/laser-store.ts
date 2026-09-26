@@ -36,7 +36,7 @@ import { applyDetectedSettingsPatch } from './detected-settings-action';
 import { grblSettingsActions } from './grbl-settings-actions';
 import type { ControllerLifecycleRefs } from './laser-interactive-command';
 import { connectionActions } from './laser-connection-actions';
-import type { ConnectAttemptOwnershipRefs } from './laser-connect-attempt';
+import type { ConnectAttemptOwnershipRefs, ConnectionAttemptState } from './laser-connect-attempt';
 import type { ConnectionTeardownOwnershipRefs } from './laser-connection-teardown';
 import { jobActions } from './laser-job-actions';
 import { appendSystemNotice } from './laser-system-notice';
@@ -53,6 +53,7 @@ import type {
   StreamPlannerSnapshot,
 } from './laser-rx-capacity-evidence';
 import type { StreamHold } from './laser-stream-hold';
+import type { CncPauseLift } from './cnc-pause-lift-state';
 import type { JobStopRequest, StreamReset } from './job-stop-request';
 import type { TranscriptBufferRefs } from './laser-transcript-buffer';
 import type { PauseResumeTransitionState } from './laser-pause-resume-transition';
@@ -105,7 +106,8 @@ export type WorkOriginSource = 'none' | 'g92' | 'g54-persistent' | 'unknown';
 export type { ConnectControllerOptions } from './laser-store-action-types';
 
 export type LaserState = LaserStoreActions &
-  ControllerBuildInfoState & {
+  ControllerBuildInfoState &
+  ConnectionAttemptState & {
     readonly connection: ConnectionState;
     readonly serialPortInfo?: SerialPortIdentity | null;
     readonly statusReport: StatusReport | null;
@@ -254,6 +256,10 @@ export type LaserState = LaserStoreActions &
      * logged once per episode; null while acknowledgements flow or no job
      * streams. Optional only so older hand-built test states remain valid. */
     readonly streamHold?: StreamHold | null;
+    /** A CNC Pause that lifted the bit out of the cut, and the evidence its
+     *  re-entry is checked against (ADR-411). Null when Pause stopped in
+     *  place. Optional only so older hand-built test states remain valid. */
+    readonly cncPauseLift?: CncPauseLift | null;
     readonly workOriginActive: boolean;
     readonly workOriginSource: WorkOriginSource;
     // Monotonic identity for XY work-origin mutations. Place Board registration
@@ -406,6 +412,15 @@ function airAssistActions(set: SetFn, get: GetFn): Pick<LaserState, 'setAirAssis
     setAirAssistEnabled: async (enabled) => {
       assertAutofocusIdle(get());
       assertAirAssistReady(set, get, enabled);
+      if (enabled && useStore.getState().project.machine?.kind === 'cnc') {
+        const message =
+          'Manual air is a laser control. CNC coolant is set in Machine Setup and runs with the job.';
+        set({
+          lastWriteError: message,
+          log: pushLog(get(), `[lf2] Manual air command blocked: ${message}`),
+        });
+        throw new Error(message);
+      }
       const command = enabled ? useStore.getState().project.device.airAssistCommand : 'M9';
       if (command === 'none') {
         const message =

@@ -3,6 +3,7 @@
 // scene checks; it proves the machine-facing properties that still apply to a
 // standalone work-origin program before the UI writes a file.
 
+import { cncMaxFeedMmPerMin } from '../cnc/cnc-head-feeds';
 import { machineBoundsForDevice, type DeviceProfile } from '../devices';
 import {
   findNonFiniteCoords,
@@ -25,7 +26,12 @@ export function runStandaloneCncPreflight(
   gcode: string | Iterable<string>,
 ): PreflightResult {
   const issues: PreflightIssue[] = [];
-  appendCommandLimitIssues(gcode, device.maxFeed, machine.params.spindleMaxRpm, issues);
+  appendCommandLimitIssues(
+    gcode,
+    cncMaxFeedMmPerMin(device, machine.params),
+    machine.params.spindleMaxRpm,
+    issues,
+  );
   appendWorkOriginBoundsIssues(gcode, device, issues);
   issues.push(...standaloneCncSetupAdvisories(device));
   appendTextInvariantIssues(gcode, machine, issues);

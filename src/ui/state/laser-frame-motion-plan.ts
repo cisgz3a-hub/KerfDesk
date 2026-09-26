@@ -19,6 +19,7 @@ export function buildFrameDispatchPlan(
   bounds: Parameters<LaserState['frame']>[0],
   feed: number,
   candidate: Parameters<LaserState['frame']>[2] | Parameters<LaserState['traceFrame']>[2],
+  jobProject?: Parameters<LaserState['frame']>[3],
 ): CncFrameMotionPlan {
   const state = get();
   const feeds = frameMotionFeeds(feed, state.controllerSettings);
@@ -30,7 +31,10 @@ export function buildFrameDispatchPlan(
     feeds.xyMmPerMin,
     candidate?.returnToWorkPosition,
   );
-  const machine = useStore.getState().project.machine;
+  // The framed job decides laser or CNC motion. A recovery or second-pass Frame
+  // of a saved laser job must not pick up a CNC safe-Z wrap because the open
+  // canvas has since been switched to CNC, or the reverse.
+  const machine = (candidate?.project ?? jobProject ?? useStore.getState().project).machine;
   if (machine?.kind !== 'cnc') {
     return {
       kind: 'ready',

@@ -138,7 +138,7 @@ export function FeedRows(props: DeviceRowsProps): JSX.Element {
           onCommit={(maxFeed) => update({ maxFeed })}
           style={numInputStyle}
           ariaLabel="Output max feed (mm/min)"
-          title="Profile ceiling used when compiling cut, engrave, and CNC output. It is not a verified hardware limit and does not cap Frame motion."
+          title="Laser ceiling used when compiling cut and engrave output. CNC keeps its own in Machine Setup. It is not a verified hardware limit and does not cap Frame motion."
         />
         <span style={unitStyle}>mm/min</span>
       </Row>
@@ -151,7 +151,7 @@ export function FeedRows(props: DeviceRowsProps): JSX.Element {
           onCommit={(framingFeedMmPerMin) => update({ framingFeedMmPerMin })}
           style={numInputStyle}
           ariaLabel="Framing feed (mm/min)"
-          title="Requested feed used by Frame. Known live X/Y controller limits cap the emitted Frame; when those limits are unknown, the full requested feed is sent."
+          title="Requested feed used by laser Frame; CNC keeps its own. Known live X/Y controller limits cap the emitted Frame; when those limits are unknown, the full requested feed is sent."
         />
         <span style={unitStyle}>mm/min</span>
       </Row>

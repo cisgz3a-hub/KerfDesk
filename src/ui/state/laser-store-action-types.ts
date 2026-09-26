@@ -1,5 +1,6 @@
 import type { JogParams, RealtimeOverrideByte } from '../../core/controllers/grbl';
 import type { ControllerCommandSet, ControllerKind } from '../../core/devices/device-profile';
+import type { Project } from '../../core/scene';
 import type { PlatformAdapter } from '../../platform/types';
 import type { AutofocusResult } from './autofocus-action';
 import type { ConsoleCommandOptions } from './laser-console-actions';
@@ -21,6 +22,11 @@ export type ConnectControllerOptions = {
    * a runtime that cannot transfer the port's streams keeps the main-thread
    * transport and the job streams exactly as it always has. */
   readonly hostedStreaming?: boolean | undefined;
+  /** Which port to open (ADR-420). 'remembered', the default, reuses the port
+   * the operator picked before when exactly one fits and shows the picker
+   * otherwise; 'choose' always shows the picker; 'automatic' never does and
+   * ends quietly when no remembered port is attached. */
+  readonly portSelection?: 'remembered' | 'choose' | 'automatic' | undefined;
 };
 
 export type LaserStoreActions = {
@@ -65,6 +71,9 @@ export type LaserStoreActions = {
     },
     feed: number,
     candidate?: FramedRunCandidate,
+    /** The job being framed when no run candidate is passed (a recovery
+     * Frame). Laser or CNC Frame motion follows this job, not the open canvas. */
+    jobProject?: Project,
   ) => Promise<void>;
   /** Physically trace a job's bounds before its exact program exists. Same
    * motion and completion boundary as `frame`, but a clean completion records

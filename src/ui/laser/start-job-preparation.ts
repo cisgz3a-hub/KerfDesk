@@ -1,3 +1,4 @@
+import { deviceForActiveHead } from '../../core/cnc/cnc-head-feeds';
 import { rotaryAppliesTo, type JobOriginPlacement } from '../../core/job';
 import { machineKindOf } from '../../core/scene';
 import type { ExecutablePlanV1 } from '../../core/execution-plan';
@@ -84,7 +85,7 @@ export function okPreparation(
   });
   const jobTimingPlan = canvasJobTimingPlan(
     gcode,
-    prepared.project.device,
+    deviceForActiveHead(prepared.project.device, prepared.project.machine),
     reportedWorkPositionMm(machine, reportInches),
     {
       machineKind: machineKindOf(prepared.project.machine),

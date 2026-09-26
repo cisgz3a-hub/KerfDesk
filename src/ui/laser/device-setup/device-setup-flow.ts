@@ -8,7 +8,6 @@ import { controllerProfileForSelection } from './device-setup-controller-selecti
 import { explicitMachineKindsForProfile } from '../../../core/devices/device-profile';
 import { deviceProfileWithInteractivePatch } from '../../../core/devices/device-profile-patch';
 import {
-  controllerCompatibleProfile,
   validateMachineProfile,
   type ControllerKind,
   type DeviceProfile,
@@ -23,6 +22,7 @@ import {
   type MachineConfig,
   type MachineKind,
 } from '../../../core/scene';
+import { acceptDetectedPatch } from './device-setup-accept-detected';
 import { deviceSetupSupportsMachineKind } from './device-setup-capability';
 import { mergeDetectedSetupFacts } from './device-setup-detected-facts';
 import {
@@ -69,6 +69,8 @@ export type DeviceSetupAction =
   | { readonly kind: 'next' }
   | { readonly kind: 'back' }
   | { readonly kind: 'go'; readonly step: DeviceSetupStep }
+  // Undo of an automatic fill (ADR-420): the draft returns, the observations stay.
+  | { readonly kind: 'restore'; readonly state: DeviceSetupState }
   | { readonly kind: 'edit'; readonly patch: Partial<DeviceProfile> }
   | { readonly kind: 'edit-machine'; readonly machine: MachineConfig }
   | {
@@ -182,12 +184,17 @@ export function deviceSetupReducer(
   if (action.kind === 'go') {
     return isDeviceSetupStep(action.step) ? { ...state, step: action.step } : state;
   }
+  if (action.kind === 'restore') {
+    const { step, detected, detectedControllerKind, controllerRead } = state;
+    const facts = { step, detected, detectedControllerKind, controllerRead };
+    return invalidateFirmwarePlan(action.state, { ...facts, detectedApplied: false });
+  }
   return reduceDraftAction(state, action);
 }
 
 function reduceDraftAction(
   state: DeviceSetupState,
-  action: Exclude<DeviceSetupAction, { readonly kind: 'next' | 'back' | 'go' }>,
+  action: Exclude<DeviceSetupAction, { readonly kind: 'next' | 'back' | 'go' | 'restore' }>,
 ): DeviceSetupState {
   switch (action.kind) {
     case 'edit':
@@ -203,7 +210,10 @@ function reduceDraftAction(
     case 'select-controller':
       return selectController(state, action.controllerKind);
     case 'accept-detected':
-      return acceptDetected(state, action.patch, action.useSpindleScaleAsRpm === true);
+      return invalidateFirmwarePlan(
+        state,
+        acceptDetectedPatch(state, action.patch, action.useSpindleScaleAsRpm === true),
+      );
     case 'apply-preset':
       return applyPreset(state, action.profile);
     case 'set-firmware-backup-confirmed':
@@ -272,52 +282,6 @@ function toggleFirmwareWrite(state: DeviceSetupState, id: number): DeviceSetupSt
       ? state.queuedFirmwareWriteIds.filter((candidate) => candidate !== id)
       : [...state.queuedFirmwareWriteIds, id],
   };
-}
-
-function acceptDetected(
-  state: DeviceSetupState,
-  patch: Partial<DeviceProfile>,
-  useSpindleScaleAsRpm: boolean,
-): DeviceSetupState {
-  const profilePatch = profilePatchForMachineKind(patch, state.machineKind);
-  const draft = controllerCompatibleProfile(
-    deviceProfileWithInteractivePatch(state.draft, profilePatch),
-    state.draft.controllerKind,
-  ).profile;
-  // $32=0 alone does not make a configured PWM scale into physical RPM.
-  // Copy $30 only when the operator explicitly chooses that mapping.
-  if (
-    state.machineKind !== 'cnc' ||
-    !useSpindleScaleAsRpm ||
-    !positive(patch.maxPowerS ?? 0) ||
-    patch.laserModeEnabled !== false
-  ) {
-    return invalidateFirmwarePlan(state, { detected: patch, draft, detectedApplied: true });
-  }
-  const cncDraft: CncMachineConfig = {
-    ...state.cncDraft,
-    params: { ...state.cncDraft.params, spindleMaxRpm: patch.maxPowerS ?? 0 },
-  };
-  const accepted = {
-    detected: patch,
-    draft,
-    draftMachine: cncDraft,
-    cncDraft,
-    detectedApplied: true,
-  };
-  return invalidateFirmwarePlan(state, accepted);
-}
-
-function profilePatchForMachineKind(
-  patch: Partial<DeviceProfile>,
-  machineKind: MachineKind,
-): Partial<DeviceProfile> {
-  if (machineKind !== 'cnc') return patch;
-  const shared = { ...patch };
-  delete shared.maxPowerS;
-  delete shared.minPowerS;
-  delete shared.laserModeEnabled;
-  return shared;
 }
 
 function applyPreset(state: DeviceSetupState, profile: DeviceProfile): DeviceSetupState {

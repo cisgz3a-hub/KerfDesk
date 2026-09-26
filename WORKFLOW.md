@@ -1167,11 +1167,31 @@ Status bar messages (toasts that appear in the bar for 3 s) for non-blocking eve
 ### F-B1. Connect to laser
 
 #### Success
-1. User clicks **Connect…** in the Laser panel.
-2. Browser shows the WebSerial port-picker (`navigator.serial.requestPort`).
-3. User picks the laser's USB-CDC port.
-4. App opens at 115200 baud, registers line + close handlers, starts the 250 ms status poll.
-5. Connection dot turns green; the status display shows the GRBL state from the first `?` reply.
+1. The **Machine connection** card at the top of the Laser and CNC rail shows the status, the
+   machine profile it connects with, and one button: **Connect**, **Connecting…** or
+   **Disconnect** (ADR-420).
+2. **Connect** reuses the remembered port without a picker when the browser still grants exactly
+   one attached port that matches it (by USB vendor and product ID), or when one granted port is
+   attached and none is remembered. Otherwise the WebSerial port-picker
+   (`navigator.serial.requestPort`) opens and the user picks the machine's USB port.
+3. App opens at the profile's baud rate, registers line + close handlers, starts the 250 ms
+   status poll, and remembers the port's USB IDs for the next Connect.
+4. Connection dot turns green; the status display shows the GRBL state from the first `?` reply,
+   and the card shows `USB <vendor>:<product> · <baud> baud` under the profile.
+5. The card's **⋯** menu holds **Use a different port…** (always shows the picker, disconnecting
+   first when connected), **Connect automatically**, and **Forget Controller** while connected.
+
+#### Success — connect automatically (ADR-420)
+1. **Connect automatically** is on by default. When KerfDesk starts, and whenever a granted port
+   is plugged in or unplugged, it connects on its own if the Connect rules above pick a port
+   without the picker.
+2. It never opens the picker, never interrupts a connection, a connection attempt, a job, a jog
+   or a controller operation, and does nothing for a file-only controller.
+3. Chrome keeps a port grant across restarts on Windows, and on macOS and Linux only for adapters
+   that report a USB serial number; a CH340 there needs one Connect after each replug or browser
+   restart. The desktop app grants a pick for the run only (ADR-366), so after a restart the
+   first Connect shows the picker.
+4. Turning it off in the **⋯** menu is remembered in this browser.
 
 #### Background streaming (ADR-354)
 1. Compatible GRBL-family connections use background streaming by default. The selected USB
@@ -1200,8 +1220,14 @@ Status bar messages (toasts that appear in the bar for 3 s) for non-blocking eve
 1. App returns to disconnected state, no error surfaced.
 
 #### Error — port open failure
-1. App stays in `failed` state with the error message displayed inline ("Failed: …").
-2. User can re-click Connect to retry.
+1. App stays in `failed` state: the card reads **Couldn’t connect** with the reason inline. A port
+   another program holds says the port is busy or unavailable and names the usual holders
+   (another sender, a serial monitor, another KerfDesk window).
+2. User can click **Connect** to retry, or **Use a different port…** in the **⋯** menu.
+
+#### Edge — Forget Controller
+1. **Forget Controller** revokes the port grant and forgets the remembered port, so the next
+   Connect shows the picker.
 
 #### Edge — Brave with WebSerial behind a flag
 1. Same as "not supported"; Brave issue #24404 is noted in `PROJECT.md` delivery targets.
@@ -1539,9 +1565,62 @@ minimum target size.
    the job frozen and prevents an overlapping same-session Pause/Resume; **ABORT JOB** and the physical
    E-stop remain available. An actual write rejection uses the existing active-stream fail-dark
    containment and transport quarantine rather than treating ambiguously staged bytes as retryable.
-4. **No retract.** `PARKING_ENABLE` is commented out in stock GRBL, and its `PARKING_TARGET` is a *machine coordinate* — meaningless on a no-homing router. A host-side lift is deliberately not built: it would require abandoning the door hold for a drain-to-Idle pause, reintroducing a re-entry seam. If a lift is wanted, it is a firmware setting.
+4. **Retract only through Pause and lift.** `PARKING_ENABLE` is commented out in stock GRBL. When a paused job qualifies for Pause and lift (F-B7a), the bit is lifted and Resume re-enters from above. Otherwise the door resume above applies, with the bit still in the cut.
 5. The advisory informs but never gates (rule 7). What stays refused is unrelated to this flow: CNC checkpoint, start-from-line, and pass-boundary recovery jobs (ADR-143/215).
 6. **Not hardware-verified.** Whether a given controller reports `A:`/`Ov:`, and its actual door spin-up delay, are per-build facts. Air-cut before cutting material.
+
+### F-B7a. CNC Pause and lift (ADR-411)
+
+#### Success — lift
+1. After a confirmed CNC Pause (F-B7), the app checks the conditions for a lift:
+   - GRBL 1.1 or grblHAL;
+   - `$32=0` is confirmed;
+   - the build has no parking (`P` in `$I`);
+   - no pendant (MPG) is in control;
+   - the report is `Door:0` or `Hold:0`;
+   - the work offset is known.
+2. It also needs a re-entry plan from the program:
+   - The stop point lies within 0.1 mm of a line the controller may still have been running. The
+     earliest such line wins.
+   - The spindle was on, and the program has a `G4 P` spin-up dwell after its M3/M4.
+   - The bit stopped below the program's highest rapid Z.
+   - The program stays inside the supported code subset.
+3. The primary control reads **Lifting…**. The app:
+   1. writes a soft reset (`0x18`);
+   2. waits for the reboot and a fresh Idle report;
+   3. checks the machine position did not move;
+   4. writes `G21 G90 G54 G94 G17`;
+   5. writes a `G92` if the work offset came back different, and verifies it;
+   6. writes `G0 Z<safe>`.
+4. The job stays paused with the bit at safe height and the spindle off. The advice beside
+   **Resume** says Resume spins up there, returns over the stop point and feeds back into its cut.
+
+#### Success — re-entry
+1. User clicks **Resume**. The app re-checks that the controller is Idle, no pendant is in control,
+   and the work offset is unchanged. The control reads **Returning…**.
+2. It writes these one at a time, each waiting for its answer and, for moves, a fresh Idle report
+   at the target:
+   - the modal line;
+   - `G0 Z<safe>`;
+   - `M3`/`M4 S<rpm>`;
+   - the program's `G4 P<spin-up>`;
+   - its `M7`/`M8`;
+   - `G0 X Y` over the entry point;
+   - `G1 Z<entry> F<plunge>`;
+   - the motion mode and feed.
+3. The stream rewinds to the matched line and continues as a resumed job.
+
+#### Exempt — no lift
+1. If a condition in the lift's step 1 or 2 is not met, the app logs why and keeps the plain door
+   pause of F-B7.
+
+#### Error — failure after the reset
+1. Any failure after the reset ends the job with Abort's reset: a refused line, a timeout, an
+   alarm, a moved frame, or a lost port. The controller no longer holds the job.
+2. The safety notice **Pause and lift stopped** says what failed. The Interrupted job card offers
+   pass recovery (ADR-215).
+3. Pause while lifting or returning is refused; **ABORT JOB** and the physical E-stop stay
+   available.
 
 ### F-B8. Software Abort / Controller Reset
 
@@ -2365,12 +2444,32 @@ The stage buttons and Back/Next remain available while a draft needs corrections
 machine setup** requires valid configuration; review cards link back to the relevant fields.
 Connecting a controller is optional, so a complete setup can be saved offline.
 
-1. **Machine** — choose **Laser only**, **CNC only**, or **Laser + CNC** from capability cards;
-   hybrids also choose the active mode after Save. **Set up automatically** follows: it states what
-   the selected controller family reported, lists those values, and carries **Use detected values**
-   (ADR-347). While nothing is connected it says that connecting the controller below reads those
-   values into the draft, and that offline setup still works; a file-only controller has no lane.
-   Laser-capable machines then see up to two compact profile previews, keeping the selected catalog
+1. **Machine** — **Find my machine** opens the stage (ADR-420). It connects with the draft's
+   controller, baud and streaming choice, reusing the remembered port as the rail's Connect does,
+   and reads the controller's identity and settings; nothing moves and no controller setting is
+   written. Its heading follows the connection: **Find your machine**, **Connecting…**,
+   **Reading your controller…**, **Found your <firmware> controller**, **Your machine didn’t
+   answer**, **Couldn’t connect**, or **No answer at any common speed**. When found it lists the
+   reported travel, max speed, power range, laser mode and Z travel.
+   - For a machine not set up before in this browser, or after the operator presses **Find my
+     machine**, the reported values are filled into the draft by themselves: the firmware the
+     banner names (when the driver can connect to it), the baud rate that answered, the machine
+     type from `$32` (laser mode on or off; a Laser + CNC draft keeps both), and the mapped `$$`
+     values. The card lists each change
+     as old → new with one **Undo** that restores the draft as it was. A machine already set up
+     that the operator only opens setup for keeps its values and offers **Use detected values**
+     for the ones that differ (ADR-347). When the adopted firmware differs from the one it
+     connected with, Find reconnects once with it.
+   - **Your machine didn’t answer** offers **Try other speeds**, which reconnects at 115200,
+     230400, 250000, 921600, 57600, 38400, 19200 and 9600 baud in turn and stops at the first that
+     answers; **Stop** ends it. **Use a different port…** always shows the picker.
+   - **Set up without connecting** keeps the whole stage usable offline; a browser without
+     WebSerial says so and keeps the offline path. A file-only controller explains that its jobs
+     are saved as files.
+   - **Connection options**, under the card, holds the controller family, baud, output dialect,
+     advanced streaming and the command contract.
+   The capability cards follow: choose **Laser only**, **CNC only**, or **Laser + CNC**; hybrids
+   also choose the active mode after Save. Laser-capable machines then see up to two compact profile previews, keeping the selected catalog
    profile in view. Search or **Browse all N profiles** opens the rest of the catalog. CNC-capable
    machines also have CNC presets. A profile card is one option in a radio group: a pointer
    anywhere on the card chooses that profile and copies it into the draft, while **Profile details**
@@ -2384,18 +2483,14 @@ Connecting a controller is optional, so a complete setup can be saved offline.
    matches are
    prioritised among the remaining profiles and explain their evidence under **Profile details**,
    but generic `$$` values never establish hardware identity: "Possible match" remains the
-   ceiling. Controller family, baud, output dialect,
-   and advanced streaming remain available in **Controller and connection settings**. **Import or
-   export a machine profile** is a separate disclosure on Machine.
+   ceiling, so Find my machine never picks a catalog profile. **Import or export a machine
+   profile** is a separate disclosure on Machine.
    CNC catalogue entries supply geometry and an assumed spindle ceiling only; they leave the
    controller choice unchanged. Controller notes and sources remain visible beside the selected
    preset. Onefinity entries require an external controller/postprocessor integration and do not
    claim compatible KerfDesk output.
-   Optional **Connect and detect** uses the selected driver/baud and that controller family's
-   read-only identity/settings commands, and holds the driver-mismatch resolution and the command
-   contract. **Use detected values**, in the automatic lane above it, explicitly copies supported
-   values into the draft; detection never applies them automatically. Ruida remains file-only.
-   CNC readback labels `$30` as a configured S maximum. Copying it into spindle RPM requires
+   A connection that does not match the draft's controller shows the driver-mismatch resolution
+   inside the Find card. Ruida remains file-only. CNC readback labels `$30` as a configured S maximum. Copying it into spindle RPM requires
    **Use S maximum as spindle RPM** and a reported CNC mode; otherwise the spindle ceiling stays
    unchanged. Configured travel is not measured usable travel.
 2. **Essentials** — review the name, usable work area, max/frame feed, origin, homing policy, and
@@ -2428,8 +2523,9 @@ settings and Job Review keep their existing read-only setup references.
 
 #### Success — connected controller answers its read commands
 
-1. Detected identity remains a separate observation. It never silently replaces the operator's
-   selected profile/controller contract; a mismatch is explicit and must be resolved deliberately.
+1. Detected identity remains a separate observation from the saved profile. For a new machine, or
+   after **Find my machine**, the draft adopts the reported firmware, baud, machine type and
+   values with one **Undo**; otherwise a mismatch is explicit and must be resolved deliberately.
 2. Supported numeric readback values can be copied into the draft with **Use detected values**.
    Using `$30` as the CNC spindle ceiling requires the explicit option and reported CNC mode
    described above. The live project remains unchanged.
@@ -3908,6 +4004,9 @@ explicitly marked below; the remaining controls and user-facing flows are planne
    depth-per-pass, and each level's region fills with concentric rings at
    the layer's physical stepover: a percentage of the bit diameter, or for a
    tapered ball nose of the width it cuts over one level (ADR-368 Amendment 2).
+   Each ring ends where it started. Above a 50% stepover, the stock a level's
+   rings leave standing (the level's centre, cusps between rings) is cleared
+   right after them (ADR-289 Amendment 1).
 2. Passes run depth-major (whole level before stepping down) as a
    clearing group — before any profile cuts. The preview's removal
    shading shows the terraced relief forming.
@@ -5108,7 +5207,7 @@ as the pane's design record.
 
 #### Success
 1. When a controller is connected and its `$$` snapshot differs from the current setup,
-   **Machine Setup > Machine > Set up automatically** shows the detected values. **Use detected
+   **Machine Setup > Machine > Find my machine** shows the detected values (ADR-420). **Use detected
    values** copies the reported spindle max (GRBL $30) and reported travel ($130/$131) into the setup
    draft; **Save machine setup** commits them, then the difference clears.
    `$30` is offered as spindle RPM only when the same dump reports `$32=0`;
@@ -5116,7 +5215,9 @@ as the pane's design record.
 
 #### Error — none (opt-in)
 1. Nothing changes until **Use detected values** updates the draft and **Save machine setup**
-   commits it; leaving or cancelling the flow changes neither project nor controller.
+   commits it; leaving or cancelling the flow changes neither project nor controller. A new
+   machine, or one the operator pressed **Find my machine** for, gets the values in the draft by
+   themselves with one **Undo**; the Save boundary is the same.
 
 #### Empty
 1. No connection, or reported values that already match, means no detected-difference prompt.

@@ -144,6 +144,8 @@ export type CncSubProfile = {
   readonly coolant?: 'off' | 'mist' | 'flood';
   readonly parkXMm?: number;
   readonly parkYMm?: number;
+  readonly maxFeedMmPerMin?: number;
+  readonly framingFeedMmPerMin?: number;
 };
 
 export type DeviceMachineKind = 'laser' | 'cnc';
