@@ -194,14 +194,23 @@ snapping itself.
   figure-eight whose snapped points are not collinear crosses itself. It is kept (GeoJSON sends
   it down the existing crossing path, so the item is written `unmerged`; PDF/EPS paint it as
   before) and it is never used as a container.
-- `contoursKeptAfterCollapse` takes the unsnapped flattened contours (flattened at 0.01 mm for
-  PDF/EPS, at the export tolerance for GeoJSON). For each collapsed contour that encloses any
+- `contoursKeptAfterCollapse` takes the unsnapped flattened contours (for PDF/EPS, at the smaller
+  of 0.01 mm and one sixteenth of the coordinate grid step; for GeoJSON, at the export tolerance).
+  For each collapsed contour that encloses any
   area there, it drops every contour whose bounding box fits inside that contour's box, none of
   whose vertices is outside it (nonzero winding), and none of whose edges properly crosses one of
   its edges. So a contour that crosses the collapsed contour is kept, whichever vertex it starts
   at, and a contour sharing only boundary with it from outside is kept. A contour lying wholly on
   the boundary is a duplicate and collapses with it. Nesting is transitive for nested-or-disjoint
   contours, so this removes the whole subtree: holes, their islands, and so on.
+- PDF/EPS containment must have a usable source outline. Exceeding the existing flattening
+  segment budget raises a specific export error; segment endpoints are never substituted for
+  an unavailable curved outline. The grid-relative tolerance remains an approximation. If a
+  collapsed curved container flattens to a line but its source controls are not collinear (or it
+  contains a nondegenerate arc), the exporter cannot establish that it is empty: it reports an
+  unresolved contour and asks for a finer coordinate grid, instead of orphaning a surviving
+  child. When every contour collapses there is no surviving child, so no containment is needed.
+  These checks bound the known ambiguity; they are not a general exact topology proof.
 - The GeoJSON writer then runs `fillRegionPolygons` on the rings that remain, as before. PDF and
   EPS (`itemPathCommands`) omit the dropped subpaths of a filled item; stroked items are
   unchanged, so a collapsed contour is still stroked.
@@ -225,3 +234,13 @@ inside the band). Squares in both lobes of a zero-area bow-tie are kept, whether
 unsnapped area is slightly off zero or exactly zero, and the item is marked `unmerged` (the first
 version dropped both squares). Unit cases pin `collapsesOnGrid`, a contour touching the band only
 along its boundary (kept) and a duplicate of the band (dropped).
+
+`src/io/vector-formats/collapsed-curved-containment.test.ts` covers the follow-up boundaries.
+At the default 0.001 mm grid, a two-cubic lens collapses while its nested polygon survives
+rounding; an independent cubic polynomial check locates every sampled child edge inside the
+source lens. PDF and EPS now drop that subtree together under both fill rules. A much thinner
+lens that remains unresolved at the containment tolerance raises an explicit error in both
+writers. A real 200,004-segment curve exhausts the existing flattening budget: its cubic reaches
+y = -7.075 mm outside the collapsed band's entire range, while its endpoints lie inside. The
+export now reports that limit instead of silently dropping the crossing curve from an
+endpoint-only outline.

@@ -21,7 +21,7 @@
 
 import { flattenCurveSubpath, type CurveSubpath, type Vec2 } from '../../core/scene';
 
-/** Flattening tolerance (mm) for the containment test only; nothing is written from it. */
+/** Maximum containment tolerance (mm); finer grids need finer source outlines. */
 const CONTAINMENT_TOLERANCE_MM = 0.01;
 
 /** A written grid point (structurally vector-artwork's GridPoint). */
@@ -53,10 +53,16 @@ export function collapsesOnGrid(points: ReadonlyArray<GridXY>): boolean {
 export function filledCurvesKept(
   curves: ReadonlyArray<CurveSubpath>,
   written: ReadonlyArray<ReadonlyArray<GridXY>>,
+  gridStepMm: number,
 ): boolean[] {
   const collapsed = written.map(collapsesOnGrid);
-  if (!collapsed.includes(true)) return collapsed.map(() => true);
-  return contoursKeptAfterCollapse(curves.map(unsnappedPolyline), collapsed);
+  if (!collapsed.includes(true) || collapsed.every(Boolean))
+    return collapsed.map((value) => !value);
+  const tolerance = Math.min(CONTAINMENT_TOLERANCE_MM, gridStepMm / 16);
+  const sources = curves.map((curve, index) =>
+    unsnappedPolyline(curve, tolerance, collapsed[index] === true),
+  );
+  return contoursKeptAfterCollapse(sources, collapsed);
 }
 
 /**
@@ -89,11 +95,44 @@ export function contoursKeptAfterCollapse(
   return keep;
 }
 
-function unsnappedPolyline(curve: CurveSubpath): Vec2[] {
-  const result = flattenCurveSubpath(curve, { toleranceMm: CONTAINMENT_TOLERANCE_MM });
-  if (result.kind === 'ok') return [...result.polyline.points];
-  // Over the segment budget: the end points still give a usable outline.
-  return [curve.start, ...curve.segments.map((segment) => segment.to)];
+function unsnappedPolyline(curve: CurveSubpath, toleranceMm: number, collapsed: boolean): Vec2[] {
+  const result = flattenCurveSubpath(curve, { toleranceMm });
+  if (result.kind !== 'ok') {
+    throw new Error(
+      'Cannot resolve contour containment within ' +
+        result.segmentBudget +
+        ' line segments. Simplify this artwork.',
+    );
+  }
+  const points = [...result.polyline.points];
+  // A grid-relative tolerance is still an approximation. A thinner curved
+  // lens can flatten to a line while holding a child that survives rounding.
+  // Do not infer an empty source contour from that unresolved outline.
+  if (collapsed && collapsesOnGrid(points) && sourceMayEncloseArea(curve)) {
+    throw new Error(
+      'Cannot resolve a collapsed curved contour at this export precision. Use a finer coordinate grid.',
+    );
+  }
+  return points;
+}
+
+function sourceMayEncloseArea(curve: CurveSubpath): boolean {
+  const points = [curve.start];
+  let from = curve.start;
+  for (const segment of curve.segments) {
+    if (segment.kind === 'cubic') points.push(segment.control1, segment.control2);
+    else if (
+      segment.kind === 'elliptical-arc' &&
+      segment.radiusX !== 0 &&
+      segment.radiusY !== 0 &&
+      (from.x !== segment.to.x || from.y !== segment.to.y)
+    ) {
+      return true;
+    }
+    points.push(segment.to);
+    from = segment.to;
+  }
+  return !collapsesOnGrid(points);
 }
 
 /** Whether a closed polyline encloses any area at all. */

@@ -197,7 +197,10 @@ export function itemPathCommands(item: VectorPaintItem, page: PreparedPage): str
   // A filled contour whose control points collapse onto one grid line paints
   // nothing; it is left out together with every contour nested in it, so none
   // of them paints with the opposite fill (ADR-444 Amendment 1).
-  const kept = item.paint === 'fill' ? filledCurvesKept(curves, paths.map(commandPoints)) : null;
+  const kept =
+    item.paint === 'fill'
+      ? filledCurvesKept(curves, paths.map(commandPoints), page.grid.step)
+      : null;
   const out: string[] = [];
   for (const [index, commands] of paths.entries()) {
     if (kept !== null && kept[index] !== true) continue;
