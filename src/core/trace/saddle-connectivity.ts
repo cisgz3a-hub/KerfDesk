@@ -24,13 +24,16 @@
 //        a checkerboard look identical. Near the image border each axis of
 //        the window shrinks symmetrically to what still fits (never counting
 //        the walker's out-of-image paper, which would make every shape look
-//        thin at an edge). A window centred on a checkerboard corner ties at
-//        any size, so a checkerboard ties everywhere, border included. The
-//        one blind spot is a corner diagonally next to an image corner: only
-//        its own 2×2 block fits, so it is a tie.
-//     2. A window tie (two equal shapes kissing at a corner, a checkerboard)
-//        is structurally symmetric. Where the pre-threshold crack field shows
-//        a genuine anti-aliasing ramp in the 2×2 block (not saturated, and
+//        thin at an edge). A 4×4 tie widens the vote to the 6×6 and then
+//        the 8×8 window (ADR-403 amendment 1), each centred on the corner
+//        and shrunk at the border the same way; the first window that is
+//        not balanced decides. A window centred on a checkerboard corner
+//        ties at any size, so a checkerboard ties everywhere, border
+//        included. The one blind spot is a corner diagonally next to an
+//        image corner: only its own 2×2 block fits, so it is a tie.
+//     2. A tie through the 8×8 window (two equal shapes kissing at a
+//        corner, a checkerboard) is structurally symmetric. Where the
+//        pre-threshold crack field shows a genuine anti-aliasing ramp in the 2×2 block (not saturated, and
 //        still agreeing with the mask), the asymptotic decider of Nielson &
 //        Hamann (1991) settles it: evaluate the bilinear interpolant of the
 //        four threshold residuals at its saddle point; ink joins iff that
@@ -102,9 +105,11 @@ export type SaddlePolicyInput = {
   readonly pixelScale?: number;
 };
 
-// Window half-size in SOURCE pixels: the corner's 2×2 block plus a one-pixel
-// ring is 4×4, i.e. two pixels either side of the corner.
-const WINDOW_RADIUS_SOURCE_PX = 2;
+// Vote window half-sizes in SOURCE pixels, tried in order: the corner's 2×2
+// block plus a one-pixel ring is 4×4 (two pixels either side of the
+// corner); a tie there widens to 6×6 and then 8×8 (ADR-403 amendment 1).
+// The 2×2 block alone is always balanced, so the vote starts at 4×4.
+const VOTE_RADII_SOURCE_PX: ReadonlyArray<number> = [2, 3, 4];
 // A grey tie is only settled when the bilinear saddle value clears the cut
 // by more than this many luma levels. Any binary pattern that is symmetric
 // about the corner (a checkerboard, or its bilinear enlargement on the 2x
@@ -137,26 +142,43 @@ export function createSaddleResolver(
   if (policy === 'connect-ink') return CONNECT_INK_AT_SADDLES;
   if (policy === 'connect-paper') return CONNECT_PAPER_AT_SADDLES;
   const scale = Number.isFinite(pixelScale) ? Math.max(1, Math.round(pixelScale)) : 1;
-  const radius = WINDOW_RADIUS_SOURCE_PX * scale;
+  const radii = VOTE_RADII_SOURCE_PX.map((radius) => radius * scale);
   return (x, y) => {
-    const balance = windowInkBalance(mask, x, y, radius);
+    const balance = minorityVote(mask, x, y, radii);
     if (balance !== 0) return balance < 0;
     const grey = field === undefined || field === null ? null : greySaddle(mask, field, x, y);
     return grey ?? false;
   };
 }
 
-/** Ink minus paper over the window of half-size `radius` centred on
- *  corner (x,y): negative means ink is the local minority. Near the border
- *  each axis's half-size shrinks to what fits inside the image on both
- *  sides, so the window stays centred on the corner: mirror-symmetric
- *  patterns (a checkerboard of any cell size) stay tied, and the walker's
- *  out-of-image paper never makes a shape look thin. Saddle corners lie
- *  strictly inside the lattice (out-of-image pixels are paper, so a border
- *  corner is never a saddle), hence each half-size is at least 1. */
-function windowInkBalance(mask: InkMask, x: number, y: number, radius: number): number {
-  const rx = Math.max(1, Math.min(radius, x, mask.width - x));
-  const ry = Math.max(1, Math.min(radius, y, mask.height - y));
+/** Ink minus paper over the first unbalanced window centred on corner
+ *  (x,y), trying the half-sizes in `radii` in order; 0 when every window
+ *  ties. Negative means ink is the local minority. Near the border each
+ *  axis's half-size shrinks to what fits inside the image on both sides, so
+ *  every window stays centred on the corner: mirror-symmetric patterns (a
+ *  checkerboard of any cell size) stay tied, and the walker's out-of-image
+ *  paper never makes a shape look thin. Saddle corners lie strictly inside
+ *  the lattice (out-of-image pixels are paper, so a border corner is never
+ *  a saddle), hence each half-size is at least 1. Once the border stops
+ *  both axes from growing, a wider radius would recount the same window. */
+function minorityVote(mask: InkMask, x: number, y: number, radii: ReadonlyArray<number>): number {
+  let previousRx = 0;
+  let previousRy = 0;
+  for (const radius of radii) {
+    const rx = Math.max(1, Math.min(radius, x, mask.width - x));
+    const ry = Math.max(1, Math.min(radius, y, mask.height - y));
+    if (rx === previousRx && ry === previousRy) break;
+    previousRx = rx;
+    previousRy = ry;
+    const balance = windowInkBalance(mask, x, y, rx, ry);
+    if (balance !== 0) return balance;
+  }
+  return 0;
+}
+
+/** Ink minus paper over the window of half-sizes (rx, ry) centred on
+ *  corner (x,y); the caller keeps the window inside the image. */
+function windowInkBalance(mask: InkMask, x: number, y: number, rx: number, ry: number): number {
   let balance = 0;
   for (let py = y - ry; py < y + ry; py += 1) {
     for (let px = x - rx; px < x + rx; px += 1) {
