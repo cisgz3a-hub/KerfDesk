@@ -46,9 +46,13 @@ browser. Reproduced on this base:
    machine profiles that still carry the old fields load without them: they are not migrated,
    because they were the broken part.
 5. **A frame of another size** uses the lens scaled to it (`lensForFrame`) when its aspect ratio is
-   within 1 %; another shape, or a frame from another camera (capture binding source kind and id),
-   is reported and not drawn or traced (`ui/camera/camera-model-frame.ts`). This keeps the existing
-   binding check's meaning; it is not a new gate (ADR-228).
+   within 1 %. Another shape, a frame from another camera, a network camera whose saved resource
+   cannot be verified, or a changed crop is reported and not drawn or traced
+   (`ui/camera/camera-model-frame.ts`). The camera and crop checks are the retained
+   `cameraBindingCompatibility` comparator (source kind and id, URL query fingerprint, capture
+   geometry), so this keeps the existing binding check's meaning; it is not a new gate (ADR-228).
+   A photo's result belongs to the document, profile, camera and settings that took it, and Save
+   applies only while they are unchanged (handoff consistency, ADR-228).
 6. **Overlay on the GPU.** `ui/camera/overlay/` draws the workspace with a WebGL2 fragment shader
    that runs the model per canvas pixel at the material height, samples the live element or the
    still, and writes premultiplied alpha. A CPU mirror of the shader is held to `projectWorldPoint`
