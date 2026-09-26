@@ -84,7 +84,7 @@ describe('designMarkSizeMm', () => {
       { id: 'a', x: 70, y: 70, size: 8 },
       { id: 'b', x: 330, y: 70, size: 10 },
     ]);
-    expect(designMarkSizeMm(project, TARGETS)).toBe(10);
+    expect(designMarkSizeMm(project, TARGETS)).toEqual({ minMm: 8, maxMm: 10 });
   });
 
   it('gives nothing when a target is not on a mark-sized object', () => {
@@ -128,10 +128,16 @@ describe('markPairMessage', () => {
 });
 
 describe('locatePrintCutMarks', () => {
-  it(
-    'finds both marks on a sheet on 3 mm material in a tilted fisheye frame of the whole bed',
+  it.each([
+    [10, 10],
+    [6, 14],
+  ])(
+    'finds both selected %s / %s mm marks in a tilted fisheye frame',
     { timeout: 30_000 },
-    () => {
+    (firstSize, secondSize) => {
+      // The smaller ring stays within the camera's resolved central field;
+      // far-corner 6 mm rings fail even the unfiltered detector on this lens.
+      const halfSpan = firstSize === secondSize ? 130 : 80;
       const lens = wideLens();
       const pose = overheadPose();
       const sheet = printedSheet({
@@ -140,9 +146,9 @@ describe('locatePrintCutMarks', () => {
         width: 297,
         height: 210,
         marks: [
-          { at: { x: -130, y: -90 }, style: 'ring', sizeMm: 10 },
-          { at: { x: 130, y: -90 }, style: 'ring', sizeMm: 10 },
-          { at: { x: -130, y: 90 }, style: 'ring', sizeMm: 10 },
+          { at: { x: -halfSpan, y: -90 }, style: 'ring', sizeMm: firstSize },
+          { at: { x: halfSpan, y: -90 }, style: 'ring', sizeMm: secondSize },
+          { at: { x: -halfSpan, y: 90 }, style: 'ring', sizeMm: 10 },
         ],
         topMm: 3,
       });
@@ -157,8 +163,11 @@ describe('locatePrintCutMarks', () => {
         { x: number; y: number },
         { x: number; y: number },
       ];
-      // The design's top marks, 260 mm apart; the sheet lies a few mm off and turned.
-      const targets = { first: { x: 72, y: 110 }, second: { x: 332, y: 110 } };
+      // The design's top marks; the sheet lies a few mm off and turned.
+      const targets = {
+        first: { x: 202 - halfSpan, y: 110 },
+        second: { x: 202 + halfSpan, y: 110 },
+      };
       const result = locatePrintCutMarks({
         raw,
         lens,
@@ -168,7 +177,13 @@ describe('locatePrintCutMarks', () => {
         surfaceHeightMm: 3,
         heightAreas: [],
         targets,
-        markSizeMm: 10,
+        markSizeMm: designMarkSizeMm(
+          designWithMarks([
+            { id: 'a', ...targets.first, size: firstSize },
+            { id: 'b', ...targets.second, size: secondSize },
+          ]),
+          targets,
+        ),
       });
       expect(result?.kind).toBe('found');
       if (result?.kind !== 'found') return;
@@ -177,7 +192,7 @@ describe('locatePrintCutMarks', () => {
       expect(off(result.pair.first.centre, topLeft)).toBeLessThan(0.3);
       expect(off(result.pair.second.centre, topRight)).toBeLessThan(0.3);
       expect(result.pair.rotationDeg).toBeCloseTo(5, 0);
-      // The left column is 180 mm apart and the diagonal 316 mm: only the top pair fits.
+      // The left column and diagonal differ in spacing: only the top pair fits.
       expect(result.pair.otherPairs).toBe(0);
     },
   );

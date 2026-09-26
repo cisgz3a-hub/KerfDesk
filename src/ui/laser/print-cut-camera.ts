@@ -29,6 +29,8 @@ const MAX_MARK_MM = 30;
 // A design object whose box centre is this close to a target is that target's mark.
 const MARK_CENTRE_TOLERANCE_MM = 0.5;
 
+export type DesignMarkSizeRangeMm = { readonly minMm: number; readonly maxMm: number };
+
 export function markPixelsPerMm(bedWidthMm: number, bedHeightMm: number): number {
   const areaMm2 = bedWidthMm * bedHeightMm;
   if (!(areaMm2 > 0)) return MARK_PIXELS_PER_MM;
@@ -46,7 +48,7 @@ export function locatePrintCutMarks(args: {
   readonly heightAreas: ReadonlyArray<SurfaceHeightArea>;
   readonly targets: PrintAndCutDesignTargets;
   /** The design marks' sizes where known, mm. */
-  readonly markSizeMm: number | null;
+  readonly markSizeMm: number | DesignMarkSizeRangeMm | null;
 }): MarkPairResult | null {
   const region = { x: 0, y: 0, width: args.bedWidthMm, height: args.bedHeightMm };
   const pixelsPerMm = markPixelsPerMm(args.bedWidthMm, args.bedHeightMm);
@@ -62,8 +64,8 @@ export function locatePrintCutMarks(args: {
     image,
     region,
     pixelsPerMm,
-    minSizeMm: size === null ? MIN_MARK_MM : 0.6 * size,
-    maxSizeMm: size === null ? MAX_MARK_MM : 1.6 * size,
+    minSizeMm: size === null ? MIN_MARK_MM : 0.6 * (typeof size === 'number' ? size : size.minMm),
+    maxSizeMm: size === null ? MAX_MARK_MM : 1.6 * (typeof size === 'number' ? size : size.maxMm),
   });
   return matchMarkPair([args.targets.first, args.targets.second], marks);
 }
@@ -75,10 +77,12 @@ export function locatePrintCutMarks(args: {
 export function designMarkSizeMm(
   project: Project,
   targets: PrintAndCutDesignTargets,
-): number | null {
+): DesignMarkSizeRangeMm | null {
   const sizes = [targets.first, targets.second].map((target) => markSizeAt(project, target));
   const [a, b] = sizes;
-  return a === null || a === undefined || b === null || b === undefined ? null : Math.max(a, b);
+  return a === null || a === undefined || b === null || b === undefined
+    ? null
+    : { minMm: Math.min(a, b), maxMm: Math.max(a, b) };
 }
 
 function markSizeAt(project: Project, target: Vec2): number | null {
