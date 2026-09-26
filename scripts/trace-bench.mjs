@@ -11,7 +11,8 @@
 //     [--cases owl,noise192] [--presets "Line Art,Sharp"] [--runs 5] [--out <dir>]
 //
 // Cases are the parity-oracle corpus of THIS tree (src/__fixtures__/perceptual/
-// trace-parity-oracle.ts); owl and hummingbird are read from TRACE_PARITY_DIR.
+// trace-parity-oracle.ts) plus the bench-only sparse4096 page; owl and
+// hummingbird are read from TRACE_PARITY_DIR.
 // A tree without node_modules resolves packages from this tree's node_modules.
 
 import { mkdirSync, appendFileSync } from 'node:fs';
@@ -60,6 +61,36 @@ function engineSource(tree) {
   ].join('\n');
 }
 
+// Bench-only synthetic case (not in the oracle): a 4096 px white page with a
+// solid disc, a ring and a few 6 px strokes, the sparse large-page regime
+// where the whole-grid raster passes dominate.
+function sparsePageImage(size) {
+  const data = new Uint8ClampedArray(size * size * 4).fill(255);
+  const ink = (x, y) => {
+    const i = (y * size + x) * 4;
+    data[i] = 0;
+    data[i + 1] = 0;
+    data[i + 2] = 0;
+  };
+  const c = size / 2;
+  for (let y = 0; y < size; y += 1) {
+    for (let x = 0; x < size; x += 1) {
+      const r = Math.hypot(x - c * 0.6, y - c * 0.6);
+      const ring = Math.hypot(x - c * 1.4, y - c * 1.3);
+      if (r < size * 0.08 || (ring > size * 0.1 && ring < size * 0.12)) ink(x, y);
+    }
+  }
+  for (let k = 0; k < 5; k += 1) {
+    const y0 = Math.round(size * (0.15 + 0.15 * k));
+    for (let x = Math.round(size * 0.1); x < size * 0.9; x += 1) {
+      const y = y0 + Math.round(Math.sin(x / (40 + 10 * k)) * 30);
+      for (let t = 0; t < 6; t += 1) ink(x, y + t);
+    }
+  }
+  return { width: size, height: size, data };
+}
+const EXTRA_CASES = [{ name: 'sparse4096', image: () => sparsePageImage(4096) }];
+
 const median = (values) => [...values].sort((a, b) => a - b)[Math.floor(values.length / 2)];
 
 async function main() {
@@ -77,7 +108,7 @@ async function main() {
     new: await bundle(engineSource(args.new), posix(args.new), `${out}/engine-new.mjs`),
   };
   const wanted = new Set(args.cases.split(','));
-  const cases = oracle.parityCases().filter((entry) => wanted.has(entry.name));
+  const cases = [...oracle.parityCases(), ...EXTRA_CASES].filter((entry) => wanted.has(entry.name));
   const runs = Number(args.runs);
   for (const entry of cases) {
     const image = entry.image();
