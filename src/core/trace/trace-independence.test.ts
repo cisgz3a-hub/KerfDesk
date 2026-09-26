@@ -9,6 +9,7 @@ import {
 } from '../../__fixtures__/perceptual/trace-parity-oracle';
 import { PERCEPTUAL_FIXTURES } from '../../__fixtures__/perceptual/shapes';
 import type { RawImageData } from './trace-image';
+import type { TraceStepRunner, TraceSteps } from './trace-steps';
 import type * as ContourIntersections from './contour-intersections';
 import type * as TraceModule from './index';
 import type { TraceOptions } from './index';
@@ -74,4 +75,76 @@ describe('trace independence', () => {
     },
     120_000,
   );
+
+  // The UI's inline runner steps a trace cooperatively (next(true)) between
+  // tasks, so two traces can interleave and a superseded one is dropped
+  // mid-way. Neither may leak into another trace.
+  it('interleaved cooperative traces and a trace abandoned mid-way leave every trace equal to a fresh one', async () => {
+    const cases = [
+      { image: target, preset: 'Line Art' },
+      { image: ring, preset: 'Centerline' },
+      { image: uniformNoiseImage(80, 7), preset: 'Sharp' },
+    ] as const;
+    const fresh: string[] = [];
+    const stepCounts: number[] = [];
+    for (const { image, preset } of cases) {
+      const tracer = await freshTracer();
+      const counted = cooperative('count');
+      fresh.push(await hashWith(tracer, image, preset, counted.runner));
+      stepCounts.push(counted.steps());
+    }
+
+    const tracer = await freshTracer();
+    // Abandon the Sharp and Centerline traces half way through their steps.
+    for (const k of [2, 1]) {
+      const { image, preset } = cases[k]!;
+      const abandoned = cooperative('drop', Math.floor(stepCounts[k]! / 2));
+      await expect(hashWith(tracer, image, preset, abandoned.runner)).rejects.toThrow(/abandoned/);
+    }
+    // Step the Line Art and Centerline traces alternately.
+    const log: string[] = [];
+    const a = cooperative('a', Infinity, log);
+    const b = cooperative('b', Infinity, log);
+    const [lineArt, centerline] = await Promise.all([
+      hashWith(tracer, cases[0].image, cases[0].preset, a.runner),
+      hashWith(tracer, cases[1].image, cases[1].preset, b.runner),
+    ]);
+    expect(log.join('')).toMatch(/ab.*ba|ba.*ab/);
+    expect([lineArt, centerline]).toEqual([fresh[0], fresh[1]]);
+    for (const [k, { image, preset }] of cases.entries()) {
+      expect(await hashWith(tracer, image, preset)).toBe(fresh[k]);
+    }
+  }, 240_000);
 });
+
+async function hashWith(
+  tracer: typeof TraceModule,
+  image: RawImageData,
+  preset: string,
+  runner?: TraceStepRunner,
+): Promise<string> {
+  rounds.push([]);
+  const options = tracer.TRACE_PRESETS[preset] as TraceOptions;
+  return canonicalTraceHash(await tracer.traceImageToColoredPaths(image, options, runner));
+}
+
+// A cooperative runner: next(true) per step with a microtask between steps,
+// so concurrent traces alternate. After `budget` steps it drops the trace.
+function cooperative(
+  tag: string,
+  budget = Infinity,
+  log?: string[],
+): { readonly runner: TraceStepRunner; readonly steps: () => number } {
+  let taken = 0;
+  async function drive<T>(steps: TraceSteps<T>): Promise<T> {
+    for (;;) {
+      const step = steps.next(true);
+      if (step.done) return step.value;
+      taken += 1;
+      log?.push(tag);
+      if (taken >= budget) throw new Error(`${tag}: trace abandoned`);
+      await Promise.resolve();
+    }
+  }
+  return { runner: drive, steps: () => taken };
+}
