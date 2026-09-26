@@ -117,7 +117,9 @@ Two defects, measured on the base (`c62084959`):
 - A path and its reverse flatten to the same vertices when equal steps fit (every circle); an
   eccentric ellipse arc or an uneven cubic may put them elsewhere on the same curve, within the same
   tolerance. `curve-join.test.ts` now checks a reversed arc against the curve itself instead of
-  expecting reversed vertices.
+  expecting reversed vertices. `vector-path-weld.test.ts` compares the welded outline's area to two
+  decimals, the resolution its 0.001 mm union grid allows, and now also checks that the coarse
+  compatibility polyline would fail it.
 - Cost: flattening every compiled path of the dragon's Centerline trace takes about 28 ms against
   6 ms (median of five warm runs in Node), the owl's Line Art 48 ms against 10 ms; the dragon's
   laser commit, which flattens several times for its topology check, about 100 ms against 28 ms.

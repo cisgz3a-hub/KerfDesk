@@ -239,10 +239,16 @@ describe('weldVectorObjects render-batch topology', () => {
     const welded = unwrap(weldVectorObjects([source], 'out'));
     const result = welded.paths[0]?.polylines[0];
     expect(result?.points).toHaveLength(machine.polyline.points.length);
+    // The union snaps vertices to 0.001 mm (VECTOR_PATH_PRECISION_DECIMALS),
+    // which can move this outline's area by up to about 0.02 mm²; the coarse
+    // compatibility polyline would differ by far more.
     expect(Math.abs(result === undefined ? 0 : signedArea(result))).toBeCloseTo(
       Math.abs(signedArea(machine.polyline)),
-      3,
+      2,
     );
+    expect(
+      Math.abs(Math.abs(signedArea(coarse.polyline)) - Math.abs(signedArea(machine.polyline))),
+    ).toBeGreaterThan(0.1);
   });
 
   it('stores equivalent disjoint input in identical raw path order', () => {
