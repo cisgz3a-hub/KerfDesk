@@ -18,6 +18,22 @@ export function PendingPauseResumeAction(props: {
   );
 }
 
+/** Pause and lift is moving the bit (ADR-401): the control waits it out. */
+export function PendingCncLiftAction(props: {
+  readonly phase: 'lifting' | 'entering';
+  readonly title: string;
+  readonly resumeJob: Action;
+}): JSX.Element {
+  return (
+    <LiveMotionActionButton
+      label={props.phase === 'lifting' ? 'Lifting…' : 'Returning…'}
+      title={props.title}
+      disabled
+      onClick={props.resumeJob}
+    />
+  );
+}
+
 export function LiveMotionActionButton(props: {
   readonly label: string;
   readonly title: string;

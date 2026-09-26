@@ -12,6 +12,7 @@ import {
   queuedLineCount,
   remainingQueuedLines,
   resume,
+  rewindPausedStream,
   step,
   wipeInFlight,
 } from './streamer';
@@ -296,6 +297,27 @@ describe('pause / resume / cancel', () => {
 
     expect(paused.status).toBe('paused');
     expect(resume(paused).status).toBe('done');
+  });
+
+  it('rewinds a paused stream to replay from an acknowledged line on the same program', () => {
+    let state = step(createStreamer('G1 X1\nG1 X2\nG1 X3\nG1 X4')).state;
+    state = onAck(state, 'ok').state;
+    state = onAck(state, 'ok').state;
+    state = onAck(state, 'ok').state;
+    const paused = wipeInFlight(pause(state));
+
+    const rewound = rewindPausedStream(paused, 1);
+
+    expect(rewound).toMatchObject({
+      status: 'streaming',
+      queueIndex: 1,
+      completed: 1,
+      inFlight: [],
+      inFlightBytes: 0,
+    });
+    expect(rewound.queued).toBe(paused.queued);
+    expect(step(rewound).toSend).toBe('G1 X2\nG1 X3\nG1 X4\n');
+    expect(rewindPausedStream(state, 1)).toBe(state);
   });
 
   it('cancel empties the queue and sets status', () => {

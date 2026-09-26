@@ -26,6 +26,7 @@ import {
   scheduleControllerQualification,
 } from './laser-controller-qualification';
 import { controllerRebootNotice } from './laser-safety-notice';
+import { isOwnedCncPauseLiftReset, ownedLiftResetPatch } from './cnc-pause-lift-state';
 import {
   clearCncLiveCaps,
   consumeSettingsResponse,
@@ -365,6 +366,8 @@ function handleWelcomeLine(
   if (detected === null) return;
   const state = get();
   const nextSessionEpoch = state.controllerSessionEpoch + 1;
+  // Pause and lift's own reset keeps its paused stream (ADR-401).
+  const ownedLiftReset = isOwnedCncPauseLiftReset(state, refs.writeEpoch ?? 0);
   refs.writeEpoch = (refs.writeEpoch ?? 0) + 1;
   // The rebooted controller starts a new transcript; anything the old session
   // held back belongs to neither (ADR-333).
@@ -425,7 +428,7 @@ function handleWelcomeLine(
     homingProof: null,
     trustedPositionEpoch: (state.trustedPositionEpoch ?? 0) + 1,
     ...mismatchLog,
-    ...rebootDuringJobPatch(state),
+    ...(ownedLiftReset ? ownedLiftResetPatch(state) : rebootDuringJobPatch(state)),
   });
   if (!resetPolicy.preserveOperation) {
     cancelControllerLifecycleRefs(refs, resetPolicy.cancellationReason);

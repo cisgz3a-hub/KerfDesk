@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
+  CNC_LIFT_PHASE_MESSAGES,
   CNC_RESUME_ADVISORY_MESSAGE,
   CNC_RESUME_LASER_MODE_ADVISORY_MESSAGE,
   cncPauseMessage,
@@ -26,6 +27,17 @@ describe('CNC pause/resume policy', () => {
 
   it('tells the operator a paused CNC job can be resumed', () => {
     expect(cncPauseMessage('cnc')).toMatch(/can be resumed/i);
+    expect(cncPauseMessage('cnc')).toMatch(/lifts the bit to safe height/i);
     expect(cncPauseMessage('laser')).toBeNull();
+  });
+
+  // ADR-401: after the lift the reset has cleared the controller's settings,
+  // so a lifted job must not fall back to the unconfirmed-mode advice.
+  it('describes a Pause and lift by its phase, whatever the laser-mode evidence', () => {
+    expect(cncResumeAdvisoryNotice('cnc', undefined, 'lifted')).toBe(
+      CNC_LIFT_PHASE_MESSAGES.lifted,
+    );
+    expect(cncResumeAdvisoryNotice('cnc', false, 'entering')).toMatch(/spinning up above the cut/);
+    expect(cncResumeAdvisoryNotice('laser', false, 'lifted')).toBeNull();
   });
 });

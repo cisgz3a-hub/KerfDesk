@@ -392,6 +392,23 @@ export function wipeInFlight(state: StreamerState): StreamerState {
   return { ...state, inFlight: [], inFlightBytes: 0 };
 }
 
+// Replay a paused stream from `lineIndex` after a soft reset emptied the
+// controller's buffers (CNC Pause and lift, ADR-401). Lines before it count as
+// acknowledged, nothing is in flight, and the program array is kept, so a
+// hosted refill still recognises the program it adopts (ADR-354).
+export function rewindPausedStream(state: StreamerState, lineIndex: number): StreamerState {
+  if (state.status !== 'paused') return state;
+  const index = Math.min(Math.max(Math.floor(lineIndex), 0), state.queued.length);
+  return {
+    ...state,
+    status: 'streaming',
+    queueIndex: index,
+    completed: index,
+    inFlight: [],
+    inFlightBytes: 0,
+  };
+}
+
 // Progress as a fraction [0, 1].
 export function progress(state: StreamerState): number {
   if (state.total === 0) return 1;

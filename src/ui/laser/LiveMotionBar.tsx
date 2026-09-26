@@ -1,5 +1,6 @@
 import type { StreamerStatus } from '../../core/controllers/grbl';
 import { SOFTWARE_ABORT_TITLE } from '../common/software-abort-copy';
+import { cncPauseLiftPhase } from '../state/cnc-pause-lift-state';
 import { cncResumeAdvisoryNotice } from '../state/cnc-pause-resume-policy';
 import { describeControllerOperation } from '../state/laser-controller-operation';
 import { useLaserStore } from '../state/laser-store';
@@ -14,6 +15,7 @@ import {
 import {
   LiveMotionActionButton,
   LIVE_MOTION_ACTION_BUTTON_STYLE,
+  PendingCncLiftAction,
   PendingPauseResumeAction,
 } from './LiveMotionActionButton';
 import { pauseControlMessage, resumeControlTitle } from './job-control-copy';
@@ -101,7 +103,8 @@ function LiveMotionPrimaryAction({ status }: { readonly status: StreamerStatus |
   const isControllerRunning = useLaserStore((state) => state.statusReport?.state === 'Run');
   const toolChangeBlockMessage = useLaserStore(toolChangeContinueBlockMessage);
   const laserModeEnabled = useLaserStore((state) => state.controllerSettings?.laserModeEnabled);
-  const resumeAdvisory = cncResumeAdvisoryNotice(machineKind, laserModeEnabled);
+  const liftPhase = useLaserStore(cncPauseLiftPhase);
+  const resumeAdvisory = cncResumeAdvisoryNotice(machineKind, laserModeEnabled, liftPhase);
   const pauseResumeTransition = useLaserStore((state) => state.pauseResumeTransition);
   if (pauseResumeTransition !== null) {
     return (
@@ -120,6 +123,14 @@ function LiveMotionPrimaryAction({ status }: { readonly status: StreamerStatus |
         title={pauseControlMessage(machineKind, hasRealtimePause, streamPauseBeamOff)}
         onClick={pauseJob}
       />
+    );
+  }
+  // A lift exists only for a paused stream; while it moves the bit, only Abort
+  // interrupts it (ADR-401).
+  const movingLift = liftPhase === 'lifted' ? null : liftPhase;
+  if (movingLift !== null) {
+    return (
+      <PendingCncLiftAction phase={movingLift} title={resumeAdvisory ?? ''} resumeJob={resumeJob} />
     );
   }
   if (status === 'paused') {

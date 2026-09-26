@@ -79,6 +79,11 @@ export type LaserSafetyNotice =
   | {
       readonly kind: 'home-unfinished';
       readonly message: string;
+    }
+  | {
+      /** CNC Pause and lift could not lift or re-enter safely (ADR-401). */
+      readonly kind: 'cnc-pause-lift-failed';
+      readonly message: string;
     };
 
 // M13 (AUDIT-2026-06-10): the streamer is ack-driven — if GRBL stops
@@ -101,6 +106,19 @@ export const CNC_PAUSE_RESUME_STALLED_MESSAGE =
   'KerfDesk froze the host stream and kept the job; no controller reset was requested. Check the ' +
   'machine state, then retry Resume or request ABORT JOB. Use the physical E-stop or power cutoff ' +
   'if the spindle or cutter is unsafe.';
+
+// ADR-401: once Pause and lift has soft-reset the controller, the buffered
+// job is gone, so a lift or re-entry that cannot finish ends the job with a
+// reset rather than leaving the spindle or the bit where nobody expects them.
+export function cncPauseLiftFailedNotice(reason: string): LaserSafetyNotice {
+  return {
+    kind: 'cnc-pause-lift-failed',
+    message:
+      `Pause and lift stopped: ${reason} KerfDesk reset the controller to stop the spindle ` +
+      'and motion, and ended the job. Check the machine, then continue from the Interrupted ' +
+      'job card. Use the physical E-stop if the cutter is unsafe.',
+  };
+}
 
 export function cncPauseResumeStalledNotice(): LaserSafetyNotice {
   return { kind: 'stream-stalled', message: CNC_PAUSE_RESUME_STALLED_MESSAGE };

@@ -32,6 +32,9 @@ import {
   reportedPauseResumeFailure,
 } from './laser-pause-resume-failure';
 import { beginPostJobSettle, type PostJobSettleRefs } from './laser-post-job-settle';
+import { liftPausedCncJob } from './cnc-pause-lift';
+import { currentCncPauseLift } from './cnc-pause-lift-state';
+import { CNC_REENTRY_BUSY_MESSAGE, resumeLiftedCncJob } from './cnc-pause-reentry-run';
 import {
   cncPauseResumeStalledNotice,
   streamStalledNotice,
@@ -87,6 +90,7 @@ const CNC_RESUME_CONFIRMATION_TIMEOUT_MESSAGE =
 
 export async function runConfirmedPauseJob(context: PauseResumeContext): Promise<void> {
   assertNoPauseResumeTransition(context);
+  if (alreadyLifted(context)) return;
   // Pause is about to change the stream's status, so this side takes the
   // refill back first; a confirmed Resume can hand it over again (ADR-354).
   // Unlike Abort's reset, the door byte does not retire the worker's refill,
@@ -149,11 +153,16 @@ export async function runConfirmedPauseJob(context: PauseResumeContext): Promise
       });
     }
   });
+  // ADR-401: with the hold settled, lift the bit out of the cut so Resume
+  // never restarts the spindle in the wood.
+  if (!laserJob) await liftPausedCncJob(context);
 }
 
 export async function runConfirmedResumeJob(context: PauseResumeContext): Promise<void> {
   assertResumeCommandOwnership(context);
   assertNoPauseResumeTransition(context);
+  // A lifted job no longer lives in the controller: Resume re-enters it.
+  if (currentCncPauseLift(context.get()) !== null) return resumeLiftedCncJob(context);
   // ADR-180 amendment 2 (2026-07-25): Resume is door-confirmed whenever the
   // driver has a door byte, for CNC as well as laser — Pause parked via Door, so
   // Resume must wait for the controller to report Run/Idle before the stream is
@@ -354,6 +363,19 @@ function clearPauseResumeTransitionState(
   context.set((state) =>
     state.pauseResumeTransition?.token === token.id ? { pauseResumeTransition: null } : {},
   );
+}
+
+// A lifted job is already paused; a lift or re-entry in motion answers only
+// to Abort (ADR-401).
+function alreadyLifted(context: PauseResumeContext): boolean {
+  const lift = currentCncPauseLift(context.get());
+  if (lift === null) return false;
+  if (lift.phase === 'lifted') return true;
+  context.set((state) => ({
+    lastWriteError: CNC_REENTRY_BUSY_MESSAGE,
+    log: pushLog(state, `[lf2] Pause blocked: ${CNC_REENTRY_BUSY_MESSAGE}`),
+  }));
+  throw new Error(CNC_REENTRY_BUSY_MESSAGE);
 }
 
 function assertPauseSafe(context: PauseResumeContext): void {
