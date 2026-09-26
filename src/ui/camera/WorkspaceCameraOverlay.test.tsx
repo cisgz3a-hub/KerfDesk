@@ -198,7 +198,7 @@ describe('WorkspaceCameraOverlay', () => {
     useCameraStore.setState({ overlayStill: still() });
     render();
     act(() => useCameraStore.setState({ surfaceHeightMm: 30 }));
-    expect(gl.draws.at(-1)?.uniforms.uSurfaceZ).toBe(-30);
+    expect(gl.draws.at(-1)?.uniforms?.uSurfaceZ).toBe(-30);
   });
 
   it('draws each height area as its own pass and outlines it on the canvas', () => {
@@ -256,7 +256,7 @@ describe('WorkspaceCameraOverlay', () => {
     useCameraStore.setState({ sourceState: { kind: 'live', source: { kind: 'usb', stream } } });
     render();
     expect(gl.draws.at(-1)?.source).toBe(video);
-    expect(gl.draws.at(-1)?.uniforms.uFrameSize).toEqual([1280, 720]);
+    expect(gl.draws.at(-1)?.uniforms?.uFrameSize).toEqual([1280, 720]);
   });
 
   it('does not draw another channel at the same redacted camera URL', () => {
@@ -297,7 +297,7 @@ describe('WorkspaceCameraOverlay', () => {
       saveModel(cropped);
       useCameraStore.setState({ overlayStill: still(1280, 720), overlayStillCapture: cropped });
     });
-    expect(gl.draws.at(-1)?.uniforms.uFrameSize).toEqual([1280, 720]);
+    expect(gl.draws.at(-1)?.uniforms?.uFrameSize).toEqual([1280, 720]);
   });
 
   it.each(['saved', 'current'] as const)(
