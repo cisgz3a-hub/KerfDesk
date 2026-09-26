@@ -11,6 +11,7 @@ import {
 } from '../../__fixtures__/controllers';
 import { grblDriver } from '../../core/controllers';
 import { cncControllerEpochOf, createCncSetupAttestation } from './cnc-setup-attestation';
+import { currentStreamResetMayLosePosition } from './job-stop-request';
 import { useLaserStore } from './laser-store';
 import { resetStore } from './test-helpers';
 
@@ -174,6 +175,27 @@ describe('CNC Pause and lift against the GRBL simulator', () => {
     expect(useLaserStore.getState().cncPauseLift).toBeNull();
     expect(useLaserStore.getState().streamer?.status).toBe('cancelled');
     expect(sim.state().mpos.z).toBe(5);
+    // The bit was parked, so pass recovery may keep the position.
+    expect(currentStreamResetMayLosePosition(useLaserStore.getState())).toBe(false);
+    expect(useLaserStore.getState().alarmCode).toBeNull();
+  });
+
+  it('records that an Abort during the lift move may have cost position', async () => {
+    const sim = await connectCnc({ settings: CNC_SETTINGS });
+    await startCnc(PROGRAM);
+    await pump(1500);
+    const pausing = useLaserStore.getState().pauseJob();
+    pausing.catch(() => undefined);
+    for (let waited = 0; waited < 5_000 && !sim.outbound().includes('G0 Z5.000\n'); waited += 5) {
+      await pump(5);
+    }
+    expect(useLaserStore.getState().cncPauseLift?.phase).toBe('lifting');
+
+    await settle(useLaserStore.getState().stopJob());
+    await settle(pausing);
+    expect(currentStreamResetMayLosePosition(useLaserStore.getState())).toBe(true);
+    expect(useLaserStore.getState().cncPauseLift ?? null).toBeNull();
+    expect(useLaserStore.getState().streamer?.status).toBe('cancelled');
   });
 
   it('ends the job with a notice when the lift fails after its reset', async () => {
@@ -193,6 +215,8 @@ describe('CNC Pause and lift against the GRBL simulator', () => {
     expect(state.streamer?.status).toBe('cancelled');
     expect(sim.state().spindle).toBe(0);
     expect(sim.outbound().filter((write) => write === '\x18')).toHaveLength(2);
+    // The refused lift line never ran and nothing else was moving.
+    expect(currentStreamResetMayLosePosition(state)).toBe(false);
   });
 
   it('will not re-enter when the work offset moved while the bit was lifted', async () => {

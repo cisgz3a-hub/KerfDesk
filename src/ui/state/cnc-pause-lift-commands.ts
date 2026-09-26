@@ -14,6 +14,7 @@ import {
   samePoint,
   type CncPauseLift,
 } from './cnc-pause-lift-state';
+import { streamResetRecord } from './job-stop-request';
 import { waitForFreshControllerStatus } from './laser-controller-status-wait';
 import { ControllerCommandRefusedError, startControllerCommand } from './laser-interactive-command';
 import type { PostJobSettleRefs } from './laser-post-job-settle';
@@ -175,6 +176,13 @@ export async function failCncPauseLift(
   context.set((state) => {
     const notice = cncPauseLiftFailedNotice(asSentence(reason));
     return {
+      // Decided while the lift is still on record: a lift move may be running
+      // under the reset Abort's stop is about to send (ADR-215 Amendment 1).
+      // A refused line never ran, and every lift move before it was seen to
+      // arrive, so the stop then judges the machine by its report alone.
+      ...(error instanceof CncLiftLineRefusedError
+        ? {}
+        : { streamReset: streamResetRecord(state) }),
       cncPauseLift: null,
       // First notice wins, except the generic one the refusal of the lift's
       // own line just raised: this one says what actually happened.

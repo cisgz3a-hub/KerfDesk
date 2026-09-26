@@ -99,6 +99,13 @@ core `d7aaee3d`):
    includes a refused line, a timeout, an alarm, a moved frame, or a lost port. The notice "Pause
    and lift stopped" says what failed. Pass recovery (ADR-215) takes over from the Interrupted job
    card.
+
+   The lift's own moves run while the stream stays paused, so a status report one poll behind can
+   read Idle while the bit travels. A reset sent while the lift is lifting or returning, by Abort
+   or by a failed lift, is therefore recorded as one that may have cost position (ADR-215
+   Amendment 1), and pass recovery asks for a re-zero. Two cases keep the report's verdict: a lift
+   whose line the controller refused, because that line never ran and every lift move before it
+   was seen to arrive; and Abort once the bit is parked above the cut.
 7. **Controls.** While lifting or returning, the primary control reads **Lifting…** or
    **Returning…** and is disabled; only Abort interrupts. A lifted job ignores a second Pause. The
    advice beside Resume describes the lift, not the door resume.

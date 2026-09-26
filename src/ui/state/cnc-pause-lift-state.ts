@@ -3,7 +3,7 @@
 // evidence from before its soft reset that everything after the reset is
 // checked against.
 
-import { wipeInFlight, type StatusReport } from '../../core/controllers/grbl';
+import { wipeInFlight, type StatusReport, type StreamerStatus } from '../../core/controllers/grbl';
 import type { MotionPoint } from '../../core/job/motion-manifest';
 import type { CncPauseReentryPlan } from '../../core/recovery/cnc-pause-reentry';
 import type { LaserState, WorkOriginSource } from './laser-store';
@@ -63,6 +63,25 @@ export function currentCncPauseLift(state: LaserState): CncPauseLift | null {
 /** Store selector: the phase of the current paused stream's lift, if any. */
 export function cncPauseLiftPhase(state: LaserState): CncPauseLiftPhase | null {
   return currentCncPauseLift(state)?.phase ?? null;
+}
+
+/**
+ * Whether the current paused stream's lift may be moving the bit. The lift
+ * moves with its own lines while the stream stays paused, so a status report
+ * one poll behind can still read Idle mid-move (ADR-215 Amendment 1).
+ */
+export function cncPauseLiftMayBeMoving(state: {
+  readonly cncPauseLift?: CncPauseLift | null;
+  readonly streamer: { readonly status: StreamerStatus } | null;
+  readonly streamerEpoch: number;
+}): boolean {
+  const lift = state.cncPauseLift ?? null;
+  return (
+    lift !== null &&
+    lift.phase !== 'lifted' &&
+    lift.streamerEpoch === state.streamerEpoch &&
+    state.streamer?.status === 'paused'
+  );
 }
 
 /**
