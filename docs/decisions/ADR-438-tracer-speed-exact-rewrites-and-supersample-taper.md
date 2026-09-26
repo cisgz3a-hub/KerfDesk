@@ -297,6 +297,8 @@ both sides.
 |                             | hummingbird |               |               | 0.932 (0.928) |
 |                             | noise1024   |               |               | 0.930 (1.007) |
 |                             | sparse4096  |               |               | 0.915 (0.976) |
+| 952fb13e3 -> ba7157fab      | owl         | 0.930 (0.907) | 0.837 (0.715) | see rank 5    |
+|                             | hummingbird | 0.953 (0.861) | 0.796 (0.860) | see rank 5    |
 
 Reading:
 - The rank 2 distance field clearly pays only where it dominates, on the sparse 4096 page
@@ -309,6 +311,52 @@ Reading:
   Centerline trace. Isolated, in one process, alternating best-of-9 against the frozen copy, the
   thinning takes 0.75x the time on a 1200 px stroke page (median 0.75x). Log:
   `lfbake/speed2/thin-bench-r5.log`, outside the repo.
+- End to end, base to the finished wave (ba7157fab, ranks 2, 4 and 5; run with 6.6-7.4 GB free),
+  Line Art takes 0.93-0.95x and Sharp 0.80-0.84x (best). Each ratio is again inside the A/A band
+  on its own; the medians (0.72-0.91) point the same way.
 - None of this changes the size of the gap to Potrace. Owl Line Art is still seconds, not a
   quarter-second. The remaining plan ranks, workers and topology repair are where that gap
   lives.
+
+**Allocations (speed wave 2).** The wave adds full-grid typed buffers that the base did not
+have, all freed when their stage returns:
+- The thinning's pending-tie mask is a `Uint16Array` of 2 bytes per pixel (32 MiB at
+  4096x4096). One mask serves both passes, because a pass drains its queue to empty and leaves
+  the mask all zero.
+- The dense distance-rank table is an `Int32Array` of (largest squared distance + 1) entries,
+  capped at 2^23 entries (32 MiB); a larger field ranks by binary search over its distinct values
+  instead. A stroke of radius r needs about r^2 entries, so real masks stay far below the cap
+  (the sparse 4096 page: about 0.4 MB).
+- The boundary walk's direction bits are a `Uint8Array` of one byte per lattice vertex
+  ((width + 1) x (height + 1)), allocated once per mask. It replaces a `Map` of `Set`s sized to
+  the boundary. Photo shading walks one mask per layer, one after another.
+
+Measured on the bench's sparse 4096 page with `process.resourceUsage().maxRSS`, one process per
+run, three alternating runs per side (scratch probe, outside the repo): the thinning stage grows
+peak RSS by 160-164 MB against 232-233 MB on 952fb13e3, and the boundary walk by 21-22 MB
+against 33-34 MB. A whole Centerline trace of that page peaks at 758 MB on both sides, and a Line
+Art trace at 778-789 MB against 774-777 MB, so an earlier stage sets the trace's peak and these
+buffers do not raise it.
+
+**Review follow-up (speed wave 2).**
+- The two thinning passes share one pending mask (above); light oracle byte-identical.
+- The `ErosionQueue` type now states that an implementation may drop an exact duplicate while it
+  is pending (the bucket queue does, the comparator heap does not), so callers may rely only on
+  the order of pops, never on `size()` or on the number of pops.
+- The light oracle corpus gains five cheap edge shapes: 37x113 noise, 1x50 and 50x1 stripes, an
+  alpha-faded disc on transparent paper, and a 200x150 page with ink on every border. Their base
+  hashes were recorded from 952fb13e3 (the oracle files copied into a detached 952fb13e3
+  worktree). The light gate is now 66 cases. The 1 px stripes trace to nothing in Centerline and
+  Edge Detection on both sides; they still guard the degenerate path. The oracle still hashes
+  only `traceImageToColoredPaths` with preset options; worker bounds, frozen source decisions and
+  non-default sliders remain outside it.
+- The canonical serialiser throws on a `Map`, `Set`, `Date` or class instance instead of writing
+  it as `{}`, so a future non-plain trace field cannot hide from the gate.
+- `trace-independence.test.ts` now also abandons a Sharp and a Centerline trace half way through
+  their cooperative steps, steps a Line Art and a Centerline trace alternately with `next(true)`,
+  then retraces all three, and compares every hash with a fresh module instance. A mutation that
+  caches the pending mask at module level fails only this new case.
+- Gate on the final code: the heavy oracle (90 cases: 66 light plus owl, hummingbird, noise1024
+  and value1024 in all six presets) matched the 952fb13e3 hashes, together with the corpus
+  distance-field and thinning checks and the distance-field, boundary-walk, thinning, queue,
+  canonical and independence suites (371/371).
