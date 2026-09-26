@@ -11,6 +11,7 @@ import { useLaserStore } from '../state/laser-store';
 import { useUiStore } from '../state/ui-store';
 import {
   drive,
+  frameUntilPermit,
   harness,
   installRecoveryStressHooks,
   startFramedJob,
@@ -54,6 +55,8 @@ describe('completion offer under repeated runs', () => {
 
       const receipt = h.repository.getSnapshot().lastCompletedReceipt;
       if (receipt === null) throw new Error('Expected the first receipt.');
+      // Run again needs a fresh Frame, like Start (ADR-372 Amendment 1).
+      await frameUntilPermit();
       const again = runCompletedJobAgainFlow(receipt, h.repository);
       for (let step = 0; step < 600 && useLaserStore.getState().streamer === null; step += 1) {
         await tick(5);

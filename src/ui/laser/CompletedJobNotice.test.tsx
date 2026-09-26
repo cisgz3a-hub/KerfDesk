@@ -18,6 +18,15 @@ import { ExecutionArchivePanel } from './ExecutionArchivePanel';
 import { LiveMotionBar } from './LiveMotionBar';
 import { RunAgainControl } from './RunAgainControl';
 
+import type * as FramedRunReadiness from './framed-run-readiness';
+
+// Done must keep the replay offer. Run again also needs a ready Frame permit
+// (ADR-372 Amendment 1), which these display cases treat as ready.
+vi.mock('./framed-run-readiness', async (importOriginal) => {
+  const actual = await importOriginal<typeof FramedRunReadiness>();
+  return { ...actual, framedRunReadinessIssue: vi.fn(() => null) };
+});
+
 (
   globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT?: boolean }
 ).IS_REACT_ACT_ENVIRONMENT = true;

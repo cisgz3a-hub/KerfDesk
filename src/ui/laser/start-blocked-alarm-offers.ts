@@ -4,9 +4,9 @@
 // operator vouches for the head, the same split STATUS_ALARM_START_MESSAGE
 // instructs. The prompts name the actions, not GRBL's $H/$X: the active
 // driver may home or unlock with other commands (the alarm banner spells
-// those out). Split out of start-blocked-fix-offers so the ordinary Frame can
-// reach it: that dispatcher also owns the Frame-run offer, which imports
-// runFrameNow and would close an import cycle.
+// those out). Frame job reaches it through frame-blocker-repair; Start and Run
+// again make no offers, since they only stream a Frame's permit (ADR-372 and
+// its Amendment 1).
 
 import { useStore } from '../state';
 import { jobAwareConfirm } from '../state/job-aware-dialogs';

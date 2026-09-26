@@ -1,6 +1,6 @@
-// Shared primitives for the blocked-Start fix offers. Both offer modules
-// (start-blocked-fix-offers, start-blocked-setup-offers) build on these, so
-// they live here instead of one importing the other in a cycle.
+// Shared primitives for the in-place fix offers that Frame job makes through
+// frame-blocker-repair (start-blocked-alarm-offers, start-blocked-setup-offers),
+// kept here so neither offer module imports the other.
 
 import { useLaserStore, type LaserState } from '../state/laser-store';
 import { useToastStore } from '../state/toast-store';
@@ -10,10 +10,6 @@ import { useToastStore } from '../state/toast-store';
  * the refusal report, the operator re-Starts when the step completes.
  * 'unrepaired' — nothing offered or the operator declined; report as before. */
 export type BlockedStartRepair = 'retry' | 'handled' | 'unrepaired';
-
-/** One in-place fix offer per Start click: the retried flow must not re-ask,
- * or a still-failing gate would loop the operator through the same dialog. */
-export type StartOfferPolicy = 'offer-fixes' | 'no-offers';
 
 // GRBL reflects unlock/home/override effects through the next status report,
 // so a bounded settle-wait covers the poll latency. Timing out is not a

@@ -3,7 +3,7 @@
 // literally cannot compile without — a User or Verified Origin that was never
 // set. Absolute uses the observed offset without erasing it. Each offer
 // its one-click remedy in place. Each offer fires only when its gate is the SOLE
-// refusal message — the dispatcher in start-blocked-fix-offers enforces that
+// refusal message; Frame job's repair (frame-blocker-repair) enforces that
 // before delegating here.
 
 import { jobAwareConfirm } from '../state/job-aware-dialogs';

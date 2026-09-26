@@ -24,7 +24,7 @@ import {
 import { createCurrentTestExecutionArtifact } from '../state/recovery/testing/execution-artifact-test-fixture';
 import { resetStore } from '../state/test-helpers';
 import { useToastStore } from '../state/toast-store';
-import { installFramedRunPermitForCurrentState } from './framed-run-testing';
+import { installFramedRunPermitForCurrentState, renewFramedRunPermit } from './framed-run-testing';
 import { installAutoJobReview, useJobReviewStore } from './job-review';
 import { useStartBlockerStore } from './start-blocker-store';
 import { runCompletedJobAgainFlow, runStartJobFlow } from './start-job-flow';
@@ -405,6 +405,8 @@ describe('completed-job replay', () => {
     await repository.completeRun(first.runId);
     const receipt = repository.getSnapshot().lastCompletedReceipt;
     if (receipt === null) throw new Error('Expected a completed receipt.');
+    // Run again needs a fresh Frame, like Start (ADR-372 Amendment 1).
+    await renewFramedRunPermit();
     startSpy().mockClear();
 
     await runCompletedJobAgainFlow(receipt, repository);

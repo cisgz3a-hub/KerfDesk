@@ -15,7 +15,18 @@ import {
   MemoryRecoveryStorageBackend,
 } from '../state/recovery/testing';
 import { createCurrentTestExecutionArtifact } from '../state/recovery/testing/execution-artifact-test-fixture';
+import { FRAME_JOB_FIRST_MESSAGE, framedRunReadinessIssue } from './framed-run-readiness';
 import { currentReplayExecutionSignature, RunAgainControl } from './RunAgainControl';
+
+import type * as FramedRunReadiness from './framed-run-readiness';
+
+// Run again unlocks like Start, on a ready Frame permit (ADR-372 Amendment 1).
+// These cases are about the replay offer itself, so the permit reads as ready
+// unless a case says otherwise.
+vi.mock('./framed-run-readiness', async (importOriginal) => {
+  const actual = await importOriginal<typeof FramedRunReadiness>();
+  return { ...actual, framedRunReadinessIssue: vi.fn(() => null) };
+});
 
 (
   globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT?: boolean }
@@ -28,6 +39,7 @@ let root: Root | null = null;
 let host: HTMLDivElement | null = null;
 
 beforeEach(() => {
+  vi.mocked(framedRunReadinessIssue).mockReturnValue(null);
   useStore.getState().newProject();
   useLaserStore.setState(initialLaserState());
   usePrintCutSessionStore.getState().clear();
@@ -102,6 +114,18 @@ describe('RunAgainControl', () => {
       expect(repository.getSnapshot().lastCompletedReceipt).not.toBeNull();
     },
   );
+
+  it('stays greyed out until a Frame of this exact job is ready, like Start', async () => {
+    vi.mocked(framedRunReadinessIssue).mockReturnValue(FRAME_JOB_FIRST_MESSAGE);
+    const onRunAgain = vi.fn(async () => undefined);
+    render(await completedRepository(), onRunAgain);
+
+    const runAgain = button('Run same job again from start');
+    expect(runAgain.disabled).toBe(true);
+    expect(runAgain.title).toContain('Press Frame job first');
+    act(() => runAgain.click());
+    expect(onRunAgain).not.toHaveBeenCalled();
+  });
 
   it('does not offer replay when there is no clean-completion receipt', async () => {
     const repository = createRepository();
