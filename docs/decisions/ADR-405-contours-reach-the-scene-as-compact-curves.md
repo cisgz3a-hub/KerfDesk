@@ -252,7 +252,8 @@ tail and follow that staircase; see Known gaps.
     uniform noise. Faster candidate proposal (coarse early exits, capped spans, fewer Newton passes,
     giving up after one pass) was measured and rejected: each changed the candidate joints enough
     to fail the R=900 commit-grid, filled-disc Optimize, Edge-dial or hairline instruments.
-    Incremental span evaluation (reusing the previous extension's parameters) is the next lever.
+    Incremental span evaluation (reusing the previous extension's parameters) is the next lever;
+    the exact part of it is done (Amendment 1), and the fit is no longer where most of the gap is.
 - Node editing, SVG export, bounds and the laser commit read the carried cubics; the downscale and
   Region Enhance routes no longer lose them.
 
@@ -260,3 +261,61 @@ Not part of this decision: chord-optimal cubic flattening in compile; the corner
 regressions; a staircase prefilter for binary sources on the 2x route; moving the centreline's
 curve registration off the sample-array key; a drawing-wide monotone Optimize under neighbour
 conflicts.
+
+### Amendment 1 - compact-fit speed, same output (2026-09-27)
+
+The compact fit was made cheaper without moving a single output bit. Every change keeps the
+arithmetic of the pass it replaces, in the same operation order:
+
+- Span passes run on allocation-free kernels (`compact-curve-project.ts`): parameters go into two
+  reused buffers (kept up to 65,536 points, so a huge ring never pins its size), and the Newton
+  step and evaluation are inlined on the cubic's coordinates and control-point differences, read
+  once per pass. A unit test holds the pass against `cubic-fit.ts`'s own step bit for bit.
+- Exact early stops: a Newton pass stops once its running maximum reaches the best error so far
+  (it can then neither be kept nor improve, which ends the passes anyway); a merge extension's
+  first pass stops at its give-up bound and its curve-to-chain check at the tolerance, because the
+  rest of either pass cannot change the decision.
+- A merge extension over a span the proposal already split reaches its decision from the
+  proposal's Newton passes (they are deterministic for the same span and joint tangents) instead
+  of refitting it. The merge's span cache is a flat error array plus full evaluations only for
+  usable spans, and the fewest-segments walk no longer prepends in a loop.
+- `hypot2` (`geometry/fast-hypot.ts`) reproduces V8's two-argument `Math.hypot` bit for bit at
+  about a quarter of its cost; its test pins the equality.
+
+Equivalence instrument: every `fitCompactRing` call of real traces (owl in Line Art, Smooth and
+Sharp; hummingbird in Line Art; perf-noise-192 and perf-noise-1024 in Line Art; 34,876 calls) was
+recorded and replayed through the fitter before and after. Structural differences 0, numeric
+differences 0 on every corpus. The bake-off owl keeps 30,530 cubics and 4,335 lines.
+
+Measured (one process per run, interleaved, machine under heavy load from other work, so ratios
+only; `traceImageToColoredPaths`, the fit timed inside it):
+
+| Case | Before (`225346494`) | After | main (`fa8939b8d`) |
+|---|---|---|---|
+| owl, Line Art, fit only | 6.6 to 8.2 s | 4.1 to 4.9 s | - |
+| owl, Line Art, whole trace | 21.7 to 24.5 s | 18.7 to 23.2 s | 8.5 to 11.5 s |
+| owl, Line Art, peak RSS | 860 to 867 MB | 865 to 871 MB | 718 to 779 MB |
+| perf-noise-1024, Line Art, fit only | 254 s | 109 s | - |
+| perf-noise-1024, Line Art, whole trace | 578 s | 419 s | 110 s |
+| perf-noise-1024, Line Art, peak RSS | 6.4 GB | 6.5 GB | 2.3 GB |
+
+Replaying the recorded owl Line Art calls alone (interleaved, same load): 3.2 to 3.3 s before,
+2.1 to 2.4 s after.
+
+Rejected, because it moves output past 0.01 px: Bernstein cubes as products (`x * x * x`) in the
+arm solve. V8's `x ** 3` differs from the product in about a quarter of cases and is not correctly
+rounded either, and the product version changed three owl-Sharp rings structurally with control
+points up to 0.389 px apart. An exact double-double cube with a fallback near rounding midpoints
+matched on 3e7 values but was no faster.
+
+Status against the speed targets (owl Line Art at most 4.0 s, perf-noise-1024 at most 67 s, memory
+not above main): not met. The fit is now about a quarter of the trace (owl 22%, noise 26%), so even
+a free fit leaves both traces well above the targets and above main. The rest is outside the fit and not yet profiled (the likely
+owners are the 0.02 px compatibility sampling that the topology repair and the curve contacts of
+ADR-406 test, and the memory that sampling and the carried cubics hold: peak RSS is 2.8x main on
+perf-noise-1024).
+Within the fit, about 75% of the remaining projection work is the candidate proposal's split-at-
+worst recursion, whose joints decide the output; the earlier proposal shortcuts moved joints and
+failed the R=900 commit-grid, filled-disc Optimize, Edge-dial and hairline instruments. Reaching
+the targets therefore needs an output-changing step (a coarser compatibility sampling or a
+redesigned proposal), which is a separate decision with its own instruments.
