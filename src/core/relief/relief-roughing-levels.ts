@@ -20,6 +20,10 @@
 // open floor is not cut again.
 
 import type { Heightmap } from './heightmap';
+import {
+  assertReliefLevelArrayLength,
+  reliefFineLevelCount,
+} from './relief-roughing-level-materialization';
 
 // Cells whose tips round to the same 0.1 µm share a flat.
 const FLAT_BUCKETS_PER_MM = 10_000;
@@ -53,6 +57,7 @@ export function reliefRoughingLevels(
   const flats = flatHeights(map, dilated, toolRadiusMm).filter((flat) =>
     isBetweenLevels(flat, [...planned, ...fine]),
   );
+  assertReliefLevelArrayLength(planned.length + fine.length + flats.length);
   const all = [
     ...planned.map((z) => ({ z, band: false })),
     ...fine.map((z) => ({ z, band: true })),
@@ -79,9 +84,17 @@ export function reliefRoughingLevels(
 // ladder level, down to clearly above the next ladder level.
 function fineHeights(planned: ReadonlyArray<number>, fineStepMm: number | undefined): number[] {
   if (fineStepMm === undefined || !(fineStepMm > 0)) return [];
+  const ordered = [...planned].sort((a, b) => b - a);
+  let count = planned.length;
+  let sliceTop = 0;
+  for (const bottom of ordered) {
+    count += reliefFineLevelCount(sliceTop, bottom + MIN_FLAT_STEP_MM, fineStepMm);
+    assertReliefLevelArrayLength(count);
+    sliceTop = bottom;
+  }
   const heights: number[] = [];
   let top = 0;
-  for (const bottom of [...planned].sort((a, b) => b - a)) {
+  for (const bottom of ordered) {
     for (let step = 1; top - step * fineStepMm > bottom + MIN_FLAT_STEP_MM; step += 1) {
       heights.push(top - step * fineStepMm);
     }
