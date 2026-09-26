@@ -1,5 +1,11 @@
+// FROZEN REFERENCE (test support only, never imported by production code).
+// A verbatim copy of the medial thinning and its bucket erosion queue as they
+// stood at 952fb13e3, before the ADR-438 speed-wave-2 thinning cut. The
+// output-identity tests thin every fuzz and corpus mask with both and demand
+// byte-identical skeletons. Do not optimise this file.
+
 // Distance-ordered homotopic thinning. Pixels are eroded lowest-distance
-// first (a queue keyed on the exact squared distance field), so the
+// first (a min-heap keyed on the exact squared distance field), so the
 // surviving 1-px skeleton sits on the ridge of the distance field — the
 // geometric centre of each stroke. That ordering is what kills the staircase
 // wobble the old Zhang-Suen pass produced: plain two-phase thinning erodes
@@ -13,11 +19,9 @@
 import type { InkMask } from './distance-field';
 import { runTraceSteps, type TraceSteps } from '../trace-steps';
 import {
-  bucketErosionQueue,
-  distanceRanks,
-  type DistanceRanks,
+  referenceBucketErosionQueue,
   type ErosionQueue,
-} from './erosion-queue';
+} from './erosion-queue-reference.test-support';
 
 // Ring positions around a pixel, clockwise from top-left.
 const RING_OFFSETS: ReadonlyArray<readonly [number, number]> = [
@@ -30,16 +34,6 @@ const RING_OFFSETS: ReadonlyArray<readonly [number, number]> = [
   [-1, 1],
   [-1, 0],
 ];
-
-// The same ring as flat x / y offset tables (no tuple destructuring on the
-// hot path), and the index deltas of an interior pixel's ring for a width.
-const RING_DX = Int8Array.from(RING_OFFSETS, ([dx]) => dx);
-const RING_DY = Int8Array.from(RING_OFFSETS, ([, dy]) => dy);
-const RING_SIZE = 8;
-
-function ringDeltas(width: number): Int32Array {
-  return Int32Array.from(RING_OFFSETS, ([dx, dy]) => dy * width + dx);
-}
 
 // The 4-adjacent-to-centre ring indices (T, R, B, L).
 const EDGE_RING_INDICES: ReadonlyArray<number> = [1, 3, 5, 7];
@@ -58,22 +52,16 @@ const NEIGHBOR_COUNT_LUT = buildNeighborCountLut();
  *  down to 1 px; by then branches are thin, so their tips are protected by
  *  the endpoint rule and survive (minus at most a pixel, which tip extension
  *  recovers). */
-export function thinToMedialAxis(mask: InkMask, distSq: Float64Array): Uint8Array {
+export function referenceThinToMedialAxis(mask: InkMask, distSq: Float64Array): Uint8Array {
   return runTraceSteps(thinToMedialAxisSteps(mask, distSq));
 }
 
-export function* thinToMedialAxisSteps(
-  mask: InkMask,
-  distSq: Float64Array,
-): TraceSteps<Uint8Array> {
+function* thinToMedialAxisSteps(mask: InkMask, distSq: Float64Array): TraceSteps<Uint8Array> {
   const { width, height, ink } = mask;
   const skeleton = new Uint8Array(ink);
   const anchors = maximalDiscAnchors(mask, distSq);
-  const ranks = distanceRanks(distSq);
-  // Both passes drain their queue to empty, so they share one pending mask.
-  const pending = ranks === null ? null : new Uint16Array(distSq.length);
-  yield* thinPassSteps(skeleton, width, height, distSq, ranks, pending, anchors);
-  yield* thinPassSteps(skeleton, width, height, distSq, ranks, pending, null);
+  yield* thinPassSteps(skeleton, width, height, distSq, anchors);
+  yield* thinPassSteps(skeleton, width, height, distSq, null);
   return skeleton;
 }
 
@@ -82,16 +70,13 @@ function* thinPassSteps(
   width: number,
   height: number,
   distSq: Float64Array,
-  ranks: DistanceRanks | null,
-  pending: Uint16Array | null,
   anchors: Uint8Array | null,
 ): TraceSteps<void> {
   const cooperate = yield;
-  const queue = erosionQueue(distSq, ranks, pending);
-  const deltas = ringDeltas(width);
+  const queue = erosionQueue(distSq);
   for (let i = 0; i < skeleton.length; i += 1) {
     if ((i & 127) === 0 && cooperate) yield;
-    if (skeleton[i] === 1) queue.push(packEntry(skeleton, width, height, i));
+    if ((skeleton[i] ?? 0) === 1) queue.push(packEntry(skeleton, width, height, i));
   }
   let work = 0;
   while (queue.size() > 0) {
@@ -99,18 +84,14 @@ function* thinPassSteps(
     const index = unpackIndex(queue.pop());
     if (!isErodable(skeleton, width, height, index, anchors)) continue;
     skeleton[index] = 0;
-    requeueNeighbours(skeleton, width, height, queue, index, deltas);
+    requeueNeighbours(skeleton, width, height, queue, index);
   }
 }
 
 // The comparator heap keys on the field directly; integer fields (every
 // field the tracer builds) take the equivalent bucket queue.
-function erosionQueue(
-  distSq: Float64Array,
-  ranks: DistanceRanks | null,
-  pending: Uint16Array | null,
-): ErosionQueue {
-  const buckets = pending === null ? null : bucketErosionQueue(distSq, ranks, pending);
+function erosionQueue(distSq: Float64Array): ErosionQueue {
+  const buckets = referenceBucketErosionQueue(distSq);
   if (buckets !== null) return buckets;
   const heap: number[] = [];
   return {
@@ -127,8 +108,8 @@ function isErodable(
   index: number,
   anchors: Uint8Array | null,
 ): boolean {
-  if (skeleton[index] !== 1) return false;
-  if (anchors !== null && anchors[index] === 1) return false; // maximal disc centre
+  if ((skeleton[index] ?? 0) !== 1) return false;
+  if (anchors !== null && (anchors[index] ?? 0) === 1) return false; // maximal disc centre
   const config = ringConfig(skeleton, width, height, index);
   if ((NEIGHBOR_COUNT_LUT[config] ?? 0) <= 1) return false; // endpoint / isolated dot
   return (SIMPLE_LUT[config] ?? 0) === 1;
@@ -141,20 +122,17 @@ function requeueNeighbours(
   height: number,
   queue: ErosionQueue,
   index: number,
-  deltas: Int32Array,
 ): void {
   const x = index % width;
   const y = (index - x) / width;
-  const interior = x > 0 && y > 0 && x < width - 1 && y < height - 1;
-  for (let k = 0; k < RING_SIZE; k += 1) {
-    let ni = index + (deltas[k] as number);
-    if (!interior) {
-      const nx = x + (RING_DX[k] as number);
-      const ny = y + (RING_DY[k] as number);
-      if (nx < 0 || ny < 0 || nx >= width || ny >= height) continue;
-      ni = ny * width + nx;
+  for (const [dx, dy] of RING_OFFSETS) {
+    const nx = x + dx;
+    const ny = y + dy;
+    if (nx < 0 || ny < 0 || nx >= width || ny >= height) continue;
+    const ni = ny * width + nx;
+    if ((skeleton[ni] ?? 0) === 1) {
+      queue.push(packEntry(skeleton, width, height, ni));
     }
-    if (skeleton[ni] === 1) queue.push(packEntry(skeleton, width, height, ni));
   }
 }
 
@@ -180,9 +158,9 @@ function isLocalDistanceMax(
   const own = distSq[i] ?? 0;
   const x = i % width;
   const y = (i - x) / width;
-  for (let k = 0; k < RING_SIZE; k += 1) {
-    const nx = x + (RING_DX[k] as number);
-    const ny = y + (RING_DY[k] as number);
+  for (const [dx, dy] of RING_OFFSETS) {
+    const nx = x + dx;
+    const ny = y + dy;
     const neighbor =
       nx < 0 || ny < 0 || nx >= width || ny >= height ? 0 : (distSq[ny * width + nx] ?? 0);
     if (neighbor > own) return false;
@@ -191,41 +169,23 @@ function isLocalDistanceMax(
 }
 
 /** 8-bit neighbourhood configuration of the ring around `index`. */
-export function ringConfig(grid: Uint8Array, width: number, height: number, index: number): number {
+function ringConfig(grid: Uint8Array, width: number, height: number, index: number): number {
   const x = index % width;
   const y = (index - x) / width;
-  if (x > 0 && y > 0 && x < width - 1 && y < height - 1) {
-    return interiorRingConfig(grid, width, index);
-  }
   let config = 0;
-  for (let i = 0; i < RING_SIZE; i += 1) {
-    const nx = x + (RING_DX[i] as number);
-    const ny = y + (RING_DY[i] as number);
+  for (let i = 0; i < RING_OFFSETS.length; i += 1) {
+    const offset = RING_OFFSETS[i];
+    if (offset === undefined) continue;
+    const nx = x + offset[0];
+    const ny = y + offset[1];
     if (nx < 0 || ny < 0 || nx >= width || ny >= height) continue;
-    if (grid[ny * width + nx] === 1) config |= 1 << i;
+    if ((grid[ny * width + nx] ?? 0) === 1) config |= 1 << i;
   }
   return config;
 }
 
-// The ring of a pixel with all eight neighbours inside the grid, read by
-// direct index (bit order as RING_OFFSETS: clockwise from top-left).
-function interiorRingConfig(grid: Uint8Array, width: number, index: number): number {
-  const up = index - width;
-  const down = index + width;
-  return (
-    (grid[up - 1] === 1 ? 1 : 0) |
-    (grid[up] === 1 ? 2 : 0) |
-    (grid[up + 1] === 1 ? 4 : 0) |
-    (grid[index + 1] === 1 ? 8 : 0) |
-    (grid[down + 1] === 1 ? 16 : 0) |
-    (grid[down] === 1 ? 32 : 0) |
-    (grid[down - 1] === 1 ? 64 : 0) |
-    (grid[index - 1] === 1 ? 128 : 0)
-  );
-}
-
 /** Number of set ring neighbours for a configuration. */
-export function ringNeighborCount(config: number): number {
+function ringNeighborCount(config: number): number {
   return NEIGHBOR_COUNT_LUT[config] ?? 0;
 }
 

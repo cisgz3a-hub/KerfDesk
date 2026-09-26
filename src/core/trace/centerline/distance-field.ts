@@ -8,6 +8,8 @@
 import { runTraceSteps, type TraceSteps } from '../trace-steps';
 
 const INF = Number.MAX_SAFE_INTEGER;
+// In-column run length meaning "no background pixel seen yet".
+const NO_BACKGROUND = 0x7fffffff;
 
 export type InkMask = {
   readonly width: number;
@@ -30,58 +32,99 @@ export function* squaredDistanceFieldSteps(mask: InkMask): TraceSteps<Float64Arr
   const cooperate = yield;
   const { width, height } = mask;
   const distSq = new Float64Array(width * height);
-  const column = new Float64Array(height);
-  // One scratch envelope serves every 1D transform of both passes.
-  const scratch = envelopeScratch(Math.max(width, height));
-  // Pass 1: per-column 1D transform of the 0/INF indicator.
-  for (let x = 0; x < width; x += 1) {
+  // Pass 1, the column transform of the 0/INF indicator. Its lower envelope
+  // over background parabolas (all rooted at 0) is exactly the squared
+  // in-column distance to the nearest background pixel (INF when the column
+  // has none), so two row-major integer sweeps give the same values without
+  // the strided per-column envelope (ADR-438 amendment, speed wave 2).
+  const run = new Int32Array(width);
+  run.fill(NO_BACKGROUND);
+  for (let y = 0; y < height; y += 1) {
     if (cooperate) yield;
-    transformColumn(mask, x, column, distSq, scratch);
+    sweepDownRow(mask, y, run, distSq);
+  }
+  run.fill(NO_BACKGROUND);
+  for (let y = height - 1; y >= 0; y -= 1) {
+    if (cooperate) yield;
+    sweepUpRow(mask, y, run, distSq);
   }
   // Pass 2: per-row 1D transform of the column result.
+  const scratch = envelopeScratch(width);
   const row = new Float64Array(width);
   for (let y = 0; y < height; y += 1) {
     if (cooperate) yield;
-    for (let x = 0; x < width; x += 1) {
-      row[x] = distSq[y * width + x] ?? 0;
-    }
-    const transformed = distanceTransform1d(row, width, scratch);
-    for (let x = 0; x < width; x += 1) {
-      distSq[y * width + x] = transformed[x] ?? 0;
-    }
+    transformRow(distSq, width, height, y, row, scratch);
   }
-  clampToVirtualBorder(distSq, width, height);
   return distSq;
 }
 
-function transformColumn(
-  { width, height, ink }: InkMask,
-  x: number,
-  column: Float64Array,
+// Down sweep: pixels since the last background pixel above, per column.
+function sweepDownRow(
+  { width, ink }: InkMask,
+  y: number,
+  run: Int32Array,
   distSq: Float64Array,
-  scratch: EnvelopeScratch,
 ): void {
-  for (let y = 0; y < height; y += 1) {
-    column[y] = (ink[y * width + x] ?? 0) === 1 ? INF : 0;
-  }
-  const transformed = distanceTransform1d(column, height, scratch);
-  for (let y = 0; y < height; y += 1) {
-    distSq[y * width + x] = transformed[y] ?? 0;
+  const rowStart = y * width;
+  for (let x = 0; x < width; x += 1) {
+    const i = rowStart + x;
+    if (ink[i] === 1) {
+      const above = run[x] as number;
+      const next = above === NO_BACKGROUND ? NO_BACKGROUND : above + 1;
+      run[x] = next;
+      distSq[i] = next;
+    } else {
+      run[x] = 0;
+    }
   }
 }
 
-// The 1D passes only see in-image background. Treat the first ring of
-// pixels OUTSIDE the image as background too: pixel (x, y) is at most
-// min(x+1, width-x, y+1, height-y) from it.
-function clampToVirtualBorder(distSq: Float64Array, width: number, height: number): void {
-  for (let y = 0; y < height; y += 1) {
-    const yEdge = Math.min(y + 1, height - y);
-    for (let x = 0; x < width; x += 1) {
-      const edge = Math.min(x + 1, width - x, yEdge);
-      const edgeSq = edge * edge;
-      const i = y * width + x;
-      if ((distSq[i] ?? 0) > edgeSq) distSq[i] = edgeSq;
+// Up sweep: the nearer of the background above and below, squared.
+function sweepUpRow(
+  { width, ink }: InkMask,
+  y: number,
+  run: Int32Array,
+  distSq: Float64Array,
+): void {
+  const rowStart = y * width;
+  for (let x = 0; x < width; x += 1) {
+    const i = rowStart + x;
+    if (ink[i] === 1) {
+      const below = run[x] as number;
+      const next = below === NO_BACKGROUND ? NO_BACKGROUND : below + 1;
+      run[x] = next;
+      const above = distSq[i] as number;
+      const nearest = above < next ? above : next;
+      distSq[i] = nearest === NO_BACKGROUND ? INF : nearest * nearest;
+    } else {
+      run[x] = 0;
     }
+  }
+}
+
+// Row envelope of one row, with the virtual border clamp folded into the
+// write-back. The 1D passes only see in-image background, so the first ring
+// of pixels OUTSIDE the image also counts as background: pixel (x, y) is at
+// most min(x+1, width-x, y+1, height-y) from it.
+function transformRow(
+  distSq: Float64Array,
+  width: number,
+  height: number,
+  y: number,
+  row: Float64Array,
+  scratch: EnvelopeScratch,
+): void {
+  const rowStart = y * width;
+  for (let x = 0; x < width; x += 1) {
+    row[x] = distSq[rowStart + x] as number;
+  }
+  const transformed = distanceTransform1d(row, width, scratch);
+  const yEdge = Math.min(y + 1, height - y);
+  for (let x = 0; x < width; x += 1) {
+    const edge = Math.min(x + 1, width - x, yEdge);
+    const edgeSq = edge * edge;
+    const value = transformed[x] as number;
+    distSq[rowStart + x] = value > edgeSq ? edgeSq : value;
   }
 }
 
