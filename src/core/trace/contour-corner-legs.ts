@@ -227,11 +227,19 @@ function isStraight(
   const first = pts[((i % n) + n) % n] as Vec2;
   const last = pts[(((i + (count - 1) * step) % n) + n) % n] as Vec2;
   const allowed = tolerance.base + tolerance.slope * Math.hypot(last.x - first.x, last.y - first.y);
-  for (let k = 0; k < count; k += 1) {
-    const p = pts[(((i + k * step) % n) + n) % n] as Vec2;
+  for (let k = 0, j = ((i % n) + n) % n; k < count; k += 1, j = wrapStep(j, step, n)) {
+    const p = pts[j] as Vec2;
     if (Math.abs((p.x - leg.cx) * nx + (p.y - leg.cy) * ny) > allowed) return false;
   }
   return true;
+}
+
+// The ring index after `j` in direction `step`: the same index as reducing
+// the unrolled index modulo n, stepped instead of divided.
+function wrapStep(j: number, step: 1 | -1, n: number): number {
+  const next = j + step;
+  if (next === n) return 0;
+  return next < 0 ? n - 1 : next;
 }
 
 // Total-least-squares line through `count` points from i in direction `step`,
@@ -239,10 +247,11 @@ function isStraight(
 export function fitLeg(pts: ReadonlyArray<Vec2>, i: number, count: number, step: 1 | -1): Leg {
   const n = pts.length;
   const at = (k: number): Vec2 => pts[(((i + k * step) % n) + n) % n] as Vec2;
+  const start = ((i % n) + n) % n;
   let cx = 0;
   let cy = 0;
-  for (let k = 0; k < count; k += 1) {
-    const p = at(k);
+  for (let k = 0, j = start; k < count; k += 1, j = wrapStep(j, step, n)) {
+    const p = pts[j] as Vec2;
     cx += p.x;
     cy += p.y;
   }
@@ -251,11 +260,13 @@ export function fitLeg(pts: ReadonlyArray<Vec2>, i: number, count: number, step:
   let sxx = 0;
   let sxy = 0;
   let syy = 0;
-  for (let k = 0; k < count; k += 1) {
-    const p = at(k);
-    sxx += (p.x - cx) ** 2;
-    sxy += (p.x - cx) * (p.y - cy);
-    syy += (p.y - cy) ** 2;
+  for (let k = 0, j = start; k < count; k += 1, j = wrapStep(j, step, n)) {
+    const p = pts[j] as Vec2;
+    const ex = p.x - cx;
+    const ey = p.y - cy;
+    sxx += ex * ex;
+    sxy += ex * ey;
+    syy += ey * ey;
   }
   const angle = 0.5 * Math.atan2(2 * sxy, sxx - syy);
   let dx = Math.cos(angle);
