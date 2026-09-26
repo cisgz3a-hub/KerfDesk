@@ -193,28 +193,105 @@
   padding-left: 18px;
   line-height: 1.6;
 }
-.lf-setup-auto {
+/* Find my machine (ADR-420): the Machine stage's first card. */
+.lf-setup-find {
   display: grid;
-  gap: 10px;
+  gap: 12px;
   padding: 16px;
   border: 1px solid var(--lf-border);
   border-radius: 10px;
   background: var(--lf-bg-1);
   min-width: 0;
 }
-.lf-setup-auto[data-ready='true'] {
+.lf-setup-find[data-phase='found'] {
+  border-color: var(--lf-success);
+}
+.lf-setup-find[data-phase='idle'],
+.lf-setup-find[data-phase='connecting'],
+.lf-setup-find[data-phase='reading'],
+.lf-setup-find[data-phase='scanning'] {
   border-color: var(--lf-accent);
   background: var(--lf-tint-accent);
 }
-.lf-setup-auto h4 {
-  margin: 0;
-  font-size: 13px;
+.lf-setup-find[data-phase='silent'],
+.lf-setup-find[data-phase='failed'] {
+  border-color: var(--lf-warning);
 }
-.lf-setup-auto p {
+.lf-setup-find-head {
+  display: grid;
+  gap: 4px;
+}
+.lf-setup-find-head h4 {
   margin: 0;
-  font-size: 11px;
-  line-height: 1.6;
+  font-size: 15px;
+}
+.lf-setup-find-head p,
+.lf-setup-find p {
+  margin: 0;
+  font-size: 12px;
+  line-height: 1.55;
   color: var(--lf-text-muted);
+}
+.lf-setup-find-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.lf-setup-find-mismatch {
+  display: grid;
+  gap: 7px;
+  padding: 10px;
+  border: 1px solid var(--lf-warning);
+  border-radius: 8px;
+  font-size: 12px;
+}
+.lf-setup-find-contract {
+  margin-top: 10px;
+  font-size: 12px;
+}
+.lf-setup-find-contract summary {
+  cursor: pointer;
+  font-weight: 600;
+}
+.lf-setup-find-contract dl {
+  display: grid;
+  grid-template-columns: 100px minmax(0, 1fr);
+  gap: 5px 10px;
+  margin: 8px 0 0;
+}
+.lf-setup-found {
+  display: grid;
+  gap: 10px;
+}
+.lf-setup-found-facts {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.lf-setup-found-facts li {
+  padding: 3px 9px;
+  border: 1px solid var(--lf-border);
+  border-radius: 999px;
+  background: var(--lf-bg-0);
+  font-size: 12px;
+}
+.lf-setup-found-filled,
+.lf-setup-found-differs {
+  display: grid;
+  gap: 6px;
+  justify-items: start;
+  padding: 10px 12px;
+  border-radius: 8px;
+  background: var(--lf-bg-0);
+  font-size: 12px;
+}
+.lf-setup-found-filled ul {
+  margin: 0;
+  padding-left: 18px;
+  line-height: 1.6;
 }
 .lf-setup-auto-values {
   display: grid;
@@ -390,7 +467,7 @@
   .lf-setup-profile-notes {
     margin: 0 12px 10px;
   }
-  .lf-setup-auto {
+  .lf-setup-find {
     padding: 12px;
   }
 }

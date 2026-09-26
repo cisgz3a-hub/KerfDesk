@@ -49,7 +49,7 @@ describe('Machine run control audit', () => {
       disabled: false,
     };
     act(() => root.render(<ConnectionBar {...props} connection={{ kind: 'disconnected' }} />));
-    act(() => button('Connect…').click());
+    act(() => button('Connect').click());
     expect(props.onConnect).toHaveBeenCalledTimes(1);
     act(() => root.render(<ConnectionBar {...props} connection={{ kind: 'connecting' }} />));
     expect(button('Connecting…').disabled).toBe(true);

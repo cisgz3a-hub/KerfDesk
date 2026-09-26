@@ -1,3 +1,4 @@
+import { deviceForActiveHead } from '../../core/cnc/cnc-head-feeds';
 import { buildResumeProgram } from '../../core/controllers/grbl';
 import { laserResumeDialectForDevice } from '../../core/controllers/grbl/laser-resume-dialect';
 import { streamingModeForController } from '../../core/devices';
@@ -100,7 +101,7 @@ function resumeStreamPlans(
   );
   const jobTimingPlan = canvasJobTimingPlan(
     gcode,
-    project.device,
+    deviceForActiveHead(project.device, project.machine),
     initialPosition,
     {
       machineKind: machineKindOf(project.machine),

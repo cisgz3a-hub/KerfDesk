@@ -137,7 +137,7 @@ baseTest(
 
     const dialog = page.getByRole('dialog', { name: 'Machine Setup' });
     await expect(dialog).toContainText('Step 1 of 3');
-    await dialog.getByText('Controller and connection settings', { exact: true }).click();
+    await dialog.getByText('Connection options', { exact: true }).click();
     await expect(dialog.getByLabel('Controller firmware')).toHaveValue('grbl-v1.1');
     await dialog.getByRole('button', { name: 'Check essentials', exact: true }).click();
     await expect(dialog).toContainText('Step 2 of 3');
@@ -245,13 +245,14 @@ kerfDeskTest(
     await page.getByRole('tab', { name: 'Machine' }).click();
     await page.getByRole('button', { name: 'Machine Setup', exact: true }).click();
     const dialog = page.getByRole('dialog', { name: 'Machine Setup' });
-    await dialog.getByText('Connect and detect', { exact: true }).click();
-    await dialog.getByRole('button', { name: /^Connect/ }).click();
-    await expect(dialog).toContainText('Controller connected.');
+    await dialog.getByRole('button', { name: 'Find my machine', exact: true }).click();
+    await expect(dialog).toContainText('Found your GRBL');
+    // A machine not set up before is filled from what it reports (ADR-420).
+    await expect(dialog).toContainText('Filled in from your controller');
 
     await kerfdesk.setSerialSetting(130, '350');
     const beforeRead = serialWrites(await kerfdesk.events()).length;
-    await dialog.getByRole('button', { name: 'Run read-only checks', exact: true }).click();
+    await dialog.getByRole('button', { name: 'Read again', exact: true }).click();
     await expect
       .poll(async () => serialWrites(await kerfdesk.events()).slice(beforeRead))
       .toContain('$I\n');
@@ -259,12 +260,7 @@ kerfDeskTest(
       .poll(async () => serialWrites(await kerfdesk.events()).slice(beforeRead))
       .toContain('$$\n');
     expect(serialWrites(await kerfdesk.events()).slice(beforeRead)).not.toMatch(/\$\d+=/);
-    await expect(dialog).toContainText('Bed width: 350.000 mm');
-
-    await dialog.getByRole('button', { name: 'Use detected values', exact: true }).click();
-    await expect(dialog.getByRole('status')).toContainText(
-      'Detected values applied to this setup draft',
-    );
+    await expect(dialog).toContainText('→ 350.000 mm');
 
     await dialog.getByRole('button', { name: 'Check essentials', exact: true }).click();
     await dialog.getByLabel('GRBL $30 max power S').fill('900');

@@ -290,12 +290,12 @@ export const CONTROL_HELP: Readonly<Record<ControlHelpKey, HelpTopic>> = {
       'Discard the complete Machine Setup draft. Queued firmware settings are not sent on Cancel.',
   },
   'laser.device-setup.connect': {
-    label: 'Connect controller',
+    label: 'Find my machine',
     tooltip:
-      'Open the serial port using the controller family and baud selected on Machine. Connecting is optional during setup.',
+      'Connect on the port the machine used last time (the first time, choose it) and read its firmware, work area, speed and power range into the setup draft. Nothing moves and no controller setting changes. Connecting is optional during setup.',
   },
   'laser.device-setup.reread': {
-    label: 'Run read-only checks',
+    label: 'Read again',
     tooltip: 'Run the selected controller family’s non-motion identity and settings-read commands.',
   },
   'laser.device-setup.apply-detected': {
