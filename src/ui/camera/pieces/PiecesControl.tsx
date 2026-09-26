@@ -93,6 +93,10 @@ function FoundPieces(props: {
   const included = scan.pieces.filter((_, index) => !scan.excluded.has(index));
 
   const place = (): void => {
+    if (usePieceScanStore.getState().scan !== scan) {
+      props.onPlaced('Find pieces again before placing the selection.');
+      return;
+    }
     const state = useStore.getState();
     const current = selectionFrame(
       state.project,

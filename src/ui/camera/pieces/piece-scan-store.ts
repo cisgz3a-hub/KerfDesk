@@ -6,6 +6,7 @@
 
 import { create } from 'zustand';
 import type { DetectedPiece } from '../../../core/camera/pieces/find-pieces';
+import { pieceScanContext, watchPieceScanContext } from './piece-scan-context';
 
 export type PieceScan = {
   readonly pieces: ReadonlyArray<DetectedPiece>;
@@ -16,31 +17,69 @@ export type PieceScan = {
 type PieceScanStore = {
   readonly scan: PieceScan | null;
   readonly finding: boolean;
-  readonly setFinding: (finding: boolean) => void;
+  readonly request: PieceFindRequest | null;
+  readonly beginFind: () => PieceFindRequest;
+  readonly ownsFind: (request: PieceFindRequest) => boolean;
+  readonly cancelFind: (request: PieceFindRequest) => void;
+  readonly finishFind: (request: PieceFindRequest, pieces: ReadonlyArray<DetectedPiece>) => void;
   readonly setPieces: (pieces: ReadonlyArray<DetectedPiece>) => void;
   readonly toggleExcluded: (index: number) => void;
   readonly clear: () => void;
 };
 
-export const usePieceScanStore = create<PieceScanStore>((set) => ({
-  scan: null,
-  finding: false,
-  setFinding: (finding) => set({ finding }),
-  setPieces: (pieces) =>
+export type PieceFindRequest = { readonly isCurrent: () => boolean };
+
+export const usePieceScanStore = create<PieceScanStore>((set, get) => {
+  let releaseContext = (): void => undefined;
+  const release = (): void => {
+    releaseContext();
+    releaseContext = () => undefined;
+  };
+  const clear = (): void => {
+    release();
+    set({ scan: null, finding: false, request: null });
+  };
+  const beginFind = (): PieceFindRequest => {
+    release();
+    const request = { isCurrent: pieceScanContext() };
+    releaseContext = watchPieceScanContext(request.isCurrent, clear);
+    set({ finding: true, request });
+    return request;
+  };
+  const ownsFind = (request: PieceFindRequest): boolean =>
+    get().request === request && request.isCurrent();
+  const finishFind = (request: PieceFindRequest, pieces: ReadonlyArray<DetectedPiece>): void => {
+    if (!ownsFind(request)) return;
     set({
+      request: null,
       finding: false,
       scan: {
         pieces,
         excluded: new Set(pieces.flatMap((piece, index) => (piece.partial ? [index] : []))),
       },
-    }),
-  toggleExcluded: (index) =>
-    set((s) => {
-      if (s.scan === null) return {};
-      const excluded = new Set(s.scan.excluded);
-      if (excluded.has(index)) excluded.delete(index);
-      else excluded.add(index);
-      return { scan: { ...s.scan, excluded } };
-    }),
-  clear: () => set({ scan: null, finding: false }),
-}));
+    });
+  };
+  return {
+    scan: null,
+    finding: false,
+    request: null,
+    beginFind,
+    ownsFind,
+    finishFind,
+    cancelFind: (request) => {
+      if (get().request !== request) return;
+      set({ request: null, finding: false });
+      if (get().scan === null) release();
+    },
+    setPieces: (pieces) => finishFind(beginFind(), pieces),
+    toggleExcluded: (index) =>
+      set((s) => {
+        if (s.scan === null) return {};
+        const excluded = new Set(s.scan.excluded);
+        if (excluded.has(index)) excluded.delete(index);
+        else excluded.add(index);
+        return { scan: { ...s.scan, excluded } };
+      }),
+    clear,
+  };
+});
