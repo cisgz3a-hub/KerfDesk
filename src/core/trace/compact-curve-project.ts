@@ -8,7 +8,7 @@
 // passes, when the rest of the pass can no longer change the caller's
 // decision. Pure core, deterministic.
 
-import { newtonProjectionStep, type CubicBezier } from '../geometry/cubic-fit';
+import type { CubicBezier } from '../geometry/cubic-fit';
 import { hypot2 } from '../geometry/fast-hypot';
 import type { Vec2 } from '../scene';
 
@@ -42,31 +42,57 @@ export function projectSpan(
   const last = span.length - 1;
   out[0] = u[0] as number;
   out[last] = u[last] as number;
+  // cubic-fit.ts's newtonProjectionStep and evaluateCubic inlined on the
+  // cubic's coordinates and control-point differences, read once per pass:
+  // every product and sum is the same operation in the same order, so each
+  // step keeps its bits (compact-curve-project.test.ts holds them together).
   const { p0, p1, p2, p3 } = cubic;
+  const x0 = p0.x;
+  const y0 = p0.y;
+  const x1 = p1.x;
+  const y1 = p1.y;
+  const x2 = p2.x;
+  const y2 = p2.y;
+  const x3 = p3.x;
+  const y3 = p3.y;
+  const ax = x1 - x0;
+  const ay = y1 - y0;
+  const bx = x2 - x1;
+  const by = y2 - y1;
+  const cx = x3 - x2;
+  const cy = y3 - y2;
+  const ex = x2 - 2 * x1 + x0;
+  const ey = y2 - 2 * y1 + y0;
+  const fx = x3 - 2 * x2 + x1;
+  const fy = y3 - 2 * y2 + y1;
   let error = 0;
   let index = span.length >> 1;
   for (let i = 1; i < last; i += 1) {
     const p = span[i] as Vec2;
+    const px = p.x;
+    const py = p.y;
     let t = u[i] as number;
     for (let step = 0; step < PROJECTION_NEWTON_STEPS; step += 1) {
-      const raw = newtonProjectionStep(cubic, p, t);
-      if (raw === null) break;
-      const next = Math.min(1, Math.max(0, raw));
-      if (Math.abs(next - t) < 1e-9) {
-        t = next;
-        break;
-      }
+      const m = 1 - t;
+      const qx = m * m * m * x0 + 3 * t * m * m * x1 + 3 * t * t * m * x2 + t * t * t * x3;
+      const qy = m * m * m * y0 + 3 * t * m * m * y1 + 3 * t * t * m * y2 + t * t * t * y3;
+      const d1x = 3 * m * m * ax + 6 * m * t * bx + 3 * t * t * cx;
+      const d1y = 3 * m * m * ay + 6 * m * t * by + 3 * t * t * cy;
+      const d2x = 6 * m * ex + 6 * t * fx;
+      const d2y = 6 * m * ey + 6 * t * fy;
+      const numerator = (qx - px) * d1x + (qy - py) * d1y;
+      const denominator = d1x * d1x + d1y * d1y + (qx - px) * d2x + (qy - py) * d2y;
+      if (Math.abs(denominator) < 1e-12) break;
+      const next = Math.min(1, Math.max(0, t - numerator / denominator));
+      const converged = Math.abs(next - t) < 1e-9;
       t = next;
+      if (converged) break;
     }
     out[i] = t;
     const m = 1 - t;
-    const b0 = m * m * m;
-    const b1 = 3 * t * m * m;
-    const b2 = 3 * t * t * m;
-    const b3 = t * t * t;
-    const qx = b0 * p0.x + b1 * p1.x + b2 * p2.x + b3 * p3.x;
-    const qy = b0 * p0.y + b1 * p1.y + b2 * p2.y + b3 * p3.y;
-    const d = hypot2(p.x - qx, p.y - qy);
+    const qx = m * m * m * x0 + 3 * t * m * m * x1 + 3 * t * t * m * x2 + t * t * t * x3;
+    const qy = m * m * m * y0 + 3 * t * m * m * y1 + 3 * t * t * m * y2 + t * t * t * y3;
+    const d = hypot2(px - qx, py - qy);
     if (d > error) {
       error = d;
       index = i;
