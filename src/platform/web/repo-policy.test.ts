@@ -145,6 +145,16 @@ describe('repository policy enforcement contract', () => {
     expect(deployWorkflow).not.toContain('playwright install');
   });
 
+  // DEP-1 (2026-09-25 audit): cancelling in-progress Browser smoke runs on
+  // main left many published commits without a finished run. Like ci.yml,
+  // only PR branches may cancel.
+  it('lets every main Browser smoke run finish', () => {
+    const browserWorkflow = repoFile('.github/workflows/e2e.yml');
+    const concurrency = /^concurrency:\n((?: {2}.*\n)+)/mu.exec(browserWorkflow)?.[1];
+
+    expect(concurrency).toContain("cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}");
+  });
+
   it('does not provision Playwright browsers in desktop jobs that never run Playwright', () => {
     for (const path of [
       '.github/workflows/release-desktop-stable.yml',

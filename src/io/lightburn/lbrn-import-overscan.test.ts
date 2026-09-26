@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { compileJob } from '../../core/job';
+import { MAX_FILL_OVERSCAN_MM } from '../../core/job/compile-job-defaults';
 import { importLightBurnProject } from './lbrn-import';
 
 // LightBurn exports a boolean overscan switch separately from overscanPercent.
@@ -32,6 +33,23 @@ describe('LightBurn exported overscan fields', () => {
     });
     expect(result.report.warnings).toEqual([
       expect.stringContaining(`overscan ${percent}% was converted to ${runway} mm`),
+    ]);
+  });
+
+  // 2026-09-25 PR audit LBG-5: 5 % at 1000 mm/s converted to a 50 mm runway, twice
+  // the Overscan field's maximum, so every lead ran 50 mm past the artwork.
+  it('stores a converted runway above the Overscan maximum at the maximum', () => {
+    const result = importScan(
+      '<speed Value="1000"/><overscan Value="1"/><overscanPercent Value="5"/>',
+    );
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(result.project.scene.layers[0]?.fillOverscanMm).toBe(MAX_FILL_OVERSCAN_MM);
+    expect(result.report.warnings).toEqual([
+      expect.stringContaining(
+        `converted to 50 mm at 1000 mm/s, above KerfDesk's ${MAX_FILL_OVERSCAN_MM} mm maximum, ` +
+          `so it is stored as ${MAX_FILL_OVERSCAN_MM} mm`,
+      ),
     ]);
   });
 

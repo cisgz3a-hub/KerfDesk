@@ -97,7 +97,8 @@ function LiveMotionPrimaryAction({ status }: { readonly status: StreamerStatus |
   const machineKind = useLaserStore((state) => state.activeJobMachineKind);
   const isControllerRunning = useLaserStore((state) => state.statusReport?.state === 'Run');
   const toolChangeBlockMessage = useLaserStore(toolChangeContinueBlockMessage);
-  const resumeAdvisory = cncResumeAdvisoryNotice(machineKind);
+  const laserModeEnabled = useLaserStore((state) => state.controllerSettings?.laserModeEnabled);
+  const resumeAdvisory = cncResumeAdvisoryNotice(machineKind, laserModeEnabled);
   const pauseResumeTransition = useLaserStore((state) => state.pauseResumeTransition);
   if (pauseResumeTransition !== null) {
     return (

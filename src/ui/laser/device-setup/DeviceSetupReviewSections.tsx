@@ -119,7 +119,7 @@ function cncRows(state: DeviceSetupStepProps['state']): ReviewRows {
     ['Safe Z', `${params.safeZMm} mm`],
     ['Spindle', `${params.spindleMaxRpm} RPM; ${params.spindleSpinupSec} s dwell`],
     ['Coolant', params.coolant ?? 'off'],
-    ['Park', `${params.parkXMm ?? 0}, ${params.parkYMm ?? 0} mm`],
+    ['Park (bed position)', `${params.parkXMm ?? 0}, ${params.parkYMm ?? 0} mm`],
   ];
 }
 

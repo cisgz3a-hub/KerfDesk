@@ -72,6 +72,9 @@ export function emitGcodeWithExecutablePlan(
     ...(options.absoluteProgramOffset === undefined
       ? {}
       : { absoluteProgramOffset: options.absoluteProgramOffset }),
+    ...(options.workZeroBedPosition === undefined
+      ? {}
+      : { workZeroBedPosition: options.workZeroBedPosition }),
   });
   return emitPreparedGcodeWithExecutablePlan(prepared, options);
 }

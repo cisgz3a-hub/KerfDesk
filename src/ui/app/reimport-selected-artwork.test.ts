@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { effectiveOperationForObject } from '../../core/effective-output';
 import type { ImportedSvg, SceneObject } from '../../core/scene';
 import type { PlatformAdapter } from '../../platform/types';
 import { useStore } from '../state';
@@ -224,5 +225,22 @@ describe('explicit re-import store history', () => {
       id: 'O1',
       paths: [{ color: '#ff0000' }],
     });
+  });
+
+  it('never takes an operation mode from the parsed source', () => {
+    useStore.getState().importSvgObject(svgObj('O1', ['#000000']));
+    const [operation] = useStore.getState().project.scene.layers;
+    expect(operation?.mode).toBe('line');
+
+    // An SVG fragment entry carries the mode a fresh import would create.
+    useStore.getState().reimportSvgObject('O1', {
+      ...svgObj('revision', ['#000000']),
+      operationOverride: { mode: 'fill' },
+    });
+
+    const [object] = useStore.getState().project.scene.objects;
+    if (operation === undefined || object === undefined) throw new Error('scene is empty');
+    expect(object.operationOverride).toBeUndefined();
+    expect(effectiveOperationForObject(operation, object).mode).toBe('line');
   });
 });

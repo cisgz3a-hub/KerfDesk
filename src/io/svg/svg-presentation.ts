@@ -107,7 +107,7 @@ export function presentationStateFor(
   // and re-split the whole style attribute for the same element. Matching
   // <style> rules merge in here, so paint, opacity, clips and effects all see
   // the winning declaration while retaining the fragment's ownership state.
-  const styles = cascadeStyles(el, styleMap(el.getAttribute('style')));
+  const styles = svgPresentationStyles(el, cascadeStyles);
   const stroke = presentationValue(el, styles, 'stroke') ?? parent.stroke;
   const fill = presentationValue(el, styles, 'fill') ?? parent.fill;
   const visibility = presentationValue(el, styles, 'visibility') ?? parent.visibility;
@@ -155,6 +155,13 @@ export function numAttr(el: Element, name: string, fallback = 0): number {
   if (raw === null) return fallback;
   const parsed = Number.parseFloat(raw);
   return Number.isFinite(parsed) ? parsed : fallback;
+}
+
+export function svgPresentationStyles(
+  el: Element,
+  cascadeStyles: SvgStyleCascade,
+): ReadonlyMap<string, string> {
+  return cascadeStyles(el, styleMap(el.getAttribute('style')));
 }
 
 function presentationValue(

@@ -62,6 +62,10 @@
   height: 100%;
 }
 
+.gcode-viewer-viewport:not([data-viewer-state='ready']) .gcode-viewer-canvas {
+  visibility: hidden;
+}
+
 .gcode-viewer-controls {
   position: absolute;
   top: 12px;

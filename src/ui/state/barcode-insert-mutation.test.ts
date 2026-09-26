@@ -46,13 +46,46 @@ describe('applyInsertBarcode', () => {
     expect(result.undoStack).toEqual([before.project]);
   });
 
-  it('keeps the operation Fill when layer defaults would start it as a line', async () => {
+  it('never seeds the Fill from a saved line default', async () => {
+    const plain = applyInsertBarcode(state(), await barcode()).project.scene.layers[0];
     const before = {
       ...state(),
-      layerDefaults: { byColor: {}, allColors: { mode: 'line' as const, power: 42 } },
+      layerDefaults: {
+        byColor: { '#000000': { mode: 'line' as const, power: 100, speed: 480, passes: 3 } },
+        allColors: { mode: 'line' as const, power: 42 },
+      },
     };
     const result = applyInsertBarcode(before, await barcode());
-    expect(result.project.scene.layers[0]).toMatchObject({ mode: 'fill', power: 42 });
+    expect(result.project.scene.layers[0]).toMatchObject({
+      mode: 'fill',
+      power: plain?.power,
+      speed: plain?.speed,
+      passes: plain?.passes,
+    });
+  });
+
+  it('seeds the Fill from a saved Fill default, colour before all colours', async () => {
+    const before = {
+      ...state(),
+      layerDefaults: {
+        byColor: { '#000000': { mode: 'fill' as const, power: 55, speed: 3000 } },
+        allColors: { mode: 'fill' as const, power: 20 },
+      },
+    };
+    const result = applyInsertBarcode(before, await barcode());
+    expect(result.project.scene.layers[0]).toMatchObject({ mode: 'fill', power: 55, speed: 3000 });
+  });
+
+  it('skips a line default for black and falls through to a Fill default for all', async () => {
+    const before = {
+      ...state(),
+      layerDefaults: {
+        byColor: { '#000000': { mode: 'line' as const, power: 100, passes: 3 } },
+        allColors: { mode: 'fill' as const, power: 20 },
+      },
+    };
+    const result = applyInsertBarcode(before, await barcode());
+    expect(result.project.scene.layers[0]).toMatchObject({ mode: 'fill', power: 20, passes: 1 });
   });
 });
 

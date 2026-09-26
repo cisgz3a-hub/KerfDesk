@@ -27,7 +27,9 @@ import { useToastStore } from '../state/toast-store';
 import { resetStore } from '../state/test-helpers';
 import { installAutoJobReview, useJobReviewStore } from './job-review';
 import {
+  HOME_OFFER_CURRENT_POSITION_PROMPT,
   HOME_OFFER_PROMPT,
+  HOMED_PLACE_HEAD_NEXT_STEP_MESSAGE,
   UNLOCK_OFFER_PROMPT,
   UNLOCKED_NEXT_STEP_MESSAGE,
 } from './start-blocked-alarm-offers';
@@ -148,6 +150,37 @@ describe('ordinary Frame offers the in-place fixes', () => {
     expect(jobAwareConfirm).toHaveBeenCalledWith(HOME_OFFER_PROMPT);
     expect(sim.outbound().join('')).toContain('$H\n');
     expect(useLaserStore.getState().framedRun).not.toBeNull();
+    expect(useStartBlockerStore.getState().messages).toEqual([]);
+  });
+
+  it('Frame in Alarm on a Current Position job homes, then stops for the head to be placed', async () => {
+    const sim = await connect(
+      lineProject(true),
+      { startFrom: 'current-position', anchor: 'front-left' },
+      [
+        [22, '1'],
+        [32, '1'],
+      ],
+    );
+    sim.triggerAlarm(3);
+    await vi.advanceTimersByTimeAsync(1_500);
+
+    const framing = runFrameNow();
+    // Long enough for the 200 ms homing cycle, short of the toast timing out.
+    await vi.advanceTimersByTimeAsync(3_000);
+    await framing;
+
+    // The cycle parked the head at the switches. Framing on from there traced the
+    // job at the homing corner and enabled Start for it (audit FRM-1).
+    expect(jobAwareConfirm).toHaveBeenCalledTimes(1);
+    expect(jobAwareConfirm).toHaveBeenCalledWith(HOME_OFFER_CURRENT_POSITION_PROMPT);
+    const sent = sim.outbound().join('');
+    expect(sent).toContain('$H\n');
+    expect(sent.slice(sent.indexOf('$H\n'))).not.toContain('$J=');
+    expect(useLaserStore.getState().framedRun).toBeNull();
+    expect(useToastStore.getState().toasts.at(-1)?.message).toBe(
+      HOMED_PLACE_HEAD_NEXT_STEP_MESSAGE,
+    );
     expect(useStartBlockerStore.getState().messages).toEqual([]);
   });
 

@@ -223,6 +223,7 @@ function requestKey(options: LargeJobPreparationOptions): string {
     outputScope: options.outputScope ?? null,
     contourEntryBounds: options.contourEntryBounds,
     absoluteProgramOffset: options.absoluteProgramOffset,
+    workZeroBedPosition: options.workZeroBedPosition,
     snapshot: options.snapshot ?? null,
     initialPosition:
       options.initialPosition === undefined

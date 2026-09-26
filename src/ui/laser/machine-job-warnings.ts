@@ -10,6 +10,7 @@ import type { Project } from '../../core/scene';
 import type { PreparedOutput } from '../../io/gcode';
 import { detectActiveWcsMismatchWarnings } from './active-wcs-warnings';
 import { detectCncAngledToolFeedWarnings } from './cnc-angled-tool-feed-warnings';
+import { detectCncTaperedBallLayoutWarnings } from './cnc-tapered-ball-layout-warnings';
 import { detectCompiledReliefDepthWarningsForJob } from './cnc-compiled-depth-warnings';
 import { detectCncContourPrecisionWarnings } from './cnc-contour-precision-warnings';
 import { detectCncDefaultFeedWarnings } from './cnc-default-feed-warnings';
@@ -18,6 +19,7 @@ import { detectCncMachineLimitWarnings } from './cnc-machine-limit-warnings';
 import { detectCncMissingPrimaryToolWarnings } from './cnc-missing-primary-tool-warnings';
 import { detectCncOffsetLadderWarnings } from './cnc-offset-ladder-warnings';
 import { detectCncOnPathSizeWarnings } from './cnc-on-path-size-warnings';
+import { detectCncParkSetAsideWarnings } from './cnc-park-set-aside-warnings';
 import { detectCncRasterWarnings } from './cnc-raster-warnings';
 import { detectCncReliefPlanningWarnings } from './cnc-relief-planning-warnings';
 import { detectCncStockWarnings } from './cnc-stock-warnings';
@@ -36,6 +38,7 @@ export function detectMachineJobWarnings(
   prepared?: Extract<PreparedOutput, { readonly ok: true }>,
   sourceGeometryChecks: 'full' | 'compiled-evidence-only' = 'full',
 ): ReadonlyArray<string> {
+  const job = prepared?.job;
   // Machine-agnostic: both laser and CNC pin G54 in emission, so a non-G54
   // active WCS mismatches either job's placement (C6). Defaults to null so
   // callers that do not track it are unchanged (no warning).
@@ -45,24 +48,26 @@ export function detectMachineJobWarnings(
           ...detectCncStockWarnings(project, prepared),
           ...detectCncThroughCutTabWarnings(project),
           ...detectCncOnPathSizeWarnings(project),
-          ...detectCncFullTabCoverageWarnings(project, prepared?.job),
+          ...detectCncFullTabCoverageWarnings(project, job),
           ...detectCncDefaultFeedWarnings(project),
           ...detectCncAngledToolFeedWarnings(project),
+          ...detectCncTaperedBallLayoutWarnings(project),
           ...detectCncMachineLimitWarnings(project, controllerSettings),
           ...detectCncMissingPrimaryToolWarnings(project),
           ...(prepared === undefined
             ? []
             : detectCncContourPrecisionWarnings(project, prepared.job)),
+          ...detectCncParkSetAsideWarnings(project, job),
           ...detectCncRasterWarnings(project),
-          ...detectCncReliefPlanningWarnings(project, prepared?.job, sourceGeometryChecks),
-          ...detectCncOffsetLadderWarnings(project, prepared?.job, sourceGeometryChecks),
+          ...detectCncReliefPlanningWarnings(project, job, sourceGeometryChecks),
+          ...detectCncOffsetLadderWarnings(project, job, sourceGeometryChecks),
           ...(prepared === undefined
             ? []
             : detectCompiledReliefDepthWarningsForJob(project, prepared.job)),
         ]
       : [
           ...detectLaserReliefWarnings(project),
-          ...detectJobIntentWarnings(project, prepared?.job),
+          ...detectJobIntentWarnings(project, job),
           ...detectLaserMachineLimitWarnings(project, controllerSettings),
         ];
   return [...detectActiveWcsMismatchWarnings(activeWcs), ...machineWarnings];

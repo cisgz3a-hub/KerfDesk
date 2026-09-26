@@ -151,7 +151,8 @@ function clipShape(
   const clip = resolveId(reference.id);
   if (clip === null || clip.tagName.toLowerCase() !== 'clippath')
     throw new Error('SVG image clip path is missing: ' + reference.id);
-  if (clip.getAttribute('clipPathUnits') !== 'userSpaceOnUse')
+  // userSpaceOnUse is SVG's default when the attribute is absent.
+  if ((clip.getAttribute('clipPathUnits') ?? 'userSpaceOnUse') !== 'userSpaceOnUse')
     throw new Error('Only userSpaceOnUse SVG image clips are supported.');
   const children = Array.from(clip.children).filter(
     (child) => !['title', 'desc'].includes(child.tagName.toLowerCase()),
