@@ -9,7 +9,8 @@
 //    blurred step between ink level I and paper level P has value (I+P)/2
 //    exactly where the edge is (50% coverage): a symmetric kernel of any
 //    width integrates equal halves of each side there. So the crossing level
-//    needs only the two plateaus, not the kernel. The automatic (Otsu) cut
+//    needs only the two LOCAL plateaus, not the kernel (a global pair of
+//    levels misplaces an edge against grey paper by up to +0.09 px). The automatic (Otsu) cut
 //    splits the histogram wherever the class variances balance, which on
 //    real art is usually darker than the mid-level: crossings then land
 //    inside the ink (measured -0.12 px mean radius on an anti-aliased disc).
@@ -35,10 +36,6 @@ const T_MIN = 0.1;
 const T_MAX = 0.9;
 const MID = 0.5;
 const MAX_LUMA = 255;
-// Plateau estimates: robust quantiles of each Otsu class, so the partial
-// (anti-aliased) pixels that sit in a class do not drag its level.
-const INK_LEVEL_QUANTILE = 0.25;
-const PAPER_LEVEL_QUANTILE = 0.75;
 // Half-size (SOURCE px) of the uniform block a broad edge needs on each
 // side of its crack; anything thinner keeps the cut's own crossing.
 const BROAD_RADIUS_SOURCE_PX = 1;
@@ -49,40 +46,6 @@ export type ScalarPlane = {
   readonly height: number;
   readonly values: Uint8Array;
 };
-
-export type PlateauLevels = { readonly ink: number; readonly paper: number };
-
-/** Ink and paper plateaus of a plane cut at `cut` (ink below the cut), or
- *  null when either class is empty. */
-export function plateauLevels(values: Uint8Array, cut: number): PlateauLevels | null {
-  const histogram = new Float64Array(MAX_LUMA + 1);
-  for (const value of values) histogram[value] = (histogram[value] ?? 0) + 1;
-  let inkCount = 0;
-  let paperCount = 0;
-  for (let v = 0; v <= MAX_LUMA; v += 1) {
-    if (v < cut) inkCount += histogram[v] ?? 0;
-    else paperCount += histogram[v] ?? 0;
-  }
-  if (inkCount === 0 || paperCount === 0) return null;
-  const ink = quantile(histogram, 0, inkCount * INK_LEVEL_QUANTILE, cut);
-  const paper = quantile(
-    histogram,
-    Math.ceil(cut),
-    paperCount * PAPER_LEVEL_QUANTILE,
-    MAX_LUMA + 1,
-  );
-  return paper > ink ? { ink, paper } : null;
-}
-
-function quantile(histogram: Float64Array, from: number, rank: number, to: number): number {
-  let seen = 0;
-  const start = Math.max(0, from);
-  for (let v = start; v < to && v <= MAX_LUMA; v += 1) {
-    seen += histogram[v] ?? 0;
-    if (seen > rank) return v;
-  }
-  return Math.min(MAX_LUMA, Math.max(start, Math.ceil(to) - 1));
-}
 
 /** Crossing t (0 = paper centre, 1 = ink centre) of a crack against `iso`,
  *  for a mask cut where ink is `value ≤ cut < paper value`. Mirrors the
@@ -101,8 +64,10 @@ function clampT(t: number): number {
 type MaskPlane = { readonly width: number; readonly height: number; readonly ink: Uint8Array };
 
 /** Adds the plateau crossing to the automatic-cut field. `ink` is the
- *  thresholded mask (1 = ink) the field describes. Returns `field` itself
- *  when the plane has no two plateaus. */
+ *  thresholded mask (1 = ink) the field describes. Each broad crack crosses
+ *  at the mid-level of the two LOCAL plateaus (the mean luma of a uniform
+ *  block just past it on each side), so an edge against grey paper and one
+ *  against white paper both land at 50% coverage. */
 export function withPlateauCrossing(
   field: CrackSubPixelField,
   plane: ScalarPlane,
@@ -110,9 +75,6 @@ export function withPlateauCrossing(
   cut: number,
   pixelScale: number,
 ): CrackSubPixelField {
-  const levels = plateauLevels(plane.values, cut);
-  if (levels === null) return field;
-  const mid = (levels.ink + levels.paper) / 2;
   const mask: MaskPlane = { width: plane.width, height: plane.height, ink };
   const radius = Math.max(1, Math.round(BROAD_RADIUS_SOURCE_PX * Math.max(1, pixelScale)));
   return {
@@ -123,29 +85,48 @@ export function withPlateauCrossing(
       // a saddle: those cracks keep the crossing of the cut itself.
       const dx = inkX - bgX;
       const dy = inkY - bgY;
-      const broad =
-        uniformBlock(mask, inkX + dx * (radius + 1), inkY + dy * (radius + 1), radius, true) &&
-        uniformBlock(mask, bgX - dx * (radius + 1), bgY - dy * (radius + 1), radius, false);
+      const reach = radius + 1;
+      const inkLevel = plateauMean(plane, mask, inkX + dx * reach, inkY + dy * reach, radius, true);
+      const paperLevel = plateauMean(
+        plane,
+        mask,
+        bgX - dx * reach,
+        bgY - dy * reach,
+        radius,
+        false,
+      );
+      const broad = inkLevel !== null && paperLevel !== null && paperLevel > inkLevel;
       return isoCrossing(
         sample(plane, inkX, inkY),
         sample(plane, bgX, bgY),
         cut,
-        broad ? mid : cut,
+        broad ? (inkLevel + paperLevel) / 2 : cut,
       );
     },
   };
 }
 
-// Every pixel of the (2r+1)² block centred on (cx, cy) has class `ink`
-// (outside the image is paper). The block sits just past the crack's own
-// pixel (whose row may hold staircase steps) and reaches 2r + 2 pixels along
-// the normal, so a stroke or gap narrower than that in ANY direction fails
-// it — a diagonal hairline too.
-function uniformBlock(mask: MaskPlane, cx: number, cy: number, r: number, ink: boolean): boolean {
+// Mean value of the (2r+1)� block centred on (cx, cy) when every pixel of it
+// has mask class `ink` (outside the image is paper), else null. The block
+// sits just past the crack's own pixel (whose row may hold staircase steps)
+// and reaches 2r + 2 pixels along the normal, so a stroke or gap narrower
+// than that in ANY direction fails it � a diagonal hairline too.
+function plateauMean(
+  plane: ScalarPlane,
+  mask: MaskPlane,
+  cx: number,
+  cy: number,
+  r: number,
+  ink: boolean,
+): number | null {
+  let sum = 0;
   for (let y = cy - r; y <= cy + r; y += 1) {
-    for (let x = cx - r; x <= cx + r; x += 1) if (inkAt(mask, x, y) !== ink) return false;
+    for (let x = cx - r; x <= cx + r; x += 1) {
+      if (inkAt(mask, x, y) !== ink) return null;
+      sum += sample(plane, x, y);
+    }
   }
-  return true;
+  return sum / (2 * r + 1) ** 2;
 }
 
 function sample(plane: ScalarPlane, x: number, y: number): number {

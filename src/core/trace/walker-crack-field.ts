@@ -18,7 +18,7 @@ function pixelScaleOf(options: TraceOptions): number {
 // Edge placement for the contour walker only (ADR-453, ADR-456); the
 // cleanup and recovery stages above keep reading `field`, so the mask and
 // its topology are unchanged. A Cutoff > 0 band gets per-crack band edges;
-// the automatic cut gets the plateau mid-level and ribbon levels.
+// the automatic cut gets the local plateau mid-level on broad edges.
 export function walkerCrackField(
   leveled: RawImageData,
   options: TraceOptions,
