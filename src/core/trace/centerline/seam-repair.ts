@@ -11,6 +11,7 @@
 
 import type { Vec2 } from '../../scene';
 import { runTraceSteps, type TraceSteps } from '../trace-steps';
+import { landmarkGrid } from './point-grid';
 import { projectOntoSegment, radiusAtPosition, trimArc } from './polyline-window';
 import { WeldFootFinder, type WeldChain } from './weld-foot-finder';
 
@@ -76,12 +77,11 @@ function nearbyJunctions(
   // later seats remain within the original bounds (plus floating roundoff).
   const magnitude = Math.max(1, Math.abs(minX), Math.abs(minY), Math.abs(maxX), Math.abs(maxY));
   const padding = MATCH_REACH_PX + 32 * Number.EPSILON * magnitude;
-  return junctions.filter(
-    (point) =>
-      point.x >= minX - padding &&
-      point.x <= maxX + padding &&
-      point.y >= minY - padding &&
-      point.y <= maxY + padding,
+  return landmarkGrid(junctions).inBox(
+    minX - padding,
+    minY - padding,
+    maxX + padding,
+    maxY + padding,
   );
 }
 
@@ -203,7 +203,7 @@ function endApproaches(pts: ReadonlyArray<Vec2>, which: 'start' | 'end', foot: V
 }
 
 function isJunctionPoint(p: Vec2, junctions: ReadonlyArray<Vec2>): boolean {
-  return junctions.some((j) => Math.abs(j.x - p.x) < MATCH_EPS && Math.abs(j.y - p.y) < MATCH_EPS);
+  return landmarkGrid(junctions).anyNear(p, MATCH_EPS);
 }
 
 function indexOfPoint(pts: ReadonlyArray<Vec2>, target: Vec2): number {

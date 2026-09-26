@@ -1,8 +1,10 @@
 import { describe, expect, it } from 'vitest';
 import { DEFAULT_TRACE_OPTIONS, type TraceOptions } from './trace-image';
 import {
+  SUPERSAMPLE_TAPER_START,
   TRACE_WORKING_PIXEL_BUDGETS,
   fitsTraceWorkingPixelBudget,
+  taperedSupersampleFactor,
   traceWorkingPixelBudget,
 } from './trace-work-budget';
 
@@ -43,4 +45,47 @@ describe('trace working-pixel budgets', () => {
       );
     },
   );
+});
+
+describe('supersample taper at the budget edge', () => {
+  const contour: TraceOptions = { ...DEFAULT_TRACE_OPTIONS };
+  const square = (side: number) => ({ width: side, height: side });
+  // Working pixels the policy would trace a side x side source on for a
+  // requested 2x: the exact 2x grid, the taper, or native past the budget.
+  const workAt = (side: number, options: TraceOptions): number => {
+    const tapered = taperedSupersampleFactor(square(side), 2, options);
+    const fits = fitsTraceWorkingPixelBudget(square(side), 2, options);
+    const factor = tapered ?? (fits ? 2 : 1);
+    return side * side * factor * factor;
+  };
+
+  it('keeps the exact 2x grid below the band and leaves other factors alone', () => {
+    const below = Math.floor(
+      Math.sqrt((TRACE_WORKING_PIXEL_BUDGETS.contour / 4) * SUPERSAMPLE_TAPER_START),
+    );
+    expect(taperedSupersampleFactor(square(below), 2, contour)).toBeNull();
+    expect(taperedSupersampleFactor(square(1200), 3, contour)).toBeNull();
+    expect(taperedSupersampleFactor(square(1200), 1, contour)).toBeNull();
+    expect(taperedSupersampleFactor(square(1225), 2, contour)).toBeNull();
+  });
+
+  it('eases from 2x toward native through the band instead of a 4x step', () => {
+    // The old policy traced 1224² on 5.99M pixels and 1225² on 1.50M.
+    const inBand = taperedSupersampleFactor(square(1150), 2, contour);
+    expect(inBand).toBeGreaterThan(1);
+    expect(inBand).toBeLessThan(2);
+    for (let side = 900; side < 1400; side += 1) {
+      const step = workAt(side, contour) / workAt(side + 1, contour);
+      expect(Math.max(step, 1 / step)).toBeLessThanOrEqual(1.25);
+    }
+  });
+
+  it('never tapers Centerline or Edge Detection, which read 1-px stroke positions', () => {
+    for (const traceMode of ['centerline', 'edge'] as const) {
+      const options = { ...contour, traceMode };
+      for (let side = 800; side <= 1000; side += 1) {
+        expect(taperedSupersampleFactor(square(side), 2, options)).toBeNull();
+      }
+    }
+  });
 });

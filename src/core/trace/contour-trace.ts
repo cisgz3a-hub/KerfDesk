@@ -17,7 +17,11 @@ import {
   smoothRawChain,
   type InkMask,
 } from './centerline';
-import { sharpenChainBendsSteps } from './centerline/sharpen-bends';
+import {
+  createBendBudget,
+  sharpenChainBendsSteps,
+  type BendBudget,
+} from './centerline/sharpen-bends';
 import { squaredDistanceFieldSteps } from './centerline/distance-field';
 import { runTraceSteps, type TraceSteps } from './trace-steps';
 import {
@@ -213,6 +217,7 @@ export function* contourPolylinesFromMaskSteps(
     fitToleranceScale: options.fitToleranceScale ?? 1,
     pixelScale,
     crackField: options.crackField,
+    bendBudget: createBendBudget(mask.width * mask.height),
   };
   const contours: FinishedContour[] = [];
   const saddles =
@@ -239,6 +244,8 @@ type LoopFinish = {
   readonly fitToleranceScale: number;
   readonly pixelScale: number;
   readonly crackField: CrackSubPixelField | undefined;
+  /** Corner-rebuild allowance shared by every loop of this mask. */
+  readonly bendBudget: BendBudget;
 };
 
 function featureAnchorsForLoop(
@@ -289,7 +296,7 @@ function* finishLoopSteps(
   const flattenStrengthEff = subPixelInformed ? 0 : finish.flattenStrength;
   const arcStrengthEff = subPixelInformed ? 0 : finish.flattenStrength;
   const sharpened = inSharpenRange
-    ? yield* sharpenChainBendsSteps(dense, true, distSq, width, featureAnchors)
+    ? yield* sharpenChainBendsSteps(dense, true, distSq, width, featureAnchors, finish.bendBudget)
     : { points: dense, corners: NO_CORNERS };
   const finishFrom = (bends: typeof sharpened): ContourRefinement => {
     const fixedPoints =

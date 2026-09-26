@@ -55,6 +55,11 @@ export class PruningWorklist {
     for (const chain of this.incident.get(node) ?? []) this.enqueue(chain);
   }
 
+  /** The live open chains at a node, unordered. */
+  incidentTo(node: number): Iterable<MutablePruneChain> {
+    return this.incident.get(node) ?? [];
+  }
+
   at(node: number): MutablePruneChain[] {
     return [...(this.incident.get(node) ?? [])].sort(
       (a, b) => (this.rank.get(a) ?? 0) - (this.rank.get(b) ?? 0),

@@ -1,4 +1,4 @@
-import { upscaleBy } from './auto-upscale';
+import { upscaleToWorkingGrid } from './auto-upscale';
 import { prepareContourTraceInput, type ContourTraceInput } from './contour-input';
 import { restoreEnlargedContourSupport } from './contour-support';
 import type { EdgeTraceInput } from './edge-input';
@@ -26,7 +26,7 @@ export function prepareUpscaledTraceInput(
     pixelScale: factor,
     ...(reuseCleanedEdge ? { edgeMedianFilter: false } : {}),
   };
-  const enlarged = upscaleBy(reuseCleanedEdge ? edgeInput.source : image, factor);
+  const enlarged = upscaleToWorkingGrid(reuseCleanedEdge ? edgeInput.source : image, factor);
   const preparedInput =
     contourInput === undefined ? undefined : prepareContourTraceInput(enlarged, scaledOptions);
   // Gray hairlines can brighten past the cut; Otsu can also change its cut.

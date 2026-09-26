@@ -11,7 +11,14 @@
 //
 // Pure-core compliant: no clock, no random, no I/O. Data in, data out.
 
-import { transformCurveSubpathUniform, type ColoredPath, type Polyline, type Vec2 } from '../scene';
+import { transformVectorCurve } from '../geometry/vector-curve-transform';
+import {
+  IDENTITY_TRANSFORM,
+  transformCurveSubpathUniform,
+  type ColoredPath,
+  type Polyline,
+  type Vec2,
+} from '../scene';
 import type { RawImageData } from './trace-image';
 
 // Above this source area we do NOT supersample. Rationale: quadrupling an
@@ -147,27 +154,128 @@ export function upscaleBy(image: RawImageData, factor: number): RawImageData {
   const outWidth = image.width * factor;
   const outHeight = image.height * factor;
   const data = new Uint8ClampedArray(outWidth * outHeight * 4);
+  const src = image.data;
+  // Every output column samples the same two source columns with the same
+  // weight in every row, so the column taps are computed once, not per pixel.
+  const left = new Int32Array(outWidth);
+  const right = new Int32Array(outWidth);
+  const weight = new Float64Array(outWidth);
+  for (let ox = 0; ox < outWidth; ox += 1) {
+    const sx = (ox + 0.5) / factor - 0.5;
+    const x0 = Math.floor(sx);
+    weight[ox] = sx - x0;
+    left[ox] = clampCoord(x0, image.width) * 4;
+    right[ox] = clampCoord(x0 + 1, image.width) * 4;
+  }
+  const rowBytes = image.width * 4;
   for (let oy = 0; oy < outHeight; oy += 1) {
     const sy = (oy + 0.5) / factor - 0.5;
     const y0 = Math.floor(sy);
     const fy = sy - y0;
-    const cy0 = clampCoord(y0, image.height);
-    const cy1 = clampCoord(y0 + 1, image.height);
+    const row0 = clampCoord(y0, image.height) * rowBytes;
+    const row1 = clampCoord(y0 + 1, image.height) * rowBytes;
+    let dst = oy * outWidth * 4;
     for (let ox = 0; ox < outWidth; ox += 1) {
-      const sx = (ox + 0.5) / factor - 0.5;
-      const x0 = Math.floor(sx);
-      const fx = sx - x0;
-      const cx0 = clampCoord(x0, image.width);
-      const cx1 = clampCoord(x0 + 1, image.width);
-      const dst = (oy * outWidth + ox) * 4;
+      const fx = weight[ox] as number;
+      const l = left[ox] as number;
+      const r = right[ox] as number;
       for (let c = 0; c < 4; c += 1) {
-        const top = lerp(sample(image, cx0, cy0, c), sample(image, cx1, cy0, c), fx);
-        const bottom = lerp(sample(image, cx0, cy1, c), sample(image, cx1, cy1, c), fx);
+        const top = lerp(src[row0 + l + c] ?? 0, src[row0 + r + c] ?? 0, fx);
+        const bottom = lerp(src[row1 + l + c] ?? 0, src[row1 + r + c] ?? 0, fx);
+        data[dst + c] = Math.round(lerp(top, bottom, fy));
+      }
+      dst += 4;
+    }
+  }
+  return { ...image, width: outWidth, height: outHeight, data };
+}
+
+/**
+ * The working raster for a supersample factor: the exact integer grid of
+ * upscaleBy, or for a fractional factor (the budget taper) the rounded grid
+ * of about `factor`x each side, sampled with the same bilinear rule.
+ */
+export function upscaleToWorkingGrid(image: RawImageData, factor: number): RawImageData {
+  if (isValidUpscaleFactor(factor)) return upscaleBy(image, factor);
+  if (!Number.isFinite(factor) || factor <= 1) return image;
+  const width = Math.max(1, Math.round(image.width * factor));
+  const height = Math.max(1, Math.round(image.height * factor));
+  const columns = bilinearTaps(image.width, width);
+  const rows = bilinearTaps(image.height, height);
+  const data = new Uint8ClampedArray(width * height * 4);
+  const src = image.data;
+  const rowBytes = image.width * 4;
+  for (let oy = 0; oy < height; oy += 1) {
+    const fy = rows.weight[oy] as number;
+    const row0 = (rows.low[oy] as number) * rowBytes;
+    const row1 = (rows.high[oy] as number) * rowBytes;
+    for (let ox = 0; ox < width; ox += 1) {
+      const fx = columns.weight[ox] as number;
+      const l = (columns.low[ox] as number) * 4;
+      const r = (columns.high[ox] as number) * 4;
+      const dst = (oy * width + ox) * 4;
+      for (let c = 0; c < 4; c += 1) {
+        const top = lerp(src[row0 + l + c] ?? 0, src[row0 + r + c] ?? 0, fx);
+        const bottom = lerp(src[row1 + l + c] ?? 0, src[row1 + r + c] ?? 0, fx);
         data[dst + c] = Math.round(lerp(top, bottom, fy));
       }
     }
   }
-  return { ...image, width: outWidth, height: outHeight, data };
+  return { ...image, width, height, data };
+}
+
+// Source taps for each output sample along one axis: output pixel o samples
+// the source at (o + 0.5) * size / outSize - 0.5, clamped at the edges.
+function bilinearTaps(
+  size: number,
+  outSize: number,
+): { readonly low: Int32Array; readonly high: Int32Array; readonly weight: Float64Array } {
+  const low = new Int32Array(outSize);
+  const high = new Int32Array(outSize);
+  const weight = new Float64Array(outSize);
+  const step = size / outSize;
+  for (let o = 0; o < outSize; o += 1) {
+    const at = (o + 0.5) * step - 0.5;
+    const base = Math.floor(at);
+    weight[o] = at - base;
+    low[o] = clampCoord(base, size);
+    high[o] = clampCoord(base + 1, size);
+  }
+  return { low, high, weight };
+}
+
+/**
+ * Map vectors traced on `working` (made by upscaleToWorkingGrid) back to the
+ * `source` grid. An exact integer grid divides by its factor exactly as
+ * downscaleTracedPaths does; a rounded fractional grid scales each axis by
+ * its own ratio so both far edges land on the source's edges.
+ */
+export function restoreFromWorkingGrid(
+  paths: ReadonlyArray<ColoredPath>,
+  source: Pick<RawImageData, 'width' | 'height'>,
+  working: Pick<RawImageData, 'width' | 'height'>,
+): ColoredPath[] {
+  const factor = working.width / source.width;
+  if (isValidUpscaleFactor(factor) && working.height === source.height * factor) {
+    return downscaleTracedPaths(paths, factor);
+  }
+  const scaleX = source.width / working.width;
+  const scaleY = source.height / working.height;
+  const point = (p: Vec2): Vec2 => ({ x: p.x * scaleX, y: p.y * scaleY });
+  // Axis scaling is affine: Bezier control points map exactly, and an
+  // elliptical arc gets the exact axes and rotation of its scaled ellipse
+  // (per-axis radius scaling is only right at 0 or 180 degrees).
+  const axisScale = { ...IDENTITY_TRANSFORM, scaleX, scaleY };
+  return paths.map((path) => ({
+    color: path.color,
+    polylines: path.polylines.map((polyline) => ({
+      points: polyline.points.map(point),
+      closed: polyline.closed,
+    })),
+    ...(path.curves === undefined
+      ? {}
+      : { curves: path.curves.map((curve) => transformVectorCurve(curve, axisScale)) }),
+  }));
 }
 
 // 2x convenience wrapper retained for the existing thin-stroke callers/tests.
@@ -261,10 +369,6 @@ function hasNonInkNeighbour(
 function isNonInk(mask: Uint8Array, width: number, height: number, x: number, y: number): boolean {
   if (x < 0 || y < 0 || x >= width || y >= height) return true;
   return mask[y * width + x] !== 1;
-}
-
-function sample(image: RawImageData, x: number, y: number, channel: number): number {
-  return image.data[(y * image.width + x) * 4 + channel] ?? 0;
 }
 
 function clampCoord(value: number, size: number): number {
