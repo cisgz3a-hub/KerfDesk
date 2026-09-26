@@ -8,6 +8,7 @@
 //
 // Pure core — no I/O, no globals, deterministic.
 
+import { cube01 } from './fast-cube';
 import { hypot2 } from './fast-hypot';
 import type { Vec2 } from '../scene';
 
@@ -274,10 +275,11 @@ export function solveTangentArms(
   let x1 = 0;
   for (let i = first; i <= last; i += 1) {
     const t = u[i - first] as number;
-    const b0 = (1 - t) ** 3;
+    // cube01(v) is v ** 3 bit for bit (params lie in [0, 1]), without the pow call.
+    const b0 = cube01(1 - t);
     const b1 = 3 * t * (1 - t) ** 2;
     const b2 = 3 * t * t * (1 - t);
-    const b3 = t ** 3;
+    const b3 = cube01(t);
     const a0x = t1.x * b1;
     const a0y = t1.y * b1;
     const a1x = t2.x * b2;

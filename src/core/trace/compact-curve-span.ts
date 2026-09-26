@@ -10,7 +10,7 @@
 // core/geometry/cubic-fit.ts; the two-way orthogonal error is the centreline
 // fit's (centerline/curve-fit-error.ts). Pure core, deterministic.
 
-import { chordParameterize, solveTangentArms, type CubicBezier } from '../geometry/cubic-fit';
+import { solveTangentArms, type CubicBezier } from '../geometry/cubic-fit';
 import { hypot2 } from '../geometry/fast-hypot';
 import type { Vec2 } from '../scene';
 import { orthogonalError } from './centerline/curve-fit-error';
@@ -81,10 +81,13 @@ export function fitSpan(
   if (known !== undefined && decisionOnly) {
     return decideFromPasses(span, known, missAbove, giveUpAbove);
   }
-  const u = chordParameterize(span, 0, span.length - 1);
-  const screened = screenFirstPass(span, u, tStart, tEnd, giveUpAbove);
+  const u = chordParams(span);
+  // The first pass's cubic, shared by the screen and the passes (armCubic is
+  // deterministic, so fitting it once changes nothing).
+  const first = armCubic(span, u, tStart, tEnd);
+  const screened = screenFirstPass(span, u, first, giveUpAbove);
   if (screened !== null) return screened;
-  const fit = bestPass(span, u, tStart, tEnd, giveUpAbove);
+  const fit = bestPass(span, u, first, tStart, tEnd, giveUpAbove);
   if (fit.gaveUp) return missed(span, fit.cubic, fit.error, fit.index);
   return checkedFit(span, fit, missAbove, decisionOnly);
 }
@@ -155,20 +158,49 @@ type Pass = {
   readonly params: Float64Array;
 };
 
-// Two parameter buffers, reused by every span pass (the fit is synchronous
-// and never re-entered); they grow up to this many points, and a longer span
-// gets its own (so a huge ring never pins its size in memory).
+// Three parameter buffers (chord parameters and two passes), reused by every
+// span (the fit is synchronous and never re-entered); they grow up to this
+// many points, and a longer span gets its own (so a huge ring never pins its
+// size in memory).
 const RETAINED_BUFFER_POINTS = 1 << 16;
 let bufferA = new Float64Array(256);
 let bufferB = new Float64Array(256);
+let bufferC = new Float64Array(256);
 
 function passBuffers(length: number): [Float64Array, Float64Array] {
+  growBuffers(length);
+  if (bufferA.length >= length) return [bufferA, bufferB];
+  return [new Float64Array(length), new Float64Array(length)];
+}
+
+function growBuffers(length: number): void {
   if (bufferA.length < length && length <= RETAINED_BUFFER_POINTS) {
     bufferA = new Float64Array(Math.min(length * 2, RETAINED_BUFFER_POINTS));
     bufferB = new Float64Array(bufferA.length);
+    bufferC = new Float64Array(bufferA.length);
   }
-  if (bufferA.length >= length) return [bufferA, bufferB];
-  return [new Float64Array(length), new Float64Array(length)];
+}
+
+// cubic-fit.ts's chordParameterize (cumulative chord lengths over the total,
+// or even steps on a zero-length span), same operations in the same order,
+// into the reused chord buffer instead of two fresh arrays.
+function chordParams(span: ReadonlyArray<Vec2>): Float64Array {
+  const n = span.length;
+  growBuffers(n);
+  const u = bufferC.length >= n ? bufferC : new Float64Array(n);
+  u[0] = 0;
+  for (let i = 1; i < n; i += 1) {
+    const a = span[i - 1] as Vec2;
+    const b = span[i] as Vec2;
+    u[i] = (u[i - 1] as number) + hypot2(b.x - a.x, b.y - a.y);
+  }
+  const total = u[n - 1] as number;
+  if (total <= 0) {
+    for (let i = 0; i < n; i += 1) u[i] = i / Math.max(1, n - 1);
+  } else {
+    for (let i = 0; i < n; i += 1) u[i] = (u[i] as number) / total;
+  }
+  return u;
 }
 
 // The first pass at chord parameters, then Newton reparameterization passes
@@ -178,34 +210,31 @@ function passBuffers(length: number): [Float64Array, Float64Array] {
 // improve, which ends the passes anyway.
 function bestPass(
   span: ReadonlyArray<Vec2>,
-  chordParams: ReadonlyArray<number>,
+  chordU: ArrayLike<number>,
+  firstCubic: CubicBezier,
   tStart: Vec2,
   tEnd: Vec2,
   giveUpAbove: number,
 ): Pass & { readonly gaveUp: boolean; readonly firstError: number } {
   let [out, spare] = passBuffers(span.length);
-  let u: ArrayLike<number> = chordParams;
-  let best: Pass | null = null;
-  let firstError = 0;
-  for (let pass = 0; pass <= MAX_REPARAM_PASSES; pass += 1) {
-    const cubic = armCubic(span, u, tStart, tEnd);
-    const bound = best === null ? giveUpAbove : best.error;
-    const projected = projectSpan(span, cubic, u, out, bound, best !== null);
-    if (best === null && projected.stopped) {
-      const { error, index } = projected;
-      return { cubic, error, index, params: out, gaveUp: true, firstError: error };
-    }
-    if (best === null) firstError = projected.error;
+  const first = projectSpan(span, firstCubic, chordU, out, giveUpAbove, false);
+  const firstError = first.error;
+  let best: Pass = { cubic: firstCubic, error: first.error, index: first.index, params: out };
+  if (first.stopped) return { ...best, gaveUp: true, firstError };
+  [out, spare] = [spare, out];
+  if (span.length <= 2) return { ...best, gaveUp: false, firstError };
+  for (let pass = 1; pass <= MAX_REPARAM_PASSES; pass += 1) {
+    const cubic = armCubic(span, best.params, tStart, tEnd);
+    const projected = projectSpan(span, cubic, best.params, out, best.error, true);
     if (projected.stopped) break;
-    const improved = best === null || projected.error < best.error - MIN_PASS_GAIN_PX;
-    if (best === null || projected.error < best.error) {
+    const improved = projected.error < best.error - MIN_PASS_GAIN_PX;
+    if (projected.error < best.error) {
       best = { cubic, error: projected.error, index: projected.index, params: out };
       [out, spare] = [spare, out];
     }
-    if (!improved || span.length <= 2) break;
-    u = (best as Pass).params;
+    if (!improved) break;
   }
-  return { ...(best as Pass), gaveUp: false, firstError };
+  return { ...best, gaveUp: false, firstError };
 }
 
 /** The straight chord of `span` alone, as an incomplete fit (no cubic was
@@ -238,14 +267,12 @@ function missed(
 // its projections (the split point is the worst screened point).
 function screenFirstPass(
   span: ReadonlyArray<Vec2>,
-  u: ReadonlyArray<number>,
-  tStart: Vec2,
-  tEnd: Vec2,
+  u: ArrayLike<number>,
+  cubic: CubicBezier,
   giveUpAbove: number,
 ): SpanFit | null {
   if (!Number.isFinite(giveUpAbove) || span.length <= 2 * SCREEN_POINTS) return null;
   const stride = Math.ceil(span.length / SCREEN_POINTS);
-  const cubic = armCubic(span, u, tStart, tEnd);
   const points: Vec2[] = [];
   const params: number[] = [];
   const indices: number[] = [];
@@ -290,7 +317,22 @@ function armCubic(
   };
 }
 
+// The last span measured and its deviation: a caller that tries the chord
+// first (lineSpanFit) and then the cubic measures the same span twice. Spans
+// are never changed once built; only spans the pass buffers would hold are
+// kept, so a huge ring is never pinned in memory.
+let deviationSpan: ReadonlyArray<Vec2> | null = null;
+let deviationValue = 0;
+
 function chordDeviation(span: ReadonlyArray<Vec2>): number {
+  if (span === deviationSpan) return deviationValue;
+  const worst = measureChordDeviation(span);
+  deviationSpan = span.length <= RETAINED_BUFFER_POINTS ? span : null;
+  deviationValue = worst;
+  return worst;
+}
+
+function measureChordDeviation(span: ReadonlyArray<Vec2>): number {
   const a = span[0] as Vec2;
   const b = span.at(-1) as Vec2;
   const vx = b.x - a.x;
