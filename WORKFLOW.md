@@ -6459,17 +6459,16 @@ as the pane's design record.
 
 ## Camera Mode flows
 
-### F-CAM1. Camera overlay + 4-point alignment (v1 — ADR-107)
+### F-CAM1. Choose a camera (ADR-116, ADR-440)
 
-- **Success / aligned.** The operator opens Camera Mode, picks a camera, and sees the live
-  feed. On a machine (network) camera the manual path is to click the four bed corners in the
-  live preview — the view prompts for each corner in turn ("Click the … bed corner (N / 4)").
-  On the fourth click the homography solves and the feed warps to sit on the bed; the operator
-  presses "Save alignment" (F-CAM3) to persist the calibration to the device profile, selects
-  "Use this camera", then "Update still" before placing artwork over the material and adjusting
-  overlay opacity. If the overlay was hidden, turn "Overlay on" to display it. Saving alignment
-  alone does not capture or display a frame. USB/RTSP cameras have
-  no click-corners path — align them with the "Align to bed…" marker wizard (F-CAM4).
+- **Success / camera running.** The operator opens the Camera panel and starts a USB camera, or
+  presses **Use this camera** on a detected machine camera. The live picture is the one source every
+  camera feature captures through. Closing the panel keeps the camera running while the calibrated
+  overlay shows it on the canvas.
+- **Hosted browser / machine camera.** A laser's built-in camera and RTSP/IP cameras answer on the
+  local network without the permission browsers need to read pixels, so the hosted web app cannot
+  use them. The panel says so and links KerfDesk Desktop, which reads them through its local bridge.
+  USB cameras work in the browser.
 - **Error / permission denied.** If the browser or OS denies camera access (or the page is not
   served over https), a one-line message explains how to grant permission. No overlay is shown
   and the rest of the app is unaffected.
@@ -6482,121 +6481,82 @@ as the pane's design record.
 - **Edge / device list changed.** While Camera Mode is open, browser `devicechange` refreshes the
   picker only. It never opens hardware or prompts for permission. A non-permission `AbortError`
   is shown as a retryable open failure rather than mislabeled as denial.
-- **Empty / no camera.** With no camera detected, Camera Mode shows an empty state ("No camera
-  found — connect a USB camera") and the camera picker is disabled.
-- **Edge / degenerate corners.** If the four chosen points are collinear or coincident (no
-  valid homography), the solve is rejected with "Move the alignment points apart — they can't
-  form a rectangle"; the previous calibration, if any, is retained.
 
-### F-CAM2. Camera lens calibration wizard (v2 — ADR-108)
+### F-CAM2. One-photo camera calibration (ADR-441)
 
-- **Success / calibrated.** With the camera live, the operator opens "Calibrate
-  lens…" from the Camera panel, describes their printed checkerboard (inner
-  corners across/down + measured square size), and holds the board in front of
-  the camera. Detected corners light up on the live view; each genuinely NEW
-  pose held steady is captured automatically (a manual Capture button exists).
-  After five or more poses, Solve runs the focal-sweep calibration and the
-  review step shows the reprojection error plus an Original / Corrected A/B of
-  the last capture. If the corrected view's straight edges LOOK straight, the
-  operator applies; the calibration persists on the device profile (undoable)
-  and survives reload, bound to the source identity and pixel geometry of the
-  accepted capture set.
-- **Error / solve rejected.** A failed solve (too few views, degenerate
-  geometry) shows the typed reason with "Back to capture"; nothing persists.
-  A suspect solve (implausible coefficients, high RMS, uneven coverage, too-
-  similar poses) still shows the A/B but with plain-language warnings telling
-  the operator what to recapture.
-- **Empty / no feed.** Opening the wizard without a live camera shows a
-  one-line pointer back to the Camera panel's Start control; the Calibrate
-  button itself is disabled until the feed runs.
-- **Edge / mid-session changes.** Captures with no full board in view are
-  rejected with a hint (not silently dropped); a camera-resolution change
-  mid-session refuses to mix pixel bases and offers Reset; changing the board
-  description discards captures taken against the old board. Changing the
-  active camera source while collecting discards the in-progress capture set.
-  A completed Review remains bound to its accepted frames; Apply persists that
-  recorded binding rather than whichever camera happens to be active later.
+- **Success / calibrated.** **Calibrate camera…** opens the wizard. The operator covers the bed
+  with one flat sheet, enters its thickness and, optionally, the camera lens height by tape
+  measure, and presses **Engrave target**: the ring target streams as a temporary job through the
+  normal Frame, review and Start path, leaving the project and undo history untouched. When the
+  job finishes the wizard moves to the photo. The operator moves the head clear of the three solid
+  discs and presses **Take photo**; the rings are found and the camera fitted in a worker. The
+  result shows the average and worst error in mm, the rings found, the camera height, and the
+  photo flattened onto the bed with each ring coloured by its error. **Save calibration** stores
+  the camera model on the machine profile (undoable) and turns the overlay on.
+- **Reuse / target already engraved.** **Target already engraved** skips the job and goes to the
+  photo, using the same margins.
+- **Error / engrave not started or stopped.** If review, preflight or confirmation stops the job,
+  or the stream errors, is cancelled or disconnects, the wizard returns to setup with the reason.
+- **Error / rings not found.** No rings, anchors covered, a mirrored picture or too few rings each
+  give a plain message saying what to fix; nothing is saved. A long solve can be cancelled.
+- **Edge / rough fit.** A fit with a large error is described with what to check (sheet moved,
+  not flat, out of focus) and can still be saved; the operator decides.
+- **Edge / camera straight down.** When one photo cannot pin the camera height down and none was
+  entered, the result asks for a tape-measured height so thick material lines up.
+- **Edge / minimized wizard.** The wizard can minimize into a small non-modal panel so the
+  operator can watch the camera and reach the machine while the target engraves.
 
-### F-CAM3. Workspace camera overlay (ADR-107 v1 wiring)
+### F-CAM3. Corrected camera overlay (ADR-440)
 
-- **Success / overlay on canvas.** After aligning a network camera (F-CAM1), the operator presses
-  "Save alignment": the alignment persists on the device profile (undoable, survives reload).
-  "Use this camera" selects the source, and "Update still" captures the frame for the workspace.
-  Turn "Overlay on" if it was hidden. The image appears under the artwork, tracking zoom and pan.
-  The Camera panel's overlay row
-  offers show/hide, a Fade slider, "Update still" (freeze the current frame —
-  LightBurn's Update Overlay model), and "Live" (continuous video, USB only).
-- **Material surface height.** Enter the material's top height above the bed. A lens-corrected
-  alignment with a recorded marker-plane height compensates for thicker or thinner material in
-  both the overlay and camera trace. Positive height moves the projected surface toward an
-  overhead camera; the workspace remains X-right/Y-down. The exact alignment height leaves the
-  stored homography unchanged.
-- **Network camera resource changed.** Calibration and alignment distinguish the exact URL query,
+- **Success / overlay on canvas.** With a saved calibration, the canvas shows the camera picture
+  through the camera model: lens distortion and parallax are undone per pixel on the GPU, and the
+  picture tracks zoom and pan. The overlay row offers show/hide, a Fade slider, **Update still**
+  (freeze the current frame, LightBurn's Update Overlay model) and **Live** for any camera kind.
+- **Material surface height.** Enter the material's top height above the bed; the overlay and
+  camera trace show the bed as seen at that height, so the material's edges line up.
+- **Network camera resource changed.** The camera calibration distinguishes the exact URL query,
   including an empty query, as well as its redacted host/path. A channel or substream change
   therefore cannot reuse another feed's geometry. The recorded identity uses a private app-local
   key; raw query text, userinfo, fragments, and the key are absent from exported camera bindings.
   Remembered URLs remain redacted. Any query change, including a query credential change, changes
-  identity. Older network bindings did not record enough resource information and require fresh
-  lens calibration and alignment, even for a remembered query-less URL. USB bindings are unchanged.
+  identity. Older network bindings did not record enough resource information and require a fresh
+  calibration, even for a remembered query-less URL. USB bindings are unchanged.
 - **Camera setup on another app or after clearing local data.** The private camera identity key
   survives ordinary reloads in the same app. A different app/browser or loss of that key requires
   fresh network-camera setup. When local storage is unavailable, a temporary key keeps setup
   usable for the current session. If secure identity cannot be established, raw camera capture
   remains available, but saved network geometry cannot be verified for precision placement.
-- **Error / basis mismatch prevented.** The persisted alignment records the
-  pixel basis it was clicked in (raw vs de-fisheyed); frames of the other basis
-  are never warped with it, so a later lens calibration cannot silently
-  mis-register the overlay.
-- **Empty / nothing to show.** With no saved alignment the overlay row is
-  absent and the canvas is untouched; with an alignment but no camera source
-  (no still, feed stopped) nothing renders.
-- **Edge / reload.** A corrupt persisted alignment is dropped on load (never
-  trusted); the overlay simply stays off until re-aligned.
+- **Error / another camera or picture shape.** A frame from a different camera, or of a different
+  aspect ratio than the calibration, is not drawn; the canvas says why. The same camera at another
+  resolution of the same shape is drawn with the lens scaled to it.
+- **Error / no WebGL2.** A browser with graphics acceleration off says the corrected picture cannot
+  be drawn instead of showing an uncorrected one.
+- **Empty / nothing to show.** Without a saved calibration the overlay row is absent and the canvas
+  is untouched; with no still and no running camera nothing renders.
+- **Edge / reload and old files.** A corrupt saved calibration is dropped on load (never trusted).
+  Projects and machine profiles holding the old lens calibration and four-corner or marker
+  alignment load without them; the Camera panel shows calibration pending.
 
-### F-CAM4. Automatic marker alignment (v3 — ADR-109)
+### F-CAM5. Trace from camera (ADR-110, ADR-440)
 
-- **Success / one-click align.** The operator opens the "Align to bed…" wizard from the
-  Camera panel. Its steps add the five-patch marker target to the project (the scene is
-  replaced by the pattern, like the other calibration generators) and burn it on scrap
-  covering the bed corners — or reuse an already-burned target — then, with the bed cleared of
-  everything else and the camera live, Detect. The five X-corners are detected, the origin
-  pair resolves the camera's rotation, the homography solves, and the alignment persists
-  (undoable) — the workspace overlay is immediately registered. With a lens calibration
-  present the capture is de-fisheyed first and the toast says "lens-corrected".
-- **Error / markers not found.** A cluttered bed, missing patches, or poor
-  lighting produce a typed toast telling the operator what to fix; nothing
-  persists. A degenerate solve (markers nearly collinear) is refused the same
-  way.
-- **Empty / no live feed.** Auto-align is disabled until an active camera
-  source can produce pixel-readable frames. Machine cameras become eligible
-  when the local bridge frame proxy is available (F-CAM6).
-- **Edge / rotated camera.** A camera mounted 180° (or at an angle) still
-  labels the corners correctly — the origin pair, not the operator, carries
-  the orientation.
-
-### F-CAM5. Trace from camera (v4 — ADR-110)
-
-- **Success / trace in place.** With the camera aligned and live, the operator
-  places an object on the bed and presses "Trace from camera": the frame is
-  captured (de-fisheyed if the alignment is lens-corrected), flattened
-  top-down into bed coordinates, and opened in the normal Trace dialog. The
-  traced vectors land exactly where the object physically sits — no manual
-  positioning.
-- **Error / basis mismatch.** If the saved alignment expects lens-corrected
-  frames but the calibration was removed, the capture is refused with a toast
-  (never silently mis-registered).
-- **Empty / no feed or alignment.** The button is disabled without a live
-  feed; without an alignment the overlay row (and the button) is absent.
-- **Edge / encoder failure.** A platform without 2D canvas support fails
-  typed ('could not build the bed image') instead of half-completing.
+- **Success / trace in place.** With a saved calibration and a live camera, the operator places an
+  object on the bed and presses **Trace from camera**: the frame is flattened top-down onto the bed
+  at the material surface height and opened in the normal Trace dialog. The traced vectors land
+  where the object physically sits.
+- **Error / another camera or shape.** The capture is refused with a toast saying which, never
+  traced through the wrong geometry.
+- **Empty / no feed or calibration.** The button is disabled without a live camera; without a
+  calibration the overlay row (and the button) is absent.
+- **Edge / encoder failure.** A platform without 2D canvas support fails typed ('could not build
+  the bed image') instead of half-completing.
 
 ### F-CAM6. Machine camera via the local bridge (ADR-121, ADR-141, ADR-248)
 
 - **Success / first-class machine camera.** The operator opens the Camera
   panel, the local bridge is healthy, and **Discover machine camera** finds a
   private-network JPEG or RTSP camera. **Use this camera** makes it the active
-  camera source; calibration, auto-align, overlay updates, trace-from-camera,
-  and snapshots use the same pixel-readable capture path as USB cameras.
+  camera source; calibration, overlay updates, trace-from-camera, and
+  snapshots use the same pixel-readable capture path as USB cameras.
 - **Error / bridge unavailable.** If the bridge is not running, discovery and
   machine-camera capture show an actionable message. Local-development users
   are pointed to the bridge command; the desktop app starts it automatically.
@@ -6659,21 +6619,6 @@ as the pane's design record.
   source is active.
 - **Edge / watching a job.** The camera panel can toggle between compact and
   wide monitoring widths, with the preference kept locally.
-
-### F-CAM9. Bed-alignment wizard with burn-the-target (ADR-122)
-
-- **Success / one wizard, aligned bed.** **Align to bed...** opens a guided
-  wizard: choose marker burn power/speed, burn the five-marker target through
-  the normal Start flow, wait for the stream to finish, clear the bed, capture
-  a frame, detect markers, solve the homography, and persist the alignment.
-- **Error / burn not started or failed.** If readiness, preflight,
-  confirmation, streaming, cancellation, or disconnect stops the burn, the
-  wizard returns to setup with the typed reason and does not persist anything.
-- **Empty / markers already burned.** The operator can skip the burn step and
-  go straight to detection when the target is already on the bed.
-- **Edge / minimized wizard.** The wizard can minimize into a small non-modal
-  panel so the operator can watch the live camera and reach the machine while
-  the capture or burn flow continues.
 
 ---
 

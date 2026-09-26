@@ -2,6 +2,7 @@ import { act } from 'react';
 import type * as FrameSource from './frame-source';
 import { beforeEach, expect, it, vi } from 'vitest';
 import { clickControl, control, mountControl } from '../image-editor/control-audit-test-support';
+import { lookAt, savedCameraModel } from '../../core/camera/model/model-fixtures';
 import { useStore } from '../state';
 import { useCameraStore as camera } from '../state/camera-store';
 import { useLaserStore } from '../state/laser-store';
@@ -46,21 +47,23 @@ beforeEach(() => {
         bedWidth: 8,
         bedHeight: 8,
         homing: { ...project.device.homing, enabled: false },
-        cameraAlignment: {
-          homography: [1, 0, 0, 0, 1, 0, 0, 0, 1],
-          frameWidth: 8,
-          frameHeight: 8,
-          basis: 'raw',
-          alignedAt: 0,
-          planeHeightMm: 0,
-          capture: {
+        cameraModel: {
+          ...savedCameraModel({
             version: 1,
             sourceKind: 'usb',
             sourceId: 'audit-usb',
             width: 8,
             height: 8,
             resizeMode: 'none',
+          }),
+          // An 8 × 8 px camera 20 mm above the middle of the 8 × 8 mm bed.
+          lens: {
+            intrinsics: { fx: 20, fy: 20, cx: 4, cy: 4 },
+            distortion: [0, 0, 0, 0],
+            imageWidth: 8,
+            imageHeight: 8,
           },
+          pose: lookAt([4, 4, -20], [4, 4.001, 0]),
         },
       },
     },

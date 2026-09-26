@@ -47,34 +47,32 @@ describe('camera capture ownership and existing failure controls', () => {
       expect(pushToast).not.toHaveBeenCalled();
     },
   );
-  it.each(['capture', 'binding', 'basis', 'height'] as const)(
+  it.each(['capture', 'binding', 'shape'] as const)(
     'retains the %s failure path without inserting source',
     async (failure) => {
       if (failure === 'capture') vi.mocked(captureSourceFrame).mockResolvedValueOnce(null);
+      if (failure === 'shape') {
+        vi.mocked(captureSourceFrame).mockResolvedValueOnce({
+          width: 100,
+          height: 100,
+          data: new Uint8ClampedArray(100 * 100 * 4),
+        });
+      }
       const s = useStore.getState();
-      await act(async () => {
-        if (failure === 'binding' || failure === 'basis')
+      const model = s.project.device.cameraModel!;
+      if (failure === 'binding') {
+        await act(async () => {
           useStore.setState({
             project: {
               ...s.project,
               device: {
                 ...s.project.device,
-                cameraAlignment: {
-                  ...s.project.device.cameraAlignment!,
-                  ...(failure === 'basis'
-                    ? { basis: 'rectified' as const }
-                    : {
-                        capture: {
-                          ...s.project.device.cameraAlignment!.capture!,
-                          sourceId: 'different',
-                        },
-                      }),
-                },
+                cameraModel: { ...model, capture: { ...model.capture!, sourceId: 'different' } },
               },
             },
           });
-        if (failure === 'height') useCameraStore.setState({ surfaceHeightMm: 10 });
-      });
+        });
+      }
       const before = useStore.getState().project;
       await open();
       expect(useStore.getState().project).toBe(before);

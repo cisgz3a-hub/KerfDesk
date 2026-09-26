@@ -95,17 +95,17 @@ Measure object diameter with calipers at the engraving location. Record roller d
 
 ## CAM series: USB and RTSP cameras
 
-Use a printed calibration board with measured square size and a fixed four-corner bed target. Do not move the camera after calibration.
+Calibrate with the engraved ring target (ADR-441) on one flat sheet covering the bed. Do not move the camera after calibration.
 
 | Case | Source | Procedure | Pass condition |
 | --- | --- | --- | --- |
-| CAM-01 | USB | Calibrate lens from the required poses, then align to the bed. | Capture succeeds and all five overlay check points meet the camera limit. |
-| CAM-02 | USB | Change camera resolution after alignment. | Existing registration is invalidated or explicitly revalidated; stale alignment is never silently reused. |
+| CAM-01 | USB | Engrave the target, take the photo and save the calibration. | Capture succeeds, the result reports its ring errors, and all five overlay check points meet the camera limit. |
+| CAM-02 | USB | Change camera resolution after calibration. | The same aspect ratio stays registered; another aspect ratio is reported and never drawn or traced with the old calibration. |
 | CAM-03 | USB | Stop camera, unplug, reconnect, and select it again. | Failure is actionable and recovery produces fresh readable pixels. |
 | CAM-04 | RTSP | Connect through the loopback bridge and run Diagnostics. | Bridge, frame proxy, FFmpeg, source, and readable capture all pass. |
 | CAM-05 | RTSP | Move a visible marker while capturing ten frames at 500 ms intervals. | Frames visibly advance with no stale sequence longer than two captures. |
-| CAM-06 | RTSP | Stop the camera or network mid-preview, then reconnect. | Failure is surfaced; stale pixels are not accepted as a fresh alignment capture; reconnect restores capture. |
-| CAM-07 | RTSP | Calibrate and align using the same target as USB. | All five overlay check points meet the camera limit. |
+| CAM-06 | RTSP | Stop the camera or network mid-preview, then reconnect. | Failure is surfaced; stale pixels are not accepted as a fresh calibration photo; reconnect restores capture. |
+| CAM-07 | RTSP | Calibrate using the same engraved target as USB. | All five overlay check points meet the camera limit. |
 
 ## PAC series: print and cut
 

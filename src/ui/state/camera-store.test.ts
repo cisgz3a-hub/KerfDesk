@@ -38,7 +38,6 @@ beforeEach(() => {
     sourceState: { kind: 'idle' },
     usbAvailability: { kind: 'available' },
     usbSourceRelease: null,
-    alignment: { kind: 'idle' },
     sourceEpoch: 0,
     machineCamera: { kind: 'idle' },
     overlayVisible: true,
@@ -357,25 +356,5 @@ describe('camera-store', () => {
     const noBridge = useCameraStore.getState().sourceState;
     expect(noBridge.kind).toBe('error');
     if (noBridge.kind === 'error') expect(noBridge.message).toContain('pnpm camera:bridge');
-  });
-
-  it('drives the alignment flow through to aligned', () => {
-    const targets = [
-      { x: 0, y: 0 },
-      { x: 200, y: 0 },
-      { x: 200, y: 150 },
-      { x: 0, y: 150 },
-    ];
-    const pixels = [
-      { x: 40, y: 380 },
-      { x: 600, y: 360 },
-      { x: 610, y: 30 },
-      { x: 30, y: 50 },
-    ];
-    const store = useCameraStore.getState();
-    store.beginAlignment(targets);
-    expect(useCameraStore.getState().alignment.kind).toBe('collecting');
-    for (const pixel of pixels) store.addAlignmentPoint(pixel);
-    expect(useCameraStore.getState().alignment.kind).toBe('aligned');
   });
 });

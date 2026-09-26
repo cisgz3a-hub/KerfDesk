@@ -1,8 +1,7 @@
-// CameraSetupSteps — the panel's guided order of operations. The camera flow
-// has a strict sequence (source → lens → alignment → use), but the panel is a
-// toolbox of buttons; this row tells the operator which one is next and what
-// is already done, driven by real state (active source, persisted
-// calibration/alignment on the device profile).
+// CameraSetupSteps — the panel's guided order of operations. Setting up a
+// camera is two steps since ADR-441 (start a camera, then calibrate it with
+// one photo of an engraved target); this row says which is next and what is
+// already done, driven by real state (active source, saved camera model).
 
 import { useStore } from '../../state';
 import { useCameraStore } from '../../state/camera-store';
@@ -12,14 +11,12 @@ type StepState = 'done' | 'next' | 'todo';
 
 export function CameraSetupSteps(): JSX.Element {
   const sourceState = useCameraStore((s) => s.sourceState);
-  const calibration = useStore((s) => s.project.device.cameraCalibration);
-  const alignment = useStore((s) => s.project.device.cameraAlignment);
+  const model = useStore((s) => s.project.device.cameraModel);
 
   const sourceLive = sourceState.kind === 'live';
   const steps: ReadonlyArray<{ readonly label: string; readonly done: boolean }> = [
     { label: 'Use a camera', done: sourceLive },
-    { label: 'Calibrate lens', done: calibration !== undefined },
-    { label: 'Align to bed', done: alignment !== undefined },
+    { label: 'Calibrate', done: model !== undefined },
   ];
   const nextIndex = steps.findIndex((step) => !step.done);
 
@@ -45,15 +42,13 @@ function stateOf(done: boolean, index: number, nextIndex: number): StepState {
 function nextHint(nextIndex: number, sourceLive: boolean): string {
   switch (nextIndex) {
     case 0:
-      return 'Next: press "Use this camera" on the detected machine camera (or start a USB camera).';
+      return 'Next: press "Use this camera" on the machine camera, or start a USB camera.';
     case 1:
-      return 'Next: "Calibrate lens…" — the wizard saves a printable checkerboard and captures poses automatically.';
-    case 2:
-      return 'Next: "Align to bed…" — burn the marker target (or reuse one) so the camera knows where the bed is.';
+      return 'Next: "Calibrate camera…" engraves a ring target and fits the camera from one photo.';
     default:
       return sourceLive
-        ? 'Ready: the overlay tracks the bed — Update still, Trace from camera, or use the crosshair tool to move the laser to a click.'
-        : 'Set up complete — start a camera to use the overlay, trace, and positioning.';
+        ? 'Ready: the corrected camera shows on the canvas. Update still, Trace from camera, or place artwork on the material.'
+        : 'Calibrated. Start the camera to see the bed on the canvas.';
   }
 }
 

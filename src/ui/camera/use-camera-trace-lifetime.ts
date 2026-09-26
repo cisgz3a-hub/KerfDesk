@@ -37,8 +37,7 @@ export function useCameraTraceLifetime(): () => () => boolean {
         useUiStore.getState().imageDialog === dialog &&
         camera.sourceState === sourceState &&
         camera.surfaceHeightMm === surfaceHeightMm &&
-        current.project.device.cameraAlignment === device.cameraAlignment &&
-        current.project.device.cameraCalibration === device.cameraCalibration &&
+        current.project.device.cameraModel === device.cameraModel &&
         current.project.device.bedWidth === device.bedWidth &&
         current.project.device.bedHeight === device.bedHeight
       );

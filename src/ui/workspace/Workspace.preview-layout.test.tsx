@@ -2,7 +2,9 @@ import { readFileSync } from 'node:fs';
 import { act, useEffect, useState } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
+import { savedCameraModel } from '../../core/camera/model/model-fixtures';
 import { findRegistrationBoxBounds } from '../../core/scene';
+import type { BedOverlayUniforms } from '../camera/overlay/bed-overlay-shader';
 import { WorkspaceCameraOverlay } from '../camera/WorkspaceCameraOverlay';
 import { CanvasViewSwitch } from '../gcode-inspector/CanvasViewSwitch';
 import { BoardAnchorOverlay } from '../laser/board-capture/BoardAnchorOverlay';
@@ -16,6 +18,18 @@ import * as drawing from './draw-scene';
 import { canvasMouseToScene } from './view-transform';
 import { Workspace } from './Workspace';
 import { WorkspaceViewport } from './WorkspaceViewport';
+
+// jsdom has no WebGL2: a stand-in renderer records what the overlay draws with.
+const cameraDraws = vi.hoisted(() => [] as BedOverlayUniforms[]);
+vi.mock('../camera/overlay/bed-overlay-renderer', () => ({
+  createBedOverlayRenderer: () => ({
+    draw: (_source: unknown, _width: number, _height: number, uniforms: BedOverlayUniforms) =>
+      cameraDraws.push(uniforms),
+    clear: () => undefined,
+    dispose: () => undefined,
+    lost: false,
+  }),
+}));
 
 const previewCss = readFileSync('src/ui/workspace/workspace-preview.css', 'utf8');
 
@@ -45,6 +59,7 @@ class ResizeObserverStub {
 beforeEach(() => {
   vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
   vi.stubGlobal('ResizeObserver', ResizeObserverStub);
+  cameraDraws.length = 0;
   resetStore();
   reservedStageHeight = 420;
   useLaserStore.setState(initialLaserState());
@@ -58,14 +73,7 @@ beforeEach(() => {
         ...project.device,
         bedWidth: 400,
         bedHeight: 400,
-        cameraAlignment: {
-          homography: [1, 0, 0, 0, 1, 0, 0, 0, 1],
-          frameWidth: 4,
-          frameHeight: 4,
-          basis: 'raw',
-          alignedAt: 0,
-          planeHeightMm: 0,
-        },
+        cameraModel: savedCameraModel(),
       },
     },
   });
@@ -73,7 +81,7 @@ beforeEach(() => {
   useCameraStore.setState({
     overlayVisible: true,
     overlayOpacityPercent: 50,
-    overlayStill: { data: new Uint8ClampedArray(64).fill(200), width: 4, height: 4 },
+    overlayStill: { data: new Uint8ClampedArray(16 * 9 * 4).fill(200), width: 16, height: 9 },
     overlayStillCapture: null,
     surfaceHeightMm: 0,
     sourceState: { kind: 'idle' },
@@ -279,11 +287,10 @@ function assertSharedCoordinates(height: number, boardHandlesVisible = true): vo
   const scale = ((height - 60) / 400) * VIEW.zoomFactor;
   const offsetX = (WIDTH - 400 * scale) / 2 + VIEW.panX * scale;
   const offsetY = (height - 400 * scale) / 2 + VIEW.panY * scale;
-  const matrix = cameraCanvas().style.transform.slice(9, -1).split(',').map(Number);
-  expect(matrix[0]).toBeCloseTo(scale, 8);
-  expect(matrix[5]).toBeCloseTo(scale, 8);
-  expect(matrix[12]).toBeCloseTo(offsetX, 8);
-  expect(matrix[13]).toBeCloseTo(offsetY, 8);
+  const drawn = cameraDraws.at(-1);
+  expect(drawn?.uViewScale).toBeCloseTo(scale, 8);
+  expect(drawn?.uViewOffset[0]).toBeCloseTo(offsetX, 8);
+  expect(drawn?.uViewOffset[1]).toBeCloseTo(offsetY, 8);
   const corner = boardOverlay().querySelector<HTMLButtonElement>('[data-board-anchor="top-right"]');
   const bounds = findRegistrationBoxBounds(useStore.getState().project.scene);
   if (bounds === null) throw new Error('Missing board reference');
@@ -315,11 +322,9 @@ function baseCanvas(): HTMLCanvasElement {
 }
 
 function cameraCanvas(): HTMLCanvasElement {
-  const still = [...host.querySelectorAll('canvas')].find((canvas) =>
-    canvas.style.transform.startsWith('matrix3d'),
-  );
-  if (still === undefined) throw new Error('Missing saved camera still');
-  return still;
+  const overlay = host.querySelector<HTMLCanvasElement>('.lf-workspace-accessories canvas');
+  if (overlay === null) throw new Error('Missing camera overlay');
+  return overlay;
 }
 
 function boardOverlay(): HTMLElement {

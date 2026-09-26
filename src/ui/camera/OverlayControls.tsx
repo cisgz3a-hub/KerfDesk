@@ -1,22 +1,21 @@
-// OverlayControls â€” the Camera panel's workspace-overlay row (ADR-107,
-// LightBurn "Camera Control" parity): show/hide on canvas, a fade slider, and
-// the still-vs-live source choice. Camera placement stays latched after hiding
-// the image so its status remains visible until the operator exits it.
+// OverlayControls — the Camera panel's workspace-overlay row (ADR-107,
+// LightBurn "Camera Control" parity): show/hide on canvas, a fade slider, the
+// still-vs-live source choice and the material's surface height, which the
+// camera model uses to undo parallax exactly (ADR-440). Camera placement
+// stays latched after hiding the image so its status remains visible until
+// the operator exits it.
 
 import { useStore } from '../state';
 import { useCameraStore } from '../state/camera-store';
-import type { CameraAlignment } from '../../core/camera';
 import { useCameraPlacementControls } from './use-camera-placement-controls';
 import { TraceFromCameraButton } from './TraceFromCameraButton';
-import { cameraSurfaceHeightIssue, resolveCameraSurfaceHeight } from './camera-surface-height';
 
 export function OverlayControls(): JSX.Element | null {
-  const alignment = useStore((s) => s.project.device.cameraAlignment);
-  return alignment === undefined ? null : <AlignedOverlayControls alignment={alignment} />;
+  const model = useStore((s) => s.project.device.cameraModel);
+  return model === undefined ? null : <CalibratedOverlayControls />;
 }
 
-function AlignedOverlayControls(props: { readonly alignment: CameraAlignment }): JSX.Element {
-  const calibration = useStore((s) => s.project.device.cameraCalibration);
+function CalibratedOverlayControls(): JSX.Element {
   const sourceState = useCameraStore((s) => s.sourceState);
   const visible = useCameraStore((s) => s.overlayVisible);
   const opacity = useCameraStore((s) => s.overlayOpacityPercent);
@@ -24,28 +23,19 @@ function AlignedOverlayControls(props: { readonly alignment: CameraAlignment }):
   const still = useCameraStore((s) => s.overlayStill);
   const surfaceHeightMm = useCameraStore((s) => s.surfaceHeightMm);
   const setSurfaceHeightMm = useCameraStore((s) => s.setSurfaceHeightMm);
-  const surface = resolveCameraSurfaceHeight(props.alignment, calibration, surfaceHeightMm);
-  const surfaceIssue = cameraSurfaceHeightIssue(surface);
-  const placement = useCameraPlacementControls(surfaceIssue === null);
+  const placement = useCameraPlacementControls(true);
 
-  const liveOverlayAvailable = sourceState.kind === 'live' && sourceState.source.kind === 'usb';
+  const sourceLive = sourceState.kind === 'live';
   return (
     <div style={sectionStyle}>
       <OverlayActionRow
         placement={placement}
         visible={visible}
-        sourceLive={sourceState.kind === 'live'}
-        liveOverlayAvailable={liveOverlayAvailable}
+        sourceLive={sourceLive}
         hasStill={still !== null}
       />
       {placement.active ? <CameraPlacementStatus placement={placement} /> : null}
-      <SurfaceHeightControl
-        alignment={props.alignment}
-        heightMm={surfaceHeightMm}
-        issue={surfaceIssue}
-        adjusted={surface.ok && surface.adjusted}
-        onChange={setSurfaceHeightMm}
-      />
+      <SurfaceHeightControl heightMm={surfaceHeightMm} onChange={setSurfaceHeightMm} />
       <FadeControl opacity={opacity} onChange={setOpacity} />
     </div>
   );
@@ -57,7 +47,6 @@ function OverlayActionRow(props: {
   readonly placement: PlacementControls;
   readonly visible: boolean;
   readonly sourceLive: boolean;
-  readonly liveOverlayAvailable: boolean;
   readonly hasStill: boolean;
 }): JSX.Element {
   return (
@@ -67,7 +56,7 @@ function OverlayActionRow(props: {
         className="lf-btn"
         aria-pressed={props.visible}
         onClick={props.placement.toggleOverlay}
-        title="Show or hide the aligned camera image on the workspace canvas."
+        title="Show or hide the corrected camera picture on the workspace canvas."
       >
         {props.visible ? 'Overlay on' : 'Overlay off'}
       </button>
@@ -83,9 +72,9 @@ function OverlayActionRow(props: {
       <button
         type="button"
         className="lf-btn"
-        disabled={!props.hasStill || !props.liveOverlayAvailable}
+        disabled={!props.hasStill || !props.sourceLive}
         onClick={props.placement.useLive}
-        title="Use the continuous live video as the workspace overlay (USB cameras)."
+        title="Show the live camera on the canvas instead of the frozen still."
       >
         Live
       </button>
@@ -96,19 +85,9 @@ function OverlayActionRow(props: {
 }
 
 function SurfaceHeightControl(props: {
-  readonly alignment: CameraAlignment;
   readonly heightMm: number;
-  readonly issue: string | null;
-  readonly adjusted: boolean;
   readonly onChange: (heightMm: number) => void;
 }): JSX.Element {
-  const status = props.adjusted
-    ? `Perspective corrected from ${props.alignment.planeHeightMm ?? 0} mm to ${props.heightMm} mm.`
-    : `Using the ${props.heightMm} mm alignment plane.`;
-  const verification =
-    props.alignment.verificationErrorMm === undefined
-      ? ''
-      : ` Alignment check: ${props.alignment.verificationErrorMm.toFixed(2)} mm.`;
   return (
     <>
       <label style={heightStyle}>
@@ -121,14 +100,15 @@ function SurfaceHeightControl(props: {
             step={0.1}
             value={props.heightMm}
             aria-label="Material surface height above bed"
-            title="Height of the material's top surface above the machine bed. KerfDesk compensates camera perspective to this plane."
+            title="Height of the material's top surface above the machine bed. The camera picture is corrected to this height."
             onChange={(event) => props.onChange(Number(event.currentTarget.value))}
           />{' '}
           mm
         </span>
       </label>
-      <div role={props.issue === null ? 'status' : 'alert'} style={heightMessageStyle(props.issue)}>
-        {props.issue ?? `${status}${verification}`}
+      <div role="status" style={heightMessageStyle}>
+        The camera picture shows the bed as seen at {props.heightMm} mm above it: set this to the
+        top of your material so its edges line up.
       </div>
     </>
   );
@@ -180,7 +160,7 @@ function CameraPlacementStatus(props: { readonly placement: PlacementControls })
           type="button"
           className="lf-btn"
           onClick={placement.confirmPosition}
-          title="Confirm only after checking that the controller coordinate origin still matches the physical bed used for camera alignment. This confirmation expires after reconnect, reset, alarm, sleep, or homing."
+          title="Confirm only after checking that the controller coordinate origin still matches the physical bed used for camera calibration. This confirmation expires after reconnect, reset, alarm, sleep, or homing."
         >
           Confirm bed coordinates
         </button>
@@ -197,7 +177,7 @@ function positionTrustCopy(homingEnabled: boolean, trusted: boolean): string {
   }
   return trusted
     ? 'Controller-to-bed position is confirmed for this session.'
-    : 'Confirm that the controller coordinates match the camera-aligned bed.';
+    : 'Confirm that the controller coordinates match the bed the camera was calibrated on.';
 }
 
 const sectionStyle: React.CSSProperties = {
@@ -224,12 +204,7 @@ const heightStyle: React.CSSProperties = {
 };
 const heightInputStyle: React.CSSProperties = { display: 'flex', alignItems: 'center', gap: 4 };
 
-function heightMessageStyle(issue: string | null): React.CSSProperties {
-  return {
-    fontSize: 12,
-    color: issue === null ? 'var(--lf-success-fg)' : 'var(--lf-warning-fg)',
-  };
-}
+const heightMessageStyle: React.CSSProperties = { fontSize: 12, color: 'var(--lf-text-faint)' };
 
 function placementStatusStyle(trusted: boolean): React.CSSProperties {
   return {

@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { savedCameraModel } from '../../core/camera/model/model-fixtures';
 import { NEOTRONICS_4040_MAX_LT4LDS_V2_PROFILE, type DeviceProfile } from '../../core/devices';
 import {
   MACHINE_PROFILE_FORMAT,
@@ -14,21 +15,7 @@ function profileWithCalibration(): DeviceProfile {
     ...NEOTRONICS_4040_MAX_LT4LDS_V2_PROFILE,
     profileSource: 'custom',
     baudRate: 250000,
-    cameraCalibration: {
-      intrinsics: { fx: 900, fy: 905, cx: 640, cy: 360 },
-      distortion: [0.1, -0.02, 0.003, -0.0004],
-      imageWidth: 1280,
-      imageHeight: 720,
-      rmsPx: 0.42,
-      calibratedAt: 1_788_000_000_000,
-    },
-    cameraAlignment: {
-      homography: [1, 0, 2, 0, 1, 3, 0, 0, 1],
-      frameWidth: 1280,
-      frameHeight: 720,
-      basis: 'rectified',
-      alignedAt: 1_788_000_100_000,
-    },
+    cameraModel: savedCameraModel(),
     fireControl: { enabled: true, maxPowerPercent: 1.5 },
     estimateCutTimeScale: 1.18,
     estimateTravelTimeScale: 1.07,
@@ -92,14 +79,9 @@ describe('LaserForge machine profile documents', () => {
         rxBufferBytes: 120,
         controlledLaserOffTravelFeedMmPerMin: 800,
         baudRate: 250000,
-        cameraCalibration: {
-          intrinsics: { fx: 900, fy: 905, cx: 640, cy: 360 },
-          distortion: [0.1, -0.02, 0.003, -0.0004],
-          rmsPx: 0.42,
-        },
-        cameraAlignment: {
-          homography: [1, 0, 2, 0, 1, 3, 0, 0, 1],
-          basis: 'rectified',
+        cameraModel: {
+          version: 1,
+          accuracy: { rmsErrorMm: 0.08, foundMarks: 96, expectedMarks: 100 },
         },
         fireControl: { enabled: true, maxPowerPercent: 1.5 },
         estimateCutTimeScale: 1.18,
@@ -115,7 +97,7 @@ describe('LaserForge machine profile documents', () => {
     });
   });
 
-  it('roundtrips transport, camera calibration, alignment, scan offsets, and no-go zones', () => {
+  it('roundtrips transport, camera calibration, scan offsets, and no-go zones', () => {
     const original = serializeMachineProfileDocument({
       format: MACHINE_PROFILE_FORMAT,
       schemaVersion: MACHINE_PROFILE_SCHEMA_VERSION,
@@ -141,12 +123,7 @@ describe('LaserForge machine profile documents', () => {
     expect(result.document.profile.rxBufferBytes).toBe(120);
     expect(result.document.profile.controlledLaserOffTravelFeedMmPerMin).toBe(800);
     expect(result.document.profile.baudRate).toBe(250000);
-    expect(result.document.profile.cameraCalibration).toEqual(
-      profileWithCalibration().cameraCalibration,
-    );
-    expect(result.document.profile.cameraAlignment).toEqual(
-      profileWithCalibration().cameraAlignment,
-    );
+    expect(result.document.profile.cameraModel).toEqual(profileWithCalibration().cameraModel);
     expect(result.document.profile.fireControl).toEqual({ enabled: true, maxPowerPercent: 1.5 });
     expect(result.document.profile.estimateCutTimeScale).toBe(1.18);
     expect(result.document.profile.estimateTravelTimeScale).toBe(1.07);
@@ -382,20 +359,13 @@ describe('LaserForge machine profile documents', () => {
       kind: 'invalid',
       reason: 'profile.laserSubProfile is invalid',
     });
-    expect(deserializeProfilePatch({ cameraCalibration: { imageWidth: 1280 } })).toEqual({
-      kind: 'invalid',
-      reason: 'profile.cameraCalibration is invalid',
-    });
     expect(
       deserializeProfilePatch({
-        cameraAlignment: {
-          ...profileWithCalibration().cameraAlignment,
-          homography: [1, 0, 0],
-        },
+        cameraModel: { ...savedCameraModel(), lens: { imageWidth: 1280 } },
       }),
     ).toEqual({
       kind: 'invalid',
-      reason: 'profile.cameraAlignment is invalid',
+      reason: 'profile.cameraModel is invalid',
     });
     expect(
       deserializeProfilePatch({ fireControl: { enabled: true, maxPowerPercent: 50 } }),
@@ -403,6 +373,29 @@ describe('LaserForge machine profile documents', () => {
       kind: 'invalid',
       reason: 'profile.fireControl is invalid',
     });
+  });
+
+  it('imports an older profile without its checkerboard calibration or bed alignment', () => {
+    const { cameraModel: _model, ...withoutModel } = profileWithCalibration();
+    const result = deserializeMachineProfileDocument(
+      JSON.stringify({
+        format: MACHINE_PROFILE_FORMAT,
+        schemaVersion: MACHINE_PROFILE_SCHEMA_VERSION,
+        profile: {
+          ...withoutModel,
+          cameraCalibration: { imageWidth: 1280 },
+          cameraAlignment: { homography: [1, 0, 0] },
+        },
+        source: { kind: 'custom', label: 'Older KerfDesk' },
+        reviewNotes: [],
+      }),
+    );
+
+    expect(result.kind).toBe('ok');
+    if (result.kind !== 'ok') return;
+    expect(result.document.profile).not.toHaveProperty('cameraCalibration');
+    expect(result.document.profile).not.toHaveProperty('cameraAlignment');
+    expect(result.document.profile.cameraModel).toBeUndefined();
   });
 
   it('rejects unsupported formats and newer schemas clearly', () => {

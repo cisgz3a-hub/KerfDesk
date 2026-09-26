@@ -62,14 +62,14 @@ export const PRODUCTION_TOOL_TUTORIALS: readonly Tutorial[] = [
       {
         title: 'Choose a feature deliberately',
         instruction:
-          'Read the descriptions for Low-power Fire control, Print and Cut, and Camera alignment v2. These optional features are off by default and expose different machine workflows.',
-        focus: 'Three optional features',
+          'Read the descriptions for Low-power Fire control and Print and Cut. These optional features are off by default and expose different machine workflows.',
+        focus: 'Two optional features',
         result: 'You can identify the feature that serves your current task.',
       },
       {
         title: 'Check the matching machine setup',
         instruction:
-          'Low-power Fire needs an approved diode profile. Print and Cut uses a homed absolute-position profile. Camera alignment v2 enables the camera alignment workflow. Turning on a preference does not supply missing hardware or prove its calibration.',
+          'Low-power Fire needs an approved diode profile. Print and Cut uses a homed absolute-position profile. Turning on a preference does not supply missing hardware or prove its calibration.',
         focus: 'Feature + supported setup',
         result: 'The preference and the actual machine configuration remain separate choices.',
       },

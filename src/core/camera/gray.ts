@@ -2,7 +2,7 @@
 // detector and the sub-pixel refiner both work on a single-channel intensity
 // image; camera frames arrive as RGBA bytes. Pure core: buffers in, buffers out.
 
-import type { RgbaImage } from './cpu-rectify';
+import type { RgbaImage } from './rgba-image';
 import type { GrayImage } from './corner-subpix';
 
 // Rec. 601 luma weights — the standard perceptual gray for 8-bit video frames.
