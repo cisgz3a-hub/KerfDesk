@@ -88,7 +88,7 @@ export function placeTracedLayers(
   const matrix = { a: 1, b: 0, c: 0, d: 1, e: -box.minX, f: -box.minY };
   return {
     layers: layers.map((layer) => ({
-      color: layer.color,
+      ...layer,
       curves: layer.curves.map((curve) => transformCurveSubpathExact(curve, matrix)),
     })),
     page: { ...page, size: { width: span(box.minX, box.maxX), height: span(box.minY, box.maxY) } },
@@ -177,7 +177,9 @@ function strokedAnywhere(
   traceMode: TraceOptions['traceMode'],
 ): boolean {
   if (traceMode === 'centerline') return layers.some((layer) => layer.curves.length > 0);
-  return layers.some((layer) => layer.curves.some((curve) => !curve.closed));
+  return layers.some((layer) =>
+    layer.curves.some((curve) => layer.strokeOnly === true || !curve.closed),
+  );
 }
 
 /** Half the widest stroke drawn on this page, in page units. */

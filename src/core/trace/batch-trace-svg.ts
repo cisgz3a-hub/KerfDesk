@@ -23,6 +23,7 @@ import {
 } from '../vector-export/decimal-grid';
 import { formatSvgPathData, quantizeCurves } from '../vector-export/svg-path-data';
 import type { TraceOptions } from './trace-option-types';
+import { isHybridStrokePath } from './hybrid/hybrid-paths';
 
 export type TracedSvgPage = {
   readonly pixelWidth: number;
@@ -38,7 +39,12 @@ export type TracedVectorOptions = {
   readonly groupContours?: boolean;
 };
 
-export type TracedLayer = { readonly color: string; readonly curves: ReadonlyArray<CurveSubpath> };
+export type TracedLayer = {
+  readonly color: string;
+  readonly curves: ReadonlyArray<CurveSubpath>;
+  /** A Line + fill stroke remains a line even when its contour is closed. */
+  readonly strokeOnly?: boolean;
+};
 
 const VISIBLE_GEOMETRY_EPSILON = 1e-6;
 
@@ -56,10 +62,12 @@ export function tracedLayers(
   const layers: TracedLayer[] = [];
   for (const path of paths) {
     if (!isVisibleColor(path.color)) continue;
+    const strokeOnly = traceMode === 'hybrid' && isHybridStrokePath(path);
     const curves = (path.curves ?? path.polylines.map(polylineToCurveSubpath))
-      .filter((curve) => isVisibleCurve(curve, traceMode))
+      .filter((curve) => isVisibleCurve(curve, strokeOnly ? 'centerline' : traceMode))
       .map((curve) => transformCurveSubpathExact(curve, matrix));
-    if (curves.length > 0) layers.push({ color: path.color, curves });
+    if (curves.length > 0)
+      layers.push({ color: path.color, curves, ...(strokeOnly ? { strokeOnly: true } : {}) });
   }
   return layers;
 }
@@ -111,7 +119,7 @@ function layerMarkup(
   group: boolean,
 ): string {
   const curves = quantizeCurves(layer.curves, grid);
-  const fillClosed = traceMode !== 'centerline';
+  const fillClosed = traceMode !== 'centerline' && layer.strokeOnly !== true;
   const closed = fillClosed ? curves.filter((curve) => curve.closed) : [];
   const stroked = fillClosed ? curves.filter((curve) => !curve.closed) : curves;
   const fill = (members: ReadonlyArray<CurveSubpath>): string =>

@@ -23,7 +23,9 @@ consulted.
    layer's effective operation fills, exactly as the SVG exporter decides, and a stroked item
    otherwise; open contours of a filled path are stroked. Items are never merged, so two
    overlapping objects of one colour do not cancel under one even-odd fill. Multi-File Trace
-   layers fill even-odd, except Centerline, where every contour is a stroke.
+   layers fill even-odd, except Centerline, where every contour is a stroke. A Line + fill
+   layer carries its stroke role through page placement and every writer, so a closed pen
+   ring remains a stroke and receives the fitted page's stroke allowance.
 2. **Placement.** Every writer maps the scene's Y-down frame to a Y-up page whose lower-left corner
    is (0, 0). The page is the exact extent of the drawn curves (derivative roots, arc extrema;
    `curveSubpathBounds`), not their control points, or a caller's rectangle (Multi-File Trace

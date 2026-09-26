@@ -357,7 +357,7 @@ export function tracedLayerItems(
   const items: VectorPaintItem[] = [];
   for (const layer of layers) {
     const curves = layer.curves.filter((curve) => curve.segments.length > 0);
-    pushSplit(items, layer.color, !strokeOnly, 'evenodd', curves);
+    pushSplit(items, layer.color, !strokeOnly && layer.strokeOnly !== true, 'evenodd', curves);
   }
   return items;
 }
