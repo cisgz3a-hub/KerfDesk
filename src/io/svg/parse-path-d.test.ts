@@ -216,6 +216,16 @@ describe('parsePathD — curve flattening (De Casteljau subdivision)', () => {
     }
   });
 
+  it('flattens a 100 mm-radius A command to vertices within 0.03 mm of its circle', () => {
+    // Two semicircles about (100, 100) make four 90° cubics. Flattening keeps
+    // each cubic's midpoint as a vertex, and that midpoint sat 0.196 mm inside
+    // the circle with the old arm length (ADR-159 Amendment 2).
+    const pts = parsePathD('M 0 100 A 100 100 0 0 1 200 100 A 100 100 0 0 1 0 100 Z')[0]?.points;
+    const radialErrors = (pts ?? []).map((p) => Math.abs(Math.hypot(p.x - 100, p.y - 100) - 100));
+    expect(radialErrors.length).toBeGreaterThan(40);
+    expect(Math.max(...radialErrors)).toBeLessThan(0.03);
+  });
+
   // H8 (AUDIT-2026-06-10): the SVG grammar defines large-arc/sweep as
   // single-digit flag productions needing no separator — `a4 4 0 011 7` is
   // valid (SVGO-minified files emit exactly this) and must parse identically

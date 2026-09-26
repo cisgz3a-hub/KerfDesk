@@ -100,7 +100,7 @@ function settingsAfterPrimaryToolChange(
     tool,
     spindleRpm: settings.spindleRpm,
     profile: context.profile,
-    machineSpindleMaxRpm: context.machine.params.spindleMaxRpm,
+    machineParams: context.machine.params,
     liveCaps: context.liveCaps,
     fluteCount: tool.fluteCount ?? DEFAULT_ASSUMED_FLUTE_COUNT,
   });
@@ -143,7 +143,7 @@ function settingsWithMaterialBinding(
     tool,
     spindleRpm: settings.spindleRpm,
     profile: context.profile,
-    machineSpindleMaxRpm: context.machine.params.spindleMaxRpm,
+    machineParams: context.machine.params,
     liveCaps: context.liveCaps,
   });
   return patch === null

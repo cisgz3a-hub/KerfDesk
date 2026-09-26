@@ -276,7 +276,7 @@ function offsetSelectionMutation(
   };
 }
 
-function prepareIndependentArtwork(
+export function prepareIndependentArtwork(
   scene: Scene,
   artwork: ImportedSvg,
   source: SceneObject | undefined,
@@ -359,7 +359,7 @@ function uniqueWeldId(scene: Scene): string {
   return uniqueObjectId(scene, 'welded');
 }
 
-function uniqueObjectId(scene: Scene, base: string): string {
+export function uniqueObjectId(scene: Scene, base: string): string {
   const used = new Set(scene.objects.map((object) => object.id));
   if (!used.has(`${base}-paths`)) return `${base}-paths`;
   for (let index = 2; index <= MAX_ID_SUFFIX; index += 1) {

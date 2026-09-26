@@ -11,6 +11,7 @@
 // CncLayerAdvancedFields.
 
 import { useState } from 'react';
+import { cncMaxFeedMmPerMin } from '../../core/cnc/cnc-head-feeds';
 import {
   CNC_CUT_TYPES,
   DEFAULT_CNC_LAYER_SETTINGS,
@@ -40,11 +41,14 @@ export function CncLayerFields(props: {
   // produces the same canonical numbers. Secondary tool choices leave them alone.
   const [assignmentRevision, setAssignmentRevision] = useState(0);
   const setLayerParam = useStore((s) => s.setLayerParam);
-  const maxFeed = useStore((s) => s.project.device.maxFeed);
+  const deviceMaxFeed = useStore((s) => s.project.device.maxFeed);
   const machine = useStore((s) => s.project.machine);
   const hasReliefObjects = useLayerHasReliefObjects(layer);
   const settings = layer.cnc ?? DEFAULT_CNC_LAYER_SETTINGS;
   const isCnc = machine?.kind === 'cnc';
+  const maxFeed = isCnc
+    ? cncMaxFeedMmPerMin({ maxFeed: deviceMaxFeed }, machine.params)
+    : deviceMaxFeed;
   const spindleMaxRpm = isCnc ? machine.params.spindleMaxRpm : 24000;
   const stockThicknessMm = isCnc ? machine.stock.thicknessMm : 0;
   const isProfile = settings.cutType.startsWith('profile') || settings.cutType === 'inlay-pair';

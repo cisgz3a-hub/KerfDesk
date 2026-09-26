@@ -7,7 +7,13 @@ import {
   MAX_RASTER_LINES_PER_MM,
   MIN_RASTER_LINES_PER_MM,
 } from '../../core/raster';
+import {
+  accelerationDistanceMm,
+  imageOverscanMmFor,
+  MAX_IMAGE_OVERSCAN_MM,
+} from '../../core/job/operation-cut-extras';
 import { DITHER_ALGORITHMS, type Layer } from '../../core/scene';
+import { useStore } from '../state';
 import { dotWidthCorrectionMax } from './cut-settings-draft';
 
 export function CutSettingsImageFields(props: {
@@ -16,6 +22,8 @@ export function CutSettingsImageFields(props: {
   readonly imageLinesPerMm: number;
   readonly maxPower?: number;
   readonly deferArtworkBounds?: boolean;
+  /** Material presets do not store image overscan (ADR-415), so their wizard hides it. */
+  readonly showOverscan?: boolean;
   readonly onDitherChange: (dither: Layer['ditherAlgorithm']) => void;
   readonly onImageLinesPerMmChange: (linesPerMm: number) => void;
 }): JSX.Element {
@@ -69,6 +77,7 @@ export function CutSettingsImageFields(props: {
         />
         <span className="lf-field-unit">mm</span>
       </Field>
+      {props.showOverscan === true ? <ImageOverscanField layer={props.layer} /> : null}
       <ImageCheckboxField
         label="Invert brightness"
         name="negativeImage"
@@ -84,6 +93,41 @@ export function CutSettingsImageFields(props: {
       <ImageExtraFields layer={props.layer} />
     </fieldset>
   );
+}
+
+// ADR-415: per-operation overscan, with the run-up this machine actually needs
+// to reach the operation's speed (v² / 2a from its acceleration setting).
+function ImageOverscanField(props: { readonly layer: Layer }): JSX.Element {
+  const device = useStore((state) => state.project.device);
+  const feed = Math.min(props.layer.speed, device.maxFeed);
+  const neededMm = accelerationDistanceMm(feed, device.accelMmPerSec2);
+  return (
+    <>
+      <Field label="Overscan">
+        <NumberInput
+          name="imageOverscanMm"
+          value={imageOverscanMmFor(props.layer)}
+          min={0}
+          max={MAX_IMAGE_OVERSCAN_MM}
+          step={0.01}
+          label="image overscan"
+          title="Laser-off run-up added at both ends of every scan line so the head is at full speed before it burns. Too little darkens the image edges."
+        />
+        <span className="lf-field-unit">mm</span>
+      </Field>
+      <p className="lf-laser-help">
+        At the saved speed of {formatNumber(feed)} mm/min and {formatNumber(device.accelMmPerSec2)}{' '}
+        mm/s² acceleration, the head needs about {formatNumber(neededMm)} mm to reach full speed.
+        {neededMm > MAX_IMAGE_OVERSCAN_MM
+          ? ` That is more than the ${MAX_IMAGE_OVERSCAN_MM} mm maximum, so lower the speed if the image edges burn darker.`
+          : ''}
+      </p>
+    </>
+  );
+}
+
+function formatNumber(value: number): string {
+  return value.toLocaleString('en-US', { maximumFractionDigits: 1 });
 }
 
 function ImageExtraFields(props: { readonly layer: Layer }): JSX.Element {

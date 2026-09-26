@@ -12,6 +12,7 @@ import {
   type Project,
   type Scene,
   updateLayer,
+  machineKindOf,
 } from '../../core/scene';
 import { recolorLayer } from '../../core/scene/scene';
 import { applyLayerDefaultSettings } from '../layers/layer-default-settings';
@@ -162,10 +163,14 @@ function createManualLayerAction(set: LayerActionSet): LayerActions['createManua
         state.project.scene.objects,
         created,
       );
-      const base = applyLayerDefaultSettings(created, defaults);
+      const base = applyLayerDefaultSettings(
+        created,
+        defaults,
+        machineKindOf(state.project.machine),
+      );
       const machine = state.project.machine;
       const layer =
-        machine?.kind === 'cnc' && defaults.cnc === undefined
+        machine?.kind === 'cnc'
           ? seedFreshCncLayer(base, {
               device: state.project.device,
               machine,
@@ -299,6 +304,11 @@ const LAYER_SETTING_KEYS = [
   'negativeImage',
   'passThrough',
   'dotWidthCorrectionMm',
+  'perforationEnabled',
+  'perforationCutMm',
+  'perforationSkipMm',
+  'overcutMm',
+  'imageOverscanMm',
   'subLayers',
 ] as const satisfies ReadonlyArray<keyof LayerSettingsClipboard>;
 
@@ -330,6 +340,13 @@ function layerSettingsFrom(layer: Layer): LayerSettingsClipboard {
     negativeImage: layer.negativeImage,
     passThrough: layer.passThrough,
     dotWidthCorrectionMm: layer.dotWidthCorrectionMm,
+    // Explicitly undefined when unset, so pasting settings that never used
+    // perforation, overcut or image overscan turns them off on the target.
+    perforationEnabled: layer.perforationEnabled,
+    perforationCutMm: layer.perforationCutMm,
+    perforationSkipMm: layer.perforationSkipMm,
+    overcutMm: layer.overcutMm,
+    imageOverscanMm: layer.imageOverscanMm,
     subLayers: layer.subLayers,
     ...(layer.materialBinding === undefined ? {} : { materialBinding: layer.materialBinding }),
     ...(layer.cnc === undefined ? {} : { cnc: layer.cnc }),

@@ -87,8 +87,17 @@ describe('useStore — undo/redo selection preservation (CNV-13)', () => {
     const state = useStore.getState();
     expect(state.project.device.name).toBe('Atomic CNC');
     expect(state.project.workspace).toMatchObject({ width: 610, height: 410 });
-    expect(state.project.machine).toEqual(machine);
-    expect(state.cachedCncMachine).toEqual(machine);
+    // Saving a CNC setup gives CNC its own Max feed and Frame speed.
+    const saved = {
+      ...machine,
+      params: {
+        ...machine.params,
+        maxFeedMmPerMin: profile.maxFeed,
+        framingFeedMmPerMin: profile.framingFeedMmPerMin,
+      },
+    };
+    expect(state.project.machine).toEqual(saved);
+    expect(state.cachedCncMachine).toEqual(saved);
     expect(state.undoStack).toHaveLength(1);
     state.undo();
     expect(useStore.getState().project.device.name).toBe(DEFAULT_DEVICE_PROFILE.name);

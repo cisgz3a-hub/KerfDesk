@@ -131,6 +131,11 @@ export type ObjectOperationSettingsOverride = {
   readonly negativeImage?: boolean;
   readonly passThrough?: boolean;
   readonly dotWidthCorrectionMm?: number;
+  readonly perforationEnabled?: boolean | undefined;
+  readonly perforationCutMm?: number | undefined;
+  readonly perforationSkipMm?: number | undefined;
+  readonly overcutMm?: number | undefined;
+  readonly imageOverscanMm?: number | undefined;
 };
 
 export type ObjectOperationOverride = ObjectOperationSettingsOverride & {

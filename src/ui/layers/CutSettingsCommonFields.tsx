@@ -1,4 +1,9 @@
+import {
+  DEFAULT_PERFORATION_CUT_MM,
+  DEFAULT_PERFORATION_SKIP_MM,
+} from '../../core/job/operation-cut-extras';
 import type { Layer, LayerMode } from '../../core/scene';
+import { MAX_OVERCUT_MM, MAX_PERFORATION_MM, MIN_PERFORATION_MM } from './cut-settings-draft';
 import { useStore } from '../state';
 import { CutPowerModeField } from './CutPowerModeField';
 import { LaserProcessField } from './LaserProcessField';
@@ -134,7 +139,69 @@ function LineModeFields(props: { readonly layer: Layer }): JSX.Element {
         />
         <span className="lf-field-unit">mm</span>
       </Field>
+      <Field label="Overcut">
+        <NumberInput
+          name="overcutMm"
+          value={props.layer.overcutMm ?? 0}
+          min={0}
+          max={MAX_OVERCUT_MM}
+          step={0.01}
+          label="overcut"
+          title="Keep cutting past the start of each closed shape on the final pass so the seam is cut through. 0 turns it off. Shapes opened by tabs or perforation are not overcut."
+        />
+        <span className="lf-field-unit">mm</span>
+      </Field>
       <LineBridgeFields layer={props.layer} />
+      <LinePerforationFields layer={props.layer} />
+    </fieldset>
+  );
+}
+
+function LinePerforationFields(props: { readonly layer: Layer }): JSX.Element {
+  return (
+    <fieldset
+      className="lf-fieldset"
+      title="Cut the line as dashes with uncut gaps, for tear-off parts and fold lines."
+    >
+      <legend>Perforation</legend>
+      <p className="lf-laser-help">
+        Cuts dashes with uncut gaps between them. Closed shapes always keep a full gap before their
+        start point.
+      </p>
+      <Field label="Enable">
+        <input
+          name="perforationEnabled"
+          type="checkbox"
+          className="lf-checkbox"
+          defaultChecked={props.layer.perforationEnabled === true}
+          aria-label="Cut settings enable perforation"
+          title="Cut every line on this layer as dashes separated by uncut gaps."
+        />
+      </Field>
+      <Field label="Cut">
+        <NumberInput
+          name="perforationCutMm"
+          value={props.layer.perforationCutMm ?? DEFAULT_PERFORATION_CUT_MM}
+          min={MIN_PERFORATION_MM}
+          max={MAX_PERFORATION_MM}
+          step={0.01}
+          label="perforation cut length"
+          title="Length of each cut dash in millimeters."
+        />
+        <span className="lf-field-unit">mm</span>
+      </Field>
+      <Field label="Skip">
+        <NumberInput
+          name="perforationSkipMm"
+          value={props.layer.perforationSkipMm ?? DEFAULT_PERFORATION_SKIP_MM}
+          min={MIN_PERFORATION_MM}
+          max={MAX_PERFORATION_MM}
+          step={0.01}
+          label="perforation skip length"
+          title="Length of each uncut gap between dashes in millimeters."
+        />
+        <span className="lf-field-unit">mm</span>
+      </Field>
     </fieldset>
   );
 }

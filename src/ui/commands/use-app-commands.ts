@@ -23,6 +23,7 @@ import {
 import type { CommandDialogs, CommandShellCallbacks } from './app-command-context-types';
 import { buildAppCommands, type AppCommand } from './command-registry';
 import { toolCommandContext } from './tool-command-context';
+import { editingToolsCommandContext } from './editing-tools-command-context';
 import type { AppCommandContext } from './command-types';
 import { selectedImageMaskPair } from './image-mask-command-state';
 import { traceSourceForTracedImage } from './image-command-actions';
@@ -65,6 +66,7 @@ export function useAppCommands(callbacks: CommandShellCallbacks): ReadonlyArray<
   const toggleRailPanel = useUiStore((s) => s.toggleRailPanel);
   const printAndCutFeatureEnabled = useExperimentalLaserFeatures((s) => s.features.printAndCut);
   const appTheme = useAppThemePreference();
+  const wireframeActive = useUiStore((s) => s.wireframeView);
   return buildAppCommands(
     appCommandContext(callbacks, platform, app, laser, pushToast, {
       openImageDialog,
@@ -88,6 +90,7 @@ export function useAppCommands(callbacks: CommandShellCallbacks): ReadonlyArray<
       resetWorkspaceLayout: () => resetWorkspaceLayout(useUiStore.getState()),
       appTheme,
       setAppTheme: setAppThemePreference,
+      wireframeActive,
     }),
   );
 }
@@ -113,6 +116,7 @@ function appCommandContext(
     ...recentProjectsCommandContext(),
     ...editCommandContext(app, dialogs),
     ...toolCommandContext(callbacks, app, platform, dialogs, pushToast, selection),
+    ...editingToolsCommandContext(app, callbacks, selectedIds, dialogs.wireframeActive),
     ...arrangeCommandContext(app, callbacks),
     ...laserCommandContext(platform, laser),
     ...windowHelpCommandContext(callbacks, app),
