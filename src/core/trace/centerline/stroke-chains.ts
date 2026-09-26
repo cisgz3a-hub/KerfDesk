@@ -47,7 +47,7 @@ export type ChainAssemblyOptions = {
   /** Sub-pixel refinement applied to every raw chain vertex before
    *  smoothing (edge mode snaps onto the gradient ridge). */
   readonly snapPoint?: (p: Vec2) => Vec2;
-  /** Output curve policy (ADR-397): corner angle and fit tolerance. Omitted
+  /** Output curve policy (ADR-405): corner angle and fit tolerance. Omitted
    *  fields keep the neutral defaults (Smoothness 1, Optimize 0.2). */
   readonly curve?: StrokeCurvePolicy;
 };
@@ -56,7 +56,7 @@ const SMOOTHING_PASSES = 2;
 const SIMPLIFY_EPSILON_PX = 0.45;
 const MIN_CHAIN_LENGTH_PX = 1.5;
 // A gap bridges only while both pieces are more than this many times longer
-// than it (ADR-397). With the join now measuring the drawn paper gap, a
+// than it (ADR-405). With the join now measuring the drawn paper gap, a
 // dashed or stitched line (short pieces, deliberate gaps) would otherwise
 // fuse into one solid line; a dropout in a real stroke leaves long pieces.
 const BRIDGE_PIECE_GAP_RATIO = 6;
@@ -118,7 +118,7 @@ export function* assembleStrokePathsSteps(
 }
 
 // Pair through junctions, extend tips, then bridge gaps and close rings.
-// Tips are extended BEFORE bridging (ADR-397). The skeleton stops about one
+// Tips are extended BEFORE bridging (ADR-405). The skeleton stops about one
 // stroke radius short of every ink tip, so an unextended gap reads the ink
 // gap plus both radii: a 1 px break in a 3 px stroke measured ~4 px and
 // stayed open under the 3 px join, and bridge candidates were ranked by

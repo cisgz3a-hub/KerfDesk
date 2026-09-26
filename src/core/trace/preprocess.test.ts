@@ -277,7 +277,7 @@ describe('despeckle', () => {
 
   it('follows the contour saddle policy: a diagonal hairline is one region', () => {
     // 12-pixel one-pixel diagonal + a 3-pixel diagonal fleck. Under the
-    // walker's auto policy both are single regions (ADR-395), so the long
+    // walker's auto policy both are single regions (ADR-403), so the long
     // hairline survives minPixels 12 while the fleck goes; the historical
     // four-connected rule erased the hairline pixel by pixel.
     const size = 16;

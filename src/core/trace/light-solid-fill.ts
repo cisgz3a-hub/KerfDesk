@@ -1,4 +1,4 @@
-// Light-solid recovery for the automatic detail mask (ADR-393).
+// Light-solid recovery for the automatic detail mask (ADR-401).
 //
 // A local-contrast test (ink = luma < localMean − bias) sees a large flat
 // region only where its neighbourhood window reaches brighter paper, so a

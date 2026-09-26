@@ -1,4 +1,4 @@
-## ADR-400 - Trace settings travel with the trace (2026-09-25)
+## ADR-408 - Trace settings travel with the trace (2026-09-25)
 
 **Status:** Accepted. | **Date:** 2026-09-25
 
@@ -58,7 +58,7 @@ Options considered:
    preset is picked. The rule table (`TRACE_OVERRIDE_RULES`) is `satisfies`-checked against
    `LightBurnTraceSettingOverrides`, so adding a control without deciding how it persists is a type
    error, and a test renders the real controls to keep the ranges in step. It also lists the line
-   presets' `invert` (ADR-396) ahead of the build that adds it, so a recorded Invert survives on
+   presets' `invert` (ADR-404) ahead of the build that adds it, so a recorded Invert survives on
    both sides of that merge; when merging, keep the `satisfies` check rather than loosening it.
    Because a commit records only the controls this build knows, re-tracing and committing in this
    build discards a newer build's controls; opening and saving without re-tracing keeps them.

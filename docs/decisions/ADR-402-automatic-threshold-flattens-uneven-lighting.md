@@ -1,4 +1,4 @@
-## ADR-394 - Automatic threshold flattens uneven lighting (2026-09-25)
+## ADR-402 - Automatic threshold flattens uneven lighting (2026-09-25)
 
 **Status:** Accepted. | **Date:** 2026-09-25
 

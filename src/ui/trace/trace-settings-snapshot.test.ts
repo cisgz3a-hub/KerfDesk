@@ -9,7 +9,7 @@ function record(over: Partial<TraceSettingsRecord> = {}): TraceSettingsRecord {
   return { schemaVersion: 1, presetName: 'Line Art', overrides: {}, ...over };
 }
 
-describe('trace settings snapshot (ADR-400)', () => {
+describe('trace settings snapshot (ADR-408)', () => {
   it('restores exactly what it captured', () => {
     const captured = captureTraceSettings({
       presetName: 'Sharp',
@@ -74,7 +74,7 @@ describe('trace settings snapshot (ADR-400)', () => {
   });
 
   it('keeps the line presets Invert through capture and restore', () => {
-    // `invert` is the Line-preset Invert control (ADR-396). It must persist
+    // `invert` is the Line-preset Invert control (ADR-404). It must persist
     // like every other control; the cast keeps this test valid on builds
     // where the override type does not list it yet.
     const overrides = { invert: true, smoothness: 0.8 } as LightBurnTraceSettingOverrides;

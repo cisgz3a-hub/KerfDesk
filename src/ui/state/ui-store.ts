@@ -59,7 +59,7 @@ export type TraceImageDialogState = {
   /** Exact owner for one open Trace dialog lifetime. */
   readonly requestToken: string;
   readonly replaceTraceId?: string;
-  /** Settings recorded on the trace being re-traced (ADR-400). */
+  /** Settings recorded on the trace being re-traced (ADR-408). */
   readonly traceSettings?: TraceSettingsRecord;
 };
 

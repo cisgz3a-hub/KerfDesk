@@ -2583,7 +2583,7 @@ settings and Job Review keep their existing read-only setup references.
    The committed trace records the dialog's preset, adjusted settings, output, fill style and
    boundary, and saves them with the project. **Re-trace Original** reopens the dialog with them
    and with **Delete Image After trace** cleared, so the source stays for the next re-trace
-   (ADR-400). Traces made before that record reopen on the defaults.
+   (ADR-408). Traces made before that record reopen on the defaults.
    In a CNC project, smoothing retains established stroke junctions at the
    source image's current physical size. In a laser project, outlines keep the
    tracer's fitted curves and store the chords the job burns within 0.025 mm;

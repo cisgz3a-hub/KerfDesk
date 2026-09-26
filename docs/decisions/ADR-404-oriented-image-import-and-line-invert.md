@@ -1,4 +1,4 @@
-## ADR-396 - Images import turned by EXIF Orientation, and line traces can Invert (2026-09-25)
+## ADR-404 - Images import turned by EXIF Orientation, and line traces can Invert (2026-09-25)
 
 **Status:** Accepted. | **Date:** 2026-09-25
 

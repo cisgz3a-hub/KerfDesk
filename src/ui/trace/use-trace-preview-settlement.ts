@@ -15,7 +15,7 @@ export type TracePreviewSettlement =
   | { readonly kind: 'ready'; readonly result: TraceResult }
   | { readonly kind: 'error'; readonly error: unknown };
 /** A settlement, or a finer commit's progress on the captured request: the
- * preview shows the phase until the commit settles it (ADR-401). */
+ * preview shows the phase until the commit settles it (ADR-409). */
 export type TracePreviewCommitUpdate =
   | TracePreviewSettlement
   | { readonly kind: 'progress'; readonly phase: TraceCommitPhase };

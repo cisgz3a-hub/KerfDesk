@@ -23,7 +23,7 @@ export async function decodeRasterToBuffer(image: RasterImage): Promise<RgbaBuff
   const file = await readRasterSourceFile(image, EDITOR_DECODE_FILENAME);
   // Native resolution: the stored pixel dims are already inside the import
   // caps, so the cap only prevents an unexpected upscale. The stored grid
-  // also holds for a turned JPEG saved before ADR-396 honoured EXIF.
+  // also holds for a turned JPEG saved before ADR-404 honoured EXIF.
   const maxEdge = Math.max(image.pixelWidth, image.pixelHeight, 1);
   const decoded = await loadImageAsRawData(file, maxEdge);
   return fitDecodeToStoredGrid(decoded, image.pixelWidth, image.pixelHeight);

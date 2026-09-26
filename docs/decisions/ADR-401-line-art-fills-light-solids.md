@@ -1,4 +1,4 @@
-## ADR-393 - Line Art fills light solids and promotes only coherent colour (2026-09-25)
+## ADR-401 - Line Art fills light solids and promotes only coherent colour (2026-09-25)
 
 **Status:** Accepted. | **Date:** 2026-09-25
 
@@ -127,7 +127,7 @@ revision replaces it.
 - Paper and surfaces are never filled, matching main to the pixel: cream paper with a hard shadow
   40–80 luma deep at noise ±0 to ±12, and a round shadow crossed by pencil lines (first version up to
   25,496 px filled); four cream/kraft sheets inside a white margin with a pencil drawing (464 px, the
-  strokes that four-connected despeckle kept; first version 43,067; with ADR-395's saddle policy all
+  strokes that four-connected despeckle kept; first version 43,067; with ADR-403's saddle policy all
   680 stroke pixels survive and the sheet is still never filled); grey, yellow and blue plates carrying dark text (2,048 px, the text;
   first version 33,600).
 - Cut-outs stay open: a gold square inside a wide black badge (0 of 3,600 interior pixels), pale

@@ -109,7 +109,7 @@ describe('buildMultiFileTraceExports', () => {
     expect(files.map((file) => file.filename)).toEqual(['oversized-trace.svg', 'small-trace.svg']);
   });
 
-  it('decodes each file on the commit working-grid policy, one at a time (ADR-401)', async () => {
+  it('decodes each file on the commit working-grid policy, one at a time (ADR-409)', async () => {
     const natural = { width: 6000, height: 4000 };
     const events: string[] = [];
     const loadImage = vi.fn(async (file: MultiFileTraceFile, maxEdge?: number) => {

@@ -1,5 +1,5 @@
 // The Trace dialog's operator choices in one place, seeded from the settings
-// recorded on the trace being re-traced (ADR-400) or from the defaults.
+// recorded on the trace being re-traced (ADR-408) or from the defaults.
 
 import { useMemo, useState } from 'react';
 import type { RasterImage, TraceSettingsRecord } from '../../core/scene';
@@ -26,7 +26,7 @@ export type TraceDialogSettingsState = {
    * The current choices as the record stored on the committed trace. It keeps
    * the operator's intent, not the effective commit: CNC forces vector output
    * and some outputs ignore the fill style, but the same project may be
-   * re-traced on a laser later, where those choices apply again (ADR-400).
+   * re-traced on a laser later, where those choices apply again (ADR-408).
    */
   readonly record: () => TraceSettingsRecord;
 };

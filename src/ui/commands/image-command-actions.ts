@@ -56,7 +56,7 @@ export function retraceOriginalAction(
       );
       return;
     }
-    // Reopen on the settings recorded with this trace (ADR-400).
+    // Reopen on the settings recorded with this trace (ADR-408).
     openImageDialog(source, {
       replaceTraceId: selected.id,
       ...(selected.traceSettings === undefined ? {} : { traceSettings: selected.traceSettings }),

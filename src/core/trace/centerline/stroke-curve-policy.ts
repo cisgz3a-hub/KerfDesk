@@ -1,4 +1,4 @@
-// Centerline meaning of the trace dialog's Smoothness and Optimize (ADR-397).
+// Centerline meaning of the trace dialog's Smoothness and Optimize (ADR-405).
 // They keep the roles Potrace-style tracers give them — Smoothness is the
 // corner threshold, Optimize the curve tolerance — applied to the centreline:
 //

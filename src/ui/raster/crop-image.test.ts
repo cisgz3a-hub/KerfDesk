@@ -77,7 +77,7 @@ describe('cropMaskedRasterImage', () => {
   });
 
   it('crops a legacy turned-JPEG raster on the grid it was saved with', async () => {
-    // Imported before EXIF Orientation was honoured (ADR-396): saved 4x2 with
+    // Imported before EXIF Orientation was honoured (ADR-404): saved 4x2 with
     // the photo squashed into it, while the loader now decodes it turned, 2x4.
     const { lumaBase64: _luma, ...input } = raster();
     const rgba = new Uint8ClampedArray(4 * 2 * 4);

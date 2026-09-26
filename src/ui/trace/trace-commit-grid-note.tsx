@@ -1,4 +1,4 @@
-// Dialog wiring for the commit working grid (ADR-401): the context a commit
+// Dialog wiring for the commit working grid (ADR-409): the context a commit
 // plans from, and the note telling the operator that Trace will commit a finer
 // grid than the preview shows. The note reads only the image header.
 

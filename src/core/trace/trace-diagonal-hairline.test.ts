@@ -1,5 +1,5 @@
 // One-pixel diagonal hairlines through the whole filled-contour pipeline
-// (ADR-395). Before the saddle policy, the walker and despeckle treated ink
+// (ADR-403). Before the saddle policy, the walker and despeckle treated ink
 // as four-connected (the walker left paper eight-connected, while pinhole
 // fill flooded paper four-connected), so every pixel of a 1-px diagonal was
 // its own speck: Line Art returned no outline at all (recall 0.000) and
@@ -92,7 +92,7 @@ type PresetName = (typeof PRESETS)[number];
 
 // Recall floor 0.9 (the brief's target) everywhere except two documented
 // finishing limits covering eight of the 36 cells. Connectivity is exact in
-// every cell; the shortfall is outline geometry (ADR-395 "Remaining gaps"):
+// every cell; the shortfall is outline geometry (ADR-403 "Remaining gaps"):
 //  - Line Art, binary 30°/60°, alone and beside the square (4 cells,
 //    measured 0.826): the small-source 2x path interpolates cracks on a
 //    bilinear enlargement of the binary staircase, which pinches the ribbon
@@ -146,7 +146,7 @@ const CELLS = PRESETS.flatMap((preset) =>
   ),
 );
 
-describe('1-px diagonal hairlines trace as one connected outline (ADR-395)', () => {
+describe('1-px diagonal hairlines trace as one connected outline (ADR-403)', () => {
   it.each(CELLS)(
     '$preset aa=$antialiased $degrees° square=$withSquare',
     async ({ preset, antialiased, degrees, withSquare }) => {
@@ -175,7 +175,7 @@ describe('1-px diagonal hairlines trace as one connected outline (ADR-395)', () 
   // block's large loop at a tolerance wider than the 1-px ribbon: Line Art
   // (legacy DP + spline tail at 2x) keeps about a quarter of it and Smooth
   // about half. These floors pin today's measurements as regression guards;
-  // the gap is ADR-395 "Remaining gaps" (owner: contour finishing).
+  // the gap is ADR-403 "Remaining gaps" (owner: contour finishing).
   const ATTACHED = [
     { preset: 'Line Art', join: 'side', floor: 0.2 },
     { preset: 'Line Art', join: 'corner', floor: 0.2 },
@@ -229,7 +229,7 @@ describe('1-px diagonal hairlines trace as one connected outline (ADR-395)', () 
   });
 });
 
-describe('checkerboards never weld into a solid block (ADR-395)', () => {
+describe('checkerboards never weld into a solid block (ADR-403)', () => {
   // Every saddle of a checkerboard is a window tie. On the small-source 2x
   // path the grey field is a bilinear enlargement of the binary board, whose
   // symmetric saddle value is the block mean (127.5 against Line Art's cut

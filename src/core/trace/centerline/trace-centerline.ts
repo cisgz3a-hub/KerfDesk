@@ -2,7 +2,7 @@
 //   preprocess (shared threshold/despeckle) → ink mask → exact distance
 //   field → distance-ordered thinning → stroke graph → radius-aware spur
 //   pruning → junction pairing + tip extension + gap bridging + smoothing →
-//   compact cubic strokes, with round dots as circular marks (ADR-397).
+//   compact cubic strokes, with round dots as circular marks (ADR-405).
 // Produces ONE open path down the middle of every stroke — the whole point
 // of centerline mode — instead of imagetracer-style double outlines.
 

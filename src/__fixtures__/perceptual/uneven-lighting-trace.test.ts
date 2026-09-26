@@ -1,4 +1,4 @@
-// Uneven-lighting regression bar (ADR-394). Smooth, Sharp and Centerline
+// Uneven-lighting regression bar (ADR-402). Smooth, Sharp and Centerline
 // binarize with an automatic Otsu cut; a single global cut cannot separate
 // dark ink from paper whose own brightness spans the ink/paper gap. On the
 // base these fixtures traced the dark part of the page as one blob (IoU

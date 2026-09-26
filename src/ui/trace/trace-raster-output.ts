@@ -109,7 +109,7 @@ export async function buildRasterTraceOutput(
     },
     signal,
   );
-  // Keep the recorded Trace settings so Re-trace Original reopens on them (ADR-400).
+  // Keep the recorded Trace settings so Re-trace Original reopens on them (ADR-408).
   return {
     ...raster,
     id: traced.id,

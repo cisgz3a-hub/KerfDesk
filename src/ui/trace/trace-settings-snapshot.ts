@@ -1,4 +1,4 @@
-// ADR-400: the Trace dialog's choices travel with the committed trace so
+// ADR-408: the Trace dialog's choices travel with the committed trace so
 // Re-trace Original reopens the dialog exactly as the operator left it.
 // `captureTraceSettings` records the dialog state at commit;
 // `restoreTraceSettings` turns a recorded (possibly older, newer or hand-edited)
@@ -32,7 +32,7 @@ function range(min: number, max: number): OverrideRule {
   return { kind: 'number', min, max };
 }
 
-// The line presets' Invert control (`invert`, ADR-396) is an ordinary
+// The line presets' Invert control (`invert`, ADR-404) is an ordinary
 // override key now that both branches are merged; the `satisfies` check below
 // keeps every key's persistence decided.
 type PersistedOverrideKey = keyof LightBurnTraceSettingOverrides;

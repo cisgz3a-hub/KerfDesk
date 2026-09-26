@@ -302,7 +302,7 @@ describe('Trace Image workflow controls', () => {
       expect(text).toContain('Remove ink specks');
       expect(host.querySelector('[aria-label="Trace Threshold"]')).toBeNull();
       expect(text).not.toContain('Ignore Less Than');
-      // ADR-397: Smoothness is the centreline corner angle, Optimize its
+      // ADR-405: Smoothness is the centreline corner angle, Optimize its
       // curve-fit tolerance.
       const smoothness = host.querySelector('input[type="number"][aria-label="Trace Smoothness"]');
       const optimize = host.querySelector('input[type="number"][aria-label="Trace Optimize"]');

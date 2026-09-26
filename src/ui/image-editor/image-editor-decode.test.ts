@@ -76,7 +76,7 @@ describe('decodeRasterToBuffer', () => {
     expect(maxEdge).toBe(2);
   });
 
-  it('keeps the saved grid of a turned JPEG imported before ADR-396', async () => {
+  it('keeps the saved grid of a turned JPEG imported before ADR-404', async () => {
     // Saved 2x1 with the photo squashed into it; the loader now decodes it turned.
     vi.spyOn(imageLoader, 'loadImageAsRawData').mockResolvedValue({
       width: 1,

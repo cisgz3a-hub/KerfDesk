@@ -1,4 +1,4 @@
-// ADR-400: the Trace dialog's settings travel with the committed trace, survive
+// ADR-408: the Trace dialog's settings travel with the committed trace, survive
 // project save/load, and pre-fill the dialog when the operator chooses
 // Re-trace Original. Driven through the real dialog, the real project
 // serializer/deserializer and the real Re-trace command.
@@ -92,7 +92,7 @@ function projectWith(...objects: Project['scene']['objects']): Project {
   return { ...base, scene: { ...base.scene, objects } };
 }
 
-describe('Re-trace Original keeps the committed trace settings (ADR-400)', () => {
+describe('Re-trace Original keeps the committed trace settings (ADR-408)', () => {
   it('commit -> save -> load -> Re-trace shows the same settings, and a second commit keeps them', async () => {
     const traceExistingImage = vi.fn();
     const seed = seedRaster();
@@ -230,7 +230,7 @@ describe('Re-trace Original keeps the committed trace settings (ADR-400)', () =>
   });
 });
 
-describe('the real store keeps the recorded settings through save (ADR-400)', () => {
+describe('the real store keeps the recorded settings through save (ADR-408)', () => {
   it.each(['laser', 'cnc'] as const)(
     '%s: commit and re-trace through the store, then save and reload',
     async (machineKind) => {

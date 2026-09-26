@@ -1,4 +1,4 @@
-## ADR-395 - Filled traces resolve diagonal pixel contacts with one shared turn policy (2026-09-25)
+## ADR-403 - Filled traces resolve diagonal pixel contacts with one shared turn policy (2026-09-25)
 
 **Status:** Accepted. | **Date:** 2026-09-25
 

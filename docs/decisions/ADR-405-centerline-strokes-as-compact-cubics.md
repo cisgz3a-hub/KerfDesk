@@ -1,4 +1,4 @@
-## ADR-397 - Centerline strokes reach the scene as compact cubics (2026-09-25)
+## ADR-405 - Centerline strokes reach the scene as compact cubics (2026-09-25)
 
 **Status:** Accepted. | **Date:** 2026-09-25
 

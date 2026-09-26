@@ -1,4 +1,4 @@
-// ADR-401: a commit that traces a finer grid than the preview takes longer, so
+// ADR-409: a commit that traces a finer grid than the preview takes longer, so
 // the dialog shows its phases over the preview until the commit settles it.
 import { act } from 'react';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';

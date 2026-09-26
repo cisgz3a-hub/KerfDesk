@@ -1,4 +1,4 @@
-// Two-way fit error for the centreline cubic fit (ADR-397): perpendicular
+// Two-way fit error for the centreline cubic fit (ADR-405): perpendicular
 // distance from chain points to the curve, and from curve samples back to
 // the chain.
 

@@ -20,7 +20,7 @@ export type BoundarySelection = {
 export function useBoundarySelection(
   initial: { readonly boundary?: TraceBoundary | null; readonly boundaryMode?: BoundaryMode } = {},
 ): BoundarySelection {
-  // A Re-trace opens on the region recorded with the trace (ADR-400).
+  // A Re-trace opens on the region recorded with the trace (ADR-408).
   const [boundary, setBoundary] = useState<TraceBoundary | null>(initial.boundary ?? null);
   const [boundaryMode, setBoundaryMode] = useState<BoundaryMode>(
     initial.boundary == null ? 'crop' : (initial.boundaryMode ?? 'crop'),

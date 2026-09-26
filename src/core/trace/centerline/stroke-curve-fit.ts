@@ -1,4 +1,4 @@
-// Compact cubic output for centreline strokes (ADR-397).
+// Compact cubic output for centreline strokes (ADR-405).
 //
 // The finished centreline used to reach the scene as a dense Catmull-Rom
 // resample drawn as straight segments: a 3 px ring became 128 line moves and

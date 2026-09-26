@@ -1,4 +1,4 @@
-// Group a filled path's subpaths into outer shapes (ADR-398).
+// Group a filled path's subpaths into outer shapes (ADR-406).
 //
 // A filled trace stores every boundary of every shape as one list of closed
 // subpaths and relies on the fill rule to tell outers from holes. Splitting

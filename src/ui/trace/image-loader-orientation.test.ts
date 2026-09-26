@@ -199,7 +199,7 @@ describe('import sizes use the oriented image', () => {
   });
 });
 
-describe('fitDecodeToStoredGrid (projects saved before ADR-396)', () => {
+describe('fitDecodeToStoredGrid (projects saved before ADR-404)', () => {
   const decoded = (width: number, height: number) => ({
     width,
     height,

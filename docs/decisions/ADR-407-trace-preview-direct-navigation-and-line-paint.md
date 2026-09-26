@@ -1,4 +1,4 @@
-## ADR-399 - Trace preview gets direct zoom and pan, and draws Line traces as hairlines (2026-09-25)
+## ADR-407 - Trace preview gets direct zoom and pan, and draws Line traces as hairlines (2026-09-25)
 
 **Status:** Accepted. | **Date:** 2026-09-25
 

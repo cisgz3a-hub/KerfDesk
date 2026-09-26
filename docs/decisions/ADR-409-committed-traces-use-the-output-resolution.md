@@ -1,4 +1,4 @@
-## ADR-401 - Committed traces use the resolution the output needs, not the preview cap (2026-09-25)
+## ADR-409 - Committed traces use the resolution the output needs, not the preview cap (2026-09-25)
 
 **Status:** Accepted. | **Date:** 2026-09-25
 
@@ -57,7 +57,7 @@ slow and indicative only.
    `ui/trace/trace-decode-cap.ts`; `image-loader.ts` re-exports both.
 2. `planTraceCommitGrid` (`ui/trace/trace-commit-grid.ts`) chooses the commit grid as the smallest
    of:
-   - the native size (EXIF orientation applied, from `readImageNaturalSize`, as ADR-396 decodes it);
+   - the native size (EXIF orientation applied, from `readImageNaturalSize`, as ADR-404 decodes it);
    - the placed output size times a target density. The output size is the raster's bounds times
      its transform scale, read from the live source at commit. The target is two samples across
      the laser spot, on its finer axis, from `DeviceProfile.laserSubProfile.spotSizeMm`: a feature

@@ -29,7 +29,7 @@ const NOISE_DEVIATIONS = 6;
  *  four noise terms, sd 2σ; the median of its magnitude is 0.6745 · 2σ. */
 const MEDIAN_ABS_CHROMA_DIFFERENCE_PER_SIGMA = 0.6745 * 2;
 
-// Colour promotes only when it is spatially coherent (ADR-393): each counted
+// Colour promotes only when it is spatially coherent (ADR-401): each counted
 // pixel must be chromatic itself and sit in a 3×3 neighbourhood whose MEAN
 // colour is chromatic beyond what the image's own per-channel noise explains.
 function hasEnoughColourForAutoSketch(image: RawImageData): boolean {

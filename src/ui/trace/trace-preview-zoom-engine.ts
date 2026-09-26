@@ -6,10 +6,10 @@
 // Re-laying the stage re-rasterises the whole trace: a median 255 ms per step
 // for a synthetic 224k-point stroked trace in a 600x280 px viewport in
 // Chromium, against one 16.7 ms frame for a lens transform (measured in
-// ADR-399). A wheel or pinch burst therefore
+// ADR-407). A wheel or pinch burst therefore
 // runs 'live': each step only scales the already-painted artwork layer (the
 // lens, a standing compositor layer) with a transform, and the stage re-lays
-// once, LIVE_ZOOM_SETTLE_MS after the last step, at the same view (ADR-399).
+// once, LIVE_ZOOM_SETTLE_MS after the last step, at the same view (ADR-407).
 // Nothing here reaches trace options, the Boundary or the worker.
 
 import {

@@ -52,7 +52,7 @@ export function* pairThroughJunctionsSteps(chains: Chain[], graph: StrokeGraph):
  *  When `pieceGapRatio` > 0, a gap bridges only while both pieces are more
  *  than that many times longer than it: a dropout splits one long stroke
  *  into long pieces, while a dashed or stitched line is short pieces
- *  separated by deliberate gaps (ADR-397). */
+ *  separated by deliberate gaps (ADR-405). */
 export function bridgeNearbyEnds(
   chains: Chain[],
   joinGapPx: number,

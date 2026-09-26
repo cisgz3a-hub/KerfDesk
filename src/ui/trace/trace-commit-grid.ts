@@ -1,4 +1,4 @@
-// Working-grid policy for committed and Multi-File traces (ADR-401).
+// Working-grid policy for committed and Multi-File traces (ADR-409).
 //
 // The live preview decodes to PREVIEW_MAX_EDGE_PX on the longest edge so the
 // dialog stays interactive. A commit and a batch trace are one-off work whose
@@ -30,7 +30,7 @@ export const DEFAULT_TRACE_SPOT_MM = 0.1;
  *  73 B/px; plus 16 B/px for the decode canvas, its pixel copy, the composited
  *  copy and the copy moved to the trace worker. Centerline plans with the
  *  contour figure although it needs less memory: its run time grows fastest
- *  (121 s at 6.3 MP on the owl). ADR-401 has the table. */
+ *  (121 s at 6.3 MP on the owl). ADR-409 has the table. */
 export const TRACE_PEAK_BYTES_PER_PIXEL = {
   contour: 190,
   edge: 220,
@@ -95,7 +95,7 @@ export function traceTargetPxPerMm(
 
 /** Working-pixel budget for one trace of these options on this device. It
  *  follows navigator.deviceMemory, so the committed geometry can differ between
- *  devices that report different memory (ADR-401). */
+ *  devices that report different memory (ADR-409). */
 export function traceCommitPixelBudget(
   options: Pick<TraceOptions, 'traceMode'>,
   deviceMemoryGb: number | undefined,

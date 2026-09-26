@@ -203,7 +203,7 @@ describe('saddle connectivity — asymptotic decider on grey ties', () => {
   it('never lets grey evidence break a thin diagonal hairline', () => {
     // A one-pixel anti-aliased diagonal whose core sits just under a low
     // cut: the bilinear saddle (≈ midpoint 110) reads as paper, but the
-    // hairline is the window minority, so it stays joined (ADR-395).
+    // hairline is the window minority, so it stays joined (ADR-403).
     const line = maskFrom(['#...', '.#..', '..#.', '...#']);
     const rows = [
       [24, 195, 255, 255],

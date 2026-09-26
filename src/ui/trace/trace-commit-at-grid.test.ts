@@ -1,4 +1,4 @@
-// ADR-401: the commit traces the grid the placed output needs, not the 2048 px
+// ADR-409: the commit traces the grid the placed output needs, not the 2048 px
 // preview cap. The browser decode is stood in for by the app's own box-halving
 // resampler, and the worker by the same tracer run inline.
 import { beforeEach, describe, expect, it, vi } from 'vitest';
@@ -154,7 +154,7 @@ beforeEach(() => {
   vi.mocked(traceImageWithBoundaryMode).mockClear();
 });
 
-describe('committed trace resolution (ADR-401)', () => {
+describe('committed trace resolution (ADR-409)', () => {
   it('keeps every bar and hairline of a 4096 x 512 source that the preview grid loses', async () => {
     serveSource(barsFixture());
     // Before: the 2048 px cap fused the 3 px bars and erased the hairlines.

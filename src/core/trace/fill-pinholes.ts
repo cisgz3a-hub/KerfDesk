@@ -18,7 +18,7 @@
 // two diagonally-touching paper pixels are one region exactly when the
 // walker joins paper at that corner. Without a policy, and under the
 // explicit 'connect-paper' rollback, paper stays four-connected: that is the
-// pre-ADR-395 flood (and the Centerline pairing with its eight-connected
+// pre-ADR-403 flood (and the Centerline pairing with its eight-connected
 // ink), so 'connect-paper' reproduces the old pipeline exactly.
 //
 // Same I/O contract as despeckle: near-binary monochrome RGBA in, new

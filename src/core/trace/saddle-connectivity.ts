@@ -49,7 +49,7 @@
 //   shattered the line into 56 islands. A decided thin feature is kept;
 //   grey evidence decides only what the structure cannot.
 //
-// Written from the papers' mathematics and our own design (ADR-395); no
+// Written from the papers' mathematics and our own design (ADR-403); no
 // third-party tracer code.
 
 import type { InkMask } from './centerline/distance-field';

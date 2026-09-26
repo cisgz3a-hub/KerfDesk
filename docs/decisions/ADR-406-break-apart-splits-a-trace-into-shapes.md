@@ -1,4 +1,4 @@
-## ADR-398 - Break Apart splits a trace into shapes that keep their holes (2026-09-25)
+## ADR-406 - Break Apart splits a trace into shapes that keep their holes (2026-09-25)
 
 **Status:** Accepted. | **Date:** 2026-09-25
 

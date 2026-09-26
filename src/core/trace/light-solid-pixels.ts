@@ -1,4 +1,4 @@
-// Pixel helpers for light-solid recovery (ADR-393).
+// Pixel helpers for light-solid recovery (ADR-401).
 
 /** Edge-clamped box means of luma and of luma² over a (2·radius+1)² window,
  *  in one separable pass pair (running sums, O(n) per axis). */

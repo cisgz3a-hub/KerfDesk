@@ -1,4 +1,4 @@
-// ADR-400: restored numeric settings are fitted to the range each dialog
+// ADR-408: restored numeric settings are fitted to the range each dialog
 // control offers. The ranges live beside the persistence rules, so this test
 // renders the real controls and fails when a control's range and its
 // persistence rule drift apart, in either direction.
@@ -58,7 +58,7 @@ const FAMILIES: ReadonlyArray<{
   },
 ];
 
-describe('persisted setting ranges match the dialog controls (ADR-400)', () => {
+describe('persisted setting ranges match the dialog controls (ADR-408)', () => {
   it.each(FAMILIES)('$preset number controls use the persisted ranges', async (family) => {
     const preset = TRACE_PRESETS[family.preset];
     expect(preset).toBeDefined();

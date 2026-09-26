@@ -1,4 +1,4 @@
-// ADR-393: what the Line Art light-solid fill must and must not do on
+// ADR-401: what the Line Art light-solid fill must and must not do on
 // realistic input — pixel noise, pale solids split or outlined by dark lines,
 // nested colours, frames at the image edge, photographed shadows and light
 // surfaces that carry a drawing.
@@ -41,7 +41,7 @@ const mask = (image: RawImageData): RawImageData =>
 const squareInk = (image: RawImageData): number =>
   inkIn(mask(image), SQUARE.x, SQUARE.y, SQUARE.side, SQUARE.side);
 
-describe('light solids survive realistic pixel noise (ADR-393)', () => {
+describe('light solids survive realistic pixel noise (ADR-401)', () => {
   const noises = [
     ['luma sd 6', (im: RawImageData) => addLumaNoise(im, 6, 3)],
     ['luma sd 8', (im: RawImageData) => addLumaNoise(im, 8, 3)],
@@ -67,7 +67,7 @@ describe('light solids survive realistic pixel noise (ADR-393)', () => {
   );
 });
 
-describe('dark lines reaching a light solid do not keep it hollow (ADR-393)', () => {
+describe('dark lines reaching a light solid do not keep it hollow (ADR-401)', () => {
   it.each(PALE)('%s square crossed edge to edge by black lines fills', (_name, rgb) => {
     const crossed = square(rgb);
     rect(crossed, 40, 138, 200, 3, 30);
@@ -93,7 +93,7 @@ describe('dark lines reaching a light solid do not keep it hollow (ADR-393)', ()
   });
 });
 
-describe('light shapes cut out of dark ink stay open (ADR-393)', () => {
+describe('light shapes cut out of dark ink stay open (ADR-401)', () => {
   it('keeps a gold square inside a wide black badge open, as a threshold would', () => {
     const badge = blank(SIZE, SIZE);
     rect(badge, 40, 40, 200, 200, 0);
@@ -133,7 +133,7 @@ describe('light shapes cut out of dark ink stay open (ADR-393)', () => {
   });
 });
 
-describe('nested flat colours keep their own edges (ADR-393)', () => {
+describe('nested flat colours keep their own edges (ADR-401)', () => {
   it.each([
     ['gold', 'light blue', COLOURS.gold, COLOURS.lightBlue],
     ['tan', 'light blue', COLOURS.tan, COLOURS.lightBlue],
@@ -156,7 +156,7 @@ describe('nested flat colours keep their own edges (ADR-393)', () => {
   });
 });
 
-describe('paper, shadows and drawn-on surfaces are never filled (ADR-393)', () => {
+describe('paper, shadows and drawn-on surfaces are never filled (ADR-401)', () => {
   // The shadow's own edge is marked by the local test, as before; beyond it
   // only the pencil lines may be ink.
   it.each([40, 60, 80])('a hard %i-deep cast shadow on cream paper stays paper', (depth) => {
@@ -199,7 +199,7 @@ describe('paper, shadows and drawn-on surfaces are never filled (ADR-393)', () =
   it('leaves a light solid cut by the image border to the local test', () => {
     const image = blank(SIZE, SIZE);
     rect(image, 0, 40, 200, 200, [...COLOURS.gold, 255]);
-    // The interior away from paper stays open, as before ADR-393.
+    // The interior away from paper stays open, as before ADR-401.
     expect(inkIn(mask(image), 40, 80, 100, 100)).toBe(0);
   });
 });
