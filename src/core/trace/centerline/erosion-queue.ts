@@ -20,6 +20,10 @@ const TIE_SCALE = 16;
 // Int32Array); larger fields rank by binary search over the distinct values.
 const DENSE_RANK_LIMIT = 1 << 23;
 
+/** Pops follow the ascending (distance, tie, index) order. An implementation
+ *  may drop a push that exactly repeats an entry still pending (the bucket
+ *  queue does; the comparator heap does not), so callers must not rely on
+ *  size() or on the number of pops, only on the order of distinct entries. */
 export type ErosionQueue = {
   readonly push: (entry: number) => void;
   readonly pop: () => number;
@@ -34,15 +38,18 @@ export type DistanceRanks = {
 };
 
 /** A bucket queue over `distSq`, or null when a distance is not a small
- *  non-negative integer (the caller keeps its comparator heap then). */
+ *  non-negative integer (the caller keeps its comparator heap then).
+ *  `pending` is the per-pixel pending-tie bitmask (2 bytes per pixel); a
+ *  caller running queues one after another may share one, because a queue
+ *  drained to empty leaves it all zero again. */
 export function bucketErosionQueue(
   distSq: Float64Array,
   ranks: DistanceRanks | null = distanceRanks(distSq),
+  pending: Uint16Array = new Uint16Array(distSq.length),
 ): ErosionQueue | null {
   if (ranks === null) return null;
   const { rankOf } = ranks;
   const groups = new Array<Array<Bucket | undefined> | undefined>(ranks.count);
-  const pending = new Uint16Array(distSq.length);
   let cursor = 0;
   let size = 0;
   const bucketAt = (rank: number, tie: number): Bucket => {

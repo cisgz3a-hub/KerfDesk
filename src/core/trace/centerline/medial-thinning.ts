@@ -70,8 +70,10 @@ export function* thinToMedialAxisSteps(
   const skeleton = new Uint8Array(ink);
   const anchors = maximalDiscAnchors(mask, distSq);
   const ranks = distanceRanks(distSq);
-  yield* thinPassSteps(skeleton, width, height, distSq, ranks, anchors);
-  yield* thinPassSteps(skeleton, width, height, distSq, ranks, null);
+  // Both passes drain their queue to empty, so they share one pending mask.
+  const pending = ranks === null ? null : new Uint16Array(distSq.length);
+  yield* thinPassSteps(skeleton, width, height, distSq, ranks, pending, anchors);
+  yield* thinPassSteps(skeleton, width, height, distSq, ranks, pending, null);
   return skeleton;
 }
 
@@ -81,10 +83,11 @@ function* thinPassSteps(
   height: number,
   distSq: Float64Array,
   ranks: DistanceRanks | null,
+  pending: Uint16Array | null,
   anchors: Uint8Array | null,
 ): TraceSteps<void> {
   const cooperate = yield;
-  const queue = erosionQueue(distSq, ranks);
+  const queue = erosionQueue(distSq, ranks, pending);
   const deltas = ringDeltas(width);
   for (let i = 0; i < skeleton.length; i += 1) {
     if ((i & 127) === 0 && cooperate) yield;
@@ -102,8 +105,12 @@ function* thinPassSteps(
 
 // The comparator heap keys on the field directly; integer fields (every
 // field the tracer builds) take the equivalent bucket queue.
-function erosionQueue(distSq: Float64Array, ranks: DistanceRanks | null): ErosionQueue {
-  const buckets = bucketErosionQueue(distSq, ranks);
+function erosionQueue(
+  distSq: Float64Array,
+  ranks: DistanceRanks | null,
+  pending: Uint16Array | null,
+): ErosionQueue {
+  const buckets = pending === null ? null : bucketErosionQueue(distSq, ranks, pending);
   if (buckets !== null) return buckets;
   const heap: number[] = [];
   return {

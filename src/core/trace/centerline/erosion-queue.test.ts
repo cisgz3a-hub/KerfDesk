@@ -19,9 +19,13 @@ function takeLeast(pending: number[], distSq: Float64Array): number {
 describe('bucket erosion queue', () => {
   // Pushes random entries, some into the key being drained and some exact
   // duplicates of pending entries (those are dropped: one pending copy each).
-  function checkAgainstComparator(distSq: Float64Array, random: (n: number) => number): void {
+  function checkAgainstComparator(
+    distSq: Float64Array,
+    random: (n: number) => number,
+    pendingMask?: Uint16Array,
+  ): void {
     const count = distSq.length;
-    const queue = bucketErosionQueue(distSq);
+    const queue = bucketErosionQueue(distSq, undefined, pendingMask);
     expect(queue).not.toBeNull();
     const pending: number[] = [];
     const push = (entry: number): void => {
@@ -55,6 +59,16 @@ describe('bucket erosion queue', () => {
         Float64Array.from({ length: 300 }, () => random(6)),
         random,
       );
+    }
+  });
+
+  it('leaves a shared pending mask all zero once drained, so queues run in turn may share it', () => {
+    const random = lcg(11);
+    const distSq = Float64Array.from({ length: 300 }, () => random(6));
+    const shared = new Uint16Array(distSq.length);
+    for (let round = 0; round < 3; round += 1) {
+      checkAgainstComparator(distSq, random, shared);
+      expect(shared.every((bits) => bits === 0)).toBe(true);
     }
   });
 
