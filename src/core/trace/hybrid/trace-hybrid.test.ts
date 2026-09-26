@@ -42,7 +42,11 @@ function toImage(c: Canvas): RawImageData {
   return { width: c.width, height: c.height, data };
 }
 
-const HYBRID = { ...TRACE_PRESETS['Centerline'], traceMode: 'hybrid', hybridMaxStrokeWidthPx: 4 } as const;
+const HYBRID = {
+  ...TRACE_PRESETS['Centerline'],
+  traceMode: 'hybrid',
+  hybridMaxStrokeWidthPx: 4,
+} as const;
 
 function strokes(paths: ReadonlyArray<ColoredPath>): ColoredPath[] {
   return paths.filter((p) => p.color === HYBRID_STROKE_COLOR);
@@ -52,10 +56,20 @@ function fills(paths: ReadonlyArray<ColoredPath>): ColoredPath[] {
   return paths.filter((p) => p.color === HYBRID_FILL_COLOR);
 }
 
-function bbox(points: ReadonlyArray<Vec2>): { minX: number; maxX: number; minY: number; maxY: number } {
+function bbox(points: ReadonlyArray<Vec2>): {
+  minX: number;
+  maxX: number;
+  minY: number;
+  maxY: number;
+} {
   const xs = points.map((p) => p.x);
   const ys = points.map((p) => p.y);
-  return { minX: Math.min(...xs), maxX: Math.max(...xs), minY: Math.min(...ys), maxY: Math.max(...ys) };
+  return {
+    minX: Math.min(...xs),
+    maxX: Math.max(...xs),
+    minY: Math.min(...ys),
+    maxY: Math.max(...ys),
+  };
 }
 
 describe('disc union', () => {
@@ -88,7 +102,14 @@ describe('stroke clipping', () => {
     const pieces = clipCurveOutsideRegion(
       {
         start: { x: 0, y: 0 },
-        segments: [{ kind: 'cubic', control1: { x: 5, y: 10 }, control2: { x: 15, y: 10 }, to: { x: 20, y: 0 } }],
+        segments: [
+          {
+            kind: 'cubic',
+            control1: { x: 5, y: 10 },
+            control2: { x: 15, y: 10 },
+            to: { x: 20, y: 0 },
+          },
+        ],
         closed: false,
       },
       (p) => p.x > 8 && p.x < 12,

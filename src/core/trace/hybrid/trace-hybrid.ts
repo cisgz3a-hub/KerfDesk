@@ -19,10 +19,18 @@
 
 import type { ColoredPath, CurveSubpath, Polyline, Vec2 } from '../../scene';
 import { registerTraceCurve, withCanonicalTraceCurves } from '../trace-curves';
-import { effectivePixelScale, preprocessForTrace, type RawImageData, type TraceOptions } from '../trace-image';
+import {
+  effectivePixelScale,
+  preprocessForTrace,
+  type RawImageData,
+  type TraceOptions,
+} from '../trace-image';
 import { runTraceSteps, type TraceSteps } from '../trace-steps';
 import { squaredDistanceFieldSteps, type InkMask } from '../centerline/distance-field';
-import { centerlineStrokesFromMaskSteps, inkMaskFromPrepared } from '../centerline/trace-centerline';
+import {
+  centerlineStrokesFromMaskSteps,
+  inkMaskFromPrepared,
+} from '../centerline/trace-centerline';
 import { closeRingEndpoints } from '../centerline/loop-closure';
 import { sampleStrokeCurve } from '../centerline/stroke-curve-fit';
 import { contourFinishOptionsFor, contourPolylinesFromMaskSteps } from '../contour-trace';
@@ -66,7 +74,10 @@ export function* traceHybridPathsSteps(
   if (cooperate) yield;
   const strokes = clippedStrokes(centre, mask, wide, gateRadius);
   const fillMask = yield* fillMaskSteps(mask, distSq, wide, strokes);
-  const outlines = fillMask === null ? [] : yield* contourPolylinesFromMaskSteps(fillMask, contourFinishOptionsFor(options));
+  const outlines =
+    fillMask === null
+      ? []
+      : yield* contourPolylinesFromMaskSteps(fillMask, contourFinishOptionsFor(options));
   return [
     ...(outlines.length === 0
       ? []
@@ -129,7 +140,8 @@ function clippedStrokes(
   gateRadius: number,
 ): KeptStroke[] {
   const rings = closeRingEndpoints(centre.polylines);
-  const curves = withCanonicalTraceCurves([{ color: HYBRID_STROKE_COLOR, polylines: rings }])[0]?.curves ?? [];
+  const curves =
+    withCanonicalTraceCurves([{ color: HYBRID_STROKE_COLOR, polylines: rings }])[0]?.curves ?? [];
   const inWide = (p: Vec2): boolean => {
     const x = Math.floor(p.x);
     const y = Math.floor(p.y);

@@ -47,7 +47,8 @@ export function strokeWidthProfile(
     if (i >= window - 1) means.push(sum / window);
   }
   means.sort((a, b) => a - b);
-  const at = (q: number): number => means[Math.min(means.length - 1, Math.floor(q * means.length))] ?? 0;
+  const at = (q: number): number =>
+    means[Math.min(means.length - 1, Math.floor(q * means.length))] ?? 0;
   return { medianPx: at(0.5), spreadPx: at(0.9) - at(0.1) };
 }
 

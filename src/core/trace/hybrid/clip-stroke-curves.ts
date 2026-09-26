@@ -94,7 +94,8 @@ function splitSegmentAtBoundary(
   for (let i = 1; i <= steps; i += 1) {
     const t = i / steps;
     const inside = inRegion(pointAt(from, segment, t));
-    if (inside !== previous) cuts.push(bisect(from, segment, (i - 1) / steps, t, previous, inRegion));
+    if (inside !== previous)
+      cuts.push(bisect(from, segment, (i - 1) / steps, t, previous, inRegion));
     previous = inside;
   }
   const bounds = [0, ...cuts, 1];
