@@ -78,4 +78,19 @@ export const FILE_COMMAND_HELP: Readonly<
     tooltip:
       'Export selected vector artwork, or all of it when nothing is selected, as a DXF in millimetres: one polyline per contour and one layer per colour. Curves are flattened within 0.01 mm; images are left out.',
   },
+  'file.export-pdf': {
+    family: 'file',
+    tooltip:
+      'Export selected vector artwork, or all of it when nothing is selected, as a one-page vector PDF sized to the artwork. Curves stay curves; filled layers are filled even-odd and line layers are 0.1 mm strokes. Images are left out.',
+  },
+  'file.export-eps': {
+    family: 'file',
+    tooltip:
+      'Export selected vector artwork, or all of it when nothing is selected, as Encapsulated PostScript (EPSF 3.0) whose bounding box is the artwork. Curves stay curves; images are left out.',
+  },
+  'file.export-geojson': {
+    family: 'file',
+    tooltip:
+      'Export selected vector artwork, or all of it when nothing is selected, as GeoJSON: polygons with holes for filled artwork and lines for strokes, flattened within 0.01 mm. Coordinates are millimetres with y up from the lower-left corner, not longitude and latitude.',
+  },
 };

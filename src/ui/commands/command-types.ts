@@ -35,6 +35,9 @@ export type CommandId =
   | 'file.save-gcode'
   | 'file.export-svg'
   | 'file.export-dxf'
+  | 'file.export-pdf'
+  | 'file.export-eps'
+  | 'file.export-geojson'
   | 'file.open-gcode'
   | 'file.inspect-gcode'
   | 'edit.undo'
@@ -192,6 +195,9 @@ export type AppCommandContext = {
   readonly saveGcode: () => void;
   readonly exportSvg: () => void;
   readonly exportDxf: () => void;
+  readonly exportPdf: () => void;
+  readonly exportEps: () => void;
+  readonly exportGeoJson: () => void;
   readonly undo: () => void;
   readonly redo: () => void;
   readonly selectAll: () => void;
