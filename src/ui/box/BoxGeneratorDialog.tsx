@@ -8,7 +8,7 @@ import { deriveBoxDims, type BoxPanel, type BoxSpec, type BoxSpecValidation } fr
 import { persistCalibrationDraft } from '../calibration/calibration-draft-storage';
 import { Button, Dialog, DialogActions } from '../kit';
 import {
-  BOX_DRAFT_KEY,
+  boxDraftKey,
   BOX_FIELD_LABELS,
   type BoxDraftParse,
   type BoxMachineContext,
@@ -33,7 +33,8 @@ export function BoxGeneratorDialog(props: {
   const [view, setView] = useState<BoxPreviewView>('flat');
   const lastReady = useRef<BoxGenerationSnapshot | null>(null);
   const generation = useBoxGeneration(form.validSpec);
-  const persistAndClose = useBoxDraftClose(form.draft, props.onCancel);
+  const draftKey = boxDraftKey(props.machine);
+  const persistAndClose = useBoxDraftClose(draftKey, form.draft, props.onCancel);
   if (generation.currentSnapshot !== null) lastReady.current = generation.currentSnapshot;
   const displayedSnapshot = generation.currentSnapshot ?? lastReady.current;
 
@@ -51,7 +52,7 @@ export function BoxGeneratorDialog(props: {
       onSubmit={(event) => {
         event.preventDefault();
         if (generation.currentSnapshot === null) return;
-        persistCalibrationDraft(BOX_DRAFT_KEY, form.draft);
+        persistCalibrationDraft(draftKey, form.draft);
         props.onGenerate(generation.currentSnapshot.panels);
       }}
       size="md"

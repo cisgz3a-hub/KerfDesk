@@ -22,6 +22,7 @@ export function projectWithCurrentJobSetup(state: ProjectJobSetupState): Project
   return {
     ...state.project,
     jobSetup: {
+      ...state.project.jobSetup,
       placement: state.jobPlacement,
       outputScope: {
         ...state.outputScopeSettings,

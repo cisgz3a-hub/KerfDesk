@@ -11,7 +11,7 @@ import { overheadPose, wideLens } from '../../../core/camera/model/model-fixture
 import type { RgbaImage } from '../../../core/camera/rgba-image';
 import { bedTargetLayout } from '../../../core/camera/target/bed-target';
 import { renderTargetScene } from '../../../core/camera/target/target-render-fixtures';
-import type { Project } from '../../../core/scene';
+import { DEFAULT_CNC_MACHINE_CONFIG, type Project } from '../../../core/scene';
 import { useStore } from '../../state';
 import { captureSourceFrame, type ActiveCameraSource } from '../frame-source';
 import {
@@ -140,5 +140,17 @@ describe('engraveCalibrationTarget', () => {
       expect.objectContaining({ id: 'camera-bed-target', power: 35, speed: 3000 }),
     ]);
     expect(scene?.objects.length).toBeGreaterThan(0);
+  });
+
+  it('engraves the target with the laser while the canvas is in CNC mode', async () => {
+    const before = useStore.getState().project;
+    useStore.setState({ project: { ...before, machine: DEFAULT_CNC_MACHINE_CONFIG } });
+    let streamed: Project | null = null;
+    await engraveCalibrationTarget(SETTINGS, async (project) => {
+      streamed = project;
+      return true;
+    });
+    useStore.setState({ project: before });
+    expect((streamed as Project | null)?.machine).toEqual({ kind: 'laser' });
   });
 });

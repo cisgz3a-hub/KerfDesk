@@ -126,6 +126,14 @@ function normalizeProject(raw: Record<string, unknown>): Project {
   } else {
     normalized['machine'] = machine;
   }
+  // The CNC setup parked by a Laser-mode save; a CNC project has none.
+  const parked =
+    machine?.['kind'] === 'cnc' ? null : normalizeCncMachineConfig(raw['parkedCncMachine']);
+  if (parked === null) {
+    delete normalized['parkedCncMachine'];
+  } else {
+    normalized['parkedCncMachine'] = parked;
+  }
   return normalized as unknown as Project;
 }
 
@@ -173,6 +181,9 @@ export function normalizeCncMachineConfig(raw: unknown): CncMachineConfig | null
       // H.9 park position: optional, any finite mm value.
       ...(isFiniteNumber(params['parkXMm']) ? { parkXMm: params['parkXMm'] } : {}),
       ...(isFiniteNumber(params['parkYMm']) ? { parkYMm: params['parkYMm'] } : {}),
+      // CNC's own Max feed and Frame speed; absent = the shared device values.
+      ...positiveField(params, 'maxFeedMmPerMin'),
+      ...positiveField(params, 'framingFeedMmPerMin'),
     },
     ...normalizeCncTiling(raw['tiling']),
   };
@@ -340,6 +351,14 @@ function isLegacyNeotronicsFrameFeed(dev: Record<string, unknown>, feed: number)
     dev['profileId'] === NEOTRONICS_4040_MAX_LT4LDS_V2_PROFILE.profileId ||
     dev['machineFamily'] === NEOTRONICS_4040_MAX_LT4LDS_V2_PROFILE.machineFamily;
   return isNeotronics && feed === DEFAULT_DEVICE_PROFILE.framingFeedMmPerMin;
+}
+
+function positiveField<K extends string>(
+  raw: Record<string, unknown>,
+  key: K,
+): Partial<Record<K, number>> {
+  const value = raw[key];
+  return isFiniteNumber(value) && value > 0 ? ({ [key]: value } as Record<K, number>) : {};
 }
 
 function positiveNumberOrDefault(value: unknown, fallback: number): number {

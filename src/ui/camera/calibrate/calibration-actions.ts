@@ -48,7 +48,9 @@ export async function engraveCalibrationTarget(
     power: settings.powerPercent,
     speed: settings.speedMmPerMin,
   });
-  return startTransientJob({ ...project, scene: pattern.scene });
+  // A laser engraving in either canvas mode (ADR-416): the rings mark where
+  // the laser fires, and the wizard's power and speed are laser settings.
+  return startTransientJob({ ...project, machine: { kind: 'laser' }, scene: pattern.scene });
 }
 
 export type PhotoOutcome =

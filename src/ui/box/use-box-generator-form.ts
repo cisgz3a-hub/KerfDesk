@@ -1,9 +1,9 @@
 import { useMemo, useState, type ChangeEvent } from 'react';
 import { validateBoxSpec, type BoxSpec, type BoxSpecValidation } from '../../core/box';
 import {
-  BOX_DRAFT_KEY,
   BOX_DRAFT_PERSISTED_FIELDS,
   SLIDE_LID_MIN_CLEARANCE_DRAFT,
+  boxDraftKey,
   boxDraftWithMaterialThickness,
   defaultBoxDraft,
   parseBoxDraft,
@@ -23,7 +23,11 @@ export function useBoxGeneratorForm(machine: BoxMachineContext): {
   readonly setField: BoxFieldSetter;
 } {
   const [draft, setDraft] = useState(() =>
-    restoreCalibrationDraft(BOX_DRAFT_KEY, defaultBoxDraft(machine), BOX_DRAFT_PERSISTED_FIELDS),
+    restoreCalibrationDraft(
+      boxDraftKey(machine),
+      defaultBoxDraft(machine),
+      BOX_DRAFT_PERSISTED_FIELDS,
+    ),
   );
   const [lockedAutoFitFields, setLockedAutoFitFields] = useState<ReadonlySet<BoxAutoFitField>>(
     () => new Set(),

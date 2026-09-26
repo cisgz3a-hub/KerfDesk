@@ -14,6 +14,7 @@ import {
   type Project,
   type Scene,
 } from '../../core/scene';
+import { cncHeadDevice } from '../../core/cnc/cnc-head-feeds';
 import type { DeviceProfile } from '../../core/devices';
 
 export type CncAutoSeedContext = {
@@ -46,14 +47,13 @@ export function projectWithFreshCncLayers(
   previousLayers: ReadonlyArray<Layer>,
   project: Project,
   liveCaps: CncMachineStarterLiveCaps | null,
-  savedDefaultLayerIds: ReadonlySet<string> = new Set(),
 ): Project {
   const machine = project.machine;
   if (machine?.kind !== 'cnc') return project;
   const existingIds = new Set(previousLayers.map((layer) => layer.id));
   let changed = false;
   const layers = project.scene.layers.map((layer) => {
-    if (existingIds.has(layer.id) || savedDefaultLayerIds.has(layer.id)) return layer;
+    if (existingIds.has(layer.id)) return layer;
     const seeded = seedFreshCncLayer(layer, { device: project.device, machine, liveCaps });
     if (seeded !== layer) changed = true;
     return seeded;
@@ -117,7 +117,7 @@ function refreshMaterialRecipeLayer(
       ? (tool.fluteCount ?? DEFAULT_ASSUMED_FLUTE_COUNT)
       : source.fluteCount;
   const patch = resolveCncMaterialFeedPatch({
-    profile: context.device,
+    profile: cncHeadDevice(context.device, context.machine.params),
     tool,
     materialKey: source.materialKey,
     spindleRpm: settings.spindleRpm,
