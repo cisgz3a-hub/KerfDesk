@@ -73,7 +73,8 @@ function lineFits(start: Vec2, end: Vec2, piece: SourcePiece, toleranceMm: numbe
   const dx = end.x - start.x;
   const dy = end.y - start.y;
   const lengthSq = dx * dx + dy * dy;
-  if (!(lengthSq > 0)) return false;
+  // As for arcs, a bound the fixed budget already spent admits no fit: squared, it would pass.
+  if (!(lengthSq > 0) || !(toleranceMm > 0)) return false;
   const limitSq = toleranceMm * toleranceMm;
   const count = pieceLength(piece);
   for (let index = 0; index < count; index += 1) {

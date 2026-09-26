@@ -228,3 +228,21 @@ Not part of this decision: fitting arcs at trace commit; arcs for kerf-offset co
 Shape fills or CNC output; reading `$12` or the firmware build (`$I`) from the controller; modelling
 the finite planner ring in the estimate; the Inspector's fixed-limit timeline; hardware or material
 qualification.
+
+### Amendment 1 (2026-09-27) - a spent fit budget declines line fits too
+
+`fitArcMoves` gives the fit what is left of the tolerance after the fixed source-sampling (0.001 mm)
+and emit-rounding (0.002 mm) shares, which is zero at 0.003 mm and negative below it. The arc check
+already declined a bound that is not positive, but the line check compared squared distances with
+the squared bound, so a negative bound passed as its magnitude: at 0.001 mm a straight or smooth run
+could collapse into one line up to 0.002 mm off its source, and at 1e-6 mm up to 0.003 mm off. The line
+check now declines a bound that is not positive (or not a number), as the arc check does. The
+fitter then keeps each edge of the source it sampled, so a tolerance at or below the
+fixed budget declines cleanly to the sampled source instead of emitting a move outside it.
+
+Compile fits laser cuts at 0.025 mm, where the fit bound is 0.022 mm, so no emitted program
+changes: the laser G2/G3 output of circles, a sampled polyline arc, a square, a zigzag, shallow
+curves and random cubic chains is byte-identical (SHA-256) before and after. The consumer this
+matters to is any future caller of the shared fitter with a tighter tolerance. Test:
+`fit-arc-moves-tiny-tolerance.test.ts` (0.003, 0.001 and 1e-6 mm, straight and smooth runs; the
+0.001 and 1e-6 mm cases fail without the guard, the 0.003 mm case pins the zero-bound boundary).
