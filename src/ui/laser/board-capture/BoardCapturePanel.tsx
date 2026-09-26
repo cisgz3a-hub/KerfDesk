@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { deviceForActiveHead } from '../../../core/cnc/cnc-head-feeds';
 import { Button } from '../../kit';
 import { TutorialButton } from '../../tutorials/TutorialButton';
 import { useStore } from '../../state';
@@ -53,10 +54,11 @@ function BoardCapturePanelBody({
   const setOriginHere = useLaserStore((state) => state.setOriginHere);
   const jogToMachinePosition = useLaserStore((state) => state.jogToMachinePosition);
   const device = useStore((state) => state.project.device);
+  const machine = useStore((state) => state.project.machine);
   const addCapturedBoard = useStore((state) => state.addCapturedBoard);
   const updateCapturedBoard = useStore((state) => state.updateCapturedBoard);
   const { connected, disabled } = useCaptureGating();
-  const feed = Math.min(device.maxFeed, BOARD_JOG_FEED_MM_PER_MIN);
+  const feed = Math.min(deviceForActiveHead(device, machine).maxFeed, BOARD_JOG_FEED_MM_PER_MIN);
   const { geometry, registrationEpoch, outlineId, committed } = capture.state;
   const outlineValid = useStore((state) =>
     capturedBoardOutlineMatches(state.project.scene, outlineId, geometry),
