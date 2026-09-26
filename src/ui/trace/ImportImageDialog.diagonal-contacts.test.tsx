@@ -1,4 +1,4 @@
-// ADR-450: the Diagonal contacts choice travels with the committed trace
+// ADR-455: the Diagonal contacts choice travels with the committed trace
 // (ADR-408) through the real dialog, the real project serializer and the
 // real Re-trace command; a trace recorded before the control reopens on Auto.
 import { act, createElement } from 'react';
@@ -85,7 +85,7 @@ function projectWith(...objects: Project['scene']['objects']): Project {
   return { ...base, scene: { ...base.scene, objects } };
 }
 
-describe('Diagonal contacts survives Re-trace Original (ADR-450)', () => {
+describe('Diagonal contacts survives Re-trace Original (ADR-455)', () => {
   it('commit -> save -> load -> Re-trace reopens on the chosen policy', async () => {
     const traceExistingImage = vi.fn();
     useStore.setState({ project: projectWith(seed), traceExistingImage });

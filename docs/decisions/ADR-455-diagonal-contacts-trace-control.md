@@ -1,4 +1,4 @@
-## ADR-450 - Diagonal contacts: the turn policy gets a Trace dialog control (2026-09-26)
+## ADR-455 - Diagonal contacts: the turn policy gets a Trace dialog control (2026-09-26)
 
 **Status:** Accepted. | **Date:** 2026-09-26
 

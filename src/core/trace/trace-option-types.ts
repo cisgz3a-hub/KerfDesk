@@ -17,7 +17,7 @@ export type TraceOptions = {
   // Centerline traces skeletonize dark strokes into open line paths
   // for single-pass vector engraving. Edge detection uses local contrast
   // to find full-colour artwork and traces closed outlines around its ink.
-  // Line + fill ('hybrid', ADR-443) burns ink no wider than
+  // Line + fill ('hybrid', ADR-454) burns ink no wider than
   // hybridMaxStrokeWidthPx once down its centre line and keeps wider ink as
   // filled outlines, decided per skeleton branch.
   readonly traceMode?: 'filled-contours' | 'centerline' | 'edge' | 'hybrid';

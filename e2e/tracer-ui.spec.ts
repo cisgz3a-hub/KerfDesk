@@ -78,7 +78,7 @@ test('inspects a trace without restarting the worker, edits with sliders, and co
   await expect(
     dialog.getByRole('slider', { name: 'Trace Smoothness slider', exact: true }),
   ).toBeVisible();
-  // Diagonal contacts (ADR-450) is a native select: the keyboard changes it.
+  // Diagonal contacts (ADR-455) is a native select: the keyboard changes it.
   const contacts = dialog.getByRole('combobox', { name: 'Trace diagonal contacts', exact: true });
   await expect(contacts).toHaveValue('auto');
   await contacts.focus();

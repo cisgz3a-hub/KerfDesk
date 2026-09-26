@@ -42,10 +42,10 @@ export type LightBurnTraceSettingOverrides = ColourLayerSettingOverrides & {
   readonly edgeSensitivity?: number;
   readonly edgeDetail?: number;
   readonly edgeMinimumLinePx?: number;
-  // Line + fill (ADR-443), in placed millimetres. The dialog converts it to
+  // Line + fill (ADR-454), in placed millimetres. The dialog converts it to
   // hybridMaxStrokeWidthPx through the placement (hybrid-stroke-width.ts).
   readonly hybridMaxStrokeWidthMm?: number;
-  // Diagonal contacts (ADR-450): the filled-contour lane's turn policy.
+  // Diagonal contacts (ADR-455): the filled-contour lane's turn policy.
   readonly turnPolicy?: TraceOptions['turnPolicy'];
 };
 
@@ -83,7 +83,7 @@ export function mergeLightBurnTraceSettings(
   return out as TraceOptions;
 }
 
-// Diagonal contacts (ADR-450); ignored by the lanes that do not resolve corners.
+// Diagonal contacts (ADR-455); ignored by the lanes that do not resolve corners.
 function turnPolicySetting(settings: LightBurnTraceSettingOverrides): Partial<TraceOptions> {
   return settings.turnPolicy === undefined ? {} : { turnPolicy: settings.turnPolicy };
 }

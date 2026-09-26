@@ -267,7 +267,7 @@ export type TracedImage = ObjectPowerScale & {
   readonly tracePixelWidth?: number;
   readonly tracePixelHeight?: number;
   // Missing means legacy filled-contour trace. 'hybrid' is Line + fill
-  // (ADR-443): strokes and filled outlines, told apart by path colour.
+  // (ADR-454): strokes and filled outlines, told apart by path colour.
   readonly traceMode?: 'filled-contours' | 'centerline' | 'edge' | 'hybrid';
   // Trace dialog settings that produced this result (ADR-408). Missing means
   // a legacy trace; Re-trace Original then opens on the defaults.

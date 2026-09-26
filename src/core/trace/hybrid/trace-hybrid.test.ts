@@ -1,4 +1,4 @@
-// Line + fill trace (ADR-443): thin pen lines burn once down their centre,
+// Line + fill trace (ADR-454): thin pen lines burn once down their centre,
 // solid shapes stay filled outlines, and the two meet without a gap.
 
 import { describe, expect, it } from 'vitest';

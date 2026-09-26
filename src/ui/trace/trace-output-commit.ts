@@ -76,7 +76,7 @@ export async function commitTraceOutput(
   return true;
 }
 
-// Line + fill (ADR-443) is vector-only: the raster route renders one
+// Line + fill (ADR-454) is vector-only: the raster route renders one
 // style for every path, which would turn its fills into outline rings.
 function usesRasterTraceOutput(
   args: TraceOutputCommitArgs,

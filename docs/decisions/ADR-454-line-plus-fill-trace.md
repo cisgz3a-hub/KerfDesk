@@ -1,4 +1,4 @@
-## ADR-443 - Line + fill trace: thin ink burns once down its centre, wide ink stays filled (2026-09-26)
+## ADR-454 - Line + fill trace: thin ink burns once down its centre, wide ink stays filled (2026-09-26)
 
 **Status:** Accepted. | **Date:** 2026-09-26
 

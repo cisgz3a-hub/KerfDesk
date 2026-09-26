@@ -1,4 +1,4 @@
-// Union of pixel discs (ADR-443): which pixel centres q lie strictly inside
+// Union of pixel discs (ADR-454): which pixel centres q lie strictly inside
 // at least one disc centred on a site p with squared radius rSq[p]?
 //
 // That is the reverse Euclidean distance transform: q is covered exactly when

@@ -1,4 +1,4 @@
-// Chord-optimal flattening of cubic and elliptical-arc segments (ADR-442).
+// Chord-optimal flattening of cubic and elliptical-arc segments (ADR-453).
 //
 // Every chord is accepted only when the true largest distance between the
 // curve piece it replaces and the chord segment is within the tolerance. That

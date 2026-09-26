@@ -1,4 +1,4 @@
-// ADR-450: the Trace dialog's Diagonal contacts control drives
+// ADR-455: the Trace dialog's Diagonal contacts control drives
 // TraceOptions.turnPolicy (ADR-403). Rendered through the real
 // TraceSettingsControls, traced through the real engine.
 import { act } from 'react';
@@ -17,7 +17,7 @@ import { captureTraceSettings, restoreTraceSettings } from './trace-settings-sna
 
 const LABEL = 'Trace diagonal contacts';
 
-describe('Diagonal contacts control (ADR-450)', () => {
+describe('Diagonal contacts control (ADR-455)', () => {
   it('is a labelled native select in Curve finishing with three described choices', async () => {
     await withControls('Line Art', async (view) => {
       const select = view.select();

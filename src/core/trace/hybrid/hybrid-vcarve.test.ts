@@ -1,4 +1,4 @@
-// Line + fill width metadata reaches the V-carve consumer (ADR-443): a traced
+// Line + fill width metadata reaches the V-carve consumer (ADR-454): a traced
 // pen line with a steady width carries strokeWidthMm, and a V-carve layer
 // turns it into a closed round-stroke outline the pen's width across, instead
 // of carving a zero-width centreline.

@@ -163,7 +163,7 @@ describe('vector clip containment proof', () => {
       '<path d="M10 0.05 L90 0.05" fill="none" stroke="black"/>',
     );
     // The clip's edge dips below the line in the middle, so only its ends remain.
-    // The curve crosses y = 0.05 at x = 14.64 and 85.36. Its chords (ADR-442)
+    // The curve crosses y = 0.05 at x = 14.64 and 85.36. Its chords (ADR-453)
     // lie on the clip's outer side within the tolerance, and the edge is almost
     // parallel to the line there, so the cut moves inward by a few units.
     const pieces = result.object?.paths[0]?.polylines ?? [];

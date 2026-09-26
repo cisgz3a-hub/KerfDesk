@@ -1,4 +1,4 @@
-## ADR-442 - Compile flattens curves with near-fewest chords within the tolerance (2026-09-26)
+## ADR-453 - Compile flattens curves with near-fewest chords within the tolerance (2026-09-26)
 
 **Status:** Accepted. | **Date:** 2026-09-26
 

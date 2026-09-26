@@ -273,7 +273,7 @@ describe('Trace Image raster output', () => {
     expect(ctx.traceExistingImage).toHaveBeenCalledTimes(1);
   });
 
-  it('keeps a Line + fill trace as vectors when Raster scan is requested (ADR-443)', async () => {
+  it('keeps a Line + fill trace as vectors when Raster scan is requested (ADR-454)', async () => {
     const source = sourceRaster();
     const ctx = context(() => projectWith(source, imageOperation()));
 

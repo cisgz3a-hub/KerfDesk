@@ -1,4 +1,4 @@
-// Line + fill's Max stroke width (ADR-443): the operator sets millimetres on
+// Line + fill's Max stroke width (ADR-454): the operator sets millimetres on
 // the placed artwork; the tracer wants preview-grid pixels (the commit grid
 // then scales them like every other size control, traceOptionsForCommitGrid).
 

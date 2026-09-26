@@ -57,7 +57,7 @@ const CANONICAL_TOLERANCE_MM = 0.0002;
 const GRBL_ARC_TOLERANCE_MM = 0.002;
 const ARCS: DeviceProfile = { ...DEFAULT_DEVICE_PROFILE, controllerKind: 'grbl-v1.1' };
 // Measured 1,605 burn moves against 2,946 for the G1 program (ratio 0.54).
-// ADR-442's near-fewest chords cut the G1 program to 2,205 moves while the
+// ADR-453's near-fewest chords cut the G1 program to 2,205 moves while the
 // arc program keeps 1,600 (ratio 0.73).
 const MAX_MOVE_RATIO = 0.8;
 
@@ -279,7 +279,7 @@ describe('Arch House laser arcs (ADR-432)', () => {
       // Arcs are checked before 3-decimal rounding, which moves an arc at most
       // 0.002 mm and is part of the 0.025 mm budget (arc-fit-limits.ts).
       expect(arcDeviation).toBeLessThanOrEqual(TOLERANCE_MM - 0.002 + ORACLE_ERROR_MM);
-      // A curve the fit leaves as G1 keeps compile's chords, which ADR-442
+      // A curve the fit leaves as G1 keeps compile's chords, which ADR-453
       // flattens with near-fewest chords using the whole 0.025 mm tolerance
       // (measured 0.0258 mm upper bound, including the oracle's 0.001 mm).
       expect(chordDeviation).toBeLessThanOrEqual(

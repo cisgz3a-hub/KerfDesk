@@ -1,4 +1,4 @@
-// Line + fill preview paint (ADR-443): hybrid strokes draw as hairlines,
+// Line + fill preview paint (ADR-454): hybrid strokes draw as hairlines,
 // hybrid outlines fill — per path, not per trace mode.
 
 import { describe, expect, it } from 'vitest';

@@ -1,4 +1,4 @@
-// ADR-442 (batch 3 integration): a cubic and its reverse flatten to the same
+// ADR-453 (batch 3 integration): a cubic and its reverse flatten to the same
 // vertices, so two filled paths sharing a seam (colour layers) meet exactly.
 
 import { describe, expect, it } from 'vitest';

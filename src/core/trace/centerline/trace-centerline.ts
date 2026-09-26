@@ -57,7 +57,7 @@ export function* traceCenterlineStrokePathsSteps(
 
 /** The centreline strokes of an ink mask, before ring closure, in output
  *  order; `marks` names the concentric circles among them that burn round
- *  dots solid. Shared by the Centerline lane and the Line + fill lane (ADR-443),
+ *  dots solid. Shared by the Centerline lane and the Line + fill lane (ADR-454),
  *  which needs the exact field and the dots kept apart. */
 export function* centerlineStrokesFromMaskSteps(
   mask: InkMask,

@@ -39,7 +39,7 @@ describe('trace settings snapshot (ADR-408)', () => {
     });
   });
 
-  it('restores a Line + fill trace with its Max stroke width (ADR-443)', () => {
+  it('restores a Line + fill trace with its Max stroke width (ADR-454)', () => {
     const captured = captureTraceSettings({
       presetName: 'Line + fill',
       overrides: { hybridMaxStrokeWidthMm: 0.8 },

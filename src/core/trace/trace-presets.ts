@@ -105,7 +105,7 @@ export const TRACE_PRESETS: Readonly<Record<string, TraceOptions>> = {
     // test). So Centerline opts OUT of upscaleSmallSmoothSources.
   },
   'Line + fill': {
-    // Line + fill (ADR-443): pen lines no wider than the Max stroke width
+    // Line + fill (ADR-454): pen lines no wider than the Max stroke width
     // burn once down their centre (the Centerline lane, unchanged), wider ink
     // stays a filled outline (the contour finisher). Same binarisation and
     // cleanup as Centerline so a drawing's strokes trace identically in both.
