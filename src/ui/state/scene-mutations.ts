@@ -25,6 +25,7 @@ import {
   type TextObject,
   type TracedImage,
 } from '../../core/scene';
+import { isHybridStrokePath } from '../../core/trace/hybrid/hybrid-paths';
 import { applyCncTextDefaultsToNewLayer } from './cnc-text-defaults';
 import { duplicateSceneSelection } from './duplicate-scene-selection';
 import { applyFreshTraceScanDirection } from './fresh-trace-scan-direction';
@@ -224,6 +225,7 @@ export function applyFreshImport(
   }
   const created = createArtworkOperations(s.project.scene, positioned, {
     mode: freshArtworkMode(positioned),
+    modeForColor: freshArtworkModeForColor(positioned),
   });
   const operations = applyFreshTraceScanDirection(positioned, created.operations, s.project.device);
   positioned = created.object;
@@ -239,6 +241,15 @@ export function applyFreshImport(
     redoStack: [],
     dirty: true,
   };
+}
+
+// Line + fill (ADR-454): its strokes bind to a LINE operation and its
+// outlines to a FILL operation, whatever the object-level mode says.
+function freshArtworkModeForColor(
+  object: SceneObject,
+): ((color: string) => 'line' | 'fill') | undefined {
+  if (object.kind !== 'traced-image' || object.traceMode !== 'hybrid') return undefined;
+  return (color) => (isHybridStrokePath({ color }) ? 'line' : 'fill');
 }
 
 function freshArtworkMode(object: SceneObject): 'line' | 'fill' | 'image' {
@@ -300,6 +311,7 @@ export function applyTraceToExisting(
     scene.objects.some((object) => object.id === positionedTrace.id);
   const created = createArtworkOperations(scene, positionedTrace, {
     mode: freshArtworkMode(positionedTrace),
+    modeForColor: freshArtworkModeForColor(positionedTrace),
   });
   const operations = applyFreshTraceScanDirection(
     positionedTrace,

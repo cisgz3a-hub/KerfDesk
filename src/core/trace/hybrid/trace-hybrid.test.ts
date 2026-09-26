@@ -7,7 +7,8 @@ import type { RawImageData } from '../trace-image';
 import { TRACE_PRESETS } from '../trace-presets';
 import { clipCurveOutsideRegion } from './clip-stroke-curves';
 import { discUnion } from './disc-union';
-import { HYBRID_FILL_COLOR, HYBRID_STROKE_COLOR, traceHybridPaths } from './trace-hybrid';
+import { HYBRID_FILL_COLOR, HYBRID_STROKE_COLOR } from './hybrid-paths';
+import { traceHybridPaths } from './trace-hybrid';
 
 type Canvas = { readonly width: number; readonly height: number; readonly ink: Uint8Array };
 

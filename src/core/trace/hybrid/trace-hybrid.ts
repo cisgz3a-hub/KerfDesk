@@ -28,12 +28,9 @@ import { sampleStrokeCurve } from '../centerline/stroke-curve-fit';
 import { contourFinishOptionsFor, contourPolylinesFromMaskSteps } from '../contour-trace';
 import { clipCurveOutsideRegion } from './clip-stroke-curves';
 import { discUnionSteps } from './disc-union';
+import { HYBRID_FILL_COLOR, HYBRID_STROKE_COLOR } from './hybrid-paths';
 import { constantStrokeWidthPx, strokeWidthProfile } from './stroke-width';
 
-/** Source colour of the Line + fill strokes (bound to a LINE operation). */
-export const HYBRID_STROKE_COLOR = '#0000ff';
-/** Source colour of the Line + fill outlines (bound to a FILL operation). */
-export const HYBRID_FILL_COLOR = '#000000';
 /** Max stroke width in source pixels when the caller supplies none. */
 export const DEFAULT_HYBRID_MAX_STROKE_WIDTH_PX = 4;
 // A wide region must be seeded by a disc at least this much (px) wider in
@@ -41,12 +38,6 @@ export const DEFAULT_HYBRID_MAX_STROKE_WIDTH_PX = 4;
 const SEED_MARGIN_PX = 0.5;
 // Width groups share a ColoredPath when their widths round alike (px).
 const WIDTH_QUANTUM_PX = 0.25;
-
-/** Whether a Line + fill path is a stroke (drawn as a hairline, bound to a
- *  line operation) rather than a filled outline. */
-export function isHybridStrokePath(path: Pick<ColoredPath, 'color'>): boolean {
-  return path.color.toLowerCase() === HYBRID_STROKE_COLOR;
-}
 
 export function traceHybridPaths(image: RawImageData, options: TraceOptions): ColoredPath[] {
   return runTraceSteps(traceHybridPathsSteps(image, options));

@@ -206,7 +206,11 @@ function useSelectedTracePreview(
 }
 
 function isFilledContourTraceOptions(options: TraceOptions): boolean {
-  return options.traceMode !== 'centerline' && options.traceMode !== 'edge';
+  return (
+    options.traceMode !== 'centerline' &&
+    options.traceMode !== 'edge' &&
+    options.traceMode !== 'hybrid'
+  );
 }
 
 function traceSourceHasTransparency(
@@ -469,5 +473,6 @@ function operationOverrideForTrace(
 function traceModeForOptions(options: TraceOptions): NonNullable<TracedImage['traceMode']> {
   if (options.traceMode === 'centerline') return 'centerline';
   if (options.traceMode === 'edge') return 'edge';
+  if (options.traceMode === 'hybrid') return 'hybrid';
   return 'filled-contours';
 }
