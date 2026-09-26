@@ -32,7 +32,10 @@ import { importDxfFiles } from './dxf-import-action';
 import { handleSaveTiledGcode } from './save-tiled-gcode';
 import { advanceExportVariables } from './advance-export-variables';
 import { controllerReadinessAdvisories } from './controller-readiness-advisories';
-import { cncProjectExportAdvisories } from './cnc-export-controller-advisory';
+import {
+  cncExportOtherControllersNote,
+  cncProjectExportAdvisories,
+} from './cnc-export-controller-advisory';
 import { importSourceSizeAdvisory } from './import-size-advisory';
 import { prepareGcodeSave } from './prepare-gcode-save';
 import { detectCompiledVCarveDepthWarnings } from '../laser/cnc-compiled-depth-warnings';
@@ -311,7 +314,10 @@ function pushPostSaveAdvisories(
       ctx.pushToast(warning, 'warning');
     }
   }
-  if (ctx.controllerSettings === null && machineKindOf(ctx.project.machine) !== 'cnc') {
+  if (machineKindOf(ctx.project.machine) === 'cnc') {
+    const note = cncExportOtherControllersNote(ctx.project.device, ctx.controllerSettings);
+    if (note !== null) ctx.pushToast(note, 'info');
+  } else if (ctx.controllerSettings === null) {
     ctx.pushToast(
       `Exported G-code assumes GRBL $30=${ctx.project.device.maxPowerS} and laser mode ($32=1) — not verified against a connected controller this session.`,
       'info',

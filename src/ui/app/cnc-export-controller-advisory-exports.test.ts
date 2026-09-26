@@ -16,6 +16,7 @@ import type { TiledOutputPreparationRequest } from '../laser/output-preparation-
 import type * as OutputPreparationWorkerClient from '../laser/output-preparation-worker-client';
 import { saveSurfacingProgram } from '../machine/save-surfacing-program';
 import type { SurfacingWorkerInput } from '../machine/surfacing-worker-protocol';
+import { CNC_EXPORT_OTHER_CONTROLLERS_NOTE } from './cnc-export-controller-advisory';
 import { handleSaveGcode } from './file-actions';
 import { capturingPlatform, tiledCncProject } from './save-tiled-gcode-testing';
 import { finalizeTiledOutput } from './tiled-output-preparation';
@@ -140,5 +141,49 @@ describe('surfacing Save for a controller that cannot run it', () => {
     expect(written).toHaveLength(1);
     expect(written[0]).toContain('G4 P3.000');
     expect(grblFamilyAdvisories(toast.messages)).toHaveLength(1);
+  });
+});
+
+// The note for PC and stand-alone controllers rides the same two exports on a
+// GRBL-family profile that no connected controller confirmed.
+describe('tiled and surfacing Save on a disconnected GRBL profile', () => {
+  const grbl = { ...catalogProfile('generic-marlin-laser'), controllerKind: 'grbl-v1.1' as const };
+  const noted = (
+    messages: ReadonlyArray<{ readonly message: string; readonly variant?: string }>,
+  ) => messages.filter((m) => m.message === CNC_EXPORT_OTHER_CONTROLLERS_NOTE);
+
+  it('tiled Save shows the note as info', async () => {
+    const toast = toasts();
+    await handleSaveGcode({
+      platform: capturingPlatform([]),
+      project: tiledProjectOn(grbl),
+      savedName: 'cn-note',
+      controllerSettings: null,
+      settingsCapability: 'none',
+      pushToast: toast.pushToast,
+    });
+    expect(noted(toast.messages)).toEqual([
+      { message: CNC_EXPORT_OTHER_CONTROLLERS_NOTE, variant: 'info' },
+    ]);
+  });
+
+  it('surfacing Save shows the note as info', async () => {
+    const toast = toasts();
+    await saveSurfacingProgram({
+      platform: streamingPlatform([]),
+      pushToast: toast.pushToast,
+      project: { ...untiledProjectOn(grbl), device: grbl },
+      machine: DEFAULT_CNC_MACHINE_CONFIG,
+      controllerSettings: null,
+      settingsCapability: 'none',
+      inputs: { widthMm: 100, heightMm: 80, stepoverPct: 40, totalDepthMm: 0.5 },
+      signal: new AbortController().signal,
+      onWriting: () => undefined,
+      onFinalizing: () => undefined,
+      isCurrent: () => true,
+    });
+    expect(noted(toast.messages)).toEqual([
+      { message: CNC_EXPORT_OTHER_CONTROLLERS_NOTE, variant: 'info' },
+    ]);
   });
 });
