@@ -158,6 +158,31 @@ describe('grbl-simulator', () => {
     expect(lines).not.toContain('ALARM:3');
   });
 
+  it.each([
+    ['feed hold', '!', /^<Hold:0\|/],
+    ['safety door', '\x84', /^<Door:0\|/],
+  ])(
+    'soft reset in a completed %s drops queued motion without an alarm and keeps position',
+    async (_name, holdByte, heldReport) => {
+      const { sim, conn, lines } = await openSim({ motionMs: 500 });
+      await pump(5);
+      await conn.write('G92 X0 Y0\n');
+      await conn.write('G1 X5 F600\n');
+      await pump(2);
+      await conn.write(holdByte);
+      await conn.write('?');
+      await pump(2);
+      expect(lines.at(-1)).toMatch(heldReport);
+      lines.length = 0;
+      await conn.write('\x18');
+      await pump(5);
+      expect(lines).toEqual(["Grbl 1.1f ['$' for help]"]);
+      expect(sim.state()).toMatchObject({ machine: 'Idle', locked: false, pendingMotions: 0 });
+      expect(sim.state().g92).toBeNull();
+      expect(sim.state().mpos.x).toBe(5);
+    },
+  );
+
   it('homes: $H answers ok only after the homing delay, from home position', async () => {
     const { sim, conn, lines } = await openSim({ homingMs: 20 });
     await pump(5);

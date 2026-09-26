@@ -192,6 +192,9 @@ export function machineActions(set: MachineSet, get: MachineGet): MachineActions
 }
 
 function machineKindStatePatch(state: MachineState, kind: MachineKind): Partial<MachineState> {
+  // The toggle swaps live placement and the CNC cache as well as the project.
+  // Undo/Redo must restore them together, like a Machine Setup save.
+  captureSetupHistoryContext(state.project, state);
   const current = state.project.machine;
   const cachedBase = state.cachedCncMachine ?? DEFAULT_CNC_MACHINE_CONFIG;
   const cncBase =
