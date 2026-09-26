@@ -69,7 +69,7 @@ leaks and give each head its own copy of those, with bed, origin, homing and con
 - The first switch into a mode copies the current placement and Output switches. That is the
   one moment the modes still touch, and it matches what the operator saw before this change.
 - Regression tests: `print-cut-output.test.ts`, `laser-store-air-assist-safety.test.ts`,
-  `MachineModeToggle.hybrid.test.tsx`, `laser-store-motion-operation.test.ts`,
+  `MachineModeToggle.hybrid.test.tsx`, `laser-store-frame-job-mode.test.ts`,
   `prepare-output-registration-jig-machine.test.ts`, `BoxGeneratorDialog.persistence.test.tsx`,
   `layer-default-actions.test.ts`, `cnc-machine-starter-seeding.test.ts`,
   `import-actions.defaults.test.ts`, `parked-cnc-machine.test.ts`, `cnc-head-feeds.test.ts`,
