@@ -81,12 +81,12 @@ export const FILE_COMMAND_HELP: Readonly<
   'file.export-pdf': {
     family: 'file',
     tooltip:
-      'Export selected vector artwork, or all of it when nothing is selected, as a one-page vector PDF sized to the artwork. Curves stay curves; filled layers are filled even-odd and line layers are 0.1 mm strokes. Images are left out.',
+      'Export selected vector artwork, or all of it when nothing is selected, as a one-page vector PDF sized to the artwork and its strokes. Curves stay curves; filled layers keep their fill rule (even-odd, text nonzero) and line layers are 0.1 mm strokes. Images are left out.',
   },
   'file.export-eps': {
     family: 'file',
     tooltip:
-      'Export selected vector artwork, or all of it when nothing is selected, as Encapsulated PostScript (EPSF 3.0) whose bounding box is the artwork. Curves stay curves; images are left out.',
+      'Export selected vector artwork, or all of it when nothing is selected, as Encapsulated PostScript (EPSF 3.0) whose bounding box fits the artwork and its strokes. Curves stay curves; images are left out.',
   },
   'file.export-geojson': {
     family: 'file',

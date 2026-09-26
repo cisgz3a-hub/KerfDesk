@@ -42,14 +42,14 @@ const FORMATS: Readonly<Record<ArtworkVectorFormat, FormatSpec>> = {
     extension: '.pdf',
     mime: 'application/pdf',
     write: (items, title) => ({ text: writePdfDocument(items, { title }).text, warning: null }),
-    note: 'The page is the artwork extent; curves stay curves.',
+    note: 'The page fits the artwork and its strokes; curves stay curves.',
   },
   eps: {
     label: 'EPS',
     extension: '.eps',
     mime: 'application/postscript',
     write: (items, title) => ({ text: writeEpsDocument(items, { title }).text, warning: null }),
-    note: 'The bounding box is the artwork extent; curves stay curves.',
+    note: 'The bounding box fits the artwork and its strokes; curves stay curves.',
   },
   geojson: {
     label: 'GeoJSON',

@@ -726,11 +726,15 @@ marks later edits as unapproved without changing the existing Frame/Start policy
    ...**) write the selection's or scene's vector artwork, text outlined; bitmaps and reliefs are
    left out and counted, and an image-only selection warns before any file name is asked.
 2. PDF (1.4, one page) and EPS (EPSF 3.0) keep lines and curves exactly (arcs become cubics); the
-   page / bounding box is the exact extent of the drawn curves, rounded outward. Filled layers fill
-   even-odd (text nonzero); line layers and open contours are 0.1 mm strokes.
+   page / bounding box is the exact extent of the drawn curves, rounded outward, plus half the
+   0.1 mm stroke on every side when strokes are drawn, and never under 3 pt. Filled layers fill
+   even-odd (text nonzero); line layers and open contours are 0.1 mm strokes. A page side over
+   5080 mm is written as PDF 1.6 with /UserUnit.
 3. GeoJSON flattens curves within 0.01 mm into Polygon rings (outer counterclockwise, holes
-   clockwise, grouped by containment) and LineStrings. Coordinates are millimetres with y up from
-   the lower-left corner, not longitude and latitude; the file states this in its `kerfdesk` member.
+   clockwise) and LineStrings. Polygons follow each shape's fill rule, so they cover what the PDF
+   fills; shapes whose outlines cross are written as separate `unmerged` polygons and the export
+   warns. Coordinates are millimetres with y up from the lower-left corner, not longitude and
+   latitude (not georeferenced); the file states this in its `kerfdesk` member and the toast says so.
 
 ### F-A9b. Remove overlapping laser lines (ADR-350)
 
