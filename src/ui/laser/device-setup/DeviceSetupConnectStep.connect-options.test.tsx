@@ -1,4 +1,4 @@
-// Machine Setup's Connect and Reconnect must pass the draft's Background
+// Machine Setup's Find my machine and Reconnect must pass the draft's Background
 // streaming choice the way the rail and menu Connect do. They sent it only for
 // an explicit opt-in, and connect() treats a missing choice as on for
 // GRBL-family drivers, so an operator who unticked the setting and clicked
@@ -20,7 +20,7 @@ import { initDeviceSetup } from './device-setup-flow';
 ).IS_REACT_ACT_ENVIRONMENT = true;
 
 type ConnectFn = ReturnType<typeof useLaserStore.getState>['connect'];
-type SetupConnectButton = 'Connect…' | 'Reconnect using selected profile';
+type SetupConnectButton = 'Find my machine' | 'Reconnect using selected profile';
 
 const original = useLaserStore.getState();
 
@@ -86,7 +86,7 @@ async function connectOptionsFrom(
   }
 }
 
-describe.each(['Connect…', 'Reconnect using selected profile'] as const)(
+describe.each(['Find my machine', 'Reconnect using selected profile'] as const)(
   'Machine Setup %s options',
   (label) => {
     it('carries a Background streaming opt-out so the worker stays off', async () => {

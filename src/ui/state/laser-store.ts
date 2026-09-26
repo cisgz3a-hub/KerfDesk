@@ -53,6 +53,7 @@ import type {
   StreamPlannerSnapshot,
 } from './laser-rx-capacity-evidence';
 import type { StreamHold } from './laser-stream-hold';
+import type { CncPauseLift } from './cnc-pause-lift-state';
 import type { JobStopRequest, StreamReset } from './job-stop-request';
 import type { TranscriptBufferRefs } from './laser-transcript-buffer';
 import type { PauseResumeTransitionState } from './laser-pause-resume-transition';
@@ -108,6 +109,12 @@ export type LaserState = LaserStoreActions &
   ControllerBuildInfoState & {
     readonly connection: ConnectionState;
     readonly serialPortInfo?: SerialPortIdentity | null;
+    /** The baud the live connection opened at (ADR-420); null while disconnected. */
+    readonly connectedBaudRate?: number | null;
+    /** Revision of the latest connect attempt or intentional disconnect. The live
+     *  connection belongs to whoever started the attempt with this revision; any
+     *  later connect or disconnect moves it on (ADR-420). Undefined reads as 0. */
+    readonly connectionAttempt?: number;
     readonly statusReport: StatusReport | null;
     readonly controllerSessionEpoch: number;
     readonly statusSequence: number;
@@ -254,6 +261,10 @@ export type LaserState = LaserStoreActions &
      * logged once per episode; null while acknowledgements flow or no job
      * streams. Optional only so older hand-built test states remain valid. */
     readonly streamHold?: StreamHold | null;
+    /** A CNC Pause that lifted the bit out of the cut, and the evidence its
+     *  re-entry is checked against (ADR-411). Null when Pause stopped in
+     *  place. Optional only so older hand-built test states remain valid. */
+    readonly cncPauseLift?: CncPauseLift | null;
     readonly workOriginActive: boolean;
     readonly workOriginSource: WorkOriginSource;
     // Monotonic identity for XY work-origin mutations. Place Board registration
