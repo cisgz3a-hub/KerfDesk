@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { applyTransform } from './transform';
 import { flattenCurveSubpath } from './curve-path';
 import { curveEndpointJoin } from './curve-join';
-import type { CurveSubpath, Transform } from './scene-object';
+import type { CurveSubpath, Transform, Vec2 } from './scene-object';
 
 const FIRST: CurveSubpath = {
   start: { x: 0, y: 0 },
@@ -163,14 +163,21 @@ describe('curve endpoint joining', () => {
       mirrorX: true,
       mirrorY: false,
     };
+    // Chord-optimal flattening walks from a curve's start (ADR-414), so a
+    // reversed ellipse may place its vertices elsewhere on the same curve.
+    // Every vertex of each flattening must lie on the other curve, whose
+    // exact trace is its flattening at 1e-7, and the ends must swap.
     const original = flattenedPhysicalPoints(arc, transform);
     const reversed = flattenedPhysicalPoints(result.curve, transform);
-    expect(reversed).toHaveLength(original.length);
-    for (const [index, point] of reversed.entries()) {
-      const expected = original.at(-index - 1);
-      expect(expected).toBeDefined();
-      expect(point.x).toBeCloseTo(expected?.x ?? Number.NaN, 8);
-      expect(point.y).toBeCloseTo(expected?.y ?? Number.NaN, 8);
+    expectSamePoint(reversed[0], original.at(-1));
+    expectSamePoint(reversed.at(-1), original[0]);
+    const originalTrace = flattenedPhysicalPoints(arc, transform, 1e-7);
+    const reversedTrace = flattenedPhysicalPoints(result.curve, transform, 1e-7);
+    for (const point of reversed) {
+      expect(distanceToPolyline(point, originalTrace)).toBeLessThan(1e-6);
+    }
+    for (const point of original) {
+      expect(distanceToPolyline(point, reversedTrace)).toBeLessThan(1e-6);
     }
   });
 
@@ -233,8 +240,32 @@ describe('curve endpoint joining', () => {
   });
 });
 
-function flattenedPhysicalPoints(path: CurveSubpath, transform: Transform) {
-  const flattened = flattenCurveSubpath(path, { toleranceMm: 0.005 });
+function flattenedPhysicalPoints(path: CurveSubpath, transform: Transform, toleranceMm = 0.005) {
+  const flattened = flattenCurveSubpath(path, { toleranceMm });
   if (flattened.kind !== 'ok') throw new Error('Expected curve fixture to flatten.');
   return flattened.polyline.points.map((point) => applyTransform(point, transform));
+}
+
+function distanceToPolyline(point: Vec2, polyline: ReadonlyArray<Vec2>): number {
+  let nearest = Infinity;
+  for (let index = 1; index < polyline.length; index += 1) {
+    const a = polyline[index - 1] as Vec2;
+    const b = polyline[index] as Vec2;
+    const dx = b.x - a.x;
+    const dy = b.y - a.y;
+    const lengthSquared = dx * dx + dy * dy;
+    const t =
+      lengthSquared === 0
+        ? 0
+        : Math.max(0, Math.min(1, ((point.x - a.x) * dx + (point.y - a.y) * dy) / lengthSquared));
+    nearest = Math.min(nearest, Math.hypot(point.x - a.x - t * dx, point.y - a.y - t * dy));
+  }
+  return nearest;
+}
+
+function expectSamePoint(actual: Vec2 | undefined, expected: Vec2 | undefined): void {
+  expect(actual).toBeDefined();
+  expect(expected).toBeDefined();
+  expect(actual?.x).toBeCloseTo(expected?.x ?? Number.NaN, 8);
+  expect(actual?.y).toBeCloseTo(expected?.y ?? Number.NaN, 8);
 }
