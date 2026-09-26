@@ -40,20 +40,24 @@ describe('vector clips that hide nothing', () => {
     expect(clipped('<clipPath id="c"><circle cx="50" cy="50" r="70"/></clipPath>')).not.toThrow();
   });
 
-  it('still refuses a clip that would cut the artwork', () => {
-    expect(clipped('<clipPath id="c"><rect width="50" height="100"/></clipPath>')).toThrow(
-      /vector clipping is not supported/i,
-    );
+  // Amendment 2 replaced the refusal of a cutting clip with its intersection.
+  it('imports the part of the artwork a cutting clip keeps', () => {
+    const polylines = clipped(
+      '<clipPath id="c"><rect width="50" height="100"/></clipPath>',
+    )().object?.paths.flatMap((path) => path.polylines);
+    const xs = polylines?.flatMap((line) => line.points.map((point) => point.x)) ?? [];
+    expect([Math.min(...xs), Math.max(...xs)]).toEqual([10, 50]);
   });
 
-  it('still refuses clips it cannot prove harmless', () => {
+  it('imports artwork unchanged when a clip the convex proof cannot read keeps all of it', () => {
+    const unclipped = parse(svg('', SQUARE)).fragment?.entries;
     for (const clipPath of [
       '<clipPath id="c" clipPathUnits="objectBoundingBox"><rect width="1" height="1"/></clipPath>',
       '<clipPath id="c"><rect width="100" height="100"/><rect x="200" width="5" height="5"/></clipPath>',
-      // Concave, even though the square fits: the rule only proves convex outlines.
+      // Concave: the intersection, not the convex proof, shows the square is whole.
       '<clipPath id="c"><path d="M0 0 H100 V95 H95 V100 H0 Z"/></clipPath>',
     ]) {
-      expect(clipped(clipPath)).toThrow(/vector clipping is not supported/i);
+      expect(clipped(clipPath)().fragment?.entries).toEqual(unclipped);
     }
   });
 });

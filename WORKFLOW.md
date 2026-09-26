@@ -165,14 +165,29 @@ opportunity, without an extra branding delay. It introduces no startup interacti
 3. Unsupported image presentation or clipping reports its reason. Decode failure, Esc cancellation
    and document replacement leave the complete file uninserted and release staged image assets.
 
-#### Edge — SVG with a vector clip
-1. A vector clip that hides none of the artwork imports as if it were absent, such as the frame or
-   artboard rectangle Figma and Illustrator wrap exported content in. KerfDesk accepts it when
-   the clip is one shape in user-space units (SVG's default) with a single convex outline, and
-   every point of the clipped artwork lies inside it (ADR-358 Amendment 1).
-2. Any other vector clip, and every vector mask and filter, still rejects the whole file with its
-   reason, because importing it unclipped could cut what the design hides.
-3. An image clip without `clipPathUnits` is read as `userSpaceOnUse`, the SVG default.
+#### Edge — SVG with a vector clip, mask or filter
+1. Clipped artwork imports as the part its clip keeps (ADR-358 Amendment 2). Filled shapes are
+   intersected with the clip as areas, under their own fill rule. Stroked paths, which are cut as
+   lines, stop at the clip's edge; a line lying on the edge is kept. Artwork wholly outside its
+   clip imports nothing.
+2. Clips are read as SVG defines them: `clipPathUnits` `userSpaceOnUse` (the default) or
+   `objectBoundingBox`, `clip-rule` `nonzero` (the default) or `evenodd`, the clip's own and its
+   shapes' transforms, several shapes, a `<use>` of a shape (as Illustrator exports clipping
+   masks), clips on groups, and nested clips, which intersect.
+3. Artwork a clip keeps whole imports unchanged with its native curves, such as content inside the
+   frame or artboard rectangle Figma and Illustrator wrap exports in (ADR-358 Amendment 1). Where
+   a clip cuts a curve, the kept part is flattened at 0.025 mm, the tolerance job compilation
+   cuts curves at.
+4. A clip KerfDesk cannot read faithfully still rejects the whole file with its reason: a clip made
+   of text (convert the text to paths first), a `<use>` in a clip that refers to anything but a
+   shape, a clip-path that names no `<clipPath>`, clip geometry or transforms set only through
+   CSS, or a clip transform that cannot be read.
+5. Vector masks and filters no longer reject the file. The artwork imports without them, and a
+   warning toast says how many elements were imported without their masks (areas the masks hide
+   are included) or without their filter effects. Masks, filters and opacity on embedded images
+   still reject the file.
+6. Image clips follow the same rules: a missing `clipPathUnits` is `userSpaceOnUse` and a missing
+   `clip-rule` is `nonzero`. KerfDesk's own exported image clips keep their curves.
 
 #### Error — file is not an SVG
 1. On drop, file type is checked by MIME and by content sniff (first 200 bytes).

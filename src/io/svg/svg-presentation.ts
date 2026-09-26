@@ -4,7 +4,12 @@ import { multiplySvgMatrix, parseSvgTransform } from './svg-transform-attribute'
 import { inheritedSvgFillRule } from './svg-fill-rule';
 import type { SvgStyleCascade } from './svg-stylesheet';
 
-export type SvgClipReference = { readonly id: string; readonly transform: SvgMatrix };
+// `element` carries the clip-path property; objectBoundingBox clips measure it.
+export type SvgClipReference = {
+  readonly id: string;
+  readonly transform: SvgMatrix;
+  readonly element: Element;
+};
 
 const COLOR_FALLBACK = '#000000';
 
@@ -141,7 +146,7 @@ export function presentationStateFor(
         return value !== null && value !== 'none';
       }),
     ],
-    clips: clipReferences(presentationValue(el, styles, 'clip-path'), parent.clips, transform),
+    clips: clipReferences(el, presentationValue(el, styles, 'clip-path'), parent.clips, transform),
     hidden,
     opacity,
     strokeOpacity,
@@ -200,13 +205,24 @@ function parseOpacity(input: string | null): number {
 }
 
 function clipReferences(
+  element: Element,
   value: string | null,
   inherited: readonly SvgClipReference[],
   transform: SvgMatrix,
 ): readonly SvgClipReference[] {
-  if (value === null || value.trim() === 'none') return inherited;
-  const match = /^url\(\s*['"]?#([^\s'")]+)['"]?\s*\)$/.exec(value.trim());
+  const id = svgClipPathId(value);
+  return id === null ? inherited : [...inherited, { id, transform, element }];
+}
+
+/** The local <clipPath> id a clip-path value names, or null for none. */
+export function svgClipPathId(value: string | null): string | null {
+  const trimmed = value
+    ?.trim()
+    .replace(/\s*!important$/i, '')
+    .trim();
+  if (trimmed === undefined || trimmed === 'none') return null;
+  const match = /^url\(\s*['"]?#([^\s'")]+)['"]?\s*\)$/.exec(trimmed);
   if (match?.[1] === undefined)
     throw new Error('Only local SVG clip-path references are supported.');
-  return [...inherited, { id: match[1], transform }];
+  return match[1];
 }

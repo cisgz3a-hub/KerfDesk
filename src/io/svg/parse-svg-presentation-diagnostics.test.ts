@@ -10,9 +10,8 @@ import { readSvgDocumentFromBlob } from './parse-svg-blob';
 const identity = { id: 'source', source: 'effects.svg' };
 const square = 'M0 0 H10 V10 H0 Z';
 const outline = `<path d="${square}" fill="none" stroke="blue"/>`;
-// A clip over one quarter of the square: importing the artwork unclipped would
-// cut what the design hides. (A clip that hides nothing imports; see
-// parse-svg-vector-clip.test.ts.)
+// A clip over one quarter of the square: the artwork imports as the quarter it
+// keeps (ADR-358 Amendment 2; see parse-svg-vector-clip-intersect.test.ts).
 const clip = `<defs><clipPath id="clip" clipPathUnits="userSpaceOnUse"><path d="M0 0 H5 V5 H0 Z" clip-rule="evenodd"/></clipPath></defs>`;
 
 function svg(content: string): string {
@@ -35,32 +34,51 @@ const parsers: readonly (readonly [string, Parser])[] = [
 
 describe.each(parsers)('SVG presentation diagnostics through %s', (_label, parse) => {
   it.each([
-    [
-      'direct clipping',
-      `${clip}<path d="${square}" stroke="blue" clip-path="url(#clip)"/>`,
-      /vector clipping/,
-    ],
-    ['inherited clipping', `${clip}<g clip-path="url(#clip)">${outline}</g>`, /vector clipping/],
+    ['direct clipping', `${clip}<path d="${square}" stroke="blue" clip-path="url(#clip)"/>`],
+    ['inherited clipping', `${clip}<g clip-path="url(#clip)">${outline}</g>`],
     [
       'clipped use',
       `${clip}<defs><path id="shape" d="${square}" stroke="blue"/></defs><use href="#shape" clip-path="url(#clip)"/>`,
-      /vector clipping/,
     ],
-    ['mask', `<path d="${square}" stroke="blue" mask="url(#mask)"/>`, /vector masks and filters/],
+  ])('imports %s as the stretch of outline the clip keeps', async (_name, content) => {
+    const result = await parse(svg(content));
+    // The outline is cut as a line: it stops at the clip's edges, as one piece
+    // that runs on through the outline's start.
+    const lines = result.object?.paths.flatMap((path) =>
+      path.polylines.map((line) => line.points.map(({ x, y }) => [x, y])),
+    );
+    expect(lines).toEqual([
+      [
+        [0, 5],
+        [0, 0],
+        [5, 0],
+      ],
+    ]);
+  });
+
+  it.each([
+    ['mask', `<path d="${square}" stroke="blue" mask="url(#mask)"/>`, 'without their masks'],
     [
       'inherited filter',
       `<g style="filter:url(#filter)">${outline}</g>`,
-      /vector masks and filters/,
+      'without their filter effects',
     ],
-  ])('rejects %s instead of returning altered vector geometry', async (_name, content, message) => {
-    await expect(Promise.resolve().then(() => parse(svg(content)))).rejects.toThrow(message);
+  ])('imports %s geometry unaltered and discloses the effect', async (_name, content, effect) => {
+    const result = await parse(svg(content));
+    expect(result.object?.paths[0]?.polylines[0]?.points).toHaveLength(5);
+    expect(
+      result.notes.some((note) => note.startsWith('SVG presentation:') && note.includes(effect)),
+    ).toBe(true);
   });
 
-  it('rejects the whole file when an unsupported vector follows valid artwork', async () => {
+  it('imports valid artwork together with the clipped artwork that follows it', async () => {
     const content = `${outline}${clip}<path d="${square}" fill="red" clip-path="url(#clip)"/>`;
-    await expect(Promise.resolve().then(() => parse(svg(content)))).rejects.toThrow(
-      /vector clipping/,
-    );
+    const result = await parse(svg(content));
+    expect(result.fragment?.entries).toHaveLength(2);
+    expect(result.fragment?.entries[1]).toMatchObject({
+      operationOverride: { mode: 'fill' },
+      bounds: { minX: 0, minY: 0, maxX: 5, maxY: 5 },
+    });
   });
 
   it('allows explicit none effects and ignores hidden or unused affected vectors', async () => {

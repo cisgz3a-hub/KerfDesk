@@ -1,11 +1,17 @@
 import { FillRule, intersectD } from 'clipper2-ts';
 import { polylineToCurveSubpath, type ColoredPath } from '../../core/scene';
+import { svgClipRegion } from './svg-clip-region';
+import {
+  resolveSvgClip,
+  type ResolvedSvgClip,
+  type SvgClipResolver,
+  type SvgClipShape,
+} from './svg-clip-resolve';
 import { applySvgMatrix, transformSvgCurveSubpath, type SvgMatrix } from './svg-curve-transform';
-import type { SvgIdResolver } from './svg-id-resolver';
 import type { SvgImageDescriptor } from './svg-import-fragment';
 import type { PresentationState, SvgClipReference } from './svg-presentation';
 import { inverseSvgMatrix, svgMatrixToSceneTransform } from './svg-scene-transform';
-import { multiplySvgMatrix, parseSvgTransform } from './svg-transform-attribute';
+import { multiplySvgMatrix } from './svg-transform-attribute';
 import { parseSvgLengthUserUnitsOrNull } from './svg-units';
 import { assertSvgImportPoints } from './svg-import-budget';
 import { elementToSubPaths } from './shape-to-polylines';
@@ -14,7 +20,7 @@ import { linearScaleMagnitude } from './transform-scale';
 export function svgImageElement(
   element: Element,
   state: PresentationState,
-  resolveId: SvgIdResolver,
+  clipResolver: SvgClipResolver,
   identity: { readonly id: string; readonly source: string },
 ): SvgImageDescriptor | null {
   const dataUrl = element.getAttribute('href') ?? element.getAttribute('xlink:href');
@@ -37,7 +43,7 @@ export function svgImageElement(
       { x: x + width, y: y + height },
     ].map((point) => applySvgMatrix(state.transform, point)),
   ]);
-  const imageClip = imageClips(state.clips, state.transform, resolveId);
+  const imageClip = imageClips(state.clips, state.transform, clipResolver);
   return {
     kind: 'svg-image',
     ...identity,
@@ -59,32 +65,52 @@ function length(element: Element, name: string, fallback?: number): number {
 function imageClips(
   references: readonly SvgClipReference[],
   imageMatrix: SvgMatrix,
-  resolveId: SvgIdResolver,
+  clipResolver: SvgClipResolver,
 ): readonly ColoredPath[] | undefined {
   if (references.length === 0) return undefined;
   const inverse = inverseSvgMatrix(imageMatrix);
   let paths: readonly ColoredPath[] | undefined;
   for (const reference of references) {
-    const next = clipPaths(reference, inverse, resolveId);
+    const next = clipPaths(resolveSvgClip(reference, clipResolver), inverse);
     paths = paths === undefined ? next : intersectClips(paths, next);
   }
   return paths;
 }
 
-function clipPaths(
-  reference: SvgClipReference,
-  inverse: SvgMatrix,
-  resolveId: SvgIdResolver,
-): readonly ColoredPath[] {
-  const { clip, path } = clipShape(reference, resolveId);
-  if (path === undefined) return [];
-  const world = multiplySvgMatrix(
-    multiplySvgMatrix(reference.transform, parseSvgTransform(clip.getAttribute('transform'))),
-    parseSvgTransform(path.getAttribute('transform')),
-  );
+// KerfDesk's exporter writes one compound even-odd path per clip; it keeps its
+// native curves. Any other clip (SVG's default nonzero rule, basic shapes,
+// several shapes, <use>, objectBoundingBox units or nested clips) owns its
+// region, flattened at the machine curve tolerance (ADR-358 Amendment 2).
+function clipPaths(clip: ResolvedSvgClip, inverse: SvgMatrix): readonly ColoredPath[] {
+  const path = compoundEvenOddPath(clip);
+  if (path !== null) return [nativeClipPath(path, inverse)];
+  const polylines = svgClipRegion([clip]).paths.map((ring) => {
+    const points = ring.map((point) => applySvgMatrix(inverse, point));
+    assertSvgImportPoints(points);
+    return { points, closed: true };
+  });
+  if (polylines.length === 0) return [];
+  return [
+    {
+      color: '#000000',
+      fillRule: 'evenodd',
+      polylines,
+      curves: polylines.map(polylineToCurveSubpath),
+    },
+  ];
+}
+
+function compoundEvenOddPath(clip: ResolvedSvgClip): SvgClipShape | null {
+  const shape = clip.shapes.length === 1 && clip.clips.length === 0 ? clip.shapes[0] : undefined;
+  if (shape === undefined || shape.clips.length > 0 || shape.rule !== 'evenodd') return null;
+  return shape.element.tagName.toLowerCase() === 'path' ? shape : null;
+}
+
+function nativeClipPath(shape: SvgClipShape, inverse: SvgMatrix): ColoredPath {
+  const world = shape.matrix;
   const local = multiplySvgMatrix(inverse, world);
   const subpaths = elementToSubPaths(
-    path,
+    shape.element,
     linearScaleMagnitude(world.a, world.b, world.c, world.d),
   );
   const polylines = subpaths.map((subpath) => {
@@ -92,18 +118,16 @@ function clipPaths(
     assertSvgImportPoints(points);
     return { points, closed: true };
   });
-  return [
-    {
-      color: '#000000',
-      fillRule: 'evenodd',
-      polylines,
-      curves: subpaths.map((subpath, index) =>
-        subpath.curve === undefined
-          ? polylineToCurveSubpath(polylines[index] ?? { points: [], closed: true })
-          : { ...transformSvgCurveSubpath(subpath.curve, local), closed: true },
-      ),
-    },
-  ];
+  return {
+    color: '#000000',
+    fillRule: 'evenodd',
+    polylines,
+    curves: subpaths.map((subpath, index) =>
+      subpath.curve === undefined
+        ? polylineToCurveSubpath(polylines[index] ?? { points: [], closed: true })
+        : { ...transformSvgCurveSubpath(subpath.curve, local), closed: true },
+    ),
+  };
 }
 
 function intersectClips(
@@ -142,32 +166,4 @@ function validateImagePresentation(
     throw new Error(
       'SVG image aspect fitting is not supported. Export the image with preserveAspectRatio="none".',
     );
-}
-
-function clipShape(
-  reference: SvgClipReference,
-  resolveId: SvgIdResolver,
-): { clip: Element; path: Element | undefined } {
-  const clip = resolveId(reference.id);
-  if (clip === null || clip.tagName.toLowerCase() !== 'clippath')
-    throw new Error('SVG image clip path is missing: ' + reference.id);
-  // userSpaceOnUse is SVG's default when the attribute is absent.
-  if ((clip.getAttribute('clipPathUnits') ?? 'userSpaceOnUse') !== 'userSpaceOnUse')
-    throw new Error('Only userSpaceOnUse SVG image clips are supported.');
-  const children = Array.from(clip.children).filter(
-    (child) => !['title', 'desc'].includes(child.tagName.toLowerCase()),
-  );
-  if (children.length === 0) return { clip, path: undefined };
-  if (children.length !== 1 || children[0]?.tagName.toLowerCase() !== 'path')
-    throw new Error('SVG image clips must contain one compound path.');
-  const path = children[0];
-  validateClipRule(clip, path);
-  return { clip, path };
-}
-
-function validateClipRule(clip: Element, path: Element): void {
-  const rule = path.getAttribute('clip-rule') ?? clip.getAttribute('clip-rule') ?? 'nonzero';
-  if (rule !== 'evenodd') throw new Error('Only even-odd SVG image clips are supported.');
-  if (path.hasAttribute('clip-path') || clip.hasAttribute('clip-path'))
-    throw new Error('A clip inside an SVG clip definition is not supported.');
 }
