@@ -128,39 +128,51 @@ function* buildNodeSteps<T extends ContourBox>(
 ): TraceSteps<BoxNode<T> | undefined> {
   if (start === end) return undefined;
   if (cooperate) yield;
-  const { bounds, horizontal } = measure(entries, start, end);
-  if (end - start <= LEAF_SIZE)
-    return { ...bounds, items: entries.slice(start, end).map((e) => e.box) };
+  if (end - start <= LEAF_SIZE) return leaf(entries, start, end);
   const middle = Math.floor((start + end) / 2);
-  selectMiddle(entries, start, end, middle, horizontal ? 'x' : 'y');
+  selectMiddle(entries, start, end, middle, splitsHorizontally(entries, start, end) ? 'x' : 'y');
+  const left = (yield* buildNodeSteps(entries, start, middle, cooperate)) as BoxNode<T>;
+  const right = (yield* buildNodeSteps(entries, middle, end, cooperate)) as BoxNode<T>;
+  // A node's bounds are its children's, joined: min and max are exact and
+  // order-free, so this is the box of all its items without revisiting them.
   return {
-    ...bounds,
-    left: yield* buildNodeSteps(entries, start, middle, cooperate),
-    right: yield* buildNodeSteps(entries, middle, end, cooperate),
+    minX: Math.min(left.minX, right.minX),
+    minY: Math.min(left.minY, right.minY),
+    maxX: Math.max(left.maxX, right.maxX),
+    maxY: Math.max(left.maxY, right.maxY),
+    left,
+    right,
   };
 }
 
-function measure<T extends ContourBox>(
-  entries: ReadonlyArray<Entry<T>>,
-  start: number,
-  end: number,
-) {
+function leaf<T extends ContourBox>(entries: ReadonlyArray<Entry<T>>, start: number, end: number) {
   let minX = Infinity,
     minY = Infinity,
     maxX = -Infinity,
     maxY = -Infinity;
+  const items: T[] = [];
+  for (let i = start; i < end; i += 1) {
+    const { box } = entries[i] as Entry<T>;
+    minX = Math.min(minX, box.minX);
+    minY = Math.min(minY, box.minY);
+    maxX = Math.max(maxX, box.maxX);
+    maxY = Math.max(maxY, box.maxY);
+    items.push(box);
+  }
+  return { minX, minY, maxX, maxY, items };
+}
+
+function splitsHorizontally<T>(
+  entries: ReadonlyArray<Entry<T>>,
+  start: number,
+  end: number,
+): boolean {
   let lowX = Infinity,
     lowY = Infinity,
     highX = -Infinity,
     highY = -Infinity;
   for (let i = start; i < end; i += 1) {
-    const entry = entries[i];
-    if (entry === undefined) continue;
-    const { box, x, y } = entry;
-    minX = Math.min(minX, box.minX);
-    minY = Math.min(minY, box.minY);
-    maxX = Math.max(maxX, box.maxX);
-    maxY = Math.max(maxY, box.maxY);
+    const { x, y } = entries[i] as Entry<T>;
     lowX = Math.min(lowX, x);
     lowY = Math.min(lowY, y);
     highX = Math.max(highX, x);
@@ -168,7 +180,7 @@ function measure<T extends ContourBox>(
   }
   // Parallel strips can overlap along their longest axis. Split on the
   // centroid spread instead, so separation on the other axis is retained.
-  return { bounds: { minX, minY, maxX, maxY }, horizontal: highX - lowX >= highY - lowY };
+  return highX - lowX >= highY - lowY;
 }
 
 function selectMiddle<T>(
