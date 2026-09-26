@@ -114,3 +114,71 @@ three noise images, in all six presets. The intended differences are:
   added there belongs in `bridgeGap`. The tip-extension junction test now asks the shared point
   grid (`landmarkGrid`).
 - `centerline/endpoint-grid.ts` is removed: the bridge queue keeps its own cells.
+
+### Amendment 1 (2026-09-27): the speed gate, an alternating bench and trace independence
+
+The second speed wave only takes output-identical changes, so it first needs a gate that can see
+any output change and a benchmark that is not fooled by machine load.
+
+**Parity oracle.** `src/__fixtures__/perceptual/trace-parity-oracle.ts` serialises the whole trace
+result canonically: every `ColoredPath` field including `curves`, object keys sorted, numbers in
+their round-trip decimal form with `-0` kept distinct, and array and path order kept. It hashes the
+text with SHA-256. The corpus is the five perceptual fixtures, seeded uniform noise at 192² and
+1024², seeded value noise at 1024² (cell 3, seed 7) and, from the lab folder outside the
+repository, the owl and the hummingbird, each in Line Art, Photo shading, Centerline, Edge
+Detection, Smooth and Sharp (60 cases). `trace-parity-oracle.test.ts` compares the hashes with a
+base file recorded from the untouched base commit (952fb13e3). It runs only with
+`TRACE_PARITY=1`; the real art and the 1024² noise also need `TRACE_PARITY_HEAVY=1`.
+
+Proof that the gate works:
+
+- It passes on the unchanged code: the 36 light cases passed twice, and all 60 cases were recorded.
+- A fitted ring whose cubics are no longer registered, so that its curves fall back to straight
+  segments, fails 4 cases: noise192 in Line Art, Edge Detection, Smooth and Sharp.
+- Reversing the order of the corner Set in `contour-trace.ts` (the union of bend corners and feature
+  anchors) still passes all 36 light cases. That Set is only used to test membership, so its order
+  is not part of the output.
+- `trace-parity-canonical.test.ts` checks that the hash changes when paths are reordered, a curve
+  is dropped, a point moves by one ulp, `0` becomes `-0`, or a typed array is permuted.
+
+**Alternating bench.** `scripts/trace-bench.mjs` bundles the tracer of two source trees into two
+independent modules, loaded in one process. The trees can be two worktrees, or a detached
+worktree of a commit. Each round alternates which side runs first. The script reports best of N,
+the median, the new/base ratio, and whether both sides produced the same canonical hash. An A/A
+run (the same code on both sides, best of 3, machine under load) gave new/base ratios from 0.86
+to 1.33. So a claimed speed-up needs at least 5 alternating rounds, and must show in the best and
+in the median.
+
+**Trace independence (the 187-against-69 question).** The speed study saw owl Line Art's first
+repair round report 187 conflicts after a noise trace in the same process, and 69 in a fresh
+process. Findings:
+
+- Neither the base nor tl-geometry-core has trace state at module level in the contour, topology
+  or finishing path. Every topology cache (membership, contacts, measurements, nesting relations,
+  pair cache) is created inside `preserveContourTopologySteps` for each trace. The only
+  module-level tables are WeakMaps keyed by arrays that each trace allocates for itself: the
+  fitted-ring curves in `trace-curves.ts` and the landmark grid in `centerline/point-grid.ts`.
+  Their entries cannot be reached from a later trace. The remaining module-level value,
+  `tracerPromise`, is a loader.
+- The two rows came from the geometry-core worktree at 841d2e49a, which also carried another
+  agent's uncommitted edits, measured through a `vi.mock` probe. The 69 row was written by a later
+  version of that probe (it has fields the 187 row lacks), so it comes from a separate run.
+  "Same final loops" compared only the loop count, not the output.
+- On this base the effect does not reproduce. Owl in Line Art gives the same hash and the same
+  conflicts in every round (310, 36, 26, 17, 12, 1, 1, 0) fresh, after noise192, after the
+  hummingbird, and traced twice in a row. Owl in Sharp gives the same (329, 8, 5, 2, 2, 2, 0)
+  fresh and after noise192. The oracle's owl hashes match as well, although there the owl runs
+  after ten traces of other images.
+- `src/core/trace/trace-independence.test.ts` keeps this true. It traces a seeded noise image in a
+  fresh module instance, then again after Sharp, Centerline and Smooth traces of other images, and
+  twice in a row, in all six presets. It requires the same hash every time and, in the four presets
+  that run the topology repair (Line Art, Edge Detection, Smooth and Sharp), the same conflicts in
+  every round. Photo shading and Centerline run no repair rounds.
+- Nothing accumulates across traces in one process, as it would in the long-lived trace worker.
+  Twenty light Line Art traces in one process (five fixtures alternating with noise192, twice
+  round) keep the heap live after a forced GC flat: noise192 rows go from 56.8 to 57.5 MB and the
+  others from 44.1 to 46.6 MB, settling after the first few traces, with every hash unchanged.
+  Owl traced twice keeps 83.9 then 84.1 MB.
+
+No code change was needed, and none was made. The 187 against 69 difference is put down to
+measuring different code, not to state leaking between traces.
