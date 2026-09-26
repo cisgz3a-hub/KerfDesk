@@ -11,8 +11,10 @@
 // fit's (centerline/curve-fit-error.ts). Pure core, deterministic.
 
 import { chordParameterize, solveTangentArms, type CubicBezier } from '../geometry/cubic-fit';
+import { hypot2 } from '../geometry/fast-hypot';
 import type { Vec2 } from '../scene';
-import { orthogonalError, reverseError } from './centerline/curve-fit-error';
+import { orthogonalError } from './centerline/curve-fit-error';
+import { projectSpan, reverseSpan } from './compact-curve-project';
 import { cubicSelfIntersects } from './compact-curve-shape';
 
 // Newton reparameterization passes per span; a pass that does not lower the
@@ -52,13 +54,17 @@ export type SpanFit = {
  *  pass off by more than `giveUpAbove` (by default
  *  {@link FIRST_PASS_GIVE_UP} times `missAbove`) skips the Newton passes.
  *  Such a fit is marked incomplete: its error already exceeds `missAbove`
- *  and its cubic is not to be drawn. */
+ *  and its cubic is not to be drawn. With `decisionOnly` (the merge, which
+ *  only asks whether a span fits) the curve-to-chain check also stops once
+ *  it passes `missAbove`; a caller that splits at the worst point needs the
+ *  whole check. */
 export function fitSpan(
   span: ReadonlyArray<Vec2>,
   tStart: Vec2,
   tEnd: Vec2,
   missAbove = Infinity,
   giveUpAbove = FIRST_PASS_GIVE_UP * missAbove,
+  decisionOnly = false,
 ): SpanFit {
   const u = chordParameterize(span, 0, span.length - 1);
   const screened = screenFirstPass(span, u, tStart, tEnd, giveUpAbove);
@@ -66,8 +72,12 @@ export function fitSpan(
   const fit = bestPass(span, u, tStart, tEnd, giveUpAbove);
   if (fit.gaveUp || fit.error > missAbove) return missed(span, fit.cubic, fit.error, fit.index);
   // The curve-to-chain check runs once, on the pass kept: it rejects a loop
-  // or bulge that slips between the data points.
-  const reverse = reverseError(span, fit.cubic, fit.params);
+  // or bulge that slips between the data points. A caller that only needs
+  // the decision stops it once it is past `missAbove`: the cubic is rejected
+  // whatever the rest of the check finds.
+  const stopAbove = decisionOnly ? missAbove : Infinity;
+  const reverse = reverseSpan(span, fit.cubic, fit.params, stopAbove);
+  if (reverse.stopped) return missed(span, fit.cubic, reverse.error, fit.index);
   // A cubic that loops or cusps is never an outline, however close it runs.
   const loops = cubicSelfIntersects(fit.cubic);
   return {
@@ -83,12 +93,19 @@ type Pass = {
   readonly cubic: CubicBezier;
   readonly error: number;
   readonly index: number;
-  readonly params: number[];
+  readonly params: Float64Array;
 };
+
+// Two parameter buffers, reused by every span pass (the fit is synchronous
+// and never re-entered); they only grow.
+let bufferA = new Float64Array(256);
+let bufferB = new Float64Array(256);
 
 // The first pass at chord parameters, then Newton reparameterization passes
 // while they lower the error; the best pass is kept. A first pass beyond
-// `giveUpAbove` is returned at once, marked given up.
+// `giveUpAbove` stops at once, marked given up. A later pass stops as soon as
+// it reaches the best error so far: it can then neither become the best nor
+// improve, which ends the passes anyway.
 function bestPass(
   span: ReadonlyArray<Vec2>,
   chordParams: ReadonlyArray<number>,
@@ -96,22 +113,29 @@ function bestPass(
   tEnd: Vec2,
   giveUpAbove: number,
 ): Pass & { readonly gaveUp: boolean } {
-  let u = chordParams;
+  if (bufferA.length < span.length) {
+    bufferA = new Float64Array(span.length * 2);
+    bufferB = new Float64Array(span.length * 2);
+  }
+  let u: ArrayLike<number> = chordParams;
+  let out = bufferA;
+  let spare = bufferB;
   let best: Pass | null = null;
   for (let pass = 0; pass <= MAX_REPARAM_PASSES; pass += 1) {
     const cubic = armCubic(span, u, tStart, tEnd);
-    const projected = orthogonalError(span, cubic, u);
-    const current = {
-      cubic,
-      error: projected.error,
-      index: projected.index,
-      params: projected.params,
-    };
-    if (pass === 0 && projected.error > giveUpAbove) return { ...current, gaveUp: true };
+    const bound = best === null ? giveUpAbove : best.error;
+    const projected = projectSpan(span, cubic, u, out, bound, best !== null);
+    if (best === null && projected.stopped) {
+      return { cubic, error: projected.error, index: projected.index, params: out, gaveUp: true };
+    }
+    if (projected.stopped) break;
     const improved = best === null || projected.error < best.error - MIN_PASS_GAIN_PX;
-    if (best === null || projected.error < best.error) best = current;
+    if (best === null || projected.error < best.error) {
+      best = { cubic, error: projected.error, index: projected.index, params: out };
+      [out, spare] = [spare, out];
+    }
     if (!improved || span.length <= 2) break;
-    u = projected.params;
+    u = (best as Pass).params;
   }
   return { ...(best as Pass), gaveUp: false };
 }
@@ -174,13 +198,13 @@ function screenFirstPass(
 // degeneracy guard.
 function armCubic(
   span: ReadonlyArray<Vec2>,
-  u: ReadonlyArray<number>,
+  u: ArrayLike<number>,
   t1: Vec2,
   t2: Vec2,
 ): CubicBezier {
   const p0 = span[0] as Vec2;
   const p3 = span.at(-1) as Vec2;
-  const chord = Math.hypot(p3.x - p0.x, p3.y - p0.y);
+  const chord = hypot2(p3.x - p0.x, p3.y - p0.y);
   const arms = solveTangentArms(span, 0, span.length - 1, u, t1, t2);
   let a = arms.start;
   let b = arms.end;
@@ -212,9 +236,9 @@ function pointToSegment(p: Vec2, a: Vec2, b: Vec2): number {
   const vx = b.x - a.x;
   const vy = b.y - a.y;
   const lenSq = vx * vx + vy * vy;
-  if (lenSq < NEAR_ZERO) return Math.hypot(p.x - a.x, p.y - a.y);
+  if (lenSq < NEAR_ZERO) return hypot2(p.x - a.x, p.y - a.y);
   const t = Math.max(0, Math.min(1, ((p.x - a.x) * vx + (p.y - a.y) * vy) / lenSq));
-  return Math.hypot(p.x - (a.x + t * vx), p.y - (a.y + t * vy));
+  return hypot2(p.x - (a.x + t * vx), p.y - (a.y + t * vy));
 }
 
 // ——— tangents on a ring ———
@@ -236,7 +260,7 @@ export function walkRing(
     if (i === limit) break;
     const a = ring[mod(i, n)] as Vec2;
     const b = ring[mod(i + direction, n)] as Vec2;
-    const seg = Math.hypot(b.x - a.x, b.y - a.y);
+    const seg = hypot2(b.x - a.x, b.y - a.y);
     if (seg >= remaining && seg > 0) {
       const t = remaining / seg;
       return { x: a.x + (b.x - a.x) * t, y: a.y + (b.y - a.y) * t };
@@ -282,8 +306,8 @@ function sub(a: Vec2, b: Vec2): Vec2 {
 }
 
 function unit(v: Vec2, fallback: Vec2): Vec2 {
-  const len = Math.hypot(v.x, v.y);
+  const len = hypot2(v.x, v.y);
   if (len > NEAR_ZERO) return { x: v.x / len, y: v.y / len };
-  const fl = Math.hypot(fallback.x, fallback.y);
+  const fl = hypot2(fallback.x, fallback.y);
   return fl > NEAR_ZERO ? { x: fallback.x / fl, y: fallback.y / fl } : { x: 1, y: 0 };
 }

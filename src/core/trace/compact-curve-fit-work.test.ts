@@ -9,6 +9,7 @@ import { describe, expect, it, vi } from 'vitest';
 import type { CubicBezier } from '../geometry/cubic-fit';
 import type { Vec2 } from '../scene';
 import type * as CurveFitError from './centerline/curve-fit-error';
+import type * as CurveProject from './compact-curve-project';
 import { fitCompactRing } from './compact-curve-fit';
 
 const work = { points: 0 };
@@ -21,9 +22,22 @@ vi.mock('./centerline/curve-fit-error', async (importOriginal) => {
       work.points += run.length;
       return real.orthogonalError(run, cubic, u);
     },
-    reverseError: (run: ReadonlyArray<Vec2>, cubic: CubicBezier, params: ReadonlyArray<number>) => {
-      work.points += run.length;
-      return real.reverseError(run, cubic, params);
+  };
+});
+
+// The span passes run on the allocation-free kernels (a pass that stops
+// early still counts its whole span here).
+vi.mock('./compact-curve-project', async (importOriginal) => {
+  const real = await importOriginal<typeof CurveProject>();
+  return {
+    ...real,
+    projectSpan: (...args: Parameters<typeof CurveProject.projectSpan>) => {
+      work.points += args[0].length;
+      return real.projectSpan(...args);
+    },
+    reverseSpan: (...args: Parameters<typeof CurveProject.reverseSpan>) => {
+      work.points += args[0].length;
+      return real.reverseSpan(...args);
     },
   };
 });

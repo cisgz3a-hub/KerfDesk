@@ -8,6 +8,7 @@
 //
 // Pure core — no I/O, no globals, deterministic.
 
+import { hypot2 } from './fast-hypot';
 import type { Vec2 } from '../scene';
 
 export type CubicBezier = {
@@ -260,7 +261,7 @@ export function solveTangentArms(
   points: ReadonlyArray<Vec2>,
   first: number,
   last: number,
-  u: ReadonlyArray<number>,
+  u: ArrayLike<number>,
   t1: Vec2,
   t2: Vec2,
 ): { readonly start: number; readonly end: number } {
@@ -367,7 +368,7 @@ export function chordParameterize(
   for (let i = first + 1; i <= last; i += 1) {
     const a = points[i - 1] as Vec2;
     const b = points[i] as Vec2;
-    u.push((u[u.length - 1] as number) + Math.hypot(b.x - a.x, b.y - a.y));
+    u.push((u[u.length - 1] as number) + hypot2(b.x - a.x, b.y - a.y));
   }
   const total = u[u.length - 1] as number;
   if (total <= 0) return u.map((_, i) => i / Math.max(1, u.length - 1));

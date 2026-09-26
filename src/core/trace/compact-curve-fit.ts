@@ -29,6 +29,7 @@
 // except such chords, and exactly G1 where two cubics meet. A cubic that
 // crosses itself is never emitted. Pure core, deterministic.
 
+import { hypot2 } from '../geometry/fast-hypot';
 import type { CurveSubpath, PathSegment, Vec2 } from '../scene';
 import { chordSpanFit, fitSpan, mod, ringTangent, type SpanFit } from './compact-curve-span';
 
@@ -126,7 +127,12 @@ function fitSection(ctx: Context, section: Section): PathSegment[] {
   proposeJoints(ctx, section.from, section.to, tangents, rules, at, 0);
   at.push(section.to);
   const joints = jointsOf(at, tangents, (t) => t === 0 || t === at.length - 1);
-  const evaluate = cachedEvaluator(ctx, joints, (t, k) => t * (at.length + 1) + k);
+  const evaluate = cachedEvaluator(
+    ctx,
+    joints,
+    at.length * SLOTS_PER_JOINT,
+    (t, k) => t * SLOTS_PER_JOINT + k,
+  );
   const plan = fewestSegments(joints, evaluate, 0, at.length - 1, options.tolerance);
   return emit(plan.steps, evaluate, options.tolerance);
 }
@@ -156,7 +162,12 @@ function fitCornerlessRing(ctx: Context): CurveSubpath {
   for (const i of at) tangents.set(i + n, tangents.get(i) as Vec2);
   tangents.set(2 * n, tangents.get(0) as Vec2);
   const joints = jointsOf(unrolled, tangents, () => false);
-  const evaluate = cachedEvaluator(ctx, joints, (t, k) => (t % m) * (m + 1) + k);
+  const evaluate = cachedEvaluator(
+    ctx,
+    joints,
+    m * SLOTS_PER_JOINT,
+    (t, k) => (t % m) * SLOTS_PER_JOINT + k,
+  );
   let best: Plan | null = null;
   const trials = Math.min(m, MAX_SEAM_TRIALS);
   for (let q = 0; q < trials; q += 1) {
@@ -262,22 +273,43 @@ function jointsOf(
 
 // ——— span evaluation ———
 
-type Evaluate = (t: number, k: number) => Evaluation;
+type Evaluate = {
+  /** The span's error (Infinity for a miss). */
+  readonly error: (t: number, k: number) => number;
+  /** The full evaluation of a span a plan can use. */
+  readonly full: (t: number, k: number) => Evaluation;
+};
 
+const SLOTS_PER_JOINT = MAX_MERGE_PIECES + 1;
+
+// Each span is evaluated once per joint set. `slot(t, k)` numbers the spans
+// (k <= MAX_MERGE_PIECES); the error of every evaluated span lives in a flat
+// array, and the full evaluation is kept only for spans a plan can use (a
+// single piece, or one within the tolerance), which bounds the memory a long
+// ring's merge holds.
 function cachedEvaluator(
   ctx: Context,
   joints: Joints,
-  key: (t: number, k: number) => number,
+  slots: number,
+  slot: (t: number, k: number) => number,
 ): Evaluate {
-  const cache = new Map<number, Evaluation>();
-  return (t, k) => {
-    const id = key(t, k);
-    const hit = cache.get(id);
+  const errors = new Float64Array(slots).fill(Number.NaN);
+  const kept = new Map<number, Evaluation>();
+  const tolerance = ctx.options.tolerance;
+  const full = (t: number, k: number): Evaluation => {
+    const id = slot(t, k);
+    const hit = kept.get(id);
     if (hit !== undefined) return hit;
     const evaluation = evaluateSpan(ctx, joints, t, k);
-    cache.set(id, evaluation);
+    errors[id] = evaluation.error;
+    if (k === 1 || evaluation.error <= tolerance) kept.set(id, evaluation);
     return evaluation;
   };
+  const error = (t: number, k: number): number => {
+    const known = errors[slot(t, k)] as number;
+    return Number.isNaN(known) ? full(t, k).error : known;
+  };
+  return { error, full };
 }
 
 function evaluateSpan(ctx: Context, joints: Joints, t: number, k: number): Evaluation {
@@ -299,7 +331,9 @@ function evaluateSpan(ctx: Context, joints: Joints, t: number, k: number): Evalu
   const fit =
     (k === 1 ? ctx.pieces.get(pieceKey(ctx.ring.length, from, to)) : undefined) ??
     lineSpanFit(span, tStart, tEnd, startCorner, endCorner, tolerance) ??
-    fitSpan(span, tStart, negate(tEnd), k === 1 ? Infinity : tolerance);
+    (k === 1
+      ? fitSpan(span, tStart, negate(tEnd))
+      : fitSpan(span, tStart, negate(tEnd), tolerance, undefined, true));
   const cubicError = fit.complete ? fit.cubicError : Infinity;
   const lineOk = lineMeetsJoints(span, tStart, tEnd, startCorner, endCorner);
   return { ...fit, cubicError, lineOk, error: Math.min(cubicError, fit.lineError) };
@@ -316,7 +350,7 @@ function lineMeetsJoints(
 ): boolean {
   const a = span[0] as Vec2;
   const b = span.at(-1) as Vec2;
-  const len = Math.hypot(b.x - a.x, b.y - a.y);
+  const len = hypot2(b.x - a.x, b.y - a.y);
   if (len < NEAR_POINT_PX) return false;
   const dx = (b.x - a.x) / len;
   const dy = (b.y - a.y) / len;
@@ -343,9 +377,9 @@ function fewestSegments(
   maxPieces = MAX_MERGE_PIECES,
 ): Plan {
   const size = last - first;
-  const count = new Array<number>(size + 1).fill(Infinity);
-  const cost = new Array<number>(size + 1).fill(Infinity);
-  const back = new Array<number>(size + 1).fill(0);
+  const count = new Float64Array(size + 1).fill(Infinity);
+  const cost = new Float64Array(size + 1).fill(Infinity);
+  const back = new Int32Array(size + 1);
   count[0] = 0;
   cost[0] = 0;
   for (let i = 0; i < size; i += 1) {
@@ -355,10 +389,10 @@ function fewestSegments(
       const piece = joints.sign[first + i + k - 1] as number;
       if (piece !== 0 && sign !== 0 && piece !== sign) break;
       if (piece !== 0) sign = piece;
-      const evaluation = evaluate(first + i, k);
-      if (k > 1 && evaluation.error > tolerance) break;
+      const error = evaluate.error(first + i, k);
+      if (k > 1 && error > tolerance) break;
       const nextCount = (count[i] as number) + 1;
-      const nextCost = (cost[i] as number) + evaluation.error ** 2;
+      const nextCost = (cost[i] as number) + error ** 2;
       if (improves(nextCount, nextCost, count[i + k] as number, cost[i + k] as number)) {
         count[i + k] = nextCount;
         cost[i + k] = nextCost;
@@ -368,8 +402,9 @@ function fewestSegments(
   }
   const steps: Step[] = [];
   for (let j = size; j > 0; j -= back[j] as number) {
-    steps.unshift({ t: first + j - (back[j] as number), k: back[j] as number });
+    steps.push({ t: first + j - (back[j] as number), k: back[j] as number });
   }
+  steps.reverse();
   return { count: count[size] as number, cost: cost[size] as number, steps };
 }
 
@@ -387,7 +422,7 @@ function better(plan: Plan, best: Plan): boolean {
 // tilted joints) is the straight chord when that is closer.
 function emit(steps: ReadonlyArray<Step>, evaluate: Evaluate, tolerance: number): PathSegment[] {
   return steps.map(({ t, k }) => {
-    const fit = evaluate(t, k);
+    const fit = evaluate.full(t, k);
     const line =
       (fit.lineOk && fit.lineError <= tolerance) ||
       (fit.cubicError > tolerance && fit.lineError < fit.cubicError);
@@ -419,7 +454,7 @@ function farthestFrom(ring: ReadonlyArray<Vec2>, index: number): number {
   let best = Math.floor(ring.length / 2);
   let bestDistance = -1;
   ring.forEach((p, i) => {
-    const d = Math.hypot(p.x - origin.x, p.y - origin.y);
+    const d = hypot2(p.x - origin.x, p.y - origin.y);
     if (d > bestDistance) {
       bestDistance = d;
       best = i;
@@ -437,7 +472,7 @@ function distinctRing(points: ReadonlyArray<Vec2>, corners: ReadonlySet<Vec2>): 
   const out: Vec2[] = [];
   for (const p of points) {
     const last = out.at(-1);
-    if (last !== undefined && Math.hypot(last.x - p.x, last.y - p.y) < NEAR_POINT_PX) {
+    if (last !== undefined && hypot2(last.x - p.x, last.y - p.y) < NEAR_POINT_PX) {
       if (corners.has(p) && !corners.has(last)) out[out.length - 1] = p;
       continue;
     }
@@ -446,7 +481,7 @@ function distinctRing(points: ReadonlyArray<Vec2>, corners: ReadonlySet<Vec2>): 
   const first = out[0];
   const last = out.at(-1);
   if (first !== undefined && last !== undefined && out.length > 1) {
-    if (Math.hypot(last.x - first.x, last.y - first.y) < NEAR_POINT_PX) {
+    if (hypot2(last.x - first.x, last.y - first.y) < NEAR_POINT_PX) {
       if (corners.has(last) && !corners.has(first)) out[0] = last;
       out.pop();
     }
