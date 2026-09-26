@@ -6,9 +6,14 @@ import type { BoundaryMode } from './region-enhance-trace';
 export function useTracePreset(
   machineKind: 'laser' | 'cnc',
   setBoundaryMode: (mode: BoundaryMode) => void,
+  initialPreset?: string,
 ): { readonly preset: string; readonly selectPreset: (next: string) => void } {
+  // A Re-trace opens on the preset recorded with the trace (ADR-408). Otherwise
+  // CNC opens on Smooth, the preset that traces cleanly on a router. It is a
+  // starting selection, not a restriction — every preset stays selectable.
   const [preset, setPreset] = useState<string>(
-    machineKind === 'cnc' ? CNC_TRACE_PRESET_NAME : DEFAULT_TRACE_PRESET_NAME,
+    () =>
+      initialPreset ?? (machineKind === 'cnc' ? CNC_TRACE_PRESET_NAME : DEFAULT_TRACE_PRESET_NAME),
   );
   return {
     preset,

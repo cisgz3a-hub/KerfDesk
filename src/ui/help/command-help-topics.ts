@@ -255,7 +255,8 @@ export const COMMAND_HELP: Readonly<Record<CommandId, CommandHelpTopic>> = {
   },
   'arrange.break-apart': {
     family: 'arrange',
-    tooltip: 'Split selected imported SVG paths into separate selectable objects.',
+    tooltip:
+      'Split selected imported SVG paths into separate objects. A trace splits into one object per shape, each keeping its holes.',
   },
   'arrange.array': {
     family: 'arrange',

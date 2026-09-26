@@ -188,16 +188,21 @@ describe('parseSvg initial fill', () => {
     expect(result.object?.paths[0]?.polylines).toHaveLength(1);
   });
 
-  it('rejects unsupported vector clipping instead of silently importing unclipped artwork', () => {
-    expect(() =>
-      parseSvg(
-        args(
-          svg(`<style>.clipped { clip-path: url(#c) }</style>
+  it('clips vector artwork through a stylesheet clip-path rule instead of importing it unclipped', () => {
+    // ADR-358 Amendment 2: the line stops at the clip's edge.
+    const result = parseSvg(
+      args(
+        svg(`<style>.clipped { clip-path: url(#c) }</style>
             <clipPath id="c"><rect width="20" height="10"/></clipPath>
             <g class="clipped"><path stroke="#ff0000" d="M0 5 L30 5"/></g>`),
-        ),
       ),
-    ).toThrow(/vector clipping is not supported/i);
+    );
+    expect(result.object?.paths[0]?.polylines.map((line) => line.points)).toEqual([
+      [
+        { x: 0, y: 5 },
+        { x: 20, y: 5 },
+      ],
+    ]);
   });
 });
 

@@ -10,6 +10,12 @@
 //     ...
 //   </svg>
 //
+// Line trace modes (Centerline and Edge Detection) commit as LINE layers, so
+// every one of their polylines, closed or open, is stroked rather than filled.
+// Strokes are hairlines (vector-effect="non-scaling-stroke"): a burned line's
+// width is the beam's kerf, not a fraction of the source image, so zooming the
+// preview must not thicken it over the detail being inspected (ADR-407).
+//
 // One <path> per ColoredPath; subpaths within a path are concatenated
 // in the same `d` attribute, separated by `M` move commands. Closed
 // polylines end with `Z`. Numbers are rounded to 2 decimals — the
@@ -64,17 +70,23 @@ function svgOpen(width: number, height: number, physicalSize?: SvgPhysicalSize):
   );
 }
 
+// Mirrors the commit's layer-mode policy (scene-mutations): these trace modes
+// become LINE layers, whose closed rings burn as outlines, never as fills.
+function isLineTraceMode(traceMode: TraceOptions['traceMode']): boolean {
+  return traceMode === 'centerline' || traceMode === 'edge';
+}
+
 function coloredPathToSvgPath(path: ColoredPath, traceMode: TraceOptions['traceMode']): string {
   if (!isVisibleColor(path.color)) return '';
-  const closedVisible =
-    traceMode === 'centerline' ? isVisibleStrokedPolyline : isVisibleClosedPolyline;
+  const lineMode = isLineTraceMode(traceMode);
+  const closedVisible = lineMode ? isVisibleStrokedPolyline : isVisibleClosedPolyline;
   const closed = path.polylines.filter((pl) => pl.closed && closedVisible(pl));
   const open = path.polylines.filter((pl) => !pl.closed && isVisibleStrokedPolyline(pl));
-  // A closed Centerline is still a line operation; closure does not imply fill.
-  const closedSvg =
-    traceMode === 'centerline'
-      ? strokedPolylinesToSvgPath(path.color, closed)
-      : closedPolylinesToSvgPath(path.color, closed);
+  // A closed Centerline or Edge ring is still a line operation; closure does
+  // not imply fill.
+  const closedSvg = lineMode
+    ? strokedPolylinesToSvgPath(path.color, closed)
+    : closedPolylinesToSvgPath(path.color, closed);
   const openSvg = strokedPolylinesToSvgPath(path.color, open);
   return `${closedSvg}${openSvg}`;
 }
@@ -100,7 +112,7 @@ function strokedPolylinesToSvgPath(
   if (d === '') return '';
   return (
     `<path d="${d}" fill="none" stroke="${color}" stroke-width="1"` +
-    ' stroke-linecap="round" stroke-linejoin="round"/>'
+    ' stroke-linecap="round" stroke-linejoin="round" vector-effect="non-scaling-stroke"/>'
   );
 }
 
@@ -122,7 +134,7 @@ function polylineToSubPath(polyline: ColoredPath['polylines'][number]): string {
 function isVisibleColoredPath(path: ColoredPath, traceMode: TraceOptions['traceMode']): boolean {
   if (!isVisibleColor(path.color)) return false;
   return path.polylines.some((polyline) =>
-    polyline.closed && traceMode !== 'centerline'
+    polyline.closed && !isLineTraceMode(traceMode)
       ? isVisibleClosedPolyline(polyline)
       : isVisibleStrokedPolyline(polyline),
   );

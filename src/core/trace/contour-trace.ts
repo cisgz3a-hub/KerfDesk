@@ -26,10 +26,17 @@ import {
   type CrackSubPixelField,
 } from './contour-boundary';
 import { fairChainSegments } from './fair-chain';
+import {
+  CONNECT_PAPER_AT_SADDLES,
+  createSaddleResolver,
+  normalizeTurnPolicy,
+  type TurnPolicy,
+} from './saddle-connectivity';
 import { fitCubicsThroughPoints } from './fit-cubics';
 import { flattenStraightRuns } from './flatten-straight-runs';
 import { smoothArcNoise } from './smooth-arc-noise';
 import { fittedTraceRing, withCanonicalTraceCurves } from './trace-curves';
+import { optimizationToleranceScaleFromOptimize } from './trace-optimize';
 import { contourFeatureAnchors } from './contour-feature-anchors';
 import { contourTraceInputMatches, type ContourTraceInput } from './contour-input';
 import {
@@ -97,8 +104,6 @@ const FIT_TOLERANCE_PX = 0.35;
 const FIT_TOLERANCE_ORGANIC_PX = 0.55;
 // Neutral Smoothness when the dialog value is absent or non-finite.
 const DEFAULT_SMOOTHNESS = 1;
-const DEFAULT_OPTIMIZE = 0.2;
-const OPTIMIZE_TOLERANCE_SLOPE = 0.75;
 
 /** The dialog's Smoothness knob doubles as the wobble-flattening / arc-
  *  evening strength. Default ON at the conservative 1px amplitude cap — the
@@ -116,12 +121,9 @@ export function flattenStrengthFromSmoothness(smoothness: number | undefined): n
   return Math.max(0, 6 * s - 5);
 }
 
-/** Optimize scales geometry tolerances around the established neutral 0.2. */
-export function optimizationToleranceScaleFromOptimize(optimize: number | undefined): number {
-  const value = Number.isFinite(optimize) ? (optimize as number) : DEFAULT_OPTIMIZE;
-  const bounded = Math.min(2, Math.max(0, value));
-  return Math.max(0.25, 1 + (bounded - DEFAULT_OPTIMIZE) * OPTIMIZE_TOLERANCE_SLOPE);
-}
+/** Optimize scales geometry tolerances around the established neutral 0.2
+ *  (shared with the edge and centerline finishers). */
+export { optimizationToleranceScaleFromOptimize };
 
 /** Trace filled ink regions as smooth closed outlines (holes stay hollow
  *  via even-odd filling downstream). */
@@ -159,6 +161,7 @@ export function* traceImageToContourColoredPathsSteps(
     fitToleranceScale: toleranceScale,
     flattenStrength: flattenStrengthFromSmoothness(options.smoothness),
     pixelScale: scale,
+    turnPolicy: normalizeTurnPolicy(options.turnPolicy),
     ...(crackField === null ? {} : { crackField }),
   });
   return polylines.length === 0
@@ -180,6 +183,9 @@ export type ContourFinishOptions = {
   /** Pre-threshold field for sub-pixel crack interpolation; omitted = plain
    *  mid-crack vertices (binary-only callers like the edge lane). */
   readonly crackField?: CrackSubPixelField;
+  /** Saddle policy (ADR-403), matching the one the mask cleanup used.
+   *  Omitted = the historical rule (ink four-connected), as the edge lane. */
+  readonly turnPolicy?: TurnPolicy;
 };
 
 /** Finish a binary ink mask into smooth closed outlines — the shared
@@ -209,7 +215,11 @@ export function* contourPolylinesFromMaskSteps(
     crackField: options.crackField,
   };
   const contours: FinishedContour[] = [];
-  for (const loop of traceBoundaryLoops(mask)) {
+  const saddles =
+    options.turnPolicy === undefined
+      ? CONNECT_PAPER_AT_SADDLES
+      : createSaddleResolver(mask, options.turnPolicy, options.crackField, pixelScale);
+  for (const loop of traceBoundaryLoops(mask, saddles)) {
     if (cooperate) yield;
     // Area-based speckle gate — the boundary walker sees paper holes the ink
     // despeckle never touched, so both loop polarities are filtered here.

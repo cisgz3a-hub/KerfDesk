@@ -10,8 +10,8 @@ function fineMarks(reflected: boolean): RawImageData {
   const ink = (x: number, y: number): void => {
     data.set([0, 0, 0, 255], (y * width + (reflected ? width - 1 - x : x)) * 4);
   };
-  // A thin diagonal is a coherent visual line, but every pixel is a separate
-  // component under four-connectivity. Include short detached hatch marks too.
+  // A thin diagonal is a coherent visual line (one component under the
+  // contour saddle policy). Include short detached hatch marks too.
   for (let i = 0; i < 24; i += 1) ink(10 + i, 10 + i);
   for (let length = 1; length <= 3; length += 1) {
     for (let x = 0; x < length; x += 1) ink(10 + length * 10 + x, 45);
@@ -39,9 +39,20 @@ describe('Sharp fine source marks', () => {
 
   it('still lets the operator remove these marks explicitly', async () => {
     const source = fineMarks(false);
-    const paths = await traceImageToColoredPaths(source, {
+    // Ignore 4 removes the detached 1-3px hatch marks. The 24-pixel diagonal
+    // is ONE component under the contour saddle policy (ADR-403), so it
+    // survives as one outline instead of being erased pixel by pixel.
+    const hatchGone = await traceImageToColoredPaths(source, {
       ...TRACE_PRESETS.Sharp!,
       despeckleMinPixels: 4,
+    });
+    const outlines = hatchGone.flatMap((path) => path.polylines);
+    expect(outlines).toHaveLength(1);
+    expect(outlines[0]?.points.every((point) => point.y < 40)).toBe(true);
+    // An Ignore above the diagonal's own area removes it too.
+    const paths = await traceImageToColoredPaths(source, {
+      ...TRACE_PRESETS.Sharp!,
+      despeckleMinPixels: 25,
     });
     expect(paths).toEqual([]);
   });

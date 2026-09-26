@@ -23,7 +23,9 @@ import {
 } from '../../core/scene';
 import type { SaveTarget } from '../../platform/types';
 import {
+  CNC_EXPORT_OTHER_CONTROLLERS_NOTE,
   cncExportControllerAdvisory,
+  cncExportOtherControllersNote,
   cncProjectExportAdvisories,
 } from './cnc-export-controller-advisory';
 import { handleSaveGcode } from './file-actions';
@@ -147,5 +149,46 @@ describe('Save G-code of a CNC project for a controller that cannot run it', () 
       pushToast: toast.pushToast,
     });
     expect(toast.messages.some((m) => /GRBL-family/.test(m.message))).toBe(false);
+  });
+});
+
+// The audit's CNC controller research: owners of PC and stand-alone
+// controllers (Mach3/4, MASSO, UCCNC, Centroid, RepRapFirmware) pick a GRBL
+// profile, since KerfDesk cannot connect to theirs, so only a note on a
+// GRBL-family export reaches them.
+describe('the note for PC and stand-alone controllers', () => {
+  const grbl = { ...catalogProfile('generic-marlin-laser'), controllerKind: 'grbl-v1.1' as const };
+
+  it('names the controllers and both commands on a GRBL profile no controller confirmed', () => {
+    const note = cncExportOtherControllersNote(grbl, null);
+    expect(note).toBe(CNC_EXPORT_OTHER_CONTROLLERS_NOTE);
+    expect(note).toMatch(
+      /MASSO, UCCNC and RepRapFirmware take the G4 P spin-up dwell as milliseconds/,
+    );
+    expect(note).toContain('M0');
+  });
+
+  it('is left out once a connected controller confirmed the profile', () => {
+    const settings = { maxPowerS: 12000, bedWidth: 400, bedHeight: 400, laserModeEnabled: false };
+    expect(cncExportOtherControllersNote(grbl, settings)).toBeNull();
+  });
+
+  it('is left out where the GRBL-family warning already applies', () => {
+    expect(cncExportOtherControllersNote(catalogProfile('generic-marlin-laser'), null)).toBeNull();
+  });
+
+  it('Save G-code of a CNC project on a disconnected GRBL profile shows it as info', async () => {
+    const toast = toasts();
+    const target: SaveTarget = { displayName: 'cn-audit.gcode', write: async () => undefined };
+    await handleSaveGcode({
+      platform: mockPlatform({ save: async () => target }),
+      project: cncProjectFor(grbl),
+      savedName: null,
+      controllerSettings: null,
+      settingsCapability: 'none',
+      pushToast: toast.pushToast,
+    });
+    const notes = toast.messages.filter((m) => m.message === CNC_EXPORT_OTHER_CONTROLLERS_NOTE);
+    expect(notes).toEqual([{ message: CNC_EXPORT_OTHER_CONTROLLERS_NOTE, variant: 'info' }]);
   });
 });

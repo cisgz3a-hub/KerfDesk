@@ -3,7 +3,7 @@
 /* eslint-disable no-restricted-syntax -- the artwork surface and its purple
    trace markers deliberately stay light/material-facing (ADR-047). */
 
-import { useLayoutEffect, useMemo, useRef, useState } from 'react';
+import { useId, useLayoutEffect, useMemo, useRef, useState } from 'react';
 
 import type { TraceBoundary } from '../../core/trace';
 import type { TracePreviewState } from './use-trace-preview';
@@ -11,6 +11,7 @@ import { traceNoticeMessage } from './trace-notices';
 import { useTracePreviewBoundary, type TracePreviewBoundaryProps } from './trace-preview-boundary';
 import { TracePreviewControls, type TracePreviewView } from './trace-preview-controls';
 import { useTracePreviewZoom } from './trace-preview-zoom';
+import { useTracePreviewNavigation } from './trace-preview-navigation';
 import { useTracePreviewImageSpace } from './trace-preview-image-space';
 import { TracePointsOverlay } from './TracePointsOverlay';
 import { TracePreviewLoading } from './TracePreviewLoading';
@@ -30,22 +31,26 @@ export function TracePreview(props: Props): JSX.Element {
   const [selectedView, setSelectedView] = useState<TracePreviewView>('overlay');
   const [isSourceFaded, setIsSourceFaded] = useState(true);
   const [shouldShowPoints, setShouldShowPoints] = useState(false);
-  const { zoom, viewportRef, zoomTo } = useTracePreviewZoom();
+  const view = useTracePreviewZoom(previewImageSize(props));
+  const { zoom, viewportRef } = view;
+  const { panState, isPanGesture } = useTracePreviewNavigation(view);
+  const helpId = useId();
   const hasSource = props.sourceDataUrl !== undefined && props.sourceDataUrl.length > 0;
-  const view = hasSource ? selectedView : 'trace';
+  const comparison = hasSource ? selectedView : 'trace';
   const isLoading = isPreviewLoading(state, props.isRasterizing);
   return (
     <div className="lf-trace-preview">
       <TracePreviewControls
-        view={view}
+        view={comparison}
         hasSource={hasSource}
         hasTrace={state.kind === 'ready'}
         zoom={zoom}
+        zoomRange={view.range}
         hasBoundary={props.boundary !== undefined && props.boundary !== null}
         isSourceFaded={isSourceFaded}
         shouldShowPoints={shouldShowPoints}
         onViewChange={setSelectedView}
-        onZoomChange={zoomTo}
+        onZoomChange={(value) => view.zoomTo(value)}
         onToggleFade={() => setIsSourceFaded((next) => !next)}
         onTogglePoints={() => setShouldShowPoints((next) => !next)}
         onBoundaryClear={props.onBoundaryClear}
@@ -58,13 +63,16 @@ export function TracePreview(props: Props): JSX.Element {
           role="region"
           aria-label="Preview viewport"
           aria-busy={isLoading}
+          aria-describedby={helpId}
+          data-pan={panState}
           tabIndex={0}
-          title="Use the scrollbars, trackpad or arrow keys to move around a zoomed preview."
         >
           <PreviewFrame
             {...props}
             zoom={zoom}
-            view={view}
+            lensRef={view.lensRef}
+            view={comparison}
+            isPanGesture={isPanGesture}
             hasSource={hasSource}
             isSourceFaded={isSourceFaded}
             shouldShowPoints={shouldShowPoints}
@@ -82,9 +90,10 @@ export function TracePreview(props: Props): JSX.Element {
         ) : null}
       </div>
       <PreviewStatus state={state} />
-      <p className="lf-trace-preview__help">
+      <p id={helpId} className="lf-trace-preview__help">
         {props.onBoundaryChange !== undefined ? 'Drag on the image to select a boundary. ' : ''}
-        Scroll to pan when zoomed.
+        Wheel or pinch to zoom; middle-drag, Space+drag or two fingers to pan. Keys: + − zoom, 0
+        Fit, 1 actual size, arrows pan.
       </p>
       {state.kind === 'ready'
         ? state.notices?.map((notice) => (
@@ -97,6 +106,13 @@ export function TracePreview(props: Props): JSX.Element {
   );
 }
 
+// The original image's domain when known, else the trace grid's.
+function previewImageSize(
+  props: Props,
+): { readonly width: number; readonly height: number } | undefined {
+  return props.imageSize ?? (props.state.kind === 'ready' ? props.state : undefined);
+}
+
 function isPreviewLoading(state: TracePreviewState, isRasterizing?: boolean): boolean {
   return state.kind === 'decoding' || state.kind === 'tracing' || isRasterizing === true;
 }
@@ -104,14 +120,16 @@ function isPreviewLoading(state: TracePreviewState, isRasterizing?: boolean): bo
 function PreviewFrame(
   props: Props & {
     readonly zoom: number;
+    readonly lensRef: React.RefObject<HTMLDivElement>;
     readonly view: TracePreviewView;
     readonly hasSource: boolean;
     readonly isSourceFaded: boolean;
     readonly shouldShowPoints: boolean;
+    readonly isPanGesture: () => boolean;
   },
 ): JSX.Element {
-  const { activeBoundary, ...dragHandlers } = useTracePreviewBoundary(props);
-  const imageSize = props.imageSize ?? (props.state.kind === 'ready' ? props.state : undefined);
+  const { activeBoundary, ...dragHandlers } = useTracePreviewBoundary(props, props.isPanGesture);
+  const imageSize = previewImageSize(props);
   const { stageRef, rectangle } = useTracePreviewImageSpace(imageSize, props.zoom);
   return (
     <div
@@ -123,6 +141,7 @@ function PreviewFrame(
       {...dragHandlers}
     >
       <div
+        ref={props.lensRef}
         className="lf-trace-preview__artwork"
         style={rectangle ?? fullStageStyle}
         data-natural-fit={imageSize === undefined}

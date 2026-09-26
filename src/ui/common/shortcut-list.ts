@@ -39,6 +39,7 @@ export function shortcutFamilies(machineKind: MachineKind): ReadonlyArray<Shortc
         { keys: 'Ctrl+E', action: 'ellipse' },
         { keys: 'Ctrl+L', action: 'pen' },
         { keys: 'Alt+M', action: 'measure' },
+        { keys: 'Alt+T', action: 'trace selected image' },
         { keys: 'Ctrl+Shift+B', action: 'convert to bitmap' },
         { keys: 'Enter or double-click', action: 'finish pen' },
         { keys: 'Esc', action: 'cancel' },

@@ -165,14 +165,29 @@ opportunity, without an extra branding delay. It introduces no startup interacti
 3. Unsupported image presentation or clipping reports its reason. Decode failure, Esc cancellation
    and document replacement leave the complete file uninserted and release staged image assets.
 
-#### Edge — SVG with a vector clip
-1. A vector clip that hides none of the artwork imports as if it were absent, such as the frame or
-   artboard rectangle Figma and Illustrator wrap exported content in. KerfDesk accepts it when
-   the clip is one shape in user-space units (SVG's default) with a single convex outline, and
-   every point of the clipped artwork lies inside it (ADR-358 Amendment 1).
-2. Any other vector clip, and every vector mask and filter, still rejects the whole file with its
-   reason, because importing it unclipped could cut what the design hides.
-3. An image clip without `clipPathUnits` is read as `userSpaceOnUse`, the SVG default.
+#### Edge — SVG with a vector clip, mask or filter
+1. Clipped artwork imports as the part its clip keeps (ADR-358 Amendment 2). Filled shapes are
+   intersected with the clip as areas, under their own fill rule. Stroked paths, which are cut as
+   lines, stop at the clip's edge; a line lying on the edge is kept. Artwork wholly outside its
+   clip imports nothing.
+2. Clips are read as SVG defines them: `clipPathUnits` `userSpaceOnUse` (the default) or
+   `objectBoundingBox`, `clip-rule` `nonzero` (the default) or `evenodd`, the clip's own and its
+   shapes' transforms, several shapes, a `<use>` of a shape (as Illustrator exports clipping
+   masks), clips on groups, and nested clips, which intersect.
+3. Artwork a clip keeps whole imports unchanged with its native curves, such as content inside the
+   frame or artboard rectangle Figma and Illustrator wrap exports in (ADR-358 Amendment 1). Where
+   a clip cuts a curve, the kept part is flattened at 0.025 mm, the tolerance job compilation
+   cuts curves at.
+4. A clip KerfDesk cannot read faithfully still rejects the whole file with its reason: a clip made
+   of text (convert the text to paths first), a `<use>` in a clip that refers to anything but a
+   shape, a clip-path that names no `<clipPath>`, clip geometry or transforms set only through
+   CSS, or a clip transform that cannot be read.
+5. Vector masks and filters no longer reject the file. The artwork imports without them, and a
+   warning toast says how many elements were imported without their masks (areas the masks hide
+   are included) or without their filter effects. Masks, filters and opacity on embedded images
+   still reject the file.
+6. Image clips follow the same rules: a missing `clipPathUnits` is `userSpaceOnUse` and a missing
+   `clip-rule` is `nonzero`. KerfDesk's own exported image clips keep their curves.
 
 #### Error — file is not an SVG
 1. On drop, file type is checked by MIME and by content sniff (first 200 bytes).
@@ -987,7 +1002,9 @@ Mac uses `Cmd`, Windows/Linux web uses `Ctrl`.
 - `Cmd/Ctrl+R` - Rectangle
 - `Cmd/Ctrl+E` - Ellipse
 - `Cmd/Ctrl+L` - Line/pen
-- `Alt+M` - Measure
+- `Alt+M` - Measure (Option+M on macOS)
+- `Alt+T` - Trace Image (LightBurn's binding; Option+T on macOS; no-op unless an image is
+  selected)
 - `Cmd/Ctrl+Shift+B` - Convert to Bitmap (LightBurn's binding; no-op unless a
   single convertible vector is selected)
 
@@ -2293,7 +2310,10 @@ Connecting a controller is optional, so a complete setup can be saved offline.
    whole, so a later correction to the preset never reaches that copy; when a saved copy still
    holds a value a correction replaced (the xTool D1 Pro's front-left origin, the Sculpfun S30's
    410 x 400 mm bed), Job Review names the old and corrected values as an advisory (ADR-322
-   Amendment 1). Detected matches are
+   Amendment 1), and Machine Setup shows a **Preset correction** row under Origin with one click
+   to use the corrected value (ADR-322 Amendment 2). Nothing is applied on its own. A preset's
+   content is pinned to its `catalogVersion`, so a preset change has to bump the version. Detected
+   matches are
    prioritised among the remaining profiles and explain their evidence under **Profile details**,
    but generic `$$` values never establish hardware identity: "Possible match" remains the
    ceiling. Controller family, baud, output dialect,
@@ -2535,13 +2555,20 @@ settings and Job Review keep their existing read-only setup references.
    preview budget and the selected preset starts tracing in a worker.
    The large preview and scrollable settings panel sit side by side on wide screens and stack
    on narrow screens, with Cancel and Trace kept in the footer. Compare **Original**, **Trace**,
-   or **Overlay**; use **Fit** and the zoom buttons (up to 16× the fitted view) to inspect detail.
+   or **Overlay**; use **Fit**, **1:1** (one image pixel per CSS pixel) and the zoom buttons
+   to inspect detail, from 1:1 or Fit (whichever is smaller) up to 16× Fit, or 4 screen pixels
+   per image pixel on large images (at most 64× Fit).
    Original shows the unfaded source alone. Overlay highlights the trace in blue over a faded
    source; Trace shows the actual output colours. **Fade Image** starts enabled and applies
    only to Overlay. A centred loading indicator names image preparation, tracing and geometry
    refinement as those stages run, and shows elapsed time. It remains visible while zoomed or
    panned, continues through raster conversion, and disappears on completion or error.
-   Scrollbars, a trackpad, or arrow keys in the preview pan a zoomed image.
+   The mouse wheel, Ctrl+wheel and a trackpad or touch pinch zoom about the pointer. Middle-drag,
+   Space+drag, a trackpad two-finger drag, one or two touch fingers, the scrollbars and the arrow
+   keys pan; plain primary drag still selects a Boundary. With the preview focused (clicking it
+   focuses it), **+** and **−** step the zoom, **0** fits and **1** shows 1:1. Space pans only
+   while no focused button, checkbox or text field needs it. At the smallest zoom a plain
+   wheel-out scrolls the dialog instead.
    **Show Points** displays vector vertices in a bounded viewport canvas. Overlapping markers
    combine at the current zoom; zoom in to separate them. These viewing controls do not
    restart tracing or change the committed geometry. Source, trace and boundary overlays share
@@ -2599,6 +2626,8 @@ settings and Job Review keep their existing read-only setup references.
    supersedes an older result.
    Edge Detection creates closed outlines around dark artwork and locally
    darker detail. Adjacent dark tones may merge into one outline. Centerline follows stroke centres.
+   Both commit as Line layers, so their preview draws every outline and stroke as a hairline that
+   stays one screen pixel wide at any zoom, rather than filling Edge outlines.
    Centerline's separate-end gap bridge uses source-grid distance (preset/default 3 pixels),
    converted once on enlarged working rasters, including Enhance regions. Zero disables that
    gap bridge; true-junction repairs and ring closure keep their existing separate policies.
@@ -2625,6 +2654,10 @@ settings and Job Review keep their existing read-only setup references.
    **Delete Image After trace** starts selected and removes the source bitmap only after a
    successful commit. Uncheck it to retain the bitmap beside the trace for **Re-trace Original**. Cancel, failed tracing,
    and abandoned requests retain the source; Undo reverses the import and source deletion together.
+   The committed trace records the dialog's preset, adjusted settings, output, fill style and
+   boundary, and saves them with the project. **Re-trace Original** reopens the dialog with them
+   and with **Delete Image After trace** cleared, so the source stays for the next re-trace
+   (ADR-408). Traces made before that record reopen on the defaults.
    In a CNC project, smoothing retains established stroke junctions at the
    source image's current physical size. In a laser project, outlines keep the
    tracer's fitted curves and store the chords the job burns within 0.025 mm;
@@ -4106,7 +4139,10 @@ and lifts the command's CNC-only gate.)*
    count becomes the default for material-feed calculations. Every selectable bit shows its
    effective flute count in Startup Setup; changing it there updates the draft bit metadata used by
    the read-only Artwork calculator. Final Save refreshes material-recipe values for operations
-   resolved through that cutter; manual numeric values remain exact.
+   resolved through that cutter; manual numeric values remain exact. A saved copy of a catalog bit
+   that predates a catalog correction offers the corrected value beside its flute count. The Amana
+   O-flute ball-nose bits saved with no flute count offer **Use 1 flute**, and Job Review warns when
+   the job runs such a copy (ADR-322 Amendment 2).
 5. Deleting a custom bit stages its removal from the saved library, open machine, and Tool Plan.
    Final **Save machine setup** commits that removal as the same project undo entry; **Cancel** keeps
    the live library and project unchanged.

@@ -59,29 +59,36 @@ export function refineChainForOutput(
   deviationCapPx = Infinity,
 ): Vec2[] {
   if (points.length < 3) return [...points];
-  const corners = collectCorners(points, closed, drawnCorners);
+  const corners = collectOutputCorners(points, closed, drawnCorners);
   return fitSmoothCurve(points, closed, corners, SAMPLES_PER_SEGMENT, deviationCapPx);
 }
 
-// Corners that break the spline: the sharpener's rebuilt vertices plus any
-// hard turn it never saw. Soft and moderate turns are deliberately NOT
-// corners — the upstream evening already made them genuine curve, so letting
-// the spline flow through them is what removes the facets.
-function collectCorners(
+/** Corners that break the output curve: the sharpener's rebuilt vertices
+ *  plus any hard turn it never saw. Soft and moderate turns are deliberately
+ *  NOT corners — the upstream evening already made them genuine curve, so
+ *  letting the curve flow through them is what removes the facets.
+ *
+ *  `hardCornerRad` is the turn at which an unmarked simplified vertex becomes
+ *  a corner (the tree-wide 60 degrees by default). A drawn corner whose own
+ *  turn is below `drawnCornerMinRad` is released as curve; the default 0
+ *  keeps every drawn corner. Returned vertices are the input objects. */
+export function collectOutputCorners(
   points: ReadonlyArray<Vec2>,
   closed: boolean,
   drawnCorners: ReadonlySet<Vec2>,
+  hardCornerRad = HARD_CORNER_RAD,
+  drawnCornerMinRad = 0,
 ): ReadonlySet<Vec2> {
   const corners = new Set<Vec2>();
   for (let i = 0; i < points.length; i += 1) {
     const p = points[i];
     if (p === undefined) continue;
+    const turn = Math.abs(signedTurnAtIndex(points, i, closed));
     if (drawnCorners.has(p)) {
-      corners.add(p);
+      if (turn >= drawnCornerMinRad) corners.add(p);
       continue;
     }
-    const turn = Math.abs(signedTurnAtIndex(points, i, closed));
-    if (turn < HARD_CORNER_RAD) continue;
+    if (turn < hardCornerRad) continue;
     const continuationRad =
       turn >= NEEDLE_TURN_RAD ? NEEDLE_CONTINUATION_RAD : CURVE_CONTINUATION_RAD;
     if (isFilletContinuation(points, i, closed, continuationRad)) continue;

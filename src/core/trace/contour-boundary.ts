@@ -9,6 +9,15 @@
 
 import type { Vec2 } from '../scene';
 import type { InkMask } from './centerline';
+import {
+  CONNECT_PAPER_AT_SADDLES,
+  SATURATED_BG_LUMA,
+  SATURATED_INK_LUMA,
+  type CrackSubPixelField,
+  type SaddleResolver,
+} from './saddle-connectivity';
+
+export type { CrackSubPixelField } from './saddle-connectivity';
 
 export type BoundaryLoop = {
   /** Closed staircase of lattice-corner points; last point ≠ first. */
@@ -23,31 +32,25 @@ export type BoundaryLoop = {
 const DIR_X = [1, 0, -1, 0] as const;
 const DIR_Y = [0, 1, 0, -1] as const;
 
-/** Extract every closed ink-boundary loop of the mask. */
-export function traceBoundaryLoops(mask: InkMask): BoundaryLoop[] {
+/** Extract every closed ink-boundary loop of the mask. `saddles` decides
+ *  each corner where ink touches only diagonally (saddle-connectivity.ts);
+ *  the default keeps the historical rule (paper joins, ink stays
+ *  4-connected), which non-trace callers such as barcode modules rely on. */
+export function traceBoundaryLoops(
+  mask: InkMask,
+  saddles: SaddleResolver = CONNECT_PAPER_AT_SADDLES,
+): BoundaryLoop[] {
   const edges = collectBoundaryEdges(mask);
   const loops: BoundaryLoop[] = [];
   for (const [start, dirs] of edges) {
     while (dirs.size > 0) {
       const firstDir = dirs.values().next().value;
       if (firstDir === undefined) break;
-      loops.push(walkLoop(mask, edges, start, firstDir));
+      loops.push(walkLoop(mask, edges, start, firstDir, saddles));
     }
   }
   return loops;
 }
-
-/** Pre-threshold grayscale access for sub-pixel crack interpolation. Luma is
- *  in the SAME (gamma-encoded) space the threshold cut is defined in — the
- *  iso-line must match the space of the cut, so no linearization here. The
- *  threshold is a per-position function because the sketch (local-contrast)
- *  binarization cuts at luma = localMean − bias, not at a global constant. */
-export type CrackSubPixelField = {
-  /** Luma at pixel (x,y); out-of-bounds must read as background (255). */
-  readonly lumaAt: (x: number, y: number) => number;
-  /** Ink is luma ≤ thresholdAt(x,y) at that position. */
-  readonly thresholdAt: (x: number, y: number) => number;
-};
 
 // Interpolation clamp: near-flat luma pairs put the crossing arbitrarily
 // close to a pixel centre; clamping keeps one vertex from touching the next
@@ -55,13 +58,11 @@ export type CrackSubPixelField = {
 const SUBPIXEL_T_MIN = 0.1;
 const SUBPIXEL_T_MAX = 0.9;
 const MID_CRACK_T = 0.5;
-// A saturated luma step (paper-white against full ink) contains NO sub-pixel
-// information — the true edge could be anywhere inside the step. Only pairs
-// with a genuine anti-aliasing ramp may move the vertex; without this gate a
+// Saturated luma steps (paper-white against full ink) carry no sub-pixel
+// information, so they stay at the midpoint (thresholds shared with the
+// saddle decider in saddle-connectivity.ts). Without this gate a
 // position-dependent threshold (sketch mode) turns hard binary edges into
 // position noise (measured: jittered-ring roundness 0.25 → 0.33px RMS).
-const SATURATED_BG_LUMA = 250;
-const SATURATED_INK_LUMA = 5;
 
 /** Midpoints of consecutive staircase edges — the dense "mid-crack" chain the
  *  curve-finishing stages consume. Halves the staircase amplitude and turns
@@ -177,7 +178,13 @@ function collectBoundaryEdges(mask: InkMask): EdgeMap {
   return edges;
 }
 
-function walkLoop(mask: InkMask, edges: EdgeMap, startKey: number, startDir: number): BoundaryLoop {
+function walkLoop(
+  mask: InkMask,
+  edges: EdgeMap,
+  startKey: number,
+  startDir: number,
+  saddles: SaddleResolver,
+): BoundaryLoop {
   const stride = mask.width + 1;
   const points: Vec2[] = [];
   let area = 0;
@@ -193,22 +200,36 @@ function walkLoop(mask: InkMask, edges: EdgeMap, startKey: number, startDir: num
     // Shoelace accumulates over the directed edge (x,y)→(nx,ny).
     area += x * ny - nx * y;
     key = ny * stride + nx;
-    dir = nextDirection(edges, key, dir);
+    dir = nextDirection(edges, key, dir, saddles, stride);
   } while (!(key === startKey && dir === startDir) && dir !== -1);
   return { points, area: area / 2 };
 }
 
 // At almost every corner exactly one out-edge remains. Two remain only at a
-// "saddle" (two diagonally-touching ink pixels): prefer the RIGHT turn, which
-// hugs the ink we are already tracing and keeps diagonal blobs as separate
-// loops instead of welding them through the corner.
-function nextDirection(edges: EdgeMap, key: number, incomingDir: number): number {
+// "saddle" (two diagonally-touching ink pixels), and they are then the right
+// and the left turn. The RIGHT turn hugs the ink already being traced and
+// splits the diagonal pair (paper joins); the LEFT turn crosses the corner
+// onto the other ink pixel (ink joins). Both passes through a saddle ask the
+// same resolver, so the pairing of in- and out-edges is always consistent:
+// the loops touch at the corner point but never cross, and the mid-crack
+// chains stay ~0.71px apart there.
+function nextDirection(
+  edges: EdgeMap,
+  key: number,
+  incomingDir: number,
+  saddles: SaddleResolver,
+  stride: number,
+): number {
   const set = edges.get(key);
   if (set === undefined || set.size === 0) return -1;
   const right = (incomingDir + 1) % 4;
+  const left = (incomingDir + 3) % 4;
+  if (set.has(right) && set.has(left)) {
+    const x = key % stride;
+    return saddles(x, (key - x) / stride) ? left : right;
+  }
   if (set.has(right)) return right;
   if (set.has(incomingDir)) return incomingDir;
-  const left = (incomingDir + 3) % 4;
   if (set.has(left)) return left;
   return -1;
 }

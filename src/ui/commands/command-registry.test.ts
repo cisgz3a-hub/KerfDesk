@@ -172,6 +172,8 @@ describe('buildAppCommands', () => {
     const commands = buildAppCommands(baseCtx({ hasRasterSelection: true, traceImage }));
 
     expect(commandById(commands, 'tools.trace-image').enabled).toBe(true);
+    // LightBurn's Trace Image binding, shown on the command wherever it lists.
+    expect(commandById(commands, 'tools.trace-image').shortcut).toBe('Alt+T');
     expect(runCommand(commandById(commands, 'tools.trace-image'))).toBe(true);
     expect(traceImage).toHaveBeenCalled();
   });
