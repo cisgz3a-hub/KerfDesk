@@ -9,12 +9,14 @@ import {
 } from '../../__fixtures__/perceptual/trace-parity-oracle';
 import { PERCEPTUAL_FIXTURES } from '../../__fixtures__/perceptual/shapes';
 import type { RawImageData } from './trace-image';
+import type * as ContourIntersections from './contour-intersections';
+import type * as TraceModule from './index';
 import type { TraceOptions } from './index';
 
 // Conflicts found by each topology-repair round, as the repair loop sees them.
 const rounds: number[][] = [];
 vi.mock('./contour-intersections', async (importOriginal) => {
-  const original = await importOriginal<typeof import('./contour-intersections')>();
+  const original = await importOriginal<typeof ContourIntersections>();
   return {
     ...original,
     intersectingContourLoopsSteps: function* (
@@ -29,13 +31,13 @@ vi.mock('./contour-intersections', async (importOriginal) => {
 
 type Trace = { readonly hash: string; readonly rounds: ReadonlyArray<number> };
 
-async function freshTracer(): Promise<typeof import('./index')> {
+async function freshTracer(): Promise<typeof TraceModule> {
   vi.resetModules();
   return import('./index');
 }
 
 async function traceWith(
-  tracer: typeof import('./index'),
+  tracer: typeof TraceModule,
   image: RawImageData,
   preset: string,
 ): Promise<Trace> {
