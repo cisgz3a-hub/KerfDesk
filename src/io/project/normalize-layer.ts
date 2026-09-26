@@ -13,6 +13,7 @@ const POCKET_STRATEGIES = new Set<string>(['offset', 'raster-x', 'raster-y', 'ad
 const LINE_ART_CONTOUR_SIDES = new Set<string>(['inner', 'outer', 'both']);
 const RELIEF_FINISH_STRATEGIES = new Set<string>(['raster', 'raster-waterline']);
 const RELIEF_RASTER_AXES = new Set<string>(['x', 'y']);
+const RELIEF_FLAT_FINISHES = new Set<string>(['finishing-bit', 'roughing-bit']);
 const PROFILE_LEAD_SHAPES = new Set<string>(['arc', 'line', 'none']);
 
 // Keep a raw string field only when it is one of a known set of values —
@@ -136,6 +137,7 @@ function optionalCncLayerFields(raw: Record<string, unknown>): Record<string, un
     ),
     ...enumPassthrough('reliefRasterAxis', raw['reliefRasterAxis'], RELIEF_RASTER_AXES),
     ...positiveNumberPassthrough('reliefFineStepMm', raw['reliefFineStepMm']),
+    ...enumPassthrough('reliefFlatFinish', raw['reliefFlatFinish'], RELIEF_FLAT_FINISHES),
     ...(isPositiveNumber(raw['rampEntryDeg']) ? { rampEntryDeg: raw['rampEntryDeg'] } : {}),
     ...positiveNumberPassthrough('vCarveRampEntryDeg', raw['vCarveRampEntryDeg']),
     ...booleanPassthrough('vCarveFlatDepthEnabled', raw['vCarveFlatDepthEnabled']),

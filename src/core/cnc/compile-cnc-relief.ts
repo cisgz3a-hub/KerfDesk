@@ -22,6 +22,7 @@ import { reliefRoughingLadder, type ReliefRoughingLadder } from '../relief/relie
 import { reliefRoughingMotion } from '../relief/relief-roughing-motion';
 import { ReliefLevelArrayMaterializationError } from '../relief/relief-roughing-level-materialization';
 import { reliefScallopBallRadiusMm } from '../relief/relief-finishing';
+import { finishedFlatDepthAt, type ReliefFinishedFlats } from '../relief/relief-flat-finish';
 import { reliefFinishingPlan, reliefFinishRowSpacingMm } from '../relief/relief-finishing-strategy';
 import type { Heightmap } from '../relief/heightmap';
 import { reliefObjectToHeightmap } from '../relief/relief-object-to-heightmap';
@@ -31,7 +32,6 @@ import {
 } from '../relief/relief-materialization-failure';
 import {
   applyTransform,
-  DEFAULT_CNC_LAYER_SETTINGS,
   layerCncTool,
   type CncLayerSettings,
   type CncMachineConfig,
@@ -40,7 +40,6 @@ import {
   type ReliefObject,
   sceneObjectUsesOperation,
   type SceneObject,
-  type Transform,
   type Vec2,
 } from '../scene';
 import { kernelForTool } from '../sim';
@@ -49,7 +48,7 @@ import { cncGroupProvenance } from './cnc-group-provenance';
 import { zPassArrayMaterializationError } from './depth-passes';
 import { parkFields } from './motion-polish';
 import { reliefMachineSpaceGeometry, reliefMachineSpaceTransform } from './relief-machine-space';
-import { machineFrameHandedness } from './machine-frame-handedness';
+import { materialOnRightInMap } from './relief-material-side';
 
 const MIN_FEED_MM_PER_MIN = 1;
 const ROUGHING_CELL_TOOL_FRACTION = 8;
@@ -111,6 +110,8 @@ export function compileReliefGroupsForLayer(
   const tool = layerCncTool(config, settings);
   const passes: CncPass[] = [];
   const plans: CncReliefPlanningEvidence[] = [];
+  // ADR-450: per relief, the flats its roughing finished for the ball to skip.
+  const finishedFlats: Array<ReliefFinishedFlats | undefined> = [];
   let offsetFailed = false;
   let passLimited = false;
   let stepoverUsed = false;
@@ -118,6 +119,7 @@ export function compileReliefGroupsForLayer(
     const roughing = appendReliefPasses(passes, relief, settings, device, tool);
     if (roughing.kind === 'relief-materialization-failed') return roughing;
     plans.push({ ...roughing.plan, layerId: layer.id });
+    finishedFlats.push(roughing.finishedFlats);
     if (roughing.offsetFailed) offsetFailed = true;
     if (roughing.passLimited) passLimited = true;
     if (roughing.stepoverUsed) stepoverUsed = true;
@@ -126,7 +128,7 @@ export function compileReliefGroupsForLayer(
   if (passes.length > 0) {
     groups.push(reliefGroup(layer, settings, device, config, tool, 'relief-rough', passes));
   }
-  const finishing = reliefFinishingGroup(reliefs, layer, settings, device, config);
+  const finishing = reliefFinishingGroup(reliefs, layer, settings, device, config, finishedFlats);
   if (finishing.kind === 'relief-materialization-failed') return finishing;
   plans.push(...finishing.plans);
   if (finishing.group !== null) groups.push(finishing.group);
@@ -190,6 +192,7 @@ function reliefFinishingGroup(
   settings: CncLayerSettings,
   device: DeviceProfile,
   config: CncMachineConfig,
+  finishedFlats: ReadonlyArray<ReliefFinishedFlats | undefined>,
 ):
   | {
       readonly kind: 'compiled';
@@ -207,7 +210,7 @@ function reliefFinishingGroup(
   const rowSpacingMm = reliefFinishRowSpacingMm(finishTool, scallopMm, strategy);
   const passes: CncPass[] = [];
   const plans: CncReliefPlanningEvidence[] = [];
-  for (const relief of reliefs) {
+  for (const [index, relief] of reliefs.entries()) {
     const machineSpace = reliefMachineSpaceGeometry(relief);
     const heightmap = reliefObjectToHeightmap(relief, {
       targetWidthMm: relief.targetWidthMm,
@@ -216,6 +219,9 @@ function reliefFinishingGroup(
       targetScaleY: machineSpace.targetScaleY,
       mmPerCell: finishingCellSizeMm(rowSpacingMm, finishTool),
     });
+    // Both maps share the relief's heightmap millimetres, so the roughing
+    // grid's finished flats read directly at finishing coordinates.
+    const finished = finishedFlats[index];
     if (heightmap.kind === 'error') {
       return reliefMaterializationFailure(relief.source, heightmap.reason);
     }
@@ -233,6 +239,9 @@ function reliefFinishingGroup(
       strategy,
       rasterAxis: settings.reliefRasterAxis ?? 'x',
       wallOnRight,
+      ...(finished === undefined
+        ? {}
+        : { finishedAt: (x: number, y: number) => finishedFlatDepthAt(finished, x, y) }),
     })) {
       if (pass.kind !== 'path3d') continue;
       const points = pass.points.map((p) => ({
@@ -257,29 +266,6 @@ function reliefFinishingGroup(
       layerCncTool(config, settings),
     ),
   };
-}
-
-// ADR-423, ADR-424: which side of travel the material should be on, in
-// heightmap numbers, for the layer's cut direction: the wall a waterline pass
-// follows, or the stock a roughing ring cuts. Climb keeps the material right
-// of travel on the physical bed (motion-polish.ts); the placement and the
-// machine frame may each mirror that.
-function materialOnRightInMap(
-  residualTransform: Transform,
-  device: DeviceProfile,
-  settings: CncLayerSettings,
-): boolean {
-  const place = (x: number, y: number): Vec2 =>
-    toMachineCoords(applyTransform({ x, y }, residualTransform), device);
-  const origin = place(0, 0);
-  const alongX = place(1, 0);
-  const alongY = place(0, 1);
-  const determinant =
-    (alongX.x - origin.x) * (alongY.y - origin.y) - (alongX.y - origin.y) * (alongY.x - origin.x);
-  const keepsSides = determinant * machineFrameHandedness(device.origin) > 0;
-  const climb =
-    (settings.cutDirection ?? DEFAULT_CNC_LAYER_SETTINGS.cutDirection ?? 'climb') === 'climb';
-  return keepsSides === climb;
 }
 
 function finishingGridEvidence(
@@ -361,6 +347,7 @@ function reliefLadderFor(
         ? {}
         : { allowanceMm: settings.finishAllowanceMm }),
       ...(settings.reliefFineStepMm === undefined ? {} : { fineStepMm: settings.reliefFineStepMm }),
+      ...(settings.reliefFlatFinish === 'roughing-bit' ? { finishFlats: true } : {}),
     });
   } catch (error) {
     if (error instanceof ReliefLevelArrayMaterializationError) {
@@ -432,6 +419,7 @@ function appendReliefPasses(
       readonly passLimited: boolean;
       readonly stepoverUsed: boolean;
       readonly plan: ReliefPlanEvidence;
+      readonly finishedFlats: ReliefFinishedFlats | undefined;
     }
   | ReliefMaterializationFailure {
   const residualTransform = reliefMachineSpaceTransform(relief.transform).residualTransform;
@@ -459,6 +447,7 @@ function appendReliefPasses(
     passLimited: result.ladder.passLimited,
     stepoverUsed: true,
     plan: result.plan,
+    finishedFlats: result.ladder.finishedFlats,
   };
 }
 

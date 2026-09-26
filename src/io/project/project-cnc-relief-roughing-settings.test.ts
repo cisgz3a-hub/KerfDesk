@@ -10,8 +10,10 @@ import { serializeProject } from './serialize-project';
 
 // ADR-422 Amendment 1: a relief layer's slope step survives a save and load,
 // and a value that is not a positive number is dropped, leaving it off.
+// ADR-450: so does the choice of bit for the flats, and an unknown one is
+// dropped, leaving the finishing bit.
 
-function loadWithSlopeStep(reliefFineStepMm: unknown): unknown {
+function loadWith(key: 'reliefFineStepMm' | 'reliefFlatFinish', value: unknown): unknown {
   const base = createProject();
   const project = {
     ...base,
@@ -25,12 +27,14 @@ function loadWithSlopeStep(reliefFineStepMm: unknown): unknown {
   const scene = raw['scene'] as { layers: Array<Record<string, unknown>> };
   scene.layers[0] = {
     ...scene.layers[0],
-    cnc: { ...DEFAULT_CNC_LAYER_SETTINGS, reliefFineStepMm },
+    cnc: { ...DEFAULT_CNC_LAYER_SETTINGS, [key]: value },
   };
   const result = deserializeProject(`${JSON.stringify(raw)}\n`);
   if (result.kind !== 'ok') throw new Error(`expected ok, got ${result.kind}`);
-  return result.project.scene.layers[0]?.cnc?.reliefFineStepMm;
+  return result.project.scene.layers[0]?.cnc?.[key];
 }
+
+const loadWithSlopeStep = (value: unknown): unknown => loadWith('reliefFineStepMm', value);
 
 describe('relief slope step in project files (ADR-422 Amendment 1)', () => {
   it('round-trips a positive slope step', () => {
@@ -41,5 +45,17 @@ describe('relief slope step in project files (ADR-422 Amendment 1)', () => {
     expect(loadWithSlopeStep(0)).toBeUndefined();
     expect(loadWithSlopeStep(-1)).toBeUndefined();
     expect(loadWithSlopeStep('0.3')).toBeUndefined();
+  });
+});
+
+describe('relief flat finishing in project files (ADR-450)', () => {
+  it('round-trips both bits', () => {
+    expect(loadWith('reliefFlatFinish', 'roughing-bit')).toBe('roughing-bit');
+    expect(loadWith('reliefFlatFinish', 'finishing-bit')).toBe('finishing-bit');
+  });
+
+  it('drops an unknown value', () => {
+    expect(loadWith('reliefFlatFinish', 'end-mill')).toBeUndefined();
+    expect(loadWith('reliefFlatFinish', true)).toBeUndefined();
   });
 });

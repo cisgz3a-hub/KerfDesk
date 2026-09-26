@@ -21,11 +21,11 @@
 // heightmap's min corner, y down), each ring closed back to its first point.
 // The compiler has already folded object XY scale into that grid, so only its
 // residual isometry and device origin remain. Depth-major: every ring of one
-// level, outside in, then its core cleanup, before the next level. Pure and
-// deterministic.
+// level, outside in, then its core cleanup, before the next level. With flat
+// finishing on (ADR-450), an end mill then cuts each flat of the model to its
+// exact height, top down (relief-flat-finish.ts). Pure and deterministic.
 
 import { buildOffsetLadder, insetContoursChecked } from '../geometry/offset-ladder';
-import { partialDualCoordinate } from '../grid';
 import type { CncContourPass, CncPass } from '../job';
 import type { CncTool, Polyline } from '../scene';
 import { kernelForTool, type ToolKernel } from '../sim';
@@ -33,8 +33,15 @@ import { zPassDepths } from '../cnc/depth-passes';
 import { cncLayoutCutWidths } from '../cnc/layout-cut-widths';
 import { dilateHeightmapByTool } from './heightmap-tool-offset';
 import type { Heightmap } from './heightmap';
-import { marchingSquares } from './marching-squares';
 import { reliefCoreCleanup } from './relief-core-cleanup';
+import {
+  finishedFlatDepths,
+  maskContoursMm,
+  mergeFlatLevels,
+  reliefFlatLevels,
+  type ReliefFinishedFlats,
+  type ReliefFlatLevel,
+} from './relief-flat-finish';
 import { reliefRoughingLevels, type ReliefRoughingLevel } from './relief-roughing-levels';
 import type { ReliefRoughingLevelPaths } from './relief-roughing-motion';
 
@@ -62,6 +69,8 @@ export type ReliefRoughingOptions = {
   // ADR-422 Amendment 1: band levels this far apart between the depth-per-pass
   // levels, so slopes keep smaller terraces. Absent = none.
   readonly fineStepMm?: number;
+  // ADR-450: an end mill also cuts every flat of the model to its height.
+  readonly finishFlats?: boolean;
 };
 
 export type ReliefRoughingLadder = {
@@ -79,6 +88,9 @@ export type ReliefRoughingLadder = {
   // True only when a diagnostic-only next inset proves usable interior still
   // exists beyond the emitted ring budget. Advisory only (rule 7).
   readonly passLimited: boolean;
+  // ADR-450: where the flat levels left the model's exact height, for the
+  // finishing ball to skip. Absent when flat finishing is off.
+  readonly finishedFlats?: ReliefFinishedFlats;
 };
 
 export function reliefRoughingPasses(
@@ -117,11 +129,12 @@ export function reliefRoughingLadder(
     options.depthPerPassMm,
   );
   const stepMm = stepoverMm(options.stepoverPercent, clearingDiameterMm);
-  const passes: CncContourPass[] = [];
-  const planned: ReliefRoughingLevelPaths[] = [];
-  let offsetFailed = false;
-  let passLimited = false;
-  const toolLaw = kernelForTool(options.tool, map.mmPerCell);
+  const context: LevelContext = {
+    map,
+    dilated,
+    stepMm,
+    toolLaw: kernelForTool(options.tool, map.mmPerCell),
+  };
   // ADR-422: the ladder plus a level at the floor and at every flat, and with
   // its Amendment 1 at every fine step on the slopes between.
   const levels = reliefRoughingLevels(
@@ -131,26 +144,139 @@ export function reliefRoughingLadder(
     clearingDiameterMm / 2,
     options.fineStepMm,
   );
-  for (const level of levels) {
-    const contours = levelContoursMm(map, dilated, level.zMm, level.bandFloorMm);
-    const reach =
-      level.bandFloorMm === null ? contours : levelContoursMm(map, dilated, level.zMm, null);
-    const cutRadiusMm = sliceCutRadiusMm(toolLaw, level.sliceTopMm - level.zMm);
-    const completion = planLevel(contours, reach, level, stepMm, cutRadiusMm);
-    if (completion.paths !== null) {
-      planned.push(completion.paths);
-      appendClosedRings(passes, completion.paths);
-    }
-    offsetFailed = offsetFailed || completion.offsetFailed;
-    passLimited = passLimited || completion.passLimited;
+  const flats =
+    options.finishFlats === true && options.tool.kind === 'end-mill'
+      ? flatPlan(map, kernel, levels, allowanceMm, options.depthPerPassMm)
+      : null;
+  const completions: ReliefLevelCompletion[] = [];
+  const finished: FinishedCut[] = [];
+  levels.forEach((level, index) => {
+    // ADR-450: a level one allowance above a flat may cut straight to it.
+    const planned = planRoughingLevel(context, level, flats?.cutZMm.get(index));
+    completions.push(planned.completion);
+    if (planned.finished !== null) finished.push(planned.finished);
+  });
+  if (flats !== null) {
+    const separate = planFlatLevels(map, flats, levels, stepMm, options.tool.diameterMm / 2);
+    completions.push(...separate.completions);
+    finished.push(...separate.finished);
+  }
+  return {
+    ...ladderOf(completions),
+    cutWidthMm: clearingDiameterMm,
+    ...(flats === null
+      ? {}
+      : { finishedFlats: finishedFlatDepths(map, finished, options.tool.diameterMm / 2) }),
+  };
+}
+
+type LevelContext = {
+  readonly map: Heightmap;
+  readonly dilated: Float32Array;
+  readonly stepMm: number;
+  readonly toolLaw: ToolKernel;
+};
+
+// A cut that took the model's flat to its height, and the tip cells it swept.
+type FinishedCut = { readonly zMm: number; readonly mask: Uint8Array };
+
+// One roughing level's rings and core cleanup, cut at `cutZMm` when ADR-450
+// folds a flat into it.
+function planRoughingLevel(
+  context: LevelContext,
+  level: ReliefRoughingLevel,
+  cutZMm: number | undefined,
+): { readonly completion: ReliefLevelCompletion; readonly finished: FinishedCut | null } {
+  const { map, dilated } = context;
+  const mask = levelMask(map, dilated, level.zMm, level.bandFloorMm);
+  const contours = mask === null ? [] : maskContoursMm(map, mask);
+  const reach =
+    level.bandFloorMm === null ? contours : levelContoursMm(map, dilated, level.zMm, null);
+  const cut = cutZMm === undefined ? level : { ...level, zMm: cutZMm };
+  const cutRadiusMm = sliceCutRadiusMm(context.toolLaw, cut.sliceTopMm - cut.zMm);
+  const completion = planLevel(contours, reach, cut, context.stepMm, cutRadiusMm);
+  const finished =
+    cutZMm !== undefined && mask !== null && levelCompleted(completion)
+      ? { zMm: cutZMm, mask }
+      : null;
+  return { completion, finished };
+}
+
+// Every planned level's closed passes and paths, and whether any stopped short.
+function ladderOf(
+  completions: ReadonlyArray<ReliefLevelCompletion>,
+): Pick<ReliefRoughingLadder, 'passes' | 'levels' | 'offsetFailed' | 'passLimited'> {
+  const passes: CncContourPass[] = [];
+  const levels: ReliefRoughingLevelPaths[] = [];
+  for (const completion of completions) {
+    if (completion.paths === null) continue;
+    levels.push(completion.paths);
+    appendClosedRings(passes, completion.paths);
   }
   return {
     passes,
-    levels: planned,
-    cutWidthMm: clearingDiameterMm,
-    offsetFailed,
-    passLimited,
+    levels,
+    offsetFailed: completions.some((completion) => completion.offsetFailed),
+    passLimited: completions.some((completion) => completion.passLimited),
   };
+}
+
+type FlatPlan = {
+  // The zero-lift tip field: the widened cutter, not lifted.
+  readonly tip: Float32Array;
+  readonly cutZMm: ReadonlyMap<number, number>;
+  readonly separate: ReadonlyArray<ReliefFlatLevel>;
+};
+
+// ADR-450: the model's flats, each taken by the roughing level one allowance
+// above it where the depth per pass allows, or else left for its own level.
+function flatPlan(
+  map: Heightmap,
+  kernel: ToolKernel,
+  levels: ReadonlyArray<ReliefRoughingLevel>,
+  allowanceMm: number,
+  depthPerPassMm: number,
+): FlatPlan {
+  const tip = dilateHeightmapByTool(map, kernel, 0);
+  const flats = reliefFlatLevels(map, tip, kernel.radiusMm - kernel.horizontalGrowthMm);
+  return { tip, ...mergeFlatLevels(levels, flats, allowanceMm, depthPerPassMm) };
+}
+
+function levelCompleted(completion: ReliefLevelCompletion): boolean {
+  return completion.paths !== null && !completion.offsetFailed && !completion.passLimited;
+}
+
+// ADR-450: a level of its own at each flat no roughing level took, after
+// every roughing level. Only a level whose rings and cleanup completed counts
+// as finished.
+function planFlatLevels(
+  map: Heightmap,
+  plan: FlatPlan,
+  levels: ReadonlyArray<ReliefRoughingLevel>,
+  stepMm: number,
+  toolRadiusMm: number,
+): {
+  readonly completions: ReadonlyArray<ReliefLevelCompletion>;
+  readonly finished: ReadonlyArray<FinishedCut>;
+} {
+  const completions: ReliefLevelCompletion[] = [];
+  const finished: FinishedCut[] = [];
+  for (const flat of plan.separate) {
+    // The stock over a flat stands no higher than the ladder level above it.
+    const sliceTopMm = levels.reduce(
+      (top, level) =>
+        level.bandFloorMm === null && level.zMm > flat.zMm + LEVEL_EPS
+          ? Math.min(top, level.zMm)
+          : top,
+      0,
+    );
+    const level = { zMm: flat.zMm, bandFloorMm: null, sliceTopMm };
+    const reach = levelContoursMm(map, plan.tip, flat.zMm, null);
+    const completion = planLevel(flat.contours, reach, level, stepMm, toolRadiusMm);
+    completions.push(completion);
+    if (levelCompleted(completion)) finished.push(flat);
+  }
+  return { completions, finished };
 }
 
 function appendClosedRings(passes: CncContourPass[], level: ReliefRoughingLevelPaths): void {
@@ -199,6 +325,16 @@ function levelContoursMm(
   levelZ: number,
   bandFloorZ: number | null,
 ): ReadonlyArray<Polyline> {
+  const mask = levelMask(map, dilated, levelZ, bandFloorZ);
+  return mask === null ? [] : maskContoursMm(map, mask);
+}
+
+function levelMask(
+  map: Heightmap,
+  dilated: Float32Array,
+  levelZ: number,
+  bandFloorZ: number | null,
+): Uint8Array | null {
   const mask = new Uint8Array(map.widthCells * map.heightCells);
   const floor = bandFloorZ === null ? Number.NEGATIVE_INFINITY : bandFloorZ + LEVEL_EPS;
   let any = false;
@@ -209,15 +345,9 @@ function levelContoursMm(
       any = true;
     }
   }
-  if (!any) return [];
+  if (!any) return null;
   if (bandFloorZ !== null) growBand(map, dilated, mask, levelZ);
-  return marchingSquares(mask, map.widthCells, map.heightCells).map((contour) => ({
-    closed: true,
-    points: contour.points.map((p) => ({
-      x: partialDualCoordinate(map, 'x', p.x),
-      y: partialDualCoordinate(map, 'y', p.y),
-    })),
-  }));
+  return mask;
 }
 
 // Where a band is steeper than one cell per level, it breaks into single cells

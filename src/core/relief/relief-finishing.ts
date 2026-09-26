@@ -20,7 +20,8 @@
 // alternate direction (serpentine). Without a mask, the rows are linked along
 // their shared edge column into one stay-down path; every path loses the
 // vertices a straight segment can replace without cutting lower
-// (relief-finishing-path.ts).
+// (relief-finishing-path.ts). Where roughing finished flats with an end mill
+// (ADR-450), an unmasked raster skips them (relief-finishing-skip.ts).
 
 import type { ToolKernel } from '../sim';
 import type { CncPass } from '../job';
@@ -29,7 +30,14 @@ import { taperedBallEnvelope } from '../cnc-tapered-ball';
 import { partialCellCenter } from '../grid';
 import { dilateHeightmapByToolWithMaskEvidence } from './heightmap-tool-offset';
 import type { Heightmap } from './heightmap';
+import { createSurfaceContactField } from './heightmap-surface-contact';
 import { reduceFinishingPath, type FinishingPoint } from './relief-finishing-path';
+import {
+  finishedSkipFlags,
+  linkFinishingRuns,
+  type FinishingGrid,
+  type FinishingRun,
+} from './relief-finishing-skip';
 
 export const DEFAULT_RELIEF_SCALLOP_MM = 0.025;
 const FLAT_TOOL_STEPOVER_FRACTION = 0.4;
@@ -37,6 +45,9 @@ const MIN_FLAT_ROW_SPACING_MM = 0.05;
 // A compiler grid sized to a whole number of rows (ADR-421) must not lose a
 // row to the rounding of rowSpacing / mmPerCell.
 const ROW_STRIDE_RELATIVE_SLACK = 1e-9;
+// Longest stay-down link between the runs of a raster that skips finished
+// flats, in bit diameters (ADR-450).
+const SKIP_LINK_DIAMETERS = 4;
 
 export type ReliefFinishingOptions = {
   readonly tool: CncTool;
@@ -47,6 +58,8 @@ export type ReliefFinishingOptions = {
   // The whole zero-allowance tip surface of an unmasked map, when the caller
   // already has it (ADR-423); otherwise only the rows read are computed.
   readonly tip?: Float32Array;
+  // ADR-450: the height roughing's flat levels cut (x, y) to, or NaN.
+  readonly finishedAt?: (x: number, y: number) => number;
 };
 
 export function reliefFinishingPasses(
@@ -87,9 +100,78 @@ export function reliefFinishingPasses(
       rows: rowFlags(heightCells, rows),
       columns: edgeColumns,
     }).tipDepth;
+  return unmaskedPasses(unmasked, tip, rows, options);
+}
+
+// One linked serpentine, or where roughing finished flats (ADR-450) the runs
+// the raster keeps.
+function unmaskedPasses(
+  map: Heightmap,
+  tip: Float32Array,
+  rows: ReadonlyArray<number>,
+  options: ReliefFinishingOptions,
+): ReadonlyArray<CncPass> {
   const passes: CncPass[] = [];
-  appendFinishingRun(passes, linkedSerpentine(map, tip, rows));
+  const skip =
+    options.finishedAt === undefined
+      ? null
+      : finishedSkipFlags(
+          finishingGrid(map),
+          options.finishedAt,
+          rows,
+          options.kernel.radiusMm,
+          map.mmPerCell,
+        );
+  if (skip === null || !skip.includes(1)) {
+    appendFinishingRun(passes, linkedSerpentine(map, tip, rows));
+    return passes;
+  }
+  for (const chain of skippingRaster(map, tip, rows, skip, options)) {
+    appendFinishingRun(passes, chain);
+  }
   return passes;
+}
+
+// ADR-450: the rows' kept runs, nearest first, linked across short gaps.
+function skippingRaster(
+  map: Heightmap,
+  tip: Float32Array,
+  rows: ReadonlyArray<number>,
+  skip: Uint8Array,
+  options: ReliefFinishingOptions,
+): ReadonlyArray<ReadonlyArray<FinishingPoint>> {
+  const runs: FinishingRun[] = [];
+  for (const row of rows) {
+    let points: FinishingPoint[] = [];
+    for (let col = 0; col <= map.widthCells; col += 1) {
+      if (col < map.widthCells && skip[row * map.widthCells + col] === 0) {
+        points.push(finishingSample(map, tip, col, row));
+      } else if (points.length > 0) {
+        runs.push({ row, points });
+        points = [];
+      }
+    }
+  }
+  const contact = createSurfaceContactField(map, options.kernel);
+  return linkFinishingRuns(
+    runs,
+    (row) => partialCellCenter(map, 'y', row),
+    { tipAt: (x, y, lowerBound) => contact?.constraintAtPoint(x, y, lowerBound) ?? 0 },
+    {
+      maxLinkMm: SKIP_LINK_DIAMETERS * options.tool.diameterMm,
+      checkSpacingMm: map.mmPerCell / 4,
+    },
+  );
+}
+
+function finishingGrid(map: Heightmap): FinishingGrid {
+  return {
+    widthCells: map.widthCells,
+    heightCells: map.heightCells,
+    depth: map.depth,
+    centerX: (col) => partialCellCenter(map, 'x', col),
+    centerY: (row) => partialCellCenter(map, 'y', row),
+  };
 }
 
 // The planned row stride, in whole sampled rows, no wider than the request.

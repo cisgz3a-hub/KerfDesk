@@ -72,9 +72,11 @@ export type GcodeMetadata = {
  * ADR-421's stay-down finishing at the exact row spacing, ADR-422's floor and
  * flat roughing levels, and ADR-423's waterline finishing and raster along Y,
  * and ADR-424's relief roughing cut inside out with links at depth, climb round
- * islands and ramped entries, and ADR-422 amendment 1's slope steps.
+ * islands and ramped entries, and ADR-422 amendment 1's slope steps, and
+ * ADR-450's flats cut to height by the roughing end mill and skipped by the
+ * finishing raster.
  */
-export const EMITTER_REVISION = 'relief-linked-roughing-20260926-v1';
+export const EMITTER_REVISION = 'relief-flat-finish-20260926-v1';
 
 // Machine-specific assumption lines (ADR-103 defect fix): router exports
 // previously carried the laser-worded `$32=1 (laser mode)` banner. The S

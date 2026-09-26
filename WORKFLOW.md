@@ -3951,6 +3951,12 @@ explicitly marked below; the remaining controls and user-facing flows are planne
    depth-per-pass levels cut only the slopes between them, so a slope keeps
    terraces no taller than the step instead of a whole pass (ADR-422
    Amendment 1). 0 or unset is off.
+   With **Flats** set to Roughing bit and an end mill roughing, every flat
+   of the model at least as wide as the bit is cut to its exact height,
+   still keeping the allowance off the walls beside it: on the roughing
+   level one allowance above it when that level can reach it within one
+   depth per pass of where its stock stands, otherwise on a level of its own
+   after all roughing (ADR-450). Any other roughing bit ignores the setting.
 2. Passes run depth-major (whole level before stepping down) as a
    clearing group — before any profile cuts. The preview's removal
    shading shows the terraced relief forming.
@@ -4616,6 +4622,13 @@ and lifts the command's CNC-only gate.)*
    as the layer's cut direction says on the physical bed. Every waterline
    vertex clears the model exactly and every move is checked; a relief with a
    mask outline gets the narrowed raster only (ADR-423).
+7. With **Flats** set to Roughing bit, the raster skips every sample from
+   which the bit would touch only flats the roughing end mill took to their
+   exact height, and cuts what it keeps nearest first: it stays down across
+   gaps up to four bit diameters, lifting to the highest tip along the way,
+   and retracts across longer ones. The part comes out as the full raster
+   leaves it, the flats without scallops (ADR-450). A relief with a mask
+   outline keeps the full raster.
 
 #### Error — unknown finishing bit id
 1. The missing ID stays visible as a disabled diagnostic choice. Prepared

@@ -1,6 +1,7 @@
 // Relief roughing allowance and finishing strategy rows (ADR-423): how much
 // stock roughing leaves, how fine it steps on slopes (ADR-422 Amendment 1),
-// whether steep walls get waterline passes, which way the raster runs, and,
+// which bit finishes the flats (ADR-450), whether steep walls get waterline
+// passes, which way the raster runs, and,
 // for layers whose cut type has no direction or ramp row of its own, whether
 // the relief is climb or conventional cut and how roughing enters each level
 // (ADR-424).
@@ -41,7 +42,8 @@ export function ReliefStrategyRows(props: ReliefRowsProps): JSX.Element {
   );
 }
 
-// How much stock roughing leaves, and how fine it steps down slopes.
+// How much stock roughing leaves, how fine it steps down slopes, and whether
+// it also finishes the flats.
 function ReliefRoughingRows(props: ReliefRowsProps): JSX.Element {
   const { layer, settings, onCommit } = props;
   const sharesProfileAllowance =
@@ -77,6 +79,23 @@ function ReliefRoughingRows(props: ReliefRowsProps): JSX.Element {
           props.onCommitSettings(mm > 0 ? { ...rest, reliefFineStepMm: mm } : rest);
         }}
       />
+      <Row label="Flats">
+        <select
+          value={settings.reliefFlatFinish ?? 'finishing-bit'}
+          onChange={(event) =>
+            onCommit({
+              reliefFlatFinish:
+                event.target.value === 'roughing-bit' ? 'roughing-bit' : 'finishing-bit',
+            })
+          }
+          aria-label={`Relief flats finished by for ${layer.color}`}
+          title="Which bit finishes flat areas such as the background floor and flat tops. Roughing bit: an end mill cuts each flat to its exact height, usually on the roughing level above it, and the finishing raster skips it, so flats have no scallops and a wide background finishes much faster. Needs an end mill as the roughing bit."
+          style={selectStyle}
+        >
+          <option value="finishing-bit">Finishing bit</option>
+          <option value="roughing-bit">Roughing bit</option>
+        </select>
+      </Row>
     </>
   );
 }

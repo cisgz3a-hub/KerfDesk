@@ -179,6 +179,27 @@ describe('ReliefLayerRows', () => {
       rows.host.remove();
     }
   });
+
+  it('chooses which bit finishes the flats (ADR-450)', async () => {
+    const onCommit = vi.fn();
+    const { host, root } = await renderRows(
+      { ...DEFAULT_CNC_LAYER_SETTINGS, cutType: 'engrave' },
+      onCommit,
+    );
+    try {
+      const flats = select(host, 'Relief flats finished by for #ff0000');
+      // Unset, the finishing bit covers the flats as before.
+      expect(flats.value).toBe('finishing-bit');
+      await act(async () => {
+        flats.value = 'roughing-bit';
+        flats.dispatchEvent(new Event('change', { bubbles: true }));
+      });
+      expect(onCommit).toHaveBeenCalledWith({ reliefFlatFinish: 'roughing-bit' });
+    } finally {
+      await act(async () => root.unmount());
+      host.remove();
+    }
+  });
 });
 
 async function renderRows(

@@ -13,7 +13,9 @@
 // than the scallop's row spacing anywhere on the part.
 //
 // The raster may run along Y instead of X: the planner then runs on the
-// transposed map and swaps the coordinates back.
+// transposed map and swaps the coordinates back. Either raster skips the flats
+// roughing finished with an end mill (ADR-450); the waterline passes stay on
+// the steep walls, which no flat level finishes.
 
 import type { CncPass } from '../job';
 import type { CncTool } from '../scene';
@@ -75,6 +77,7 @@ export function reliefFinishingPlan(
     scallopMm: options.scallopMm,
     rowSpacingMm,
   };
+  const finishedAt = options.finishedAt;
   const raster =
     options.rasterAxis === 'y'
       ? transposedPasses(
@@ -83,9 +86,14 @@ export function reliefFinishingPlan(
             ...(tip === undefined
               ? {}
               : { tip: transposeCells(tip, map.widthCells, map.heightCells) }),
+            ...(finishedAt === undefined ? {} : { finishedAt: (x, y) => finishedAt(y, x) }),
           }),
         )
-      : reliefFinishingPasses(map, { ...rasterOptions, ...(tip === undefined ? {} : { tip }) });
+      : reliefFinishingPasses(map, {
+          ...rasterOptions,
+          ...(tip === undefined ? {} : { tip }),
+          ...(finishedAt === undefined ? {} : { finishedAt }),
+        });
   if (tip === undefined) return raster;
   const levelStepMm =
     scallopRowSpacingMm(options.tool, options.scallopMm) * Math.sin(STEEP_ANGLE_RAD);
