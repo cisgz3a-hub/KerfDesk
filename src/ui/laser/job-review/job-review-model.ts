@@ -3,7 +3,12 @@
 // still read stores directly; compiled facts come from the prepared job.
 
 import type { OverrideValues } from '../../../core/controllers/grbl';
-import { formatDuration, type Job, type ScanOffsetPoint } from '../../../core/job';
+import {
+  formatDuration,
+  type Job,
+  type JobOriginPlacement,
+  type ScanOffsetPoint,
+} from '../../../core/job';
 import {
   DEFAULT_OUTPUT_SCOPE,
   machineKindOf,
@@ -68,6 +73,8 @@ export type JobReviewModel = {
   readonly stats: ReadonlyArray<JobReviewStatTile>;
   readonly warnings: ReadonlyArray<string>;
   readonly resolvedOriginLabel: string;
+  /** Placement of the reviewed job; decides where an unset CNC park ends. */
+  readonly startFrom?: JobOriginPlacement['startFrom'];
   readonly toolPlanLabels: ReadonlyArray<string>;
   readonly acknowledgement: JobReviewAcknowledgement;
   readonly outputQualityFacts: ReadonlyArray<JobReviewFact>;
@@ -142,6 +149,7 @@ export function buildJobReviewModel(args: JobReviewModelArgs): JobReviewModel {
           })),
     ]),
     resolvedOriginLabel: describeJobOrigin(args.prepared.jobOrigin),
+    startFrom: args.prepared.jobOrigin?.startFrom ?? 'absolute',
     toolPlanLabels: toolPlanLabels(args.prepared.cncToolPlan),
     acknowledgement: buildAcknowledgement(args, machineKind),
     outputQualityFacts: buildOutputQualityReviewFacts(
@@ -200,6 +208,7 @@ function buildSecondPassReviewModel(args: JobReviewModelArgs): JobReviewModel {
       ...secondPassThroughputWarnings(args),
     ]),
     resolvedOriginLabel: describeJobOrigin(prepared.jobOrigin),
+    startFrom: prepared.jobOrigin?.startFrom ?? 'absolute',
     toolPlanLabels: [],
     acknowledgement: buildAcknowledgement(args, 'laser'),
     outputQualityFacts: [

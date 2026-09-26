@@ -13,11 +13,11 @@ export function DeviceSetupCncMachineStep(props: {
   readonly dispatch: DeviceSetupStepProps['dispatch'];
   readonly machine: CncMachineConfig;
 }): JSX.Element {
+  const setParams = (params: CncMachineParams): void => {
+    props.dispatch({ kind: 'edit-machine', machine: { ...props.machine, params } });
+  };
   const updateParams = (patch: Partial<CncMachineParams>): void => {
-    props.dispatch({
-      kind: 'edit-machine',
-      machine: { ...props.machine, params: { ...props.machine.params, ...patch } },
-    });
+    setParams({ ...props.machine.params, ...patch });
   };
   return (
     <section style={sectionStyle} aria-label="CNC machine limits">
@@ -25,13 +25,15 @@ export function DeviceSetupCncMachineStep(props: {
         <strong>CNC machine limits</strong>
         <span>
           These machine-owned values control retracts, spindle output, dwell, coolant commands, and
-          end or tool-change parking. Park X and Y are a bed position that moves with the job like
-          every cut; a job whose place on the bed is unknown parks at its origin instead. CNC mode
-          assumes an installed, powered Z axis; choosing CNC does not prove Z hardware or direction.
-          Recorded Z travel is informational. Artwork chooses its running spindle speed separately.
+          end or tool-change parking. A park is a bed position that moves with the job like every
+          cut, and a job whose place on the bed is unknown parks at its origin instead. With no
+          park, a Current Position job returns to its start and any other job ends at program X0 Y0.
+          CNC mode assumes an installed, powered Z axis; choosing CNC does not prove Z hardware or
+          direction. Recorded Z travel is informational. Artwork chooses its running spindle speed
+          separately.
         </span>
       </div>
-      <CncParameterRows machine={props.machine} updateParams={updateParams} />
+      <CncParameterRows machine={props.machine} updateParams={updateParams} setParams={setParams} />
       <div style={warningStyle}>
         <strong>Hardware check required:</strong> confirm a powered Z is installed, Z-positive moves
         away from the stock, Safe Z clears clamps, M3/S reaches the expected RPM, the dwell is long
@@ -45,6 +47,7 @@ export function DeviceSetupCncMachineStep(props: {
 function CncParameterRows(props: {
   readonly machine: CncMachineConfig;
   readonly updateParams: (patch: Partial<CncMachineParams>) => void;
+  readonly setParams: (params: CncMachineParams) => void;
 }): JSX.Element {
   const { machine, updateParams } = props;
   return (
@@ -100,35 +103,57 @@ function CncParameterRows(props: {
           </select>
         </Row>
       </MachineSetupFieldAnchor>
-      <ParkRows machine={machine} updateParams={updateParams} />
+      <ParkRows machine={machine} setParams={props.setParams} />
     </>
   );
 }
 
+// No park is its own state, not X0 Y0 (CNC audit MC-7): 0, 0 is a real bed
+// position since ADR-392, so the fields sit behind a toggle that removes both.
 function ParkRows(props: {
   readonly machine: CncMachineConfig;
-  readonly updateParams: (patch: Partial<CncMachineParams>) => void;
+  readonly setParams: (params: CncMachineParams) => void;
 }): JSX.Element {
+  const { params } = props.machine;
+  const parked = params.parkXMm !== undefined || params.parkYMm !== undefined;
+  const setParked = (on: boolean): void => {
+    const { parkXMm, parkYMm, ...unparked } = params;
+    props.setParams(on ? { ...unparked, parkXMm: parkXMm ?? 0, parkYMm: parkYMm ?? 0 } : unparked);
+  };
   return (
     <MachineSetupFieldAnchor field="park" label="Park position in Machine Setup">
-      <MachineNumberRow
-        label="Park X"
-        unit="mm"
-        value={props.machine.params.parkXMm ?? 0}
-        min={-1500}
-        max={1500}
-        step={1}
-        onCommit={(parkXMm) => props.updateParams({ parkXMm })}
-      />
-      <MachineNumberRow
-        label="Park Y"
-        unit="mm"
-        value={props.machine.params.parkYMm ?? 0}
-        min={-1500}
-        max={1500}
-        step={1}
-        onCommit={(parkYMm) => props.updateParams({ parkYMm })}
-      />
+      <label style={checkRowStyle}>
+        <input
+          type="checkbox"
+          checked={parked}
+          onChange={(event) => setParked(event.target.checked)}
+          aria-label="Park at a bed position"
+          title="Park at a bed position after the job and at planned bit changes."
+        />
+        <span>Park at a bed position after the job and at bit changes</span>
+      </label>
+      {parked ? (
+        <>
+          <MachineNumberRow
+            label="Park X"
+            unit="mm"
+            value={params.parkXMm ?? 0}
+            min={-1500}
+            max={1500}
+            step={1}
+            onCommit={(parkXMm) => props.setParams({ ...params, parkXMm })}
+          />
+          <MachineNumberRow
+            label="Park Y"
+            unit="mm"
+            value={params.parkYMm ?? 0}
+            min={-1500}
+            max={1500}
+            step={1}
+            onCommit={(parkYMm) => props.setParams({ ...params, parkYMm })}
+          />
+        </>
+      ) : null}
     </MachineSetupFieldAnchor>
   );
 }
@@ -167,6 +192,12 @@ const introStyle: React.CSSProperties = {
   fontSize: 12,
   lineHeight: 1.45,
   marginBottom: 2,
+};
+const checkRowStyle: React.CSSProperties = {
+  display: 'flex',
+  alignItems: 'center',
+  gap: 6,
+  fontSize: 12,
 };
 const warningStyle: React.CSSProperties = {
   border: '1px solid var(--lf-warning)',

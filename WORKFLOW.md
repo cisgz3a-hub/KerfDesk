@@ -4233,6 +4233,12 @@ and lifts the command's CNC-only gate.)*
    labelled as a bed position.
 3. No park set keeps the old behaviour: Current Position parks at its start, every other mode at
    program X0 Y0. The out-of-bed advisory and the park-outside-frame note check the placed park.
+4. No park is its own setting (ADR-392 Amendment 1). Machine Setup shows Park X and Y only while
+   **Park at a bed position** is on. Turning it off removes both numbers, because 0, 0 is a real bed
+   position, not "no park". Job Review's "Park after job" reads `Bed X … · Y …` for a set park, and
+   for none it names where the job ends: "Not set · program X0 Y0", or "Not set · back to where the
+   job started" for Current Position. The CNC setup reference and the Machine Setup review page
+   show "None".
 
 ### F-CNC15. Re-zero Z at a tool change — Phase H.7
 

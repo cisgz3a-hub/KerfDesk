@@ -7,7 +7,12 @@ import type { OverrideValues, StatusReport } from '../../../core/controllers/grb
 import type { ActiveWorkCoordinateSystem } from '../../../core/controllers/grbl/work-offset-readback';
 import type { ControllerKind } from '../../../core/devices';
 import type { ControllerSettingsSnapshot } from '../../../core/preflight';
-import { analyzeFillHeatRisk, type Job, type ScanOffsetPoint } from '../../../core/job';
+import {
+  analyzeFillHeatRisk,
+  type Job,
+  type JobOriginPlacement,
+  type ScanOffsetPoint,
+} from '../../../core/job';
 import type { ScanDirectionReason } from '../../../core/job/scan-direction-policy';
 import {
   activeCncTool,
@@ -25,6 +30,7 @@ import {
   overridesAreBaseline,
 } from './job-review-format';
 import { frameMotionFeeds } from '../../state/frame-feed-limits';
+import { parkLabel } from './job-review-park-label';
 import { buildContourEntryReviewFacts } from './job-review-contour-entry-facts';
 import { rotaryReviewSummary } from '../rotary-summary';
 
@@ -89,6 +95,7 @@ export function buildControllerReviewFacts(
 export function buildMachineReviewFacts(
   project: Project,
   controllerSettings: ControllerSettingsSnapshot | null = null,
+  startFrom?: JobOriginPlacement['startFrom'],
 ): ReadonlyArray<JobReviewFact> {
   const device = project.device;
   const shared: JobReviewFact[] = [
@@ -115,7 +122,7 @@ export function buildMachineReviewFacts(
         `max ${machine.params.spindleMaxRpm} RPM · spin-up ${machine.params.spindleSpinupSec} s`,
       ),
       fact('Coolant', machine.params.coolant ?? 'off'),
-      fact('Park after job', parkLabel(machine.params.parkXMm, machine.params.parkYMm)),
+      fact('Park after job', parkLabel(machine.params, startFrom)),
     ];
   }
   return [
@@ -427,10 +434,4 @@ function travelFact(
       : `${value} — profile bed ${formatMm(profileBedWidth)} × ${formatMm(profileBedHeight)} mm`,
     matches ? 'default' : 'warning',
   );
-}
-
-function parkLabel(parkXMm: number | undefined, parkYMm: number | undefined): string {
-  if (parkXMm === undefined || parkYMm === undefined) return 'Machine origin';
-  // A bed position that moves with the job (ADR-392).
-  return `Bed X ${formatMm(parkXMm)} · Y ${formatMm(parkYMm)}`;
 }
