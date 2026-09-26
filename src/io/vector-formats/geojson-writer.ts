@@ -12,18 +12,23 @@
 // at the page's lower-left corner (the artwork's lower-left corner unless a
 // page was given). The scene's Y-down frame is mirrored, as DXF export does.
 //
-// Filled items become Polygon / MultiPolygon features: closed contours are
-// grouped by containment into an outer ring and its direct holes (even-odd
-// nesting depth, core/vector-export/contour-nesting), an island inside a hole
-// is its own polygon, and rings follow the right-hand rule of section 3.1.6
-// (exterior counterclockwise, holes clockwise, in the y-up frame). Every ring
-// is closed (first position = last) and has at least four positions; rings
-// that collapse on the grid are dropped with their holes. Stroked items
-// become LineString / MultiLineString features (a closed contour's line ends
-// where it starts). A bbox member (section 5) gives the written extent.
+// Filled items become Polygon / MultiPolygon features under the item's own
+// fill rule (fill-region-rings): the snapped closed contours that bound the
+// filled region become an outer ring and its holes, an island inside a hole
+// is its own polygon, and a contour that does not bound the region (a
+// same-winding contour nested in another under nonzero, as in text) is left
+// out, so the polygons show what the PDF and EPS files paint. Rings follow
+// the right-hand rule of section 3.1.6 (exterior counterclockwise, holes
+// clockwise, in the y-up frame). Every ring is closed (first position =
+// last) and has at least four positions; rings that collapse on the grid are
+// dropped. Contours that cross one another are not merged: that item's
+// polygons are written as separate features marked "unmerged": true, so the
+// file never claims an invalid MultiPolygon, and the caller is told.
+// Stroked items become LineString / MultiLineString features (a closed
+// contour's line ends where it starts). A bbox member (section 5) gives the
+// written extent.
 
 import { flattenCurveSubpath, type CurveSubpath, type Vec2 } from '../../core/scene';
-import { groupContoursWithHoles } from '../../core/vector-export/contour-nesting';
 import { formatGridIndex } from '../../core/vector-export/decimal-grid';
 import {
   preparePage,
@@ -32,6 +37,7 @@ import {
   type VectorPaintItem,
   type VectorWriteOptions,
 } from './vector-artwork';
+import { fillRegionPolygons, twiceSignedArea } from './fill-region-rings';
 
 export const DEFAULT_GEOJSON_FLATTEN_TOLERANCE_MM = 0.01;
 
@@ -45,6 +51,8 @@ export type GeoJsonDocument = {
   readonly featureCount: number;
   readonly polygonCount: number;
   readonly lineCount: number;
+  /** Filled items whose contours cross; their polygons are separate, unmerged features. */
+  readonly unmergedItemCount: number;
 };
 
 type Position = readonly [number, number];
@@ -67,19 +75,23 @@ export function writeGeoJsonDocument(
   const extent = new Extent();
   let polygonCount = 0;
   let lineCount = 0;
+  let unmergedItemCount = 0;
   for (const item of items) {
-    const { geometry, polygons, lines } = itemGeometry(item, page, tolerance);
+    const { geometries, polygons, lines, unmerged } = itemGeometries(item, page, tolerance);
     polygonCount += polygons;
     lineCount += lines;
-    if (geometry === null) continue;
-    extent.addGeometry(geometry);
-    features.push(
-      JSON.stringify({
-        type: 'Feature',
-        properties: { color: item.color, paint: item.paint, fillRule: item.fillRule },
-        geometry,
-      }),
-    );
+    if (unmerged) unmergedItemCount += 1;
+    for (const geometry of geometries) {
+      extent.addGeometry(geometry);
+      const properties = { color: item.color, paint: item.paint, fillRule: item.fillRule };
+      features.push(
+        JSON.stringify({
+          type: 'Feature',
+          properties: unmerged ? { ...properties, unmerged: true } : properties,
+          geometry,
+        }),
+      );
+    }
   }
   if (features.length === 0) throw new Error('There is no vector geometry to write.');
   const header = {
@@ -94,59 +106,61 @@ export function writeGeoJsonDocument(
   };
   const headerText = JSON.stringify(header);
   const text = headerText.slice(0, -1) + ',"features":[\n' + features.join(',\n') + '\n]}\n';
-  return { text, featureCount: features.length, polygonCount, lineCount };
+  return { text, featureCount: features.length, polygonCount, lineCount, unmergedItemCount };
 }
 
-function itemGeometry(
+function itemGeometries(
   item: VectorPaintItem,
   page: PreparedPage,
   tolerance: number,
-): { geometry: Geometry | null; polygons: number; lines: number } {
+): { geometries: Geometry[]; polygons: number; lines: number; unmerged: boolean } {
   const curves = item.curves.filter((curve) => curve.segments.length > 0);
   if (item.paint === 'fill') {
-    const polygons = filledPolygons(curves, page, tolerance);
-    const geometry: Geometry | null =
-      polygons.length === 0
-        ? null
+    const { polygons, crossing } = filledPolygons(curves, item.fillRule, page, tolerance);
+    const geometries: Geometry[] = crossing
+      ? polygons.map((coordinates) => ({ type: 'Polygon', coordinates }))
+      : polygons.length === 0
+        ? []
         : polygons.length === 1
-          ? { type: 'Polygon', coordinates: polygons[0] as Position[][] }
-          : { type: 'MultiPolygon', coordinates: polygons };
-    return { geometry, polygons: polygons.length, lines: 0 };
+          ? [{ type: 'Polygon', coordinates: polygons[0] as Position[][] }]
+          : [{ type: 'MultiPolygon', coordinates: polygons }];
+    return { geometries, polygons: polygons.length, lines: 0, unmerged: crossing };
   }
   const lines = curves
     .map((curve) => lineString(curve, page, tolerance))
     .filter((line): line is Position[] => line !== null);
-  const geometry: Geometry | null =
+  const geometries: Geometry[] =
     lines.length === 0
-      ? null
+      ? []
       : lines.length === 1
-        ? { type: 'LineString', coordinates: lines[0] as Position[] }
-        : { type: 'MultiLineString', coordinates: lines };
-  return { geometry, polygons: 0, lines: lines.length };
+        ? [{ type: 'LineString', coordinates: lines[0] as Position[] }]
+        : [{ type: 'MultiLineString', coordinates: lines }];
+  return { geometries, polygons: 0, lines: lines.length, unmerged: false };
 }
 
 function filledPolygons(
   curves: ReadonlyArray<CurveSubpath>,
+  fillRule: VectorPaintItem['fillRule'],
   page: PreparedPage,
   tolerance: number,
-): Position[][][] {
-  const rings = curves.map((curve) => closedRing(curve, page, tolerance));
-  const polygons: Position[][][] = [];
-  for (const group of groupContoursWithHoles(curves)) {
-    const outer = rings[group.outer];
-    if (outer === null || outer === undefined) continue;
-    const polygon = [orient(outer, true, page)];
-    for (const index of group.holes) {
-      const hole = rings[index];
-      if (hole !== null && hole !== undefined) polygon.push(orient(hole, false, page));
-    }
-    polygons.push(polygon);
-  }
-  return polygons;
+): { polygons: Position[][][]; crossing: boolean } {
+  const rings = curves
+    .map((curve) => openRing(curve, page, tolerance))
+    .filter((ring): ring is GridPoint[] => ring !== null);
+  const region = fillRegionPolygons(rings, fillRule);
+  const closedRing = (index: number, counterclockwise: boolean): Position[] => {
+    const ring = rings[index] as GridPoint[];
+    return orient([...ring, ring[0] as GridPoint], counterclockwise, page);
+  };
+  const polygons = region.polygons.map((polygon) => [
+    closedRing(polygon.outer, true),
+    ...polygon.holes.map((hole) => closedRing(hole, false)),
+  ]);
+  return { polygons, crossing: region.crossing };
 }
 
-/** A closed ring on the grid (first = last), or null when it collapses. */
-function closedRing(
+/** An open ring on the grid (first point not repeated), or null when it collapses. */
+function openRing(
   curve: CurveSubpath,
   page: PreparedPage,
   tolerance: number,
@@ -158,7 +172,7 @@ function closedRing(
     points.pop();
   }
   if (points.length < 3 || twiceSignedArea(points) === 0) return null;
-  return [...points, points[0] as GridPoint];
+  return points;
 }
 
 function lineString(curve: CurveSubpath, page: PreparedPage, tolerance: number): Position[] | null {
@@ -197,17 +211,6 @@ function orient(ring: GridPoint[], counterclockwise: boolean, page: PreparedPage
 
 function position(point: GridPoint, page: PreparedPage): Position {
   return [Number(formatGridIndex(point.x, page.grid)), Number(formatGridIndex(point.y, page.grid))];
-}
-
-/** Shoelace sum over integer grid indices (exact while |index| stays below 2^25). */
-function twiceSignedArea(ring: ReadonlyArray<GridPoint>): number {
-  let sum = 0;
-  for (let i = 0; i < ring.length; i += 1) {
-    const a = ring[i] as GridPoint;
-    const b = ring[(i + 1) % ring.length] as GridPoint;
-    sum += a.x * b.y - b.x * a.y;
-  }
-  return sum;
 }
 
 function dedupe(points: ReadonlyArray<GridPoint>): GridPoint[] {

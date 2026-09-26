@@ -22,11 +22,17 @@ import { exportProjectSelection } from './export-artwork-svg';
 
 export type ArtworkVectorFormat = 'pdf' | 'eps' | 'geojson';
 
+type WrittenFile = {
+  readonly text: string;
+  /** A caveat about this particular file, appended to the toast as a warning. */
+  readonly warning: string | null;
+};
+
 type FormatSpec = {
   readonly label: string;
   readonly extension: string;
   readonly mime: string;
-  readonly write: (items: ReadonlyArray<VectorPaintItem>, title: string) => string;
+  readonly write: (items: ReadonlyArray<VectorPaintItem>, title: string) => WrittenFile;
   readonly note: string;
 };
 
@@ -35,22 +41,35 @@ const FORMATS: Readonly<Record<ArtworkVectorFormat, FormatSpec>> = {
     label: 'PDF',
     extension: '.pdf',
     mime: 'application/pdf',
-    write: (items, title) => writePdfDocument(items, { title }).text,
+    write: (items, title) => ({ text: writePdfDocument(items, { title }).text, warning: null }),
     note: 'The page is the artwork extent; curves stay curves.',
   },
   eps: {
     label: 'EPS',
     extension: '.eps',
     mime: 'application/postscript',
-    write: (items, title) => writeEpsDocument(items, { title }).text,
+    write: (items, title) => ({ text: writeEpsDocument(items, { title }).text, warning: null }),
     note: 'The bounding box is the artwork extent; curves stay curves.',
   },
   geojson: {
     label: 'GeoJSON',
     extension: '.geojson',
     mime: 'application/geo+json',
-    write: (items) => writeGeoJsonDocument(items).text,
-    note: 'Curves are flattened within 0.01 mm; coordinates are millimetres with y up.',
+    write: (items) => {
+      const document = writeGeoJsonDocument(items);
+      return {
+        text: document.text,
+        warning:
+          document.unmergedItemCount === 0
+            ? null
+            : document.unmergedItemCount +
+              ' shape(s) have crossing outlines; their pieces are kept as separate, overlapping' +
+              ' polygons (marked "unmerged"), not merged as the PDF fill shows.',
+      };
+    },
+    note:
+      'Curves are flattened within 0.01 mm. Coordinates are millimetres with y up, not' +
+      ' longitude/latitude: the file is not georeferenced (RFC 7946 section 4).',
   },
 };
 
@@ -96,6 +115,7 @@ export async function handleExportArtworkFormat(ctx: ExportArtworkFormatContext)
     }
     await target.write(new Blob([file.value.text], { type: spec.mime }));
     const omitted = file.value.omittedObjectCount;
+    const warning = file.value.warning;
     ctx.pushToast(
       'Exported ' +
         file.value.objectCount +
@@ -103,8 +123,9 @@ export async function handleExportArtworkFormat(ctx: ExportArtworkFormatContext)
         target.displayName +
         '. Text is outlined. ' +
         spec.note +
-        (omitted > 0 ? ' ' + omitted + ' image or relief item(s) were left out.' : ''),
-      omitted > 0 ? 'warning' : 'success',
+        (omitted > 0 ? ' ' + omitted + ' image or relief item(s) were left out.' : '') +
+        (warning === null ? '' : ' ' + warning),
+      omitted > 0 || warning !== null ? 'warning' : 'success',
     );
   } catch (error) {
     failed(error instanceof Error ? error.message : String(error));
@@ -118,7 +139,12 @@ async function exportFile(
   ids: readonly string[] | undefined,
   evaluation: Parameters<typeof materializeVariableText>[1],
   title: string,
-): Promise<Result<{ text: string; objectCount: number; omittedObjectCount: number }, string>> {
+): Promise<
+  Result<
+    { text: string; warning: string | null; objectCount: number; omittedObjectCount: number },
+    string
+  >
+> {
   const resolved = await materializeVariableText(
     project,
     evaluation,
@@ -127,10 +153,10 @@ async function exportFile(
   if (!resolved.ok) return err(resolved.preflight.issues.map((issue) => issue.message).join(' '));
   const artwork = sceneVectorArtwork(resolved.project, ids);
   if (artwork.kind === 'error') return artwork;
-  const text = writeText(spec, artwork.value.items, title);
-  if (text.kind === 'error') return text;
+  const written = writeText(spec, artwork.value.items, title);
+  if (written.kind === 'error') return written;
   return ok({
-    text: text.value,
+    ...written.value,
     objectCount: artwork.value.objectCount,
     omittedObjectCount: artwork.value.omittedObjectCount,
   });
@@ -140,7 +166,7 @@ function writeText(
   spec: FormatSpec,
   items: ReadonlyArray<VectorPaintItem>,
   title: string,
-): Result<string, string> {
+): Result<WrittenFile, string> {
   try {
     return ok(spec.write(items, title));
   } catch (error) {

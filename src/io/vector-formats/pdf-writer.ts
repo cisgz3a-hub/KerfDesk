@@ -7,22 +7,32 @@
 // startxref and %%EOF. The file is pure 7-bit ASCII, so a character offset
 // is a byte offset; the header therefore omits the optional binary comment.
 //
-// Page: MediaBox [0 0 w h] in points (1/72 in), the page size in mm times
-// 72/25.4 rounded outward to 0.0001 pt. The content stream first scales user
-// space to millimetres (cm), so every coordinate is printed in millimetres on
-// the export grid: m/l/c build subpaths, h closes a closed contour, f* (or f
+// Page: MediaBox [0 0 w h] in points (1/72 in): the grid page in mm times
+// 72/25.4 rounded outward to 0.0001 pt, plus half the stroke width on each
+// side when hairlines are drawn on the artwork-extent page, and never below
+// the 3 pt minimum (Appendix C); see paintedPageBox. The content stream
+// first maps user space to millimetres and moves the artwork to its offset
+// (cm), so every coordinate is printed in millimetres on the export grid: m/l/c build subpaths, h closes a closed contour, f* (or f
 // for nonzero artwork such as text) fills a painted item and S strokes it
 // with a 0.1 mm round-joined hairline. Colours are DeviceRGB (rg / RG).
 // Nothing is compressed and no date is written, so output is deterministic.
+//
+// Appendix C also caps a page side at 14400 default units (200 in, 5080 mm).
+// A larger page is written as PDF 1.6 with /UserUnit (section 3.6.2 of the
+// Reference, a PDF 1.6 page attribute): the smallest integer unit that brings
+// both sides within the cap, with the content scale divided by the same unit,
+// so the physical size is unchanged.
 
 import {
   itemPathCommands,
+  paintedPageBox,
+  PT_PER_MM,
   pointText,
-  pointsOutward,
   preparePage,
   rgbBytes,
   unitColorText,
   VECTOR_STROKE_WIDTH_MM,
+  type PaintedPageBox,
   type VectorPaintItem,
   type VectorWriteOptions,
 } from './vector-artwork';
@@ -30,11 +40,16 @@ import {
 /** Points per millimetre (72 / 25.4), printed in the content stream's cm. */
 export const PT_PER_MM_TEXT = '2.834645669291339';
 
+/** PDF 1.4 Reference, Appendix C: the largest page side in default units. */
+export const MAX_PAGE_SIDE_UNITS = 14400;
+
 export type PdfDocument = {
   readonly text: string;
-  /** MediaBox width and height in points. */
+  /** Physical page width and height in points (MediaBox times UserUnit). */
   readonly widthPt: number;
   readonly heightPt: number;
+  /** 1 for PDF 1.4 pages; above 1 for oversized pages written as PDF 1.6. */
+  readonly userUnit: number;
   readonly pathCount: number;
 };
 
@@ -43,9 +58,14 @@ export function writePdfDocument(
   options: VectorWriteOptions & { readonly title?: string } = {},
 ): PdfDocument {
   const page = preparePage(items, options);
-  const content = pdfContent(items, page);
-  const widthPt = pointsOutward(page.widthSteps, page.grid);
-  const heightPt = pointsOutward(page.heightSteps, page.grid);
+  const box = paintedPageBox(items, options, page);
+  const userUnit = Math.max(
+    1,
+    Math.ceil(Math.max(box.widthPt, box.heightPt) / MAX_PAGE_SIDE_UNITS - 1e-9),
+  );
+  const content = pdfContent(items, page, box, userUnit);
+  const inUnits = (pt: number): string =>
+    pointText(userUnit === 1 ? pt : Math.ceil((pt / userUnit) * 1e4 - 1e-6) / 1e4);
   const info =
     '<< /Producer (KerfDesk)' +
     (options.title === undefined ? '' : ' /Title ' + pdfString(options.title)) +
@@ -54,10 +74,12 @@ export function writePdfDocument(
     '<< /Type /Catalog /Pages 2 0 R >>',
     '<< /Type /Pages /Kids [3 0 R] /Count 1 >>',
     '<< /Type /Page /Parent 2 0 R /MediaBox [0 0 ' +
-      pointText(widthPt) +
+      inUnits(box.widthPt) +
       ' ' +
-      pointText(heightPt) +
-      '] /Resources << /ProcSet [/PDF] >> /Contents 4 0 R >>',
+      inUnits(box.heightPt) +
+      ']' +
+      (userUnit === 1 ? '' : ' /UserUnit ' + userUnit) +
+      ' /Resources << /ProcSet [/PDF] >> /Contents 4 0 R >>',
     '<< /Length ' + content.text.length + ' >>\nstream\n' + content.text + '\nendstream',
     info,
   ];
@@ -78,16 +100,26 @@ export function writePdfDocument(
     ' /Root 1 0 R /Info 5 0 R >>\nstartxref\n' +
     xref +
     '\n%%EOF\n';
-  return { text, widthPt, heightPt, pathCount: content.pathCount };
+  return {
+    text,
+    widthPt: box.widthPt,
+    heightPt: box.heightPt,
+    userUnit,
+    pathCount: content.pathCount,
+  };
 }
 
 function pdfContent(
   items: ReadonlyArray<VectorPaintItem>,
   page: ReturnType<typeof preparePage>,
+  box: PaintedPageBox,
+  userUnit: number,
 ): { text: string; pathCount: number } {
+  const scale = userUnit === 1 ? PT_PER_MM_TEXT : String(PT_PER_MM / userUnit);
+  const offset = (pt: number): string => (userUnit === 1 ? pointText(pt) : String(pt / userUnit));
   const lines: string[] = [
     'q',
-    PT_PER_MM_TEXT + ' 0 0 ' + PT_PER_MM_TEXT + ' 0 0 cm',
+    scale + ' 0 0 ' + scale + ' ' + offset(box.offsetXPt) + ' ' + offset(box.offsetYPt) + ' cm',
     VECTOR_STROKE_WIDTH_MM + ' w 1 J 1 j',
   ];
   let pathCount = 0;

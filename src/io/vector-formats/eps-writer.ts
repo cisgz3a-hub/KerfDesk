@@ -7,15 +7,17 @@
 // comment, rounded outward from the exact page), %%HiResBoundingBox with the
 // exact page in points, %%LanguageLevel: 2, a prolog that binds short names
 // to moveto / lineto / curveto / closepath, and a setup that scales user
-// space to millimetres. Each painted item is a path filled with eofill (or
+// space to millimetres after moving the artwork to its offset on the page
+// (half the stroke width when hairlines are drawn on the artwork-extent
+// page; the page never falls below 3 pt, see paintedPageBox). Each painted item is a path filled with eofill (or
 // fill for nonzero artwork such as text) or stroked as a 0.1 mm round-joined
 // hairline, in DeviceRGB. The page's lower-left corner is the origin, so the
 // bounding box starts at 0 0. Output is 7-bit ASCII and deterministic.
 
 import {
   itemPathCommands,
+  paintedPageBox,
   pointText,
-  pointsOutward,
   preparePage,
   rgbBytes,
   unitColorText,
@@ -41,8 +43,8 @@ export function writeEpsDocument(
   options: VectorWriteOptions & { readonly title?: string } = {},
 ): EpsDocument {
   const page = preparePage(items, options);
-  const widthPt = pointsOutward(page.widthSteps, page.grid);
-  const heightPt = pointsOutward(page.heightSteps, page.grid);
+  const box = paintedPageBox(items, options, page);
+  const { widthPt, heightPt } = box;
   const lines: string[] = [
     '%!PS-Adobe-3.0 EPSF-3.0',
     '%%BoundingBox: 0 0 ' + Math.ceil(widthPt) + ' ' + Math.ceil(heightPt),
@@ -57,6 +59,9 @@ export function writeEpsDocument(
     '%%EndProlog',
     '%%Page: 1 1',
     'gsave',
+    ...(box.offsetXPt === 0 && box.offsetYPt === 0
+      ? []
+      : [pointText(box.offsetXPt) + ' ' + pointText(box.offsetYPt) + ' translate']),
     PT_PER_MM_TEXT + ' ' + PT_PER_MM_TEXT + ' scale',
     VECTOR_STROKE_WIDTH_MM + ' setlinewidth 1 setlinecap 1 setlinejoin',
   ];

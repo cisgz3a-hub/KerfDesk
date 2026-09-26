@@ -7,9 +7,12 @@
 // objects of the same colour never cancel under one even-odd fill.
 //
 // Placement: each writer maps the scene frame to a Y-up page whose lower-left
-// corner is (0, 0). The page is the exact artwork extent by default, or a
-// caller's rectangle (the traced image page), and coordinates are snapped to
-// a power-of-ten millimetre grid (core/vector-export/decimal-grid).
+// corner is (0, 0). The grid page is the exact artwork extent by default, or
+// a caller's rectangle (the traced image page), and coordinates are snapped
+// to a power-of-ten millimetre grid (core/vector-export/decimal-grid). PDF
+// and EPS paint on a slightly larger page (paintedPageBox) so the stroke
+// width fits and no side is below the 3 pt minimum; GeoJSON has no ink and
+// uses the grid page itself.
 
 import {
   curveSubpathBounds,
@@ -209,6 +212,51 @@ export const PT_PER_MM = 72 / 25.4;
 export function pointsOutward(steps: number, grid: DecimalGrid): number {
   const mm = Number(formatGridIndex(steps, grid));
   return Math.ceil(mm * PT_PER_MM * 1e4 - 1e-6) / 1e4;
+}
+
+/** PDF 1.4 Reference, Appendix C: the smallest page side, in default units (points). */
+export const MIN_PAGE_SIDE_PT = 3;
+
+/**
+ * The painted page in points around the grid page: the artwork sits at
+ * (offsetXPt, offsetYPt). On the default (artwork-extent) page, stroked items
+ * add half the stroke width on every side so hairlines on the extent edge are
+ * not clipped; any side shorter than 3 pt grows to 3 pt, centred. A caller's
+ * page (the traced image) is kept as given apart from that minimum.
+ */
+export type PaintedPageBox = {
+  readonly widthPt: number;
+  readonly heightPt: number;
+  readonly offsetXPt: number;
+  readonly offsetYPt: number;
+};
+
+export function paintedPageBox(
+  items: ReadonlyArray<VectorPaintItem>,
+  options: VectorWriteOptions,
+  page: PreparedPage,
+): PaintedPageBox {
+  // Work in integer 1/10000 pt so sums stay exact.
+  const unit = 1e4;
+  const margin =
+    options.page === undefined && items.some((item) => item.paint === 'stroke')
+      ? Math.ceil(((VECTOR_STROKE_WIDTH_MM / 2) * PT_PER_MM * unit) - 1e-6)
+      : 0;
+  const minimum = MIN_PAGE_SIDE_PT * unit;
+  const side = (steps: number): { size: number; offset: number } => {
+    const art = Math.round(pointsOutward(steps, page.grid) * unit);
+    const size = art + 2 * margin;
+    if (size >= minimum) return { size, offset: margin };
+    return { size: minimum, offset: Math.floor((minimum - art) / 2) };
+  };
+  const x = side(page.widthSteps);
+  const y = side(page.heightSteps);
+  return {
+    widthPt: x.size / unit,
+    heightPt: y.size / unit,
+    offsetXPt: x.offset / unit,
+    offsetYPt: y.offset / unit,
+  };
 }
 
 export function pointText(value: number): string {

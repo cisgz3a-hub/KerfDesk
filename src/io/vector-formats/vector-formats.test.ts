@@ -85,6 +85,9 @@ const EXACT = { minX: 10, minY: 5, maxX: 40, maxY: WAVE_MAX_Y };
 const WIDTH_MM = EXACT.maxX - EXACT.minX;
 const HEIGHT_MM = EXACT.maxY - EXACT.minY;
 const GRID_MM = 0.001;
+// The sample strokes a wave, so PDF/EPS pages grow by half the 0.1 mm stroke
+// on every side (0.05 mm = 0.14173 pt, written rounded up as 0.1418 pt).
+const MARGIN_PT = 0.1418;
 const HALF_DIAGONAL_MM = (GRID_MM * Math.SQRT2) / 2;
 
 const goldenPath = (name: string): string =>
@@ -136,13 +139,16 @@ describe('PDF writer', () => {
     const box = /\/MediaBox \[0 0 ([\d.]+) ([\d.]+)\]/.exec(pdf.text);
     const width = Number(box?.[1]);
     const height = Number(box?.[2]);
-    // Rounded outward: never smaller, and at most one grid step plus 0.0001 pt larger.
+    // The exact extent rounded outward (at most one grid step plus 0.0001 pt
+    // larger), plus the stroke margin on both sides.
     for (const [written, exactMm] of [
       [width, WIDTH_MM],
       [height, HEIGHT_MM],
     ] as const) {
-      expect(written).toBeGreaterThanOrEqual(exactMm * PT_PER_MM);
-      expect(written - exactMm * PT_PER_MM).toBeLessThanOrEqual(GRID_MM * PT_PER_MM + 1e-4);
+      expect(written).toBeGreaterThanOrEqual(exactMm * PT_PER_MM + 2 * MARGIN_PT);
+      expect(written - exactMm * PT_PER_MM - 2 * MARGIN_PT).toBeLessThanOrEqual(
+        GRID_MM * PT_PER_MM + 1e-4,
+      );
     }
     // The control points would have made the page about 7 mm taller.
     expect(height).toBeLessThan((50 - 5) * PT_PER_MM);
@@ -153,7 +159,7 @@ describe('PDF writer', () => {
     const lines = content.split('\n');
     expect(lines.slice(0, 3)).toEqual([
       'q',
-      PT_PER_MM_TEXT + ' 0 0 ' + PT_PER_MM_TEXT + ' 0 0 cm',
+      PT_PER_MM_TEXT + ' 0 0 ' + PT_PER_MM_TEXT + ' ' + MARGIN_PT + ' ' + MARGIN_PT + ' cm',
       '0.1 w 1 J 1 j',
     ]);
     expect(lines.filter((l) => l === 'h')).toHaveLength(4);
@@ -207,17 +213,19 @@ describe('EPS writer', () => {
     const lines = eps.text.split('\n');
     expect(lines[0]).toBe('%!PS-Adobe-3.0 EPSF-3.0');
     const box = /^%%BoundingBox: 0 0 (\d+) (\d+)$/.exec(lines[1] ?? '');
-    expect(Number(box?.[1])).toBe(Math.ceil(WIDTH_MM * PT_PER_MM));
-    expect(Number(box?.[2])).toBe(Math.ceil(HEIGHT_MM * PT_PER_MM));
+    expect(Number(box?.[1])).toBe(Math.ceil(WIDTH_MM * PT_PER_MM + 2 * MARGIN_PT));
+    expect(Number(box?.[2])).toBe(Math.ceil(HEIGHT_MM * PT_PER_MM + 2 * MARGIN_PT));
     const hires = /^%%HiResBoundingBox: 0 0 ([\d.]+) ([\d.]+)$/.exec(lines[2] ?? '');
-    expect(Number(hires?.[1])).toBeGreaterThanOrEqual(WIDTH_MM * PT_PER_MM);
-    expect(Number(hires?.[1]) - WIDTH_MM * PT_PER_MM).toBeLessThanOrEqual(
-      GRID_MM * PT_PER_MM + 1e-4,
-    );
-    expect(Number(hires?.[2])).toBeGreaterThanOrEqual(HEIGHT_MM * PT_PER_MM);
-    expect(Number(hires?.[2]) - HEIGHT_MM * PT_PER_MM).toBeLessThanOrEqual(
-      GRID_MM * PT_PER_MM + 1e-4,
-    );
+    for (const [written, exactMm] of [
+      [Number(hires?.[1]), WIDTH_MM],
+      [Number(hires?.[2]), HEIGHT_MM],
+    ] as const) {
+      expect(written).toBeGreaterThanOrEqual(exactMm * PT_PER_MM + 2 * MARGIN_PT);
+      expect(written - exactMm * PT_PER_MM - 2 * MARGIN_PT).toBeLessThanOrEqual(
+        GRID_MM * PT_PER_MM + 1e-4,
+      );
+    }
+    expect(lines).toContain(MARGIN_PT + ' ' + MARGIN_PT + ' translate');
     expect(lines).toContain('%%LanguageLevel: 2');
     expect(lines).toContain('%%EndComments');
     expect(lines.filter((l) => l === 'eofill')).toHaveLength(1);

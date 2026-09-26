@@ -91,6 +91,6 @@ export const FILE_COMMAND_HELP: Readonly<
   'file.export-geojson': {
     family: 'file',
     tooltip:
-      'Export selected vector artwork, or all of it when nothing is selected, as GeoJSON: polygons with holes for filled artwork and lines for strokes, flattened within 0.01 mm. Coordinates are millimetres with y up from the lower-left corner, not longitude and latitude.',
+      'Export selected vector artwork, or all of it when nothing is selected, as GeoJSON: polygons with holes for filled artwork and lines for strokes, flattened within 0.01 mm. Coordinates are millimetres with y up from the lower-left corner, not longitude and latitude, so the file is not georeferenced (a deliberate departure from RFC 7946 section 4) and map tools will not place it on a map. Filled shapes follow their fill rule; shapes whose outlines cross are kept as separate, overlapping polygons rather than merged, and the export warns when that happens.',
   },
 };
