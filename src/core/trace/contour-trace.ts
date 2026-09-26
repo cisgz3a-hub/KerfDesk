@@ -67,7 +67,16 @@ const CONTOUR_COLOR = '#000000';
  *  gate (ADR-123). */
 export function isBinaryContourPreset(options: TraceOptions): boolean {
   if (options.photoDetail !== undefined) return false;
-  if (options.traceMode === 'centerline' || options.traceMode === 'edge') return false;
+  // Line + fill (ADR-454) is also 2-colour with a fixed palette, but its
+  // strokes carry widths and its gate is in pixels: the contour-only routes
+  // (supersample profile, dense-colour downscale) would drop both.
+  if (
+    options.traceMode === 'centerline' ||
+    options.traceMode === 'edge' ||
+    options.traceMode === 'hybrid'
+  ) {
+    return false;
+  }
   if (options.numberOfColors !== 2) return false;
   return options.fixedPalette?.length === 2;
 }
@@ -156,9 +165,23 @@ export function* traceImageToContourColoredPathsSteps(
   // decides exactly where its edge lies).
   // Pixel-denominated knobs keep SOURCE-pixel semantics on a supersampled
   // trace: areas scale by scale², lengths (simplify ε) by scale.
+  const polylines = yield* contourPolylinesFromMaskSteps(mask, {
+    ...contourFinishOptionsFor(options),
+    ...(crackField === null ? {} : { crackField }),
+  });
+  return polylines.length === 0
+    ? []
+    : withCanonicalTraceCurves([{ color: CONTOUR_COLOR, polylines }]);
+}
+
+/** The outline finish a trace's options ask for, less the crack field.
+ *  Pixel-denominated knobs keep SOURCE-pixel semantics on a supersampled
+ *  trace: areas scale by scale^2, lengths (simplify epsilon) by scale. Shared
+ *  with the Line + fill lane, which finishes its fill mask the same way. */
+export function contourFinishOptionsFor(options: TraceOptions): ContourFinishOptions {
   const scale = effectivePixelScale(options);
   const toleranceScale = optimizationToleranceScaleFromOptimize(options.optimize);
-  const polylines = yield* contourPolylinesFromMaskSteps(mask, {
+  return {
     minAreaPx: Math.max(options.ignoreLessThanPixels ?? 0, 0) * scale * scale,
     epsilonPx:
       SIMPLIFY_EPSILON_PX * Math.max(0.1, options.lineTolerance ?? 1) * scale * toleranceScale,
@@ -166,11 +189,7 @@ export function* traceImageToContourColoredPathsSteps(
     flattenStrength: flattenStrengthFromSmoothness(options.smoothness),
     pixelScale: scale,
     turnPolicy: normalizeTurnPolicy(options.turnPolicy),
-    ...(crackField === null ? {} : { crackField }),
-  });
-  return polylines.length === 0
-    ? []
-    : withCanonicalTraceCurves([{ color: CONTOUR_COLOR, polylines }]);
+  };
 }
 
 export type ContourFinishOptions = {

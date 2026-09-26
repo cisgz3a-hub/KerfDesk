@@ -82,6 +82,7 @@ export const TRACE_OVERRIDE_RULES = {
   colourCount: { kind: 'count-or-auto', min: MIN_COLOUR_LAYERS, max: MAX_COLOUR_LAYERS },
   colourLayerOutput: { kind: 'choice', values: COLOUR_LAYER_OUTPUTS },
   keepBackground: BOOLEAN,
+  hybridMaxStrokeWidthMm: range(0.05, 3),
 } as const satisfies Record<PersistedOverrideKey, OverrideRule>;
 
 // Exhaustive by construction, like the rules above.

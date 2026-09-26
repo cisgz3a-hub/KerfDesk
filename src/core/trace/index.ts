@@ -35,6 +35,8 @@ export {
 } from './trace-to-paths';
 export { isBinaryContourPreset } from './contour-trace';
 export { traceCenterlineStrokePaths } from './centerline';
+export { DEFAULT_HYBRID_MAX_STROKE_WIDTH_PX, traceHybridPaths } from './hybrid/trace-hybrid';
+export { HYBRID_FILL_COLOR, HYBRID_STROKE_COLOR, isHybridStrokePath } from './hybrid/hybrid-paths';
 export { coloredPathsToSvg } from './paths-to-svg';
 export type {
   BatchTraceDependencies,

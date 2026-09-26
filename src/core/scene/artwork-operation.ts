@@ -72,15 +72,30 @@ export function createArtworkOperation(
 export function createArtworkOperations(
   scene: Scene,
   object: SceneObject,
-  options: { readonly mode?: LayerMode; readonly name?: string } = {},
+  options: {
+    readonly mode?: LayerMode;
+    readonly name?: string;
+    /** Per source colour mode, e.g. a Line + fill trace's strokes and fills
+     *  (ADR-454); undefined falls back to `mode`. */
+    readonly modeForColor?: (color: string) => LayerMode | undefined;
+    /** Per source colour name suffix, e.g. "lines" and "fills"; undefined
+     *  falls back to the colour's 1-based index. */
+    readonly nameForColor?: (color: string) => string | undefined;
+  } = {},
 ): ArtworkOperationsResult {
   if (!('paths' in object)) {
     const created = createArtworkOperation(scene, object, options);
     return { object: created.object, operations: [created.operation] };
   }
   const colors = [...new Set(object.paths.map((path) => path.color.toLowerCase()))];
+  const modeFor = (color: string | undefined): LayerMode | undefined =>
+    (color === undefined ? undefined : options.modeForColor?.(color)) ?? options.mode;
   if (colors.length <= 1) {
-    const created = createArtworkOperation(scene, object, options);
+    const mode = modeFor(colors[0]);
+    const created = createArtworkOperation(scene, object, {
+      ...(options.name === undefined ? {} : { name: options.name }),
+      ...(mode === undefined ? {} : { mode }),
+    });
     return { object: created.object, operations: [created.operation] };
   }
   const baseName = options.name?.trim() || artworkOperationName(object);
@@ -88,9 +103,10 @@ export function createArtworkOperations(
   const operationIdByColor = new Map<string, string>();
   let workingScene = scene;
   colors.forEach((color, index) => {
+    const mode = modeFor(color);
     const created = createArtworkOperation(workingScene, object, {
-      ...options,
-      name: `${baseName} ${index + 1}`,
+      ...(mode === undefined ? {} : { mode }),
+      name: `${baseName} ${options.nameForColor?.(color) ?? index + 1}`,
     });
     operations.push(created.operation);
     operationIdByColor.set(color, created.operation.id);

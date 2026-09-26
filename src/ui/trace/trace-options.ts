@@ -42,6 +42,9 @@ export type LightBurnTraceSettingOverrides = ColourLayerSettingOverrides & {
   readonly edgeSensitivity?: number;
   readonly edgeDetail?: number;
   readonly edgeMinimumLinePx?: number;
+  // Line + fill (ADR-454), in placed millimetres. The dialog converts it to
+  // hybridMaxStrokeWidthPx through the placement (hybrid-stroke-width.ts).
+  readonly hybridMaxStrokeWidthMm?: number;
 };
 
 export type TraceDetectionMode = 'preset' | 'manual' | 'sketch' | 'faint-lines';

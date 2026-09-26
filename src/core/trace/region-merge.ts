@@ -13,7 +13,9 @@
 //
 // Every surviving subpath keeps its canonical curve and its path keeps its
 // operationIds, strokes and fill rule; a path nothing touched is returned as
-// the same object.
+// the same object. Paths merge by kind: the colour plus a stroke's pen width
+// and pen transform, so Line + fill's per-width stroke groups (ADR-454) keep
+// their widths.
 
 import {
   polylineToCurveSubpath,
@@ -36,7 +38,7 @@ type Box = {
 };
 
 type Entry = {
-  readonly color: string;
+  readonly key: string;
   readonly polyline: Polyline;
   readonly curve: CurveSubpath | undefined;
   readonly box: Box | null;
@@ -44,7 +46,7 @@ type Entry = {
 };
 
 /** Drop original subpaths inside `interior`, add re-traced ones inside it, and
- *  fold additions into the first existing path of the same colour. */
+ *  fold additions into the first existing path of the same kind. */
 export function replacePathsInRegion(
   existing: ReadonlyArray<ColoredPath>,
   interior: TraceBoundary,
@@ -57,13 +59,12 @@ export function replacePathsInRegion(
     interior,
   );
   const out: ColoredPath[] = [];
-  const mergedColors = new Set<string>();
+  const mergedKinds = new Set<string>();
   existing.forEach((path, index) => {
+    const key = mergeKey(path);
     const survivors = (originals[index] ?? []).filter((entry) => !entry.inside);
-    const additions = mergedColors.has(path.color)
-      ? []
-      : accepted.filter((entry) => entry.color === path.color);
-    mergedColors.add(path.color);
+    const additions = mergedKinds.has(key) ? [] : accepted.filter((entry) => entry.key === key);
+    mergedKinds.add(key);
     if (survivors.length === path.polylines.length && additions.length === 0) {
       out.push(path);
       return;
@@ -72,15 +73,22 @@ export function replacePathsInRegion(
     if (merged !== null) out.push(merged);
   });
   for (const path of replacement) {
-    if (mergedColors.has(path.color)) continue;
-    mergedColors.add(path.color);
+    const key = mergeKey(path);
+    if (mergedKinds.has(key)) continue;
+    mergedKinds.add(key);
     const merged = withEntries(
-      { color: path.color, polylines: [] },
-      accepted.filter((entry) => entry.color === path.color),
+      path,
+      accepted.filter((entry) => entry.key === key),
     );
     if (merged !== null) out.push(merged);
   }
   return out;
+}
+
+function mergeKey(path: ColoredPath): string {
+  const t = path.strokeTransform;
+  const pen = t === undefined ? '' : `${t.a},${t.b},${t.c},${t.d}`;
+  return `${path.color}|${path.strokeWidthMm ?? ''}|${pen}`;
 }
 
 function acceptedReplacements(
@@ -110,7 +118,7 @@ function borderPairs(
   }> = [];
   for (const retraced of nearReplacements) {
     for (const original of nearOriginals) {
-      if (original.color !== retraced.color) continue;
+      if (original.key !== retraced.key) continue;
       if (original.polyline.closed !== retraced.polyline.closed) continue;
       const d = boxDistance(original.box, retraced.box);
       if (d <= REGION_MATCH_TOLERANCE_PX) candidates.push({ original, retraced, d });
@@ -131,10 +139,11 @@ function borderPairs(
 function pathEntries(path: ColoredPath, interior: TraceBoundary): Entry[] {
   // Curves are index-aligned with polylines; a mismatched array is not.
   const curves = path.curves?.length === path.polylines.length ? path.curves : undefined;
+  const key = mergeKey(path);
   return path.polylines.map((polyline, index) => {
     const box = polylineBox(polyline);
     return {
-      color: path.color,
+      key,
       polyline,
       curve: curves?.[index],
       box,
