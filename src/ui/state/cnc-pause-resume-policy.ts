@@ -1,4 +1,5 @@
 import type { MachineKind } from '../../core/scene';
+import type { CncPauseLiftPhase } from './cnc-pause-lift-state';
 
 // ADR-180 amendment 2 (2026-07-25): CNC Pause now uses GRBL's safety-door byte
 // rather than a bare feed hold, so the machine stops in place AND the controller
@@ -26,7 +27,24 @@ const CNC_RESUME_UNCONFIRMED_MODE_MESSAGE =
 
 const CNC_PAUSE_MESSAGE =
   'Pause stops motion in place and switches the spindle off; position is kept and the ' +
-  'job can be resumed. Use ABORT JOB or the physical E-stop if the cutter is unsafe.';
+  'job can be resumed. When the program allows it, KerfDesk then lifts the bit to safe ' +
+  'height, so Resume spins up above the cut instead of in it. Use ABORT JOB or the ' +
+  'physical E-stop if the cutter is unsafe.';
+
+// ADR-411: Pause and lift. While a lift exists the controller no longer holds
+// the job, so the door-resume advice above does not apply.
+export const CNC_LIFT_PHASE_MESSAGES: Readonly<Record<CncPauseLiftPhase, string>> = {
+  lifting:
+    'Pause and lift is raising the bit out of the cut. Use ABORT JOB or the physical E-stop ' +
+    'if unsafe.',
+  lifted:
+    'The bit is lifted to safe height with the spindle off. Resume spins the spindle up there, ' +
+    "waits the program's spin-up dwell, moves back over the stop point and feeds down into " +
+    'its own cut before the job continues.',
+  entering:
+    'Resume is spinning up above the cut and taking the bit back to where it stopped. Use ' +
+    'ABORT JOB or the physical E-stop if unsafe.',
+};
 
 /**
  * Advisory shown beside a paused CNC job's Resume control. Informational only —
@@ -35,8 +53,10 @@ const CNC_PAUSE_MESSAGE =
 export function cncResumeAdvisoryNotice(
   machineKind: MachineKind | null,
   laserModeEnabled: boolean | undefined,
+  liftPhase: CncPauseLiftPhase | null = null,
 ): string | null {
   if (machineKind !== 'cnc') return null;
+  if (liftPhase !== null) return CNC_LIFT_PHASE_MESSAGES[liftPhase];
   if (laserModeEnabled === undefined) return CNC_RESUME_UNCONFIRMED_MODE_MESSAGE;
   return laserModeEnabled === false
     ? CNC_RESUME_ADVISORY_MESSAGE

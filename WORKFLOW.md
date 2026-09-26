@@ -1500,9 +1500,62 @@ minimum target size.
    the job frozen and prevents an overlapping same-session Pause/Resume; **ABORT JOB** and the physical
    E-stop remain available. An actual write rejection uses the existing active-stream fail-dark
    containment and transport quarantine rather than treating ambiguously staged bytes as retryable.
-4. **No retract.** `PARKING_ENABLE` is commented out in stock GRBL, and its `PARKING_TARGET` is a *machine coordinate* — meaningless on a no-homing router. A host-side lift is deliberately not built: it would require abandoning the door hold for a drain-to-Idle pause, reintroducing a re-entry seam. If a lift is wanted, it is a firmware setting.
+4. **Retract only through Pause and lift.** `PARKING_ENABLE` is commented out in stock GRBL. When a paused job qualifies for Pause and lift (F-B7a), the bit is lifted and Resume re-enters from above. Otherwise the door resume above applies, with the bit still in the cut.
 5. The advisory informs but never gates (rule 7). What stays refused is unrelated to this flow: CNC checkpoint, start-from-line, and pass-boundary recovery jobs (ADR-143/215).
 6. **Not hardware-verified.** Whether a given controller reports `A:`/`Ov:`, and its actual door spin-up delay, are per-build facts. Air-cut before cutting material.
+
+### F-B7a. CNC Pause and lift (ADR-411)
+
+#### Success — lift
+1. After a confirmed CNC Pause (F-B7), the app checks the conditions for a lift:
+   - GRBL 1.1 or grblHAL;
+   - `$32=0` is confirmed;
+   - the build has no parking (`P` in `$I`);
+   - no pendant (MPG) is in control;
+   - the report is `Door:0` or `Hold:0`;
+   - the work offset is known.
+2. It also needs a re-entry plan from the program:
+   - The stop point lies within 0.1 mm of a line the controller may still have been running. The
+     earliest such line wins.
+   - The spindle was on, and the program has a `G4 P` spin-up dwell after its M3/M4.
+   - The bit stopped below the program's highest rapid Z.
+   - The program stays inside the supported code subset.
+3. The primary control reads **Lifting…**. The app:
+   1. writes a soft reset (`0x18`);
+   2. waits for the reboot and a fresh Idle report;
+   3. checks the machine position did not move;
+   4. writes `G21 G90 G54 G94 G17`;
+   5. writes a `G92` if the work offset came back different, and verifies it;
+   6. writes `G0 Z<safe>`.
+4. The job stays paused with the bit at safe height and the spindle off. The advice beside
+   **Resume** says Resume spins up there, returns over the stop point and feeds back into its cut.
+
+#### Success — re-entry
+1. User clicks **Resume**. The app re-checks that the controller is Idle, no pendant is in control,
+   and the work offset is unchanged. The control reads **Returning…**.
+2. It writes these one at a time, each waiting for its answer and, for moves, a fresh Idle report
+   at the target:
+   - the modal line;
+   - `G0 Z<safe>`;
+   - `M3`/`M4 S<rpm>`;
+   - the program's `G4 P<spin-up>`;
+   - its `M7`/`M8`;
+   - `G0 X Y` over the entry point;
+   - `G1 Z<entry> F<plunge>`;
+   - the motion mode and feed.
+3. The stream rewinds to the matched line and continues as a resumed job.
+
+#### Exempt — no lift
+1. If a condition in the lift's step 1 or 2 is not met, the app logs why and keeps the plain door
+   pause of F-B7.
+
+#### Error — failure after the reset
+1. Any failure after the reset ends the job with Abort's reset: a refused line, a timeout, an
+   alarm, a moved frame, or a lost port. The controller no longer holds the job.
+2. The safety notice **Pause and lift stopped** says what failed. The Interrupted job card offers
+   pass recovery (ADR-215).
+3. Pause while lifting or returning is refused; **ABORT JOB** and the physical E-stop stay
+   available.
 
 ### F-B8. Software Abort / Controller Reset
 

@@ -34,6 +34,7 @@ type CommandWriteFn = (
 
 export type ControllerCommandKind =
   | 'autofocus'
+  | 'cnc-pause-lift'
   | 'connection-handshake'
   | 'controller-identity'
   | 'home'
