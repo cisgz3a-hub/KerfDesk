@@ -73,7 +73,7 @@ The full log is `verification.md`. The first notes, on Ruida:
 
 ## Status
 
-All steps are done except the merge:
+All steps are done:
 
 1. Each track's findings are saved in `tracks/`.
 2. The lead verified every finding against the code and the upstream source
@@ -82,4 +82,4 @@ All steps are done except the merge:
 3. Every confirmed finding is fixed with a regression test. ADR-393 to ADR-400 record the
    product choices, and the Frame-first Start contract is unchanged.
 4. The final report is `docs/audits/2026-09-25-controller-full-audit.md`.
-5. `pnpm release:check`, the PR, CI and the merge into main follow on the branch.
+5. `pnpm release:check` passed, and [PR #923](https://github.com/cisgz3a-hub/KerfDesk/pull/923) carries the branch into main.

@@ -5,7 +5,7 @@ Every controller KerfDesk talks to, checked against that firmware's own source. 
 - **Checked:** main at 39d7f96, 25 Sep 2026
 - **Controllers:** GRBL 1.1h, grblHAL, FluidNC v4.0.3, the Creality Falcon A1 Pro command set, Marlin 2.1.2.8, Smoothieware edge, and the Ruida `.rd` export
 - **Upstream source:** gnea/grbl `bfb67f0c`, grblHAL core `d7aaee3d`, FluidNC `25ae119b` (v4.0.3), Marlin `1cd56c4c` (2.1.2.8), Smoothieware `38e2cc08`, and meerk40t `7e82652f` as the Ruida reference
-- **Fixes:** PR from `claude/focused-tesla-kb5if0`; decisions in ADR-393 to ADR-400
+- **Fixes:** [PR #923](https://github.com/cisgz3a-hub/KerfDesk/pull/923) from `claude/focused-tesla-kb5if0`; decisions in ADR-393 to ADR-400
 
 ## Verdict
 
