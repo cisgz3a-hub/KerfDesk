@@ -15,7 +15,6 @@ import {
   inkMaskFromPrepared,
   simplifyChain,
   smoothChainCurvature,
-  smoothRawChain,
   type InkMask,
 } from './centerline';
 import { runTraceSteps, type TraceSteps } from './trace-steps';
@@ -37,6 +36,7 @@ import { collectOutputCorners } from './centerline/curve-refine';
 import { fitSmoothCurve } from './centerline/curve-fit';
 import { denseChordBand } from './contour-chord-band';
 import { flattenStraightRuns } from './flatten-straight-runs';
+import { isSaddleVertex, smoothBetweenCorners } from './contour-loop-shape';
 import { smoothArcNoise } from './smooth-arc-noise';
 import { curvedTraceRing } from './trace-curves';
 import {
@@ -373,23 +373,6 @@ function finishLoop(staircase: ReadonlyArray<Vec2>, finish: LoopFinish): Finishe
   };
 }
 
-// A lattice vertex where ink touches ink only diagonally (a 2x2 checkerboard):
-// two boundary passages meet there, one per touching component or twice for
-// one pinched loop.
-function isSaddleVertex(mask: InkMask, vertex: Vec2): boolean {
-  const { x, y } = vertex;
-  if (!Number.isInteger(x) || !Number.isInteger(y)) return false;
-  const at = (px: number, py: number): number =>
-    px < 0 || py < 0 || px >= mask.width || py >= mask.height
-      ? 0
-      : (mask.ink[py * mask.width + px] ?? 0);
-  const a = at(x - 1, y - 1);
-  const b = at(x, y - 1);
-  const c = at(x - 1, y);
-  const d = at(x, y);
-  return a === d && b === c && a !== b;
-}
-
 // Smooth the spliced chain between its corners, then run the size-class tail.
 // Null when the tail collapses the loop (the caller retains the cracks).
 function finishDenseLoop(
@@ -449,29 +432,6 @@ function finishDenseLoop(
       : fitLoopTail(arcSmoothed, corners, finish, FIT_TOLERANCE_PX);
   }
   return finishLegacyLoop(arcSmoothed, corners, denoiseStrength, finish, featureAnchors);
-}
-
-// Taubin pre-smoothing between corner apexes: each span between two corners
-// is smoothed as an open chain, so its end apexes stay fixed as the same
-// objects. Without corners this is exactly the closed-ring pass. The output
-// is index-aligned with the input.
-function smoothBetweenCorners(points: ReadonlyArray<Vec2>, corners: ReadonlySet<Vec2>): Vec2[] {
-  if (corners.size === 0) return smoothRawChain(points, true);
-  const n = points.length;
-  const first = points.findIndex((point) => corners.has(point));
-  const out: Vec2[] = new Array<Vec2>(n);
-  let spanStart = 0;
-  for (let k = 1; k <= n; k += 1) {
-    if (k < n && !corners.has(points[(first + k) % n] as Vec2)) continue;
-    const span: Vec2[] = [];
-    for (let j = spanStart; j <= k; j += 1) span.push(points[(first + j) % n] as Vec2);
-    const smoothed = smoothRawChain(span, false);
-    for (let j = 0; j < smoothed.length - 1; j += 1) {
-      out[(first + spanStart + j) % n] = smoothed[j] as Vec2;
-    }
-    spanStart = k;
-  }
-  return out;
 }
 
 // The binary tail (saturated / pixel-fidelity sources): straight-run flatten
