@@ -152,8 +152,21 @@ export function registerDocumentExternalAcceptance() {
         await saveReopenDocument(page, kerfdesk, info);
       });
     }
+    // ADR-358 Amendment 2: clipped vector artwork imports the part its clip
+    // keeps instead of rejecting the file.
+    test('E2 masking-path-02-b.svg imports its clipped artwork', async ({
+      page,
+      kerfdesk,
+    }, info) => {
+      await page.goto('/');
+      await importDocumentFile(page, kerfdesk, pinnedDocumentFile('masking-path-02-b.svg'));
+      await expect
+        .poll(async () => (await composedSvgSnapshot(page)).project.scene.objects.length)
+        .toBeGreaterThan(0);
+      await expect(page.getByText(/Could not import masking-path-02-b\.svg/)).toHaveCount(0);
+      await page.screenshot({ path: info.outputPath('clipped.png') });
+    });
     for (const [id, name, diagnostic] of [
-      ['E2', 'masking-path-02-b.svg', /SVG vector clipping is not supported/],
       ['E6', 'spectrum.plt', /two-letter command|two letter command/i],
     ] as const) {
       test(`${id} ${name} rejects unsupported content without partial state`, async ({

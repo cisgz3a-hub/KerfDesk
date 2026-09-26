@@ -173,8 +173,9 @@ export function findOversizedLine(
 // disconnected, or errored, no ack may move it anywhere else. H5
 // (AUDIT-2026-06-10): without this, the ok acks trailing an error:N in the
 // final RX window drained the queue and promoted the stream back to 'done',
-// reporting a clean finish over a real rejection.
-function isTerminal(status: StreamerStatus): boolean {
+// reporting a clean finish over a real rejection. The serial worker lets go of
+// a run's program once the stream it releases is terminal (ADR-354 Amendment 3).
+export function isTerminal(status: StreamerStatus): boolean {
   return (
     status === 'done' || status === 'cancelled' || status === 'disconnected' || status === 'errored'
   );

@@ -10,7 +10,7 @@
 
 import { CNC_AUTOMATIC_RECOVERY_DISABLED_REASON } from '../../core/controllers/grbl/resume-program';
 import { machineKindOf } from '../../core/scene';
-import { currentOutputScope, useStore } from '../state';
+import { useStore } from '../state';
 import { jobAwareAlert } from '../state/job-aware-dialogs';
 import { useLaserStore } from '../state/laser-store';
 import {
@@ -19,33 +19,20 @@ import {
   type LastCompletedReceipt,
   type RecoveryRepository,
 } from '../state/recovery';
-import { useCameraStore } from '../state/camera-store';
-import { clearStartBlockers, reportStartBlockers } from './start-blocker-invalidation';
+import { clearStartBlockers } from './start-blocker-invalidation';
 import { useToastStore } from '../state/toast-store';
 import { streamResumeFromRawLine } from './start-job-resume-stream';
-import { prepareCurrentStartJob } from './start-job-source';
 import { noteManualRestartStarted, prepareManualRestartSource } from './manual-restart-source';
-import {
-  completedReceiptIsCurrent,
-  replayCompilationMatches,
-} from './start-job-execution-tracking';
+import { completedReceiptIsCurrent } from './start-job-execution-tracking';
 import { armFreshStartHandoff } from './start-handoff-arming';
-import {
-  completedReplayInvalidationHandler,
-  discardChangedCompletedReplay,
-} from './completed-replay-invalidation';
 import {
   currentLaserForAuthorizedStartNow,
   type CurrentStartAuthorizationArgs,
 } from './start-job-authorization';
 import { reportStartAuthorizationRefusal } from './start-job-authorization-reporting';
 import { transmitPreparedStart, type PreparedStartArgs } from './start-job-transmission';
-import { offerFixForBlockedStart } from './start-blocked-fix-offers';
-import { type StartOfferPolicy } from './start-blocked-repair';
-import { runJobReviewGate } from './job-review';
-import { captureLaserModeStartSnapshot } from '../state/laser-mode-start-evidence';
 import type { FramedRunPermit, FramedRunReviewEvidence } from '../state/framed-run';
-import { framedRunReadinessIssue } from './framed-run-readiness';
+import { framedRunReadinessIssue, REPLAY_PERMIT_MISMATCH_MESSAGE } from './framed-run-readiness';
 import {
   FRAMED_PERMIT_LOST_DURING_REVIEW_MESSAGE,
   reviewFramedRunForStart,
@@ -65,10 +52,13 @@ export async function runStartJobFlow(
   await runFreshFramedJobFlow(repository);
 }
 
-async function runFreshFramedJobFlow(repository: RecoveryRepository): Promise<void> {
+async function runFreshFramedJobFlow(
+  repository: RecoveryRepository,
+  completedReceipt: LastCompletedReceipt | null = null,
+): Promise<void> {
   clearStartBlockers();
   const permit = useLaserStore.getState().framedRun;
-  const issue = framedRunReadinessIssue(permit);
+  const issue = framedRunReadinessIssue(permit) ?? replayPermitMismatch(permit, completedReceipt);
   if (issue !== null) {
     // Start is disabled until a clean Frame of this exact job completes; only
     // the keyboard shortcut or a permit expiring under the click reaches here.
@@ -86,7 +76,21 @@ async function runFreshFramedJobFlow(repository: RecoveryRepository): Promise<vo
     return;
   }
   if (permit === null) return;
-  await runFramedPermitStart(permit, repository);
+  await runFramedPermitStart(permit, repository, completedReceipt);
+}
+
+// Run again streams a Frame permit like Start, so the permit must be for the
+// completed job it replays. The button shows only while the current job
+// matches the receipt, and a ready permit matches the current job; this
+// catches either one changing between the render and the click.
+function replayPermitMismatch(
+  permit: FramedRunPermit | null,
+  completedReceipt: LastCompletedReceipt | null,
+): string | null {
+  if (permit === null || completedReceipt === null) return null;
+  return permit.candidate.executionSignature === completedReceipt.artifact.executionSignature
+    ? null
+    : REPLAY_PERMIT_MISMATCH_MESSAGE;
 }
 
 /** Claims and transmits exactly one completion-issued permit. Derived jobs
@@ -94,6 +98,7 @@ async function runFreshFramedJobFlow(repository: RecoveryRepository): Promise<vo
 export async function runFramedPermitStart(
   permit: FramedRunPermit,
   repository: RecoveryRepository = recoveryRepository,
+  completedReceipt: LastCompletedReceipt | null = null,
 ): Promise<boolean> {
   if (useLaserStore.getState().framedRun !== permit || framedRunReadinessIssue(permit) !== null) {
     return false;
@@ -114,7 +119,7 @@ export async function runFramedPermitStart(
     return false;
   }
   try {
-    return await streamFramedRun(permit, review, claim, repository);
+    return await streamFramedRun(permit, review, claim, repository, completedReceipt);
   } finally {
     releaseFramedRunStartClaim(claim);
   }
@@ -125,10 +130,11 @@ async function streamFramedRun(
   review: FramedRunReviewEvidence,
   claim: FramedRunStartClaim,
   repository: RecoveryRepository,
+  completedReceipt: LastCompletedReceipt | null,
 ): Promise<boolean> {
   const authorizationArgs = {
     preparedAgainst: permit.controller,
-    completedReceipt: null,
+    completedReceipt,
     expectedExecutionSignature: permit.candidate.executionSignature,
     repository,
     framedRunClaim: claim,
@@ -145,81 +151,21 @@ async function streamFramedRun(
     reviewModel: review.reviewModel,
     laserModeStartEvidence: review.laserModeStartEvidence,
     cncSetupAttestation: review.cncSetupAttestation,
-    completedReceipt: null,
+    completedReceipt,
     repository,
     framedRunClaim: claim,
   });
 }
 
-/** Exact-job replay after a fully settled completion. This still performs the
- * complete current Start flow and creates a new run identity at line one. */
+/** Exact-job replay after a fully settled completion (ADR-372 Amendment 1).
+ * It follows Start exactly: it needs a completed Frame of this job, streams
+ * that permit's bytes from line one with a new run identity, and never runs a
+ * Frame itself. The receipt records which completed run it replays. */
 export async function runCompletedJobAgainFlow(
   receipt: LastCompletedReceipt,
   repository: RecoveryRepository = recoveryRepository,
 ): Promise<void> {
-  await runStartJobFlowWithReceipt(receipt, repository);
-}
-
-async function runStartJobFlowWithReceipt(
-  completedReceipt: LastCompletedReceipt | null,
-  repository: RecoveryRepository,
-  offerPolicy: StartOfferPolicy = 'offer-fixes',
-): Promise<void> {
-  clearStartBlockers();
-  const laser = useLaserStore.getState();
-  const app = useStore.getState();
-  const { project } = app;
-  const laserModeStartSnapshot = captureLaserModeStartSnapshot(laser);
-  const camera = useCameraStore.getState();
-  const prepared = await prepareCurrentStartJob(
-    app,
-    laser,
-    camera,
-    completedReceipt?.artifact.jobOrigin,
-  );
-  if (!prepared.ok) {
-    if ((await repairOrReportBlockedStart(prepared.messages, offerPolicy)) === 'retry') {
-      return runStartJobFlowWithReceipt(completedReceipt, repository, 'no-offers');
-    }
-    return;
-  }
-  if (completedReceipt !== null && !replayCompilationMatches(prepared, completedReceipt)) {
-    await discardChangedCompletedReplay(completedReceipt, repository);
-    return;
-  }
-  // ADR-224: the Job Review dialog replaces the warnings toast and the two
-  // native start confirms here. It returns the exact bundle that must stream
-  // — re-prepared if the operator edited settings inside the review — plus
-  // the same evidence/attestation objects the confirms used to produce.
-  const review = await runJobReviewGate({
-    initial: { app, project, laser, prepared, laserModeStartSnapshot },
-    completedReceipt,
-    ...completedReplayInvalidationHandler(completedReceipt, repository),
-  });
-  if (review === null) return;
-  const { bundle, reviewedAtIso, reviewModel, laserModeStartEvidence, cncSetupAttestation } =
-    review;
-  const machineKind = machineKindOf(bundle.project.machine);
-  const currentLaser = await currentLaserForAuthorizedStart({
-    preparedAgainst: bundle.laser,
-    completedReceipt,
-    expectedExecutionSignature: bundle.prepared.canvasPlan.retentionKey,
-    repository,
-  });
-  if (currentLaser === null) return;
-  await streamPreparedStart({
-    outputScope: currentOutputScope(bundle.app),
-    project: bundle.project,
-    laser: currentLaser,
-    prepared: bundle.prepared,
-    machineKind,
-    reviewedAtIso,
-    reviewModel,
-    laserModeStartEvidence,
-    cncSetupAttestation,
-    completedReceipt,
-    repository,
-  });
+  await runFreshFramedJobFlow(repository, receipt);
 }
 
 async function currentLaserForAuthorizedStart(
@@ -236,26 +182,6 @@ async function currentLaserForAuthorizedStart(
     args.repository,
   );
   return null;
-}
-
-// Blocks that have a one-click remedy offer it in place instead of
-// dead-ending in an alert. Retried at most once ('no-offers') so a gate that
-// still fails cannot loop the operator through the same dialog. 'handled'
-// (frame trace underway) skips the refusal report entirely — its toast
-// already tells the operator to press Start again after the trace.
-async function repairOrReportBlockedStart(
-  messages: ReadonlyArray<string>,
-  offerPolicy: StartOfferPolicy,
-): Promise<'retry' | 'blocked'> {
-  if (offerPolicy === 'offer-fixes') {
-    const repair = await offerFixForBlockedStart(messages);
-    if (repair === 'retry') return 'retry';
-    if (repair === 'handled') return 'blocked';
-  }
-  reportStartBlockers(messages);
-  const lines = messages.map((message) => `• ${message}`).join('\n');
-  jobAwareAlert(`Cannot start job:\n\n${lines}`);
-  return 'blocked';
 }
 
 // ADR-337: nothing proportional to the job's geometry runs between here and

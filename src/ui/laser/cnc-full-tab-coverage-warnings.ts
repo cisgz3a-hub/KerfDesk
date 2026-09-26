@@ -18,8 +18,14 @@
 // their bridges, the advisory just stays quiet.
 
 import { compileCncJob, isProfileCutType, passNeedsTabs, tabTopZMm } from '../../core/cnc';
+import { settingsWithStockTabGate } from '../../core/cnc/cnc-tabs';
 import type { Job } from '../../core/job';
-import { DEFAULT_CNC_LAYER_SETTINGS, type Layer, type Project } from '../../core/scene';
+import {
+  DEFAULT_CNC_LAYER_SETTINGS,
+  type CncLayerSettings,
+  type Layer,
+  type Project,
+} from '../../core/scene';
 
 const Z_EPS = 1e-9;
 
@@ -30,13 +36,20 @@ export function detectCncFullTabCoverageWarnings(
   const machine = project.machine;
   if (machine === undefined || machine.kind !== 'cnc') return [];
 
-  const candidates = project.scene.layers.filter(layerRequestsDeepTabbedProfile);
+  // The compiler's own tab settings: skipped where the floor holds the part, and
+  // measured from the stock bottom when the stock is set (ADR-258 amendment 3).
+  const stockThicknessMm = machine.stock.thicknessMm;
+  const tabSettings = (layer: Layer) =>
+    settingsWithStockTabGate(layer.cnc ?? DEFAULT_CNC_LAYER_SETTINGS, stockThicknessMm);
+  const candidates = project.scene.layers.filter(
+    (layer) => layer.output && layerRequestsDeepTabbedProfile(tabSettings(layer)),
+  );
   if (candidates.length === 0) return [];
 
   const job = compiledJob ?? compileCncJob(project.scene, project.device, machine);
   const warnings: string[] = [];
   for (const layer of candidates) {
-    const settings = layer.cnc ?? DEFAULT_CNC_LAYER_SETTINGS;
+    const settings = tabSettings(layer);
     const tabTop = tabTopZMm(settings.depthMm, settings.tabHeightMm);
     const passZs = job.groups
       .flatMap((group) =>
@@ -67,9 +80,7 @@ export function detectCncFullTabCoverageWarnings(
   return warnings;
 }
 
-function layerRequestsDeepTabbedProfile(layer: Layer): boolean {
-  if (!layer.output) return false;
-  const settings = layer.cnc ?? DEFAULT_CNC_LAYER_SETTINGS;
+function layerRequestsDeepTabbedProfile(settings: CncLayerSettings): boolean {
   return (
     settings.tabsEnabled &&
     isProfileCutType(settings.cutType) &&

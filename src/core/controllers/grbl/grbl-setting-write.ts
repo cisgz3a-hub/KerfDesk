@@ -56,20 +56,29 @@ export function buildGrblSettingWrite(
   return blocked(`${row.code} is not writable by the guarded writer.`);
 }
 
+export const ROUTER_LASER_MODE_WRITE_REFUSAL =
+  'Router machine setup cannot write $32=1 or a non-zero $32 value. Only $32=0 is allowed for a spindle: laser mode skips the spin-up delay and runs the M3 dwell with the spindle off. Switch the project to laser mode only for a laser.';
+
 export function grblSettingMachineKindIssue(
   machineKind: MachineKind,
   id: number,
   value: string,
 ): string | null {
   const normalizedValue = value.trim();
-  if (machineKind !== 'laser' || id !== 32 || normalizedValue === '') return null;
+  if (id !== 32 || normalizedValue === '') return null;
   // GRBL truncates the parsed float into an 8-bit integer before applying
   // $32. Values such as 0.5 therefore disable laser mode just like literal
   // zero, while oversized values can wrap. The confirmed Console lane accepts
-  // a broader numeric grammar than Machine Settings, so laser projects allow
-  // only the one canonical value whose firmware meaning is unambiguous.
-  if (normalizedValue === '1') return null;
-  return 'Laser machine setup cannot write $32=0 or a non-canonical $32 value. Only exact $32=1 is allowed for a laser; switch the project to CNC/router mode only for a spindle machine.';
+  // a broader numeric grammar than Machine Settings, so each machine kind
+  // allows only the one canonical value whose firmware meaning is unambiguous:
+  // $32=1 for a laser, and $32=0 for a router (CNC audit JR-1, ADR-180
+  // Amendment 6).
+  if (machineKind === 'laser') {
+    if (normalizedValue === '1') return null;
+    return 'Laser machine setup cannot write $32=0 or a non-canonical $32 value. Only exact $32=1 is allowed for a laser; switch the project to CNC/router mode only for a spindle machine.';
+  }
+  // A router takes any plain zero ($32=0, $32=0.0); GRBL stores each as 0.
+  return /^0+(?:\.0+)?$/.test(normalizedValue) ? null : ROUTER_LASER_MODE_WRITE_REFUSAL;
 }
 
 export function grblSettingCommandMachineKindIssue(

@@ -18,10 +18,11 @@
 // only what the project says, and a value left from thicker stock frees the
 // parts with no tabs, so a skip always names the thickness it relied on.
 
-import { isProfileCutType } from '../../core/cnc';
-import { cutCanFreePart } from '../../core/cnc/cnc-tabs';
+import { isProfileCutType, passNeedsTabs, tabTopZMm } from '../../core/cnc';
+import { cutCanFreePart, settingsWithStockTabGate } from '../../core/cnc/cnc-tabs';
 import {
   DEFAULT_CNC_LAYER_SETTINGS,
+  DEFAULT_CNC_STOCK,
   sceneObjectUsesOperation,
   type CncLayerSettings,
   type Layer,
@@ -67,6 +68,7 @@ function layerStockWarning(layer: Layer, stockThicknessMm: number): string | nul
     return (
       `Layer ${layer.id} cuts ${settings.depthMm} mm into ${stockThicknessMm} mm stock — ` +
       `${pastMm.toFixed(2)} mm past the bottom, into the spoilboard. ` +
+      overcutTabNote(settings, stockThicknessMm) +
       'Reduce the cut depth if that is not intended.'
     );
   }
@@ -80,6 +82,30 @@ function layerStockWarning(layer: Layer, stockThicknessMm: number): string | nul
     );
   }
   return null;
+}
+
+// ADR-258 amendment 3 (CNC audit TP-1): how much of each tab an overcut profile
+// leaves in the stock. A set stock thickness keeps the full tab above the stock
+// bottom, which relies on that thickness being right; the shipped default still
+// measures from the cut floor, so the overcut eats into the tab.
+function overcutTabNote(settings: CncLayerSettings, stockThicknessMm: number): string {
+  if (!isProfileCutType(settings.cutType) || !settings.tabsEnabled) return '';
+  const tabs = settingsWithStockTabGate(settings, stockThicknessMm);
+  if (!tabs.tabsEnabled || !passNeedsTabs(-tabs.depthMm, tabs.depthMm, tabs.tabHeightMm)) {
+    return '';
+  }
+  if (stockThicknessMm !== DEFAULT_CNC_STOCK.thicknessMm) {
+    return (
+      `Its holding tabs stay ${formatMm(settings.tabHeightMm)} mm thick above the stock bottom, ` +
+      'which relies on Stock thickness being right. '
+    );
+  }
+  const inStockMm = stockThicknessMm + tabTopZMm(tabs.depthMm, tabs.tabHeightMm);
+  return inStockMm > 0
+    ? `Stock thickness is still the default, so its tabs are measured from the cut floor and only ` +
+        `${formatMm(inStockMm)} mm of each is in the stock. Set Stock thickness to keep them full height. `
+    : 'Stock thickness is still the default, so its tabs are measured from the cut floor and sit ' +
+        'below the stock, and the part comes free. Set Stock thickness to keep them. ';
 }
 
 /** True when the compiler drops tabs this profile asks for (cnc-tabs.ts). */

@@ -3,6 +3,7 @@ import { effectiveFillOverscanMm } from '../../../core/job/fill-overscan';
 import {
   createLayer,
   DEFAULT_CNC_LAYER_SETTINGS,
+  DEFAULT_CNC_MACHINE_CONFIG,
   type CncLayerSettings,
   type Layer,
 } from '../../../core/scene';
@@ -120,6 +121,23 @@ describe('cncOperationDetail', () => {
       'tabs 4 per shape (6 × 2 mm), skipped: the 16 mm floor holds the part',
     );
     expect(cncOperationDetail({ ...settings, depthMm: 19 }, 19)).not.toContain('skipped');
+  });
+
+  // ADR-258 amendment 3: a set stock thickness measures a kept tab from the
+  // stock bottom; the shipped default still measures it from the cut floor.
+  it('says a kept tab stands on the stock bottom when the stock is set', () => {
+    const settings: CncLayerSettings = {
+      ...DEFAULT_CNC_LAYER_SETTINGS,
+      cutType: 'profile-outside',
+      depthMm: 19,
+      tabsEnabled: true,
+    };
+    expect(cncOperationDetail(settings, 19)).toContain(
+      'tabs 4 per shape (6 × 2 mm) above the stock bottom',
+    );
+    expect(
+      cncOperationDetail(settings, DEFAULT_CNC_MACHINE_CONFIG.stock.thicknessMm),
+    ).not.toContain('above the stock bottom');
   });
 
   it('includes direction, entry, finish allowance, strategy, and material feeds', () => {

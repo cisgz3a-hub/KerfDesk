@@ -9,7 +9,12 @@ import { CHIPLOAD_MATERIALS, isProfileCutType, zPassDepths } from '../../../core
 import { cutCanFreePart } from '../../../core/cnc/cnc-tabs';
 import { findCncMachineStarterById } from '../../../core/cnc/machine-starters';
 import { MAX_FILL_OVERSCAN_MM } from '../../../core/job/compile-job-defaults';
-import type { CncLayerSettings, Layer, LayerOperationSettings } from '../../../core/scene';
+import {
+  DEFAULT_CNC_STOCK,
+  type CncLayerSettings,
+  type Layer,
+  type LayerOperationSettings,
+} from '../../../core/scene';
 import type { MaterialLibraryDocument } from '../../../io/material-library';
 import { materialBindingStatus } from '../../layers/material-binding-status';
 import { formatMm } from './job-review-format';
@@ -195,15 +200,16 @@ function laserTabsPart(settings: LayerOperationSettings): string {
 function cncTabsPart(settings: CncLayerSettings, stockThicknessMm: number | undefined): string {
   if (!settings.tabsEnabled) return 'tabs off';
   const configured = `tabs ${settings.tabsPerShape} per shape (${formatMm(settings.tabWidthMm)} × ${formatMm(settings.tabHeightMm)} mm)`;
+  if (stockThicknessMm === undefined) return configured;
   // ADR-258 amendment 1: the compiler drops tabs where the floor holds the part,
   // so say so rather than list tabs that will not be cut.
-  if (
-    stockThicknessMm === undefined ||
-    cutCanFreePart(settings.depthMm, settings.tabHeightMm, stockThicknessMm)
-  ) {
-    return configured;
+  if (!cutCanFreePart(settings.depthMm, settings.tabHeightMm, stockThicknessMm)) {
+    return `${configured}, skipped: the ${formatMm(stockThicknessMm - settings.depthMm)} mm floor holds the part`;
   }
-  return `${configured}, skipped: the ${formatMm(stockThicknessMm - settings.depthMm)} mm floor holds the part`;
+  // Amendment 3: a set stock thickness measures a kept tab from the stock bottom.
+  return stockThicknessMm === DEFAULT_CNC_STOCK.thicknessMm
+    ? configured
+    : `${configured} above the stock bottom`;
 }
 
 function cncEntryPart(settings: CncLayerSettings): ReadonlyArray<string> {

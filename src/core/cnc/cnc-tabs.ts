@@ -3,6 +3,8 @@
 //
 // Model: tabs occupy the bottom `tabHeightMm` of the cut. Passes at or above
 // the tab top cut the full loop; passes below it skip the tab intervals —
+// (with a set stock thickness the compiler measures that height from the stock
+// bottom instead, through settingsWithStockTabGate; ADR-258 amendment 3) —
 // reusing the laser tab-splitting geometry (skip windows along the perimeter).
 // The skip length adds one tool diameter so the PHYSICAL bridge is the
 // requested width after the bit (radius on each side) eats into the gap.
@@ -62,15 +64,37 @@ export function cutCanFreePart(
   return stockThicknessMm - depthMm < tabHeightMm - TAB_EPS;
 }
 
-/** The layer settings the pass builders see: tabs off where the floor holds the part. */
+// ADR-258 amendment 3 (CNC audit TP-1): with a set stock thickness a tab is one
+// tab height of material above the stock bottom, as Easel measures it, so a cut
+// that runs on into the spoilboard no longer thins or removes the tabs. The pass
+// builders measure the tab top up from the cut floor (tabTopZMm), so this is the
+// floor-measured height that puts the top there. The shipped stock thickness
+// reads as never set and keeps the cut-floor rule, as cutCanFreePart does.
+export function tabHeightAboveCutFloorMm(
+  depthMm: number,
+  tabHeightMm: number,
+  stockThicknessMm: number,
+): number {
+  if (stockThicknessMm === DEFAULT_CNC_STOCK.thicknessMm) return tabHeightMm;
+  return tabHeightMm + Math.max(0, depthMm) - stockThicknessMm;
+}
+
+/** The layer settings the pass builders see: tabs off where the floor holds the
+ * part, and a kept tab measured from the stock bottom when the stock is set. */
 export function settingsWithStockTabGate(
   settings: CncLayerSettings,
   stockThicknessMm: number,
 ): CncLayerSettings {
   if (!settings.tabsEnabled) return settings;
-  return cutCanFreePart(settings.depthMm, settings.tabHeightMm, stockThicknessMm)
-    ? settings
-    : { ...settings, tabsEnabled: false };
+  if (!cutCanFreePart(settings.depthMm, settings.tabHeightMm, stockThicknessMm)) {
+    return { ...settings, tabsEnabled: false };
+  }
+  const tabHeightMm = tabHeightAboveCutFloorMm(
+    settings.depthMm,
+    settings.tabHeightMm,
+    stockThicknessMm,
+  );
+  return tabHeightMm === settings.tabHeightMm ? settings : { ...settings, tabHeightMm };
 }
 
 export function splitPassForTabs(

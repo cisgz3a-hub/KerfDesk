@@ -81,10 +81,10 @@ function openedConnection(
 ): SerialConnection {
   return createWorkerSerialConnection({
     bridge: {
-      postMessage: (message) => {
+      postMessage: (message, transfer) => {
         if (message.kind === 'attach' || message.kind === 'reattach-readable')
           throw new Error('Native serial streams stay in their worker.');
-        bridge.post(message);
+        bridge.post(message, transfer);
       },
       onMessage: (handler) =>
         bridge.subscribe((message) => {
@@ -179,9 +179,11 @@ function createNativeBridge(worker: NativeWorker) {
   worker.onerror = fail;
   worker.onmessageerror = fail;
   return {
-    post: (request: NativeSerialWorkerRequest): void => {
+    /** `transfer` moves a program's buffers into the worker (ADR-354 Amendment 3). */
+    post: (request: NativeSerialWorkerRequest, transfer: ReadonlyArray<unknown> = []): void => {
       if (failed || terminated) throw new Error('Serial worker is unavailable.');
-      worker.postMessage(request);
+      if (transfer.length === 0) worker.postMessage(request);
+      else worker.postMessage(request, transfer as Transferable[]);
     },
     subscribe: (reply: Reply): (() => void) => {
       replies.add(reply);

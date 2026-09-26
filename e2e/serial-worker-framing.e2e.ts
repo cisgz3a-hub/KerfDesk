@@ -13,9 +13,13 @@ test('real serial Worker discards an oversized record across transferred-stream 
   await page.goto('/serial-framing-probe');
   const result = await page.evaluate(async () => {
     const streamerPath = '/src/core/controllers/grbl/streamer.ts';
+    const programPath = '/src/platform/web/serial-program-buffer.ts';
     const { createStreamer, step } = (await import(
       /* @vite-ignore */ streamerPath
     )) as typeof import('../src/core/controllers/grbl/streamer');
+    const { encodeProgramLines } = (await import(
+      /* @vite-ignore */ programPath
+    )) as typeof import('../src/platform/web/serial-program-buffer');
     const worker = new Worker('/src/platform/web/serial-stream-worker.ts', { type: 'module' });
     const messages: SerialWorkerResponse[] = [];
     const writes: string[] = [];
@@ -48,11 +52,17 @@ test('real serial Worker discards an oversized record across transferred-stream 
       const transferred = readable.locked && writable.locked;
       worker.postMessage({ kind: 'prepare-arm', id: 1 });
       await waitFor(() => messages.some((message) => message.kind === 'ready'));
-      worker.postMessage({
-        kind: 'arm',
-        id: 1,
-        streamer: step(createStreamer('G1 X1.000\nG1 X2.000\n', { rxBufferBytes: 11 })).state,
-      });
+      // The program crosses once, transferred; the arm carries only the
+      // position (ADR-354 Amendment 3).
+      const { queued, ...position } = step(
+        createStreamer('G1 X1.000\nG1 X2.000\n', { rxBufferBytes: 11 }),
+      ).state;
+      const program = encodeProgramLines(queued);
+      worker.postMessage({ kind: 'program', programId: 1, ...program }, [
+        program.bytes,
+        program.offsets,
+      ]);
+      worker.postMessage({ kind: 'arm', id: 1, programId: 1, position });
       await waitFor(() => messages.some((message) => message.kind === 'armed'));
 
       incoming?.enqueue(new TextEncoder().encode('A'.repeat(65_537)));

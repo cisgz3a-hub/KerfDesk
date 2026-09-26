@@ -142,6 +142,14 @@ export async function installFramedRunPermitForCurrentState(): Promise<FramedRun
   return permit;
 }
 
+/** Spend the current permit as the real Start boundary does (a mocked startJob
+ * leaves it in place), then Frame the current job again. Run again needs a
+ * fresh Frame, like Start (ADR-372 Amendment 1). */
+export async function renewFramedRunPermit(): Promise<FramedRunPermit> {
+  useLaserStore.setState({ framedRun: null });
+  return installFramedRunPermitForCurrentState();
+}
+
 /** Test-only completion seam for a mocked physical Frame dispatch. */
 export function completeFramedRunCandidateForTest(candidate: FramedRunCandidate): void {
   useLaserStore.setState({

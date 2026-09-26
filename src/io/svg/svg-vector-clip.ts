@@ -1,19 +1,16 @@
-// A vector clip-path is refused because importing the artwork unclipped could
-// cut what the design hides. A clip that hides nothing is accepted, such as the
-// frame or artboard rectangle Figma and Illustrator wrap exported content in.
-// "Hides nothing" is proved narrowly: the clip is one shape in user-space units
-// whose outline is a single convex ring, and every point of the element lies
-// inside it, so ignoring the clip changes nothing that is cut (ADR-358
-// Amendment 1; 2026-09-25 PR audit, ART-2). Anything else is still refused.
+// The exact short cut before any vector clip is intersected: a clip that
+// provably hides none of an element changes nothing that is cut, so the
+// element imports unchanged and keeps its native curves (ADR-358 Amendment 1).
+// "Hides nothing" is proved narrowly: the clip is one shape with no nested
+// clip, whose outline is a single convex ring, and every point of the element,
+// including each curve's control hull, lies inside it. Everything else is
+// intersected with the clip region instead (Amendment 2).
 
 import type { Vec2 } from '../../core/scene';
 import type { SubPath } from './parse-path-d';
 import { elementToSubPaths } from './shape-to-polylines';
+import type { ResolvedSvgClip } from './svg-clip-resolve';
 import { applySvgMatrix, transformSvgCurveSubpath, type SvgMatrix } from './svg-curve-transform';
-import { vectorClipTransform } from './svg-clip-presentation';
-import type { SvgIdResolver } from './svg-id-resolver';
-import type { SvgClipReference } from './svg-presentation';
-import type { SvgStyleCascade } from './svg-stylesheet';
 import { linearScaleMagnitude } from './transform-scale';
 
 // Points this close outside an outline count as on it: float noise, far below
@@ -21,38 +18,26 @@ import { linearScaleMagnitude } from './transform-scale';
 const BOUNDARY_TOLERANCE = 1e-6;
 const FULL_TURN = 2 * Math.PI;
 
-/** True when every clip leaves all of `points` (document space) uncut. */
-export function clipsKeepWholeGeometry(
-  clips: ReadonlyArray<SvgClipReference>,
+export type ConvexClipOutline = ReadonlyArray<Vec2>;
+
+/** True when every outline exists and leaves all of `points` (document space) uncut. */
+export function outlinesKeepWholeGeometry(
+  outlines: ReadonlyArray<ConvexClipOutline | null>,
   points: ReadonlyArray<Vec2>,
-  resolveId: SvgIdResolver,
-  cascade: SvgStyleCascade,
 ): boolean {
   if (points.some((point) => !Number.isFinite(point.x) || !Number.isFinite(point.y))) return false;
-  return clips.every((clip) => {
-    const outline = convexClipOutline(clip, resolveId, cascade);
-    return outline !== null && points.every((point) => insideConvexOutline(outline, point));
-  });
+  return outlines.every(
+    (outline) => outline !== null && points.every((point) => insideConvexOutline(outline, point)),
+  );
 }
 
-function convexClipOutline(
-  reference: SvgClipReference,
-  resolveId: SvgIdResolver,
-  cascade: SvgStyleCascade,
-): ReadonlyArray<Vec2> | null {
-  const clip = resolveId(reference.id);
-  if (clip === null || clip.tagName.toLowerCase() !== 'clippath') return null;
-  // userSpaceOnUse is SVG's default; objectBoundingBox needs the element's bounds.
-  if ((clip.getAttribute('clipPathUnits') ?? 'userSpaceOnUse') !== 'userSpaceOnUse') return null;
-  const shapes = Array.from(clip.children).filter(
-    (child) => !['title', 'desc'].includes(child.tagName.toLowerCase()),
-  );
-  const shape = shapes.length === 1 ? shapes[0] : undefined;
-  if (shape === undefined) return null;
-  const world = vectorClipTransform(reference, clip, shape, cascade);
-  if (world === null) return null;
+/** The clip's outline in document space when it is one convex ring, else null. */
+export function convexClipOutline(clip: ResolvedSvgClip): ConvexClipOutline | null {
+  const shape = clip.shapes.length === 1 && clip.clips.length === 0 ? clip.shapes[0] : undefined;
+  if (shape === undefined || shape.clips.length > 0) return null;
+  const world = shape.matrix;
   const subpaths = elementToSubPaths(
-    shape,
+    shape.element,
     linearScaleMagnitude(world.a, world.b, world.c, world.d),
   );
   const ring = supportedClipSubpath(subpaths);

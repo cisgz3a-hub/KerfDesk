@@ -105,7 +105,7 @@ opportunity, without an extra branding delay. It introduces no startup interacti
 - **CNC Canvas Focus**: has no effect. It collapsed the CNC 3D result pane by default when the viewport was 1439 px wide or less (ADR-223), and that pane has not been shown since 2026-08-03 (F-CNC28).
 - **Left tool strip (ADR-051)**: the default strip is 50 px wide and scrolls on short windows. Edit and Draw groups retain Select, Text, Node, Measure, the drawing tools (Rectangle, Ellipse, Polygon, Star, Pen), Position-laser, and named icon buttons for the design library and Design Studio (ADR-272, flows F-DS1..F-DS4). Curve-node actions remain beside the editing tools with readable labels. Preview is in the primary toolbar, with a More fallback at narrow widths, and the Window menu.
 - **Machine-panel hierarchy (ADR-340)**: jog and origin controls remain together in the working area. Homing/focus or CNC maintenance, placement/output, history/recovery, and Console use named disclosures. Active interruption notices, repeat offers and the canonical Live Motion controls remain independent of those disclosures. Manual Air OFF uses a quiet state card; its setup guidance and switching behaviour are unchanged. Tutorial buttons no longer sit beside positioning, origin or Frame/Start: lessons live in Learn and on the tool panels that teach a procedure (ADR-348).
-- **After a job completes (ADR-340)**: the job dock shows **Job complete** and **Done** after controller settlement. Done clears only the finished run preview. The editable design, undo history, machine coordinates, Frame state and stored execution history remain intact. Run same job again remains available when its existing receipt checks allow it. Acknowledged-but-finishing, active and interrupted jobs do not offer Done. Clearing a design is still a separate project/editing action.
+- **After a job completes (ADR-340)**: the job dock shows **Job complete** and **Done** after controller settlement. Done clears only the finished run preview. The editable design, undo history, machine coordinates, Frame state and stored execution history remain intact. Run same job again remains offered while its receipt still matches the job, and like Start it needs a fresh Frame (ADR-372 Amendment 1). Acknowledged-but-finishing, active and interrupted jobs do not offer Done. Clearing a design is still a separate project/editing action.
 - **Workspace colours**: panels, drawing bed, grid, rulers and controls use the application appearance preference, defaulting to Light. Window > Appearance offers Light, Dark and Match System (ADR-339). Dark mode uses the approved charcoal drawing surface and light, readable vector ink. Contrast adjustments happen only while drawing the workspace; saved artwork, raster pixels, exported files and machine output retain their original colours and settings. The layout menu uses the same themed surface as the rest of the workspace.
 - **Notifications**: transient messages stay within the available canvas area, clear of the job dock, Live Motion bar, and zoom controls. An open modal gives notifications a reserved scrolling row so they do not cover its actions. Message lifetimes and dismissal controls are unchanged.
 - **Window menu**: checked `Cuts / Layers Panel` and `Machine Controls Panel` commands mirror the two panel states. `Toggle Side Panels` (`F12`) hides or restores both, and `Reset Workspace Layout` restores Auto and opens both panels. Compact still displays one tab at a time. Panel visibility does not affect the Live Motion bar.
@@ -165,14 +165,29 @@ opportunity, without an extra branding delay. It introduces no startup interacti
 3. Unsupported image presentation or clipping reports its reason. Decode failure, Esc cancellation
    and document replacement leave the complete file uninserted and release staged image assets.
 
-#### Edge — SVG with a vector clip
-1. A vector clip that hides none of the artwork imports as if it were absent, such as the frame or
-   artboard rectangle Figma and Illustrator wrap exported content in. KerfDesk accepts it when
-   the clip is one shape in user-space units (SVG's default) with a single convex outline, and
-   every point of the clipped artwork lies inside it (ADR-358 Amendment 1).
-2. Any other vector clip, and every vector mask and filter, still rejects the whole file with its
-   reason, because importing it unclipped could cut what the design hides.
-3. An image clip without `clipPathUnits` is read as `userSpaceOnUse`, the SVG default.
+#### Edge — SVG with a vector clip, mask or filter
+1. Clipped artwork imports as the part its clip keeps (ADR-358 Amendment 2). Filled shapes are
+   intersected with the clip as areas, under their own fill rule. Stroked paths, which are cut as
+   lines, stop at the clip's edge; a line lying on the edge is kept. Artwork wholly outside its
+   clip imports nothing.
+2. Clips are read as SVG defines them: `clipPathUnits` `userSpaceOnUse` (the default) or
+   `objectBoundingBox`, `clip-rule` `nonzero` (the default) or `evenodd`, the clip's own and its
+   shapes' transforms, several shapes, a `<use>` of a shape (as Illustrator exports clipping
+   masks), clips on groups, and nested clips, which intersect.
+3. Artwork a clip keeps whole imports unchanged with its native curves, such as content inside the
+   frame or artboard rectangle Figma and Illustrator wrap exports in (ADR-358 Amendment 1). Where
+   a clip cuts a curve, the kept part is flattened at 0.025 mm, the tolerance job compilation
+   cuts curves at.
+4. A clip KerfDesk cannot read faithfully still rejects the whole file with its reason: a clip made
+   of text (convert the text to paths first), a `<use>` in a clip that refers to anything but a
+   shape, a clip-path that names no `<clipPath>`, clip geometry or transforms set only through
+   CSS, or a clip transform that cannot be read.
+5. Vector masks and filters no longer reject the file. The artwork imports without them, and a
+   warning toast says how many elements were imported without their masks (areas the masks hide
+   are included) or without their filter effects. Masks, filters and opacity on embedded images
+   still reject the file.
+6. Image clips follow the same rules: a missing `clipPathUnits` is `userSpaceOnUse` and a missing
+   `clip-rule` is `nonzero`. KerfDesk's own exported image clips keep their curves.
 
 #### Error — file is not an SVG
 1. On drop, file type is checked by MIME and by content sniff (first 200 bytes).
@@ -1315,11 +1330,13 @@ Status bar messages (toasts that appear in the bar for 3 s) for non-blocking eve
     readable (ADR-221). Runs without a recorded start show no timer.
 
 #### Repeat — Run again
-1. **Run again** never reuses the consumed `FramedRunPermit`. It fresh-compiles the project,
-   computes and compares the new fingerprint, and opens Job Review for the deliberate repeat.
-2. The controlled repeat may use the retained compatibility `FrameVerification` proof only while
-   that proof and the new artifact still satisfy the repeat contract. It does not turn the one-use
-   permit into an unbounded replay token.
+1. **Run again** follows Start exactly (ADR-372 Amendment 1). The completed job's permit was spent
+   at its Start, so **Run same job again from start** stays greyed out until a clean Frame of this
+   exact job issues a new permit. It never runs a Frame itself and makes no offer. It then streams
+   that permit's bytes, the ones the Frame traced, through the same single Job Review, from line 1
+   with a new run ID, and the run records which completed run it repeats.
+2. A Current Position job therefore runs where the new Frame traced it, not at the first run's
+   frozen origin.
 
 #### Error — exact artifact cannot be produced
 1. The persistent blocker surface and error toast show the compile/transport reason. No Frame or job
@@ -1410,7 +1427,7 @@ minimum target size.
    bound still applies; the CNC-only Door progress extension does not.
 
 #### Success — generic CNC resume (ADR-180 amendment 2)
-1. The CNC **Resume** button is enabled alongside **ABORT JOB**. Its tooltip and the paused rail carry an advisory stating that Resume restarts the spindle, waits a fixed spin-up delay (4 s in stock GRBL), then continues the same line from where it stopped — and that the cutter is still in the cut, so it spins back up **engaged**. On a deep or full-width pass, check the bit before resuming. That advisory needs the controller to have reported `$32=0`: with laser mode on (`$32=1`), it says instead that Resume restarts motion at once with **no** spin-up and recommends **ABORT JOB** and recovery from the interrupted-job card. With `$32` unreported, it says the mode is unconfirmed and Resume **may** restart motion without spindle spin-up, and recommends verifying `$32=0` before resuming or aborting and recovering (ADR-180 Amendment 5). Job Review opens its Warnings list for a router job whose `$32` is on or unreported.
+1. The CNC **Resume** button is enabled alongside **ABORT JOB**. Its tooltip and the paused rail carry an advisory stating that Resume restarts the spindle, waits a fixed spin-up delay (4 s in stock GRBL), then continues the same line from where it stopped — and that the cutter is still in the cut, so it spins back up **engaged**. On a deep or full-width pass, check the bit before resuming. That advisory needs the controller to have reported `$32=0`: with laser mode on (`$32=1`), it says instead that Resume restarts motion at once with **no** spin-up and recommends **ABORT JOB** and recovery from the interrupted-job card. With `$32` unreported, it says the mode is unconfirmed and Resume **may** restart motion without spindle spin-up, and recommends verifying `$32=0` before resuming or aborting and recovering (ADR-180 Amendment 5). Job Review opens its Warnings list for a router job whose `$32` is on or unreported. When a GRBL or grblHAL controller reports `$32=1`, that warning carries **Send $32=0**: after a confirm, it writes the setting through Machine Settings' guarded write, reads `$$` back to verify, and the warning clears (ADR-180 Amendment 6). FluidNC, whose `$32` follows its YAML spindle type, gets no button.
 2. On Resume the store writes realtime `~` and waits for a fresh same-session report proving `Run` or `Idle` before refilling the stream — the **door-confirmed** branch, selected by driver capability (`realtime.safetyDoor`) rather than machine kind. GRBL restores spindle and coolant and holds motion for `SAFETY_DOOR_SPINDLE_DELAY` (4.0 s in stock `config.h`) so the cutter is back at speed before the interrupted move continues. In laser mode (`$32=1`) GRBL and grblHAL skip that delay, and the stopped cutter moves the instant power returns (CNC audit MC-1).
 3. Fresh post-command same-session `Door:3` reports keep **JOB RESUMING** live without refilling.
    Two seconds of silence fails; a non-resettable 30-second maximum bounds custom firmware. Only
@@ -2118,12 +2135,10 @@ the lock when the owning window closes, reloads or crashes, so crash recovery is
    settle marker, and fresh stable Idle. Then `activeRun` is removed and an exact
    `lastCompletedReceipt` is retained.
 2. **Run same job again from start** appears only while canvas, machine profile,
-   output scope, placement, and execution signature still match. Clicking performs
-   a fresh compile, fingerprint comparison, and Job Review. After the operator
-   accepts, the controlled repeat may use the retained compatibility
-   `FrameVerification` only while that proof and the new artifact still satisfy
-   the repeat contract; it then starts line 1 with a new run ID and zero recovery
-   progress.
+   output scope, placement, and execution signature still match. Like Start, it
+   is greyed out until a clean Frame of this exact job issues a permit (ADR-372
+   Amendment 1). Clicking streams that permit through Job Review, from line 1 with
+   a new run ID and zero recovery progress.
 3. Any relevant edit hides the offer. The receipt remains diagnostic history
    until another accepted run replaces it; **Forget Controller** clears it.
    Ordinary **Start current job** remains available.
@@ -2357,7 +2372,10 @@ settings and Job Review keep their existing read-only setup references.
    exact re-read check.
 2. Machine-critical travel settings are review-only. There is no fixed-value setup batch.
 3. When the active project is a laser, both Machine Setup and the confirmed Console setting lane
-   reject `$32=0` before serial transmission. Laser `$32=1` and CNC/router `$32=0` remain available.
+   reject `$32=0` before serial transmission. When it is a CNC/router, they reject `$32=1` and any
+   other non-zero `$32` the same way (ADR-180 Amendment 6): laser mode skips the spindle spin-up
+   and runs the M3 dwell with the spindle off. Laser `$32=1` and CNC/router `$32=0` remain
+   available.
 
 ---
 
@@ -3664,6 +3682,17 @@ explicitly marked below; the remaining controls and user-facing flows are planne
    thickness (ADR-258 Amendment 2). A value left from thicker stock would otherwise free the
    parts on the final pass with no tabs. The warning never blocks save or Start.
 
+#### Edge — tabs on a cut that reaches or passes the stock bottom (ADR-258 Amendment 3)
+1. With Stock thickness set, a kept tab is one tab height of material above the stock bottom,
+   however far the cut runs on into the spoilboard. On 6 mm stock, 2 mm tabs top out at Z-4 for a
+   6.5 mm and an 8.15 mm cut alike, and for a 5.5 mm cut that stops just short of the bottom. Job
+   Review's layer line says "above the stock bottom".
+2. The shipped Stock thickness reads as never set, so it still measures tabs up from the cut floor,
+   and extra depth thins them. The spoilboard warning then says how much of each tab stays in the
+   stock, or that the tabs sit below it and the part comes free, and asks for Stock thickness. With
+   Stock thickness set, it says the tabs stay full height and that this relies on the thickness
+   being right.
+
 #### Empty
 1. An operation with no bound geometry compiles to no passes and is skipped; no G-code group is
    emitted for it.
@@ -4292,6 +4321,12 @@ and lifts the command's CNC-only gate.)*
    labelled as a bed position.
 3. No park set keeps the old behaviour: Current Position parks at its start, every other mode at
    program X0 Y0. The out-of-bed advisory and the park-outside-frame note check the placed park.
+4. No park is its own setting (ADR-392 Amendment 1). Machine Setup shows Park X and Y only while
+   **Park at a bed position** is on. Turning it off removes both numbers, because 0, 0 is a real bed
+   position, not "no park". Job Review's "Park after job" reads `Bed X … · Y …` for a set park, and
+   for none it names where the job ends: "Not set · program X0 Y0", or "Not set · back to where the
+   job started" for Current Position. The CNC setup reference and the Machine Setup review page
+   show "None".
 
 ### F-CNC15. Re-zero Z at a tool change — Phase H.7
 

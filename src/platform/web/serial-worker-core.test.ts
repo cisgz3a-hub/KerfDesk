@@ -4,6 +4,7 @@
 
 import { describe, expect, it } from 'vitest';
 import { createStreamer, step, type StreamerState } from '../../core/controllers/grbl';
+import { encodeProgramLines } from './serial-program-buffer';
 import { MAX_READ_RECOVERIES_WITHOUT_DATA } from './serial-read-recovery';
 import { createSerialWorkerCore } from './serial-worker-core';
 import type { SerialWorkerResponse } from './serial-worker-protocol';
@@ -58,9 +59,17 @@ function streamingJob(rxBufferBytes = 11): StreamerState {
   return step(createStreamer('G1 X1.000\nG1 X2.000\nG1 X3.000\n', { rxBufferBytes })).state;
 }
 
+// The program crosses once in its own message; the arm carries only the
+// position (ADR-354 Amendment 3).
+function armCore(core: Harness['core']): void {
+  const { queued, ...position } = streamingJob();
+  core.handle({ kind: 'program', programId: 1, ...encodeProgramLines(queued) });
+  core.handle({ kind: 'prepare-arm', id: 1 });
+  core.handle({ kind: 'arm', id: 1, programId: 1, position });
+}
+
 function arm(h: Harness): void {
-  h.core.handle({ kind: 'prepare-arm', id: 1 });
-  h.core.handle({ kind: 'arm', id: 1, streamer: streamingJob() });
+  armCore(h.core);
 }
 
 function lines(posted: ReadonlyArray<SerialWorkerResponse>): ReadonlyArray<string> {
@@ -281,8 +290,7 @@ describe('serial worker core: how the read side ends (audits connect-1, transpor
       },
     });
     const w = attachedTo(first.readable, writable);
-    w.core.handle({ kind: 'prepare-arm', id: 1 });
-    w.core.handle({ kind: 'arm', id: 1, streamer: streamingJob() });
+    armCore(w.core);
 
     first.fail('FramingError');
     await w.core.readLoop();

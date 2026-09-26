@@ -82,7 +82,7 @@ async function readyStart(
 ): Promise<() => Promise<unknown>> {
   if (kind === 'Run Again') {
     // Seed replay through an actual accepted, settled ordinary Start so the
-    // receipt and retained Frame evidence match the current compiled job.
+    // receipt matches the current compiled job.
     await installReviewPendingFramedRunPermitForCurrentState();
     const sourceStart = runStartJobFlow(input.repository);
     await vi.waitFor(() => expect(input.repository.getSnapshot().activeRun).not.toBeNull());
@@ -94,6 +94,9 @@ async function readyStart(
     expect(await input.repository.completeRun(runId)).toEqual({ ok: true, value: true });
     const receipt = input.repository.getSnapshot().lastCompletedReceipt;
     if (receipt === null) throw new Error('Expected completed source receipt.');
+    // Run again needs a fresh Frame of the same job, like Start (ADR-372
+    // Amendment 1): the source run consumed the first permit.
+    await installReviewPendingFramedRunPermitForCurrentState();
     return () => runCompletedJobAgainFlow(receipt, input.repository);
   }
   if (kind === 'ordinary') {

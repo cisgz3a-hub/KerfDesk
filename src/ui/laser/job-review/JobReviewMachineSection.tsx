@@ -3,6 +3,7 @@
 // or CNC stock, bit, safe-Z, spindle, coolant, park — plus the ordered tool
 // plan of the exact prepared program.
 
+import type { JobOriginPlacement } from '../../../core/job';
 import type { MachineKind, Project } from '../../../core/scene';
 import { useStore } from '../../state';
 import { useLaserStore } from '../../state/laser-store';
@@ -22,12 +23,14 @@ export function JobReviewMachineSection(props: {
   readonly toolPlanLabels: ReadonlyArray<string>;
   readonly outputQualityFacts: ReadonlyArray<JobReviewFact>;
   readonly project?: Project;
+  /** The reviewed job's placement, which decides where an unset park ends. */
+  readonly startFrom?: JobOriginPlacement['startFrom'];
 }): JSX.Element {
   const liveProject = useStore((s) => s.project);
   const project = props.project ?? liveProject;
   const controllerSettings = useLaserStore((s) => s.controllerSettings);
   const facts = [
-    ...buildMachineReviewFacts(project, controllerSettings),
+    ...buildMachineReviewFacts(project, controllerSettings, props.startFrom),
     ...props.outputQualityFacts,
   ];
   return (

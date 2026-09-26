@@ -59,9 +59,10 @@ export type GcodeMetadata = {
  * beam lit (no between-pass re-arm, no seek to the current position, mode and
  * air changes after a group's first laser-off seek, a 1 mm dark step where a
  * group starts on the last burn, no zero-length M3 raster row close), and
- * Marlin G0 travel carrying its own feed.
+ * Marlin G0 travel carrying its own feed, and ADR-258 amendment 3's holding
+ * tabs measured from the stock bottom when the stock thickness is set.
  */
-export const EMITTER_REVISION = 'controller-audit-repair-20260925-v1';
+export const EMITTER_REVISION = 'tabs-from-stock-bottom-20260926-v1';
 
 // Machine-specific assumption lines (ADR-103 defect fix): router exports
 // previously carried the laser-worded `$32=1 (laser mode)` banner. The S

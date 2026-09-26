@@ -321,14 +321,20 @@ export async function harness(
 /** Frame the job on the simulator exactly as the Frame button does, wait for the
  * permit its final Idle mints, then press Start through Job Review. Returns once
  * the stream has been accepted by the controller. */
-export async function startFramedJob(
-  repository: RecoveryRepository,
-): Promise<{ readonly runId: string; readonly running: Promise<void> }> {
+/** Frame the current job through the simulator until the Frame issues its
+ * permit. Start, and Run again since ADR-372 Amendment 1, need one. */
+export async function frameUntilPermit(): Promise<void> {
   expect(await drive(runFrameNow(), 60_000)).toBe(true);
   for (let step = 0; step < 2_000 && useLaserStore.getState().framedRun === null; step += 1) {
     await tick(5);
   }
   if (useLaserStore.getState().framedRun === null) throw new Error('Frame issued no permit.');
+}
+
+export async function startFramedJob(
+  repository: RecoveryRepository,
+): Promise<{ readonly runId: string; readonly running: Promise<void> }> {
+  await frameUntilPermit();
   const running = runStartJobFlow(repository);
   for (let step = 0; step < 600 && useLaserStore.getState().streamer === null; step += 1) {
     await tick(5);

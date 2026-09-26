@@ -7,6 +7,11 @@ import { currentReplayExecutionSignature } from './start-job-execution-tracking'
 export const FRAME_JOB_FIRST_MESSAGE =
   'Frame this job first. A completed Frame authorizes the exact prepared job that Start will send.';
 
+/** Run again streams a Frame permit like Start (ADR-372 Amendment 1), so a
+ * permit for a different job than the completed one stops it. */
+export const REPLAY_PERMIT_MISMATCH_MESSAGE =
+  'The framed job is not the completed job, so Run again stopped. Start runs the framed job.';
+
 export const JOB_CHANGED_AFTER_FRAME_REASON =
   'The artwork, output selection, placement, or registration changed after Frame.';
 export const CONTROLLER_CHANGED_AFTER_FRAME_REASON =

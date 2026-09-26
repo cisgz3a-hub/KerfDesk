@@ -254,3 +254,44 @@ describe('tabs skipped because of the stock thickness (ADR-258 amendment 2)', ()
     }
   });
 });
+
+// ADR-258 amendment 3 (CNC audit TP-1): the overcut warning says how thick the
+// tabs stay, because a set stock thickness now measures them from the stock
+// bottom, and the shipped default still loses tab height to the overcut.
+describe('tab thickness in the spoilboard overcut warning (ADR-258 amendment 3)', () => {
+  const tabs = { ...DEFAULT_CNC_LAYER_SETTINGS, tabsEnabled: true };
+  function projectWith(stockThicknessMm: number, cnc: CncLayerSettings): Project {
+    const project = cncProjectWithLayerCnc(cnc);
+    const stock = { ...DEFAULT_CNC_MACHINE_CONFIG.stock, thicknessMm: stockThicknessMm };
+    return { ...project, machine: { ...DEFAULT_CNC_MACHINE_CONFIG, stock } };
+  }
+
+  it('says a set stock keeps the tabs full height above the stock bottom', () => {
+    const warnings = detectCncThroughCutTabWarnings(projectWith(6, { ...tabs, depthMm: 6.5 }));
+    expect(warnings).toHaveLength(1);
+    expect(warnings[0]).toContain('into the spoilboard');
+    expect(warnings[0]).toContain('Its holding tabs stay 2 mm thick above the stock bottom');
+  });
+
+  it('says how much of each tab the shipped default stock leaves after the overcut', () => {
+    const shipped = DEFAULT_CNC_MACHINE_CONFIG.stock.thicknessMm;
+    const partly = detectCncThroughCutTabWarnings(
+      projectWith(shipped, { ...tabs, depthMm: shipped + 0.5 }),
+    );
+    expect(partly[0]).toContain('only 1.5 mm of each is in the stock');
+    const gone = detectCncThroughCutTabWarnings(
+      projectWith(shipped, { ...tabs, depthMm: shipped + 2.15 }),
+    );
+    expect(gone[0]).toContain('sit below the stock, and the part comes free');
+  });
+
+  it('adds nothing about tabs to an overcut without them', () => {
+    const pocket = { ...tabs, cutType: 'pocket' as const, depthMm: 6.5 };
+    const tabless = { ...tabs, tabsEnabled: false, depthMm: 6.5 };
+    for (const cnc of [pocket, tabless]) {
+      const [warning] = detectCncThroughCutTabWarnings(projectWith(6, cnc));
+      expect(warning).not.toContain('holding tabs stay');
+      expect(warning).not.toContain('measured from the cut floor');
+    }
+  });
+});
