@@ -246,6 +246,9 @@ function cncMachineSetupStatePatch(
 ): Partial<MachineState> {
   const machine = state.project.machine;
   if (machine?.kind !== 'cnc') return {};
+  // A device change can move live placement (homing off turns Absolute into
+  // User Origin); Undo/Redo must restore it with the project.
+  captureSetupHistoryContext(state.project, state);
   const baseDevice = patch.deviceProfile ?? state.project.device;
   const device: DeviceProfile = { ...baseDevice, ...patch.devicePatch };
   const params = { ...machine.params, ...patch.paramsPatch };
