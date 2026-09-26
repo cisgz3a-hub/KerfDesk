@@ -34,9 +34,12 @@ consulted.
    control points, is snapped to that grid; a Bezier point therefore moves by at most half a grid
    diagonal. Elliptical arcs become cubics of at most a quarter turn; a zero-radius arc is a line
    and a zero-length arc is dropped (SVG 1.1 F.6.2). The grid page is the geometry's exact
-   bounds; PDF and EPS paint on a page built around it (`paintedPageBox`): on the default
-   artwork-extent page, if any item is stroked, half the stroke width (0.05 mm, rounded up to
-   0.0001 pt) is added on every side so a hairline on the extent edge is not half clipped, and any
+   bounds; PDF and EPS paint on a page built around it (`paintedPageBox`). On the default
+   artwork-extent page, exact extrema of the quantized cubics actually written can extend the
+   page beyond the source arc's bounds; that extra space is rounded outward to 0.0001 pt,
+   retaining the source grid and shifting only the page offset. If any item is stroked,
+   half the stroke width (0.05 mm, rounded up to 0.0001 pt) is added on every side so a hairline
+   on the extent edge is not half clipped, and any
    side shorter than 3 pt (PDF 1.4 Reference Appendix C minimum) grows to 3 pt with the artwork
    centred. A caller's page (the traced image) keeps its size apart from that minimum. GeoJSON has
    no ink and uses the grid page itself.
@@ -120,6 +123,10 @@ consulted.
   MediaBox side within 14400.
 - `src/io/pdf/pdf-vector-page.test.ts`: a curve whose control points leave the page but whose
   extent does not imports as vectors; one that truly leaves the page still falls back.
+- `src/io/vector-formats/painted-arc-page.test.ts`: independently samples the actual PDF and
+  EPS cubic operands for rotated semicircles of radius 100 and 500 mm, filled and stroked.
+  Every emitted curve and hairline fits inside its page, which remains tight to the ink;
+  the source arc's bounds alone previously clipped the cubic approximation by up to 0.136 mm.
 - `src/ui/app/export-artwork-format.test.ts`, `src/core/trace/batch-trace.test.ts`: command flow,
   file names, the picker refusal and the Multi-File hand-off (page size, Centerline strokes).
 
@@ -139,5 +146,6 @@ consulted.
   that warning under either fill rule. Only a ring that collapses to a line or point is dropped.
 - GeoJSON coordinates are millimetres and the file is not georeferenced; this is stated in the
   file, the help and the toast.
-- An exported PDF or EPS page can be up to 0.05 mm per side larger than the geometry, and never
-  smaller than 3 pt; the exact geometry bounds remain the GeoJSON `bbox` and the grid page.
+- A default artwork-extent PDF or EPS page contains its actual quantized cubic geometry, plus 0.05 mm
+  per side for strokes, and is never smaller than 3 pt. Arc-to-cubic approximation can extend
+  beyond the source arc; only the painted page grows, while the source grid stays unchanged.
