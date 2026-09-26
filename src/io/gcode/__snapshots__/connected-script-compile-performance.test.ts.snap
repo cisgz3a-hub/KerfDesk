@@ -2,7 +2,7 @@
 
 exports[`multi-artwork connected-script compilation > stays byte-exact and measurable 1`] = `
 {
-  "codeUnitCount": 1095146,
+  "codeUnitCount": 1100098,
   "head": [
     "G21",
     "G90",
@@ -21,55 +21,55 @@ exports[`multi-artwork connected-script compilation > stays byte-exact and measu
     "; cnc v-resolution-mm: auto",
     "; cnc v-carve-depth: flowing-width",
   ],
-  "lineCount": 44277,
+  "lineCount": 44457,
   "samples": [
     {
       "line": "G21",
       "lineIndex": 0,
     },
     {
-      "line": "X130.736Y347.418Z-1.500",
-      "lineIndex": 4025,
+      "line": "X125.090Y345.639Z-0.753",
+      "lineIndex": 4041,
     },
     {
-      "line": "X49.255Y356.720Z-1.063",
-      "lineIndex": 8050,
+      "line": "X46.117Y355.839Z-0.787F471",
+      "lineIndex": 8083,
     },
     {
-      "line": "X146.470Y355.294Z-2.170F380",
-      "lineIndex": 12075,
+      "line": "X146.272Y355.257Z-1.918F388",
+      "lineIndex": 12124,
     },
     {
-      "line": "X165.967Y351.028Z-1.500F376",
-      "lineIndex": 16100,
+      "line": "X165.544Y351.519Z-1.500",
+      "lineIndex": 16166,
     },
     {
-      "line": "X216.739Y356.490Z-2.067",
-      "lineIndex": 20125,
+      "line": "X224.731Y351.904Z-2.026F388",
+      "lineIndex": 20207,
     },
     {
-      "line": "X44.423Y327.939Z-2.115",
-      "lineIndex": 24151,
+      "line": "X44.226Y326.264Z-1.939",
+      "lineIndex": 24249,
     },
     {
-      "line": "X87.528Y307.948Z-2.461",
-      "lineIndex": 28176,
+      "line": "X98.058Y314.721Z-2.242",
+      "lineIndex": 28290,
     },
     {
-      "line": "X135.347Y318.443Z-0.549F385",
-      "lineIndex": 32201,
+      "line": "X118.499Y305.963Z-0.867F910",
+      "lineIndex": 32332,
     },
     {
-      "line": "X198.386Y334.220Z-1.314F348",
-      "lineIndex": 36226,
+      "line": "X192.532Y306.667Z-0.926",
+      "lineIndex": 36373,
     },
     {
-      "line": "X252.614Y311.466Z-0.869",
-      "lineIndex": 40251,
+      "line": "X255.291Y318.716Z-0.847",
+      "lineIndex": 40415,
     },
     {
       "line": "",
-      "lineIndex": 44276,
+      "lineIndex": 44456,
     },
   ],
   "tail": [
@@ -90,6 +90,6 @@ exports[`multi-artwork connected-script compilation > stays byte-exact and measu
     "G0 X0.000 Y0.000",
     "",
   ],
-  "utf8ByteCount": 1095146,
+  "utf8ByteCount": 1100098,
 }
 `;

@@ -125,10 +125,13 @@ const EXPECTED_REGION_COUNT = 12;
 // certificate budget; ownership, region count and index reuse stay unchanged.
 // ADR-442 chord-optimal flattening moved the glyph chords and so the medial
 // axis: 1,083,336 to 1,095,146 bytes on about 130 more lines, mostly longer
-// lines (more words changing per move) rather than more moves.
-const EXPECTED_GCODE_CODE_UNITS = 1_095_146;
-const EXPECTED_GCODE_SHA256 = 'f937f5790a9e6c6e661c44e4094844f8fc7e8a375018e7fcf06d77269c22a74f';
-const EXPECTED_GCODE_UTF8_BYTES = 1_095_146;
+// lines (more words changing per move) rather than more moves. Flattening each
+// cubic in one canonical direction (so shared seams match) moved the chord
+// vertices again, and the medial axis with them: 1,095,146 to 1,100,098 bytes
+// on 180 more lines.
+const EXPECTED_GCODE_CODE_UNITS = 1_100_098;
+const EXPECTED_GCODE_SHA256 = '6213711b652de729c1d4c57f905817bf39eab2ef86e8d8a1627f37ba20a6dbc6';
+const EXPECTED_GCODE_UTF8_BYTES = 1_100_098;
 const GCODE_REVIEW_EDGE_LINES = 16;
 const GCODE_REVIEW_SAMPLES = 12;
 const TEST_TIMEOUT_MS = 180_000;
