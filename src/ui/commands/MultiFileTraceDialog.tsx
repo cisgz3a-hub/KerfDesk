@@ -38,7 +38,11 @@ const PRESET_CHOICES: ReadonlyArray<Choice> = VISIBLE_TRACE_PRESET_NAMES.filter(
 const FORMAT_CHOICES: ReadonlyArray<Choice> = [
   { value: 'svg', label: 'SVG' },
   { value: 'dxf', label: 'DXF' },
+  { value: 'pdf', label: 'PDF' },
+  { value: 'eps', label: 'EPS' },
+  { value: 'geojson', label: 'GeoJSON' },
 ];
+const FORMATS: ReadonlyArray<BatchTraceFormat> = ['svg', 'dxf', 'pdf', 'eps', 'geojson'];
 const PRECISION_CHOICES: ReadonlyArray<Choice> = [0.1, 0.01, 0.001, 0.0001].map((step) => ({
   value: String(step),
   label: `${step} mm`,
@@ -102,10 +106,10 @@ export function MultiFileTraceDialog(props: {
       <ChoiceField
         label="Format"
         ariaLabel="Output format"
-        title="SVG keeps smooth curves; DXF writes millimetre polylines for CAD and CAM."
+        title="SVG, PDF and EPS keep smooth curves; DXF writes millimetre polylines for CAD and CAM; GeoJSON writes flattened polygons in millimetres."
         value={settings.format}
         choices={FORMAT_CHOICES}
-        onChange={(format) => update({ format: format === 'dxf' ? 'dxf' : 'svg' })}
+        onChange={(value) => update({ format: FORMATS.find((f) => f === value) ?? 'svg' })}
       />
       <ChoiceField
         label="Precision"

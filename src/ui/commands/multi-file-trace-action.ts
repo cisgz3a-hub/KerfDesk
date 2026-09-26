@@ -2,6 +2,7 @@ import type { ColoredPath } from '../../core/scene';
 import {
   DEFAULT_TRACE_OPTIONS,
   TRACE_PRESETS,
+  batchTraceFormatLabel,
   traceImagesToVectorFiles,
   type BatchTraceFile,
   type BatchTraceImageJob,
@@ -11,6 +12,7 @@ import {
   type TraceOptions,
 } from '../../core/trace';
 import { tracedLayersToDxf } from '../../io/dxf/export-dxf';
+import { writeTracedDrawing } from '../../io/vector-formats/traced-drawing';
 import type { PlatformAdapter } from '../../platform/types';
 import { rasterImportGeometry } from '../common/image-import';
 import type { ToastVariant } from '../state/toast-store';
@@ -98,6 +100,7 @@ export async function buildMultiFileTraceExports(
       // preview grid instead of aborting the batch. Cancellation still aborts.
       canFallBack: (error) => !isTraceAbort(error) && !isTraceRequestSuperseded(error),
       onFallback: (index) => previewResolution.add(index),
+      writeDrawing: writeTracedDrawing,
     },
     deps.output ?? {},
   );
@@ -184,7 +187,7 @@ export async function runMultiFileTrace(
       if (skippedText !== '') pushToast(skippedText, 'warning');
       return;
     }
-    const format = (batch.files[0]?.format ?? 'svg').toUpperCase();
+    const format = batchTraceFormatLabel(batch.files[0]?.format ?? 'svg');
     const summary = `Traced ${written} ${written === 1 ? 'image' : 'images'} to ${format}.`;
     const message = [summary, skippedText, ...notices.map(traceNoticeMessage)]
       .filter((part) => part !== '')
@@ -225,7 +228,7 @@ export async function writeTraceFileWithPlatform(
 ): Promise<boolean> {
   const target = await platform.pickFileForSave({
     suggestedName: file.filename,
-    extensions: [file.format === 'dxf' ? '.dxf' : '.svg'],
+    extensions: ['.' + file.format],
   });
   if (target === null) return false;
   await target.write(file.text);

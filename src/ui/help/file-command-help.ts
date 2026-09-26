@@ -78,4 +78,19 @@ export const FILE_COMMAND_HELP: Readonly<
     tooltip:
       'Export selected vector artwork, or all of it when nothing is selected, as a DXF in millimetres: one polyline per contour and one layer per colour. Curves are flattened within 0.01 mm; images are left out.',
   },
+  'file.export-pdf': {
+    family: 'file',
+    tooltip:
+      'Export selected vector artwork, or all of it when nothing is selected, as a one-page vector PDF sized to the artwork and its strokes. Curves stay curves; filled layers keep their fill rule (even-odd, text nonzero) and line layers are 0.1 mm strokes. Images are left out.',
+  },
+  'file.export-eps': {
+    family: 'file',
+    tooltip:
+      'Export selected vector artwork, or all of it when nothing is selected, as Encapsulated PostScript (EPSF 3.0) whose bounding box fits the artwork and its strokes. Curves stay curves; images are left out.',
+  },
+  'file.export-geojson': {
+    family: 'file',
+    tooltip:
+      'Export selected vector artwork, or all of it when nothing is selected, as GeoJSON: polygons with holes for filled artwork and lines for strokes, flattened within 0.01 mm. Coordinates are millimetres with y up from the lower-left corner, not longitude and latitude, so the file is not georeferenced (a deliberate departure from RFC 7946 section 4) and map tools will not place it on a map. Filled shapes follow their fill rule; shapes whose outlines cross are kept as separate, overlapping polygons rather than merged, and the export warns when that happens.',
+  },
 };

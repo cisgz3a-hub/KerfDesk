@@ -339,6 +339,49 @@ describe('traceImagesToVectorFiles', () => {
       expect.objectContaining({ pageHeight: 8, precisionMm: 0.01 }),
     );
   });
+
+  it('hands PDF, EPS and GeoJSON output to the drawing writer with the page size', async () => {
+    const writeDrawing = vi.fn((format: string) => format.toUpperCase());
+    for (const format of ['pdf', 'eps', 'geojson'] as const) {
+      const result = await traceImagesToVectorFiles(
+        [
+          {
+            sourceName: 'a.png',
+            image: rawImage(4, 4),
+            physicalSizeMm: { widthMm: 8, heightMm: 6 },
+            options: { ...DEFAULT_TRACE_OPTIONS, traceMode: 'centerline' },
+          },
+        ],
+        { trace: async () => [SQUARE_PATH], writeDrawing },
+        { format, precisionMm: 0.01 },
+      );
+      expect(result.files[0]).toMatchObject({
+        filename: 'a-trace.' + format,
+        format,
+        text: format.toUpperCase(),
+      });
+      expect(writeDrawing).toHaveBeenLastCalledWith(
+        format,
+        [expect.objectContaining({ color: '#000000' })],
+        expect.objectContaining({
+          pageWidth: 8,
+          pageHeight: 6,
+          strokeOnly: true,
+          precisionMm: 0.01,
+        }),
+      );
+    }
+  });
+
+  it('refuses a drawing format when no drawing writer is injected', async () => {
+    await expect(
+      traceImagesToVectorFiles(
+        [{ sourceName: 'a.png', image: rawImage(4, 4) }],
+        { trace: async () => [SQUARE_PATH] },
+        { format: 'geojson' },
+      ),
+    ).rejects.toThrow('GeoJSON output is not available here.');
+  });
 });
 
 describe('traceImagesToVectorFiles fallback (ADR-409)', () => {
