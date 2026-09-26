@@ -61,6 +61,45 @@ describe('wedgeFieldFit', () => {
     expect(fieldConfirmsWedge(fit)).toBe(false);
   });
 
+  it('confirms the concave corner of a paper wedge cut into ink', () => {
+    // Reversed travel keeps ink on the right: the wedge is now paper.
+    const reverse = (l: WedgeLine): WedgeLine => ({ ...l, dx: -l.dx, dy: -l.dy });
+    const notch = boxFiltered((x, y) => !inWedge(x, y));
+    const fit = wedgeFieldFit(notch, APEX, reverse(ahead), reverse(back), 1);
+    expect(fit?.max).toBeLessThan(0.05);
+    expect(fieldConfirmsWedge(fit)).toBe(true);
+  });
+
+  it('confirms the apex on a 2x bilinear enlargement of the anti-aliased wedge', () => {
+    // auto-upscale.ts upscaleBy: each enlarged pixel samples the source's
+    // pixel centres bilinearly at ((o + 0.5) / 2 - 0.5).
+    const source = boxFiltered(inWedge);
+    const enlarged: CrackSubPixelField = {
+      lumaAt: (ox, oy) => {
+        const sx = (ox + 0.5) / 2 - 0.5;
+        const sy = (oy + 0.5) / 2 - 0.5;
+        const x0 = Math.floor(sx);
+        const y0 = Math.floor(sy);
+        const fx = sx - x0;
+        const fy = sy - y0;
+        const row = (y: number): number =>
+          source.lumaAt(x0, y) * (1 - fx) + source.lumaAt(x0 + 1, y) * fx;
+        return Math.round(row(y0) * (1 - fy) + row(y0 + 1) * fy);
+      },
+      thresholdAt: () => 128,
+    };
+    const double = (l: WedgeLine): WedgeLine => ({ ...l, cx: l.cx * 2, cy: l.cy * 2 });
+    const fit = wedgeFieldFit(
+      enlarged,
+      { x: APEX.x * 2, y: APEX.y * 2 },
+      double(back),
+      double(ahead),
+      2,
+    );
+    expect(fit?.max).toBeLessThan(0.05);
+    expect(fieldConfirmsWedge(fit)).toBe(true);
+  });
+
   it('cannot judge a field without paper-to-ink contrast', () => {
     const flat: CrackSubPixelField = { lumaAt: () => 128, thresholdAt: () => 128 };
     expect(wedgeFieldFit(flat, APEX, back, ahead, 1)).toBeNull();
