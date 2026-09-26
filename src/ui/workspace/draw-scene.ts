@@ -27,7 +27,12 @@ import { drawSelectionMarquee } from './draw-selection-marquee';
 import { drawSnapGuides } from './draw-snap-guides';
 import type { SnapGuide } from './snapping';
 import type { DisplayPolylineCache } from './display-polylines';
-import { drawObjectDisplay, isVectorSceneObject, resolveObjectDisplay } from './object-display';
+import {
+  drawObjectDisplay,
+  isVectorSceneObject,
+  resolveObjectDisplay,
+  type ObjectDisplayMode,
+} from './object-display';
 import type { PathNodeRef } from '../state/path-node-edit-actions';
 import { drawCncRemoval } from './draw-cnc-removal';
 import {
@@ -94,6 +99,8 @@ export type DrawOpts = {
   readonly snapGuides?: ReadonlyArray<SnapGuide>;
   readonly cncTabLayerColor?: string;
   readonly artworkRunFocus?: ArtworkRunFocus;
+  // ADR-410 Wireframe view: outline Fill artwork instead of filling it.
+  readonly wireframe?: boolean;
 };
 
 export function drawScene(
@@ -138,6 +145,7 @@ export function drawScene(
         (opts.selectedPathNode === undefined || opts.selectedPathNode === null
           ? []
           : [opts.selectedPathNode]),
+      opts.wireframe === true ? 'wireframe' : 'design',
       opts.additionalSelectedIds,
       opts.onRasterBitmapReady,
       opts.displayPolylineCache,
@@ -268,6 +276,7 @@ function drawObjects(
   showPathNodeHandles: boolean,
   selectedPathNode: PathNodeRef | null,
   selectedPathNodes: ReadonlyArray<PathNodeRef>,
+  displayMode: ObjectDisplayMode,
   additionalSelectedIds: ReadonlySet<string> = EMPTY_SELECTION,
   onRasterBitmapReady?: () => void,
   displayPolylineCache?: DisplayPolylineCache,
@@ -287,7 +296,15 @@ function drawObjects(
     // placement fixture, not artwork; reset after, before the overlays below.
     ctx.setLineDash(isRegistrationBox(obj) ? [8, 5] : []);
     if (
-      drawObjectPolylines(ctx, obj, layerByColor, view, displayPolylineCache, onRasterBitmapReady)
+      drawObjectPolylines(
+        ctx,
+        obj,
+        layerByColor,
+        view,
+        displayPolylineCache,
+        onRasterBitmapReady,
+        displayMode,
+      )
     ) {
       simplified = true;
     }
@@ -350,9 +367,10 @@ function drawObjectPolylines(
   view: ViewTransform,
   displayPolylineCache: DisplayPolylineCache | undefined,
   requestRedraw: (() => void) | undefined,
+  displayMode: ObjectDisplayMode,
 ): boolean {
   if (!isVectorSceneObject(obj)) return false;
-  const resolved = resolveObjectDisplay(obj, layerByColor, view, displayPolylineCache, 'design');
+  const resolved = resolveObjectDisplay(obj, layerByColor, view, displayPolylineCache, displayMode);
   drawObjectDisplay(ctx, obj, resolved, view, requestRedraw);
   return resolved.isSimplified;
 }

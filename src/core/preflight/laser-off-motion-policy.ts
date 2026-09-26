@@ -1,7 +1,7 @@
 import { INTENTIONAL_LASER_OFF_MOTION_COMMENT } from '../gcode-comments';
 import { effectiveGcodeFeedMmPerMin } from '../gcode/feed-word';
 import { parseGcodeWord } from '../invariants';
-import { DEFAULT_OVERSCAN_MM } from '../job';
+import { imageOverscanMmFor } from '../job/operation-cut-extras';
 import {
   outputOperationLayers,
   sceneObjectUsesOperation,
@@ -29,13 +29,17 @@ export function controlledLaserOffTravelFeedIssue(device: DeviceProfile): string
 export function maxOutputOverscanMm(scene: Scene): number {
   const outputLayers = scene.layers.flatMap(outputOperationLayers);
   const imageLayers = outputLayers.filter((layer) => layer.mode === 'image');
-  const hasImageOutput = scene.objects.some(
-    (object) =>
-      object.kind === 'raster-image' &&
-      object.role !== 'trace-source' &&
-      imageLayers.some((layer) => sceneObjectUsesOperation(object, layer)),
+  // ADR-415: each image operation (and artwork override) sets its own overscan.
+  const imageOverscan = Math.max(
+    0,
+    ...scene.objects.flatMap((object) =>
+      object.kind === 'raster-image' && object.role !== 'trace-source'
+        ? imageLayers
+            .filter((layer) => sceneObjectUsesOperation(object, layer))
+            .map((layer) => imageOverscanMmFor(effectiveOperationForObject(layer, object)))
+        : [],
+    ),
   );
-  const imageOverscan = hasImageOutput ? DEFAULT_OVERSCAN_MM : 0;
   const fillOverscan = Math.max(
     0,
     ...outputLayers

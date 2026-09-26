@@ -71,10 +71,15 @@ export type CutGroup = {
   // carried by Follow Shape (offset) FillGroups via the Omit below; scanline
   // and island fill use fillRunwayPolicy sweep plans instead and never set it.
   readonly entryRunwayMm?: number;
+  // ADR-415: how far each closed segment runs past its start on the final
+  // pass (see cut-pass-segments.ts). Absent when the operation has no overcut
+  // or no closed segments, so existing output stays byte-identical. Offset
+  // fill groups drop it via the Omit below; overcut is a Line setting.
+  readonly finalPassOvercutMm?: number;
   readonly segments: ReadonlyArray<CutSegment>;
 };
 
-export type FillGroup = Omit<CutGroup, 'kind' | 'segments'> & {
+export type FillGroup = Omit<CutGroup, 'kind' | 'segments' | 'finalPassOvercutMm'> & {
   readonly kind: 'fill';
   readonly fillStyle?: LayerFillStyle;
   readonly islandMotionPolicy?: IslandFillMotionPolicy;

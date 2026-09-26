@@ -28,6 +28,11 @@ const SETTING_KEYS: ReadonlyArray<keyof ObjectOperationSettingsOverride> = [
   'negativeImage',
   'passThrough',
   'dotWidthCorrectionMm',
+  'perforationEnabled',
+  'perforationCutMm',
+  'perforationSkipMm',
+  'overcutMm',
+  'imageOverscanMm',
 ];
 
 export const objectOperationSettingKeys: ReadonlySet<string> = new Set(SETTING_KEYS);

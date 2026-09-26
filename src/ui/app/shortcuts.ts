@@ -377,7 +377,7 @@ const TOOL_BINDINGS: Readonly<Record<string, ToolMode>> = {
 // key labelled T (QWERTY K position, types a dagger) does not. The browser
 // exposes no synchronous way to recover the unmodified letter of a composed
 // key, so the QWERTY position is the documented binding there.
-function isAltLetterChord(e: KeyboardEvent, letter: string): boolean {
+export function isAltLetterChord(e: KeyboardEvent, letter: string): boolean {
   if (!e.altKey || hasMeta(e) || e.shiftKey) return false;
   const key = e.key.toLowerCase();
   return key === letter || (!/^[a-z]$/.test(key) && e.code === `Key${letter.toUpperCase()}`);

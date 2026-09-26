@@ -1,4 +1,5 @@
 import { DITHER_ALGORITHMS } from '../../core/scene';
+import { cutExtrasFieldErrors } from './project-cut-extras-validator';
 import {
   firstError,
   isObject,
@@ -55,6 +56,7 @@ export function validateProjectLayer(layer: unknown, path: string): string | nul
     optionalBoolean(layer, `${path}.negativeImage`),
     optionalBoolean(layer, `${path}.passThrough`),
     optionalNonNegativeNumber(layer, `${path}.dotWidthCorrectionMm`),
+    ...cutExtrasFieldErrors(layer, path),
     validateLayerSubLayers(layer['subLayers'], `${path}.subLayers`),
     validateMaterialBinding(layer['materialBinding'], `${path}.materialBinding`),
   ]);

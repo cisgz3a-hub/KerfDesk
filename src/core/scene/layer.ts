@@ -45,6 +45,14 @@ export type LayerOperationSettings = {
   readonly negativeImage: boolean;
   readonly passThrough: boolean;
   readonly dotWidthCorrectionMm: number;
+  // ADR-415. Optional so operations, presets and recipes written before them
+  // load unchanged; absent means off (perforation, overcut) or 5 mm (image
+  // overscan), which compiles byte-identically to the output before them.
+  readonly perforationEnabled?: boolean | undefined;
+  readonly perforationCutMm?: number | undefined;
+  readonly perforationSkipMm?: number | undefined;
+  readonly overcutMm?: number | undefined;
+  readonly imageOverscanMm?: number | undefined;
 };
 
 export type LinkedMaterialBinding = {
@@ -140,6 +148,11 @@ const LAYER_OPERATION_SETTING_KEYS = [
   'negativeImage',
   'passThrough',
   'dotWidthCorrectionMm',
+  'perforationEnabled',
+  'perforationCutMm',
+  'perforationSkipMm',
+  'overcutMm',
+  'imageOverscanMm',
 ] as const satisfies ReadonlyArray<keyof LayerOperationSettings>;
 
 const LAYER_COLOR_RE = /^#[0-9a-fA-F]{6}$/;
@@ -208,7 +221,28 @@ export function captureLayerOperationSettings(
     negativeImage: layer.negativeImage,
     passThrough: layer.passThrough,
     dotWidthCorrectionMm: layer.dotWidthCorrectionMm,
+    ...captureOptionalCutSettings(layer),
   };
+}
+
+export const OPTIONAL_CUT_SETTING_KEYS = [
+  'perforationEnabled',
+  'perforationCutMm',
+  'perforationSkipMm',
+  'overcutMm',
+  'imageOverscanMm',
+] as const satisfies ReadonlyArray<keyof LayerOperationSettings>;
+
+// Written only when set, so a capture of an operation that never used them
+// keeps exactly the keys it had (saved process recipes compare key sets).
+function captureOptionalCutSettings(
+  layer: LayerOperationSettings,
+): Partial<LayerOperationSettings> {
+  const out: Record<string, unknown> = {};
+  for (const key of OPTIONAL_CUT_SETTING_KEYS) {
+    if (layer[key] !== undefined) out[key] = layer[key];
+  }
+  return out as Partial<LayerOperationSettings>;
 }
 
 export function createLayerSubLayer(
