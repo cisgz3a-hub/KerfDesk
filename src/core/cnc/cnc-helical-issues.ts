@@ -36,7 +36,7 @@ export function findCncHelicalEntryIssues(
     const polylines = collectLayerPolylines(scene.objects, layer, device);
     if (polylines.length === 0) continue;
     const tool = layerCncTool(config, settings);
-    const toolpaths = pocketToolpathsForSettings(polylines, settings, tool.diameterMm);
+    const toolpaths = pocketToolpathsForSettings(polylines, settings, tool);
     const depths = zPassDepths(settings.depthMm, settings.depthPerPassMm);
     if (toolpaths.length === 0 || depths.length === 0) continue;
     for (const bucket of sourceRegionToolpathBuckets(polylines, toolpaths)) {
