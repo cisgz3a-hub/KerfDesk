@@ -119,14 +119,17 @@ function plateauMean(
   r: number,
   ink: boolean,
 ): number | null {
-  let sum = 0;
+  // The block's extreme (darkest ink, lightest paper) is its plateau: an
+  // opposite edge's ramp inside the block only pulls the other way.
+  let level = ink ? MAX_LUMA : 0;
   for (let y = cy - r; y <= cy + r; y += 1) {
     for (let x = cx - r; x <= cx + r; x += 1) {
       if (inkAt(mask, x, y) !== ink) return null;
-      sum += sample(plane, x, y);
+      const value = sample(plane, x, y);
+      level = ink ? Math.min(level, value) : Math.max(level, value);
     }
   }
-  return sum / (2 * r + 1) ** 2;
+  return level;
 }
 
 function sample(plane: ScalarPlane, x: number, y: number): number {
