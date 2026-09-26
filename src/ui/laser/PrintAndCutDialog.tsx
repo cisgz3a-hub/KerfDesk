@@ -15,7 +15,7 @@ export type PrintAndCutCamera = {
   readonly onFind: (targets: PrintAndCutDesignTargets) => void;
 };
 
-export function PrintAndCutDialog(props: {
+type PrintAndCutDialogProps = {
   readonly initialTargets: PrintAndCutDesignTargets;
   readonly firstMachinePoint: Vec2 | null;
   readonly secondMachinePoint: Vec2 | null;
@@ -23,24 +23,31 @@ export function PrintAndCutDialog(props: {
   readonly secondSource?: CaptureSource | null;
   readonly captureEnabled: boolean;
   readonly captureFrameNotice?: string | null;
+  readonly captureBasisError?: string | null;
   /** The centres of the two selected objects, when exactly two are selected. */
   readonly selectionTargets?: PrintAndCutDesignTargets | null;
   readonly camera?: PrintAndCutCamera;
+  readonly onTargetsChanged?: () => void;
   readonly onCapture: (which: 'first' | 'second') => void;
   readonly onCancel: () => void;
   readonly onApply: (targets: PrintAndCutDesignTargets) => void;
   readonly onDisable: () => void;
-}): JSX.Element {
+};
+
+export function PrintAndCutDialog(props: PrintAndCutDialogProps): JSX.Element {
   const [targets, setTargets] = useState(props.initialTargets);
-  const invalidReason = registrationDraftError(
-    targets,
-    props.firstMachinePoint,
-    props.secondMachinePoint,
-  );
+  const invalidReason =
+    props.captureBasisError ??
+    registrationDraftError(targets, props.firstMachinePoint, props.secondMachinePoint);
+  const changeTargets = (next: PrintAndCutDesignTargets): void => {
+    if (sameTargets(targets, next)) return;
+    props.onTargetsChanged?.();
+    setTargets(next);
+  };
   const setCoordinate = (which: 'first' | 'second', axis: 'x' | 'y', value: string): void => {
     const parsed = Number(value);
     if (!Number.isFinite(parsed)) return;
-    setTargets((current) => ({ ...current, [which]: { ...current[which], [axis]: parsed } }));
+    changeTargets({ ...targets, [which]: { ...targets[which], [axis]: parsed } });
   };
   return (
     <Dialog
@@ -55,7 +62,7 @@ export function PrintAndCutDialog(props: {
       }}
     >
       {props.selectionTargets !== undefined ? (
-        <SelectionTargetsRow selectionTargets={props.selectionTargets} onUse={setTargets} />
+        <SelectionTargetsRow selectionTargets={props.selectionTargets} onUse={changeTargets} />
       ) : null}
       <div style={gridStyle}>
         <TargetRow
@@ -92,6 +99,15 @@ export function PrintAndCutDialog(props: {
         </Button>
       </DialogActions>
     </Dialog>
+  );
+}
+
+function sameTargets(a: PrintAndCutDesignTargets, b: PrintAndCutDesignTargets): boolean {
+  return (
+    a.first.x === b.first.x &&
+    a.first.y === b.first.y &&
+    a.second.x === b.second.x &&
+    a.second.y === b.second.y
   );
 }
 

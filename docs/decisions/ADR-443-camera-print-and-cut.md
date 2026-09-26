@@ -12,9 +12,10 @@ LightBurn's Print and Cut works too, and jogging a dot onto a mark by eye is the
 error-prone part.
 
 ADR-440 gives a top-down picture of the bed in millimetres at the material height (ADR-441 and
-its amendments). Those millimetres are the scene frame, which is the same frame a head capture is
-converted into (`capturedMachinePointToScene`). So a mark found in the camera picture can fill a
-registration point directly, and both marks come from one frame without moving the machine.
+its amendments). Those millimetres are the bed scene frame. A head capture shares that frame
+only when the controller-to-bed mapping is established (`capturedMachinePointToScene`);
+otherwise it remains controller-relative. A camera-only pair can fill both registration points
+directly from one frame without moving the machine, including with no controller connected.
 
 ### Decision
 
@@ -38,8 +39,8 @@ registration point directly, and both marks come from one frame without moving t
    decides which mark is target 1. The number of other fitting pairs is reported, so a sheet of
    repeated labels is not mistaken silently.
 3. **Mark size.** When both targets sit on the centres of small design objects (at most 30 mm, and
-   within 0.5 mm), marks from 0.6 to 1.6 times that size are looked for. Otherwise the range is
-   2 to 30 mm.
+   within 0.5 mm), marks from 0.6 times the smaller size to 1.6 times the larger size are looked
+   for, so differently sized targets remain detectable. Otherwise the range is 2 to 30 mm.
 4. **Dialog (`PrintAndCutDialog`).** Two additions:
    - **Use selected marks** sets both design targets to the centres of the two selected objects,
      the left one first. When two objects are not selected, it says to select the marks first.
@@ -47,16 +48,29 @@ registration point directly, and both marks come from one frame without moving t
      and fills both registration points, labelled **Camera x, y** instead of **Machine x, y**. It
      reports the measured spacing, the print scale, the turn and any other fitting pairs, or how
      many mark-like shapes it saw when no pair fits.
-   - **Capture head** stays. A camera point and a head point can be mixed.
+   - **Capture head** stays. A camera point and a head point can be mixed when both use the
+     established bed coordinate basis. A bed point and a controller-relative point cannot
+     define one consistent registration; the dialog explains this and offers recapture.
 5. **Session.** Camera points go into the same session as head captures. They carry
-   `source: 'camera'`, the current position epoch and the current coordinate-frame key. The
-   existing rule therefore applies unchanged: after a reconnect, reset or frame change, the
-   points must be captured again. With the camera, that is one more click. **Apply registration**
-   and the output path are unchanged, and the camera never moves the machine.
+   `source: 'camera'`, `coordinateBasis: 'bed'`, and the position epoch and coordinate-frame key
+   at capture initiation. Head points record either the established bed or controller-relative
+   basis. The existing epoch/frame-key checks remain, with a basis compatibility check shared by
+   the dialog and output resolver. Camera-only and head-only relative pairs remain usable.
+   After a reconnect, reset or frame change, points must be captured again.
+6. **Capture ownership.** A pending photo belongs to its dialog, design target draft, document,
+   profile, camera/source, material heights, controller session, position epoch, coordinate frame
+   and existing registration captures. Changing that context prevents stale results from
+   publishing. Editing the target draft retires its request immediately and permits a new search;
+   only the current request may settle its busy state or message. Cancel/unmount invalidates the
+   request, and a failed capture releases it for retry. A completed photo is never relabelled with
+   a newer epoch or frame key. **Apply registration** remains one undoable target edit, and the
+   camera never moves the machine.
 
-No new guards. **Find marks with camera** is disabled without a live camera, like **Find pieces**,
-because there is no frame to capture (a transport precondition). Nothing is refused; when no pair
-fits, the points stay as they were and the dialog says what it saw.
+No new Start policy gate. **Find marks with camera** is disabled without a live camera, like
+**Find pieces**, because there is no frame to capture. An incompatible mixed capture basis is a
+factual inability to form consistent registration geometry, not a policy finding. When no pair
+fits, points stay as they were and the dialog says what it saw. A completed Frame for the exact
+reviewed job remains the sole ordinary Start gate.
 
 ### Measured
 

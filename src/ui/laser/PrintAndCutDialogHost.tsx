@@ -1,6 +1,6 @@
 import { useStore } from '../state';
 import { useLaserStore } from '../state/laser-store';
-import { usePrintCutSessionStore } from '../state/print-cut-session-store';
+import { capturedBasisError, usePrintCutSessionStore } from '../state/print-cut-session-store';
 import { useToastStore } from '../state/toast-store';
 import { targetsFromSelection } from './print-cut-camera';
 import { capturedMachinePointToScene } from './print-cut-capture-frame';
@@ -20,6 +20,7 @@ export function PrintAndCutDialogHost(props: { readonly onClose: () => void }): 
   const epoch = laser.trustedPositionEpoch ?? 0;
   const nativeFrame = resolveNativeBedFrame(project.device, laser);
   const coordinateFrameKey = nativeBedCaptureFrameKey(project.device, laser);
+  const basisError = capturedBasisError(session.first, session.second);
   const captureEnabled =
     laser.connection.kind === 'connected' &&
     laser.statusReport?.state === 'Idle' &&
@@ -34,7 +35,14 @@ export function PrintAndCutDialogHost(props: { readonly onClose: () => void }): 
       nativeFrame,
     );
     if (scenePoint === null) return;
-    session.capture(which, scenePoint, epoch, coordinateFrameKey, 'head');
+    session.capture(
+      which,
+      scenePoint,
+      epoch,
+      coordinateFrameKey,
+      'head',
+      nativeFrame === null ? 'controller-relative' : 'bed',
+    );
   };
   return (
     <PrintAndCutDialog
@@ -49,6 +57,8 @@ export function PrintAndCutDialogHost(props: { readonly onClose: () => void }): 
       firstSource={session.first?.source ?? null}
       secondSource={session.second?.source ?? null}
       captureEnabled={captureEnabled}
+      captureBasisError={basisError}
+      onTargetsChanged={camera.invalidate}
       selectionTargets={targetsFromSelection(project, selectedObjectId, additionalSelectedIds)}
       camera={{
         offered: camera.offered,
@@ -57,11 +67,7 @@ export function PrintAndCutDialogHost(props: { readonly onClose: () => void }): 
         message: camera.message,
         onFind: (targets) => void camera.find(targets),
       }}
-      captureFrameNotice={
-        nativeFrame === null
-          ? 'Registration uses controller-relative positions. Physical bed location is unverified; keep the same origin and check the Frame.'
-          : null
-      }
+      captureFrameNotice={captureFrameNotice(nativeFrame !== null, session, basisError)}
       onCapture={capture}
       onCancel={props.onClose}
       onApply={(targets) => {
@@ -76,6 +82,19 @@ export function PrintAndCutDialogHost(props: { readonly onClose: () => void }): 
       }}
     />
   );
+}
+
+function captureFrameNotice(
+  hasNativeFrame: boolean,
+  session: Pick<ReturnType<typeof usePrintCutSessionStore.getState>, 'first' | 'second'>,
+  basisError: string | null,
+): string | null {
+  if (basisError !== null) return null;
+  if (session.first?.source === 'camera' && session.second?.source === 'camera')
+    return 'Camera registration uses calibrated bed coordinates. Check the placement with Frame.';
+  return hasNativeFrame
+    ? null
+    : 'Head captures use controller-relative positions until the controller-to-bed mapping is known. Camera captures use calibrated bed coordinates.';
 }
 
 function capturedPointForFrame(
