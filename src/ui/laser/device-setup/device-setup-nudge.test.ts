@@ -54,6 +54,20 @@ describe('shouldPromptDeviceSetup', () => {
     ).toBe(true);
   });
 
+  it('keeps laser and CNC setup marks apart on the same profile', () => {
+    const laserOnly = configuredOf(DEFAULT_DEVICE_PROFILE);
+    const input = { connected: true, device: DEFAULT_DEVICE_PROFILE } as const;
+    expect(shouldPromptDeviceSetup({ ...input, configured: laserOnly })).toBe(false);
+    expect(shouldPromptDeviceSetup({ ...input, machineKind: 'cnc', configured: laserOnly })).toBe(
+      true,
+    );
+    const cncOnly = new Set([deviceProfileSignature(DEFAULT_DEVICE_PROFILE, 'cnc')]);
+    expect(shouldPromptDeviceSetup({ ...input, machineKind: 'cnc', configured: cncOnly })).toBe(
+      false,
+    );
+    expect(shouldPromptDeviceSetup({ ...input, configured: cncOnly })).toBe(true);
+  });
+
   it('does not prompt once the active profile has been configured', () => {
     expect(
       shouldPromptDeviceSetup({

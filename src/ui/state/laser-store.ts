@@ -408,6 +408,15 @@ function airAssistActions(set: SetFn, get: GetFn): Pick<LaserState, 'setAirAssis
     setAirAssistEnabled: async (enabled) => {
       assertAutofocusIdle(get());
       assertAirAssistReady(set, get, enabled);
+      if (enabled && useStore.getState().project.machine?.kind === 'cnc') {
+        const message =
+          'Manual air is a laser control. CNC coolant is set in Machine Setup and runs with the job.';
+        set({
+          lastWriteError: message,
+          log: pushLog(get(), `[lf2] Manual air command blocked: ${message}`),
+        });
+        throw new Error(message);
+      }
       const command = enabled ? useStore.getState().project.device.airAssistCommand : 'M9';
       if (command === 'none') {
         const message =

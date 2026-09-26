@@ -3,10 +3,12 @@ import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import type { ControllerKind, DeviceProfile } from '../../core/devices';
 import { DEFAULT_CNC_MACHINE_CONFIG, LASER_MACHINE_CONFIG, machineKindOf } from '../../core/scene';
+import { createStreamer } from '../../core/controllers/grbl';
 import { useStore } from '../state';
+import { useLaserStore } from '../state/laser-store';
 import { resetStore } from '../state/test-helpers';
 import { useToastStore } from '../state/toast-store';
-import { MachineModeToggle } from './MachineModeToggle';
+import { MODE_LOCKED_DURING_JOB, MachineModeToggle } from './MachineModeToggle';
 
 (
   globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT?: boolean }
@@ -19,6 +21,7 @@ beforeEach(() => {
 });
 
 afterEach(() => {
+  useLaserStore.setState({ streamer: null });
   clearToasts();
   resetStore();
 });
@@ -178,6 +181,44 @@ describe('MachineModeToggle controller fact', () => {
       expect(cnc.dataset['capabilityWarning']).toBeUndefined();
       await act(async () => cnc.click());
       expect(useToastStore.getState().toasts).toEqual([]);
+    } finally {
+      await act(async () => root.unmount());
+      host.remove();
+    }
+  });
+});
+
+describe('MachineModeToggle during a job', () => {
+  it('keeps a CNC project in CNC while a bit change holds the job', async () => {
+    useStore.setState((state) => ({
+      project: { ...state.project, machine: DEFAULT_CNC_MACHINE_CONFIG },
+    }));
+    useLaserStore.setState({
+      streamer: { ...createStreamer('G0 Z5\nM0\nG0 Z5\n'), status: 'tool-change', inFlight: [] },
+    });
+    const { host, root } = await renderToggle();
+    try {
+      const laser = modeButton(host, 'Laser');
+      expect(laser.disabled).toBe(true);
+      expect(laser.title).toBe(MODE_LOCKED_DURING_JOB);
+      expect(modeButton(host, 'CNC').disabled).toBe(false);
+      await act(async () => laser.click());
+      expect(machineKindOf(useStore.getState().project.machine)).toBe('cnc');
+    } finally {
+      await act(async () => root.unmount());
+      host.remove();
+    }
+  });
+
+  it('switches again once the job has ended', async () => {
+    useStore.setState((state) => ({
+      project: { ...state.project, machine: DEFAULT_CNC_MACHINE_CONFIG },
+    }));
+    useLaserStore.setState({ streamer: { ...createStreamer('G1 X1\n'), status: 'cancelled' } });
+    const { host, root } = await renderToggle();
+    try {
+      await act(async () => modeButton(host, 'Laser').click());
+      expect(machineKindOf(useStore.getState().project.machine)).toBe('laser');
     } finally {
       await act(async () => root.unmount());
       host.remove();

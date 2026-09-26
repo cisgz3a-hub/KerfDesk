@@ -141,7 +141,10 @@ describe('handleSaveTiledGcode', () => {
   // Rule 7 / ADR-228: a pre-emit policy finding stopped refusing the tiled
   // export, so it must now be SHOWN once for the set rather than silently
   // dropped — otherwise the fix trades a refusal for silence.
-  it('toasts a pre-emit policy advisory after a successful tiled save', async () => {
+  // Tiled Save is CNC only, and laser-only pre-emit findings such as the
+  // laser-off seek feed never reach a router job (ADR-416). Every CNC pre-emit
+  // finding refuses the save instead (blocking-codes.ts).
+  it('does not toast a laser-only pre-emit advisory after a tiled CNC save', async () => {
     const base = tiledCncProject();
     const written: string[] = [];
     const messages: string[] = [];
@@ -154,7 +157,7 @@ describe('handleSaveTiledGcode', () => {
     });
 
     expect(written.length).toBeGreaterThan(0);
-    expect(messages.filter((m) => m.includes('Controlled laser-off seek feed'))).toHaveLength(1);
+    expect(messages.filter((m) => m.includes('Controlled laser-off seek feed'))).toHaveLength(0);
   });
 
   it('shows the actual compiled flowing V-carve depth after a successful tiled save', async () => {
