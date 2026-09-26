@@ -20,7 +20,7 @@ import {
 import type { ToastVariant } from '../state/toast-store';
 import { costlyCanvasPreparation } from '../workspace/canvas-preparation-policy';
 import { controllerReadinessAdvisories } from './controller-readiness-advisories';
-import { cncExportControllerAdvisory } from './cnc-export-controller-advisory';
+import { pushCncExportControllerMessages } from './cnc-export-controller-advisory';
 import type { TileFile } from './tile-emission';
 import { finalizeTiledOutput, type TiledOutputPreparation } from './tiled-output-preparation';
 import { tiledSaveWorkBudgetMessage } from './tiled-save-work-budget';
@@ -94,8 +94,7 @@ async function saveConfiguredTiledGcode(ctx: SaveTiledGcodeCtx): Promise<true> {
   }
   // Tiles are GRBL CNC files whatever the profile, the file-only Ruida one
   // included: tiling runs before the .rd route (CN-1, CN-3).
-  const controllerAdvisory = cncExportControllerAdvisory(ctx.project.device);
-  if (controllerAdvisory !== null) ctx.pushToast(controllerAdvisory, 'warning');
+  pushCncExportControllerMessages(ctx.project.device, ctx.controllerSettings, ctx.pushToast);
   pushWarnings(ctx, preparation.machineWarnings);
   pushWarnings(ctx, preparation.tileAdvisories);
   const saved = await saveTileFiles(ctx, preparation.files, directory);

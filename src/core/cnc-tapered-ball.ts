@@ -62,6 +62,23 @@ export function taperedBallCuttingLengthMm(envelope: TaperedBallEnvelope): numbe
 }
 
 /**
+ * Radius of the cutting surface at a height above the tip, the inverse of
+ * taperedBallHeightMm. It is not capped at the envelope's outer radius, so a
+ * caller that must stay on the modeled flutes caps it (ADR-368 Amendment 2).
+ */
+export function taperedBallRadiusAtHeightMm(
+  envelope: TaperedBallEnvelope,
+  heightMm: number,
+): number {
+  if (heightMm >= envelope.tangentHeightMm) {
+    return envelope.tangentRadiusMm + (heightMm - envelope.tangentHeightMm) * envelope.tanHalf;
+  }
+  const ball = envelope.ballRadiusMm;
+  const fromCenter = ball - Math.max(0, heightMm);
+  return Math.sqrt(Math.max(0, ball * ball - fromCenter * fromCenter));
+}
+
+/**
  * Cut diameter a tangent taper reaches at a listed flute length. Catalog
  * entries use it to turn a seller's tip, side angle, and cutting length into
  * the stored cut diameter; a length inside the ball returns the ball's own
@@ -73,14 +90,7 @@ export function taperedBallDiameterAtHeightMm(
   heightMm: number,
 ): number {
   const envelope = envelopeFor(tipDiameterMm, includedAngleDeg, Number.POSITIVE_INFINITY);
-  if (heightMm >= envelope.tangentHeightMm) {
-    return (
-      2 * (envelope.tangentRadiusMm + (heightMm - envelope.tangentHeightMm) * envelope.tanHalf)
-    );
-  }
-  const ball = envelope.ballRadiusMm;
-  const fromCenter = ball - Math.max(0, heightMm);
-  return 2 * Math.sqrt(Math.max(0, ball * ball - fromCenter * fromCenter));
+  return 2 * taperedBallRadiusAtHeightMm(envelope, heightMm);
 }
 
 function envelopeFor(

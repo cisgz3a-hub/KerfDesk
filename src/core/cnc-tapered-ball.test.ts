@@ -5,6 +5,7 @@ import {
   taperedBallDiameterAtHeightMm,
   taperedBallEnvelope,
   taperedBallHeightMm,
+  taperedBallRadiusAtHeightMm,
   type TaperedBallEnvelope,
 } from './cnc-tapered-ball';
 import type { CncTool } from './scene';
@@ -91,8 +92,10 @@ describe('tapered ball-nose envelope', () => {
     const envelope = envelopeOf(TBN);
     for (const radius of [0.3, envelope.tangentRadiusMm, 1.5, 3.125]) {
       const height = taperedBallHeightMm(envelope, radius);
+      expect(taperedBallRadiusAtHeightMm(envelope, height)).toBeCloseTo(radius, 9);
       expect(taperedBallDiameterAtHeightMm(1.5875, 10.8, height)).toBeCloseTo(2 * radius, 9);
     }
+    expect(taperedBallRadiusAtHeightMm(envelope, 0)).toBe(0);
     expect(taperedBallDiameterAtHeightMm(1.5875, 10.8, 0)).toBe(0);
   });
 

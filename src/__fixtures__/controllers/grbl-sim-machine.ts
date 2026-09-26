@@ -279,9 +279,10 @@ function reduceSoftReset(state: GrblSimState, opts: GrblSimOptions): GrblSimReac
     ...state,
     pendingMotions: 0,
     spindle: 0,
-    // Soft reset clears the volatile G92 offset (GRBL v1.1 behavior); the
-    // persistent G54 offset survives.
-    g92: null,
+    // Stock GRBL's soft reset clears G92 (gcode.c gc_init memsets the parser
+    // state); grblHAL at COMPATIBILITY_LEVEL <= 1 keeps it (gcode.c:787 clears
+    // only up to g92_offset). The persistent G54 offset survives either way.
+    g92: opts.firmware === 'grblhal' ? state.g92 : null,
     pendingLine: null,
     critical: false,
     lastError: null,

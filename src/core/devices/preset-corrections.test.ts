@@ -25,6 +25,8 @@ describe('stalePresetCorrections', () => {
           before: 'origin front-left',
           now: 'rear-left',
           effect: expect.any(String),
+          // ADR-322 Amendment 2: the value Machine Setup's one-click offer applies.
+          patch: { origin: 'rear-left' },
         },
       ]);
       expect(stalePresetCorrections(preset)).toEqual([]);
@@ -33,7 +35,9 @@ describe('stalePresetCorrections', () => {
 
   it('names a saved S30 copy that still has the old 410 x 400 mm bed', () => {
     for (const preset of S30_PRESETS) {
-      expect(stalePresetCorrections({ ...preset, bedWidth: 410, bedHeight: 400 })).toHaveLength(1);
+      expect(stalePresetCorrections({ ...preset, bedWidth: 410, bedHeight: 400 })).toEqual([
+        expect.objectContaining({ patch: { bedWidth: 380, bedHeight: 385 } }),
+      ]);
       expect(stalePresetCorrections(preset)).toEqual([]);
     }
   });

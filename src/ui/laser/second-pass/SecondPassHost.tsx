@@ -13,10 +13,12 @@ import {
 } from '../../state/recovery';
 import { SecondPassCompletionPrompt } from './SecondPassCompletionPrompt';
 import { SecondPassWorkbench } from './SecondPassWorkbench';
+import { anotherRunHoldsTheStream } from './second-pass-offer';
 import { openRetainedSecondPassSource } from './second-pass-source';
 
 /** App-shell ownership keeps the prompt and editor available with collapsed
- * rails. Both manual history selection and completion bind an explicit run. */
+ * rails. The Machine-panel button and the completion prompt both bind the run
+ * that just finished. */
 export function SecondPassHost(props: { repository?: RecoveryRepository }): JSX.Element {
   const repository = props.repository ?? recoveryRepository;
   const request = useLaserSecondPassUiStore((s) => s.editorRequest);
@@ -42,9 +44,11 @@ function SecondPassEditor(props: {
   useEffect(() => {
     let active = true;
     let opening = true;
+    // A newer run holding the stream supersedes this opening. An aborted run's
+    // leftover activeRunId does not: it closed the editor the moment the
+    // Machine-panel button opened it (ADR-341 Amendment 4).
     const cancelSupersededOpening = (): void => {
-      const activeRunId = useLaserStore.getState().activeRunId;
-      if (opening && activeRunId !== null && activeRunId !== request.runId) {
+      if (opening && anotherRunHoldsTheStream(useLaserStore.getState(), request.runId)) {
         active = false;
         closeEditor(request);
       }

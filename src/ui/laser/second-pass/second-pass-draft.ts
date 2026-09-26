@@ -4,7 +4,9 @@ import type { ExecutionArtifactV1 } from '../../state/recovery';
 
 const LEGACY_KEY = 'kerfdesk.second-pass-draft.v1';
 const KEY = 'kerfdesk.second-pass-drafts.v2';
-const MAX_DRAFTS = 20;
+// Builds before ADR-341 Amendment 4 kept drafts for the 20 most recently
+// edited jobs. Such an envelope still reads, and the next save trims it.
+const MAX_STORED_DRAFTS = 20;
 type DraftSource = Pick<ExecutionArtifactV1, 'runId' | 'fingerprint'>;
 type Draft = DraftSource & { readonly strokes: LaserSecondPassSelection['strokes'] };
 
@@ -31,13 +33,11 @@ export function saveSecondPassDraft(
     const previous = current === null ? legacyDrafts() : readEnvelope(current);
     // Never overwrite malformed/future storage with an empty inferred history.
     if (previous === null) return false;
-    const key = sourceKey(source);
-    const drafts = [...previous.filter((item) => sourceKey(item) !== key), draft].slice(
-      -MAX_DRAFTS,
-    );
-    // One atomic storage replacement: quota failure leaves every previous draft
-    // (including the oldest that would be evicted) intact, and reports failure.
-    localStorage.setItem(KEY, JSON.stringify({ version: 2, drafts }));
+    // A second pass is offered only for the job that just finished, so only
+    // its draft is kept: saving replaces any other job's draft (ADR-341
+    // Amendment 4). One atomic storage replacement: quota failure leaves the
+    // previous draft intact, and reports failure.
+    localStorage.setItem(KEY, JSON.stringify({ version: 2, drafts: [draft] }));
     return true;
   } catch {
     return false;
@@ -54,7 +54,8 @@ function readEnvelope(raw: string): ReadonlyArray<Draft> | null {
   if (!value || typeof value !== 'object') return null;
   const record = value as Record<string, unknown>;
   const drafts = record['drafts'];
-  if (record['version'] !== 2 || !Array.isArray(drafts) || drafts.length > MAX_DRAFTS) return null;
+  if (record['version'] !== 2 || !Array.isArray(drafts) || drafts.length > MAX_STORED_DRAFTS)
+    return null;
   if (!drafts.every(validDraft)) return null;
   return new Set(drafts.map(sourceKey)).size === drafts.length ? drafts : null;
 }

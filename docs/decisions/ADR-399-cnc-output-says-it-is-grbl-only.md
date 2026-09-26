@@ -54,6 +54,13 @@ controllers hobby CNC machines ship with is in the audit report
 4. **Machine Setup.** When the setup includes CNC, the select is labelled "Laser output dialect"
    with the hint "CNC programs always use KerfDesk's GRBL CNC dialect." Laser-only setups are
    unchanged.
+5. **PC and stand-alone controllers get a note.** KerfDesk cannot connect to Mach3/4, MASSO,
+   UCCNC, Centroid or RepRapFirmware, so their owners pick a GRBL profile and no warning above
+   applies. Save G-code of a CNC project, a tiled Save and Save surfacing G-code on a GRBL-family
+   profile that no connected controller confirmed this session show one info note: the file is
+   for GRBL, grblHAL and FluidNC; MASSO, UCCNC and RepRapFirmware take `G4 P` as milliseconds
+   (Mach3 can be set either way), and some skip `M0` or end the job there. It is information,
+   not a warning, because most such exports are for GRBL machines run later from KerfDesk.
 
 ### Consequences
 
@@ -65,3 +72,5 @@ controllers hobby CNC machines ship with is in the audit report
   `cnc-frame-lines.test.ts`, `emit-rd-cnc-refusal.test.ts`,
   `emit-gcode-cnc-dialect-independence.test.ts`, `DeviceSetupWizard.cnc.test.tsx`,
   `MachineModeToggle.hybrid.test.tsx`.
+- Operators of PC and stand-alone controllers are told which two commands to check, without a
+  warning on every GRBL export.
