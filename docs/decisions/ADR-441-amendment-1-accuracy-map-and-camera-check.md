@@ -41,6 +41,12 @@ recalibrate and compare figures by memory.
    Both buttons are always offered (ADR-228). Engraving a new target from the check clears the
    saved area, so the new target's own area is used.
 
+   Older valid records without a saved target area still serve overlay, Trace and ordinary job
+   placement. **Check camera** sends those records to calibration setup with an explanation:
+   engrave a new target, or confirm the original bed size, margins and sheet thickness before
+   choosing **Target already engraved**. It does not guess the old layout from current settings
+   and diagnose that difference as camera movement, or replace the saved calibration.
+
 ### Not done
 
 There is no automatic check before a job. Without the target on the bed, a camera move can only

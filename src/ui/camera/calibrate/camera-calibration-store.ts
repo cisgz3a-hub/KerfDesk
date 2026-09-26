@@ -84,6 +84,10 @@ export const DEFAULT_CALIBRATION_SETTINGS: CalibrationSettings = {
 };
 
 const INITIAL_STEP: CalibrationStep = { kind: 'setup', note: null };
+const MISSING_TARGET_LAYOUT_NOTE =
+  "This calibration's target layout was not saved, so it cannot be checked against the old target. " +
+  'Recalibrate with a new engraved target, or confirm the original bed size and enter the exact original margins ' +
+  'and sheet thickness before choosing Target already engraved. Your saved calibration is unchanged.';
 
 export const useCameraCalibrationStore = create<CameraCalibrationStore>((set) => ({
   open: false,
@@ -94,13 +98,17 @@ export const useCameraCalibrationStore = create<CameraCalibrationStore>((set) =>
   targetArea: null,
   openWizard: () =>
     set({ open: true, mode: 'calibrate', minimized: false, step: INITIAL_STEP, targetArea: null }),
-  // The same target at the same height the saved calibration measured.
+  // Check needs the target that was actually engraved. Older records remain
+  // usable, but current bed/margin settings cannot stand in for their layout.
   openCheck: (saved) =>
     set((s) => ({
       open: true,
-      mode: 'check',
+      mode: saved.accuracy.targetArea === undefined ? 'calibrate' : 'check',
       minimized: false,
-      step: { kind: 'photo', status: { kind: 'idle' } },
+      step:
+        saved.accuracy.targetArea === undefined
+          ? { kind: 'setup', note: MISSING_TARGET_LAYOUT_NOTE }
+          : { kind: 'photo', status: { kind: 'idle' } },
       settings: { ...s.settings, sheetThicknessMm: saved.accuracy.targetHeightMm },
       targetArea: saved.accuracy.targetArea ?? null,
     })),
