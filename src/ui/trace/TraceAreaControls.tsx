@@ -44,11 +44,12 @@ export function TraceAreaControls(props: TraceAreaControlsProps): JSX.Element {
         onChange={(despeckleMinPixels) => set({ despeckleMinPixels })}
         auto={{
           checked: state.inkAuto,
-          // Leaving Auto starts from the fixed cut Auto replaced (12 px²).
+          // Leaving Auto restores a fixed-cleanup preset's own value; on an
+          // Auto preset it starts at Auto's candidate ceiling (12 px²).
           onChange: (auto) =>
             setOrClear(
               'despeckleMinPixels',
-              auto ? (presetState.inkAuto ? undefined : 'auto') : AUTO_CANDIDATE_AREA_PX,
+              presetState.inkAuto === auto ? undefined : auto ? 'auto' : AUTO_CANDIDATE_AREA_PX,
             ),
         }}
       />
@@ -68,11 +69,12 @@ export function TraceAreaControls(props: TraceAreaControlsProps): JSX.Element {
         onChange={(fillPinholeCracks) => set({ fillPinholeCracks })}
         auto={{
           checked: state.holesAuto,
-          // Leaving Auto starts unticked: fill none until asked.
+          // Leaving Auto restores a fixed-cleanup preset's own choice; on an
+          // Auto preset it starts unticked: fill none until asked.
           onChange: (auto) =>
             setOrClear(
               'fillPinholeCracks',
-              auto ? (presetState.holesAuto ? undefined : 'auto') : false,
+              presetState.holesAuto === auto ? undefined : auto ? 'auto' : false,
             ),
         }}
       />

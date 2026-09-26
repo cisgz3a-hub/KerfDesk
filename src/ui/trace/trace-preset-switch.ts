@@ -28,15 +28,20 @@ const lineStyle = (p: TraceOptions): boolean =>
   p.photoDetail === undefined && p.colourLayers === undefined;
 const colourLayers = (p: TraceOptions): boolean => p.colourLayers !== undefined;
 const smallMarks = (p: TraceOptions): boolean => p.smallMarkPolicy === 'auto';
+const autoOn = (p: TraceOptions, value: unknown): boolean => value === 'auto' && lineStyle(p);
 
-/** Whether a preset sets its own value for a shared control. */
-const DEFINED_BY: Readonly<Record<SharedKey, (preset: TraceOptions) => boolean>> = {
+/** Whether a preset sets its own value for a shared control. An 'auto'
+ *  small-mark override is not a value but a switch that turns the automatic
+ *  policy on, so every line preset defines the answer to it: a preset without
+ *  the policy (Sharp) chose fixed cleanup, and one with it already has Auto. */
+const DEFINED_BY: Readonly<Record<SharedKey, (preset: TraceOptions, value: unknown) => boolean>> = {
   smoothness: (p) => p.smoothness !== undefined,
   optimize: (p) => p.optimize !== undefined,
   ignoreLessThanPixels: (p) => p.ignoreLessThanPixels !== undefined,
   // Colour layers' "Remove specks" shares the key with its own meaning.
-  despeckleMinPixels: (p) => p.despeckleMinPixels !== undefined || smallMarks(p) || colourLayers(p),
-  fillPinholeCracks: (p) => p.fillPinholeCracks !== undefined || smallMarks(p),
+  despeckleMinPixels: (p, v) =>
+    p.despeckleMinPixels !== undefined || smallMarks(p) || colourLayers(p) || autoOn(p, v),
+  fillPinholeCracks: (p, v) => p.fillPinholeCracks !== undefined || smallMarks(p) || autoOn(p, v),
   // Photo shading's Invert is its own control (photoInvert).
   invert: (p) => lineStyle(p) && p.invert !== undefined,
 };
@@ -56,7 +61,7 @@ export function overridesForPresetSwitch(
   const dropped = (Object.keys(DEFINED_BY) as SharedKey[]).filter(
     (key) =>
       overrides[key] !== undefined &&
-      (DEFINED_BY[key](to) || (roleChange && ROLE_KEYS.includes(key))),
+      (DEFINED_BY[key](to, overrides[key]) || (roleChange && ROLE_KEYS.includes(key))),
   );
   if (dropped.length === 0) return overrides;
   const drop = new Set<string>(dropped);

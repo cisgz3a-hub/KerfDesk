@@ -75,8 +75,11 @@ export function mergeLightBurnTraceSettings(
 }
 
 // Each small-mark stage is Auto (no explicit value, policy on) or exact
-// (ADR-434 Amendment 1). Auto on one stage leaves the other stage's explicit
-// value in force: the engine only automates stages without one.
+// (ADR-434 Amendment 1). Auto on one stage leaves the other stage's value in
+// force. The engine automates every stage without an explicit value, so when
+// Auto switches the policy on for a preset that has none (Sharp), the other
+// stage is pinned to the fixed value the preset ran with (Sharp's unset holes
+// stage = fill nothing) instead of silently passing to the policy.
 function applySmallMarkSettings(
   out: Record<string, unknown>,
   preset: TraceOptions,
@@ -89,14 +92,16 @@ function applySmallMarkSettings(
   } else if (ink !== undefined) {
     out['despeckleMinPixels'] = Math.max(0, Math.round(ink));
   }
-  const holes = settings.fillPinholeCracks;
-  if (holes === undefined || preset.traceMode === 'edge') return;
+  const holes = preset.traceMode === 'edge' ? undefined : settings.fillPinholeCracks;
   if (holes === 'auto') {
     delete out['fillPinholeCracks'];
     out['smallMarkPolicy'] = 'auto';
-  } else {
+  } else if (holes !== undefined) {
     out['fillPinholeCracks'] = holes;
   }
+  if (out['smallMarkPolicy'] !== 'auto' || preset.smallMarkPolicy === 'auto') return;
+  if (ink !== 'auto' && out['despeckleMinPixels'] === undefined) out['despeckleMinPixels'] = 0;
+  if (holes !== 'auto' && out['fillPinholeCracks'] === undefined) out['fillPinholeCracks'] = false;
 }
 
 /** What a small-mark control shows for these merged options: Auto when the

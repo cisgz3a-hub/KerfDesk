@@ -113,6 +113,53 @@ describe('small-mark controls show Auto or the exact value the engine uses', () 
       expect(controls.options().fillPinholeCracks).toBeUndefined();
     });
   });
+
+  it('Auto on one Sharp stage never hands the other stage to the policy', async () => {
+    const image = blockWithSlit();
+    await withControls('Sharp', async (controls) => {
+      await controls.check('Remove ink specks: Auto', true);
+      expect(controls.overrides()).toEqual({ despeckleMinPixels: 'auto' });
+      expect(checkbox(controls, 'Fill tiny holes: Auto').checked).toBe(false);
+      expect(checkbox(controls, 'Fill tiny holes').checked).toBe(false);
+      const options = controls.options();
+      expect(options.smallMarkPolicy).toBe('auto');
+      expect(options.despeckleMinPixels).toBeUndefined();
+      expect(options.fillPinholeCracks).toBe(false);
+      // Sharp's own rule fills no hole: the slit survives.
+      expect(ink(preprocessForTrace(image, options))).toBe(1380);
+    });
+    await withControls('Sharp', async (controls) => {
+      await controls.check('Fill tiny holes: Auto', true);
+      expect(checkbox(controls, 'Remove ink specks: Auto').checked).toBe(false);
+      expect(controls.number('Remove ink specks').value).toBe('1');
+      expect(controls.options().despeckleMinPixels).toBe(1);
+      expect(controls.options().fillPinholeCracks).toBeUndefined();
+    });
+    // Both stages Auto: nothing is pinned.
+    const both = mergeLightBurnTraceSettings(preset('Sharp'), {
+      despeckleMinPixels: 'auto',
+      fillPinholeCracks: 'auto',
+    });
+    expect(both.despeckleMinPixels).toBeUndefined();
+    expect(both.fillPinholeCracks).toBeUndefined();
+  });
+
+  it('leaving Auto on a fixed-cleanup preset restores its own value', async () => {
+    await withControls('Sharp', async (controls) => {
+      await controls.check('Remove ink specks: Auto', true);
+      await controls.check('Remove ink specks: Auto', false);
+      expect(controls.overrides()).toEqual({});
+      expect(controls.number('Remove ink specks').value).toBe('1');
+      expect(controls.options()).toEqual(preset('Sharp'));
+    });
+    await withControls('Centerline', async (controls) => {
+      await controls.check('Fill tiny holes: Auto', true);
+      await controls.check('Fill tiny holes: Auto', false);
+      expect(controls.overrides()).toEqual({});
+      expect(checkbox(controls, 'Fill tiny holes').checked).toBe(true);
+      expect(controls.options()).toEqual(preset('Centerline'));
+    });
+  });
 });
 
 describe('preset switch drops overrides the new preset defines (ADR-434 Amendment 1)', () => {
@@ -125,6 +172,23 @@ describe('preset switch drops overrides the new preset defines (ADR-434 Amendmen
     expect(overridesForPresetSwitch(fromCenterline, preset('Line Art'), preset('Sharp'))).toEqual({
       fillPinholeCracks: false,
     });
+    // An 'auto' choice turns the policy on; Sharp chose fixed cleanup.
+    expect(
+      overridesForPresetSwitch(
+        { fillPinholeCracks: 'auto' },
+        preset('Centerline'),
+        preset('Sharp'),
+      ),
+    ).toEqual({});
+    const sharp = mergeLightBurnTraceSettings(
+      preset('Sharp'),
+      overridesForPresetSwitch(
+        { fillPinholeCracks: 'auto' },
+        preset('Centerline'),
+        preset('Sharp'),
+      ),
+    );
+    expect(sharp.smallMarkPolicy).toBeUndefined();
     // Colour layers' Remove specks shares the key with its own meaning.
     expect(
       overridesForPresetSwitch(
