@@ -274,7 +274,11 @@ describe('camera calibration photo ownership', () => {
   });
 
   it('suggests saving the new calibration when the saved one is off', async () => {
-    const saved = savedCameraModel();
+    const base = savedCameraModel();
+    const saved = {
+      ...base,
+      accuracy: { ...base.accuracy, targetArea: { x: 5, y: 5, width: 390, height: 390 } },
+    };
     await act(async () => useStore.getState().updateDeviceProfile({ cameraModel: saved }));
     useCameraStore.setState({ sourceState: { kind: 'live', source } });
     const drift = { rmsMm: 2.1, maxMm: 2.6, meanDxMm: -2, meanDyMm: 0.4, marks: 90 };

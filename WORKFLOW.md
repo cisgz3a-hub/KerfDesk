@@ -6567,6 +6567,9 @@ as the pane's design record.
   the canvas the saved calibration is off. The suggested button is **Keep saved calibration**
   when the camera has not moved and **Save new calibration** when it has; both are always offered.
   Any recalibration while a calibration is saved shows the same comparison.
+- **Edge / target layout not saved.** An older calibration remains usable, but **Check camera…**
+  opens setup instead of guessing the old target's layout. Engrave a new target, or confirm the
+  original bed size, margins and sheet thickness before choosing **Target already engraved**.
 - **Edge / sheet moved since engraving.** The check cannot tell a moved sheet from a moved camera;
   the photo step says the sheet must lie where it was engraved, and **Back** engraves a new one.
 - **Edge / another camera.** A photo from another camera or with another crop is not compared;
