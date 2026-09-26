@@ -1,4 +1,5 @@
 import type { RawImageData } from './trace-image';
+import { isTonedMonochrome } from './toned-monochrome';
 
 export type AutoSketchTraceOptions = {
   readonly sketchTrace?: boolean;
@@ -41,6 +42,8 @@ const MEDIAN_ABS_CHROMA_DIFFERENCE_PER_SIGMA = 0.6745 * 2;
 // Colour promotes only when it is spatially coherent (ADR-401): each counted
 // pixel must be chromatic itself and sit in a 3×3 neighbourhood whose MEAN
 // colour is chromatic beyond what the image's own per-channel noise explains.
+// Coherent colour that is only one weak tint of the artwork's tones on
+// paper-light paper (sepia, duotone) does not promote (ADR-446).
 function hasEnoughColourForAutoSketch(image: RawImageData): boolean {
   const pixelCount = image.width * image.height;
   if (pixelCount === 0) return false;
@@ -48,17 +51,21 @@ function hasEnoughColourForAutoSketch(image: RawImageData): boolean {
     MIN_NEIGHBOURHOOD_SPREAD,
     (NOISE_DEVIATIONS * channelNoiseSigma(image)) / 3,
   );
-  let colourPixels = 0;
-  const required = Math.max(32, Math.ceil(pixelCount * 0.002));
-  for (let pixel = 0; pixel < pixelCount; pixel += 1) {
+  const coherent = (pixel: number): boolean => {
     const offset = pixel * 4;
     const r = image.data[offset] ?? 255;
     const g = image.data[offset + 1] ?? 255;
     const b = image.data[offset + 2] ?? 255;
-    if (!isChromatic(r, g, b, MIN_PIXEL_SPREAD)) continue;
-    if (!chromaticNeighbourhood(image, pixel, minSpread)) continue;
+    return (
+      isChromatic(r, g, b, MIN_PIXEL_SPREAD) && chromaticNeighbourhood(image, pixel, minSpread)
+    );
+  };
+  let colourPixels = 0;
+  const required = Math.max(32, Math.ceil(pixelCount * 0.002));
+  for (let pixel = 0; pixel < pixelCount; pixel += 1) {
+    if (!coherent(pixel)) continue;
     colourPixels += 1;
-    if (colourPixels >= required) return true;
+    if (colourPixels >= required) return !isTonedMonochrome(image, required, coherent);
   }
   return false;
 }
