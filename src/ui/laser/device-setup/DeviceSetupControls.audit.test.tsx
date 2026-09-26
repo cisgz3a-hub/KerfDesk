@@ -15,6 +15,7 @@ import { DeviceSetupCncProfiles } from './DeviceSetupCncProfiles';
 import { DeviceSetupCncTilingFields } from './DeviceSetupCncTilingFields';
 import { DeviceSetupConfirmStep } from './DeviceSetupConfirmStep';
 import { DeviceSetupConnectStep } from './DeviceSetupConnectStep';
+import { DeviceSetupConnectionOptions } from './DeviceSetupConnectionOptions';
 import { DeviceSetupControls } from './DeviceSetupControls';
 import { DeviceSetupIdentifyStep } from './DeviceSetupIdentifyStep';
 import { DeviceSetupOptionsStep } from './DeviceSetupOptionsStep';
@@ -85,7 +86,7 @@ describe('Setup control audit', () => {
         dispatch={vi.fn()}
       />,
     );
-    await act(async () => button('Run read-only checks').click());
+    await act(async () => button('Read again').click());
     expect(sendConsoleCommand.mock.calls).toEqual([['$I']]);
     expect(readMachineSettings).toHaveBeenCalledTimes(1);
     expect(writeGrblSetting).not.toHaveBeenCalled();
@@ -180,11 +181,7 @@ describe('Setup control audit', () => {
   it('Identify disclosures toggle and worker streaming records a draft-only preference', () => {
     const dispatch = vi.fn();
     const state = initDeviceSetup(DEFAULT_DEVICE_PROFILE, null);
-    render(<DeviceSetupIdentifyStep state={state} dispatch={dispatch} />);
-    for (const text of [
-      'Advanced connection and streaming',
-      'Import or export a machine profile',
-    ]) {
+    const toggles = (text: string): void => {
       const summary = [...host.querySelectorAll('summary')].find((node) =>
         node.textContent?.includes(text),
       )!;
@@ -193,8 +190,15 @@ describe('Setup control audit', () => {
       expect(details.open).toBe(true);
       act(() => summary.click());
       expect(details.open).toBe(false);
-    }
-    const worker = host.querySelector<HTMLInputElement>('input[type="checkbox"]')!;
+    };
+    render(<DeviceSetupIdentifyStep state={state} dispatch={dispatch} />);
+    toggles('Import or export a machine profile');
+    // The connection contract lives under Find my machine (ADR-420).
+    render(<DeviceSetupConnectionOptions state={state} dispatch={dispatch} />);
+    toggles('Advanced connection and streaming');
+    const worker = host.querySelector<HTMLInputElement>(
+      'input[aria-label="Read the serial port and refill the job stream in a worker"]',
+    )!;
     expect(worker.checked).toBe(true);
     act(() => worker.click());
     expect(dispatch).toHaveBeenCalledWith({
@@ -210,7 +214,7 @@ describe('Setup control audit', () => {
       act(() =>
         root.render(
           <PlatformProvider adapter={{ ...platform, id }}>
-            <DeviceSetupIdentifyStep state={state} dispatch={vi.fn()} />
+            <DeviceSetupConnectionOptions state={state} dispatch={vi.fn()} />
           </PlatformProvider>,
         ),
       );

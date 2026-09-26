@@ -51,7 +51,7 @@ describe('DeviceSetupWizard', () => {
         'input[aria-label="Read the serial port and refill the job stream in a worker"]',
       );
     try {
-      await openSetupDisclosure(view.host, 'Controller and connection settings');
+      await openSetupDisclosure(view.host, 'Connection options');
       await openSetupDisclosure(view.host, 'Advanced connection and streaming');
       const option = workerOption();
       if (option === null) throw new Error('GRBL worker option missing');
@@ -109,11 +109,10 @@ describe('DeviceSetupWizard', () => {
     useLaserStore.setState({ connect });
     const view = await renderWizard();
     try {
-      await openSetupDisclosure(view.host, 'Controller and connection settings');
+      await openSetupDisclosure(view.host, 'Connection options');
       await changeSelect(view.host, 'Controller firmware', 'marlin');
-      await openSetupDisclosure(view.host, 'Connect and detect');
       await act(async () => {
-        button(view.host, 'Connect…').click();
+        button(view.host, 'Find my machine').click();
         await Promise.resolve();
       });
       expect(connect).toHaveBeenCalledWith(expect.anything(), {
@@ -135,10 +134,9 @@ describe('DeviceSetupWizard', () => {
     } as Partial<ReturnType<typeof useLaserStore.getState>>);
     const view = await renderWizard();
     try {
-      await openSetupDisclosure(view.host, 'Controller and connection settings');
+      await openSetupDisclosure(view.host, 'Connection options');
       expect(select(view.host, 'Controller firmware').value).toBe('grbl-v1.1');
-      await openSetupDisclosure(view.host, 'Connect and detect');
-      expect(view.host.textContent).toContain('Connection does not match the setup draft');
+      expect(view.host.textContent).toContain('The connection does not match this setup');
       await act(async () => button(view.host, 'Use detected grblHAL in draft').click());
       expect(select(view.host, 'Controller firmware').value).toBe('grblhal');
     } finally {
@@ -149,9 +147,8 @@ describe('DeviceSetupWizard', () => {
   it('disables serial connection when the platform does not support it', async () => {
     const view = await renderWizard(undefined, mockPlatform(false));
     try {
-      await openSetupDisclosure(view.host, 'Connect and detect');
-      expect(button(view.host, 'Connect…').disabled).toBe(true);
-      expect(view.host.textContent).toContain('Web Serial is unavailable');
+      expect(buttonOrNull(view.host, 'Find my machine')).toBeNull();
+      expect(view.host.textContent).toContain('This browser can’t reach USB machines');
     } finally {
       await view.unmount();
     }
@@ -161,7 +158,7 @@ describe('DeviceSetupWizard', () => {
     const onClose = vi.fn();
     const view = await renderWizard(onClose);
     try {
-      await openSetupDisclosure(view.host, 'Controller and connection settings');
+      await openSetupDisclosure(view.host, 'Connection options');
       await changeSelect(view.host, 'Controller firmware', 'marlin');
       await act(async () => button(view.host, 'Cancel without saving').click());
       expect(onClose).toHaveBeenCalledTimes(1);
@@ -303,7 +300,7 @@ describe('DeviceSetupWizard', () => {
       const cncRadio = view.host.querySelectorAll('input[name="machine-capability"]').item(1);
       if (!(cncRadio instanceof HTMLInputElement)) throw new Error('CNC radio missing');
       await act(async () => cncRadio.click());
-      await openSetupDisclosure(view.host, 'Controller and connection settings');
+      await openSetupDisclosure(view.host, 'Connection options');
       await changeSelect(view.host, 'Controller firmware', 'marlin');
       expect(view.host.textContent).toContain('not a KerfDesk CNC streaming target');
       expect(button(view.host, 'Check essentials').disabled).toBe(false);
@@ -318,7 +315,7 @@ describe('DeviceSetupWizard', () => {
   it('uses external configuration guidance for Marlin instead of firmware writes', async () => {
     const view = await renderWizard();
     try {
-      await openSetupDisclosure(view.host, 'Controller and connection settings');
+      await openSetupDisclosure(view.host, 'Connection options');
       await changeSelect(view.host, 'Controller firmware', 'marlin');
       await advanceToReview(view.host);
       await openSetupDisclosure(view.host, 'Controller settings');
@@ -333,14 +330,14 @@ describe('DeviceSetupWizard', () => {
   it('hides serial streaming and G-code controls for file-only Ruida setup', async () => {
     const view = await renderWizard();
     try {
-      await openSetupDisclosure(view.host, 'Controller and connection settings');
+      await openSetupDisclosure(view.host, 'Connection options');
       await changeSelect(view.host, 'Controller firmware', 'ruida');
       expect(view.host.textContent).toContain('File export');
       expect(view.host.querySelector('[aria-label="Serial baud rate"]')).toBeNull();
       expect(view.host.querySelector('[aria-label="G-code output dialect"]')).toBeNull();
       expect(view.host.querySelector('[aria-label="Streaming mode"]')).toBeNull();
-      await openSetupDisclosure(view.host, 'Connect and detect');
-      expect(view.host.textContent).toContain('No live connection is used for this controller');
+      expect(view.host.textContent).toContain('jobs are saved as files');
+      expect(buttonOrNull(view.host, 'Find my machine')).toBeNull();
     } finally {
       await view.unmount();
     }
@@ -422,4 +419,11 @@ function button(host: HTMLElement, label: string): HTMLButtonElement {
   );
   if (!(match instanceof HTMLButtonElement)) throw new Error(`Button not rendered: ${label}`);
   return match;
+}
+
+function buttonOrNull(host: HTMLElement, label: string): HTMLButtonElement | null {
+  return (
+    [...host.querySelectorAll('button')].find((candidate) => candidate.textContent === label) ??
+    null
+  );
 }

@@ -9,6 +9,7 @@ export function initialControllerConnectionState(): Pick<
   | 'detectedControllerKind'
   | 'connection'
   | 'serialPortInfo'
+  | 'connectedBaudRate'
   | 'statusReport'
 > {
   return {
@@ -18,6 +19,7 @@ export function initialControllerConnectionState(): Pick<
     detectedControllerKind: null,
     connection: { kind: 'disconnected' },
     serialPortInfo: null,
+    connectedBaudRate: null,
     statusReport: null,
   };
 }
