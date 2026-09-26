@@ -10,13 +10,13 @@
 import {
   assertNever,
   curveNodeCount,
-  ellipticalArcEndDirection,
   flattenCurveSubpath,
   type CurveSubpath,
   type EllipticalArcPathSegment,
   type PathSegment,
   type Vec2,
 } from '../scene';
+import { ellipticalArcEndDirection } from '../scene/curve-path';
 import { fitCubicWithTangents } from './cubic-fit';
 
 // The polyline Delete's floors: an open run keeps one segment, a ring a triangle.
