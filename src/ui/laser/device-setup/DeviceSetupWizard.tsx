@@ -2,7 +2,7 @@
 // open the relevant section, and only Save changes the project.
 import { useEffect, useReducer, useState } from 'react';
 import type { ControllerKind, DeviceProfile } from '../../../core/devices';
-import { LASER_MACHINE_CONFIG } from '../../../core/scene';
+import { LASER_MACHINE_CONFIG, type MachineKind } from '../../../core/scene';
 import { Dialog } from '../../kit';
 import { useStore } from '../../state';
 import { cncMachineWithCustomTools } from '../../state/machine-actions';
@@ -25,6 +25,8 @@ import { useMachineSetupSave } from './use-machine-setup-save';
 import { useMachineSetupTargetFocus } from './use-machine-setup-target-focus';
 import { DeviceSetupShell } from './DeviceSetupShell';
 import './device-setup.css';
+
+const MACHINE_KINDS: ReadonlyArray<MachineKind> = ['laser', 'cnc'];
 
 type DeviceSetupWizardProps = {
   readonly onClose: () => void;
@@ -67,11 +69,14 @@ function DeviceSetupWizardDraft(props: DeviceSetupWizardProps): JSX.Element {
     connected: connectionKind === 'connected',
   });
   // A machine that has not been through setup fills in what its controller
-  // reports by itself (ADR-420). Decided once, when setup opens.
+  // reports by itself (ADR-420). Decided once, when setup opens. Setup saved
+  // for either head counts (ADR-416 records them apart).
   const [newMachine] = useState(() => {
     const storage = browserLocalStorage();
     const configured = storage === null ? new Set<string>() : loadConfiguredSignatures(storage);
-    return !configured.has(deviceProfileSignature(project.device));
+    return !MACHINE_KINDS.some((kind) =>
+      configured.has(deviceProfileSignature(project.device, kind)),
+    );
   });
   const automatic = useControllerAutoFill(state, dispatch, newMachine);
   const cncSetup = useCncStartupWizardDraft(project.scene.layers, libraryCustomTools);

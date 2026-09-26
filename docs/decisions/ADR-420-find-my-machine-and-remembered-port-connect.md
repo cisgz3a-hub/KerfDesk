@@ -67,9 +67,15 @@ Platform limits that shape the design:
    actions: the firmware the banner named (only a serial firmware), the baud that answered, the
    machine type from `$32` (a Laser + CNC draft keeps both), and the mapped `$$` values. The card
    lists every change as old → new with one **Undo** that restores the draft it started from.
-   Nothing reaches the project before **Save machine setup**. A machine already set up that the
-   operator only opens setup for keeps its values and keeps the explicit **Use detected values**
-   (ADR-347), so opening setup never rewrites a finished machine.
+   Nothing reaches the project before **Save machine setup**. A machine already set up, for
+   either head, that the operator only opens setup for keeps its values and keeps the explicit
+   **Use detected values** (ADR-347), so opening setup never rewrites a finished machine.
+   The reported max rate (`$110`/`$111`) is the machine's ceiling, and each head keeps its own
+   Max feed (ADR-416), so the fill and **Use detected values** write it to each head the setup
+   includes: the device profile's Max feed for a laser, `CncMachineParams.maxFeedMmPerMin` for
+   CNC. A CNC-only setup leaves the laser's untouched. The change list names them **Laser max
+   feed** and **CNC max feed** on a Laser + CNC machine. Frame speed is not reported, so it is
+   not filled.
 6. **Adopting a firmware reconnects once.** When auto-fill adopted a firmware different from the
    one the connection used, Find reconnects once with it, so the matching driver reads the
    controller. It happens only after Find in this setup; a connection made elsewhere is never
@@ -100,6 +106,10 @@ Platform limits that shape the design:
   `DeviceSetupFoundMachine`. The controller contract fields move from `DeviceSetupIdentifyStep` to
   `DeviceSetupConnectionOptions`, unchanged.
 - The laser store records `connectedBaudRate`, reset wherever `serialPortInfo` is.
+- `device-setup-accept-detected.ts` holds the accept rule and the per-head change rows;
+  `device-setup-accept-detected.test.ts` pins the laser, CNC and Laser + CNC cases.
+- The rail's detected-settings toast outside setup still writes the device profile only, so in
+  CNC mode it changes the laser's Max feed; routing it per head is left for a follow-up.
 - Locators change: `Connect…` is `Connect`; Forget Controller is in the **More connection options**
   menu; `Connect and detect` and `Set up automatically` are gone; `Run read-only checks` is
   `Read again`; `Controller and connection settings` is `Connection options`.

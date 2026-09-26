@@ -7,9 +7,9 @@ import { selectControllerDriver } from '../../../core/controllers';
 import type { DeviceProfile } from '../../../core/devices';
 import { useLaserStore } from '../../state/laser-store';
 import { Button } from '../../kit';
-import { describePatch } from '../DetectedSettingsBanner';
+import { acceptDetectedPatch, setupChangeRows } from './device-setup-accept-detected';
 import type { DeviceSetupAutoFillSummary } from './device-setup-auto-fill';
-import type { DeviceSetupStepProps } from './device-setup-flow';
+import type { DeviceSetupState, DeviceSetupStepProps } from './device-setup-flow';
 import { DeviceSetupDetectedApply } from './DeviceSetupDetectedApply';
 import type { DeviceSetupAutomatic } from './use-controller-auto-fill';
 
@@ -36,8 +36,8 @@ export function DeviceSetupFoundMachine(
       {record?.status === 'applied' ? (
         <AutoFilled
           summary={record.summary}
-          before={record.undo.draft}
-          after={props.state.draft}
+          before={record.undo}
+          after={props.state}
           onUndo={props.automatic?.undo}
         />
       ) : (
@@ -49,18 +49,20 @@ export function DeviceSetupFoundMachine(
 
 function AutoFilled(props: {
   readonly summary: DeviceSetupAutoFillSummary;
-  readonly before: DeviceProfile;
-  readonly after: DeviceProfile;
+  readonly before: DeviceSetupState;
+  readonly after: DeviceSetupState;
   readonly onUndo: (() => void) | undefined;
 }): JSX.Element {
-  const rows = describePatch(props.after, props.before);
+  const rows = setupChangeRows(props.before, props.after);
   const { summary } = props;
   return (
     <div className="lf-setup-found-filled" role="status" aria-live="polite">
       <strong>Filled in from your controller</strong>
       <ul>
         {summary.controllerKind !== null ? (
-          <li>Controller set to {selectControllerDriver(props.after.controllerKind).label}</li>
+          <li>
+            Controller set to {selectControllerDriver(props.after.draft.controllerKind).label}
+          </li>
         ) : null}
         {summary.baudRate !== null ? <li>Baud rate set to {summary.baudRate}</li> : null}
         {summary.machineKind !== null ? (
@@ -96,7 +98,8 @@ function ExplicitApply(
 ): JSX.Element | null {
   const { detected } = props;
   if (detected === null) return null;
-  const rows = describePatch(detected, props.state.draft);
+  const { state } = props;
+  const rows = setupChangeRows(state, { ...state, ...acceptDetectedPatch(state, detected, false) });
   if (rows.length === 0) {
     return props.state.detectedApplied ? (
       <AppliedNote />
