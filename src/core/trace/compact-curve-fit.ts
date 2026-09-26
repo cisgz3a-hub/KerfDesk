@@ -327,7 +327,14 @@ function cachedEvaluator(
 function evaluateSpan(ctx: Context, joints: Joints, t: number, k: number): Evaluation {
   const from = joints.at[t] as number;
   const to = joints.at[t + k] as number;
-  const span = spanOf(ctx.ring, from, to);
+  const key = pieceKey(ctx.ring.length, from, to);
+  const known = k === 1 ? ctx.pieces.get(key) : undefined;
+  // A proposal piece is only read at its ends; any other span is copied out.
+  const ring = ctx.ring;
+  const span =
+    known === undefined
+      ? spanOf(ring, from, to)
+      : [ring[mod(from, ring.length)] as Vec2, ring[mod(to, ring.length)] as Vec2];
   const tStart = joints.tangent[t] as Vec2;
   const tEnd = joints.tangent[t + k] as Vec2;
   // A single piece is the proposal's accepted fit (same span, same joint
@@ -340,9 +347,8 @@ function evaluateSpan(ctx: Context, joints: Joints, t: number, k: number): Evalu
   const startCorner = joints.corner[t] === true;
   const endCorner = joints.corner[t + k] === true;
   const tolerance = ctx.options.tolerance;
-  const key = pieceKey(ctx.ring.length, from, to);
   const fit =
-    (k === 1 ? ctx.pieces.get(key) : undefined) ??
+    known ??
     lineSpanFit(span, tStart, tEnd, startCorner, endCorner, tolerance) ??
     (k === 1
       ? fitSpan(span, tStart, negate(tEnd))
