@@ -81,7 +81,7 @@ export type LaserSafetyNotice =
       readonly message: string;
     }
   | {
-      /** CNC Pause and lift could not lift or re-enter safely (ADR-410). */
+      /** CNC Pause and lift could not lift or re-enter safely (ADR-411). */
       readonly kind: 'cnc-pause-lift-failed';
       readonly message: string;
     };
@@ -107,7 +107,7 @@ export const CNC_PAUSE_RESUME_STALLED_MESSAGE =
   'machine state, then retry Resume or request ABORT JOB. Use the physical E-stop or power cutoff ' +
   'if the spindle or cutter is unsafe.';
 
-// ADR-410: once Pause and lift has soft-reset the controller, the buffered
+// ADR-411: once Pause and lift has soft-reset the controller, the buffered
 // job is gone, so a lift or re-entry that cannot finish ends the job with a
 // reset rather than leaving the spindle or the bit where nobody expects them.
 export function cncPauseLiftFailedNotice(reason: string): LaserSafetyNotice {

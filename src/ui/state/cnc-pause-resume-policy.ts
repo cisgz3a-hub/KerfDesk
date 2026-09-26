@@ -31,7 +31,7 @@ const CNC_PAUSE_MESSAGE =
   'height, so Resume spins up above the cut instead of in it. Use ABORT JOB or the ' +
   'physical E-stop if the cutter is unsafe.';
 
-// ADR-410: Pause and lift. While a lift exists the controller no longer holds
+// ADR-411: Pause and lift. While a lift exists the controller no longer holds
 // the job, so the door-resume advice above does not apply.
 export const CNC_LIFT_PHASE_MESSAGES: Readonly<Record<CncPauseLiftPhase, string>> = {
   lifting:

@@ -1,4 +1,4 @@
-// cnc-pause-lift (ADR-410) — "Pause and lift". A confirmed CNC Pause stops
+// cnc-pause-lift (ADR-411) — "Pause and lift". A confirmed CNC Pause stops
 // the router in place with the spindle off, but the bit stays in the wood,
 // and a door-resume would restart the spindle there. GRBL cannot move while
 // it holds a job, so once the hold has fully settled (Door:0 or Hold:0) the

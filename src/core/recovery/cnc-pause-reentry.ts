@@ -1,4 +1,4 @@
-// cnc-pause-reentry (ADR-410) — where a paused CNC job re-enters its own cut
+// cnc-pause-reentry (ADR-411) — where a paused CNC job re-enters its own cut
 // after "Pause and lift", and the lines that take it there.
 //
 // Pause stops the router in place with the bit in the wood. To lift it, the
@@ -39,7 +39,7 @@ export const CNC_REENTRY_MATCH_TOLERANCE_MM = 0.1;
 const Z_EPSILON_MM = 0.001;
 
 /** Firmware whose soft reset at a completed hold keeps position without an
- *  alarm, and whose restart this re-entry was built against (ADR-410). */
+ *  alarm, and whose restart this re-entry was built against (ADR-411). */
 const LIFT_CONTROLLERS: ReadonlySet<ControllerKind> = new Set(['grbl-v1.1', 'grblhal']);
 
 export type CncPauseReentryPlan = {

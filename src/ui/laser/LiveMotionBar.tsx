@@ -126,7 +126,7 @@ function LiveMotionPrimaryAction({ status }: { readonly status: StreamerStatus |
     );
   }
   // A lift exists only for a paused stream; while it moves the bit, only Abort
-  // interrupts it (ADR-410).
+  // interrupts it (ADR-411).
   const movingLift = liftPhase === 'lifted' ? null : liftPhase;
   if (movingLift !== null) {
     return (

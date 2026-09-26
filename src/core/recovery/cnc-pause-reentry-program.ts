@@ -1,4 +1,4 @@
-// cnc-pause-reentry-program (ADR-410) — the modal state a CNC re-entry after
+// cnc-pause-reentry-program (ADR-411) — the modal state a CNC re-entry after
 // "Pause and lift" must restore, read from the lines the job has already
 // streamed.
 //

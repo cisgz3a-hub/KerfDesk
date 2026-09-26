@@ -1,4 +1,4 @@
-// cnc-pause-reentry-run (ADR-410) — Resume after "Pause and lift". The bit is
+// cnc-pause-reentry-run (ADR-411) — Resume after "Pause and lift". The bit is
 // at safe height with the spindle off, and the controller holds none of the
 // job. Resume re-checks the frame, spins the spindle up there with the
 // program's own dwell, rapids above the stop point, feeds straight down into

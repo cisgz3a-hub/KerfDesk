@@ -393,7 +393,7 @@ export function wipeInFlight(state: StreamerState): StreamerState {
 }
 
 // Replay a paused stream from `lineIndex` after a soft reset emptied the
-// controller's buffers (CNC Pause and lift, ADR-410). Lines before it count as
+// controller's buffers (CNC Pause and lift, ADR-411). Lines before it count as
 // acknowledged, nothing is in flight, and the program array is kept, so a
 // hosted refill still recognises the program it adopts (ADR-354).
 export function rewindPausedStream(state: StreamerState, lineIndex: number): StreamerState {

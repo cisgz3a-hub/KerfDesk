@@ -1425,7 +1425,7 @@ minimum target size.
 5. The advisory informs but never gates (rule 7). What stays refused is unrelated to this flow: CNC checkpoint, start-from-line, and pass-boundary recovery jobs (ADR-143/215).
 6. **Not hardware-verified.** Whether a given controller reports `A:`/`Ov:`, and its actual door spin-up delay, are per-build facts. Air-cut before cutting material.
 
-### F-B7a. CNC Pause and lift (ADR-410)
+### F-B7a. CNC Pause and lift (ADR-411)
 
 #### Success — lift
 1. After a confirmed CNC Pause (F-B7), the app checks the conditions for a lift:

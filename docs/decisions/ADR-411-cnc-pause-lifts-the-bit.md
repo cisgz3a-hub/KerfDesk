@@ -1,4 +1,4 @@
-## ADR-410 - CNC Pause lifts the bit out of the cut, and Resume re-enters from above (2026-09-26)
+## ADR-411 - CNC Pause lifts the bit out of the cut, and Resume re-enters from above (2026-09-26)
 
 **Status:** Accepted. | **Date:** 2026-09-26
 

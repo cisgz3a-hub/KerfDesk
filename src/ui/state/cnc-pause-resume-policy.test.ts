@@ -31,7 +31,7 @@ describe('CNC pause/resume policy', () => {
     expect(cncPauseMessage('laser')).toBeNull();
   });
 
-  // ADR-410: after the lift the reset has cleared the controller's settings,
+  // ADR-411: after the lift the reset has cleared the controller's settings,
   // so a lifted job must not fall back to the unconfirmed-mode advice.
   it('describes a Pause and lift by its phase, whatever the laser-mode evidence', () => {
     expect(cncResumeAdvisoryNotice('cnc', undefined, 'lifted')).toBe(
