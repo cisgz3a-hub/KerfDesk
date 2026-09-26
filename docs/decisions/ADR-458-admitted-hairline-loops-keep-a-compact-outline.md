@@ -182,6 +182,12 @@ vanish:
   the source orientation and the source nesting depth, and that the orphan count is 0. It also
   checks that the gate never admits a loop without every loop enclosing it, and it checks that
   depth parity equals orientation in Line Art, Smooth and Sharp traces of the same nests.
+- `contour-no-orphan-measured.test.ts` runs the same check on the measured (sub-pixel) finishing
+  tail, which the nests above never reach: they are painted at two grey levels, so their cracks
+  carry no sub-pixel information. It traces an anti-aliased ring around a disc (outer, hole,
+  island) with a crack field, so every loop is finished by the cubic fit. It passes a fine fit, a
+  coarse fit (tolerance scale 400) and a fit that returns no cubics at all, and checks one ring per
+  loop with the source orientation and depth.
 
 **Measurements.**
 
@@ -189,21 +195,39 @@ vanish:
   - dropping the loops that reach the fallback (the pre-TR-011 behaviour): 26 cases fail;
   - topology repair dropping one ring: 64 fail;
   - a gate that admits holes (or outers) at a quarter of the area: 1 and 2 fail;
-  - admitting zero-area loops: 1 fails.
-- On this ADR's base commit (f0b28de20), the test fails at its import of `isAdmittedLoop`. Its
-  behavioural cases pass there, because the fallback above already covered every reachable
-  collapse.
+  - admitting zero-area loops: 1 fails;
+  - dropping a measured loop whose fit collapsed: the measured test fails (1 case), and the
+    two-level nest test does not notice it, which is why the measured test exists.
+- **No reachable orphan existed on the base commit (f0b28de20).** This amendment hardens and pins
+  an invariant the base already held; it does not fix a live defect. The only case that fails on
+  the base is the unit test of the gate rule for a zero-area loop, which the walker never produces.
+  Every behavioural case passes there, because the fallback above already covered every reachable
+  collapse. The mutations above show that the test does guard the invariant.
 - Orphan census (rings whose orientation disagrees with their depth parity), before and after:
   **0 in all 39 contour rows**. The rows cover the analytic set, noise192, five edge shapes, the
   owl and the hummingbird in Line Art, Smooth and Sharp. The owl Sharp trace has 10,870 rings.
 - ADR-438-style parity hashes, before and after: **78 of 78 byte-identical**. That is 13 cases
   (the five analytic fixtures, noise192, five edge shapes, the owl and the hummingbird) in all six
-  presets, serialised canonically with curves and hashed.
+  presets, serialised canonically with curves and hashed. The oracle was an off-tree scratch
+  harness, not committed, modelled on ADR-438's trace-parity approach: a vitest file that traces
+  each case in each preset, hashes the canonical serialisation, and compares it with a recorded
+  base file. It ran as `NO_ORPHAN=1 NO_ORPHAN_HEAVY=1 npx vitest run --maxWorkers=2
+  <harness>.test.ts`, first with `NO_ORPHAN_RECORD=1` on the base and then without it on this
+  change. A later reviewer cannot re-run it from this commit; once the ADR-438 parity test lands,
+  it is the reproducible check.
 
 **Consequences.**
 
 - The invariant is now stated in the code and pinned by a test, rather than holding by accident.
   Corridor finishing (action-plan item 13) must keep it.
+- Scope: the invariant covers the binary contour lane only (`contourPolylinesFromMask`, called by
+  the contour and Edge Detection traces). The multi-colour lanes (`colour-layer-trace` and the
+  legacy imagetracerjs lane in `trace-to-paths.ts`) and the Region Enhance merge (ADR-113/435) are
+  unaudited. Region Enhance keeps or drops each subpath on its own, by box containment
+  (`region-merge.ts`), without looking at nesting. So when a re-trace's topology differs from the
+  original, for example an outer re-traced across the box border by more than 1 px, a hole could
+  keep its re-traced copy while its outer is dropped. That risk predates this ADR and was not
+  reproduced end to end; making the merge treat an outer and its holes as one unit is a follow-up.
 - Not addressed here: the artwork exporters (ADR-455, on its own branch). Their PDF and EPS
   writers paint every closed ring of a painted item as one compound path under the item's fill
   rule. Their GeoJSON writer groups holes by geometric containment. Neither groups by list order.
