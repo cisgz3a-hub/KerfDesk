@@ -106,7 +106,10 @@ width** is traced as centre-line strokes. Wider ink is traced as filled outlines
 11. **Vector only.** Line + fill offers no Raster scan output: the raster route renders every path
    in one style and would turn the fills into outline rings. Its operations are named
    "<file> lines" and "<file> fills". Enhance region keeps the per-width stroke groups, their
-   widths and their curves. `isBinaryContourPreset` excludes Line + fill, so the contour-only
+   widths and their curves. Border counterparts match by source colour, pen presence/transform,
+   closedness and nearest bounds, one-to-one: a changed width measured on the finer grid must not
+   delete or duplicate a stroke. An accepted replacement keeps its new measured width.
+   `isBinaryContourPreset` excludes Line + fill, so the contour-only
    supersample and dense-colour downscale routes (which carry neither widths nor the gate) never
    take it.
 

@@ -15,7 +15,9 @@
 // operationIds, strokes and fill rule; a path nothing touched is returned as
 // the same object. Paths merge by kind: the colour plus a stroke's pen width
 // and pen transform, so Line + fill's per-width stroke groups (ADR-443) keep
-// their widths.
+// their widths. Border correspondence ignores only the numeric pen width:
+// tracing the same mark on a finer grid can change that measurement, but its
+// colour, pen presence and pen transform still distinguish its role.
 
 import {
   polylineToCurveSubpath,
@@ -39,6 +41,7 @@ type Box = {
 
 type Entry = {
   readonly key: string;
+  readonly correspondence: string;
   readonly polyline: Polyline;
   readonly curve: CurveSubpath | undefined;
   readonly box: Box | null;
@@ -86,9 +89,17 @@ export function replacePathsInRegion(
 }
 
 function mergeKey(path: ColoredPath): string {
+  return `${path.color}|${path.strokeWidthMm ?? ''}|${penTransformKey(path)}`;
+}
+
+function correspondenceKey(path: ColoredPath): string {
+  const pen = path.strokeWidthMm === undefined ? 'unmeasured' : 'stroke';
+  return `${path.color}|${pen}|${penTransformKey(path)}`;
+}
+
+function penTransformKey(path: ColoredPath): string {
   const t = path.strokeTransform;
-  const pen = t === undefined ? '' : `${t.a},${t.b},${t.c},${t.d}`;
-  return `${path.color}|${path.strokeWidthMm ?? ''}|${pen}`;
+  return t === undefined ? '' : `${t.a},${t.b},${t.c},${t.d}`;
 }
 
 function acceptedReplacements(
@@ -118,7 +129,7 @@ function borderPairs(
   }> = [];
   for (const retraced of nearReplacements) {
     for (const original of nearOriginals) {
-      if (original.key !== retraced.key) continue;
+      if (original.correspondence !== retraced.correspondence) continue;
       if (original.polyline.closed !== retraced.polyline.closed) continue;
       const d = boxDistance(original.box, retraced.box);
       if (d <= REGION_MATCH_TOLERANCE_PX) candidates.push({ original, retraced, d });
@@ -140,10 +151,12 @@ function pathEntries(path: ColoredPath, interior: TraceBoundary): Entry[] {
   // Curves are index-aligned with polylines; a mismatched array is not.
   const curves = path.curves?.length === path.polylines.length ? path.curves : undefined;
   const key = mergeKey(path);
+  const correspondence = correspondenceKey(path);
   return path.polylines.map((polyline, index) => {
     const box = polylineBox(polyline);
     return {
       key,
+      correspondence,
       polyline,
       curve: curves?.[index],
       box,
