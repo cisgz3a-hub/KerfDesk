@@ -254,7 +254,8 @@ tail and follow that staircase; see Known gaps.
     to fail the R=900 commit-grid, filled-disc Optimize, Edge-dial or hairline instruments.
     Incremental span evaluation (reusing the previous extension's parameters) is the next lever;
     the exact part of it is done (Amendment 1), and the fit is no longer where most of the gap is.
-    The topology repair's exact savings are Amendment 2; what remains is the sample count.
+    The topology repair's exact savings are Amendment 2, and its memory and the corner legs are
+    Amendment 3; what remains is the sample count.
 - Node editing, SVG export, bounds and the laser commit read the carried cubics; the downscale and
   Region Enhance routes no longer lose them.
 
@@ -367,3 +368,45 @@ dropped: testing a small ring's later cubics in place instead of filtering them 
 points against main's 0.97M; perf-noise-192: 100,405 against 30,110), which the repair, the
 contact indexes and the curve pieces all hold. Only a coarser compatibility sampling removes it,
 and that changes the output, so it is a separate decision with its own instruments.
+
+### Amendment 3 - index memory and corner legs, same output (2026-09-27)
+
+Peak memory is garbage-collector slack over a live set about three times main's. A heap snapshot
+at the end of the topology repair (perf-noise-256) held 123 MB against main's 39 MB, mostly boxed
+doubles: every contour edge and every box-index node stored four bounds as heap numbers. Four
+changes remove that and some corner-leg work without changing a coordinate:
+
+- Contour edges compute their box from their end points (`Math.min`/`Math.max` of the same two
+  values) instead of storing it.
+- The box index copies each item's bounds once into a `Float64Array`; leaves list a range of the
+  partition order instead of an array of items, and queries and the dual-tree walk test the flat
+  copies. The build partitions over typed centre arrays by the same swaps.
+- The box index keeps its nodes in flat typed arrays sized by the build's exact node count. Nodes
+  are built, numbered and visited in the same order and compare the same doubles.
+- `fitLeg` and `isStraight` step the ring index instead of reducing it modulo the ring length for
+  every point. The points and the order of every sum are unchanged (`x ** 2` is `x * x` exactly).
+
+Tried without gain and dropped: moving the partition keys with the order so partitions read them
+in sequence.
+
+Equivalence instrument: the same FNV hash of every polyline vertex and curve coordinate. It is
+unchanged on owl Line Art, Smooth and Sharp, hummingbird Line Art and perf-noise-192, -256, -512
+and -1024 from Amendment 2 to this amendment. The heap at the end of the repair on perf-noise-256
+is 103 MB after the first two changes, before the node arrays.
+
+Measured (node bundles, one process per run, runs interleaved, machine less loaded than for
+Amendment 2):
+
+| Case | Amendment 2 (`0300fd3e8`) | After | main (`fa8939b8d`) |
+|---|---|---|---|
+| owl Line Art, whole trace | 7.2 to 8.3 s | 6.2 to 7.3 s | 4.3 to 4.5 s |
+| owl Line Art, peak RSS | 705 to 718 MB | 595 to 673 MB | 562 to 564 MB |
+| perf-noise-512 Line Art, `fitLeg` (CPU profile) | 1.22 s | 0.49 s | - |
+| perf-noise-1024 Line Art, whole trace | 107 s | 96 s | 61 s |
+| perf-noise-1024 Line Art, peak RSS | 6.3 GB | 4.3 GB | 2.7 GB |
+
+Status against the targets: not met. Owl Line Art is about 1.5x main and above the 4.0 s target
+(main itself measured 4.3 to 4.5 s in this run); perf-noise-1024 is 1.6x main in time and in
+peak memory. The fit is about 44% of the perf-noise-512 trace in a CPU profile and has no known
+exact saving left (Amendment 1). The rest still grows with the sample count (2.62M points against
+main's 0.97M on perf-noise-1024).
