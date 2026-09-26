@@ -93,8 +93,10 @@ Options considered:
    - Inside-first cutting: `compileJob` gives each line-mode segment of a path with a valid forest
      its depth and a forest key unique to that object's path (`CutSegment.nesting`).
      `containmentDepths` never probes contours of the same forest against each other and adds
-     their carried depth; containers from other paths are probed as before. Kerf-offset and tabbed
-     contours are rebuilt, carry nothing and probe as before.
+     their carried depth; containers from other paths are probed as before. The tabs step keeps a
+     contour's nesting, whether the contour takes no tab or is split into open pieces (each piece
+     lies at its contour's depth). Kerf-offset contours are rebuilt, carry nothing and probe as
+     before.
    - Break Apart (`groupSubpathsByOuterShape`): the carried forest is the tree; the probe vote of
      `loop-nesting.ts` runs only without it.
    - Fill needs no forest: scanline fill applies the fill rule, Follow Shape uses the Clipper
@@ -152,7 +154,11 @@ proper crossings of the output flattened within 0.02 source px.
 - **Cost of the curve guard**, same process, guard off then on, two runs each: owl Line Art 9.6-10.3
   to 10.3-10.4 s (+0 to 9 percent), owl Sharp 12.7-13.1 to 15.0-15.2 s (+15 to 19 percent),
   hummingbird Line Art 6.0-6.1 to 6.6-6.9 s (+10 to 13 percent), hummingbird Sharp 8.2-9.2 to
-  9.8-10.0 s (+9 to 20 percent). The forest itself is one integer sweep per pixel row and does not
+  9.8-10.0 s (+9 to 20 percent). Dense binary noise costs more: a 200 px noise field, same A/B,
+  reads Line Art 7.2-9.2 to 9.3-9.9 s (+8 to 29 percent), Sharp 4.5-4.6 to 5.1-5.2 s (+10 to 15
+  percent) and Smooth 6.3-6.6 to 7.2-7.3 s (+10 to 17 percent); the review's own A/B read Smooth
+  +17 to 28 percent, so take about +25 percent for noisy art. Halftone, anti-aliased rings and
+  checker art stay within noise. The forest itself is one integer sweep per pixel row and does not
   show above noise. The bake-off's single timing run (noisy, other worktrees active) read owl Line
   Art 8.4 to 10.0 s and hummingbird Line Art 5.4 to 6.5 s against ADR-405.
 - **Tests:** six nested square bands (depths 0 to 5, outers first) and B, 8 and @ glyph topologies
@@ -169,9 +175,17 @@ proper crossings of the output flattened within 0.02 source px.
   job it computes today) and through the laser commit.
 - Inside-first cutting is exact within a trace; it still probes between separate objects.
 - The tracer's subpath order changes (outers first). Nothing depends on the scan order.
+- The forest is all or nothing per path: if the row sweep finds spans that do not nest, or any
+  one ring's orientation disagrees with its depth parity, the whole path carries no forest and
+  every consumer falls back to the probe. No test or real-art trace has triggered this (in the
+  review's probes 137 synthetic paths and 6 real-art paths all kept their forest), but a single bad ring degrades the
+  whole trace, not only its own subtree.
+- A traced contour on a layer with tabs keeps its nesting through the tabs step, so a hole inside
+  a tabbed outline now orders before the outline's pieces. Previously the split outline was no
+  container and the hole read depth 0.
 - Known gaps: the Edge Detection lane shares the finisher but filters loops by length afterwards
   and carries no forest yet (it does get the curve guard); Region Enhance and the CNC fairing drop
-  the forest; kerf and tab contours probe; Island fill still groups by bounds. The guard proves the
+  the forest; kerf-offset contours probe; Island fill still groups by bounds. The guard proves the
   curves disjoint, not a clearance between them: a flattening of two curves that pass within its
   tolerance of each other can still show a crossing its curves do not have (the bake-off's 0.02 px
   flattening does, at a few near misses; compile's machine-tolerance flattening can too).

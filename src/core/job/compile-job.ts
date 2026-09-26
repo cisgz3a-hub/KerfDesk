@@ -12,7 +12,7 @@
 import { type DeviceProfile, toMachineCoords } from '../devices';
 import { artworkOperationRuns, orderedArtworkObjects } from '../artwork-order';
 import { offsetClosedPolylinesForKerfChecked } from '../geometry/kerf-offset';
-import { applyAutomaticTabsToPolylines } from '../geometry/tabs-bridges';
+import { applyAutomaticTabsBySource } from '../geometry/tabs-bridges';
 import {
   applyTransform,
   assertNever,
@@ -318,11 +318,18 @@ function collectLineSegmentsForLayer(
     if (appendSegmentsFromObject(obj, layer, device, out)) kerfOffsetFailed = true;
   }
   if (!layer.tabsEnabled) return { segments: out, kerfOffsetFailed };
+  // A contour keeps its carried nesting (ADR-406) across the tabs step, whole
+  // or split into open pieces: a piece lies at its contour's depth.
+  const tabbed = applyAutomaticTabsBySource(
+    out.map((segment) => ({ points: segment.polyline, closed: segment.closed })),
+    layer,
+  );
   return {
-    segments: applyAutomaticTabsToPolylines(
-      out.map((segment) => ({ points: segment.polyline, closed: segment.closed })),
-      layer,
-    ).map((polyline) => ({ polyline: polyline.points, closed: polyline.closed })),
+    segments: tabbed.map(({ polyline, source }) => {
+      const nesting = out[source]?.nesting;
+      const segment = { polyline: polyline.points, closed: polyline.closed };
+      return nesting === undefined ? segment : { ...segment, nesting };
+    }),
     kerfOffsetFailed,
   };
 }

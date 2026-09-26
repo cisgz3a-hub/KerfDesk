@@ -77,6 +77,23 @@ describe('inside-first ordering of a traced path (ADR-406)', () => {
     expect(firstCut(nested)).toBe(hole.points.length);
   });
 
+  it('keeps the forest on a layer with tabs, whole contours and split pieces alike', () => {
+    const nested = withSubpathNesting({ color, polylines: [outline, hole] }, [-1, 0]);
+    const tabbed = { ...layer, tabsEnabled: true, tabSizeMm: 2, tabsPerShape: 4 };
+    const compiled = compileJob({ objects: [trace(nested)], layers: [tabbed] }, device);
+    const segments = (compiled.groups[0] as CutGroup).segments;
+    // The outline takes four tabs; the hole, an inner shape, is skipped.
+    const pieces = segments.filter((segment) => !segment.closed);
+    const whole = segments.filter((segment) => segment.closed);
+    expect(pieces).toHaveLength(4);
+    expect(whole).toHaveLength(1);
+    expect(pieces.every((piece) => piece.nesting?.depth === 0)).toBe(true);
+    expect(whole[0]?.nesting?.depth).toBe(1);
+    expect(new Set(segments.map((segment) => segment.nesting?.forest)).size).toBe(1);
+    const job = optimizePaths(compiled, { ...DEFAULT_PROJECT_OPTIMIZATION, insideFirst: true });
+    expect((job.groups[0] as CutGroup).segments[0]?.closed).toBe(true);
+  });
+
   it('ignores a forest whose geometry changed since it was written', () => {
     const nested = withSubpathNesting({ color, polylines: [outline, hole] }, [-1, 0]);
     const moved: ColoredPath = {
