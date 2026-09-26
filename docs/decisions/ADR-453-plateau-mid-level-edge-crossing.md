@@ -118,6 +118,33 @@ Contestants: P-default, O-default, O-smooth and O-sharp.
   inward crossing bias cancelled it; with the bias removed, the bars trace 0.2-0.3 px wide. The fix
   belongs to the fit tail (geometry-core work), not to edge placement.
 
+### On top of claude/tl-geometry-core
+
+The calibration loss above is a property of this base's fit tail. To check how the change behaves
+once it merges with the compact fit, it was applied to claude/tl-geometry-core (417a44cdb) in a
+scratch worktree (its own files merge without conflict; trace-image.ts took the same three-line
+call-site edit by hand). A synthetic probe traced anti-aliased bars at (40.3, 50.35) and the grey-patch
+disc through the full pipeline (traceImageToColoredPaths). Area error is traced area over true area,
+minus 1. Four builds were measured: base, this change, geometry-core, and geometry-core plus this change.
+
+| fixture, preset         | a10013827 | + ADR-453 | geometry-core | + ADR-453 |
+| ----------------------- | --------- | --------- | ------------- | --------- |
+| bar 100x8, Smooth       | +14.3%    | +18.1%    | -4.77%        | -0.36%    |
+| bar 100x8, Sharp        | +0.73%    | +4.68%    | -4.77%        | +0.01%    |
+| bar 100x20, Smooth      | +5.87%    | +7.26%    | -2.14%        | +0.13%    |
+| bar 100x20, Sharp       | +0.05%    | +1.58%    | -2.14%        | +0.06%    |
+| bar 100x3, Smooth       | +60.1%    | +55.9%    | +10.8%        | +0.86%    |
+| bar 100x3, Sharp        | +18.5%    | +18.5%    | +5.30%        | +4.95%    |
+| bars, Line Art (all)    | unchanged | unchanged | unchanged     | unchanged |
+| disc on 180 grey, Smooth | -0.026 / 0.176 | -0.046 / 0.110 | -0.037 / 0.115 | -0.011 / 0.081 |
+| disc on 180 grey, Sharp  | -0.053 / 0.137 | -0.039 / 0.108 | -0.032 / 0.099 | -0.021 / 0.064 |
+
+The disc rows are radial bias / RMS in px over vertices and segment midpoints.
+
+With the compact fit, the bulge is gone. The fit then shows the inward crossing bias directly: the
+bars come out 2-5% thin. This change removes it, and the thin-bar area errors drop to at most 0.4%
+on the 8 and 20 px bars. So the calibration-bar loss on this base reverses once geometry-core lands.
+
 ### Consequences
 
 - Smooth and Sharp place broad anti-aliased edges at 50% coverage, including against grey paper.
