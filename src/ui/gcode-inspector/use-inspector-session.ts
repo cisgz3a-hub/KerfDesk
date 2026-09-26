@@ -4,7 +4,7 @@ import type { GcodeRenderModel } from '../../core/gcode-view';
 import { directionArrows, resolveViewer3dTheme } from '../viewer3d';
 import type { GcodeInspectionSource } from './gcode-inspection-source';
 import type { GcodeInspectorAnalysis } from './gcode-inspector-analysis';
-import { DEFAULT_LENS_ID, lensColorFn, type LensId } from './lenses';
+import { defaultLensFor, lensColorFn, type LensId } from './lenses';
 import { playheadAtTime } from './playhead';
 import { useInspectorPlayback } from './use-inspector-playback';
 import { useInspectorLiveProgress } from './use-inspector-live-progress';
@@ -15,7 +15,11 @@ export function useInspectorSession(
   source?: GcodeInspectionSource,
 ) {
   const [travelVisible, setTravelVisible] = useState(true);
-  const [lens, setLens] = useState<LensId>(DEFAULT_LENS_ID);
+  // Null until the operator picks one; until then the program chooses.
+  const [chosenLens, setLens] = useState<LensId | null>(null);
+  const machineKind = source?.machineKind;
+  const programLens = useMemo(() => defaultLensFor(model, machineKind), [model, machineKind]);
+  const lens = chosenLens ?? programLens;
   const [arrowsVisible, setArrowsVisible] = useState(false);
   const [followLive, setFollowLive] = useState(true);
   const theme = useMemo(() => resolveViewer3dTheme(), []);
@@ -62,6 +66,7 @@ function useInspectorDerived(
   readonly playback: ReturnType<typeof useInspectorPlayback>;
   readonly playhead: ReturnType<typeof playheadAtTime>;
   readonly findings: GcodeInspectorAnalysis['findings'];
+  readonly timedFor: GcodeInspectorAnalysis['timedFor'];
   readonly atEnd: boolean;
   readonly colorOf: ReturnType<typeof lensColorFn>;
   readonly arrows: ReturnType<typeof directionArrows> | null;
@@ -69,7 +74,7 @@ function useInspectorDerived(
   readonly activeLine: number | null;
 } {
   // Timeline and findings arrive with the worker result; keep them off the UI thread.
-  const { time, findings } = analysis;
+  const { time, findings, timedFor } = analysis;
   const playback = useInspectorPlayback(time.motionSeconds, playbackEnabled, model);
   const playhead = useMemo(
     () => playheadAtTime(model, time.segTimeEndSec, playback.routeMm),
@@ -86,6 +91,7 @@ function useInspectorDerived(
     playback,
     playhead,
     findings,
+    timedFor,
     // Fully-drawn playhead = show everything, so the scene never hides the
     // tail segment to floating-point rounding.
     atEnd: playback.routeMm >= time.motionSeconds,

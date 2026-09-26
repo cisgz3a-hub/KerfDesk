@@ -4,7 +4,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { createProject, DEFAULT_CNC_MACHINE_CONFIG, type Project } from '../../core/scene';
 import type { RemovalGrid } from '../../core/sim';
 import type { Toolpath } from '../../core/job';
-import { useCncRemovalGrid } from './use-cnc-removal-grid';
+import { useCncRemovalGrid, useCncRemovalGridState } from './use-cnc-removal-grid';
 import { registerPreviewJobOriginOffset } from './preview-scene-frame';
 
 (
@@ -103,6 +103,28 @@ describe('useCncRemovalGrid', () => {
     expect(observed).toBeNull();
   });
 });
+
+describe('useCncRemovalGridState', () => {
+  it('reports pending until the grid settles, and a failure as settled (ADR-425)', async () => {
+    let fail: ((error: Error) => void) | null = null;
+    workerMocks.prepare.mockReturnValueOnce(
+      new Promise<RemovalGrid | null>((_resolve, reject) => {
+        fail = reject;
+      }),
+    );
+    await act(async () => root.render(<StateHarness />));
+    expect(observedState).toEqual({ grid: null, pending: true });
+    await act(async () => fail?.(new Error('worker stopped')));
+    expect(observedState).toEqual({ grid: null, pending: false });
+  });
+});
+
+let observedState: ReturnType<typeof useCncRemovalGridState> | null = null;
+
+function StateHarness(): null {
+  observedState = useCncRemovalGridState(PROJECT, true, TOOLPATH, 1);
+  return null;
+}
 
 async function render(previewMode: boolean): Promise<void> {
   await act(async () => {

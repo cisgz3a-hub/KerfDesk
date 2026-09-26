@@ -2,6 +2,13 @@
 // the 3D cut preview (ADR-103 G4). Each fully included output cell takes the
 // deepest value in its source block; any excluded source coverage keeps the
 // coarse display cell excluded so preview downsampling cannot fill holes.
+//
+// One exception keeps material left inside a cut (ADR-425): a block wholly
+// below the stock top that is two flat levels, such as a tab standing in a
+// profile groove, shows the level most of the block has. Deepest-only pooling
+// erased any tab shorter than about two display cells. Blocks that reach the
+// stock top stay deepest, so thin grooves and V-carve strokes never vanish,
+// and sloped relief blocks stay deepest because they are not two-level.
 // Pure and deterministic (indexed loops only).
 
 import { partialCellCount } from '../grid';
@@ -58,21 +65,68 @@ function displayFactor(grid: RemovalGrid, maxCellsAcross: number): number {
   return Math.ceil(Math.max(grid.widthCells, grid.heightCells) / across);
 }
 
+// Depths within this of the stock top count as uncut material.
+const STOCK_TOP_TOLERANCE_MM = 1e-4;
+// Samples within this of a block's extreme belong to that flat level.
+const FLAT_LEVEL_TOLERANCE_MM = 0.01;
+// Share of a block the two flat levels must cover for it to read as a step.
+const TWO_LEVEL_SHARE = 0.9;
+
+type SourceBlock = {
+  readonly rowStart: number;
+  readonly rowEnd: number;
+  readonly colStart: number;
+  readonly colEnd: number;
+};
+
 function downsampledCell(
   grid: RemovalGrid,
   factor: number,
   row: number,
   col: number,
 ): { readonly depth: number; readonly included: boolean } {
+  const block = {
+    rowStart: row * factor,
+    rowEnd: Math.min(grid.heightCells, (row + 1) * factor),
+    colStart: col * factor,
+    colEnd: Math.min(grid.widthCells, (col + 1) * factor),
+  };
   let deepest = 0;
-  const rowEnd = Math.min(grid.heightCells, (row + 1) * factor);
-  const colEnd = Math.min(grid.widthCells, (col + 1) * factor);
-  for (let sourceRow = row * factor; sourceRow < rowEnd; sourceRow += 1) {
-    for (let sourceCol = col * factor; sourceCol < colEnd; sourceCol += 1) {
+  let highest = Number.NEGATIVE_INFINITY;
+  for (let sourceRow = block.rowStart; sourceRow < block.rowEnd; sourceRow += 1) {
+    for (let sourceCol = block.colStart; sourceCol < block.colEnd; sourceCol += 1) {
       const sourceIndex = sourceRow * grid.widthCells + sourceCol;
       if (grid.inclusion?.[sourceIndex] === 0) return { depth: 0, included: false };
-      deepest = Math.min(deepest, grid.depth[sourceIndex] ?? 0);
+      const depth = grid.depth[sourceIndex] ?? 0;
+      deepest = Math.min(deepest, depth);
+      highest = Math.max(highest, depth);
     }
   }
-  return { depth: deepest, included: true };
+  const insideCut = highest < -STOCK_TOP_TOLERANCE_MM;
+  const stepped = highest - deepest > FLAT_LEVEL_TOLERANCE_MM;
+  const depth = insideCut && stepped ? majorityFlatLevel(grid, block, deepest, highest) : deepest;
+  return { depth, included: true };
+}
+
+// The level most of a two-level block sits at; deepest when the block is not
+// two flat levels (a slope, a ramp) or the levels tie.
+function majorityFlatLevel(
+  grid: RemovalGrid,
+  block: SourceBlock,
+  deepest: number,
+  highest: number,
+): number {
+  let atDeepest = 0;
+  let atHighest = 0;
+  let samples = 0;
+  for (let sourceRow = block.rowStart; sourceRow < block.rowEnd; sourceRow += 1) {
+    for (let sourceCol = block.colStart; sourceCol < block.colEnd; sourceCol += 1) {
+      const depth = grid.depth[sourceRow * grid.widthCells + sourceCol] ?? 0;
+      samples += 1;
+      if (depth - deepest <= FLAT_LEVEL_TOLERANCE_MM) atDeepest += 1;
+      else if (highest - depth <= FLAT_LEVEL_TOLERANCE_MM) atHighest += 1;
+    }
+  }
+  if (atDeepest + atHighest < samples * TWO_LEVEL_SHARE) return deepest;
+  return atHighest > atDeepest ? highest : deepest;
 }

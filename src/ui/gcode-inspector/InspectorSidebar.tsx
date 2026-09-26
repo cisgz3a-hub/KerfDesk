@@ -17,6 +17,8 @@ export function InspectorSidebar(props: {
   readonly theme: Viewer3dTheme;
   readonly playhead: PlayheadState;
   readonly time: ProgramTimeModel;
+  /** Device profile the time assumes; null for stock GRBL limits. */
+  readonly timedFor: string | null;
   readonly findings: ReadonlyArray<ProgramFinding>;
   readonly lens: LensId;
   readonly onLensChange: (lens: LensId) => void;
@@ -29,7 +31,10 @@ export function InspectorSidebar(props: {
   // Playback re-renders this column every animation frame. statsRows scans
   // every segment, so derive it per PROGRAM, not per frame. The lens control
   // applies the same memo boundary to its legend; droRows reads one segment.
-  const stats = useMemo(() => statsRows(props.model, props.time), [props.model, props.time]);
+  const stats = useMemo(
+    () => statsRows(props.model, props.time, props.timedFor),
+    [props.model, props.time, props.timedFor],
+  );
   return (
     <aside style={sidebarStyle} aria-label="Program readouts">
       <Section title="Position">

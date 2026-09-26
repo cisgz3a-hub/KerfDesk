@@ -23,7 +23,7 @@ import { DragOverlay, DragReadout, MeasureReadoutOverlay, ZoomControls } from '.
 import { useCanvasBitmapSize, type CanvasBitmapSize } from './use-canvas-bitmap-size';
 import { usePreviewPlayback } from './use-preview-playback';
 import { usePreviewToolpath } from './use-preview-toolpath';
-import { useCncRemovalGrid } from './use-cnc-removal-grid';
+import { useCncRemovalGridState } from './use-cnc-removal-grid';
 import type { RemovalGrid } from '../../core/sim';
 import { useDragMove } from './use-workspace-drag';
 import { useWorkspaceWheelZoom } from './use-workspace-wheel';
@@ -54,7 +54,8 @@ export function Workspace(): JSX.Element {
   const canvasMotionOverlay = useCanvasMotionOverlay(project, previewMode);
   const jobEstimate = useJobEstimate();
   usePreviewPlayback(previewMode, previewToolpath, jobEstimate);
-  const cncRemovalGrid = useCncRemovalGrid(project, previewMode, previewToolpath, scrubberT);
+  const cncRemoval = useCncRemovalGridState(project, previewMode, previewToolpath, scrubberT);
+  const cncRemovalGrid = cncRemoval.grid;
   const canvasSize = useCanvasBitmapSize(ref);
   const previewBitmap = usePreviewBitmapRenderer(previewMode);
   const { displayProject, textEditing } = useCanvasTextDisplayProject(project, previewMode);
@@ -111,6 +112,7 @@ export function Workspace(): JSX.Element {
         estimate={jobEstimate}
         routeLabel={routePreviewLabel}
         cncRemovalGrid={cncRemovalGrid}
+        cncRemovalGridPending={cncRemoval.pending}
         rasterPending={previewBitmap.pending}
       />
     </div>

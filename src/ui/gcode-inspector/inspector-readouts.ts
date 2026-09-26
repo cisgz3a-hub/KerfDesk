@@ -61,10 +61,11 @@ function segmentEndPoint(
 export function statsRows(
   model: GcodeRenderModel,
   time?: ProgramTimeModel,
+  timedFor: string | null = null,
 ): ReadonlyArray<Readout> {
   const { stats } = model;
   return [
-    ...(time === undefined ? [] : timeRows(time)),
+    ...(time === undefined ? [] : timeRows(time, timedFor)),
     ...(time === undefined ? [] : timeSplitRows(model, time)),
     { label: 'Size', value: boundsSize(stats) },
     { label: 'Cut', value: `${num(stats.cutMm)} mm` },
@@ -78,11 +79,15 @@ export function statsRows(
   ];
 }
 
-// Planner-grade, but against stock GRBL kinematics rather than the connected
-// machine's, so it is labelled an estimate rather than a promise.
-function timeRows(time: ProgramTimeModel): ReadonlyArray<Readout> {
+// Planner-grade against the device profile's limits and calibration, as Job
+// Review times it (ADR-425). It still cannot see serial delivery or the real
+// controller's firmware, so it is labelled an estimate rather than a promise.
+function timeRows(time: ProgramTimeModel, timedFor: string | null): ReadonlyArray<Readout> {
   const limited = countFeedLimited(time.segFeedLimited);
-  const rows: Readout[] = [{ label: 'Est. time', value: `~${clock(time.totalSeconds)}` }];
+  const rows: Readout[] = [
+    { label: 'Est. time', value: `~${clock(time.totalSeconds)}` },
+    { label: 'Timed for', value: timedFor ?? 'Stock GRBL limits' },
+  ];
   if (time.dwellSeconds > 0) {
     rows.push({ label: 'of which dwell', value: clock(time.dwellSeconds) });
   }

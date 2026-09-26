@@ -16,15 +16,31 @@ import type { Cut3DOffscreenControl } from './cut3d-offscreen-worker-protocol';
 export type Cut3DOffscreenRenderer = {
   readonly control: (control: Cut3DOffscreenControl) => void;
   readonly resize: (widthPx: number, heightPx: number, pixelRatio: number) => void;
+  /**
+   * Shows a recomputed surface without a new canvas or renderer. The camera
+   * stays where the operator left it unless the stock changed size. Resolves
+   * false when a newer surface or disposal overtook this one.
+   */
+  readonly replaceSurface: (
+    mesh: ReliefSurfaceMeshWithNormals | null,
+    stockThicknessMm: number,
+  ) => Promise<boolean>;
   readonly dispose: () => void;
 };
 
 type RendererParts = {
+  readonly three: typeof ThreeNamespace;
   readonly renderer: WebGLRenderer;
-  readonly scene: Scene;
   readonly camera: PerspectiveCamera;
+};
+
+// Replaced as a unit when the stock changes size: the light rig is sized to it.
+type SurfaceParts = {
+  readonly scene: Scene;
   readonly content: ViewerContentHandle;
   readonly lighting: SceneLightingHandle;
+  readonly mesh: ReliefSurfaceMeshWithNormals;
+  readonly stockThicknessMm: number;
 };
 
 const CAMERA_NEAR_MM = 0.1;
@@ -63,8 +79,14 @@ export async function createCut3DOffscreenRenderer(input: {
     stockThicknessMm: input.stockThicknessMm,
   });
   scene.add(content.object);
-  const parts = { renderer, scene, camera, content, lighting };
-  return createRendererHandle(parts, cameraState, input);
+  const surface = {
+    scene,
+    content,
+    lighting,
+    mesh: input.mesh,
+    stockThicknessMm: input.stockThicknessMm,
+  };
+  return createRendererHandle({ three, renderer, camera }, surface, cameraState, input);
 }
 
 function createRenderer(three: typeof ThreeNamespace, canvas: OffscreenCanvas): WebGLRenderer {
@@ -75,11 +97,15 @@ function createRenderer(three: typeof ThreeNamespace, canvas: OffscreenCanvas): 
 
 function createRendererHandle(
   parts: RendererParts,
+  initialSurface: SurfaceParts,
   initialCamera: Cut3DCameraState,
   input: Parameters<typeof createCut3DOffscreenRenderer>[0],
 ): Cut3DOffscreenRenderer {
+  let surface = initialSurface;
   let cameraState = initialCamera;
   let viewportHeightPx = Math.max(MIN_VIEWPORT_PX, input.heightPx);
+  let pixelRatio = input.pixelRatio;
+  let surfaceSequence = 0;
   let isDisposed = false;
   const handleContextLoss = (event: Event): void => {
     event.preventDefault();
@@ -89,18 +115,39 @@ function createRendererHandle(
   const render = (): void => {
     if (isDisposed) return;
     applyCameraPose(parts.camera, cameraState);
-    parts.renderer.render(parts.scene, parts.camera);
+    parts.renderer.render(surface.scene, parts.camera);
     if (parts.renderer.getContext().isContextLost()) input.onFailure(CONTEXT_LOST_REASON);
   };
-  const resize = (widthPx: number, heightPx: number, pixelRatio: number): void => {
+  const resize = (widthPx: number, heightPx: number, ratio: number): void => {
     const width = Math.max(MIN_VIEWPORT_PX, widthPx);
     const height = Math.max(MIN_VIEWPORT_PX, heightPx);
     viewportHeightPx = height;
-    parts.renderer.setPixelRatio(Math.min(pixelRatio, viewer3dTheme.maxPixelRatio));
+    pixelRatio = ratio;
+    parts.renderer.setPixelRatio(Math.min(ratio, viewer3dTheme.maxPixelRatio));
     parts.renderer.setSize(width, height, false);
     parts.camera.aspect = width / height;
     parts.camera.updateProjectionMatrix();
     render();
+  };
+  const replaceSurface = async (
+    nextMesh: ReliefSurfaceMeshWithNormals | null,
+    stockThicknessMm: number,
+  ): Promise<boolean> => {
+    surfaceSequence += 1;
+    const sequence = surfaceSequence;
+    const mesh = nextMesh ?? surface.mesh;
+    const content = await buildViewerContent(parts.three, { mesh, stockThicknessMm });
+    if (isDisposed || sequence !== surfaceSequence) {
+      content.dispose();
+      return false;
+    }
+    const reframe = !sameStock(surface, mesh, stockThicknessMm);
+    surface = swapSurface(parts, surface, { content, mesh, stockThicknessMm }, pixelRatio);
+    if (reframe) {
+      cameraState = initialCut3DCameraState(mesh.widthMm, mesh.heightMm, stockThicknessMm);
+    }
+    render();
+    return true;
   };
   resize(input.widthPx, input.heightPx, input.pixelRatio);
   return {
@@ -109,16 +156,50 @@ function createRendererHandle(
       render();
     },
     resize,
+    replaceSurface,
     dispose: () => {
       if (isDisposed) return;
       isDisposed = true;
       input.canvas.removeEventListener('webglcontextlost', handleContextLoss);
-      parts.content.dispose();
-      parts.lighting.dispose();
+      surface.content.dispose();
+      surface.lighting.dispose();
       parts.renderer.dispose();
       parts.renderer.forceContextLoss();
     },
   };
+}
+
+// Same stock: swap the content in place. New stock: re-light for its envelope.
+function swapSurface(
+  parts: RendererParts,
+  previous: SurfaceParts,
+  next: Pick<SurfaceParts, 'content' | 'mesh' | 'stockThicknessMm'>,
+  pixelRatio: number,
+): SurfaceParts {
+  if (sameStock(previous, next.mesh, next.stockThicknessMm)) {
+    previous.scene.remove(previous.content.object);
+    previous.content.dispose();
+    previous.scene.add(next.content.object);
+    return { ...previous, ...next };
+  }
+  const scene = new parts.three.Scene();
+  const lighting = applySceneLighting(parts.three, parts.renderer, scene, next.mesh, pixelRatio);
+  scene.add(next.content.object);
+  previous.content.dispose();
+  previous.lighting.dispose();
+  return { ...next, scene, lighting };
+}
+
+function sameStock(
+  surface: SurfaceParts,
+  mesh: ReliefSurfaceMeshWithNormals,
+  stockThicknessMm: number,
+): boolean {
+  return (
+    surface.mesh.widthMm === mesh.widthMm &&
+    surface.mesh.heightMm === mesh.heightMm &&
+    surface.stockThicknessMm === stockThicknessMm
+  );
 }
 
 function applyCameraPose(camera: PerspectiveCamera, state: Cut3DCameraState): void {

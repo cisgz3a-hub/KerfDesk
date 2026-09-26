@@ -62,7 +62,7 @@ function Legend(props: { readonly legend: LensLegend }): JSX.Element {
       <div
         style={{
           ...rampBarStyle,
-          backgroundImage: `linear-gradient(to right, ${props.legend.fromColor}, ${props.legend.toColor})`,
+          backgroundImage: `linear-gradient(to right, ${props.legend.stops.join(', ')})`,
         }}
         role="img"
         aria-label={`${props.legend.note}: ${props.legend.from} to ${props.legend.to}`}
