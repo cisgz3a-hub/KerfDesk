@@ -164,7 +164,10 @@ describe('traced page: fit to artwork', () => {
   });
 
   it('keeps millimetres per pixel exact: the fitted SVG stroke width is one source pixel', async () => {
-    const svg = await traceFile('svg', fitted, { ...DEFAULT_TRACE_OPTIONS, traceMode: 'centerline' });
+    const svg = await traceFile('svg', fitted, {
+      ...DEFAULT_TRACE_OPTIONS,
+      traceMode: 'centerline',
+    });
     expect(svg).toContain('stroke-width="0.5"');
     // Centerline adds half the widest hairline (one 0.5 mm pixel) around the extent.
     expect(svg).toContain(' viewBox="0 0 60.5 25.5" width="60.5mm" height="25.5mm"');

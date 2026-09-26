@@ -12,9 +12,9 @@ export type TracePageSettings = {
 export const DEFAULT_TRACE_PAGE_SETTINGS: TracePageSettings = { pageFit: 'image', marginMm: 0 };
 
 /** The batch output's page, or nothing for the default image page. */
-export function tracePageOutput(
-  settings: TracePageSettings,
-): { readonly page?: { readonly fit: 'artwork'; readonly marginMm: number } } {
+export function tracePageOutput(settings: TracePageSettings): {
+  readonly page?: { readonly fit: 'artwork'; readonly marginMm: number };
+} {
   return settings.pageFit === 'artwork'
     ? { page: { fit: 'artwork', marginMm: settings.marginMm } }
     : {};
@@ -23,9 +23,7 @@ export function tracePageOutput(
 function parseMargin(text: string): number | null {
   if (text.trim() === '') return null;
   const value = Number(text);
-  return Number.isFinite(value) && value >= 0 && value <= MAX_TRACED_PAGE_MARGIN_MM
-    ? value
-    : null;
+  return Number.isFinite(value) && value >= 0 && value <= MAX_TRACED_PAGE_MARGIN_MM ? value : null;
 }
 
 export function TracePageFields(props: {

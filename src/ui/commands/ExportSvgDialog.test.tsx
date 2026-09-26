@@ -7,7 +7,9 @@ import { PlatformProvider } from '../app/platform-context';
 import { useExportSvgDialogStore } from './export-svg-dialog-store';
 import { ExportSvgDialogHost } from './ExportSvgDialog';
 
-vi.mock('../app/export-artwork-svg', () => ({ handleExportArtworkSvg: vi.fn(async () => undefined) }));
+vi.mock('../app/export-artwork-svg', () => ({
+  handleExportArtworkSvg: vi.fn(async () => undefined),
+}));
 
 (
   globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT?: boolean }

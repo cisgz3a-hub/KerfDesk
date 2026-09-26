@@ -22,7 +22,7 @@ const MM_PAGE: TracedSvgPage = {
 
 describe('fittedPageBox', () => {
   it('uses the exact curve extent, not the control points', () => {
-    expect(fittedPageBox(LAYERS, MM_PAGE, 'fill', 0, 0.01)).toEqual({
+    expect(fittedPageBox(LAYERS, MM_PAGE, 'filled-contours', 0, 0.01)).toEqual({
       minX: 20,
       minY: 15,
       maxX: 70,
@@ -31,7 +31,7 @@ describe('fittedPageBox', () => {
   });
 
   it('adds the margin on every side and rounds outward to the export grid', () => {
-    expect(fittedPageBox(LAYERS, MM_PAGE, 'fill', 0.26, 0.1)).toEqual({
+    expect(fittedPageBox(LAYERS, MM_PAGE, 'filled-contours', 0.26, 0.1)).toEqual({
       minX: 19.7,
       minY: 14.7,
       maxX: 70.3,
@@ -54,7 +54,7 @@ describe('fittedPageBox', () => {
 
   it('takes the margin in pixels on a page with no physical size, without a grid', () => {
     const pixels: TracedSvgPage = { pixelWidth: 200, pixelHeight: 100 };
-    expect(fittedPageBox(LAYERS, pixels, 'fill', 2.5, 0.1)).toEqual({
+    expect(fittedPageBox(LAYERS, pixels, 'filled-contours', 2.5, 0.1)).toEqual({
       minX: 17.5,
       minY: 12.5,
       maxX: 72.5,
@@ -63,22 +63,30 @@ describe('fittedPageBox', () => {
   });
 
   it('ignores a negative or non-finite margin and returns null with nothing to fit', () => {
-    expect(fittedPageBox(LAYERS, MM_PAGE, 'fill', -3, 0.01)?.minX).toBe(20);
-    expect(fittedPageBox(LAYERS, MM_PAGE, 'fill', Number.NaN, 0.01)?.minX).toBe(20);
-    expect(fittedPageBox([], MM_PAGE, 'fill', 1, 0.01)).toBeNull();
+    expect(fittedPageBox(LAYERS, MM_PAGE, 'filled-contours', -3, 0.01)?.minX).toBe(20);
+    expect(fittedPageBox(LAYERS, MM_PAGE, 'filled-contours', Number.NaN, 0.01)?.minX).toBe(20);
+    expect(fittedPageBox([], MM_PAGE, 'filled-contours', 1, 0.01)).toBeNull();
   });
 });
 
 describe('placeTracedLayers', () => {
   it('returns the image page and layers untouched by default', () => {
-    const placed = placeTracedLayers(LAYERS, MM_PAGE, 'fill', undefined, undefined);
+    const placed = placeTracedLayers(LAYERS, MM_PAGE, 'filled-contours', undefined, undefined);
     expect(placed.layers).toBe(LAYERS);
     expect(placed.page).toBe(MM_PAGE);
-    expect(placeTracedLayers(LAYERS, MM_PAGE, 'fill', { fit: 'image' }, 0.01).page).toBe(MM_PAGE);
+    expect(placeTracedLayers(LAYERS, MM_PAGE, 'filled-contours', { fit: 'image' }, 0.01).page).toBe(
+      MM_PAGE,
+    );
   });
 
   it('moves the artwork to the fitted page and keeps the image scale', () => {
-    const placed = placeTracedLayers(LAYERS, MM_PAGE, 'fill', { fit: 'artwork', marginMm: 5 }, 0.01);
+    const placed = placeTracedLayers(
+      LAYERS,
+      MM_PAGE,
+      'filled-contours',
+      { fit: 'artwork', marginMm: 5 },
+      0.01,
+    );
     expect(placed.page).toEqual({ ...MM_PAGE, size: { width: 60, height: 25 } });
     const moved = placed.layers[0]?.curves[0];
     expect(moved?.start).toEqual({ x: 5, y: 20 });
