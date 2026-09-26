@@ -17,6 +17,15 @@ const REVERSE_CHECK_STEP_PX = 0.5;
 const REVERSE_WINDOW_BEHIND = 4;
 const REVERSE_WINDOW_AHEAD = 12;
 const NEAR_SEGMENT_SQ = 1e-18;
+// A squared distance this far below the running maximum's square (or above
+// the running minimum's) cannot win the comparison: hypot2 and the square
+// each round by a few ulps (~1e-15 relative), far inside this margin, so the
+// root is taken only where it may decide and every kept value keeps its bits.
+export const SQ_BELOW = 1 - 1e-9;
+const SQ_ABOVE = 1 + 1e-9;
+// Below this a square nears the subnormal range and loses its relative
+// precision: no pruning there.
+export const SQ_PRUNE_MIN = 1e-150;
 
 export type PassError = {
   /** Max distance found (the full pass's max unless `stopped`). */
@@ -66,6 +75,7 @@ export function projectSpan(
   const fx = x3 - 2 * x2 + x1;
   const fy = y3 - 2 * y2 + y1;
   let error = 0;
+  let errorFloorSq = 0;
   let index = span.length >> 1;
   for (let i = 1; i < last; i += 1) {
     const p = span[i] as Vec2;
@@ -92,9 +102,13 @@ export function projectSpan(
     const m = 1 - t;
     const qx = m * m * m * x0 + 3 * t * m * m * x1 + 3 * t * t * m * x2 + t * t * t * x3;
     const qy = m * m * m * y0 + 3 * t * m * m * y1 + 3 * t * t * m * y2 + t * t * t * y3;
-    const d = hypot2(px - qx, py - qy);
+    const rx = px - qx;
+    const ry = py - qy;
+    if (rx * rx + ry * ry < errorFloorSq) continue;
+    const d = hypot2(rx, ry);
     if (d > error) {
       error = d;
+      if (error > SQ_PRUNE_MIN) errorFloorSq = error * error * SQ_BELOW;
       index = i;
       if (error > stopAbove || (inclusive && error >= stopAbove)) {
         return { error, index, stopped: true };
@@ -135,10 +149,30 @@ export function reverseSpan(
     const lo = Math.max(0, segment - REVERSE_WINDOW_BEHIND);
     const hi = Math.min(span.length - 2, segment + REVERSE_WINDOW_AHEAD);
     let best = Infinity;
+    let bestCeilSq = Infinity;
     for (let k = lo; k <= hi; k += 1) {
-      const d = segmentDistance(qx, qy, span[k] as Vec2, span[k + 1] as Vec2);
+      // Point-to-segment distance (pointToSegment's arithmetic), the root
+      // taken only where it may win.
+      const a = span[k] as Vec2;
+      const b = span[k + 1] as Vec2;
+      const vx = b.x - a.x;
+      const vy = b.y - a.y;
+      const lenSq = vx * vx + vy * vy;
+      let ex: number;
+      let ey: number;
+      if (lenSq < NEAR_SEGMENT_SQ) {
+        ex = a.x - qx;
+        ey = a.y - qy;
+      } else {
+        const t = Math.max(0, Math.min(1, ((qx - a.x) * vx + (qy - a.y) * vy) / lenSq));
+        ex = qx - (a.x + t * vx);
+        ey = qy - (a.y + t * vy);
+      }
+      if (ex * ex + ey * ey > bestCeilSq) continue;
+      const d = hypot2(ex, ey);
       if (d < best) {
         best = d;
+        bestCeilSq = best > SQ_PRUNE_MIN ? best * best * SQ_ABOVE : Infinity;
         segment = k;
       }
     }
@@ -150,15 +184,6 @@ export function reverseSpan(
   }
   const index = params === null ? 0 : nearestParamIndex(params, span.length, worstT);
   return { error, index, stopped: false };
-}
-
-function segmentDistance(px: number, py: number, a: Vec2, b: Vec2): number {
-  const vx = b.x - a.x;
-  const vy = b.y - a.y;
-  const lenSq = vx * vx + vy * vy;
-  if (lenSq < NEAR_SEGMENT_SQ) return hypot2(a.x - px, a.y - py);
-  const t = Math.max(0, Math.min(1, ((px - a.x) * vx + (py - a.y) * vy) / lenSq));
-  return hypot2(px - (a.x + t * vx), py - (a.y + t * vy));
 }
 
 function nearestParamIndex(params: ArrayLike<number>, length: number, t: number): number {

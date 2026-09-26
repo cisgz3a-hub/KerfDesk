@@ -220,7 +220,7 @@ function isStraight(
   step: 1 | -1,
   tolerance: LegTolerance,
 ): boolean {
-  const leg = fitLeg(pts, i, count, step);
+  const leg = legLine(pts, i, count, step);
   const n = pts.length;
   const nx = -leg.dy;
   const ny = leg.dx;
@@ -245,8 +245,21 @@ function wrapStep(j: number, step: 1 | -1, n: number): number {
 // Total-least-squares line through `count` points from i in direction `step`,
 // oriented along the chain's travel.
 export function fitLeg(pts: ReadonlyArray<Vec2>, i: number, count: number, step: 1 | -1): Leg {
+  const { cx, cy, dx, dy, sxx, sxy, syy } = legLine(pts, i, count, step);
+  // Smallest eigenvalue of the scatter matrix = residual sum of squares.
+  const residualSq = Math.max(0, (sxx + syy - Math.hypot(sxx - syy, 2 * sxy)) / 2);
+  return { count, cx, cy, dx, dy, residualSq };
+}
+
+type LegLine = Omit<Leg, 'count' | 'residualSq'> & {
+  readonly sxx: number;
+  readonly sxy: number;
+  readonly syy: number;
+};
+
+// The leg's line and scatter sums (isStraight needs no residual).
+function legLine(pts: ReadonlyArray<Vec2>, i: number, count: number, step: 1 | -1): LegLine {
   const n = pts.length;
-  const at = (k: number): Vec2 => pts[(((i + k * step) % n) + n) % n] as Vec2;
   const start = ((i % n) + n) % n;
   let cx = 0;
   let cy = 0;
@@ -271,17 +284,15 @@ export function fitLeg(pts: ReadonlyArray<Vec2>, i: number, count: number, step:
   const angle = 0.5 * Math.atan2(2 * sxy, sxx - syy);
   let dx = Math.cos(angle);
   let dy = Math.sin(angle);
-  const first = at(0);
-  const last = at(count - 1);
+  const first = pts[start] as Vec2;
+  const last = pts[(((i + (count - 1) * step) % n) + n) % n] as Vec2;
   const travelX = (last.x - first.x) * step;
   const travelY = (last.y - first.y) * step;
   if (dx * travelX + dy * travelY < 0) {
     dx = -dx;
     dy = -dy;
   }
-  // Smallest eigenvalue of the scatter matrix = residual sum of squares.
-  const residualSq = Math.max(0, (sxx + syy - Math.hypot(sxx - syy, 2 * sxy)) / 2);
-  return { count, cx, cy, dx, dy, residualSq };
+  return { cx, cy, dx, dy, sxx, sxy, syy };
 }
 
 function legCorner(

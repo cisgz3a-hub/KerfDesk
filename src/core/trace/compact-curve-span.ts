@@ -14,7 +14,7 @@ import { chordParameterize, solveTangentArms, type CubicBezier } from '../geomet
 import { hypot2 } from '../geometry/fast-hypot';
 import type { Vec2 } from '../scene';
 import { orthogonalError } from './centerline/curve-fit-error';
-import { projectSpan, reverseSpan } from './compact-curve-project';
+import { projectSpan, reverseSpan, SQ_BELOW, SQ_PRUNE_MIN } from './compact-curve-project';
 import { cubicSelfIntersects } from './compact-curve-shape';
 
 // Newton reparameterization passes per span; a pass that does not lower the
@@ -293,20 +293,30 @@ function armCubic(
 function chordDeviation(span: ReadonlyArray<Vec2>): number {
   const a = span[0] as Vec2;
   const b = span.at(-1) as Vec2;
-  let worst = 0;
-  for (let i = 1; i < span.length - 1; i += 1) {
-    worst = Math.max(worst, pointToSegment(span[i] as Vec2, a, b));
-  }
-  return worst;
-}
-
-function pointToSegment(p: Vec2, a: Vec2, b: Vec2): number {
   const vx = b.x - a.x;
   const vy = b.y - a.y;
   const lenSq = vx * vx + vy * vy;
-  if (lenSq < NEAR_ZERO) return hypot2(p.x - a.x, p.y - a.y);
-  const t = Math.max(0, Math.min(1, ((p.x - a.x) * vx + (p.y - a.y) * vy) / lenSq));
-  return hypot2(p.x - (a.x + t * vx), p.y - (a.y + t * vy));
+  const degenerate = lenSq < NEAR_ZERO;
+  let worst = 0;
+  let floorSq = 0;
+  for (let i = 1; i < span.length - 1; i += 1) {
+    // Point-to-segment distance; the root only where it may raise the max.
+    const p = span[i] as Vec2;
+    let ex: number;
+    let ey: number;
+    if (degenerate) {
+      ex = p.x - a.x;
+      ey = p.y - a.y;
+    } else {
+      const t = Math.max(0, Math.min(1, ((p.x - a.x) * vx + (p.y - a.y) * vy) / lenSq));
+      ex = p.x - (a.x + t * vx);
+      ey = p.y - (a.y + t * vy);
+    }
+    if (ex * ex + ey * ey < floorSq) continue;
+    worst = Math.max(worst, hypot2(ex, ey));
+    if (worst > SQ_PRUNE_MIN) floorSq = worst * worst * SQ_BELOW;
+  }
+  return worst;
 }
 
 // ——— tangents on a ring ———
