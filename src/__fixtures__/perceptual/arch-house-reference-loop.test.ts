@@ -21,7 +21,12 @@ import { mkdirSync, writeFileSync, existsSync } from 'node:fs';
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import type { ColoredPath } from '../../core/scene';
-import { TRACE_PRESETS, traceImageToColoredPaths, type RawImageData } from '../../core/trace';
+import {
+  TRACE_PRESETS,
+  traceImageToColoredPaths,
+  type RawImageData,
+  type TraceOptions,
+} from '../../core/trace';
 import { preprocessForTrace } from '../../core/trace/trace-image';
 import { chamferDistance } from './chamfer';
 import { compareMasks } from './compare';
@@ -43,6 +48,18 @@ const MIN_INPUT_IOU: Readonly<Record<(typeof PRESETS_UNDER_TEST)[number], number
   Smooth: 0.95,
   Sharp: 0.97,
   'Edge Detection': 0.8,
+};
+// The local-contrast Edge detector binarises nothing, so its preset carries no
+// Otsu, palette or despeckle entry (ADR-437). Its input truth stays the ink
+// mask this floor was measured against: the Otsu cut with the 12 px despeckle.
+const TRUTH_BINARISATION: Partial<
+  Record<(typeof PRESETS_UNDER_TEST)[number], Partial<TraceOptions>>
+> = {
+  'Edge Detection': {
+    fixedPalette: ['#ffffff', '#000000'],
+    useOtsuThreshold: true,
+    despeckleMinPixels: 12,
+  },
 };
 
 describe('arch-house real-source trace fidelity', () => {
@@ -78,7 +95,8 @@ describe('arch-house real-source trace fidelity', () => {
         const elapsedMs = performance.now() - start;
 
         // Fidelity to the input (this preset's own binarized truth).
-        const presetTruth = monoToMask(preprocessForTrace(source, preset));
+        const truthOptions = { ...preset, ...TRUTH_BINARISATION[presetName] };
+        const presetTruth = monoToMask(preprocessForTrace(source, truthOptions));
         const fillMask = rasterizeColoredPaths(paths, source.width, source.height);
         const inputFidelity = compareMasks(fillMask, presetTruth);
 
