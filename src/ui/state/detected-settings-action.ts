@@ -25,6 +25,7 @@ import {
 } from '../../core/controllers/grbl';
 import type { ControllerEvent } from '../../core/controllers';
 import type { DeviceProfile } from '../../core/devices';
+import { deviceProfileWithInteractivePatch } from '../../core/devices/device-profile-patch';
 import { useStore } from './store';
 import { cncLiveCapsFromController } from './cnc-controller-caps';
 
@@ -87,16 +88,36 @@ export function consumeSettingsResponse(
   return null;
 }
 
-// Apply the pending patch to the active project's DeviceProfile.
-// Returns true if a patch was applied, false when called with no
-// pending detection (defensive — UI buttons should be disabled but
-// nothing breaks if a stale click slips through).
+// Apply the pending patch to the head in use. Returns true if a patch was
+// applied, false when called with no pending detection (defensive — UI
+// buttons should be disabled but nothing breaks if a stale click slips
+// through).
 export function applyDetectedSettingsPatch(patch: Partial<DeviceProfile> | null): boolean {
   if (patch === null) return false;
   // useStore (project store) is independent of useLaserStore; both
   // are top-level Zustand stores. getState() avoids a parameter pipe
   // through every layer of the laser-store actions object.
-  useStore.getState().updateDeviceProfile(patch);
+  const state = useStore.getState();
+  if (state.project.machine?.kind !== 'cnc') {
+    state.updateDeviceProfile(patch);
+    return true;
+  }
+  // Laser and CNC keep their own Max feed (ADR-416). In CNC mode the reported
+  // max rate is CNC's, and the laser's Max feed, S range and laser mode stay
+  // as they are; the bed, travel and motion limits are the shared machine's.
+  const shared = { ...patch };
+  delete shared.maxFeed;
+  delete shared.maxPowerS;
+  delete shared.minPowerS;
+  delete shared.laserModeEnabled;
+  const maxFeed = patch.maxFeed;
+  state.applyCncMachineSetup({
+    devicePatch: deviceProfileWithInteractivePatch(state.project.device, shared),
+    paramsPatch:
+      maxFeed !== undefined && Number.isFinite(maxFeed) && maxFeed > 0
+        ? { maxFeedMmPerMin: maxFeed }
+        : {},
+  });
   return true;
 }
 

@@ -1,4 +1,5 @@
 import { useCallback, useMemo, useState, type CSSProperties } from 'react';
+import { deviceForActiveHead } from '../../../core/cnc/cnc-head-feeds';
 import { jogAxisSignsForOrigin, machineBoundsForDevice } from '../../../core/devices';
 import { Button } from '../../kit';
 import { useStore } from '../../state';
@@ -28,6 +29,7 @@ export function BoardFineJogControls(props: BoardFineJogControlsProps): JSX.Elem
   const setPreferredStep = useJogControlPreferences((state) => state.setStepMm);
   const requestedFeed = useJogControlPreferences((state) => state.requestedFeedMmPerMin);
   const device = useStore((state) => state.project.device);
+  const machine = useStore((state) => state.project.machine);
   const jog = useLaserStore((state) => state.jog);
   const statusReport = useLaserStore((state) => state.statusReport);
   const wcoCache = useLaserStore((state) => state.wcoCache);
@@ -39,7 +41,7 @@ export function BoardFineJogControls(props: BoardFineJogControlsProps): JSX.Elem
     Number.isFinite(requestedFeed) && requestedFeed > 0
       ? Math.min(requestedFeed, FINE_JOG_FEED_CAP_MM_PER_MIN)
       : FINE_JOG_FEED_CAP_MM_PER_MIN;
-  const feed = clampJogFeed(safeRequestedFeed, device.maxFeed);
+  const feed = clampJogFeed(safeRequestedFeed, deviceForActiveHead(device, machine).maxFeed);
   const signs = useMemo(() => jogAxisSignsForOrigin(device.origin), [device.origin]);
   const bounds = useMemo(() => machineBoundsForDevice(device), [device]);
   const position = inferCurrentMachinePosition(statusReport, wcoCache, reportInches);
