@@ -8,6 +8,7 @@
 // Pure-core compliant: no clock, no random, no I/O. Same lazy tracer
 // load as trace-image.ts (cached promise — no re-download).
 
+import { downscaleWorkingOptions } from './trace-downscale-options';
 import {
   polylineToCurveSubpath,
   type ColoredPath,
@@ -187,21 +188,7 @@ export async function traceImageToColoredPaths(
       (workingImage.width / image.width) *
       (workingImage.height / image.height) *
       effectivePixelScale(options) ** 2;
-    const workingOptions: TraceOptions = {
-      ...options,
-      ...(options.despeckleMinPixels === undefined
-        ? {}
-        : { despeckleMinPixels: options.despeckleMinPixels * areaScale }),
-      ...(options.ignoreLessThanPixels === undefined
-        ? {}
-        : { ignoreLessThanPixels: options.ignoreLessThanPixels * areaScale }),
-      // The automatic small-mark policy's areas are source px² too (ADR-409).
-      ...(options.smallMarkPolicy === 'auto' ? { smallMarkAreaScale: areaScale } : {}),
-      supersampleContour: false,
-      autoUpscaleSmallSources: false,
-      upscaleSmallSmoothSources: false,
-      pixelScale: 1,
-    };
+    const workingOptions = downscaleWorkingOptions(options, areaScale);
     const traced = await dispatchTrace(workingImage, workingOptions, run);
     // Only binary contours take this route. Their canonical curves are line
     // segments over the finished polylines; rebuild them on the restored grid.

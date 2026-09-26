@@ -114,7 +114,9 @@ export type TraceOptions = {
   // smallMarkAreaScale: INTERNAL — working-grid px² per source px² on the
   // bounded downscale route (set by trace-to-paths.ts, which resets
   // pixelScale to 1 there), so the automatic policy keeps SOURCE-pixel
-  // semantics. Callers never set this directly.
+  // semantics; a commit on a grid finer than the preview multiplies in the
+  // commit/preview area ratio (trace-commit-grid.ts, ADR-401). Operators never
+  // set this.
   readonly smallMarkAreaScale?: number;
   // turnPolicy: how the filled-contour lane resolves a SADDLE — two ink
   // pixels touching only at a corner. 'connect-ink' joins them (a 1-px
