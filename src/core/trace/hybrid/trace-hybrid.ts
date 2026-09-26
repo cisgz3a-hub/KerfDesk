@@ -46,6 +46,14 @@ export const DEFAULT_HYBRID_MAX_STROKE_WIDTH_PX = 4;
 const SEED_MARGIN_PX = 0.5;
 // Width groups share a ColoredPath when their widths round alike (px).
 const WIDTH_QUANTUM_PX = 0.25;
+// A stroke whose measured pen width exceeds the gate by more than this (px)
+// is ink the pen could not have drawn: it goes to the fill (the measurement
+// resolves widths to about half a pixel).
+const OVERWIDE_TOLERANCE_PX = 0.5;
+// How far (px) a stroke's cut end reaches on into the fill (see reachIntoFill).
+const JUNCTION_REACH_PX = 1;
+// Spacing (px) of the stroke samples that place a stroke's discs.
+const DISC_STEP_PX = 0.5;
 
 export function traceHybridPaths(image: RawImageData, options: TraceOptions): ColoredPath[] {
   return runTraceSteps(traceHybridPathsSteps(image, options));
@@ -65,14 +73,17 @@ export function* traceHybridPathsSteps(
   const maxWidthPx = hybridMaxStrokeWidthPx(options) * scale;
   // A w-pixel line's centre pixel sits (w + 1) / 2 from the paper.
   const gateRadius = (maxWidthPx + 1) / 2;
-  const wide = yield* discUnionSteps({
+  const cores = yield* discUnionSteps({
     width: mask.width,
     height: mask.height,
     radiusSq: wideCoreRadii(mask, distSq, gateRadius),
   });
   const centre = yield* centerlineStrokesFromMaskSteps(mask, distSq, options);
   if (cooperate) yield;
-  const strokes = clippedStrokes(centre, mask, wide, gateRadius);
+  const { wide, strokes } = yield* withOverwideStrokesFilled(centre, mask, distSq, cores, {
+    gateRadius,
+    maxWidthPx,
+  });
   const fillMask = yield* fillMaskSteps(mask, distSq, wide, strokes);
   const outlines =
     fillMask === null
@@ -136,6 +147,38 @@ function floodEightConnected(
   }
 }
 
+type Centre = { readonly polylines: Polyline[]; readonly marks: ReadonlySet<Polyline> };
+
+// The disc gate reads the inscribed radius at pixel centres, so a pen line
+// uniformly a pixel or two wider than the gate can slip under it (its ridge
+// sits on a pixel-centre radius, or wobbles about the gate along a slant).
+// Measuring each stroke straight across catches it: a stroke measurably
+// wider than the Max stroke width joins the wide region as the union of its
+// inscribed discs, and the strokes are clipped again against that region, so
+// a thin stroke running into it still ends on the fill edge (rule 4).
+function* withOverwideStrokesFilled(
+  centre: Centre,
+  mask: InkMask,
+  distSq: Float64Array,
+  cores: Uint8Array,
+  gate: { readonly gateRadius: number; readonly maxWidthPx: number },
+): TraceSteps<{ wide: Uint8Array; strokes: KeptStroke[] }> {
+  const strokes = clippedStrokes(centre, mask, cores, gate.gateRadius);
+  const overwide = strokes.filter((stroke) => {
+    if (stroke.mark) return false;
+    const profile = strokeWidthProfile(stroke.polyline.points, mask, gate.maxWidthPx);
+    return profile !== null && profile.medianPx > gate.maxWidthPx + OVERWIDE_TOLERANCE_PX;
+  });
+  if (overwide.length === 0) return { wide: cores, strokes };
+  const grown = yield* discUnionSteps({
+    width: mask.width,
+    height: mask.height,
+    radiusSq: strokeDiscRadii(mask, distSq, overwide, 0),
+  });
+  const wide = cores.map((c, i) => (c === 1 || grown[i] === 1 ? 1 : 0));
+  return { wide, strokes: clippedStrokes(centre, mask, wide, gate.gateRadius) };
+}
+
 type KeptStroke = {
   readonly curve: CurveSubpath;
   readonly polyline: Polyline;
@@ -144,7 +187,7 @@ type KeptStroke = {
 };
 
 function clippedStrokes(
-  centre: { readonly polylines: Polyline[]; readonly marks: ReadonlySet<Polyline> },
+  centre: Centre,
   mask: InkMask,
   wide: Uint8Array,
   gateRadius: number,
@@ -168,13 +211,72 @@ function clippedStrokes(
         kept.push({ curve, polyline, mark });
         continue;
       }
-      const points = sampleStrokeCurve(piece.curve);
-      if ((piece.startCut || piece.endCut) && pathLength(points) < minStubPx) continue;
-      registerTraceCurve(points, piece.curve);
-      kept.push({ curve: piece.curve, polyline: { points, closed: false }, mark });
+      const sampled = sampleStrokeCurve(piece.curve);
+      if ((piece.startCut || piece.endCut) && pathLength(sampled) < minStubPx) continue;
+      const reached = reachIntoFill(piece, sampled, mask);
+      registerTraceCurve(reached.points, reached.curve);
+      kept.push({
+        curve: reached.curve,
+        polyline: { points: reached.points, closed: false },
+        mark,
+      });
     }
   });
   return kept;
+}
+
+// Carry each cut end JUNCTION_REACH_PX further along its end tangent. Where a
+// pen line meets a shape, the line's own ink widens the inscribed discs
+// there, so the wide region reaches about a pixel up the line; the contour
+// finisher smooths that one-pixel bump off the fill outline, which would
+// leave a pixel of paper between the stroke end and the fill. The reach
+// closes it; an end whose reach would leave the ink stays where it was.
+function reachIntoFill(
+  piece: { readonly curve: CurveSubpath; readonly startCut: boolean; readonly endCut: boolean },
+  sampled: ReadonlyArray<Vec2>,
+  mask: InkMask,
+): { curve: CurveSubpath; points: Vec2[] } {
+  let curve = piece.curve;
+  let points = [...sampled];
+  const endReach = piece.endCut ? reachPoint(points, mask) : null;
+  if (endReach !== null) {
+    curve = { ...curve, segments: [...curve.segments, { kind: 'line', to: endReach }] };
+    points = [...points, endReach];
+  }
+  const startReach = piece.startCut ? reachPoint([...points].reverse(), mask) : null;
+  if (startReach !== null) {
+    curve = {
+      ...curve,
+      start: startReach,
+      segments: [{ kind: 'line', to: curve.start }, ...curve.segments],
+    };
+    points = [startReach, ...points];
+  }
+  return { curve, points };
+}
+
+// The point JUNCTION_REACH_PX past the last point, along the direction the
+// stroke arrives in (measured over its last pixel), or null off the ink.
+function reachPoint(points: ReadonlyArray<Vec2>, mask: InkMask): Vec2 | null {
+  const end = points.at(-1);
+  if (end === undefined) return null;
+  let back: Vec2 | undefined;
+  for (let i = points.length - 2; i >= 0; i -= 1) {
+    back = points[i];
+    if (back !== undefined && Math.hypot(end.x - back.x, end.y - back.y) >= 1) break;
+  }
+  if (back === undefined) return null;
+  const length = Math.hypot(end.x - back.x, end.y - back.y);
+  if (length < 1e-6) return null;
+  const to = {
+    x: end.x + ((end.x - back.x) / length) * JUNCTION_REACH_PX,
+    y: end.y + ((end.y - back.y) / length) * JUNCTION_REACH_PX,
+  };
+  const x = Math.floor(to.x);
+  const y = Math.floor(to.y);
+  const onInk =
+    x >= 0 && y >= 0 && x < mask.width && y < mask.height && mask.ink[y * mask.width + x] === 1;
+  return onInk ? to : null;
 }
 
 // The fill: wide ink, plus thin ink no kept stroke accounts for (corner
@@ -188,7 +290,7 @@ function* fillMaskSteps(
 ): TraceSteps<InkMask | null> {
   if (!wide.includes(1)) return null;
   const { width, height } = mask;
-  const strokeRadii = strokeCoverRadii(mask, distSq, strokes);
+  const strokeRadii = strokeDiscRadii(mask, distSq, strokes, 1);
   const swallowed = yield* discUnionSteps({ width, height, radiusSq: strokeRadii });
   const fill = new Uint8Array(width * height);
   mask.ink.forEach((ink, i) => {
@@ -197,23 +299,24 @@ function* fillMaskSteps(
   return { width, height, ink: componentsHoldingWideInk(fill, wide, width, height) };
 }
 
-// Squared cover radius at every kept-stroke sample pixel. One pixel beyond
-// the inscribed radius swallows the stroke's edge pixels (an even-width
-// line's second centre row sits exactly r away).
-function strokeCoverRadii(
+// Squared disc radius at every stroke sample pixel: the inscribed radius plus
+// `padPx`. As a stroke's cover, one pixel of pad swallows its edge pixels (an
+// even-width line's second centre row sits exactly r away).
+function strokeDiscRadii(
   mask: InkMask,
   distSq: Float64Array,
   strokes: ReadonlyArray<KeptStroke>,
+  padPx: number,
 ): Float64Array {
   const { width, height } = mask;
   const radii = new Float64Array(width * height);
   for (const stroke of strokes) {
-    for (const p of stroke.polyline.points) {
+    for (const p of densePoints(stroke.polyline.points)) {
       const x = Math.floor(p.x);
       const y = Math.floor(p.y);
       if (x < 0 || y < 0 || x >= width || y >= height) continue;
       const i = y * width + x;
-      const r = Math.sqrt(distSq[i] ?? 0) + 1;
+      const r = Math.sqrt(distSq[i] ?? 0) + padPx;
       if (r * r > (radii[i] ?? 0)) radii[i] = r * r;
     }
   }
@@ -277,6 +380,24 @@ function strokePath(strokes: ReadonlyArray<KeptStroke>): ColoredPath {
     polylines: strokes.map((s) => s.polyline),
     curves: strokes.map((s) => s.curve),
   };
+}
+
+// The polyline's vertices plus points every half pixel along each segment: a
+// straight stroke's fitted polyline is just its two ends, but every pixel it
+// crosses needs its disc.
+function* densePoints(points: ReadonlyArray<Vec2>): Generator<Vec2> {
+  const first = points[0];
+  if (first !== undefined) yield first;
+  for (let i = 1; i < points.length; i += 1) {
+    const a = points[i - 1];
+    const b = points[i];
+    if (a === undefined || b === undefined) continue;
+    const steps = Math.ceil(Math.hypot(b.x - a.x, b.y - a.y) / DISC_STEP_PX);
+    for (let k = 1; k <= steps; k += 1) {
+      const t = k / steps;
+      yield { x: a.x + (b.x - a.x) * t, y: a.y + (b.y - a.y) * t };
+    }
+  }
 }
 
 function pathLength(points: ReadonlyArray<Vec2>): number {

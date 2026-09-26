@@ -121,6 +121,40 @@ describe('stroke clipping', () => {
   });
 });
 
+function distanceToRing(p: Vec2, ring: ReadonlyArray<Vec2>): number {
+  let best = Infinity;
+  ring.forEach((a, i) => {
+    const b = ring[(i + 1) % ring.length] ?? a;
+    const dx = b.x - a.x;
+    const dy = b.y - a.y;
+    const t = Math.max(
+      0,
+      Math.min(1, ((p.x - a.x) * dx + (p.y - a.y) * dy) / (dx * dx + dy * dy || 1)),
+    );
+    best = Math.min(best, Math.hypot(p.x - a.x - t * dx, p.y - a.y - t * dy));
+  });
+  return best;
+}
+
+function insideRing(p: Vec2, ring: ReadonlyArray<Vec2>): boolean {
+  let inside = false;
+  ring.forEach((a, i) => {
+    const b = ring[(i + ring.length - 1) % ring.length] ?? a;
+    if (a.y > p.y !== b.y > p.y && p.x < ((b.x - a.x) * (p.y - a.y)) / (b.y - a.y) + a.x) {
+      inside = !inside;
+    }
+  });
+  return inside;
+}
+
+// Paper between a stroke end and the fill outline, in px (0 when the end
+// touches or lies inside the outline; a hair of tolerance for the fit).
+function junctionGap(p: Vec2, ring: ReadonlyArray<Vec2>): number {
+  if (insideRing(p, ring)) return 0;
+  const d = distanceToRing(p, ring);
+  return d <= 0.1 ? 0 : d;
+}
+
 describe('Line + fill trace', () => {
   // A solid 40 px logo block with a 3 px pen line running into its left
   // side (a T-junction), a free 1 px hairline and a 2 px vertical line.
@@ -157,14 +191,38 @@ describe('Line + fill trace', () => {
     expect(horizontal).toBeDefined();
     const box = bbox(horizontal?.points ?? []);
     expect(box.minX).toBeLessThan(13);
-    // Reaches the block (its left edge is x = 100) and stops on the fill
-    // outline, which bulges at most a pixel into the pen line there.
+    // Reaches the block (its left edge is x = 100) and ends inside the fill
+    // outline, at most the junction reach (1 px) plus half the pen deep.
     const outline = fills(paths).flatMap((p) => p.polylines)[0]?.points ?? [];
-    const end = { x: box.maxX, y: 50.5 };
-    const gap = Math.min(...outline.map((p) => Math.hypot(p.x - end.x, p.y - end.y)));
-    expect(box.maxX).toBeGreaterThanOrEqual(98.5);
-    expect(box.maxX).toBeLessThanOrEqual(101);
-    expect(gap).toBeLessThan(1);
+    const end = horizontal?.points.reduce((a, b) => (b.x > a.x ? b : a)) ?? { x: 0, y: 0 };
+    expect(box.maxX).toBeGreaterThanOrEqual(99.5);
+    expect(box.maxX).toBeLessThanOrEqual(102.5);
+    expect(junctionGap(end, outline)).toBe(0);
+    expect(distanceToRing(end, outline)).toBeLessThanOrEqual(2.5);
+  });
+
+  // A pen line meets a solid block end-on at several angles: the stroke end
+  // must touch or enter the fill outline (no strip of paper between them),
+  // and never run deeper than the reach plus half its pen.
+  it.each([1, 2, 3, 4])('closes the junction of a %i px pen line at any angle', (width) => {
+    for (const angle of [0, 20, 45, 70]) {
+      const c = canvas(220, 220);
+      rect(c, 110, 110, 200, 200);
+      const r = (angle * Math.PI) / 180;
+      const end = { x: 130, y: 130 };
+      const start = { x: end.x - 110 * Math.cos(r), y: end.y - 110 * Math.sin(r) };
+      pen(c, { x: Math.max(2, start.x), y: Math.max(2, start.y) }, end, width);
+      const paths = traceHybridPaths(toImage(c), HYBRID);
+      const outline = fills(paths).flatMap((p) => p.polylines)[0]?.points ?? [];
+      const ends = strokes(paths)
+        .flatMap((p) => p.polylines)
+        .flatMap((line) => [line.points[0], line.points.at(-1)])
+        .filter((p): p is Vec2 => p !== undefined);
+      if (ends.length === 0) continue; // a 1 px axis line the cleanup absorbs
+      const tip = ends.reduce((a, b) => (b.x + b.y > a.x + a.y ? b : a));
+      expect(junctionGap(tip, outline), `${width} px at ${angle} deg`).toBe(0);
+      expect(distanceToRing(tip, outline)).toBeLessThanOrEqual(1 + width / 2 + 0.25);
+    }
   });
 
   it('gives each constant-width pen line its measured width', () => {
@@ -200,5 +258,32 @@ describe('Line + fill trace', () => {
     const paths = traceHybridPaths(toImage(c), HYBRID);
     expect(strokes(paths)).toHaveLength(0);
     expect(fills(paths).flatMap((p) => p.polylines)).toHaveLength(1);
+  });
+
+  // A 5 or 6 px line's centre ridge sits exactly on a pixel-centre radius of
+  // 3, short of the 0.5 px seed margin, yet the line is wider than the 4 px
+  // gate all along: its long ridge makes it wide.
+  it.each([
+    { label: '5 px horizontal', y: 20.5, width: 5, angle: 0 },
+    { label: '6 px horizontal', y: 20, width: 6, angle: 0 },
+    { label: '5 px at 30 degrees', y: 30, width: 5, angle: 30 },
+  ])('turns a $label line just over the gate into a fill', ({ y, width, angle }) => {
+    const c = canvas(140, 80);
+    const r = (angle * Math.PI) / 180;
+    const a = { x: 70 - 55 * Math.cos(r), y: y - 55 * Math.sin(r) * 0.4 };
+    const b = { x: 70 + 55 * Math.cos(r), y: y + 55 * Math.sin(r) * 0.4 };
+    pen(c, a, b, width);
+    const paths = traceHybridPaths(toImage(c), HYBRID);
+    expect(strokes(paths)).toHaveLength(0);
+    expect(fills(paths).flatMap((p) => p.polylines)).toHaveLength(1);
+  });
+
+  it('keeps a pen line with a one-pixel blot a single stroke', () => {
+    const c = canvas(120, 40);
+    rect(c, 10, 18, 110, 22);
+    rect(c, 59, 17, 62, 18);
+    const paths = traceHybridPaths(toImage(c), HYBRID);
+    expect(fills(paths)).toHaveLength(0);
+    expect(strokes(paths).flatMap((p) => p.polylines)).toHaveLength(1);
   });
 });
