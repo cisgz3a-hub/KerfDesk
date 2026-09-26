@@ -26,9 +26,12 @@ export type TraceDialogSettings = {
 
 export type RestoredTraceSettings = Partial<TraceDialogSettings>;
 
+// `auto`: the control also offers Auto, stored as the string 'auto' (the
+// small-mark controls, ADR-434 Amendment 1). Records from before Auto hold a
+// plain number / boolean, which still restores as that exact value.
 type OverrideRule =
-  | { readonly kind: 'number'; readonly min: number; readonly max: number }
-  | { readonly kind: 'boolean' }
+  | { readonly kind: 'number'; readonly min: number; readonly max: number; readonly auto?: true }
+  | { readonly kind: 'boolean'; readonly auto?: true }
   | { readonly kind: 'detection' }
   // Colour layers' Colours control: 'auto' or a whole count in range (ADR-430).
   | { readonly kind: 'count-or-auto'; readonly min: number; readonly max: number }
@@ -36,7 +39,10 @@ type OverrideRule =
 
 const BOOLEAN = { kind: 'boolean' } as const;
 
-function range(min: number, max: number): OverrideRule {
+function range(
+  min: number,
+  max: number,
+): { readonly kind: 'number'; readonly min: number; readonly max: number } {
   return { kind: 'number', min, max };
 }
 
@@ -70,8 +76,8 @@ export const TRACE_OVERRIDE_RULES = {
   cutoffLuma: range(0, 255),
   thresholdLuma: range(0, 255),
   ignoreLessThanPixels: range(0, 10000),
-  despeckleMinPixels: range(0, 10000),
-  fillPinholeCracks: BOOLEAN,
+  despeckleMinPixels: { ...range(0, 10000), auto: true },
+  fillPinholeCracks: { kind: 'boolean', auto: true },
   smoothness: range(0, 1.33),
   optimize: range(0, 2),
   traceTransparency: BOOLEAN,
@@ -160,6 +166,7 @@ function acceptOverride(
   rule: OverrideRule,
   value: TraceSettingsValue,
 ): TraceSettingsValue | undefined {
+  if (value === 'auto' && 'auto' in rule && rule.auto === true) return value;
   switch (rule.kind) {
     case 'number':
       return fitted(value, rule.min, rule.max);

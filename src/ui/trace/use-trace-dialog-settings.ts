@@ -4,9 +4,10 @@
 import { useMemo, useState } from 'react';
 import type { RasterImage } from '../../core/scene';
 import type { TraceSettingsRecord } from '../../core/scene/scene-object';
-import type { TraceOptions } from '../../core/trace';
+import { TRACE_PRESETS, type TraceOptions } from '../../core/trace';
 import type { TraceFillStyle, TraceOutput } from './dialog-parts';
 import { mergeLightBurnTraceSettings, type LightBurnTraceSettingOverrides } from './trace-options';
+import { overridesForPresetSwitch } from './trace-preset-switch';
 import { captureTraceSettings, restoreTraceSettings } from './trace-settings-snapshot';
 import { useBoundarySelection, type BoundarySelection } from './use-boundary-selection';
 import { useTracePreset } from './use-trace-preset';
@@ -49,7 +50,7 @@ export function useTraceDialogSettings(
   );
   const retrace = request.replaceTraceId !== undefined;
   const boundarySelection = useBoundarySelection(initial);
-  const { preset, selectPreset } = useTracePreset(
+  const { preset, selectPreset: choosePreset } = useTracePreset(
     machineKind,
     boundarySelection.setBoundaryMode,
     initial.presetName,
@@ -57,6 +58,13 @@ export function useTraceDialogSettings(
   const [traceSettings, setTraceSettings] = useState<LightBurnTraceSettingOverrides>(
     initial.overrides ?? {},
   );
+  // A new preset's own settings replace overrides of them (ADR-434 Amd 1).
+  const selectPreset = (next: string): void => {
+    setTraceSettings((current) =>
+      overridesForPresetSwitch(current, TRACE_PRESETS[preset], TRACE_PRESETS[next]),
+    );
+    choosePreset(next);
+  };
   const [traceFillStyle, setTraceFillStyle] = useState<TraceFillStyle>(
     initial.fillStyle ?? 'scanline',
   );

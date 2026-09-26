@@ -1,19 +1,13 @@
 import { act } from 'react';
-import { createRoot } from 'react-dom/client';
 import { describe, expect, it } from 'vitest';
-import { TRACE_PRESETS, type TraceOptions } from '../../core/trace';
+import { TRACE_PRESETS } from '../../core/trace';
 import {
   flattenStrengthFromSmoothness,
   optimizationToleranceScaleFromOptimize,
 } from '../../core/trace/contour-trace';
 import { preprocessForTrace } from '../../core/trace/trace-image';
-import { TraceSettingsControls } from './TraceSettingsControls';
 import { fill, ink, loopCount, paper } from './trace-controls-test-helpers';
-import { mergeLightBurnTraceSettings, type LightBurnTraceSettingOverrides } from './trace-options';
-
-(
-  globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT?: boolean }
-).IS_REACT_ACT_ENVIRONMENT = true;
+import { withControls } from './trace-settings-controls.test-support';
 
 describe('trace controls describe the options the engine actually receives', () => {
   it('recovers grayscale strokes, persists the choice across styles, and restores defaults on reset', async () => {
@@ -26,19 +20,21 @@ describe('trace controls describe the options the engine actually receives', () 
       await controls.detect('faint-lines');
       expect(controls.host.querySelector('[aria-label="Trace Threshold"]')).toBeNull();
       expect(ink(preprocessForTrace(image, controls.options()))).toBe(440);
-      // Line Art's default is the automatic small-mark policy (unchecked);
-      // check then uncheck to make the explicit "never fill" choice.
-      await controls.check('Fill tiny holes', true);
-      await controls.check('Fill tiny holes', false);
+      // Line Art's default is the automatic small-mark policy; leaving Auto
+      // makes the explicit "never fill" choice.
+      await controls.check('Fill tiny holes: Auto', false);
+      expect(controls.options().fillPinholeCracks).toBe(false);
       await controls.selectPreset('Sharp');
       expect(controls.options().faintLineRecovery).toBe(true);
       expect(ink(preprocessForTrace(image, controls.options()))).toBe(440);
       await controls.selectPreset('Photo shading');
       expect(controls.options().faintLineRecovery).toBeUndefined();
       expect(controls.options().fillPinholeCracks).toBeUndefined();
+      // Line Art sets its own small-mark choice (Auto), so the explicit Off
+      // does not follow it back (ADR-434 Amendment 1); detection does.
       await controls.selectPreset('Line Art');
       expect(controls.options().faintLineRecovery).toBe(true);
-      expect(controls.options().fillPinholeCracks).toBe(false);
+      expect(controls.options().fillPinholeCracks).toBeUndefined();
       await controls.detect('manual');
       expect(controls.options().faintLineRecovery).not.toBe(true);
       expect(ink(preprocessForTrace(image, controls.options()))).toBe(400);
@@ -51,6 +47,7 @@ describe('trace controls describe the options the engine actually receives', () 
     '%s tiny-hole checkbox controls enclosed slits while leaving open gaps open',
     async (name) => {
       await withControls(name, async (controls) => {
+        await controls.check('Fill tiny holes: Auto', false);
         for (const [width, height] of [
           [1, 20],
           [2, 20],
@@ -129,11 +126,12 @@ describe('trace controls describe the options the engine actually receives', () 
     fill(image, 60, 40, 3, 2, [0, 0, 0]);
     await withControls('Line Art', async (controls) => {
       expect(controls.number('Ignore Less Than').value).toBe('2');
-      // Unset (shown as 0): the automatic policy removes the lone 6 px speck.
-      expect(controls.number('Remove ink specks').value).toBe('0');
+      // Auto (no number shown): the automatic policy removes the lone 6 px speck.
+      expect(controls.number('Remove ink specks').value).toBe('');
       expect(ink(preprocessForTrace(image, controls.options()))).toBe(400);
       await controls.change('Ignore Less Than', 3);
       expect(ink(preprocessForTrace(image, controls.options()))).toBe(400);
+      await controls.check('Remove ink specks: Auto', false);
       await controls.change('Remove ink specks', 2);
       expect(ink(preprocessForTrace(image, controls.options()))).toBe(406);
       expect(controls.options().ignoreLessThanPixels).toBe(3);
@@ -314,92 +312,3 @@ describe('trace controls describe the options the engine actually receives', () 
     });
   });
 });
-
-type Controls = {
-  readonly host: HTMLDivElement;
-  readonly options: () => TraceOptions;
-  readonly number: (label: string) => HTMLInputElement;
-  readonly change: (label: string, value: number) => Promise<void>;
-  readonly detect: (mode: string) => Promise<void>;
-  readonly check: (label: string, checked: boolean) => Promise<void>;
-  readonly selectPreset: (name: string) => Promise<void>;
-  readonly reset: () => Promise<void>;
-};
-
-async function withControls(
-  name: string,
-  run: (controls: Controls) => Promise<void>,
-  sourceHasTransparency = false,
-): Promise<void> {
-  const initialPreset = TRACE_PRESETS[name];
-  if (initialPreset === undefined) throw new Error(`Missing preset ${name}`);
-  let preset = initialPreset;
-  const host = document.createElement('div');
-  document.body.append(host);
-  const root = createRoot(host);
-  let settings: LightBurnTraceSettingOverrides = {};
-  const render = (): void =>
-    root.render(
-      <TraceSettingsControls
-        preset={preset}
-        overrides={settings}
-        sourceHasTransparency={sourceHasTransparency}
-        onChange={(next) => {
-          settings = next;
-          render();
-        }}
-      />,
-    );
-  const number = (label: string): HTMLInputElement => {
-    const input = host.querySelector(`[aria-label="Trace ${label}"]`);
-    if (!(input instanceof HTMLInputElement)) throw new Error(`Missing number ${label}`);
-    return input;
-  };
-  await act(async () => render());
-  try {
-    await run({
-      host,
-      options: () => mergeLightBurnTraceSettings(preset, settings),
-      number,
-      check: async (label, checked) => {
-        const input = host.querySelector(`[aria-label="${label}"]`);
-        if (!(input instanceof HTMLInputElement)) throw new Error(`Missing checkbox ${label}`);
-        if (input.checked !== checked) await act(async () => input.click());
-      },
-      selectPreset: async (nextName) => {
-        const next = TRACE_PRESETS[nextName];
-        if (next === undefined) throw new Error(`Missing preset ${nextName}`);
-        preset = next;
-        await act(async () => render());
-      },
-      reset: async () => {
-        const button = [...host.querySelectorAll('button')].find(
-          (node) => node.textContent === 'Reset trace settings',
-        );
-        if (button === undefined) throw new Error('Missing reset button');
-        await act(async () => button.click());
-      },
-      change: async (label, value) => {
-        await act(async () => {
-          const input = number(label);
-          Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')?.set?.call(
-            input,
-            String(value),
-          );
-          input.dispatchEvent(new Event('input', { bubbles: true }));
-        });
-      },
-      detect: async (mode) => {
-        await act(async () => {
-          const select = host.querySelector('[aria-label="Trace detection"]');
-          if (!(select instanceof HTMLSelectElement)) throw new Error('Missing detection selector');
-          select.value = mode;
-          select.dispatchEvent(new Event('change', { bubbles: true }));
-        });
-      },
-    });
-  } finally {
-    await act(async () => root.unmount());
-    host.remove();
-  }
-}

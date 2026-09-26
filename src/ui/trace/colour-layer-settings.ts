@@ -14,7 +14,8 @@ export type ColourLayerSettingOverrides = {
   readonly colourCount?: number | 'auto';
   readonly colourLayerOutput?: ColourLayerOutput;
   readonly keepBackground?: boolean;
-  readonly despeckleMinPixels?: number;
+  /** 'auto' (a line preset's small-mark Auto) reads as the preset's own area. */
+  readonly despeckleMinPixels?: number | 'auto';
 };
 
 export function mergeColourLayerSettings(
@@ -36,7 +37,7 @@ export function mergeColourLayerSettings(
   return {
     ...preset,
     colourLayers,
-    ...(settings.despeckleMinPixels === undefined
+    ...(settings.despeckleMinPixels === undefined || settings.despeckleMinPixels === 'auto'
       ? {}
       : { despeckleMinPixels: Math.max(0, Math.round(settings.despeckleMinPixels)) }),
   };
