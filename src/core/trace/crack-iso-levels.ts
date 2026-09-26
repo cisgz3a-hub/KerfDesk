@@ -13,11 +13,13 @@
 //    splits the histogram wherever the class variances balance, which on
 //    real art is usually darker than the mid-level: crossings then land
 //    inside the ink (measured -0.12 px mean radius on an anti-aliased disc).
-// 2. Ribbon level. A stroke narrower than ~2 source px never reaches its
-//    plateau, so any fixed level misreads its width. For such a component
-//    the level is solved so the traced area equals the component's
-//    integrated darkness (paper − luma)/(paper − ink) summed over its pixels
-//    and their paper neighbours: traced width = integrated darkness.
+// 2. Thin features keep the cut. Where the ink or the paper side of a crack
+//    holds no uniform 3x3-source-px block (a hairline, a narrow counter), the
+//    samples never reach a plateau and pushing the edge past the mask's own
+//    crack can fold a loop onto itself at a saddle, so those cracks keep the
+//    crossing of the cut exactly as before. (A per-component ribbon level
+//    that sets traced width to integrated darkness was measured and dropped
+//    for now; ADR-453 records why.)
 // 3. Brightness band (Cutoff > 0) and the alpha route. Ink is a band
 //    lo ≤ v ≤ hi, so each crack takes the band edge its paper sample lies
 //    beyond: v > hi crosses at hi, v < lo crosses at lo with the polarity
@@ -37,9 +39,9 @@ const MAX_LUMA = 255;
 // (anti-aliased) pixels that sit in a class do not drag its level.
 const INK_LEVEL_QUANTILE = 0.25;
 const PAPER_LEVEL_QUANTILE = 0.75;
-// Mean width 2·area/perimeter below this (SOURCE px) makes a ribbon.
-const RIBBON_WIDTH_SOURCE_PX = 2;
-const RIBBON_BISECTION_STEPS = 24;
+// Half-size (SOURCE px) of the uniform block a broad edge needs on each
+// side of its crack; anything thinner keeps the cut's own crossing.
+const BROAD_RADIUS_SOURCE_PX = 1;
 
 /** Row-major 8-bit plane: the scalar the mask was cut from. */
 export type ScalarPlane = {
@@ -63,7 +65,12 @@ export function plateauLevels(values: Uint8Array, cut: number): PlateauLevels | 
   }
   if (inkCount === 0 || paperCount === 0) return null;
   const ink = quantile(histogram, 0, inkCount * INK_LEVEL_QUANTILE, cut);
-  const paper = quantile(histogram, Math.ceil(cut), paperCount * PAPER_LEVEL_QUANTILE, MAX_LUMA + 1);
+  const paper = quantile(
+    histogram,
+    Math.ceil(cut),
+    paperCount * PAPER_LEVEL_QUANTILE,
+    MAX_LUMA + 1,
+  );
   return paper > ink ? { ink, paper } : null;
 }
 
@@ -93,7 +100,7 @@ function clampT(t: number): number {
 
 type MaskPlane = { readonly width: number; readonly height: number; readonly ink: Uint8Array };
 
-/** Adds the plateau/ribbon crossing to the automatic-cut field. `ink` is the
+/** Adds the plateau crossing to the automatic-cut field. `ink` is the
  *  thresholded mask (1 = ink) the field describes. Returns `field` itself
  *  when the plane has no two plateaus. */
 export function withPlateauCrossing(
@@ -106,159 +113,44 @@ export function withPlateauCrossing(
   const levels = plateauLevels(plane.values, cut);
   if (levels === null) return field;
   const mid = (levels.ink + levels.paper) / 2;
-  const ribbons = createRibbonLevels(plane, { width: plane.width, height: plane.height, ink }, {
-    cut,
-    levels,
-    maxWidth: RIBBON_WIDTH_SOURCE_PX * Math.max(1, pixelScale),
-  });
-  const valueAt = (x: number, y: number): number => sample(plane, x, y);
+  const mask: MaskPlane = { width: plane.width, height: plane.height, ink };
+  const radius = Math.max(1, Math.round(BROAD_RADIUS_SOURCE_PX * Math.max(1, pixelScale)));
   return {
     ...field,
     crackCrossingAt: (inkX, inkY, bgX, bgY) => {
-      const ribbon = ribbons(inkX, inkY);
-      return isoCrossing(valueAt(inkX, inkY), valueAt(bgX, bgY), cut, ribbon ?? mid);
+      // Thin ink or a narrow paper gap never reaches its plateau, and moving
+      // such an edge past the mask's crack can fold the loop onto itself at
+      // a saddle: those cracks keep the crossing of the cut itself.
+      const dx = inkX - bgX;
+      const dy = inkY - bgY;
+      const broad =
+        uniformBlock(mask, inkX + dx * (radius + 1), inkY + dy * (radius + 1), radius, true) &&
+        uniformBlock(mask, bgX - dx * (radius + 1), bgY - dy * (radius + 1), radius, false);
+      return isoCrossing(
+        sample(plane, inkX, inkY),
+        sample(plane, bgX, bgY),
+        cut,
+        broad ? mid : cut,
+      );
     },
   };
+}
+
+// Every pixel of the (2r+1)² block centred on (cx, cy) has class `ink`
+// (outside the image is paper). The block sits just past the crack's own
+// pixel (whose row may hold staircase steps) and reaches 2r + 2 pixels along
+// the normal, so a stroke or gap narrower than that in ANY direction fails
+// it — a diagonal hairline too.
+function uniformBlock(mask: MaskPlane, cx: number, cy: number, r: number, ink: boolean): boolean {
+  for (let y = cy - r; y <= cy + r; y += 1) {
+    for (let x = cx - r; x <= cx + r; x += 1) if (inkAt(mask, x, y) !== ink) return false;
+  }
+  return true;
 }
 
 function sample(plane: ScalarPlane, x: number, y: number): number {
   if (x < 0 || y < 0 || x >= plane.width || y >= plane.height) return MAX_LUMA;
   return plane.values[y * plane.width + x] ?? MAX_LUMA;
-}
-
-type RibbonSettings = {
-  readonly cut: number;
-  readonly levels: PlateauLevels;
-  readonly maxWidth: number;
-};
-
-// Lazily labels the 8-connected ink component under a crack's ink pixel and
-// caches its ribbon level (null = broad shape, which keeps the mid-level).
-function createRibbonLevels(
-  plane: ScalarPlane,
-  mask: MaskPlane,
-  settings: RibbonSettings,
-): (x: number, y: number) => number | null {
-  const labels = new Int32Array(mask.width * mask.height);
-  const levelOf: Array<number | null> = [null];
-  return (x, y) => {
-    if (x < 0 || y < 0 || x >= mask.width || y >= mask.height) return null;
-    const p = y * mask.width + x;
-    if (mask.ink[p] !== 1) return null;
-    const known = labels[p] ?? 0;
-    if (known !== 0) return levelOf[known] ?? null;
-    const label = levelOf.length;
-    const pixels = floodComponent(mask, labels, p, label);
-    levelOf.push(ribbonLevel(plane, mask, pixels, settings));
-    return levelOf[label] ?? null;
-  };
-}
-
-function floodComponent(mask: MaskPlane, labels: Int32Array, seed: number, label: number): number[] {
-  const { width, height } = mask;
-  const pixels: number[] = [seed];
-  labels[seed] = label;
-  for (let head = 0; head < pixels.length; head += 1) {
-    const p = pixels[head] as number;
-    const px = p % width;
-    const py = (p - px) / width;
-    for (let dy = -1; dy <= 1; dy += 1) {
-      for (let dx = -1; dx <= 1; dx += 1) {
-        const nx = px + dx;
-        const ny = py + dy;
-        if (nx < 0 || ny < 0 || nx >= width || ny >= height) continue;
-        const q = ny * width + nx;
-        if (mask.ink[q] !== 1 || labels[q] !== 0) continue;
-        labels[q] = label;
-        pixels.push(q);
-      }
-    }
-  }
-  return pixels;
-}
-
-const SIDES = [
-  [1, 0],
-  [-1, 0],
-  [0, 1],
-  [0, -1],
-] as const;
-
-type Crack = { readonly ink: number; readonly bg: number };
-
-function ribbonLevel(
-  plane: ScalarPlane,
-  mask: MaskPlane,
-  pixels: ReadonlyArray<number>,
-  settings: RibbonSettings,
-): number | null {
-  const cracks = componentCracks(plane, mask, pixels);
-  if (cracks.length === 0 || (2 * pixels.length) / cracks.length >= settings.maxWidth) return null;
-  const darkness = integratedDarkness(plane, mask, pixels, settings.levels);
-  const tracedArea = (iso: number): number => {
-    let area = pixels.length;
-    for (const crack of cracks) area += MID - isoCrossing(crack.ink, crack.bg, settings.cut, iso);
-    return area;
-  };
-  let low = settings.levels.ink;
-  let high = settings.levels.paper;
-  if (tracedArea(low) >= darkness) return low;
-  if (tracedArea(high) <= darkness) return high;
-  for (let step = 0; step < RIBBON_BISECTION_STEPS; step += 1) {
-    const iso = (low + high) / 2;
-    if (tracedArea(iso) < darkness) low = iso;
-    else high = iso;
-  }
-  return (low + high) / 2;
-}
-
-function componentCracks(
-  plane: ScalarPlane,
-  mask: MaskPlane,
-  pixels: ReadonlyArray<number>,
-): Crack[] {
-  const cracks: Crack[] = [];
-  for (const p of pixels) {
-    const x = p % mask.width;
-    const y = (p - x) / mask.width;
-    for (const [dx, dy] of SIDES) {
-      if (inkAt(mask, x + dx, y + dy)) continue;
-      cracks.push({ ink: sample(plane, x, y), bg: sample(plane, x + dx, y + dy) });
-    }
-  }
-  return cracks;
-}
-
-// Darkness of the component's pixels plus every paper pixel touching it
-// (8-neighbourhood, each counted once): the ink the ribbon really holds.
-function integratedDarkness(
-  plane: ScalarPlane,
-  mask: MaskPlane,
-  pixels: ReadonlyArray<number>,
-  levels: PlateauLevels,
-): number {
-  const counted = new Set<number>();
-  let total = 0;
-  const span = levels.paper - levels.ink;
-  const add = (x: number, y: number): void => {
-    if (x < 0 || y < 0 || x >= mask.width || y >= mask.height) return;
-    const q = y * mask.width + x;
-    if (counted.has(q)) return;
-    counted.add(q);
-    const value = plane.values[q] ?? MAX_LUMA;
-    total += Math.min(1, Math.max(0, (levels.paper - value) / span));
-  };
-  for (const p of pixels) {
-    const x = p % mask.width;
-    const y = (p - x) / mask.width;
-    add(x, y);
-    for (let dy = -1; dy <= 1; dy += 1) {
-      for (let dx = -1; dx <= 1; dx += 1) {
-        if (!inkAt(mask, x + dx, y + dy)) add(x + dx, y + dy);
-      }
-    }
-  }
-  return total;
 }
 
 function inkAt(mask: MaskPlane, x: number, y: number): boolean {

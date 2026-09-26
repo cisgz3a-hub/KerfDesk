@@ -146,8 +146,12 @@ describe('explicit coherent faint-line recovery', () => {
       traceTransparency: true,
       sourceHasTransparency: true,
     };
-    expect(prepareTraceForContour(image, { ...options, faintLineRecovery: true })).toEqual(
-      prepareTraceForContour(image, options),
+    const recovered = prepareTraceForContour(image, { ...options, faintLineRecovery: true });
+    const plain = prepareTraceForContour(image, options);
+    expect(recovered.prepared).toEqual(plain.prepared);
+    // Both carry the alpha route's band crossing (ADR-456), never faint-line's.
+    expect(recovered.crackField?.crackCrossingAt?.(0, 0, 1, 0)).toBe(
+      plain.crackField?.crackCrossingAt?.(0, 0, 1, 0),
     );
   });
 
