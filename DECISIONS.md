@@ -21581,9 +21581,10 @@ changes do not establish the cause of the reported immediate minimisation pause.
 
 ADR-341's amendments are separate decision files (ADR-344):
 `docs/decisions/ADR-341-amendment-1-sweep-boundaries-and-beam-mode-economy.md`,
-`docs/decisions/ADR-341-amendment-2-controller-families.md` and
-`docs/decisions/ADR-341-amendment-3-resume-and-painted-pass-fidelity.md`. Amendment 1 was first
-appended here on 2026-09-22 and was moved there verbatim.
+`docs/decisions/ADR-341-amendment-2-controller-families.md`,
+`docs/decisions/ADR-341-amendment-3-resume-and-painted-pass-fidelity.md` and
+`docs/decisions/ADR-341-amendment-4-second-pass-only-for-the-job-that-just-finished.md`.
+Amendment 1 was first appended here on 2026-09-22 and was moved there verbatim.
 
 ---
 

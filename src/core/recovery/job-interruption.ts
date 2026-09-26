@@ -32,6 +32,14 @@ export type JobInterruption = {
   readonly message: string;
   readonly rejectedLine?: string;
   readonly plannerBacklog?: PlannerBacklog;
+  /**
+   * The stop may have killed the steppers mid-motion: a soft reset (Abort)
+   * while the machine was moving, or an alarm GRBL documents as losing
+   * position (a hard limit, ALARM:3). The controller cannot know about steps
+   * it never took, so its work offset still reads as unchanged; recovery must
+   * not offer the retained-position path (ADR-215 Amendment 1, CNC audit MC-3).
+   */
+  readonly positionLost?: true;
 };
 
 export function withJobInterruption<T extends { readonly updatedAtIso: string }>(
@@ -52,6 +60,8 @@ export function parseOptionalJobInterruption(
   const rejectedLine = value['rejectedLine'];
   if (!isJobInterruptionKind(kind) || typeof message !== 'string') return null;
   if (rejectedLine !== undefined && typeof rejectedLine !== 'string') return null;
+  const positionLost = parsePositionLost(value['positionLost']);
+  if (positionLost === null) return null;
   const plannerBacklog = parsePlannerBacklog(value['plannerBacklog']);
   if (plannerBacklog === null) return null;
   return {
@@ -60,8 +70,13 @@ export function parseOptionalJobInterruption(
       message,
       ...(rejectedLine === undefined ? {} : { rejectedLine }),
       ...(plannerBacklog === undefined ? {} : { plannerBacklog }),
+      ...(positionLost === undefined ? {} : { positionLost }),
     },
   };
+}
+
+function parsePositionLost(value: unknown): true | undefined | null {
+  return value === undefined || value === true ? value : null;
 }
 
 function parsePlannerBacklog(value: unknown): PlannerBacklog | undefined | null {

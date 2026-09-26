@@ -34,11 +34,16 @@ const EPSILON = 1e-9;
 
 export type RestPocketCompletion = 'complete' | 'geometry-failed' | 'pass-limit';
 
+// finishToolDiameterMm places the finishing bit's centres and reach; its rings
+// step by a stepover percentage of finishClearingDiameterMm, which defaults to
+// the same diameter. A tapered ball nose passes its wall and clearing widths
+// (layout-cut-widths.ts, ADR-368 Amendment 2).
 export function planRestPocketToolpaths(
   contours: ReadonlyArray<Polyline>,
   roughToolDiameterMm: number,
   finishToolDiameterMm: number,
   stepoverPercent: number,
+  finishClearingDiameterMm = finishToolDiameterMm,
 ): RestPocketPlan {
   const issue = requestIssue(contours, roughToolDiameterMm, finishToolDiameterMm);
   if (issue !== null) return { ok: false, reason: issue };
@@ -55,7 +60,11 @@ export function planRestPocketToolpaths(
   }
   const target = finishTarget(stock.original, stock.rest, finishToolDiameterMm);
   if (target === null) return clipperFailure();
-  const rings = centerRegionRings(target, finishToolDiameterMm, stepoverPercent);
+  const clearingMm =
+    finishClearingDiameterMm > 0 && finishClearingDiameterMm < finishToolDiameterMm
+      ? finishClearingDiameterMm
+      : finishToolDiameterMm;
+  const rings = centerRegionRings(target, clearingMm, stepoverPercent);
   return {
     ok: true,
     toolpaths: rings.toolpaths,

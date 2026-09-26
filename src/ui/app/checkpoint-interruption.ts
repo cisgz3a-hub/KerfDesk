@@ -1,6 +1,11 @@
-import type { StreamerStatus } from '../../core/controllers/grbl';
+import { describeAlarm, type StreamerStatus } from '../../core/controllers/grbl';
 import type { JobInterruption } from '../../core/recovery';
-import { jobStopRequestMessage, type JobStopRequest } from '../state/job-stop-request';
+import {
+  currentStreamResetMayLosePosition,
+  jobStopRequestMessage,
+  type JobStopRequest,
+  type StreamReset,
+} from '../state/job-stop-request';
 import type { LaserSafetyNotice } from '../state/laser-safety-notice';
 import {
   controllerPlannerSizeBlocks,
@@ -12,14 +17,19 @@ import {
  * without one, a stop KerfDesk was asked for (Abort, the app closing) is a
  * cancellation, and only a stop nobody asked for is unexplained. A cause that
  * discarded the controller's planner also records its backlog, so recovery
- * restarts before the moves it threw away (controller audit recovery-6). */
+ * restarts before the moves it threw away (controller audit recovery-6). A
+ * stop that may have killed the steppers mid-motion is marked position-lost
+ * (ADR-215 Amendment 1). */
 export function checkpointInterruption(
   status: StreamerStatus,
   notice: LaserSafetyNotice | null,
   stopRequest: JobStopRequest | null = null,
   plannerBacklog?: JobInterruption['plannerBacklog'],
+  positionLost = false,
 ): JobInterruption | null {
-  const interruption = interruptionCause(status, notice, stopRequest);
+  const cause = interruptionCause(status, notice, stopRequest);
+  const interruption =
+    cause !== null && positionLost ? { ...cause, positionLost: true as const } : cause;
   if (interruption === null || plannerBacklog === undefined) return interruption;
   // The stop sent while the app closed may never have arrived.
   const stopMayNotHaveArrived = stopRequest?.reason === 'app-closing';
@@ -36,6 +46,25 @@ const PLANNER_DISCARDING_KINDS: ReadonlyArray<JobInterruption['kind']> = [
   'controller-error',
   'controller-reboot',
 ];
+
+/** Whether the run's stop may have killed the steppers mid-motion: a reset
+ * KerfDesk sent against a moving machine, or an alarm GRBL or grblHAL
+ * documents as losing position (a hard limit, ALARM:3). Code 10 is a homing
+ * failure on GRBL and an E-stop on grblHAL; both lose position, so either
+ * table's verdict counts. Start refuses an alarmed controller, so an alarm
+ * code seen during a run was raised by it (ADR-215 Amendment 1). */
+export function runStopMayHaveLostPosition(state: {
+  readonly alarmCode: number | null;
+  readonly streamReset?: StreamReset | null;
+  readonly streamerEpoch: number;
+}): boolean {
+  if (currentStreamResetMayLosePosition(state)) return true;
+  if (state.alarmCode === null) return false;
+  return (
+    describeAlarm(state.alarmCode, 'grbl')?.positionLost === true ||
+    describeAlarm(state.alarmCode, 'grblhal')?.positionLost === true
+  );
+}
 
 function interruptionCause(
   status: StreamerStatus,

@@ -195,21 +195,41 @@ describe('completed-job second pass offer', () => {
     expect(useLaserSecondPassUiStore.getState().completionRunId).toBeNull();
   });
 
-  it('offers the new completed job even when an older job is selected in the rail', async () => {
+  it('offers only the job that just finished in the Machine panel', async () => {
     await complete('old');
     await complete('new');
     await render(true);
-    const select = host.querySelector('select') as HTMLSelectElement;
-    await act(async () => {
-      select.value = 'old';
-      select.dispatchEvent(new Event('change', { bubbles: true }));
-    });
-    await offer('new');
-    await act(async () => button('Darken selected areas…').click());
-    await expectOpenedSource('new');
-    await act(async () => button('Close editor').click());
+    expect(host.querySelector('select')).toBeNull();
     await act(async () => button('Paint a second pass…').click());
-    await expectOpenedSource('old');
+    await expectOpenedSource('new');
+  });
+
+  it('opens from the Machine panel after an aborted run left its stream behind', async () => {
+    // Abort leaves the cancelled stream and its activeRunId until the next
+    // Start. Treating that as a newer run closed the editor as it opened.
+    await complete('saved');
+    useLaserStore.setState({
+      activeRunId: 'aborted',
+      streamer: { ...createStreamer('G1 X1'), status: 'cancelled' },
+    });
+    await render(true);
+    await act(async () => button('Paint a second pass…').click());
+    await expectOpenedSource('saved');
+  });
+
+  it('withdraws the Machine panel offer when a later run is interrupted', async () => {
+    await complete('finished');
+    await render(true);
+    expect(host.textContent).toContain('Paint a second pass…');
+    const later = await createCurrentTestExecutionArtifact({ runId: 'stopped', createdAtIso: NOW });
+    await act(async () => {
+      expect((await repository.stageArtifact(later)).ok).toBe(true);
+      expect((await repository.activateFreshRun('stopped', NOW)).ok).toBe(true);
+      const interruption = { kind: 'cancelled', message: 'Aborted.' } as const;
+      expect((await repository.interruptRun('stopped', 0, interruption, NOW)).ok).toBe(true);
+    });
+    expect(repository.getSnapshot().lastCompletedReceipt).toBeNull();
+    expect(host.textContent).not.toContain('Paint a second pass…');
   });
 
   it('keeps an opened editor mounted when the Machine rail is collapsed', async () => {
@@ -317,18 +337,11 @@ describe('controller families the transformer cannot read', () => {
     expect(host.textContent).not.toContain('Paint a second pass…');
   });
 
-  it('keeps older completed jobs reachable when only the latest run is unsupported', async () => {
+  it('does not fall back to an older job when the latest run is unsupported', async () => {
     await complete('grbl');
     await complete('marlin', marlinProject());
     await render(true);
-    expect(host.textContent).toContain('support jobs generated for GRBL, grblHAL and FluidNC');
-    const select = host.querySelector('select');
-    if (select === null) throw new Error('Expected the completed-job selector.');
-    await act(async () => {
-      select.value = 'grbl';
-      select.dispatchEvent(new Event('change', { bubbles: true }));
-    });
-    await act(async () => button('Paint a second pass…').click());
-    await expectOpenedSource('grbl');
+    expect(host.querySelector('select')).toBeNull();
+    expect(host.textContent).not.toContain('Paint a second pass…');
   });
 });
