@@ -40,6 +40,7 @@ import { reportingTraceRunner, type TraceProgress } from './trace-progress';
 import { resolveTraceSourceOptions, shouldTraceAlphaMask } from './trace-alpha';
 import { dedicatedTraceSteps } from './dedicated-trace-backends';
 import { invertImage } from './raster-prep';
+import { withSourceAutoSketch } from './auto-sketch-trace';
 
 export { boundsFromColoredPaths } from './trace-bounds';
 
@@ -154,10 +155,16 @@ export async function traceImageToColoredPaths(
   // Photo shading and Colour layers own their whole pipeline.
   const dedicated = dedicatedTraceSteps(requestedImage, requestedOptions);
   if (dedicated !== undefined) return run(dedicated);
-  const { image, options } = invertBeforePolicy(
+  const polarised = invertBeforePolicy(
     requestedImage,
     resolveTraceSourceOptions(requestedImage, requestedOptions),
   );
+  const image = polarised.image;
+  // The auto-sketch verdict is read once, on the polarised source, so the
+  // scale plan and the working grid it chooses take one route (ADR-446).
+  const options = shouldTraceAlphaMask(image, polarised.options)
+    ? polarised.options
+    : withSourceAutoSketch(image, polarised.options);
   // Sparse small/thin sources trace poorly at native resolution, so their
   // scale plan supersamples them. Dense color pictures instead stay native or
   // trace on a bounded working grid so photo texture cannot multiply the

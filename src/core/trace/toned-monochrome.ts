@@ -27,70 +27,85 @@ const HUE_ALLOWANCE = 6;
 const HUE_PER_TINT = 0.35;
 
 type Paper = readonly [number, number, number];
-/** The weak tints in the opponent-chroma plane (x, y interleaved) and how
- *  many counted pixels were strong. */
-type WeakTints = { readonly strong: number; readonly chroma: readonly number[] };
+/** A predicate over pixel indices that, when it returns true, has written the
+ *  pixel's 3×3 mean colour (edge-clamped, like the trigger) into `mean`. */
+export type CountedPixel = (pixel: number, mean: Float64Array) => boolean;
+/** How many counted pixels were strong, and the unit-vector sum of the weak
+ *  tints' hues in the opponent-chroma plane. */
+type WeakHue = { readonly strong: number; readonly x: number; readonly y: number };
 
 /**
  * True when the coherent colour pixels `counts` selects are, relative to
- * paper-light paper, all weak tints of one hue. Stops as soon as `required`
- * pixels are strong, so saturated colour art pays at most one pass.
+ * paper-light paper, all weak tints of one hue. Streams the counted pixels
+ * twice at most and stores nothing per pixel: the first pass finds the
+ * dominant hue (stopping once `required` pixels are strong, so saturated
+ * colour art pays one pass), the second counts the weak tints off it.
  */
 export function isTonedMonochrome(
   image: RawImageData,
   required: number,
-  counts: (pixel: number) => boolean,
+  counts: CountedPixel,
 ): boolean {
   const paper = paperColour(image);
   if (paper === null) return false;
-  const weak = weakTints(image, paper, required, counts);
-  return weak !== null && weak.strong + offHueCount(weak.chroma) < required;
+  const hue = weakHue(image, paper, required, counts);
+  if (hue === null) return false;
+  const length = Math.hypot(hue.x, hue.y);
+  if (length === 0) return hue.strong < required;
+  const budget = required - hue.strong;
+  return offHueCount(image, paper, budget, counts, hue.x / length, hue.y / length) < budget;
 }
 
-/** Collects the weak tints; null once `required` counted pixels are strong. */
-function weakTints(
+/** Sums the weak tints' hue directions; null once `required` are strong. */
+function weakHue(
   image: RawImageData,
   paper: Paper,
   required: number,
-  counts: (pixel: number) => boolean,
-): WeakTints | null {
+  counts: CountedPixel,
+): WeakHue | null {
   const pixelCount = image.width * image.height;
+  const mean = new Float64Array(3);
   const tint = new Float64Array(3);
-  const chroma: number[] = [];
   let strong = 0;
+  let x = 0;
+  let y = 0;
   for (let pixel = 0; pixel < pixelCount; pixel += 1) {
-    if (!counts(pixel)) continue;
-    tintAt(image, pixel, paper, tint);
-    if (!isStrongTint(tint)) {
-      chroma.push(...chromaPlane(tint));
+    if (!counts(pixel, mean)) continue;
+    tintOf(mean, paper, tint);
+    if (isStrongTint(tint)) {
+      strong += 1;
+      if (strong >= required) return null;
       continue;
     }
-    strong += 1;
-    if (strong >= required) return null;
-  }
-  return { strong, chroma };
-}
-
-/** Weak tints off their dominant hue: the unit-vector sum of all of them. */
-function offHueCount(chroma: readonly number[]): number {
-  let hueX = 0;
-  let hueY = 0;
-  for (let i = 0; i < chroma.length; i += 2) {
-    const a = chroma[i] as number;
-    const b = chroma[i + 1] as number;
+    const a = chromaA(tint);
+    const b = chromaB(tint);
     const magnitude = Math.hypot(a, b);
     if (magnitude === 0) continue;
-    hueX += a / magnitude;
-    hueY += b / magnitude;
+    x += a / magnitude;
+    y += b / magnitude;
   }
-  const length = Math.hypot(hueX, hueY);
-  if (length === 0) return 0;
-  const ux = hueX / length;
-  const uy = hueY / length;
+  return { strong, x, y };
+}
+
+/** Weak tints off the hue (ux, uy); stops counting at `budget`. */
+function offHueCount(
+  image: RawImageData,
+  paper: Paper,
+  budget: number,
+  counts: CountedPixel,
+  ux: number,
+  uy: number,
+): number {
+  const pixelCount = image.width * image.height;
+  const mean = new Float64Array(3);
+  const tint = new Float64Array(3);
   let off = 0;
-  for (let i = 0; i < chroma.length; i += 2) {
-    const a = chroma[i] as number;
-    const b = chroma[i + 1] as number;
+  for (let pixel = 0; pixel < pixelCount && off < budget; pixel += 1) {
+    if (!counts(pixel, mean)) continue;
+    tintOf(mean, paper, tint);
+    if (isStrongTint(tint)) continue;
+    const a = chromaA(tint);
+    const b = chromaB(tint);
     const along = a * ux + b * uy;
     const across = Math.abs(a * uy - b * ux);
     // Distance from the hue's half-axis: the opposite hue is another hue.
@@ -101,10 +116,14 @@ function offHueCount(chroma: readonly number[]): number {
 }
 
 /** Mean colour of the pixels at the most populated luma level (5-level
- *  window), or null when that level is not paper-light. */
+ *  window), or null when that colour is not paper-light. The window's level
+ *  leans up to two levels brighter than a uniform paper, so the gate reads
+ *  the mean colour's own luma. */
 function paperColour(image: RawImageData): Paper | null {
   const level = paperLevel(lumaHistogram(image));
-  return level < PAPER_LIGHT_LUMA ? null : meanColourNearLevel(image, level);
+  if (level < PAPER_LIGHT_LUMA) return null;
+  const paper = meanColourNearLevel(image, level);
+  return lumaByte(paper[0], paper[1], paper[2]) < PAPER_LIGHT_LUMA ? null : paper;
 }
 
 function lumaHistogram(image: RawImageData): Float64Array {
@@ -157,26 +176,11 @@ function readRgb(image: RawImageData, pixel: number, out: Float64Array): void {
   out[2] = image.data[o + 2] ?? 255;
 }
 
-/** Paper minus the pixel's 3×3 mean colour (edge-clamped, like the trigger). */
-function tintAt(image: RawImageData, pixel: number, paper: Paper, out: Float64Array): void {
-  const { width, height, data } = image;
-  const x = pixel % width;
-  const y = (pixel - x) / width;
-  let r = 0;
-  let g = 0;
-  let b = 0;
-  for (let dy = -1; dy <= 1; dy += 1) {
-    const yy = Math.min(height - 1, Math.max(0, y + dy));
-    for (let dx = -1; dx <= 1; dx += 1) {
-      const offset = (yy * width + Math.min(width - 1, Math.max(0, x + dx))) * 4;
-      r += data[offset] ?? 255;
-      g += data[offset + 1] ?? 255;
-      b += data[offset + 2] ?? 255;
-    }
-  }
-  out[0] = paper[0] - r / 9;
-  out[1] = paper[1] - g / 9;
-  out[2] = paper[2] - b / 9;
+/** Paper minus the pixel's 3×3 mean colour. */
+function tintOf(mean: Float64Array, paper: Paper, out: Float64Array): void {
+  out[0] = paper[0] - (mean[0] as number);
+  out[1] = paper[1] - (mean[1] as number);
+  out[2] = paper[2] - (mean[2] as number);
 }
 
 function isStrongTint(tint: Float64Array): boolean {
@@ -189,11 +193,12 @@ function isStrongTint(tint: Float64Array): boolean {
 }
 
 /** Orthonormal opponent-chroma coordinates of an RGB difference. */
-function chromaPlane(tint: Float64Array): readonly [number, number] {
-  const r = tint[0] as number;
-  const g = tint[1] as number;
-  const b = tint[2] as number;
-  return [(r - g) / Math.SQRT2, (r + g - 2 * b) / Math.sqrt(6)];
+function chromaA(tint: Float64Array): number {
+  return ((tint[0] as number) - (tint[1] as number)) / Math.SQRT2;
+}
+
+function chromaB(tint: Float64Array): number {
+  return ((tint[0] as number) + (tint[1] as number) - 2 * (tint[2] as number)) / Math.sqrt(6);
 }
 
 function lumaByte(r: number, g: number, b: number): number {
