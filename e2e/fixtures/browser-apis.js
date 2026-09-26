@@ -112,6 +112,12 @@ function respondToSerialWrite(text, emitLine, currentStatus, settings) {
   if (text.includes('$$')) {
     for (const [id, value] of settings) emitLine(`$${id}=${value}`);
   }
+  // GRBL answers `$G` with its modal state before the `ok` (report.c
+  // report_gcode_modes). The Frame reads it when the active WCS is unknown
+  // (controller audit 2026-09-25 CG-2).
+  if (text.split('\n').some((line) => line.trim() === '$G')) {
+    emitLine('[GC:G0 G54 G17 G21 G90 G94 M5 M9 T0 F0 S0]');
+  }
   const acknowledgements = [...text].filter((character) => character === '\n').length;
   if (!state.autoAcknowledge && acknowledgements > 0) {
     record('serial-acks-held', { count: acknowledgements });
