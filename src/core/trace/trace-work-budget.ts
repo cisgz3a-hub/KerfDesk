@@ -12,7 +12,7 @@ export const TRACE_WORKING_PIXEL_BUDGETS = {
 
 export function traceWorkingPixelBudget(options: TraceOptions): number {
   if (options.traceMode === 'edge') return TRACE_WORKING_PIXEL_BUDGETS.edge;
-  if (options.traceMode === 'centerline') return TRACE_WORKING_PIXEL_BUDGETS.centerline;
+  if (options.traceMode === 'centerline' || options.traceMode === 'hybrid') return TRACE_WORKING_PIXEL_BUDGETS.centerline;
   return TRACE_WORKING_PIXEL_BUDGETS.contour;
 }
 

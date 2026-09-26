@@ -6,7 +6,7 @@
 // Produces ONE open path down the middle of every stroke — the whole point
 // of centerline mode — instead of imagetracer-style double outlines.
 
-import type { ColoredPath } from '../../scene';
+import type { ColoredPath, Polyline } from '../../scene';
 import { withCanonicalTraceCurves } from '../trace-curves';
 import {
   effectivePixelScale,
@@ -46,6 +46,25 @@ export function* traceCenterlineStrokePathsSteps(
   const mask = inkMaskFromPrepared(prepared);
   if (!hasInk(mask)) return [];
   const distSq = yield* squaredDistanceFieldSteps(mask);
+  const { polylines } = yield* centerlineStrokesFromMaskSteps(mask, distSq, options);
+  // Rings closed at a corner keep their endpoints a gap apart; make them
+  // return to start so a stroked/engraved closed loop has no seam gap.
+  const closed = closeRingEndpoints(polylines);
+  return closed.length === 0
+    ? []
+    : withCanonicalTraceCurves([{ color: CENTERLINE_COLOR, polylines: closed }]);
+}
+
+/** The centreline strokes of an ink mask, before ring closure, in output
+ *  order; `marks` names the concentric circles among them that burn round
+ *  dots solid. Shared by the Centerline lane and the Line + fill lane (ADR-454),
+ *  which needs the exact field and the dots kept apart. */
+export function* centerlineStrokesFromMaskSteps(
+  mask: InkMask,
+  distSq: Float64Array,
+  options: TraceOptions,
+): TraceSteps<{ readonly polylines: Polyline[]; readonly marks: ReadonlySet<Polyline> }> {
+  const cooperate = yield;
   const skeleton = yield* thinToMedialAxisSteps(mask, distSq);
   const graph = buildStrokeGraph(skeleton, mask.width, mask.height);
   if (cooperate) yield;
@@ -72,12 +91,8 @@ export function* traceCenterlineStrokePathsSteps(
   // stroke to follow; they become concentric circles that burn them solid
   // instead of vanishing or turning into dashes.
   const marked = withDotMarks(polylines, mask, distSq, condensed, effectivePixelScale(options));
-  // Rings closed at a corner keep their endpoints a gap apart; make them
-  // return to start so a stroked/engraved closed loop has no seam gap.
-  const closed = closeRingEndpoints(marked);
-  return closed.length === 0
-    ? []
-    : withCanonicalTraceCurves([{ color: CENTERLINE_COLOR, polylines: closed }]);
+  const assembled = new Set(polylines);
+  return { polylines: marked, marks: new Set(marked.filter((p) => !assembled.has(p))) };
 }
 
 // The shared preprocessing already binarized the image (threshold/Otsu);

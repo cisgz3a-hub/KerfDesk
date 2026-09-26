@@ -15,7 +15,14 @@ export type TraceOptions = {
   // Centerline traces skeletonize dark strokes into open line paths
   // for single-pass vector engraving. Edge detection uses local contrast
   // to find full-colour artwork and traces closed outlines around its ink.
-  readonly traceMode?: 'filled-contours' | 'centerline' | 'edge';
+  // Line + fill ('hybrid', ADR-454) burns ink no wider than
+  // hybridMaxStrokeWidthPx once down its centre line and keeps wider ink as
+  // filled outlines, decided per skeleton branch.
+  readonly traceMode?: 'filled-contours' | 'centerline' | 'edge' | 'hybrid';
+  // Line + fill only: the widest ink, in source-image pixels, that still
+  // traces as a single centre-line stroke. The dialog converts its
+  // millimetre control through the placement; undefined = 4 px.
+  readonly hybridMaxStrokeWidthPx?: number;
   // Number of color quantization buckets. 2 = black-and-white,
   // suitable for most laser engraving. Higher values produce more
   // layers and (usually) more visual fidelity. Range 2-16.

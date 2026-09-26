@@ -152,9 +152,23 @@ export function* traceImageToContourColoredPathsSteps(
   // decides exactly where its edge lies).
   // Pixel-denominated knobs keep SOURCE-pixel semantics on a supersampled
   // trace: areas scale by scale², lengths (simplify ε) by scale.
+  const polylines = yield* contourPolylinesFromMaskSteps(mask, {
+    ...contourFinishOptionsFor(options),
+    ...(crackField === null ? {} : { crackField }),
+  });
+  return polylines.length === 0
+    ? []
+    : withCanonicalTraceCurves([{ color: CONTOUR_COLOR, polylines }]);
+}
+
+/** The outline finish a trace's options ask for, less the crack field.
+ *  Pixel-denominated knobs keep SOURCE-pixel semantics on a supersampled
+ *  trace: areas scale by scale^2, lengths (simplify epsilon) by scale. Shared
+ *  with the Line + fill lane, which finishes its fill mask the same way. */
+export function contourFinishOptionsFor(options: TraceOptions): ContourFinishOptions {
   const scale = effectivePixelScale(options);
   const toleranceScale = optimizationToleranceScaleFromOptimize(options.optimize);
-  const polylines = yield* contourPolylinesFromMaskSteps(mask, {
+  return {
     minAreaPx: Math.max(options.ignoreLessThanPixels ?? 0, 0) * scale * scale,
     epsilonPx:
       SIMPLIFY_EPSILON_PX * Math.max(0.1, options.lineTolerance ?? 1) * scale * toleranceScale,
@@ -162,11 +176,7 @@ export function* traceImageToContourColoredPathsSteps(
     flattenStrength: flattenStrengthFromSmoothness(options.smoothness),
     pixelScale: scale,
     turnPolicy: normalizeTurnPolicy(options.turnPolicy),
-    ...(crackField === null ? {} : { crackField }),
-  });
-  return polylines.length === 0
-    ? []
-    : withCanonicalTraceCurves([{ color: CONTOUR_COLOR, polylines }]);
+  };
 }
 
 export type ContourFinishOptions = {

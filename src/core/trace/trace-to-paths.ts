@@ -27,6 +27,7 @@ import {
 } from './trace-image';
 import { downscaleTracedPaths } from './auto-upscale';
 import { traceCenterlineStrokePathsSteps } from './centerline/trace-centerline';
+import { traceHybridPathsSteps } from './hybrid/trace-hybrid';
 import { isBinaryContourPreset, traceImageToContourColoredPathsSteps } from './contour-trace';
 import { traceImageToEdgePathsSteps } from './edge-trace';
 import { prepareEdgeTraceInput, type EdgeTraceInput } from './edge-input';
@@ -279,6 +280,7 @@ async function dispatchTrace(
 ): Promise<ColoredPath[]> {
   if (options.traceMode === 'centerline')
     return run(traceCenterlineStrokePathsSteps(image, options));
+  if (options.traceMode === 'hybrid') return run(traceHybridPathsSteps(image, options));
   if (options.traceMode === 'edge')
     return run(traceImageToEdgePathsSteps(image, options, edgeInput));
   // The binary filled-contours lane (Line Art / Smooth / Sharp) is traced by
