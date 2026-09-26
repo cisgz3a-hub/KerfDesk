@@ -60,10 +60,11 @@ On the ADR-412 bench relief (60 x 40 mm, 10 mm deep, 3.175 mm ball nose, 0.025 m
   before: on the bench the leftover on walls over 45 degrees went from p95 0.17 mm to 0.38 mm. A
   steep-wall strategy (waterline, or a steep/shallow split) is the planned remedy; a smaller
   scallop request is the remedy today.
-- The worst finishing residue on the plateau's sharp top edge moved from 0.108 mm to 0.163 mm
-  because the new cell size puts the samples in a different place relative to that edge. Batch
-  1's code on the same grid gives the same 0.163 mm; it is the sampled-model chord ADR-412
-  describes, not a change in contact.
+- The worst dip below the sampled model moved from 0.108 mm to 0.163 mm on the plateau's sharp
+  top edge, and from 0.083 mm to 0.093 mm (normal to the wall) on walls over 45 degrees, because
+  the new cell size puts the samples in a different place relative to those edges. Batch 1's code
+  on the same grid gives the same numbers; they are the sampled-model chord ADR-412 describes,
+  not a change in contact.
 - The finer grid costs compile time only where the request lands just above a tenth of the
   diameter (the cell can be up to twice as fine per axis). Computing only the rows read offsets
   most of it: the slowest finishing compile test (0.1 mm ball, 0.005 mm scallop) takes 3.0 s,
