@@ -182,7 +182,8 @@ describe('PDF writer', () => {
       data: new TextEncoder().encode(pdf.text),
       stopAtErrors: true,
       useWorkerFetch: false,
-      isEvalSupported: false,
+      // No isEvalSupported: pdfjs-dist 6 dropped that option along with its
+      // eval-compiled font paths, so there is no eval left to disable.
     });
     const document = await task.promise;
     try {
