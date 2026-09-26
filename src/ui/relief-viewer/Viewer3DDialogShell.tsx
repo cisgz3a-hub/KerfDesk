@@ -2,7 +2,7 @@
 // surface, cut preview): accessible dialog, canvas, loading / ready / failed
 // state machine, and scene lifecycle (cancel + dispose on unmount).
 
-import { useId, useRef } from 'react';
+import { useId, useRef, useState } from 'react';
 import { Dialog } from '../kit';
 import {
   useViewerDialogScene,
@@ -27,14 +27,14 @@ export function Viewer3DDialogShell(props: {
   // Display-only disclosure such as bounded preview coarsening. Never a gate.
   readonly notice?: string;
   readonly preparationFailure?: string;
-  // A transferred canvas cannot be transferred again. Incrementing this
-  // remounts a fresh element when background preparation yields a new mesh.
-  readonly canvasKey?: number;
+  // A newer surface is being prepared; the current one stays on screen.
+  readonly updating?: boolean;
 }): JSX.Element {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const hintId = useId();
   const { buildScene } = props;
   const state = useViewerDialogScene(buildScene, canvasRef);
+  const canvasGeneration = useCanvasGeneration(buildScene, state);
 
   const visibleState: ViewerDialogState =
     buildScene === null
@@ -59,13 +59,13 @@ export function Viewer3DDialogShell(props: {
         </button>
       </div>
       <canvas
-        key={props.canvasKey}
+        key={canvasGeneration}
         ref={canvasRef}
         width={VIEWER_CANVAS_WIDTH_PX}
         height={VIEWER_CANVAS_HEIGHT_PX}
         aria-label={props.canvasAriaLabel}
         aria-describedby={hintId}
-        aria-busy={visibleState.kind === 'loading'}
+        aria-busy={visibleState.kind === 'loading' || props.updating === true}
         tabIndex={0}
         className="lf-viewer3d-dialog__canvas"
       />
@@ -74,19 +74,42 @@ export function Viewer3DDialogShell(props: {
           {props.notice}
         </p>
       )}
-      <ViewerStateHint id={hintId} state={visibleState} />
+      <ViewerStateHint id={hintId} state={visibleState} updating={props.updating === true} />
     </Dialog>
   );
+}
+
+// A new surface reuses the live canvas and keeps the camera (ADR-425). A
+// transferred canvas cannot be transferred again, so only a failed renderer
+// gets a fresh element, letting the next surface start over.
+function useCanvasGeneration(
+  buildScene: ViewerDialogSceneBuilder | null,
+  state: ReturnType<typeof useViewerDialogScene>,
+): number {
+  const [tracked, setTracked] = useState({ buildScene, generation: 0 });
+  if (tracked.buildScene !== buildScene && buildScene !== null) {
+    const failed = state.value.kind === 'failed' && state.buildScene === tracked.buildScene;
+    setTracked({ buildScene, generation: tracked.generation + (failed ? 1 : 0) });
+  }
+  return tracked.generation;
 }
 
 function ViewerStateHint(props: {
   readonly id: string;
   readonly state: ViewerDialogState;
+  readonly updating: boolean;
 }): JSX.Element {
   if (props.state.kind === 'loading') {
     return (
       <p id={props.id} className="lf-viewer3d-dialog__hint" role="status" aria-live="polite">
         Building the 3D surface…
+      </p>
+    );
+  }
+  if (props.state.kind === 'ready' && props.updating) {
+    return (
+      <p id={props.id} className="lf-viewer3d-dialog__hint" role="status" aria-live="polite">
+        Updating the 3D surface…
       </p>
     );
   }

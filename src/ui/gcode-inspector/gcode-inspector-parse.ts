@@ -18,12 +18,13 @@ export function inspectGcodeText(
   context: GcodeInspectionContext = {},
 ): GcodeInspectorWorkerResult {
   const builder = createGcodeRenderModelBuilder({
-    ...context,
+    machineKind: context.machineKind,
+    laserPowerControl: context.laserPowerControl,
     retainPreciseSegmentLengths: true,
     renderPressureThreshold: INSPECTOR_RENDER_PRESSURE_THRESHOLD,
   });
   const sourceIndex = indexGcodeTextLines(text, (line) => builder.pushLine(line));
-  return inspectionResult(builder.finish(), sourceIndex);
+  return inspectionResult(builder.finish(), sourceIndex, context);
 }
 
 export async function inspectGcodeSource(
@@ -42,14 +43,15 @@ export async function inspectGcodeSource(
     (line) => builder.pushLine(line),
     onProgress,
   );
-  return inspectionResult(builder.finish(), sourceIndex);
+  return inspectionResult(builder.finish(), sourceIndex, source);
 }
 
 function inspectionResult(
   parsed: BuildRenderModelResult,
   sourceIndex: GcodeSourceLineIndex,
+  context: GcodeInspectionContext,
 ): GcodeInspectorWorkerResult {
   const base = { sourceIndex, sourceLineCount: sourceIndex.starts.length };
   if (parsed.kind === 'error') return { ...base, parsed, analysis: null };
-  return { ...base, parsed, analysis: analyzeGcodeModel(parsed.model) };
+  return { ...base, parsed, analysis: analyzeGcodeModel(parsed.model, context) };
 }

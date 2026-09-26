@@ -38,10 +38,12 @@ describe('InspectorLensControl', () => {
       expect(text).toContain('Shallow -1.00 mm');
       expect(text).toContain('Deep -2.00 mm');
       expect(view.host.querySelector('[role="img"]')?.getAttribute('aria-label')).toContain(
-        'light blue to muted red',
+        'pale blue to pale red',
       );
       expect(view.host.querySelector<HTMLElement>('[role="img"]')?.style.backgroundImage).toBe(
-        'linear-gradient(to right, rgb(173, 209, 245), rgb(191, 112, 117))',
+        // The colours the lines render (ADR-425), not the theme hexes.
+        'linear-gradient(to right, rgb(215, 234, 250), rgb(217, 225, 241), rgb(218, 217, 230), ' +
+          'rgb(220, 208, 219), rgb(221, 198, 207), rgb(223, 188, 195), rgb(225, 177, 181))',
       );
     } finally {
       view.cleanup();
