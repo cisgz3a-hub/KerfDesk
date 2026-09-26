@@ -27,6 +27,7 @@ import { runTraceSteps, type TraceSteps } from './trace-steps';
 import {
   midCrackChainWithStats,
   traceBoundaryLoops,
+  type BoundaryLoop,
   type CrackSubPixelField,
 } from './contour-boundary';
 import { fairChainSegments } from './fair-chain';
@@ -229,11 +230,22 @@ export function* contourPolylinesFromMaskSteps(
     if (cooperate) yield;
     // Area-based speckle gate — the boundary walker sees paper holes the ink
     // despeckle never touched, so both loop polarities are filtered here.
-    if (Math.abs(loop.area) < options.minAreaPx) continue;
-    const finished = yield* finishLoopSteps(loop.points, finish);
-    if (finished !== null) contours.push(finished);
+    if (!isAdmittedLoop(loop, options.minAreaPx)) continue;
+    // No-orphan invariant (ADR-458 amendment 1): finishing and topology
+    // repair return exactly one ring per admitted loop, with its source
+    // orientation and nesting, so a hole never outlives its outer.
+    contours.push(yield* finishLoopSteps(loop.points, finish));
   }
   return yield* preserveContourTopologySteps(contours);
+}
+
+/** The area policy for boundary loops. A loop that encloses nothing is never
+ *  admitted. Enclosed area shrinks strictly down the nesting (a loop's area
+ *  includes everything inside it), so this rule drops a loop only together
+ *  with every loop nested inside it (ADR-458 amendment 1). */
+export function isAdmittedLoop(loop: BoundaryLoop, minAreaPx: number): boolean {
+  const area = Math.abs(loop.area);
+  return area > 0 && area >= minAreaPx;
 }
 
 type LoopFinish = {
@@ -263,9 +275,8 @@ function featureAnchorsForLoop(
 function* finishLoopSteps(
   staircase: ReadonlyArray<Polyline['points'][number]>,
   finish: LoopFinish,
-): TraceSteps<FinishedContour | null> {
+): TraceSteps<FinishedContour> {
   const { distSq, width } = finish;
-  if (staircase.length < MIN_LOOP_POINTS) return null;
   // Mid-crack first (lattice steps become ≤45° bends; sub-pixel interpolated
   // when the pre-threshold field is available), then the SAME raw Taubin
   // pre-smoothing the skeleton tracer applies — without it the residual

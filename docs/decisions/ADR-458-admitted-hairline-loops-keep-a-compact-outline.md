@@ -140,3 +140,72 @@ The two beside-a-square tests fail on the first version of this change.
   105/97 points against 21/25 on the native grid), and a hairline attached to broad ink still loses
   width in the tail (ADR-403 remaining gaps). Both need changes to the supersample route or a
   width-aware finishing tolerance, not to this fallback.
+
+### Amendment 1 - No admitted loop is dropped: the no-orphan invariant (2026-09-27)
+
+**Context.** Item 3 of the clean-room Potrace study's action plan asks for this invariant. The
+reports describe Potrace's only drop rule, which removes a path by enclosed area. A nested path
+encloses strictly less area than its container, so every dropped path takes its whole subtree
+with it, and no surviving path is ever orphaned (report R1 sections 2.5 and 2.6, idea level only;
+no Potrace source was read). Our contour lane has more stages than one area rule. If any of them
+lost an admitted outer while its hole survived, the hole would paint as ink under even-odd and
+nonzero fill alike. The audit of this branch found these places where an admitted loop could
+vanish:
+
+- The area gate in `contourPolylinesFromMaskSteps`. It compares each loop's enclosed lattice area
+  with `minAreaPx`, so it is monotone down the nesting, the same property as the reports' rule.
+  One gap: with `minAreaPx` = 0, a loop enclosing nothing would pass it. The walker never produces
+  one.
+- `finishLoopSteps`. Since TR-011 and this ADR, a tail that returns nothing falls back to the crack
+  chain. One `null` remained: a staircase under 3 points. The walker never produces one either, but
+  the call site still filtered `null` out and so could drop a loop silently.
+- Topology repair. It returns one ring per contour, and a ring whose orientation differs from its
+  source is a conflict that backs off to the source. It never drops a ring.
+- Later stages. The SVG serialiser drops closed rings under 3 points or with an area of 1e-6 or
+  less. An admitted loop never gets that small, because topology repair gives any zero-area ring
+  its source back. Edge Detection drops rings by length, but its rings are stroked, not filled.
+
+**Decision.**
+
+- `isAdmittedLoop` (in `contour-trace.ts`) is the area gate: a loop is admitted when it encloses a
+  non-zero area of at least `minAreaPx`. Dropping by this rule removes a loop together with
+  everything nested inside it.
+- `finishLoopSteps` is total. It returns a finished contour for every admitted loop and never
+  `null`: the staircase guard is gone, and every empty tail already goes to the crack-chain
+  fallback above. The call site pushes every result.
+- `contour-no-orphan.test.ts` checks the invariant, "one loop out per loop in", through
+  finishing, the fallback and topology repair. It uses five synthetic nests: an outer with two
+  holes, an island in a hole, a 3 px band around a 1 px slit, 1 px concentric rings three deep, and
+  a 1 px diagonal ring. Each nest runs at 1x with ink or paper connected at saddles and at 2x, and
+  at tolerances from 0.1 to 6 px. The coarse tolerances collapse every sliver to the fallback. For
+  each admitted loop, the test checks that exactly one closed ring comes out, in loop order, with
+  the source orientation and the source nesting depth, and that the orphan count is 0. It also
+  checks that the gate never admits a loop without every loop enclosing it, and it checks that
+  depth parity equals orientation in Line Art, Smooth and Sharp traces of the same nests.
+
+**Measurements.**
+
+- Mutations, each run against the new test:
+  - dropping the loops that reach the fallback (the pre-TR-011 behaviour): 26 cases fail;
+  - topology repair dropping one ring: 64 fail;
+  - a gate that admits holes (or outers) at a quarter of the area: 1 and 2 fail;
+  - admitting zero-area loops: 1 fails.
+- On this ADR's base commit (f0b28de20), the test fails at its import of `isAdmittedLoop`. Its
+  behavioural cases pass there, because the fallback above already covered every reachable
+  collapse.
+- Orphan census (rings whose orientation disagrees with their depth parity), before and after:
+  **0 in all 39 contour rows**. The rows cover the analytic set, noise192, five edge shapes, the
+  owl and the hummingbird in Line Art, Smooth and Sharp. The owl Sharp trace has 10,870 rings.
+- ADR-438-style parity hashes, before and after: **78 of 78 byte-identical**. That is 13 cases
+  (the five analytic fixtures, noise192, five edge shapes, the owl and the hummingbird) in all six
+  presets, serialised canonically with curves and hashed.
+
+**Consequences.**
+
+- The invariant is now stated in the code and pinned by a test, rather than holding by accident.
+  Corridor finishing (action-plan item 13) must keep it.
+- Not addressed here: the artwork exporters (ADR-455, on its own branch). Their PDF and EPS
+  writers paint every closed ring of a painted item as one compound path under the item's fill
+  rule. Their GeoJSON writer groups holes by geometric containment. Neither groups by list order.
+  One GeoJSON caveat is recorded for that branch: a ring that collapses on the export grid is
+  dropped before nesting.
