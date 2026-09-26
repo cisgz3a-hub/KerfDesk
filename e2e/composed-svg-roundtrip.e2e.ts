@@ -1,5 +1,6 @@
 import { readFileSync, writeFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
+import { DEFAULT_EXPORT_PRECISION_MM } from '../src/core/vector-export/decimal-grid';
 import { expect, test } from './fixtures/kerfdesk-test';
 import { clearCanvasProject } from './fixtures/mixed-canvas-project';
 import {
@@ -23,6 +24,16 @@ const fixtures = [
   { name: 'inkscape-clipped-image.svg', objects: 1, images: 1, shouldFit: false },
   { name: 'inkscape-visible-mask.svg', objects: 5, images: 2, shouldFit: true },
 ] as const;
+
+/**
+ * ADR-431 rounds the exported page outward onto the export grid, so each end of
+ * an extent may grow by up to one grid step and the page never shrinks.
+ */
+function expectPageExtentOnGrid(exported: number, source: number): void {
+  const growth = exported - source;
+  expect(growth).toBeGreaterThanOrEqual(-1e-9);
+  expect(growth).toBeLessThanOrEqual(2 * DEFAULT_EXPORT_PRECISION_MM + 1e-9);
+}
 
 function fixtureText(name: string): string {
   return readFileSync(
@@ -55,8 +66,8 @@ for (const fixture of fixtures) {
     expect(workers.some((url) => url.includes('document-import-worker'))).toBe(true);
     const exported = await exportComposedSvg(page, kerfdesk);
     const native = await compareNativeSvg(page, source, exported);
-    expect(native.exportedViewBox[2]).toBeCloseTo(Number(native.sourceViewBox[2]), 7);
-    expect(native.exportedViewBox[3]).toBeCloseTo(Number(native.sourceViewBox[3]), 7);
+    expectPageExtentOnGrid(Number(native.exportedViewBox[2]), Number(native.sourceViewBox[2]));
+    expectPageExtentOnGrid(Number(native.exportedViewBox[3]), Number(native.sourceViewBox[3]));
     expect(native.paintedPixels).toBeGreaterThan(100);
     expect(native.changedFraction).toBeLessThan(0.0001);
     writeFileSync(info.outputPath('exported.svg'), exported);
