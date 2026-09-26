@@ -266,7 +266,11 @@ describe('runMultiFileTrace', () => {
 
     expect(write).toHaveBeenCalledTimes(2);
     expect(writtenFiles).toEqual(['logo-trace.svg', 'logo-2-trace.svg']);
-    expect(pushToast).toHaveBeenCalledWith('Traced 2 images to SVG.', 'success');
+    // The fixtures carry no bytes, so both were sized at the default DPI.
+    expect(pushToast).toHaveBeenCalledWith(
+      'Traced 2 images to SVG. 2 of 2 images had no embedded DPI and were sized at 254 DPI.',
+      'success',
+    );
   });
 
   it('exports physical SVG dimensions from the source image size, not the sampled trace grid', async () => {

@@ -1,13 +1,20 @@
 import { describe, expect, it, vi } from 'vitest';
 import type { ColoredPath } from '../../core/scene';
 import { TRACE_PRESETS, type RawImageData } from '../../core/trace';
-import { buildMultiFileTraceExports, type MultiFileTraceFile } from './multi-file-trace-action';
+import {
+  buildMultiFileTraceExports,
+  runMultiFileTrace,
+  type MultiFileTraceFile,
+} from './multi-file-trace-action';
+import { IMAGE_DENSITY_PROBE_BYTES } from '../common/image-density';
+import { syntheticJpegFile } from '../trace/jpeg-header.test-support';
 import { PREVIEW_MAX_EDGE_PX, scaleToCap } from '../trace/trace-decode-cap';
 import { planTraceCommitGridFor } from '../trace/trace-commit-grid';
 
 // Multi-File Trace sizes each export from the file's EMBEDDED density, read
-// exactly as Import Image reads it (readImageDensity), so a 300 DPI scan
-// exports at its real size instead of the 254 DPI default.
+// with the same parser Import Image uses, so a 300 DPI scan exports at its
+// real size instead of the 254 DPI default. Only a bounded header prefix is
+// read (readImageHeaderDensity), never the whole file.
 
 const SQUARE_PATH: ColoredPath = {
   color: '#000000',
@@ -41,24 +48,38 @@ function pngChunk(type: string, data: number[]): number[] {
 }
 
 // pHYs in pixels per metre (unit 1): 11811 px/m = 300 DPI, 5906 px/m = 150 DPI.
-function pngBytes(phys?: { readonly x: number; readonly y: number }): Uint8Array {
+// ancillaryBytes puts a zTXt chunk of that size ahead of pHYs, where a large
+// metadata block would sit.
+function pngBytes(
+  phys?: { readonly x: number; readonly y: number },
+  ancillaryBytes = 0,
+): Uint8Array<ArrayBuffer> {
   const physChunk = phys === undefined ? [] : pngChunk('pHYs', [...u32(phys.x), ...u32(phys.y), 1]);
-  return new Uint8Array([...PNG_SIG, ...physChunk, ...pngChunk('IDAT', [0])]);
+  const idat = pngChunk('IDAT', [0]);
+  const bytes = new Uint8Array(
+    PNG_SIG.length + ancillaryBytes + 12 + physChunk.length + idat.length,
+  );
+  let offset = 0;
+  const put = (part: ArrayLike<number>): void => {
+    bytes.set(part, offset);
+    offset += part.length;
+  };
+  put(PNG_SIG);
+  put([...u32(ancillaryBytes), ...ascii('zTXt')]);
+  offset += ancillaryBytes;
+  put([0, 0, 0, 0]);
+  put(physChunk);
+  put(idat);
+  return bytes;
 }
 
-function jpegJfifBytes(xDpi: number, yDpi = xDpi): Uint8Array {
+function jpegJfifBytes(xDpi: number, yDpi = xDpi): Uint8Array<ArrayBuffer> {
   const data = [...ascii('JFIF'), 0x00, 1, 2, 1, ...u16(xDpi), ...u16(yDpi), 0, 0];
   return new Uint8Array([0xff, 0xd8, 0xff, 0xe0, ...u16(data.length + 2), ...data, 0xff, 0xd9]);
 }
 
-// jsdom's File has no arrayBuffer(); the batch reads density through it, so
-// the fixture supplies the real bytes the production reader parses.
-function imageFile(name: string, bytes: Uint8Array): MultiFileTraceFile {
-  return {
-    name,
-    size: bytes.byteLength,
-    arrayBuffer: async () => bytes.slice().buffer,
-  } as unknown as MultiFileTraceFile;
+function imageFile(name: string, bytes: Uint8Array<ArrayBuffer>): MultiFileTraceFile {
+  return new File([bytes], name);
 }
 
 function rawImage(width: number, height: number): RawImageData {
@@ -84,7 +105,7 @@ async function exportOne(
   file: MultiFileTraceFile,
   natural: { readonly width: number; readonly height: number },
   grid: { readonly width: number; readonly height: number } = natural,
-): Promise<ReturnType<typeof svgSize>> {
+): Promise<ReturnType<typeof svgSize> & { readonly densitySource: string | undefined }> {
   const files = await buildMultiFileTraceExports([file], {
     loadImage: async () => rawImage(grid.width, grid.height),
     readNaturalSize: async () => natural,
@@ -93,7 +114,7 @@ async function exportOne(
     deviceMemoryGb: 8,
   });
   expect(files).toHaveLength(1);
-  return svgSize(files[0]!.svg);
+  return { ...svgSize(files[0]!.svg), densitySource: files[0]!.densitySource };
 }
 
 describe('Multi-File Trace embedded density', () => {
@@ -130,6 +151,7 @@ describe('Multi-File Trace embedded density', () => {
     const png = await exportOne(imageFile('plain.png', pngBytes()), { width: 1000, height: 500 });
     expect(png.widthMm).toBe(100);
     expect(png.heightMm).toBe(50);
+    expect(png.densitySource).toBe('default');
 
     // An unreadable file (no bytes to parse) falls back the same way.
     const opaque = { name: 'opaque.png', size: 1 } as MultiFileTraceFile;
@@ -198,5 +220,75 @@ describe('Multi-File Trace embedded density', () => {
     const size = svgSize(files[0]!.svg);
     expect(size.widthMm).toBeCloseTo(25.4, 6);
     expect(size.heightMm).toBeCloseTo(12.7, 6);
+  });
+
+  it('pairs an EXIF-rotated JPEG with its swapped JFIF densities', async () => {
+    // Stored 600 x 200 at 200 DPI across, 100 DPI down; Orientation 6 turns
+    // it upright to 200 x 600, so across is now 100 DPI and down 200 DPI.
+    const file = syntheticJpegFile({
+      width: 600,
+      height: 200,
+      jfifDpi: { x: 200, y: 100 },
+      orientation: 6,
+    });
+    const size = await exportOne(file, { width: 200, height: 600 });
+
+    // 200 px / 100 DPI = 50.8 mm; 600 px / 200 DPI = 76.2 mm. Unswapped
+    // densities would give 25.4 x 152.4 mm.
+    expect(size.widthMm).toBeCloseTo(50.8, 6);
+    expect(size.heightMm).toBeCloseTo(76.2, 6);
+    expect(size.densitySource).toBe('embedded');
+  });
+
+  it('reads density from a bounded header prefix, not the whole file', async () => {
+    // A pHYs behind 512 KiB of metadata is still inside the prefix.
+    const file = imageFile('meta.png', pngBytes({ x: 11811, y: 11811 }, 512 * 1024));
+    const slice = vi.spyOn(file, 'slice');
+    const arrayBuffer = vi.fn(async () => {
+      throw new Error('the whole file must not be read');
+    });
+    Object.defineProperty(file, 'arrayBuffer', { value: arrayBuffer });
+
+    const size = await exportOne(file, { width: 1200, height: 600 });
+
+    expect(size.widthMm).toBeCloseTo(101.6, 6);
+    expect(size.densitySource).toBe('embedded');
+    expect(slice).toHaveBeenCalledWith(0, IMAGE_DENSITY_PROBE_BYTES);
+    expect(arrayBuffer).not.toHaveBeenCalled();
+  });
+
+  it('falls back to the default when pHYs lies beyond the header prefix', async () => {
+    const bytes = pngBytes({ x: 11811, y: 11811 }, IMAGE_DENSITY_PROBE_BYTES);
+    const size = await exportOne(imageFile('huge-meta.png', bytes), { width: 1000, height: 500 });
+    expect(size.widthMm).toBe(100);
+    expect(size.densitySource).toBe('default');
+  });
+
+  it('tells the operator which written files fell back to the default DPI', async () => {
+    const run = async (files: ReadonlyArray<MultiFileTraceFile>) => {
+      const pushToast = vi.fn();
+      await runMultiFileTrace(files, pushToast, {
+        loadImage: async () => rawImage(10, 10),
+        trace: async () => [SQUARE_PATH],
+        write: async () => true,
+      });
+      return pushToast;
+    };
+    const scan = () => imageFile('scan.png', pngBytes({ x: 11811, y: 11811 }));
+    const plain = () => imageFile('plain.png', pngBytes());
+
+    expect(await run([scan(), plain(), plain()])).toHaveBeenCalledWith(
+      'Traced 3 images to SVG. 2 of 3 images had no embedded DPI and were sized at 254 DPI.',
+      'success',
+    );
+    expect(await run([scan(), plain()])).toHaveBeenCalledWith(
+      'Traced 2 images to SVG. 1 of 2 images had no embedded DPI and was sized at 254 DPI.',
+      'success',
+    );
+    expect(await run([plain()])).toHaveBeenCalledWith(
+      'Traced 1 image to SVG. It had no embedded DPI, so it was sized at 254 DPI.',
+      'success',
+    );
+    expect(await run([scan()])).toHaveBeenCalledWith('Traced 1 image to SVG.', 'success');
   });
 });
