@@ -4,7 +4,7 @@
 // `restoreTraceSettings` turns a recorded (possibly older, newer or hand-edited)
 // snapshot back into dialog state, keeping only what this build can honour.
 
-import type { TraceSettingsRecord, TraceSettingsValue } from '../../core/scene';
+import type { TraceSettingsRecord, TraceSettingsValue } from '../../core/scene/scene-object';
 import { normalizeTraceBoundary, TRACE_PRESETS, type TraceBoundary } from '../../core/trace';
 import { VISIBLE_TRACE_PRESET_NAMES, type TraceFillStyle, type TraceOutput } from './dialog-parts';
 import type { BoundaryMode } from './region-enhance-trace';

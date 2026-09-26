@@ -11,10 +11,10 @@ import type {
   RasterImage,
   SelectionAnchor,
   ShapeObject,
-  TraceSettingsRecord,
   VariableTemplate,
   Vec2,
 } from '../../core/scene';
+import type { TraceSettingsRecord } from '../../core/scene/scene-object';
 import type { TextAlignment } from '../../core/text';
 import type { MeasureDraft } from '../workspace/measure-tool';
 import { DEFAULT_SNAP_SETTINGS, type SnapGuide, type SnapSettings } from '../workspace/snapping';

@@ -10,8 +10,8 @@ import {
   type RasterImage,
   type SceneObject,
   type TracedImage,
-  type TraceSettingsRecord,
 } from '../../core/scene';
+import type { TraceSettingsRecord } from '../../core/scene/scene-object';
 import { PROJECT_SCHEMA_VERSION } from '../../core/scene/project';
 import { deserializeProject } from './deserialize-project';
 import { prepareProjectForPersistence } from './prepare-project-persistence';

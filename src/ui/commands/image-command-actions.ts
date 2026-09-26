@@ -1,4 +1,5 @@
-import type { Project, RasterImage, TraceSettingsRecord } from '../../core/scene';
+import type { Project, RasterImage } from '../../core/scene';
+import type { TraceSettingsRecord } from '../../core/scene/scene-object';
 import { cropMaskedRasterImage } from '../raster/crop-image';
 import { useStore } from '../state';
 import type { SelectedImageMaskPair } from './image-mask-command-state';

@@ -76,8 +76,6 @@ export type {
   TextAlignment,
   TextObject,
   TracedImage,
-  TraceSettingsRecord,
-  TraceSettingsValue,
   Transform,
   Vec2,
 } from './scene-object';

@@ -2,7 +2,8 @@
 // recorded on the trace being re-traced (ADR-408) or from the defaults.
 
 import { useMemo, useState } from 'react';
-import type { RasterImage, TraceSettingsRecord } from '../../core/scene';
+import type { RasterImage } from '../../core/scene';
+import type { TraceSettingsRecord } from '../../core/scene/scene-object';
 import type { TraceOptions } from '../../core/trace';
 import type { TraceFillStyle, TraceOutput } from './dialog-parts';
 import { mergeLightBurnTraceSettings, type LightBurnTraceSettingOverrides } from './trace-options';

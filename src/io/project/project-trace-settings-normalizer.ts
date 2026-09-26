@@ -1,4 +1,4 @@
-import type { TraceSettingsRecord, TraceSettingsValue } from '../../core/scene';
+import type { TraceSettingsRecord, TraceSettingsValue } from '../../core/scene/scene-object';
 import { isObject } from './project-shape-primitives';
 
 // ADR-408: recorded Trace dialog settings are Re-trace convenience metadata,

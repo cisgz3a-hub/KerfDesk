@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import type { TraceSettingsRecord } from '../../core/scene';
+import type { TraceSettingsRecord } from '../../core/scene/scene-object';
 import type { LightBurnTraceSettingOverrides } from './trace-options';
 import { captureTraceSettings, restoreTraceSettings } from './trace-settings-snapshot';
 
