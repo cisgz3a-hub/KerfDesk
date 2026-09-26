@@ -13,7 +13,7 @@ import type { CrackSubPixelField } from './saddle-connectivity';
 type Inside = (x: number, y: number) => boolean;
 
 // Box-filtered (anti-aliased) raster of a shape, thresholded at mid-grey.
-function antiAliased(width: number, height: number, inside: Inside) {
+function antiAliased(width: number, height: number, inside: Inside, threshold = 128) {
   const samples = 16;
   const luma = new Float64Array(width * height);
   const ink = new Uint8Array(width * height);
@@ -27,13 +27,13 @@ function antiAliased(width: number, height: number, inside: Inside) {
       }
       const value = Math.round(255 - (covered / samples ** 2) * 255);
       luma[y * width + x] = value;
-      ink[y * width + x] = value < 128 ? 1 : 0;
+      ink[y * width + x] = value < threshold ? 1 : 0;
     }
   }
   const field: CrackSubPixelField = {
     lumaAt: (x, y) =>
       x < 0 || y < 0 || x >= width || y >= height ? 255 : (luma[y * width + x] as number),
-    thresholdAt: () => 128,
+    thresholdAt: () => threshold,
   };
   return { ink, field };
 }
@@ -71,9 +71,17 @@ function enlarged(width: number, height: number, inside: Inside, scale: number) 
 
 // Corner apexes (source px) the dial decides on every measured loop of the
 // raster, traced at `scale` times the source's resolution.
-function measuredCorners(width: number, height: number, inside: Inside, scale = 1): Vec2[] {
+function measuredCorners(
+  width: number,
+  height: number,
+  inside: Inside,
+  scale = 1,
+  threshold = 128,
+): Vec2[] {
   const { ink, field } =
-    scale === 1 ? antiAliased(width, height, inside) : enlarged(width, height, inside, scale);
+    scale === 1
+      ? antiAliased(width, height, inside, threshold)
+      : enlarged(width, height, inside, scale);
   const apexes: Vec2[] = [];
   for (const loop of traceBoundaryLoops({ width: width * scale, height: height * scale, ink })) {
     const crack = midCrackChainWithStats(loop.points, field);
@@ -150,6 +158,24 @@ describe('decideContourCorners on measured (anti-aliased) loops', () => {
     ] as const) {
       expect(nearest(measuredCorners(60, 60, wedge(0, degrees, tip), 2), tip)).toBeLessThan(0.15);
     }
+  });
+
+  it('keeps every corner of an anti-aliased rectangle thresholded off half coverage', () => {
+    // Sharp and Smooth threshold by Otsu: 97 of 255 on this rectangle. The
+    // iso-line then sits ~0.12 px inside every edge and the bottom-left corner
+    // stood 0.704 px off its chain: the plain allowance dropped it (Smooth
+    // traced three corners). The remaining error is that edge inset.
+    const x0 = 37.3;
+    const y0 = 23.6;
+    const truth = [
+      { x: x0, y: y0 },
+      { x: x0 + 100, y: y0 },
+      { x: x0 + 100, y: y0 + 60 },
+      { x: x0, y: y0 + 60 },
+    ];
+    const inside: Inside = (x, y) => x > x0 && x < x0 + 100 && y > y0 && y < y0 + 60;
+    const apexes = measuredCorners(200, 120, inside, 1, 97);
+    for (const p of truth) expect(nearest(apexes, p)).toBeLessThan(0.4);
   });
 
   it('does not extrapolate a filleted tip to the sharp apex its legs meet at', () => {

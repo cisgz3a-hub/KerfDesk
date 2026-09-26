@@ -61,14 +61,26 @@ stages. Taubin pre-smoothing ran before all of them. Measured on the base:
    chain (binary loops 0.9 + 0.5 / sin), and reject an apex whose swapped region contains a source
    pixel centre, since the chain is the field's own iso-line. A box filter rounds a true corner
    further than that: its half-coverage iso-line recedes 0.25 / tan(interior / 2) px from the apex,
-   and the crack chord near the tip cuts up to 0.3 / sin(interior / 2) px more. An apex out to that
-   allowance, or over a pixel centre, stands only when the pre-threshold field confirms it
-   (`contour-corner-field.ts`): the box-filtered wedge the two legs bound must predict each source
-   pixel's coverage within 0.2 (mean 0.05) over the pixels within 2 px of the apex, with paper and
-   ink levels read 1.25 px off each leg. A rounded or organic tip leaves paper where the wedge
-   predicts ink and a neighbouring outline adds ink, so neither passes. In selection, a measured leg
-   of at least 3 x 3 cracks is trimmed by one more crack at its far end: a turn stop can sit one
-   crack past an anti-aliased tip's peak, so the next corner's leg wraps round that tip.
+   and the crack chord near the tip cuts up to 0.3 / sin(interior / 2) px more. A threshold off half
+   coverage (Otsu puts Sharp and Smooth at 97 of 255 on the anti-aliased calibration rectangle)
+   recedes the tip a little further, so the allowance takes another 0.1 / sin(interior / 2) px. An
+   apex out to that allowance, or over a pixel centre, stands only when the pre-threshold field
+   confirms it (`contour-corner-field.ts`): the box-filtered wedge the two legs bound must predict
+   each source pixel's coverage within 0.2 (mean 0.05) over the pixels within 2 px of the apex, with
+   paper and ink levels read 1.25 px off each leg. Each leg is first moved onto the drawn edge its
+   field profile implies (the coverage integral across the leg, 2 px either side), so an iso-line
+   off half coverage still matches. On a supersampled field (Line Art and Smooth trace small
+   sources at 2x through the pixel-centre bilinear enlargement) each field pixel is compared with
+   the same bilinear blend of the source pixels' box coverages, and the levels are read 1 source px
+   further off. A rounded or organic tip leaves paper where the wedge predicts ink and a
+   neighbouring outline adds ink, so most organic candidates fail: on the owl, 641 of 24420 field
+   checks confirm on Line Art (2.6 %), 1455 of 56574 on Sharp and 640 of 23627 on Smooth; on the
+   hummingbird 141 of 11506, 447 of 32160 and 138 of 11345. Those that pass do change the output. The check needs 48 luma of paper-to-ink
+   contrast; paler art (the same anti-aliased wedge in luma 210 ink on 255 paper) is never
+   confirmed and keeps the tight allowance, as before this amendment. In selection, a measured leg
+   at least 3 x (2 + 1) source-pixel lengths of cracks long (9 cracks at 1x, 18 at 2x) is trimmed by
+   one source pixel's length of cracks at its far end: a turn stop can sit one crack past an
+   anti-aliased tip's peak, so the next corner's leg wraps round that tip.
 4. **Pixel-exact contacts.** An exact apex on a lattice vertex where ink touches only diagonally is
    moved 1/128 px into its own corner, so the topology repair does not strip the corners of two
    touching sprite pixels.
@@ -184,10 +196,32 @@ straightness gate (contour-straightness.test) and the jittered-ring roundness ga
     hummingbird, outer, hole and component counts are unchanged, and IoU moves by at most -0.0001.
     Their reference is the rounded 0.5 iso-contour, which a true corner overshoots by design.
     The allowance alone, without the field check, cost up to 0.0036 IoU there and raised the owl
-    Line Art's first-round topology conflicts from 75 to 190.
-  - Scanned (noisy) variants gain less: stars.scan keeps 2.392 px with 3 spurious corners (2
-    before), stars-lowres.scan 2.407 px with 4, and rounded-rects.scan 0.841 -> 0.803. Scan noise
-    makes the field check miss its thresholds, so a noisier candidate inside the tight standoff wins.
-    With a looser check (0.25, mean 0.08), those fixtures have 0 extra spurious corners, but the owl
-    loses up to 0.0005 IoU.
+    Line Art's first-round topology conflicts from 75 to 190. With the field check they are 75 -> 77
+    (Line Art), 3025 -> 3028 (Sharp) and 68 -> 69 (Smooth) on the owl, 68 -> 67, 1877 -> 1876 and
+    62 -> 61 on the hummingbird (tight allowance only -> this design, same code otherwise).
+  - Sharp and Smooth: the sub-pixel calibration rectangle goes 0.633 / 0.664 -> 0.386 px (main
+    0.386), the 100x20 bar 0.633 / 0.730 -> 0.348 and the 100x8 bar 0.633 / 0.704 -> 0.306;
+    rounded-rects.clean stays 0.155. The remaining 0.39 px is the Otsu iso-line's edge inset, not a
+    corner decision.
+  - Side effects on the calibration bars (Line Art, before this amendment -> after): each edge is
+    now the line between two apexes, so apex bias moves the whole edge. calibration-subpixel-aa IoU
+    0.9965 -> 0.9951, mean deviation 0.066 -> 0.093 px (Hausdorff 0.752 -> 0.126);
+    calibration-thin-100x20-aa 0.9906 -> 0.9888, 0.080 -> 0.094 (0.818 -> 0.126);
+    calibration-thin-100x8-aa 0.9812 -> 0.9716, 0.072 -> 0.107 (0.968 -> 0.250). Sharp and Smooth
+    improve on all three. counter-letters.clean moves 0.9684 -> 0.9677 IoU on Line Art (apex error
+    unchanged). Follow-up: fit the legs without the cracks nearest the tip, which the anti-aliased
+    rounding pulls inward, so apex-to-apex edges keep the chain's ~0.07 px accuracy.
+  - Scanned (noisy) variants gain less, and several stay behind main. Line Art, main -> this
+    change (Potrace in brackets): rounded-rects.scan 0.037 -> 0.828 px (0.801), so the lead
+    over Potrace is gone there; shallow-edges.scan 0.097 -> 1.106 (0.910), so it now trails
+    Potrace; stars.scan 2.392 px with 2 spurious corners (main 1); stars-lowres.scan
+    2.251 -> 2.350 px with 3 spurious corners (the dial parent: 3). Sharp and Smooth recover
+    rounded-rects.scan to 0.108 px (dial parent 0.718 / 0.834). Scan noise makes the field check
+    miss its thresholds, so a noisier candidate inside the tight standoff wins. With a looser check
+    (0.25, mean 0.08), those fixtures have 0 extra spurious corners, but the owl loses up to 0.0005
+    IoU. So the apex lead over Potrace is back on clean anti-aliased art in every preset, but not on
+    scans.
+  - Sharp's spurious corners on text, dial parent -> this change: text-large.clean 11 -> 13,
+    text-lowres.scan 31 -> 33, text-lowres.clean 18 -> 17, counter-letters.scan 3 -> 2; the other
+    text fixtures are equal.
   - Discs of radius 8 px or less can still take 1 to 4 corners at s = 0.45 to 0.75.

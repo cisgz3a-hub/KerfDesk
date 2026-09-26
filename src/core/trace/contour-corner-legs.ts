@@ -49,11 +49,17 @@ const APEX_STANDOFF_ACUTE_PX = 0.5;
 // gives organic tips on the owl and hummingbird apexes that cut into their
 // neighbours (first-round topology conflicts 75 -> 190 on the owl's Line Art),
 // so an apex past the tight allowance, the one tuned against those conflicts,
-// must also be confirmed by the field (contour-corner-field.ts).
+// must also be confirmed by the field (contour-corner-field.ts). A threshold
+// off half coverage (Otsu puts Sharp and Smooth at 97 of 255 on an
+// anti-aliased rectangle) moves the iso-line and the chord through the tip
+// cracks a little further off: the calibration rectangle's corner stood
+// 0.704 px off against the 0.674 px allowance, so the loose allowance takes a
+// further 0.1 / sin(A / 2). Only the field's confirmation lets such an apex in.
 const APEX_STANDOFF_MEASURED_BASE_PX = 0.3;
 const APEX_STANDOFF_MEASURED_ACUTE_PX = 0.15;
 const APEX_STANDOFF_MEASURED_FILTER_PX = 0.25;
 const APEX_STANDOFF_MEASURED_SAMPLING_PX = 0.3;
+const APEX_STANDOFF_MEASURED_LEVEL_PX = 0.1;
 // Weight of the one-circle model's excess RMS residual over the two-leg
 // model's in the cost cap (see header).
 const ARC_EXCESS_WEIGHT = 10;
@@ -283,7 +289,7 @@ function legCorner(
   if (back.count + ahead.count + skip > n) return null;
   const meeting = legMeeting(pts, a, skip, back, ahead, scale, measured);
   if (meeting === null) return null;
-  const { apex, turn, confirm } = meeting;
+  const { apex, turn } = meeting;
   const b = (a + 1 + skip) % n;
   const farBack = pts[(((a - back.count + 1) % n) + n) % n] as Vec2;
   const farAhead = pts[(b + ahead.count - 1) % n] as Vec2;
@@ -300,7 +306,7 @@ function legCorner(
   const legRms = Math.sqrt((back.residualSq + ahead.residualSq) / (back.count + ahead.count));
   const cost = Math.min(filletGap, ARC_EXCESS_WEIGHT * Math.max(0, arcRms - legRms)) / scale;
   if (cost <= thresholdPx) return null;
-  if (measured && !measuredApexStands(pts, a, skip, apex, back, ahead, scale, confirm, field)) {
+  if (measured && !measuredApexStands(pts, a, skip, apex, back, ahead, scale, meeting, field)) {
     return null;
   }
   return { from: a, skip, apex, cost, legBack: back.count, legAhead: ahead.count };
@@ -316,12 +322,20 @@ function measuredApexStands(
   back: Leg,
   ahead: Leg,
   scale: number,
-  confirm: boolean,
+  meeting: LegMeeting,
   field: CrackSubPixelField | undefined,
 ): boolean {
-  if (!confirm && !claimsPixelCentre(pts, a, skip, apex, scale)) return true;
-  return field !== undefined && fieldConfirmsWedge(wedgeFieldFit(field, apex, back, ahead, scale));
+  if (!meeting.confirm && !claimsPixelCentre(pts, a, skip, apex, scale)) return true;
+  if (field === undefined) return false;
+  return fieldConfirmsWedge(wedgeFieldFit(field, apex, back, ahead, scale));
 }
+
+type LegMeeting = {
+  readonly apex: Vec2;
+  readonly turn: number;
+  /** The apex stands past the tight allowance: the field must confirm it. */
+  readonly confirm: boolean;
+};
 
 // Where the two legs meet, if they form a corner there: a well-conditioned
 // intersection past the incoming leg's end and before the outgoing leg's
@@ -335,7 +349,7 @@ function legMeeting(
   ahead: Leg,
   scale: number,
   measured: boolean,
-): { readonly apex: Vec2; readonly turn: number; readonly confirm: boolean } | null {
+): LegMeeting | null {
   const turn = Math.atan2(
     back.dx * ahead.dy - back.dy * ahead.dx,
     back.dx * ahead.dx + back.dy * ahead.dy,
@@ -364,7 +378,7 @@ function legMeeting(
   const half = Math.max(0.05, interior / 2);
   const loose =
     (APEX_STANDOFF_MEASURED_FILTER_PX / Math.tan(half) +
-      APEX_STANDOFF_MEASURED_SAMPLING_PX / Math.sin(half)) *
+      (APEX_STANDOFF_MEASURED_SAMPLING_PX + APEX_STANDOFF_MEASURED_LEVEL_PX) / Math.sin(half)) *
     scale;
   if (dist > Math.max(tight, loose)) return null;
   return { apex, turn, confirm: dist > tight };

@@ -100,6 +100,21 @@ describe('wedgeFieldFit', () => {
     expect(fieldConfirmsWedge(fit)).toBe(true);
   });
 
+  it('confirms legs on an iso-line off half coverage (an Otsu threshold)', () => {
+    // Otsu at 97 of 255 puts the iso-line ~0.12 px inside the ink; the legs
+    // run parallel to the drawn edges, 0.15 px in, and meet further in.
+    const inset = 0.15;
+    const moveIn = (l: WedgeLine): WedgeLine => ({
+      ...l,
+      cx: l.cx - l.dy * inset,
+      cy: l.cy + l.dx * inset,
+    });
+    const apex = { x: APEX.x + inset / Math.sin(HALF), y: APEX.y };
+    const fit = wedgeFieldFit(boxFiltered(inWedge), apex, moveIn(back), moveIn(ahead), 1);
+    expect(fit?.max).toBeLessThan(0.1);
+    expect(fieldConfirmsWedge(fit)).toBe(true);
+  });
+
   it('cannot judge a field without paper-to-ink contrast', () => {
     const flat: CrackSubPixelField = { lumaAt: () => 128, thresholdAt: () => 128 };
     expect(wedgeFieldFit(flat, APEX, back, ahead, 1)).toBeNull();

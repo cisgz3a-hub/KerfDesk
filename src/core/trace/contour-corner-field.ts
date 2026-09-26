@@ -30,6 +30,15 @@ const LEVEL_OFFSET_PX = 1.25;
 const LEVEL_INTERPOLATION_REACH_PX = 1;
 // Below this paper-to-ink contrast (luma) the coverage estimate is noise.
 const MIN_CONTRAST_LUMA = 48;
+// Each leg's drawn edge is found from the coverage integral of the field
+// profile this far (source px) either side of the leg, across it...
+const EDGE_PROFILE_PX = 2;
+const EDGE_PROFILE_STEP_PX = 0.25;
+// ...clear by this much (a pixel box's half-diagonal) of the other leg's edge.
+const EDGE_PROFILE_CLEARANCE_PX = 0.75;
+// A leg further than this from the edge its profile implies is not the
+// iso-line of a straight edge; it is compared where it lies.
+const MAX_EDGE_SHIFT_PX = 0.5;
 // Field pixels whose centres lie within this box (source px) round the apex
 // are compared.
 const WINDOW_PX = 2;
@@ -74,9 +83,15 @@ export function wedgeFieldFit(
   ink /= 2;
   const contrast = paper - ink;
   if (!(contrast >= MIN_CONTRAST_LUMA)) return null;
-  const coverage = sourceCoverage(apex, back, ahead, scale);
-  const ax = apex.x / scale;
-  const ay = apex.y / scale;
+  // The iso-line runs parallel to the drawn edge but off it whenever the
+  // threshold is not midway between paper and ink (Otsu on Sharp and Smooth
+  // put it at 97 of 255 on an anti-aliased rectangle, ~0.12 px inside the
+  // ink). The wedge is compared where the field puts the edges; the apex the
+  // dial draws stays the legs' own meeting point.
+  const edge = drawnEdgeApex(field, apex, back, ahead, scale, paper, contrast);
+  const coverage = sourceCoverage(edge, back, ahead, scale);
+  const ax = edge.x / scale;
+  const ay = edge.y / scale;
   let max = 0;
   let sum = 0;
   let count = 0;
@@ -99,6 +114,67 @@ export function wedgeFieldFit(
     }
   }
   return count === 0 ? null : { max, mean: sum / count };
+}
+
+// Where the legs meet once each is moved onto the drawn edge its field
+// profile implies (field px). A leg whose profile would reach the other leg's
+// edge borrows that leg's shift; with neither, the apex stays.
+function drawnEdgeApex(
+  field: CrackSubPixelField,
+  apex: Vec2,
+  back: WedgeLine,
+  ahead: WedgeLine,
+  scale: number,
+  paper: number,
+  contrast: number,
+): Vec2 {
+  const shiftBack = edgeShift(field, back, ahead, scale, paper, contrast);
+  const shiftAhead = edgeShift(field, ahead, back, scale, paper, contrast);
+  const eb = (Number.isNaN(shiftBack) ? shiftAhead : shiftBack) * scale;
+  const ea = (Number.isNaN(shiftAhead) ? shiftBack : shiftAhead) * scale;
+  const det = back.dx * ahead.dy - back.dy * ahead.dx;
+  if (Number.isNaN(eb) || Math.abs(det) < 1e-6) return apex;
+  // Solve n_back . v = eb and n_ahead . v = ea with n = (-dy, dx).
+  const vx = (eb * ahead.dx - ea * back.dx) / det;
+  const vy = (eb * ahead.dy - ea * back.dy) / det;
+  return { x: apex.x + vx, y: apex.y + vy };
+}
+
+// How far (source px, towards the ink) the drawn edge lies from the leg: the
+// profile across the leg covers R - e of its 2R length with ink when the edge
+// is e past the leg, whatever the filter's ramp. NaN when the profile would
+// reach the other leg's edge or the shift is too large to be an offset.
+function edgeShift(
+  field: CrackSubPixelField,
+  leg: WedgeLine,
+  other: WedgeLine,
+  scale: number,
+  paper: number,
+  contrast: number,
+): number {
+  const reach = EDGE_PROFILE_PX + (scale > 1 ? LEVEL_INTERPOLATION_REACH_PX : 0);
+  const clear = Math.abs(other.dx * (leg.cy - other.cy) - other.dy * (leg.cx - other.cx)) / scale;
+  if (!(clear > reach + EDGE_PROFILE_CLEARANCE_PX)) return Number.NaN;
+  const coverageAt = (t: number): number => {
+    const seen =
+      (paper - fieldLuma(field, leg.cx - leg.dy * t * scale, leg.cy + leg.dx * t * scale)) /
+      contrast;
+    return Math.min(1, Math.max(0, seen));
+  };
+  let covered = 0;
+  const steps = Math.round((2 * reach) / EDGE_PROFILE_STEP_PX);
+  for (let i = 0; i <= steps; i += 1) {
+    const weight = i === 0 || i === steps ? 0.5 : 1;
+    covered += weight * coverageAt(-reach + i * EDGE_PROFILE_STEP_PX);
+  }
+  const shift = reach - covered * EDGE_PROFILE_STEP_PX;
+  return Math.abs(shift) <= MAX_EDGE_SHIFT_PX ? shift : Number.NaN;
+}
+
+// The field's luma at a continuous point (field px), bilinear between pixel
+// centres.
+function fieldLuma(field: CrackSubPixelField, x: number, y: number): number {
+  return bilinear((px, py) => field.lumaAt(px, py), x - 0.5, y - 0.5);
 }
 
 // The wedge's box coverage of each SOURCE pixel near the apex, memoised.
