@@ -11,6 +11,7 @@ import { CalibrationSetupStep } from './CalibrationSetupStep';
 import { EngravingStep, PhotoStep } from './CalibrationPhotoSteps';
 import { CalibrationResultStep } from './CalibrationResultStep';
 import { useCameraCalibrationStore, type CalibrationStep } from './camera-calibration-store';
+import { useCalibrationPhoto, type CalibrationPhotoControls } from './use-calibration-photo';
 
 const STEP_LABELS: ReadonlyArray<{
   readonly kinds: ReadonlyArray<CalibrationStep['kind']>;
@@ -31,6 +32,8 @@ function OpenWizard(): JSX.Element {
   const minimized = useCameraCalibrationStore((s) => s.minimized);
   const closeWizard = useCameraCalibrationStore((s) => s.closeWizard);
   const toggleMinimized = useCameraCalibrationStore((s) => s.toggleMinimized);
+  // The request outlives the step's modal/non-modal presentation when minimized.
+  const photo = useCalibrationPhoto();
   return (
     <CameraWizardFrame
       title="Calibrate camera"
@@ -50,12 +53,15 @@ function OpenWizard(): JSX.Element {
           ))}
         </div>
       )}
-      <StepBody step={step} />
+      <StepBody step={step} photo={photo} />
     </CameraWizardFrame>
   );
 }
 
-function StepBody(props: { readonly step: CalibrationStep }): JSX.Element {
+function StepBody(props: {
+  readonly step: CalibrationStep;
+  readonly photo: CalibrationPhotoControls;
+}): JSX.Element {
   const { step } = props;
   switch (step.kind) {
     case 'setup':
@@ -63,9 +69,9 @@ function StepBody(props: { readonly step: CalibrationStep }): JSX.Element {
     case 'engraving':
       return <EngravingStep started={step.started} earlierJob={step.earlierJob} />;
     case 'photo':
-      return <PhotoStep status={step.status} />;
+      return <PhotoStep status={step.status} take={props.photo.take} cancel={props.photo.cancel} />;
     case 'result':
-      return <CalibrationResultStep result={step.result} />;
+      return <CalibrationResultStep result={step.result} save={props.photo.save} />;
     default:
       return assertNever(step, 'camera calibration step');
   }

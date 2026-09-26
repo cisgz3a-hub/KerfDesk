@@ -6,7 +6,6 @@
 import { cameraModelHeightMm } from '../../../core/camera/model/camera-model-record';
 import type { MarkError } from '../../../core/camera/target/bed-calibration';
 import { useStore } from '../../state';
-import { useCameraStore } from '../../state/camera-store';
 import { calibrationGrade, type CalibrationGrade } from './calibration-result';
 import { useCameraCalibrationStore, type CalibrationResult } from './camera-calibration-store';
 import { RgbaCanvas } from './RgbaCanvas';
@@ -18,18 +17,14 @@ const HEIGHT_ADVICE_SIGMA_MM = 10;
 const GOOD_RING_MM = 0.25;
 const FAIR_RING_MM = 0.6;
 
-export function CalibrationResultStep(props: { readonly result: CalibrationResult }): JSX.Element {
+export function CalibrationResultStep(props: {
+  readonly result: CalibrationResult;
+  readonly save: (result: CalibrationResult) => void;
+}): JSX.Element {
   const { result } = props;
   const { record } = result;
   const grade = calibrationGrade(record);
   const setStep = useCameraCalibrationStore((s) => s.setStep);
-  const closeWizard = useCameraCalibrationStore((s) => s.closeWizard);
-
-  const save = (): void => {
-    useStore.getState().updateDeviceProfile({ cameraModel: record });
-    useCameraStore.getState().setOverlayVisible(true);
-    closeWizard();
-  };
 
   return (
     <div style={columnStyle}>
@@ -42,7 +37,7 @@ export function CalibrationResultStep(props: { readonly result: CalibrationResul
         <button
           type="button"
           className="lf-btn lf-btn--primary"
-          onClick={save}
+          onClick={() => props.save(result)}
           title="Save this calibration to the machine profile and show the corrected camera on the canvas."
         >
           Save calibration

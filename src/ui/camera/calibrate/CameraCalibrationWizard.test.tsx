@@ -53,12 +53,12 @@ beforeEach(() => {
   vi.mocked(photographTarget).mockReset();
   useCameraCalibrationStore.setState({ settings: DEFAULT_CALIBRATION_SETTINGS });
   useCameraCalibrationStore.getState().openWizard();
-  useCameraStore.setState({ sourceState: { kind: 'idle' }, overlayVisible: false });
+  useCameraStore.setState({ sourceState: { kind: 'idle' }, sourceEpoch: 0, overlayVisible: false });
   useLaserStore.setState({ connection: { kind: 'disconnected' }, streamer: null });
 });
 
-afterEach(() => {
-  useCameraCalibrationStore.getState().closeWizard();
+afterEach(async () => {
+  await act(async () => useCameraCalibrationStore.getState().closeWizard());
 });
 
 describe('camera calibration wizard', () => {
@@ -152,17 +152,22 @@ describe('camera calibration wizard', () => {
 
   it('keeps a rough result saveable and asks for the camera height when the photo could not tell it', async () => {
     const rough = savedCameraModel();
-    useCameraCalibrationStore.getState().setStep({
-      kind: 'result',
+    useCameraStore.setState({ sourceState: { kind: 'live', source } });
+    vi.mocked(photographTarget).mockResolvedValue({
+      kind: 'ok',
       result: result({
         record: { ...rough, accuracy: { ...rough.accuracy, rmsErrorMm: 1.4 } },
         cameraHeightSigmaMm: 60,
       }),
     });
+    useCameraCalibrationStore.getState().setStep({ kind: 'photo', status: { kind: 'idle' } });
     await mountControl(<CameraCalibrationWizard />);
+    await clickControl(document.body, 'Take photo');
     expect(document.body.textContent).toContain('disagree by more than half a millimetre');
     expect(document.body.textContent).toContain('Measure the lens height above the bed');
     expect(control(document.body, 'Save calibration').disabled).toBe(false);
+    await clickControl(document.body, 'Save calibration');
+    expect(useStore.getState().project.device.cameraModel?.accuracy.rmsErrorMm).toBe(1.4);
   });
 
   it('keeps a field being retyped instead of snapping back, and treats an empty camera height as not measured', async () => {
@@ -180,6 +185,114 @@ describe('camera calibration wizard', () => {
     expect(useCameraCalibrationStore.getState().settings.cameraHeightMm).toBeNull();
   });
 });
+
+describe('camera calibration photo ownership', () => {
+  it.each(['document', 'profile', 'source', 'source-round-trip', 'settings'] as const)(
+    'retires a pending photo when its %s changes',
+    async (change) => {
+      const pending = await takePendingPhoto();
+      await act(async () => changePhotoContext(change));
+      const before = useStore.getState();
+      expect(pending.signal.aborted).toBe(true);
+      expect(useCameraCalibrationStore.getState().step).toEqual({
+        kind: 'photo',
+        status: { kind: 'idle' },
+      });
+      await pending.finish();
+      expect(useCameraCalibrationStore.getState().step.kind).toBe('photo');
+      expect(useStore.getState().project).toBe(before.project);
+      expect(useStore.getState().undoStack).toBe(before.undoStack);
+      expect(useCameraStore.getState().overlayVisible).toBe(false);
+    },
+  );
+
+  it('does not save an old result after the profile changes, even before React updates the button', async () => {
+    const pending = await takePendingPhoto();
+    await pending.finish();
+    const save = control(document.body, 'Save calibration');
+    let afterChange = useStore.getState();
+    await act(async () => {
+      useStore.getState().updateDeviceProfile({ bedWidth: 800, bedHeight: 600 });
+      afterChange = useStore.getState();
+      save.click();
+    });
+    expect(useStore.getState().project).toBe(afterChange.project);
+    expect(useStore.getState().undoStack).toBe(afterChange.undoStack);
+    expect(useStore.getState().project.device.cameraModel).toBeUndefined();
+    expect(useCameraStore.getState().overlayVisible).toBe(false);
+    expect(useCameraCalibrationStore.getState().open).toBe(true);
+    expect(useCameraCalibrationStore.getState().step.kind).toBe('photo');
+  });
+
+  it('keeps the same pending photo across minimize and expand, then saves it', async () => {
+    const pending = await takePendingPhoto();
+    await clickControl(document.body, 'Minimize');
+    expect(pending.signal.aborted).toBe(false);
+    await clickControl(document.body, 'Expand');
+    expect(pending.signal.aborted).toBe(false);
+    await pending.finish();
+    await clickControl(document.body, 'Save calibration');
+    expect(useStore.getState().project.device.cameraModel).toEqual(savedCameraModel());
+    expect(photographTarget).toHaveBeenCalledOnce();
+  });
+
+  it.each(['cancel', 'close'] as const)(
+    'drops a delayed result after %s and keeps the newer review',
+    async (action) => {
+      const old = await takePendingPhoto();
+      await clickControl(document.body, action === 'cancel' ? 'Cancel' : 'Close Calibrate camera');
+      if (action === 'close') {
+        await act(async () => useCameraCalibrationStore.getState().openWizard());
+        await clickControl(document.body, 'Target already engraved');
+      }
+      vi.mocked(photographTarget).mockResolvedValueOnce({ kind: 'ok', result: result() });
+      await clickControl(document.body, 'Take photo');
+      const newer = useCameraCalibrationStore.getState().step;
+      expect(newer.kind).toBe('result');
+      await old.finish();
+      expect(old.signal.aborted).toBe(true);
+      expect(useCameraCalibrationStore.getState().step).toBe(newer);
+      await clickControl(document.body, 'Save calibration');
+      expect(useStore.getState().project.device.cameraModel).toEqual(savedCameraModel());
+    },
+  );
+});
+
+async function takePendingPhoto() {
+  let resolve!: (outcome: Awaited<ReturnType<typeof photographTarget>>) => void;
+  vi.mocked(photographTarget).mockReturnValueOnce(
+    new Promise((done) => {
+      resolve = done;
+    }),
+  );
+  useCameraStore.setState({ sourceState: { kind: 'live', source } });
+  useCameraCalibrationStore.getState().setStep({ kind: 'photo', status: { kind: 'idle' } });
+  await mountControl(<CameraCalibrationWizard />);
+  await clickControl(document.body, 'Take photo');
+  return {
+    signal: vi.mocked(photographTarget).mock.calls[0]![0].signal!,
+    finish: async () => {
+      await act(async () => resolve({ kind: 'ok', result: result() }));
+    },
+  };
+}
+
+function changePhotoContext(
+  change: 'document' | 'profile' | 'source' | 'source-round-trip' | 'settings',
+): void {
+  if (change === 'document') useStore.getState().newProject();
+  if (change === 'profile')
+    useStore.getState().updateDeviceProfile({ bedWidth: 800, bedHeight: 600 });
+  if (change === 'source')
+    useCameraStore.setState({ sourceEpoch: 1, sourceState: { kind: 'idle' } });
+  if (change === 'source-round-trip') {
+    const original = useCameraStore.getState().sourceState;
+    useCameraStore.setState({ sourceState: { kind: 'idle' } });
+    useCameraStore.setState({ sourceState: original });
+  }
+  if (change === 'settings')
+    useCameraCalibrationStore.getState().updateSettings({ sheetThicknessMm: 10 });
+}
 
 async function typeInto(input: HTMLInputElement, value: string): Promise<void> {
   await act(async () => {

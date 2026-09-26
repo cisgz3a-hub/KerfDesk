@@ -2,13 +2,11 @@
 // engrave, then take the one photo. The photo is fitted in a worker, and the
 // operator can cancel a fit that is taking too long.
 
-import { useEffect, useRef } from 'react';
+import { useEffect } from 'react';
 import type { StreamerState } from '../../../core/controllers/grbl';
-import { useStore } from '../../state';
 import { useCameraStore } from '../../state/camera-store';
 import { useLaserStore } from '../../state/laser-store';
 import { CameraSourceView } from '../CameraSourceView';
-import { photographTarget } from './calibration-actions';
 import { useCameraCalibrationStore, type PhotoStatus } from './camera-calibration-store';
 import { columnStyle, errStyle, noteStyle, rowStyle } from './wizard-styles';
 
@@ -59,10 +57,14 @@ export function EngravingStep(props: {
   );
 }
 
-export function PhotoStep(props: { readonly status: PhotoStatus }): JSX.Element {
+export function PhotoStep(props: {
+  readonly status: PhotoStatus;
+  readonly take: () => Promise<void>;
+  readonly cancel: () => void;
+}): JSX.Element {
   const sourceState = useCameraStore((s) => s.sourceState);
   const setStep = useCameraCalibrationStore((s) => s.setStep);
-  const { take, cancel } = usePhotoRun();
+  const { take, cancel } = props;
   const running = props.status.kind === 'running';
 
   return (
@@ -112,49 +114,4 @@ export function PhotoStep(props: { readonly status: PhotoStatus }): JSX.Element 
       {props.status.kind === 'failed' ? <p style={errStyle}>{props.status.message}</p> : null}
     </div>
   );
-}
-
-// One photo run at a time. Cancelling, closing the wizard or leaving the step
-// aborts the run, and a late answer from an aborted run is dropped.
-function usePhotoRun(): { readonly take: () => Promise<void>; readonly cancel: () => void } {
-  const settings = useCameraCalibrationStore((s) => s.settings);
-  const setStep = useCameraCalibrationStore((s) => s.setStep);
-  const bedWidthMm = useStore((s) => s.project.device.bedWidth);
-  const bedHeightMm = useStore((s) => s.project.device.bedHeight);
-  const controllerRef = useRef<AbortController | null>(null);
-
-  useEffect(() => () => controllerRef.current?.abort(), []);
-
-  const take = async (): Promise<void> => {
-    const { sourceState } = useCameraStore.getState();
-    if (sourceState.kind !== 'live') return;
-    controllerRef.current?.abort();
-    const controller = new AbortController();
-    controllerRef.current = controller;
-    setStep({ kind: 'photo', status: { kind: 'running' } });
-    try {
-      const outcome = await photographTarget({
-        source: sourceState.source,
-        settings,
-        bedWidthMm,
-        bedHeightMm,
-        signal: controller.signal,
-      });
-      if (controller.signal.aborted) return;
-      setStep(
-        outcome.kind === 'ok'
-          ? { kind: 'result', result: outcome.result }
-          : { kind: 'photo', status: { kind: 'failed', message: outcome.message } },
-      );
-    } catch (error: unknown) {
-      if (controller.signal.aborted) return;
-      const message = error instanceof Error ? error.message : String(error);
-      setStep({ kind: 'photo', status: { kind: 'failed', message } });
-    }
-  };
-  const cancel = (): void => {
-    controllerRef.current?.abort();
-    setStep({ kind: 'photo', status: { kind: 'idle' } });
-  };
-  return { take, cancel };
 }

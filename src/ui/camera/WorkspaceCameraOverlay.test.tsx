@@ -16,6 +16,7 @@ import { useCameraStore } from '../state/camera-store';
 import { useUiStore } from '../state/ui-store';
 import { computeView } from '../workspace/view-transform';
 import type { LiveCaptureElement } from './frame-capture';
+import { cameraCaptureBindingForFrame } from './frame-source';
 import type { BedOverlayUniforms } from './overlay/bed-overlay-shader';
 import { WorkspaceCameraOverlay } from './WorkspaceCameraOverlay';
 
@@ -112,10 +113,10 @@ afterEach(() => {
   vi.restoreAllMocks();
 });
 
-function saveModel(): void {
+function saveModel(capture: CameraCaptureBinding = USB): void {
   const project = useStore.getState().project;
   useStore.setState({
-    project: { ...project, device: { ...project.device, cameraModel: savedCameraModel(USB) } },
+    project: { ...project, device: { ...project.device, cameraModel: savedCameraModel(capture) } },
   });
 }
 
@@ -137,27 +138,30 @@ describe('WorkspaceCameraOverlay', () => {
     expect(container.innerHTML).toBe('');
   });
 
-  it('draws a still through the model at its own size, the surface height and the workspace view', () => {
-    saveModel();
-    useCameraStore.setState({
-      overlayStill: still(),
-      overlayStillCapture: { ...USB, width: 640, height: 360 },
-    });
-    render();
-    const drawn = gl.draws.at(-1)?.uniforms;
-    const view = computeView(BOX.width, BOX.height, 400, 400, {
-      zoomFactor: 1.5,
-      panX: 20,
-      panY: -10,
-    });
-    expect(drawn?.uFrameSize).toEqual([640, 360]);
-    expect(drawn?.uFocal[0]).toBeCloseTo(wideLens().intrinsics.fx / 2, 9);
-    expect(drawn?.uSurfaceZ).toBe(-12);
-    expect(drawn?.uOpacity).toBeCloseTo(0.6, 9);
-    expect(drawn?.uViewScale).toBeCloseTo(view.scale, 9);
-    expect(drawn?.uViewOffset).toEqual([view.offsetX, view.offsetY]);
-    expect(container.querySelector('[role="status"]')).toBeNull();
-  });
+  it.each([360, 361])(
+    'draws a resized still at 640 × %s within the model aspect tolerance',
+    (height) => {
+      saveModel();
+      useCameraStore.setState({
+        overlayStill: still(640, height),
+        overlayStillCapture: { ...USB, width: 640, height },
+      });
+      render();
+      const drawn = gl.draws.at(-1)?.uniforms;
+      const view = computeView(BOX.width, BOX.height, 400, 400, {
+        zoomFactor: 1.5,
+        panX: 20,
+        panY: -10,
+      });
+      expect(drawn?.uFrameSize).toEqual([640, height]);
+      expect(drawn?.uFocal[0]).toBeCloseTo(wideLens().intrinsics.fx / 2, 9);
+      expect(drawn?.uSurfaceZ).toBe(-12);
+      expect(drawn?.uOpacity).toBeCloseTo(0.6, 9);
+      expect(drawn?.uViewScale).toBeCloseTo(view.scale, 9);
+      expect(drawn?.uViewOffset).toEqual([view.offsetX, view.offsetY]);
+      expect(container.querySelector('[role="status"]')).toBeNull();
+    },
+  );
 
   it('redraws when the material height changes', () => {
     saveModel();
@@ -200,6 +204,67 @@ describe('WorkspaceCameraOverlay', () => {
     expect(gl.draws.at(-1)?.source).toBe(video);
     expect(gl.draws.at(-1)?.uniforms.uFrameSize).toEqual([1280, 720]);
   });
+
+  it('does not draw another channel at the same redacted camera URL', () => {
+    const capture = (channel: number) =>
+      cameraCaptureBindingForFrame(
+        {
+          kind: 'machine-jpeg',
+          cameraUrl: `http://camera/frame.jpg?channel=${channel}`,
+          frameUrl: 'http://bridge/frame.jpg',
+          queryFingerprint: `hmac-sha256:${String(channel).repeat(64)}`,
+        },
+        640,
+        360,
+      );
+    const first = capture(1);
+    const second = capture(2);
+    expect(second.sourceId).toBe(first.sourceId);
+    saveModel(first);
+    useCameraStore.setState({ overlayStill: still(), overlayStillCapture: second });
+    render();
+    expect(gl.draws).toHaveLength(0);
+    expect(container.textContent).toContain('belongs to a different camera');
+    act(() => useCameraStore.setState({ overlayStillCapture: first }));
+    expect(gl.draws).toHaveLength(1);
+  });
+
+  it('does not resize cropped geometry but still draws the exact calibrated crop', () => {
+    const cropped: CameraCaptureBinding = { ...USB, resizeMode: 'crop-and-scale' };
+    saveModel();
+    useCameraStore.setState({
+      overlayStill: still(),
+      overlayStillCapture: { ...cropped, width: 640, height: 360 },
+    });
+    render();
+    expect(gl.draws).toHaveLength(0);
+    expect(container.textContent).toContain('crop differs');
+    act(() => {
+      saveModel(cropped);
+      useCameraStore.setState({ overlayStill: still(1280, 720), overlayStillCapture: cropped });
+    });
+    expect(gl.draws.at(-1)?.uniforms.uFrameSize).toEqual([1280, 720]);
+  });
+
+  it.each(['saved', 'current'] as const)(
+    'reports unverifiable network identity when the %s fingerprint is absent',
+    (missing) => {
+      const unverified: CameraCaptureBinding = {
+        ...USB,
+        sourceKind: 'machine-jpeg',
+        sourceId: 'http://camera/frame.jpg',
+      };
+      const verified = { ...unverified, queryFingerprint: `hmac-sha256:${'a'.repeat(64)}` };
+      saveModel(missing === 'saved' ? unverified : verified);
+      useCameraStore.setState({
+        overlayStill: still(1280, 720),
+        overlayStillCapture: missing === 'current' ? unverified : verified,
+      });
+      render();
+      expect(gl.draws).toHaveLength(0);
+      expect(container.textContent).toContain('camera resource cannot be verified');
+    },
+  );
 
   it('explains when the browser cannot draw the corrected picture', () => {
     gl.available = false;
