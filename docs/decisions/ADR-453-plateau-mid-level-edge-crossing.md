@@ -123,6 +123,27 @@ Contestants: P-default, O-default, O-smooth and O-sharp.
   inward crossing bias cancelled it; with the bias removed, the bars trace 0.2-0.3 px wide. The fix
   belongs to the fit tail (geometry-core work), not to edge placement.
 
+Two further attempts on the residual losses were measured on the same set (O-smooth and O-sharp,
+against base) and set aside; the committed code is unchanged:
+
+- **Deadband 3% instead of 2%** (about the ±0.03 px bias tolerance). rounded-rects.clean and
+  solid-gold.scan no longer lose, but five fixtures that gained now lose against this
+  change: topology.scan Sharp -0.0034, small-features.scan Sharp -0.0042, counter-letters.clean
+  Sharp -0.0033, s-curve-band.scan Sharp -0.0037, text-large.scan Smooth -0.0011. Mean IoU gain
+  drops from +0.00067 / +0.00111 to +0.00062 / +0.00084 (Smooth / Sharp, 63 fixtures).
+- **Coverage-sum crossing.** Instead of interpolating the plateau mid-level between the two pixel
+  centres, the edge sits where the summed coverage of the two pixels on each side of the crack puts
+  it (levels from the mean of the outer block row). This is exact for a box-filtered straight edge,
+  and it clears the solid-red/blue/gold and rounded-rects losses. The linear interpolation it
+  replaces has a phase-dependent error of up to about ±0.07 px on a box-filtered edge, and on the
+  200 px squares that shifts one side out and the opposite side in, which is where the solid-*
+  losses come from. But the sum picks up the ramps of nearby edges and curvature: counter-letters
+  loses 0.006-0.013, owl 0.0008-0.0009 and hummingbird 0.0003-0.0005. Mean IoU change goes
+  negative (-0.00021 / -0.00001).
+
+So the residual losses are below what a level or deadband choice can remove without new losses
+elsewhere.
+
 ### On top of claude/tl-geometry-core
 
 The calibration loss above is a property of this base's fit tail. To check how the change behaves
