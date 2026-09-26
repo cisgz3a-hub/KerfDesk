@@ -73,6 +73,17 @@ export type ColoredPath = {
   // compatibility view while preview and compilation migrate subsystem by
   // subsystem; serializers always materialize this field for saved projects.
   readonly curves?: ReadonlyArray<CurveSubpath>;
+  // Containment forest of the closed subpaths, written by the contour tracer
+  // (ADR-441). Optional and derived: readers use it only through
+  // `carriedSubpathParents`, which ignores it once the geometry changes.
+  readonly subpathNesting?: SubpathNesting;
+};
+
+/** Parent of each subpath (-1 for an outer) plus the key of the geometry it
+ *  was computed for (subpath-nesting.ts). A parent always precedes its child. */
+export type SubpathNesting = {
+  readonly parents: ReadonlyArray<number>;
+  readonly geometryKey: string;
 };
 
 export type Transform = {

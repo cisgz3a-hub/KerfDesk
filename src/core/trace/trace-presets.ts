@@ -210,10 +210,12 @@ export const TRACE_PRESETS: Readonly<Record<string, TraceOptions>> = {
     useOtsuThreshold: true,
     despeckleMinPixels: 1,
     // Curve params that drive the contour backend (the imagetracerjs fields
-    // above are inert there). smoothness scales the wobble flattener /
-    // arc-evening strength: at 0.55 both are fully off, so pixel-art notches
-    // and square dots keep their exact corners instead of rounding to pills
-    // or circles.
+    // above are inert there). smoothness sets the corner dial (ADR-439) and
+    // the wobble flattener / arc-evening strength: at 0.55 the flattener and
+    // evening are fully off and the dial keeps pixel features (notches,
+    // teeth, square dots) and drawn corners while digitized circles stay
+    // round, so pixel art keeps its exact corners instead of rounding to
+    // pills or circles.
     smoothness: 0.55,
     optimize: 0.15,
     // NO auto-upscale of any kind (neither autoUpscaleSmallSources nor

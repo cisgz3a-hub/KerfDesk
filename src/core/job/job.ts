@@ -37,6 +37,11 @@ export type CutSegment = {
   // closed segment, the last point equals the first by construction.
   readonly polyline: ReadonlyArray<Vec2>;
   readonly closed: boolean;
+  /** Nesting of this contour inside its own path, from the path's carried
+   *  forest (ADR-441): `depth` among the contours sharing `forest`, a key
+   *  unique to one path of one object. Inside-first ordering reads it instead
+   *  of probing those contours; absent, it probes as before. */
+  readonly nesting?: { readonly forest: string; readonly depth: number };
   /** Estimator-only 3D edge geometry for a two-point CNC segment. */
   readonly plannerMotion?: {
     readonly distanceMm: number;

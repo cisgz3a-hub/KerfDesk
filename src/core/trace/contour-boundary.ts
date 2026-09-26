@@ -27,8 +27,9 @@ export type BoundaryLoop = {
 };
 
 // Directions are indexed E,S,W,N; each boundary edge travels with ink on its
-// RIGHT in screen coordinates (y down), so outer loops run counter-clockwise
-// on screen and hole loops clockwise.
+// RIGHT in screen coordinates (y down), so outer loops run clockwise on screen
+// with positive shoelace area (a single ink pixel: E, S, W, N, area +1) and
+// hole loops counter-clockwise with negative area.
 const DIR_X = [1, 0, -1, 0] as const;
 const DIR_Y = [0, 1, 0, -1] as const;
 

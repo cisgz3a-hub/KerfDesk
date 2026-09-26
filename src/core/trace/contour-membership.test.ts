@@ -1,7 +1,9 @@
 import { describe, expect, it } from 'vitest';
 import type { Vec2 } from '../scene';
+import { contourEdgesSteps, type ContourEdges } from './contour-edges';
 import { ContourMembership } from './contour-membership';
 import { insideContour } from './contour-orientation';
+import { runTraceSteps } from './trace-steps';
 
 describe('prepared contour winding', () => {
   it('matches exact winding on vertices, edges, notches, self-crossings and tiny gaps', () => {
@@ -44,6 +46,40 @@ describe('prepared contour winding', () => {
     }
   });
 
+  it('answers exactly from a lent edge index, closing point repeated or not', () => {
+    const ring: Vec2[] = [
+      { x: 0, y: 0 },
+      { x: 4, y: 0 },
+      { x: 4, y: 4 },
+      { x: 2, y: 1e-12 },
+      { x: 2, y: 2 },
+      { x: 0, y: 4 },
+    ];
+    const lent = new Map<ReadonlyArray<Vec2>, ContourEdges | null>();
+    let lends = 0;
+    const membership = new ContourMembership((points) => {
+      lends += 1;
+      return lent.get(points);
+    });
+    for (const points of [ring, [...ring].reverse(), [...ring, { ...ring[0]! }]]) {
+      lent.set(points, runTraceSteps(contourEdgesSteps(points)));
+      for (const p of points) {
+        for (const [dx, dy] of [
+          [0, 0],
+          [1e-12, 0],
+          [-1e-12, 0],
+          [0, 1e-12],
+          [0, -1e-12],
+          [0.5, 0.5],
+        ]) {
+          const point = { x: p.x + dx!, y: p.y + dy! };
+          expect(membership.contains(point, points)).toBe(insideContour(point, points));
+        }
+      }
+    }
+    expect(lends).toBe(3);
+  });
+
   it('retains subnormal orientation signs and large finite coordinates', () => {
     const membership = new ContourMembership();
     for (const scale of [1e-200, 1e200]) {
@@ -81,7 +117,9 @@ describe('prepared contour winding', () => {
       }
     }
     const membership = new ContourMembership();
+    // The first query scans the edges; the second builds the boundary's index.
     expect(membership.contains({ x: 5, y: 1.5 }, points)).toBe(true);
+    expect(membership.contains({ x: 5, y: 2.5 }, points)).toBe(true);
     coordinateReads = 0;
     for (let y = 0.5; y < 100; y += 1) expect(membership.contains({ x: 5, y }, points)).toBe(true);
     expect(coordinateReads).toBeLessThan(10000);

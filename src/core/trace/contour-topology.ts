@@ -6,6 +6,7 @@ import { ContourContactCache } from './contour-contact-cache';
 import { unionContourBoxes } from './contour-bounds';
 import { ContourPairCache } from './contour-pair-cache';
 import { ContourMeasurements, ContourNestingRelations } from './contour-topology-cache';
+import { CurveContactCache } from './compact-curve-contacts';
 import type { TraceSteps } from './trace-steps';
 
 export type ContourRefinement = {
@@ -51,13 +52,17 @@ export function* preserveContourTopologySteps(
   const current = contours.map((contour) => contour.polyline);
   const attempts = contours.map(() => 0);
   const repair: TopologyRepair = { current, attempts, finishes: [...contours] };
-  const membership = new ContourMembership();
   const contacts = new ContourContactCache();
+  const membership = new ContourMembership((points) => contacts.preparedEdges(points));
   const measurements = new ContourMeasurements();
   const relations = new ContourNestingRelations();
   const nestingPairs = new ContourPairCache();
+  const curves = new CurveContactCache();
   for (;;) {
     const conflicts = yield* intersectingContourLoopsSteps(current, contacts);
+    // The fitted curves themselves, which can meet between their samples
+    // (ADR-441). Rings without a fitted curve are exact in their samples.
+    for (const index of yield* curves.conflictsSteps(current)) conflicts.add(index);
     yield* addNestingConflictsSteps(contours, current, conflicts, {
       membership,
       measurements,

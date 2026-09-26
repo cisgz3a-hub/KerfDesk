@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { denseFixture, rect } from '../../__fixtures__/dense-trace-area';
 import { components } from '../../__fixtures__/auto-detail-trace';
 import { resampleBuffer } from '../image-resample';
-import { polylineToCurveSubpath, type ColoredPath } from '../scene';
+import { carrySubpathNesting, polylineToCurveSubpath, type ColoredPath, type Vec2 } from '../scene';
 import { enhanceRegionPaths } from './region-enhance';
 import { TRACE_PRESETS } from './trace-presets';
 import { prepareTraceForContour, type TraceOptions } from './trace-image';
@@ -179,12 +179,32 @@ describe('source-grid area controls during dense downsampling', () => {
   }, 30000);
 });
 
+// The restored trace is the working trace with every point, polyline and
+// canonical-curve control point alike, mapped by the two axis scales
+// (ADR-440: the downscale route keeps the fitted cubics) and the containment
+// forest (ADR-441).
 function restoreSourceGrid(paths: ColoredPath[], scaleX: number, scaleY: number): ColoredPath[] {
+  const map = (point: Vec2): Vec2 => ({ x: point.x * scaleX, y: point.y * scaleY });
   return paths.map((path) => {
     const polylines = path.polylines.map((line) => ({
       closed: line.closed,
-      points: line.points.map((point) => ({ x: point.x * scaleX, y: point.y * scaleY })),
+      points: line.points.map(map),
     }));
-    return { color: path.color, polylines, curves: polylines.map(polylineToCurveSubpath) };
+    const curves = (path.curves ?? polylines.map(polylineToCurveSubpath)).map((curve) => ({
+      start: map(curve.start),
+      closed: curve.closed,
+      segments: curve.segments.map((segment) =>
+        segment.kind === 'cubic'
+          ? {
+              kind: 'cubic' as const,
+              control1: map(segment.control1),
+              control2: map(segment.control2),
+              to: map(segment.to),
+            }
+          : { ...segment, to: map(segment.to) },
+      ),
+    }));
+    // A per-axis scale keeps containment, so the forest carries (ADR-441).
+    return carrySubpathNesting(path, { color: path.color, polylines, curves });
   });
 }

@@ -33,7 +33,7 @@ import { isBinaryContourPreset, traceImageToContourColoredPathsSteps } from './c
 import { traceImageToEdgePathsSteps } from './edge-trace';
 import { prepareEdgeTraceInput, type EdgeTraceInput } from './edge-input';
 import { prepareContourTraceInput, type ContourTraceInput } from './contour-input';
-import { withCanonicalTraceCurves } from './trace-curves';
+import { scaleTracedPaths, withCanonicalTraceCurves } from './trace-curves';
 import { traceScalePlan } from './trace-upscale-policy';
 import { prepareUpscaledTraceInput, releaseMedianStage } from './trace-upscale-input';
 import { runTraceSteps, type TraceStepRunner, type TraceSteps } from './trace-steps';
@@ -189,20 +189,14 @@ export async function traceImageToColoredPaths(
       effectivePixelScale(options) ** 2;
     const workingOptions = downscaleWorkingOptions(options, areaScale);
     const traced = await dispatchTrace(workingImage, workingOptions, run);
-    // Only binary contours take this route. Their canonical curves are line
-    // segments over the finished polylines; rebuild them on the restored grid.
-    // The resampler covers each axis independently, and rounded working height
-    // need not have the same ratio as width.
-    const scaleX = image.width / workingImage.width;
-    const scaleY = image.height / workingImage.height;
-    return withCanonicalTraceCurves(
-      traced.map((path) => ({
-        color: path.color,
-        polylines: path.polylines.map((polyline) => ({
-          closed: polyline.closed,
-          points: polyline.points.map((point) => ({ x: point.x * scaleX, y: point.y * scaleY })),
-        })),
-      })),
+    // Only binary contours take this route. Their canonical curves (ADR-440)
+    // are mapped with their polylines, so the restored trace keeps its
+    // cubics. The resampler covers each axis independently, and rounded
+    // working height need not have the same ratio as width.
+    return scaleTracedPaths(
+      traced,
+      image.width / workingImage.width,
+      image.height / workingImage.height,
     );
   }
   const factor = scalePlan.kind === 'upscale' ? scalePlan.factor : 1;

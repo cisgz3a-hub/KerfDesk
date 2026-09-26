@@ -18,6 +18,13 @@
 // enclose the whole target's bounds, and the probe point is the centre of those
 // bounds, so any container that passed the original test necessarily contains
 // the probe point and is therefore registered in the probe point's cell.
+//
+// CARRIED NESTING (ADR-441): the probe is the centre of the target's bounds,
+// which misses when the target is concave (the centre of a C-shaped hole lies
+// in its mouth, outside the outline around it). A traced path knows its own
+// nesting exactly, and its segments carry it: contours of the same forest are
+// never probed against each other, their carried depth is used instead, and
+// only containers from other paths are probed.
 
 import { pointInPolygon } from '../geometry';
 import type { Vec2 } from '../scene';
@@ -26,6 +33,7 @@ import { boundsCenter, boundsContains, polylineBounds, type SegmentBounds } from
 export type ContainmentSegment = {
   readonly polyline: ReadonlyArray<Vec2>;
   readonly closed: boolean;
+  readonly nesting?: { readonly forest: string; readonly depth: number };
 };
 
 // A container spanning more cells than this is held in a single always-checked
@@ -39,22 +47,49 @@ export function containmentDepths(segments: ReadonlyArray<ContainmentSegment>): 
   if (containers.length === 0) return segments.map(() => 0);
   const grid = buildContainerGrid(containers, bounds);
 
-  return segments.map((_, index) => {
-    const targetBounds = bounds[index] ?? null;
-    const probe = boundsCenter(targetBounds);
-    if (probe === null || targetBounds === null) return 0;
-    const candidates = grid === null ? containers : candidatesFor(grid, probe);
-    let depth = 0;
-    for (const containerIndex of candidates) {
-      if (containerIndex === index) continue;
-      const container = segments[containerIndex];
-      const containerBounds = bounds[containerIndex] ?? null;
-      if (container === undefined || containerBounds === null) continue;
-      if (!boundsContains(containerBounds, targetBounds)) continue;
-      if (pointInPolygon(probe, container.polyline)) depth += 1;
-    }
-    return depth;
-  });
+  const context: DepthContext = { segments, bounds, containers, grid };
+  return segments.map((_, index) => containmentDepth(context, index));
+}
+
+type DepthContext = {
+  readonly segments: ReadonlyArray<ContainmentSegment>;
+  readonly bounds: ReadonlyArray<SegmentBounds | null>;
+  readonly containers: ReadonlyArray<number>;
+  readonly grid: ContainerGrid | null;
+};
+
+function containmentDepth(context: DepthContext, index: number): number {
+  const { segments, bounds, containers, grid } = context;
+  const target = segments[index];
+  const targetBounds = bounds[index] ?? null;
+  const probe = boundsCenter(targetBounds);
+  let depth = target?.nesting?.depth ?? 0;
+  if (probe === null || targetBounds === null || target === undefined) return depth;
+  const candidates = grid === null ? containers : candidatesFor(grid, probe);
+  for (const containerIndex of candidates) {
+    if (containerIndex === index) continue;
+    if (probedContainer(context, containerIndex, target, targetBounds, probe)) depth += 1;
+  }
+  return depth;
+}
+
+function probedContainer(
+  context: DepthContext,
+  containerIndex: number,
+  target: ContainmentSegment,
+  targetBounds: SegmentBounds,
+  probe: Vec2,
+): boolean {
+  const container = context.segments[containerIndex];
+  const containerBounds = context.bounds[containerIndex] ?? null;
+  if (container === undefined || containerBounds === null) return false;
+  if (sameForest(target.nesting, container)) return false;
+  if (!boundsContains(containerBounds, targetBounds)) return false;
+  return pointInPolygon(probe, container.polyline);
+}
+
+function sameForest(target: ContainmentSegment['nesting'], container: ContainmentSegment): boolean {
+  return target !== undefined && container.nesting?.forest === target.forest;
 }
 
 function collectContainers(

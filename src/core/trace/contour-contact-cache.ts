@@ -1,9 +1,9 @@
 import type { Polyline, Vec2 } from '../scene';
-import { unionContourBoxes, type ContourBox } from './contour-bounds';
+import { unionContourBoxes } from './contour-bounds';
 import {
+  adjacentContourEdgeIndices,
+  contourEdge,
   contourEdgesSteps,
-  adjacentContourEdges,
-  type ContourEdge,
   type ContourEdges,
 } from './contour-edges';
 import {
@@ -31,6 +31,11 @@ export class ContourContactCache {
   private readonly orientation = new ContourOrientation();
   private readonly loopPairs = new ContourPairCache();
   private readonly occupancy = new WeakMap<ContourEdges, Set<number> | null>();
+
+  /** The boundary's edges if this cache has prepared them, else undefined. */
+  preparedEdges(points: ReadonlyArray<Vec2>): ContourEdges | null | undefined {
+    return this.geometries.get(points);
+  }
 
   *findSteps(polylines: ReadonlyArray<Polyline>): TraceSteps<Set<number> | undefined> {
     const cooperate = yield;
@@ -119,7 +124,7 @@ export class ContourContactCache {
   private cellsOf(geometry: ContourEdges): Set<number> | null {
     let cells = this.occupancy.get(geometry);
     if (cells === undefined) {
-      cells = occupiedCells(geometry.edges);
+      cells = occupiedCells(geometry);
       this.occupancy.set(geometry, cells);
     }
     return cells;
@@ -130,14 +135,19 @@ const OCCUPANCY_CELL_PX = 8;
 const MAX_CELLS_PER_EDGE = 64;
 const OCCUPANCY_KEY_STRIDE = 2 ** 26;
 
-function occupiedCells(edges: ReadonlyArray<ContourEdge>): Set<number> | null {
+// Edge i's box is Math.min and Math.max of its two ends (contour-edges.ts),
+// so the cells are read from the points without making the edges.
+function occupiedCells(geometry: ContourEdges): Set<number> | null {
   const cells = new Set<number>();
   const cell = (value: number): number => Math.floor(value / OCCUPANCY_CELL_PX);
-  for (const edge of edges) {
-    const x0 = cell(edge.minX);
-    const x1 = cell(edge.maxX);
-    const y0 = cell(edge.minY);
-    const y1 = cell(edge.maxY);
+  const { points, count } = geometry;
+  for (let i = 0; i < count; i += 1) {
+    const a = points[i] as Vec2,
+      b = points[i + 1 === count ? 0 : i + 1] as Vec2;
+    const x0 = cell(Math.min(a.x, b.x));
+    const x1 = cell(Math.max(a.x, b.x));
+    const y0 = cell(Math.min(a.y, b.y));
+    const y1 = cell(Math.max(a.y, b.y));
     if ((x1 - x0 + 1) * (y1 - y0 + 1) > MAX_CELLS_PER_EDGE) return null;
     for (let cx = x0; cx <= x1; cx += 1) {
       for (let cy = y0; cy <= y1; cy += 1) cells.add(cx * OCCUPANCY_KEY_STRIDE + cy);
@@ -154,72 +164,36 @@ function* findContactsSteps(
 ): TraceSteps<ContactChoices> {
   const cooperate = yield;
   const choices: ContactChoices = { minX: null, minY: null };
-  const { scanFirst, edges } = scanPlan(a, b, sameLoop);
-  const target = scanFirst ? b : a;
-  let visited = 0;
-  for (const edge of edges) {
-    if (cooperate) yield;
-    for (const other of target.index.query(edge)) {
-      if (cooperate && ++visited % 256 === 0) yield;
-      if (skipContact(edge, other, sameLoop)) continue;
-      const first = scanFirst ? edge : other,
-        second = scanFirst ? other : edge;
-      if (edgesMeet(first, second, orientation)) rememberContact(choices, first, second, sameLoop);
-    }
-  }
+  // Every overlapping edge pair is tested, each once with `a`'s edge first.
+  // The earliest contact is a minimum under a total order, so the order the
+  // pairs arrive in cannot change the choice. Edges are made only for pairs
+  // that meet.
+  const aPoints = a.points,
+    aCount = a.count,
+    bPoints = b.points,
+    bCount = b.count;
+  yield* a.index.overlapIdsSteps(
+    b.index,
+    (i, j) => {
+      // Within one loop each unordered pair is tested once, from its lower edge.
+      if (sameLoop && (j <= i || adjacentContourEdgeIndices(i, j, aCount))) return;
+      const a0 = aPoints[i] as Vec2,
+        a1 = aPoints[i + 1 === aCount ? 0 : i + 1] as Vec2,
+        b0 = bPoints[j] as Vec2,
+        b1 = bPoints[j + 1 === bCount ? 0 : j + 1] as Vec2;
+      if (
+        orientation.sign(a0, a1, b0) * orientation.sign(a0, a1, b1) <= 0 &&
+        orientation.sign(b0, b1, a0) * orientation.sign(b0, b1, a1) <= 0
+      ) {
+        rememberContact(
+          choices,
+          contourEdge(aPoints, i, aCount),
+          contourEdge(bPoints, j, bCount),
+          sameLoop,
+        );
+      }
+    },
+    cooperate,
+  );
   return choices;
-}
-
-// Which boundary's edges to walk. An edge can only meet the other boundary
-// inside that boundary's box, so two different boundaries walk just the
-// edges of one that lie in the other's box, taking the side with fewer: a
-// ring nested in another then walks the few edges of the outer one near the
-// inner one's box, not every edge of the inner one. One boundary against
-// itself walks every edge.
-function scanPlan(
-  a: ContourEdges,
-  b: ContourEdges,
-  sameLoop: boolean,
-): { readonly scanFirst: boolean; readonly edges: ReadonlyArray<ContourEdge> } {
-  if (sameLoop) return { scanFirst: true, edges: a.edges };
-  // Inside the other's box every edge qualifies, so only the other side
-  // needs a query (and is walked when it is the shorter list).
-  if (boxWithin(a, b)) {
-    const fromB = b.index.query(a);
-    return fromB.length < a.edges.length
-      ? { scanFirst: false, edges: fromB }
-      : { scanFirst: true, edges: a.edges };
-  }
-  if (boxWithin(b, a)) {
-    const fromA = a.index.query(b);
-    return fromA.length <= b.edges.length
-      ? { scanFirst: true, edges: fromA }
-      : { scanFirst: false, edges: b.edges };
-  }
-  const fromA = a.index.query(b);
-  if (fromA.length === 0) return { scanFirst: true, edges: fromA };
-  const fromB = b.index.query(a);
-  return fromA.length <= fromB.length
-    ? { scanFirst: true, edges: fromA }
-    : { scanFirst: false, edges: fromB };
-}
-
-function boxWithin(inner: ContourBox, outer: ContourBox): boolean {
-  return (
-    inner.minX >= outer.minX &&
-    inner.maxX <= outer.maxX &&
-    inner.minY >= outer.minY &&
-    inner.maxY <= outer.maxY
-  );
-}
-
-function skipContact(edge: ContourEdge, other: ContourEdge, sameLoop: boolean): boolean {
-  return sameLoop && (other.index <= edge.index || adjacentContourEdges(edge, other));
-}
-
-function edgesMeet(a: ContourEdge, b: ContourEdge, orientation: ContourOrientation): boolean {
-  return (
-    orientation.sign(a.a, a.b, b.a) * orientation.sign(a.a, a.b, b.b) <= 0 &&
-    orientation.sign(b.a, b.b, a.a) * orientation.sign(b.a, b.b, a.b) <= 0
-  );
 }

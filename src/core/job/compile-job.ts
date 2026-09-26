@@ -12,10 +12,11 @@
 import { type DeviceProfile, toMachineCoords } from '../devices';
 import { artworkOperationRuns, orderedArtworkObjects } from '../artwork-order';
 import { offsetClosedPolylinesForKerfChecked } from '../geometry/kerf-offset';
-import { applyAutomaticTabsToPolylines } from '../geometry/tabs-bridges';
+import { applyAutomaticTabsBySource } from '../geometry/tabs-bridges';
 import {
   applyTransform,
   assertNever,
+  carriedSubpathDepths,
   type ColoredPath,
   type Layer,
   layerOperationSettingsEqual,
@@ -319,11 +320,17 @@ function collectLineSegmentsForLayer(
   for (const obj of objects) {
     if (appendSegmentsFromObject(obj, layer, device, out)) kerfOffsetFailed = true;
   }
+  // A contour keeps its carried nesting (ADR-441) across the tabs step, whole
+  // or split into open pieces: a piece lies at its contour's depth.
   const tabbed = layer.tabsEnabled
-    ? applyAutomaticTabsToPolylines(
+    ? applyAutomaticTabsBySource(
         out.map((segment) => ({ points: segment.polyline, closed: segment.closed })),
         layer,
-      ).map((polyline) => ({ polyline: polyline.points, closed: polyline.closed }))
+      ).map(({ polyline, source }) => {
+        const nesting = out[source]?.nesting;
+        const segment = { polyline: polyline.points, closed: polyline.closed };
+        return nesting === undefined ? segment : { ...segment, nesting };
+      })
     : out;
   return { segments: perforateLineSegments(tabbed, layer), kerfOffsetFailed };
 }
@@ -381,11 +388,13 @@ function appendPathSegments(
   out: CutSegment[],
 ): boolean {
   let kerfOffsetFailed = false;
-  for (const path of object.paths) {
+  for (const [pathIndex, path] of object.paths.entries()) {
     if (!pathUsesOperation(object, path, layer)) continue;
     const closedForKerf: Polyline[] = [];
     const withArcs = laserArcFitFor(path, object.transform, device);
-    for (const [index, polyline] of compilationPolylines(path, object.transform).entries()) {
+    // A traced path's own forest (ADR-441) orders its contours inside first.
+    const nesting = segmentNesting(path, `${object.id}#${pathIndex}`);
+    for (const [subpathIndex, polyline] of compilationPolylines(path, object.transform).entries()) {
       const points: Vec2[] = polyline.points.map((p) =>
         toMachineCoords(applyTransform(p, object.transform), device),
       );
@@ -400,7 +409,10 @@ function appendPathSegments(
           polyline: withClosingPoint(points, polyline.closed),
           closed: polyline.closed,
         };
-        out.push(withArcs(index, segment));
+        // Only closed contours are nodes of the forest; an open subpath
+        // keeps probing every container, its own path's included.
+        const known = polyline.closed ? nesting(subpathIndex) : undefined;
+        out.push(withArcs(subpathIndex, known === undefined ? segment : { ...segment, nesting: known }));
       }
     }
     // Checked: the unchecked variant flattens a clipper2 failure to an empty
@@ -416,6 +428,19 @@ function appendPathSegments(
     }
   }
   return kerfOffsetFailed;
+}
+
+// The nesting a subpath's segment carries, from the path's valid forest only.
+function segmentNesting(
+  path: ColoredPath,
+  forest: string,
+): (subpathIndex: number) => CutSegment['nesting'] {
+  const depths = carriedSubpathDepths(path);
+  if (depths === null) return () => undefined;
+  return (subpathIndex) => {
+    const depth = depths[subpathIndex];
+    return depth === undefined ? undefined : { forest, depth };
+  };
 }
 
 function shouldApplyKerf(polyline: Polyline, layer: Layer): boolean {
