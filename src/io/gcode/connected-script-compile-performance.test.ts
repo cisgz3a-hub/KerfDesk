@@ -123,7 +123,7 @@ const EXPECTED_REGION_COUNT = 12;
 // Final-grid containment and retained cutting/surface transitions add necessary
 // detail. Mapped-first capsule searches preserve compaction within the existing
 // certificate budget; ownership, region count and index reuse stay unchanged.
-// ADR-414 chord-optimal flattening moved the glyph chords and so the medial
+// ADR-442 chord-optimal flattening moved the glyph chords and so the medial
 // axis: 1,083,336 to 1,095,146 bytes on about 130 more lines, mostly longer
 // lines (more words changing per move) rather than more moves.
 const EXPECTED_GCODE_CODE_UNITS = 1_095_146;

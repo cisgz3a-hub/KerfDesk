@@ -95,7 +95,7 @@ function hitVectorObject(
 }
 
 // Hover and click hit tests flatten the same immutable paths on every pointer
-// move, and chord-optimal flattening (ADR-414) costs several times the old
+// move, and chord-optimal flattening (ADR-442) costs several times the old
 // midpoint splitter, so each path's hit polylines are kept while it lives.
 const hitTestPolylineCache = new WeakMap<ColoredPath, ReadonlyArray<Polyline>>();
 

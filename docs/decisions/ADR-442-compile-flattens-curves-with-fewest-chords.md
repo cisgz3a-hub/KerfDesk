@@ -1,8 +1,8 @@
-## ADR-414 - Compile flattens curves with near-fewest chords within the tolerance (2026-09-26)
+## ADR-442 - Compile flattens curves with near-fewest chords within the tolerance (2026-09-26)
 
 **Status:** Accepted. | **Date:** 2026-09-26
 
-This takes up the change ADR-391 and ADR-397 both left out ("chord-optimal cubic flattening in
+This takes up the change ADR-391 and ADR-405 both left out ("chord-optimal cubic flattening in
 compile"). It changes how every cubic and elliptical-arc segment becomes straight moves, for laser
 and CNC alike. Line segments, the tolerance (`DEFAULT_MACHINE_CURVE_TOLERANCE_MM`, 0.025 mm at the
 placement's largest axis scale) and the callers are unchanged, except Edit Nodes Delete, which read
@@ -21,7 +21,7 @@ Two defects, measured on the base (`c62084959`):
 
 - **More chords than the tolerance needs.** Midpoint splitting only produces 1, 2, 4, 8... pieces
   per split level, and the control points' distance overstates the curve's own by up to a third,
-  so most chords are shorter than they may be. Centerline cubics (ADR-397) raised laser
+  so most chords are shorter than they may be. Centerline cubics (ADR-405) raised laser
   burn moves by about 55% over the ADR-391 simplification (logo 809 to 1,224, dragon 17,108 to
   26,464 at 100 mm), and ADR-391 measured the same effect on contour cubics.
 - **The tolerance was not a guarantee.** The test measured control points against the infinite
@@ -93,7 +93,7 @@ Two defects, measured on the base (`c62084959`):
 
   The hummingbird trace commits no cubic subpath, so nothing changes. The chords now use the whole
   tolerance instead of about three quarters of it; none exceeds it.
-- Centerline recovers most of what ADR-397 accepted: logo 842 against the 809 of ADR-391's
+- Centerline recovers most of what ADR-405 accepted: logo 842 against the 809 of ADR-391's
   simplification and dragon 18,978 against 17,108, while keeping the cubics for editing, export and
   rescaling.
 - `estimateJobDuration` rises 0.6 to 1.1% (dragon Centerline 1,506.8 to 1,523.8 s at the default
@@ -102,7 +102,7 @@ Two defects, measured on the base (`c62084959`):
   look-ahead, which the longer spans relieve: by ADR-391's formula, the square root of 2 x
   acceleration x the 15-move span, at 500 mm/s² the cap rises from about 4,060 to 4,830 mm/min on
   the dragon's Centerline and from 5,860 to 7,190 mm/min on the logo's (spans measured as above, so
-  the absolute values differ from ADR-397's).
+  the absolute values differ from ADR-405's).
 - For comparison, the official Potrace 1.16 binary, run out of process on the same images' luma at
   LightBurn's default settings (`-k 0.5 -t 2 -a 1 -O 0.2 -z minority -u 100`), with its cubics
   flattened by the same function at the same 0.025 mm: Arch House 2,447 to 1,845 chords, dragon

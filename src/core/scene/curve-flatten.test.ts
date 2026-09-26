@@ -1,4 +1,4 @@
-// ADR-414: compile flattens cubic and elliptical-arc segments with near-fewest
+// ADR-442: compile flattens cubic and elliptical-arc segments with near-fewest
 // chords whose true distance from the curve stays within the tolerance.
 // These checks measure that distance independently, by dense sampling of the
 // exact curve against each emitted chord, never through the flattener's own
@@ -115,7 +115,7 @@ function random(seed: number): () => number {
   };
 }
 
-describe('chord-optimal curve flattening (ADR-414)', () => {
+describe('chord-optimal curve flattening (ADR-442)', () => {
   it('keeps every chord of random cubics within the tolerance, ends exact', () => {
     const next = random(414);
     const point = (span: number): Vec2 => ({ x: (next() - 0.5) * span, y: (next() - 0.5) * span });

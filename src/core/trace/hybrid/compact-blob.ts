@@ -1,4 +1,4 @@
-// Compact blobs in the Line + fill tracer (ADR-454): short strokes that are
+// Compact blobs in the Line + fill tracer (ADR-443): short strokes that are
 // really round dots a little wider than the Max stroke width.
 
 import type { Vec2 } from '../../scene';

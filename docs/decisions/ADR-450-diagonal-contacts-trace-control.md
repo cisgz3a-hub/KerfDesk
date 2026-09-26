@@ -24,8 +24,8 @@ corner-kissing shapes had no way to override Auto.
    linked with `aria-describedby`, says in plain language what each choice does where two ink
    pixels touch only at a corner. Centerline, Edge Detection, Photo shading and Colour layers
    ignore the policy (ADR-403), so they do not show it. The control lives in its own component,
-   `DiagonalContactsControl.tsx`; `TraceSettingsControls.tsx` gains two lines, so the in-flight
-   ADR-445 follow-up in that file merges cleanly.
+   `DiagonalContactsControl.tsx`; `TraceSettingsControls.tsx` gains two lines, so in-flight
+   follow-ups in that file merge cleanly.
 2. **Override.** The choice is an ordinary dialog override, `turnPolicy` in
    `LightBurnTraceSettingOverrides`, merged into the preset's options by
    `mergeLightBurnTraceSettings`. Like the other line-preset overrides it survives preset switches

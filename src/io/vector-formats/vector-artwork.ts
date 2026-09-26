@@ -1,4 +1,4 @@
-// Shared artwork model for the PDF, EPS and GeoJSON writers (ADR-455).
+// Shared artwork model for the PDF, EPS and GeoJSON writers (ADR-444).
 //
 // Every writer receives the same painted items: world millimetres in the
 // scene frame (Y down), one item per artwork path, each either filled (closed

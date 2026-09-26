@@ -1,4 +1,4 @@
-// Line + fill trace (ADR-454): thin ink burns once down its centre line, wide
+// Line + fill trace (ADR-443): thin ink burns once down its centre line, wide
 // ink stays a filled outline — decided per skeleton branch, not per image.
 //
 // The medial axis (Blum 1967) carries an inscribed radius at every point. A

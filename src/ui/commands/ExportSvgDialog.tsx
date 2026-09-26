@@ -72,7 +72,7 @@ export function ExportSvgDialogHost(): JSX.Element | null {
   );
 }
 
-/** Export the artwork as it stands at the click (ADR-403 capture rule). */
+/** Export the artwork as it stands at the click (ADR-431 capture rule). */
 function exportSvgFromStore(
   platform: PlatformAdapter,
   pushToast: (message: string, variant?: ToastVariant) => void,

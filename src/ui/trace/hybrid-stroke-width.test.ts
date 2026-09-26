@@ -1,5 +1,5 @@
 // Line + fill Max stroke width: millimetres on the placed artwork become
-// preview-grid pixels for the tracer (ADR-454).
+// preview-grid pixels for the tracer (ADR-443).
 
 import { describe, expect, it } from 'vitest';
 import { IDENTITY_TRANSFORM } from '../../core/scene';

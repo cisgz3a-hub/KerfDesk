@@ -1,4 +1,4 @@
-// GeoJSON writer (ADR-455), written from RFC 7946.
+// GeoJSON writer (ADR-444), written from RFC 7946.
 //
 // GeoJSON has no curves, so every contour is flattened within a stated
 // tolerance (default 0.01 mm) and then snapped to the export grid: each

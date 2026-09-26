@@ -1,4 +1,4 @@
-// Recentre a width-carrying Line + fill stroke on its ink (ADR-454). The
+// Recentre a width-carrying Line + fill stroke on its ink (ADR-443). The
 // Centerline lane's skeleton runs through pixel centres, so an even-width
 // line's centre line sits half a pixel off the true centre. A hairline never
 // showed that; a round-pen outline of the stroke's width burns it as a

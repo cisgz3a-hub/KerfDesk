@@ -78,7 +78,7 @@ function svgOpen(width: number, height: number, physicalSize?: SvgPhysicalSize):
 
 // Mirrors the commit's layer-mode policy (scene-mutations): these trace modes
 // become LINE layers, whose closed rings burn as outlines, never as fills.
-// Line + fill (ADR-454) splits per path: its strokes are hairlines, its
+// Line + fill (ADR-443) splits per path: its strokes are hairlines, its
 // outlines fill.
 function isLinePath(path: ColoredPath, traceMode: TraceOptions['traceMode']): boolean {
   if (traceMode === 'hybrid') return isHybridStrokePath(path);

@@ -57,7 +57,7 @@ export async function commitTraceOutput(
     ...(args.replaceTraceId === undefined ? {} : { replaceTraceId: args.replaceTraceId }),
   };
   const sourceStatus = deleteSourceAfterTrace ? 'source deleted' : 'source kept';
-  // Line + fill (ADR-454) is vector-only: the raster route renders one
+  // Line + fill (ADR-443) is vector-only: the raster route renders one
   // style for every path, which would turn its fills into outline rings.
   const rasterOutput =
     (args.traceOutput ?? 'vector') === 'raster' &&

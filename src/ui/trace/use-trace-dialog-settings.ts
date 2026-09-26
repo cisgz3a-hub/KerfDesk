@@ -96,7 +96,7 @@ export function useTraceDialogSettings(
 }
 
 // A Line + fill trace records the Max stroke width it used, default or not
-// (ADR-454 rule 10): the default follows the machine's spot size, so a
+// (ADR-443 rule 10): the default follows the machine's spot size, so a
 // Re-trace on another device profile would otherwise re-split the ink.
 function withResolvedHybridWidth(
   presetName: string,
@@ -121,7 +121,7 @@ export function useTraceOptions(
 }
 
 /** The dialog's trace options; for Line + fill, with the operator's millimetre Max stroke width
- *  converted to preview pixels through the source's placement (ADR-454).
+ *  converted to preview pixels through the source's placement (ADR-443).
  *  Every other trace mode gets `options` back unchanged. */
 export function useDialogTraceOptions(
   preset: TraceOptions,

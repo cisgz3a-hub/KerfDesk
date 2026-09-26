@@ -163,7 +163,7 @@ describe('curve endpoint joining', () => {
       mirrorX: true,
       mirrorY: false,
     };
-    // Chord-optimal flattening walks from a curve's start (ADR-414), so a
+    // Chord-optimal flattening walks from a curve's start (ADR-442), so a
     // reversed ellipse may place its vertices elsewhere on the same curve.
     // Every vertex of each flattening must lie on the other curve, whose
     // exact trace is its flattening at 1e-7, and the ends must swap.

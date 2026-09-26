@@ -1,4 +1,4 @@
-// Line + fill path roles (ADR-454). Kept apart from the tracer so the
+// Line + fill path roles (ADR-443). Kept apart from the tracer so the
 // preview, the commit and the scene can tell strokes from outlines without
 // loading the tracing lanes.
 

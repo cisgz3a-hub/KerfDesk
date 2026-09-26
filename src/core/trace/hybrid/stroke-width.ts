@@ -1,4 +1,4 @@
-// Pen width of a traced centreline stroke (ADR-454). The distance field knows
+// Pen width of a traced centreline stroke (ADR-443). The distance field knows
 // the inscribed radius at every ink pixel, but its integer-pixel sampling
 // cannot tell a 2 px line from a 1 px one. Measuring straight across instead
 // — walking the local normal both ways until the ink ends — resolves every

@@ -817,7 +817,7 @@ marks later edits as unapproved without changing the existing Frame/Start policy
 2. **Tools → Multi-File Trace...** first asks for the preset, format (SVG, DXF, PDF, EPS or
    GeoJSON), coordinate precision and, for SVG, **Group islands** (each shape with its holes);
    **Choose Images...** then picks the files. Each image is saved as `<name>-trace.<format>` on the
-   traced image's page, lower-left corner as the origin (ADR-455). **Page → Fit to artwork**
+   traced image's page, lower-left corner as the origin (ADR-444). **Page → Fit to artwork**
    instead trims the page to the exact traced curves plus a **Margin (mm)**; the millimetre scale
    is unchanged and the DXF and GeoJSON origin moves to the fitted page's corner (ADR-451). A
    fitted side under 3 pt (the smallest PDF page) grows to 3 pt, centred, in every format. A
@@ -826,7 +826,7 @@ marks later edits as unapproved without changing the existing Frame/Start policy
 3. An image whose trace has nothing visible writes no file; the rest of the batch is still saved
    and the completion message names the skipped images.
 
-### F-A9d. Export artwork as PDF, EPS or GeoJSON (ADR-455)
+### F-A9d. Export artwork as PDF, EPS or GeoJSON (ADR-444)
 
 1. **File → Export artwork as PDF... / EPS... / GeoJSON...** (or **Export selected artwork as
    ...**) write the selection's or scene's vector artwork, text outlined; bitmaps and reliefs are

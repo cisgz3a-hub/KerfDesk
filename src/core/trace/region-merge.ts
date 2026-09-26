@@ -14,7 +14,7 @@
 // Every surviving subpath keeps its canonical curve and its path keeps its
 // operationIds, strokes and fill rule; a path nothing touched is returned as
 // the same object. Paths merge by kind: the colour plus a stroke's pen width
-// and pen transform, so Line + fill's per-width stroke groups (ADR-454) keep
+// and pen transform, so Line + fill's per-width stroke groups (ADR-443) keep
 // their widths.
 
 import {

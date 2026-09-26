@@ -1,4 +1,4 @@
-// Line + fill (hybrid) trace commit binding (ADR-454): the stroke colour binds
+// Line + fill (hybrid) trace commit binding (ADR-443): the stroke colour binds
 // to a LINE operation, the outline colour to a FILL operation, on a fresh
 // import and when a trace lands over its source bitmap. Other trace modes
 // keep their single object-level mode.

@@ -1,8 +1,8 @@
-## ADR-455 - Artwork and Multi-File Trace export as PDF, EPS and GeoJSON (2026-09-26)
+## ADR-444 - Artwork and Multi-File Trace export as PDF, EPS and GeoJSON (2026-09-26)
 
 **Status:** Accepted. | **Date:** 2026-09-26
 
-This extends ADR-403 (canonical curves on a millimetre grid, DXF; ADR-440 once integrated). It
+This extends ADR-431 (canonical curves on a millimetre grid, DXF). It
 changes file export and one PDF import check only: no scene, compile, G-code, Frame or Start path
 reads the new code, so the Frame-first contract (PROJECT.md non-negotiable 21, ADRs 228, 230, 232
 and 237) is untouched.
@@ -10,7 +10,7 @@ and 237) is untouched.
 ### Context
 
 Potrace ships svg, pdf, pdfpage, eps, ps, pgm, dxf, geojson, gimppath and xfig backends. After
-ADR-403 the app writes SVG and DXF (and G-code). PDF and EPS are what print shops, sign makers and
+ADR-431 the app writes SVG and DXF (and G-code). PDF and EPS are what print shops, sign makers and
 vinyl-cutter software ask for; GeoJSON feeds GIS and scripting tools. The writers below follow the
 published specifications only (PDF Reference / ISO 32000-1 restricted to PDF 1.4 features, Adobe
 EPSF 3.0 and the PostScript Language Reference Level 2, RFC 7946); no Potrace code or source was

@@ -1,4 +1,4 @@
-// Encapsulated PostScript writer (ADR-455), written from Adobe's published
+// Encapsulated PostScript writer (ADR-444), written from Adobe's published
 // Encapsulated PostScript File Format Specification 3.0 and the PostScript
 // Language Reference, third edition (Level 2 operators only).
 //

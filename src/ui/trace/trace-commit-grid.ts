@@ -32,7 +32,7 @@ export const DEFAULT_TRACE_SPOT_MM = 0.1;
  *  contour figure although it needs less memory: its run time grows fastest
  *  (121 s at 6.3 MP on the owl). ADR-409 has the table.
  *
- *  Line + fill (ADR-454) is NOT measured. It runs the Centerline lane and
+ *  Line + fill (ADR-443) is NOT measured. It runs the Centerline lane and
  *  then the contour finisher on the fill mask while its own grids stay alive
  *  (ink mask, Float64 distance field, wide region, stroke discs, fill mask:
  *  about 13 B/px, and transient Float64 disc radii), so it plans with the
@@ -259,7 +259,7 @@ function traceLane(
   if (options.traceMode === 'edge') return 'edge';
   if (options.traceMode === 'centerline') return 'centerline';
   // Line + fill runs the centreline lane over the whole mask, then the
-  // contour finisher (ADR-454): its run time caps like Centerline's.
+  // contour finisher (ADR-443): its run time caps like Centerline's.
   if (options.traceMode === 'hybrid') return 'hybrid';
   return 'contour';
 }

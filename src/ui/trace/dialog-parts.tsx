@@ -127,7 +127,7 @@ export function TraceOutputFields(props: {
   readonly photoShading?: boolean;
   readonly machineKind: 'laser' | 'cnc';
   readonly traceOutput: TraceOutput;
-  /** Line + fill: Raster scan would outline its fills (ADR-454). */
+  /** Line + fill: Raster scan would outline its fills (ADR-443). */
   readonly rasterUnavailable?: boolean;
   readonly onTraceOutputChange: (output: TraceOutput) => void;
   readonly supportsFillStyle: boolean;
@@ -164,7 +164,7 @@ export function TraceOutputFields(props: {
   );
 }
 
-/** CNC and Line + fill (ADR-454: a raster scan would outline its fills) are
+/** CNC and Line + fill (ADR-443: a raster scan would outline its fills) are
  *  vector-only, whatever the picker last held. */
 export function effectiveOutput(
   kind: 'laser' | 'cnc',

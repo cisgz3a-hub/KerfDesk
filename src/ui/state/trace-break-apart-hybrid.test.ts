@@ -3,7 +3,7 @@ import type { ColoredPath, Polyline, TracedImage } from '../../core/scene';
 import { HYBRID_FILL_COLOR, HYBRID_STROKE_COLOR } from '../../core/trace/hybrid/hybrid-paths';
 import { splitTracedImage } from './trace-break-apart';
 
-// ADR-454: Break Apart on a Line + fill trace splits each stroke into its own
+// ADR-443: Break Apart on a Line + fill trace splits each stroke into its own
 // shape (a closed stroke inside another is a separate mark), while each fill
 // outline keeps its holes.
 
