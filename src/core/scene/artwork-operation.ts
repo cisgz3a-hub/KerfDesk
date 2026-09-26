@@ -77,10 +77,10 @@ export function createArtworkOperations(
     readonly name?: string;
     /** Per source colour mode, e.g. a Line + fill trace's strokes and fills
      *  (ADR-443); undefined falls back to `mode`. */
-    readonly modeForColor?: (color: string) => LayerMode | undefined;
+    readonly modeForColor?: ((color: string) => LayerMode | undefined) | undefined;
     /** Per source colour name suffix, e.g. "lines" and "fills"; undefined
      *  falls back to the colour's 1-based index. */
-    readonly nameForColor?: (color: string) => string | undefined;
+    readonly nameForColor?: ((color: string) => string | undefined) | undefined;
   } = {},
 ): ArtworkOperationsResult {
   if (!('paths' in object)) {

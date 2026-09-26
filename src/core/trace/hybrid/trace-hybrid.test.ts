@@ -43,7 +43,7 @@ function toImage(c: Canvas): RawImageData {
 }
 
 const HYBRID = {
-  ...TRACE_PRESETS['Centerline'],
+  ...TRACE_PRESETS['Centerline']!,
   traceMode: 'hybrid',
   hybridMaxStrokeWidthPx: 4,
 } as const;

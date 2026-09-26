@@ -25,14 +25,15 @@ function image(): RawImageData {
   const width = 120;
   const height = 60;
   const data = new Uint8ClampedArray(width * height * 4).fill(255);
-  const ink = (x: number, y: number): void =>
+  const ink = (x: number, y: number): void => {
     data.fill(0, (y * width + x) * 4, (y * width + x) * 4 + 3);
+  };
   for (let y = 29; y < 32; y += 1) for (let x = 10; x < 70; x += 1) ink(x, y);
   for (let y = 18; y < 42; y += 1) for (let x = 70; x < 94; x += 1) ink(x, y);
   return { width, height, data };
 }
 
-function vcarveLayer(color: string, cutType: 'v-carve' | 'profile'): Layer {
+function vcarveLayer(color: string, cutType: 'v-carve' | 'profile-on-path'): Layer {
   return {
     ...createLayer({ id: `op-${cutType}`, color }),
     cnc: { ...DEFAULT_CNC_LAYER_SETTINGS, cutType },
@@ -41,7 +42,7 @@ function vcarveLayer(color: string, cutType: 'v-carve' | 'profile'): Layer {
 
 function tracedObject(): TracedImage {
   const paths = traceHybridPaths(image(), {
-    ...TRACE_PRESETS['Centerline'],
+    ...TRACE_PRESETS['Centerline']!,
     traceMode: 'hybrid',
     hybridMaxStrokeWidthPx: 4,
   });
@@ -82,7 +83,7 @@ describe('Line + fill strokes on a V-carve layer', () => {
   it('keeps the bare centreline on a non-V-carve layer', () => {
     const carved = collectLayerContours(
       [tracedObject()],
-      vcarveLayer(HYBRID_STROKE_COLOR, 'profile'),
+      vcarveLayer(HYBRID_STROKE_COLOR, 'profile-on-path'),
       DEFAULT_DEVICE_PROFILE,
     );
     expect(carved.length).toBeGreaterThan(0);
