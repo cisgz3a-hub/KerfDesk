@@ -85,16 +85,28 @@ export function fitSpan(
   const screened = screenFirstPass(span, u, tStart, tEnd, giveUpAbove);
   if (screened !== null) return screened;
   const fit = bestPass(span, u, tStart, tEnd, giveUpAbove);
-  const passes = fit.gaveUp
-    ? undefined
-    : { cubic: fit.cubic, firstError: fit.firstError, error: fit.error, index: fit.index };
-  if (fit.gaveUp || fit.error > missAbove) {
-    return { ...missed(span, fit.cubic, fit.error, fit.index), passes };
-  }
-  // The curve-to-chain check runs once, on the pass kept: it rejects a loop
-  // or bulge that slips between the data points. A caller that only needs
-  // the decision stops it once it is past `missAbove`: the cubic is rejected
-  // whatever the rest of the check finds.
+  if (fit.gaveUp) return missed(span, fit.cubic, fit.error, fit.index);
+  return checkedFit(span, fit, missAbove, decisionOnly);
+}
+
+// The kept pass against the tolerance, then the curve-to-chain check, which
+// runs once, on the pass kept: it rejects a loop or bulge that slips between
+// the data points. A caller that only needs the decision stops it once it is
+// past `missAbove`: the cubic is rejected whatever the rest of the check
+// finds. The passes ride along for a later decision on the same span.
+function checkedFit(
+  span: ReadonlyArray<Vec2>,
+  fit: Pass & { readonly firstError: number },
+  missAbove: number,
+  decisionOnly: boolean,
+): SpanFit {
+  const passes = {
+    cubic: fit.cubic,
+    firstError: fit.firstError,
+    error: fit.error,
+    index: fit.index,
+  };
+  if (fit.error > missAbove) return { ...missed(span, fit.cubic, fit.error, fit.index), passes };
   const stopAbove = decisionOnly ? missAbove : Infinity;
   const reverse = reverseSpan(span, fit.cubic, fit.params, stopAbove);
   if (reverse.stopped) return missed(span, fit.cubic, reverse.error, fit.index);
@@ -150,6 +162,15 @@ const RETAINED_BUFFER_POINTS = 1 << 16;
 let bufferA = new Float64Array(256);
 let bufferB = new Float64Array(256);
 
+function passBuffers(length: number): [Float64Array, Float64Array] {
+  if (bufferA.length < length && length <= RETAINED_BUFFER_POINTS) {
+    bufferA = new Float64Array(Math.min(length * 2, RETAINED_BUFFER_POINTS));
+    bufferB = new Float64Array(bufferA.length);
+  }
+  if (bufferA.length >= length) return [bufferA, bufferB];
+  return [new Float64Array(length), new Float64Array(length)];
+}
+
 // The first pass at chord parameters, then Newton reparameterization passes
 // while they lower the error; the best pass is kept. A first pass beyond
 // `giveUpAbove` stops at once, marked given up. A later pass stops as soon as
@@ -162,14 +183,8 @@ function bestPass(
   tEnd: Vec2,
   giveUpAbove: number,
 ): Pass & { readonly gaveUp: boolean; readonly firstError: number } {
-  if (bufferA.length < span.length && span.length <= RETAINED_BUFFER_POINTS) {
-    bufferA = new Float64Array(Math.min(span.length * 2, RETAINED_BUFFER_POINTS));
-    bufferB = new Float64Array(bufferA.length);
-  }
-  const retained = bufferA.length >= span.length;
+  let [out, spare] = passBuffers(span.length);
   let u: ArrayLike<number> = chordParams;
-  let out = retained ? bufferA : new Float64Array(span.length);
-  let spare = retained ? bufferB : new Float64Array(span.length);
   let best: Pass | null = null;
   let firstError = 0;
   for (let pass = 0; pass <= MAX_REPARAM_PASSES; pass += 1) {
