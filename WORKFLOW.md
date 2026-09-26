@@ -1393,7 +1393,7 @@ minimum target size.
    bound still applies; the CNC-only Door progress extension does not.
 
 #### Success — generic CNC resume (ADR-180 amendment 2)
-1. The CNC **Resume** button is enabled alongside **ABORT JOB**. Its tooltip and the paused rail carry an advisory stating that Resume restarts the spindle, waits a fixed spin-up delay (4 s in stock GRBL), then continues the same line from where it stopped — and that the cutter is still in the cut, so it spins back up **engaged**. On a deep or full-width pass, check the bit before resuming. That advisory needs the controller to have reported `$32=0`: with laser mode on (`$32=1`), it says instead that Resume restarts motion at once with **no** spin-up and recommends **ABORT JOB** and recovery from the interrupted-job card. With `$32` unreported, it says the mode is unconfirmed and Resume **may** restart motion without spindle spin-up, and recommends verifying `$32=0` before resuming or aborting and recovering (ADR-180 Amendment 5). Job Review opens its Warnings list for a router job whose `$32` is on or unreported.
+1. The CNC **Resume** button is enabled alongside **ABORT JOB**. Its tooltip and the paused rail carry an advisory stating that Resume restarts the spindle, waits a fixed spin-up delay (4 s in stock GRBL), then continues the same line from where it stopped — and that the cutter is still in the cut, so it spins back up **engaged**. On a deep or full-width pass, check the bit before resuming. That advisory needs the controller to have reported `$32=0`: with laser mode on (`$32=1`), it says instead that Resume restarts motion at once with **no** spin-up and recommends **ABORT JOB** and recovery from the interrupted-job card. With `$32` unreported, it says the mode is unconfirmed and Resume **may** restart motion without spindle spin-up, and recommends verifying `$32=0` before resuming or aborting and recovering (ADR-180 Amendment 5). Job Review opens its Warnings list for a router job whose `$32` is on or unreported. When a GRBL or grblHAL controller reports `$32=1`, that warning carries **Send $32=0**: after a confirm, it writes the setting through Machine Settings' guarded write, reads `$$` back to verify, and the warning clears (ADR-180 Amendment 6). FluidNC, whose `$32` follows its YAML spindle type, gets no button.
 2. On Resume the store writes realtime `~` and waits for a fresh same-session report proving `Run` or `Idle` before refilling the stream — the **door-confirmed** branch, selected by driver capability (`realtime.safetyDoor`) rather than machine kind. GRBL restores spindle and coolant and holds motion for `SAFETY_DOOR_SPINDLE_DELAY` (4.0 s in stock `config.h`) so the cutter is back at speed before the interrupted move continues. In laser mode (`$32=1`) GRBL and grblHAL skip that delay, and the stopped cutter moves the instant power returns (CNC audit MC-1).
 3. Fresh post-command same-session `Door:3` reports keep **JOB RESUMING** live without refilling.
    Two seconds of silence fails; a non-resettable 30-second maximum bounds custom firmware. Only
@@ -2340,7 +2340,10 @@ settings and Job Review keep their existing read-only setup references.
    exact re-read check.
 2. Machine-critical travel settings are review-only. There is no fixed-value setup batch.
 3. When the active project is a laser, both Machine Setup and the confirmed Console setting lane
-   reject `$32=0` before serial transmission. Laser `$32=1` and CNC/router `$32=0` remain available.
+   reject `$32=0` before serial transmission. When it is a CNC/router, they reject `$32=1` and any
+   other non-zero `$32` the same way (ADR-180 Amendment 6): laser mode skips the spindle spin-up
+   and runs the M3 dwell with the spindle off. Laser `$32=1` and CNC/router `$32=0` remain
+   available.
 
 ---
 
