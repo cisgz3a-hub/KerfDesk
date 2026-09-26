@@ -230,15 +230,19 @@ export async function runMultiFileTrace(
     }
     const format = batchTraceFormatLabel(batch.files[0]?.format ?? 'svg');
     const summary = `Traced ${written} ${written === 1 ? 'image' : 'images'} to ${format}.`;
-    const density = defaultDensityNotice(defaultDensity, written) ?? '';
-    const message = [summary, density, skippedText, ...notices.map(traceNoticeMessage)]
-      .filter((part) => part !== '')
-      .join(' ');
-    pushToast(message, skippedText === '' ? 'success' : 'warning');
+    const density = defaultDensityNotice(defaultDensity, written);
+    pushToast(
+      joinToastParts([summary, density, skippedText, ...notices.map(traceNoticeMessage)]),
+      skippedText === '' ? 'success' : 'warning',
+    );
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
     pushToast(`Could not trace images: ${message}`, 'error');
   }
+}
+
+function joinToastParts(parts: ReadonlyArray<string | null>): string {
+  return parts.filter((part): part is string => part !== null && part !== '').join(' ');
 }
 
 function skippedMessage(skipped: ReadonlyArray<BatchTraceSkip>): string {
