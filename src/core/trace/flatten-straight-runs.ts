@@ -73,7 +73,10 @@ const MIN_OSCILLATION_PX = 0.15;
 const FLAT_LINE_SLACK_PX = 0.02;
 // A joint may snap to the intersection of its two fitted lines only within
 // this distance of the original vertex; near-parallel fits intersect far
-// away and fall back to the projection midpoint.
+// away and fall back to the projection midpoint. Denominated in SOURCE
+// pixels and multiplied by the working-grid scale like its siblings
+// (ADR-457): unscaled, a 2x trace snapped only within 1 source px, so the
+// same soft bend kept its apex at 1x and lost it at 1.5x/2x.
 const JOINT_SNAP_LIMIT_PX = 2;
 // Direction cross-products under this magnitude are parallel lines.
 const PARALLEL_EPS = 1e-6;
@@ -113,7 +116,7 @@ export function flattenStraightRuns(
     pinned.add(ring[ring.length - 1] as Vec2);
   }
   const runs = collectWobbleRuns(ring, corners, maxDeviationPx, scale);
-  const out = emitWithFittedRuns(ring, runs, pinned);
+  const out = emitWithFittedRuns(ring, runs, pinned, JOINT_SNAP_LIMIT_PX * scale);
   return closed ? mergeRingSeam(out, corners, scale) : out;
 }
 
@@ -235,7 +238,8 @@ function classifyRun(
 // With the residual cap, this also bounds distance to the finite projected
 // segment, not just its infinite line. Pins and joints retain their existing
 // emission semantics: their displacement from those projections adds to that
-// bound (a snapped joint stays within JOINT_SNAP_LIMIT_PX of its input vertex).
+// bound (a snapped joint stays within JOINT_SNAP_LIMIT_PX source px of its
+// input vertex).
 function hasLongitudinalReversal(
   ring: ReadonlyArray<Vec2>,
   start: number,
@@ -296,6 +300,7 @@ function emitWithFittedRuns(
   ring: ReadonlyArray<Vec2>,
   runs: ReadonlyArray<WobbleRun>,
   pinned: ReadonlySet<Vec2>,
+  jointSnapLimit: number,
 ): Vec2[] {
   const out: Vec2[] = [];
   let runIdx = 0;
@@ -307,7 +312,7 @@ function emitWithFittedRuns(
       i += 1;
       continue;
     }
-    out.push(runStartVertex(ring, runs, runIdx, pinned));
+    out.push(runStartVertex(ring, runs, runIdx, pinned, jointSnapLimit));
     i = run.end;
     runIdx += 1;
     const next = runs[runIdx];
@@ -327,21 +332,24 @@ function runStartVertex(
   runs: ReadonlyArray<WobbleRun>,
   runIdx: number,
   pinned: ReadonlySet<Vec2>,
+  jointSnapLimit: number,
 ): Vec2 {
   const run = runs[runIdx] as WobbleRun;
   const vertex = ring[run.start] as Vec2;
   if (pinned.has(vertex)) return vertex;
   const prev = runIdx > 0 ? runs[runIdx - 1] : undefined;
-  if (prev !== undefined && prev.end === run.start) return jointVertex(vertex, prev.line, run.line);
+  if (prev !== undefined && prev.end === run.start) {
+    return jointVertex(vertex, prev.line, run.line, jointSnapLimit);
+  }
   return projectOntoLine(run.line, vertex);
 }
 
 // Intersection of the two fitted lines when it stays near the original
 // vertex (the true apex of a soft bend); the projection midpoint otherwise —
 // near-parallel lines intersect arbitrarily far away.
-function jointVertex(vertex: Vec2, a: FitLine, b: FitLine): Vec2 {
+function jointVertex(vertex: Vec2, a: FitLine, b: FitLine, snapLimit: number): Vec2 {
   const p = intersectLines(a, b);
-  if (p !== null && chordLength(p, vertex) <= JOINT_SNAP_LIMIT_PX) return p;
+  if (p !== null && chordLength(p, vertex) <= snapLimit) return p;
   const pa = projectOntoLine(a, vertex);
   const pb = projectOntoLine(b, vertex);
   return { x: (pa.x + pb.x) / 2, y: (pa.y + pb.y) / 2 };
