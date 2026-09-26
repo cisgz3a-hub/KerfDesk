@@ -52,8 +52,8 @@ export function* preserveContourTopologySteps(
   const current = contours.map((contour) => contour.polyline);
   const attempts = contours.map(() => 0);
   const repair: TopologyRepair = { current, attempts, finishes: [...contours] };
-  const membership = new ContourMembership();
   const contacts = new ContourContactCache();
+  const membership = new ContourMembership((points) => contacts.preparedEdges(points));
   const measurements = new ContourMeasurements();
   const relations = new ContourNestingRelations();
   const curves = new CurveContactCache();

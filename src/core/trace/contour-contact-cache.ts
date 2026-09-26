@@ -30,6 +30,11 @@ export class ContourContactCache {
   >();
   private readonly orientation = new ContourOrientation();
 
+  /** The boundary's edges if this cache has prepared them, else undefined. */
+  preparedEdges(points: ReadonlyArray<Vec2>): ContourEdges | null | undefined {
+    return this.geometries.get(points);
+  }
+
   *findSteps(polylines: ReadonlyArray<Polyline>): TraceSteps<Set<number> | undefined> {
     const cooperate = yield;
     const loops: Loop[] = [];

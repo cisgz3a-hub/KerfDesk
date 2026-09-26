@@ -1,6 +1,7 @@
 import type { Vec2 } from '../scene';
 import { contourBox, finiteContourBox, type ContourBox } from './contour-bounds';
 import { ContourBoxIndex } from './contour-box-index';
+import type { ContourEdges } from './contour-edges';
 import { ContourOrientation, insideContour } from './contour-orientation';
 import { runTraceSteps, type TraceSteps } from './trace-steps';
 
@@ -18,10 +19,17 @@ type PreparedContour = {
 // builds the index, so later queries never scan every edge.
 const SCAN_CHECKPOINT_INTERVAL = 32;
 
+/** Edges already indexed for a boundary elsewhere, if any. */
+export type IndexedContourEdges = (points: ReadonlyArray<Vec2>) => ContourEdges | null | undefined;
+
 /** Reuse immutable source/candidate boundaries during one topology repair. */
 export class ContourMembership {
   private readonly prepared = new WeakMap<ReadonlyArray<Vec2>, PreparedContour | null>();
   private readonly orientation = new ContourOrientation();
+
+  /** `indexed` lends boundaries whose edges are already indexed, such as the
+   *  contact cache's (contour-contact-cache.ts); their index answers the ray. */
+  constructor(private readonly indexed?: IndexedContourEdges) {}
 
   contains(point: Vec2, points: ReadonlyArray<Vec2>): boolean {
     return runTraceSteps(this.containsSteps(point, points));
@@ -62,7 +70,10 @@ export class ContourMembership {
     points: ReadonlyArray<Vec2>,
     contour: PreparedContour,
   ): TraceSteps<number> {
-    if (contour.scanned) {
+    // A lent index answers from the first query; otherwise the first query
+    // scans and a second builds the crossing index.
+    contour.index ??= this.indexed?.(points)?.index;
+    if (contour.scanned || contour.index !== undefined) {
       contour.index ??= yield* crossingIndexSteps(points);
       return rayWinding(point, contour.index, this.orientation);
     }
@@ -79,6 +90,9 @@ function matchesQuery(
   return previous !== undefined && previous.x === point.x && previous.y === point.y;
 }
 
+/** Every edge of the boundary may be in the index: a horizontal edge never
+ *  crosses the ray, and a repeated closing point adds only a horizontal edge,
+ *  so an index of all edges (contour-edges.ts) gives the same winding. */
 function rayWinding(
   point: Vec2,
   index: ContourBoxIndex<CrossingEdge>,
