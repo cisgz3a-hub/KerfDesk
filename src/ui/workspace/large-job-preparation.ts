@@ -44,6 +44,9 @@ export function prepareLargeJob(
     ...(options.absoluteProgramOffset === undefined
       ? {}
       : { absoluteProgramOffset: options.absoluteProgramOffset }),
+    ...(options.workZeroBedPosition === undefined
+      ? {}
+      : { workZeroBedPosition: options.workZeroBedPosition }),
     ...(options.jobOrigin === undefined ? {} : { jobOrigin: options.jobOrigin }),
     ...(options.outputScope === undefined ? {} : { outputScope: options.outputScope }),
   });
@@ -62,6 +65,9 @@ export async function prepareLargeJobAsync(
     ...(options.absoluteProgramOffset === undefined
       ? {}
       : { absoluteProgramOffset: options.absoluteProgramOffset }),
+    ...(options.workZeroBedPosition === undefined
+      ? {}
+      : { workZeroBedPosition: options.workZeroBedPosition }),
     ...(options.jobOrigin === undefined ? {} : { jobOrigin: options.jobOrigin }),
     ...(options.outputScope === undefined ? {} : { outputScope: options.outputScope }),
   });

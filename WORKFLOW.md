@@ -4220,6 +4220,20 @@ and lifts the command's CNC-only gate.)*
    shares those values. The warning is advisory and does not alter motion or add a policy
    gate; the operator must verify the shared values before cutting.
 
+#### Edge — park position set in Machine Setup (ADR-392)
+1. Park X and Y are a bed position. The bit-change park and the end park move with the job like
+   every cut: with zero at bed (150, 100), a park of X0 Y380 is written as `G0 X-150.000
+   Y280.000` and lands at bed (0, 380), not at bed (150, 480). Absolute artwork is already in bed
+   numbers, so its park shifts exactly as its cuts do.
+2. A placed job knows where program zero sits on the bed only after a confirmed Home this
+   session, once the controller has reported the settings and work offset that place it. Without
+   that (no Home yet, a machine without homing, or any Verified Origin job, whose origin is set by
+   hand) the configured park is not used: the job parks at its origin, which for Current Position
+   is where the head started. Job Review's "Park after job" still shows the Machine Setup numbers,
+   labelled as a bed position.
+3. No park set keeps the old behaviour: Current Position parks at its start, every other mode at
+   program X0 Y0. The out-of-bed advisory and the park-outside-frame note check the placed park.
+
 ### F-CNC15. Re-zero Z at a tool change — Phase H.7
 
 #### Work-Z evidence at Start *(demoted by frame-first — ADR-228; this section predates it)*

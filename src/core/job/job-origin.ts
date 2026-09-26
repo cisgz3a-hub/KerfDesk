@@ -230,6 +230,38 @@ function translateGroup(group: Group, dx: number, dy: number): Group {
   }
 }
 
+/**
+ * A configured CNC park is a bed position (ADR-392; CNC audit CO-1). It enters
+ * the program frame through `bedToProgram`, the translation that takes a bed
+ * point to program coordinates. Null means where program zero sits on the bed
+ * is unknown, so the park cannot be placed: it is dropped and the job parks at
+ * its own start instead (parkTarget's fallback), never at bed numbers read as
+ * program coordinates.
+ */
+export function placeCncParks(job: Job, bedToProgram: Vec2 | null): Job {
+  if (!job.groups.some(hasConfiguredPark)) return job;
+  return {
+    ...job,
+    groups: job.groups.map((group) =>
+      hasConfiguredPark(group) ? placeCncPark(group, bedToProgram) : group,
+    ),
+  };
+}
+
+function hasConfiguredPark(group: Group): group is CncGroup {
+  return group.kind === 'cnc' && (group.parkXMm !== undefined || group.parkYMm !== undefined);
+}
+
+function placeCncPark(group: CncGroup, bedToProgram: Vec2 | null): CncGroup {
+  const { parkXMm, parkYMm, ...unparked } = group;
+  if (bedToProgram === null) return unparked;
+  return {
+    ...unparked,
+    parkXMm: (parkXMm ?? 0) + bedToProgram.x,
+    parkYMm: (parkYMm ?? 0) + bedToProgram.y,
+  };
+}
+
 function translateCncGroup(group: CncGroup, dx: number, dy: number): CncGroup {
   return {
     ...group,
