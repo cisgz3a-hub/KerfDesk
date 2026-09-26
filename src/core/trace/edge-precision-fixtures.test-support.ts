@@ -34,12 +34,13 @@ export function lumaImage(size: number, lumaOf: (x: number, y: number) => number
   return { width: size, height: size, data };
 }
 
-/** Black ink whose alpha carries the disc coverage, on transparent paper. */
-export function alphaDiscImage(size: number, disc: Disc): RawImageData {
+/** Black ink whose alpha carries the disc coverage (scaled to `inkAlpha`
+ *  at full coverage), on transparent paper. */
+export function alphaDiscImage(size: number, disc: Disc, inkAlpha = 255): RawImageData {
   const data = new Uint8ClampedArray(size * size * 4);
   for (let y = 0; y < size; y += 1) {
     for (let x = 0; x < size; x += 1) {
-      data.set([0, 0, 0, Math.round(255 * discCoverage(x, y, disc))], (y * size + x) * 4);
+      data.set([0, 0, 0, Math.round(inkAlpha * discCoverage(x, y, disc))], (y * size + x) * 4);
     }
   }
   return { width: size, height: size, data };
@@ -78,4 +79,34 @@ export function radiusStats(
   return samples === 0
     ? { bias: Number.NaN, rms: Number.NaN, samples }
     : { bias: sum / samples, rms: Math.sqrt(sumSq / samples), samples };
+}
+
+/** Separable Gaussian blur of an opaque grey image (red channel as luma),
+ *  in float, rounded once: a symmetric kernel `sigma` px wide, as a scan or
+ *  a soft photo carries it. Edges are clamped. */
+export function gaussianBlurred(image: RawImageData, sigma: number): RawImageData {
+  const { width, height } = image;
+  const half = Math.ceil(3 * sigma);
+  const kernel: number[] = [];
+  for (let k = -half; k <= half; k += 1) kernel.push(Math.exp(-(k * k) / (2 * sigma * sigma)));
+  const total = kernel.reduce((sum, w) => sum + w, 0);
+  const pass = (src: Float64Array, horizontal: boolean): Float64Array => {
+    const out = new Float64Array(width * height);
+    for (let y = 0; y < height; y += 1) {
+      for (let x = 0; x < width; x += 1) {
+        let acc = 0;
+        for (let k = -half; k <= half; k += 1) {
+          const sx = horizontal ? Math.min(width - 1, Math.max(0, x + k)) : x;
+          const sy = horizontal ? y : Math.min(height - 1, Math.max(0, y + k));
+          acc += (kernel[k + half] ?? 0) * (src[sy * width + sx] ?? 0);
+        }
+        out[y * width + x] = acc / total;
+      }
+    }
+    return out;
+  };
+  const luma = new Float64Array(width * height);
+  for (let p = 0; p < luma.length; p += 1) luma[p] = image.data[p * 4] ?? 255;
+  const blurred = pass(pass(luma, true), false);
+  return lumaImage(width, (x, y) => blurred[y * width + x] ?? 255);
 }

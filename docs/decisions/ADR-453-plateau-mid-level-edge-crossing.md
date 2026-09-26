@@ -14,19 +14,30 @@ the cut is the edge level, but the automatic cut splits the histogram where the 
 balance, which on real art is usually darker than the mid-level. Every crossing then lands inside the
 ink: the 2026-09-25 bake-off measured a -0.12 px mean radius on an anti-aliased disc for Smooth and
 Sharp, 0.18-0.19 px apex gaps, and Smooth AA hairline recall 0.775 against Potrace 1.16's 0.887
-(backlog item G2).
+(backlog item G2). The -0.12 px figure does not reproduce on a10013827's own synthetic disc on white
+paper: there Otsu lands at 125, inside the deadband (Decision 5), and the end-to-end output is
+byte-identical before and after at -0.029 px (see "End to end"). The bias shows where the automatic
+cut is pulled away from the mid-level, as with the grey-patch fixtures below.
 
 An anti-aliased or symmetrically blurred step between ink level I and paper level P has the value
-(I + P) / 2 exactly at the edge (50% coverage), for a symmetric kernel of any width. So the right
-crossing level needs the two plateaus, not the kernel.
+(I + P) / 2 exactly at the edge (50% coverage), for a symmetric kernel of any width. So in theory
+the right crossing level needs the two plateaus, not the kernel. The implementation reads those
+plateaus from blocks 1-3 px past the crack and keeps the crossing inside the mask's own crack, so it
+is only exact for anti-aliased edges and narrow blurs; see "Limits".
 
 ### Decision
 
 1. **A walker-only crossing hook.** `CrackSubPixelField.crackCrossingAt(inkX, inkY, bgX, bgY)`
    (optional) returns the crossing t of one crack. `contour-boundary.ts` consults it before the
    threshold interpolation; `contour-support.ts` passes it through for unpatched cracks. Saddle
-   decisions and cleanup read only `lumaAt` / `thresholdAt`, so the mask and topology are exactly the
-   cut's. Fields without the hook run the old arithmetic unchanged.
+   decisions and cleanup read only `lumaAt` / `thresholdAt`, so the mask and its topology are
+   unchanged. The finished contours can still shift by a component: the fits downstream see moved
+   vertices (thin-bars.clean Smooth misses 2 components instead of 1; thin-bars.scan Smooth misses 4
+   instead of 7). Fields without the hook run the old arithmetic unchanged. The plateau gate reads
+   the thresholded mask before cleanup and restoration. On the upscale route,
+   `restoreEnlargedContourSupport` vetoes the hook only when one of a crack's own two pixels is
+   patched, so a gate block can overlap a restored cell and decide broad or thin on the
+   pre-restoration mask. That affects vertex placement only, never topology.
 2. **Local plateau mid-level on broad edges** (`crack-iso-levels.ts` `withPlateauCrossing`, wired by
    `walker-crack-field.ts` on the automatic cut only). For each crack, the (2r+1)^2 block just past
    the ink pixel (r = 1 source px x pixelScale, reaching 2r + 2 px along the normal) must be all ink
@@ -79,6 +90,9 @@ coverage (`crack-iso-levels.test.ts`):
 | disc, right half on 150-grey paper | 97 | -0.0427 / 0.1665 | -0.0169 / 0.0937 |
 | Line Art AA disc | - | -0.0003 / 0.0542 | unchanged (same bytes) |
 
+The +/-0.03 px radius criterion is met at this crack-chain layer (rows two to four). The finished
+output adds the finishing fits' own error; see "End to end".
+
 Where the cut lands very far below the mid-level (109 against 127.5), pixels whose coverage lies
 between the two levels are paper in the mask. The crossing cannot pass their centre without
 changing topology, so a -0.03 px residual remains. Final-polyline vertex RMS is 0.11-0.14 px on
@@ -90,7 +104,61 @@ Smooth AA 30 deg / 60 deg is 0.9750 / 0.9375 alone and 0.8875 / 0.8875 beside th
 binary is 1.0000 / 0.9130 alone and 0.8986 / 0.8986 beside the square. All are at or above the
 0.887 target. The 0.75 floor the backlog refers to (ADR-405 on the geometry-core branch) does not
 exist on this base: its Smooth-beside-square floor is 0.85, and it is left as is. The square-apex
-gate the backlog cites is also not on this base.
+gate the backlog cites is not on this base either. The bake-off's `maxApexErrPx` (px, identical for
+O-smooth and O-sharp) still gives the apex numbers, base -> this change:
+
+| fixture                                                       | base          | now           |
+| ------------------------------------------------------------- | ------------- | ------------- |
+| solid-red.clean                                               | 0.416         | 0.091         |
+| solid-blue.clean                                              | 0.415         | 0.092         |
+| solid-gold.clean / .scan                                      | 0.200 / 0.199 | 0.091 / 0.074 |
+| solid-dark-noise.clean / .scan                                | 0.421 / 0.209 | 0.142 / 0.213 |
+| rounded-rects.clean                                           | 0.155         | 0.109         |
+| solid-red.scan, solid-blue.scan, small-squares, rotated-rects | unchanged     | unchanged     |
+
+So the square apex is under 0.08 px only on solid-gold.scan (and on the .scan squares that were
+already there). The clean 200 px squares reach 0.09 px; the rest of their apex error is the
+finishing fit's.
+
+### End to end
+
+`traceImageToColoredPaths` on the same synthetic fixtures (vertex radial error within 1.5 px of the
+true edge, bias / RMS px). Base is the same build with `walker-crack-field.ts` mocked to return the
+plain field:
+
+| fixture, preset                                         | base                     | now                      |
+| ------------------------------------------------------- | ------------------------ | ------------------------ |
+| AA disc r=60 on white, Smooth and Sharp                 | -0.0290 / 0.1215         | same bytes               |
+| + 180-grey patch (Otsu 113), Smooth                     | -0.0789 / 0.1574         | -0.0325 / 0.1388         |
+| + 180-grey patch, Sharp                                 | -0.1023 / 0.1438         | -0.0325 / 0.1388         |
+| disc half on 150-grey paper, Smooth                     | +0.0058 / 0.1886         | -0.0242 / 0.1301         |
+| disc half on 150-grey paper, Sharp                      | +0.0058 / 0.1886         | -0.0357 / 0.1362         |
+| 56 px source, disc r=12 half on 170 grey, Smooth        | +0.0992 / 0.1929 (n=53)  | +0.1211 / 0.1843 (n=49)  |
+| 56 px source, disc r=12 half on 170 grey, Sharp         | +0.0520 / 0.1226 (n=81)  | +0.0281 / 0.0868 (n=73)  |
+| every fixture above, Line Art                           | -                        | same bytes               |
+
+End to end, the far-Otsu disc lands at -0.0325 px: much closer, but just outside +/-0.03. So the
++/-0.03 criterion is met at the crack-chain layer only.
+
+### Limits
+
+- **Wide blurs.** The plateau blocks sit 1-3 source px past the crack, and t stays in 0.1-0.9 of
+  the mask's own crack. For a symmetric blur, both block extremes fall short of their plateaus by
+  about the same amount, so the mid-level still holds. The residual comes from the crack
+  confinement: once the ramp is wide, the 50% point often lies beyond the paper pixel of the crack
+  the cut chose. On the far-Otsu disc blurred by a Gaussian (crack-chain layer, Sharp; recorded by
+  `crack-iso-levels.test.ts`), bias / RMS px goes -0.145 / 0.160 -> -0.067 / 0.117 at sigma 1 px and
+  -0.262 / 0.272 -> -0.151 / 0.201 at sigma 2 px. Walking the blocks outward while the block mean
+  keeps ramping by more than 3% of the step (up to 4 px further) was measured and dropped: sigma 1
+  was unchanged and sigma 2 only moved -0.151 -> -0.136. Lifting the clamp entirely (a measurement
+  only; it lets vertices leave their crack) still left -0.050 and -0.101. A wide-blur fix therefore
+  needs crossings that can move to the neighbouring crack, which is a topology question outside
+  this ADR.
+- **Upscale route.** On a small Smooth source traced through the upscale route, the plateau crossing
+  adds to the fit tail's outward push (+0.099 -> +0.121 px bias, RMS 0.193 -> 0.184, End to end
+  table). Sharp improves on the same fixture. At the crack-chain layer, pixelScale 2 doubles the
+  block radius and leaves -0.037 px on the far-Otsu disc (the cut alone gives -0.07); a test
+  records it.
 
 Bake-off (owl, hummingbird, analytic set; O-default / O-smooth / O-sharp vs P-default, before /
 after): see "Bake-off" below.
@@ -115,6 +183,20 @@ Contestants: P-default, O-default, O-smooth and O-sharp.
   - solid-dark-noise.scan -0.0008 (the extreme of a noisy dark block reads about 8 levels dark)
   - solid-gold.scan -0.0003, solid-blue.clean -0.00014, solid-red.clean -0.00008. Area error
     improves on all three.
+- Deviation, apex and component changes that the IoU means hide (O-smooth and O-sharp alike unless
+  noted):
+  - RMS deviation worse: solid-dark-noise.scan 0.082 -> 0.128 (the extreme of a noisy block follows
+    the noise), solid-gold.scan 0.137 -> 0.152, rounded-rects.clean 0.131 -> 0.137 (Smooth) and
+    0.127 -> 0.134 (Sharp).
+  - RMS deviation better: solid-dark-noise.clean 0.182 -> 0.090, calibration-subpixel-aa 0.199 ->
+    0.091, counter-letters.scan Sharp 0.214 -> 0.162, and 12 smaller gains.
+  - Apex worse: s-curve-band.scan 0.275 -> 0.316, text-large.scan Sharp 2.799 -> 2.841,
+    solid-dark-noise.scan 0.209 -> 0.213. Apex better: the table above, text-small and
+    counter-letters.scan.
+  - Components: thin-bars.clean Smooth misses 2 instead of 1 and has 2 spurious instead of 1;
+    thin-bars.scan Smooth misses 4 instead of 7; owl Smooth misses 4589 instead of 4588, owl Sharp
+    564 instead of 567.
+- Hard photos were not run before and after, so "no IoU loss on hard photos" is not evaluated.
 - Calibration thin bars (report-only placements) lose: 100x8 -0.015/-0.017 and 100x20
   -0.007/-0.007 (Smooth/Sharp). This does not come from the crossing. The crack layer on the 8 px bar
   improves: the top edge was 0.29 px inside the ink and is now 0.10 px inside. The measured-loop fit

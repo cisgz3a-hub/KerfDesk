@@ -11,6 +11,7 @@ import { bandCrossing, isoCrossing } from './crack-iso-levels';
 import {
   alphaDiscImage,
   discCoverage,
+  gaussianBlurred,
   lumaImage,
   radiusStats,
   type Disc,
@@ -74,9 +75,17 @@ describe('isoCrossing / bandCrossing', () => {
 });
 
 describe('automatic cut: plateau mid-level on broad edges (ADR-453)', () => {
-  it('places an anti-aliased disc at 50% coverage on Smooth and Sharp', () => {
-    for (const name of ['Smooth', 'Sharp'])
-      expectPrecise(radiusStats(chains(discOnPaper(), preset(name)).placed, DISC));
+  it('removes the inward bias of a far automatic cut on Smooth and Sharp', () => {
+    // A grey patch clear of the disc pulls Otsu to <= 115 (mid-level 127.5):
+    // the cut's own crossings sit inside the ink (fails +/-0.03 before
+    // ADR-453); the plateau mid-level places the disc at 50% coverage.
+    const image = discOnPaper(180, 170);
+    expect(otsuThreshold(image)).toBeLessThanOrEqual(115);
+    for (const name of ['Smooth', 'Sharp']) {
+      const { placed, cutOnly } = chains(image, preset(name));
+      expect(radiusStats(cutOnly, DISC).bias).toBeLessThan(-0.06);
+      expectPrecise(radiusStats(placed, DISC), 0.065);
+    }
   });
 
   it('keeps the crossing of a cut that already sits at the mid-level', () => {
@@ -88,20 +97,46 @@ describe('automatic cut: plateau mid-level on broad edges (ADR-453)', () => {
     expect(placed).toEqual(cutOnly);
   });
 
-  it('removes the inward bias when the automatic cut lands far below the mid-level', () => {
-    const image = discOnPaper(180, 170);
-    expect(otsuThreshold(image)).toBeLessThanOrEqual(115);
-    const { placed, cutOnly } = chains(image, preset('Smooth'));
-    expect(radiusStats(cutOnly, DISC).bias).toBeLessThan(-0.06);
-    expectPrecise(radiusStats(placed, DISC), 0.065);
-  });
-
   it('uses the local paper level where the disc meets grey paper', () => {
     const { placed, cutOnly } = chains(discOnPaper(150, 130), preset('Sharp'));
     const before = radiusStats(cutOnly, DISC);
     const after = radiusStats(placed, DISC);
     expect(Math.abs(after.bias)).toBeLessThanOrEqual(0.03);
     expect(after.rms).toBeLessThan(0.7 * before.rms);
+  });
+
+  it('records the residual inward bias of a Gaussian-blurred edge', () => {
+    // A symmetric blur leaves both block extremes equally short of their
+    // plateaus, so the mid-level itself holds; what remains is the crossing
+    // being confined to the mask's own crack pair (t in 0.1..0.9), which a
+    // wide ramp outgrows. Measured on this fixture (ADR-453 Limits): sigma 1
+    // -0.145 -> -0.067 px, sigma 2 -0.262 -> -0.151 px mean radius.
+    const residual = { 1: [-0.09, -0.04], 2: [-0.18, -0.12] } as const;
+    for (const sigma of [1, 2] as const) {
+      const image = gaussianBlurred(discOnPaper(180, 170), sigma);
+      const { placed, cutOnly } = chains(image, preset('Sharp'));
+      const before = radiusStats(cutOnly, DISC);
+      const after = radiusStats(placed, DISC);
+      expect(after.bias).toBeGreaterThan(residual[sigma][0]);
+      expect(after.bias).toBeLessThan(residual[sigma][1]);
+      expect(Math.abs(after.bias)).toBeLessThan(0.6 * Math.abs(before.bias));
+      expect(after.rms).toBeLessThan(0.8 * before.rms);
+    }
+  });
+
+  it('records the pixelScale block scaling (upscale route)', () => {
+    // pixelScale 2 doubles the block radius and reach. On this 1x disc the
+    // wider blocks leave -0.037 px (cut alone -0.07), just outside +/-0.03;
+    // end to end a small upscaled Smooth source moves the other way (the fit
+    // tail's outward push, ADR-453 Limits), so it is recorded, not claimed.
+    const image = discOnPaper(180, 170);
+    const { placed, cutOnly } = chains(image, { ...preset('Sharp'), pixelScale: 2 });
+    const before = radiusStats(cutOnly, DISC);
+    const after = radiusStats(placed, DISC);
+    expect(before.bias).toBeLessThan(-0.06);
+    expect(after.bias).toBeGreaterThan(-0.05);
+    expect(after.bias).toBeLessThan(-0.02);
+    expect(after.rms).toBeLessThan(before.rms);
   });
 
   it('keeps the crossing of the cut on a thin stroke', () => {
@@ -126,6 +161,19 @@ describe('alpha route and Cutoff > 0 bands (ADR-456)', () => {
     const options = { ...preset('Sharp'), traceTransparency: true };
     const { placed } = chains(alphaDiscImage(140, disc), options);
     expectPrecise(radiusStats(placed, disc));
+  });
+
+  it('records the inward bias of semi-transparent ink (alpha 127 crossing)', () => {
+    // The crossing is at 255 - alpha = 128, i.e. 50% of FULL alpha, not of
+    // the ink's own 200 (ADR-456 Decision 3): bias worsens, RMS improves.
+    const disc: Disc = { cx: 70.4, cy: 69.7, r: 40 };
+    const options = { ...preset('Sharp'), traceTransparency: true };
+    const { placed, cutOnly } = chains(alphaDiscImage(140, disc, 200), options);
+    const before = radiusStats(cutOnly, disc);
+    const after = radiusStats(placed, disc);
+    expect(after.bias).toBeLessThan(-0.15);
+    expect(after.bias).toBeGreaterThan(-0.19);
+    expect(after.rms).toBeLessThan(0.75 * before.rms);
   });
 
   it('places both edges of a mid-grey band ring', () => {

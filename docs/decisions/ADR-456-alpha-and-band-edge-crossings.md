@@ -27,7 +27,12 @@ vertex RMS at the crack-chain layer, against about 0.055 px where a field exists
    receives no field on these routes.
 3. **Alpha route** (`walker-crack-field.ts` `alphaBandField`). The alpha mask is the band cut of
    255 - alpha, with the same Cutoff/Threshold, so the same band crossing applies to that plane.
-   With Cutoff 0 and Threshold 128 the level is 127.5-128, a 50% alpha coverage.
+   With Cutoff 0 and Threshold 128 the level is 127.5-128: 50% alpha coverage for fully opaque
+   ink. Semi-transparent ink crosses at alpha 127, not at half of the ink's own alpha, so its edge
+   sits inside the ink. On an alpha disc r=40 whose ink alpha peaks at 200 (Sharp, crack-chain
+   layer), mean bias moves from -0.136 to -0.170 px while RMS improves from 0.271 to 0.182 px; a test
+   records it. Reading a local alpha plateau, as ADR-453 does for luma, would fix this and is left
+   open.
 4. **Luma bands** (Cutoff > 0) get `bandCrackField` on the leveled luma the band was cut from.
 
 ### Measurements
@@ -55,4 +60,6 @@ Cutoff > 0 contestant. The synthetic fixtures above are the measure for this rou
 
 - Transparent cut-outs and Cutoff > 0 band traces get the same edge accuracy as threshold traces.
 - Two tests that asserted a null alpha field now assert the intended field
-  (`faint-line-recovery.test.ts`, `trace-image-auto-detail.test.ts`).
+  (`faint-line-recovery.test.ts`, `trace-image-auto-detail.test.ts`). The faint-line test checks
+  that both preparations carry the alpha band field (thresholdAt NaN) and the same crossing on
+  every edge crack of a fixture with a transparent margin and a soft alpha column.

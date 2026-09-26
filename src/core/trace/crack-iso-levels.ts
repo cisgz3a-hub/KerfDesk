@@ -3,17 +3,21 @@
 // The binary mask decides WHAT exists; these levels only decide WHERE each
 // crack's edge sits between its two pixel centres. They reach the walker
 // through CrackSubPixelField.crackCrossingAt, which saddle decisions and the
-// cleanup stages never read, so topology is exactly the mask's.
+// cleanup stages never read, so the mask's topology is unchanged (finished
+// contour counts can still shift by one through the fits downstream).
 //
 // 1. Plateau mid-level (automatic cut). An anti-aliased or symmetrically
 //    blurred step between ink level I and paper level P has value (I+P)/2
 //    exactly where the edge is (50% coverage): a symmetric kernel of any
 //    width integrates equal halves of each side there. So the crossing level
 //    needs only the two LOCAL plateaus, not the kernel (a global pair of
-//    levels misplaces an edge against grey paper by up to +0.09 px). The automatic (Otsu) cut
-//    splits the histogram wherever the class variances balance, which on
-//    real art is usually darker than the mid-level: crossings then land
-//    inside the ink (measured -0.12 px mean radius on an anti-aliased disc).
+//    levels misplaces an edge against grey paper by up to +0.09 px). The
+//    automatic (Otsu) cut splits the histogram wherever the class variances
+//    balance, which is often darker than the mid-level: crossings then land
+//    inside the ink. LIMIT: the plateaus are read 1-3 source px past the
+//    crack and t stays within the mask's own crack, so a blur wider than
+//    about 1 px keeps part of the inward bias (Gaussian sigma 2: -0.26 ->
+//    -0.15 px; ADR-453 Limits).
 // 2. Thin features keep the cut. Where the ink or the paper side of a crack
 //    holds no uniform 3x3-source-px block (a hairline, a narrow counter), the
 //    samples never reach a plateau and pushing the edge past the mask's own
@@ -25,7 +29,9 @@
 //    lo ≤ v ≤ hi, so each crack takes the band edge its paper sample lies
 //    beyond: v > hi crosses at hi, v < lo crosses at lo with the polarity
 //    reversed. A crack whose ink sample is outside the band (a cleanup flip)
-//    keeps the plain midpoint.
+//    keeps the plain midpoint. On the alpha route that is 50% coverage for
+//    fully opaque ink only; semi-transparent ink crosses at alpha 127
+//    (ADR-456).
 //
 // Our own design from the coverage model; no third-party tracer code.
 
