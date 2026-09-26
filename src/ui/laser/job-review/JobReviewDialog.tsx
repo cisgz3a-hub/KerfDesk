@@ -137,6 +137,7 @@ function ReviewMachineFacts({
         machineKind={model.machineKind}
         toolPlanLabels={model.toolPlanLabels}
         outputQualityFacts={model.outputQualityFacts}
+        {...(model.startFrom === undefined ? {} : { startFrom: model.startFrom })}
         {...context}
       />
     </section>

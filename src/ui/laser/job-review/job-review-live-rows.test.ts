@@ -108,6 +108,36 @@ describe('Job Review machine facts', () => {
       tone: 'warning',
     });
   });
+
+  // ADR-392 Amendment 1: an unset park used to read "Machine origin", which is
+  // wrong for every placed job: they end at program X0 Y0 or their own start.
+  it('labels a set park as a bed position and an unset one by where the job ends', () => {
+    const cnc = (park: { readonly parkXMm?: number; readonly parkYMm?: number }) => ({
+      ...createProject(DEFAULT_DEVICE_PROFILE),
+      machine: {
+        ...DEFAULT_CNC_MACHINE_CONFIG,
+        params: { ...DEFAULT_CNC_MACHINE_CONFIG.params, ...park },
+      },
+    });
+    const parkFact = (
+      project: ReturnType<typeof cnc>,
+      startFrom?: Parameters<typeof buildMachineReviewFacts>[2],
+    ) =>
+      buildMachineReviewFacts(project, null, startFrom).find((f) => f.label === 'Park after job');
+
+    expect(parkFact(cnc({ parkXMm: 0, parkYMm: 200 }), 'user-origin')?.value).toBe(
+      'Bed X 0 · Y 200',
+    );
+    expect(parkFact(cnc({ parkYMm: 380 }), 'absolute')?.value).toBe('Bed X 0 · Y 380');
+    expect(parkFact(cnc({}), 'current-position')?.value).toBe(
+      'Not set · back to where the job started',
+    );
+    expect(parkFact(cnc({}), 'user-origin')?.value).toBe('Not set · program X0 Y0');
+    expect(parkFact(cnc({}), 'absolute')?.value).toBe('Not set · program X0 Y0');
+    expect(parkFact(cnc({}))?.value).toBe(
+      'Not set · program X0 Y0, or a Current Position job start',
+    );
+  });
 });
 
 describe('Job Review override facts (ADR-355)', () => {
