@@ -7,6 +7,7 @@
 // without a curve and gets straight segments over its points.
 
 import {
+  carrySubpathNesting,
   polylineToCurveSubpath,
   type ColoredPath,
   type CurveSubpath,
@@ -76,7 +77,8 @@ export function scaleTracedPaths(
   scaleY: number,
 ): ColoredPath[] {
   const map = (p: Vec2): Vec2 => ({ x: p.x * scaleX, y: p.y * scaleY });
-  return withCanonicalTraceCurves(
+  // A positive per-axis scale keeps every containment, so the forest carries.
+  const scaled = withCanonicalTraceCurves(
     paths.map((path) => {
       const polylines = path.polylines.map((polyline) => ({
         closed: polyline.closed,
@@ -96,6 +98,7 @@ export function scaleTracedPaths(
       };
     }),
   );
+  return scaled.map((path, index) => carrySubpathNesting(paths[index] as ColoredPath, path));
 }
 
 function scaleCurve(curve: CurveSubpath, map: (p: Vec2) => Vec2): CurveSubpath {

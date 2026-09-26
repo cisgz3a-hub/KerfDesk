@@ -11,6 +11,7 @@
 
 import {
   DEFAULT_MACHINE_CURVE_TOLERANCE_MM,
+  carrySubpathNesting,
   flattenCurveSubpath,
   polylineToCurveSubpath,
   type ColoredPath,
@@ -59,7 +60,11 @@ export function simplifyTracedPathsForLaser(
         : null,
   };
   const candidates = paths.map((path) => conditionPath(path, moves));
-  return preserveLaserTraceTopology(paths, candidates, placement);
+  // The topology check keeps every crossing and nesting relation of the
+  // source, subpath for subpath, so a traced forest (ADR-406) carries.
+  return preserveLaserTraceTopology(paths, candidates, placement).map((path, index) =>
+    path === paths[index] ? path : carrySubpathNesting(paths[index] as ColoredPath, path),
+  );
 }
 
 function conditionPath(path: ColoredPath, moves: LaserMoves): ColoredPath {

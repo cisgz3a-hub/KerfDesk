@@ -37,7 +37,13 @@ import { fitSmoothCurve } from './centerline/curve-fit';
 import { denseChordBand } from './contour-chord-band';
 import { flattenStraightRuns } from './flatten-straight-runs';
 import { smoothArcNoise } from './smooth-arc-noise';
-import { curvedTraceRing, withCanonicalTraceCurves } from './trace-curves';
+import { curvedTraceRing } from './trace-curves';
+import {
+  keptForest,
+  latticeLoopParents,
+  nestedContourPath,
+  type NestedContourRings,
+} from './contour-nesting';
 import { optimizationToleranceScaleFromOptimize } from './trace-optimize';
 import { contourFeatureAnchors } from './contour-feature-anchors';
 import {
@@ -170,7 +176,7 @@ export function* traceImageToContourColoredPathsSteps(
   // trace: areas scale by scale², lengths (simplify ε) by scale.
   const scale = effectivePixelScale(options);
   const toleranceScale = optimizationToleranceScaleFromOptimize(options.optimize);
-  const polylines = yield* contourPolylinesFromMaskSteps(mask, {
+  const rings = yield* contourRingsFromMaskSteps(mask, {
     minAreaPx: Math.max(options.ignoreLessThanPixels ?? 0, 0) * scale * scale,
     epsilonPx:
       SIMPLIFY_EPSILON_PX * Math.max(0.1, options.lineTolerance ?? 1) * scale * toleranceScale,
@@ -181,9 +187,7 @@ export function* traceImageToContourColoredPathsSteps(
     turnPolicy: normalizeTurnPolicy(options.turnPolicy),
     ...(crackField === null ? {} : { crackField }),
   });
-  return polylines.length === 0
-    ? []
-    : withCanonicalTraceCurves([{ color: CONTOUR_COLOR, polylines }]);
+  return rings.polylines.length === 0 ? [] : [nestedContourPath(CONTOUR_COLOR, rings)];
 }
 
 export type ContourFinishOptions = {
@@ -219,6 +223,15 @@ export function* contourPolylinesFromMaskSteps(
   mask: InkMask,
   options: ContourFinishOptions,
 ): TraceSteps<Polyline[]> {
+  return [...(yield* contourRingsFromMaskSteps(mask, options)).polylines];
+}
+
+/** The finished outlines in boundary scan order, with their containment forest
+ *  from the raw lattice loops (contour-nesting.ts, ADR-406). */
+export function* contourRingsFromMaskSteps(
+  mask: InkMask,
+  options: ContourFinishOptions,
+): TraceSteps<NestedContourRings> {
   const cooperate = yield;
   const pixelScale =
     options.pixelScale !== undefined && Number.isFinite(options.pixelScale)
@@ -238,15 +251,22 @@ export function* contourPolylinesFromMaskSteps(
     options.turnPolicy === undefined
       ? CONNECT_PAPER_AT_SADDLES
       : createSaddleResolver(mask, options.turnPolicy, options.crackField, pixelScale);
-  for (const loop of traceBoundaryLoops(mask, saddles)) {
+  const loops = traceBoundaryLoops(mask, saddles);
+  // Exact containment on the lattice, before any vertex moves.
+  const parents = latticeLoopParents(loops);
+  const kept: number[] = [];
+  for (const [index, loop] of loops.entries()) {
     if (cooperate) yield;
     // Area-based speckle gate — the boundary walker sees paper holes the ink
     // despeckle never touched, so both loop polarities are filtered here.
     if (Math.abs(loop.area) < options.minAreaPx) continue;
     const finished = finishLoop(loop.points, finish);
-    if (finished !== null) contours.push(finished);
+    if (finished === null) continue;
+    contours.push(finished);
+    kept.push(index);
   }
-  return yield* preserveContourTopologySteps(contours);
+  const polylines = yield* preserveContourTopologySteps(contours);
+  return { polylines, parents: parents === null ? null : keptForest(parents, kept) };
 }
 
 type LoopFinish = {

@@ -16,6 +16,7 @@ import { applyAutomaticTabsToPolylines } from '../geometry/tabs-bridges';
 import {
   applyTransform,
   assertNever,
+  carriedSubpathDepths,
   type ColoredPath,
   type Layer,
   layerOperationSettingsEqual,
@@ -379,10 +380,12 @@ function appendPathSegments(
   out: CutSegment[],
 ): boolean {
   let kerfOffsetFailed = false;
-  for (const path of object.paths) {
+  for (const [pathIndex, path] of object.paths.entries()) {
     if (!pathUsesOperation(object, path, layer)) continue;
     const closedForKerf: Polyline[] = [];
-    for (const polyline of compilationPolylines(path, object.transform)) {
+    // A traced path's own forest (ADR-406) orders its contours inside first.
+    const nesting = segmentNesting(path, `${object.id}#${pathIndex}`);
+    for (const [subpathIndex, polyline] of compilationPolylines(path, object.transform).entries()) {
       const points: Vec2[] = polyline.points.map((p) =>
         toMachineCoords(applyTransform(p, object.transform), device),
       );
@@ -393,7 +396,14 @@ function appendPathSegments(
         // equals its first" so the emitter (which walks points and ignores the
         // `closed` flag) draws the closing edge. DXF entities drop the seam
         // vertex, which otherwise left the final edge uncut.
-        out.push({ polyline: withClosingPoint(points, polyline.closed), closed: polyline.closed });
+        const segment = {
+          polyline: withClosingPoint(points, polyline.closed),
+          closed: polyline.closed,
+        };
+        // Only closed contours are nodes of the forest; an open subpath
+        // keeps probing every container, its own path's included.
+        const known = polyline.closed ? nesting(subpathIndex) : undefined;
+        out.push(known === undefined ? segment : { ...segment, nesting: known });
       }
     }
     // Checked: the unchecked variant flattens a clipper2 failure to an empty
@@ -409,6 +419,19 @@ function appendPathSegments(
     }
   }
   return kerfOffsetFailed;
+}
+
+// The nesting a subpath's segment carries, from the path's valid forest only.
+function segmentNesting(
+  path: ColoredPath,
+  forest: string,
+): (subpathIndex: number) => CutSegment['nesting'] {
+  const depths = carriedSubpathDepths(path);
+  if (depths === null) return () => undefined;
+  return (subpathIndex) => {
+    const depth = depths[subpathIndex];
+    return depth === undefined ? undefined : { forest, depth };
+  };
 }
 
 function shouldApplyKerf(polyline: Polyline, layer: Layer): boolean {

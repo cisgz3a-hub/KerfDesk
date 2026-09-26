@@ -11,7 +11,13 @@
 //
 // Pure-core compliant: no clock, no random, no I/O. Data in, data out.
 
-import { transformCurveSubpathUniform, type ColoredPath, type Polyline, type Vec2 } from '../scene';
+import {
+  carrySubpathNesting,
+  transformCurveSubpathUniform,
+  type ColoredPath,
+  type Polyline,
+  type Vec2,
+} from '../scene';
 import type { RawImageData } from './trace-image';
 
 // Above this source area we do NOT supersample. Rationale: quadrupling an
@@ -193,15 +199,18 @@ export function scaleTracedPathsUniform(
   scale: number,
 ): ColoredPath[] {
   if (!Number.isFinite(scale) || scale <= 0) return paths.map((path) => ({ ...path }));
-  return paths.map((path) => ({
-    color: path.color,
-    polylines: path.polylines.map((polyline) => scalePolyline(polyline, scale)),
-    ...(path.curves === undefined
-      ? {}
-      : {
-          curves: path.curves.map((curve) => transformCurveSubpathUniform(curve, { scale })),
-        }),
-  }));
+  return paths.map((path) =>
+    // A uniform positive scale keeps every containment, so the forest carries.
+    carrySubpathNesting(path, {
+      color: path.color,
+      polylines: path.polylines.map((polyline) => scalePolyline(polyline, scale)),
+      ...(path.curves === undefined
+        ? {}
+        : {
+            curves: path.curves.map((curve) => transformCurveSubpathUniform(curve, { scale })),
+          }),
+    }),
+  );
 }
 
 function scalePolyline(polyline: Polyline, scale: number): Polyline {

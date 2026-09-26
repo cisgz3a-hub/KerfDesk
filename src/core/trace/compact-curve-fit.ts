@@ -31,8 +31,6 @@
 
 import type { CurveSubpath, PathSegment, Vec2 } from '../scene';
 import { chordSpanFit, fitSpan, mod, ringTangent, type SpanFit } from './compact-curve-span';
-import { evaluateCubic } from '../geometry/cubic-fit';
-import { cubicFlatnessSteps } from './compact-curve-shape';
 
 export type CompactFitOptions = {
   /** Max orthogonal deviation of the curve from the ring, px (Optimize). */
@@ -53,12 +51,6 @@ const NEUTRAL_TURN_RAD = (4 * Math.PI) / 180;
 // A line may meet a smooth joint only this close to the joint's tangent.
 const LINE_JOINT_COS = Math.cos((4 * Math.PI) / 180);
 const NEAR_POINT_PX = 1e-9;
-// Compatibility polyline: about one vertex per this many px along a cubic.
-const SAMPLE_STEP_PX = 1.5;
-// ...and never further than this from the cubic, px: the topology repair
-// tests these samples, so a crossing of the exact curves must show in them.
-const SAMPLE_FLATNESS_PX = 0.02;
-const MIN_CUBIC_SAMPLES = 4;
 
 // A stretch of the ring between two corners, in unrolled indices.
 type Section = { readonly from: number; readonly to: number };
@@ -116,33 +108,8 @@ export function fitCompactRing(
   return { start: ring[breaks[0] as number] as Vec2, segments, closed: true };
 }
 
-/** The compatibility polyline of a compact curve: line ends only, about one
- *  vertex per 1.5 px along cubics and never more than 0.02 px from them
- *  (the topology repair tests these samples for crossings), every joint
- *  exact. A closed curve's samples end on its start, as every closed trace
- *  ring does. */
-export function sampleCompactCurve(curve: CurveSubpath): Vec2[] {
-  const out: Vec2[] = [curve.start];
-  let current = curve.start;
-  for (const segment of curve.segments) {
-    if (segment.kind === 'cubic') {
-      const cubic = { p0: current, p1: segment.control1, p2: segment.control2, p3: segment.to };
-      const length =
-        Math.hypot(cubic.p1.x - cubic.p0.x, cubic.p1.y - cubic.p0.y) +
-        Math.hypot(cubic.p2.x - cubic.p1.x, cubic.p2.y - cubic.p1.y) +
-        Math.hypot(cubic.p3.x - cubic.p2.x, cubic.p3.y - cubic.p2.y);
-      const steps = Math.max(
-        MIN_CUBIC_SAMPLES,
-        Math.ceil(length / SAMPLE_STEP_PX),
-        cubicFlatnessSteps(cubic, SAMPLE_FLATNESS_PX),
-      );
-      for (let s = 1; s < steps; s += 1) out.push(evaluateCubic(cubic, s / steps));
-    }
-    out.push(segment.to);
-    current = segment.to;
-  }
-  return out;
-}
+// The compatibility polyline lives in compact-curve-sample.ts.
+export { sampleCompactCurve } from './compact-curve-sample';
 
 // ——— sections between breaks ———
 
