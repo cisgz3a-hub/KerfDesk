@@ -65,7 +65,8 @@ export const MACHINE_SETUP_TUTORIALS: readonly Tutorial[] = [
     category: 'Machine & setup',
     machine: 'all',
     minutes: 3,
-    location: 'Machine connection card → Connect, or Machine Setup → Machine → Find my machine',
+    location:
+      'Machine controls → Machine connection → Connect, or Machine Setup → Machine → Find my machine',
     prerequisites:
       'A supported serial controller and the appropriate machine profile. File-only profiles use export instead.',
     visual: 'machine',
