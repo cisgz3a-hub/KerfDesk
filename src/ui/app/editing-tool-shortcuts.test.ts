@@ -48,6 +48,18 @@ describe('editing tool shortcuts (ADR-410)', () => {
     expect(context.toggleWireframeView).toHaveBeenCalledOnce();
   });
 
+  it('reads Alt+W by the letter typed when it is a Latin letter', () => {
+    const context = ctx();
+    // A layout that puts another letter on the physical W key keeps Alt+W on the W letter.
+    expect(handleEditingToolShortcut(key({ key: 'x', code: 'KeyW', altKey: true }), context)).toBe(
+      false,
+    );
+    expect(handleEditingToolShortcut(key({ key: 'w', code: 'KeyV', altKey: true }), context)).toBe(
+      true,
+    );
+    expect(context.toggleWireframeView).toHaveBeenCalledOnce();
+  });
+
   it('does not take plain Ctrl+V or Ctrl+I from Paste and Import', () => {
     const context = ctx();
     expect(handleEditingToolShortcut(key({ key: 'v', ctrlKey: true }), context)).toBe(false);

@@ -10,6 +10,7 @@
 // ignores any chord with Ctrl or Cmd held.
 
 import { isEditableShortcutTarget } from '../common/keyboard-targets';
+import { isAltLetterChord } from './shortcuts';
 import { useStore } from '../state';
 import { useUiStore } from '../state/ui-store';
 import type { QuarterTurnDirection } from '../../core/scene/selection-placement';
@@ -48,10 +49,10 @@ function tryShiftChord(e: KeyboardEvent, ctx: EditingToolCtx): boolean {
   return false;
 }
 
-// e.code keeps Alt+W working on macOS, where Option+W types a symbol.
+// Alt/Option+W, read the way every Alt-letter chord is (shortcuts.ts), so it
+// also works on macOS, where Option+W types a symbol.
 function tryWireframe(e: KeyboardEvent, ctx: EditingToolCtx): boolean {
-  if (!e.altKey || hasMeta(e) || e.shiftKey) return false;
-  if (e.code !== 'KeyW' && e.key.toLowerCase() !== 'w') return false;
+  if (!isAltLetterChord(e, 'w')) return false;
   return run(e, ctx.toggleWireframeView);
 }
 
