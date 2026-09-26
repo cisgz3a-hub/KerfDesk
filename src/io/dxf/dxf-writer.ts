@@ -16,7 +16,8 @@
 // frame and translated so the drawing's lower-left corner (or a caller's
 // chosen scene point) is the origin.
 // Lines and circular arcs are exact (bulge); cubics and elliptical arcs are
-// flattened within the stated tolerance (see core/vector-export/bulge-rings).
+// fitted with lines and circular-arc bulges within the stated tolerance
+// (ADR-452; see core/vector-export/bulge-rings).
 
 import { curveSubpathBounds, type CurveSubpath } from '../../core/scene';
 import {
@@ -42,7 +43,7 @@ export type DxfLayerGeometry = {
 };
 
 export type DxfWriteOptions = {
-  /** Maximum distance between a flattened cubic/ellipse and the true curve. */
+  /** Maximum distance between a fitted cubic/ellipse and the true curve. */
   readonly curveToleranceMm?: number;
   /** Coordinate grid; each vertex moves by at most half a grid diagonal. */
   readonly precisionMm?: number;
