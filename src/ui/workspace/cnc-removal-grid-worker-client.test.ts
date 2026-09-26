@@ -276,6 +276,48 @@ describe('CNC removal-grid worker client', () => {
     await expect(relief).resolves.toMatchObject([{ taskId: 'relief', result: { kind: 'ok' } }]);
   });
 
+  it('queues a surface behind the running grid instead of cancelling it (ADR-425)', async () => {
+    const grid = prepareCncRemovalGridOffThread(request());
+    const surface = prepareCncCut3DSurfaceOffThread(GRID);
+    const worker = FakeWorker.instances[0];
+    if (grid === null || surface === null || worker === undefined) {
+      throw new Error('preview worker unavailable');
+    }
+    expect(worker.terminated).toBe(false);
+    expect(worker.posted.map((posted) => posted.kind)).toEqual(['grid']);
+
+    worker.respondGrid(GRID);
+    await expect(grid).resolves.toBe(GRID);
+    expect(worker.posted.map((posted) => posted.kind)).toEqual(['grid', 'surface']);
+    worker.respondSurface(SURFACE);
+    await expect(surface).resolves.toBe(SURFACE);
+    expect(FakeWorker.instances).toHaveLength(1);
+  });
+
+  it('keeps only the newest queued request and lets its owner abort it', async () => {
+    const surface = prepareCncCut3DSurfaceOffThread(GRID);
+    const firstController = new AbortController();
+    const first = prepareCncRemovalGridOffThread(request(), firstController.signal);
+    const secondController = new AbortController();
+    const second = prepareCncRemovalGridOffThread(
+      { ...request(), scrubFraction: 0.5 },
+      secondController.signal,
+    );
+    const worker = FakeWorker.instances[0];
+    if (surface === null || first === null || second === null || worker === undefined) {
+      throw new Error('preview worker unavailable');
+    }
+    await expect(first).rejects.toMatchObject({ name: 'CncRemovalGridSupersededError' });
+    firstController.abort();
+    secondController.abort();
+    await expect(second).rejects.toMatchObject({ name: 'AbortError' });
+
+    expect(worker.terminated).toBe(false);
+    worker.respondSurface(SURFACE);
+    await expect(surface).resolves.toBe(SURFACE);
+    expect(worker.posted.map((posted) => posted.kind)).toEqual(['surface']);
+  });
+
   it('does not let stale same-kind cleanup cancel a newer surface owner', async () => {
     const staleController = new AbortController();
     const stale = prepareCncCut3DSurfaceOffThread(GRID, staleController.signal);

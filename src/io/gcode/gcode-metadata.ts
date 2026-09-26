@@ -67,9 +67,11 @@ export type GcodeMetadata = {
  * arc at each segment midpoint instead of sitting up to 0.196% of the radius
  * inside it, and ADR-289 amendment 1's relief roughing rings that end where
  * they start and levels cleared to their centre above 50% stepover, and
- * ADR-432's native laser G2/G3 arcs with represented-arc validation and G17.
+ * ADR-432's native laser G2/G3 arcs with represented-arc validation and G17, and
+ * ADR-154 amendment 2's adaptive pocket finishing rings that end where they
+ * start.
  */
-export const EMITTER_REVISION = 'svg-and-laser-arcs-relief-rings-and-cores-20260927-v1';
+export const EMITTER_REVISION = 'laser-arcs-and-adaptive-ring-seams-20260927-v1';
 
 // Machine-specific assumption lines (ADR-103 defect fix): router exports
 // previously carried the laser-worded `$32=1 (laser mode)` banner. The S
