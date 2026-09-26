@@ -33,10 +33,18 @@ type Extremes = { min: number; max: number };
 // A step below this many parameter units is accepted without a fit test, the
 // same floor as the depth-24 cap of the midpoint subdivision it replaces.
 const MIN_PARAMETER_STEP = 2 ** -24;
-// The chord end is placed to within this fraction of its own parameter length.
-const STEP_REFINEMENT = 2 ** -10;
-// Bisection steps on the shared error once the chord count is known.
-const BALANCE_STEPS = 8;
+// A fitting chord whose error reaches this share of the tolerance is long
+// enough: its length is within about 1% of the longest (error grows with the
+// square of a short chord's length).
+const ACCEPT_SHARE = 0.98;
+// The search aims a little under the tolerance so a model step usually fits.
+const AIM_SHARE = 0.99;
+// The search ends once the unknown gap is this share of the chord.
+const STEP_REFINEMENT = 2 ** -8;
+const MAX_PROBES = 96;
+// Steps, and the error difference that ends them, evening out the last two chords.
+const PAIR_STEPS = 12;
+const PAIR_BALANCE = 0.02;
 
 export type ChordEllipse = {
   readonly center: Vec2;
@@ -67,48 +75,96 @@ export function flattenEllipseChords(
 }
 
 function fewestChords(curve: ChordCurve, tolerance: number, budget: number): Vec2[] | null {
-  const first = greedyChords(curve, tolerance, budget);
-  if (first === null || first.length <= 1) return first;
-  const count = first.length;
-  let best = first;
-  let low = 0;
-  let high = tolerance;
-  for (let step = 0; step < BALANCE_STEPS; step += 1) {
-    const middle = (low + high) / 2;
-    const candidate = greedyChords(curve, middle, count);
-    if (candidate === null) {
-      low = middle;
-    } else {
-      high = middle;
-      best = candidate;
-    }
-  }
-  return best;
+  const chords = greedyChords(curve, tolerance, budget);
+  if (chords === null) return null;
+  balanceLastPair(curve, chords, tolerance);
+  return chords.points;
 }
 
+type Chords = { readonly points: Vec2[]; readonly ends: number[] };
+
 /** Longest fitting chord from each point; null when more than `limit` chords. */
-function greedyChords(curve: ChordCurve, tolerance: number, limit: number): Vec2[] | null {
-  const out: Vec2[] = [];
+function greedyChords(curve: ChordCurve, tolerance: number, limit: number): Chords | null {
+  const points: Vec2[] = [];
+  const ends: number[] = [];
   let t0 = 0;
   let from = curve.start;
   let step = 1;
   while (t0 < 1) {
-    if (out.length >= limit) return null;
-    if (fits(curve, t0, 1, from, curve.end, tolerance)) {
-      out.push(curve.end);
-      return out;
-    }
-    const t1 = longestFit(curve, t0, from, Math.min(step, 1 - t0), tolerance);
-    const to = curve.point(t1);
-    out.push(to);
+    if (points.length >= limit) return null;
+    const t1 = longestFit(curve, t0, from, step, tolerance);
+    const to = t1 >= 1 ? curve.end : curve.point(t1);
+    points.push(to);
+    ends.push(t1);
     step = t1 - t0;
     t0 = t1;
     from = to;
   }
-  return out;
+  return { points, ends };
 }
 
-/** The largest t1 in (t0, 1) whose chord fits, found from a first guess. */
+/**
+ * The greedy walk leaves whatever is left for its last chord, often a sliver.
+ * Move the vertex before it to where the last two chords' errors are equal,
+ * so neither is short. The first error grows and the second shrinks as the
+ * vertex moves on, and the square root of each is close to linear in the
+ * chord's length, so false position (Illinois variant) on the difference of
+ * the square roots finds it in a few steps. Both chords are checked, the
+ * count is unchanged, and the greedy vertex stays unless a split is better.
+ */
+function balanceLastPair(curve: ChordCurve, chords: Chords, tolerance: number): void {
+  const count = chords.points.length;
+  if (count < 2) return;
+  const t0 = count > 2 ? (chords.ends[count - 3] as number) : 0;
+  const from = count > 2 ? (chords.points[count - 3] as Vec2) : curve.start;
+  const split = (t: number): Split => {
+    const point = curve.point(t);
+    const first = curve.chordError(t0, t, from, point);
+    const second = curve.chordError(t, 1, point, curve.end);
+    return { t, point, first, second, gap: Math.sqrt(first) - Math.sqrt(second) };
+  };
+  let best = split(chords.ends[count - 2] as number);
+  let high = { t: best.t, gap: best.gap };
+  let low = { t: t0, gap: -Math.sqrt(curve.chordError(t0, 1, from, curve.end)) };
+  let side = 0;
+  for (let step = 0; step < PAIR_STEPS; step += 1) {
+    if (!(high.gap > 0 && low.gap < 0)) break;
+    const next = split((low.t * high.gap - high.t * low.gap) / (high.gap - low.gap));
+    if (fitsBetter(next, best, tolerance)) best = next;
+    if (Math.abs(next.first - next.second) <= PAIR_BALANCE * tolerance) break;
+    if (next.gap < 0) {
+      low = { t: next.t, gap: next.gap };
+      if (side < 0) high = { t: high.t, gap: high.gap / 2 };
+      side = -1;
+    } else {
+      high = { t: next.t, gap: next.gap };
+      if (side > 0) low = { t: low.t, gap: low.gap / 2 };
+      side = 1;
+    }
+  }
+  chords.points[count - 2] = best.point;
+  chords.ends[count - 2] = best.t;
+}
+
+type Split = {
+  readonly t: number;
+  readonly point: Vec2;
+  readonly first: number;
+  readonly second: number;
+  readonly gap: number;
+};
+
+function fitsBetter(candidate: Split, current: Split, tolerance: number): boolean {
+  const worst = Math.max(candidate.first, candidate.second);
+  return worst <= tolerance && worst < Math.max(current.first, current.second);
+}
+
+/**
+ * The end t1 in (t0, 1] of a chord from `from` that fits and is nearly the
+ * longest that does. Probes follow the square-law model of the error from
+ * the previous probe, kept inside the bracket of the longest fitting and the
+ * shortest failing end found so far, and bisect when the model leaves it.
+ */
 function longestFit(
   curve: ChordCurve,
   t0: number,
@@ -116,52 +172,40 @@ function longestFit(
   guess: number,
   tolerance: number,
 ): number {
-  const fitsAt = (t: number): boolean => fits(curve, t0, t, from, curve.point(t), tolerance);
-  // Bracket: `low` fits (or is t0), `high` does not (t = 1 already failed).
   let low = t0;
-  let high = 1;
-  let probe = Math.min(t0 + guess, 1);
-  if (probe < 1 && fitsAt(probe)) {
-    low = probe;
-    for (probe = t0 + 2 * (low - t0); probe < 1 && fitsAt(probe); probe = t0 + 2 * (low - t0)) {
-      low = probe;
-    }
-    high = Math.min(probe, 1);
-  } else {
-    high = probe;
-    for (
-      probe = t0 + (high - t0) / 2;
-      probe - t0 > MIN_PARAMETER_STEP;
-      probe = t0 + (probe - t0) / 2
-    ) {
-      if (fitsAt(probe)) {
-        low = probe;
-        break;
-      }
-      high = probe;
-    }
-    if (low === t0) return Math.min(1, t0 + Math.max(MIN_PARAMETER_STEP, probe - t0));
+  let high = Infinity;
+  let probe = Math.min(1, t0 + guess);
+  for (let count = 0; count < MAX_PROBES; count += 1) {
+    const error = chordErrorTo(curve, t0, probe, from);
+    const fit = !Number.isFinite(error) || error <= tolerance;
+    if (fit) low = probe;
+    else high = probe;
+    if (fit && (probe >= 1 || !(error < tolerance * ACCEPT_SHARE))) return probe;
+    if (!fit && probe - t0 <= MIN_PARAMETER_STEP) return probe;
+    if (high - low <= (low - t0) * STEP_REFINEMENT) return low;
+    probe = nextProbe(t0, probe, error, tolerance, low, high);
   }
-  while (high - low > (low - t0) * STEP_REFINEMENT) {
-    const middle = (low + high) / 2;
-    if (fitsAt(middle)) low = middle;
-    else high = middle;
-  }
-  return low;
+  return low > t0 ? low : Math.min(1, t0 + MIN_PARAMETER_STEP);
 }
 
-function fits(
-  curve: ChordCurve,
+function nextProbe(
   t0: number,
-  t1: number,
-  a: Vec2,
-  b: Vec2,
+  probe: number,
+  error: number,
   tolerance: number,
-): boolean {
-  const error = curve.chordError(t0, t1, a, b);
-  // Non-finite geometry cannot be measured; it keeps one straight chord
-  // rather than subdividing to the step floor.
-  return !Number.isFinite(error) || error <= tolerance;
+  low: number,
+  high: number,
+): number {
+  const ratio = error > 0 ? Math.sqrt((tolerance * AIM_SHARE) / error) : 4;
+  const modelled = t0 + (probe - t0) * Math.min(4, Math.max(0.25, ratio));
+  const upper = Math.min(high, 1);
+  if (modelled > low && modelled < upper) return modelled;
+  if (high === Infinity) return Math.min(1, t0 + 4 * (low - t0));
+  return (low + high) / 2;
+}
+
+function chordErrorTo(curve: ChordCurve, t0: number, t1: number, from: Vec2): number {
+  return curve.chordError(t0, t1, from, t1 >= 1 ? curve.end : curve.point(t1));
 }
 
 /**
