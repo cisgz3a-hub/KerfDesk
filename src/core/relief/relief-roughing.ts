@@ -40,10 +40,10 @@ import {
   mergeFlatLevels,
   reliefFlatLevels,
   type ReliefFinishedFlats,
-  type ReliefFlatLevel,
 } from './relief-flat-finish';
 import { reliefRoughingLevels, type ReliefRoughingLevel } from './relief-roughing-levels';
 import type { ReliefRoughingLevelPaths } from './relief-roughing-motion';
+import { flatFinishingStepPlans, type FlatFinishingStepPlan } from './relief-flat-finish-steps';
 
 // Material intentionally left everywhere for the finishing pass (H.8).
 export const DEFAULT_RELIEF_ALLOWANCE_MM = 0.5;
@@ -146,7 +146,7 @@ export function reliefRoughingLadder(
   );
   const flats =
     options.finishFlats === true && options.tool.kind === 'end-mill'
-      ? flatPlan(map, kernel, levels, allowanceMm, options.depthPerPassMm)
+      ? flatPlan(map, kernel, dilated, levels, allowanceMm, options.depthPerPassMm)
       : null;
   const completions: ReliefLevelCompletion[] = [];
   const finished: FinishedCut[] = [];
@@ -157,9 +157,15 @@ export function reliefRoughingLadder(
     if (planned.finished !== null) finished.push(planned.finished);
   });
   if (flats !== null) {
-    const separate = planFlatLevels(map, flats, levels, stepMm, options.tool.diameterMm / 2);
-    completions.push(...separate.completions);
-    finished.push(...separate.finished);
+    const separate = planFlatLevels(
+      map,
+      flats,
+      options.depthPerPassMm,
+      stepMm,
+      options.tool.diameterMm / 2,
+    );
+    for (const completion of separate.completions) completions.push(completion);
+    for (const flat of separate.finished) finished.push(flat);
   }
   return {
     ...ladderOf(completions),
@@ -225,7 +231,7 @@ type FlatPlan = {
   // The zero-lift tip field: the widened cutter, not lifted.
   readonly tip: Float32Array;
   readonly cutZMm: ReadonlyMap<number, number>;
-  readonly separate: ReadonlyArray<ReliefFlatLevel>;
+  readonly separate: ReadonlyArray<FlatFinishingStepPlan>;
 };
 
 // ADR-450: the model's flats, each taken by the roughing level one allowance
@@ -233,13 +239,19 @@ type FlatPlan = {
 function flatPlan(
   map: Heightmap,
   kernel: ToolKernel,
+  roughingTip: Float32Array,
   levels: ReadonlyArray<ReliefRoughingLevel>,
   allowanceMm: number,
   depthPerPassMm: number,
 ): FlatPlan {
   const tip = dilateHeightmapByTool(map, kernel, 0);
   const flats = reliefFlatLevels(map, tip, kernel.radiusMm - kernel.horizontalGrowthMm);
-  return { tip, ...mergeFlatLevels(levels, flats, allowanceMm, depthPerPassMm) };
+  const merged = mergeFlatLevels(levels, flats, allowanceMm, depthPerPassMm);
+  return {
+    tip,
+    cutZMm: merged.cutZMm,
+    separate: flatFinishingStepPlans(merged.separate, levels, roughingTip, depthPerPassMm),
+  };
 }
 
 function levelCompleted(completion: ReliefLevelCompletion): boolean {
@@ -252,7 +264,7 @@ function levelCompleted(completion: ReliefLevelCompletion): boolean {
 function planFlatLevels(
   map: Heightmap,
   plan: FlatPlan,
-  levels: ReadonlyArray<ReliefRoughingLevel>,
+  depthPerPassMm: number,
   stepMm: number,
   toolRadiusMm: number,
 ): {
@@ -261,20 +273,19 @@ function planFlatLevels(
 } {
   const completions: ReliefLevelCompletion[] = [];
   const finished: FinishedCut[] = [];
-  for (const flat of plan.separate) {
-    // The stock over a flat stands no higher than the ladder level above it.
-    const sliceTopMm = levels.reduce(
-      (top, level) =>
-        level.bandFloorMm === null && level.zMm > flat.zMm + LEVEL_EPS
-          ? Math.min(top, level.zMm)
-          : top,
-      0,
-    );
-    const level = { zMm: flat.zMm, bandFloorMm: null, sliceTopMm };
+  for (const entry of plan.separate) {
+    const { flat } = entry;
+    let sliceTopMm = entry.sliceTopMm;
     const reach = levelContoursMm(map, plan.tip, flat.zMm, null);
-    const completion = planLevel(flat.contours, reach, level, stepMm, toolRadiusMm);
-    completions.push(completion);
-    if (levelCompleted(completion)) finished.push(flat);
+    const depths = zPassDepths(sliceTopMm - flat.zMm, depthPerPassMm);
+    for (const [index, depth] of depths.entries()) {
+      const zMm = index === depths.length - 1 ? flat.zMm : entry.sliceTopMm + depth;
+      const level = { zMm, bandFloorMm: null, sliceTopMm };
+      const completion = planLevel(flat.contours, reach, level, stepMm, toolRadiusMm);
+      completions.push(completion);
+      if (index === depths.length - 1 && levelCompleted(completion)) finished.push(flat);
+      sliceTopMm = zMm;
+    }
   }
   return { completions, finished };
 }

@@ -40,9 +40,14 @@ ball at 0.025 mm), and the floor still comes out with scallops. The other vendor
    depth per pass of its slice top, that level cuts at the flat and nothing is added. Ladder
    levels above the floor are never lowered: they would lose their vertical allowance
    everywhere, not only on a flat.
-4. **Otherwise, a level of its own.** A flat no roughing level takes gets its own level after all
-   roughing, top down, entered from the ladder level above it. It is planned and moved like any
-   other level (rings, core cleanup, ADR-424 order, links and ramps).
+4. **Otherwise, levels of its own.** A flat no roughing level takes is cut after all roughing,
+   in slices no deeper than the requested depth per pass, ending at the exact flat height.
+   Entry starts from a full roughing level that reached the allowance-bearing tip region, or
+   stock top when none did. A deeper level elsewhere does not establish clearance over the flat.
+   Every slice uses the same flat region, rings, core cleanup, ADR-424 order, links and ramps.
+   Only a completed final slice reports a finished flat. The combined roughing and extra slice
+   count is checked against the existing factual ECMAScript Array domain before expansion;
+   no machining policy limit or silent depth coarsening is added.
 5. **What was finished.** For every such cut whose rings and core cleanup completed, roughing
    reports the height it cut each cell to: the cut's tip region grown by the cutter radius less
    two cells. Ring 0 lies within 0.75 cells of a region cell, and a finishing sample within 0.71
@@ -79,7 +84,7 @@ ball at 0.025 mm), and the floor still comes out with scallops. The other vendor
 - The flat cut has no vertical allowance, so detail smaller than a roughing cell standing on a
   flat carries the same qualification as a Rough allowance of 0 (ADR-289).
 - The finishing raster can end in a few more passes, each a retract.
-- The G-code header's emitter revision is `relief-flat-finish-20260926-v1`.
+- The G-code header's emitter revision is `relief-flat-finish-depth-slices-20260927-v1`.
 - Tests: `relief-flat-finish.test.ts` (flats found, peaks and patches smaller than the bit
   ignored, allowance kept off walls, folding and its limits, the finished report, a flat on a
   level of its own, a ball nose unchanged, and a property that no cut goes below the model);

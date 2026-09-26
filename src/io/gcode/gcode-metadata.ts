@@ -74,9 +74,10 @@ export type GcodeMetadata = {
  * and ADR-424's relief roughing cut inside out with links at depth, climb round
  * islands and ramped entries, and ADR-422 amendment 1's slope steps, and
  * ADR-450's flats cut to height by the roughing end mill and skipped by the
- * finishing raster.
+ * finishing raster, with separate flat cuts split at the requested depth per
+ * pass from the allowance-bearing region's cleared stock (2026-09-27).
  */
-export const EMITTER_REVISION = 'relief-flat-finish-20260926-v1';
+export const EMITTER_REVISION = 'relief-flat-finish-depth-slices-20260927-v1';
 
 // Machine-specific assumption lines (ADR-103 defect fix): router exports
 // previously carried the laser-worded `$32=1 (laser mode)` banner. The S

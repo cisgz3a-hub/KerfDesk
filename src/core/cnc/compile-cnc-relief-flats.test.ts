@@ -167,6 +167,26 @@ function finishingLength(job: Job): number {
 
 describe('relief flats finished by the roughing bit (ADR-450)', () => {
   it(
+    'emits depth-limited cuts through a flat allowance larger than a pass',
+    () => {
+      const job = compile({ reliefFlatFinish: 'roughing-bit', depthPerPassMm: 0.1 });
+      const emitted = cncGrblStrategy.emit(job, DEFAULT_DEVICE_PROFILE);
+      let deepest = 0;
+      for (const line of emitted.split('\n')) {
+        if (line.startsWith(';')) continue;
+        const match = /\bZ(-\d+(?:\.\d+)?)/.exec(line);
+        if (match === null) continue;
+        const depth = Number(match[1]);
+        if (depth >= deepest) continue;
+        expect(deepest - depth).toBeLessThanOrEqual(0.1 + 1e-6);
+        deepest = depth;
+      }
+      expect(deepest).toBe(-3);
+    },
+    TIMEOUT_MS,
+  );
+
+  it(
     'cuts the floor and the plateau top to their heights with the end mill',
     () => {
       const on = removal(compile({ reliefFlatFinish: 'roughing-bit' }));

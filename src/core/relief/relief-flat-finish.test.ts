@@ -252,6 +252,23 @@ describe('relief roughing with flat finishing (ADR-450)', () => {
     expect(on.finishedFlats).toBeUndefined();
   });
 
+  it('splits a separate flat allowance into the requested depths and reaches the exact floor', () => {
+    const floor = boxesMap(-3, []);
+    const on = reliefRoughingLadder(floor, options({ depthPerPassMm: 0.1 }));
+    for (const level of on.levels) {
+      expect(level.sliceTopMm - level.zMm).toBeLessThanOrEqual(0.1 + 1e-6);
+    }
+    expect(on.levels.slice(-5).map((level) => level.zMm)).toEqual([
+      expect.closeTo(-2.6, 6),
+      expect.closeTo(-2.7, 6),
+      expect.closeTo(-2.8, 6),
+      expect.closeTo(-2.9, 6),
+      -3,
+    ]);
+    expect(on.finishedFlats).toBeDefined();
+    expect(finishedFlatDepthAt(on.finishedFlats!, 20, 20)).toBe(-3);
+  });
+
   it('never cuts below the model, whatever the flats and settings', () => {
     const box = fc.record({
       x0: fc.integer({ min: 2, max: 26 }),

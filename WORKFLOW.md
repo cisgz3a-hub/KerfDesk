@@ -3955,8 +3955,9 @@ explicitly marked below; the remaining controls and user-facing flows are planne
    of the model at least as wide as the bit is cut to its exact height,
    still keeping the allowance off the walls beside it: on the roughing
    level one allowance above it when that level can reach it within one
-   depth per pass of where its stock stands, otherwise on a level of its own
-   after all roughing (ADR-450). Any other roughing bit ignores the setting.
+   depth per pass of where its stock stands, otherwise in separate slices
+   after all roughing, each within the requested depth per pass (ADR-450).
+   Any other roughing bit ignores the setting.
 2. Passes run depth-major (whole level before stepping down) as a
    clearing group — before any profile cuts. The preview's removal
    shading shows the terraced relief forming.
