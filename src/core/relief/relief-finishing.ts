@@ -45,12 +45,15 @@ export function reliefFinishingPasses(
 ): ReadonlyArray<CncPass> {
   const { widthCells, heightCells, mmPerCell } = map;
   if (widthCells < 1 || heightCells < 1) return [];
-  const dilation = dilateHeightmapByToolWithMaskEvidence(map, options.kernel, 0);
-  const tip = dilation.tipDepth;
   const rowSpacingMm = scallopRowSpacingMm(options.tool, options.scallopMm);
   const rowStep = Math.max(1, Math.floor(rowSpacingMm / mmPerCell));
   if (map.inclusion !== undefined) {
-    return maskedFinishingPasses(map, tip, rowStep, map.inclusion, dilation.touchesExcluded);
+    const selected = selectMaskedFinishingCells(map, map.inclusion, rowStep);
+    const rows = maskedRows(map, selected);
+    const dilation = dilateHeightmapByToolWithMaskEvidence(map, options.kernel, 0, {
+      exactRows: rowFlags(heightCells, rows),
+    });
+    return maskedFinishingPasses(map, dilation.tipDepth, rows, selected, dilation.touchesExcluded);
   }
 
   // Row indices at the scallop stride, plus the far-Y row whenever the stride
@@ -61,6 +64,10 @@ export function reliefFinishingPasses(
   for (let row = 0; row < heightCells; row += rowStep) rows.push(row);
   const farRow = heightCells - 1;
   if (rows[rows.length - 1] !== farRow) rows.push(farRow);
+  // Only emitted rows need the exact surface contact (ADR-412).
+  const tip = dilateHeightmapByToolWithMaskEvidence(map, options.kernel, 0, {
+    exactRows: rowFlags(heightCells, rows),
+  }).tipDepth;
 
   const passes: CncPass[] = [];
   let leftToRight = true;
@@ -87,18 +94,30 @@ export function reliefFinishingPasses(
   return passes;
 }
 
+function rowFlags(heightCells: number, rows: ReadonlyArray<number>): Uint8Array {
+  const flags = new Uint8Array(heightCells);
+  for (const row of rows) flags[row] = 1;
+  return flags;
+}
+
+function maskedRows(map: Heightmap, selected: Uint8Array): ReadonlyArray<number> {
+  const rows: number[] = [];
+  for (let row = 0; row < map.heightCells; row += 1) {
+    if (rowHasSelection(selected, row, map.widthCells)) rows.push(row);
+  }
+  return rows;
+}
+
 function maskedFinishingPasses(
   map: Heightmap,
   tip: Float32Array,
-  rowStep: number,
-  inclusion: Uint8Array,
+  rows: ReadonlyArray<number>,
+  selected: Uint8Array,
   touchesExcluded: Uint8Array | undefined,
 ): ReadonlyArray<CncPass> {
-  const selected = selectMaskedFinishingCells(map, inclusion, rowStep);
   const passes: CncPass[] = [];
   let leftToRight = true;
-  for (let row = 0; row < map.heightCells; row += 1) {
-    if (!rowHasSelection(selected, row, map.widthCells)) continue;
+  for (const row of rows) {
     appendMaskedFinishingRow(passes, map, tip, row, leftToRight, selected, touchesExcluded);
     leftToRight = !leftToRight;
   }

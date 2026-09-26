@@ -3,9 +3,12 @@
 //   dilated(x, y) = max over kernel offsets of (h(x+dx, y+dy) − dz)
 // without cutting below the sampled target values under its discrete kernel
 // (dz is the cutting surface's clearance above the tip at that offset —
-// core/sim/tool-kernels). Continuous sweep over included target samples remains
-// outside this proof; excluded-mask stock separately uses whole-cell and output-
-// precision envelopes below. Adding a finishing allowance lifts the whole
+// core/sim/tool-kernels). ADR-412 then raises each tip to its exact contact
+// with the piecewise-linear surface between included samples
+// (heightmap-surface-contact.ts), so a steep wall's contact between two
+// samples is no longer missed. The continuous XY sweep between emitted tool
+// positions remains outside this proof; excluded-mask stock separately uses
+// whole-cell and output-precision envelopes below. Adding a finishing allowance lifts the whole
 // roughing target so H.8's ball-nose pass has material to finish.
 //
 // Out-of-bounds neighbors are ignored (treated as bottomless), so the field
@@ -16,6 +19,7 @@ import type { ToolKernel } from '../sim';
 // (scripts/index-export-baseline.json) and may only shrink.
 import { CNC_MASK_EMISSION_Z_CLEARANCE_MM } from '../cnc/cnc-output-precision';
 import type { Heightmap } from './heightmap';
+import { createSurfaceContactField, type SurfaceContactField } from './heightmap-surface-contact';
 import {
   hasPartialTerminalCandidate,
   isPartialTerminalCenter,
@@ -25,12 +29,27 @@ import {
   partialTerminalSurfaceConstraint,
 } from './heightmap-tool-offset-partial';
 
+export type HeightmapDilationOptions = {
+  /**
+   * ADR-412: raise each tip to its exact contact with the surface between
+   * samples. On by default; only tests of the sampled lattice alone turn it off.
+   */
+  readonly betweenSamples?: boolean;
+  /**
+   * Rows (1 per row index) that need the exact contact; the rest keep the
+   * sampled lattice value. Finishing cuts only every few rows, so it refines
+   * only those. Absent: every row.
+   */
+  readonly exactRows?: Uint8Array;
+};
+
 export function dilateHeightmapByTool(
   map: Heightmap,
   kernel: ToolKernel,
   allowanceMm: number,
+  options: HeightmapDilationOptions = {},
 ): Float32Array {
-  return dilateHeightmap(map, kernel, allowanceMm, false).tipDepth;
+  return dilateHeightmap(map, kernel, allowanceMm, false, options).tipDepth;
 }
 
 /**
@@ -42,11 +61,12 @@ export function dilateHeightmapByToolWithMaskEvidence(
   map: Heightmap,
   kernel: ToolKernel,
   allowanceMm: number,
+  options: HeightmapDilationOptions = {},
 ): {
   readonly tipDepth: Float32Array;
   readonly touchesExcluded: Uint8Array | undefined;
 } {
-  return dilateHeightmap(map, kernel, allowanceMm, true);
+  return dilateHeightmap(map, kernel, allowanceMm, true, options);
 }
 
 function dilateHeightmap(
@@ -54,6 +74,7 @@ function dilateHeightmap(
   kernel: ToolKernel,
   allowanceMm: number,
   trackMaskBoundary: boolean,
+  options: HeightmapDilationOptions,
 ): {
   readonly tipDepth: Float32Array;
   readonly touchesExcluded: Uint8Array | undefined;
@@ -65,7 +86,10 @@ function dilateHeightmap(
     trackMaskBoundary && inclusion !== undefined
       ? new Uint8Array(widthCells * heightCells)
       : undefined;
+  const contact = options.betweenSamples === false ? null : createSurfaceContactField(map, kernel);
   for (let cy = 0; cy < heightCells; cy += 1) {
+    const rowContact =
+      options.exactRows === undefined || options.exactRows[cy] === 1 ? contact : null;
     for (let cx = 0; cx < widthCells; cx += 1) {
       const center = cy * widthCells + cx;
       if (inclusion?.[center] === 0) continue;
@@ -73,7 +97,7 @@ function dilateHeightmap(
         out,
         outBits,
         center,
-        dilatedCell(map, kernel, cx, cy, allowanceMm, touchesExcluded, center),
+        dilatedCell(map, kernel, cx, cy, allowanceMm, touchesExcluded, center, rowContact),
         inclusion !== undefined,
       );
     }
@@ -89,9 +113,13 @@ function dilatedCell(
   allowanceMm: number,
   touchesExcluded: Uint8Array | undefined,
   center: number,
+  contact: SurfaceContactField | null,
 ): number {
   let best = excludedMaskConstraint(map, kernel, cx, cy, touchesExcluded, center);
   best = Math.max(best, includedSurfaceConstraint(map, kernel, cx, cy));
+  // ADR-412: the lattice kernel only meets the surface at sample points; the
+  // exact contact with the surface between them can only raise the tip.
+  if (contact !== null) best = contact.constraint(cx, cy, best);
   const safe = best === Number.NEGATIVE_INFINITY ? (map.depth[center] ?? 0) : best;
   // The roughing target never rises above the stock top.
   return Math.min(0, safe + allowanceMm);

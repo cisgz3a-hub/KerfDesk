@@ -47,7 +47,14 @@ export type ToolKernel = {
   // distance between their shifted terminal-cell centers instead of treating
   // every indexed offset as exactly dx/dy * mmPerCell.
   readonly tool: CncTool;
+  // Outer radius of the modelled envelope: the tool radius plus any
+  // horizontalGrowthMm.
   readonly radiusMm: number;
+  // Relief roughing keeps its stock-to-leave in 3D by planning with the cutter
+  // widened horizontally (ADR-412): the envelope is the tool's own surface law
+  // shifted outward by this distance, with a flat land at the tip. Zero for the
+  // physical cutter.
+  readonly horizontalGrowthMm: number;
   readonly mmPerCell: number;
   readonly radiusCells: number;
   // Candidate square used by position-aware consumers near a partial edge.
@@ -78,10 +85,20 @@ export function kernelForTool(
   tool: CncTool,
   mmPerCell: number,
   maskPathUncertaintyMm = 0,
+  horizontalGrowthMm = 0,
 ): ToolKernel {
-  const radiusMm = Math.max(0, tool.diameterMm / 2);
+  const toolRadiusMm = Math.max(0, tool.diameterMm / 2);
+  const growthMm =
+    Number.isFinite(horizontalGrowthMm) && horizontalGrowthMm > 0 ? horizontalGrowthMm : 0;
+  const radiusMm = toolRadiusMm + growthMm;
   const radiusCells = Math.max(0, Math.ceil(radiusMm / mmPerCell));
-  const surfaceDzAtRadius = surfaceDzAtRadiusForTool(tool, radiusMm);
+  const toolSurfaceDz = surfaceDzAtRadiusForTool(tool, toolRadiusMm);
+  // Widening moves every point of the cutting surface outward by growthMm, so
+  // the envelope at radius r has the tool's own height at r - growthMm.
+  const surfaceDzAtRadius =
+    growthMm === 0
+      ? toolSurfaceDz
+      : (distanceMm: number) => toolSurfaceDz(Math.max(0, distanceMm - growthMm));
   const maskCellUncertaintyMm = maskPathUncertaintyMm + CNC_MASK_EMISSION_XY_CLEARANCE_MM;
   const maskSweepPathUncertaintyMm = mmPerCell / 2 + CNC_MASK_EMISSION_XY_CLEARANCE_MM;
   const offsets: ToolKernelOffset[] = [];
@@ -95,14 +112,20 @@ export function kernelForTool(
   return {
     tool,
     radiusMm,
+    horizontalGrowthMm: growthMm,
     mmPerCell,
     radiusCells,
     surfaceCandidateSpanCells: radiusCells + 1,
     offsets,
     surfaceDzAtRadius,
-    maskCellOffsets: maskCellOffsets(tool, radiusMm, mmPerCell, maskCellUncertaintyMm),
+    maskCellOffsets: maskCellOffsets(surfaceDzAtRadius, radiusMm, mmPerCell, maskCellUncertaintyMm),
     maskCellCandidateSpanCells: maskCellSpanCells(radiusMm, mmPerCell, maskCellUncertaintyMm),
-    maskSweepCellOffsets: maskCellOffsets(tool, radiusMm, mmPerCell, maskSweepPathUncertaintyMm),
+    maskSweepCellOffsets: maskCellOffsets(
+      surfaceDzAtRadius,
+      radiusMm,
+      mmPerCell,
+      maskSweepPathUncertaintyMm,
+    ),
     maskSweepCandidateSpanCells: maskCellSpanCells(radiusMm, mmPerCell, maskSweepPathUncertaintyMm),
     maskPathUncertaintyMm: maskCellUncertaintyMm,
     maskSweepPathUncertaintyMm,
@@ -137,7 +160,7 @@ function surfaceDzAtRadiusForTool(
 }
 
 function maskCellOffsets(
-  tool: CncTool,
+  surfaceDzAtRadius: (radiusMm: number) => number,
   radiusMm: number,
   mmPerCell: number,
   centerClearanceMm: number,
@@ -155,7 +178,7 @@ function maskCellOffsets(
       offsets.push({
         dx,
         dy,
-        dz: cuttingSurfaceDz(tool, Math.min(radiusMm, nearestDistanceMm), radiusMm),
+        dz: surfaceDzAtRadius(Math.min(radiusMm, nearestDistanceMm)),
       });
     }
   }

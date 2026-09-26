@@ -3744,6 +3744,12 @@ explicitly marked below; the remaining controls and user-facing flows are planne
    plus a 0.5 mm finishing allowance, sliced into Z levels by the layer's
    depth-per-pass, and each level's region fills with concentric rings at
    the layer's physical stepover.
+   The allowance holds in 3D: roughing plans with the bit widened sideways by
+   the allowance plus the contour clearance, so steep walls keep their stock
+   too, and each ring point clears the model surface between samples as well
+   as at them (ADR-412). When the stepover is wider than the bit reaches on
+   that level's slice, extra closed passes cut the cores the rings missed
+   (ADR-413).
 2. Passes run depth-major (whole level before stepping down) as a
    clearing group — before any profile cuts. The preview's removal
    shading shows the terraced relief forming.
@@ -3753,7 +3759,8 @@ explicitly marked below; the remaining controls and user-facing flows are planne
 #### Error — bit too big for the detail
 1. Regions narrower than the bit's dilated footprint produce no rings
    there — fine detail is left for the H.8 finishing pass (and the
-   preview shows it uncut). This is a sampled-grid region result; roughing's
+   preview shows it uncut). Ring vertices clear the piecewise-linear model
+   surface under the bit (ADR-412); roughing's
    dual-grid/offset vertices, continuous sweep, and subcell detail retain
    ADR-289's qualification boundary.
 
@@ -3774,7 +3781,8 @@ explicitly marked below; the remaining controls and user-facing flows are planne
    interior beyond that limit. The latter two are retained with the exact
    compiled/recovery Job and reach Job Review as warnings only; they never
    refuse Frame, Start, preview, save, or G-code emission, and the probe never
-   adds a cutter move.
+   adds a cutter move. A core-cleanup offset failure reports through the same
+   warning (ADR-413).
 
 ### F-CNC7. Import an STL relief — Phase H.4 (ADR-098/309)
 
@@ -3791,7 +3799,10 @@ explicitly marked below; the remaining controls and user-facing flows are planne
    larger than the bed is scaled down to fit, with a warning (F-A3). The
    worker transfers its typed mesh into the live object without expanding
    it into a boxed number array on the UI thread.
-3. The canvas shows the relief as a grayscale depth map — light = stock
+3. The mesh keeps its CAD top-view orientation: +Y in the STL is the top of
+   the canvas, so raised text reads the right way round (ADR-414). Meshes
+   already saved in projects keep the orientation they were saved with.
+   The canvas shows the relief as a grayscale depth map — light = stock
    top, dark = floor. It selects, moves, and saves/loads like any object;
    `.lf2` embeds the mesh as the existing JSON number-array schema so
    projects stay self-contained and older saved projects still reopen.
@@ -4357,16 +4368,19 @@ and lifts the command's CNC-only gate.)*
    requests a planar-grid ridge-height target. Compile then emits the
    roughing group AND a finishing group cut with that bit (an M0 change
    separates them when the bits differ).
-2. Finishing rides the sampled max-plus tip surface in serpentine rows. A ball
+2. Finishing rides the max-plus tip surface in serpentine rows, raised on the
+   rows it emits until the bit clears the model surface between samples as
+   well as at them (ADR-412). A ball
    nose uses `2*sqrt(c*(2r-c))` physical-XY spacing after bounding scallop `c`
    to [0.001 mm, bit radius]. A tapered ball nose uses the same law with its
    tip ball radius and samples a grid of at most a tenth of the tip diameter;
    its flank lies below that sphere, so the planar cusp can only be lower, and
    its whole flank constrains the tip (ADR-368). Flat bits use the larger of
    0.05 mm and 40% of diameter. The grid attempts that resolved spacing and
-   its whole-row stride rounds down so it does not overshoot it. This qualifies sampled finishing
-   vertices and planar cusp, not a continuous included-surface sweep or true
-   along-surface scallop proof (ADR-292/294).
+   its whole-row stride rounds down so it does not overshoot it. This qualifies finishing
+   vertices against the piecewise-linear surface and the planar cusp, not the
+   XY chord between vertices, subcell detail, or true along-surface scallop
+   (ADR-292/294/412).
 3. Roughing still leaves its fixed 0.5 mm allowance (it exists FOR this
    pass); finishing consumes it down to the true surface.
 
