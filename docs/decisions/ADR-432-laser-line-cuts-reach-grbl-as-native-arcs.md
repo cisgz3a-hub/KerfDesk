@@ -236,13 +236,22 @@ and emit-rounding (0.002 mm) shares, which is zero at 0.003 mm and negative belo
 already declined a bound that is not positive, but the line check compared squared distances with
 the squared bound, so a negative bound passed as its magnitude: at 0.001 mm a straight or smooth run
 could collapse into one line up to 0.002 mm off its source, and at 1e-6 mm up to 0.003 mm off. The line
-check now declines a bound that is not positive (or not a number), as the arc check does. The
-fitter then keeps each edge of the source it sampled, so a tolerance at or below the
-fixed budget declines cleanly to the sampled source instead of emitting a move outside it.
+check now declines a negative (or not-a-number) bound. A zero bound, at exactly 0.003 mm, still
+merges exactly collinear edges, as before, since that merge adds no fit error; the arc check keeps
+declining a zero bound. Below the fixed 0.003 mm budget the fitter falls back to the sampled
+source, keeping each of its edges. That source is the floor: for a smooth run it can itself be up to
+0.001 mm off the curve, plus emit rounding, so the fitter does not honour a tolerance below 0.003
+mm; it only stops adding fit error of its own. A caller that needs tighter output must fall back
+itself, as the laser caller does by keeping its compiled polyline when the fit is empty or saves
+no move (`cut-arc-moves.ts`). An empty result is not the decline, because a caller that turns the
+moves straight into edges would drop the curve.
 
 Compile fits laser cuts at 0.025 mm, where the fit bound is 0.022 mm, so no emitted program
 changes: the laser G2/G3 output of circles, a sampled polyline arc, a square, a zigzag, shallow
 curves and random cubic chains is byte-identical (SHA-256) before and after. The consumer this
 matters to is any future caller of the shared fitter with a tighter tolerance. Test:
-`fit-arc-moves-tiny-tolerance.test.ts` (0.003, 0.001 and 1e-6 mm, straight and smooth runs; the
-0.001 and 1e-6 mm cases fail without the guard, the 0.003 mm case pins the zero-bound boundary).
+`fit-arc-moves-tiny-tolerance.test.ts` (0.003, 0.001, 1e-6 mm and NaN, straight, smooth and
+collinear runs; the 0.001 and 1e-6 mm cases fail without the guard, the 0.003 mm cases pin the
+zero-bound boundary and pass on the base too, because there the bound computes to exactly 0).
+A source point that is itself not finite still passes through to the moves; rejecting it belongs
+to the caller or to mapping, not to this guard.

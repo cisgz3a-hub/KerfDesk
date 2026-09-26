@@ -78,6 +78,17 @@ const SHALLOW_CUBIC: CurveSubpath = {
   closed: false,
 };
 
+// Three exactly collinear edges: merging them into one line has zero fit error.
+const COLLINEAR: CurveSubpath = {
+  start: { x: 0, y: 0 },
+  segments: [
+    { kind: 'line', to: { x: 1, y: 0 } },
+    { kind: 'line', to: { x: 2, y: 0 } },
+    { kind: 'line', to: { x: 3, y: 0 } },
+  ],
+  closed: false,
+};
+
 describe('fitArcMoves at a tolerance the fixed budget already spends', () => {
   it.each(TINY_TOLERANCES_MM)('keeps a straight run within %f mm', (toleranceMm) => {
     const moves = fitArcMoves(BUMPED_LINE, IDENTITY, toleranceMm);
@@ -94,8 +105,25 @@ describe('fitArcMoves at a tolerance the fixed budget already spends', () => {
     const moves = fitArcMoves(SHALLOW_CUBIC, IDENTITY, toleranceMm);
     expect(allFinite(moves)).toBe(true);
     expect(moves.every((move) => move.kind === 'line')).toBe(true);
-    // Declining leaves the sampled source, whose own error is the floor.
+    // Declining leaves the sampled source, whose own error (up to
+    // ARC_FIT_SOURCE_SAMPLE_ERROR_MM) is the floor. That floor is a known limit,
+    // not a guarantee of the requested tolerance: below it a caller needing
+    // tighter output must fall back itself (the laser caller does).
     const bound = Math.max(toleranceMm, ARC_FIT_SOURCE_SAMPLE_ERROR_MM) + ORACLE_MM;
     expect(hausdorff(SHALLOW_CUBIC, moves)).toBeLessThanOrEqual(bound);
+  });
+
+  it('still merges exactly collinear edges at the zero bound (0.003 mm)', () => {
+    const moves = fitArcMoves(COLLINEAR, IDENTITY, 0.003);
+    expect(moves).toEqual([{ kind: 'line', to: { x: 3, y: 0 } }]);
+  });
+
+  it.each([0.001, 1e-6, Number.NaN])('keeps collinear edges apart at %f mm', (toleranceMm) => {
+    const moves = fitArcMoves(COLLINEAR, IDENTITY, toleranceMm);
+    expect(moves.map((move) => move.to)).toEqual([
+      { x: 1, y: 0 },
+      { x: 2, y: 0 },
+      { x: 3, y: 0 },
+    ]);
   });
 });
