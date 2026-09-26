@@ -139,7 +139,7 @@ describe('three-stage Machine Setup integration audit', () => {
       await roundTripDisclosure(title);
     act(() => ariaButton('Go to step 2: Essentials').click());
     for (const title of [
-      'Travel speeds',
+      'Laser travel speeds',
       'Air assist and test fire',
       'CNC job setup',
       'Accessories and calibration',

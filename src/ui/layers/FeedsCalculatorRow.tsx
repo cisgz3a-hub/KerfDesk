@@ -40,7 +40,7 @@ export function FeedsCalculatorRow(props: {
             tool,
             spindleRpm: rpm,
             profile,
-            machineSpindleMaxRpm: machine.params.spindleMaxRpm,
+            machineParams: machine.params,
             liveCaps,
             fluteCount: flutes,
           }),

@@ -1,10 +1,13 @@
-import { LAYER_DEFAULTS, type Layer } from '../../core/scene';
+import { LAYER_DEFAULTS, type Layer, type MachineKind } from '../../core/scene';
 import { normalizeLayer } from '../../io/project/normalize-layer';
 import { validateProjectLayer } from '../../io/project/project-layer-shape-validator';
-import { cncSettingsForArtworkPaste } from '../state/cnc-settings-clipboard';
 import type { LayerDefaultsState } from '../state/layer-default-actions';
 
-export type LayerDefaultSettings = Partial<Omit<Layer, 'id' | 'color'>>;
+// Make Default is a laser setting: it lives in the laser Cut Settings dialog
+// and never carries a CNC block. New CNC operations take their bit, feeds and
+// depth from Startup Setup and the stock material instead, so a laser default
+// can never turn every new router cut into the last CNC operation it saw.
+export type LayerDefaultSettings = Partial<Omit<Layer, 'id' | 'color' | 'cnc' | 'parkedOutput'>>;
 
 type StorageLike = Pick<Storage, 'getItem' | 'setItem' | 'removeItem'>;
 
@@ -12,35 +15,53 @@ type StorageLike = Pick<Storage, 'getItem' | 'setItem' | 'removeItem'>;
 // a reusable setting. A saved 'baseline' marker would let every new layer skip
 // the verified-offset rule for bidirectional scanning (scan-direction-policy.ts),
 // so neither is captured, and neither is applied from an older saved default.
-export function captureLayerDefaultSettings(layer: Layer): LayerDefaultSettings {
+// Its Output value is the laser Output switch: `output` in Laser mode,
+// `parkedOutput` in CNC mode (ADR-416), so CNC's switch is never saved or set.
+export function captureLayerDefaultSettings(
+  layer: Layer,
+  machineKind: MachineKind = 'laser',
+): LayerDefaultSettings {
   const {
     id: _id,
     color: _color,
     scanOffsetCalibrationMode: _calibrationMode,
     bindingOperationId: _bindingOperationId,
-    cnc,
+    cnc: _cnc,
+    output,
+    parkedOutput,
     ...settings
   } = layer;
-  return {
-    ...settings,
-    ...(cnc === undefined ? {} : { cnc: cncSettingsForArtworkPaste(cnc, undefined) }),
-  };
+  return { ...settings, output: machineKind === 'cnc' ? (parkedOutput ?? output) : output };
 }
 
-export function applyLayerDefaultSettings(layer: Layer, settings: LayerDefaultSettings): Layer {
+export function applyLayerDefaultSettings(
+  layer: Layer,
+  settings: LayerDefaultSettings,
+  machineKind: MachineKind = 'laser',
+): Layer {
   const {
-    cnc,
     scanOffsetCalibrationMode: _calibrationMode,
     bindingOperationId: _bindingOperationId,
+    output,
     ...artwork
   } = settings;
+  const laserOutput =
+    output === undefined ? {} : machineKind === 'cnc' ? { parkedOutput: output } : { output };
   return {
     ...layer,
-    ...artwork,
-    ...(cnc === undefined ? {} : { cnc: cncSettingsForArtworkPaste(cnc, layer.cnc) }),
+    ...withoutCncBlock(artwork),
+    ...laserOutput,
     id: layer.id,
     color: layer.color,
   };
+}
+
+// Defaults saved before the split may still hold a CNC block. It is validated
+// with the rest (a corrupt slot is still discarded) and then dropped.
+function withoutCncBlock<T extends object>(settings: T): T {
+  if (!('cnc' in settings)) return settings;
+  const { cnc: _cnc, ...laserOnly } = settings as T & { readonly cnc?: unknown };
+  return laserOnly as T;
 }
 
 export function layerDefaultsStorageKey(deviceProfileName: string): string {
@@ -102,7 +123,12 @@ function parseLayerDefaults(raw: string): LayerDefaultsState | null {
   const allColors = (parsed as Record<string, unknown>)['allColors'];
   if (!isLayerDefaultRecord(byColor)) return null;
   if (allColors !== null && !isLayerDefaultSettings(allColors)) return null;
-  return { byColor, allColors };
+  return {
+    byColor: Object.fromEntries(
+      Object.entries(byColor).map(([color, settings]) => [color, withoutCncBlock(settings)]),
+    ),
+    allColors: allColors === null ? null : withoutCncBlock(allColors),
+  };
 }
 
 function isLayerDefaultRecord(value: unknown): value is Record<string, LayerDefaultSettings> {

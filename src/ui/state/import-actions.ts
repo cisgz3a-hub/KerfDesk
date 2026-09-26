@@ -10,7 +10,6 @@
 // store.ts -> import-actions.ts -> store.ts cycle ESLint forbids.
 
 import type { RasterImage, SceneObject, TracedImage } from '../../core/scene';
-import { applyLayerDefaultSettings } from '../layers/layer-default-settings';
 import { applyConvertToBitmap } from './convert-to-bitmap';
 import { applyRasterizedTraceToExisting } from './rasterized-trace-mutation';
 import {
@@ -25,11 +24,7 @@ import { applyImportBedFit } from './import-bed-fit';
 import { fitAllObjects, type ProjectSlice } from './viewport-actions';
 import { projectWithFreshCncLayers } from './cnc-auto-seeding';
 import type { CncLiveCapsState } from './cnc-live-caps-actions';
-import {
-  DEFAULT_LAYER_DEFAULTS_STATE,
-  defaultSettingsForOperation,
-  type LayerDefaultsState,
-} from './layer-default-actions';
+import type { LayerDefaultsState } from './layer-default-actions';
 import { applyCameraTraceImport } from './camera-trace-import';
 
 // Narrow `set`: every action here dispatches a pure mutation helper
@@ -109,28 +104,14 @@ export function imageImportActions(
 }
 
 function withFreshCncLayers(state: ImportState, result: MutationResult): MutationResult {
-  const existingIds = new Set(state.project.scene.layers.map((layer) => layer.id));
-  const savedDefaultLayerIds = new Set<string>();
-  const defaults = state.layerDefaults ?? DEFAULT_LAYER_DEFAULTS_STATE;
-  const layers = result.project.scene.layers.map((layer) => {
-    if (existingIds.has(layer.id)) return layer;
-    const savedCnc = defaultSettingsForOperation(defaults, result.project.scene.objects, layer).cnc;
-    if (savedCnc === undefined) return layer;
-    savedDefaultLayerIds.add(layer.id);
-    // Image and trace mutations own structural settings such as mode and
-    // density. Only the operator's saved CNC block participates here.
-    return applyLayerDefaultSettings(layer, { cnc: savedCnc });
-  });
-  const project = layers.some((layer, index) => layer !== result.project.scene.layers[index])
-    ? { ...result.project, scene: { ...result.project.scene, layers } }
-    : result.project;
+  // Laser Make Default never carries CNC settings, so every new CNC operation
+  // from an import or trace is seeded from the machine setup.
   return {
     ...result,
     project: projectWithFreshCncLayers(
       state.project.scene.layers,
-      project,
+      result.project,
       state.cncLiveCaps ?? null,
-      savedDefaultLayerIds,
     ),
   };
 }

@@ -65,9 +65,11 @@ export type GcodeMetadata = {
  * windows, and pocket and relief-roughing stepover sized by the cut width at
  * depth, and ADR-159 amendment 2's SVG arcs imported as cubics that meet the
  * arc at each segment midpoint instead of sitting up to 0.196% of the radius
- * inside it.
+ * inside it, and ADR-289 amendment 1's relief roughing rings that end where
+ * they start and levels cleared to their centre above 50% stepover, and
+ * ADR-432's native laser G2/G3 arcs with represented-arc validation and G17.
  */
-export const EMITTER_REVISION = 'svg-arcs-on-the-arc-20260926-v1';
+export const EMITTER_REVISION = 'svg-and-laser-arcs-relief-rings-and-cores-20260927-v1';
 
 // Machine-specific assumption lines (ADR-103 defect fix): router exports
 // previously carried the laser-worded `$32=1 (laser mode)` banner. The S

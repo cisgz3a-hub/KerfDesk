@@ -19,6 +19,7 @@ type FinishedJobState = Pick<
   | 'pendingToolLabel'
   | 'pendingToolId'
   | 'streamHold'
+  | 'cncPauseLift'
 >;
 
 type SessionScopedState = FinishedJobState &
@@ -48,6 +49,7 @@ export function finishedJobStateReset(): FinishedJobState {
     pendingToolLabel: null,
     pendingToolId: null,
     streamHold: null,
+    cncPauseLift: null,
   };
 }
 

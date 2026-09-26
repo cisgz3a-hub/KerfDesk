@@ -21,6 +21,9 @@ export function runPreEmitPreflight(project: Project): PreflightResult {
   if (project.machine?.kind === 'cnc') {
     issues.push(...cncMachineParamIssues(project.machine));
     issues.push(...findInvalidCncToolGeometry(project.scene, project.machine, project.device));
+    // The laser-off seek feed and the raster scan-offset table shape laser
+    // output only; a router job never reads them, so they cannot fail it.
+    return { ok: issues.length === 0, issues };
   }
   const controlledFeed = project.device.controlledLaserOffTravelFeedMmPerMin;
   const controlledTravelIssue = controlledLaserOffTravelFeedIssue(project.device);

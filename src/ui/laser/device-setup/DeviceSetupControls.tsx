@@ -4,6 +4,7 @@
 // explicit setup launch, removing the former pair of near-synonym workflows.
 
 import { useEffect, useState } from 'react';
+import { machineKindOf } from '../../../core/scene';
 import { helpProps } from '../../help/help-topics';
 import { Button } from '../../kit';
 import { useStore } from '../../state';
@@ -23,7 +24,8 @@ export function DeviceSetupControls(): JSX.Element {
   const configuredRevision = useMachineSetupDialogStore((store) => store.configuredRevision);
   const connected = useLaserStore((s) => s.connection.kind === 'connected');
   const device = useStore((s) => s.project.device);
-  const needsSetup = shouldPromptDeviceSetup({ connected, device, configured });
+  const machineKind = useStore((s) => machineKindOf(s.project.machine));
+  const needsSetup = shouldPromptDeviceSetup({ connected, device, machineKind, configured });
   useEffect(() => {
     const storage = browserLocalStorage();
     setConfigured(storage === null ? new Set() : loadConfiguredSignatures(storage));

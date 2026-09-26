@@ -6,6 +6,8 @@ export type CncSubProfileValidation = {
 };
 
 const COOLANT_MODES = ['off', 'mist', 'flood'] as const;
+// CNC's own Max feed and Frame speed; absent means the shared device values.
+const CNC_FEED_FIELDS = ['maxFeedMmPerMin', 'framingFeedMmPerMin'] as const;
 
 /** Validate the persisted machine-wide CNC fields before they reach setup or output. */
 export function cncSubProfileIssues(value: unknown, path = 'cncSubProfile'): ReadonlyArray<string> {
@@ -22,9 +24,20 @@ export function cncSubProfileIssues(value: unknown, path = 'cncSubProfile'): Rea
   if (value['coolant'] !== undefined && !COOLANT_MODES.includes(value['coolant'] as never)) {
     issues.push(`${path}.coolant must be off, mist, or flood`);
   }
+  issues.push(...optionalFieldIssues(value, path));
+  return issues;
+}
+
+function optionalFieldIssues(value: Record<string, unknown>, path: string): string[] {
+  const issues: string[] = [];
   for (const field of ['parkXMm', 'parkYMm'] as const) {
     if (value[field] !== undefined && !isFiniteNumber(value[field])) {
       issues.push(`${path}.${field} must be finite`);
+    }
+  }
+  for (const field of CNC_FEED_FIELDS) {
+    if (value[field] !== undefined && !isPositiveFinite(value[field])) {
+      issues.push(`${path}.${field} must be positive`);
     }
   }
   return issues;
@@ -56,11 +69,22 @@ export function recoverCncSubProfile(
         ? value['spindleSpinupSec']
         : fallback.spindleSpinupSec,
       ...(coolant === undefined ? {} : { coolant }),
-      ...(isFiniteNumber(value['parkXMm']) ? { parkXMm: value['parkXMm'] } : {}),
-      ...(isFiniteNumber(value['parkYMm']) ? { parkYMm: value['parkYMm'] } : {}),
+      ...recoveredOptionalFields(value),
     },
     issues,
   };
+}
+
+// Invalid optional values are omitted: no park, or the shared device feeds.
+function recoveredOptionalFields(value: Record<string, unknown>): Partial<CncSubProfile> {
+  const recovered: { -readonly [K in keyof CncSubProfile]?: CncSubProfile[K] } = {};
+  if (isFiniteNumber(value['parkXMm'])) recovered.parkXMm = value['parkXMm'];
+  if (isFiniteNumber(value['parkYMm'])) recovered.parkYMm = value['parkYMm'];
+  for (const field of CNC_FEED_FIELDS) {
+    const feed = value[field];
+    if (isPositiveFinite(feed)) recovered[field] = feed;
+  }
+  return recovered;
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {

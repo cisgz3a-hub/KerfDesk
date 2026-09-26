@@ -22,6 +22,7 @@ import {
   type JobOriginPlacement,
 } from '../../core/job';
 import { compileCncJobResult, type CncJobCompilationResult } from '../../core/cnc/compile-cnc-job';
+import { registrationBoxScene } from '../../core/job/registration-placement';
 import {
   COMPILE_INTEGRITY_PREFLIGHT_CODES,
   runPreEmitPreflight,
@@ -241,7 +242,7 @@ function resolveJobOriginOffset(
   // to the BOX, not to whichever layer is output for that run, so the artwork
   // lands inside the burned box instead of at the bed corner. No-op when no jig
   // is present (returns null -> existing placement logic below).
-  const boxBounds = computeRegistrationBoxBounds(project.scene, project.device);
+  const boxBounds = registrationBoxBounds(project);
   if (boxBounds !== null) return jobOriginOffsetFromBounds(boxBounds, jobOrigin, project.device);
 
   if (outputScope.cutSelectedGraphics && !outputScope.useSelectionOrigin) {
@@ -251,6 +252,17 @@ function resolveJobOriginOffset(
       : jobOriginOffsetFromBounds(fullBounds, jobOrigin, project.device);
   }
   return jobOriginOffset(compiled, jobOrigin, project.device);
+}
+
+function registrationBoxBounds(project: Project): JobBounds | null {
+  const machine = project.machine;
+  if (machine === undefined || machine.kind !== 'cnc') {
+    return computeRegistrationBoxBounds(project.scene, project.device);
+  }
+  const boxScene = registrationBoxScene(project.scene);
+  if (boxScene === null) return null;
+  const compiled = compileCncJobResult(boxScene, project.device, machine);
+  return compiled.kind === 'compiled' ? computeJobBounds(compiled.job, project.device) : null;
 }
 
 function fullSceneOutputBounds(project: Project): JobBounds | null {

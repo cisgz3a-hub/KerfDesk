@@ -5,6 +5,7 @@
 // epoch, so it never describes a later run.
 
 import type { GrblState, StatusReport, StreamerStatus } from '../../core/controllers/grbl';
+import { cncPauseLiftMayBeMoving, type CncPauseLift } from './cnc-pause-lift-state';
 
 export type JobStopReason = 'operator' | 'app-closing';
 
@@ -51,6 +52,7 @@ export function streamResetRecord(
     readonly streamerEpoch: number;
     readonly pauseResumeTransition: unknown;
     readonly streamReset?: StreamReset | null;
+    readonly cncPauseLift?: CncPauseLift | null;
   },
   pauseResumeSettling = false,
 ): StreamReset {
@@ -61,7 +63,10 @@ export function streamResetRecord(
       softResetMayLosePosition(
         state.statusReport,
         state.streamer?.status ?? null,
-        pauseResumeSettling || state.pauseResumeTransition !== null,
+        // A Pause and lift move (ADR-411) runs outside the paused stream.
+        pauseResumeSettling ||
+          state.pauseResumeTransition !== null ||
+          cncPauseLiftMayBeMoving(state),
       ),
   };
 }

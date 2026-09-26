@@ -4,6 +4,7 @@
 // seeding hooks stay in lockstep. No store access — callers thread the project.
 
 import { isChiploadMaterialKey } from '../../core/cnc';
+import { cncHeadDevice } from '../../core/cnc/cnc-head-feeds';
 import {
   DEFAULT_ASSUMED_FLUTE_COUNT,
   resolveCncMaterialFeedPatch,
@@ -15,6 +16,7 @@ import {
   layerCncTool,
   type CncLayerSettings,
   type CncMachineConfig,
+  type CncMachineParams,
   type CncStock,
   type CncTool,
   type Layer,
@@ -38,7 +40,7 @@ export function layerWithCncMaterial(input: {
     tool: layerCncTool(input.machine, cnc),
     spindleRpm: cnc.spindleRpm,
     profile: input.profile,
-    machineSpindleMaxRpm: input.machine.params.spindleMaxRpm,
+    machineParams: input.machine.params,
     ...(input.liveCaps === undefined ? {} : { liveCaps: input.liveCaps }),
     ...(input.fluteCount === undefined ? {} : { fluteCount: input.fluteCount }),
   });
@@ -54,16 +56,17 @@ export function materialFeedsPatch(input: {
   readonly tool: CncTool;
   readonly spindleRpm: number;
   readonly profile: DeviceProfile;
-  readonly machineSpindleMaxRpm: number;
+  // CNC's own params: the spindle ceiling and CNC's Max feed come from here.
+  readonly machineParams: CncMachineParams;
   readonly liveCaps?: CncMachineStarterLiveCaps | null;
   readonly fluteCount?: number;
 }): Partial<CncLayerSettings> | null {
   return resolveCncMaterialFeedPatch({
-    profile: input.profile,
+    profile: cncHeadDevice(input.profile, input.machineParams),
     tool: input.tool,
     materialKey: input.materialKey,
     spindleRpm: input.spindleRpm,
-    machineSpindleMaxRpm: input.machineSpindleMaxRpm,
+    machineSpindleMaxRpm: input.machineParams.spindleMaxRpm,
     fluteCount: input.fluteCount ?? input.tool.fluteCount ?? DEFAULT_ASSUMED_FLUTE_COUNT,
     ...(input.liveCaps === null || input.liveCaps === undefined
       ? {}

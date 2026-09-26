@@ -1,11 +1,16 @@
 import { useCallback } from 'react';
 import { persistCalibrationDraft } from '../calibration/calibration-draft-storage';
-import { BOX_DRAFT_KEY, type BoxDraft } from './box-draft';
+import type { BoxDraft } from './box-draft';
 
-/** Persist the current Box draft before closing without generating geometry. */
-export function useBoxDraftClose(draft: BoxDraft, onClose: () => void): () => void {
+/** Persist the current Box draft under its machine's key before closing
+ * without generating geometry. */
+export function useBoxDraftClose(
+  draftKey: string,
+  draft: BoxDraft,
+  onClose: () => void,
+): () => void {
   return useCallback(() => {
-    persistCalibrationDraft(BOX_DRAFT_KEY, draft);
+    persistCalibrationDraft(draftKey, draft);
     onClose();
-  }, [draft, onClose]);
+  }, [draftKey, draft, onClose]);
 }

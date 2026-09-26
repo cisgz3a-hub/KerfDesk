@@ -1,6 +1,7 @@
 import type { CncGroup } from '../job';
 import type { DeviceProfile } from '../devices';
 import type { CncMachineConfig, Vec2 } from '../scene';
+import { cncMaxFeedMmPerMin } from './cnc-head-feeds';
 import type { CncTile } from './cnc-tile';
 import type { EffectiveCncTileGrid } from './effective-cnc-tile-grid';
 import { capFeed, capSpindle } from './compile-cnc-helpers';
@@ -36,6 +37,7 @@ export function registrationGroupForTile(
   if (centers.length === 0) return null;
   const { tool, settings } = registration;
   const isPeck = settings.holeDiameterMm === tool.diameterMm;
+  const maxFeed = cncMaxFeedMmPerMin(device, machine.params);
   return {
     kind: 'cnc',
     layerId: 'tile-registration',
@@ -52,9 +54,9 @@ export function registrationGroupForTile(
     depthPerPassMm: settings.depthPerPassMm,
     feedMmPerMin: capFeed(
       isPeck ? Math.min(settings.feedMmPerMin, settings.plungeMmPerMin) : settings.feedMmPerMin,
-      device.maxFeed,
+      maxFeed,
     ),
-    plungeMmPerMin: capFeed(settings.plungeMmPerMin, device.maxFeed),
+    plungeMmPerMin: capFeed(settings.plungeMmPerMin, maxFeed),
     spindleRpm: capSpindle(settings.spindleRpm, machine.params.spindleMaxRpm),
     spindleSpinupSec: Math.max(0, machine.params.spindleSpinupSec),
     safeZMm: Math.max(0, machine.params.safeZMm),

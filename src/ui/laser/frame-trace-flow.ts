@@ -1,3 +1,4 @@
+import { deviceForActiveHead } from '../../core/cnc/cnc-head-feeds';
 import { frameBoundsSignature, type JobOriginPlacement } from '../../core/job';
 import { currentOutputScope, type useStore } from '../state';
 import type { useCameraStore } from '../state/camera-store';
@@ -163,7 +164,8 @@ async function traceFrameOutline(
   try {
     await currentLaser.traceFrame(
       preview.frameMotionBounds,
-      context.app.project.device.framingFeedMmPerMin,
+      deviceForActiveHead(context.app.project.device, context.app.project.machine)
+        .framingFeedMmPerMin,
       candidate,
     );
   } catch (error) {
