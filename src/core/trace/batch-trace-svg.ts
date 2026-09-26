@@ -29,6 +29,8 @@ export type TracedSvgPage = {
   readonly pixelHeight: number;
   /** Absent: the file is written in source pixels with no physical size. */
   readonly physicalSizeMm?: { readonly widthMm: number; readonly heightMm: number };
+  /** Page size in page units when it is not the image (a fitted page, ADR-451). */
+  readonly size?: { readonly width: number; readonly height: number };
 };
 
 export type TracedVectorOptions = {
@@ -77,8 +79,8 @@ export function tracedLayersToSvg(
   // Round the page outward so it never clips geometry at its right/bottom edge.
   const extent = (size: number): string =>
     grid === null ? String(size) : formatGridIndex(outwardGridIndices(0, size, grid).hi, grid);
-  const width = extent(page.pixelWidth * scale.x);
-  const height = extent(page.pixelHeight * scale.y);
+  const width = extent(page.size?.width ?? page.pixelWidth * scale.x);
+  const height = extent(page.size?.height ?? page.pixelHeight * scale.y);
   const size = physical
     ? ` width="${width}mm" height="${height}mm"`
     : ' width="100%" height="100%"';

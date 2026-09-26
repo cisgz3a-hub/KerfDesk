@@ -48,6 +48,11 @@ export type {
 } from './batch-trace';
 export { batchTraceFormatLabel, traceImagesToVectorFiles } from './batch-trace';
 export type { TracedLayer, TracedVectorOptions } from './batch-trace-svg';
+export {
+  MAX_TRACED_PAGE_MARGIN_MM,
+  type TracedPageFit,
+  type TracedPageLayout,
+} from './traced-page-box';
 export type { EnhanceRegionArgs, RegionTraceFn } from './region-enhance';
 export { enhanceRegionPaths } from './region-enhance';
 export type { TraceBoundary } from './trace-boundary';
