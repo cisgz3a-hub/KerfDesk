@@ -254,6 +254,7 @@ tail and follow that staircase; see Known gaps.
     to fail the R=900 commit-grid, filled-disc Optimize, Edge-dial or hairline instruments.
     Incremental span evaluation (reusing the previous extension's parameters) is the next lever;
     the exact part of it is done (Amendment 1), and the fit is no longer where most of the gap is.
+    The topology repair's exact savings are Amendment 2; what remains is the sample count.
 - Node editing, SVG export, bounds and the laser commit read the carried cubics; the downscale and
   Region Enhance routes no longer lose them.
 
@@ -319,3 +320,50 @@ worst recursion, whose joints decide the output; the earlier proposal shortcuts 
 failed the R=900 commit-grid, filled-disc Optimize, Edge-dial and hairline instruments. Reaching
 the targets therefore needs an output-changing step (a coarser compatibility sampling or a
 redesigned proposal), which is a separate decision with its own instruments.
+
+### Amendment 2 - topology-repair speed, same output (2026-09-27)
+
+A CPU profile of a whole owl Line Art trace, taken from a plain node bundle of
+`traceImageToColoredPaths` (vitest's worker wrote no profile), put half of it in
+`preserveContourTopologySteps`: 7.2 s against 2.6 s on main. The 0.02 px compatibility sampling
+gives the owl 365,074 polyline points against main's 189k, and every stage of the repair grows
+with the edge count. Four changes remove work without changing a coordinate:
+
+- The contact cache pairs overlapping edges by descending both edge trees together
+  (`ContourBoxIndex.overlapPairsSteps`) instead of one index query per edge; the earliest contact
+  it keeps does not depend on the order pairs arrive in.
+- A boundary's first membership query scans its edges; the second builds the crossing index.
+- Box-index nodes take their bounds from their children, and the tree is built on an explicit
+  stack in one generator instead of a recursive generator that resumed once per level at every
+  checkpoint. The nodes, their order and their partitions are the same.
+- `ContourMembership` answers a candidate ring from the contact cache's edge index
+  (`ContourContactCache.preparedEdges`), from the first query. A horizontal edge never crosses
+  the ray and a repeated closing point adds only a horizontal edge, so an index of all edges gives
+  the same winding as the crossing index; `contour-membership.test.ts` pins it.
+
+Equivalence instrument: an FNV hash of every polyline vertex and every curve coordinate of the
+whole trace. It is unchanged on owl Line Art, Smooth and Sharp, hummingbird Line Art,
+perf-noise-192 and perf-noise-1024 (941,017 segments, 2,619,458 points), from `172a27538` to
+this amendment.
+
+Measured (node bundles, one process per run, machine under load from other work, so pairs run
+back to back and only ratios mean anything):
+
+| Case | Before (`172a27538`) | After | main (`fa8939b8d`) |
+|---|---|---|---|
+| owl Line Art, topology repair (CPU profile) | 7.2 s | 5.5 s | 2.6 s |
+| owl Line Art, nesting checks (CPU profile) | 1.5 s | 1.1 s | - |
+| perf-noise-1024 Line Art, whole trace | 358.7 s | 144 to 232 s | 86.6 s |
+| perf-noise-1024 Line Art, peak RSS | 6.7 GB | 5.0 to 6.3 GB | 2.3 GB |
+
+The back-to-back noise pair just before the last two changes and after them measured 234 s and
+144 s; owl whole-trace wall time on this machine swung from 7.6 to 16 s for the same code and is
+not ranked.
+
+Status against the targets: not met. Owl Line Art is about twice main in the topology repair
+alone; perf-noise-1024 is 1.7 to 2.7x main in time and 2.7x in memory. Tried without gain and
+dropped: testing a small ring's later cubics in place instead of filtering them in
+`ringMeetsItself`. What remains is proportional to the sample count (perf-noise-1024: 2.62M
+points against main's 0.97M; perf-noise-192: 100,405 against 30,110), which the repair, the
+contact indexes and the curve pieces all hold. Only a coarser compatibility sampling removes it,
+and that changes the output, so it is a separate decision with its own instruments.
