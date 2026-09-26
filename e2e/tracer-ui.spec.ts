@@ -78,7 +78,14 @@ test('inspects a trace without restarting the worker, edits with sliders, and co
   await expect(
     dialog.getByRole('slider', { name: 'Trace Smoothness slider', exact: true }),
   ).toBeVisible();
+  // Diagonal contacts (ADR-450) is a native select: the keyboard changes it.
+  const contacts = dialog.getByRole('combobox', { name: 'Trace diagonal contacts', exact: true });
+  await expect(contacts).toHaveValue('auto');
+  await contacts.focus();
+  await contacts.press('ArrowDown');
+  await expect(contacts).toHaveValue('connect-ink');
   await dialog.getByRole('button', { name: 'Reset trace settings', exact: true }).click();
+  await expect(contacts).toHaveValue('auto');
   await expect(dialog.getByRole('combobox', { name: 'Trace detection' })).toHaveValue('preset');
   await expect(dialog.getByText('Settings edited', { exact: true })).toHaveCount(0);
   await expect(dialog.getByText(/Trace ready/)).toBeVisible();
