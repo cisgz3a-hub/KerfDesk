@@ -131,9 +131,12 @@ Two defects, measured on the base (`c62084959`):
   `connected-script-compile-performance` (script-font glyphs; length and SHA-256), and the V-carve
   pass positions above. Every other G-code snapshot, including the SVG rounded rectangle and ellipse
   (imported as polylines), is unchanged.
-- A path and its reverse flatten to the same vertices when equal steps fit (every circle); an
-  eccentric ellipse arc or an uneven cubic may put them elsewhere on the same curve, within the same
-  tolerance. `curve-join.test.ts` now checks a reversed arc against the curve itself instead of
+- Cubics and elliptical arcs choose a canonical endpoint direction before the greedy walk, then
+  reverse the result for the opposite traversal. This keeps shared colour-layer seams on the same
+  chords even when equal steps do not fit. Independent ellipse parametrisations can differ at
+  floating-point rounding scale; both original segment endpoints are preserved exactly. The
+  asymmetric 100 x 7 mm ellipse regression previously left a 0.023 mm seam gap at 0.025 mm
+  tolerance. `curve-join.test.ts` also checks a reversed arc against the curve itself instead of
   expecting reversed vertices. `vector-path-weld.test.ts` bounds the welded outline's area change by
   what its 0.001 mm union grid can cause (perimeter times half a grid diagonal, about 0.018 mm²;
   measured 0.0005 mm²), and checks that the coarse compatibility polyline differs by more than
