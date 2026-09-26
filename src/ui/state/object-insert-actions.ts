@@ -262,7 +262,7 @@ export function applyLayerDefaultsToFreshLayers<T extends { readonly project: Pr
     // Seed fresh CNC layers from the project stock material (ADR-112); no-op
     // for laser or when no material is chosen.
     const seeded =
-      machine?.kind === 'cnc' && settings.cnc === undefined
+      machine?.kind === 'cnc'
         ? seedFreshCncLayer(withDefaults, {
             device: result.project.device,
             machine,

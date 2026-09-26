@@ -46,14 +46,13 @@ export function projectWithFreshCncLayers(
   previousLayers: ReadonlyArray<Layer>,
   project: Project,
   liveCaps: CncMachineStarterLiveCaps | null,
-  savedDefaultLayerIds: ReadonlySet<string> = new Set(),
 ): Project {
   const machine = project.machine;
   if (machine?.kind !== 'cnc') return project;
   const existingIds = new Set(previousLayers.map((layer) => layer.id));
   let changed = false;
   const layers = project.scene.layers.map((layer) => {
-    if (existingIds.has(layer.id) || savedDefaultLayerIds.has(layer.id)) return layer;
+    if (existingIds.has(layer.id)) return layer;
     const seeded = seedFreshCncLayer(layer, { device: project.device, machine, liveCaps });
     if (seeded !== layer) changed = true;
     return seeded;

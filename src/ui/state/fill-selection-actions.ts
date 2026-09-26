@@ -88,7 +88,7 @@ function isolateSelectionToNewFillOperation(
   };
   const machine = state.project.machine;
   const operation =
-    machine?.kind === 'cnc' && defaults.cnc === undefined
+    machine?.kind === 'cnc'
       ? seedFreshCncLayer(withDefaults, {
           device: state.project.device,
           machine,

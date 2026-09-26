@@ -165,7 +165,7 @@ function createManualLayerAction(set: LayerActionSet): LayerActions['createManua
       const base = applyLayerDefaultSettings(created, defaults);
       const machine = state.project.machine;
       const layer =
-        machine?.kind === 'cnc' && defaults.cnc === undefined
+        machine?.kind === 'cnc'
           ? seedFreshCncLayer(base, {
               device: state.project.device,
               machine,
