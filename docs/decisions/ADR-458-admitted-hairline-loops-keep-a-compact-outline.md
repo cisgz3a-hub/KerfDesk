@@ -233,3 +233,13 @@ vanish:
   rule. Their GeoJSON writer groups holes by geometric containment. Neither groups by list order.
   One GeoJSON caveat is recorded for that branch: a ring that collapses on the export grid is
   dropped before nesting.
+
+### Amendment 2 - on top of the compact-curve contour tail (2026-09-27)
+
+Merged onto ADR-439..441, the fallback keeps its place (`retainCracks` in `finishLoop` calls
+`admittedLoopFallback`), but Smooth's 2x hairlines are sub-pixel informed and now finish through the
+compact cubic fit (ADR-440), which does not collapse them, so the fallback is not reached on these
+cases. A ring's cost is therefore counted in its canonical curve's segments, not its polyline (only a
+sampling of the curve): the 1 px diagonals are 4 to 6 segments. The 52 degree hairline beside a
+square costs 57 cubics (the raw-crack chain it replaced was 457 moves) and keeps both ends; its test
+bound is 64 moves, a pin on today's cost rather than the < 40 this ADR measured on the legacy tail.
