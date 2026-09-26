@@ -3,7 +3,6 @@ import { APP_DISPLAY_NAME } from '../../core/app-branding';
 import { primaryOperationForObject } from '../../core/scene';
 import { CONNECTION_HELP_TEXT } from '../help/connection-help';
 import { SAFETY_NOTICE_TEXT } from '../help/safety-notice';
-import type { PlatformAdapter } from '../../platform/types';
 import { useStore } from '../state';
 import { useUiStore } from '../state/ui-store';
 import { jobAwareAlert } from '../state/job-aware-dialogs';
@@ -11,7 +10,7 @@ import { BarcodeDialogHost } from '../barcode/BarcodeDialogHost';
 import { useBarcodeDialogStore } from '../barcode/barcode-dialog-store';
 import { BoxGeneratorHost } from '../box/BoxGeneratorHost';
 import { BoxFitTestHost } from '../box/BoxFitTestHost';
-import { useToastStore, type ToastVariant } from '../state/toast-store';
+import { useToastStore } from '../state/toast-store';
 import { OptimizationSettingsDialog } from '../laser/OptimizationSettingsDialog';
 import { LabsSettingsDialog } from '../laser/LabsSettingsDialog';
 import { RotarySetupHost } from '../laser/RotarySetupHost';
@@ -20,14 +19,12 @@ import { type ConvertibleVector } from '../raster/vector-to-bitmap';
 import { usePlatform } from '../app/platform-context';
 import { useImportDragDrop } from '../app/use-import-drag-drop';
 import { Toolbar } from '../common/Toolbar';
-import { traceTargetPxPerMm } from '../trace/trace-commit-grid';
 import { AppMenuBar } from './AppMenuBar';
 import { CloseOpenFillContoursDialog } from './CloseOpenFillContoursDialog';
 import { ConvertBitmapDialogHost } from './ConvertBitmapDialogHost';
 import { runImagePickAction } from './image-pick-action';
-import { runMultiFileTrace, writeTraceSvgFileWithPlatform } from './multi-file-trace-action';
+import { MultiFileTraceDialogHost } from './MultiFileTraceDialog';
 import { NumericEditsBar } from './NumericEditsBar';
-import { pickPlatformImageFiles } from './platform-image-files';
 import { ProjectNotesDialog } from './ProjectNotesDialog';
 import { selectedConvertibleVectors, selectedObjectIds } from './selection-command-state';
 import { UndoHistoryDialog } from './UndoHistoryDialog';
@@ -51,6 +48,7 @@ type SettingsDialogKind =
   | 'print-cut'
   | 'labs'
   | 'rotary'
+  | 'multi-file-trace'
   | null;
 
 export function CommandShell(): JSX.Element {
@@ -68,11 +66,10 @@ export function CommandShell(): JSX.Element {
   const gcodeInspector = useCommandShellGcodeInspector();
   const selectedRaster = useSelectedRaster();
   const onImagePick = useImagePickHandler();
-  const onMultiFileTracePick = useMultiFileTracePickHandler();
   const machineKind = useStore((s) => s.project.machine?.kind ?? 'laser');
   const commands = useAppCommands({
     requestImportImage: onImagePick,
-    requestMultiFileTrace: onMultiFileTracePick,
+    requestMultiFileTrace: () => setSettingsDialog('multi-file-trace'),
     requestConvertToBitmap: openConvertBitmapDialog,
     requestAdjustImage: () => setAdjustDialogOpen(true),
     requestGcodeInspector: gcodeInspector.open,
@@ -164,6 +161,8 @@ function SettingsDialogHost(props: {
   if (props.current === 'print-cut') return <PrintAndCutDialogHost onClose={props.onClose} />;
   if (props.current === 'labs') return <LabsSettingsDialog onClose={props.onClose} />;
   if (props.current === 'rotary') return <RotarySetupHost onClose={props.onClose} />;
+  if (props.current === 'multi-file-trace')
+    return <MultiFileTraceDialogHost onClose={props.onClose} />;
   return null;
 }
 const FOCUS_TEST_UNAVAILABLE_MESSAGE =
@@ -290,14 +289,6 @@ function AdjustDialog(props: {
   );
 }
 
-function useMultiFileTracePickHandler(): () => void {
-  const platform = usePlatform();
-  const pushToast = useToastStore((s) => s.pushToast);
-  return () => {
-    void pickAndRunMultiFileTrace(platform, pushToast);
-  };
-}
-
 function useImagePickHandler(): () => void {
   const platform = usePlatform();
   const importSvgObject = useStore((s) => s.importSvgObject);
@@ -312,30 +303,6 @@ function useImagePickHandler(): () => void {
       pushToast,
     });
 }
-
-async function pickAndRunMultiFileTrace(
-  platform: PlatformAdapter,
-  pushToast: PushToast,
-): Promise<void> {
-  let files: ReadonlyArray<File>;
-  try {
-    files = await pickPlatformImageFiles(platform);
-  } catch (err) {
-    pushToast(`Could not choose trace images: ${errMsg(err)}`, 'error');
-    return;
-  }
-  const { project } = useStore.getState();
-  await runMultiFileTrace(files, pushToast, {
-    write: (file) => writeTraceSvgFileWithPlatform(platform, file),
-    targetPxPerMm: traceTargetPxPerMm(project.device, project.machine?.kind),
-  });
-}
-
-function errMsg(err: unknown): string {
-  return err instanceof Error ? err.message : String(err);
-}
-
-type PushToast = (message: string, variant?: ToastVariant) => void;
 
 function useSelectedRaster() {
   const scene = useStore((s) => s.project.scene);

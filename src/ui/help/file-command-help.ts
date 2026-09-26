@@ -73,4 +73,9 @@ export const FILE_COMMAND_HELP: Readonly<
     tooltip:
       'Export selected artwork as SVG, or all artwork when nothing is selected. Text is outlined and images are embedded; production serials do not advance.',
   },
+  'file.export-dxf': {
+    family: 'file',
+    tooltip:
+      'Export selected vector artwork, or all of it when nothing is selected, as a DXF in millimetres: one polyline per contour and one layer per colour. Curves are flattened within 0.01 mm; images are left out.',
+  },
 };

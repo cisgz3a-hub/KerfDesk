@@ -704,6 +704,9 @@ marks later edits as unapproved without changing the existing Frame/Start policy
    It resolves current variable text, outlines text, preserves physical millimetre size and
    canonical curves, embeds original bitmap pixels, and includes image masks and transforms.
    Machine settings and generated toolpaths are excluded; the production cursor does not advance.
+   Vector coordinates are rounded so each point lies within half a 0.001 mm grid diagonal of its
+   true position, and the page is the exact extent of the drawn curves, not their control points
+   (ADR-403).
 3. Cancellation writes nothing. Missing image pixels, unsupported 3D relief or invalid geometry
    report an error without claiming a successful partial export. A write error reports its reason.
 4. Re-import preserves the supported vector/image composition, physical size and image clips
@@ -712,6 +715,18 @@ marks later edits as unapproved without changing the existing Frame/Start policy
 5. Explicit **Re-import source** replaces the complete originally imported SVG composition in one
    Undo step. Unambiguous unchanged components retain settings; changed or ambiguous components
    receive new operations. Copies are independent of the original source's replacement set.
+
+### F-A9c. Export artwork as DXF; Multi-File Trace formats (ADR-403)
+
+1. **File → Export artwork as DXF...** (or **Export selected artwork as DXF...**) writes the
+   selection or scene's vector artwork as a millimetre DXF: one polyline per contour, one layer per
+   colour, circular arcs as exact bulges, cubics and elliptical arcs flattened within 0.01 mm.
+   Bitmaps and reliefs have no DXF form; they are left out and the completion message counts them.
+2. **Tools → Multi-File Trace...** first asks for the preset, format (SVG or DXF), coordinate
+   precision and, for SVG, whether to group each shape with its holes; **Choose Images...** then
+   picks the files. Each image is saved as `<name>-trace.svg` or `<name>-trace.dxf`.
+3. An image whose trace has nothing visible writes no file; the rest of the batch is still saved
+   and the completion message names the skipped images.
 
 ### F-A9b. Remove overlapping laser lines (ADR-350)
 
