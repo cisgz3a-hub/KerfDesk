@@ -36,7 +36,7 @@ import { applyDetectedSettingsPatch } from './detected-settings-action';
 import { grblSettingsActions } from './grbl-settings-actions';
 import type { ControllerLifecycleRefs } from './laser-interactive-command';
 import { connectionActions } from './laser-connection-actions';
-import type { ConnectAttemptOwnershipRefs } from './laser-connect-attempt';
+import type { ConnectAttemptOwnershipRefs, ConnectionAttemptState } from './laser-connect-attempt';
 import type { ConnectionTeardownOwnershipRefs } from './laser-connection-teardown';
 import { jobActions } from './laser-job-actions';
 import { appendSystemNotice } from './laser-system-notice';
@@ -106,7 +106,8 @@ export type WorkOriginSource = 'none' | 'g92' | 'g54-persistent' | 'unknown';
 export type { ConnectControllerOptions } from './laser-store-action-types';
 
 export type LaserState = LaserStoreActions &
-  ControllerBuildInfoState & {
+  ControllerBuildInfoState &
+  ConnectionAttemptState & {
     readonly connection: ConnectionState;
     readonly serialPortInfo?: SerialPortIdentity | null;
     readonly statusReport: StatusReport | null;
