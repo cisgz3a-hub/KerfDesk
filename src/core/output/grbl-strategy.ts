@@ -152,6 +152,14 @@ function segmentBurnLines(
   const arcs = arcSegmentBurns(seg, first, context);
   if (arcs !== null)
     return arcs.firstTarget === null ? null : { ...arcs, firstTarget: arcs.firstTarget };
+  return polylineSegmentBurns(seg, first, context);
+}
+
+function polylineSegmentBurns(
+  seg: CutSegment,
+  first: { readonly x: number; readonly y: number },
+  context: SegmentEmissionContext,
+): SegmentBurns | null {
   const { s, feed, dialect } = context;
   const lines: string[] = [];
   let head = emittedHead(first.x, first.y);
