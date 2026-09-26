@@ -19,14 +19,17 @@ afterEach(() => {
 });
 
 describe('painted drafts owned by their exact saved source', () => {
-  it('reopens A and B independently and only replaces the edited source', () => {
+  it('keeps only the draft of the job saved last', () => {
     expect(saveSecondPassDraft(A, strokes('a'))).toBe(true);
-    expect(saveSecondPassDraft(B, strokes('b'))).toBe(true);
     expect(loadSecondPassDraft(A)).toEqual(strokes('a'));
-    expect(loadSecondPassDraft(B)).toEqual(strokes('b'));
     expect(saveSecondPassDraft(A, strokes('a-edited'))).toBe(true);
     expect(loadSecondPassDraft(A)).toEqual(strokes('a-edited'));
+    expect(saveSecondPassDraft(B, strokes('b'))).toBe(true);
     expect(loadSecondPassDraft(B)).toEqual(strokes('b'));
+    expect(loadSecondPassDraft(A)).toEqual([]);
+    expect((JSON.parse(localStorage.getItem(KEY)!) as { drafts: unknown[] }).drafts).toHaveLength(
+      1,
+    );
   });
 
   it('matches run ID and every fingerprint field, independent of object property order', () => {
@@ -52,27 +55,25 @@ describe('painted drafts owned by their exact saved source', () => {
     ).toEqual(strokes('a'));
     const revised = { ...A, fingerprint: B.fingerprint };
     expect(saveSecondPassDraft(revised, strokes('revised-a'))).toBe(true);
-    expect(loadSecondPassDraft(A)).toEqual(strokes('a'));
+    expect(loadSecondPassDraft(A)).toEqual([]);
     expect(loadSecondPassDraft(revised)).toEqual(strokes('revised-a'));
   });
 
-  it('retains the 20 most recently saved sources, including an older source edited again', () => {
-    const sources = Array.from({ length: 21 }, (_, index) => ({ ...A, runId: `job-${index}` }));
-    for (const source of sources.slice(0, 20))
-      expect(saveSecondPassDraft(source, strokes(source.runId))).toBe(true);
-    expect(saveSecondPassDraft(sources[0]!, strokes('oldest-edited'))).toBe(true);
-    expect(saveSecondPassDraft(sources[20]!, strokes('newest'))).toBe(true);
-    expect(loadSecondPassDraft(sources[0]!)).toEqual(strokes('oldest-edited'));
-    expect(loadSecondPassDraft(sources[1]!)).toEqual([]);
-    for (const source of sources.slice(2, 20))
+  it('reads the 20 drafts an older build kept, then trims them to the job saved next', () => {
+    const sources = Array.from({ length: 20 }, (_, index) => ({ ...A, runId: `job-${index}` }));
+    const drafts = sources.map((source) => ({ ...source, strokes: strokes(source.runId) }));
+    localStorage.setItem(KEY, JSON.stringify({ version: 2, drafts }));
+    for (const source of sources)
       expect(loadSecondPassDraft(source)).toEqual(strokes(source.runId));
-    expect(loadSecondPassDraft(sources[20]!)).toEqual(strokes('newest'));
+    expect(saveSecondPassDraft(sources[3]!, strokes('edited'))).toBe(true);
+    expect(loadSecondPassDraft(sources[3]!)).toEqual(strokes('edited'));
+    expect(loadSecondPassDraft(sources[19]!)).toEqual([]);
     expect((JSON.parse(localStorage.getItem(KEY)!) as { drafts: unknown[] }).drafts).toHaveLength(
-      20,
+      1,
     );
   });
 
-  it('reads legacy data without writing, then migrates it with the next successful save', () => {
+  it('reads legacy data without writing, then replaces it with the next successful save', () => {
     const legacy = JSON.stringify({
       ...A,
       fingerprint: JSON.stringify(A.fingerprint),
@@ -83,44 +84,27 @@ describe('painted drafts owned by their exact saved source', () => {
     expect(loadSecondPassDraft(B)).toEqual([]);
     expect(localStorage.getItem(KEY)).toBeNull();
     expect(saveSecondPassDraft(B, strokes('new-b'))).toBe(true);
-    expect(loadSecondPassDraft(A)).toEqual(strokes('legacy-a'));
     expect(loadSecondPassDraft(B)).toEqual(strokes('new-b'));
+    // The saved envelope is authoritative: the legacy draft does not reappear.
+    expect(loadSecondPassDraft(A)).toEqual([]);
     expect(localStorage.getItem(LEGACY_KEY)).toBe(legacy);
     expect(saveSecondPassDraft(A, [])).toBe(true);
     expect(loadSecondPassDraft(A)).toEqual([]);
   });
-
-  it('does not resurrect an evicted legacy draft beyond the 20-source retention bound', () => {
-    localStorage.setItem(
-      LEGACY_KEY,
-      JSON.stringify({
-        ...A,
-        fingerprint: JSON.stringify(A.fingerprint),
-        strokes: strokes('old-a'),
-      }),
-    );
-    for (let index = 0; index < 20; index += 1) {
-      expect(saveSecondPassDraft({ ...B, runId: `new-${index}` }, strokes(String(index)))).toBe(
-        true,
-      );
-    }
-    expect(loadSecondPassDraft(A)).toEqual([]);
-    expect(localStorage.getItem(LEGACY_KEY)).not.toBeNull();
-  });
 });
 
 describe('painted draft write failure', () => {
-  it('keeps both saved drafts and reports quota failure when an update cannot be committed', () => {
+  it('keeps the saved draft and reports quota failure when an update cannot be committed', () => {
     saveSecondPassDraft(A, strokes('a'));
-    saveSecondPassDraft(B, strokes('b'));
     const previous = localStorage.getItem(KEY);
     vi.spyOn(Storage.prototype, 'setItem').mockImplementation(() => {
       throw new DOMException('Full', 'QuotaExceededError');
     });
     expect(saveSecondPassDraft(A, strokes('unsaved-a'))).toBe(false);
+    expect(saveSecondPassDraft(B, strokes('unsaved-b'))).toBe(false);
     expect(localStorage.getItem(KEY)).toBe(previous);
     expect(loadSecondPassDraft(A)).toEqual(strokes('a'));
-    expect(loadSecondPassDraft(B)).toEqual(strokes('b'));
+    expect(loadSecondPassDraft(B)).toEqual([]);
   });
 
   it.each([

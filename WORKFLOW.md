@@ -1986,8 +1986,10 @@ authorization, Frame proof, controller command, or safety boundary.
   itself, not on a button, so a keystroke meant for the field being edited cannot answer it;
   Tab reaches both buttons. Reloading saved history,
   an interrupted/aborted job, and a CNC completion do not produce the darkening prompt.
-- **Paint a second pass…** in the Machine panel remains available after dismissing the prompt.
-  The completed-run selector also offers older retained completions. When a completed run
+- **Paint a second pass…** in the Machine panel reopens the same job after dismissing the
+  prompt, until another job starts. It offers only the job that just finished: there is no
+  list of older jobs, and a later job that is aborted or interrupted removes the button
+  rather than bringing back an older one (ADR-341 Amendment 4). When the finished run
   was a recovery or a painted pass, the preview follows its independently verified retained
   ancestor so the original full engraving is available where that archive still exists.
   The current artwork document is never replaced or recompiled by this workflow.
@@ -2038,10 +2040,11 @@ authorization, Frame proof, controller command, or safety boundary.
   provenance. A disconnect can therefore resume the derived pass without regenerating the
   full original job. Uncertain first writes keep the attempted run, even if the transport
   closes before reporting the write failure; the old offer is not silently restored.
-- Painted drafts for the 20 most recently edited sources are retained locally, keyed to each
-  exact run and fingerprint. Storage failure is disclosed and preserves prior saved drafts.
-  Drafts and bounded execution history are different: history
-  still retains at most 20 terminal runs within 100 MiB, with its existing protected slots.
+- The painted draft of the last edited job is retained locally, keyed to its exact run and
+  fingerprint; painting another job replaces it (ADR-341 Amendment 4). Storage failure is
+  disclosed and preserves the prior saved draft. Drafts and the execution history are
+  different: the **Execution archive** under History & recovery still retains at most 20
+  terminal runs within 100 MiB for export and recovery, with its existing protected slots.
 - Supported inputs are the flat XY laser image, fill and vector programs KerfDesk generates
   for GRBL, grblHAL and FluidNC. Marlin and Smoothieware programs are refused with a message
   naming the controller, and their completed runs get no darkening prompt and no Machine-panel
@@ -2328,7 +2331,10 @@ Connecting a controller is optional, so a complete setup can be saved offline.
    whole, so a later correction to the preset never reaches that copy; when a saved copy still
    holds a value a correction replaced (the xTool D1 Pro's front-left origin, the Sculpfun S30's
    410 x 400 mm bed), Job Review names the old and corrected values as an advisory (ADR-322
-   Amendment 1). Detected matches are
+   Amendment 1), and Machine Setup shows a **Preset correction** row under Origin with one click
+   to use the corrected value (ADR-322 Amendment 2). Nothing is applied on its own. A preset's
+   content is pinned to its `catalogVersion`, so a preset change has to bump the version. Detected
+   matches are
    prioritised among the remaining profiles and explain their evidence under **Profile details**,
    but generic `$$` values never establish hardware identity: "Possible match" remains the
    ceiling. Controller family, baud, output dialect,
@@ -4154,7 +4160,10 @@ and lifts the command's CNC-only gate.)*
    count becomes the default for material-feed calculations. Every selectable bit shows its
    effective flute count in Startup Setup; changing it there updates the draft bit metadata used by
    the read-only Artwork calculator. Final Save refreshes material-recipe values for operations
-   resolved through that cutter; manual numeric values remain exact.
+   resolved through that cutter; manual numeric values remain exact. A saved copy of a catalog bit
+   that predates a catalog correction offers the corrected value beside its flute count. The Amana
+   O-flute ball-nose bits saved with no flute count offer **Use 1 flute**, and Job Review warns when
+   the job runs such a copy (ADR-322 Amendment 2).
 5. Deleting a custom bit stages its removal from the saved library, open machine, and Tool Plan.
    Final **Save machine setup** commits that removal as the same project undo entry; **Cancel** keeps
    the live library and project unchanged.
