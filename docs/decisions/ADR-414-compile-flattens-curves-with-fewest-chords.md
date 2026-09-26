@@ -141,6 +141,12 @@ Two defects, measured on the base (`c62084959`):
   6 ms (median of five warm runs in Node), the owl's Line Art 48 ms against 10 ms; the dragon's
   laser commit, which flattens several times for its topology check, about 100 ms against 28 ms.
   The canvas flattens at display tolerances through the same function and caches per tolerance.
+  Interactive callers pay the same factor: a 5,000-cubic path takes about 74 ms against 13 to 20 ms
+  at 0.025 mm and 73 ms against 9 ms at 0.05 mm. Hover and click hit testing (`hit-test.ts`), which
+  flattened every path under the pointer on each move, now caches its polylines per path object.
+  Node editing (`path-node-edit-geometry.ts`, `path-node-curve-command-actions.ts`,
+  `path-node-curve-join-plan.ts`) still re-flattens the edited path at 0.05 mm on each change; on a
+  large single-colour trace that may be felt while dragging a node and is to be profiled in the app.
 - Tests: `curve-flatten.test.ts` measures each emitted chord against its own curve piece, both
   directions, by dense sampling after recovering each vertex's parameter: 300 random cubics at three
   scales and tolerances (a quarter with collinear controls that overrun their ends), 120 rotated
