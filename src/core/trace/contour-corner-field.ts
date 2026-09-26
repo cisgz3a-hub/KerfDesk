@@ -185,28 +185,49 @@ function sourceCoverage(
   scale: number,
 ): (px: number, py: number) => number {
   const convex = back.dx * ahead.dy - back.dy * ahead.dx > 0;
-  const inkAt = (x: number, y: number): boolean => {
-    const onBack = back.dx * (y - apex.y) - back.dy * (x - apex.x) > 0;
-    const onAhead = ahead.dx * (y - apex.y) - ahead.dy * (x - apex.x) > 0;
-    return convex ? onBack && onAhead : onBack || onAhead;
-  };
-  const memo = new Map<string, number>();
+  // A sample (x, y) is on a leg's ink side when dx * (y - apex.y) -
+  // dy * (x - apex.x) > 0. The row terms and the column terms are each
+  // computed once per pixel, by the same operations, so every test is the
+  // same comparison of the same two values.
+  const backColumn = new Float64Array(COVERAGE_SAMPLES);
+  const aheadColumn = new Float64Array(COVERAGE_SAMPLES);
+  const memo = new Map<number | string, number>();
   return (px, py) => {
-    const key = `${px},${py}`;
+    const key = coverageKey(px, py);
     const known = memo.get(key);
     if (known !== undefined) return known;
+    for (let sx = 0; sx < COVERAGE_SAMPLES; sx += 1) {
+      const x = (px + (sx + 0.5) / COVERAGE_SAMPLES) * scale;
+      backColumn[sx] = back.dy * (x - apex.x);
+      aheadColumn[sx] = ahead.dy * (x - apex.x);
+    }
     let covered = 0;
     for (let sy = 0; sy < COVERAGE_SAMPLES; sy += 1) {
+      const y = (py + (sy + 0.5) / COVERAGE_SAMPLES) * scale;
+      const backRow = back.dx * (y - apex.y);
+      const aheadRow = ahead.dx * (y - apex.y);
       for (let sx = 0; sx < COVERAGE_SAMPLES; sx += 1) {
-        const x = (px + (sx + 0.5) / COVERAGE_SAMPLES) * scale;
-        const y = (py + (sy + 0.5) / COVERAGE_SAMPLES) * scale;
-        if (inkAt(x, y)) covered += 1;
+        const onBack = backRow - (backColumn[sx] as number) > 0;
+        const onAhead = aheadRow - (aheadColumn[sx] as number) > 0;
+        if (convex ? onBack && onAhead : onBack || onAhead) covered += 1;
       }
     }
     const value = covered / (COVERAGE_SAMPLES * COVERAGE_SAMPLES);
     memo.set(key, value);
     return value;
   };
+}
+
+// Pixels are integers; below 2^26 in size a number key is unique, and any
+// other pair keeps the text key.
+const KEY_LIMIT = 2 ** 26;
+function coverageKey(px: number, py: number): number | string {
+  return Number.isInteger(px) &&
+    Number.isInteger(py) &&
+    Math.abs(px) < KEY_LIMIT &&
+    Math.abs(py) < KEY_LIMIT
+    ? px * 2 * KEY_LIMIT + py
+    : `${px},${py}`;
 }
 
 // Bilinear interpolation of per-pixel values at a pixel-centre-indexed point

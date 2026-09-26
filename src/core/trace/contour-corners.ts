@@ -206,10 +206,11 @@ export function chainWithCorners(
   corners: ReadonlyArray<ContourCorner>,
 ): CornerChain {
   const n = cracks.length;
-  const apexAfter = new Map<number, ContourCorner>();
+  // cornerAt[i] is one more than the index of the (last) corner after crack i.
+  const cornerAt = new Int32Array(n);
   const skipped = new Uint8Array(n);
-  for (const corner of corners) {
-    apexAfter.set(corner.from, corner);
+  for (const [index, corner] of corners.entries()) {
+    cornerAt[corner.from] = index + 1;
     for (let k = 1; k <= corner.skip; k += 1) skipped[(corner.from + k) % n] = 1;
   }
   const points: Vec2[] = [];
@@ -219,16 +220,17 @@ export function chainWithCorners(
   let start = 0;
   while (start < n && skipped[start] === 1) start += 1;
   const pending: number[] = [];
-  for (let step = 0; step < n; step += 1) {
-    const i = (start + step) % n;
+  // i = (start + step) % n, stepped; start is n when every crack is skipped.
+  for (let step = 0, i = start % Math.max(n, 1); step < n; step += 1, i = i + 1 === n ? 0 : i + 1) {
     if (skipped[i] === 1) {
       pending.push(i);
       continue;
     }
     crackIndex[i] = points.length;
     points.push(cracks[i] as Vec2);
-    const corner = apexAfter.get(i);
-    if (corner === undefined) continue;
+    const at = cornerAt[i] as number;
+    if (at === 0) continue;
+    const corner = corners[at - 1] as ContourCorner;
     set.add(corner.apex);
     const apexIndex = points.length;
     points.push(corner.apex);
