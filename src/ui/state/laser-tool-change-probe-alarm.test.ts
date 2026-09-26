@@ -23,14 +23,17 @@ const ALARM = '<Alarm|MPos:10.000,20.000,-1.000|FS:0,0>';
 
 type Device = SerialConnection & { readonly say: (line: string) => void };
 
-// A GRBL 1.1 stand-in: Idle on `?`, `ok` for the settle dwell, and the
-// unlock reply GRBL prints for `$X`.
+// A GRBL 1.1 stand-in: `?` answers the last status report the test said (so
+// the 250 ms status poll cannot report Idle while the test holds the machine
+// in Alarm, however slow a loaded runner makes the settles), `ok` for the
+// settle dwell, and the unlock reply GRBL prints for `$X`.
 function makeDevice(sent: string[]): Device {
   const handlers = new Set<(line: string) => void>();
+  let status = IDLE;
   const device: Device = {
     write: async (data) => {
       sent.push(data);
-      if (data === '?') setTimeout(() => device.say(IDLE), 0);
+      if (data === '?') setTimeout(() => device.say(status), 0);
       if (data === 'G4 P0.01\n') setTimeout(() => device.say('ok'), 0);
       if (data === '$X\n') {
         setTimeout(() => {
@@ -47,6 +50,7 @@ function makeDevice(sent: string[]): Device {
     onClose: () => () => undefined,
     close: async () => undefined,
     say: (line) => {
+      if (line.startsWith('<')) status = line;
       for (const handler of handlers) handler(line);
     },
   };
