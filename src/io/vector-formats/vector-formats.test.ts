@@ -144,7 +144,7 @@ describe('PDF writer', () => {
       expect(written).toBeGreaterThanOrEqual(exactMm * PT_PER_MM);
       expect(written - exactMm * PT_PER_MM).toBeLessThanOrEqual(GRID_MM * PT_PER_MM + 1e-4);
     }
-    // The control points would have made the page 20 mm taller.
+    // The control points would have made the page about 7 mm taller.
     expect(height).toBeLessThan((50 - 5) * PT_PER_MM);
   });
 

@@ -713,11 +713,24 @@ marks later edits as unapproved without changing the existing Frame/Start policy
    selection or scene's vector artwork as a millimetre DXF: one polyline per contour, one layer per
    colour, circular arcs as exact bulges, cubics and elliptical arcs flattened within 0.01 mm.
    Bitmaps and reliefs have no DXF form; they are left out and the completion message counts them.
-2. **Tools → Multi-File Trace...** first asks for the preset, format (SVG or DXF), coordinate
-   precision and, for SVG, whether to group each shape with its holes; **Choose Images...** then
-   picks the files. Each image is saved as `<name>-trace.svg` or `<name>-trace.dxf`.
+2. **Tools → Multi-File Trace...** first asks for the preset, format (SVG, DXF, PDF, EPS or
+   GeoJSON), coordinate precision and, for SVG, whether to group each shape with its holes;
+   **Choose Images...** then picks the files. Each image is saved as `<name>-trace.<format>` on the
+   traced image's page, lower-left corner as the origin (ADR-455).
 3. An image whose trace has nothing visible writes no file; the rest of the batch is still saved
    and the completion message names the skipped images.
+
+### F-A9d. Export artwork as PDF, EPS or GeoJSON (ADR-455)
+
+1. **File → Export artwork as PDF... / EPS... / GeoJSON...** (or **Export selected artwork as
+   ...**) write the selection's or scene's vector artwork, text outlined; bitmaps and reliefs are
+   left out and counted, and an image-only selection warns before any file name is asked.
+2. PDF (1.4, one page) and EPS (EPSF 3.0) keep lines and curves exactly (arcs become cubics); the
+   page / bounding box is the exact extent of the drawn curves, rounded outward. Filled layers fill
+   even-odd (text nonzero); line layers and open contours are 0.1 mm strokes.
+3. GeoJSON flattens curves within 0.01 mm into Polygon rings (outer counterclockwise, holes
+   clockwise, grouped by containment) and LineStrings. Coordinates are millimetres with y up from
+   the lower-left corner, not longitude and latitude; the file states this in its `kerfdesk` member.
 
 ### F-A9b. Remove overlapping laser lines (ADR-350)
 
