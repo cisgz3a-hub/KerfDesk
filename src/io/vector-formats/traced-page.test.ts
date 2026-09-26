@@ -96,6 +96,58 @@ function dxfPoints(text: string): { xs: number[]; ys: number[] } {
   return { xs, ys };
 }
 
+/** Highest y of the bulge arc from a to b (DXF group 42: bulge = tan(sweep / 4)). */
+function bulgeArcTopY(
+  a: { x: number; y: number },
+  b: { x: number; y: number },
+  bulge: number,
+): number {
+  const length = Math.hypot(b.x - a.x, b.y - a.y);
+  const endpoints = Math.max(a.y, b.y);
+  if (bulge === 0 || length === 0) return endpoints;
+  const sweep = 4 * Math.atan(bulge);
+  // The centre sits left of a->b for a counter-clockwise sweep under half a turn.
+  const offset = length / 2 / Math.tan(sweep / 2);
+  const cx = (a.x + b.x) / 2 - ((b.y - a.y) / length) * offset;
+  const cy = (a.y + b.y) / 2 + ((b.x - a.x) / length) * offset;
+  const radius = Math.hypot(a.x - cx, a.y - cy);
+  const start = Math.atan2(a.y - cy, a.x - cx);
+  const turn = 2 * Math.PI;
+  const toTop = sweep > 0 ? Math.PI / 2 - start : start - Math.PI / 2;
+  const reachesTop = ((toTop % turn) + turn) % turn <= Math.abs(sweep);
+  return reachesTop ? cy + radius : endpoints;
+}
+
+/**
+ * Highest point a DXF draws: every vertex, and the top of every bulge arc
+ * (ADR-452 writes a traced dome as arcs, so its top lies between vertices).
+ */
+function dxfTopY(text: string): number {
+  const all = text.split(/\r?\n/).map((line) => line.trim());
+  const lines = all.slice(all.indexOf('ENTITIES') + 1);
+  const vertices: Array<{ x: number; y: number; bulge: number }> = [];
+  let top = -Infinity;
+  const flush = (): void => {
+    for (let i = 0; i + 1 < vertices.length; i += 1) {
+      top = Math.max(top, bulgeArcTopY(vertices[i]!, vertices[i + 1]!, vertices[i]!.bulge));
+    }
+    vertices.length = 0;
+  };
+  for (let i = 0; i + 1 < lines.length; i += 2) {
+    const code = lines[i];
+    const value = Number(lines[i + 1]);
+    if (code === '0') flush();
+    if (code === '10') vertices.push({ x: value, y: Number.NaN, bulge: 0 });
+    if (code === '20') {
+      vertices[vertices.length - 1]!.y = value;
+      top = Math.max(top, value);
+    }
+    if (code === '42') vertices[vertices.length - 1]!.bulge = value;
+  }
+  flush();
+  return top;
+}
+
 function geoJsonPositions(text: string): Array<readonly [number, number]> {
   const out: Array<readonly [number, number]> = [];
   const walk = (value: unknown): void => {
@@ -157,9 +209,10 @@ describe('traced page: fit to artwork', () => {
     expect(Math.min(...xs)).toBeCloseTo(5, 6);
     expect(Math.max(...xs)).toBeCloseTo(55, 6);
     expect(Math.min(...ys)).toBeCloseTo(5, 6);
-    // The flattened dome top stays at or under the true peak, 5 mm below the page top.
+    // The dome top, drawn as a bulge arc (ADR-452), meets the true peak 5 mm
+    // below the page top within the export tolerance.
     expect(Math.max(...ys)).toBeLessThanOrEqual(20 + 1e-9);
-    expect(Math.max(...ys)).toBeGreaterThan(19.9);
+    expect(Math.abs(dxfTopY(await traceFile('dxf', fitted)) - 20)).toBeLessThanOrEqual(0.01);
   });
 
   it('GeoJSON: coordinates are measured from the fitted page corner', async () => {
