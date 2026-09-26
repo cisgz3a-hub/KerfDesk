@@ -52,10 +52,14 @@ const SOURCE_PATH = join(
 const WIDTH_MM = 100;
 const TOLERANCE_MM = 0.025;
 const ORACLE_ERROR_MM = 0.001;
+// How far the canonical reference polyline may sit from the true curve.
+const CANONICAL_TOLERANCE_MM = 0.0002;
 const GRBL_ARC_TOLERANCE_MM = 0.002;
 const ARCS: DeviceProfile = { ...DEFAULT_DEVICE_PROFILE, controllerKind: 'grbl-v1.1' };
 // Measured 1,605 burn moves against 2,946 for the G1 program (ratio 0.54).
-const MAX_MOVE_RATIO = 0.65;
+// ADR-442's near-fewest chords cut the G1 program to 2,205 moves while the
+// arc program keeps 1,600 (ratio 0.73).
+const MAX_MOVE_RATIO = 0.8;
 
 function burnMoves(gcode: string): number {
   return gcode.split('\n').filter((line) => /^G[123] .*X/.test(line)).length;
@@ -97,7 +101,7 @@ function executed(start: Vec2, group: CutGroup, index: number): Vec2[] {
 
 function canonicalInMachine(curve: CurveSubpath, traced: TracedImage): Vec2[] {
   const scale = Math.abs(traced.transform.scaleX);
-  const flat = flattenCurveSubpath(curve, { toleranceMm: 0.0002 / scale });
+  const flat = flattenCurveSubpath(curve, { toleranceMm: CANONICAL_TOLERANCE_MM / scale });
   if (flat.kind !== 'ok') throw new Error('flatten failed');
   const points = flat.polyline.points.map((point) =>
     toMachineCoords(applyTransform(point, traced.transform), ARCS),
@@ -257,7 +261,8 @@ describe('Arch House laser arcs (ADR-432)', () => {
       expectInsideBounds(executedCutBounds(gcode), bounds, 0.0005 + 2e-5);
       // No more joints turning 60 degrees or more than the G1 program has.
       expect(sharpJointCount(job, true)).toBeLessThanOrEqual(sharpJointCount(offJob, false));
-      let deviation = 0;
+      let arcDeviation = 0;
+      let chordDeviation = 0;
       for (const [index, curve] of curves.entries()) {
         const segment = group.segments[index];
         const start = segment?.polyline[0];
@@ -265,15 +270,21 @@ describe('Arch House laser arcs (ADR-432)', () => {
         const run = executed(start, group, index);
         expectInside(run, bounds);
         const canonical = canonicalInMachine(curve, traced);
-        deviation = Math.max(
-          deviation,
-          polylineDeviationBounds(run, canonical, ORACLE_ERROR_MM).upperBound,
-        );
+        const deviation = polylineDeviationBounds(run, canonical, ORACLE_ERROR_MM).upperBound;
+        if (validCutArcMoves(segment) === null)
+          chordDeviation = Math.max(chordDeviation, deviation);
+        else arcDeviation = Math.max(arcDeviation, deviation);
         expectCornersKept(curve, segment, traced);
       }
       // Arcs are checked before 3-decimal rounding, which moves an arc at most
       // 0.002 mm and is part of the 0.025 mm budget (arc-fit-limits.ts).
-      expect(deviation).toBeLessThanOrEqual(TOLERANCE_MM - 0.002 + ORACLE_ERROR_MM);
+      expect(arcDeviation).toBeLessThanOrEqual(TOLERANCE_MM - 0.002 + ORACLE_ERROR_MM);
+      // A curve the fit leaves as G1 keeps compile's chords, which ADR-442
+      // flattens with near-fewest chords using the whole 0.025 mm tolerance
+      // (measured 0.0258 mm upper bound, including the oracle's 0.001 mm).
+      expect(chordDeviation).toBeLessThanOrEqual(
+        TOLERANCE_MM + CANONICAL_TOLERANCE_MM + ORACLE_ERROR_MM,
+      );
     },
   );
 });
