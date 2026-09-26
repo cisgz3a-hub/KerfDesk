@@ -3840,6 +3840,9 @@ explicitly marked below; the remaining controls and user-facing flows are planne
    depth-per-pass, and each level's region fills with concentric rings at
    the layer's physical stepover: a percentage of the bit diameter, or for a
    tapered ball nose of the width it cuts over one level (ADR-368 Amendment 2).
+   Each ring ends where it started. Above a 50% stepover, the stock a level's
+   rings leave standing (the level's centre, cusps between rings) is cleared
+   right after them (ADR-289 Amendment 1).
 2. Passes run depth-major (whole level before stepping down) as a
    clearing group — before any profile cuts. The preview's removal
    shading shows the terraced relief forming.
