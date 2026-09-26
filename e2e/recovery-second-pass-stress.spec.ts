@@ -276,6 +276,12 @@ test('offers darkening once per completion, closes on Escape, re-offers after Ru
   await expect(paint).toBeEnabled();
 
   const runAgain = page.getByRole('button', { name: 'Run same job again from start', exact: true });
+  // Run again needs a fresh Frame, like Start (ADR-372 Amendment 1): the first
+  // run spent its permit.
+  await expect(runAgain).toBeDisabled();
+  await kerfdesk.setAutoAcknowledge(true);
+  await frameCurrentJob(page, kerfdesk);
+  await kerfdesk.setAutoAcknowledge(false);
   await expect(runAgain).toBeEnabled();
   baselineLines = serialWriteLineCount(await kerfdesk.events());
   await runAgain.click();

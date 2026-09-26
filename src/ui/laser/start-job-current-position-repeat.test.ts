@@ -154,7 +154,11 @@ describe('completed Current Position replay', () => {
     });
   });
 
-  it('reuses the frozen origin after the live head moves', async () => {
+  // ADR-372 Amendment 1: Run again follows Start. The completed job's first
+  // permit is spent, so it needs a fresh Frame, and it streams exactly what that
+  // Frame traced, here at the head's new position, instead of replaying the
+  // first run's frozen origin unframed.
+  it('needs a fresh Frame to run a completed job again, then streams what that Frame traced', async () => {
     const repository = recoveryRepository();
     await runStartJobFlow(repository);
     const first = repository.getSnapshot().activeRun;
@@ -164,21 +168,39 @@ describe('completed Current Position replay', () => {
       anchor: 'front-left',
       currentPosition: { x: 120, y: 80 },
     });
-    expect(first.artifact.gcode.trimEnd()).toMatch(/G0 X120\.000 Y80\.000 S0$/);
-
     await repository.completeRun(first.runId);
     const receipt = repository.getSnapshot().lastCompletedReceipt;
     if (receipt === null) throw new Error('Expected a completed receipt.');
+    // The real controller boundary consumes the one-run permit at Start; the
+    // mocked startJob here does not, so spend it the same way.
+    useLaserStore.setState({ framedRun: null });
     vi.mocked(useLaserStore.getState().startJob).mockClear();
     useLaserStore.setState({
-      statusReport: { ...idleStatus, mPos: { x: 0, y: 0, z: 0 } },
+      statusReport: { ...idleStatus, mPos: { x: 40, y: 30, z: 0 } },
     });
 
     await runCompletedJobAgainFlow(receipt, repository);
 
+    expect(useLaserStore.getState().startJob).not.toHaveBeenCalled();
+    expect(repository.getSnapshot().activeRun).toBeNull();
+    expect(repository.getSnapshot().lastCompletedReceipt?.runId).toBe(first.runId);
+
+    const permit = await installFramedRunPermitForCurrentState();
+    await runCompletedJobAgainFlow(receipt, repository);
+
     const replay = repository.getSnapshot().activeRun;
-    expect(useLaserStore.getState().startJob).toHaveBeenCalledTimes(1);
-    expect(replay?.artifact.jobOrigin).toEqual(first.artifact.jobOrigin);
-    expect(replay?.artifact.gcode).toBe(first.artifact.gcode);
+    expect(useLaserStore.getState().startJob).toHaveBeenCalledExactlyOnceWith(
+      permit.candidate.preparedStart.gcode,
+      expect.any(Object),
+    );
+    expect(replay?.runId).not.toBe(first.runId);
+    expect(replay?.artifact.jobOrigin).toEqual({
+      startFrom: 'current-position',
+      anchor: 'front-left',
+      currentPosition: { x: 40, y: 30 },
+    });
+    expect(replay?.artifact.provenance).toMatchObject({
+      workflow: { kind: 'ordinary-start', completedReplaySourceRunId: first.runId },
+    });
   });
 });

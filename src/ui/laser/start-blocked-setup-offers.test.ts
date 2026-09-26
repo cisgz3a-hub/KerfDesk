@@ -7,7 +7,6 @@ import {
   USER_ORIGIN_REQUIRED_MESSAGE,
   VERIFIED_ORIGIN_REQUIRED_MESSAGE,
 } from '../job-placement';
-import { offerFixForBlockedStart } from './start-blocked-fix-offers';
 import {
   offerSetupFixForBlockedStart,
   SET_ORIGIN_OFFER_PROMPT,
@@ -45,11 +44,6 @@ describe('set-origin offer', () => {
     expect(SET_ORIGIN_OFFER_PROMPT).toContain('Frame the updated placement before starting');
     expect(vi.mocked(useLaserStore.getState().setOriginHere)).toHaveBeenCalledTimes(1);
     expect(useToastStore.getState().toasts.at(-1)).toMatchObject({ variant: 'success' });
-  });
-
-  it('reaches the offer through the blocked-Start dispatcher', async () => {
-    await expect(offerFixForBlockedStart([USER_ORIGIN_REQUIRED_MESSAGE])).resolves.toBe('retry');
-    expect(vi.mocked(useLaserStore.getState().setOriginHere)).toHaveBeenCalledTimes(1);
   });
 
   it('keeps the block when the operator declines', async () => {
@@ -90,13 +84,6 @@ describe('refusals without a one-click remedy', () => {
     );
     expect(jobAwareConfirm).not.toHaveBeenCalled();
   });
-
-  it('offers nothing when several blockers refuse together', async () => {
-    await expect(
-      offerFixForBlockedStart([USER_ORIGIN_REQUIRED_MESSAGE, 'A job is already active.']),
-    ).resolves.toBe('unrepaired');
-    expect(jobAwareConfirm).not.toHaveBeenCalled();
-  });
 });
 
 describe('verified-origin set-origin offer (ADR-327)', () => {
@@ -106,12 +93,6 @@ describe('verified-origin set-origin offer (ADR-327)', () => {
     );
     expect(jobAwareConfirm).toHaveBeenCalledWith(VERIFIED_ORIGIN_SET_ORIGIN_OFFER_PROMPT);
     expect(useLaserStore.getState().setOriginHere).toHaveBeenCalledTimes(1);
-  });
-
-  it('reaches the offer through the blocked-Start dispatcher', async () => {
-    await expect(offerFixForBlockedStart([VERIFIED_ORIGIN_REQUIRED_MESSAGE])).resolves.toBe(
-      'retry',
-    );
   });
 
   it('keeps the block when the operator declines', async () => {

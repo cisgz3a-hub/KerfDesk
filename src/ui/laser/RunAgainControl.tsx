@@ -12,7 +12,9 @@ import { useRecoveryRepositorySelection } from '../state/use-recovery-repository
 import { currentPrintCutOutputRegistration } from './print-cut-output';
 import { useExecutionSignatureAppState } from './use-execution-signature-app-state';
 import { currentReplayExecutionSignature } from './start-job-execution-tracking';
+import { framedRunReadinessIssue } from './framed-run-readiness';
 import { runCompletedJobAgainFlow } from './start-job-flow';
+import { useFramedRunLaserState } from './use-framed-run-laser-state';
 
 export { currentReplayExecutionSignature } from './start-job-execution-tracking';
 
@@ -25,11 +27,14 @@ type Props = {
 
 /** Exact replay is deliberately separate from interrupted-job recovery. The
  * offer exists only while the open execution inputs still match the immutable
- * receipt; clicking performs a fresh compile and final fingerprint check. */
+ * receipt. Like Start, it unlocks only when a clean Frame of this exact job has
+ * issued a permit, and it streams that permit; it never Frames itself
+ * (ADR-372 Amendment 1). */
 export function RunAgainControl(props: Props): JSX.Element | null {
   const repository = props.repository ?? recoveryRepository;
   const receipt = useRecoveryRepositorySelection(selectLastCompletedReceipt, repository);
   const app = useExecutionSignatureAppState();
+  const laser = useFramedRunLaserState();
   const [starting, setStarting] = useState(false);
 
   // These stores participate in print-and-cut execution identity but are read
@@ -45,6 +50,7 @@ export function RunAgainControl(props: Props): JSX.Element | null {
   const eligible = receipt !== null && receipt.artifact.executionSignature === currentSignature;
 
   if (!eligible || receipt === null) return null;
+  const framedReady = framedRunReadinessIssue(laser.framedRun, app, laser) === null;
 
   const runAgain = async (): Promise<void> => {
     if (starting) return;
@@ -64,8 +70,12 @@ export function RunAgainControl(props: Props): JSX.Element | null {
     <button
       type="button"
       onClick={() => void runAgain()}
-      disabled={props.disabled || props.busy || starting}
-      title="Freshly compile this exact completed job, verify its fingerprint, and run it from line 1 with a new run identity."
+      disabled={props.disabled || props.busy || starting || !framedReady}
+      title={
+        framedReady
+          ? 'Run the framed job, which is this exact completed job, from line 1 with a new run identity.'
+          : 'Run again unlocks when a Frame of this exact job finishes cleanly, like Start. Press Frame job first.'
+      }
     >
       {starting ? 'Checking completed job…' : 'Run same job again from start'}
     </button>

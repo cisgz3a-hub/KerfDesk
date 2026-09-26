@@ -105,7 +105,7 @@ opportunity, without an extra branding delay. It introduces no startup interacti
 - **CNC Canvas Focus**: has no effect. It collapsed the CNC 3D result pane by default when the viewport was 1439 px wide or less (ADR-223), and that pane has not been shown since 2026-08-03 (F-CNC28).
 - **Left tool strip (ADR-051)**: the default strip is 50 px wide and scrolls on short windows. Edit and Draw groups retain Select, Text, Node, Measure, the drawing tools (Rectangle, Ellipse, Polygon, Star, Pen), Position-laser, and named icon buttons for the design library and Design Studio (ADR-272, flows F-DS1..F-DS4). Curve-node actions remain beside the editing tools with readable labels. Preview is in the primary toolbar, with a More fallback at narrow widths, and the Window menu.
 - **Machine-panel hierarchy (ADR-340)**: jog and origin controls remain together in the working area. Homing/focus or CNC maintenance, placement/output, history/recovery, and Console use named disclosures. Active interruption notices, repeat offers and the canonical Live Motion controls remain independent of those disclosures. Manual Air OFF uses a quiet state card; its setup guidance and switching behaviour are unchanged. Tutorial buttons no longer sit beside positioning, origin or Frame/Start: lessons live in Learn and on the tool panels that teach a procedure (ADR-348).
-- **After a job completes (ADR-340)**: the job dock shows **Job complete** and **Done** after controller settlement. Done clears only the finished run preview. The editable design, undo history, machine coordinates, Frame state and stored execution history remain intact. Run same job again remains available when its existing receipt checks allow it. Acknowledged-but-finishing, active and interrupted jobs do not offer Done. Clearing a design is still a separate project/editing action.
+- **After a job completes (ADR-340)**: the job dock shows **Job complete** and **Done** after controller settlement. Done clears only the finished run preview. The editable design, undo history, machine coordinates, Frame state and stored execution history remain intact. Run same job again remains offered while its receipt still matches the job, and like Start it needs a fresh Frame (ADR-372 Amendment 1). Acknowledged-but-finishing, active and interrupted jobs do not offer Done. Clearing a design is still a separate project/editing action.
 - **Workspace colours**: panels, drawing bed, grid, rulers and controls use the application appearance preference, defaulting to Light. Window > Appearance offers Light, Dark and Match System (ADR-339). Dark mode uses the approved charcoal drawing surface and light, readable vector ink. Contrast adjustments happen only while drawing the workspace; saved artwork, raster pixels, exported files and machine output retain their original colours and settings. The layout menu uses the same themed surface as the rest of the workspace.
 - **Notifications**: transient messages stay within the available canvas area, clear of the job dock, Live Motion bar, and zoom controls. An open modal gives notifications a reserved scrolling row so they do not cover its actions. Message lifetimes and dismissal controls are unchanged.
 - **Window menu**: checked `Cuts / Layers Panel` and `Machine Controls Panel` commands mirror the two panel states. `Toggle Side Panels` (`F12`) hides or restores both, and `Reset Workspace Layout` restores Auto and opens both panels. Compact still displays one tab at a time. Panel visibility does not affect the Live Motion bar.
@@ -1298,11 +1298,13 @@ Status bar messages (toasts that appear in the bar for 3 s) for non-blocking eve
     readable (ADR-221). Runs without a recorded start show no timer.
 
 #### Repeat — Run again
-1. **Run again** never reuses the consumed `FramedRunPermit`. It fresh-compiles the project,
-   computes and compares the new fingerprint, and opens Job Review for the deliberate repeat.
-2. The controlled repeat may use the retained compatibility `FrameVerification` proof only while
-   that proof and the new artifact still satisfy the repeat contract. It does not turn the one-use
-   permit into an unbounded replay token.
+1. **Run again** follows Start exactly (ADR-372 Amendment 1). The completed job's permit was spent
+   at its Start, so **Run same job again from start** stays greyed out until a clean Frame of this
+   exact job issues a new permit. It never runs a Frame itself and makes no offer. It then streams
+   that permit's bytes, the ones the Frame traced, through the same single Job Review, from line 1
+   with a new run ID, and the run records which completed run it repeats.
+2. A Current Position job therefore runs where the new Frame traced it, not at the first run's
+   frozen origin.
 
 #### Error — exact artifact cannot be produced
 1. The persistent blocker surface and error toast show the compile/transport reason. No Frame or job
@@ -2101,12 +2103,10 @@ the lock when the owning window closes, reloads or crashes, so crash recovery is
    settle marker, and fresh stable Idle. Then `activeRun` is removed and an exact
    `lastCompletedReceipt` is retained.
 2. **Run same job again from start** appears only while canvas, machine profile,
-   output scope, placement, and execution signature still match. Clicking performs
-   a fresh compile, fingerprint comparison, and Job Review. After the operator
-   accepts, the controlled repeat may use the retained compatibility
-   `FrameVerification` only while that proof and the new artifact still satisfy
-   the repeat contract; it then starts line 1 with a new run ID and zero recovery
-   progress.
+   output scope, placement, and execution signature still match. Like Start, it
+   is greyed out until a clean Frame of this exact job issues a permit (ADR-372
+   Amendment 1). Clicking streams that permit through Job Review, from line 1 with
+   a new run ID and zero recovery progress.
 3. Any relevant edit hides the offer. The receipt remains diagnostic history
    until another accepted run replaces it; **Forget Controller** clears it.
    Ordinary **Start current job** remains available.
