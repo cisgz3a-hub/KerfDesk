@@ -44,9 +44,15 @@ width** is traced as centre-line strokes. Wider ink is traced as filled outlines
    wider than the gate can slip under it: a 6 px horizontal line's ridge sits exactly on radius 3,
    short of a 4 px gate's seed, and a slanted 5 px line's ridge wobbles about the gate in short
    patches. So each clipped stroke is also measured straight across (rule 7). A stroke whose median
-   width exceeds the Max stroke width by more than 0.5 px joins the wide region as the union of
-   its inscribed discs, placed every half pixel along it. The strokes are then clipped again
-   against that region, so a thin stroke running into it still meets the fill under rule 5.
+   width exceeds the Max stroke width by more than one width quantum (0.25 px) joins the wide
+   region as the union of its inscribed discs, placed every half pixel along it. The same test
+   decides a line standing alone and one running into a shape, and no stroke carries a width that
+   rounds above the Max stroke width. A **compact blob** joins the wide region the same way: a
+   stroke shorter than two gate widths whose middle holds a disc wider than the gate, or that lies
+   in a small ink island wider across the stroke than the gate plus 0.25 px (a round dot just over
+   the gate, whose centreline is a short dash, would otherwise burn as a hairline). The strokes
+   are then clipped again against that region, so a thin stroke running into it still meets the
+   fill under rule 5.
 4. **Strokes.** The Centerline lane traces the whole ink mask, unchanged. Each stroke curve is
    clipped where it enters the wide region (`clip-stroke-curves.ts`). The clip splits the cubics
    with de Casteljau, so clipped strokes stay compact cubics. It does not flatten them.
@@ -67,12 +73,18 @@ width** is traced as centre-line strokes. Wider ink is traced as filled outlines
    corners, and a thin speck the Centerline cleanup dropped does not come back as an outline. The
    fill mask then runs through the ordinary filled-contour finisher (`contourFinishOptionsFor`).
 7. **Width metadata.** Each kept stroke's pen width is measured along its normal, averaged over a
-   6 px window (`stroke-width.ts`). When the spread of those widths is under 25 % of their median,
+   6 px window (`stroke-width.ts`). A cross-section whose march runs out (it is measuring the line
+   that meets this one at a junction) is dropped with the samples within half a gate width of it,
+   and windows average only unbroken runs of clean samples, so a steady line meeting another at a
+   T keeps its width. When the spread of those widths is under 25 % of their median,
    the stroke gets `strokeWidthMm`, quantised to 0.25 working px. Strokes are grouped by width into
    one path each. Dot marks (concentric rings) never get a width. The value is in the path's local
    units, the same units as its coordinates, so the object transform takes it to millimetres, and
    `scaleTracedPathsUniform` scales it with the points. On a V-carve layer the existing consumer
-   turns these strokes into round-stroke outlines of the real pen width.
+   turns these strokes into round-stroke outlines of the real pen width. A stroke that carries a
+   width is first recentred on its ink (`recentre-stroke.ts`): each vertex and control point moves
+   along the local normal by the median centre offset the cross-sections measured, at most 1 px.
+   The skeleton of an even-width line otherwise sits half a pixel off the true centre.
 8. **Colours and commit binding.** Strokes are `#0000ff` (`HYBRID_STROKE_COLOR`) and fills are
    `#000000` (`HYBRID_FILL_COLOR`). On commit, both on a fresh import and on a trace over its
    source bitmap, `createArtworkOperations` takes a per-colour mode (`modeForColor`):
@@ -86,9 +98,17 @@ width** is traced as centre-line strokes. Wider ink is traced as filled outlines
    Three spots is about as wide as a single pass looks once dwell and char widen it. The dialog
    converts millimetres to preview-grid pixels through the source's placement
    (`ui/trace/hybrid-stroke-width.ts`). The commit grid then scales that value like the other size
-   controls (see the decision on committed traces using the output resolution). The setting
-   persists with the trace (see the decision on trace settings travelling with the trace). When the
-   placement is unknown, the core default of 4 px applies.
+   controls (see the decision on committed traces using the output resolution); the 1 px floor
+   applies on the working grid, after that scaling. The slider runs 0.05 to 3 mm. The resolved
+   value, default or not, is recorded with the trace (see the decision on trace settings
+   travelling with the trace), so a Re-trace on another device profile splits the ink the same
+   way. When the placement is unknown, the core default of 4 px applies.
+11. **Vector only.** Line + fill offers no Raster scan output: the raster route renders every path
+   in one style and would turn the fills into outline rings. Its operations are named
+   "<file> lines" and "<file> fills". Enhance region keeps the per-width stroke groups, their
+   widths and their curves. `isBinaryContourPreset` excludes Line + fill, so the contour-only
+   supersample and dense-colour downscale routes (which carry neither widths nor the gate) never
+   take it.
 
 ### Measurements
 
@@ -118,18 +138,30 @@ length of every emitted path in working px, which is what a LINE-mode pass trave
   over the gate from strokes to fill. Before it, the owl at 4 px burned 168,675 px with 101,646
   segments, but some of those strokes were up to 1.5 x the Max stroke width.
 - **Time**: Line + fill costs the Centerline lane plus a contour finish. On the owl that is about
-  1.2 x Centerline and 3.5 x Line Art.
+  1.2 x Centerline and 3.5 x Line Art. These are single runs on one machine, taken before the
+  review fixes (junction-clean widths, compact blobs, 0.25 px tolerance, recentring); the operator
+  saw about 27 s for the owl in the app, so treat them as +/- 25 %.
 
 ### Consequences
 
 - Line Art, Centerline and Edge output is unchanged. The Centerline lane was refactored into
   `centerlineStrokesFromMaskSteps` with no change in behaviour. Its existing tests pass unchanged.
-- Peak memory is above Centerline's because the lane allocates the disc-union and fill-mask arrays.
-  Line + fill uses the Centerline working-pixel budget. That peak has not been measured separately.
+- Peak memory is above Centerline's because the lane allocates the disc-union and fill-mask arrays
+  and then runs the contour finisher. Line + fill plans with its own 230 B/px figure (the contour
+  lane's 190 plus its retained grids and headroom) and the Centerline run-time ceiling. That figure
+  is an estimate; the peak has not been measured as ADR-409 measured the other lanes.
 - Strokes are grouped by width, so their order differs from Centerline's output order.
 - Crossing loops, such as looped handwriting, often widen where they cross. They then fail the
   25 % spread test and carry no width. They still trace as single strokes.
 - The dialog's scanline and offset fill-style choice does not apply to Line + fill yet. Its fill
   operation uses the operation defaults.
-- A 2 px line's centre line sits half a pixel off the true centre. That is the existing Centerline
-  lane's behaviour, which this decision does not change.
+- A stroke without a width (a hairline) keeps the Centerline lane's centre line, which for an
+  even-width line sits half a pixel off the true centre. Only width-carrying strokes are recentred.
+- Where lines at the gate width cross, the crossing's inscribed disc can exceed the gate and seed a
+  small fill blob; each stroke ending there reaches 1 px into it plus its round cap, so a large
+  share of that small blob burns twice. This is rule 5 as designed: dropping the reach for small
+  blobs would reopen the pixel-wide seam the reach exists to close.
+- A diagonal line's digitised width quantises in steps of about 0.7 px (pixel diagonals), so a pen
+  line drawn at exactly the Max stroke width can measure up to half a pixel over it at 45 degrees
+  and fill. The measurement is right about the pixels; set the Max stroke width a little above the
+  pen width. On the commit grid (2 samples per spot) that is a small fraction of the gate.
