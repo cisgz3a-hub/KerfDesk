@@ -10,6 +10,7 @@ export const VISIBLE_TRACE_PRESET_NAMES = [
   'Smooth',
   'Sharp',
   'Centerline',
+  'Line + fill',
   'Edge Detection',
 ] as const;
 export const DEFAULT_TRACE_PRESET_NAME = 'Line Art';
@@ -28,6 +29,8 @@ const PRESET_DESCRIPTIONS: Readonly<Record<string, string>> = {
     'Crisp corners, fine lines and tiny marks. Keeps more detail, including small source specks.',
   Centerline:
     'One path along the middle of each stroke. Useful for single-stroke lettering and linework.',
+  'Line + fill':
+    'Thin pen lines burn once down their middle; wider shapes stay filled. For drawings that mix lettering and solid logos.',
   'Edge Detection':
     'Outlines around dark artwork and local detail. Neighbouring dark tones may merge.',
 };

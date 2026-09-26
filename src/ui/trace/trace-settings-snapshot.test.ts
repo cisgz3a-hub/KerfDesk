@@ -39,6 +39,20 @@ describe('trace settings snapshot (ADR-408)', () => {
     });
   });
 
+  it('restores a Line + fill trace with its Max stroke width (ADR-454)', () => {
+    const captured = captureTraceSettings({
+      presetName: 'Line + fill',
+      overrides: { hybridMaxStrokeWidthMm: 0.8 },
+      output: 'vector',
+      fillStyle: 'scanline',
+      boundary: null,
+      boundaryMode: 'crop',
+    });
+    const restored = restoreTraceSettings(captured, GRID);
+    expect(restored.presetName).toBe('Line + fill');
+    expect(restored.overrides).toEqual({ hybridMaxStrokeWidthMm: 0.8 });
+  });
+
   it('does not record a boundary mode without a boundary', () => {
     const captured = captureTraceSettings({
       presetName: 'Line Art',
