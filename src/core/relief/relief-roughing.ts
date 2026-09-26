@@ -7,6 +7,9 @@
 // The dilation already encodes the tool's footprint, so ring 0 rides the
 // region boundary directly — no additional tool-radius inset (deliberate
 // deviation from pocketToolpathRings, which would double-count the radius).
+// The stepover is a percentage of the cut width over one level, which is the
+// stored diameter except for a tapered ball nose: its rings then overlap
+// inside every level instead of leaving ribs (ADR-368 Amendment 2).
 //
 // Output passes are contour passes in heightmap physical mm (origin at the
 // heightmap's min corner, y down). The compiler has already folded object XY
@@ -19,6 +22,7 @@ import type { CncContourPass, CncPass } from '../job';
 import type { CncTool, Polyline } from '../scene';
 import { kernelForTool, type ToolKernel } from '../sim';
 import { zPassDepths } from '../cnc/depth-passes';
+import { cncLayoutCutWidths } from '../cnc/layout-cut-widths';
 import { dilateHeightmapByTool } from './heightmap-tool-offset';
 import type { Heightmap } from './heightmap';
 import { marchingSquares } from './marching-squares';
@@ -80,7 +84,12 @@ export function reliefRoughingLadder(
     kernel,
     options.allowanceMm ?? DEFAULT_RELIEF_ALLOWANCE_MM,
   );
-  const stepMm = stepoverMm(options.stepoverPercent, options.tool.diameterMm);
+  const { clearingDiameterMm } = cncLayoutCutWidths(
+    options.tool,
+    options.reliefDepthMm,
+    options.depthPerPassMm,
+  );
+  const stepMm = stepoverMm(options.stepoverPercent, clearingDiameterMm);
   const passes: CncContourPass[] = [];
   let offsetFailed = false;
   let passLimited = false;
