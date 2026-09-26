@@ -2,7 +2,7 @@
 // device profile, workspace dimensions, and the scene. Pure; never mutated.
 
 import { DEFAULT_DEVICE_PROFILE, type DeviceProfile } from '../devices';
-import type { MachineConfig } from './machine';
+import type { CncMachineConfig, MachineConfig } from './machine';
 import { EMPTY_SCENE, type Scene } from './scene';
 import type { ProjectVariableData } from './variable-template';
 import type { PrintAndCutDesignTargets } from './print-and-cut';
@@ -78,6 +78,10 @@ export type Project = {
   readonly notes: string;
   // Absent on laser projects saved before CNC support — treated as laser.
   readonly machine?: MachineConfig;
+  // The CNC setup (stock, bits, params, tiling) kept while the project is in
+  // Laser mode, so saving a laser job does not throw the router setup away.
+  // Never present while `machine` is CNC.
+  readonly parkedCncMachine?: CncMachineConfig;
   readonly scene: Scene;
 };
 

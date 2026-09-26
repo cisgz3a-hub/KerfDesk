@@ -125,6 +125,14 @@ function normalizeProject(raw: Record<string, unknown>): Project {
   } else {
     normalized['machine'] = machine;
   }
+  // The CNC setup parked by a Laser-mode save; a CNC project has none.
+  const parked =
+    machine?.['kind'] === 'cnc' ? null : normalizeCncMachineConfig(raw['parkedCncMachine']);
+  if (parked === null) {
+    delete normalized['parkedCncMachine'];
+  } else {
+    normalized['parkedCncMachine'] = parked;
+  }
   return normalized as unknown as Project;
 }
 

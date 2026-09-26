@@ -9,6 +9,7 @@ import {
   type CncStartupOperationDraft,
 } from './cnc-startup-setup';
 import { cncMachineWithCustomTools } from './machine-actions';
+import { projectWithParkedCnc } from './parked-cnc-machine';
 import { nextProbeSetupState } from './probe-setup-history-identity';
 import { pushUndo } from './scene-mutations';
 import { captureSetupHistoryContext } from './setup-history-context';
@@ -80,10 +81,13 @@ function replacementState(
     nextMachine,
     state.cncLiveCaps,
   );
-  const setupProject = projectWithStartupChanges(
-    projectWithMachine(state.project, nextProfile, nextMachine, scene),
-    state.cncLiveCaps,
-    startup,
+  const setupProject = projectWithParkedCnc(
+    projectWithStartupChanges(
+      projectWithMachine(state.project, nextProfile, nextMachine, scene),
+      state.cncLiveCaps,
+      startup,
+    ),
+    nextCachedCnc,
   );
   return {
     ...nextProbeSetupState(setupProject, state.probeSetupEpoch),
