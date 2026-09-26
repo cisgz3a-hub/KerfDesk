@@ -42,6 +42,7 @@ import { smoothArcNoise } from './smooth-arc-noise';
 import { fittedTraceRing, withCanonicalTraceCurves } from './trace-curves';
 import { optimizationToleranceScaleFromOptimize } from './trace-optimize';
 import { contourFeatureAnchors } from './contour-feature-anchors';
+import { ADMITTED_LOOP_MIN_POINTS, admittedLoopFallback } from './admitted-loop-simplify';
 import { contourTraceInputMatches, type ContourTraceInput } from './contour-input';
 import {
   closeContour,
@@ -74,7 +75,7 @@ export function isBinaryContourPreset(options: TraceOptions): boolean {
 // Same base simplification epsilon as the centerline finisher; the
 // TraceOptions lineTolerance contract scales it (higher = fewer vertices).
 const SIMPLIFY_EPSILON_PX = 0.45;
-const MIN_LOOP_POINTS = 3;
+const MIN_LOOP_POINTS = ADMITTED_LOOP_MIN_POINTS;
 // Corner rebuild is worth its cost only on SMALL loops (glyphs, counters),
 // where it restores drawn corners to ~0.01px. On big hand-drawn art
 // boundaries it changes nothing measurable (arch-house IoU 0.9648 vs 0.9644)
@@ -328,7 +329,7 @@ function* finishLoopSteps(
     // must not become another area-removal control. Retain the measured crack
     // boundary in that case (one bounded fallback, no new fitting search), and
     // include it in the same topology repair as every other admitted contour.
-    return refined ?? contourRefinement(crack.points, () => crack.points);
+    return refined ?? admittedLoopFallback(crack.points, finish.epsilonPx);
   };
   const retained = finishFrom(sharpened);
   const source = closeContour(crack.points);
