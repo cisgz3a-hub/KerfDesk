@@ -11,6 +11,7 @@
 // travel is always written; after that it carries across passes and layers.
 
 import type { CutGroup } from '../../job';
+import { cutSegmentsForPass, finalPassCutSegments } from '../../job/cut-pass-segments';
 import type { Vec2 } from '../../scene';
 import { mmToUm } from './rd-numbers';
 
@@ -37,8 +38,12 @@ export function planRdMotion(groups: ReadonlyArray<CutGroup>): ReadonlyArray<RdM
   let head: RdPoint | null = null;
   for (const group of groups) {
     const steps: RdMotionStep[] = [];
-    for (let pass = 0; pass < Math.max(1, group.passes); pass += 1) {
-      for (const segment of group.segments) head = planSegment(steps, segment.polyline, head);
+    const passes = Math.max(1, group.passes);
+    const finalPass = finalPassCutSegments(group);
+    for (let pass = 0; pass < passes; pass += 1) {
+      for (const segment of cutSegmentsForPass(group, finalPass, pass, passes)) {
+        head = planSegment(steps, segment.polyline, head);
+      }
     }
     const bounds = stepBounds(steps);
     if (bounds !== null) parts.push({ part: parts.length, group, steps, bounds });

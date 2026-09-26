@@ -29,6 +29,11 @@ const OPERATION_SETTING_KEYS = [
   'negativeImage',
   'passThrough',
   'dotWidthCorrectionMm',
+  'perforationEnabled',
+  'perforationCutMm',
+  'perforationSkipMm',
+  'overcutMm',
+  'imageOverscanMm',
 ] as const satisfies ReadonlyArray<keyof LayerOperationSettings>;
 
 export function mixedOperationFields(

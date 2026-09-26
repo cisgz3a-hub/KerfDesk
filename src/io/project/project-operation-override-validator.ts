@@ -1,4 +1,5 @@
 import { DITHER_ALGORITHMS } from '../../core/scene';
+import { cutExtrasFieldErrors } from './project-cut-extras-validator';
 import { objectOperationSettingKeys } from '../../core/scene/object-operation-settings';
 import { layerSubLayerOperationId } from '../../core/scene/layer';
 import {
@@ -43,6 +44,7 @@ export function validateObjectOperationOverride(value: unknown, path: string): s
     optionalBoolean(value, `${path}.negativeImage`),
     optionalBoolean(value, `${path}.passThrough`),
     optionalNonNegativeNumber(value, `${path}.dotWidthCorrectionMm`),
+    ...cutExtrasFieldErrors(value, path),
     validateScopedOverrides(value['byOperation'], `${path}.byOperation`),
   ]);
 }
