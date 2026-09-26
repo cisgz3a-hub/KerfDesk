@@ -48,8 +48,8 @@ function expireStalePermit(laser: ReturnType<typeof useLaserStore.getState>): vo
   useLaserStore.setState((current) =>
     current.framedRun === permit ? { framedRun: null, frameVerification: null } : {},
   );
-  // Start says why it frames again (frame-expiry-note.ts). Activity such as a
-  // jog or the job itself is visible to the operator and needs no note.
+  // The status line says why the Frame expired (frame-expiry-note.ts). Activity
+  // such as a jog or the job itself is visible to the operator and needs no note.
   if (drift !== null) noteFrameExpired(drift);
 }
 
