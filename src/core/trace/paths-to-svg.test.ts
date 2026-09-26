@@ -64,6 +64,9 @@ describe('coloredPathsToSvg', () => {
     expect(svg).toContain('viewBox="0 0 1000 500"');
     expect(svg).toContain('width="100mm"');
     expect(svg).toContain('height="50mm"');
+    // The stated millimetres win over the grid's aspect (anisotropic density).
+    expect(svg).toContain('preserveAspectRatio="none"');
+    expect(svg).not.toContain('meet');
   });
 
   it('emits one <path> per ColoredPath with the layer colour', () => {
