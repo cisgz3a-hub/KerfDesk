@@ -52,7 +52,7 @@ type RingInfo = {
 
 /**
  * Rings are open (the first point is not repeated), have at least three
- * points and a non-zero area. Output polygons keep input order of outers.
+ * points and are not collinear. Output polygons keep input order of outers.
  */
 export function fillRegionPolygons(
   rings: ReadonlyArray<ReadonlyArray<GridPoint>>,
@@ -63,7 +63,8 @@ export function fillRegionPolygons(
   const role = ringRoles(infos, nesting, fillRule);
   const { polygons, orphanHole } = assignHoles(infos, nesting, role);
   const undecided = [...nesting.values()].some((entry) => entry.undecided);
-  return { polygons, crossing: orphanHole || undecided || ringsCross(infos) };
+  const zeroNetArea = infos.some((ring) => ring.twiceArea === 0);
+  return { polygons, crossing: zeroNetArea || orphanHole || undecided || ringsCross(infos) };
 }
 
 type Nesting = {
@@ -149,6 +150,13 @@ function ringRoles(
   const filled = (value: number): boolean => (evenOdd ? value % 2 !== 0 : value !== 0);
   const role = new Map<number, 'outer' | 'hole'>();
   for (const ring of infos) {
+    // A bowtie's opposite-winding lobes cancel its net area but still paint.
+    // The nesting model cannot assign it one orientation. Keep the contour
+    // as an unmerged feature under both fill rules, with the crossing warning.
+    if (ring.twiceArea === 0) {
+      role.set(ring.index, 'outer');
+      continue;
+    }
     const entry = nesting.get(ring.index);
     const outside = (evenOdd ? entry?.count : entry?.winding) ?? 0;
     const inside = outside + (evenOdd ? 1 : Math.sign(ring.twiceArea));

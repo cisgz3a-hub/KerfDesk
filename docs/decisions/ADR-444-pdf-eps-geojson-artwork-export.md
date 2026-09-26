@@ -134,7 +134,9 @@ consulted.
   self-crossing or duplicate contours (overlapping user shapes, some glyphs, messy imports) are
   detected and written as separate, overlapping `unmerged` features with a warning, not merged:
   a polygon union with winding bookkeeping was judged too large for this export. Consumers that
-  need one valid geometry must union those features themselves.
+  need one valid geometry must union those features themselves. Zero net signed area alone does
+  not prove an empty fill: a bowtie's opposite-winding lobes remain an `unmerged` feature with
+  that warning under either fill rule. Only a ring that collapses to a line or point is dropped.
 - GeoJSON coordinates are millimetres and the file is not georeferenced; this is stated in the
   file, the help and the toast.
 - An exported PDF or EPS page can be up to 0.05 mm per side larger than the geometry, and never

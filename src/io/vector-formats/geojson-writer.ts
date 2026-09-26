@@ -167,8 +167,22 @@ function openRing(curve: CurveSubpath, page: PreparedPage, tolerance: number): G
   if (first !== undefined && last !== undefined && samePoint(first, last) && points.length > 1) {
     points.pop();
   }
-  if (points.length < 3 || twiceSignedArea(points) === 0) return null;
+  if (points.length < 3 || !hasPaintedArea(points)) return null;
   return points;
+}
+
+// A self-crossing contour can paint two opposite-winding lobes whose signed
+// areas cancel. Only collinearity proves a zero-area ring has no ink; retain
+// every other case for the crossing-contour warning rather than dropping it.
+function hasPaintedArea(points: ReadonlyArray<GridPoint>): boolean {
+  if (twiceSignedArea(points) !== 0) return true;
+  const first = points[0];
+  const second = points[1];
+  if (first === undefined || second === undefined) return false;
+  return points.some(
+    (point) =>
+      (second.x - first.x) * (point.y - first.y) !== (second.y - first.y) * (point.x - first.x),
+  );
 }
 
 function lineString(curve: CurveSubpath, page: PreparedPage, tolerance: number): Position[] | null {
