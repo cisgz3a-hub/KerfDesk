@@ -18,6 +18,7 @@ import { computeView } from '../workspace/view-transform';
 import type { LiveCaptureElement } from './frame-capture';
 import { cameraCaptureBindingForFrame } from './frame-source';
 import type { BedOverlayUniforms } from './overlay/bed-overlay-shader';
+import { usePieceScanStore } from './pieces/piece-scan-store';
 import { WorkspaceCameraOverlay } from './WorkspaceCameraOverlay';
 
 type Draw = {
@@ -223,6 +224,34 @@ describe('WorkspaceCameraOverlay', () => {
     const outline = container.querySelector('[data-testid="camera-height-areas"]');
     expect(outline?.querySelectorAll('rect')).toHaveLength(1);
     expect(outline?.textContent).toBe('Area 1: 35 mm');
+  });
+
+  it('outlines found pieces, the ones left out faint and dashed', () => {
+    saveModel();
+    useCameraStore.setState({ overlayStill: still() });
+    render();
+    expect(container.querySelector('[data-testid="camera-piece-outlines"]')).toBeNull();
+    const piece = (x: number, partial: boolean) => ({
+      outline: [
+        { x: x - 40, y: 75 },
+        { x: x + 40, y: 75 },
+        { x: x + 40, y: 125 },
+        { x: x - 40, y: 125 },
+      ],
+      rect: { centre: { x, y: 100 }, axisDeg: 0, length: 80, width: 50 },
+      areaMm2: 4000,
+      centroid: { x, y: 100 },
+      shape: 'oblong' as const,
+      headingDeg: null,
+      partial,
+    });
+    act(() => usePieceScanStore.getState().setPieces([piece(100, false), piece(250, true)]));
+    const outlines = container.querySelector('[data-testid="camera-piece-outlines"]');
+    const groups = [...(outlines?.querySelectorAll('g') ?? [])];
+    expect(groups.map((g) => g.getAttribute('data-included'))).toEqual(['true', 'false']);
+    expect(groups[1]?.querySelector('polygon')?.getAttribute('stroke-dasharray')).toBe('6 4');
+    expect(outlines?.textContent).toBe('12');
+    act(() => usePieceScanStore.getState().clear());
   });
 
   it('says why a still of another shape or from another camera is not drawn', () => {

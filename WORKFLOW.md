@@ -6704,6 +6704,30 @@ as the pane's design record.
 - **Edge / watching a job.** The camera panel can toggle between compact and
   wide monitoring widths, with the preference kept locally.
 
+### F-CAM9. Find pieces on the bed and place the design on each (ADR-442)
+
+- **Success / fill a batch of blanks.** With a saved calibration and a live camera, the operator
+  lays out blanks, puts the design on one of them, selects it and presses **Find pieces** in the
+  Camera panel's **Pieces on the bed** section. The overlay turns on and each piece is outlined on
+  the canvas with its number, centre and long-side line. The panel lists each piece with its size
+  and angle and how the design will move and turn onto it. **Place selection on each piece** adds
+  a copy on every ticked piece, the way the design sits on its own piece, as one undo step.
+- **Success / design not on a piece.** The design is centred on each piece, its long side along
+  the piece's long side, and the design itself moves to the first piece.
+- **Edge / piece partly out of view.** It is listed and outlined but starts unticked, with the
+  reason; ticking it includes it.
+- **Edge / different piece.** A piece of another shape, or more than 3 mm longer or wider than the
+  design's own piece, is flagged and stays ticked. Place is never refused.
+- **Edge / raised pieces.** Pieces on a box are found at the box's height when a height area
+  covers it (F-CAM3).
+- **Edge / Frame.** Frame traces the rectangle around all the copies, not each piece; the panel
+  says so after Place.
+- **Empty / no pieces or no selection.** "No pieces found" explains that pieces need to stand out
+  by colour or brightness. Place with nothing selected, or with every piece unticked, says what to
+  do and changes nothing.
+- **Empty / no feed.** **Find pieces** is disabled without a live camera; without a calibration
+  the section is absent.
+
 ---
 
 ## Desktop app (Windows + macOS Preview) flows

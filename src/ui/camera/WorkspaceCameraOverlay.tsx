@@ -18,6 +18,8 @@ import { computeView } from '../workspace/view-transform';
 import { CameraAccuracyMap } from './accuracy/CameraAccuracyMap';
 import { CameraSourceView } from './CameraSourceView';
 import { HeightAreaOutlines } from './heights/HeightAreaOutlines';
+import { PieceOutlines } from './pieces/PieceOutlines';
+import { usePieceScanStore } from './pieces/piece-scan-store';
 import type { LiveCaptureElement } from './frame-capture';
 import {
   useBedOverlayDrawing,
@@ -50,6 +52,7 @@ function ModelOverlay(props: { readonly model: CameraModelRecord }): JSX.Element
   const scene = useOverlayScene(props.model, box);
   const { unsupported, issue } = useBedOverlayDrawing(canvas, frame, scene);
   const accuracyMapVisible = useCameraStore((s) => s.accuracyMapVisible);
+  const pieceScan = usePieceScanStore((s) => s.scan);
   const notice = unsupported ? UNSUPPORTED_NOTICE : issue;
 
   return (
@@ -66,6 +69,15 @@ function ModelOverlay(props: { readonly model: CameraModelRecord }): JSX.Element
       {scene === null ? null : (
         <HeightAreaOutlines
           areas={scene.heightAreas}
+          view={scene.view}
+          width={scene.cssWidth}
+          height={scene.cssHeight}
+        />
+      )}
+      {scene === null || pieceScan === null ? null : (
+        <PieceOutlines
+          pieces={pieceScan.pieces}
+          excluded={pieceScan.excluded}
           view={scene.view}
           width={scene.cssWidth}
           height={scene.cssHeight}
