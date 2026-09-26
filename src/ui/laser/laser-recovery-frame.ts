@@ -16,7 +16,7 @@ export async function frameRemainingRecoveryArea(
   try {
     const controller = await prepareTransientFrameController(project);
     if (controller === null) return;
-    await controller.laser.frame(bounds, project.device.framingFeedMmPerMin);
+    await controller.laser.frame(bounds, project.device.framingFeedMmPerMin, undefined, project);
   } catch (error) {
     jobAwareAlert(
       `Cannot frame the remaining area:\n\n${error instanceof Error ? error.message : String(error)}`,

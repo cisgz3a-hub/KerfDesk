@@ -103,8 +103,6 @@ export function buildMachineReviewFacts(
     fact('Machine origin', device.origin.split('-').join(' ')),
     fact('Output max feed', `${formatMm(device.maxFeed)} mm/min (profile compile ceiling)`),
     frameFeedFact(project, controllerSettings),
-    fact('G-code dialect', device.gcodeDialect.dialectId),
-    scanOffsetProvenanceFact(project),
   ];
   const machine = project.machine;
   if (machineKindOf(machine) === 'cnc' && machine?.kind === 'cnc') {
@@ -125,8 +123,12 @@ export function buildMachineReviewFacts(
       fact('Park after job', parkLabel(machine.params, startFrom)),
     ];
   }
+  // The G-code dialect and the raster scan-offset table shape laser output
+  // only; CNC output is GRBL router G-code whatever the laser dialect (ADR-399).
   return [
     ...shared,
+    fact('G-code dialect', device.gcodeDialect.dialectId),
+    scanOffsetProvenanceFact(project),
     fact('Laser power scale', `S max $30 = ${device.maxPowerS}`),
     fact(
       'Air assist command',

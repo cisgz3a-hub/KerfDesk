@@ -353,6 +353,31 @@ describe('laser-store motion operation lifecycle', () => {
     expect(writes).toEqual([]);
   });
 
+  it('frames a saved laser job as a laser Frame while the open canvas is CNC', async () => {
+    const writes: string[] = [];
+    const connection = makeConnection(async (data) => {
+      writes.push(data);
+    });
+    await connectWith(connection);
+    const laserJob = useStore.getState().project;
+    useStore.getState().setMachineKind('cnc');
+    useLaserStore.setState({
+      workZZeroEvidence: null,
+      workZReferenceEpoch: 0,
+    } as Partial<ReturnType<typeof useLaserStore.getState>>);
+    connection.emitLine('<Idle|MPos:0.000,0.000,0.000|FS:0,0>');
+    writes.length = 0;
+
+    await useLaserStore
+      .getState()
+      .frame({ minX: 0, minY: 0, maxX: 10, maxY: 10 }, 1000, undefined, laserJob);
+    await acknowledgeFrameToolOffPrelude(connection);
+
+    const jogs = writes.filter((line) => line.startsWith('$J='));
+    expect(jogs.length).toBeGreaterThan(0);
+    expect(jogs.some((line) => /Z/.test(line))).toBe(false);
+  });
+
   it('stops dispatching Frame legs after the controller rejects a jog command', async () => {
     const writes: string[] = [];
     const connection = makeConnection(async (data) => {

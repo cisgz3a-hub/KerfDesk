@@ -3,7 +3,11 @@ import { createRoot, type Root } from 'react-dom/client';
 import { Simulate } from 'react-dom/test-utils';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { ImmediateBoxGenerationWorker } from '../../__fixtures__/box/immediate-box-generation-worker';
+import type { BoxMachineContext } from './box-draft';
 import { BoxGeneratorDialog } from './BoxGeneratorDialog';
+
+const LASER: BoxMachineContext = { kind: 'laser' };
+const CNC: BoxMachineContext = { kind: 'cnc', stockThicknessMm: 12, toolDiameterMm: 3.175 };
 
 (
   globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT?: boolean }
@@ -41,17 +45,41 @@ describe('BoxGeneratorDialog draft persistence', () => {
       await act(async () => second.root.unmount());
     }
   });
+
+  it('keeps the laser and CNC drafts apart', async () => {
+    const laser = await renderDialog(LASER);
+    try {
+      await setWidth(laser.host, '80');
+      await closeDialog(laser.host, 'Cancel');
+    } finally {
+      await act(async () => laser.root.unmount());
+    }
+
+    const cnc = await renderDialog(CNC);
+    try {
+      expect(widthInput(cnc.host).value).toBe('60');
+      await setWidth(cnc.host, '120');
+      await closeDialog(cnc.host, 'Cancel');
+    } finally {
+      await act(async () => cnc.root.unmount());
+    }
+
+    const laserAgain = await renderDialog(LASER);
+    try {
+      expect(widthInput(laserAgain.host).value).toBe('80');
+    } finally {
+      await act(async () => laserAgain.root.unmount());
+    }
+  });
 });
 
-async function renderDialog(): Promise<RenderedDialog> {
+async function renderDialog(machine: BoxMachineContext = LASER): Promise<RenderedDialog> {
   const host = document.createElement('div');
   document.body.appendChild(host);
   const root = createRoot(host);
   const onCancel = vi.fn();
   await act(async () => {
-    root.render(
-      <BoxGeneratorDialog machine={{ kind: 'laser' }} onCancel={onCancel} onGenerate={vi.fn()} />,
-    );
+    root.render(<BoxGeneratorDialog machine={machine} onCancel={onCancel} onGenerate={vi.fn()} />);
   });
   return { host, root, onCancel };
 }
