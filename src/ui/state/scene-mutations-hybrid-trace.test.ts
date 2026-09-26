@@ -141,9 +141,14 @@ describe('createArtworkOperations modeForColor', () => {
       {
         mode: 'fill',
         modeForColor: (color) => (color === HYBRID_STROKE_COLOR ? 'line' : undefined),
+        nameForColor: (color) => (color === HYBRID_STROKE_COLOR ? 'lines' : 'fills'),
       },
     );
     expect(operations.map((operation) => operation.mode)).toEqual(['fill', 'line']);
+    expect(operations.map((operation) => operation.name.split(' ').at(-1))).toEqual([
+      'fills',
+      'lines',
+    ]);
     expect('paths' in object && object.paths.every((path) => path.operationIds?.length === 1)).toBe(
       true,
     );

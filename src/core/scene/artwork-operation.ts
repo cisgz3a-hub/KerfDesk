@@ -78,6 +78,9 @@ export function createArtworkOperations(
     /** Per source colour mode, e.g. a Line + fill trace's strokes and fills
      *  (ADR-454); undefined falls back to `mode`. */
     readonly modeForColor?: (color: string) => LayerMode | undefined;
+    /** Per source colour name suffix, e.g. "lines" and "fills"; undefined
+     *  falls back to the colour's 1-based index. */
+    readonly nameForColor?: (color: string) => string | undefined;
   } = {},
 ): ArtworkOperationsResult {
   if (!('paths' in object)) {
@@ -103,7 +106,7 @@ export function createArtworkOperations(
     const mode = modeFor(color);
     const created = createArtworkOperation(workingScene, object, {
       ...(mode === undefined ? {} : { mode }),
-      name: `${baseName} ${index + 1}`,
+      name: `${baseName} ${options.nameForColor?.(color) ?? index + 1}`,
     });
     operations.push(created.operation);
     operationIdByColor.set(color, created.operation.id);

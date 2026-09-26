@@ -1,4 +1,5 @@
 // Presentational controls; trace requests and commit ownership stay in the dialog.
+import type { TraceOptions } from '../../core/trace';
 import type { RasterImage } from '../../core/scene';
 import { TRACE_PRESETS } from '../../core/trace';
 import { Button, DialogActions as KitDialogActions } from '../kit';
@@ -157,6 +158,16 @@ export function TraceOutputFields(props: {
       ) : null}
     </>
   );
+}
+
+/** CNC and Line + fill (ADR-454: a raster scan would outline its fills) are
+ *  vector-only, whatever the picker last held. */
+export function effectiveOutput(
+  kind: 'laser' | 'cnc',
+  options: Pick<TraceOptions, 'traceMode'>,
+  chosen: TraceOutput,
+): TraceOutput {
+  return kind === 'cnc' || options.traceMode === 'hybrid' ? 'vector' : chosen;
 }
 
 export function TraceOutputPicker(props: {

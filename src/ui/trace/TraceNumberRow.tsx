@@ -85,7 +85,7 @@ function traceNumberTitle(label: string): string {
     case 'Detail':
       return 'Higher values preserve more fine edge detail; lower values smooth noise.';
     case 'Max stroke width':
-      return 'Ink up to this wide burns once down its centre line; wider ink stays a filled outline.';
+      return 'Ink up to this wide is traced once down its centre line; wider ink stays a filled outline.';
     case 'Minimum line':
       return 'Discard closed edge outlines whose perimeter is shorter than this many source-image pixels.';
     default:

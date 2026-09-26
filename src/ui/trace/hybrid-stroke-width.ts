@@ -16,7 +16,9 @@ export const HYBRID_SPOTS_PER_STROKE = 3;
 /** Floor for the default, so a very fine spot does not turn every
  *  scanned pen line into a filled outline. */
 export const HYBRID_MIN_DEFAULT_STROKE_MM = 0.25;
-export const HYBRID_MAX_STROKE_WIDTH_MM_RANGE = { min: 0.05, max: 10 } as const;
+/** Ink wider than 3 mm is a solid shape on either machine, and a short
+ *  range keeps the slider's useful travel (defaults of 0.25 to 0.6 mm) wide. */
+export const HYBRID_MAX_STROKE_WIDTH_MM_RANGE = { min: 0.05, max: 3 } as const;
 
 /** Default Max stroke width for this machine, in millimetres. */
 export function defaultHybridMaxStrokeWidthMm(

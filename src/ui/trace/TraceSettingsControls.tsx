@@ -240,7 +240,9 @@ const CENTERLINE_OPTIMIZE_TITLE =
   'Higher values let curves stray further from the stroke centre for fewer nodes.';
 
 function ContourGeometryControls(props: TraceSettingsControlsProps): JSX.Element {
-  const centerline = props.preset.traceMode === 'centerline';
+  // Line + fill's strokes are Centerline strokes: the knobs steer them the
+  // same way (and its fill outlines as usual).
+  const centerline = props.preset.traceMode === 'centerline' || props.preset.traceMode === 'hybrid';
   const set = (patch: LightBurnTraceSettingOverrides): void => {
     props.onChange({ ...props.overrides, ...patch });
   };

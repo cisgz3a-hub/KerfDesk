@@ -17,7 +17,7 @@ import {
 import { positionTraceOverRasterSource, useStore } from '../state';
 import { useToastStore } from '../state/toast-store';
 import { useUiStore } from '../state/ui-store';
-import type { TraceFillStyle, TraceOutput } from './dialog-parts';
+import { effectiveOutput, type TraceFillStyle, type TraceOutput } from './dialog-parts';
 import { rasterDisplayDataUrl } from '../workspace/draw-raster';
 import type { PendingPreparedTrace, PreparedTrace } from './prepared-trace';
 import { TraceDialogView } from './TraceDialogView';
@@ -122,9 +122,7 @@ function DialogBody(props: DialogBodyProps): JSX.Element {
   // otherwise be ref-unstable too.
   const presetOptions = TRACE_PRESETS[choices.preset] ?? DEFAULT_TRACE_OPTIONS;
   const options = useDialogTraceOptions(presetOptions, choices.traceSettings, seed);
-  // Line + fill is vector-only (ADR-454): a raster scan would outline its fills.
-  const vectorOnly = machineKind === 'cnc' || options.traceMode === 'hybrid';
-  const effectiveTraceOutput: TraceOutput = vectorOnly ? 'vector' : choices.traceOutput;
+  const effectiveTraceOutput = effectiveOutput(machineKind, options, choices.traceOutput);
   const preview = useSelectedTracePreview(file, options, boundarySelection, seed, previewControl);
 
   const onSubmit = (): void =>

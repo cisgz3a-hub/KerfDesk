@@ -13,6 +13,14 @@ export function freshArtworkModeForColor(
   return (color) => (isHybridStrokePath({ color }) ? 'line' : 'fill');
 }
 
+/** Operation name suffixes for a Line + fill trace: its strokes and fills. */
+export function freshArtworkNameForColor(
+  object: SceneObject,
+): ((color: string) => string | undefined) | undefined {
+  if (object.kind !== 'traced-image' || object.traceMode !== 'hybrid') return undefined;
+  return (color) => (isHybridStrokePath({ color }) ? 'lines' : 'fills');
+}
+
 export function freshArtworkMode(object: SceneObject): 'line' | 'fill' | 'image' {
   if (object.kind === 'raster-image') return 'image';
   if (object.kind === 'traced-image') {

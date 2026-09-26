@@ -27,7 +27,11 @@ import {
 } from '../../core/scene';
 import { applyCncTextDefaultsToNewLayer } from './cnc-text-defaults';
 import { duplicateSceneSelection } from './duplicate-scene-selection';
-import { freshArtworkMode, freshArtworkModeForColor } from './fresh-artwork-mode';
+import {
+  freshArtworkMode,
+  freshArtworkModeForColor,
+  freshArtworkNameForColor,
+} from './fresh-artwork-mode';
 import { applyFreshTraceScanDirection } from './fresh-trace-scan-direction';
 import { positionTraceOverRasterSource } from './trace-placement';
 import { releaseTraceSourcePalette } from './trace-source-palette';
@@ -226,6 +230,7 @@ export function applyFreshImport(
   const created = createArtworkOperations(s.project.scene, positioned, {
     mode: freshArtworkMode(positioned),
     modeForColor: freshArtworkModeForColor(positioned),
+    nameForColor: freshArtworkNameForColor(positioned),
   });
   const operations = applyFreshTraceScanDirection(positioned, created.operations, s.project.device);
   positioned = created.object;
@@ -294,6 +299,7 @@ export function applyTraceToExisting(
   const created = createArtworkOperations(scene, positionedTrace, {
     mode: freshArtworkMode(positionedTrace),
     modeForColor: freshArtworkModeForColor(positionedTrace),
+    nameForColor: freshArtworkNameForColor(positionedTrace),
   });
   const operations = applyFreshTraceScanDirection(
     positionedTrace,

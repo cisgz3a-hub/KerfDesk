@@ -65,7 +65,7 @@ export const TRACE_OVERRIDE_RULES = {
   edgeSensitivity: range(0, 100),
   edgeDetail: range(0, 100),
   edgeMinimumLinePx: range(0, 1000),
-  hybridMaxStrokeWidthMm: range(0.05, 10),
+  hybridMaxStrokeWidthMm: range(0.05, 3),
 } as const satisfies Record<PersistedOverrideKey, OverrideRule>;
 
 // Exhaustive by construction, like the rules above.
