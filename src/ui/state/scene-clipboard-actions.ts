@@ -33,6 +33,7 @@ export type SceneClipboardActions = {
   readonly copySelection: () => void;
   readonly cutSelection: () => void;
   readonly pasteClipboard: () => void;
+  readonly pasteClipboardInPlace: () => void;
 };
 
 type Setter = (fn: (state: AppState) => AppState | Partial<AppState>) => void;
@@ -51,34 +52,39 @@ export function sceneClipboardActions(set: Setter): SceneClipboardActions {
         const removed = removeSceneObjectsFromState(state, clipboard.selectedObjectIds);
         return removed === state ? state : { ...removed, sceneClipboard: clipboard };
       }),
-    pasteClipboard: () =>
-      set((state) => {
-        const clipboard = state.sceneClipboard;
-        if (clipboard === null || clipboard.objects.length === 0) return state;
-        const prepared = prepareClipboardPaste(
-          state.project.scene,
-          clipboard.layers,
-          clipboard.objects,
-          clipboard.selectedObjectIds,
-          clipboard.groups ?? [],
-          clipboard.sourceDocumentEpoch === state.projectDocumentEpoch,
-        );
-        const pasted = prepared.objects;
-        let scene = prepared.scene;
-        for (const object of pasted) scene = addObject(scene, object);
-        if (prepared.groups.length > 0) {
-          scene = { ...scene, groups: [...(scene.groups ?? []), ...prepared.groups] };
-        }
-        const [primary, ...rest] = prepared.selectedObjectIds;
-        return {
-          project: { ...state.project, scene },
-          selectedObjectId: primary ?? null,
-          additionalSelectedIds: new Set(rest),
-          undoStack: pushUndo(state.project, state.undoStack),
-          redoStack: [],
-          dirty: true,
-        };
-      }),
+    pasteClipboard: () => set((state) => pasteFromClipboard(state, PASTE_OFFSET_MM)),
+    // LightBurn's Paste in Place (ADR-410): the copy lands exactly where the
+    // original was, e.g. to stack a second pass or move art between projects.
+    pasteClipboardInPlace: () => set((state) => pasteFromClipboard(state, 0)),
+  };
+}
+
+function pasteFromClipboard(state: AppState, offsetMm: number): AppState | Partial<AppState> {
+  const clipboard = state.sceneClipboard;
+  if (clipboard === null || clipboard.objects.length === 0) return state;
+  const prepared = prepareClipboardPaste(
+    state.project.scene,
+    clipboard.layers,
+    clipboard.objects,
+    clipboard.selectedObjectIds,
+    clipboard.groups ?? [],
+    clipboard.sourceDocumentEpoch === state.projectDocumentEpoch,
+    offsetMm,
+  );
+  const pasted = prepared.objects;
+  let scene = prepared.scene;
+  for (const object of pasted) scene = addObject(scene, object);
+  if (prepared.groups.length > 0) {
+    scene = { ...scene, groups: [...(scene.groups ?? []), ...prepared.groups] };
+  }
+  const [primary, ...rest] = prepared.selectedObjectIds;
+  return {
+    project: { ...state.project, scene },
+    selectedObjectId: primary ?? null,
+    additionalSelectedIds: new Set(rest),
+    undoStack: pushUndo(state.project, state.undoStack),
+    redoStack: [],
+    dirty: true,
   };
 }
 

@@ -10,6 +10,7 @@ import {
   type RasterImage,
   type TracedImage,
 } from '../../core/scene';
+import type { LayerDefaultSettings } from '../layers/layer-default-settings';
 import { useStore } from './store';
 import { resetStore, svgObj } from './test-helpers';
 
@@ -131,7 +132,9 @@ describe('4040 machine-aware CNC starters', () => {
     expect(useStore.getState().project.scene.layers[0]?.cnc).toBeUndefined();
   });
 
-  it('preserves operator-saved CNC layer defaults ahead of the machine starter', () => {
+  // Laser Make Default no longer carries a CNC block (laser/CNC split). A slot
+  // saved before the split still holds one; it must not replace the starter.
+  it('seeds the machine starter even when a default saved before the split holds CNC settings', () => {
     const savedCnc = {
       ...DEFAULT_CNC_LAYER_SETTINGS,
       feedMmPerMin: 321,
@@ -139,41 +142,18 @@ describe('4040 machine-aware CNC starters', () => {
       spindleRpm: 9_876,
       depthPerPassMm: 0.4,
     };
-    select4040Cnc();
-    useStore.getState().setLayerDefaults({ byColor: {}, allColors: { cnc: savedCnc } });
-
-    useStore.getState().createManualLayer('#112233');
-    useStore.getState().importSvgObject(svgObj('saved-default', ['#445566']));
-
-    const scene = useStore.getState().project.scene;
-    expect(scene.layers.find((layer) => layer.color === '#112233')?.cnc).toEqual(savedCnc);
-    const imported = scene.objects.find((object) => object.id === 'saved-default');
-    expect(
-      imported === undefined ? undefined : primaryOperationForObject(imported, scene.layers)?.cnc,
-    ).toEqual(savedCnc);
-  });
-
-  it('preserves saved CNC defaults for raster, trace, and Convert-to-Bitmap operations', () => {
-    const savedCnc = {
-      ...DEFAULT_CNC_LAYER_SETTINGS,
-      feedMmPerMin: 321,
-      plungeMmPerMin: 54,
-      spindleRpm: 9_876,
-      depthPerPassMm: 0.4,
-    };
+    const legacy = { cnc: savedCnc } as unknown as LayerDefaultSettings;
     const rasterColor = '#818181';
     const traceColor = '#010203';
     const convertedColor = '#828282';
     select4040Cnc();
     useStore.getState().setLayerDefaults({
-      byColor: {
-        [rasterColor]: { cnc: savedCnc },
-        [traceColor]: { cnc: savedCnc },
-        [convertedColor]: { cnc: savedCnc },
-      },
-      allColors: null,
+      byColor: { [rasterColor]: legacy, [traceColor]: legacy, [convertedColor]: legacy },
+      allColors: legacy,
     });
 
+    useStore.getState().createManualLayer('#112233');
+    expect4040Starter('#112233');
     useStore.getState().importRasterImage(rasterImage('source-raster', rasterColor));
     useStore
       .getState()
@@ -182,19 +162,22 @@ describe('4040 machine-aware CNC starters', () => {
     useStore
       .getState()
       .convertToBitmap(['convert-source'], rasterImage('converted-raster', convertedColor));
+    useStore.getState().importSvgObject(svgObj('svg-import', ['#445566']));
 
     const scene = useStore.getState().project.scene;
     const cases = [
       { id: 'source-raster', mode: 'image' },
       { id: 'source-trace', mode: 'line' },
       { id: 'converted-raster', mode: 'image' },
+      { id: 'svg-import', mode: 'line' },
     ] as const;
     for (const item of cases) {
       const object = scene.objects.find((candidate) => candidate.id === item.id);
       const operation =
         object === undefined ? undefined : primaryOperationForObject(object, scene.layers);
-      expect(operation?.cnc).toEqual(savedCnc);
       expect(operation?.mode).toBe(item.mode);
+      expect(operation?.cnc?.feedMmPerMin).toBe(300);
+      expect(operation?.cnc?.feedSource).toMatchObject({ kind: 'machine-starter' });
     }
   });
 });

@@ -53,7 +53,7 @@ import type {
   StreamPlannerSnapshot,
 } from './laser-rx-capacity-evidence';
 import type { StreamHold } from './laser-stream-hold';
-import type { JobStopRequest } from './job-stop-request';
+import type { JobStopRequest, StreamReset } from './job-stop-request';
 import type { TranscriptBufferRefs } from './laser-transcript-buffer';
 import type { PauseResumeTransitionState } from './laser-pause-resume-transition';
 import { overrideActions } from './override-actions';
@@ -144,6 +144,10 @@ export type LaserState = LaserStoreActions &
     /** Why KerfDesk stopped the stream of `streamerEpoch`, when it was asked
      * to (Abort, or the app closing); read through currentJobStopRequest. */
     readonly jobStopRequest?: JobStopRequest | null;
+    /** The soft reset KerfDesk sent against the stream of `streamerEpoch`,
+     * and whether it may have cost position; read through
+     * currentStreamResetMayLosePosition (ADR-215 Amendment 1). */
+    readonly streamReset?: StreamReset | null;
     readonly pauseResumeTransition: PauseResumeTransitionState | null;
     /** Immutable recovery/replay ownership for the current streamer. */
     readonly activeRunId: RunId | null;
@@ -402,6 +406,15 @@ function airAssistActions(set: SetFn, get: GetFn): Pick<LaserState, 'setAirAssis
     setAirAssistEnabled: async (enabled) => {
       assertAutofocusIdle(get());
       assertAirAssistReady(set, get, enabled);
+      if (enabled && useStore.getState().project.machine?.kind === 'cnc') {
+        const message =
+          'Manual air is a laser control. CNC coolant is set in Machine Setup and runs with the job.';
+        set({
+          lastWriteError: message,
+          log: pushLog(get(), `[lf2] Manual air command blocked: ${message}`),
+        });
+        throw new Error(message);
+      }
       const command = enabled ? useStore.getState().project.device.airAssistCommand : 'M9';
       if (command === 'none') {
         const message =

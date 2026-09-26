@@ -6,6 +6,10 @@
 import type { MachineKind, SelectionAlignKind, SelectionDistributeKind } from '../../core/scene';
 import type { AppThemePreference } from '../theme/app-theme';
 import { commandHelpId, commandTitle, controlHelp } from '../help/help-topics';
+import type {
+  EditingToolsCommandContext,
+  EditingToolsCommandId,
+} from './editing-tools-command-types';
 
 export const COMMAND_FAMILY_ORDER = [
   'file',
@@ -20,6 +24,7 @@ export const COMMAND_FAMILY_ORDER = [
 export type CommandFamily = (typeof COMMAND_FAMILY_ORDER)[number];
 
 export type CommandId =
+  | EditingToolsCommandId
   | 'file.new'
   | 'file.open'
   | 'file.open-recent'
@@ -136,7 +141,7 @@ export type AppCommand = {
   readonly invoke: () => void;
 };
 
-export type AppCommandContext = {
+export type AppCommandContext = EditingToolsCommandContext & {
   // ADR-101 gate-and-hide: laser-only commands are filtered out of the
   // registry's output when the project machine is CNC.
   readonly machineKind: MachineKind;

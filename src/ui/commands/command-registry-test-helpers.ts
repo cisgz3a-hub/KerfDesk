@@ -20,9 +20,25 @@ export function baseCtx(overrides: Partial<AppCommandContext> = {}): AppCommandC
     saveTemplate: vi.fn(),
     openRecentProjects: vi.fn(),
     barcodeGenerator: vi.fn(),
+    ...baseCtxEditingTools(),
     ...baseCtxAppearance(),
     ...overrides,
   } as AppCommandContext;
+}
+
+// ADR-410 (LightBurn gap batch 3) editing tools.
+function baseCtxEditingTools(): Partial<AppCommandContext> {
+  return {
+    pasteInPlace: vi.fn(),
+    invertSelection: vi.fn(),
+    selectOpenShapes: vi.fn(),
+    canOffsetShapes: false,
+    offsetShapes: vi.fn(),
+    rotateSelectionQuarterTurn: vi.fn(),
+    moveSelectionToBed: vi.fn(),
+    wireframeActive: false,
+    toggleWireframe: vi.fn(),
+  };
 }
 
 function baseCtxFlags(): Partial<AppCommandContext> {

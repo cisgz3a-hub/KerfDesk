@@ -141,7 +141,10 @@ export function arcToCubics(
   const sign = arc.largeArc === arc.sweep ? -1 : 1;
   const numerator = Math.max(0, rxSq * rySq - rxSq * y1pSq - rySq * x1pSq);
   const denominator = rxSq * y1pSq + rySq * x1pSq;
-  const coef = sign * Math.sqrt(numerator / denominator);
+  // At λ ≥ 1 the chord is a diameter and the centre is its midpoint; the
+  // numerator is then zero only up to rounding, whose square root moved the
+  // centre ~1e-8 of the radius off the chord and tilted both end tangents.
+  const coef = lambda >= 1 ? 0 : sign * Math.sqrt(numerator / denominator);
   const cxp = (coef * (rx * y1p)) / ry;
   const cyp = (coef * -(ry * x1p)) / rx;
 
@@ -166,9 +169,15 @@ export function arcToCubics(
   const cubics: Cubic[] = [];
   for (let i = 0; i < segCount; i += 1) {
     const t0 = theta1 + i * segDelta;
-    const t1 = t0 + segDelta;
+    const t1 = theta1 + (i + 1) * segDelta;
     cubics.push(arcSegmentToCubic(cx, cy, rx, ry, cosPhi, sinPhi, t0, t1));
   }
+  // The trig round trip lands within float noise of the authored endpoints;
+  // pin them so the arc joins its neighbouring segments exactly.
+  const first = cubics[0];
+  if (first !== undefined) cubics[0] = { ...first, p0: start };
+  const last = cubics.at(-1);
+  if (last !== undefined) cubics[cubics.length - 1] = { ...last, p3: end };
   return cubics;
 }
 
@@ -186,7 +195,11 @@ function arcSegmentToCubic(
   const sinT0 = Math.sin(t0);
   const cosT1 = Math.cos(t1);
   const sinT1 = Math.sin(t1);
-  const alpha = (Math.sin(t1 - t0) * (Math.sqrt(4 + 3 * Math.tan((t1 - t0) / 2) ** 2) - 1)) / 3;
+  // Arms of (4/3)·tan(Δ/4) along the parametric derivative put each cubic's
+  // midpoint on the arc; a 90° cubic then strays at most 0.027% of the major
+  // radius, outward. Maisonobe's sin(Δ)·(√(4 + 3·tan²(Δ/2)) − 1)/3 left the
+  // midpoint 0.196% inside: 0.2 mm on a 100 mm radius (ADR-159 Amendment 2).
+  const alpha = (4 / 3) * Math.tan((t1 - t0) / 4);
   const p0e: Vec2 = { x: rx * cosT0, y: ry * sinT0 };
   const p3e: Vec2 = { x: rx * cosT1, y: ry * sinT1 };
   const p1e: Vec2 = { x: p0e.x - alpha * rx * sinT0, y: p0e.y + alpha * ry * cosT0 };
@@ -206,12 +219,10 @@ function rotateAndTranslate(p: Vec2, cosPhi: number, sinPhi: number, cx: number,
   };
 }
 
+// atan2 of the cross and dot products keeps full precision near 0 and π, where
+// acos loses half its digits: a semicircle could end ~1e-8 rad short.
 function angleBetween(ux: number, uy: number, vx: number, vy: number): number {
-  const dot = ux * vx + uy * vy;
-  const len = Math.hypot(ux, uy) * Math.hypot(vx, vy);
-  const cos = Math.max(-1, Math.min(1, dot / len));
-  const sign = ux * vy - uy * vx < 0 ? -1 : 1;
-  return sign * Math.acos(cos);
+  return Math.atan2(ux * vy - uy * vx, ux * vx + uy * vy);
 }
 
 // --- shared math ---

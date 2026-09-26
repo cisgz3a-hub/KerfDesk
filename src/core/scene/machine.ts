@@ -214,6 +214,11 @@ export type CncMachineParams = {
   // M0 bit changes). Absent = the machine origin, the pre-H.9 behavior.
   readonly parkXMm?: number;
   readonly parkYMm?: number;
+  // CNC's own output feed ceiling and Frame speed, so the laser's Max feed
+  // and Frame speed never reach router jobs. Absent on projects saved before
+  // the split: the shared device values apply (cnc-head-feeds.ts).
+  readonly maxFeedMmPerMin?: number;
+  readonly framingFeedMmPerMin?: number;
 };
 
 export type LaserMachineConfig = { readonly kind: 'laser' };

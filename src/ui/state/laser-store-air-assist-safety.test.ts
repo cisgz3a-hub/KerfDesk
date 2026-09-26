@@ -130,6 +130,24 @@ describe('laser store air assist safety cleanup', () => {
     expect(useLaserStore.getState().airAssistOn).toBe(false);
   });
 
+  it('never sends the laser air command from Manual Air in a CNC project, but still sends M9', async () => {
+    const write = vi.fn<(data: string) => Promise<void>>(async () => undefined);
+    const connection = makeConnection(write);
+    useStore.getState().updateDeviceProfile({ airAssistCommand: 'M8' });
+    useStore.getState().setMachineKind('cnc');
+    await connectWith(connection);
+
+    write.mockClear();
+    await expect(useLaserStore.getState().setAirAssistEnabled(true)).rejects.toThrow(
+      'Manual air is a laser control',
+    );
+    expect(write).not.toHaveBeenCalled();
+    expect(useLaserStore.getState().airAssistOn).toBe(false);
+
+    await useLaserStore.getState().setAirAssistEnabled(false);
+    expect(write).toHaveBeenCalledWith('M9\n');
+  });
+
   it('fails air off when MPG ownership arrives while the on write is pending', async () => {
     const activation = deferredVoid();
     const write = vi.fn<(data: string) => Promise<void>>(async (data) => {

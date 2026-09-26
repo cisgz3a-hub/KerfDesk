@@ -55,9 +55,10 @@ export type ObjectDisplay = {
 };
 
 // 'design' is the ordinary workspace (fills fill, orphan colours stroke as
-// themselves); 'faint' is the Preview underlay, which strokes everything in
-// its operation colour and never fills.
-export type ObjectDisplayMode = 'design' | 'faint';
+// themselves); 'wireframe' is the same but Fill artwork is outlined instead of
+// filled (ADR-410); 'faint' is the Preview underlay, which strokes everything
+// in its operation colour and never fills.
+export type ObjectDisplayMode = 'design' | 'wireframe' | 'faint';
 
 export function isVectorSceneObject(obj: SceneObject): obj is VectorSceneObject {
   return (
@@ -191,7 +192,7 @@ function resolvePaint(
   }
   const effective = effectiveOperationForObject(layer, obj);
   const color = canvasVectorDisplayColor(layer.color);
-  if (effective.mode === 'fill') {
+  if (effective.mode === 'fill' && mode !== 'wireframe') {
     return {
       kind: 'fill',
       color,

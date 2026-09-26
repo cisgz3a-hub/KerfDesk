@@ -262,6 +262,11 @@ function sanitizeOperationOverridePatch(patch: ObjectOperationOverride): ObjectO
   setBoolean(out, 'negativeImage', patch.negativeImage);
   setBoolean(out, 'passThrough', patch.passThrough);
   setNonNegativeNumber(out, 'dotWidthCorrectionMm', patch.dotWidthCorrectionMm);
+  setBoolean(out, 'perforationEnabled', patch.perforationEnabled);
+  setMinimumNumber(out, 'perforationCutMm', patch.perforationCutMm, 0.01);
+  setMinimumNumber(out, 'perforationSkipMm', patch.perforationSkipMm, 0.01);
+  setNonNegativeNumber(out, 'overcutMm', patch.overcutMm);
+  setNonNegativeNumber(out, 'imageOverscanMm', patch.imageOverscanMm);
   return out as ObjectOperationOverride;
 }
 

@@ -1,7 +1,11 @@
 import { describe, expect, it } from 'vitest';
 import { currentJobStopRequest } from '../state/job-stop-request';
 import type { LaserSafetyNotice } from '../state/laser-safety-notice';
-import { checkpointInterruption, currentRunPlannerBacklog } from './checkpoint-interruption';
+import {
+  checkpointInterruption,
+  currentRunPlannerBacklog,
+  runStopMayHaveLostPosition,
+} from './checkpoint-interruption';
 
 describe('checkpointInterruption', () => {
   it('maps a disconnect-during-fire notice to a disconnect interruption', () => {
@@ -83,6 +87,44 @@ describe('checkpointInterruption', () => {
     expect(
       checkpointInterruption('disconnected', notice, { reason: 'operator', streamerEpoch: 1 }),
     ).toEqual({ kind: 'disconnect', message: notice.message });
+  });
+});
+
+// ADR-215 Amendment 1 (CNC audit MC-3): a stop that may have killed the
+// steppers mid-motion is recorded, so recovery cannot offer retained position.
+describe('position loss on the recorded cause', () => {
+  const abort = { reason: 'operator', streamerEpoch: 3 } as const;
+  const run = { alarmCode: null, streamReset: null, streamerEpoch: 3 };
+
+  it('marks the cause when the stop may have lost position', () => {
+    expect(checkpointInterruption('errored', null, abort, undefined, true)).toEqual({
+      kind: 'cancelled',
+      message: 'Stopped by the operator (Abort).',
+      positionLost: true,
+    });
+    expect(checkpointInterruption('errored', null, abort)).not.toHaveProperty('positionLost');
+    expect(checkpointInterruption('done', null, null, undefined, true)).toBeNull();
+  });
+
+  it('reads a reset sent against a moving machine, for this stream only', () => {
+    const moving = { streamerEpoch: 3, positionMayBeLost: true };
+    expect(runStopMayHaveLostPosition({ ...run, streamReset: moving })).toBe(true);
+    expect(
+      runStopMayHaveLostPosition({ ...run, streamReset: { ...moving, positionMayBeLost: false } }),
+    ).toBe(false);
+    expect(runStopMayHaveLostPosition({ ...run, streamReset: moving, streamerEpoch: 4 })).toBe(
+      false,
+    );
+  });
+
+  it('reads an alarm that loses position', () => {
+    // ALARM:1 hard limit, ALARM:3 reset in motion; 10 loses position on both firmwares.
+    for (const alarmCode of [1, 3, 10]) {
+      expect(runStopMayHaveLostPosition({ ...run, alarmCode })).toBe(true);
+    }
+    // ALARM:2 soft limit: GRBL holds before it alarms and keeps position.
+    expect(runStopMayHaveLostPosition({ ...run, alarmCode: 2 })).toBe(false);
+    expect(runStopMayHaveLostPosition(run)).toBe(false);
   });
 });
 
