@@ -255,8 +255,9 @@ tail and follow that staircase; see Known gaps.
     Incremental span evaluation (reusing the previous extension's parameters) is the next lever;
     the exact part of it is done (Amendment 1), and the fit is no longer where most of the gap is.
     The topology repair's exact savings are Amendment 2, and its memory and the corner legs are
-    Amendments 3 and 4; Amendment 5 counts where the fit's work goes. What remains is the sample
-    count and the proposal's Newton passes.
+    Amendments 3 and 4; Amendment 5 counts where the fit's work goes, and Amendment 6 takes the
+    pow calls out of the arm solve. What remains is the sample count and the proposal's Newton
+    passes.
 - Node editing, SVG export, bounds and the laser commit read the carried cubics; the downscale and
   Region Enhance routes no longer lose them.
 
@@ -499,11 +500,54 @@ and -1024 (`84472a71`).
 
 Measured (node bundles, interleaved, one process per run): owl Line Art fit time fell from
 1.73-1.76 s to 1.66-1.68 s over three rounds. Whole-trace time on owl (5.1 to 5.3 s before, 5.1 to
-5.2 s after) and
-on perf-noise-512 moved less than the run-to-run noise. perf-noise-1024 took 92 s against 97 s
+5.2 s after) and on perf-noise-512 moved less than the run-to-run noise. perf-noise-1024 took 92 s against 97 s
 back to back, with peak RSS unchanged at 3.66 GB, on a machine more loaded than in Amendment 4.
 
 Status against the targets: unchanged. Owl Line Art is about 1.45x main, perf-noise-1024 about
 1.7x main in time and 1.6x in memory. No exact lever of more than a few percent is known. The
 remaining cost is in the proposal's passes, which are 80% of the fit, and in the topology repair's
 work on the 0.02 px sampling. Both can only be reduced by a change to the output.
+
+### Amendment 6 - the arm solve's cubes without pow, same output (2026-09-27)
+
+A CPU profile of perf-noise-512 put the shared arm solve (`solveTangentArms` in
+`core/geometry/cubic-fit.ts`) at 14% of the whole trace, second only to the projection pass. Most
+of that was its two cubes, `(1 - t) ** 3` and `t ** 3`. V8 computes `x ** 3` with its pow routine,
+which is about ten times slower than multiplying. The result is also not `x * x * x`: the two
+differ in the last bit for about a quarter of all x. (`x ** 2` is already `x * x`, bit for bit.)
+
+Changes, all with identical output:
+
+- `cube01` (`core/geometry/fast-cube.ts`) returns `x ** 3` bit for bit for x in [2^-300, 1]
+  without calling pow. It forms the exact cube as a double-double (Dekker's product, twice) and
+  rounds it. If the exact cube lies within 2^-57 times its value (at least 1/32 ulp) of a
+  rounding boundary, it returns `x ** 3` instead. Everywhere else, any pow that stays that close to
+  correctly rounded returns the same double. Measured against exact integer cubes, V8's pow was
+  at most 0.0036 ulp past correct rounding over 4e6 cubes, so the band has about nine times that
+  margin. An instrumented run compared all 2.28e8 cubes of the seven traces below with `x ** 3`:
+  none differed, and 8% took the fallback. `fast-cube.test.ts` pins 8e5 cubes (uniform, near 0,
+  near 1, products, grid values) and the edge values. Parameters always lie in [0, 1], so the arm
+  solve uses it for both cubes.
+- The compact span fit (`compact-curve-span.ts`) writes the chord parameters into a reused buffer
+  with `chordParameterize`'s operations in the same order. It fits the first-pass cubic once for
+  both the screen and the passes. It runs the first pass before the Newton loop, and it keeps the
+  last span's chord deviation, since the chord is tried before the cubic on the same span.
+- A single-piece merge span that reuses the proposal's fit reads only the piece's two end points,
+  so its span is no longer copied out of the ring (`compact-curve-fit.ts`).
+
+Equivalence instrument: the whole-trace hash of every polyline vertex and curve coordinate is
+unchanged on owl Line Art, Sharp and Smooth, hummingbird Line Art and perf-noise-192, -256, -512
+and -1024 (`84472a71`).
+
+Measured (node bundles, interleaved, one process per run): perf-noise-512 went from 15.7-16.0 s
+to 14.4-14.8 s (main 9.4-9.6 s), and the arm solve's share of the trace from 14% to 10% including
+`cube01`. perf-noise-1024 went from 77.7-77.8 s to 75.0-75.6 s over two rounds (main
+45.8 s), with peak RSS unchanged at 3.67 GB (main 2.65 GB). Owl Line Art moved less than the run-to-run noise
+(4.8-5.4 s before and after; main 3.4-3.6 s), because its fit is a smaller share of the trace.
+Peak memory is unchanged.
+
+Status against the targets: not met. Owl Line Art is about 1.4x main, and perf-noise-1024 is
+1.6x main in time and 1.4x in memory. The projection pass is now the largest cost
+(22% of perf-noise-512), and its arithmetic is already at the reference's operation count. The
+remaining gap is the proposal's Newton passes and the topology repair's work on the 0.02 px
+sampling. Both can only be reduced by a change to the output.
