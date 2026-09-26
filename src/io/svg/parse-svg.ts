@@ -9,7 +9,9 @@
 //    color for fill-only logo artwork. Colors cascade from presentation
 //    attributes, <style> rules and the style attribute; an unset fill is
 //    SVG's initial black. Elements that paint neither are skipped.
-// 5. Bundle into an ImportedSvg with the SVG's viewBox as the natural bounds.
+// 5. Keep only what each element's clip paths keep (svg-vector-clip-geometry.ts);
+//    masks and filters are left out and disclosed (ADR-358 Amendment 2).
+// 6. Bundle into an ImportedSvg with the SVG's viewBox as the natural bounds.
 
 import {
   type ColoredPath,
@@ -17,14 +19,13 @@ import {
   IDENTITY_TRANSFORM,
   type ImportedSvg,
   type Polyline,
-  polylineToCurveSubpath,
 } from '../../core/scene';
 import { type SvgStripCounts, sanitizeSvg } from './sanitize';
-import { applySvgMatrix, transformSvgCurveSubpath } from './svg-curve-transform';
 import { multiplySvgMatrix, translateSvgMatrix } from './svg-transform-attribute';
 import { elementToSubPaths } from './shape-to-polylines';
 import { createSvgIdResolver, type SvgIdResolver } from './svg-id-resolver';
-import { clipsKeepWholeGeometry, vectorContainmentPoints } from './svg-vector-clip';
+import { createSvgClipResolver, type SvgClipResolver } from './svg-clip-resolve';
+import { createSvgVectorClipper, type SvgVectorClipper } from './svg-vector-clip-geometry';
 import { linearScaleMagnitude } from './transform-scale';
 import {
   assertSvgImportPoints,
@@ -70,10 +71,20 @@ type WalkContext = {
   readonly byColor: Map<string, PathBucket>;
   readonly entries: SvgImportEntry[];
   readonly identity: { readonly id: string; readonly source: string };
-  readonly counts: { text: number; image: number; fillAndStroke: number };
+  readonly counts: WalkCounts;
   readonly budget: SvgImportBudget;
   readonly resolveId: SvgIdResolver;
   readonly cascadeStyles: SvgStyleCascade;
+  readonly clipResolver: SvgClipResolver;
+  readonly clipVector: SvgVectorClipper;
+};
+
+type WalkCounts = {
+  text: number;
+  image: number;
+  fillAndStroke: number;
+  masked: number;
+  filtered: number;
 };
 
 function walkGeometry(
@@ -118,7 +129,7 @@ function walkElement(
   if (['text', 'tspan'].includes(tag)) {
     context.counts.text += 1;
   } else if (tag === 'image' && !state.hidden) {
-    const image = svgImageElement(el, state, context.resolveId, {
+    const image = svgImageElement(el, state, context.clipResolver, {
       id: context.identity.id + '-' + context.entries.length,
       source: context.identity.source,
     });
@@ -179,9 +190,10 @@ function appendElementGeometry(el: Element, state: PresentationState, context: W
   const fillColor = visibleFillColor(el, state);
   const color = strokeColor !== '' ? strokeColor : fillColor;
   if (color === '') return;
-  recordVectorPresentation(state, context, strokeColor, fillColor, () =>
-    vectorContainmentPoints(subs, state.transform),
-  );
+  // Stroked artwork is cut as lines, so its clip trims lines; fills clip as areas.
+  const geometry = context.clipVector(subs, state, strokeColor === '' ? 'fill' : 'line');
+  if (geometry.polylines.length === 0) return;
+  recordVectorPresentation(state, context, strokeColor, fillColor);
   // Explicit SVG rules apply to each element's compound path. Different
   // elements paint independently even when their colours/rules match.
   const key = state.fillRule === undefined ? color : `${color}:${context.byColor.size}`;
@@ -193,24 +205,16 @@ function appendElementGeometry(el: Element, state: PresentationState, context: W
   };
   const entryPolylines: Polyline[] = [];
   const entryCurves: CurveSubpath[] = [];
-  for (const sub of subs) {
-    reserveSvgPolyline(color, sub.points.length, context.budget);
-    const points = sub.points.map((p) => applySvgMatrix(state.transform, p));
-    assertSvgImportPoints(points);
-    const polyline = {
-      points,
-      closed: sub.closed,
-    };
+  geometry.polylines.forEach((polyline, index) => {
+    reserveSvgPolyline(color, polyline.points.length, context.budget);
+    assertSvgImportPoints(polyline.points);
+    const curve = geometry.curves[index];
+    if (curve === undefined) return;
     bucket.polylines.push(polyline);
     entryPolylines.push(polyline);
-    bucket.curves.push(
-      sub.curve === undefined
-        ? polylineToCurveSubpath(polyline)
-        : transformSvgCurveSubpath(sub.curve, state.transform),
-    );
-    const curve = bucket.curves.at(-1);
-    if (curve !== undefined) entryCurves.push(curve);
-  }
+    bucket.curves.push(curve);
+    entryCurves.push(curve);
+  });
   appendVectorEntry(
     context,
     {
@@ -224,27 +228,17 @@ function appendElementGeometry(el: Element, state: PresentationState, context: W
   context.byColor.set(key, bucket);
 }
 
+// Masks and filters are imported without their effect and disclosed: the
+// geometry they apply to is exact, and what they hide or soften is not cut
+// geometry KerfDesk can derive (ADR-358 Amendment 2).
 function recordVectorPresentation(
   state: PresentationState,
   context: WalkContext,
   strokeColor: string,
   fillColor: string,
-  documentPoints: () => ReadonlyArray<{ readonly x: number; readonly y: number }>,
 ): void {
-  // A clip that provably hides none of this element changes nothing that is cut.
-  if (
-    state.clips.length > 0 &&
-    !clipsKeepWholeGeometry(state.clips, documentPoints(), context.resolveId, context.cascadeStyles)
-  ) {
-    throw new Error(
-      'SVG vector clipping is not supported. Apply the clip to the paths before importing.',
-    );
-  }
-  if (state.unsupportedEffects.length > 0) {
-    throw new Error(
-      'SVG vector masks and filters are not supported. Apply these effects before importing.',
-    );
-  }
+  if (state.unsupportedEffects.includes('mask')) context.counts.masked += 1;
+  if (state.unsupportedEffects.includes('filter')) context.counts.filtered += 1;
   if (strokeColor !== '' && fillColor !== '') context.counts.fillAndStroke += 1;
 }
 
@@ -295,10 +289,12 @@ export function parseSvgDocument(
     { x: bounds.maxX, y: bounds.maxY },
   ]);
   const byColor = new Map<string, PathBucket>();
-  const counts = { text: 0, image: 0, fillAndStroke: 0 };
+  const counts = { text: 0, image: 0, fillAndStroke: 0, masked: 0, filtered: 0 };
   const budget = createSvgImportBudget();
   const entries: SvgImportEntry[] = [];
   const cascadeStyles = createSvgStyleCascade(svgEl);
+  const resolveId = createSvgIdResolver(svgEl);
+  const clipResolver = createSvgClipResolver(resolveId, cascadeStyles);
   walkGeometry(
     svgEl,
     {
@@ -307,8 +303,10 @@ export function parseSvgDocument(
       budget,
       entries,
       identity: args,
-      resolveId: createSvgIdResolver(svgEl),
+      resolveId,
       cascadeStyles,
+      clipResolver,
+      clipVector: createSvgVectorClipper(clipResolver),
     },
     unitScale,
   );
@@ -319,24 +317,7 @@ export function parseSvgDocument(
     polylines: bucket.polylines,
     curves: bucket.curves,
   }));
-
-  const notes: string[] = [];
-  if (entries.length === 0) notes.push('SVG has no drawable geometry');
-  // Rule 7 / ADR-268: this used to THROW mid-walk once the polyline/point/color
-  // ceilings were crossed. It now reports the same measurement and imports.
-  const sizeNote = svgImportSizeNote(budget);
-  if (sizeNote !== null) notes.push(sizeNote);
-  if (counts.text > 0) {
-    notes.push(`Ignored ${counts.text} text element(s) — convert to paths or wait for Phase D`);
-  }
-  if (counts.image > 0) {
-    notes.push(`Ignored ${counts.image} image element(s) — Phase E adds raster tracing`);
-  }
-  if (counts.fillAndStroke > 0) {
-    notes.push(
-      `SVG presentation: Imported ${counts.fillAndStroke} SVG element(s) as strokes only; their fills were omitted.`,
-    );
-  }
+  const notes = importNotes(entries, budget, counts);
 
   return {
     object:
@@ -356,6 +337,41 @@ export function parseSvgDocument(
     ignoredTextElements: counts.text,
     ignoredImageElements: counts.image,
   };
+}
+
+function importNotes(
+  entries: ReadonlyArray<SvgImportEntry>,
+  budget: SvgImportBudget,
+  counts: WalkCounts,
+): string[] {
+  const notes: string[] = [];
+  if (entries.length === 0) notes.push('SVG has no drawable geometry');
+  // Rule 7 / ADR-268: this used to THROW mid-walk once the polyline/point/color
+  // ceilings were crossed. It now reports the same measurement and imports.
+  const sizeNote = svgImportSizeNote(budget);
+  if (sizeNote !== null) notes.push(sizeNote);
+  if (counts.text > 0) {
+    notes.push(`Ignored ${counts.text} text element(s) — convert to paths or wait for Phase D`);
+  }
+  if (counts.image > 0) {
+    notes.push(`Ignored ${counts.image} image element(s) — Phase E adds raster tracing`);
+  }
+  if (counts.fillAndStroke > 0) {
+    notes.push(
+      `SVG presentation: Imported ${counts.fillAndStroke} SVG element(s) as strokes only; their fills were omitted.`,
+    );
+  }
+  if (counts.masked > 0) {
+    notes.push(
+      `SVG presentation: Imported ${counts.masked} SVG element(s) without their masks; areas the masks hide are included.`,
+    );
+  }
+  if (counts.filtered > 0) {
+    notes.push(
+      `SVG presentation: Imported ${counts.filtered} SVG element(s) without their filter effects.`,
+    );
+  }
+  return notes;
 }
 
 function boundsForPolylines(polylines: readonly Polyline[]): ImportedSvg['bounds'] {
