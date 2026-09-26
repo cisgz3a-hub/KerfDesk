@@ -13,6 +13,7 @@ import {
 import { Row } from '../device-settings-shared';
 import { PresetCorrectionOffer } from '../PresetCorrectionOffer';
 import type { DeviceSetupStepProps } from './device-setup-flow';
+import { deviceSetupSupportsMachineKind } from './device-setup-flow';
 import { machineSetupControllerGuide } from './machine-setup-controller-guide';
 
 export function DeviceSetupConfirmStep({ state, dispatch }: DeviceSetupStepProps): JSX.Element {
@@ -70,18 +71,21 @@ export function DeviceSetupConfirmStep({ state, dispatch }: DeviceSetupStepProps
         Enable Home only after checking your switches and homing direction. Saving does not run
         Home.
       </p>
-      <details className="lf-setup-disclosure lf-setup-disclosure--nested">
-        <summary title="Adjust the output feed limit and framing speed for this machine.">
-          <span>Travel speeds</span>
-          <small>{state.draft.maxFeed} mm/min output limit</small>
-        </summary>
-        <div className="lf-setup-disclosure-body">
-          <FeedRows device={state.draft} update={update} />
-          <p className="lf-setup-muted">
-            Output speed limits generated jobs. Frame speed is a separate request.
-          </p>
-        </div>
-      </details>
+      {deviceSetupSupportsMachineKind(state, 'laser') ? (
+        <details className="lf-setup-disclosure lf-setup-disclosure--nested">
+          <summary title="Adjust the laser output feed limit and framing speed.">
+            <span>Laser travel speeds</span>
+            <small>{state.draft.maxFeed} mm/min output limit</small>
+          </summary>
+          <div className="lf-setup-disclosure-body">
+            <FeedRows device={state.draft} update={update} />
+            <p className="lf-setup-muted">
+              Output speed limits generated laser jobs. Frame speed is a separate request. CNC keeps
+              its own speeds in the CNC step.
+            </p>
+          </div>
+        </details>
+      ) : null}
     </section>
   );
 }

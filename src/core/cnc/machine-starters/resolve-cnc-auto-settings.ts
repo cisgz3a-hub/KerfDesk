@@ -6,6 +6,7 @@ import {
   type CncMachineConfig,
   type CncTool,
 } from '../../scene';
+import { cncHeadDevice } from '../cnc-head-feeds';
 import { calculateFeeds, isChiploadMaterialKey } from '../feeds-calculator';
 import {
   resolveCncMachineStarter,
@@ -23,6 +24,7 @@ export type CncAutoSettingsInput = {
 };
 
 export type CncMaterialFeedInput = {
+  // The device as the CNC head sees it (cncHeadDevice): its maxFeed is CNC's.
   readonly profile: DeviceProfile;
   readonly tool: CncTool;
   readonly materialKey: string;
@@ -46,7 +48,7 @@ export function resolveCncAutoLayerSettings(input: CncAutoSettingsInput): CncLay
   if (materialKey !== undefined) {
     const tool = layerCncTool(input.machine, base);
     const materialPatch = resolveCncMaterialFeedPatch({
-      profile: input.profile,
+      profile: cncHeadDevice(input.profile, input.machine.params),
       tool,
       materialKey,
       spindleRpm: base.spindleRpm,
@@ -64,7 +66,7 @@ export function resolveCncStarterFeedPatch(
   input: CncStarterFeedInput,
 ): Partial<CncLayerSettings> | null {
   const starter = resolveCncMachineStarter({
-    profile: input.profile,
+    profile: cncHeadDevice(input.profile, input.machine.params),
     machineSpindleMaxRpm: input.machine.params.spindleMaxRpm,
     ...(input.liveCaps === undefined ? {} : { liveCaps: input.liveCaps }),
   });

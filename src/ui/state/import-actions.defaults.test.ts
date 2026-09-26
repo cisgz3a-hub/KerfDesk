@@ -85,7 +85,8 @@ function restoreLegacyDefaults(): void {
   };
   persistLayerDefaults(localStorage, profile, defaults);
   const restored = restoreLayerDefaults(localStorage, profile);
-  expect(restored).toEqual(defaults);
+  // The laser values restore; the CNC block saved before the split does not.
+  expect(restored).toEqual({ byColor: {}, allColors: { mode: 'fill', linesPerMm: 0.5 } });
   if (restored === null) throw new Error('Valid legacy defaults should restore');
   useStore.getState().setLayerDefaults(restored);
 }
@@ -150,16 +151,19 @@ describe('image creation with legacy CNC defaults', () => {
     'rasterized trace',
     'camera trace',
     'camera raster',
-  ])('%s inherits current job bindings while copying only saved CNC artwork values', (kind) => {
+  ])('%s keeps the CNC settings it gets without a saved default', (kind) => {
     if (kind === 'trace') useStore.getState().importRasterImage(raster('source'));
     if (kind === 'bitmap') useStore.getState().importSvgObject(svgObj('source', ['#123456']));
     const machine = useStore.getState().project.machine;
     if (machine?.kind !== 'cnc') throw new Error('Expected CNC');
     // Establish the actual creation result with the current Startup choices
-    // before introducing saved artwork defaults.
+    // before introducing the saved default.
     createOutput(kind);
-    const baseline = effectiveBindings(machine, operationFor('output').cnc);
-    expect(baseline).toMatchObject({ toolId: 'em-6350', materialKey: 'acrylic' });
+    const baseline = operationFor('output').cnc;
+    expect(effectiveBindings(machine, baseline)).toMatchObject({
+      toolId: 'em-6350',
+      materialKey: 'acrylic',
+    });
     useStore.getState().undo();
     restoreLegacyDefaults();
     const before = useStore.getState().project;
@@ -168,23 +172,8 @@ describe('image creation with legacy CNC defaults', () => {
     createOutput(kind);
 
     const operation = operationFor('output');
-    expect(operation.cnc).toMatchObject({
-      depthMm: 9,
-      feedMmPerMin: 321,
-      plungeMmPerMin: 54,
-      spindleRpm: 9876,
-    });
-    for (const key of [
-      'toolId',
-      'materialKey',
-      'vClearToolId',
-      'pocketRoughToolId',
-      'reliefFinishToolId',
-      'feedSource',
-    ]) {
-      expect(operation.cnc).not.toHaveProperty(key);
-    }
-    expect(effectiveBindings(machine, operation.cnc)).toEqual(baseline);
+    expect(operation.cnc).toEqual(baseline);
+    expect(operation.cnc?.depthMm).not.toBe(savedCnc.depthMm);
     const vector = kind === 'trace' || kind === 'camera trace';
     expect(operation.mode).toBe(vector ? 'line' : 'image');
     if (!vector) expect(operation.linesPerMm).toBe(17);

@@ -13,6 +13,7 @@ import {
   type SceneObject,
   type ShapeObject,
   type TextObject,
+  machineKindOf,
 } from '../../core/scene';
 import type { Sketch } from '../../core/design';
 import { applyInsertBoxPanels, type InsertablePart } from './box-insert-mutation';
@@ -258,11 +259,13 @@ export function applyLayerDefaultsToFreshLayers<T extends { readonly project: Pr
     if (existing.has(layer.id)) return layer;
     const settings = defaultSettingsForOperation(defaults, result.project.scene.objects, layer);
     const withDefaults =
-      Object.keys(settings).length === 0 ? layer : applyLayerDefaultSettings(layer, settings);
+      Object.keys(settings).length === 0
+        ? layer
+        : applyLayerDefaultSettings(layer, settings, machineKindOf(machine));
     // Seed fresh CNC layers from the project stock material (ADR-112); no-op
     // for laser or when no material is chosen.
     const seeded =
-      machine?.kind === 'cnc' && settings.cnc === undefined
+      machine?.kind === 'cnc'
         ? seedFreshCncLayer(withDefaults, {
             device: result.project.device,
             machine,
