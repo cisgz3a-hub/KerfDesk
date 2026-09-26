@@ -3757,7 +3757,7 @@ explicitly marked below; the remaining controls and user-facing flows are planne
 1. A relief object on an output-enabled layer compiles to waterline
    roughing: object XY scale is first rasterized into square physical-mm
    heightmap cells, then the map is dilated by the active bit's footprint
-   plus a 0.5 mm finishing allowance, sliced into Z levels by the layer's
+   plus the layer's Rough allowance (0.5 mm unless set), sliced into Z levels by the layer's
    depth-per-pass, and each level's region fills with concentric rings at
    the layer's physical stepover: a percentage of the bit diameter, or for a
    tapered ball nose of the width it cuts over one level (ADR-368 Amendment 2).
@@ -4413,8 +4413,17 @@ and lifts the command's CNC-only gate.)*
    stays at or above it by no more than 0.002 mm, so the reduced path clears
    everything the sampled one did (ADR-421). A mask that excludes cells keeps
    one pass per run.
-4. Roughing still leaves its fixed 0.5 mm allowance (it exists FOR this
-   pass); finishing consumes it down to the true surface.
+4. Roughing leaves the layer's Rough allowance (0.5 mm unless set; it exists
+   FOR this pass); finishing consumes it down to the true surface.
+5. Raster direction runs the rows along X (default) or along Y (ADR-423).
+6. Finish strategy Raster + waterline narrows the rows to cos 45° of the
+   scallop's spacing and adds waterline passes wherever the tip surface
+   slopes 45° or more, levels sin 45° of that spacing apart, so passes are
+   never further apart along the surface than the scallop's spacing. Each
+   feature is circled top down in one stay-down pass, climb or conventional
+   as the layer's cut direction says on the physical bed. Every waterline
+   vertex clears the model exactly and every move is checked; a relief with a
+   mask outline gets the narrowed raster only (ADR-423).
 
 #### Error — unknown finishing bit id
 1. The missing ID stays visible as a disabled diagnostic choice. Prepared

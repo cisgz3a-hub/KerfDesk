@@ -53,6 +53,7 @@ import {
   read64,
   readCorners,
   readInt,
+  sortByBoundDescending,
 } from './heightmap-surface-contact-element';
 import { type ContactProfile, PRUNE_TOLERANCE_MM } from './heightmap-surface-contact-geometry';
 
@@ -68,6 +69,17 @@ export type SurfaceContactField = {
    * requires more. Never lower than `lowerBound`.
    */
   readonly constraint: (cx: number, cy: number, lowerBound: number) => number;
+  /**
+   * The same contact for a cutter centred anywhere, (x, y) in map mm: waterline
+   * finishing places its vertices between samples (ADR-423).
+   */
+  readonly constraintAtPoint: (x: number, y: number, lowerBound: number) => number;
+  /**
+   * Whether a cutter centred at (x, y) may stand with its tip at z: its
+   * contact there is at most z + slackMm. It stops at the first element found
+   * to lift the tip higher, so a "no" costs less than a height (ADR-423).
+   */
+  readonly clearsAtPoint: (x: number, y: number, z: number, slackMm: number) => boolean;
 };
 
 type Contact = ElementContact & {
@@ -89,6 +101,7 @@ type Contact = ElementContact & {
   // Per-call scratch, reused to avoid allocation in the dilation loop.
   readonly candidates: Int32Array;
   readonly candidateBound: Float64Array;
+  readonly mmPerCell: number;
 };
 
 /** Precompute the triangulation bounds for one map and cutter envelope. */
@@ -127,12 +140,19 @@ export function createSurfaceContactField(
     regularSide: side,
     terminalColumn: partialGridHasPartialCell(map, 'x') ? widthCells - 1 : null,
     terminalRow: partialGridHasPartialCell(map, 'y') ? heightCells - 1 : null,
-    candidates: new Int32Array(side * side),
-    candidateBound: new Float64Array(side * side),
+    // A point between samples reaches one element further than a sample does.
+    candidates: new Int32Array((side + 1) * (side + 1)),
+    candidateBound: new Float64Array((side + 1) * (side + 1)),
+    mmPerCell: kernel.mmPerCell,
     roots: new Float64Array(6),
     facet: { planeBound: 0, candidate: 0, insideRectangle: 0 },
   };
-  return { constraint: (cx, cy, lowerBound) => constraintAt(contact, cx, cy, lowerBound) };
+  return {
+    constraint: (cx, cy, lowerBound) => constraintAt(contact, cx, cy, lowerBound),
+    constraintAtPoint: (x, y, lowerBound) => constraintAtPoint(contact, x, y, lowerBound),
+    clearsAtPoint: (x, y, z, slackMm) =>
+      constraintAtPoint(contact, x, y, z, z + slackMm) <= z + slackMm,
+  };
 }
 
 function profileFor(kernel: ToolKernel): ContactProfile {
@@ -277,6 +297,56 @@ function constraintAt(contact: Contact, cx: number, cy: number, lowerBound: numb
   return refineCandidates(contact, count, xc, yc, lowerBound);
 }
 
+// With `stopAbove`, the result is only exact up to it: any contact higher
+// than it is returned as soon as one is found.
+function constraintAtPoint(
+  contact: Contact,
+  x: number,
+  y: number,
+  lowerBound: number,
+  stopAbove = Number.POSITIVE_INFINITY,
+): number {
+  const reach = contact.span + 1;
+  const i = sampleAtOrBefore(contact.xs, contact.widthCells, x, contact.mmPerCell);
+  const j = sampleAtOrBefore(contact.ys, contact.heightCells, y, contact.mmPerCell);
+  const maxI = Math.min(contact.widthCells - 1, i + reach);
+  const maxJ = Math.min(contact.heightCells - 1, j + reach);
+  const threshold = lowerBound + PRUNE_TOLERANCE_MM;
+  let count = 0;
+  for (let ej = Math.max(0, j - reach); ej <= maxJ; ej += 1) {
+    for (let ei = Math.max(0, i - reach); ei <= maxI; ei += 1) {
+      const element = ej * contact.widthCells + ei;
+      // The tip is the cutter's lowest point, so an element no higher than
+      // the bound cannot lift it past the bound.
+      const top = read32(contact.elementTop, element);
+      if (!(top > threshold)) continue;
+      const near = top - exactNearDz(contact, ei, ej, x, y);
+      if (!(near > threshold)) continue;
+      const bound = Math.min(near, exactSupportBound(contact, ei, ej, x, y));
+      if (!(bound > threshold)) continue;
+      contact.candidates[count] = element;
+      contact.candidateBound[count] = bound;
+      count += 1;
+    }
+  }
+  sortByBoundDescending(contact.candidates, contact.candidateBound, count);
+  return refineCandidates(contact, count, x, y, lowerBound, stopAbove);
+}
+
+// The last sample at or before `coordinate` along one axis (the first when
+// the point lies before it).
+function sampleAtOrBefore(
+  centers: Float64Array,
+  cells: number,
+  coordinate: number,
+  mmPerCell: number,
+): number {
+  let index = Math.min(cells - 1, Math.max(0, Math.floor(coordinate / mmPerCell - 0.5)));
+  while (index > 0 && read64(centers, index) > coordinate) index -= 1;
+  while (index + 1 < cells && read64(centers, index + 1) <= coordinate) index += 1;
+  return index;
+}
+
 // Elements whose highest corner, at their nearest approach, could still lift
 // the tip above `lowerBound`. Returns how many were written to the scratch.
 function collectCandidates(
@@ -385,6 +455,7 @@ function refineCandidates(
   xc: number,
   yc: number,
   lowerBound: number,
+  stopAbove = Number.POSITIVE_INFINITY,
 ): number {
   const { widthCells, candidates, candidateBound } = contact;
   let best = lowerBound;
@@ -400,6 +471,7 @@ function refineCandidates(
     const i = element % widthCells;
     const facets = elementFacets(contact, i, (element - i) / widthCells, xc, yc, best);
     best = facets.best;
+    if (best > stopAbove) return best;
     candidateBound[k] = Math.min(bound, facets.planeBound);
   }
   // Pass 2: edges, only where a facet plane still allows a higher contact.
@@ -408,24 +480,9 @@ function refineCandidates(
     const element = readInt(candidates, k);
     const i = element % widthCells;
     best = elementEdges(contact, i, (element - i) / widthCells, xc, yc, best);
+    if (best > stopAbove) return best;
   }
   return best;
-}
-
-// Insertion sort: a center has a handful of candidate elements.
-function sortByBoundDescending(elements: Int32Array, bounds: Float64Array, count: number): void {
-  for (let k = 1; k < count; k += 1) {
-    const element = readInt(elements, k);
-    const bound = read64(bounds, k);
-    let m = k - 1;
-    while (m >= 0 && read64(bounds, m) < bound) {
-      elements[m + 1] = readInt(elements, m);
-      bounds[m + 1] = read64(bounds, m);
-      m -= 1;
-    }
-    elements[m + 1] = element;
-    bounds[m + 1] = bound;
-  }
 }
 
 function exactNearDz(contact: Contact, i: number, j: number, xc: number, yc: number): number {

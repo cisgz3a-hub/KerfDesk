@@ -228,3 +228,23 @@ export function elementEdges(
   }
   return best;
 }
+
+// Insertion sort: a center has a handful of candidate elements.
+export function sortByBoundDescending(
+  elements: Int32Array,
+  bounds: Float64Array,
+  count: number,
+): void {
+  for (let k = 1; k < count; k += 1) {
+    const element = readInt(elements, k);
+    const bound = read64(bounds, k);
+    let m = k - 1;
+    while (m >= 0 && read64(bounds, m) < bound) {
+      elements[m + 1] = readInt(elements, m);
+      bounds[m + 1] = read64(bounds, m);
+      m -= 1;
+    }
+    elements[m + 1] = element;
+    bounds[m + 1] = bound;
+  }
+}

@@ -109,6 +109,11 @@ export type CncLayerSettings = {
   readonly reliefFinishToolId?: string;
   // Ball-nose scallop height target driving the finishing row spacing.
   readonly reliefScallopMm?: number;
+  // ADR-423 finishing strategy. Absent = 'raster' (the serpentine alone);
+  // 'raster-waterline' adds waterline passes on slopes of 45 degrees or more.
+  readonly reliefFinishStrategy?: 'raster' | 'raster-waterline';
+  // ADR-423 raster direction. Absent = 'x' (rows along X).
+  readonly reliefRasterAxis?: 'x' | 'y';
   // Motion polish (H.9), both opt-in — absent keeps pre-H.9 output:
   // descend into cuts along the path at this angle instead of plunging.
   readonly rampEntryDeg?: number;

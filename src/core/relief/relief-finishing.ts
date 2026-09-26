@@ -42,6 +42,11 @@ export type ReliefFinishingOptions = {
   readonly tool: CncTool;
   readonly kernel: ToolKernel;
   readonly scallopMm: number;
+  // Row spacing to plan instead of the scallop's (ADR-423 narrows it).
+  readonly rowSpacingMm?: number;
+  // The whole zero-allowance tip surface of an unmasked map, when the caller
+  // already has it (ADR-423); otherwise only the rows read are computed.
+  readonly tip?: Float32Array;
 };
 
 export function reliefFinishingPasses(
@@ -50,7 +55,7 @@ export function reliefFinishingPasses(
 ): ReadonlyArray<CncPass> {
   const { widthCells, heightCells, mmPerCell } = map;
   if (widthCells < 1 || heightCells < 1) return [];
-  const rowSpacingMm = scallopRowSpacingMm(options.tool, options.scallopMm);
+  const rowSpacingMm = options.rowSpacingMm ?? scallopRowSpacingMm(options.tool, options.scallopMm);
   const rowStep = finishingRowStep(rowSpacingMm, mmPerCell);
   if (map.inclusion !== undefined && map.inclusion.includes(0)) {
     const selected = selectMaskedFinishingCells(map, map.inclusion, rowStep);
@@ -76,10 +81,12 @@ export function reliefFinishingPasses(
   edgeColumns[widthCells - 1] = 1;
   // A mask that excludes nothing plans exactly as no mask.
   const { inclusion: _allIncluded, ...unmasked } = map;
-  const tip = dilateHeightmapByToolWithMaskEvidence(unmasked, options.kernel, 0, {
-    rows: rowFlags(heightCells, rows),
-    columns: edgeColumns,
-  }).tipDepth;
+  const tip =
+    options.tip ??
+    dilateHeightmapByToolWithMaskEvidence(unmasked, options.kernel, 0, {
+      rows: rowFlags(heightCells, rows),
+      columns: edgeColumns,
+    }).tipDepth;
   const passes: CncPass[] = [];
   appendFinishingRun(passes, linkedSerpentine(map, tip, rows));
   return passes;

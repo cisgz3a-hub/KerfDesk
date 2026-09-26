@@ -14,12 +14,14 @@ import type { CncContourPass, CncGroup, CncPass } from '../job';
 // Deep type import: core/job's barrel is a ratcheted over-cap legacy barrel
 // (scripts/index-export-baseline.json) and may only shrink.
 import type { CncReliefPlanningEvidence } from '../job/job';
-import { DEFAULT_RELIEF_SCALLOP_MM, reliefFinishingPasses, scallopRowSpacingMm } from '../relief';
+import { DEFAULT_RELIEF_SCALLOP_MM } from '../relief';
 // Deep import: core/relief's barrel is a ratcheted over-cap legacy barrel
 // (scripts/index-export-baseline.json) and may only shrink, so the ladder
 // variant cannot be added to it.
 import { reliefRoughingLadder, type ReliefRoughingLadder } from '../relief/relief-roughing';
 import { reliefScallopBallRadiusMm } from '../relief/relief-finishing';
+import { reliefFinishingPlan, reliefFinishRowSpacingMm } from '../relief/relief-finishing-strategy';
+import type { Heightmap } from '../relief/heightmap';
 import { reliefObjectToHeightmap } from '../relief/relief-object-to-heightmap';
 import {
   reliefMaterializationFailure,
@@ -36,6 +38,8 @@ import {
   type ReliefObject,
   sceneObjectUsesOperation,
   type SceneObject,
+  type Transform,
+  type Vec2,
 } from '../scene';
 import { kernelForTool } from '../sim';
 import { coolantFields } from './coolant-fields';
@@ -191,7 +195,8 @@ function reliefFinishingGroup(
   const finishTool = config.tools.find((tool) => tool.id === settings.reliefFinishToolId);
   if (finishTool === undefined) return { kind: 'compiled', group: null, plans: [] };
   const scallopMm = settings.reliefScallopMm ?? DEFAULT_RELIEF_SCALLOP_MM;
-  const rowSpacingMm = scallopRowSpacingMm(finishTool, scallopMm);
+  const strategy = settings.reliefFinishStrategy ?? 'raster';
+  const rowSpacingMm = reliefFinishRowSpacingMm(finishTool, scallopMm, strategy);
   const passes: CncPass[] = [];
   const plans: CncReliefPlanningEvidence[] = [];
   for (const relief of reliefs) {
@@ -207,32 +212,25 @@ function reliefFinishingGroup(
       return reliefMaterializationFailure(relief.source, heightmap.reason);
     }
     plans.push({
-      layerId: layer.id,
-      source: relief.source,
-      stage: 'finishing',
-      widthCells: heightmap.heightmap.widthCells,
-      heightCells: heightmap.heightmap.heightCells,
-      cellSizeMm: heightmap.heightmap.mmPerCell,
-      toolDiameterMm: finishTool.diameterMm,
-      toolKind: finishTool.kind,
-      ...finishingTipEvidence(finishTool),
+      ...finishingGridEvidence(layer, relief, heightmap.heightmap, finishTool),
       rowSpacingMm,
       scallopMm,
     });
-    const kernel = kernelForTool(finishTool, heightmap.heightmap.mmPerCell);
-    for (const pass of reliefFinishingPasses(heightmap.heightmap, {
+    const residual = machineSpace.residualTransform;
+    for (const pass of reliefFinishingPlan(heightmap.heightmap, {
       tool: finishTool,
-      kernel,
+      kernel: kernelForTool(finishTool, heightmap.heightmap.mmPerCell),
       scallopMm,
+      strategy,
+      rasterAxis: settings.reliefRasterAxis ?? 'x',
+      wallOnRight: waterlineWallOnRight(residual, device, settings),
     })) {
       if (pass.kind !== 'path3d') continue;
-      passes.push({
-        ...pass,
-        points: pass.points.map((p) => ({
-          ...toMachineCoords(applyTransform(p, machineSpace.residualTransform), device),
-          z: p.z,
-        })),
-      });
+      const points = pass.points.map((p) => ({
+        ...toMachineCoords(applyTransform(p, residual), device),
+        z: p.z,
+      }));
+      passes.push({ ...pass, points });
     }
   }
   if (passes.length === 0) return { kind: 'compiled', group: null, plans };
@@ -249,6 +247,47 @@ function reliefFinishingGroup(
       passes,
       layerCncTool(config, settings),
     ),
+  };
+}
+
+// ADR-423: which side of travel the wall should be on, in heightmap numbers,
+// for the layer's cut direction. Climb keeps the material right of travel on
+// the physical bed (motion-polish.ts); the placement and the machine frame may
+// each mirror that.
+function waterlineWallOnRight(
+  residualTransform: Transform,
+  device: DeviceProfile,
+  settings: CncLayerSettings,
+): boolean {
+  const place = (x: number, y: number): Vec2 =>
+    toMachineCoords(applyTransform({ x, y }, residualTransform), device);
+  const origin = place(0, 0);
+  const alongX = place(1, 0);
+  const alongY = place(0, 1);
+  const determinant =
+    (alongX.x - origin.x) * (alongY.y - origin.y) - (alongX.y - origin.y) * (alongY.x - origin.x);
+  const keepsSides = determinant * machineFrameHandedness(device.origin) > 0;
+  const climb =
+    (settings.cutDirection ?? DEFAULT_CNC_LAYER_SETTINGS.cutDirection ?? 'climb') === 'climb';
+  return keepsSides === climb;
+}
+
+function finishingGridEvidence(
+  layer: Layer,
+  relief: ReliefObject,
+  heightmap: Heightmap,
+  tool: CncTool,
+): CncReliefPlanningEvidence {
+  return {
+    layerId: layer.id,
+    source: relief.source,
+    stage: 'finishing',
+    widthCells: heightmap.widthCells,
+    heightCells: heightmap.heightCells,
+    cellSizeMm: heightmap.mmPerCell,
+    toolDiameterMm: tool.diameterMm,
+    toolKind: tool.kind,
+    ...finishingTipEvidence(tool),
   };
 }
 
