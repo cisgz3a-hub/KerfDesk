@@ -1,4 +1,4 @@
-// cnc-pause-lift-state (ADR-401) — the store's record of a CNC "Pause and
+// cnc-pause-lift-state (ADR-410) — the store's record of a CNC "Pause and
 // lift": which paused stream it belongs to, how far it got, and the controller
 // evidence from before its soft reset that everything after the reset is
 // checked against.

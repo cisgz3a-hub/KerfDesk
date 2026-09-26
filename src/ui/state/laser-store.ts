@@ -252,7 +252,7 @@ export type LaserState = LaserStoreActions &
      * streams. Optional only so older hand-built test states remain valid. */
     readonly streamHold?: StreamHold | null;
     /** A CNC Pause that lifted the bit out of the cut, and the evidence its
-     *  re-entry is checked against (ADR-401). Null when Pause stopped in
+     *  re-entry is checked against (ADR-410). Null when Pause stopped in
      *  place. Optional only so older hand-built test states remain valid. */
     readonly cncPauseLift?: CncPauseLift | null;
     readonly workOriginActive: boolean;

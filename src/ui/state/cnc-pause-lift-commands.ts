@@ -1,4 +1,4 @@
-// cnc-pause-lift-commands (ADR-401) — the controller exchanges Pause and lift
+// cnc-pause-lift-commands (ADR-410) — the controller exchanges Pause and lift
 // is built from. Every line goes out through the command arbiter, one at a
 // time, and every step re-checks that the lift still owns the paused stream:
 // Abort, an alarm, an uncommanded reboot or a lost port ends it between any

@@ -18,7 +18,7 @@ export function PendingPauseResumeAction(props: {
   );
 }
 
-/** Pause and lift is moving the bit (ADR-401): the control waits it out. */
+/** Pause and lift is moving the bit (ADR-410): the control waits it out. */
 export function PendingCncLiftAction(props: {
   readonly phase: 'lifting' | 'entering';
   readonly title: string;

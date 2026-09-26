@@ -153,7 +153,7 @@ export async function runConfirmedPauseJob(context: PauseResumeContext): Promise
       });
     }
   });
-  // ADR-401: with the hold settled, lift the bit out of the cut so Resume
+  // ADR-410: with the hold settled, lift the bit out of the cut so Resume
   // never restarts the spindle in the wood.
   if (!laserJob) await liftPausedCncJob(context);
 }
@@ -366,7 +366,7 @@ function clearPauseResumeTransitionState(
 }
 
 // A lifted job is already paused; a lift or re-entry in motion answers only
-// to Abort (ADR-401).
+// to Abort (ADR-410).
 function alreadyLifted(context: PauseResumeContext): boolean {
   const lift = currentCncPauseLift(context.get());
   if (lift === null) return false;

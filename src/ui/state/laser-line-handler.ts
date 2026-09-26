@@ -366,7 +366,7 @@ function handleWelcomeLine(
   if (detected === null) return;
   const state = get();
   const nextSessionEpoch = state.controllerSessionEpoch + 1;
-  // Pause and lift's own reset keeps its paused stream (ADR-401).
+  // Pause and lift's own reset keeps its paused stream (ADR-410).
   const ownedLiftReset = isOwnedCncPauseLiftReset(state, refs.writeEpoch ?? 0);
   refs.writeEpoch = (refs.writeEpoch ?? 0) + 1;
   // The rebooted controller starts a new transcript; anything the old session

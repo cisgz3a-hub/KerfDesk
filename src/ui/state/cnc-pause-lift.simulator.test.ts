@@ -1,4 +1,4 @@
-// Pause and lift (ADR-401) against the scripted GRBL simulator: the real store
+// Pause and lift (ADR-410) against the scripted GRBL simulator: the real store
 // pauses a CNC job with the door byte, soft-resets the settled hold, restores
 // the G92 origin the reset dropped, lifts the bit, and on Resume spins up
 // above the cut, plunges back into its own kerf and replays the stream.
