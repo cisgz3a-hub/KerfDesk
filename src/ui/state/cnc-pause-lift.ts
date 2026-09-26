@@ -226,7 +226,19 @@ async function verifyFrameAfterReset(
     throw new Error('The machine position changed across the lift reset.');
   }
   await sendCncLiftLine(context, lift.token, CNC_REENTRY_MODAL_LINE, 'pause');
-  if (report.wco !== null && samePoint(scaled(report.wco, lift.reportInches), lift.workOffsetMm)) {
+  // A startup block may have selected another work system. Its offset can
+  // match the saved frame even though G54's does not, so the reboot report
+  // cannot prove the frame selected by the modal line we just acknowledged.
+  const frameReport = await waitForCncLiftStatus(
+    context,
+    lift.token,
+    (candidate) => candidate.state === 'Idle' && candidate.wco !== null,
+    'The controller did not confirm its work offset after selecting G54 for the lift.',
+  );
+  if (
+    frameReport.wco !== null &&
+    samePoint(scaled(frameReport.wco, lift.reportInches), lift.workOffsetMm)
+  ) {
     return false;
   }
   await sendCncLiftLine(

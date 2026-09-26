@@ -76,7 +76,9 @@ core `d7aaee3d`):
    2. It waits for the reboot and a fresh Idle report.
    3. It checks the machine position is unchanged within 0.01 mm.
    4. It restates `G21 G90 G54 G94 G17`.
-   5. If the work offset changed, it writes one `G92` that puts it back, and verifies it.
+   5. It waits for fresh Idle/WCO after that modal line: a startup block may have selected
+      another work system whose offset matches the saved frame while G54's does not. If the
+      newly selected work offset changed, it writes one `G92` that puts it back, and verifies it.
    6. It sends `G0 Z<safe>`.
 
    Every line goes through the command arbiter one at a time and must reach its target on a fresh
