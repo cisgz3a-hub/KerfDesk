@@ -23,7 +23,7 @@ export function projectForModeSwitch(
       placement: placementForDevice(restored, project.device),
       parkedPlacement: placement,
     },
-    scene: { ...project.scene, layers: project.scene.layers.map(layerForModeSwitch) },
+    scene: sceneForModeSwitch(project.scene),
   };
 }
 
@@ -41,7 +41,16 @@ export function modeSwitchState(
   return { project: switched, jobPlacement: switched.jobSetup.placement };
 }
 
+// A scene whose switches already match in both modes is returned unchanged.
+function sceneForModeSwitch(scene: Project['scene']): Project['scene'] {
+  const layers = scene.layers.map(layerForModeSwitch);
+  return layers.every((layer, index) => layer === scene.layers[index])
+    ? scene
+    : { ...scene, layers };
+}
+
 function layerForModeSwitch(layer: Layer): Layer {
+  if (layer.parkedOutput === layer.output) return layer;
   return { ...layer, output: layer.parkedOutput ?? layer.output, parkedOutput: layer.output };
 }
 
