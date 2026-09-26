@@ -37,6 +37,13 @@ describe('Diagonal contacts control (ADR-450)', () => {
       expect(hint?.textContent).toMatch(/touch only at a corner, like squares on a checkerboard/);
       for (const choice of ['Auto', 'Join ink', 'Split ink'])
         expect(hint?.textContent).toContain(choice);
+      // Each forced choice names its cost, not only its benefit.
+      expect(hint?.textContent).toMatch(
+        /Join ink[^.]*diagonal gap in solid ink closes or breaks up/,
+      );
+      expect(hint?.textContent).toMatch(
+        /Split ink[^.]*diagonal line can break into dots or disappear/,
+      );
       // A native, enabled select: focusable and operable from the keyboard.
       expect(select.disabled).toBe(false);
       select.focus();

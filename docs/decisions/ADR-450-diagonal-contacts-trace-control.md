@@ -42,11 +42,15 @@ corner-kissing shapes had no way to override Auto.
    common near the corner). It was evaluated as our own 4x4-source-pixel window rule (the same
    window as Auto, the majority colour joins, ties split ink) against Auto, Join ink and Split ink
    on synthetic 300x300 binary fixtures, traced end to end in all three presets; outlines and IoU
-   against the input mask:
+   against the input mask. The harness (a temporary majority hook in the saddle resolver plus a
+   scratch test that drew the fixtures) was throwaway and is not committed, so the table below is
+   the record of that run, not a reproducible test; anyone reopening this choice should rebuild the
+   fixtures from the row names and re-measure:
 
    | Fixture | Preset | Auto | Join ink | Split ink | Majority |
    |---|---|---|---|---|---|
    | 1-px checkerboard patch | Line Art | 2, 0.050 | 1, 0.510 | 0, 0.000 | 0, 0.000 |
+   | 1-px checkerboard patch | Smooth | 2, 0.078 | 1, 0.503 | 1, 0.503 | 1, 0.503 |
    | 2-px checkerboard patch | Line Art | 1,250, 1.000 | 1,153, 0.981 | 1,250, 1.000 | 1,250, 1.000 |
    | Squares kissing at a corner | Smooth | 2, 0.972 | 1, 1.000 | 2, 0.972 | 2, 0.972 |
    | Halftone dot gradient | Line Art | 1,992, 0.984 | 1,930, 0.963 | 1,930, 0.963 | 1,930, 0.963 |
@@ -59,19 +63,23 @@ corner-kissing shapes had no way to override Auto.
    | 1-px paper crack in a block | Line Art | 2, 0.999 | 1, 0.997 | 1, 0.997 | 1, 0.997 |
    | 1-px paper crack in a block | Sharp | 2, 1.000 | 121, 1.000 | 2, 1.000 | 121, 1.000 |
 
-   In no row (all 24 fixture-preset cells were measured; the rest agree) does majority beat the
-   best of Auto, Join ink and Split ink; it is never better than Auto on IoU, it reproduces the
-   hairline defect ADR-403 fixed (a 1-px diagonal becomes 100 dots in Sharp and vanishes in Line
-   Art), welds a crack shut, and collapses a dither to one outline. It is not added. Potrace's
-   left, right and random policies are test policies (a fixed turn, or noise) with no operator
-   use: skipped. The black and white policies are Join ink and Split ink.
+   In no row (all 24 fixture-preset cells were measured; the unlisted cells agree) does majority
+   beat the best of Auto, Join ink and Split ink. Where it beats Auto on IoU (the 1-px
+   checkerboard in Smooth) it only ties Join ink, which the operator can already choose. It
+   reproduces the hairline defect ADR-403 fixed (a 1-px diagonal becomes 100 dots in Sharp and
+   vanishes in Line Art), welds a crack shut, and collapses a dither to one outline. It is not
+   added. Potrace's left, right and random policies are test policies (a fixed turn, or noise)
+   with no operator use: skipped. The black and white policies are Join ink and Split ink.
 
 ### Consequences
 
 - An operator can force the answer ADR-403's Auto gives only by local evidence: Join ink welds
   corner-kissing shapes into one outline (two squares touching at a corner trace as one), Split
-  ink restores the pre-ADR-403 rule (a 1-px diagonal breaks into dots). Auto is still the default
-  and nothing changes for a trace that never touches the control.
+  ink restores the pre-ADR-403 rule (a 1-px diagonal breaks into dots, and in Line Art the dots are
+  then dropped as specks, so the line disappears). Join ink's cost is the mirror case: a 1-px
+  diagonal paper gap in solid ink closes (Line Art, Smooth) or breaks the ink into pieces (Sharp).
+  The help text names both costs. Auto is still the default and nothing changes for a trace that
+  never touches the control.
 - Tests: `DiagonalContactsControl.test.tsx` (label, options, help text, focus, which presets show
   it, the choice reaching the engine and changing a corner-contact trace from 2 outlines to 1 and
   back, preset switching, Reset, record round trip, older and unknown records) and

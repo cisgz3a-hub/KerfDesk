@@ -21,8 +21,9 @@ export const DIAGONAL_CONTACTS_CHOICES: ReadonlyArray<{
 export const DIAGONAL_CONTACTS_HELP =
   'Where two ink pixels touch only at a corner, like squares on a checkerboard. ' +
   'Auto keeps thin diagonal lines joined and thin gaps in solid ink open. ' +
-  'Join ink always connects the two pixels, so shapes that touch at a corner trace as one. ' +
-  'Split ink always separates them, so a one-pixel diagonal line can break into dots.';
+  'Join ink always connects the two pixels, so shapes that touch at a corner trace as one, ' +
+  'and a one-pixel diagonal gap in solid ink closes or breaks up. ' +
+  'Split ink always separates them, so a one-pixel diagonal line can break into dots or disappear.';
 
 /** Only the filled-contour lane resolves corner contacts; Centerline and Edge
  *  Detection ignore the policy, so they do not offer the control. */
