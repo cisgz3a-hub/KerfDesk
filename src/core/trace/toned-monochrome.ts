@@ -27,12 +27,14 @@ const HUE_ALLOWANCE = 6;
 const HUE_PER_TINT = 0.35;
 
 type Paper = readonly [number, number, number];
-type Hue = { readonly strong: number; readonly ux: number; readonly uy: number };
+/** The weak tints in the opponent-chroma plane (x, y interleaved) and how
+ *  many counted pixels were strong. */
+type WeakTints = { readonly strong: number; readonly chroma: readonly number[] };
 
 /**
  * True when the coherent colour pixels `counts` selects are, relative to
  * paper-light paper, all weak tints of one hue. Stops as soon as `required`
- * pixels are strong or off that hue, so saturated colour art pays one pass.
+ * pixels are strong, so saturated colour art pays at most one pass.
  */
 export function isTonedMonochrome(
   image: RawImageData,
@@ -41,66 +43,61 @@ export function isTonedMonochrome(
 ): boolean {
   const paper = paperColour(image);
   if (paper === null) return false;
-  const hue = dominantWeakHue(image, paper, required, counts);
-  if (hue === null) return false;
-  if (hue.ux === 0 && hue.uy === 0) return true;
-  return offHueCount(image, paper, hue, required, counts) < required;
+  const weak = weakTints(image, paper, required, counts);
+  return weak !== null && weak.strong + offHueCount(weak.chroma) < required;
 }
 
-/** Counts strong tints (null once `required` are strong) and sums the unit
- *  chroma of the weak ones into their dominant hue direction. */
-function dominantWeakHue(
+/** Collects the weak tints; null once `required` counted pixels are strong. */
+function weakTints(
   image: RawImageData,
   paper: Paper,
   required: number,
   counts: (pixel: number) => boolean,
-): Hue | null {
+): WeakTints | null {
   const pixelCount = image.width * image.height;
   const tint = new Float64Array(3);
+  const chroma: number[] = [];
   let strong = 0;
-  let hueX = 0;
-  let hueY = 0;
   for (let pixel = 0; pixel < pixelCount; pixel += 1) {
     if (!counts(pixel)) continue;
     tintAt(image, pixel, paper, tint);
-    if (isStrongTint(tint)) {
-      strong += 1;
-      if (strong >= required) return null;
+    if (!isStrongTint(tint)) {
+      chroma.push(...chromaPlane(tint));
       continue;
     }
-    const [a, b] = chromaPlane(tint);
+    strong += 1;
+    if (strong >= required) return null;
+  }
+  return { strong, chroma };
+}
+
+/** Weak tints off their dominant hue: the unit-vector sum of all of them. */
+function offHueCount(chroma: readonly number[]): number {
+  let hueX = 0;
+  let hueY = 0;
+  for (let i = 0; i < chroma.length; i += 2) {
+    const a = chroma[i] as number;
+    const b = chroma[i + 1] as number;
     const magnitude = Math.hypot(a, b);
     if (magnitude === 0) continue;
     hueX += a / magnitude;
     hueY += b / magnitude;
   }
   const length = Math.hypot(hueX, hueY);
-  return length === 0 ? { strong, ux: 0, uy: 0 } : { strong, ux: hueX / length, uy: hueY / length };
-}
-
-/** Strong plus off-hue tints, counted up to `required`. */
-function offHueCount(
-  image: RawImageData,
-  paper: Paper,
-  hue: Hue,
-  required: number,
-  counts: (pixel: number) => boolean,
-): number {
-  const pixelCount = image.width * image.height;
-  const tint = new Float64Array(3);
-  let rejected = hue.strong;
-  for (let pixel = 0; pixel < pixelCount && rejected < required; pixel += 1) {
-    if (!counts(pixel)) continue;
-    tintAt(image, pixel, paper, tint);
-    if (isStrongTint(tint)) continue;
-    const [a, b] = chromaPlane(tint);
-    const along = a * hue.ux + b * hue.uy;
-    const across = Math.abs(a * hue.uy - b * hue.ux);
+  if (length === 0) return 0;
+  const ux = hueX / length;
+  const uy = hueY / length;
+  let off = 0;
+  for (let i = 0; i < chroma.length; i += 2) {
+    const a = chroma[i] as number;
+    const b = chroma[i + 1] as number;
+    const along = a * ux + b * uy;
+    const across = Math.abs(a * uy - b * ux);
     // Distance from the hue's half-axis: the opposite hue is another hue.
-    const offHue = along >= 0 ? across : Math.hypot(along, across);
-    if (offHue > HUE_ALLOWANCE + HUE_PER_TINT * Math.max(0, along)) rejected += 1;
+    const distance = along >= 0 ? across : Math.hypot(along, across);
+    if (distance > HUE_ALLOWANCE + HUE_PER_TINT * Math.max(0, along)) off += 1;
   }
-  return rejected;
+  return off;
 }
 
 /** Mean colour of the pixels at the most populated luma level (5-level
