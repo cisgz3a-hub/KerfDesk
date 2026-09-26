@@ -58,7 +58,8 @@ leaks and give each head its own copy of those, with bed, origin, homing and con
    mode switch (toggle, Machine Setup or keeping the current machine for an opened file). The
    first switch has nothing parked, so the new mode starts from the current values; after that
    each mode keeps its own. A parked Absolute placement comes back as the machine default when
-   homing has been turned off since.
+   homing has been turned off since. Undo and Redo of a mode toggle restore the live placement
+   and cached CNC setup with the project, so saving after Undo cannot overwrite either head.
 
 ### Consequences
 
@@ -74,4 +75,4 @@ leaks and give each head its own copy of those, with bed, origin, homing and con
   `layer-default-actions.test.ts`, `cnc-machine-starter-seeding.test.ts`,
   `import-actions.defaults.test.ts`, `parked-cnc-machine.test.ts`, `cnc-head-feeds.test.ts`,
   `cnc-own-feeds.test.ts`, `DeviceSetupCncMachineStep.speeds.test.tsx`,
-  `save-tiled-gcode.test.ts`, `mode-switch-settings.test.ts`.
+  `save-tiled-gcode.test.ts`, `mode-switch-settings.test.ts`, `mode-switch-history.test.ts`.
