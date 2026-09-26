@@ -129,9 +129,11 @@ Two defects, measured on the base (`c62084959`):
   scales and tolerances (a quarter with collinear controls that overrun their ends), 120 rotated
   ellipse arcs built from an independent centre parametrisation, the overrunning cubic above, the
   dragon cubic that measured 0.032 mm, the analytic chord count of a circular arc and a quarter
-  circle, exact ends, line vertices kept exactly, determinism, bounds containment and a zero-length
-  cubic loop. Five of its seven tests fail on the midpoint splitter (the arc test on its inexact end
-  point); the line and loop tests pass on both.
+  circle, exact ends, line vertices kept exactly, determinism, bounds containment, a zero-length
+  cubic loop, and named hard shapes at 0.001 and 0.025 mm (an interior cusp, a cusp at the start, a
+  self-loop, single and double inflections, and degenerate cubics: a point, controls on the ends,
+  coincident controls, a 1 um cubic). Five of its eight tests fail on the midpoint splitter (the arc
+  test on its inexact end point); the line, loop and hard-shape tests pass on both.
 
 Not part of this decision: emitting G2/G3 arcs on laser controllers; flattening against a
 controller's own arc tolerance; the SVG importer's compatibility polylines (`io/svg/flatten-curves.ts`),

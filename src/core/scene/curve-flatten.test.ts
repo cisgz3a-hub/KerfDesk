@@ -282,4 +282,57 @@ describe('chord-optimal curve flattening (ADR-414)', () => {
     expect(chords.at(-1)).toEqual(loop.to);
     expect(perChordDeviation(cubicCurve(from, loop), chords)).toBeLessThanOrEqual(0.025);
   });
+
+  it('holds on cusps, self-loops, inflections and degenerate cubics', () => {
+    const cubic = (c1: Vec2, c2: Vec2, to: Vec2): CubicPathSegment => ({
+      kind: 'cubic',
+      control1: c1,
+      control2: c2,
+      to,
+    });
+    const o = { x: 0, y: 0 };
+    const cases: ReadonlyArray<{ name: string; segment: CubicPathSegment; straight?: true }> = [
+      // Crossed controls whose derivative vanishes at t = 0.5.
+      { name: 'cusp', segment: cubic({ x: 40, y: 40 }, { x: 0, y: 40 }, { x: 40, y: 0 }) },
+      { name: 'cusp at the start', segment: cubic(o, { x: 30, y: 40 }, { x: 40, y: 0 }) },
+      { name: 'self-loop', segment: cubic({ x: 60, y: 30 }, { x: -30, y: 30 }, { x: 30, y: 0 }) },
+      { name: 'inflection', segment: cubic({ x: 30, y: 30 }, { x: 30, y: -30 }, { x: 60, y: 0 }) },
+      {
+        name: 'double inflection',
+        segment: cubic({ x: 30, y: 25 }, { x: -5, y: -20 }, { x: 25, y: 5 }),
+      },
+      { name: 'point', segment: cubic(o, o, o), straight: true },
+      {
+        name: 'controls on the ends',
+        segment: cubic(o, { x: 17, y: -3 }, { x: 17, y: -3 }),
+        straight: true,
+      },
+      {
+        name: 'coincident controls on the chord',
+        segment: cubic({ x: 5, y: 5 }, { x: 5, y: 5 }, { x: 10, y: 10 }),
+        straight: true,
+      },
+      {
+        name: 'microscopic',
+        segment: cubic({ x: 2e-7, y: 1e-7 }, { x: -1e-7, y: 3e-7 }, { x: 1e-6, y: 0 }),
+      },
+    ];
+    for (const { name, segment, straight } of cases) {
+      for (const tolerance of [0.001, 0.025]) {
+        const chords = flattenOne(o, segment, tolerance);
+        expect(chords[0], name).toEqual(o);
+        expect(chords.at(-1), name).toEqual(segment.to);
+        if (straight) expect(chords.length, name).toBeLessThanOrEqual(2);
+        const deviation = perChordDeviation(cubicCurve(o, segment), chords);
+        expect(deviation, `${name} at ${tolerance}`).toBeLessThanOrEqual(tolerance * (1 + 1e-9));
+        const bounds = curveSubpathBounds({ start: o, segments: [segment], closed: false });
+        for (const p of chords) {
+          expect(p.x, name).toBeGreaterThanOrEqual(bounds.minX);
+          expect(p.x, name).toBeLessThanOrEqual(bounds.maxX);
+          expect(p.y, name).toBeGreaterThanOrEqual(bounds.minY);
+          expect(p.y, name).toBeLessThanOrEqual(bounds.maxY);
+        }
+      }
+    }
+  });
 });
