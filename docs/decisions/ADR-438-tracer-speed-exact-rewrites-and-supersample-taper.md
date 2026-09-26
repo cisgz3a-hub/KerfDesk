@@ -132,7 +132,8 @@ base file recorded from the untouched base commit (952fb13e3). It runs only with
 
 Proof that the gate works:
 
-- It passes on the unchanged code: the 36 light cases passed twice, and all 60 cases were recorded.
+- It passes on the unchanged code: the 36 light cases passed twice, all 60 cases were recorded,
+  and the full 60-case compare passes on the branch head that adds the gate.
 - A fitted ring whose cubics are no longer registered, so that its curves fall back to straight
   segments, fails 4 cases: noise192 in Line Art, Edge Detection, Smooth and Sharp.
 - Reversing the order of the corner Set in `contour-trace.ts` (the union of bend corners and feature
@@ -178,7 +179,9 @@ process. Findings:
   Twenty light Line Art traces in one process (five fixtures alternating with noise192, twice
   round) keep the heap live after a forced GC flat: noise192 rows go from 56.8 to 57.5 MB and the
   others from 44.1 to 46.6 MB, settling after the first few traces, with every hash unchanged.
-  Owl traced twice keeps 83.9 then 84.1 MB.
+  Owl traced twice keeps 83.9 then 84.1 MB. Owl and hummingbird alternated three times in Line
+  Art keep 83.9, 79.9 and 80.1 MB after each owl and 66.0, 66.2 and 66.4 MB after each
+  hummingbird, and every owl and hummingbird trace repeats its hash and its repair conflicts.
 
 No code change was needed, and none was made. The 187 against 69 difference is put down to
 measuring different code, not to state leaking between traces.
