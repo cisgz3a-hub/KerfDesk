@@ -68,7 +68,7 @@ function FindActions(props: {
     case 'idle':
     case 'failed':
     case 'offline':
-      return <StartActions model={model} failed={phase.kind === 'failed'} {...props} />;
+      return <StartActions {...props} failed={phase.kind === 'failed'} />;
     case 'silent':
       return (
         <div className="lf-setup-find-actions">
