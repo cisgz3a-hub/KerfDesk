@@ -240,7 +240,7 @@ export function paintedPageBox(
   const unit = 1e4;
   const margin =
     options.page === undefined && items.some((item) => item.paint === 'stroke')
-      ? Math.ceil(((VECTOR_STROKE_WIDTH_MM / 2) * PT_PER_MM * unit) - 1e-6)
+      ? Math.ceil((VECTOR_STROKE_WIDTH_MM / 2) * PT_PER_MM * unit - 1e-6)
       : 0;
   const minimum = MIN_PAGE_SIDE_PT * unit;
   const side = (steps: number): { size: number; offset: number } => {

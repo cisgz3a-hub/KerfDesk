@@ -83,7 +83,7 @@ export function writePdfDocument(
     '<< /Length ' + content.text.length + ' >>\nstream\n' + content.text + '\nendstream',
     info,
   ];
-  let text = '%PDF-1.4\n';
+  let text = userUnit === 1 ? '%PDF-1.4\n' : '%PDF-1.6\n';
   const offsets: number[] = [];
   objects.forEach((body, index) => {
     offsets.push(text.length);

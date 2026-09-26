@@ -1,6 +1,12 @@
 import { describe, expect, it, vi } from 'vitest';
 import { mockPlatform, projectWithTwoLines } from '../../__fixtures__/file-actions';
-import { IDENTITY_TRANSFORM, type Project, type SceneObject } from '../../core/scene';
+import {
+  createLayer,
+  createProject,
+  IDENTITY_TRANSFORM,
+  type Project,
+  type SceneObject,
+} from '../../core/scene';
 import type { SaveTarget } from '../../platform/types';
 import type { VariableTextRenderer } from '../../io/gcode/prepare-output-snapshot';
 import { handleExportArtworkFormat, type ArtworkVectorFormat } from './export-artwork-format';
@@ -52,6 +58,34 @@ function withImage(project: Project): Project {
     dither: 'grayscale',
   };
   return { ...project, scene: { ...project.scene, objects: [...project.scene.objects, image] } };
+}
+
+/** One filled object whose two square outlines cross (even-odd). */
+function projectWithCrossingFill(): Project {
+  const square = (x: number, y: number) => ({
+    closed: true,
+    points: [
+      { x, y },
+      { x: x + 10, y },
+      { x: x + 10, y: y + 10 },
+      { x, y: y + 10 },
+    ],
+  });
+  const object: SceneObject = {
+    kind: 'imported-svg',
+    id: 'X',
+    source: 'X.svg',
+    bounds: { minX: 0, minY: 0, maxX: 15, maxY: 15 },
+    transform: IDENTITY_TRANSFORM,
+    paths: [{ color: '#000000', fillRule: 'evenodd', polylines: [square(0, 0), square(5, 5)] }],
+  };
+  return {
+    ...createProject(),
+    scene: {
+      layers: [createLayer({ id: '#000000', color: '#000000', mode: 'fill' })],
+      objects: [object],
+    },
+  };
 }
 
 const CASES: ReadonlyArray<{
@@ -109,6 +143,29 @@ describe('PDF / EPS / GeoJSON artwork export action', () => {
       );
     });
   }
+
+  it('says GeoJSON is not georeferenced and warns when filled outlines cross', async () => {
+    const saved = destination('cross.geojson');
+    const pushToast = vi.fn();
+    await handleExportArtworkFormat({
+      format: 'geojson',
+      platform: mockPlatform({ save: async () => saved.target }),
+      project: projectWithCrossingFill(),
+      selectedIds: [],
+      savedName: null,
+      pushToast,
+      renderer,
+    });
+    const parsed = JSON.parse(await textOf(saved.writes[0])) as {
+      features: { properties: Record<string, unknown>; geometry: { type: string } }[];
+    };
+    expect(parsed.features.map((f) => f.geometry.type)).toEqual(['Polygon', 'Polygon']);
+    expect(parsed.features.every((f) => f.properties['unmerged'] === true)).toBe(true);
+    const [message, variant] = pushToast.mock.calls[0] as [string, string];
+    expect(variant).toBe('warning');
+    expect(message).toContain('not georeferenced');
+    expect(message).toContain('1 shape(s) have crossing outlines');
+  });
 
   it('warns with a count when images are left out', async () => {
     const saved = destination('parts.pdf');

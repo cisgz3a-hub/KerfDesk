@@ -59,62 +59,102 @@ export function fillRegionPolygons(
   fillRule: RegionFillRule,
 ): FillRegion {
   const infos = rings.map(ringInfo);
-  let crossing = ringsCross(infos);
+  const nesting = nestRings(infos);
+  const role = ringRoles(infos, nesting, fillRule);
+  const { polygons, orphanHole } = assignHoles(infos, nesting, role);
+  const undecided = [...nesting.values()].some((entry) => entry.undecided);
+  return { polygons, crossing: orphanHole || undecided || ringsCross(infos) };
+}
+
+type Nesting = {
+  /** Smallest containing ring, or null. */
+  readonly parent: number | null;
+  /** Sum of the containing rings' orientations (+1 counterclockwise). */
+  readonly winding: number;
+  /** Number of containing rings. */
+  readonly count: number;
+  /** Some containment against a larger ring could not be decided. */
+  readonly undecided: boolean;
+};
+
+function nestRings(infos: ReadonlyArray<RingInfo>): Map<number, Nesting> {
   const bySize = [...infos].sort(
     (a, b) => Math.abs(b.twiceArea) - Math.abs(a.twiceArea) || a.index - b.index,
   );
-  const parent = new Map<number, number | null>();
-  const winding = new Map<number, number>();
-  const count = new Map<number, number>();
+  const nesting = new Map<number, Nesting>();
   bySize.forEach((ring, order) => {
     let best: RingInfo | null = null;
-    let sum = 0;
-    let n = 0;
+    let winding = 0;
+    let count = 0;
+    let undecided = false;
     for (let k = 0; k < order; k += 1) {
       const candidate = bySize[k] as RingInfo;
       if (!boxContains(candidate, ring)) continue;
       const inside = ringInside(ring, candidate);
-      if (inside === null) crossing = true;
+      undecided ||= inside === null;
       if (inside !== true) continue;
-      sum += Math.sign(candidate.twiceArea);
-      n += 1;
-      if (best === null || Math.abs(candidate.twiceArea) < Math.abs(best.twiceArea)) {
-        best = candidate;
-      }
+      winding += Math.sign(candidate.twiceArea);
+      count += 1;
+      // Sorted largest first, so the last container found is the smallest.
+      best = candidate;
     }
-    parent.set(ring.index, best?.index ?? null);
-    winding.set(ring.index, sum);
-    count.set(ring.index, n);
+    nesting.set(ring.index, { parent: best?.index ?? null, winding, count, undecided });
   });
+  return nesting;
+}
 
-  const filled = (value: number): boolean =>
-    fillRule === 'evenodd' ? value % 2 !== 0 : value !== 0;
-  const role = new Map<number, 'outer' | 'hole'>();
-  for (const ring of infos) {
-    const outside =
-      fillRule === 'evenodd' ? (count.get(ring.index) ?? 0) : (winding.get(ring.index) ?? 0);
-    const inside = outside + (fillRule === 'evenodd' ? 1 : Math.sign(ring.twiceArea));
-    if (filled(outside) !== filled(inside)) {
-      role.set(ring.index, filled(inside) ? 'outer' : 'hole');
-    }
-  }
+/** Each hole joins the nearest enclosing bounding ring, which is an outer ring. */
+function assignHoles(
+  infos: ReadonlyArray<RingInfo>,
+  nesting: ReadonlyMap<number, Nesting>,
+  role: ReadonlyMap<number, 'outer' | 'hole'>,
+): { polygons: RegionPolygon[]; orphanHole: boolean } {
   const holes = new Map<number, number[]>();
+  let orphanHole = false;
   for (const ring of infos) if (role.get(ring.index) === 'outer') holes.set(ring.index, []);
   for (const ring of infos) {
     if (role.get(ring.index) !== 'hole') continue;
-    let owner = parent.get(ring.index) ?? null;
-    while (owner !== null && !role.has(owner)) owner = parent.get(owner) ?? null;
+    const owner = boundingAncestor(ring.index, nesting, role);
     const list = owner === null ? undefined : holes.get(owner);
     if (list === undefined) {
       // Only reachable when the nesting model is broken; keep the ring visible.
-      crossing = true;
+      orphanHole = true;
       holes.set(ring.index, []);
     } else list.push(ring.index);
   }
   const polygons = [...holes.entries()]
     .sort(([a], [b]) => a - b)
     .map(([outer, list]) => ({ outer, holes: list }));
-  return { polygons, crossing };
+  return { polygons, orphanHole };
+}
+
+/** The nearest enclosing ring that bounds the filled region, or null. */
+function boundingAncestor(
+  index: number,
+  nesting: ReadonlyMap<number, Nesting>,
+  role: ReadonlyMap<number, 'outer' | 'hole'>,
+): number | null {
+  let owner = nesting.get(index)?.parent ?? null;
+  while (owner !== null && !role.has(owner)) owner = nesting.get(owner)?.parent ?? null;
+  return owner;
+}
+
+/** Rings that bound the filled region, as outer rings or holes. */
+function ringRoles(
+  infos: ReadonlyArray<RingInfo>,
+  nesting: ReadonlyMap<number, Nesting>,
+  fillRule: RegionFillRule,
+): Map<number, 'outer' | 'hole'> {
+  const evenOdd = fillRule === 'evenodd';
+  const filled = (value: number): boolean => (evenOdd ? value % 2 !== 0 : value !== 0);
+  const role = new Map<number, 'outer' | 'hole'>();
+  for (const ring of infos) {
+    const entry = nesting.get(ring.index);
+    const outside = (evenOdd ? entry?.count : entry?.winding) ?? 0;
+    const inside = outside + (evenOdd ? 1 : Math.sign(ring.twiceArea));
+    if (filled(outside) !== filled(inside)) role.set(ring.index, filled(inside) ? 'outer' : 'hole');
+  }
+  return role;
 }
 
 /** Twice the signed area (shoelace) of an open integer ring; positive = counterclockwise, y up. */
@@ -171,10 +211,7 @@ function ringInside(inner: RingInfo, outer: RingInfo): boolean | null {
 }
 
 /** Nonzero winding test of a doubled-coordinate probe against a ring. */
-function classify(
-  p: GridPoint,
-  ring: ReadonlyArray<GridPoint>,
-): 'inside' | 'outside' | 'boundary' {
+function classify(p: GridPoint, ring: ReadonlyArray<GridPoint>): 'inside' | 'outside' | 'boundary' {
   let wn = 0;
   for (let i = 0; i < ring.length; i += 1) {
     const r0 = ring[i] as GridPoint;
@@ -182,20 +219,21 @@ function classify(
     const a = { x: 2 * r0.x, y: 2 * r0.y };
     const b = { x: 2 * r1.x, y: 2 * r1.y };
     const cross = (b.x - a.x) * (p.y - a.y) - (p.x - a.x) * (b.y - a.y);
-    if (
-      cross === 0 &&
-      Math.min(a.x, b.x) <= p.x &&
-      p.x <= Math.max(a.x, b.x) &&
-      Math.min(a.y, b.y) <= p.y &&
-      p.y <= Math.max(a.y, b.y)
-    ) {
-      return 'boundary';
-    }
+    if (cross === 0 && withinBox(p, a, b)) return 'boundary';
     if (a.y <= p.y) {
       if (b.y > p.y && cross > 0) wn += 1;
     } else if (b.y <= p.y && cross < 0) wn -= 1;
   }
   return wn !== 0 ? 'inside' : 'outside';
+}
+
+function withinBox(p: GridPoint, a: GridPoint, b: GridPoint): boolean {
+  return (
+    Math.min(a.x, b.x) <= p.x &&
+    p.x <= Math.max(a.x, b.x) &&
+    Math.min(a.y, b.y) <= p.y &&
+    p.y <= Math.max(a.y, b.y)
+  );
 }
 
 type Edge = {

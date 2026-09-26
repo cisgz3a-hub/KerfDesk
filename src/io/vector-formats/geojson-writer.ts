@@ -160,11 +160,7 @@ function filledPolygons(
 }
 
 /** An open ring on the grid (first point not repeated), or null when it collapses. */
-function openRing(
-  curve: CurveSubpath,
-  page: PreparedPage,
-  tolerance: number,
-): GridPoint[] | null {
+function openRing(curve: CurveSubpath, page: PreparedPage, tolerance: number): GridPoint[] | null {
   const points = dedupe(flattened(curve, tolerance).map(page.toGrid));
   const first = points[0];
   const last = points[points.length - 1];

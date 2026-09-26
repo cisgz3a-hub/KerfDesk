@@ -114,22 +114,32 @@ export async function handleExportArtworkFormat(ctx: ExportArtworkFormatContext)
       return;
     }
     await target.write(new Blob([file.value.text], { type: spec.mime }));
-    const omitted = file.value.omittedObjectCount;
-    const warning = file.value.warning;
-    ctx.pushToast(
-      'Exported ' +
-        file.value.objectCount +
-        ' artwork item(s) to ' +
-        target.displayName +
-        '. Text is outlined. ' +
-        spec.note +
-        (omitted > 0 ? ' ' + omitted + ' image or relief item(s) were left out.' : '') +
-        (warning === null ? '' : ' ' + warning),
-      omitted > 0 || warning !== null ? 'warning' : 'success',
-    );
+    const done = exportedToast(spec, target.displayName, file.value);
+    ctx.pushToast(done.message, done.variant);
   } catch (error) {
     failed(error instanceof Error ? error.message : String(error));
   }
+}
+
+function exportedToast(
+  spec: FormatSpec,
+  displayName: string,
+  file: { warning: string | null; objectCount: number; omittedObjectCount: number },
+): { message: string; variant: ToastVariant } {
+  const omitted = file.omittedObjectCount;
+  const caveats = [
+    ...(omitted > 0 ? [omitted + ' image or relief item(s) were left out.'] : []),
+    ...(file.warning === null ? [] : [file.warning]),
+  ];
+  return {
+    message: [
+      'Exported ' + file.objectCount + ' artwork item(s) to ' + displayName + '.',
+      'Text is outlined.',
+      spec.note,
+      ...caveats,
+    ].join(' '),
+    variant: caveats.length > 0 ? 'warning' : 'success',
+  };
 }
 
 async function exportFile(
