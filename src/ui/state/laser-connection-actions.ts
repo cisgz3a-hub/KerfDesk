@@ -97,6 +97,7 @@ export function connectionActions(
     disconnect: () => {
       clearCncLiveCaps();
       cancelConnectAttempt(refs, false);
+      set({ connectionAttempt: refs.connectAttemptRevision });
       return runDisconnect(set, get, refs, safeWrite, false);
     },
     forgetDevice: () => {
@@ -104,6 +105,7 @@ export function connectionActions(
       // Forget means pick again next time, so the next Connect asks (ADR-420).
       forgetRememberedSerialPort(browserLocalStorage());
       cancelConnectAttempt(refs, true);
+      set({ connectionAttempt: refs.connectAttemptRevision });
       return runDisconnect(set, get, refs, safeWrite, true);
     },
   };

@@ -19,7 +19,7 @@ import {
 } from './device-setup-baud-scan';
 import type { DeviceSetupStepProps } from './device-setup-flow';
 import { machineSetupControllerGuide } from './machine-setup-controller-guide';
-import type { DeviceSetupAutomatic } from './use-controller-auto-fill';
+import { liveConnectionAttempt, type DeviceSetupAutomatic } from './use-controller-auto-fill';
 
 const ANSWER_WAIT_MS = 4_000;
 
@@ -67,57 +67,91 @@ export function useFindMachine(
   // A failed attempt shows as the connection's own failure; the scan reads it.
   const connectAt = (baud: number): Promise<void> =>
     openConnection({ baudRate: baud }).catch(() => undefined);
-  const scan = useBaudScan(connectAt, laser.disconnect, baudRate);
-  // Every other connection action here takes the connection from a running scan.
-  const reconnect = async (): Promise<void> => {
-    scan.stop();
-    await laser.disconnect();
-    await openConnection();
-  };
-  const find = (): void => {
-    scan.stop();
-    automatic?.requestFind();
-    void openConnection().catch(showError);
-  };
-  const choosePort = (): void => {
-    scan.stop();
-    void (async () => {
-      if (useLaserStore.getState().connection.kind === 'connected') await laser.disconnect();
-      // After the old connection closes, so its read cannot fill the draft.
-      automatic?.requestFind();
-      await openConnection({ portSelection: 'choose' });
-    })().catch(showError);
-  };
-  const disconnect = (): void => {
-    scan.stop();
-    void laser.disconnect().catch(showError);
-  };
+  const scan = useBaudScan(connectAt, laser.disconnect, baudRate, automatic);
+  const actions = findConnectionActions({
+    openConnection,
+    disconnect: laser.disconnect,
+    stopScan: scan.stop,
+    automatic,
+    showError,
+  });
   useAdoptDetectedFirmware(
     mismatch,
     laser.detectedControllerKind,
     controllerKind,
     automatic,
-    reconnect,
+    actions.reconnectForFind,
   );
   return {
     baudRate,
-    choosePort,
+    choosePort: actions.choosePort,
     connected,
     controllerKind,
     driver,
-    find,
+    find: actions.find,
     guide,
     laser,
     mismatch,
     readAgain: () => void readController(guide, driver, laser).catch(showError),
-    reconnect: () => void reconnect().catch(showError),
-    disconnect,
+    reconnect: () => void actions.reconnect().catch(showError),
+    disconnect: actions.disconnect,
     scan,
     supportsSerial: platform.serial.isSupported(),
   };
 }
 
 export type FindMachineModel = ReturnType<typeof useFindMachine>;
+
+// Setup's connection actions. Find's claim is the connect attempt it started:
+// connect() takes its attempt revision before its first await, so the claim is
+// read right after the call. Every action takes the connection from a running
+// scan first.
+function findConnectionActions(deps: {
+  readonly openConnection: (extra?: Partial<ConnectControllerOptions>) => Promise<void>;
+  readonly disconnect: () => Promise<void>;
+  readonly stopScan: () => void;
+  readonly automatic: DeviceSetupAutomatic | undefined;
+  readonly showError: (error: unknown) => void;
+}) {
+  const { openConnection, disconnect, stopScan, automatic, showError } = deps;
+  const openForFind = (
+    claim: (attempt: number) => void,
+    extra?: Partial<ConnectControllerOptions>,
+  ): Promise<void> => {
+    const opening = openConnection(extra);
+    claim(liveConnectionAttempt());
+    return opening;
+  };
+  const requestFind = (attempt: number): void => automatic?.requestFind(attempt);
+  return {
+    find: (): void => {
+      stopScan();
+      void openForFind(requestFind).catch(showError);
+    },
+    choosePort: (): void => {
+      stopScan();
+      void (async () => {
+        if (useLaserStore.getState().connection.kind === 'connected') await disconnect();
+        await openForFind(requestFind, { portSelection: 'choose' });
+      })().catch(showError);
+    },
+    reconnect: async (): Promise<void> => {
+      stopScan();
+      await disconnect();
+      await openConnection();
+    },
+    disconnect: (): void => {
+      stopScan();
+      void disconnect().catch(showError);
+    },
+    // Find's follow-up reconnect with the adopted firmware keeps Find's claim.
+    reconnectForFind: async (): Promise<void> => {
+      stopScan();
+      await disconnect();
+      await openForFind((attempt) => automatic?.continueFind(attempt));
+    },
+  };
+}
 
 function useFindLaserState() {
   return {
@@ -139,10 +173,11 @@ function useFindLaserState() {
 }
 
 // The banner named a different firmware in the same family and auto-fill
-// adopted it in the draft: reconnect once so the right driver reads it. Only
-// after Find my machine in this setup, so a connection made elsewhere is never
-// dropped by opening setup: a new machine's draft fills itself without Find,
-// but that does not make the connection Find's.
+// adopted it in the draft: reconnect once per Find press so the right driver
+// reads it. Only on the connection Find opened, so a connection made
+// elsewhere, before setup or after Find, is never dropped by setup: a new
+// machine's draft fills itself without Find, but that does not make the
+// connection Find's.
 function useAdoptDetectedFirmware(
   mismatch: boolean,
   detected: string | null,
@@ -150,16 +185,18 @@ function useAdoptDetectedFirmware(
   automatic: DeviceSetupAutomatic | undefined,
   reconnect: () => Promise<void>,
 ): void {
-  const done = useRef(false);
+  const reconnectedFor = useRef<number | null>(null);
+  const findCount = automatic?.findCount ?? 0;
   const adopted =
-    automatic?.findRequested === true &&
+    automatic?.findOwnsConnection === true &&
     automatic.record?.status === 'applied' &&
     automatic.record.summary.controllerKind !== null;
   useEffect(() => {
-    if (done.current || !mismatch || !adopted || detected !== draftKind) return;
-    done.current = true;
+    if (reconnectedFor.current === findCount) return;
+    if (!mismatch || !adopted || detected !== draftKind) return;
+    reconnectedFor.current = findCount;
     void reconnect().catch(() => undefined);
-  }, [adopted, detected, draftKind, mismatch, reconnect]);
+  }, [adopted, detected, draftKind, findCount, mismatch, reconnect]);
 }
 
 // Stop, a new scan and closing setup each retire the running scan, which then
@@ -168,13 +205,17 @@ function useBaudScan(
   connectAt: (baudRate: number) => Promise<void>,
   disconnect: () => Promise<void>,
   currentBaud: number,
+  automatic: DeviceSetupAutomatic | undefined,
 ) {
   const [status, setStatus] = useState<BaudScanStatus>({ kind: 'idle' });
   const [ownership] = useState(createBaudScanOwnership);
   useEffect(() => () => ownership.retire(), [ownership]);
   const start = (): void => {
     const retired = ownership.claim();
-    const connection = scanConnectionOwnership();
+    // A scan from the connection Find opened keeps Find's claim on each speed.
+    const connection = scanConnectionOwnership(
+      automatic?.findOwnsConnection === true ? automatic.continueFind : undefined,
+    );
     const candidates = baudScanCandidates([currentBaud]);
     const report = (next: BaudScanStatus): void => {
       if (!retired()) setStatus(next);
@@ -182,7 +223,7 @@ function useBaudScan(
     void scanBaudRates(
       {
         connectAt: (baud) => connection.open(() => connectAt(baud)),
-        disconnect,
+        disconnect: () => connection.close(disconnect),
         awaitAnswer,
         cancelled: () => retired() || connection.replaced(),
       },
@@ -193,8 +234,7 @@ function useBaudScan(
       .then((result) =>
         report(result.kind === 'none' ? { kind: 'none', tried: result.tried } : { kind: 'idle' }),
       )
-      .catch(() => report({ kind: 'idle' }))
-      .finally(connection.release);
+      .catch(() => report({ kind: 'idle' }));
   };
   const stop = (): void => {
     ownership.retire();
@@ -203,28 +243,26 @@ function useBaudScan(
   return { status, start, stop };
 }
 
-// The connection a scan opened stays the scan's until a connect it did not
-// start begins (auto-connect on a replug, say). A replaced connection is
-// someone else's, so the scan stops without closing it.
-export function scanConnectionOwnership() {
-  let opening = false;
-  let replaced = false;
-  const release = useLaserStore.subscribe((state, previous) => {
-    const began =
-      state.connection.kind === 'connecting' && previous.connection.kind !== 'connecting';
-    if (began && !opening) replaced = true;
-  });
+// The connection a scan opened is the scan's while the store's connect attempt
+// is the one the scan started. connect() and disconnect() move the revision
+// before their first await, so the scan reads its own right after each call,
+// and any connect or disconnect it did not make (auto-connect on a replug, or
+// one that lands while the scan's open is still pending) reads as replaced.
+export function scanConnectionOwnership(onOpened?: (attempt: number) => void) {
+  let owned: number | null = null;
   return {
-    open: async (connect: () => Promise<void>): Promise<void> => {
-      opening = true;
-      try {
-        await connect();
-      } finally {
-        opening = false;
-      }
+    open: (connect: () => Promise<void>): Promise<void> => {
+      const opening = connect();
+      owned = liveConnectionAttempt();
+      onOpened?.(owned);
+      return opening;
     },
-    replaced: (): boolean => replaced,
-    release,
+    close: (disconnect: () => Promise<void>): Promise<void> => {
+      const closing = disconnect();
+      owned = liveConnectionAttempt();
+      return closing;
+    },
+    replaced: (): boolean => owned !== null && liveConnectionAttempt() !== owned,
   };
 }
 

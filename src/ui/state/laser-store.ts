@@ -110,6 +110,10 @@ export type LaserState = LaserStoreActions &
     readonly serialPortInfo?: SerialPortIdentity | null;
     /** The baud the live connection opened at (ADR-420); null while disconnected. */
     readonly connectedBaudRate?: number | null;
+    /** Revision of the latest connect attempt or intentional disconnect. The live
+     *  connection belongs to whoever started the attempt with this revision; any
+     *  later connect or disconnect moves it on (ADR-420). Undefined reads as 0. */
+    readonly connectionAttempt?: number;
     readonly statusReport: StatusReport | null;
     readonly controllerSessionEpoch: number;
     readonly statusSequence: number;

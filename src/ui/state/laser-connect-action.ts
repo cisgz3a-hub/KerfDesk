@@ -85,6 +85,7 @@ async function connectSerialController(
   attachConnection: AttachConnectionFn,
 ): Promise<void> {
   const attempt = beginConnectAttempt(refs);
+  set({ connectionAttempt: attempt.revision });
   let requestedPort: SerialPortRef | null = null;
   let cancelledPermissionReleased = false;
   const releaseCancelledPermission = async (): Promise<void> => {

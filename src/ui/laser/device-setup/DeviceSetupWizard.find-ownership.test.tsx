@@ -5,6 +5,7 @@
 
 import { act } from 'react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import type { ControllerKind } from '../../../core/devices';
 import type { ConnectControllerOptions } from '../../state/laser-store';
 import { useLaserStore } from '../../state/laser-store';
 import { initialLaserState } from '../../state/laser-store-helpers';
@@ -27,25 +28,36 @@ afterEach(() => {
   useLaserStore.setState(original, true);
 });
 
-// A controller that answers as grblHAL whatever driver it was opened with.
-function answeringController(readAt: { value: number }) {
+// A simulated controller that answers as `reports` whatever driver it was
+// opened with. Like the store, connect and disconnect move the attempt
+// revision before their first await.
+function answeringController(
+  readAt: { value: number },
+  reports: (options: ConnectControllerOptions) => ControllerKind = () => 'grblhal',
+) {
   const connect = vi.fn(async (_adapter: unknown, options: ConnectControllerOptions) => {
+    moveAttempt();
     readAt.value += 1;
     useLaserStore.setState({
       connection: { kind: 'connected' },
       activeControllerKind: options.controllerKind ?? 'grbl-v1.1',
-      detectedControllerKind: 'grblhal',
+      detectedControllerKind: reports(options),
       detectedSettings: { bedWidth: 363, bedHeight: 273, laserModeEnabled: true },
       lastSettingsReadAt: readAt.value,
     });
   });
   const disconnect = vi.fn(async () => {
+    moveAttempt();
     useLaserStore.setState({ connection: { kind: 'disconnected' } });
   });
   useLaserStore.setState({ connect, disconnect } as Partial<
     ReturnType<typeof useLaserStore.getState>
   >);
   return { connect, disconnect };
+}
+
+function moveAttempt(): void {
+  useLaserStore.setState((state) => ({ connectionAttempt: (state.connectionAttempt ?? 0) + 1 }));
 }
 
 describe('Find my machine owns the connection', () => {
@@ -81,6 +93,35 @@ describe('Find my machine owns the connection', () => {
       expect(link.disconnect).toHaveBeenCalledTimes(1);
       expect(link.connect).toHaveBeenCalledTimes(2);
       expect(link.connect.mock.calls[1]?.[1]).toMatchObject({ controllerKind: 'grblhal' });
+    } finally {
+      await view.unmount();
+    }
+  });
+
+  // Second review of #941: Find's claim outlived its connection, so a later
+  // connection made elsewhere was adopted and dropped without a new Find.
+  it("ends Find's claim when another connection replaces Find's", async () => {
+    const link = answeringController(
+      { value: 0 },
+      (options) => options.controllerKind ?? 'grbl-v1.1',
+    );
+    const view = await renderWizard(undefined, mockPlatform(), { newMachine: true });
+    try {
+      await act(async () => button(view.host, 'Find my machine').click());
+      expect(link.connect).toHaveBeenCalledTimes(1);
+      await act(async () => {
+        // Reconnected elsewhere, and this controller reports grblHAL.
+        moveAttempt();
+        useLaserStore.setState({
+          connection: { kind: 'connected' },
+          activeControllerKind: 'grbl-v1.1',
+          detectedControllerKind: 'grblhal',
+          lastSettingsReadAt: 50,
+        });
+      });
+      expect(link.disconnect).not.toHaveBeenCalled();
+      expect(link.connect).toHaveBeenCalledTimes(1);
+      expect(view.host.textContent).toContain('Reconnect using selected profile');
     } finally {
       await view.unmount();
     }

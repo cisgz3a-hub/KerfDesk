@@ -78,16 +78,22 @@ Platform limits that shape the design:
    not filled.
 6. **Adopting a firmware reconnects once.** When auto-fill adopted a firmware different from the
    one the connection used, Find reconnects once with it, so the matching driver reads the
-   controller. It happens only after Find in this setup; a connection made elsewhere is never
-   dropped by opening setup. A new machine's draft may adopt the firmware by itself on open,
-   but that leaves the connection as it is and offers **Reconnect using selected profile**.
+   controller, once per Find press. Find owns only the connection it opened: the laser store's
+   `connectionAttempt` revision moves on every connect and intentional disconnect, before the
+   first await, and Find's claim is the revision its own connect took. Any other connect or
+   disconnect ends the claim, so a connection made elsewhere, before setup or after Find, is
+   never dropped by setup and does not refill a finished machine by itself. A new machine's
+   draft may adopt the firmware by itself on open or on such a connection, but that leaves the
+   connection as it is and offers **Reconnect using selected profile**.
 7. **Try other speeds.** When the port opened but nothing answered, **Try other speeds**
    reconnects at 115200, 230400, 250000, 921600, 57600, 38400, 19200 and 9600 baud in turn (the
    one already tried is skipped), waits up to 4 s for an answer at each, and stops at the first
    that answers. **Stop** ends it. It only listens and reads. Stop, a new scan, another
-   connection action in setup, closing setup, or a connect the scan did not start (auto-connect
-   after a replug) each retire the running scan, which then closes nothing: the open connection
-   is no longer the scan's.
+   connection action in setup, closing setup, or a connect or disconnect the scan did not make
+   (auto-connect after a replug, even while the scan's own open is pending) each retire the
+   running scan, which then closes nothing: the open connection is no longer the scan's. The
+   scan owns a connection by the same `connectionAttempt` revision. A scan started from Find's
+   own connection keeps Find's claim on each speed it opens.
 8. **The catalog is not auto-picked.** `$130`/`$131` are the controller's travel limits, not the
    bed: a Creality Falcon A1 Pro reports 400 × 400 mm for a 358 × 268 mm bed. Detected matches stay
    prioritised with "Possible match" as the ceiling (ADR-240 #2).
@@ -109,7 +115,8 @@ Platform limits that shape the design:
 - `DeviceSetupAutoDetect` is deleted; its readback list and apply action live in
   `DeviceSetupFoundMachine`. The controller contract fields move from `DeviceSetupIdentifyStep` to
   `DeviceSetupConnectionOptions`, unchanged.
-- The laser store records `connectedBaudRate`, reset wherever `serialPortInfo` is.
+- The laser store records `connectedBaudRate`, reset wherever `serialPortInfo` is, and
+  `connectionAttempt`, the revision of the latest connect attempt or intentional disconnect.
 - `device-setup-accept-detected.ts` holds the accept rule and the per-head change rows;
   `device-setup-accept-detected.test.ts` pins the laser, CNC and Laser + CNC cases.
 - The rail's detected-settings toast outside setup still writes the device profile only, so in
