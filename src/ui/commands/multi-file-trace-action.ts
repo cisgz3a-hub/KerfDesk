@@ -9,6 +9,7 @@ import {
   type TraceOptions,
 } from '../../core/trace';
 import type { PlatformAdapter } from '../../platform/types';
+import { readImageDensity, type ImageDensity } from '../common/image-density';
 import { rasterImportGeometry } from '../common/image-import';
 import type { ToastVariant } from '../state/toast-store';
 import { loadImageAsRawData, readImageNaturalSize } from '../trace/image-loader';
@@ -34,6 +35,9 @@ export type MultiFileTraceDeps = {
   readonly readNaturalSize?: (
     file: MultiFileTraceFile,
   ) => Promise<{ readonly width: number; readonly height: number }>;
+  // The file's embedded density (PNG pHYs, JFIF, EXIF, BMP); omitted, read
+  // from the file exactly as a single-image import reads it.
+  readonly readDensity?: (file: MultiFileTraceFile) => Promise<ImageDensity | null>;
   readonly trace?: (
     image: RawImageData,
     options: TraceOptions,
@@ -53,6 +57,7 @@ const DEFAULT_MULTI_FILE_TRACE_OPTIONS: TraceOptions =
 type MultiFileJobContext = {
   readonly loadImage: NonNullable<MultiFileTraceDeps['loadImage']>;
   readonly readNatural: NonNullable<MultiFileTraceDeps['readNaturalSize']> | null;
+  readonly readDensity: NonNullable<MultiFileTraceDeps['readDensity']>;
   readonly options: TraceOptions;
   readonly targetPxPerMm: number;
   readonly deviceMemoryGb: number | undefined;
@@ -66,6 +71,7 @@ export async function buildMultiFileTraceExports(
     loadImage: deps.loadImage ?? loadImageAsRawData,
     readNatural:
       deps.readNaturalSize ?? (deps.loadImage === undefined ? readImageNaturalSize : null),
+    readDensity: deps.readDensity ?? readImageDensity,
     options: deps.options ?? DEFAULT_MULTI_FILE_TRACE_OPTIONS,
     targetPxPerMm: deps.targetPxPerMm ?? traceTargetPxPerMm(undefined, undefined),
     deviceMemoryGb: deps.deviceMemoryGb ?? browserDeviceMemoryGb(),
@@ -95,23 +101,25 @@ export async function buildMultiFileTraceExports(
 }
 
 // One batch job on the same working-grid policy as a dialog commit (ADR-409):
-// the placed size is the import size, and the image is decoded on its turn so
-// the batch holds one large decode at a time.
+// the placed size is the import size — the file's embedded density when it has
+// one, the default bitmap DPI otherwise, exactly as Import Image sizes it — and
+// the image is decoded on its turn so the batch holds one large decode at a time.
 async function multiFileTraceJob(
   file: MultiFileTraceFile,
   context: MultiFileJobContext,
 ): Promise<BatchTraceImageJob> {
+  const density = await context.readDensity(file);
   if (context.readNatural === null) {
     const image = await context.loadImage(file);
     return {
       sourceName: file.name,
       image,
-      physicalSizeMm: physicalSizeMm(image, image),
+      physicalSizeMm: physicalSizeMm(image, density),
       options: context.options,
     };
   }
   const natural = await context.readNatural(file);
-  const size = physicalSizeMm(natural, natural);
+  const size = physicalSizeMm(natural, density);
   const plan = planTraceCommitGridFor(
     natural,
     {
@@ -135,13 +143,14 @@ async function multiFileTraceJob(
 
 function physicalSizeMm(
   natural: { readonly width: number; readonly height: number },
-  sampled: { readonly width: number; readonly height: number },
+  density: ImageDensity | null,
 ): { readonly widthMm: number; readonly heightMm: number } {
   const geometry = rasterImportGeometry({
     naturalWidth: natural.width,
     naturalHeight: natural.height,
-    sampledWidth: sampled.width,
-    sampledHeight: sampled.height,
+    sampledWidth: natural.width,
+    sampledHeight: natural.height,
+    density,
   });
   return {
     widthMm: geometry.bounds.maxX - geometry.bounds.minX,

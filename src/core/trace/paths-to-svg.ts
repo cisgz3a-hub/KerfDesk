@@ -57,16 +57,21 @@ export function countVisibleColoredPaths(
   return paths.filter((path) => isVisibleColoredPath(path, traceMode)).length;
 }
 
+// A physical size is authoritative: the viewBox is only the traced grid that
+// samples it. An anisotropic density (e.g. 300 x 150 DPI) or a capped grid's
+// rounding gives the two axes different mm-per-unit scales, and "meet" would
+// letterbox the artwork instead of filling the stated millimetres, so a sized
+// export stretches each axis independently.
 function svgOpen(width: number, height: number, physicalSize?: SvgPhysicalSize): string {
   const sizeAttrs =
     physicalSize === undefined
-      ? ' width="100%" height="100%"'
-      : ` width="${round(physicalSize.widthMm)}mm" height="${round(physicalSize.heightMm)}mm"`;
+      ? ' width="100%" height="100%" preserveAspectRatio="xMidYMid meet"'
+      : ` width="${round(physicalSize.widthMm)}mm" height="${round(physicalSize.heightMm)}mm" preserveAspectRatio="none"`;
   return (
     '<svg xmlns="http://www.w3.org/2000/svg"' +
     ` viewBox="0 0 ${width} ${height}"` +
     sizeAttrs +
-    ' preserveAspectRatio="xMidYMid meet">'
+    '>'
   );
 }
 
