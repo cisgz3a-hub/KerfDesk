@@ -25,7 +25,7 @@ export function discUnion(sites: DiscSites): Uint8Array {
 /** 1 where a pixel centre lies strictly inside some site's disc. */
 export function* discUnionSteps(sites: DiscSites): TraceSteps<Uint8Array> {
   const cooperate = yield;
-  const { width, height, radiusSq } = sites;
+  const { width, height } = sites;
   // Envelope values are stored negated (lower envelope of -rSq + d^2), so
   // "covered" means the final value is strictly negative.
   const field = new Float64Array(width * height);
@@ -33,24 +33,46 @@ export function* discUnionSteps(sites: DiscSites): TraceSteps<Uint8Array> {
   const column = new Float64Array(height);
   for (let x = 0; x < width; x += 1) {
     if (cooperate && x % 64 === 0) yield;
-    for (let y = 0; y < height; y += 1) {
-      const r = radiusSq[y * width + x] ?? 0;
-      column[y] = r > 0 ? -r : Infinity;
-    }
-    lowerEnvelope(column, height, scratch);
-    for (let y = 0; y < height; y += 1) field[y * width + x] = scratch.out[y] ?? Infinity;
+    columnPass(sites, x, column, field, scratch);
   }
   const row = new Float64Array(width);
   const covered = new Uint8Array(width * height);
   for (let y = 0; y < height; y += 1) {
     if (cooperate && y % 64 === 0) yield;
-    for (let x = 0; x < width; x += 1) row[x] = field[y * width + x] ?? Infinity;
-    lowerEnvelope(row, width, scratch);
-    for (let x = 0; x < width; x += 1) {
-      if ((scratch.out[x] ?? Infinity) < 0) covered[y * width + x] = 1;
-    }
+    rowPass(width, y, field, row, covered, scratch);
   }
   return covered;
+}
+
+function columnPass(
+  sites: DiscSites,
+  x: number,
+  column: Float64Array,
+  field: Float64Array,
+  scratch: EnvelopeScratch,
+): void {
+  const { width, height, radiusSq } = sites;
+  for (let y = 0; y < height; y += 1) {
+    const r = radiusSq[y * width + x] ?? 0;
+    column[y] = r > 0 ? -r : Infinity;
+  }
+  lowerEnvelope(column, height, scratch);
+  for (let y = 0; y < height; y += 1) field[y * width + x] = scratch.out[y] ?? Infinity;
+}
+
+function rowPass(
+  width: number,
+  y: number,
+  field: Float64Array,
+  row: Float64Array,
+  covered: Uint8Array,
+  scratch: EnvelopeScratch,
+): void {
+  for (let x = 0; x < width; x += 1) row[x] = field[y * width + x] ?? Infinity;
+  lowerEnvelope(row, width, scratch);
+  for (let x = 0; x < width; x += 1) {
+    if ((scratch.out[x] ?? Infinity) < 0) covered[y * width + x] = 1;
+  }
 }
 
 type EnvelopeScratch = {
@@ -67,38 +89,41 @@ function envelopeScratch(n: number): EnvelopeScratch {
 // site exists. Non-sites are skipped rather than modelled as a huge finite
 // value, so the intersection arithmetic never mixes 1e15 with pixel sizes.
 function lowerEnvelope(f: Float64Array, n: number, s: EnvelopeScratch): void {
-  const { v, z, out } = s;
-  let k = -1;
-  for (let q = 0; q < n; q += 1) {
-    const fq = f[q] ?? Infinity;
-    if (fq === Infinity) continue;
-    if (k < 0) {
-      k = 0;
-      v[0] = q;
-      z[0] = -Infinity;
-      z[1] = Infinity;
-      continue;
-    }
-    let sect = intersection(f, v[k] ?? 0, q);
-    while (sect <= (z[k] ?? -Infinity)) {
-      k -= 1;
-      sect = intersection(f, v[k] ?? 0, q);
-    }
-    k += 1;
-    v[k] = q;
-    z[k] = sect;
-    z[k + 1] = Infinity;
-  }
+  const k = buildEnvelope(f, n, s);
   if (k < 0) {
-    out.fill(Infinity, 0, n);
+    s.out.fill(Infinity, 0, n);
     return;
   }
+  const { v, z, out } = s;
   let j = 0;
   for (let q = 0; q < n; q += 1) {
     while ((z[j + 1] ?? Infinity) < q) j += 1;
     const p = v[j] ?? 0;
     out[q] = (q - p) * (q - p) + (f[p] ?? 0);
   }
+}
+
+// Builds the parabola hull into s.v / s.z; returns the last hull index, or -1
+// when f holds no finite site.
+function buildEnvelope(f: Float64Array, n: number, s: EnvelopeScratch): number {
+  const { v, z } = s;
+  let k = -1;
+  for (let q = 0; q < n; q += 1) {
+    if ((f[q] ?? Infinity) === Infinity) continue;
+    let sect = -Infinity;
+    if (k >= 0) {
+      sect = intersection(f, v[k] ?? 0, q);
+      while (sect <= (z[k] ?? -Infinity)) {
+        k -= 1;
+        sect = intersection(f, v[k] ?? 0, q);
+      }
+    }
+    k += 1;
+    v[k] = q;
+    z[k] = sect;
+    z[k + 1] = Infinity;
+  }
+  return k;
 }
 
 function intersection(f: Float64Array, p: number, q: number): number {

@@ -30,7 +30,29 @@ export function clipCurveOutsideRegion(
   curve: CurveSubpath,
   inRegion: (p: Vec2) => boolean,
 ): ClippedPiece[] {
-  const spans: { span: Span; inside: boolean }[] = [];
+  const spans = classifiedSpans(curve, inRegion);
+  if (spans.every((s) => !s.inside)) return [{ curve, startCut: false, endCut: false }];
+  if (spans.every((s) => s.inside)) return [];
+  const runs = outsideRuns(spans);
+  if (curve.closed) mergeSeamRun(spans, runs);
+  const firstSpan = spans[0]?.span;
+  const lastSpan = spans.at(-1)?.span;
+  return runs.map((run) => pieceFromRun(curve, run, firstSpan, lastSpan));
+}
+
+// A closed curve cut somewhere: the run through its seam is one piece.
+function mergeSeamRun(spans: readonly ClassifiedSpan[], runs: Span[][]): void {
+  const firstOutside = spans[0]?.inside === false;
+  const lastOutside = spans.at(-1)?.inside === false;
+  if (!firstOutside || !lastOutside || runs.length < 2) return;
+  const head = runs.shift() ?? [];
+  runs[runs.length - 1] = [...(runs.at(-1) ?? []), ...head];
+}
+
+type ClassifiedSpan = { readonly span: Span; readonly inside: boolean };
+
+function classifiedSpans(curve: CurveSubpath, inRegion: (p: Vec2) => boolean): ClassifiedSpan[] {
+  const spans: ClassifiedSpan[] = [];
   let from = curve.start;
   for (const segment of curve.segments) {
     for (const span of splitSegmentAtBoundary(from, segment, inRegion)) {
@@ -38,8 +60,11 @@ export function clipCurveOutsideRegion(
     }
     from = segment.to;
   }
-  if (spans.every((s) => !s.inside)) return [{ curve, startCut: false, endCut: false }];
-  if (spans.every((s) => s.inside)) return [];
+  return spans;
+}
+
+// Maximal runs of consecutive outside spans.
+function outsideRuns(spans: readonly ClassifiedSpan[]): Span[][] {
   const runs: Span[][] = [];
   let current: Span[] | null = null;
   for (const { span, inside } of spans) {
@@ -53,28 +78,27 @@ export function clipCurveOutsideRegion(
     }
     current.push(span);
   }
-  const firstOutside = spans[0]?.inside === false;
-  const lastOutside = spans.at(-1)?.inside === false;
-  // A closed curve cut somewhere: the run through its seam is one piece.
-  if (curve.closed && firstOutside && lastOutside && runs.length > 1) {
-    const head = runs.shift() ?? [];
-    runs[runs.length - 1] = [...(runs.at(-1) ?? []), ...head];
-  }
-  return runs.map((run) => {
-    const first = run[0];
-    const last = run.at(-1);
-    const startsAtCurveStart = !curve.closed && first === spans[0]?.span;
-    const endsAtCurveEnd = !curve.closed && last === spans.at(-1)?.span;
-    return {
-      curve: {
-        start: first === undefined ? curve.start : pointAt(first.from, first.segment, first.t0),
-        segments: run.map(subSegment),
-        closed: false,
-      },
-      startCut: !startsAtCurveStart,
-      endCut: !endsAtCurveEnd,
-    };
-  });
+  return runs;
+}
+
+function pieceFromRun(
+  curve: CurveSubpath,
+  run: readonly Span[],
+  firstSpan: Span | undefined,
+  lastSpan: Span | undefined,
+): ClippedPiece {
+  const first = run[0];
+  const startsAtCurveStart = !curve.closed && first === firstSpan;
+  const endsAtCurveEnd = !curve.closed && run.at(-1) === lastSpan;
+  return {
+    curve: {
+      start: first === undefined ? curve.start : pointAt(first.from, first.segment, first.t0),
+      segments: run.map(subSegment),
+      closed: false,
+    },
+    startCut: !startsAtCurveStart,
+    endCut: !endsAtCurveEnd,
+  };
 }
 
 function mid(span: Span): number {

@@ -96,34 +96,44 @@ export function hybridMaxStrokeWidthPx(options: TraceOptions): number {
 // Squared radii of the discs wider than the gate, restricted to the
 // eight-connected cores that reach the seed radius (a hysteresis band).
 function wideCoreRadii(mask: InkMask, distSq: Float64Array, gateRadius: number): Float64Array {
-  const { width, height } = mask;
   const gateSq = gateRadius * gateRadius;
   const seedSq = (gateRadius + SEED_MARGIN_PX) ** 2;
-  const radiusSq = new Float64Array(width * height);
-  const queue: number[] = [];
-  for (let i = 0; i < distSq.length; i += 1) {
-    if ((distSq[i] ?? 0) > seedSq) {
-      radiusSq[i] = distSq[i] ?? 0;
-      queue.push(i);
+  const radiusSq = new Float64Array(mask.width * mask.height);
+  const seeds: number[] = [];
+  distSq.forEach((d, i) => {
+    if (d > seedSq) {
+      radiusSq[i] = d;
+      seeds.push(i);
     }
-  }
-  for (let head = 0; head < queue.length; head += 1) {
-    const i = queue[head] ?? 0;
+  });
+  floodEightConnected(mask.width, mask.height, seeds, (n) => {
+    const d = distSq[n] ?? 0;
+    if ((radiusSq[n] ?? 0) > 0 || d <= gateSq) return false;
+    radiusSq[n] = d;
+    return true;
+  });
+  return radiusSq;
+}
+
+// Breadth-first eight-neighbour flood from `queue` (already claimed by the
+// caller). `claim` returns true when it takes a neighbour into the region.
+function floodEightConnected(
+  width: number,
+  height: number,
+  queue: number[],
+  claim: (index: number) => boolean,
+): void {
+  // The array iterator reads the live length, so pushed pixels are visited.
+  for (const i of queue) {
     const x = i % width;
     const y = (i - x) / width;
-    for (let dy = -1; dy <= 1; dy += 1) {
-      for (let dx = -1; dx <= 1; dx += 1) {
-        const nx = x + dx;
-        const ny = y + dy;
-        if (nx < 0 || ny < 0 || nx >= width || ny >= height) continue;
+    for (let ny = Math.max(0, y - 1); ny <= Math.min(height - 1, y + 1); ny += 1) {
+      for (let nx = Math.max(0, x - 1); nx <= Math.min(width - 1, x + 1); nx += 1) {
         const n = ny * width + nx;
-        if ((radiusSq[n] ?? 0) > 0 || (distSq[n] ?? 0) <= gateSq) continue;
-        radiusSq[n] = distSq[n] ?? 0;
-        queue.push(n);
+        if (claim(n)) queue.push(n);
       }
     }
   }
-  return radiusSq;
 }
 
 type KeptStroke = {
@@ -178,25 +188,36 @@ function* fillMaskSteps(
 ): TraceSteps<InkMask | null> {
   if (!wide.includes(1)) return null;
   const { width, height } = mask;
-  const strokeRadii = new Float64Array(width * height);
+  const strokeRadii = strokeCoverRadii(mask, distSq, strokes);
+  const swallowed = yield* discUnionSteps({ width, height, radiusSq: strokeRadii });
+  const fill = new Uint8Array(width * height);
+  mask.ink.forEach((ink, i) => {
+    if (ink === 1 && (wide[i] === 1 || swallowed[i] !== 1)) fill[i] = 1;
+  });
+  return { width, height, ink: componentsHoldingWideInk(fill, wide, width, height) };
+}
+
+// Squared cover radius at every kept-stroke sample pixel. One pixel beyond
+// the inscribed radius swallows the stroke's edge pixels (an even-width
+// line's second centre row sits exactly r away).
+function strokeCoverRadii(
+  mask: InkMask,
+  distSq: Float64Array,
+  strokes: ReadonlyArray<KeptStroke>,
+): Float64Array {
+  const { width, height } = mask;
+  const radii = new Float64Array(width * height);
   for (const stroke of strokes) {
     for (const p of stroke.polyline.points) {
       const x = Math.floor(p.x);
       const y = Math.floor(p.y);
       if (x < 0 || y < 0 || x >= width || y >= height) continue;
       const i = y * width + x;
-      // One pixel beyond the inscribed radius swallows the stroke's edge
-      // pixels (an even-width line's second centre row sits exactly r away).
       const r = Math.sqrt(distSq[i] ?? 0) + 1;
-      if (r * r > (strokeRadii[i] ?? 0)) strokeRadii[i] = r * r;
+      if (r * r > (radii[i] ?? 0)) radii[i] = r * r;
     }
   }
-  const swallowed = yield* discUnionSteps({ width, height, radiusSq: strokeRadii });
-  const fill = new Uint8Array(width * height);
-  for (let i = 0; i < fill.length; i += 1) {
-    if (mask.ink[i] === 1 && (wide[i] === 1 || swallowed[i] !== 1)) fill[i] = 1;
-  }
-  return { width, height, ink: componentsHoldingWideInk(fill, wide, width, height) };
+  return radii;
 }
 
 function componentsHoldingWideInk(
@@ -206,29 +227,18 @@ function componentsHoldingWideInk(
   height: number,
 ): Uint8Array {
   const out = new Uint8Array(fill.length);
-  const queue: number[] = [];
-  for (let i = 0; i < fill.length; i += 1) {
-    if (wide[i] === 1 && fill[i] === 1 && out[i] === 0) {
+  const seeds: number[] = [];
+  fill.forEach((f, i) => {
+    if (f === 1 && wide[i] === 1) {
       out[i] = 1;
-      queue.push(i);
+      seeds.push(i);
     }
-  }
-  for (let head = 0; head < queue.length; head += 1) {
-    const i = queue[head] ?? 0;
-    const x = i % width;
-    const y = (i - x) / width;
-    for (let dy = -1; dy <= 1; dy += 1) {
-      for (let dx = -1; dx <= 1; dx += 1) {
-        const nx = x + dx;
-        const ny = y + dy;
-        if (nx < 0 || ny < 0 || nx >= width || ny >= height) continue;
-        const n = ny * width + nx;
-        if (fill[n] !== 1 || out[n] === 1) continue;
-        out[n] = 1;
-        queue.push(n);
-      }
-    }
-  }
+  });
+  floodEightConnected(width, height, seeds, (n) => {
+    if (fill[n] !== 1 || out[n] === 1) return false;
+    out[n] = 1;
+    return true;
+  });
   return out;
 }
 

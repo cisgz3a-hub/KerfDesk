@@ -25,9 +25,9 @@ import {
   type TextObject,
   type TracedImage,
 } from '../../core/scene';
-import { isHybridStrokePath } from '../../core/trace/hybrid/hybrid-paths';
 import { applyCncTextDefaultsToNewLayer } from './cnc-text-defaults';
 import { duplicateSceneSelection } from './duplicate-scene-selection';
+import { freshArtworkMode, freshArtworkModeForColor } from './fresh-artwork-mode';
 import { applyFreshTraceScanDirection } from './fresh-trace-scan-direction';
 import { positionTraceOverRasterSource } from './trace-placement';
 import { releaseTraceSourcePalette } from './trace-source-palette';
@@ -241,24 +241,6 @@ export function applyFreshImport(
     redoStack: [],
     dirty: true,
   };
-}
-
-// Line + fill (ADR-454): its strokes bind to a LINE operation and its
-// outlines to a FILL operation, whatever the object-level mode says.
-function freshArtworkModeForColor(
-  object: SceneObject,
-): ((color: string) => 'line' | 'fill') | undefined {
-  if (object.kind !== 'traced-image' || object.traceMode !== 'hybrid') return undefined;
-  return (color) => (isHybridStrokePath({ color }) ? 'line' : 'fill');
-}
-
-function freshArtworkMode(object: SceneObject): 'line' | 'fill' | 'image' {
-  if (object.kind === 'raster-image') return 'image';
-  if (object.kind === 'traced-image') {
-    if (object.traceMode === 'centerline' || object.traceMode === 'edge') return 'line';
-    return object.operationOverride?.mode ?? 'fill';
-  }
-  return object.operationOverride?.mode ?? 'line';
 }
 
 // Trace paths use the actual capped working grid reported by the tracer, while
