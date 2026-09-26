@@ -3,6 +3,7 @@
 
 import type { Vec2 } from '../scene';
 import { fitCircle } from './contour-corner-circle';
+import { fieldConfirmsWedge, wedgeFieldFit } from './contour-corner-field';
 import { latticeBarriers } from './contour-corner-lattice';
 import {
   KEPT_FEATURE,
@@ -13,6 +14,7 @@ import {
   type Candidate,
   type CornerDialInput,
 } from './contour-corner-types';
+import type { CrackSubPixelField } from './saddle-connectivity';
 
 // Leg straightness: the largest perpendicular residual a leg may carry. Binary
 // cracks of a digital straight line scatter up to ~±0.25 px about their line,
@@ -36,11 +38,22 @@ const MAX_SKIP_PX = 2;
 const APEX_STANDOFF_BASE_PX = 0.9;
 const APEX_STANDOFF_ACUTE_PX = 0.5;
 // A measured chain is the field's own iso-line, rounded only by the source's
-// anti-aliasing: its hidden apex lies much closer (measured on owl and
-// hummingbird: the binary allowance let corners cut into neighbouring
-// outlines, 3900 topology conflicts vs 350 on the owl at Sharp).
+// anti-aliasing. Its hidden apex stands off by what a one-pixel box filter
+// rounds away plus what the crack sampling chords off, not by a pixel chamfer:
+// the half-coverage iso-line of a box-filtered corner of interior angle A
+// recedes from the apex by 0.25 / tan(A / 2) (0.293 px at 90 degrees, 0.93 px
+// at 30), and the chord through the lattice cracks nearest the tip cuts up to
+// 0.3 / sin(A / 2) further in (measured on the bake-off's anti-aliased wedges,
+// stars and rectangles: the distance past the filter recession, times
+// sin(A / 2), stays at 0.18..0.29 px for 30..120 degrees). That allowance alone
+// gives organic tips on the owl and hummingbird apexes that cut into their
+// neighbours (first-round topology conflicts 75 -> 190 on the owl's Line Art),
+// so an apex past the tight allowance, the one tuned against those conflicts,
+// must also be confirmed by the field (contour-corner-field.ts).
 const APEX_STANDOFF_MEASURED_BASE_PX = 0.3;
 const APEX_STANDOFF_MEASURED_ACUTE_PX = 0.15;
+const APEX_STANDOFF_MEASURED_FILTER_PX = 0.25;
+const APEX_STANDOFF_MEASURED_SAMPLING_PX = 0.3;
 // Weight of the one-circle model's excess RMS residual over the two-leg
 // model's in the cost cap (see header).
 const ARC_EXCESS_WEIGHT = 10;
@@ -139,6 +152,7 @@ export function legCandidates(
         scale,
         input.thresholdPx,
         input.measured,
+        input.field,
       );
       if (candidate !== null && (best === null || candidate.cost > best.cost)) best = candidate;
     }
@@ -262,13 +276,14 @@ function legCorner(
   scale: number,
   thresholdPx: number,
   measured: boolean,
+  field: CrackSubPixelField | undefined,
 ): Candidate | null {
   if (back.count < MIN_LEG_POINTS || ahead.count < MIN_LEG_POINTS) return null;
   const n = pts.length;
   if (back.count + ahead.count + skip > n) return null;
   const meeting = legMeeting(pts, a, skip, back, ahead, scale, measured);
   if (meeting === null) return null;
-  const { apex, turn } = meeting;
+  const { apex, turn, confirm } = meeting;
   const b = (a + 1 + skip) % n;
   const farBack = pts[(((a - back.count + 1) % n) + n) % n] as Vec2;
   const farAhead = pts[(b + ahead.count - 1) % n] as Vec2;
@@ -285,8 +300,27 @@ function legCorner(
   const legRms = Math.sqrt((back.residualSq + ahead.residualSq) / (back.count + ahead.count));
   const cost = Math.min(filletGap, ARC_EXCESS_WEIGHT * Math.max(0, arcRms - legRms)) / scale;
   if (cost <= thresholdPx) return null;
-  if (measured && claimsPixelCentre(pts, a, skip, apex, scale)) return null;
+  if (measured && !measuredApexStands(pts, a, skip, apex, back, ahead, scale, confirm, field)) {
+    return null;
+  }
   return { from: a, skip, apex, cost, legBack: back.count, legAhead: ahead.count };
+}
+
+// A measured apex past the tight standoff, or over a pixel centre, stands only
+// if the field looks like the box-filtered wedge its legs bound.
+function measuredApexStands(
+  pts: ReadonlyArray<Vec2>,
+  a: number,
+  skip: number,
+  apex: Vec2,
+  back: Leg,
+  ahead: Leg,
+  scale: number,
+  confirm: boolean,
+  field: CrackSubPixelField | undefined,
+): boolean {
+  if (!confirm && !claimsPixelCentre(pts, a, skip, apex, scale)) return true;
+  return field !== undefined && fieldConfirmsWedge(wedgeFieldFit(field, apex, back, ahead, scale));
 }
 
 // Where the two legs meet, if they form a corner there: a well-conditioned
@@ -301,7 +335,7 @@ function legMeeting(
   ahead: Leg,
   scale: number,
   measured: boolean,
-): { readonly apex: Vec2; readonly turn: number } | null {
+): { readonly apex: Vec2; readonly turn: number; readonly confirm: boolean } | null {
   const turn = Math.atan2(
     back.dx * ahead.dy - back.dy * ahead.dx,
     back.dx * ahead.dx + back.dy * ahead.dy,
@@ -316,10 +350,24 @@ function legMeeting(
   if (along(back, apex) < along(back, pts[a] as Vec2) - slack) return null;
   if (along(ahead, apex) > along(ahead, pts[(a + 1 + skip) % n] as Vec2) + slack) return null;
   const interior = Math.PI - Math.abs(turn);
-  const base = measured ? APEX_STANDOFF_MEASURED_BASE_PX : APEX_STANDOFF_BASE_PX;
-  const acute = measured ? APEX_STANDOFF_MEASURED_ACUTE_PX : APEX_STANDOFF_ACUTE_PX;
-  const standoff = (base + acute / Math.max(0.1, Math.sin(interior / 2))) * scale;
-  return distanceToGap(pts, a, skip, apex) > standoff ? null : { apex, turn };
+  const dist = distanceToGap(pts, a, skip, apex);
+  if (!measured) {
+    const standoff =
+      (APEX_STANDOFF_BASE_PX + APEX_STANDOFF_ACUTE_PX / Math.max(0.1, Math.sin(interior / 2))) *
+      scale;
+    return dist > standoff ? null : { apex, turn, confirm: false };
+  }
+  const tight =
+    (APEX_STANDOFF_MEASURED_BASE_PX +
+      APEX_STANDOFF_MEASURED_ACUTE_PX / Math.max(0.1, Math.sin(interior / 2))) *
+    scale;
+  const half = Math.max(0.05, interior / 2);
+  const loose =
+    (APEX_STANDOFF_MEASURED_FILTER_PX / Math.tan(half) +
+      APEX_STANDOFF_MEASURED_SAMPLING_PX / Math.sin(half)) *
+    scale;
+  if (dist > Math.max(tight, loose)) return null;
+  return { apex, turn, confirm: dist > tight };
 }
 
 // Measured loops: the crack chain is the iso-line of the pre-threshold field,
@@ -330,7 +378,9 @@ function legMeeting(
 // contradict the measurement (on dense art it is usually a neighbour's pixel,
 // and the corner would cut into that outline). Binary chains are mid-crack
 // approximations whose true corner may lie well past them (an acute tip), so
-// the test does not apply there.
+// the test does not apply there. Pixel centres close to an acute anti-aliased
+// tip legitimately read as paper, so a claim is waived when the field confirms
+// the wedge (legCorner).
 function claimsPixelCentre(
   pts: ReadonlyArray<Vec2>,
   a: number,

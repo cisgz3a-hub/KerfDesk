@@ -1,0 +1,68 @@
+import { describe, expect, it } from 'vitest';
+import { fieldConfirmsWedge, wedgeFieldFit, type WedgeLine } from './contour-corner-field';
+import type { CrackSubPixelField } from './saddle-connectivity';
+
+// A 40 degree ink wedge pointing left, apex at (10.3, 20.4): the incoming leg
+// runs up-left along the lower edge to the apex, the outgoing leg up-right
+// along the upper edge (ink on the right of travel).
+const APEX = { x: 10.3, y: 20.4 };
+const HALF = (20 * Math.PI) / 180;
+const back: WedgeLine = {
+  cx: APEX.x + 10 * Math.cos(HALF),
+  cy: APEX.y + 10 * Math.sin(HALF),
+  dx: -Math.cos(HALF),
+  dy: -Math.sin(HALF),
+};
+const ahead: WedgeLine = {
+  cx: APEX.x + 10 * Math.cos(HALF),
+  cy: APEX.y - 10 * Math.sin(HALF),
+  dx: Math.cos(HALF),
+  dy: -Math.sin(HALF),
+};
+
+function boxFiltered(inside: (x: number, y: number) => boolean): CrackSubPixelField {
+  const samples = 16;
+  return {
+    lumaAt: (px, py) => {
+      let covered = 0;
+      for (let sy = 0; sy < samples; sy += 1) {
+        for (let sx = 0; sx < samples; sx += 1) {
+          if (inside(px + (sx + 0.5) / samples, py + (sy + 0.5) / samples)) covered += 1;
+        }
+      }
+      return 255 - (covered / samples ** 2) * 255;
+    },
+    thresholdAt: () => 128,
+  };
+}
+
+const inWedge = (x: number, y: number): boolean =>
+  x > APEX.x && Math.abs(y - APEX.y) < (x - APEX.x) * Math.tan(HALF);
+
+describe('wedgeFieldFit', () => {
+  it('confirms the apex of an anti-aliased wedge', () => {
+    const fit = wedgeFieldFit(boxFiltered(inWedge), APEX, back, ahead, 1);
+    expect(fit).not.toBeNull();
+    expect(fit?.max).toBeLessThan(0.05);
+    expect(fieldConfirmsWedge(fit)).toBe(true);
+  });
+
+  it('rejects legs that only extrapolate to a meeting point round a rounded tip', () => {
+    // The same legs, but the tip is rounded off by a 3 px fillet.
+    const r = 3;
+    const centreX = APEX.x + r / Math.sin(HALF);
+    // Past the fillet's tangent points the wedge is whole; before them only
+    // the fillet circle is ink.
+    const tangentX = (r * Math.cos(HALF) ** 2) / Math.sin(HALF);
+    const rounded = (x: number, y: number): boolean =>
+      inWedge(x, y) && (x - APEX.x >= tangentX || Math.hypot(x - centreX, y - APEX.y) < r);
+    const fit = wedgeFieldFit(boxFiltered(rounded), APEX, back, ahead, 1);
+    expect(fit).not.toBeNull();
+    expect(fieldConfirmsWedge(fit)).toBe(false);
+  });
+
+  it('cannot judge a field without paper-to-ink contrast', () => {
+    const flat: CrackSubPixelField = { lumaAt: () => 128, thresholdAt: () => 128 };
+    expect(wedgeFieldFit(flat, APEX, back, ahead, 1)).toBeNull();
+  });
+});

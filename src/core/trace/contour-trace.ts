@@ -313,6 +313,7 @@ function finishLoop(staircase: ReadonlyArray<Vec2>, finish: LoopFinish): Finishe
     // The straight-run flattener erases wobble up to 1px × strength; apexes
     // sit on the lines it will draw (binary loops only — measured loops skip it).
     edgeNoisePx: subPixelInformed ? 0 : finish.flattenStrength,
+    field: finish.crackField,
   });
   const corners = separateSaddleApexes(decided, crack.points, (vertex) =>
     isSaddleVertex(finish.mask, vertex),

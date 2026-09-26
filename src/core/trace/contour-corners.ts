@@ -76,6 +76,12 @@ const DEFAULT_SMOOTHNESS = 1;
 // Two corners conflict when one's apex lies inside the other's straight legs
 // by more than this many px.
 const LEG_INTERIOR_MARGIN_PX = 2;
+// A measured leg grows until it crosses a turn stop, and on an anti-aliased
+// tip the stop can sit a crack past the tip's peak: the neighbouring corner's
+// leg then wraps up to this far round that tip (measured on the bake-off's
+// 12-point star, whose inner corners were blocked by their own neighbouring
+// tips). A long leg's far end is trimmed by this much more before the test.
+const MEASURED_LEG_WRAP_PX = 1;
 
 /** The Smoothness dial as a rounding-cost threshold in source px. */
 export function cornerThresholdFromSmoothness(smoothness: number | undefined): number {
@@ -107,7 +113,7 @@ export function decideContourCorners(input: CornerDialInput): ContourCorner[] {
     ? lattice
     : [...lattice.filter((c) => c.feature === true), ...legCandidates(input, scale, lattice)];
   const alive = candidates.filter((c) => c.cost > threshold);
-  const chosen = (latticeRegime ? alive : selectCompatible(alive, n, scale))
+  const chosen = (latticeRegime ? alive : selectCompatible(alive, n, scale, input.measured))
     .map(({ from, skip, apex, cost }) => ({ from, skip, apex, cost }))
     .sort((a, b) => a.from - b.from);
   const noise = (input.edgeNoisePx ?? 0) * scale;
@@ -241,11 +247,14 @@ function selectCompatible(
   candidates: ReadonlyArray<Candidate>,
   n: number,
   scale: number,
+  measured: boolean,
 ): Candidate[] {
   const order = [...candidates].sort(
     (x, y) => y.cost - x.cost || x.skip - y.skip || x.from - y.from,
   );
-  const margin = Math.max(1, Math.round(LEG_INTERIOR_MARGIN_PX * scale));
+  const base = Math.max(1, Math.round(LEG_INTERIOR_MARGIN_PX * scale));
+  const wrap = measured ? Math.max(1, Math.round(MEASURED_LEG_WRAP_PX * scale)) : 0;
+  const margin: LegMargin = { base, wrap, long: 3 * (base + wrap) };
   const kept: Candidate[] = [];
   // Occupancy of kept apex gaps, in doubled crack coordinates.
   for (const candidate of order) {
@@ -255,17 +264,26 @@ function selectCompatible(
   return kept;
 }
 
-function conflicts(x: Candidate, y: Candidate, n: number, margin: number): boolean {
+type LegMargin = {
+  /** Cracks trimmed off every leg's far end. */
+  readonly base: number;
+  /** Further cracks trimmed off the far end of a leg at least `long` cracks. */
+  readonly wrap: number;
+  readonly long: number;
+};
+
+function conflicts(x: Candidate, y: Candidate, n: number, margin: LegMargin): boolean {
   return apexInsideLegs(x, y, n, margin) || apexInsideLegs(y, x, n, margin);
 }
 
 // Apex of `x` (the half-open crack gap from+0.5 … from+skip+0.5) inside the
 // leg span of `y` shrunk by `margin` cracks at both far ends. Coordinates are
 // doubled so half-crack positions are integers.
-function apexInsideLegs(x: Candidate, y: Candidate, n: number, margin: number): boolean {
+function apexInsideLegs(x: Candidate, y: Candidate, n: number, margin: LegMargin): boolean {
   const ring = 2 * n;
-  const lo = 2 * (y.from - y.legBack + 1 + margin);
-  const hi = 2 * (y.from + y.skip + 1 + y.legAhead - 1 - margin);
+  const trim = (count: number): number => margin.base + (count >= margin.long ? margin.wrap : 0);
+  const lo = 2 * (y.from - y.legBack + 1 + trim(y.legBack));
+  const hi = 2 * (y.from + y.skip + 1 + y.legAhead - 1 - trim(y.legAhead));
   if (hi <= lo) return false;
   const span = hi - lo;
   const xLo = 2 * x.from + 1;

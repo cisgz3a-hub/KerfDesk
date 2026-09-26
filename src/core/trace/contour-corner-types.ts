@@ -2,6 +2,7 @@
 // ADR-404).
 
 import type { Vec2 } from '../scene';
+import type { CrackSubPixelField } from './saddle-connectivity';
 
 /** Rounding cost of a one-pixel lattice step: tan(22.5°). */
 export const LATTICE_STEP_COST_PX = Math.tan(Math.PI / 8);
@@ -42,6 +43,9 @@ export type CornerDialInput = {
    *  away; 0 or omitted = none. Only re-seats the decided apexes on the lines
    *  the flattener will draw; which corners exist does not depend on it. */
   readonly edgeNoisePx?: number;
+  /** The pre-threshold field the measured cracks came from, which confirms
+   *  measured apexes the crack chain alone cannot (contour-corner-field.ts). */
+  readonly field?: CrackSubPixelField;
 };
 
 export type Candidate = ContourCorner & {
