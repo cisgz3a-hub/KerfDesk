@@ -47,7 +47,8 @@ describe('Line + fill Max stroke width', () => {
     const centerline = TRACE_PRESETS['Centerline'];
     if (hybrid === undefined || centerline === undefined) throw new Error('missing preset');
     expect(withHybridMaxStrokeWidth(hybrid, 0.5, 10).hybridMaxStrokeWidthPx).toBe(5);
-    expect(withHybridMaxStrokeWidth(hybrid, 0.05, 10).hybridMaxStrokeWidthPx).toBe(1);
+    // Unfloored: a sub-pixel preview gate scales to the commit grid intact.
+    expect(withHybridMaxStrokeWidth(hybrid, 0.05, 10).hybridMaxStrokeWidthPx).toBeCloseTo(0.5, 9);
     expect(withHybridMaxStrokeWidth(hybrid, 0.5, null)).toBe(hybrid);
     expect(withHybridMaxStrokeWidth(centerline, 0.5, 10)).toBe(centerline);
   });

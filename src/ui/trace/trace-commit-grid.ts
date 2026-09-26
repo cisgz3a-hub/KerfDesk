@@ -30,11 +30,18 @@ export const DEFAULT_TRACE_SPOT_MM = 0.1;
  *  73 B/px; plus 16 B/px for the decode canvas, its pixel copy, the composited
  *  copy and the copy moved to the trace worker. Centerline plans with the
  *  contour figure although it needs less memory: its run time grows fastest
- *  (121 s at 6.3 MP on the owl). ADR-409 has the table. */
+ *  (121 s at 6.3 MP on the owl). ADR-409 has the table.
+ *
+ *  Line + fill (ADR-454) is NOT measured. It runs the Centerline lane and
+ *  then the contour finisher on the fill mask while its own grids stay alive
+ *  (ink mask, Float64 distance field, wide region, stroke discs, fill mask:
+ *  about 13 B/px, and transient Float64 disc radii), so it plans with the
+ *  contour figure plus 40 B/px for those grids and headroom. */
 export const TRACE_PEAK_BYTES_PER_PIXEL = {
   contour: 190,
   edge: 220,
   centerline: 190,
+  hybrid: 230,
 } as const;
 /** Share of the device's memory one trace may plan to use. */
 export const TRACE_MEMORY_SHARE = 0.25;
@@ -104,10 +111,12 @@ export function traceCommitPixelBudget(
     deviceMemoryGb !== undefined && Number.isFinite(deviceMemoryGb) && deviceMemoryGb > 0
       ? deviceMemoryGb
       : DEFAULT_DEVICE_MEMORY_GB;
-  const bytesPerPixel = TRACE_PEAK_BYTES_PER_PIXEL[traceLane(options)];
-  const pixels = Math.floor((memoryGb * 2 ** 30 * TRACE_MEMORY_SHARE) / bytesPerPixel);
+  const lane = traceLane(options);
+  const pixels = Math.floor(
+    (memoryGb * 2 ** 30 * TRACE_MEMORY_SHARE) / TRACE_PEAK_BYTES_PER_PIXEL[lane],
+  );
   const ceiling =
-    traceLane(options) === 'centerline'
+    lane === 'centerline' || lane === 'hybrid'
       ? TRACE_CENTERLINE_MAX_WORKING_PIXELS
       : TRACE_MAX_WORKING_PIXELS;
   return Math.min(ceiling, pixels);
@@ -241,8 +250,10 @@ function traceLane(
   options: Pick<TraceOptions, 'traceMode'>,
 ): keyof typeof TRACE_PEAK_BYTES_PER_PIXEL {
   if (options.traceMode === 'edge') return 'edge';
-  // Line + fill runs the centreline lane over the whole mask (ADR-454).
-  if (options.traceMode === 'centerline' || options.traceMode === 'hybrid') return 'centerline';
+  if (options.traceMode === 'centerline') return 'centerline';
+  // Line + fill runs the centreline lane over the whole mask, then the
+  // contour finisher (ADR-454): its run time caps like Centerline's.
+  if (options.traceMode === 'hybrid') return 'hybrid';
   return 'contour';
 }
 

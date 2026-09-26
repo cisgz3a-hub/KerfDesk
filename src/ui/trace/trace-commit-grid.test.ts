@@ -41,7 +41,7 @@ describe('traceTargetPxPerMm', () => {
 
 describe('traceCommitPixelBudget (memory guard)', () => {
   it.each([0.5, 2, 4, 8])('keeps the planned peak within the memory share of %s GB', (gb) => {
-    for (const traceMode of ['filled-contours', 'edge', 'centerline'] as const) {
+    for (const traceMode of ['filled-contours', 'edge', 'centerline', 'hybrid'] as const) {
       const budget = traceCommitPixelBudget({ traceMode }, gb);
       const lane = traceMode === 'filled-contours' ? 'contour' : traceMode;
       const peak = budget * TRACE_PEAK_BYTES_PER_PIXEL[lane];

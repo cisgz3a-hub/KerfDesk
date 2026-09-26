@@ -64,5 +64,7 @@ export function withHybridMaxStrokeWidth(
   if (options.traceMode !== 'hybrid' || pxPerMm === null) return options;
   const px = widthMm * pxPerMm;
   if (!Number.isFinite(px) || px <= 0) return options;
-  return { ...options, hybridMaxStrokeWidthPx: Math.max(1, px) };
+  // No floor here: the commit grid scales this value up, and the core floors
+  // the gate at 1 px on its own working grid.
+  return { ...options, hybridMaxStrokeWidthPx: px };
 }

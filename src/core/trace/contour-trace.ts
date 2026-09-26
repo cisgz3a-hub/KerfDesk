@@ -63,7 +63,16 @@ const CONTOUR_COLOR = '#000000';
  *  gate (ADR-123). */
 export function isBinaryContourPreset(options: TraceOptions): boolean {
   if (options.photoDetail !== undefined) return false;
-  if (options.traceMode === 'centerline' || options.traceMode === 'edge') return false;
+  // Line + fill (ADR-454) is also 2-colour with a fixed palette, but its
+  // strokes carry widths and its gate is in pixels: the contour-only routes
+  // (supersample profile, dense-colour downscale) would drop both.
+  if (
+    options.traceMode === 'centerline' ||
+    options.traceMode === 'edge' ||
+    options.traceMode === 'hybrid'
+  ) {
+    return false;
+  }
   if (options.numberOfColors !== 2) return false;
   return options.fixedPalette?.length === 2;
 }
