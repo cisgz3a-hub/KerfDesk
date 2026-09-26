@@ -57,7 +57,7 @@ async function clickConnect(): Promise<unknown> {
   });
   try {
     const button = [...host.querySelectorAll('button')].find(
-      (candidate) => candidate.textContent === 'Connect…',
+      (candidate) => candidate.textContent === 'Connect',
     );
     if (button === undefined) throw new Error('Connect button missing');
     await act(async () => {

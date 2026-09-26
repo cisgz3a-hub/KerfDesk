@@ -2,16 +2,13 @@
 // profile catalog, and verbatim profile application.
 
 import { act } from 'react';
-import { createRoot, type Root } from 'react-dom/client';
 import { Simulate } from 'react-dom/test-utils';
-import { afterEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, describe, expect, it } from 'vitest';
 import { DEFAULT_DEVICE_PROFILE } from '../../../core/devices';
-import type { FileOpenRequest, FileSaveRequest, PlatformAdapter } from '../../../platform/types';
-import { PlatformProvider } from '../../app/platform-context';
 import { useStore } from '../../state';
 import { useLaserStore } from '../../state/laser-store';
 import { resetStore } from '../../state/test-helpers';
-import { DeviceSetupWizard } from './DeviceSetupWizard';
+import { renderWizard } from './device-setup-wizard.test-support';
 
 (
   globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT?: boolean }
@@ -120,10 +117,10 @@ describe('DeviceSetupWizard catalog', () => {
     } as Partial<ReturnType<typeof useLaserStore.getState>>);
     const view = await renderWizard();
     try {
-      const auto = view.host.querySelector('section[aria-label="Automatic setup"]');
-      if (!(auto instanceof HTMLElement)) throw new Error('Automatic setup lane missing');
+      const auto = view.host.querySelector('section[aria-label="Find my machine"]');
+      if (!(auto instanceof HTMLElement)) throw new Error('Find my machine card missing');
       expect(auto.closest('details')).toBeNull();
-      expect(auto.textContent).toContain('Bed width: 363.000 mm');
+      expect(auto.textContent).toMatch(/Bed width: .* → 363\.000 mm/);
       expect(view.host.querySelector('[role="status"]')).toBeNull();
 
       await act(async () => button(view.host, 'Use detected values').click());
@@ -164,39 +161,6 @@ describe('DeviceSetupWizard catalog', () => {
     }
   });
 });
-
-function mockPlatform(): PlatformAdapter {
-  return {
-    id: 'mock',
-    pickFilesForOpen: vi.fn(async (_request: FileOpenRequest) => []),
-    pickFileForSave: vi.fn(async (_request: FileSaveRequest) => null),
-    serial: { isSupported: () => true, requestPort: async () => null },
-  };
-}
-
-async function renderWizard(): Promise<{
-  readonly host: HTMLDivElement;
-  readonly unmount: () => Promise<void>;
-}> {
-  const host = document.createElement('div');
-  document.body.appendChild(host);
-  let root: Root | null = null;
-  await act(async () => {
-    root = createRoot(host);
-    root.render(
-      <PlatformProvider adapter={mockPlatform()}>
-        <DeviceSetupWizard onClose={() => undefined} />
-      </PlatformProvider>,
-    );
-  });
-  return {
-    host,
-    unmount: async () => {
-      if (root !== null) await act(async () => root?.unmount());
-      host.remove();
-    },
-  };
-}
 
 /** The catalog card control: one radio per profile, the whole card is its label. */
 function profileCard(host: HTMLElement, ariaLabel: string): HTMLInputElement {

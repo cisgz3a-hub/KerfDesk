@@ -56,6 +56,8 @@ import type { TranscriptSource } from './laser-transcript';
 import { clearCncLiveCaps } from './detected-settings-action';
 import { createLaserStatusPollWriter } from './laser-status-poll-writer';
 import { cancelAttemptOwnsStatusBoundary } from './laser-motion-operation';
+import { browserLocalStorage } from './browser-local-storage';
+import { forgetRememberedSerialPort } from './serial-port-memory';
 
 type SetFn = (
   partial: Partial<LaserState> | ((state: LaserState) => Partial<LaserState> | LaserState),
@@ -99,6 +101,8 @@ export function connectionActions(
     },
     forgetDevice: () => {
       clearCncLiveCaps();
+      // Forget means pick again next time, so the next Connect asks (ADR-420).
+      forgetRememberedSerialPort(browserLocalStorage());
       cancelConnectAttempt(refs, true);
       return runDisconnect(set, get, refs, safeWrite, true);
     },
@@ -144,7 +148,11 @@ function attachConnectedController(
     clearCncLiveCaps();
     set(buildPortClosePatch);
   });
-  set((state) => ({ ...connectedControllerStatePatch(state), serialPortInfo: portInfo }));
+  set((state) => ({
+    ...connectedControllerStatePatch(state),
+    serialPortInfo: portInfo,
+    connectedBaudRate: baudRate,
+  }));
   startConnectedControllerHandshake(set, get, refs, safeWrite, connection, baudRate);
 }
 
@@ -201,6 +209,7 @@ function connectingStatePatch(state: LaserState, refs: LiveRefs): Partial<LaserS
   return {
     connection: { kind: 'connecting' },
     serialPortInfo: null,
+    connectedBaudRate: null,
     controllerSessionEpoch: nextEpoch,
     statusReport: null,
     statusObservation: null,

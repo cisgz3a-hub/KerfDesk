@@ -1049,11 +1049,31 @@ Status bar messages (toasts that appear in the bar for 3 s) for non-blocking eve
 ### F-B1. Connect to laser
 
 #### Success
-1. User clicks **Connect…** in the Laser panel.
-2. Browser shows the WebSerial port-picker (`navigator.serial.requestPort`).
-3. User picks the laser's USB-CDC port.
-4. App opens at 115200 baud, registers line + close handlers, starts the 250 ms status poll.
-5. Connection dot turns green; the status display shows the GRBL state from the first `?` reply.
+1. The **Machine connection** card at the top of the Laser and CNC rail shows the status, the
+   machine profile it connects with, and one button: **Connect**, **Connecting…** or
+   **Disconnect** (ADR-420).
+2. **Connect** reuses the remembered port without a picker when the browser still grants exactly
+   one attached port that matches it (by USB vendor and product ID), or when one granted port is
+   attached and none is remembered. Otherwise the WebSerial port-picker
+   (`navigator.serial.requestPort`) opens and the user picks the machine's USB port.
+3. App opens at the profile's baud rate, registers line + close handlers, starts the 250 ms
+   status poll, and remembers the port's USB IDs for the next Connect.
+4. Connection dot turns green; the status display shows the GRBL state from the first `?` reply,
+   and the card shows `USB <vendor>:<product> · <baud> baud` under the profile.
+5. The card's **⋯** menu holds **Use a different port…** (always shows the picker, disconnecting
+   first when connected), **Connect automatically**, and **Forget Controller** while connected.
+
+#### Success — connect automatically (ADR-420)
+1. **Connect automatically** is on by default. When KerfDesk starts, and whenever a granted port
+   is plugged in or unplugged, it connects on its own if the Connect rules above pick a port
+   without the picker.
+2. It never opens the picker, never interrupts a connection, a connection attempt, a job, a jog
+   or a controller operation, and does nothing for a file-only controller.
+3. Chrome keeps a port grant across restarts on Windows, and on macOS and Linux only for adapters
+   that report a USB serial number; a CH340 there needs one Connect after each replug or browser
+   restart. The desktop app grants a pick for the run only (ADR-366), so after a restart the
+   first Connect shows the picker.
+4. Turning it off in the **⋯** menu is remembered in this browser.
 
 #### Background streaming (ADR-354)
 1. Compatible GRBL-family connections use background streaming by default. The selected USB
@@ -1082,8 +1102,14 @@ Status bar messages (toasts that appear in the bar for 3 s) for non-blocking eve
 1. App returns to disconnected state, no error surfaced.
 
 #### Error — port open failure
-1. App stays in `failed` state with the error message displayed inline ("Failed: …").
-2. User can re-click Connect to retry.
+1. App stays in `failed` state: the card reads **Couldn’t connect** with the reason inline. A port
+   another program holds says the port is busy or unavailable and names the usual holders
+   (another sender, a serial monitor, another KerfDesk window).
+2. User can click **Connect** to retry, or **Use a different port…** in the **⋯** menu.
+
+#### Edge — Forget Controller
+1. **Forget Controller** revokes the port grant and forgets the remembered port, so the next
+   Connect shows the picker.
 
 #### Edge — Brave with WebSerial behind a flag
 1. Same as "not supported"; Brave issue #24404 is noted in `PROJECT.md` delivery targets.
@@ -2244,12 +2270,32 @@ The stage buttons and Back/Next remain available while a draft needs corrections
 machine setup** requires valid configuration; review cards link back to the relevant fields.
 Connecting a controller is optional, so a complete setup can be saved offline.
 
-1. **Machine** — choose **Laser only**, **CNC only**, or **Laser + CNC** from capability cards;
-   hybrids also choose the active mode after Save. **Set up automatically** follows: it states what
-   the selected controller family reported, lists those values, and carries **Use detected values**
-   (ADR-347). While nothing is connected it says that connecting the controller below reads those
-   values into the draft, and that offline setup still works; a file-only controller has no lane.
-   Laser-capable machines then see up to two compact profile previews, keeping the selected catalog
+1. **Machine** — **Find my machine** opens the stage (ADR-420). It connects with the draft's
+   controller, baud and streaming choice, reusing the remembered port as the rail's Connect does,
+   and reads the controller's identity and settings; nothing moves and no controller setting is
+   written. Its heading follows the connection: **Find your machine**, **Connecting…**,
+   **Reading your controller…**, **Found your <firmware> controller**, **Your machine didn’t
+   answer**, **Couldn’t connect**, or **No answer at any common speed**. When found it lists the
+   reported travel, max speed, power range, laser mode and Z travel.
+   - For a machine not set up before in this browser, or after the operator presses **Find my
+     machine**, the reported values are filled into the draft by themselves: the firmware the
+     banner names (when the driver can connect to it), the baud rate that answered, the machine
+     type from `$32` (laser mode on or off; a Laser + CNC draft keeps both), and the mapped `$$`
+     values. The card lists each change
+     as old → new with one **Undo** that restores the draft as it was. A machine already set up
+     that the operator only opens setup for keeps its values and offers **Use detected values**
+     for the ones that differ (ADR-347). When the adopted firmware differs from the one it
+     connected with, Find reconnects once with it.
+   - **Your machine didn’t answer** offers **Try other speeds**, which reconnects at 115200,
+     230400, 250000, 921600, 57600, 38400, 19200 and 9600 baud in turn and stops at the first that
+     answers; **Stop** ends it. **Use a different port…** always shows the picker.
+   - **Set up without connecting** keeps the whole stage usable offline; a browser without
+     WebSerial says so and keeps the offline path. A file-only controller explains that its jobs
+     are saved as files.
+   - **Connection options**, under the card, holds the controller family, baud, output dialect,
+     advanced streaming and the command contract.
+   The capability cards follow: choose **Laser only**, **CNC only**, or **Laser + CNC**; hybrids
+   also choose the active mode after Save. Laser-capable machines then see up to two compact profile previews, keeping the selected catalog
    profile in view. Search or **Browse all N profiles** opens the rest of the catalog. CNC-capable
    machines also have CNC presets. A profile card is one option in a radio group: a pointer
    anywhere on the card chooses that profile and copies it into the draft, while **Profile details**
@@ -2263,18 +2309,14 @@ Connecting a controller is optional, so a complete setup can be saved offline.
    matches are
    prioritised among the remaining profiles and explain their evidence under **Profile details**,
    but generic `$$` values never establish hardware identity: "Possible match" remains the
-   ceiling. Controller family, baud, output dialect,
-   and advanced streaming remain available in **Controller and connection settings**. **Import or
-   export a machine profile** is a separate disclosure on Machine.
+   ceiling, so Find my machine never picks a catalog profile. **Import or export a machine
+   profile** is a separate disclosure on Machine.
    CNC catalogue entries supply geometry and an assumed spindle ceiling only; they leave the
    controller choice unchanged. Controller notes and sources remain visible beside the selected
    preset. Onefinity entries require an external controller/postprocessor integration and do not
    claim compatible KerfDesk output.
-   Optional **Connect and detect** uses the selected driver/baud and that controller family's
-   read-only identity/settings commands, and holds the driver-mismatch resolution and the command
-   contract. **Use detected values**, in the automatic lane above it, explicitly copies supported
-   values into the draft; detection never applies them automatically. Ruida remains file-only.
-   CNC readback labels `$30` as a configured S maximum. Copying it into spindle RPM requires
+   A connection that does not match the draft's controller shows the driver-mismatch resolution
+   inside the Find card. Ruida remains file-only. CNC readback labels `$30` as a configured S maximum. Copying it into spindle RPM requires
    **Use S maximum as spindle RPM** and a reported CNC mode; otherwise the spindle ceiling stays
    unchanged. Configured travel is not measured usable travel.
 2. **Essentials** — review the name, usable work area, max/frame feed, origin, homing policy, and
@@ -2307,8 +2349,9 @@ settings and Job Review keep their existing read-only setup references.
 
 #### Success — connected controller answers its read commands
 
-1. Detected identity remains a separate observation. It never silently replaces the operator's
-   selected profile/controller contract; a mismatch is explicit and must be resolved deliberately.
+1. Detected identity remains a separate observation from the saved profile. For a new machine, or
+   after **Find my machine**, the draft adopts the reported firmware, baud, machine type and
+   values with one **Undo**; otherwise a mismatch is explicit and must be resolved deliberately.
 2. Supported numeric readback values can be copied into the draft with **Use detected values**.
    Using `$30` as the CNC spindle ceiling requires the explicit option and reported CNC mode
    described above. The live project remains unchanged.
@@ -4946,7 +4989,7 @@ as the pane's design record.
 
 #### Success
 1. When a controller is connected and its `$$` snapshot differs from the current setup,
-   **Machine Setup > Machine > Set up automatically** shows the detected values. **Use detected
+   **Machine Setup > Machine > Find my machine** shows the detected values (ADR-420). **Use detected
    values** copies the reported spindle max (GRBL $30) and reported travel ($130/$131) into the setup
    draft; **Save machine setup** commits them, then the difference clears.
    `$30` is offered as spindle RPM only when the same dump reports `$32=0`;
@@ -4954,7 +4997,9 @@ as the pane's design record.
 
 #### Error — none (opt-in)
 1. Nothing changes until **Use detected values** updates the draft and **Save machine setup**
-   commits it; leaving or cancelling the flow changes neither project nor controller.
+   commits it; leaving or cancelling the flow changes neither project nor controller. A new
+   machine, or one the operator pressed **Find my machine** for, gets the values in the draft by
+   themselves with one **Undo**; the Save boundary is the same.
 
 #### Empty
 1. No connection, or reported values that already match, means no detected-difference prompt.

@@ -69,6 +69,8 @@ export type DeviceSetupAction =
   | { readonly kind: 'next' }
   | { readonly kind: 'back' }
   | { readonly kind: 'go'; readonly step: DeviceSetupStep }
+  // Undo of an automatic fill (ADR-420): the draft returns, the observations stay.
+  | { readonly kind: 'restore'; readonly state: DeviceSetupState }
   | { readonly kind: 'edit'; readonly patch: Partial<DeviceProfile> }
   | { readonly kind: 'edit-machine'; readonly machine: MachineConfig }
   | {
@@ -182,12 +184,17 @@ export function deviceSetupReducer(
   if (action.kind === 'go') {
     return isDeviceSetupStep(action.step) ? { ...state, step: action.step } : state;
   }
+  if (action.kind === 'restore') {
+    const { step, detected, detectedControllerKind, controllerRead } = state;
+    const facts = { step, detected, detectedControllerKind, controllerRead };
+    return invalidateFirmwarePlan(action.state, { ...facts, detectedApplied: false });
+  }
   return reduceDraftAction(state, action);
 }
 
 function reduceDraftAction(
   state: DeviceSetupState,
-  action: Exclude<DeviceSetupAction, { readonly kind: 'next' | 'back' | 'go' }>,
+  action: Exclude<DeviceSetupAction, { readonly kind: 'next' | 'back' | 'go' | 'restore' }>,
 ): DeviceSetupState {
   switch (action.kind) {
     case 'edit':

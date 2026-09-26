@@ -1,12 +1,18 @@
 // One draft across Machine, Essentials and Review. Existing recovery targets
 // open the relevant section, and only Save changes the project.
-import { useEffect, useReducer } from 'react';
+import { useEffect, useReducer, useState } from 'react';
 import type { ControllerKind, DeviceProfile } from '../../../core/devices';
 import { LASER_MACHINE_CONFIG } from '../../../core/scene';
 import { Dialog } from '../../kit';
 import { useStore } from '../../state';
 import { cncMachineWithCustomTools } from '../../state/machine-actions';
 import { useLaserStore } from '../../state/laser-store';
+import {
+  browserLocalStorage,
+  loadConfiguredSignatures,
+} from '../../state/device-setup-configured-persistence';
+import { deviceProfileSignature } from './device-setup-nudge';
+import { useControllerAutoFill } from './use-controller-auto-fill';
 import {
   deviceSetupReducer,
   initDeviceSetup,
@@ -60,6 +66,14 @@ function DeviceSetupWizardDraft(props: DeviceSetupWizardProps): JSX.Element {
     controllerRead: lastReadAt !== null,
     connected: connectionKind === 'connected',
   });
+  // A machine that has not been through setup fills in what its controller
+  // reports by itself (ADR-420). Decided once, when setup opens.
+  const [newMachine] = useState(() => {
+    const storage = browserLocalStorage();
+    const configured = storage === null ? new Set<string>() : loadConfiguredSignatures(storage);
+    return !configured.has(deviceProfileSignature(project.device));
+  });
+  const automatic = useControllerAutoFill(state, dispatch, newMachine);
   const cncSetup = useCncStartupWizardDraft(project.scene.layers, libraryCustomTools);
   useMachineSetupTargetFocus(props.target, state.step);
   const save = useMachineSetupSave({
@@ -83,6 +97,7 @@ function DeviceSetupWizardDraft(props: DeviceSetupWizardProps): JSX.Element {
         highlight={props.highlight}
         layers={project.scene.layers}
         cncSetup={cncSetup}
+        automatic={automatic}
         onClose={props.onClose}
         onSave={save.onSave}
         saving={save.saving}

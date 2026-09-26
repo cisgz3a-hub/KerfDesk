@@ -108,6 +108,8 @@ export type LaserState = LaserStoreActions &
   ControllerBuildInfoState & {
     readonly connection: ConnectionState;
     readonly serialPortInfo?: SerialPortIdentity | null;
+    /** The baud the live connection opened at (ADR-420); null while disconnected. */
+    readonly connectedBaudRate?: number | null;
     readonly statusReport: StatusReport | null;
     readonly controllerSessionEpoch: number;
     readonly statusSequence: number;

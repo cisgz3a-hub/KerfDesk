@@ -9,6 +9,7 @@ export function disconnectedStatePatch(state: LaserState): Partial<LaserState> {
     ...sessionScopedJobStateReset(),
     connection: { kind: 'disconnected' },
     serialPortInfo: null,
+    connectedBaudRate: null,
     statusReport: null,
     controllerSessionEpoch: state.controllerSessionEpoch + 1,
     statusObservation: null,

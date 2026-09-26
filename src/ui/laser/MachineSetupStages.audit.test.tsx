@@ -135,7 +135,7 @@ describe('three-stage Machine Setup integration audit', () => {
     useStore.getState().setMachineKind('cnc');
     const project = useStore.getState().project;
     openSetup();
-    for (const title of ['Controller and connection settings', 'Connect and detect'])
+    for (const title of ['Connection options', 'Advanced connection and streaming'])
       await roundTripDisclosure(title);
     act(() => ariaButton('Go to step 2: Essentials').click());
     for (const title of [
