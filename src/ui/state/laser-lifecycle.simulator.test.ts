@@ -12,7 +12,7 @@ import {
   type GrblSimulator,
 } from '../../__fixtures__/controllers';
 import { grblDriver } from '../../core/controllers';
-import { currentJobStopRequest } from './job-stop-request';
+import { currentJobStopRequest, currentStreamResetMayLosePosition } from './job-stop-request';
 import type { ConnectControllerOptions } from './laser-store';
 import { useLaserStore } from './laser-store';
 import { startTestLaserJob } from './laser-test-start-helpers';
@@ -264,6 +264,44 @@ describe('laser lifecycle against the GRBL simulator', () => {
     expect(useLaserStore.getState().streamer?.status).toBe('cancelled');
   });
 
+  it('records that an Abort mid-cut may have cost position', async () => {
+    await connectIdle();
+    await startTestLaserJob(jobLines(40, 2));
+    await pump(5);
+    // Decided with the errored mark: ALARM:3 only arrives after the checkpoint
+    // tracker has recorded the stop (ADR-215 Amendment 1).
+    const seenWithError: boolean[] = [];
+    const unsubscribe = useLaserStore.subscribe((state) => {
+      if (state.streamer?.status === 'errored') {
+        seenWithError.push(currentStreamResetMayLosePosition(state));
+      }
+    });
+    await useLaserStore.getState().stopJob();
+    unsubscribe();
+    expect(seenWithError[0]).toBe(true);
+    await pump(50);
+    // The simulator agrees: the reset killed the steppers mid-motion.
+    expect(useLaserStore.getState().alarmCode).toBe(3);
+  });
+
+  it('records an Abort after a completed door hold as keeping position', async () => {
+    const sim = await connectIdle();
+    await startTestLaserJob(jobLines(40, 3));
+    const pausing = useLaserStore.getState().pauseJob();
+    await pump(5);
+    await pausing;
+    await pump(400);
+    const paused = useLaserStore.getState();
+    expect(paused.streamer?.status).toBe('paused');
+    expect(paused.statusReport).toMatchObject({ state: 'Door', subState: 0 });
+    await useLaserStore.getState().stopJob();
+    expect(currentStreamResetMayLosePosition(useLaserStore.getState())).toBe(false);
+    await pump(50);
+    // The simulator agrees: a reset with the motors stopped raises no alarm.
+    expect(sim.outbound()).toContain('\x18');
+    expect(useLaserStore.getState().alarmCode).toBeNull();
+  });
+
   it('treats a mid-stream error:N as terminal; recovery is Stop, then unlock', async () => {
     const sim = await connectIdle({ rejectLines: [{ pattern: /X13\b/, errorCode: 20 }] });
     await startTestLaserJob(jobLines(30, 3));
@@ -281,6 +319,23 @@ describe('laser lifecycle against the GRBL simulator', () => {
     await pump(50);
     expect(useLaserStore.getState().alarmCode).toBeNull();
     expect(sim.state().locked).toBe(false);
+  });
+
+  it('records that the automatic reset after error:N may have cost position', async () => {
+    await connectIdle({ rejectLines: [{ pattern: /X13\b/, errorCode: 20 }] });
+    const seenWithError: boolean[] = [];
+    const unsubscribe = useLaserStore.subscribe((state) => {
+      if (state.streamer?.status === 'errored') {
+        seenWithError.push(currentStreamResetMayLosePosition(state));
+      }
+    });
+    await startTestLaserJob(jobLines(30, 3));
+    await pump(100);
+    unsubscribe();
+    // The controller was still running the moves it buffered before the
+    // rejected line when KerfDesk reset it (ADR-215 Amendment 1).
+    expect(seenWithError[0]).toBe(true);
+    expect(useLaserStore.getState().alarmCode).toBe(3);
   });
 
   it('auto-releases an errored stream at the next Idle when no alarm follows', async () => {

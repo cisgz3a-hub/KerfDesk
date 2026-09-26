@@ -61,6 +61,7 @@ function exactCapsule(options?: {
   readonly ackedLines?: number;
   readonly archiveWco?: boolean;
   readonly interruptionKind?: RecoveryCapsule['interruption']['kind'];
+  readonly positionLost?: boolean;
 }): RecoveryCapsule {
   const prepared = prepareOutput(recoveryProject());
   if (!prepared.ok) throw new Error('Expected prepared CNC output.');
@@ -89,6 +90,7 @@ function exactCapsule(options?: {
     interruption: {
       kind: options?.interruptionKind ?? 'disconnect',
       message: 'Connection lost.',
+      ...(options?.positionLost === true ? { positionLost: true as const } : {}),
     },
     updatedAtIso: '2026-07-16T12:01:00.000Z',
     artifact,
@@ -183,6 +185,16 @@ describe('buildCncPassRecoveryModel', () => {
     );
     if (afterReboot.kind !== 'ready') throw new Error(afterReboot.kind);
     expect(afterReboot.retainedPositionIssue).toContain('rebooted');
+
+    // ADR-215 Amendment 1 (CNC audit MC-3): the offset survives a reset that
+    // killed the steppers, so a matching offset cannot retain position.
+    const afterMotionKill = buildCncPassRecoveryModel(
+      exactCapsule({ interruptionKind: 'cancelled', positionLost: true }),
+      { x: 0, y: 0, z: 0 },
+    );
+    if (afterMotionKill.kind !== 'ready') throw new Error(afterMotionKill.kind);
+    expect(afterMotionKill.retainedPositionIssue).toContain('lost steps');
+    expect(afterMotionKill.retainedPositionIssue).toContain('Re-home');
   });
 
   // OR-2: the run's own planner size bounds the rewind when it was recorded.

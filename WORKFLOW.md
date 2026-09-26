@@ -5319,8 +5319,10 @@ as the pane's design record.
 5. The operator confirms four physical facts — cutter clear, spindle stopped,
    workholding unchanged, tool installed/intact/Z-zeroed — and chooses position
    evidence: **retained** (enabled only with session-continuity evidence: the
-   interruption was not a controller reboot AND the live work offset matches
-   the offset archived with the run) or **re-zeroed**.
+   interruption was not a controller reboot, did not stop a moving machine by
+   a reset (Abort, or the automatic stop after a rejected line) or by a
+   position-losing alarm such as a hard limit (ADR-215 Amendment 1), AND the live work offset matches the offset archived with the
+   run) or **re-zeroed**.
 6. Start generates a NEW recovery job — safe-Z retract → spindle start with its
    full spin-up dwell → rapid to the boundary pass start → plunge at plunge
    feed into already-cut kerf → recut that pass → every later pass and
