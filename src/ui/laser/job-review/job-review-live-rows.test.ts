@@ -109,6 +109,22 @@ describe('Job Review machine facts', () => {
     });
   });
 
+  it('leaves the laser dialect and scan-offset rows out of CNC review', () => {
+    const project = {
+      ...createProject({
+        ...DEFAULT_DEVICE_PROFILE,
+        scanningOffsets: [{ speedMmPerMin: 3000, offsetMm: 0.1 }],
+        scanOffsetCalibrationStatus: 'pending',
+      }),
+      machine: DEFAULT_CNC_MACHINE_CONFIG,
+    };
+    const labels = buildMachineReviewFacts(project).map((row) => row.label);
+    expect(labels).not.toContain('Scan offsets');
+    expect(labels).not.toContain('G-code dialect');
+    const laserLabels = buildMachineReviewFacts(createProject()).map((row) => row.label);
+    expect(laserLabels).toEqual(expect.arrayContaining(['Scan offsets', 'G-code dialect']));
+  });
+
   // ADR-392 Amendment 1: an unset park used to read "Machine origin", which is
   // wrong for every placed job: they end at program X0 Y0 or their own start.
   it('labels a set park as a bed position and an unset one by where the job ends', () => {

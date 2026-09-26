@@ -1,3 +1,4 @@
+import { deviceForActiveHead } from '../../core/cnc/cnc-head-feeds';
 import { frameBoundsSignature } from '../../core/job';
 import { machineKindOf, type OutputScope, type Project } from '../../core/scene';
 import { currentOutputScope, useStore } from '../state';
@@ -321,7 +322,11 @@ async function dispatchPreparedFrame(
   publishFramePreparationStage('tracing');
   const completion = waitForFrameOutcome(candidate);
   try {
-    await currentLaser.frame(motionBounds, bundle.project.device.framingFeedMmPerMin, candidate);
+    const { framingFeedMmPerMin } = deviceForActiveHead(
+      bundle.project.device,
+      bundle.project.machine,
+    );
+    await currentLaser.frame(motionBounds, framingFeedMmPerMin, candidate);
   } catch (error) {
     completion.cancel();
     reportFrameRefusal([error instanceof Error ? error.message : String(error)]);

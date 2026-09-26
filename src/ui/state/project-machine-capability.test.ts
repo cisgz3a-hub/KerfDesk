@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { cncMachineWithOwnFeeds } from '../../core/cnc/cnc-head-feeds';
 import { DEFAULT_DEVICE_PROFILE } from '../../core/devices';
 import { DEFAULT_CNC_MACHINE_CONFIG, createProject, type CncTool } from '../../core/scene';
 import { resolveProjectMachineCapability } from './project-machine-capability';
@@ -14,7 +15,9 @@ describe('project machine capability resolution', () => {
 
     const resolved = resolveProjectMachineCapability(project, []);
 
-    expect(resolved.project.machine).toEqual(DEFAULT_CNC_MACHINE_CONFIG);
+    expect(resolved.project.machine).toEqual(
+      cncMachineWithOwnFeeds(DEFAULT_CNC_MACHINE_CONFIG, project.device),
+    );
     expect(resolved.cachedCncMachine).toBeNull();
     expect(resolved.loadResult).toEqual({
       kind: 'capability-warning',

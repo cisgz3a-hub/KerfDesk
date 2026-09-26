@@ -29,6 +29,14 @@ export type BoxDraft = {
 };
 
 export const BOX_DRAFT_KEY = 'laserforge.box.generatorDraft.v1';
+// Laser and CNC keep their own last-entered box: a laser press fit (0 clearance,
+// no relief) must never become a router's starting values, or the reverse.
+// The laser keeps the original key so existing laser drafts survive.
+export const CNC_BOX_DRAFT_KEY = 'laserforge.box.generatorDraft.cnc.v1';
+
+export function boxDraftKey(machine: BoxMachineContext): string {
+  return machine.kind === 'cnc' ? CNC_BOX_DRAFT_KEY : BOX_DRAFT_KEY;
+}
 
 // The relief tool diameter is never persisted: the bit currently in the
 // machine is the truth, and a stale stored diameter would silently mis-size
