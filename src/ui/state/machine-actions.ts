@@ -22,11 +22,7 @@ import {
 import type { CncMachinePreset } from '../../core/cnc';
 import type { CncMachineStarterLiveCaps } from '../../core/cnc/machine-starters';
 import type { DeviceProfile } from '../../core/devices';
-import {
-  jobPlacementAfterDeviceChange,
-  jobPlacementAfterProfileSelection,
-  type JobPlacementSettings,
-} from '../job-placement';
+import { jobPlacementAfterDeviceChange, jobPlacementAfterProfileSelection } from '../job-placement';
 import type { CncLibrary } from './cnc-library-persistence';
 import { projectWithStockMaterial } from './cnc-project-material';
 import { applyCncTextDefaultsForScene } from './cnc-text-defaults';
@@ -36,16 +32,14 @@ import { nextProbeSetupState } from './probe-setup-history-identity';
 import { projectWithParkedCnc } from './parked-cnc-machine';
 import { modeSwitchState } from './mode-switch-settings';
 import { cncMachineWithOwnFeeds } from '../../core/cnc/cnc-head-feeds';
+import { captureSetupHistoryContext, type SetupHistoryContext } from './setup-history-context';
 
-type MachineState = {
+type MachineState = SetupHistoryContext & {
   readonly project: Project;
   readonly undoStack: ReadonlyArray<Project>;
   readonly redoStack: ReadonlyArray<Project>;
   readonly dirty: boolean;
-  readonly jobPlacement: JobPlacementSettings;
-  readonly cachedCncMachine: CncMachineConfig | null;
   readonly cncLiveCaps: CncMachineStarterLiveCaps | null;
-  readonly probeSetupEpoch: number;
   // App-level custom bits (H.7) merge into every CNC session's tool list.
   readonly cncLibrary: CncLibrary;
 };
@@ -198,6 +192,9 @@ export function machineActions(set: MachineSet, get: MachineGet): MachineActions
 }
 
 function machineKindStatePatch(state: MachineState, kind: MachineKind): Partial<MachineState> {
+  // The toggle swaps live placement and the CNC cache as well as the project.
+  // Undo/Redo must restore them together, like a Machine Setup save.
+  captureSetupHistoryContext(state.project, state);
   const current = state.project.machine;
   const cachedBase = state.cachedCncMachine ?? DEFAULT_CNC_MACHINE_CONFIG;
   const cncBase =

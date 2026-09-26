@@ -9,12 +9,17 @@
 // deviation from pocketToolpathRings, which would double-count the radius).
 // The stepover is a percentage of the cut width over one level, which is the
 // stored diameter except for a tapered ball nose: its rings then overlap
-// inside every level instead of leaving ribs (ADR-368 Amendment 2).
+// inside every level instead of leaving ribs (ADR-368 Amendment 2). Above 50%
+// stepover the innermost ring can stop short of a level's centre;
+// relief-core-cleanup.ts then adds the paths that clear what the rings leave,
+// as the pocket planner does (ADR-289 Amendment 1).
 //
 // Output passes are contour passes in heightmap physical mm (origin at the
-// heightmap's min corner, y down). The compiler has already folded object XY
-// scale into that grid, so only its residual isometry and device origin remain.
-// Depth-major: every ring of one level before the next. Pure and deterministic.
+// heightmap's min corner, y down), each ring closed back to its first point.
+// The compiler has already folded object XY scale into that grid, so only its
+// residual isometry and device origin remain. Depth-major: every ring of one
+// level, outside in, then its core cleanup, before the next level. Pure and
+// deterministic.
 
 import { buildOffsetLadder, insetContoursChecked } from '../geometry/offset-ladder';
 import { partialDualCoordinate } from '../grid';
@@ -26,6 +31,7 @@ import { cncLayoutCutWidths } from '../cnc/layout-cut-widths';
 import { dilateHeightmapByTool } from './heightmap-tool-offset';
 import type { Heightmap } from './heightmap';
 import { marchingSquares } from './marching-squares';
+import { reliefCoreCleanup } from './relief-core-cleanup';
 
 // Material intentionally left everywhere for the finishing pass (H.8).
 export const DEFAULT_RELIEF_ALLOWANCE_MM = 0.5;
@@ -84,6 +90,8 @@ export function reliefRoughingLadder(
     kernel,
     options.allowanceMm ?? DEFAULT_RELIEF_ALLOWANCE_MM,
   );
+  // The stepover is a percentage of this width, and each ring clears half of
+  // it to either side; the core cleanup reads both from the same number.
   const { clearingDiameterMm } = cncLayoutCutWidths(
     options.tool,
     options.reliefDepthMm,
@@ -95,7 +103,7 @@ export function reliefRoughingLadder(
   let passLimited = false;
   for (const level of zPassDepths(options.reliefDepthMm, options.depthPerPassMm)) {
     const contours = levelContoursMm(map, dilated, level);
-    const completion = appendLevelRings(passes, contours, level, stepMm);
+    const completion = appendLevelRings(passes, contours, level, stepMm, clearingDiameterMm / 2);
     offsetFailed = offsetFailed || completion.offsetFailed;
     passLimited = passLimited || completion.passLimited;
   }
@@ -147,6 +155,7 @@ function appendLevelRings(
   contours: ReadonlyArray<Polyline>,
   levelZ: number,
   stepMm: number,
+  cutRadiusMm: number,
 ): ReliefLevelCompletion {
   const usable = contours.filter((c) => c.points.length >= MIN_RING_POINTS);
   if (usable.length === 0) return { offsetFailed: false, passLimited: false };
@@ -156,14 +165,14 @@ function appendLevelRings(
   // Deeper rings shrink inward by the stepover until they vanish. Step 0's inset
   // is 0, which the offset engine returns unchanged.
   const ladder = buildOffsetLadder(usable, MAX_RINGS_PER_LEVEL, (step) => step * stepMm);
-  for (const ring of ladder.rings) {
-    for (const polyline of ring) {
-      if (polyline.points.length < MIN_RING_POINTS) continue;
-      passes.push({ kind: 'contour', zMm: levelZ, polyline: closeRing(polyline), closed: true });
-    }
+  const cleanup = reliefCoreCleanup(usable, ladder, stepMm, cutRadiusMm);
+  for (const polyline of [...ladder.rings.flat(), ...cleanup.paths]) {
+    if (polyline.points.length < MIN_RING_POINTS) continue;
+    passes.push({ kind: 'contour', zMm: levelZ, polyline: closeRing(polyline), closed: true });
   }
-  if (ladder.offsetFailed) return { offsetFailed: true, passLimited: false };
-  if (!ladder.capped) return { offsetFailed: false, passLimited: false };
+  const offsetFailed = ladder.offsetFailed || cleanup.offsetFailed;
+  if (offsetFailed) return { offsetFailed, passLimited: false };
+  if (!ladder.capped) return { offsetFailed, passLimited: cleanup.passLimited };
 
   // buildOffsetLadder stops immediately after its last permitted non-empty
   // ring. Probe the next inset once to classify the stop, but never append this
