@@ -1,4 +1,5 @@
 import type { ControllerDriver } from '../../../core/controllers';
+import { consoleAllowedStateReason } from '../../state/console-command-readiness';
 import { controllerOperationCommandBlockMessage } from '../../state/laser-controller-operation';
 import type { LaserState } from '../../state/laser-store';
 import {
@@ -42,6 +43,9 @@ export function consoleCommandDisabledReason(
     if (operationReason !== null) return operationReason;
   }
 
+  if (prepared.command.allowedStates !== undefined) {
+    return consoleAllowedStateReason(state.statusReport, prepared.command.allowedStates);
+  }
   if (!prepared.command.requiresIdle) return null;
   if (state.statusReport === null) return UNKNOWN_IDLE_STATUS_MESSAGE;
   if (state.statusReport.state !== 'Idle') {

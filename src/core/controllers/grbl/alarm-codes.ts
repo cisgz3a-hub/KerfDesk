@@ -57,14 +57,19 @@ const SHARED_ALARM_CODES: ReadonlyArray<AlarmDescription> = [
     title: 'Hard limit triggered',
     detail: 'A limit switch was hit while the machine was moving.',
     positionLost: true,
-    action: 'Re-home the machine ($H) after clearing the obstruction.',
+    // A critical event: GRBL prints [MSG:Reset to continue] and answers
+    // nothing until a soft reset (gnea/grbl protocol.c:224-236; grblHAL
+    // alarm_is_critical). Audit GP-2, GP-8, HF-3.
+    action:
+      'The controller accepts only a soft reset now: press Reset (Ctrl-X). Then clear the obstruction and re-home the machine ($H).',
   },
   {
     code: 2,
     title: 'G-code target exceeds machine travel',
     detail: 'The job tried to move outside the soft-limits envelope.',
     positionLost: false,
-    action: 'Check the design fits the bed; re-import or shrink.',
+    action:
+      'The controller accepts only a soft reset now: press Reset (Ctrl-X). The position is kept, so Unlock ($X) is safe after the reset. Then check the design fits the bed.',
   },
   {
     code: 3,
@@ -76,7 +81,8 @@ const SHARED_ALARM_CODES: ReadonlyArray<AlarmDescription> = [
   {
     code: 4,
     title: 'Probe fail (initial)',
-    detail: 'A probe cycle was started while the probe was already triggered.',
+    detail:
+      'The probe was not in the expected state when the cycle started: already touching for G38.2/G38.3, or not touching for G38.4/G38.5.',
     positionLost: false,
     action: 'Verify the probe wiring and the workpiece position.',
   },

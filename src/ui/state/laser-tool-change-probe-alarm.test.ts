@@ -151,10 +151,13 @@ describe('a missed touch-off probe in a drained tool-change hold', () => {
     await useLaserStore.getState().unlockAlarm();
     await settle();
     expect(sent).toContain('$X\n');
-    expect(useLaserStore.getState().alarmCode).toBeNull();
+    // The acknowledgement alone does not prove the unlock (FluidNC acks `$X`
+    // in its Critical state); the next report that is not Alarm clears it.
+    expect(useLaserStore.getState().alarmCode).toBe(5);
 
     await say(device, IDLE);
     const unlocked = useLaserStore.getState();
+    expect(unlocked.alarmCode).toBeNull();
     expect(unlocked.toolChangeIdleSeen).toBe(true);
     // The alarm voided the new bit's Z0: it must be zeroed again.
     expect(toolChangeContinueBlockMessage(unlocked)).toBe(TOOL_CHANGE_Z_ZERO_REQUIRED_MESSAGE);

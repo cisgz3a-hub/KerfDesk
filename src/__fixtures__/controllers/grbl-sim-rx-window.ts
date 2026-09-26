@@ -1,16 +1,20 @@
 // grbl-sim-rx-window — models GRBL's hardware serial receive ring: the bytes a
 // host has written that the firmware's main loop has not yet consumed.
 //
-// Firmware ground truth, read from gnea/grbl v1.1 source on 2026-07-27:
-//  * `grbl/serial.h`: `#define RX_BUFFER_SIZE 128`.
-//  * `grbl/serial.c` `ISR(SERIAL_RX)` executes realtime bytes (?, !, ~, 0x18,
-//    0x84, 0x85) inside the interrupt and never stores them, so they occupy no
-//    ring space. Every other byte is written "unless it is full" — when full
-//    the byte is dropped with no error, no notification, and no recovery.
-//  * The ring reserves one slot: `serial_get_rx_buffer_available()` returns
-//    `rtail - head - 1` on the wrapped branch, so 127 of the 128 bytes are
-//    usable. grbl's own `doc/script/stream.py` streams against
-//    `RX_BUFFER_SIZE - 1` for exactly that reason.
+// Firmware ground truth (gnea/grbl 1.1h, bfb67f0c):
+//  * `grbl/serial.h`: `#define RX_BUFFER_SIZE 128`; `grbl/serial.c:24`
+//    allocates the ring as `RX_RING_BUFFER (RX_BUFFER_SIZE+1)` and keeps one
+//    slot empty to tell full from empty, so all 128 bytes are usable. (grbl's
+//    own `doc/script/stream.py` stays below `RX_BUFFER_SIZE - 1`, a
+//    conservative host, not the firmware's limit.)
+//  * `grbl/serial.c` `ISR(SERIAL_RX)` executes realtime bytes (`?`, `!`, `~`,
+//    0x18 and every byte above 0x7F) inside the interrupt and never stores
+//    them, so they occupy no ring space. Every other byte is written "unless
+//    it is full" — when full the byte is dropped with no error, no
+//    notification, and no recovery.
+//  * `grbl/protocol.c:79` ends a line at `\n` OR `\r`, so each one is an end
+//    of line (`G21\r\n` is `G21` plus an empty line, each answered `ok`).
+//    grblHAL treats a CRLF or LFCR pair as one end of line (protocol.c:227-233).
 //  * grblHAL sizes the same ring at 1024 (`grblHAL/core/stream.h`).
 //
 // Line terminators are ordinary bytes here: `\r` and `\n` occupy ring space,
@@ -21,11 +25,12 @@
 // character-counting sender exists to prevent, and the one no test in this repo
 // could reach while the simulator acked instantly.
 
-/** Physical ring size on stock grbl 1.1 (`RX_BUFFER_SIZE`). */
+/** `RX_BUFFER_SIZE` on stock grbl 1.1. */
 export const GRBL_RX_BUFFER_BYTES = 128;
 
-/** Usable bytes: the ring reserves one slot to distinguish full from empty. */
-export const GRBL_RX_USABLE_BYTES = GRBL_RX_BUFFER_BYTES - 1;
+/** Usable bytes: the ring is one byte larger than `RX_BUFFER_SIZE`, and that
+ * spare slot is the one kept empty (serial.c:24, :37-42). */
+export const GRBL_RX_USABLE_BYTES = GRBL_RX_BUFFER_BYTES;
 
 /** Ring size on grblHAL (`grblHAL/core/stream.h`), for capability-delta tests. */
 export const GRBLHAL_RX_BUFFER_BYTES = 1024;
@@ -39,7 +44,14 @@ export type GrblSimRxWindow = {
   readonly peakBytes: number;
   /** Bytes the ring silently discarded. Any value above zero is a sender bug. */
   readonly droppedBytes: number;
+  /** grblHAL only: the end-of-line byte that closed the previous line, so the
+   * other half of a CRLF or LFCR pair does not read as an empty line. */
+  readonly lastEol?: string | null;
 };
+
+/** Stock GRBL: every `\r` and every `\n` ends a line. grblHAL: a CRLF or LFCR
+ * pair ends one line. */
+export type GrblSimLineEnding = 'each' | 'pair';
 
 export function createRxWindow(capacity: number = GRBL_RX_USABLE_BYTES): GrblSimRxWindow {
   return { capacity, pending: '', peakBytes: 0, droppedBytes: 0 };
@@ -68,17 +80,25 @@ export function acceptRxBytes(window: GrblSimRxWindow, data: string): GrblSimRxW
  * read step. Returns `line: null` when no terminator has arrived yet, which is
  * how a partially-received line correctly keeps occupying ring space.
  */
-export function takeRxLine(window: GrblSimRxWindow): {
+export function takeRxLine(
+  window: GrblSimRxWindow,
+  lineEnding: GrblSimLineEnding = 'each',
+): {
   readonly window: GrblSimRxWindow;
   readonly line: string | null;
 } {
-  const terminator = window.pending.indexOf('\n');
-  if (terminator === -1) return { window, line: null };
-  const raw = window.pending.slice(0, terminator);
-  return {
-    window: { ...window, pending: window.pending.slice(terminator + 1) },
-    line: raw.replace(/\r/g, '').trim(),
-  };
+  let pending = window.pending;
+  let lastEol = window.lastEol ?? null;
+  for (;;) {
+    const terminator = pending.search(/[\r\n]/);
+    if (terminator === -1) return { window: { ...window, pending, lastEol }, line: null };
+    const eol = pending.charAt(terminator);
+    const raw = pending.slice(0, terminator);
+    pending = pending.slice(terminator + 1);
+    const pairTail = lineEnding === 'pair' && raw === '' && lastEol !== null && lastEol !== eol;
+    lastEol = pairTail ? null : eol;
+    if (!pairTail) return { window: { ...window, pending, lastEol }, line: raw.trim() };
+  }
 }
 
 /** Bytes currently occupied. The value a sender's in-flight tally must not exceed. */

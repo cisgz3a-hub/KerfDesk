@@ -166,7 +166,33 @@ describe('native controller power modes', () => {
     expect(power).toBe(0);
     expect(out[0]).toBe('M5 I');
     expect(out.some((line) => /^M4\b/.test(line))).toBe(false);
-    expect(out.slice(-2)).toEqual(['M5 I', 'G0 X0.000 Y0.000 S0']);
+    // MA-8: Marlin travel carries its own feed (the profile's max feed).
+    expect(out.slice(-2)).toEqual(['M5 I', 'G0 X0.000 Y0.000 F6000 S0']);
+  });
+
+  // OR-1: the GRBL body no longer re-arms between passes, so the derived
+  // per-pass pairs are gone too. Marlin's `M5 I` synchronizes before it zeroes
+  // continuous inline power (M3-M5.cpp M5()), so that pair stopped the head
+  // with the last pass's power still applied.
+  it('writes no per-pass re-entry into a multi-pass Marlin inline or Smoothie layer', () => {
+    const twoPass: Job = { groups: [vector('dynamic', 2)] };
+    const marlin = marlinStrategy
+      .emit(twoPass, {
+        ...DEFAULT_DEVICE_PROFILE,
+        controllerKind: 'marlin',
+        maxPowerS: 255,
+        gcodeDialect: { dialectId: 'marlin-inline' },
+      })
+      .split('\n');
+    expect(marlin.filter((line) => line === 'M3 I S0')).toHaveLength(1);
+    expect(marlin.filter((line) => line === 'M5 I')).toEqual(['M5 I', 'M5 I']);
+    expect(
+      marlin.slice(marlin.indexOf('; pass 2 of 2'), marlin.indexOf('; pass 2 of 2') + 2),
+    ).toEqual(['; pass 2 of 2', 'G0 X10.000 Y10.000 F6000 S0']);
+    const smoothie = smoothiewareStrategy
+      .emit(twoPass, { ...DEFAULT_DEVICE_PROFILE, controllerKind: 'smoothieware', maxPowerS: 1 })
+      .split('\n');
+    expect(smoothie.filter((line) => line.startsWith('M221 S100'))).toEqual(['M221 S100 P0']);
   });
 
   it('drains and turns off before repeated Marlin inline entry after S0', () => {
@@ -177,12 +203,12 @@ describe('native controller power modes', () => {
       gcodeDialect: { dialectId: 'marlin-inline' },
     });
     const lines = output.trim().split('\n');
-    const leadOutLine = lines.indexOf('G0 X21.000 Y10.000 S0');
-    const approachLine = lines.indexOf('G0 X22.000 Y10.000 S0');
+    const leadOutLine = lines.indexOf('G0 X21.000 Y10.000 F6000 S0');
+    const approachLine = lines.indexOf('G0 X22.000 Y10.000 F6000 S0');
     expect(leadOutLine).toBeGreaterThan(0);
     expect(approachLine).toBeGreaterThan(leadOutLine);
     expect(lines.slice(leadOutLine, leadOutLine + 3)).toEqual([
-      'G0 X21.000 Y10.000 S0',
+      'G0 X21.000 Y10.000 F6000 S0',
       'M5 I',
       'M3 I S0',
     ]);

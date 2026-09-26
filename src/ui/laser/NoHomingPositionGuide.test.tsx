@@ -101,7 +101,7 @@ describe('NoHomingPositionGuide', () => {
     let failWake: ((cause: Error) => void) | null = null;
     const wakeController = vi.fn(
       () =>
-        new Promise<void>((_resolve, reject) => {
+        new Promise<'idle' | 'alarm'>((_resolve, reject) => {
           failWake = reject;
         }),
     );
@@ -273,7 +273,7 @@ describe('NoHomingPositionGuide unlock that does not reach Idle', () => {
       releaseMotors: vi.fn(async () => undefined),
       wakeController: vi.fn(
         () =>
-          new Promise<void>((_resolve, reject) => {
+          new Promise<'idle' | 'alarm'>((_resolve, reject) => {
             failWake = reject;
           }),
       ),

@@ -25,7 +25,19 @@ describe('GRBL-family variant drivers', () => {
     expect(grblHalDriver.label).toBe('grblHAL');
     expect(grblHalDriver.realtime).toEqual(grblDriver.realtime);
     expect(grblHalDriver.commands).toEqual(nonStockGrblCommands);
-    expect(grblHalDriver.capabilities).toEqual(grblDriver.capabilities);
+    // Neither stock GRBL's homing loop nor grblHAL's at its default settings
+    // serves `?`; FluidNC's does (audit ST-4). grblHAL latches a refused
+    // line's error until an empty line (HF-7) and locates at 10 x $27, up to
+    // $43 times.
+    expect(grblHalDriver.capabilities).toEqual({
+      ...grblDriver.capabilities,
+      statusWhileHoming: false,
+      stickyLineError: true,
+    });
+    expect(grblHalDriver.homingCycle).toEqual({ locateScalar: 10, locateCyclesSettingId: 43 });
+    expect(grblDriver.capabilities.statusWhileHoming).toBe(false);
+    expect(grblDriver.homingCycle).toBeUndefined();
+    expect(fluidncDriver.capabilities.statusWhileHoming).toBe(true);
     expect(grblHalDriver.defaultBaudRate).toBe(115200);
   });
 

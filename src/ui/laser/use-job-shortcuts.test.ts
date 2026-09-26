@@ -115,6 +115,36 @@ describe('job shortcuts (M22: keyboard Start/Stop)', () => {
     uninstall();
   });
 
+  // Controller audit 2026-09-25 CG-12: without a jog-cancel byte, cancelJog
+  // writes nothing and the Frame runs on; the bar's ABORT MOTION calls stopJob.
+  it('Ctrl+. aborts frame or jog motion on a controller without jog cancel', () => {
+    const stopJob = vi.fn(async () => undefined);
+    const cancelJog = vi.fn(async () => undefined);
+    const capabilities = useLaserStore.getState().capabilities;
+    patchLaserStore({
+      streamer: null,
+      stopJob,
+      cancelJog,
+      capabilities: { ...capabilities, jogCancel: false },
+      motionOperation: {
+        operationId: 1,
+        kind: 'frame',
+        sawControllerBusy: false,
+        idleStatusReports: 0,
+        dispatchComplete: true,
+        pendingLines: [],
+      },
+    });
+    const uninstall = installJobShortcuts(window);
+
+    press('.');
+
+    expect(stopJob).toHaveBeenCalledTimes(1);
+    expect(cancelJog).not.toHaveBeenCalled();
+    patchLaserStore({ capabilities });
+    uninstall();
+  });
+
   it('plain "." without a modifier never stops the job', () => {
     const stopJob = vi.fn(async () => undefined);
     patchLaserStore({ streamer: streamingState(), stopJob });

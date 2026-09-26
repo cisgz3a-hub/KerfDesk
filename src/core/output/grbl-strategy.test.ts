@@ -205,7 +205,7 @@ describe('grblStrategy multi-pass repeats the segment block per pass', () => {
     expect(out.match(/G1 X5\.000 Y0\.000 F1000 S1000/g)).toHaveLength(3);
   });
 
-  it('re-arms the cut power mode at zero power before each repeated pass', () => {
+  it('does not re-arm the power mode between repeated passes', () => {
     const job: Job = {
       groups: [
         {
@@ -232,11 +232,14 @@ describe('grblStrategy multi-pass repeats the segment block per pass', () => {
 
     const out = emit(job);
 
+    // OR-1: the power word cannot change inside a group and every positioning
+    // move carries S0, so no `M4 S0` re-arm follows the pass comment. On GRBL
+    // that line forced a full planner drain between passes; the preamble's arm
+    // is the only one.
     expect(out).toContain(
-      // ADR-257: the between-pass re-arm carries the group's effective mode, which on
-      // the default dialect is now M4. The re-arm itself still happens, at zero power.
-      ['; pass 2 of 2', 'M4 S0', 'G0 X0.000 Y0.000 S0', 'G1 X5.000 Y0.000 F1200 S600'].join('\n'),
+      ['; pass 2 of 2', 'G0 X0.000 Y0.000 S0', 'G1 X5.000 Y0.000 F1200 S600'].join('\n'),
     );
+    expect(out.match(/^M4 S0$/gm)).toHaveLength(1);
   });
 });
 

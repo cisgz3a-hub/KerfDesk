@@ -25,6 +25,7 @@ import { statusRequestActions } from './laser-status-request';
 import { invalidateAccessoryObservation } from './cnc-accessory-readiness';
 import type { LaserControllerOperation } from './laser-controller-operation';
 import type { ControllerBuildInfoState } from './laser-controller-build-info';
+import type { LaserModuleObservation } from './laser-module-probe';
 import type {
   ControllerQualification,
   ControllerQualificationScheduleRefs,
@@ -112,6 +113,9 @@ export type LaserState = LaserStoreActions &
     readonly statusSequence: number;
     readonly statusObservation: ControllerObservationStamp | null;
     readonly alarmCode: number | null;
+    // The firmware printed "Reset to continue" after a critical event: only a
+    // soft reset is accepted until the reboot banner (controller-reset-required.ts).
+    readonly resetRequired?: boolean;
     readonly lastError: number | null;
     readonly lastWriteError: string | null;
     // Operator-requested coolant/air state for the manual jog-panel control.
@@ -187,6 +191,15 @@ export type LaserState = LaserStoreActions &
      * controllerSessionEpoch so late replies from a reset or forgotten port can
      * never make a newer session look ready. */
     readonly controllerQualification: ControllerQualification;
+    /** What the connected firmware's own laser-module report proved (the
+     * Smoothieware `M221` probe, laser-module-probe.ts). Connection-scoped:
+     * the module cannot change without a reboot, and a reboot re-runs the
+     * probe. null/undefined: not probed, or the driver has no probe. */
+    readonly laserModuleEvidence?: LaserModuleObservation | null;
+    /** Frame modal-state pushes (Smoothieware M120) written by a Frame that
+     * has not ended cleanly; restored with the driver's pop at the next free
+     * Idle (laser-frame-modal-restore.ts). Optional for hand-built states. */
+    readonly framePushesAwaitingPop?: number;
     readonly grblSettingsRows: ReadonlyArray<GrblSettingRow>;
     readonly lastSettingsReadAt: number | null;
     /**
@@ -321,6 +334,8 @@ export type LiveRefs = ControllerLifecycleRefs & {
   // M13 ack-watchdog probe: last-seen stream position + when it was first
   // seen unchanged. Lives here (not React state) — only the poll reads it.
   stallProbe: StallProbe;
+  /** Last Marlin busy keepalive; restarts the ack watchdog (MA-9). */
+  controllerBusyAt?: number | null;
 } & TranscriptBufferRefs &
   ResetCleanupRefs &
   ResetAlarmRefs &
@@ -515,7 +530,7 @@ export const useLaserStore = create<LaserState>((set, get) => {
       set,
       get,
       refs,
-      (line, action) => safeWrite(set, get, line, action),
+      (line, action, source) => safeWrite(set, get, line, action, source),
       () => refs.driver,
     ),
     ...setupActions(set, get, refs, (line) => safeWrite(set, get, line)),

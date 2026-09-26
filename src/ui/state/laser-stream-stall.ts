@@ -27,18 +27,28 @@ export type StallProbe = {
   readonly checkedAt: number;
 } | null;
 
+/**
+ * `busyAt`: when a controller that is not polled while it streams (Marlin)
+ * last printed its busy keepalive. That line says the controller is working on
+ * the line it has not answered yet, so it restarts the clock the way an
+ * acknowledgement does (controller audit MA-9). Marlin prints it every 2 s
+ * while a handler such as `M5 I` waits for the planner (gcode.cpp
+ * host_keepalive).
+ */
 export function detectStreamStall(
   streamer: StreamerState | null,
   statusReport: StatusReport | null,
   prev: StallProbe,
   now: number,
+  busyAt: number | null = null,
 ): { readonly probe: StallProbe; readonly stalled: boolean } {
   if (!isStallWatchActive(streamer)) return { probe: null, stalled: false };
   if (statusPausesStallWatch(statusReport)) return { probe: null, stalled: false };
   const unchanged =
     streamPositionUnchanged(prev, streamer) &&
     !freshRunStatus(prev, statusReport) &&
-    !hostWasAway(prev, now);
+    !hostWasAway(prev, now) &&
+    !busySinceLastCheck(prev, busyAt, now);
   const at = unchanged ? prev.at : now;
   const timeoutMs = streamStallTimeoutMs(statusReport);
   return {
@@ -59,6 +69,11 @@ export function detectStreamStall(
 // host's, not a controller hold (ADR-356). The clock restarts at this tick.
 function hostWasAway(prev: StallProbe, now: number): boolean {
   return prev !== null && now - prev.checkedAt >= HOST_SCHEDULING_GAP_MS;
+}
+
+// A busy time later than now is not this session's (a clock stepped back).
+function busySinceLastCheck(prev: StallProbe, busyAt: number | null, now: number): boolean {
+  return busyAt !== null && prev !== null && busyAt >= prev.checkedAt && busyAt <= now;
 }
 
 function streamStallTimeoutMs(statusReport: StatusReport | null): number {

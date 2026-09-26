@@ -41,7 +41,10 @@ const ERRORS: ReadonlyArray<ErrorDescription> = [
   {
     code: 7,
     title: 'EEPROM read failed',
-    detail: 'Settings were reset to defaults; verify with $$.',
+    // gnea/grbl also returns it when a G54-G59/G28/G30 slot cannot be read,
+    // and then zeroes that slot (gcode.c:509,543,614-616; settings.c).
+    detail:
+      'The controller could not read stored data and restored it to defaults. That can be settings ($$) or a stored work offset ($#), which is then zeroed: check both.',
   },
   { code: 8, title: 'Not idle', detail: 'The command needs the controller to be idle.' },
   {
@@ -61,7 +64,7 @@ const ERRORS: ReadonlyArray<ErrorDescription> = [
     code: 11,
     title: 'Line overflow',
     detail:
-      'A line exceeded the controller line length (80 characters on stock GRBL) and was not run.',
+      'A line exceeded the controller line length and was not run. Stock GRBL takes 79 characters, counted after spaces and comments are removed.',
   },
   {
     code: 12,

@@ -11,7 +11,9 @@ import {
   buildSmoothieJogCommand,
   SMOOTHIE_CMD_FIRMWARE_INFO,
   SMOOTHIE_CMD_HOME,
+  SMOOTHIE_CMD_POP_STATE,
   SMOOTHIE_CMD_POSITION,
+  SMOOTHIE_CMD_PUSH_STATE,
   SMOOTHIE_CMD_SETTLE,
   SMOOTHIE_CMD_UNLOCK,
   SMOOTHIE_CMD_VERSION,
@@ -19,6 +21,8 @@ import {
   SMOOTHIE_FRAME_TOOL_OFF_LINES,
 } from './commands';
 import { prepareSmoothieConsoleCommand } from './console-command';
+import { smoothieHomeVerification } from './home-verification';
+import { smoothieLaserModuleProbe } from './laser-module';
 import { classifySmoothieResponse } from './response';
 
 export const SMOOTHIE_DEFAULT_BAUD_RATE = 115200;
@@ -46,6 +50,11 @@ export const smoothiewareDriver: ControllerDriver = {
     cncJobs: false,
     lowPowerFire: false,
     overrides: false,
+    // A halted board answers its Home sequence's first line (M400) with `!!`
+    // until M999 (GcodeDispatch.cpp:158-180).
+    homeFromAlarm: false,
+    // Ctrl-X halts the board; it does not reboot or print a banner (CG-3).
+    softResetReboots: false,
   },
   realtime: {
     statusQuery: RT_STATUS,
@@ -69,7 +78,9 @@ export const smoothiewareDriver: ControllerDriver = {
     sleep: null,
     settingsQuery: null,
     buildInfoQuery: null,
-    modalStateQuery: null,
+    // `$G` prints `[GC:...]` then `ok` (SimpleShell.cpp:218-222, 879-882), so
+    // the Frame can read the active WCS before it selects G54 (audit CG-2).
+    modalStateQuery: '$G',
     offsetsQuery: null,
     queuedStatusQuery: null,
     stopLaserLines: SMOOTHIE_STOP_LASER_LINES,
@@ -81,6 +92,7 @@ export const smoothiewareDriver: ControllerDriver = {
     clearPersistentOrigin: null,
     buildJog: buildSmoothieJogCommand,
     buildFrameLines: buildSmoothieFrameLines,
+    frameModalState: { push: SMOOTHIE_CMD_PUSH_STATE, pop: SMOOTHIE_CMD_POP_STATE },
   },
   classifyLine: classifySmoothieResponse,
   prepareConsoleCommand: prepareSmoothieConsoleCommand,
@@ -98,4 +110,9 @@ export const smoothiewareDriver: ControllerDriver = {
   // config-set/config-load persist Smoothie configuration; block them inside
   // streamed payloads the same way GRBL blocks $-lines mid-job.
   isSetupOnlyPayload: (payload) => /(^|\n)\s*config-(set|load)\b/i.test(payload),
+  // `fire off` and the M221 power modes exist only while the Laser module is
+  // loaded; qualification asks the board with M221 (laser-module.ts).
+  laserModuleProbe: smoothieLaserModuleProbe,
+  // `$H` answers `ok` whether or not anything homed (audit SM-6).
+  homeVerification: smoothieHomeVerification,
 };

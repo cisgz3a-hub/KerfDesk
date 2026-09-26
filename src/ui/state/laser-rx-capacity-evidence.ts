@@ -12,6 +12,10 @@
 // grblHAL, firmware build unconfirmed) reported `Bf:512,65535`.
 
 import type { StatusReport } from '../../core/controllers/grbl';
+import type { GrblBuildInfo } from '../../core/controllers/grbl/build-info';
+import type { ControllerKind } from '../../core/devices';
+import { DEFAULT_PLANNER_BLOCKS } from '../../core/recovery/planner-backlog-restart';
+import type { SessionObservationStamp } from './laser-controller-observation';
 import { hasUnsettledStreamAcks, isActiveJob } from './laser-store-helpers';
 import type { LaserState } from './laser-store';
 
@@ -102,13 +106,41 @@ function plannerCapacityEvidencePatch(
   };
 }
 
-function currentPlannerCapacityEvidence(
+/** Idle planner capacity from the current controller session only. */
+export function currentPlannerCapacityEvidence(
   state: Pick<LaserState, 'controllerSessionEpoch' | 'plannerCapacityEvidence'>,
 ): PlannerCapacityEvidence | null {
   const evidence = state.plannerCapacityEvidence ?? null;
   return evidence !== null && evidence.sessionEpoch === state.controllerSessionEpoch
     ? evidence
     : null;
+}
+
+export type PlannerSizeSource = {
+  readonly controllerSessionEpoch?: number;
+  readonly plannerCapacityEvidence?: PlannerCapacityEvidence | null;
+  readonly activeControllerKind?: ControllerKind;
+  readonly controllerBuildInfo?: GrblBuildInfo | null;
+  readonly controllerBuildInfoObservation?: SessionObservationStamp | null;
+};
+
+/**
+ * The current controller session's usable planner size: the larger of its idle
+ * `Bf` blocks free and its `$I` OPT block count, else the controller family's
+ * default (planner-backlog-restart.ts). Undefined for a controller KerfDesk
+ * never streams (controller audit OR-3).
+ */
+export function controllerPlannerSizeBlocks(state: PlannerSizeSource): number | undefined {
+  const session = state.controllerSessionEpoch;
+  const idle = state.plannerCapacityEvidence;
+  const build = state.controllerBuildInfoObservation;
+  const measured = [
+    idle?.sessionEpoch === session ? idle?.plannerBlocksFree : undefined,
+    build?.sessionEpoch === session ? state.controllerBuildInfo?.plannerBufferBlocks : undefined,
+  ].filter((blocks): blocks is number => blocks !== undefined && blocks > 0);
+  if (measured.length > 0) return Math.max(...measured);
+  const kind = state.activeControllerKind;
+  return kind === undefined ? undefined : DEFAULT_PLANNER_BLOCKS[kind];
 }
 
 export type StreamPlannerSnapshot = {
@@ -143,6 +175,20 @@ export function statusBufferPatch(
 
 // The planner size comes from this session's idle `Bf`. Without it the
 // backlog is unknown and no snapshot is taken (controller audit recovery-6).
+function reportDescribesRun(state: PlannerSnapshotSource, status: string): boolean {
+  // A reboot can leave the interrupted stream mounted for recovery. Fresh
+  // Idle capacity belongs to the replacement controller session, and must not
+  // erase the last backlog of the run whose planner the reboot discarded.
+  const previous = state.streamPlannerSnapshot;
+  if (previous?.streamerEpoch === state.streamerEpoch) {
+    return previous.sessionEpoch === state.controllerSessionEpoch;
+  }
+  // A run that stopped before any report of its own backlog gains none from
+  // later reports: after a reboot they describe the replacement controller's
+  // empty planner, and an empty report is a restart frontier (OR-3).
+  return status !== 'errored';
+}
+
 function streamPlannerSnapshotPatch(
   state: PlannerSnapshotSource,
   report: StatusReport,
@@ -152,16 +198,7 @@ function streamPlannerSnapshotPatch(
   if (buffer === null || buffer === undefined || !isActiveJob(streamer) || streamer === null) {
     return {};
   }
-  // A reboot can leave the interrupted stream mounted for recovery. Fresh
-  // Idle capacity belongs to the replacement controller session, and must not
-  // erase the last backlog of the run whose planner the reboot discarded.
-  const previous = state.streamPlannerSnapshot;
-  if (
-    previous?.streamerEpoch === state.streamerEpoch &&
-    previous.sessionEpoch !== state.controllerSessionEpoch
-  ) {
-    return {};
-  }
+  if (!reportDescribesRun(state, streamer.status)) return {};
   const capacity = currentPlannerCapacityEvidence(state)?.plannerBlocksFree;
   if (capacity === undefined) return {};
   return {

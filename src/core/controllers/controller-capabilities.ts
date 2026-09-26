@@ -49,6 +49,10 @@ export type ControllerCapabilities = {
   // `!` / `~` realtime feed hold. false ⇒ pause is stream-side only (stop
   // sending; buffered motion drains) and the UI must say so.
   readonly realtimePause: boolean;
+  // Stream-side pause also queues a beam-off behind the buffered motion, and
+  // Resume switches the beam back on in the program's own commands (Marlin,
+  // driver.planStreamPauseBeam). Absent means false.
+  readonly streamPauseBeamOff?: boolean;
   // Realtime soft reset / abort byte exists (GRBL \x18).
   readonly softStop: boolean;
   readonly statusQuery: StatusQueryCapability;
@@ -77,4 +81,40 @@ export type ControllerCapabilities = {
   // in its line buffer and corrupt the stream mid-job — the UI must not mount
   // the override controls and the send path must drop the byte (CTL-01).
   readonly overrides: boolean;
+  // Whether the homing command runs while the controller is locked in Alarm.
+  // GRBL-family `$H` is the documented way out of an alarm; a halted
+  // Smoothieware board refuses every G-code line until M999, so its Home
+  // sequence (M400 first) cannot run there (controller audit 2026-09-25
+  // CG-4). Absent means true.
+  readonly homeFromAlarm?: boolean;
+  // Whether the firmware answers a status query while it homes. Stock GRBL
+  // 1.1 services no realtime request inside its homing loop (limits.c:320,
+  // "No time to run protocol_execute_realtime() in this loop"), and grblHAL
+  // does so only with "report when homing" on, off by default
+  // (machine_limits.c:336-337), so their Home cannot be timed on status
+  // silence (controller audit 2026-09-25 ST-4). FluidNC homes from its main
+  // loop and keeps answering. Absent means true.
+  readonly statusWhileHoming?: boolean;
+  // A refused line's error stays latched and answers every later G-code line
+  // until an empty line clears it: grblHAL at its default COMPATIBILITY_LEVEL
+  // 0 (protocol.c:246-286). KerfDesk then sends one empty line after a refusal
+  // (laser-parser-rearm.ts; controller audit 2026-09-25 HF-7). Absent means
+  // false.
+  readonly stickyLineError?: boolean;
+  // Where the work offset comes from. 'reported' (GRBL-family, Smoothieware):
+  // the status report carries it (WCO:, or MPos and WPos). 'host-recorded'
+  // (Marlin): M114 reports only the work position, with the G92 shift applied
+  // (motion.cpp:192-212), so KerfDesk keeps the shift it writes itself: a G92
+  // sets it, homing and a restart clear it (motion.cpp:2346-2349), and Reset
+  // origin restores machine coordinates with a computed G92, because a stock
+  // build compiles no G92.1 (G92.cpp:62-70; controller audit 2026-09-25 MA-2,
+  // CG-1, CG-11). Absent means 'reported'.
+  readonly workOffsetSource?: 'reported' | 'host-recorded';
+  // Whether the realtime soft reset reboots the firmware, which then prints
+  // its banner. GRBL-family firmware does. Smoothieware halts instead: Ctrl-X
+  // sets halt_flag (USBSerial.cpp:204-208) and on_idle prints `HALTED, M999
+  // or $X to exit HALT state` (:298-311), with no banner, so KerfDesk re-arms
+  // qualification itself (controller audit 2026-09-25 CG-3). Absent means
+  // true.
+  readonly softResetReboots?: boolean;
 };

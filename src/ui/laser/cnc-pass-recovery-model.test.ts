@@ -13,7 +13,7 @@ import type { CncContourPass } from '../../core/job';
 import { emitPreparedGcode, prepareOutput } from '../../io/gcode';
 import type { CanvasMotionPlan } from '../state/canvas-motion-plan';
 import { createExecutionArtifact, type RecoveryCapsule } from '../state/recovery';
-import { buildCncPassRecoveryModel } from './cnc-pass-recovery-model';
+import { buildCncPassRecoveryModel, recordedPlannerBlocks } from './cnc-pass-recovery-model';
 
 function recoveryProject(): Project {
   const color = '#ff0000';
@@ -183,6 +183,42 @@ describe('buildCncPassRecoveryModel', () => {
     );
     if (afterReboot.kind !== 'ready') throw new Error(afterReboot.kind);
     expect(afterReboot.retainedPositionIssue).toContain('rebooted');
+  });
+
+  // OR-2: the run's own planner size bounds the rewind when it was recorded.
+  it('reads the recorded idle planner size and the same-session $I block count', () => {
+    const capsule = exactCapsule();
+    const artifact = capsule.artifact;
+    if (artifact.kind !== 'exact-execution') throw new Error(artifact.kind);
+    expect(recordedPlannerBlocks(artifact)).toBeUndefined();
+    const withIdle = {
+      ...artifact,
+      archivedControllerObservation: {
+        ...artifact.archivedControllerObservation,
+        plannerBlocksAtIdle: 512,
+      },
+    };
+    expect(recordedPlannerBlocks(withIdle)).toBe(512);
+    const buildInfo = {
+      parsed: {
+        protocolVersion: '1.1h',
+        buildRevision: '20190830',
+        userInfo: '',
+        optionCodes: [],
+        plannerBufferBlocks: 35,
+        rxBufferBytes: 255,
+      },
+      rawLines: [],
+      observation: { sessionEpoch: 4, observedAt: 1 },
+    };
+    const provenance = (sessionEpoch: number) =>
+      ({ controller: { sessionEpoch, buildInfo } }) as unknown as NonNullable<
+        typeof artifact.provenance
+      >;
+    expect(recordedPlannerBlocks({ ...artifact, provenance: provenance(4) })).toBe(35);
+    // `$I` from an earlier controller session says nothing about this run.
+    expect(recordedPlannerBlocks({ ...artifact, provenance: provenance(5) })).toBeUndefined();
+    expect(recordedPlannerBlocks({ ...withIdle, provenance: provenance(4) })).toBe(512);
   });
 
   it('is unavailable for non-CNC capsules', () => {

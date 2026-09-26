@@ -222,6 +222,22 @@ function whileArchivePending(
 
 /** The ack in the store update that first shows the stream errored: the one
  * the checkpoint tracker sees first. */
+// The auto-stop's soft reset also discarded GRBL's planner, and stock GRBL
+// 1.1h reports no Bf ($10=1), so the restart may step back over the whole
+// planner (audit OR-3). It still replays the rejected line.
+function expectRestartReplaysRejectedLine(
+  gcode: string,
+  capsule: RecoveryCapsule,
+  rejectedLine: number,
+): void {
+  const restart = automaticRestart(gcode, capsule.ackedLines, capsule.interruption);
+  expect(restart.replaysRejectedLine).toBe(true);
+  expect(restart.line).toBeLessThanOrEqual(rejectedLine);
+  if (restart.line < rejectedLine) {
+    expect(restart.plannerBacklogBasis).toBe('planner-size');
+  }
+}
+
 function watchAckWhenErrored(): {
   readonly ack: () => number | undefined;
   readonly stop: () => void;
@@ -286,12 +302,9 @@ describe('a line the controller rejects mid-job', () => {
       const rejectedBurn = oracleBurns(gcode).find((burn) => burn.line === rejectedLine);
       if (rejectedBurn === undefined) throw new Error('Expected the rejected line to burn.');
       // GRBL answers a rejected line with error:N, which the stream counts as
-      // acknowledged; the automatic restart must still start at that line.
+      // acknowledged; the automatic restart must still replay that line.
       expect(rawResumeLine(gcode, capsule.ackedLines)).toBeGreaterThan(rejectedLine);
-      expect(automaticRestart(gcode, capsule.ackedLines, capsule.interruption)).toEqual({
-        line: rejectedLine,
-        replaysRejectedLine: true,
-      });
+      expectRestartReplaysRejectedLine(gcode, capsule, rejectedLine);
       // The operator unplugs and reconnects the controller, then recovers.
       h.simulator.yankCable();
       await tick(20);
@@ -327,10 +340,7 @@ describe('a line the controller rejects mid-job', () => {
       });
       expect(capsule.ackedLines).toBe(ackedAtRejection);
       const rejectedLine = gcode.split('\n').findIndex((line) => line.trim() === target) + 1;
-      expect(automaticRestart(gcode, capsule.ackedLines, capsule.interruption)).toEqual({
-        line: rejectedLine,
-        replaysRejectedLine: true,
-      });
+      expectRestartReplaysRejectedLine(gcode, capsule, rejectedLine);
     },
     STRESS_TIMEOUT_MS,
   );

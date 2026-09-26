@@ -55,7 +55,9 @@ type LaserSnapshot = ReturnType<typeof useLaserStore.getState>;
 // It used to act only on a streaming job or a jog/Frame, so during Home,
 // Probe, Auto-focus, Start arming or with momentary Fire latched on, Ctrl+.
 // silently did nothing (audit job-lifecycle-6 / ui-panel-4). Jog and Frame
-// keep the gentler jog-cancel.
+// keep the gentler jog-cancel where the firmware has one; without it (Marlin,
+// Smoothieware, the Falcon contract) cancelJog writes nothing, so Ctrl+. sends
+// the same Abort as the bar's ABORT MOTION (controller audit 2026-09-25 CG-12).
 function stopShortcutAction(
   laser: LaserSnapshot,
 ): { readonly label: string; readonly run: () => Promise<void> } | null {
@@ -63,7 +65,11 @@ function stopShortcutAction(
   if (laser.controllerOperation !== null) {
     return { label: 'Abort motion', run: () => laser.stopJob() };
   }
-  if (laser.motionOperation !== null) return { label: 'Stop motion', run: () => laser.cancelJog() };
+  if (laser.motionOperation !== null) {
+    return laser.capabilities.jogCancel
+      ? { label: 'Stop motion', run: () => laser.cancelJog() }
+      : { label: 'Abort motion', run: () => laser.stopJob() };
+  }
   if (laser.fireActive) return { label: 'Laser off', run: () => laser.setFireActive(false) };
   return null;
 }

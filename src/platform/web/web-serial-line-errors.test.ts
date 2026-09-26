@@ -138,3 +138,65 @@ describe('main-thread serial transport: UART line errors (audit connect-1)', () 
     expect(port.streamsCreated).toBe(1 + MAX_READ_RECOVERIES_WITHOUT_DATA);
   });
 });
+
+// Audit TC-4: a session whose read side ends on its own must also release the
+// OS port, as the worker transport does. An UnknownError does not make the
+// port unusable in the Web Serial spec (only a lost device sets [[readFatal]]),
+// so without an explicit close the page kept the port open, DTR asserted, and
+// no other program could open the controller until the next Connect or a
+// reload (spec 4.10 close(), Example 7: close the port as the read loop's last
+// step).
+describe('main-thread serial transport: the port closes when the read side ends (audit TC-4)', () => {
+  it('closes the port after an UnknownError ends the session', async () => {
+    vi.spyOn(console, 'error').mockImplementation(() => undefined);
+    const port = new SerialPortDouble();
+    const session = await connect(port);
+
+    port.readError('UnknownError');
+    await waitFor(() => session.closes() === 1, 'the session to end');
+    await waitFor(() => !port.opened, 'the port to close');
+
+    expect(session.closes()).toBe(1);
+  });
+
+  it('closes the port after the line-error recovery budget is exhausted', async () => {
+    vi.spyOn(console, 'error').mockImplementation(() => undefined);
+    vi.spyOn(console, 'warn').mockImplementation(() => undefined);
+    const port = new SerialPortDouble();
+    const session = await connect(port);
+
+    port.failFreshStreams = 'BreakError';
+    port.readError('BreakError');
+    await waitFor(() => session.closes() === 1, 'the session to end');
+    await waitFor(() => !port.opened, 'the port to close');
+
+    expect(session.closes()).toBe(1);
+  });
+
+  it('closes the port after a cable pull, and a later Disconnect is a no-op', async () => {
+    vi.spyOn(console, 'error').mockImplementation(() => undefined);
+    const port = new SerialPortDouble();
+    const close = vi.spyOn(port, 'close');
+    const session = await connect(port);
+
+    port.unplug();
+    await waitFor(() => !port.opened, 'the port to close');
+    await session.connection.close();
+
+    expect(close).toHaveBeenCalledTimes(1);
+    expect(session.closes()).toBe(1);
+  });
+
+  it('leaves the port close to an explicit Disconnect already in progress', async () => {
+    const port = new SerialPortDouble();
+    const close = vi.spyOn(port, 'close');
+    const session = await connect(port);
+
+    await session.connection.close();
+    await settle();
+
+    expect(port.opened).toBe(false);
+    expect(close).toHaveBeenCalledTimes(1);
+    expect(session.closes()).toBe(1);
+  });
+});

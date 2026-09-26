@@ -15,6 +15,7 @@ import {
   type CreateGrblSimulatorOptions,
   type GrblSimulator,
 } from '../../__fixtures__/controllers';
+import { GRBL_PLANNER_BLOCKS } from '../../__fixtures__/controllers/grbl-sim-planner';
 import { isSendableGcodeLine } from '../../core/controllers/grbl';
 import { DEFAULT_DEVICE_PROFILE } from '../../core/devices';
 import { rawResumeLine } from '../../core/recovery';
@@ -45,10 +46,10 @@ import { runFrameNow } from './use-frame-action';
 
 export const PROMPT_TEXT = 'Would you like to darken selected areas?';
 export const STRESS_TIMEOUT_MS = 60_000;
-// Planner back-pressure makes the simulator withhold `ok` while its 16-block
-// planner is full, so acknowledgements arrive at motion pace (25 ms per
-// segment) and a yank can land at any acknowledged line.
-const SIM_OPTIONS = { plannerBlocks: 16, motionMs: 25 } as const;
+// Planner back-pressure makes the simulator withhold `ok` while its stock
+// 15-block planner is full, so acknowledgements arrive at motion pace (25 ms
+// per segment) and a yank can land at any acknowledged line.
+const SIM_OPTIONS = { plannerBlocks: GRBL_PLANNER_BLOCKS, motionMs: 25 } as const;
 const ASCII_REALTIME_BYTES = new Set(['?', '!', '~', String.fromCharCode(0x18)]);
 
 /** GRBL takes these out of the stream before its line buffer: the ASCII

@@ -1,10 +1,10 @@
 import { describe, expect, it } from 'vitest';
 import { DEFAULT_DEVICE_PROFILE } from '../../devices';
 import type { Job } from '../../job';
-import { decodeRdStream } from '../../../__fixtures__/controllers/ruida-decoder';
+import { decodeRdStream, layerBodySettings } from '../../../__fixtures__/controllers/ruida-decoder';
 import { ruidaDriver } from './driver';
 import { encodeRdJob } from './rd-encoder';
-import { layerColor } from './rd-commands';
+import { partColor } from './rd-commands';
 import {
   decodeCoord35,
   decodePower14,
@@ -49,22 +49,22 @@ const JOB: Job = {
   ],
 };
 
-describe('ruida layer color wire order', () => {
+describe('ruida part color wire order', () => {
   // Public .rd decoders (MeerK40t / EduTech reverse engineering; NOT
   // hardware-verified) read the layer-color int as blue<<16|green<<8|red —
   // red in the LOW byte. Audit F8: the old conversion read the channels
   // swapped AND repacked them swapped (a no-op), leaving red in the high
   // byte on the wire.
   it('packs #ff0000 (red) with red in the low byte', () => {
-    expect(layerColor(0, 0xff0000)).toEqual([0xca, 0x06, 0, ...encodeCoord35(0x0000ff)]);
+    expect(partColor(0, 0xff0000)).toEqual([0xca, 0x06, 0, ...encodeCoord35(0x0000ff)]);
   });
 
   it('packs #0000ff (blue) with blue in the high byte', () => {
-    expect(layerColor(2, 0x0000ff)).toEqual([0xca, 0x06, 2, ...encodeCoord35(0xff0000)]);
+    expect(partColor(2, 0x0000ff)).toEqual([0xca, 0x06, 2, ...encodeCoord35(0xff0000)]);
   });
 
   it('leaves greys unchanged (symmetric channels)', () => {
-    expect(layerColor(1, 0x808080)).toEqual([0xca, 0x06, 1, ...encodeCoord35(0x808080)]);
+    expect(partColor(1, 0x808080)).toEqual([0xca, 0x06, 1, ...encodeCoord35(0x808080)]);
   });
 });
 
@@ -123,17 +123,20 @@ describe('encodeRdJob', () => {
     const encoded = encodeRdJob(JOB, RUIDA_DEVICE);
     if (!encoded.ok) throw new Error('encode failed');
     const events = decodeRdStream(encoded.bytes);
-    expect(events[0]).toEqual({ kind: 'stream-start' });
+    expect(events[0]).toEqual({ kind: 'reference-point', mode: 'machine-zero' });
     expect(events.at(-1)).toEqual({ kind: 'file-end' });
-    expect(events.at(-2)).toEqual({ kind: 'block-end' });
+    expect(events.at(-2)).toMatchObject({ kind: 'file-sum' });
     expect(events.filter((e) => e.kind === 'unknown')).toEqual([]);
     expect(events.filter((e) => e.kind === 'job-bounds')).toHaveLength(4);
-    const speed = events.find((e) => e.kind === 'layer-speed');
-    expect(speed).toMatchObject({ layer: 0, mmPerMin: 1500 });
-    expect(events.find((e) => e.kind === 'layer-max-power')).toMatchObject({ layer: 0 });
-    const maxPower = events.find((e) => e.kind === 'layer-max-power');
-    if (maxPower?.kind !== 'layer-max-power') throw new Error('missing power');
-    expect(maxPower.percent).toBeCloseTo(50, 1);
+    expect(events.find((e) => e.kind === 'part-speed')).toEqual({
+      kind: 'part-speed',
+      part: 0,
+      mmPerMin: 1500,
+    });
+    const body = layerBodySettings(events).get(0);
+    expect(body?.mmPerMin).toBeCloseTo(1500, 6);
+    expect(body?.maxPercent).toBeCloseTo(50, 1);
+    expect(body?.airAssist).toBe(false);
     // passes: 2 → the move/cut sequence repeats twice.
     const moves = events.filter((e) => e.kind === 'move');
     const cuts = events.filter((e) => e.kind === 'cut');
@@ -265,7 +268,8 @@ describe('ruida UDP session state machine', () => {
       expect(retry.toSend).not.toBeNull(); // same packet retransmitted
     }
     const dead = onRuidaResponse(state, swizzleByte(RUIDA_NAK));
-    expect(dead.state.status).toBe('errored');
+    expect(dead.state.status).toBe('failed');
+    expect(dead.state.failure).toBe('nak-retries-exhausted');
     expect(dead.toSend).toBeNull();
   });
 });

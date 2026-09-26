@@ -55,7 +55,27 @@ export function cncPassRecoveryDefaultPoint(capsule: RecoveryCapsule): CncResume
     controllerKind: artifact.controller.kind,
     streamingMode: artifact.controller.streamingMode,
     rxBufferBytes: artifact.controller.rxBufferBytes,
+    plannerBlocks: recordedPlannerBlocks(artifact),
   });
+}
+
+/** The usable planner size the run's controller reported, when the run kept
+ * it: the session's idle `Bf` blocks free, and the stock `$I` OPT block count
+ * observed in the same session. The larger one bounds the rewind (OR-2). */
+export function recordedPlannerBlocks(
+  artifact: Extract<RecoveryCapsule['artifact'], { readonly kind: 'exact-execution' }>,
+): number | undefined {
+  const idle = artifact.archivedControllerObservation.plannerBlocksAtIdle ?? undefined;
+  const controller = artifact.provenance?.controller;
+  const buildInfo = controller?.buildInfo;
+  const fromBuildInfo =
+    buildInfo?.observation.sessionEpoch === controller?.sessionEpoch
+      ? buildInfo?.parsed?.plannerBufferBlocks
+      : undefined;
+  const recorded = [idle, fromBuildInfo].filter(
+    (blocks): blocks is number => blocks !== undefined && Number.isFinite(blocks) && blocks > 0,
+  );
+  return recorded.length === 0 ? undefined : Math.max(...recorded);
 }
 
 /** Why pass recovery refuses a fingerprint-only record: a migrated checkpoint

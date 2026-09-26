@@ -19,6 +19,7 @@ const SAFETY_NOTICE_TITLES: Record<LaserSafetyNotice['kind'], string> = {
   'stream-stalled': 'Controller stream stalled',
   'controller-reboot': 'Controller rebooted mid-job',
   'frame-limit': 'Frame hit a machine limit',
+  'home-unfinished': 'Home did not finish',
 };
 
 type Props = {

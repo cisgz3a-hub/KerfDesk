@@ -1,5 +1,7 @@
 import type { JobBounds } from '../../core/job';
+import type { MachineKind } from '../../core/scene';
 import { reportedWorkPositionMm } from '../state/canvas-motion-plan';
+import { CNC_FRAME_REQUIRES_GRBL_MESSAGE } from '../state/cnc-frame-lines';
 import type { FrameMotionCandidate } from '../state/framed-run';
 import { useLaserStore } from '../state/laser-store';
 import type { LaserMotionOperation, LaserMotionOperationId } from '../state/laser-motion-operation';
@@ -132,6 +134,16 @@ export function reportFramePreparationRefusal(
   reportFrameRefusal(
     wcsNormalizationWarning === undefined ? messages : [...messages, wcsNormalizationWarning],
   );
+}
+
+/** A CNC Frame on a controller that cannot run KerfDesk CNC jobs is refused
+ * with that reason before any Frame preparation: no G54 normalization, and no
+ * Zero-Z prompt or `G92 Z0` for a Frame that can never be built (controller
+ * audit CN-2). The same refusal the CNC Frame plan makes. */
+export function requireFrameControllerRunsMachineKind(machineKind: MachineKind): boolean {
+  if (machineKind !== 'cnc' || useLaserStore.getState().capabilities.cncJobs) return true;
+  reportFrameRefusal([CNC_FRAME_REQUIRES_GRBL_MESSAGE]);
+  return false;
 }
 
 export async function requireFrameControllerQueue(signal?: AbortSignal): Promise<boolean> {

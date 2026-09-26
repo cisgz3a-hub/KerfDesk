@@ -5,7 +5,18 @@ import {
   waitForFreshIdle,
   type ControllerLifecycleRefs,
 } from './laser-interactive-command';
-import { controllerErrorNotice, type LaserSafetyAction } from './laser-safety-notice';
+import { grblHomingDurationBoundMs } from '../../core/controllers/grbl/grbl-homing-duration';
+import {
+  controllerErrorNotice,
+  homeNotConfirmedNotice,
+  homeUnfinishedNotice,
+  type LaserSafetyAction,
+  type LaserSafetyNotice,
+} from './laser-safety-notice';
+import { resetRequiredBlockMessage } from './controller-reset-required';
+import { NO_WORK_OFFSET } from './host-recorded-origin';
+import { reopenHomeAlarmReplyWindow } from './laser-home-alarm-reply';
+import { requestTerminalOwnedActiveWcsReadback } from './terminal-owned-wcs-readback';
 import { hasPendingControllerWrite } from './laser-start-queue-fence';
 import type { LaserState } from './laser-store';
 import {
@@ -49,31 +60,52 @@ let nextHomeOperationId = 1;
 // whole cycle.
 const HOME_COMMAND_TIMEOUT_MS = 120_000;
 
+// Stock GRBL answers no status query while it homes, so status silence says
+// nothing there. The wait is the longest cycle its own `$$` settings allow,
+// with room for acceleration and startup lines, and a long backstop when the
+// settings were not read; GRBL itself raises ALARM:8/9 when a switch is not
+// found (controller audit 2026-09-25 ST-4).
+const SILENT_HOME_MARGIN = 1.5;
+const SILENT_HOME_EXTRA_MS = 30_000;
+const SILENT_HOME_BACKSTOP_MS = 30 * 60_000;
+
+function homeLineTimeoutMs(state: LaserState, driver: ControllerDriver): number {
+  if (driver.capabilities.statusWhileHoming !== false) return HOME_COMMAND_TIMEOUT_MS;
+  const bound = grblHomingDurationBoundMs(state.grblSettingsRows, driver.homingCycle);
+  if (bound === null) return SILENT_HOME_BACKSTOP_MS;
+  return Math.max(HOME_COMMAND_TIMEOUT_MS, bound * SILENT_HOME_MARGIN + SILENT_HOME_EXTRA_MS);
+}
+
+const PENDING_WRITE_HOME_MESSAGE =
+  'Home is blocked until the previous controller write and terminal acknowledgement settle.';
+
 function assertHomeReady(set: SetFn, get: GetFn, driver: ControllerDriver): HomeReadiness {
   assertAutofocusIdle(get());
   const homeCommand = driver.commands.home;
   if (homeCommand === null) throw new Error('This controller has no homing command.');
   const state = get();
-  const mpgBlocked = mpgCommandBlockMessage(state);
-  if (mpgBlocked !== null) blockHome(set, get, mpgBlocked);
-  if (hasPendingControllerWrite(get())) {
-    const message =
-      'Home is blocked until the previous controller write and terminal acknowledgement settle.';
-    blockHome(set, get, message);
-  }
-  const controllerState = state.statusReport?.state ?? null;
-  const alarmRecoveryKnown =
-    controllerState === 'Alarm' || (controllerState === null && state.alarmCode !== null);
-  if (controllerState !== 'Idle' && !alarmRecoveryKnown) {
-    blockHome(
-      set,
-      get,
-      `Machine must be known Idle or Alarm before homing (currently ${controllerState ?? 'unknown'}).`,
-    );
-  }
-  const blockedMessage = setupCommandBlockMessage(get());
-  if (blockedMessage === null) return { homeCommand, fromAlarm: alarmRecoveryKnown };
+  const fromAlarm = alarmRecoveryKnown(state);
+  const blockedMessage =
+    // An MPG owns the controller, or a critical event left it accepting only a
+    // soft reset (controller-reset-required.ts).
+    mpgCommandBlockMessage(state) ??
+    resetRequiredBlockMessage(state) ??
+    (hasPendingControllerWrite(state) ? PENDING_WRITE_HOME_MESSAGE : null) ??
+    homeStateBlockMessage(state, fromAlarm) ??
+    setupCommandBlockMessage(state);
+  if (blockedMessage === null) return { homeCommand, fromAlarm };
   blockHome(set, get, blockedMessage);
+}
+
+function alarmRecoveryKnown(state: LaserState): boolean {
+  const controllerState = state.statusReport?.state ?? null;
+  return controllerState === 'Alarm' || (controllerState === null && state.alarmCode !== null);
+}
+
+function homeStateBlockMessage(state: LaserState, fromAlarm: boolean): string | null {
+  const controllerState = state.statusReport?.state ?? null;
+  if (controllerState === 'Idle' || fromAlarm) return null;
+  return `Machine must be known Idle or Alarm before homing (currently ${controllerState ?? 'unknown'}).`;
 }
 
 function blockHome(set: SetFn, get: GetFn, message: string): never {
@@ -87,7 +119,7 @@ function blockHome(set: SetFn, get: GetFn, message: string): never {
 export async function runHomeAction(
   set: SetFn,
   get: GetFn,
-  refs: ControllerLifecycleRefs,
+  refs: ControllerLifecycleRefs & { readonly driver: ControllerDriver },
   safeWrite: SafeWriteFn,
   driver: ControllerDriver,
 ): Promise<void> {
@@ -106,12 +138,7 @@ export async function runHomeAction(
     statusObservation: null,
     trustedPositionEpoch: (expectedPositionEpoch = (state.trustedPositionEpoch ?? 0) + 1),
     workZReferenceEpoch: state.workZReferenceEpoch + 1,
-    wcoCache: null,
-    // Home establishes machine position, not the absence of G92/G54 offsets.
-    // Keep a prior origin unresolved until a fresh accepted WCO proves it.
-    workOriginActive: state.workOriginActive || state.workOriginSource !== 'none',
-    workOriginSource:
-      state.workOriginActive || state.workOriginSource !== 'none' ? 'unknown' : 'none',
+    ...homeOriginPatch(state),
     // Homing re-establishes machine zero, so any prior G92 Z0 now points at a
     // different physical height — work Z0 must be re-set (Codex audit P1).
     workZZeroEvidence: null,
@@ -133,6 +160,11 @@ export async function runHomeAction(
     recordHomeFailure(set, err, epochs);
     throw err;
   }
+  // A completed Home runs the controller's startup lines ($N0/$N1), which can
+  // select another work coordinate system (gnea/grbl system.c:198; grblHAL
+  // system.c:494-500), so the WCS is read again (controller audit 2026-09-25
+  // GP-1). Non-fatal: an unread WCS is read before the next Frame selects one.
+  await requestTerminalOwnedActiveWcsReadback(get, refs, safeWrite, epochs.session, 'home');
 }
 
 async function executeHomeSequence(
@@ -147,15 +179,17 @@ async function executeHomeSequence(
   // Vendor Home sequences can contain one command per axis. Each line must
   // earn its own terminal acknowledgement before the next line is dispatched;
   // the first axis's ok must never authorize the final settlement marker.
-  for (const command of homeCommand.split(/\r?\n/).filter((line) => line.trim() !== '')) {
+  const lines = homeCommand.split(/\r?\n/).filter((line) => line.trim() !== '');
+  for (const [index, command] of lines.entries()) {
     assertHomeCurrent(get(), refs, epochs);
+    if (index > 0) set(reopenHomeAlarmReplyWindow);
     await startControllerCommand(refs, safeWrite, {
       kind: 'home',
-      label: 'home',
+      label: 'Home',
       command: `${command}\n`,
       action: 'home',
       source: 'motion',
-      timeoutMs: HOME_COMMAND_TIMEOUT_MS,
+      timeoutMs: homeLineTimeoutMs(get(), driver),
       timeoutMode: 'non-idle-status-activity',
     });
     assertHomeCurrent(get(), refs, epochs);
@@ -169,10 +203,57 @@ async function executeHomeSequence(
     source: 'system',
   });
   assertHomeCurrent(get(), refs, epochs);
+  await verifyHomedAxes(refs, safeWrite, driver);
+  assertHomeCurrent(get(), refs, epochs);
   set({ controllerOperation: homeOperation(epochs.operationId, 'awaiting-idle') });
   await waitForFreshIdle(refs, { kind: 'home', requiredReports: 1 });
   assertHomeCurrent(get(), refs, epochs);
   confirmHome(set, get, epochs);
+}
+
+// Home establishes machine position, not the absence of G92/G54 offsets: a
+// prior origin stays unresolved until a fresh accepted WCO proves it. Marlin is
+// the exception: homing clears its G92 shift (motion.cpp:2346-2349), which
+// KerfDesk records itself (host-recorded-origin.ts; audit MA-2).
+function homeOriginPatch(state: LaserState): Partial<LaserState> {
+  if (state.capabilities.workOffsetSource === 'host-recorded') {
+    return { wcoCache: NO_WORK_OFFSET, workOriginActive: false, workOriginSource: 'none' };
+  }
+  const keepsOrigin = state.workOriginActive || state.workOriginSource !== 'none';
+  return {
+    wcoCache: null,
+    workOriginActive: keepsOrigin,
+    workOriginSource: keepsOrigin ? 'unknown' : 'none',
+  };
+}
+
+/** The firmware answered its Home line although it homed nothing (SM-6). */
+class HomeNotConfirmedError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = 'HomeNotConfirmedError';
+  }
+}
+
+// Firmware whose Home answers `ok` whether or not anything homed is asked which
+// axes it homed before the Home is confirmed (Smoothieware G28.6; controller
+// audit 2026-09-25 SM-6).
+async function verifyHomedAxes(
+  refs: ControllerLifecycleRefs,
+  safeWrite: SafeWriteFn,
+  driver: ControllerDriver,
+): Promise<void> {
+  const verification = driver.homeVerification;
+  if (verification === undefined) return;
+  const responses = await startControllerCommand(refs, safeWrite, {
+    kind: 'home',
+    label: 'homed axes query',
+    command: `${verification.query}\n`,
+    action: 'home',
+    source: 'system',
+  });
+  const reason = verification.unhomedReason(responses);
+  if (reason !== null) throw new HomeNotConfirmedError(reason);
 }
 
 function confirmHome(set: SetFn, get: GetFn, epochs: HomeEpochs): void {
@@ -194,6 +275,7 @@ function confirmHome(set: SetFn, get: GetFn, epochs: HomeEpochs): void {
       confirmedStatusSequence: observation.sequence,
     },
     alarmCode: null,
+    activeWcs: null,
     log: pushLog(state, '[lf2] Homing confirmed after fresh Idle.'),
   }));
 }
@@ -214,10 +296,21 @@ function recordHomeFailure(set: SetFn, error: unknown, epochs: HomeEpochs): void
       homingProof: null,
       ...refusedHomePositionPatch(state, operation, error, epochs),
       lastWriteError: message,
-      safetyNotice: state.safetyNotice ?? controllerErrorNotice(null, 'command', message),
+      safetyNotice: state.safetyNotice ?? homeFailureNotice(error, message),
       log: pushLog(state, `[lf2] Home failed: ${message}`),
     };
   });
+}
+
+// Only a line the controller answered with error:N was rejected; a timeout, an
+// alarm or a voided attempt is a Home that did not finish (audit ST-4).
+function homeFailureNotice(error: unknown, message: string): LaserSafetyNotice {
+  if (error instanceof HomeNotConfirmedError) return homeNotConfirmedNotice(message);
+  if (!(error instanceof ControllerCommandRefusedError)) return homeUnfinishedNotice(message);
+  const code = /^error:(\d+)$/i.exec(message.trim());
+  return code === null
+    ? controllerErrorNotice(null, 'command', message)
+    : controllerErrorNotice(Number(code[1]), 'command');
 }
 
 // KD-HOME-03/04 hides status positions after a failed Home because the cycle

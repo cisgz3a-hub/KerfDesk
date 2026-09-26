@@ -1,3 +1,4 @@
+import type { ControllerCapabilities } from '../../core/controllers/controller-capabilities';
 import type { LaserState } from './laser-store';
 import { isActiveJob } from './laser-store-helpers';
 import { pendingTransportWriteCount } from './laser-start-queue-fence';
@@ -91,34 +92,40 @@ export function failedControllerQualificationPatch(
   return { controllerQualification: { kind: 'failed', epoch: expectedEpoch, message } };
 }
 
+type QualificationScheduleOptions = {
+  /** Run only on an Idle that follows an Alarm report. */
+  readonly afterAlarm?: boolean;
+};
+
 export function scheduleControllerQualification(
   set: SetFn,
   get: GetFn,
   refs: ControllerQualificationScheduleRefs,
   epoch: number,
+  options: QualificationScheduleOptions = {},
 ): void {
   cancelScheduledControllerQualification(refs);
   refs.qualificationDeadline = Date.now() + QUALIFICATION_READY_TIMEOUT_MS;
+  let alarmSeen = options.afterAlarm !== true;
+  let reportSequence = get().statusSequence;
   const poll = (): void => {
     refs.qualificationTimer = null;
     const state = get();
-    if (!qualificationScheduleIsCurrent(state, refs, epoch)) {
-      refs.qualificationDeadline = null;
-      return;
-    }
-    if (qualificationIsTerminal(state.controllerQualification)) {
+    if (!qualificationStillPending(state, refs, epoch)) {
       refs.qualificationDeadline = null;
       return;
     }
     const controllerBusy = controllerQualificationIsBusy(state);
-    if (controllerBusy || waitingOnOperator(state)) {
+    const freshReport = state.statusSequence !== reportSequence;
+    reportSequence = state.statusSequence;
+    if (controllerBusy || controllerReportsLive(state, freshReport)) {
       refs.qualificationDeadline = Date.now() + QUALIFICATION_READY_TIMEOUT_MS;
     }
-    if (!controllerBusy && state.statusReport?.state === 'Idle') {
+    const reported = state.statusReport?.state;
+    if (reported === 'Alarm') alarmSeen = true;
+    if (!controllerBusy && alarmSeen && reported === 'Idle') {
       refs.qualificationDeadline = null;
-      const run = refs.runControllerQualification;
-      if (run == null) return;
-      void run().catch(() => undefined);
+      startQualificationRun(refs);
       return;
     }
     if (Date.now() >= (refs.qualificationDeadline ?? 0)) {
@@ -135,6 +142,25 @@ export function scheduleControllerQualification(
     refs.qualificationTimer = setTimeout(poll, QUALIFICATION_READY_POLL_MS);
   };
   refs.qualificationTimer = setTimeout(poll, QUALIFICATION_READY_POLL_MS);
+}
+
+/**
+ * A soft reset that halts the firmware instead of rebooting it (Smoothieware)
+ * prints no banner, so no banner re-arms qualification (controller audit
+ * 2026-09-25 CG-3). The halted board reports Alarm until the operator clears
+ * it with M999. Qualification runs on the first fresh Idle after that Alarm,
+ * so a report printed before the reset landed cannot start it.
+ */
+export function requalifyAfterHaltingReset(
+  set: SetFn,
+  get: GetFn,
+  refs: ControllerQualificationScheduleRefs,
+  capabilities: Pick<ControllerCapabilities, 'softResetReboots'>,
+): void {
+  if (capabilities.softResetReboots !== false) return;
+  scheduleControllerQualification(set, get, refs, get().controllerSessionEpoch, {
+    afterAlarm: true,
+  });
 }
 
 /**
@@ -197,16 +223,21 @@ export function awaitPolledQualification(
   }, POLLED_RESPONSE_TIMEOUT_MS);
 }
 
-// A fresh Alarm or Sleep report is a controller answering and waiting for the
-// operator ($X, $H or Wake), not a dead link. After a Stop mid-motion GRBL
-// reboots into ALARM:3, and the 8 s deadline used to latch "Controller
-// qualification failed" on every such Stop, with nothing re-arming it once the
-// operator unlocked (audit connect-3). Qualification now runs on the first
-// fresh Idle however long the operator takes; reports that stop arriving
-// still time out.
-function waitingOnOperator(state: LaserState): boolean {
+// A fresh report that is not Idle is a live controller: waiting for the
+// operator (Alarm, Sleep: $X, $H or Wake) or still busy (Run, Jog, Home, Hold,
+// Door, Check), not a dead link. After a Stop mid-motion GRBL reboots into
+// ALARM:3, and the 8 s deadline used to latch "Controller qualification
+// failed" on every such Stop, with nothing re-arming it once the operator
+// unlocked (audit connect-3); a controller still busy when the connect
+// handshake handed over did the same (audit TC-1). Qualification now runs on
+// the first fresh Idle however long that takes; reports that stop arriving
+// still time out. An Alarm or Sleep report clears the status observation
+// (laser-status-line handleInvalidatingStatus), so a report also counts as
+// fresh when the status sequence moved since the previous poll.
+function controllerReportsLive(state: LaserState, freshReport: boolean): boolean {
   const reported = state.statusReport?.state;
-  if (reported !== 'Alarm' && reported !== 'Sleep') return false;
+  if (reported === undefined || reported === 'Idle') return false;
+  if (freshReport) return true;
   const observedAt = state.statusObservation?.observedAt;
   return observedAt !== undefined && Date.now() - observedAt <= QUALIFICATION_READY_TIMEOUT_MS;
 }
@@ -226,6 +257,23 @@ function qualificationScheduleIsCurrent(
 
 function qualificationIsTerminal(qualification: ControllerQualification): boolean {
   return qualification.kind === 'qualified' || qualification.kind === 'failed';
+}
+
+function startQualificationRun(refs: ControllerQualificationScheduleRefs): void {
+  const run = refs.runControllerQualification;
+  if (run == null) return;
+  void run().catch(() => undefined);
+}
+
+function qualificationStillPending(
+  state: LaserState,
+  refs: ControllerQualificationScheduleRefs,
+  epoch: number,
+): boolean {
+  return (
+    qualificationScheduleIsCurrent(state, refs, epoch) &&
+    !qualificationIsTerminal(state.controllerQualification)
+  );
 }
 
 function controllerQualificationIsBusy(state: LaserState): boolean {

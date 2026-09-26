@@ -25,6 +25,10 @@ export type AutomaticRestart = {
   /** Planner blocks the stop discarded, when the restart steps back over them
    *  (planner-backlog-restart.ts). */
   readonly plannerBacklogBlocks?: number;
+  /** What bounded that step back: the backlog a status report showed, the
+   *  moves acknowledged after a report that showed an empty planner, or the
+   *  controller's whole planner when no report showed it (OR-3). */
+  readonly plannerBacklogBasis?: 'status-backlog' | 'after-empty-status' | 'planner-size';
 };
 
 type RestartScan = {
@@ -76,7 +80,19 @@ function withPlannerBacklog(
   if (backlog === undefined) return restart;
   const frontier = plannerFrontierRawLine(gcode, backlog);
   if (frontier === null || frontier >= restart.line) return restart;
-  return { ...restart, line: frontier, plannerBacklogBlocks: backlog.queuedBlocks };
+  return {
+    ...restart,
+    line: frontier,
+    plannerBacklogBlocks: backlog.queuedBlocks,
+    plannerBacklogBasis: plannerBacklogBasis(backlog),
+  };
+}
+
+function plannerBacklogBasis(
+  backlog: NonNullable<JobInterruption['plannerBacklog']>,
+): NonNullable<AutomaticRestart['plannerBacklogBasis']> {
+  if (backlog.bound === 'planner-size') return 'planner-size';
+  return backlog.queuedBlocks === 0 ? 'after-empty-status' : 'status-backlog';
 }
 
 function visitLine(

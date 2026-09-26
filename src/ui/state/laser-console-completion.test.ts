@@ -70,7 +70,10 @@ describe('Console command completion', () => {
     expect(useLaserStore.getState().log.at(-1)).toContain(EMPTY_SETTINGS_RESPONSE_MESSAGE);
   });
 
-  it('clears the alarm latch once the controller acknowledges $X', async () => {
+  // The acknowledgement alone does not prove the unlock: FluidNC acks `$X` in
+  // its Critical state (controller audit 2026-09-25 HF-2). The next report that
+  // is not Alarm clears the latch.
+  it('clears the alarm latch once the controller reports Idle after acknowledging $X', async () => {
     const { connection, wire } = await connectedIdle();
     useLaserStore.setState({ alarmCode: 5 });
     wire.length = 0;
@@ -78,6 +81,9 @@ describe('Console command completion', () => {
     await sendAndAnswer(connection, wire, '$X', ['[MSG:Caution: Unlocked]', 'ok']);
 
     expect(wire).toContain('$X\n');
+    expect(useLaserStore.getState().alarmCode).toBe(5);
+    connection.emitLine(IDLE);
+    await flushConnect();
     expect(useLaserStore.getState().alarmCode).toBeNull();
   });
 

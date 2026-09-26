@@ -28,12 +28,12 @@ async function alarmedController(reply: string) {
   connection.emitLine(ALARM);
   await flushConnect();
   expect(useLaserStore.getState().alarmCode).toBe(1);
-  return writes;
+  return { writes, connection };
 }
 
 describe('Alarm banner Unlock', () => {
   it('keeps the alarm and names the refusal when the controller answers error:N', async () => {
-    const writes = await alarmedController('error:9');
+    const { writes } = await alarmedController('error:9');
 
     await expect(useLaserStore.getState().unlockAlarm()).rejects.toThrow(/error:9/);
 
@@ -41,11 +41,17 @@ describe('Alarm banner Unlock', () => {
     expect(useLaserStore.getState().alarmCode).toBe(1);
   });
 
-  it('clears the alarm once the controller acknowledges the unlock', async () => {
-    await alarmedController('ok');
+  // Controller audit 2026-09-25 HF-2: FluidNC acknowledges `$X` in its Critical
+  // state without unlocking, so the `ok` alone clears nothing; the next report
+  // that is not Alarm does.
+  it('clears the alarm once the controller reports it left Alarm after the unlock', async () => {
+    const { connection } = await alarmedController('ok');
 
     await useLaserStore.getState().unlockAlarm();
+    expect(useLaserStore.getState().alarmCode).toBe(1);
 
+    connection.emitLine('<Idle|MPos:0.000,0.000,0.000|FS:0,0>');
+    await flushConnect();
     expect(useLaserStore.getState().alarmCode).toBeNull();
   });
 });

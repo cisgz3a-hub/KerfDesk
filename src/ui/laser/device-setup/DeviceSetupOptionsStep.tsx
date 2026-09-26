@@ -115,6 +115,7 @@ function LaserCalibrationSections(props: {
         <AutofocusEditor
           value={draft.autofocusCommand}
           onChange={(autofocusCommand) => update({ autofocusCommand })}
+          controllerCommandSet={draft.controllerCommandSet}
         />
       </OptionSection>
       <OptionSection title="Rotary attachment" status={rotaryStatus(draft)}>
