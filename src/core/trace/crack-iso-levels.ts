@@ -39,6 +39,9 @@ const MAX_LUMA = 255;
 // Half-size (SOURCE px) of the uniform block a broad edge needs on each
 // side of its crack; anything thinner keeps the cut's own crossing.
 const BROAD_RADIUS_SOURCE_PX = 1;
+// A cut this close to the plateau mid-level (fraction of the local step)
+// keeps its own crossing; see crossingLevel.
+const PLATEAU_DEADBAND = 0.02;
 
 /** Row-major 8-bit plane: the scalar the mask was cut from. */
 export type ScalarPlane = {
@@ -65,9 +68,9 @@ type MaskPlane = { readonly width: number; readonly height: number; readonly ink
 
 /** Adds the plateau crossing to the automatic-cut field. `ink` is the
  *  thresholded mask (1 = ink) the field describes. Each broad crack crosses
- *  at the mid-level of the two LOCAL plateaus (the mean luma of a uniform
- *  block just past it on each side), so an edge against grey paper and one
- *  against white paper both land at 50% coverage. */
+ *  at the mid-level of the two LOCAL plateaus (the extreme value of a uniform block
+ *  just past it on each side), so an edge against grey paper and one against
+ *  white paper both land at 50% coverage. */
 export function withPlateauCrossing(
   field: CrackSubPixelField,
   plane: ScalarPlane,
@@ -80,38 +83,53 @@ export function withPlateauCrossing(
   return {
     ...field,
     crackCrossingAt: (inkX, inkY, bgX, bgY) => {
-      // Thin ink or a narrow paper gap never reaches its plateau, and moving
-      // such an edge past the mask's crack can fold the loop onto itself at
-      // a saddle: those cracks keep the crossing of the cut itself.
       const dx = inkX - bgX;
       const dy = inkY - bgY;
       const reach = radius + 1;
-      const inkLevel = plateauMean(plane, mask, inkX + dx * reach, inkY + dy * reach, radius, true);
-      const paperLevel = plateauMean(
+      const inkLevel = plateauLevel(
         plane,
         mask,
-        bgX - dx * reach,
-        bgY - dy * reach,
+        inkX + dx * reach,
+        inkY + dy * reach,
         radius,
-        false,
+        true,
       );
-      const broad = inkLevel !== null && paperLevel !== null && paperLevel > inkLevel;
+      const paperLevel =
+        inkLevel === null
+          ? null
+          : plateauLevel(plane, mask, bgX - dx * reach, bgY - dy * reach, radius, false);
       return isoCrossing(
         sample(plane, inkX, inkY),
         sample(plane, bgX, bgY),
         cut,
-        broad ? (inkLevel + paperLevel) / 2 : cut,
+        crossingLevel(cut, inkLevel, paperLevel),
       );
     },
   };
 }
 
-// Mean value of the (2r+1)� block centred on (cx, cy) when every pixel of it
-// has mask class `ink` (outside the image is paper), else null. The block
+// Thin ink or a narrow paper gap never reaches its plateau, and moving such
+// an edge past the mask's crack can fold the loop onto itself at a saddle:
+// those cracks keep the crossing of the cut itself. So does a cut that
+// already sits at the mid-level to within PLATEAU_DEADBAND of the step: the
+// move would be under ~0.02 px, and the finishing fits react to such a
+// uniform nudge by re-choosing vertices (a -0.003 IoU swing on a clean
+// r = 40 ring, ADR-453) rather than by moving the edge.
+function crossingLevel(cut: number, inkLevel: number | null, paperLevel: number | null): number {
+  if (inkLevel === null || paperLevel === null || !(paperLevel > inkLevel)) return cut;
+  const mid = (inkLevel + paperLevel) / 2;
+  return Math.abs(mid - cut) <= PLATEAU_DEADBAND * (paperLevel - inkLevel) ? cut : mid;
+}
+
+// Plateau level of the (2r+1)^2 block centred on (cx, cy) when every pixel of
+// it has mask class `ink` (outside the image is paper), else null. The block
 // sits just past the crack's own pixel (whose row may hold staircase steps)
 // and reaches 2r + 2 pixels along the normal, so a stroke or gap narrower
-// than that in ANY direction fails it � a diagonal hairline too.
-function plateauMean(
+// than that in ANY direction fails it (a diagonal hairline too). The level
+// is the block's extreme (darkest ink, lightest paper): the ramp of this or
+// an opposite edge reaching into the block only pulls the other way (a block
+// median widened a clean 8 px bar by 3.5% area, ADR-453).
+function plateauLevel(
   plane: ScalarPlane,
   mask: MaskPlane,
   cx: number,
@@ -119,8 +137,6 @@ function plateauMean(
   r: number,
   ink: boolean,
 ): number | null {
-  // The block's extreme (darkest ink, lightest paper) is its plateau: an
-  // opposite edge's ramp inside the block only pulls the other way.
   let level = ink ? MAX_LUMA : 0;
   for (let y = cy - r; y <= cy + r; y += 1) {
     for (let x = cx - r; x <= cx + r; x += 1) {

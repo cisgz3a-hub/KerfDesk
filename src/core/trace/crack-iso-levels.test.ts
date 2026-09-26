@@ -79,6 +79,15 @@ describe('automatic cut: plateau mid-level on broad edges (ADR-453)', () => {
       expectPrecise(radiusStats(chains(discOnPaper(), preset(name)).placed, DISC));
   });
 
+  it('keeps the crossing of a cut that already sits at the mid-level', () => {
+    // Otsu 125 against a 0/255 step: within 2% of the step, so the chain is
+    // exactly the cut's own (no sub-0.02 px nudge for the fits to react to).
+    const image = discOnPaper();
+    expect(Math.abs(otsuThreshold(image) - 127.5)).toBeLessThanOrEqual(0.02 * 255);
+    const { placed, cutOnly } = chains(image, preset('Sharp'));
+    expect(placed).toEqual(cutOnly);
+  });
+
   it('removes the inward bias when the automatic cut lands far below the mid-level', () => {
     const image = discOnPaper(180, 170);
     expect(otsuThreshold(image)).toBeLessThanOrEqual(115);
