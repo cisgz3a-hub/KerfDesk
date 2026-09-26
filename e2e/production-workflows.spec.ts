@@ -403,7 +403,7 @@ test('configures the Creality Falcon profile through the complete setup wizard',
   await page.getByRole('button', { name: 'Machine Setup', exact: true }).click();
   const setup = page.getByRole('dialog', { name: 'Machine Setup' });
   await expect(setup).toContainText('Step 1 of 3');
-  await setup.getByText('Controller and connection settings', { exact: true }).click();
+  await setup.getByText('Connection options', { exact: true }).click();
   await setup.getByLabel('Controller firmware').selectOption('grblhal');
   await setup.getByLabel('Search machine profiles').fill('Creality Falcon A1 Pro');
   await page.getByRole('radio', { name: 'Use Creality Falcon A1 Pro' }).check();
@@ -439,7 +439,7 @@ test('keeps detected firmware, catalog profile, and streaming transport coherent
 
   await page.getByRole('button', { name: 'Machine Setup', exact: true }).click();
   const setup = page.getByRole('dialog', { name: 'Machine Setup' });
-  await setup.getByText('Controller and connection settings', { exact: true }).click();
+  await setup.getByText('Connection options', { exact: true }).click();
   await expect(setup.getByLabel('Controller firmware')).toHaveValue('grbl-v1.1');
 
   // A firmware mismatch informs on the card but never disables it — the

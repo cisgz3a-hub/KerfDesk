@@ -1,231 +1,213 @@
-// Optional Machine-stage connection, using the selected driver and baud.
-// Identity/settings reads do not move the machine or write its configuration.
-// What a read returned, and the action that copies it into the draft, live in
-// the Set up automatically lane above this section (ADR-347).
+// Find my machine (ADR-420): the first thing on the Machine stage. It connects
+// with the draft's controller contract, shows what the controller reported,
+// and fills a new machine's setup from it (use-controller-auto-fill.ts).
+// Identity and settings reads do not move the machine or change its settings.
+// Setting up without connecting stays one click away.
 
-import { selectControllerDriver } from '../../../core/controllers';
+import { useState } from 'react';
+import type { ControllerKind } from '../../../core/devices';
 import { assertNever } from '../../../core/scene';
-import { usePlatform } from '../../app/platform-context';
-import { connectOptionsForDevice } from '../../commands/connect-options';
 import { helpProps } from '../../help/help-topics';
 import { Button } from '../../kit';
-import { useLaserStore, type ConnectionState } from '../../state/laser-store';
-import { waitForControllerQueueSettled } from '../../state/controller-queue-settle';
-import { useToastStore } from '../../state/toast-store';
 import type { DeviceSetupStepProps } from './device-setup-flow';
+import { DeviceSetupConnectionOptions } from './DeviceSetupConnectionOptions';
+import { DeviceSetupFoundMachine } from './DeviceSetupFoundMachine';
+import { findMachinePhase, type FindMachinePhase } from './find-machine-phase';
 import { machineSetupControllerGuide } from './machine-setup-controller-guide';
+import { useFindMachine, type FindMachineModel } from './use-find-machine';
+import type { DeviceSetupAutomatic } from './use-controller-auto-fill';
 
-export function DeviceSetupConnectStep({ state, dispatch }: DeviceSetupStepProps): JSX.Element {
-  const model = useConnectionStepModel(state);
-  if (model.driver.capabilities.transport === 'file-only') {
-    return (
-      <section style={sectionStyle}>
-        <p style={statusStyle}>No live connection is used for this controller.</p>
-        <p style={hintStyle}>{model.guide.writeExplanation}</p>
-        <CommandContract guide={model.guide} />
-      </section>
-    );
-  }
-  return <SerialConnectStep model={model} dispatch={dispatch} />;
-}
+type Props = DeviceSetupStepProps & {
+  readonly automatic?: DeviceSetupAutomatic | undefined;
+  readonly openOptions?: boolean;
+};
 
-function useConnectionStepModel(state: DeviceSetupStepProps['state']) {
-  const platform = usePlatform();
-  const connection = useLaserStore((s) => s.connection);
-  const activeControllerKind = useLaserStore((s) => s.activeControllerKind);
-  const activeControllerCommandSet = useLaserStore((s) => s.activeControllerCommandSet);
-  const controllerOperation = useLaserStore((s) => s.controllerOperation);
-  const detectedControllerKind = useLaserStore((s) => s.detectedControllerKind);
-  const connect = useLaserStore((s) => s.connect);
-  const disconnect = useLaserStore((s) => s.disconnect);
-  const readMachineSettings = useLaserStore((s) => s.readMachineSettings);
-  const sendConsoleCommand = useLaserStore((s) => s.sendConsoleCommand);
-  const pushToast = useToastStore((s) => s.pushToast);
-  const controllerKind = state.draft.controllerKind ?? 'grbl-v1.1';
-  const driver = selectControllerDriver(controllerKind, state.draft.controllerCommandSet);
-  const guide = machineSetupControllerGuide(controllerKind, state.draft.controllerCommandSet);
-  const connected = connection.kind === 'connected';
-  const supportsSerial = platform.serial.isSupported();
-  const mismatch =
-    connected &&
-    (activeControllerKind !== controllerKind ||
-      (activeControllerCommandSet ?? null) !== (driver.commandSet ?? null) ||
-      (detectedControllerKind !== null && detectedControllerKind !== controllerKind));
-
-  // The options the rail and menu Connect build from a profile, so the draft's
-  // Background streaming choice travels as they send it, an explicit opt-out
-  // included (2026-09-25 audit, SER-2). Connect treats a missing choice as on
-  // for GRBL-family drivers. Setup keeps its controller and baud fallbacks.
-  const openConnection = (): Promise<void> =>
-    connect(platform, {
-      ...connectOptionsForDevice(state.draft),
-      controllerKind,
-      baudRate: state.draft.baudRate ?? guide.defaultBaudRate,
-    });
-  const reconnect = async (): Promise<void> => {
-    await disconnect();
-    await openConnection();
-  };
-  const readController = async (): Promise<void> => {
-    try {
-      for (const command of guide.identityCommands) await sendConsoleCommand(command);
-      for (const command of guide.settingsCommands) {
-        if (command === driver.commands.settingsQuery) {
-          // A Console line resolves when its bytes leave, not on the ok, and the
-          // settings read refuses while an ok is still owed (settings-console-3).
-          if (!(await waitForControllerQueueSettled())) {
-            throw new Error(
-              'The controller did not acknowledge the identity query in time. Check the connection, then run the checks again.',
-            );
-          }
-          await readMachineSettings();
-        } else await sendConsoleCommand(command);
-      }
-      pushToast(
-        `${guide.label} read-only checks sent. Review the transcript and values below.`,
-        'success',
-      );
-    } catch (error: unknown) {
-      pushToast(error instanceof Error ? error.message : String(error), 'error');
-    }
-  };
-  return {
-    activeControllerKind,
-    connection,
-    controllerOperation,
-    controllerKind,
-    detectedControllerKind,
-    driver,
-    guide,
-    mismatch,
-    openConnection,
-    pushToast,
-    readController,
-    reconnect,
-    state,
-    supportsSerial,
-  };
-}
-
-function SerialConnectStep(props: {
-  readonly model: ReturnType<typeof useConnectionStepModel>;
-  readonly dispatch: DeviceSetupStepProps['dispatch'];
-}): JSX.Element {
-  const { model } = props;
+export function DeviceSetupConnectStep(props: Props): JSX.Element {
+  const model = useFindMachine(props.state, props.automatic);
+  const [offline, setOffline] = useState(false);
+  const phase = findMachinePhase(model, offline);
   return (
-    <section style={sectionStyle}>
-      <p style={statusStyle}>{connectionStatusText(model.connection)}</p>
-      <p style={hintStyle}>
-        KerfDesk will open {model.guide.label} at{' '}
-        {model.state.draft.baudRate ?? model.guide.defaultBaudRate} baud. Reading identity and
-        settings is non-motion and does not change controller configuration.
-      </p>
-      {model.guide.writePolicy === 'external-config' ? (
-        <p style={hintStyle}>{model.guide.writeExplanation}</p>
+    <section className="lf-setup-find" aria-label="Find my machine" data-phase={phase.kind}>
+      <div className="lf-setup-find-head">
+        <h4>{phase.title}</h4>
+        <p>{phase.detail}</p>
+      </div>
+      {phase.kind === 'found' ? (
+        <DeviceSetupFoundMachine
+          state={props.state}
+          dispatch={props.dispatch}
+          automatic={props.automatic}
+        />
       ) : null}
       {model.mismatch ? <ConnectionMismatch model={model} dispatch={props.dispatch} /> : null}
-      <ConnectionActions model={model} />
-      {!model.supportsSerial ? (
-        <p style={warningStyle}>
-          Web Serial is unavailable. Use the desktop app or Chrome/Edge, or continue with manual
-          values.
-        </p>
-      ) : null}
-      <CommandContract guide={model.guide} />
+      <FindActions model={model} phase={phase} onOffline={setOffline} />
+      <details className="lf-setup-disclosure lf-setup-disclosure--nested" open={props.openOptions}>
+        <summary title="Choose the controller firmware, baud rate, output dialect and streaming used to connect.">
+          <span>Connection options</span>
+          <small>
+            {model.guide.label}
+            {model.driver.capabilities.transport === 'serial' ? ` · ${model.baudRate} baud` : ''}
+          </small>
+        </summary>
+        <div className="lf-setup-disclosure-body">
+          <DeviceSetupConnectionOptions state={props.state} dispatch={props.dispatch} />
+          <CommandContract guide={model.guide} />
+        </div>
+      </details>
     </section>
   );
 }
 
-function ConnectionMismatch(props: {
-  readonly model: ReturnType<typeof useConnectionStepModel>;
-  readonly dispatch: DeviceSetupStepProps['dispatch'];
+function FindActions(props: {
+  readonly model: FindMachineModel;
+  readonly phase: FindMachinePhase;
+  readonly onOffline: (offline: boolean) => void;
+}): JSX.Element | null {
+  const { model, phase } = props;
+  switch (phase.kind) {
+    case 'idle':
+    case 'failed':
+    case 'offline':
+      return <StartActions {...props} failed={phase.kind === 'failed'} />;
+    case 'silent':
+      return (
+        <div className="lf-setup-find-actions">
+          <Button variant="primary" onClick={model.scan.start}>
+            Try other speeds
+          </Button>
+          <ChoosePort model={model} />
+          <Button variant="ghost" onClick={model.disconnect}>
+            Disconnect
+          </Button>
+        </div>
+      );
+    case 'scanning':
+      return (
+        <div className="lf-setup-find-actions">
+          <Button onClick={model.scan.stop}>Stop</Button>
+        </div>
+      );
+    case 'found':
+      return <FoundActions model={model} />;
+    case 'connecting':
+    case 'reading':
+    case 'unsupported':
+    case 'file-only':
+      return null;
+    default:
+      return assertNever(phase.kind);
+  }
+}
+
+function StartActions(props: {
+  readonly model: FindMachineModel;
+  readonly phase: FindMachinePhase;
+  readonly failed: boolean;
+  readonly onOffline: (offline: boolean) => void;
 }): JSX.Element {
   const { model } = props;
-  const detectedGuide =
-    model.detectedControllerKind === null
-      ? null
-      : machineSetupControllerGuide(model.detectedControllerKind);
   return (
-    <div role="alert" style={warningCardStyle}>
-      <strong>Connection does not match the setup draft.</strong>
-      <span>
-        Active driver: {model.activeControllerKind}; detected firmware:{' '}
-        {model.detectedControllerKind ?? 'unknown'}; selected: {model.controllerKind}.
-      </span>
+    <div className="lf-setup-find-actions">
       <Button
         variant="primary"
-        onClick={() => void model.reconnect().catch(showError(model.pushToast))}
+        onClick={() => {
+          props.onOffline(false);
+          model.find();
+        }}
+        {...helpProps('control:laser.device-setup.connect')}
       >
-        Reconnect using selected profile
+        {props.failed ? 'Try again' : 'Find my machine'}
       </Button>
-      {detectedGuide !== null && model.detectedControllerKind !== model.controllerKind ? (
-        <Button
-          onClick={() =>
-            props.dispatch({
-              kind: 'select-controller',
-              controllerKind: detectedGuide.kind,
-            })
-          }
-        >
-          Use detected {detectedGuide.label} in draft
+      {props.failed ? <ChoosePort model={model} /> : null}
+      {props.phase.kind === 'idle' ? (
+        <Button variant="ghost" onClick={() => props.onOffline(true)}>
+          Set up without connecting
         </Button>
       ) : null}
     </div>
   );
 }
 
-function ConnectionActions(props: {
-  readonly model: ReturnType<typeof useConnectionStepModel>;
-}): JSX.Element {
-  const { model } = props;
-  if (model.connection.kind !== 'connected') {
-    return (
-      <div style={actionsStyle}>
-        <Button
-          variant="primary"
-          onClick={() => void model.openConnection().catch(showError(model.pushToast))}
-          disabled={model.connection.kind === 'connecting' || !model.supportsSerial}
-          {...helpProps('control:laser.device-setup.connect')}
-        >
-          Connect…
-        </Button>
-      </div>
-    );
-  }
+function FoundActions({ model }: { readonly model: FindMachineModel }): JSX.Element {
   return (
-    <div style={actionsStyle}>
+    <div className="lf-setup-find-actions">
       <Button
-        onClick={() => void model.readController()}
+        onClick={model.readAgain}
         disabled={
           model.mismatch ||
-          model.controllerOperation !== null ||
+          model.laser.controllerOperation !== null ||
           (model.guide.identityCommands.length === 0 && model.guide.settingsCommands.length === 0)
         }
         {...helpProps('control:laser.device-setup.reread')}
       >
-        Run read-only checks
+        Read again
+      </Button>
+      <ChoosePort model={model} />
+      <Button variant="ghost" onClick={model.disconnect}>
+        Disconnect
       </Button>
     </div>
   );
 }
 
-function CommandContract(props: {
-  readonly guide: ReturnType<typeof machineSetupControllerGuide>;
-}): JSX.Element {
-  const { guide } = props;
+function ChoosePort({ model }: { readonly model: FindMachineModel }): JSX.Element {
   return (
-    <details style={detailsStyle}>
+    <Button
+      onClick={model.choosePort}
+      title="Show the port list and connect to the port you choose."
+    >
+      Use a different port…
+    </Button>
+  );
+}
+
+function ConnectionMismatch(props: {
+  readonly model: FindMachineModel;
+  readonly dispatch: DeviceSetupStepProps['dispatch'];
+}): JSX.Element {
+  const { model } = props;
+  const detected = model.laser.detectedControllerKind;
+  const label = (kind: ControllerKind): string => machineSetupControllerGuide(kind).label;
+  return (
+    <div role="alert" className="lf-setup-find-mismatch">
+      <strong>The connection does not match this setup.</strong>
+      <span>
+        Connected as {label(model.laser.activeControllerKind)}; the controller reports{' '}
+        {detected === null ? 'unknown firmware' : label(detected)}; this setup uses{' '}
+        {model.guide.label}.
+      </span>
+      <div className="lf-setup-find-actions">
+        <Button variant="primary" onClick={model.reconnect}>
+          Reconnect using selected profile
+        </Button>
+        {detected !== null && detected !== model.controllerKind ? (
+          <Button
+            onClick={() => props.dispatch({ kind: 'select-controller', controllerKind: detected })}
+          >
+            Use detected {label(detected)} in draft
+          </Button>
+        ) : null}
+      </div>
+    </div>
+  );
+}
+
+function CommandContract(props: { readonly guide: FindMachineModel['guide'] }): JSX.Element {
+  const { guide } = props;
+  const list = (commands: ReadonlyArray<string>): string =>
+    commands.length === 0 ? 'Not available' : commands.join(', ');
+  return (
+    <details className="lf-setup-find-contract">
       <summary
-        style={summaryStyle}
         title={`Show the exact read, status, home, and configuration contract for ${guide.label}.`}
       >
         Commands and configuration used for {guide.label}
       </summary>
-      <dl style={definitionStyle}>
+      <dl>
         <dt>Identify</dt>
-        <dd>{commandList(guide.identityCommands)}</dd>
+        <dd>{list(guide.identityCommands)}</dd>
         <dt>Read / settle</dt>
-        <dd>{commandList(guide.settingsCommands)}</dd>
+        <dd>{list(guide.settingsCommands)}</dd>
         <dt>Status</dt>
         <dd>{guide.statusCommand ?? 'Not available'}</dd>
         <dt>Home</dt>
@@ -236,62 +218,3 @@ function CommandContract(props: {
     </details>
   );
 }
-
-function connectionStatusText(connection: ConnectionState): string {
-  switch (connection.kind) {
-    case 'disconnected':
-      return 'Not connected.';
-    case 'connecting':
-      return 'Connecting…';
-    case 'connected':
-      return 'Controller connected.';
-    case 'failed':
-      return `Connection failed: ${connection.error}`;
-    default:
-      return assertNever(connection);
-  }
-}
-
-function commandList(commands: ReadonlyArray<string>): string {
-  return commands.length === 0 ? 'Not available' : commands.join(', ');
-}
-
-function showError(pushToast: (message: string, kind: 'error') => void): (error: unknown) => void {
-  return (error) => pushToast(error instanceof Error ? error.message : String(error), 'error');
-}
-
-const sectionStyle: React.CSSProperties = { display: 'flex', flexDirection: 'column', gap: 10 };
-const statusStyle: React.CSSProperties = { margin: 0, fontWeight: 600 };
-const actionsStyle: React.CSSProperties = { display: 'flex', gap: 8, flexWrap: 'wrap' };
-const hintStyle: React.CSSProperties = {
-  margin: 0,
-  fontSize: 12,
-  color: 'var(--lf-text-muted)',
-  lineHeight: 1.45,
-};
-const warningStyle: React.CSSProperties = {
-  margin: 0,
-  fontSize: 12,
-  color: 'var(--lf-warning-fg)',
-};
-const warningCardStyle: React.CSSProperties = {
-  display: 'grid',
-  gap: 7,
-  border: '1px solid var(--lf-warning)',
-  borderRadius: 6,
-  padding: 9,
-  fontSize: 12,
-};
-const detailsStyle: React.CSSProperties = {
-  border: '1px solid var(--lf-border)',
-  borderRadius: 6,
-  padding: 8,
-};
-const summaryStyle: React.CSSProperties = { cursor: 'pointer', fontSize: 12, fontWeight: 600 };
-const definitionStyle: React.CSSProperties = {
-  display: 'grid',
-  gridTemplateColumns: '100px minmax(0, 1fr)',
-  gap: '5px 10px',
-  margin: '8px 0 0',
-  fontSize: 12,
-};

@@ -56,6 +56,31 @@ export const webSerial: SerialAdapter = {
       throw err;
     }
   },
+  // getPorts() lists only ports this origin was granted that are attached
+  // now: Chrome keeps a grant across restarts when it can tell the adapter
+  // again (on Windows by device instance ID), and the desktop app for the run
+  // (ADR-366). A port still flagged open from an earlier session is closed
+  // and reopened by openWithRetry, as a picked one is.
+  grantedPorts: async () => {
+    try {
+      const ports = await navigator.serial.getPorts();
+      return ports.map(makePortRef);
+    } catch {
+      return [];
+    }
+  },
+  onGrantedPortsChange: (handler) => {
+    const serial = navigator.serial;
+    // A test double or an embedder's partial API may lack the events.
+    if (typeof serial.addEventListener !== 'function') return () => undefined;
+    const listener = (): void => handler();
+    serial.addEventListener('connect', listener);
+    serial.addEventListener('disconnect', listener);
+    return () => {
+      serial.removeEventListener('connect', listener);
+      serial.removeEventListener('disconnect', listener);
+    };
+  },
 };
 
 // Walk previously-paired ports and close any that's still in the open state.

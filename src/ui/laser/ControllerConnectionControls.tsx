@@ -1,10 +1,14 @@
+import { useState } from 'react';
 import { selectControllerDriver } from '../../core/controllers';
 import type { MachineKind } from '../../core/scene';
 import { usePlatform } from '../app/platform-context';
 import { connectOptionsForDevice } from '../commands/connect-options';
 import { machineNoun } from '../machine/machine-labels';
 import { useStore } from '../state';
+import { browserLocalStorage } from '../state/browser-local-storage';
 import { useLaserStore } from '../state/laser-store';
+import type { ConnectControllerOptions } from '../state/laser-store';
+import { loadAutoConnectPreference, saveAutoConnectPreference } from '../state/serial-port-memory';
 import { ConnectionBar } from './ConnectionBar';
 import { ConnectedMachineProfile } from './ConnectedMachineProfile';
 import { DeviceSetupControls } from './device-setup';
@@ -32,7 +36,8 @@ export function ControllerConnectionControls(props: Props): JSX.Element {
   // One builder with the menu Connect, read at click time, so the profile's
   // "Stream in worker" opt-in (ADR-334) is honoured on every Connect surface;
   // the rail used to rebuild the options without it (audit connect-6/ui-panel-7).
-  const connectOptions = () => connectOptionsForDevice(useStore.getState().project.device);
+  const connectOptions = (): ConnectControllerOptions =>
+    connectOptionsForDevice(useStore.getState().project.device);
   const connect = (): void => {
     void connectController(platform, connectOptions());
   };
@@ -40,6 +45,12 @@ export function ControllerConnectionControls(props: Props): JSX.Element {
     await disconnectController();
     await connectController(platform, connectOptions());
   };
+  // A connected machine is closed first, so the chosen port replaces it.
+  const choosePort = async (): Promise<void> => {
+    if (useLaserStore.getState().connection.kind === 'connected') await disconnectController();
+    await connectController(platform, { ...connectOptions(), portSelection: 'choose' });
+  };
+  const autoConnect = useAutoConnectPreference();
   return (
     <>
       <SafetyNoticeBanner
@@ -47,9 +58,12 @@ export function ControllerConnectionControls(props: Props): JSX.Element {
         reconnectDisabled={!supportsSerial || props.motionOperation !== null || isFileOnlyProfile}
       />
       <ConnectionHints supportsSerial={supportsSerial} isFileOnlyProfile={isFileOnlyProfile} />
-      <DeviceSetupControls />
-      <ConnectedMachineProfile />
       <ConnectionBar
+        machine={<ConnectedMachineProfile />}
+        setup={<DeviceSetupControls />}
+        onChoosePort={() => void choosePort().catch(controllerActionFailureHandler('Connect'))}
+        autoConnect={autoConnect.enabled}
+        onAutoConnectChange={autoConnect.change}
         connection={connection}
         machineNoun={machineNoun(props.machineKind)}
         onConnect={connect}
@@ -72,6 +86,18 @@ export function ControllerConnectionControls(props: Props): JSX.Element {
       />
     </>
   );
+}
+
+function useAutoConnectPreference(): {
+  readonly enabled: boolean;
+  readonly change: (enabled: boolean) => void;
+} {
+  const [enabled, setEnabled] = useState(() => loadAutoConnectPreference(browserLocalStorage()));
+  const change = (next: boolean): void => {
+    saveAutoConnectPreference(browserLocalStorage(), next);
+    setEnabled(next);
+  };
+  return { enabled, change };
 }
 
 function ConnectionHints(props: {

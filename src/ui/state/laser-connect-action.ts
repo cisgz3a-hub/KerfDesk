@@ -19,6 +19,12 @@ import {
 import { pushLog } from './laser-store-helpers';
 import { connectionScopedEvidenceReset } from './laser-module-probe';
 import { useToastStore } from './toast-store';
+import { browserLocalStorage } from './browser-local-storage';
+import {
+  chooseGrantedPort,
+  loadRememberedSerialPort,
+  rememberSerialPort,
+} from './serial-port-memory';
 
 type SetFn = (
   partial: Partial<LaserState> | ((state: LaserState) => Partial<LaserState> | LaserState),
@@ -79,6 +85,7 @@ async function connectSerialController(
   attachConnection: AttachConnectionFn,
 ): Promise<void> {
   const attempt = beginConnectAttempt(refs);
+  set({ connectionAttempt: attempt.revision });
   let requestedPort: SerialPortRef | null = null;
   let cancelledPermissionReleased = false;
   const releaseCancelledPermission = async (): Promise<void> => {
@@ -105,7 +112,7 @@ async function connectSerialController(
   refs.driver = driver;
   set((state) => ({ ...connectingPatch(state, refs), ...connectionScopedEvidenceReset() }));
   try {
-    const portRef = await adapter.serial.requestPort();
+    const portRef = await resolveSerialPort(adapter, options.portSelection);
     requestedPort = portRef;
     if (!connectAttemptIsCurrent(refs, attempt)) {
       await releaseCancelledPermission();
@@ -124,7 +131,7 @@ async function connectSerialController(
       await closeCancelledConnection(refs, attempt, connection);
       return;
     }
-    attachConnection(connection, baudRate, portRef.info ?? null);
+    attachRememberedConnection(attachConnection, connection, baudRate, portRef);
     reportBackgroundStreaming(set, connection, adapter.id);
   } catch (error) {
     if (!connectAttemptIsCurrent(refs, attempt)) {
@@ -137,6 +144,35 @@ async function connectSerialController(
       controllerQualification: disconnectedControllerQualification(state.controllerSessionEpoch),
     }));
   }
+}
+
+// The machine's port opens without the picker when chooseGrantedPort finds it
+// among the ports the operator picked before (ADR-420). 'choose' always asks;
+// 'automatic' never does, because auto-connect has no click to show a picker
+// with, and a null result reads as a cancelled picker.
+async function resolveSerialPort(
+  adapter: PlatformAdapter,
+  selection: ConnectControllerOptions['portSelection'] = 'remembered',
+): Promise<SerialPortRef | null> {
+  if (selection !== 'choose' && adapter.serial.grantedPorts !== undefined) {
+    const granted = await adapter.serial.grantedPorts();
+    const choice = chooseGrantedPort(granted, loadRememberedSerialPort(browserLocalStorage()));
+    if (choice.kind === 'use') return choice.port;
+  }
+  if (selection === 'automatic') return null;
+  return adapter.serial.requestPort();
+}
+
+// The port that opened is the one Connect reuses next time (ADR-420).
+function attachRememberedConnection(
+  attachConnection: AttachConnectionFn,
+  connection: LiveConnection,
+  baudRate: number,
+  portRef: SerialPortRef,
+): void {
+  const info = portRef.info ?? null;
+  rememberSerialPort(browserLocalStorage(), info);
+  attachConnection(connection, baudRate, info);
 }
 
 // Every host records the fallback; only a host whose hidden window pauses

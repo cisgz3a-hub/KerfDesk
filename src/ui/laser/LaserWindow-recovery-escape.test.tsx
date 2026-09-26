@@ -59,7 +59,10 @@ describe('LaserWindow recovery connection escape', () => {
       });
 
       expect(button(host, 'Reconnect controller').disabled).toBe(false);
-      expect(button(host, 'Connect…').disabled).toBe(false);
+      expect(
+        [...host.querySelectorAll('button')].find((item) => item.textContent === 'Connect')
+          ?.disabled,
+      ).toBe(false);
       expect(host.textContent).not.toContain('Recover controller');
 
       await act(async () => {
