@@ -132,7 +132,9 @@ describe('real Line + fill Enhance region', () => {
     },
   ])('$label', async ({ region, expectedWidth }) => {
     const image = lineAndBlock();
-    const options = { ...TRACE_PRESETS['Line + fill'], hybridMaxStrokeWidthPx: 4 };
+    const preset = TRACE_PRESETS['Line + fill'];
+    if (preset === undefined) throw new Error('Line + fill preset is missing');
+    const options = { ...preset, hybridMaxStrokeWidthPx: 4 };
     const fullTracePaths = await traceImageToColoredPaths(image, options);
     const originalStrokes = strokes(fullTracePaths);
     expect(originalStrokes).toHaveLength(1);
