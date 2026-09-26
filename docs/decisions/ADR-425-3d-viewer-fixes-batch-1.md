@@ -66,8 +66,11 @@ The audit found six places where a viewer said something untrue or lost the oper
      again, since its buffers are gone; only the new stock thickness goes.
    - The worker rebuilds only the content. With the same stock size it keeps the scene, the lights
      and the camera. With a new stock size it re-lights a fresh scene and re-frames the camera.
-     Surfaces are latest-wins, and the worker reports each one as a `surface` presentation that the
-     session checks against the ids it sent.
+      Surfaces are latest-wins, and the worker reports each one as a `surface` presentation that the
+      session checks against the ids it sent.
+      A thickness-only request keeps the latest requested mesh, including one queued during
+      initialization or still being built. It never restores the last committed mesh over a newer
+      request; superseded content is disposed without a presentation acknowledgement.
    - A transferred canvas cannot be transferred twice. So the dialog shell gives a fresh canvas
      only after a renderer failure, which lets the next surface start over.
 5. **Display pooling keeps material left inside a cut.** A display block that lies wholly below the
@@ -116,7 +119,12 @@ The audit found six places where a viewer said something untrue or lost the oper
   - Downsampling keeps a 4 mm tab that deepest-only pooling erased. It keeps a one-cell groove in
     stock and keeps slopes at their deepest.
   - `screenshotSize` fits a 1900 x 1000 view at 4x on a 2x screen to 4096 x 2155.
-- Browser (`e2e/cut3d-surface-swap.e2e.ts`): during real preview playback, Cut 3D receives a new
-  surface while its original canvas stays connected and only one render worker is ever created.
+- Worker/renderer regression: deferred initialization and deferred surface builds followed by a
+  thickness-only update keep the replacement mesh in the rendered scene, and stale/disposed builds
+  are released without presentation acknowledgement.
+- Browser (`e2e/cut3d-surface-swap.e2e.ts`): after Cut 3D is ready, two controlled scrub changes
+  each produce a later surface revision while the original canvas stays connected and only one
+  render worker is ever created. Starting playback before initial preparation finishes does not
+  guarantee a later surface swap on a busy runner.
   The existing Cut 3D suites (`cnc-3d-viewer-ab`, `depth-map-relief-worker`) still pass. A manual
   check with an orbited camera showed the same view before and after a new surface.

@@ -34,7 +34,7 @@ export type Cut3DOffscreenWorkerRequest =
       readonly kind: 'surface';
       readonly sessionId: number;
       readonly surfaceId: number;
-      /** Null keeps the worker's mesh; its buffers were transferred already. */
+      /** Null keeps the latest requested mesh, even while it is still building. */
       readonly mesh: ReliefSurfaceMeshWithNormals | null;
       readonly stockThicknessMm: number;
     }

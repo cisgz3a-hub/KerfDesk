@@ -102,6 +102,9 @@ function createRendererHandle(
   input: Parameters<typeof createCut3DOffscreenRenderer>[0],
 ): Cut3DOffscreenRenderer {
   let surface = initialSurface;
+  // A thickness-only request refers to the last requested mesh, including a
+  // replacement still being built, rather than the last committed surface.
+  let requestedMesh = initialSurface.mesh;
   let cameraState = initialCamera;
   let viewportHeightPx = Math.max(MIN_VIEWPORT_PX, input.heightPx);
   let pixelRatio = input.pixelRatio;
@@ -135,7 +138,8 @@ function createRendererHandle(
   ): Promise<boolean> => {
     surfaceSequence += 1;
     const sequence = surfaceSequence;
-    const mesh = nextMesh ?? surface.mesh;
+    const mesh = nextMesh ?? requestedMesh;
+    requestedMesh = mesh;
     const content = await buildViewerContent(parts.three, { mesh, stockThicknessMm });
     if (isDisposed || sequence !== surfaceSequence) {
       content.dispose();

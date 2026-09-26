@@ -88,7 +88,11 @@ function control(
 
 function surface(request: SurfaceRequest): void {
   if (active?.sessionId === request.sessionId) void replaceSurface(request);
-  else if (initializingSessionId === request.sessionId) pendingSurface = request;
+  else if (initializingSessionId === request.sessionId) {
+    // Null keeps the latest requested mesh. Coalescing a thickness update
+    // must not discard the full replacement already queued during startup.
+    pendingSurface = { ...request, mesh: request.mesh ?? pendingSurface?.mesh ?? null };
+  }
 }
 
 async function replaceSurface(request: SurfaceRequest): Promise<void> {
