@@ -82,7 +82,10 @@ export type GcodeMetadata = {
  */
 // ADR-427 integration also cuts deepest cleanup before linked relief rings;
 // all adaptive ring closure and flat depth-slice provenance above is retained.
-export const EMITTER_REVISION = 'adaptive-relief-cleanup-linked-entry-20260927-v1';
+// ADR-368 amendment 3 sizes ball-nose, V-bit and engraving pocket and profile
+// offsets, tab windows, and pocket and relief-roughing stepover by the cut
+// width at depth.
+export const EMITTER_REVISION = 'narrowing-bit-cut-width-20260927-v1';
 
 // Machine-specific assumption lines (ADR-103 defect fix): router exports
 // previously carried the laser-worded `$32=1 (laser mode)` banner. The S
