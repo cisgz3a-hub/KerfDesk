@@ -31,7 +31,14 @@
 
 import { hypot2 } from '../geometry/fast-hypot';
 import type { CurveSubpath, PathSegment, Vec2 } from '../scene';
-import { chordSpanFit, fitSpan, mod, ringTangent, type SpanFit } from './compact-curve-span';
+import {
+  chordSpanFit,
+  fitSpan,
+  mod,
+  ringTangent,
+  type SpanFit,
+  type SpanPasses,
+} from './compact-curve-span';
 
 export type CompactFitOptions = {
   /** Max orthogonal deviation of the curve from the ring, px (Optimize). */
@@ -80,6 +87,9 @@ type Context = {
   /** Candidate pieces the proposal accepted, by start (mod ring length) and
    *  length: the merge's single-piece spans, fitted once. */
   readonly pieces: Map<number, SpanFit>;
+  /** The Newton passes of every span the proposal split, same keys: a merge
+   *  extension over exactly that span reaches its decision from them. */
+  readonly split: Map<number, SpanPasses>;
 };
 
 /** Fit a closed ring (distinct points, no repeated start) with compact
@@ -92,7 +102,7 @@ export function fitCompactRing(
 ): CurveSubpath | null {
   const ring = distinctRing(points, corners);
   if (ring.length < 3) return null;
-  const ctx: Context = { ring, options, pieces: new Map() };
+  const ctx: Context = { ring, options, pieces: new Map(), split: new Map() };
   const breaks: number[] = [];
   ring.forEach((p, index) => {
     if (corners.has(p)) breaks.push(index);
@@ -210,10 +220,12 @@ function proposeJoints(
   // disc at 4 cubics for every Optimize and moved the R=900 commit-grid
   // disc off round).
   const fit = straight ?? fitSpan(span, tStart, negate(tEnd), tolerance, Infinity);
+  const key = pieceKey(ctx.ring.length, lo, hi);
   if (Math.min(fit.cubicError, fit.lineError) <= tolerance) {
-    ctx.pieces.set(pieceKey(ctx.ring.length, lo, hi), fit);
+    ctx.pieces.set(key, fit);
     return;
   }
+  if (fit.passes !== undefined) ctx.split.set(key, fit.passes);
   const split = lo + splitIndex(span, fit.worstIndex);
   tangents.set(split, joints.tangentAt(split));
   proposeJoints(ctx, lo, split, tangents, joints, out, depth + 1);
@@ -328,12 +340,13 @@ function evaluateSpan(ctx: Context, joints: Joints, t: number, k: number): Evalu
   const startCorner = joints.corner[t] === true;
   const endCorner = joints.corner[t + k] === true;
   const tolerance = ctx.options.tolerance;
+  const key = pieceKey(ctx.ring.length, from, to);
   const fit =
-    (k === 1 ? ctx.pieces.get(pieceKey(ctx.ring.length, from, to)) : undefined) ??
+    (k === 1 ? ctx.pieces.get(key) : undefined) ??
     lineSpanFit(span, tStart, tEnd, startCorner, endCorner, tolerance) ??
     (k === 1
       ? fitSpan(span, tStart, negate(tEnd))
-      : fitSpan(span, tStart, negate(tEnd), tolerance, undefined, true));
+      : fitSpan(span, tStart, negate(tEnd), tolerance, undefined, true, ctx.split.get(key)));
   const cubicError = fit.complete ? fit.cubicError : Infinity;
   const lineOk = lineMeetsJoints(span, tStart, tEnd, startCorner, endCorner);
   return { ...fit, cubicError, lineOk, error: Math.min(cubicError, fit.lineError) };

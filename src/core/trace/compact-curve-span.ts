@@ -45,6 +45,17 @@ export type SpanFit = {
   readonly worstIndex: number;
   /** False when the fit stopped once it was bound to miss (see fitSpan). */
   readonly complete: boolean;
+  /** The passes a full fit ran (absent when it gave up or never fitted). */
+  readonly passes?: SpanPasses | undefined;
+};
+
+/** What the Newton passes of one span found: the kept cubic and its error
+ *  and worst index, and the first (chord-parameter) pass's error. */
+export type SpanPasses = {
+  readonly cubic: CubicBezier;
+  readonly firstError: number;
+  readonly error: number;
+  readonly index: number;
 };
 
 /** Fit one cubic through `span` with its end tangents fixed (`tEnd` points
@@ -65,12 +76,21 @@ export function fitSpan(
   missAbove = Infinity,
   giveUpAbove = FIRST_PASS_GIVE_UP * missAbove,
   decisionOnly = false,
+  known?: SpanPasses,
 ): SpanFit {
+  if (known !== undefined && decisionOnly) {
+    return decideFromPasses(span, known, missAbove, giveUpAbove);
+  }
   const u = chordParameterize(span, 0, span.length - 1);
   const screened = screenFirstPass(span, u, tStart, tEnd, giveUpAbove);
   if (screened !== null) return screened;
   const fit = bestPass(span, u, tStart, tEnd, giveUpAbove);
-  if (fit.gaveUp || fit.error > missAbove) return missed(span, fit.cubic, fit.error, fit.index);
+  const passes = fit.gaveUp
+    ? undefined
+    : { cubic: fit.cubic, firstError: fit.firstError, error: fit.error, index: fit.index };
+  if (fit.gaveUp || fit.error > missAbove) {
+    return { ...missed(span, fit.cubic, fit.error, fit.index), passes };
+  }
   // The curve-to-chain check runs once, on the pass kept: it rejects a loop
   // or bulge that slips between the data points. A caller that only needs
   // the decision stops it once it is past `missAbove`: the cubic is rejected
@@ -86,6 +106,33 @@ export function fitSpan(
     lineError: chordDeviation(span),
     worstIndex: fit.error >= reverse.error ? fit.index : reverse.index,
     complete: true,
+    passes,
+  };
+}
+
+// The same decision fitSpan reaches when its passes already ran on this span
+// with these joint tangents (they are deterministic): the first pass decides
+// the give-up (a screen is a subset of it, so it never gives up alone), the
+// kept pass the miss, then the curve-to-chain and loop checks as above. The
+// worst index is not tracked (a decision-only caller never splits).
+function decideFromPasses(
+  span: ReadonlyArray<Vec2>,
+  known: SpanPasses,
+  missAbove: number,
+  giveUpAbove: number,
+): SpanFit {
+  const { cubic } = known;
+  if (known.firstError > giveUpAbove) return missed(span, cubic, known.firstError, 0);
+  if (known.error > missAbove) return missed(span, cubic, known.error, known.index);
+  const reverse = reverseSpan(span, cubic, null, missAbove);
+  if (reverse.stopped) return missed(span, cubic, reverse.error, known.index);
+  const loops = cubicSelfIntersects(cubic);
+  return {
+    cubic,
+    cubicError: loops ? Infinity : Math.max(known.error, reverse.error),
+    lineError: chordDeviation(span),
+    worstIndex: known.index,
+    complete: true,
   };
 }
 
@@ -97,7 +144,9 @@ type Pass = {
 };
 
 // Two parameter buffers, reused by every span pass (the fit is synchronous
-// and never re-entered); they only grow.
+// and never re-entered); they grow up to this many points, and a longer span
+// gets its own (so a huge ring never pins its size in memory).
+const RETAINED_BUFFER_POINTS = 1 << 16;
 let bufferA = new Float64Array(256);
 let bufferB = new Float64Array(256);
 
@@ -112,22 +161,26 @@ function bestPass(
   tStart: Vec2,
   tEnd: Vec2,
   giveUpAbove: number,
-): Pass & { readonly gaveUp: boolean } {
-  if (bufferA.length < span.length) {
-    bufferA = new Float64Array(span.length * 2);
-    bufferB = new Float64Array(span.length * 2);
+): Pass & { readonly gaveUp: boolean; readonly firstError: number } {
+  if (bufferA.length < span.length && span.length <= RETAINED_BUFFER_POINTS) {
+    bufferA = new Float64Array(Math.min(span.length * 2, RETAINED_BUFFER_POINTS));
+    bufferB = new Float64Array(bufferA.length);
   }
+  const retained = bufferA.length >= span.length;
   let u: ArrayLike<number> = chordParams;
-  let out = bufferA;
-  let spare = bufferB;
+  let out = retained ? bufferA : new Float64Array(span.length);
+  let spare = retained ? bufferB : new Float64Array(span.length);
   let best: Pass | null = null;
+  let firstError = 0;
   for (let pass = 0; pass <= MAX_REPARAM_PASSES; pass += 1) {
     const cubic = armCubic(span, u, tStart, tEnd);
     const bound = best === null ? giveUpAbove : best.error;
     const projected = projectSpan(span, cubic, u, out, bound, best !== null);
     if (best === null && projected.stopped) {
-      return { cubic, error: projected.error, index: projected.index, params: out, gaveUp: true };
+      const { error, index } = projected;
+      return { cubic, error, index, params: out, gaveUp: true, firstError: error };
     }
+    if (best === null) firstError = projected.error;
     if (projected.stopped) break;
     const improved = best === null || projected.error < best.error - MIN_PASS_GAIN_PX;
     if (best === null || projected.error < best.error) {
@@ -137,7 +190,7 @@ function bestPass(
     if (!improved || span.length <= 2) break;
     u = (best as Pass).params;
   }
-  return { ...(best as Pass), gaveUp: false };
+  return { ...(best as Pass), gaveUp: false, firstError };
 }
 
 /** The straight chord of `span` alone, as an incomplete fit (no cubic was

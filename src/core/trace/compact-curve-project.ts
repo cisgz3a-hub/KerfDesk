@@ -80,12 +80,12 @@ export function projectSpan(
 
 /** Distance from samples of the curve back to the span polyline (sliding
  *  window of span segments). The index is the span point whose parameter in
- *  `params` is nearest the worst sample. Stops once the running maximum is
+ *  `params` is nearest the worst sample (0 without `params`). Stops once the running maximum is
  *  above `stopAbove` (index then meaningless). */
 export function reverseSpan(
   span: ReadonlyArray<Vec2>,
   cubic: CubicBezier,
-  params: ArrayLike<number>,
+  params: ArrayLike<number> | null,
   stopAbove: number,
 ): PassError {
   const { p0, p1, p2, p3 } = cubic;
@@ -122,7 +122,8 @@ export function reverseSpan(
       if (error > stopAbove) return { error, index: 0, stopped: true };
     }
   }
-  return { error, index: nearestParamIndex(params, span.length, worstT), stopped: false };
+  const index = params === null ? 0 : nearestParamIndex(params, span.length, worstT);
+  return { error, index, stopped: false };
 }
 
 function segmentDistance(px: number, py: number, a: Vec2, b: Vec2): number {
