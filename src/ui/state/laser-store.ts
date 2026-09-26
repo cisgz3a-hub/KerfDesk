@@ -36,7 +36,7 @@ import { applyDetectedSettingsPatch } from './detected-settings-action';
 import { grblSettingsActions } from './grbl-settings-actions';
 import type { ControllerLifecycleRefs } from './laser-interactive-command';
 import { connectionActions } from './laser-connection-actions';
-import type { ConnectAttemptOwnershipRefs } from './laser-connect-attempt';
+import type { ConnectAttemptOwnershipRefs, ConnectionAttemptState } from './laser-connect-attempt';
 import type { ConnectionTeardownOwnershipRefs } from './laser-connection-teardown';
 import { jobActions } from './laser-job-actions';
 import { appendSystemNotice } from './laser-system-notice';
@@ -106,15 +106,10 @@ export type WorkOriginSource = 'none' | 'g92' | 'g54-persistent' | 'unknown';
 export type { ConnectControllerOptions } from './laser-store-action-types';
 
 export type LaserState = LaserStoreActions &
-  ControllerBuildInfoState & {
+  ControllerBuildInfoState &
+  ConnectionAttemptState & {
     readonly connection: ConnectionState;
     readonly serialPortInfo?: SerialPortIdentity | null;
-    /** The baud the live connection opened at (ADR-420); null while disconnected. */
-    readonly connectedBaudRate?: number | null;
-    /** Revision of the latest connect attempt or intentional disconnect. The live
-     *  connection belongs to whoever started the attempt with this revision; any
-     *  later connect or disconnect moves it on (ADR-420). Undefined reads as 0. */
-    readonly connectionAttempt?: number;
     readonly statusReport: StatusReport | null;
     readonly controllerSessionEpoch: number;
     readonly statusSequence: number;
