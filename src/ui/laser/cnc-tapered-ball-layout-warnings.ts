@@ -1,10 +1,13 @@
-// Advisory for a tapered ball nose used where its stored diameter sets the
-// layout (ADR-368 Amendment 1). ADR-368 models the bit's true shape for relief
-// finishing and the simulators, but pocket and profile offsets and relief
-// roughing still step by the bit's diameter, which for this bit is the widest
-// one, at the top of the flutes. At ordinary depths it cuts far narrower
-// (2026-09-25 PR audit, CNC-1). Compilation is unchanged.
+// Advisory for a tapered ball nose whose layout still uses its stored diameter
+// (ADR-368 Amendments 1 and 2). With a modeled ball tip and taper, pocket and
+// profile offsets, their stepover, and relief roughing's stepover follow the
+// bit's cut width at depth (Amendment 2), so nothing is said. A tapered ball
+// nose missing a usable tip or taper plans as a flat cylinder of its stored
+// diameter, the widest one, at the top of the flutes (ADR-368 item 2). It cuts
+// far narrower than that plan at ordinary depths, and the 3D removal preview
+// shows the plan, so Job Review says so. Compilation is unchanged.
 
+import { taperedBallEnvelope } from '../../core/cnc-tapered-ball';
 import {
   DEFAULT_CNC_LAYER_SETTINGS,
   layerCncTool,
@@ -31,17 +34,18 @@ export function detectCncTaperedBallLayoutWarnings(project: Project): ReadonlyAr
     if (bound.length === 0) continue;
     const settings = layer.cnc ?? DEFAULT_CNC_LAYER_SETTINGS;
     const tool = layerCncTool(machine, settings);
-    if (tool.kind !== 'tapered-ball-nose') continue;
+    if (tool.kind !== 'tapered-ball-nose' || taperedBallEnvelope(tool) !== null) continue;
     // A relief's roughing always uses the operation's main bit.
     const effect = bound.some((object) => object.kind === 'relief')
       ? ROUGHING_EFFECT
       : LAYOUT_EFFECTS[settings.cutType];
     if (effect === undefined) continue;
     warnings.push(
-      `${layer.name} uses ${tool.name}, a tapered ball nose, but sizes its offsets and ` +
-        `stepover by the bit's widest diameter (${formatMm(tool.diameterMm)} mm, at the top ` +
-        `of the flutes). At ordinary depths it cuts far narrower, so ${effect}. Use a flat ` +
-        'end mill for this operation, or check the 3D removal preview before cutting.',
+      `${layer.name} uses ${tool.name}, a tapered ball nose without a usable ball tip and ` +
+        "taper, so its offsets and stepover are sized by the bit's widest diameter " +
+        `(${formatMm(tool.diameterMm)} mm, at the top of the flutes). At ordinary depths it ` +
+        `cuts far narrower, so ${effect}. Add the bit again with its tip and taper per side, ` +
+        'or use a flat end mill for this operation.',
     );
   }
   return warnings;

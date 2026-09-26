@@ -4,11 +4,15 @@
 // cannot disagree about shape:
 //   pocket   flat floor at -depthMm over the even-odd region
 //   v-carve  z = -min(dist / tan(tip/2), optional flat depth, cone height)
-//   profile  the REAL offset (profileToolpathPolylines) swept at bit radius
+//   profile  the REAL offset (profileToolpathPolylines) swept at the wall
+//            radius the compiler offsets by: the bit radius, or a tapered
+//            ball nose's cut radius at the layer depth (ADR-368 Amendment 2)
 //   engrave  the drawn path swept at bit radius
 //   drill    a bit-diameter hole at each circle centre
 
 import { profileToolpathPolylines, type ProfileSide } from '../cnc';
+// Deep import: the legacy core/cnc barrel is frozen by the export ratchet.
+import { cncLayoutCutWidths } from '../cnc/layout-cut-widths';
 import { vcarveIncludedAngleDeg } from '../cnc/vcarve-angle';
 import {
   conicalRadialEnvelope,
@@ -100,6 +104,9 @@ function applyVCarve(
   }
 }
 
+// The flat stamp keeps the slot's top edge where the compiled wall meets the
+// stock surface; a tapered ball nose's taper and ball floor are left to the
+// Simulate tier, which stamps the real cutter.
 function applyProfile(
   depth: Float32Array,
   grid: CarveGrid,
@@ -108,8 +115,9 @@ function applyProfile(
   tool: CncTool,
   cut: number,
 ): void {
-  const centerlines = profileToolpathPolylines(polylines, side, tool.diameterMm);
-  stampAlongPolylines(depth, grid, centerlines, tool.diameterMm / 2, cut);
+  const wallMm = cncLayoutCutWidths(tool, -cut, -cut).wallDiameterMm;
+  const centerlines = profileToolpathPolylines(polylines, side, wallMm);
+  stampAlongPolylines(depth, grid, centerlines, wallMm / 2, cut);
 }
 
 // Drill reads round entities' CENTRES: the hole is the bit's own diameter, so

@@ -3663,13 +3663,23 @@ explicitly marked below; the remaining controls and user-facing flows are planne
 1. Open polylines cannot be offset; they are cut on-path (documented
    fallback), closed shapes on the same layer still offset normally.
 
-#### Warning — a tapered ball nose sets pocket or profile offsets
-1. A tapered ball nose is modelled for relief finishing (ADR-368), but pocket and
-   profile offsets, and relief roughing, still step by its widest diameter at the
-   top of the flutes. When one is the main bit of a pocket, an inside or outside
-   profile, or a relief, Job Review warns that the result comes out off-size or
-   ribbed and suggests a flat end mill or the 3D removal preview (ADR-368
-   Amendment 1). The warning never blocks save or Start.
+#### Edge — a tapered ball nose sets pocket or profile offsets
+1. A tapered ball nose's stored diameter is its widest, at the top of the flutes, and
+   it cuts narrower at any shallower depth. Outside and inside profiles and pockets
+   offset by the width it cuts at the operation's full depth, so the wall meets the
+   drawn line at the stock surface and follows the taper and then the ball below it.
+   An outside part is its drawn size at the top face and larger below; a hole is its
+   drawn size at the top face and smaller below. Every depth pass rides that one path
+   (ADR-368 Amendment 2).
+2. Pocket rings and raster sweeps, and relief roughing rings, step by the stepover
+   percentage of the width the bit cuts in one depth pass, so no rib stands between
+   them. Tab windows add the full-depth cut width to the tab width, so a bridge is never
+   narrower than requested. The 3D removal preview shows the taper and the ball corner.
+3. A tapered ball nose without a usable ball tip and taper is planned as a flat
+   cylinder of its stored diameter. When one is the main bit of a pocket, an inside
+   or outside profile, or a relief, Job Review warns that the result comes out
+   off-size or ribbed and asks for the bit's tip and taper or a flat end mill
+   (ADR-368 Amendments 1 and 2). The warning never blocks save or Start.
 
 ### F-CNC3. CNC preflight and save G-code
 
@@ -3749,7 +3759,8 @@ explicitly marked below; the remaining controls and user-facing flows are planne
    heightmap cells, then the map is dilated by the active bit's footprint
    plus a 0.5 mm finishing allowance, sliced into Z levels by the layer's
    depth-per-pass, and each level's region fills with concentric rings at
-   the layer's physical stepover.
+   the layer's physical stepover: a percentage of the bit diameter, or for a
+   tapered ball nose of the width it cuts over one level (ADR-368 Amendment 2).
 2. Passes run depth-major (whole level before stepping down) as a
    clearing group — before any profile cuts. The preview's removal
    shading shows the terraced relief forming.
@@ -4242,7 +4253,8 @@ and lifts the command's CNC-only gate.)*
 2. Between sections the G-code retracts, stops the spindle (M5), parks,
    and pauses on M0 with comments naming the next bit. GRBL holds until
    cycle start; the streaming UI's Resume continues the job.
-3. Geometry offsets use each layer's OWN bit diameter.
+3. Geometry offsets use each layer's OWN bit diameter, or a tapered ball nose's
+   cut width at the layer depth (ADR-368 Amendment 2).
 
 #### Error — v-carve layer with a flat bit
 1. Job Review warns with the layer's bit named (not just the machine bit), but
@@ -7530,8 +7542,9 @@ the edge it sits on, and a midpoint over the same edge.
    sketch draws on its top face in each layer's colour, and the carve renders
    live underneath — pockets flat-floor, v-carves groove by boundary distance
    with the layer's v-bit angle, profiles slot at bit diameter on the offset
-   side, drills bore at circle centres, and depths at the stock thickness
-   read as through cuts.
+   side (a tapered ball nose at its cut width at the layer depth, the offset
+   the compiler uses), drills bore at circle centres, and depths at the stock
+   thickness read as through cuts.
 2. The left button always belongs to the armed tool — draw, select, and move
    exactly as in 2D, from any camera angle (the pointer lands on the stock
    plane). Middle drag pans, Shift+middle or right drag orbits, the wheel

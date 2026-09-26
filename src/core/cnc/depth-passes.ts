@@ -29,10 +29,7 @@ export function zPassDepths(depthMm: number, depthPerPassMm: number): ReadonlyAr
   if (materializationError !== null) throw new RangeError(materializationError);
   const count = zPassCount(depthMm, depthPerPassMm);
   if (count === 0) return [];
-  const perPass =
-    Number.isFinite(depthPerPassMm) && depthPerPassMm > 0
-      ? Math.min(depthPerPassMm, depthMm)
-      : depthMm;
+  const perPass = zPassStepMm(depthMm, depthPerPassMm);
   const out: number[] = [];
   for (let i = 1; i <= count; i += 1) {
     out.push(-Math.min(depthMm, i * perPass));
@@ -43,9 +40,17 @@ export function zPassDepths(depthMm: number, depthPerPassMm: number): ReadonlyAr
 
 export function zPassCount(depthMm: number, depthPerPassMm: number): number {
   if (!Number.isFinite(depthMm) || depthMm <= 0) return 0;
-  const perPass =
-    Number.isFinite(depthPerPassMm) && depthPerPassMm > 0
-      ? Math.min(depthPerPassMm, depthMm)
-      : depthMm;
+  const perPass = zPassStepMm(depthMm, depthPerPassMm);
   return Math.max(1, Math.ceil(depthMm / perPass - DEPTH_EPS));
+}
+
+/**
+ * The depth each full pass removes: the depth per pass, capped at the total
+ * depth, or the whole depth in one pass when the setting is unusable. Only a
+ * final remainder pass can be shallower.
+ */
+export function zPassStepMm(depthMm: number, depthPerPassMm: number): number {
+  return Number.isFinite(depthPerPassMm) && depthPerPassMm > 0
+    ? Math.min(depthPerPassMm, depthMm)
+    : depthMm;
 }

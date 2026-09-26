@@ -8,6 +8,11 @@
 // by the containment-aware offset: hole boundaries grow as the outer shrinks,
 // so rings never enter the island.
 //
+// The stepover, and the sweep that proves the core is reached, use a separate
+// clearing diameter. It defaults to the tool diameter; a tapered ball nose
+// passes its cut width over one depth pass (layout-cut-widths.ts, ADR-368
+// Amendment 2), which is narrower than the wall width at the full depth.
+//
 // Each ring offsets from the ORIGINAL contours (not the previous ring) to
 // avoid accumulating clipper approximation error across many rings.
 //
@@ -73,19 +78,22 @@ export function pocketRingToolpaths(
   polylines: ReadonlyArray<Polyline>,
   toolDiameterMm: number,
   stepoverPercent: number,
+  clearingDiameterMm = toolDiameterMm,
 ): PocketToolpaths {
   const contours = pocketContours(polylines);
   if (contours.length === 0 || !(toolDiameterMm > 0)) return NO_POCKET_TOOLPATHS;
   const radius = toolDiameterMm / 2;
-  const stepMm = (positiveStepoverPercent(stepoverPercent) / 100) * toolDiameterMm;
+  const clearingMm = usableClearingDiameterMm(clearingDiameterMm, toolDiameterMm);
+  const sweepRadius = clearingMm / 2;
+  const stepMm = (positiveStepoverPercent(stepoverPercent) / 100) * clearingMm;
 
   const ladder = buildOffsetLadder(contours, MAX_POCKET_RINGS, (step) => radius + step * stepMm);
-  const core = coreRing(contours, ladder.rings, radius, stepMm);
+  const core = coreRing(contours, ladder.rings, radius, stepMm, sweepRadius);
   const rings = core.ring === null ? ladder.rings : [...ladder.rings, core.ring];
   const toolpaths = innermostFirst(rings);
   const remaining =
-    stepMm > radius && !ladder.capped && !ladder.offsetFailed && !core.offsetFailed
-      ? remainingPocketCores(ladder.rings[0] ?? [], toolpaths, toolDiameterMm)
+    stepMm > sweepRadius && !ladder.capped && !ladder.offsetFailed && !core.offsetFailed
+      ? remainingPocketCores(ladder.rings[0] ?? [], toolpaths, clearingMm)
       : { toolpaths: [], offsetFailed: false };
   return {
     // Innermost ring first, boundary (ring 0) last as the finishing pass.
@@ -122,15 +130,17 @@ function remainingPocketCores(
 // sweeps only to r=1.825, leaving a 3.65 mm pillar. Bisect for the deepest
 // offset that still yields a ring instead of clamping the operator's
 // stepover. At stepover <= 50% the final ring's sweep always covers the
-// centre, so this never runs and output is unchanged.
+// centre, so this never runs and output is unchanged. The sweep is the
+// clearing radius; `radius` places the wall ring.
 function coreRing(
   contours: ReadonlyArray<Polyline>,
   rings: ReadonlyArray<ReadonlyArray<Polyline>>,
   radius: number,
   stepMm: number,
+  sweepRadius: number,
 ): DeepestRing {
   const lastRing = rings.length - 1;
-  if (!(stepMm > radius) || lastRing < 0 || rings.length >= MAX_POCKET_RINGS) {
+  if (!(stepMm > sweepRadius) || lastRing < 0 || rings.length >= MAX_POCKET_RINGS) {
     return NO_DEEPEST_RING;
   }
   const lastInset = radius + lastRing * stepMm;
@@ -219,10 +229,18 @@ function positiveStepoverPercent(stepoverPercent: number): number {
     : MIN_STEPOVER_PERCENT;
 }
 
+// A clearing width can only narrow the spacing. Anything unusable, or wider
+// than the wall width, falls back to the tool diameter.
+function usableClearingDiameterMm(clearingDiameterMm: number, toolDiameterMm: number): number {
+  return clearingDiameterMm > 0 && clearingDiameterMm < toolDiameterMm
+    ? clearingDiameterMm
+    : toolDiameterMm;
+}
+
 // Raster pocket clearing (ADR-105 G10) — Easel's Fill Method raster X/Y.
 // The region reachable by the bit CENTER is the contour inset by one radius;
-// serpentine sweeps at the stepover spacing clear it, then the inset
-// perimeter runs last as the finishing wall pass.
+// serpentine sweeps at the stepover spacing (of the clearing diameter, as for
+// rings) clear it, then the inset perimeter runs last as the finishing wall.
 export function pocketToolpathRaster(
   polylines: ReadonlyArray<Polyline>,
   toolDiameterMm: number,
@@ -240,10 +258,12 @@ export function pocketRasterToolpaths(
   toolDiameterMm: number,
   stepoverPercent: number,
   axis: 'x' | 'y',
+  clearingDiameterMm = toolDiameterMm,
 ): PocketToolpaths {
   const contours = pocketContours(polylines);
   if (contours.length === 0 || !(toolDiameterMm > 0)) return NO_POCKET_TOOLPATHS;
-  const stepMm = (positiveStepoverPercent(stepoverPercent) / 100) * toolDiameterMm;
+  const clearingMm = usableClearingDiameterMm(clearingDiameterMm, toolDiameterMm);
+  const stepMm = (positiveStepoverPercent(stepoverPercent) / 100) * clearingMm;
   const wall = insetContoursChecked(contours, toolDiameterMm / 2);
   if (wall.contours.length === 0) {
     return {
