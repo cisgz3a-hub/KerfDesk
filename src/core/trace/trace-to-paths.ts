@@ -195,6 +195,8 @@ export async function traceImageToColoredPaths(
       ...(options.ignoreLessThanPixels === undefined
         ? {}
         : { ignoreLessThanPixels: options.ignoreLessThanPixels * areaScale }),
+      // The automatic small-mark policy's areas are source px² too (ADR-409).
+      ...(options.smallMarkPolicy === 'auto' ? { smallMarkAreaScale: areaScale } : {}),
       supersampleContour: false,
       autoUpscaleSmallSources: false,
       upscaleSmallSmoothSources: false,

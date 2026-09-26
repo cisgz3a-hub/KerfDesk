@@ -27,6 +27,7 @@ import type { CrackSubPixelField } from './contour-boundary';
 import { cleanupSaddlePolicy } from './saddle-connectivity';
 import type { TraceOptions } from './trace-option-types';
 import { fillPinholes } from './fill-pinholes';
+import { smallMarkCleanupPlan } from './small-mark-policy';
 import { autoMedianFilter, despeckle, medianFilter, otsuThreshold } from './preprocess';
 import { levelForAutomaticThreshold } from './background-flatten';
 import { adjustBrightness, adjustContrast, adjustGamma, invertImage } from './raster-prep';
@@ -204,13 +205,14 @@ function cleanBinaryMask(
   options: TraceOptions,
   crackField: CrackSubPixelField | null,
 ): RawImageData {
-  // Area-denominated caps scale by pixelScale² on supersampled traces so
-  // their SOURCE-pixel semantics hold (a 12px speck at 2x covers 48px).
-  const scale = effectivePixelScale(options);
+  // Area caps scale by pixelScale² on supersampled traces so their SOURCE-
+  // pixel semantics hold (a 12px speck at 2x covers 48px). See ADR-409.
   const saddles = cleanupSaddlePolicy(options, crackField);
-  const minPixels = (options.despeckleMinPixels ?? 0) * scale * scale;
-  const despeckled = shouldDespeckle(options) ? despeckle(image, minPixels, saddles ?? 8) : image;
-  return options.fillPinholeCracks === true ? fillPinholes(despeckled, scale, saddles) : despeckled;
+  const plan = smallMarkCleanupPlan(image, options, crackField, isBinaryMask(options));
+  const despeckled =
+    plan.ink === null ? image : despeckle(image, plan.ink.minPixels, saddles ?? 8, plan.ink.keep);
+  if (plan.holes === null) return despeckled;
+  return fillPinholes(despeckled, effectivePixelScale(options), saddles, plan.holes.fill);
 }
 
 /** Sanitized supersampling factor (see TraceOptions.pixelScale). */
@@ -339,9 +341,7 @@ export function applyImageAdjustments(image: RawImageData, options: TraceOptions
 // Despeckle only makes sense on binary data — otherwise the luma<128
 // classification inside despeckle splits a non-binary image in two
 // arbitrarily, eroding mid-tones the user wanted to keep.
-function shouldDespeckle(options: TraceOptions): boolean {
-  const min = options.despeckleMinPixels;
-  if (min === undefined || min <= 1) return false;
+function isBinaryMask(options: TraceOptions): boolean {
   return (
     options.traceTransparency === true ||
     options.sketchTrace === true ||

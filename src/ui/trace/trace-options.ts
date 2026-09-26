@@ -233,9 +233,10 @@ function copyIfDefined<T extends keyof TraceOptions>(
   if (value !== undefined) out[key] = value;
 }
 
-// True when the options stack any of the three preset features that
-// can collapse a near-uniform image to zero paths: Otsu histogram
-// binarization, fixedPalette, or despeckle.
+// True when the options stack any of the preset features that can
+// collapse a near-uniform image to zero paths: Otsu histogram
+// binarization, fixedPalette, despeckle, or the automatic small-mark
+// cleanup (ADR-409), which can erase art made only of small marks.
 export function hasAggressivePreprocessing(options: TraceOptions): boolean {
   if (options.photoDetail !== undefined) return false;
   // Edge mode never runs the shared preprocessing (local contrast reads the raw
@@ -245,7 +246,8 @@ export function hasAggressivePreprocessing(options: TraceOptions): boolean {
   return (
     options.useOtsuThreshold === true ||
     options.fixedPalette !== undefined ||
-    (options.despeckleMinPixels !== undefined && options.despeckleMinPixels > 1)
+    (options.despeckleMinPixels !== undefined && options.despeckleMinPixels > 1) ||
+    options.smallMarkPolicy === 'auto'
   );
 }
 
@@ -259,10 +261,17 @@ export function hasAggressivePreprocessing(options: TraceOptions): boolean {
 // colorquantcycles:1 disabling every recovery), committing a full-frame
 // rectangle instead of an honest "no paths". The retry must stay on the
 // same backend; only Otsu, despeckle, and pathOmit relax.
+//
+// smallMarkPolicy goes with despeckle (ADR-409): an unset despeckle means
+// "automatic" while the policy is on, so deleting despeckle alone would
+// re-run the same automatic cleanup (or turn an explicit value back into
+// auto) instead of relaxing it. Without the policy the retry erases no ink
+// specks and fills no pinholes the user did not ask for explicitly.
 export function relaxAggressivePreprocessing(options: TraceOptions): TraceOptions {
   const next: Record<string, unknown> = { ...options };
   delete next['useOtsuThreshold'];
   delete next['despeckleMinPixels'];
+  delete next['smallMarkPolicy'];
   next['pathOmit'] = 0;
   return next as TraceOptions;
 }

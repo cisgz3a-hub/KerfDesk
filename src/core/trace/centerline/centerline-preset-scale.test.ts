@@ -89,13 +89,15 @@ describe('Centerline preset connectivity', () => {
     // and lone speck remain noise. Filled contours now judge the diagonal as
     // their walker traces it — one hairline (ADR-395) — so they agree with
     // Centerline; the historical four-connected rule is still available.
+    const fixedLineArt = { ...TRACE_PRESETS['Line Art']!, despeckleMinPixels: 12 };
     expect(lowerInkPixels(preprocessForTrace(image, CENTERLINE))).toBe(12);
-    expect(lowerInkPixels(preprocessForTrace(image, TRACE_PRESETS['Line Art']!))).toBe(12);
+    expect(lowerInkPixels(preprocessForTrace(image, fixedLineArt))).toBe(12);
     expect(
-      lowerInkPixels(
-        preprocessForTrace(image, { ...TRACE_PRESETS['Line Art']!, turnPolicy: 'connect-paper' }),
-      ),
+      lowerInkPixels(preprocessForTrace(image, { ...fixedLineArt, turnPolicy: 'connect-paper' })),
     ).toBe(0);
+    // Line Art's default automatic policy (ADR-409) judges the same regions:
+    // an 11-pixel full-contrast hairline is a mark, a lone pixel is not.
+    expect(lowerInkPixels(preprocessForTrace(image, TRACE_PRESETS['Line Art']!))).toBe(23);
   });
 });
 

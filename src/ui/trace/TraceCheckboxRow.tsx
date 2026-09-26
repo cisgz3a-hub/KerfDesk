@@ -22,7 +22,7 @@ export function TraceCheckboxRow(props: {
 function traceCheckboxTitle(label: string): string {
   switch (label) {
     case 'Fill tiny holes':
-      return 'Fill enclosed hairline holes in solid ink. Turn off to keep tiny highlights and slots; open gaps stay open.';
+      return 'Fill every enclosed hairline hole in solid ink; open gaps stay open. Line Art and Smooth start unticked and fill only faint threshold cracks automatically; once you tick or untick it, ticked fills every hole and unticked fills none.';
     case 'Invert':
       return 'Trace light artwork on a dark background: light areas become the traced shapes. Transparent areas stay background.';
     case 'Trace alpha mask':

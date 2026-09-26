@@ -146,8 +146,24 @@ describe('mergeLightBurnTraceSettings', () => {
 });
 
 describe('hasAggressivePreprocessing', () => {
-  it('is true for Line Art (uses Otsu + fixedPalette + despeckle)', () => {
+  it('is true for Line Art (fixedPalette + automatic small-mark cleanup)', () => {
+    expect(LINE_ART.fixedPalette).toBeDefined();
+    expect(LINE_ART.smallMarkPolicy).toBe('auto');
     expect(hasAggressivePreprocessing(LINE_ART)).toBe(true);
+  });
+
+  it('is true when only the automatic small-mark cleanup is on (ADR-409)', () => {
+    const bare: TraceOptions = {
+      numberOfColors: 2,
+      pathOmit: 8,
+      lineTolerance: 1,
+      quadraticTolerance: 1,
+      blurRadius: 0,
+      blurDelta: 0,
+      lineFilter: true,
+      smallMarkPolicy: 'auto',
+    };
+    expect(hasAggressivePreprocessing(bare)).toBe(true);
   });
 
   it('is false for an options object with none of the three levers', () => {
@@ -203,6 +219,41 @@ describe('relaxAggressivePreprocessing', () => {
     // (colorquantcycles:1 disables every recovery), committing a full-frame
     // rectangle instead of an honest "no paths" (the IoU-0.25 degeneracy).
     expect(relaxed.fixedPalette).toEqual(LINE_ART.fixedPalette);
+  });
+
+  it.each([
+    ['Line Art', LINE_ART],
+    ['Smooth', SMOOTH],
+    ['Line Art with an explicit speck value', { ...LINE_ART, despeckleMinPixels: 12 }],
+  ])('turns the small-mark cleanup OFF for %s, not back to automatic (ADR-409)', (_, preset) => {
+    const relaxed = relaxAggressivePreprocessing(preset);
+    expect(relaxed.smallMarkPolicy).toBeUndefined();
+    expect(relaxed.despeckleMinPixels).toBeUndefined();
+  });
+
+  it('recovers small-mark-only art on the zero-paths retry (ADR-409)', async () => {
+    // A sparse grid of 3x2 black dots, 9 px apart: no dot has a like mark
+    // within the support radius, so the automatic cleanup removes them all
+    // and the trace is empty. The relaxed retry must bring them back.
+    const { traceImageToColoredPaths } = await import('../../core/trace');
+    const width = 90;
+    const height = 60;
+    const data = new Uint8ClampedArray(width * height * 4).fill(255);
+    for (let row = 0; row < 5; row += 1)
+      for (let col = 0; col < 9; col += 1)
+        for (let y = 0; y < 2; y += 1)
+          for (let x = 0; x < 3; x += 1) {
+            const i = ((8 + row * 9 + y) * width + 5 + col * 9 + x) * 4;
+            data[i] = data[i + 1] = data[i + 2] = 0;
+          }
+    const image = { width, height, data };
+    const loops = async (options: TraceOptions): Promise<number> =>
+      (await traceImageToColoredPaths(image, options))
+        .flatMap((path) => path.polylines)
+        .filter((line) => line.closed).length;
+    expect(await loops(LINE_ART)).toBe(0);
+    expect(hasAggressivePreprocessing(LINE_ART)).toBe(true);
+    expect(await loops(relaxAggressivePreprocessing(LINE_ART))).toBe(45);
   });
 
   it('keeps the retry on the contour backend for two-color presets (M10)', async () => {
