@@ -63,9 +63,11 @@ export type GcodeMetadata = {
  * tabs measured from the stock bottom when the stock thickness is set, and
  * ADR-368 amendment 2's tapered ball-nose pocket and profile offsets, tab
  * windows, and pocket and relief-roughing stepover sized by the cut width at
- * depth.
+ * depth, and ADR-159 amendment 2's SVG arcs imported as cubics that meet the
+ * arc at each segment midpoint instead of sitting up to 0.196% of the radius
+ * inside it.
  */
-export const EMITTER_REVISION = 'tapered-ball-cut-width-20260926-v1';
+export const EMITTER_REVISION = 'svg-arcs-on-the-arc-20260926-v1';
 
 // Machine-specific assumption lines (ADR-103 defect fix): router exports
 // previously carried the laser-worded `$32=1 (laser mode)` banner. The S
