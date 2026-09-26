@@ -24,9 +24,11 @@
 
 import { finiteOr } from '../util';
 import type { CrackSubPixelField } from './contour-boundary';
+import { cleanupSaddlePolicy } from './saddle-connectivity';
 import type { TraceOptions } from './trace-option-types';
 import { fillPinholes } from './fill-pinholes';
 import { autoMedianFilter, despeckle, medianFilter, otsuThreshold } from './preprocess';
+import { levelForAutomaticThreshold } from './background-flatten';
 import { adjustBrightness, adjustContrast, adjustGamma, invertImage } from './raster-prep';
 import { shouldUseSketchTrace } from './auto-sketch-trace';
 import { prepareAutomaticDetailMask } from './automatic-detail-mask';
@@ -146,7 +148,7 @@ export function prepareTraceForContour(
       options.cutoffLuma ?? 0,
       options.thresholdLuma ?? 128,
     );
-    return { prepared: cleanBinaryMask(prepared, options), crackField: null };
+    return { prepared: cleanBinaryMask(prepared, options, null), crackField: null };
   }
   const adjusted = applyImageAdjustments(image, options);
   if (options.faintLineRecovery !== true && shouldUseSketchTrace(image, options)) {
@@ -157,7 +159,8 @@ export function prepareTraceForContour(
         sketchCrackField(adjusted, radiusPx),
         options,
       );
-      return { ...recovered, prepared: cleanBinaryMask(recovered.prepared, options) };
+      const cleaned = cleanBinaryMask(recovered.prepared, options, recovered.crackField);
+      return { ...recovered, prepared: cleaned };
     }
     const prepared = sketchTraceToMonochrome(
       adjusted,
@@ -167,15 +170,18 @@ export function prepareTraceForContour(
       // failure mode: recall 0.93 -> 0.66 measured at 2x).
       radiusPx,
     );
-    return {
-      prepared: cleanBinaryMask(prepared, options),
-      crackField: sketchCrackField(adjusted, radiusPx),
-    };
+    const crackField = sketchCrackField(adjusted, radiusPx);
+    return { prepared: cleanBinaryMask(prepared, options, crackField), crackField };
   }
   const prepared = applyMedian(adjusted, options.medianFilter);
-  const thresholded = applyThresholdWithIso(prepared, options);
+  // The automatic cut levels detectably uneven lighting first (ADR-402); the
+  // crack field then interpolates the same luma that was cut. Uniform pages,
+  // and explicit Cutoff/Threshold values, get `prepared` itself back.
+  const level = levelForAutomaticThreshold(prepared, options);
+  const leveled = level.source;
+  const thresholded = applyThresholdWithIso(leveled, options, level.threshold);
   const field =
-    thresholded.thresholdLuma === null ? null : lumaCrackField(prepared, thresholded.thresholdLuma);
+    thresholded.thresholdLuma === null ? null : lumaCrackField(leveled, thresholded.thresholdLuma);
   if (options.faintLineRecovery === true) {
     const recovered = prepareFaintLineMask(
       thresholded.prepared,
@@ -183,30 +189,28 @@ export function prepareTraceForContour(
       sketchCrackField(prepared, SKETCH_RADIUS_PX * effectivePixelScale(options)),
       effectivePixelScale(options),
     );
-    return { ...recovered, prepared: cleanBinaryMask(recovered.prepared, options) };
+    const cleaned = cleanBinaryMask(recovered.prepared, options, recovered.crackField);
+    return { ...recovered, prepared: cleaned };
   }
-  return {
-    prepared: cleanBinaryMask(thresholded.prepared, options),
-    crackField: field,
-  };
+  return { prepared: cleanBinaryMask(thresholded.prepared, options, field), crackField: field };
 }
 
 // Mask cleanup is the shared tail of every preprocessing branch: despeckle
 // (ink specks → white), then pinhole-crack fill (enclosed hairline white
 // slivers → ink). Extracting it keeps preprocessForTrace under the
-// complexity cap.
-function cleanBinaryMask(image: RawImageData, options: TraceOptions): RawImageData {
+// complexity cap. Both share the walker's saddle decision (ADR-403).
+function cleanBinaryMask(
+  image: RawImageData,
+  options: TraceOptions,
+  crackField: CrackSubPixelField | null,
+): RawImageData {
   // Area-denominated caps scale by pixelScale² on supersampled traces so
   // their SOURCE-pixel semantics hold (a 12px speck at 2x covers 48px).
   const scale = effectivePixelScale(options);
-  const despeckled = shouldDespeckle(options)
-    ? despeckle(
-        image,
-        (options.despeckleMinPixels ?? 0) * scale * scale,
-        options.traceMode === 'centerline' ? 8 : 4,
-      )
-    : image;
-  return options.fillPinholeCracks === true ? fillPinholes(despeckled, scale) : despeckled;
+  const saddles = cleanupSaddlePolicy(options, crackField);
+  const minPixels = (options.despeckleMinPixels ?? 0) * scale * scale;
+  const despeckled = shouldDespeckle(options) ? despeckle(image, minPixels, saddles ?? 8) : image;
+  return options.fillPinholeCracks === true ? fillPinholes(despeckled, scale, saddles) : despeckled;
 }
 
 /** Sanitized supersampling factor (see TraceOptions.pixelScale). */
@@ -230,9 +234,12 @@ export function crackFieldForTrace(
 
 const BACKGROUND_LUMA = 255;
 
+// `automaticCut`, when given, is otsuThreshold(prepared) already computed by
+// levelForAutomaticThreshold; it saves a second histogram pass.
 function applyThresholdWithIso(
   prepared: RawImageData,
   options: TraceOptions,
+  automaticCut: number | null = null,
 ): { readonly prepared: RawImageData; readonly thresholdLuma: number | null } {
   if (options.cutoffLuma !== undefined) {
     const upper = options.thresholdLuma ?? 128;
@@ -248,7 +255,7 @@ function applyThresholdWithIso(
     };
   }
   if (options.useOtsuThreshold === true) {
-    const thresholdLuma = otsuThreshold(prepared);
+    const thresholdLuma = automaticCut ?? otsuThreshold(prepared);
     return {
       prepared: thresholdToMonochrome(prepared, thresholdLuma),
       thresholdLuma,
@@ -303,7 +310,9 @@ function applyMedian(
 // Brightness → contrast → gamma → invert. Each is a no-op at its
 // neutral value (0 / 0 / 1 / false) and returns the input ref-equal,
 // so chaining is cheap when the user hasn't touched a slider.
-function applyImageAdjustments(image: RawImageData, options: TraceOptions): RawImageData {
+// traceImageToColoredPaths runs this same chain once, before its scale
+// policy, when Invert is on (ADR-404), so both entry points keep this order.
+export function applyImageAdjustments(image: RawImageData, options: TraceOptions): RawImageData {
   let out = image;
   // Non-finite brightness/contrast normalize to their neutral 0 (a NaN/Infinity
   // delta or factor otherwise clamps every channel to 0 — silent blackening);

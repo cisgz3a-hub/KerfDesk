@@ -225,6 +225,66 @@ describe('trace controls describe the options the engine actually receives', () 
       expect(controls.options()).toEqual(options);
     });
   });
+
+  it.each(['Line Art', 'Smooth', 'Sharp', 'Centerline', 'Edge Detection'])(
+    '%s offers Invert, sends it to the engine and resets it with the preset',
+    async (name) => {
+      // Light artwork on a dark ground: without Invert the ground is the ink.
+      const image = paper(0);
+      fill(image, 20, 15, 30, 30, [255, 255, 255]);
+      await withControls(name, async (controls) => {
+        const invert = controls.host.querySelector('[aria-label="Invert"]');
+        if (!(invert instanceof HTMLInputElement)) throw new Error('Missing Invert');
+        expect(invert.checked).toBe(false);
+        expect(invert.disabled).toBe(false);
+        expect(invert.title).toContain('light artwork on a dark background');
+        expect(controls.options().invert).toBeUndefined();
+        await controls.check('Invert', true);
+        expect(controls.options()).toEqual({ ...TRACE_PRESETS[name], invert: true });
+        if (name !== 'Edge Detection') {
+          expect(ink(preprocessForTrace(image, controls.options()))).toBe(900);
+        }
+        // Each style keeps its own Invert: Photo shading's stays off.
+        await controls.selectPreset('Photo shading');
+        expect(controls.options().invert).toBe(false);
+        await controls.selectPreset(name);
+        expect(controls.options().invert).toBe(true);
+        await controls.reset();
+        expect(controls.options()).toEqual(TRACE_PRESETS[name]);
+      });
+    },
+  );
+
+  it('stands Invert down while the alpha mask owns detection', async () => {
+    await withControls(
+      'Line Art',
+      async (controls) => {
+        await controls.check('Trace alpha mask', true);
+        const invert = controls.host.querySelector('[aria-label="Invert"]');
+        expect(invert instanceof HTMLInputElement && invert.disabled).toBe(true);
+      },
+      true,
+    );
+  });
+
+  it('describes Centerline Smoothness and Optimize the same way in the hint and the tooltip', async () => {
+    // ADR-405: in Centerline they are the corner angle and the fit tolerance.
+    // The visible hint the input is described by must not keep the contour
+    // copy while only the hover title changes.
+    await withControls('Centerline', async (controls) => {
+      for (const [label, role] of [
+        ['Smoothness', 'corner'],
+        ['Optimize', 'fewer nodes'],
+      ] as const) {
+        const input = controls.number(label);
+        const hintId = input.getAttribute('aria-describedby') ?? '';
+        const hint = controls.host.querySelector(`[id="${hintId}"]`);
+        expect(input.title).toContain(role);
+        expect(hint?.textContent).toBe(input.title);
+      }
+      expect(controls.host.textContent).not.toContain('Smooth traced edges');
+    });
+  });
 });
 
 type Controls = {

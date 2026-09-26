@@ -198,13 +198,22 @@ for (const presetName of ['Centerline', 'Line Art', 'Smooth', 'Sharp', 'Edge Det
       paths.map((path) => ({
         fill: path.getAttribute('fill'),
         stroke: path.getAttribute('stroke'),
+        fillRule: path.getAttribute('fill-rule'),
+        vectorEffect: path.getAttribute('vector-effect'),
         d: path.getAttribute('d') ?? '',
       })),
     );
-    if (preset.traceMode === 'centerline') {
+    if (preset.traceMode === 'centerline' || preset.traceMode === 'edge') {
+      // Line trace modes commit as LINE layers, so the preview strokes every
+      // ring as a zoom-independent hairline instead of filling it (ADR-407).
       expect(
         svgPaths.every(
-          (path) => path.fill === 'none' && path.stroke !== null && path.stroke !== 'none',
+          (path) =>
+            path.fill === 'none' &&
+            path.fillRule === null &&
+            path.stroke !== null &&
+            path.stroke !== 'none' &&
+            path.vectorEffect === 'non-scaling-stroke',
         ),
       ).toBe(true);
     } else {
