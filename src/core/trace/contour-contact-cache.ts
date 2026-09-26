@@ -105,25 +105,23 @@ function* findContactsSteps(
 ): TraceSteps<ContactChoices> {
   const cooperate = yield;
   const choices: ContactChoices = { minX: null, minY: null };
-  const scanFirst = a.edges.length <= b.edges.length;
-  const scan = scanFirst ? a : b,
-    target = scanFirst ? b : a;
-  let visited = 0;
-  for (const edge of scan.edges) {
-    if (cooperate) yield;
-    for (const other of target.index.query(edge)) {
-      if (cooperate && ++visited % 256 === 0) yield;
-      if (skipContact(edge, other, sameLoop)) continue;
-      const first = scanFirst ? edge : other,
-        second = scanFirst ? other : edge;
+  // Every overlapping edge pair is tested, each once with `a`'s edge first.
+  // The earliest contact is a minimum under a total order, so the order the
+  // pairs arrive in cannot change the choice.
+  yield* a.index.overlapPairsSteps(
+    b.index,
+    (first, second) => {
+      if (skipContact(first, second, sameLoop)) return;
       if (edgesMeet(first, second, orientation)) rememberContact(choices, first, second, sameLoop);
-    }
-  }
+    },
+    cooperate,
+  );
   return choices;
 }
 
-function skipContact(edge: ContourEdge, other: ContourEdge, sameLoop: boolean): boolean {
-  return sameLoop && (other.index <= edge.index || adjacentContourEdges(edge, other));
+// Within one loop each unordered pair is tested once, from its lower edge.
+function skipContact(first: ContourEdge, second: ContourEdge, sameLoop: boolean): boolean {
+  return sameLoop && (second.index <= first.index || adjacentContourEdges(first, second));
 }
 
 function edgesMeet(a: ContourEdge, b: ContourEdge, orientation: ContourOrientation): boolean {

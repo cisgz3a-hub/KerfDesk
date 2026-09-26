@@ -81,7 +81,9 @@ describe('prepared contour winding', () => {
       }
     }
     const membership = new ContourMembership();
+    // The first query scans the edges; the second builds the boundary's index.
     expect(membership.contains({ x: 5, y: 1.5 }, points)).toBe(true);
+    expect(membership.contains({ x: 5, y: 2.5 }, points)).toBe(true);
     coordinateReads = 0;
     for (let y = 0.5; y < 100; y += 1) expect(membership.contains({ x: 5, y }, points)).toBe(true);
     expect(coordinateReads).toBeLessThan(10000);

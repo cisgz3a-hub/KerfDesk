@@ -46,6 +46,78 @@ export class ContourBoxIndex<T extends ContourBox> {
     }
     return result;
   }
+
+  /** Every pair of an item here and an item of `other` whose boxes overlap
+   *  (inclusive), in no particular order. The same pairs as querying `other`
+   *  with each item here, found by descending both trees together, so node
+   *  pairs that are apart are dismissed once instead of once per item. */
+  *overlapPairsSteps<U extends ContourBox>(
+    other: ContourBoxIndex<U>,
+    visit: (item: T, otherItem: U) => void,
+    cooperate: boolean,
+  ): TraceSteps<void> {
+    if (this.root === undefined || other.root === undefined) return;
+    const mine: BoxNode<T>[] = [this.root];
+    const theirs: BoxNode<U>[] = [other.root];
+    let visited = 0;
+    while (mine.length > 0) {
+      const a = mine.pop() as BoxNode<T>;
+      const b = theirs.pop() as BoxNode<U>;
+      if (!boxesOverlap(a, b)) continue;
+      if (cooperate && ++visited % PAIR_CHECKPOINT_INTERVAL === 0) yield;
+      if (a.items !== undefined && b.items !== undefined) {
+        visitLeafPairs(a.items, b, b.items, visit);
+      } else if (b.items !== undefined || (a.items === undefined && wider(a, b))) {
+        pushChildren(a, b, mine, theirs);
+      } else {
+        pushOtherChildren(a, b, mine, theirs);
+      }
+    }
+  }
+}
+
+const PAIR_CHECKPOINT_INTERVAL = 256;
+
+function visitLeafPairs<T extends ContourBox, U extends ContourBox>(
+  items: ReadonlyArray<T>,
+  leaf: ContourBox,
+  others: ReadonlyArray<U>,
+  visit: (item: T, otherItem: U) => void,
+): void {
+  for (const item of items) {
+    if (!boxesOverlap(item, leaf)) continue;
+    for (const otherItem of others) if (boxesOverlap(item, otherItem)) visit(item, otherItem);
+  }
+}
+
+function wider(a: ContourBox, b: ContourBox): boolean {
+  return a.maxX - a.minX + (a.maxY - a.minY) >= b.maxX - b.minX + (b.maxY - b.minY);
+}
+
+function pushChildren<T, U>(
+  a: BoxNode<T>,
+  b: BoxNode<U>,
+  mine: BoxNode<T>[],
+  theirs: BoxNode<U>[],
+): void {
+  for (const child of [a.left, a.right]) {
+    if (child === undefined) continue;
+    mine.push(child);
+    theirs.push(b);
+  }
+}
+
+function pushOtherChildren<T, U>(
+  a: BoxNode<T>,
+  b: BoxNode<U>,
+  mine: BoxNode<T>[],
+  theirs: BoxNode<U>[],
+): void {
+  for (const child of [b.left, b.right]) {
+    if (child === undefined) continue;
+    mine.push(a);
+    theirs.push(child);
+  }
 }
 
 function* buildNodeSteps<T extends ContourBox>(

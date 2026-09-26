@@ -10,7 +10,13 @@ type PreparedContour = {
   readonly bounds: ContourBox;
   readonly membership: WeakMap<Vec2, MembershipResult>;
   index?: ContourBoxIndex<CrossingEdge>;
+  scanned: boolean;
 };
+
+// Many boundaries answer a single membership query. The first query scans
+// the edges, which is no more work than building the index; a second query
+// builds the index, so later queries never scan every edge.
+const SCAN_CHECKPOINT_INTERVAL = 32;
 
 /** Reuse immutable source/candidate boundaries during one topology repair. */
 export class ContourMembership {
@@ -26,7 +32,9 @@ export class ContourMembership {
     let contour = this.prepared.get(points);
     if (contour === undefined) {
       const bounds = contourBox(points);
-      contour = finiteContourBox(bounds) ? { bounds, membership: new WeakMap() } : null;
+      contour = finiteContourBox(bounds)
+        ? { bounds, membership: new WeakMap(), scanned: false }
+        : null;
       this.prepared.set(points, contour);
     }
     if (contour === null || !Number.isFinite(point.x) || !Number.isFinite(point.y)) {
@@ -44,10 +52,23 @@ export class ContourMembership {
     // queries that need a ray scan; cheap bounding rejects need no retained entry.
     const previous = contour.membership.get(point);
     if (matchesQuery(previous, point)) return previous.inside;
-    contour.index ??= yield* crossingIndexSteps(points);
-    const inside = rayWinding(point, contour.index, this.orientation) !== 0;
+    const inside = (yield* this.windingSteps(point, points, contour)) !== 0;
     contour.membership.set(point, { x: point.x, y: point.y, inside });
     return inside;
+  }
+
+  private *windingSteps(
+    point: Vec2,
+    points: ReadonlyArray<Vec2>,
+    contour: PreparedContour,
+  ): TraceSteps<number> {
+    if (contour.scanned) {
+      contour.index ??= yield* crossingIndexSteps(points);
+      return rayWinding(point, contour.index, this.orientation);
+    }
+    const winding = yield* scannedWindingSteps(point, points, this.orientation);
+    contour.scanned = true;
+    return winding;
   }
 }
 
@@ -68,9 +89,33 @@ function rayWinding(
   // Inclusive boxes retain vertices; the original half-open y test below
   // still counts a shared vertex once and keeps exact boundary behavior.
   const ray = { minX: point.x, maxX: Infinity, minY: point.y, maxY: point.y };
-  for (const { a, b } of index.query(ray)) {
-    if (a.y <= point.y && b.y > point.y && orientation.sign(a, b, point) > 0) winding += 1;
-    if (a.y > point.y && b.y <= point.y && orientation.sign(a, b, point) < 0) winding -= 1;
+  for (const { a, b } of index.query(ray)) winding += crossing(a, b, point, orientation);
+  return winding;
+}
+
+function crossing(a: Vec2, b: Vec2, point: Vec2, orientation: ContourOrientation): number {
+  if (a.y <= point.y && b.y > point.y && orientation.sign(a, b, point) > 0) return 1;
+  if (a.y > point.y && b.y <= point.y && orientation.sign(a, b, point) < 0) return -1;
+  return 0;
+}
+
+/** rayWinding without the index: the same edges, those whose inclusive box
+ *  meets the rightward ray, and the winding is a sum, so it is the same. */
+function* scannedWindingSteps(
+  point: Vec2,
+  points: ReadonlyArray<Vec2>,
+  orientation: ContourOrientation,
+): TraceSteps<number> {
+  const cooperate = yield;
+  let winding = 0;
+  for (let i = 0; i < points.length; i += 1) {
+    if (cooperate && i % SCAN_CHECKPOINT_INTERVAL === 0) yield;
+    const a = points[i];
+    const b = points[(i + 1) % points.length];
+    if (a === undefined || b === undefined || a.y === b.y) continue;
+    if (Math.max(a.x, b.x) < point.x) continue;
+    if (Math.min(a.y, b.y) > point.y || Math.max(a.y, b.y) < point.y) continue;
+    winding += crossing(a, b, point, orientation);
   }
   return winding;
 }
