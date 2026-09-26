@@ -3,8 +3,6 @@
 
 import { useState } from 'react';
 import type { GrblState } from '../../core/controllers/grbl';
-import { presentAlarm } from '../../core/controllers/grbl/response-presentation';
-import type { ControllerKind } from '../../core/devices';
 import type { MachineKind } from '../../core/scene';
 import { CollapsedRail, RailPanelHeading } from '../common';
 import { useStore } from '../state';
@@ -19,7 +17,7 @@ import { CncUtilitiesPanel } from '../machine/CncUtilitiesPanel';
 import { CollapsibleRailSection } from './CollapsibleRailSection';
 import { ConsolePanel } from './ConsolePanel';
 import { SuperConsoleLauncher } from './super-console/SuperConsoleLauncher';
-import { AlarmRecoveryActions } from './AlarmRecoveryActions';
+import { AlarmBanner } from './AlarmBanner';
 import { ControllerConnectionControls } from './ControllerConnectionControls';
 import { DetectedSettingsToast } from './DetectedSettingsToast';
 import { openMachineSetup } from './device-setup';
@@ -28,7 +26,6 @@ import { JogPad } from './JogPad';
 import { JobControls } from './JobControls';
 import { ProbePanel } from './ProbePanel';
 import { runStartJobFlow } from './start-job-flow';
-import { STATUS_ALARM_START_MESSAGE } from './start-job-readiness';
 import { jobAwareConfirm } from '../state/job-aware-dialogs';
 import { clearStartBlockers } from './start-blocker-invalidation';
 import { controllerActionFailureHandler } from './report-controller-action-failure';
@@ -87,10 +84,13 @@ export function LaserWindow({
           code={alarmCode}
           controllerKind={controllerKind}
           homingEnabled={homingEnabled}
+          homeFromAlarm={control.homeFromAlarm}
           canUnlock={control.canUnlock}
+          resetRequired={control.resetRequired}
           onHome={control.runHome}
           onConfigureHoming={openHomingSetup}
           onUnlock={control.runUnlock}
+          onReset={control.runReset}
         />
       )}
       {controllerDisplay.sleep && <SleepBanner onWake={control.runWake} />}
@@ -154,10 +154,13 @@ function useControllerActions(): {
   readonly unlockAlarm: ReturnType<typeof useLaserStore.getState>['unlockAlarm'];
   readonly wakeController: ReturnType<typeof useLaserStore.getState>['wakeController'];
   readonly canUnlock: boolean;
+  readonly homeFromAlarm: boolean;
+  readonly resetRequired: boolean;
   // Banner click handlers: a refusal becomes a toast instead of silence.
   readonly runHome: () => void;
   readonly runUnlock: () => void;
   readonly runWake: () => void;
+  readonly runReset: () => void;
 } {
   const home = useLaserStore((s) => s.home);
   const unlockAlarm = useLaserStore((s) => s.unlockAlarm);
@@ -169,9 +172,12 @@ function useControllerActions(): {
     unlockAlarm,
     wakeController,
     canUnlock: useLaserStore((s) => s.capabilities.unlock),
+    homeFromAlarm: useLaserStore((s) => s.capabilities.homeFromAlarm !== false),
+    resetRequired: useLaserStore((s) => s.resetRequired === true),
     runHome: () => void home().catch(controllerActionFailureHandler('Home')),
     runUnlock: () => void unlockAlarm().catch(controllerActionFailureHandler('Unlock')),
     runWake: () => void wakeController().catch(controllerActionFailureHandler('Wake')),
+    runReset: () => void wakeController().catch(controllerActionFailureHandler('Reset')),
   };
 }
 
@@ -270,56 +276,6 @@ function SleepBanner({ onWake }: { readonly onWake: () => void }): JSX.Element {
   );
 }
 
-function AlarmBanner({
-  code,
-  controllerKind,
-  homingEnabled,
-  canUnlock,
-  onHome,
-  onConfigureHoming,
-  onUnlock,
-}: {
-  readonly code: number | null;
-  readonly controllerKind: ControllerKind;
-  readonly homingEnabled: boolean;
-  readonly canUnlock: boolean;
-  readonly onHome: () => void;
-  readonly onConfigureHoming: () => void;
-  readonly onUnlock: () => void;
-}): JSX.Element {
-  const alarm = code === null ? null : presentAlarm(controllerKind, code);
-  const alarmAction = alarmRecoveryAction(controllerKind, code, alarm?.action);
-  return (
-    <div style={alarmStyle} role="alert">
-      <strong>
-        {code === null ? 'Controller reports Alarm' : `Alarm ${code}: ${alarm?.title ?? 'unknown'}`}
-      </strong>
-      <p style={alarmDetailStyle}>
-        {code === null
-          ? 'GRBL has locked jog, frame, and start until the machine is homed or unlocked.'
-          : (alarm?.detail ?? '')}
-      </p>
-      {alarmAction !== undefined && <p style={alarmDetailStyle}>{alarmAction}</p>}
-      <AlarmRecoveryActions
-        homingEnabled={homingEnabled}
-        canUnlock={canUnlock}
-        onHome={onHome}
-        onConfigureHoming={onConfigureHoming}
-        onUnlock={onUnlock}
-      />
-    </div>
-  );
-}
-
-function alarmRecoveryAction(
-  controllerKind: ControllerKind,
-  code: number | null,
-  action: string | undefined,
-): string | undefined {
-  if (code !== null && controllerKind === 'fluidnc') return action;
-  return action ?? STATUS_ALARM_START_MESSAGE;
-}
-
 const panelStyle: React.CSSProperties = {
   // Explicit width + flexShrink: 0 so this rail cannot push the workspace
   // canvas off-screen when its sub-panels (ConsolePanel, etc.)
@@ -335,13 +291,6 @@ const panelStyle: React.CSSProperties = {
   fontFamily: 'system-ui, sans-serif',
   display: 'flex',
   flexDirection: 'column',
-};
-const alarmStyle: React.CSSProperties = {
-  border: '1px solid var(--lf-danger)',
-  background: 'var(--lf-tint-danger)',
-  color: 'var(--lf-danger-fg)',
-  padding: 8,
-  borderRadius: 4,
 };
 const sleepStyle: React.CSSProperties = {
   border: '1px solid var(--lf-warning)',

@@ -9,6 +9,7 @@ import type { ControllerCapabilities } from './controller-capabilities';
 import type { ControllerEvent } from './controller-event';
 import type { JogParams } from './grbl/commands';
 import type { ConsoleCommandResult } from './grbl/console-command';
+import type { HomingCycleModel } from './grbl/grbl-homing-duration';
 
 export type FrameBounds = {
   readonly minX: number;
@@ -52,6 +53,12 @@ export type ControllerCommands = {
   /** Best-effort de-energize lines written after a job Abort
    *  (GRBL: ['M9']; Marlin: ['M5', 'M107']). No trailing newlines. */
   readonly stopLaserLines: ReadonlyArray<string>;
+  /** A controller without a realtime reset stops with these ordinary lines,
+   *  written in this order wherever a realtime reset would be sent (Abort,
+   *  ABORT MOTION, the stop after a stream error, Disconnect with a job
+   *  running). Each owes an acknowledgement. Absent: the driver's stop is its
+   *  realtime softReset, or it has no stop but stopLaserLines. No newlines. */
+  readonly quickStopLines?: ReadonlyArray<string>;
   /** Queued tool-off lines dispatched and acknowledged before any Frame motion.
    *  These must explicitly de-energize every driver-owned cutting accessory;
    *  unlike stopLaserLines, callers cannot rely on a preceding soft reset. */
@@ -74,6 +81,39 @@ export type ControllerCommands = {
    *  firmware has no jog-based Z retract omits it, and the caller skips the
    *  retract prefix. Newline-terminated to match buildFrameLines. */
   readonly buildFrameRetract?: (zMm: number, feed: number) => string;
+  /** Modal-state push and pop lines around the Frame perimeter (Smoothieware
+   *  M120/M121). A Frame that ends after its push but before its own pop is
+   *  restored with the pop once the controller is Idle. Absent: no wrapper. */
+  readonly frameModalState?: { readonly push: string; readonly pop: string };
+};
+
+/** What a firmware's own laser-module report proved (Smoothieware `M221`). */
+export type LaserModuleEvidence = {
+  /** 'absent': no laser output module answered, so the controller cannot run
+   *  laser output and prints nothing for the module's own commands. */
+  readonly module: 'loaded' | 'absent';
+  /** Whether the loaded module has a constant-power (not speed-proportional)
+   *  mode. Null when the module is absent. */
+  readonly constantPowerMode: boolean | null;
+};
+
+/** How a Home is confirmed on firmware whose Home command proves nothing. */
+export type HomeVerification = {
+  /** The line that asks which axes are homed. */
+  readonly query: string;
+  /** Null when X and Y are homed; otherwise why the Home is not confirmed. */
+  readonly unhomedReason: (responses: ReadonlyArray<string>) => string | null;
+};
+
+/** One owned query, sent once per qualification, that proves whether the
+ *  firmware's laser output module is loaded. */
+export type LaserModuleProbe = {
+  readonly command: string;
+  /** Classifies the lines the query printed before its terminal `ok`. */
+  readonly parse: (responses: ReadonlyArray<string>) => LaserModuleEvidence;
+  /** The same driver for a session with no laser module: its vocabulary minus
+   *  the module's own commands, which nothing on the board would answer. */
+  readonly withoutLaserModule: (driver: ControllerDriver) => ControllerDriver;
 };
 
 export type ConsoleQuickCommand = {
@@ -89,6 +129,17 @@ export type ConsoleSettingWrite = {
   readonly max: number;
   /** What the setting controls, for the out-of-range message. */
   readonly meaning: string;
+};
+
+/** What a stream-side Pause (no realtime hold) must do about the beam the
+ * lines already sent left on. `offLines` are queued behind the buffered motion
+ * at Pause. At Resume, `restoreLines` are sent before the stream refills, and
+ * `restatedLine` replaces the queued line at `queueIndex + offset` (the next
+ * burn move, given the power the program held). No trailing newlines. */
+export type StreamPauseBeamPlan = {
+  readonly offLines: ReadonlyArray<string>;
+  readonly restoreLines: ReadonlyArray<string>;
+  readonly restatedLine: { readonly offset: number; readonly line: string } | null;
 };
 
 export type ControllerDriver = {
@@ -110,4 +161,19 @@ export type ControllerDriver = {
   /** True when a write payload contains setup-only lines that must be blocked
    *  while a job is active (GRBL: any `$` line). */
   readonly isSetupOnlyPayload: (payload: string) => boolean;
+  /** Stream-side Pause beam handling, from the job's stream lines (each
+   *  newline-terminated) and the index of the first unsent one. Absent: Pause
+   *  only stops sending. */
+  readonly planStreamPauseBeam?: (
+    streamLines: ReadonlyArray<string>,
+    queueIndex: number,
+  ) => StreamPauseBeamPlan;
+  /** Present when the firmware can run without its laser output module. */
+  readonly laserModuleProbe?: LaserModuleProbe;
+  /** Present when the firmware's Home answers `ok` whether or not anything
+   *  homed, so KerfDesk asks which axes it homed (Smoothieware). */
+  readonly homeVerification?: HomeVerification;
+  /** How the firmware's homing cycle moves, for timing a Home from its `$$`
+   *  settings; absent means stock GRBL's (grbl-homing-duration.ts). */
+  readonly homingCycle?: HomingCycleModel;
 };

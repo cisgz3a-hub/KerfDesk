@@ -13,23 +13,64 @@ describe('classifyMarlinResponse', () => {
     expect(classifyMarlinResponse('ok T:22.5 /0.0')).toEqual({ kind: 'ok' });
     expect(classifyMarlinResponse('echo:busy: processing')).toEqual({ kind: 'busy' });
     expect(classifyMarlinResponse('Resend: 42')).toEqual({ kind: 'resend', line: 42 });
-    expect(classifyMarlinResponse('Error:Printer halted. kill() called!')).toMatchObject({
+    expect(classifyMarlinResponse('Error:G2/G3 bad parameters')).toEqual({
       kind: 'error',
       code: null,
+      raw: 'Error:G2/G3 bad parameters',
     });
     expect(classifyMarlinResponse('start')).toMatchObject({ kind: 'welcome' });
     expect(classifyMarlinResponse('FIRMWARE_NAME:Marlin 2.1.2')).toMatchObject({
       kind: 'welcome',
     });
-    expect(classifyMarlinResponse('echo:Unknown command: "$$"')).toMatchObject({
+    expect(classifyMarlinResponse('echo:M112 Shutdown')).toMatchObject({
       kind: 'message',
       tag: 'echo',
     });
   });
 
+  // MA-10: kill() prints this and then waits for RESET or a power cycle
+  // (MarlinCore.cpp L889-L957).
+  it('marks the kill() error as a halted controller', () => {
+    expect(classifyMarlinResponse('Error:Printer halted. kill() called!')).toEqual({
+      kind: 'error',
+      code: null,
+      raw: 'Error:Printer halted. kill() called!',
+      halted: true,
+    });
+  });
+
+  // MA-12: parser.cpp L390-L392 echoes the command, gcode.cpp L1122 then
+  // answers the line with `ok`.
+  it('classifies "Unknown command" with the command and the build option it needs', () => {
+    expect(classifyMarlinResponse('echo:Unknown command: "M8"')).toEqual({
+      kind: 'unknown-command',
+      command: 'M8',
+      raw: 'echo:Unknown command: "M8"',
+      requirement: 'AIR_ASSIST (or COOLANT_FLOOD)',
+    });
+    expect(classifyMarlinResponse('echo:Unknown command: "M5 I"')).toMatchObject({
+      command: 'M5 I',
+      requirement: 'LASER_FEATURE (a laser cutter)',
+    });
+    expect(classifyMarlinResponse('echo:Unknown command: "M107"')).toMatchObject({
+      requirement: 'a fan output (HAS_FAN)',
+    });
+    expect(classifyMarlinResponse('echo:Unknown command: "$$"')).toMatchObject({
+      kind: 'unknown-command',
+      command: '$$',
+      requirement: null,
+    });
+  });
+
   it('parses M114 position lines into Idle status reports', () => {
     const report = parseMarlinPositionReport('X:10.50 Y:5.00 Z:0.00 E:0.00 Count X:840 Y:400 Z:0');
-    expect(report).toMatchObject({ state: 'Idle', mPos: { x: 10.5, y: 5, z: 0 }, wco: null });
+    // M114 is the logical (work) position (audit MA-2).
+    expect(report).toMatchObject({
+      state: 'Idle',
+      mPos: null,
+      wPos: { x: 10.5, y: 5, z: 0 },
+      wco: null,
+    });
     expect(classifyMarlinResponse('X:1.00 Y:2.00 Z:3.00 E:0.00 Count X:0 Y:0 Z:0')).toMatchObject({
       kind: 'status',
     });
@@ -71,6 +112,18 @@ describe('prepareMarlinConsoleCommand', () => {
       ok: false,
       reason: 'Console commands and saved macros must contain exactly one line.',
     });
+  });
+
+  // MA-5: queue.cpp answers nothing for a line left empty once `;` comments
+  // are removed, so its owed `ok` would block every later command.
+  it('refuses a line that is only a comment, and keeps one with a command', () => {
+    for (const input of ['; note', '(note)', ' (a) ; b ']) {
+      const result = prepareMarlinConsoleCommand(input);
+      expect(result.ok).toBe(false);
+      expect(!result.ok && result.reason).toMatch(/only a comment/);
+    }
+    const commented = prepareMarlinConsoleCommand('M114 ; where');
+    expect(commented.ok && commented.command.wire).toBe('M114 ; where\n');
   });
 
   it('blocks persistent writes, allows queries without idle, never gates M112', () => {
@@ -130,6 +183,20 @@ describe('marlinDriver', () => {
     expect(marlinDriver.commands.stopLaserLines).toEqual(['M5 I', 'M107']);
     expect(marlinDriver.commands.frameToolOffLines).toEqual(['M5 I', 'M107']);
     expect(marlinDriver.defaultBaudRate).toBe(250000);
+  });
+
+  // MA-7: M107 first (no synchronize), M410 acted on when read, then M5 I.
+  it('stops with the quickstop sequence', () => {
+    expect(marlinDriver.commands.quickStopLines).toEqual(['M107', 'M410', 'M5 I']);
+    expect(marlinDriver.capabilities.streamPauseBeamOff).toBe(true);
+  });
+
+  // MA-10: after kill() Marlin needs its reset button or a power cycle.
+  it('tells the operator how to recover from the M112 emergency stop', () => {
+    const m112 = marlinDriver.consoleQuickCommands.find((entry) => entry.command === 'M112');
+    expect(m112?.hint).toBe(
+      "EMERGENCY STOP (halts the firmware; press the controller's reset button or power-cycle it, then reconnect)",
+    );
   });
 });
 

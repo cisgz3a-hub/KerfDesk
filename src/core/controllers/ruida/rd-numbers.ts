@@ -35,6 +35,14 @@ export function decodeCoord35(bytes: ReadonlyArray<number>): number {
   return value >= limit / 2 ? value - limit : value;
 }
 
+/** Encode a raw integer as 2 × 7-bit bytes, two's complement inside 14 bits
+ *  (meerk40t rdjob.py `encode14`, used by the E7 04 / E7 08 repeat records:
+ *  -3328 → 0x66 0x00). */
+export function encodeInt14(value: number): ReadonlyArray<number> {
+  const raw = Math.trunc(value);
+  return [(raw >> 7) & 0x7f, raw & 0x7f];
+}
+
 /** Encode a power percentage (0..100) as the 14-bit Ruida scale. */
 export function encodePower14(percent: number): ReadonlyArray<number> {
   const clamped = Math.max(0, Math.min(100, percent));

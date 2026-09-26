@@ -61,6 +61,8 @@ export type LaserSafetyNotice =
       readonly raw?: string;
       readonly rejectedLine?: string;
       readonly message: string;
+      /** The firmware halted itself and needs a reset or power cycle. */
+      readonly halted?: true;
     }
   | {
       readonly kind: 'stream-stalled';
@@ -72,6 +74,10 @@ export type LaserSafetyNotice =
     }
   | {
       readonly kind: 'frame-limit';
+      readonly message: string;
+    }
+  | {
+      readonly kind: 'home-unfinished';
       readonly message: string;
     };
 
@@ -131,6 +137,8 @@ export function disconnectDuringFireNotice(): LaserSafetyNotice {
   return { kind: 'disconnect-during-fire', message: DISCONNECT_DURING_FIRE_MESSAGE };
 }
 
+// A controller with neither a realtime reset nor quickstop lines (see
+// QUICK_STOP_UNCONFIRMED_MESSAGE for Marlin).
 export const DISCONNECT_STOP_UNCONFIRMED_MESSAGE =
   'This controller has no realtime reset, so KerfDesk could only stop sending and queue ' +
   'beam-off commands. Buffered motion or laser output may still be active. ' +
@@ -141,21 +149,113 @@ export function disconnectStopUnconfirmedNotice(): LaserSafetyNotice {
   return { kind: 'disconnect-stop-unconfirmed', message: DISCONNECT_STOP_UNCONFIRMED_MESSAGE };
 }
 
+// Marlin stopped with M107, M410 and M5 I (controller audit MA-7): M410 drops
+// the planned moves when Marlin reads it, without a reset, and the beam-off
+// lines follow. Nothing confirms the stop before this notice is raised.
+export const QUICK_STOP_UNCONFIRMED_MESSAGE =
+  'Marlin was quick-stopped: KerfDesk sent M107, M410 and M5 I, which drop the moves Marlin had ' +
+  'queued and switch the laser off within about a second. A quick stop halts the motors ' +
+  'without slowing down, so the position may have slipped: re-home, or re-check the origin, ' +
+  'before running again. Use the physical E-stop or power cutoff now if the machine is still ' +
+  'moving or the beam is still on.';
+
+export function quickStopUnconfirmedNotice(): LaserSafetyNotice {
+  return { kind: 'disconnect-stop-unconfirmed', message: QUICK_STOP_UNCONFIRMED_MESSAGE };
+}
+
+// Marlin kill() (M112, a failed homing move, a thermal fault): the firmware
+// disables interrupts and waits for its RESET button or a power cycle, so it
+// answers nothing, reports no Idle and does not recover on its own
+// (MarlinCore.cpp L889-L957; controller audit MA-10).
+export function controllerHaltedMessage(raw: string): string {
+  return (
+    `The controller halted its firmware (${raw}) and answers nothing until it is reset. ` +
+    "Press the controller's reset button or power-cycle it, then reconnect. Position is unknown " +
+    'after a halt, so home before running a job. Use the physical E-stop or power cutoff now if unsafe.'
+  );
+}
+
+export function controllerHaltedNotice(raw: string): LaserSafetyNotice {
+  return {
+    kind: 'controller-error',
+    code: null,
+    raw,
+    message: controllerHaltedMessage(raw),
+    halted: true,
+  };
+}
+
+/** A halted controller runs nothing it is sent, so a later stop notice must
+ * not replace the reset advice. */
+export function isControllerHaltedNotice(notice: LaserSafetyNotice | null): boolean {
+  return notice?.kind === 'controller-error' && notice.halted === true;
+}
+
+/** The controller skipped a command it has no handler for: its firmware
+ * build lacks the option that provides it (controller audit MA-12). */
+export type SkippedCommand = {
+  readonly command: string;
+  readonly raw: string;
+  /** The build option that provides the command, when the driver knows it. */
+  readonly requirement: string | null;
+};
+
+export function skippedCommandReason(skipped: SkippedCommand): string {
+  const feature = skipped.requirement ?? 'the firmware option that provides it';
+  return `The controller answered "Unknown command" to ${skipped.command}: this firmware build lacks ${feature}.`;
+}
+
+export function skippedCommandNotice(
+  skipped: SkippedCommand,
+  rejectedLine: string,
+): LaserSafetyNotice {
+  return {
+    kind: 'controller-error',
+    code: null,
+    raw: skipped.raw,
+    rejectedLine: rejectedLine.trim(),
+    message:
+      `The controller skipped ${skipped.command} during the job. ${skippedCommandReason(skipped)} ` +
+      'KerfDesk stopped the job, because the rest of it would run without that command. Use the ' +
+      'physical E-stop or power cutoff now if unsafe. Enable that option in the firmware, or ' +
+      'change the device profile so the job does not send the command, then home before re-running.',
+  };
+}
+
 // ADR-053 P3: a hard-limit ALARM fired while a Verified Frame was tracing the
 // job box, i.e. the job does not fit the travel from this hand-set origin. The
 // alarm cleared the origin (G92) and the verification, so the operator must
-// unlock, re-home the origin somewhere safer (or shrink the job), and re-frame.
+// reset, unlock, re-home the origin somewhere safer (or shrink the job), and
+// re-frame. A hard limit is a critical event: the controller takes only a soft
+// reset until it gets one (ADR-393).
 export function frameHitLimitMessage(axisLabel: string | null): string {
   const where = axisLabel === null ? 'a limit switch' : `the ${axisLabel} limit switch`;
   return (
     `The Verified Frame hit ${where} — the job does not fit the travel from this origin. ` +
-    'Unlock ($X), move the origin away from that edge or shrink the job, set the origin again, ' +
-    'then re-frame before starting.'
+    'Press Reset (Ctrl-X), then Unlock ($X), move the origin away from that edge or shrink the ' +
+    'job, set the origin again, then re-frame before starting.'
   );
 }
 
 export function frameHitLimitNotice(axisLabel: string | null): LaserSafetyNotice {
   return { kind: 'frame-limit', message: frameHitLimitMessage(axisLabel) };
+}
+
+/** The controller answered its Home, but reports the axes not homed (SM-6). */
+export function homeNotConfirmedNotice(reason: string): LaserSafetyNotice {
+  return { kind: 'home-unfinished', message: `Home was not confirmed. ${reason}` };
+}
+
+/** Home ended without the controller confirming it: a timeout, an alarm, or a
+ *  change that voided the attempt. Not a rejection, so it is not worded as one
+ *  (controller audit 2026-09-25 ST-4). */
+export function homeUnfinishedNotice(reason: string): LaserSafetyNotice {
+  return {
+    kind: 'home-unfinished',
+    message:
+      `Home did not finish: ${reason} The machine may have stopped anywhere or may still be ` +
+      'homing. Wait until it stops, check it, then Home again.',
+  };
 }
 
 export function writeFailedMessage(action: LaserSafetyAction): string {

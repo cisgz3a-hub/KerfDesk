@@ -6,12 +6,12 @@ import type { CncGroup, CncPass, Job } from '../job';
 import { emitCncJobWithPassSpans } from '../output';
 import { rawResumeLine } from './job-checkpoint';
 import {
-  CNC_RESUME_PLANNER_RESERVE_LINES,
+  CNC_RESUME_PLANNER_RESERVES,
   resolveCncResumePoint,
   type CncResumePointArgs,
 } from './cnc-resume-point';
 
-const RESERVE = CNC_RESUME_PLANNER_RESERVE_LINES['grbl-v1.1'];
+const RESERVE = CNC_RESUME_PLANNER_RESERVES['grbl-v1.1'].unmeasured;
 
 function testGroup(passes: ReadonlyArray<CncPass>, toolId?: string): CncGroup {
   return {

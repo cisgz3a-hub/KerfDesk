@@ -50,6 +50,21 @@ export function staleHomeAlarmReplyPatch(
   };
 }
 
+/** Opens the stale-reply window again before a further line of a per-axis Home
+ * sequence (the Falcon's `$HX` then `$HY`). grblHAL with its homing lock goes
+ * back into Alarm when `$HX` finishes while Y is still unhomed, and prints no
+ * ALARM line for it (grblHAL core system.c:494-505, go_home), so a `?` served
+ * before `$HY` starts reads Alarm although the Home goes on (controller audit
+ * 2026-09-25 HF-1). A failed cycle still ends the Home through its ALARM:N or
+ * error:N reply. */
+export function reopenHomeAlarmReplyWindow(
+  state: LaserState,
+): Partial<Pick<LaserState, 'controllerOperation'>> {
+  const operation = state.controllerOperation;
+  if (operation?.kind !== 'home' || operation.phase !== 'command') return {};
+  return { controllerOperation: { ...operation, awaitingFirstNonAlarmReport: true } };
+}
+
 /** The first non-Alarm report after the Home line closes the stale-reply window:
  * from then on an Alarm report is a new Alarm. */
 export function homeAlarmReplyWindowPatch(

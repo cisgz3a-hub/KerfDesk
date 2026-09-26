@@ -4,6 +4,7 @@ import { useLaserStore } from './laser-store';
 import { startTestLaserJob } from './laser-test-start-helpers';
 import { useStore } from './store';
 import { resetStore } from './test-helpers';
+import { disconnectOnTestClock } from './laser-disconnect-testing';
 
 type FakeConnection = SerialConnection & {
   readonly emitLine: (line: string) => void;
@@ -78,7 +79,7 @@ beforeEach(() => {
 afterEach(async () => {
   vi.useRealTimers();
   useLaserStore.setState({ autofocusBusy: false });
-  await useLaserStore.getState().disconnect();
+  await disconnectOnTestClock();
   useLaserStore.setState({
     connection: { kind: 'disconnected' },
     statusReport: null,
@@ -283,7 +284,7 @@ describe('stop-path ack attribution', () => {
   }
 
   // Marlin stop is stream-side: no soft reset exists, so the in-flight job
-  // line AND the M5/M107 beam-off lines all still ack after cancel.
+  // line AND the M107 / M410 / M5 I quickstop lines all still ack after cancel.
   it('a stream-owned ok does not settle the untracked ledger (Marlin stop)', async () => {
     const connection = makeConnection(async () => undefined);
     await connectMarlinWith(connection);
@@ -296,18 +297,22 @@ describe('stop-path ack attribution', () => {
 
     await useLaserStore.getState().stopJob();
     expect(useLaserStore.getState().streamer?.status).toBe('cancelled');
-    expect(useLaserStore.getState().pendingUntrackedAcks).toBe(2);
+    expect(useLaserStore.getState().pendingUntrackedAcks).toBe(3);
 
     connection.emitLine('ok'); // the in-flight job line — stream-owned
     await flush();
-    expect(useLaserStore.getState().pendingUntrackedAcks).toBe(2);
+    expect(useLaserStore.getState().pendingUntrackedAcks).toBe(3);
     expect(useLaserStore.getState().streamer?.inFlight).toHaveLength(0);
 
-    connection.emitLine('ok'); // M5
+    connection.emitLine('ok'); // M107
+    await flush();
+    expect(useLaserStore.getState().pendingUntrackedAcks).toBe(2);
+
+    connection.emitLine('ok'); // M410
     await flush();
     expect(useLaserStore.getState().pendingUntrackedAcks).toBe(1);
 
-    connection.emitLine('ok'); // M107
+    connection.emitLine('ok'); // M5 I
     await flush();
     expect(useLaserStore.getState().pendingUntrackedAcks).toBe(0);
   });
@@ -323,16 +328,17 @@ describe('stop-path ack attribution', () => {
     await useLaserStore.getState().stopJob();
 
     connection.emitLine('ok'); // in-flight job line
-    connection.emitLine('ok'); // M5
+    connection.emitLine('ok'); // M107
+    connection.emitLine('ok'); // M410
     await flush();
 
-    // M107's ok is still owed. Start must wait for it; once it lands it
+    // M5 I's ok is still owed. Start must wait for it; once it lands it
     // belongs to the ledger, never to the new stream.
     const started = startTestLaserJob('G1 X9 S100\nG1 X8 S100', {
       streamingMode: 'ping-pong',
     });
     await flush();
-    connection.emitLine('ok'); // M107
+    connection.emitLine('ok'); // M5 I
     await started;
     await flush();
 

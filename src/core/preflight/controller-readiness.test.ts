@@ -163,6 +163,48 @@ describe('runControllerReadiness', () => {
       expect(result.errors).toEqual([]);
     });
 
+    // OR-6: FluidNC's $30/$32 are read-only proxies of its YAML spindle config
+    // (SettingsDefinitions.cpp:146-148), so "$32=1" / "$30=..." cannot be applied.
+    it('names the YAML spindle config instead of $32=1 and $30= on FluidNC', () => {
+      const laserOff = runControllerReadiness(
+        createProject(),
+        { ...controllerOk, laserModeEnabled: false },
+        'readonly-dump',
+      );
+      const laserMessage = laserOff.errors.find((e) => e.code === 'laser-mode-disabled')?.message;
+      expect(laserMessage).toContain('configure the spindle as Laser in the FluidNC YAML config');
+      expect(laserMessage).toContain('GRBL Compatible (constant-power) output dialect');
+      expect(laserMessage).not.toContain('Enable GRBL laser mode ($32=1)');
+
+      const scale = runControllerReadiness(
+        createProject(),
+        { ...controllerOk, maxPowerS: 255 },
+        'readonly-dump',
+      );
+      const scaleMessage = scale.errors.find((e) => e.code === 'max-power-mismatch')?.message;
+      expect(scaleMessage).toContain("the top of the spindle's speed_map in its YAML config");
+
+      const unverified = runControllerReadiness(createProject(), {}, 'readonly-dump');
+      expect(
+        unverified.warnings.find((w) => w.code === 'laser-mode-unverified')?.message,
+      ).toContain('configured as Laser in the FluidNC YAML config');
+    });
+
+    it('names the YAML spindle config for the CNC $30/$32 advice on FluidNC', () => {
+      const project = { ...createProject(), machine: DEFAULT_CNC_MACHINE_CONFIG };
+      const rpm = DEFAULT_CNC_MACHINE_CONFIG.params.spindleMaxRpm;
+      const result = runControllerReadiness(
+        project,
+        { maxPowerS: rpm + 1, minPowerS: 0, laserModeEnabled: true },
+        'readonly-dump',
+      );
+      const messages = result.errors.map((e) => e.message).join('\n');
+      expect(messages).toContain("configure the router's spindle (not Laser) in the FluidNC YAML");
+      expect(messages).toContain(`change speed_map there to reach ${rpm}`);
+      expect(messages).not.toContain('Set $32=0');
+      expect(messages).not.toContain(`Set $30=${rpm}`);
+    });
+
     it("firmwares with NO settings dump keep ADR-095's warning-only path", () => {
       const result = runControllerReadiness(createProject(), null, 'none');
 

@@ -14,6 +14,7 @@ import type { SerialConnection } from '../../platform/types';
 import type { LaserMotionOperationId } from './laser-motion-operation';
 import type { TranscriptSource } from './laser-transcript';
 import type { TranscriptBufferRefs } from './laser-transcript-buffer';
+import type { UnknownCommandRefs } from './laser-unknown-command';
 
 export type HandlerRefs = ControllerLifecycleRefs &
   ResetCleanupRefs &
@@ -33,7 +34,14 @@ export type HandlerRefs = ControllerLifecycleRefs &
     // get().log.length on a 50 ms loop (R-L2 audit finding).
     onLineArrived: (() => void) | null;
     nextTranscriptId?: number;
+    /** The write epoch in which a refused line left the controller's error
+     *  latched (laser-parser-rearm.ts). */
+    parserRearmEpoch?: number | null;
+    /** When the controller last said it is busy with a line (Marlin
+     *  `echo:busy: processing`); the ack watchdog reads it (MA-9). */
+    controllerBusyAt?: number | null;
   } & TranscriptBufferRefs &
+  UnknownCommandRefs &
   ControllerQualificationScheduleRefs;
 
 export type SetFn = (

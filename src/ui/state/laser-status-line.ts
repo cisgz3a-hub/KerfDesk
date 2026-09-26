@@ -51,8 +51,7 @@ export function handleStatusLine(
   const state = get();
   const streamer = state.streamer;
   if (isInvalidatingStatusState(report.state)) {
-    if (isStaleHomeAlarmReply(state, report)) set(staleHomeAlarmReplyPatch(state, report));
-    else handleInvalidatingStatus(set, refs, state, report, streamer);
+    handleInvalidatingReport(set, refs, state, report);
     return;
   }
   const { operation, observation: motionObservation } = observeOwnedMotionStatus(
@@ -247,6 +246,47 @@ function nonAlarmReportPatch(
 
 function isInvalidatingStatusState(state: string): boolean {
   return state === 'Alarm' || state === 'Sleep';
+}
+
+function handleInvalidatingReport(
+  set: SetFn,
+  refs: HandlerRefs,
+  state: LaserState,
+  report: StatusReport,
+): void {
+  if (isStaleHomeAlarmReply(state, report)) set(staleHomeAlarmReplyPatch(state, report));
+  else if (alreadyInReportedState(state, report)) {
+    handleRepeatedInvalidatingStatus(set, refs, state, report);
+  } else handleInvalidatingStatus(set, refs, state, report, state.streamer);
+}
+
+// Everything Alarm or Sleep voids was voided when the controller entered the
+// state: by that first report, or by the ALARM:N line, which also clears the
+// report. A repeat is no new event. GRBL goes on answering lines in Alarm (an
+// operator's `$X`, a `$$` read), and a `?` served at such a line's end-of-line
+// check point reads Alarm just before the line runs (gnea/grbl
+// protocol.c:79-105), so voiding again rejected that exchange and dropped the
+// acknowledgement it was still owed (controller audit 2026-09-25 ST-3).
+function alreadyInReportedState(state: LaserState, report: StatusReport): boolean {
+  const previous = state.statusReport?.state;
+  if (previous !== undefined) return previous === report.state;
+  return report.state === 'Alarm' && state.alarmCode !== null;
+}
+
+function handleRepeatedInvalidatingStatus(
+  set: SetFn,
+  refs: HandlerRefs,
+  state: LaserState,
+  report: StatusReport,
+): void {
+  const nextSequence = state.statusSequence + 1;
+  set({
+    statusReport: report,
+    statusSequence: nextSequence,
+    statusObservation: null,
+    ...mpgOwnershipPatch(report, state),
+  });
+  observeStatusConsumers(set, refs, state, nextSequence, report);
 }
 
 function handleInvalidatingStatus(

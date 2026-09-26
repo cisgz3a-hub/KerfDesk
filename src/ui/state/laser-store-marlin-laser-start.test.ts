@@ -12,6 +12,7 @@ import {
   createLaserModeStartEvidence,
 } from './laser-mode-start-evidence';
 import { useLaserStore } from './laser-store';
+import { disconnectOnTestClock } from './laser-disconnect-testing';
 
 const JOB_LINE = 'G1 X10.000 Y5.000 F600 S255';
 const JOB_GCODE = `G21\nG90\n${JOB_LINE}\nM5\n`;
@@ -94,7 +95,7 @@ beforeEach(() => {
 });
 
 afterEach(async () => {
-  await useLaserStore.getState().disconnect();
+  await disconnectOnTestClock();
   vi.restoreAllMocks();
 });
 

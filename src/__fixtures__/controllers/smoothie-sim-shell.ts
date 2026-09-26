@@ -12,12 +12,13 @@
 //   https://github.com/Smoothieware/Smoothieware/blob/edge/src/modules/utils/simpleshell/SimpleShell.cpp
 // - Endstops::on_gcode_received: G28 homes in Reprap mode and parks in grbl
 //   mode; G28.2 homes in grbl mode and parks otherwise; G28.1 stores the park
-//   point (saved_position defaults to machine 0,0).
+//   point (saved_position defaults to machine 0,0); G28.6 reports the homed
+//   flag of each axis with a homing pin.
 //   https://github.com/Smoothieware/Smoothieware/blob/edge/src/modules/tools/endstops/Endstops.cpp
 // - Kernel.cpp: grbl_mode defaults to true only in the CNC build.
 //   https://github.com/Smoothieware/Smoothieware/blob/edge/src/libs/Kernel.cpp
 
-export type SmoothieReferenceEffect = 'home' | 'park' | 'save-park' | null;
+export type SmoothieReferenceEffect = 'home' | 'park' | 'save-park' | 'report' | null;
 
 /** What a G28-family line or `$H` does on this dialect (null: not a reference line). */
 export function smoothieReferenceEffect(line: string, grblMode: boolean): SmoothieReferenceEffect {
@@ -30,7 +31,7 @@ export function smoothieReferenceEffect(line: string, grblMode: boolean): Smooth
   if (subcode === 0) return grblMode ? 'park' : 'home';
   if (subcode === 1) return 'save-park';
   if (subcode === 2) return grblMode ? 'home' : 'park';
-  return null;
+  return subcode === 6 ? 'report' : null;
 }
 
 export type SmoothieShellContext = {
@@ -43,7 +44,8 @@ export type SmoothieShellReply = {
   readonly clearsHalt: boolean;
 };
 
-const MODAL_STATE_LINE = '[G0 G54 G17 G21 G90 G94 M0 M5 M9 T0 F4000.0000 S0.8000]';
+// SimpleShell `state` (SimpleShell.cpp L879-L890 at 38e2cc08), printed for $G and $I.
+const MODAL_STATE_LINE = '[GC:G0 G54 G17 G21 G90 G94 M0 M5 M9 T0 F4000.0000 S0.8000]';
 const KNOWN_TEXT_COMMANDS: ReadonlyMap<string, ReadonlyArray<string>> = new Map([
   ['help', ['Commands:', 'version', 'mem [-v]', 'ls [-s] [folder]']],
   ['mem', ['Unused Heap: 2048 bytes', 'Used Heap Size: 30720']],

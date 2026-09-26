@@ -7,9 +7,11 @@
 import { disconnect as disconnectStreamer, type StreamerState } from '../../core/controllers/grbl';
 import type { ControllerDriver } from '../../core/controllers';
 import * as controllerOperation from './laser-controller-operation';
+import { hasPendingControllerWrite } from './laser-start-queue-fence';
 import { disconnectedControllerQualification } from './laser-controller-qualification';
 import { emptyControllerBuildInfoState } from './laser-controller-build-info';
 import { disconnectDuringFireNotice, disconnectDuringJobNotice } from './laser-safety-notice';
+import { airOffLines, noResetStopLines } from './laser-quick-stop';
 import { sessionScopedJobStateReset } from './laser-session-reset';
 import { liveCanvasLifecyclePatch } from './live-canvas-run';
 import type { LaserState } from './laser-store';
@@ -38,6 +40,10 @@ export const MPG_ACTIVE_COMMAND_MESSAGE =
   'This machine command is unavailable while grblHAL reports MPG mode active. Return control from the pendant/MPG to KerfDesk and wait for an MPG:0 report.';
 export const TOOL_CHANGE_NOT_IDLE_MESSAGE =
   'Waiting for the machine to reach the tool-change position. Jog, probe, and Zero Z unlock once it reports Idle.';
+export const TOOL_CHANGE_MOTION_ACTIVE_MESSAGE =
+  'A jog or probe is still moving. Continue once it has finished and the machine reports Idle.';
+export const TOOL_CHANGE_ACK_OWED_MESSAGE =
+  'The controller has not yet answered your last command. Continue once it has, so its answer is not counted as a job line.';
 export const TOOL_CHANGE_Z_ZERO_REQUIRED_MESSAGE =
   'Load the new bit, select it as the Active bit, and establish its Z zero on the stock top before continuing.';
 
@@ -111,6 +117,8 @@ export function toolChangeContinueBlockMessage(state: LaserState): string | null
   const mpgBlock = mpgCommandBlockMessage(state);
   if (mpgBlock !== null) return mpgBlock;
   if (!toolChangeReady(state)) return TOOL_CHANGE_NOT_IDLE_MESSAGE;
+  const handoffBlock = toolChangeHandoffBlockMessage(state);
+  if (handoffBlock !== null) return handoffBlock;
   if (
     !isWorkZEvidenceCurrentForStart(
       state.workZZeroEvidence,
@@ -129,6 +137,27 @@ export function toolChangeContinueBlockMessage(state: LaserState): string | null
       `Work Z belongs to a different bit. Load ${expected}, select it as the Active bit, ` +
       'then touch it to the stock top and Zero Z — or probe again — before continuing.'
     );
+  }
+  return null;
+}
+
+// Continue hands the controller back to the job stream, so the operator's own
+// work in the hold must be finished first. GRBL answers every G-code line with
+// error:9 while a jog runs (gnea/grbl protocol.c:99-101), and once the stream
+// runs every terminal ack is booked to it, so an `ok` still owed to a Zero Z or
+// a jog's settle marker would be counted as a job line (audit ST-1). These are
+// facts about the handoff, not a policy gate.
+function toolChangeHandoffBlockMessage(state: LaserState): string | null {
+  if (state.fireActive) return FIRE_ACTIVE_COMMAND_MESSAGE;
+  if (state.motionOperation !== null) return TOOL_CHANGE_MOTION_ACTIVE_MESSAGE;
+  const operationMessage = controllerOperation.controllerOperationCommandBlockMessage(
+    state.controllerOperation,
+  );
+  if (operationMessage !== null) return operationMessage;
+  if (hasPendingControllerWrite(state)) return TOOL_CHANGE_ACK_OWED_MESSAGE;
+  const reported = state.statusReport?.state ?? null;
+  if (reported !== 'Idle') {
+    return `The controller reports ${reported ?? 'no state'}. Continue waits for it to report Idle.`;
   }
   return null;
 }
@@ -188,26 +217,30 @@ export function jogFrameCommandBlockMessage(state: LaserState): string | null {
   return null;
 }
 
+// A running job gets the driver's stop: the realtime reset, or on a controller
+// without one its quickstop lines (Marlin M107, M410, M5 I; MA-7). Air assist
+// that may be on gets M9 when the stop lines do not already send it (CG-10).
 export function disconnectStopCommands(
   state: LaserState,
   driver: ControllerDriver,
 ): ReadonlyArray<string> {
   const fireOff = state.fireActive ? ['M5\n'] : [];
+  const softReset = driver.realtime.softReset;
   if (isActiveJob(state.streamer) || state.controllerOperation?.kind === 'probe') {
-    const softReset = driver.realtime.softReset;
-    return [
-      ...(softReset === null ? [] : [softReset]),
-      ...fireOff,
-      ...driver.commands.stopLaserLines.map((line) => `${line}\n`),
-    ];
+    return softReset === null
+      ? [...fireOff, ...noResetStopLines(driver, state)]
+      : [softReset, ...fireOff, ...terminated(driver.commands.stopLaserLines)];
   }
-  if (state.fireActive) {
-    return [...fireOff, ...driver.commands.stopLaserLines.map((line) => `${line}\n`)];
-  }
-  if (state.airAssistOn) return driver.commands.stopLaserLines.map((line) => `${line}\n`);
+  const beamOff = terminated([...driver.commands.stopLaserLines, ...airOffLines(driver, state)]);
+  if (state.fireActive) return [...fireOff, ...beamOff];
+  if (state.airAssistOn) return beamOff;
   if (state.motionOperation === null) return [];
   const jogCancel = driver.realtime.jogCancel;
   return jogCancel === null ? [] : [jogCancel];
+}
+
+function terminated(lines: ReadonlyArray<string>): ReadonlyArray<string> {
+  return lines.map((line) => `${line}\n`);
 }
 
 export function assertAutofocusIdle(state: LaserState): void {

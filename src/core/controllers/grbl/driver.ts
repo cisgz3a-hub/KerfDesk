@@ -57,6 +57,8 @@ export const grblDriver: ControllerDriver = {
     cncJobs: true,
     lowPowerFire: true,
     overrides: true,
+    // limits.c:319-320: no `?` is answered during the homing cycle.
+    statusWhileHoming: false,
   },
   realtime: {
     statusQuery: RT_STATUS,

@@ -47,7 +47,8 @@ describe('marlinStrategy', () => {
     const out = marlinStrategy.emit(JOB, MARLIN_INLINE_DEVICE);
     expect(out).toMatch(/^M5 I\nG21\nG90\nM3 I S0\n/);
     expect(out).toContain('G1 X30.000 Y40.000 F1500 S128');
-    expect(out).toContain('M5 I\nG0 X0.000 Y0.000 S0');
+    // MA-8: the park carries its own feed; stock Marlin runs G0 at the modal F.
+    expect(out).toContain('M5 I\nG0 X0.000 Y0.000 F6000 S0');
     expect(out).not.toMatch(/^M4\b|^G(?:54|94)\b/m);
   });
 
@@ -75,7 +76,7 @@ describe('marlinStrategy', () => {
       gcodeDialect: { dialectId: 'neotronics-4040-safe' },
     });
     expect(out).toContain('M3 I S0');
-    expect(out).toContain('G0 X0.000 Y0.000 S0');
+    expect(out).toContain('G0 X0.000 Y0.000 F6000 S0');
   });
 
   it('fan dialect output satisfies the laser-off-on-travel invariant (#3)', () => {

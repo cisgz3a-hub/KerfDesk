@@ -64,7 +64,9 @@ async function recoverWorkZ(
         controllerSessionEpoch: context.controllerSessionEpoch,
         toolId: context.toolId,
         activeWcs: after.activeWcs,
-        offsetZMm: after.offset.z,
+        // `$#` reports in inches under `$13=1` (gnea/grbl print.c
+        // printFloat_CoordValue); the evidence is stored in mm (audit GP-6).
+        offsetZMm: after.offset.z * (state.controllerSettings?.reportInches === true ? 25.4 : 1),
         observedAtMs: Date.now(),
       }),
       lastWriteError: null,

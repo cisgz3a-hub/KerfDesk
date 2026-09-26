@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { detectControllerFromBanner } from '../../core/controllers';
 import type { JobReviewModel } from './job-review';
 import {
   CONTROLLER_IDENTITY_UNCONFIRMED_PREFIX,
@@ -26,6 +27,18 @@ describe('controller identity warnings', () => {
     expect(warnings).toHaveLength(1);
     expect(warnings[0]).toContain(CONTROLLER_IDENTITY_WARNING_PREFIX);
     expect(warnings[0]).toContain('firmware banner identifies Marlin');
+  });
+
+  // Audit HF-8: "Grbl 1.1f" is also grblHAL's banner at COMPATIBILITY_LEVEL >= 1
+  // (grblHAL report.c:310-314), so it does not contradict a grblHAL profile;
+  // "Grbl 1.1h" does, because grblHAL never prints it (grbl.h:38-43).
+  it('does not claim a "Grbl 1.1f" banner identifies stock GRBL on a grblHAL profile', () => {
+    const compat = detectControllerFromBanner("Grbl 1.1f ['$' for help]", 'grblhal');
+    expect(controllerIdentityWarnings('grblhal', 'grblhal', compat)).toEqual([]);
+    const stock = detectControllerFromBanner("Grbl 1.1h ['$' for help]", 'grblhal');
+    const warnings = controllerIdentityWarnings('grblhal', 'grblhal', stock);
+    expect(warnings).toHaveLength(1);
+    expect(warnings[0]).toContain('firmware banner identifies GRBL');
   });
 
   it('discloses a GRBL-family variant instead of silently treating it as identical', () => {

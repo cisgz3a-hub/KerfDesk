@@ -130,11 +130,13 @@ describe('grblStrategy fill dynamic-power mode (ADR-036)', () => {
     expect(findLaserOnTravelIssues(out)).toEqual([]);
   });
 
-  it('re-arms between passes with the GROUP effective mode, not the dialect default', () => {
+  it('keeps the GROUP effective mode on every pass, not the dialect default', () => {
     // Rolling audit 2026-07-17-0625 P2-1: the pass-2 re-arm hardcoded the
     // dialect's cutPowerMode (always M3 S0), so a dynamic-override cut layer
     // burned pass 1 under M4 and passes 2+ under M3 — and emitJob's modal
     // tracker was never told, so a following fill group got no re-arm at all.
+    // OR-1 then removed the between-pass re-arm altogether: the group's word is
+    // armed once, before its first pass.
     const dynamicCut: CutGroup = {
       ...cut(),
       layerId: 'dyn-multi',
@@ -144,18 +146,22 @@ describe('grblStrategy fill dynamic-power mode (ADR-036)', () => {
     // Runs on the constant-cut dialect so the override genuinely differs from the
     // dialect default (under ADR-257 both are dynamic on the shipped default).
     const out = emitMixedMode({ groups: [dynamicCut, fill(5)] });
-    // Pass 2 re-arms dynamic, never constant.
-    expect(out).toContain('; pass 2 of 2\nM4 S0');
+    expect(out).toContain('M5\nM4 S0\n; layer dyn-multi');
+    expect(out).toContain('; pass 2 of 2\nG0 X1.000 Y1.000 S0\nG1 X2.000 Y2.000 F1500 S500');
+    expect(out.match(/^M4 S0$/gm) ?? []).toHaveLength(1);
     // The ONLY M3 S0 in the file is the preamble arm — the controller is in
     // M4 when the fill body runs, matching the tracker.
     expect(out.match(/^M3 S0$/gm) ?? []).toHaveLength(1);
     expect(findLaserOnTravelIssues(out)).toEqual([]);
   });
 
-  it('re-arms between passes with constant power for a plain multi-pass cut (unchanged)', () => {
+  it('does not re-arm a constant-power multi-pass cut between passes (OR-1)', () => {
+    // A `M3 S0` after pass 1's last burn drained GRBL's planner while that
+    // burn's power was still applied: a dot at every pass seam.
     const multiCut: CutGroup = { ...cut(), layerId: 'plain-multi', passes: 2 };
     const out = emitMixedMode({ groups: [multiCut] });
-    expect(out).toContain('; pass 2 of 2\nM3 S0');
+    expect(out).toContain('; pass 2 of 2\nG0 X1.000 Y1.000 S0\nG1 X2.000 Y2.000 F1500 S500');
+    expect(out.match(/^M3 S0$/gm) ?? []).toHaveLength(1);
     expect(out).not.toContain('M4');
   });
 

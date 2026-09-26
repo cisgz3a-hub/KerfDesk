@@ -9,33 +9,47 @@
 // autofocus macro. The file does not establish a firmware family or minimum
 // version. See the sourced device fields in the 2026-09-19 correction record.
 
+//
+// A preset is offered only for its own command set: `$HZ1` is a vendor macro.
+// Smoothieware runs it as `$H`, a full homing cycle, and stock GRBL answers it
+// error:3 but is left in its homing state until a reset (controller audit
+// 2026-09-25 CG-9).
+
+import type { ControllerCommandSet } from '../../core/devices/device-profile';
 import { inlineCodeStyle } from './device-settings-shared';
 
 const AUTOFOCUS_PRESETS: ReadonlyArray<{
   readonly label: string;
   readonly command: string;
   readonly hint: string;
+  readonly commandSet: ControllerCommandSet;
 }> = [
   {
     label: 'Creality Falcon A1 Pro',
     command: '$HZ1',
     hint: 'Uses the $HZ1 macro from Creality’s A1 Pro device configuration. Confirm support for your firmware.',
+    commandSet: 'creality-falcon-a1-pro',
   },
 ];
 
 export function AutofocusEditor(props: {
   readonly value: string;
   readonly onChange: (next: string) => void;
+  readonly controllerCommandSet?: ControllerCommandSet | undefined;
 }): JSX.Element {
+  const presets = AUTOFOCUS_PRESETS.filter(
+    (preset) => preset.commandSet === props.controllerCommandSet,
+  );
   return (
     <div style={focusBlockStyle}>
       <p style={focusIntroStyle}>
-        Choose a known machine preset, or paste one controller command or firmware macro from your
-        controller documentation.
+        {presets.length > 0
+          ? 'Choose a known machine preset, or paste one controller command or firmware macro from your controller documentation.'
+          : 'Paste one controller command or firmware macro from your controller documentation.'}
       </p>
-      <span style={presetLabelStyle}>Known machine presets</span>
+      {presets.length > 0 && <span style={presetLabelStyle}>Known machine presets</span>}
       <div style={presetsRowStyle}>
-        {AUTOFOCUS_PRESETS.map((p) => (
+        {presets.map((p) => (
           <button
             key={p.label}
             type="button"

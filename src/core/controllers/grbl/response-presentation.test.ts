@@ -96,7 +96,7 @@ describe('controller-family response presentation', () => {
     expect(presentError('fluidnc', 999)).toBeNull();
   });
 
-  it('uses FluidNC alarm labels without borrowing recovery metadata', () => {
+  it('uses FluidNC alarm labels without borrowing GRBL recovery metadata', () => {
     const expected = [
       'Hard Limit',
       'Soft Limit',
@@ -118,8 +118,11 @@ describe('controller-family response presentation', () => {
       'Probe Hard Limit',
     ];
     for (const [index, title] of expected.entries()) {
-      expect(presentAlarm('fluidnc', index + 1)).toEqual({ code: index + 1, title });
+      // Only FluidNC's own reset guidance for its Critical alarms is added.
+      expect(presentAlarm('fluidnc', index + 1)).toMatchObject({ code: index + 1, title });
+      expect(presentAlarm('fluidnc', index + 1)?.detail).toBeUndefined();
     }
+    expect(presentAlarm('fluidnc', 3)?.action).toBeUndefined();
   });
 
   it('leaves existing stock and grblHAL presentation unchanged', () => {
@@ -161,5 +164,48 @@ describe('controller-family response presentation', () => {
   it('gives the GRBL recovery steps for homing pull-off and search failures', () => {
     expect(presentAlarm('grbl-v1.1', 8)?.action).toContain('$27');
     expect(presentAlarm('grbl-v1.1', 9)?.action).toContain('$130');
+  });
+});
+
+// Controller audit 2026-09-25 GP-2, GP-8 and HF-3: hard and soft limits are
+// critical events that accept only a soft reset (gnea/grbl protocol.c:224-236;
+// grblHAL alarm_is_critical, error:79 for `$X`/`$H` meanwhile).
+describe('critical alarms and the texts the audit corrected', () => {
+  it.each([
+    ['grbl-v1.1', 1],
+    ['grbl-v1.1', 2],
+    ['grblhal', 1],
+    ['grblhal', 2],
+  ] as const)('%s ALARM:%i says a soft reset comes first', (kind, code) => {
+    expect(presentAlarm(kind, code)?.action).toMatch(
+      /only a soft reset now: press Reset \(Ctrl-X\)/,
+    );
+  });
+
+  it.each([1, 2, 13])('FluidNC ALARM:%i (Critical state) says a soft reset comes first', (code) => {
+    expect(presentAlarm('fluidnc', code)?.action).toMatch(/press Reset \(Ctrl-X\)/);
+  });
+
+  it('describes grblHAL error:79 and the extended codes, and keeps GRBL 1.1 at 38', () => {
+    expect(presentError('grblhal', 79)).toMatchObject({
+      title: 'Not allowed while critical event is active.',
+    });
+    expect(presentError('grblhal', 79)?.detail).toMatch(/Reset \(Ctrl-X\)/);
+    expect(presentError('grblhal', 46)?.title).toBe('Home machine to continue.');
+    expect(presentError('grbl-v1.1', 79)).toBeNull();
+  });
+
+  // grblHAL errors.c:48-49 names 18 and 19, which GRBL 1.1 leaves unused.
+  it('describes grblHAL error:18 and error:19, which stock GRBL does not define', () => {
+    expect(presentError('grblhal', 18)?.title).toBe('Reset asserted.');
+    expect(presentError('grblhal', 19)?.title).toBe('Non positive value.');
+    expect(presentError('grbl-v1.1', 18)).toBeNull();
+    expect(presentError('grbl-v1.1', 19)).toBeNull();
+  });
+
+  it('names both probe directions for ALARM:4 and both stores for error:7', () => {
+    expect(presentAlarm('grbl-v1.1', 4)?.detail).toMatch(/G38\.4\/G38\.5/);
+    expect(presentError('grbl-v1.1', 7)?.detail).toMatch(/\$#/);
+    expect(presentError('grbl-v1.1', 11)?.detail).toMatch(/79 characters/);
   });
 });

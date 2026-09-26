@@ -74,12 +74,14 @@ export function isSettingsReadOperation(operation: LaserState['controllerOperati
 }
 
 /** The controller acknowledged `$X`: the same state the Alarm banner's Unlock
- *  leaves. Positions and references taken before the alarm no longer hold. */
+ *  leaves. Positions and references taken before the alarm no longer hold.
+ *  The alarm code stays until a report that is not Alarm clears it: FluidNC
+ *  acknowledges `$X` in its Critical state without unlocking, and its next
+ *  report still reads Alarm (controller audit 2026-09-25 HF-2). */
 export function controllerUnlockedPatch(state: LaserState): Partial<LaserState> {
   const persistentOrUnknown =
     state.workOriginSource === 'g54-persistent' || state.workOriginSource === 'unknown';
   return {
-    alarmCode: null,
     homingState: 'unknown',
     homingProof: null,
     positionEvidenceSuppressed: true,

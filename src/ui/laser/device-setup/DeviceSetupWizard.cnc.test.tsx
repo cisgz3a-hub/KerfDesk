@@ -112,7 +112,61 @@ describe('DeviceSetupWizard router commit', () => {
       await view.unmount();
     }
   });
+
+  // CN-4 (2026-09-25 controller audit): the dialect choice shapes laser output
+  // only; CNC output is byte-identical for every choice.
+  it('names the output dialect as the laser dialect when the setup includes CNC', async () => {
+    useStore.getState().setMachineKind('cnc');
+    const view = await renderWizard();
+    try {
+      await openSetupDisclosure(view.host, 'Controller and connection settings');
+      expect(view.host.querySelector('[aria-label="Laser G-code output dialect"]')).not.toBeNull();
+      expect(view.host.querySelector('[aria-label="G-code output dialect"]')).toBeNull();
+      expect(view.host.textContent).toContain('Laser output dialect');
+      expect(view.host.textContent).toContain(
+        "CNC programs always use KerfDesk's GRBL CNC dialect.",
+      );
+    } finally {
+      await view.unmount();
+    }
+  });
+
+  // CN-2: the controller list says which controllers cannot run CNC jobs.
+  it('marks the controllers that cannot run CNC jobs as laser only when the setup includes CNC', async () => {
+    useStore.getState().setMachineKind('cnc');
+    const view = await renderWizard();
+    try {
+      await openSetupDisclosure(view.host, 'Controller and connection settings');
+      expect(controllerOptionLabels(view.host)).toEqual([
+        'GRBL v1.1',
+        'grblHAL',
+        'FluidNC',
+        'Marlin — laser only',
+        'Smoothieware — laser only',
+        'Ruida (.rd export) — laser only',
+      ]);
+    } finally {
+      await view.unmount();
+    }
+  });
+
+  it('lists controllers by name alone in a laser-only setup', async () => {
+    const view = await renderWizard();
+    try {
+      await openSetupDisclosure(view.host, 'Controller and connection settings');
+      expect(controllerOptionLabels(view.host)).toContain('Marlin');
+      expect(controllerOptionLabels(view.host).join()).not.toContain('laser only');
+    } finally {
+      await view.unmount();
+    }
+  });
 });
+
+function controllerOptionLabels(host: HTMLElement): ReadonlyArray<string> {
+  const select = host.querySelector('select[aria-label="Controller firmware"]');
+  if (!(select instanceof HTMLSelectElement)) throw new Error('controller select missing');
+  return [...select.options].map((option) => option.textContent ?? '');
+}
 
 async function renderWizard(): Promise<{
   readonly host: HTMLDivElement;

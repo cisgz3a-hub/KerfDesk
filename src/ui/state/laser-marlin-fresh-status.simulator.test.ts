@@ -13,6 +13,7 @@ import { grblDriver } from '../../core/controllers';
 import { useLaserStore } from './laser-store';
 import { useStore } from './store';
 import { resetStore } from './test-helpers';
+import { disconnectOnTestClock } from './laser-disconnect-testing';
 
 const MARLIN_JOG_X1 = 'G21\nG91\nG0 X1.000 F1000\nG90\n';
 
@@ -22,7 +23,7 @@ beforeEach(() => {
 });
 
 afterEach(async () => {
-  await useLaserStore.getState().disconnect();
+  await disconnectOnTestClock();
   useLaserStore.setState({
     capabilities: grblDriver.capabilities,
     activeControllerKind: grblDriver.kind,

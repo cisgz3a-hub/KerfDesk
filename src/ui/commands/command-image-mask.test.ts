@@ -12,6 +12,7 @@ function baseCtx(overrides: Partial<AppCommandContext> = {}): AppCommandContext 
     dirty: false,
     savedName: null,
     serialSupported: true,
+    fileOnlyTransport: false,
     connected: false,
     machineBusy: false,
     jobActive: false,

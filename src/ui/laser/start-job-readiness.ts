@@ -1,6 +1,8 @@
 import type { OverrideValues, StatusReport } from '../../core/controllers/grbl';
 import type { GrblBuildInfo } from '../../core/controllers/grbl/build-info';
 import type { StatusQueryCapability } from '../../core/controllers';
+import type { LaserModuleEvidence } from '../../core/controllers/controller-driver';
+import { programForLaserModule } from '../../core/preflight/laser-module-readiness';
 import type { ControllerKind } from '../../core/devices';
 import type { CanvasJobTimingPlanResult } from '../state/canvas-job-timing-plan';
 import type { SimilarityTransform } from '../../core/registration';
@@ -149,6 +151,8 @@ export type MachineStartSnapshot = {
   readonly controllerBuildInfoObservation?: SessionObservationStamp | null;
   readonly controllerSettings?: ControllerSettingsSnapshot | null;
   readonly controllerSettingsObservation?: SessionObservationStamp | null;
+  /** The connection's laser-module probe result (Smoothieware M221). */
+  readonly laserModuleReport?: LaserModuleEvidence | null;
 };
 
 export function prepareStartJob(
@@ -295,14 +299,7 @@ export function finalizeStartPreparation(
 ): StartJobPreparation {
   const { prepared, toolPlan, advisoryWarnings } = options.inspected;
   const coordinates = coordinatePreflightContext(options);
-  const { gcode, preflight } = emitPreparedGcode(prepared, {
-    ...(options.placement.jobOrigin === undefined
-      ? {}
-      : { jobOrigin: options.placement.jobOrigin }),
-    outputScope: options.outputScope,
-    ...coordinates.emitOptions,
-    sourceGeometryChecks: options.sourceGeometryChecks,
-  });
+  const { gcode, preflight } = emitStartProgram(prepared, options, coordinates.emitOptions);
   const emitSplit = partitionEmitPreflight(preflight);
   if (emitSplit.blocking.length > 0) return { ok: false, messages: emitSplit.blocking };
   const programIssue = preparedProgramIntegrityIssue(
@@ -372,6 +369,26 @@ export function finalizeStartPreparation(
     controllerReportsInches(options.controllerSettings),
     options.canvasPlanKey,
   );
+}
+
+function emitStartProgram(
+  prepared: SuccessfulPreparedStartInspection['prepared'],
+  options: FinalizeStartPreparationOptions,
+  coordinateOptions: ReturnType<typeof coordinatePreflightContext>['emitOptions'],
+): ReturnType<typeof emitPreparedGcode> {
+  const emitted = emitPreparedGcode(prepared, {
+    ...(options.placement.jobOrigin === undefined
+      ? {}
+      : { jobOrigin: options.placement.jobOrigin }),
+    outputScope: options.outputScope,
+    ...coordinateOptions,
+    sourceGeometryChecks: options.sourceGeometryChecks,
+  });
+  // Without the Laser module nothing answers the program's `fire off` (SM-3).
+  return {
+    ...emitted,
+    gcode: programForLaserModule(emitted.gcode, options.machine.laserModuleReport),
+  };
 }
 
 function coordinatePreflightContext(options: FinalizeStartPreparationOptions) {

@@ -80,7 +80,7 @@ describe('SafetyNoticeBanner', () => {
 
   it('offers reconnect, never Ctrl-X recovery, when the USB transport is gone', async () => {
     const reconnect = vi.fn();
-    const wake = vi.fn(async () => undefined);
+    const wake = vi.fn(async () => 'idle' as const);
     useLaserStore.setState({
       connection: { kind: 'disconnected' },
       wakeController: wake,
@@ -111,7 +111,7 @@ describe('SafetyNoticeBanner', () => {
   });
 
   it('labels Ctrl-X explicitly and only offers it to a connected sleeping controller', async () => {
-    const wake = vi.fn(async () => undefined);
+    const wake = vi.fn(async () => 'idle' as const);
     useLaserStore.setState({
       connection: { kind: 'connected' },
       statusReport: {

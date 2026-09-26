@@ -4,6 +4,7 @@ import type { OutputScope } from '../../core/scene';
 import { currentOutputScope, useStore } from '../state';
 import { canvasPlanRetentionKey } from '../state/canvas-motion-plan';
 import type { LaserState } from '../state/laser-store';
+import { currentPlannerCapacityEvidence } from '../state/laser-rx-capacity-evidence';
 import type { CncSetupAttestation } from '../state/cnc-setup-attestation';
 import type { LaserModeStartEvidence } from '../state/laser-mode-start-evidence';
 import {
@@ -70,6 +71,20 @@ export async function completedReceiptIsCurrent(
   return false;
 }
 
+function startControllerObservation(laser: LaserState) {
+  return {
+    statusReport: laser.statusReport,
+    wco: laser.wcoCache,
+    overrides: laser.ovCache,
+    accessories: laser.accessoryCache ?? null,
+    workZZeroEvidence: laser.workZZeroEvidence,
+    activeControllerKind: laser.activeControllerKind,
+    detectedControllerKind: laser.detectedControllerKind,
+    controllerSessionEpoch: laser.controllerSessionEpoch,
+    plannerBlocksAtIdle: currentPlannerCapacityEvidence(laser)?.plannerBlocksFree ?? null,
+  };
+}
+
 export async function stageFreshExecutionArtifact(args: {
   readonly runId: RunId;
   readonly prepared: PreparedCurrentStart;
@@ -101,16 +116,7 @@ export async function stageFreshExecutionArtifact(args: {
     const archivedControllerObservation = createArchivedControllerObservation({
       controllerSettings: args.laser.controllerSettings,
       observedAtIso: createdAtIso,
-      controllerObservation: {
-        statusReport: args.laser.statusReport,
-        wco: args.laser.wcoCache,
-        overrides: args.laser.ovCache,
-        accessories: args.laser.accessoryCache ?? null,
-        workZZeroEvidence: args.laser.workZZeroEvidence,
-        activeControllerKind: args.laser.activeControllerKind,
-        detectedControllerKind: args.laser.detectedControllerKind,
-        controllerSessionEpoch: args.laser.controllerSessionEpoch,
-      },
+      controllerObservation: startControllerObservation(args.laser),
     });
     const provenance = await createExecutionProvenance({
       gcode: args.prepared.gcode,

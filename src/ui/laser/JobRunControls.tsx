@@ -25,12 +25,17 @@ export function RunningControls(props: {
   readonly isFinishingTail?: boolean;
 }): JSX.Element {
   const hasRealtimePause = useLaserStore((s) => s.capabilities.realtimePause);
+  const streamPauseBeamOff = useLaserStore((s) => s.capabilities.streamPauseBeamOff === true);
   const hasOverrides = useLaserStore((s) => s.capabilities.overrides);
   const pendingToolLabel = useLaserStore((s) => s.pendingToolLabel);
   const activeJobMachineKind = useLaserStore((s) => s.activeJobMachineKind);
   const laserModeEnabled = useLaserStore((s) => s.controllerSettings?.laserModeEnabled);
   const resumeAdvisory = cncResumeAdvisoryNotice(activeJobMachineKind, laserModeEnabled);
-  const pauseMessage = pauseControlMessage(activeJobMachineKind, hasRealtimePause);
+  const pauseMessage = pauseControlMessage(
+    activeJobMachineKind,
+    hasRealtimePause,
+    streamPauseBeamOff,
+  );
   const safetyMessage = runningSafetyMessage({
     isToolChange: props.isToolChange,
     isPaused: props.isPaused,

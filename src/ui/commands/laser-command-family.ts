@@ -4,12 +4,13 @@
 // (ADR-101 §7); only user-visible copy follows the machine noun.
 
 import { machineNoun } from '../machine/machine-labels';
+import { FILE_ONLY_CONNECT_REFUSAL } from '../state/laser-connect-action';
 import { disabled, enabled, type AppCommand, type AppCommandContext } from './command-types';
 
 export function laserCommands(ctx: AppCommandContext): ReadonlyArray<AppCommand> {
   const noun = machineNoun(ctx.machineKind);
   const connect =
-    ctx.serialSupported && !ctx.connected
+    ctx.serialSupported && !ctx.connected && !ctx.fileOnlyTransport
       ? enabled(
           'laser.connect',
           'laser',
@@ -43,6 +44,9 @@ export function laserCommands(ctx: AppCommandContext): ReadonlyArray<AppCommand>
 
 function connectDisabledReason(ctx: AppCommandContext): string {
   const machine = capitalizedMachineNoun(ctx);
+  // The same refusal runConnectAction gives, so every Connect surface agrees
+  // with the rail, which is already disabled for file-only profiles (RU-6).
+  if (ctx.fileOnlyTransport) return FILE_ONLY_CONNECT_REFUSAL;
   if (!ctx.serialSupported) return 'WebSerial is not supported in this browser.';
   if (ctx.connected) return `${machine} is already connected.`;
   return `${machine} is not ready to connect.`;

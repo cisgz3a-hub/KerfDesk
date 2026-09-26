@@ -42,6 +42,7 @@ import {
 } from './laser-interactive-command';
 import { handleErrorLine, handleResendLine } from './laser-error-line';
 import { dispatchQueuedMotionLine } from './laser-frame-dispatch';
+import { restoreInterruptedFrameModalState } from './laser-frame-modal-restore';
 import {
   acknowledgeMotionSettlementMarker,
   takeNextAcknowledgedFramePrefixLine,
@@ -49,12 +50,15 @@ import {
 import type { AckSettlement, GetFn, HandlerRefs, SafeWriteFn, SetFn } from './laser-line-shared';
 import { forgetAlarmBeforeBanner, takeAlarmBeforeBanner } from './laser-reset-alarm';
 import { handleAlarmLine } from './laser-alarm-line';
+import { rearmParserWhenDrained } from './laser-parser-rearm';
 import { handleStatusLine, originUnknownAfterControllerReset } from './laser-status-line';
 import { settleUntrackedAck, streamOwnsTerminalAck } from './laser-stream-ack';
+import { noteStreamUnknownCommand, takeStreamUnknownCommand } from './laser-unknown-command';
 import { flushStreamAcksBefore, routeStreamAck } from './laser-stream-ack-batch';
 import type { LaserState } from './laser-store';
 import { emptyControllerBuildInfoState } from './laser-controller-build-info';
-import { hasUnsettledStreamAcks } from './laser-store-helpers';
+import { hasUnsettledStreamAcks, pushLog } from './laser-store-helpers';
+import { isCriticalEventMessage, RESET_REQUIRED_MESSAGE } from './controller-reset-required';
 import { appendSystemNotice } from './laser-system-notice';
 import { inboundTranscriptEntry } from './laser-transcript';
 import {
@@ -79,6 +83,7 @@ export function handleLine(
   const state = get();
   recordInboundLine(set, refs, state, cls, line);
   captureActiveWcsFromModalReport(set, line);
+  latchResetRequired(set, cls);
   invalidateSettingsForMpgTakeover(set, refs, state, cls);
   publishDetectedSettings(set, get, refs, cls);
   // Marlin answers an operator-owned M115 with the same FIRMWARE_NAME line it
@@ -92,6 +97,7 @@ export function handleLine(
     return;
   }
   handleNonBannerLine(set, get, refs, safeWrite, cls, line, state);
+  if (cls.kind === 'ok' || cls.kind === 'error') rearmParserWhenDrained(set, get, refs, safeWrite);
 }
 
 function handleNonBannerLine(
@@ -115,30 +121,53 @@ function handleNonBannerLine(
     // new boot, not the reset that raised it (laser-reset-alarm.ts).
     forgetAlarmBeforeBanner(refs);
     handleStatusLine(set, get, refs, safeWrite, cls.report);
+    restoreInterruptedFrameModalState(set, get, refs, safeWrite, cls.report);
     return;
   }
   if (cls.kind === 'alarm') {
-    handleAlarmLine(set, get, refs, safeWrite, cls.code);
+    handleAlarmLine(set, get, refs, safeWrite, cls);
     return;
   }
   if (cls.kind === 'error') {
-    handleErrorLine(
-      set,
-      get,
-      refs,
-      safeWrite,
-      cls.code,
-      cls.raw,
-      ackSettlement,
-      commandConsumed ? ownedCommandLine : undefined,
-    );
+    const rejection = { code: cls.code, raw: cls.raw, halted: cls.halted === true };
+    const ownedLine = commandConsumed ? ownedCommandLine : undefined;
+    handleErrorLine(set, get, refs, safeWrite, rejection, ackSettlement, ownedLine);
     return;
   }
-  // Marlin "echo:busy:" — the controller is alive but not ready; explicitly
-  // NOT an ack, so the streamer must not advance.
-  if (cls.kind === 'busy') return;
   if (cls.kind === 'resend') {
     handleResendLine(set, get, refs, safeWrite, cls.line);
+    return;
+  }
+  handleProgressLine(set, get, refs, safeWrite, cls, ackSettlement, state);
+}
+
+// Acknowledgements and the lines that report on the one in flight.
+function handleProgressLine(
+  set: SetFn,
+  get: GetFn,
+  refs: HandlerRefs,
+  safeWrite: SafeWriteFn,
+  cls: ControllerEvent,
+  ackSettlement: AckSettlement,
+  state: LaserState,
+): void {
+  // Marlin "echo:busy:" — the controller is alive but not ready; explicitly
+  // NOT an ack, so the streamer must not advance. It still proves the line the
+  // stream waits on is being worked on (MA-9).
+  if (cls.kind === 'busy') {
+    refs.controllerBusyAt = Date.now();
+    return;
+  }
+  if (cls.kind === 'unknown-command') {
+    noteStreamUnknownCommand(refs, state, cls);
+    return;
+  }
+  // The `ok` Marlin sends for a job line it skipped (MA-12).
+  const skipped =
+    cls.kind === 'ok' && ackSettlement.owner === 'stream' ? takeStreamUnknownCommand(refs) : null;
+  if (skipped !== null) {
+    const rejection = { code: null, raw: skipped.raw, skipped };
+    handleErrorLine(set, get, refs, safeWrite, rejection, ackSettlement);
     return;
   }
   routeAcknowledgement(set, get, refs, safeWrite, cls.kind, ackSettlement, state.motionOperation);
@@ -197,6 +226,21 @@ function captureActiveWcsFromModalReport(set: SetFn, line: string): void {
   if (!line.includes('[GC:')) return;
   const activeWcs = parseActiveWcsFromModalResponses([line]);
   if (activeWcs !== null) set({ activeWcs });
+}
+
+// `[MSG:Reset to continue]` (FluidNC: `[MSG:ERR: Reset to continue]`) follows a
+// critical ALARM: only a soft reset is accepted until the reboot banner
+// (controller-reset-required.ts).
+function latchResetRequired(set: SetFn, cls: ControllerEvent): void {
+  if (!isCriticalEventMessage(cls)) return;
+  set((state) =>
+    state.resetRequired === true
+      ? {}
+      : {
+          resetRequired: true,
+          log: pushLog(state, `[lf2] ${RESET_REQUIRED_MESSAGE}`),
+        },
+  );
 }
 
 function recordInboundLine(
@@ -315,7 +359,9 @@ function handleWelcomeLine(
   safeWrite: SafeWriteFn,
   raw: string,
 ): void {
-  const detected = detectControllerFromBanner(raw);
+  // A "Grbl 1.1f" banner is also grblHAL's at COMPATIBILITY_LEVEL >= 1, so on a
+  // grblHAL driver it identifies grblHAL, not a mismatch (audit HF-8).
+  const detected = detectControllerFromBanner(raw, refs.driver.kind);
   if (detected === null) return;
   const state = get();
   const nextSessionEpoch = state.controllerSessionEpoch + 1;
@@ -354,6 +400,8 @@ function handleWelcomeLine(
     // controller's alarm after the banner; any other code belonged to the
     // previous boot (audit streaming-4).
     alarmCode: takeAlarmBeforeBanner(refs),
+    // The reboot is the soft reset a critical event asked for.
+    resetRequired: false,
     wcoCache: null,
     // A reset re-initializes the parser's modal state ($N runs fresh), so the
     // cached WCS selection is stale until re-qualification re-reads $G (C6).

@@ -6,6 +6,7 @@ import {
 } from '../../core/controllers/grbl';
 import type { PlatformAdapter, SerialConnection } from '../../platform/types';
 import { useLaserStore } from './laser-store';
+import { disconnectOnTestClock } from './laser-disconnect-testing';
 
 type FakeConnection = SerialConnection & {
   readonly emitLine: (line: string) => void;
@@ -85,7 +86,7 @@ async function connect(connection: FakeConnection): Promise<void> {
 
 afterEach(async () => {
   vi.useRealTimers();
-  await useLaserStore.getState().disconnect();
+  await disconnectOnTestClock();
 });
 
 describe('serial connection epoch guards', () => {

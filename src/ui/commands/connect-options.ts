@@ -1,5 +1,13 @@
+import { selectControllerDriver } from '../../core/controllers';
 import type { DeviceProfile } from '../../core/devices';
 import type { ConnectControllerOptions } from '../state/laser-store';
+
+/** The profile's driver has no live transport (ADR-097: Ruida .rd export), so
+ *  no Connect surface can open one for it (audit RU-6). */
+export function hasFileOnlyTransport(device: DeviceProfile): boolean {
+  const driver = selectControllerDriver(device.controllerKind, device.controllerCommandSet);
+  return driver.capabilities.transport === 'file-only';
+}
 
 // The menu Connect command must open the transport with the SAME controller
 // driver and baud the rail's Connect uses. A bare connect() resolves to the

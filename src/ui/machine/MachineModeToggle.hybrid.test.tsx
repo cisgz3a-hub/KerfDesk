@@ -1,6 +1,7 @@
 import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import type { ControllerKind, DeviceProfile } from '../../core/devices';
 import { DEFAULT_CNC_MACHINE_CONFIG, LASER_MACHINE_CONFIG, machineKindOf } from '../../core/scene';
 import { useStore } from '../state';
 import { resetStore } from '../state/test-helpers';
@@ -131,3 +132,60 @@ describe('MachineModeToggle machine capability', () => {
     }
   });
 });
+
+// CN-2 (2026-09-25 controller audit): an unlabelled profile whose controller
+// cannot run KerfDesk CNC jobs used to switch to CNC without a word.
+describe('MachineModeToggle controller fact', () => {
+  it('warns with the GRBL-family reason on an unlabelled Marlin profile, and still switches', async () => {
+    useStore.setState((state) => ({
+      project: {
+        ...state.project,
+        device: unlabelledDevice(state.project.device, 'marlin'),
+        machine: LASER_MACHINE_CONFIG,
+      },
+    }));
+    const { host, root } = await renderToggle();
+    try {
+      const cnc = modeButton(host, 'CNC');
+      expect(cnc.dataset['capabilityWarning']).toBe('true');
+      expect(cnc.title).toContain('GRBL-family controller');
+      expect(modeButton(host, 'Laser').dataset['capabilityWarning']).toBeUndefined();
+      await act(async () => cnc.click());
+      expect(machineKindOf(useStore.getState().project.machine)).toBe('cnc');
+      expect(useToastStore.getState().toasts.at(-1)).toMatchObject({
+        variant: 'warning',
+        message: expect.stringContaining(
+          "this profile's controller (Marlin) cannot run KerfDesk CNC jobs",
+        ),
+      });
+    } finally {
+      await act(async () => root.unmount());
+      host.remove();
+    }
+  });
+
+  it('says nothing for an unlabelled GRBL-family profile', async () => {
+    useStore.setState((state) => ({
+      project: {
+        ...state.project,
+        device: unlabelledDevice(state.project.device, 'grblhal'),
+        machine: LASER_MACHINE_CONFIG,
+      },
+    }));
+    const { host, root } = await renderToggle();
+    try {
+      const cnc = modeButton(host, 'CNC');
+      expect(cnc.dataset['capabilityWarning']).toBeUndefined();
+      await act(async () => cnc.click());
+      expect(useToastStore.getState().toasts).toEqual([]);
+    } finally {
+      await act(async () => root.unmount());
+      host.remove();
+    }
+  });
+});
+
+function unlabelledDevice(device: DeviceProfile, controllerKind: ControllerKind): DeviceProfile {
+  const { capabilities: _label, ...unlabelled } = device;
+  return { ...unlabelled, controllerKind };
+}

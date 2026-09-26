@@ -56,6 +56,7 @@ export function buildFrameDispatchPlan(
     ),
     buildRetract: refs.driver.commands.buildFrameRetract,
     zFeed: feeds.zMmPerMin,
+    cncJobsSupported: refs.driver.capabilities.cncJobs,
   });
   if (motion.kind === 'blocked') return motion;
   return { kind: 'ready', lines: [...toolOffLines, ...motion.lines] };

@@ -1,6 +1,7 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import type { PlatformAdapter, SerialConnection } from '../../platform/types';
 import { useLaserStore } from './laser-store';
+import { disconnectOnTestClock } from './laser-disconnect-testing';
 
 function silentConnection(): SerialConnection {
   return {
@@ -47,7 +48,7 @@ function adapterFor(connection: SerialConnection): PlatformAdapter {
 afterEach(async () => {
   // Real timers first: a disconnect waits on its own timeouts.
   vi.useRealTimers();
-  await useLaserStore.getState().disconnect();
+  await disconnectOnTestClock();
 });
 
 describe('connection diagnostics', () => {

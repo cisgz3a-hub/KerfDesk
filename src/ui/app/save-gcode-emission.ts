@@ -52,18 +52,38 @@ function saveGcodeOptions(
   ctx: SaveGcodeCtx,
   placement: Extract<ResolvedJobPlacement, { readonly ok: true }>,
 ): EmitGcodeOptions {
-  const evidence = {
-    ...ctx.machine,
-    ...(ctx.controllerSettings === undefined ? {} : { controllerSettings: ctx.controllerSettings }),
-  };
-  const motionOffset = trustedMotionOffsetForPreflight(ctx.project.device, placement, evidence);
   return {
-    ...runtimeCoordinatePreparationOptions(ctx.project.device, placement, evidence),
+    ...runtimeCoordinatePreparationOptions(ctx.project.device, placement, saveEvidence(ctx)),
     metadata: buildGcodeMetadata(),
     ...(placement.jobOrigin === undefined ? {} : { jobOrigin: placement.jobOrigin }),
     ...(ctx.outputScope === undefined ? {} : { outputScope: ctx.outputScope }),
-    ...(motionOffset === undefined ? {} : { preflightMotionOffset: motionOffset }),
-    ...(motionOffset === undefined ? { preflightCoordinateMode: 'relative-origin' as const } : {}),
+    ...savePreflightFrameOptions(ctx, placement),
+  };
+}
+
+/**
+ * The frame a saved export's post-compile checks use: the bed frame when the
+ * controller-to-bed offset is trusted, otherwise size-only relative checks.
+ * Shared with the Ruida .rd save (audit RU-7) so the two cannot drift apart.
+ */
+export function savePreflightFrameOptions(
+  ctx: SaveGcodeCtx,
+  placement: Extract<ResolvedJobPlacement, { readonly ok: true }>,
+): Pick<EmitGcodeOptions, 'preflightMotionOffset' | 'preflightCoordinateMode'> {
+  const motionOffset = trustedMotionOffsetForPreflight(
+    ctx.project.device,
+    placement,
+    saveEvidence(ctx),
+  );
+  return motionOffset === undefined
+    ? { preflightCoordinateMode: 'relative-origin' }
+    : { preflightMotionOffset: motionOffset };
+}
+
+function saveEvidence(ctx: SaveGcodeCtx) {
+  return {
+    ...ctx.machine,
+    ...(ctx.controllerSettings === undefined ? {} : { controllerSettings: ctx.controllerSettings }),
   };
 }
 

@@ -113,7 +113,8 @@ describe('grbl-simulator', () => {
     await conn.write('\x84');
     await conn.write('?');
     await pump(2);
-    expect(lines.at(-1)).toMatch(/^<Door:1\|.*\|FS:0,0\|.*\|Ov:100,100,100>$/);
+    // No door input: parked and ready to resume, Door:0 (report.c:491-500).
+    expect(lines.at(-1)).toMatch(/^<Door:0\|.*\|FS:0,0\|.*\|Ov:100,100,100>$/);
     await conn.write('~');
     await conn.write('?');
     await pump(2);
@@ -209,7 +210,7 @@ describe('grbl-simulator', () => {
     expect(lines).toEqual(['error:20']);
   });
 
-  it('$SLP puts the controller to sleep; soft reset wakes it', async () => {
+  it('$SLP puts the controller to sleep; soft reset wakes it into Alarm', async () => {
     const { sim, conn, lines } = await openSim();
     await pump(5);
     await conn.write('$SLP\n');
@@ -221,7 +222,10 @@ describe('grbl-simulator', () => {
     expect(lines).toEqual([]); // asleep: no replies
     await conn.write('\x18');
     await pump(5);
-    expect(sim.state().machine).toBe('Idle');
+    // Sleep cannot vouch for position: the reset comes back in Alarm (grbl
+    // protocol.c:49-54; grblHAL protocol.c:167-174; FluidNC Protocol.cpp:1158).
+    expect(sim.state().machine).toBe('Alarm');
+    expect(lines).toEqual(["Grbl 1.1f ['$' for help]", "[MSG:'$H'|'$X' to unlock]"]);
   });
 
   it('yankCable closes the port: writes fail and no lines are delivered', async () => {

@@ -189,3 +189,52 @@ describe('persistent restores and $ string values', () => {
     expect(prepared.command.wire).toBe('$Sta/SSID=My Home WiFi\n');
   });
 });
+
+// Controller audit 2026-09-25 GP-3: GRBL-family firmware runs `!`, `~` and `?`
+// the moment they arrive, even inside a comment (gnea/grbl serial.c ISR), so a
+// line carrying one is never sent as ordinary G-code. GP-4: `$C` is accepted
+// in Idle or Check mode and `$H`/`$SLP` in Idle or Alarm (system.c).
+describe('realtime characters and state-dependent $ commands', () => {
+  it.each(['!', 'M8 (air on!)', 'G0 X10 ; go!', 'G1 X1 ~', 'M5 (done?)', '$J=G91 X1 F100 ?'])(
+    'refuses %s instead of queuing a realtime byte inside a line',
+    (input) => {
+      const prepared = prepareConsoleCommand(input);
+      expect(prepared.ok).toBe(false);
+      if (!prepared.ok) expect(prepared.reason).toMatch(/acts the moment it arrives/);
+    },
+  );
+
+  it('sends a lone ~ as the realtime cycle-start byte, with no newline and no owed ack', () => {
+    expect(prepareConsoleCommand(' ~ ')).toEqual({
+      ok: true,
+      command: {
+        kind: 'realtime-cycle-start',
+        normalized: '~',
+        wire: '~',
+        requiresIdle: false,
+        requiresNoActiveOperation: true,
+        requiresConfirmation: false,
+        stateEffect: 'read-only',
+      },
+    });
+  });
+
+  it('accepts $C in Idle or Check mode, so the second $C can leave Check mode', () => {
+    expect(prepareConsoleCommand('$c')).toMatchObject({
+      ok: true,
+      command: {
+        kind: 'check-mode',
+        wire: '$C\n',
+        requiresIdle: false,
+        allowedStates: ['Idle', 'Check'],
+      },
+    });
+  });
+
+  it.each(['$H', '$HX', '$slp'])('accepts %s in Idle or Alarm, like the firmware', (input) => {
+    expect(prepareConsoleCommand(input)).toMatchObject({
+      ok: true,
+      command: { requiresIdle: false, allowedStates: ['Idle', 'Alarm'] },
+    });
+  });
+});

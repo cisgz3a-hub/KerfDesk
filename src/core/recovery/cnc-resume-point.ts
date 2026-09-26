@@ -28,21 +28,52 @@ import type { GrblStreamingMode } from '../grbl-streaming';
 import type { CncPassSpan } from '../output';
 import { countSendableLines, rawResumeLine } from './job-checkpoint';
 
-// Assumed upper bounds on acked-but-unexecuted lines, in sendable lines.
-// These are conservative safety margins (≥2x the firmware family's planner
-// block buffer plus stepper-segment prefetch), NOT firmware claims. grblHAL
-// planner sizes are driver-configurable and can be large on 32-bit MCUs, so
-// its reserve is generous; the operator's "everything before the boundary is
-// complete" confirmation remains the load-bearing check on such rigs. Ruida
-// is never a CNC target; it gets the most conservative placeholder.
-export const CNC_RESUME_PLANNER_RESERVE_LINES: Readonly<Record<ControllerKind, number>> = {
-  'grbl-v1.1': 32,
-  grblhal: 256,
-  fluidnc: 64,
-  marlin: 64,
-  smoothieware: 64,
-  ruida: 256,
+// Upper bounds on acked-but-unexecuted lines, in sendable lines. A line is
+// acknowledged once it is queued, not once it has moved: GRBL's mc_line waits
+// for planner room and then queues the block (motion_control.c:57-68), and the
+// `ok` follows gc_execute_line (protocol.c:104). So every line still waiting
+// in the planner, plus the blocks whose steps sit in the step-segment buffer,
+// can be acknowledged and unexecuted when the job stops (controller audit
+// OR-2). A pass counts as proven only below that bound.
+type PlannerReserve = {
+  /** No planner size recorded: the firmware's largest planner plus its
+   *  largest step-segment buffer. */
+  readonly unmeasured: number;
+  /** Floor under a recorded planner size: the historical conservative margin. */
+  readonly floor: number;
+  /** Step-segment buffer added to a recorded planner size. */
+  readonly segmentLag: number;
 };
+
+export const CNC_RESUME_PLANNER_RESERVES: Readonly<Record<ControllerKind, PlannerReserve>> = {
+  // BLOCK_BUFFER_SIZE 16, 15 usable (grbl planner.h:31, planner.c:500), and
+  // SEGMENT_BUFFER_SIZE 6 (stepper.h:26), with a margin.
+  'grbl-v1.1': { unmeasured: 32, floor: 32, segmentLag: 6 },
+  // `$398` "Planner buffer blocks" accepts 30..1000 (grblHAL settings.c:2485),
+  // all of them usable (planner.c:697-702); SEGMENT_BUFFER_SIZE 10 (config.h:392).
+  grblhal: { unmeasured: 1010, floor: 256, segmentLag: 10 },
+  // `planner_blocks` accepts 10..120 (FluidNC v4.0.3 MachineConfig.cpp:89) and
+  // `stepping/segments` 6..20 (Stepping.cpp:216).
+  fluidnc: { unmeasured: 140, floor: 64, segmentLag: 20 },
+  // Not CNC targets (cncJobs false); Ruida is never streamed. Placeholders.
+  marlin: { unmeasured: 64, floor: 64, segmentLag: 0 },
+  smoothieware: { unmeasured: 64, floor: 64, segmentLag: 0 },
+  ruida: { unmeasured: 256, floor: 256, segmentLag: 0 },
+};
+
+/** Sendable lines to rewind from the acknowledged count: the recorded planner
+ *  size of the run's controller when there is one, never below the floor;
+ *  otherwise the firmware's largest planner. */
+export function cncResumePlannerReserveLines(
+  controllerKind: ControllerKind,
+  plannerBlocks: number | undefined,
+): number {
+  const reserve = CNC_RESUME_PLANNER_RESERVES[controllerKind];
+  if (plannerBlocks === undefined || !Number.isFinite(plannerBlocks) || plannerBlocks <= 0) {
+    return reserve.unmeasured;
+  }
+  return Math.max(reserve.floor, Math.ceil(plannerBlocks) + reserve.segmentLag);
+}
 
 export type CncResumePointArgs = {
   readonly gcode: string;
@@ -52,6 +83,8 @@ export type CncResumePointArgs = {
   readonly controllerKind: ControllerKind;
   readonly streamingMode: GrblStreamingMode;
   readonly rxBufferBytes: number;
+  /** Usable planner blocks the run's controller reported (idle `Bf`, `$I`). */
+  readonly plannerBlocks?: number | undefined;
 };
 
 export type CncResumePoint =
@@ -79,7 +112,7 @@ export function resolveCncResumePoint(args: CncResumePointArgs): CncResumePoint 
 
   const sendableTotal = countSendableLines(args.gcode);
   const acked = Math.min(Math.max(Math.floor(args.ackedLines), 0), sendableTotal);
-  const reserve = CNC_RESUME_PLANNER_RESERVE_LINES[args.controllerKind];
+  const reserve = cncResumePlannerReserveLines(args.controllerKind, args.plannerBlocks);
   const proven = Math.max(0, acked - reserve, lastAcknowledgedToolChange(args.gcode, acked));
   if (proven >= sendableTotal) return { kind: 'after-last-pass' };
 

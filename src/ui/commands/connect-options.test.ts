@@ -1,6 +1,16 @@
 import { describe, expect, it } from 'vitest';
 import { DEFAULT_DEVICE_PROFILE } from '../../core/devices';
-import { connectOptionsForDevice } from './connect-options';
+import { profileCatalogEntryById } from '../../core/devices/profile-catalog';
+import { connectOptionsForDevice, hasFileOnlyTransport } from './connect-options';
+
+describe('hasFileOnlyTransport', () => {
+  it('marks the Ruida .rd export profile file-only and a GRBL profile not', () => {
+    const ruida = profileCatalogEntryById('generic-ruida-rd-export');
+    if (ruida === undefined) throw new Error('missing generic Ruida profile');
+    expect(hasFileOnlyTransport(ruida.profile)).toBe(true);
+    expect(hasFileOnlyTransport(DEFAULT_DEVICE_PROFILE)).toBe(false);
+  });
+});
 
 describe('connectOptionsForDevice', () => {
   it.each([true, false])('preserves the explicit background streaming choice %s', (enabled) => {

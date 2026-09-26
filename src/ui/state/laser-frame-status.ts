@@ -13,6 +13,7 @@ import {
   observeMotionStatus,
   takeNextMotionLine,
 } from './laser-motion-operation';
+import { cleanFramePopPatch } from './laser-frame-modal-restore';
 import type { LaserState } from './laser-store';
 import { pushLog } from './laser-store-helpers';
 
@@ -60,9 +61,7 @@ export function frameCompletionPatch(args: {
     Pick<LaserState, 'wcoCache' | 'workOriginActive' | 'workOriginSource'>
   >;
   readonly frameFailureMessage: string | null;
-}): Partial<
-  Pick<LaserState, 'framedRun' | 'frameTrace' | 'frameVerification' | 'lastWriteError' | 'log'>
-> {
+}): Partial<FrameCompletionFields> {
   if (args.positionInvalidated || args.frameFailureMessage !== null) return {};
   const completedFrame = cleanCompletedFrameOperation(
     args.operation,
@@ -70,6 +69,24 @@ export function frameCompletionPatch(args: {
     args.queuedFrameDispatch,
   );
   if (completedFrame === null) return {};
+  // A clean completion ran the Frame's own modal pop (laser-frame-modal-restore.ts).
+  return { ...cleanFramePopPatch(args.state), ...completedFrameProofPatch(completedFrame, args) };
+}
+
+type FrameCompletionFields = Pick<
+  LaserState,
+  | 'framedRun'
+  | 'frameTrace'
+  | 'frameVerification'
+  | 'lastWriteError'
+  | 'log'
+  | 'framePushesAwaitingPop'
+>;
+
+function completedFrameProofPatch(
+  completedFrame: FrameMotionOperation,
+  args: Parameters<typeof frameCompletionPatch>[0],
+): Partial<FrameCompletionFields> {
   const candidate = completedFrame.candidate ?? null;
   if (candidate === null) {
     // PR #288 compatibility: legacy callers attach only the verification

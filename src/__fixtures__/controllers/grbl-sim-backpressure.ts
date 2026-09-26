@@ -34,9 +34,10 @@ import {
   acceptRxBytes,
   createRxWindow,
   takeRxLine,
+  type GrblSimLineEnding,
   type GrblSimRxWindow,
 } from './grbl-sim-rx-window';
-import type { GrblSimEffect } from './grbl-sim-machine';
+import type { GrblSimEffect } from './grbl-sim-state';
 
 export type BackpressureConfig = {
   readonly plannerBlocks: number;
@@ -55,13 +56,21 @@ export type BackpressureDeps = {
   readonly runEffect: (effect: GrblSimEffect) => void;
   /** Tell the reducer one queued motion has finished executing. */
   readonly retireMotion: () => void;
+  /** False while the main loop is blocked inside a line, a hold, homing or an
+   * alarm loop (grblSimParsesLines); bytes keep piling up in the ring. */
+  readonly parsesLines: () => boolean;
+  readonly lineEnding: GrblSimLineEnding;
 };
 
 export type BackpressureFeeder = {
   /** Deliver non-realtime host bytes into the RX ring, then drain what fits. */
   readonly acceptBytes: (data: string) => void;
-  /** Drop queued blocks and buffered bytes, as a soft reset or ALARM does. */
+  /** Read what the main loop can take now (after something unblocked it). */
+  readonly drain: () => void;
+  /** Drop queued blocks and buffered bytes, as a soft reset does. */
   readonly reset: () => void;
+  /** Drop queued blocks but keep the ring, as an alarm without a reset does. */
+  readonly wipePlanner: () => void;
   readonly rxWindow: () => GrblSimRxWindow;
   readonly planner: () => GrblSimPlanner;
 };
@@ -121,12 +130,19 @@ export function createBackpressureFeeder(
   };
 
   const drain = (): void => {
-    while (!isPlannerBlocked(planner)) {
-      const taken = takeRxLine(rx);
-      if (taken.line === null) return;
+    while (!isPlannerBlocked(planner) && deps.parsesLines()) {
+      const taken = takeRxLine(rx, deps.lineEnding);
       rx = taken.window;
+      if (taken.line === null) return;
       consume(taken.line);
     }
+  };
+
+  const dropQueuedMotion = (): void => {
+    if (retireTimer !== null) clearTimeout(retireTimer);
+    retireTimer = null;
+    planner = wipePlanner(planner);
+    withheld = [];
   };
 
   return {
@@ -134,13 +150,12 @@ export function createBackpressureFeeder(
       rx = acceptRxBytes(rx, data);
       drain();
     },
+    drain,
     reset: () => {
-      if (retireTimer !== null) clearTimeout(retireTimer);
-      retireTimer = null;
-      planner = wipePlanner(planner);
-      withheld = [];
-      rx = { ...rx, pending: '' };
+      dropQueuedMotion();
+      rx = { ...rx, pending: '', lastEol: null };
     },
+    wipePlanner: dropQueuedMotion,
     rxWindow: () => rx,
     planner: () => planner,
   };

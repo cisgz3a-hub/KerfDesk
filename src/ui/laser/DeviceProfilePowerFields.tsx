@@ -10,6 +10,10 @@ import {
   profileSupportsCapability,
   type DeviceProfile,
 } from '../../core/devices';
+import {
+  SMOOTHIE_FULL_POWER_S,
+  SMOOTHIE_FULL_POWER_S_REASON,
+} from '../../core/devices/smoothie-power-scale';
 import { NumberField as ClearableNumberField } from '../common/NumberField';
 import { numInputStyle, Row } from './device-settings-shared';
 import { PresetAirAssistOffer } from './PresetAirAssistOffer';
@@ -33,20 +37,24 @@ export function LaserPowerRows(props: DeviceRowsProps): JSX.Element {
   return (
     <>
       <Row label={labels.max}>
-        <ClearableNumberField
-          min={1}
-          max={MAX_POWER_S}
-          step={1}
-          value={device.maxPowerS}
-          onCommit={(v) => update({ maxPowerS: Math.floor(v) })}
-          style={numInputStyle}
-          ariaLabel={grblLabels ? 'GRBL $30 max power S' : 'Maximum laser power S'}
-          title={
-            grblLabels
-              ? "Maximum GRBL spindle/laser S value. Match your controller's $30 setting."
-              : 'Maximum S value expected by the selected firmware and laser output mode.'
-          }
-        />
+        {device.controllerKind === 'smoothieware' ? (
+          <SmoothieFullPowerS device={device} update={update} />
+        ) : (
+          <ClearableNumberField
+            min={1}
+            max={MAX_POWER_S}
+            step={1}
+            value={device.maxPowerS}
+            onCommit={(v) => update({ maxPowerS: Math.floor(v) })}
+            style={numInputStyle}
+            ariaLabel={grblLabels ? 'GRBL $30 max power S' : 'Maximum laser power S'}
+            title={
+              grblLabels
+                ? "Maximum GRBL spindle/laser S value. Match your controller's $30 setting."
+                : 'Maximum S value expected by the selected firmware and laser output mode.'
+            }
+          />
+        )}
       </Row>
       <Row label={labels.min}>
         <ClearableNumberField
@@ -80,6 +88,37 @@ export function LaserPowerRows(props: DeviceRowsProps): JSX.Element {
         </label>
       </Row>
     </>
+  );
+}
+
+// Smoothieware keeps S in 12-bit 1.11 fixed point, so Full-power S is held at 1
+// (smoothie-power-scale.ts). A saved profile that still holds another value is
+// shown as it is, with an explicit one-click correction: saved values are never
+// migrated silently (ADR-322 §6), and Job Review warns until it is fixed.
+function SmoothieFullPowerS({ device, update }: DeviceRowsProps): JSX.Element {
+  const held = device.maxPowerS === SMOOTHIE_FULL_POWER_S;
+  return (
+    <span style={lockedFieldStyle}>
+      <input
+        type="number"
+        value={device.maxPowerS}
+        disabled
+        readOnly
+        style={numInputStyle}
+        aria-label="Maximum laser power S"
+        title={SMOOTHIE_FULL_POWER_S_REASON}
+      />
+      {held ? null : (
+        <button
+          type="button"
+          onClick={() => update({ maxPowerS: SMOOTHIE_FULL_POWER_S })}
+          title={SMOOTHIE_FULL_POWER_S_REASON}
+        >
+          Set to {SMOOTHIE_FULL_POWER_S}
+        </button>
+      )}
+      <span style={lockedReasonStyle}>{SMOOTHIE_FULL_POWER_S_REASON}</span>
+    </span>
   );
 }
 
@@ -178,6 +217,19 @@ export function FireControlRow({ device, update }: DeviceRowsProps): JSX.Element
     </Row>
   );
 }
+
+const lockedFieldStyle: React.CSSProperties = {
+  display: 'flex',
+  alignItems: 'center',
+  flexWrap: 'wrap',
+  gap: 6,
+};
+
+const lockedReasonStyle: React.CSSProperties = {
+  flexBasis: '100%',
+  fontSize: 11,
+  color: 'var(--lf-text-muted)',
+};
 
 const inlineLabelStyle: React.CSSProperties = {
   display: 'inline-flex',

@@ -13,10 +13,18 @@ export type JobInterruptionKind =
  * reboot): how many lines were acknowledged then, and how many planner blocks
  * were still waiting to move. An acknowledgement means "parsed", not
  * "moved", so this bounds how far the automatic restart must step back.
+ *
+ * Zero queued blocks is a frontier too: the planner was empty at that report,
+ * so every line acknowledged by then had run and only later ones may not have.
+ * When no status report showed the backlog (stock GRBL and FluidNC print no
+ * `Bf` at `$10=1`; Smoothieware never does), `bound: 'planner-size'` records
+ * the controller's whole planner at the acknowledgement count of the stop
+ * (controller audit OR-3).
  */
 export type PlannerBacklog = {
   readonly ackedAtStatus: number;
   readonly queuedBlocks: number;
+  readonly bound?: 'planner-size';
 };
 
 export type JobInterruption = {
@@ -61,8 +69,10 @@ function parsePlannerBacklog(value: unknown): PlannerBacklog | undefined | null 
   if (!isRecord(value)) return null;
   const ackedAtStatus = value['ackedAtStatus'];
   const queuedBlocks = value['queuedBlocks'];
+  const bound = value['bound'];
   if (!isNonNegativeInteger(ackedAtStatus) || !isNonNegativeInteger(queuedBlocks)) return null;
-  return { ackedAtStatus, queuedBlocks };
+  if (bound !== undefined && bound !== 'planner-size') return null;
+  return { ackedAtStatus, queuedBlocks, ...(bound === undefined ? {} : { bound }) };
 }
 
 function isNonNegativeInteger(value: unknown): value is number {
