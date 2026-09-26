@@ -116,7 +116,9 @@ describe('Line + fill trace', () => {
     const outlines = fills(paths).flatMap((p) => p.polylines);
     expect(outlines).toHaveLength(1);
     const box = bbox(outlines[0]?.points ?? []);
-    expect(box.minX).toBeCloseTo(100, 0);
+    // The junction may carry the fill a pixel into the pen line (see below).
+    expect(box.minX).toBeGreaterThan(98);
+    expect(box.minX).toBeLessThan(100.5);
     expect(box.maxX).toBeCloseTo(140, 0);
     expect(box.minY).toBeCloseTo(30, 0);
     expect(box.maxY).toBeCloseTo(70, 0);
@@ -129,12 +131,18 @@ describe('Line + fill trace', () => {
     const paths = traceHybridPaths(toImage(mixedDrawing()), HYBRID);
     const horizontal = strokes(paths)
       .flatMap((p) => p.polylines)
-      .find((line) => Math.abs((line.points[0]?.y ?? 0) - 50.5) < 2 && line.points.length > 2);
+      .find((line) => line.points.every((p) => Math.abs(p.y - 50.5) < 2));
     expect(horizontal).toBeDefined();
     const box = bbox(horizontal?.points ?? []);
-    // Reaches the block's left edge at x = 100 (no gap) and stops there.
-    expect(box.maxX).toBeGreaterThanOrEqual(99.5);
-    expect(box.maxX).toBeLessThanOrEqual(101.5);
+    expect(box.minX).toBeLessThan(13);
+    // Reaches the block (its left edge is x = 100) and stops on the fill
+    // outline, which bulges at most a pixel into the pen line there.
+    const outline = fills(paths).flatMap((p) => p.polylines)[0]?.points ?? [];
+    const end = { x: box.maxX, y: 50.5 };
+    const gap = Math.min(...outline.map((p) => Math.hypot(p.x - end.x, p.y - end.y)));
+    expect(box.maxX).toBeGreaterThanOrEqual(98.5);
+    expect(box.maxX).toBeLessThanOrEqual(101);
+    expect(gap).toBeLessThan(1);
   });
 
   it('gives each constant-width pen line its measured width', () => {

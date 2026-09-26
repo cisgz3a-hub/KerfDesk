@@ -11,32 +11,63 @@ const MARCH_STEP_PX = 0.25;
 /** A stroke whose width spread (p10..p90) stays under this fraction of its
  *  median width is a constant-width pen line and carries its width. */
 export const CONSTANT_WIDTH_SPREAD = 0.25;
-const MIN_WIDTH_SAMPLES = 3;
+const SAMPLE_STEP_PX = 0.5;
+const WINDOW_PX = 6;
 
 export type StrokeWidthProfile = {
   readonly medianPx: number;
   readonly spreadPx: number;
 };
 
-/** Widths across the stroke at its samples, or null when too short to say. */
+/** Widths across the stroke, or null when it is too short to say. Widths are
+ *  measured every half pixel, then averaged over a few-pixel window: a
+ *  diagonal hairline's staircase makes single cross-sections swing by a pixel
+ *  even when the pen width never changed. */
 export function strokeWidthProfile(
   points: ReadonlyArray<Vec2>,
   mask: InkMask,
   maxWidthPx: number,
 ): StrokeWidthProfile | null {
-  const widths: number[] = [];
+  const samples = resample(points, SAMPLE_STEP_PX);
   const limit = maxWidthPx * 2 + 2;
-  for (let i = 0; i < points.length; i += 1) {
-    const p = points[i];
-    const normal = normalAt(points, i);
+  const widths: number[] = [];
+  for (let i = 0; i < samples.length; i += 1) {
+    const p = samples[i];
+    const normal = normalAt(samples, i);
     if (p === undefined || normal === null) continue;
-    const width = march(mask, p, normal, limit) + march(mask, p, negate(normal), limit);
-    if (width > 0) widths.push(width);
+    widths.push(march(mask, p, normal, limit) + march(mask, p, negate(normal), limit));
   }
-  if (widths.length < MIN_WIDTH_SAMPLES) return null;
-  widths.sort((a, b) => a - b);
-  const at = (q: number): number => widths[Math.min(widths.length - 1, Math.floor(q * widths.length))] ?? 0;
+  const window = Math.max(1, Math.round(WINDOW_PX / SAMPLE_STEP_PX));
+  if (widths.length < window) return null;
+  const means: number[] = [];
+  let sum = 0;
+  for (let i = 0; i < widths.length; i += 1) {
+    sum += widths[i] ?? 0;
+    if (i >= window) sum -= widths[i - window] ?? 0;
+    if (i >= window - 1) means.push(sum / window);
+  }
+  means.sort((a, b) => a - b);
+  const at = (q: number): number => means[Math.min(means.length - 1, Math.floor(q * means.length))] ?? 0;
   return { medianPx: at(0.5), spreadPx: at(0.9) - at(0.1) };
+}
+
+function resample(points: ReadonlyArray<Vec2>, step: number): Vec2[] {
+  const out: Vec2[] = [];
+  let carry = 0;
+  for (let i = 1; i < points.length; i += 1) {
+    const a = points[i - 1];
+    const b = points[i];
+    if (a === undefined || b === undefined) continue;
+    const length = Math.hypot(b.x - a.x, b.y - a.y);
+    let at = carry;
+    while (at < length) {
+      const t = at / length;
+      out.push({ x: a.x + (b.x - a.x) * t, y: a.y + (b.y - a.y) * t });
+      at += step;
+    }
+    carry = at - length;
+  }
+  return out;
 }
 
 /** The pen width a near-constant stroke carries, else undefined. */
