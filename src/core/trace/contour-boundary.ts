@@ -131,6 +131,8 @@ function crackCrossing(
   const inkY = Math.floor(midY + MID_CRACK_T * rightY);
   const bgX = Math.floor(midX - MID_CRACK_T * rightX);
   const bgY = Math.floor(midY - MID_CRACK_T * rightY);
+  const placed = field.crackCrossingAt?.(inkX, inkY, bgX, bgY);
+  if (placed !== undefined) return placed;
   const inkLuma = field.lumaAt(inkX, inkY);
   const bgLuma = field.lumaAt(bgX, bgY);
   if (bgLuma >= SATURATED_BG_LUMA && inkLuma <= SATURATED_INK_LUMA) return MID_CRACK_T;

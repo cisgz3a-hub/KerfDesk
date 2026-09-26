@@ -40,6 +40,24 @@ function scaled(area: Rect, scale: number): Rect {
     height: area.height * scale,
   };
 }
+// Every 4-neighbour ink/paper pair of a prepared mask, as [inkX, inkY, bgX, bgY].
+function edgeCracks(mask: RawImageData): Array<readonly [number, number, number, number]> {
+  const { width, height, data } = mask;
+  const inkAt = (x: number, y: number): boolean => data[(y * width + x) * 4] === 0;
+  const cracks: Array<readonly [number, number, number, number]> = [];
+  const add = (x: number, y: number, nx: number, ny: number): void => {
+    if (nx >= width || ny >= height || inkAt(x, y) === inkAt(nx, ny)) return;
+    cracks.push(inkAt(x, y) ? [x, y, nx, ny] : [nx, ny, x, y]);
+  };
+  for (let y = 0; y < height; y += 1) {
+    for (let x = 0; x < width; x += 1) {
+      add(x, y, x + 1, y);
+      add(x, y, x, y + 1);
+    }
+  }
+  return cracks;
+}
+
 function artwork(scale = 1): RawImageData {
   const image = blank(255, scale);
   rect(image, scaled(solid, scale), 0);
@@ -141,14 +159,29 @@ describe('explicit coherent faint-line recovery', () => {
   it('keeps alpha interpretation ahead of faint-line detection', () => {
     const image = artwork();
     image.data[3] = 0;
+    // A transparent margin with a soft alpha column gives the alpha route
+    // real edge cracks to place.
+    for (let y = 0; y < image.height; y += 1)
+      for (let x = 0; x <= 20; x += 1) image.data[(y * image.width + x) * 4 + 3] = x < 20 ? 0 : 100;
     const options = {
       ...TRACE_PRESETS['Line Art']!,
       traceTransparency: true,
       sourceHasTransparency: true,
     };
-    expect(prepareTraceForContour(image, { ...options, faintLineRecovery: true })).toEqual(
-      prepareTraceForContour(image, options),
-    );
+    const recovered = prepareTraceForContour(image, { ...options, faintLineRecovery: true });
+    const plain = prepareTraceForContour(image, options);
+    expect(recovered.prepared).toEqual(plain.prepared);
+    // Both carry the alpha route's band field (ADR-456), never faint-line's:
+    // no single threshold, and the same crossing on every edge crack.
+    expect(recovered.crackField?.thresholdAt(5, 5)).toBeNaN();
+    expect(plain.crackField?.thresholdAt(5, 5)).toBeNaN();
+    const cracks = edgeCracks(plain.prepared);
+    expect(cracks.length).toBeGreaterThan(100);
+    for (const [ix, iy, bx, by] of cracks) {
+      const crossing = plain.crackField?.crackCrossingAt?.(ix, iy, bx, by);
+      expect(crossing).toBeDefined();
+      expect(recovered.crackField?.crackCrossingAt?.(ix, iy, bx, by)).toBe(crossing);
+    }
   });
 
   it.each(['Line Art', 'Sharp'])(
