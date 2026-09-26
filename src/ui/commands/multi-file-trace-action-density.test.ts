@@ -106,7 +106,7 @@ async function exportOne(
   natural: { readonly width: number; readonly height: number },
   grid: { readonly width: number; readonly height: number } = natural,
 ): Promise<ReturnType<typeof svgSize> & { readonly densitySource: string | undefined }> {
-  const files = await buildMultiFileTraceExports([file], {
+  const { files } = await buildMultiFileTraceExports([file], {
     loadImage: async () => rawImage(grid.width, grid.height),
     readNaturalSize: async () => natural,
     trace: async () => [SQUARE_PATH],
@@ -114,7 +114,7 @@ async function exportOne(
     deviceMemoryGb: 8,
   });
   expect(files).toHaveLength(1);
-  return { ...svgSize(files[0]!.svg), densitySource: files[0]!.densitySource };
+  return { ...svgSize(files[0]!.text), densitySource: files[0]!.densitySource };
 }
 
 describe('Multi-File Trace embedded density', () => {
@@ -128,10 +128,9 @@ describe('Multi-File Trace embedded density', () => {
     // 1200 px / 300 DPI = 4 in = 101.6 mm; 600 px = 50.8 mm (not 120 x 60 mm).
     expect(size.widthMm).toBeCloseTo(101.6, 6);
     expect(size.heightMm).toBeCloseTo(50.8, 6);
-    expect(size.viewBox).toEqual([0, 0, 600, 300]);
-    // One viewBox unit is one traced cell: 101.6 / 600 mm on both axes.
-    expect(size.widthMm / size.viewBox[2]!).toBeCloseTo(25.4 / 150, 9);
-    expect(size.heightMm / size.viewBox[3]!).toBeCloseTo(25.4 / 150, 9);
+    // The viewBox is in millimetres (ADR-431), so the traced 600 x 300 grid
+    // is scaled onto the density-sized page: one viewBox unit is one mm.
+    expect(size.viewBox).toEqual([0, 0, 101.6, 50.8]);
   });
 
   it('sizes a JPEG with a 150 DPI JFIF density at 150 DPI', async () => {
@@ -143,8 +142,7 @@ describe('Multi-File Trace embedded density', () => {
     // 900 px / 150 DPI = 6 in = 152.4 mm; 450 px = 76.2 mm.
     expect(size.widthMm).toBeCloseTo(152.4, 6);
     expect(size.heightMm).toBeCloseTo(76.2, 6);
-    expect(size.viewBox).toEqual([0, 0, 900, 450]);
-    expect(size.widthMm / size.viewBox[2]!).toBeCloseTo(25.4 / 150, 9);
+    expect(size.viewBox).toEqual([0, 0, 152.4, 76.2]);
   });
 
   it('keeps the 254 DPI default for a file with no embedded density', async () => {
@@ -168,12 +166,12 @@ describe('Multi-File Trace embedded density', () => {
     });
     expect(png.widthMm).toBeCloseTo(50.8, 6);
     expect(png.heightMm).toBeCloseTo(101.6, 6);
-    expect(png.viewBox).toEqual([0, 0, 600, 600]);
-    expect(png.widthMm / png.viewBox[2]!).toBeCloseTo(25.4 / 300, 9);
-    expect(png.heightMm / png.viewBox[3]!).toBeCloseTo(25.4 / 150, 9);
-    // "meet" would draw the 600 x 600 grid as a 50.8 mm square inside a
-    // 50.8 x 101.6 mm box; the stated size is only honoured with "none".
-    expect(png.aspect).toBe('none');
+    // Each axis is scaled on its own into the millimetre viewBox, so the
+    // square 600 x 600 grid lands on a 1:2 viewBox.
+    expect(png.viewBox).toEqual([0, 0, 50.8, 101.6]);
+    // The viewBox already has the page's 1:2 shape, so "meet" fills the
+    // stated 50.8 x 101.6 mm box exactly instead of letterboxing a square.
+    expect(png.aspect).toBe('xMidYMid meet');
 
     const jpeg = await exportOne(imageFile('aniso.jpg', jpegJfifBytes(200, 100)), {
       width: 400,
@@ -189,7 +187,7 @@ describe('Multi-File Trace embedded density', () => {
       const grid = scaleToCap(natural.width, natural.height, maxEdge ?? PREVIEW_MAX_EDGE_PX);
       return rawImage(grid.width, grid.height);
     });
-    const files = await buildMultiFileTraceExports(
+    const { files } = await buildMultiFileTraceExports(
       [imageFile('scan.png', pngBytes({ x: 23622, y: 23622 }))],
       {
         loadImage,
@@ -209,15 +207,15 @@ describe('Multi-File Trace embedded density', () => {
     );
     expect(plan).not.toBeNull();
     expect(loadImage).toHaveBeenCalledWith(expect.anything(), plan!.maxEdge);
-    expect(svgSize(files[0]!.svg).widthMm).toBeCloseTo(254, 6);
+    expect(svgSize(files[0]!.text).widthMm).toBeCloseTo(254, 6);
   });
 
   it('applies the density when only a decoder is injected', async () => {
-    const files = await buildMultiFileTraceExports(
+    const { files } = await buildMultiFileTraceExports(
       [imageFile('small.png', pngBytes({ x: 11811, y: 11811 }))],
       { loadImage: async () => rawImage(300, 150), trace: async () => [SQUARE_PATH] },
     );
-    const size = svgSize(files[0]!.svg);
+    const size = svgSize(files[0]!.text);
     expect(size.widthMm).toBeCloseTo(25.4, 6);
     expect(size.heightMm).toBeCloseTo(12.7, 6);
   });
