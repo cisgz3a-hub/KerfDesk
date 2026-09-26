@@ -18,6 +18,11 @@
 //  * A software safety door (0x84) with no door input reports Door:0 once
 //    parked (system.c:87-93 system_check_safety_door_ajar() is false without
 //    ENABLE_SAFETY_DOOR_INPUT_PIN; report.c:491-500).
+//  * A soft reset in a completed feed hold or door raises no alarm, even with
+//    motion still queued: the hold's completion (EXEC_CYCLE_STOP in
+//    protocol_exec_rt_system) clears STEP_CONTROL_EXECUTE_HOLD, so mc_reset
+//    finds no motion to kill. The reboot drops the queued blocks and the G92
+//    offset but keeps the machine position.
 //  * ALARM:1 and ALARM:2 (hard and soft limit) print `[MSG:Reset to continue]`
 //    and loop until a soft reset, answering no status query (protocol.c:226-236).
 //  * A soft reset from Alarm or Sleep comes back in Alarm with the unlock
@@ -37,8 +42,7 @@
 //  * A feed hold or door completes at once (no Hold:1 / Door:2 deceleration,
 //    no Door:3 restore delays), `!` in Jog holds instead of cancelling the jog,
 //    `!` from Idle is ignored, and M3-M9 do not wait for the planner to drain.
-//  * A soft reset with motion still queued raises ALARM:3 even from a completed
-//    hold, and a reset during homing raises ALARM:3 rather than ALARM:6.
+//  * A reset during homing raises ALARM:3 rather than ALARM:6.
 //  * `$$`, `$I`, `$#` and `$G` are answered immediately in every state.
 //  * Motion position is applied at command time; state stays Run/Jog until the
 //    scheduled motion-finished event, then reports Idle.
@@ -270,11 +274,13 @@ function reduceCycleStart(state: GrblSimState, opts: GrblSimOptions): GrblSimRea
 }
 
 function reduceSoftReset(state: GrblSimState, opts: GrblSimOptions): GrblSimReaction {
+  // Holds complete at once here (see header), so Hold and Door are settled.
+  const heldSettled = state.machine === 'Hold' || state.machine === 'Door';
   const wasMoving =
     state.machine === 'Run' ||
     state.machine === 'Jog' ||
     state.machine === 'Home' ||
-    state.pendingMotions > 0;
+    (state.pendingMotions > 0 && !heldSettled);
   const base: GrblSimState = {
     ...state,
     pendingMotions: 0,
