@@ -191,6 +191,15 @@ function restoredField(grid: SupportGrid, original: CrackSubPixelField | null): 
       return inkAt(grid.enlarged, y * grid.enlarged.width + x) ? 0 : 255;
     },
     thresholdAt: (x, y) => (patched(x, y) ? 128 : (original?.thresholdAt(x, y) ?? 128)),
+    // Unpatched cracks keep the original field's edge placement (ADR-453).
+    ...(original?.crackCrossingAt === undefined
+      ? {}
+      : {
+          crackCrossingAt: (inkX: number, inkY: number, bgX: number, bgY: number) =>
+            patched(inkX, inkY) || patched(bgX, bgY)
+              ? undefined
+              : original.crackCrossingAt?.(inkX, inkY, bgX, bgY),
+        }),
   };
 }
 

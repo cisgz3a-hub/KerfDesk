@@ -68,6 +68,17 @@ export type CrackSubPixelField = {
    *  the cut may be either class (the brightness band's cut is inclusive,
    *  the global and sketch cuts are strict), so consumers accept both. */
   readonly thresholdAt: (x: number, y: number) => number;
+  /** Optional edge placement for the contour walker only: the crossing t
+   *  (0 = paper pixel centre, 1 = ink pixel centre) of the crack between
+   *  ink pixel (inkX,inkY) and paper pixel (bgX,bgY), or undefined for the
+   *  interpolation against thresholdAt. Saddle decisions and cleanup never
+   *  read it, so it moves vertices without touching topology (ADR-453). */
+  readonly crackCrossingAt?: (
+    inkX: number,
+    inkY: number,
+    bgX: number,
+    bgY: number,
+  ) => number | undefined;
 };
 
 // A saturated luma step (paper-white against full ink) contains NO sub-pixel

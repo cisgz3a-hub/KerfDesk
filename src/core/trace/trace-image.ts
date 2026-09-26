@@ -25,6 +25,7 @@
 import { finiteOr } from '../util';
 import type { CrackSubPixelField } from './contour-boundary';
 import { cleanupSaddlePolicy } from './saddle-connectivity';
+import { bandCrackField, withPlateauCrossing, type ScalarPlane } from './crack-iso-levels';
 import type { TraceOptions } from './trace-option-types';
 import { fillPinholes } from './fill-pinholes';
 import { hexToRgba } from './hex-to-rgba';
@@ -164,7 +165,10 @@ export function prepareTraceForContour(
       options.cutoffLuma ?? 0,
       options.thresholdLuma ?? 128,
     );
-    return { prepared: cleanBinaryMask(prepared, options, null), crackField: null };
+    return {
+      prepared: cleanBinaryMask(prepared, options, null),
+      crackField: alphaBandField(image, options.cutoffLuma ?? 0, options.thresholdLuma ?? 128),
+    };
   }
   const adjusted = applyImageAdjustments(image, options);
   if (options.faintLineRecovery !== true && shouldUseSketchTrace(image, options)) {
@@ -214,7 +218,46 @@ export function prepareTraceForContour(
     return { ...recovered, median, prepared: cleaned };
   }
   const cleanedMask = cleanBinaryMask(thresholded.prepared, options, field);
-  return { prepared: cleanedMask, crackField: field, median };
+  const walkerField = walkerCrackField(leveled, options, thresholded, field);
+  return { prepared: cleanedMask, crackField: walkerField, median };
+}
+
+// Edge placement for the contour walker only (ADR-453, ADR-456); the
+// cleanup and recovery stages above keep reading `field`, so the mask and
+// its topology are unchanged. A Cutoff > 0 band gets per-crack band edges;
+// the automatic cut gets the plateau mid-level and ribbon levels.
+function walkerCrackField(
+  leveled: RawImageData,
+  options: TraceOptions,
+  thresholded: { readonly prepared: RawImageData; readonly thresholdLuma: number | null },
+  field: CrackSubPixelField | null,
+): CrackSubPixelField | null {
+  const cutoff = options.cutoffLuma;
+  if (cutoff !== undefined && cutoff !== 0) {
+    const upper = options.thresholdLuma ?? 128;
+    const lo = clampLuma(Math.min(cutoff, upper));
+    return bandCrackField(lumaPlane(leveled), lo, clampLuma(Math.max(cutoff, upper)));
+  }
+  const cut = thresholded.thresholdLuma;
+  const automatic = options.useOtsuThreshold === true && options.thresholdLuma === undefined;
+  if (field === null || cut === null || cutoff !== undefined || !automatic) return field;
+  const { data } = thresholded.prepared;
+  const ink = new Uint8Array(leveled.width * leveled.height);
+  for (let p = 0; p < ink.length; p += 1) ink[p] = data[p * 4] === 0 ? 1 : 0;
+  return withPlateauCrossing(field, lumaPlane(leveled), ink, cut, effectivePixelScale(options));
+}
+
+function lumaPlane(image: RawImageData): ScalarPlane {
+  return { width: image.width, height: image.height, values: lumaBuffer(image) };
+}
+
+// The alpha route cuts 255 − alpha with the same band as luma (ADR-456).
+function alphaBandField(image: RawImageData, cutoff: number, threshold: number): CrackSubPixelField {
+  const values = new Uint8Array(image.width * image.height);
+  for (let p = 0; p < values.length; p += 1) values[p] = 255 - (image.data[p * 4 + 3] ?? 255);
+  const plane = { width: image.width, height: image.height, values };
+  const lo = clampLuma(Math.min(cutoff, threshold));
+  return bandCrackField(plane, lo, clampLuma(Math.max(cutoff, threshold)));
 }
 
 // Mask cleanup is the shared tail of every preprocessing branch: despeckle
