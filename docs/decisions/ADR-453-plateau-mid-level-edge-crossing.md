@@ -1,6 +1,6 @@
 ## ADR-453 - Automatic-cut edges cross at the local plateau mid-level (2026-09-27)
 
-**Status:** Proposed (open: per-fixture IoU losses, see Bake-off). | **Date:** 2026-09-27
+**Status:** Accepted | **Date:** 2026-09-27
 
 Amends the sub-pixel crack field of ADR-128 (measured boundary) for the automatic (Otsu) cut used by
 Smooth (the CNC default) and Sharp. The binary mask, despeckle, pinhole fill, saddle decisions and
@@ -31,7 +31,8 @@ crossing level needs the two plateaus, not the kernel.
    `walker-crack-field.ts` on the automatic cut only). For each crack, the (2r+1)^2 block just past
    the ink pixel (r = 1 source px x pixelScale, reaching 2r + 2 px along the normal) must be all ink
    in the mask, and the block just past the paper pixel all paper. The crack then crosses at the
-   mean of those two blocks' luma, halved. The crossing keeps the walker's gates (saturated steps
+   mid-level of the two blocks' extremes (darkest ink value, lightest paper value): the ramp of this
+   or an opposite edge reaching into a block only pulls its extreme the other way. The crossing keeps the walker's gates (saturated steps
    and cracks the cut does not straddle keep the midpoint; t is clamped to 0.1-0.9, so an edge never
    leaves the mask's own crack).
 3. **Thin features keep the cut.** A crack that fails either block (a hairline, a narrow counter or
@@ -39,7 +40,15 @@ crossing level needs the two plateaus, not the kernel.
    direction, so diagonal hairlines fail it as well as axis-aligned ones.
 4. **Local, not global, levels.** A first version took global levels (25%/75% quantiles of each Otsu
    class). An edge against grey paper then crossed at the wrong level: a disc half on 150-grey paper
-   measured +0.09 px bias. Local block means bring it to -0.007 px.
+   measured +0.09 px bias. Local block levels bring it under 0.02 px.
+5. **A 2% deadband.** A cut already within 2% of the local step from the mid-level keeps its own
+   crossing. The move would be under 0.02 px, and the finishing fits react to such a uniform nudge
+   by re-choosing vertices rather than by moving the edge: on topology.clean (cut 130 against 127.5)
+   Sharp's r = 40 rings moved only 0.008 px at the crack layer but came out with a +-0.2 px wobble,
+   -0.003 IoU. With the deadband that fixture is byte-identical to base.
+6. **Rejected level estimators.** Block means (an opposite edge's ramp pulls them; stars.scan -0.003
+   IoU), block medians (a clean 8 px bar widened by 3.5% area), extrapolating up to 0.5 px past a
+   pixel centre on blurred ramps, and blocks one width further out were all measured worse.
 
 ### Rejected: a per-component ribbon level
 
@@ -59,10 +68,10 @@ coverage (`crack-iso-levels.test.ts`):
 
 | fixture | Otsu | base | now |
 | --- | --- | --- | --- |
-| AA disc r=60 on white (Smooth, Sharp) | 125 | -0.0165 / 0.0565 | -0.0086 / 0.0567 |
-| same + 180-grey patch, 80 px | 113 | -0.0703 / 0.0904 | -0.0233 / 0.0643 |
-| same + 150-grey patch, 80 px | 109 | -0.0923 / 0.1087 | -0.0325 / 0.0719 |
-| disc half on 150-grey paper | 104 | -0.0026 / 0.1738 | -0.0065 / 0.0994 |
+| AA disc r=60 on white (Smooth, Sharp) | 125 | -0.0165 / 0.0565 | same (inside the deadband) |
+| same + 180-grey patch, 80 px | 113 | -0.0703 / 0.0904 | -0.0229 / 0.0625 |
+| same + 150-grey patch, 80 px | 109 | -0.0923 / 0.1087 | -0.0319 / 0.0705 |
+| disc, right half on 150-grey paper | 97 | -0.0427 / 0.1665 | -0.0169 / 0.0937 |
 | Line Art AA disc | - | -0.0003 / 0.0542 | unchanged (same bytes) |
 
 Where the cut lands very far below the mid-level (109 against 127.5), pixels whose coverage lies
@@ -83,22 +92,31 @@ after): see "Bake-off" below.
 
 ### Bake-off
 
-Base a10013827 vs this branch (block-mean variant), owl + hummingbird + all analytic clean/scan/
-binary fixtures (57), contestants P-default / O-default / O-smooth / O-sharp:
+Base a10013827 against this change (final code: block extremes + 2% deadband). Fixtures: owl,
+hummingbird, all 57 analytic clean/scan/binary fixtures and the 6 calibration placements.
+Contestants: P-default, O-default, O-smooth and O-sharp.
 
-- O-default (Line Art): all 63 O-default output files byte-identical (sha256); every metric equal.
-- owl IoU: O-smooth 0.8787 -> 0.8788, O-sharp 0.9181 -> 0.9185. Hummingbird: O-smooth
-  0.8768 -> 0.8776, O-sharp 0.9138 -> 0.9145. Area error falls about 0.2 points on both.
-- Mean IoU change over 57 fixtures: O-smooth +0.00055, O-sharp +0.00115. Mean area error:
-  O-smooth 4.88% -> 4.65%, O-sharp 2.88% -> 2.61%.
-- Per-fixture losses (block-mean variant): stars.scan -0.0030, topology.clean (Sharp) -0.0028,
-  small-squares.scan -0.0014, rounded-rects.scan -0.0014, solid-blue.scan -0.0010, a few under
-  0.0007.
-- Block-extreme variant (current code), on 24 affected fixtures x 2 presets: mean IoU change
-  +0.00016. Remaining losses: topology.clean Sharp 0.9838 -> 0.9806, solid-blue.scan
-  0.9986 -> 0.9977, rounded-rects.clean -0.0004, rotated-rects.clean Smooth -0.0004.
-- Tried and rejected: extrapolating up to 0.5 px past a pixel centre on blurred ramps (stars.scan
-  0.9889), and a block one width further out (mean IoU change -0.00008).
+- O-default (Line Art): all 63 O-default output files are byte-identical (sha256), and every
+  metric is equal. P-default is unchanged as well.
+- owl IoU: O-smooth 0.8787 -> 0.8789, O-sharp 0.9181 -> 0.9187. Area error: 3.38% -> 3.12% and
+  3.90% -> 3.67%.
+- hummingbird IoU: O-smooth 0.8768 -> 0.8773, O-sharp 0.9138 -> 0.9146. Area error: 4.94% -> 4.72%
+  and 5.75% -> 5.55%.
+- Analytic set (57): mean IoU change is +0.00101 on O-smooth and +0.00160 on O-sharp. Mean |area
+  error| goes 5.27% -> 4.99% (Smooth) and 3.28% -> 2.96% (Sharp). 29-30 fixtures per preset are
+  byte-identical to base.
+- Residual per-fixture losses, all at most 0.0008 IoU:
+  - rounded-rects.clean -0.0004 (cut 122, just outside the deadband)
+  - solid-dark-noise.scan -0.0008 (the extreme of a noisy dark block reads about 8 levels dark)
+  - solid-gold.scan -0.0003, solid-blue.clean -0.00014, solid-red.clean -0.00008. Area error
+    improves on all three.
+- Calibration thin bars (report-only placements) lose: 100x8 -0.015/-0.017 and 100x20
+  -0.007/-0.007 (Smooth/Sharp). This does not come from the crossing. The crack layer on the 8 px bar
+  improves: the top edge was 0.29 px inside the ink and is now 0.10 px inside. The measured-loop fit
+  tail then pushes the long sides of these out-of-sharpener-range loops about 0.28 px OUTWARD, on
+  base and head alike. That push is a fit-tolerance bulge on a stadium-shaped loop. At base, the
+  inward crossing bias cancelled it; with the bias removed, the bars trace 0.2-0.3 px wide. The fix
+  belongs to the fit tail (geometry-core work), not to edge placement.
 
 ### Consequences
 

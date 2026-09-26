@@ -1,6 +1,6 @@
 ## ADR-456 - Sub-pixel edges on the alpha route and Cutoff > 0 bands (2026-09-27)
 
-**Status:** Proposed (open: per-fixture IoU losses, see Bake-off). | **Date:** 2026-09-27
+**Status:** Accepted | **Date:** 2026-09-27
 
 Amends the sub-pixel crack field of ADR-128 for the two routes that had none: Trace Transparency
 (the alpha route) and brightness bands with Cutoff > 0. It uses the walker-only crossing hook of
