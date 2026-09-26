@@ -53,7 +53,8 @@ export type GcodeMetadata = {
  * ADR-368's tapered ball-nose cutter envelope and tip provenance, and the
  * 2026-09-24 CNC audit repairs: each helix revolution as two half-circle arcs,
  * inlay contours closed then opened by the bit radius, ADR-310 group order
- * under a reversed layer priority, and printable-ASCII comment text, and the
+ * under a reversed layer priority, and printable-ASCII comment text, and
+ * ADR-392's CNC park placed as a bed position that moves with the job, and the
  * 2026-09-25 controller audit repairs (ADR-398): no planner drain with an M3
  * beam lit (no between-pass re-arm, no seek to the current position, mode and
  * air changes after a group's first laser-off seek, a 1 mm dark step where a

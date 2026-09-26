@@ -160,6 +160,7 @@ export async function buildPreviewToolpathSnapshot(
     | 'registration'
     | 'contourEntryBounds'
     | 'absoluteProgramOffset'
+    | 'workZeroBedPosition'
   >,
 ): Promise<PreviewToolpath> {
   // Hydrate before the gates: this path can await, so a page-backed project

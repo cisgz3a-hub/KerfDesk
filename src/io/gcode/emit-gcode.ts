@@ -56,6 +56,8 @@ export type EmitGcodeOptions = {
   readonly contourEntryBounds?: JobBounds | null;
   /** Known bed-to-program translation for Absolute placement only. */
   readonly absoluteProgramOffset?: Vec2;
+  /** Known bed position of program zero for a placed job (ADR-392 park). */
+  readonly workZeroBedPosition?: Vec2;
   /** Program/work XY to the configured bed frame. A native controller WCO
    * must first be combined with its established native-to-bed translation. */
   readonly preflightMotionOffset?: PreflightOptions['motionOffset'];
@@ -88,6 +90,9 @@ export function emitGcode(project: Project, options: EmitGcodeOptions = {}): Emi
     ...(options.absoluteProgramOffset === undefined
       ? {}
       : { absoluteProgramOffset: options.absoluteProgramOffset }),
+    ...(options.workZeroBedPosition === undefined
+      ? {}
+      : { workZeroBedPosition: options.workZeroBedPosition }),
   });
   return emitPreparedGcode(prepared, options);
 }

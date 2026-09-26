@@ -41,6 +41,7 @@ import {
 } from './program-materialization';
 import { reliefMaterializationFailure } from './relief-materialization-failure';
 import { contourEntryBoundsForDevice, withContourEntryBounds } from '../../core/job/contour-entry';
+import { placeCncParks } from '../../core/job/job-origin';
 
 export type PrepareOutputOptions = {
   readonly jobOrigin?: JobOriginPlacement;
@@ -51,6 +52,10 @@ export type PrepareOutputOptions = {
   /** Known bed-number to controller-program translation for Absolute jobs.
    * Relative placement modes already choose their own work-coordinate target. */
   readonly absoluteProgramOffset?: Vec2;
+  /** Known bed position of program zero for a placed (non-Absolute) job. A
+   * configured CNC park is a bed position (ADR-392): without this it cannot be
+   * placed, so the job parks at its own start. */
+  readonly workZeroBedPosition?: Vec2;
 };
 
 export type PreparedOutput =
@@ -184,7 +189,13 @@ export function completePreparedOutput(
       : (input.options.jobOrigin?.startFrom ?? 'absolute') === 'absolute'
         ? offsetJobBounds(contourEntryBoundsForDevice(input.project.device), offset)
         : null;
-  const placed = withContourEntryBounds(applyJobOriginOffset(compiled, offset), entryBounds);
+  const placed = withContourEntryBounds(
+    placeCncParks(
+      applyJobOriginOffset(compiled, offset),
+      cncParkBedToProgram(input.options, offset),
+    ),
+    entryBounds,
+  );
   // Optimization preserves cut geometry/settings while reordering and possibly
   // reversing paths. Joining formerly separated paths can also change planner
   // junction timing, not only travel distance. Doing it HERE means the preview
@@ -209,6 +220,15 @@ function compileForMachine(project: Project): CncJobCompilationResult {
   return machine !== undefined && machine.kind === 'cnc'
     ? compileCncJobResult(project.scene, project.device, machine)
     : { kind: 'compiled', job: compileJob(project.scene, project.device) };
+}
+
+// Absolute artwork is in bed numbers, so its park takes the cuts' own
+// bed-to-program offset. A placed job's offset only moves the artwork's anchor
+// to its target; the park needs where program zero sits on the bed (ADR-392).
+function cncParkBedToProgram(options: PrepareOutputOptions, offset: Vec2): Vec2 | null {
+  if ((options.jobOrigin?.startFrom ?? 'absolute') === 'absolute') return offset;
+  const zero = options.workZeroBedPosition;
+  return zero === undefined ? null : { x: -zero.x, y: -zero.y };
 }
 
 function resolveJobOriginOffset(

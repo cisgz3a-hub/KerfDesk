@@ -39,7 +39,12 @@ const transferSender = new PreparationTransferSender((response, transfer) => {
 
 type PreparationOptions = Pick<
   LargeJobPreparationOptions,
-  'jobOrigin' | 'outputScope' | 'initialPosition' | 'contourEntryBounds' | 'absoluteProgramOffset'
+  | 'jobOrigin'
+  | 'outputScope'
+  | 'initialPosition'
+  | 'contourEntryBounds'
+  | 'absoluteProgramOffset'
+  | 'workZeroBedPosition'
 >;
 
 self.onmessage = (
@@ -83,6 +88,9 @@ function preparationOptions(request: PreparationWorkerRequest): PreparationOptio
     ...(request.absoluteProgramOffset === undefined
       ? {}
       : { absoluteProgramOffset: request.absoluteProgramOffset }),
+    ...(request.workZeroBedPosition === undefined
+      ? {}
+      : { workZeroBedPosition: request.workZeroBedPosition }),
     ...(request.jobOrigin === undefined ? {} : { jobOrigin: request.jobOrigin }),
     ...(request.outputScope === undefined ? {} : { outputScope: request.outputScope }),
     ...(request.initialPosition === undefined ? {} : { initialPosition: request.initialPosition }),

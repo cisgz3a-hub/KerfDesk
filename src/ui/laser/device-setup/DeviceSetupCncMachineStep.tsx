@@ -25,9 +25,10 @@ export function DeviceSetupCncMachineStep(props: {
         <strong>CNC machine limits</strong>
         <span>
           These machine-owned values control retracts, spindle output, dwell, coolant commands, and
-          end or tool-change parking. CNC mode assumes an installed, powered Z axis; choosing CNC
-          does not prove Z hardware or direction. Recorded Z travel is informational. Artwork
-          chooses its running spindle speed separately.
+          end or tool-change parking. Park X and Y are a bed position that moves with the job like
+          every cut; a job whose place on the bed is unknown parks at its origin instead. CNC mode
+          assumes an installed, powered Z axis; choosing CNC does not prove Z hardware or direction.
+          Recorded Z travel is informational. Artwork chooses its running spindle speed separately.
         </span>
       </div>
       <CncParameterRows machine={props.machine} updateParams={updateParams} />

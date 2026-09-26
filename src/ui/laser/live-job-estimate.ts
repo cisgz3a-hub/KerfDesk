@@ -34,7 +34,10 @@ export { countOutputVectorSegments };
 export const LIVE_ESTIMATE_RAW_VECTOR_SEGMENT_BUDGET = PREPARATION_RAW_VECTOR_SEGMENT_BUDGET;
 export const LIVE_ESTIMATE_COMPILED_SEGMENT_BUDGET = PREPARATION_COMPILED_SEGMENT_BUDGET;
 export type LiveJobEstimateOptions = Pick<JobDurationEstimateOptions, 'initialPosition'> &
-  Pick<PrepareOutputOptions, 'contourEntryBounds' | 'absoluteProgramOffset'>;
+  Pick<
+    PrepareOutputOptions,
+    'contourEntryBounds' | 'absoluteProgramOffset' | 'workZeroBedPosition'
+  >;
 
 export type LiveJobEstimate =
   | { readonly kind: 'empty' }

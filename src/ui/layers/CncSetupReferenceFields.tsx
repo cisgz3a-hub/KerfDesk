@@ -63,7 +63,9 @@ function machineReferenceRows(machine: CncMachineConfig): ReadonlyArray<Referenc
       label: 'Park position',
       value: parkLabel(machine),
       description:
-        'This is the Machine Setup park position used after the job and during planned bit changes.',
+        'This is the Machine Setup park position on the bed, used after the job and during planned ' +
+        'bit changes. It moves with the job like every cut; when KerfDesk cannot tell where the job ' +
+        'sits on the bed, the job parks at its origin instead (ADR-392).',
       setupField: 'park',
     },
   ];
