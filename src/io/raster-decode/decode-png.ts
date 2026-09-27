@@ -118,9 +118,11 @@ function validateHeader(header: PngHeader): void {
 }
 
 async function inflate(compressed: Uint8Array): Promise<Uint8Array> {
-  const source = new ReadableStream<Uint8Array>({
+  // A copy, so the stream holds a plain ArrayBuffer-backed view.
+  const input = new Uint8Array(compressed);
+  const source = new ReadableStream<Uint8Array<ArrayBuffer>>({
     start(controller) {
-      controller.enqueue(compressed);
+      controller.enqueue(input);
       controller.close();
     },
   });

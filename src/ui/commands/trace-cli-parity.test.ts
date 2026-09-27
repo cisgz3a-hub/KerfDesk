@@ -51,7 +51,7 @@ function sha256(text: string): string {
 }
 
 async function appSvg(image: Synthetic, png: Uint8Array, preset: string): Promise<string> {
-  const batch = await buildMultiFileTraceExports([new File([png], 'art.png')], {
+  const batch = await buildMultiFileTraceExports([new File([new Uint8Array(png)], 'art.png')], {
     loadImage: async () => compositeRgbOverWhitePreservingAlpha(rgba(image)),
     trace: traceImageToColoredPaths,
     ...(TRACE_PRESETS[preset] === undefined ? {} : { options: TRACE_PRESETS[preset] }),

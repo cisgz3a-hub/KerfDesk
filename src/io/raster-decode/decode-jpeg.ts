@@ -27,9 +27,10 @@ export function isJpeg(bytes: Uint8Array): boolean {
 }
 
 export async function decodeJpeg(bytes: Uint8Array): Promise<DecodedRaster> {
-  // @ts-expect-error pdfjs-dist ships no declarations for its image decoders.
-  const decoders =
-    (await import('pdfjs-dist/image_decoders/pdf.image_decoders.mjs')) as ImageDecodersModule;
+  const loaded: unknown =
+    // @ts-expect-error pdfjs-dist ships no declarations for its image decoders.
+    await import('pdfjs-dist/image_decoders/pdf.image_decoders.mjs');
+  const decoders = loaded as ImageDecodersModule;
   const jpeg = new decoders.JpegImage();
   jpeg.parse(bytes);
   assertRasterSize(jpeg.width, jpeg.height);
