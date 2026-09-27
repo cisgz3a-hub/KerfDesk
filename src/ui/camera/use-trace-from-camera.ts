@@ -8,6 +8,7 @@ import { useStore } from '../state';
 import { useCameraStore } from '../state/camera-store';
 import { useToastStore } from '../state/toast-store';
 import { useUiStore } from '../state/ui-store';
+import { useActiveCameraModel } from './active-camera-model';
 import { cameraModelForFrame } from './camera-model-frame';
 import { cameraCaptureBindingForFrame, captureSourceFrame } from './frame-source';
 import { buildCameraTraceImage } from './trace-from-camera';
@@ -21,7 +22,7 @@ export type TraceFromCamera = {
 };
 
 export function useTraceFromCamera(): TraceFromCamera {
-  const model = useStore((s) => s.project.device.cameraModel);
+  const model = useActiveCameraModel();
   const bedWidth = useStore((s) => s.project.device.bedWidth);
   const bedHeight = useStore((s) => s.project.device.bedHeight);
   const sourceState = useCameraStore((s) => s.sourceState);

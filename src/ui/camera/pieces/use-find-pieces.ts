@@ -7,6 +7,7 @@ import { useEffect, useRef } from 'react';
 import { useStore } from '../../state';
 import { useCameraStore } from '../../state/camera-store';
 import { useToastStore } from '../../state/toast-store';
+import { useActiveCameraModel } from '../active-camera-model';
 import { cameraModelForFrame } from '../camera-model-frame';
 import { cameraCaptureBindingForFrame, captureSourceFrame } from '../frame-source';
 import { useCameraTraceLifetime } from '../use-camera-trace-lifetime';
@@ -21,7 +22,7 @@ export type FindPieces = {
 };
 
 export function useFindPieces(): FindPieces {
-  const model = useStore((s) => s.project.device.cameraModel);
+  const model = useActiveCameraModel();
   const sourceState = useCameraStore((s) => s.sourceState);
   const pushToast = useToastStore((s) => s.pushToast);
   const captureLifetime = useCameraTraceLifetime();
