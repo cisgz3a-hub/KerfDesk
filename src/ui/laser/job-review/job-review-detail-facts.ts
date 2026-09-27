@@ -335,8 +335,8 @@ function requestedCncEntry(
   return null;
 }
 
-// The layer's entry ramps or circles only its other shapes: a relief group
-// that records no ramp plunges at every start (ADR-273 Amendment 1).
+// A relief group that records no ramp plunges at every start, whatever entry
+// the layer asks for (ADR-273 Amendment 1).
 function reliefPlungeNote(stages: ReadonlyArray<PlungingReliefStage>): ReadonlyArray<string> {
   if (stages.length === 0) return [];
   if (stages.length > 1) return ['relief passes plunge'];
