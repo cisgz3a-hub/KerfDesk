@@ -129,7 +129,6 @@ function wideCoreRadii(
   gateRadius: number,
   maxWidthPx: number,
 ): Float64Array {
-  const gateSq = gateRadius * gateRadius;
   const seedSq = (gateRadius + SEED_MARGIN_GATE_RATIO * maxWidthPx) ** 2;
   const radiusSq = new Float64Array(mask.width * mask.height);
   const seeds: number[] = [];
@@ -139,13 +138,27 @@ function wideCoreRadii(
       seeds.push(i);
     }
   });
+  growWideRadii(mask, distSq, radiusSq, gateRadius, seeds);
+  return radiusSq;
+}
+
+// A seed can come from a strong inscribed disc or a supported normal-width
+// measurement. Both continue only through discs wider than the same gate.
+// This covers bends with unmeasurable normals without crossing thin ink.
+function growWideRadii(
+  mask: InkMask,
+  distSq: Float64Array,
+  radiusSq: Float64Array,
+  gateRadius: number,
+  seeds: number[],
+): void {
+  const gateSq = gateRadius * gateRadius;
   floodEightConnected(mask.width, mask.height, seeds, (n) => {
     const d = distSq[n] ?? 0;
     if ((radiusSq[n] ?? 0) > 0 || d <= gateSq) return false;
     radiusSq[n] = d;
     return true;
   });
-  return radiusSq;
 }
 
 type Centre = { readonly polylines: Polyline[]; readonly marks: ReadonlySet<Polyline> };
@@ -154,9 +167,10 @@ type Centre = { readonly polylines: Polyline[]; readonly marks: ReadonlySet<Poly
 // uniformly a pixel or two wider than the gate can slip under it (its ridge
 // sits on a pixel-centre radius, or wobbles about the gate along a slant).
 // Normal measurements identify supported local wide runs, even on a mostly
-// thin branch (or a thin tail on a mostly wide one). Only those runs' discs
-// join the wide region. Clipping the original strokes again keeps the thin
-// parts attached to the fill edge (ADR rule 5).
+// thin branch (or a thin tail on a mostly wide one). Their discs seed the
+// same radius-gated growth as strong cores, continuing through wide bends.
+// The measured discs remain even where pixel-centred radii miss the gate.
+// Clipping again keeps the thin parts attached to the fill edge (ADR rule 5).
 function* withOverwideStrokesFilled(
   centre: Centre,
   mask: InkMask,
@@ -176,10 +190,16 @@ function* withOverwideStrokesFilled(
     return wideStrokeRuns(profile, gate.maxWidthPx, stroke.polyline.closed);
   });
   if (overwide.length === 0) return { wide: cores, strokes };
+  const radiusSq = strokeDiscRadii(mask, distSq, overwide, 0);
+  const seeds: number[] = [];
+  radiusSq.forEach((radius, i) => {
+    if (radius > gate.gateRadius ** 2) seeds.push(i);
+  });
+  growWideRadii(mask, distSq, radiusSq, gate.gateRadius, seeds);
   const grown = yield* discUnionSteps({
     width: mask.width,
     height: mask.height,
-    radiusSq: strokeDiscRadii(mask, distSq, overwide, 0),
+    radiusSq,
   });
   const wide = cores.map((c, i) => (c === 1 || grown[i] === 1 ? 1 : 0));
   return { wide, strokes: clippedStrokes(centre, mask, wide, gate.gateRadius) };

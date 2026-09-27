@@ -20,6 +20,15 @@ function inBox(
   return x >= left && x < right && y >= top && y < bottom;
 }
 
+function squareRing(topWidth = 5): RawImageData {
+  const width = 75;
+  const data = new Uint8ClampedArray(width * width * 4).fill(255);
+  for (let y = 10; y < 65; y += 1)
+    for (let x = 10; x < 65; x += 1)
+      if (!inBox(x, y, 15, 10 + topWidth, 60, 60)) data.set([0, 0, 0, 255], (y * width + x) * 4);
+  return { width, height: width, data };
+}
+
 function drawing(
   wideFrom = 120,
   wideTo = 150,
@@ -142,6 +151,80 @@ function assertSplit(paths: readonly ColoredPath[], point: (p: Vec2) => Vec2, sc
 }
 
 describe('Line + fill local width classification', () => {
+  it.each([1, 2, 4])(
+    'keeps a uniformly wide square ring filled through its unmeasurable bends at %ix',
+    async (scale) => {
+      const { image, point } = transformed(squareRing(), scale);
+      const paths = await traceImageToColoredPaths(image, {
+        ...OPTIONS,
+        hybridMaxStrokeWidthPx: 4 * scale,
+      });
+      expect(paths.filter((path) => path.color === HYBRID_STROKE_COLOR)).toHaveLength(0);
+      expect(
+        paths.filter((path) => path.color === HYBRID_FILL_COLOR).flatMap((path) => path.polylines),
+      ).toHaveLength(2);
+      let filled = 0;
+      for (let y = 0; y < image.height; y += 1)
+        for (let x = 0; x < image.width; x += 1)
+          if (
+            image.data[(y * image.width + x) * 4] === 0 &&
+            fillContains(paths, { x: x + 0.5, y: y + 0.5 })
+          )
+            filled += 1;
+      expect(filled).toBe(1000 * scale * scale);
+      expect(fillContains(paths, point({ x: 37.5, y: 37.5 }))).toBe(false);
+    },
+  );
+
+  it.each([1, 2, 4])('retains a narrow side of a closed mixed-width ring at %ix', async (scale) => {
+    for (const turn of [0, 1, 2, 3]) {
+      const { image, point } = transformed(squareRing(2), scale, turn, turn % 2 === 1);
+      const paths = await traceImageToColoredPaths(image, {
+        ...OPTIONS,
+        hybridMaxStrokeWidthPx: 4 * scale,
+      });
+      expect(fillContains(paths, point({ x: 37.5, y: 11 }))).toBe(false);
+      expect(strokeDistance(paths, point({ x: 37.5, y: 11 }))).toBeLessThan(scale);
+      for (const p of [
+        { x: 12.5, y: 37.5 },
+        { x: 62.5, y: 37.5 },
+        { x: 37.5, y: 62.5 },
+      ]) {
+        expect(fillContains(paths, point(p))).toBe(true);
+        expect(strokeDistance(paths, point(p))).toBeGreaterThan(10 * scale);
+      }
+      expect(fillContains(paths, point({ x: 37.5, y: 37.5 }))).toBe(false);
+      expect(
+        paths
+          .filter((path) => path.color === HYBRID_STROKE_COLOR)
+          .flatMap((path) => path.polylines),
+      ).toHaveLength(1);
+    }
+  });
+
+  it.each([1, 2, 4])(
+    'does not grow across a thin connector between wide sections at %ix',
+    async (scale) => {
+      const source = drawing(15, 150, (x) => (x >= 75 && x < 87 ? 2 : 5));
+      const { image, point } = transformed(source, scale);
+      const paths = await traceImageToColoredPaths(image, {
+        ...OPTIONS,
+        hybridMaxStrokeWidthPx: 4 * scale,
+      });
+      expect(fillContains(paths, point({ x: 81, y: 50 }))).toBe(false);
+      expect(strokeDistance(paths, point({ x: 81, y: 50 }))).toBeLessThan(scale);
+      for (const x of [40, 110]) {
+        expect(fillContains(paths, point({ x, y: 50 }))).toBe(true);
+        expect(strokeDistance(paths, point({ x, y: 50 }))).toBeGreaterThan(15 * scale);
+      }
+      expect(
+        paths
+          .filter((path) => path.color === HYBRID_STROKE_COLOR)
+          .flatMap((path) => path.polylines),
+      ).toHaveLength(1);
+    },
+  );
+
   it.each([1, 2, 4])(
     'keeps a thin stroke attached to its wide end at %ix source resolution',
     async (scale) => {

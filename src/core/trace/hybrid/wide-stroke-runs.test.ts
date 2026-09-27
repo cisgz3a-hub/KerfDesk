@@ -17,6 +17,21 @@ function profile(widthAt: (x: number) => number | null, length = 100): StrokeWid
 }
 
 describe('local wide-stroke evidence', () => {
+  it('retains the measured endpoints of a uniformly wide clean run', () => {
+    const widths = profile(() => 5, 40);
+    const [run] = wideStrokeRuns(widths, 4);
+    expect(run?.[0]).toEqual({ x: 0, y: 0 });
+    expect(run?.at(-1)).toEqual({ x: 39.5, y: 0 });
+  });
+
+  it('preserves clean wide endpoints on both sides of a junction without joining the gap', () => {
+    const widths = profile((x) => (x >= 40 && x < 50 ? null : 5));
+    const runs = wideStrokeRuns(widths, 4);
+    expect(runs).toHaveLength(2);
+    expect(runs[0]?.at(-1)).toEqual({ x: 39.5, y: 0 });
+    expect(runs[1]?.[0]).toEqual({ x: 50, y: 0 });
+  });
+
   it.each([1, 2, 4])('uses the same relative width allowance at %ix', (scale) => {
     for (const [width, wide] of [
       [4.24, false],

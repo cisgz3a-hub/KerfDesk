@@ -206,3 +206,28 @@ quarter turns and mirrors, 15/30/45-degree strokes, a short wide island with two
 gradual tapers, constant-width pens, pen blots, both sides of the allowance, junction gaps, and
 the actual preview-to-commit option conversion. They check fill membership, retained thin travel,
 stroke/fill attachment and absence of an uncut duplicate stroke through the wide region.
+
+### Amendment 3 - continue supported wide ink through bends (2026-09-27)
+
+A uniform 5 px square ring with a 4 px gate exposed a regression in the local classifier. The
+normal cannot measure around each right-angle bend. Four clean, uniformly wide sides were
+separated by missing evidence, and the averaging window also trimmed their measured endpoints.
+Only the side-centre discs reached the wide mask, leaving four false corner strokes and replacing
+one filled ring with four disconnected fills.
+
+An accepted edge window whose every raw measurement exceeds the allowance now retains its
+measured endpoints. Missing measurements still separate normal-width evidence; neither a null
+gap nor a branch median authorizes fill. Supported normal-width runs additionally seed the
+existing eight-connected inscribed-radius hysteresis: growth can continue only through pixels
+whose squared radius exceeds the original gate radius squared. This supplies independent width
+evidence around the bend and stops at a narrow connector. The same helper serves the original
+strong core seeds. Measured-run discs remain as a fallback when the pixel-centred distance field
+understates a locally measured width, and compact-blob handling is unchanged.
+
+The public regression restores one filled ring with two contours, no stroke output and all 1,000
+source ink-pixel centres inside the fill; exact 2x and 4x replicas with equivalent gates retain all
+4,000 and 16,000 centres too. Additional regressions preserve the narrow side of a closed
+mixed-width ring through quarter turns, reflections and scale changes, and preserve a narrow
+connector between two wide sections. Existing thin-tail, local-island, junction-gap, closed-seam,
+pen-blot, attachment and CNC checks still apply. These are software classification and geometry
+checks, not a claim of material qualification.

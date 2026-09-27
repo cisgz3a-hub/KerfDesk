@@ -102,9 +102,33 @@ function supportedRuns(
       flush();
       continue;
     }
-    run.push((sections[i - Math.floor((window - 1) / 2)] as MeasuredCrossSection).p);
+    appendWideWindow(run, sections, i, window, above);
     if (above >= Math.ceil(window * SEED_SUPPORT_FRACTION)) seeded = true;
   }
   flush();
   return out;
+}
+
+// The averaging window proves the whole edge window wide when every
+// measurement exceeds the allowance. Keep its measured endpoints too:
+// otherwise a bend's evidence gap loses another half-window on each
+// side and a uniformly wide ring acquires artificial corner strokes.
+// This does not cross a gap or extend into a measured thin transition.
+function appendWideWindow(
+  run: Vec2[],
+  sections: ReadonlyArray<MeasuredCrossSection>,
+  index: number,
+  window: number,
+  above: number,
+): void {
+  const halfWindow = Math.floor((window - 1) / 2);
+  const centre = index - halfWindow;
+  if (index === window - 1 && above === window) {
+    for (let j = 0; j < centre; j += 1) run.push((sections[j] as MeasuredCrossSection).p);
+  }
+  run.push((sections[centre] as MeasuredCrossSection).p);
+  if (index === sections.length - 1 && above === window) {
+    for (let j = sections.length - halfWindow; j < sections.length; j += 1)
+      run.push((sections[j] as MeasuredCrossSection).p);
+  }
 }
