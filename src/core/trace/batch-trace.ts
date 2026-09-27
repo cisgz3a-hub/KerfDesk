@@ -37,7 +37,7 @@ export type BatchTraceAttempt = {
 
 export type BatchTraceFormat = 'svg' | 'dxf' | 'pdf' | 'eps' | 'geojson';
 
-/** Formats written by the io-layer vector writer (ADR-444). */
+/** Formats written by the io-layer vector writer (ADR-468). */
 export type BatchTraceDrawingFormat = 'pdf' | 'eps' | 'geojson';
 
 /** Human label for a batch format ("GeoJSON", "PDF"). */
@@ -90,7 +90,7 @@ export type BatchTraceDependencies = {
     options: TracedVectorOptions & { readonly pageHeight: number },
   ) => string;
   /**
-   * PDF / EPS / GeoJSON serializer (io layer, ADR-444). Receives visible
+   * PDF / EPS / GeoJSON serializer (io layer, ADR-468). Receives visible
    * layers in page units (Y down), the page size, and whether every contour
    * is a stroke (Centerline or Edge). Per-path Hybrid roles remain on the
    * layers. Required only for those formats.
