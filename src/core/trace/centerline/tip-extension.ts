@@ -6,6 +6,7 @@
 import type { Vec2 } from '../../scene';
 import type { InkMask } from './distance-field';
 import type { Chain } from './junction-pairing';
+import { landmarkGrid } from './point-grid';
 import { pointAtArcDistance, radiusAtPosition } from './polyline-window';
 
 const TANGENT_PROBE_PX = 3;
@@ -23,10 +24,7 @@ export function isTrueTip(
   const tip = which === 'start' ? chain.points[0] : chain.points.at(-1);
   if (tip === undefined) return false;
   const guard = Math.max(1.5, 1.5 * radiusAtPosition(tip, distSq, width));
-  for (const j of junctions) {
-    if (Math.hypot(j.x - tip.x, j.y - tip.y) <= guard) return false;
-  }
-  return true;
+  return !landmarkGrid(junctions).anyWithin(tip, guard);
 }
 
 // Extend an open end to the true ink tip by FOLLOWING the stroke, not by

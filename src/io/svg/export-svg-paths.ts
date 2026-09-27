@@ -1,11 +1,5 @@
-import {
-  polylineToCurveSubpath,
-  type ColoredPath,
-  type CurveSubpath,
-  type Transform,
-  type Vec2,
-} from '../../core/scene';
-import { transformSvgCurveSubpath, type SvgMatrix } from './svg-curve-transform';
+import type { Transform } from '../../core/scene';
+import type { SvgMatrix } from './svg-curve-transform';
 
 export function svgNumber(value: number): string {
   if (!Number.isFinite(value)) throw new Error('Artwork contains a non-finite coordinate.');
@@ -61,72 +55,4 @@ export function svgObjectMatrix(transform: Transform): SvgMatrix {
 export function svgMatrixAttribute(transform: Transform): string {
   const m = svgObjectMatrix(transform);
   return 'matrix(' + [m.a, m.b, m.c, m.d, m.e, m.f].map(svgNumber).join(' ') + ')';
-}
-
-export function worldSvgCurves(path: ColoredPath, transform: Transform): readonly CurveSubpath[] {
-  const matrix = svgObjectMatrix(transform);
-  return (path.curves ?? path.polylines.map(polylineToCurveSubpath)).map((curve) =>
-    transformSvgCurveSubpath(curve, matrix),
-  );
-}
-
-export function svgPathData(curves: readonly CurveSubpath[]): string {
-  return curves
-    .filter((curve) => curve.segments.length > 0)
-    .map((curve) => {
-      const parts = ['M ' + point(curve.start)];
-      for (const segment of curve.segments) {
-        switch (segment.kind) {
-          case 'line':
-            parts.push('L ' + point(segment.to));
-            break;
-          case 'cubic':
-            parts.push(
-              'C ' +
-                point(segment.control1) +
-                ' ' +
-                point(segment.control2) +
-                ' ' +
-                point(segment.to),
-            );
-            break;
-          case 'elliptical-arc':
-            parts.push(
-              'A ' +
-                [
-                  segment.radiusX,
-                  segment.radiusY,
-                  segment.rotationDeg,
-                  Number(segment.largeArc),
-                  Number(segment.sweep),
-                ]
-                  .map(svgNumber)
-                  .join(' ') +
-                ' ' +
-                point(segment.to),
-            );
-            break;
-        }
-      }
-      if (curve.closed) parts.push('Z');
-      return parts.join(' ');
-    })
-    .join(' ');
-}
-
-export function* svgCurvePoints(curves: readonly CurveSubpath[]): Generator<Vec2> {
-  for (const curve of curves) {
-    yield curve.start;
-    for (const segment of curve.segments) {
-      if (segment.kind === 'cubic') {
-        yield segment.control1;
-        yield segment.control2;
-      }
-      yield segment.to;
-    }
-  }
-}
-
-function point(value: Vec2): string {
-  return svgNumber(value.x) + ' ' + svgNumber(value.y);
 }

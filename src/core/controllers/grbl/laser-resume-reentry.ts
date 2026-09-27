@@ -17,14 +17,19 @@ export type LaserResumeWcs = 'G54' | 'G55' | 'G56' | 'G57' | 'G58' | 'G59';
  *    written for: Smoothieware `M221`, Marlin `M3 I` and Marlin `M106`
  *    (ADR-364). Transforms 1 and 2 always wrote GRBL's, which left those
  *    programs dark. A GRBL-family program resumes exactly as in transform 2.
+ * 4: re-selects the arc plane (G17/G18/G19) the program had active, or G17
+ *    when the replayed tail holds G2/G3 and the program named none (ADR-432):
+ *    a plane left changed by a console command or `$N` startup block would
+ *    otherwise run an XY I/J arc in the wrong plane. A program with neither a
+ *    plane word nor an arc resumes exactly as in transform 3.
  */
-export type LaserResumeTransformVersion = 1 | 2 | 3;
+export type LaserResumeTransformVersion = 1 | 2 | 3 | 4;
 
 /** True for a transform this build can replay. */
 export function isLaserResumeTransformVersion(
   value: unknown,
 ): value is LaserResumeTransformVersion {
-  return value === 1 || value === 2 || value === 3;
+  return value === 1 || value === 2 || value === 3 || value === 4;
 }
 
 /** Modal values needed to rebuild a beam-off laser recovery boundary. */
@@ -36,6 +41,8 @@ export type LaserResumeModalState = {
   // in G54, but an imported program may select G55-G59; the resume preamble must
   // re-select whatever was active or the replayed tail runs in the wrong frame.
   wcs: LaserResumeWcs;
+  /** The arc plane the program last selected, if it named one. */
+  plane: 'G17' | 'G18' | 'G19' | null;
   sValue: number | null;
   feed: number | null;
   x: number | null;

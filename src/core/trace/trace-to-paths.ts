@@ -8,6 +8,7 @@
 // Pure-core compliant: no clock, no random, no I/O. Same lazy tracer
 // load as trace-image.ts (cached promise — no re-download).
 
+import { downscaleWorkingOptions } from './trace-downscale-options';
 import {
   polylineToCurveSubpath,
   type ColoredPath,
@@ -25,7 +26,7 @@ import {
   effectivePixelScale,
   preprocessForTrace,
 } from './trace-image';
-import { downscaleTracedPaths } from './auto-upscale';
+import { restoreFromWorkingGrid } from './auto-upscale';
 import { traceCenterlineStrokePathsSteps } from './centerline/trace-centerline';
 import { isBinaryContourPreset, traceImageToContourColoredPathsSteps } from './contour-trace';
 import { traceImageToEdgePathsSteps } from './edge-trace';
@@ -33,11 +34,11 @@ import { prepareEdgeTraceInput, type EdgeTraceInput } from './edge-input';
 import { prepareContourTraceInput, type ContourTraceInput } from './contour-input';
 import { withCanonicalTraceCurves } from './trace-curves';
 import { traceScalePlan } from './trace-upscale-policy';
-import { prepareUpscaledTraceInput } from './trace-upscale-input';
+import { prepareUpscaledTraceInput, releaseMedianStage } from './trace-upscale-input';
 import { runTraceSteps, type TraceStepRunner, type TraceSteps } from './trace-steps';
 import { reportingTraceRunner, type TraceProgress } from './trace-progress';
 import { resolveTraceSourceOptions, shouldTraceAlphaMask } from './trace-alpha';
-import { traceImageToPhotoPathsSteps } from './photo-trace';
+import { dedicatedTraceSteps } from './dedicated-trace-backends';
 import { invertImage } from './raster-prep';
 
 export { boundsFromColoredPaths } from './trace-bounds';
@@ -150,11 +151,9 @@ export async function traceImageToColoredPaths(
   progress?: TraceProgress,
 ): Promise<ColoredPath[]> {
   const run = reportingTraceRunner(runner, progress);
-  // Photo tone is encoded in ribbon coverage, before any binary detection or
-  // contour supersampling can discard it. The backend owns its bounded grid.
-  if (requestedOptions.photoDetail !== undefined) {
-    return run(traceImageToPhotoPathsSteps(requestedImage, requestedOptions));
-  }
+  // Photo shading and Colour layers own their whole pipeline.
+  const dedicated = dedicatedTraceSteps(requestedImage, requestedOptions);
+  if (dedicated !== undefined) return run(dedicated);
   const { image, options } = invertBeforePolicy(
     requestedImage,
     resolveTraceSourceOptions(requestedImage, requestedOptions),
@@ -187,19 +186,7 @@ export async function traceImageToColoredPaths(
       (workingImage.width / image.width) *
       (workingImage.height / image.height) *
       effectivePixelScale(options) ** 2;
-    const workingOptions: TraceOptions = {
-      ...options,
-      ...(options.despeckleMinPixels === undefined
-        ? {}
-        : { despeckleMinPixels: options.despeckleMinPixels * areaScale }),
-      ...(options.ignoreLessThanPixels === undefined
-        ? {}
-        : { ignoreLessThanPixels: options.ignoreLessThanPixels * areaScale }),
-      supersampleContour: false,
-      autoUpscaleSmallSources: false,
-      upscaleSmallSmoothSources: false,
-      pixelScale: 1,
-    };
+    const workingOptions = downscaleWorkingOptions(options, areaScale);
     const traced = await dispatchTrace(workingImage, workingOptions, run);
     // Only binary contours take this route. Their canonical curves are line
     // segments over the finished polylines; rebuild them on the restored grid.
@@ -221,6 +208,8 @@ export async function traceImageToColoredPaths(
   if (factor > 1) {
     return traceUpscaledImage(image, options, factor, run, edgeInput, contourInput);
   }
+  // Only the upscale route resamples the median stage (ADR-436); release it.
+  contourInput = releaseMedianStage(contourInput);
   return withCanonicalTraceCurves(
     await dispatchTrace(image, options, run, edgeInput, contourInput),
   );
@@ -235,17 +224,18 @@ export async function traceImageToColoredPaths(
 //   - Luma lanes run the whole documented brightness → contrast → gamma →
 //     invert chain here, so tone keeps its place before Invert.
 //   - Edge Detection never read the tone fields; it only gets the inversion.
-//   - While the alpha mask decides the ink, colour inversion cannot change
-//     it (the dialog disables Invert then), and an opaque negative would
-//     erase the transparency the mask reads, so Invert is dropped.
+//   - While the alpha mask decides the ink (every lane, Edge included since
+//     ADR-437), colour inversion cannot change it (the dialog disables
+//     Invert then), and an opaque negative would erase the transparency the
+//     mask reads, so Invert is dropped.
 function invertBeforePolicy(
   image: RawImageData,
   options: TraceOptions,
 ): { readonly image: RawImageData; readonly options: TraceOptions } {
   if (options.invert !== true) return { image, options };
   const cleared: TraceOptions = { ...options, invert: false };
-  if (options.traceMode === 'edge') return { image: invertImage(image), options: cleared };
   if (shouldTraceAlphaMask(image, options)) return { image, options: cleared };
+  if (options.traceMode === 'edge') return { image: invertImage(image), options: cleared };
   return {
     image: applyImageAdjustments(image, options),
     options: { ...cleared, brightness: 0, contrast: 0, gamma: 1 },
@@ -264,7 +254,7 @@ async function traceUpscaledImage(
   const upscaled = withCanonicalTraceCurves(
     await dispatchTrace(enlarged.image, enlarged.options, run, undefined, enlarged.contourInput),
   );
-  return downscaleTracedPaths(upscaled, factor);
+  return restoreFromWorkingGrid(upscaled, image, enlarged.image);
 }
 
 // The backend selection shared by both the direct and the upscaled paths.

@@ -4,7 +4,7 @@ import { intersectingContourLoopsSteps } from './contour-intersections';
 import { ContourMembership } from './contour-membership';
 import { ContourContactCache } from './contour-contact-cache';
 import { unionContourBoxes } from './contour-bounds';
-import { visitContourBoxPairsSteps } from './contour-spatial';
+import { ContourPairCache } from './contour-pair-cache';
 import { ContourMeasurements, ContourNestingRelations } from './contour-topology-cache';
 import type { TraceSteps } from './trace-steps';
 
@@ -55,16 +55,15 @@ export function* preserveContourTopologySteps(
   const contacts = new ContourContactCache();
   const measurements = new ContourMeasurements();
   const relations = new ContourNestingRelations();
+  const nestingPairs = new ContourPairCache();
   for (;;) {
     const conflicts = yield* intersectingContourLoopsSteps(current, contacts);
-    yield* addNestingConflictsSteps(
-      contours,
-      current,
-      conflicts,
+    yield* addNestingConflictsSteps(contours, current, conflicts, {
       membership,
       measurements,
       relations,
-    );
+      nestingPairs,
+    });
     let changed = false;
     for (const index of conflicts) {
       if (cooperate) yield;
@@ -123,13 +122,19 @@ function backOffStep(contour: FinishedContour, finish: ContourRefinement, step: 
   return step === REFINEMENT_ATTEMPTS + 1 ? finish.baseline : contour.source;
 }
 
+/** What one topology repair keeps between its rounds. */
+type NestingCaches = {
+  readonly membership: ContourMembership;
+  readonly measurements: ContourMeasurements;
+  readonly relations: ContourNestingRelations;
+  readonly nestingPairs: ContourPairCache;
+};
+
 function* addNestingConflictsSteps(
   contours: ReadonlyArray<FinishedContour>,
   current: ReadonlyArray<Polyline>,
   conflicts: Set<number>,
-  membership: ContourMembership,
-  measurements: ContourMeasurements,
-  relations: ContourNestingRelations,
+  { membership, measurements, relations, nestingPairs }: NestingCaches,
 ): TraceSteps<void> {
   const cooperate = yield;
   const boxes = contours.map((contour, index) => {
@@ -147,11 +152,17 @@ function* addNestingConflictsSteps(
     };
   });
   if (cooperate) yield;
-  const pairs: [(typeof boxes)[number], (typeof boxes)[number]][] = [];
-  yield* visitContourBoxPairsSteps(boxes, (a, b) => pairs.push([a, b]));
-  for (const [a, b] of pairs) {
+  // A box changes only with its candidate boundary, so that is its key.
+  const pairs = yield* nestingPairs.pairsSteps(boxes, (box) => box.candidate.points);
+  for (const { first: a, second: b, slot } of pairs) {
     if (cooperate) yield;
-    if (yield* relations.changedSteps(a, b, membership)) {
+    // An unchanged pair keeps the verdict its unchanged boundaries gave.
+    let changed = nestingPairs.recall(slot) as boolean | undefined;
+    if (changed === undefined) {
+      changed = yield* relations.changedSteps(a, b, membership);
+      nestingPairs.remember(slot, changed);
+    }
+    if (changed) {
       conflicts.add(a.index);
       conflicts.add(b.index);
     }

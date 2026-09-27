@@ -12,7 +12,7 @@ import {
   rArcGeometry,
   stripInlineComments,
 } from '../gcode';
-import { sampleArcPoints } from '../geometry';
+import { timingArcPoints } from './controller-arc-points';
 import {
   createLaserRenderState,
   isLaserOffFeed,
@@ -54,6 +54,7 @@ const XY_PLANE = 17;
 
 type BuildContext = {
   readonly coordinateRepresentation: BuildRenderModelOptions['coordinateRepresentation'];
+  readonly controllerArcToleranceMm: number | undefined;
   readonly laser: LaserRenderState;
   readonly modal: RenderModal;
   readonly segments: SegmentBuilder;
@@ -61,6 +62,7 @@ type BuildContext = {
   readonly skipped: SkippedMotion[];
   readonly unsupported: UnsupportedWordMap;
   recognizedWords: number;
+  controllerArcBudgetRelief: number; // mc_arc chords maxSegments does not count (ADR-432)
 };
 
 export type GcodeRenderModelBuilder = {
@@ -76,6 +78,7 @@ export function createGcodeRenderModelBuilder(
   // it degrades from, never as a refusal of the job itself.
   const context: BuildContext = {
     coordinateRepresentation: options.coordinateRepresentation,
+    controllerArcToleranceMm: options.controllerArcToleranceMm,
     laser: createLaserRenderState(options),
     modal: freshRenderModal(options.initialPositionMm),
     segments: createSegmentBuilder(1024, options.retainPreciseSegmentLengths),
@@ -83,6 +86,7 @@ export function createGcodeRenderModelBuilder(
     skipped: [],
     unsupported: new Map(),
     recognizedWords: 0,
+    controllerArcBudgetRelief: 0,
   };
   const categories = createLineCategoryBuilder();
   let lineCount = 0;
@@ -95,7 +99,7 @@ export function createGcodeRenderModelBuilder(
     categories.push(category);
     if (category === LINE_CATEGORY.junk) junkLines += 1;
     lineCount += 1;
-    const segmentCount = context.segments.count();
+    const segmentCount = context.segments.count() - context.controllerArcBudgetRelief;
     if (options.maxSegments !== undefined && segmentCount > options.maxSegments) {
       terminalResult = {
         kind: 'error',
@@ -349,7 +353,9 @@ function emitArc(
   const samePoint =
     Math.abs(from.x - target.x) <= AXIS_EPSILON && Math.abs(from.y - target.y) <= AXIS_EPSILON;
   const sweep = arcSweepAngle(startAngle, endAngle, clockwise, samePoint);
-  const points = sampleArcPoints(center, radius, startAngle, sweep);
+  const arc = timingArcPoints(center, radius, startAngle, sweep, context.controllerArcToleranceMm);
+  const points = arc.points;
+  context.controllerArcBudgetRelief += arc.budgetRelief;
   points[points.length - 1] = { x: target.x, y: target.y };
   pushArcPairs(context, points, target, sweep * radius, line, clockwise);
   return true;

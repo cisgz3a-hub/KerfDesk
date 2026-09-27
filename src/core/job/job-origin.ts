@@ -13,6 +13,7 @@ import type {
 import type { JobBounds } from './job-bounds';
 import { computeJobBounds } from './job-bounds';
 import { withContourEntryBounds } from './contour-entry';
+import { translateCutSegment } from './cut-arc-moves';
 
 export type JobStartMode = 'absolute' | 'current-position' | 'user-origin' | 'verified-origin';
 
@@ -319,8 +320,5 @@ function translateRasterGroup(group: RasterGroup, dx: number, dy: number): Raste
 }
 
 function translateSegment<T extends CutSegment>(segment: T, dx: number, dy: number): T {
-  return {
-    ...segment,
-    polyline: segment.polyline.map((point) => ({ x: point.x + dx, y: point.y + dy })),
-  };
+  return translateCutSegment(segment, dx, dy);
 }

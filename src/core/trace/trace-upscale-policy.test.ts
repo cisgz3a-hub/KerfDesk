@@ -127,3 +127,81 @@ describe('trace supersample performance regression', () => {
     await expect(traceImageToColoredPaths(image, LINE_ART)).resolves.not.toHaveLength(0);
   }, 30_000);
 });
+
+describe('supersample taper near the working-pixel budget', () => {
+  // Thin 1-px strokes ask for the 2x thin-stroke supersample.
+  function thinLines(side: number): RawImageData {
+    const image = whiteImage(side, side);
+    for (const y of [150, 300, 450, 600]) paintRect(image, 100, y, side - 200, 1);
+    return image;
+  }
+
+  it('traces a band-size source on a fractional grid and restores source coordinates', async () => {
+    const side = 1150;
+    const image = thinLines(side);
+    const plan = traceScalePlan(image, LINE_ART);
+    expect(plan.kind).toBe('upscale');
+    const factor = plan.kind === 'upscale' ? plan.factor : 1;
+    expect(factor).toBeGreaterThan(1);
+    expect(factor).toBeLessThan(2);
+    const points = (await traceImageToColoredPaths(image, LINE_ART)).flatMap((path) =>
+      path.polylines.flatMap((polyline) => polyline.points),
+    );
+    expect(points.length).toBeGreaterThan(0);
+    const xs = points.map((p) => p.x);
+    const ys = points.map((p) => p.y);
+    expect(Math.abs(Math.min(...xs) - 100)).toBeLessThan(1.5);
+    expect(Math.abs(Math.max(...xs) - (side - 100))).toBeLessThan(1.5);
+    expect(Math.abs(Math.min(...ys) - 150)).toBeLessThan(1.5);
+    expect(Math.abs(Math.max(...ys) - 601)).toBeLessThan(1.5);
+  }, 30_000);
+
+  // A fractional grid samples each 1-px row at a different sub-pixel phase:
+  // at 950² (1.51x) the row-150 centerline sat up to 0.81 px off the stroke
+  // centre with hooked ends. Both stroke-position modes keep the 2x grid.
+  it('keeps Centerline on the 2x grid inside the outline band, on the stroke centre', async () => {
+    const centerline = TRACE_PRESETS['Centerline']!;
+    const side = 950;
+    const image = thinLines(side);
+    expect(traceScalePlan(image, centerline)).toEqual({ kind: 'upscale', factor: 2 });
+    const polylines = (await traceImageToColoredPaths(image, centerline)).flatMap(
+      (path) => path.polylines,
+    );
+    for (const row of [150, 300, 450, 600]) {
+      const centre = row + 0.5;
+      const onRow = polylines.filter((polyline) =>
+        polyline.points.every((point) => Math.abs(point.y - centre) < 4),
+      );
+      expect(onRow).toHaveLength(1);
+      const points = onRow[0]!.points;
+      // A straight stroke stays straight: no hooks or intermediate wobble.
+      expect(points.length).toBeLessThanOrEqual(4);
+      for (const point of points) expect(Math.abs(point.y - centre)).toBeLessThanOrEqual(0.4);
+      const xs = points.map((point) => point.x);
+      expect(Math.min(...xs)).toBeGreaterThanOrEqual(99);
+      expect(Math.max(...xs)).toBeLessThanOrEqual(side - 99);
+    }
+  }, 60_000);
+
+  it('keeps Edge Detection on the 2x grid, so every row sits at the same offset', async () => {
+    const edge = TRACE_PRESETS['Edge Detection']!;
+    for (const side of [900, 990]) {
+      expect(traceScalePlan(thinLines(side), edge)).toEqual({ kind: 'upscale', factor: 2 });
+    }
+    const points = (await traceImageToColoredPaths(thinLines(950), edge)).flatMap((path) =>
+      path.polylines.flatMap((polyline) => polyline.points),
+    );
+    const offsets = [150, 300, 450, 600].map((row) => {
+      const ys = points.filter((p) => Math.abs(p.y - row - 0.5) < 4).map((p) => p.y - row - 0.5);
+      return [Math.min(...ys), Math.max(...ys)] as const;
+    });
+    for (const [low, high] of offsets) {
+      expect(Math.abs(low - offsets[0]![0])).toBeLessThan(0.05);
+      expect(Math.abs(high - offsets[0]![1])).toBeLessThan(0.05);
+    }
+  }, 60_000);
+
+  it('keeps the exact 2x grid for sources clear of the budget edge', () => {
+    expect(traceScalePlan(thinLines(800), LINE_ART)).toEqual({ kind: 'upscale', factor: 2 });
+  });
+});

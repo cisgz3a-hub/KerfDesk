@@ -66,6 +66,7 @@ function baseCtx(overrides: Partial<AppCommandContext> = {}): AppCommandContext 
     multiFileTrace: vi.fn(),
     saveGcode: vi.fn(),
     exportSvg: vi.fn(),
+    exportDxf: vi.fn(),
     undo: vi.fn(),
     redo: vi.fn(),
     selectAll: vi.fn(),

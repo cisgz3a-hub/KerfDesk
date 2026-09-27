@@ -12,7 +12,11 @@ import {
 } from './fixtures/composed-svg-browser';
 import { compareNativeSvg } from './fixtures/composed-svg-native-render';
 import { captureSvgCanvas, compareClippedCanvas } from './fixtures/composed-svg-canvas';
-import { composedSvgImportStages } from './fixtures/composed-svg-fit';
+import {
+  composedSvgImportStages,
+  compositionExtent,
+  expectSvgExportPageBounds,
+} from './fixtures/composed-svg-fit';
 import { toolbarCommand } from './fixtures/workspace-ui';
 
 const fixtures = [
@@ -55,8 +59,11 @@ for (const fixture of fixtures) {
     expect(workers.some((url) => url.includes('document-import-worker'))).toBe(true);
     const exported = await exportComposedSvg(page, kerfdesk);
     const native = await compareNativeSvg(page, source, exported);
-    expect(native.exportedViewBox[2]).toBeCloseTo(Number(native.sourceViewBox[2]), 7);
-    expect(native.exportedViewBox[3]).toBeCloseTo(Number(native.sourceViewBox[3]), 7);
+    const authoredExtent = compositionExtent(authored.project.scene.objects);
+    // These fixtures keep their authored physical extent; ADR-431 rounds the page outward.
+    expect(authoredExtent.width).toBeCloseTo(Number(native.sourceViewBox[2]), 7);
+    expect(authoredExtent.height).toBeCloseTo(Number(native.sourceViewBox[3]), 7);
+    expectSvgExportPageBounds(native.exportedViewBox, authored.project);
     expect(native.paintedPixels).toBeGreaterThan(100);
     expect(native.changedFraction).toBeLessThan(0.0001);
     writeFileSync(info.outputPath('exported.svg'), exported);
@@ -107,6 +114,12 @@ for (const fixture of fixtures) {
     );
     const repeated = await exportComposedSvg(page, kerfdesk);
     const again = await compareNativeSvg(page, exported, repeated);
+    const reimportedExtent = compositionExtent(reimported.project.scene.objects);
+    expect(reimportedExtent.width).toBeCloseTo(authoredExtent.width, 7);
+    expect(reimportedExtent.height).toBeCloseTo(authoredExtent.height, 7);
+    expectSvgExportPageBounds(again.exportedViewBox, reimported.project);
+    expect(again.exportedViewBox[2]).toBeCloseTo(Number(native.exportedViewBox[2]), 7);
+    expect(again.exportedViewBox[3]).toBeCloseTo(Number(native.exportedViewBox[3]), 7);
     expect(again.changedFraction).toBeLessThan(0.0001);
     await page.screenshot({ path: info.outputPath('workspace-reimport.png') });
     writeFileSync(

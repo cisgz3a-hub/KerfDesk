@@ -26,6 +26,13 @@ parser or store mutation is substituted. Escape cancellation holds the second
 native bitmap decode until the key is pressed, then resumes the real decoder.
 The clear-project helper is used only between independent import attempts.
 
+ADR-431 rounds the export page outward onto a 0.001 mm grid. Each page edge must
+contain the independently transformed artwork with less than one grid step of
+padding (apart from 1e-9 mm floating-point arithmetic tolerance). The authored
+geometry still matches the source's physical extent, and re-import preserves that
+geometry and the first export's page size. The test does not require a rounded
+page to equal the unrounded source extent or relax its clipping/pixel thresholds.
+
 After undoing any automatic fit, exported SVG is rendered at matched authored
 dimensions with Chromium's native SVG implementation independently
 of KerfDesk's parser and renderer. Fewer than 0.01% of pixels may differ by over
