@@ -119,6 +119,9 @@ export type PlungingReliefStage = 'relief-rough' | 'relief-finish';
 export type CompiledReliefFacts = {
   // Distinct depths the relief roughing cuts at, as emitted, shallowest first.
   readonly roughingLevelDepthsMm: ReadonlyArray<number>;
+  // How many reliefs the operation compiled, from the job's relief planning
+  // evidence; 0 when the job carries none.
+  readonly reliefCount: number;
   // Whether the operation's other shapes compiled groups of their own.
   readonly cutsOtherShapes: boolean;
 };
@@ -146,7 +149,7 @@ export function cncOperationDetail(
     ...cncStepoverPart(settings, shapes, relief),
     ...cncDirectionPart(settings),
     ...(shapes ? cncProfileTabsPart(settings, stockThicknessMm, relief !== undefined) : []),
-    ...cncEntryPart(settings, plungingReliefStages),
+    ...cncEntryPart(settings, plungingReliefStages, shapes),
     ...(shapes ? cncVCarveClearPart(settings) : []),
     ...cncFinishAllowancePart(settings),
     ...(shapes ? cncPocketStrategyPart(settings) : []),
@@ -161,8 +164,15 @@ function reliefRoughingPart(relief: CompiledReliefFacts | undefined): ReadonlyAr
   const levels = relief.roughingLevelDepthsMm;
   const deepestMm = levels[levels.length - 1];
   if (deepestMm === undefined) return ['no relief roughing levels'];
+  const to = `to ${formatIntervalMm(deepestMm)} mm`;
+  // The reliefs of one operation share a roughing group, so its levels are
+  // the distinct depths across them all, not a count for each relief.
+  if (relief.reliefCount > 1) {
+    const depths = `${levels.length} ${levels.length === 1 ? 'depth' : 'depths'}`;
+    return [`relief roughing at ${depths} ${to} across ${relief.reliefCount} reliefs`];
+  }
   const noun = levels.length === 1 ? 'level' : 'levels';
-  return [`relief roughing ${levels.length} ${noun} to ${formatIntervalMm(deepestMm)} mm`];
+  return [`relief roughing ${levels.length} ${noun} ${to}`];
 }
 
 // Relief roughing rings step by the stepover on every cut type, V-carve too.
@@ -291,11 +301,23 @@ function cncTabsPart(
 function cncEntryPart(
   settings: CncLayerSettings,
   plungingReliefStages: ReadonlyArray<PlungingReliefStage>,
+  shapes: boolean,
 ): ReadonlyArray<string> {
-  const entry = requestedCncEntry(settings);
+  const entry = shapes ? requestedCncEntry(settings) : reliefRoughingEntry(settings);
   if (entry === null) return [];
   const notes = [...entry.notes, ...reliefPlungeNote(plungingReliefStages)];
   return [notes.length === 0 ? entry.label : `${entry.label} (${notes.join('; ')})`];
+}
+
+// ADR-224 Amendment 3: relief roughing ramps at the ramp angle on every cut
+// type (ADR-424), and no helix or V-carve entry reaches a relief, so an
+// operation that cut only reliefs names that ramp alone.
+function reliefRoughingEntry(
+  settings: CncLayerSettings,
+): { readonly label: string; readonly notes: ReadonlyArray<string> } | null {
+  return settings.rampEntryDeg === undefined
+    ? null
+    : { label: `ramp entry ${settings.rampEntryDeg}°`, notes: [] };
 }
 
 function requestedCncEntry(

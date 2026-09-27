@@ -3982,10 +3982,13 @@ explicitly marked below; the remaining controls and user-facing flows are planne
    before cutter geometry, then mirror/rotate/move placement is honored.
 4. Job Review's detail line for the operation names the levels the
    compiled job roughs, for example `relief roughing 2 levels to 2.5 mm`,
-   instead of a pass count from Cut depth. An operation that cut only
-   reliefs leaves out its pass count and tabs. One that also cut other
-   shapes says `1 pass on the other shapes`, and kept tabs add
-   `none on reliefs` (ADR-224 Amendment 3).
+   instead of a pass count from Cut depth. With several reliefs on one
+   operation it counts their distinct depths, for example
+   `relief roughing at 4 depths to 4.5 mm across 2 reliefs`. An operation
+   that cut only reliefs leaves out its pass count and tabs, and its entry
+   names only the ramp angle, since no helix or V-carve entry reaches a
+   relief. One that also cut other shapes says `1 pass on the other shapes`,
+   and kept tabs add `none on reliefs` (ADR-224 Amendment 3).
 
 #### Error — bit too big for the detail
 1. Regions narrower than the bit's dilated footprint produce no rings

@@ -92,14 +92,26 @@ function compiledReliefFactsByLayer(job: Job): ReadonlyMap<string, CompiledRelie
     if (group.cutType === 'relief-rough') addRoughingLevels(levels, group);
     levelsByLayer.set(group.layerId, levels);
   }
+  const reliefCounts = compiledReliefCounts(job);
   const facts = new Map<string, CompiledReliefFacts>();
   for (const [layerId, levels] of levelsByLayer) {
     facts.set(layerId, {
       roughingLevelDepthsMm: [...levels].sort((a, b) => a - b),
+      reliefCount: reliefCounts.get(layerId) ?? 0,
       cutsOtherShapes: otherShapeLayers.has(layerId),
     });
   }
   return facts;
+}
+
+// The job's relief planning evidence holds one roughing entry per compiled
+// relief; a legacy job without it counts none.
+function compiledReliefCounts(job: Job): ReadonlyMap<string, number> {
+  const counts = new Map<string, number>();
+  for (const plan of job.cncCompilation?.reliefPlans ?? []) {
+    if (plan.stage === 'roughing') counts.set(plan.layerId, (counts.get(plan.layerId) ?? 0) + 1);
+  }
+  return counts;
 }
 
 // Every emitted roughing pass cuts at one level: a ring or cleanup path at its
