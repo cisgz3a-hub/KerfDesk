@@ -10,7 +10,7 @@ import { MAX_TRACED_PAGE_MARGIN_MM, type TracedPageFit } from '../../core/trace/
 import { DEFAULT_EXPORT_PRECISION_MM } from '../../core/vector-export/decimal-grid';
 import type { ImageDensity } from '../common/image-density';
 import type { LightBurnTraceSettingOverrides } from '../trace/trace-options';
-import { TRACE_OVERRIDE_RULES } from '../trace/trace-settings-snapshot';
+import { DETECTION_MODES, TRACE_OVERRIDE_RULES } from '../trace/trace-settings-snapshot';
 
 type OverrideKey = keyof typeof TRACE_OVERRIDE_RULES;
 
@@ -54,31 +54,35 @@ export const TRACE_CLI_FORMATS: ReadonlyArray<BatchTraceFormat> = [
 export const TRACE_CLI_OVERRIDE_FLAGS: Readonly<
   Record<OverrideKey, { readonly flag: string; readonly help: string }>
 > = {
-  cutoffLuma: { flag: 'cutoff', help: 'Cutoff: darkest luma counted as ink (0-255)' },
-  thresholdLuma: { flag: 'threshold', help: 'Threshold: lightest luma counted as ink (0-255)' },
+  cutoffLuma: { flag: 'cutoff', help: 'Cutoff: darkest luma counted as ink' },
+  thresholdLuma: { flag: 'threshold', help: 'Threshold: lightest luma counted as ink' },
   ignoreLessThanPixels: { flag: 'ignore-less-than', help: 'Ignore shapes under N pixels' },
-  smoothness: { flag: 'smoothness', help: 'Smoothness (0-1.33)' },
-  optimize: { flag: 'optimize', help: 'Optimize: curve fit tolerance (0-2)' },
+  smoothness: { flag: 'smoothness', help: 'Smoothness' },
+  optimize: { flag: 'optimize', help: 'Optimize: curve fit tolerance' },
   turnPolicy: { flag: 'diagonal-contacts', help: 'Diagonal contacts' },
   invert: { flag: 'invert', help: 'Trace light artwork on a dark ground' },
-  detectionMode: { flag: 'detection', help: 'preset | manual | sketch | faint-lines' },
+  detectionMode: { flag: 'detection', help: 'Ink detection' },
   despeckleMinPixels: { flag: 'despeckle', help: 'Remove specks under N pixels' },
   fillPinholeCracks: { flag: 'fill-pinholes', help: 'Close pinholes and hairline cracks' },
   traceTransparency: { flag: 'trace-transparency', help: 'Trace the alpha mask' },
   sketchTrace: { flag: 'sketch', help: 'Sketch (pencil) detection' },
-  edgeSensitivity: { flag: 'edge-sensitivity', help: 'Edge Detection sensitivity (0-100)' },
-  edgeDetail: { flag: 'edge-detail', help: 'Edge Detection detail (0-100)' },
-  edgeMinimumLinePx: { flag: 'edge-min-line', help: 'Edge Detection shortest line (px)' },
-  hybridMaxStrokeWidthMm: { flag: 'max-stroke-width', help: 'Line + fill max stroke (mm)' },
-  photoDetail: { flag: 'photo-detail', help: 'Photo shading detail (0-100)' },
-  photoBrightness: { flag: 'photo-brightness', help: 'Photo shading brightness (-100 to 100)' },
-  photoContrast: { flag: 'photo-contrast', help: 'Photo shading contrast (-100 to 100)' },
-  photoGamma: { flag: 'photo-gamma', help: 'Photo shading gamma (0.1-5)' },
+  edgeSensitivity: { flag: 'edge-sensitivity', help: 'Edge Detection sensitivity' },
+  edgeDetail: { flag: 'edge-detail', help: 'Edge Detection detail' },
+  edgeMinimumLinePx: { flag: 'edge-min-line', help: 'Edge Detection shortest line in px' },
+  hybridMaxStrokeWidthMm: { flag: 'max-stroke-width', help: 'Line + fill max stroke in mm' },
+  photoDetail: { flag: 'photo-detail', help: 'Photo shading detail' },
+  photoBrightness: { flag: 'photo-brightness', help: 'Photo shading brightness' },
+  photoContrast: { flag: 'photo-contrast', help: 'Photo shading contrast' },
+  photoGamma: { flag: 'photo-gamma', help: 'Photo shading gamma' },
   photoInvert: { flag: 'photo-invert', help: 'Photo shading invert' },
-  colourCount: { flag: 'colours', help: 'Colour layers count, or auto' },
+  colourCount: { flag: 'colours', help: 'Colour layers count' },
   colourLayerOutput: { flag: 'colour-output', help: 'Colour layers output style' },
   keepBackground: { flag: 'keep-background', help: 'Colour layers: keep the background' },
 };
+
+/** Accepted --precision (mm) and --dpi values; --help prints these. */
+export const TRACE_CLI_PRECISION_RANGE = { min: 1e-6, max: 1 } as const;
+export const TRACE_CLI_DPI_RANGE = { min: 10, max: 10_000 } as const;
 
 const DEFAULTS: TraceCliOptions = {
   help: false,
@@ -127,8 +131,11 @@ function applyFlag(draft: Draft, arg: string, queue: string[]): void {
     if (next === undefined) throw new TraceCliUsageError(`--${name} needs a value.`);
     return next;
   };
-  if (applyGeneralFlag(draft, name, value)) return;
-  if (applyOverrideFlag(draft, name, inline, value)) return;
+  if (applyGeneralFlag(draft, name, inline, value)) return;
+  if (applyOverrideFlag(draft, name, inline, value)) {
+    refuseDetachedBoolean(name, inline, queue);
+    return;
+  }
   throw new TraceCliUsageError(`Unknown option ${arg}. Run with --help for the list.`);
 }
 
@@ -151,7 +158,8 @@ const GENERAL_FLAGS: Readonly<Record<string, GeneralFlag>> = {
     draft.dpi = dpiValue(value());
   },
   precision: (draft, value) => {
-    draft.precisionMm = numberIn('precision', value(), 1e-6, 1);
+    const { min, max } = TRACE_CLI_PRECISION_RANGE;
+    draft.precisionMm = numberIn('precision', value(), min, max);
   },
   'group-contours': (draft) => {
     draft.groupContours = true;
@@ -172,10 +180,21 @@ const SHORT_FLAGS: Readonly<Record<string, string>> = {
   r: 'dpi',
 };
 
-function applyGeneralFlag(draft: Draft, name: string, value: () => string): boolean {
+/** General flags that take no value: `--group-contours=false` is refused, not read as on. */
+const VALUELESS_FLAGS: ReadonlySet<string> = new Set(['help', 'group-contours']);
+
+function applyGeneralFlag(
+  draft: Draft,
+  name: string,
+  inline: string | undefined,
+  value: () => string,
+): boolean {
   const long = SHORT_FLAGS[name] ?? name;
   const apply = Object.hasOwn(GENERAL_FLAGS, long) ? GENERAL_FLAGS[long] : undefined;
   if (apply === undefined) return false;
+  if (inline !== undefined && VALUELESS_FLAGS.has(long)) {
+    throw new TraceCliUsageError(`--${long} takes no value; leave it out for the default.`);
+  }
   apply(draft, value);
   return true;
 }
@@ -199,12 +218,30 @@ function applyOverrideFlag(
   else if (rule.kind === 'number')
     draft.overrides[key] = numberIn(name, value(), rule.min, rule.max);
   else if (rule.kind === 'count-or-auto') draft.overrides[key] = countOrAuto(name, value(), rule);
-  else draft.overrides[key] = choice(name, value(), choices(rule));
+  else draft.overrides[key] = choice(name, value(), overrideChoices(rule));
   return true;
 }
 
-function choices(rule: { readonly kind: string; readonly values?: ReadonlyArray<string> }) {
-  return rule.values ?? ['preset', 'manual', 'sketch', 'faint-lines'];
+/** Choices of a choice rule; the detection rule's are DETECTION_MODES. */
+export function overrideChoices(rule: {
+  readonly kind: string;
+  readonly values?: ReadonlyArray<string>;
+}): ReadonlyArray<string> {
+  return rule.values ?? DETECTION_MODES;
+}
+
+// `--invert false` would otherwise set invert on and read "false" as the
+// input file: a boolean override takes its value only as `--flag=false`.
+function refuseDetachedBoolean(name: string, inline: string | undefined, queue: string[]): void {
+  const key = FLAG_TO_KEY.get(name);
+  if (key === undefined || inline !== undefined) return;
+  if (TRACE_OVERRIDE_RULES[key].kind !== 'boolean') return;
+  const next = queue[0];
+  if (next === 'true' || next === 'false') {
+    throw new TraceCliUsageError(
+      `--${name} takes no separate value; write --${name}=${next} or --no-${name}.`,
+    );
+  }
 }
 
 function flagBool(name: string, text: string): boolean {
@@ -278,5 +315,6 @@ function pageFit(text: string): TracedPageFit {
 
 function dpiValue(text: string): ImageDensity {
   const [x = '', y = x] = text.toLowerCase().split('x');
-  return { xDpi: numberIn('dpi', x, 10, 10_000), yDpi: numberIn('dpi', y, 10, 10_000) };
+  const { min, max } = TRACE_CLI_DPI_RANGE;
+  return { xDpi: numberIn('dpi', x, min, max), yDpi: numberIn('dpi', y, min, max) };
 }

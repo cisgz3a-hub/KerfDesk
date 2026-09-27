@@ -7,7 +7,11 @@
 
 import type { RawImageData } from '../../core/trace';
 import { decodeRaster, sniffRasterFormat } from '../../io/raster-decode/decode-raster';
-import { densityFromBytes, type ImageDensity } from '../common/image-density';
+import {
+  densityFromBytes,
+  IMAGE_DENSITY_PROBE_BYTES,
+  type ImageDensity,
+} from '../common/image-density';
 import { rasterImportGeometry, type RasterImportGeometry } from '../common/image-import';
 import { compositeRgbOverWhitePreservingAlpha } from '../trace/image-loader';
 import { jpegExifOrientation, type ExifOrientation } from '../trace/jpeg-header';
@@ -28,7 +32,7 @@ export async function traceCliSource(
   const oriented = orientRaster(decoded, orientation);
   const image = compositeRgbOverWhitePreservingAlpha(oriented);
   const embedded =
-    densityFromBytes(bytes) ??
+    headerDensity(bytes) ??
     (decoded.dpi === undefined ? null : { xDpi: decoded.dpi.x, yDpi: decoded.dpi.y });
   const geometry = rasterImportGeometry({
     naturalWidth: image.width,
@@ -43,6 +47,17 @@ export async function traceCliSource(
     heightMm: geometry.bounds.maxY - geometry.bounds.minY,
     densitySource: dpiOverride === null ? geometry.densitySource : 'option',
   };
+}
+
+// The header prefix Multi-File Trace reads (readImageHeaderDensity), with its
+// "unreadable means no density" rule, so a density block beyond the prefix
+// sizes the image the same way on both paths.
+function headerDensity(bytes: Uint8Array): ImageDensity | null {
+  try {
+    return densityFromBytes(bytes.subarray(0, IMAGE_DENSITY_PROBE_BYTES));
+  } catch {
+    return null;
+  }
 }
 
 /** Turn a stored-grid raster upright for its EXIF Orientation (1-8). */

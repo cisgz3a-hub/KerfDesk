@@ -252,8 +252,11 @@ cat art.png | pnpm -s trace -f dxf > art.dxf
 ```
 
 Traces one PNG, JPEG, BMP, TIFF or PBM/PGM/PPM image to SVG, DXF, PDF, EPS or GeoJSON with the
-app's own tracer, presets and Trace dialog settings, byte for byte as Multi-File Trace writes it
-(ADR-477). The package also exposes it as the `kerfdesk-trace` bin. `pnpm trace --help` lists
+app's own tracer, presets and Trace dialog settings (ADR-477). For 8-bit sRGB PNG, BMP and
+PBM/PGM/PPM images up to 2048 px on the long edge the file is byte for byte what Multi-File Trace
+writes; larger images trace at full resolution with pixel-unit settings scaled as the app scales
+them for its finer commit grid, and JPEG (a different decoder than the browser's) or images with
+colour profiles can trace slightly differently at edges. The package also exposes it as the `kerfdesk-trace` bin. `pnpm trace --help` lists
 every flag; the exit status is 0 traced, 1 failed, 2 invalid options, 3 nothing to draw.
 
 ### Desktop (Electron)

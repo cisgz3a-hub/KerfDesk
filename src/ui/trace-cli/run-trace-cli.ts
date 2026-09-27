@@ -8,6 +8,8 @@ import { TRACE_PRESETS, traceImagesToVectorFiles, type TraceOptions } from '../.
 import { tracedLayersToDxf } from '../../io/dxf/export-dxf';
 import { writeTracedDrawing } from '../../io/vector-formats/traced-drawing';
 import { withHybridMaxStrokeWidth } from '../trace/hybrid-stroke-width';
+import { traceOptionsForCommitGrid } from '../trace/trace-commit-grid';
+import { PREVIEW_MAX_EDGE_PX, scaleToCap } from '../trace/trace-decode-cap';
 import { mergeLightBurnTraceSettings } from '../trace/trace-options';
 import { traceCliHelp } from './trace-cli-help';
 import { parseTraceCliArgs, TraceCliUsageError, type TraceCliOptions } from './trace-cli-options';
@@ -86,12 +88,32 @@ export function traceCliTraceOptions(
 ): TraceOptions {
   const preset = TRACE_PRESETS[options.presetName];
   if (preset === undefined) throw new TraceCliUsageError(`Unknown preset ${options.presetName}.`);
-  const merged = mergeLightBurnTraceSettings(preset, options.overrides);
+  const merged = nativeGridOptions(
+    mergeLightBurnTraceSettings(preset, options.overrides),
+    source.image,
+  );
   const widthMm = options.overrides.hybridMaxStrokeWidthMm;
   // Line + fill's Max stroke width is in placed millimetres (ADR-454); the
   // image traces on its stored grid, so that grid's density converts it.
   if (widthMm === undefined) return merged;
   return withHybridMaxStrokeWidth(merged, widthMm, source.image.width / source.widthMm);
+}
+
+/**
+ * The CLI traces the stored grid, while the Trace dialog's pixel-unit
+ * settings (Ignore less than, despeckle, Minimum line, gap joins) are judged
+ * on its preview grid, capped at PREVIEW_MAX_EDGE_PX. Above that cap they
+ * scale as the app scales them for a finer commit grid (ADR-409), so a given
+ * --ignore-less-than drops the same physical specks it drops in the dialog.
+ * At or under the cap the options are returned unchanged.
+ */
+export function nativeGridOptions(
+  options: TraceOptions,
+  grid: { readonly width: number; readonly height: number },
+): TraceOptions {
+  const native = { width: grid.width, height: grid.height };
+  const preview = scaleToCap(native.width, native.height, PREVIEW_MAX_EDGE_PX);
+  return traceOptionsForCommitGrid(options, { grid: native, preview });
 }
 
 function message(error: unknown): string {
