@@ -287,10 +287,22 @@ export async function runMenuCommand(page: Page, family: string, command: string
     .click();
 }
 
-export async function connectAndHome(page: Page, kerfdesk: KerfDeskFixture): Promise<void> {
+export async function connectAndHome(
+  page: Page,
+  kerfdesk: KerfDeskFixture,
+  options: { readonly closeRecoveryReview?: boolean } = {},
+): Promise<void> {
   await selectWorkspacePanel(page, 'Machine');
   await page.getByRole('button', { name: /^Connect/ }).click();
   await expect(page.getByText('State: Idle', { exact: true })).toBeVisible();
+  if (options.closeRecoveryReview) {
+    // Reconnect opens this review once per interrupted run (ADR-341 Amendment 6).
+    // These workflows choose to home first, then reopen the same saved recovery.
+    const review = page.getByRole('dialog', { name: 'Review interrupted laser job', exact: true });
+    await expect(review).toBeVisible();
+    await review.getByRole('button', { name: 'Close', exact: true }).click();
+    await expect(review).not.toBeVisible();
+  }
   await expandMachineUtilities(page);
   await page.getByRole('button', { name: 'Home', exact: true }).click();
   await expect.poll(async () => serialWrites(await kerfdesk.events())).toContain('G4 P0.01');

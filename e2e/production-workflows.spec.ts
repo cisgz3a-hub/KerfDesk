@@ -10,6 +10,7 @@ import {
   type Locator,
   type Page,
 } from './fixtures/kerfdesk-test';
+import { connectAndHome } from './fixtures/recovery-flow';
 
 test.beforeEach(async ({ page }) => {
   await page.goto('/');
@@ -816,7 +817,7 @@ test('preserves an interrupted laser checkpoint after a cable disconnect', async
 
   // Resume the sealed job after reconnect, without framing the edited canvas.
   await kerfdesk.setAutoAcknowledge(true);
-  await connectAndHome(page, kerfdesk);
+  await connectAndHome(page, kerfdesk, { closeRecoveryReview: true });
   await recovery.getByRole('button', { name: 'Review recovery', exact: true }).click();
   await selectRecoveryMovement(review.getByRole('img', { name: /^Laser recovery canvas:/ }), true);
   await kerfdesk.setAutoAcknowledge(false);
@@ -1227,17 +1228,6 @@ async function enableLab(page: Page, label: string): Promise<void> {
   await runMenuCommand(page, 'Tools', 'Labs...');
   await page.getByText(label, { exact: true }).click();
   await page.getByRole('button', { name: 'Done' }).click();
-}
-
-async function connectAndHome(page: Page, kerfdesk: KerfDeskFixture): Promise<void> {
-  await selectWorkspacePanel(page, 'Machine');
-  await page.getByRole('button', { name: /^Connect/ }).click();
-  await expect(page.getByText('State: Idle', { exact: true })).toBeVisible();
-  await expandMachineUtilities(page);
-  await page.getByRole('button', { name: 'Home', exact: true }).click();
-  await expect.poll(async () => serialWrites(await kerfdesk.events())).toContain('G4 P0.01');
-  await kerfdesk.emitSerialLine('<Idle|MPos:0.000,0.000,0.000|WCO:0.000,0.000,0.000|FS:0,0>');
-  await expect(page.getByRole('button', { name: 'Home', exact: true })).toBeEnabled();
 }
 
 function serialWrites(events: readonly Readonly<Record<string, unknown>>[]): string {

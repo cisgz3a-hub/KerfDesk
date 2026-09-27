@@ -63,9 +63,13 @@ async function startHeld(page: Page, kerfdesk: KerfDeskFixture, status = IDLE): 
 }
 
 /** Reconnect, start the saved recovery, acknowledge everything; return the lines sent. */
-async function recoverAndDrain(page: Page, kerfdesk: KerfDeskFixture): Promise<string[]> {
+async function recoverAndDrain(
+  page: Page,
+  kerfdesk: KerfDeskFixture,
+  automaticReview = true,
+): Promise<string[]> {
   await kerfdesk.setAutoAcknowledge(true);
-  await connectAndHome(page, kerfdesk);
+  await connectAndHome(page, kerfdesk, { closeRecoveryReview: automaticReview });
   await kerfdesk.setAutoAcknowledge(false);
   const recovery = page.locator('details[aria-label="Interrupted job recovery"]');
   if (!(await recovery.getByRole('button', { name: 'Review recovery', exact: true }).isVisible()))
@@ -322,7 +326,8 @@ test('a page reload mid-job saves a recoverable capsule no older than one checkp
   expect(saved.ackedLines).toBeGreaterThan(60 - 25);
   // The capsule outlives the project session: reopen the design's machine.
   await reopenProject(page);
-  const sent = await recoverAndDrain(page, kerfdesk);
+  // A page close/restart is not one of the controller failures that auto-opens review.
+  const sent = await recoverAndDrain(page, kerfdesk, false);
   expect(sent.length).toBeGreaterThan(0);
   await expect(page.getByRole('dialog', { name: 'Job complete', exact: true })).toContainText(
     'Would you like to darken selected areas?',
@@ -383,7 +388,7 @@ test('recovery after a controller reset warns when the work origin differs from 
   // Reconnecting resets the controller: G92 is gone and the head reads machine 20,20.
   await kerfdesk.emitSerialLine('<Idle|MPos:20.000,20.000,0.000|WCO:0.000,0.000,0.000|FS:0,0>');
   await kerfdesk.setAutoAcknowledge(true);
-  await connectAndHome(page, kerfdesk);
+  await connectAndHome(page, kerfdesk, { closeRecoveryReview: true });
   // The operator re-creates an origin by eye, 15 mm away from the original one.
   await kerfdesk.emitSerialLine('<Idle|MPos:35.000,35.000,0.000|WCO:0.000,0.000,0.000|FS:0,0>');
   await page.getByRole('button', { name: 'Set origin here', exact: true }).click();
@@ -428,7 +433,7 @@ test('two windows cannot both resume one interrupted job', async ({ page, kerfde
   await selectWorkspacePanel(other.page, 'Machine');
   const cardB = other.page.locator('details[aria-label="Interrupted job recovery"]');
   await expect(cardB.getByText('Interrupted job saved', { exact: true })).toBeVisible();
-  await connectAndHome(other.page, other.fixture);
+  await connectAndHome(other.page, other.fixture, { closeRecoveryReview: true });
 
   // Window A resumes first. Chrome holds a background tab's native confirm until
   // the tab is shown, so each window is brought forward before it acts.
@@ -462,7 +467,7 @@ test('a recovery review open in another window closes when this window resumes t
   const other = await secondWindow(page);
   other.page.on('dialog', (dialog) => void dialog.accept());
   await selectWorkspacePanel(other.page, 'Machine');
-  await connectAndHome(other.page, other.fixture);
+  await connectAndHome(other.page, other.fixture, { closeRecoveryReview: true });
   // Window B opens its review first; window A then resumes the same capsule.
   const cardB = other.page.locator('details[aria-label="Interrupted job recovery"]');
   if (!(await cardB.getByRole('button', { name: 'Review recovery', exact: true }).isVisible()))
