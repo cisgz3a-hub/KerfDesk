@@ -8,10 +8,12 @@
 
 import type { ProgramTimeModel } from '../../core/gcode-time';
 import { SEG_KIND, type GcodeRenderModel } from '../../core/gcode-view';
-import { cssHexColor, rgbTriple, type Viewer3dTheme } from '../viewer3d';
+import type { Viewer3dTheme } from '../viewer3d';
 // Deep import: the viewer3d barrel is capped at 20 exports by its index contract.
-import { renderedLineCss, renderedLineRampStops } from '../viewer3d/segment-buckets';
-import { buildDepthLensScale, DEPTH_RAMP_DEEP, DEPTH_RAMP_SHALLOW, type Rgb } from './depth-lens';
+import type { Viewer3dLook } from '../viewer3d/viewer3d-look';
+import { buildDepthLensScale, type Rgb } from './depth-lens';
+import { lensPalette, rampAt, rampCss, toolColor, type LensPalette } from './lens-palette';
+import type { ToolSections } from './tool-sections';
 
 /** Stable lens identifiers in the order presented by both viewer controls. */
 export const LENS_IDS = ['depth', 'tool', 'kind', 'feed', 'power', 'planner'] as const;
@@ -54,7 +56,7 @@ function cutPowerVaries(model: GcodeRenderModel): boolean {
 export const LENS_LABEL: Readonly<Record<LensId, string>> = {
   kind: 'Move kind',
   depth: 'Depth / pass',
-  tool: 'Tool colour (single)',
+  tool: 'Tool',
   feed: 'Feed rate',
   power: 'Power (S)',
   planner: 'Reached feed',
@@ -82,13 +84,11 @@ export type LensLegend =
     }
   | { readonly kind: 'note'; readonly note: string };
 
-// Cool → warm. Deliberately not red-green: red already means traversal here,
-// and a red/green ramp is unreadable with the commonest colour-vision
-// deficiency.
-const RAMP_LOW: Rgb = [0.24, 0.42, 0.85];
-const RAMP_HIGH: Rgb = [0.98, 0.76, 0.19];
-const REACHED_RGB: Rgb = [0.35, 0.72, 0.45];
-const LIMITED_RGB: Rgb = [0.9, 0.5, 0.2];
+/** Which look to colour for, and the program's tool sections for the Tool lens. */
+export type LensOptions = {
+  readonly look?: Viewer3dLook | undefined;
+  readonly sections?: ToolSections | null | undefined;
+};
 
 type Range = { readonly min: number; readonly max: number };
 
@@ -99,22 +99,25 @@ export function lensColorFn(
   time: ProgramTimeModel,
   lens: LensId,
   theme: Viewer3dTheme,
+  options: LensOptions = {},
 ): (segmentIndex: number) => Rgb {
-  if (lens === 'kind') return kindColorFn(model, theme);
-  if (lens === 'tool') return toolColorFn(model, theme);
+  const palette = lensPalette(theme, options.look);
+  const travel = palette.travel;
+  const isTravel = (index: number): boolean => model.segKind[index] === SEG_KIND.travel;
+  if (lens === 'kind') return kindColorFn(model, palette);
+  if (lens === 'tool') return toolColorFn(model, palette, options.sections ?? null);
   if (lens === 'depth') {
     const scale = buildDepthLensScale(model);
-    const fallback = rgbTriple(theme.cut);
-    const travel = rgbTriple(theme.travel);
-    const solidColor = scale === null ? () => fallback : scale.colorOf;
-    return (index) => (model.segKind[index] === SEG_KIND.travel ? travel : solidColor(index));
+    if (scale === null) return (index) => (isTravel(index) ? travel : palette.cut);
+    return (index) =>
+      isTravel(index) ? travel : rampAt(palette.depthRamp, scale.progressOf(index));
   }
   if (lens === 'planner') {
-    return (index) => (time.segFeedLimited[index] === 1 ? LIMITED_RGB : REACHED_RGB);
+    return (index) => (time.segFeedLimited[index] === 1 ? palette.limited : palette.reached);
   }
   const values = lensValues(model, lens);
   const range = spanOf(values);
-  return (index) => rampColor(normalized(values[index] ?? 0, range));
+  return (index) => rampAt(palette.valueRamp, normalized(values[index] ?? 0, range));
 }
 
 export function lensLegend(
@@ -122,11 +125,16 @@ export function lensLegend(
   time: ProgramTimeModel,
   lens: LensId,
   theme: Viewer3dTheme,
+  options: LensOptions = {},
 ): LensLegend {
-  if (lens === 'kind') return { kind: 'swatches', entries: kindSwatches(model, theme) };
-  if (lens === 'tool') return { kind: 'swatches', entries: toolSwatches(model, theme) };
-  if (lens === 'depth') return depthLegend(model);
-  if (lens === 'planner') return { kind: 'swatches', entries: plannerSwatches(model, time) };
+  const palette = lensPalette(theme, options.look);
+  if (lens === 'kind') return { kind: 'swatches', entries: kindSwatches(model, palette) };
+  if (lens === 'tool') {
+    return { kind: 'swatches', entries: toolSwatches(model, palette, options.sections ?? null) };
+  }
+  if (lens === 'depth') return depthLegend(model, palette);
+  if (lens === 'planner')
+    return { kind: 'swatches', entries: plannerSwatches(model, time, palette) };
   const range = spanOf(lensValues(model, lens));
   if (range === null) return { kind: 'note', note: `No ${LENS_LABEL[lens].toLowerCase()} data` };
   return {
@@ -134,25 +142,31 @@ export function lensLegend(
     from: formatValue(range.min, lens),
     to: formatValue(range.max, lens),
     note: LENS_LABEL[lens],
-    stops: renderedLineRampStops(RAMP_LOW, RAMP_HIGH),
+    stops: rampCss(palette, palette.valueRamp),
   };
 }
 
-function kindColorFn(model: GcodeRenderModel, theme: Viewer3dTheme): (segmentIndex: number) => Rgb {
+function kindColorFn(model: GcodeRenderModel, palette: LensPalette): (segmentIndex: number) => Rgb {
   const byKind = new Map<number, Rgb>([
-    [SEG_KIND.cut, rgbTriple(theme.cut)],
-    [SEG_KIND.plunge, rgbTriple(theme.plunge)],
-    [SEG_KIND.retract, rgbTriple(theme.retract)],
-    [SEG_KIND.travel, rgbTriple(theme.travel)],
+    [SEG_KIND.cut, palette.cut],
+    [SEG_KIND.plunge, palette.plunge],
+    [SEG_KIND.retract, palette.retract],
+    [SEG_KIND.travel, palette.travel],
   ]);
-  const fallback = rgbTriple(theme.cut);
-  return (index) => byKind.get(model.segKind[index] ?? SEG_KIND.cut) ?? fallback;
+  return (index) => byKind.get(model.segKind[index] ?? SEG_KIND.cut) ?? palette.cut;
 }
 
-function toolColorFn(model: GcodeRenderModel, theme: Viewer3dTheme): (segmentIndex: number) => Rgb {
-  const tool = rgbTriple(theme.cut);
-  const travel = rgbTriple(theme.travel);
-  return (index) => (model.segKind[index] === SEG_KIND.travel ? travel : tool);
+// Each tool in its own colour, in order of first use (ADR-426). A program
+// that never changes tool shows one colour, as the lens always did.
+function toolColorFn(
+  model: GcodeRenderModel,
+  palette: LensPalette,
+  sections: ToolSections | null,
+): (segmentIndex: number) => Rgb {
+  return (index) => {
+    if (model.segKind[index] === SEG_KIND.travel) return palette.travel;
+    return toolColor(palette, sections?.segTool[index] ?? 0);
+  };
 }
 
 function lensValues(model: GcodeRenderModel, lens: 'feed' | 'power'): Float32Array {
@@ -176,64 +190,57 @@ function normalized(value: number, range: Range | null): number {
   return Math.min(1, Math.max(0, (value - range.min) / (range.max - range.min)));
 }
 
-function rampColor(t: number): Rgb {
-  const mix = (low: number, high: number): number => low + (high - low) * t;
-  return [
-    mix(RAMP_LOW[0], RAMP_HIGH[0]),
-    mix(RAMP_LOW[1], RAMP_HIGH[1]),
-    mix(RAMP_LOW[2], RAMP_HIGH[2]),
-  ];
-}
-
-function kindSwatches(model: GcodeRenderModel, theme: Viewer3dTheme): ReadonlyArray<LegendSwatch> {
+function kindSwatches(model: GcodeRenderModel, palette: LensPalette): ReadonlyArray<LegendSwatch> {
   const counts = new Map<number, number>();
   for (let index = 0; index < model.segmentCount; index += 1) {
     const kind = model.segKind[index] ?? SEG_KIND.travel;
     counts.set(kind, (counts.get(kind) ?? 0) + 1);
   }
+  const line = palette.lineCss;
   return [
-    { label: 'Cut', color: lineCss(theme.cut), count: counts.get(SEG_KIND.cut) ?? 0 },
-    { label: 'Plunge', color: lineCss(theme.plunge), count: counts.get(SEG_KIND.plunge) ?? 0 },
-    {
-      label: 'Retract',
-      color: lineCss(theme.retract),
-      count: counts.get(SEG_KIND.retract) ?? 0,
-    },
-    {
-      label: 'Traversal',
-      color: cssHexColor(theme.travel),
-      count: counts.get(SEG_KIND.travel) ?? 0,
-    },
+    { label: 'Cut', color: line(palette.cut), count: counts.get(SEG_KIND.cut) ?? 0 },
+    { label: 'Plunge', color: line(palette.plunge), count: counts.get(SEG_KIND.plunge) ?? 0 },
+    { label: 'Retract', color: line(palette.retract), count: counts.get(SEG_KIND.retract) ?? 0 },
+    { label: 'Traversal', color: palette.travelCss, count: counts.get(SEG_KIND.travel) ?? 0 },
   ];
 }
 
-function toolSwatches(model: GcodeRenderModel, theme: Viewer3dTheme): ReadonlyArray<LegendSwatch> {
+function toolSwatches(
+  model: GcodeRenderModel,
+  palette: LensPalette,
+  sections: ToolSections | null,
+): ReadonlyArray<LegendSwatch> {
   let travel = 0;
   for (let index = 0; index < model.segmentCount; index += 1) {
     if (model.segKind[index] === SEG_KIND.travel) travel += 1;
   }
-  return [
-    { label: 'Toolpath', color: lineCss(theme.cut), count: model.segmentCount - travel },
-    { label: 'Traversal', color: cssHexColor(theme.travel), count: travel },
-  ];
+  const tools = sections?.tools ?? [{ label: null, moveCount: model.segmentCount - travel }];
+  const entries = tools.map((tool, index) => ({
+    label: tool.label ?? 'Toolpath',
+    color: palette.lineCss(toolColor(palette, index)),
+    count: tool.moveCount,
+  }));
+  return [...entries, { label: 'Traversal', color: palette.travelCss, count: travel }];
 }
 
-function depthLegend(model: GcodeRenderModel): LensLegend {
+function depthLegend(model: GcodeRenderModel, palette: LensPalette): LensLegend {
   const scale = buildDepthLensScale(model);
   if (scale === null) return { kind: 'note', note: 'No cutting depth data' };
   const levelWord = scale.levelCount === 1 ? 'level' : 'levels';
+  const colours = palette.look === 'studio' ? 'bright to dark' : 'pale blue to pale red';
   return {
     kind: 'ramp',
     from: `Shallow ${formatDepth(scale.shallowMm)}`,
     to: `Deep ${formatDepth(scale.deepMm)}`,
-    note: `${scale.levelCount} depth ${levelWord}, pale blue to pale red`,
-    stops: renderedLineRampStops(DEPTH_RAMP_SHALLOW, DEPTH_RAMP_DEEP),
+    note: `${scale.levelCount} depth ${levelWord}, ${colours}`,
+    stops: rampCss(palette, palette.depthRamp),
   };
 }
 
 function plannerSwatches(
   model: GcodeRenderModel,
   time: ProgramTimeModel,
+  palette: LensPalette,
 ): ReadonlyArray<LegendSwatch> {
   let limited = 0;
   for (let index = 0; index < model.segmentCount; index += 1) {
@@ -242,15 +249,11 @@ function plannerSwatches(
   return [
     {
       label: 'Reached feed',
-      color: renderedLineCss(REACHED_RGB),
+      color: palette.lineCss(palette.reached),
       count: model.segmentCount - limited,
     },
-    { label: 'Below set feed', color: renderedLineCss(LIMITED_RGB), count: limited },
+    { label: 'Below set feed', color: palette.lineCss(palette.limited), count: limited },
   ];
-}
-
-function lineCss(color: number): string {
-  return renderedLineCss(rgbTriple(color));
 }
 
 export function rgbCss(rgb: Rgb): string {

@@ -1,8 +1,9 @@
-// The selected design as the piece fill sees it (ADR-442): the centre and
-// size of the selection's bounds, or null when nothing is selected.
+// The selected design as the piece fill sees it (ADR-442): the box around the
+// selection in the design's own frame, or null when nothing is selected.
 
+import { designFrame } from '../../../core/camera/pieces/design-frame';
 import type { DesignFrame } from '../../../core/camera/pieces/piece-placements';
-import { combinedBBox, type Project } from '../../../core/scene';
+import type { Project } from '../../../core/scene';
 
 export function selectionFrame(
   project: Project,
@@ -13,11 +14,5 @@ export function selectionFrame(
     ...(selectedObjectId === null ? [] : [selectedObjectId]),
     ...additionalSelectedIds,
   ]);
-  const bounds = combinedBBox(project.scene.objects.filter((object) => ids.has(object.id)));
-  if (bounds === null) return null;
-  return {
-    centre: { x: (bounds.minX + bounds.maxX) / 2, y: (bounds.minY + bounds.maxY) / 2 },
-    width: bounds.maxX - bounds.minX,
-    height: bounds.maxY - bounds.minY,
-  };
+  return designFrame(project.scene.objects.filter((object) => ids.has(object.id)));
 }

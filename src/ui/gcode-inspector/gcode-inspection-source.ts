@@ -1,7 +1,9 @@
-import type { DeviceProfile } from '../../core/devices';
+import { machineBoundsForDevice, type DeviceProfile } from '../../core/devices';
 import type { MotionLimits } from '../../core/gcode-time';
 import { laserPowerControlForDevice, type BuildRenderModelOptions } from '../../core/gcode-view';
 import type { Project } from '../../core/scene';
+// Deep import: the viewer3d barrel is capped at 20 exports by its index contract.
+import type { Viewer3dRect } from '../viewer3d/viewer3d-look';
 
 /**
  * The kinematics and calibration the Inspector ETA plans against (ADR-425).
@@ -20,6 +22,9 @@ export type GcodeInspectionContext = Pick<
   'machineKind' | 'laserPowerControl'
 > & {
   readonly timing?: GcodeInspectionTiming;
+  /** The machine bed in program coordinates, only when the program runs in
+   * that frame (an Absolute laser job). Studio outlines it (ADR-426). */
+  readonly workArea?: Viewer3dRect;
 };
 
 export type GcodeInspectionSource = (
@@ -31,7 +36,19 @@ export type GcodeInspectionSource = (
 /** Context belongs to the compiled snapshot; arbitrary imported programs have
  * no inferred machine kind because CNC and laser share M3/M4/S words. */
 export function projectInspectionContext(project: Project): GcodeInspectionContext {
-  return deviceInspectionContext(project.device, project.machine?.kind ?? 'laser');
+  const machineKind = project.machine?.kind ?? 'laser';
+  const context = deviceInspectionContext(project.device, machineKind);
+  // Only an Absolute laser job is written in bed coordinates. Every other
+  // start runs from a work zero the program cannot know, and a CNC program's
+  // zero is on the stock, so no bed is drawn for those.
+  if (machineKind !== 'laser' || project.jobSetup.placement.startFrom !== 'absolute') {
+    return context;
+  }
+  const bed = machineBoundsForDevice(project.device);
+  return {
+    ...context,
+    workArea: { minX: bed.minX, maxX: bed.maxX, minY: bed.minY, maxY: bed.maxY },
+  };
 }
 
 export function deviceInspectionContext(

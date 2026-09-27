@@ -1,7 +1,14 @@
 export type Viewer3DCameraControl =
   | { readonly kind: 'pan'; readonly deltaX: number; readonly deltaY: number }
   | { readonly kind: 'rotate'; readonly deltaX: number; readonly deltaY: number }
-  | { readonly kind: 'zoom'; readonly deltaY: number };
+  | {
+      readonly kind: 'zoom';
+      readonly deltaY: number;
+      /** The pointer, in normalised device coordinates; zooms toward it (ADR-426). */
+      readonly cursor?: Viewer3DZoomCursor;
+    };
+
+export type Viewer3DZoomCursor = { readonly ndcX: number; readonly ndcY: number };
 
 const KEYBOARD_MOVE_STEP_PX = 12;
 const KEYBOARD_ZOOM_STEP_PX = 100;

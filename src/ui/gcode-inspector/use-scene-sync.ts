@@ -3,6 +3,8 @@
 
 import { useEffect, useRef, type RefObject } from 'react';
 import type { ArrowPlacement, PlayheadMarker, Viewer3dSceneHandle } from '../viewer3d';
+// Deep import: the viewer3d barrel is capped at 20 exports by its index contract.
+import type { Viewer3dStage } from '../viewer3d/viewer3d-look';
 import type { Viewer3dSceneState } from './use-viewer3d-scene';
 
 type SceneSyncArgs = {
@@ -18,6 +20,8 @@ type SceneSyncArgs = {
   /** Direction arrowheads, or null when the overlay is off. */
   readonly arrows: ReadonlyArray<ArrowPlacement> | null;
   readonly travelVisible: boolean;
+  /** Classic or Studio, and what Studio dresses the job with (ADR-426). */
+  readonly stage?: Viewer3dStage;
 };
 
 type AppliedSceneSync = SceneSyncArgs & { readonly handle: Viewer3dSceneHandle };
@@ -67,6 +71,7 @@ function syncSceneValues(
   force: boolean,
 ): void {
   if (force || previous === null) {
+    if (next.stage !== undefined) handle.setStage(next.stage);
     handle.setTravelVisible(next.travelVisible);
     setScenePlayhead(handle, next);
     handle.recolor(next.colorOf);
@@ -74,6 +79,7 @@ function syncSceneValues(
     handle.setLiveMachine(next.live);
     return;
   }
+  if (next.stage !== undefined && previous.stage !== next.stage) handle.setStage(next.stage);
   if (previous.travelVisible !== next.travelVisible) handle.setTravelVisible(next.travelVisible);
   if (
     !samePlayhead(previous.playhead, next.playhead) ||
