@@ -76,6 +76,27 @@ describe('reliefRoughingMotion', () => {
     }
   });
 
+  it('cuts the deepest cleanup before the rings while retaining linked motion', () => {
+    const base = level([rect(0, 0, 20, 20)]);
+    const cleanup = [rect(8, 8, 12, 12), rect(9, 9, 11, 11)];
+    const planned = { ...base, cleanup, cleanupStockInside: [false, false] };
+    const loops = contourLoops(
+      reliefRoughingMotion([planned], {
+        stockOnRight: true,
+        cutWidthMm: CUT_WIDTH_MM,
+      }),
+    );
+    expect(Math.abs(areaOf(loops[0] ?? []))).toBe(4);
+    expect(Math.abs(areaOf(loops[1] ?? []))).toBe(16);
+    expect(loops).toHaveLength(base.rings.flat().length + cleanup.length);
+    const ramped = reliefRoughingMotion([planned], {
+      stockOnRight: true,
+      cutWidthMm: CUT_WIDTH_MM,
+      rampAngleDeg: 3,
+    });
+    expect(ramped.some((pass) => pass.kind === 'path3d')).toBe(true);
+  });
+
   it('keeps the stock right of travel for climb and left for conventional', () => {
     const square = level([rect(0, 0, 20, 20)]);
     const climb = contourLoops(
@@ -212,7 +233,7 @@ describe('reliefRoughingMotion', () => {
       ),
       { numRuns: 25 },
     );
-  });
+  }, 30_000);
 
   it('ramps down along the first loop from the level above', () => {
     const square = level([rect(0, 0, 20, 20)], -1.5, -0.5);

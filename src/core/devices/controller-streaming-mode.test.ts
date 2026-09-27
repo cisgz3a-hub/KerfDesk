@@ -3,14 +3,17 @@ import { isStreamingModeCompatible, streamingModeForController } from './control
 import { KNOWN_CONTROLLER_KINDS } from './device-profile';
 
 describe('controller streaming-mode compatibility', () => {
-  it.each(['marlin', 'smoothieware'] as const)('%s requires ping-pong streaming', (kind) => {
-    expect(streamingModeForController(kind, 'char-counted')).toBe('ping-pong');
-    expect(isStreamingModeCompatible(kind, 'char-counted')).toBe(false);
-    expect(isStreamingModeCompatible(kind, 'ping-pong')).toBe(true);
-  });
+  it.each(['fluidnc', 'marlin', 'smoothieware'] as const)(
+    '%s requires ping-pong streaming',
+    (kind) => {
+      expect(streamingModeForController(kind, 'char-counted')).toBe('ping-pong');
+      expect(isStreamingModeCompatible(kind, 'char-counted')).toBe(false);
+      expect(isStreamingModeCompatible(kind, 'ping-pong')).toBe(true);
+    },
+  );
 
   it('preserves supported GRBL-family choices', () => {
-    for (const kind of ['grbl-v1.1', 'grblhal', 'fluidnc'] as const) {
+    for (const kind of ['grbl-v1.1', 'grblhal'] as const) {
       expect(streamingModeForController(kind, 'char-counted')).toBe('char-counted');
       expect(streamingModeForController(kind, 'ping-pong')).toBe('ping-pong');
     }

@@ -63,7 +63,7 @@ describe('isEmittableFillSegment', () => {
     expect(planFillSweeps(microGroup)).toEqual([]);
     expect(bounds).toBeNull();
     expect(gcode).not.toContain('kerfdesk:laser-off-motion');
-    expect(gcode).not.toMatch(/\bS300\b/);
+    expect(gcode).not.toMatch(/S300\b/);
   });
 
   it('does not plan or emit a signed-zero stationary powered move', () => {
@@ -72,7 +72,7 @@ describe('isEmittableFillSegment', () => {
 
     expect(planFillSweeps(signedZeroGroup)).toEqual([]);
     expect(gcode).not.toContain('kerfdesk:laser-off-motion');
-    expect(gcode).not.toMatch(/\bS300\b/);
+    expect(gcode).not.toMatch(/S300\b/);
   });
 
   it('filters after scan-offset translation when a reverse sweep collapses', () => {
@@ -85,7 +85,7 @@ describe('isEmittableFillSegment', () => {
     expect(planFillSweeps(candidate, 2 * CALIBRATED_OFFSET_MM)).toEqual([]);
     expect(computeJobMotionBounds({ groups: [candidate] }, DEFAULT_DEVICE_PROFILE)).toBeNull();
     expect(gcode).not.toContain('kerfdesk:laser-off-motion');
-    expect(gcode).not.toMatch(/\bS300\b/);
+    expect(gcode).not.toMatch(/S300\b/);
   });
 
   it('retains a reverse sweep that becomes moving after scan-offset translation', () => {
@@ -96,6 +96,6 @@ describe('isEmittableFillSegment', () => {
     const gcode = grblStrategy.emit({ groups: [candidate] }, DEFAULT_DEVICE_PROFILE);
 
     expect(planFillSweeps(candidate, CALIBRATED_OFFSET_MM)).toHaveLength(1);
-    expect(gcode).toContain('G1 X9.999 Y4.000 F1500 S300');
+    expect(gcode).toContain('G1X9.999Y4F1500S300');
   });
 });

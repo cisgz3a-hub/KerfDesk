@@ -28,6 +28,10 @@ export type LargeJobPreparationOptions = LiveJobEstimateOptions & {
   readonly snapshot?: { readonly registration?: SimilarityTransform | null };
 };
 
+// At most 1 MiB of UTF-16 source stays live while a route is built. Larger
+// programs and row providers keep the release-before-route allocation order.
+export const MAX_REUSABLE_PREVIEW_PROGRAM_CHARS = 512 * 1024;
+
 /**
  * Compile a large job once, then derive the preview and ETA from that exact
  * prepared output. This is intentionally unbounded and belongs in a worker.
@@ -81,12 +85,30 @@ export function largeJobPreparationFromPrepared(
 ): LargeJobPreparation {
   // Finish the planner's temporary allocations before retaining a complete
   // multi-million-step preview route. Both use this exact prepared output.
+  let emittedProgram: string | undefined;
+  const canReuseProgram =
+    prepared.ok &&
+    options.jobOrigin?.startFrom !== 'current-position' &&
+    !prepared.job.groups.some(
+      (group) => group.kind === 'raster' && group.rowProvider !== undefined,
+    );
   const estimate = estimateLiveJobFromPrepared(prepared, options.jobOrigin, {
     ...(options.initialPosition === undefined ? {} : { initialPosition: options.initialPosition }),
     unbounded: true,
+    ...(canReuseProgram
+      ? {
+          onEmittedProgram: (gcode: string) => {
+            if (gcode.length <= MAX_REUSABLE_PREVIEW_PROGRAM_CHARS) emittedProgram = gcode;
+          },
+        }
+      : {}),
   });
   const toolpath = buildPreviewToolpathFromPrepared(project, prepared, options.jobOrigin, {
     executablePlan: true,
+    // Optional sidecars may consume the bounded source retained above. Never
+    // emit a second complete program just to decorate this full preview route.
+    allowPlanEmission: false,
+    ...(emittedProgram === undefined ? {} : { emittedProgram }),
   });
   const serializedToolpath = serializeExecutablePlanPreviewRoute(toolpath);
   const jobOriginOffset = prepared.ok ? prepared.jobOriginOffset : { x: 0, y: 0 };

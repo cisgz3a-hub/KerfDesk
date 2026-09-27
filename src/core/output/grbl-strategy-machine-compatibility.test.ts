@@ -160,6 +160,7 @@ describe('grblStrategy machine compatibility dialects', () => {
     const out = grblStrategy.emit(
       { groups: [{ ...source, fillRunwayPolicy: 'legacy-skip' }] },
       DEFAULT_DEVICE_PROFILE,
+      { compactMotionWords: false },
     );
 
     expect(out).toBe(

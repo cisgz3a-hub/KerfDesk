@@ -1,8 +1,10 @@
 import type { CncContourPass, CncPass } from '../job';
 import type { CncCutType, CncLayerSettings, CncTool, Polyline, Vec2 } from '../scene';
 import { vcarveRegionBuckets } from './vcarve-region-order';
+import type { CncCuttingStage } from '../scene/cnc-stage-recipe';
 
 export type CncGroupCompileOptions = {
+  readonly cuttingStage?: CncCuttingStage;
   readonly layerPrimaryTool?: CncTool;
   readonly includeRampEntry?: boolean;
   readonly retractBetweenPasses?: boolean;

@@ -2405,6 +2405,10 @@ Setup has three visible stages for both Laser and CNC (ADR-240/306, amended 2026
 The stage buttons and Back/Next remain available while a draft needs corrections. Only **Save
 machine setup** requires valid configuration; review cards link back to the relevant fields.
 Connecting a controller is optional, so a complete setup can be saved offline.
+The Machine stage keeps **Review & save** visible beside **Check essentials**. After choosing a
+profile, **Review & save** opens the final review directly; **Save machine setup** applies it.
+**Check essentials** remains available to edit values first. Neither selecting the shortcut nor
+saving an ordinary software profile disconnects the controller.
 
 1. **Machine** — **Find my machine** opens the stage (ADR-420). It connects with the draft's
    controller, baud and streaming choice, reusing the remembered port as the rail's Connect does,
@@ -3962,7 +3966,8 @@ explicitly marked below; the remaining controls and user-facing flows are planne
 2. Passes run depth-major (whole level before stepping down) as a
    clearing group — before any profile cuts. The preview's removal
    shading shows the terraced relief forming.
-   Within a level each connected piece is cut inside out, starting in its
+   Within a level the deepest cleanup paths cut first (ADR-427), then
+   each connected ring piece is cut inside out, starting in its
    middle and widening one stepover at a time, and of the pieces ready the
    one nearest the bit comes next (ADR-424). Every ring keeps its stock on
    the side the layer's cut direction asks for, round islands as well as

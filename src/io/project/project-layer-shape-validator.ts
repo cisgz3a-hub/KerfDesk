@@ -1,4 +1,5 @@
 import { DITHER_ALGORITHMS } from '../../core/scene';
+import { validateCncStageRecipes } from './project-cnc-stage-validator';
 import { cutExtrasFieldErrors } from './project-cut-extras-validator';
 import {
   firstError,
@@ -23,6 +24,7 @@ import { validateLayerOperationSettings, validateLayerSubLayers } from './projec
 export function validateProjectLayer(layer: unknown, path: string): string | null {
   if (!isObject(layer)) return `missing or invalid \`${path}\``;
   return firstError([
+    validateCncStageRecipes(layer['cnc'], `${path}.cnc`),
     requireString(layer, `${path}.id`),
     requireString(layer, `${path}.name`),
     requireString(layer, `${path}.color`),

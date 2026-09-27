@@ -11,6 +11,9 @@ import {
   type CompiledReliefFacts,
   type PlungingReliefStage,
 } from './job-review-detail-facts';
+import { cncCuttingStageLabel } from '../../../core/scene/cnc-stage-recipe';
+import { nominalChiploadMm } from '../../../core/cnc/nominal-chipload';
+import { effectiveGcodeFeedMmPerMin } from '../../../core/gcode/feed-word';
 
 export type JobReviewEffectiveOperation = {
   readonly layerId: string;
@@ -148,11 +151,19 @@ function cncGroupSummary(group: CncGroup): string {
       : '';
   return (
     actualDepth +
+    (group.cuttingStage === undefined ? '' : `${cncCuttingStageLabel(group.cuttingStage)} · `) +
     `${tool} · ${group.passes.length} ${plural(group.passes.length, 'pass', 'passes')}` +
-    ` · ${formatNumber(group.feedMmPerMin)} mm/min feed` +
-    ` · ${formatNumber(group.plungeMmPerMin)} mm/min plunge` +
-    ` · ${formatNumber(group.spindleRpm)} RPM · ${coolant}`
+    ` · ${formatNumber(effectiveGcodeFeedMmPerMin(group.feedMmPerMin))} mm/min feed` +
+    ` · ${formatNumber(effectiveGcodeFeedMmPerMin(group.plungeMmPerMin))} mm/min plunge` +
+    ` · ${formatNumber(Math.max(0, Math.round(group.spindleRpm)))} RPM · ${coolant}` +
+    nominalChiploadSummary(group)
   );
+}
+
+function nominalChiploadSummary(group: CncGroup): string {
+  if (group.toolFluteCount === undefined) return '';
+  const chipload = nominalChiploadMm(group.feedMmPerMin, group.spindleRpm, group.toolFluteCount);
+  return chipload === null ? '' : ` · ${chipload.toFixed(4)} mm/tooth programmed nominal chipload`;
 }
 
 function laserGroupSummary(

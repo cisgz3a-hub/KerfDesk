@@ -99,3 +99,11 @@ cleanup paths into passes, in heightmap mm; the compiler maps them to the machin
   `compile-cnc-relief-roughing-coverage.test.ts` (one pass per level, ramped entries clear the
   floor, the entry comment, climb round an island through the compiler);
   `CncReliefFinishFields.test.tsx` (the Roughing ramp row).
+
+
+### Integration with ADR-427 (2026-09-27)
+
+Deepest cleanup now precedes regular rings, rather than following them. Cleanup
+outline/island stock-side metadata describes that inside-out order. The piece tree,
+nearest selection, checked links, ramps and slice-top contract remain unchanged.
+ADR-427's compile/removal oracle includes links when checking newly removed stock.

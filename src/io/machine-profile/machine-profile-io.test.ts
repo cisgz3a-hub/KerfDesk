@@ -53,6 +53,19 @@ function deserializeProfilePatch(patch: Record<string, unknown>) {
 }
 
 describe('LaserForge machine profile documents', () => {
+  it('repairs buffered streaming in an older imported FluidNC profile', () => {
+    const result = deserializeProfilePatch({
+      controllerKind: 'fluidnc',
+      streamingMode: 'char-counted',
+      rxBufferBytes: 512,
+    });
+    if (result.kind !== 'ok') throw new Error(`expected ok, got ${result.kind}`);
+    expect(result.document.profile).toMatchObject({
+      controllerKind: 'fluidnc',
+      streamingMode: 'ping-pong',
+      rxBufferBytes: 512,
+    });
+  });
   it('serializes deterministic .lfmachine.json with canonical profile safety fields', () => {
     const document: MachineProfileDocument = {
       format: MACHINE_PROFILE_FORMAT,
