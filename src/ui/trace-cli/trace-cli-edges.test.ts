@@ -108,6 +108,29 @@ describe('trace command edges (ADR-477)', () => {
     expect(await readImageHeaderDensity(new Blob([new Uint8Array(far)]))).toBeNull();
   });
 
+  it('traces an image above the app inline-trace bound, with no Worker', async () => {
+    // 640 x 400 is 256,000 px, over the 160,000 px the app traces off-worker.
+    // Node has no Worker, so the command must trace it in-thread, not refuse.
+    const width = 640;
+    const height = 400;
+    const rgb = new Uint8Array(width * height * 3).fill(255);
+    for (let y = 100; y < 300; y += 1) rgb.fill(0, (y * width + 200) * 3, (y * width + 440) * 3);
+    let out = '';
+    let err = '';
+    const code = await runTraceCli(['-p', 'Line Art'], {
+      readInput: async () => encodeRgbPng(rgb, width, height),
+      writeOutput: async (_path, text) => {
+        out += text;
+      },
+      writeError: (text) => {
+        err += text;
+      },
+    });
+    expect(err).toBe('');
+    expect(code).toBe(0);
+    expect(out).toContain('<path');
+  });
+
   it('scales pixel-unit settings from the preview grid above the 2048 px cap', () => {
     const lineArt = TRACE_PRESETS['Line Art'] as TraceOptions;
     const options: TraceOptions = { ...lineArt, ignoreLessThanPixels: 10, edgeMinLengthPx: 3 };

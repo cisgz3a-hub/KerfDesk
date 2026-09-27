@@ -12,7 +12,7 @@ import { traceOptionsForCommitGrid } from '../trace/trace-commit-grid';
 import { PREVIEW_MAX_EDGE_PX, scaleToCap } from '../trace/trace-decode-cap';
 import { traceNoticeMessage, type TraceNotice } from '../trace/trace-notices';
 import { mergeLightBurnTraceSettings } from '../trace/trace-options';
-import { traceImageWithFallback } from '../trace/use-trace-worker-client';
+import { traceImageInThreadWithFallback } from '../trace/use-trace-worker-client';
 import { traceCliHelp } from './trace-cli-help';
 import { parseTraceCliArgs, TraceCliUsageError, type TraceCliOptions } from './trace-cli-options';
 import { traceCliSource, type TraceCliSource } from './trace-cli-source';
@@ -84,10 +84,11 @@ export async function traceCliText(
     ],
     {
       // Multi-File Trace's trace function: a first pass that finds nothing
-      // under aggressive preprocessing is retried with relaxed settings. With
-      // no Worker (Node) it traces in-thread.
+      // under aggressive preprocessing is retried with relaxed settings. Node
+      // has no Worker, so it traces in-thread at any size (the app's inline
+      // bound exists to keep its UI thread responsive).
       trace: async (image, traceOptions) => {
-        const traced = await traceImageWithFallback(image, traceOptions);
+        const traced = await traceImageInThreadWithFallback(image, traceOptions);
         notices.push(...(traced.notices ?? []));
         return traced.paths;
       },

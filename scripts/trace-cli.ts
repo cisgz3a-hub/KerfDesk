@@ -14,6 +14,11 @@ async function readStdin(): Promise<Uint8Array> {
   return new Uint8Array(Buffer.concat(chunks));
 }
 
+// A reader that closes early (`| head`) makes stdout emit EPIPE. The write
+// callback below already carries that error to the command's exit 1 path; this
+// listener only stops Node from also crashing on the unhandled 'error' event.
+process.stdout.on('error', () => undefined);
+
 function writeStdout(text: string): Promise<void> {
   return new Promise((resolve, reject) => {
     process.stdout.write(text, 'utf8', (error) => (error == null ? resolve() : reject(error)));

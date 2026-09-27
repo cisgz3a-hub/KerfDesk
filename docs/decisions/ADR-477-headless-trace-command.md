@@ -18,10 +18,11 @@ output, and takes a backend and tracing parameters as flags.
 ### Decision
 
 1. **One pipeline.** `src/ui/trace-cli/run-trace-cli.ts` traces one image with
-   `traceImagesToVectorFiles`, the trace function Multi-File Trace passes it
-   (`traceImageWithFallback`: a first pass that finds nothing under aggressive preprocessing
-   is re-traced with relaxed settings; with no Worker under Node it runs in-thread) and the
-   same writers (`tracedLayersToDxf`, `writeTracedDrawing`). A relaxed-settings retry is
+   `traceImagesToVectorFiles`, the trace Multi-File Trace passes it (a first pass that finds
+   nothing under aggressive preprocessing is re-traced with relaxed settings; the command
+   shares that retry with `traceImageWithFallback` through `traceImageInThreadWithFallback`,
+   which traces in-thread at any size because Node has no Worker and no UI thread to keep
+   responsive, where the app bounds off-worker tracing to 160,000 px) and the same writers (`tracedLayersToDxf`, `writeTracedDrawing`). A relaxed-settings retry is
    printed to standard error with the app's toast wording. So for the same pixels, size and options SVG,
    DXF, PDF, EPS and GeoJSON come out byte for byte as the app writes them (which pixels
    reach the tracer is point 3's and point 4's business). Output defaults are the Multi-File Trace dialog's:
