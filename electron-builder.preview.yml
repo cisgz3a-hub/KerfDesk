@@ -92,7 +92,8 @@ mac:
   identity: null
   hardenedRuntime: false
   notarize: false
-  minimumSystemVersion: '12.0'
+  # Electron 44 needs macOS 13 Ventura or newer (Chromium dropped macOS 12).
+  minimumSystemVersion: '13.0'
   extendInfo:
     NSCameraUsageDescription: KerfDesk uses a camera to align work with material and preview the machine workspace.
     NSLocalNetworkUsageDescription: KerfDesk connects to cameras on the local network for workspace preview.
