@@ -1,5 +1,6 @@
 // CameraPanel — the LightBurn-style Camera Control panel (ADR-107/116): pick
-// a camera (machine-integrated via the bridge, RTSP by URL, or USB), start it
+// a camera (machine-integrated via the bridge, RTSP by URL, a phone camera
+// app by its address (ADR-448), or USB), start it
 // as the active source, calibrate it from one photo (ADR-441), control the
 // workspace overlay, and self-check via Diagnostics. Opened from the top
 // toolbar / Tools menu via the `tools.camera` command (like the registration
@@ -18,6 +19,7 @@ import { CameraDiagnostics } from './CameraDiagnostics';
 import { CameraSetupSteps } from './CameraSetupSteps';
 import { MachineCameraSection } from './MachineCameraSection';
 import { noteStyle } from './panel-styles';
+import { PhoneCameraSection } from './PhoneCameraSection';
 import { RtspSourceControls } from './RtspSourceControls';
 import { SavedCamerasSection } from './SavedCamerasSection';
 import { SnapshotControls } from './SnapshotControls';
@@ -75,6 +77,7 @@ function CameraPanelOpen(): JSX.Element {
             onDetect={() => void detectMachineCamera(bridge)}
           />
           <RtspSourceControls />
+          <PhoneCameraSection />
         </>
       ) : (
         <HostedNetworkCameraNotice />
@@ -154,15 +157,18 @@ function cameraShownOnCanvas(): boolean {
 // Why the machine camera works in Desktop and not here: the laser's camera
 // serves plain http on the local network without CORS, so an https page may
 // at most display it (Chrome's Local Network Access) and can never read its
-// pixels, which calibration, the corrected overlay and trace all need.
+// pixels, which calibration, the corrected overlay and trace all need. A
+// phone camera app is the same kind of local-network camera (ADR-448).
 function HostedNetworkCameraNotice(): JSX.Element {
   return (
     <div style={hostedNoticeStyle}>
       <strong>USB cameras work here.</strong>
       <span>
-        A laser&apos;s built-in camera and RTSP/IP cameras cannot be read by a web page: they answer
-        on your local network without the permission browsers require. KerfDesk Desktop reads them
-        through its own local camera bridge, with nothing to set up.
+        So does a phone that shows up as a webcam (Continuity Camera on a Mac, or a webcam app with
+        its computer driver). A laser&apos;s built-in camera, RTSP/IP cameras and phone camera apps
+        cannot be read by a web page: they answer on your local network without the permission
+        browsers require. KerfDesk Desktop reads them through its own local camera bridge, with
+        nothing to set up.
       </span>
       <DownloadDesktopLink />
     </div>

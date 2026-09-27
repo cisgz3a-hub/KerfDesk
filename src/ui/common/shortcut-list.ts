@@ -1,7 +1,8 @@
 // Shortcut reference data — single source for the toolbar hover hint and the
 // Keyboard Shortcuts dialog.
 //
-// Keep in sync with shortcuts.ts, use-job-shortcuts.ts, and drag-state.ts —
+// Keep in sync with shortcuts.ts, use-job-shortcuts.ts, use-jog-shortcuts.ts,
+// jog-keyboard-map.ts, and drag-state.ts —
 // the audit (M27/A.5) caught the old hint omitting four shipped shortcuts.
 // The job-control family is machine-aware (ADR-101 §7): same keys, right noun.
 
@@ -17,6 +18,18 @@ export type ShortcutFamily = {
   readonly family: string;
   readonly rows: ReadonlyArray<ShortcutRow>;
 };
+
+// Keyboard jog, live while the jog pad is shown and enabled: Z focus on the
+// Page keys, XY on LightBurn's Move-window keys (ADR-493, jog-keyboard-map.ts).
+const JOG_SHORTCUT_ROWS: ReadonlyArray<ShortcutRow> = [
+  { keys: 'PageUp/PageDown', action: 'jog Z (focus) up/down one step' },
+  { keys: 'Ctrl+Shift+] / Ctrl+Shift+[', action: 'jog up/down one step, like the jog arrows' },
+  { keys: 'Ctrl+Alt+[ / Ctrl+Alt+]', action: 'jog left/right one step' },
+  {
+    keys: 'Numpad 8/2/4/6 (Num Lock on)',
+    action: 'jog up/down/left/right one step; 7/9/1/3 jog diagonally',
+  },
+];
 
 export function shortcutFamilies(machineKind: MachineKind): ReadonlyArray<ShortcutFamily> {
   return [
@@ -90,7 +103,7 @@ export function shortcutFamilies(machineKind: MachineKind): ReadonlyArray<Shortc
       rows: [
         { keys: 'Ctrl+Enter', action: 'start job' },
         { keys: 'Ctrl+.', action: 'abort the job or machine motion, or turn a latched Fire off' },
-        { keys: 'PageUp/PageDown', action: 'jog Z (focus) up/down one step' },
+        ...JOG_SHORTCUT_ROWS,
       ],
     },
   ];
