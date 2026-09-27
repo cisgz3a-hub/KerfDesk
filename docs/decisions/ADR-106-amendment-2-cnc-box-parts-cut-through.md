@@ -33,8 +33,12 @@ generated box from cutting out as inserted:
 
 - A CNC box now compiles to full-depth G-code as inserted. Measured on the dialog's default CNC
   box (6.35 mm stock, 3.175 mm bit, 1 × 1 dividers, relief on) for all three styles: the deepest
-  cut is Z -6.35, every point inside every slot is swept by the bit at full depth, the bit centre
-  never comes within one radius of the fitted part, and each outline keeps its four holding tabs.
+  cut is Z -6.35, slot pockets run before outlines, and each outline keeps its four holding tabs.
+  Independent sampling of the emitted cutter sweep at 0.5 mm spacing found four points per
+  closed/open-top box near the relief boundary with up to 0.006 mm of residual clearance beyond
+  the sweep; the slide-lid sample found none. This demonstrates full-depth pocket clearing,
+  not exact coverage of every point of the polygon. Offset approximation and emitted coordinate
+  rounding remain part of the software result; physical fit is unverified until a real cut.
 - A seat corner that falls under a holding-tab window is relieved only down to the tab top, like
   the rest of the tab. Trimming the tab clears it.
 - The depth comes from the dialog's material thickness, which is prefilled from the machine's
