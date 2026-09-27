@@ -3849,23 +3849,29 @@ explicitly marked below; the remaining controls and user-facing flows are planne
 1. Open polylines cannot be offset; they are cut on-path (documented
    fallback), closed shapes on the same layer still offset normally.
 
-#### Edge — a tapered ball nose sets pocket or profile offsets
-1. A tapered ball nose's stored diameter is its widest, at the top of the flutes, and
-   it cuts narrower at any shallower depth. Outside and inside profiles and pockets
-   offset by the width it cuts at the operation's full depth, so the wall meets the
-   drawn line at the stock surface and follows the taper and then the ball below it.
-   An outside part is its drawn size at the top face and larger below; a hole is its
-   drawn size at the top face and smaller below. Every depth pass rides that one path
-   (ADR-368 Amendment 2).
+#### Edge — a bit that narrows toward its tip sets pocket or profile offsets
+1. A ball nose, V-bit, engraving bit or tapered ball nose stores its widest cutting
+   diameter and cuts narrower at any shallower depth: a ball nose until the cut is as
+   deep as its radius, a V-bit or engraving bit until its cone reaches the diameter, a
+   tapered ball nose until the top of its flutes. Outside and inside profiles and
+   pockets offset by the width the bit cuts at the operation's full depth, so the wall
+   meets the drawn line at the stock surface and follows the bit's shape below it. An
+   outside part is its drawn size at the top face and larger below; a hole is its drawn
+   size at the top face and smaller below. Every depth pass rides that one path
+   (ADR-368 Amendments 2 and 3). A flat end mill, and any cut deeper than the bit
+   narrows, still offset by the diameter.
 2. Pocket rings and raster sweeps, and relief roughing rings, step by the stepover
    percentage of the width the bit cuts in one depth pass, so no rib stands between
    them. Tab windows add the full-depth cut width to the tab width, so a bridge is never
-   narrower than requested. The 3D removal preview shows the taper and the ball corner.
-3. A tapered ball nose without a usable ball tip and taper is planned as a flat
-   cylinder of its stored diameter. When one is the main bit of a pocket, an inside
-   or outside profile, or a relief, Job Review warns that the result comes out
-   off-size or ribbed and asks for the bit's tip and taper or a flat end mill
-   (ADR-368 Amendments 1 and 2). The warning never blocks save or Start.
+   narrower than requested. The 3D removal preview shows the bit's wall and floor shape.
+   Job Review's On path size warning and full-tab-coverage warning give the cut width
+   too. V-carve and engrave never offset by the diameter and are unchanged.
+3. A V-bit or engraving bit without a usable included angle or tip flat, or a tapered
+   ball nose without a usable ball tip and taper, is laid out at its stored diameter.
+   When one is the main bit of a pocket, an inside or outside profile, or a relief,
+   Job Review warns that the result comes out off-size or ribbed and asks for the bit's
+   geometry or a flat end mill (ADR-368 Amendments 1 to 3). The warning never blocks
+   save or Start.
 
 ### F-CNC3. CNC preflight and save G-code
 
@@ -3945,8 +3951,10 @@ explicitly marked below; the remaining controls and user-facing flows are planne
    heightmap cells, then the map is dilated by the active bit's footprint
    plus the layer's Rough allowance (0.5 mm unless set), sliced into Z levels by the layer's
    depth-per-pass, and each level's region fills with concentric rings at
-   the layer's physical stepover: a percentage of the bit diameter, or for a
-   tapered ball nose of the width it cuts over one level (ADR-368 Amendment 2).
+   the layer's physical stepover: a percentage of the width the bit cuts over
+   one level. That is the bit diameter for a flat end mill, and narrower for a
+   ball nose, V-bit, engraving bit or tapered ball nose on levels shallower than
+   the bit narrows (ADR-368 Amendments 2 and 3).
    Each ring ends where it started (ADR-289 Amendment 1).
    The allowance holds in 3D: roughing plans with the bit widened sideways by
    the allowance plus the contour clearance, so steep walls keep their stock
@@ -4478,8 +4486,9 @@ and lifts the command's CNC-only gate.)*
 2. Between sections the G-code retracts, stops the spindle (M5), parks,
    and pauses on M0 with comments naming the next bit. GRBL holds until
    cycle start; the streaming UI's Resume continues the job.
-3. Geometry offsets use each layer's OWN bit diameter, or a tapered ball nose's
-   cut width at the layer depth (ADR-368 Amendment 2).
+3. Geometry offsets use each layer's OWN bit: its diameter, or for a bit that
+   narrows toward its tip its cut width at the layer depth (ADR-368 Amendments 2
+   and 3).
 
 #### Error — v-carve layer with a flat bit
 1. Job Review warns with the layer's bit named (not just the machine bit), but
@@ -7839,9 +7848,9 @@ the edge it sits on, and a midpoint over the same edge.
    sketch draws on its top face in each layer's colour, and the carve renders
    live underneath — pockets flat-floor, v-carves groove by boundary distance
    with the layer's v-bit angle, profiles slot at bit diameter on the offset
-   side (a tapered ball nose at its cut width at the layer depth, the offset
-   the compiler uses), drills bore at circle centres, and depths at the stock
-   thickness read as through cuts.
+   side (a bit that narrows toward its tip at its cut width at the layer
+   depth, the offset the compiler uses), drills bore at circle centres, and
+   depths at the stock thickness read as through cuts.
 2. The left button always belongs to the armed tool — draw, select, and move
    exactly as in 2D, from any camera angle (the pointer lands on the stock
    plane). Middle drag pans, Shift+middle or right drag orbits, the wheel

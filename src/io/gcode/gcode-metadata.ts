@@ -89,7 +89,11 @@ export type GcodeMetadata = {
 // all adaptive ring closure and flat depth-slice provenance above is retained.
 // Scan timing v2 also preserves M3 state across shared, empty and coincident
 // Image handoffs (ADR-445); cached v1 output must be regenerated.
-export const EMITTER_REVISION = 'adaptive-relief-ramp-laps-scan-timing-20260927-v1';
+// ADR-368 amendment 3 sizes ball-nose, V-bit and engraving pocket and profile
+// offsets, tab windows, and pocket and relief-roughing stepover by the cut
+// width at depth.
+// ADR-457's independent finishing recipes survive the ramp transformation.
+export const EMITTER_REVISION = 'adaptive-relief-ramp-laps-cut-width-scan-timing-20260927-v1';
 
 // Machine-specific assumption lines (ADR-103 defect fix): router exports
 // previously carried the laser-worded `$32=1 (laser mode)` banner. The S

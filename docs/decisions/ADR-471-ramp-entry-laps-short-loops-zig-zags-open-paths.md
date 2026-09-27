@@ -75,7 +75,10 @@ operator's choice for pockets.
    the advisory `cnc-ramp-entry-plunge` to Job Review and Save, naming Helical entry for pockets.
 5. **No new refusal.** An impossible lap count throws a `RangeError` at the ECMAScript Array
    length limit, as the tabbed ramp does; nothing smaller is refused.
-6. `EMITTER_REVISION` advances to `ramp-entry-laps-zigzag-level-above-20260927-v1`.
+6. After integration with independent stage recipes, narrowed cutter widths and scan timing,
+   `EMITTER_REVISION` advances to `adaptive-relief-ramp-laps-cut-width-scan-timing-20260927-v1`.
+   The finishing-stage wrapper retains each pass's cutting recipe around the ramp transform,
+   and the minimum retraced path uses the same full-depth cutter width as its wall layout.
 
 The maintainer chose items 2 and 4 over the alternatives on 2026-09-27: lapping loops shorter
 than one cut width too (ADR-278's rule: no plunge left, but the 0.285 mm ring would take 15 laps
@@ -131,4 +134,8 @@ Not changed, recorded for follow-up:
   down, the advisory line) and preflight (an advisory, not a compile-integrity code). All seven
   fail against the previous compiler.
 - `motion-polish.test.ts`, `tabbed-ramp-entry.test.ts` and `cnc-tab-ramp.test.ts` pass unchanged.
+- `contour-ramp-stage-integration.test.ts` compiles short inside profiles with independent
+  finishing recipes through both lapping and disclosed-plunge paths. It checks separate depth
+  ladders, emitted feed/plunge/spindle values, a complete lap at depth and the narrowed V-bit
+  wall geometry and ramp threshold after integration with ADR-457 and ADR-368 Amendment 3.
 - NOT verified: air cuts, material cuts, or any hardware. There is no machine for this project.
