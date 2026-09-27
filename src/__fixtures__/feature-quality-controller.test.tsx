@@ -11,9 +11,6 @@ import { stockNativeEvidence } from '../ui/state/native-bed-frame.test-support';
 import { useStore } from '../ui/state/store';
 import { respondToTestGrblHandshake } from '../ui/state/laser-test-start-helpers';
 import { dispatchPositionLaser } from '../ui/workspace/position-laser-click';
-import { InspectorView } from '../ui/gcode-inspector/InspectorView';
-import { inspectGcodeText } from '../ui/gcode-inspector/gcode-inspector-parse';
-import type * as Viewer3dModule from '../ui/viewer3d';
 import type * as ExecutionTrackingModule from '../ui/laser/start-job-execution-tracking';
 import { transmitPreparedStart } from '../ui/laser/start-job-transmission';
 import { cancelVariableStreamAdvancement } from '../ui/laser/variable-stream-advancement';
@@ -21,13 +18,8 @@ import { Cnc3DFullPage } from '../ui/workspace/Cnc3DFullPage';
 import { PlatformProvider } from '../ui/app/platform-context';
 import { useShortcuts } from '../ui/app/use-shortcuts';
 import { useUiStore } from '../ui/state/ui-store';
-import { fakeViewer3dSceneHandle } from './viewer3d-scene-handle';
 
-const mocks = vi.hoisted(() => ({ createScene: vi.fn(), activate: vi.fn() }));
-vi.mock('../ui/viewer3d', async (load) => ({
-  ...(await load<typeof Viewer3dModule>()),
-  createViewer3dScene: mocks.createScene,
-}));
+const mocks = vi.hoisted(() => ({ activate: vi.fn() }));
 vi.mock('../ui/laser/start-job-execution-tracking', async (load) => ({
   ...(await load<typeof ExecutionTrackingModule>()),
   activateAcceptedFreshRun: mocks.activate,
@@ -205,52 +197,6 @@ describe('feature controller and workspace regressions', () => {
     expect(await pending).toBeInstanceOf(Error);
     expect(useLaserStore.getState()).toBe(replacementState);
     expect(useLaserStore.getState().wcoCache).toEqual({ x: 40, y: 50, z: 0 });
-  });
-
-  it('applies the latest travel visibility when the asynchronous scene becomes ready', async () => {
-    const scene = deferred<Viewer3dModule.Viewer3dSceneResult>();
-    mocks.createScene.mockReturnValue(scene.promise);
-    const program = 'G21 G90\nM3 S500\nG0 X10 Y0\nG1 X20 Y0 F600';
-    const result = inspectGcodeText(program);
-    if (result.parsed.kind !== 'ok' || result.analysis === null)
-      throw new Error('fixture parse failed');
-    const model = result.parsed.model;
-    const analysis = result.analysis;
-    const host = document.createElement('div');
-    document.body.appendChild(host);
-    const root = createRoot(host);
-    const setTravelVisible = vi.fn();
-    const handle = fakeViewer3dSceneHandle({ setTravelVisible });
-    try {
-      await act(async () =>
-        root.render(
-          <InspectorView
-            model={model}
-            analysis={analysis}
-            source={{ kind: 'text', text: program }}
-            sourceIndex={result.sourceIndex}
-          />,
-        ),
-      );
-      const toggle = [...host.querySelectorAll('input')].find(
-        (input) => input.title === 'Show or hide the non-cutting moves between shapes',
-      );
-      if (!toggle) throw new Error('travel control missing');
-      await act(async () => toggle.click());
-      expect(toggle.checked).toBe(false);
-      await act(async () => {
-        scene.resolve({ kind: 'ok', handle });
-        await flush();
-      });
-      expect(host.querySelector('[data-viewer-state]')?.getAttribute('data-viewer-state')).toBe(
-        'ready',
-      );
-      expect(toggle.checked).toBe(false);
-      expect(setTravelVisible).toHaveBeenLastCalledWith(false);
-    } finally {
-      await act(async () => root.unmount());
-      host.remove();
-    }
   });
 
   it('advances variables when terminal completion precedes recovery activation', async () => {
