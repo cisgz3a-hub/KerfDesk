@@ -5,9 +5,11 @@
 // pins that the whole chain agrees for the shipped Falcon A1 Pro profile.
 import { describe, expect, it } from 'vitest';
 import { buildResumeProgram } from '../../core/controllers/grbl/resume-program';
+import { buildProgramTimeline } from '../../core/gcode-time';
 import type { DeviceProfile } from '../../core/devices';
 // Deep import: the devices barrel is at its public-export ratchet.
 import { FALCON_A1_PRO_GRBLHAL_PROFILE } from '../../core/devices/falcon-profiles';
+import { AIR_KEEP_ALIVE_SECONDS } from '../../core/output/air-keep-alive';
 import {
   createLayer,
   createProject,
@@ -80,6 +82,11 @@ function airWords(lines: ReadonlyArray<string>): string[] {
   return lines.filter((line) => /^M[789]$/.test(line));
 }
 
+/** Air words with the keep-alive repeats of the one before folded away (ADR-462). */
+function airSwitches(lines: ReadonlyArray<string>): string[] {
+  return airWords(lines).filter((word, index, words) => word !== words[index - 1]);
+}
+
 function isBurn(line: string): boolean {
   return /^G1\b.*\bS[1-9]/.test(line);
 }
@@ -104,10 +111,33 @@ describe('air assist from operation settings to controller bytes', () => {
     const m8 = lines.indexOf('M8');
     const m9 = lines.lastIndexOf('M9');
 
-    expect(airWords(lines)).toEqual(['M8', 'M9']);
+    expect(airSwitches(lines)).toEqual(['M8', 'M9']);
+    expect(airWords(lines).length).toBeGreaterThan(2);
     expect(m8).toBeLessThan(lines.findIndex(isBurn));
     expect(lines.slice(m9).some(isBurn)).toBe(false);
     expect(lines.slice(m9 + 1).find((line) => line !== '')).toBe('M5');
+  });
+
+  it('repeats the Falcon A1 Pro air command before its pump timer can run out', () => {
+    // The firmware stops the pump 20-30 s after the last M8 (ADR-462). Timed by
+    // KerfDesk's own planner, no air command is further from the next than the
+    // keep-alive interval plus the one move that crossed it.
+    const device = FALCON_A1_PRO_GRBLHAL_PROFILE;
+    const lines = emittedLines([{ air: true, mode: 'fill' }, { air: true }], device);
+    const timed = buildProgramTimeline(lines.join('\n'), {
+      accelMmPerSec2: device.accelMmPerSec2,
+      junctionDeviationMm: device.junctionDeviationMm,
+      maxFeedMmPerMin: device.maxFeed,
+    });
+    if (timed.kind !== 'ok') throw new Error(`Timing failed: ${timed.reason}`);
+    const ends = timed.timeline.rawLineEndSeconds;
+    const air = lines.flatMap((line, index) => (/^M[789]$/.test(line) ? [index] : []));
+    const gaps = air.slice(1).map((index, n) => (ends[index] ?? 0) - (ends[air[n] ?? 0] ?? 0));
+
+    expect(air.length).toBeGreaterThan(4);
+    expect(Math.max(...gaps)).toBeLessThanOrEqual(AIR_KEEP_ALIVE_SECONDS + 1);
+    expect(airSwitches(lines)).toEqual(['M8', 'M9']);
+    for (const index of air.slice(1, -1)) expect(lines[index + 1]).toMatch(/[XY]-?\d/);
   });
 
   it('switches air per operation when the profile can restart it', () => {
@@ -119,7 +149,7 @@ describe('air assist from operation settings to controller bytes', () => {
   it('follows an artwork override that turns air on inside an Air-off operation', () => {
     const lines = emittedLines([{ air: false, objectAir: true }], FALCON_A1_PRO_GRBLHAL_PROFILE);
 
-    expect(airWords(lines)).toEqual(['M8', 'M9']);
+    expect(airSwitches(lines)).toEqual(['M8', 'M9']);
   });
 
   it('writes no air command when the saved profile has Air output disabled', () => {

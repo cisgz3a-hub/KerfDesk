@@ -12,21 +12,26 @@
 // and then stops" and a machine that sits Idle for about a minute mid-burn
 // before carrying on. KerfDesk cannot read `$152` on this controller (the
 // vendor contract forbids `$$`), so the remedy is named rather than checked;
-// the Console can write it (ADR-370).
+// the Console can write it (ADR-370). The emitter now repeats the air command
+// every AIR_KEEP_ALIVE_SECONDS of motion on these profiles (ADR-462), so the
+// advisory says so and keeps `$152=100` as the remedy if air still stops.
 //
 // Advisory only (rule 7 / ADR-228, ADR-345): it never refuses a Start.
 
 import type { DeviceProfile } from '../../../core/devices';
 import type { Job } from '../../../core/job';
+import { AIR_KEEP_ALIVE_SECONDS } from '../../../core/output/air-keep-alive';
 
 type StandbyDevice = Pick<DeviceProfile, 'airAssistCommand' | 'airAssistRestartUnreliable'>;
 
 export const AIR_STANDBY_WARNING =
   'This controller idles its air pump and laser module on its own standby timer ($152, ' +
-  '100 = never) and Creality firmware has been seen dropping the pump mid-job. If air ' +
-  'stops after a few minutes or the machine sits Idle mid-burn and then continues, send $152=100 ' +
-  'from the Console, or install the latest firmware and confirm with an air test. KerfDesk ' +
-  'names such a hold in the live bar and keeps waiting; it does not reset the controller.';
+  '100 = never), and Creality firmware has been seen stopping the pump about 30 s after the ' +
+  `air command. KerfDesk repeats the air command every ${AIR_KEEP_ALIVE_SECONDS} s of motion ` +
+  'while this job wants air. If air still stops or the machine sits Idle mid-burn and then ' +
+  'continues, send $152=100 from the Console, or install the latest firmware and confirm with ' +
+  'an air test. KerfDesk names such a hold in the live bar and keeps waiting; it does not ' +
+  'reset the controller.';
 
 export function detectAirAssistStandbyWarnings(
   job: Job,

@@ -160,8 +160,9 @@ export function AirAssistRow(props: DeviceRowsProps): JSX.Element {
 // air, which is what an operator wants once `$152=100` (no standby: the pump
 // and laser module stay powered) is sent from the Console (ADR-370), or an air
 // test shows the installed firmware restarting the pump (A1 and A1 Pro firmware
-// are numbered separately). Hidden while air output is disabled, where it would
-// mean nothing.
+// are numbered separately). The same flag makes the job repeat the air command
+// while air is on, because that firmware's timer also stops a running pump
+// (ADR-462). Hidden while air output is disabled, where it would mean nothing.
 export function AirRestartRow({ device, update }: DeviceRowsProps): JSX.Element | null {
   if (device.airAssistCommand === 'none') return null;
   return (
@@ -170,7 +171,7 @@ export function AirRestartRow({ device, update }: DeviceRowsProps): JSX.Element 
         type="checkbox"
         checked={device.airAssistRestartUnreliable === true}
         aria-label="Controller cannot restart air assist mid-job"
-        title="Tick when the controller cannot switch air off and on again inside a running job — Creality A1 firmware holds the pump in standby after M9 and may not restart it. Air is then held on through operations that sit between two air-on operations, and Job Review says so. Untick once $152=100 (no standby) is sent from the Console, or after an air test shows your firmware restarting the pump."
+        title="Tick when the controller cannot switch air off and on again inside a running job — Creality A1 firmware holds the pump in standby after M9 and may not restart it. Air is then held on through operations that sit between two air-on operations, and the air command is repeated every few seconds while air is on so the pump timer cannot stop it; Job Review says so. Untick once $152=100 (no standby) is sent from the Console, or after an air test shows your firmware restarting the pump."
         onChange={(event) => update({ airAssistRestartUnreliable: event.target.checked })}
       />
       <span style={{ opacity: 0.7 }}>cannot switch air off and on mid-job</span>

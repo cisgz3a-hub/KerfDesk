@@ -3164,8 +3164,9 @@ work-Z evidence, but it cannot enable User Origin or Verified Origin.
     blocked.
 12. **Air pump across an Air-off operation (ADR-335).** Build three
     operations with Air on, off, then on, and Start. On a profile with
-    "Air restart" ticked the program must contain exactly one `M8` and
-    one `M9`, the pump must still be running through the middle
+    "Air restart" ticked the program must switch air exactly once each
+    way (`M8`, then `M9` after the last operation; the `M8` repeats of
+    step 13 switch nothing), the pump must still be running through the middle
     operation and the last one, and Job Review must name the held
     operation and `$152=100` (ADR-345: Creality's Falcon A1 parameter
     page defines `$152` as the standby wait, so `100` keeps the pump
@@ -3178,6 +3179,14 @@ work-Z evidence, but it cannot enable User Origin or Verified Origin.
     go back to `M8 M9 M8 M9`. If the pump is audibly off for the last
     operation with the box ticked, the hold is not working; if it is
     off only with the box unticked, the firmware timer is confirmed.
+13. **Air pump through a long job (ADR-462).** Leave `$152` at the
+    machine's default, not `100`. Run a job of a minute or more whose
+    operations all have Air on. With "Air restart" ticked the program
+    repeats `M8` every few seconds of motion, and the pump and the
+    enclosure fan must run until the job's last burn. Untick "Air
+    restart" and run it again: the program carries a single `M8`, and a
+    pump that stops about 20-30 s in confirms the firmware timer the
+    repeats work around.
 
 When this checklist passes on the Falcon, replace the F.3 status in `PROJECT.md` Phase F
 ("Code shipped; hardware verification pending") with the recorded result and update the F.3
