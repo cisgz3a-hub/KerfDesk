@@ -146,6 +146,17 @@ The planning-evidence and camera files passed unchanged in isolation and retain
 their existing budgets. Fresh full release checks are required for the refreshed
 candidate; these diagnostics are not substitutes for that gate.
 
+Later stall diagnosis captured a reproducible property failure at seed 20260927,
+case 317. Independent exact rational segment/edge intersections confirmed that
+the actual production link remains inside its region; floating interpolation
+rounded one sample onto a boundary vertex that the strict ray-cast oracle
+excluded. The test now includes exact boundary points, rejects neighbouring
+excluded points without a distance allowance, and pins this input alongside all
+25 generated cases. First-failure reporting avoids unpreemptible synchronous
+shrinking. This is a test-only correction; production relief geometry is unchanged
+and matches the current main implementation. Fresh CI applies to the corrected
+candidate, rather than treating an earlier random pass as proof against this case.
+
 ## Physical qualification
 
 The accompanying pack provides setup records, artwork fixtures, measurement
