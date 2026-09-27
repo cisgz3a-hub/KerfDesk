@@ -41,6 +41,11 @@ model name nor a synthetic test establishes a machine's measured correction.
    A sweep that entirely disappears on that grid must preserve the previous emitted power
    state, including a deferred M3 close. Positioning alone cannot consume the first engraving
    feed: only a written engraving F word establishes it, including on a dark closing G1.
+   Image group handoffs also carry the actual last controller position and any pending mode
+   or air changes. If an incoming M3 burn ends at the first Image burn's start, a dark move
+   of at most 1 mm along that run and back gives the pending changes a moving, dark boundary.
+   It adds no reach outside the existing path. Blank or collapsed groups preserve those
+   changes until a later real dark move; outgoing Image positions remain known to vectors.
 2. Fill honours `compactMotionWords`, resetting modal spelling at each sweep. GRBL Dynamic,
    Raster, and 4040 Safe scan output use compact spelling. The 4040 dialect still repeats F
    and S as configured, and keeps its power modes and controlled seek speed. GRBL Compatible

@@ -48,6 +48,32 @@ export function rasterSweepOpening(
   };
 }
 
+/**
+ * An incoming M3 burn can end exactly at this image's first burn. Darken on
+ * that burn's existing path and return before arming the image, just as the
+ * vector cursor does. The caller inserts its held opening after the first
+ * move. Both endpoints are on the controller grid; no new reach is added.
+ */
+export function rasterEntryExcursion(
+  startX: number,
+  y: number,
+  firstTargetX: number,
+  formatting: {
+    readonly input: { readonly controlledLaserOffTravelFeedMmPerMin?: number };
+    readonly writer: ModalMotionWriter;
+    readonly style: MotionWordStyle;
+  },
+): ReadonlyArray<string> {
+  const { input, writer, style } = formatting;
+  const feed = input.controlledLaserOffTravelFeedMmPerMin;
+  const distance = Math.min(1, Math.abs(firstTargetX - startX));
+  const asideX = startX + Math.sign(firstTargetX - startX) * distance;
+  return [
+    formatLaserOffTravel(asideX, y, feed, writer, style),
+    formatLaserOffTravel(startX, y, feed, writer, style),
+  ];
+}
+
 function formatLaserOffTravel(
   x: number,
   y: number,

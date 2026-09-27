@@ -165,6 +165,29 @@ passed afterwards: zero-line sweeps preserve the previous state, and only an act
 F word satisfies the feed requirement. The tests cover compact and verbose M3/M4 output and
 the real Image-to-Cut handoff; the deferred opening remains after the first positioning move.
 
+A separate, pre-existing OR-1 handoff defect was reproduced in 11 more tests: the strategy did
+not pass known head positions into or out of Image emission. A Cut/Fill ending exactly at
+the next Image entry therefore wrote a coincident seek while still lit. Image-to-vector and
+Image-to-Image handoffs lost the same position, and blank Images could flush pending mode or
+air changes too early. The repair carries the known position and pending opening across the
+boundary. When no real positioning move precedes the next burn, it uses the existing vector
+policy of a dark excursion along that first burn and back, bounded to 1 mm and the burn edge.
+Tests verify unchanged powered geometry and power, the bounded motion envelope, and the held
+air commands. All 11 failed before the repair and passed afterwards. The broader combined
+raster/output/metadata cohort then passed 248 tests across 35 files. Sweep emission was
+subsequently extracted into its own module to meet the repository's function and file limits.
+
+A post-extraction combined rerun crashed with V8 `Zone Allocation failed` while the host had
+about 1.2 GB free physical memory. It reported a controller-grid property failure before the
+crash, without a counterexample; that run is failed/incomplete. The isolated ten-test suite
+passed, followed by a bounded 1,000-case run using seed `20260927` with no failures. The latter
+JSON result is retained as `controller-grid-seed20260927.json` in the external audit directory.
+This is non-reproduction evidence, not a claim that the interrupted run passed. Final-source
+TypeScript, scoped lint/format, file-size, soft-size, export and ADR gates pass.
+The subsequent serial rerun passed all 248 tests across 35 files; its JSON is retained as
+`final-handoff-cohort.json`. The scan-timing emitter revision advances to v2 so prepared output
+from before the shared/empty/coincident Image repairs cannot retain the same identity.
+
 ## Physical acceptance after this code is available
 
 1. Use the actual saved machine/head profile. Confirm its acceleration, feed limits, laser
