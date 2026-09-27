@@ -17,7 +17,8 @@ those straight plunges, and nothing said which passes plunged. ADR-471 added the
 so for contour ramps (an `entryPlunge` marker on the contour pass, a header advisory and the Job
 Review advisory `cnc-ramp-entry-plunge`) and listed relief roughing as not yet using it.
 
-Reproduced on main 52cb50cce with PR #975 applied: compiled with `compileCncJob`, emitted with
+Reproduced on main 52cb50cce with PR #975 applied, and again on main 8e037c2fc after it merged
+(all 16 programs byte-identical between the two): compiled with `compileCncJob`, emitted with
 `cncGrblStrategy`, and the emitted G-code replayed through a flat end mill stock simulation
 (0.05 mm cells). 3.175 mm end mill, 1.5 mm per pass, 40% stepover, the default 0.5 mm allowance
 and a 5 degree ramp; each relief 30 mm square and 3 mm deep:
@@ -48,12 +49,14 @@ angle every pass plunges and the group claims no ramp, so there is nothing to di
    `Layer L1: 2 relief roughing passes plunge straight down instead of ramping: a loop shorter
    than one cut width is too tight to ramp round. Set Ramp entry to 0 to remove this notice.`
    It names the field the layer's card shows for the angle relief roughing reads: Ramp entry on a
-   profile, pocket or engrave layer, Roughing ramp on any other. ADR-471's wording fits relief
-   except for the field: on a V-carve layer, Ramp entry sets the V-bit angle
+   profile, pocket or engrave layer, Roughing ramp on any other. ADR-471's message, applied to
+   relief unchanged, would not say which passes it meant on a layer that also holds shapes, and
+   would name the wrong field: on a V-carve layer Ramp entry sets the V-bit angle
    (`vCarveRampEntryDeg`), so setting it to 0 would never remove the notice, and inlay and drill
    layers show no Ramp entry row. The rule behind the card's Roughing ramp row
    (`cutTypeShowsRampEntry`) moved from `CncReliefStrategyRows.tsx` to
-   `src/core/cnc/relief-ramp-field.ts`, so the card and the notice share it. The code stays
+   `src/core/cnc/relief-ramp-field.ts`, so the card and the notice share it. The header line
+   keeps ADR-471's words, since it sits in the roughing group's own section. The code stays
    `cnc-ramp-entry-plunge`: an advisory, not a compile-integrity code.
 4. `EMITTER_REVISION` advances to `relief-ramp-plunges-disclosed-20260927-v1`.
 
@@ -72,8 +75,9 @@ weighed and declined by ADR-424 and again by ADR-471.
   line and are otherwise identical; the other 11 are byte-identical.
 - Job Review's operation line is unchanged: it still reads `ramp entry 5°` for relief roughing,
   which records the ramp it cuts; the advisory lists the passes that plunge instead.
-- Not changed: tiled output rebuilds clipped contour passes without the marker, so tiled relief
-  roughing, like a tiled contour ramp (ADR-471), carries no plunge count.
+- Not changed here: on main 8e037c2fc tiled output rebuilds clipped contour passes without the
+  marker, so tiled relief roughing, like a tiled contour ramp (ADR-471), carries no plunge count.
+  Open PR #978 keeps the marker on every clipped fragment, which covers relief roughing too.
 
 ### Verification
 
@@ -88,4 +92,11 @@ weighed and declined by ADR-424 and again by ADR-471.
   code. A layer's relief plunges are reported apart from its other passes.
 - Against the code before this amendment, the four tests that check the marker, the header, the
   advisory and the grouping fail; the two that check for no marker pass either way.
+- On main 8e037c2fc: the CNC, relief, output, G-code and preflight suites, with the relief layer
+  field and Job Review relief-entry tests, pass 2,141 tests in 290 files (one opt-in benchmark
+  skipped), run with a 60 s test timeout because the shared machine was loaded. `pnpm
+  typecheck`, ESLint and Prettier on the changed files, and the ADR-number, file-size,
+  soft-size and index-export gates pass.
 - NOT verified: air cuts, material cuts, or any hardware. There is no machine for this project.
+  The running app was not opened; the card change only moves the Roughing ramp rule into core,
+  and `CncReliefFinishFields.test.tsx` still covers that row.
