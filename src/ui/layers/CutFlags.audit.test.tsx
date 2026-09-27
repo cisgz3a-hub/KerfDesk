@@ -31,7 +31,7 @@ describe('artwork control audit: cut settings', () => {
     useStore.getState().setLayerParam(id, { mode });
     const before = layer(1);
     const host = await mount(<CutsLayersPanel />);
-    await click(button(host, 'Advanced cut settings'));
+    await click(button(host, 'More cut settings'));
     await openDisclosure(
       host,
       mode === 'line'
@@ -53,25 +53,10 @@ describe('artwork control audit: cut settings', () => {
     expect(layer().output).toBe(true);
   });
 
-  it.each([
-    ['image', 'Negative image', 'negativeImage'],
-    ['image', 'Pass-through image', 'passThrough'],
-  ] as const)(
-    'commits the %s %s inline toggle to the selected operation',
-    async (mode, label, field) => {
-      arrangeTwo();
-      useStore.getState().setLayerParam(layer(1).id, { mode });
-      const before = layer(1)[field];
-      const host = await mount(<CutsLayersPanel />);
-      await openDisclosure(host, 'Image options');
-      await click(input(host, `input[aria-label="${label} for selected objects"]`));
-      expect(layer(1)[field]).toBe(!before);
-    },
-  );
-
-  // Scan direction is a per-job speed/quality trade-off, so it has to stay on
-  // the always-visible card. No disclosure is opened before the click, and the
-  // control must not sit inside one.
+  // Scan direction is a per-job speed/quality trade-off, so it stays a visible
+  // switch in the inspector (ADR-430). No disclosure is opened before the
+  // click, and the control must not sit inside one. Invert and original pixels
+  // moved to Cut Settings; the Apply test above covers them there.
   it.each([
     ['fill', 'Bidirectional fill', 'fillBidirectional'],
     ['image', 'Bidirectional image scan', 'imageBidirectional'],
@@ -94,7 +79,7 @@ describe('artwork control audit: cut settings', () => {
     const id = layer(1).id;
     useStore.getState().setLayerParam(id, { power: 63, speed: 888 });
     const host = await mount(<CutsLayersPanel />);
-    await click(button(host, 'Advanced cut settings'));
+    await click(button(host, 'More cut settings'));
     await openDisclosure(host, 'Saved defaults');
     // The operation shows a palette color; the default belongs to its blue artwork.
     await click(button(host, 'Make Default for #0000ff'));

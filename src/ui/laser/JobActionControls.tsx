@@ -60,7 +60,11 @@ export function JobActionControls(props: Props): JSX.Element {
   if (props.docked) {
     return (
       <>
-        <div className="lf-job-dock__status" data-ready={model.framedReady}>
+        <div
+          className="lf-job-dock__status"
+          data-ready={model.framedReady}
+          data-frame-next={model.frameIsNext}
+        >
           {status}
           <span className="lf-job-dock__estimate">{estimate}</span>
         </div>
@@ -95,13 +99,16 @@ function useJobActionModel(props: { readonly disabled: boolean; readonly streami
   const busy = props.disabled || props.streaming || framePending;
   const framedRunIssue = framedRunReadinessIssue(laser.framedRun, app, laser);
   const framedReady = framedRunIssue === null;
+  const frameControl = frameControlProps(busy, laser.statusReport?.state);
   return {
     onFrame,
     framedRunIssue,
     framedReady,
     preparingFrame,
     cancellablePreparation: preparingFrame && cancellable,
-    frameControl: frameControlProps(busy, laser.statusReport?.state),
+    frameControl,
+    // The dock's one bright action: Frame until this exact job is framed, then Start.
+    frameIsNext: !framedReady && !frameControl.disabled,
     frameLabel: preparingFrame ? 'Preparing Frame…' : framedReady ? 'Frame again' : 'Frame job',
     // Frame is the only Start gate (ADR-228): Start stays greyed out until a
     // clean Frame of this exact job completes, and then nothing else holds it.
@@ -135,6 +142,7 @@ function JobActionButtons(props: {
     <button
       type="button"
       className={docked ? 'lf-btn' : 'lf-btn lf-btn--go'}
+      data-primary={docked ? model.frameIsNext : undefined}
       onClick={model.onFrame}
       disabled={model.frameControl.disabled}
       title={model.frameControl.title}
@@ -148,6 +156,7 @@ function JobActionButtons(props: {
       type="button"
       className={docked ? 'lf-btn lf-job-dock__start' : 'lf-btn lf-btn--go'}
       style={docked ? undefined : primaryActionStyle}
+      data-primary={docked ? model.framedReady : undefined}
       onClick={props.onStartJob}
       disabled={model.startControl.disabled}
       title={model.startControl.title}

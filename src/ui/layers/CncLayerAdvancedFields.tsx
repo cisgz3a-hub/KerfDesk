@@ -264,7 +264,12 @@ export function CutTypeSections(props: {
           label="Relief finish"
           hint="Review relief depth ownership and control the spacing of the finishing passes."
         >
-          <ReliefLayerRows layer={layer} settings={settings} onCommit={onCommit} />
+          <ReliefLayerRows
+            layer={layer}
+            settings={settings}
+            onCommit={onCommit}
+            onCommitSettings={props.onCommitSettings}
+          />
         </RailSection>
       ) : null}
       {settings.cutType === 'v-carve' ? (

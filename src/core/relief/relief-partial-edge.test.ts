@@ -36,6 +36,8 @@ function partialMap(
 describe('relief partial terminal cells', () => {
   it('places finishing centers inside the exact physical extent', () => {
     const map = partialMap(1, 0.3, 0.3, 4, 1);
+    // Alternate the depth so point reduction (ADR-421) keeps every center.
+    map.depth.set([-1, -0.5, -1, -0.5]);
     const passes = reliefFinishingPasses(map, {
       tool: POINT_TOOL,
       kernel: kernelForTool(POINT_TOOL, map.mmPerCell),
@@ -107,10 +109,22 @@ describe('relief partial terminal cells', () => {
     const radiusMm = tool.diameterMm / 2;
     const centerDistanceMm = 1.05 - 0.5;
     const expectedDz = radiusMm - Math.sqrt(radiusMm ** 2 - centerDistanceMm ** 2);
-    const tip = dilateHeightmapByTool(map, kernelForTool(tool, map.mmPerCell), 0);
+    const kernel = kernelForTool(tool, map.mmPerCell);
+    const lattice = dilateHeightmapByTool(map, kernel, 0, { betweenSamples: false });
 
-    expect(tip[0]).toBeCloseTo(-expectedDz, 6);
-    expect(tip[0]).toBeGreaterThan(-1);
+    expect(lattice[0]).toBeCloseTo(-expectedDz, 6);
+    expect(lattice[0]).toBeGreaterThan(-1);
+
+    // ADR-412: the ball meets the ramp between the two samples where its own
+    // slope matches the ramp's, which holds the tip higher than either sample.
+    const slope = 1 / centerDistanceMm;
+    const contactRadius = (radiusMm * slope) / Math.sqrt(1 + slope * slope);
+    const contactTip =
+      -1 + slope * contactRadius - (radiusMm - Math.sqrt(radiusMm ** 2 - contactRadius ** 2));
+    const tip = dilateHeightmapByTool(map, kernel, 0);
+
+    expect(tip[0]).toBeCloseTo(contactTip, 6);
+    expect(tip[0]).toBeGreaterThan(lattice[0] ?? 0);
   });
 
   it('treats an included partial cell as physically adjacent to excluded stock', () => {

@@ -91,10 +91,10 @@ describe('operation inspector artwork ownership', () => {
     try {
       let previousChoice = 'constant';
       for (const choice of ['dynamic', 'constant', 'auto']) {
-        const open = [...mounted.host.querySelectorAll('button')].find(
-          (button) => button.textContent === 'Advanced cut settings',
+        const open = mounted.host.querySelector<HTMLButtonElement>(
+          'button[aria-label="More cut settings"]',
         );
-        if (open === undefined) throw new Error('Advanced settings missing');
+        if (open === null) throw new Error('More cut settings missing');
         await act(async () => open.click());
         const field = document.querySelector<HTMLSelectElement>('select[name="powerMode"]');
         if (field === null || field.form === null) throw new Error('Power mode form missing');

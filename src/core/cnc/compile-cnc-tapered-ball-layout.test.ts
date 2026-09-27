@@ -27,6 +27,7 @@ import {
   type SceneObject,
 } from '../scene';
 import { compileCncJob } from './compile-cnc-job';
+import { roughingLoops } from '../relief/relief-roughing-chain.test-support';
 
 // Amana 46282, as the audit modeled it: 6.25 mm across the top of the flutes,
 // a 1/16" ball tip, 5.4 degrees per side.
@@ -315,9 +316,9 @@ describe('tapered ball-nose relief roughing', () => {
 
     // Each level's rings step in by the stepover of the cut width over one
     // level (0.691 mm), where the widest diameter stepped 2.5 mm.
-    const ringMinXs = roughing.passes
-      .filter((pass) => pass.kind === 'contour' && pass.zMm === -3)
-      .map((pass) => (pass.kind === 'contour' ? Math.min(...pass.polyline.map((p) => p.x)) : 0))
+    const ringMinXs = roughingLoops(roughing.passes)
+      .filter((loop) => loop.zMm === -3)
+      .map((loop) => Math.min(...loop.points.map((p) => p.x)))
       .sort((a, b) => a - b);
     expect(ringMinXs.length).toBeGreaterThan(3);
     for (let ring = 1; ring < ringMinXs.length; ring += 1) {

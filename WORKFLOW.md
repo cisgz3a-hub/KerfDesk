@@ -94,6 +94,7 @@ opportunity, without an extra branding delay. It introduces no startup interacti
 - **Top command toolbar**: Open, Import, Import Image, Save and Preview lead with readable labels when space permits. Selecting an image brings Trace image into the row; Image Studio remains in **More**. Other commands remain in **More** and the application menus, with their existing shortcuts, disabled reasons, tooltips and actions. The row measures available width and moves commands into More instead of scrolling horizontally. Utility controls share the row down to 520 px. The project name includes an unsaved-change indicator.
 - **Numeric transforms**: X, Y, width, height, rotation, and the aspect-ratio lock remain directly available. **Anchor** opens the existing nine-point transform reference selector in a keyboard-accessible popover. Changing its presentation does not change the X/Y reference, resize anchor, or rotation centre.
 - **Artwork / Operations panel**: docked right with **Settings**, **Run order**, and **Materials** views in Laser mode; CNC keeps Settings and Run order. Settings is the default. Run order shares the same docked rail at the same width while the canvas remains on the left; it is not a modal or a third sidebar, and switching views never resizes the rail (ADR-348). Materials owns reusable preset and saved-library management without displacing the active job workflow. A header chevron collapses the rail to a narrow named strip; the same strip expands it.
+- **Laser artwork settings (ADR-430)**: the selected artwork's name heads the Settings view, with the Operation | Artwork switch under it. The Operation view leads with the operation's colour and name, then one scope line only when an edit reaches other artwork (with **Make unique**). **Line**, **Fill** and **Image** are three buttons; Power, Speed and Passes share one row; Fill adds Line spacing and Angle, and Image adds Dither, Line interval and (Grayscale) Min power. Scan both ways and Air assist are one-line switches whose explanations are tooltips. **More cut settings** opens Cut Settings for everything else and names what it holds. Include in output, Show on canvas and **Add operation** close the view.
 - **Operation cards**: the list comes before the artwork inspector, with the selected operation's process fields before secondary artwork properties. Each card keeps its visibility toggle on the face. Its **•••** disclosure contains order, output, artwork selection, settings clipboard, and delete controls.
 - **Machine controls panel**: in Spacious layout it is docked at the far right with the same collapse/expand pattern. Both panels can be resized or hidden independently. It may be collapsed during a job because active run controls live independently in the Live Motion bar.
 - **Toasts**: share the canvas's available space (lower left of the workspace, above the live controls) or a reserved row inside the open modal — never the rails, where they hid Start/Job and the layer list. Only the newest three render. The toast body does not take pointer input, so a click or drag through it reaches the canvas; the × control dismisses it early. Success confirmations dismiss after 4 s; advisories and failures after 8 s.
@@ -527,7 +528,7 @@ destination and cannot overwrite the template source.
   together. Named sections reveal the applicable line, fill or image options. **Advanced cut
   settings** groups the full draft editor by purpose; **Apply settings** commits the draft and
   **Cancel** leaves the operation unchanged.
-- **Saved defaults** in Advanced cut settings offers **Make Default for #rrggbb**, which remembers
+- **Saved defaults** in More cut settings offers **Make Default for #rrggbb**, which remembers
   the operation's applied settings for the colour it names: the colour of the artwork the operation
   was created for, or the operation's own colour when it has no artwork. New operations and **Reset
   to Default** use the default saved for that same colour, otherwise **Make Default for All**. The
@@ -697,14 +698,14 @@ marks later edits as unapproved without changing the existing Frame/Start policy
 
 ### F-A7a. Perforation, overcut and image overscan (ADR-415)
 
-1. **Advanced cut settings → Line detail → Perforation**: **Enable**, **Cut** and **Skip** (mm) cut
+1. **More cut settings → Line detail → Perforation**: **Enable**, **Cut** and **Skip** (mm) cut
    every line of the operation as dashes with uncut gaps. Closed shapes keep a full gap before their
    start point, so no dash is longer than Cut and no gap shorter than Skip. Perforation applies after
    kerf and tabs.
 2. **Overcut** (mm, 0 is off) keeps cutting past the start of each closed shape on the final pass
    only, retracing its first edges, so the seam is cut through. Shapes opened by tabs or perforation
    are not overcut.
-3. **Advanced cut settings → Image detail → Overscan** (0 to 25 mm, default 5) sets the laser-off
+3. **More cut settings → Image detail → Overscan** (0 to 25 mm, default 5) sets the laser-off
    run-up at both ends of every scan line. The note under it says how much run-up this machine needs
    to reach the operation's saved speed.
 4. Job Review lists these settings on the operation's detail line when they are set. Preview, Frame,
@@ -3932,23 +3933,54 @@ explicitly marked below; the remaining controls and user-facing flows are planne
 1. A relief object on an output-enabled layer compiles to waterline
    roughing: object XY scale is first rasterized into square physical-mm
    heightmap cells, then the map is dilated by the active bit's footprint
-   plus a 0.5 mm finishing allowance, sliced into Z levels by the layer's
+   plus the layer's Rough allowance (0.5 mm unless set), sliced into Z levels by the layer's
    depth-per-pass, and each level's region fills with concentric rings at
    the layer's physical stepover: a percentage of the bit diameter, or for a
    tapered ball nose of the width it cuts over one level (ADR-368 Amendment 2).
-   Each ring ends where it started. Above a 50% stepover, the stock a level's
-   rings leave standing (the level's centre, cusps between rings) is cleared
-   right after them (ADR-289 Amendment 1).
+   Each ring ends where it started (ADR-289 Amendment 1).
+   The allowance holds in 3D: roughing plans with the bit widened sideways by
+   the allowance plus the contour clearance, so steep walls keep their stock
+   too, and each ring point clears the model surface between samples as well
+   as at them (ADR-412). When the stepover is wider than the bit reaches on
+   that level's slice (ADR-413), the stock the level's rings leave standing
+   (its centre, cusps between rings) is cleared right after them (ADR-289
+   Amendment 1).
+   Ladder levels below the deepest tip become one level at it, so the floor
+   keeps exactly the allowance, and a flat the ladder would overshoot by more
+   than 0.05 mm gets a level of its own that clears only its band (ADR-422).
+   With a **Slope step** set, band levels that far apart between the
+   depth-per-pass levels cut only the slopes between them, so a slope keeps
+   terraces no taller than the step instead of a whole pass (ADR-422
+   Amendment 1). 0 or unset is off.
+   With **Flats** set to Roughing bit and an end mill roughing, every flat
+   of the model at least as wide as the bit is cut to its exact height,
+   still keeping the allowance off the walls beside it: on the roughing
+   level one allowance above it when that level can reach it within one
+   depth per pass of where its stock stands, otherwise in separate slices
+   after all roughing, each within the requested depth per pass (ADR-450).
+   Any other roughing bit ignores the setting.
 2. Passes run depth-major (whole level before stepping down) as a
    clearing group — before any profile cuts. The preview's removal
    shading shows the terraced relief forming.
+   Within a level each connected piece is cut inside out, starting in its
+   middle and widening one stepover at a time, and of the pieces ready the
+   one nearest the bit comes next (ADR-424). Every ring keeps its stock on
+   the side the layer's cut direction asks for, round islands as well as
+   outlines. The bit stays down between rings when the straight move to the
+   next ring is no longer than one cut width and stays where the level may
+   cut, or, between a piece's outline and its islands, stays inside that
+   already cleared piece; otherwise it lifts. With a ramp angle set (the
+   layer's Ramp entry, or **Roughing ramp** where the cut type has none),
+   each run of linked rings descends along its first ring from the level
+   above instead of plunging; a ring shorter than one cut width plunges.
 3. Emitted G-code passes the plunged-travel invariant; scale is resolved
    before cutter geometry, then mirror/rotate/move placement is honored.
 
 #### Error — bit too big for the detail
 1. Regions narrower than the bit's dilated footprint produce no rings
    there — fine detail is left for the H.8 finishing pass (and the
-   preview shows it uncut). This is a sampled-grid region result; roughing's
+   preview shows it uncut). Ring vertices clear the piecewise-linear model
+   surface under the bit (ADR-412); roughing's
    dual-grid/offset vertices, continuous sweep, and subcell detail retain
    ADR-289's qualification boundary.
 
@@ -3969,7 +4001,8 @@ explicitly marked below; the remaining controls and user-facing flows are planne
    interior beyond that limit. The latter two are retained with the exact
    compiled/recovery Job and reach Job Review as warnings only; they never
    refuse Frame, Start, preview, save, or G-code emission, and the probe never
-   adds a cutter move.
+   adds a cutter move. A core-cleanup offset failure reports through the same
+   warning (ADR-413).
 
 ### F-CNC7. Import an STL relief — Phase H.4 (ADR-098/309)
 
@@ -3986,7 +4019,10 @@ explicitly marked below; the remaining controls and user-facing flows are planne
    larger than the bed is scaled down to fit, with a warning (F-A3). The
    worker transfers its typed mesh into the live object without expanding
    it into a boxed number array on the UI thread.
-3. The canvas shows the relief as a grayscale depth map — light = stock
+3. The mesh keeps its CAD top-view orientation: +Y in the STL is the top of
+   the canvas, so raised text reads the right way round (ADR-414). Meshes
+   already saved in projects keep the orientation they were saved with.
+   The canvas shows the relief as a grayscale depth map — light = stock
    top, dark = floor. It selects, moves, and saves/loads like any object;
    `.lf2` embeds the mesh as the existing JSON number-array schema so
    projects stay self-contained and older saved projects still reopen.
@@ -4556,18 +4592,45 @@ and lifts the command's CNC-only gate.)*
    requests a planar-grid ridge-height target. Compile then emits the
    roughing group AND a finishing group cut with that bit (an M0 change
    separates them when the bits differ).
-2. Finishing rides the sampled max-plus tip surface in serpentine rows. A ball
+2. Finishing rides the max-plus tip surface in serpentine rows, raised on the
+   rows it emits until the bit clears the model surface between samples as
+   well as at them (ADR-412). A ball
    nose uses `2*sqrt(c*(2r-c))` physical-XY spacing after bounding scallop `c`
    to [0.001 mm, bit radius]. A tapered ball nose uses the same law with its
    tip ball radius and samples a grid of at most a tenth of the tip diameter;
    its flank lies below that sphere, so the planar cusp can only be lower, and
    its whole flank constrains the tip (ADR-368). Flat bits use the larger of
-   0.05 mm and 40% of diameter. The grid attempts that resolved spacing and
-   its whole-row stride rounds down so it does not overshoot it. This qualifies sampled finishing
-   vertices and planar cusp, not a continuous included-surface sweep or true
-   along-surface scallop proof (ADR-292/294).
-3. Roughing still leaves its fixed 0.5 mm allowance (it exists FOR this
-   pass); finishing consumes it down to the true surface.
+   0.05 mm and 40% of diameter. The grid cell divides that resolved spacing
+   into whole rows no coarser than a tenth of the contact diameter, so rows
+   land at the requested spacing; the whole-row stride still rounds down so it
+   never overshoots it (ADR-421). This qualifies finishing
+   vertices against the piecewise-linear surface and the planar cusp, not the
+   XY chord between vertices, subcell detail, or true along-surface scallop
+   (ADR-292/294/412).
+3. Without a mask, the rows form one stay-down path: each row steps to the
+   next along its edge column's own tip samples instead of retracting and
+   plunging. A vertex is dropped only where the straight move replacing it
+   stays at or above it by no more than 0.002 mm, so the reduced path clears
+   everything the sampled one did (ADR-421). A mask that excludes cells keeps
+   one pass per run.
+4. Roughing leaves the layer's Rough allowance (0.5 mm unless set; it exists
+   FOR this pass); finishing consumes it down to the true surface.
+5. Raster direction runs the rows along X (default) or along Y (ADR-423).
+6. Finish strategy Raster + waterline narrows the rows to cos 45° of the
+   scallop's spacing and adds waterline passes wherever the tip surface
+   slopes 45° or more, levels sin 45° of that spacing apart, so passes are
+   never further apart along the surface than the scallop's spacing. Each
+   feature is circled top down in one stay-down pass, climb or conventional
+   as the layer's cut direction says on the physical bed. Every waterline
+   vertex clears the model exactly and every move is checked; a relief with a
+   mask outline gets the narrowed raster only (ADR-423).
+7. With **Flats** set to Roughing bit, the raster skips every sample from
+   which the bit would touch only flats the roughing end mill took to their
+   exact height, and cuts what it keeps nearest first: it stays down across
+   gaps up to four bit diameters, lifting to the highest tip along the way,
+   and retracts across longer ones. The part comes out as the full raster
+   leaves it, the flats without scallops (ADR-450). A relief with a mask
+   outline keeps the full raster.
 
 #### Error — unknown finishing bit id
 1. The missing ID stays visible as a disabled diagnostic choice. Prepared

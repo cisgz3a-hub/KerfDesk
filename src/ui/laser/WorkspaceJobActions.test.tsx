@@ -90,9 +90,16 @@ describe('Workspace job dock', () => {
     expect(button('Start').disabled).toBe(true);
     expect(button('Start').title).toContain('Start unlocks when a Frame of this exact job');
 
+    expect(button('Frame job').dataset['primary']).toBe('false');
+
     act(() => useLaserStore.setState({ statusReport: idleControllerStatusForFrameTest() }));
     expect(button('Frame job').disabled).toBe(false);
     expect(button('Start').disabled).toBe(true);
+    // Frame is the next step, so it and the "Not framed" line carry the copper.
+    expect(button('Frame job').dataset['primary']).toBe('true');
+    expect(host.querySelector('.lf-job-dock__status')?.getAttribute('data-frame-next')).toBe(
+      'true',
+    );
   });
 
   it.each(['streaming', 'paused', 'tool-change', 'errored', 'done'] as const)(
@@ -149,6 +156,9 @@ describe('Workspace job dock', () => {
     expect(button('Start').disabled).toBe(false);
     expect(button('Frame again').disabled).toBe(false);
     expect(host.textContent).toContain('Ready to start — framed job unchanged');
+    // One bright action at a time: Start once framed, Frame again goes quiet.
+    expect(button('Start').dataset['primary']).toBe('true');
+    expect(button('Frame again').dataset['primary']).toBe('false');
     act(() => button('Start').click());
     expect(calls.start).toHaveBeenCalledOnce();
 
@@ -156,6 +166,8 @@ describe('Workspace job dock', () => {
     expect(button('Start').disabled).toBe(true);
     expect(button('Frame job').disabled).toBe(false);
     expect(host.textContent).toContain('Frame expired');
+    expect(button('Frame job').dataset['primary']).toBe('true');
+    expect(button('Start').dataset['primary']).toBe('false');
   });
 
   it('mounts one estimator and action pair while preserving setup, placement, recovery, and console', () => {

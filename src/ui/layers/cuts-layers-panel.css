@@ -1,4 +1,5 @@
 .lf-artwork-panel {
+  container-type: inline-size;
   box-sizing: border-box;
   display: flex;
   flex-direction: column;
@@ -10,6 +11,8 @@
 }
 
 .lf-artwork-panel-heading {
+  /* The Laser / CNC switch sizes itself against this row (machine-mode-toggle.css). */
+  container: lf-artwork-heading / inline-size;
   display: flex;
   align-items: center;
   flex-wrap: wrap;
@@ -23,47 +26,6 @@
   margin: 0;
   font-size: 16px;
   font-weight: 600;
-}
-
-.lf-machine-mode {
-  display: flex;
-  flex-shrink: 0;
-  gap: 2px;
-  padding: 2px;
-  border: 1px solid var(--lf-border);
-  border-radius: 6px;
-}
-
-.lf-machine-mode__choice {
-  min-width: 48px;
-  min-height: 30px;
-  padding: 4px 7px;
-  border: 0;
-  border-radius: 4px;
-  background: transparent;
-  color: var(--lf-text-muted);
-  font-size: 13px;
-  font-weight: 600;
-  cursor: pointer;
-}
-
-.lf-machine-mode__choice:hover,
-.lf-machine-mode__choice[aria-pressed='true'] {
-  background: var(--lf-accent-wash);
-  color: var(--lf-accent-fg);
-}
-
-.lf-machine-mode__choice[aria-pressed='true'] {
-  box-shadow: inset 0 -2px var(--lf-accent);
-}
-
-.lf-machine-mode__choice[data-capability-warning='true'] {
-  box-shadow: inset 0 -2px var(--lf-warning-border);
-}
-
-.lf-machine-mode__choice:focus-visible {
-  outline: 2px solid var(--lf-focus);
-  outline-offset: 1px;
 }
 
 .lf-artwork-view-tabs {
@@ -93,6 +55,19 @@
 
 .lf-artwork-view-tab svg {
   flex-shrink: 0;
+}
+
+.lf-artwork-view-tab span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* A narrow rail keeps each tab's words on one line by dropping its icon. */
+@container (max-width: 320px) {
+  .lf-artwork-view-tab svg {
+    display: none;
+  }
 }
 
 .lf-artwork-view-content {

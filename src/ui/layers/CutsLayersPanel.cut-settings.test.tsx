@@ -116,22 +116,23 @@ describe('selected artwork cut settings', () => {
     useStore.getState().setLayerParam(operation().id, { mode: 'image' });
     const panel = await renderPanel();
     try {
-      const negative = requireInput(
-        panel.host,
-        'input[aria-label="Negative image for selected objects"]',
-      );
+      const dither = panel.host.querySelector('select[aria-label="Dither for selected objects"]');
+      if (!(dither instanceof HTMLSelectElement)) throw new Error('dither missing');
       const interval = requireInput(
         panel.host,
         'input[aria-label="Line interval for selected objects"]',
       );
-      await act(async () => negative.dispatchEvent(new MouseEvent('click', { bubbles: true })));
+      await act(async () => {
+        dither.value = 'grayscale';
+        Simulate.change(dither);
+      });
       await act(async () => {
         interval.value = '0.2';
         Simulate.change(interval);
       });
       await act(async () => Simulate.blur(interval));
 
-      expect(operation()).toMatchObject({ negativeImage: true, linesPerMm: 5 });
+      expect(operation()).toMatchObject({ ditherAlgorithm: 'grayscale', linesPerMm: 5 });
       expect(useStore.getState().project.scene.objects[0]?.operationOverride).toBeUndefined();
     } finally {
       await panel.unmount();
@@ -192,7 +193,9 @@ async function renderPanel(): Promise<{ host: HTMLDivElement; unmount: () => Pro
 }
 
 async function openAdvancedSettings(host: HTMLElement): Promise<void> {
-  await clickButton(host, 'Advanced cut settings');
+  const button = host.querySelector('button[aria-label="More cut settings"]');
+  if (!(button instanceof HTMLButtonElement)) throw new Error('More cut settings button missing');
+  await act(async () => button.dispatchEvent(new MouseEvent('click', { bubbles: true })));
 }
 
 async function clickButton(host: HTMLElement, text: string): Promise<void> {

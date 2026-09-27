@@ -34,6 +34,7 @@ import {
 } from '../geometry/polygon-difference';
 import { roundStrokeOutline } from '../geometry/round-stroke-outline';
 import type { Polyline } from '../scene';
+import { evenOddHoles, openLoop } from './relief-roughing-order';
 
 // The pocket planner's bisection budget and tolerance: 24 halvings resolve any
 // bed-sized span far below 0.01 mm, which also sets the thinnest stock that
@@ -48,6 +49,12 @@ const MAX_CLEANUP_ROUNDS = 4096;
 export type ReliefCoreCleanup = {
   // Closed paths to cut after the level's regular rings, round by round.
   readonly paths: ReadonlyArray<Polyline>;
+  // For each path, whether the stock it cuts lies inside it: true for the
+  // outer contour a trace follows round a piece, false for a trace round a
+  // hole in a piece and for a piece's deepest ring, whose piece surrounds it
+  // (inside the ring when it circles an island). Read for cut direction
+  // (ADR-424).
+  readonly stockInside: ReadonlyArray<boolean>;
   // True when a sweep, subtraction or grouping failed, so the level may still
   // hold stock. Advisory only, like the ladder's own failure (rule 7).
   readonly offsetFailed: boolean;
@@ -55,7 +62,12 @@ export type ReliefCoreCleanup = {
   readonly passLimited: boolean;
 };
 
-const NO_CLEANUP: ReliefCoreCleanup = { paths: [], offsetFailed: false, passLimited: false };
+const NO_CLEANUP: ReliefCoreCleanup = {
+  paths: [],
+  stockInside: [],
+  offsetFailed: false,
+  passLimited: false,
+};
 
 /** Paths that clear what one level's regular rings leave standing. `region` is
  * the level's tool-centre region, `ladder` its rings (ring k inset k * stepMm),
@@ -81,35 +93,65 @@ export function reliefCoreCleanup(
 
 function clearStock(uncut: ReadonlyArray<Polyline>, cutRadiusMm: number): ReliefCoreCleanup {
   const paths: Polyline[] = [];
+  const stockInside: boolean[] = [];
   let area = uncut;
   for (let round = 0; round < MAX_CLEANUP_ROUNDS; round += 1) {
     const stock = thickPieces(area);
     if (stock === null) {
       // Stock the engine cannot sort is traced once as it stands, and reported.
-      return { paths: [...paths, ...area], offsetFailed: true, passLimited: false };
+      const holes = evenOddHoles(area.map((path) => openLoop(path.points)));
+      return {
+        paths: [...paths, ...area],
+        stockInside: [...stockInside, ...holes.map((hole) => !hole)],
+        offsetFailed: true,
+        passLimited: false,
+      };
     }
-    if (stock.length === 0) return { paths, offsetFailed: false, passLimited: false };
-    const added = stock.flatMap((piece) => piecePaths(piece, cutRadiusMm));
-    paths.push(...added);
-    const left = uncutArea(stock.flat(), added, cutRadiusMm);
-    if (left === null) return { paths, offsetFailed: true, passLimited: false };
+    if (stock.length === 0) return { paths, stockInside, offsetFailed: false, passLimited: false };
+    const added = stock.map((piece) => piecePaths(piece, cutRadiusMm));
+    for (const piece of added) {
+      paths.push(...piece.paths);
+      stockInside.push(...piece.stockInside);
+    }
+    const left = uncutArea(
+      stock.flat(),
+      added.flatMap((piece) => piece.paths),
+      cutRadiusMm,
+    );
+    if (left === null) return { paths, stockInside, offsetFailed: true, passLimited: false };
     area = left;
   }
   const stock = thickPieces(area);
-  return { paths, offsetFailed: stock === null, passLimited: (stock?.length ?? 0) > 0 };
+  return {
+    paths,
+    stockInside,
+    offsetFailed: stock === null,
+    passLimited: (stock?.length ?? 0) > 0,
+  };
 }
+
+type PiecePaths = {
+  readonly paths: ReadonlyArray<Polyline>;
+  readonly stockInside: ReadonlyArray<boolean>;
+};
 
 // The ring at a piece's deepest inset when its sweep covers the whole piece,
 // as it covers a core or a cusp; otherwise a trace around the piece.
-function piecePaths(piece: ReadonlyArray<Polyline>, cutRadiusMm: number): ReadonlyArray<Polyline> {
+function piecePaths(piece: ReadonlyArray<Polyline>, cutRadiusMm: number): PiecePaths {
   const centre = deepestRing(piece);
   // A piece deeper than one radius has boundary beyond its centre's reach.
   if (centre.ring.length > 0 && centre.insetMm <= cutRadiusMm) {
     const missed = uncutArea(piece, centre.ring, cutRadiusMm);
     const rest = missed === null ? null : thickPieces(missed);
-    if (rest !== null && rest.length === 0) return centre.ring;
+    if (rest !== null && rest.length === 0) {
+      return {
+        paths: centre.ring,
+        stockInside: evenOddHoles(centre.ring.map((path) => openLoop(path.points))),
+      };
+    }
   }
-  return piece;
+  // A piece is its outer contour followed by its holes (solidRegions).
+  return { paths: piece, stockInside: piece.map((_, index) => index === 0) };
 }
 
 // The part of the region no regular ring reaches. Ring 0 is the region's own

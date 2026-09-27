@@ -86,6 +86,7 @@ describe('CutsLayersPanel numeric safety', () => {
     });
     const { host, unmount } = await renderPanel();
     try {
+      await openMoreCutSettings(host);
       expect(host.textContent).toContain('stored 0; generic effective target 5 mm');
       act(() => {
         useStore.getState().setLayerParam(operationId, { fillOverscanMm: -2 });
@@ -108,6 +109,7 @@ describe('CutsLayersPanel numeric safety', () => {
     });
     const { host, unmount } = await renderPanel();
     try {
+      await openMoreCutSettings(host);
       expect(host.textContent).toContain('stored 10; 4040-safe Scan Line uses up to 5 mm');
       act(() => {
         useStore.getState().setLayerParam(operationId, { fillOverscanMm: 0 });
@@ -119,21 +121,25 @@ describe('CutsLayersPanel numeric safety', () => {
     }
   });
 
-  it('does not commit maximum raster density when visible image density fields are blanked', async () => {
+  it('does not commit maximum raster density when the visible line interval is blanked', async () => {
     useStore.getState().importSvgObject(svgObj('O1', ['#ff0000']));
     useStore.getState().setLayerParam(requireOperationId(), { mode: 'image', linesPerMm: 10 });
     const { host, unmount } = await renderPanel();
     try {
       blankAndBlur(host, 'input[aria-label="Line interval for selected objects"]');
       expect(useStore.getState().project.scene.layers[0]?.linesPerMm).toBe(10);
-
-      blankAndBlur(host, 'input[aria-label="DPI for selected objects"]');
-      expect(useStore.getState().project.scene.layers[0]?.linesPerMm).toBe(10);
     } finally {
       await unmount();
     }
   });
 });
+
+// The Scan Line overscan note lives with Overscan in Cut Settings (ADR-430).
+async function openMoreCutSettings(host: HTMLElement): Promise<void> {
+  const button = host.querySelector('button[aria-label="More cut settings"]');
+  if (!(button instanceof HTMLButtonElement)) throw new Error('More cut settings missing');
+  await act(async () => button.click());
+}
 
 function requireOperationId(): string {
   const id = useStore.getState().project.scene.layers[0]?.id;
