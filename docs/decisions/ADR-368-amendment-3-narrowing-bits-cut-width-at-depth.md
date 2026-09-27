@@ -101,8 +101,8 @@ V-carve and engrave were never affected: they do not offset by the diameter.
   and its header names the older emitter revision.
 - Not changed: adaptive clearing (end mill only), a rest-machining roughing bit (end mill only),
   V-carve, inlays, engrave, drill, on-path profiles without tabs, and relief finishing, which
-  already reads the bit's true shape. Relief roughing's seam and core defects noted in Amendment 2
-  remain.
+  already reads the bit's true shape. The separate relief roughing seam/core repairs are
+  preserved from the merged base; this amendment changes cutter-width interpretation only.
 
 ### Verification
 
