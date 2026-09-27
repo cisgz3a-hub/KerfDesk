@@ -106,7 +106,10 @@ function createRendererHandle(
   // replacement still being built, rather than the last committed surface.
   let requestedMesh = initialSurface.mesh;
   let cameraState = initialCamera;
-  let viewportHeightPx = Math.max(MIN_VIEWPORT_PX, input.heightPx);
+  let viewport = {
+    widthPx: Math.max(MIN_VIEWPORT_PX, input.widthPx),
+    heightPx: Math.max(MIN_VIEWPORT_PX, input.heightPx),
+  };
   let pixelRatio = input.pixelRatio;
   let surfaceSequence = 0;
   let isDisposed = false;
@@ -124,7 +127,7 @@ function createRendererHandle(
   const resize = (widthPx: number, heightPx: number, ratio: number): void => {
     const width = Math.max(MIN_VIEWPORT_PX, widthPx);
     const height = Math.max(MIN_VIEWPORT_PX, heightPx);
-    viewportHeightPx = height;
+    viewport = { widthPx: width, heightPx: height };
     pixelRatio = ratio;
     parts.renderer.setPixelRatio(Math.min(ratio, viewer3dTheme.maxPixelRatio));
     parts.renderer.setSize(width, height, false);
@@ -156,7 +159,7 @@ function createRendererHandle(
   resize(input.widthPx, input.heightPx, input.pixelRatio);
   return {
     control: (control) => {
-      cameraState = applyCut3DCameraControl(cameraState, control, viewportHeightPx);
+      cameraState = applyCut3DCameraControl(cameraState, control, viewport);
       render();
     },
     resize,

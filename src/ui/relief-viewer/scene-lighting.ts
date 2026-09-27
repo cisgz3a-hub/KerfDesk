@@ -14,6 +14,8 @@
 import type * as ThreeNamespace from 'three';
 import type { Scene, WebGLRenderer } from 'three';
 import { viewer3dTheme } from '../theme/viewer3d-theme';
+// Deep import: the viewer3d barrel is capped at 20 exports by its index contract.
+import { prefilteredRoomEnvironment } from '../viewer3d/viewer3d-environment';
 
 // The dynamically-imported three module, passed in rather than imported here
 // so this module stays inside the ADR-102 §3 lazy-load boundary.
@@ -67,48 +69,7 @@ export function applySceneLighting(
   return {
     dispose: () => {
       scene.environment = null;
-      environment?.dispose();
+      environment.dispose();
     },
   };
-}
-
-// PMREMGenerator is disposed immediately: it holds render targets and shader
-// materials that are only needed while prefiltering, not afterwards. The
-// RoomEnvironment source scene is likewise transient.
-function prefilteredRoomEnvironment(
-  three: ThreeModule,
-  renderer: WebGLRenderer,
-  blurSigma: number,
-): Scene['environment'] {
-  const generator = new three.PMREMGenerator(renderer);
-  const room = new three.Scene();
-  buildRoom(three, room);
-  const target = generator.fromScene(room, blurSigma);
-  generator.dispose();
-  return target.texture;
-}
-
-// A minimal three-sided light box, standing in for the RoomEnvironment addon.
-// Inlining it keeps the lazily-loaded 3D chunk from pulling in a second addon
-// module for what amounts to five emissive boxes.
-function buildRoom(three: ThreeModule, room: Scene): void {
-  const geometry = new three.BoxGeometry();
-  const add = (
-    intensity: number,
-    scale: readonly [number, number, number],
-    position: readonly [number, number, number],
-  ): void => {
-    const mesh = new three.Mesh(
-      geometry,
-      new three.MeshBasicMaterial({ color: KEY_LIGHT_COLOR, side: three.BackSide }),
-    );
-    mesh.material.color.multiplyScalar(intensity);
-    mesh.scale.set(...scale);
-    mesh.position.set(...position);
-    room.add(mesh);
-  };
-  add(1, [20, 20, 20], [0, 0, 0]); // enclosing shell
-  add(3.2, [8, 0.5, 8], [0, 0, 9]); // overhead softbox
-  add(1.4, [0.5, 8, 8], [-9, 0, 2]); // side bounce
-  add(0.8, [0.5, 8, 8], [9, 0, 2]); // opposing bounce
 }

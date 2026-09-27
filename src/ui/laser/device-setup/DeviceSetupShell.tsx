@@ -155,7 +155,7 @@ function SetupActions(props: ShellProps): JSX.Element {
           </Button>
         ) : (
           <Button
-            variant="primary"
+            variant={stage === 'identify' ? 'default' : 'primary'}
             onClick={() => props.dispatch({ kind: 'next' })}
             disabled={props.saving}
             {...helpProps('control:laser.device-setup.next')}
@@ -163,6 +163,16 @@ function SetupActions(props: ShellProps): JSX.Element {
             {stage === 'identify' ? 'Check essentials' : 'Review setup'} <Icon name="arrow-right" />
           </Button>
         )}
+        {stage === 'identify' ? (
+          <Button
+            variant="primary"
+            onClick={() => props.dispatch({ kind: 'go', step: 'review' })}
+            disabled={props.saving}
+            title="Review your selected profile and save the machine setup."
+          >
+            Review &amp; save <Icon name="arrow-right" />
+          </Button>
+        ) : null}
       </DialogActions>
     </footer>
   );
