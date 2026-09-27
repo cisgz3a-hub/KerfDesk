@@ -40,6 +40,7 @@ type CurrentTestArtifactArgs = {
   readonly cncSetupAttestation?: CncSetupAttestation;
   readonly controllerSettings?: ControllerSettingsSnapshot | null;
   readonly controllerObservation?: ArchivedControllerObservationInput;
+  readonly enforceArchiveBudget?: boolean;
 };
 
 export async function createCurrentTestExecutionArtifact(
@@ -135,6 +136,9 @@ function currentArtifactInput(
     archivedControllerObservation,
     createdAtIso: context.createdAtIso,
     provenance,
+    ...(args.enforceArchiveBudget === undefined
+      ? {}
+      : { enforceArchiveBudget: args.enforceArchiveBudget }),
   };
 }
 

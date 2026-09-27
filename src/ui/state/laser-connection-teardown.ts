@@ -185,6 +185,7 @@ function clearConnectionSessionRefs(refs: LiveRefs, preserveConnection: boolean)
   refs.unsubscribeLine = null;
   refs.unsubscribeClose = null;
   refs.pollHandle = null;
+  refs.statusPollSchedule = null;
   refs.settingsCollector = idleCollector();
   refs.settingsCollectorSessionEpoch = null;
   refs.nextTranscriptId = 1;

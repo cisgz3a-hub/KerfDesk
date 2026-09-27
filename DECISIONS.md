@@ -21588,6 +21588,8 @@ ADR-341's amendments are separate decision files (ADR-344):
 `docs/decisions/ADR-341-amendment-6-continue-from-where-the-head-stopped.md`.
 Amendment 1 was first appended here on 2026-09-22 and was moved there verbatim.
 
+Amendment 7 is `docs/decisions/ADR-341-amendment-7-second-pass-for-jobs-too-large-to-archive.md`.
+
 ---
 
 ## ADR-342 - Preserve record boundaries and effective operations across audit edge cases (2026-09-22)

@@ -2190,10 +2190,15 @@ authorization, Frame proof, controller command, or safety boundary.
   instead of in one uninterruptible task. Order and content are unchanged (ADR-356). This
   keeps the page answering during catch-up; it does not make a stalled page keep feeding
   the controller, which still depends on the page unless the transport runs in a worker.
+- The end-of-job check that waits for the controller to report Idle, and the other waits on
+  status reports, also count only time the status poll ran on schedule. A job that finishes
+  while Chrome is minimised or its tab is hidden is recorded as completed on the reports of the
+  slowed poll, instead of timing out as interrupted (ADR-356 Amendment 1). A controller that
+  stays silent once the page polls normally still fails the check after the same time.
 
 #### Painted second passes (2026-09-22, ADR-341)
 
-- After a settled laser completion and successful archive capture, **Job complete** asks
+- After a settled laser completion, **Job complete** asks
   **Would you like to darken selected areas?** Choose **Darken selected areas…** to open
   that exact saved job in the paintbrush/eraser editor, or **Not now** to close the offer. No
   motion is started by this choice. The prompt also works with the Machine panel collapsed, waits
@@ -2204,7 +2209,9 @@ authorization, Frame proof, controller command, or safety boundary.
 - **Paint a second pass…** in the Machine panel reopens the same job after dismissing the
   prompt, until another job starts. It offers only the job that just finished: there is no
   list of older jobs, and a later job that is aborted or interrupted removes the button
-  rather than bringing back an older one (ADR-341 Amendment 4). When the finished run
+  rather than bringing back an older one (ADR-341 Amendment 4). A job too large for the
+  execution archive is offered too: the page keeps its program until another job starts or
+  KerfDesk is closed or reloaded, and the prompt says so (ADR-341 Amendment 7). When the finished run
   was a recovery or a painted pass, the preview follows its independently verified retained
   ancestor so the original full engraving is available where that archive still exists.
   The current artwork document is never replaced or recompiled by this workflow.
