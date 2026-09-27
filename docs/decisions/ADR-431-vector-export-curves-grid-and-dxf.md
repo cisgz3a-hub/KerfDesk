@@ -136,3 +136,23 @@ hummingbird 1,699,567 bytes with 112,343.
 Not part of this decision: PDF, EPS, PostScript and GeoJSON writers; fitting arcs to cubics for
 DXF bulges; a tight page (Potrace `--tight`) for traced files; a precision control for the scene
 export commands (they use the 0.001 mm default).
+
+### Amendment: retain Edge line paint in batch SVG (2026-09-27)
+
+The canonical-curve batch writer retained Centerline's line role but omitted Edge Detection.
+This regressed the preview/commit paint contract: a closed Edge result exported as a fill, and
+closed Edge travel with zero enclosed area was discarded as invisible. Open curves were already
+stroked and must stay open and visible.
+
+The batch SVG writer now treats both Centerline and Edge as line modes when deciding visibility
+and paint. Their closed and open contours are strokes; visibility depends on travel length.
+Filled-contour (Silhouette) output keeps its even-odd fills, open strokes and zero-area-fill
+filter. Canonical curves, decimal grids, source-page dimensions, source-pixel stroke widths and
+DXF serialization are unchanged. This correction introduces no additional formats or page-fit
+policy.
+
+`batch-trace-svg-paint.test.ts` inspects SVG from the actual batch serializer, including a real
+default Edge Detection trace, canonical closed/open cubics with no compatibility polylines,
+zero-area closed travel, grouping on/off, and Centerline/Silhouette controls. The existing
+preview paint tests remain separate and unchanged. These are software export checks, not a
+material or machine qualification.

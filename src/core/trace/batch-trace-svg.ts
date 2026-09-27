@@ -5,7 +5,7 @@
 // decimal grid. The page is the source image rectangle so the trace keeps
 // registration with the image it came from. Paint follows the trace intent:
 // filled contours fill closed curves even-odd with no stroke; Centerline
-// strokes every curve; open curves are always stroked.
+// and Edge stroke every curve; open curves are always stroked.
 //
 // Pure-core compliant: no clock, no random, no I/O, no DOM.
 
@@ -109,7 +109,7 @@ function layerMarkup(
   group: boolean,
 ): string {
   const curves = quantizeCurves(layer.curves, grid);
-  const fillClosed = traceMode !== 'centerline';
+  const fillClosed = !isLineTraceMode(traceMode);
   const closed = fillClosed ? curves.filter((curve) => curve.closed) : [];
   const stroked = fillClosed ? curves.filter((curve) => !curve.closed) : curves;
   const fill = (members: ReadonlyArray<CurveSubpath>): string =>
@@ -151,12 +151,18 @@ function isVisibleColor(color: string): boolean {
   return normalized !== '#fff' && normalized !== '#ffffff';
 }
 
+// Match preview and commit intent: closing a Centerline or Edge contour
+// does not turn its line operation into a filled region.
+function isLineTraceMode(traceMode: TraceOptions['traceMode']): boolean {
+  return traceMode === 'centerline' || traceMode === 'edge';
+}
+
 function isVisibleCurve(curve: CurveSubpath, traceMode: TraceOptions['traceMode']): boolean {
   if (curve.segments.length === 0) return false;
   const flattened = flattenCurveSubpath(curve, { toleranceMm: 0.05 });
   if (flattened.kind !== 'ok') return true;
   const points = flattened.polyline.points;
-  if (curve.closed && traceMode !== 'centerline') {
+  if (curve.closed && !isLineTraceMode(traceMode)) {
     return Math.abs(signedArea(points)) > VISIBLE_GEOMETRY_EPSILON;
   }
   return pathLength(points, curve.closed) > VISIBLE_GEOMETRY_EPSILON;
