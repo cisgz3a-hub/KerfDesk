@@ -133,6 +133,7 @@ describe('Job Review relief levels with independent stage recipes', () => {
       );
       expect(effective[0]?.relief).toEqual({
         roughingLevelDepthsMm: [1.5, 2.5],
+        reliefCount: 1,
         cutsOtherShapes: withShape,
       });
       expect(effective[0]?.plungingReliefStages).toEqual(['relief-finish']);
