@@ -77,9 +77,13 @@ export type GcodeMetadata = {
  * finishing raster, with separate flat cuts split at the requested depth per
  * pass from the allowance-bearing region's cleared stock (2026-09-27), and
  * ADR-154 amendment 2's adaptive pocket finishing rings that end where they
- * start, and ADR-432's native laser G2/G3 arcs with represented-arc validation and G17.
+ * start, and ADR-273 amendment 1's relief group headers that no longer claim
+ * a ramp entry for a relief stage that actually plunges, and ADR-432's native
+ * laser G2/G3 arcs with represented-arc validation and G17.
  */
-export const EMITTER_REVISION = 'laser-arcs-adaptive-relief-flat-slices-20260927-v1';
+// ADR-427 integration also cuts deepest cleanup before linked relief rings;
+// all adaptive ring closure and flat depth-slice provenance above is retained.
+export const EMITTER_REVISION = 'laser-arcs-relief-cleanup-entry-20260927-v1';
 
 // Machine-specific assumption lines (ADR-103 defect fix): router exports
 // previously carried the laser-worded `$32=1 (laser mode)` banner. The S

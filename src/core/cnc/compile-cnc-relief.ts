@@ -161,6 +161,10 @@ function reliefGroup(
       includeRequestedDepth: false,
       includeDepthPerPass: cutType !== 'relief-finish',
       includeVResolution: false,
+      // Generic provenance must not claim the layer's requested ramp.
+      // A relief stage that actually ramps sets its angle explicitly below;
+      // finishing retains no entry claim (ADR-273 Amendment 1).
+      includeRampEntry: false,
       layerPrimaryTool,
     }),
     feedMmPerMin: cap(settings.feedMmPerMin, device.maxFeed),
