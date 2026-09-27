@@ -63,6 +63,7 @@ function handle(): Viewer3dModule.Viewer3dSceneHandle {
     onDetailChange: vi.fn(),
     setStock: vi.fn(),
     updateStock: vi.fn(),
+    setStockMaterial: vi.fn(),
     setToolpathVisible: vi.fn(),
     setCameraTracking: vi.fn(),
     onCameraInteraction: vi.fn(),

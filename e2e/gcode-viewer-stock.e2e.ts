@@ -118,6 +118,16 @@ test('the Inspector carves the stock as playback runs (ADR-487)', async ({ page,
   await page.keyboard.press('End');
   await expect.poll(async () => (await view.screenshot()).equals(carved)).toBe(true);
 
+  // Another material draws the same carving in its colours: a black laminate
+  // shows no wood, and wood again the same picture.
+  const material = dialog.getByLabel('Stock material');
+  await expect(material).toHaveValue('wood');
+  const wood = await woodPixels(page, view);
+  await material.selectOption('laminate');
+  await expect.poll(() => woodPixels(page, view), { timeout: 20_000 }).toBeLessThan(wood / 4);
+  await material.selectOption('wood');
+  await expect.poll(async () => (await view.screenshot()).equals(carved)).toBe(true);
+
   // The toolpath can be drawn over the stock, in both looks.
   await over.check();
   await expect.poll(async () => (await view.screenshot()).equals(carved)).toBe(false);

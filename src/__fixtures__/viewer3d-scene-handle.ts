@@ -31,6 +31,7 @@ export function fakeViewer3dSceneHandle(
     onDetailChange: vi.fn(),
     setStock: vi.fn(),
     updateStock: vi.fn(),
+    setStockMaterial: vi.fn(),
     setToolpathVisible: vi.fn(),
     captureImage: vi.fn(() => ''),
     setDirectionArrows: vi.fn(),

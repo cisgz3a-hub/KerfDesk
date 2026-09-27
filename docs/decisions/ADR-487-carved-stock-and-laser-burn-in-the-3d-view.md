@@ -54,6 +54,23 @@ burn a laser job will leave. This batch shows both in the Inspector.
      on it; it goes back when the stock is hidden. Classic's lines and colours are unchanged.
    - **The toolpath hides behind the stock** unless "Toolpath over the stock" is on; the tool, the
      playback marker and the rest of the view stay.
+2. **Materials.** A "Material" choice in the Stock section, remembered per browser, draws the
+   stock as wood (the default), MDF, acrylic, aluminium, a two-colour laminate, flat grey or a
+   height map. Each is worked out per pixel from where the pixel is in the block, so a cut shows
+   what is under the surface:
+   - wood has growth rings round a trunk along X, which a carving cuts across and the block's end
+     shows as end grain;
+   - MDF has a darker skin 0.4 mm deep over a paler core;
+   - acrylic has a gloss top and frosted, paler cuts;
+   - aluminium is rolled plate with faint streaks along X, with brighter, shinier machined faces;
+   - the laminate is a black cap 0.2 mm deep over a white core, as engraving plastics are;
+   - flat grey shows only the shape;
+   - the height map colours each depth from pale at the top through green and blue to dark at the
+     stock's bottom.
+   One shader serves them all, so a new material changes a uniform and the surface's shine, and
+   nothing is rebuilt. Studio's key light and environment are brighter than Classic's rig, so
+   colours are drawn a little darker there; Classic has no environment for metal to reflect, so
+   aluminium is only part metal there.
 
 ### Consequences
 
@@ -64,6 +81,9 @@ burn a laser job will leave. This batch shows both in the Inspector.
   corners, is rounded to the grid. A sloped ball or V-bit move is exact to half a cell.
 - **Going back re-carves from the start.** A 300,000-move relief takes about 1.5 seconds in the
   worker, during which the view shows the stock as it was.
+- **Materials are looks, not stock data.** The material changes nothing about the carving: the
+  grid, the bit and the depths are the same whatever is chosen, and the program says nothing
+  about what it is cut from.
 - **Memory:** the worker holds a copy of the moves and the grid (4 bytes a cell, about 4 MB); the
   page holds the grid's depths and the GPU a texture of them and one vertex a cell (about 36 MB
   for a million cells), while the stock is shown.
@@ -82,10 +102,15 @@ burn a laser job will leave. This batch shows both in the Inspector.
 - Unit tests (`stock-worker-client.test.ts`): the worker gets its own copy of the moves,
   transferred; only the latest carve waits while one is under way; a program with nothing to
   carve asks nothing more; a stopped worker is ignored.
+- Unit tests (`scene-stock-materials.test.ts`, `stock-material-preference.test.ts`): the
+  material code lands after three's colour and roughness in both shaders, with a branch for each
+  material; a new material or look changes the uniforms and shine, fully metal in Studio and part
+  metal in Classic; the choice is remembered, and unknown or unavailable storage gives wood.
 - Browser (`e2e/gcode-viewer-stock.e2e.ts`): a 30 mm pocket with a 6 mm end mill shows a whole
   block at the start of the program, a carved pocket at the end, the same whole block going back
-  and the same carving going forward again; the toolpath can be drawn over it; Studio shows it
-  too; hiding it leaves no stock. A program without its bit says it carves with a 3.175 mm end
+  and the same carving going forward again; the laminate shows no wood colours and wood again
+  gives the same picture; the toolpath can be drawn over it; Studio shows it too; hiding it
+  leaves no stock. A program without its bit says it carves with a 3.175 mm end
   mill.
 - Timings (Node, one core): a 150 x 100 mm pocket in three depths with a 6 mm end mill carved
   whole in 39.7 s with Cut 3D's stamping (measured beside a test run) and in 0.16 s swept; a

@@ -36,6 +36,7 @@ import { disposeDetail, type Viewer3dDetail } from './scene-detail';
 import type { Viewer3dPick } from './scene-pick';
 import type { Viewer3dStage } from './viewer3d-look';
 import { createStockView, type Viewer3dStock } from './scene-stock';
+import type { StockMaterial } from './scene-stock-materials';
 import { resolveViewer3dTheme } from './viewer3d-theme';
 import { yieldViewer3dInitialization } from './yield-viewer3d-initialization';
 
@@ -116,6 +117,8 @@ export type Viewer3dSceneHandle = {
   readonly setStock: (stock: Viewer3dStock | null) => void;
   /** The stock's depths changed in place. */
   readonly updateStock: () => void;
+  /** What the stock is made of, as drawn. */
+  readonly setStockMaterial: (material: StockMaterial) => void;
   /** Shows or hides the drawn toolpath, as over the carved stock. */
   readonly setToolpathVisible: (visible: boolean) => void;
   /** Direction arrowheads over the cut path; null clears them. */
@@ -187,6 +190,7 @@ function createSceneHandle(deps: SceneHandleDeps): Viewer3dSceneHandle {
     },
     setStock: (next) => (stock.set(next), core.requestRender()),
     updateStock: () => (stock.update(), core.requestRender()),
+    setStockMaterial: (material) => (stock.setMaterial(material), core.requestRender()),
     setToolpathVisible: (visible) => {
       deps.toolpathGroup.visible = visible;
       core.requestRender();

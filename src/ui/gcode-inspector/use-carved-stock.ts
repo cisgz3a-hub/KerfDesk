@@ -7,10 +7,12 @@ import { useEffect, useMemo, useRef, useState, type RefObject } from 'react';
 import type { Viewer3dSceneHandle } from '../viewer3d';
 // Deep import: the viewer3d barrel is capped at 20 exports by its index contract.
 import type { Viewer3dStock } from '../viewer3d/scene-stock';
+import type { StockMaterial } from '../viewer3d/scene-stock-materials';
 import type { InspectorRenderModel } from './inspector-model';
 import { carvesStock, type StockMoves, type StockTarget } from './stock-carving';
 import { startStockWorker, type StockWorkerClient } from './stock-worker-client';
 import type { StockWorkerResponse } from './stock-worker-protocol';
+import { useStockMaterial } from './stock-material-preference';
 import type { ToolSections } from './tool-sections';
 import type { Viewer3dSceneState } from './use-viewer3d-model-installation';
 
@@ -22,6 +24,8 @@ export type CarvedStock = {
   /** The toolpath is drawn over the stock too. */
   readonly toolpathShown: boolean;
   readonly onToolpathShownChange: (shown: boolean) => void;
+  readonly material: StockMaterial;
+  readonly onMaterialChange: (material: StockMaterial) => void;
   /** Some moves cut with a bit the program gives no size for. */
   readonly unknownTool: boolean;
   /** Could not carve here: no worker, or no room for the grid. */
@@ -38,14 +42,12 @@ type CarvedStockOptions = {
   readonly target: StockTarget;
 };
 
-// Pale pine until the material can be chosen.
-const STOCK_COLOR = 0xd8b88a;
-
 export function useCarvedStock(options: CarvedStockOptions): CarvedStock {
   const { handleRef, state, model, sections, machineKind, target } = options;
   const [shown, setShown] = useState(false);
   const [toolpathShown, setToolpathShown] = useState(false);
   const [failed, setFailed] = useState(false);
+  const [material, setMaterial] = useStockMaterial();
   const available = useMemo(
     () => machineKind !== 'laser' && carvesStock(model),
     [model, machineKind],
@@ -67,13 +69,16 @@ export function useCarvedStock(options: CarvedStockOptions): CarvedStock {
   useEffect(() => {
     if (state !== 'ready') return;
     handleRef.current?.setToolpathVisible(!carving || toolpathShown);
-  }, [handleRef, state, carving, toolpathShown]);
+    handleRef.current?.setStockMaterial(material);
+  }, [handleRef, state, carving, toolpathShown, material]);
   return {
     available,
     shown,
     onShownChange: setShown,
     toolpathShown,
     onToolpathShownChange: setToolpathShown,
+    material,
+    onMaterialChange: setMaterial,
     unknownTool: available && moves.tools.some((tool) => tool === null),
     failed: carving && failed,
   };
@@ -130,6 +135,5 @@ function stockFor(ready: Extract<StockWorkerResponse, { kind: 'ready' }>): Viewe
     rows: ready.rows,
     depth: new Float32Array(ready.columns * ready.rows),
     bottomZ: ready.layout.bottomZ,
-    color: STOCK_COLOR,
   };
 }

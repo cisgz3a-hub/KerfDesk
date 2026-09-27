@@ -13,6 +13,14 @@
 // to the stock's bottom and the block sits on it; it goes back after.
 
 import type * as ThreeNamespace from 'three';
+import {
+  applyStockMaterial,
+  createStockUniforms,
+  stockFragmentChunks,
+  stockVertexChunks,
+  type StockMaterial,
+  type StockUniforms,
+} from './scene-stock-materials';
 import type { Viewer3dLook } from './viewer3d-look';
 
 type ThreeModule = typeof ThreeNamespace;
@@ -25,12 +33,10 @@ export type Viewer3dStock = {
   readonly mmPerCell: number;
   readonly columns: number;
   readonly rows: number;
-  /** Depth of each cell below the stock top (Z0), row by row from the front. */
+  /** Each cell's Z, 0 at the stock top and negative below, row by row from the front. */
   readonly depth: Float32Array;
   /** The stock's bottom, below Z0. */
   readonly bottomZ: number;
-  /** The colour of the material. */
-  readonly color: number;
 };
 
 export type StockView = {
@@ -38,6 +44,7 @@ export type StockView = {
   /** The depths changed: uploads them. */
   readonly update: () => void;
   readonly setLook: (look: Viewer3dLook) => void;
+  readonly setMaterial: (material: StockMaterial) => void;
   /** Classic's grid was built again: puts it under the stock. */
   readonly placeGrid: () => void;
   readonly dispose: () => void;
@@ -58,7 +65,11 @@ export function createStockView(
   scene.add(root);
   let built: BuiltStock | null = null;
   let look: Viewer3dLook = 'classic';
+  let material: StockMaterial = 'wood';
   let gridZ = 0;
+  const shade = (): void => {
+    if (built !== null) applyStockMaterial(built.uniforms, built.materials, material, look);
+  };
   const placeGrid = (): void => {
     for (const child of classicFurniture.children) {
       if (child.type === 'GridHelper') child.position.z = gridZ;
@@ -79,6 +90,7 @@ export function createStockView(
       if (stock === null) return;
       built = buildStock(three, stock);
       root.add(built.group);
+      shade();
     },
     update: () => {
       if (built !== null) built.texture.needsUpdate = true;
@@ -86,6 +98,11 @@ export function createStockView(
     setLook: (next) => {
       look = next;
       lights.visible = look === 'classic';
+      shade();
+    },
+    setMaterial: (next) => {
+      material = next;
+      shade();
     },
     placeGrid,
     dispose: () => {
@@ -98,6 +115,8 @@ export function createStockView(
 type BuiltStock = {
   readonly group: ThreeNamespace.Group;
   readonly texture: ThreeNamespace.DataTexture;
+  readonly uniforms: StockUniforms;
+  readonly materials: ReadonlyArray<ThreeNamespace.MeshStandardMaterial>;
   readonly dispose: () => void;
 };
 
@@ -112,29 +131,38 @@ function buildStock(three: ThreeModule, stock: Viewer3dStock): BuiltStock {
   texture.minFilter = three.NearestFilter;
   texture.magFilter = three.NearestFilter;
   texture.needsUpdate = true;
-  const top = topMesh(three, stock, texture);
-  const sides = sideMesh(three, stock);
+  const uniforms = createStockUniforms(stock.bottomZ);
+  const top = topMesh(three, stock, texture, uniforms);
+  const sides = sideMesh(three, stock, uniforms);
   const group = new three.Group();
   group.add(top, sides);
   return {
     group,
     texture,
+    uniforms,
+    materials: [top.material, sides.material],
     dispose: () => {
       texture.dispose();
       for (const mesh of [top, sides]) {
         mesh.geometry.dispose();
-        (mesh.material as ThreeNamespace.Material).dispose();
+        mesh.material.dispose();
       }
     },
   };
 }
+
+type StockMesh = ThreeNamespace.Mesh<
+  ThreeNamespace.BufferGeometry,
+  ThreeNamespace.MeshStandardMaterial
+>;
 
 // One vertex per cell centre, from the first to the last.
 function topMesh(
   three: ThreeModule,
   stock: Viewer3dStock,
   texture: ThreeNamespace.DataTexture,
-): ThreeNamespace.Mesh {
+  shared: StockUniforms,
+): StockMesh {
   const spanX = Math.max(stock.columns - 1, 1) * stock.mmPerCell;
   const spanY = Math.max(stock.rows - 1, 1) * stock.mmPerCell;
   const geometry = new three.PlaneGeometry(
@@ -148,16 +176,16 @@ function topMesh(
     stock.originY + stock.mmPerCell / 2 + spanY / 2,
     0,
   );
-  const material = stockMaterial(three, stock.color);
+  const material = stockMaterial(three);
   const uniforms = {
+    ...shared,
     stockDepth: { value: texture },
     stockCell: { value: stock.mmPerCell },
-    stockBottom: { value: stock.bottomZ },
   };
   material.onBeforeCompile = (shader) => {
     Object.assign(shader.uniforms, uniforms);
-    shader.vertexShader = carveVertex(shader.vertexShader);
-    shader.fragmentShader = carveFragment(shader.fragmentShader);
+    shader.vertexShader = stockVertexChunks(carveVertex(shader.vertexShader));
+    shader.fragmentShader = carveFragment(stockFragmentChunks(shader.fragmentShader));
   };
   material.customProgramCacheKey = () => 'carved-stock-top';
   const mesh = new three.Mesh(geometry, material);
@@ -167,7 +195,7 @@ function topMesh(
 }
 
 // The four sides and the bottom, around the cells from edge to edge.
-function sideMesh(three: ThreeModule, stock: Viewer3dStock): ThreeNamespace.Mesh {
+function sideMesh(three: ThreeModule, stock: Viewer3dStock, shared: StockUniforms): StockMesh {
   const width = stock.columns * stock.mmPerCell;
   const depth = stock.rows * stock.mmPerCell;
   const height = -stock.bottomZ;
@@ -180,11 +208,19 @@ function sideMesh(three: ThreeModule, stock: Viewer3dStock): ThreeNamespace.Mesh
     geometry.clearGroups();
   }
   geometry.translate(stock.originX + width / 2, stock.originY + depth / 2, stock.bottomZ / 2);
-  return new three.Mesh(geometry, stockMaterial(three, stock.color));
+  const material = stockMaterial(three);
+  material.onBeforeCompile = (shader) => {
+    Object.assign(shader.uniforms, shared);
+    shader.vertexShader = stockVertexChunks(shader.vertexShader);
+    shader.fragmentShader = stockFragmentChunks(shader.fragmentShader);
+  };
+  material.customProgramCacheKey = () => 'carved-stock-sides';
+  return new three.Mesh(geometry, material);
 }
 
-function stockMaterial(three: ThreeModule, color: number): ThreeNamespace.MeshStandardMaterial {
-  return new three.MeshStandardMaterial({ color, roughness: 0.82, metalness: 0 });
+// White, so the shader's colour is the colour drawn.
+function stockMaterial(three: ThreeModule): ThreeNamespace.MeshStandardMaterial {
+  return new three.MeshStandardMaterial({ color: 0xffffff });
 }
 
 // Raises each vertex to its cell's depth and takes its normal from the cells
@@ -223,9 +259,9 @@ vec3 transformed = vec3(position.xy, max(vStockDepth, stockBottom));`,
     );
 }
 
+// stockBottom comes with the material's own uniforms (scene-stock-materials.ts).
 function carveFragment(source: string): string {
-  return `uniform float stockBottom;
-varying float vStockDepth;
+  return `varying float vStockDepth;
 ${source}`.replace(
     '#include <clipping_planes_fragment>',
     `#include <clipping_planes_fragment>
