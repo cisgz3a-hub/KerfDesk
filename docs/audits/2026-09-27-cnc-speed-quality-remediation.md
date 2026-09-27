@@ -17,6 +17,14 @@ ADR-444) and relief planner changes (PR #939, ADR-412, 413, 421, 422, 423, 424 a
 The prototype and its private metadata/helpers were removed before publication;
 its timing figures are historical evidence, not results for the final planner.
 
+The final refresh incorporates PR #957's actual main commit
+`66e073ef23be19b0a9dc588198c50aac2dbb6a6b` and reviewed PR #952 head
+`6beae4d08b4e2eafcb8a9d296c7d3effdc13e4ad`. It preserves deepest cleanup before
+linked inside-out roughing rings, paired contour/stock-side metadata, and the
+combined emitter revision. Independent finishing recipes and stage-owned entry
+provenance remain in place. Both prerequisite PRs must be on main before this
+candidate is merged.
+
 No hardware was operated. The user confirmed that no machine is available.
 Physical trials remain **NOT RUN**. A completed Frame for the exact reviewed job
 remains the sole ordinary Start policy gate. CNC output remains supported on
@@ -124,6 +132,19 @@ already passed. Logs and the hash manifest are in the `publication-cnc` director
 Full release checks and exact PR/main/deployment identities are recorded in the
 publication evidence directory once completed. This report does not turn a
 focused passing run into a full release or physical qualification claim.
+
+The pre-refresh local release run at `137599d38` was stopped after the actual
+PR #957 main commit became available. It had five failures and no completed
+suite footer, so it is recorded as superseded with failures, not passing. The
+25-case random relief-link property and two relief coverage simulations
+reproduced default five-second timeouts in isolation; diagnostic runs with a
+larger CLI budget passed their unchanged assertions. PR #952 already provides
+60 seconds for five existing heavy simulations. This refresh additionally gives
+30 seconds only to the random-link property and slope-terrace simulation. No
+random cases, geometry fixtures, assertions or production behavior are removed.
+The planning-evidence and camera files passed unchanged in isolation and retain
+their existing budgets. Fresh full release checks are required for the refreshed
+candidate; these diagnostics are not substitutes for that gate.
 
 ## Physical qualification
 
