@@ -24,6 +24,11 @@ import {
   type RasterImportGeometry,
 } from '../common/image-import';
 import type { ToastVariant } from '../state/toast-store';
+import {
+  batchRasterAtMaxEdge,
+  decodeBatchRasterFile,
+  type DecodedBatchRaster,
+} from './batch-raster-decode';
 import { loadImageAsRawData, readImageNaturalSize } from '../trace/image-loader';
 import { browserDeviceMemoryGb } from '../trace/trace-commit-at-grid';
 import {
@@ -57,6 +62,9 @@ export type MultiFileTraceDeps = {
   // The file's embedded density (PNG pHYs, JFIF, EXIF, BMP); omitted, parsed
   // as a single-image import parses it, from a bounded header prefix only.
   readonly readDensity?: (file: MultiFileTraceFile) => Promise<ImageDensity | null>;
+  // TIFF (page 1) and Netpbm files, decoded here rather than by the browser;
+  // null for any other file.
+  readonly decodeRaster?: (file: MultiFileTraceFile) => Promise<DecodedBatchRaster | null>;
   readonly trace?: (
     image: RawImageData,
     options: TraceOptions,
@@ -81,6 +89,7 @@ type MultiFileJobContext = {
   readonly loadImage: NonNullable<MultiFileTraceDeps['loadImage']>;
   readonly readNatural: NonNullable<MultiFileTraceDeps['readNaturalSize']> | null;
   readonly readDensity: NonNullable<MultiFileTraceDeps['readDensity']>;
+  readonly decodeRaster: NonNullable<MultiFileTraceDeps['decodeRaster']>;
   readonly options: TraceOptions;
   readonly targetPxPerMm: number;
   readonly deviceMemoryGb: number | undefined;
@@ -95,6 +104,7 @@ export async function buildMultiFileTraceExports(
     readNatural:
       deps.readNaturalSize ?? (deps.loadImage === undefined ? readImageNaturalSize : null),
     readDensity: deps.readDensity ?? readImageHeaderDensity,
+    decodeRaster: deps.decodeRaster ?? decodeBatchRasterFile,
     options: deps.options ?? DEFAULT_MULTI_FILE_TRACE_OPTIONS,
     targetPxPerMm: deps.targetPxPerMm ?? traceTargetPxPerMm(undefined, undefined),
     deviceMemoryGb: deps.deviceMemoryGb ?? browserDeviceMemoryGb(),
@@ -160,6 +170,16 @@ async function multiFileTraceJob(
   readonly job: BatchTraceImageJob;
   readonly densitySource: RasterImportGeometry['densitySource'];
 }> {
+  const raster = await context.decodeRaster(file);
+  if (raster !== null) {
+    const natural = { width: raster.width, height: raster.height };
+    const { densitySource, ...size } =
+      raster.sizeMm === null
+        ? physicalSizeMm(natural, null)
+        : { ...raster.sizeMm, densitySource: 'embedded' as const };
+    const load: GridLoader = async (maxEdge) => batchRasterAtMaxEdge(raster, maxEdge);
+    return { job: planMultiFileTraceJob(file.name, natural, size, load, context), densitySource };
+  }
   const density = await context.readDensity(file);
   if (context.readNatural === null) {
     const image = await context.loadImage(file);
@@ -174,13 +194,19 @@ async function multiFileTraceJob(
   }
   const natural = await context.readNatural(file);
   const { densitySource, ...size } = physicalSizeMm(natural, density);
-  return { job: planMultiFileTraceJob(file, natural, size, context), densitySource };
+  const load: GridLoader = (maxEdge) =>
+    maxEdge === undefined ? context.loadImage(file) : context.loadImage(file, maxEdge);
+  return { job: planMultiFileTraceJob(file.name, natural, size, load, context), densitySource };
 }
 
+// Decodes the file capped to maxEdge; omitted, the preview cap.
+type GridLoader = (maxEdge?: number) => Promise<RawImageData>;
+
 function planMultiFileTraceJob(
-  file: MultiFileTraceFile,
+  sourceName: string,
   natural: { readonly width: number; readonly height: number },
   size: { readonly widthMm: number; readonly heightMm: number },
+  load: GridLoader,
   context: MultiFileJobContext,
 ): BatchTraceImageJob {
   const plan = planTraceCommitGridFor(
@@ -193,11 +219,11 @@ function planMultiFileTraceJob(
     context.options,
   );
   const finer = plan !== null && commitGridExceedsPreview(plan) ? plan : null;
-  const previewGrid = { image: () => context.loadImage(file), options: context.options };
-  if (finer === null) return { sourceName: file.name, physicalSizeMm: size, ...previewGrid };
+  const previewGrid = { image: () => load(), options: context.options };
+  if (finer === null) return { sourceName, physicalSizeMm: size, ...previewGrid };
   return {
-    sourceName: file.name,
-    image: () => context.loadImage(file, finer.maxEdge),
+    sourceName,
+    image: () => load(finer.maxEdge),
     physicalSizeMm: size,
     options: traceOptionsForCommitGrid(context.options, finer),
     fallback: previewGrid,

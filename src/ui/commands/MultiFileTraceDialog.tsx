@@ -14,7 +14,7 @@ import {
   runMultiFileTrace,
   writeTraceFileWithPlatform,
 } from './multi-file-trace-action';
-import { pickPlatformImageFiles } from './platform-image-files';
+import { pickPlatformBatchTraceImageFiles } from './platform-image-files';
 import {
   DEFAULT_TRACE_PAGE_SETTINGS,
   TracePageFields,
@@ -174,7 +174,7 @@ export async function pickAndRunMultiFileTrace(
   let files: ReadonlyArray<File>;
   try {
     // The picker must be the first await so it runs inside the click's user activation.
-    files = await pickPlatformImageFiles(platform);
+    files = await pickPlatformBatchTraceImageFiles(platform);
   } catch (err) {
     pushToast(`Could not choose trace images: ${errMsg(err)}`, 'error');
     return;
