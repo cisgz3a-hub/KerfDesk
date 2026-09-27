@@ -80,7 +80,9 @@ export type GcodeMetadata = {
  * start, and ADR-273 amendment 1's relief group headers that no longer claim
  * a ramp entry for a relief stage that actually plunges.
  */
-export const EMITTER_REVISION = 'adaptive-flat-slices-relief-entry-20260927-v1';
+// ADR-427 integration also cuts deepest cleanup before linked relief rings;
+// all adaptive ring closure and flat depth-slice provenance above is retained.
+export const EMITTER_REVISION = 'adaptive-relief-cleanup-linked-entry-20260927-v1';
 
 // Machine-specific assumption lines (ADR-103 defect fix): router exports
 // previously carried the laser-worded `$32=1 (laser mode)` banner. The S

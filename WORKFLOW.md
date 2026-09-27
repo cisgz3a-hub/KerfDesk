@@ -3966,7 +3966,8 @@ explicitly marked below; the remaining controls and user-facing flows are planne
 2. Passes run depth-major (whole level before stepping down) as a
    clearing group — before any profile cuts. The preview's removal
    shading shows the terraced relief forming.
-   Within a level each connected piece is cut inside out, starting in its
+   Within a level the deepest cleanup paths cut first (ADR-427), then
+   each connected ring piece is cut inside out, starting in its
    middle and widening one stepover at a time, and of the pieces ready the
    one nearest the bit comes next (ADR-424). Every ring keeps its stock on
    the side the layer's cut direction asks for, round islands as well as
