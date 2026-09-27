@@ -170,6 +170,9 @@ cache and independent stage settings while removing superseded prototype links.
 The V-carve integration selection passed 61 tests across 12 files (one existing
 benchmark skipped); relief reconciliation passed 149 distinct tests across
 13 files, including stage values with X/Y raster, waterlines and flat finishing.
+PR #957's stage-owned relief entry provenance is also integrated: 27 selected
+compiler tests and 35 selected Job Review/metadata tests passed. Finishing keeps
+its selected values without falsely claiming a ramp entry.
 Exact release checks, PR/main/deploy
 identities, and served-build evidence are recorded separately in the audit
 directory. The user confirmed that no physical machine was available, so material

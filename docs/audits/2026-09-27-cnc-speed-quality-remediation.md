@@ -108,6 +108,10 @@ Publication integration added these checks:
   13 files passed. Four strategy cases preserve exact passes, planning evidence
   and bounds while emitting the selected stage values. Scoped lint, formatting
   and diff checks passed.
+- PR #957 integration: 27 compiler/provenance tests across four files and
+  35 Job Review/metadata tests across four files passed. The combined cases
+  request a layer ramp and verify that only roughing records it, while finishing
+  retains its independent feed/RPM without a false ramp claim.
 
 The first relief run caught four test assertions that assumed spaces between
 compact G-code words. Those assertions were corrected. An existing tiny-ball
