@@ -15,6 +15,7 @@ import type { WorkCoordinateOffset } from '../state/origin-actions';
 import { describeJobOrigin, formatMm } from './job-review/job-review-format';
 import { formatOriginMm, sameRecoveryOrigin, savedWorkOffsetMm } from './laser-recovery-origin';
 import { ContinueFromHeadStop, type HeadStopContinue } from './LaserRecoveryHeadStop';
+import { MoveToJobPoints } from './LaserRecoveryMoveTo';
 import {
   remainingRecoveryWorkBounds,
   type RecoveryWorkBounds,
@@ -36,6 +37,11 @@ export type LaserRecoveryPlacementProps = {
   readonly headStop?: HeadStopContinue;
   /** Runs the homing cycle; supplied by the host when the machine has homing set up. */
   readonly onHome?: () => Promise<void>;
+  /** Jogs the head, beam off, to a point in work mm; supplied by the host. */
+  readonly onMoveToWorkPoint?: (pointMm: {
+    readonly x: number;
+    readonly y: number;
+  }) => Promise<void>;
 };
 
 export function LaserRecoveryPlacement(props: LaserRecoveryPlacementProps): JSX.Element {
@@ -50,11 +56,7 @@ export function LaserRecoveryPlacement(props: LaserRecoveryPlacementProps): JSX.
       </h3>
       <dl style={listStyle}>
         <Row label="Placement">{describeJobOrigin(artifact.jobOrigin)}</Row>
-        <Row label="Origin then">
-          {artifact.kind === 'exact-execution'
-            ? describeOffset(saved, 'Not reported when the job started')
-            : 'Not saved in a fingerprint-only record'}
-        </Row>
+        <Row label="Origin then">{describeSavedOrigin(artifact, saved)}</Row>
         <Row label="Origin now">
           {describeOffset(
             live,
@@ -75,17 +77,70 @@ export function LaserRecoveryPlacement(props: LaserRecoveryPlacementProps): JSX.
         {...(props.headStop === undefined ? {} : { headStop: props.headStop })}
         {...(props.onHome === undefined ? {} : { onHome: props.onHome })}
       />
-      {artifact.kind === 'exact-execution' && props.onFrameRemaining !== undefined ? (
-        <FrameRemaining
+      {artifact.kind === 'exact-execution' ? (
+        <PlacementMoves
           key={artifact.runId}
           artifact={artifact}
           restartLine={props.restartLine}
           disabled={props.disabled}
-          onFrame={props.onFrameRemaining}
+          originInPlace={originInPlace(saved, live, originGone, props.headStop?.anchored === true)}
+          {...(props.onFrameRemaining === undefined
+            ? {}
+            : { onFrameRemaining: props.onFrameRemaining })}
+          {...(props.onMoveToWorkPoint === undefined
+            ? {}
+            : { onMoveToWorkPoint: props.onMoveToWorkPoint })}
         />
       ) : null}
     </section>
   );
+}
+
+/** Frame remaining area, and the moves to the job's origin and restart point
+ * once the origin is in place. */
+function PlacementMoves(props: {
+  readonly artifact: ExecutionArtifactV1;
+  readonly restartLine: number | undefined;
+  readonly disabled: boolean;
+  readonly originInPlace: boolean;
+  readonly onFrameRemaining?: (bounds: RecoveryWorkBounds) => Promise<void>;
+  readonly onMoveToWorkPoint?: (pointMm: {
+    readonly x: number;
+    readonly y: number;
+  }) => Promise<void>;
+}): JSX.Element {
+  return (
+    <>
+      {props.onFrameRemaining === undefined ? null : (
+        <FrameRemaining
+          artifact={props.artifact}
+          restartLine={props.restartLine}
+          disabled={props.disabled}
+          onFrame={props.onFrameRemaining}
+        />
+      )}
+      {props.onMoveToWorkPoint === undefined || !props.originInPlace ? null : (
+        <MoveToJobPoints
+          artifact={props.artifact}
+          restartLine={props.restartLine}
+          disabled={props.disabled}
+          onMove={props.onMoveToWorkPoint}
+        />
+      )}
+    </>
+  );
+}
+
+// The job's points are where it put them only while the controller has the
+// origin the job ran with, or one set from where the head stopped.
+function originInPlace(
+  saved: WorkCoordinateOffset | null,
+  live: WorkCoordinateOffset | null,
+  originGone: boolean,
+  anchored: boolean,
+): boolean {
+  if (anchored) return true;
+  return saved !== null && !originNeedsRestoring(saved, live, originGone);
 }
 
 // A User or Verified Origin job needs an origin set on the controller. An
@@ -281,6 +336,15 @@ function FrameRemaining(props: {
       </span>
     </div>
   );
+}
+
+function describeSavedOrigin(
+  artifact: RecoveryCapsule['artifact'],
+  saved: WorkCoordinateOffset | null,
+): string {
+  return artifact.kind === 'exact-execution'
+    ? describeOffset(saved, 'Not reported when the job started')
+    : 'Not saved in a fingerprint-only record';
 }
 
 function describeOffset(offset: WorkCoordinateOffset | null, missing: string): string {

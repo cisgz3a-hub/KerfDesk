@@ -109,7 +109,40 @@ export function resumeEntryPointMm(
   if (!Number.isInteger(fromLine) || fromLine < 1 || fromLine > lines.length + 1) return null;
   const state = initialModalState();
   if (scanToResumeLine(lines, fromLine, state, null, true) !== null) return null;
-  if (state.x === null || state.y === null || state.wcs !== 'G54') return null;
+  return state.wcs === 'G54' ? pointMm(state) : null;
+}
+
+/**
+ * How far the program moves in XY, in mm, from the head's point at `fromLine`
+ * to its point at `toLine`: the straight distance between successive commanded
+ * points, so an arc counts its chord. After a lost link the head stopped at
+ * the end of the last line sent only if the controller kept running; this is
+ * how far back along the path the stretch after the last confirmed line
+ * reaches (ADR-341 Amendment 7). Null when the program cannot be followed.
+ */
+export function resumeTravelMm(gcode: string, fromLine: number, toLine: number): number | null {
+  const lines = gcode.split('\n');
+  if (!validLineSpan(fromLine, toLine, lines.length)) return null;
+  const state = initialModalState();
+  if (scanToResumeLine(lines, fromLine, state, null, true) !== null) return null;
+  let travel = 0;
+  let from = pointMm(state);
+  for (let i = fromLine - 1; i < toLine - 1; i += 1) {
+    if (applyLine(state, lines[i] ?? '', true) !== null) return null;
+    const to = pointMm(state);
+    if (from !== null && to !== null) travel += Math.hypot(to.x - from.x, to.y - from.y);
+    from = to;
+  }
+  return state.wcs === 'G54' ? travel : null;
+}
+
+function validLineSpan(fromLine: number, toLine: number, lineCount: number): boolean {
+  if (!Number.isInteger(fromLine) || !Number.isInteger(toLine)) return false;
+  return fromLine >= 1 && toLine >= fromLine && toLine <= lineCount + 1;
+}
+
+function pointMm(state: LaserResumeModalState): { readonly x: number; readonly y: number } | null {
+  if (state.x === null || state.y === null) return null;
   const scale = state.units === 'G20' ? 25.4 : 1;
   return { x: state.x * scale, y: state.y * scale };
 }
