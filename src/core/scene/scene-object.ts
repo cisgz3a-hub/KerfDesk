@@ -6,7 +6,7 @@
 
 import type { VariableTemplate } from './variable-template';
 import type { ReliefHeightfield } from './relief/relief-heightfield';
-import type { LayerPowerMode } from './layer';
+import type { LayerPowerMode, TabLayoutMode } from './layer';
 
 export type Vec2 = { readonly x: number; readonly y: number };
 
@@ -136,6 +136,10 @@ export type ObjectOperationSettingsOverride = {
   readonly perforationSkipMm?: number | undefined;
   readonly overcutMm?: number | undefined;
   readonly imageOverscanMm?: number | undefined;
+  readonly tabLayout?: TabLayoutMode | undefined;
+  readonly tabSpacingMm?: number | undefined;
+  readonly tabMaxPerShape?: number | undefined;
+  readonly tabCutPowerPercent?: number | undefined;
 };
 
 export type ObjectOperationOverride = ObjectOperationSettingsOverride & {
@@ -166,6 +170,22 @@ export type ObjectPowerScale = {
   // Manual CNC holding-tab locations. The normalized contour position keeps
   // each tab attached when its object is moved, rotated, mirrored, or scaled.
   readonly cncTabAnchors?: ReadonlyArray<CncTabAnchor>;
+  // ADR-494: click-placed laser Line tabs, keyed like the CNC anchors by the
+  // colour of the path they sit on. Where a contour has any, they replace the
+  // operation's automatic tabs on that contour, and only while the operation
+  // has tabs turned on. So an older build, which ignores this field, still
+  // cuts automatic tabs and never frees the part; that is why adding it needed
+  // no project schema bump.
+  readonly laserTabAnchors?: ReadonlyArray<LaserTabAnchor>;
+};
+
+// Same shape as CncTabAnchor, declared separately so laser and CNC tabs can
+// change independently (ADR-101).
+export type LaserTabAnchor = {
+  readonly layerColor: string;
+  readonly pathIndex: number;
+  readonly polylineIndex: number;
+  readonly pathT: number;
 };
 
 export type CncTabAnchor = {

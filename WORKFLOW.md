@@ -772,6 +772,26 @@ marks later edits as unapproved without changing the existing Frame/Start policy
    the time estimate and every output format follow them. With none set, output is unchanged.
 5. Material presets do not store them; applying a preset keeps what the operation has.
 
+### F-A7b. Laser tabs by spacing, with a tab power, and placed by hand (ADR-494)
+
+1. **More cut settings → Line detail → Tabs / Bridges**: **Place by** chooses **Count** (the same
+   number of tabs on every closed shape) or **Spacing** (one tab per that length of outline, at
+   least one per shape, and **At most** per shape when above 0).
+2. **Tab power** (%, 0 is off) burns the tabs at that share of the cut power, with the same speed,
+   passes and air, so parts hold in the sheet but snap out cleanly. The tabs burn as a second Line
+   group right after the cut; Job Review names it "Line tabs (N% of cut power)".
+3. **Place tabs** applies the settings and starts the tab tool for the one selected, unlocked
+   artwork that uses the operation; its tooltip says why when it is disabled (tabs off, no or
+   several artworks selected, artwork locked). On the canvas, click the outline to add a tab, click
+   a tab to remove it, or drag a tab to move it; each is one undo step. Placed tabs draw filled and
+   the automatic tabs they replace draw hollow. **Done** or Esc returns to Select.
+4. Placed tabs replace the automatic tabs on their shape only, and only while tabs are on. They
+   move, rotate and scale with the artwork and survive copy and paste and break apart. **Clear
+   placed tabs** (in Cut Settings or in the canvas hint) returns the artwork to automatic tabs.
+5. Job Review's detail line reads e.g. "tabs every 50 mm (at most 6) × 0.5 mm, cut at 20%" or
+   "tabs 4 × 0.5 mm, 3 placed by hand". With none of this set, output is unchanged.
+6. Material presets do not store these settings; applying a preset keeps what the operation has.
+
 ---
 
 ### F-A7b. Operations list tools and Sort cuts last (ADR-480)

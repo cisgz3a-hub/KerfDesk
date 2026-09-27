@@ -24,6 +24,7 @@ import { handlePenMouseDown } from './pen-tool';
 import { beginPathNodeDrag } from './path-node-drag';
 import { dispatchPositionLaser } from './position-laser-click';
 import { hitCncTabAnchor } from './cnc-tab-editor';
+import { beginLaserTabPointer, finishLaserTabDrag } from './laser-tab-editor';
 import { selectObjectsInMarquee } from './selection-marquee';
 import { useEscCancelsDrag } from './use-esc-cancels-drag';
 import type { SnapGuide, SnapSettings } from './snapping';
@@ -244,6 +245,10 @@ function beginToolDrag(args: {
       ),
     };
   }
+  if (args.toolMode.kind === 'laser-tabs') {
+    const drag = beginLaserTabPointer({ ...args, canvas: args.ref.current, mode: args.toolMode });
+    return { kind: 'handled', drag };
+  }
   if (args.toolMode.kind === 'position-laser') {
     const point = canvasMouseToScene(args.e, args.ref.current, args.project, args.viewState);
     if (point !== null) dispatchPositionLaser(point, args.project.device);
@@ -359,6 +364,10 @@ function finishWorkspaceDrag(args: {
   }
   if (args.drag.kind === 'marquee') {
     commitSelectionMarquee({ ...args, drag: args.drag });
+    return;
+  }
+  if (args.drag.kind === 'laser-tab') {
+    finishLaserTabDrag(args.drag);
     return;
   }
   args.endInteraction();
