@@ -50,4 +50,28 @@ describe('desktop window readiness policy', () => {
     expect(show).toHaveBeenCalledOnce();
     expect(reportFailure).toHaveBeenCalledWith('KerfDesk could not load its application window.');
   });
+
+  it('reveals through the given reveal and leaves a renderer crash to the reload offer', () => {
+    const show = vi.fn();
+    const reveal = vi.fn();
+    const reportFailure = vi.fn();
+    const listeners = new Map<string, (...args: ReadonlyArray<unknown>) => void>();
+    installWindowReadinessPolicy(
+      {
+        once: vi.fn(),
+        show,
+        webContents: {
+          once: vi.fn(),
+          on: vi.fn((event, listener) => listeners.set(event, listener)),
+        },
+      },
+      { reportFailure, reveal },
+    );
+
+    listeners.get('render-process-gone')?.();
+
+    expect(reveal).toHaveBeenCalledOnce();
+    expect(show).not.toHaveBeenCalled();
+    expect(reportFailure).not.toHaveBeenCalled();
+  });
 });

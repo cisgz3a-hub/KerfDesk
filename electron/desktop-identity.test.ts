@@ -2,6 +2,7 @@ import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import {
+  DESKTOP_APP_USER_MODEL_ID,
   DESKTOP_PRODUCT_NAME,
   legacyDesktopDataPath,
   LEGACY_DESKTOP_DATA_DIRECTORY,
@@ -23,5 +24,14 @@ describe('desktop identity continuity', () => {
       'const DESKTOP_DATA_PATH = NATIVE_SMOKE_CONFIG?.userDataPath ?? LEGACY_DESKTOP_DATA_PATH',
     );
     expect(main).toContain('title: DESKTOP_PRODUCT_NAME');
+  });
+
+  it('runs under the same Windows app ID the installer gives its shortcuts', () => {
+    for (const config of ['electron-builder.yml', 'electron-builder.preview.yml']) {
+      const yaml = readFileSync(join(process.cwd(), config), 'utf8');
+      expect(yaml, config).toMatch(new RegExp(`^appId: ${DESKTOP_APP_USER_MODEL_ID}$`, 'm'));
+    }
+    const main = readFileSync(join(process.cwd(), 'electron', 'main.ts'), 'utf8');
+    expect(main).toContain('app.setAppUserModelId(DESKTOP_APP_USER_MODEL_ID)');
   });
 });
