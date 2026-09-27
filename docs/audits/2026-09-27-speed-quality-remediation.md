@@ -96,7 +96,7 @@ evacuation, workholding, and material variation still need controlled coupons or
 cuts on each physical setup. Unknown fixtures and subcell relief detail are not
 qualified by the sampled connector proof.
 
-## Verification record
+## Initial implementation verification
 
 The original SHA-256 manifest, `remediation-source-before-final-checks.json`,
 covers 98 changed source and test files. Integration required four additional
@@ -104,8 +104,9 @@ test/snapshot corrections and hover explanations on two CNC controls in
 `CncStageRecipeFields.tsx`. The latter change affects title text only; output,
 transport, geometry and handler behavior remain unchanged. The final build and
 CNC/production browser checks include it. The final 102-file manifest is
-`remediation-source-final.json`. Documentation is recorded separately. The candidate is local and
-uncommitted on the branch above, based on `c81504fcda188b71652f9fe32597d8c435c5bc54`.
+`remediation-source-final.json`. Documentation is recorded separately. At the end
+of this initial verification, the candidate was local and uncommitted on the
+branch above, based on `c81504fcda188b71652f9fe32597d8c435c5bc54`.
 
 | Check | Result |
 | --- | --- |
@@ -158,5 +159,11 @@ its failed result instead of being relabelled as a clean run.
 Focused evidence, logs, independent reviews and paired benchmark scripts are stored in
 `D:\LaserForge\audits\2026-09-27-speed-quality` alongside the original report.
 The benchmarks are host-specific software measurements, not material or controller
-runtime promises. No merge, deployment, firmware write, or hardware operation was
-performed as part of this remediation.
+runtime promises. This initial verification did not include publication or
+hardware operation. The later publication follow-through integrates main's
+V-carve geometry reuse (`c75ba261e`, ADR-444) and renumbers this remediation's
+decisions to ADR-445 through ADR-449. It preserves both the upstream geometry
+cache and the independent stage settings. Exact release checks, PR/main/deploy
+identities, and served-build evidence are recorded separately in the audit
+directory. The user confirmed that no physical machine was available, so material
+qualification remains not run; the accompanying trial pack records that limit.
