@@ -87,7 +87,9 @@ export type GcodeMetadata = {
 // ADR-368 amendment 3 sizes ball-nose, V-bit and engraving pocket and profile
 // offsets, tab windows, and pocket and relief-roughing stepover by the cut
 // width at depth.
-export const EMITTER_REVISION = 'adaptive-relief-cut-width-scan-timing-20260927-v1';
+// Scan timing v2 also preserves M3 state across shared, empty and coincident
+// Image handoffs (ADR-445); cached v1 output must be regenerated.
+export const EMITTER_REVISION = 'adaptive-relief-cut-width-scan-timing-20260927-v2';
 
 // Machine-specific assumption lines (ADR-103 defect fix): router exports
 // previously carried the laser-worded `$32=1 (laser mode)` banner. The S

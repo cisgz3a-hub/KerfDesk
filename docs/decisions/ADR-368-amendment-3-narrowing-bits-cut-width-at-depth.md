@@ -82,9 +82,11 @@ V-carve and engrave were never affected: they do not offset by the diameter.
      traced outlines are one drawn stroke, and the user picks which edge to cut. A narrower
      threshold would turn traced strokes back into double outlines for V-bit engraving, a role this
      amendment does not change.
-7. **Emitter revision** advances to `narrowing-bit-cut-width-20260927-v1`, because ball-nose,
+7. **Emitter revision** advances to `adaptive-relief-cut-width-scan-timing-20260927-v2`, because ball-nose,
    V-bit and engraving pockets, side-offset profiles, tabbed on-path profiles and relief roughing
-   now emit different G-code.
+   now emit different G-code. This integrated identity also preserves adaptive relief and cleanup
+   ordering, relief-entry disclosure, ADR-445's split runways and compact Fill/4040 Image words,
+   and its corrected M3 state across shared, empty and coincident Image handoffs.
 
 ### Consequences
 
