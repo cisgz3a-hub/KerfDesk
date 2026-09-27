@@ -80,9 +80,10 @@ export type GcodeMetadata = {
  * start, and ADR-432's native laser G2/G3 arcs with represented-arc validation and G17,
  * tracer batch 3's bounded chord flattening with canonical shared seams and
  * width-bearing Line + fill output, and preserved colour detail/alpha and
- * local mixed-width classification (2026-09-27).
+ * local mixed-width classification (2026-09-27). ADR-273 amendment 1 records
+ * actual relief entry motion, and ADR-427 cuts deepest cleanup before linked rings.
  */
-export const EMITTER_REVISION = 'trace-colour-hybrid-arcs-relief-20260927-v2';
+export const EMITTER_REVISION = 'trace-hybrid-arcs-relief-cleanup-entry-20260927-v2';
 
 // Machine-specific assumption lines (ADR-103 defect fix): router exports
 // previously carried the laser-worded `$32=1 (laser mode)` banner. The S
