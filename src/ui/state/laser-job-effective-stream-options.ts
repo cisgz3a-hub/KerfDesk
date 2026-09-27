@@ -7,9 +7,9 @@
 //
 // Both are current-session evidence only. Without any, the GRBL family falls
 // back to the stock 128-byte ring's 120 usable bytes — the safe direction for a
-// controller that never proved more — while firmwares whose profile value is
-// the only authority (FluidNC, ping-pong controllers) keep the request. The
-// window is never raised above the profile request.
+// controller that never proved more. Ping-pong controllers retain the saved
+// window value but never use it to put a second line in flight. The window is
+// never raised above the profile request.
 
 import type { GrblBuildInfo } from '../../core/controllers/grbl/build-info';
 import {

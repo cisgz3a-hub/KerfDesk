@@ -79,11 +79,13 @@ export type GcodeMetadata = {
  * ADR-154 amendment 2's adaptive pocket finishing rings that end where they
  * start, and ADR-273 amendment 1's relief group headers that no longer claim
  * a ramp entry for a relief stage that actually plunges, and ADR-432's native
- * laser G2/G3 arcs with represented-arc validation and G17.
+ * laser G2/G3 arcs with represented-arc validation and G17, and ADR-445's shared
+ * split scan exit/entry runways, canonical meeting endpoints and compact
+ * Fill/4040 Image motion words, retaining ADR-460's lossless Fill compaction.
  */
 // ADR-427 integration also cuts deepest cleanup before linked relief rings;
 // all adaptive ring closure and flat depth-slice provenance above is retained.
-export const EMITTER_REVISION = 'laser-arcs-relief-cleanup-entry-20260927-v1';
+export const EMITTER_REVISION = 'laser-arcs-relief-cleanup-entry-scan-timing-20260927-v1';
 
 // Machine-specific assumption lines (ADR-103 defect fix): router exports
 // previously carried the laser-worded `$32=1 (laser mode)` banner. The S

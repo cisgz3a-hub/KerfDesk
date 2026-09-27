@@ -33,14 +33,14 @@ describe('emitRasterGroup bounded split runways', () => {
   it('never reverses inside a wide blank gap on a forward row', () => {
     const xValues = emittedXAtY(sparseRaster(1), 0.5);
 
-    expect(xValues).toEqual([-5, 0, 1, 1, 2, 7, 8, 13]);
+    expect(xValues).toEqual([-5, 0, 1, 4, 4, 7, 8, 13]);
     expect(xValues).toEqual([...xValues].sort((a, b) => a - b));
   });
 
   it('mirrors the monotonic bounded-gap path on a reverse row', () => {
     const xValues = emittedXAtY(sparseRaster(2), 1.5);
 
-    expect(xValues).toEqual([13, 8, 7, 7, 6, 1, 0, -5]);
+    expect(xValues).toEqual([13, 8, 7, 4, 4, 1, 0, -5]);
     expect(xValues).toEqual([...xValues].sort((a, b) => b - a));
   });
 });

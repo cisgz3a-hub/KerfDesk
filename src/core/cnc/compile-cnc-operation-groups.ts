@@ -1,30 +1,23 @@
+import { cncGroupForPasses } from './compile-cnc-pass-group';
 import { jogAxisSignsForOrigin, machineBoundsForDevice, type DeviceProfile } from '../devices';
 import type { CncGroup, CncPass } from '../job';
 import {
   layerCncTool,
   type CncLayerSettings,
   type CncMachineConfig,
-  type CncTool,
   type Layer,
   type Polyline,
 } from '../scene';
-import { coolantFields } from './coolant-fields';
-import {
-  capFeed,
-  capSpindle,
-  resolveRetractBetweenPasses,
-  sourceRegionMajorDepthPasses,
-  type CncGroupCompileOptions,
-} from './compile-cnc-helpers';
-import { cncGroupProvenance } from './cnc-group-provenance';
+import { sourceRegionMajorDepthPasses } from './compile-cnc-helpers';
 import { resolveRestPocketOperation } from './cnc-rest-operation';
 import { zPassDepths } from './depth-passes';
 import { compileStraightInlayGroupsWithEvidence } from './inlay-pair-operation';
-import { applyRampEntry, enforceCutDirection, parkFields } from './motion-polish';
+import { applyRampEntry, enforceCutDirection } from './motion-polish';
 import { machineFrameHandedness } from './machine-frame-handedness';
 import { applyProfileLeadPasses } from './profile-lead-passes';
 import { vcarveClearancePocket } from './vcarve-clearance';
 import { vcarveEffectiveDepthMm } from './vcarve-depth';
+import { cncSettingsForStage, cncStageProvenance } from './cnc-stage-settings';
 
 export function compiledInlayGroups(
   layer: Layer,
@@ -116,7 +109,8 @@ function restPocketRoughingGroupForLayer(
       stepoverUsed: operation.stepoverUsed,
     };
   }
-  const depths = zPassDepths(settings.depthMm, settings.depthPerPassMm);
+  const roughSettings = cncSettingsForStage(settings, 'pocket-rough', operation.roughTool);
+  const depths = zPassDepths(roughSettings.depthMm, roughSettings.depthPerPassMm);
   const roughToolpaths =
     settings.cutDirection === undefined
       ? operation.roughToolpaths
@@ -134,50 +128,15 @@ function restPocketRoughingGroupForLayer(
   if (settings.rampEntryDeg !== undefined) passes = applyRampEntry(passes, settings.rampEntryDeg);
   const primaryTool = layerCncTool(config, settings);
   return {
-    group: cncGroupForPasses(layer, settings, operation.roughTool, passes, device, config, {
+    group: cncGroupForPasses(layer, roughSettings, operation.roughTool, passes, device, config, {
       layerPrimaryTool: primaryTool,
+      ...cncStageProvenance(settings, 'pocket-rough', operation.roughTool),
     }),
     offsetFailed: operation.roughingOffsetFailed,
     passLimited: operation.roughingPassLimited,
     stepoverUsed: operation.stepoverUsed,
   };
 }
-
-function cncGroupForPasses(
-  layer: Layer,
-  settings: CncLayerSettings,
-  tool: CncTool,
-  passes: ReadonlyArray<CncPass>,
-  device: DeviceProfile,
-  config: CncMachineConfig,
-  options: CncGroupCompileOptions = {},
-): CncGroup | null {
-  if (passes.length === 0) return null;
-  const cutFeed =
-    settings.cutType === 'drill'
-      ? Math.min(settings.feedMmPerMin, settings.plungeMmPerMin)
-      : settings.feedMmPerMin;
-  return {
-    kind: 'cnc',
-    layerId: layer.id,
-    color: layer.color,
-    cutType: settings.cutType,
-    toolId: tool.id,
-    toolName: tool.name,
-    toolDiameterMm: tool.diameterMm,
-    ...cncGroupProvenance(settings, tool, options),
-    feedMmPerMin: capFeed(cutFeed, device.maxFeed),
-    plungeMmPerMin: capFeed(settings.plungeMmPerMin, device.maxFeed),
-    spindleRpm: capSpindle(settings.spindleRpm, config.params.spindleMaxRpm),
-    spindleSpinupSec: Math.max(0, config.params.spindleSpinupSec),
-    ...coolantFields(config),
-    safeZMm: Math.max(0, config.params.safeZMm),
-    ...parkFields(config),
-    retractBetweenPasses: options.retractBetweenPasses ?? resolveRetractBetweenPasses(settings),
-    passes,
-  };
-}
-
 // The two-stage V-carve's clearing group: pocket an explicitly enabled flat
 // floor with the layer's clearing bit before the V-bit medial finish.
 export function vcarveClearanceGroupForLayer(
@@ -215,7 +174,8 @@ function compiledVcarveClearanceGroup(
     maxDepthMm: effectiveDepthMm,
     stepoverPercent: settings.stepoverPercent,
   });
-  const depths = zPassDepths(effectiveDepthMm, settings.depthPerPassMm);
+  const stageSettings = cncSettingsForStage(settings, 'v-clear', clearTool);
+  const depths = zPassDepths(effectiveDepthMm, stageSettings.depthPerPassMm);
   if (clearance.toolpaths.length === 0 || depths.length === 0) {
     return {
       group: null,
@@ -224,7 +184,7 @@ function compiledVcarveClearanceGroup(
       stepoverUsed: clearance.stepoverUsed,
     };
   }
-  const clearingSettings: CncLayerSettings = { ...settings, cutType: 'pocket' };
+  const clearingSettings: CncLayerSettings = { ...stageSettings, cutType: 'pocket' };
   return {
     group: cncGroupForPasses(
       layer,
@@ -233,7 +193,12 @@ function compiledVcarveClearanceGroup(
       sourceRegionMajorDepthPasses(polylines, clearance.toolpaths, depths),
       device,
       config,
-      { layerPrimaryTool: vBit, includeRampEntry: false, retractBetweenPasses: false },
+      {
+        layerPrimaryTool: vBit,
+        includeRampEntry: false,
+        retractBetweenPasses: false,
+        ...cncStageProvenance(settings, 'v-clear', clearTool),
+      },
     ),
     offsetFailed: clearance.offsetFailed,
     passLimited: clearance.passLimited,

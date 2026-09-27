@@ -13,6 +13,7 @@ import { representedCncCoordinateMm } from '../cnc/coordinate-representation';
 import type { ArcMove } from '../geometry/arc-fit';
 import { sampleCircularArcPoints } from '../geometry/arc-representation';
 import type { RasterPowerValues } from '../raster/raster-power-values';
+import type { CncCuttingStage } from '../scene/cnc-stage-recipe';
 import {
   assertNever,
   type CncCoolantMode,
@@ -256,6 +257,8 @@ export function cncPassEntryDepthMm(pass: CncPass): number {
 }
 
 export type CncGroup = {
+  /** Explicit independent recipe used for this compiled stage. */
+  readonly cuttingStage?: CncCuttingStage;
   readonly kind: 'cnc';
   readonly layerId: string;
   readonly sourceObjectId?: string;

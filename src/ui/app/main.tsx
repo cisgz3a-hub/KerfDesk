@@ -80,7 +80,7 @@ createRoot(rootElement).render(
 );
 
 // Static HTML supplies the wordmark and indeterminate loader before JS arrives.
-// Give the mounted canvas one paint opportunity, then reveal the workspace
+// Give the successfully drawn workspace one paint opportunity, then reveal it
 // without an artificial hold. Keep the fallback for startup render failures.
 // The fade duration matches index.html; reduced motion removes it immediately.
 const SPLASH_FADE_MS = 180;
@@ -103,10 +103,11 @@ function fadeOutSplash(): void {
 }
 
 function dismissWhenBoardReady(): void {
-  const boardMounted = document.querySelector('#app-root canvas') !== null;
+  const boardPainted =
+    document.querySelector('#app-root canvas[data-workspace-painted="true"]') !== null;
   const startupCrashed = document.querySelector('#app-root > [role="alert"]') !== null;
   const timedOut = performance.now() - splashStartedAt > SPLASH_MAX_WAIT_MS;
-  if (boardMounted || startupCrashed || timedOut) {
+  if (boardPainted || startupCrashed || timedOut) {
     requestAnimationFrame(fadeOutSplash);
     return;
   }

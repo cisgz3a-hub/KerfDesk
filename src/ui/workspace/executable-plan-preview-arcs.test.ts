@@ -3,11 +3,14 @@
 // away: the v1 plan draws arcs with the display parser's chords, so the two
 // routes cannot agree at emitted precision.
 
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
+import { projectWithLine } from '../../__fixtures__/file-actions';
 import type { CutSegment, Job } from '../../core/job';
 import { buildToolpath } from '../../core/job';
 import { withCutArcMoves } from '../../core/job/cut-arc-moves';
 import { createProject } from '../../core/scene';
+import { emitPreparedGcode, prepareOutput } from '../../io/gcode';
+import * as executablePlan from '../../io/gcode/executable-plan';
 import { buildPreviewToolpathFromPrepared } from './draw-preview';
 import { planPreviewRouteEligible, previewRouteSource } from './executable-plan-preview-route';
 
@@ -65,6 +68,51 @@ describe('preview route for arc jobs (ADR-432)', () => {
       expect(planPreviewRouteEligible({ prepared: prepared(job), route: buildToolpath(job) })).toBe(
         true,
       );
+    }
+  });
+
+  it('rejects native arcs before reading a supplied worker program or emitting a sidecar', () => {
+    const ready = prepared(jobWith(ARCS));
+    const expected = buildPreviewToolpathFromPrepared(ready.project, ready);
+    const program = emitPreparedGcode(ready).gcode;
+    expect(program).toMatch(/\bG[23]\b/);
+    const emit = vi.spyOn(executablePlan, 'emitPreparedGcodeWithExecutablePlan');
+    const sidecar = vi.spyOn(executablePlan, 'buildExecutablePlanSidecar');
+    try {
+      const preview = buildPreviewToolpathFromPrepared(ready.project, ready, undefined, {
+        executablePlan: true,
+        emittedProgram: program,
+        allowPlanEmission: false,
+      });
+      expect(previewRouteSource(preview)).toBe('legacy-toolpath');
+      expect(preview).toEqual(expected);
+      expect(sidecar).not.toHaveBeenCalled();
+      expect(emit).not.toHaveBeenCalled();
+    } finally {
+      sidecar.mockRestore();
+      emit.mockRestore();
+    }
+  });
+
+  it('reuses a supplied G1 worker program while optional re-emission is disabled', () => {
+    const project = projectWithLine();
+    const ready = prepareOutput(project);
+    if (!ready.ok) throw new Error('Line fixture did not prepare');
+    const program = emitPreparedGcode(ready).gcode;
+    const emit = vi.spyOn(executablePlan, 'emitPreparedGcodeWithExecutablePlan');
+    const sidecar = vi.spyOn(executablePlan, 'buildExecutablePlanSidecar');
+    try {
+      const preview = buildPreviewToolpathFromPrepared(project, ready, undefined, {
+        executablePlan: true,
+        emittedProgram: program,
+        allowPlanEmission: false,
+      });
+      expect(previewRouteSource(preview)).toBe('executable-plan');
+      expect(sidecar).toHaveBeenCalledExactlyOnceWith(program, ready.project);
+      expect(emit).not.toHaveBeenCalled();
+    } finally {
+      sidecar.mockRestore();
+      emit.mockRestore();
     }
   });
 });

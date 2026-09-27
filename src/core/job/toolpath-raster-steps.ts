@@ -94,7 +94,10 @@ function appendRasterSpanSweepSteps(
   const activeEndX = group.bounds.minX + (span.lastX + 1) * pixelWidthMm;
   const rowShiftX = reverse ? -scanOffsetMm : 0;
   const leadStart = {
-    x: (reverse ? activeEndX + sweepPlan.leadInMm : activeStartX - sweepPlan.leadInMm) + rowShiftX,
+    x:
+      (sweepPlan.sharedLeadStartXWorldMm ??
+        (reverse ? activeEndX + sweepPlan.leadInMm : activeStartX - sweepPlan.leadInMm)) +
+      rowShiftX,
     y: worldY,
   };
   const burnStart = {
@@ -103,7 +106,9 @@ function appendRasterSpanSweepSteps(
   };
   const leadEnd = {
     x:
-      (reverse ? activeStartX - sweepPlan.leadOutMm : activeEndX + sweepPlan.leadOutMm) + rowShiftX,
+      (sweepPlan.sharedLeadEndXWorldMm ??
+        (reverse ? activeStartX - sweepPlan.leadOutMm : activeEndX + sweepPlan.leadOutMm)) +
+      rowShiftX,
     y: worldY,
   };
   appendTravelStep(steps, prevEnd, leadStart);
