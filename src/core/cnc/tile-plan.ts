@@ -177,8 +177,7 @@ function clipGroupToTile(group: CncGroup, tile: CncTile): CncGroup | null {
       for (const piece of clipPointsToRect(xyz, tile.rect, pass.closed)) {
         // A clipped loop is no longer closed — it continues in a neighbor.
         passes.push({
-          kind: 'contour',
-          zMm: pass.zMm,
+          ...pass,
           closed: false,
           polyline: piece.map((point) => ({ x: point.x, y: point.y })),
         });
@@ -218,15 +217,13 @@ function clippedPath3dPass(
   vcarve: boolean,
 ): Extract<CncPass, { readonly kind: 'path3d' }> {
   return {
-    kind: 'path3d',
+    ...pass,
     closed: false,
     // The V-carve certificate reserves final XY rounding. Keep interpolated
     // Z shallow so this later split cannot consume an additional cone radius.
     points: vcarve
       ? points.map((point) => ({ ...point, z: vcarveConservativeZ(point.z) }))
       : points,
-    ...(pass.lateralFeed === undefined ? {} : { lateralFeed: pass.lateralFeed }),
-    ...(pass.entryRamp === undefined ? {} : { entryRamp: pass.entryRamp }),
   };
 }
 

@@ -4845,6 +4845,9 @@ and lifts the command's CNC-only gate.)*
    (clipped at boundaries, Z interpolated), translated so the tile's
    corner is the machine origin: cut tile 1, slide the stock, re-zero
    XY on the next tile frame, cut tile 2, and so on.
+   A ramp entry kept as a plunge because its source path is shorter than one
+   cut width remains disclosed in each affected tile's G-code header. Split
+   fragments count separately in that tile's plunge advisory.
 3. With registration holes on, **Configure registration** starts a separate
    saved plan from the current default cutter and operation cutting values.
    Review its cutter, hole diameter, depth, depth per pass, feed, plunge and
