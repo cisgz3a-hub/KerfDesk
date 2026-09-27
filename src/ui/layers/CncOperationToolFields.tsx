@@ -31,7 +31,7 @@ type OperationToolProps = {
 
 /**
  * The operation's bit, the second bit its cut type can use, and its material
- * (ADR-431). Assignments share the exact transform used by Machine Setup's tool plan.
+ * (ADR-481). Assignments share the exact transform used by Machine Setup's tool plan.
  */
 export function CncOperationToolFields(props: OperationToolProps): JSX.Element | null {
   const machine = useStore((state) => state.project.machine);

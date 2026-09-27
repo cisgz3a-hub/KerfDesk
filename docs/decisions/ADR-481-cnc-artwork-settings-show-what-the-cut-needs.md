@@ -1,4 +1,4 @@
-## ADR-431 - The CNC Artwork settings show what the cut needs, and Machine Setup holds the machine (2026-09-27)
+## ADR-481 - The CNC Artwork settings show what the cut needs, and Machine Setup holds the machine (2026-09-27)
 
 **Status:** Accepted. | **Date:** 2026-09-27
 

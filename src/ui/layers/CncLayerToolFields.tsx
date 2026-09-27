@@ -1,5 +1,5 @@
 // Operation-owned relief, entry, and motion-polish fields for CNC artwork.
-// Cutter assignments sit under Bit at the top of the operation editor (ADR-431).
+// Cutter assignments sit under Bit at the top of the operation editor (ADR-481).
 
 import { sceneObjectUsesOperation, type CncLayerSettings, type Layer } from '../../core/scene';
 import { NumberField as ClearableNumberField } from '../common/NumberField';

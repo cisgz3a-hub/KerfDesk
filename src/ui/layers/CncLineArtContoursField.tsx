@@ -60,7 +60,7 @@ export function CncLineArtContoursField(props: {
 }
 
 // Only imported and traced outlines pair (ADR-277): text and drawn shapes
-// always cut every edge, so the choice is shown only when it can matter (ADR-431).
+// always cut every edge, so the choice is shown only when it can matter (ADR-481).
 function useLayerHasTracedOutlines(layer: Layer): boolean {
   return useStore((state) =>
     state.project.scene.objects.some(

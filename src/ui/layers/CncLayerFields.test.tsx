@@ -179,7 +179,7 @@ describe('CncLayerFields essentials and named refinements', () => {
         'button[aria-label^="Machine maximum:"]',
       );
       expect(maximum?.textContent).toBe('Max 12,000');
-      // ADR-431: stock, safe Z, coolant and the rest are edited in Machine Setup only.
+      // ADR-481: stock, safe Z, coolant and the rest are edited in Machine Setup only.
       expect(host.textContent).not.toContain('Stock & machine reference');
       expect(host.textContent).not.toContain('Safe Z');
       await act(async () => maximum?.click());

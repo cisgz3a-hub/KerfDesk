@@ -44,7 +44,7 @@ describe('traced-edge vocabulary', () => {
     expect(html).toContain('aria-label="Traced edges for #123456"');
   });
 
-  // ADR-431: only imported and traced outlines pair (ADR-277), so the choice
+  // ADR-481: only imported and traced outlines pair (ADR-277), so the choice
   // stays out of the way for operations that cut nothing it could change.
   it('stays hidden when the operation cuts no imported or traced outline', async () => {
     useArtwork([]);

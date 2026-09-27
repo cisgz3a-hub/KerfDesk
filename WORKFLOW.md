@@ -95,7 +95,7 @@ opportunity, without an extra branding delay. It introduces no startup interacti
 - **Numeric transforms**: X, Y, width, height, rotation, and the aspect-ratio lock remain directly available. **Anchor** opens the existing nine-point transform reference selector in a keyboard-accessible popover. Changing its presentation does not change the X/Y reference, resize anchor, or rotation centre.
 - **Artwork / Operations panel**: docked right with **Settings**, **Run order**, and **Materials** views in Laser mode; CNC keeps Settings and Run order. Settings is the default. Run order shares the same docked rail at the same width while the canvas remains on the left; it is not a modal or a third sidebar, and switching views never resizes the rail (ADR-348). Materials owns reusable preset and saved-library management without displacing the active job workflow. A header chevron collapses the rail to a narrow named strip; the same strip expands it.
 - **Laser artwork settings (ADR-430)**: the selected artwork's name heads the Settings view, with the Operation | Artwork switch under it. The Operation view leads with the operation's colour and name, then one scope line only when an edit reaches other artwork (with **Make unique**). **Line**, **Fill** and **Image** are three buttons; Power, Speed and Passes share one row; Fill adds Line spacing and Angle, and Image adds Dither, Line interval and (Grayscale) Min power. Scan both ways and Air assist are one-line switches whose explanations are tooltips. **More cut settings** opens Cut Settings for everything else and names what it holds. Include in output, Show on canvas and **Add operation** close the view.
-- **CNC artwork settings (ADR-431)**: the same header, scope line and footer lead and close the CNC Operation view. **Cut type** comes first (its explanation is the tooltip), then **Bit** with a **Manage bits** link to the Machine Setup bit library, the second bit the cut type uses (Pocket roughing, Floor clearing or Relief finishing) and **Material**. Cut depth and Depth per pass share one row with **Set to stock thickness** under it; Feed, Plunge and Spindle speed share the next, with the machine maximum under Spindle speed opening Machine Setup. **Traced edges** appears only for imported or traced outlines. Collapsed sections follow only for the cut types they serve, each naming its state (Holding tabs "4 per shape", Clearing strategy "Offset · 40 %", Entry & travel "Climb · Plunge"). Stock, tiling, spin-up, coolant, safe Z and park are edited in Machine Setup only.
+- **CNC artwork settings (ADR-481)**: the same header, scope line and footer lead and close the CNC Operation view. **Cut type** comes first (its explanation is the tooltip), then **Bit** with a **Manage bits** link to the Machine Setup bit library, the second bit the cut type uses (Pocket roughing, Floor clearing or Relief finishing) and **Material**. Cut depth and Depth per pass share one row with **Set to stock thickness** under it; Feed, Plunge and Spindle speed share the next, with the machine maximum under Spindle speed opening Machine Setup. **Traced edges** appears only for imported or traced outlines. Collapsed sections follow only for the cut types they serve, each naming its state (Holding tabs "4 per shape", Clearing strategy "Offset · 40 %", Entry & travel "Climb · Plunge"). Stock, tiling, spin-up, coolant, safe Z and park are edited in Machine Setup only.
 - **Operation cards**: the list comes before the artwork inspector, with the selected operation's process fields before secondary artwork properties. Each card keeps its visibility toggle on the face. Its **•••** disclosure contains order, output, artwork selection, settings clipboard, and delete controls.
 - **Machine controls panel**: in Spacious layout it is docked at the far right with the same collapse/expand pattern. Both panels can be resized or hidden independently. It may be collapsed during a job because active run controls live independently in the Live Motion bar.
 - **Toasts**: share the canvas's available space (lower left of the workspace, above the live controls) or a reserved row inside the open modal — never the rails, where they hid Start/Job and the layer list. Only the newest three render. The toast body does not take pointer input, so a click or drag through it reaches the canvas; the × control dismisses it early. Success confirmations dismiss after 4 s; advisories and failures after 8 s.
@@ -511,7 +511,7 @@ destination and cannot overwrite the template source.
   depth per pass, feed, plunge, **Spindle speed**, tabs, and specialist CAM controls. **Bit** and
   **Material** offer direct per-operation cutter and material choices, with the second bit a cut
   type uses under Bit. Machine Setup owns stock, machine maximum RPM, spin-up, coolant, safe Z and
-  park (ADR-431); the machine maximum shows under Spindle speed as a link to its field there, and
+  park (ADR-481); the machine maximum shows under Spindle speed as a link to its field there, and
   **Manage bits** opens the Machine Setup bit library.
 - Importing, placing, or selecting artwork never opens Startup Setup and never asks for material or
   bit before editing. New CNC operations inherit the committed current-job defaults. Direct choices
@@ -537,7 +537,7 @@ destination and cannot overwrite the template source.
   does not reach other artwork whose operation happens to be black.
 - CNC settings lead with cut type, bit and material, then depth and feeds, followed by named
   sections for holding tabs, clearing, finishing, entry/travel, saved feeds and the calculator,
-  each naming its current state when closed (ADR-431). The machine maximum sits under
+  each naming its current state when closed (ADR-481). The machine maximum sits under
   **Spindle speed**. Collapsing a group keeps its numeric editors mounted and does not change any
   cutting setting.
 - **All operations**, a compact expandable list, follows the inspector. Each row shows automatic colour, name,
@@ -5197,7 +5197,7 @@ as the pane's design record.
 
 #### Success
 1. CNC Artwork settings lead with **Cut type**, then **Bit** (with **Manage bits**), the second bit
-   the cut type uses, and **Material** for direct operation choices (ADR-431). Stock, tiling,
+   the cut type uses, and **Material** for direct operation choices (ADR-481). Stock, tiling,
    spin-up, coolant, safe Z and park are edited in Machine Setup and are not repeated here.
 2. Cut depth and Depth per pass share a row; Feed, Plunge and **Spindle speed** share the next.
    The machine maximum ("Max 12,000") sits under Spindle speed and opens its Machine Setup field,

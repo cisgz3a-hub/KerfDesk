@@ -60,7 +60,7 @@ afterEach(async () => {
   vi.useRealTimers();
 });
 
-// ADR-431: the second bit a cut type can use sits under Bit, only while that
+// ADR-481: the second bit a cut type can use sits under Bit, only while that
 // cut type uses it; the bit library itself lives in Machine Setup.
 describe('CNC operation bits', () => {
   it('names the job default and shows only the second bit this cut type uses', () => {

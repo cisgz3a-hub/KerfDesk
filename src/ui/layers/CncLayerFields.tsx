@@ -4,7 +4,7 @@
 // existing setLayerParam action as a whole `cnc` patch, so undo/dirty tracking
 // and .lf2 persistence come for free.
 //
-// ADR-431: the cut type, bit and material, depth and feeds lead; each
+// ADR-481: the cut type, bit and material, depth and feeds lead; each
 // remaining section appears only for the cut types it serves and names its
 // state when closed. Machine and stock values stay in Machine Setup. Named
 // disclosures keep their inputs mounted, so folding one never discards an

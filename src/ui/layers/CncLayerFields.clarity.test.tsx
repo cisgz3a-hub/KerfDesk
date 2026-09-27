@@ -58,7 +58,7 @@ async function renderFields(
 }
 
 describe('CNC layer clarity', () => {
-  // ADR-431: the cut type leads, then the bit and material, then the numbers.
+  // ADR-481: the cut type leads, then the bit and material, then the numbers.
   it('offers the cut type, bit and material before cutting values', async () => {
     installCnc();
     const view = await renderFields();

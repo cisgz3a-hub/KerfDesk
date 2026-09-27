@@ -1,4 +1,4 @@
-// CNC operation numbers and the sections each cut type needs (ADR-431). Native
+// CNC operation numbers and the sections each cut type needs (ADR-481). Native
 // disclosures keep their controls mounted; each summary names its current state
 // and its tooltip says what it holds.
 
@@ -106,7 +106,7 @@ export function DepthPerPassField(props: {
 }
 
 // Feed, plunge and spindle speed share one row. The machine maximum sits under
-// the spindle speed and opens Machine Setup, which owns it (ADR-306, ADR-431).
+// the spindle speed and opens Machine Setup, which owns it (ADR-306, ADR-481).
 export function CncFeedFields(props: {
   readonly layer: Layer;
   readonly settings: CncLayerSettings;
