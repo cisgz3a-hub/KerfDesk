@@ -124,6 +124,24 @@ describe('planCncPauseReentry', () => {
     });
   });
 
+  it('lifts to the safe height since the last bit change, not the park height before it', () => {
+    // A bit change that parks high (ADR-491) and re-zeros Z on the new bit.
+    const bitChange = ['G0 Z30', 'M5', 'M9', 'G0 X0 Y-50', '; re-zero Z', 'M0'];
+    const lines = createStreamer(
+      [...PROGRAM.split('\n').slice(0, -3), ...bitChange, ...PROGRAM.split('\n')].join('\n'),
+    ).queued;
+    const secondBitCut = lines.indexOf('G1 X20 Y0 F900\n', lines.indexOf('M0\n'));
+    const result = expectPlan(
+      planCncPauseReentry({
+        lines,
+        ackedLines: secondBitCut + 1,
+        stopPoint: { x: 10, y: 0, z: -1 },
+        controllerKind: 'grbl-v1.1',
+      }),
+    );
+    expect(result).toMatchObject({ resumeLineIndex: secondBitCut, safeZMm: 5 });
+  });
+
   it('re-enters an arc at its start', () => {
     const arcProgram = [
       'G21',

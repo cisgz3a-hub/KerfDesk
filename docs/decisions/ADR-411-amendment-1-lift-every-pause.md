@@ -17,7 +17,7 @@ default settings, but the lift itself had five gaps:
    every reset (`main.c`). grblHAL does the same for the spindle, and for feed and rapid unless its
    keep-override settings are on (`grbllib.c`). A cut the operator had slowed resumed at full feed.
 3. **A spin-up time of 0 s turned the lift off (PR-11).** Machine Setup and preflight accept 0 s,
-   the output then has no `G4` after `M3`, and decision 3 refused every lift without that dwell.
+   the output then has no `G4` after `M3`, and ADR-411 decision 3 refused every lift without that dwell.
    The output code's comment still said preflight rejects values of 0 or less.
 4. **A skipped lift said why only in the log (PR-12).** The advice beside Resume showed the door
    resume text, and a lift skipped because the door input was open was never tried again.
@@ -47,17 +47,25 @@ default settings, but the lift itself had five gaps:
 3. **Default spin-up.** When the program has no dwell after its latest `M3`/`M4`, the re-entry
    waits 4 s at safe height. This is stock GRBL's own door-resume delay
    (`SAFETY_DOOR_SPINDLE_DELAY`). Waiting above the work costs only time. This replaces "There is
-   no lift without one" in decision 3.
+   no lift without one" in ADR-411 decision 3.
 4. **A skipped lift is shown and retried.** The reason a Pause left the bit in the cut is kept
    with the stream and shown first in the advice beside Resume, followed by the door-resume
    advice that still applies. Resume on such a pause tries the lift again before anything else.
-   If it lifts, Resume continues straight into the re-entry (decision 5). If it is refused
+   If it lifts, Resume continues straight into the re-entry (ADR-411 decision 5). If it is refused
    again, the door resume runs as before. If it fails after its reset, the job ends as in
-   decision 6. A retry refused for the same reason is not logged twice.
+   ADR-411 decision 6. A retry refused for the same reason is not logged twice.
 5. **A failed lift is a stop from the app.** Its interruption is filed as `cancelled`, with the
    lift's own message. The CNC extraction guidance then says the job was stopped from the app
    and the spindle was commanded off, and asks the operator to free a stopped cutter by hand.
    ADR-215 Amendment 1's position-lost rule is unchanged.
+6. **Safe height since the last bit change.** The lift height is the highest rapid Z between the
+   latest tool-change `M0` and the resume line, not the highest in the whole program. Heights
+   from before a bit change were set against the old bit's Z zero, and the retract before a bit
+   change may go to a park height far above the cut (ADR-491), which after a Z re-zero on a
+   longer bit could run into the top of Z travel. KerfDesk's output lifts to safe height again
+   after every `M0`, before its `M3`, so a stop after a bit change always has a height to use.
+   This replaces "the highest rapid Z before the resume line" in ADR-411 decision 3. Found while
+   checking the lift against the pocket stay-down and park height work.
 
 ### Consequences
 
@@ -66,8 +74,11 @@ default settings, but the lift itself had five gaps:
 - The lift adds realtime override bytes to its reset sequence, and only when the operator had
   moved an override off 100%. They cost no receive buffer space and owe no acknowledgement.
 - A job with a spin-up time of 0 s now lifts and waits 4 s above the cut on Resume.
+- A Pause after a bit change lifts to the program's safe height, never to the bit-change park
+  height. Jobs without a park height lift exactly as before: the output's heights never drop
+  across a bit change.
 - Resume may now soft-reset the controller when an earlier Pause could not lift. That is the
-  same lift the Pause would have run. Its failure costs the job, as decision 6 already accepts.
+  same lift the Pause would have run. Its failure costs the job, as ADR-411 decision 6 already accepts.
 - The GRBL simulator now models the realtime overrides and a safety-door input switch, so these
   cases are tested end to end: two pauses in one job, overrides at 70% feed and 80% spindle,
   a program with no dwell, and a Pause with the door open that lifts on Resume once it closes.

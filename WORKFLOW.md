@@ -1649,7 +1649,8 @@ minimum target size.
      earliest such line wins.
    - The spindle was on. Its spin-up is the program's `G4 P` dwell after its M3/M4, or 4 s when
      the program has none (spin-up time 0 s).
-   - The bit stopped below the program's highest rapid Z.
+   - The bit stopped below the program's highest rapid Z since its last bit change. That height
+     is the lift height, so a bit-change park height is never used.
    - The program stays inside the supported code subset.
 3. The primary control reads **Lifting…**. The app:
    1. writes a soft reset (`0x18`);

@@ -53,7 +53,8 @@ export type CncPauseReentryPlan = {
   readonly resumeLineIndex: number;
   /** Where the bit goes back down, in work millimetres. */
   readonly entry: MotionPoint;
-  /** Highest rapid height the program used before the resume line. */
+  /** Highest rapid height the program used between its last bit change and
+   *  the resume line. */
   readonly safeZMm: number;
   readonly spindle: 'M3' | 'M4';
   readonly spindleRpm: number;
@@ -107,7 +108,8 @@ export function planCncPauseReentry(input: CncPauseReentryInput): CncPauseReentr
   }
   const scan = scanCncReentryProgram(input.lines, block.sendableLineIndex, windowEnd);
   if (!scan.ok) return noLift(scan.reason);
-  return planFromScan(input.stopPoint, block, manifest.blocks, scan);
+  const rapidsFrom = lastToolChangeBoundary(input.lines, block.sendableLineIndex);
+  return planFromScan(input.stopPoint, block, manifest.blocks, scan, rapidsFrom);
 }
 
 type CompletedScan = Extract<ReturnType<typeof scanCncReentryProgram>, { readonly ok: true }>;
@@ -117,13 +119,16 @@ function planFromScan(
   block: MotionBlock,
   blocks: ReadonlyArray<MotionBlock>,
   scan: CompletedScan,
+  rapidsFrom: number,
 ): CncPauseReentryResult {
   const modal: CncReentryModal = scan.atResume;
   const k = block.sendableLineIndex;
   const spinup = spinupAtStop(modal);
   if (typeof spinup === 'string') return noLift(spinup);
-  const safeZMm = highestRapidZ(blocks, k, scan.motionAt);
-  if (safeZMm === null) return noLift('The program has no rapid height before the stop point.');
+  const safeZMm = highestRapidZ(blocks, rapidsFrom, k, scan.motionAt);
+  if (safeZMm === null) {
+    return noLift('The program has no rapid height since its last bit change.');
+  }
   if (stopPoint.z >= safeZMm - Z_EPSILON_MM) {
     return noLift('The bit already stopped at or above safe height.');
   }
@@ -191,14 +196,21 @@ function lastToolChangeBoundary(lines: ReadonlyArray<string>, acked: number): nu
   return 0;
 }
 
+// The lift height: the highest rapid since the last bit change. Heights from
+// before a tool-change M0 were measured against the old bit's Z zero, and the
+// bit-change park height (ADR-491) may sit far above the cut, so neither is
+// a safe height for the bit in the spindle now. The program lifts to safe
+// height again after every M0 before its M3 (cnc-grbl-transitions.ts).
 function highestRapidZ(
   blocks: ReadonlyArray<MotionBlock>,
+  fromIndex: number,
   resumeIndex: number,
   motionAt: Uint8Array,
 ): number | null {
   let highest: number | null = null;
   for (const block of blocks) {
     if (block.sendableLineIndex >= resumeIndex) break;
+    if (block.sendableLineIndex < fromIndex) continue;
     if (motionAt[block.sendableLineIndex] !== 0) continue;
     const z = block.points.at(-1)?.z;
     if (z !== undefined && (highest === null || z > highest)) highest = z;
