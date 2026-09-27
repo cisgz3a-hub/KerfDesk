@@ -12,6 +12,7 @@ import {
 import { LaserArcMovesRow } from '../LaserArcMovesRow';
 import { deviceSetupSupportsMachineKind, type DeviceSetupStepProps } from './device-setup-flow';
 import { DeviceSetupCncMachineStep } from './DeviceSetupCncMachineStep';
+import { DeviceSetupLaserFinishRows } from './DeviceSetupLaserFinishRows';
 import type { DeviceSetupHighlight } from './machine-setup-dialog-store';
 
 export function DeviceSetupMachineStep(
@@ -57,6 +58,7 @@ function LaserMachineStep({
         grblLabels={driver.capabilities.settings === 'grbl-dollar'}
       />
       <LaserArcMovesRow device={state.draft} update={update} />
+      <DeviceSetupLaserFinishRows device={state.draft} update={update} />
       <details
         className="lf-setup-disclosure lf-setup-disclosure--nested"
         open={highlight === 'air-assist'}

@@ -436,6 +436,21 @@ destination and cannot overwrite the template source.
   selection is kept.
 - No shortcut: LightBurn's `P` is KerfDesk's Preview.
 
+#### Move laser to selection — menu (ADR-493)
+- `Arrange → Move laser to selection` → **Center**, **Top Left**, **Top**, **Top Right**, **Left**,
+  **Right**, **Bottom Left**, **Bottom**, **Bottom Right** of the selection's bounds.
+- The head moves there with the beam off, at the jog pad's speed, through the same machine-position
+  jog as Go to work zero: CNC lifts to safe Z first, and configured bounds and no-go zones warn
+  without refusing (ADR-232).
+- The target is where an Absolute Coordinates job burns that canvas point. With a verified bed
+  mapping (ADR-342) that is the physical spot on the bed; without one the head goes where the
+  Absolute job would go, and a warning says the spot must be checked at the machine.
+- In User Origin, Verified Origin and Current Position the job is placed from the origin when it is
+  prepared, so a canvas point has no fixed place yet: a notice says so and points at Frame, and
+  nothing moves. Not connected or not Idle is a notice too.
+- With the rotary on, only X moves and Y stays where it is, with a notice: Y on the rotary is
+  rotation from where the job starts. The same applies to Move to position.
+
 #### Typed values with math — numeric edits bar (ADR-480)
 - The X, Y, Width, Height and Rotation boxes take a number or a sum: `10+5`, `2*(3+4)`, `2^3`,
   `pi`, `e`, `sqrt()`, `abs()`, `sin()`, `cos()`, `tan()`, `asin()`, `acos()`, `atan()` (degrees),
@@ -1206,6 +1221,13 @@ Mac uses `Cmd`, Windows/Linux web uses `Ctrl`.
   (ADR-362).
 - `PageUp` / `PageDown` — Jog Z. When a scrolling list, tab panel or the Artwork panel has focus,
   the keys scroll it instead (ADR-362).
+- `Cmd/Ctrl+Shift+]` / `Cmd/Ctrl+Shift+[` — Jog up / down one step; `Cmd/Ctrl+Alt+[` /
+  `Cmd/Ctrl+Alt+]` — Jog left / right one step (LightBurn's Move-window keys, ADR-493).
+  Numpad `8`/`2`/`4`/`6` jog the same way and `7`/`9`/`1`/`3` diagonally, only with Num Lock on:
+  with Num Lock off the keypad sends arrow keys, which nudge the selected artwork and never move
+  the machine. Directions, step and speed are exactly the jog pad arrows'. Like the Z keys, they
+  work only while the jog pad is shown and enabled, send one step per press (no auto-repeat), and
+  do nothing in a dialog, a text field or a focused scrolling list.
 
 ---
 
@@ -3200,6 +3222,32 @@ The profile's **Recorded home** corner documents the setup. It does not write co
 homing direction or change work zero. Home uses the selected controller's command contract
 (for example, generic GRBL `$H`, or the Falcon A1 Pro's `$HX` then `$HY`); firmware determines
 the physical direction. **Go to work zero** is a separate movement to the workpiece reference.
+
+**Move to position** (under the jog pad, ADR-493) moves the head, beam off, to typed X and Y.
+**Coordinates** picks the frame: **Canvas** is the numbers on the rulers, the spot where an
+Absolute job burns that point (as Move laser to selection); **From origin** is millimetres from
+the work origin, the numbers in the job's G-code, and needs no homing (MPos = work position +
+work offset). It starts on Canvas in Absolute Coordinates and on From origin otherwise, with X and
+Y on machine X0 Y0 or work zero until they are typed.
+**Use current** fills X and Y with where the head is now. **Save** keeps the typed position under a
+name (blank gives Position N; the same name replaces the old entry) in the machine profile, so it
+travels with the profile and the project and is one undo step. Each saved row has **Go** and
+**Delete**. Go needs a connected, Idle machine, like the jog arrows; a missing work offset for a
+From origin move is a notice and nothing moves.
+
+**After a job** (Machine Setup's laser step, ADR-493; LightBurn's Finish Position) sets where a laser
+job leaves the head: **Go to the work origin** (the default, which stores nothing; a Current
+Position job still returns to its start), **Stay where the job ends** (no park move in any mode),
+or **Go to a bed position**, given in canvas coordinates as on the rulers; it starts on machine X0
+Y0 (the front-left corner of a front-left machine). Stay and a bed position also apply to a
+Current Position job, so the next Start begins where the head was left. **Finish jobs here** in
+Move to position sets that bed position from typed Canvas numbers. The bed position moves with the
+job like the CNC park (ADR-392): canvas → machine coordinates → the job's bed-to-program shift.
+Where that shift is unknown (a placed job before a confirmed Home, any Verified Origin job) or the
+rotary is on, the finish is set aside for that job, the default applies, and Job Review says why.
+The G-code, preview, estimates and Job Review's park-outside-frame note all read the same placed
+finish. Changing the finish changes the G-code, so it needs a fresh Frame; saving a head position
+does not.
 
 The controller's native MPos is distinct from the drawn bed coordinates (ADR-342). Stock GRBL
 can report negative machine positions after homing. With current-session build, travel and homing

@@ -57,7 +57,7 @@ Sierra variants).
 | LBG-T12 | Measure shape readout (perimeter, area, node count, open or closed) and node snapping | `R/Measure/` | Distance and angle line (`src/ui/workspace/measure-tool.ts`) | S-M | open |
 | LBG-T13 | Grid Array extras: centre-to-centre spacing, row/column shift, reverse, mirror alternate, virtual array | `R/GridArray/` | Rows, columns, edge gap, variable advance (`array-layout.ts`) | S-L | open |
 | LBG-T14 | Circular Array end/step angle and last-selected-as-centre | `R/CircularArray/` | Count, centre, radius, start angle, rotate copies | S | open |
-| LBG-T15 | Move Laser to Selection (centre, corners, edges) | `R/MoveLaserToSelection/` | Missing; click-to-move exists (`src/ui/workspace/position-laser-click.ts`) | S | BATCH 6 |
+| LBG-T15 | Move Laser to Selection (centre, corners, edges) | `R/MoveLaserToSelection/` | Missing; click-to-move exists (`src/ui/workspace/position-laser-click.ts`) | S | Built (ADR-493) |
 | LBG-T16 | Mirror Across Line | `R/FlipMirror/` | Missing | S | open |
 | LBG-T17 | Two-Point Rotate/Scale | `R/TwoPointRotateScale/` | Missing | M | open |
 | LBG-T18 | Break Apart into individual segments | `R/BreakApart/` | Splits imported SVGs and traces into subpaths only (`src/ui/state/break-apart-actions.ts`) | S | open |
@@ -103,12 +103,12 @@ Sierra variants).
 | ID | Gap | LightBurn | KerfDesk today | Size | Status |
 |---|---|---|---|---|---|
 | LBG-M01 | Laser on while framing (low-power visible frame), and Fire out of Labs | `R/DeviceSettings/BasicSettings/`, `R/MoveWindow/` | Hold-to-fire behind an off-by-default Labs flag (`src/ui/laser/MomentaryFireControl.tsx`) | M | open (needs an ADR: Frame is the Start gate) |
-| LBG-M02 | Numeric Move-to, saved positions, laser Finish Position | `R/MoveWindow/`, `R/CoordinatesOrigin/` | Click-to-move only; laser finish is fixed (`src/core/output/job-park-target.ts`) | S | BATCH 6 |
+| LBG-M02 | Numeric Move-to, saved positions, laser Finish Position | `R/MoveWindow/`, `R/CoordinatesOrigin/` | Click-to-move only; laser finish is fixed (`src/core/output/job-park-target.ts`) | S | Built (ADR-493) |
 | LBG-M03 | Rubber-band frame (outline that hugs the artwork) | `R/LaserWindow/` | Bounding-box frame (`src/core/job/frame-bounds.ts`) | M | open (needs an ADR) |
 | LBG-M04 | Red-dot pointer offset | `R/DeviceSettings/DimensionsUnits/` | Missing | M | open |
 | LBG-M05 | Material Test: choose the varied parameters (interval, passes), Line and Image modes, border | `R/MaterialTest/` | Speed by power, Fill only (`src/core/job/material-test-grid.ts`) | M | open |
 | LBG-M06 | Frame continuously (does not grant Start) | `R/DeviceSettings/BasicSettings/` | Missing | S-M | open |
-| LBG-M07 | Keyboard XY jog with modifier keys | `R/MoveWindow/` | Z only (`src/ui/laser/use-jog-shortcuts.ts`) | S | BATCH 6 |
+| LBG-M07 | Keyboard XY jog with modifier keys | `R/MoveWindow/` | Z only (`src/ui/laser/use-jog-shortcuts.ts`) | S | Built (ADR-493) |
 | LBG-M08 | Rotary on an A axis for 4-axis grblHAL and FluidNC boards | `R/RotaryMode/RotaryModeGCode/` | Y substitution only (`src/core/devices/rotary.ts`) | M | open |
 | LBG-M09 | Print and Cut out of Labs | `R/PrintAndCut/` | Works behind a Labs flag | S | open (needs hardware qualification) |
 | LBG-M10 | Interval Test dithered-image variant | `R/IntervalTest/` | Fill swatches only | S | open |
@@ -161,6 +161,7 @@ Each batch is one pull request with its own decision record, tests and WORKFLOW.
 - **Batch 5 — design tools:** LBG-T05, LBG-T07, LBG-F03, LBG-F08, LBG-F12, LBG-C07, LBG-I04. Moves
   no machine. Built in ADR-480.
 - **Batch 6 — moving the machine:** LBG-T15, LBG-M02, LBG-M07. Chosen with batch 5 on 2026-09-27.
+  Built in ADR-493.
 - **Next candidates, in order:** LBG-C04, LBG-C05, LBG-I01, LBG-I02, LBG-C06, LBG-T04, LBG-T06,
   LBG-T08, LBG-T09, LBG-F06.
 - **Not in these batches:** the Camera feature rebuild thread owns LBG-M13 (several cameras per
