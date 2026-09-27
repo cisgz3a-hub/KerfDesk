@@ -26,7 +26,9 @@ const TRANSFORM: Transform = {
   y: 11.039871519308113,
   rotationDeg: 37,
 };
-const EXPECTED_CUT_PREFIX = 'G1X20.217Y11.541Z-0.016';
+// Beside the mask the tip stands the stock tolerance above the exact one
+// (ADR-484): -0.0158 raised to -0.0138.
+const EXPECTED_CUT_PREFIX = 'G1X20.217Y11.541Z-0.014';
 
 describe('ball-nose relief mask margin after emitted-coordinate rounding', () => {
   it('keeps a rotated fractional-radius boundary pass outside excluded stock', () => {

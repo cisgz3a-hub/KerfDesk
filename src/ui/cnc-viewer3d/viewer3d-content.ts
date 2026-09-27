@@ -22,6 +22,7 @@ import { createCarvedWoodMaterial } from './viewer3d-wood-material';
 import { displayModeFlags, type Viewer3DDisplayMode } from './viewer3d-display-mode';
 import { localFromScene } from './viewer3d-picking';
 import { buildStageFurniture } from './viewer3d-stage';
+import type { ViewerWorkAxes } from './viewer3d-work-axes';
 import { buildToolMesh, type ToolMeshHandle } from './viewer3d-tool';
 import { buildToolpathLines, type ToolpathLinesHandle } from './viewer3d-toolpath';
 
@@ -50,6 +51,8 @@ export type ViewerToolpathOverlay = {
 export type ViewerContentInput = {
   readonly mesh: ViewerSurfaceMesh;
   readonly stockThicknessMm: number;
+  /** Undefined retains other viewers' stock marker; null draws no work-zero claim. */
+  readonly workAxes?: ViewerWorkAxes | null;
   readonly toolpath?: ViewerToolpathOverlay;
   // The grid `mesh` was built from. Present only for the CNC pane, which is
   // the one surface whose shader marches it for self-shadowing and ambient
@@ -104,7 +107,7 @@ export async function buildViewerContent(
 
   addStockOutline(three, group, mesh, stockThicknessMm, disposers);
 
-  const stage = buildStageFurniture(three, mesh, stockThicknessMm);
+  const stage = buildStageFurniture(three, mesh, stockThicknessMm, input.workAxes);
   group.add(stage.object);
   disposers.push(stage.dispose);
 

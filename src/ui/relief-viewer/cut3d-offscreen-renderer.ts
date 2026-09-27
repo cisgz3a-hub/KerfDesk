@@ -1,6 +1,6 @@
 import type { PerspectiveCamera, Scene, WebGLRenderer } from 'three';
 import type * as ThreeNamespace from 'three';
-import type { ReliefSurfaceMeshWithNormals } from '../../core/relief/relief-surface-mesh';
+import type { Cut3DSurfaceMesh } from '../cnc-viewer3d/viewer3d-work-axes';
 import { buildViewerContent, type ViewerContentHandle } from '../cnc-viewer3d';
 import { viewer3dTheme } from '../theme/viewer3d-theme';
 import { applySceneLighting, type SceneLightingHandle } from './scene-lighting';
@@ -22,7 +22,7 @@ export type Cut3DOffscreenRenderer = {
    * false when a newer surface or disposal overtook this one.
    */
   readonly replaceSurface: (
-    mesh: ReliefSurfaceMeshWithNormals | null,
+    mesh: Cut3DSurfaceMesh | null,
     stockThicknessMm: number,
   ) => Promise<boolean>;
   readonly dispose: () => void;
@@ -39,7 +39,7 @@ type SurfaceParts = {
   readonly scene: Scene;
   readonly content: ViewerContentHandle;
   readonly lighting: SceneLightingHandle;
-  readonly mesh: ReliefSurfaceMeshWithNormals;
+  readonly mesh: Cut3DSurfaceMesh;
   readonly stockThicknessMm: number;
 };
 
@@ -51,7 +51,7 @@ const CONTEXT_LOST_REASON = 'The 3D graphics context was lost.';
 /** Builds the entire Cut 3D Three.js scene inside its render worker. */
 export async function createCut3DOffscreenRenderer(input: {
   readonly canvas: OffscreenCanvas;
-  readonly mesh: ReliefSurfaceMeshWithNormals;
+  readonly mesh: Cut3DSurfaceMesh;
   readonly stockThicknessMm: number;
   readonly widthPx: number;
   readonly heightPx: number;
@@ -74,10 +74,7 @@ export async function createCut3DOffscreenRenderer(input: {
   );
   camera.up.set(0, 0, 1);
   const lighting = applySceneLighting(three, renderer, scene, input.mesh, input.pixelRatio);
-  const content = await buildViewerContent(three, {
-    mesh: input.mesh,
-    stockThicknessMm: input.stockThicknessMm,
-  });
+  const content = await buildCut3DContent(three, input.mesh, input.stockThicknessMm);
   scene.add(content.object);
   const surface = {
     scene,
@@ -93,6 +90,15 @@ function createRenderer(three: typeof ThreeNamespace, canvas: OffscreenCanvas): 
   const renderer = new three.WebGLRenderer({ canvas, antialias: true });
   renderer.setClearColor(viewer3dTheme.color.background);
   return renderer;
+}
+
+// Initialization and replacement must interpret the surface's frame identically.
+function buildCut3DContent(
+  three: typeof ThreeNamespace,
+  mesh: Cut3DSurfaceMesh,
+  stockThicknessMm: number,
+): Promise<ViewerContentHandle> {
+  return buildViewerContent(three, { mesh, stockThicknessMm, workAxes: mesh.workAxes ?? null });
 }
 
 function createRendererHandle(
@@ -136,14 +142,14 @@ function createRendererHandle(
     render();
   };
   const replaceSurface = async (
-    nextMesh: ReliefSurfaceMeshWithNormals | null,
+    nextMesh: Cut3DSurfaceMesh | null,
     stockThicknessMm: number,
   ): Promise<boolean> => {
     surfaceSequence += 1;
     const sequence = surfaceSequence;
     const mesh = nextMesh ?? requestedMesh;
     requestedMesh = mesh;
-    const content = await buildViewerContent(parts.three, { mesh, stockThicknessMm });
+    const content = await buildCut3DContent(parts.three, mesh, stockThicknessMm);
     if (isDisposed || sequence !== surfaceSequence) {
       content.dispose();
       return false;
@@ -199,7 +205,7 @@ function swapSurface(
 
 function sameStock(
   surface: SurfaceParts,
-  mesh: ReliefSurfaceMeshWithNormals,
+  mesh: Cut3DSurfaceMesh,
   stockThicknessMm: number,
 ): boolean {
   return (

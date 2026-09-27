@@ -174,9 +174,10 @@ export type CncContourPass = {
   readonly zMm: number; // cutting depth for this pass; negative below stock top
   readonly polyline: ReadonlyArray<Vec2>;
   readonly closed: boolean;
-  // Provenance marker: the layer asked for a ramp entry, but this path is too
-  // short to ramp along, so the pass keeps its straight plunge (ADR-471).
-  // G-code comments and Job Review disclose it; motion is unchanged.
+  // Provenance marker: the layer asked for a ramp entry, but this path (for
+  // relief roughing, the chain's first loop) is too short to ramp along, so the
+  // pass keeps its straight plunge (ADR-471, ADR-424 Amendment 1). G-code
+  // comments and Job Review disclose it; motion is unchanged.
   readonly entryPlunge?: true;
 };
 
@@ -413,6 +414,16 @@ export type Job = {
   } | null;
   readonly diagnostics?: ReadonlyArray<JobDiagnostic>;
   readonly cncCompilation?: CncCompilationSidecar;
+  /** Laser finish placed by preparation (ADR-493). Absent keeps the default. */
+  readonly laserFinish?: JobLaserFinish;
 };
+
+/** Where a laser job leaves the head (ADR-493): `point` is in this job's program
+ * coordinates; `set-aside` is a configured bed finish that could not be placed,
+ * so the default applies and Job Review says why. */
+export type JobLaserFinish =
+  | { readonly kind: 'stay' }
+  | { readonly kind: 'point'; readonly x: number; readonly y: number }
+  | { readonly kind: 'set-aside'; readonly reason: 'unplaced' | 'rotary' };
 
 export const EMPTY_JOB: Job = { groups: [] };

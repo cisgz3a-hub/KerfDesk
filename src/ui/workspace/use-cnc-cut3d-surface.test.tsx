@@ -3,7 +3,9 @@ import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { ReliefSurfaceMeshWithNormals } from '../../core/relief/relief-surface-mesh';
 import type { RemovalGrid } from '../../core/sim';
+import { DEFAULT_DEVICE_PROFILE } from '../../core/devices';
 import { useCncCut3DSurface, type CncCut3DSurfaceState } from './use-cnc-cut3d-surface';
+import { cncCut3DWorkFrame, registerCncCut3DWorkFrame } from './cnc-cut3d-work-frame';
 
 (
   globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT?: boolean }
@@ -36,6 +38,7 @@ const MESH: ReliefSurfaceMeshWithNormals = {
   widthMm: 1,
   heightMm: 1,
 };
+const UNFRAMED_MESH = { ...MESH, workAxes: null };
 
 let host: HTMLDivElement;
 let root: Root;
@@ -66,7 +69,7 @@ describe('useCncCut3DSurface', () => {
     expect(observed.kind).toBe('loading');
     expect(workerMocks.prepare).toHaveBeenCalledWith(GRID, expect.any(AbortSignal));
     await act(async () => finish?.(MESH));
-    expect(observed).toEqual({ kind: 'ready', mesh: MESH, revision: 1, updating: false });
+    expect(observed).toEqual({ kind: 'ready', mesh: UNFRAMED_MESH, revision: 1, updating: false });
   });
 
   it('cancels a closing dialog and suppresses its delayed completion', async () => {
@@ -93,14 +96,19 @@ describe('useCncCut3DSurface', () => {
       }),
     );
     await render(true);
-    expect(observed).toEqual({ kind: 'ready', mesh: MESH, revision: 1, updating: false });
+    expect(observed).toEqual({ kind: 'ready', mesh: UNFRAMED_MESH, revision: 1, updating: false });
 
     await render(true, { ...GRID, depth: new Float32Array([-2]) });
-    expect(observed).toEqual({ kind: 'ready', mesh: MESH, revision: 1, updating: true });
+    expect(observed).toEqual({ kind: 'ready', mesh: UNFRAMED_MESH, revision: 1, updating: true });
 
     const next = { ...MESH, positions: new Float32Array([0, 0, -2]) };
     await act(async () => finish?.(next));
-    expect(observed).toEqual({ kind: 'ready', mesh: next, revision: 2, updating: false });
+    expect(observed).toEqual({
+      kind: 'ready',
+      mesh: { ...next, workAxes: null },
+      revision: 2,
+      updating: false,
+    });
   });
 
   it('lets the running surface finish while newer grids arrive, then builds the newest', async () => {
@@ -124,7 +132,47 @@ describe('useCncCut3DSurface', () => {
     await act(async () => finish?.(MESH));
     expect(workerMocks.prepare).toHaveBeenCalledTimes(2);
     expect(workerMocks.prepare.mock.calls[1]?.[0]).toBe(newest);
-    expect(observed).toEqual({ kind: 'ready', mesh: next, revision: 2, updating: false });
+    expect(observed).toEqual({
+      kind: 'ready',
+      mesh: { ...next, workAxes: null },
+      revision: 2,
+      updating: false,
+    });
+  });
+
+  it('keeps each work frame with its displayed surface while a different frame is pending', async () => {
+    const firstGrid = { ...GRID };
+    const nextGrid = { ...GRID, originX: 12, originY: 34, depth: new Float32Array([-2]) };
+    registerCncCut3DWorkFrame(firstGrid, DEFAULT_DEVICE_PROFILE, { x: 20, y: 30 });
+    registerCncCut3DWorkFrame(
+      nextGrid,
+      { ...DEFAULT_DEVICE_PROFILE, origin: 'rear-right' },
+      { x: -5, y: 6 },
+    );
+    let finish: ((mesh: ReliefSurfaceMeshWithNormals) => void) | null = null;
+    workerMocks.prepare.mockResolvedValueOnce(MESH).mockReturnValueOnce(
+      new Promise<ReliefSurfaceMeshWithNormals>((resolve) => {
+        finish = resolve;
+      }),
+    );
+    await render(true, firstGrid);
+    expect(observed).toMatchObject({ mesh: { workAxes: cncCut3DWorkFrame(firstGrid) } });
+    await render(true, nextGrid);
+    expect(observed).toMatchObject({
+      updating: true,
+      mesh: { workAxes: cncCut3DWorkFrame(firstGrid) },
+    });
+    const next = { ...MESH, positions: new Float32Array([0, 0, -2]) };
+    await act(async () => finish?.(next));
+    expect(observed).toMatchObject({
+      updating: false,
+      mesh: { positions: next.positions, workAxes: cncCut3DWorkFrame(nextGrid) },
+    });
+    expect(cncCut3DWorkFrame(nextGrid)).not.toEqual(cncCut3DWorkFrame(firstGrid));
+    // Frame attachment does not mutate or copy the worker's geometry arrays.
+    if (observed.kind !== 'ready') throw new Error('Missing completed surface');
+    expect(observed.mesh.positions).toBe(next.positions);
+    expect(MESH).not.toHaveProperty('workAxes');
   });
 
   it('reports a recoverable unavailable state instead of running on the UI thread', async () => {

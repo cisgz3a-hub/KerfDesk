@@ -5,6 +5,7 @@ import type { Heightmap } from './heightmap';
 import { reliefFinishingPasses, scallopRowSpacingMm } from './relief-finishing';
 import { finishingRows, rowDirection } from './relief-finishing-test-rows';
 import { dilateHeightmapByTool } from './heightmap-tool-offset';
+import { CNC_MASK_EMISSION_Z_CLEARANCE_MM } from '../cnc/precision';
 
 const BALL_NOSE: CncTool = { id: 'bn', name: 'ball', kind: 'ball-nose', diameterMm: 3.175 };
 const SMALL_BALL_NOSE: CncTool = {
@@ -267,12 +268,12 @@ describe('reliefFinishingPasses', () => {
       kernel: POINT_KERNEL,
       scallopMm: 0.025,
     });
-    const lobe = passes.find((pass) => pass.kind === 'path3d' && pass.points[0]?.y === 0.75);
+    const lobe = finishingRows(passes).find((row) => row.y === 0.75);
 
     // The flat lobe row keeps only its end vertices (ADR-421 point reduction).
-    expect(lobe?.kind === 'path3d' ? lobe.points : []).toEqual([
-      { x: 1.75, y: 0.75, z: -2 },
+    expect(lobe?.points).toEqual([
       { x: 0.75, y: 0.75, z: -2 },
+      { x: 1.75, y: 0.75, z: -2 },
     ]);
   });
 
@@ -290,11 +291,18 @@ describe('reliefFinishingPasses', () => {
       kernel: kernelForTool(BALL_NOSE, map.mmPerCell),
       scallopMm: 0.025,
     });
-    const branchTargets = passes.flatMap((pass) =>
-      pass.kind === 'path3d' ? pass.points.filter((point) => point.y === 0.375 && point.z < 0) : [],
-    );
+    // Row 1 runs stay down across its 15 selected samples (column 8's is not
+    // selected), either side of that column (ADR-484).
+    const lobeRuns = finishingRows(passes)
+      .filter((row) => row.y === 0.375 && row.points.every((point) => point.z < 0))
+      .map((row) => row.points.map((point) => point.x));
 
-    expect(branchTargets).toHaveLength(15);
+    expect(
+      lobeRuns.map((xs) => [Math.min(...xs), Math.max(...xs)]).sort((a, b) => a[0]! - b[0]!),
+    ).toEqual([
+      [0.125, 1.875],
+      [2.375, 3.875],
+    ]);
   });
 
   it('represents a reachable singleton as a stock-top-to-target vertical plunge', () => {
@@ -318,7 +326,7 @@ describe('reliefFinishingPasses', () => {
     ]);
   });
 
-  it('keeps diagonal-only mask cells in separate vertical passes', () => {
+  it('crosses between diagonal-only mask cells above the stock', () => {
     const map = {
       ...flatMap(-2, 2, 2, 1),
       inclusion: Uint8Array.from([1, 0, 0, 1]),
@@ -329,36 +337,37 @@ describe('reliefFinishingPasses', () => {
       scallopMm: 0.025,
     });
 
-    expect(passes).toHaveLength(2);
-    expect(
-      passes.map((pass) =>
-        pass.kind === 'path3d' ? pass.points.map(({ x, y }) => ({ x, y })) : [],
-      ),
-    ).toEqual([
-      [
-        { x: 0.5, y: 0.5 },
-        { x: 0.5, y: 0.5 },
-      ],
-      [
-        { x: 1.5, y: 1.5 },
-        { x: 1.5, y: 1.5 },
-      ],
+    // One pass: down, up to stock top, over the shared corner, and down again
+    // (ADR-484 links the two, and the corner is the excluded cells').
+    expect(passes).toHaveLength(1);
+    const points = passes[0]?.kind === 'path3d' ? passes[0].points : [];
+    expect(points.map(({ x, y }) => ({ x, y }))).toEqual([
+      { x: 0.5, y: 0.5 },
+      { x: 0.5, y: 0.5 },
+      { x: 1.5, y: 1.5 },
+      { x: 1.5, y: 1.5 },
+    ]);
+    expect(points.map((point) => point.z >= CNC_MASK_EMISSION_Z_CLEARANCE_MM)).toEqual([
+      false,
+      true,
+      true,
+      false,
     ]);
   });
 
   it('uses the requested row stride and component far row for a vertical strip', () => {
-    // The excluded second column keeps this on the masked planner; a mask that
+    // The excluded third column keeps this on the masked planner; a mask that
     // excludes nothing plans as an unmasked stay-down path (ADR-421).
     const map = {
-      ...flatMap(-2, 2, 7, 0.25),
-      inclusion: Uint8Array.from({ length: 14 }, (_, index) => (index % 2 === 0 ? 1 : 0)),
+      ...flatMap(-2, 3, 7, 0.25),
+      inclusion: Uint8Array.from({ length: 21 }, (_, index) => (index % 3 === 2 ? 0 : 1)),
     };
     const passes = reliefFinishingPasses(map, {
       tool: END_MILL,
       kernel: POINT_KERNEL,
       scallopMm: 0.025,
     });
-    const rowYs = passes.map((pass) => (pass.kind === 'path3d' ? pass.points[0]?.y : undefined));
+    const rowYs = finishingRows(passes).map((row) => row.y);
 
     expect(rowYs).toEqual([0.125, 1.375, 1.625]);
     expect(

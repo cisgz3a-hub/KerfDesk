@@ -15,10 +15,35 @@ files:
   - '!dist-electron/**/*.map'
   - dist/web/**/*
   - package.json
-  # Browser PDF code is already in dist/web; only the reviewed OFL fallback
-  # fonts emitted there may ship, not pdfjs-dist's old GPL font assets.
-  - '!**/node_modules/pdfjs-dist/**/*'
-  - '!**/node_modules/@napi-rs/canvas*/**/*'
+  # The renderer is bundled into dist/web, so the main process needs only
+  # electron-updater at runtime. Ship its dependency closure and no other
+  # node_modules (ADR-483): the renderer-only packages were 88.6 MB of the
+  # 110 MB app.asar. This also keeps pdfjs-dist's old GPL font assets and any
+  # native canvas binary out. electron/packaged-runtime-closure.test.ts keeps
+  # this list equal to electron-updater's installed dependency tree.
+  - '!**/node_modules/**/*'
+  - '**/node_modules/{electron-updater,builder-util-runtime,debug,ms,sax,fs-extra,graceful-fs,jsonfile,universalify,js-yaml,argparse,lazy-val,lodash.escaperegexp,lodash.isequal,semver,tiny-typed-emitter}/**/*'
+
+# Electron fuses, flipped in the packaged binary before signing (ADR-483).
+# KerfDesk never runs its executable as plain Node, reads NODE_OPTIONS, takes
+# --inspect, or loads anything outside app.asar, so each of those stays off;
+# app.asar's header hash is checked at launch (electron-builder writes the
+# hash into the executable). Nothing is served from file://.
+electronFuses:
+  runAsNode: false
+  # Cookie encryption uses the macOS Keychain, which an unsigned app cannot
+  # use reliably. KerfDesk keeps no login cookies.
+  enableCookieEncryption: false
+  enableNodeOptionsEnvironmentVariable: false
+  enableNodeCliInspectArguments: false
+  enableEmbeddedAsarIntegrityValidation: true
+  onlyLoadAppFromAsar: true
+  loadBrowserProcessSpecificV8Snapshot: false
+  grantFileProtocolExtraPrivileges: false
+  # The unsigned macOS Preview has only an ad-hoc signature, which flipping
+  # fuses invalidates; Apple silicon refuses to launch it unless re-signed.
+  resetAdHocDarwinSignature: true
+
 extraResources:
   - from: LICENSE
     to: legal/LICENSE

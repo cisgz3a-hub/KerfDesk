@@ -14,6 +14,7 @@ import { useMenuBarState } from './use-menu-bar-state';
 import { AppMenuChrome } from './AppMenuChrome';
 import { MenuBarHistoryControls } from './MenuBarHistoryControls';
 import { RecentProjectMenuGroup } from '../recent-projects/RecentProjectMenuGroup';
+import { MOVE_LASER_TO_SELECTION_IDS } from './machine-move-commands';
 
 export function AppMenuBar(props: {
   readonly commands: ReadonlyArray<AppCommand>;
@@ -214,6 +215,7 @@ const MENU_GROUPS: Partial<Record<CommandFamily, ReadonlyArray<MenuGroupLayout>>
         'arrange.move-to-bed-se',
       ],
     },
+    { label: 'Move laser to selection', ids: MOVE_LASER_TO_SELECTION_IDS },
     { label: 'Layout', ids: ['arrange.array', 'arrange.quick-nest', 'arrange.break-apart'] },
   ],
   window: [
@@ -273,6 +275,7 @@ const MENU_GROUPS: Partial<Record<CommandFamily, ReadonlyArray<MenuGroupLayout>>
         'tools.adjust-image',
         'tools.apply-image-mask',
         'tools.crop-image',
+        'tools.flatten-image-mask',
         'tools.remove-image-mask',
         'tools.save-processed-bitmap',
       ],
@@ -289,6 +292,9 @@ const MENU_GROUPS: Partial<Record<CommandFamily, ReadonlyArray<MenuGroupLayout>>
         'tools.union-silhouette',
         'tools.join-paths',
         'tools.offset-shapes',
+        'tools.rubber-band-outline',
+        'tools.close-paths',
+        'tools.reverse-paths',
         'tools.subtract',
         'tools.intersect',
         'tools.exclude',

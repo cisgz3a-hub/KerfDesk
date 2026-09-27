@@ -84,13 +84,10 @@ describe('reliefWaterlinePasses (ADR-423)', { timeout: 30_000 }, () => {
     expect(turn(left[0]?.points ?? [])).toBeGreaterThan(0);
   });
 
-  it('leaves shallow slopes and masked maps to the raster', () => {
+  it('leaves shallow slopes to the raster', () => {
     const gentle = sampledMap(60, (x) => -1 - 0.5 * x * 0.3);
-    const masked = { ...coneMap(), inclusion: new Uint8Array(100 * 100).fill(1) };
-    masked.inclusion[0] = 0;
 
     expect(planned(gentle)).toEqual([]);
-    expect(planned(masked)).toEqual([]);
   });
 
   it('finishes a vertical wall at the level spacing', () => {

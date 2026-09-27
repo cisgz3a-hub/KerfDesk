@@ -75,6 +75,8 @@ export function TextFormattingFields(props: {
         setGuideId={fields.setPathGuideId}
         setOffsetMm={fields.setPathOffsetMm}
         setReverse={fields.setPathReverse}
+        setAlongAlign={fields.setPathAlongAlign}
+        setAcrossAlign={fields.setPathAcrossAlign}
       />
     </>
   );

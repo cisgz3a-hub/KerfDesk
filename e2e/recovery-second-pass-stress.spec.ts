@@ -83,7 +83,7 @@ for (const acked of [0, 1, 3, 5]) {
     // operator would, then resume from the sealed bytes.
     await reopenProject(page);
     await kerfdesk.setAutoAcknowledge(true);
-    await connectAndHome(page, kerfdesk);
+    await connectAndHome(page, kerfdesk, { closeRecoveryReview: true });
     await kerfdesk.setAutoAcknowledge(false);
     await recovery.getByText('Interrupted job saved', { exact: true }).click();
     await recovery.getByRole('button', { name: 'Review recovery', exact: true }).click();
@@ -170,7 +170,7 @@ test('records a disconnect during post-job settle as an interruption of every li
   // The operator can still finish the job: recovery replays the final line.
   await reopenProject(page);
   await kerfdesk.setAutoAcknowledge(true);
-  await connectAndHome(page, kerfdesk);
+  await connectAndHome(page, kerfdesk, { closeRecoveryReview: true });
   await kerfdesk.setAutoAcknowledge(false);
   await recovery.getByText('Interrupted job saved', { exact: true }).click();
   await recovery.getByRole('button', { name: 'Review recovery', exact: true }).click();
@@ -236,7 +236,7 @@ test('chains three disconnect-and-resume cycles from the same engraving', async 
     expect(saved?.interruption).toBe('disconnect');
     await expect(page.getByRole('dialog', { name: 'Job complete', exact: true })).toHaveCount(0);
     await kerfdesk.setAutoAcknowledge(true);
-    await connectAndHome(page, kerfdesk);
+    await connectAndHome(page, kerfdesk, { closeRecoveryReview: true });
     await kerfdesk.setAutoAcknowledge(false);
   }
   await recovery.getByText('Interrupted job saved', { exact: true }).click();
@@ -394,7 +394,7 @@ test('resumes an image engraving interrupted 150 lines in, finishes it and offer
     { name: 'stress-image.png', kind: 'png-fixture', width: 200, height: 200 },
   ]);
   await (await toolbarCommand(page, 'Import...')).click();
-  await expect(page.getByRole('spinbutton', { name: 'Selection width' })).toHaveValue('20');
+  await expect(page.getByLabel('Selection width', { exact: true })).toHaveValue('20');
   await connectAndHome(page, kerfdesk);
   await frameCurrentJob(page, kerfdesk);
   await kerfdesk.setAutoAcknowledge(false);
@@ -416,7 +416,7 @@ test('resumes an image engraving interrupted 150 lines in, finishes it and offer
   expect(saved.ackedLines).toBe(150);
 
   await kerfdesk.setAutoAcknowledge(true);
-  await connectAndHome(page, kerfdesk);
+  await connectAndHome(page, kerfdesk, { closeRecoveryReview: true });
   await kerfdesk.setAutoAcknowledge(false);
   await recovery.getByText('Interrupted job saved', { exact: true }).click();
   await recovery.getByRole('button', { name: 'Review recovery', exact: true }).click();

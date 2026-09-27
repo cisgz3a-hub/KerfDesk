@@ -325,6 +325,16 @@ destination and cannot overwrite the template source.
 2. A notice reports how many objects and open paths were found and points to **Tools → Join
    paths...**. When nothing is open, the notice says so and the selection is kept.
 
+#### Contained and smaller — Edit menu (ADR-480)
+1. Select a closed shape and choose **Edit → Select Contained**. Every unlocked object on a visible
+   operation lying fully inside one of the selected closed paths is added; the shape stays
+   selected. Rotation, scale and mirroring count, a concave shape's notch is outside it, and a shape
+   straddling two containers is inside neither.
+2. **Edit → Select Smaller Shapes** adds every such object no wider and no taller than the widest
+   and tallest selected object, measured as it sits on the bed.
+3. Each notice says how many objects were added. When none qualify, or no closed shape is
+   selected, it says why and the selection is kept.
+
 #### Deselect — Escape or click in empty space
 1. Selection cleared. Status bar updates: `Nothing selected`.
 2. A stationary right click in empty space also clears selection, then opens the empty-workspace
@@ -426,6 +436,31 @@ destination and cannot overwrite the template source.
   selection is kept.
 - No shortcut: LightBurn's `P` is KerfDesk's Preview.
 
+#### Move laser to selection — menu (ADR-493)
+- `Arrange → Move laser to selection` → **Center**, **Top Left**, **Top**, **Top Right**, **Left**,
+  **Right**, **Bottom Left**, **Bottom**, **Bottom Right** of the selection's bounds.
+- The head moves there with the beam off, at the jog pad's speed, through the same machine-position
+  jog as Go to work zero: CNC lifts to safe Z first, and configured bounds and no-go zones warn
+  without refusing (ADR-232).
+- The target is where an Absolute Coordinates job burns that canvas point. With a verified bed
+  mapping (ADR-342) that is the physical spot on the bed; without one the head goes where the
+  Absolute job would go, and a warning says the spot must be checked at the machine.
+- In User Origin, Verified Origin and Current Position the job is placed from the origin when it is
+  prepared, so a canvas point has no fixed place yet: a notice says so and points at Frame, and
+  nothing moves. Not connected or not Idle is a notice too.
+- With the rotary on, only X moves and Y stays where it is, with a notice: Y on the rotary is
+  rotation from where the job starts. The same applies to Move to position.
+
+#### Typed values with math — numeric edits bar (ADR-480)
+- The X, Y, Width, Height and Rotation boxes take a number or a sum: `10+5`, `2*(3+4)`, `2^3`,
+  `pi`, `e`, `sqrt()`, `abs()`, `sin()`, `cos()`, `tan()`, `asin()`, `acos()`, `atan()` (degrees),
+  `log()` (base 10) and `ln()`. Enter or leaving the box applies it.
+- Lengths take `mm`, `cm`, `in` or `"`, and are converted to millimetres; nothing is shown in
+  inches. Rotation takes `deg` or `°`. Width and Height take a percentage of the current size,
+  such as `50%`.
+- A typing mistake shows a notice with what was wrong and what to type, and the box goes back to
+  the current value. An emptied box goes back silently. ArrowUp and ArrowDown nudge by 0.1 mm or 1°.
+
 #### Edge — transform pushes object out of bed
 - Permitted (user may be temporarily repositioning).
 - Out-of-bounds geometry gains the red dashed overlay (F-A3 edge).
@@ -497,6 +532,29 @@ destination and cannot overwrite the template source.
    so overlaps and stray paths show. The menu item shows a check while it is on.
 2. It changes the canvas only: output, Preview and saved projects are unchanged. It resets to
    Filled when the app restarts.
+
+### F-A6e. Rubber-band outline, Close Path, Reverse Direction, Delete Duplicates, Flatten Image Mask (ADR-480)
+
+1. **Tools → Vector → Rubber-Band Outline** adds one closed shape stretched around everything
+   selected, images included, and selects it. It takes a copy of the first selected Line
+   operation's settings, or a new Line operation named Outline. A selection lying on one straight
+   line has no area; the notice says so and nothing changes.
+2. **Tools → Vector → Close Path** closes every open path of three or more points in the selected
+   imported, traced or drawn-line artwork with a straight line. The notice gives the widest gap it
+   closed. Text and drawn rectangles, ellipses and polygons keep their own paths; the notice says
+   to convert them to paths first.
+3. **Tools → Vector → Reverse Direction** reverses the same kinds of paths. Open paths swap ends;
+   closed paths keep their start point and run the other way round. CNC tabs stay where they were
+   on the shape. When Cut Planner may cut open paths from either end, the notice says to set Path
+   direction to Preserve direction to keep the new direction.
+4. **Edit → Delete Duplicates** (`Alt+D`) deletes later copies of artwork drawn twice in the same
+   place on the same operation: moved-back copies, and closed shapes starting at another corner or
+   drawn the other way, count. Copies on another operation, or with another power scale or
+   override, are kept. Locked artwork, image masks and path-text guides are never deleted.
+5. **Tools → Image → Flatten Image Mask** bakes the mask into the selected image and crops it, as
+   **Crop Image** does, then deletes the mask shape. The shape stays when it is locked or another
+   image or path text uses it; the notice says which.
+6. Each tool is one undo step and adds none when nothing changes. None operates a machine.
 
 ### F-A7. Artwork Operations panel
 
@@ -713,6 +771,22 @@ marks later edits as unapproved without changing the existing Frame/Start policy
 4. Job Review lists these settings on the operation's detail line when they are set. Preview, Frame,
    the time estimate and every output format follow them. With none set, output is unchanged.
 5. Material presets do not store them; applying a preset keeps what the operation has.
+
+---
+
+### F-A7b. Operations list tools and Sort cuts last (ADR-480)
+
+1. The **•••** button on the Cuts / Layers header opens **Turn output on for all**, **Turn output
+   off for all**, **Invert output**, **Show all**, **Hide all**, **Invert visibility** and **Sort
+   cuts last**. Each row's **Show only this** hides every other operation.
+2. Each is one undo step. Hidden artwork leaves the selection. The registration jig's output is
+   left alone by Turn output on for all and Invert output, since it burns in its own run; Turn
+   output off for all includes it.
+3. **Sort cuts last** keeps Fill and Image operations in place and moves Line operations after
+   them, weakest first (power × passes ÷ speed). Run order is rewritten to match: engrave-only
+   artwork first, then artwork that engraves and cuts, whose cut follows its own engraving, then
+   cut-only artwork, weakest first. The notice says what moved. Running it again changes nothing.
+4. In CNC, Sort cuts last is unavailable: CNC already runs profiles last.
 
 ---
 
@@ -1107,6 +1181,7 @@ Mac uses `Cmd`, Windows/Linux web uses `Ctrl`.
 - `Cmd/Ctrl+D` — Duplicate selection in place (LightBurn parity)
 - `Cmd/Ctrl+A` — Select all
 - `Cmd/Ctrl+Shift+I` — Invert selection (ADR-410)
+- `Alt+D` — Delete duplicates (ADR-480; Option+D on macOS)
 - `Delete` / `Backspace` — Delete selected
 - `Escape` — Deselect / cancel current operation
 
@@ -1146,6 +1221,13 @@ Mac uses `Cmd`, Windows/Linux web uses `Ctrl`.
   (ADR-362).
 - `PageUp` / `PageDown` — Jog Z. When a scrolling list, tab panel or the Artwork panel has focus,
   the keys scroll it instead (ADR-362).
+- `Cmd/Ctrl+Shift+]` / `Cmd/Ctrl+Shift+[` — Jog up / down one step; `Cmd/Ctrl+Alt+[` /
+  `Cmd/Ctrl+Alt+]` — Jog left / right one step (LightBurn's Move-window keys, ADR-493).
+  Numpad `8`/`2`/`4`/`6` jog the same way and `7`/`9`/`1`/`3` diagonally, only with Num Lock on:
+  with Num Lock off the keypad sends arrow keys, which nudge the selected artwork and never move
+  the machine. Directions, step and speed are exactly the jog pad arrows'. Like the Z keys, they
+  work only while the jog pad is shown and enabled, send one step per press (no auto-repeat), and
+  do nothing in a dialog, a text field or a focused scrolling list.
 
 ---
 
@@ -2056,6 +2138,30 @@ authorization, Frame proof, controller command, or safety boundary.
   (a controller reset clears a temporary origin; home first where the machine homes). **Frame
   remaining area** traces everything still to engrave from the chosen line, from the current
   origin, through the ordinary Frame preparation; it issues no Start permit. Both inform only.
+- When the origin differs, is not reported, or (for a User or Verified Origin job) is no longer
+  set, **Restore saved origin** writes the saved XY offset back with one `G92` at the live
+  machine position, without moving the head, and waits for the controller to report it. A
+  cleared origin that sat at machine zero reads as gone, not as matching. The saved offset is
+  measured from machine zero, so after a reset or power loss the operator homes a machine that
+  was homed before the job first; a machine never homed cannot get its origin back from the
+  numbers. When a recovery is refused for a missing origin, the refusal names the saved origin
+  and points here instead of to Set origin here, which would place the rest of the job where
+  the head stopped (ADR-341 Amendment 5).
+- After a lost connection the recovery record also keeps how many lines had been sent: a
+  controller keeps running what it had received, so the head stops at the end of the last of
+  them. When the origin is gone, not reported or moved, **Continue from where the head stopped**
+  writes one `G92` that makes the head's current spot that program point, without moving the
+  head, and sets the restart to the next line. It is meant for a machine that was not homed
+  before the job, and only while nobody has moved the head since the stop; if the controller
+  itself restarted or lost power mid-burn the head stopped earlier, which Frame remaining area
+  shows before anything burns. The Review then reads as set from the head stop instead of
+  warning that the origin moved (ADR-341 Amendment 6).
+- The Review of an interrupted laser job opens by itself once the controller is connected after
+  a lost link, a controller restart, a failed write or a stalled stream, once per run in each
+  app session. It does not open after the operator's own Abort or a rejected line; the card
+  stays either way. It covers the Machine panel, so when the machine has homing set up the
+  restore offers **Home machine** beside **Restore saved origin**: the operator homes and puts
+  the origin back without closing the Review.
 - A recorded cause names what happened: **Abort** is recorded as stopped by the operator, and
   closing or reloading KerfDesk mid-job as the app closing (its stop may not have arrived);
   only a stop nobody requested reads as unexplained. A recovery card another window has
@@ -2067,6 +2173,8 @@ authorization, Frame proof, controller command, or safety boundary.
   the last completed run, or the previous manual restart), so a Current Position job is not
   re-anchored where the head stopped; the dialog and confirmation name that placement. With no
   such run, the confirmation says the restart is anchored at the head as it is now (ADR-362).
+  While an interrupted laser job is saved, the line field starts at its automatic restart line
+  (a file line, like the field) and says where the job stopped in sent lines.
   Costly image/fill preparation runs in the background for both manual and fingerprint-based
   recovery; worker failure is retryable and never falls back to blocking the canvas.
 - Recovery preserves the saved scope and resolved placement. It uses its separate source,
@@ -2633,6 +2741,9 @@ settings and Job Review keep their existing read-only setup references.
   Italianno, and Corinthia for names and calligraphic signs. Cinzel Decorative provides ornamental
   serif companion lettering. These fonts are bundled with the app, remain editable on canvas,
   and work with **Weld overlaps**; no system-font installation or font-service connection is needed.
+- **Path text** (ADR-480): **Place at** puts the text at the Start, Middle or End of its guide
+  path; **Path offset** moves it away from that point. **Text sits** puts the text on top of the
+  path, centred on it, or hanging below it. Text that does not fit is reported and not placed.
 - F-D3. Choose font. The picker draws real `Aa` toolpath previews for Relief
   SingleLine, EMS Nixish, EMS Decorous Script, and EMS Casual Hand. These create
   open center strokes, so use **Engrave** or **Profile on path**; V-carve,
@@ -3111,6 +3222,32 @@ The profile's **Recorded home** corner documents the setup. It does not write co
 homing direction or change work zero. Home uses the selected controller's command contract
 (for example, generic GRBL `$H`, or the Falcon A1 Pro's `$HX` then `$HY`); firmware determines
 the physical direction. **Go to work zero** is a separate movement to the workpiece reference.
+
+**Move to position** (under the jog pad, ADR-493) moves the head, beam off, to typed X and Y.
+**Coordinates** picks the frame: **Canvas** is the numbers on the rulers, the spot where an
+Absolute job burns that point (as Move laser to selection); **From origin** is millimetres from
+the work origin, the numbers in the job's G-code, and needs no homing (MPos = work position +
+work offset). It starts on Canvas in Absolute Coordinates and on From origin otherwise, with X and
+Y on machine X0 Y0 or work zero until they are typed.
+**Use current** fills X and Y with where the head is now. **Save** keeps the typed position under a
+name (blank gives Position N; the same name replaces the old entry) in the machine profile, so it
+travels with the profile and the project and is one undo step. Each saved row has **Go** and
+**Delete**. Go needs a connected, Idle machine, like the jog arrows; a missing work offset for a
+From origin move is a notice and nothing moves.
+
+**After a job** (Machine Setup's laser step, ADR-493; LightBurn's Finish Position) sets where a laser
+job leaves the head: **Go to the work origin** (the default, which stores nothing; a Current
+Position job still returns to its start), **Stay where the job ends** (no park move in any mode),
+or **Go to a bed position**, given in canvas coordinates as on the rulers; it starts on machine X0
+Y0 (the front-left corner of a front-left machine). Stay and a bed position also apply to a
+Current Position job, so the next Start begins where the head was left. **Finish jobs here** in
+Move to position sets that bed position from typed Canvas numbers. The bed position moves with the
+job like the CNC park (ADR-392): canvas → machine coordinates → the job's bed-to-program shift.
+Where that shift is unknown (a placed job before a confirmed Home, any Verified Origin job) or the
+rotary is on, the finish is set aside for that job, the default applies, and Job Review says why.
+The G-code, preview, estimates and Job Review's park-outside-frame note all read the same placed
+finish. Changing the finish changes the G-code, so it needs a fresh Frame; saving a head position
+does not.
 
 The controller's native MPos is distinct from the drawn bed coordinates (ADR-342). Stock GRBL
 can report negative machine positions after homing. With current-session build, travel and homing
@@ -4075,7 +4212,9 @@ explicitly marked below; the remaining controls and user-facing flows are planne
    already cleared piece; otherwise it lifts. With a ramp angle set (the
    layer's Ramp entry, or **Roughing ramp** where the cut type has none),
    each run of linked rings descends along its first ring from the level
-   above instead of plunging; a ring shorter than one cut width plunges.
+   above instead of plunging; a ring shorter than one cut width plunges,
+   and the G-code header and Job Review say so (F-CNC18, ADR-424
+   Amendment 1).
 3. Emitted G-code passes the plunged-travel invariant; scale is resolved
    before cutter geometry, then mirror/rotate/move placement is honored.
 4. Job Review's detail line for the operation names the levels the
@@ -4087,6 +4226,12 @@ explicitly marked below; the remaining controls and user-facing flows are planne
    names only the ramp angle, since no helix or V-carve entry reaches a
    relief. One that also cut other shapes says `1 pass on the other shapes`,
    and kept tabs add `none on reliefs` (ADR-224 Amendment 3).
+5. In the same row, an operation that cut only reliefs shows **Relief**
+   under Cut and the deepest compiled relief pass under Depth mm, for
+   example `2.5 mm actual`, or `3 mm actual` where a finishing bit cuts
+   the allowance. Its cut type and Cut depth reach no shape, so the row
+   does not show them. One that also cut other shapes keeps both
+   (ADR-224 Amendment 4).
 
 #### Error — bit too big for the detail
 1. Regions narrower than the bit's dilated footprint produce no rings
@@ -4726,8 +4871,16 @@ and lifts the command's CNC-only gate.)*
    next along its edge column's own tip samples instead of retracting and
    plunging. A vertex is dropped only where the straight move replacing it
    stays at or above it by no more than 0.002 mm, so the reduced path clears
-   everything the sampled one did (ADR-421). A mask that excludes cells keeps
-   one pass per run.
+   everything the sampled one did (ADR-421). With a mask that excludes cells,
+   every column's included run keeps the raster's rows plus its two ends,
+   and the rows' runs are cut nearest first, staying down across gaps up to
+   four bit diameters as a skipping raster does (item 7). Every move is
+   checked exactly against the whole-cell blocks of stock the mask leaves
+   standing and lifted where it would dip into them; to keep that check
+   cheap, samples within the bit's reach of the mask stand 0.002 mm above
+   their exact tip (ADR-484). As along any wall parallel to the rows, the
+   raster leaves the foot of a mask edge running along them; Raster +
+   waterline finishes it.
 4. Roughing leaves the layer's Rough allowance (0.5 mm unless set; it exists
    FOR this pass); finishing consumes it down to the true surface.
 5. Raster direction runs the rows along X (default) or along Y (ADR-423).
@@ -4737,8 +4890,10 @@ and lifts the command's CNC-only gate.)*
    never further apart along the surface than the scallop's spacing. Each
    feature is circled top down in one stay-down pass, climb or conventional
    as the layer's cut direction says on the physical bed. Every waterline
-   vertex clears the model exactly and every move is checked; a relief with a
-   mask outline gets the narrowed raster only (ADR-423).
+   vertex clears the model exactly and every move is checked (ADR-423). On a
+   relief with a mask outline the waterline also circles the stock the mask
+   leaves standing, keeping every point of every move clear of it by the
+   mask's own clearance (ADR-484).
 7. With **Flats** set to Roughing bit, the raster skips every sample from
    which the bit would touch only flats the roughing end mill took to their
    exact height, and cuts what it keeps nearest first: it stays down across
@@ -4834,6 +4989,12 @@ and lifts the command's CNC-only gate.)*
    starts, so the finishing group's header carries no entry line, and Job
    Review's operation line names the relief stages that plunge, for example
    `ramp entry 5° (relief finishing plunges)` (ADR-273 Amendment 1).
+2. A roughing run whose first ring is shorter than one cut width still
+   plunges. The roughing header adds the same `; cnc entry-advisory: N
+   passes plunge: path shorter than one cut width` line, and Job Review lists
+   an advisory naming the relief roughing passes and the field that sets
+   their ramp: Ramp entry on a profile, pocket or engrave layer, Roughing
+   ramp on any other (ADR-424 Amendment 1). No ramp angle, no notice.
 
 ### F-CNC19. Tile a job larger than the bed — Phase H.10
 
@@ -7187,8 +7348,11 @@ recorded below, and only step 4 remains deliberately open:
 4. [ ] Only when a future signed stable release is deliberately authorized, create
    the protected `desktop-production` environment, add the exact reviewed commit as the repository
    Actions variable `STABLE_APPROVED_RELEASE_SHA`, and add
-   `STABLE_WINDOWS_CSC_LINK`, `STABLE_WINDOWS_CSC_KEY_PASSWORD`,
-   `STABLE_R2_API_TOKEN`, and `STABLE_CLOUDFLARE_ACCOUNT_ID` there.
+   `STABLE_ESIGNER_USERNAME`, `STABLE_ESIGNER_PASSWORD`,
+   `STABLE_ESIGNER_TOTP_SECRET`, `STABLE_R2_API_TOKEN`, and
+   `STABLE_CLOUDFLARE_ACCOUNT_ID` there. The three eSigner values come from an
+   SSL.com code-signing certificate enrolled in eSigner (the TOTP secret is shown
+   at enrollment); no `.pfx` exists (ADR-142 Amendment 1).
 5. [x] Use the checked-in local tag-policy/workflow tests—not a remote malformed or
    Preview tag—to prove rejection precedes the protected-environment job.
 

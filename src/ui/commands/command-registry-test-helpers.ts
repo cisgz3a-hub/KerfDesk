@@ -40,8 +40,18 @@ function baseCtxEditingTools(): Partial<AppCommandContext> {
     offsetShapes: vi.fn(),
     rotateSelectionQuarterTurn: vi.fn(),
     moveSelectionToBed: vi.fn(),
+    moveLaserToSelection: vi.fn(),
     wireframeActive: false,
     toggleWireframe: vi.fn(),
+    // ADR-480 (LightBurn gap batch 5) design tools.
+    selectContainedShapes: vi.fn(),
+    selectSmallerShapes: vi.fn(),
+    deleteDuplicates: vi.fn(),
+    canEditSelectedPaths: false,
+    closeSelectedPaths: vi.fn(),
+    reverseSelectedPaths: vi.fn(),
+    addRubberBandOutline: vi.fn(),
+    flattenImageMask: vi.fn(),
   };
 }
 
