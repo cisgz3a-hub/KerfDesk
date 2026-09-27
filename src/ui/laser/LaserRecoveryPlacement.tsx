@@ -34,6 +34,8 @@ export type LaserRecoveryPlacementProps = {
   readonly onRestoreOrigin?: (savedMm: WorkCoordinateOffset) => Promise<void>;
   /** Where the head stopped after a lost link, and the action that sets the origin from it. */
   readonly headStop?: HeadStopContinue;
+  /** Runs the homing cycle; supplied by the host when the machine has homing set up. */
+  readonly onHome?: () => Promise<void>;
 };
 
 export function LaserRecoveryPlacement(props: LaserRecoveryPlacementProps): JSX.Element {
@@ -71,6 +73,7 @@ export function LaserRecoveryPlacement(props: LaserRecoveryPlacementProps): JSX.
         disabled={props.disabled}
         {...(props.onRestoreOrigin === undefined ? {} : { onRestoreOrigin: props.onRestoreOrigin })}
         {...(props.headStop === undefined ? {} : { headStop: props.headStop })}
+        {...(props.onHome === undefined ? {} : { onHome: props.onHome })}
       />
       {artifact.kind === 'exact-execution' && props.onFrameRemaining !== undefined ? (
         <FrameRemaining
@@ -116,6 +119,7 @@ function OriginRepair(props: {
   readonly disabled: boolean;
   readonly onRestoreOrigin?: (savedMm: WorkCoordinateOffset) => Promise<void>;
   readonly headStop?: HeadStopContinue;
+  readonly onHome?: () => Promise<void>;
 }): JSX.Element {
   const anchored = props.headStop?.anchored === true;
   const uncertain =
@@ -129,6 +133,7 @@ function OriginRepair(props: {
           disabled={props.disabled}
           headStopOffered={showHeadStop}
           onRestore={props.onRestoreOrigin}
+          {...(props.onHome === undefined ? {} : { onHome: props.onHome })}
         />
       ) : null}
       {showHeadStop && props.headStop !== undefined ? (
@@ -171,45 +176,64 @@ function OriginComparison(props: {
   );
 }
 
+// The Review opens by itself after a reconnect and covers the Machine panel, so
+// the Home the restore depends on sits beside it (ADR-341 Amendment 6).
 function RestoreSavedOrigin(props: {
   readonly saved: WorkCoordinateOffset;
   readonly disabled: boolean;
   readonly headStopOffered: boolean;
   readonly onRestore: (savedMm: WorkCoordinateOffset) => Promise<void>;
+  readonly onHome?: () => Promise<void>;
 }): JSX.Element {
-  const [restoring, setRestoring] = useState(false);
+  const [running, setRunning] = useState<'home' | 'restore' | null>(null);
   const [failure, setFailure] = useState<string | null>(null);
-  const restore = async (): Promise<void> => {
-    if (restoring) return;
-    setRestoring(true);
+  const run = async (step: 'home' | 'restore', action: () => Promise<void>): Promise<void> => {
+    if (running !== null) return;
+    setRunning(step);
     setFailure(null);
     try {
-      await props.onRestore(props.saved);
+      await action();
     } catch (error: unknown) {
       setFailure(error instanceof Error ? error.message : String(error));
     } finally {
-      setRestoring(false);
+      setRunning(null);
     }
   };
+  const onHome = props.onHome;
   return (
     <div style={restoreStyle}>
       <p style={noteStyle}>
         Restore saved origin puts work zero back at X {formatOriginMm(props.saved.x)}, Y{' '}
         {formatOriginMm(props.saved.y)} mm from machine zero without moving the head. That is where
         this job started only if the machine measures its position as it did then: if the controller
-        was reset or lost power, home it first. A machine that was not homed before this job cannot
-        get its origin back from these numbers
+        was reset or lost power, home it first{onHome === undefined ? '' : ' with Home machine'}. A
+        machine that was not homed before this job cannot get its origin back from these numbers
         {props.headStopOffered ? '; use Continue from where the head stopped below instead' : ''}.
         Set origin here would put the origin where the head is now, not where the job started.
+        {props.headStopOffered && onHome !== undefined
+          ? ' Homing moves the head off the spot where the job stopped, so after it only the restore can place the job.'
+          : null}
       </p>
-      <button
-        type="button"
-        disabled={props.disabled || restoring}
-        onClick={() => void restore()}
-        title="Write the work origin this job ran with back to the controller with one G92. The head does not move."
-      >
-        {restoring ? 'Restoring…' : 'Restore saved origin'}
-      </button>
+      <div style={actionRowStyle}>
+        {onHome === undefined ? null : (
+          <button
+            type="button"
+            disabled={props.disabled || running !== null}
+            onClick={() => void run('home', onHome)}
+            title="Run the homing cycle so the controller measures from machine zero again. The head moves to its home switches."
+          >
+            {running === 'home' ? 'Homing…' : 'Home machine'}
+          </button>
+        )}
+        <button
+          type="button"
+          disabled={props.disabled || running !== null}
+          onClick={() => void run('restore', () => props.onRestore(props.saved))}
+          title="Write the work origin this job ran with back to the controller with one G92. The head does not move."
+        >
+          {running === 'restore' ? 'Restoring…' : 'Restore saved origin'}
+        </button>
+      </div>
       {failure === null ? null : (
         <p role="alert" style={warningStyle}>
           {failure}
@@ -301,6 +325,7 @@ const warningStyle: React.CSSProperties = {
   lineHeight: 1.45,
 };
 const restoreStyle: React.CSSProperties = { margin: '4px 0 8px' };
+const actionRowStyle: React.CSSProperties = { display: 'flex', gap: 8, flexWrap: 'wrap' };
 const frameRowStyle: React.CSSProperties = {
   display: 'flex',
   alignItems: 'center',

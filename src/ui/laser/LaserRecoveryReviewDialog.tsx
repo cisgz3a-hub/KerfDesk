@@ -28,6 +28,8 @@ export type LaserRecoveryReviewDialogProps = {
     readonly x: number;
     readonly y: number;
   }) => Promise<{ readonly x: number; readonly y: number }>;
+  /** Runs the homing cycle before a restore; supplied by the host when homing is set up. */
+  readonly onHome?: () => Promise<void>;
 };
 
 /**
@@ -64,6 +66,7 @@ export function LaserRecoveryReviewDialog(props: LaserRecoveryReviewDialogProps)
           : { onFrameRemaining: props.onFrameRemaining })}
         {...(props.onRestoreOrigin === undefined ? {} : { onRestoreOrigin: props.onRestoreOrigin })}
         {...(headStop === undefined ? {} : { headStop })}
+        {...(props.onHome === undefined ? {} : { onHome: props.onHome })}
       />
       <LaserRecoveryRestartPicker
         key={selectionKey}

@@ -288,11 +288,36 @@ export async function connectAndHome(page: Page, kerfdesk: KerfDeskFixture): Pro
   await selectWorkspacePanel(page, 'Machine');
   await page.getByRole('button', { name: /^Connect/ }).click();
   await expect(page.getByText('State: Idle', { exact: true })).toBeVisible();
-  await expandMachineUtilities(page);
-  await page.getByRole('button', { name: 'Home', exact: true }).click();
+  await closingAutoOpenedRecoveryReview(page, async () => {
+    await expandMachineUtilities(page);
+    await page.getByRole('button', { name: 'Home', exact: true }).click();
+  });
   await expect.poll(async () => serialWrites(await kerfdesk.events())).toContain('G4 P0.01');
   await kerfdesk.emitSerialLine(IDLE);
   await expect(page.getByRole('button', { name: 'Home', exact: true })).toBeEnabled();
+}
+
+/** A job cut off by a lost link or a controller failure opens its Review by
+ * itself once the controller is connected again (ADR-341 Amendment 6), over
+ * the Machine panel. Steps that reach the panel right after a connect close it
+ * first; the card keeps the job, and it opens only once per run. */
+export async function closingAutoOpenedRecoveryReview(
+  page: Page,
+  steps: () => Promise<void>,
+): Promise<void> {
+  const review = page.getByRole('dialog', { name: 'Review interrupted laser job' });
+  await page.addLocatorHandler(
+    review,
+    async () => {
+      await review.getByRole('button', { name: 'Close', exact: true }).click();
+    },
+    { times: 1 },
+  );
+  try {
+    await steps();
+  } finally {
+    await page.removeLocatorHandler(review);
+  }
 }
 
 export function serialWrites(events: FixtureEvents): string {

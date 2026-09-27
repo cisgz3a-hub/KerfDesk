@@ -2051,7 +2051,9 @@ authorization, Frame proof, controller command, or safety boundary.
 - The Review of an interrupted laser job opens by itself once the controller is connected after
   a lost link, a controller restart, a failed write or a stalled stream, once per run in each
   app session. It does not open after the operator's own Abort or a rejected line; the card
-  stays either way.
+  stays either way. It covers the Machine panel, so when the machine has homing set up the
+  restore offers **Home machine** beside **Restore saved origin**: the operator homes and puts
+  the origin back without closing the Review.
 - A recorded cause names what happened: **Abort** is recorded as stopped by the operator, and
   closing or reloading KerfDesk mid-job as the app closing (its stop may not have arrived);
   only a stop nobody requested reads as unexplained. A recovery card another window has

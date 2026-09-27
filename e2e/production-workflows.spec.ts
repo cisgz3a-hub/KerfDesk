@@ -10,6 +10,7 @@ import {
   type Locator,
   type Page,
 } from './fixtures/kerfdesk-test';
+import { closingAutoOpenedRecoveryReview } from './fixtures/recovery-flow';
 
 test.beforeEach(async ({ page }) => {
   await page.goto('/');
@@ -1230,8 +1231,10 @@ async function connectAndHome(page: Page, kerfdesk: KerfDeskFixture): Promise<vo
   await selectWorkspacePanel(page, 'Machine');
   await page.getByRole('button', { name: /^Connect/ }).click();
   await expect(page.getByText('State: Idle', { exact: true })).toBeVisible();
-  await expandMachineUtilities(page);
-  await page.getByRole('button', { name: 'Home', exact: true }).click();
+  await closingAutoOpenedRecoveryReview(page, async () => {
+    await expandMachineUtilities(page);
+    await page.getByRole('button', { name: 'Home', exact: true }).click();
+  });
   await expect.poll(async () => serialWrites(await kerfdesk.events())).toContain('G4 P0.01');
   await kerfdesk.emitSerialLine('<Idle|MPos:0.000,0.000,0.000|WCO:0.000,0.000,0.000|FS:0,0>');
   await expect(page.getByRole('button', { name: 'Home', exact: true })).toBeEnabled();
