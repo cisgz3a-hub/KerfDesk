@@ -178,6 +178,11 @@ export type CncContourPass = {
   // short to ramp along, so the pass keeps its straight plunge (ADR-471).
   // G-code comments and Job Review disclose it; motion is unchanged.
   readonly entryPlunge?: true;
+  // ADR-489: earlier passes of this job have cut away everything the cutter
+  // would touch at or above this Z anywhere along this pass's path, so the
+  // emitter may rapid down to it plus CNC_AIR_RAPID_CLEARANCE_MM before the
+  // plunge instead of feeding down from safe Z. Absent: plunge from safe Z.
+  readonly airFloorZMm?: number;
 };
 
 export type CncPath3dPass = {
@@ -199,6 +204,8 @@ export type CncPath3dPass = {
   // its descents against the configured plunge rate.
   // Tiling and G-code comments preserve this marker without changing motion.
   readonly entryRamp?: true;
+  // ADR-489: see CncContourPass.airFloorZMm.
+  readonly airFloorZMm?: number;
 };
 
 export type CncArcPass = {
@@ -209,6 +216,8 @@ export type CncArcPass = {
   readonly clockwise: boolean;
   readonly zMm: number;
   readonly closed: boolean;
+  // ADR-489: see CncContourPass.airFloorZMm.
+  readonly airFloorZMm?: number;
 };
 
 export type CncHelicalContourPass = {

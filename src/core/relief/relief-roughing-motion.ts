@@ -52,6 +52,9 @@ export type ReliefRoughingLevelPaths = {
   // Core cleanup paths and, for each, whether its stock lies inside it.
   readonly cleanup: ReadonlyArray<Polyline>;
   readonly cleanupStockInside: ReadonlyArray<boolean>;
+  // ADR-489: with its tip at or above this Z the cutter touches no stock
+  // anywhere on the level's paths; absent when that is not proven.
+  readonly airFloorZMm?: number;
 };
 
 export type ReliefRoughingMotionOptions = {
@@ -66,6 +69,7 @@ export type ReliefRoughingMotionOptions = {
 
 type Chain = {
   readonly zMm: number;
+  readonly airFloorZMm: number | undefined;
   // The entry ramp, descending to zMm; empty when the chain plunges.
   readonly ramp: ReadonlyArray<Vec3>;
   // Everything at depth, from the ramp's end (or the plunge) onward.
@@ -284,12 +288,13 @@ function openChain(
   const drop = level.sliceTopMm - level.zMm;
   const angle = options.rampAngleDeg ?? 0;
   const perimeter = perimeterMm(points);
+  const airFloorZMm = level.airFloorZMm;
   if (!(angle > 0) || !(drop > 0) || !(perimeter > 0) || !(perimeter >= options.cutWidthMm)) {
-    return { zMm: level.zMm, ramp: [], path: loopFrom(points, start) };
+    return { zMm: level.zMm, airFloorZMm, ramp: [], path: loopFrom(points, start) };
   }
   const clamped = Math.min(Math.max(angle, MIN_RAMP_ANGLE_DEG), MAX_RAMP_ANGLE_DEG);
   const ramp = rampAlong(points, start, level.sliceTopMm, level.zMm, (clamped * Math.PI) / 180);
-  return { zMm: level.zMm, ramp: ramp.points, path: loopFrom(points, ramp.end) };
+  return { zMm: level.zMm, airFloorZMm, ramp: ramp.points, path: loopFrom(points, ramp.end) };
 }
 
 function longestSideMiddle(points: ReadonlyArray<Vec2>): LoopPoint {
@@ -342,8 +347,9 @@ function rampAlong(
 }
 
 function chainPass(chain: Chain): CncPass {
+  const floor = chain.airFloorZMm === undefined ? {} : { airFloorZMm: chain.airFloorZMm };
   if (chain.ramp.length === 0) {
-    return { kind: 'contour', zMm: chain.zMm, polyline: chain.path, closed: false };
+    return { kind: 'contour', zMm: chain.zMm, polyline: chain.path, closed: false, ...floor };
   }
   const atDepth = chain.path.slice(1).map((point) => ({ ...point, z: chain.zMm }));
   const pass: CncPath3dPass = {
@@ -353,6 +359,7 @@ function chainPass(chain: Chain): CncPass {
     // The ramp's descent rides the cutting feed only as far as the plunge
     // rate allows; the level itself keeps the full cutting feed.
     lateralFeed: 'z-rate-capped',
+    ...floor,
   };
   return pass;
 }

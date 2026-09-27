@@ -87,14 +87,16 @@ export type GcodeMetadata = {
  * exact-contact checks exceed the normal-to-move tolerance, with finite
  * sampling and output-rounding limits retained, and ADR-462's best-effort
  * air repeats at eligible boundaries, with full-circle/large-arc timing
- * and unchanged M3 dark-transition ordering.
+ * and unchanged M3 dark-transition ordering, and ADR-489's CNC passes rapided
+ * down from safe Z to just above the air their earlier passes cleared.
  */
 // ADR-427 keeps deepest cleanup before linked relief rings and flat depth slices.
 // ADR-368 sizes nonflat pocket/profile offsets, tabs and stepover by cut width.
 // Tracer batch 3 preserves bounded chords, shared seams and Line + fill.
 // Native arcs and compact Fill retain scan v2's shared/empty/coincident M3 handoffs.
 // ADR-471 discloses sub-width plunges; ADR-457 finishing recipes survive ramping.
-export const EMITTER_REVISION = 'trace-arcs-relief-width-ramp-contact-air-scan-v2-20260927-v7';
+export const EMITTER_REVISION =
+  'trace-arcs-relief-width-ramp-contact-air-scan-v2-air-floor-20260927-v8';
 
 // Machine-specific assumption lines (ADR-103 defect fix): router exports
 // previously carried the laser-worded `$32=1 (laser mode)` banner. The S
