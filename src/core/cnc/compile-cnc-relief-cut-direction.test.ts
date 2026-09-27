@@ -71,12 +71,16 @@ function plateauRelief(): ReliefObject {
   };
 }
 
-function reliefRoughing(direction: CncCutDirection | undefined, device: DeviceProfile): Job {
+function reliefRoughing(
+  direction: CncCutDirection | undefined,
+  device: DeviceProfile,
+  stepoverPercent = 40,
+): Job {
   const { cutDirection: _unset, ...settings }: CncLayerSettings = {
     ...DEFAULT_CNC_LAYER_SETTINGS,
     toolId: 'em-3175',
     depthPerPassMm: 1.5,
-    stepoverPercent: 40,
+    stepoverPercent,
     finishAllowanceMm: 0,
   };
   const scene: Scene = {
@@ -285,6 +289,23 @@ describe('relief roughing cut direction (ADR-427)', () => {
       expect(requested / total).toBeGreaterThan(0.8);
     }, 60_000);
   }
+
+  it('keeps one-sided cleanup and ring cuts correctly oriented above 50% stepover', () => {
+    for (const direction of ['climb', 'conventional'] as const) {
+      const rings = newStockByRing(
+        reliefRoughing(direction, DEFAULT_DEVICE_PROFILE, 85),
+        DEFAULT_DEVICE_PROFILE,
+      ).filter((ring) => ring.leftMm3 + ring.rightMm3 > MIN_RING_VOLUME_MM3);
+      const oneSided = rings.filter((ring) => !isSlot(ring));
+      expect(oneSided.length).toBeGreaterThan(0);
+      for (const ring of oneSided) {
+        expect(
+          requestedShare(ring, direction),
+          `${direction} at Z${ring.pass.zMm}`,
+        ).toBeGreaterThan(0.8);
+      }
+    }
+  }, 60_000);
 
   it('cuts a layer with no direction exactly as Climb', () => {
     const unset = roughingGroup(reliefRoughing(undefined, DEFAULT_DEVICE_PROFILE));

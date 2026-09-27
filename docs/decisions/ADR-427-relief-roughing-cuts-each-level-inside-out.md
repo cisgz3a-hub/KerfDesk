@@ -160,7 +160,7 @@ stock-side cases already passed on ADR-424 before changing cleanup order. The ad
 cleanup-first test distinguishes the remaining integration change. Existing ramp,
 allowance, link-region and flat-depth tests continue to cover the preserved planner.
 
-Emitter revision is `adaptive-rings-relief-cleanup-first-linked-20260927-v1`, retaining
-adaptive closure and relief flat depth-slice provenance. The earlier limitations
+Emitter revision is `adaptive-relief-cleanup-linked-entry-20260927-v1`, retaining
+adaptive closure, relief flat depth-slice and ADR-273 Amendment 1 truthful entry provenance. The earlier limitations
 about missing roughing ramps/direction controls are historical; ADR-424 supplies them.
 Frame policy and hardware qualification are unchanged.
