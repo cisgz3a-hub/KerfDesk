@@ -207,7 +207,7 @@ gradual tapers, constant-width pens, pen blots, both sides of the allowance, jun
 the actual preview-to-commit option conversion. They check fill membership, retained thin travel,
 stroke/fill attachment and absence of an uncut duplicate stroke through the wide region.
 
-### Amendment 3 - continue supported wide ink through bends (2026-09-27)
+### Amendment 2 - continue supported wide ink through bends (2026-09-27)
 
 A uniform 5 px square ring with a 4 px gate exposed a regression in the local classifier. The
 normal cannot measure around each right-angle bend. Four clean, uniformly wide sides were
