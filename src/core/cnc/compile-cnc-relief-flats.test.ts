@@ -228,8 +228,10 @@ describe('relief flats finished by the roughing bit (ADR-450)', () => {
             Math.min(Math.abs(p.y - PLATEAU.y0), Math.abs(p.y - PLATEAU.y1)) < 0.75;
           if (!sampledShort) gouge = Math.max(gouge, model(p.x, p.y) - depth);
         });
-        // Never more stock than the full raster leaves, never below the model.
-        expect(moreStock).toBeLessThanOrEqual(0.003);
+        // Never more stock than the full raster leaves, beyond the finishing
+        // reduction's 0.002 mm and what the contact check lets either path cut
+        // (ADR-421 Amendment 1); never below the model.
+        expect(moreStock).toBeLessThanOrEqual(0.004);
         expect(gouge).toBeLessThanOrEqual(0.01);
         // The flats come out flat; the ball's rows leave scallops on them.
         const floorOn = heights(on.grid, on.at, 'floor');
