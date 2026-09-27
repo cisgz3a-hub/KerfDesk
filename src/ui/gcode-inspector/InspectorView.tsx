@@ -19,6 +19,7 @@ import { useInspectorCamera } from './use-inspector-camera';
 import { useInspectorSession } from './use-inspector-session';
 import { useSceneSync } from './use-scene-sync';
 import { useViewer3dScene } from './use-viewer3d-scene';
+import { useCarvedStock, type CarvedStock } from './use-carved-stock';
 
 export type InspectorVariant = 'full' | 'preview';
 type InspectorViewProps =
@@ -43,7 +44,8 @@ export function InspectorView(props: InspectorViewProps): JSX.Element {
   const bodyRef = useRef<HTMLDivElement | null>(null);
   const fullWindow = useFullWindow(bodyRef);
   const session = useInspectorSession(props.model, props.analysis, props.source);
-  const { canvasRef, handleRef, state, reason, camera } = useInspectorScene(props.model, session);
+  const scene = useInspectorScene(props.model, session, props.source?.machineKind);
+  const { canvasRef, handleRef, state, reason, camera } = scene;
   const { playhead, liveMode, live } = session;
   const { selectedLine, locateLine, locateMove } = useLocators(props.model, session);
   const travelChange = session.setTravelVisible;
@@ -110,6 +112,7 @@ export function InspectorView(props: InspectorViewProps): JSX.Element {
           session={session}
           onTravelChange={travelChange}
           onLocateLine={locateLine}
+          stock={scene.stock}
         />
       ) : null}
     </div>
@@ -198,6 +201,7 @@ function Readouts(props: {
   readonly session: Session;
   readonly onTravelChange: (visible: boolean) => void;
   readonly onLocateLine: (line: number) => void;
+  readonly stock: CarvedStock;
 }): JSX.Element {
   const s = props.session;
   return (
@@ -221,13 +225,35 @@ function Readouts(props: {
       onToggleEntry={s.toggleEntry}
       isolate={s.isolate}
       onIsolateChange={s.setIsolate}
+      stock={props.stock}
     />
   );
 }
 
-function useInspectorScene(model: InspectorRenderModel, session: Session) {
+// The stock carves as far as the playhead: the whole program with playback
+// at its end, nothing while a live job has not started.
+function stockTarget(model: InspectorRenderModel, session: Session) {
+  const { playhead } = session;
+  if (!session.liveMode && session.atEnd) return { index: model.segmentCount, fraction: 0 };
+  if (playhead.segmentIndex < 0) return { index: 0, fraction: 0 };
+  return { index: playhead.segmentIndex, fraction: playhead.segmentFraction };
+}
+
+function useInspectorScene(
+  model: InspectorRenderModel,
+  session: Session,
+  machineKind: 'laser' | 'cnc' | undefined,
+) {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const { handleRef, state, reason } = useViewer3dScene(canvasRef, model);
+  const stock = useCarvedStock({
+    handleRef,
+    state,
+    model,
+    sections: session.sections,
+    machineKind,
+    target: stockTarget(model, session),
+  });
   const { playhead, liveMode, live } = session;
   const trailing = !liveMode && session.trailSeconds > 0;
   const trailed = trailing
@@ -264,7 +290,7 @@ function useInspectorScene(model: InspectorRenderModel, session: Session) {
     },
     model,
   );
-  return { canvasRef, handleRef, state, reason, camera };
+  return { canvasRef, handleRef, state, reason, camera, stock };
 }
 
 const previewLensStyle: React.CSSProperties = {
