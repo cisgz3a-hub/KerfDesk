@@ -35,8 +35,9 @@ export const RESTORE_ORIGIN_POSITION_UNKNOWN_MESSAGE =
   'saved origin back. Wait for a position report and try again.';
 
 export const RESTORE_ORIGIN_UNCONFIRMED_NOTICE =
-  '[lf2] Saved origin written, but the controller has not reported the new work offset yet. ' +
-  'Check that the recovery review shows the origin matching before you start.';
+  '[lf2] Saved origin written, but the controller has not confirmed the saved work offset. ' +
+  'The recovery review keeps its last reported offset, which may still differ. ' +
+  'Wait for a new position report and check the origin before you start.';
 
 /** GRBL reports offsets to three decimals; the G92 is written to three. */
 const RESTORED_OFFSET_TOLERANCE_MM = 0.005;
@@ -53,7 +54,7 @@ export function savedOriginRestoreLine(
   const y = formatGcodeCoordinateMm(machineMm.y - savedMm.y);
   // GRBL-family: select G54 like every origin action, and pin millimetres so a
   // startup block that chose G20 cannot scale the offset. Other dialects
-  // (Marlin reads one G command per line) get the bare G92.
+  // (Marlin reads one G command per line) get G21 acknowledged separately.
   return grblFamily ? `G54 G21 G92 X${x} Y${y}` : `G92 X${x} Y${y}`;
 }
 
@@ -70,7 +71,10 @@ export async function restoreWorkOrigin(
   const machineMm = inferCurrentMachinePosition(before.statusReport, before.wcoCache, reportInches);
   if (machineMm === null) throw new Error(RESTORE_ORIGIN_POSITION_UNKNOWN_MESSAGE);
   const grblFamily = usesPrimaryWcs(before);
+  const usesReportedOffset = before.capabilities.workOffsetSource !== 'host-recorded';
   const line = savedOriginRestoreLine(machineMm, savedMm, grblFamily);
+  const sessionEpoch = before.controllerSessionEpoch;
+  const writeEpoch = refs.writeEpoch;
   let confirmed = true;
   await runOriginTransaction(
     set,
@@ -78,16 +82,25 @@ export async function restoreWorkOrigin(
     refs,
     safeWrite,
     'Restore saved origin',
-    (write) => write(`${line}\n`),
+    async (write) => {
+      if (!grblFamily) await write('G21\n');
+      await write(`${line}\n`);
+    },
     async (assertCurrent) => {
-      // A full-WCS controller reports the new offset on its next status after
-      // a G92. Marlin never reports one, so its recorded shift is the offset.
-      if (grblFamily) confirmed = await waitForRestoredOffset(get, savedMm, assertCurrent);
-      return restoredOriginPatch(get(), savedMm, grblFamily && confirmed);
+      // GRBL reports WCO; Smoothie reports MPos/WPos, from which the status
+      // handler derives it. Marlin instead records the shift it writes itself.
+      if (usesReportedOffset) confirmed = await waitForRestoredOffset(get, savedMm, assertCurrent);
+      return restoredOriginPatch(get(), savedMm, usesReportedOffset);
     },
     { changesXyOrigin: true, reestablishesPositionEvidence: true },
   );
-  if (!confirmed) set((state) => ({ log: pushLog(state, RESTORE_ORIGIN_UNCONFIRMED_NOTICE) }));
+  if (
+    !confirmed &&
+    get().controllerSessionEpoch === sessionEpoch &&
+    refs.writeEpoch === writeEpoch
+  ) {
+    set((state) => ({ log: pushLog(state, RESTORE_ORIGIN_UNCONFIRMED_NOTICE) }));
+  }
 }
 
 async function waitForRestoredOffset(
@@ -120,13 +133,16 @@ function offsetMatches(state: LaserState, savedMm: SavedXyOffsetMm): boolean {
 function restoredOriginPatch(
   state: LaserState,
   savedMm: SavedXyOffsetMm,
-  reportedByController: boolean,
+  usesReportedOffset: boolean,
 ): Partial<LaserState> {
   return {
     workOriginActive: true,
     workOriginSource: 'g92',
     positionEvidenceSuppressed: false,
-    wcoCache: reportedByController ? state.wcoCache : writtenOffset(state, savedMm),
+    // A missing or contradictory controller report must not become a matching
+    // report merely because this was the offset requested. Host-recorded
+    // dialects instead retain the shift their acknowledged G92 wrote.
+    wcoCache: usesReportedOffset ? state.wcoCache : writtenOffset(state, savedMm),
     frameVerification: null,
     framedRun: null,
     frameTrace: null,

@@ -42,10 +42,14 @@ pull, and a reconnect to a fresh controller refuses recovery with the Set origin
    `G92 X(m - s) Y(m - s)`, which makes the XY work offset equal the saved one whatever G54
    holds, without moving the head. GRBL-family controllers get `G54 G21` in the same block,
    as every origin action selects G54, and millimetres so a startup block that chose `G20`
-   cannot scale the offset. Z is untouched. The action runs through the ordinary origin
-   transaction (fresh Idle, exclusive acknowledgement, Frame permit voided) and waits for the
-   controller's next `WCO:` report to confirm the offset; without one it records the offset
-   it wrote and logs that it is unconfirmed.
+   cannot scale the offset. Other dialects acknowledge `G21` separately before `G92`,
+   since Marlin reads one G command per line. Z is untouched. The action runs through the
+   ordinary origin transaction (fresh Idle, exclusive acknowledgement, Frame permit voided)
+   and waits for the controller's offset report (`WCO:` on GRBL, `MPos`/`WPos` on Smoothieware).
+   If confirmation times out, it
+   preserves the controller's reported offset (or its absence) and logs that the restore is
+   unconfirmed; a contradictory report must never be replaced with the requested numbers.
+   Host-recorded dialects retain the shift their acknowledged `G92` wrote.
 2. **The review says when the numbers are right.** The saved offset is measured from
    machine zero. It lands where the job started only while machine zero is where it was when
    the job ran: after a reset or power loss, a machine that was homed before the job must be
