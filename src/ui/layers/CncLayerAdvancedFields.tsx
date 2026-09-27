@@ -15,6 +15,7 @@ import { AdaptivePocketFields } from './AdaptivePocketFields';
 import { CncInlayFields } from './CncInlayFields';
 import { CncEntryFields } from './CncEntryFields';
 import { SetupOwnedValueRow } from './SetupOwnedValueRow';
+import { CncStageRecipeFields } from './CncStageRecipeFields';
 
 export function CncLayerAdvancedGroup(props: {
   readonly layer: Layer;
@@ -28,6 +29,7 @@ export function CncLayerAdvancedGroup(props: {
       <ClearingFields {...props} />
       <CncInlayFields layer={props.layer} settings={props.settings} onCommit={props.onCommit} />
       <CutTypeSections {...props} />
+      <CncStageRecipeFields {...props} />
       <FeedHelperRows
         layer={props.layer}
         settings={props.settings}
@@ -253,8 +255,9 @@ export function CutTypeSections(props: {
           hint="Leave material during roughing, then remove it in a final pass along the wall."
         >
           <p className="lf-cnc-settings-hint">
-            Leave a small allowance for a final full-depth wall pass. Zero uses no separate finish
-            pass.
+            Leave a small allowance for a true-wall finish. It uses one full-depth pass unless
+            separate wall finishing values specify smaller depth passes. Zero uses no separate
+            finish.
           </p>
           <CncFinishAllowanceField layer={layer} settings={settings} onCommit={onCommit} />
         </RailSection>

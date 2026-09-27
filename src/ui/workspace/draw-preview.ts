@@ -41,6 +41,7 @@ import {
 import type { ViewTransform } from './view-transform';
 import { preparePreviewFrame } from './preview-route-frame';
 import { renderPreviewFrame } from './preview-route-render';
+import { objectIntersectsCanvas } from './object-viewport';
 
 type FaintVectorObject = Extract<
   SceneObject,
@@ -59,6 +60,7 @@ export function drawObjectsFaint(
   const layerByColor = sceneLayerVisibility.lookup(project.scene.layers);
   for (const obj of project.scene.objects) {
     if (!hasFaintVectorGeometry(obj)) continue;
+    if (!objectIntersectsCanvas(obj, view, ctx.canvas)) continue;
     // Same resolution and painter as Design mode, in 'faint' style: a dense
     // trace under the route comes from its sprite instead of being restroked
     // on every Preview pan (object-display.ts, ADR-346).
@@ -175,11 +177,17 @@ export async function buildPreviewToolpathSnapshot(
   });
 }
 
+type PreparedPreviewOptions = {
+  readonly executablePlan?: boolean;
+  readonly emittedProgram?: string;
+  readonly allowPlanEmission?: boolean;
+};
+
 export function buildPreviewToolpathFromPrepared(
   project: Project,
   prepared: PreparedOutput,
   jobOrigin?: JobOriginPlacement,
-  options: { readonly executablePlan?: boolean } = {},
+  options: PreparedPreviewOptions = {},
 ): PreviewToolpath {
   if (!prepared.ok) {
     return emptyPreviewToolpath({
@@ -207,13 +215,7 @@ export function buildPreviewToolpathFromPrepared(
   const streamedRaster = prepared.job.groups.some(
     (group) => group.kind === 'raster' && group.rowProvider !== undefined,
   );
-  const planPreview =
-    options.executablePlan === true &&
-    planPreviewRouteEligible({
-      prepared,
-      ...(jobOrigin === undefined ? {} : { jobOrigin }),
-      route: machineToolpath,
-    });
+  const planPreview = canBuildPlanPreview(options, prepared, jobOrigin, machineToolpath);
   // Past the same budget, the mapped route lands in columnar buffers instead
   // of a step object per span: nothing compares against it any more, and a
   // multi-million-step fill is the case where roughly 217 bytes a step is what
@@ -235,9 +237,27 @@ export function buildPreviewToolpathFromPrepared(
       ...(jobOrigin === undefined ? {} : { jobOrigin }),
       jobOriginOffset: prepared.jobOriginOffset,
       device: project.device,
+      ...(options.emittedProgram === undefined ? {} : { emittedProgram: options.emittedProgram }),
     });
   }
   return previewToolpath;
+}
+
+function canBuildPlanPreview(
+  options: PreparedPreviewOptions,
+  prepared: Extract<PreparedOutput, { readonly ok: true }>,
+  jobOrigin: JobOriginPlacement | undefined,
+  route: Toolpath,
+): boolean {
+  return (
+    options.executablePlan === true &&
+    (options.emittedProgram !== undefined || options.allowPlanEmission !== false) &&
+    planPreviewRouteEligible({
+      prepared,
+      ...(jobOrigin === undefined ? {} : { jobOrigin }),
+      route,
+    })
+  );
 }
 
 function previewStartPoint(jobOrigin: JobOriginPlacement | undefined): Vec2 {

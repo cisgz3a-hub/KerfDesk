@@ -6,6 +6,7 @@
 
 import type { Vec2 } from './scene-object';
 import type { CncFeedSource } from './cnc-feed-source';
+import type { CncCuttingStage, CncStageRecipe } from './cnc-stage-recipe';
 import type { CncTool } from './cnc-tool';
 import { DEFAULT_CNC_TOOLS } from './cnc-tool-starters';
 
@@ -96,6 +97,8 @@ export type CncProfileLeadSettings = {
 };
 
 export type CncLayerSettings = {
+  // Absent stages retain the shared layer values. Recipes are bound to a cutter.
+  readonly stageRecipes?: Partial<Readonly<Record<CncCuttingStage, CncStageRecipe>>>;
   readonly cutType: CncCutType;
   // Multi-tool jobs (H.7): the bit this layer cuts with. Absent = the
   // machine's active bit. Unknown ids resolve to the active bit at compile

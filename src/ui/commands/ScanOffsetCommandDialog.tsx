@@ -11,7 +11,7 @@ export function ScanOffsetCommandDialog(props: { readonly onClose: () => void })
   const device = useStore((state) => state.project.device);
   const pushToast = useToastStore((state) => state.pushToast);
   const onGenerate = (options: ScanOffsetCalibrationPatternOptions): void => {
-    const pattern = generateScanOffsetCalibrationPattern(options);
+    const pattern = generateScanOffsetCalibrationPattern(options, device);
     replaceSceneWithGeneratedScene(pattern.scene);
     props.onClose();
     const purpose =

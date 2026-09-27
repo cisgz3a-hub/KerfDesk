@@ -95,40 +95,45 @@ describe('analyzeFillHeatRisk runway coverage', () => {
     });
   });
 
-  it('requires both sides of every generic split sweep for full-runway coverage', () => {
-    const job: Job = {
-      groups: [
-        group({
-          fillRunwayPolicy: 'feed-matched-every-sweep',
-          segments: [
-            {
-              ...sweep(1, 1),
-              polyline: [
-                { x: 0, y: 1 },
-                { x: 1, y: 1 },
-              ],
-            },
-            {
-              ...sweep(1, 1),
-              polyline: [
-                { x: 7, y: 1 },
-                { x: 8, y: 1 },
-              ],
-            },
-          ],
-        }),
-      ],
-    };
+  it.each(['feed-matched-every-sweep', 'feed-matched-entry', 'full', 'raster-bounded'] as const)(
+    'requires both sides of every %s split sweep for full-runway coverage',
+    (fillRunwayPolicy) => {
+      const job: Job = {
+        groups: [
+          group({
+            fillRunwayPolicy,
+            fillStyle: 'island',
+            segments: [
+              {
+                ...sweep(1, 1),
+                polyline: [
+                  { x: 0, y: 1 },
+                  { x: 1, y: 1 },
+                ],
+              },
+              {
+                ...sweep(1, 1),
+                polyline: [
+                  { x: 7, y: 1 },
+                  { x: 8, y: 1 },
+                ],
+              },
+            ],
+          }),
+        ],
+      };
 
-    expect(analyzeFillHeatRisk(job)).toMatchObject({
-      fillSweepCount: 2,
-      fillFullRunwaySweepCount: 0,
-      fillPartialRunwaySweepCount: 2,
-      fillNoRunwaySweepCount: 0,
-      fillDisabledRunwaySweepCount: 0,
-      fillRequestedRunwayValuesMm: [5],
-    });
-  });
+      expect(analyzeFillHeatRisk(job)).toMatchObject({
+        fillSweepCount: 2,
+        fillFullRunwaySweepCount: 0,
+        fillPartialRunwaySweepCount: 2,
+        fillNoRunwaySweepCount: 0,
+        fillDisabledRunwaySweepCount: 0,
+        fillRequestedRunwayValuesMm: [5],
+        islandPartialRunwaySweepCount: 2,
+      });
+    },
+  );
 
   it('reports the effective generic fallback instead of a disabled zero-runway sweep', () => {
     expect(

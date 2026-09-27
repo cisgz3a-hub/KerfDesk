@@ -61,6 +61,56 @@ describe('machine profile camera metadata', () => {
     expect(result.document.profile.cameraModel).toEqual(savedCameraModel());
   });
 
+  it('roundtrips other cameras’ calibrations and rejects an invalid one (ADR-446)', () => {
+    const other = savedCameraModel({
+      version: 1,
+      sourceKind: 'usb',
+      sourceId: 'overhead',
+      width: 1280,
+      height: 720,
+      resizeMode: 'none',
+    });
+    const document = (profile: DeviceProfile) =>
+      serializeMachineProfileDocument({
+        format: MACHINE_PROFILE_FORMAT,
+        schemaVersion: MACHINE_PROFILE_SCHEMA_VERSION,
+        profile,
+        source: { kind: 'custom', label: 'Camera bench' },
+        reviewNotes: [],
+      });
+    const result = deserializeMachineProfileDocument(
+      document({ ...profileWithCamera(), otherCameraModels: [other] }),
+    );
+    expect(result.kind).toBe('ok');
+    if (result.kind !== 'ok') return;
+    expect(result.document.profile.otherCameraModels).toEqual([other]);
+    // An entry with no camera binding could never be matched to a camera.
+    const raw = JSON.parse(document(profileWithCamera())) as { profile: Record<string, unknown> };
+    raw.profile['otherCameraModels'] = [other, savedCameraModel()];
+    expect(deserializeMachineProfileDocument(JSON.stringify(raw))).toMatchObject({
+      kind: 'invalid',
+      reason: 'profile.otherCameraModels is invalid',
+    });
+  });
+
+  it('accepts an explicit empty list of other camera calibrations as none', () => {
+    const raw = JSON.parse(
+      serializeMachineProfileDocument({
+        format: MACHINE_PROFILE_FORMAT,
+        schemaVersion: MACHINE_PROFILE_SCHEMA_VERSION,
+        profile: profileWithCamera(),
+        source: { kind: 'custom', label: 'Camera bench' },
+        reviewNotes: [],
+      }),
+    ) as { profile: Record<string, unknown> };
+    raw.profile['otherCameraModels'] = [];
+    const result = deserializeMachineProfileDocument(JSON.stringify(raw));
+    expect(result.kind).toBe('ok');
+    if (result.kind !== 'ok') return;
+    expect(result.document.profile.cameraModel).toEqual(savedCameraModel());
+    expect(result.document.profile.otherCameraModels).toBeUndefined();
+  });
+
   it('roundtrips RTSP camera source metadata in .lfmachine.json', () => {
     const profile = profileWithCamera();
     const text = serializeMachineProfileDocument({

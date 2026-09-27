@@ -2,6 +2,7 @@ import type { CncGroup } from '../job';
 import { isValidCncTipDiameterMm } from '../cnc-tip-diameter';
 import { isValidTaperedBallTipDiameterMm } from '../cnc-tapered-ball';
 import type { CncLayerSettings, CncTool } from '../scene';
+import type { CncCuttingStage } from '../scene/cnc-stage-recipe';
 
 type CncGroupProvenance = Pick<
   CncGroup,
@@ -16,9 +17,11 @@ type CncGroupProvenance = Pick<
   | 'vCarveFlatDepthEnabled'
   | 'rampEntryDeg'
   | 'feedSource'
+  | 'cuttingStage'
 >;
 
 type CncGroupProvenanceOptions = {
+  readonly cuttingStage?: CncCuttingStage;
   readonly includeRequestedDepth?: boolean;
   readonly includeDepthPerPass?: boolean;
   readonly includeVResolution?: boolean;
@@ -33,6 +36,7 @@ export function cncGroupProvenance(
   options: CncGroupProvenanceOptions = {},
 ): CncGroupProvenance {
   return {
+    ...(options.cuttingStage === undefined ? {} : { cuttingStage: options.cuttingStage }),
     ...toolProvenance(tool, options.layerPrimaryTool ?? tool),
     ...depthProvenance(settings, options),
     ...entryAndFeedProvenance(settings, options),

@@ -136,7 +136,8 @@ export function estimateLiveJobUnbounded(
 export function estimateLiveJobFromPrepared(
   prepared: PreparedOutput,
   jobOrigin?: JobOriginPlacement,
-  options: LiveJobEstimateOptions & { readonly unbounded?: boolean } = {},
+  options: LiveJobEstimateOptions &
+    Pick<JobDurationEstimateOptions, 'onEmittedProgram'> & { readonly unbounded?: boolean } = {},
 ): LiveJobEstimate {
   if (!prepared.ok) {
     return {
@@ -166,6 +167,9 @@ export function estimateLiveJobFromPrepared(
     {
       ...(initialPosition === undefined ? {} : { initialPosition }),
       ...(finishPosition === undefined ? {} : { finishPosition }),
+      ...(options.onEmittedProgram === undefined
+        ? {}
+        : { onEmittedProgram: options.onEmittedProgram }),
     },
   );
   return liveEstimateFromDuration(result);

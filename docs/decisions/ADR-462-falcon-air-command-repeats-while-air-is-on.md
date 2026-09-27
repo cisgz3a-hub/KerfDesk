@@ -66,8 +66,9 @@ command repeats while air is on. The Falcon A1 Pro preset declares it. `withAirK
 - **Profiles without the flag.** Their bytes are unchanged, and so are CNC coolant and the Marlin
   and Smoothieware strategies.
 - **Output identity.** `EMITTER_REVISION` becomes
-  `adaptive-relief-cleanup-linked-entry-air-repeats-20260927-v1`, preserving the existing relief and
-  adaptive-ring provenance while identifying this output behavior.
+  `adaptive-relief-cleanup-linked-entry-scan-v2-air-repeats-20260927-v1`, preserving the existing
+  relief and adaptive-ring provenance plus ADR-445's scan-v2 state and dark handoff repairs
+  while identifying this output behavior.
 
 The Job Review standby advisory, the Machine Setup "Air restart" tooltip, and WORKFLOW F.3
 describe the best-effort repeat and its gaps. `$152=100` and installed-firmware qualification

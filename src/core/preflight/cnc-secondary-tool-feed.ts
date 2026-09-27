@@ -3,9 +3,8 @@ import type { PreflightIssue } from './preflight';
 
 /**
  * Surface the exact shared layer values a secondary cutter will receive.
- * Secondary tool IDs choose geometry only; feed, plunge, RPM, and any
- * operation-applicable depth/pass are shared layer settings associated with
- * the current primary cutter. This does not assert their historical origin.
+ * Stages without an explicit cutter-bound recipe inherit the layer's cutting
+ * values. This does not assert their historical origin.
  */
 export function findCncSecondaryToolFeedIssues(job: Job): ReadonlyArray<PreflightIssue> {
   const issues: PreflightIssue[] = [];
@@ -13,6 +12,7 @@ export function findCncSecondaryToolFeedIssues(job: Job): ReadonlyArray<Prefligh
   for (const group of job.groups) {
     if (
       group.kind !== 'cnc' ||
+      group.cuttingStage !== undefined ||
       group.toolId === undefined ||
       group.layerPrimaryToolId === undefined ||
       group.toolId === group.layerPrimaryToolId
