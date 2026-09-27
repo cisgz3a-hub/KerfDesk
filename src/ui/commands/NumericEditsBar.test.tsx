@@ -5,6 +5,7 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { createProject, IDENTITY_TRANSFORM } from '../../core/scene';
 import { useStore } from '../state';
 import { resetStore } from '../state/test-helpers';
+import { useToastStore } from '../state/toast-store';
 import { useUiStore } from '../state/ui-store';
 import { NumericEditsBar } from './NumericEditsBar';
 
@@ -18,6 +19,7 @@ let root: Root | null = null;
 beforeEach(() => {
   resetStore();
   useUiStore.setState({ selectionAnchor: 'nw' });
+  useToastStore.setState({ toasts: [] });
 });
 
 afterEach(async () => {
@@ -176,12 +178,25 @@ describe('NumericEditsBar', () => {
     expect(useStore.getState().project.scene.objects[0]?.transform.x).toBe(25);
     expect(useStore.getState().undoStack).toHaveLength(0);
     expect(input(container, 'Selection X position').value).toBe('25');
+    // Clearing the box is backing out, not a typo: it snaps back silently.
+    expect(useToastStore.getState().toasts).toEqual([]);
   });
 
+  // The boxes are text fields now (they take math), so the 0.1 mm step lives
+  // on as the ArrowUp/ArrowDown nudge. It stays an editing increment: finite
+  // values off that grid must still commit.
   it('treats step as an editing increment rather than refusing finite values', async () => {
     installProject(25);
     const container = await render(<NumericEditsBar />);
     const x = input(container, 'Selection X position');
+    expect(x.type).toBe('text');
+    expect(x.inputMode).toBe('decimal');
+
+    await act(async () => {
+      x.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowUp', bubbles: true }));
+    });
+    expect(x.value).toBe('25.1');
+    expect(useStore.getState().undoStack).toHaveLength(0);
 
     await act(async () => {
       setInputValue(x, '25.05');
@@ -192,6 +207,81 @@ describe('NumericEditsBar', () => {
 
     expect(useStore.getState().project.scene.objects[0]?.transform.x).toBe(25.05);
     expect(useStore.getState().undoStack).toHaveLength(1);
+  });
+
+  it('commits typed math as the evaluated width', async () => {
+    installProject(); // rect 20 x 10
+    const container = await render(<NumericEditsBar />);
+    const width = input(container, 'Selection width');
+
+    await typeAndPress(width, '25.4*2', 'Enter');
+
+    const object = useStore.getState().project.scene.objects[0];
+    expect(object?.transform.scaleX).toBeCloseTo(50.8 / 20, 10);
+    expect(object?.transform.scaleY).toBe(1);
+    expect(input(container, 'Selection width').value).toBe('50.8');
+    expect(useStore.getState().undoStack).toHaveLength(1);
+  });
+
+  it('converts an inch entry in X to millimetres', async () => {
+    installProject();
+    const container = await render(<NumericEditsBar />);
+
+    await typeAndPress(input(container, 'Selection X position'), '1in', 'Enter');
+
+    expect(useStore.getState().project.scene.objects[0]?.transform.x).toBeCloseTo(25.4, 10);
+    expect(input(container, 'Selection X position').value).toBe('25.4');
+  });
+
+  it('reads a Height percentage against the current height', async () => {
+    installProject(); // height 10
+    const container = await render(<NumericEditsBar />);
+    const height = input(container, 'Selection height');
+    expect(height.title).toContain('50%');
+
+    await typeAndPress(height, '50%', 'Enter');
+
+    expect(useStore.getState().project.scene.objects[0]?.transform.scaleY).toBe(0.5);
+    expect(input(container, 'Selection height').value).toBe('5');
+  });
+
+  it('snaps unreadable text back with an error toast and no undo step', async () => {
+    installProject();
+    const container = await render(<NumericEditsBar />);
+    const width = input(container, 'Selection width');
+
+    await act(async () => {
+      setInputValue(width, '10++');
+      width.dispatchEvent(new InputEvent('input', { bubbles: true }));
+    });
+    expect(width.getAttribute('aria-invalid')).toBe('true');
+    await act(async () => Simulate.blur(width));
+
+    expect(useStore.getState().project.scene.objects[0]?.transform.scaleX).toBe(1);
+    expect(useStore.getState().undoStack).toHaveLength(0);
+    expect(input(container, 'Selection width').value).toBe('20');
+    expect(input(container, 'Selection width').getAttribute('aria-invalid')).toBe('false');
+    expect(useToastStore.getState().toasts).toEqual([
+      expect.objectContaining({
+        variant: 'error',
+        message:
+          'Couldn\'t read "10++": a number is missing after "+". Type a number, a sum like 10+5, ' +
+          'a unit like 1in, or a percentage like 50% in Width or Height.',
+      }),
+    ]);
+  });
+
+  it('refuses a percentage in X, where there is no size to take it of', async () => {
+    installProject(5);
+    const container = await render(<NumericEditsBar />);
+
+    await typeAndPress(input(container, 'Selection X position'), '50%', 'Enter');
+
+    expect(useStore.getState().project.scene.objects[0]?.transform.x).toBe(5);
+    expect(useStore.getState().undoStack).toHaveLength(0);
+    expect(useToastStore.getState().toasts[0]?.message).toContain(
+      'percentages only work in Width and Height',
+    );
   });
 
   // Bug (2026-07-16): the aspect lock defaulted ON, so setting width silently
@@ -248,6 +338,18 @@ function setInputValue(inputElement: HTMLInputElement, value: string): void {
   const setter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')?.set;
   if (setter === undefined) throw new Error('native input value setter missing');
   setter.call(inputElement, value);
+}
+
+async function typeAndPress(
+  inputElement: HTMLInputElement,
+  value: string,
+  key: string,
+): Promise<void> {
+  await act(async () => {
+    setInputValue(inputElement, value);
+    inputElement.dispatchEvent(new InputEvent('input', { bubbles: true }));
+    inputElement.dispatchEvent(new KeyboardEvent('keydown', { key, bubbles: true }));
+  });
 }
 
 function installProject(x = 0): void {

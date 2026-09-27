@@ -1,8 +1,11 @@
 // StartFromLineControl — laser start-from-line recovery plus CNC guidance to
 // checkpoint-bound supervised recovery (ADR-103 H1, ADR-200).
 
-import { useRef, useState } from 'react';
+import { useMemo, useRef, useState } from 'react';
 import { jobAwareAlert } from '../state/job-aware-dialogs';
+import type { RecoveryCapsule, RecoveryRepositorySnapshot } from '../state/recovery';
+import { useRecoveryRepositorySelection } from '../state/use-recovery-repository';
+import { automaticRecoveryRestart } from './laser-recovery-automatic-restart';
 import { runStartFromLineFlow } from './start-job-flow';
 import { prepareManualRestartSource, type ManualRestartSource } from './manual-restart-source';
 import { ManualLaserRestartDialog } from './ManualLaserRestartDialog';
@@ -15,7 +18,7 @@ export function StartFromLineControl(props: {
   readonly busy: boolean;
   readonly machineKind: 'laser' | 'cnc';
 }): JSX.Element {
-  const [line, setLine] = useState(MIN_LINE);
+  const { line, setLine, hint } = useRestartLine();
   const [preparing, setPreparing] = useState(false);
   const [preview, setPreview] = useState<ManualRestartSource | null>(null);
   const inFlight = useRef(false);
@@ -79,7 +82,7 @@ export function StartFromLineControl(props: {
       >
         Choose restart point…
       </button>
-      <ManualRestartGuidance />
+      <ManualRestartGuidance savedHint={hint} />
       {preview === null ? null : (
         <ManualLaserRestartDialog
           restart={preview}
@@ -91,14 +94,65 @@ export function StartFromLineControl(props: {
   );
 }
 
-function ManualRestartGuidance(): JSX.Element {
+type SavedLaserRestart = {
+  readonly key: string;
+  readonly line: number | null;
+  readonly hint: string | null;
+};
+
+/** Until the operator types a line, the field holds the saved interrupted
+ * job's automatic restart line. The progress bar counts sent lines, not file
+ * lines, so a line typed from it can restart far from the stop. */
+function useRestartLine(): {
+  readonly line: number;
+  readonly setLine: (line: number) => void;
+  readonly hint: string | null;
+} {
+  const capsule = useRecoveryRepositorySelection(selectRecoveryCapsule);
+  const saved = useMemo(() => savedLaserRestart(capsule), [capsule]);
+  const [typed, setTyped] = useState<{ readonly key: string; readonly line: number } | null>(null);
+  return {
+    line: (typed?.key === saved.key ? typed.line : null) ?? saved.line ?? MIN_LINE,
+    setLine: (line) => setTyped({ key: saved.key, line }),
+    hint: saved.hint,
+  };
+}
+
+function selectRecoveryCapsule({ recoveryCapsule }: RecoveryRepositorySnapshot) {
+  return { recoveryCapsule };
+}
+
+function savedLaserRestart({
+  recoveryCapsule: capsule,
+}: {
+  readonly recoveryCapsule: RecoveryCapsule | null;
+}): SavedLaserRestart {
+  if (capsule === null || capsule.artifact.machineKind !== 'laser') {
+    return { key: 'none', line: null, hint: null };
+  }
+  const automatic = automaticRecoveryRestart(capsule);
+  const stopped = `The saved interrupted job stopped after ${capsule.ackedLines} of ${capsule.sendableLines} sent lines.`;
+  return {
+    key: capsule.runId,
+    line: automatic?.line ?? null,
+    hint:
+      automatic === null
+        ? stopped
+        : `${stopped} Its automatic restart is file line ${automatic.line}, filled in above. The Interrupted job saved card's Review restarts there too and shows the origin.`,
+  };
+}
+
+function ManualRestartGuidance(props: { readonly savedHint: string | null }): JSX.Element {
   return (
-    <p style={hintStyle}>
-      Requires the same work zero as the original run, and uses that run&apos;s job placement when
-      the project still matches it. The head moves to the recorded position with the beam off, then
-      the remaining laser program is replayed. This manual tool is not an exact sealed replay and
-      creates no execution-archive or recovery record.
-    </p>
+    <>
+      {props.savedHint === null ? null : <p style={hintStyle}>{props.savedHint}</p>}
+      <p style={hintStyle}>
+        Requires the same work zero as the original run, and uses that run&apos;s job placement when
+        the project still matches it. The head moves to the recorded position with the beam off,
+        then the remaining laser program is replayed. This manual tool is not an exact sealed replay
+        and creates no execution-archive or recovery record.
+      </p>
+    </>
   );
 }
 

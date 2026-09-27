@@ -52,6 +52,41 @@ describe('project path text', () => {
     });
   });
 
+  it('round-trips the along and across alignment (ADR-480)', () => {
+    const aligned: TextObject = {
+      ...TEXT,
+      pathText: {
+        guideObjectId: 'guide',
+        offsetMm: 0,
+        reverse: false,
+        alongAlign: 'middle',
+        acrossAlign: 'below',
+      },
+    };
+    const project = createProject();
+    const result = deserializeProject(
+      serializeProject({ ...project, scene: addObject(project.scene, aligned) }),
+    );
+    expect(result).toMatchObject({
+      kind: 'ok',
+      project: { scene: { objects: [{ pathText: aligned.pathText }] } },
+    });
+  });
+
+  it('rejects an unknown path text alignment', () => {
+    const raw = JSON.parse(serializeProject(projectWithPathText())) as {
+      scene: { objects: Array<Record<string, unknown>> };
+    };
+    raw.scene.objects[0] = {
+      ...raw.scene.objects[0],
+      pathText: { guideObjectId: 'guide', offsetMm: 0, reverse: false, alongAlign: 'left' },
+    };
+    expect(deserializeProject(JSON.stringify(raw))).toMatchObject({
+      kind: 'invalid',
+      reason: expect.stringContaining('alongAlign'),
+    });
+  });
+
   it('rejects a negative path offset', () => {
     const raw = JSON.parse(serializeProject(projectWithPathText())) as {
       scene: { objects: Array<Record<string, unknown>> };
