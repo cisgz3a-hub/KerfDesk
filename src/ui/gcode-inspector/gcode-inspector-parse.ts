@@ -1,6 +1,12 @@
 import { createGcodeRenderModelBuilder } from '../../core/gcode-view/gcode-render-model-builder';
 import { createSegmentBuilder } from '../../core/gcode-view/segment-builder';
-import type { BuildRenderModelOptions, BuildRenderModelResult } from '../../core/gcode-view';
+import type {
+  AxisBounds,
+  BuildRenderModelOptions,
+  BuildRenderModelResult,
+} from '../../core/gcode-view';
+// Deep import: the viewer3d barrel is capped at 20 exports by its index contract.
+import { buildMoveDetail } from '../viewer3d/move-detail';
 import type { BlobReadProgress } from '../import/blob-line-reader';
 import type { GcodeInspectionContext, GcodeInspectionSource } from './gcode-inspection-source';
 import { analyzeGcodeModel } from './gcode-inspector-analysis';
@@ -96,9 +102,25 @@ function inspectionResult(
 ): GcodeInspectorWorkerResult {
   const base = { sourceIndex, sourceLineCount: sourceIndex.starts.length };
   if (parsed.kind === 'error') return { ...base, parsed, analysis: null };
+  const analysis = analyzeGcodeModel(parsed.model, context, toolMarks);
+  const detail = buildMoveDetail({
+    ...parsed.model,
+    feedLimited: analysis.time.segFeedLimited,
+    toolLines: toolMarks.map((mark) => mark.line),
+    diagonalMm: diagonalOf(parsed.model.stats.motionBounds),
+  });
   return {
     ...base,
-    parsed: { kind: 'ok', model: inspectorRenderModel(parsed.model) },
-    analysis: analyzeGcodeModel(parsed.model, context, toolMarks),
+    parsed: { kind: 'ok', model: inspectorRenderModel(parsed.model, detail) },
+    analysis,
   };
+}
+
+function diagonalOf(bounds: AxisBounds | null): number {
+  if (bounds === null) return 0;
+  return Math.hypot(
+    bounds.maxX - bounds.minX,
+    bounds.maxY - bounds.minY,
+    bounds.maxZ - bounds.minZ,
+  );
 }

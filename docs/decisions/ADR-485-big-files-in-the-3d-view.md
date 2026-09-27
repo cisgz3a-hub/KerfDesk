@@ -29,6 +29,13 @@ to millions of moves.
    with no picture. The worker's reader also grew its arrays by doubling and copied them once more
    at the end, so for a moment it held two to three times the moves it had read: 100 to 150 bytes
    a move, where the moves themselves are 50.
+4. **Every move was drawn at every zoom.** A relief or raster fitted to the view puts many moves in
+   each pixel, and the view drew all of them every frame: 400,000 moves are 3.2 million fat-line
+   vertices a frame for a picture a few hundred thousand pixels big.
+5. **A program the GPU could not draw left an empty view.** Without WebGL, after a lost graphics
+   context, or when the GPU had not finished the first frame after 30 seconds, the view said "3D
+   view unavailable: …" over an empty canvas. The readouts worked, but there was no picture of the
+   toolpath at all.
 
 ### Decision
 
@@ -90,6 +97,45 @@ to millions of moves.
      field, largest first. The most it holds is the moves plus their positions once more, 74 bytes
      a move, plus at most one part-filled chunk.
 
+4. **A big program is drawn simplified when zoomed out** (`ui/viewer3d/move-detail.ts`,
+   `ui/viewer3d/detail-lines.ts`, `ui/viewer3d/scene-detail.ts`).
+   - For a program of 100,000 solid moves or more, the worker works out, after timing it, runs of
+     consecutive solid moves that one line can stand for: moves that join end to end exactly, with
+     the same kind, feed, power and reached feed, no tool change between them, and every join
+     within a tolerance of the line from the run's first start to its last end. A run is at most
+     64 moves. There are two tolerances, 1/2000 and 1/8000 of the job's diagonal. A level that
+     saves less than a quarter of the lines is dropped, and so is a coarser level with nine
+     tenths or more of the finer level's lines. Each level is two arrays of move numbers,
+     transferred with the program.
+   - The page builds one fat-line geometry per level from the program's positions, and copies each
+     line's colours from its first and last moves' colours after every lens change, so a depth
+     ramp still shades along the line. The runs depend only on the program, so the worker works
+     them out; the lenses are worked out on the page, so the colours are copied there.
+   - Before each frame the view works out how many millimetres a pixel spans at the part of the
+     job nearest the camera, and draws the coarsest level whose tolerance is at most half of that,
+     or every move once zoomed in past both. A line within half a pixel of every move it stands
+     for lights the same pixels, up to antialiasing.
+   - The drawn path is simplified only while it shows the whole program. During playback the done
+     moves are drawn one by one and only the faint copy of the moves to come is simplified.
+     Pointing at a move still searches every move (the pick pass draws them all), and a legend
+     filter draws every move.
+   - The view says when it is simplifying, in both looks, under the position readout: "Simplified
+     at this zoom: N lines for M moves, within T mm. Zoom in to see every move."
+
+5. **Where the 3D view cannot draw, the moves are shown from above**
+   (`ui/gcode-inspector/top-view-image.ts`, `ui/gcode-inspector/InspectorTopView.tsx`).
+   - In place of the empty canvas the Inspector, and the canvas G-code view that uses it, draws the
+     program from above on a plain 2D canvas: each solid move walked a pixel at a time, rapids
+     left out, the job fitted in the middle at the same scale both ways.
+   - Where moves cross, a pixel shows the deepest one, the later one on a tie, so a pocket or a
+     relief shows its last floor.
+   - Each pixel takes its move's colour in the chosen lens, encoded as the 3D view's lines show on
+     screen, so the legend reads the same. Which move each pixel shows is worked out once for the
+     view's size; a lens change only repaints.
+   - The sentence stays, at the bottom, and says what the picture is: "3D view unavailable: … Showing
+     the moves from above; where moves cross, the deepest shows. The program parsed — readouts are
+     live." The camera controls, which have nothing to move, are hidden.
+
 ### Consequences
 
 - **More vertex work for the faint lines and the pick pass.** A fat line runs the vertex shader 8
@@ -101,6 +147,14 @@ to millions of moves.
 - **The page briefly holds the picture's moves** (24 bytes a move, in batches) until the finished
   program replaces it, and a second WebGL context for the picture. Both go when the full view
   appears.
+- **A zoomed-out big program is drawn from fewer, longer lines.** Colours are blended along each
+  line from its first move's colour to its last, where each move had its own; runs break wherever
+  the kind, feed, power, reached feed or tool changes, so only the depth lens is blended. Programs under 100,000 moves are drawn as before.
+- **The GPU holds each level as well**: 24 bytes of positions and 16 of colour a line, about 1.2 MB
+  for a 400,000-move relief whose moves take 12.8 MB.
+- **The picture from above is a picture, not a view.** It cannot be turned, zoomed or pointed at,
+  and playback moves only the readouts. It is worked out on the page when the view fails or
+  changes size: about 0.1 seconds for a million moves.
 - **Not a guard (ADR-228).** Nothing here blocks, refuses or asks for confirmation. The view draws
   and times the same program the same way; CAM and G-code are unchanged.
 
@@ -149,6 +203,34 @@ to millions of moves.
   the worker reads, passes unchanged.
 - On a 2.4 million move program in the test browser (software WebGL) the picture keeps up with the
   worker, which sends a batch about every quarter second for 7 seconds; the page is busy for about
-  2 seconds at most, at the largest reframes. Reading and timing a million moves takes 2.2 to 2.6 seconds, against 2.3 seconds on
-  main. The reader's peak of 74 bytes a move, against 100 to 150 on main, is worked out from the
+  2 seconds at most, at the largest reframes. Reading and timing a million moves takes 2.2 to 2.6
+  seconds, against 2.3 seconds on main. The reader's peak of 74 bytes a move, against 100 to 150 on main, is worked out from the
   arrays it holds, not measured.
+- Unit tests: a straight cut is drawn as one line per 64 moves and keeps one level when both
+  agree; runs break at a change of power, feed, reached feed or kind, at a tool change, at a
+  rapid and at a gap, and no rapid is drawn; a zigzag within the coarse tolerance only keeps the
+  coarse level, and one within neither is left alone; programs under 100,000 moves get no levels;
+  a level's lines run from each run's first start to its last end and share their buffers with
+  the faint copy; the colours come from each run's first and last moves; the coarsest level within
+  half a pixel is chosen; a pixel is measured at the nearest part of the job in both cameras; the
+  drawn path is simplified only for the whole program; the worker transfers each level's arrays.
+- Browser (`e2e/gcode-viewer-detail.e2e.ts`): on a 120,000-move relief fitted to the view the note
+  gives 3,634 lines within 0.052 mm and no draw call on the view draws a quarter of the moves;
+  pointing at a move still reads it out; zoomed in, the note goes and a redraw draws every move;
+  played half way, the note goes; nothing is logged as an error.
+- A 400,000-move relief keeps a coarse level of 10,466 lines and a fine one of 18,671; a photo
+  raster keeps only the fine level, at about 1.8 moves a line. Working out both levels takes 64 ms
+  per 400,000 moves in the worker. In the test browser (software WebGL) the relief's view was
+  ready in 3.4 seconds, against 17.6 on main, and zooming in with 13 wheel steps drew 208,000 lines
+  against 4.8 million. Its toolpath pixels differ from main's in 201 of 90,000 lit pixels fitted
+  and 924 of 207,000 zoomed in.
+- Unit tests: the picture from above draws cuts and not rapids, fitted in the middle with Y up;
+  where moves cross it shows the deepest, the later one on a tie; it paints each pixel in its
+  move's colour as the 3D view shows it, asking a run of pixels on one move for its colour once;
+  rapids alone or no room draw nothing.
+- Browser (`e2e/gcode-viewer-top-view.e2e.ts`): with every WebGL context refused, a pocket cleared
+  1 mm deep with its lower half 2 mm deep shows its sentence and an image with thousands of lit
+  pixels in the depth lens's two colours; switching to the move kind lens repaints the same pixels
+  in other colours; the timeline still works; nothing throws.
+- Working out the picture for a million moves at 1,260 by 780 pixels takes about 120 ms, and
+  painting it 20 to 95 ms (Node, the test machine).

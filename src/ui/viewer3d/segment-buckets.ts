@@ -4,6 +4,7 @@
 // solid moves draw straight from the program instead (program-lines.ts).
 
 import { SEG_KIND } from '../../core/gcode-view';
+import type { MoveDetail } from './move-detail';
 
 export type Viewer3dSegmentsInput = {
   readonly segmentCount: number;
@@ -12,6 +13,8 @@ export type Viewer3dSegmentsInput = {
   readonly segKind: Uint8Array;
   /** Per segment, 0 leaves the move out of the drawing (ADR-470 filters). */
   readonly visible?: Uint8Array | null;
+  /** Lighter drawings of a big program for zoomed-out views (ADR-485). */
+  readonly detail?: MoveDetail | null;
 };
 
 export type TravelBucket = {
@@ -88,9 +91,12 @@ export function cssHexColor(color: number): string {
  * the same encoding or its swatches never match the toolpath.
  */
 export function renderedLineCss(rgb: readonly [number, number, number]): string {
-  const channel = (value: number): number =>
-    Math.round(linearToSrgb(Math.min(1, Math.max(0, value))) * 255);
-  return `rgb(${channel(rgb[0])}, ${channel(rgb[1])}, ${channel(rgb[2])})`;
+  return `rgb(${renderedLineByte(rgb[0])}, ${renderedLineByte(rgb[1])}, ${renderedLineByte(rgb[2])})`;
+}
+
+/** One channel of `renderedLineCss`, 0 to 255. */
+export function renderedLineByte(value: number): number {
+  return Math.round(linearToSrgb(Math.min(1, Math.max(0, value))) * 255);
 }
 
 /** Stops for a CSS gradient matching a linearly blended line-colour ramp. */

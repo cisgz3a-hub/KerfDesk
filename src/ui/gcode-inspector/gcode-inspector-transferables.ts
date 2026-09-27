@@ -21,6 +21,7 @@ export function gcodeInspectorTransferables(
     time.segTimeEndSec.buffer,
     time.segFeedLimited.buffer,
     time.kindSeconds.buffer,
+    ...(model.detail?.levels.flatMap((level) => [level.starts.buffer, level.ends.buffer]) ?? []),
   ]);
 }
 

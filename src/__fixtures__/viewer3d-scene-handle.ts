@@ -28,6 +28,7 @@ export function fakeViewer3dSceneHandle(
     setClipPlanes: vi.fn(),
     setMeasure: vi.fn(),
     onCameraMoving: vi.fn(),
+    onDetailChange: vi.fn(),
     captureImage: vi.fn(() => ''),
     setDirectionArrows: vi.fn(),
     resize: vi.fn(),

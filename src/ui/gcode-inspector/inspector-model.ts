@@ -5,9 +5,16 @@
 
 import type { ProgramTimeModel } from '../../core/gcode-time';
 import { SEG_KIND, type GcodeRenderModel } from '../../core/gcode-view';
+// Deep import: the viewer3d barrel is capped at 20 exports by its index contract.
+import type { MoveDetail } from '../viewer3d/move-detail';
 
-/** The render model without the route and length arrays only timing used. */
-export type InspectorRenderModel = Omit<GcodeRenderModel, 'segRouteEndMm' | 'segLengthMm'>;
+/**
+ * The render model without the route and length arrays only timing used, and
+ * with the lighter drawings of a big program, worked out in the worker.
+ */
+export type InspectorRenderModel = Omit<GcodeRenderModel, 'segRouteEndMm' | 'segLengthMm'> & {
+  readonly detail?: MoveDetail | null;
+};
 
 /** The program time without the planner's per-move working arrays. */
 export type InspectorProgramTime = Omit<
@@ -23,9 +30,12 @@ export type InspectorProgramTime = Omit<
   readonly kindSeconds: Float64Array;
 };
 
-export function inspectorRenderModel(model: GcodeRenderModel): InspectorRenderModel {
+export function inspectorRenderModel(
+  model: GcodeRenderModel,
+  detail: MoveDetail | null = null,
+): InspectorRenderModel {
   const { segRouteEndMm: _routeEnd, segLengthMm: _length, ...kept } = model;
-  return kept;
+  return detail === null ? kept : { ...kept, detail };
 }
 
 export function inspectorProgramTime(

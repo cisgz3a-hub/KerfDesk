@@ -21,12 +21,14 @@ function bigProgram(): string {
 }
 
 // Watches WebGL draws into the preview's canvas: how many moves it drew in
-// all, and, for the first few draws, how many pixels the lines lit. Reading
-// pixels straight after a draw sees the frame before it is shown, so the
-// check does not race the full view replacing the preview.
+// all, and the most pixels its lines lit, read after each draw until plenty
+// are lit (reading the canvas is slow). Reading pixels straight after a draw
+// sees the frame before it is shown, so the check does not race the full
+// view replacing the preview.
 async function watchPreviewDraws(page: Page): Promise<void> {
   await page.addInitScript(() => {
     type Gl = WebGL2RenderingContext;
+    const PLENTY = 5_000;
     const drawn = { draws: 0, moves: 0, litPixels: 0 };
     Object.assign(window, { __previewDrawn: drawn });
     const litPixels = (gl: Gl): number => {
@@ -51,7 +53,7 @@ async function watchPreviewDraws(page: Page): Promise<void> {
       if (mode !== this.LINES || canvas.closest?.('.gcode-viewer-preview') == null) return;
       drawn.draws += 1;
       drawn.moves += count / 2;
-      if (drawn.draws <= 4) drawn.litPixels = Math.max(drawn.litPixels, litPixels(this));
+      if (drawn.litPixels < PLENTY) drawn.litPixels = Math.max(drawn.litPixels, litPixels(this));
     };
   });
 }
@@ -91,7 +93,16 @@ test('the Inspector draws the moves read so far while its worker reads a big fil
   await expect(preview.getByRole('status')).toContainText(/worker.*cancel/i);
   await expect(preview.getByRole('status')).toContainText(/[\d,]+ moves read/);
 
-  await expect.poll(async () => (await previewDrawn(page)).litPixels).toBeGreaterThan(500);
+  // Says how many draws there were, so a failure tells a blank canvas from none.
+  await expect
+    .poll(
+      async () => {
+        const { draws, litPixels } = await previewDrawn(page);
+        return `${litPixels > 500 ? 'lit' : 'not lit'} after ${draws} draws (${litPixels} px)`;
+      },
+      { timeout: 30_000 },
+    )
+    .toMatch(/^lit/);
   await cdp.send('Emulation.setCPUThrottlingRate', { rate: 1 });
 
   await expect(dialog.getByText(/shown segments/)).toBeVisible({ timeout: 150_000 });

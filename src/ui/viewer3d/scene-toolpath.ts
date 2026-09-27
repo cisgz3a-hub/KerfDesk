@@ -15,7 +15,9 @@ import {
   shareProgramGeometry,
   writeProgramColors,
 } from './program-lines';
+import { createDetailLines, paintDetailLines } from './detail-lines';
 import { createCurrentMove, type CurrentMove } from './scene-current-move';
+import type { DetailTargets } from './scene-detail';
 import { buildTravelBucket, revealCount, type Viewer3dSegmentsInput } from './segment-buckets';
 import type { PlayheadMarker } from './viewer3d-scene';
 import type { Viewer3dTheme } from './viewer3d-theme';
@@ -62,6 +64,8 @@ export type RevealTargets = {
     readonly total: number;
   } | null;
   readonly travelSource: Uint32Array;
+  /** The simplified drawings of a big program, when it has them (ADR-485). */
+  readonly detail: DetailTargets | null;
 };
 
 // Repaints the solid moves in place from a render-model segment → rgb
@@ -78,6 +82,7 @@ export function applyRecolor(
   targets.fadeColor = hexRgb(targets.background).map(channel) as [number, number, number];
   writeProgramColors(targets.solid.colors, colorOf, encode);
   targets.solid.colorBuffer.needsUpdate = true;
+  if (targets.detail !== null) paintDetailLines(targets.detail.levels, targets.solid.colors);
   return true;
 }
 
@@ -176,6 +181,7 @@ export function buildToolpathObjects(args: ToolpathBuildArgs): {
   let solidTarget: RevealTargets['solid'] = null;
   let travelTarget: RevealTargets['travel'] = null;
   let solidGhost: RevealTargets['solidGhost'] = null;
+  let detail: DetailTargets | null = null;
   let travelGhost: RevealTargets['travelGhost'] = null;
   const active = createCurrentMove(args);
   objects.push(active.object);
@@ -185,6 +191,7 @@ export function buildToolpathObjects(args: ToolpathBuildArgs): {
     fatMaterials = solid.materials;
     solidGhost = solid.ghost;
     solidTarget = solid.target;
+    detail = solid.detail;
   }
   if (travelBucket.count > 0) {
     const travel = lineSegmentsObject(
@@ -232,6 +239,7 @@ export function buildToolpathObjects(args: ToolpathBuildArgs): {
       active,
       solidGhost,
       travelGhost,
+      detail,
     },
   };
 }
@@ -270,7 +278,39 @@ function buildSolid(args: ToolpathBuildArgs, colors: Uint16Array) {
     colors,
     colorBuffer,
   };
-  return { lines, ghost, materials: [material, ghostMaterial], target };
+  return {
+    lines,
+    ghost,
+    materials: [material, ghostMaterial],
+    target,
+    detail: detailOf(args, lines, ghost, colors),
+  };
+}
+
+// A big program's simplified drawings, unless a legend filter is on: they
+// stand for every move (ADR-485).
+function detailOf(
+  args: ToolpathBuildArgs,
+  lines: DetailTargets['lines'],
+  ghost: DetailTargets['ghost'],
+  colors: Uint16Array,
+): DetailTargets | null {
+  const { detail } = args.segments;
+  if (detail == null || args.segments.visible != null) return null;
+  const levels = createDetailLines(
+    args.three,
+    args.LineSegmentsGeometry,
+    args.segments.positions,
+    detail,
+  );
+  paintDetailLines(levels, colors);
+  return {
+    lines,
+    ghost,
+    full: { lines: lines.geometry, ghost: ghost.geometry },
+    levels,
+    moves: detail.solidMoves,
+  };
 }
 
 // Studio tone maps its lit tool model; line colours stay exact (ADR-426).

@@ -71,6 +71,7 @@ export function InspectorView(props: InspectorViewProps): JSX.Element {
           handleRef={handleRef}
           state={state}
           reason={reason}
+          topView={{ model: props.model, colorOf: session.colorOf }}
           cameraMode={camera.cameraMode}
           onCameraModeChange={camera.setCameraMode}
           live={liveMode ? live : null}
