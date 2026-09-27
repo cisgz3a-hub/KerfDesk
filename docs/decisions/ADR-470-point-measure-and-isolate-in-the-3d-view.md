@@ -96,6 +96,22 @@ points, and what does this part of the job look like on its own.
      Keys typed in fields, Space and Enter on a focused button, and key chords pass through. The
      hint bar lists the keys while the view has focus. Live mode has no playback keys.
 
+5. **Cut 3D marks program work zero** (`workspace/cnc-cut3d-work-frame.ts`,
+   `cnc-viewer3d/viewer3d-stage.ts`). The completed removal grid captures the same
+   device transform and prepared `jobOriginOffset` used to map its stock and toolpath.
+   Work `(0, 0, 0)` is mapped into scene space, then through the surface's shared Y mirror
+   and recentring. Positive X/Y directions follow the same transform; Z remains up, with
+   program Z0 at the stock top. The marker can therefore sit inside, at a corner, or outside
+   the stock, according to the actual stock offset, rather than always marking its min-XY corner.
+   - The frame belongs to the completed grid and then its exact prepared surface. Holding an
+     older surface while a replacement is pending keeps that surface's frame. Worker initialization,
+     replacement and thickness-only updates retain this ownership without transferring geometry twice.
+   - A Cut 3D surface without frame evidence omits the work-zero marker. Standalone relief/design
+     viewers retain their existing stock-corner orientation marker. This displays the program's
+     coordinate reference, not a new measurement or claim that physical work zero was established.
+   - This completes the triad item deferred by ADR-425. It changes no camera framing, stock mesh,
+     G-code, controller state or Frame/Start policy.
+
 ### Consequences
 
 - **Picking reads pixels back synchronously.** One 13 x 13 read per animation frame while the
@@ -108,6 +124,10 @@ points, and what does this part of the job look like on its own.
 ### Verification
 
 - Unit tests:
+  - Cut 3D maps work zero across all five device origins, nonzero stock offsets and three prepared
+    placements against an independent stock-centre oracle. Real Three axes point in the mapped
+    positive X/Y/Z directions, while the floor grids remain unchanged. Surface/worker tests keep
+    each frame with its displayed mesh through delayed completion and superseded replacements.
   - `encodePickIds` paints both ends of each move with its index plus one and round-trips indices
     past 2^24; `nearestPickedSegment` names the move nearest the centre, finds one at the window's
     edge and names nothing over empty space.

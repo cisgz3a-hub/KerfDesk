@@ -1,4 +1,4 @@
-import type { ReliefSurfaceMeshWithNormals } from '../../core/relief/relief-surface-mesh';
+import type { Cut3DSurfaceMesh } from '../cnc-viewer3d/viewer3d-work-axes';
 import type { ViewerDialogSceneBuilder, ViewerDialogSceneResult } from './use-viewer-dialog-scene';
 import { Cut3DOffscreenSession, type Cut3DWorkerPort } from './cut3d-offscreen-session';
 import { scheduleBrowserMicrotask } from './schedule-browser-microtask';
@@ -26,7 +26,7 @@ class Cut3DOffscreenRuntime {
 
   build(
     canvas: HTMLCanvasElement,
-    mesh: ReliefSurfaceMeshWithNormals,
+    mesh: Cut3DSurfaceMesh,
     stockThicknessMm: number,
     signal: AbortSignal,
     reportFailure: (reason: string) => void,
@@ -47,7 +47,7 @@ class Cut3DOffscreenRuntime {
 
   private createSession(
     canvas: HTMLCanvasElement,
-    mesh: ReliefSurfaceMeshWithNormals,
+    mesh: Cut3DSurfaceMesh,
     stockThicknessMm: number,
   ): Cut3DOffscreenSession | Error {
     try {
@@ -89,7 +89,7 @@ const injectedRuntimes = new WeakMap<
 /** Binds one immutable prepared surface to the shared, one-session render runtime.
  * Coordinators built with the same dependencies share one runtime. */
 export function createCut3DOffscreenCoordinator(
-  mesh: ReliefSurfaceMeshWithNormals,
+  mesh: Cut3DSurfaceMesh,
   stockThicknessMm: number,
   dependencies?: Cut3DOffscreenCoordinatorDependencies,
 ): Cut3DOffscreenCoordinator {

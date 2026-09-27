@@ -6,7 +6,7 @@
 // surface shows exactly what the 2D depth shading shows.
 
 import { useMemo } from 'react';
-import type { ReliefSurfaceMeshWithNormals } from '../../core/relief/relief-surface-mesh';
+import type { Cut3DSurfaceMesh } from '../cnc-viewer3d/viewer3d-work-axes';
 import type { RemovalGrid } from '../../core/sim';
 import { formatDisplayMillimetres } from '../format-display-millimetres';
 import { cncCut3dDisplayResolution, previewResolutionMessage } from '../workspace/preview';
@@ -17,7 +17,7 @@ import { Viewer3DDialogShell } from './Viewer3DDialogShell';
 // component owns only the lazy Three.js/WebGL presentation boundary.
 export function Cut3DPreviewDialog(props: {
   readonly grid: RemovalGrid;
-  readonly mesh: ReliefSurfaceMeshWithNormals | null;
+  readonly mesh: Cut3DSurfaceMesh | null;
   // A newer cut is being prepared; the shown surface and camera stay put.
   readonly updating?: boolean;
   // A bit the surface draws at an assumed tip angle (ADR-425).

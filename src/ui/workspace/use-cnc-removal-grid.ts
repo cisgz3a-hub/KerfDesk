@@ -8,6 +8,7 @@ import type { Vec2 } from '../../core/scene';
 import type { RemovalGrid } from '../../core/sim';
 import type { PreviewToolpath } from './preview-status';
 import { previewJobOriginOffset } from './preview-scene-frame';
+import { registerCncCut3DWorkFrame } from './cnc-cut3d-work-frame';
 import { createCoalescedJob } from './coalesced-preview-job';
 import {
   isCncRemovalGridSuperseded,
@@ -68,15 +69,18 @@ export function useCncRemovalGridState(
           signal,
         ),
       // Keyed even when empty, so a failed or unavailable grid reads as settled.
-      (scrubFraction, outcome) =>
+      (scrubFraction, outcome) => {
+        const grid = outcome.kind === 'done' ? outcome.value : null;
+        if (grid !== null) registerCncCut3DWorkFrame(grid, device, jobOriginOffset);
         setState({
           device,
           machine: cncMachine,
           toolpath,
           scrubFraction,
           jobOriginOffset,
-          grid: outcome.kind === 'done' ? outcome.value : null,
-        }),
+          grid,
+        });
+      },
       isCncRemovalGridSuperseded,
     );
   }, [previewMode, cncMachine, device, toolpath, jobOriginOffsetX, jobOriginOffsetY]);
