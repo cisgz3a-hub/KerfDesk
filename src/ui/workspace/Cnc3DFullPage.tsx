@@ -29,6 +29,8 @@ import {
   type SurfaceReading,
 } from './use-cnc-3d-scene';
 import { previewResolutionMessage } from './preview-resolution';
+// Deep import: the viewer3d barrel is capped at 20 exports by its index contract.
+import { VIEWER3D_MOUSE_HINT } from '../viewer3d/viewer3d-controls';
 
 export function Cnc3DFullPage(props: {
   readonly source: DesignSceneSource;
@@ -80,9 +82,7 @@ export function Cnc3DFullPage(props: {
       <div style={barStyle}>
         <span style={titleStyle}>3D result</span>
         <span style={hintStyle}>
-          {state === 'failed'
-            ? '3D view unavailable in this browser.'
-            : 'Drag to move, right-drag to orbit, scroll to zoom.'}
+          {state === 'failed' ? '3D view unavailable in this browser.' : `${VIEWER3D_MOUSE_HINT}.`}
         </span>
         <button type="button" onClick={onClose} style={closeStyle} title="Close (Esc)">
           Close

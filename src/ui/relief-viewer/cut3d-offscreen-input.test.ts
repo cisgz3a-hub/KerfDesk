@@ -46,6 +46,33 @@ describe('createCut3DOffscreenInput', () => {
   });
 });
 
+describe('Cut 3D wheel zoom', () => {
+  it('zooms toward the pointer (ADR-426)', () => {
+    const canvas = document.createElement('canvas');
+    document.body.appendChild(canvas);
+    canvas.getBoundingClientRect = () => new DOMRect(100, 50, 400, 200);
+    const onControl = vi.fn();
+    const input = createCut3DOffscreenInput(canvas, onControl, vi.fn());
+    input.start();
+
+    const wheel = new WheelEvent('wheel', {
+      deltaY: -120,
+      clientX: 400,
+      clientY: 100,
+      bubbles: true,
+      cancelable: true,
+    });
+    canvas.dispatchEvent(wheel);
+    expect(wheel.defaultPrevented).toBe(true);
+    expect(onControl).toHaveBeenLastCalledWith({
+      kind: 'zoom',
+      deltaY: -120,
+      cursor: { ndcX: expect.closeTo(0.5), ndcY: expect.closeTo(0.5) },
+    });
+    input.dispose();
+  });
+});
+
 function keydown(canvas: HTMLCanvasElement, key: string, shiftKey = false): KeyboardEvent {
   const event = new KeyboardEvent('keydown', {
     key,

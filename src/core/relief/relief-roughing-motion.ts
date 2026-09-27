@@ -4,7 +4,7 @@
 //
 // - Order: each level's pieces inside out (relief-roughing-order.ts), taking
 //   of the pieces whose inner pieces are all cut the one nearest the cutter,
-//   then that level's core cleanup paths in the planner's order.
+//   after that level's deepest-first core cleanup paths (ADR-427).
 // - Direction: every loop keeps the stock it cuts on the side the layer's cut
 //   direction asks for, islands and cleanup traces included.
 // - Links: after a loop the cutter stays down and feeds straight to the
@@ -106,11 +106,11 @@ function appendLevel(
       chain = openChain(oriented, level, options);
     });
   };
+  for (const group of [...cleanupGroups(level)].reverse()) cut(group);
   const next = insideOutNearest(ringPieces(level.rings), loopDistance);
   for (let piece = next(undefined); piece !== undefined; piece = next(chainEnd(chain))) {
     cut(piece.loops);
   }
-  for (const group of cleanupGroups(level)) cut(group);
   if (chain !== null) passes.push(chainPass(chain));
 }
 

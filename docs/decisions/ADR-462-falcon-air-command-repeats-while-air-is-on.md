@@ -66,7 +66,7 @@ command repeats while air is on. The Falcon A1 Pro preset declares it. `withAirK
 - **Profiles without the flag.** Their bytes are unchanged, and so are CNC coolant and the Marlin
   and Smoothieware strategies.
 - **Output identity.** `EMITTER_REVISION` becomes
-  `adaptive-rings-relief-flat-depth-air-repeats-20260927-v1`, preserving the existing relief and
+  `adaptive-relief-cleanup-linked-entry-air-repeats-20260927-v1`, preserving the existing relief and
   adaptive-ring provenance while identifying this output behavior.
 
 The Job Review standby advisory, the Machine Setup "Air restart" tooltip, and WORKFLOW F.3

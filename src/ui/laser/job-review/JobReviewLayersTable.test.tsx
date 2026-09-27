@@ -268,4 +268,15 @@ describe('JobReviewLayersTable', () => {
     // inert noise.
     expect(host.textContent).toContain('1 pass · stepover 40% · tabs 4 per shape (6 × 2 mm)');
   });
+
+  it('says beside the ramp which compiled relief stages plunge', async () => {
+    const base = createLayer({ id: 'relief', color: '#a0522d' });
+    seedLayers([{ ...base, cnc: { ...DEFAULT_CNC_LAYER_SETTINGS, rampEntryDeg: 5 } }], 'cnc');
+    await render('cnc', [
+      { layerId: 'relief', summaries: [], plungingReliefStages: ['relief-rough', 'relief-finish'] },
+    ]);
+
+    // ADR-273 Amendment 1: the layer ramps only its other shapes.
+    expect(host.textContent).toContain('ramp entry 5° (relief passes plunge)');
+  });
 });

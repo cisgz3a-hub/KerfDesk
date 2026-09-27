@@ -112,8 +112,16 @@ function localScanOffsetPart(settings: LayerOperationSettings): ReadonlyArray<st
   return [`local scan offset ${signed} mm — replaces device table only for bidirectional output`];
 }
 
-/** The read-only strategy a CNC operation cuts with, joined for one line. */
-export function cncOperationDetail(settings: CncLayerSettings, stockThicknessMm?: number): string {
+/** Compiled relief stages whose groups record no ramp, so they plunge. */
+export type PlungingReliefStage = 'relief-rough' | 'relief-finish';
+
+/** The read-only strategy a CNC operation cuts with, joined for one line.
+ * `plungingReliefStages` comes from the compiled job (ADR-273 Amendment 1). */
+export function cncOperationDetail(
+  settings: CncLayerSettings,
+  stockThicknessMm?: number,
+  plungingReliefStages: ReadonlyArray<PlungingReliefStage> = [],
+): string {
   // Read the pass count from the same helper the compiler steps with, rather
   // than re-deriving it: zPassDepths carries an epsilon and a per-pass clamp,
   // and a bare Math.ceil disagreed with the emitter on imperial depths
@@ -123,7 +131,7 @@ export function cncOperationDetail(settings: CncLayerSettings, stockThicknessMm?
     ...cncStepoverPart(settings),
     ...cncDirectionPart(settings),
     ...cncProfileTabsPart(settings, stockThicknessMm),
-    ...cncEntryPart(settings),
+    ...cncEntryPart(settings, plungingReliefStages),
     ...cncVCarveClearPart(settings),
     ...cncFinishAllowancePart(settings),
     ...cncPocketStrategyPart(settings),
@@ -235,17 +243,37 @@ function cncTabsPart(settings: CncLayerSettings, stockThicknessMm: number | unde
     : `${configured} above the stock bottom`;
 }
 
-function cncEntryPart(settings: CncLayerSettings): ReadonlyArray<string> {
+function cncEntryPart(
+  settings: CncLayerSettings,
+  plungingReliefStages: ReadonlyArray<PlungingReliefStage>,
+): ReadonlyArray<string> {
+  const entry = requestedCncEntry(settings);
+  if (entry === null) return [];
+  const notes = [...entry.notes, ...reliefPlungeNote(plungingReliefStages)];
+  return [notes.length === 0 ? entry.label : `${entry.label} (${notes.join('; ')})`];
+}
+
+function requestedCncEntry(
+  settings: CncLayerSettings,
+): { readonly label: string; readonly notes: ReadonlyArray<string> } | null {
   const rampEntryDeg =
     settings.cutType === 'v-carve' ? settings.vCarveRampEntryDeg : settings.rampEntryDeg;
   if (rampEntryDeg !== undefined) {
     return settings.cutType === 'v-carve'
-      ? [`requested entry ${rampEntryDeg}° (medial depth profile governs)`]
-      : [`ramp entry ${rampEntryDeg}°`];
+      ? { label: `requested entry ${rampEntryDeg}°`, notes: ['medial depth profile governs'] }
+      : { label: `ramp entry ${rampEntryDeg}°`, notes: [] };
   }
-  if (settings.cutType === 'v-carve') return [];
-  if (settings.helixEntry !== undefined) return ['helix entry'];
-  return [];
+  if (settings.cutType === 'v-carve') return null;
+  if (settings.helixEntry !== undefined) return { label: 'helix entry', notes: [] };
+  return null;
+}
+
+// A relief group that records no ramp plunges at every start, whatever entry
+// the layer asks for (ADR-273 Amendment 1).
+function reliefPlungeNote(stages: ReadonlyArray<PlungingReliefStage>): ReadonlyArray<string> {
+  if (stages.length === 0) return [];
+  if (stages.length > 1) return ['relief passes plunge'];
+  return [stages[0] === 'relief-rough' ? 'relief roughing plunges' : 'relief finishing plunges'];
 }
 
 function powerModePart(settings: LayerOperationSettings): ReadonlyArray<string> {
