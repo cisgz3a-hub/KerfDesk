@@ -174,9 +174,10 @@ export type CncContourPass = {
   readonly zMm: number; // cutting depth for this pass; negative below stock top
   readonly polyline: ReadonlyArray<Vec2>;
   readonly closed: boolean;
-  // Provenance marker: the layer asked for a ramp entry, but this path is too
-  // short to ramp along, so the pass keeps its straight plunge (ADR-471).
-  // G-code comments and Job Review disclose it; motion is unchanged.
+  // Provenance marker: the layer asked for a ramp entry, but this path (for
+  // relief roughing, the chain's first loop) is too short to ramp along, so the
+  // pass keeps its straight plunge (ADR-471, ADR-424 Amendment 1). G-code
+  // comments and Job Review disclose it; motion is unchanged.
   readonly entryPlunge?: true;
   // ADR-489: earlier passes of this job have cut away everything the cutter
   // would touch at or above this Z anywhere along this pass's path, so the

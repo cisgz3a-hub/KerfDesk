@@ -18,7 +18,8 @@
 //   descending along it from the level above (the stock there is already
 //   cleared) instead of plunging, wrapping round the loop as often as the
 //   angle needs. A loop shorter than one cut width is too tight to ramp round
-//   and is plunged.
+//   and is plunged; its pass is marked `entryPlunge`, which the G-code header
+//   and Job Review disclose (ADR-424 Amendment 1).
 //
 // Everything stays in heightmap mm; the compiler maps it to the machine.
 
@@ -72,6 +73,9 @@ type Chain = {
   readonly airFloorZMm: number | undefined;
   // The entry ramp, descending to zMm; empty when the chain plunges.
   readonly ramp: ReadonlyArray<Vec3>;
+  // True when a ramp angle is set but the first loop is too tight to ramp
+  // round, so the chain plunges anyway.
+  readonly entryPlunge: boolean;
   // Everything at depth, from the ramp's end (or the plunge) onward.
   readonly path: Vec2[];
 };
@@ -287,14 +291,37 @@ function openChain(
   const start = longestSideMiddle(points);
   const drop = level.sliceTopMm - level.zMm;
   const angle = options.rampAngleDeg ?? 0;
-  const perimeter = perimeterMm(points);
   const airFloorZMm = level.airFloorZMm;
-  if (!(angle > 0) || !(drop > 0) || !(perimeter > 0) || !(perimeter >= options.cutWidthMm)) {
-    return { zMm: level.zMm, airFloorZMm, ramp: [], path: loopFrom(points, start) };
+  if (!(angle > 0) || !(drop > 0)) {
+    return {
+      zMm: level.zMm,
+      airFloorZMm,
+      ramp: [],
+      entryPlunge: false,
+      path: loopFrom(points, start),
+    };
+  }
+  const perimeter = perimeterMm(points);
+  if (!(perimeter > 0) || !(perimeter >= options.cutWidthMm)) {
+    // The cutter covers the whole loop wherever it stands on it, so laps
+    // would only slow the plunge; the pass says it plunged instead.
+    return {
+      zMm: level.zMm,
+      airFloorZMm,
+      ramp: [],
+      entryPlunge: true,
+      path: loopFrom(points, start),
+    };
   }
   const clamped = Math.min(Math.max(angle, MIN_RAMP_ANGLE_DEG), MAX_RAMP_ANGLE_DEG);
   const ramp = rampAlong(points, start, level.sliceTopMm, level.zMm, (clamped * Math.PI) / 180);
-  return { zMm: level.zMm, airFloorZMm, ramp: ramp.points, path: loopFrom(points, ramp.end) };
+  return {
+    zMm: level.zMm,
+    airFloorZMm,
+    ramp: ramp.points,
+    entryPlunge: false,
+    path: loopFrom(points, ramp.end),
+  };
 }
 
 function longestSideMiddle(points: ReadonlyArray<Vec2>): LoopPoint {
@@ -349,7 +376,14 @@ function rampAlong(
 function chainPass(chain: Chain): CncPass {
   const floor = chain.airFloorZMm === undefined ? {} : { airFloorZMm: chain.airFloorZMm };
   if (chain.ramp.length === 0) {
-    return { kind: 'contour', zMm: chain.zMm, polyline: chain.path, closed: false, ...floor };
+    return {
+      kind: 'contour',
+      zMm: chain.zMm,
+      polyline: chain.path,
+      closed: false,
+      ...(chain.entryPlunge ? { entryPlunge: true as const } : {}),
+      ...floor,
+    };
   }
   const atDepth = chain.path.slice(1).map((point) => ({ ...point, z: chain.zMm }));
   const pass: CncPath3dPass = {

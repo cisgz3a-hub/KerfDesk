@@ -122,6 +122,8 @@ export type CompiledReliefFacts = {
   // How many reliefs the operation compiled, from the job's relief planning
   // evidence; 0 when the job carries none.
   readonly reliefCount: number;
+  // The deepest any relief pass reaches, roughing or finishing, as emitted.
+  readonly maxDepthMm: number;
   // Whether the operation's other shapes compiled groups of their own.
   readonly cutsOtherShapes: boolean;
 };
