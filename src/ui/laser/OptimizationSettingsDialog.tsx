@@ -44,6 +44,9 @@ function PlannerFields(props: {
   const orderingControlTitle = keepsSourceOrder
     ? 'Keep source order bypasses this setting. Switch Travel policy to Reduce travel to use it.'
     : undefined;
+  // Keep source order still moves closed-shape starts, from Planning start.
+  const choosesClosedStarts = settings.closedShapeStart !== 'drawn';
+  const startPointTitle = choosesClosedStarts ? undefined : orderingControlTitle;
   return (
     <>
       <PlannerSelect
@@ -95,8 +98,8 @@ function PlannerFields(props: {
         label="Planning start"
         name="startPoint"
         value={settings.startPoint}
-        disabled={keepsSourceOrder}
-        {...(orderingControlTitle === undefined ? {} : { title: orderingControlTitle })}
+        disabled={keepsSourceOrder && !choosesClosedStarts}
+        {...(startPointTitle === undefined ? {} : { title: startPointTitle })}
         onChange={(startPoint) =>
           update({ startPoint: startPoint as ProjectOptimizationSettings['startPoint'] })
         }
@@ -106,8 +109,45 @@ function PlannerFields(props: {
           ['job-center', 'Job center'],
         ]}
       />
-      {keepsSourceOrder ? <SourceOrderPrecedenceNote /> : null}
+      <ClosedShapeStartField value={settings.closedShapeStart} update={update} />
+      {keepsSourceOrder ? (
+        <SourceOrderPrecedenceNote choosesClosedStarts={choosesClosedStarts} />
+      ) : null}
     </>
+  );
+}
+
+// LBG-C04. The dialog is laser-only: its command is hidden in CNC mode
+// (LASER_ONLY_COMMAND_IDS), and optimizePaths never reorders CNC groups.
+function ClosedShapeStartField(props: {
+  readonly value: ProjectOptimizationSettings['closedShapeStart'];
+  readonly update: (patch: Partial<ProjectOptimizationSettings>) => void;
+}): JSX.Element {
+  return (
+    <PlannerSelect
+      label="Start closed shapes"
+      name="closedShapeStart"
+      value={props.value}
+      title="Choose where each closed shape starts and stops cutting."
+      onChange={(closedShapeStart) =>
+        props.update({
+          closedShapeStart: closedShapeStart as ProjectOptimizationSettings['closedShapeStart'],
+        })
+      }
+      options={[
+        ['drawn', 'Where drawn', 'Start each closed shape at the point where it was drawn.'],
+        [
+          'nearest',
+          'Nearest point',
+          'Start each closed shape at the point nearest the head, to shorten travel.',
+        ],
+        [
+          'nearest-corner',
+          'Nearest corner',
+          'Start each closed shape at the corner nearest the head, so the start and stop mark lands on a corner. Shapes without corners start at the nearest point.',
+        ],
+      ]}
+    />
   );
 }
 
@@ -152,7 +192,17 @@ function OverlapRemovalField(props: {
   );
 }
 
-function SourceOrderPrecedenceNote(): JSX.Element {
+function SourceOrderPrecedenceNote(props: { readonly choosesClosedStarts: boolean }): JSX.Element {
+  if (props.choosesClosedStarts) {
+    return (
+      <p style={precedenceNoteStyle} role="status">
+        Keep source order preserves path sequence and direction inside each operation. Inside paths
+        first and Path direction are saved but bypassed. Start closed shapes still applies,
+        beginning from Planning start. Layer priority still applies. Overlap removal, when enabled,
+        also applies.
+      </p>
+    );
+  }
   return (
     <p style={precedenceNoteStyle} role="status">
       Keep source order preserves path sequence and direction inside each operation. Inside paths
@@ -166,7 +216,7 @@ function PlannerSelect(props: {
   readonly label: string;
   readonly name: string;
   readonly value: string;
-  readonly options: ReadonlyArray<readonly [value: string, label: string]>;
+  readonly options: ReadonlyArray<readonly [value: string, label: string, title?: string]>;
   readonly onChange: (value: string) => void;
   readonly disabled?: boolean;
   readonly title?: string;
@@ -181,8 +231,8 @@ function PlannerSelect(props: {
         onChange={(event) => props.onChange(event.currentTarget.value)}
         title={props.title ?? `Choose ${props.label.toLowerCase()}.`}
       >
-        {props.options.map(([value, label]) => (
-          <option key={value} value={value}>
+        {props.options.map(([value, label, title]) => (
+          <option key={value} value={value} {...(title === undefined ? {} : { title })}>
             {label}
           </option>
         ))}

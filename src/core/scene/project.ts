@@ -38,6 +38,13 @@ export type ProjectOptimizationSettings = {
   readonly layerPriority: 'project-order' | 'reverse-project-order';
   readonly pathDirection: 'allow-reverse' | 'preserve';
   readonly startPoint: 'machine-origin' | 'job-lower-left' | 'job-center';
+  /**
+   * Where each closed laser shape starts and stops (LBG-C04): where it was
+   * drawn, at the vertex nearest the head, or at the nearest corner so the
+   * start/stop mark lands on one. No schema bump: an older reader ignores the
+   * field and starts closed shapes where drawn, which cuts the same outline.
+   */
+  readonly closedShapeStart: 'drawn' | 'nearest' | 'nearest-corner';
 };
 
 export type ProjectJobPlacement = {
@@ -74,6 +81,7 @@ export const DEFAULT_PROJECT_OPTIMIZATION: ProjectOptimizationSettings = {
   layerPriority: 'project-order',
   pathDirection: 'allow-reverse',
   startPoint: 'machine-origin',
+  closedShapeStart: 'drawn',
 };
 
 export type Project = {

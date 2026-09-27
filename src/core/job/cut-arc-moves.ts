@@ -279,6 +279,93 @@ export function reverseCutSegment<T extends CutSegment>(segment: T): T {
   return withCutArcMoves(reversed, reverseArcMoves(first, moves));
 }
 
+/**
+ * The closed segment started at polyline vertex `vertexIndex` (LBG-C04): the
+ * same loop, cut from that vertex round to it again, with any arc moves
+ * rotated at the same point. Null when that would lose the arcs, because the
+ * vertex is not also a move end (see arcRotatableVertices) or the moves do not
+ * validate afterwards, and when the segment is not a closed loop or the index
+ * is not one of its vertices. Vertex 0 returns the segment itself.
+ */
+export function rotateClosedCutSegment<T extends CutSegment>(
+  segment: T,
+  vertexIndex: number,
+): T | null {
+  const { polyline } = segment;
+  const vertexCount = polyline.length - 1;
+  if (!segment.closed || !Number.isInteger(vertexIndex) || vertexCount < 2) return null;
+  if (vertexIndex < 0 || vertexIndex >= vertexCount) return null;
+  if (vertexIndex === 0) return segment;
+  // The closing point is dropped for the loop's first point, which the
+  // rotated loop passes through instead; the new start closes it.
+  const rotated = {
+    ...withoutArcMoves(segment),
+    polyline: [...polyline.slice(vertexIndex, vertexCount), ...polyline.slice(0, vertexIndex + 1)],
+  };
+  const moves = validCutArcMoves(segment);
+  if (moves === null) return rotated;
+  const moveIndex = arcRotatableVertices(segment)?.get(vertexIndex);
+  if (moveIndex === undefined) return null;
+  const withArcs = withCutArcMoves(rotated, [
+    ...moves.slice(moveIndex + 1),
+    ...moves.slice(0, moveIndex + 1),
+  ]);
+  return withArcs.arcMoves === undefined ? null : withArcs;
+}
+
+/**
+ * For a closed segment carrying valid arc moves: each polyline vertex after
+ * the start that is bit for bit the end of a move, mapped to that move's
+ * index. A loop may start at those vertices and keep its arcs; anywhere else
+ * the arcs would have to be split. Null when the segment carries no valid
+ * moves. Empty when its last point is not bit for bit its first, since the
+ * rotated moves would then run through a point the polyline does not.
+ *
+ * A vertex whose coordinates the loop visits more than once is left out, so a
+ * match can never pair one visit with a move ending at another. Linear in
+ * vertex and move count.
+ */
+export function arcRotatableVertices(segment: CutSegment): ReadonlyMap<number, number> | null {
+  const moves = validCutArcMoves(segment);
+  if (moves === null) return null;
+  const rotatable = new Map<number, number>();
+  const { polyline } = segment;
+  const first = polyline[0];
+  const last = polyline[polyline.length - 1];
+  if (!segment.closed || first === undefined || last === undefined) return rotatable;
+  if (first.x !== last.x || first.y !== last.y) return rotatable;
+  const vertexAt = uniqueVertexIndex(polyline, polyline.length - 1);
+  let previous = 0;
+  // The last move ends on the closing point, which is the start itself.
+  for (let moveIndex = 0; moveIndex < moves.length - 1; moveIndex += 1) {
+    const to = (moves[moveIndex] as ArcMove).to;
+    const vertexIndex = vertexAt.get(to.x)?.get(to.y);
+    if (vertexIndex === undefined || vertexIndex <= previous) continue;
+    rotatable.set(vertexIndex, moveIndex);
+    previous = vertexIndex;
+  }
+  return rotatable;
+}
+
+// x -> y -> the one vertex index among the first `count` at that point, or -1
+// where several vertices share it.
+function uniqueVertexIndex(
+  polyline: ReadonlyArray<Vec2>,
+  count: number,
+): Map<number, Map<number, number>> {
+  const byX = new Map<number, Map<number, number>>();
+  for (let index = 0; index < count; index += 1) {
+    const point = polyline[index] as Vec2;
+    let byY = byX.get(point.x);
+    if (byY === undefined) {
+      byY = new Map();
+      byX.set(point.x, byY);
+    }
+    byY.set(point.y, byY.has(point.y) ? -1 : index);
+  }
+  return byX;
+}
+
 function polylineLengthMm(polyline: ReadonlyArray<Vec2>): number {
   let length = 0;
   for (let index = 1; index < polyline.length; index += 1) {

@@ -86,6 +86,61 @@ describe('OptimizationSettingsDialog', () => {
     }
   });
 
+  it('chooses where closed shapes start, explaining each choice on hover', async () => {
+    const { host, root, onApply } = await renderDialog();
+    try {
+      const select = host.querySelector('select[name="closedShapeStart"]');
+      if (!(select instanceof HTMLSelectElement)) throw new Error('closed-shape start missing');
+      expect(select.value).toBe('drawn');
+      expect(select.title).not.toBe('');
+      expect([...select.options].map((option) => [option.value, option.textContent])).toEqual([
+        ['drawn', 'Where drawn'],
+        ['nearest', 'Nearest point'],
+        ['nearest-corner', 'Nearest corner'],
+      ]);
+      for (const option of select.options) expect(option.title).not.toBe('');
+      expect(select.options[2]?.title).toContain('start and stop mark lands on a corner');
+
+      await act(async () => {
+        select.value = 'nearest-corner';
+        Simulate.change(select);
+      });
+      await act(async () => {
+        const form = host.querySelector('form');
+        if (!(form instanceof HTMLFormElement)) throw new Error('form missing');
+        Simulate.submit(form);
+      });
+      expect(onApply).toHaveBeenCalledWith({
+        ...DEFAULT_PROJECT_OPTIMIZATION,
+        closedShapeStart: 'nearest-corner',
+      });
+    } finally {
+      await act(async () => root.unmount());
+    }
+  });
+
+  it('keeps Planning start live under Keep source order when it seeds closed-shape starts', async () => {
+    const { host, root } = await renderDialog(vi.fn(), {
+      ...DEFAULT_PROJECT_OPTIMIZATION,
+      travelPolicy: 'source-order',
+      reduceTravelMoves: false,
+      closedShapeStart: 'nearest',
+    });
+    try {
+      const startPoint = host.querySelector<HTMLSelectElement>('select[name="startPoint"]');
+      expect(startPoint?.disabled).toBe(false);
+      expect(
+        host.querySelector<HTMLSelectElement>('select[name="closedShapeStart"]')?.disabled,
+      ).toBe(false);
+      expect(host.querySelector<HTMLSelectElement>('select[name="pathDirection"]')?.disabled).toBe(
+        true,
+      );
+      expect(host.textContent).toContain('Start closed shapes still applies');
+    } finally {
+      await act(async () => root.unmount());
+    }
+  });
+
   it('preserves bypassed settings so switching back to Reduce travel restores them', async () => {
     const sourceOrder = {
       ...DEFAULT_PROJECT_OPTIMIZATION,

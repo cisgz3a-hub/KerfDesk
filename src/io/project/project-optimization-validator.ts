@@ -18,5 +18,6 @@ export function validateOptimization(value: unknown): string | null {
       'job-lower-left',
       'job-center',
     ]),
+    optionalLiteral(value, 'optimization.closedShapeStart', ['drawn', 'nearest', 'nearest-corner']),
   ]);
 }

@@ -83,6 +83,7 @@ describe('project cut-planner settings', () => {
         layerPriority: 'reverse-project-order',
         pathDirection: 'preserve',
         startPoint: 'job-center',
+        closedShapeStart: 'nearest-corner',
       },
     };
 
@@ -90,6 +91,30 @@ describe('project cut-planner settings', () => {
 
     expect(result.kind).toBe('ok');
     if (result.kind === 'ok') expect(result.project.optimization).toEqual(project.optimization);
+  });
+
+  it('starts closed shapes where drawn when a file predates the option, and rejects junk', () => {
+    const project = createProject();
+    const { closedShapeStart: _start, ...legacy } = project.optimization;
+    const old = deserializeProject(JSON.stringify({ ...project, optimization: legacy }));
+    expect(old.kind === 'ok' ? old.project.optimization.closedShapeStart : null).toBe('drawn');
+    for (const closedShapeStart of ['drawn', 'nearest', 'nearest-corner'] as const) {
+      const text = serializeProject({
+        ...project,
+        optimization: { ...project.optimization, closedShapeStart },
+      });
+      const result = deserializeProject(text);
+      expect(result.kind === 'ok' ? result.project.optimization.closedShapeStart : null).toBe(
+        closedShapeStart,
+      );
+    }
+    const invalid = deserializeProject(
+      JSON.stringify({ ...project, optimization: { ...legacy, closedShapeStart: 'corners' } }),
+    );
+    expect(invalid.kind).toBe('invalid');
+    if (invalid.kind === 'invalid') {
+      expect(invalid.reason).toMatch(/optimization\.closedShapeStart/);
+    }
   });
 
   it('defaults a missing overlap option off and rejects non-boolean values', () => {
