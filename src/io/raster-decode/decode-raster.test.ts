@@ -138,5 +138,7 @@ describe('headless raster decoders (ADR-477)', () => {
     expect([image.width, image.height]).toEqual([2, 1]);
     expect(image.dpi?.x).toBeCloseTo(200, 6);
     await expect(decodeRaster(Uint8Array.from([1, 2, 3, 4]))).rejects.toThrow(/Unrecognised/);
+    const gif = new TextEncoder().encode('GIF89a\u0001\u0000\u0001\u0000');
+    await expect(decodeRaster(gif)).rejects.toThrow(/GIF input is not supported/);
   });
 });

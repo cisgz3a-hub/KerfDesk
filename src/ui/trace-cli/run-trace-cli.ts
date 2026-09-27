@@ -10,7 +10,9 @@ import { writeTracedDrawing } from '../../io/vector-formats/traced-drawing';
 import { withHybridMaxStrokeWidth } from '../trace/hybrid-stroke-width';
 import { traceOptionsForCommitGrid } from '../trace/trace-commit-grid';
 import { PREVIEW_MAX_EDGE_PX, scaleToCap } from '../trace/trace-decode-cap';
+import { traceNoticeMessage, type TraceNotice } from '../trace/trace-notices';
 import { mergeLightBurnTraceSettings } from '../trace/trace-options';
+import { traceImageWithFallback } from '../trace/use-trace-worker-client';
 import { traceCliHelp } from './trace-cli-help';
 import { parseTraceCliArgs, TraceCliUsageError, type TraceCliOptions } from './trace-cli-options';
 import { traceCliSource, type TraceCliSource } from './trace-cli-source';
@@ -38,7 +40,12 @@ export async function runTraceCli(argv: ReadonlyArray<string>, io: TraceCliIo): 
     return TRACE_CLI_EXIT.ok;
   }
   try {
-    const text = await traceCliText(await io.readInput(options.input), options);
+    const { text, notices } = await traceCliText(await io.readInput(options.input), options);
+    // The app shows these as a toast beside the written file; here they are
+    // warnings on standard error, so standard output stays the file alone.
+    for (const notice of notices) {
+      io.writeError(`kerfdesk-trace: warning: ${traceNoticeMessage(notice)}\n`);
+    }
     if (text === null) {
       io.writeError('kerfdesk-trace: the trace found nothing to draw; no file written.\n');
       return TRACE_CLI_EXIT.empty;
@@ -51,13 +58,21 @@ export async function runTraceCli(argv: ReadonlyArray<string>, io: TraceCliIo): 
   }
 }
 
-/** The vector file text for one encoded image, or null when nothing traced. */
+export type TraceCliResult = {
+  /** The vector file text, or null when nothing traced. */
+  readonly text: string | null;
+  /** What the app would disclose about this trace, e.g. a relaxed-settings retry. */
+  readonly notices: ReadonlyArray<TraceNotice>;
+};
+
+/** The vector file text for one encoded image, and the trace's notices. */
 export async function traceCliText(
   bytes: Uint8Array,
   options: TraceCliOptions,
-): Promise<string | null> {
+): Promise<TraceCliResult> {
   if (bytes.length === 0) throw new Error('The input is empty.');
   const source = await traceCliSource(bytes, options.dpi);
+  const notices: TraceNotice[] = [];
   const result = await traceImagesToVectorFiles(
     [
       {
@@ -67,7 +82,18 @@ export async function traceCliText(
         options: traceCliTraceOptions(options, source),
       },
     ],
-    { writeDxf: tracedLayersToDxf, writeDrawing: writeTracedDrawing },
+    {
+      // Multi-File Trace's trace function: a first pass that finds nothing
+      // under aggressive preprocessing is retried with relaxed settings. With
+      // no Worker (Node) it traces in-thread.
+      trace: async (image, traceOptions) => {
+        const traced = await traceImageWithFallback(image, traceOptions);
+        notices.push(...(traced.notices ?? []));
+        return traced.paths;
+      },
+      writeDxf: tracedLayersToDxf,
+      writeDrawing: writeTracedDrawing,
+    },
     {
       format: options.format,
       precisionMm: options.precisionMm,
@@ -78,7 +104,7 @@ export async function traceCliText(
         : {}),
     },
   );
-  return result.files[0]?.text ?? null;
+  return { text: result.files[0]?.text ?? null, notices };
 }
 
 /** Preset plus overrides, merged as the Trace dialog merges them. */

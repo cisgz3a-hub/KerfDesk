@@ -28,6 +28,11 @@ export async function decodeRaster(bytes: Uint8Array): Promise<DecodedRaster> {
   if (format === 'bmp') return decodeBmp(bytes);
   if (format === 'pnm') return decodePnm(bytes);
   if (format === 'tiff') return decodeTiff(bytes);
+  // The app opens a GIF's first frame through the browser; this decoder set
+  // has no GIF reader, so say so rather than calling the file unrecognised.
+  if (String.fromCharCode(...bytes.subarray(0, 4)) === 'GIF8') {
+    throw new Error('GIF input is not supported; save the frame to trace as PNG.');
+  }
   throw new Error('Unrecognised image format: expected PNG, JPEG, BMP, TIFF or PBM/PGM/PPM.');
 }
 

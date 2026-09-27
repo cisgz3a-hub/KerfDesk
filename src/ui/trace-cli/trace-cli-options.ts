@@ -207,6 +207,9 @@ function applyOverrideFlag(
 ): boolean {
   const negated = name.startsWith('no-') ? FLAG_TO_KEY.get(name.slice(3)) : undefined;
   if (negated !== undefined && TRACE_OVERRIDE_RULES[negated].kind === 'boolean') {
+    if (inline !== undefined) {
+      throw new TraceCliUsageError(`--${name} takes no value; write --${name.slice(3)}=false.`);
+    }
     draft.overrides[negated] = false;
     return true;
   }
@@ -237,12 +240,14 @@ function refuseDetachedBoolean(name: string, inline: string | undefined, queue: 
   if (key === undefined || inline !== undefined) return;
   if (TRACE_OVERRIDE_RULES[key].kind !== 'boolean') return;
   const next = queue[0];
-  if (next === 'true' || next === 'false') {
+  if (next !== undefined && BOOLEAN_WORDS.has(next)) {
     throw new TraceCliUsageError(
       `--${name} takes no separate value; write --${name}=${next} or --no-${name}.`,
     );
   }
 }
+
+const BOOLEAN_WORDS: ReadonlySet<string> = new Set(['true', 'false', '1', '0']);
 
 function flagBool(name: string, text: string): boolean {
   if (text === 'true' || text === '1') return true;
@@ -314,7 +319,9 @@ function pageFit(text: string): TracedPageFit {
 }
 
 function dpiValue(text: string): ImageDensity {
-  const [x = '', y = x] = text.toLowerCase().split('x');
+  const parts = text.toLowerCase().split('x');
+  if (parts.length > 2) throw new TraceCliUsageError('--dpi takes <n> or <n>x<n>.');
+  const [x = '', y = x] = parts;
   const { min, max } = TRACE_CLI_DPI_RANGE;
   return { xDpi: numberIn('dpi', x, min, max), yDpi: numberIn('dpi', y, min, max) };
 }

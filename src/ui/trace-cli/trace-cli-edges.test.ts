@@ -72,6 +72,18 @@ describe('trace command edges (ADR-477)', () => {
     expect(parseTraceCliArgs(['--no-invert']).overrides.invert).toBe(false);
     const parsed = parseTraceCliArgs(['--invert', 'art.png']);
     expect(parsed).toMatchObject({ input: 'art.png', overrides: { invert: true } });
+    // flagBool reads 1 and 0 too, so a detached 1/0 is refused like true/false.
+    expect(() => parseTraceCliArgs(['--invert', '0'])).toThrow(/--invert=0 or --no-invert/);
+    expect(() => parseTraceCliArgs(['--invert', '1', 'x.png'])).toThrow(/--invert=1/);
+    // A negated switch takes no value: --no-invert=true must not read as off.
+    expect(() => parseTraceCliArgs(['--no-invert=true'])).toThrow(/--no-invert takes no value/);
+    expect(() => parseTraceCliArgs(['--no-invert=banana'])).toThrow(TraceCliUsageError);
+  });
+
+  it('refuses a --dpi with more than two parts', () => {
+    expect(() => parseTraceCliArgs(['--dpi', '300x600x7'])).toThrow(/--dpi takes <n> or <n>x<n>/);
+    expect(parseTraceCliArgs(['--dpi', '300x600']).dpi).toEqual({ xDpi: 300, yDpi: 600 });
+    expect(parseTraceCliArgs(['--dpi', '300']).dpi).toEqual({ xDpi: 300, yDpi: 300 });
   });
 
   it('prints every range and choice from the rules the parser checks', () => {

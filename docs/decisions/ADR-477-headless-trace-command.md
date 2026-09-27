@@ -18,8 +18,11 @@ output, and takes a backend and tracing parameters as flags.
 ### Decision
 
 1. **One pipeline.** `src/ui/trace-cli/run-trace-cli.ts` traces one image with
-   `traceImagesToVectorFiles` and the writers Multi-File Trace passes it
-   (`tracedLayersToDxf`, `writeTracedDrawing`), so for the same pixels, size and options SVG,
+   `traceImagesToVectorFiles`, the trace function Multi-File Trace passes it
+   (`traceImageWithFallback`: a first pass that finds nothing under aggressive preprocessing
+   is re-traced with relaxed settings; with no Worker under Node it runs in-thread) and the
+   same writers (`tracedLayersToDxf`, `writeTracedDrawing`). A relaxed-settings retry is
+   printed to standard error with the app's toast wording. So for the same pixels, size and options SVG,
    DXF, PDF, EPS and GeoJSON come out byte for byte as the app writes them (which pixels
    reach the tracer is point 3's and point 4's business). Output defaults are the Multi-File Trace dialog's:
    precision 0.001 mm, contours ungrouped, the image page (`--page artwork --margin <mm>` is
@@ -38,7 +41,10 @@ output, and takes a backend and tracing parameters as flags.
    depth, tRNS, Adam7; inflate through the web-standard `DecompressionStream`), JPEG through
    the decoder pdf.js already ships to the app (`pdfjs-dist`, Apache-2.0), BMP (palette,
    16/24/32-bit, bit fields), TIFF through the app's TIFF importer (`tiff`, MIT; first page,
-   oriented) and Potrace's Netpbm P1-P6. No dependency is added and none is GPL. The CLI then
+   oriented) and Potrace's Netpbm P1-P6. The app has no Netpbm import, so for PBM/PGM/PPM
+   "the same" means the trace an app import of the same pixels would give, not a file
+   Multi-File Trace can write. GIF, which the app opens at its first frame, has no decoder
+   here and is refused by name. No dependency is added and none is GPL. The CLI then
    prepares pixels as the import does: EXIF Orientation turns a JPEG upright, RGB is
    composited onto white with alpha kept, and the size in millimetres comes from the density
    Multi-File Trace reads (PNG pHYs, JPEG JFIF/EXIF, BMP, from the same 1 MiB header prefix
@@ -71,11 +77,13 @@ output, and takes a backend and tracing parameters as flags.
   `buildMultiFileTraceExports` (with its natural-size planning branch running) for Line
   Art, Smooth and Centerline on opaque synthetic PNGs, and for a PNG with a 300 dpi pHYs, a
   PNG whose transparent ground carries black RGB (traced by luma and with Trace
-  transparency) and a BMP with pixels-per-metre. It catches a drift in PNG/BMP decoding,
+  transparency), a BMP with pixels-per-metre, and sparse specks that the first pass drops
+  for three presets, so both sides must take the relaxed-settings retry. The app side keeps
+  its own trace function (`traceWithWorkerFallback`), not an injected one. It catches a drift in PNG/BMP decoding,
   embedded density, alpha compositing, option merge or writer defaults. It does not model
   the browser's decode: it hands the app side the straight-alpha pixels the PNG stores.
-- Exact parity holds for 8-bit sRGB PNG, BMP and Netpbm images up to 2048 px on the long
-  edge. Partly transparent pixels can differ by a unit from a browser decode, whose canvas
+- Exact parity holds for 8-bit sRGB PNG and BMP images up to 2048 px on the long edge
+  (Netpbm traces its pixels as point 3 says; Multi-File Trace cannot open it). Partly transparent pixels can differ by a unit from a browser decode, whose canvas
   premultiplies alpha; JPEG pixels differ as point 3 says, bounded by a test against a
   libjpeg-turbo reference decode (`decode-jpeg-reference.test.ts`); colour-managed images differ by their profile.
 - Start-up costs a few seconds while Vite transforms the source; batch many images from one

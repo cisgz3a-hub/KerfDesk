@@ -7,13 +7,16 @@
 // browser import composites them; the CLI path decodes the bytes itself from
 // standard input. The fixtures vary what the CLI must get right on its own:
 // PNG and BMP decoding, embedded density (none, PNG pHYs, BMP pixels per
-// metre), a transparent ground whose stored RGB is black, and Trace
-// transparency.
+// metre), a transparent ground whose stored RGB is black, Trace
+// transparency, and sparse specks whose first pass finds nothing, so both
+// sides must take the app's relaxed-settings retry. The app side keeps its
+// own trace function (traceWithWorkerFallback, in-thread under Node).
 
 import { createHash } from 'node:crypto';
 import { crc32, deflateSync } from 'node:zlib';
 import { describe, expect, it } from 'vitest';
 import { TRACE_PRESETS, traceImageToColoredPaths, type RawImageData } from '../../core/trace';
+import { traceNoticeMessage } from '../trace/trace-notices';
 import { DEFAULT_EXPORT_PRECISION_MM } from '../../core/vector-export/decimal-grid';
 import { runTraceCli } from '../trace-cli/run-trace-cli';
 import { compositeRgbOverWhitePreservingAlpha } from '../trace/image-loader';
@@ -55,6 +58,13 @@ const RING = synthetic(96, 80, ringInk);
 const DISC = synthetic(72, 72, (x, y) => Math.hypot(x - 36, y - 36) < 24);
 const ZIGZAG = synthetic(90, 60, (x, y) => Math.abs(((x / 15) % 2) * 20 + 15 - y) < 2.5);
 const CLEAR_RING = synthetic(96, 80, ringInk, CLEAR);
+// Four 2x2 dots on white: aggressive presets drop them on the first pass.
+const SPECKS = synthetic(
+  120,
+  90,
+  (x, y) =>
+    [20, 90].some((cx) => x >= cx && x < cx + 2) && [20, 60].some((cy) => y >= cy && y < cy + 2),
+);
 
 const DPI_300_PER_METRE = Math.round(300 / 0.0254);
 
@@ -133,14 +143,15 @@ type Case = {
   readonly cliFlags?: ReadonlyArray<string>;
 };
 
-async function appSvg(test: Case): Promise<string> {
+type Traced = { readonly text: string; readonly relaxed: boolean };
+
+async function appSvg(test: Case): Promise<Traced> {
   const preset = TRACE_PRESETS[test.preset];
   if (preset === undefined) throw new Error(`No preset ${test.preset}.`);
   const file = new File([new Uint8Array(test.bytes)], test.name);
   const batch = await buildMultiFileTraceExports([file], {
     loadImage: async () => compositeRgbOverWhitePreservingAlpha(test.image),
     readNaturalSize: async () => ({ width: test.image.width, height: test.image.height }),
-    trace: traceImageToColoredPaths,
     options: mergeLightBurnTraceSettings(preset, test.overrides ?? {}),
     output: {
       format: 'svg',
@@ -149,13 +160,14 @@ async function appSvg(test: Case): Promise<string> {
       ...tracePageOutput(DEFAULT_TRACE_PAGE_SETTINGS),
     },
   });
-  const text = batch.files[0]?.text;
-  if (text === undefined) throw new Error(`The app traced nothing for ${test.preset}.`);
-  return text;
+  const file0 = batch.files[0];
+  if (file0 === undefined) throw new Error(`The app traced nothing for ${test.preset}.`);
+  return { text: file0.text, relaxed: file0.notices?.includes('relaxed-settings') === true };
 }
 
-async function cliSvg(test: Case): Promise<string> {
+async function cliSvg(test: Case): Promise<Traced> {
   let out = '';
+  let errors = '';
   const argv = ['--preset', test.preset, '--format', 'svg', ...(test.cliFlags ?? []), '-'];
   const code = await runTraceCli(argv, {
     readInput: async (path) => {
@@ -166,11 +178,13 @@ async function cliSvg(test: Case): Promise<string> {
       out += text;
     },
     writeError: (text) => {
-      throw new Error(text);
+      errors += text;
     },
   });
-  expect(code).toBe(0);
-  return out;
+  expect(code, errors).toBe(0);
+  const relaxed = `kerfdesk-trace: warning: ${traceNoticeMessage('relaxed-settings')}\n`;
+  expect([relaxed, '']).toContain(errors);
+  return { text: out, relaxed: errors === relaxed };
 }
 
 const png = (preset: string, image: RawImageData): Case => ({
@@ -202,15 +216,28 @@ describe('trace command parity with the app (ADR-477)', () => {
         cliFlags: ['--trace-transparency'],
       },
     ],
-  ] as const)('writes the SVG the app writes for %s', { timeout: 60_000 }, async (_label, test) => {
+    ['Line Art, sparse specks after a relaxed retry', png('Line Art', SPECKS)],
+    ['Smooth, sparse specks after a relaxed retry', png('Smooth', SPECKS)],
+    ['Centerline, sparse specks after a relaxed retry', png('Centerline', SPECKS)],
+  ] as const)('writes the SVG the app writes for %s', { timeout: 60_000 }, async (label, test) => {
     const app = await appSvg(test);
     const cli = await cliSvg(test);
-    expect(app).toContain('<path');
-    expect(sha256(cli)).toBe(sha256(app));
+    expect(app.text).toContain('<path');
+    expect(sha256(cli.text)).toBe(sha256(app.text));
+    // Both sides disclose the same retry, and the specks cases do need it.
+    expect(cli.relaxed).toBe(app.relaxed);
+    expect(app.relaxed).toBe(label.includes('relaxed retry'));
+  });
+
+  it('proves the specks fixture is empty on a plain first pass', async () => {
+    const preset = TRACE_PRESETS['Line Art'];
+    if (preset === undefined) throw new Error('No Line Art preset.');
+    const first = await traceImageToColoredPaths(SPECKS, preset);
+    expect(first).toHaveLength(0);
   });
 
   it('sizes a pHYs fixture from its embedded density, not the 254 dpi default', async () => {
-    const svg = await cliSvg({
+    const { text: svg } = await cliSvg({
       ...png('Line Art', RING),
       bytes: encodePng(RING, DPI_300_PER_METRE),
     });
