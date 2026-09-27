@@ -9,7 +9,7 @@ import { keyboardJogDirection } from './jog-keyboard-map';
 // to ALSO jog the machine, so with the rail connected and a shape selected one
 // press both nudged the artwork and lurched the head across the bed (F104).
 // Keyboard machine jog therefore uses keys the canvas never binds: PageUp /
-// PageDown for Z focus, and LightBurn's Move-window keys for XY (ADR-483,
+// PageDown for Z focus, and LightBurn's Move-window keys for XY (ADR-493,
 // jog-keyboard-map.ts): Ctrl/Cmd+Alt+[ / ] and Ctrl/Cmd+Shift+] / [, and the
 // keypad digits with NumLock on.
 const FOCUS_JOG_KEYS: Readonly<Record<string, 1 | -1>> = {
@@ -43,7 +43,7 @@ export function installJogShortcuts(target: Window, args: JogShortcutArgs): () =
       return;
     }
     // XY keys are one step per press, like the jog pad's arrow click, and the
-    // vector is built exactly as the arrow's (ADR-483): same physical
+    // vector is built exactly as the arrow's (ADR-493): same physical
     // direction, origin signs, step, and clamped feed.
     const direction = keyboardJogDirection(event);
     if (direction === null || args.xyDisabled()) return;

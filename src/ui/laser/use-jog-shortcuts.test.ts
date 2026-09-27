@@ -4,7 +4,7 @@
 // 2026-09-23, ui-panel-3). The oracle is whether a jog was requested and
 // whether the browser's own scrolling was left alone.
 //
-// XY keyboard jog (LightBurn gap LBG-M07, ADR-483) uses LightBurn's Move-window
+// XY keyboard jog (LightBurn gap LBG-M07, ADR-493) uses LightBurn's Move-window
 // keys. The oracle is the machine vector the key asks for: it must be the one
 // the jog pad's matching arrow sends, for a front-left and a mirrored
 // (rear-right) origin. Bare arrows, and the arrows a NumLock-off keypad sends,
@@ -225,7 +225,7 @@ function numpad(digit: string): KeyboardEventInit {
   return { key: digit, code: `Numpad${digit}` };
 }
 
-describe('keyboard XY jog (ADR-483)', () => {
+describe('keyboard XY jog (ADR-493)', () => {
   it.each(XY_KEYS)('$name jogs one step on a front-left machine', ({ init, frontLeft }) => {
     const { onXyJog, onFocusJog, uninstall } = install({ xyStep: FRONT_LEFT });
     cleanup = uninstall;

@@ -1,4 +1,4 @@
-// ADR-483: the laser finish position and saved head positions are optional
+// ADR-493: the laser finish position and saved head positions are optional
 // DeviceProfile fields. They round-trip through a project file without a schema
 // bump, stay absent when unset, and malformed values are rejected on load.
 import { describe, expect, it } from 'vitest';
@@ -25,7 +25,7 @@ function reason(text: string): string | null {
   return result.kind === 'invalid' ? result.reason : null;
 }
 
-describe('project head positions (ADR-483)', () => {
+describe('project head positions (ADR-493)', () => {
   it('round-trips a bed finish position and saved positions', () => {
     const project = createProject({
       ...DEFAULT_DEVICE_PROFILE,

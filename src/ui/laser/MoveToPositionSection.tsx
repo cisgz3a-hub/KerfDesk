@@ -1,5 +1,5 @@
 // MoveToPositionSection — typed Move-to and saved head positions (LightBurn gap
-// LBG-M02, ADR-483). LightBurn's Move window takes absolute machine numbers;
+// LBG-M02, ADR-493). LightBurn's Move window takes absolute machine numbers;
 // here the operator picks the frame they already read on screen: Canvas (the
 // rulers and X/Y boxes, so it lands where an Absolute job burns that point) or
 // From origin (work coordinates, the numbers in the job's G-code, which need
@@ -114,7 +114,7 @@ function frameZero(frame: SavedPositionFrame, device: DeviceProfile): Vec2 {
   return frame === 'bed' ? toSceneCoords({ x: 0, y: 0 }, device) : { x: 0, y: 0 };
 }
 
-// LightBurn's Set Finish Position (ADR-483): laser jobs end at this canvas
+// LightBurn's Set Finish Position (ADR-493): laser jobs end at this canvas
 // point. The finish is stored in canvas coordinates, so a From origin position,
 // whose place on the bed depends on the current work offset, cannot be used.
 function SetFinishButton(props: {

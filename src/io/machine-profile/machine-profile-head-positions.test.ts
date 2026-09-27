@@ -1,4 +1,4 @@
-// ADR-483: a machine-profile export carries the laser finish position and the
+// ADR-493: a machine-profile export carries the laser finish position and the
 // saved head positions, import validates them with the rules project load
 // uses, and a profile that never set them exports without them.
 import { describe, expect, it } from 'vitest';
@@ -34,7 +34,7 @@ function importReason(patch: Record<string, unknown>): string | null {
   return result.kind === 'invalid' ? result.reason : null;
 }
 
-describe('machine profile head positions (ADR-483)', () => {
+describe('machine profile head positions (ADR-493)', () => {
   it('exports and re-imports the finish position and saved positions', () => {
     const profile: DeviceProfile = {
       ...DEFAULT_DEVICE_PROFILE,

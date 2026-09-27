@@ -1,4 +1,4 @@
-## ADR-483 - Machine-moving tools from the LightBurn gap list, batch 6 (2026-09-27)
+## ADR-493 - Machine-moving tools from the LightBurn gap list, batch 6 (2026-09-27)
 
 **Status:** Accepted. | **Date:** 2026-09-27
 

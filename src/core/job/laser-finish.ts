@@ -1,4 +1,4 @@
-// Laser finish position (LightBurn gap LBG-M02, ADR-483). Machine Setup's
+// Laser finish position (LightBurn gap LBG-M02, ADR-493). Machine Setup's
 // "After a job" choice is placed onto the prepared laser job here, once, so
 // emission, the preview, the estimate and Job Review all read the same result
 // (finishOptionsForJob in core/output). A `bed` finish is a canvas position: it

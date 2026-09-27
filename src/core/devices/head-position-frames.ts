@@ -1,5 +1,5 @@
 // head-position-frames — the two coordinate frames a typed or saved head
-// position can use (LightBurn gap LBG-M02 / LBG-T15, ADR-483), and their exact
+// position can use (LightBurn gap LBG-M02 / LBG-T15, ADR-493), and their exact
 // mapping to and from the controller's native machine position (MPos).
 //
 // `bed` is canvas coordinates: the scene millimetres the rulers and the X/Y

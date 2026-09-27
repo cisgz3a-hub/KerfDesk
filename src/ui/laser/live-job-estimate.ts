@@ -157,7 +157,7 @@ export function estimateLiveJobFromPrepared(
   const jobStart =
     jobOrigin?.startFrom === 'current-position' ? jobOrigin.currentPosition : undefined;
   // Where the head ends comes from the one finish source emission uses
-  // (ADR-483). Placement controls the job's coordinates, while the physical
+  // (ADR-493). Placement controls the job's coordinates, while the physical
   // head may begin elsewhere in any placement mode.
   const { finishPosition } = finishOptionsForJob(prepared.job, jobOrigin);
   const initialPosition = options.initialPosition ?? jobStart;

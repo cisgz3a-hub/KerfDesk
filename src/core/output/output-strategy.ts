@@ -36,7 +36,7 @@ export function finishOptionsForJobOrigin(
 }
 
 /**
- * The one source of a job's finish options (ADR-483). Emission, byte-identity
+ * The one source of a job's finish options (ADR-493). Emission, byte-identity
  * re-emission, the preview, the estimate and Job Review's park target all call
  * this with the prepared job, so none of them can disagree about the final move.
  * A laser finish placed by preparation wins: `stay` omits the park in every

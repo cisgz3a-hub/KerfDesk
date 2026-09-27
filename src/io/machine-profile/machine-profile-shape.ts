@@ -75,7 +75,7 @@ function validateLaserOutputFields(value: Record<string, unknown>): string | nul
   return validateLaserFireControl(value['fireControl']) ?? validateHeadPositions(value);
 }
 
-// ADR-483: the same guards project load uses.
+// ADR-493: the same guards project load uses.
 function validateHeadPositions(value: Record<string, unknown>): string | null {
   const finish = value['laserFinishPosition'];
   if (finish !== undefined && !isLaserFinishPosition(finish)) {

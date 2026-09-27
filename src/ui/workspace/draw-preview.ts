@@ -272,7 +272,7 @@ function previewStartPoint(jobOrigin: JobOriginPlacement | undefined): Vec2 {
   return jobOrigin?.startFrom === 'current-position' ? jobOrigin.currentPosition : { x: 0, y: 0 };
 }
 
-// The laser park comes from the one finish source emission uses (ADR-483), so
+// The laser park comes from the one finish source emission uses (ADR-493), so
 // the drawn final move is the emitted one.
 function previewParkPoint(
   project: Project,

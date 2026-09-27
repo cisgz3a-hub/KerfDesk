@@ -1,4 +1,4 @@
-// Keyboard XY jog wiring (LightBurn gap LBG-M07, ADR-483). The jog pad installs
+// Keyboard XY jog wiring (LightBurn gap LBG-M07, ADR-493). The jog pad installs
 // the keys while it is mounted, so the oracle is what the pad sends through the
 // store's jog action: the SAME vector its matching on-screen arrow sends (origin
 // signs, step, clamped feed), nothing while the pad is disabled or unmounted,
@@ -94,7 +94,7 @@ afterEach(() => {
   useToastStore.setState({ toasts: [] });
 });
 
-describe('JogPad keyboard XY jog (ADR-483)', () => {
+describe('JogPad keyboard XY jog (ADR-493)', () => {
   it('sends exactly what the matching arrow sends on a rear-right machine', async () => {
     const jog = vi.fn(async () => undefined);
     useLaserStore.setState({ jog });

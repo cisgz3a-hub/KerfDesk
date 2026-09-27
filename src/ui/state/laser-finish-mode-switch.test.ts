@@ -1,4 +1,4 @@
-// ADR-483 with ADR-416: the laser finish position and saved head positions are
+// ADR-493 with ADR-416: the laser finish position and saved head positions are
 // machine fields on the shared DeviceProfile, not per-head settings, so a trip
 // through CNC mode and back keeps them.
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';

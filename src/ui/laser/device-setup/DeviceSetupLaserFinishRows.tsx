@@ -1,4 +1,4 @@
-// "After a job" for laser output (LightBurn gap LBG-M02, ADR-483). The default
+// "After a job" for laser output (LightBurn gap LBG-M02, ADR-493). The default
 // is no stored value, so a profile that never touches this keeps today's
 // output. A bed position is typed in canvas coordinates, the numbers the rulers
 // show, like every other head position in the app; preparation places it on

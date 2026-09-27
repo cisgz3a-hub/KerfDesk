@@ -236,7 +236,7 @@ const DESCRIPTIVE_DEVICE_FIELDS: ReadonlySet<keyof DeviceProfile> = new Set([
   'profileSource',
   'catalogVersion',
   'evidence',
-  // Saved head positions (ADR-483) are only read by the Move to position panel;
+  // Saved head positions (ADR-493) are only read by the Move to position panel;
   // saving one after Frame must not expire a permit whose program is unchanged.
   'savedPositions',
 ]);

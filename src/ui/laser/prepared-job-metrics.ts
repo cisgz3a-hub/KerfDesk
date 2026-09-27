@@ -43,7 +43,7 @@ export function buildPreparedJobMetrics(
   const device = prepared.project.device;
   const machineKind = machineKindOf(prepared.project.machine);
   // The head starts at a Current Position job's start; where it ends comes from
-  // the one finish source emission uses (ADR-483), so the Time tile and the
+  // the one finish source emission uses (ADR-493), so the Time tile and the
   // park disclosure describe the exact final move.
   const initialPosition =
     jobOrigin?.startFrom === 'current-position' ? jobOrigin.currentPosition : undefined;

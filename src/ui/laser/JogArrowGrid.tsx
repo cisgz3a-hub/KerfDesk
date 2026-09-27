@@ -61,7 +61,7 @@ function JogArrowButton(
 ): JSX.Element {
   const stepVector = stepJogVector(props.direction, props.stepMm, props.signs, props.feed);
   const label = jogVectorLabel(stepVector, props.stepMm);
-  // The tooltip names this arrow's keyboard keys (ADR-483); the accessible name
+  // The tooltip names this arrow's keyboard keys (ADR-493); the accessible name
   // stays the wire command.
   const hinted = `${label} (${keyboardJogHint(props.direction)})`;
   const handlers = useHoldJog({

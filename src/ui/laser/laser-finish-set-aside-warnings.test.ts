@@ -1,4 +1,4 @@
-// ADR-483: Job Review's note for a laser finish position preparation set aside.
+// ADR-493: Job Review's note for a laser finish position preparation set aside.
 import { describe, expect, it } from 'vitest';
 import { DEFAULT_DEVICE_PROFILE } from '../../core/devices';
 import { createProject, type Project } from '../../core/scene';

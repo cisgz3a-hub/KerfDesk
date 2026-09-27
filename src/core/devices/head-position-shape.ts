@@ -1,5 +1,5 @@
 // Shape rules for the optional head-position fields of a DeviceProfile
-// (LightBurn gap LBG-M02, ADR-483): the laser finish position and the saved
+// (LightBurn gap LBG-M02, ADR-493): the laser finish position and the saved
 // head positions. Project load and machine-profile import both use these
 // guards so a file cannot pass one and fail the other, and export copies the
 // fields through canonicalHeadPositions so nothing unexpected rides along.

@@ -1,4 +1,4 @@
-// ADR-483 (LightBurn gap LBG-M02): the laser finish position is placed on the
+// ADR-493 (LightBurn gap LBG-M02): the laser finish position is placed on the
 // prepared job once, and finishOptionsForJob is the one reader.
 import { describe, expect, it } from 'vitest';
 import { DEFAULT_DEVICE_PROFILE, type DeviceProfile } from '../devices';

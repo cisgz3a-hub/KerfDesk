@@ -1,4 +1,4 @@
-// ADR-483 (LightBurn gap LBG-M02): the laser finish position, end to end. Each
+// ADR-493 (LightBurn gap LBG-M02): the laser finish position, end to end. Each
 // case runs the real placement resolution, preparation and emission, then
 // checks that the G-code's last move, Job Review's park target and park note,
 // the preview's final travel and the estimate all describe the same move. The
@@ -162,7 +162,7 @@ function runWorkflow(project: Project, mode: Mode) {
   return { prepared, gcode, park, notes, previewEnd };
 }
 
-describe('laser finish position, whole workflow (ADR-483)', () => {
+describe('laser finish position, whole workflow (ADR-493)', () => {
   it('Absolute with zero WCO: canvas Y 0 (the back edge) ends at machine Y = bed height', () => {
     const project = laserProject(BED_FINISH);
     const run = runWorkflow(project, { options: {} });
@@ -271,7 +271,7 @@ describe('laser finish position absent: byte-identical to the placement default'
   it.each(modes)('%s', (_label, mode) => {
     const run = runWorkflow(project, mode);
     expect('laserFinish' in run.prepared.job).toBe(false);
-    // The pre-ADR-483 call: the placement's own finish options on the same job.
+    // The pre-ADR-493 call: the placement's own finish options on the same job.
     const legacy = selectOutputStrategy(project.device).emit(
       run.prepared.job,
       project.device,

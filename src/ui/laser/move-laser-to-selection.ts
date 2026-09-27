@@ -1,4 +1,4 @@
-// Move laser to selection (LightBurn gap LBG-T15, ADR-483). The anchor of the
+// Move laser to selection (LightBurn gap LBG-T15, ADR-493). The anchor of the
 // selection's world bounds is a canvas point, so the head goes where an
 // Absolute job burns it. In User Origin, Verified Origin and Current Position
 // the job is placed from the origin when it is prepared, so a canvas point has

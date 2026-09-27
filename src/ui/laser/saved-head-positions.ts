@@ -1,4 +1,4 @@
-// Saved head positions list edits (ADR-483). Names are the key: saving under a
+// Saved head positions list edits (ADR-493). Names are the key: saving under a
 // name that exists replaces that entry in place, so "Corner stop" can be
 // re-taught without a duplicate. A blank name gets the next "Position N".
 

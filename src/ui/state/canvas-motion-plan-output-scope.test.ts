@@ -35,8 +35,8 @@ describe('canvasPlanRetentionKey output scope (ADR-327)', () => {
   });
 });
 
-// Saved head positions (ADR-483) never reach the program; the finish position does.
-describe('canvasPlanRetentionKey head positions (ADR-483)', () => {
+// Saved head positions (ADR-493) never reach the program; the finish position does.
+describe('canvasPlanRetentionKey head positions (ADR-493)', () => {
   const placement = { startFrom: 'absolute' as const, anchor: 'front-left' as const };
 
   it('ignores a saved head position but keys on the laser finish position', () => {

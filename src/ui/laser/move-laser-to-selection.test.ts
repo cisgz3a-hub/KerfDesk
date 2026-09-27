@@ -1,4 +1,4 @@
-// Move laser to selection and the shared head-move dispatcher (ADR-483). The
+// Move laser to selection and the shared head-move dispatcher (ADR-493). The
 // jog itself is the laser store's machine-position jog; these tests pin where
 // it is asked to go and when nothing is sent.
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';

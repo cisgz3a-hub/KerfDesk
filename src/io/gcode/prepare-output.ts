@@ -55,7 +55,7 @@ export type PrepareOutputOptions = {
    * Relative placement modes already choose their own work-coordinate target. */
   readonly absoluteProgramOffset?: Vec2;
   /** Known bed position of program zero for a placed (non-Absolute) job. A
-   * configured CNC park (ADR-392) and a laser finish position (ADR-483) are
+   * configured CNC park (ADR-392) and a laser finish position (ADR-493) are
    * bed positions: without this they cannot be placed, so the default applies. */
   readonly workZeroBedPosition?: Vec2;
 };
@@ -192,7 +192,7 @@ export function completePreparedOutput(
         ? offsetJobBounds(contourEntryBoundsForDevice(input.project.device), offset)
         : null;
   // One bed-to-program translation places both the CNC park (ADR-392) and the
-  // laser finish position (ADR-483); each machine kind ignores the other's.
+  // laser finish position (ADR-493); each machine kind ignores the other's.
   const bedToProgram = bedToProgramTranslation(input.options, offset);
   const placed = withContourEntryBounds(
     placeLaserFinish(
@@ -230,7 +230,7 @@ function compileForMachine(project: Project): CncJobCompilationResult {
 }
 
 // Absolute artwork is in bed numbers, so a bed position (CNC park, ADR-392;
-// laser finish, ADR-483) takes the cuts' own bed-to-program offset. A placed
+// laser finish, ADR-493) takes the cuts' own bed-to-program offset. A placed
 // job's offset only moves the artwork's anchor to its target; a bed position
 // needs where program zero sits on the bed. Null: unknown, never guessed.
 function bedToProgramTranslation(options: PrepareOutputOptions, offset: Vec2): Vec2 | null {

@@ -5,7 +5,7 @@
 // controller's jog-cancel command. Bare arrow keys nudge the selected canvas
 // object and no longer jog the machine (F104). The pad owns the keyboard jog
 // keys while it is mounted: PageUp/PageDown for Z focus, and LightBurn's XY
-// keys (ADR-483), which send the same step vector as the matching arrow.
+// keys (ADR-493), which send the same step vector as the matching arrow.
 
 import { useCallback, useMemo, useState } from 'react';
 import {
@@ -150,7 +150,7 @@ function nativeTravel(bounds: NativeXyBounds): MachineBounds {
 }
 
 // Keyboard jog is live only while the pad is mounted. An XY key sends the pad's
-// own step vector (ADR-483), so it is disabled exactly when the arrows are.
+// own step vector (ADR-493), so it is disabled exactly when the arrows are.
 function useJogPadShortcuts(pad: {
   readonly disabled: boolean;
   readonly focusReady: boolean;

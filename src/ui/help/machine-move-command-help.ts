@@ -1,7 +1,7 @@
 import type { MachineMoveCommandId } from '../commands/machine-move-command-types';
 import type { CommandHelpTopic } from './command-help-topics';
 
-// Move laser to selection (LightBurn gap LBG-T15, ADR-483).
+// Move laser to selection (LightBurn gap LBG-T15, ADR-493).
 const WHERE: Readonly<Record<MachineMoveCommandId, string>> = {
   'arrange.move-laser-to-selection-center': 'the centre of the selection',
   'arrange.move-laser-to-selection-nw': 'the top-left corner of the selection',

@@ -413,11 +413,11 @@ export type Job = {
   } | null;
   readonly diagnostics?: ReadonlyArray<JobDiagnostic>;
   readonly cncCompilation?: CncCompilationSidecar;
-  /** Laser finish placed by preparation (ADR-483). Absent keeps the default. */
+  /** Laser finish placed by preparation (ADR-493). Absent keeps the default. */
   readonly laserFinish?: JobLaserFinish;
 };
 
-/** Where a laser job leaves the head (ADR-483): `point` is in this job's program
+/** Where a laser job leaves the head (ADR-493): `point` is in this job's program
  * coordinates; `set-aside` is a configured bed finish that could not be placed,
  * so the default applies and Job Review says why. */
 export type JobLaserFinish =

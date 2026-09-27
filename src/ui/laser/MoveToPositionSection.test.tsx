@@ -1,4 +1,4 @@
-// Typed Move-to and saved head positions (LightBurn gap LBG-M02, ADR-483),
+// Typed Move-to and saved head positions (LightBurn gap LBG-M02, ADR-493),
 // driven through the rendered section: what the store's machine-position jog
 // is asked for, and what the machine profile keeps.
 import { act } from 'react';

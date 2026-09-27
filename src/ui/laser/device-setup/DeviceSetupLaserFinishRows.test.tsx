@@ -1,4 +1,4 @@
-// ADR-483 (LightBurn gap LBG-M02): Machine Setup's laser step offers "After a
+// ADR-493 (LightBurn gap LBG-M02): Machine Setup's laser step offers "After a
 // job" with three choices. The default stores nothing, stay stores `stay`, and
 // a bed position is typed in canvas coordinates. The harness runs the real
 // Machine Setup reducer and the profile Save would write.
@@ -52,7 +52,7 @@ function canvasField(axis: 'X' | 'Y'): HTMLInputElement | null {
   return host.querySelector<HTMLInputElement>(`input[aria-label="${axis} on the canvas"]`);
 }
 
-describe('Machine Setup: after a laser job (ADR-483)', () => {
+describe('Machine Setup: after a laser job (ADR-493)', () => {
   it('defaults to the work origin and stores nothing', () => {
     render();
 

@@ -151,7 +151,7 @@ export function optionalLaserFireControl(
   return requireBoolean(value, `${path}.enabled`);
 }
 
-/** The laser finish position and saved head positions (ADR-483). */
+/** The laser finish position and saved head positions (ADR-493). */
 export function optionalHeadPositions(obj: Record<string, unknown>, path: string): string | null {
   const finish = obj['laserFinishPosition'];
   if (finish !== undefined && !isLaserFinishPosition(finish)) {

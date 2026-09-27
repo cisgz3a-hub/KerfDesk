@@ -1,4 +1,4 @@
-// Machine Setup's laser finish position is a canvas position (ADR-483). When
+// Machine Setup's laser finish position is a canvas position (ADR-493). When
 // preparation cannot place it on this job (where the job sits on the bed is
 // unknown, or the rotary turns Y into rotation), it is set aside and the job
 // ends where it would without one. Job Review says so rather than leaving the

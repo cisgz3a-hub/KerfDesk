@@ -426,7 +426,7 @@ destination and cannot overwrite the template source.
   selection is kept.
 - No shortcut: LightBurn's `P` is KerfDesk's Preview.
 
-#### Move laser to selection — menu (ADR-483)
+#### Move laser to selection — menu (ADR-493)
 - `Arrange → Move laser to selection` → **Center**, **Top Left**, **Top**, **Top Right**, **Left**,
   **Right**, **Bottom Left**, **Bottom**, **Bottom Right** of the selection's bounds.
 - The head moves there with the beam off, at the jog pad's speed, through the same machine-position
@@ -1162,7 +1162,7 @@ Mac uses `Cmd`, Windows/Linux web uses `Ctrl`.
 - `PageUp` / `PageDown` — Jog Z. When a scrolling list, tab panel or the Artwork panel has focus,
   the keys scroll it instead (ADR-362).
 - `Cmd/Ctrl+Shift+]` / `Cmd/Ctrl+Shift+[` — Jog up / down one step; `Cmd/Ctrl+Alt+[` /
-  `Cmd/Ctrl+Alt+]` — Jog left / right one step (LightBurn's Move-window keys, ADR-483).
+  `Cmd/Ctrl+Alt+]` — Jog left / right one step (LightBurn's Move-window keys, ADR-493).
   Numpad `8`/`2`/`4`/`6` jog the same way and `7`/`9`/`1`/`3` diagonally, only with Num Lock on:
   with Num Lock off the keypad sends arrow keys, which nudge the selected artwork and never move
   the machine. Directions, step and speed are exactly the jog pad arrows'. Like the Z keys, they
@@ -3134,7 +3134,7 @@ homing direction or change work zero. Home uses the selected controller's comman
 (for example, generic GRBL `$H`, or the Falcon A1 Pro's `$HX` then `$HY`); firmware determines
 the physical direction. **Go to work zero** is a separate movement to the workpiece reference.
 
-**Move to position** (under the jog pad, ADR-483) moves the head, beam off, to typed X and Y.
+**Move to position** (under the jog pad, ADR-493) moves the head, beam off, to typed X and Y.
 **Coordinates** picks the frame: **Canvas** is the numbers on the rulers, the spot where an
 Absolute job burns that point (as Move laser to selection); **From origin** is millimetres from
 the work origin, the numbers in the job's G-code, and needs no homing (MPos = work position +
@@ -3146,7 +3146,7 @@ travels with the profile and the project and is one undo step. Each saved row ha
 **Delete**. Go needs a connected, Idle machine, like the jog arrows; a missing work offset for a
 From origin move is a notice and nothing moves.
 
-**After a job** (Machine Setup's laser step, ADR-483; LightBurn's Finish Position) sets where a laser
+**After a job** (Machine Setup's laser step, ADR-493; LightBurn's Finish Position) sets where a laser
 job leaves the head: **Go to the work origin** (the default, which stores nothing; a Current
 Position job still returns to its start), **Stay where the job ends** (no park move in any mode),
 or **Go to a bed position**, given in canvas coordinates as on the rulers; it starts on machine X0

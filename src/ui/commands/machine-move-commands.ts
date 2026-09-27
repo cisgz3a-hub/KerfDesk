@@ -1,4 +1,4 @@
-// Move laser to selection (LightBurn gap LBG-T15, ADR-483): nine Arrange
+// Move laser to selection (LightBurn gap LBG-T15, ADR-493): nine Arrange
 // commands that send the head, beam off, to the centre, a corner or an edge
 // midpoint of the selection. The command only needs a selection; connection,
 // Idle, bed mapping and job placement are checked when it runs and explained

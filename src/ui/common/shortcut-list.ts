@@ -20,7 +20,7 @@ export type ShortcutFamily = {
 };
 
 // Keyboard jog, live while the jog pad is shown and enabled: Z focus on the
-// Page keys, XY on LightBurn's Move-window keys (ADR-483, jog-keyboard-map.ts).
+// Page keys, XY on LightBurn's Move-window keys (ADR-493, jog-keyboard-map.ts).
 const JOG_SHORTCUT_ROWS: ReadonlyArray<ShortcutRow> = [
   { keys: 'PageUp/PageDown', action: 'jog Z (focus) up/down one step' },
   { keys: 'Ctrl+Shift+] / Ctrl+Shift+[', action: 'jog up/down one step, like the jog arrows' },

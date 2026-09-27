@@ -1,5 +1,5 @@
 // The AppCommandContext slice for the machine-moving LightBurn gap commands
-// (LBG-T15, ADR-483), kept in its own file so command-types.ts stays inside
+// (LBG-T15, ADR-493), kept in its own file so command-types.ts stays inside
 // the size cap.
 
 import type { SelectionAnchor } from '../../core/scene';

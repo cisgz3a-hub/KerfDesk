@@ -1,4 +1,4 @@
-// Keyboard XY jog keys (LightBurn gap LBG-M07, ADR-483).
+// Keyboard XY jog keys (LightBurn gap LBG-M07, ADR-493).
 //
 // LightBurn's Move window binds XY jog to Ctrl/Cmd + a bracket, with Alt for
 // left/right and Shift for up/down, plus the numeric keypad while NumLock is

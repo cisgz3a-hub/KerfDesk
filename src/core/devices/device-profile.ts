@@ -112,7 +112,7 @@ export type NoGoZone = {
 };
 
 /**
- * Where a laser job leaves the head (LightBurn gap LBG-M02, ADR-483). Absent
+ * Where a laser job leaves the head (LightBurn gap LBG-M02, ADR-493). Absent
  * keeps the dialect default: work X0 Y0, or the start for a Current Position
  * job. `stay` ends where the last burn ended. `bed` is a canvas position (scene
  * mm, as on the rulers: top-left origin, +Y down) that preparation moves into
@@ -124,11 +124,11 @@ export type LaserFinishPosition =
   | { readonly kind: 'stay' }
   | { readonly kind: 'bed'; readonly xMm: number; readonly yMm: number };
 
-/** Which coordinates a saved head position uses (ADR-483). */
+/** Which coordinates a saved head position uses (ADR-493). */
 export type SavedPositionFrame = 'bed' | 'origin';
 
 /**
- * A named head position the operator can return to (ADR-483). `bed` positions
+ * A named head position the operator can return to (ADR-493). `bed` positions
  * are canvas coordinates and need a verified bed mapping; `origin` positions
  * are measured from the work origin, so they work without homing.
  */
@@ -325,7 +325,7 @@ export type DeviceProfile = {
   // intentionally unsupported; users need one firmware command/macro from
   // their controller documentation. Empty disables Auto-focus.
   readonly autofocusCommand: string;
-  // `undefined` lets a Machine Setup patch return to the default (ADR-483).
+  // `undefined` lets a Machine Setup patch return to the default (ADR-493).
   readonly laserFinishPosition?: LaserFinishPosition | undefined;
   readonly savedPositions?: ReadonlyArray<SavedHeadPosition>;
 };

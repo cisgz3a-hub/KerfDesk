@@ -1,5 +1,5 @@
 // head-move-dispatch — send the head to a typed, saved or selection position
-// (LightBurn gaps LBG-T15 and LBG-M02, ADR-483). One path for all three: the
+// (LightBurn gaps LBG-T15 and LBG-M02, ADR-493). One path for all three: the
 // position resolves to native MPos through head-position-frames, then goes out
 // as the laser store's beam-off machine-position jog, which already handles the
 // work-offset delta, CNC safe Z, the Frame permit and the configured-bounds and

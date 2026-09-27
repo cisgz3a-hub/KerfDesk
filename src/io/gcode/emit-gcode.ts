@@ -146,7 +146,7 @@ export function emitPreparedGcodeWithCncPassSpans(
   // projects pick their controller dialect via the ADR-094 driver seam. Both
   // receive the current-position finish so a head-relative job parks back at
   // its own start instead of rapiding to work zero (arbitrary on no-homing),
-  // unless preparation placed a laser finish position (ADR-483).
+  // unless preparation placed a laser finish position (ADR-493).
   const finish = finishOptionsForJob(job, options.jobOrigin);
   const emission = materializeProgram(() => {
     const cnc =
