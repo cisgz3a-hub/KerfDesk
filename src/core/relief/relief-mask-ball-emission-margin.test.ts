@@ -27,7 +27,7 @@ const TRANSFORM: Transform = {
   rotationDeg: 37,
 };
 // Beside the mask the tip stands the stock tolerance above the exact one
-// (ADR-482): -0.0158 raised to -0.0138.
+// (ADR-484): -0.0158 raised to -0.0138.
 const EXPECTED_CUT_PREFIX = 'G1X20.217Y11.541Z-0.014';
 
 describe('ball-nose relief mask margin after emitted-coordinate rounding', () => {

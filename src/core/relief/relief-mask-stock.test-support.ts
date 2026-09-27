@@ -1,4 +1,4 @@
-// Test support (ADR-482): excluded stock checked one excluded cell at a time,
+// Test support (ADR-484): excluded stock checked one excluded cell at a time,
 // and random masked maps.
 import fc from 'fast-check';
 import { CNC_MASK_EMISSION_Z_CLEARANCE_MM } from '../cnc/precision';

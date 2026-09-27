@@ -35,7 +35,7 @@ describe('relief finishing mask sweep safety', () => {
       scallopMm: 0.025,
     });
 
-    // ADR-482: one stay-down row, not a plunge per sample near the mask.
+    // ADR-484: one stay-down row, not a plunge per sample near the mask.
     expect(passes.filter((pass) => !isVerticalPass(pass))).toHaveLength(1);
     expect(passes.filter(isVerticalPass)).toHaveLength(0);
     expectMaskedPassesSafe(map, tool, passes);
@@ -55,7 +55,7 @@ describe('relief finishing mask sweep safety', () => {
     const kernel = kernelForTool(tool, map.mmPerCell);
     const passes = reliefFinishingPasses(map, { tool, kernel, scallopMm: 0.025 });
 
-    // ADR-482: every row and every lone edge sample on one pass, the links
+    // ADR-484: every row and every lone edge sample on one pass, the links
     // between them checked against the stock like the rows.
     expect(passes).toHaveLength(1);
     expect(passes.filter(isVerticalPass)).toHaveLength(0);

@@ -1,4 +1,4 @@
-## ADR-482 - Masked reliefs finish like unmasked ones: waterline round the excluded stock, linked stay-down rows (2026-09-27)
+## ADR-484 - Masked reliefs finish like unmasked ones: waterline round the excluded stock, linked stay-down rows (2026-09-27)
 
 **Status:** Accepted; software-verified through unit, property, compile and removal-simulation
 tests, hardware qualification pending. | **Date:** 2026-09-27

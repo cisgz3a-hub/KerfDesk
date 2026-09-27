@@ -87,7 +87,7 @@ export type GcodeMetadata = {
  * exact-contact checks exceed the normal-to-move tolerance, with finite
  * sampling and output-rounding limits retained, and ADR-462's best-effort
  * air repeats at eligible boundaries, with full-circle/large-arc timing
- * and unchanged M3 dark-transition ordering, and ADR-482's masked relief
+ * and unchanged M3 dark-transition ordering, and ADR-484's masked relief
  * finishing: waterline round the excluded stock, rows linked across short
  * gaps, and every move kept out of that stock.
  */

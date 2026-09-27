@@ -19,7 +19,7 @@
 //
 // A masked relief gets waterline passes too: they circle its excluded stock
 // like any other wall, the foot of which its raster leaves wherever the mask
-// edge runs along the rows (ADR-482).
+// edge runs along the rows (ADR-484).
 //
 // Every move of every strategy is then checked against the exact contact
 // between its vertices (ADR-421 Amendment 1, relief-finishing-contact.ts).

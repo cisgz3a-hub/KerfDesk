@@ -1,4 +1,4 @@
-// One straight move against one excluded block (ADR-482).
+// One straight move against one excluded block (ADR-484).
 //
 // A block is an excluded cell's rectangle, standing `top` high, which the
 // cutter keeps `clearanceMm` off in XY. Along a straight move the distance

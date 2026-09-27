@@ -1,4 +1,4 @@
-// Excluded stock as a cutter centred anywhere meets it (ADR-482).
+// Excluded stock as a cutter centred anywhere meets it (ADR-484).
 //
 // A mask that excludes cells leaves their stock uncut. The dilation protects
 // it at sample centres (heightmap-tool-offset.ts): every excluded cell is a

@@ -152,7 +152,7 @@ describe('reliefFinishingPlan (ADR-423)', { timeout: 30_000 }, () => {
     expect(y.slice(y.length - (x.length - rows))).toEqual(x.slice(rows));
   });
 
-  it("adds waterline passes around a masked map's excluded stock (ADR-482)", () => {
+  it("adds waterline passes around a masked map's excluded stock (ADR-484)", () => {
     const masked = { ...map, inclusion: new Uint8Array(50 * 50).fill(1) };
     masked.inclusion[0] = 0;
     const narrowed = reliefFinishingPasses(masked, {

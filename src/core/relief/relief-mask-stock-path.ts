@@ -1,4 +1,4 @@
-// Finishing moves kept out of excluded stock (ADR-482). A masked raster's
+// Finishing moves kept out of excluded stock (ADR-484). A masked raster's
 // samples clear the excluded blocks where they stand (the dilation proves
 // that), but near the mask the tip a cutter needs rises along a curve as the
 // ball rolls over a block's edge, so the straight move between two samples can

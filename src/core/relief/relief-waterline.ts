@@ -18,7 +18,7 @@
 // spacing the raster keeps on the shallow slopes it covers.
 //
 // A masked map's excluded stock stands as blocks the contours ride round like
-// any wall (ADR-482, relief-mask-stock.ts). Every waterline move is level and
+// any wall (ADR-484, relief-mask-stock.ts). Every waterline move is level and
 // checked a quarter cell apart, beside the wall; the blocks keep the cutter
 // off by the dilation's clearance plus half that spacing and that reach, so
 // no point of a move comes nearer than a checked one allows.

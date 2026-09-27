@@ -13,9 +13,9 @@ import {
   TOOLS,
 } from './relief-mask-stock.test-support';
 
-// ADR-482: excluded stock as a cutter centred anywhere meets it.
+// ADR-484: excluded stock as a cutter centred anywhere meets it.
 
-describe('createMaskStock (ADR-482)', () => {
+describe('createMaskStock (ADR-484)', () => {
   it('matches every excluded cell checked one by one, on and off the map', () => {
     fc.assert(
       fc.property(

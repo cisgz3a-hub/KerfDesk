@@ -22,7 +22,7 @@ import {
   sampledMap,
 } from './relief-waterline.test-support';
 
-// ADR-482: waterline passes on a masked relief circle its excluded stock like
+// ADR-484: waterline passes on a masked relief circle its excluded stock like
 // any other wall, and never enter it.
 
 const END_MILL: CncTool = { id: 'em', name: 'end mill', kind: 'end-mill', diameterMm: 3.175 };
@@ -129,7 +129,7 @@ function levelsOf(passes: ReadonlyArray<CncPass>): ReadonlyArray<number> {
   return [...levels].sort((a, b) => b - a);
 }
 
-describe('masked waterline (ADR-482)', { timeout: 60_000 }, () => {
+describe('masked waterline (ADR-484)', { timeout: 60_000 }, () => {
   it('circles excluded stock at every level down to the floor', () => {
     const passes = planned(squareIslandMap());
 

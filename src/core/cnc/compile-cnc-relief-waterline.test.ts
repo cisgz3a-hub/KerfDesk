@@ -51,7 +51,7 @@ function bossRelief(transform: Transform = IDENTITY_TRANSFORM): ReliefObject {
 }
 
 // A flat relief 5 mm deep inside a round mask outline: the only steep wall is
-// the stock the mask leaves standing round it (ADR-482).
+// the stock the mask leaves standing round it (ADR-484).
 function maskedDiscRelief(): ReliefObject {
   const inclusionMask = Array.from({ length: CELLS * CELLS }, (_, index) => {
     const x = (index % CELLS) + 0.5;
@@ -183,7 +183,7 @@ describe('relief finish strategy compile (ADR-423)', { timeout: 60_000 }, () => 
     expect(waterlineTurn(conventional)).toBeGreaterThan(0);
   });
 
-  it('circles the stock a mask outline leaves standing (ADR-482)', () => {
+  it('circles the stock a mask outline leaves standing (ADR-484)', () => {
     const raster = finishPasses({}, maskedDiscRelief());
     const passes = finishPasses({ reliefFinishStrategy: 'raster-waterline' }, maskedDiscRelief());
 

@@ -8,12 +8,12 @@ import { blockExcess, type BlockLaw, type Move } from './relief-mask-stock-move'
 import { stockCheckedPath } from './relief-mask-stock-path';
 import { bruteForceTip, maskedMapArb, TOOLS } from './relief-mask-stock.test-support';
 
-// ADR-482: moves checked exactly against the blocks of excluded stock.
+// ADR-484: moves checked exactly against the blocks of excluded stock.
 
 const TOLERANCE_MM = 0.002;
 const SAMPLES = 4000;
 
-describe('blockExcess (ADR-482)', () => {
+describe('blockExcess (ADR-484)', () => {
   it('never finds a move higher above a block than dense sampling does', () => {
     fc.assert(
       fc.property(
@@ -65,7 +65,7 @@ describe('blockExcess (ADR-482)', () => {
   });
 });
 
-describe('stockCheckedPath (ADR-482)', () => {
+describe('stockCheckedPath (ADR-484)', () => {
   it('keeps every point of every move clear of the real blocks', () => {
     fc.assert(
       fc.property(

@@ -292,7 +292,7 @@ describe('reliefFinishingPasses', () => {
       scallopMm: 0.025,
     });
     // Row 1 runs stay down across its 15 selected samples (column 8's is not
-    // selected), either side of that column (ADR-482).
+    // selected), either side of that column (ADR-484).
     const lobeRuns = finishingRows(passes)
       .filter((row) => row.y === 0.375 && row.points.every((point) => point.z < 0))
       .map((row) => row.points.map((point) => point.x));
@@ -338,7 +338,7 @@ describe('reliefFinishingPasses', () => {
     });
 
     // One pass: down, up to stock top, over the shared corner, and down again
-    // (ADR-482 links the two, and the corner is the excluded cells').
+    // (ADR-484 links the two, and the corner is the excluded cells').
     expect(passes).toHaveLength(1);
     const points = passes[0]?.kind === 'path3d' ? passes[0].points : [];
     expect(points.map(({ x, y }) => ({ x, y }))).toEqual([

@@ -6,7 +6,7 @@
 // kernel. A masked raster's rows run through every selected sample, their
 // runs are linked nearest first across short gaps, and each move is checked
 // exactly against the whole-cell blocks of excluded stock and lifted where it
-// would dip into them (ADR-482, relief-mask-stock-path.ts); interpolation over
+// would dip into them (ADR-484, relief-mask-stock-path.ts); interpolation over
 // included subcell surface features retains ADR-289's explicit qualification
 // boundary.
 //
@@ -252,7 +252,7 @@ function maskedRows(map: Heightmap, selected: Uint8Array): ReadonlyArray<number>
 
 // The masked rows' runs, linked nearest first across short gaps as ADR-450
 // links a skipping raster's; every hop, like every move, is then checked
-// against the excluded stock (ADR-482).
+// against the excluded stock (ADR-484).
 function maskedFinishingPasses(
   map: Heightmap,
   runs: ReadonlyArray<FinishingRun>,
@@ -309,7 +309,7 @@ function maskedRuns(
 // its selected samples lie more than a stride apart. A narrow lobe therefore
 // cannot disappear merely because the global row phase steps past it. One
 // phase for every run keeps a row's selected samples side by side, so they
-// run together instead of each plunging alone (ADR-482).
+// run together instead of each plunging alone (ADR-484).
 // Selecting cells by column also permits one global O(width*height) row scan;
 // adversarial checkerboards never multiply full-width scans by component count.
 function selectMaskedFinishingCells(

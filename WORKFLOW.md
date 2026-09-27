@@ -4733,7 +4733,7 @@ and lifts the command's CNC-only gate.)*
    checked exactly against the whole-cell blocks of stock the mask leaves
    standing and lifted where it would dip into them; to keep that check
    cheap, samples within the bit's reach of the mask stand 0.002 mm above
-   their exact tip (ADR-482). As along any wall parallel to the rows, the
+   their exact tip (ADR-484). As along any wall parallel to the rows, the
    raster leaves the foot of a mask edge running along them; Raster +
    waterline finishes it.
 4. Roughing leaves the layer's Rough allowance (0.5 mm unless set; it exists
@@ -4748,7 +4748,7 @@ and lifts the command's CNC-only gate.)*
    vertex clears the model exactly and every move is checked (ADR-423). On a
    relief with a mask outline the waterline also circles the stock the mask
    leaves standing, keeping every point of every move clear of it by the
-   mask's own clearance (ADR-482).
+   mask's own clearance (ADR-484).
 7. With **Flats** set to Roughing bit, the raster skips every sample from
    which the bit would touch only flats the roughing end mill took to their
    exact height, and cuts what it keeps nearest first: it stays down across
