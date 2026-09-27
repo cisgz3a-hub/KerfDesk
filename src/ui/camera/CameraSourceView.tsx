@@ -24,7 +24,13 @@ export function CameraSourceView(props: {
     case 'usb':
       return <UsbVideo stream={source.stream.stream} onElement={onElement} />;
     case 'machine-jpeg':
-      return <PolledJpeg url={source.frameUrl} onElement={onElement} />;
+      return (
+        <PolledJpeg
+          url={source.frameUrl}
+          intervalMs={source.pollIntervalMs ?? MACHINE_JPEG_POLL_INTERVAL_MS}
+          onElement={onElement}
+        />
+      );
     case 'machine-rtsp':
       return <MjpegImage url={source.previewUrl} onElement={onElement} onFailure={onFailure} />;
     default:
@@ -54,9 +60,10 @@ function UsbVideo(props: {
 
 function PolledJpeg(props: {
   readonly url: string;
+  readonly intervalMs: number;
   readonly onElement?: ((element: LiveCaptureElement | null) => void) | undefined;
 }): JSX.Element {
-  const tick = usePollTick(MACHINE_JPEG_POLL_INTERVAL_MS);
+  const tick = usePollTick(props.intervalMs);
   // The buster is derived from the tick so React only swaps src per poll.
   const [src, setSrc] = useState(props.url);
   useEffect(() => {
@@ -67,7 +74,7 @@ function PolledJpeg(props: {
       src={src}
       alt="Machine camera"
       onElement={props.onElement}
-      expectedRefreshMs={MACHINE_JPEG_POLL_INTERVAL_MS}
+      expectedRefreshMs={props.intervalMs}
     />
   );
 }

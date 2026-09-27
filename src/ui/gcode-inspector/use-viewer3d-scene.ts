@@ -9,8 +9,8 @@
 // drawn toolpath in place (viewer3d-scene.ts setSegments).
 
 import { useEffect, useRef, useState, type RefObject } from 'react';
-import type { GcodeRenderModel } from '../../core/gcode-view';
 import { createViewer3dScene, type Viewer3dSceneHandle } from '../viewer3d';
+import type { InspectorRenderModel } from './inspector-model';
 import {
   useViewer3dModelInstallation,
   type Viewer3dSceneState,
@@ -29,10 +29,10 @@ export type Viewer3dSceneBinding = {
 /** Owns one Inspector WebGL scene for the canvas and swaps models into that scene. */
 export function useViewer3dScene(
   canvasRef: RefObject<HTMLCanvasElement | null>,
-  model: GcodeRenderModel,
+  model: InspectorRenderModel,
 ): Viewer3dSceneBinding {
   const handleRef = useRef<Viewer3dSceneHandle | null>(null);
-  const drawnModelRef = useRef<GcodeRenderModel | null>(null);
+  const drawnModelRef = useRef<InspectorRenderModel | null>(null);
   const [state, setState] = useState<Viewer3dSceneState>('loading');
   const [reason, setReason] = useState('');
 

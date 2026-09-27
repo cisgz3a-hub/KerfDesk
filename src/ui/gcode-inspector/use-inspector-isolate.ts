@@ -5,8 +5,7 @@
 // switch for the same moves.
 
 import { useMemo, useState } from 'react';
-import type { ProgramTimeModel } from '../../core/gcode-time';
-import type { GcodeRenderModel } from '../../core/gcode-view';
+import type { InspectorProgramTime, InspectorRenderModel } from './inspector-model';
 import { isolatePlanes, moveFilterMask, NO_ISOLATE, type IsolateState } from './isolate';
 import { lensEntries, type LensId } from './lenses';
 import type { ToolSections } from './tool-sections';
@@ -14,8 +13,8 @@ import type { ToolSections } from './tool-sections';
 const NOTHING_HIDDEN: ReadonlySet<number> = new Set();
 
 export function useInspectorIsolate(args: {
-  readonly model: GcodeRenderModel;
-  readonly time: ProgramTimeModel;
+  readonly model: InspectorRenderModel;
+  readonly time: Pick<InspectorProgramTime, 'segFeedLimited'>;
   readonly lens: LensId;
   readonly sections: ToolSections | null;
   readonly travelVisible: boolean;

@@ -4,9 +4,10 @@ import type {
   GcodeInspectorWorkerResponse,
   GcodeInspectorWorkerResult,
 } from './gcode-inspector-worker-protocol';
+import type { PreviewChunk } from './inspection-preview';
 
 export type GcodeInspectorProgress = {
-  readonly phase: 'queued' | 'reading' | 'parsing';
+  readonly phase: 'queued' | 'reading' | 'parsing' | 'timing';
   readonly queuePosition: number;
   readonly bytesRead?: number;
   readonly totalBytes?: number;
@@ -15,6 +16,8 @@ export type GcodeInspectorProgress = {
 export type GcodeInspectorRequestOptions = {
   readonly signal?: AbortSignal;
   readonly onProgress?: (progress: GcodeInspectorProgress) => void;
+  /** The moves read so far, a chunk at a time (ADR-485). */
+  readonly onPreview?: (chunk: PreviewChunk) => void;
 };
 
 type Pending = {
@@ -95,6 +98,10 @@ function handleMessage(event: MessageEvent<GcodeInspectorWorkerResponse>): void 
       ...(event.data.bytesRead === undefined ? {} : { bytesRead: event.data.bytesRead }),
       ...(event.data.totalBytes === undefined ? {} : { totalBytes: event.data.totalBytes }),
     });
+    return;
+  }
+  if (event.data.kind === 'preview') {
+    pending.options.onPreview?.(event.data.chunk);
     return;
   }
   if (event.data.kind === 'error') pending.reject(new Error(event.data.message));

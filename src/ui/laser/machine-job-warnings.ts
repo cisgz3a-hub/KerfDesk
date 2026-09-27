@@ -26,6 +26,7 @@ import { detectCncStockWarnings } from './cnc-stock-warnings';
 import { detectCncThroughCutTabWarnings } from './cnc-through-cut-tab-warnings';
 import { detectCncUnmodeledBitLayoutWarnings } from './cnc-unmodeled-bit-layout-warnings';
 import { detectJobIntentWarnings } from './job-intent-warnings';
+import { detectLaserFinishSetAsideWarnings } from './laser-finish-set-aside-warnings';
 import { detectLaserReliefWarnings } from './laser-relief-warnings';
 import { detectLaserMachineLimitWarnings } from './laser-machine-limit-warnings';
 
@@ -69,6 +70,7 @@ export function detectMachineJobWarnings(
       : [
           ...detectLaserReliefWarnings(project),
           ...detectJobIntentWarnings(project, job),
+          ...detectLaserFinishSetAsideWarnings(project, job),
           ...detectLaserMachineLimitWarnings(project, controllerSettings),
           // A saved Smoothieware profile above S 2 (controller audit SM-7).
           ...warningList(smoothiePowerScaleWarning(project.device)),

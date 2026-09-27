@@ -5,11 +5,11 @@
 // for that question: a long rapid and a short plunge can take the same time,
 // so "60% of the cutting distance" says nothing about where the minutes go.
 //
-// Uses the planner's per-segment seconds, so the split is as honest as the
-// ETA it adds up to.
+// Uses the planner's seconds, summed per kind in the parse worker (ADR-485),
+// so the split is as honest as the ETA it adds up to.
 
-import type { ProgramTimeModel } from '../../core/gcode-time';
-import { SEG_KIND, type GcodeRenderModel } from '../../core/gcode-view';
+import { SEG_KIND } from '../../core/gcode-view';
+import type { InspectorProgramTime } from './inspector-model';
 
 export type TimeShare = {
   readonly label: string;
@@ -30,20 +30,13 @@ const KIND_LABEL: ReadonlyArray<{ readonly kind: number; readonly label: string 
  * uses. Empty when there is no motion to divide up.
  */
 export function timeSplit(
-  model: GcodeRenderModel,
-  time: ProgramTimeModel,
+  time: Pick<InspectorProgramTime, 'kindSeconds' | 'motionSeconds'>,
 ): ReadonlyArray<TimeShare> {
   if (time.motionSeconds <= 0) return [];
-  const seconds = new Map<number, number>();
-  for (let index = 0; index < model.segmentCount; index += 1) {
-    const kind = model.segKind[index] ?? SEG_KIND.travel;
-    seconds.set(kind, (seconds.get(kind) ?? 0) + (time.segSeconds[index] ?? 0));
-  }
-  return KIND_LABEL.map((entry) => ({
-    label: entry.label,
-    seconds: seconds.get(entry.kind) ?? 0,
-    percent: ((seconds.get(entry.kind) ?? 0) / time.motionSeconds) * 100,
-  }))
+  return KIND_LABEL.map((entry) => {
+    const seconds = time.kindSeconds[entry.kind] ?? 0;
+    return { label: entry.label, seconds, percent: (seconds / time.motionSeconds) * 100 };
+  })
     .filter((share) => share.seconds > 0)
     .sort((left, right) => right.seconds - left.seconds);
 }

@@ -1,0 +1,76 @@
+name: Desktop package check
+
+# Packages the stable desktop config as an unpacked Linux app on every pull
+# request and push to main, then checks what shipped and launches it
+# (ADR-483). Unit tests cannot see what electron-builder actually packs:
+# its file patterns and fuse flips apply silently, and a broken package was
+# otherwise found only by the weekly Windows smoke or after a release.
+# Kept out of ci.yml so a desktop packaging failure never holds a web deploy.
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
+
+permissions:
+  contents: read
+
+jobs:
+  linux-package:
+    name: Package, check and launch the desktop app
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+
+      - name: Set up pnpm
+        uses: pnpm/action-setup@0ebf47130e4866e96fce0953f49152a61190b271 # v6
+
+      - name: Set up Node.js
+        uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Build renderer and Electron main
+        run: pnpm build:web && pnpm build:electron-main
+
+      - name: Package the stable config as an unpacked Linux app
+        run: pnpm exec electron-builder --linux dir --x64 --config electron-builder.yml --publish never
+
+      - name: Check fuses and app.asar contents
+        run: |
+          app_dir="$(ls -d release/*/linux-unpacked)"
+          node scripts/verify-packaged-desktop.mjs \
+            "${app_dir}/laserforge" "${app_dir}/resources/app.asar" electron-builder.yml
+
+      - name: Let Chromium's sandbox start on the runner
+        # Ubuntu 24.04 blocks unprivileged user namespaces through AppArmor,
+        # which Chromium's Linux sandbox needs. Allow them for this job rather
+        # than launching KerfDesk with --no-sandbox.
+        run: |
+          if [ -e /proc/sys/kernel/apparmor_restrict_unprivileged_userns ]; then
+            sudo sysctl -w kernel.apparmor_restrict_unprivileged_userns=0
+          fi
+          command -v xvfb-run || (sudo apt-get update && sudo apt-get install -y xvfb)
+
+      - name: Launch, import and save in the packaged app
+        run: |
+          app_dir="$(pwd)/$(ls -d release/*/linux-unpacked)"
+          xvfb-run -a pnpm smoke:desktop:native -- "${app_dir}/laserforge"
+
+      - name: Upload native smoke evidence
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        with:
+          name: desktop-package-check-${{ github.sha }}
+          path: artifacts/native-smoke/
+          if-no-files-found: warn
+          retention-days: 14
