@@ -7,7 +7,7 @@ import {
   type SceneObject,
   type TextObject,
 } from '../../core/scene';
-import { applyArraySelection } from './array-actions';
+import { applyArraySelection, applySelectionPlacements } from './array-actions';
 import type { AppState } from './store';
 
 function object(id: string, x: number): SceneObject {
@@ -353,3 +353,27 @@ function dependentText(id: string, guideObjectId: string): TextObject {
     pathText: { guideObjectId, offsetMm: 0, reverse: false },
   };
 }
+
+describe('applySelectionPlacements', () => {
+  it('moves the selection to the first placement and copies it to the rest in one undo step', () => {
+    let nextId = 0;
+    const before = state();
+    const result = applySelectionPlacements(
+      before,
+      () => [
+        { dx: 5, dy: 0, rotationDeg: 0 },
+        { dx: 100, dy: 50, rotationDeg: 90, pivot: { x: 112.5, y: 52.5 } },
+      ],
+      () => `new-${nextId++}`,
+    ) as AppState;
+    const objects = result.project.scene.objects;
+    expect(objects).toHaveLength(4);
+    expect(objects[0]?.transform.x).toBe(5);
+    expect(objects[1]?.transform.x).toBe(20);
+    expect(objects[2]?.transform.rotationDeg).toBe(90);
+    // Moved to (100, 50), then turned a quarter about the pivot.
+    expect(objects[2]?.transform.x).toBeCloseTo(115);
+    expect(objects[2]?.transform.y).toBeCloseTo(40);
+    expect(result.undoStack).toEqual([before.project]);
+  });
+});
