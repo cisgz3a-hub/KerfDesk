@@ -13,6 +13,7 @@ import { applyPanelFit } from '../../core/box/panel-fit';
 import { dividerLayout } from '../../core/box/divider-layout';
 import { dividerPanelRings, wallSlotCutouts } from '../../core/box/divider-panels';
 import type { DividerRefereeInput } from '../../core/box/divider-referee';
+import { profileToolpathPolylines } from '../../core/cnc/profile-paths';
 
 export const BENCHMARK_SEED = 0x1057b0c5;
 const SWEEP_SPECS = 48;
@@ -167,25 +168,47 @@ function shoelace(ring: ReadonlyArray<Vec2>): number {
   return sum / 2;
 }
 
-// Every reflex corner of the nominal ring must sit ~one bit radius away
-// from the relieved boundary (24-gon chord bound + clipper rounding).
-export function reliefsAtFullRadius(
-  nominal: Polyline,
-  relieved: Polyline,
-  radiusMm: number,
+// The fabrication contract for CNC relief (ADR-106 Amd 1): after the
+// shipped profile-outside compensation, the bit's centre path must come
+// within one bit radius of every seat corner — reflex corners of the nominal
+// outline and convex corners of its cutouts — so a square tab can seat.
+// Measuring the drawn relief alone is not enough: a relief the compensated
+// bit cannot enter leaves the corner filleted.
+export function bitReachesSeatCorners(
+  nominal: { readonly outline: Polyline; readonly cutouts: ReadonlyArray<Polyline> },
+  relieved: { readonly outline: Polyline; readonly cutouts: ReadonlyArray<Polyline> },
+  toolMm: number,
 ): boolean {
-  const ring = nominal.points.slice(0, -1);
-  for (let i = 0; i < ring.length; i += 1) {
-    const prev = ring[(i + ring.length - 1) % ring.length];
-    const curr = ring[i];
-    const next = ring[(i + 1) % ring.length];
-    if (prev === undefined || curr === undefined || next === undefined) return false;
-    const cross = (curr.x - prev.x) * (next.y - curr.y) - (curr.y - prev.y) * (next.x - curr.x);
-    if (cross >= 0) continue;
-    const distance = minDistance(curr, relieved);
-    if (distance < 0.98 * radiusMm || distance > radiusMm + 2e-3) return false;
-  }
-  return true;
+  const toolPath = profileToolpathPolylines(
+    [relieved.outline, ...relieved.cutouts],
+    'outside',
+    toolMm,
+  );
+  const corners = [
+    ...ringCorners(nominal.outline, 'reflex'),
+    ...nominal.cutouts.flatMap((cutout) => ringCorners(cutout, 'convex')),
+  ];
+  return corners.every((corner) =>
+    toolPath.some((path) => minDistance(corner, closedRing(path)) <= toolMm / 2 + 2e-3),
+  );
+}
+
+function ringCorners(ring: Polyline, kind: 'reflex' | 'convex'): Vec2[] {
+  const points = ring.points.slice(0, -1);
+  const orientation = Math.sign(shoelace(points));
+  return points.filter((curr, i) => {
+    const prev = points[(i + points.length - 1) % points.length];
+    const next = points[(i + 1) % points.length];
+    if (prev === undefined || next === undefined) return false;
+    const turn =
+      orientation * ((curr.x - prev.x) * (next.y - curr.y) - (curr.y - prev.y) * (next.x - curr.x));
+    return kind === 'reflex' ? turn < 0 : turn > 0;
+  });
+}
+
+function closedRing(path: Polyline): Polyline {
+  const first = path.points[0];
+  return first === undefined ? path : { ...path, points: [...path.points, first] };
 }
 
 export function minDistance(point: Vec2, outline: Polyline): number {
