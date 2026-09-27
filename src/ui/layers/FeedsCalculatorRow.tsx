@@ -11,6 +11,7 @@ import {
   type ChiploadMaterial,
 } from '../../core/cnc';
 import { DEFAULT_ASSUMED_FLUTE_COUNT } from '../../core/cnc/machine-starters';
+import { nominalChiploadMm } from '../../core/cnc/nominal-chipload';
 import { layerCncTool, type CncLayerSettings, type CncTool, type Layer } from '../../core/scene';
 import { cncAngledToolFeedAdvisory } from '../common/cnc-angled-tool-feed-advisory';
 import { RailSection } from '../kit';
@@ -129,12 +130,24 @@ function FeedsCalculatorResultText(props: {
   if (result === null) {
     return <p style={errorStyle}>No valid machine-aware starting values are available.</p>;
   }
+  const nominal = nominalChiploadMm(
+    result.feedMmPerMin,
+    result.spindleRpm,
+    result.feedSource.fluteCount,
+  );
+  const chart = props.chiploadMm;
+  const belowChart = nominal !== null && chart !== null && nominal < chart * 0.99;
   return (
     <p style={resultStyle}>
       {toolName} at {result.spindleRpm.toLocaleString()} RPM → chart chipload{' '}
       {props.chiploadMm?.toFixed(3)} mm: machine-aware feed <strong>{result.feedMmPerMin}</strong>,
       plunge <strong>{result.plungeMmPerMin}</strong> mm/min, {result.depthPerPassMm.toFixed(2)}{' '}
-      mm/pass. Active machine limits are applied; verify the cut.
+      mm/pass. Programmed nominal chipload: <strong>{nominal?.toFixed(4)} mm/tooth</strong> after
+      feed limits and output rounding.
+      {belowChart
+        ? ' This is below the chart starting value; check cutter guidance and spindle range before changing RPM or feed.'
+        : ''}{' '}
+      Actual chip thickness also depends on engagement and acceleration. Verify the cut.
     </p>
   );
 }

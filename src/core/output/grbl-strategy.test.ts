@@ -7,7 +7,8 @@ import { grblStrategy } from './grbl-strategy';
 const dev = DEFAULT_DEVICE_PROFILE;
 
 function emit(job: Job): string {
-  return grblStrategy.emit(job, dev);
+  // This suite pins readable output; grbl-fill-compaction covers the default modal spelling.
+  return grblStrategy.emit(job, dev, { compactMotionWords: false });
 }
 
 describe('grblStrategy preamble/postamble', () => {

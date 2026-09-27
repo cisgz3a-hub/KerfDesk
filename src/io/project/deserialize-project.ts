@@ -2,6 +2,7 @@
 // structured error describing why it cannot be loaded.
 
 import { normalizeCameraModelRecord } from '../../core/camera/model/camera-model-record';
+import { normalizeOtherCameraModels } from '../../core/camera/model/saved-cameras';
 import { isChiploadMaterialKey } from '../../core/cnc';
 import {
   DEFAULT_DEVICE_PROFILE,
@@ -300,6 +301,7 @@ function normalizeDevice(dev: Record<string, unknown>): Record<string, unknown> 
     // Override (not merge) the raw value so a malformed persisted camera model is
     // dropped to undefined rather than trusted; JSON.stringify omits the undefined.
     cameraModel: normalizeCameraModelRecord(dev['cameraModel']),
+    otherCameraModels: normalizeOtherCameraModels(dev['otherCameraModels']),
     fireControl: normalizeLaserFireControl(dev['fireControl']),
     noGoZones: Array.isArray(dev['noGoZones']) ? dev['noGoZones'] : [],
     ...(dev['cameraProfile'] !== undefined

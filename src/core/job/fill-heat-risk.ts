@@ -72,10 +72,7 @@ function accumulateFillGroupRisk(
     if (first === undefined || last === undefined) continue;
     const length = Math.hypot(last.end.x - first.start.x, last.end.y - first.start.y);
     if (length <= 0) continue;
-    const effective =
-      group.fillRunwayPolicy === 'feed-matched-every-sweep'
-        ? Math.min(plan.leadInMm, plan.leadOutMm)
-        : plan.leadInMm;
+    const effective = Math.min(plan.leadInMm, plan.leadOutMm);
     summary.fillSweepCount += emittedPasses;
     summary.minFillSweepMm =
       summary.minFillSweepMm === null ? length : Math.min(summary.minFillSweepMm, length);

@@ -9,16 +9,17 @@
 import { TutorialButton } from '../../tutorials/TutorialButton';
 import { useEffect, useState } from 'react';
 import { usePlatform } from '../../app';
-import { useStore } from '../../state';
 import { loadCameraPanelWide, saveCameraPanelWide } from '../../state/camera-preference-storage';
 import { useCameraStore } from '../../state/camera-store';
 import { CalibrateCameraControls } from '../calibrate/CalibrateCameraControls';
+import { activeCameraModelNow } from '../active-camera-model';
 import { OverlayControls } from '../OverlayControls';
 import { CameraDiagnostics } from './CameraDiagnostics';
 import { CameraSetupSteps } from './CameraSetupSteps';
 import { MachineCameraSection } from './MachineCameraSection';
 import { noteStyle } from './panel-styles';
 import { RtspSourceControls } from './RtspSourceControls';
+import { SavedCamerasSection } from './SavedCamerasSection';
 import { SnapshotControls } from './SnapshotControls';
 import { UsbCameraSection } from './UsbCameraSection';
 import { localCameraBridgeAvailable } from './camera-platform-capability';
@@ -87,6 +88,7 @@ function CameraPanelOpen(): JSX.Element {
         </p>
       )}
       <CalibrateCameraControls />
+      <SavedCamerasSection />
       <OverlayControls />
       <SnapshotControls wide={wide} onToggleWide={toggleWide} />
       <CameraDiagnostics bridgeAvailable={bridgeAvailable} />
@@ -146,10 +148,7 @@ function useCameraPanelOpenState() {
 // The canvas overlay draws the live camera, so the source outlives the panel
 // while the overlay is on and there is a calibration to draw it with.
 function cameraShownOnCanvas(): boolean {
-  return (
-    useCameraStore.getState().overlayVisible &&
-    useStore.getState().project.device.cameraModel !== undefined
-  );
+  return useCameraStore.getState().overlayVisible && activeCameraModelNow() !== undefined;
 }
 
 // Why the machine camera works in Desktop and not here: the laser's camera

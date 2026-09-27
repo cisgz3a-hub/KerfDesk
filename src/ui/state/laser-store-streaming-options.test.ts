@@ -117,6 +117,34 @@ describe('laser-store profile streaming options', () => {
 // controller reports its receive ring in a status frame, and the job that
 // starts afterwards streams with the window that report proved.
 describe('laser-store grblHAL receive-capacity evidence (ADR-331)', () => {
+  afterEach(async () => {
+    await useLaserStore.getState().disconnect();
+  });
+
+  it('sends only one FluidNC line until its acknowledgement, even with a buffered saved request', async () => {
+    const writes: string[] = [];
+    const connection = makeGrblHalConnection(writes);
+    await useLaserStore.getState().connect(makeAdapter(connection), { controllerKind: 'fluidnc' });
+    connection.emitLine('Grbl 3.0 [FluidNC v4.0.3]');
+    await flushConnect();
+    connection.emitLine('<Idle|MPos:0.000,0.000,0.000|FS:0,0|Ov:100,100,100>');
+    await flushConnect();
+    expect(useLaserStore.getState().activeControllerKind).toBe('fluidnc');
+    writes.length = 0;
+    await startTestLaserJob('G21\nG90\nM4 S0\nG1 X1 S100\nM5\n', {
+      streamingMode: 'char-counted',
+      rxBufferBytes: 512,
+    });
+    expect(writes.filter((line) => line.endsWith('\n'))).toEqual(['G21\n']);
+    expect(useLaserStore.getState().streamer).toMatchObject({
+      streamingMode: 'ping-pong',
+      inFlight: [{ line: 'G21\n', bytes: 4 }],
+    });
+    connection.emitLine('ok');
+    await flushConnect();
+    expect(writes.filter((line) => line.endsWith('\n'))).toEqual(['G21\n', 'G90\n']);
+  });
+
   function makeGrblHalConnection(writes: string[]): FakeConnection {
     const lineHandlers = new Set<(line: string) => void>();
     const emit = (line: string): void => {
