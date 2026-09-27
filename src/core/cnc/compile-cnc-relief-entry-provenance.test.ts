@@ -1,10 +1,10 @@
 // ADR-273 Amendment 1: a group records a ramp entry only where it enters along
-// its path. Relief roughing rings and finishing rows plunge at their starts, so
-// before the amendment both relief groups carried the layer's ramp angle, and
-// the G-code header said `; cnc entry: contour-ramp; max-angle-deg: 5.000`
-// above a straight `G1 Z-1.500 F300` plunge. The layer's other shapes still
-// ramp. Stated as the rule, the test also holds for a relief planner that
-// ramps and records it (ADR-424, PR #939).
+// its path. Before the amendment every relief group carried the layer's ramp
+// angle, so the G-code header said `; cnc entry: contour-ramp;
+// max-angle-deg: 5.000` above a straight plunge: every relief pass before
+// ADR-424 made roughing ramp, and relief finishing still after it. Stated as
+// the rule, the test holds either way; the layer's other shapes keep their
+// ramp.
 
 import { describe, expect, it } from 'vitest';
 import { testReliefHeightfield } from '../../__fixtures__/relief-heightfield';
@@ -140,7 +140,7 @@ function expectEntryMatchesClaim(job: Job, operation: CncGroup['cutType']): void
 describe('relief entry provenance', () => {
   it('claims a ramp on a relief group only where the group ramps', () => {
     const job = compile([flatRelief()], { reliefFinishToolId: 'bn-3175' });
-    // Both relief groups claimed the ramp above a straight plunge.
+    // Roughing ramps and says so (ADR-424); finishing plunges and must not.
     expectEntryMatchesClaim(job, 'relief-rough');
     expectEntryMatchesClaim(job, 'relief-finish');
   });
