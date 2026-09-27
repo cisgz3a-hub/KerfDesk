@@ -291,7 +291,7 @@ describe('Restore saved origin controller evidence and units', () => {
       );
       await flush();
       if (boundary === 'session') h.set({ controllerSessionEpoch: 2 });
-      if (boundary === 'write epoch') h.refs.writeEpoch += 1;
+      if (boundary === 'write epoch') h.refs.writeEpoch = (h.refs.writeEpoch ?? 0) + 1;
       if (boundary === 'replacement operation')
         h.set({
           controllerOperation: {
