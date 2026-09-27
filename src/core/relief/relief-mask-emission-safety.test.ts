@@ -59,7 +59,9 @@ const MASK_EMISSION_CASES: ReadonlyArray<MaskEmissionCase> = [
     columns: 25,
     includedColumns: 20,
     stepoverPercent: 40,
-    scallopMm: 0.025,
+    // The cusp of a 0.4 mm row spacing: exactly two 0.2 mm cells per row
+    // (ADR-421), so the compiled grid stays on this fixture's mask cells.
+    scallopMm: 1 - Math.sqrt(0.96),
     transform: {
       ...IDENTITY_TRANSFORM,
       x: 50.0004,

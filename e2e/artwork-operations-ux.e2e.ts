@@ -16,8 +16,6 @@ test('laser line and fill edits survive artwork navigation, output changes and s
   await setNumber(panel, /^Power for/, '37');
   await setNumber(panel, /^Speed for/, '1800');
   await setNumber(panel, /^Passes for/, '2');
-  await openSection(panel, /^Line options/);
-  await setNumber(panel, /^Contour entry for/, '3');
 
   const editorTabs = panel.getByRole('tablist', { name: 'Edit artwork or operation' });
   await editorTabs.getByRole('tab', { name: 'Operation', exact: true }).focus();
@@ -29,11 +27,15 @@ test('laser line and fill edits survive artwork navigation, output changes and s
   await expect(editorTabs.getByRole('tab', { name: 'Operation', exact: true })).toBeFocused();
   await expect(panel.getByRole('spinbutton', { name: /^Power for/ })).toHaveValue('37');
 
-  await panel.getByRole('combobox', { name: /^Mode for/ }).selectOption('fill');
-  await openSection(panel, /^Fill options/);
+  await chooseProcess(panel, 'Fill');
   await setNumber(panel, /^Hatch angle for/, '30');
   await setNumber(panel, /^Hatch spacing for/, '0.2');
-  await setNumber(panel, /^Fill overscan for/, '4');
+  // Overscan lives in Cut Settings with the rest of the Fill detail (ADR-430).
+  await panel.getByRole('button', { name: 'More cut settings', exact: true }).click();
+  const cutSettings = page.getByRole('dialog', { name: /^Cut settings for/ });
+  await cutSettings.locator('input[name="fillOverscanMm"]').fill('4');
+  await cutSettings.getByRole('button', { name: 'Apply settings', exact: true }).click();
+  await expect(cutSettings).toBeHidden();
   await panel.getByRole('checkbox', { name: /^Bidirectional fill for/ }).uncheck();
   await panel.getByRole('checkbox', { name: /^Output / }).uncheck();
   await expect(panel.getByRole('status')).toContainText('excluded from output');
@@ -45,7 +47,7 @@ test('laser line and fill edits survive artwork navigation, output changes and s
   const run = panel.getByRole('article', { name: /^Run 1:/ });
   await expect(run).toContainText('Output off');
   await run.getByRole('button', { name: 'Edit settings', exact: true }).click();
-  await expect(panel.getByRole('combobox', { name: /^Mode for/ })).toHaveValue('fill');
+  await expect(processRadio(panel, 'Fill')).toBeChecked();
   await panel.getByRole('checkbox', { name: /^Output / }).check();
 
   const { text, project } = await saveProject(page, kerfdesk);
@@ -65,9 +67,8 @@ test('laser line and fill edits survive artwork navigation, output changes and s
   await kerfdesk.setOpenFiles([{ name: 'artwork-roundtrip.lf2', text }]);
   await (await toolbarCommand(page, 'Open...')).click();
   await expect(page).toHaveTitle(/artwork-roundtrip\.lf2/);
-  await expect(panel.getByRole('combobox', { name: /^Mode for/ })).toHaveValue('fill');
+  await expect(processRadio(panel, 'Fill')).toBeChecked();
   await expect(panel.getByRole('spinbutton', { name: /^Power for/ })).toHaveValue('37');
-  await openSection(panel, /^Fill options/);
   await expect(panel.getByRole('spinbutton', { name: /^Hatch spacing for/ })).toHaveValue('0.2');
   await expect(panel.getByRole('checkbox', { name: /^Bidirectional fill for/ })).not.toBeChecked();
   await expectNoSerial(kerfdesk);
@@ -204,10 +205,9 @@ for (const viewport of [
       const panel = await openBasicProject(page);
       await expect(page.locator('html')).toHaveAttribute('data-theme', theme);
       await assertControlBounds(page, panel);
-      await panel.getByRole('combobox', { name: /^Mode for/ }).selectOption('fill');
-      await openSection(panel, /^Fill options/);
+      await chooseProcess(panel, 'Fill');
       await assertControlBounds(page, panel);
-      await panel.getByRole('button', { name: 'Advanced cut settings', exact: true }).click();
+      await panel.getByRole('button', { name: 'More cut settings', exact: true }).click();
       const dialog = page.getByRole('dialog', { name: /^Cut settings for/ });
       await expect(dialog).toBeVisible();
       await assertControlBounds(page, dialog);
@@ -260,8 +260,19 @@ async function openBasicProject(page: Page): Promise<Locator> {
     name: 'Artwork / Operations panel',
     exact: true,
   });
-  await expect(panel.getByRole('combobox', { name: /^Mode for/ })).toBeVisible();
+  await expect(panel.getByRole('radiogroup', { name: /^Mode for/ })).toBeVisible();
   return panel;
+}
+
+function processRadio(panel: Locator, name: 'Line' | 'Fill' | 'Image'): Locator {
+  return panel
+    .getByRole('radiogroup', { name: /^Mode for/ })
+    .getByRole('radio', { name, exact: true });
+}
+
+async function chooseProcess(panel: Locator, name: 'Line' | 'Fill' | 'Image'): Promise<void> {
+  await processRadio(panel, name).check();
+  await expect(processRadio(panel, name)).toBeChecked();
 }
 
 async function setNumber(scope: Locator, name: RegExp, value: string): Promise<void> {

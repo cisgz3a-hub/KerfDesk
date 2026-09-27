@@ -219,11 +219,10 @@ describe('Artwork panel navigation', () => {
     const host = await renderPanel();
     const outputGroup = required(host, '.lf-operation-output');
     expect(outputGroup.textContent).toContain(
-      'Visibility and output apply to all 2 artworks using this operation.',
+      'Output and visibility apply to all 2 artworks using this operation.',
     );
     expect(outputGroup.textContent).toContain('Show on canvas');
     expect(outputGroup.textContent).toContain('Include in output');
-    expect(host.textContent).toContain('Editing settings for 1 artwork.');
     expect(host.textContent).toContain('This artwork has its own settings.');
     expect(host.textContent).not.toContain('Shared by 2 artworks. Edits apply to all of them.');
     const output = required<HTMLInputElement>(
