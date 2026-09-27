@@ -168,3 +168,41 @@ length of every emitted path in working px, which is what a LINE-mode pass trave
   line drawn at exactly the Max stroke width can measure up to half a pixel over it at 45 degrees
   and fill. The measurement is right about the pixels; set the Max stroke width a little above the
   pen width. On the commit grid (2 samples per spot) that is a small fraction of the gate.
+### Amendment 1 - classify supported local widths on equivalent grids (2026-09-27)
+
+Rule 3's branch median hid a 6 px-wide end on a long 2 px stroke when the gate was 4 px. The same
+source replicated 2x with gate 8 correctly filled the end because its distance-field core crossed
+the seed margin. Conversely, a short thin tail on a mostly wide branch was filled by the median.
+The median is now used only to describe steady pen widths; it never assigns an entire mixed-width
+branch to fill.
+
+The normal cross-sections already measured by `stroke-width.ts` retain their ordered widths and
+their unmeasurable junction gaps. `wide-stroke-runs.ts` finds supported local runs. Its allowance is
+one sixteenth of the gate (0.25 px at gate 4), and its averaging window is 1.5 gate widths (6 px at
+gate 4). A window with at least three quarters of its measurements above the allowance seeds a
+wide run; neighbouring windows whose mean remains above it join that run. A mean sustained above
+the allowance for two gate widths also seeds a run, so the alternating pixel measurements of a
+slanted steady pen do not defeat the decision. A brief pen blot does not meet either evidence
+test. Gaps where another stroke makes the normal unmeasurable terminate the evidence; separated
+wide runs are never connected through thin ink.
+On closed strokes the evidence starts after a genuine measurement gap, or at the narrowest
+cross-section, so an arbitrary curve seam does not split a wide island into two unsupported ends.
+
+Only those runs' inscribed discs join the wide mask, followed by the existing canonical-curve
+clipping, stub rule, fill-mask reconstruction and attachment closing. Compact blobs retain their
+separate evidence test. Rule 2's seed margin also follows the gate: one eighth of its width,
+preserving the original 0.5 px margin at gate 4. A harmless one-pixel pen blot must not become a
+filled island merely because the source and physical width control were both scaled up.
+
+The support lengths and allowance scale with the operator's gate, including the existing
+preview-to-commit conversion. This defines a small relative evidence band around the control;
+it is not a claim that a digitised raster determines a width with unlimited precision. Width
+metadata still rounds to 0.25 working px, and the existing centreline can retain a short medial
+branch within a coarse blot. The classifier does not duplicate the full-length pen or fill that
+blot to hide the branch.
+
+Focused regressions cover the original and reversed mixed-width branch, exact 1x/2x/4x replicas,
+quarter turns and mirrors, 15/30/45-degree strokes, a short wide island with two attachments,
+gradual tapers, constant-width pens, pen blots, both sides of the allowance, junction gaps, and
+the actual preview-to-commit option conversion. They check fill membership, retained thin travel,
+stroke/fill attachment and absence of an uncut duplicate stroke through the wide region.
