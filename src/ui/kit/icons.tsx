@@ -40,7 +40,9 @@ export type IconName =
   | 'panel-left'
   | 'panel-right'
   | 'undo'
-  | 'redo';
+  | 'redo'
+  | 'laser'
+  | 'cnc';
 
 const ICON_PATHS: Readonly<Record<IconName, JSX.Element>> = {
   sliders: (
@@ -140,6 +142,20 @@ const ICON_PATHS: Readonly<Record<IconName, JSX.Element>> = {
     <>
       <path d="M13 8H6.5a3 3 0 0 0 0 6H10" />
       <path d="M9.5 4.5 13 8l-3.5 3.5" />
+    </>
+  ),
+  // Machine modes: the same head over the same work surface, so the pair
+  // reads as one choice. Laser drops a beam that sparks; CNC holds a fluted bit.
+  laser: (
+    <>
+      <rect x="4.5" y="1.5" width="7" height="4.5" rx="1" />
+      <path d="M6.5 6 8 8l1.5-2M8 8v4M5.5 12.5l-1-1M10.5 12.5l1-1M2.5 14.5h11" />
+    </>
+  ),
+  cnc: (
+    <>
+      <rect x="4.5" y="1.5" width="7" height="4.5" rx="1" />
+      <path d="M6.5 6v6.5h3V6M6.5 9.5l3-2M6.5 12.5l3-2M2.5 14.5h11" />
     </>
   ),
 };
