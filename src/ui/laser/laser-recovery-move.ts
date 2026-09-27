@@ -1,5 +1,5 @@
 // Beam-off move to a point of an interrupted job's work coordinates (ADR-341
-// Amendment 7), through the same jog as Go to work zero: the machine target is
+// Amendment 8), through the same jog as Go to work zero: the machine target is
 // the controller's reported work offset plus the point.
 
 import { deviceForActiveHead } from '../../core/cnc/cnc-head-feeds';

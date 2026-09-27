@@ -2133,7 +2133,12 @@ authorization, Frame proof, controller command, or safety boundary.
   before the job, and only while nobody has moved the head since the stop; if the controller
   itself restarted or lost power mid-burn the head stopped earlier, which Frame remaining area
   shows before anything burns. The Review then reads as set from the head stop instead of
-  warning that the origin moved (ADR-341 Amendment 6).
+  warning that the origin moved (ADR-341 Amendment 6). It also says how far back along the path
+  the lines sent after the last confirmed one reach, the stretch a laser that lost power may
+  not have burned (ADR-341 Amendment 8).
+- Once the controller has the origin the job ran with, or one set from where the head stopped,
+  **Go to job origin** and **Go to restart point** jog the head, beam off, to work X0 Y0 and to
+  where the chosen restart line re-enters the job (ADR-341 Amendment 8).
 - The Review of an interrupted laser job opens by itself once the controller is connected after
   a lost link, a controller restart, a failed write or a stalled stream, once per run in each
   app session. It does not open after the operator's own Abort or a rejected line; the card
@@ -2290,7 +2295,12 @@ provider from the archived project and refuses unless the re-emitted program mat
 G-code exactly. The complete artifact is bounded by a conservative 64 MiB allocation-free estimate
 including G-code and embedded project data. A larger job may still
 Start, but it runs without recovery/archive capture and the operator receives the forensic-record
-warning. A fresh Start arms only its small start intent before the wire (ADR-337); the execution
+warning. A laser run without an archive keeps its start intent and the work offset at Start in
+memory, and an interruption writes them as a fingerprint-only capsule: the card, the Review and
+Restore saved origin work, and the Review's recovery rebuilds the program from the open project
+when it reproduces the fingerprint, running without an archive when its own is over the budget
+too; its record maps progress back onto the job's lines, so a second interruption can be
+continued again (ADR-341 Amendment 8). A fresh Start arms only its small start intent before the wire (ADR-337); the execution
 archive, including its full G-code hashing and IndexedDB clone, is built and stored after the
 controller accepts the program, off the Start-to-motion path. Until activation hands the run to
 `activeRun`, the `pendingStart` intent owns it and no progress checkpoint is written. A crash in

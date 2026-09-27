@@ -118,7 +118,7 @@ export function resumeEntryPointMm(
  * points, so an arc counts its chord. After a lost link the head stopped at
  * the end of the last line sent only if the controller kept running; this is
  * how far back along the path the stretch after the last confirmed line
- * reaches (ADR-341 Amendment 7). Null when the program cannot be followed.
+ * reaches (ADR-341 Amendment 8). Null when the program cannot be followed.
  */
 export function resumeTravelMm(gcode: string, fromLine: number, toLine: number): number | null {
   const lines = gcode.split('\n');

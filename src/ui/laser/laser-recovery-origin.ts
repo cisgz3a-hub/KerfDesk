@@ -10,13 +10,16 @@
 
 import { USER_ORIGIN_REQUIRED_MESSAGE, VERIFIED_ORIGIN_REQUIRED_MESSAGE } from '../job-placement';
 import type { WorkCoordinateOffset } from '../state/origin-actions';
-import type { ExecutionArtifactV1 } from '../state/recovery';
+import type { RecoveryArtifactV1 } from '../state/recovery/execution-artifact';
 
 /** Largest origin difference still read as the same origin (GRBL reports three decimals). */
 export const RECOVERY_ORIGIN_TOLERANCE_MM = 0.05;
 
-/** The work offset observed when the run was archived, in mm from machine zero. */
-export function savedWorkOffsetMm(artifact: ExecutionArtifactV1): WorkCoordinateOffset | null {
+/** The work offset observed when the run was archived, in mm from machine
+ * zero; a run too large to archive keeps the one reported at its Start
+ * (Amendment 8). */
+export function savedWorkOffsetMm(artifact: RecoveryArtifactV1): WorkCoordinateOffset | null {
+  if (artifact.kind === 'legacy-fingerprint-only') return artifact.startWorkOffsetMm ?? null;
   const observation = artifact.archivedControllerObservation;
   const wco = observation.wco ?? null;
   if (wco === null) return null;

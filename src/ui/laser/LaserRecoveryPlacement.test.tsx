@@ -319,6 +319,37 @@ describe('recovery placement and work origin', () => {
     expect(host?.textContent).not.toContain('Restore saved origin');
   });
 
+  it('offers the origin a run too large to archive kept at its Start', async () => {
+    const exact = capsule(null);
+    const fingerprintOnly: RecoveryCapsule = {
+      ...exact,
+      artifactKind: 'legacy-fingerprint-only',
+      artifact: {
+        schemaVersion: 1,
+        kind: 'legacy-fingerprint-only',
+        runId: exact.runId,
+        createdAtIso: exact.artifact.createdAtIso,
+        migratedAtIso: exact.artifact.createdAtIso,
+        fingerprint: exact.artifact.fingerprint,
+        sendableLines: exact.sendableLines,
+        machineKind: 'laser',
+        outputScope: DEFAULT_OUTPUT_SCOPE,
+        startWorkOffsetMm: { x: 20, y: 30, z: 0 },
+      },
+    };
+    const onRestoreOrigin = vi.fn(async () => undefined);
+    render({
+      capsule: fingerprintOnly,
+      liveWorkOffsetMm: { x: 0, y: 0, z: 0 },
+      restartLine: 1,
+      disabled: false,
+      onRestoreOrigin,
+    });
+    expect(host?.textContent).toContain('Origin thenX 20 · Y 30 mm from machine zero');
+    await act(async () => button('Restore saved origin').click());
+    expect(onRestoreOrigin).toHaveBeenCalledWith({ x: 20, y: 30, z: 0 });
+  });
+
   it('converts an origin the controller reported in inches', () => {
     render({
       capsule: capsule({ x: 1, y: 2, z: 0 }, true),

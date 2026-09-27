@@ -46,7 +46,7 @@ export type LaserRecoveryPlacementProps = {
 
 export function LaserRecoveryPlacement(props: LaserRecoveryPlacementProps): JSX.Element {
   const artifact = props.capsule.artifact;
-  const saved = artifact.kind === 'exact-execution' ? savedWorkOffsetMm(artifact) : null;
+  const saved = savedWorkOffsetMm(artifact);
   const live = props.liveWorkOffsetMm ?? null;
   const originGone = placedOriginGone(artifact, props.liveOriginSet);
   return (
@@ -342,9 +342,11 @@ function describeSavedOrigin(
   artifact: RecoveryCapsule['artifact'],
   saved: WorkCoordinateOffset | null,
 ): string {
-  return artifact.kind === 'exact-execution'
-    ? describeOffset(saved, 'Not reported when the job started')
-    : 'Not saved in a fingerprint-only record';
+  const missing =
+    artifact.kind === 'exact-execution'
+      ? 'Not reported when the job started'
+      : 'Not saved in a fingerprint-only record';
+  return describeOffset(saved, missing);
 }
 
 function describeOffset(offset: WorkCoordinateOffset | null, missing: string): string {

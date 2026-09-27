@@ -75,7 +75,7 @@ export function ContinueFromHeadStop(
   );
 }
 
-// How far back an earlier stop can sit (Amendment 7): the lines sent after the
+// How far back an earlier stop can sit (Amendment 8): the lines sent after the
 // last confirmed one, and the confirmed lines still queued in the controller.
 function earlierStopReach(stop: RecoveryHeadStop): string {
   if (stop.unconfirmedLines <= 0 || stop.unconfirmedTravelMm === null) return '';

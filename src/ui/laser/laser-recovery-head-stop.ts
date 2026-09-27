@@ -8,7 +8,7 @@
 // from the next line without moving the head. That holds only while the
 // controller kept running: if the laser itself lost power, the head stopped
 // earlier, so the stop also says how far the unconfirmed lines reach back
-// along the path (Amendment 7).
+// along the path (Amendment 8).
 
 import { resumeEntryPointMm, resumeTravelMm } from '../../core/controllers/grbl/resume-program';
 import { rawResumeLine } from '../../core/recovery';

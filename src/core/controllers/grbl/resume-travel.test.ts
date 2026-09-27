@@ -1,4 +1,4 @@
-// How far the program travels between two lines (ADR-341 Amendment 7): the
+// How far the program travels between two lines (ADR-341 Amendment 8): the
 // stretch after the last line a controller confirmed before a lost link.
 
 import { describe, expect, it } from 'vitest';

@@ -147,6 +147,9 @@ export type LegacyFingerprintOnlyArtifactV1 = {
   readonly machineKind: JobMachineKind;
   readonly outputScope: OutputScope;
   readonly jobOrigin?: JobOriginPlacement;
+  /** The work offset in mm the controller reported when a run too large for
+   * the exact archive started (ADR-341 Amendment 8). */
+  readonly startWorkOffsetMm?: { readonly x: number; readonly y: number; readonly z: number };
 };
 
 export type RecoveryArtifactV1 = ExecutionArtifactV1 | LegacyFingerprintOnlyArtifactV1;
@@ -338,8 +341,14 @@ export function isLegacyFingerprintArtifact(
     isFingerprint(value['fingerprint']) &&
     isNonNegativeInteger(value['sendableLines']) &&
     (value['machineKind'] === 'laser' || value['machineKind'] === 'cnc') &&
-    isOutputScope(value['outputScope'])
+    isOutputScope(value['outputScope']) &&
+    isOptionalFiniteXyz(value['startWorkOffsetMm'])
   );
+}
+
+function isOptionalFiniteXyz(value: unknown): boolean {
+  if (value === undefined) return true;
+  return isRecord(value) && ['x', 'y', 'z'].every((axis) => Number.isFinite(value[axis]));
 }
 
 export function isRecoveryArtifact(value: unknown): value is RecoveryArtifactV1 {

@@ -1,5 +1,5 @@
 // Move the head to the job's origin or to where recovery will resume (ADR-341
-// Amendment 7). Offered once the controller's origin is the one the job ran
+// Amendment 8). Offered once the controller's origin is the one the job ran
 // with, or was set from where the head stopped, so both points land where the
 // job put them. Each is a beam-off jog like Go to work zero; operator actions,
 // not gates (ADR-228).
