@@ -2015,6 +2015,15 @@ authorization, Frame proof, controller command, or safety boundary.
   (a controller reset clears a temporary origin; home first where the machine homes). **Frame
   remaining area** traces everything still to engrave from the chosen line, from the current
   origin, through the ordinary Frame preparation; it issues no Start permit. Both inform only.
+- When the origin differs, is not reported, or (for a User or Verified Origin job) is no longer
+  set, **Restore saved origin** writes the saved XY offset back with one `G92` at the live
+  machine position, without moving the head, and waits for the controller to report it. A
+  cleared origin that sat at machine zero reads as gone, not as matching. The saved offset is
+  measured from machine zero, so after a reset or power loss the operator homes a machine that
+  was homed before the job first; a machine never homed cannot get its origin back from the
+  numbers. When a recovery is refused for a missing origin, the refusal names the saved origin
+  and points here instead of to Set origin here, which would place the rest of the job where
+  the head stopped (ADR-341 Amendment 5).
 - A recorded cause names what happened: **Abort** is recorded as stopped by the operator, and
   closing or reloading KerfDesk mid-job as the app closing (its stop may not have arrived);
   only a stop nobody requested reads as unexplained. A recovery card another window has
@@ -2026,6 +2035,8 @@ authorization, Frame proof, controller command, or safety boundary.
   the last completed run, or the previous manual restart), so a Current Position job is not
   re-anchored where the head stopped; the dialog and confirmation name that placement. With no
   such run, the confirmation says the restart is anchored at the head as it is now (ADR-362).
+  While an interrupted laser job is saved, the line field starts at its automatic restart line
+  (a file line, like the field) and says where the job stopped in sent lines.
   Costly image/fill preparation runs in the background for both manual and fingerprint-based
   recovery; worker failure is retryable and never falls back to blocking the canvas.
 - Recovery preserves the saved scope and resolved placement. It uses its separate source,

@@ -3,35 +3,39 @@
 // the job lands on the finished part only if the work origin is where it was.
 // A controller reset clears a temporary G92 origin, and on Windows opening the
 // port can reset an Arduino-class controller, so the review shows the saved and
-// current origin side by side and can trace the remaining area. Information
-// only: nothing here gates the recovery Start.
+// current origin side by side and can trace the remaining area. When they
+// differ, Restore saved origin puts the saved one back without moving the head
+// (Amendment 5). Nothing here gates the recovery Start.
 
 import { useState } from 'react';
 import type { ExecutionArtifactV1, RecoveryCapsule } from '../state/recovery';
 import type { WorkCoordinateOffset } from '../state/origin-actions';
 import { describeJobOrigin, formatMm } from './job-review/job-review-format';
+import { formatOriginMm, sameRecoveryOrigin, savedWorkOffsetMm } from './laser-recovery-origin';
 import {
   remainingRecoveryWorkBounds,
   type RecoveryWorkBounds,
 } from './laser-recovery-picker-model';
 import { useLaserRecoveryPreviewRoute } from './use-laser-recovery-preview-route';
 
-/** Largest origin difference still read as the same origin (GRBL reports three decimals). */
-export const RECOVERY_ORIGIN_TOLERANCE_MM = 0.05;
-
 export type LaserRecoveryPlacementProps = {
   readonly capsule: RecoveryCapsule;
   /** The controller's current work offset in mm; null until it is reported. */
   readonly liveWorkOffsetMm: WorkCoordinateOffset | null | undefined;
+  /** False when the controller has no work origin set (a reset cleared it). */
+  readonly liveOriginSet?: boolean;
   readonly restartLine: number | undefined;
   readonly disabled: boolean;
   readonly onFrameRemaining?: (bounds: RecoveryWorkBounds) => Promise<void>;
+  /** Writes the saved XY origin back at the live machine position; supplied by the host. */
+  readonly onRestoreOrigin?: (savedMm: WorkCoordinateOffset) => Promise<void>;
 };
 
 export function LaserRecoveryPlacement(props: LaserRecoveryPlacementProps): JSX.Element {
   const artifact = props.capsule.artifact;
   const saved = artifact.kind === 'exact-execution' ? savedWorkOffsetMm(artifact) : null;
   const live = props.liveWorkOffsetMm ?? null;
+  const originGone = placedOriginGone(artifact, props.liveOriginSet);
   return (
     <section aria-labelledby="laser-recovery-placement-title" style={sectionStyle}>
       <h3 id="laser-recovery-placement-title" style={titleStyle}>
@@ -51,7 +55,17 @@ export function LaserRecoveryPlacement(props: LaserRecoveryPlacementProps): JSX.
           )}
         </Row>
       </dl>
-      <OriginComparison saved={saved} live={live} />
+      <OriginComparison saved={saved} live={live} originGone={originGone} />
+      {saved !== null &&
+      props.onRestoreOrigin !== undefined &&
+      originNeedsRestoring(saved, live, originGone) ? (
+        <RestoreSavedOrigin
+          key={artifact.runId}
+          saved={saved}
+          disabled={props.disabled}
+          onRestore={props.onRestoreOrigin}
+        />
+      ) : null}
       {artifact.kind === 'exact-execution' && props.onFrameRemaining !== undefined ? (
         <FrameRemaining
           key={artifact.runId}
@@ -65,17 +79,45 @@ export function LaserRecoveryPlacement(props: LaserRecoveryPlacementProps): JSX.
   );
 }
 
+// A User or Verified Origin job needs an origin set on the controller. An
+// origin set at machine zero has a zero offset, so a reset that cleared it
+// leaves the numbers equal: say it is gone rather than that it matches.
+function placedOriginGone(
+  artifact: RecoveryCapsule['artifact'],
+  liveOriginSet: boolean | undefined,
+): boolean {
+  const startFrom = artifact.jobOrigin?.startFrom;
+  return (
+    liveOriginSet === false && (startFrom === 'user-origin' || startFrom === 'verified-origin')
+  );
+}
+
+function originNeedsRestoring(
+  saved: WorkCoordinateOffset,
+  live: WorkCoordinateOffset | null,
+  originGone: boolean,
+): boolean {
+  return live === null || originGone || !sameRecoveryOrigin(saved, live);
+}
+
 function OriginComparison(props: {
   readonly saved: WorkCoordinateOffset | null;
   readonly live: WorkCoordinateOffset | null;
+  readonly originGone: boolean;
 }): JSX.Element | null {
+  if (props.originGone) {
+    return (
+      <p role="note" style={warningStyle}>
+        The controller has no work origin set now, so recovery has nowhere to place this job. A
+        controller reset or power loss clears an origin made with Set origin here. Put the saved
+        origin back first.
+      </p>
+    );
+  }
   if (props.saved === null || props.live === null) return null;
   const dx = props.live.x - props.saved.x;
   const dy = props.live.y - props.saved.y;
-  if (
-    Math.abs(dx) <= RECOVERY_ORIGIN_TOLERANCE_MM &&
-    Math.abs(dy) <= RECOVERY_ORIGIN_TOLERANCE_MM
-  ) {
+  if (sameRecoveryOrigin(props.saved, props.live)) {
     return (
       <p role="status" style={noteStyle}>
         The work origin matches the one this job ran with.
@@ -86,9 +128,54 @@ function OriginComparison(props: {
     <p role="note" style={warningStyle}>
       The work origin has moved X {formatOriginMm(dx)} mm, Y {formatOriginMm(dy)} mm since this job
       ran. Recovery replays the saved program from the current origin, so the rest of the job would
-      land that far from the finished part. Set the origin back first. A controller reset clears a
-      temporary origin; if the machine homes, home it before setting the origin again.
+      land that far from the finished part. Put the saved origin back first.
     </p>
+  );
+}
+
+function RestoreSavedOrigin(props: {
+  readonly saved: WorkCoordinateOffset;
+  readonly disabled: boolean;
+  readonly onRestore: (savedMm: WorkCoordinateOffset) => Promise<void>;
+}): JSX.Element {
+  const [restoring, setRestoring] = useState(false);
+  const [failure, setFailure] = useState<string | null>(null);
+  const restore = async (): Promise<void> => {
+    if (restoring) return;
+    setRestoring(true);
+    setFailure(null);
+    try {
+      await props.onRestore(props.saved);
+    } catch (error: unknown) {
+      setFailure(error instanceof Error ? error.message : String(error));
+    } finally {
+      setRestoring(false);
+    }
+  };
+  return (
+    <div style={restoreStyle}>
+      <p style={noteStyle}>
+        Restore saved origin puts work zero back at X {formatOriginMm(props.saved.x)}, Y{' '}
+        {formatOriginMm(props.saved.y)} mm from machine zero without moving the head. That is where
+        this job started only if the machine measures its position as it did then: if the controller
+        was reset or lost power, home it first. A machine that was not homed before this job cannot
+        get its origin back from these numbers. Set origin here would put the origin where the head
+        is now, not where the job started.
+      </p>
+      <button
+        type="button"
+        disabled={props.disabled || restoring}
+        onClick={() => void restore()}
+        title="Write the work origin this job ran with back to the controller with one G92. The head does not move."
+      >
+        {restoring ? 'Restoring…' : 'Restore saved origin'}
+      </button>
+      {failure === null ? null : (
+        <p role="alert" style={warningStyle}>
+          {failure}
+        </p>
+      )}
+    </div>
   );
 }
 
@@ -132,21 +219,6 @@ function FrameRemaining(props: {
   );
 }
 
-/** Origins in hundredths of a millimetre, finer than the 0.05 mm tolerance. */
-function formatOriginMm(value: number): string {
-  const rounded = Math.round(value * 100) / 100;
-  return String(rounded === 0 ? 0 : rounded);
-}
-
-/** The work offset observed when the run was archived, in mm. */
-function savedWorkOffsetMm(artifact: ExecutionArtifactV1): WorkCoordinateOffset | null {
-  const observation = artifact.archivedControllerObservation;
-  const wco = observation.wco ?? null;
-  if (wco === null) return null;
-  const scale = observation.settings?.reportInches === true ? 25.4 : 1;
-  return { x: wco.x * scale, y: wco.y * scale, z: wco.z * scale };
-}
-
 function describeOffset(offset: WorkCoordinateOffset | null, missing: string): string {
   return offset === null
     ? missing
@@ -188,6 +260,7 @@ const warningStyle: React.CSSProperties = {
   fontSize: 12,
   lineHeight: 1.45,
 };
+const restoreStyle: React.CSSProperties = { margin: '4px 0 8px' };
 const frameRowStyle: React.CSSProperties = {
   display: 'flex',
   alignItems: 'center',

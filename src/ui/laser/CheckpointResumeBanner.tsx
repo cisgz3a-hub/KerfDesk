@@ -80,6 +80,7 @@ function LaserRecoveryReview(props: {
   readonly onClose: () => void;
 }): JSX.Element {
   const liveWorkOffsetMm = useLiveWorkOffsetMm();
+  const liveOriginSet = useLaserStore((state) => state.workOriginActive);
   return (
     <LaserRecoveryReviewDialog
       capsule={props.capsule}
@@ -92,7 +93,9 @@ function LaserRecoveryReview(props: {
         )
       }
       liveWorkOffsetMm={liveWorkOffsetMm}
+      liveOriginSet={liveOriginSet}
       onFrameRemaining={(bounds) => frameRemainingRecoveryArea(props.capsule, bounds)}
+      onRestoreOrigin={(saved) => useLaserStore.getState().restoreWorkOrigin(saved)}
     />
   );
 }

@@ -14,8 +14,12 @@ export type LaserRecoveryReviewDialogProps = {
   readonly onStart: (capsule: RecoveryCapsule, fromLine?: number) => Promise<boolean>;
   /** The controller's current work offset in mm, supplied by the host. */
   readonly liveWorkOffsetMm?: WorkCoordinateOffset | null;
+  /** Whether the controller has a work origin set now, supplied by the host. */
+  readonly liveOriginSet?: boolean;
   /** Traces the remaining area with the current origin; supplied by the host. */
   readonly onFrameRemaining?: (bounds: RecoveryWorkBounds) => Promise<void>;
+  /** Writes the saved origin back to the controller; supplied by the host. */
+  readonly onRestoreOrigin?: (savedMm: WorkCoordinateOffset) => Promise<void>;
 };
 
 /**
@@ -41,11 +45,13 @@ export function LaserRecoveryReviewDialog(props: LaserRecoveryReviewDialogProps)
       <LaserRecoveryPlacement
         capsule={props.capsule}
         liveWorkOffsetMm={props.liveWorkOffsetMm}
+        {...(props.liveOriginSet === undefined ? {} : { liveOriginSet: props.liveOriginSet })}
         restartLine={fromLine ?? automatic?.line}
         disabled={start.state === 'starting'}
         {...(props.onFrameRemaining === undefined
           ? {}
           : { onFrameRemaining: props.onFrameRemaining })}
+        {...(props.onRestoreOrigin === undefined ? {} : { onRestoreOrigin: props.onRestoreOrigin })}
       />
       <LaserRecoveryRestartPicker
         key={selectionKey}

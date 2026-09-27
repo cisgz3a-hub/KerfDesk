@@ -97,6 +97,7 @@ function makeLaserState(): LaserState {
     setPersistentOriginHere: async () => undefined,
     clearPersistentOrigin: async () => undefined,
     releaseMotors: async () => undefined,
+    restoreWorkOrigin: async () => undefined,
     configureGrblLaserSetup: async () => undefined,
     readMachineSettings: async () => undefined,
     retryControllerQualification: async () => undefined,

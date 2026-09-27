@@ -16,7 +16,6 @@ import {
 } from './host-recorded-origin';
 import { useStore } from './store';
 import { captureWorkZZeroEvidence, selectedCncToolId } from './work-z-zero-evidence';
-import { controllerOperationCommandBlockMessage } from './laser-controller-operation';
 import { sleepRefusalMessage, sleepUnavailableReason } from './controller-sleep';
 import { ControllerCommandRefusedError } from './laser-interactive-command';
 import {
@@ -32,83 +31,17 @@ import {
   setPersistentOriginHere as setPersistentOriginHereAction,
   zeroZHere as zeroZHereAction,
 } from './origin-actions';
-import {
-  assertAutofocusIdle,
-  assertNoActiveJob,
-  mpgCommandBlockMessage,
-  motionOperationCommandBlockMessage,
-  pushLog,
-} from './laser-store-helpers';
+import { pushLog } from './laser-store-helpers';
 import type { LaserState } from './laser-store';
 import type { LiveRefs } from './laser-store';
-import { confirmFreshManualMotionIdle } from './manual-motion-fresh-idle';
+import { assertOriginActionReady, usesPrimaryWcs } from './laser-origin-readiness';
+import { restoreWorkOrigin } from './laser-origin-restore';
 
 type SetFn = (
   partial: Partial<LaserState> | ((state: LaserState) => Partial<LaserState> | LaserState),
 ) => void;
 type GetFn = () => LaserState;
 type SafeWriteFn = OriginSafeWrite;
-
-// Every origin action requires a known stationary controller and exclusive
-// acknowledgement ownership before it may start a transaction.
-async function assertOriginActionReady(
-  set: SetFn,
-  get: GetFn,
-  refs: LiveRefs,
-  safeWrite: SafeWriteFn,
-): Promise<void> {
-  assertOriginActionReadyNow(set, get, refs);
-  await confirmFreshManualMotionIdle({ get, refs, write: safeWrite, action: 'origin' }).catch(
-    (error: unknown) =>
-      blockOriginAction(set, get, error instanceof Error ? error.message : String(error)),
-  );
-  assertOriginActionReadyNow(set, get, refs);
-}
-
-function assertOriginActionReadyNow(set: SetFn, get: GetFn, refs: LiveRefs): void {
-  assertAutofocusIdle(get());
-  assertNoActiveJob(get());
-  const state = get();
-  const operationBlock =
-    motionOperationCommandBlockMessage(state) ??
-    controllerOperationCommandBlockMessage(state.controllerOperation);
-  if (operationBlock !== null) blockOriginAction(set, get, operationBlock);
-  const mpgBlock = mpgCommandBlockMessage(state);
-  if (mpgBlock !== null) blockOriginAction(set, get, mpgBlock);
-  if (state.pendingUntrackedAcks > 0 || refs.controllerCommand !== null) {
-    blockOriginAction(
-      set,
-      get,
-      'Wait for the previous controller command to be acknowledged before changing origin.',
-    );
-  }
-  if (refs.controllerIdleWait !== null) {
-    blockOriginAction(
-      set,
-      get,
-      'Wait for the active controller Idle check before changing origin.',
-    );
-  }
-  if (state.connection.kind !== 'connected') {
-    blockOriginAction(set, get, 'Connect to the controller before changing origin.');
-  }
-  if (state.statusReport?.state !== 'Idle') {
-    const current = state.statusReport?.state ?? 'unknown';
-    blockOriginAction(
-      set,
-      get,
-      `Machine must be Idle before changing origin (currently ${current}).`,
-    );
-  }
-}
-
-function blockOriginAction(set: SetFn, get: GetFn, message: string): never {
-  set({
-    lastWriteError: message,
-    log: pushLog(get(), `[lf2] Origin command blocked: ${message}`),
-  });
-  throw new Error(message);
-}
 
 export function originActions(
   set: SetFn,
@@ -123,6 +56,7 @@ export function originActions(
   | 'setPersistentOriginHere'
   | 'clearPersistentOrigin'
   | 'releaseMotors'
+  | 'restoreWorkOrigin'
 > {
   return {
     setOriginHere: () => setOriginHere(set, get, refs, safeWrite),
@@ -131,6 +65,8 @@ export function originActions(
     setPersistentOriginHere: () => setPersistentOriginHere(set, get, refs, safeWrite),
     clearPersistentOrigin: () => clearPersistentOrigin(set, get, refs, safeWrite),
     releaseMotors: () => releaseMotors(set, get, refs, safeWrite),
+    restoreWorkOrigin: (savedOffsetMm) =>
+      restoreWorkOrigin(set, get, refs, safeWrite, savedOffsetMm),
   };
 }
 
@@ -338,10 +274,6 @@ async function releaseMotors(
     if (!(error instanceof ControllerCommandRefusedError)) throw error;
     throw new Error(sleepRefusalMessage(get(), error.message));
   }
-}
-
-function usesPrimaryWcs(state: LaserState): boolean {
-  return state.capabilities.wcs === 'g92-and-g10';
 }
 
 // Bounded so a silent controller cannot hang Set origin; a full-WCS controller

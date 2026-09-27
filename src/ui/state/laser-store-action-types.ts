@@ -106,4 +106,10 @@ export type LaserStoreActions = {
   readonly setPersistentOriginHere: () => Promise<void>;
   readonly clearPersistentOrigin: () => Promise<void>;
   readonly releaseMotors: () => Promise<void>;
+  /** Put back the XY work offset an interrupted job ran with, in mm from
+   *  machine zero, with one G92 at the live machine position (ADR-341 Amd 5). */
+  readonly restoreWorkOrigin: (savedOffsetMm: {
+    readonly x: number;
+    readonly y: number;
+  }) => Promise<void>;
 };
