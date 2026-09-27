@@ -5,31 +5,35 @@
   min-width: 0;
 }
 
+/* The artwork's name gets the full width; the Operation | Artwork switch
+   sits under it instead of squeezing it (ADR-430). */
 .lf-artwork-context {
   display: flex;
-  align-items: center;
-  gap: 10px;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 8px;
   padding: 2px 2px 0;
-  justify-content: space-between;
 }
 
 .lf-artwork-editor-tabs {
-  display: flex;
-  flex-shrink: 0;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 2px;
-  padding: 0;
-  border-radius: 5px;
+  padding: 2px;
+  border-radius: 8px;
   border: 1px solid var(--lf-border);
 }
 
 .lf-artwork-editor-tabs .lf-btn {
   display: inline-flex;
   align-items: center;
-  gap: 4px;
+  justify-content: center;
+  gap: 5px;
   min-height: 30px;
   padding: 5px;
   border: 0;
-  font-size: 12px;
+  border-radius: 6px;
+  font-size: 13px;
 }
 
 .lf-artwork-editor-tabs [aria-selected='true'] {
@@ -82,16 +86,17 @@
   flex: 1;
 }
 .lf-artwork-tool__actions button {
-  flex: 1;
+  flex: 1 1 0;
   min-height: 32px;
+}
+
+/* Artwork tools use the panel's text size, so a button reads as one line. */
+.lf-artwork-adjustments .lf-btn {
+  font-size: 13px;
 }
 
 .lf-artwork-context > div {
   min-width: 0;
-}
-
-.lf-artwork-context > div:first-child {
-  flex: 1;
 }
 
 .lf-artwork-context strong {
@@ -207,15 +212,29 @@
 .lf-operation-inspector {
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  gap: 12px;
   min-width: 0;
 }
 
 .lf-operation-scope {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0;
   padding: 5px 8px;
   border-left: 2px solid var(--lf-border-strong);
   background: var(--lf-bg-0);
+}
+
+.lf-operation-scope > p {
+  flex: 1;
   color: var(--lf-text);
+}
+
+.lf-operation-scope > .lf-btn {
+  flex-shrink: 0;
+  margin-left: auto;
+  font-size: 12px;
 }
 
 .lf-operation-inspector__heading {
@@ -224,56 +243,25 @@
 }
 
 .lf-operation-identity {
-  display: flex;
-  align-items: center;
-  gap: 9px;
-}
-
-.lf-operation-swatch {
-  width: 5px;
-  height: 32px;
-  flex-shrink: 0;
-  border-radius: 3px;
-}
-
-.lf-operation-identity > label {
   display: grid;
-  grid-template-columns: auto minmax(0, 1fr);
+  grid-template-columns: auto auto minmax(0, 1fr);
   align-items: center;
   gap: 8px;
   min-width: 0;
-  flex: 1;
+}
+
+.lf-operation-swatch {
+  width: 14px;
+  height: 14px;
+  flex-shrink: 0;
+  border: 1px solid var(--lf-border-strong);
+  border-radius: 3px;
 }
 
 .lf-operation-identity input {
   width: 100%;
   box-sizing: border-box;
   font-weight: 600;
-}
-
-.lf-operation-context {
-  display: flex;
-  align-items: center;
-  flex-wrap: wrap;
-  gap: 8px;
-}
-
-.lf-operation-context > p {
-  flex: 1 1 100px;
-}
-
-.lf-operation-context__actions {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 6px;
-}
-
-.lf-operation-context__actions .lf-btn {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  gap: 5px;
-  font-size: 12px;
 }
 
 .lf-operation-output {
@@ -284,9 +272,9 @@
 }
 
 .lf-operation-output__toggles {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 8px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 18px;
 }
 
 .lf-operation-output label {
@@ -296,6 +284,15 @@
   cursor: pointer;
   font-size: 13px;
   line-height: 1.35;
+  white-space: nowrap;
+}
+
+.lf-operation-add.lf-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  justify-self: start;
+  font-size: 12px;
 }
 
 .lf-operation-output input {

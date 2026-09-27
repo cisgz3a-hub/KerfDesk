@@ -109,6 +109,18 @@ export type CncLayerSettings = {
   readonly reliefFinishToolId?: string;
   // Ball-nose scallop height target driving the finishing row spacing.
   readonly reliefScallopMm?: number;
+  // ADR-423 finishing strategy. Absent = 'raster' (the serpentine alone);
+  // 'raster-waterline' adds waterline passes on slopes of 45 degrees or more.
+  readonly reliefFinishStrategy?: 'raster' | 'raster-waterline';
+  // ADR-423 raster direction. Absent = 'x' (rows along X).
+  readonly reliefRasterAxis?: 'x' | 'y';
+  // ADR-422 Amendment 1 fine step on slopes: relief roughing adds band levels
+  // this far apart between its depth-per-pass levels. Absent = off.
+  readonly reliefFineStepMm?: number;
+  // ADR-450: which bit finishes the model's flats. Absent = 'finishing-bit'
+  // (the finishing raster covers them); 'roughing-bit' has an end-mill
+  // roughing bit cut each flat to its exact height and the raster skip it.
+  readonly reliefFlatFinish?: 'finishing-bit' | 'roughing-bit';
   // Motion polish (H.9), both opt-in — absent keeps pre-H.9 output:
   // descend into cuts along the path at this angle instead of plunging.
   readonly rampEntryDeg?: number;

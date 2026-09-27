@@ -3,6 +3,7 @@ import { partialCellCenter, partialCellEnd, partialCellStart } from '../grid';
 import type { ToolKernel, ToolKernelOffset } from '../sim';
 import { cuttingSurfaceDz } from '../sim/cutting-surface';
 import type { Heightmap } from './heightmap';
+import { createSurfaceContactField } from './heightmap-surface-contact';
 
 const TOOL_DISTANCE_TOLERANCE_ULPS = 16;
 
@@ -20,20 +21,25 @@ type CellContext = {
   readonly cy: number;
 };
 
+// `betweenSamples` adds the ADR-412 surface contact on top of the lattice
+// reference, exactly as production does; its own correctness is tested
+// against an independent oracle in heightmap-surface-contact.test.ts.
 export function bruteForcePhysicalDilation(
   map: Heightmap,
   kernel: ToolKernel,
   allowanceMm: number,
+  betweenSamples = false,
 ): DilationReference {
-  return referenceDilation(map, kernel, allowanceMm, 'physical');
+  return referenceDilation(map, kernel, allowanceMm, 'physical', betweenSamples);
 }
 
 export function legacyRegularDilation(
   map: Heightmap,
   kernel: ToolKernel,
   allowanceMm: number,
+  betweenSamples = false,
 ): DilationReference {
-  return referenceDilation(map, kernel, allowanceMm, 'regular');
+  return referenceDilation(map, kernel, allowanceMm, 'regular', betweenSamples);
 }
 
 function referenceDilation(
@@ -41,7 +47,9 @@ function referenceDilation(
   kernel: ToolKernel,
   allowanceMm: number,
   geometry: ReferenceGeometry,
+  betweenSamples: boolean,
 ): DilationReference {
+  const contact = betweenSamples ? createSurfaceContactField(map, kernel) : null;
   const out = new Float32Array(map.widthCells * map.heightCells);
   const outBits = new Uint32Array(out.buffer);
   const touchesExcluded =
@@ -53,7 +61,8 @@ function referenceDilation(
       const context = { map, kernel, cx, cy };
       const surface = surfaceConstraint(context, geometry);
       const excluded = excludedConstraint(context, geometry, false);
-      const best = Math.max(surface, excluded);
+      const lattice = Math.max(surface, excluded);
+      const best = contact === null ? lattice : contact.constraint(cx, cy, lattice);
       const safe = best === Number.NEGATIVE_INFINITY ? (map.depth[center] ?? 0) : best;
       storeTipDepth(
         out,

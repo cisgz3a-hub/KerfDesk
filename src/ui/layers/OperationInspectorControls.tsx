@@ -3,74 +3,65 @@ import type { Layer } from '../../core/scene';
 import { Icon } from '../kit';
 import { useStore } from '../state';
 
-export function OperationContextActions(props: {
+// One line under the operation's name says who an edit reaches, and only when
+// that is not just this artwork (ADR-430). Make unique sits beside the reason
+// to use it.
+export function OperationScope(props: {
   readonly affected: number;
   readonly selectedUsingActive: number;
   readonly overrideEditing: boolean;
+  readonly mixed: boolean;
   readonly onMakeUnique: () => void;
-  readonly onAdd: () => void;
-}): JSX.Element {
-  const shared = props.affected > props.selectedUsingActive;
+}): JSX.Element | null {
+  const message = scopeMessage(props);
+  const others = props.affected > props.selectedUsingActive;
+  if (message === null && !others) return null;
   return (
-    <div className="lf-operation-context">
-      <p className="lf-artwork-hint">
-        {props.overrideEditing
-          ? `Editing settings for ${props.selectedUsingActive} artwork${props.selectedUsingActive === 1 ? '' : 's'}.`
-          : `Affects ${props.affected} artwork${props.affected === 1 ? '' : 's'}.`}
-        {shared && !props.overrideEditing ? ' Shared edits apply to all of them.' : null}
-      </p>
-      <div className="lf-operation-context__actions">
-        {shared ? (
-          <button
-            type="button"
-            className="lf-btn"
-            title="Give only this artwork a copy of the operation so it can be edited independently"
-            onClick={props.onMakeUnique}
-          >
-            Make unique
-          </button>
-        ) : null}
+    <div className="lf-operation-scope">
+      {message === null ? null : <p className="lf-artwork-hint">{message}</p>}
+      {others ? (
         <button
           type="button"
-          className="lf-btn lf-btn--ghost"
-          title="Add another operation to this artwork, then edit its settings"
-          onClick={props.onAdd}
+          className="lf-btn"
+          title="Give only this artwork a copy of the operation so it can be edited independently"
+          onClick={props.onMakeUnique}
         >
-          <Icon name="plus" size={14} />
-          Add operation
+          Make unique
         </button>
-      </div>
+      ) : null}
     </div>
   );
 }
 
-export function OperationToggles({
-  operation,
-  affected,
-}: {
+function scopeMessage(props: {
+  readonly affected: number;
+  readonly selectedUsingActive: number;
+  readonly overrideEditing: boolean;
+  readonly mixed: boolean;
+}): string | null {
+  if (props.overrideEditing) {
+    if (props.mixed) return null;
+    return props.selectedUsingActive === 1
+      ? 'This artwork has its own settings. The values shown here are used for its output.'
+      : `These ${props.selectedUsingActive} artworks have their own settings. The values shown here are used for their output.`;
+  }
+  return props.affected > 1
+    ? `Shared by ${props.affected} artworks. Edits apply to all of them.`
+    : null;
+}
+
+export function OperationFooter(props: {
   readonly operation: Layer;
   readonly affected: number;
+  readonly overrideEditing: boolean;
+  readonly onAdd: () => void;
 }): JSX.Element {
+  const { operation } = props;
   const setLayerParam = useStore((state) => state.setLayerParam);
   return (
     <div className="lf-operation-output">
-      {affected > 1 ? (
-        <p className="lf-artwork-hint">
-          Visibility and output apply to all {affected} artworks using this operation.
-        </p>
-      ) : null}
       <div className="lf-operation-output__toggles">
-        <label title="Show or hide this operation on the workspace">
-          <input
-            type="checkbox"
-            checked={operation.visible}
-            aria-label={`Show ${operation.name}`}
-            title="Show or hide artwork using this operation on the workspace"
-            onChange={(event) => setLayerParam(operation.id, { visible: event.target.checked })}
-          />
-          Show on canvas
-        </label>
-        <label title="Include this operation in preview and machine output">
+        <label title="Include artwork using this operation in preview and machine output">
           <input
             type="checkbox"
             checked={operation.output}
@@ -80,12 +71,36 @@ export function OperationToggles({
           />
           Include in output
         </label>
+        <label title="Show or hide artwork using this operation on the workspace">
+          <input
+            type="checkbox"
+            checked={operation.visible}
+            aria-label={`Show ${operation.name}`}
+            title="Show or hide artwork using this operation on the workspace"
+            onChange={(event) => setLayerParam(operation.id, { visible: event.target.checked })}
+          />
+          Show on canvas
+        </label>
       </div>
+      {props.overrideEditing && props.affected > 1 ? (
+        <p className="lf-artwork-hint">
+          Output and visibility apply to all {props.affected} artworks using this operation.
+        </p>
+      ) : null}
       {!operation.output ? (
         <p className="lf-artwork-hint" role="status">
           This operation is excluded from output. Turn on Include in output to use it in the job.
         </p>
       ) : null}
+      <button
+        type="button"
+        className="lf-btn lf-btn--ghost lf-operation-add"
+        title="Add another operation to this artwork, then edit its settings"
+        onClick={props.onAdd}
+      >
+        <Icon name="plus" size={14} />
+        Add operation
+      </button>
     </div>
   );
 }

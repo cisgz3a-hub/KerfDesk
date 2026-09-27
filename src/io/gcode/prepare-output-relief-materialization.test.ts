@@ -12,8 +12,33 @@ import {
 } from '../../core/scene';
 import { prepareOutputAsync } from './prepare-output-async';
 import { prepareOutput } from './prepare-output';
+import { deserializeProject } from '../project/deserialize-project';
+import { serializeProject } from '../project/serialize-project';
 
 describe('relief materialization compile integrity', () => {
+  it('reports an impossible persisted slope-step Array from sync and background preparation', async () => {
+    const project = persistedSlopeStepProject(1e-12);
+    const expected = {
+      ok: false,
+      preflight: {
+        issues: [
+          {
+            code: 'relief-materialization-failed',
+            message: expect.stringMatching(/fine-depth\.png.*roughing level count.*Array length/s),
+          },
+        ],
+      },
+    };
+    expect(prepareOutput(project)).toMatchObject(expected);
+    expect(
+      await prepareOutputAsync(project, {}, { jobId: 'fine-step', runCncTasks: async () => [] }),
+    ).toMatchObject(expected);
+  });
+
+  it('still prepares a persisted ordinary slope step without changing its value', () => {
+    expect(prepareOutput(persistedSlopeStepProject(0.3)).ok).toBe(true);
+  });
+
   it('refuses the whole mixed job when stored relief samples cannot materialize', () => {
     expect(prepareOutput(mixedMalformedReliefProject())).toMatchObject({
       ok: false,
@@ -59,6 +84,35 @@ describe('relief materialization compile integrity', () => {
     });
   });
 });
+
+function persistedSlopeStepProject(step: number): Project {
+  const base = mixedReliefProject({
+    source: 'fine-depth.png',
+    reliefSource: testReliefHeightfield({
+      width: 1,
+      height: 1,
+      physicalWidthMm: 20,
+      physicalHeightMm: 20,
+      maxDepthMm: 1,
+      samplesU16: [0],
+    }),
+    reliefDepthMm: 1,
+  });
+  const project = {
+    ...base,
+    scene: {
+      ...base.scene,
+      layers: base.scene.layers.map((layer) => ({
+        ...layer,
+        cnc: { ...DEFAULT_CNC_LAYER_SETTINGS, depthPerPassMm: 1, reliefFineStepMm: step },
+      })),
+    },
+  };
+  const loaded = deserializeProject(serializeProject(project));
+  if (loaded.kind !== 'ok') throw new Error('expected project to load');
+  expect(loaded.project.scene.layers[0]?.cnc?.reliefFineStepMm).toBe(step);
+  return loaded.project;
+}
 
 function mixedMalformedReliefProject(): Project {
   return mixedReliefProject({

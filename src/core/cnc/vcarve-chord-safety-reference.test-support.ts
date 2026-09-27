@@ -1,0 +1,182 @@
+import type { Vec2 } from '../scene';
+// Frozen pre-optimization certificate oracle. Keep its projection Set/sort
+// independent of production so work-reuse tests catch any numeric drift.
+import {
+  everyVCarveBoundarySegmentInBox,
+  type VCarveBoundarySegmentSource,
+} from './vcarve-boundary-segment-index';
+import type { BoundarySegment } from './vcarve-detail-geometry';
+import { radialEnvelopeSweepRadiiMm } from './radial-envelope';
+import {
+  pointInsideVCarveBoundary,
+  type VCarveCertifiedEnvelope,
+} from './vcarve-cutting-constraints';
+
+const QUADRATIC_EPSILON_MM2 = 1e-14;
+
+export function referenceEmittedChordIsSafe(
+  a: Vec2,
+  b: Vec2,
+  depthA: number,
+  depthB: number,
+  segments: VCarveBoundarySegmentSource,
+  envelope: VCarveCertifiedEnvelope,
+): boolean {
+  if (envelope.requireInsideBoundary) {
+    if (depthA > 0 && !pointInsideVCarveBoundary(a, segments)) return false;
+    if (depthB > 0 && !pointInsideVCarveBoundary(b, segments)) return false;
+  }
+  const radii = radialEnvelopeSweepRadiiMm(envelope, depthA, depthB);
+  const reserve = depthA > 0 || depthB > 0 ? (envelope.boundaryClearanceMm ?? 0) : 0;
+  const radiusA = radii[0] + reserve;
+  const radiusB = radii[1] + reserve;
+  // The envelope radius varies linearly from radiusA to radiusB, so the swept
+  // region cannot extend past the chord's bounding box grown by the larger of
+  // the two. A segment outside that box is unreachable and therefore always
+  // clears, which makes this rejection exact rather than approximate.
+  //
+  // It matters because this is the compaction inner loop: profile compaction
+  // tests up to MAX_COMPACTION_SPAN_POINTS candidate spans per point, and each
+  // one previously ran the quadratic clearance solve against every boundary
+  // segment in the region. A single carved letter spent seconds here.
+  const reach = Math.max(radiusA, radiusB);
+  const minX = Math.min(a.x, b.x) - reach;
+  const maxX = Math.max(a.x, b.x) + reach;
+  const minY = Math.min(a.y, b.y) - reach;
+  const maxY = Math.max(a.y, b.y) + reach;
+  return everyVCarveBoundarySegmentInBox(segments, { minX, minY, maxX, maxY }, (segment) =>
+    radiusChordClearsSegment(a, b, radiusA, radiusB, segment),
+  );
+}
+
+function radiusChordClearsSegment(
+  a: Vec2,
+  b: Vec2,
+  radiusA: number,
+  radiusB: number,
+  segment: BoundarySegment,
+): boolean {
+  const vx = b.x - a.x;
+  const vy = b.y - a.y;
+  const wx = segment.bx - segment.ax;
+  const wy = segment.by - segment.ay;
+  const wLengthSquared = wx * wx + wy * wy;
+  if (wLengthSquared === 0) {
+    return quadraticClearanceOnInterval(
+      a.x - segment.ax,
+      a.y - segment.ay,
+      vx,
+      vy,
+      radiusA,
+      radiusB - radiusA,
+      0,
+      1,
+    );
+  }
+  const u0 = ((a.x - segment.ax) * wx + (a.y - segment.ay) * wy) / wLengthSquared;
+  const uSlope = (vx * wx + vy * wy) / wLengthSquared;
+  const breaks = projectionBreaks(u0, uSlope);
+  for (let index = 0; index < breaks.length - 1; index += 1) {
+    const low = breaks[index];
+    const high = breaks[index + 1];
+    if (low === undefined || high === undefined) continue;
+    const coefficients = nearestVectorCoefficients(
+      a,
+      { x: vx, y: vy },
+      segment,
+      u0,
+      uSlope,
+      (low + high) / 2,
+    );
+    if (
+      !quadraticClearanceOnInterval(
+        coefficients.x0,
+        coefficients.y0,
+        coefficients.x1,
+        coefficients.y1,
+        radiusA,
+        radiusB - radiusA,
+        low,
+        high,
+      )
+    ) {
+      return false;
+    }
+  }
+  return true;
+}
+
+function projectionBreaks(u0: number, uSlope: number): ReadonlyArray<number> {
+  const values = [0, 1];
+  if (uSlope !== 0) {
+    for (const boundary of [0, 1]) {
+      const t = (boundary - u0) / uSlope;
+      if (t > 0 && t < 1) values.push(t);
+    }
+  }
+  return [...new Set(values)].sort((a, b) => a - b);
+}
+
+function nearestVectorCoefficients(
+  a: Vec2,
+  velocity: Vec2,
+  segment: BoundarySegment,
+  u0: number,
+  uSlope: number,
+  sampleT: number,
+): { readonly x0: number; readonly y0: number; readonly x1: number; readonly y1: number } {
+  const sampleU = u0 + uSlope * sampleT;
+  if (sampleU <= 0) {
+    return {
+      x0: a.x - segment.ax,
+      y0: a.y - segment.ay,
+      x1: velocity.x,
+      y1: velocity.y,
+    };
+  }
+  if (sampleU >= 1) {
+    return {
+      x0: a.x - segment.bx,
+      y0: a.y - segment.by,
+      x1: velocity.x,
+      y1: velocity.y,
+    };
+  }
+  const wx = segment.bx - segment.ax;
+  const wy = segment.by - segment.ay;
+  return {
+    x0: a.x - segment.ax - wx * u0,
+    y0: a.y - segment.ay - wy * u0,
+    x1: velocity.x - wx * uSlope,
+    y1: velocity.y - wy * uSlope,
+  };
+}
+
+function quadraticClearanceOnInterval(
+  x0: number,
+  y0: number,
+  x1: number,
+  y1: number,
+  radius0: number,
+  radiusSlope: number,
+  low: number,
+  high: number,
+): boolean {
+  const a = x1 * x1 + y1 * y1 - radiusSlope * radiusSlope;
+  const b = 2 * (x0 * x1 + y0 * y1 - radius0 * radiusSlope);
+  // Evaluate the geometric residual, not the expanded polynomial. A long
+  // chord can have coefficients around 1e12 while passing within microns
+  // of a boundary; polynomial cancellation would erase the cutter radius.
+  const clearanceAt = (t: number) => {
+    const x = x0 + x1 * t;
+    const y = y0 + y1 * t;
+    const radius = radius0 + radiusSlope * t;
+    return x * x + y * y - radius * radius;
+  };
+  let minimum = Math.min(clearanceAt(low), clearanceAt(high));
+  if (a > 0) {
+    const vertex = -b / (2 * a);
+    if (vertex > low && vertex < high) minimum = Math.min(minimum, clearanceAt(vertex));
+  }
+  return minimum >= -QUADRATIC_EPSILON_MM2;
+}
