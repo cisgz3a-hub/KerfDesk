@@ -96,10 +96,10 @@ function LaserProcessChoice(props: {
               key={mode}
               className="lf-process-segment"
               data-checked={checked ? 'true' : undefined}
-              title={PROCESS_COPY[mode].description}
             >
               <input
                 type="radio"
+                title={PROCESS_COPY[mode].description}
                 name={name}
                 value={mode}
                 checked={checked}

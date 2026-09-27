@@ -71,7 +71,8 @@ describe('laser artwork settings layout (ADR-430)', () => {
       if (!(group instanceof HTMLElement)) throw new Error('process group missing');
       const options = [...group.querySelectorAll('label')];
       expect(options.map((option) => option.textContent)).toEqual(['Line', 'Fill', 'Image']);
-      expect(options.every((option) => (option.title ?? '').length > 20)).toBe(true);
+      const titles = [...group.querySelectorAll('input')].map((input) => input.title);
+      expect(titles.every((title) => title.length > 20)).toBe(true);
       expect(group.querySelector<HTMLInputElement>('input[value="line"]')?.checked).toBe(true);
       expect(view.host.querySelector('select[aria-label^="Mode for"]')).toBeNull();
       expect(view.host.textContent).not.toContain('About this process');
