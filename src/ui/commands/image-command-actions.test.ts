@@ -12,6 +12,7 @@ import { useStore } from '../state';
 import { resetStore } from '../state/test-helpers';
 import {
   cropImageAction,
+  flattenImageMaskAction,
   retraceOriginalAction,
   traceSourceForTracedImage,
 } from './image-command-actions';
@@ -265,5 +266,99 @@ describe('cropImageAction document ownership', () => {
 
     expect(cropImage).toHaveBeenCalledWith(source.id, cropped);
     expect(pushToast).toHaveBeenCalledWith(`Cropped image: ${source.source}`, 'success');
+  });
+});
+
+// Flatten Image Mask (ADR-480) shares Crop Image's bake and ownership checks.
+describe('flattenImageMaskAction', () => {
+  function maskedProject(): { readonly project: Project; readonly source: RasterImage } {
+    const mask = createRectangle({
+      id: 'M1',
+      color: '#000000',
+      spec: { widthMm: 10, heightMm: 10, cornerRadiusMm: 0 },
+    });
+    const source = { ...raster(), imageMaskId: mask.id };
+    return { project: projectWith(source, mask), source };
+  }
+
+  function settle(): Promise<void> {
+    return new Promise((resolve) => setTimeout(resolve, 0));
+  }
+
+  it.each([
+    ['mask-deleted', 'Flattened the mask into logo.png and deleted the mask shape.'],
+    [
+      'mask-kept',
+      'Flattened the mask into logo.png. The mask shape stays because it is locked or still in use.',
+    ],
+    ['unchanged', null],
+  ] as const)('reports the %s outcome', async (outcome, message) => {
+    const { project, source } = maskedProject();
+    const flattened = { ...source, source: 'flattened.png' };
+    const flattenImageMask = vi.fn(() => outcome);
+    const pushToast = vi.fn();
+    vi.mocked(cropMaskedRasterImage).mockResolvedValue(flattened);
+    useStore.setState({ project, projectDocumentEpoch: 40 });
+
+    flattenImageMaskAction(
+      { project, projectDocumentEpoch: 40, flattenImageMask },
+      source,
+      pushToast,
+    )();
+    await settle();
+
+    expect(flattenImageMask).toHaveBeenCalledWith(source.id, flattened);
+    if (message === null) expect(pushToast).not.toHaveBeenCalled();
+    else expect(pushToast).toHaveBeenCalledWith(message, 'success');
+  });
+
+  it('reports a failed bake with the flatten wording', async () => {
+    const { project, source } = maskedProject();
+    const flattenImageMask = vi.fn(() => 'mask-deleted');
+    const pushToast = vi.fn();
+    vi.mocked(cropMaskedRasterImage).mockRejectedValue(new Error('decode failed'));
+    useStore.setState({ project, projectDocumentEpoch: 41 });
+
+    flattenImageMaskAction(
+      { project, projectDocumentEpoch: 41, flattenImageMask },
+      source,
+      pushToast,
+    )();
+    await settle();
+
+    expect(flattenImageMask).not.toHaveBeenCalled();
+    expect(pushToast).toHaveBeenCalledWith(
+      'Could not flatten the image mask: decode failed',
+      'error',
+    );
+  });
+
+  it('flattens through the store and deletes the unused mask shape', async () => {
+    const { project, source } = maskedProject();
+    const flattened = { ...source, dataUrl: 'data:image/png;base64,flat' };
+    const pushToast = vi.fn();
+    vi.mocked(cropMaskedRasterImage).mockResolvedValue(flattened);
+    useStore.setState({ project, projectDocumentEpoch: 42 });
+
+    flattenImageMaskAction(
+      {
+        project,
+        projectDocumentEpoch: 42,
+        flattenImageMask: (imageId, image) => useStore.getState().flattenImageMask(imageId, image),
+      },
+      source,
+      pushToast,
+    )();
+    await settle();
+
+    const objects = useStore.getState().project.scene.objects;
+    expect(objects.map((object) => object.id)).toEqual([source.id]);
+    expect(objects[0]).toMatchObject({ dataUrl: 'data:image/png;base64,flat' });
+    expect(objects[0]).not.toHaveProperty('imageMaskId');
+    expect(useStore.getState().undoStack).toHaveLength(1);
+    expect(pushToast).toHaveBeenCalledWith(
+      'Flattened the mask into logo.png and deleted the mask shape.',
+      'success',
+    );
   });
 });

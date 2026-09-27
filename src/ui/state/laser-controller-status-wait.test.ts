@@ -1,4 +1,4 @@
-import { describe, expect, it, vi } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import { parseStatusReport, type StatusReport } from '../../core/controllers/grbl';
 import {
   cancelFreshControllerStatusWait,
@@ -11,6 +11,8 @@ const SESSION_EPOCH = 7;
 const STATUS_SEQUENCE = 11;
 const TIMEOUT_MESSAGE = 'Status confirmation timed out.';
 
+afterEach(() => vi.useRealTimers());
+
 function status(line: string): StatusReport {
   const report = parseStatusReport(line);
   if (report === null) throw new Error(`Expected a status report: ${line}`);
@@ -18,6 +20,37 @@ function status(line: string): StatusReport {
 }
 
 describe('fresh controller status observation', () => {
+  it('allows an owned caller to supply the deadline and still cancel explicitly', async () => {
+    vi.useFakeTimers();
+    const refs: ControllerStatusWaitRefs = {};
+    const pending = waitForFreshControllerStatus(refs, {
+      after: { sessionEpoch: SESSION_EPOCH, sequence: STATUS_SEQUENCE },
+      accept: () => false,
+      timeoutMs: null,
+      timeoutMessage: TIMEOUT_MESSAGE,
+    });
+    const cancelled = expect(pending).rejects.toThrow(/cancelled/i);
+    await vi.advanceTimersByTimeAsync(10_000);
+    expect(refs.controllerStatusWait).not.toBeNull();
+    cancelFreshControllerStatusWait(refs);
+    await cancelled;
+    expect(refs.controllerStatusWait).toBeNull();
+  });
+
+  it('retains the default timeout when the caller does not own a deadline', async () => {
+    vi.useFakeTimers();
+    const refs: ControllerStatusWaitRefs = {};
+    const pending = waitForFreshControllerStatus(refs, {
+      after: { sessionEpoch: SESSION_EPOCH, sequence: STATUS_SEQUENCE },
+      accept: () => false,
+      timeoutMessage: TIMEOUT_MESSAGE,
+    });
+    const rejected = expect(pending).rejects.toThrow(TIMEOUT_MESSAGE);
+    await vi.advanceTimersByTimeAsync(8_000);
+    await rejected;
+    expect(refs.controllerStatusWait).toBeNull();
+  });
+
   it('notifies progress only after the sequence floor in the expected session', async () => {
     const refs: ControllerStatusWaitRefs = {};
     const onFreshReport = vi.fn();

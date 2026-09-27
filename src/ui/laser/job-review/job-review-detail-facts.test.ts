@@ -269,6 +269,7 @@ describe('cncOperationDetail', () => {
     const reliefOnly = {
       roughingLevelDepthsMm: [1.5, 2.5],
       reliefCount: 1,
+      maxDepthMm: 2.5,
       cutsOtherShapes: false,
     };
     expect(cncOperationDetail(DEFAULT_CNC_LAYER_SETTINGS, 18, [], reliefOnly)).toBe(
@@ -293,7 +294,12 @@ describe('cncOperationDetail', () => {
   });
 
   it('keeps the pass count and tabs for the other shapes cut beside reliefs', () => {
-    const mixed = { roughingLevelDepthsMm: [1.5, 2.5], reliefCount: 1, cutsOtherShapes: true };
+    const mixed = {
+      roughingLevelDepthsMm: [1.5, 2.5],
+      reliefCount: 1,
+      maxDepthMm: 2.5,
+      cutsOtherShapes: true,
+    };
     expect(cncOperationDetail(DEFAULT_CNC_LAYER_SETTINGS, undefined, [], mixed)).toBe(
       'relief roughing 2 levels to 2.5 mm · 1 pass on the other shapes · stepover 40% · tabs 4 per shape (6 × 2 mm), none on reliefs · Manual feeds',
     );
@@ -316,7 +322,12 @@ describe('cncOperationDetail', () => {
       vCarveFlatDepthEnabled: true,
       vClearToolId: 'clear',
     };
-    const oneLevel = { roughingLevelDepthsMm: [3], reliefCount: 1, cutsOtherShapes: false };
+    const oneLevel = {
+      roughingLevelDepthsMm: [3],
+      reliefCount: 1,
+      maxDepthMm: 3,
+      cutsOtherShapes: false,
+    };
     expect(cncOperationDetail(vCarve, undefined, [], oneLevel)).toBe(
       'relief roughing 1 level to 3 mm · stepover 40% · Manual feeds',
     );
@@ -324,7 +335,12 @@ describe('cncOperationDetail', () => {
       'relief roughing 1 level to 3 mm · requested flat floor 1 mm · max stepdown 1.5 mm · stepover 40% · clear stepover 40% · Manual feeds',
     );
     // A relief no deeper than its allowance compiles only its finishing pass.
-    const noLevels = { roughingLevelDepthsMm: [], reliefCount: 1, cutsOtherShapes: false };
+    const noLevels = {
+      roughingLevelDepthsMm: [],
+      reliefCount: 1,
+      maxDepthMm: 0.4,
+      cutsOtherShapes: false,
+    };
     expect(cncOperationDetail(DEFAULT_CNC_LAYER_SETTINGS, undefined, [], noLevels)).toBe(
       'no relief roughing levels · Manual feeds',
     );
@@ -336,6 +352,7 @@ describe('cncOperationDetail', () => {
     const reliefOnly = {
       roughingLevelDepthsMm: [1.5, 2.5],
       reliefCount: 1,
+      maxDepthMm: 2.5,
       cutsOtherShapes: false,
     };
     const helix: CncLayerSettings = {
@@ -370,6 +387,7 @@ describe('cncOperationDetail', () => {
     const twoReliefs = {
       roughingLevelDepthsMm: [1.5, 2.5, 3, 4.5],
       reliefCount: 2,
+      maxDepthMm: 4.5,
       cutsOtherShapes: false,
     };
     expect(cncOperationDetail(DEFAULT_CNC_LAYER_SETTINGS, undefined, [], twoReliefs)).toBe(

@@ -87,17 +87,19 @@ export type GcodeMetadata = {
  * exact-contact checks exceed the normal-to-move tolerance, with finite
  * sampling and output-rounding limits retained, and ADR-462's best-effort
  * air repeats at eligible boundaries, with full-circle/large-arc timing
- * and unchanged M3 dark-transition ordering, and ADR-491's pocket rings and
- * rows linked at depth at the plunge feed and its park height before the
- * job-end and bit-change parks.
+ * and unchanged M3 dark-transition ordering, and ADR-424 amendment 1's relief
+ * roughing headers that count the passes plunged into a first loop shorter
+ * than one cut width, and ADR-491's pocket rings and rows linked at depth at
+ * the plunge feed and its park height before the job-end and bit-change parks.
  */
 // ADR-427 keeps deepest cleanup before linked relief rings and flat depth slices.
 // ADR-368 sizes nonflat pocket/profile offsets, tabs and stepover by cut width.
 // Tracer batch 3 preserves bounded chords, shared seams and Line + fill.
 // Native arcs and compact Fill retain scan v2's shared/empty/coincident M3 handoffs.
 // ADR-471 discloses sub-width plunges; ADR-457 finishing recipes survive ramping.
-export const EMITTER_REVISION =
-  'trace-arcs-relief-width-ramp-contact-air-scan-v2-stay-down-park-20260927-v8';
+// ADR-424 Amd 1 discloses relief roughing's sub-width plunges the same way.
+// ADR-491 links pocket rings at depth and lifts to the park height.
+export const EMITTER_REVISION = 'relief-ramp-plunges-stay-down-park-20260927-v2';
 
 // Machine-specific assumption lines (ADR-103 defect fix): router exports
 // previously carried the laser-worded `$32=1 (laser mode)` banner. The S

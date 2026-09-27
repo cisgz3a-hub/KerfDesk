@@ -334,6 +334,40 @@ describe('reliefRoughingMotion', () => {
     expect(passes[0]?.kind).toBe('contour');
   });
 
+  it('marks each chain the ramp leaves to plunge, and only those (ADR-424 Amendment 1)', () => {
+    // A 0.5 mm square, 2 mm round, and a 20 mm square too far away to link:
+    // the first is shorter than the cut width, the second ramps.
+    const pair = level([rect(0, 0, 0.5, 0.5), rect(10, 0, 30, 20)]);
+    const ramped = reliefRoughingMotion([pair], {
+      stockOnRight: true,
+      cutWidthMm: CUT_WIDTH_MM,
+      rampAngleDeg: 3,
+    });
+    const plunged = reliefRoughingMotion([pair], { stockOnRight: true, cutWidthMm: CUT_WIDTH_MM });
+    const tinyChain = (passes: ReadonlyArray<CncPass>): CncPass | undefined =>
+      passes.find((pass) => pass.kind === 'contour' && pass.polyline.every((p) => p.x <= 0.5));
+
+    expect(ramped.map((pass) => pass.kind).sort()).toEqual(['contour', 'path3d']);
+    expect(tinyChain(ramped)).toMatchObject({ kind: 'contour', entryPlunge: true });
+    // The marker only discloses: the motion is the plunge the same loop gets
+    // without a ramp angle, which is not marked.
+    expect(plunged.some((pass) => 'entryPlunge' in pass)).toBe(false);
+    expect(tinyChain(ramped)).toEqual({ ...tinyChain(plunged), entryPlunge: true });
+  });
+
+  it('marks no plunge where the level leaves no stock to ramp through', () => {
+    // The slice top is the level's own depth, so the descent crosses air.
+    const cleared = level([rect(0, 0, 0.5, 0.5)], -1, -1);
+    const [pass] = reliefRoughingMotion([cleared], {
+      stockOnRight: true,
+      cutWidthMm: CUT_WIDTH_MM,
+      rampAngleDeg: 3,
+    });
+
+    expect(pass?.kind).toBe('contour');
+    expect(pass).not.toHaveProperty('entryPlunge');
+  });
+
   it('keeps a cleanup trace round its stock on the climb side', () => {
     const base = level([rect(0, 0, 20, 20)]);
     const trace = rect(8, 8, 12, 12);
