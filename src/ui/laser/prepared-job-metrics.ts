@@ -15,6 +15,7 @@ import {
 import type { ExecutablePlanV1 } from '../../core/execution-plan';
 import type { JobDurationEstimateOptions } from '../../core/job/estimate-duration';
 import { resolveJobParkTarget } from '../../core/output';
+import { finishOptionsForJob } from '../../core/output/output-strategy';
 import { machineKindOf, type Vec2 } from '../../core/scene';
 import type { PreparedOutput } from '../../io/gcode';
 import { selectExecutablePlanCalculatedBounds } from './executable-plan-calculated-bounds';
@@ -41,8 +42,12 @@ export function buildPreparedJobMetrics(
 ): PreparedJobMetrics {
   const device = prepared.project.device;
   const machineKind = machineKindOf(prepared.project.machine);
-  const finishPosition =
+  // The head starts at a Current Position job's start; where it ends comes from
+  // the one finish source emission uses (ADR-483), so the Time tile and the
+  // park disclosure describe the exact final move.
+  const initialPosition =
     jobOrigin?.startFrom === 'current-position' ? jobOrigin.currentPosition : undefined;
+  const { finishPosition } = finishOptionsForJob(prepared.job, jobOrigin);
   const framedJob = machineSpaceJob(prepared.job, device, prepared.project.machine);
   // ADR-127: the rotary mapping must be applied everywhere the job is
   // MEASURED, and the head travels machine millimetres, not design-surface
@@ -53,9 +58,8 @@ export function buildPreparedJobMetrics(
   const duration: JobDurationEstimate =
     timingOptions.unavailableReason === undefined
       ? estimateJobDuration(framedJob, device, {
-          ...(finishPosition === undefined
-            ? {}
-            : { initialPosition: finishPosition, finishPosition }),
+          ...(initialPosition === undefined ? {} : { initialPosition }),
+          ...(finishPosition === undefined ? {} : { finishPosition }),
           ...timingOptions,
         })
       : {

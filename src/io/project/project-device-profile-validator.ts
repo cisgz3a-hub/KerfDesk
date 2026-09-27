@@ -8,6 +8,10 @@ import {
   type ProfileCapability,
 } from '../../core/devices';
 import {
+  invalidSavedHeadPositionIndex,
+  isLaserFinishPosition,
+} from '../../core/devices/head-position-shape';
+import {
   firstError,
   isObject,
   optionalBoolean,
@@ -145,6 +149,19 @@ export function optionalLaserFireControl(
     return `missing or invalid \`${path}.maxPowerPercent\``;
   }
   return requireBoolean(value, `${path}.enabled`);
+}
+
+/** The laser finish position and saved head positions (ADR-483). */
+export function optionalHeadPositions(obj: Record<string, unknown>, path: string): string | null {
+  const finish = obj['laserFinishPosition'];
+  if (finish !== undefined && !isLaserFinishPosition(finish)) {
+    return `missing or invalid \`${path}.laserFinishPosition\``;
+  }
+  const saved = obj['savedPositions'];
+  if (saved === undefined) return null;
+  if (!Array.isArray(saved)) return `missing or invalid \`${path}.savedPositions\``;
+  const index = invalidSavedHeadPositionIndex(saved);
+  return index < 0 ? null : `missing or invalid \`${path}.savedPositions[${index}]\``;
 }
 
 function optionalLaserSpotSize(obj: Record<string, unknown>, path: string): string | null {

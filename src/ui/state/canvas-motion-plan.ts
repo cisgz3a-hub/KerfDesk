@@ -17,7 +17,7 @@ import {
   INITIAL_ROUTE_RECONCILIATION,
   type RouteReconciliationState,
 } from '../../core/job/live-route-reconciliation';
-import { finishOptionsForJobOrigin } from '../../core/output';
+import { finishOptionsForJob } from '../../core/output/output-strategy';
 import { fingerprintGcode, type GcodeFingerprint } from '../../core/recovery';
 import {
   machineKindOf,
@@ -224,7 +224,7 @@ function cncPassSpansOption(
     args.prepared.project.device,
     fingerprintSource,
     manifest,
-    finishOptionsForJobOrigin(args.jobOrigin),
+    finishOptionsForJob(args.prepared.job, args.jobOrigin),
   );
   return spans === undefined ? {} : { cncPassSpans: spans };
 }
@@ -236,6 +236,9 @@ const DESCRIPTIVE_DEVICE_FIELDS: ReadonlySet<keyof DeviceProfile> = new Set([
   'profileSource',
   'catalogVersion',
   'evidence',
+  // Saved head positions (ADR-483) are only read by the Move to position panel;
+  // saving one after Frame must not expire a permit whose program is unchanged.
+  'savedPositions',
 ]);
 
 function retainedDeviceFields(device: DeviceProfile): Readonly<Record<string, unknown>> {

@@ -12,8 +12,16 @@ import {
   type Vec2,
   validateOutputScope,
 } from '../../core/scene';
-import { buildToolpath, EMPTY_JOB, type JobOriginPlacement, type Toolpath } from '../../core/job';
+import {
+  buildToolpath,
+  EMPTY_JOB,
+  type Job,
+  type JobOriginPlacement,
+  type Toolpath,
+} from '../../core/job';
 import { resolveGrblDialect } from '../../core/devices';
+import { laserParkTarget } from '../../core/output/job-park-target';
+import { finishOptionsForJob } from '../../core/output/output-strategy';
 import {
   prepareOutput,
   prepareOutputSnapshot,
@@ -199,7 +207,7 @@ export function buildPreviewToolpathFromPrepared(
   // raster sim) draws in scene space. Map back so the overlay registers with
   // the design instead of mirroring about the bed midline (H3).
   const startPoint = previewStartPoint(jobOrigin);
-  const parkPoint = previewParkPoint(project, jobOrigin);
+  const parkPoint = previewParkPoint(project, prepared.job, jobOrigin);
   const machineToolpath = buildToolpath(prepared.job, {
     startPoint,
     ...(parkPoint === undefined ? {} : { parkPoint }),
@@ -264,15 +272,16 @@ function previewStartPoint(jobOrigin: JobOriginPlacement | undefined): Vec2 {
   return jobOrigin?.startFrom === 'current-position' ? jobOrigin.currentPosition : { x: 0, y: 0 };
 }
 
+// The laser park comes from the one finish source emission uses (ADR-483), so
+// the drawn final move is the emitted one.
 function previewParkPoint(
   project: Project,
+  job: Job,
   jobOrigin: JobOriginPlacement | undefined,
 ): Vec2 | undefined {
-  if (jobOrigin?.startFrom === 'current-position') return jobOrigin.currentPosition;
-  if (project.machine?.kind === 'cnc' || resolveGrblDialect(project.device).parkAtOriginAfterJob) {
-    return { x: 0, y: 0 };
-  }
-  return undefined;
+  const { finishPosition } = finishOptionsForJob(job, jobOrigin);
+  if (project.machine?.kind === 'cnc') return finishPosition ?? { x: 0, y: 0 };
+  return laserParkTarget(resolveGrblDialect(project.device), finishPosition) ?? undefined;
 }
 
 function emptyPreviewToolpath(previewIssue: PreviewIssue): PreviewToolpath {

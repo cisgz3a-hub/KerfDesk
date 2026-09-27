@@ -3,12 +3,15 @@
 // Click a jog arrow for one selected step. Holding a pointer arrow starts a
 // continuous jog; release, pointer loss, blur, and unmount all route through the
 // controller's jog-cancel command. Bare arrow keys nudge the selected canvas
-// object and no longer jog the machine (F104); Z-focus keys stay on the pad.
+// object and no longer jog the machine (F104). The pad owns the keyboard jog
+// keys while it is mounted: PageUp/PageDown for Z focus, and LightBurn's XY
+// keys (ADR-483), which send the same step vector as the matching arrow.
 
 import { useCallback, useMemo, useState } from 'react';
 import {
   jogAxisSignsForOrigin,
   machineBoundsForDevice,
+  type JogAxisSigns,
   type MachineBounds,
 } from '../../core/devices';
 import { deviceForActiveHead } from '../../core/cnc/cnc-head-feeds';
@@ -74,7 +77,7 @@ export function JogPad({ disabled }: { readonly disabled: boolean }): JSX.Elemen
   }, [cancelJog]);
   const handleZeroZ = useZeroZAction();
 
-  useJogPadShortcuts(disabled, focusReady, sendFocus);
+  useJogPadShortcuts({ disabled, focusReady, sendFocus, sendVector, step, feed, signs });
 
   return (
     <div className="lf-jog-panel" style={containerStyle}>
@@ -146,12 +149,24 @@ function nativeTravel(bounds: NativeXyBounds): MachineBounds {
   return { ...bounds, width: bounds.maxX - bounds.minX, height: bounds.maxY - bounds.minY };
 }
 
-function useJogPadShortcuts(
-  disabled: boolean,
-  focusReady: boolean,
-  onFocusJog: (direction: 1 | -1) => void,
-): void {
-  useJogShortcuts({ focusDisabled: disabled || !focusReady, onFocusJog });
+// Keyboard jog is live only while the pad is mounted. An XY key sends the pad's
+// own step vector (ADR-483), so it is disabled exactly when the arrows are.
+function useJogPadShortcuts(pad: {
+  readonly disabled: boolean;
+  readonly focusReady: boolean;
+  readonly sendFocus: (direction: 1 | -1) => void;
+  readonly sendVector: (vector: JogVector) => void;
+  readonly step: number;
+  readonly feed: number;
+  readonly signs: JogAxisSigns;
+}): void {
+  useJogShortcuts({
+    focusDisabled: pad.disabled || !pad.focusReady,
+    onFocusJog: pad.sendFocus,
+    xyDisabled: pad.disabled,
+    xyStep: { stepMm: pad.step, feed: pad.feed, signs: pad.signs },
+    onXyJog: pad.sendVector,
+  });
 }
 
 const containerStyle: React.CSSProperties = { display: 'flex', flexDirection: 'column', gap: 6 };

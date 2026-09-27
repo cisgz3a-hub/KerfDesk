@@ -35,6 +35,24 @@ export function finishOptionsForJobOrigin(
     : {};
 }
 
+/**
+ * The one source of a job's finish options (ADR-483). Emission, byte-identity
+ * re-emission, the preview, the estimate and Job Review's park target all call
+ * this with the prepared job, so none of them can disagree about the final move.
+ * A laser finish placed by preparation wins: `stay` omits the park in every
+ * placement mode, a placed bed `point` is the park. Otherwise (no finish set, a
+ * set-aside finish, every CNC job) the placement's own default applies.
+ */
+export function finishOptionsForJob(
+  job: Job,
+  jobOrigin: JobOriginPlacement | undefined,
+): OutputEmitOptions {
+  const finish = job.laserFinish;
+  if (finish?.kind === 'stay') return { finishPosition: null };
+  if (finish?.kind === 'point') return { finishPosition: { x: finish.x, y: finish.y } };
+  return finishOptionsForJobOrigin(jobOrigin);
+}
+
 export type OutputStrategy = {
   // Discriminator on the strategy union (ADR-095 added 'marlin'; the CNC
   // router strategy is 'grbl-cnc'). New strategies add a literal here and a

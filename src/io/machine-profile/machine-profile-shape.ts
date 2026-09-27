@@ -20,6 +20,10 @@ import {
   isControllerCommandSet,
 } from '../../core/devices/device-profile';
 import { cncSubProfileIssues } from '../../core/devices/cnc-sub-profile-validation';
+import {
+  invalidSavedHeadPositionIndex,
+  isLaserFinishPosition,
+} from '../../core/devices/head-position-shape';
 import { isScanOffsetCalibrationStatus } from '../../core/devices/scan-offset-profile';
 export { laserArcMovesEntry } from '../../core/devices/laser-arc-moves';
 import { validateCameraProfileShape } from '../../core/camera';
@@ -63,8 +67,25 @@ export function validateMachineProfileShape(value: Record<string, unknown>): str
     validateCameraProfile(value['cameraProfile']) ??
     validateCameraModel(value['cameraModel']) ??
     validateOtherCameraModels(value['otherCameraModels']) ??
-    validateLaserFireControl(value['fireControl'])
+    validateLaserOutputFields(value)
   );
+}
+
+function validateLaserOutputFields(value: Record<string, unknown>): string | null {
+  return validateLaserFireControl(value['fireControl']) ?? validateHeadPositions(value);
+}
+
+// ADR-483: the same guards project load uses.
+function validateHeadPositions(value: Record<string, unknown>): string | null {
+  const finish = value['laserFinishPosition'];
+  if (finish !== undefined && !isLaserFinishPosition(finish)) {
+    return 'profile.laserFinishPosition is invalid';
+  }
+  const saved = value['savedPositions'];
+  if (saved === undefined) return null;
+  if (!Array.isArray(saved)) return 'profile.savedPositions is invalid';
+  const index = invalidSavedHeadPositionIndex(saved);
+  return index < 0 ? null : `profile.savedPositions[${index}] is invalid`;
 }
 
 function validateToolheadProfiles(value: Record<string, unknown>): string | null {
