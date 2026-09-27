@@ -114,9 +114,10 @@ function mixtureOwner(
   return owner;
 }
 
-/** Mode filter for 1-px islands: a pixel none of whose 8-neighbours shares
- *  its label takes the most common label of its 8-neighbourhood (ties to the
- *  lower label). Reads the original labels so the pass is order-free. */
+/** Mode filter for 1-px islands: a pixel with no same-label 4-neighbour and
+ *  no linked diagonal continuation (see `linkedNeighbour8`) takes the most
+ *  common label of its 8-neighbourhood (ties to the lower label). Reads the
+ *  original labels so the pass is order-free. */
 export function modeFilterIsolatedPixels(grid: LabelGrid): void {
   const source: LabelGrid = { ...grid, labels: grid.labels.slice() };
   const counts = new Int32Array(256);
@@ -130,9 +131,8 @@ export function modeFilterIsolatedPixels(grid: LabelGrid): void {
 }
 
 function sharesLabel8(grid: LabelGrid, i: number, label: number): boolean {
-  const n = grid.labels.length;
   for (let d = 0; d < 8; d += 1) {
-    const q = neighbour8(i, d, grid.width, n);
+    const q = linkedNeighbour8(grid, i, d);
     if (q >= 0 && grid.labels[q] === label) return true;
   }
   return false;
@@ -157,7 +157,7 @@ function neighbourhoodMode(grid: LabelGrid, i: number, counts: Int32Array): numb
   return best;
 }
 
-/** Regions (8-connected, one label) smaller than minArea join the neighbour
+/** Regions (linked 8-connected, one label) smaller than minArea join the neighbour
  *  label they share the most boundary with (ties to the lower label).
  *  Transparent regions stay. The smallest regions go first, and a region that
  *  joins another is re-measured as the merged whole (union-find), so two
@@ -187,13 +187,12 @@ export function absorbSmallRegions(grid: LabelGrid, minArea: number): void {
 
 // The cleanup area includes diagonal continuations of a drawn line. This does
 // not change boundary extraction: corner-touching regions still have separate
-// outlines. After absorption, union every 8-adjacent region of the same label.
+// outlines. After absorption, union every linked region of the same label.
 function unionWithNeighbours(grid: LabelGrid, regions: Regions, r: number, label: number): number {
-  const n = grid.labels.length;
   let root = r;
   for (const p of regions.members[r] ?? []) {
     for (let d = 0; d < 8; d += 1) {
-      const q = neighbour8(p, d, grid.width, n);
+      const q = linkedNeighbour8(grid, p, d);
       if (q < 0 || grid.labels[q] !== label) continue;
       const other = regions.find(regions.component[q] as number);
       if (other !== root) root = regions.union(root, other);
@@ -203,7 +202,7 @@ function unionWithNeighbours(grid: LabelGrid, regions: Regions, r: number, label
 }
 
 type Regions = {
-  /** Region id of every pixel (8-connected, one label). */
+  /** Region id of every pixel (linked 8-connected, one label). */
   readonly component: Int32Array;
   readonly size: number[];
   /** Pixels of a region below the speck area; null for a large region. */
@@ -258,7 +257,6 @@ function floodComponent(
   component: Int32Array,
   stack: Int32Array,
 ): number[] {
-  const n = grid.labels.length;
   const label = grid.labels[start];
   const members: number[] = [];
   let top = 0;
@@ -268,7 +266,7 @@ function floodComponent(
     const p = stack[--top] as number;
     members.push(p);
     for (let d = 0; d < 8; d += 1) {
-      const q = neighbour8(p, d, grid.width, n);
+      const q = linkedNeighbour8(grid, p, d);
       if (q < 0 || component[q] !== -1 || grid.labels[q] !== label) continue;
       component[q] = id;
       stack[top++] = q;
@@ -323,4 +321,35 @@ function neighbour8(p: number, d: number, width: number, n: number): number {
   if (x < 0 || x >= width) return -1;
   const q = p + dx + (d < 6 ? -width : width);
   return q >= 0 && q < n ? q : -1;
+}
+
+// The d-th 8-neighbour of p when cleanup treats the two as touching, else -1.
+// Edge neighbours always touch, and so does a diagonal neighbour of the same
+// label that a same-label edge neighbour already joins. A corner-only contact
+// links a 1-px diagonal hairline into one region, also where it meets another
+// line. Dither is the exception: a pixel with corner-only contacts along both
+// diagonals (a checkerboard, an ordered or error-diffused dither) links to
+// nothing, so, as before 2026-09-27, the mode filter and speck removal make
+// the pattern solid rather than one outline per pixel (ADR-461 Amendment 1).
+function linkedNeighbour8(grid: LabelGrid, p: number, d: number): number {
+  const q = neighbour8(p, d, grid.width, grid.labels.length);
+  if (d < 4 || q < 0 || grid.labels[q] !== grid.labels[p]) return q;
+  if (!cornerOnly(grid, p, d)) return q;
+  return isDither(grid, p) || isDither(grid, q) ? -1 : q;
+}
+
+// Same-label diagonal neighbour d of p that no same-label edge pixel joins.
+function cornerOnly(grid: LabelGrid, p: number, d: number): boolean {
+  const q = neighbour8(p, d, grid.width, grid.labels.length);
+  const label = grid.labels[p];
+  if (q < 0 || grid.labels[q] !== label) return false;
+  const dx = d % 2 === 0 ? -1 : 1;
+  const dy = d < 6 ? -grid.width : grid.width;
+  return grid.labels[p + dx] !== label && grid.labels[p + dy] !== label;
+}
+
+// NW (4) and SE (7) lie along one diagonal, NE (5) and SW (6) along the other.
+function isDither(grid: LabelGrid, i: number): boolean {
+  const back = cornerOnly(grid, i, 4) || cornerOnly(grid, i, 7);
+  return back && (cornerOnly(grid, i, 5) || cornerOnly(grid, i, 6));
 }

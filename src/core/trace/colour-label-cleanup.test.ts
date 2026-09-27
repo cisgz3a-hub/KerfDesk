@@ -73,4 +73,37 @@ describe('absorbSmallRegions', () => {
     absorbSmallRegions(grid, 2);
     expect(count(grid.labels, 1)).toBe(0);
   });
+
+  // ADR-461 Amendment 1: diagonal-only contact links line-like pixels, not
+  // dither. Every pixel of a checkerboard or of a 4x4 ordered (Bayer) dither
+  // at 7/16 has three or four same-label diagonals, so the pattern cleans up
+  // to one label instead of staying one outline per pixel.
+  it.each([
+    ['checkerboard', (x: number, y: number) => (x + y) % 2],
+    ['Bayer 7/16', (x: number, y: number) => (BAYER[(y % 4) * 4 + (x % 4)]! < 7 ? 1 : 0)],
+    ['Bayer 6/16', (x: number, y: number) => (BAYER[(y % 4) * 4 + (x % 4)]! < 6 ? 1 : 0)],
+  ] as const)('cleans a %s dither patch to one label', (_, labelAt) => {
+    const width = 24;
+    const grid = { width, height: width, labels: new Uint8Array(width * width) };
+    for (let y = 0; y < width; y += 1)
+      for (let x = 0; x < width; x += 1) grid.labels[y * width + x] = labelAt(x, y);
+    modeFilterIsolatedPixels(grid);
+    absorbSmallRegions(grid, 12);
+    expect(Math.min(count(grid.labels, 0), count(grid.labels, 1))).toBe(0);
+  });
+
+  it('keeps a diagonal hairline crossing a straight one', () => {
+    const width = 24;
+    const grid = { width, height: width, labels: new Uint8Array(width * width) };
+    for (let i = 2; i < 22; i += 1) {
+      grid.labels[i * width + i] = 1;
+      grid.labels[12 * width + i] = 1;
+    }
+    const drawn = count(grid.labels, 1);
+    modeFilterIsolatedPixels(grid);
+    absorbSmallRegions(grid, 12);
+    expect(count(grid.labels, 1)).toBe(drawn);
+  });
 });
+
+const BAYER = [0, 8, 2, 10, 12, 4, 14, 6, 3, 11, 1, 9, 15, 7, 13, 5];

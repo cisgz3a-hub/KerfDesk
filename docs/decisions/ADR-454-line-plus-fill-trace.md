@@ -231,3 +231,36 @@ mixed-width ring through quarter turns, reflections and scale changes, and prese
 connector between two wide sections. Existing thin-tail, local-island, junction-gap, closed-seam,
 pen-blot, attachment and CNC checks still apply. These are software classification and geometry
 checks, not a claim of material qualification.
+
+### Amendment 3 - keep a line wobbling around the gate in one piece (2026-09-27)
+
+Amendment 1 classifies width locally with no memory between runs. A hand-drawn line whose width
+hovers around the gate therefore split into alternating fill and outline pieces, and every join
+burns twice. At a 4 px gate, a line alternating 5 and 4 px every 12 px traced as 7 fills and
+8 strokes (1 fill before Amendment 1), and a 4.5 +/- 0.75 px sine wobble with a 20 px period as 9
+fills and 9 strokes.
+
+Decision: two kept wide runs on one measured stroke join into one run when every averaging window
+between them keeps its mean above seven eighths of the gate (3.5 px at gate 4); the ink between
+them joins the run too (`wide-stroke-runs.ts`, `BRIDGE_ALLOWANCE`). The seed, allowance and
+sustained-mean rules for starting a run are unchanged, so a steady pen at or under the gate is
+still a stroke; only ink already between two independently supported wide runs is bridged. A window
+at or under the bridge width ends the chain, so a clearly thinner connector (a 3 px neck between
+5 px bars, or the 2 px connector of Amendment 2's regression) still separates two fills.
+Measurement gaps still end the evidence, as before. Near-gate ink beyond the first or last wide run
+is not bridged: it stays a stroke, so a 3.6 to 4.2 px band attached to a wide bar keeps its outline.
+
+Results on the audit images (gate 4): the 5/4 px alternation with 12 px and 20 px segments traces
+as 1 fill plus a short stroke at each tip where the line ends on its thin phase; the 20, 40 and 80
+px sine wobbles as 1 fill (plus at most one tip stroke); lines with random 3 to 6 px widths split
+into fewer pieces but still split where the width falls to 3 px, as Amendment 1 intends. A 4 px connector between two 5 px bars
+now joins them into one fill (as before Amendment 1); a 3 px or thinner one does not. All other
+cases of the 160-image audit set trace as before this amendment.
+
+Limit: a deliberate near-gate stroke joining two wide areas (a 3.6 to 4.2 px line between two thick
+blobs, with the gate at 4) becomes part of the fill, as it did before Amendment 1.
+
+Regressions: `wide-stroke-runs.test.ts` (a 5/4 px wobble is one run at 1x, 2x and 4x; a 3.4 px
+neck separates, a 3.6 px neck joins; a near-gate tail stays out of the run) and
+`trace-hybrid-local-width.test.ts` (a line wobbling between 5 and 4 px traces as one fill with no
+stroke at 1x, 2x and 4x). These are software classification checks, not a material cut.
