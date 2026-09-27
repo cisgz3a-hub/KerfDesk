@@ -6,9 +6,10 @@ import { describe, expect, it, vi } from 'vitest';
 import { buildGcodeRenderModel } from '../../core/gcode-view';
 import { applyReveal, buildToolpathObjects, setToolpathTravelVisibility } from './scene-toolpath';
 import { disposeChildren } from './scene-furniture';
+import { clipObjects } from './scene-isolate';
 import { resolveViewer3dTheme } from './viewer3d-theme';
 
-function fixture() {
+function fixture(visible: Uint8Array | null = null) {
   const parsed = buildGcodeRenderModel('G21 G90\nG0 X10\nM3 S500\nG1 X110 F600\nG1 Y50');
   if (parsed.kind !== 'ok') throw new Error(parsed.reason);
   const built = buildToolpathObjects({
@@ -16,7 +17,7 @@ function fixture() {
     LineMaterial,
     LineSegments2,
     LineSegmentsGeometry,
-    segments: parsed.model,
+    segments: { ...parsed.model, visible },
     theme: resolveViewer3dTheme(),
     viewWidth: 800,
     viewHeight: 600,
@@ -28,6 +29,33 @@ function fixture() {
 }
 
 describe('toolpath progress geometry', () => {
+  it.each([
+    { mask: [1, 0, 1], segmentIndex: 1 },
+    { mask: [0, 1, 1], segmentIndex: 0 },
+    { mask: [0, 0, 0], segmentIndex: 1 },
+  ])('keeps a filtered current move hidden for $mask', ({ mask, segmentIndex }) => {
+    const f = fixture(new Uint8Array(mask));
+    applyReveal(f.reveal, { segmentIndex, point: { x: 35, y: 0, z: 0 } });
+    expect(f.reveal.active.object.visible).toBe(false);
+    // Travel changes must not override the independent legend mask.
+    setToolpathTravelVisibility(f.reveal, false);
+    setToolpathTravelVisibility(f.reveal, true);
+    expect(f.reveal.active.object.visible).toBe(false);
+    disposeChildren(f.group);
+  });
+
+  it('retains the visible current move and clips both its strokes with the path', () => {
+    const f = fixture(new Uint8Array([0, 1, 0]));
+    const planes = [new three.Plane(new three.Vector3(0, 0, 1), 1)];
+    clipObjects(f.group, planes);
+    applyReveal(f.reveal, { segmentIndex: 1, point: { x: 35, y: 0, z: 0 } });
+    expect(f.reveal.active.object.visible).toBe(true);
+    for (const material of f.reveal.active.materials) {
+      expect(material.clippingPlanes).toBe(planes);
+    }
+    disposeChildren(f.group);
+  });
+
   it('draws only to the current point inside a long move, retaining a faint program context', () => {
     const f = fixture();
     const geometry = f.reveal.solid?.geometry;

@@ -32,6 +32,8 @@ export type RevealTargets = {
   fadeColor: readonly [number, number, number];
   readonly background: number;
   readonly segKind: Uint8Array;
+  /** The same legend mask used to build the solid and travel buckets. */
+  readonly moveFilter: Uint8Array | null;
   readonly positions: Float32Array;
   /** The move under way, drawn bold to the playhead (ADR-470). */
   readonly active: CurrentMove;
@@ -140,6 +142,7 @@ export function setToolpathTravelVisibility(targets: RevealTargets | null, visib
   targets.travelVisible = visible;
   targets.active.object.visible =
     targets.activeSegment >= 0 &&
+    targets.moveFilter?.[targets.activeSegment] !== 0 &&
     (visible || targets.segKind[targets.activeSegment] !== SEG_KIND.travel);
 }
 
@@ -221,6 +224,7 @@ export function buildToolpathObjects(args: ToolpathBuildArgs): {
       ...revealTargets(buckets, solidTarget, travelTarget),
       positions: args.segments.positions,
       segKind: args.segments.segKind,
+      moveFilter: args.segments.visible ?? null,
       activeSegment: -1,
       travelVisible: args.travelVisible,
       fadeColor: hexRgb(args.theme.background),
