@@ -68,6 +68,6 @@ export function disposeMarkers(scene: ThreeNamespace.Scene, markers: SceneMarker
 function createMarker(three: ThreeModule, color: number): MarkerMesh {
   return new three.Mesh(
     new three.SphereGeometry(1, 16, 12),
-    new three.MeshBasicMaterial({ color }),
+    new three.MeshBasicMaterial({ color, toneMapped: false }),
   );
 }

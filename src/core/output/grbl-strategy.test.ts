@@ -283,7 +283,7 @@ describe('grblStrategy legacy fill hatch overscan', () => {
       [
         'G0 X8.000 Y5.000 S0',
         'G0 X10.000 Y5.000 S0',
-        'G1X20Y5F1500S300',
+        'G1 X20.000 Y5.000 F1500 S300',
         'G0 X22.000 Y5.000 S0',
       ].join('\n'),
     );
@@ -334,14 +334,16 @@ describe('grblStrategy legacy fill hatch overscan', () => {
       [
         'G0 X5.000 Y0.000 S0',
         'G0 X10.000 Y0.000 S0',
-        'G1X30Y0F1500S300',
+        'G1 X30.000 Y0.000 F1500 S300',
         'G0 X35.000 Y0.000 S0',
       ].join('\n'),
     );
     // Short run (3mm < 2x5): no runway — straight seek to burnStart, then burn,
     // then the postamble. Coverage (burn endpoints) is unchanged; only the
     // laser-off runway is dropped.
-    expect(out).toContain(['G0 X10.000 Y5.000 S0', 'G1X13Y5F1500S300', 'M5'].join('\n'));
+    expect(out).toContain(
+      ['G0 X10.000 Y5.000 S0', 'G1 X13.000 Y5.000 F1500 S300', 'M5'].join('\n'),
+    );
   });
 
   it('emits one continuous sweep for a multi-hole scanline, blanking gaps with S0', () => {
@@ -398,17 +400,17 @@ describe('grblStrategy legacy fill hatch overscan', () => {
       [
         'G0 X-5.000 Y0.000 S0',
         'G0 X0.000 Y0.000 S0',
-        'G1X5Y0F1500S300',
-        'X8S0',
-        'X12S300',
-        'X15S0',
-        'X20S300',
+        'G1 X5.000 Y0.000 F1500 S300',
+        'G1 X8.000 Y0.000 S0',
+        'G1 X12.000 Y0.000 S300',
+        'G1 X15.000 Y0.000 S0',
+        'G1 X20.000 Y0.000 S300',
         'G0 X25.000 Y0.000 S0',
       ].join('\n'),
     );
     // Safety: every interior gap re-blanks to S0 and every ink span re-asserts
     // S300 (S is modal — a missed reset would fire the beam across a hole).
-    const burnBody = out.slice(out.indexOf('F1500S300'));
+    const burnBody = out.slice(out.indexOf('F1500 S300'));
     const sSequence = (burnBody.slice(0, burnBody.indexOf('G0 X25')).match(/S\d+/g) ?? []).join(
       ',',
     );

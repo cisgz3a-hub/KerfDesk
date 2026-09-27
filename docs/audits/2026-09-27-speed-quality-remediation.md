@@ -173,6 +173,15 @@ benchmark skipped); relief reconciliation passed 149 distinct tests across
 PR #957's stage-owned relief entry provenance is also integrated: 27 selected
 compiler tests and 35 selected Job Review/metadata tests passed. Finishing keeps
 its selected values without falsely claiming a ramp entry.
+The final refresh includes PR #957's actual main commit `66e073ef23` and reviewed
+PR #952 head `6beae4d08`, preserving cleanup-before-rings ordering and stock-side
+metadata with the stage recipes. The pre-refresh local run at `137599d38` was
+superseded with five failures before its footer. Isolated diagnosis reproduced
+relief test timeouts; PR #952's existing simulation budgets and two additional
+30-second functional-test budgets retain every original case and assertion.
+Planning-evidence and camera tests passed unchanged in isolation. The CNC report
+records the measurements and limits; fresh release gates apply to the final
+combined candidate.
 Exact release checks, PR/main/deploy
 identities, and served-build evidence are recorded separately in the audit
 directory. The user confirmed that no physical machine was available, so material

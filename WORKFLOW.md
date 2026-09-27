@@ -2444,6 +2444,10 @@ Setup has three visible stages for both Laser and CNC (ADR-240/306, amended 2026
 The stage buttons and Back/Next remain available while a draft needs corrections. Only **Save
 machine setup** requires valid configuration; review cards link back to the relevant fields.
 Connecting a controller is optional, so a complete setup can be saved offline.
+The Machine stage keeps **Review & save** visible beside **Check essentials**. After choosing a
+profile, **Review & save** opens the final review directly; **Save machine setup** applies it.
+**Check essentials** remains available to edit values first. Neither selecting the shortcut nor
+saving an ordinary software profile disconnects the controller.
 
 1. **Machine** — **Find my machine** opens the stage (ADR-420). It connects with the draft's
    controller, baud and streaming choice, reusing the remembered port as the rail's Connect does,
@@ -4779,11 +4783,11 @@ and lifts the command's CNC-only gate.)*
    path); the remainder cuts level on the next lap.
 
 #### Edge — reliefs on a layer with a ramp angle
-1. Relief roughing rings and finishing rows plunge at their starts; the
-   layer's ramp angle ramps only its other shapes. The relief groups'
-   G-code headers carry no entry line, and Job Review's operation line
-   names the relief stages that plunge, for example
-   `ramp entry 5° (relief passes plunge)` (ADR-273 Amendment 1).
+1. Relief roughing ramps with the layer's angle (F-CNC17, ADR-424) and its
+   G-code header records that ramp. Relief finishing rows plunge at their
+   starts, so the finishing group's header carries no entry line, and Job
+   Review's operation line names the relief stages that plunge, for example
+   `ramp entry 5° (relief finishing plunges)` (ADR-273 Amendment 1).
 
 ### F-CNC19. Tile a job larger than the bed — Phase H.10
 
@@ -6728,7 +6732,7 @@ as the pane's design record.
   picker only. It never opens hardware or prompts for permission. A non-permission `AbortError`
   is shown as a retryable open failure rather than mislabeled as denial.
 
-### F-CAM2. One-photo camera calibration (ADR-441, Amendment 1)
+### F-CAM2. One-photo camera calibration (ADR-441, Amendments 1 and 3)
 
 - **Success / calibrated.** **Calibrate camera…** opens the wizard. The operator covers the bed
   with one flat sheet, enters its thickness and, optionally, the camera lens height by tape
@@ -6741,6 +6745,10 @@ as the pane's design record.
   the camera model on the machine profile (undoable) and turns the overlay on.
 - **Reuse / target already engraved.** **Target already engraved** skips the job and goes to the
   photo, using the same margins.
+- **Edge / small bed.** When the usual grid of 10 mm rings 40 mm apart does not fit inside the
+  margins, the rings and spacing shrink together so every ring stays on the bed. The grid keeps
+  rings around all three solid anchors. Engrave a new target if an older one ran off the bed or
+  placed an anchor on the grid's edge (Amendment 3).
 - **Error / engrave not started or stopped.** If review, preflight or confirmation stops the job,
   or the stream errors, is cancelled or disconnects, the wizard returns to setup with the reason.
 - **Error / rings not found.** No rings, anchors covered, a mirrored picture or too few rings each
@@ -6894,7 +6902,7 @@ as the pane's design record.
 - **Edge / watching a job.** The camera panel can toggle between compact and
   wide monitoring widths, with the preference kept locally.
 
-### F-CAM9. Find pieces on the bed and place the design on each (ADR-442)
+### F-CAM9. Find pieces on the bed and place the design on each (ADR-442, Amendment 1)
 
 - **Success / fill a batch of blanks.** With a saved calibration and a live camera, the operator
   lays out blanks, puts the design on one of them, selects it and presses **Find pieces** in the
@@ -6903,7 +6911,9 @@ as the pane's design record.
   and angle and how the design will move and turn onto it. **Place selection on each piece** adds
   a copy on every ticked piece, the way the design sits on its own piece, as one undo step.
 - **Success / design not on a piece.** The design is centred on each piece, its long side along
-  the piece's long side, and the design itself moves to the first piece.
+  the piece's long side, and the design itself moves to the first piece. A design already turned
+  on the canvas is measured along its own turn, so it lies along the piece rather than keeping
+  its old angle (Amendment 1).
 - **Edge / piece partly out of view.** It is listed and outlined but starts unticked, with the
   reason; ticking it includes it.
 - **Edge / different piece.** A piece of another shape, or more than 3 mm longer or wider than the
