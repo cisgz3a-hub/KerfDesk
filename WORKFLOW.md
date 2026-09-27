@@ -1579,13 +1579,16 @@ minimum target size.
    - GRBL 1.1 or grblHAL;
    - `$32=0` is confirmed;
    - the build has no parking (`P` in `$I`);
+   - (A later Pause of the same job relies on the `$32` and parking check an earlier lift made
+     before its reset, ADR-411 Amendment 1.)
    - no pendant (MPG) is in control;
    - the report is `Door:0` or `Hold:0`;
    - the work offset is known.
 2. It also needs a re-entry plan from the program:
    - The stop point lies within 0.1 mm of a line the controller may still have been running. The
      earliest such line wins.
-   - The spindle was on, and the program has a `G4 P` spin-up dwell after its M3/M4.
+   - The spindle was on. Its spin-up is the program's `G4 P` dwell after its M3/M4, or 4 s when
+     the program has none (spin-up time 0 s).
    - The bit stopped below the program's highest rapid Z.
    - The program stays inside the supported code subset.
 3. The primary control reads **Lifting…**. The app:
@@ -1594,7 +1597,9 @@ minimum target size.
    3. checks the machine position did not move;
    4. writes `G21 G90 G54 G94 G17`;
    5. writes a `G92` if the work offset came back different, and verifies it;
-   6. writes `G0 Z<safe>`.
+   6. writes `G0 Z<safe>`;
+   7. when any override was off 100%, writes the realtime override bytes that put it back and
+      waits for the `Ov:` report to show it (logged, not failed, if none arrives).
 4. The job stays paused with the bit at safe height and the spindle off. The advice beside
    **Resume** says Resume spins up there, returns over the stop point and feeds back into its cut.
 
@@ -1606,7 +1611,7 @@ minimum target size.
    - the modal line;
    - `G0 Z<safe>`;
    - `M3`/`M4 S<rpm>`;
-   - the program's `G4 P<spin-up>`;
+   - `G4 P<spin-up>`;
    - its `M7`/`M8`;
    - `G0 X Y` over the entry point;
    - `G1 Z<entry> F<plunge>`;
@@ -1615,13 +1620,15 @@ minimum target size.
 
 #### Exempt — no lift
 1. If a condition in the lift's step 1 or 2 is not met, the app logs why and keeps the plain door
-   pause of F-B7.
+   pause of F-B7. The advice beside **Resume** starts with that reason.
+2. **Resume** on such a pause tries the lift again first (the door may have been open). If it
+   lifts, the re-entry follows at once; if not, the door resume of F-B7 runs.
 
 #### Error — failure after the reset
 1. Any failure after the reset ends the job with Abort's reset: a refused line, a timeout, an
    alarm, a moved frame, or a lost port. The controller no longer holds the job.
-2. The safety notice **Pause and lift stopped** says what failed. The Interrupted job card offers
-   pass recovery (ADR-215).
+2. The safety notice **Pause and lift stopped** says what failed. The Interrupted job card files it
+   as a stop from the app, with the spindle commanded off, and offers pass recovery (ADR-215).
 3. Pause while lifting or returning is refused; **ABORT JOB** and the physical E-stop stay
    available.
 

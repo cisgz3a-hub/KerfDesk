@@ -1,6 +1,10 @@
 import type { StreamerStatus } from '../../core/controllers/grbl';
 import { SOFTWARE_ABORT_TITLE } from '../common/software-abort-copy';
-import { cncPauseLiftPhase } from '../state/cnc-pause-lift-state';
+import {
+  cncJobLaserModeEnabled,
+  cncPauseLiftPhase,
+  cncPauseLiftSkipReason,
+} from '../state/cnc-pause-lift-state';
 import { cncResumeAdvisoryNotice } from '../state/cnc-pause-resume-policy';
 import { describeControllerOperation } from '../state/laser-controller-operation';
 import { useLaserStore } from '../state/laser-store';
@@ -102,9 +106,15 @@ function LiveMotionPrimaryAction({ status }: { readonly status: StreamerStatus |
   const machineKind = useLaserStore((state) => state.activeJobMachineKind);
   const isControllerRunning = useLaserStore((state) => state.statusReport?.state === 'Run');
   const toolChangeBlockMessage = useLaserStore(toolChangeContinueBlockMessage);
-  const laserModeEnabled = useLaserStore((state) => state.controllerSettings?.laserModeEnabled);
+  const laserModeEnabled = useLaserStore(cncJobLaserModeEnabled);
   const liftPhase = useLaserStore(cncPauseLiftPhase);
-  const resumeAdvisory = cncResumeAdvisoryNotice(machineKind, laserModeEnabled, liftPhase);
+  const liftSkipReason = useLaserStore(cncPauseLiftSkipReason);
+  const resumeAdvisory = cncResumeAdvisoryNotice(
+    machineKind,
+    laserModeEnabled,
+    liftPhase,
+    liftSkipReason,
+  );
   const pauseResumeTransition = useLaserStore((state) => state.pauseResumeTransition);
   if (pauseResumeTransition !== null) {
     return (

@@ -38,6 +38,12 @@ import {
 export const CNC_REENTRY_MATCH_TOLERANCE_MM = 0.1;
 const Z_EPSILON_MM = 0.001;
 
+/** Spin-up Resume waits above the cut when the program has no dwell after
+ *  its spindle start (a spin-up time of 0 s): stock GRBL's own door-resume
+ *  delay, SAFETY_DOOR_SPINDLE_DELAY. Waiting at safe height costs only time
+ *  (ADR-411 Amendment 1). */
+export const CNC_REENTRY_DEFAULT_SPINUP_SEC = 4;
+
 /** Firmware whose soft reset at a completed hold keeps position without an
  *  alarm, and whose restart this re-entry was built against (ADR-411). */
 const LIFT_CONTROLLERS: ReadonlySet<ControllerKind> = new Set(['grbl-v1.1', 'grblhal']);
@@ -150,8 +156,11 @@ function spinupAtStop(
   if (modal.spindle === null || modal.spindleRpm <= 0) {
     return 'The spindle was off at the stop point, so Resume cannot spin up in the cut.';
   }
-  if (modal.spinupSec === null) return 'The program has no spin-up dwell after its spindle start.';
-  return { spindle: modal.spindle, spindleRpm: modal.spindleRpm, spinupSec: modal.spinupSec };
+  return {
+    spindle: modal.spindle,
+    spindleRpm: modal.spindleRpm,
+    spinupSec: modal.spinupSec ?? CNC_REENTRY_DEFAULT_SPINUP_SEC,
+  };
 }
 
 /** The plunge feed back into the kerf, or why none is known. */

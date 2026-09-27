@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { createStreamer } from '../controllers/grbl';
 import {
+  CNC_REENTRY_DEFAULT_SPINUP_SEC,
   cncPauseLiftLine,
   cncReentrySteps,
   planCncPauseReentry,
@@ -230,7 +231,7 @@ describe('planCncPauseReentry', () => {
     ).toMatchObject({ kind: 'no-lift' });
   });
 
-  it('refuses a program with no spin-up dwell', () => {
+  it('waits the default spin-up when the program has no dwell (spin-up 0 s)', () => {
     const lines = createStreamer(PROGRAM.replace('G4 P2.5\n', '')).queued;
     expect(
       planCncPauseReentry({
@@ -239,10 +240,7 @@ describe('planCncPauseReentry', () => {
         stopPoint: { x: 20, y: 10, z: -2 },
         controllerKind: 'grbl-v1.1',
       }),
-    ).toEqual({
-      kind: 'no-lift',
-      reason: 'The program has no spin-up dwell after its spindle start.',
-    });
+    ).toMatchObject({ kind: 'plan', plan: { spinupSec: CNC_REENTRY_DEFAULT_SPINUP_SEC } });
   });
 
   it('refuses a stop point off the toolpath', () => {
