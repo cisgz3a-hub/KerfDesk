@@ -44,7 +44,7 @@ Batch letters say which fix batch covers each one.
 | A7 | `console-message` uses the old positional signature Electron deprecated in 35. | Electron 42 docs. |
 | A8 | Windows taskbar identity is never set. The installer's shortcuts use `dev.laserforge.app`, and Electron only sets it for Squirrel installs, so pinned icons and notifications can group under the wrong app. | Code and docs reading; not seen on Windows. |
 
-### Packaging and versions (Batch B, next)
+### Packaging and versions (Batch B, built)
 
 | # | Finding |
 |---|---|
@@ -56,7 +56,7 @@ Batch letters say which fix batch covers each one.
 | B6 | Pull requests never launch the packaged app. The packaged smoke test runs weekly on Windows only, so a packaging break (like B3) is found after release. |
 | B7 | The macOS preview config skips signing (`identity: null`). Once fuses are flipped, Apple Silicon refuses to launch it unless `resetAdHocDarwinSignature` is set. Electron 44 also drops macOS 12, so `minimumSystemVersion` must move to 13 then. |
 
-### Local camera bridge (Batch C)
+### Local camera bridge (Batch C, built)
 
 | # | Finding |
 |---|---|
@@ -69,7 +69,7 @@ Batch letters say which fix batch covers each one.
 |---|---|
 | D1 | Serial port permission is kept only in memory (no `setDevicePermissionHandler`), so every restart forgets it. This is known and recorded in ADR-366. Persisting it would let Connect reach the remembered machine without a picker; the Machine setup thread owns Connect, so this is a proposal for that thread. |
 
-### Windows signing and updates (needs the maintainer)
+### Windows signing and updates (built; needs the maintainer's certificate)
 
 | # | Finding |
 |---|---|
@@ -87,6 +87,12 @@ Options for S1/S2:
 
 Whichever is picked, the workflow change is small and can be made the day the account exists.
 
+**Chosen 2026-09-27: option 2, SSL.com eSigner.** Built as ADR-142 Amendment 1: the stable workflow loads the eSigner
+certificate through SSL.com's pinned Cloud Key Adapter, signs by thumbprint (SHA-256, SSL.com timestamp), and before
+publishing requires a timestamped installer, `KerfDesk.exe` signed by the same certificate, and an `app-update.yml`
+whose `publisherName` matches the signer (S2). It needs the certificate bought and three secrets added
+(`STABLE_ESIGNER_USERNAME`, `STABLE_ESIGNER_PASSWORD`, `STABLE_ESIGNER_TOTP_SECRET`).
+
 ## Not verified
 
 - Spelling dictionaries on Windows: Electron downloads them from Google on first use; it worked on Linux.
@@ -100,8 +106,9 @@ Whichever is picked, the workflow change is small and can be made the day the ac
   menu; window place remembered and restored only while a screen still shows it; reload offer after a page crash that
   keeps the E-stop instruction; taskbar identity set; dev mode renders; current event signatures. ADR-482.
 - **Batch B**: fuses on both configs, ASAR integrity enforced, renderer-only packages out of `app.asar`, Electron
-  42.11.8, electron-builder 26.17.0, electron-updater 6.8.10, and a Linux packaged-launch check on every PR that
-  fails if the app does not start or the fuses are not set.
+  42.11.8, electron-builder 26.16.1 (26.17.0 and electron-updater 6.8.10 were a day old), and a Linux
+  packaged-launch check on every PR that fails if the app does not start or the fuses are not set. ADR-483.
 - **Batch C**: camera bridge Host check and required Origin (ADR-141 Amendment 1).
+- **Signing**: SSL.com eSigner signing and the update-publisher check (ADR-142 Amendment 1).
 - **Batch D**: persisted serial grant, proposed to the Machine setup thread.
 - **Electron 44**: its own draft PR once A and B land, before 42's support ends on 20 Oct 2026.

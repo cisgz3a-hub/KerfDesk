@@ -43,6 +43,15 @@ win:
   # electron-updater verifies downloaded NSIS updates against the publisher
   # identity from the installed signed build. Keep this explicit in config.
   verifyUpdateCodeSignature: true
+  # Stable tags sign with the SSL.com eSigner certificate that the release
+  # workflow loads into the Windows certificate store and names by thumbprint
+  # (ADR-142 Amendment 1). SHA-256 only: every signature counts against the
+  # eSigner plan, and a SHA-1 signature adds nothing on supported Windows.
+  # Builds with no certificate (dry run, package check) skip signing.
+  signtoolOptions:
+    signingHashAlgorithms:
+      - sha256
+    rfc3161TimeStampServer: http://ts.ssl.com
   target:
     - target: nsis
       arch:
