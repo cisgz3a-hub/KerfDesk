@@ -9,12 +9,24 @@ function emit(job: Job): string {
 }
 
 function hasZeroLengthMove(gcode: string): boolean {
-  let prev = '';
+  let x: number | undefined;
+  let y: number | undefined;
   for (const line of gcode.split('\n')) {
-    if (!/^G[01] /.test(line)) continue;
-    const coord = (line.match(/X[-\d.]+ Y[-\d.]+/) ?? [''])[0];
-    if (coord !== '' && coord === prev) return true;
-    prev = coord;
+    const code = line.split(';')[0] ?? '';
+    const nextX = code.match(/X([-\d.]+)/);
+    const nextY = code.match(/Y([-\d.]+)/);
+    if (nextX === null && nextY === null) {
+      // A compact writer can omit both unchanged axes. A regressed span guard
+      // then leaves a bare S300 (or G1S300), still arming power without motion.
+      const power = code.match(/S([-+\d.]+)/);
+      if (power !== null && Number(power[1]) > 0) return true;
+      continue;
+    }
+    const targetX = nextX === null ? x : Number(nextX[1]);
+    const targetY = nextY === null ? y : Number(nextY[1]);
+    if (targetX === x && targetY === y) return true;
+    x = targetX;
+    y = targetY;
   }
   return false;
 }

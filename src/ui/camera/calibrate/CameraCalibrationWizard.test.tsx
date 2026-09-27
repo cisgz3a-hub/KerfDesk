@@ -153,6 +153,37 @@ describe('camera calibration wizard', () => {
     expect(useCameraCalibrationStore.getState().open).toBe(false);
   });
 
+  it('calibrates a second camera and keeps the first camera’s calibration (ADR-446)', async () => {
+    const binding = (sourceKind: 'usb' | 'machine-rtsp', sourceId: string) => ({
+      version: 1 as const,
+      sourceKind,
+      sourceId,
+      ...(sourceKind === 'usb' ? {} : { queryFingerprint: `hmac-sha256:${'d'.repeat(64)}` }),
+      width: 1280,
+      height: 960,
+      resizeMode: sourceKind === 'usb' ? ('none' as const) : ('unknown' as const),
+    });
+    const first = savedCameraModel(binding('machine-rtsp', 'rtsp://192.168.10.1:8554/'));
+    useStore.getState().updateDeviceProfile({ cameraModel: first });
+    useCameraStore.setState({ sourceState: { kind: 'live', source } });
+    const second = savedCameraModel(binding('usb', 'overhead'));
+    vi.mocked(photographTarget).mockResolvedValue({
+      kind: 'ok',
+      result: result({ record: second }),
+    });
+    useCameraCalibrationStore.getState().setStep({ kind: 'photo', status: { kind: 'idle' } });
+    await mountControl(<CameraCalibrationWizard />);
+    await clickControl(document.body, 'Take photo');
+    // The first camera's calibration is not this camera's, so nothing is compared.
+    expect(vi.mocked(photographTarget).mock.calls[0]?.[0]).not.toHaveProperty('saved');
+    expect(document.body.textContent).toContain(
+      "Saving keeps the calibration of the machine's other camera; each camera uses its own when it runs.",
+    );
+    await clickControl(document.body, 'Save calibration');
+    expect(useStore.getState().project.device.cameraModel).toBe(second);
+    expect(useStore.getState().project.device.otherCameraModels).toEqual([first]);
+  });
+
   it('keeps a rough result saveable and asks for the camera height when the photo could not tell it', async () => {
     const rough = savedCameraModel();
     useCameraStore.setState({ sourceState: { kind: 'live', source } });

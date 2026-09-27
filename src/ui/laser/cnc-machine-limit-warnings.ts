@@ -1,14 +1,12 @@
 // CNC machine-limit advisories: compare configured spindle values even offline;
 // compare travel, feed, plunge and controller S scale only with a live snapshot.
 // Pure review information, never a gate or a measurement of physical motion/RPM.
+// Stage recipes (ADR-457) emit their own feed, plunge and RPM, so a recipe whose
+// cutter is in the tool library is compared too (ADR-457 Amd 1).
 
 import type { ControllerSettingsSnapshot } from '../../core/controllers/grbl';
-import {
-  DEFAULT_CNC_LAYER_SETTINGS,
-  type CncLayerSettings,
-  type CncStock,
-  type Project,
-} from '../../core/scene';
+import { DEFAULT_CNC_LAYER_SETTINGS, type CncStock, type Project } from '../../core/scene';
+import { CNC_CUTTING_STAGES, cncCuttingStageLabel } from '../../core/scene/cnc-stage-recipe';
 import { reportedAxisFeedLimit } from './reported-axis-feed-limit';
 
 export function detectCncMachineLimitWarnings(
@@ -51,10 +49,10 @@ function stockVsBed(stock: CncStock, limits: ControllerSettingsSnapshot): Readon
 function feedVsMax(project: Project, limits: ControllerSettingsSnapshot): ReadonlyArray<string> {
   const axisLimit = reportedAxisFeedLimit(limits);
   if (axisLimit === null) return [];
-  const topFeed = maxOutputLayerValue(project, (cnc) => cnc.feedMmPerMin);
-  if (topFeed === null || topFeed <= axisLimit) return [];
+  const top = maxOutputValue(project, 'feedMmPerMin');
+  if (top === null || top.value <= axisLimit) return [];
   return [
-    `A layer's feed ${topFeed} mm/min is above the machine's reported max rate ` +
+    `${top.source}'s feed ${top.value} mm/min is above the machine's reported max rate ` +
       `${axisLimit} mm/min — the controller clamps to its limit, so the cut ` +
       'runs slower than planned.',
   ];
@@ -62,10 +60,10 @@ function feedVsMax(project: Project, limits: ControllerSettingsSnapshot): Readon
 
 function plungeVsZMax(project: Project, limits: ControllerSettingsSnapshot): ReadonlyArray<string> {
   if (limits.zMaxFeed === undefined) return [];
-  const topPlunge = maxOutputLayerValue(project, (cnc) => cnc.plungeMmPerMin);
-  if (topPlunge === null || topPlunge <= limits.zMaxFeed) return [];
+  const top = maxOutputValue(project, 'plungeMmPerMin');
+  if (top === null || top.value <= limits.zMaxFeed) return [];
   return [
-    `A layer's plunge ${topPlunge} mm/min is above the machine's reported Z max rate ($112) ` +
+    `${top.source}'s plunge ${top.value} mm/min is above the machine's reported Z max rate ($112) ` +
       `${limits.zMaxFeed} mm/min — the controller clamps to its limit, so plunges ` +
       'run slower than planned.',
   ];
@@ -78,10 +76,10 @@ function spindleVsConfiguredCeiling(project: Project): ReadonlyArray<string> {
   const machine = project.machine;
   if (machine === undefined || machine.kind !== 'cnc') return [];
   const ceiling = machine.params.spindleMaxRpm;
-  const topRpm = maxOutputLayerValue(project, (cnc) => cnc.spindleRpm);
-  if (topRpm === null || topRpm <= ceiling) return [];
+  const top = maxOutputValue(project, 'spindleRpm');
+  if (top === null || top.value <= ceiling) return [];
   return [
-    `A layer requests spindle ${topRpm} RPM but the machine's Spindle maximum is ` +
+    `${top.source} requests spindle ${top.value} RPM but the machine's Spindle maximum is ` +
       `${ceiling} RPM — the compiled spindle setting is limited to ${ceiling} RPM; ` +
       'actual spindle RPM is not measured. Verify the controller-to-spindle scale.',
   ];
@@ -89,23 +87,38 @@ function spindleVsConfiguredCeiling(project: Project): ReadonlyArray<string> {
 
 function spindleVsMax(project: Project, limits: ControllerSettingsSnapshot): ReadonlyArray<string> {
   if (limits.maxPowerS === undefined) return [];
-  const topRpm = maxOutputLayerValue(project, (cnc) => cnc.spindleRpm);
-  if (topRpm === null || topRpm <= limits.maxPowerS) return [];
+  const top = maxOutputValue(project, 'spindleRpm');
+  if (top === null || top.value <= limits.maxPowerS) return [];
   return [
-    `A layer requests spindle ${topRpm} RPM, above the machine's reported max ($30) ` +
+    `${top.source} requests spindle ${top.value} RPM, above the machine's reported max ($30) ` +
       `${limits.maxPowerS} RPM. On GRBL, S commands above $30 use maximum PWM output; ` +
       'actual spindle RPM is not measured. Verify the controller-to-spindle scale.',
   ];
 }
 
-// The largest value of one CNC setting among layers that actually emit (output
-// on). Null when no output layer exists — nothing to compare, so no advisory.
-function maxOutputLayerValue(
-  project: Project,
-  pick: (cnc: CncLayerSettings) => number,
-): number | null {
-  const values = project.scene.layers
-    .filter((layer) => layer.output)
-    .map((layer) => pick(layer.cnc ?? DEFAULT_CNC_LAYER_SETTINGS));
-  return values.length === 0 ? null : Math.max(...values);
+// The largest value of one CNC cutting setting among layers that actually emit
+// (output on), including each layer's stage recipes whose cutter is in the tool
+// library (a recipe for an absent cutter cannot emit). Null when no output
+// layer exists: nothing to compare, so no advisory. A tie keeps the layer.
+type CuttingValueKey = 'feedMmPerMin' | 'plungeMmPerMin' | 'spindleRpm';
+type TopValue = { readonly value: number; readonly source: string };
+
+function maxOutputValue(project: Project, key: CuttingValueKey): TopValue | null {
+  const machine = project.machine;
+  const toolIds = new Set(machine?.kind === 'cnc' ? machine.tools.map((tool) => tool.id) : []);
+  const candidates: TopValue[] = [];
+  for (const layer of project.scene.layers) {
+    if (!layer.output) continue;
+    const cnc = layer.cnc ?? DEFAULT_CNC_LAYER_SETTINGS;
+    candidates.push({ value: cnc[key], source: 'A layer' });
+    for (const stage of CNC_CUTTING_STAGES) {
+      const recipe = cnc.stageRecipes?.[stage];
+      if (recipe === undefined || !toolIds.has(recipe.toolId)) continue;
+      candidates.push({ value: recipe[key], source: `The ${cncCuttingStageLabel(stage)} recipe` });
+    }
+  }
+  return candidates.reduce<TopValue | null>(
+    (top, candidate) => (top === null || candidate.value > top.value ? candidate : top),
+    null,
+  );
 }

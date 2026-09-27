@@ -43,7 +43,7 @@ const enlargedJFillGroup: FillGroup = {
 };
 
 describe('4040 split-fill controlled entry emission', () => {
-  it('gives the enlarged J fragment a feed-matched 5 mm entry after a controlled seek', () => {
+  it('shares the enlarged J gap between feed-matched exit and entry runways', () => {
     const out = grblStrategy.emit(
       { groups: [enlargedJFillGroup] },
       NEOTRONICS_4040_MAX_LT4LDS_V2_PROFILE,
@@ -51,10 +51,11 @@ describe('4040 split-fill controlled entry emission', () => {
 
     expect(out).toContain(
       [
-        'G1 X7.015 Y43.000 F1500 S300',
-        'G1 X11.620 Y43.000 F800 S0 ; kerfdesk:laser-off-motion',
+        'G1X7.015Y43F1500S300',
+        'G1 X11.818 Y43.000 F1500 S0 ; kerfdesk:laser-off-motion',
+        'G1 X11.818 Y43.000 F800 S0 ; kerfdesk:laser-off-motion',
         'G1 X16.620 Y43.000 F1500 S0 ; kerfdesk:laser-off-motion',
-        'G1 X18.108 Y43.000 F1500 S300',
+        'G1X18.108Y43F1500S300',
       ].join('\n'),
     );
     expect(out).not.toContain('G0 ');
@@ -66,7 +67,7 @@ describe('4040 split-fill controlled entry emission', () => {
     ]);
   });
 
-  it('gives both enlarged C gaps monotonic 5 mm feed entries without overlap', () => {
+  it('shares both enlarged C gaps between monotonic entry and exit runways', () => {
     const cJob: Job = {
       groups: [
         {
@@ -103,11 +104,13 @@ describe('4040 split-fill controlled entry emission', () => {
     const out = grblStrategy.emit(cJob, NEOTRONICS_4040_MAX_LT4LDS_V2_PROFILE);
 
     expect(out).toContain(
-      'G1 X2.958 Y46.000 F800 S0 ; kerfdesk:laser-off-motion\n' +
+      'G1 X4.617 Y46.000 F1500 S0 ; kerfdesk:laser-off-motion\n' +
+        'G1 X4.617 Y46.000 F800 S0 ; kerfdesk:laser-off-motion\n' +
         'G1 X7.958 Y46.000 F1500 S0 ; kerfdesk:laser-off-motion',
     );
     expect(out).toContain(
-      'G1 X12.482 Y46.000 F800 S0 ; kerfdesk:laser-off-motion\n' +
+      'G1 X13.958 Y46.000 F1500 S0 ; kerfdesk:laser-off-motion\n' +
+        'G1 X13.958 Y46.000 F800 S0 ; kerfdesk:laser-off-motion\n' +
         'G1 X17.482 Y46.000 F1500 S0 ; kerfdesk:laser-off-motion',
     );
     expect(out).not.toContain('G0 ');

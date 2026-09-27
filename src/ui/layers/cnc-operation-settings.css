@@ -43,6 +43,15 @@
   grid-template-columns: repeat(auto-fit, minmax(min(100%, 100px), 1fr));
 }
 
+/* Depth per pass, Feed and Plunge each span two rows of the grid, like the
+   laser Power / Speed / Passes: the labels share the first and the boxes the
+   second, so "Depth per pass mm" wrapping moves neither the other labels nor
+   any box. */
+.lf-cnc-feed-grid > .lf-cnc-setting-row {
+  grid-row: span 2;
+  grid-template-rows: subgrid;
+}
+
 .lf-cnc-spindle-field {
   grid-column: 1 / -1;
   grid-template-columns: repeat(auto-fit, minmax(min(100%, 140px), 1fr));

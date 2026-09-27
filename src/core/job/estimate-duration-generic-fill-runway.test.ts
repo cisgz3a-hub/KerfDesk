@@ -45,7 +45,7 @@ function fragmentedGroup(fillRunwayPolicy: NonNullable<FillGroup['fillRunwayPoli
 describe('generic Scan Line runway duration', () => {
   it('times both runways on every fragment within the accepted planner runtime bound', () => {
     const group = fragmentedGroup('feed-matched-every-sweep');
-    const entryOnlyGroup = fragmentedGroup('feed-matched-entry');
+    const boundedGroup = fragmentedGroup('feed-matched-entry');
     const controller = {
       ...DEFAULT_DEVICE_PROFILE,
       maxFeed: MAX_FEED_MM_PER_MIN,
@@ -54,7 +54,7 @@ describe('generic Scan Line runway duration', () => {
     };
 
     const estimate = estimateJobDuration({ groups: [group] }, controller);
-    const entryOnlyEstimate = estimateJobDuration({ groups: [entryOnlyGroup] }, controller);
+    const boundedEstimate = estimateJobDuration({ groups: [boundedGroup] }, controller);
     const plans = planFillSweeps(group);
 
     expect(plans).toHaveLength(FRAGMENT_COUNT);
@@ -64,8 +64,9 @@ describe('generic Scan Line runway duration', () => {
     expect(estimate.totalSeconds).toBeLessThanOrEqual(
       FRAGMENT_COUNT * MAX_ACCEPTED_SECONDS_PER_FRAGMENT,
     );
-    expect(estimate.breakdown.feedTravelSeconds).toBeGreaterThan(
-      entryOnlyEstimate.breakdown.feedTravelSeconds ?? 0,
+    expect(estimate.breakdown.feedTravelSeconds).toBeCloseTo(
+      boundedEstimate.breakdown.feedTravelSeconds ?? 0,
+      8,
     );
   });
 });

@@ -2955,14 +2955,16 @@ or traced image) with at least one closed polyline.
   sweep. Newly committed generic traced Scan Line operations default one-way when no direction was
   explicitly selected and the profile has no verified or legacy-verified scan-offset calibration;
   ordinary vector layers, calibrated profiles, and explicitly saved choices retain their direction.
-  The 4040-safe, Raster Image, Island Fill, and Offset Fill policies remain separate. For generic
+  Raster Image and bounded 4040-safe/Island Fill now share the same non-overlapping split exit
+  and entry geometry (ADR-445), while keeping their own Overscan limits. Offset Fill follows
+  contours. For generic
   Scan Line, a positive stored Overscan value is the full runway wherever it fits (always at each
   scanline's outer entry and exit), up to the field's 25 mm maximum, and a stored value of zero uses
   the bounded 5 mm generic runway default rather than allowing a rapid-to-powered start; Frame
   includes that effective motion. A larger stored value, such as a LightBurn percentage converted
   at high speed, is applied at 25 mm; the import stores it at 25 mm and says so, and Job Review
   notes "applied at most 25 mm" (ADR-238 Amendment 3).
-- *Overscan above 5 mm on the 4040-safe profile*: 4040-safe Scan Line keeps its ADR-234 entry
+- *Overscan above 5 mm on the 4040-safe profile*: 4040-safe Scan Line keeps its ADR-234 entry/exit
   runway of at most 5 mm. The Overscan field keeps the stored value and says so beside it
   ("stored 10; 4040-safe Scan Line uses up to 5 mm"); 4040-safe Island Fill uses the full value.
 - *Very small spacing* (≤ 0.05 mm): clamped to 0.05 mm at the algorithm
@@ -3783,7 +3785,8 @@ last updated.
    table; with no saved points it remains a useful uncorrected comparison, not proof of calibration.
 2. Qualification concerns are prominent warnings. No acknowledgement checkbox is required and
    missing measured points or a requested speed above the profile ceiling does not disable
-   Generate. The emitted job discloses requested/effective feed through the normal compile path.
+   Generate. Generated layers and burned speed labels use the effective feed after the profile
+   ceiling and G-code rounding (ADR-445). Regenerate if the profile or coupon speed is changed.
 3. Malformed geometry, non-finite values, invalid power, and invalid step counts remain factual
    generation-integrity failures because no valid coupon can be produced from them.
 4. After the physical burn, measure the full signed forward-versus-reverse separation (do not
@@ -3799,6 +3802,9 @@ last updated.
    or profile table resets the corresponding measurement draft. Renaming a profile does not.
 5. Source tests do not qualify belts, focus, optics, firmware timing, or the physical coupon. Frame
    remains the only ordinary Start guard and Job Review remains the warning surface.
+6. Raster Diagnostics checks actual split runways against the profile acceleration distance as
+   well as the calibration margin. Confirm that acceleration against the controller. If runway
+   is too short, lower engraving speed or increase Overscan before measuring scan offsets.
 
 ## Phase H flows (CNC router mode — ADR-098)
 
@@ -6698,7 +6704,7 @@ as the pane's design record.
 
 ## Camera Mode flows
 
-### F-CAM1. Choose a camera (ADR-116, ADR-440)
+### F-CAM1. Choose a camera (ADR-116, ADR-440, ADR-446)
 
 - **Success / camera running.** The operator opens the Camera panel and starts a USB camera, or
   presses **Use this camera** on a detected machine camera. The live picture is the one source every
@@ -6720,6 +6726,11 @@ as the pane's design record.
 - **Edge / device list changed.** While Camera Mode is open, browser `devicechange` refreshes the
   picker only. It never opens hardware or prompts for permission. A non-permission `AbortError`
   is shown as a retryable open failure rather than mislabeled as denial.
+- **Success / several cameras (ADR-446).** Each camera on the machine keeps its own calibration.
+  Starting a camera uses its own calibration automatically; **Calibrated cameras** in the panel
+  lists them, marks the one in use, and **Forget** removes one (undoable).
+- **Edge / camera without its own calibration.** The setup steps say to calibrate it, the canvas
+  says the saved calibration belongs to another camera, and calibrating it keeps the others.
 
 ### F-CAM2. One-photo camera calibration (ADR-441, Amendments 1 and 3)
 

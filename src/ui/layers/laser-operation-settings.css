@@ -117,9 +117,25 @@
 }
 
 .lf-process-segment .lf-laser-process__illustration {
+  flex-shrink: 0;
   width: 18px;
   height: 18px;
   color: currentColor;
+}
+
+.lf-process-segment span {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* Same breakpoint as the Settings / Run order / Materials tabs above: a panel
+   too narrow for picture and word drops the picture, so "Image" is never cut
+   to "Ima…". */
+@container (max-width: 320px) {
+  .lf-process-segment .lf-laser-process__illustration {
+    display: none;
+  }
 }
 
 .lf-inspector-help {
@@ -152,17 +168,17 @@
   margin-top: 0;
 }
 
+/* A unit that does not fit beside its name drops to the next line rather than
+   being cut off ("Speed mm/r"); the boxes stay level because the labels share
+   one grid row and the boxes the next (the subgrid below). */
 .lf-laser-essentials--compact .lf-laser-field__label,
 .lf-laser-process-fields .lf-laser-field__label {
   display: flex;
-  flex-wrap: nowrap;
+  flex-wrap: wrap;
   align-items: baseline;
   min-width: 0;
   column-gap: 4px;
   font-size: 13px;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
 }
 
 .lf-laser-essentials--compact .lf-laser-field__label small,
@@ -188,15 +204,20 @@
   border-radius: 0 6px 6px 0;
 }
 
+/* Power, Speed and Passes get three equal boxes. A panel dragged below about
+   270 px cannot fit a five-digit speed in a third, so Speed takes a larger
+   share there. */
 .lf-laser-essentials__grid {
   display: grid;
-  grid-template-columns: 1fr 1.25fr 0.85fr;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 8px;
   margin-top: 10px;
 }
 
-.lf-laser-essentials--compact .lf-laser-essentials__grid {
-  grid-template-columns: minmax(0, 0.9fr) minmax(0, 1.3fr) minmax(0, 0.8fr);
+@container (max-width: 245px) {
+  .lf-laser-essentials__grid {
+    grid-template-columns: minmax(0, 0.95fr) minmax(0, 1.35fr) minmax(0, 0.7fr);
+  }
 }
 
 /* The one or two settings that matter for Fill or Image, laid out like the
@@ -246,12 +267,17 @@
   min-height: 32px;
 }
 
+/* Each field spans two rows of its grid: every label in a row shares the first
+   and every box the second, so one label wrapping onto two lines moves neither
+   the other labels nor any box. */
 .lf-laser-essentials__grid .lf-laser-field,
 .lf-laser-process-fields .lf-laser-field {
-  display: flex;
-  flex-direction: column;
-  align-items: stretch;
-  gap: 6px;
+  display: grid;
+  grid-row: span 2;
+  grid-template-rows: subgrid;
+  grid-template-columns: minmax(0, 1fr);
+  align-items: start;
+  row-gap: 6px;
 }
 
 .lf-laser-essentials__grid .lf-laser-field__label,

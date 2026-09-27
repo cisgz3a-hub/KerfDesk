@@ -1,7 +1,9 @@
 import { boundedSplitRunwayLengths } from '../raster/raster-sweep-plan';
+import type { Vec2 } from '../scene';
 import { DEFAULT_OVERSCAN_MM, MAX_FILL_OVERSCAN_MM } from './compile-job-defaults';
 import { isEmittableFillSegment } from './fill-emission-resolution';
 import { effectiveFillOverscanMm } from './fill-overscan';
+import type { FillRunwayLengths } from './fill-runway';
 import { FILL_GAP_RAPID_THRESHOLD_MM, groupFillScanlines, type FillSweep } from './fill-sweeps';
 import type { FillGroup, FillSegment } from './job';
 import { shiftAlongTravel } from './scan-offset';
@@ -10,10 +12,8 @@ import { shiftAlongTravel } from './scan-offset';
 export type FillRunwayMotion = 'rapid' | 'feed-matched';
 
 /** One fill sweep plus its executable laser-off entry and exit geometry. */
-export type FillSweepPlan = {
+export type FillSweepPlan = FillRunwayLengths & {
   readonly sweep: FillSweep;
-  readonly leadInMm: number;
-  readonly leadOutMm: number;
   readonly runwayMotion: FillRunwayMotion;
 };
 
@@ -64,7 +64,7 @@ export function planFillSweeps(group: FillGroup, scanOffsetMm = 0): FillSweepPla
   }
   if (group.fillRunwayPolicy === 'feed-matched-every-sweep') {
     const runwayMm = genericFeedMatchedFillRunwayMm(group.overscanMm);
-    return scanlines.flatMap((scanline) => everySweepFeedMatchedPlans(scanline, runwayMm));
+    return scanlines.flatMap((scanline) => feedMatchedPlans(scanline, runwayMm));
   }
   if (group.fillRunwayPolicy === 'full' || group.fillRunwayPolicy === 'raster-bounded') {
     const runwayMm = Math.max(0, group.overscanMm);
@@ -117,45 +117,44 @@ function legacyPlan(sweep: FillSweep, group: FillGroup): FillSweepPlan {
 }
 
 function feedMatchedPlans(scanline: ReadonlyArray<FillSweep>, runwayMm: number): FillSweepPlan[] {
+  const joins = fillSplitRunwayJoins(scanline, runwayMm);
   return scanline.map<FillSweepPlan>((sweep, index) => {
     const previous = scanline[index - 1];
-    const previousEnd = previous?.spans[previous.spans.length - 1]?.end;
-    const currentStart = sweep.spans[0]?.start;
-    const gapBeforeMm =
-      previousEnd === undefined || currentStart === undefined
-        ? runwayMm
-        : Math.hypot(currentStart.x - previousEnd.x, currentStart.y - previousEnd.y);
+    const next = scanline[index + 1];
+    const sharedLeadStart = joins[index - 1];
+    const sharedLeadEnd = joins[index];
     const runwayLengths = boundedSplitRunwayLengths({
       index,
       count: scanline.length,
       requestedMm: runwayMm,
-      gapBeforeMm,
+      gapBeforeMm: previous === undefined ? runwayMm : splitGapMm(previous, sweep),
+      gapAfterMm: next === undefined ? runwayMm : splitGapMm(sweep, next),
     });
     return {
       sweep,
       ...runwayLengths,
+      ...(sharedLeadStart === undefined ? {} : { sharedLeadStart }),
+      ...(sharedLeadEnd === undefined ? {} : { sharedLeadEnd }),
       runwayMotion: 'feed-matched',
     };
   });
 }
 
-function everySweepFeedMatchedPlans(
+function fillSplitRunwayJoins(
   scanline: ReadonlyArray<FillSweep>,
   runwayMm: number,
-): FillSweepPlan[] {
-  return scanline.map<FillSweepPlan>((sweep, index) => {
-    const previous = scanline[index - 1];
-    const next = scanline[index + 1];
-    return {
-      sweep,
-      leadInMm:
-        previous === undefined
-          ? runwayMm
-          : splitSideRunwayMm(runwayMm, splitGapMm(previous, sweep)),
-      leadOutMm:
-        next === undefined ? runwayMm : splitSideRunwayMm(runwayMm, splitGapMm(sweep, next)),
-      runwayMotion: 'feed-matched',
-    };
+): ReadonlyArray<Vec2 | undefined> {
+  return scanline.slice(1).map((next, index) => {
+    const previous = scanline[index];
+    if (previous === undefined || runwayMm <= 0 || splitGapMm(previous, next) > 2 * runwayMm) {
+      return undefined;
+    }
+    const from = previous.spans[previous.spans.length - 1]?.end;
+    const to = next.spans[0]?.start;
+    if (from === undefined || to === undefined) return undefined;
+    // The shifted/rotated world endpoints define one shared midpoint. Reusing
+    // it avoids separate +/- expansions rounding to different controller points.
+    return { x: (from.x + to.x) / 2, y: (from.y + to.y) / 2 };
   });
 }
 
@@ -164,8 +163,4 @@ function splitGapMm(previous: FillSweep, next: FillSweep): number {
   const nextStart = next.spans[0]?.start;
   if (previousEnd === undefined || nextStart === undefined) return 0;
   return Math.hypot(nextStart.x - previousEnd.x, nextStart.y - previousEnd.y);
-}
-
-function splitSideRunwayMm(requestedMm: number, gapMm: number): number {
-  return Math.min(Math.max(0, requestedMm), Math.max(0, gapMm) / 2);
 }
