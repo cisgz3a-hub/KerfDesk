@@ -9,6 +9,7 @@ import {
 import { placeTracedLayers, type TracedPageLayout } from './traced-page-box';
 import { traceImageToColoredPaths } from './trace-to-paths';
 import { DEFAULT_TRACE_OPTIONS, type RawImageData, type TraceOptions } from './trace-image';
+import { isLineTraceMode } from './trace-paint';
 
 export type BatchTracePhysicalSize = {
   readonly widthMm: number;
@@ -91,7 +92,8 @@ export type BatchTraceDependencies = {
   /**
    * PDF / EPS / GeoJSON serializer (io layer, ADR-444). Receives visible
    * layers in page units (Y down), the page size, and whether every contour
-   * is a stroke (Centerline). Required only for those formats.
+   * is a stroke (Centerline or Edge). Per-path Hybrid roles remain on the
+   * layers. Required only for those formats.
    */
   readonly writeDrawing?: (
     format: BatchTraceDrawingFormat,
@@ -188,7 +190,7 @@ function tracedFileText(
     ...output,
     pageWidth: page.size?.width ?? page.physicalSizeMm?.widthMm ?? page.pixelWidth,
     pageHeight: pageHeight(page),
-    strokeOnly: traceMode === 'centerline',
+    strokeOnly: isLineTraceMode(traceMode),
   });
 }
 

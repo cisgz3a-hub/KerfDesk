@@ -44,18 +44,21 @@ describe('fittedPageBox', () => {
     });
   });
 
-  it('adds half the widest hairline around stroked artwork', () => {
-    // 0.5 mm pixels are wider than the 0.1 mm PDF/EPS hairline.
-    expect(fittedPageBox(LAYERS, MM_PAGE, 'centerline', 0, 0.01)).toEqual({
-      minX: 19.75,
-      minY: 14.75,
-      maxX: 70.25,
-      maxY: 30.25,
-    });
-    const finePixels: TracedSvgPage = { ...MM_PAGE, physicalSizeMm: { widthMm: 2, heightMm: 1 } };
-    const half = TRACED_HAIRLINE_MM / 2;
-    expect(fittedPageBox(LAYERS, finePixels, 'centerline', 0, 0.01)?.minX).toBeCloseTo(20 - half);
-  });
+  it.each(['centerline', 'edge'] as const)(
+    'adds half the widest hairline around %s artwork',
+    (mode) => {
+      // 0.5 mm pixels are wider than the 0.1 mm PDF/EPS hairline.
+      expect(fittedPageBox(LAYERS, MM_PAGE, mode, 0, 0.01)).toEqual({
+        minX: 19.75,
+        minY: 14.75,
+        maxX: 70.25,
+        maxY: 30.25,
+      });
+      const finePixels: TracedSvgPage = { ...MM_PAGE, physicalSizeMm: { widthMm: 2, heightMm: 1 } };
+      const half = TRACED_HAIRLINE_MM / 2;
+      expect(fittedPageBox(LAYERS, finePixels, mode, 0, 0.01)?.minX).toBeCloseTo(20 - half);
+    },
+  );
 
   it('takes the margin in pixels on a page with no physical size, without a grid', () => {
     const pixels: TracedSvgPage = { pixelWidth: 200, pixelHeight: 100 };
