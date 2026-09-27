@@ -33,7 +33,7 @@ points, and what does this part of the job look like on its own.
      over Studio's warm ones. A card beside the pointer gives the line number, the kind of move
      and its G word, X Y Z at the pointer, the feed (or "rapid") and power in force, and when the
      tool gets there. The card flips to the pointer's other side near the view's edges.
-   - Clicking a move (press and release within 4 pixels) selects its line in the source pane and
+   - Clicking a move (the entire press stays within 4 pixels; cancellation retires the press) selects its line in the source pane and
      moves the playhead to the clicked point. In live mode it selects the line only, because the
      playhead follows the machine there.
    - Hover pauses while a mouse button is held or the camera moves, since the pick would chase a

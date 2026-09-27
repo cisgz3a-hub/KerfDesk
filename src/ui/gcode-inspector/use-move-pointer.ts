@@ -20,7 +20,7 @@ export type MoveHover = {
 
 type PointerAt = Omit<MoveHover, 'pick'>;
 
-/** Farther than this between press and release is a pan, not a click. */
+/** Moving farther than this at any point in a press makes it a pan. */
 export const CLICK_SLOP_PX = 4;
 
 export function useMovePointer(args: {
@@ -60,11 +60,13 @@ export function useMovePointer(args: {
     canvas.addEventListener('pointerleave', listeners.clear);
     canvas.addEventListener('pointerdown', listeners.down);
     canvas.addEventListener('pointerup', listeners.up);
+    canvas.addEventListener('pointercancel', listeners.cancel);
     return () => {
       canvas.removeEventListener('pointermove', listeners.move);
       canvas.removeEventListener('pointerleave', listeners.clear);
       canvas.removeEventListener('pointerdown', listeners.down);
       canvas.removeEventListener('pointerup', listeners.up);
+      canvas.removeEventListener('pointercancel', listeners.cancel);
       listeners.clear();
       listenersRef.current = null;
     };
@@ -86,7 +88,12 @@ function createMoveListeners(
   const { handleRef, setHover } = deps;
   let frame: number | null = null;
   let latest: PointerAt | null = null;
-  let press: { readonly x: number; readonly y: number; readonly id: number } | null = null;
+  let press: {
+    readonly x: number;
+    readonly y: number;
+    readonly id: number;
+    dragged: boolean;
+  } | null = null;
   const pointerAt = (event: PointerEvent): PointerAt => {
     const rect = canvas.getBoundingClientRect();
     return {
@@ -115,6 +122,10 @@ function createMoveListeners(
   return {
     clear,
     move: (event: PointerEvent): void => {
+      if (press !== null && event.pointerId === press.id) {
+        press.dragged ||=
+          Math.hypot(event.clientX - press.x, event.clientY - press.y) > CLICK_SLOP_PX;
+      }
       if (event.buttons !== 0 || deps.isPaused()) {
         if (latest !== null) clear();
         return;
@@ -124,15 +135,22 @@ function createMoveListeners(
     },
     down: (event: PointerEvent): void => {
       press =
-        event.button === 0 ? { x: event.clientX, y: event.clientY, id: event.pointerId } : null;
+        event.button === 0
+          ? { x: event.clientX, y: event.clientY, id: event.pointerId, dragged: false }
+          : null;
     },
     up: (event: PointerEvent): void => {
       const start = press;
       press = null;
-      if (start === null || event.button !== 0 || event.pointerId !== start.id) return;
+      if (start === null || start.dragged || event.button !== 0 || event.pointerId !== start.id)
+        return;
       if (Math.hypot(event.clientX - start.x, event.clientY - start.y) > CLICK_SLOP_PX) return;
       const pick = pickAt(pointerAt(event));
       if (pick !== null) deps.locate(pick);
+    },
+    cancel: (event: PointerEvent): void => {
+      if (event.pointerId === press?.id) press = null;
+      clear();
     },
   };
 }
