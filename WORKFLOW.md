@@ -3975,6 +3975,12 @@ explicitly marked below; the remaining controls and user-facing flows are planne
    above instead of plunging; a ring shorter than one cut width plunges.
 3. Emitted G-code passes the plunged-travel invariant; scale is resolved
    before cutter geometry, then mirror/rotate/move placement is honored.
+4. Job Review's detail line for the operation names the levels the
+   compiled job roughs, for example `relief roughing 2 levels to 2.5 mm`,
+   instead of a pass count from Cut depth. An operation that cut only
+   reliefs leaves out its pass count and tabs. One that also cut other
+   shapes says `1 pass on the other shapes`, and kept tabs add
+   `none on reliefs` (ADR-224 Amendment 3).
 
 #### Error — bit too big for the detail
 1. Regions narrower than the bit's dilated footprint produce no rings

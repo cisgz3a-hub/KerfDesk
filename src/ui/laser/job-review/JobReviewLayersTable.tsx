@@ -217,6 +217,7 @@ function CncLayersTable(props: {
                   settings,
                   machine.stock.thicknessMm,
                   effective?.plungingReliefStages,
+                  effective?.relief,
                 )}
               />
               <JobReviewEffectiveOperationRow
