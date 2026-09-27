@@ -2,62 +2,41 @@
 // ADR-102 §2 as amended: src/ui/viewer3d/ is a sanctioned three home).
 // Z-up work-coordinate frame, DPR-correct rendering, orbit controls,
 // bed/grid/origin furniture, render-on-demand, and complete disposal.
+// ADR-426 adds orthographic views, the view cube and the Studio look.
 
-// Type-only imports: erased at compile time, so three itself still loads
-// lazily through the dynamic import() below (ADR-102 §3).
-import type * as ThreeNamespace from 'three';
-import type { Object3D, PerspectiveCamera, WebGLRenderer } from 'three';
-import type { LineMaterial as LineMaterialType } from 'three/examples/jsm/lines/LineMaterial.js';
-import type * as LineMaterialModule from 'three/examples/jsm/lines/LineMaterial.js';
-import type * as LineSegments2Module from 'three/examples/jsm/lines/LineSegments2.js';
-import type * as LineSegmentsGeometryModule from 'three/examples/jsm/lines/LineSegmentsGeometry.js';
 import type { AxisBounds } from '../../core/gcode-view';
 import type { Viewer3dSegmentsInput } from './segment-buckets';
-import {
-  applyRecolor,
-  applyReveal,
-  buildToolpathObjects,
-  setToolpathTravelVisibility,
-  type RevealTargets,
-  type ToolpathBuildArgs,
-} from './scene-toolpath';
-import { createCameraDirector } from './camera-director';
+import { applyRecolor, applyReveal, setToolpathTravelVisibility } from './scene-toolpath';
 import type { CameraTracking } from './camera-tracking';
-import { cameraPlacement, type CameraPreset } from './camera-presets';
-import {
-  createViewer3dRenderScheduler,
-  type Viewer3dRenderScheduler,
-} from './create-viewer3d-render-scheduler';
+import type { Viewer3dProjection, Viewer3dView } from './camera-presets';
 import type { ArrowPlacement } from './direction-arrows';
-import { createArrowMesh, disposeArrowMesh, type ArrowMesh } from './scene-arrows';
 import { boundsExtent } from './scene-furniture';
 import {
-  createCameraRig,
-  startRenderer,
-  type CameraRig,
-  type OrbitControlsCtor,
-} from './scene-setup';
+  createSceneCore,
+  type ColorOf,
+  type PlayheadMarker,
+  type SceneCore,
+  type SceneHandleDeps,
+} from './scene-handle-core';
+import { createCameraRig, startRenderer } from './scene-setup';
+import { sizeMarkers } from './scene-markers';
 import {
-  createMarkers,
-  disposeMarkers,
-  sizeMarkers,
-  type MarkerMesh,
-  type SceneMarkers,
-} from './scene-markers';
-import { buildFurniture, disposeChildren, frameCamera } from './scene-furniture';
-import { resolveViewer3dTheme, type Viewer3dTheme } from './viewer3d-theme';
+  applyResize,
+  captureFrame,
+  placeMarker,
+  rebuildFurniture,
+  rebuildToolpath,
+  swapArrows,
+  type Point3,
+} from './scene-parts';
+import { loadThree } from './viewer3d-modules';
+import type { Viewer3dStage } from './viewer3d-look';
+import { resolveViewer3dTheme } from './viewer3d-theme';
 import { yieldViewer3dInitialization } from './yield-viewer3d-initialization';
-import { createViewer3dFramePreparation } from './wait-for-viewer3d-gpu';
 
 export type Viewer3dSegments = Viewer3dSegmentsInput;
 
-export type PlayheadMarker = {
-  readonly hideMarker?: boolean;
-  /** Reveal geometry through this segment; -1 hides everything. */
-  readonly segmentIndex: number;
-  /** Interpolated tool position, or null to hide the marker. */
-  readonly point: { readonly x: number; readonly y: number; readonly z: number } | null;
-};
+export type { PlayheadMarker } from './scene-handle-core';
 
 export type Viewer3dSceneHandle = {
   readonly setSegments: (segments: Viewer3dSegments) => void;
@@ -71,23 +50,35 @@ export type Viewer3dSceneHandle = {
    * Drawn distinctly from the playback marker: one is a simulation, the
    * other is a live report, and confusing them would be dangerous.
    */
-  readonly setLiveMachine: (
-    point: { readonly x: number; readonly y: number; readonly z: number } | null,
-  ) => void;
+  readonly setLiveMachine: (point: Point3 | null) => void;
   /**
    * Recolour the drawn moves from a render-model-segment → rgb function.
    * Rewrites the existing colour attribute only — no geometry rebuild — so
    * switching data lenses is free (ADR-255 §11 R2).
    */
-  readonly recolor: (colorOf: (segmentIndex: number) => readonly [number, number, number]) => void;
-  /** Snap to a standard view (Top / Front / Right / Iso) framed on the job. */
-  readonly setView: (preset: CameraPreset) => void;
+  readonly recolor: (colorOf: ColorOf) => void;
+  /** Turn to a named view, drawn orthographically unless it is Iso (ADR-426). */
+  readonly setView: (view: Viewer3dView) => void;
+  /** Frame the whole job from the current angle. */
+  readonly fitView: () => void;
+  readonly setProjection: (projection: Viewer3dProjection) => void;
+  /** Reports each projection change, including the automatic ones. */
+  readonly onProjectionChange: (
+    listener: ((projection: Viewer3dProjection) => void) | null,
+  ) => void;
+  /** Classic or Studio, with the job box, work area and tool Studio draws. */
+  readonly setStage: (stage: Viewer3dStage) => void;
+  /** The view cube face under a point in its square (fractions, 0,0 top-left). */
+  readonly pickViewCube: (xFraction: number, yFraction: number) => Viewer3dView | null;
+  readonly hoverViewCube: (view: Viewer3dView | null) => void;
   readonly setCameraTracking: (tracking: CameraTracking) => void;
   readonly onCameraInteraction: (listener: (() => void) | null) => void;
+  /** Reports orbit, pan and zoom drags starting (true) and ending (false). */
+  readonly onCameraMoving: (listener: ((moving: boolean) => void) | null) => void;
   /**
    * PNG data URL of the current frame. Renders and reads back in the SAME
    * task: without preserveDrawingBuffer the buffer is cleared at composite,
-   * so a deferred read returns a blank image.
+   * so a deferred read returns a blank image. The view cube is left out.
    */
   readonly captureImage: () => string;
   /** Direction arrowheads over the cut path; null clears them. */
@@ -102,26 +93,6 @@ export type Viewer3dSceneHandle = {
 export type Viewer3dSceneResult =
   | { readonly kind: 'ok'; readonly handle: Viewer3dSceneHandle }
   | { readonly kind: 'no-webgl'; readonly reason: string };
-
-type ThreeModule = typeof ThreeNamespace;
-
-type ThreeModules = {
-  readonly three: ThreeModule;
-  readonly OrbitControls: OrbitControlsCtor;
-  readonly LineSegments2: typeof LineSegments2Module.LineSegments2;
-  readonly LineSegmentsGeometry: typeof LineSegmentsGeometryModule.LineSegmentsGeometry;
-  readonly LineMaterial: typeof LineMaterialModule.LineMaterial;
-};
-
-// Every three module the scene needs, loaded in one lazy chunk (ADR-102 §3).
-async function loadThree(): Promise<ThreeModules> {
-  const three = await import('three');
-  const { OrbitControls } = await import('three/examples/jsm/controls/OrbitControls.js');
-  const { LineSegments2 } = await import('three/examples/jsm/lines/LineSegments2.js');
-  const { LineSegmentsGeometry } = await import('three/examples/jsm/lines/LineSegmentsGeometry.js');
-  const { LineMaterial } = await import('three/examples/jsm/lines/LineMaterial.js');
-  return { three, OrbitControls, LineSegments2, LineSegmentsGeometry, LineMaterial };
-}
 
 export async function createViewer3dScene(canvas: HTMLCanvasElement): Promise<Viewer3dSceneResult> {
   const modules = await loadThree();
@@ -145,6 +116,7 @@ export async function createViewer3dScene(canvas: HTMLCanvasElement): Promise<Vi
     theme,
     renderer,
     scene,
+    canvas,
     toolpathGroup,
     furnitureGroup,
     rig,
@@ -156,200 +128,167 @@ export async function createViewer3dScene(canvas: HTMLCanvasElement): Promise<Vi
   return { kind: 'ok', handle };
 }
 
-type SceneHandleDeps = {
-  readonly modules: ThreeModules;
-  readonly theme: Viewer3dTheme;
-  readonly renderer: WebGLRenderer;
-  readonly scene: ThreeNamespace.Scene;
-  readonly toolpathGroup: Object3D;
-  readonly furnitureGroup: Object3D;
-  readonly rig: CameraRig;
-  readonly width: number;
-  readonly height: number;
-};
-
-// Owns the scene's mutable render state (current buffers, reveal targets,
-// traversal visibility, view size) behind the handle's function surface.
+// The handle's methods, grouped by what they touch, over one shared core.
 function createSceneHandle(deps: SceneHandleDeps): Viewer3dSceneHandle {
-  const { modules, theme, renderer, scene, toolpathGroup, furnitureGroup } = deps;
-  const { three } = modules;
-  const { camera, controls, render } = deps.rig;
-  const renderScheduler = createViewer3dRenderScheduler({ render, renderChangeEvents: controls });
-  const preparation = createViewer3dFramePreparation(renderer.getContext(), renderScheduler);
-  const director = createCameraDirector({ ...deps.rig, render: renderScheduler.requestRender });
-
-  // Fat-line materials size their strokes against the drawing buffer, so the
-  // current view size is tracked and pushed into the material on resize.
-  let viewWidth = deps.width;
-  let viewHeight = deps.height;
-  let fatMaterial: LineMaterialType | null = null;
-  let travelObject: Object3D | null = null;
-  let travelVisible = true;
-  let reveal: RevealTargets | null = null;
-  let lastBounds: AxisBounds | null = null;
-  let arrowMesh: ArrowMesh | null = null;
-  const markers = createMarkers(three, scene);
-  const { marker, liveMarker } = markers;
-
+  const core = createSceneCore(deps);
   return {
-    setCameraTracking: director.track,
-    onCameraInteraction: director.onManual,
+    ...toolpathMethods(core),
+    ...cameraMethods(core),
+    ...lifecycleMethods(core),
+  };
+}
+
+type ToolpathMethods = Pick<
+  Viewer3dSceneHandle,
+  | 'setSegments'
+  | 'recolor'
+  | 'setLiveMachine'
+  | 'setPlayhead'
+  | 'setTravelVisible'
+  | 'setStage'
+  | 'setDirectionArrows'
+>;
+
+function toolpathMethods(core: SceneCore): ToolpathMethods {
+  const { deps, state, markers, requestRender } = core;
+  const { modules, theme } = deps;
+  return {
     setSegments: (segments) => {
-      const built = rebuildToolpath(toolpathGroup, {
+      const built = rebuildToolpath(deps.toolpathGroup, {
         ...modules,
         segments,
         theme,
-        viewWidth,
-        viewHeight,
-        travelVisible,
+        viewWidth: state.viewWidth,
+        viewHeight: state.viewHeight,
+        travelVisible: state.travelVisible,
       });
-      ({ fatMaterial, travelObject, reveal } = built);
+      state.fatMaterial = built.fatMaterial;
+      state.travelObject = built.travelObject;
+      state.travelLine = built.travelLine;
+      state.reveal = built.reveal;
+      core.applyTravel();
       sizeMarkers(markers, segments);
-      renderScheduler.requestRender();
+      requestRender();
     },
-    recolor: (colorOf) => void (applyRecolor(reveal, colorOf) && renderScheduler.requestRender()),
-    setLiveMachine: (point) => (placeMarker(liveMarker, point), renderScheduler.requestRender()),
+    recolor: (colorOf) => {
+      state.colorOf = colorOf;
+      if (applyRecolor(state.reveal, colorOf, core.encode())) requestRender();
+    },
+    setLiveMachine: (point) => (placeMarker(markers.liveMarker, point), requestRender()),
     setPlayhead: (playhead) => {
-      applyReveal(reveal, playhead);
-      placeMarker(marker, playhead?.hideMarker ? null : (playhead?.point ?? null));
-      renderScheduler.requestRender();
-    },
-    fitToBounds: (bounds) => {
-      lastBounds = bounds;
-      director.setBounds(bounds);
-      rebuildFurniture(three, furnitureGroup, bounds, theme);
-      frameCamera(camera, controls, bounds);
-      renderScheduler.requestRender();
+      state.playhead = playhead;
+      applyReveal(state.reveal, playhead);
+      core.placePlayhead();
+      requestRender();
     },
     setTravelVisible: (visible) => {
-      travelVisible = visible;
-      if (travelObject !== null) travelObject.visible = visible;
-      setToolpathTravelVisibility(reveal, visible);
-      renderScheduler.requestRender();
+      state.travelVisible = visible;
+      if (state.travelObject !== null) state.travelObject.visible = visible;
+      setToolpathTravelVisibility(state.reveal, visible);
+      requestRender();
     },
-
+    setStage: (stage) => {
+      const lookChanged = stage.look !== state.stage.look;
+      state.stage = stage;
+      core.studio.setStage(stage, state.bounds);
+      core.applyTravel();
+      if (lookChanged) core.repaint();
+      core.placePlayhead();
+      requestRender();
+    },
     setDirectionArrows: (placements) => {
-      arrowMesh = swapArrows(three, scene, arrowMesh, placements, boundsExtent(lastBounds), theme);
-      renderScheduler.requestRender();
-    },
-    setView: (preset) => {
-      director.stop();
-      applyView(camera, controls, cameraPlacement(preset, lastBounds, camera.aspect));
-      renderScheduler.requestRender();
-    },
-    captureImage: () => captureSceneImage(renderScheduler, renderer),
-    resize: (nextWidth, nextHeight) => {
-      if (nextWidth <= 0 || nextHeight <= 0) return;
-      viewWidth = nextWidth;
-      viewHeight = nextHeight;
-      applyResize({ renderer, camera, fatMaterial }, nextWidth, nextHeight);
-      renderScheduler.requestRender();
-    },
-    requestRender: renderScheduler.requestRender,
-    prepareToShow: preparation.prepareToShow,
-    dispose: () => {
-      preparation.dispose();
-      renderScheduler.dispose();
-      director.dispose();
-      disposeScene(deps, markers, arrowMesh);
+      const extent = boundsExtent(state.bounds);
+      const { three } = modules;
+      state.arrowMesh = swapArrows(three, deps.scene, state.arrowMesh, placements, extent, theme);
+      requestRender();
     },
   };
 }
 
-function captureSceneImage(scheduler: Viewer3dRenderScheduler, renderer: WebGLRenderer): string {
-  scheduler.renderNow();
-  return renderer.domElement.toDataURL('image/png');
+type CameraMethods = Pick<
+  Viewer3dSceneHandle,
+  | 'setCameraTracking'
+  | 'onCameraInteraction'
+  | 'onCameraMoving'
+  | 'onProjectionChange'
+  | 'fitToBounds'
+  | 'setView'
+  | 'fitView'
+  | 'setProjection'
+  | 'pickViewCube'
+  | 'hoverViewCube'
+>;
+
+function cameraMethods(core: SceneCore): CameraMethods {
+  const { deps, state, director, views, projection, requestRender } = core;
+  return {
+    setCameraTracking: director.track,
+    onCameraInteraction: director.onManual,
+    onCameraMoving: core.moving.listen,
+    onProjectionChange: projection.listen,
+    fitToBounds: (bounds) => {
+      state.bounds = bounds;
+      director.setBounds(bounds);
+      views.setBounds(bounds);
+      rebuildFurniture(deps.modules.three, deps.furnitureGroup, bounds, deps.theme);
+      core.studio.setStage(state.stage, bounds);
+      core.applyTravel();
+      views.frame();
+      projection.report();
+      requestRender();
+    },
+    setView: (view) => {
+      director.stop();
+      views.goToView(view);
+      projection.report();
+    },
+    fitView: () => {
+      director.stop();
+      views.fit();
+    },
+    setProjection: (next) => {
+      views.setProjection(next);
+      projection.report();
+    },
+    pickViewCube: core.cube.pick,
+    hoverViewCube: (view) => {
+      if (core.cube.hover(view)) requestRender();
+    },
+  };
 }
 
-function disposeScene(
-  deps: SceneHandleDeps,
-  markers: SceneMarkers,
-  arrows: ArrowMesh | null,
-): void {
-  deps.rig.controls.dispose();
-  disposeChildren(deps.toolpathGroup);
-  disposeChildren(deps.furnitureGroup);
-  disposeMarkers(deps.scene, markers);
-  disposeArrowMesh(deps.scene, arrows);
-  deps.renderer.dispose();
-}
+type LifecycleMethods = Pick<
+  Viewer3dSceneHandle,
+  'captureImage' | 'resize' | 'requestRender' | 'prepareToShow' | 'dispose'
+>;
 
-// Swap the drawn toolpath: dispose what was there, build the new batches,
-// mount them. Disposal first — the old buffers are dead the moment the
-// program changes.
-function rebuildToolpath(
-  group: Object3D,
-  args: ToolpathBuildArgs,
-): ReturnType<typeof buildToolpathObjects> {
-  disposeChildren(group);
-  const built = buildToolpathObjects(args);
-  for (const object of built.objects) group.add(object);
-  return built;
-}
-
-// Swap the bed/grid/triad for a new job extent.
-function rebuildFurniture(
-  three: ThreeModule,
-  group: Object3D,
-  bounds: AxisBounds | null,
-  theme: Viewer3dTheme,
-): void {
-  disposeChildren(group);
-  for (const object of buildFurniture(three, bounds, theme)) group.add(object);
-}
-
-// Replace the arrow overlay: the old instanced mesh is dead the moment the
-// overlay is toggled or the program changes.
-function swapArrows(
-  three: ThreeModule,
-  scene: ThreeNamespace.Scene,
-  previous: ArrowMesh | null,
-  placements: ReadonlyArray<ArrowPlacement> | null,
-  extentMm: number,
-  theme: Viewer3dTheme,
-): ArrowMesh | null {
-  disposeArrowMesh(scene, previous);
-  if (placements === null) return null;
-  const mesh = createArrowMesh(three, placements, extentMm, theme);
-  if (mesh !== null) scene.add(mesh);
-  return mesh;
-}
-
-// Point the camera at a standard view and re-target the orbit controls.
-function applyView(
-  camera: PerspectiveCamera,
-  controls: { target: { set: (x: number, y: number, z: number) => void }; update: () => void },
-  view: ReturnType<typeof cameraPlacement>,
-): void {
-  camera.up.set(view.up.x, view.up.y, view.up.z);
-  camera.position.set(view.position.x, view.position.y, view.position.z);
-  controls.target.set(view.target.x, view.target.y, view.target.z);
-  camera.lookAt(view.target.x, view.target.y, view.target.z);
-  controls.update();
-}
-
-// Fat-line materials size their strokes against the drawing buffer, so the
-// material's resolution has to track the canvas.
-function applyResize(
-  parts: {
-    readonly renderer: WebGLRenderer;
-    readonly camera: PerspectiveCamera;
-    readonly fatMaterial: LineMaterialType | null;
-  },
-  width: number,
-  height: number,
-): void {
-  parts.renderer.setSize(width, height, false);
-  parts.camera.aspect = width / height;
-  parts.camera.updateProjectionMatrix();
-  parts.fatMaterial?.resolution.set(width, height);
-}
-
-// Show a marker at a point, or hide it when there is nothing to show.
-function placeMarker(
-  mesh: MarkerMesh,
-  point: { readonly x: number; readonly y: number; readonly z: number } | null,
-): void {
-  mesh.visible = point !== null;
-  if (point !== null) mesh.position.set(point.x, point.y, point.z);
+function lifecycleMethods(core: SceneCore): LifecycleMethods {
+  const { deps, state, requestRender } = core;
+  return {
+    captureImage: () => {
+      state.overlays = false;
+      try {
+        return captureFrame(core.scheduler, deps.renderer);
+      } finally {
+        state.overlays = true;
+        requestRender();
+      }
+    },
+    resize: (nextWidth, nextHeight) => {
+      if (nextWidth <= 0 || nextHeight <= 0) return;
+      state.viewWidth = nextWidth;
+      state.viewHeight = nextHeight;
+      const parts = {
+        renderer: deps.renderer,
+        camera: deps.rig.camera,
+        fatMaterial: state.fatMaterial,
+      };
+      applyResize(parts, nextWidth, nextHeight);
+      core.studio.resize(nextWidth, nextHeight);
+      requestRender();
+    },
+    requestRender,
+    prepareToShow: core.preparation.prepareToShow,
+    dispose: core.dispose,
+  };
 }

@@ -9,6 +9,8 @@ import type { Project } from '../../core/scene';
 import { liveViewerState } from '../cnc-viewer3d/viewer3d-live-run';
 import { useOutputScope, useStore } from '../state';
 import { useUiStore } from '../state/ui-store';
+// Deep import: the viewer3d barrel is capped at 20 exports by its index contract.
+import { VIEWER3D_MOUSE_HINT } from '../viewer3d/viewer3d-controls';
 import { Cnc3DFullPage } from './Cnc3DFullPage';
 import { Cnc3DPaneToggle } from './Cnc3DPaneToggle';
 import {
@@ -129,7 +131,7 @@ function PaneScene(props: {
           3D view unavailable in this browser.
         </p>
       ) : (
-        <p style={hintStyle}>Drag to orbit, scroll to zoom. Updates as you edit.</p>
+        <p style={hintStyle}>{VIEWER3D_MOUSE_HINT}. Updates as you edit.</p>
       )}
       {resolutionNotice === null ? null : (
         <p style={resolutionNoticeStyle} role="status">

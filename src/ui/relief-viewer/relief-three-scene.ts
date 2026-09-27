@@ -1,7 +1,7 @@
 // createReliefThreeScene — the persistent half of the 3D viewport (ADR-102
 // §2: three is UI-only, lazy-loaded). Owns the renderer, Z-up camera, orbit
 // controls and lights, and renders on demand (no rAF loop — renders on
-// interaction, resize, or a content swap only).
+// interaction, resize, a content swap, or while a drag's glide settles).
 //
 // Everything that depends on the JOB lives in viewer3d-content and is swapped
 // through updateContent(). Keeping the two lifetimes apart is what stops the
@@ -13,7 +13,6 @@
 // lazily through the dynamic import() below (ADR-102 §3).
 import type { WebGLRenderer } from 'three';
 import type * as ThreeNamespace from 'three';
-import type { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
 import {
   SECTION_DISABLED_FRACTION,
   SECTION_PLANE_NORMAL,
@@ -28,6 +27,9 @@ import {
 } from '../cnc-viewer3d';
 import { applySceneLighting } from './scene-lighting';
 import { installViewer3DThreeKeyboard } from './viewer3d-three-keyboard';
+// Deep imports: the viewer3d barrel is capped at 20 exports by its index contract.
+import { configureViewer3dControls } from '../viewer3d/viewer3d-controls';
+import { createViewer3dGlideRendering } from '../viewer3d/viewer3d-glide-rendering';
 
 export type { ViewerSurfaceMesh, ViewerToolpathOverlay };
 
@@ -73,11 +75,12 @@ export async function createReliefThreeScene(
 
   const camera = framedCamera(three, width / height, mesh, stockThicknessMm);
   const controls = new OrbitControls(camera, canvas);
-  applyOperatorMouseBindings(three, controls);
+  // The shared mouse map and feel of every 3D view (ADR-426).
+  configureViewer3dControls(three, controls);
   const sectionPlane = installSectionPlane(three, renderer, mesh.heightMm);
   const raycaster = new three.Raycaster();
-  const render = (): void => renderer.render(scene, camera);
-  controls.addEventListener('change', render);
+  const rendering = createViewer3dGlideRendering(controls, () => renderer.render(scene, camera));
+  const render = rendering.render;
 
   const content = await buildViewerContent(three, {
     mesh,
@@ -102,6 +105,7 @@ export async function createReliefThreeScene(
       sectionSpanMm: mesh.heightMm,
       content,
       render,
+      disposeRendering: rendering.dispose,
       disposeKeyboard,
       disposeLighting: lighting.dispose,
     }),
@@ -124,17 +128,6 @@ function framedCamera(
   camera.position.set(orbitRadius * 0.7, -orbitRadius * 0.7, orbitRadius * 0.6);
   camera.lookAt(0, 0, 0);
   return camera;
-}
-
-// Left-drag PANS, right-drag orbits — the opposite of three's default. Sliding
-// the part around is the move an operator reaches for constantly while
-// inspecting a cut; re-aiming the camera is occasional.
-function applyOperatorMouseBindings(three: typeof ThreeNamespace, controls: OrbitControls): void {
-  controls.mouseButtons = {
-    LEFT: three.MOUSE.PAN,
-    MIDDLE: three.MOUSE.DOLLY,
-    RIGHT: three.MOUSE.ROTATE,
-  };
 }
 
 // Allocated ONCE at length 1 and never resized. three recompiles every shader

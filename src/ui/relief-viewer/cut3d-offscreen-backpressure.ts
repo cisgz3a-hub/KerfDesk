@@ -103,7 +103,11 @@ function mergeControls(
   second: Cut3DOffscreenControl,
 ): Cut3DOffscreenControl {
   if (first.kind === 'zoom' && second.kind === 'zoom') {
-    return { kind: 'zoom', deltaY: first.deltaY + second.deltaY };
+    // One zoom toward the newest pointer position stands for both.
+    const deltaY = first.deltaY + second.deltaY;
+    return second.cursor === undefined
+      ? { kind: 'zoom', deltaY }
+      : { kind: 'zoom', deltaY, cursor: second.cursor };
   }
   if (first.kind === 'pan' && second.kind === 'pan') {
     return {
