@@ -40,6 +40,7 @@ import {
   type ReliefObject,
   sceneObjectUsesOperation,
   type SceneObject,
+  type Vec2,
 } from '../scene';
 import { kernelForTool } from '../sim';
 import { coolantFields } from './coolant-fields';
