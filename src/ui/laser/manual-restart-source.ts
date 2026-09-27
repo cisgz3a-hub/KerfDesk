@@ -18,6 +18,8 @@ import type { OutputScope } from '../../core/scene';
 import { currentOutputScope, useStore } from '../state';
 import { recoveryRepository, type RecoveryRepository } from '../state/recovery';
 import type { RecoveryArtifactV1 } from '../state/recovery/execution-artifact';
+import type { WorkCoordinateOffset } from '../state/origin-actions';
+import { savedWorkOffsetMm } from './laser-recovery-origin';
 import { prepareRecoverySource, type PreparedRecoverySource } from './start-job-source';
 
 type RunPlacement = {
@@ -26,6 +28,8 @@ type RunPlacement = {
   /** The program this placement produced, before any resume transform. */
   readonly fingerprint: GcodeFingerprint;
   readonly atIso: string;
+  /** The work offset the run ran with, when its archive observed one. */
+  readonly savedOffsetMm?: WorkCoordinateOffset | null;
 };
 
 export type ManualRestartSource = {
@@ -46,6 +50,7 @@ export async function prepareManualRestartSource(
     const source = await prepareRecoverySource({
       outputScope: run.outputScope,
       ...(run.jobOrigin === undefined ? {} : { jobOrigin: run.jobOrigin }),
+      savedWorkOffsetMm: run.savedOffsetMm ?? null,
     });
     if (source === null) return null;
     if (fingerprintsEqual(fingerprintGcode(source.gcode), run.fingerprint)) {
@@ -107,6 +112,7 @@ function artifactPlacement(artifact: RecoveryArtifactV1, atIso: string): RunPlac
     ...(artifact.jobOrigin === undefined ? {} : { jobOrigin: artifact.jobOrigin }),
     fingerprint: artifact.fingerprint,
     atIso,
+    savedOffsetMm: artifact.kind === 'exact-execution' ? savedWorkOffsetMm(artifact) : null,
   };
 }
 

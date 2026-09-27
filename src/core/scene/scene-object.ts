@@ -215,10 +215,18 @@ export type TextAlignment = 'left' | 'center' | 'right';
 // fonts are bundled (so adding a font doesn't ripple here).
 export type FontKey = string;
 
+// Where the text sits along the guide (measured from the guide's start, or
+// from its end for 'end') and across it. Absent means 'start' and 'above',
+// the placement every path text had before ADR-480.
+export type PathTextAlongAlign = 'start' | 'middle' | 'end';
+export type PathTextAcrossAlign = 'above' | 'center' | 'below';
+
 export type PathTextSettings = {
   readonly guideObjectId: string;
   readonly offsetMm: number;
   readonly reverse: boolean;
+  readonly alongAlign?: PathTextAlongAlign;
+  readonly acrossAlign?: PathTextAcrossAlign;
 };
 
 export type TextObject = ObjectPowerScale & {

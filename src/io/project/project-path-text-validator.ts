@@ -1,6 +1,7 @@
 import {
   firstError,
   isObject,
+  optionalLiteral,
   requireBoolean,
   requireNumber,
   requireString,
@@ -13,6 +14,8 @@ export function validatePathText(value: unknown, path: string): string | null {
     requireString(value, `${path}.guideObjectId`),
     requireNumber(value, `${path}.offsetMm`),
     requireBoolean(value, `${path}.reverse`),
+    optionalLiteral(value, `${path}.alongAlign`, ['start', 'middle', 'end']),
+    optionalLiteral(value, `${path}.acrossAlign`, ['above', 'center', 'below']),
   ]);
   if (fieldError !== null) return fieldError;
   return typeof value['offsetMm'] === 'number' && value['offsetMm'] < 0
