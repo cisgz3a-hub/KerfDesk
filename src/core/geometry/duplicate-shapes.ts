@@ -55,28 +55,43 @@ export function duplicateSignature(
     [...operationIdsForObject(object, layers)].sort(),
     object.powerScale ?? null,
     object.operationOverride ?? null,
+    object.cncTabAnchors ?? null,
   ]);
+  // Anchors use path/polyline indexes and a fraction from the authored start.
+  // Rotating, reversing or sorting that geometry would move an identical t.
+  const anchored = (object.cncTabAnchors?.length ?? 0) > 0;
   const paths = materializeVectorObject(object).paths.map((path) =>
     [
       path.color,
       JSON.stringify(path.operationIds ?? null),
-      ...path.polylines
-        .filter((polyline) => polyline.points.length > 0)
-        .map(contourKey)
-        .sort(),
+      path.fillRule ?? 'evenodd',
+      JSON.stringify([path.strokeWidthMm ?? null, path.strokeTransform ?? null]),
+      ...orderedKeys(
+        path.polylines
+          .filter((polyline) => polyline.points.length > 0)
+          .map((polyline) => contourKey(polyline, anchored, path.fillRule === 'nonzero')),
+        anchored,
+      ),
     ].join('|'),
   );
   return paths.length === 0 ? null : `${binding}#${paths.join('#')}`;
 }
 
-function contourKey(polyline: Polyline): string {
+function orderedKeys(keys: string[], anchored: boolean): string[] {
+  return anchored ? keys : keys.sort();
+}
+
+function contourKey(polyline: Polyline, anchored: boolean, preserveWinding: boolean): string {
   const points = polyline.points.map(snap);
+  if (anchored) return `${polyline.closed ? 'C' : 'O'}${encode(points)}`;
   if (!isClosedEnough(polyline)) {
     return `O${smaller(encode(points), encode([...points].reverse()))}`;
   }
   const ring = dropRepeatedStart(points);
   const start = lowestIndex(ring);
   const forward = [...ring.slice(start), ...ring.slice(0, start)];
+  // A nonzero compound's hole depends on each contour's relative winding.
+  if (preserveWinding) return `C${encode(forward)}`;
   const backward = [forward[0] as Vec2, ...forward.slice(1).reverse()];
   return `C${smaller(encode(forward), encode(backward))}`;
 }

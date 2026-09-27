@@ -43,10 +43,13 @@ LightBurn behaviour, read on 2026-09-27 from `https://docs.lightburnsoftware.com
    placement. The offset always pushes away from the chosen point: forward from the start or
    middle, back from the end. Text that does not fit between the ends with its offset is refused
    with the existing "longer than the available guide path" message.
-2. **Project schema 11.** Path text is re-rendered when it is edited and when variable text such as
+2. **Project schema 12.** Path text is re-rendered when it is edited and when variable text such as
    a serial number changes, so an older build that ignored the alignment would burn the text in
-   the wrong place. Older builds refuse schema 11 with the existing "newer version" message. The
-   10 to 11 migration only changes the version: old path text has no alignment.
+   the wrong place. Older builds refuse schema 12 with the existing "newer version" message.
+   ADR-457 and this work initially used separate schema-11 variants. Schema 12 preserves both
+   CNC stage recipes and path-text alignment. The 10 to 11 to 12 migrations only change the
+   version: absent recipes or alignments retain their legacy defaults, while either schema-11
+   variant keeps its authored values through loading and saving.
 3. **Rubber-Band Outline.** **Tools → Vector → Rubber-Band Outline** adds the convex hull of everything
    selected as one closed path and selects it. Vector artwork and text contribute their real world
    outlines; images and reliefs contribute their four transformed corners. KerfDesk has no
@@ -58,7 +61,10 @@ LightBurn behaviour, read on 2026-09-27 from `https://docs.lightburnsoftware.com
    selection and add to it, and only pick artwork the user could click (unlocked, on a visible
    operation), like Select Open Shapes (ADR-410). Contained means every outline point of the
    artwork lies inside one closed path of the selection, in world space, so a shape straddling two
-   containers or sitting in the notch of a concave one is not added. Smaller means no wider and no
+   containers or crossing the notch of a concave one is not added. Each outline segment,
+   including the closing segment, is partitioned at boundary intersections and checked throughout;
+   contained vertices alone cannot establish containment. Separate paths remain separate, and
+   boundary contact counts as contained. Smaller means no wider and no
    taller than the widest and tallest selected object, measured on the rotated world box. Each says
    how many objects it added, or why it added none.
 5. **Delete Duplicates** (`Alt+D`, Edit menu) deletes later copies of artwork drawn twice in the
@@ -69,6 +75,9 @@ LightBurn behaviour, read on 2026-09-27 from `https://docs.lightburnsoftware.com
      how doubled outlines arrive from DXF files; an open path drawn backwards is the same path;
    - copies on different operations, with a different power scale, or with a different operation
      override are deliberate (score, then cut) and are kept;
+   - fill rules, relative nonzero winding, materialized stroke envelopes and manual CNC tab
+     annotations participate in equivalence. Tabbed paths keep their authored path order,
+     start and direction in the comparison because a tab fraction depends on that basis;
    - locked artwork, image masks and path-text guides are never deleted, and one of them is kept in
      preference to an unprotected copy.
 6. **Close Path and Reverse Direction** (Tools → Vector) edit imported, traced and drawn-line artwork
@@ -80,7 +89,8 @@ LightBurn behaviour, read on 2026-09-27 from `https://docs.lightburnsoftware.com
      closed polyline repeats its first point, as every closed KerfDesk path does, so the canvas
      draws the closing line; the rubber-band outline does the same.
    - Reverse Direction swaps the ends of an open path. A closed path keeps its start point and runs
-     the other way round, and CNC tab positions move with it (`t` becomes `1 − t`).
+     the other way round, and CNC tab positions move with it (`t` becomes `1 − t`). Anchors on
+     paths left unchanged keep their original fraction and physical position.
    - Text and drawn rectangles, ellipses and polygons rebuild their paths from their settings, so
      the notice says to convert them to paths first.
    - When Cut Planner may cut open paths from either end (Path direction Allow reverse with a

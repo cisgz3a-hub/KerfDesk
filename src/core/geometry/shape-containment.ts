@@ -6,11 +6,12 @@ import {
   isClosedEnough,
   transformedBBox,
   type Bounds,
+  type Polyline,
   type SceneObject,
   type Vec2,
 } from '../scene';
-import { pointInPolygon } from './point-in-polygon';
 import { worldOutlinePoints } from './rubber-band-outline';
+import { segmentContainedInPolygon } from './segment-contained-in-polygon';
 import { isClosedPolygon, isVectorPathObject, materializeVectorObject } from './vector-path-tools';
 
 type Contour = { readonly points: ReadonlyArray<Vec2>; readonly bounds: Bounds };
@@ -42,10 +43,19 @@ export function containedObjectIds(
       const points = worldOutlinePoints(candidate);
       if (points.length === 0) return false;
       const bounds = pointBounds(points);
+      const outlines: ReadonlyArray<Polyline> = isVectorPathObject(candidate)
+        ? materializeVectorObject(candidate).paths.flatMap((path) => path.polylines)
+        : [{ closed: true, points }];
       return contours.some(
         (contour) =>
           boundsInside(bounds, contour.bounds) &&
-          points.every((point) => pointInPolygon(point, contour.points)),
+          outlines.every((outline) =>
+            outline.points.every((point, index) => {
+              const next =
+                outline.points[index + 1] ?? (outline.closed ? outline.points[0] : point);
+              return next !== undefined && segmentContainedInPolygon(point, next, contour.points);
+            }),
+          ),
       );
     })
     .map((candidate) => candidate.id);

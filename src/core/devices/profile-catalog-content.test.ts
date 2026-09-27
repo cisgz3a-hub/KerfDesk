@@ -13,7 +13,7 @@ import { GRBL_MACHINE_PROFILE_CATALOG } from './profile-catalog';
 const RECORDED: Readonly<Record<string, string>> = {
   'creality-falcon-a1-pro-compatible': '2026-09-19 cf1f1b29e4ab0ba4',
   'creality-falcon-a1-pro-grblhal': '2026-09-24 fab4de72b2c64f55',
-  'generic-fluidnc': '2026-09-19 8b9cd18c16da218d',
+  'generic-fluidnc': '2026-09-27 29ab798e8d004473',
   'generic-grbl-400x400': '2026-09-19 99584b14b49a75ff',
   'generic-grblhal': '2026-09-19 73f84d5af72bd78c',
   'generic-marlin-laser': '2026-09-19 33d9199ef3c16b7d',

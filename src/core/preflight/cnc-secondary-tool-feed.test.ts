@@ -36,6 +36,11 @@ function group(overrides: Partial<CncGroup> = {}): CncGroup {
 }
 
 describe('secondary CNC cutter feed advisories', () => {
+  it('does not claim shared values for an explicit independent stage recipe', () => {
+    expect(
+      findCncSecondaryToolFeedIssues({ groups: [group({ cuttingStage: 'v-clear' })] }),
+    ).toEqual([]);
+  });
   it('reports exact shared values when a compiled group uses a secondary cutter', () => {
     const issues = findCncSecondaryToolFeedIssues({ groups: [group()] });
 

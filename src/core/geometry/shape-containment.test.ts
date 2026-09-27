@@ -3,6 +3,52 @@ import { IDENTITY_TRANSFORM, type ImportedSvg, type Transform, type Vec2 } from 
 import { containedObjectIds, smallerObjectIds, worldClosedContours } from './shape-containment';
 
 describe('select contained', () => {
+  it('rejects edges crossing a concave notch even when every vertex is inside', () => {
+    const cup = shape('cup', [
+      [0, 0],
+      [10, 0],
+      [10, 10],
+      [7, 10],
+      [7, 3],
+      [3, 3],
+      [3, 10],
+      [0, 10],
+    ]);
+    expect(
+      containedObjectIds(worldClosedContours([cup]), [
+        rect('bridge', 1, 7, 8, 1),
+        rect('inside-arm', 1, 4, 1, 4),
+        rect('touch-bottom', 1, 1, 8, 2),
+      ]),
+    ).toEqual(['inside-arm', 'touch-bottom']);
+  });
+
+  it('checks the closing edge and keeps separately contained paths separate', () => {
+    const cup = shape('cup', [
+      [0, 0],
+      [10, 0],
+      [10, 10],
+      [7, 10],
+      [7, 3],
+      [3, 3],
+      [3, 10],
+      [0, 10],
+    ]);
+    const closure = shape('closure', [
+      [1, 8],
+      [1, 1],
+      [9, 1],
+      [9, 8],
+    ]);
+    const separate = {
+      ...rect('separate', 1, 4, 1, 4),
+      paths: [...rect('left', 1, 4, 1, 4).paths, ...rect('right', 8, 4, 1, 4).paths],
+    };
+    expect(containedObjectIds(worldClosedContours([cup]), [closure, separate])).toEqual([
+      'separate',
+    ]);
+  });
+
   it('finds artwork lying fully inside a selected closed shape', () => {
     const contours = worldClosedContours([rect('frame', 0, 0, 100, 100)]);
 

@@ -23,14 +23,16 @@ const ALARM = '<Alarm|MPos:10.000,20.000,-1.000|FS:0,0>';
 
 type Device = SerialConnection & { readonly say: (line: string) => void };
 
-// A GRBL 1.1 stand-in: Idle on `?`, `ok` for the settle dwell, and the
-// unlock reply GRBL prints for `$X`.
+// A GRBL 1.1 stand-in: the last status on `?`, `ok` for the settle dwell,
+// and the unlock reply GRBL prints for `$X`. A poll must not invent Idle
+// while the test is still modelling Alarm.
 function makeDevice(sent: string[]): Device {
   const handlers = new Set<(line: string) => void>();
+  let statusReply = IDLE;
   const device: Device = {
     write: async (data) => {
       sent.push(data);
-      if (data === '?') setTimeout(() => device.say(IDLE), 0);
+      if (data === '?') setTimeout(() => device.say(statusReply), 0);
       if (data === 'G4 P0.01\n') setTimeout(() => device.say('ok'), 0);
       if (data === '$X\n') {
         setTimeout(() => {
@@ -47,6 +49,7 @@ function makeDevice(sent: string[]): Device {
     onClose: () => () => undefined,
     close: async () => undefined,
     say: (line) => {
+      if (line === IDLE || line === ALARM) statusReply = line;
       for (const handler of handlers) handler(line);
     },
   };
@@ -141,6 +144,10 @@ describe('a missed touch-off probe in a drained tool-change hold', () => {
     expect(useLaserStore.getState().toolChangeIdleSeen).toBe(true);
 
     await say(device, 'ALARM:5', ALARM);
+    // Polling can interleave with this exchange. The device must keep reporting
+    // Alarm until the test explicitly supplies the fresh post-unlock Idle.
+    await device.write('?');
+    await settle();
     const alarmed = useLaserStore.getState();
     expect(alarmed.streamer?.status).toBe('tool-change');
     expect(alarmed.alarmCode).toBe(5);
@@ -153,6 +160,8 @@ describe('a missed touch-off probe in a drained tool-change hold', () => {
     expect(sent).toContain('$X\n');
     // The acknowledgement alone does not prove the unlock (FluidNC acks `$X`
     // in its Critical state); the next report that is not Alarm clears it.
+    await device.write('?');
+    await settle();
     expect(useLaserStore.getState().alarmCode).toBe(5);
 
     await say(device, IDLE);

@@ -18,6 +18,7 @@ import {
 import { useStore } from './store';
 import { resetStore } from './test-helpers';
 import { useToastStore } from './toast-store';
+import { cncTabAnchorPosition } from '../../core/cnc/cnc-tab-anchors';
 
 type Point = readonly [number, number];
 
@@ -266,6 +267,41 @@ describe('Close Path', () => {
 });
 
 describe('Reverse Direction', () => {
+  it('keeps physical tabs on skipped paths while reversing the other paths', () => {
+    const curve: CurveSubpath = {
+      start: { x: 0, y: 0 },
+      closed: true,
+      segments: [
+        { x: 10, y: 0 },
+        { x: 10, y: 10 },
+        { x: 0, y: 10 },
+        { x: 0, y: 0 },
+      ].map((to) => ({ kind: 'line', to })),
+    };
+    const skipped = { color: '#000000', polylines: [rect(10, 10)], curves: [curve, curve] };
+    const edited = { color: '#000000', polylines: [rect(20, 20)] };
+    const anchors: CncTabAnchor[] = [0, 1].map((pathIndex) => ({
+      layerColor: '#000000',
+      pathIndex,
+      polylineIndex: 0,
+      pathT: 0.125,
+    }));
+    const before = art('mixed', [rect(10, 10)], {
+      paths: [skipped, edited],
+      cncTabAnchors: anchors,
+    });
+    load([before], ['mixed']);
+    const positions = anchors.map((entry) => cncTabAnchorPosition(before, entry));
+    expect(positions.every((point) => point !== null)).toBe(true);
+    useStore.getState().reverseSelectedPaths();
+    const after = objectById('mixed') as ImportedSvg;
+    expect(after.paths[0]).toBe(skipped);
+    expect(after.cncTabAnchors?.map((entry) => entry.pathT)).toEqual([0.125, 0.875]);
+    expect(after.cncTabAnchors?.map((entry) => cncTabAnchorPosition(after, entry))).toEqual(
+      positions,
+    );
+  });
+
   const EITHER_END_NOTE =
     ' Open paths can still be cut from either end: set Path direction to Preserve direction in the Cut Planner to keep it.';
 

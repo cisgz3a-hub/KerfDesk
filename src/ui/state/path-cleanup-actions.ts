@@ -146,7 +146,15 @@ function withPaths(
   const bounds = boundsForPaths(paths) ?? object.bounds;
   const anchors =
     reversed && object.cncTabAnchors !== undefined
-      ? { cncTabAnchors: object.cncTabAnchors.map(reverseAnchor) }
+      ? {
+          cncTabAnchors: object.cncTabAnchors.map((anchor) => {
+            const before = object.paths[anchor.pathIndex]?.polylines[anchor.polylineIndex];
+            const after = paths[anchor.pathIndex]?.polylines[anchor.polylineIndex];
+            return before !== undefined && after !== undefined && before !== after
+              ? reverseAnchor(anchor)
+              : anchor;
+          }),
+        }
       : {};
   if (object.kind === 'shape') {
     const synced = synchronizePolylineShapeGeometry(object, paths, bounds);

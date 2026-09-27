@@ -48,6 +48,7 @@ import { cncGroupProvenance } from './cnc-group-provenance';
 import { zPassArrayMaterializationError } from './depth-passes';
 import { parkFields } from './motion-polish';
 import { reliefMachineSpaceGeometry, reliefMachineSpaceTransform } from './relief-machine-space';
+import { cncSettingsForStage, cncStageProvenance } from './cnc-stage-settings';
 import { materialOnRightInMap } from './relief-material-side';
 
 const MIN_FEED_MM_PER_MIN = 1;
@@ -166,6 +167,7 @@ function reliefGroup(
       // finishing retains no entry claim (ADR-273 Amendment 1).
       includeRampEntry: false,
       layerPrimaryTool,
+      ...(cutType === 'relief-finish' ? cncStageProvenance(settings, 'relief-finish', tool) : {}),
     }),
     feedMmPerMin: cap(settings.feedMmPerMin, device.maxFeed),
     plungeMmPerMin: cap(settings.plungeMmPerMin, device.maxFeed),
@@ -261,7 +263,7 @@ function reliefFinishingGroup(
     plans,
     group: reliefGroup(
       layer,
-      settings,
+      cncSettingsForStage(settings, 'relief-finish', finishTool),
       device,
       config,
       finishTool,

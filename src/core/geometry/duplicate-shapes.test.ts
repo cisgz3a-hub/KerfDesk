@@ -17,6 +17,71 @@ const LAYERS: ReadonlyArray<Layer> = [
 const SQUARE = [p(0, 0), p(10, 0), p(10, 10), p(0, 10)];
 
 describe('delete duplicates', () => {
+  it('keeps different fill rules, winding relationships and stroke envelopes', () => {
+    const outer = closed(SQUARE);
+    const inner = closed([p(3, 3), p(7, 3), p(7, 7), p(3, 7)]);
+    const fill = (id: string, fillRule: 'evenodd' | 'nonzero', hole = inner) => ({
+      ...art(id, [outer, hole]),
+      paths: [{ color: '#ff0000', fillRule, polylines: [outer, hole] }],
+    });
+    const strokes = [1, 2].map((strokeWidthMm) => ({
+      ...art(`stroke-${strokeWidthMm}`, [outer]),
+      paths: [{ color: '#ff0000', strokeWidthMm, polylines: [outer] }],
+    }));
+    expect(
+      duplicateObjectIds(
+        [
+          fill('even', 'evenodd'),
+          fill('solid', 'nonzero'),
+          fill('hole', 'nonzero', { ...inner, points: [...inner.points].reverse() }),
+          ...strokes,
+        ],
+        LAYERS,
+        new Set(),
+      ),
+    ).toEqual([]);
+  });
+
+  it('keeps manual tabs and their source contour parameterization', () => {
+    const base = art('automatic', [closed(SQUARE)]);
+    const manual = {
+      ...base,
+      id: 'manual',
+      cncTabAnchors: [{ layerColor: '#ff0000', pathIndex: 0, polylineIndex: 0, pathT: 0.1 }],
+    };
+    const movedStart = {
+      ...manual,
+      id: 'other-tab-location',
+      paths: [
+        {
+          color: '#ff0000',
+          polylines: [closed([...SQUARE.slice(1), SQUARE[0]!])],
+        },
+      ],
+    };
+    expect(
+      duplicateObjectIds(
+        [base, manual, movedStart, { ...manual, id: 'true-copy' }],
+        LAYERS,
+        new Set(),
+      ),
+    ).toEqual(['true-copy']);
+  });
+
+  it('compares transformed stroke envelopes without discarding equivalent copies', () => {
+    const base = art('round-pen', [closed(SQUARE)]);
+    const path = { ...base.paths[0]!, strokeWidthMm: 1 };
+    const round = { ...base, paths: [path] };
+    const wide = {
+      ...base,
+      id: 'wide-pen',
+      paths: [{ ...path, strokeTransform: { a: 2, b: 0, c: 0, d: 1 } }],
+    };
+    expect(
+      duplicateObjectIds([round, wide, { ...wide, id: 'wide-copy' }], LAYERS, new Set()),
+    ).toEqual(['wide-copy']);
+  });
+
   it('deletes later copies of artwork drawn twice on the same operation', () => {
     const objects = [
       art('a', [closed(SQUARE)]),
