@@ -31,7 +31,7 @@ describe('S1: untouched CNC controls retain exact persisted ownership', () => {
     ['Depth per pass', 'depthPerPassMm', 0.01],
     ['Feed', 'feedMmPerMin', 0.5],
     ['Plunge', 'plungeMmPerMin', 0.5],
-    ['Artwork spindle speed', 'spindleRpm', 500],
+    ['Spindle speed', 'spindleRpm', 500],
     ['Tab height', 'tabHeightMm', 0.02],
     ['Tab width', 'tabWidthMm', 0.2],
     ['Tabs per shape', 'tabsPerShape', 23],

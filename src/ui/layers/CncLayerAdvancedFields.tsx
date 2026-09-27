@@ -1,7 +1,9 @@
-// CNC operation essentials and purpose-labelled refinements. Native
-// disclosures keep the existing controls mounted while reducing visual noise.
+// CNC operation numbers and the sections each cut type needs (ADR-481). Native
+// disclosures keep their controls mounted; each summary names its current state
+// and its tooltip says what it holds.
 
 import { isVCarveToolCompatible } from '../../core/cnc/vcarve-tool-compatibility';
+import { cncStageRecipe } from '../../core/cnc/cnc-stage-settings';
 import { layerCncTool, type CncLayerSettings, type Layer } from '../../core/scene';
 import { useStore } from '../state';
 import { RailSection } from '../kit';
@@ -14,7 +16,7 @@ import { PocketFillRow } from './PocketFillRow';
 import { AdaptivePocketFields } from './AdaptivePocketFields';
 import { CncInlayFields } from './CncInlayFields';
 import { CncEntryFields } from './CncEntryFields';
-import { SetupOwnedValueRow } from './SetupOwnedValueRow';
+import { openMachineSetup } from '../laser/device-setup';
 import { CncStageRecipeFields } from './CncStageRecipeFields';
 
 export function CncLayerAdvancedGroup(props: {
@@ -62,6 +64,7 @@ function ClearingFields(props: {
   return (
     <RailSection
       label="Clearing strategy"
+      badge={clearingBadge(settings, hasReliefObjects)}
       hint="Choose the spacing and pattern used to remove material inside an area."
     >
       <p className="lf-cnc-settings-hint">
@@ -76,8 +79,40 @@ function ClearingFields(props: {
   );
 }
 
-// The core per-cut parameters always remain visible.
-export function CncCoreCutFields(props: {
+function clearingBadge(settings: CncLayerSettings, hasReliefObjects: boolean): string {
+  if (settings.cutType === 'pocket' && !hasReliefObjects) {
+    const strategy = settings.pocketStrategy ?? 'offset';
+    if (strategy === 'adaptive') return 'Adaptive';
+    const pattern = strategy === 'offset' ? 'Offset' : 'Raster';
+    return `${pattern} · ${settings.stepoverPercent} %`;
+  }
+  return `${settings.stepoverPercent} % stepover`;
+}
+
+export function DepthPerPassField(props: {
+  readonly layer: Layer;
+  readonly settings: CncLayerSettings;
+  readonly onCommit: (patch: Partial<CncLayerSettings>) => void;
+}): JSX.Element {
+  return (
+    <NumberField
+      stacked
+      layer={props.layer}
+      label="Depth per pass"
+      unit="mm"
+      value={props.settings.depthPerPassMm}
+      min={0.05}
+      max={50}
+      step={0.25}
+      title="Material removed per Z pass. Rule of thumb: up to half the bit diameter in wood."
+      onCommit={(depthPerPassMm) => props.onCommit({ depthPerPassMm })}
+    />
+  );
+}
+
+// Feed, plunge and spindle speed share one row. The machine maximum sits under
+// the spindle speed and opens Machine Setup, which owns it (ADR-306, ADR-481).
+export function CncFeedFields(props: {
   readonly layer: Layer;
   readonly settings: CncLayerSettings;
   readonly maxFeed: number;
@@ -85,75 +120,56 @@ export function CncCoreCutFields(props: {
   readonly onCommit: (patch: Partial<CncLayerSettings>) => void;
 }): JSX.Element {
   const { layer, settings, maxFeed, spindleMaxRpm, onCommit } = props;
+  const maximum = spindleMaxRpm.toLocaleString('en-US');
   return (
-    <section className="lf-cnc-settings-card" aria-label="Feeds & passes">
-      <div className="lf-cnc-feed-grid">
-        <NumberField
-          stacked
-          layer={layer}
-          label="Depth per pass"
-          unit="mm"
-          value={settings.depthPerPassMm}
-          min={0.05}
-          max={50}
-          step={0.25}
-          title="Material removed per Z pass. Rule of thumb: up to half the bit diameter in wood."
-          onCommit={(depthPerPassMm) => onCommit({ depthPerPassMm })}
-        />
-        <NumberField
-          stacked
-          layer={layer}
-          label="Feed"
-          unit="mm/min"
-          value={settings.feedMmPerMin}
-          min={1}
-          max={maxFeed}
-          step={50}
-          title="XY cutting feed rate."
-          onCommit={(feedMmPerMin) => onCommit({ feedMmPerMin })}
-        />
-        <NumberField
-          stacked
-          layer={layer}
-          label="Plunge"
-          unit="mm/min"
-          value={settings.plungeMmPerMin}
-          min={1}
-          max={maxFeed}
-          step={25}
-          title="Z plunge feed rate — slower than XY feed, bits cut poorly straight down."
-          onCommit={(plungeMmPerMin) => onCommit({ plungeMmPerMin })}
-        />
-        <div className="lf-cnc-spindle-field">
-          <SetupOwnedValueRow
-            compact
-            label="Machine maximum"
-            value={`${spindleMaxRpm.toLocaleString('en-US')} RPM`}
-            description="This is the machine maximum spindle speed saved in Machine Setup. Artwork spindle speed is the requested running speed for this operation."
-            setupField="spindle-max"
-          />
-          <NumberField
-            stacked
-            layer={layer}
-            label="Artwork spindle speed"
-            unit="RPM"
-            value={settings.spindleRpm}
-            min={1000}
-            max={spindleMaxRpm}
-            step={500}
-            title="Requested spindle running speed for this artwork operation. Machine maximum is shown alongside and is edited in Machine Setup."
-            onCommit={(spindleRpm) => onCommit({ spindleRpm })}
-          />
-        </div>
-      </div>
-      <details className="lf-inspector-help">
-        <summary title="Explain cutting feed, plunge rate and spindle speed.">About feeds</summary>
-        <p className="lf-cnc-settings-hint">
-          Feed moves across the material. Plunge moves down into it. Spindle speed is the requested
-          running RPM; the machine maximum comes from Machine Setup.
-        </p>
-      </details>
-    </section>
+    <div className="lf-cnc-feed-grid" role="group" aria-label="Feed, plunge and spindle speed">
+      <NumberField
+        stacked
+        layer={layer}
+        label="Feed"
+        unit="mm/min"
+        value={settings.feedMmPerMin}
+        min={1}
+        max={maxFeed}
+        step={50}
+        title="Cutting feed: how fast the bit moves sideways through the material."
+        onCommit={(feedMmPerMin) => onCommit({ feedMmPerMin })}
+      />
+      <NumberField
+        stacked
+        layer={layer}
+        label="Plunge"
+        unit="mm/min"
+        value={settings.plungeMmPerMin}
+        min={1}
+        max={maxFeed}
+        step={25}
+        title="Plunge feed: how fast the bit moves down into the material. Slower than Feed, because bits cut poorly straight down."
+        onCommit={(plungeMmPerMin) => onCommit({ plungeMmPerMin })}
+      />
+      <NumberField
+        stacked
+        layer={layer}
+        label="Spindle"
+        ariaName="Spindle speed"
+        unit="RPM"
+        value={settings.spindleRpm}
+        min={1000}
+        max={spindleMaxRpm}
+        step={500}
+        title={`Spindle speed this operation asks for. The machine maximum (${maximum} RPM) is set in Machine Setup.`}
+        onCommit={(spindleRpm) => onCommit({ spindleRpm })}
+      />
+      <button
+        type="button"
+        className="lf-cnc-link-button lf-cnc-feed-grid__maximum"
+        aria-label={`Machine maximum: ${maximum} RPM. Edit in Machine Setup.`}
+        title="The machine's top spindle speed, from Machine Setup. Select to change it there."
+        onClick={() => openMachineSetup({ kind: 'cnc', field: 'spindle-max' })}
+      >
+        Max {maximum}
+      </button>
+    </div>
   );
 }
 
@@ -163,15 +179,14 @@ function FeedHelperRows(props: {
   readonly onCommit: (patch: Partial<CncLayerSettings>) => void;
   readonly onCommitSettings: (settings: CncLayerSettings) => void;
 }): JSX.Element {
+  const presetCount = useStore((s) => s.cncLibrary.feedPresets.length);
   return (
     <>
       <RailSection
         label="Saved feeds"
-        hint="Save or reuse feed, plunge, spindle, depth per pass and stepover settings."
+        badge={presetCount === 0 ? 'None yet' : `${presetCount} saved`}
+        hint="Reuse a tested set of feed, plunge, spindle speed, depth per pass and stepover, or save these values for next time."
       >
-        <p className="lf-cnc-settings-hint">
-          Reuse a tested set of feeds and speeds, or save these values for next time.
-        </p>
         <CncFeedPresetRows
           layer={props.layer}
           settings={props.settings}
@@ -233,7 +248,7 @@ function stepoverDescription(hasReliefObjects: boolean, vCarveClearing: boolean)
   }
   return vCarveClearing
     ? 'Flat-floor clearing spacing as a percentage of the clearing bit diameter. Detail controls the V-bit finishing pitch separately.'
-    : 'Pocket clearing spacing as a percentage of the bit diameter.';
+    : 'Pocket clearing spacing as a percentage of the bit diameter. For a bit that narrows toward its tip (ball nose, V-bit, engraving bit or tapered ball nose) it is a percentage of the width the bit cuts in one depth pass.';
 }
 
 // Only show refinements that apply to the current cut type or artwork.
@@ -245,6 +260,12 @@ export function CutTypeSections(props: {
   readonly onCommitSettings: (settings: CncLayerSettings) => void;
 }): JSX.Element {
   const { layer, settings, onCommit } = props;
+  const separateWallValues = useStore(
+    (state) =>
+      state.project.machine?.kind === 'cnc' &&
+      cncStageRecipe(settings, 'profile-finish', layerCncTool(state.project.machine, settings)) !==
+        undefined,
+  );
   const offsetProfile =
     settings.cutType === 'profile-outside' || settings.cutType === 'profile-inside';
   return (
@@ -253,13 +274,12 @@ export function CutTypeSections(props: {
         <RailSection
           label="Wall finish"
           badge={(settings.finishAllowanceMm ?? 0) > 0 ? 'Finish pass' : 'No allowance'}
-          hint="Leave material during roughing, then remove it in a final pass along the wall."
+          hint={
+            separateWallValues
+              ? 'Leave a small allowance during roughing, then remove it using the separate wall finishing values in Stage cutting values. Zero uses no separate finish pass.'
+              : 'Leave a small allowance during roughing, then remove it in one full-depth pass along the wall. Set separate wall finishing values in Stage cutting values to use smaller depth passes. Zero uses no separate finish pass.'
+          }
         >
-          <p className="lf-cnc-settings-hint">
-            Leave a small allowance for a true-wall finish. It uses one full-depth pass unless
-            separate wall finishing values specify smaller depth passes. Zero uses no separate
-            finish.
-          </p>
           <CncFinishAllowanceField layer={layer} settings={settings} onCommit={onCommit} />
         </RailSection>
       ) : null}
@@ -279,13 +299,10 @@ export function CutTypeSections(props: {
       {settings.cutType === 'v-carve' ? (
         <RailSection
           label="V-carve detail"
-          hint="Set boundary sampling detail and review whether the assigned cutter suits V-carving."
-          open
+          badge={settings.vResolutionMm > 0 ? `${settings.vResolutionMm} mm` : 'Automatic'}
+          hint="Boundary sampling detail. Zero uses automatic detail; smaller values can add detail and take longer to prepare."
         >
-          <p className="lf-cnc-settings-hint">
-            Zero uses automatic detail. Smaller values can add detail and increase preparation time.
-          </p>
-          <VCarveFields layer={layer} settings={settings} onCommit={onCommit} />
+          <VCarveDetailField layer={layer} settings={settings} onCommit={onCommit} />
         </RailSection>
       ) : null}
       <CncEntryFields {...props} />
@@ -293,40 +310,45 @@ export function CutTypeSections(props: {
   );
 }
 
-// H.3 V-carve options: medial sampling detail + a live warning when THIS LAYER's bit lacks a
-// supported conical envelope. Wrong-kind selection remains advisory-only and keeps its legacy
-// fallback geometry; an actual V-bit with invalid angle is the separate exact compile-integrity
-// refusal. Read the layer tool so overrides are represented.
-function VCarveFields(props: {
+function VCarveDetailField(props: {
   readonly layer: Layer;
   readonly settings: CncLayerSettings;
   readonly onCommit: (patch: Partial<CncLayerSettings>) => void;
 }): JSX.Element {
+  return (
+    <NumberField
+      layer={props.layer}
+      label="Detail"
+      unit="mm"
+      value={props.settings.vResolutionMm}
+      min={0}
+      max={5}
+      step={0.05}
+      title="V-carve boundary sampling and flat-core clearing pitch. 0 = automatic. Smaller values refine sampling and can increase compile/job time; this is not an exact whole-artwork tolerance. Pointed cutters can leave scallops between floor passes."
+      onCommit={(vResolutionMm) => props.onCommit({ vResolutionMm })}
+    />
+  );
+}
+
+// H.3: a live warning when THIS operation's bit lacks a supported conical
+// envelope. It stays beside the bit choice rather than inside a section.
+// Wrong-kind selection remains advisory-only and keeps its legacy fallback
+// geometry; an actual V-bit with an invalid angle is the separate exact
+// compile-integrity refusal. Read the layer tool so overrides are represented.
+export function VCarveToolWarning(props: {
+  readonly settings: CncLayerSettings;
+}): JSX.Element | null {
   const activeToolIsCompatible = useStore(
     (s) =>
       s.project.machine?.kind === 'cnc' &&
       isVCarveToolCompatible(layerCncTool(s.project.machine, props.settings)),
   );
+  if (props.settings.cutType !== 'v-carve' || activeToolIsCompatible) return null;
   return (
-    <>
-      <NumberField
-        layer={props.layer}
-        label="Detail"
-        unit="mm"
-        value={props.settings.vResolutionMm}
-        min={0}
-        max={5}
-        step={0.05}
-        title="V-carve boundary sampling and flat-core clearing pitch. 0 = automatic. Smaller values refine sampling and can increase compile/job time; this is not an exact whole-artwork tolerance. Pointed cutters can leave scallops between floor passes."
-        onCommit={(vResolutionMm) => props.onCommit({ vResolutionMm })}
-      />
-      {!activeToolIsCompatible ? (
-        <div style={vbitWarningStyle} role="alert">
-          V-carve needs a V-bit or modeled angled engraving bit. Choose one in Tool &amp; material
-          above. Unsupported selections may use legacy 60° fallback geometry where compatible.
-        </div>
-      ) : null}
-    </>
+    <div style={vbitWarningStyle} role="alert">
+      V-carve needs a V-bit or modeled angled engraving bit. Choose one under Bit above. Unsupported
+      selections may use legacy 60° fallback geometry where compatible.
+    </div>
   );
 }
 

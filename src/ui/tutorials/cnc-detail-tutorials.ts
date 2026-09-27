@@ -30,8 +30,8 @@ export const CNC_DETAIL_TUTORIALS: readonly Tutorial[] = [
       {
         title: 'Choose roughing or finishing',
         instruction:
-          'Open the Operation tab and choose Relief roughing or Relief finishing as appropriate. In Tool & material, assign the primary and any Relief finishing bit; review Stepover or Finish scallop where shown.',
-        focus: 'Relief operation and Tool & material',
+          'Open the Operation tab and choose Relief roughing or Relief finishing as appropriate. Under Bit, assign the primary and any Relief finishing bit; review Stepover or Finish scallop where shown.',
+        focus: 'Relief operation and Bit',
         result: 'The toolpath uses the chosen cutters and the spacing for that stage of the carve.',
       },
       {
@@ -117,15 +117,14 @@ export const CNC_DETAIL_TUTORIALS: readonly Tutorial[] = [
     category: 'CNC',
     machine: 'cnc',
     minutes: 4,
-    location:
-      'Artwork / Operations → Settings → Operation → Tool & material; Machine Setup → Bit library',
+    location: 'Artwork / Operations → Settings → Operation → Bit; Machine Setup → Bit library',
     prerequisites: 'CNC mode and the specifications of the cutters you intend to use.',
     visual: 'library',
     steps: [
       {
         title: 'Identify the cutter geometry',
         instruction:
-          'In Tool & material, use Show picture to recognise the cutter family. Choose the matching bit, or open Add another bit to browse the catalog or add a custom bit with its name, kind, diameter and actual flute count. The same library is available in Machine Setup.',
+          'Select Manage bits beside Bit to open the Machine Setup bit library. Use Show picture to recognise the cutter family, then browse the catalog or add a custom bit with its name, kind, diameter and actual flute count. Choose the matching Bit for the operation.',
         focus: 'Bit library',
         result:
           'The picture explains the cutter shape; its actual specifications define the geometry the planner uses.',
@@ -141,8 +140,8 @@ export const CNC_DETAIL_TUTORIALS: readonly Tutorial[] = [
       {
         title: 'Assign default and operation bits',
         instruction:
-          'In Artwork / Operations → Settings → Operation → Tool & material, choose the Bit and any applicable Floor clearing, Pocket roughing or Relief finishing bit. Use job default bit removes an operation override. Change the job default in Machine Setup.',
-        focus: 'Tool & material · Bit',
+          'In Artwork / Operations → Settings → Operation, choose the Bit and any applicable Floor clearing, Pocket roughing or Relief finishing bit shown under it. Use job default bit removes an operation override. Change the job default in Machine Setup.',
+        focus: 'Bit',
         result:
           'Each operation has a visible cutter assignment, including any separate clearing stage.',
         visual: 'layers',
