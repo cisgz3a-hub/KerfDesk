@@ -61,6 +61,8 @@ These three compact fixtures fit the raw 11,520 bytes/s wire ceiling. Actual fir
 USB latency and controller telemetry can reduce usable throughput further.
 The sender trims line ends but keeps interior G-code words, so these savings reach the serial
 connection; they are not just smaller exported files.
+The exported emitter revision also advances for this executable-output change while retaining
+the integrated CNC provenance. Previously exported G-code must be regenerated to receive the fix.
 
 ### Calibration labels could describe a speed that was never emitted
 

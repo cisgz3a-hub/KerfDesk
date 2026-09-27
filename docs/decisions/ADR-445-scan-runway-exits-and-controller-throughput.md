@@ -45,6 +45,8 @@ model name nor a synthetic test establishes a machine's measured correction.
    margin and the conservative acceleration distance `v² / (2a)` from the profile. Unknown
    acceleration is not a passing check. This is an estimate and advice, not a new Start gate
    or an automatic change to feed, power, controller settings, or the Frame envelope.
+5. Exported G-code receives a distinct scan-timing emitter revision, preserving prior CNC
+   provenance, so saved output from before this change can be identified and regenerated.
 
 ## Consequences and verification
 
