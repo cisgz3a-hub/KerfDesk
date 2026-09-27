@@ -76,8 +76,10 @@ LightBurn behaviour, read on 2026-09-27 from `https://docs.lightburnsoftware.com
    - copies on different operations, with a different power scale, or with a different operation
      override are deliberate (score, then cut) and are kept;
    - fill rules, relative nonzero winding, materialized stroke envelopes and manual CNC tab
-     annotations participate in equivalence. Tabbed paths keep their authored path order,
-     start and direction in the comparison because a tab fraction depends on that basis;
+     annotations participate in equivalence. Tabbed paths keep their authored transform,
+     path order (including empty contour slots), start and direction in the comparison,
+     because a tab fraction is measured along the local contour before its transform.
+     World-equivalent artwork with a different authored transform is conservatively kept;
    - locked artwork, image masks and path-text guides are never deleted, and one of them is kept in
      preference to an unprotected copy.
 6. **Close Path and Reverse Direction** (Tools → Vector) edit imported, traced and drawn-line artwork
@@ -140,8 +142,8 @@ LightBurn behaviour, read on 2026-09-27 from `https://docs.lightburnsoftware.com
 
 ### Consequences
 
-- Project schema 11. Open pull requests #943, #950, #959, #960 and #963 also move the schema to 11
-  for their own fields; whichever lands second takes 12.
+- Project schema 12 retains the independent CNC stage recipes and optional path-text alignment
+  introduced by the two schema-11 branches. Both migrate without losing their authored settings.
 - One shortcut is added: `Alt+D`. It was free.
 - The Tools menu's Vector group gains Rubber-Band Outline, Close Path and Reverse Direction, and
   its Image group gains Flatten Image Mask; the Edit menu gains Select Contained, Select Smaller
@@ -166,7 +168,7 @@ LightBurn behaviour, read on 2026-09-27 from `https://docs.lightburnsoftware.com
 - `src/core/sort-cuts-last.test.ts`, `src/ui/state/operation-list-actions.test.ts` and
   `src/ui/layers/OperationListTools.test.tsx`: operation and Run order, effective settings, the
   registration jig, CNC, undo steps and the menu.
-- `src/io/project/project-path-text.test.ts` and `migrations.test.ts`: alignment round trip,
-  invalid values refused, and the 10 to 11 step.
+- `src/io/project/project-path-text.test.ts`, `project-schema12-compatibility.test.ts` and
+  `migrations.test.ts`: alignment round trip, invalid values refused, and the 10 to 11 to 12 steps.
 - `src/ui/app/editing-tool-shortcuts.test.ts` and `AppMenuBar.control-audit.test.tsx`: `Alt+D` and
   every new menu entry.

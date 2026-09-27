@@ -1,6 +1,11 @@
 import { describe, expect, it } from 'vitest';
+import { cncTabAnchorPosition } from '../cnc/cnc-tab-anchors';
+import { compileCncJob } from '../cnc/compile-cnc-job';
+import { DEFAULT_DEVICE_PROFILE } from '../devices';
 import {
   createLayer,
+  DEFAULT_CNC_LAYER_SETTINGS,
+  DEFAULT_CNC_MACHINE_CONFIG,
   IDENTITY_TRANSFORM,
   type ImportedSvg,
   type Layer,
@@ -66,6 +71,54 @@ describe('delete duplicates', () => {
         new Set(),
       ),
     ).toEqual(['true-copy']);
+  });
+
+  it('keeps world-equivalent contours whose authored scale puts tabs at different locations', () => {
+    const anchor = { layerColor: '#ff0000', pathIndex: 0, polylineIndex: 0, pathT: 0.125 };
+    const square = { ...art('square', [closed(SQUARE)]), cncTabAnchors: [anchor] };
+    const scaled = {
+      ...art('scaled', [closed([p(0, 0), p(5, 0), p(5, 10), p(0, 10)])]),
+      bounds: { minX: 0, minY: 0, maxX: 5, maxY: 10 },
+      transform: { ...IDENTITY_TRANSFORM, scaleX: 2 },
+      cncTabAnchors: [anchor],
+    };
+    expect(cncTabAnchorPosition(square, anchor)).toEqual(p(5, 0));
+    expect(cncTabAnchorPosition(scaled, anchor)).toEqual(p(7.5, 0));
+    expect(deepestTabPaths(square)).not.toEqual(deepestTabPaths(scaled));
+    expect(
+      duplicateObjectIds(
+        [square, scaled, { ...scaled, id: 'scaled-copy' }],
+        TABBED_CNC_LAYERS,
+        new Set(),
+      ),
+    ).toEqual(['scaled-copy']);
+  });
+
+  it('retains empty contour slots that give tab indexes their authored meaning', () => {
+    const anchor = { layerColor: '#ff0000', pathIndex: 0, polylineIndex: 1, pathT: 0.125 };
+    const empty = closed([]);
+    const left = closed(SQUARE);
+    const right = closed(SQUARE.map((point) => p(point.x + 20, point.y)));
+    const before = {
+      ...art('empty-before', [empty, left, right]),
+      bounds: { minX: 0, minY: 0, maxX: 30, maxY: 10 },
+      cncTabAnchors: [anchor],
+    };
+    const after = {
+      ...before,
+      id: 'empty-after',
+      paths: [{ color: '#ff0000', polylines: [left, right, empty] }],
+    };
+    expect(cncTabAnchorPosition(before, anchor)).toEqual(p(5, 0));
+    expect(cncTabAnchorPosition(after, anchor)).toEqual(p(25, 0));
+    expect(deepestTabPaths(before)).not.toEqual(deepestTabPaths(after));
+    expect(
+      duplicateObjectIds(
+        [before, after, { ...after, id: 'same-index-copy' }],
+        TABBED_CNC_LAYERS,
+        new Set(),
+      ),
+    ).toEqual(['same-index-copy']);
   });
 
   it('compares transformed stroke envelopes without discarding equivalent copies', () => {
@@ -180,6 +233,40 @@ describe('delete duplicates', () => {
     expect(duplicateObjectIds([image, { ...image, id: 'copy' }], LAYERS, new Set())).toEqual([]);
   });
 });
+
+const TABBED_CNC_LAYERS: ReadonlyArray<Layer> = [
+  {
+    ...createLayer({ id: 'cut', color: '#ff0000' }),
+    cnc: {
+      ...DEFAULT_CNC_LAYER_SETTINGS,
+      cutType: 'profile-on-path',
+      depthMm: 6,
+      depthPerPassMm: 3,
+      tabsEnabled: true,
+      tabHeightMm: 2,
+      tabWidthMm: 2,
+      tabsPerShape: 4,
+    },
+  },
+];
+
+function deepestTabPaths(object: ImportedSvg) {
+  const job = compileCncJob(
+    { objects: [object], layers: TABBED_CNC_LAYERS },
+    DEFAULT_DEVICE_PROFILE,
+    DEFAULT_CNC_MACHINE_CONFIG,
+  );
+  const paths = job.groups
+    .filter((group) => group.kind === 'cnc')
+    .flatMap((group) => group.passes)
+    .flatMap((pass) =>
+      pass.kind === 'path3d' && Math.min(...pass.points.map((point) => point.z)) === -6
+        ? [pass.points]
+        : [],
+    );
+  expect(paths.length).toBeGreaterThan(0);
+  return paths;
+}
 
 function p(x: number, y: number): Vec2 {
   return { x, y };

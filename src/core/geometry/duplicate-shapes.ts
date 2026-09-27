@@ -51,15 +51,19 @@ export function duplicateSignature(
   layers: ReadonlyArray<Layer>,
 ): string | null {
   if (!isVectorPathObject(object)) return null;
+  const anchored = (object.cncTabAnchors?.length ?? 0) > 0;
   const binding = JSON.stringify([
     [...operationIdsForObject(object, layers)].sort(),
     object.powerScale ?? null,
     object.operationOverride ?? null,
     object.cncTabAnchors ?? null,
+    // A tab fraction is measured in local space before the transform. Equal
+    // world outlines need not put that fraction at the same physical point
+    // when one copy has a different non-uniform scale. Keep its authored basis.
+    anchored ? object.transform : null,
   ]);
   // Anchors use path/polyline indexes and a fraction from the authored start.
   // Rotating, reversing or sorting that geometry would move an identical t.
-  const anchored = (object.cncTabAnchors?.length ?? 0) > 0;
   const paths = materializeVectorObject(object).paths.map((path) =>
     [
       path.color,
@@ -68,7 +72,7 @@ export function duplicateSignature(
       JSON.stringify([path.strokeWidthMm ?? null, path.strokeTransform ?? null]),
       ...orderedKeys(
         path.polylines
-          .filter((polyline) => polyline.points.length > 0)
+          .filter((polyline) => anchored || polyline.points.length > 0)
           .map((polyline) => contourKey(polyline, anchored, path.fillRule === 'nonzero')),
         anchored,
       ),
