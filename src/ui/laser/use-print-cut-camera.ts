@@ -5,6 +5,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import type { PrintAndCutDesignTargets } from '../../core/scene';
 import type { MarkPair } from '../../core/camera/marks/match-mark-pair';
+import { activeCameraModel, useActiveCameraModel } from '../camera/active-camera-model';
 import { cameraModelForFrame } from '../camera/camera-model-frame';
 import { cameraCaptureBindingForFrame, captureSourceFrame } from '../camera/frame-source';
 import { useCameraTraceLifetime } from '../camera/use-camera-trace-lifetime';
@@ -26,7 +27,7 @@ export type PrintCutCamera = {
 };
 
 export function usePrintCutCamera(): PrintCutCamera {
-  const model = useStore((s) => s.project.device.cameraModel);
+  const model = useActiveCameraModel();
   const sourceState = useCameraStore((s) => s.sourceState);
   const captureLifetime = useCameraTraceLifetime();
   const [finding, setFinding] = useState(false);
@@ -50,7 +51,7 @@ export function usePrintCutCamera(): PrintCutCamera {
     const { project } = useStore.getState();
     const camera = useCameraStore.getState();
     const source = camera.sourceState;
-    const capturedModel = project.device.cameraModel;
+    const capturedModel = activeCameraModel(project.device, source);
     if (source.kind !== 'live' || capturedModel === undefined) return;
     const request = printCutCameraRequest(captureLifetime());
     active.current = request;

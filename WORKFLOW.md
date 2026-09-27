@@ -6660,7 +6660,7 @@ as the pane's design record.
 
 ## Camera Mode flows
 
-### F-CAM1. Choose a camera (ADR-116, ADR-440)
+### F-CAM1. Choose a camera (ADR-116, ADR-440, ADR-446)
 
 - **Success / camera running.** The operator opens the Camera panel and starts a USB camera, or
   presses **Use this camera** on a detected machine camera. The live picture is the one source every
@@ -6682,6 +6682,11 @@ as the pane's design record.
 - **Edge / device list changed.** While Camera Mode is open, browser `devicechange` refreshes the
   picker only. It never opens hardware or prompts for permission. A non-permission `AbortError`
   is shown as a retryable open failure rather than mislabeled as denial.
+- **Success / several cameras (ADR-446).** Each camera on the machine keeps its own calibration.
+  Starting a camera uses its own calibration automatically; **Calibrated cameras** in the panel
+  lists them, marks the one in use, and **Forget** removes one (undoable).
+- **Edge / camera without its own calibration.** The setup steps say to calibrate it, the canvas
+  says the saved calibration belongs to another camera, and calibrating it keeps the others.
 
 ### F-CAM2. One-photo camera calibration (ADR-441, Amendments 1 and 3)
 
