@@ -5,6 +5,7 @@
 import type { SceneObject } from '../../core/scene';
 import type { TraceSettingsRecord } from '../../core/scene/scene-object';
 import { TRACE_PRESETS, type TraceOptions } from '../../core/trace';
+import { CNC_TRACE_PRESET_NAME, DEFAULT_TRACE_PRESET_NAME } from '../trace/dialog-parts';
 import { mergeLightBurnTraceSettings } from '../trace/trace-options';
 import { restoreTraceSettings } from '../trace/trace-settings-snapshot';
 
@@ -19,7 +20,9 @@ export type BatchTraceSettings = {
   readonly label: string;
 };
 
-/** The newest trace in the scene that recorded its dialog settings. */
+/** The newest trace in the scene that recorded its dialog settings. A commit
+ * adds its trace on top of the scene, so the topmost record is the latest
+ * commit unless objects were reordered since; the scene keeps no commit time. */
 export function lastTraceSettingsRecord(
   objects: ReadonlyArray<SceneObject>,
 ): TraceSettingsRecord | null {
@@ -49,11 +52,16 @@ export function batchTraceSettings(
   source: MultiFileTraceSettingsSource,
   presetName: string,
   record: TraceSettingsRecord | null,
+  machineKind: 'laser' | 'cnc' = 'laser',
 ): BatchTraceSettings {
   if (source === 'last-trace' && record !== null) {
     // The grid only fits a crop boundary, which a batch does not use.
     const restored = restoreTraceSettings(record, { width: 1, height: 1 });
-    const name = restored.presetName ?? presetName;
+    // A preset no longer known opens the Trace dialog on the machine's
+    // default preset (useTracePreset), so the batch starts from it too.
+    const name =
+      restored.presetName ??
+      (machineKind === 'cnc' ? CNC_TRACE_PRESET_NAME : DEFAULT_TRACE_PRESET_NAME);
     const preset = TRACE_PRESETS[name];
     const overrides = restored.overrides ?? {};
     const adjusted = Object.keys(overrides).length;

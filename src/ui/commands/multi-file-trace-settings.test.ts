@@ -4,6 +4,7 @@ import type { SceneObject } from '../../core/scene';
 import type { TraceSettingsRecord } from '../../core/scene/scene-object';
 import { TRACE_PRESETS } from '../../core/trace';
 import { useStore } from '../state';
+import { CNC_TRACE_PRESET_NAME, DEFAULT_TRACE_PRESET_NAME } from '../trace/dialog-parts';
 import { mergeLightBurnTraceSettings } from '../trace/trace-options';
 import { restoreTraceSettings } from '../trace/trace-settings-snapshot';
 import type * as multiFileTraceAction from './multi-file-trace-action';
@@ -65,6 +66,16 @@ describe('Multi-File Trace settings choice (rank 20)', () => {
     expect(chosen.options?.turnPolicy).toBe('connect-ink');
     expect(chosen.presetName).toBe('Smooth');
     expect(chosen.label).toBe('the last Trace Image settings (Smooth, 3 adjusted)');
+  });
+
+  it('starts an unknown recorded preset from the machine default, as the Trace dialog does', () => {
+    const unknown: TraceSettingsRecord = { ...RECORD, presetName: 'Retired Preset' };
+    expect(batchTraceSettings('last-trace', 'Centerline', unknown).presetName).toBe(
+      DEFAULT_TRACE_PRESET_NAME,
+    );
+    expect(batchTraceSettings('last-trace', 'Centerline', unknown, 'cnc').presetName).toBe(
+      CNC_TRACE_PRESET_NAME,
+    );
   });
 
   it('keeps preset defaults identical to the preset', () => {

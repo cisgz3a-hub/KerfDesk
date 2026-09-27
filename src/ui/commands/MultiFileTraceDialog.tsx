@@ -193,10 +193,12 @@ function TraceSettingsSourceFields(props: {
   readonly onChange: (patch: Partial<MultiFileTraceSettings>) => void;
 }): JSX.Element {
   const fromLast = props.settings.settingsSource === 'last-trace' && props.lastTrace !== null;
+  const machineKind = useStore((state) => state.project.machine?.kind);
   const shown = batchTraceSettings(
     props.settings.settingsSource,
     props.settings.presetName,
     props.lastTrace,
+    machineKind,
   );
   return (
     <>
@@ -303,6 +305,7 @@ export async function runChosenMultiFileTrace(
     settings.settingsSource,
     settings.presetName,
     lastTraceSettingsRecord(project.scene.objects),
+    project.machine?.kind,
   );
   const options = chosen.options;
   const controller = new AbortController();
