@@ -1,7 +1,8 @@
 ## ADR-289 Amendment 1 - Relief roughing rings end where they start, and each level is cleared to its centre (2026-09-27)
 
 **Status:** Accepted; software-verified through unit, compile and removal-simulation tests,
-hardware qualification pending. | **Date:** 2026-09-27
+hardware qualification pending. | **Date:** 2026-09-27 | **Order and direction amended by:**
+ADR-427, which cuts each level from the inside out with these cleanup paths first.
 
 Amends ADR-289's roughing planner (items 2 and 7 plan and qualify the waterline rings) and
 resolves the two ring-ladder defects ADR-368 Amendment 2 recorded as not changed. The Frame-first
