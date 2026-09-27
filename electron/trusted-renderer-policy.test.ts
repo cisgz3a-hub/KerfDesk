@@ -267,6 +267,40 @@ describe('Electron trusted renderer policy', () => {
     ).toBe(false);
   });
 
+  // ADR-482: navigator.clipboard.writeText arrives as clipboard-sanitized-write.
+  // Plain-text copy is granted to the trusted main frame; reads stay denied.
+  it('grants clipboard writes, not reads, to the trusted main renderer', () => {
+    const request = (permission: string, isMainFrame: boolean, url: string): boolean =>
+      shouldGrantPermissionRequest(
+        { permission, isMainFrame, requestingUrl: url, currentUrl: url },
+        trustedOrigins,
+      );
+    expect(request('clipboard-sanitized-write', true, 'app://app/index.html')).toBe(true);
+    expect(request('clipboard-sanitized-write', false, 'app://app/index.html')).toBe(false);
+    expect(request('clipboard-sanitized-write', true, 'https://evil.example/')).toBe(false);
+    expect(request('clipboard-read', true, 'app://app/index.html')).toBe(false);
+    expect(
+      shouldGrantPermissionCheck(
+        {
+          permission: 'clipboard-sanitized-write',
+          requestingOrigin: 'app://app',
+          currentUrl: 'app://app/index.html',
+        },
+        trustedOrigins,
+      ),
+    ).toBe(true);
+    expect(
+      shouldGrantPermissionCheck(
+        {
+          permission: 'clipboard-read',
+          requestingOrigin: 'app://app',
+          currentUrl: 'app://app/index.html',
+        },
+        trustedOrigins,
+      ),
+    ).toBe(false);
+  });
+
   it('denies renderer popups even when the URL is otherwise trusted', () => {
     expect(shouldAllowWindowOpen('app://app/help', trustedOrigins)).toBe(false);
     expect(shouldAllowWindowOpen('https://evil.example/', trustedOrigins)).toBe(false);

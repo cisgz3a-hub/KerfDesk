@@ -114,9 +114,16 @@ function isAllowedNonMediaAppPermission(permission: string): boolean {
   // the shipped 42-x-y branch). Chromium browsers grant it without a prompt;
   // denying it here silently disables keep-awake on the desktop app, letting
   // the OS sleep the display mid-burn while Web Serial is still streaming.
+  //
+  // 'clipboard-sanitized-write' backs navigator.clipboard.writeText (ADR-482):
+  // Copy transcript, the Super Console copy and the crash report copy. Chromium
+  // grants plain-text writes to a focused page without a prompt; denying it
+  // made every Copy button fail on the desktop app only. Clipboard reads stay
+  // denied.
   return (
     permission === 'serial' ||
     permission === 'screen-wake-lock' ||
+    permission === 'clipboard-sanitized-write' ||
     permission.startsWith('fileSystem')
   );
 }

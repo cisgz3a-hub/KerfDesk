@@ -29,7 +29,11 @@ export function validateNativeSmokeResult(result, expectedUserData) {
 }
 
 async function runCli() {
-  if (process.platform !== 'win32') throw new Error('Windows packaged smoke requires Windows');
+  // Windows is the shipped target; Linux runs the same smoke on every pull
+  // request against the fused package (ADR-483).
+  if (process.platform !== 'win32' && process.platform !== 'linux') {
+    throw new Error('Packaged smoke runs on Windows or Linux');
+  }
   const args = parseArgs(process.argv.slice(2));
   await runNativeSmoke(args, spawn, {
     reportEvidence: (path) => process.stdout.write(`NATIVE_SMOKE_EVIDENCE=${path}\n`),
@@ -56,7 +60,9 @@ export async function runNativeSmoke(args, spawnProcess = spawn, dependencies = 
 function parseArgs(args) {
   const executable = args.find((arg) => !arg.startsWith('--'));
   if (executable === undefined || !isAbsolute(executable)) {
-    throw new Error('usage: verify-windows-packaged-native-smoke.mjs <absolute KerfDesk.exe>');
+    throw new Error(
+      'usage: verify-windows-packaged-native-smoke.mjs <absolute packaged executable>',
+    );
   }
   const output = valueFor(args, '--output=');
   const timeout = valueFor(args, '--timeout-ms=');

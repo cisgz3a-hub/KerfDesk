@@ -187,15 +187,69 @@ describe('Desktop release workflow gate (ADR-024/135/142/248)', () => {
     const signedBuild = workflow.slice(signedStart, verifyStart);
     expect(workflow.slice(requireStart, signedStart)).toContain(tagPushPredicate);
     expect(signedBuild).toContain(tagPushPredicate);
-    expect(signedBuild).toContain('WIN_CSC_LINK: ${{ secrets.STABLE_WINDOWS_CSC_LINK }}');
-    expect(signedBuild).not.toContain('secrets.CSC_LINK');
     expect(signedBuild).toContain('--config.forceCodeSigning=true');
     expect(workflow.slice(verifyStart, uploadStart)).toContain(tagPushPredicate);
     expect(workflow).toContain("$signature.Status -ne 'Valid'");
   });
 
+  // ADR-142 Amendment 1: the key stays in SSL.com's eSigner vault; CKA loads
+  // the certificate into the Windows store and signtool signs by thumbprint.
+  it('signs with the eSigner cloud certificate loaded from a pinned CKA installer', () => {
+    const requireStart = workflow.indexOf('Require tag-release signing credentials');
+    const loadStart = workflow.indexOf('Load the eSigner signing certificate');
+    const signedStart = workflow.indexOf('Build signed Windows installer + update feed');
+    const verifyStart = workflow.indexOf('Verify signed tag installer');
+    const load = workflow.slice(loadStart, signedStart);
+    const signedBuild = workflow.slice(signedStart, verifyStart);
+
+    expect(requireStart).toBeLessThan(loadStart);
+    expect(loadStart).toBeLessThan(signedStart);
+    for (const name of ['USERNAME', 'PASSWORD', 'TOTP_SECRET']) {
+      expect(workflow.slice(requireStart, loadStart)).toContain(
+        `ESIGNER_${name}: \${{ secrets.STABLE_ESIGNER_${name} }}`,
+      );
+      expect(load).toContain(`ESIGNER_${name}: \${{ secrets.STABLE_ESIGNER_${name} }}`);
+    }
+    expect(workflow).not.toContain('CSC_LINK');
+    expect(workflow).not.toContain('CSC_KEY_PASSWORD');
+    expect(load).toContain(tagPushPredicate);
+    expect(load).toContain("steps.retry.outputs.reuse-artifact == 'false'");
+    expect(load).toMatch(
+      /ESIGNER_CKA_URL: https:\/\/github\.com\/SSLcom\/eSignerCKA\/releases\/download\//u,
+    );
+    expect(load).toMatch(/ESIGNER_CKA_SHA256: [0-9a-f]{64}\n/u);
+    expect(load).toContain('Get-FileHash -Algorithm SHA256');
+    expect(load).toContain('Get-ChildItem Cert:\\CurrentUser\\My -CodeSigningCert');
+    expect(signedBuild).toContain(
+      '--config.win.signtoolOptions.certificateSha1="${WIN_CERTIFICATE_SHA1}"',
+    );
+    expect(signedBuild).toContain(
+      'WIN_CERTIFICATE_SHA1: ${{ steps.signing-certificate.outputs.thumbprint }}',
+    );
+    expect(signedBuild).toContain(
+      'SIGNTOOL_PATH: ${{ steps.signing-certificate.outputs.signtool }}',
+    );
+    const builder = repoFile('electron-builder.yml');
+    expect(builder).toMatch(/signingHashAlgorithms:\s*\n\s*- sha256\n/u);
+    expect(builder).toContain('rfc3161TimeStampServer: http://ts.ssl.com');
+    expect(builder).not.toContain('certificateSha1');
+  });
+
+  it('requires a timestamped installer and an update feed that names its signer', () => {
+    const verifyStart = workflow.indexOf('Verify signed tag installer');
+    const evidenceStart = workflow.indexOf(
+      'Record checksums, SBOM, and normalized build provenance',
+    );
+    const verify = workflow.slice(verifyStart, evidenceStart);
+    expect(verify).toContain('$signature.TimeStamperCertificate');
+    expect(verify).toContain('$appSignature.SignerCertificate.Thumbprint');
+    expect(verify).toContain('node scripts/verify-update-publisher.mjs');
+    expect(verify).toContain('win-unpacked/resources/app-update.yml');
+    expect(repoFile('package.json')).toContain('scripts/verify-update-publisher.test.mjs');
+  });
+
   it('uses the actual tag-push predicate on every production-sensitive step', () => {
-    expect(workflow.split(tagPushPredicate)).toHaveLength(10);
+    expect(workflow.split(tagPushPredicate)).toHaveLength(11);
   });
 
   it('restores the same-run original artifact without rebuilding or replacing its evidence', () => {
