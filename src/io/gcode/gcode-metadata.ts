@@ -91,7 +91,8 @@ export type GcodeMetadata = {
  * roughing headers that count the passes plunged into a first loop shorter
  * than one cut width, and ADR-484's masked relief finishing: waterline round
  * the excluded stock, rows linked across short gaps, and every move kept out
- * of that stock.
+ * of that stock, and ADR-250 amendment 2's inlay inserts that keep their
+ * lead-in and lead-out when the layer carries a ramp angle the pair never cuts.
  */
 // ADR-427 keeps deepest cleanup before linked relief rings and flat depth slices.
 // ADR-368 sizes nonflat pocket/profile offsets, tabs and stepover by cut width.
@@ -100,7 +101,9 @@ export type GcodeMetadata = {
 // ADR-471 discloses sub-width plunges; ADR-457 finishing recipes survive ramping.
 // ADR-424 Amd 1 discloses relief roughing's sub-width plunges the same way.
 // ADR-484 keeps masked relief finishing out of the excluded stock.
-export const EMITTER_REVISION = 'relief-ramp-plunges-disclosed-masked-relief-20260927-v2';
+// ADR-250 Amd 2 keeps the inlay insert's lead under a ramp the pair never cuts.
+export const EMITTER_REVISION =
+  'relief-ramp-plunges-disclosed-masked-relief-inlay-lead-20260928-v3';
 
 // Machine-specific assumption lines (ADR-103 defect fix): router exports
 // previously carried the laser-worded `$32=1 (laser mode)` banner. The S

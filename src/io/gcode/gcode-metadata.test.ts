@@ -41,7 +41,9 @@ function laserAssumptions(
 
 describe('gcodeMetadataHeader', () => {
   it('tracks the latest safety-relevant emitter revision', () => {
-    expect(EMITTER_REVISION).toBe('relief-ramp-plunges-disclosed-masked-relief-20260927-v2');
+    expect(EMITTER_REVISION).toBe(
+      'relief-ramp-plunges-disclosed-masked-relief-inlay-lead-20260928-v3',
+    );
   });
 
   it('emits provenance as GRBL comment lines and ends with a newline', () => {
