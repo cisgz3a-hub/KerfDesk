@@ -177,13 +177,14 @@ describe('relief roughing rings', () => {
     expect(cellsLeftStanding(removal(job, cutter, machineBox(relief)), FLAT_SLACK_MM)).toBe(0);
   });
 
+  // The removal simulation takes ~5.7 s here even at b4c50aa41, past the 5 s default.
   it('leave no stock at the ring seams with a tapered ball nose', () => {
     const relief = flatRelief(20);
     // 11% spaces the rings at most 0.69 mm apart (11% of the widest diameter),
     // close enough that no rib stands between them at a 1.5 mm level.
     const job = compile(relief, TBN, 11);
     expect(cellsLeftStanding(removal(job, TBN, machineBox(relief)), BALL_SLACK_MM)).toBe(0);
-  });
+  }, 20_000);
 });
 
 describe('relief roughing core cleanup', () => {
