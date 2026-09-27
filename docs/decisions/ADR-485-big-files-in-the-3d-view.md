@@ -24,6 +24,12 @@ to millions of moves.
    program the GPU held 12 MB after opening, 20 MB after the first hover and 44 MB after four lens
    changes.
 
+3. **A big file showed a sentence for seconds.** While the worker read a program the Inspector said
+   "Building preview in worker…" and nothing else; on a million-move file that is several seconds
+   with no picture. The worker's reader also grew its arrays by doubling and copied them once more
+   at the end, so for a moment it held two to three times the moves it had read: 100 to 150 bytes
+   a move, where the moves themselves are 50.
+
 ### Decision
 
 1. **The Inspector keeps only what it reads** (`ui/gcode-inspector/inspector-model.ts`).
@@ -63,6 +69,27 @@ to millions of moves.
      pixel. The faint playback lines are one-pixel fat lines instead of GL lines and differ from
      main only in their antialiasing.
 
+3. **The moves appear while the worker reads them** (`ui/gcode-inspector/inspection-preview.ts`,
+   `ui/viewer3d/preview-scene.ts`, `core/gcode-view/segment-builder.ts`).
+   - About four times a second the worker sends the page the moves read since its last message,
+     split into solid moves and rapids, in transferred buffers, with how far through the file it
+     is. Checking the clock costs one call per 1,024 lines. Once the file is read it says it is
+     timing the moves, then sends the finished program as before.
+   - The Inspector and the canvas G-code view show those moves, growing, from the Iso view, with
+     "N moves read · P% of the file" and a bar. A file read before the first message arrives never
+     shows the picture, so small files look as they did.
+   - The picture is a sketch: one-pixel lines in Classic's colours, no controls. Its cost stays in
+     step with what is new. Each batch is drawn once over the picture already on the canvas, which
+     keeps its frames. Only a reframe redraws the lot, and the frame leaves half the job again past
+     a side the job has grown across, so a job read row by row reframes a few dozen times at most.
+     Redrawing every move at every batch kept the main thread busy for 14 seconds on a 2.4 million
+     move file in the test browser.
+   - The reader fills fixed chunks (1,024 moves, doubling to 65,536) that are never regrown, so the
+     picture's moves can be copied out of them and nothing read is copied again while reading. At
+     the end each field is gathered into one exact array and its chunks let go before the next
+     field, largest first. The most it holds is the moves plus their positions once more, 74 bytes
+     a move, plus at most one part-filled chunk.
+
 ### Consequences
 
 - **More vertex work for the faint lines and the pick pass.** A fat line runs the vertex shader 8
@@ -71,6 +98,9 @@ to millions of moves.
   before the shader drops them. Memory was the limit on big programs; later steps in this batch
   cut how many moves are drawn at all.
 - **A legend filter still rebuilds the drawn toolpath** (ADR-470), now without copying positions.
+- **The page briefly holds the picture's moves** (24 bytes a move, in batches) until the finished
+  program replaces it, and a second WebGL context for the picture. Both go when the full view
+  appears.
 - **Not a guard (ADR-228).** Nothing here blocks, refuses or asks for confirmation. The view draws
   and times the same program the same way; CAM and G-code are unchanged.
 
@@ -104,3 +134,21 @@ to millions of moves.
 - GPU buffers on the same programs: at 250,000 moves main held 12 MB after opening, 20 MB after
   the first hover and 44 MB after four lens changes; now 8 MB throughout. At 1,000,000 moves, now
   32 MB throughout.
+- Unit tests: the reader's chunks finish into exact arrays across chunk boundaries, with and
+  without precise lengths, and copy any run of moves; the worker sends only new moves, at most
+  every quarter second and only after 1,024 lines, then the rest with the whole file read, and
+  says it is timing only after the last moves; a program's picture holds every solid move and
+  rapid once; the worker client hands the picture over without settling the request; the dialog
+  keeps its sentence until moves arrive, shows them with the count and share read, and gives way
+  to the full view; the frame leaves room only past the side the job grew across and reframes a
+  3,000-row job fewer than 25 times.
+- Browser (`e2e/gcode-viewer-preview.e2e.ts`): opening a 300,000-move program on a CPU slowed six
+  times shows the picture with its sentence and count, its lines light pixels on the canvas, the
+  full view replaces it, it draws each move about once (fewer than four times the moves read) and
+  nothing is logged as an error. The large-worker cancel spec, which looks for the sentence while
+  the worker reads, passes unchanged.
+- On a 2.4 million move program in the test browser (software WebGL) the picture keeps up with the
+  worker, which sends a batch about every quarter second for 7 seconds; the page is busy for about
+  2 seconds at most, at the largest reframes. Reading and timing a million moves takes 2.2 to 2.6 seconds, against 2.3 seconds on
+  main. The reader's peak of 74 bytes a move, against 100 to 150 on main, is worked out from the
+  arrays it holds, not measured.

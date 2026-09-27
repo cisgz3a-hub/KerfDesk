@@ -3,6 +3,7 @@ import type { GcodeInspectionSource } from './gcode-inspection-source';
 import type { GcodeInspectorAnalysis } from './gcode-inspector-analysis';
 import type { InspectorRenderModel } from './inspector-model';
 import type { GcodeSourceLineIndex } from './gcode-source-line-index';
+import type { PreviewChunk } from './inspection-preview';
 
 export const INSPECTOR_RENDER_PRESSURE_THRESHOLD = 250_000;
 
@@ -43,9 +44,12 @@ export type GcodeInspectorWorkerResponse =
   | {
       readonly id: number;
       readonly kind: 'progress';
-      readonly phase: 'reading' | 'parsing';
+      /** Timing: the source is read and the worker times the moves (ADR-485). */
+      readonly phase: 'reading' | 'parsing' | 'timing';
       readonly bytesRead?: number;
       readonly totalBytes?: number;
     }
+  /** The moves read since the last preview, while the worker reads (ADR-485). */
+  | { readonly id: number; readonly kind: 'preview'; readonly chunk: PreviewChunk }
   | { readonly id: number; readonly kind: 'complete'; readonly result: GcodeInspectorWorkerResult }
   | { readonly id: number; readonly kind: 'error'; readonly message: string };

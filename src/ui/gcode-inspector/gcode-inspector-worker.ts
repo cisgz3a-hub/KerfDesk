@@ -15,9 +15,19 @@ async function inspect(request: GcodeInspectorWorkerRequest): Promise<void> {
   try {
     postProgress(request.id, 'reading');
     postProgress(request.id, 'parsing');
-    const result = await inspectGcodeSource(request.source, ({ bytesRead, totalBytes }) => {
-      postProgress(request.id, 'parsing', bytesRead, totalBytes);
-    });
+    const result = await inspectGcodeSource(
+      request.source,
+      ({ bytesRead, totalBytes }) => {
+        postProgress(request.id, 'parsing', bytesRead, totalBytes);
+      },
+      {
+        onPreview: (chunk) => {
+          const response: GcodeInspectorWorkerResponse = { id: request.id, kind: 'preview', chunk };
+          self.postMessage(response, { transfer: [chunk.solid.buffer, chunk.travel.buffer] });
+        },
+        onTiming: () => postProgress(request.id, 'timing'),
+      },
+    );
     const response: GcodeInspectorWorkerResponse = {
       id: request.id,
       kind: 'complete',

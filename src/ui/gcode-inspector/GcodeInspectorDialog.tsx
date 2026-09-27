@@ -7,9 +7,10 @@ import { Dialog } from '../kit/Dialog';
 import type { InspectorRenderModel } from './inspector-model';
 import type { GcodeInspectionSource } from './gcode-inspection-source';
 import { InspectionPressureNotice } from './InspectionPressureNotice';
+import { InspectionPreviewView } from './InspectionPreviewView';
 import { InspectorView } from './InspectorView';
 import { MainThreadInspectionNotice } from './MainThreadInspectionNotice';
-import { useGcodeInspection } from './use-gcode-inspection';
+import { loadingPreview, useGcodeInspection, type InspectionState } from './use-gcode-inspection';
 import { hasGcodeInspectorAnalysis } from './gcode-inspector-worker-protocol';
 
 export type GcodeInspectorDialogProps = {
@@ -23,6 +24,7 @@ export type GcodeInspectorDialogProps = {
 
 export function GcodeInspectorDialog(props: GcodeInspectorDialogProps): JSX.Element {
   const state = useGcodeInspection(props.source);
+  const preview = loadingPreview(state);
   return (
     <Dialog
       ariaLabel={`G-code Inspector: ${props.programName}`}
@@ -42,7 +44,14 @@ export function GcodeInspectorDialog(props: GcodeInspectorDialogProps): JSX.Elem
         </button>
       </header>
       {state.kind === 'loading' ? (
-        <p style={messageStyle}>{inspectionProgressLabel(state.phase, state.queuePosition)}</p>
+        preview !== null ? (
+          <InspectionPreviewView
+            preview={preview}
+            label={inspectionProgressLabel(state.phase, state.queuePosition)}
+          />
+        ) : (
+          <p style={messageStyle}>{inspectionProgressLabel(state.phase, state.queuePosition)}</p>
+        )
       ) : null}
       {state.kind === 'ready' ? (
         hasGcodeInspectorAnalysis(state.result) ? (
@@ -83,7 +92,7 @@ export function GcodeInspectorDialog(props: GcodeInspectorDialogProps): JSX.Elem
 }
 
 function inspectionProgressLabel(
-  phase: 'queued' | 'reading' | 'parsing' | 'fallback',
+  phase: Extract<InspectionState, { readonly kind: 'loading' }>['phase'],
   queuePosition: number,
 ): string {
   if (phase === 'fallback') {
@@ -94,6 +103,7 @@ function inspectionProgressLabel(
   }
   if (phase === 'reading') return 'Reading G-code in worker… Close to cancel.';
   if (phase === 'parsing') return 'Building preview in worker… Close to cancel.';
+  if (phase === 'timing') return 'Timing the moves in worker… Close to cancel.';
   return 'Preparing preview in worker… Close to cancel.';
 }
 
