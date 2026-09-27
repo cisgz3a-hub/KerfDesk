@@ -20,11 +20,15 @@
 //   angle needs. A loop shorter than one cut width is too tight to ramp round
 //   and is plunged; its pass is marked `entryPlunge`, which the G-code header
 //   and Job Review disclose (ADR-424 Amendment 1).
+// - Moves: vertices on the straight line between their neighbours (a
+//   staircase ring's cell-by-cell runs, a ramp's along one side) are dropped,
+//   so each straight run is one move; the path is unchanged (ADR-488).
 //
 // Everything stays in heightmap mm; the compiler maps it to the machine.
 
 import type { CncPass, CncPath3dPass } from '../job';
 import type { Vec3 } from '../geometry/vec3';
+import { dropCollinearPoints } from '../geometry/drop-collinear-points';
 import { signedAreaMm2 } from '../geometry/polyline-orientation';
 import { pointInPolygon } from '../geometry/point-in-polygon';
 import type { Polyline, Vec2 } from '../scene';
@@ -379,7 +383,7 @@ function chainPass(chain: Chain): CncPass {
     return {
       kind: 'contour',
       zMm: chain.zMm,
-      polyline: chain.path,
+      polyline: dropCollinearPoints(chain.path),
       closed: false,
       ...(chain.entryPlunge ? { entryPlunge: true as const } : {}),
       ...floor,
@@ -388,7 +392,7 @@ function chainPass(chain: Chain): CncPass {
   const atDepth = chain.path.slice(1).map((point) => ({ ...point, z: chain.zMm }));
   const pass: CncPath3dPass = {
     kind: 'path3d',
-    points: [...chain.ramp, ...atDepth],
+    points: dropCollinearPoints([...chain.ramp, ...atDepth]),
     closed: false,
     // The ramp's descent rides the cutting feed only as far as the plunge
     // rate allows; the level itself keeps the full cutting feed.

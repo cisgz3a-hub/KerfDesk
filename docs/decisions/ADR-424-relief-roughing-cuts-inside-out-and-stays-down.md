@@ -1,7 +1,8 @@
 ## ADR-424 - Relief roughing cuts each piece inside out, stays down between rings and ramps in (2026-09-26)
 
 **Status:** Accepted; software-verified through unit, property, compile and removal-simulation
-tests, hardware qualification pending; the descent to each entry amended by ADR-489. |
+tests, hardware qualification pending; the descent to each entry amended by ADR-489, its moves
+by ADR-488. |
 **Date:** 2026-09-26
 
 This amends how the Phase H.5 relief roughing planner (ADR-098, ADR-289) moves between and into

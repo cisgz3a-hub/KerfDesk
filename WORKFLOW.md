@@ -4083,6 +4083,8 @@ explicitly marked below; the remaining controls and user-facing flows are planne
    1 mm above the stock the level above left (its depth plus the bit's rise
    at full radius) and feeds only the rest; the first level, a level below
    one that stopped short, and recovery jobs plunge from safe Z (ADR-489).
+   Each straight run of a ring is one G-code move, however many cells it
+   was traced across; the path is the same (ADR-488).
 3. Emitted G-code passes the plunged-travel invariant; scale is resolved
    before cutter geometry, then mirror/rotate/move placement is honored.
 4. Job Review's detail line for the operation names the levels the
