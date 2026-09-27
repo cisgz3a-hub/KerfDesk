@@ -56,10 +56,19 @@ import {
   sortByBoundDescending,
 } from './heightmap-surface-contact-element';
 import { type ContactProfile, PRUNE_TOLERANCE_MM } from './heightmap-surface-contact-geometry';
+import {
+  collectMoveElements,
+  type MoveElements,
+  type MovePoint,
+  sampleAtOrBefore,
+} from './heightmap-surface-contact-move';
+import {
+  regularNearDzTable,
+  regularSupportTables,
+  supportingLine,
+} from './heightmap-surface-contact-tables';
 
 const FALLBACK_V_TIP_ANGLE_DEG = 60;
-// Radial step of the left secant that stands in for the cutter law's slope.
-const SECANT_MM = 1e-6;
 
 /** Exact contact heights for one heightmap and one cutter envelope. */
 export type SurfaceContactField = {
@@ -80,6 +89,18 @@ export type SurfaceContactField = {
    * to lift the tip higher, so a "no" costs less than a height (ADR-423).
    */
   readonly clearsAtPoint: (x: number, y: number, z: number, slackMm: number) => boolean;
+  /**
+   * The contact that can matter along the straight move from `from` to `to`:
+   * null when nothing can lift the tip more than `toleranceMm` above the move
+   * anywhere on it, else constraintAtPoint over only the elements that might,
+   * exact wherever the contact rises further above the move. The answer holds
+   * until the next call (ADR-421 Amendment 1).
+   */
+  readonly alongMove: (
+    from: MovePoint,
+    to: MovePoint,
+    toleranceMm: number,
+  ) => ((x: number, y: number, lowerBound: number) => number) | null;
 };
 
 type Contact = ElementContact & {
@@ -102,6 +123,8 @@ type Contact = ElementContact & {
   readonly candidates: Int32Array;
   readonly candidateBound: Float64Array;
   readonly mmPerCell: number;
+  // The elements alongMove kept for the latest move.
+  readonly move: MoveElements;
 };
 
 /** Precompute the triangulation bounds for one map and cutter envelope. */
@@ -144,14 +167,19 @@ export function createSurfaceContactField(
     candidates: new Int32Array((side + 1) * (side + 1)),
     candidateBound: new Float64Array((side + 1) * (side + 1)),
     mmPerCell: kernel.mmPerCell,
+    move: { elements: new Int32Array(64), count: 0 },
     roots: new Float64Array(6),
     facet: { planeBound: 0, candidate: 0, insideRectangle: 0 },
   };
+  const amongKept = (x: number, y: number, lowerBound: number): number =>
+    constraintAlongMove(contact, x, y, lowerBound);
   return {
     constraint: (cx, cy, lowerBound) => constraintAt(contact, cx, cy, lowerBound),
     constraintAtPoint: (x, y, lowerBound) => constraintAtPoint(contact, x, y, lowerBound),
     clearsAtPoint: (x, y, z, slackMm) =>
       constraintAtPoint(contact, x, y, z, z + slackMm) <= z + slackMm,
+    alongMove: (from, to, toleranceMm) =>
+      collectMoveElements(contact, from, to, toleranceMm) === 0 ? null : amongKept,
   };
 }
 
@@ -211,84 +239,6 @@ function elementTops(map: Heightmap): Float32Array {
   return tops;
 }
 
-// Element (cx + di, cy + dj) spans [di, di + 1] x [dj, dj + 1] cells from the
-// center on a regular grid, so its nearest-approach cutter height is a table.
-function regularNearDzTable(
-  mmPerCell: number,
-  span: number,
-  radiusMm: number,
-  dz: (radiusMm: number) => number,
-): Float64Array {
-  const side = 2 * span + 2;
-  const table = new Float64Array(side * side);
-  for (let row = 0; row < side; row += 1) {
-    const dy = axisGapMm(row - span - 1, mmPerCell);
-    for (let col = 0; col < side; col += 1) {
-      const distance = Math.hypot(axisGapMm(col - span - 1, mmPerCell), dy);
-      table[row * side + col] = distance > radiusMm ? Number.POSITIVE_INFINITY : dz(distance);
-    }
-  }
-  return table;
-}
-
-function axisGapMm(offset: number, mmPerCell: number): number {
-  if (offset > 0) return offset * mmPerCell;
-  return offset + 1 < 0 ? -(offset + 1) * mmPerCell : 0;
-}
-
-function regularSupportTables(
-  mmPerCell: number,
-  span: number,
-  radiusMm: number,
-  dz: (radiusMm: number) => number,
-): { readonly regularSupportBase: Float64Array; readonly regularSupportSlopes: Float64Array } {
-  const side = 2 * span + 2;
-  const base = new Float64Array(side * side).fill(Number.POSITIVE_INFINITY);
-  const slopes = new Float64Array(side * side * 4);
-  for (let row = 0; row < side; row += 1) {
-    for (let col = 0; col < side; col += 1) {
-      const di = col - span - 1;
-      const dj = row - span - 1;
-      const rho = Math.hypot(axisGapMm(di, mmPerCell), axisGapMm(dj, mmPerCell));
-      const line = supportingLine(
-        dz,
-        rho,
-        radiusMm,
-        (di + 0.5) * mmPerCell,
-        (dj + 0.5) * mmPerCell,
-      );
-      if (line === null) continue;
-      const index = row * side + col;
-      base[index] = line.base;
-      const x0 = di * mmPerCell;
-      const y0 = dj * mmPerCell;
-      slopes[index * 4] = line.gx * x0 + line.gy * y0;
-      slopes[index * 4 + 1] = line.gx * (x0 + mmPerCell) + line.gy * y0;
-      slopes[index * 4 + 2] = line.gx * x0 + line.gy * (y0 + mmPerCell);
-      slopes[index * 4 + 3] = line.gx * (x0 + mmPerCell) + line.gy * (y0 + mmPerCell);
-    }
-  }
-  return { regularSupportBase: base, regularSupportSlopes: slopes };
-}
-
-// The supporting line of the cutter law at the element's nearest approach
-// rho, pointed at the element's middle (mx, my) relative to the axis: slope
-// vector (gx, gy) and constant g rho - dz(rho). Null when it gives no bound.
-function supportingLine(
-  dz: (radiusMm: number) => number,
-  rho: number,
-  radiusMm: number,
-  mx: number,
-  my: number,
-): { readonly gx: number; readonly gy: number; readonly base: number } | null {
-  if (!(rho > SECANT_MM) || rho > radiusMm) return null;
-  const near = dz(rho);
-  const g = (near - dz(rho - SECANT_MM)) / SECANT_MM;
-  const length = Math.hypot(mx, my);
-  if (!(g > 0) || !Number.isFinite(g) || !(length > 0)) return null;
-  return { gx: (g * mx) / length, gy: (g * my) / length, base: g * rho - near };
-}
-
 function constraintAt(contact: Contact, cx: number, cy: number, lowerBound: number): number {
   const xc = read64(contact.xs, cx);
   const yc = read64(contact.ys, cy);
@@ -315,36 +265,58 @@ function constraintAtPoint(
   let count = 0;
   for (let ej = Math.max(0, j - reach); ej <= maxJ; ej += 1) {
     for (let ei = Math.max(0, i - reach); ei <= maxI; ei += 1) {
-      const element = ej * contact.widthCells + ei;
-      // The tip is the cutter's lowest point, so an element no higher than
-      // the bound cannot lift it past the bound.
-      const top = read32(contact.elementTop, element);
-      if (!(top > threshold)) continue;
-      const near = top - exactNearDz(contact, ei, ej, x, y);
-      if (!(near > threshold)) continue;
-      const bound = Math.min(near, exactSupportBound(contact, ei, ej, x, y));
-      if (!(bound > threshold)) continue;
-      contact.candidates[count] = element;
-      contact.candidateBound[count] = bound;
-      count += 1;
+      count = addPointCandidate(contact, ei, ej, x, y, threshold, count);
     }
   }
   sortByBoundDescending(contact.candidates, contact.candidateBound, count);
   return refineCandidates(contact, count, x, y, lowerBound, stopAbove);
 }
 
-// The last sample at or before `coordinate` along one axis (the first when
-// the point lies before it).
-function sampleAtOrBefore(
-  centers: Float64Array,
-  cells: number,
-  coordinate: number,
-  mmPerCell: number,
+// constraintAtPoint over the elements alongMove kept. Every other element
+// stays within its tolerance of the move, so wherever the contact rises
+// further above the move the answer is the same.
+function constraintAlongMove(contact: Contact, x: number, y: number, lowerBound: number): number {
+  const { widthCells, move } = contact;
+  const reach = contact.span + 1;
+  const i = sampleAtOrBefore(contact.xs, widthCells, x, contact.mmPerCell);
+  const j = sampleAtOrBefore(contact.ys, contact.heightCells, y, contact.mmPerCell);
+  const threshold = lowerBound + PRUNE_TOLERANCE_MM;
+  let count = 0;
+  for (let k = 0; k < move.count; k += 1) {
+    const element = readInt(move.elements, k);
+    const ei = element % widthCells;
+    const ej = (element - ei) / widthCells;
+    // The same neighbourhood constraintAtPoint searches.
+    if (Math.abs(ei - i) > reach || Math.abs(ej - j) > reach) continue;
+    count = addPointCandidate(contact, ei, ej, x, y, threshold, count);
+  }
+  sortByBoundDescending(contact.candidates, contact.candidateBound, count);
+  return refineCandidates(contact, count, x, y, lowerBound);
+}
+
+// Adds element (ei, ej) to the candidates when it could lift a cutter centred
+// at (x, y) past the threshold. Returns the new candidate count.
+function addPointCandidate(
+  contact: Contact,
+  ei: number,
+  ej: number,
+  x: number,
+  y: number,
+  threshold: number,
+  count: number,
 ): number {
-  let index = Math.min(cells - 1, Math.max(0, Math.floor(coordinate / mmPerCell - 0.5)));
-  while (index > 0 && read64(centers, index) > coordinate) index -= 1;
-  while (index + 1 < cells && read64(centers, index + 1) <= coordinate) index += 1;
-  return index;
+  const element = ej * contact.widthCells + ei;
+  // The tip is the cutter's lowest point, so an element no higher than the
+  // bound cannot lift it past the bound.
+  const top = read32(contact.elementTop, element);
+  if (!(top > threshold)) return count;
+  const near = top - exactNearDz(contact, ei, ej, x, y);
+  if (!(near > threshold)) return count;
+  const bound = Math.min(near, exactSupportBound(contact, ei, ej, x, y));
+  if (!(bound > threshold)) return count;
+  contact.candidates[count] = element;
+  contact.candidateBound[count] = bound;
+  return count + 1;
 }
 
 // Elements whose highest corner, at their nearest approach, could still lift

@@ -1,7 +1,10 @@
 import { describe, expect, it } from 'vitest';
 import type { CncPass } from '../job';
+import type { Heightmap } from './heightmap';
+import { createSurfaceContactField } from './heightmap-surface-contact';
 import { dilateHeightmapByTool } from './heightmap-tool-offset';
 import { reliefFinishingPasses, scallopRowSpacingMm } from './relief-finishing';
+import { checkedAgainstContact } from './relief-finishing-contact';
 import {
   reliefFinishingPlan,
   reliefFinishRowSpacingMm,
@@ -28,6 +31,18 @@ const OPTIONS: ReliefFinishingPlanOptions = {
   rasterAxis: 'x',
   wallOnRight: true,
 };
+
+// Passes as the plan leaves them: every move checked against the exact
+// contact (ADR-421 Amendment 1).
+function checked(map: Heightmap, passes: ReadonlyArray<CncPass>): ReadonlyArray<CncPass> {
+  const field = createSurfaceContactField(map, OPTIONS.kernel);
+  if (field === null) throw new Error('expected a contact field');
+  return checkedAgainstContact(passes, {
+    tipAt: field.constraintAtPoint,
+    alongMove: field.alongMove,
+    spacingMm: map.mmPerCell / 4,
+  });
+}
 
 // Every point of every pass, with the direction of the move into it.
 function moves(passes: ReadonlyArray<CncPass>) {
@@ -59,9 +74,12 @@ describe('reliefFinishingPlan (ADR-423)', { timeout: 30_000 }, () => {
     return tip[j * map.widthCells + i] ?? Number.NaN;
   };
 
-  it('plans the raster along X exactly as before by default', () => {
+  it('plans the raster along X as before by default', () => {
     expect(reliefFinishingPlan(map, OPTIONS)).toEqual(
-      reliefFinishingPasses(map, { tool: BALL, kernel: OPTIONS.kernel, scallopMm: 0.025 }),
+      checked(
+        map,
+        reliefFinishingPasses(map, { tool: BALL, kernel: OPTIONS.kernel, scallopMm: 0.025 }),
+      ),
     );
   });
 
@@ -77,12 +95,16 @@ describe('reliefFinishingPlan (ADR-423)', { timeout: 30_000 }, () => {
         : a,
     );
     expect(longest.to.x).toBe(longest.from.x);
-    // And each vertex rides this map's tip where it stands.
-    for (const { to } of along) expect(to.z).toBe(tipAt(to.x, to.y));
+    // And each vertex on a sample rides this map's tip there, or crosses
+    // over the contact just above it.
+    const onSample = along.filter(({ to }) => isCentre(to));
+    for (const { to } of onSample) expect(to.z).toBeGreaterThanOrEqual(tipAt(to.x, to.y));
+    expect(onSample.filter(({ to }) => to.z === tipAt(to.x, to.y)).length).toBeGreaterThan(
+      0.99 * onSample.length,
+    );
   });
 
   it('adds waterline passes on the steep walls and narrows the raster', () => {
-    const raster = reliefFinishingPlan(map, OPTIONS);
     const passes = reliefFinishingPlan(map, { ...OPTIONS, strategy: 'raster-waterline' });
     const narrowed = reliefFinishingPasses(map, {
       tool: BALL,
@@ -91,17 +113,23 @@ describe('reliefFinishingPlan (ADR-423)', { timeout: 30_000 }, () => {
       rowSpacingMm: reliefFinishRowSpacingMm(BALL, 0.025, 'raster-waterline'),
     });
 
-    expect(passes.slice(0, narrowed.length)).toEqual(narrowed);
-    expect(moves(narrowed).length).toBeGreaterThan(moves(raster).length);
+    expect(passes.slice(0, narrowed.length)).toEqual(checked(map, narrowed));
+    const rows = reliefFinishingPasses(map, {
+      tool: BALL,
+      kernel: OPTIONS.kernel,
+      scallopMm: 0.025,
+    });
+    expect(moves(narrowed).length).toBeGreaterThan(moves(rows).length);
     const waterline = passes.slice(narrowed.length);
     expect(waterline.length).toBeGreaterThan(0);
     // Levels sin(45) x the scallop row spacing apart.
     const step = scallopRowSpacingMm(BALL, 0.025) * Math.SQRT1_2;
-    const levels = new Set(
-      waterline.flatMap((pass) => (pass.kind === 'path3d' ? pass.points.map((p) => p.z) : [])),
+    // The contact check only lifts, so a pass's lowest vertex is its level.
+    const levels = waterline.map((pass) =>
+      pass.kind === 'path3d' ? Math.min(...pass.points.map((p) => p.z)) : Number.NaN,
     );
     for (const z of levels) {
-      if (z > -1) continue; // a vertex lifted over the rim
+      if (z > -1) continue; // a pass lifted over the rim
       expect(Math.abs(z / step - Math.round(z / step))).toBeLessThan(1e-9);
     }
   });
@@ -135,7 +163,7 @@ describe('reliefFinishingPlan (ADR-423)', { timeout: 30_000 }, () => {
     });
 
     expect(reliefFinishingPlan(masked, { ...OPTIONS, strategy: 'raster-waterline' })).toEqual(
-      narrowed,
+      checked(masked, narrowed),
     );
   });
 
@@ -149,3 +177,9 @@ describe('reliefFinishingPlan (ADR-423)', { timeout: 30_000 }, () => {
     expect(transposeHeightmap(flipped)).toEqual(small);
   });
 });
+
+function isCentre(point: { readonly x: number; readonly y: number }): boolean {
+  const i = point.x / CELL_MM - 0.5;
+  const j = point.y / CELL_MM - 0.5;
+  return Math.abs(i - Math.round(i)) < 1e-9 && Math.abs(j - Math.round(j)) < 1e-9;
+}

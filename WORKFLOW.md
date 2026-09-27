@@ -3294,8 +3294,9 @@ work-Z evidence, but it cannot enable User Origin or Verified Origin.
     blocked.
 12. **Air pump across an Air-off operation (ADR-335).** Build three
     operations with Air on, off, then on, and Start. On a profile with
-    "Air restart" ticked the program must contain exactly one `M8` and
-    one `M9`, the pump must still be running through the middle
+    "Air restart" ticked the program must switch air exactly once each
+    way (`M8`, then `M9` after the last operation; the `M8` repeats of
+    step 13 switch nothing), the pump must still be running through the middle
     operation and the last one, and Job Review must name the held
     operation and `$152=100` (ADR-345: Creality's Falcon A1 parameter
     page defines `$152` as the standby wait, so `100` keeps the pump
@@ -3308,6 +3309,19 @@ work-Z evidence, but it cannot enable User Origin or Verified Origin.
     go back to `M8 M9 M8 M9`. If the pump is audibly off for the last
     operation with the box ticked, the hold is not working; if it is
     off only with the box unticked, the firmware timer is confirmed.
+13. **Qualify air repeats on the installed firmware (ADR-462).** In a
+    separately supervised air check, record the firmware and current
+    `$152` setting. With "Air restart" ticked, inspect a short-block job
+    of a minute or more with Air on: the program attempts `M8` repeats
+    at eligible movement boundaries after about 5 s of estimated time.
+    Observe whether the pump stays on and whether the enclosure fan
+    follows it; program bytes alone establish neither. Long moves or
+    dwells and continuous M3 cutting can exceed the trigger without a
+    repeat, so this mitigation does not guarantee continuous air.
+    Compare with "Air restart" unticked, which emits one `M8` for an
+    all-Air-on job. If air still stops, keep the firmware/`$152=100`
+    remedy from step 12 and verify it separately. Do not treat a pass
+    on short blocks as qualification of every job or firmware version.
 
 When this checklist passes on the Falcon, replace the F.3 status in `PROJECT.md` Phase F
 ("Code shipped; hardware verification pending") with the recorded result and update the F.3
@@ -4766,9 +4780,11 @@ and lifts the command's CNC-only gate.)*
    into whole rows no coarser than a tenth of the contact diameter, so rows
    land at the requested spacing; the whole-row stride still rounds down so it
    never overshoots it (ADR-421). This qualifies finishing
-   vertices against the piecewise-linear surface and the planar cusp, not the
-   XY chord between vertices, subcell detail, or true along-surface scallop
-   (ADR-292/294/412).
+   vertices against the piecewise-linear surface and the planar cusp, not
+   subcell detail or true along-surface scallop (ADR-292/294/412). Every move
+   between vertices, of every strategy, is then checked against the exact
+   contact at sampled points and lifted where those checks exceed 0.002 mm into the part,
+   measured normal to the move (ADR-421 amendment 1).
 3. Without a mask, the rows form one stay-down path: each row steps to the
    next along its edge column's own tip samples instead of retracting and
    plunging. A vertex is dropped only where the straight move replacing it

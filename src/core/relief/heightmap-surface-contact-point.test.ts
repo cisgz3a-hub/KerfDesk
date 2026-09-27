@@ -44,6 +44,27 @@ const MAPS = fc.record({
   partial: fc.boolean(),
 });
 
+// A tilted plane with one straight step: the contact lies exactly on the
+// facet planes here, which random samples almost never do.
+const SMOOTH_MAPS = fc
+  .record({
+    gx: fc.double({ min: -1.5, max: 1.5, noNaN: true }),
+    gy: fc.double({ min: -1.5, max: 1.5, noNaN: true }),
+    stepAtMm: fc.double({ min: 0, max: WIDTH * CELL_MM, noNaN: true }),
+    stepMm: fc.double({ min: -2, max: 2, noNaN: true }),
+    partial: fc.boolean(),
+  })
+  .map(({ gx, gy, stepAtMm, stepMm, partial }) => {
+    const depths = Array.from({ length: WIDTH * HEIGHT }, (_, index) => {
+      const x = ((index % WIDTH) + 0.5) * CELL_MM;
+      const y = (Math.floor(index / WIDTH) + 0.5) * CELL_MM;
+      return 1_000 * (-3 + gx * (x - 1.5) + gy * (y - 1.25) + (x > stepAtMm ? stepMm : 0));
+    });
+    return mapFrom({ depths, mask: undefined, partial });
+  });
+
+const SMOOTH_OR_ROUGH_MAPS = fc.oneof(SMOOTH_MAPS, MAPS.map(mapFrom));
+
 function mapFrom(input: {
   readonly depths: ReadonlyArray<number>;
   readonly mask: ReadonlyArray<boolean> | undefined;
@@ -132,5 +153,89 @@ describe('surface contact at any point (ADR-423)', () => {
       }),
       { numRuns: 20 },
     );
+  });
+
+  it.each(TOOLS)('keeps every element that can rise above a move ($kind)', (tool) => {
+    // ADR-421 Amendment 1: finishing solves only the elements alongMove keeps,
+    // so wherever the contact rises past the move plus the tolerance, those
+    // elements must give the same height every element does.
+    const end = fc.record({
+      x: fc.double({ min: -0.8, max: WIDTH * CELL_MM + 0.8, noNaN: true }),
+      y: fc.double({ min: -0.8, max: HEIGHT * CELL_MM + 0.8, noNaN: true }),
+      // Height above (or below) the contact at that end: mostly on it, as a
+      // finishing path runs.
+      above: fc.oneof(
+        fc.double({ min: -0.3, max: 0.3, noNaN: true }),
+        fc.double({ min: -0.003, max: 0.003, noNaN: true }),
+      ),
+    });
+    const move = fc.record({ from: end, to: end, toleranceMm: fc.constantFrom(0.001, 0.05) });
+    fc.assert(
+      fc.property(
+        SMOOTH_OR_ROUGH_MAPS,
+        fc.array(move, { minLength: 1, maxLength: 6 }),
+        (map, moves) => {
+          const field = createSurfaceContactField(map, kernelForTool(tool, CELL_MM));
+          if (field === null) return;
+          const onContact = (p: { x: number; y: number; above: number }) => {
+            const tip = field.constraintAtPoint(p.x, p.y, Number.NEGATIVE_INFINITY);
+            return { x: p.x, y: p.y, z: (tip === Number.NEGATIVE_INFINITY ? -3 : tip) + p.above };
+          };
+          for (const { toleranceMm, ...ends } of moves) {
+            const from = onContact(ends.from);
+            const to = onContact(ends.to);
+            const kept = field.alongMove(from, to, toleranceMm);
+            for (let step = 0; step <= 16; step += 1) {
+              const t = step / 16;
+              const x = from.x + t * (to.x - from.x);
+              const y = from.y + t * (to.y - from.y);
+              const bound = from.z + t * (to.z - from.z) + toleranceMm;
+              const all = field.constraintAtPoint(x, y, bound);
+              const some = kept === null ? bound : kept(x, y, bound);
+              if (all > bound + TOLERANCE_MM)
+                expect(Math.abs(some - all)).toBeLessThanOrEqual(TOLERANCE_MM);
+              else expect(some).toBeLessThanOrEqual(bound + TOLERANCE_MM);
+            }
+          }
+        },
+      ),
+      { numRuns: 20 },
+    );
+  });
+
+  it.each(TOOLS)('keeps the far side of a ridge a short move crosses ($kind)', (tool) => {
+    // Two planes meeting at a ridge: each one, extended, rises above the
+    // other's side, so a move that crosses the ridge keeps both. A move short
+    // enough keeps them only by the tolerance, where a slip would show.
+    const depths = Array.from({ length: WIDTH * HEIGHT }, (_, index) => {
+      const x = ((index % WIDTH) + 0.5) * CELL_MM;
+      return 1_000 * (-3 - 0.8 * Math.abs(x - 1.5));
+    });
+    const field = createSurfaceContactField(
+      mapFrom({ depths, mask: undefined, partial: false }),
+      kernelForTool(tool, CELL_MM),
+    );
+    if (field === null) throw new Error('expected a contact field');
+    const onContact = (x: number, y: number) => ({
+      x,
+      y,
+      z: field.constraintAtPoint(x, y, Number.NEGATIVE_INFINITY),
+    });
+    for (let middle = 0.9; middle <= 2.1; middle += 0.025) {
+      for (const half of [0.001, 0.003, 0.01, 0.03, 0.1, 0.3]) {
+        const from = onContact(middle - half, 1.1);
+        const to = onContact(middle + half, 1.3);
+        const kept = field.alongMove(from, to, 0.001);
+        for (let step = 0; step <= 32; step += 1) {
+          const t = step / 32;
+          const x = from.x + t * (to.x - from.x);
+          const y = from.y + t * (to.y - from.y);
+          const bound = from.z + t * (to.z - from.z) + 0.001;
+          const all = field.constraintAtPoint(x, y, bound);
+          const some = kept === null ? bound : kept(x, y, bound);
+          expect(Math.abs(some - all)).toBeLessThanOrEqual(TOLERANCE_MM);
+        }
+      }
+    }
   });
 });
