@@ -1,4 +1,4 @@
-// Vector PDF writer (ADR-444), written from the published PDF Reference,
+// Vector PDF writer (ADR-468), written from the published PDF Reference,
 // sixth edition (PDF 1.7, ISO 32000-1) using only PDF 1.4 features.
 //
 // Structure (Reference section 3.4): header, body of five indirect objects

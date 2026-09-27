@@ -89,9 +89,11 @@ baseTest(
     await page.getByRole('button', { name: 'Select all artwork using fixture' }).click();
     await expect(page.getByRole('region', { name: 'Selected artwork operation' })).toBeVisible();
 
-    const layerMode = page.getByLabel('Mode for selected objects');
-    await layerMode.selectOption('fill');
-    await expect(layerMode).toHaveValue('fill');
+    const fillProcess = page
+      .getByRole('radiogroup', { name: 'Mode for selected objects' })
+      .getByRole('radio', { name: 'Fill', exact: true });
+    await fillProcess.check();
+    await expect(fillProcess).toBeChecked();
 
     const preview = await toolbarCommand(page, 'Preview');
     await expect(preview).toBeEnabled();

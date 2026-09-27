@@ -1,4 +1,4 @@
-// Grid-collapsed contours leave no orphans (ADR-444 Amendment 1).
+// Grid-collapsed contours leave no orphans (ADR-468 Amendment 1).
 //
 // Each filled contour is snapped to the export grid: GeoJSON snaps its
 // flattened points, PDF and EPS snap its path's control points. A very thin

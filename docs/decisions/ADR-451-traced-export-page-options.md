@@ -3,7 +3,7 @@
 **Status:** Accepted. | **Date:** 2026-09-26
 
 This extends the traced-file export of ADR-431 (SVG and DXF) and
-ADR-444 (PDF, EPS and GeoJSON). It changes file export only: no scene,
+ADR-468 (PDF, EPS and GeoJSON). It changes file export only: no scene,
 compile, G-code, Frame or Start path reads the new code, so the Frame-first contract (PROJECT.md
 non-negotiable 21, ADRs 228, 230, 232 and 237) is untouched.
 

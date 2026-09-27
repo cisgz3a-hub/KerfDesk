@@ -1,16 +1,18 @@
 // CameraPanel — the LightBurn-style Camera Control panel (ADR-107/116): pick
 // a camera (machine-integrated via the bridge, RTSP by URL, or USB), start it
-// as the active source, calibrate the lens, align to the bed, control the
+// as the active source, calibrate it from one photo (ADR-441), control the
 // workspace overlay, and self-check via Diagnostics. Opened from the top
 // toolbar / Tools menu via the `tools.camera` command (like the registration
 // jig); it renders nothing until opened, and its own × button closes it.
+// Closing the panel keeps a running camera on while the canvas shows it.
 
 import { TutorialButton } from '../../tutorials/TutorialButton';
 import { useEffect, useState } from 'react';
 import { usePlatform } from '../../app';
+import { useStore } from '../../state';
 import { loadCameraPanelWide, saveCameraPanelWide } from '../../state/camera-preference-storage';
 import { useCameraStore } from '../../state/camera-store';
-import { AutoAlignControls } from '../AutoAlignControls';
+import { CalibrateCameraControls } from '../calibrate/CalibrateCameraControls';
 import { OverlayControls } from '../OverlayControls';
 import { CameraDiagnostics } from './CameraDiagnostics';
 import { CameraSetupSteps } from './CameraSetupSteps';
@@ -84,7 +86,7 @@ function CameraPanelOpen(): JSX.Element {
           machine camera above does not need it.
         </p>
       )}
-      <AutoAlignControls />
+      <CalibrateCameraControls />
       <OverlayControls />
       <SnapshotControls wide={wide} onToggleWide={toggleWide} />
       <CameraDiagnostics bridgeAvailable={bridgeAvailable} />
@@ -115,7 +117,7 @@ function useCameraPanelOpenState() {
     if (bridgeAvailable && machineCamera.kind === 'idle') void detectMachineCamera(bridge);
     return () => {
       stopWatchingDevices?.();
-      stopSource();
+      if (!cameraShownOnCanvas()) stopSource();
     };
     // machineCamera is deliberately NOT a dependency: the probe fires once per
     // panel open, not on every probe-state transition.
@@ -141,13 +143,27 @@ function useCameraPanelOpenState() {
   };
 }
 
+// The canvas overlay draws the live camera, so the source outlives the panel
+// while the overlay is on and there is a calibration to draw it with.
+function cameraShownOnCanvas(): boolean {
+  return (
+    useCameraStore.getState().overlayVisible &&
+    useStore.getState().project.device.cameraModel !== undefined
+  );
+}
+
+// Why the machine camera works in Desktop and not here: the laser's camera
+// serves plain http on the local network without CORS, so an https page may
+// at most display it (Chrome's Local Network Access) and can never read its
+// pixels, which calibration, the corrected overlay and trace all need.
 function HostedNetworkCameraNotice(): JSX.Element {
   return (
     <div style={hostedNoticeStyle}>
-      <strong>USB camera available here.</strong>
+      <strong>USB cameras work here.</strong>
       <span>
-        Machine and RTSP/IP cameras need KerfDesk Desktop, which runs the secure local camera bridge
-        automatically.
+        A laser&apos;s built-in camera and RTSP/IP cameras cannot be read by a web page: they answer
+        on your local network without the permission browsers require. KerfDesk Desktop reads them
+        through its own local camera bridge, with nothing to set up.
       </span>
       <DownloadDesktopLink />
     </div>

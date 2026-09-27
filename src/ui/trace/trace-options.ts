@@ -236,7 +236,7 @@ export function hasAggressivePreprocessing(options: TraceOptions): boolean {
   // may still carry them), so relaxing them cannot change its output — a
   // zero-paths retry would just repeat the identical multi-second pipeline.
   if (options.traceMode === 'edge') return false;
-  // Colour layers (ADR-430) own their speck rule: a missing despeckle reads as
+  // Colour layers (ADR-461) own their speck rule: a missing despeckle reads as
   // the same 12 px default, so a "relaxed" retry would repeat the identical
   // colour pipeline and falsely report relaxed settings.
   if (options.colourLayers !== undefined) return false;

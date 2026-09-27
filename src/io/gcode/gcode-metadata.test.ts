@@ -41,7 +41,7 @@ function laserAssumptions(
 
 describe('gcodeMetadataHeader', () => {
   it('tracks the latest safety-relevant emitter revision', () => {
-    expect(EMITTER_REVISION).toBe('trace-hybrid-chords-laser-arcs-adaptive-rings-20260927-v1');
+    expect(EMITTER_REVISION).toBe('trace-colour-hybrid-arcs-relief-20260927-v2');
   });
 
   it('emits provenance as GRBL comment lines and ends with a newline', () => {

@@ -94,9 +94,9 @@
 | ADR-104 | — | Accepted; Phase-J schedule amended by ADR-248 | Integration numbering: controllers keep 094–097 + Phase I; CNC renumbers to 098/101/102/103 + keeps Phase H (2026-07-03) |
 | ADR-105 | — | accepted (maintainer directive: "make sure that we have | Easel-parity UX pack: persistent 3D pane, pocket raster fill, bundled design library (2026-07-03) |
 | ADR-106 | — | accepted (maintainer-approved build plan, 2026-07-03) | Parametric finger-joint box generator: claim-model joinery (2026-07-03) |
-| ADR-107 | 2026-06-27 | Accepted | Camera Mode: overhead-camera alignment (manual 4-point homography v1; staged v1–v4) |
-| ADR-108 | 2026-06-28 | Accepted | Camera Mode v2: fisheye lens calibration + de-fisheye render |
-| ADR-109 | 2026-07-03 | Accepted | Camera Mode v3: automatic marker alignment (no-click homography) |
+| ADR-107 | 2026-06-27 | Superseded by ADR-440 | Camera Mode: overhead-camera alignment (manual 4-point homography v1; staged v1–v4) |
+| ADR-108 | 2026-06-28 | Superseded by ADR-440, ADR-441 | Camera Mode v2: fisheye lens calibration + de-fisheye render |
+| ADR-109 | 2026-07-03 | Superseded by ADR-441 | Camera Mode v3: automatic marker alignment (no-click homography) |
 | ADR-110 | 2026-07-03 | Accepted | Camera Mode v4: capture-to-trace at true bed coordinates |
 | ADR-111 | — | accepted; decision #4 amended by maintainer directive 2026-08-01 | CNC usability pack: material picker, machine auto-fill, limit advisories, always-visible Advanced section (Phase H.13, 2026-07-04) |
 | ADR-112 | — | accepted (maintainer follow-up to ADR-111: on the live ap... | Project-level CNC material picker: set material once for the job (Phase H.14, 2026-07-04) |

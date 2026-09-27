@@ -1,4 +1,4 @@
-// Shared artwork model for the PDF, EPS and GeoJSON writers (ADR-444).
+// Shared artwork model for the PDF, EPS and GeoJSON writers (ADR-468).
 //
 // Every writer receives the same painted items: world millimetres in the
 // scene frame (Y down), one item per artwork path, each either filled (closed
@@ -196,7 +196,7 @@ export function itemPathCommands(item: VectorPaintItem, page: PreparedPage): str
   const paths = curves.map((curve) => gridCommands(curve, page));
   // A filled contour whose control points collapse onto one grid line paints
   // nothing; it is left out together with every contour nested in it, so none
-  // of them paints with the opposite fill (ADR-444 Amendment 1).
+  // of them paints with the opposite fill (ADR-468 Amendment 1).
   const kept =
     item.paint === 'fill'
       ? filledCurvesKept(curves, paths.map(commandPoints), page.grid.step)

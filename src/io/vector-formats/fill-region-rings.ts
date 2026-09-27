@@ -1,4 +1,4 @@
-// Filled-region rings for GeoJSON (ADR-444): which closed contours of one
+// Filled-region rings for GeoJSON (ADR-468): which closed contours of one
 // painted item bound its filled region, and which outer ring each hole
 // belongs to, under the item's own fill rule.
 //

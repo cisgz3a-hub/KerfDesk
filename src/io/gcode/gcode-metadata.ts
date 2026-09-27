@@ -66,14 +66,23 @@ export type GcodeMetadata = {
  * depth, and ADR-159 amendment 2's SVG arcs imported as cubics that meet the
  * arc at each segment midpoint instead of sitting up to 0.196% of the radius
  * inside it, and ADR-289 amendment 1's relief roughing rings that end where
- * they start and levels cleared to their centre above 50% stepover, and
- * ADR-432's native laser G2/G3 arcs with represented-arc validation and G17, and
+ * they start and levels cleared to their centre above 50% stepover, and the
+ * 3D carving batches: ADR-412's exact relief contact and 3D roughing
+ * allowance, ADR-413's per-slice cutter reach, ADR-414's STL orientation,
+ * ADR-421's stay-down finishing at the exact row spacing, ADR-422's floor and
+ * flat roughing levels, and ADR-423's waterline finishing and raster along Y,
+ * and ADR-424's relief roughing cut inside out with links at depth, climb round
+ * islands and ramped entries, and ADR-422 amendment 1's slope steps, and
+ * ADR-450's flats cut to height by the roughing end mill and skipped by the
+ * finishing raster, with separate flat cuts split at the requested depth per
+ * pass from the allowance-bearing region's cleared stock (2026-09-27), and
  * ADR-154 amendment 2's adaptive pocket finishing rings that end where they
- * start,
- * and tracer batch 3's bounded chord flattening with canonical shared seams
- * and width-bearing Line + fill output (2026-09-27).
+ * start, and ADR-432's native laser G2/G3 arcs with represented-arc validation and G17,
+ * tracer batch 3's bounded chord flattening with canonical shared seams and
+ * width-bearing Line + fill output, and preserved colour detail/alpha and
+ * local mixed-width classification (2026-09-27).
  */
-export const EMITTER_REVISION = 'trace-hybrid-chords-laser-arcs-adaptive-rings-20260927-v1';
+export const EMITTER_REVISION = 'trace-colour-hybrid-arcs-relief-20260927-v2';
 
 // Machine-specific assumption lines (ADR-103 defect fix): router exports
 // previously carried the laser-worded `$32=1 (laser mode)` banner. The S

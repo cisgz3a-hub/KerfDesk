@@ -2,10 +2,17 @@ import { create } from 'zustand';
 import { solveTwoPointRegistration, type SimilarityTransform } from '../../core/registration';
 import type { PrintAndCutDesignTargets, Project, Vec2 } from '../../core/scene';
 
+/** Where a registration point came from: the head jogged onto the mark, or the camera (ADR-443). */
+export type CaptureSource = 'head' | 'camera';
+/** Physical bed scene coordinates, or the legacy unverified controller-relative frame. */
+export type CaptureCoordinateBasis = 'bed' | 'controller-relative';
+
 type CapturedPoint = {
   readonly point: Vec2;
   readonly epoch: number;
   readonly coordinateFrameKey?: string;
+  readonly source?: CaptureSource;
+  readonly coordinateBasis?: CaptureCoordinateBasis;
 };
 
 type PrintCutSessionState = {
@@ -16,6 +23,8 @@ type PrintCutSessionState = {
     point: Vec2,
     epoch: number,
     coordinateFrameKey?: string,
+    source?: CaptureSource,
+    coordinateBasis?: CaptureCoordinateBasis,
   ) => void;
   readonly clear: () => void;
 };
@@ -23,12 +32,14 @@ type PrintCutSessionState = {
 export const usePrintCutSessionStore = create<PrintCutSessionState>((set) => ({
   first: null,
   second: null,
-  capture: (which, point, epoch, coordinateFrameKey) =>
+  capture: (which, point, epoch, coordinateFrameKey, source, coordinateBasis) =>
     set({
       [which]: {
         point,
         epoch,
         ...(coordinateFrameKey === undefined ? {} : { coordinateFrameKey }),
+        ...(source === undefined ? {} : { source }),
+        ...(coordinateBasis === undefined ? {} : { coordinateBasis }),
       },
     }),
   clear: () => set({ first: null, second: null }),
@@ -38,6 +49,19 @@ export type PrintCutRegistrationState =
   | { readonly kind: 'inactive' }
   | { readonly kind: 'invalid'; readonly reason: string }
   | { readonly kind: 'valid'; readonly transform: SimilarityTransform };
+
+/** A shared profile key does not prove camera and unverified head points share a basis. */
+export function capturedBasisError(
+  first: CapturedPoint | null,
+  second: CapturedPoint | null,
+): string | null {
+  if (first === null || second === null) return null;
+  const basis = (capture: CapturedPoint): CaptureCoordinateBasis =>
+    capture.coordinateBasis ?? (capture.source === 'camera' ? 'bed' : 'controller-relative');
+  return basis(first) === basis(second)
+    ? null
+    : 'The camera and head captures use different coordinate bases. Capture both points with the same source, or establish the controller-to-bed mapping before mixing sources.';
+}
 
 export function resolvePrintCutRegistration(
   project: Project,
@@ -67,7 +91,10 @@ export function resolvePrintCutRegistration(
       reason: 'The registration coordinate frame changed. Capture both points again.',
     };
   }
-  return solveRegistration(targets, session.first.point, session.second.point);
+  const basisError = capturedBasisError(session.first, session.second);
+  return basisError === null
+    ? solveRegistration(targets, session.first.point, session.second.point)
+    : { kind: 'invalid', reason: basisError };
 }
 
 function solveRegistration(

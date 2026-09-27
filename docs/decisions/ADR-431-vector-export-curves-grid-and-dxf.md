@@ -142,7 +142,7 @@ export commands (they use the 0.001 mm default).
 The canonical-curve batch writer introduced here retained Centerline's line role but omitted
 Edge Detection. This regressed ADR-407's paint contract: a closed Edge result previewed and
 committed as a line, but exported as a fill. The omission also reached the drawing-writer
-handoff added by ADR-444 and the fitted-page stroke allowance added by ADR-451.
+handoff added by ADR-468 and the fitted-page stroke allowance added by ADR-451.
 
 `core/trace/trace-paint.ts` now owns the preview/export paint decision. Centerline and Edge
 stroke every contour. Hybrid keeps its per-path stroke/fill roles; other modes fill closed

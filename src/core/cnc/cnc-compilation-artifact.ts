@@ -4,9 +4,11 @@ import {
   DEFAULT_CNC_LAYER_SETTINGS,
   layerCncTool,
   type CncMachineConfig,
+  type Polyline,
   type Scene,
 } from '../scene';
 import { collectLayerContours, layerPolylinesFromContours } from './collect-cnc-contours';
+import type { CollectedCncContour } from './cnc-manual-tab-mapping';
 import type { VCarveLadder } from './vcarve-ladder';
 import { vcarveMedialOptionsForLayer } from './vcarve-medial-options';
 import {
@@ -90,8 +92,15 @@ export type ResolvedCncCompilation =
       readonly scene: Scene;
       readonly device: DeviceProfile;
       readonly config: CncMachineConfig;
+      readonly sourceGeometry: ReadonlyMap<number, CncOperationSourceGeometry>;
       readonly evidence: CncCompilationEvidence;
     };
+
+/** Geometry owned by this immutable compilation, never a cross-project cache. */
+export type CncOperationSourceGeometry = {
+  readonly contours: ReadonlyArray<CollectedCncContour>;
+  readonly polylines: ReadonlyArray<Polyline>;
+};
 
 type LayerWork = {
   readonly operationIndex: number;
@@ -106,6 +115,7 @@ type ArtifactState = {
   readonly device: DeviceProfile;
   readonly config: CncMachineConfig;
   readonly layerWork: ReadonlyArray<LayerWork>;
+  readonly sourceGeometry: ReadonlyMap<number, CncOperationSourceGeometry>;
   readonly expectedByTaskId: ReadonlyMap<string, CncCompilationTask>;
 };
 
@@ -116,7 +126,7 @@ export function prepareCncCompilationArtifact(
   config: CncMachineConfig,
 ): PreparedCncCompilationArtifact {
   const snapshot = { scene, device, config };
-  const { layerWork, tasks } = prepareLayerWork(scene, device, config);
+  const { layerWork, tasks, sourceGeometry } = prepareLayerWork(scene, device, config);
   const frozenTasks = Object.freeze(
     tasks.map((task) =>
       Object.freeze({
@@ -131,6 +141,7 @@ export function prepareCncCompilationArtifact(
   const state: ArtifactState = {
     ...snapshot,
     layerWork,
+    sourceGeometry,
     expectedByTaskId: new Map(frozenTasks.map((task) => [task.taskId, task])),
   };
   return Object.freeze({
@@ -171,6 +182,7 @@ export function resolveCncCompilationArtifact(
     scene: state.scene,
     device: state.device,
     config: state.config,
+    sourceGeometry: state.sourceGeometry,
     evidence: { identity: artifact.identity, vcarveLayers },
   };
 }
@@ -182,9 +194,11 @@ function prepareLayerWork(
 ): {
   readonly layerWork: ReadonlyArray<LayerWork>;
   readonly tasks: ReadonlyArray<CncCompilationTask>;
+  readonly sourceGeometry: ReadonlyMap<number, CncOperationSourceGeometry>;
 } {
   const layerWork: LayerWork[] = [];
   const tasks: CncCompilationTask[] = [];
+  const sourceGeometry = new Map<number, CncOperationSourceGeometry>();
   for (const [operationIndex, { layer, priorityObjectId }] of artworkOperationRuns(
     scene,
   ).entries()) {
@@ -192,6 +206,7 @@ function prepareLayerWork(
     if (settings.cutType !== 'v-carve') continue;
     const contours = collectLayerContours(scene.objects, layer, device);
     const polylines = layerPolylinesFromContours(layer, contours);
+    sourceGeometry.set(operationIndex, { contours, polylines });
     const work = prepareVCarveMedialWork(
       polylines,
       vcarveMedialOptionsForLayer(settings, layerCncTool(config, settings)),
@@ -214,7 +229,7 @@ function prepareLayerWork(
       }),
     );
   }
-  return { layerWork, tasks };
+  return { layerWork, tasks, sourceGeometry };
 }
 
 function validateResults(

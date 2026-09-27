@@ -223,7 +223,7 @@ export const TRACE_PRESETS: Readonly<Record<string, TraceOptions>> = {
     // are intentional pixel geometry here, not a small-scale tracing artefact.
   },
   'Colour layers': {
-    // One filled layer per flat colour (ADR-430): OKLab quantisation to an
+    // One filled layer per flat colour (ADR-461): OKLab quantisation to an
     // automatic palette (or the dialog's 2-8 colours), paper colour excluded,
     // neighbouring colours sharing one boundary. The imagetracerjs fields
     // below are inert on this backend; despeckleMinPixels is the area below
