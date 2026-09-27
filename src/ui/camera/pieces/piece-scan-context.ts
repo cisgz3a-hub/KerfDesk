@@ -1,5 +1,6 @@
 import { useStore } from '../../state/store';
 import { useCameraStore } from '../../state/camera-store';
+import { activeCameraModel } from '../active-camera-model';
 
 /** A scan's coordinates belong to the document and camera geometry that measured them. */
 export function pieceScanContext(): () => boolean {
@@ -8,13 +9,14 @@ export function pieceScanContext(): () => boolean {
     project: { device },
   } = useStore.getState();
   const { sourceEpoch, sourceState, surfaceHeightMm, heightAreas } = useCameraStore.getState();
+  const model = activeCameraModel(device, sourceState);
   return () => {
     const app = useStore.getState();
     const camera = useCameraStore.getState();
     return (
       app.projectDocumentEpoch === projectDocumentEpoch &&
       app.project.device.profileId === device.profileId &&
-      app.project.device.cameraModel === device.cameraModel &&
+      activeCameraModel(app.project.device, camera.sourceState) === model &&
       app.project.device.bedWidth === device.bedWidth &&
       app.project.device.bedHeight === device.bedHeight &&
       camera.sourceEpoch === sourceEpoch &&
