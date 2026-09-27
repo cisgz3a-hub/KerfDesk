@@ -1,6 +1,15 @@
 import type { Vec3 } from '../geometry/vec3';
 import type { CncContourPass, CncPass, CncPath3dPass, Job } from '../job';
 import type { Vec2 } from '../scene';
+import {
+  along,
+  descentBudget,
+  descentSteps,
+  emittedDescentSteps,
+  shortestFittingLength,
+  type DescentBudget,
+  type StepCapacity,
+} from './ramp-descent-budget';
 
 // Floating-point slack when counting how many laps or legs a ramp needs, so
 // a ramp exactly one lap long is not rounded up to two.
@@ -23,6 +32,11 @@ const MAX_ARRAY_LENGTH = 0xffff_ffff;
  *   covers the whole path, so going round it again would only be a slower
  *   plunge. It stays a contour pass marked `entryPlunge`, which the G-code
  *   header and Job Review disclose.
+ *
+ * The descent is planned in whole 0.001 mm steps, so no emitted move is
+ * steeper than the angle, and fed so its Z rate stays within the plunge rate
+ * (ADR-472). A path of moves too short for whole steps keeps the angle as
+ * planned before rounding and is marked `entryAngleApproximate`.
  */
 export function rampContourPass(
   pass: CncContourPass,
@@ -40,14 +54,19 @@ export function rampContourPass(
   if (!(lengthMm > 0) || (goesOverAgain && lengthMm < minPathMm)) {
     return { ...pass, entryPlunge: true };
   }
-  const retraces = Math.ceil(rampMm / lengthMm - COUNT_EPSILON) + 1;
-  if (retraces * path.length > MAX_ARRAY_LENGTH) {
-    throw new RangeError('Contour ramp point count exceeds the ECMAScript Array length limit.');
-  }
+  // The level above is written at this depth: there is nothing to descend.
+  if (emittedDescentSteps(fromZ, pass.zMm) < 1) return pass;
+  const budget = descentBudget(stepCapacity(path, tangent), fromZ, pass.zMm, tangent);
   const points = pass.closed
-    ? loopRampPoints(path, fromZ, pass.zMm, rampMm)
-    : zigZagRampPoints(path, fromZ, pass.zMm, rampMm, lengthMm);
-  const ramped: CncPath3dPass = { kind: 'path3d', points, closed: false };
+    ? loopRampPoints(path, fromZ, pass.zMm, budget)
+    : zigZagRampPoints(path, fromZ, pass.zMm, budget, rampMm, lengthMm);
+  const ramped: CncPath3dPass = {
+    kind: 'path3d',
+    points,
+    closed: false,
+    lateralFeed: 'z-rate-capped',
+    ...(budget.stepped ? {} : { entryAngleApproximate: true as const }),
+  };
   return ramped;
 }
 
@@ -57,54 +76,76 @@ function loopRampPoints(
   ring: ReadonlyArray<Vec2>,
   fromZ: number,
   zMm: number,
-  rampMm: number,
+  budget: DescentBudget,
 ): Vec3[] {
   const last = ring.length - 1; // ring[last] repeats ring[0]
+  const laps = Math.ceil(budget.total / walkCapacity(ring, budget) - COUNT_EPSILON) + 1;
+  if (laps * ring.length > MAX_ARRAY_LENGTH) {
+    throw new RangeError('Contour ramp point count exceeds the ECMAScript Array length limit.');
+  }
   const start = ring[0] as Vec2;
-  const points: Vec3[] = [{ x: start.x, y: start.y, z: fromZ }];
-  let travelled = 0;
+  const points: Vec3[] = [at(start, fromZ)];
+  let descended = 0;
   for (let index = 1; ; index = index === last ? 1 : index + 1) {
     const a = ring[index - 1] as Vec2;
     const b = ring[index] as Vec2;
-    const segment = Math.hypot(b.x - a.x, b.y - a.y);
-    if (segment === 0) continue;
-    const remaining = rampMm - travelled;
-    if (segment >= remaining) {
-      const end = along(a, b, remaining / segment);
-      points.push({ x: end.x, y: end.y, z: zMm });
+    if (a.x === b.x && a.y === b.y) continue;
+    const carried = budget.carries(a, b);
+    if (descended + carried >= budget.total) {
+      const end = budget.endFor(a, b, budget.total - descended);
+      points.push(at(end, zMm));
       for (let k = index; k <= last; k += 1) points.push(at(ring[k] as Vec2, zMm));
       for (let k = 1; k < index; k += 1) points.push(at(ring[k] as Vec2, zMm));
-      points.push({ x: end.x, y: end.y, z: zMm });
+      points.push(at(end, zMm));
       return points;
     }
-    travelled += segment;
-    points.push(at(b, fromZ - (travelled / rampMm) * (fromZ - zMm)));
+    descended += carried;
+    points.push(at(b, budget.zAfter(descended)));
   }
 }
 
 // Zig-zag along the path's first span, forward and back an even number of
 // times so the descent lands on the start at depth, then the whole path. The
-// legs share the ramp's length equally, so each descends at the full angle.
+// span is the shortest whose legs can carry the descent, and each move takes
+// its share of it, so each leg descends at the angle.
 function zigZagRampPoints(
   path: ReadonlyArray<Vec2>,
   fromZ: number,
   zMm: number,
+  budget: DescentBudget,
   rampMm: number,
   lengthMm: number,
 ): Vec3[] {
-  const legs = 2 * Math.max(1, Math.ceil(rampMm / (2 * lengthMm) - COUNT_EPSILON));
-  const forward = leadingSpan(path, rampMm / legs);
+  const legs =
+    2 *
+    Math.max(
+      1,
+      Math.ceil(rampMm / (2 * lengthMm) - COUNT_EPSILON),
+      Math.ceil(budget.total / (2 * walkCapacity(path, budget)) - COUNT_EPSILON),
+    );
+  if ((legs + 1) * path.length > MAX_ARRAY_LENGTH) {
+    throw new RangeError('Contour ramp point count exceeds the ECMAScript Array length limit.');
+  }
+  const carriesDescent = (walk: ReadonlyArray<Vec2>): boolean =>
+    legs * walkCapacity(walk, budget) >= budget.total;
+  const span = leadingSpan(
+    path,
+    shortestFittingLength(lengthMm, (spanMm) => carriesDescent(leadingSpan(path, spanMm))),
+  );
+  // The whole path always carries the descent; a span cut a hair short of it
+  // by floating point might not.
+  const forward = carriesDescent(span) ? span : path;
   const back = [...forward].reverse();
+  const capacity = legs * walkCapacity(forward, budget);
   const start = path[0] as Vec2;
   const points: Vec3[] = [at(start, fromZ)];
-  let travelled = 0;
+  let carried = 0;
   for (let leg = 0; leg < legs; leg += 1) {
     const walk = leg % 2 === 0 ? forward : back;
     for (let k = 1; k < walk.length; k += 1) {
-      const a = walk[k - 1] as Vec2;
       const b = walk[k] as Vec2;
-      travelled += Math.hypot(b.x - a.x, b.y - a.y);
-      points.push(at(b, fromZ - Math.min(1, travelled / rampMm) * (fromZ - zMm)));
+      carried += budget.carries(walk[k - 1] as Vec2, b);
+      points.push(at(b, budget.zAfter(budget.shareAfter(carried, capacity))));
     }
   }
   points[points.length - 1] = at(start, zMm);
@@ -129,6 +170,23 @@ function leadingSpan(path: ReadonlyArray<Vec2>, spanMm: number): ReadonlyArray<V
     span.push(b);
   }
   return span;
+}
+
+// The descent a walk's moves can carry under the budget.
+function walkCapacity(walk: ReadonlyArray<Vec2>, budget: DescentBudget): number {
+  let capacity = 0;
+  for (let k = 1; k < walk.length; k += 1) {
+    capacity += budget.carries(walk[k - 1] as Vec2, walk[k] as Vec2);
+  }
+  return capacity;
+}
+
+function stepCapacity(path: ReadonlyArray<Vec2>, tangent: number): StepCapacity {
+  let steps = 0;
+  for (let k = 1; k < path.length; k += 1) {
+    steps += descentSteps(path[k - 1] as Vec2, path[k] as Vec2, tangent);
+  }
+  return { steps, lengthMm: pathLengthMm(path) };
 }
 
 export type RampEntryPlunges = {
@@ -185,10 +243,6 @@ function pathLengthMm(path: ReadonlyArray<Vec2>): number {
     total += Math.hypot(b.x - a.x, b.y - a.y);
   }
   return total;
-}
-
-function along(a: Vec2, b: Vec2, t: number): Vec2 {
-  return { x: a.x + (b.x - a.x) * t, y: a.y + (b.y - a.y) * t };
 }
 
 function at(point: Vec2, z: number): Vec3 {

@@ -28,7 +28,8 @@
 //   is descended round, lapping when it is shorter than its ramp, then cut
 //   one whole lap at depth; an open path zig-zags along its start and is then
 //   cut end to end at depth. A path too short to ramp along keeps its plunge
-//   and says so (ADR-471).
+//   and says so (ADR-471). Ramps descend in whole 0.001 mm steps, so the
+//   angle holds once emitted, and at a Z rate within the plunge feed (ADR-472).
 
 import type { CncContourPass, CncGroup, CncPass } from '../job';
 import {

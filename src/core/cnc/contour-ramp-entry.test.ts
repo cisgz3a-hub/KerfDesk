@@ -70,6 +70,40 @@ function lengthAt(points: ReadonlyArray<Vec3>, zMm: number): number {
   return total;
 }
 
+type Descent = { readonly line: string; readonly previous: string; readonly sameXy: boolean };
+type At = { readonly x: string; readonly y: string; readonly z: number };
+
+// Feed moves that descend below the stock top, each with the line before it.
+// Ramps are compact modal lines (`G1X..Y..Z..`, then `X..Y..Z..`, ADR-472).
+function descentsBelowStockTop(gcode: string): Descent[] {
+  const descents: Descent[] = [];
+  let at: At = { x: '', y: '', z: 0 };
+  let previous = '';
+  let mode = '';
+  for (const line of gcode.split('\n')) {
+    const motion = /^G([01])(?![0-9])/.exec(line);
+    if (motion !== null) mode = `G${motion[1]}`;
+    if (line.startsWith(';') || !/[XYZ]/.test(line) || mode === '') continue;
+    const next = movedTo(line, at);
+    if (mode === 'G1' && next.z < Math.min(at.z, 0)) {
+      descents.push({ line, previous, sameXy: next.x === at.x && next.y === at.y });
+    }
+    previous = line;
+    at = next;
+  }
+  return descents;
+}
+
+function movedTo(line: string, at: At): At {
+  const word = (letter: string): string | undefined =>
+    new RegExp(`${letter}(-?\\d+\\.\\d+)`).exec(line)?.[1];
+  return {
+    x: word('X') ?? at.x,
+    y: word('Y') ?? at.y,
+    z: Number(word('Z') ?? at.z),
+  };
+}
+
 describe('applyRampEntry on paths shorter than their ramp (ADR-471)', () => {
   it('laps a closed loop at the angle, then cuts one whole lap at depth', () => {
     // An 8 mm loop and a 1.5 mm drop at 5°: a 17.1 mm ramp, just over two laps.
@@ -84,7 +118,10 @@ describe('applyRampEntry on paths shorter than their ramp (ADR-471)', () => {
       const b = points[index]!;
       ramp += Math.hypot(b.x - a.x, b.y - a.y);
     }
-    expect(ramp).toBeCloseTo(1.5 / TAN_5, 9);
+    // Whole 0.001 mm steps make it a little longer than the angle's 17.1 mm
+    // (ADR-472), never shorter.
+    expect(ramp).toBeGreaterThanOrEqual(1.5 / TAN_5);
+    expect(ramp).toBeLessThan((1.5 / TAN_5) * 1.01);
     expect(lengthAt(points, -1.5)).toBeCloseTo(8, 9);
     expect(points.at(-1)).toEqual(points[reached]);
   });
@@ -170,28 +207,11 @@ describe('the reported 6 mm pocket (ADR-471)', () => {
 
   it('never finishes a ramp straight down, and says which passes plunge', () => {
     // Every straight descent below the stock top starts a pass after a rapid.
-    const word = (line: string, letter: string): string | undefined =>
-      new RegExp(`${letter}(-?\\d+\\.\\d+)`).exec(line)?.[1];
-    let at = { x: '', y: '', z: 0 };
-    let previous = '';
-    for (const line of gcode.split('\n')) {
-      if (!/^G[01]\b/.test(line)) continue;
-      const next = {
-        x: word(line, 'X') ?? at.x,
-        y: word(line, 'Y') ?? at.y,
-        z: Number(word(line, 'Z') ?? at.z),
-      };
-      if (
-        line.startsWith('G1') &&
-        next.x === at.x &&
-        next.y === at.y &&
-        next.z < Math.min(at.z, 0)
-      ) {
-        expect(previous).toMatch(/^G0 X/);
-      }
-      previous = line;
-      at = next;
+    const descents = descentsBelowStockTop(gcode);
+    for (const descent of descents.filter((candidate) => candidate.sameXy)) {
+      expect(descent.previous, descent.line).toMatch(/^G0 X/);
     }
+    expect(descents.some((descent) => !descent.sameXy)).toBe(true);
     expect(gcode).toContain('; cnc entry: contour-ramp; max-angle-deg: 5.000');
     expect(gcode).toContain(
       '; cnc entry-advisory: 2 passes plunge: path shorter than one cut width',

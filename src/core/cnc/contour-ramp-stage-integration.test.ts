@@ -124,7 +124,11 @@ function expectFullRampLap(pass: CncPass, fromZ: number, zMm: number, perimeterM
   // The independent fixture is a 1-degree descent, longer than either square.
   const expectedRampMm = (fromZ - zMm) / Math.tan(Math.PI / 180);
   expect(expectedRampMm).toBeGreaterThan(perimeterMm);
-  expect(xyLength(points.slice(0, atDepth + 1))).toBeCloseTo(expectedRampMm, 7);
+  // Whole 0.001 mm steps (ADR-472) make the ramp a little longer than the
+  // angle's own length, never shorter.
+  const rampMm = xyLength(points.slice(0, atDepth + 1));
+  expect(rampMm).toBeGreaterThanOrEqual(expectedRampMm - 1e-9);
+  expect(rampMm).toBeLessThan(expectedRampMm * 1.05);
   expect(xyLength(points.slice(atDepth))).toBeCloseTo(perimeterMm, 7);
   expect(points.slice(atDepth).every((point) => point.z === zMm)).toBe(true);
   expect(points.at(-1)).toEqual(points[atDepth]);

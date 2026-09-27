@@ -212,12 +212,15 @@ describe('applyRampEntry', () => {
       previous = Math.min(previous, point.z);
     }
     expect(ramped.points.at(-1)?.z).toBe(-2);
-    // The descent rate along the path matches tan(10°) within one segment.
+    // The descent rate along the path is tan(10°) in whole 0.001 mm steps,
+    // never above it and short of it by under two steps (ADR-472).
     const second = ramped.points[1];
     if (second === undefined) throw new Error('ramp vertex missing');
     const run = Math.hypot(second.x - 0, second.y - 0);
     const drop = 0 - second.z;
-    expect(drop / run).toBeCloseTo(Math.tan((10 * Math.PI) / 180), 6);
+    const tangent = Math.tan((10 * Math.PI) / 180);
+    expect(drop / run).toBeLessThanOrEqual(tangent);
+    expect(drop).toBeGreaterThan(run * tangent - 0.002);
   });
 
   it('ramps each depth step from the previous level in a contour ladder', () => {

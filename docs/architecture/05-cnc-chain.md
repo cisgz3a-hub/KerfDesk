@@ -132,7 +132,13 @@ round, **lapping when it is shorter than its ramp**, then cut one whole lap at d
 descent ended; an open path **zig-zags** along its start back to the start at depth, then is cut end to
 end at depth, so no slope is left. A path shorter than one cut width that the ramp would have to go
 over again keeps its plunge as a contour pass marked `entryPlunge`, which the G-code header and a Job
-Review advisory disclose.
+Review advisory disclose. **ADR-472** plans the descent in whole 0.001 mm steps against the shortest
+each move can be once emitted (`ramp-descent-budget.ts`, ADR-278's budget), so no emitted move is
+steeper than the angle wherever job-origin placement moves the job, and gives the ramp
+`lateralFeed: 'z-rate-capped'` so its Z rate stays within the plunge feed. A path whose moves are too
+short for whole steps (they would more than double the ramp) keeps the angle as planned before
+rounding, marked `entryAngleApproximate` and disclosed in the header. The tabbed ramp
+(`tabbed-ramp-entry.ts`) follows the same rules.
 
 **Lead-in/out** — **ADR-250** (`DECISIONS.md:12313`) adds arc/line leads to closed profile cuts,
 default-on for profile-outside/inside, no-op elsewhere. Applied at `compile-cnc-job.ts:119-124` via

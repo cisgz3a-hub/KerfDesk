@@ -4882,10 +4882,13 @@ and lifts the command's CNC-only gate.)*
    last cut to (the stock top the first time). A closed loop is then cut one
    whole lap at depth from where its descent ended; an open path zig-zags
    along its start back to the start at depth, then is cut end to end at
-   depth (ADR-471). V-carve is different: its changing Z is the cutting
-   profile itself, so the certified medial path governs and any stored V-carve
-   ramp request is reported as advisory provenance rather than being layered
-   onto that profile.
+   depth (ADR-471). The descent rides the cutting feed, slowed on any move
+   steep enough that its Z rate would pass the plunge feed, and is planned in
+   whole 0.001 mm steps, so no emitted move is steeper than the angle wherever
+   the job is placed; tabbed profile ramps do the same (ADR-472). V-carve is
+   different: its changing Z is the cutting profile itself, so the certified
+   medial path governs and any stored V-carve ramp request is reported as
+   advisory provenance rather than being layered onto that profile.
 4. Offset pockets can instead enable **Helical entry**. Each ring retracts,
    relocates, and descends through a native tangent helix that ends at the
    contour start. Raster pockets, islands, disconnected pockets, and a minimum
@@ -4924,6 +4927,15 @@ and lifts the command's CNC-only gate.)*
    header says `; cnc entry-advisory: N passes plunge: path shorter than one
    cut width`, and Job Review lists it as an advisory, naming Helical entry
    for a pocket (ADR-471).
+
+#### Edge — ramp moves too short for whole 0.001 mm steps
+1. On a path made of very short moves, such as a densely sampled import,
+   whole 0.001 mm steps would more than double the ramp or stop it
+   descending at all. That ramp keeps the angle as planned before rounding,
+   so an emitted move can be one 0.001 mm step steeper than the header's
+   angle; it still ramps, never plunges, and keeps within the plunge feed.
+   The G-code header says `; cnc entry-advisory: N ramps keep max-angle-deg
+   before rounding: moves too short` (ADR-472).
 
 #### Edge — reliefs on a layer with a ramp angle
 1. Relief roughing ramps with the layer's angle (F-CNC17, ADR-424) and its

@@ -86,6 +86,7 @@ function appendEntryComments(lines: string[], group: CncGroup): void {
     lines.push('; cnc entry-advisory: thin-detail passes use stepped entry');
   }
   appendPlungeAdvisory(lines, group);
+  appendApproximateAngleAdvisory(lines, group);
 }
 
 function hasSteppedDetail(group: CncGroup): boolean {
@@ -99,6 +100,18 @@ function appendPlungeAdvisory(lines: string[], group: CncGroup): void {
   if (plunges === 0) return;
   const passes = plunges === 1 ? '1 pass plunges' : `${plunges} passes plunge`;
   lines.push(`; cnc entry-advisory: ${passes}: path shorter than one cut width`);
+}
+
+// A ramp whose moves are too short to descend in whole 0.001 mm steps keeps
+// its angle as planned before rounding (ADR-472), so once emitted a move can
+// be one step steeper than the max-angle line above says.
+function appendApproximateAngleAdvisory(lines: string[], group: CncGroup): void {
+  const ramps = group.passes.filter(
+    (pass) => pass.kind === 'path3d' && pass.entryAngleApproximate === true,
+  ).length;
+  if (ramps === 0) return;
+  const subject = ramps === 1 ? '1 ramp keeps' : `${ramps} ramps keep`;
+  lines.push(`; cnc entry-advisory: ${subject} max-angle-deg before rounding: moves too short`);
 }
 
 function toolGeometryComment(group: CncGroup): string {

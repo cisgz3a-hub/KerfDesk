@@ -227,6 +227,9 @@ function clippedPath3dPass(
       : points,
     ...(pass.lateralFeed === undefined ? {} : { lateralFeed: pass.lateralFeed }),
     ...(pass.entryRamp === undefined ? {} : { entryRamp: pass.entryRamp }),
+    ...(pass.entryAngleApproximate === undefined
+      ? {}
+      : { entryAngleApproximate: pass.entryAngleApproximate }),
   };
 }
 

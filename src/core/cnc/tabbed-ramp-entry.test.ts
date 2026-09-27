@@ -28,8 +28,11 @@ describe('ramp composition with rectangular tabs', () => {
     const a = output.points[index - 1]!;
     const b = output.points[index]!;
     expect(a).toEqual({ x: 5, y: 0, z: -2 });
-    expect(Math.hypot(b.x - a.x, b.y - a.y)).toBeGreaterThan(0);
-    expect((a.z - b.z) / Math.hypot(b.x - a.x, b.y - a.y)).toBeCloseTo(tangent, 9);
+    const run = Math.hypot(b.x - a.x, b.y - a.y);
+    expect(run).toBeGreaterThan(0);
+    // At the angle in whole 0.001 mm steps: never steeper, under two steps short.
+    expect((a.z - b.z) / run).toBeLessThanOrEqual(tangent);
+    expect(a.z - b.z).toBeGreaterThan(run * tangent - 0.002);
     expect(output.points.at(-1)?.z).toBe(-4);
   });
 

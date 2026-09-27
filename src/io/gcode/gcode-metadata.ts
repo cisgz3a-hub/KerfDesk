@@ -89,7 +89,9 @@ export type GcodeMetadata = {
  * air repeats at eligible boundaries, with full-circle/large-arc timing
  * and unchanged M3 dark-transition ordering, and ADR-424 amendment 1's relief
  * roughing headers that count the passes plunged into a first loop shorter
- * than one cut width.
+ * than one cut width, and ADR-472's contour and tabbed ramps that descend
+ * within the plunge rate, in compact G1 lines, and in whole 0.001 mm steps so
+ * no emitted move is steeper than the requested angle.
  */
 // ADR-427 keeps deepest cleanup before linked relief rings and flat depth slices.
 // ADR-368 sizes nonflat pocket/profile offsets, tabs and stepover by cut width.
@@ -97,7 +99,8 @@ export type GcodeMetadata = {
 // Native arcs and compact Fill retain scan v2's shared/empty/coincident M3 handoffs.
 // ADR-471 discloses sub-width plunges; ADR-457 finishing recipes survive ramping.
 // ADR-424 Amd 1 discloses relief roughing's sub-width plunges the same way.
-export const EMITTER_REVISION = 'relief-ramp-plunges-disclosed-20260927-v1';
+// ADR-472 caps contour/tabbed ramp Z at the plunge rate, in whole 0.001 mm steps.
+export const EMITTER_REVISION = 'ramp-entry-z-rate-whole-steps-20260928-v1';
 
 // Machine-specific assumption lines (ADR-103 defect fix): router exports
 // previously carried the laser-worded `$32=1 (laser mode)` banner. The S

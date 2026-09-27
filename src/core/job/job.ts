@@ -187,19 +187,25 @@ export type CncPath3dPass = {
   readonly points: ReadonlyArray<Vec3>;
   readonly closed: boolean;
   // Most in-cut XYZ moves use the group's cutting feed. Opt-in alternatives,
-  // so relief, tabs, imported paths, and existing ramps keep their established
-  // feed semantics:
-  //   - 'plunge':        every lateral move rides the plunge feed (entry ramps).
+  // so tab rises and imported paths keep it:
+  //   - 'plunge':        every lateral move rides the plunge feed (ADR-278's
+  //     V-carve entry ramps).
   //   - 'z-rate-capped': the cutting feed, reduced per segment only as much as
   //     the descent needs so its Z component stays within the plunge rate. A
   //     variable-depth cutting profile is mostly flat, and riding the plunge
   //     feed across that flat majority costs time for no motion-safety gain.
+  //     Relief passes and contour and tabbed entry ramps use it (ADR-472).
   readonly lateralFeed?: 'plunge' | 'z-rate-capped';
   // Provenance marker for an actual along-contour entry ramp. Feed selection
   // alone cannot identify one: variable-depth V-carve detail also constrains
   // its descents against the configured plunge rate.
   // Tiling and G-code comments preserve this marker without changing motion.
   readonly entryRamp?: true;
+  // Provenance marker: this contour or tabbed ramp's moves are too short to
+  // descend in whole 0.001 mm steps, so it keeps its angle as planned before
+  // rounding and an emitted move can be one step steeper (ADR-472). Tiling and
+  // G-code comments preserve it; motion is unchanged.
+  readonly entryAngleApproximate?: true;
 };
 
 export type CncArcPass = {
