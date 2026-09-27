@@ -57,17 +57,18 @@ describe('buildMachineSetupScanFacts', () => {
   });
 
   it('compares runway with the emitted-speed 5 percent calibration reference', () => {
-    const justBelow = fillProject(DEFAULT_DEVICE_PROFILE, {
+    const device = { ...DEFAULT_DEVICE_PROFILE, accelMmPerSec2: 1000 };
+    const justBelow = fillProject(device, {
       speed: 6000,
       fillBidirectional: true,
       fillOverscanMm: 4.9,
     });
-    const atReference = fillProject(DEFAULT_DEVICE_PROFILE, {
+    const atReference = fillProject(device, {
       speed: 6000,
       fillBidirectional: true,
       fillOverscanMm: 5,
     });
-    const slower = fillProject(DEFAULT_DEVICE_PROFILE, {
+    const slower = fillProject(device, {
       speed: 1200,
       fillBidirectional: true,
       fillOverscanMm: 1,
@@ -78,7 +79,26 @@ describe('buildMachineSetupScanFacts', () => {
     expect(buildMachineSetupScanFacts(slower).lowOverscanGroups).toBe(0);
   });
 
-  it('flags split fill sweeps whose actual internal runways fall below the reference', () => {
+  it('detects low-acceleration profiles that need more runway than the speed-percent heuristic', () => {
+    const settings = { speed: 3000, fillBidirectional: true, fillOverscanMm: 5 };
+    const slow = fillProject({ ...DEFAULT_DEVICE_PROFILE, accelMmPerSec2: 100 }, settings);
+    const fast = fillProject({ ...DEFAULT_DEVICE_PROFILE, accelMmPerSec2: 1000 }, settings);
+
+    // At 50 mm/s, v²/(2a) needs 12.5 mm with a=100, but only 1.25 mm with a=1000.
+    // Both pass the old 2.5 mm speed-percent reference.
+    expect(buildMachineSetupScanFacts(slow).lowOverscanGroups).toBe(1);
+    expect(buildMachineSetupScanFacts(fast).lowOverscanGroups).toBe(0);
+  });
+
+  it('does not call unknown acceleration a passing runway check', () => {
+    const project = fillProject(
+      { ...DEFAULT_DEVICE_PROFILE, accelMmPerSec2: Number.NaN },
+      { speed: 1500, fillBidirectional: true, fillOverscanMm: 5 },
+    );
+    expect(buildMachineSetupScanFacts(project).lowOverscanGroups).toBeNull();
+  });
+
+  it('flags split fill sweeps whose actual runways fall below the reference', () => {
     const project = fillProject(DEFAULT_DEVICE_PROFILE, {
       speed: 6000,
       fillBidirectional: true,
@@ -108,7 +128,7 @@ describe('buildMachineSetupScanFacts', () => {
     expect(buildMachineSetupScanFacts(split).lowOverscanGroups).toBe(1);
   });
 
-  it('flags split raster sweeps whose emitted internal runway is shortened', () => {
+  it('flags split raster sweeps whose emitted runways fall below the reference', () => {
     const project = createProject(DEFAULT_DEVICE_PROFILE);
     const raster: RasterImage = {
       kind: 'raster-image',
@@ -136,6 +156,54 @@ describe('buildMachineSetupScanFacts', () => {
     };
 
     expect(buildMachineSetupScanFacts(withRaster).lowOverscanGroups).toBe(1);
+  });
+
+  it('does not ask for distance from rest where two split runways meet', () => {
+    // At 50 mm/s and 300 mm/s², a stop needs 4.17 mm: the 5 mm outer runways pass.
+    // A 6 mm gap gives each side 3 mm, but both runways run at scan feed and the
+    // head crosses the gap without slowing, so more Overscan would not help.
+    const device = { ...NEOTRONICS_4040_MAX_LT4LDS_V2_PROFILE, accelMmPerSec2: 300 };
+    const settings = {
+      speed: 3000,
+      fillBidirectional: true,
+      allowUncalibratedBidirectionalScan: true,
+      fillOverscanMm: 5,
+    };
+    const splitAt = (gapMm: number): Project => {
+      const project = fillProject(device, settings);
+      const object = project.scene.objects[0];
+      if (object?.kind !== 'imported-svg') throw new Error('fill fixture object missing');
+      return {
+        ...project,
+        scene: {
+          ...project.scene,
+          objects: [
+            {
+              ...object,
+              bounds: { minX: 20, minY: 20, maxX: 40 + gapMm, maxY: 40 },
+              paths: [
+                {
+                  color: '#ff0000',
+                  polylines: [rectangle(20, 30), rectangle(30 + gapMm, 40 + gapMm)],
+                },
+              ],
+            },
+          ],
+        },
+      };
+    };
+
+    expect(buildMachineSetupScanFacts(splitAt(6))).toMatchObject({
+      effectiveBidirectionalGroups: 1,
+      lowOverscanGroups: 0,
+    });
+    expect(buildMachineSetupScanFacts(splitAt(12)).lowOverscanGroups).toBe(0);
+    expect(
+      buildMachineSetupScanFacts({
+        ...splitAt(6),
+        device: { ...device, accelMmPerSec2: 200 },
+      }).lowOverscanGroups,
+    ).toBe(1);
   });
 });
 

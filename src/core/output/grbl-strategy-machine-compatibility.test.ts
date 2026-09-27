@@ -120,10 +120,10 @@ type MotionArtifact = {
 function parseMotionArtifact(gcode: string): ReadonlyArray<MotionArtifact> {
   return gcode
     .split('\n')
-    .filter((line) => /^G[01]\b/.test(line))
+    .filter((line) => /^(?:G[01](?:\s|X|Y)|[XY])/.test(line))
     .map((raw) => {
-      const f = raw.match(/\bF(\d+(?:\.\d+)?)/);
-      const s = raw.match(/\bS(\d+(?:\.\d+)?)/);
+      const f = raw.match(/F(\d+(?:\.\d+)?)/);
+      const s = raw.match(/S(\d+(?:\.\d+)?)/);
       return {
         raw,
         ...(f === null ? {} : { f: Number(f[1]) }),
@@ -221,7 +221,7 @@ describe('grblStrategy machine compatibility dialects', () => {
     const raster = grblStrategy.emit(singleRasterJob, device);
 
     expect(vector).toContain('G1 X10.000 Y20.000 F0.4 S0');
-    expect(raster).toContain('G1 X0.000 Y0.500 F0.4 S0');
+    expect(raster).toContain('G1X0Y0.5F0.4S0');
   });
 
   it('omits Neotronics vector cuts that collapse at controller precision', () => {
@@ -312,8 +312,8 @@ describe('grblStrategy machine compatibility dialects', () => {
   it('uses controlled laser-off travel and reasserts burn feed for Neotronics raster output', () => {
     const out = grblStrategy.emit(singleRasterJob, NEOTRONICS_4040_MAX_LT4LDS_V2_PROFILE);
 
-    expect(out).toContain('G1 X0.000 Y0.500 F800 S0 ; kerfdesk:laser-off-motion');
-    expect(out).toContain('G1 X1.000 F1000 S500\nG1 X1.000 F1000 S0');
+    expect(out).toContain('G1X0Y0.5F800S0 ; kerfdesk:laser-off-motion');
+    expect(out).toContain('X1F1000S500\nX1F1000S0');
   });
 
   it('omits a 1x1 Neotronics raster burn that collapses at controller precision', () => {
@@ -333,12 +333,12 @@ describe('grblStrategy machine compatibility dialects', () => {
       NEOTRONICS_4040_MAX_LT4LDS_V2_PROFILE,
     );
 
-    expect(out.split('\n').filter((line) => /^G[01]\b/.test(line))).toEqual([
-      'G1 X1.000 Y1.050 F800 S0 ; kerfdesk:laser-off-motion',
-      'G1 X1.021 F1000 S0',
-      'G1 X1.042 F1000 S0',
+    expect(parseMotionArtifact(out).map((motion) => motion.raw)).toEqual([
+      'G1X1Y1.05F800S0 ; kerfdesk:laser-off-motion',
+      'X1.021F1000S0',
+      'X1.042F1000S0',
     ]);
-    expect(out).not.toMatch(/^G1 X1\.021 F1000 S500$/m);
+    expect(parseMotionArtifact(out).every((motion) => motion.s === 0)).toBe(true);
   });
 
   it('uses controlled seeks and feed-matched full runway for Neotronics fill output', () => {
@@ -348,7 +348,7 @@ describe('grblStrategy machine compatibility dialects', () => {
     expect(out).toContain('G1 X10.000 Y5.000 F800 S0 ; kerfdesk:laser-off-motion');
     expect(out).toContain('G1 X37.000 Y5.000 F800 S0 ; kerfdesk:laser-off-motion');
     expect(out).toContain('G1 X53.000 Y5.000 F800 S0 ; kerfdesk:laser-off-motion');
-    expect(out).not.toContain('X23.000 Y5.000');
+    expect(out).toContain('G1 X23.000 Y5.000 F800 S0 ; kerfdesk:laser-off-motion');
     expect(out).not.toContain('G0 ');
   });
 
@@ -372,7 +372,7 @@ describe('grblStrategy machine compatibility dialects', () => {
     }).toEqual({
       seek: 'G1 X5.000 Y5.000 F800 S0 ; kerfdesk:laser-off-motion',
       leadIn: 'G1 X10.000 Y5.000 F1500 S0 ; kerfdesk:laser-off-motion',
-      burn: 'G1 X13.000 Y5.000 F1500 S900',
+      burn: 'G1X13Y5F1500S900',
       leadOut: 'G1 X18.000 Y5.000 F1500 S0 ; kerfdesk:laser-off-motion',
     });
   });

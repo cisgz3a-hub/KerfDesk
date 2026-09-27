@@ -2,7 +2,7 @@
 // become continuous G1 sweeps with S0 gaps (ADR-034); wide gaps split into
 // independently planned sweeps (ADR-035). Generic Scan Line gives every sweep
 // bounded feed-matched laser-off entry and exit motion. The 4040 plan retains
-// its qualified bounded-entry policy.
+// its 5 mm limit and shares split exits and entries by the same rule (ADR-445).
 
 import type { DeviceProfile, GrblGcodeDialect } from '../devices';
 import type { FillGroup } from '../job';
@@ -128,9 +128,10 @@ function sweepSpanLines(
   if (first === undefined) return [];
   const { s, feed, device, dialect, cursor } = context;
   const lines: string[] = [];
-  // Fine traced Fill can contain pixel-sized spans. Use the same lossless
-  // spelling as raster on qualified dialects (ADR-460). Reset per sweep: the
-  // preceding seek, runway, or held mode transition may have changed state.
+  // Narrow ink spans and holes can consume G-code just as quickly as raster
+  // pixels. Keep the same motion/feed/power while omitting redundant words in
+  // dialects that support compact output. A new writer per sweep makes its
+  // first burn self-contained after any seek, runway or held mode transition.
   const style = motionWordStyleFor(dialect.compactMotionWords);
   const writer = createModalMotionWriter(style);
   // Head starts where the planned runway move left it: the first span's start.
@@ -152,13 +153,7 @@ function sweepSpanLines(
     feedEmitted = true;
     lines.push(
       joinMotionWords(
-        [
-          writer.motion('G1'),
-          writer.axis('X', Number(target.x)),
-          writer.axis('Y', Number(target.y)),
-          feedWord,
-          `S${power}`,
-        ],
+        [writer.motion('G1'), writer.axis('X', x), writer.axis('Y', y), feedWord, `S${power}`],
         style,
       ),
     );

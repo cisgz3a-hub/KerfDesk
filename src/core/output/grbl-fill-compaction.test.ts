@@ -1,209 +1,267 @@
 import { describe, expect, it } from 'vitest';
-import { findM3LitPlannerDrains } from '../../__fixtures__/controllers/grbl-lit-drain-checker';
-import { burnGeometryKey, oracleBurns } from '../controllers/grbl/laser-burn-oracle.test-helper';
-import { buildResumeProgram } from '../controllers/grbl/resume-program';
-import { DEFAULT_DEVICE_PROFILE, type DeviceProfile } from '../devices';
-import { buildMotionManifest } from '../job/motion-manifest';
-import type { FillGroup, Job } from '../job';
+import { DEFAULT_DEVICE_PROFILE, NEOTRONICS_4040_MAX_LT4LDS_V2_PROFILE } from '../devices';
+import type { FillGroup, FillSegment, Job } from '../job';
 import { grblStrategy } from './grbl-strategy';
 
-function fill(rows = 3, spans = 12): FillGroup {
+const SERIAL_BYTES_PER_SECOND = 115_200 / 10;
+
+function fillGroup(
+  segments: ReadonlyArray<FillSegment>,
+  patch: Partial<FillGroup> = {},
+): FillGroup {
   return {
     kind: 'fill',
-    layerId: 'detail',
+    layerId: 'dense-fill',
     color: '#000000',
     power: 30,
-    speed: 6000,
-    passes: 2,
-    airAssist: true,
-    fillStyle: 'scanline',
-    fillRunwayPolicy: 'feed-matched-every-sweep',
+    speed: 1500,
+    passes: 1,
+    airAssist: false,
     overscanMm: 5,
-    segments: Array.from({ length: rows * spans }, (_, index) => {
-      const row = Math.floor(index / spans);
-      const reverse = row % 2 !== 0;
-      const start = { x: 20 + (index % spans) * 0.2, y: 20 + row * 0.1 };
-      const end = { x: start.x + 0.1, y: start.y };
-      return { polyline: reverse ? [end, start] : [start, end], closed: false, reverse };
-    }),
+    fillRunwayPolicy: 'feed-matched-every-sweep',
+    segments,
+    ...patch,
   };
 }
 
-function output(job: Job, compact = true, device: DeviceProfile = DEFAULT_DEVICE_PROFILE): string {
-  return grblStrategy.emit(job, device, compact ? {} : { compactMotionWords: false });
+function denseRows(angleDegrees = 0): ReadonlyArray<FillSegment> {
+  const angle = (angleDegrees * Math.PI) / 180;
+  const point = (along: number, across: number) => ({
+    x: 10 + along * Math.cos(angle) - across * Math.sin(angle),
+    y: 12 + along * Math.sin(angle) + across * Math.cos(angle),
+  });
+  return [false, true].flatMap((reverse, row) =>
+    Array.from({ length: 500 }, (_, index): FillSegment => {
+      const x = index * 0.08;
+      const ends = [point(x, row * 0.1), point(x + 0.04, row * 0.1)];
+      return { polyline: reverse ? ends.reverse() : ends, closed: false, reverse };
+    }),
+  );
 }
 
-function burns(gcode: string) {
-  return oracleBurns(gcode).map((burn) => [burnGeometryKey(burn), burn.air]);
+function emit(job: Job, compact: boolean): string {
+  return grblStrategy.emit(
+    job,
+    DEFAULT_DEVICE_PROFILE,
+    compact ? {} : { compactMotionWords: false },
+  );
 }
 
-describe('lossless Fill motion compaction (ADR-460)', () => {
-  it.each(['grbl-dynamic', 'grbl-raster'] as const)(
-    'preserves all motion, feeds, power, air and pass order on %s',
-    (dialectId) => {
-      const device = {
-        ...DEFAULT_DEVICE_PROFILE,
-        gcodeDialect: { dialectId },
-        scanningOffsets: [{ speedMmPerMin: 6000, offsetMm: 0.025 }],
-      };
-      const job = {
-        groups: [fill(), { ...fill(), layerId: 'second', power: 60, airAssist: false }],
-      };
-      const compact = output(job, true, device);
-      const verbose = output(job, false, device);
-      expect(burns(compact)).toEqual(burns(verbose));
-      expect(burns(compact).length).toBeGreaterThan(100);
-      // Compaction changes no raw line count either, keeping provenance aligned.
-      expect(buildMotionManifest(compact, { machineKind: 'laser' })).toEqual(
-        buildMotionManifest(verbose, { machineKind: 'laser' }),
-      );
-      expect(compact).toMatch(/^X[\d.-]+S0$/m);
-      expect(compact).not.toMatch(/^S[\d.-]+$/m);
-    },
-  );
+type DecodedMove = {
+  readonly from: readonly [number, number];
+  readonly to: readonly [number, number];
+  readonly motion: number;
+  readonly feed: number;
+  readonly power: number;
+  readonly laserMode: number;
+  readonly source: string;
+};
 
-  it.each(['grbl-compatible', 'neotronics-4040-safe'] as const)(
-    'retains the conservative %s spelling',
-    (dialectId) => {
-      const device = { ...DEFAULT_DEVICE_PROFILE, gcodeDialect: { dialectId } };
-      expect(output({ groups: [fill()] }, true, device)).toBe(
-        output({ groups: [fill()] }, false, device),
-      );
-    },
-  );
+type DecoderState = {
+  x: number;
+  y: number;
+  motion: number;
+  feed: number;
+  power: number;
+  laserMode: number;
+};
 
-  it('restores the exact remaining burns from every line of a compact Fill program', () => {
-    const compact = output({ groups: [fill(2, 4)] });
-    const original = oracleBurns(compact);
-    for (let fromLine = 1; fromLine <= compact.split('\n').length; fromLine += 1) {
-      const resumed = buildResumeProgram(compact, fromLine, {
-        machineKind: 'laser',
-        safeZMm: 0,
-        spindleSpinupSec: 0,
-        plungeMmPerMin: 300,
-      });
-      const expected = original.filter((burn) => burn.line >= fromLine);
-      if (resumed.kind === 'error') {
-        expect(expected, resumed.reason).toEqual([]);
-        expect(resumed.reason).toBe('Nothing left to run from that line.');
-      } else {
-        const actual = oracleBurns(resumed.lines.join('\n'), { x: 987.654, y: 876.543 });
-        expect(
-          actual.map((burn) => [burnGeometryKey(burn), burn.air]),
-          `line ${fromLine}`,
-        ).toEqual(expected.map((burn) => [burnGeometryKey(burn), burn.air]));
-      }
+function readWord(state: DecoderState, letter: string, value: number): boolean {
+  switch (letter) {
+    case 'G':
+      if ([0, 1].includes(value)) state.motion = value;
+      break;
+    case 'M':
+      if ([3, 4, 5].includes(value)) state.laserMode = value;
+      break;
+    case 'F':
+      state.feed = value;
+      break;
+    case 'S':
+      state.power = value;
+      break;
+    case 'X':
+      state.x = value;
+      return true;
+    case 'Y':
+      state.y = value;
+      return true;
+  }
+  return false;
+}
+
+// Deliberately independent of the production modal reader and motion writer.
+// This oracle evaluates the absolute XY subset emitted by these fixtures.
+function decode(gcode: string): ReadonlyArray<DecodedMove> {
+  const state: DecoderState = { x: 0, y: 0, motion: 0, feed: 0, power: 0, laserMode: 5 };
+  const moves: DecodedMove[] = [];
+  for (const source of gcode.split('\n')) {
+    const words = [...(source.split(';')[0] ?? '').matchAll(/([A-Z])([-+]?(?:\d*\.\d+|\d+))/g)];
+    const from = [state.x, state.y] as const;
+    let hasAxis = false;
+    for (const word of words) {
+      if (readWord(state, word[1] ?? '', Number(word[2]))) hasAxis = true;
     }
-  });
+    if (hasAxis) {
+      const { x, y, ...modes } = state;
+      moves.push({ from, to: [x, y], ...modes, source });
+    }
+  }
+  return moves;
+}
 
-  it.each([0, 37, 90])(
-    'preserves both axes on a %s degree sweep across negative coordinates',
-    (degrees) => {
-      const radians = (degrees * Math.PI) / 180;
-      const group = fill(2, 4);
-      const rotated: FillGroup = {
-        ...group,
-        speed: 31.7,
-        segments: group.segments.map((segment) => ({
-          ...segment,
-          polyline: segment.polyline.map(({ x, y }) => ({
-            x: (x - 20) * Math.cos(radians) - (y - 20) * Math.sin(radians) - 0.1254,
-            y: (x - 20) * Math.sin(radians) + (y - 20) * Math.cos(radians) - 0.1254,
-          })),
-        })),
-      };
-      const compact = output({ groups: [rotated] });
-      const verbose = output({ groups: [rotated] }, false);
-      expect(burns(compact)).toEqual(burns(verbose));
-      expect(oracleBurns(compact)).toHaveLength(16);
-      expect(oracleBurns(compact).every((burn) => burn.feed === 31)).toBe(true);
-      expect(buildMotionManifest(compact, { machineKind: 'laser' })).toEqual(
-        buildMotionManifest(verbose, { machineKind: 'laser' }),
-      );
-    },
+function semantics(gcode: string) {
+  return decode(gcode).map(({ source: _source, ...move }) => move);
+}
+
+function denseSweepMoves(gcode: string): ReadonlyArray<DecodedMove> {
+  return decode(gcode).filter(
+    (move) =>
+      move.motion === 1 &&
+      move.from[1] === move.to[1] &&
+      Math.min(move.from[0], move.to[0]) >= 10 &&
+      Math.max(move.from[0], move.to[0]) <= 49.96,
   );
+}
 
-  it('keeps micrometre moves while skipping rounded-away spans and touching gaps', () => {
-    const pairs = [
-      [-0.0004, -0.0001],
-      [-0.0004, 0.00149],
-      [0.00149, 0.00151],
-      [0.0021, 0.0022],
-      [0.0022, 0.0031],
-    ];
-    const group: FillGroup = {
-      ...fill(1, 1),
-      passes: 1,
-      fillRunwayPolicy: 'raster-full',
-      overscanMm: 0,
-      segments: pairs.map(([start = 0, end = 0]) => ({
-        polyline: [
-          { x: start, y: start },
-          { x: end, y: end },
-        ],
-        closed: false,
-        reverse: false,
-      })),
-    };
-    const compact = output({ groups: [group] });
-    expect(burns(compact)).toEqual(burns(output({ groups: [group] }, false)));
-    expect(oracleBurns(compact).map((burn) => [burn.from, burn.to])).toEqual([
-      [
-        { x: 0, y: 0 },
-        { x: 0.001, y: 0.001 },
-      ],
-      [
-        { x: 0.001, y: 0.001 },
-        { x: 0.002, y: 0.002 },
-      ],
-      [
-        { x: 0.002, y: 0.002 },
-        { x: 0.003, y: 0.003 },
-      ],
-    ]);
-    expect(compact).not.toMatch(/^S[\d.-]+$/m);
+function deliveryDensity(gcode: string): number {
+  const moves = denseSweepMoves(gcode);
+  const bytes = moves.reduce((total, move) => total + move.source.trim().length + 1, 0);
+  const seconds = moves.reduce(
+    (total, move) => total + (Math.abs(move.to[0] - move.from[0]) * 60) / move.feed,
+    0,
+  );
+  expect(moves).toHaveLength(1998);
+  return bytes / seconds;
+}
+
+describe('compact Fill sweep delivery', () => {
+  it('brings a dense 0.04 mm Fill sweep below the 115200-baud delivery budget', () => {
+    const job: Job = { groups: [fillGroup(denseRows())] };
+    const verboseDensity = deliveryDensity(emit(job, false));
+    const compactDensity = deliveryDensity(emit(job, true));
+
+    expect(verboseDensity).toBeGreaterThan(SERIAL_BYTES_PER_SECOND);
+    expect(
+      compactDensity,
+      `compact ${compactDensity}; verbose ${verboseDensity} bytes/s`,
+    ).toBeLessThan(SERIAL_BYTES_PER_SECOND);
+    expect(compactDensity / verboseDensity).toBeLessThan(0.55);
   });
 
-  it('restores G1 and axes after held M3 and air transitions at a coincident zero-runway entry', () => {
-    const at = (start: number, airAssist: boolean): FillGroup => ({
-      ...fill(1, 1),
-      layerId: `at-${start}`,
-      passes: 1,
-      powerMode: 'constant',
-      airAssist,
-      fillRunwayPolicy: 'raster-full',
-      overscanMm: 0,
-      segments: [
+  it.each([0, 37, 90])('preserves every decoded move at %s degrees in both directions', (angle) => {
+    const group = fillGroup(denseRows(angle), { bidirectionalScanOffsetMm: -0.23, passes: 2 });
+    const job: Job = { groups: [group] };
+    const compact = emit(job, true);
+    const verbose = emit(job, false);
+
+    expect(semantics(compact)).toEqual(semantics(verbose));
+    const powered = decode(compact).filter((move) => move.power > 0 && move.motion === 1);
+    expect(powered).toHaveLength(2000);
+    expect(powered.every((move) => move.feed === 1500 && move.laserMode === 4)).toBe(true);
+    expect(
+      powered.every((move) => move.from[0] !== move.to[0] || move.from[1] !== move.to[1]),
+    ).toBe(true);
+  });
+
+  it('re-establishes each sweep after mixed laser modes, axes and controlled travel feeds', () => {
+    const job: Job = {
+      groups: [
         {
-          polyline: [
-            { x: start, y: 2 },
-            { x: start + 1, y: 2 },
+          kind: 'cut',
+          layerId: 'cut',
+          color: '#ff0000',
+          power: 60,
+          powerMode: 'constant',
+          speed: 800,
+          passes: 1,
+          airAssist: false,
+          segments: [
+            {
+              polyline: [
+                { x: 3, y: 2 },
+                { x: 4, y: 3 },
+              ],
+              closed: false,
+            },
           ],
-          closed: false,
-          reverse: false,
         },
+        fillGroup(denseRows(37), { speed: 1432.5 }),
+        {
+          kind: 'raster',
+          layerId: 'image',
+          color: '#00ff00',
+          power: 20,
+          speed: 2200,
+          passes: 1,
+          airAssist: false,
+          pixelWidth: 2,
+          pixelHeight: 1,
+          sValues: new Uint16Array([0, 200]),
+          bounds: { minX: 80, minY: 30, maxX: 82, maxY: 31 },
+          overscanMm: 5,
+          dotWidthCorrectionMm: 0,
+        },
+        fillGroup(denseRows(90), { speed: 987, power: 42 }),
       ],
-    });
-    const device: DeviceProfile = { ...DEFAULT_DEVICE_PROFILE, airAssistCommand: 'M8' };
-    const job = { groups: [at(10, true), at(11, false)] };
-    const compact = output(job, true, device);
-    expect(burns(compact)).toEqual(burns(output(job, false, device)));
-    expect(oracleBurns(compact).map((burn) => [burn.beam, burn.air])).toEqual([
-      [3, 'M8'],
-      [3, 'off'],
-    ]);
-    expect(findM3LitPlannerDrains(compact)).toEqual([]);
-    expect(buildMotionManifest(compact, { machineKind: 'laser' })).toEqual(
-      buildMotionManifest(output(job, false, device), { machineKind: 'laser' }),
+    };
+    const device = { ...DEFAULT_DEVICE_PROFILE, controlledLaserOffTravelFeedMmPerMin: 800 };
+    expect(semantics(grblStrategy.emit(job, device))).toEqual(
+      semantics(grblStrategy.emit(job, device, { compactMotionWords: false })),
     );
   });
 
-  it('reduces dense Fill bytes by at least 40 percent without dropping a span', () => {
-    const job = { groups: [{ ...fill(100, 200), passes: 1 }] };
-    const compact = output(job);
-    const verbose = output(job, false);
-    expect(compact.length).toBeLessThan(verbose.length * 0.6);
-    expect(burns(compact)).toHaveLength(20_000);
-    expect(burns(compact)).toEqual(burns(verbose));
+  it('keeps the existing verbose legacy GRBL dialect unchanged', () => {
+    const job: Job = { groups: [fillGroup(denseRows())] };
+    const device = {
+      ...DEFAULT_DEVICE_PROFILE,
+      gcodeDialect: { dialectId: 'grbl-compatible' as const },
+    };
+    const gcode = grblStrategy.emit(job, device);
+    expect(gcode).toBe(grblStrategy.emit(job, device, { compactMotionWords: false }));
+    expect(gcode).toContain('G1 X10.040 Y12.000 F1500 S300');
+    expect(gcode).toContain('G1 X10.080 Y12.000');
   });
+
+  it.each(['fill', 'image'] as const)(
+    'reduces 4040 %s wire demand while preserving explicit feed and power',
+    (kind) => {
+      const group =
+        kind === 'fill'
+          ? fillGroup(denseRows())
+          : {
+              kind: 'raster' as const,
+              layerId: 'dense-image',
+              color: '#000000',
+              power: 30,
+              speed: 1500,
+              passes: 1,
+              airAssist: false,
+              pixelWidth: 1000,
+              pixelHeight: 2,
+              sValues: Uint16Array.from({ length: 2000 }, (_, index) =>
+                index % 2 === 0 ? 300 : 0,
+              ),
+              bounds: { minX: 10, minY: 12, maxX: 50, maxY: 12.2 },
+              overscanMm: 5,
+              dotWidthCorrectionMm: 0,
+            };
+      const job: Job = { groups: [group] };
+      const compact = grblStrategy.emit(job, NEOTRONICS_4040_MAX_LT4LDS_V2_PROFILE);
+      const verbose = grblStrategy.emit(job, NEOTRONICS_4040_MAX_LT4LDS_V2_PROFILE, {
+        compactMotionWords: false,
+      });
+
+      expect(semantics(compact)).toEqual(semantics(verbose));
+      const compactDensity = deliveryDensity(compact);
+      const verboseDensity = deliveryDensity(verbose);
+      expect(verboseDensity).toBeGreaterThan(SERIAL_BYTES_PER_SECOND);
+      expect(compactDensity).toBeLessThan(SERIAL_BYTES_PER_SECOND);
+      expect(compactDensity / verboseDensity).toBeLessThan(0.72);
+      for (const move of denseSweepMoves(compact)) {
+        expect(move.source).toMatch(/F1500(?:\D|$)/);
+        expect(move.source).toMatch(/S(?:300|0)(?:\D|$)/);
+      }
+    },
+  );
 });

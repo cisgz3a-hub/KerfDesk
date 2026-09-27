@@ -47,7 +47,7 @@ function emit(job: Job): string {
 function motionLines(job: Job): ReadonlyArray<string> {
   return emit(job)
     .split('\n')
-    .filter((line) => /^G[01]\b/.test(line));
+    .filter((line) => /^(?:G[01](?:\s|X|Y)|[XY])/.test(line));
 }
 
 function fillMotionLines(group: FillGroup): ReadonlyArray<string> {
@@ -59,8 +59,8 @@ function assertEveryPoweredStartFollowsFeedMatchedLaserOffMotion(
 ): void {
   for (let index = 0; index < lines.length; index += 1) {
     const line = lines[index];
-    if (line === undefined || !new RegExp(`\\bS${LASER_POWER_S}\\b`).test(line)) continue;
-    expect(lines[index - 1]).toMatch(/^G1\b.*\bS0\b/);
+    if (line === undefined || !new RegExp(`S${LASER_POWER_S}(?:[^\\d.]|$)`).test(line)) continue;
+    expect(lines[index - 1]).toMatch(/^(?:G1(?=\s|X|Y)|[XY]).*S0(?:[^\d.]|$)/);
   }
 }
 
@@ -141,7 +141,7 @@ describe('generic Scan Line feed-matched runway emission', () => {
     const segments = [segment(0, 1), segment(7, 8)];
     const poweredTargets = (overscanMm: number): ReadonlyArray<string> =>
       fillMotionLines(fillGroup(segments, overscanMm)).filter((line) =>
-        new RegExp(`\\bS${LASER_POWER_S}\\b`).test(line),
+        new RegExp(`S${LASER_POWER_S}(?:[^\\d.]|$)`).test(line),
       );
 
     expect(poweredTargets(DEFAULT_RUNWAY_MM)).toEqual(poweredTargets(2));

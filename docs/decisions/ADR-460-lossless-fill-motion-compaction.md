@@ -27,8 +27,11 @@ each still contains an axis word and reasserts its S value. Existing checks drop
 moves that collapse to zero length at controller precision before updating the
 writer. Laser-off entry/exit and seek lines retain their existing representation.
 
-GRBL Dynamic and GRBL Raster use this spelling. The conservative GRBL Compatible
-and Neotronics dialects retain their historical text. Marlin and Smoothieware
+GRBL Dynamic and GRBL Raster use this spelling. GRBL Compatible retains its
+historical text. ADR-445 supersedes this decision's original Neotronics exception:
+4040 Safe also uses compact motion and axis spelling while retaining its required
+explicit feed and power words. Its independent decoder and wire-demand tests
+verify the same represented moves, feeds and powers. Marlin and Smoothieware
 post-processing continues to force verbose output. Ruida binary export and CNC
 toolpath generation are separate and unchanged by this emitter.
 
@@ -38,12 +41,13 @@ and [streaming documentation](https://github.com/gnea/grbl/blob/master/doc/markd
 
 ### Verification
 
-`grbl-fill-compaction.test.ts` compares compact and verbose programs using an
+`grbl-fill-compaction-resume.test.ts` compares compact and verbose programs using an
 independent burn interpreter, including coordinates, feed, power, beam mode,
 work frame, air, passes and reverse-row compensation. The complete motion
 manifest, including raw line indices, is identical. Every restart line in a
 representative two-pass Fill program preserves the exact remaining burns after
-arbitrary repositioning. Conservative dialects remain byte-identical.
+arbitrary repositioning. GRBL Compatible remains byte-identical; the 4040
+compact-output equivalence and explicit F/S checks are covered by ADR-445.
 
 A 40 by 10 mm alternating 0.1 mm detail fixture has 20,000 powered spans. The
 paired probe emitted 932,023 verbose bytes and 366,203 compact bytes, a 60.7 percent

@@ -79,7 +79,7 @@ describe('grblStrategy fill dynamic-power mode (ADR-036)', () => {
     // the constant mode first, mirroring emit-raster) before any burn.
     expect(out).toContain('G21\nG90\nG54\nG94\nM3 S0\nM5\nM4 S0\n; fill layer');
     // The burn G1 comes AFTER the M4 flip — so it runs under dynamic power.
-    expect(out.indexOf('G1 X20.000 Y5.000')).toBeGreaterThan(out.indexOf('M4 S0'));
+    expect(out.indexOf('G1X20Y5F1500S300')).toBeGreaterThan(out.indexOf('M4 S0'));
     // No constant-power burn: there is no M3 with positive S anywhere.
     expect(out).not.toMatch(/^M3 S[1-9]/m);
     // Still PROJECT.md #3 clean (M4 S0 sets sticky S=0; every G0 stays laser-off).
