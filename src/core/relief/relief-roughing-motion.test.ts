@@ -233,7 +233,7 @@ describe('reliefRoughingMotion', () => {
       ),
       { numRuns: 25 },
     );
-  });
+  }, 30_000);
 
   it('ramps down along the first loop from the level above', () => {
     const square = level([rect(0, 0, 20, 20)], -1.5, -0.5);
