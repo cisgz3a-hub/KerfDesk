@@ -1,5 +1,5 @@
 // SavedCamerasSection — the calibrations of every camera on this machine
-// (ADR-445). Each camera keeps its own lens and pose, and the one running is
+// (ADR-446). Each camera keeps its own lens and pose, and the one running is
 // used automatically, so a built-in camera and a USB camera can both stay
 // calibrated. Shown once there is a second camera to tell apart: two saved
 // calibrations, or a running camera that is not the calibrated one.

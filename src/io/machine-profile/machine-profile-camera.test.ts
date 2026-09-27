@@ -61,7 +61,7 @@ describe('machine profile camera metadata', () => {
     expect(result.document.profile.cameraModel).toEqual(savedCameraModel());
   });
 
-  it('roundtrips other cameras’ calibrations and rejects an invalid one (ADR-445)', () => {
+  it('roundtrips other cameras’ calibrations and rejects an invalid one (ADR-446)', () => {
     const other = savedCameraModel({
       version: 1,
       sourceKind: 'usb',

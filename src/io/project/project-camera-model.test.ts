@@ -57,7 +57,7 @@ describe('project camera model persistence', () => {
     expect(result.project.device.cameraModel).toBeUndefined();
   });
 
-  it('round-trips the calibrations of the machine’s other cameras (ADR-445)', () => {
+  it('round-trips the calibrations of the machine’s other cameras (ADR-446)', () => {
     const usb = (sourceId: string): CameraCaptureBinding => ({
       version: 1,
       sourceKind: 'usb',

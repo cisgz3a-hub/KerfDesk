@@ -1,4 +1,4 @@
-// The saved calibration of the camera that is running (ADR-445). Every camera
+// The saved calibration of the camera that is running (ADR-446). Every camera
 // consumer reads the model through here, so switching cameras switches the
 // lens and pose with it. With no camera running, or a camera that has no
 // calibration of its own, it is the newest calibration, which then reports

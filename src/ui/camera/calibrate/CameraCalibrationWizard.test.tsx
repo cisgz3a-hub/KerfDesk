@@ -153,7 +153,7 @@ describe('camera calibration wizard', () => {
     expect(useCameraCalibrationStore.getState().open).toBe(false);
   });
 
-  it('calibrates a second camera and keeps the first camera’s calibration (ADR-445)', async () => {
+  it('calibrates a second camera and keeps the first camera’s calibration (ADR-446)', async () => {
     const binding = (sourceKind: 'usb' | 'machine-rtsp', sourceId: string) => ({
       version: 1 as const,
       sourceKind,

@@ -55,7 +55,7 @@ export function cameraCaptureBindingForFrame(
   };
 }
 
-/** Which camera `source` is, as a saved calibration names it (ADR-445). */
+/** Which camera `source` is, as a saved calibration names it (ADR-446). */
 export function cameraSourceIdentity(source: ActiveCameraSource): CameraSourceIdentity {
   switch (source.kind) {
     case 'usb':

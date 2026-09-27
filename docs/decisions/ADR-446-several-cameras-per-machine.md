@@ -1,4 +1,4 @@
-## ADR-445 - Several cameras per machine, each with its own calibration (2026-09-27)
+## ADR-446 - Several cameras per machine, each with its own calibration (2026-09-27)
 
 **Status:** Accepted. | **Date:** 2026-09-27
 

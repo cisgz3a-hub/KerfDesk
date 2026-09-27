@@ -50,7 +50,7 @@ export function CalibrationResultStep(props: {
   );
 }
 
-// Saving replaces only this camera's own calibration (ADR-445); say so when
+// Saving replaces only this camera's own calibration (ADR-446); say so when
 // the machine has others, so a second camera's calibration never looks lost.
 function OtherCamerasNote(props: { readonly result: CalibrationResult }): JSX.Element | null {
   const cameraModel = useStore((s) => s.project.device.cameraModel);

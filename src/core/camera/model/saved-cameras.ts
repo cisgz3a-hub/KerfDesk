@@ -1,4 +1,4 @@
-// The calibrations of every camera on one machine (ADR-445). A machine can have
+// The calibrations of every camera on one machine (ADR-446). A machine can have
 // several cameras, such as the built-in one and a USB camera over a large bed,
 // and each keeps its own lens and pose. Each saved model names the camera it
 // was fitted on (its capture binding), so the model in use follows whichever

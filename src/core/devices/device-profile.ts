@@ -249,7 +249,7 @@ export type DeviceProfile = {
   // from one photo of the engraved target. Absent until the operator
   // calibrates; it replaces the old lens calibration and bed alignment, whose
   // saved values are dropped on load rather than trusted. With several
-  // cameras (ADR-445) this is the newest calibration, and the others keep
+  // cameras (ADR-446) this is the newest calibration, and the others keep
   // theirs in `otherCameraModels`, each bound to its own camera.
   readonly cameraModel?: CameraModelRecord | undefined;
   readonly otherCameraModels?: ReadonlyArray<CameraModelRecord> | undefined;
