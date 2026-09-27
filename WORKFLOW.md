@@ -4763,8 +4763,11 @@ and lifts the command's CNC-only gate.)*
    inside/pocket run CCW) and rotates entry points to the midpoint of
    the longest segment so witness marks land on a flat span.
 3. For profile, pocket, and engrave, a ramp angle > 0 turns plunges into
-   descents ALONG the toolpath at that angle; closed loops re-cut the ramped
-   span level afterwards. V-carve is different: its changing Z is the cutting
+   descents ALONG the toolpath at that angle, from the depth that path was
+   last cut to (the stock top the first time). A closed loop is then cut one
+   whole lap at depth from where its descent ended; an open path zig-zags
+   along its start back to the start at depth, then is cut end to end at
+   depth (ADR-471). V-carve is different: its changing Z is the cutting
    profile itself, so the certified medial path governs and any stored V-carve
    ramp request is reported as advisory provenance rather than being layered
    onto that profile.
@@ -4797,8 +4800,15 @@ and lifts the command's CNC-only gate.)*
    V-carve.
 
 #### Edge — path shorter than the ramp
-1. The descent finishes at the path end (the ramp consumed the whole
-   path); the remainder cuts level on the next lap.
+1. A closed loop keeps descending round itself, lap after lap, until it
+   reaches depth, then cuts one whole lap at depth. An open path zig-zags
+   along its whole length back to its start at depth, then cuts end to end.
+2. A path shorter than one cut width that the ramp would have to go over
+   again keeps its straight plunge at the plunge feed: the cutter covers the
+   whole path, so going round it again would only slow the plunge. The G-code
+   header says `; cnc entry-advisory: N passes plunge: path shorter than one
+   cut width`, and Job Review lists it as an advisory, naming Helical entry
+   for a pocket (ADR-471).
 
 #### Edge — reliefs on a layer with a ramp angle
 1. Relief roughing ramps with the layer's angle (F-CNC17, ADR-424) and its

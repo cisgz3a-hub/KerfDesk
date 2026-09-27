@@ -24,20 +24,21 @@
 //   documented deferral).
 //
 // * Ramp entry. Plunges into contour passes become descents ALONG the
-//   toolpath at the configured angle: the pass converts to path3d, ramping
-//   over the leading span, cutting the full loop at depth, then re-cutting
-//   the ramped span level (closed loops), or ramping forward from the
-//   start (open paths).
+//   toolpath at the configured angle (contour-ramp-entry.ts): a closed loop
+//   is descended round, lapping when it is shorter than its ramp, then cut
+//   one whole lap at depth; an open path zig-zags along its start and is then
+//   cut end to end at depth. A path too short to ramp along keeps its plunge
+//   and says so (ADR-471).
 
-import type { CncContourPass, CncGroup, CncPass, CncPath3dPass } from '../job';
+import type { CncContourPass, CncGroup, CncPass } from '../job';
 import {
   isCounterClockwise,
   reversedPolyline,
   signedAreaMm2,
 } from '../geometry/polyline-orientation';
-import type { Vec3 } from '../geometry/vec3';
 import type { FrameHandedness } from './machine-frame-handedness';
 import type { CncCutDirection, CncCutType, CncMachineConfig, Polyline, Vec2 } from '../scene';
+import { rampContourPass } from './contour-ramp-entry';
 import { rampTabbedPath } from './tabbed-ramp-entry';
 
 const MIN_CLOSED_POINTS = 3;
@@ -151,17 +152,24 @@ export function rotateStartToLongestSegment(toolpath: Polyline): Polyline {
   return { ...toolpath, points: rotated };
 }
 
-// Convert contour passes into ramped path3d descents. prevLevelZ is the Z
-// the ramp starts from: the previous pass's level for stepped depth
-// ladders, or 0 (stock top) for the first.
+// Convert contour passes into path3d descents along their own paths
+// (contour-ramp-entry.ts). A pass ramps from the level its own path was last
+// cut at, or from the stock top (0) the first time the path is cut. Every
+// ladder cuts each path's depths shallow to deep, so this holds whether it
+// deepens one contour at a time (profiles) or cuts every ring of a level
+// before the next (pockets), where "the previous pass's level" sent every ring
+// after a level's first down from the stock top through cleared stock.
+// `minRampPathMm` (one cut width) is the shortest path a ramp goes over again.
 export function applyRampEntry(
   passes: ReadonlyArray<CncPass>,
   rampAngleDeg: number,
   includeTabbedPaths = false,
+  minRampPathMm = 0,
 ): ReadonlyArray<CncPass> {
   const angle = Math.min(Math.max(rampAngleDeg, 0.5), MAX_RAMP_ANGLE_DEG);
   const tangent = Math.tan((angle * Math.PI) / 180);
   let previousZ = 0;
+  const cutPaths = new Map<string, CutPath[]>();
   return passes.map((pass) => {
     if (includeTabbedPaths && pass.kind === 'path3d') {
       const depth = pass.points.reduce((min, point) => Math.min(min, point.z), Infinity);
@@ -170,104 +178,42 @@ export function applyRampEntry(
       return rampTabbedPath(pass, fromZ, tangent);
     }
     if (pass.kind !== 'contour') return pass;
-    // Contour-major ladders deepen the SAME contour step by step (ramp from
-    // the previous level); a new contour starts shallow again — ramp from
-    // the stock top.
-    const fromZ = pass.zMm >= previousZ ? 0 : previousZ;
-    const ramped = rampContour(pass, fromZ, tangent);
+    const path = cutPathOf(cutPaths, pass);
+    const fromZ = path.levelZ;
+    path.levelZ = Math.min(fromZ, pass.zMm);
     previousZ = pass.zMm;
-    return ramped;
+    return rampContourPass(pass, fromZ, tangent, minRampPathMm);
   });
 }
 
-function rampContour(pass: CncContourPass, fromZ: number, tangent: number): CncPass {
-  const drop = fromZ - pass.zMm;
-  if (!(drop > 0) || pass.polyline.length < 2) return pass;
-  const rampLengthMm = drop / tangent;
-  const points: Vec3[] = [];
-  const resumeIndex = appendRampSpan(points, pass, fromZ, rampLengthMm);
-  // The remainder of the loop at full depth, resuming from the vertex the ramp
-  // actually reached — NOT always source[1], which doubled the path back down a
-  // ramp that spanned more than the first segment.
-  for (const point of walkFrom(pass, resumeIndex)) {
-    points.push({ x: point.x, y: point.y, z: pass.zMm });
-  }
-  // …then re-cut the ramped span level so no slope is left (closed only).
-  if (pass.closed) {
-    appendLevelRampSpan(points, pass, rampLengthMm);
-  }
-  const path: CncPath3dPass = { kind: 'path3d', points, closed: false };
-  return path;
+// The level one contour path has been cut to so far (0 until it is cut).
+type CutPath = {
+  readonly polyline: ReadonlyArray<Vec2>;
+  readonly closed: boolean;
+  levelZ: number;
+};
+
+// Depth passes of one toolpath share its coordinates but not its array
+// (contourPassFromPolyline clones a ring to close it), so a path is matched
+// by value, among the paths with its point count and start.
+function cutPathOf(cutPaths: Map<string, CutPath[]>, pass: CncContourPass): CutPath {
+  const start = pass.polyline[0];
+  const key = `${pass.polyline.length};${start?.x};${start?.y}`;
+  const candidates = cutPaths.get(key) ?? [];
+  const found = candidates.find(
+    (path) => path.closed === pass.closed && samePoints(path.polyline, pass.polyline),
+  );
+  if (found !== undefined) return found;
+  const created: CutPath = { polyline: pass.polyline, closed: pass.closed, levelZ: 0 };
+  cutPaths.set(key, [...candidates, created]);
+  return created;
 }
 
-// Walks the pass polyline emitting the descending ramp vertices. Returns the
-// index of the source vertex the at-depth walk should RESUME from — the vertex
-// just past where the ramp reached full depth — so a ramp spanning several
-// segments does not make the caller double back to source[1].
-function appendRampSpan(
-  points: Vec3[],
-  pass: CncContourPass,
-  fromZ: number,
-  rampLengthMm: number,
-): number {
-  const drop = fromZ - pass.zMm;
-  let travelled = 0;
-  const source = pass.polyline;
-  points.push({ x: (source[0] as Vec2).x, y: (source[0] as Vec2).y, z: fromZ });
-  for (let i = 1; i < source.length && travelled < rampLengthMm; i += 1) {
-    const a = source[i - 1] as Vec2;
-    const b = source[i] as Vec2;
-    const segment = Math.hypot(b.x - a.x, b.y - a.y);
-    if (segment === 0) continue;
-    const remaining = rampLengthMm - travelled;
-    if (segment >= remaining) {
-      const t = remaining / segment;
-      points.push({
-        x: a.x + (b.x - a.x) * t,
-        y: a.y + (b.y - a.y) * t,
-        z: pass.zMm,
-      });
-      // The ramp ended inside segment [i-1, i]; resume at source[i].
-      return i;
-    }
-    travelled += segment;
-    points.push({ x: b.x, y: b.y, z: fromZ - (travelled / rampLengthMm) * drop });
-  }
-  // Path shorter than the ramp: finish the descent vertically at the end
-  // point (the ramp consumed the whole path); nothing left to walk forward.
-  const last = source[source.length - 1] as Vec2;
-  points.push({ x: last.x, y: last.y, z: pass.zMm });
-  return source.length;
-}
-
-// The full loop at depth, resuming from `resumeIndex` (the vertex just past
-// where the ramp reached full depth).
-function* walkFrom(pass: CncContourPass, resumeIndex: number): Generator<Vec2> {
-  const source = pass.polyline;
-  for (let i = resumeIndex; i < source.length; i += 1) {
-    yield source[i] as Vec2;
-  }
-  if (pass.closed) yield source[0] as Vec2;
-}
-
-// Re-cut the ramp span at the final depth (closed loops only).
-function appendLevelRampSpan(points: Vec3[], pass: CncContourPass, rampLengthMm: number): void {
-  const source = pass.polyline;
-  let travelled = 0;
-  for (let i = 1; i < source.length && travelled < rampLengthMm; i += 1) {
-    const a = source[i - 1] as Vec2;
-    const b = source[i] as Vec2;
-    const segment = Math.hypot(b.x - a.x, b.y - a.y);
-    if (segment === 0) continue;
-    const remaining = rampLengthMm - travelled;
-    if (segment >= remaining) {
-      const t = remaining / segment;
-      points.push({ x: a.x + (b.x - a.x) * t, y: a.y + (b.y - a.y) * t, z: pass.zMm });
-      return;
-    }
-    travelled += segment;
-    points.push({ x: b.x, y: b.y, z: pass.zMm });
-  }
+function samePoints(a: ReadonlyArray<Vec2>, b: ReadonlyArray<Vec2>): boolean {
+  return (
+    a.length === b.length &&
+    a.every((point, index) => point.x === b[index]?.x && point.y === b[index]?.y)
+  );
 }
 
 // H.9 parking parity: park fields are only present on groups when the

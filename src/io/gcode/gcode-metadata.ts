@@ -81,16 +81,15 @@ export type GcodeMetadata = {
  * a ramp entry for a relief stage that actually plunges, and ADR-432's native
  * laser G2/G3 arcs with represented-arc validation and G17, and ADR-445's shared
  * split scan exit/entry runways, canonical meeting endpoints and compact
- * Fill/4040 Image motion words, retaining ADR-460's lossless Fill compaction.
+ * Fill/4040 Image motion words, retaining ADR-460's lossless Fill compaction,
+ * and ADR-471's short-loop laps and open-path zig-zags from prior cut depth.
  */
-// ADR-427 integration also cuts deepest cleanup before linked relief rings;
-// all adaptive ring closure and flat depth-slice provenance above is retained.
-// ADR-368 amendment 3 sizes ball-nose, V-bit and engraving pocket and profile
-// offsets, tab windows, and pocket and relief-roughing stepover by cut width.
-// Tracer batch 3 preserves bounded chord flattening, shared seams and Line + fill.
-// Native arcs, compact Fill and linked relief entry retain scan timing v2's
-// shared, empty and coincident M3 Image handoffs (ADR-445).
-export const EMITTER_REVISION = 'trace-hybrid-arcs-relief-cut-width-scan-v2-20260927-v4';
+// ADR-427 keeps deepest cleanup before linked relief rings and flat depth slices.
+// ADR-368 sizes nonflat pocket/profile offsets, tabs and stepover by cut width.
+// Tracer batch 3 preserves bounded chords, shared seams and Line + fill.
+// Native arcs and compact Fill retain scan v2's shared/empty/coincident M3 handoffs.
+// ADR-471 discloses sub-width plunges; ADR-457 finishing recipes survive ramping.
+export const EMITTER_REVISION = 'trace-arcs-relief-width-ramp-scan-v2-20260927-v5';
 
 // Machine-specific assumption lines (ADR-103 defect fix): router exports
 // previously carried the laser-worded `$32=1 (laser mode)` banner. The S

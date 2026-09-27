@@ -41,7 +41,7 @@ function laserAssumptions(
 
 describe('gcodeMetadataHeader', () => {
   it('tracks the latest safety-relevant emitter revision', () => {
-    expect(EMITTER_REVISION).toBe('trace-hybrid-arcs-relief-cut-width-scan-v2-20260927-v4');
+    expect(EMITTER_REVISION).toBe('trace-arcs-relief-width-ramp-scan-v2-20260927-v5');
   });
 
   it('emits provenance as GRBL comment lines and ends with a newline', () => {
