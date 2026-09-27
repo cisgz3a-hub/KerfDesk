@@ -78,13 +78,18 @@ export type GcodeMetadata = {
  * pass from the allowance-bearing region's cleared stock (2026-09-27), and
  * ADR-154 amendment 2's adaptive pocket finishing rings that end where they
  * start, and ADR-273 amendment 1's relief group headers that no longer claim
- * a ramp entry for a relief stage that actually plunges, and ADR-421
- * amendment 1's relief finishing moves lifted wherever they would cut into
- * the part between vertices.
+ * a ramp entry for a relief stage that actually plunges, and ADR-445's shared
+ * split scan exit/entry runways, canonical meeting endpoints and compact
+ * Fill/4040 Image motion words, and ADR-421 amendment 1's relief finishing
+ * moves lifted where sampled exact-contact checks exceed the normal-to-move
+ * tolerance, with finite sampling and output-rounding limits retained.
  */
 // ADR-427 integration also cuts deepest cleanup before linked relief rings;
 // all adaptive ring closure and flat depth-slice provenance above is retained.
-export const EMITTER_REVISION = 'relief-finishing-contact-checked-20260927-v1';
+// Scan timing v2 also preserves M3 state across shared, empty and coincident
+// Image handoffs (ADR-445); cached v1 output must be regenerated.
+export const EMITTER_REVISION =
+  'adaptive-relief-cleanup-linked-entry-scan-v2-contact-checked-20260927-v1';
 
 // Machine-specific assumption lines (ADR-103 defect fix): router exports
 // previously carried the laser-worded `$32=1 (laser mode)` banner. The S

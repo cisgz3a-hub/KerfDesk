@@ -4,6 +4,9 @@ import type { FillOverscanRun } from './fill-overscan';
 export type FillRunwayLengths = {
   readonly leadInMm: number;
   readonly leadOutMm: number;
+  /** Canonical meeting point shared with the adjacent sweep, when present. */
+  readonly sharedLeadStart?: Vec2;
+  readonly sharedLeadEnd?: Vec2;
 };
 
 export function expandFillHatchWithRunways(
@@ -24,9 +27,15 @@ export function expandFillHatchWithRunways(
   const ux = dx / length;
   const uy = dy / length;
   return {
-    leadStart: { x: burnStart.x - ux * leadInMm, y: burnStart.y - uy * leadInMm },
+    leadStart: lengths.sharedLeadStart ?? {
+      x: burnStart.x - ux * leadInMm,
+      y: burnStart.y - uy * leadInMm,
+    },
     burnStart,
     burnEnd,
-    leadEnd: { x: burnEnd.x + ux * leadOutMm, y: burnEnd.y + uy * leadOutMm },
+    leadEnd: lengths.sharedLeadEnd ?? {
+      x: burnEnd.x + ux * leadOutMm,
+      y: burnEnd.y + uy * leadOutMm,
+    },
   };
 }

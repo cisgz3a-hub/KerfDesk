@@ -45,6 +45,7 @@ it('repaints an unchanged workspace and invalidates its preview background when 
   try {
     await act(async () => root.render(<Workspace />));
     const before = draw.mock.calls.at(-1);
+    expect(host.querySelector('canvas[data-workspace-painted="true"]')).not.toBeNull();
     const count = draw.mock.calls.length;
     const lightBed = canvasTheme.bedFill;
     expect(before).toBeDefined();

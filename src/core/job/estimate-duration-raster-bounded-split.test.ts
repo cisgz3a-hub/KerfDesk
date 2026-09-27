@@ -77,6 +77,7 @@ describe('raster split-runway duration', () => {
     expect(bounded.totalSeconds).toBeLessThan(reversing.totalSeconds);
     expect(bounded.breakdown.feedTravelSeconds).toBeGreaterThan(0);
     expect(bounded.breakdown.rapidTravelSeconds).toBe(0);
-    expect(genericSeek.breakdown.rapidTravelSeconds).toBeGreaterThan(0);
+    // The 6 mm gap is shared by two 3 mm runways, leaving no rapid remainder.
+    expect(genericSeek.breakdown.rapidTravelSeconds).toBe(0);
   });
 });

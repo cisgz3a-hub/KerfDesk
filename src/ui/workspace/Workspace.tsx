@@ -336,6 +336,9 @@ function drawWorkspaceScene(
     ...(args.artworkRunFocus === null ? {} : { artworkRunFocus: args.artworkRunFocus }),
     wireframe: state.wireframe,
   });
+  // Startup reveals the editor after a successful artwork/chrome paint, not
+  // merely after React has inserted an empty canvas element.
+  canvas.dataset.workspacePainted = 'true';
 }
 
 function useDisplayPolylineCache(): DisplayPolylineCache {

@@ -9,6 +9,7 @@ import { computeJobBounds, frameBoundsSignature } from '../job';
 import { signedAreaMm2 } from '../geometry/polyline-orientation';
 import { scallopRowSpacingMm } from '../relief';
 import { finishingRows } from '../relief/relief-finishing-test-rows';
+import { cncGrblStrategy } from '../output';
 import {
   createLayer,
   DEFAULT_CNC_LAYER_SETTINGS,
@@ -133,6 +134,72 @@ function compiledReliefArtifact(
 }
 
 describe('relief finishing compile (H.8)', () => {
+  it.each([
+    ['raster', 'x', 'finishing-bit'],
+    ['raster', 'y', 'finishing-bit'],
+    ['raster-waterline', 'y', 'finishing-bit'],
+    ['raster-waterline', 'y', 'roughing-bit'],
+  ] as const)(
+    'preserves %s / %s / %s geometry while applying only the finishing recipe',
+    (reliefFinishStrategy, reliefRasterAxis, reliefFlatFinish) => {
+      const settings: Partial<CncLayerSettings> = {
+        feedMmPerMin: 900,
+        plungeMmPerMin: 200,
+        spindleRpm: 12000,
+        rampEntryDeg: 5,
+        reliefFinishToolId: 'bn-3175',
+        reliefFinishStrategy,
+        reliefRasterAxis,
+        reliefFlatFinish,
+      };
+      const original = compile(settings, depthMapRelief());
+      const job = compile(
+        {
+          ...settings,
+          stageRecipes: {
+            'relief-finish': {
+              toolId: 'bn-3175',
+              feedMmPerMin: 321,
+              plungeMmPerMin: 123,
+              spindleRpm: 9000,
+              depthPerPassMm: 0.5,
+            },
+          },
+        },
+        depthMapRelief(),
+      );
+      const groups = job.groups.filter((group) => group.kind === 'cnc');
+      expect(groups[0]).toMatchObject({
+        cutType: 'relief-rough',
+        feedMmPerMin: 900,
+        plungeMmPerMin: 200,
+        spindleRpm: 12000,
+        rampEntryDeg: 5,
+      });
+      expect(groups[1]).toMatchObject({
+        cutType: 'relief-finish',
+        cuttingStage: 'relief-finish',
+        feedMmPerMin: 321,
+        plungeMmPerMin: 123,
+        spindleRpm: 9000,
+      });
+      expect(groups.map((group) => group.passes)).toEqual(
+        original.groups.map((group) => (group.kind === 'cnc' ? group.passes : [])),
+      );
+      expect(job.cncCompilation?.reliefPlans).toEqual(original.cncCompilation?.reliefPlans);
+      expect(computeJobBounds(job, DEFAULT_DEVICE_PROFILE)).toEqual(
+        computeJobBounds(original, DEFAULT_DEVICE_PROFILE),
+      );
+      const finish = groups[1];
+      if (finish === undefined) throw new Error('finish group missing');
+      expect(finish.rampEntryDeg).toBeUndefined();
+      const output = cncGrblStrategy.emit({ groups: [finish] }, DEFAULT_DEVICE_PROFILE);
+      expect(output).not.toContain('; cnc entry:');
+      expect(output).toContain('; cnc motion: feed-mm-min: 321; plunge-mm-min: 123');
+      expect(output).toMatch(/^M3 S9000$/m);
+      expect(output).toMatch(/^G1\s*X[^\n]*F321$/m);
+    },
+  );
   it('routes a durable depth map through existing relief roughing and finishing CAM', () => {
     const job = compile({ reliefFinishToolId: 'bn-3175' }, depthMapRelief());
     const groups = job.groups.filter((group) => group.kind === 'cnc');
@@ -309,45 +376,37 @@ describe('relief finishing compile (H.8)', () => {
     expect(maxGap).toBeCloseTo(scallopRowSpacingMm(tool, scallopMm), 9);
   });
 
-  // A 0.1 mm ball over a 12 mm part is a two-million-cell finishing grid.
-  it(
-    'honors the supported minimum ball-nose planar cusp below the flat-tool row floor',
-    {
-      timeout: 60_000,
-    },
-    () => {
-      const scallopMm = 0.005;
-      const job = compile(
-        { reliefFinishToolId: SMALL_BALL_NOSE.id, reliefScallopMm: scallopMm },
-        relief(),
-        DEFAULT_DEVICE_PROFILE,
-        SMALL_TOOL_CONFIG,
-      );
-      const finish = job.groups.find(
-        (group) => group.kind === 'cnc' && group.cutType === 'relief-finish',
-      );
-      if (finish?.kind !== 'cnc') throw new Error('small-tool finish group missing');
-      const rowYs = finishingRows(finish.passes).map((row) => row.y);
-      const maxGap = Math.max(
-        ...rowYs.slice(1).map((y, index) => Math.abs(y - (rowYs[index] ?? y))),
-      );
-      const radius = SMALL_BALL_NOSE.diameterMm / 2;
-      const planarCusp = radius - Math.sqrt(radius * radius - (maxGap * maxGap) / 4);
-      const finishPlan = job.cncCompilation?.reliefPlans?.find(
-        (plan) => plan.stage === 'finishing',
-      );
+  it('honors the supported minimum ball-nose planar cusp below the flat-tool row floor', () => {
+    const scallopMm = 0.005;
+    // A 1 mm surface still covers over twenty requested rows. Testing this
+    // spacing contract does not require a multi-million-cell 12 mm map.
+    const job = compile(
+      { reliefFinishToolId: SMALL_BALL_NOSE.id, reliefScallopMm: scallopMm },
+      relief({ targetWidthMm: 1, bounds: { minX: 0, minY: 0, maxX: 1, maxY: 1 } }),
+      DEFAULT_DEVICE_PROFILE,
+      SMALL_TOOL_CONFIG,
+    );
+    const finish = job.groups.find(
+      (group) => group.kind === 'cnc' && group.cutType === 'relief-finish',
+    );
+    if (finish?.kind !== 'cnc') throw new Error('small-tool finish group missing');
+    const rowYs = finishingRows(finish.passes).map((row) => row.y);
+    expect(rowYs.length).toBeGreaterThan(20);
+    const maxGap = Math.max(...rowYs.slice(1).map((y, index) => Math.abs(y - (rowYs[index] ?? y))));
+    const radius = SMALL_BALL_NOSE.diameterMm / 2;
+    const planarCusp = radius - Math.sqrt(radius * radius - (maxGap * maxGap) / 4);
+    const finishPlan = job.cncCompilation?.reliefPlans?.find((plan) => plan.stage === 'finishing');
 
-      expect(maxGap).toBeLessThan(0.05);
-      expect(maxGap).toBeLessThanOrEqual(scallopRowSpacingMm(SMALL_BALL_NOSE, scallopMm) + 1e-9);
-      expect(planarCusp).toBeLessThanOrEqual(scallopMm + 1e-12);
-      // ADR-421: the largest cell no coarser than a tenth of the diameter that
-      // divides the row spacing into whole rows.
-      const rowSpacingMm = scallopRowSpacingMm(SMALL_BALL_NOSE, scallopMm);
-      const rowsPerStride = Math.ceil(rowSpacingMm / (SMALL_BALL_NOSE.diameterMm / 10));
-      expect(finishPlan?.cellSizeMm).toBeCloseTo(rowSpacingMm / rowsPerStride, 12);
-      expect(maxGap).toBeCloseTo(rowSpacingMm, 9);
-    },
-  );
+    expect(maxGap).toBeLessThan(0.05);
+    expect(maxGap).toBeLessThanOrEqual(scallopRowSpacingMm(SMALL_BALL_NOSE, scallopMm) + 1e-9);
+    expect(planarCusp).toBeLessThanOrEqual(scallopMm + 1e-12);
+    // ADR-421: the largest cell no coarser than a tenth of the diameter that
+    // divides the row spacing into whole rows.
+    const rowSpacingMm = scallopRowSpacingMm(SMALL_BALL_NOSE, scallopMm);
+    const rowsPerStride = Math.ceil(rowSpacingMm / (SMALL_BALL_NOSE.diameterMm / 10));
+    expect(finishPlan?.cellSizeMm).toBeCloseTo(rowSpacingMm / rowsPerStride, 12);
+    expect(maxGap).toBeCloseTo(rowSpacingMm, 9);
+  });
 
   it('does not floor roughing resolution for a small exact tool', () => {
     const object = relief({

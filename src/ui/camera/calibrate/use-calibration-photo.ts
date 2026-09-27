@@ -2,8 +2,10 @@
 // settings that requested them. The owner lives above the minimize/expand
 // presentation, and remains current until Save or explicit abandonment.
 import { useEffect, useRef, type MutableRefObject } from 'react';
+import { ownModelFor, withSavedCameraModel } from '../../../core/camera/model/saved-cameras';
 import { useStore } from '../../state';
 import { useCameraStore } from '../../state/camera-store';
+import { cameraSourceIdentity } from '../frame-source';
 import { photographTarget } from './calibration-actions';
 import {
   useCameraCalibrationStore,
@@ -51,6 +53,8 @@ export function useCalibrationPhoto(): CalibrationPhotoControls {
     const wizard = useCameraCalibrationStore.getState();
     if (!mounted.current || !wizard.open || camera.sourceState.kind !== 'live') return;
     discard(runRef);
+    // Only this camera's own calibration is compared; another camera's stays saved.
+    const saved = ownModelFor(app.project.device, cameraSourceIdentity(camera.sourceState.source));
     const run: PhotoRun = {
       controller: new AbortController(),
       ownsContext: () => {
@@ -76,9 +80,7 @@ export function useCalibrationPhoto(): CalibrationPhotoControls {
         bedWidthMm: app.project.device.bedWidth,
         bedHeightMm: app.project.device.bedHeight,
         ...(wizard.targetArea === null ? {} : { area: wizard.targetArea }),
-        ...(app.project.device.cameraModel === undefined
-          ? {}
-          : { saved: app.project.device.cameraModel }),
+        ...(saved === undefined ? {} : { saved }),
         signal: run.controller.signal,
       });
       publish(
@@ -137,7 +139,8 @@ function saveCurrent(runRef: RunRef, result: CalibrationResult): void {
     return;
   // Release before our own profile update notifies the context listeners.
   runRef.current = null;
-  useStore.getState().updateDeviceProfile({ cameraModel: result.record });
+  const { device } = useStore.getState().project;
+  useStore.getState().updateDeviceProfile(withSavedCameraModel(device, result.record));
   useCameraStore.getState().setOverlayVisible(true);
   useCameraCalibrationStore.getState().closeWizard();
 }
