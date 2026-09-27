@@ -1,8 +1,8 @@
 import { useState } from 'react';
 import { TRACE_PRESETS } from '../../core/trace';
-import type { BatchTraceFormat } from '../../core/trace/batch-trace';
+import type { BatchTraceFile, BatchTraceFormat } from '../../core/trace/batch-trace';
 import { DEFAULT_EXPORT_PRECISION_MM } from '../../core/vector-export/decimal-grid';
-import type { PlatformAdapter } from '../../platform/types';
+import type { PlatformAdapter, SaveDirectoryTarget } from '../../platform/types';
 import { usePlatform } from '../app/platform-context';
 import { Button, Dialog, DialogActions } from '../kit';
 import { useStore } from '../state';
@@ -12,8 +12,10 @@ import { VISIBLE_TRACE_PRESET_NAMES } from '../trace/dialog-parts';
 import {
   DEFAULT_MULTI_FILE_TRACE_PRESET,
   runMultiFileTrace,
+  traceFileWriterForDirectory,
   writeTraceFileWithPlatform,
 } from './multi-file-trace-action';
+import { beginMultiFileTraceProgress } from './MultiFileTraceProgress';
 import { pickPlatformBatchTraceImageFiles } from './platform-image-files';
 import {
   DEFAULT_TRACE_PAGE_SETTINGS,
@@ -86,9 +88,12 @@ function ChoiceField(props: {
 
 export function MultiFileTraceDialog(props: {
   readonly onCancel: () => void;
-  readonly onRun: (settings: MultiFileTraceSettings) => void;
+  // Opens the image picker; its first await runs inside the button's click.
+  readonly onChooseImages: () => Promise<ReadonlyArray<File> | null>;
+  readonly onRun: (settings: MultiFileTraceSettings, files: ReadonlyArray<File>) => void;
 }): JSX.Element {
   const [settings, setSettings] = useState<MultiFileTraceSettings>(lastSettings);
+  const [files, setFiles] = useState<ReadonlyArray<File>>([]);
   const update = (patch: Partial<MultiFileTraceSettings>): void =>
     setSettings((current) => ({ ...current, ...patch }));
   return (
@@ -99,8 +104,9 @@ export function MultiFileTraceDialog(props: {
       as="form"
       onSubmit={(event) => {
         event.preventDefault();
+        if (files.length === 0) return;
         lastSettings = settings;
-        props.onRun(settings);
+        props.onRun(settings, files);
       }}
     >
       <ChoiceField
@@ -140,17 +146,48 @@ export function MultiFileTraceDialog(props: {
         </label>
       ) : null}
       <div className="lf-dialog-body">
-        <p>Each image is traced with the preset and saved as its own file.</p>
+        <p>
+          Each image is traced with the preset and written as its own file into the folder you
+          choose.
+        </p>
+        <p aria-live="polite">{chosenText(files)}</p>
       </div>
-      <DialogActions>
-        <Button onClick={props.onCancel}>Cancel</Button>
-        <Button variant="primary" type="submit">
-          Choose Images...
-        </Button>
-      </DialogActions>
+      <MultiFileTraceActions
+        onCancel={props.onCancel}
+        onChooseImages={() => {
+          void props.onChooseImages().then((chosen) => {
+            if (chosen !== null) setFiles(chosen);
+          });
+        }}
+        canTrace={files.length > 0}
+      />
     </Dialog>
   );
 }
+
+function MultiFileTraceActions(props: {
+  readonly onCancel: () => void;
+  readonly onChooseImages: () => void;
+  readonly canTrace: boolean;
+}): JSX.Element {
+  return (
+    <DialogActions>
+      <Button onClick={props.onCancel}>Cancel</Button>
+      <Button onClick={props.onChooseImages}>Choose Images...</Button>
+      <Button variant="primary" type="submit" disabled={!props.canTrace}>
+        Trace...
+      </Button>
+    </DialogActions>
+  );
+}
+
+function chosenText(files: ReadonlyArray<File>): string {
+  if (files.length === 0) return 'No images chosen yet.';
+  if (files.length === 1) return `1 image chosen: ${files[0]?.name ?? ''}`;
+  return `${files.length} images chosen.`;
+}
+
+type PushToast = (message: string, variant?: ToastVariant) => void;
 
 export function MultiFileTraceDialogHost(props: { readonly onClose: () => void }): JSX.Element {
   const platform = usePlatform();
@@ -158,41 +195,77 @@ export function MultiFileTraceDialogHost(props: { readonly onClose: () => void }
   return (
     <MultiFileTraceDialog
       onCancel={props.onClose}
-      onRun={(settings) => {
+      onChooseImages={() => chooseMultiFileTraceImages(platform, pushToast)}
+      onRun={(settings, files) => {
         props.onClose();
-        void pickAndRunMultiFileTrace(platform, pushToast, settings);
+        void runChosenMultiFileTrace(platform, pushToast, settings, files);
       }}
     />
   );
 }
 
-export async function pickAndRunMultiFileTrace(
+export async function chooseMultiFileTraceImages(
   platform: PlatformAdapter,
-  pushToast: (message: string, variant?: ToastVariant) => void,
-  settings: MultiFileTraceSettings,
-): Promise<void> {
-  let files: ReadonlyArray<File>;
+  pushToast: PushToast,
+): Promise<ReadonlyArray<File> | null> {
   try {
     // The picker must be the first await so it runs inside the click's user activation.
-    files = await pickPlatformBatchTraceImageFiles(platform);
+    return await pickPlatformBatchTraceImageFiles(platform);
   } catch (err) {
     pushToast(`Could not choose trace images: ${errMsg(err)}`, 'error');
-    return;
+    return null;
   }
+}
+
+// The output folder is reserved in the Trace click (as Save Tiled G-code
+// reserves one), and each file is written into it as soon as it is traced.
+export async function runChosenMultiFileTrace(
+  platform: PlatformAdapter,
+  pushToast: PushToast,
+  settings: MultiFileTraceSettings,
+  files: ReadonlyArray<File>,
+): Promise<void> {
+  const write = await reserveTraceOutput(platform);
+  if (write === null || files.length === 0) return;
   const options = TRACE_PRESETS[settings.presetName];
   const { project } = useStore.getState();
-  await runMultiFileTrace(files, pushToast, {
-    ...(options === undefined ? {} : { options }),
-    // Trace each file on the grid its placed size needs (ADR-409).
-    targetPxPerMm: traceTargetPxPerMm(project.device, project.machine?.kind),
-    output: {
-      format: settings.format,
-      groupContours: settings.groupContours,
-      precisionMm: settings.precisionMm,
-      ...tracePageOutput(settings),
-    },
-    write: (file) => writeTraceFileWithPlatform(platform, file),
-  });
+  const controller = new AbortController();
+  const progress = beginMultiFileTraceProgress(files.length, () => controller.abort());
+  try {
+    await runMultiFileTrace(files, pushToast, {
+      ...(options === undefined ? {} : { options }),
+      // Trace each file on the grid its placed size needs (ADR-409).
+      targetPxPerMm: traceTargetPxPerMm(project.device, project.machine?.kind),
+      output: {
+        format: settings.format,
+        groupContours: settings.groupContours,
+        precisionMm: settings.precisionMm,
+        ...tracePageOutput(settings),
+      },
+      signal: controller.signal,
+      onProgress: progress.update,
+      write,
+    });
+  } finally {
+    progress.end();
+  }
+}
+
+type TraceWriter = (file: BatchTraceFile) => Promise<boolean> | boolean;
+
+async function reserveTraceOutput(platform: PlatformAdapter): Promise<TraceWriter | null> {
+  const perFile: TraceWriter = (file) => writeTraceFileWithPlatform(platform, file);
+  if (platform.reserveSaveDirectory === undefined) return perFile;
+  let directory: SaveDirectoryTarget | null;
+  try {
+    // The folder picker must be the first await, inside the click's activation.
+    directory = await platform.reserveSaveDirectory();
+  } catch {
+    // No folder picker here (a browser without the File System Access
+    // directory API): each file is offered through its own save dialog.
+    return perFile;
+  }
+  return directory === null ? null : traceFileWriterForDirectory(directory);
 }
 
 function errMsg(err: unknown): string {
