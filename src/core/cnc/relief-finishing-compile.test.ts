@@ -146,6 +146,7 @@ describe('relief finishing compile (H.8)', () => {
         feedMmPerMin: 900,
         plungeMmPerMin: 200,
         spindleRpm: 12000,
+        rampEntryDeg: 5,
         reliefFinishToolId: 'bn-3175',
         reliefFinishStrategy,
         reliefRasterAxis,
@@ -173,6 +174,7 @@ describe('relief finishing compile (H.8)', () => {
         feedMmPerMin: 900,
         plungeMmPerMin: 200,
         spindleRpm: 12000,
+        rampEntryDeg: 5,
       });
       expect(groups[1]).toMatchObject({
         cutType: 'relief-finish',
@@ -190,7 +192,9 @@ describe('relief finishing compile (H.8)', () => {
       );
       const finish = groups[1];
       if (finish === undefined) throw new Error('finish group missing');
+      expect(finish.rampEntryDeg).toBeUndefined();
       const output = cncGrblStrategy.emit({ groups: [finish] }, DEFAULT_DEVICE_PROFILE);
+      expect(output).not.toContain('; cnc entry:');
       expect(output).toContain('; cnc motion: feed-mm-min: 321; plunge-mm-min: 123');
       expect(output).toMatch(/^M3 S9000$/m);
       expect(output).toMatch(/^G1\s*X[^\n]*F321$/m);
