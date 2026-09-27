@@ -243,3 +243,6 @@ cases. A ring's cost is therefore counted in its canonical curve's segments, not
 sampling of the curve): the 1 px diagonals are 4 to 6 segments. The 52 degree hairline beside a
 square costs 57 cubics (the raw-crack chain it replaced was 457 moves) and keeps both ends; its test
 bound is 64 moves, a pin on today's cost rather than the < 40 this ADR measured on the legacy tail.
+These are canonical-curve segments, not G-code moves: compilation flattens each cubic to G1 chords
+within `DEFAULT_MACHINE_CURVE_TOLERANCE_MM` (0.025 mm, `compilationPolylines`), or arc-fits it (ADR-432),
+so the machine move count of a ring depends on its placed size and is at least its segment count.
