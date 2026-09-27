@@ -2024,6 +2024,19 @@ authorization, Frame proof, controller command, or safety boundary.
   numbers. When a recovery is refused for a missing origin, the refusal names the saved origin
   and points here instead of to Set origin here, which would place the rest of the job where
   the head stopped (ADR-341 Amendment 5).
+- After a lost connection the recovery record also keeps how many lines had been sent: a
+  controller keeps running what it had received, so the head stops at the end of the last of
+  them. When the origin is gone, not reported or moved, **Continue from where the head stopped**
+  writes one `G92` that makes the head's current spot that program point, without moving the
+  head, and sets the restart to the next line. It is meant for a machine that was not homed
+  before the job, and only while nobody has moved the head since the stop; if the controller
+  itself restarted or lost power mid-burn the head stopped earlier, which Frame remaining area
+  shows before anything burns. The Review then reads as set from the head stop instead of
+  warning that the origin moved (ADR-341 Amendment 6).
+- The Review of an interrupted laser job opens by itself once the controller is connected after
+  a lost link, a controller restart, a failed write or a stalled stream, once per run in each
+  app session. It does not open after the operator's own Abort or a rejected line; the card
+  stays either way.
 - A recorded cause names what happened: **Abort** is recorded as stopped by the operator, and
   closing or reloading KerfDesk mid-job as the app closing (its stop may not have arrived);
   only a stop nobody requested reads as unexplained. A recovery card another window has

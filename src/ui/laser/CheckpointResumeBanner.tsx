@@ -1,7 +1,10 @@
 // Optional, newest-only recovery capsule. Archived jobs are observational
-// until the operator explicitly reaches a final supervised Start action.
+// until the operator explicitly reaches a final supervised Start action. A
+// laser job cut off by a lost link or a controller failure opens its Review by
+// itself once the controller is connected again (ADR-341 Amendment 6).
 
 import { useEffect, useMemo, useState } from 'react';
+import type { JobInterruptionKind } from '../../core/recovery';
 import { jobAwareAlert, jobAwareConfirm } from '../state/job-aware-dialogs';
 import { useLaserStore } from '../state/laser-store';
 import { isActiveJob } from '../state/laser-store-helpers';
@@ -32,6 +35,11 @@ export function CheckpointResumeBanner(props: {
   const jobActive = useLaserStore((state) => isActiveJob(state.streamer));
   const [reviewOpen, setReviewOpen] = useState(false);
   const claimActive = useRecoveryClaimActive(capsule?.claim);
+  useAutoOpenReview(
+    capsule,
+    { jobActive, pendingStart: pendingStart !== null, claimActive, busy: props.busy },
+    setReviewOpen,
+  );
   // A pending Start may already have reached the controller. Never offer the
   // older capsule during the short owner lease; it returns only if arming is
   // cancelled, otherwise the candidate commits or reconciles as newest.
@@ -71,6 +79,46 @@ export function CheckpointResumeBanner(props: {
   );
 }
 
+// Link and controller failures, not the operator's own Stop, a rejected line
+// or a stop nobody could explain.
+const AUTO_OPEN_KINDS: ReadonlyArray<JobInterruptionKind> = [
+  'disconnect',
+  'controller-reboot',
+  'write-failed',
+  'stream-stalled',
+];
+
+// Runs whose Review already opened by itself in this app session; closing it
+// leaves the card, and the Review does not open again for that run.
+const autoOpenedRuns = new Set<string>();
+
+/** Opens an interrupted laser job's Review once the controller is connected,
+ * so the way to continue is in front of the operator after a reconnect. */
+function useAutoOpenReview(
+  capsule: RecoveryCapsule | null,
+  blockers: {
+    readonly jobActive: boolean;
+    readonly pendingStart: boolean;
+    readonly claimActive: boolean;
+    readonly busy: boolean;
+  },
+  setReviewOpen: (open: boolean) => void,
+): void {
+  const connected = useLaserStore((state) => state.connection.kind === 'connected');
+  const ready = !Object.values(blockers).some(Boolean);
+  const runId =
+    capsule !== null &&
+    capsule.artifact.machineKind === 'laser' &&
+    AUTO_OPEN_KINDS.includes(capsule.interruption.kind)
+      ? capsule.runId
+      : null;
+  useEffect(() => {
+    if (!ready || !connected || runId === null || autoOpenedRuns.has(runId)) return;
+    autoOpenedRuns.add(runId);
+    setReviewOpen(true);
+  }, [ready, connected, runId, setReviewOpen]);
+}
+
 /** The laser review with the live controller facts it compares against.
  * Mounted only while open, so a closed banner never re-renders on status
  * reports (ADR-352). */
@@ -96,6 +144,7 @@ function LaserRecoveryReview(props: {
       liveOriginSet={liveOriginSet}
       onFrameRemaining={(bounds) => frameRemainingRecoveryArea(props.capsule, bounds)}
       onRestoreOrigin={(saved) => useLaserStore.getState().restoreWorkOrigin(saved)}
+      onSetOriginAtHead={(point) => useLaserStore.getState().setOriginAtProgramPoint(point)}
     />
   );
 }

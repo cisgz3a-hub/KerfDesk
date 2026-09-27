@@ -75,18 +75,7 @@ export function buildResumeProgram(
     return { kind: 'error', reason: `Line must be between 1 and ${lines.length}.` };
   }
   const transform = options.laserTransform ?? LASER_RESUME_TRANSFORM_VERSION;
-  const state: LaserResumeModalState = {
-    units: 'G21',
-    spindle: 'M5',
-    motion: null,
-    wcs: 'G54',
-    sValue: null,
-    feed: null,
-    x: null,
-    y: null,
-    mist: false,
-    flood: false,
-  };
+  const state = initialModalState();
   const beam = nativeBeamFor(transform, options.laserDialect);
   const issue = scanToResumeLine(lines, fromLine, state, beam);
   if (issue !== null) return { kind: 'error', reason: issue };
@@ -103,6 +92,27 @@ export function buildResumeProgram(
   };
 }
 
+/**
+ * Where the program's head stands, in mm of G54 work coordinates, when the
+ * replay reaches `fromLine`: the end point of the last move before it. A lost
+ * link leaves the controller running what it had, so after the reconnect the
+ * head sits there, and recovery can set the origin from it (ADR-341 Amendment
+ * 6). Null when the program before that line cannot be followed, has not yet
+ * commanded both X and Y, or ran in another work coordinate system.
+ */
+export function resumeEntryPointMm(
+  gcode: string,
+  fromLine: number,
+): { readonly x: number; readonly y: number } | null {
+  const lines = gcode.split('\n');
+  if (!Number.isInteger(fromLine) || fromLine < 1 || fromLine > lines.length + 1) return null;
+  const state = initialModalState();
+  if (scanToResumeLine(lines, fromLine, state, null) !== null) return null;
+  if (state.x === null || state.y === null || state.wcs !== 'G54') return null;
+  const scale = state.units === 'G20' ? 25.4 : 1;
+  return { x: state.x * scale, y: state.y * scale };
+}
+
 // Smoothieware and Marlin programs get their own power commands from
 // transform 3 on (ADR-364). Earlier transforms wrote GRBL's for every program,
 // and their archived steps must still rebuild those exact bytes.
@@ -112,6 +122,21 @@ function nativeBeamFor(
 ): NativeLaserBeam | null {
   if (transform < 3 || dialect === undefined || dialect === 'grbl') return null;
   return createNativeLaserBeam(dialect);
+}
+
+function initialModalState(): LaserResumeModalState {
+  return {
+    units: 'G21',
+    spindle: 'M5',
+    motion: null,
+    wcs: 'G54',
+    sValue: null,
+    feed: null,
+    x: null,
+    y: null,
+    mist: false,
+    flood: false,
+  };
 }
 
 /** Follows the program up to the resume line, or says why the replay cannot. */

@@ -14,6 +14,11 @@
 // position as it did when the job ran: after a reset, a machine that was homed
 // before the job must be homed again first. The recovery review says so; this
 // action refuses only what it factually cannot do (no machine position).
+//
+// A machine that was not homed cannot get its origin back from the numbers.
+// Continue from where the head stopped (Amendment 6) writes the same kind of
+// G92 from the other end: the head has not moved since the link dropped, so
+// its current point is made the program point it stopped at.
 
 import { formatGcodeCoordinateMm } from '../../core/gcode/coordinate-format';
 import { inferCurrentMachinePosition, reportedWorkOffsetMm } from './infer-machine-position';
@@ -69,11 +74,60 @@ export async function restoreWorkOrigin(
   safeWrite: OriginSafeWrite,
   savedMm: SavedXyOffsetMm,
 ): Promise<void> {
+  await writeXyOffset(set, get, refs, safeWrite, RESTORE_ORIGIN_WRITE, () => savedMm);
+}
+
+/**
+ * Continue from where the head stopped (ADR-341 Amendment 6): after a lost
+ * link the controller ran what it had received and the head sits at the end of
+ * the last line sent. One G92 makes that point the program point `pointMm`
+ * without moving the head, so the rest of the job continues from it. Resolves
+ * to the XY work offset written, in mm from machine zero.
+ */
+export async function setOriginAtProgramPoint(
+  set: SetFn,
+  get: GetFn,
+  refs: LiveRefs,
+  safeWrite: OriginSafeWrite,
+  pointMm: SavedXyOffsetMm,
+): Promise<SavedXyOffsetMm> {
+  return writeXyOffset(set, get, refs, safeWrite, HEAD_STOP_ORIGIN_WRITE, (machineMm) => ({
+    x: machineMm.x - pointMm.x,
+    y: machineMm.y - pointMm.y,
+  }));
+}
+
+type XyOffsetWrite = { readonly label: string; readonly unconfirmedNotice: string };
+
+const RESTORE_ORIGIN_WRITE: XyOffsetWrite = {
+  label: 'Restore saved origin',
+  unconfirmedNotice: RESTORE_ORIGIN_UNCONFIRMED_NOTICE,
+};
+
+const HEAD_STOP_ORIGIN_WRITE: XyOffsetWrite = {
+  label: 'Continue from where the head stopped',
+  unconfirmedNotice:
+    '[lf2] Origin set from where the head stopped, but the controller has not confirmed the ' +
+    'new work offset. The recovery review keeps its last reported offset, which may still ' +
+    'differ. Wait for a new position report and frame the remaining area before you start.',
+};
+
+/** One G92 at the live machine position that makes the XY work offset
+ * `targetFor(machine)`, confirmed from the controller's own report. */
+async function writeXyOffset(
+  set: SetFn,
+  get: GetFn,
+  refs: LiveRefs,
+  safeWrite: OriginSafeWrite,
+  action: XyOffsetWrite,
+  targetFor: (machineMm: SavedXyOffsetMm) => SavedXyOffsetMm,
+): Promise<SavedXyOffsetMm> {
   await assertOriginActionReady(set, get, refs, safeWrite);
   const before = get();
   const reportInches = before.controllerSettings?.reportInches === true;
   const machineMm = inferCurrentMachinePosition(before.statusReport, before.wcoCache, reportInches);
   if (machineMm === null) throw new Error(RESTORE_ORIGIN_POSITION_UNKNOWN_MESSAGE);
+  const savedMm = targetFor(machineMm);
   const grblFamily = usesPrimaryWcs(before);
   const usesReportedOffset = before.capabilities.workOffsetSource !== 'host-recorded';
   const line = savedOriginRestoreLine(machineMm, savedMm, grblFamily);
@@ -87,7 +141,7 @@ export async function restoreWorkOrigin(
       get,
       refs,
       safeWrite,
-      'Restore saved origin',
+      action.label,
       async (write) => {
         if (!grblFamily) await write('G21\n');
         if (usesReportedOffset) confirmation.observe();
@@ -109,8 +163,9 @@ export async function restoreWorkOrigin(
     get().controllerSessionEpoch === sessionEpoch &&
     refs.writeEpoch === writeEpoch
   ) {
-    set((state) => ({ log: pushLog(state, RESTORE_ORIGIN_UNCONFIRMED_NOTICE) }));
+    set((state) => ({ log: pushLog(state, action.unconfirmedNotice) }));
   }
+  return savedMm;
 }
 
 function restoredOffsetConfirmation(

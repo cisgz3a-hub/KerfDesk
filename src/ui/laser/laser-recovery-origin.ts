@@ -51,7 +51,8 @@ export function recoveryOriginLostMessage(saved: WorkCoordinateOffset | null): s
     'reset or power loss clears an origin made with Set origin here. Setting a new origin ' +
     'where the head is now would shift the rest of the job. Put the saved origin back first: ' +
     "home the machine if it was reset, then use Restore saved origin in the interrupted job's " +
-    'Review.'
+    'Review. If the machine was not homed and the head has not moved since a lost ' +
+    'connection, use Continue from where the head stopped there instead.'
   );
 }
 

@@ -5,13 +5,16 @@
 // port can reset an Arduino-class controller, so the review shows the saved and
 // current origin side by side and can trace the remaining area. When they
 // differ, Restore saved origin puts the saved one back without moving the head
-// (Amendment 5). Nothing here gates the recovery Start.
+// (Amendment 5), and after a lost link Continue from where the head stopped
+// sets it from the head's stop point instead (Amendment 6). Nothing here gates
+// the recovery Start.
 
 import { useState } from 'react';
 import type { ExecutionArtifactV1, RecoveryCapsule } from '../state/recovery';
 import type { WorkCoordinateOffset } from '../state/origin-actions';
 import { describeJobOrigin, formatMm } from './job-review/job-review-format';
 import { formatOriginMm, sameRecoveryOrigin, savedWorkOffsetMm } from './laser-recovery-origin';
+import { ContinueFromHeadStop, type HeadStopContinue } from './LaserRecoveryHeadStop';
 import {
   remainingRecoveryWorkBounds,
   type RecoveryWorkBounds,
@@ -29,6 +32,8 @@ export type LaserRecoveryPlacementProps = {
   readonly onFrameRemaining?: (bounds: RecoveryWorkBounds) => Promise<void>;
   /** Writes the saved XY origin back at the live machine position; supplied by the host. */
   readonly onRestoreOrigin?: (savedMm: WorkCoordinateOffset) => Promise<void>;
+  /** Where the head stopped after a lost link, and the action that sets the origin from it. */
+  readonly headStop?: HeadStopContinue;
 };
 
 export function LaserRecoveryPlacement(props: LaserRecoveryPlacementProps): JSX.Element {
@@ -55,17 +60,18 @@ export function LaserRecoveryPlacement(props: LaserRecoveryPlacementProps): JSX.
           )}
         </Row>
       </dl>
-      <OriginComparison saved={saved} live={live} originGone={originGone} />
-      {saved !== null &&
-      props.onRestoreOrigin !== undefined &&
-      originNeedsRestoring(saved, live, originGone) ? (
-        <RestoreSavedOrigin
-          key={artifact.runId}
-          saved={saved}
-          disabled={props.disabled}
-          onRestore={props.onRestoreOrigin}
-        />
-      ) : null}
+      {props.headStop?.anchored === true ? null : (
+        <OriginComparison saved={saved} live={live} originGone={originGone} />
+      )}
+      <OriginRepair
+        key={artifact.runId}
+        saved={saved}
+        live={live}
+        originGone={originGone}
+        disabled={props.disabled}
+        {...(props.onRestoreOrigin === undefined ? {} : { onRestoreOrigin: props.onRestoreOrigin })}
+        {...(props.headStop === undefined ? {} : { headStop: props.headStop })}
+      />
       {artifact.kind === 'exact-execution' && props.onFrameRemaining !== undefined ? (
         <FrameRemaining
           key={artifact.runId}
@@ -98,6 +104,38 @@ function originNeedsRestoring(
   originGone: boolean,
 ): boolean {
   return live === null || originGone || !sameRecoveryOrigin(saved, live);
+}
+
+/** The two ways to give the job its origin back: the saved numbers, or the
+ * point where the head stopped after a lost link. Neither shows while the
+ * controller still has the origin the job ran with. */
+function OriginRepair(props: {
+  readonly saved: WorkCoordinateOffset | null;
+  readonly live: WorkCoordinateOffset | null;
+  readonly originGone: boolean;
+  readonly disabled: boolean;
+  readonly onRestoreOrigin?: (savedMm: WorkCoordinateOffset) => Promise<void>;
+  readonly headStop?: HeadStopContinue;
+}): JSX.Element {
+  const anchored = props.headStop?.anchored === true;
+  const uncertain =
+    props.saved === null || originNeedsRestoring(props.saved, props.live, props.originGone);
+  const showHeadStop = props.headStop !== undefined && (anchored || uncertain);
+  return (
+    <>
+      {props.saved !== null && props.onRestoreOrigin !== undefined && uncertain && !anchored ? (
+        <RestoreSavedOrigin
+          saved={props.saved}
+          disabled={props.disabled}
+          headStopOffered={showHeadStop}
+          onRestore={props.onRestoreOrigin}
+        />
+      ) : null}
+      {showHeadStop && props.headStop !== undefined ? (
+        <ContinueFromHeadStop {...props.headStop} disabled={props.disabled} />
+      ) : null}
+    </>
+  );
 }
 
 function OriginComparison(props: {
@@ -136,6 +174,7 @@ function OriginComparison(props: {
 function RestoreSavedOrigin(props: {
   readonly saved: WorkCoordinateOffset;
   readonly disabled: boolean;
+  readonly headStopOffered: boolean;
   readonly onRestore: (savedMm: WorkCoordinateOffset) => Promise<void>;
 }): JSX.Element {
   const [restoring, setRestoring] = useState(false);
@@ -159,8 +198,9 @@ function RestoreSavedOrigin(props: {
         {formatOriginMm(props.saved.y)} mm from machine zero without moving the head. That is where
         this job started only if the machine measures its position as it did then: if the controller
         was reset or lost power, home it first. A machine that was not homed before this job cannot
-        get its origin back from these numbers. Set origin here would put the origin where the head
-        is now, not where the job started.
+        get its origin back from these numbers
+        {props.headStopOffered ? '; use Continue from where the head stopped below instead' : ''}.
+        Set origin here would put the origin where the head is now, not where the job started.
       </p>
       <button
         type="button"
