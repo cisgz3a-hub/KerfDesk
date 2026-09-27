@@ -7,8 +7,8 @@
 // stays latched after hiding the image so its status remains visible until
 // the operator exits it.
 
-import { useStore } from '../state';
 import { useCameraStore } from '../state/camera-store';
+import { useActiveCameraModel } from './active-camera-model';
 import { useCameraPlacementControls } from './use-camera-placement-controls';
 import { TraceFromCameraButton } from './TraceFromCameraButton';
 import { AccuracyMapToggle } from './accuracy/AccuracyMapToggle';
@@ -16,7 +16,7 @@ import { HeightAreasControl } from './heights/HeightAreasControl';
 import { PiecesControl } from './pieces/PiecesControl';
 
 export function OverlayControls(): JSX.Element | null {
-  const model = useStore((s) => s.project.device.cameraModel);
+  const model = useActiveCameraModel();
   return model === undefined ? null : <CalibratedOverlayControls />;
 }
 
