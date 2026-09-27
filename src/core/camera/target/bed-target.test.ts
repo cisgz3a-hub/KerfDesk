@@ -38,7 +38,7 @@ describe('bedTargetLayout', () => {
     const layout = bedTargetLayout({ area: { x: 5, y: 5, width: 90, height: 90 } });
     expect(layout.spacingMm).toBeLessThan(40);
     expect(layout.spacingMm / layout.ringDiameterMm).toBeCloseTo(4);
-    expect(layout.marks.length).toBeGreaterThanOrEqual(12);
+    expect(layout.marks).toHaveLength(20);
     expect(markAt(layout, 0, 0)?.anchor).toBe(true);
     expect(markAt(layout, 1, 0)?.anchor).toBe(true);
     expect(markAt(layout, 0, 2)?.anchor).toBe(true);

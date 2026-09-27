@@ -46,8 +46,8 @@ const RING_WIDTH_SHARE = 0.18;
 // Keep every ring fully inside the area.
 const EDGE_CLEARANCE_SHARE = 0.75;
 // The fewest columns and rows that hold the anchor L with rings around it.
-const MIN_COLS = 3;
-const MIN_ROWS = 4;
+const MIN_COLS = 4;
+const MIN_ROWS = 5;
 // Rounding slack when the smallest grid exactly fills the area.
 const FIT_EPSILON_MM = 1e-9;
 
@@ -66,9 +66,10 @@ export function bedTargetLayout(options: BedTargetOptions): BedTargetLayout {
   const rows = Math.max(MIN_ROWS, gridCount(area.height - 2 * clearance, spacing));
   const x0 = area.x + (area.width - (cols - 1) * spacing) / 2;
   const y0 = area.y + (area.height - (rows - 1) * spacing) / 2;
-  // Origin anchor near the middle, with room for both arms of the L.
-  const originCol = Math.min(Math.floor((cols - 1) / 2), cols - 2);
-  const originRow = Math.min(Math.floor((rows - 1) / 2), rows - 3);
+  // Leave a ring beyond both arms: the detector rejects an anchor whose
+  // neighbours all lie on one side, even when the anchor itself fits.
+  const originCol = Math.min(Math.floor((cols - 1) / 2), cols - 3);
+  const originRow = Math.min(Math.floor((rows - 1) / 2), rows - 4);
   const marks: BedTargetMark[] = [];
   for (let r = 0; r < rows; r += 1) {
     for (let c = 0; c < cols; c += 1) {

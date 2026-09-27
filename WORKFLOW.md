@@ -6597,7 +6597,9 @@ as the pane's design record.
 - **Reuse / target already engraved.** **Target already engraved** skips the job and goes to the
   photo, using the same margins.
 - **Edge / small bed.** When the usual grid of 10 mm rings 40 mm apart does not fit inside the
-  margins, the rings and spacing shrink together so every ring stays on the bed (Amendment 3).
+  margins, the rings and spacing shrink together so every ring stays on the bed. The grid keeps
+  rings around all three solid anchors. Engrave a new target if an older one ran off the bed or
+  placed an anchor on the grid's edge (Amendment 3).
 - **Error / engrave not started or stopped.** If review, preflight or confirmation stops the job,
   or the stream errors, is cancelled or disconnects, the wizard returns to setup with the reason.
 - **Error / rings not found.** No rings, anchors covered, a mirrored picture or too few rings each
