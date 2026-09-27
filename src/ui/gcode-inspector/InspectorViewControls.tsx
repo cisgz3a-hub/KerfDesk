@@ -1,6 +1,8 @@
-// Camera direction, progress following and local screenshot export.
+// Camera direction, projection, progress following and local screenshot export.
 
 import { CAMERA_PRESETS, CAMERA_PRESET_LABEL, type CameraPreset } from '../viewer3d';
+// Deep import: the viewer3d barrel is capped at 20 exports by its index contract.
+import type { Viewer3dProjection } from '../viewer3d/camera-presets';
 import './inspector-viewer.css';
 
 export type InspectorCameraMode = 'manual' | 'follow' | 'auto';
@@ -21,9 +23,9 @@ const CAMERA_MODES: ReadonlyArray<{
 
 const VIEW_HINT: Readonly<Record<CameraPreset, string>> = {
   iso: 'Three-quarter view',
-  top: 'Look straight down (XY)',
-  front: 'Look along +Y (XZ)',
-  right: 'Look along -X (YZ)',
+  top: 'Look straight down (XY), orthographic',
+  front: 'Look along +Y (XZ), orthographic',
+  right: 'Look along -X (YZ), orthographic',
 };
 
 export function InspectorViewControls(props: {
@@ -32,8 +34,11 @@ export function InspectorViewControls(props: {
   readonly cameraMode: InspectorCameraMode;
   readonly onCameraModeChange: (mode: InspectorCameraMode) => void;
   readonly onFit: () => void;
+  readonly projection: Viewer3dProjection;
+  readonly onProjectionChange: (projection: Viewer3dProjection) => void;
   readonly disabled?: boolean;
 }): JSX.Element {
+  const ortho = props.projection === 'orthographic';
   return (
     <div className="gcode-viewer-controls" aria-label="View controls">
       <div className="gcode-viewer-control-row" role="group" aria-label="Camera mode">
@@ -68,7 +73,17 @@ export function InspectorViewControls(props: {
         <button
           type="button"
           className="lf-btn gcode-viewer-button"
-          title="Fit the whole program in view"
+          aria-pressed={ortho}
+          title="Orthographic view: no perspective, so sizes read true across the view"
+          disabled={props.disabled}
+          onClick={() => props.onProjectionChange(ortho ? 'perspective' : 'orthographic')}
+        >
+          Ortho
+        </button>
+        <button
+          type="button"
+          className="lf-btn gcode-viewer-button"
+          title="Fit the whole program in view from this direction"
           disabled={props.disabled}
           onClick={props.onFit}
         >

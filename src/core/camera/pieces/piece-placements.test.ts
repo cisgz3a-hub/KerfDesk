@@ -73,7 +73,7 @@ describe('piecePlacements', () => {
   it('keeps the design where it is on the sample and repeats it on the other pieces', () => {
     const placements = piecePlacements({
       pieces: [others[0] as DetectedPiece, sample, others[1] as DetectedPiece],
-      design: { centre: { x: 110, y: 95 }, width: 40, height: 20 },
+      design: { centre: { x: 110, y: 95 }, width: 40, height: 20, turnDeg: 0 },
       sample,
     });
     expect(placements[0]).toEqual({ dx: 0, dy: 0, rotationDeg: 0 });
@@ -90,7 +90,7 @@ describe('piecePlacements', () => {
   it('moves the design itself to the first piece when its own piece is left out', () => {
     const placements = piecePlacements({
       pieces: others,
-      design: { centre: { x: 100, y: 100 }, width: 40, height: 20 },
+      design: { centre: { x: 100, y: 100 }, width: 40, height: 20, turnDeg: 0 },
       sample,
     });
     expect(placements).toHaveLength(2);
@@ -101,7 +101,7 @@ describe('piecePlacements', () => {
   it('centres the design on each piece, long side along the long side, with no sample', () => {
     const placements = piecePlacements({
       pieces: others,
-      design: { centre: { x: 20, y: 30 }, width: 10, height: 40 },
+      design: { centre: { x: 20, y: 30 }, width: 10, height: 40, turnDeg: 0 },
       sample: null,
     });
     const centre = land({ x: 20, y: 30 }, placements[0] as ArrayPlacement);

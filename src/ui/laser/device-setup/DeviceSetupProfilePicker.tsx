@@ -37,7 +37,10 @@ export function DeviceSetupProfilePicker({ state, dispatch }: DeviceSetupStepPro
       <div className="lf-setup-catalog-heading">
         <div>
           <h4>Start with a machine profile</h4>
-          <p>Choose a card to start from it. Every value stays editable in the next step.</p>
+          <p>
+            Choose a profile, then Review &amp; save to apply it. Use Check essentials to adjust the
+            settings first.
+          </p>
         </div>
         <input
           type="search"

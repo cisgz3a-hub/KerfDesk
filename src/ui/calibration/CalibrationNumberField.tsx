@@ -1,4 +1,5 @@
 import type { ChangeEvent, CSSProperties } from 'react';
+import { calibrationFieldStyle } from './calibration-dialog-styles';
 
 export function CalibrationNumberField(props: {
   readonly label: string;
@@ -12,7 +13,7 @@ export function CalibrationNumberField(props: {
   readonly onChange: (event: ChangeEvent<HTMLInputElement>) => void;
 }): JSX.Element {
   return (
-    <label style={fieldStyle}>
+    <label style={calibrationFieldStyle}>
       <span>{props.label}</span>
       <input
         type="number"
@@ -31,10 +32,4 @@ export function CalibrationNumberField(props: {
   );
 }
 
-const fieldStyle: CSSProperties = {
-  display: 'flex',
-  flexDirection: 'column',
-  gap: 3,
-  fontSize: 12,
-};
 const inputStyle: CSSProperties = { width: '100%', boxSizing: 'border-box' };

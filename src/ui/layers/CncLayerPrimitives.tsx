@@ -10,11 +10,16 @@ export function Row(props: {
   readonly label: string;
   readonly children: React.ReactNode;
   readonly stacked?: boolean;
+  /** Stacked rows name the unit beside the label, so every box fills its column. */
+  readonly unit?: string;
 }): JSX.Element {
   return (
     <div className="lf-cnc-setting-row" style={props.stacked ? stackedRowStyle : rowStyle}>
       {props.label.length > 0 ? (
-        <span style={props.stacked ? stackedLabelStyle : labelStyle}>{props.label}</span>
+        <span style={props.stacked ? stackedLabelStyle : labelStyle}>
+          {props.label}
+          {props.unit ? <small style={stackedUnitStyle}>{props.unit}</small> : null}
+        </span>
       ) : null}
       <div className="lf-cnc-setting-value" style={props.stacked ? stackedValueStyle : valueStyle}>
         {props.children}
@@ -49,8 +54,9 @@ export function NumberField(props: NumberFieldProps): JSX.Element {
       return Math.max(props.min, Math.min(props.max, n));
     },
   });
+  const unitBesideBox = props.stacked !== true && props.unit.length > 0;
   return (
-    <Row label={props.label} {...(props.stacked ? { stacked: true } : {})}>
+    <Row label={props.label} {...(props.stacked ? { stacked: true, unit: props.unit } : {})}>
       <input
         type="number"
         {...(props.positiveOnly === true ? {} : { min: props.min, max: props.max })}
@@ -62,7 +68,7 @@ export function NumberField(props: NumberFieldProps): JSX.Element {
         aria-label={`${props.label} for ${props.layer.color}`}
         title={props.title}
       />
-      {props.unit.length > 0 ? <span style={unitStyle}>{props.unit}</span> : null}
+      {unitBesideBox ? <span style={unitStyle}>{props.unit}</span> : null}
     </Row>
   );
 }
@@ -109,9 +115,20 @@ const stackedRowStyle: React.CSSProperties = {
   minWidth: 0,
   alignContent: 'start',
 };
+// Like the laser Power % / Speed mm/min labels: a unit that does not fit
+// beside its name drops to the next line instead of squeezing the box.
 const stackedLabelStyle: React.CSSProperties = {
+  display: 'flex',
+  flexWrap: 'wrap',
+  alignItems: 'baseline',
+  columnGap: 4,
   fontSize: 13,
   color: 'var(--lf-text)',
+};
+const stackedUnitStyle: React.CSSProperties = {
+  fontSize: 12,
+  fontWeight: 400,
+  color: 'var(--lf-text-muted)',
 };
 const stackedValueStyle: React.CSSProperties = {
   display: 'flex',
