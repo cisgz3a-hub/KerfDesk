@@ -22,7 +22,7 @@ export const CNC_TUTORIALS: readonly Tutorial[] = [
       {
         title: 'Set the depth in passes',
         instruction:
-          'Enter Cut depth and Depth per pass. Set to stock thickness copies the measured stock value; any extra depth remains your separate setup decision. Check Feed, Plunge and Artwork spindle speed.',
+          'Enter Cut depth and Depth per pass. Set to stock thickness copies the measured stock value; any extra depth remains your separate setup decision. Check Feed, Plunge and Spindle speed.',
         focus: 'Cut depth · Depth per pass',
         result: 'The same contour can be cut in several depth passes.',
       },
@@ -35,7 +35,7 @@ export const CNC_TUTORIALS: readonly Tutorial[] = [
         visual: 'preview',
       },
     ],
-    tip: 'The selected bit diameter affects the offset. Choose the correct bit in Tool & material before compensating by resizing the artwork.',
+    tip: 'The selected bit diameter affects the offset. Choose the correct Bit before compensating by resizing the artwork.',
     keywords: ['cnc', 'profile', 'outside', 'inside', 'on path', 'contour', 'depth', 'leads'],
     related: ['tool-library', 'cnc-tabs', 'preview', 'cnc-probe', 'frame-start'],
   },
@@ -73,7 +73,7 @@ export const CNC_TUTORIALS: readonly Tutorial[] = [
         visual: 'preview',
       },
     ],
-    tip: 'Pocket roughing can use a separate bit assigned in Tool & material. Inspect the resulting tool changes before running.',
+    tip: 'Pocket roughing can use a separate Pocket roughing bit, chosen under Bit. Inspect the resulting tool changes before running.',
     keywords: [
       'pocket',
       'clear',
@@ -108,7 +108,7 @@ export const CNC_TUTORIALS: readonly Tutorial[] = [
       {
         title: 'Match the bit and depth',
         instruction:
-          'Choose the bit in Tool & material. Enter Cut depth, Depth per pass, Feed, Plunge and Artwork spindle speed for your setup.',
+          'Choose the Bit. Enter Cut depth, Depth per pass, Feed, Plunge and Spindle speed for your setup.',
         focus: 'Bit and Cut depth',
         result: 'The groove depth and cutter shape together determine the resulting mark.',
       },
@@ -148,7 +148,7 @@ export const CNC_TUTORIALS: readonly Tutorial[] = [
       {
         title: 'Choose the real angled cutter',
         instruction:
-          'Select the artwork, choose the intended bit in Tool & material and choose V-carve (angled bit). Verify the cutter diameter, angle and any tip diameter against its bit-library entry.',
+          'Select the artwork, choose the intended Bit and choose V-carve (angled bit). Verify the cutter diameter, angle and any tip diameter against its bit-library entry.',
         focus: 'Bit geometry',
         result: 'The planned depth reflects the selected cutter geometry.',
       },
@@ -163,7 +163,7 @@ export const CNC_TUTORIALS: readonly Tutorial[] = [
       {
         title: 'Plan any separate clearing bit',
         instruction:
-          'For flat-floor work, choose a Floor clearing bit in Tool & material when you want another bit to clear the core. Review its operation values and any tool changes.',
+          'For flat-floor work, choose a Floor clearing bit under Bit when you want another bit to clear the core. Review its operation values and any tool changes.',
         focus: 'V-carve floor clearing',
         result: 'The clearing work and angled finishing work have explicit cutter assignments.',
         visual: 'layers',

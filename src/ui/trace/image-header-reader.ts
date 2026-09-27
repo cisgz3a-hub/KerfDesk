@@ -3,9 +3,16 @@ import { traceAbortError } from './trace-cancellation';
 const IMAGE_HEADER_PROBE_BYTES = 64 * 1024;
 
 export async function readImageHeader(file: File, signal?: AbortSignal): Promise<Uint8Array> {
-  return new Uint8Array(
-    await readBlobAsArrayBuffer(file.slice(0, IMAGE_HEADER_PROBE_BYTES), signal),
-  );
+  return readImagePrefix(file, IMAGE_HEADER_PROBE_BYTES, signal);
+}
+
+// The first maxBytes of a file, without reading the rest into memory.
+export async function readImagePrefix(
+  file: Blob,
+  maxBytes: number,
+  signal?: AbortSignal,
+): Promise<Uint8Array> {
+  return new Uint8Array(await readBlobAsArrayBuffer(file.slice(0, maxBytes), signal));
 }
 
 function readBlobAsArrayBuffer(blob: Blob, signal?: AbortSignal): Promise<ArrayBuffer> {

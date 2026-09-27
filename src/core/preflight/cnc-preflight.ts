@@ -20,6 +20,7 @@ import {
   findDroppedCncLayers,
 } from '../cnc';
 import { cncMaxFeedMmPerMin } from '../cnc/cnc-head-feeds';
+import { rampEntryPlungesByLayer } from '../cnc/contour-ramp-entry';
 import { findCncVCarveEntryIssues } from '../cnc/vcarve-entry-diagnostics';
 import { isVCarveToolCompatible } from '../cnc/vcarve-tool-compatibility';
 import { machineBoundsForDevice } from '../devices';
@@ -73,6 +74,7 @@ export function runCncPreflight(
     appendCncLayerIssues(layer, cncMaxFeedMmPerMin(project.device, config.params), config, issues);
   }
   appendSourceGeometryIssues(project, config, options, issues);
+  appendRampEntryPlungeIssues(options.compiledJob, issues);
   issues.push(...findCncMotionBoundsPreflightIssues(project.device, gcode, options));
   appendNonFiniteCoordIssues(gcode, issues);
   appendNoGoZoneIssues(project, config, gcode, options, issues);
@@ -152,6 +154,23 @@ function appendVCarveEntryIssues(
     issues.push({
       code: 'cnc-vcarve-entry-fallback',
       message: `Layer ${issue.layerId}: ${issue.reason} Set Ramp entry to 0 to remove this notice.`,
+    });
+  }
+}
+
+// ADR-471: the compiled job marks each pass its ramp entry left to plunge.
+// Advisory only: the program is complete and every other entry ramps.
+function appendRampEntryPlungeIssues(compiledJob: Job | undefined, issues: PreflightIssue[]): void {
+  if (compiledJob === undefined) return;
+  for (const plunges of rampEntryPlungesByLayer(compiledJob)) {
+    const passes = plunges.passes === 1 ? '1 pass plunges' : `${plunges.passes} passes plunge`;
+    const helix = plunges.pocket ? ' A pocket can use Helical entry instead.' : '';
+    issues.push({
+      code: 'cnc-ramp-entry-plunge',
+      message:
+        `Layer ${plunges.layerId}: ${passes} straight down instead of ramping: ` +
+        `a path shorter than one cut width is too short to ramp along.${helix} ` +
+        'Set Ramp entry to 0 to remove this notice.',
     });
   }
 }

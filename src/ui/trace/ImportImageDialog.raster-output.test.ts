@@ -273,6 +273,18 @@ describe('Trace Image raster output', () => {
     expect(ctx.traceExistingImage).toHaveBeenCalledTimes(1);
   });
 
+  it('keeps a Line + fill trace as vectors when Raster scan is requested (ADR-454)', async () => {
+    const source = sourceRaster();
+    const ctx = context(() => projectWith(source, imageOperation()));
+
+    await commit(commitArgs(source, 'Line + fill'), ctx);
+
+    // One render style for every path would turn its fills into outline rings.
+    expect(buildBitmapFromVectors).not.toHaveBeenCalled();
+    expect(ctx.commitRasterizedTrace).not.toHaveBeenCalled();
+    expect(ctx.traceExistingImage).toHaveBeenCalledTimes(1);
+  });
+
   it('rejects a raster result if the machine switches to CNC during materialization', async () => {
     const source = sourceRaster();
     const operation = imageOperation();

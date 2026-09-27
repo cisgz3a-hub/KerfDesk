@@ -63,13 +63,13 @@ function isOpenPolyline(polyline: Polyline): boolean {
   return polyline.points.length >= 2 && !isClosedEnough(polyline);
 }
 
-function pickableObjects(scene: Scene): ReadonlyArray<SceneObject> {
+export function pickableObjects(scene: Scene): ReadonlyArray<SceneObject> {
   return scene.objects.filter(
     (object) => object.locked !== true && sceneObjectHasVisibleLayer(scene, object),
   );
 }
 
-function selectIds(state: AppState, ids: ReadonlyArray<string>): Partial<AppState> {
+export function selectIds(state: AppState, ids: ReadonlyArray<string>): Partial<AppState> {
   return {
     ...scopedSelectionProjectPatch(state, selectionFromIds(state, ids, false)),
     selectedPathNode: null,

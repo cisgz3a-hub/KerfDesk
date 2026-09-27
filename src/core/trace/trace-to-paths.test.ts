@@ -311,6 +311,13 @@ describe('filled-contour backend routing', () => {
     }
     expect(isBinaryContourPreset(TRACE_PRESETS['Centerline'] as TraceOptions)).toBe(false);
     expect(isBinaryContourPreset(TRACE_PRESETS['Edge Detection'] as TraceOptions)).toBe(false);
+    expect(isBinaryContourPreset(TRACE_PRESETS['Line + fill'] as TraceOptions)).toBe(false);
+    expect(
+      isBinaryContourPreset({
+        ...TRACE_PRESETS['Line + fill'],
+        supersampleContour: true,
+      } as TraceOptions),
+    ).toBe(false);
     // A multi-colour, no-fixed-palette option falls through to imagetracerjs.
     expect(isBinaryContourPreset({ numberOfColors: 8 } as TraceOptions)).toBe(false);
   });

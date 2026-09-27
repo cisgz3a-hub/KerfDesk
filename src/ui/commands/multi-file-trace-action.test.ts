@@ -266,7 +266,11 @@ describe('runMultiFileTrace', () => {
 
     expect(write).toHaveBeenCalledTimes(2);
     expect(writtenFiles).toEqual(['logo-trace.svg', 'logo-2-trace.svg']);
-    expect(pushToast).toHaveBeenCalledWith('Traced 2 images to SVG.', 'success');
+    // The fixtures carry no bytes, so both were sized at the default DPI.
+    expect(pushToast).toHaveBeenCalledWith(
+      'Traced 2 images to SVG. 2 of 2 images had no embedded DPI and were sized at 254 DPI.',
+      'success',
+    );
   });
 
   it('exports physical SVG dimensions from the source image size, not the sampled trace grid', async () => {
@@ -365,7 +369,8 @@ describe('runMultiFileTrace', () => {
 
     expect(written).toEqual(['logo-trace.svg', 'badge-trace.svg']);
     expect(pushToast).toHaveBeenCalledWith(
-      'Traced 2 images to SVG. Skipped 1 image with no visible paths (blank.png); try Trace Image with an adjusted threshold or import as Image instead.',
+      'Traced 2 images to SVG. 2 of 2 images had no embedded DPI and were sized at 254 DPI. ' +
+        'Skipped 1 image with no visible paths (blank.png); try Trace Image with an adjusted threshold or import as Image instead.',
       'warning',
     );
   });
@@ -390,7 +395,10 @@ describe('runMultiFileTrace', () => {
     );
     const file = (write.mock.calls[0] as unknown as [{ readonly text: string }])[0];
     expect(file.text).toContain('LWPOLYLINE');
-    expect(pushToast).toHaveBeenCalledWith('Traced 1 image to DXF.', 'success');
+    expect(pushToast).toHaveBeenCalledWith(
+      'Traced 1 image to DXF. It had no embedded DPI, so it was sized at 254 DPI.',
+      'success',
+    );
   });
 });
 

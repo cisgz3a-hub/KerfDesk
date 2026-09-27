@@ -6,6 +6,7 @@ import { placeBoardCommand } from './board-capture-command-family';
 import { adjustImageCommand, processedRasterToolCommands } from './command-raster-family';
 import { vectorBooleanCommands } from './vector-boolean-commands';
 import { offsetShapesCommand, wireframeCommand } from './editing-tools-commands';
+import { designToolsCommands } from './design-tools-commands';
 import { windowPanelCommands } from './window-panel-commands';
 import { rotarySetupCommand } from './rotary-command-family';
 import { labsCommand } from './labs-command-family';
@@ -51,13 +52,14 @@ export function toolsCommands(ctx: AppCommandContext): ReadonlyArray<AppCommand>
       'tools.multi-file-trace',
       'tools',
       'Multi-File Trace...',
-      'Trace multiple image files to SVG or DXF exports',
+      'Trace multiple image files to SVG, DXF, PDF, EPS or GeoJSON exports',
       ctx.multiFileTrace,
     ),
     convertToPathCommand(ctx),
     weldCommand(ctx),
     ...vectorBooleanCommands(ctx),
     offsetShapesCommand(ctx),
+    ...designToolsCommands(ctx),
     ctx.hasFillableSelection
       ? enabled(
           'tools.fill-selection',

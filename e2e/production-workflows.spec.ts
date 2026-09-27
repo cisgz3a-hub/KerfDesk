@@ -775,7 +775,7 @@ test('preserves an interrupted laser checkpoint after a cable disconnect', async
 
   // Make the live canvas differ from the archived run before opening its review.
   await selectAll(page);
-  await expect(page.getByRole('spinbutton', { name: 'Selection X position' })).toHaveValue('10');
+  await expect(page.getByLabel('Selection X position', { exact: true })).toHaveValue('10');
   await fillAndCommit(page, 'Selection X position', '47');
   await (await toolbarCommand(page, 'Save As...')).click();
   const currentProject = await savedProject(kerfdesk);
@@ -805,7 +805,7 @@ test('preserves an interrupted laser checkpoint after a cable disconnect', async
   await review.screenshot({ path: testInfo.outputPath('saved-laser-restart-preview.png') });
   await review.getByRole('button', { name: 'Close', exact: true }).click();
   await expect(review).not.toBeVisible();
-  await expect(page.getByRole('spinbutton', { name: 'Selection X position' })).toHaveValue('47');
+  await expect(page.getByLabel('Selection X position', { exact: true })).toHaveValue('47');
 
   await (await toolbarCommand(page, 'Save As...')).click();
   await expect
@@ -841,7 +841,7 @@ test('preserves an interrupted laser checkpoint after a cable disconnect', async
   await expect(review).toContainText('Exact job artifact saved');
   await expect(review.getByRole('img', { name: /^Laser recovery canvas:/ })).toBeVisible();
   await review.getByRole('button', { name: 'Close', exact: true }).click();
-  await expect(page.getByRole('spinbutton', { name: 'Selection X position' })).toHaveValue('47');
+  await expect(page.getByLabel('Selection X position', { exact: true })).toHaveValue('47');
 });
 
 test('prepares a large image restart preview and starts only the selected remainder', async ({
@@ -856,10 +856,10 @@ test('prepares a large image restart preview and starts only the selected remain
     { name: 'restart-image.png', kind: 'png-fixture', width: 600, height: 600 },
   ]);
   await (await toolbarCommand(page, 'Import...')).click();
-  await expect(page.getByRole('spinbutton', { name: 'Selection width' })).toHaveValue('60');
-  await page.getByRole('spinbutton', { name: 'Selection width' }).click();
+  await expect(page.getByLabel('Selection width', { exact: true })).toHaveValue('60');
+  await page.getByLabel('Selection width', { exact: true }).click();
   await fillAndCommit(page, 'Selection width', '20');
-  await page.getByRole('spinbutton', { name: 'Selection height' }).click();
+  await page.getByLabel('Selection height', { exact: true }).click();
   await fillAndCommit(page, 'Selection height', '20');
   await connectAndHome(page, kerfdesk);
   await dismissNotifications(page);
@@ -954,10 +954,10 @@ test('paints, erases, adjusts and recovers a second pass from a completed image'
     { name: 'painted-image.png', kind: 'png-fixture', width: 120, height: 120 },
   ]);
   await (await toolbarCommand(page, 'Import...')).click();
-  await expect(page.getByRole('spinbutton', { name: 'Selection width' })).toHaveValue('12');
-  await page.getByRole('spinbutton', { name: 'Selection width' }).click();
+  await expect(page.getByLabel('Selection width', { exact: true })).toHaveValue('12');
+  await page.getByLabel('Selection width', { exact: true }).click();
   await fillAndCommit(page, 'Selection width', '20');
-  await page.getByRole('spinbutton', { name: 'Selection height' }).click();
+  await page.getByLabel('Selection height', { exact: true }).click();
   await fillAndCommit(page, 'Selection height', '20');
   await connectAndHome(page, kerfdesk);
   await frameCurrentJob(page, kerfdesk);
@@ -1036,7 +1036,7 @@ test('paints, erases, adjusts and recovers a second pass from a completed image'
   await expect(page.getByText(/Job recovery tracking hit an unexpected error/)).toHaveCount(0);
   await workbench.screenshot({ path: testInfo.outputPath('painted-image-second-pass.png') });
   await workbench.getByRole('button', { name: 'Close', exact: true }).click();
-  await expect(page.getByRole('spinbutton', { name: 'Selection X position' })).toHaveValue('47');
+  await expect(page.getByLabel('Selection X position', { exact: true })).toHaveValue('47');
   await paintButton.click();
   await expect(
     workbench.getByRole('button', { name: 'Paint 1 · 150%', exact: true }),
@@ -1101,7 +1101,7 @@ test('uses jog speed for XY buttons and return to work zero without hijacking ca
   await kerfdesk.emitSerialLine('<Idle|MPos:10.000,10.000,0.000|WCO:0.000,0.000,0.000|FS:0,0>');
 
   const jogWritesBeforeArrow = jogWriteCount(await kerfdesk.events());
-  const selectionY = page.getByRole('spinbutton', { name: 'Selection Y position' });
+  const selectionY = page.getByLabel('Selection Y position', { exact: true });
   const selectionYBeforeArrow = Number(await selectionY.inputValue());
   await page.keyboard.press('ArrowUp');
   await expect(selectionY).toHaveValue(String(selectionYBeforeArrow - 1));
@@ -1208,7 +1208,7 @@ async function dismissNotifications(page: Page): Promise<void> {
 }
 
 async function fillAndCommit(page: Page, name: string, value: string): Promise<void> {
-  const input = page.getByRole('spinbutton', { name });
+  const input = page.getByLabel(name, { exact: true });
   await input.fill(value);
   await input.press('Tab');
   await expect(input).toHaveValue(value);
@@ -1217,7 +1217,10 @@ async function fillAndCommit(page: Page, name: string, value: string): Promise<v
 async function runMenuCommand(page: Page, family: string, command: string): Promise<void> {
   const applicationMenu = page.getByRole('menubar', { name: 'Application menu' });
   await applicationMenu.getByRole('menuitem', { name: family, exact: true }).click();
-  await applicationMenu.getByRole('menuitem').filter({ hasText: command }).click();
+  await applicationMenu
+    .getByRole('menuitem')
+    .filter({ has: page.getByText(command, { exact: true }) })
+    .click();
 }
 
 async function enableLab(page: Page, label: string): Promise<void> {

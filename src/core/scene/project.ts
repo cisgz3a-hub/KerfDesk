@@ -11,9 +11,10 @@ import type { PrintAndCutDesignTargets } from './print-and-cut';
 // bitmap if allowed to silently ignore its clip geometry.
 // v10 adds perforation and overcut (ADR-415). An older reader would ignore them
 // and cut straight through a perforated line.
-// v11 adds independent CNC stage recipes (ADR-457). Older readers must not
-// silently ignore feeds, spindle speed, or depth settings that change motion.
-export const PROJECT_SCHEMA_VERSION = 11 as const;
+// v11 introduced independent CNC stage recipes (ADR-457); a parallel v11 build
+// introduced path text alignment (ADR-480). v12 preserves both contracts so
+// neither older reader can silently drop motion settings or text placement.
+export const PROJECT_SCHEMA_VERSION = 12 as const;
 
 export type EmbeddedFont = {
   readonly key: string;

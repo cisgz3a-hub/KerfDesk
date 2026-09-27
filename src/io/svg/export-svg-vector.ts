@@ -23,7 +23,7 @@ import {
   curvesBounds,
   transformCurveSubpathExact,
 } from '../../core/vector-export/affine-curves';
-import { groupContoursWithHoles } from '../../core/vector-export/contour-nesting';
+import { provenContourGroups } from '../../core/vector-export/proven-contour-groups';
 import { decimalGridAtMost, type DecimalGrid } from '../../core/vector-export/decimal-grid';
 import { formatSvgPathData, quantizeCurves } from '../../core/vector-export/svg-path-data';
 import { svgMatrixAttribute, svgObjectMatrix, xmlText } from './export-svg-paths';
@@ -98,15 +98,24 @@ function filledMarkup(
         '" fill-rule="' +
         paint.fillRule +
         '" stroke="none"/>';
-  return options.groupContours ? groupedMarkup(closed, fillPath) : fillPath(closed);
+  return options.groupContours ? groupedMarkup(closed, fillPath, paint.fillRule) : fillPath(closed);
 }
 
 function groupedMarkup(
   closed: ReadonlyArray<CurveSubpath>,
   render: (curves: ReadonlyArray<CurveSubpath>) => string,
+  fillRule = 'evenodd',
 ): string {
   const drawable = closed.filter((curve) => curve.segments.length > 0);
-  return groupContoursWithHoles(drawable)
+  const groups = provenContourGroups(drawable);
+  // Parity-based islands also cannot split nested nonzero winding compounds.
+  if (
+    groups === null ||
+    (fillRule !== 'evenodd' && groups.some((group) => group.holes.length > 0))
+  ) {
+    return drawable.length === 0 ? '' : '<g>' + render(drawable) + '</g>';
+  }
+  return groups
     .map((group) => {
       const members = [group.outer, ...group.holes].map((index) => drawable[index] as CurveSubpath);
       return '<g>' + render(members) + '</g>';

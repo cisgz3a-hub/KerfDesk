@@ -394,7 +394,7 @@ test('resumes an image engraving interrupted 150 lines in, finishes it and offer
     { name: 'stress-image.png', kind: 'png-fixture', width: 200, height: 200 },
   ]);
   await (await toolbarCommand(page, 'Import...')).click();
-  await expect(page.getByRole('spinbutton', { name: 'Selection width' })).toHaveValue('20');
+  await expect(page.getByLabel('Selection width', { exact: true })).toHaveValue('20');
   await connectAndHome(page, kerfdesk);
   await frameCurrentJob(page, kerfdesk);
   await kerfdesk.setAutoAcknowledge(false);

@@ -41,6 +41,8 @@ type NumberFieldProps = {
   readonly title: string;
   readonly onCommit: (value: number) => void;
   readonly stacked?: boolean;
+  /** Spoken name when the visible label is a short form of it ("Spindle" for Spindle speed). */
+  readonly ariaName?: string;
 } & NumberFieldRange;
 
 export function NumberField(props: NumberFieldProps): JSX.Element {
@@ -65,7 +67,7 @@ export function NumberField(props: NumberFieldProps): JSX.Element {
         onChange={debounced.onChange}
         onBlur={debounced.onBlur}
         style={props.stacked ? { ...inputStyle, flex: 1, minWidth: 0 } : inputStyle}
-        aria-label={`${props.label} for ${props.layer.color}`}
+        aria-label={`${props.ariaName ?? props.label} for ${props.layer.color}`}
         title={props.title}
       />
       {unitBesideBox ? <span style={unitStyle}>{props.unit}</span> : null}

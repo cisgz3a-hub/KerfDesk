@@ -281,7 +281,10 @@ export async function dismissNotifications(page: Page): Promise<void> {
 export async function runMenuCommand(page: Page, family: string, command: string): Promise<void> {
   const applicationMenu = page.getByRole('menubar', { name: 'Application menu' });
   await applicationMenu.getByRole('menuitem', { name: family, exact: true }).click();
-  await applicationMenu.getByRole('menuitem').filter({ hasText: command }).click();
+  await applicationMenu
+    .getByRole('menuitem')
+    .filter({ has: page.getByText(command, { exact: true }) })
+    .click();
 }
 
 export async function connectAndHome(page: Page, kerfdesk: KerfDeskFixture): Promise<void> {

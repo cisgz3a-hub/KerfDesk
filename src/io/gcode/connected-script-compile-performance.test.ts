@@ -123,9 +123,15 @@ const EXPECTED_REGION_COUNT = 12;
 // Final-grid containment and retained cutting/surface transitions add necessary
 // detail. Mapped-first capsule searches preserve compaction within the existing
 // certificate budget; ownership, region count and index reuse stay unchanged.
-const EXPECTED_GCODE_CODE_UNITS = 1_083_336;
-const EXPECTED_GCODE_SHA256 = 'e211745f82754855ebd20683a3c19f256e877488282b2df34c60a7c84ea26740';
-const EXPECTED_GCODE_UTF8_BYTES = 1_083_336;
+// ADR-453 chord-optimal flattening moved the glyph chords and so the medial
+// axis: 1,083,336 to 1,095,146 bytes on about 130 more lines, mostly longer
+// lines (more words changing per move) rather than more moves. Flattening each
+// cubic in one canonical direction (so shared seams match) moved the chord
+// vertices again, and the medial axis with them: 1,095,146 to 1,100,098 bytes
+// on 180 more lines.
+const EXPECTED_GCODE_CODE_UNITS = 1_100_098;
+const EXPECTED_GCODE_SHA256 = '6213711b652de729c1d4c57f905817bf39eab2ef86e8d8a1627f37ba20a6dbc6';
+const EXPECTED_GCODE_UTF8_BYTES = 1_100_098;
 const GCODE_REVIEW_EDGE_LINES = 16;
 const GCODE_REVIEW_SAMPLES = 12;
 const TEST_TIMEOUT_MS = 180_000;

@@ -215,10 +215,18 @@ export type TextAlignment = 'left' | 'center' | 'right';
 // fonts are bundled (so adding a font doesn't ripple here).
 export type FontKey = string;
 
+// Where the text sits along the guide (measured from the guide's start, or
+// from its end for 'end') and across it. Absent means 'start' and 'above',
+// the placement every path text had before ADR-480.
+export type PathTextAlongAlign = 'start' | 'middle' | 'end';
+export type PathTextAcrossAlign = 'above' | 'center' | 'below';
+
 export type PathTextSettings = {
   readonly guideObjectId: string;
   readonly offsetMm: number;
   readonly reverse: boolean;
+  readonly alongAlign?: PathTextAlongAlign;
+  readonly acrossAlign?: PathTextAcrossAlign;
 };
 
 export type TextObject = ObjectPowerScale & {
@@ -266,8 +274,9 @@ export type TracedImage = ObjectPowerScale & {
   // Missing means a legacy trace whose grid matches its source raster.
   readonly tracePixelWidth?: number;
   readonly tracePixelHeight?: number;
-  // Missing means legacy filled-contour trace.
-  readonly traceMode?: 'filled-contours' | 'centerline' | 'edge';
+  // Missing means legacy filled-contour trace. 'hybrid' is Line + fill
+  // (ADR-454): strokes and filled outlines, told apart by path colour.
+  readonly traceMode?: 'filled-contours' | 'centerline' | 'edge' | 'hybrid';
   // Trace dialog settings that produced this result (ADR-408). Missing means
   // a legacy trace; Re-trace Original then opens on the defaults.
   readonly traceSettings?: TraceSettingsRecord;

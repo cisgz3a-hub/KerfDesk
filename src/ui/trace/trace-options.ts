@@ -42,6 +42,11 @@ export type LightBurnTraceSettingOverrides = ColourLayerSettingOverrides & {
   readonly edgeSensitivity?: number;
   readonly edgeDetail?: number;
   readonly edgeMinimumLinePx?: number;
+  // Line + fill (ADR-454), in placed millimetres. The dialog converts it to
+  // hybridMaxStrokeWidthPx through the placement (hybrid-stroke-width.ts).
+  readonly hybridMaxStrokeWidthMm?: number;
+  // Diagonal contacts (ADR-455): the filled-contour lane's turn policy.
+  readonly turnPolicy?: TraceOptions['turnPolicy'];
 };
 
 export type TraceDetectionMode = 'preset' | 'manual' | 'sketch' | 'faint-lines';
@@ -71,10 +76,16 @@ export function mergeLightBurnTraceSettings(
     out['traceTransparency'] = settings.traceTransparency;
   }
   if (settings.invert !== undefined) out['invert'] = settings.invert;
+  Object.assign(out, turnPolicySetting(settings));
   if (preset.traceMode === 'edge') {
     applyEdgeTraceSettings(out, preset, settings);
   }
   return out as TraceOptions;
+}
+
+// Diagonal contacts (ADR-455); ignored by the lanes that do not resolve corners.
+function turnPolicySetting(settings: LightBurnTraceSettingOverrides): Partial<TraceOptions> {
+  return settings.turnPolicy === undefined ? {} : { turnPolicy: settings.turnPolicy };
 }
 
 function mergePhotoSettings(

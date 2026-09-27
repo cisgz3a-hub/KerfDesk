@@ -10,12 +10,13 @@
 // region boundary directly — no additional tool-radius inset (deliberate
 // deviation from pocketToolpathRings, which would double-count the radius).
 // The stepover is a percentage of the cut width over one level, which is the
-// stored diameter except for a tapered ball nose: its rings then overlap
-// inside every level instead of leaving ribs (ADR-368 Amendment 2). When the
-// stepover is wider than the cutter reaches on a level's slice (ADR-413), the
-// innermost ring can stop short of the level's centre; relief-core-cleanup.ts
-// then adds the paths that clear what the rings leave, as the pocket planner
-// does (ADR-289 Amendment 1).
+// stored diameter for a flat end mill. A ball nose, V-bit, engraving bit or
+// tapered ball nose cuts narrower on a level shallower than it narrows, and its
+// rings then overlap inside every level instead of leaving ribs (ADR-368
+// Amendments 2 and 3). When the stepover is wider than the cutter reaches on a
+// level's slice (ADR-413), the innermost ring can stop short of the level's
+// centre; relief-core-cleanup.ts then adds the paths that clear what the rings
+// leave, as the pocket planner does (ADR-289 Amendment 1).
 //
 // Output passes are contour passes in heightmap physical mm (origin at the
 // heightmap's min corner, y down), each ring closed back to its first point.

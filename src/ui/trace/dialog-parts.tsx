@@ -1,4 +1,5 @@
 // Presentational controls; trace requests and commit ownership stay in the dialog.
+import type { TraceOptions } from '../../core/trace';
 import type { RasterImage } from '../../core/scene';
 import { TRACE_PRESETS } from '../../core/trace';
 import { Button, DialogActions as KitDialogActions } from '../kit';
@@ -10,6 +11,7 @@ export const VISIBLE_TRACE_PRESET_NAMES = [
   'Smooth',
   'Sharp',
   'Centerline',
+  'Line + fill',
   'Edge Detection',
   'Colour layers',
 ] as const;
@@ -29,6 +31,8 @@ const PRESET_DESCRIPTIONS: Readonly<Record<string, string>> = {
     'Crisp corners, fine lines and tiny marks. Keeps more detail, including small source specks.',
   Centerline:
     'One path along the middle of each stroke. Useful for single-stroke lettering and linework.',
+  'Line + fill':
+    'Thin pen lines burn once down their middle; wider shapes stay filled. For drawings that mix lettering and solid logos.',
   'Edge Detection':
     'Outlines around dark artwork and local detail. Neighbouring dark tones may merge.',
   'Colour layers':
@@ -123,6 +127,8 @@ export function TraceOutputFields(props: {
   readonly photoShading?: boolean;
   readonly machineKind: 'laser' | 'cnc';
   readonly traceOutput: TraceOutput;
+  /** Line + fill: Raster scan would outline its fills (ADR-454). */
+  readonly rasterUnavailable?: boolean;
   readonly onTraceOutputChange: (output: TraceOutput) => void;
   readonly supportsFillStyle: boolean;
   readonly traceFillStyle: TraceFillStyle;
@@ -139,6 +145,7 @@ export function TraceOutputFields(props: {
           value={props.traceOutput}
           onChange={props.onTraceOutputChange}
           photoShading={props.photoShading === true}
+          rasterUnavailable={props.rasterUnavailable === true}
         />
       )}
       {showFillStyle ? (
@@ -157,11 +164,25 @@ export function TraceOutputFields(props: {
   );
 }
 
+/** CNC and Line + fill (ADR-454: a raster scan would outline its fills) are
+ *  vector-only, whatever the picker last held. */
+export function effectiveOutput(
+  kind: 'laser' | 'cnc',
+  options: Pick<TraceOptions, 'traceMode'>,
+  chosen: TraceOutput,
+): TraceOutput {
+  return kind === 'cnc' || options.traceMode === 'hybrid' ? 'vector' : chosen;
+}
+
 export function TraceOutputPicker(props: {
   readonly photoShading?: boolean;
+  readonly rasterUnavailable?: boolean;
   readonly value: TraceOutput;
   readonly onChange: (next: TraceOutput) => void;
 }): JSX.Element {
+  const hint = props.rasterUnavailable
+    ? 'Line + fill makes editable vectors: a line operation for the strokes and a fill operation for the solid shapes.'
+    : traceOutputHint(props.photoShading === true, props.value);
   return (
     <div className="lf-trace-output-field">
       <label>
@@ -174,20 +195,25 @@ export function TraceOutputPicker(props: {
           onChange={(e) => props.onChange(e.target.value === 'raster' ? 'raster' : 'vector')}
         >
           <option value="vector">Editable vectors</option>
-          <option value="raster">Raster scan</option>
+          <option value="raster" disabled={props.rasterUnavailable === true}>
+            Raster scan
+          </option>
         </select>
       </label>
-      <p className="lf-trace-hint">
-        {props.photoShading
-          ? props.value === 'vector'
-            ? 'Editable filled lines reproduce the photo’s shades. Use a fill operation to keep the shading.'
-            : 'Engraves the shaded line pattern with image scan motion.'
-          : props.value === 'vector'
-            ? 'Editable paths for line or fill operations.'
-            : 'Black-and-white traced artwork engraved with image scan motion. Original grayscale shading is not retained.'}
-      </p>
+      <p className="lf-trace-hint">{hint}</p>
     </div>
   );
+}
+
+function traceOutputHint(photoShading: boolean, value: TraceOutput): string {
+  if (photoShading) {
+    return value === 'vector'
+      ? 'Editable filled lines reproduce the photo’s shades. Use a fill operation to keep the shading.'
+      : 'Engraves the shaded line pattern with image scan motion.';
+  }
+  return value === 'vector'
+    ? 'Editable paths for line or fill operations.'
+    : 'Black-and-white traced artwork engraved with image scan motion. Original grayscale shading is not retained.';
 }
 
 export function TraceFillStylePicker(props: {

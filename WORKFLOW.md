@@ -95,6 +95,7 @@ opportunity, without an extra branding delay. It introduces no startup interacti
 - **Numeric transforms**: X, Y, width, height, rotation, and the aspect-ratio lock remain directly available. **Anchor** opens the existing nine-point transform reference selector in a keyboard-accessible popover. Changing its presentation does not change the X/Y reference, resize anchor, or rotation centre.
 - **Artwork / Operations panel**: docked right with **Settings**, **Run order**, and **Materials** views in Laser mode; CNC keeps Settings and Run order. Settings is the default. Run order shares the same docked rail at the same width while the canvas remains on the left; it is not a modal or a third sidebar, and switching views never resizes the rail (ADR-348). Materials owns reusable preset and saved-library management without displacing the active job workflow. A header chevron collapses the rail to a narrow named strip; the same strip expands it.
 - **Laser artwork settings (ADR-430)**: the selected artwork's name heads the Settings view, with the Operation | Artwork switch under it. The Operation view leads with the operation's colour and name, then one scope line only when an edit reaches other artwork (with **Make unique**). **Line**, **Fill** and **Image** are three buttons; Power, Speed and Passes share one row; Fill adds Line spacing and Angle, and Image adds Dither, Line interval and (Grayscale) Min power. Scan both ways and Air assist are one-line switches whose explanations are tooltips. **More cut settings** opens Cut Settings for everything else and names what it holds. Include in output, Show on canvas and **Add operation** close the view.
+- **CNC artwork settings (ADR-481)**: the same header, scope line and footer lead and close the CNC Operation view. **Cut type** comes first (its explanation is the tooltip), then **Bit** with a **Manage bits** link to the Machine Setup bit library, the second bit the cut type uses (Pocket roughing, Floor clearing or Relief finishing) and **Material**. Cut depth and Depth per pass share one row with **Set to stock thickness** under it; Feed, Plunge and Spindle speed share the next, with the machine maximum under Spindle speed opening Machine Setup. **Traced edges** appears only for imported or traced outlines. Collapsed sections follow only for the cut types they serve, each naming its state (Holding tabs "4 per shape", Clearing strategy "Offset · 40 %", Entry & travel "Climb · Plunge"). Stock, tiling, spin-up, coolant, safe Z and park are edited in Machine Setup only.
 - **Operation cards**: the list comes before the artwork inspector, with the selected operation's process fields before secondary artwork properties. Each card keeps its visibility toggle on the face. Its **•••** disclosure contains order, output, artwork selection, settings clipboard, and delete controls.
 - **Machine controls panel**: in Spacious layout it is docked at the far right with the same collapse/expand pattern. Both panels can be resized or hidden independently. It may be collapsed during a job because active run controls live independently in the Live Motion bar.
 - **Toasts**: share the canvas's available space (lower left of the workspace, above the live controls) or a reserved row inside the open modal — never the rails, where they hid Start/Job and the layer list. Only the newest three render. The toast body does not take pointer input, so a click or drag through it reaches the canvas; the × control dismisses it early. Success confirmations dismiss after 4 s; advisories and failures after 8 s.
@@ -324,6 +325,16 @@ destination and cannot overwrite the template source.
 2. A notice reports how many objects and open paths were found and points to **Tools → Join
    paths...**. When nothing is open, the notice says so and the selection is kept.
 
+#### Contained and smaller — Edit menu (ADR-480)
+1. Select a closed shape and choose **Edit → Select Contained**. Every unlocked object on a visible
+   operation lying fully inside one of the selected closed paths is added; the shape stays
+   selected. Rotation, scale and mirroring count, a concave shape's notch is outside it, and a shape
+   straddling two containers is inside neither.
+2. **Edit → Select Smaller Shapes** adds every such object no wider and no taller than the widest
+   and tallest selected object, measured as it sits on the bed.
+3. Each notice says how many objects were added. When none qualify, or no closed shape is
+   selected, it says why and the selection is kept.
+
 #### Deselect — Escape or click in empty space
 1. Selection cleared. Status bar updates: `Nothing selected`.
 2. A stationary right click in empty space also clears selection, then opens the empty-workspace
@@ -425,6 +436,16 @@ destination and cannot overwrite the template source.
   selection is kept.
 - No shortcut: LightBurn's `P` is KerfDesk's Preview.
 
+#### Typed values with math — numeric edits bar (ADR-480)
+- The X, Y, Width, Height and Rotation boxes take a number or a sum: `10+5`, `2*(3+4)`, `2^3`,
+  `pi`, `e`, `sqrt()`, `abs()`, `sin()`, `cos()`, `tan()`, `asin()`, `acos()`, `atan()` (degrees),
+  `log()` (base 10) and `ln()`. Enter or leaving the box applies it.
+- Lengths take `mm`, `cm`, `in` or `"`, and are converted to millimetres; nothing is shown in
+  inches. Rotation takes `deg` or `°`. Width and Height take a percentage of the current size,
+  such as `50%`.
+- A typing mistake shows a notice with what was wrong and what to type, and the box goes back to
+  the current value. An emptied box goes back silently. ArrowUp and ArrowDown nudge by 0.1 mm or 1°.
+
 #### Edge — transform pushes object out of bed
 - Permitted (user may be temporarily repositioning).
 - Out-of-bounds geometry gains the red dashed overlay (F-A3 edge).
@@ -497,6 +518,29 @@ destination and cannot overwrite the template source.
 2. It changes the canvas only: output, Preview and saved projects are unchanged. It resets to
    Filled when the app restarts.
 
+### F-A6e. Rubber-band outline, Close Path, Reverse Direction, Delete Duplicates, Flatten Image Mask (ADR-480)
+
+1. **Tools → Vector → Rubber-Band Outline** adds one closed shape stretched around everything
+   selected, images included, and selects it. It takes a copy of the first selected Line
+   operation's settings, or a new Line operation named Outline. A selection lying on one straight
+   line has no area; the notice says so and nothing changes.
+2. **Tools → Vector → Close Path** closes every open path of three or more points in the selected
+   imported, traced or drawn-line artwork with a straight line. The notice gives the widest gap it
+   closed. Text and drawn rectangles, ellipses and polygons keep their own paths; the notice says
+   to convert them to paths first.
+3. **Tools → Vector → Reverse Direction** reverses the same kinds of paths. Open paths swap ends;
+   closed paths keep their start point and run the other way round. CNC tabs stay where they were
+   on the shape. When Cut Planner may cut open paths from either end, the notice says to set Path
+   direction to Preserve direction to keep the new direction.
+4. **Edit → Delete Duplicates** (`Alt+D`) deletes later copies of artwork drawn twice in the same
+   place on the same operation: moved-back copies, and closed shapes starting at another corner or
+   drawn the other way, count. Copies on another operation, or with another power scale or
+   override, are kept. Locked artwork, image masks and path-text guides are never deleted.
+5. **Tools → Image → Flatten Image Mask** bakes the mask into the selected image and crops it, as
+   **Crop Image** does, then deletes the mask shape. The shape stays when it is locked or another
+   image or path text uses it; the notice says which.
+6. Each tool is one undo step and adds none when nothing changes. None operates a machine.
+
 ### F-A7. Artwork Operations panel
 
 #### Layout
@@ -507,15 +551,15 @@ destination and cannot overwrite the template source.
   single **Artwork** selector chooses which one the inspector edits. The selector is UI-only and
   does not change selected-only output, canvas handles, grouping, or machine order.
 - In CNC mode, Artwork settings owns operation cutting behavior: cut type, cut/insert depth,
-  depth per pass, feed, plunge, **Artwork spindle speed**, tabs, and specialist CAM controls.
-  **Tool & material** offers direct per-operation material and primary/secondary cutter choices.
-  Stock, machine maximum RPM, spin-up, coolant, safe Z and park remain read-only references.
-  A reference remains keyboard-focusable;
-  activating it explains its scope and offers a direct **Edit in Startup Setup** route to the exact
-  field. It is not a disabled input and does not add a confirmation before editing.
+  depth per pass, feed, plunge, **Spindle speed**, tabs, and specialist CAM controls. **Bit** and
+  **Material** offer direct per-operation cutter and material choices, with the second bit a cut
+  type uses under Bit. Machine Setup owns stock, machine maximum RPM, spin-up, coolant, safe Z and
+  park (ADR-481); the machine maximum shows under Spindle speed as a link to its field there, and
+  **Manage bits** opens the Machine Setup bit library.
 - Importing, placing, or selecting artwork never opens Startup Setup and never asks for material or
   bit before editing. New CNC operations inherit the committed current-job defaults. Direct choices
-  in **Tool & material** and **Startup Setup > Tool Plan** use the same persisted operation bindings.
+  under **Bit** and **Material** and in **Startup Setup > Tool Plan** use the same persisted
+  operation bindings.
   Changing an operation's assignments leaves job defaults and unrelated operations unchanged.
 - The inspector renders only one detailed settings context at a time. A real multi-selection keeps
   the existing combined/common-operation workflow; unselected artworks are switched through the
@@ -524,9 +568,9 @@ destination and cannot overwrite the template source.
   image adjustments and path tools. Operation opens first; switching tabs keeps the editors mounted
   so in-progress numeric edits and undo reconciliation are retained. Both levels of tabs support
   arrow keys, Home and End, with one tab stop per tab list.
-- Laser settings explain **Line**, **Fill** and **Image**, then show power, speed and passes
-  together. Named sections reveal the applicable line, fill or image options. **Advanced cut
-  settings** groups the full draft editor by purpose; **Apply settings** commits the draft and
+- Laser settings offer **Line**, **Fill** and **Image**, then show power, speed and passes
+  together, followed only by the settings that process needs (ADR-430). **More cut settings**
+  opens the full draft editor grouped by purpose; **Apply settings** commits the draft and
   **Cancel** leaves the operation unchanged.
 - **Saved defaults** in More cut settings offers **Make Default for #rrggbb**, which remembers
   the operation's applied settings for the colour it names: the colour of the artwork the operation
@@ -534,10 +578,11 @@ destination and cannot overwrite the template source.
   to Default** use the default saved for that same colour, otherwise **Make Default for All**. The
   automatic operation colour is never matched for artwork, so a default saved for black artwork
   does not reach other artwork whose operation happens to be black.
-- CNC settings group tool/material choices, cut/depth and feeds/passes, followed by named
-  sections for holding tabs, clearing, finishing, entry/travel, saved feeds, the calculator and
-  machine references. **Machine maximum** remains beside **Artwork spindle speed**. Collapsing a
-  group keeps its numeric editors mounted and does not change any cutting setting.
+- CNC settings lead with cut type, bit and material, then depth and feeds, followed by named
+  sections for holding tabs, clearing, finishing, entry/travel, saved feeds and the calculator,
+  each naming its current state when closed (ADR-481). The machine maximum sits under
+  **Spindle speed**. Collapsing a group keeps its numeric editors mounted and does not change any
+  cutting setting.
 - **All operations**, a compact expandable list, follows the inspector. Each row shows automatic colour, name,
   process summary, visibility, output, and order controls. Operation row order decides the processes
   inside an artwork; artwork run priority is the top-level machine sequence. Jobs with more than
@@ -714,6 +759,22 @@ marks later edits as unapproved without changing the existing Frame/Start policy
 
 ---
 
+### F-A7b. Operations list tools and Sort cuts last (ADR-480)
+
+1. The **•••** button on the Cuts / Layers header opens **Turn output on for all**, **Turn output
+   off for all**, **Invert output**, **Show all**, **Hide all**, **Invert visibility** and **Sort
+   cuts last**. Each row's **Show only this** hides every other operation.
+2. Each is one undo step. Hidden artwork leaves the selection. The registration jig's output is
+   left alone by Turn output on for all and Invert output, since it burns in its own run; Turn
+   output off for all includes it.
+3. **Sort cuts last** keeps Fill and Image operations in place and moves Line operations after
+   them, weakest first (power × passes ÷ speed). Run order is rewritten to match: engrave-only
+   artwork first, then artwork that engraves and cuts, whose cut follows its own engraving, then
+   cut-only artwork, weakest first. The notice says what moved. Running it again changes nothing.
+4. In CNC, Sort cuts last is unavailable: CNC already runs profiles last.
+
+---
+
 ### F-A8. Preview
 
 #### Success — toggle on
@@ -790,7 +851,9 @@ marks later edits as unapproved without changing the existing Frame/Start policy
 
 1. Select the artwork to exchange, then choose **File → Export selected artwork as SVG...**.
    With nothing selected, **Export artwork as SVG...** includes the whole scene, including
-   output-disabled artwork.
+   output-disabled artwork. The **Export SVG** dialog offers **Group islands** (off by default,
+   remembered for the session: each filled shape and its holes in their own group); **Choose
+   File...** then asks for the destination (ADR-451).
 2. The export captures the source selection and one clock before choosing a destination.
    It resolves current variable text, outlines text, preserves physical millimetre size and
    canonical curves, embeds original bitmap pixels, and includes image masks and transforms.
@@ -813,11 +876,33 @@ marks later edits as unapproved without changing the existing Frame/Start policy
    selection or scene's vector artwork as a millimetre DXF: one polyline per contour, one layer per
    colour, circular arcs as exact bulges, cubics and elliptical arcs flattened within 0.01 mm.
    Bitmaps and reliefs have no DXF form; they are left out and the completion message counts them.
-2. **Tools → Multi-File Trace...** first asks for the preset, format (SVG or DXF), coordinate
-   precision and, for SVG, whether to group each shape with its holes; **Choose Images...** then
-   picks the files. Each image is saved as `<name>-trace.svg` or `<name>-trace.dxf`.
+2. **Tools → Multi-File Trace...** first asks for the preset, format (SVG, DXF, PDF, EPS or
+   GeoJSON), coordinate precision and, for SVG, **Group islands** (each shape with its holes);
+   **Choose Images...** then picks the files. Each image is saved as `<name>-trace.<format>` on the
+   traced image's page, lower-left corner as the origin (ADR-468). **Page → Fit to artwork**
+   instead trims the page to the exact traced curves plus a **Margin (mm)**; the millimetre scale
+   is unchanged and the DXF and GeoJSON origin moves to the fitted page's corner (ADR-451). A
+   fitted side under 3 pt (the smallest PDF page) grows to 3 pt, centred, in every format. A
+   Margin field that is blank means no margin; a negative value or one over 1000 mm is marked
+   invalid and **Choose Images...** waits until it is corrected.
 3. An image whose trace has nothing visible writes no file; the rest of the batch is still saved
    and the completion message names the skipped images.
+
+### F-A9d. Export artwork as PDF, EPS or GeoJSON (ADR-468)
+
+1. **File → Export artwork as PDF... / EPS... / GeoJSON...** (or **Export selected artwork as
+   ...**) write the selection's or scene's vector artwork, text outlined; bitmaps and reliefs are
+   left out and counted, and an image-only selection warns before any file name is asked.
+2. PDF (1.4, one page) and EPS (EPSF 3.0) keep lines and curves exactly (arcs become cubics); the
+   page / bounding box is the exact extent of the drawn curves, rounded outward, plus half the
+   0.1 mm stroke on every side when strokes are drawn, and never under 3 pt. Filled layers fill
+   even-odd (text nonzero); line layers and open contours are 0.1 mm strokes. A page side over
+   5080 mm is written as PDF 1.6 with /UserUnit.
+3. GeoJSON flattens curves within 0.01 mm into Polygon rings (outer counterclockwise, holes
+   clockwise) and LineStrings. Polygons follow each shape's fill rule, so they cover what the PDF
+   fills; shapes whose outlines cross are written as separate `unmerged` polygons and the export
+   warns. Coordinates are millimetres with y up from the lower-left corner, not longitude and
+   latitude (not georeferenced); the file states this in its `kerfdesk` member and the toast says so.
 
 ### F-A9b. Remove overlapping laser lines (ADR-350)
 
@@ -1081,6 +1166,7 @@ Mac uses `Cmd`, Windows/Linux web uses `Ctrl`.
 - `Cmd/Ctrl+D` — Duplicate selection in place (LightBurn parity)
 - `Cmd/Ctrl+A` — Select all
 - `Cmd/Ctrl+Shift+I` — Invert selection (ADR-410)
+- `Alt+D` — Delete duplicates (ADR-480; Option+D on macOS)
 - `Delete` / `Backspace` — Delete selected
 - `Escape` — Deselect / cancel current operation
 
@@ -2631,6 +2717,9 @@ settings and Job Review keep their existing read-only setup references.
   Italianno, and Corinthia for names and calligraphic signs. Cinzel Decorative provides ornamental
   serif companion lettering. These fonts are bundled with the app, remain editable on canvas,
   and work with **Weld overlaps**; no system-font installation or font-service connection is needed.
+- **Path text** (ADR-480): **Place at** puts the text at the Start, Middle or End of its guide
+  path; **Path offset** moves it away from that point. **Text sits** puts the text on top of the
+  path, centred on it, or hanging below it. Text that does not fit is reported and not placed.
 - F-D3. Choose font. The picker draws real `Aa` toolpath previews for Relief
   SingleLine, EMS Nixish, EMS Decorous Script, and EMS Casual Hand. These create
   open center strokes, so use **Engrave** or **Profile on path**; V-carve,
@@ -3229,8 +3318,9 @@ work-Z evidence, but it cannot enable User Origin or Verified Origin.
     blocked.
 12. **Air pump across an Air-off operation (ADR-335).** Build three
     operations with Air on, off, then on, and Start. On a profile with
-    "Air restart" ticked the program must contain exactly one `M8` and
-    one `M9`, the pump must still be running through the middle
+    "Air restart" ticked the program must switch air exactly once each
+    way (`M8`, then `M9` after the last operation; the `M8` repeats of
+    step 13 switch nothing), the pump must still be running through the middle
     operation and the last one, and Job Review must name the held
     operation and `$152=100` (ADR-345: Creality's Falcon A1 parameter
     page defines `$152` as the standby wait, so `100` keeps the pump
@@ -3243,6 +3333,19 @@ work-Z evidence, but it cannot enable User Origin or Verified Origin.
     go back to `M8 M9 M8 M9`. If the pump is audibly off for the last
     operation with the box ticked, the hold is not working; if it is
     off only with the box unticked, the firmware timer is confirmed.
+13. **Qualify air repeats on the installed firmware (ADR-462).** In a
+    separately supervised air check, record the firmware and current
+    `$152` setting. With "Air restart" ticked, inspect a short-block job
+    of a minute or more with Air on: the program attempts `M8` repeats
+    at eligible movement boundaries after about 5 s of estimated time.
+    Observe whether the pump stays on and whether the enclosure fan
+    follows it; program bytes alone establish neither. Long moves or
+    dwells and continuous M3 cutting can exceed the trigger without a
+    repeat, so this mitigation does not guarantee continuous air.
+    Compare with "Air restart" unticked, which emits one `M8` for an
+    all-Air-on job. If air still stops, keep the firmware/`$152=100`
+    remedy from step 12 and verify it separately. Do not treat a pass
+    on short blocks as qualification of every job or firmware version.
 
 When this checklist passes on the Falcon, replace the F.3 status in `PROJECT.md` Phase F
 ("Code shipped; hardware verification pending") with the recorded result and update the F.3
@@ -3866,12 +3969,12 @@ explicitly marked below; the remaining controls and user-facing flows are planne
 #### Success
 1. User selects artwork, then picks a CNC operation: Outside / Inside / On path, Pocket,
    or Engrave. Each artwork starts with its own operation; a multi-selection can intentionally share.
-2. Cut type, depth, depth-per-pass, feed, plunge, and **Artwork spindle speed** accept typed values;
-   **Tool & material** provides operation material and cutter selectors. **Machine maximum** remains
-   a read-only reference beside the editable spindle speed.
+2. Cut type, depth, depth-per-pass, feed, plunge, and **Spindle speed** accept typed values;
+   **Bit** and **Material** provide operation cutter and material selectors. The machine maximum
+   shows under the editable spindle speed and opens Machine Setup, which owns it.
    Pocket additionally shows stepover %, profile cut types show the tabs
-   group (enabled, height, width, count). Outline and Engrave operations show
-   a **Line art** selector (inner / outer / both, default inner): a traced
+   group (enabled, height, width, count). Outline and Engrave operations that cut imported or
+   traced outlines show a **Traced edges** selector (inner / outer / both, default inner): a traced
    double-line ring — a nested closed pair tighter than the bit diameter —
    machines only the chosen edge, while wider nesting and lone contours
    always cut (ADR-218).
@@ -3879,11 +3982,11 @@ explicitly marked below; the remaining controls and user-facing flows are planne
    engraves first, then profiles inner-before-outer).
 4. Artwork run controls set priority inside each safe phase. The compiler never moves a profile
    ahead of remaining clearing work or splits a contiguous tool section merely to satisfy priority.
-5. Change an operation's material or cutter directly in **Tool & material**, or through the same
+5. Change an operation's material or cutter directly under **Bit** and **Material**, or through the same
    saved bindings in **Startup Setup > Tool Plan**. A material choice applies starting cutting values
    to this operation; Manual keeps the current numbers. A bit change refreshes only material-recipe
    feeds and preserves manual numbers. **Use job default bit** removes the primary-tool override.
-   Applicable clearing, pocket roughing and relief finishing bits appear with the primary choice.
+   Applicable clearing, pocket roughing and relief finishing bits appear under the primary choice.
 
 #### Warning — depth exceeds stock
 1. Preflight (F-CNC3) surfaces depth > stock thickness as a Job Review warning.
@@ -3917,23 +4020,29 @@ explicitly marked below; the remaining controls and user-facing flows are planne
 1. Open polylines cannot be offset; they are cut on-path (documented
    fallback), closed shapes on the same layer still offset normally.
 
-#### Edge — a tapered ball nose sets pocket or profile offsets
-1. A tapered ball nose's stored diameter is its widest, at the top of the flutes, and
-   it cuts narrower at any shallower depth. Outside and inside profiles and pockets
-   offset by the width it cuts at the operation's full depth, so the wall meets the
-   drawn line at the stock surface and follows the taper and then the ball below it.
-   An outside part is its drawn size at the top face and larger below; a hole is its
-   drawn size at the top face and smaller below. Every depth pass rides that one path
-   (ADR-368 Amendment 2).
+#### Edge — a bit that narrows toward its tip sets pocket or profile offsets
+1. A ball nose, V-bit, engraving bit or tapered ball nose stores its widest cutting
+   diameter and cuts narrower at any shallower depth: a ball nose until the cut is as
+   deep as its radius, a V-bit or engraving bit until its cone reaches the diameter, a
+   tapered ball nose until the top of its flutes. Outside and inside profiles and
+   pockets offset by the width the bit cuts at the operation's full depth, so the wall
+   meets the drawn line at the stock surface and follows the bit's shape below it. An
+   outside part is its drawn size at the top face and larger below; a hole is its drawn
+   size at the top face and smaller below. Every depth pass rides that one path
+   (ADR-368 Amendments 2 and 3). A flat end mill, and any cut deeper than the bit
+   narrows, still offset by the diameter.
 2. Pocket rings and raster sweeps, and relief roughing rings, step by the stepover
    percentage of the width the bit cuts in one depth pass, so no rib stands between
    them. Tab windows add the full-depth cut width to the tab width, so a bridge is never
-   narrower than requested. The 3D removal preview shows the taper and the ball corner.
-3. A tapered ball nose without a usable ball tip and taper is planned as a flat
-   cylinder of its stored diameter. When one is the main bit of a pocket, an inside
-   or outside profile, or a relief, Job Review warns that the result comes out
-   off-size or ribbed and asks for the bit's tip and taper or a flat end mill
-   (ADR-368 Amendments 1 and 2). The warning never blocks save or Start.
+   narrower than requested. The 3D removal preview shows the bit's wall and floor shape.
+   Job Review's On path size warning and full-tab-coverage warning give the cut width
+   too. V-carve and engrave never offset by the diameter and are unchanged.
+3. A V-bit or engraving bit without a usable included angle or tip flat, or a tapered
+   ball nose without a usable ball tip and taper, is laid out at its stored diameter.
+   When one is the main bit of a pocket, an inside or outside profile, or a relief,
+   Job Review warns that the result comes out off-size or ribbed and asks for the bit's
+   geometry or a flat end mill (ADR-368 Amendments 1 to 3). The warning never blocks
+   save or Start.
 
 ### F-CNC3. CNC preflight and save G-code
 
@@ -4013,8 +4122,10 @@ explicitly marked below; the remaining controls and user-facing flows are planne
    heightmap cells, then the map is dilated by the active bit's footprint
    plus the layer's Rough allowance (0.5 mm unless set), sliced into Z levels by the layer's
    depth-per-pass, and each level's region fills with concentric rings at
-   the layer's physical stepover: a percentage of the bit diameter, or for a
-   tapered ball nose of the width it cuts over one level (ADR-368 Amendment 2).
+   the layer's physical stepover: a percentage of the width the bit cuts over
+   one level. That is the bit diameter for a flat end mill, and narrower for a
+   ball nose, V-bit, engraving bit or tapered ball nose on levels shallower than
+   the bit narrows (ADR-368 Amendments 2 and 3).
    Each ring ends where it started (ADR-289 Amendment 1).
    The allowance holds in 3D: roughing plans with the bit widened sideways by
    the allowance plus the contour clearance, so steep walls keep their stock
@@ -4054,6 +4165,15 @@ explicitly marked below; the remaining controls and user-facing flows are planne
    above instead of plunging; a ring shorter than one cut width plunges.
 3. Emitted G-code passes the plunged-travel invariant; scale is resolved
    before cutter geometry, then mirror/rotate/move placement is honored.
+4. Job Review's detail line for the operation names the levels the
+   compiled job roughs, for example `relief roughing 2 levels to 2.5 mm`,
+   instead of a pass count from Cut depth. With several reliefs on one
+   operation it counts their distinct depths, for example
+   `relief roughing at 4 depths to 4.5 mm across 2 reliefs`. An operation
+   that cut only reliefs leaves out its pass count and tabs, and its entry
+   names only the ramp angle, since no helix or V-carve entry reaches a
+   relief. One that also cut other shapes says `1 pass on the other shapes`,
+   and kept tabs add `none on reliefs` (ADR-224 Amendment 3).
 
 #### Error — bit too big for the detail
 1. Regions narrower than the bit's dilated footprint produce no rings
@@ -4546,8 +4666,9 @@ and lifts the command's CNC-only gate.)*
 2. Between sections the G-code retracts, stops the spindle (M5), parks,
    and pauses on M0 with comments naming the next bit. GRBL holds until
    cycle start; the streaming UI's Resume continues the job.
-3. Geometry offsets use each layer's OWN bit diameter, or a tapered ball nose's
-   cut width at the layer depth (ADR-368 Amendment 2).
+3. Geometry offsets use each layer's OWN bit: its diameter, or for a bit that
+   narrows toward its tip its cut width at the layer depth (ADR-368 Amendments 2
+   and 3).
 
 #### Error — v-carve layer with a flat bit
 1. Job Review warns with the layer's bit named (not just the machine bit), but
@@ -4683,9 +4804,11 @@ and lifts the command's CNC-only gate.)*
    into whole rows no coarser than a tenth of the contact diameter, so rows
    land at the requested spacing; the whole-row stride still rounds down so it
    never overshoots it (ADR-421). This qualifies finishing
-   vertices against the piecewise-linear surface and the planar cusp, not the
-   XY chord between vertices, subcell detail, or true along-surface scallop
-   (ADR-292/294/412).
+   vertices against the piecewise-linear surface and the planar cusp, not
+   subcell detail or true along-surface scallop (ADR-292/294/412). Every move
+   between vertices, of every strategy, is then checked against the exact
+   contact at sampled points and lifted where those checks exceed 0.002 mm into the part,
+   measured normal to the move (ADR-421 amendment 1).
 3. Without a mask, the rows form one stay-down path: each row steps to the
    next along its edge column's own tip samples instead of retracting and
    plunging. A vertex is dropped only where the straight move replacing it
@@ -4745,8 +4868,11 @@ and lifts the command's CNC-only gate.)*
    inside/pocket run CCW) and rotates entry points to the midpoint of
    the longest segment so witness marks land on a flat span.
 3. For profile, pocket, and engrave, a ramp angle > 0 turns plunges into
-   descents ALONG the toolpath at that angle; closed loops re-cut the ramped
-   span level afterwards. V-carve is different: its changing Z is the cutting
+   descents ALONG the toolpath at that angle, from the depth that path was
+   last cut to (the stock top the first time). A closed loop is then cut one
+   whole lap at depth from where its descent ended; an open path zig-zags
+   along its start back to the start at depth, then is cut end to end at
+   depth (ADR-471). V-carve is different: its changing Z is the cutting
    profile itself, so the certified medial path governs and any stored V-carve
    ramp request is reported as advisory provenance rather than being layered
    onto that profile.
@@ -4779,8 +4905,15 @@ and lifts the command's CNC-only gate.)*
    V-carve.
 
 #### Edge — path shorter than the ramp
-1. The descent finishes at the path end (the ramp consumed the whole
-   path); the remainder cuts level on the next lap.
+1. A closed loop keeps descending round itself, lap after lap, until it
+   reaches depth, then cuts one whole lap at depth. An open path zig-zags
+   along its whole length back to its start at depth, then cuts end to end.
+2. A path shorter than one cut width that the ramp would have to go over
+   again keeps its straight plunge at the plunge feed: the cutter covers the
+   whole path, so going round it again would only slow the plunge. The G-code
+   header says `; cnc entry-advisory: N passes plunge: path shorter than one
+   cut width`, and Job Review lists it as an advisory, naming Helical entry
+   for a pocket (ADR-471).
 
 #### Edge — reliefs on a layer with a ramp angle
 1. Relief roughing ramps with the layer's angle (F-CNC17, ADR-424) and its
@@ -4998,8 +5131,8 @@ and lifts the command's CNC-only gate.)*
 
 #### Success
 1. Every CNC Artwork settings card has a **Feeds calculator**. Its material, resolved cutter,
-   diameter and flute evidence reflect the operation's **Tool & material** choices; RPM comes from
-   the editable Artwork spindle speed. The calculator displays these inputs read-only; change the
+   diameter and flute evidence reflect the operation's **Bit** and **Material** choices; RPM comes
+   from the editable Spindle speed. The calculator displays these inputs read-only; change the
    material or bit above, and edit cutter metadata in the bit library. The row shows the live
    result — feed = RPM × flutes × chipload, plunge as a material
    percentage, depth-per-pass as a fraction of bit diameter.
@@ -5016,7 +5149,7 @@ and lifts the command's CNC-only gate.)*
 
 #### Error — none (inputs are bounded)
 1. Tiny results floor at 50 mm/min feed / 0.1 mm per pass rather than emitting zeros. **Manual**
-   leaves Apply unavailable until a material is chosen in **Tool & material**; the calculator does
+   leaves Apply unavailable until a material is chosen under **Material**; the calculator does
    not silently substitute the job stock's material. Flute count uses cutter metadata or saved
    recipe evidence, falling back to the displayed two-flute assumption when both are absent.
 
@@ -5072,12 +5205,14 @@ and lifts the command's CNC-only gate.)*
 #### Success
 1. With closed shapes selected in CNC mode, the "Dogbone" row (bit
    diameter prefilled from the active bit) relieves every corner
-   sharper than 135° with a bit-radius overcut circle — square parts
+   sharper than 135° with a dogbone the bit can reach — square parts
    then seat fully into routed slots. One undo step; objects are
    replaced in place.
-2. Style is the corner overcut (circle centered on the vertex),
-   documented as the PROVISIONAL v1; directional dogbone/T-bone are
-   future refinements.
+2. Style is the bisector dogbone (ADR-103 Amd 1): the capsule the bit
+   sweeps along the corner's bisector until its edge touches the
+   corner, a hair wider than the bit, so the pocket or inside-profile
+   toolpath runs into it as part of the same loop. T-bone placement is
+   a future refinement.
 
 #### Error — nothing qualifies
 1. Obtuse-only shapes (or open contours) leave the scene untouched.
@@ -5227,7 +5362,7 @@ as the pane's design record.
 ### F-CNC31. Auto-fill operation feeds from a material — ADR-111 #1, amended by ADR-306
 
 #### Success
-1. **Artwork settings > Tool & material** and **Startup Setup > Tool Plan** share a grouped material
+1. **Artwork settings > Material** and **Startup Setup > Tool Plan** share a grouped material
    assignment for each operation (Use job
    material / Manual + common Softwood and Hardwood species / Plywood-MDF / Acrylic / Aluminium).
    Applying an override fills that operation's feed, plunge, and depth-per-pass in the setup draft
@@ -5256,20 +5391,20 @@ as the pane's design record.
 #### Edge — full flute/RPM control
 1. A bit without stored flute evidence starts from the displayed two-flute assumption. Set the
    actual cutter count in **Startup Setup > Manage bits**; set operation RPM with the editable
-   **Artwork spindle speed**. The flute count accepts every positive whole number without an
+   **Spindle speed**. The flute count accepts every positive whole number without an
    artificial upper cap. The Artwork calculator reads both and does not duplicate either input.
 
 ### F-CNC32. Edit grouped operation settings — ADR-111 #4 / ADR-306 amendment
 
 #### Success
-1. CNC Artwork settings lead with **Tool & material** for direct operation material and cutter
-   choices. Stock and machine references remain muted, keyboard-focusable controls that explain
-   their scope and deep-link to Startup Setup.
-2. The editable core follows with Cut type, Cut depth, Depth per pass, Feed, Plunge,
-   **Artwork spindle speed**, and Tabs. **Machine maximum** is shown adjacent to Artwork spindle
-   speed so an RPM ceiling cannot be confused with the requested operation speed. Named expandable
-   sections follow for holding tabs, clearing, finishing, entry/travel, saved feeds, the calculator
-   and machine references. Only applicable cut-type sections appear.
+1. CNC Artwork settings lead with **Cut type**, then **Bit** (with **Manage bits**), the second bit
+   the cut type uses, and **Material** for direct operation choices (ADR-481). Stock, tiling,
+   spin-up, coolant, safe Z and park are edited in Machine Setup and are not repeated here.
+2. Cut depth and Depth per pass share a row; Feed, Plunge and **Spindle speed** share the next.
+   The machine maximum ("Max 12,000") sits under Spindle speed and opens its Machine Setup field,
+   so an RPM ceiling cannot be confused with the requested operation speed. Named expandable
+   sections follow for holding tabs, clearing, finishing, entry/travel, saved feeds and the
+   calculator, each naming its state when closed. Only applicable cut-type sections appear.
 3. Cut depth carries a one-click "Set to stock thickness (N mm)" button. It
    sets the exact measured thickness without silently adding spoilboard
    overcut; any verified overcut remains an explicit operator edit.
@@ -5342,7 +5477,7 @@ as the pane's design record.
    expose common species such as Pine, Cedar, Oak, Hard maple, and Walnut.
    Choosing an entry previews its family model without changing the job;
    **Apply [material] preset** then fills every operation's feed / plunge /
-   depth-per-pass (each operation's resolved bit + Artwork spindle speed) in the draft.
+   depth-per-pass (each operation's resolved bit + Spindle speed) in the draft.
    **Save machine setup** commits the complete setup as one undoable step.
 2. New operations inherit it: add artwork or import an SVG after choosing the
    material and the fresh layers come in with those feeds (not the generic
@@ -5362,7 +5497,7 @@ as the pane's design record.
    leaves current feeds untouched for hand-tuning.
 
 #### Edge — per-operation override and other object types
-1. An operation's explicit **Tool & material** / **Tool Plan** assignment (F-CNC31) overrides the project
+1. An operation's explicit **Bit** / **Tool Plan** assignment (F-CNC31) overrides the project
    material. Fresh text, drawn shapes, raster/trace conversions, fill-isolated
    operations, and generated box operations use the same new-operation resolver.
 
@@ -6395,13 +6530,20 @@ as the pane's design record.
 1. With the machine in CNC mode, the dialog defaults clearance to
    0.15 mm and shows the relief tool diameter prefilled from the active
    tool; stock thickness prefills the material thickness field.
-2. Generated panels carry corner-overcut reliefs (F-CNC26 style: circle
-   of one bit radius centered on the vertex) at exactly the
-   seat-critical reflex corners — notch bottoms where a mating tab must
-   seat. Tabs narrow and recesses widen by clearance/4 per flank, so
-   each joint's notch − tab play equals the clearance exactly.
-3. The panels then flow through the normal CNC pipeline: the layer's
-   profile-outside cutter compensation applies at compile, unchanged.
+2. Generated panels carry dogbone reliefs (ADR-106 Amd 1: the capsule
+   the bit sweeps along the corner's open bisector until its edge touches
+   the corner, a hair wider than the bit) at exactly the seat-critical
+   reflex corners — notch bottoms where a mating tab must seat. The
+   profile-outside bit runs into each dogbone and back as part of the
+   same loop until its edge passes the corner, so square tabs seat. Tabs
+   narrow and recesses widen by clearance/4 per flank, so each joint's
+   notch − tab play equals the clearance exactly.
+3. Inserted panels cut through as generated (ADR-106 Amd 2): the
+   **Box panels** operation profiles the outlines outside at the full
+   material thickness with the default holding tabs, and a second
+   **Box slots** operation pockets the divider slots at the same depth.
+   The pocket clears every slot, so no loose piece is left and no tab
+   bridges a slot; clearing runs before any outline frees a panel.
 
 #### Error — relief tool larger than a finger cell
 1. Validation error per F-K2; generation disabled until resolved.
@@ -6419,7 +6561,9 @@ as the pane's design record.
 #### Success
 1. Style "Open top" drops the Top panel (5 panels) and flattens the
    walls' top edges at the outer face line — no orphan fingers pointing
-   at a missing lid.
+   at a missing lid. The entered inner height is the usable depth: the
+   walls stand the bottom thickness plus that height (outer = inner + T,
+   ADR-106 Amd 1).
 2. Corner cells that the Top would have claimed fall to the
    next-priority panel (Z > Y > X among present panels); the assembled
    rim is flush.
@@ -6472,7 +6616,7 @@ as the pane's design record.
    from the top, Y from the bottom).
 3. Wall slots and cross-laps widen with the clearance pass exactly like
    edge recesses; in CNC mode every slot corner a tab must seat against
-   carries the corner-overcut relief at full bit radius.
+   carries a dogbone the bit can reach (ADR-106 Amd 1).
 
 #### Error — compartments too small
 
@@ -6547,7 +6691,7 @@ as the pane's design record.
 
 #### Edge — CNC relief
 
-1. CNC mode carves corner-overcuts in every notch at full bit radius;
+1. CNC mode carves a reachable dogbone at every notch seat corner;
    validation rejects a tool wider than the finger (F-K2 rule).
 
 ### F-K9. Assembled 3D preview (ADR-119)
@@ -7902,9 +8046,9 @@ the edge it sits on, and a midpoint over the same edge.
    sketch draws on its top face in each layer's colour, and the carve renders
    live underneath — pockets flat-floor, v-carves groove by boundary distance
    with the layer's v-bit angle, profiles slot at bit diameter on the offset
-   side (a tapered ball nose at its cut width at the layer depth, the offset
-   the compiler uses), drills bore at circle centres, and depths at the stock
-   thickness read as through cuts.
+   side (a bit that narrows toward its tip at its cut width at the layer
+   depth, the offset the compiler uses), drills bore at circle centres, and
+   depths at the stock thickness read as through cuts.
 2. The left button always belongs to the armed tool — draw, select, and move
    exactly as in 2D, from any camera angle (the pointer lands on the stock
    plane). Middle drag pans, Shift+middle or right drag orbits, the wheel

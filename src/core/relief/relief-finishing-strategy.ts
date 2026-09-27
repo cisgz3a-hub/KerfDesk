@@ -16,11 +16,16 @@
 // transposed map and swaps the coordinates back. Either raster skips the flats
 // roughing finished with an end mill (ADR-450); the waterline passes stay on
 // the steep walls, which no flat level finishes.
+//
+// Every move of every strategy is then checked against the exact contact
+// between its vertices (ADR-421 Amendment 1, relief-finishing-contact.ts).
 
 import type { CncPass } from '../job';
 import type { CncTool } from '../scene';
 import type { Heightmap } from './heightmap';
+import { createSurfaceContactField } from './heightmap-surface-contact';
 import { dilateHeightmapByTool } from './heightmap-tool-offset';
+import { checkedAgainstContact } from './relief-finishing-contact';
 import {
   reliefFinishingPasses,
   scallopRowSpacingMm,
@@ -61,8 +66,25 @@ export type ReliefFinishingPlanOptions = Omit<ReliefFinishingOptions, 'rowSpacin
   readonly wallOnRight: boolean;
 };
 
-/** Raster passes, then (under 'raster-waterline') the waterline passes. */
+/**
+ * Raster passes, then (under 'raster-waterline') the waterline passes, every
+ * move checked against the exact contact.
+ */
 export function reliefFinishingPlan(
+  map: Heightmap,
+  options: ReliefFinishingPlanOptions,
+): ReadonlyArray<CncPass> {
+  const passes = plannedPasses(map, options);
+  const contact = createSurfaceContactField(map, options.kernel);
+  if (contact === null) return passes;
+  return checkedAgainstContact(passes, {
+    tipAt: contact.constraintAtPoint,
+    alongMove: contact.alongMove,
+    spacingMm: map.mmPerCell / 4,
+  });
+}
+
+function plannedPasses(
   map: Heightmap,
   options: ReliefFinishingPlanOptions,
 ): ReadonlyArray<CncPass> {

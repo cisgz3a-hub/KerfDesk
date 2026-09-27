@@ -14,7 +14,7 @@ const LAYER = createLayer({ id: 'relief-layer', color: '#ff0000' });
 afterEach(resetStore);
 
 describe('ReliefLayerRows', () => {
-  it('keeps scallop separate from the finishing-bit chooser in Tool & material', async () => {
+  it('keeps scallop separate from the finishing-bit chooser under Bit', async () => {
     const onCommit = vi.fn();
     const host = document.createElement('div');
     document.body.appendChild(host);
@@ -38,7 +38,7 @@ describe('ReliefLayerRows', () => {
       ).toBeNull();
       const scallop = host.querySelector('input[aria-label="Relief scallop height for #ff0000"]');
       if (!(scallop instanceof HTMLInputElement)) throw new Error('scallop input missing');
-      expect(scallop.title).toContain('finishing bit chosen in Tool & material');
+      expect(scallop.title).toContain('Relief finishing bit chosen under Bit above');
 
       await act(async () => {
         const setter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')?.set;

@@ -36,10 +36,18 @@ export type SourcePiece = {
   readonly tail?: Vec2;
 };
 
+/**
+ * The deviation bound of one move: a plain number for moves a GRBL-family
+ * controller executes (an arc loses the sag of the chords it is cut into), or
+ * `exactArcs` for a consumer that draws arcs exactly, such as a CAD file
+ * (ADR-452), where the whole bound is the fit's.
+ */
+export type ArcFitTolerance = number | { readonly toleranceMm: number; readonly exactArcs: true };
+
 export function primitiveFitsPoints(
   primitive: FitPrimitive,
   points: ReadonlyArray<Vec2>,
-  toleranceMm: number,
+  toleranceMm: ArcFitTolerance,
 ): boolean {
   return primitiveFitsPiece(primitive, { points, from: 0, to: points.length - 1 }, toleranceMm);
 }
@@ -47,11 +55,13 @@ export function primitiveFitsPoints(
 export function primitiveFitsPiece(
   primitive: FitPrimitive,
   piece: SourcePiece,
-  toleranceMm: number,
+  toleranceMm: ArcFitTolerance,
 ): boolean {
-  return primitive.kind === 'line'
-    ? lineFits(primitive.start, primitive.end, piece, toleranceMm)
-    : arcFits(primitive, piece, toleranceMm);
+  const bound = typeof toleranceMm === 'number' ? toleranceMm : toleranceMm.toleranceMm;
+  if (primitive.kind === 'line') return lineFits(primitive.start, primitive.end, piece, bound);
+  const sag =
+    typeof toleranceMm === 'number' ? controllerChordSagMm(primitive.radius, primitive.sweep) : 0;
+  return arcFits(primitive, piece, bound - sag);
 }
 
 function pieceLength(piece: SourcePiece): number {
@@ -88,9 +98,8 @@ function lineFits(start: Vec2, end: Vec2, piece: SourcePiece, toleranceMm: numbe
   return true;
 }
 
-// The controller runs the arc as chords sagging up to this far inside it.
-function arcFits(arc: FitArc, piece: SourcePiece, moveToleranceMm: number): boolean {
-  const toleranceMm = moveToleranceMm - controllerChordSagMm(arc.radius, arc.sweep);
+// `toleranceMm` already excludes any controller chord sag.
+function arcFits(arc: FitArc, piece: SourcePiece, toleranceMm: number): boolean {
   if (!(toleranceMm > 0)) return false;
   const sx = arc.start.x - arc.center.x;
   const sy = arc.start.y - arc.center.y;
