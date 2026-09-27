@@ -1,7 +1,8 @@
 ## ADR-491 - Pockets step over at depth instead of lifting between rings, and the bit lifts to a park height before parking (2026-09-27)
 
-**Status:** Accepted; software-verified through unit, compile/emit and removal-simulation checks,
-hardware qualification pending (an air cut on the 4040). | **Date:** 2026-09-27
+**Status:** Accepted; software-verified through unit, compile/emit, removal-simulation and GRBL
+simulator streaming checks, hardware qualification pending (an air cut on the 4040). | **Date:**
+2026-09-27
 
 This fixes CW-01 and CW-07 of the 2026-09-27 CNC gap audit
 (`docs/audits/2026-09-27-cnc-gap-audit.md`), the first half of its motion batch. The Frame-first
@@ -84,6 +85,20 @@ Removal simulation (`computeRemovalGrid`, 0.25 mm cells) of 14 pockets with and 
 (offset, raster, island offset, round island raster, L, U raster, five-slot comb offset and raster,
 star, two adjacent pockets, circle, ramp, helix, rest roughing): no cell differs by more than
 0.01 mm in either direction. The links cut nothing the lifts did not.
+
+GRBL simulator, in place of the air cut the machine was not available for: nine
+pocket jobs (offset, raster, island with a 40 mm park height, U raster with a park position, circle,
+ramp, helix, rest roughing and a two-bit job with a 50 mm park height) streamed through the app's own
+sender into the simulated stock GRBL (15 planner blocks, 128-byte receive buffer, laser mode off).
+Every line was delivered with no error or alarm, and the controller ended Idle, spindle off, at the
+park position and height; the two-tool jobs held for the bit change parked at the park height with
+the spindle off, and the first move after the change is `G0` to safe Z. Checked move by move, no
+rapid runs below safe Z, nothing cuts with the spindle off, no step is longer than the bit diameter
+(longest 6.11 mm with the 6.35 mm bit) and every arc is within GRBL's radius tolerance. Pausing on a
+stay-down step at the second depth (offset, raster, island) lifted the bit, and Resume spun up above
+the cut, plunged back into its own kerf at the stop point and finished the job.
+`src/ui/state/cnc-stay-down-pocket.simulator.test.ts` keeps the offset and raster streams, the
+bit-change hold and the two pause cases.
 
 ### Consequences
 
