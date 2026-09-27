@@ -551,3 +551,45 @@ Status against the targets: not met. Owl Line Art is about 1.4x main, and perf-n
 (22% of perf-noise-512), and its arithmetic is already at the reference's operation count. The
 remaining gap is the proposal's Newton passes and the topology repair's work on the 0.02 px
 sampling. Both can only be reduced by a change to the output.
+
+### Amendment 7 - the arm solve's cubes are correctly rounded on every engine (2026-09-28)
+
+Amendment 6's `cube01` returned `x ** 3` bit for bit only on the V8 it was measured on. V8's pow
+is not the same routine in every version. CI runs Node 22 (V8 12.4), and there `cube01` differed
+from `x ** 3` on 29,783 of the unit test's 8e5 cubes, so the test failed. Node 24 (V8 13.6) and
+Chrome 152 agree with each other, and their pow is off from the correctly rounded cube on about
+1 in 2,800 inputs. So before this amendment the trace already depended on the engine's pow,
+and "same output" held only on the engine that measured it.
+
+Change: `cube01` returns the correctly rounded cube (round to nearest, ties to even) for x in
+[2^-300, 1] on every engine, and never calls pow there.
+
+- The double-double remainder is off by at most about 2^-104 of the cube: Dekker's products are
+  exact, and only `pErr * x` and one addition round. So the boundary band shrinks from 2^-57 to
+  2^-100 of the cube. The fallback now occurs about once in 2^47 random inputs, and on exact
+  ties. It was taken 8% of the time before.
+- The fallback no longer calls pow. It rounds the exact integer cube of the 53-bit significand
+  (a BigInt) to nearest, ties to even.
+- Outside [2^-300, 1] it still returns `x ** 3`. The arm solve never goes there.
+
+Test: `fast-cube.test.ts` no longer compares against the engine's `x ** 3`. It checks each
+result against the exact cube from the definition: the cube must lie between the midpoints to
+its two neighbouring doubles, and on a midpoint only when the result is even. It covers 4e5
+cubes (uniform, near 0, near 1, products and grid values, and their mirrors), about 400 exact
+ties and near-ties (k / 2^18 and k / 2^19), and the edge values. A `x * x * x` mutant fails the
+first case, and a ties-to-odd mutant fails two cases. Removing the fallback does not fail the
+test, because plain floating point already rounds an exact tie correctly, and a near tie that
+needs the fallback has no known constructed input.
+
+Measured:
+
+- Correct rounding: the new `cube01` was correctly rounded on all of 6e5 random cubes on Node 24
+  and on Chrome 152. On both engines pow was wrong on 217 of those 6e5.
+- Output: compared against 6c834c673 on Node 24, about 0.1-0.15% of all output coordinates
+  move, by at most 2.2e-12 px. This holds for owl and hummingbird in Line Art, Sharp and Smooth,
+  and for noise192 and noise37x113. The number and order of curves, segments and kinds are
+  unchanged in every case. Only `subpathNesting.geometryKey`, a hash of the coordinates, differs.
+  The parity-oracle hashes recorded before this amendment need re-recording.
+- Speed: over 8.4e6 uniform cubes (best of 5, Node 24), the new version took 159 ms, Amendment
+  6's version 249 ms, pow 372 ms and `x * x * x` 140 ms. The gain comes from the fallback, which
+  called pow 8% of the time and now almost never runs.
