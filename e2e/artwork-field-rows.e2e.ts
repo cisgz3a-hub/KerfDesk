@@ -90,30 +90,28 @@ test('laser settings keep Power, Speed and Passes level and even at every panel 
   }
 });
 
-test('CNC feed boxes stay level and even at every panel width', async ({ page }) => {
+// ADR-431: Cut depth and Depth per pass share one row, Feed, Plunge and
+// Spindle speed the next. Each row's boxes stay level and even at every width;
+// at the narrowest width Spindle speed wraps under Feed.
+test('CNC depth and feed boxes stay level and even at every panel width', async ({ page }) => {
   await page.setViewportSize({ width: 1280, height: 900 });
   await page.goto('/');
   await page.getByRole('button', { name: 'CNC', exact: true }).click();
   const panel = await addTextArtwork(page);
-  const feeds = [/^Depth per pass for/, /^Feed for/, /^Plunge for/].map((name) =>
-    panel.getByRole('spinbutton', { name }),
-  );
+  const rows = [
+    [/^Cut depth for/, /^Depth per pass for/],
+    [/^Feed for/, /^Plunge for/, /^Spindle speed for/],
+  ].map((names) => names.map((name) => panel.getByRole('spinbutton', { name })));
 
   for (const width of [240, 300, 400]) {
     await setPanelWidth(page, panel, width);
-    const boxes = await Promise.all(feeds.map(boxOf));
-    expectEven(boxes);
-    // Fields whose grid cells start on the same line share a row: their boxes
-    // must be level too.
-    const cellTops = await Promise.all(
-      feeds.map((field) =>
-        field.evaluate((input) =>
-          Math.round(input.closest('.lf-cnc-setting-row')?.getBoundingClientRect().top ?? 0),
-        ),
-      ),
-    );
-    for (const top of new Set(cellTops)) {
-      expectLevel(boxes.filter((_, index) => cellTops[index] === top));
+    // Below about 290 px Spindle speed takes its own row so five digits fit.
+    const [depthRow = [], feedRow = []] = rows;
+    const levelRows = width >= 290 ? [depthRow, feedRow] : [depthRow, feedRow.slice(0, 2)];
+    for (const row of levelRows) {
+      const boxes = await Promise.all(row.map(boxOf));
+      expectLevel(boxes);
+      expectEven(boxes);
     }
   }
 });

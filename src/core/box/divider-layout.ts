@@ -20,7 +20,7 @@ export type DividerPlacement = {
 export type DividerLayout = {
   readonly xDividers: ReadonlyArray<DividerPlacement>;
   readonly yDividers: ReadonlyArray<DividerPlacement>;
-  /** Divider panel height: inner height, plus the rim band when open-top. */
+  /** Divider panel height: the inner (cavity) height for every style. */
   readonly heightSpanMm: number;
   /**
    * ONE alternating sequence shared by every divider↔wall junction (they
@@ -43,8 +43,9 @@ export function hasDividers(spec: BoxSpec): boolean {
 export function dividerLayout(spec: BoxSpec): DividerLayout {
   const dims = deriveBoxDims(spec);
   const counts = dividerCounts(spec);
-  const heightSpanMm =
-    spec.style === 'open-top' ? dims.innerHeightMm + spec.thicknessMm : dims.innerHeightMm;
+  // The full cavity for every style: up to the top panel, the open-top rim,
+  // or the slide lid's channel floor.
+  const heightSpanMm = dims.innerHeightMm;
   return {
     xDividers: placements('x', counts.x, dims.innerWidthMm, spec.thicknessMm),
     yDividers: placements('y', counts.y, dims.innerDepthMm, spec.thicknessMm),

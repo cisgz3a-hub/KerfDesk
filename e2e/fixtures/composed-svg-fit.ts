@@ -42,8 +42,34 @@ function expectUniformSvgFit(fitted: Project, authored: Project): void {
   expect(extent.centerY).toBeCloseTo(cy, 8);
 }
 
-/** Independent affine bounds calculation, not the app's fit or bounds implementation. */
-function compositionExtent(objects: readonly SceneObject[]) {
+/** These fixtures' export pages enclose their independent affine geometry on the ADR-431 grid. */
+export function expectSvgExportPageBounds(viewBox: readonly number[], project: Project): void {
+  const gridMm = 0.001;
+  const epsilonMm = 1e-9;
+  expect(viewBox).toHaveLength(4);
+  for (const value of viewBox) {
+    expect(Number.isFinite(value)).toBe(true);
+    expect(value / gridMm).toBeCloseTo(Math.round(value / gridMm), 6);
+  }
+  const [x, y, width, height] = viewBox.map(Number);
+  expect(width).toBeGreaterThan(0);
+  expect(height).toBeGreaterThan(0);
+  const bounds = compositionExtent(project.scene.objects);
+  const padding = {
+    left: bounds.minX - Number(x),
+    top: bounds.minY - Number(y),
+    right: Number(x) + Number(width) - bounds.maxX,
+    bottom: Number(y) + Number(height) - bounds.maxY,
+  };
+  for (const [edge, gap] of Object.entries(padding)) {
+    // No inward rounding or extra whole grid step; epsilon only absorbs float arithmetic.
+    expect(gap, `${edge} page edge must contain artwork`).toBeGreaterThanOrEqual(-epsilonMm);
+    expect(gap, `${edge} outward padding`).toBeLessThan(gridMm + epsilonMm);
+  }
+}
+
+/** Independent affine bounds calculation, not the app's fit, export or bounds implementation. */
+export function compositionExtent(objects: readonly SceneObject[]) {
   const points = objects.flatMap(({ bounds: b, transform: t }) => {
     const cos = Math.cos((t.rotationDeg * Math.PI) / 180);
     const sin = Math.sin((t.rotationDeg * Math.PI) / 180);
@@ -64,6 +90,10 @@ function compositionExtent(objects: readonly SceneObject[]) {
   const minY = Math.min(...points.map((point) => point.y));
   const maxY = Math.max(...points.map((point) => point.y));
   return {
+    minX,
+    maxX,
+    minY,
+    maxY,
     width: maxX - minX,
     height: maxY - minY,
     centerX: (minX + maxX) / 2,

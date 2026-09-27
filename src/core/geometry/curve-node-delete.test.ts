@@ -269,4 +269,46 @@ describe('deleteCurveNodes', () => {
     const midpoint = cubicPoint(merged!.start, segment, 0.5);
     expect(Math.abs(Math.hypot(midpoint.x, midpoint.y) - RADIUS)).toBeLessThan(0.05);
   });
+
+  it('takes eccentric arc end tangents analytically, not from flattened samples', () => {
+    // 100 x 2 ellipse rotated 30 deg: the flattener's chords are unevenly
+    // spaced here, so a finite difference over them misreads the tangent by
+    // degrees and the merged cubic kinks at its joints.
+    const rx = 100;
+    const ry = 2;
+    const phi = Math.PI / 6;
+    const rotate = (x: number, y: number): Vec2 => ({
+      x: x * Math.cos(phi) - y * Math.sin(phi),
+      y: x * Math.sin(phi) + y * Math.cos(phi),
+    });
+    const at = (theta: number): Vec2 => rotate(rx * Math.cos(theta), ry * Math.sin(theta));
+    const tangentAt = (theta: number): Vec2 => rotate(-rx * Math.sin(theta), ry * Math.cos(theta));
+    const arc = (to: Vec2): PathSegment => ({
+      kind: 'elliptical-arc',
+      radiusX: rx,
+      radiusY: ry,
+      rotationDeg: 30,
+      largeArc: false,
+      sweep: true,
+      to,
+    });
+    const angleDeg = (a: Vec2, b: Vec2): number =>
+      (Math.abs(Math.atan2(a.x * b.y - a.y * b.x, a.x * b.x + a.y * b.y)) * 180) / Math.PI;
+
+    const merged = deleteCurveNodes(
+      { start: at(0), segments: [arc(at(0.5)), arc(at(1))], closed: false },
+      new Set([1]),
+    );
+
+    const segment = merged!.segments[0]!;
+    if (segment.kind !== 'cubic') throw new Error('expected a cubic');
+    const start = merged!.start;
+    const startHandle = { x: segment.control1.x - start.x, y: segment.control1.y - start.y };
+    const endHandle = {
+      x: segment.to.x - segment.control2.x,
+      y: segment.to.y - segment.control2.y,
+    };
+    expect(angleDeg(startHandle, tangentAt(0))).toBeLessThan(0.01);
+    expect(angleDeg(endHandle, tangentAt(1))).toBeLessThan(0.01);
+  });
 });

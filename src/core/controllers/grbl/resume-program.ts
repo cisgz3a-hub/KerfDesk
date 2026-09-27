@@ -17,7 +17,7 @@ import { nativeLaserResume, scanNativeBeamLine } from './native-laser-resume';
 
 export type { LaserResumeTransformVersion };
 /** The transform new resumes use; archived resume steps record their own. */
-export const LASER_RESUME_TRANSFORM_VERSION: LaserResumeTransformVersion = 3;
+export const LASER_RESUME_TRANSFORM_VERSION: LaserResumeTransformVersion = 4;
 
 export type ResumeProgram = {
   readonly kind: 'ok';
@@ -80,6 +80,7 @@ export function buildResumeProgram(
     spindle: 'M5',
     motion: null,
     wcs: 'G54',
+    plane: null,
     sValue: null,
     feed: null,
     x: null,
@@ -138,7 +139,7 @@ function resumeBody(
 ): { readonly preamble: ReadonlyArray<string>; readonly tail: ReadonlyArray<string> } {
   if (beam !== null) return nativeLaserResume(state, beam, originalTail);
   return {
-    preamble: buildPreamble(state, transform),
+    preamble: buildPreamble(state, transform, originalTail),
     tail: rewriteLaserResumeTail(state, originalTail, transform),
   };
 }
@@ -196,6 +197,8 @@ function applyModalGWord(state: LaserResumeModalState, value: number): void {
   else if (value === 21) state.units = 'G21';
   else if (value >= 54 && value <= 59 && Number.isInteger(value)) {
     state.wcs = `G${value}` as LaserResumeModalState['wcs'];
+  } else if (value === 17 || value === 18 || value === 19) {
+    state.plane = `G${value}` as LaserResumeModalState['plane'];
   }
   const motion = motionForGWord(value);
   if (motion !== null) state.motion = motion;
@@ -225,6 +228,7 @@ function applyMWord(state: LaserResumeModalState, value: number): void {
 function buildPreamble(
   state: LaserResumeModalState,
   transform: LaserResumeTransformVersion,
+  originalTail: ReadonlyArray<string>,
 ): ReadonlyArray<string> {
   // Pin the WCS and feed mode before re-positioning, exactly as the job preamble
   // does (grbl-strategy.ts): a resume re-executes from a mid-program line, and a
@@ -239,8 +243,33 @@ function buildPreamble(
     'G90',
     state.wcs,
     'G94',
+    ...resumePlane(state, transform, originalTail),
     ...laserResumeBody(state, transform),
   ];
+}
+
+// Transform 4 pins the arc plane like the WCS (ADR-432): the plane the program
+// selected, or G17 when the tail replays G2/G3 and the program named none.
+function resumePlane(
+  state: LaserResumeModalState,
+  transform: LaserResumeTransformVersion,
+  originalTail: ReadonlyArray<string>,
+): string[] {
+  if (transform < 4) return [];
+  if (state.plane !== null) return [state.plane];
+  return originalTail.some(replaysArc) ? ['G17'] : [];
+}
+
+function replaysArc(rawLine: string): boolean {
+  for (const match of stripComments(rawLine).matchAll(WORD_RE)) {
+    if (
+      (match[1] ?? '').toUpperCase() === 'G' &&
+      (Number(match[2]) === 2 || Number(match[2]) === 3)
+    ) {
+      return true;
+    }
+  }
+  return false;
 }
 
 // Laser re-entry: hard-off first, position with explicit S0, then re-arm at S0.

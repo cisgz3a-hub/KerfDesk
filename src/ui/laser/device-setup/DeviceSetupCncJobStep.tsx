@@ -105,13 +105,15 @@ function MaterialAndBitCards(props: {
         </MachineSetupFieldAnchor>
       </SetupCard>
       <SetupCard title="Bit library">
-        <DeviceSetupCncBitLibrary
-          machine={props.machine}
-          customTools={props.customTools}
-          onChange={props.onChangeMachine}
-          onChangeCustomTools={props.onChangeCustomTools}
-          onRemoveTool={props.onRemoveTool}
-        />
+        <MachineSetupFieldAnchor field="bit-library" label="Bit library in Machine Setup">
+          <DeviceSetupCncBitLibrary
+            machine={props.machine}
+            customTools={props.customTools}
+            onChange={props.onChangeMachine}
+            onChangeCustomTools={props.onChangeCustomTools}
+            onRemoveTool={props.onRemoveTool}
+          />
+        </MachineSetupFieldAnchor>
       </SetupCard>
     </>
   );

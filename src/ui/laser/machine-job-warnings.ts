@@ -11,7 +11,6 @@ import type { Project } from '../../core/scene';
 import type { PreparedOutput } from '../../io/gcode';
 import { detectActiveWcsMismatchWarnings } from './active-wcs-warnings';
 import { detectCncAngledToolFeedWarnings } from './cnc-angled-tool-feed-warnings';
-import { detectCncTaperedBallLayoutWarnings } from './cnc-tapered-ball-layout-warnings';
 import { detectCompiledReliefDepthWarningsForJob } from './cnc-compiled-depth-warnings';
 import { detectCncContourPrecisionWarnings } from './cnc-contour-precision-warnings';
 import { detectCncDefaultFeedWarnings } from './cnc-default-feed-warnings';
@@ -25,6 +24,7 @@ import { detectCncRasterWarnings } from './cnc-raster-warnings';
 import { detectCncReliefPlanningWarnings } from './cnc-relief-planning-warnings';
 import { detectCncStockWarnings } from './cnc-stock-warnings';
 import { detectCncThroughCutTabWarnings } from './cnc-through-cut-tab-warnings';
+import { detectCncUnmodeledBitLayoutWarnings } from './cnc-unmodeled-bit-layout-warnings';
 import { detectJobIntentWarnings } from './job-intent-warnings';
 import { detectLaserReliefWarnings } from './laser-relief-warnings';
 import { detectLaserMachineLimitWarnings } from './laser-machine-limit-warnings';
@@ -52,7 +52,7 @@ export function detectMachineJobWarnings(
           ...detectCncFullTabCoverageWarnings(project, job),
           ...detectCncDefaultFeedWarnings(project),
           ...detectCncAngledToolFeedWarnings(project),
-          ...detectCncTaperedBallLayoutWarnings(project),
+          ...detectCncUnmodeledBitLayoutWarnings(project),
           ...detectCncMachineLimitWarnings(project, controllerSettings),
           ...detectCncMissingPrimaryToolWarnings(project),
           ...(prepared === undefined

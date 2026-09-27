@@ -31,6 +31,7 @@ import {
   boundsFromColoredPaths,
   traceImageToColoredPaths,
 } from '../../core/trace';
+import { resolveFrozenTraceSourceOptions } from '../../core/trace/trace-source-decisions';
 import { hasAggressivePreprocessing, relaxAggressivePreprocessing } from './trace-options';
 import type { TraceWorkerRequest, TraceWorkerResponse } from './trace-worker';
 import { createCooperativeTraceRunner } from './cooperative-trace-runner';
@@ -49,6 +50,17 @@ export type TraceResult = {
   readonly notices?: ReadonlyArray<TraceNotice>;
   // Submit's fallback decoder can recover source metadata before any crop.
   readonly sourceHasTransparency?: boolean;
+  // The options the first pass traced with, the whole source's binarisation
+  // decisions resolved into them. Present exactly when the request asked for
+  // freezeSourceDecisions (ADR-435).
+  readonly sourceOptions?: TraceOptions;
+};
+
+/** Per-request switches that are not trace settings. */
+export type TraceRequestFlags = {
+  // Run resolveFrozenTraceSourceOptions next to the trace (in the worker when
+  // there is one), trace with its result and return that as sourceOptions.
+  readonly freezeSourceDecisions?: boolean;
 };
 
 export class TraceRequestSupersededError extends Error {
@@ -154,6 +166,7 @@ function handleWorkerMessage(worker: Worker, e: MessageEvent<TraceWorkerResponse
       bounds: e.data.bounds,
       width: e.data.width,
       height: e.data.height,
+      ...(e.data.sourceOptions === undefined ? {} : { sourceOptions: e.data.sourceOptions }),
     });
     return;
   }
@@ -203,6 +216,7 @@ export async function traceImage(
   options: TraceOptions,
   signal?: AbortSignal,
   progress?: TraceProgress,
+  flags: TraceRequestFlags = {},
 ): Promise<TraceResult> {
   if (signal?.aborted === true) throw new TraceRequestSupersededError();
   const epoch = ++latestTraceEpoch;
@@ -217,9 +231,15 @@ export async function traceImage(
   };
   signal?.addEventListener('abort', cancel, { once: true });
   try {
-    return await traceImageForEpoch(image, options, epoch, (phase) => {
-      if (epoch === latestTraceEpoch) progress?.(phase);
-    });
+    return await traceImageForEpoch(
+      image,
+      options,
+      epoch,
+      (phase) => {
+        if (epoch === latestTraceEpoch) progress?.(phase);
+      },
+      flags,
+    );
   } finally {
     signal?.removeEventListener('abort', cancel);
   }
@@ -229,7 +249,8 @@ async function traceImageForEpoch(
   image: RawImageData,
   options: TraceOptions,
   epoch: number,
-  progress?: TraceProgress,
+  progress: TraceProgress | undefined,
+  flags: TraceRequestFlags,
 ): Promise<TraceResult> {
   if (workerInstance !== null && pendingByRequestId.size > 0) {
     rejectAllPendingAndRetireWorker(workerInstance, new TraceRequestSupersededError());
@@ -242,15 +263,15 @@ async function traceImageForEpoch(
     worker = ensureWorker();
   }
   if (worker === null) {
-    return traceInlineIfSafe(image, options, epoch, progress);
+    return traceInlineIfSafe(image, options, epoch, progress, flags);
   }
   try {
-    return await traceInWorker(worker, image, options, progress);
+    return await traceInWorker(worker, image, options, progress, flags);
   } catch (err) {
     checkTraceEpoch(epoch);
     if (isTraceRequestSuperseded(err)) throw err;
     if (canTraceInline(image)) {
-      return recoverSmallTrace(image, options, epoch, err, progress);
+      return recoverSmallTrace(image, options, epoch, err, progress, flags);
     }
     throw err instanceof Error ? err : new Error(String(err));
   }
@@ -265,7 +286,8 @@ async function recoverSmallTrace(
   options: TraceOptions,
   epoch: number,
   error: unknown,
-  progress?: TraceProgress,
+  progress: TraceProgress | undefined,
+  flags: TraceRequestFlags,
 ): Promise<TraceResult> {
   // Request-level errors keep their existing fallback route. Only actual
   // runtime death gets one fresh worker attempt; it can never retry forever.
@@ -273,14 +295,14 @@ async function recoverSmallTrace(
     const worker = ensureWorker();
     if (worker !== null) {
       try {
-        return await traceInWorker(worker, image, options, progress);
+        return await traceInWorker(worker, image, options, progress, flags);
       } catch (retryError) {
         checkTraceEpoch(epoch);
         if (isTraceRequestSuperseded(retryError)) throw retryError;
       }
     }
   }
-  return traceInline(image, options, epoch, progress);
+  return traceInline(image, options, epoch, progress, flags);
 }
 
 export function canTraceInline(image: {
@@ -294,25 +316,32 @@ async function traceInlineIfSafe(
   image: RawImageData,
   options: TraceOptions,
   epoch: number,
-  progress?: TraceProgress,
+  progress: TraceProgress | undefined,
+  flags: TraceRequestFlags,
 ): Promise<TraceResult> {
   if (!canTraceInline(image)) {
     throw new Error(
       'Trace worker is unavailable for this large image. Reload the app and try again.',
     );
   }
-  return traceInline(image, options, epoch, progress);
+  return traceInline(image, options, epoch, progress, flags);
 }
 
 async function traceInline(
   image: RawImageData,
   options: TraceOptions,
   epoch: number,
-  progress?: TraceProgress,
+  progress: TraceProgress | undefined,
+  flags: TraceRequestFlags,
 ): Promise<TraceResult> {
+  // Inline tracing is bounded to small images, so resolving here is cheap.
+  const traced =
+    flags.freezeSourceDecisions === true
+      ? resolveFrozenTraceSourceOptions(image, options)
+      : options;
   const paths = await traceImageToColoredPaths(
     image,
-    options,
+    traced,
     createCooperativeTraceRunner(() => checkTraceEpoch(epoch)),
     progress,
   );
@@ -322,6 +351,7 @@ async function traceInline(
     bounds: boundsFromColoredPaths(paths),
     width: image.width,
     height: image.height,
+    ...(flags.freezeSourceDecisions === true ? { sourceOptions: traced } : {}),
   };
 }
 
@@ -349,7 +379,8 @@ function traceInWorker(
   worker: Worker,
   image: RawImageData,
   options: TraceOptions,
-  progress?: TraceProgress,
+  progress: TraceProgress | undefined,
+  flags: TraceRequestFlags,
 ): Promise<TraceResult> {
   return new Promise<TraceResult>((resolve, reject) => {
     nextRequestId += 1;
@@ -376,6 +407,7 @@ function traceInWorker(
       id,
       image: { ...image, width: image.width, height: image.height, data: transferredData },
       options,
+      ...(flags.freezeSourceDecisions === true ? { freezeSourceDecisions: true } : {}),
     };
     try {
       worker.postMessage(request, [transferredData.buffer]);
@@ -402,13 +434,25 @@ export async function traceImageWithFallback(
   options: TraceOptions,
   signal?: AbortSignal,
   progress?: TraceProgress,
+  flags: TraceRequestFlags = {},
 ): Promise<TraceResult> {
-  const first = await traceImage(image, options, signal, progress);
+  const first = await traceImage(image, options, signal, progress, flags);
   if (first.paths.length > 0) return first;
   if (!hasAggressivePreprocessing(options)) return first;
   // Keep the same palette/backend and disclose that Otsu, ink despeckle,
   // and short-path filtering were relaxed. Preview and commit carry this
   // result together so recovered artwork never masquerades as the first pass.
-  const retried = await traceImage(image, relaxAggressivePreprocessing(options), signal, progress);
-  return { ...retried, notices: ['relaxed-settings'] };
+  // A frozen first pass hands the retry its resolved decisions, and its
+  // unrelaxed options stay the ones any derived pass inherits.
+  const retried = await traceImage(
+    image,
+    relaxAggressivePreprocessing(first.sourceOptions ?? options),
+    signal,
+    progress,
+  );
+  return {
+    ...retried,
+    notices: ['relaxed-settings'],
+    ...(first.sourceOptions === undefined ? {} : { sourceOptions: first.sourceOptions }),
+  };
 }

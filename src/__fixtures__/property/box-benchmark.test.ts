@@ -5,8 +5,8 @@
 //   assembly-exact      nominal referee: zero collisions/voids, true to size
 //   assembly-clearance  fitted referee: uniform play == c, zero interference
 //   structure           simple rectilinear rings, area exact vs claims
-//   fit-relief          full-radius overcut at every reflex corner; laser
-//                       output bit-identical at clearance 0
+//   fit-relief          the compensated CNC bit reaches every seat corner;
+//                       laser output bit-identical at clearance 0
 //   determinism         same spec ⇒ JSON-identical output, twice
 //   cutouts             multi-ring fit invariants (ADR-116 V1)
 //   sabotage-detection  the referee FAILS on all four broken-math classes
@@ -36,10 +36,9 @@ import {
   buildCorpus,
   clearanceFor,
   isRectilinearSimple,
-  minDistance,
   rectRing,
+  bitReachesSeatCorners,
   reliefToolFor,
-  reliefsAtFullRadius,
   ringSpan,
   spec,
   tamperCell,
@@ -144,13 +143,16 @@ function scoreFitRelief(corpus: ReadonlyArray<BoxSpec>): Score {
         { clearanceMm: 0, relief: { kind: 'none' } },
       );
       if (laser.kind === 'fitted' && laser.outline === nominal) passed += 1;
-      // CNC: every reflex corner carries a full-radius overcut.
+      // CNC: the profile-outside bit reaches every reflex (seat) corner.
       total += 1;
       const cnc = applyPanelFit(
         { outline: nominal, cutouts: [] },
         { clearanceMm: 0, relief: { kind: 'corner-overcut', toolDiameterMm: toolMm } },
       );
-      if (cnc.kind === 'fitted' && reliefsAtFullRadius(nominal, cnc.outline, toolMm / 2)) {
+      if (
+        cnc.kind === 'fitted' &&
+        bitReachesSeatCorners({ outline: nominal, cutouts: [] }, cnc, toolMm)
+      ) {
         passed += 1;
       }
     }
@@ -174,9 +176,9 @@ function scoreDeterminism(corpus: ReadonlyArray<BoxSpec>): Score {
 }
 
 // Multi-ring fit invariants (ADR-116 V1): synthetic panels with slot
-// cutouts must keep their ring count, widen slots by c/2, carve full-radius
-// overcuts at slot corners, stay bit-identical at c=0, and stay
-// deterministic.
+// cutouts must keep their ring count, widen slots by c/2, let the
+// compensated bit reach every slot corner, stay bit-identical at c=0, and
+// stay deterministic.
 function scoreCutouts(): Score {
   const outline = rectRing(0, 0, 120, 80);
   const slots = [rectRing(20, 30, 28, 50), rectRing(60, 20, 100, 26)];
@@ -212,16 +214,12 @@ function scoreCutouts(): Score {
     clearanceMm: 0,
     relief: { kind: 'corner-overcut', toolDiameterMm: toolMm },
   });
-  if (relieved.kind === 'fitted' && relieved.cutouts.length === 2) {
-    const ok = slots.every((slot, i) => {
-      const hole = relieved.cutouts[i];
-      if (hole === undefined) return false;
-      return slot.points.slice(0, -1).every((corner) => {
-        const d = minDistance(corner, hole);
-        return d >= 0.98 * (toolMm / 2) && d <= toolMm / 2 + 2e-3;
-      });
-    });
-    if (ok) passed += 1;
+  if (
+    relieved.kind === 'fitted' &&
+    relieved.cutouts.length === 2 &&
+    bitReachesSeatCorners(rings, relieved, toolMm)
+  ) {
+    passed += 1;
   }
   total += 1;
   const a = applyPanelFit(rings, {

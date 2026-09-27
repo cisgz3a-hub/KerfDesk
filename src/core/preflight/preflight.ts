@@ -71,6 +71,9 @@ export type PreflightCode =
   | 'cnc-machine-params-invalid'
   | 'cnc-helix-entry-invalid'
   | 'cnc-vcarve-entry-fallback'
+  // Advisory-only (ADR-471): a ramp entry left passes whose paths are too
+  // short to ramp along to plunge.
+  | 'cnc-ramp-entry-plunge'
   | 'cnc-rest-machining-invalid'
   | 'cnc-adaptive-clearing-invalid'
   | 'cnc-inlay-invalid'

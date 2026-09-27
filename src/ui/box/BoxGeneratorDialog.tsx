@@ -27,7 +27,7 @@ import { useBoxGeneratorForm } from './use-box-generator-form';
 export function BoxGeneratorDialog(props: {
   readonly machine: BoxMachineContext;
   readonly onCancel: () => void;
-  readonly onGenerate: (panels: ReadonlyArray<BoxPanel>) => void;
+  readonly onGenerate: (panels: ReadonlyArray<BoxPanel>, spec: BoxSpec) => void;
 }): JSX.Element {
   const form = useBoxGeneratorForm(props.machine);
   const [view, setView] = useState<BoxPreviewView>('flat');
@@ -53,7 +53,7 @@ export function BoxGeneratorDialog(props: {
         event.preventDefault();
         if (generation.currentSnapshot === null) return;
         persistCalibrationDraft(draftKey, form.draft);
-        props.onGenerate(generation.currentSnapshot.panels);
+        props.onGenerate(generation.currentSnapshot.panels, generation.currentSnapshot.spec);
       }}
       size="md"
     >

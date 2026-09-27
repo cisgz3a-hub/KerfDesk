@@ -127,7 +127,7 @@ describe('TracePreview visible feedback', () => {
     await click('Show Points');
     const hole = host.querySelector('#hole') as SVGPathElement;
     const line = host.querySelector('#line') as SVGPathElement;
-    const marker = host.querySelector('[aria-label="Trace points"]') as HTMLCanvasElement;
+    const marker = host.querySelector('[aria-label="Trace nodes"]') as HTMLCanvasElement;
     const geometry = [hole.outerHTML, line.outerHTML, marker.outerHTML];
     expect(getComputedStyle(hole).fill).toBe('var(--lf-accent)');
     expect(getComputedStyle(line).stroke).toBe('var(--lf-accent)');

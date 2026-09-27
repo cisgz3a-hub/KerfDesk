@@ -160,6 +160,9 @@ export type BuildRenderModelOptions = {
   /** Timing can retain true segment lengths without quantizing a long route.
    * Rendering-only callers keep the smaller default model. */
   readonly retainPreciseSegmentLengths?: boolean;
+  /** Timing: interpolate G2/G3 as the controller does at this `$12` arc
+   * tolerance instead of the display's coarser chords (ADR-432). */
+  readonly controllerArcToleranceMm?: number;
   /** Advisory threshold only. Every parsed segment remains in the render model. */
   readonly renderPressureThreshold?: number;
   /** Work-coordinate position before the first program line. */

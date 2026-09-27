@@ -27,11 +27,17 @@ import {
 } from '../../core/scene';
 import { applyCncTextDefaultsToNewLayer } from './cnc-text-defaults';
 import { duplicateSceneSelection } from './duplicate-scene-selection';
+import {
+  freshArtworkMode,
+  freshArtworkModeForColor,
+  freshArtworkNameForColor,
+} from './fresh-artwork-mode';
 import { applyFreshTraceScanDirection } from './fresh-trace-scan-direction';
 import { positionTraceOverRasterSource } from './trace-placement';
 import { releaseTraceSourcePalette } from './trace-source-palette';
 import type { BedFit } from '../../core/scene/fit-to-bed';
 import { pruneSceneObjectOperationOverrides } from '../../core/scene/operation-binding';
+import { withColourLayerPowers, type ColourLayerCommit } from '../../core/trace/colour-layer-power';
 
 export { positionTraceOverRasterSource } from './trace-placement';
 
@@ -76,6 +82,9 @@ export type TraceExistingImageOptions = {
   readonly cameraSource?: RasterImage;
   readonly deleteSourceAfterTrace?: boolean;
   readonly replaceTraceId?: string;
+  /** Colour-layer trace (ADR-461): set each colour's laser operation power
+   *  by darkness; paper colours start with output off. */
+  readonly colourLayers?: ColourLayerCommit;
 };
 
 type PreparedTraceSource = {
@@ -224,6 +233,8 @@ export function applyFreshImport(
   }
   const created = createArtworkOperations(s.project.scene, positioned, {
     mode: freshArtworkMode(positioned),
+    modeForColor: freshArtworkModeForColor(positioned),
+    nameForColor: freshArtworkNameForColor(positioned),
   });
   const operations = applyFreshTraceScanDirection(positioned, created.operations, s.project.device);
   positioned = created.object;
@@ -239,15 +250,6 @@ export function applyFreshImport(
     redoStack: [],
     dirty: true,
   };
-}
-
-function freshArtworkMode(object: SceneObject): 'line' | 'fill' | 'image' {
-  if (object.kind === 'raster-image') return 'image';
-  if (object.kind === 'traced-image') {
-    if (object.traceMode === 'centerline' || object.traceMode === 'edge') return 'line';
-    return object.operationOverride?.mode ?? 'fill';
-  }
-  return object.operationOverride?.mode ?? 'line';
 }
 
 // Trace paths use the actual capped working grid reported by the tracer, while
@@ -300,11 +302,14 @@ export function applyTraceToExisting(
     scene.objects.some((object) => object.id === positionedTrace.id);
   const created = createArtworkOperations(scene, positionedTrace, {
     mode: freshArtworkMode(positionedTrace),
+    modeForColor: freshArtworkModeForColor(positionedTrace),
+    nameForColor: freshArtworkNameForColor(positionedTrace),
   });
-  const operations = applyFreshTraceScanDirection(
-    positionedTrace,
-    created.operations,
-    s.project.device,
+  const operations = withColourLayerPowers(
+    created.object,
+    applyFreshTraceScanDirection(positionedTrace, created.operations, s.project.device),
+    options.colourLayers,
+    s.project.machine,
   );
   scene = replaceInPlace
     ? replaceObject(scene, positionedTrace.id, created.object)

@@ -20,6 +20,10 @@ const CUBE: BoxSpec = {
   partSpacingMm: 8,
 };
 
+// Open top adds one T (the bottom) to the inner height, so an inner 35 mm
+// open-top box stands on the same 40 mm walls as the closed cube.
+const OPEN_CUBE: BoxSpec = { ...CUBE, heightMm: 35, style: 'open-top' };
+
 function outlineOf(spec: BoxSpec, panel: string): Polyline {
   const claims = buildPanelClaims(spec).find((c) => c.panel === panel);
   if (claims === undefined) throw new Error(`missing panel ${panel}`);
@@ -76,7 +80,7 @@ describe('panelOutline — exact rings on the 30³ cube', () => {
   });
 
   it('notches the open-top side wall at the rim corners only', () => {
-    const points = ring(outlineOf({ ...CUBE, style: 'open-top' }, 'left'));
+    const points = ring(outlineOf(OPEN_CUBE, 'left'));
     const has = (x: number, y: number): boolean => points.some((p) => p.x === x && p.y === y);
     // The rim stops T short of both ends; each unclaimed corner square merges
     // with the adjacent unowned finger cell into one straight recess down to
@@ -95,7 +99,7 @@ describe('panelOutline — exact rings on the 30³ cube', () => {
   });
 
   it('keeps the open-top front wall rim straight across', () => {
-    const points = ring(outlineOf({ ...CUBE, style: 'open-top' }, 'front'));
+    const points = ring(outlineOf(OPEN_CUBE, 'front'));
     const rim = points.filter((p) => p.y === 40).map((p) => p.x);
     expect(Math.min(...rim)).toBe(0);
     expect(Math.max(...rim)).toBe(40);

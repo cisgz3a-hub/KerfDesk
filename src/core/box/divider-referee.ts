@@ -74,7 +74,7 @@ type ExpectedGrid = {
 function expectedGrid(spec: BoxSpec): ExpectedGrid {
   const dims = deriveBoxDims(spec);
   const t = spec.thicknessMm;
-  const heightSpanMm = spec.style === 'open-top' ? dims.innerHeightMm + t : dims.innerHeightMm;
+  const heightSpanMm = dims.innerHeightMm;
   const pattern = edgePattern({
     fullSpanMm: heightSpanMm + 2 * t,
     thicknessMm: t,

@@ -7,6 +7,7 @@
 // showing surface-true geometry. Raster groups map their bounds through the
 // same transform; reverse mode maps source-row traversal onto descending Y.
 
+import { withoutArcMoves } from './cut-arc-moves';
 import type { CutSegment, FillSegment, Job, RasterGroup } from './job';
 
 // reverse (ADR-127): the rotary can spin the opposite way (chuck mounted
@@ -115,8 +116,9 @@ function mapSegment<T extends CutSegment>(
   extent: number,
   reverse: boolean,
 ): T {
+  // A Y scale turns arcs into ellipses; the chords are what the rotary runs.
   return {
-    ...segment,
+    ...withoutArcMoves(segment),
     polyline: segment.polyline.map((p) => {
       const forward = (p.y - baseY) * yScale;
       return { x: p.x, y: reverse ? extent - forward : forward };
