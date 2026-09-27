@@ -102,3 +102,38 @@ from Potrace's documented behaviour only; no Potrace source was consulted (ADR-1
 - A fitted Multi-File Trace file no longer shares the source image's frame; files of one batch
   each have their own page.
 - The fitted page can extend past the image when the margin is larger than the image border.
+
+### Amendment: paper pages and per-side margins (2026-09-27)
+
+The gap backlog still listed Potrace's page-size and per-side margin options (`--pagesize`,
+`--margin` with its `-L`/`-R`/`-T`/`-B` sides, taken from the documented CLI only; no Potrace
+source was consulted, ADR-120/123) and LightBurn's paper output against Multi-File Trace.
+
+1. **Paper pages.** The Page select (accessible name *Page size*) adds *A4 (210 x 297 mm)*,
+   *Letter (8.5 x 11 in)* (215.9 x 279.4 mm) and *Custom size* with *Page width (mm)* and
+   *Page height (mm)* fields (above 0, at most 10000 mm). `placeTracedLayers` takes
+   `fit: 'paper'` with `paperMm`: the page is exactly that size, portrait, and the artwork's exact
+   curve extent (as in Decision 3) is centred on the area inside the margins, moved by a whole
+   number of export-grid steps, so a paper file differs from the image-page file by one exact
+   offset. Artwork larger than that area stays centred and runs past it; the page never shrinks
+   to the artwork and nothing is scaled, so physical size stays exact (Decision 4). Every format
+   follows the page as in Decision 5 (SVG viewBox and mm size, PDF MediaBox, EPS bounding boxes,
+   DXF and GeoJSON origin at the page's lower-left corner). A page with no physical size, or an
+   invalid paper size from a direct core caller, keeps the image page.
+2. **Per-side margins.** A *Per-side margins* checkbox replaces the one Margin field with Top,
+   Right, Bottom and Left fields (each 0 to 1000 mm, seeded from the shared margin). They apply
+   to Fit to artwork (each side's margin added on its own side, then rounded outward as before)
+   and to paper pages. `TracedPageLayout.margins` replaces `marginMm` when present; `pageMargins`
+   clamps each side as the single margin was clamped.
+3. **Defaults are unchanged.** Image size remains the default and sends no page option, and a
+   single margin on Fit to artwork is the same layout as before. Golden hashes taken from the
+   base commit 7a644d486 match for the image page and the fitted page in SVG, PDF, EPS, DXF and
+   GeoJSON.
+
+Evidence: `src/core/trace/traced-page-paper.test.ts` (centring on the grid, asymmetric margins,
+oversize artwork, invalid paper, per-side margins on a fitted page),
+`src/ui/commands/batch-trace-default-golden.test.ts` (image and fitted pages hash as the base
+commit in all five formats), `src/ui/commands/batch-trace-paper-golden.test.ts` (an A4 page with
+asymmetric margins is 210 x 297 mm in SVG and PDF and centred to one grid step in DXF), and
+`src/ui/commands/MultiFileTraceDialog.paper.test.tsx` (the choices, the custom and per-side
+fields, their validation and the page option each sends).
