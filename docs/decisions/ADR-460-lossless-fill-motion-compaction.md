@@ -41,7 +41,7 @@ and [streaming documentation](https://github.com/gnea/grbl/blob/master/doc/markd
 
 ### Verification
 
-`grbl-fill-compaction.test.ts` compares compact and verbose programs using an
+`grbl-fill-compaction-resume.test.ts` compares compact and verbose programs using an
 independent burn interpreter, including coordinates, feed, power, beam mode,
 work frame, air, passes and reverse-row compensation. The complete motion
 manifest, including raw line indices, is identical. Every restart line in a
