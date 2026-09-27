@@ -37,6 +37,21 @@ describe('decodePnm', () => {
     expect(() => decodePnm(ascii('P1 2 2 1 0'))).toThrow('truncated');
   });
 
+  it('refuses a truncated huge-header file before allocating its raster', () => {
+    const before = process.memoryUsage().arrayBuffers;
+    for (const magic of ['P1', 'P2', 'P3', 'P4', 'P5', 'P6']) {
+      const max = magic === 'P1' || magic === 'P4' ? '' : ' 255';
+      const bytes = new Uint8Array([...ascii(`${magic} 16384 16384${max}\n`), 1, 2, 3]);
+      expect(() => decodePnm(bytes)).toThrow('truncated');
+    }
+    expect(process.memoryUsage().arrayBuffers - before).toBeLessThan(16 * 1024 * 1024);
+  });
+
+  it('refuses an edge over the TIFF import limit of 16384 px', () => {
+    expect(() => decodePnm(ascii('P5 16385 1 255\n'))).toThrow('1-16384 px');
+    expect(() => decodePnm(ascii('P1 1 16385\n'))).toThrow('1-16384 px');
+  });
+
   it('recognises Netpbm extensions', () => {
     expect(['a.pbm', 'b.PGM', 'c.ppm', 'd.pnm', 'e.png'].map(isPnmFileName)).toEqual([
       true,
