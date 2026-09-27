@@ -182,8 +182,8 @@ describe('source-grid area controls during dense downsampling', () => {
 
 // The restored trace is the working trace with every point, polyline and
 // canonical-curve control point alike, mapped by the two axis scales
-// (ADR-440: the downscale route keeps the fitted cubics) and the containment
-// forest (ADR-441).
+// (ADR-482: the downscale route keeps the fitted cubics) and the containment
+// forest (ADR-483).
 function restoreSourceGrid(paths: ColoredPath[], scaleX: number, scaleY: number): ColoredPath[] {
   const map = (point: Vec2): Vec2 => ({ x: point.x * scaleX, y: point.y * scaleY });
   return paths.map((path) => {
@@ -205,7 +205,7 @@ function restoreSourceGrid(paths: ColoredPath[], scaleX: number, scaleY: number)
           : { ...segment, to: map(segment.to) },
       ),
     }));
-    // A per-axis scale keeps containment, so the forest carries (ADR-441).
+    // A per-axis scale keeps containment, so the forest carries (ADR-483).
     return carrySubpathNesting(path, { color: path.color, polylines, curves });
   });
 }

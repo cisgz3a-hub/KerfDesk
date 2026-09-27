@@ -105,7 +105,7 @@ export const TRACE_PRESETS: Readonly<Record<string, TraceOptions>> = {
     // test). So Centerline opts OUT of upscaleSmallSmoothSources.
   },
   'Line + fill': {
-    // Line + fill (ADR-443): pen lines no wider than the Max stroke width
+    // Line + fill (ADR-454): pen lines no wider than the Max stroke width
     // burn once down their centre (the Centerline lane, unchanged), wider ink
     // stays a filled outline (the contour finisher). Same binarisation and
     // cleanup as Centerline so a drawing's strokes trace identically in both.
@@ -225,7 +225,7 @@ export const TRACE_PRESETS: Readonly<Record<string, TraceOptions>> = {
     // are intentional pixel geometry here, not a small-scale tracing artefact.
   },
   'Colour layers': {
-    // One filled layer per flat colour (ADR-430): OKLab quantisation to an
+    // One filled layer per flat colour (ADR-461): OKLab quantisation to an
     // automatic palette (or the dialog's 2-8 colours), paper colour excluded,
     // neighbouring colours sharing one boundary. The imagetracerjs fields
     // below are inert on this backend; despeckleMinPixels is the area below

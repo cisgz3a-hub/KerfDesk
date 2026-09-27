@@ -32,7 +32,9 @@ class Cut3DOffscreenRuntime {
     reportFailure: (reason: string) => void,
   ): Promise<ViewerDialogSceneResult> {
     if (!supportsOffscreen(canvas, this.dependencies)) return unsupported();
-    if (this.active?.isCompatible(canvas, mesh, stockThicknessMm) !== true) {
+    if (this.active?.canHost(canvas) === true) {
+      this.active.showSurface(mesh, stockThicknessMm);
+    } else {
       this.active?.dispose();
       const created = this.createSession(canvas, mesh, stockThicknessMm);
       if (created instanceof Error) {
@@ -79,19 +81,33 @@ class Cut3DOffscreenRuntime {
 }
 
 const sharedRuntime = new Cut3DOffscreenRuntime(defaultDependencies());
+const injectedRuntimes = new WeakMap<
+  Cut3DOffscreenCoordinatorDependencies,
+  Cut3DOffscreenRuntime
+>();
 
-/** Binds one immutable prepared surface to the shared, one-session render runtime. */
+/** Binds one immutable prepared surface to the shared, one-session render runtime.
+ * Coordinators built with the same dependencies share one runtime. */
 export function createCut3DOffscreenCoordinator(
   mesh: ReliefSurfaceMeshWithNormals,
   stockThicknessMm: number,
   dependencies?: Cut3DOffscreenCoordinatorDependencies,
 ): Cut3DOffscreenCoordinator {
-  const runtime =
-    dependencies === undefined ? sharedRuntime : new Cut3DOffscreenRuntime(dependencies);
+  const runtime = dependencies === undefined ? sharedRuntime : injectedRuntime(dependencies);
   return {
     buildScene: (canvas, signal, reportFailure) =>
       runtime.build(canvas, mesh, stockThicknessMm, signal, reportFailure),
   };
+}
+
+function injectedRuntime(
+  dependencies: Cut3DOffscreenCoordinatorDependencies,
+): Cut3DOffscreenRuntime {
+  const existing = injectedRuntimes.get(dependencies);
+  if (existing !== undefined) return existing;
+  const runtime = new Cut3DOffscreenRuntime(dependencies);
+  injectedRuntimes.set(dependencies, runtime);
+  return runtime;
 }
 
 function supportsOffscreen(

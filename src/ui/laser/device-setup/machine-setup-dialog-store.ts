@@ -10,6 +10,7 @@ export type DeviceSetupHighlight = 'autofocus' | 'air-assist';
 export type CncStartupSetupField =
   | 'material'
   | 'default-bit'
+  | 'bit-library'
   | 'stock'
   | 'spindle-max'
   | 'spinup'

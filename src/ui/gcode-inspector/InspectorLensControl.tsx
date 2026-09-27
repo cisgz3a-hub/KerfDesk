@@ -4,6 +4,8 @@ import { useMemo } from 'react';
 import type { ProgramTimeModel } from '../../core/gcode-time';
 import type { GcodeRenderModel } from '../../core/gcode-view';
 import type { Viewer3dTheme } from '../viewer3d';
+// Deep import: the viewer3d barrel is capped at 20 exports by its index contract.
+import type { Viewer3dLook } from '../viewer3d/viewer3d-look';
 import {
   LENS_IDS,
   LENS_LABEL,
@@ -12,11 +14,14 @@ import {
   type LensId,
   type LensLegend,
 } from './lenses';
+import type { ToolSections } from './tool-sections';
 
 type InspectorLensControlProps = {
   readonly model: GcodeRenderModel;
   readonly time: ProgramTimeModel;
   readonly theme: Viewer3dTheme;
+  readonly look?: Viewer3dLook | undefined;
+  readonly sections?: ToolSections | null | undefined;
   readonly lens: LensId;
   readonly onLensChange: (lens: LensId) => void;
   /** Sidebar fills the readout column; overlay adds compact positioned chrome. */
@@ -25,9 +30,10 @@ type InspectorLensControlProps = {
 
 /** Shared colour selector and accessible legend for both G-code 3D surfaces. */
 export function InspectorLensControl(props: InspectorLensControlProps): JSX.Element {
+  const { model, time, lens, theme, look, sections } = props;
   const legend = useMemo(
-    () => lensLegend(props.model, props.time, props.lens, props.theme),
-    [props.model, props.time, props.lens, props.theme],
+    () => lensLegend(model, time, lens, theme, { look, sections }),
+    [model, time, lens, theme, look, sections],
   );
   return (
     <div style={props.variant === 'overlay' ? overlayStyle : undefined}>
@@ -62,7 +68,7 @@ function Legend(props: { readonly legend: LensLegend }): JSX.Element {
       <div
         style={{
           ...rampBarStyle,
-          backgroundImage: `linear-gradient(to right, ${props.legend.fromColor}, ${props.legend.toColor})`,
+          backgroundImage: `linear-gradient(to right, ${props.legend.stops.join(', ')})`,
         }}
         role="img"
         aria-label={`${props.legend.note}: ${props.legend.from} to ${props.legend.to}`}
@@ -78,8 +84,8 @@ function Legend(props: { readonly legend: LensLegend }): JSX.Element {
 function SwatchList(props: { readonly entries: ReadonlyArray<LegendSwatch> }): JSX.Element {
   return (
     <ul style={legendStyle}>
-      {props.entries.map((entry) => (
-        <li key={entry.label} style={legendItemStyle}>
+      {props.entries.map((entry, index) => (
+        <li key={`${index}:${entry.label}`} style={legendItemStyle}>
           <span style={{ ...swatchStyle, background: entry.color }} aria-hidden="true" />
           <span>{entry.label}</span>
           <span style={legendCountStyle}>{entry.count}</span>

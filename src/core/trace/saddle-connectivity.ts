@@ -72,7 +72,7 @@ export type CrackSubPixelField = {
    *  (0 = paper pixel centre, 1 = ink pixel centre) of the crack between
    *  ink pixel (inkX,inkY) and paper pixel (bgX,bgY), or undefined for the
    *  interpolation against thresholdAt. Saddle decisions and cleanup never
-   *  read it, so it moves vertices without touching topology (ADR-453). */
+   *  read it, so it moves vertices without touching topology (ADR-485). */
   readonly crackCrossingAt?: (
     inkX: number,
     inkY: number,

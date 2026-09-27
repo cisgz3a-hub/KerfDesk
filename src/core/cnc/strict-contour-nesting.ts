@@ -1,10 +1,40 @@
 import { pointInPolygon } from '../geometry';
 import type { Polyline, Vec2 } from '../scene';
+import { ContourBoxIndex } from '../trace/contour-box-index';
 import {
   buildVCarveBoundarySegmentIndex,
   someVCarveBoundarySegmentInBox,
+  type VCarveBoundarySegmentIndex,
+  type VCarveBoundaryBox,
 } from './vcarve-boundary-segment-index';
 import type { BoundarySegment } from './vcarve-detail-geometry';
+
+type PreparedContour = VCarveBoundaryBox & {
+  readonly contour: Polyline;
+  readonly sourceIndex: number;
+  readonly closedFinite: boolean;
+  readonly distinctPointCount: number;
+  readonly coordinateScale: number;
+  boundaryIndex: VCarveBoundarySegmentIndex | undefined;
+};
+
+export type PreparedStrictContourNesting = {
+  readonly source: ReadonlyArray<Polyline>;
+  readonly contours: ReadonlyArray<PreparedContour>;
+  readonly candidates: ContourBoxIndex<PreparedContour>;
+};
+
+/** One snapshot-local broad phase; exact touching and crossing tests remain authoritative. */
+export function prepareStrictContourNesting(
+  source: ReadonlyArray<Polyline>,
+): PreparedStrictContourNesting {
+  const contours = source.map(prepareContour);
+  return {
+    source,
+    contours,
+    candidates: ContourBoxIndex.create(contours.filter((contour) => contour.closedFinite)),
+  };
+}
 
 export function isClosedFiniteContour(contour: Polyline): boolean {
   return (
@@ -16,66 +46,86 @@ export function isClosedFiniteContour(contour: Polyline): boolean {
 
 /** True only when the whole inner boundary is separated from and inside the outer boundary. */
 export function strictlyContainsContour(outer: Polyline, inner: Polyline): boolean {
-  const probe = inner.points[0];
-  if (probe === undefined || !boundsContain(outer, inner) || boundariesIntersect(outer, inner)) {
-    return false;
-  }
-  return pointInPolygon(probe, outer.points);
+  return strictlyContainsPreparedContour(prepareContour(outer, 0), prepareContour(inner, 1));
 }
 
 export function strictContourContainmentDepth(
   contour: Polyline,
   contourIndex: number,
   contours: ReadonlyArray<Polyline>,
+  prepared?: PreparedStrictContourNesting,
 ): number {
-  return contours.reduce(
-    (depth, candidate, candidateIndex) =>
-      candidateIndex !== contourIndex &&
-      isClosedFiniteContour(candidate) &&
-      strictlyContainsContour(candidate, contour)
-        ? depth + 1
-        : depth,
-    0,
+  const index = prepared?.source === contours ? prepared : prepareStrictContourNesting(contours);
+  const entry = index.contours[contourIndex];
+  const inner = entry?.contour === contour ? entry : prepareContour(contour, contourIndex);
+  return index.candidates
+    .query(inner)
+    .reduce(
+      (depth, candidate) =>
+        candidate.sourceIndex !== contourIndex && strictlyContainsPreparedContour(candidate, inner)
+          ? depth + 1
+          : depth,
+      0,
+    );
+}
+
+function strictlyContainsPreparedContour(outer: PreparedContour, inner: PreparedContour): boolean {
+  const probe = inner.contour.points[0];
+  if (probe === undefined || !boundsContain(outer, inner) || boundariesIntersect(outer, inner)) {
+    return false;
+  }
+  return pointInPolygon(probe, outer.contour.points);
+}
+
+function boundsContain(outer: VCarveBoundaryBox, inner: VCarveBoundaryBox): boolean {
+  return (
+    outer.minX <= inner.minX &&
+    outer.minY <= inner.minY &&
+    outer.maxX >= inner.maxX &&
+    outer.maxY >= inner.maxY
   );
 }
 
-function boundsContain(outer: Polyline, inner: Polyline): boolean {
-  const a = polylineBounds(outer);
-  const b = polylineBounds(inner);
-  return a.minX <= b.minX && a.minY <= b.minY && a.maxX >= b.maxX && a.maxY >= b.maxY;
-}
-
-type Bounds = {
-  readonly minX: number;
-  readonly minY: number;
-  readonly maxX: number;
-  readonly maxY: number;
-};
-
-function polylineBounds(polyline: Polyline): Bounds {
+function prepareContour(contour: Polyline, sourceIndex: number): PreparedContour {
   let minX = Number.POSITIVE_INFINITY;
   let minY = Number.POSITIVE_INFINITY;
   let maxX = Number.NEGATIVE_INFINITY;
   let maxY = Number.NEGATIVE_INFINITY;
-  for (const point of polyline.points) {
-    minX = Math.min(minX, point.x);
-    minY = Math.min(minY, point.y);
-    maxX = Math.max(maxX, point.x);
-    maxY = Math.max(maxY, point.y);
+  let coordinateScale = 1;
+  let finite = true;
+  for (const { x, y } of contour.points) {
+    minX = Math.min(minX, x);
+    minY = Math.min(minY, y);
+    maxX = Math.max(maxX, x);
+    maxY = Math.max(maxY, y);
+    coordinateScale = Math.max(coordinateScale, Math.abs(x), Math.abs(y));
+    finite = finite && Number.isFinite(x) && Number.isFinite(y);
   }
-  return { minX, minY, maxX, maxY };
+  const distinctPointCount = distinctClosedPointCount(contour);
+  return {
+    contour,
+    sourceIndex,
+    minX,
+    minY,
+    maxX,
+    maxY,
+    coordinateScale,
+    distinctPointCount,
+    closedFinite: contour.closed && distinctPointCount >= 3 && finite,
+    boundaryIndex: undefined,
+  };
 }
 
-function boundariesIntersect(a: Polyline, b: Polyline): boolean {
+function boundariesIntersect(a: PreparedContour, b: PreparedContour): boolean {
   // Reuse the exact-query boundary index: only disjoint segment boxes are
   // excluded, so touching and crossing still use the original predicate.
-  // A dense trace must not compare every edge to every other edge.
-  const index = buildVCarveBoundarySegmentIndex(contourSegments(a));
-  const precision = Number.EPSILON * 32 * Math.max(coordinateScale(a), coordinateScale(b));
-  const bCount = distinctClosedPointCount(b);
+  // Every candidate owns one lazy index across the snapshot's nesting queries.
+  const index = (a.boundaryIndex ??= buildVCarveBoundarySegmentIndex(contourSegments(a)));
+  const precision = Number.EPSILON * 32 * Math.max(a.coordinateScale, b.coordinateScale);
+  const bCount = b.distinctPointCount;
   for (let bi = 0; bi < bCount; bi += 1) {
-    const b0 = b.points[bi];
-    const b1 = b.points[(bi + 1) % bCount];
+    const b0 = b.contour.points[bi];
+    const b1 = b.contour.points[(bi + 1) % bCount];
     if (b0 === undefined || b1 === undefined) continue;
     const box = {
       minX: Math.min(b0.x, b1.x) - precision,
@@ -99,19 +149,12 @@ function boundariesIntersect(a: Polyline, b: Polyline): boolean {
   return false;
 }
 
-function coordinateScale(polyline: Polyline): number {
-  let scale = 1;
-  for (const point of polyline.points)
-    scale = Math.max(scale, Math.abs(point.x), Math.abs(point.y));
-  return scale;
-}
-
-function contourSegments(polyline: Polyline): BoundarySegment[] {
-  const count = distinctClosedPointCount(polyline);
+function contourSegments(prepared: PreparedContour): BoundarySegment[] {
+  const count = prepared.distinctPointCount;
   const segments: BoundarySegment[] = [];
   for (let i = 0; i < count; i += 1) {
-    const start = polyline.points[i];
-    const end = polyline.points[(i + 1) % count];
+    const start = prepared.contour.points[i];
+    const end = prepared.contour.points[(i + 1) % count];
     if (start !== undefined && end !== undefined) {
       segments.push({ ax: start.x, ay: start.y, bx: end.x, by: end.y });
     }

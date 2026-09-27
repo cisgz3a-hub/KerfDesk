@@ -25,8 +25,8 @@
 // Pure-core compliant: no clock, no random, no I/O, no DOM.
 
 import type { ColoredPath } from '../scene';
-import { isHybridStrokePath } from './hybrid/hybrid-paths';
 import type { TraceOptions } from './trace-option-types';
+import { isLineTracePath } from './trace-paint';
 
 // Decimal-rounding precision. 2 dp = 0.01px on a 400px preview ≈
 // 0.0025% of width — well below display resolution. Higher precision
@@ -76,18 +76,9 @@ function svgOpen(width: number, height: number, physicalSize?: SvgPhysicalSize):
   );
 }
 
-// Mirrors the commit's layer-mode policy (scene-mutations): these trace modes
-// become LINE layers, whose closed rings burn as outlines, never as fills.
-// Line + fill (ADR-443) splits per path: its strokes are hairlines, its
-// outlines fill.
-function isLinePath(path: ColoredPath, traceMode: TraceOptions['traceMode']): boolean {
-  if (traceMode === 'hybrid') return isHybridStrokePath(path);
-  return traceMode === 'centerline' || traceMode === 'edge';
-}
-
 function coloredPathToSvgPath(path: ColoredPath, traceMode: TraceOptions['traceMode']): string {
   if (!isVisibleColor(path.color)) return '';
-  const lineMode = isLinePath(path, traceMode);
+  const lineMode = isLineTracePath(path, traceMode);
   const closedVisible = lineMode ? isVisibleStrokedPolyline : isVisibleClosedPolyline;
   const closed = path.polylines.filter((pl) => pl.closed && closedVisible(pl));
   const open = path.polylines.filter((pl) => !pl.closed && isVisibleStrokedPolyline(pl));
@@ -143,7 +134,7 @@ function polylineToSubPath(polyline: ColoredPath['polylines'][number]): string {
 function isVisibleColoredPath(path: ColoredPath, traceMode: TraceOptions['traceMode']): boolean {
   if (!isVisibleColor(path.color)) return false;
   return path.polylines.some((polyline) =>
-    polyline.closed && !isLinePath(path, traceMode)
+    polyline.closed && !isLineTracePath(path, traceMode)
       ? isVisibleClosedPolyline(polyline)
       : isVisibleStrokedPolyline(polyline),
   );

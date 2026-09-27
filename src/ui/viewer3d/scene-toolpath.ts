@@ -16,7 +16,11 @@ import type { PlayheadMarker } from './viewer3d-scene';
 import type { Viewer3dTheme } from './viewer3d-theme';
 type ThreeModule = typeof ThreeNamespace;
 type Viewer3dSegments = Viewer3dSegmentsInput;
-const TRAVEL_OPACITY = 0.35;
+export type TravelLine = ThreeNamespace.LineSegments<
+  ThreeNamespace.BufferGeometry,
+  ThreeNamespace.LineBasicMaterial
+>;
+export const TRAVEL_OPACITY = 0.35;
 const FAT_LINE_PX = 2.5;
 
 export type RevealTargets = {
@@ -45,21 +49,28 @@ export type RevealTargets = {
 };
 
 // Rewrites the solid batch's colour attribute in place from a render-model
-// segment → rgb function. Returns whether anything was repainted.
+// segment → rgb function. Returns whether anything was repainted. `encode`
+// maps each channel on the way in: Studio passes sRGB-to-linear so its lines
+// show their legend colour exactly (ADR-426); Classic passes nothing.
 export function applyRecolor(
   targets: RevealTargets | null,
   colorOf: (segmentIndex: number) => readonly [number, number, number],
+  encode?: (channel: number) => number,
 ): boolean {
   if (targets?.solid == null) return false;
   const source = targets.solidSource;
   const colors = new Float32Array(source.length * 6);
+  const channel = encode ?? ((value: number): number => value);
   for (let entry = 0; entry < source.length; entry += 1) {
     const rgb = colorOf(source[entry] ?? 0);
+    const red = channel(rgb[0]);
+    const green = channel(rgb[1]);
+    const blue = channel(rgb[2]);
     for (let end = 0; end < 2; end += 1) {
       const at = entry * 6 + end * 3;
-      colors[at] = rgb[0];
-      colors[at + 1] = rgb[1];
-      colors[at + 2] = rgb[2];
+      colors[at] = red;
+      colors[at + 1] = green;
+      colors[at + 2] = blue;
     }
   }
   targets.solid.geometry.setColors(colors);
@@ -139,12 +150,15 @@ export function buildToolpathObjects(args: ToolpathBuildArgs): {
   readonly objects: ReadonlyArray<Object3D>;
   readonly fatMaterial: LineMaterialType | null;
   readonly travelObject: Object3D | null;
+  /** The drawn traversal line, whose material the look swaps (ADR-426). */
+  readonly travelLine: TravelLine | null;
   readonly reveal: RevealTargets;
 } {
   const buckets = buildSegmentBuckets(args.segments, args.theme);
   const objects: Object3D[] = [];
   let fatMaterial: LineMaterialType | null = null;
   let travelObject: Object3D | null = null;
+  let travelLine: TravelLine | null = null;
   let solidTarget: RevealTargets['solid'] = null;
   let travelTarget: RevealTargets['travel'] = null;
   let solidGhost: RevealTargets['solidGhost'] = null;
@@ -157,6 +171,8 @@ export function buildToolpathObjects(args: ToolpathBuildArgs): {
     geometry.setPositions(buckets.solid.positions);
     geometry.setColors(buckets.solid.colors);
     fatMaterial = new args.LineMaterial({ vertexColors: true, linewidth: FAT_LINE_PX });
+    // Studio tone maps its lit tool model; line colours stay exact (ADR-426).
+    fatMaterial.toneMapped = false;
     fatMaterial.resolution.set(args.viewWidth, args.viewHeight);
     const lines = new args.LineSegments2(geometry, fatMaterial);
     lines.renderOrder = 1;
@@ -192,11 +208,13 @@ export function buildToolpathObjects(args: ToolpathBuildArgs): {
     travelObject = travelGroup;
     objects.push(travelGroup);
     travelTarget = { geometry: travel.geometry, total: buckets.travel.count };
+    travelLine = travel;
   }
   return {
     objects,
     fatMaterial,
     travelObject,
+    travelLine,
     reveal: {
       ...revealTargets(buckets, solidTarget, travelTarget),
       positions: args.segments.positions,
@@ -236,6 +254,7 @@ function lineSegmentsObject(
     color,
     transparent: opacity < 1,
     opacity,
+    toneMapped: false,
   });
   const lines = new three.LineSegments(geometry, material);
   lines.renderOrder = renderOrder;

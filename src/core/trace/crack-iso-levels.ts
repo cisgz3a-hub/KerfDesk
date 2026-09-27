@@ -1,4 +1,4 @@
-// Edge-placement levels for the sub-pixel crack crossing (ADR-453, ADR-456).
+// Edge-placement levels for the sub-pixel crack crossing (ADR-485, ADR-486).
 //
 // The binary mask decides WHAT exists; these levels only decide WHERE each
 // crack's edge sits between its two pixel centres. They reach the walker
@@ -17,21 +17,21 @@
 //    inside the ink. LIMIT: the plateaus are read 1-3 source px past the
 //    crack and t stays within the mask's own crack, so a blur wider than
 //    about 1 px keeps part of the inward bias (Gaussian sigma 2: -0.26 ->
-//    -0.15 px; ADR-453 Limits).
+//    -0.15 px; ADR-485 Limits).
 // 2. Thin features keep the cut. Where the ink or the paper side of a crack
 //    holds no uniform 3x3-source-px block (a hairline, a narrow counter), the
 //    samples never reach a plateau and pushing the edge past the mask's own
 //    crack can fold a loop onto itself at a saddle, so those cracks keep the
 //    crossing of the cut exactly as before. (A per-component ribbon level
 //    that sets traced width to integrated darkness was measured and dropped
-//    for now; ADR-453 records why.)
+//    for now; ADR-485 records why.)
 // 3. Brightness band (Cutoff > 0) and the alpha route. Ink is a band
 //    lo ≤ v ≤ hi, so each crack takes the band edge its paper sample lies
 //    beyond: v > hi crosses at hi, v < lo crosses at lo with the polarity
 //    reversed. A crack whose ink sample is outside the band (a cleanup flip)
 //    keeps the plain midpoint. On the alpha route that is 50% coverage for
 //    fully opaque ink only; semi-transparent ink crosses at alpha 127
-//    (ADR-456).
+//    (ADR-486).
 //
 // Our own design from the coverage model; no third-party tracer code.
 
@@ -120,7 +120,7 @@ export function withPlateauCrossing(
 // already sits at the mid-level to within PLATEAU_DEADBAND of the step: the
 // move would be under ~0.02 px, and the finishing fits react to such a
 // uniform nudge by re-choosing vertices (a -0.003 IoU swing on a clean
-// r = 40 ring, ADR-453) rather than by moving the edge.
+// r = 40 ring, ADR-485) rather than by moving the edge.
 function crossingLevel(cut: number, inkLevel: number | null, paperLevel: number | null): number {
   if (inkLevel === null || paperLevel === null || !(paperLevel > inkLevel)) return cut;
   const mid = (inkLevel + paperLevel) / 2;
@@ -134,7 +134,7 @@ function crossingLevel(cut: number, inkLevel: number | null, paperLevel: number 
 // than that in ANY direction fails it (a diagonal hairline too). The level
 // is the block's extreme (darkest ink, lightest paper): the ramp of this or
 // an opposite edge reaching into the block only pulls the other way (a block
-// median widened a clean 8 px bar by 3.5% area, ADR-453).
+// median widened a clean 8 px bar by 3.5% area, ADR-485).
 function plateauLevel(
   plane: ScalarPlane,
   mask: MaskPlane,

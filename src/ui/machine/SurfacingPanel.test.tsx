@@ -101,6 +101,7 @@ async function clickSave(
   platform: PlatformAdapter,
   noGoZones: ReadonlyArray<NoGoZone> = [],
   totalDepthMm?: number,
+  cuttingValues: Readonly<Record<string, number>> = {},
 ): Promise<void> {
   const project = {
     ...createProject({ ...DEFAULT_DEVICE_PROFILE, maxFeed: 500, noGoZones }),
@@ -130,6 +131,17 @@ async function clickSave(
       input.dispatchEvent(new FocusEvent('focusout', { bubbles: true }));
     });
   }
+  for (const [label, value] of Object.entries(cuttingValues)) {
+    const input = host.querySelector(`input[aria-label="Surfacing ${label}"]`);
+    const setter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')?.set;
+    if (!(input instanceof HTMLInputElement) || setter === undefined)
+      throw new Error('Cutting input missing');
+    await act(async () => {
+      setter.call(input, String(value));
+      input.dispatchEvent(new Event('input', { bubbles: true }));
+      input.dispatchEvent(new FocusEvent('focusout', { bubbles: true }));
+    });
+  }
   const saveButton = [...host.querySelectorAll('button')].find((button) =>
     button.textContent?.includes('Save surfacing G-code'),
   );
@@ -139,6 +151,22 @@ async function clickSave(
     await new Promise((resolve) => setTimeout(resolve, 0));
   });
 }
+
+it('saves explicit surfacing feeds, RPM and bounded depth passes from the visible fields', async () => {
+  const { platform, write } = mockPlatform();
+  await clickSave(platform, [], 0.45, {
+    feed: 321,
+    plunge: 123,
+    'spindle rpm': 9000,
+    'depth per pass': 0.2,
+  });
+  const output = String(write.mock.calls[0]?.[0]);
+  expect(output).toContain('M3 S9000');
+  expect(output).toMatch(/F321\b/);
+  expect(output).toMatch(/F123\b/);
+  const depths = [...output.matchAll(/^G1 Z(-[0-9.]+)/gm)].map((match) => Number(match[1]));
+  expect(new Set(depths)).toEqual(new Set([-0.2, -0.4, -0.45]));
+});
 
 describe('SurfacingPanel stock tracking', () => {
   // The panel prefills the facing area from the stock footprint. Seeded once

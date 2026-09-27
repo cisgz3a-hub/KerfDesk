@@ -6,6 +6,7 @@
 
 import type { Vec2 } from './scene-object';
 import type { CncFeedSource } from './cnc-feed-source';
+import type { CncCuttingStage, CncStageRecipe } from './cnc-stage-recipe';
 import type { CncTool } from './cnc-tool';
 import { DEFAULT_CNC_TOOLS } from './cnc-tool-starters';
 
@@ -96,6 +97,8 @@ export type CncProfileLeadSettings = {
 };
 
 export type CncLayerSettings = {
+  // Absent stages retain the shared layer values. Recipes are bound to a cutter.
+  readonly stageRecipes?: Partial<Readonly<Record<CncCuttingStage, CncStageRecipe>>>;
   readonly cutType: CncCutType;
   // Multi-tool jobs (H.7): the bit this layer cuts with. Absent = the
   // machine's active bit. Unknown ids resolve to the active bit at compile
@@ -109,6 +112,18 @@ export type CncLayerSettings = {
   readonly reliefFinishToolId?: string;
   // Ball-nose scallop height target driving the finishing row spacing.
   readonly reliefScallopMm?: number;
+  // ADR-423 finishing strategy. Absent = 'raster' (the serpentine alone);
+  // 'raster-waterline' adds waterline passes on slopes of 45 degrees or more.
+  readonly reliefFinishStrategy?: 'raster' | 'raster-waterline';
+  // ADR-423 raster direction. Absent = 'x' (rows along X).
+  readonly reliefRasterAxis?: 'x' | 'y';
+  // ADR-422 Amendment 1 fine step on slopes: relief roughing adds band levels
+  // this far apart between its depth-per-pass levels. Absent = off.
+  readonly reliefFineStepMm?: number;
+  // ADR-450: which bit finishes the model's flats. Absent = 'finishing-bit'
+  // (the finishing raster covers them); 'roughing-bit' has an end-mill
+  // roughing bit cut each flat to its exact height and the raster skip it.
+  readonly reliefFlatFinish?: 'finishing-bit' | 'roughing-bit';
   // Motion polish (H.9), both opt-in — absent keeps pre-H.9 output:
   // descend into cuts along the path at this angle instead of plunging.
   readonly rampEntryDeg?: number;

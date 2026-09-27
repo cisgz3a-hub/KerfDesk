@@ -1,4 +1,5 @@
 import type { Job, RasterGroup } from '../../core/job';
+import { effectiveGcodeFeedMmPerMin } from '../../core/gcode/feed-word';
 import { compiledLinesPerMm } from '../../core/raster/luma-resample';
 import {
   LAYER_DEFAULTS,
@@ -69,10 +70,10 @@ function describeRasterEnergy(
   const op = effectiveOperationForObject(layer, obj);
   // group.power is the burned power after the artwork's Power scale.
   if (!(op.power > 0) || !(group.power > 0)) return null;
-  const linesPerMm = burnDensity(group, op);
+  const linesPerMm = burnDensity(group);
   if (linesPerMm === null) return null;
   const maxFeed = project.device.maxFeed;
-  const dose: Dose = { ...op, linesPerMm, speed: Math.min(op.speed, maxFeed) };
+  const dose: Dose = { ...op, linesPerMm, speed: effectiveGcodeFeedMmPerMin(group.speed) };
   const preset = presetDose(layer.materialBinding?.lastResolved, maxFeed);
   const ratio =
     preset === null
@@ -102,11 +103,10 @@ function overriddenFields(override: ReturnType<typeof operationOverrideForObject
   };
 }
 
-// The operation's compiled density, or the source's own for Pass-Through.
-function burnDensity(group: RasterGroup, op: LayerOperationSettings): number | null {
-  const linesPerMm = op.passThrough
-    ? group.pixelHeight / (group.bounds.maxY - group.bounds.minY)
-    : compiledLinesPerMm(op.linesPerMm);
+// Read the actual grid for ordinary and Pass-Through images alike. Rounding
+// the row count can change a small image's physical interval substantially.
+function burnDensity(group: RasterGroup): number | null {
+  const linesPerMm = group.pixelHeight / (group.bounds.maxY - group.bounds.minY);
   return Number.isFinite(linesPerMm) && linesPerMm > 0 ? linesPerMm : null;
 }
 
@@ -149,7 +149,7 @@ function presetDose(settings: LayerOperationSettings | undefined, maxFeed: numbe
     power: settings.power,
     linesPerMm: compiledLinesPerMm(settings.linesPerMm),
     passes: settings.passes,
-    speed: Math.min(settings.speed, maxFeed),
+    speed: effectiveGcodeFeedMmPerMin(Math.min(settings.speed, maxFeed)),
   };
 }
 
@@ -159,9 +159,13 @@ function energyPerArea(dose: Dose): number {
 
 function fillIn(project: Project, linesPerMm: number): string {
   const spotMm = project.device.laserSubProfile?.spotSizeMm?.y;
-  const effect = 'white lines and dots fill in and the image burns darker than the canvas shows.';
+  const effect =
+    'white lines and dots can fill in and the image can burn darker than the canvas shows.';
   if (spotMm === undefined || !(spotMm > 0)) return ` Fine ${effect}`;
-  return ` The ${formatMm(spotMm)} mm beam sweeps each point about ${formatCount(spotMm * linesPerMm)} times, so fine ${effect}`;
+  return (
+    ` The profile's nominal ${formatMm(spotMm)} mm spot spans about ${formatCount(spotMm * linesPerMm)} ` +
+    `row intervals. Actual burn width depends on focus and material, so fine ${effect}`
+  );
 }
 
 // With a preset there is a real reference dose, so the advice is absolute and

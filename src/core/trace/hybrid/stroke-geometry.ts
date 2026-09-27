@@ -1,4 +1,4 @@
-// Small geometry shared by the Line + fill tracer (ADR-443).
+// Small geometry shared by the Line + fill tracer (ADR-454).
 
 import type { Vec2 } from '../../scene';
 

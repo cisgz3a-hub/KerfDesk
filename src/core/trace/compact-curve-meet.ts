@@ -1,4 +1,4 @@
-// Whether two pieces of fitted outline curves meet (ADR-441).
+// Whether two pieces of fitted outline curves meet (ADR-483).
 //
 // A piece is a cubic Bézier or a straight line (a cubic with its control
 // points on the chord). Its control points bound it: the curve lies in their

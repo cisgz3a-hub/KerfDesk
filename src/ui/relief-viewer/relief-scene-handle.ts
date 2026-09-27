@@ -20,6 +20,8 @@ import {
 import type { Viewer3DDisplayMode } from '../cnc-viewer3d/viewer3d-display-mode';
 import { pointerNdc, type PickVec3 } from '../cnc-viewer3d/viewer3d-picking';
 import { screenshotSize } from '../cnc-viewer3d/viewer3d-screenshot';
+// Deep import: the viewer3d barrel is capped at 20 exports by its index contract.
+import { disposeViewer3dRenderer } from '../viewer3d/viewer3d-context';
 
 export type SceneHandle = {
   readonly dispose: () => void;
@@ -44,6 +46,8 @@ export type SceneHandleDeps = {
   readonly sectionSpanMm: number;
   readonly content: ViewerContentHandle;
   readonly render: () => void;
+  /** Stops the glide-aware rendering that follows the controls (ADR-426). */
+  readonly disposeRendering: () => void;
   readonly disposeKeyboard: () => void;
   readonly disposeLighting: () => void;
 };
@@ -98,12 +102,12 @@ export function createSceneHandle(deps: SceneHandleDeps): SceneHandle {
         offsetY,
       }),
     dispose: () => {
-      controls.removeEventListener('change', render);
+      deps.disposeRendering();
       deps.disposeKeyboard();
       controls.dispose();
       deps.disposeLighting();
       content.dispose();
-      renderer.dispose();
+      disposeViewer3dRenderer(renderer);
     },
   };
 }
@@ -121,13 +125,22 @@ function capturePngDataUrl(input: {
 }): string {
   const { renderer, camera, canvas, render, scale } = input;
   const previous = { width: canvas.clientWidth, height: canvas.clientHeight };
-  const size = screenshotSize(previous.width, previous.height, scale);
+  const size = screenshotSize(previous.width, previous.height, scale, maxCaptureSidePx(renderer));
   resizeTo(renderer, camera, size);
   render();
   const dataUrl = renderer.domElement.toDataURL('image/png');
   resizeTo(renderer, camera, previous);
   render();
   return dataUrl;
+}
+
+// The buffer is the CSS size times the pixel ratio; keep it inside what the
+// GPU allocates, and inside 8192 px so the PNG stays a file people can send.
+const MAX_CAPTURE_BUFFER_PX = 8192;
+
+function maxCaptureSidePx(renderer: WebGLRenderer): number {
+  const gpu = Math.min(MAX_CAPTURE_BUFFER_PX, renderer.capabilities.maxTextureSize);
+  return gpu / Math.max(1, renderer.getPixelRatio());
 }
 
 function resizeTo(

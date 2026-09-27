@@ -4,48 +4,50 @@ export const PLACEMENT_TUTORIALS: readonly Tutorial[] = [
   {
     id: 'camera',
     title: 'Use a camera to place artwork',
-    summary: 'Connect a camera, calibrate its view and use an updated bed image for placement.',
+    summary:
+      'Connect a camera, calibrate it from one photo of an engraved target, and place artwork on the corrected bed image.',
     category: 'Machine & setup',
     machine: 'all',
     minutes: 5,
     location: 'Tools → Camera',
-    prerequisites: 'A supported camera, a calibration board and a stable camera mounting position.',
+    prerequisites:
+      'A supported camera in a fixed position and a flat sheet of scrap that covers the bed.',
     visual: 'camera',
     steps: [
       {
         title: 'Choose a camera source',
         instruction:
-          'Select a USB camera and choose Start, or select a detected machine camera where available. Network camera sources require the desktop app or local bridge; check the source notice in the panel.',
+          'Select a USB camera and choose Start, or choose Use this camera on a detected machine camera. Machine and RTSP cameras need KerfDesk Desktop; the panel says which sources this browser can read.',
         focus: 'Source → Start',
         result: 'A live camera image is available for calibration and placement.',
       },
       {
-        title: 'Calibrate the lens',
+        title: 'Engrave the calibration target',
         instruction:
-          'Open Calibrate lens. Enter the checkerboard’s inner-corner counts and measured square size. Capture a flat board in several positions and angles, choose Solve calibration, review the result, then Apply calibration.',
-        focus: 'Inner corners, not squares',
-        result: 'Lens calibration describes how the camera distorts the image.',
+          'Choose Calibrate camera. Cover the bed with one flat sheet, enter its thickness and, for a camera that looks straight down, the camera height by tape measure. Engrave target runs a temporary job through the usual Frame and review; Target already engraved reuses one.',
+        focus: 'Sheet thickness · camera height',
+        result: 'Rings are engraved across the bed at exactly known positions.',
       },
       {
-        title: 'Align the view to the bed',
+        title: 'Take one photo and check it',
         instruction:
-          'Align to bed is available with Camera alignment v2 enabled in Labs. Follow its marker workflow and enter the Marker surface height. Keep the marker sheet fixed during detection; Burn markers is a real machine job, while Markers already burned reuses a target.',
-        focus: 'Lens calibration + bed alignment',
-        result: 'Detected bed markers relate the camera view to the machine workspace.',
+          'Leave the sheet where it is, move the laser head clear of the three solid discs and choose Take photo. The result shows the error of every ring in millimetres over the flattened photo. Save calibration when it is good enough for your work.',
+        focus: 'Average and worst error in mm',
+        result: 'The camera lens, its position and the bed mapping are saved together.',
       },
       {
         title: 'Refresh before placing artwork',
         instruction:
-          'Use Update still after moving material, or Live for a supported USB source. Check Material surface height where available, then place artwork over the image or trace a visible shape. Physically Frame the exact intended job before Start.',
+          'Use Update still after moving material, or Live. Set Material surface height to the top of the material so its edges line up, then place artwork over the image or trace a visible shape. Physically Frame the exact intended job before Start.',
         focus: 'Fresh image · correct surface height',
         result:
           'The overlay helps place artwork, and the physical Frame checks the intended job location.',
         visual: 'frame',
       },
     ],
-    tip: 'Moving the camera changes its relationship to the bed. A convincing overlay alone does not verify real-world alignment.',
-    keywords: ['camera', 'USB', 'RTSP', 'lens', 'checkerboard', 'markers', 'overlay', 'alignment'],
-    related: ['labs', 'trace', 'board', 'print-cut', 'frame-start'],
+    tip: 'Moving the camera changes its relationship to the bed; calibrate again after it moves. A convincing overlay alone does not verify real-world alignment.',
+    keywords: ['camera', 'USB', 'RTSP', 'lens', 'calibration', 'target', 'overlay', 'alignment'],
+    related: ['trace', 'board', 'print-cut', 'frame-start'],
   },
   {
     id: 'registration',

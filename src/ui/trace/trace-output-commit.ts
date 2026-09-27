@@ -22,7 +22,7 @@ export type TraceOutputCommitArgs = {
   readonly replaceTraceId?: string;
   readonly notices?: ReadonlyArray<TraceNotice>;
   /** The trace's options; a colour-layer trace gives each colour its own
-   *  operation with a darkness-ordered power (ADR-430). */
+   *  operation with a darkness-ordered power (ADR-461). */
   readonly options?: Pick<TraceOptions, 'colourLayers'>;
 };
 
@@ -76,7 +76,7 @@ export async function commitTraceOutput(
   return true;
 }
 
-// Line + fill (ADR-443) is vector-only: the raster route renders one
+// Line + fill (ADR-454) is vector-only: the raster route renders one
 // style for every path, which would turn its fills into outline rings.
 function usesRasterTraceOutput(
   args: TraceOutputCommitArgs,
@@ -171,7 +171,7 @@ async function buildOwnedRaster(
 }
 
 // A colour-layer trace gives each colour's operation a darkness-ordered power
-// (ADR-430); the store needs to know which output the powers are for and
+// (ADR-461); the store needs to know which output the powers are for and
 // whether the paper was traced (its operation starts with output off).
 function withColourLayerOutput(
   options: TraceExistingImageOptions,

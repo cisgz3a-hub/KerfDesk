@@ -55,7 +55,7 @@ function pieceGeometries(object: TracedImage): ReadonlyArray<PieceGeometry> {
   // Centerline traces are strokes: a closed stroke inside another is a
   // separate mark, not a hole. Edge Detection output is filled closed contours
   // like filled-contours (edge-trace.ts), so its holes group with their outer.
-  // Line + fill (ADR-443) holds both: strokes split per stroke, outlines
+  // Line + fill (ADR-454) holds both: strokes split per stroke, outlines
   // group with their holes.
   return object.paths.flatMap((path, pathIndex) => {
     const strokes =
@@ -72,7 +72,7 @@ function pieceGeometries(object: TracedImage): ReadonlyArray<PieceGeometry> {
   });
 }
 
-// Each piece keeps the part of a traced forest (ADR-441) that its subpaths span.
+// Each piece keeps the part of a traced forest (ADR-483) that its subpaths span.
 function pathSubset(path: ColoredPath, indices: ReadonlyArray<number>): ColoredPath {
   return subsetSubpathNesting(path, indices, subsetGeometry(path, indices));
 }

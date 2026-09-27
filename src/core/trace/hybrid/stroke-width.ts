@@ -1,4 +1,4 @@
-// Pen width of a traced centreline stroke (ADR-443). The distance field knows
+// Pen width of a traced centreline stroke (ADR-454). The distance field knows
 // the inscribed radius at every ink pixel, but its integer-pixel sampling
 // cannot tell a 2 px line from a 1 px one. Measuring straight across instead
 // — walking the local normal both ways until the ink ends — resolves every
@@ -11,7 +11,7 @@ const MARCH_STEP_PX = 0.25;
 /** A stroke whose width spread (p10..p90) stays under this fraction of its
  *  median width is a constant-width pen line and carries its width. */
 export const CONSTANT_WIDTH_SPREAD = 0.25;
-const SAMPLE_STEP_PX = 0.5;
+export const STROKE_WIDTH_SAMPLE_STEP_PX = 0.5;
 const WINDOW_PX = 6;
 
 export type StrokeWidthProfile = {
@@ -20,6 +20,8 @@ export type StrokeWidthProfile = {
   /** Clean cross-sections: where each sample sits and how far (px, along
    *  `normal`) the true centre of the ink lies from it. */
   readonly sections: ReadonlyArray<CrossSection>;
+  /** Ordered local widths; null separates measurements obscured by a junction. */
+  readonly measurements: ReadonlyArray<MeasuredCrossSection | null>;
 };
 
 export type CrossSection = {
@@ -27,6 +29,8 @@ export type CrossSection = {
   readonly normal: Vec2;
   readonly offsetPx: number;
 };
+
+export type MeasuredCrossSection = CrossSection & { readonly widthPx: number };
 
 /** Widths across the stroke, or null when it is too short to say. Widths are
  *  measured every half pixel, then averaged over a few-pixel window: a
@@ -43,9 +47,9 @@ export function strokeWidthProfile(
   mask: InkMask,
   maxWidthPx: number,
 ): StrokeWidthProfile | null {
-  const samples = resample(points, SAMPLE_STEP_PX);
+  const samples = resample(points, STROKE_WIDTH_SAMPLE_STEP_PX);
   const limit = maxWidthPx * 2 + 2;
-  const measured: Array<(CrossSection & { readonly widthPx: number }) | null> = [];
+  const measured: Array<MeasuredCrossSection | null> = [];
   for (let i = 0; i < samples.length; i += 1) {
     const p = samples[i];
     const normal = normalAt(samples, i);
@@ -58,8 +62,11 @@ export function strokeWidthProfile(
         : { p, normal, offsetPx: (ahead - behind) / 2, widthPx: ahead + behind },
     );
   }
-  const clean = dropNearDirty(measured, Math.ceil(Math.max(1, maxWidthPx / 2) / SAMPLE_STEP_PX));
-  const window = Math.max(1, Math.round(WINDOW_PX / SAMPLE_STEP_PX));
+  const clean = dropNearDirty(
+    measured,
+    Math.ceil(Math.max(1, maxWidthPx / 2) / STROKE_WIDTH_SAMPLE_STEP_PX),
+  );
+  const window = Math.max(1, Math.round(WINDOW_PX / STROKE_WIDTH_SAMPLE_STEP_PX));
   const means = windowMeans(clean, window);
   const sections = clean.filter((s): s is NonNullable<typeof s> => s !== null);
   // Too few clean samples for one window: the raw widths still say something
@@ -70,7 +77,7 @@ export function strokeWidthProfile(
   values.sort((a, b) => a - b);
   const at = (q: number): number =>
     values[Math.min(values.length - 1, Math.floor(q * values.length))] ?? 0;
-  return { medianPx: at(0.5), spreadPx: at(0.9) - at(0.1), sections };
+  return { medianPx: at(0.5), spreadPx: at(0.9) - at(0.1), sections, measurements: clean };
 }
 
 function dropNearDirty<T>(items: ReadonlyArray<T | null>, reach: number): Array<T | null> {

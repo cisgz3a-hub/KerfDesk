@@ -1,6 +1,6 @@
-// The no-orphan invariant (ADR-458 amendment 1) on the MEASURED finishing
+// The no-orphan invariant (ADR-488 amendment 1) on the MEASURED finishing
 // tail: an anti-aliased nest whose cracks carry sub-pixel information, so each
-// loop is finished by the compact cubic fit (fitLoopTail, ADR-440) rather than
+// loop is finished by the compact cubic fit (fitLoopTail, ADR-482) rather than
 // the legacy simplify tail. A coarse fit tolerance must not lose a loop, and
 // a fit that collapses to nothing must fall back to the crack boundary.
 

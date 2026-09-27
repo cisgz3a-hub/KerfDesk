@@ -1,5 +1,5 @@
-// Line + fill trace (ADR-443): thin ink burns once down its centre line, wide
-// ink stays a filled outline — decided per skeleton branch, not per image.
+// Line + fill trace (ADR-454): thin ink burns once down its centre line, wide
+// ink stays a filled outline — decided locally along each skeleton branch.
 //
 // The medial axis (Blum 1967) carries an inscribed radius at every point. A
 // part of the drawing is WIDE where it contains a disc wider than the "Max
@@ -43,19 +43,15 @@ import { closeJunctionGaps } from './junction-close';
 import { recentredStroke } from './recentre-stroke';
 import { densePoints, floodEightConnected, pathLength } from './stroke-geometry';
 import { constantStrokeWidthPx, strokeWidthProfile, type StrokeWidthProfile } from './stroke-width';
+import { wideStrokeRuns } from './wide-stroke-runs';
 
 /** Max stroke width in source pixels when the caller supplies none. */
 export const DEFAULT_HYBRID_MAX_STROKE_WIDTH_PX = 4;
-// A wide region must be seeded by a disc at least this much (px) wider in
-// radius than the gate, so a pen line's one-pixel bulge stays a stroke.
-const SEED_MARGIN_PX = 0.5;
+// At the default 4 px gate, the old 0.5 px seed margin. Following the gate
+// keeps the same pen blot a stroke on an equivalent finer source/commit grid.
+const SEED_MARGIN_GATE_RATIO = 1 / 8;
 // Width groups share a ColoredPath when their widths round alike (px).
 const WIDTH_QUANTUM_PX = 0.25;
-// A stroke whose measured pen width exceeds the gate by more than this (px)
-// is ink the pen could not have drawn: it goes to the fill. One width quantum:
-// a stroke never carries a width that rounds above the Max stroke width, and
-// the same test decides an isolated line and one running into a shape.
-const OVERWIDE_TOLERANCE_PX = WIDTH_QUANTUM_PX;
 // How far (px) a stroke's cut end reaches on into the fill (see reachIntoFill).
 const JUNCTION_REACH_PX = 1;
 
@@ -83,7 +79,7 @@ export function* traceHybridPathsSteps(
   const cores = yield* discUnionSteps({
     width: mask.width,
     height: mask.height,
-    radiusSq: wideCoreRadii(mask, distSq, gateRadius),
+    radiusSq: wideCoreRadii(mask, distSq, gateRadius, maxWidthPx),
   });
   const centre = yield* centerlineStrokesFromMaskSteps(mask, distSq, options);
   if (cooperate) yield;
@@ -131,9 +127,13 @@ export function hybridMaxStrokeWidthPx(options: TraceOptions): number {
 
 // Squared radii of the discs wider than the gate, restricted to the
 // eight-connected cores that reach the seed radius (a hysteresis band).
-function wideCoreRadii(mask: InkMask, distSq: Float64Array, gateRadius: number): Float64Array {
-  const gateSq = gateRadius * gateRadius;
-  const seedSq = (gateRadius + SEED_MARGIN_PX) ** 2;
+function wideCoreRadii(
+  mask: InkMask,
+  distSq: Float64Array,
+  gateRadius: number,
+  maxWidthPx: number,
+): Float64Array {
+  const seedSq = (gateRadius + SEED_MARGIN_GATE_RATIO * maxWidthPx) ** 2;
   const radiusSq = new Float64Array(mask.width * mask.height);
   const seeds: number[] = [];
   distSq.forEach((d, i) => {
@@ -142,13 +142,27 @@ function wideCoreRadii(mask: InkMask, distSq: Float64Array, gateRadius: number):
       seeds.push(i);
     }
   });
+  growWideRadii(mask, distSq, radiusSq, gateRadius, seeds);
+  return radiusSq;
+}
+
+// A seed can come from a strong inscribed disc or a supported normal-width
+// measurement. Both continue only through discs wider than the same gate.
+// This covers bends with unmeasurable normals without crossing thin ink.
+function growWideRadii(
+  mask: InkMask,
+  distSq: Float64Array,
+  radiusSq: Float64Array,
+  gateRadius: number,
+  seeds: number[],
+): void {
+  const gateSq = gateRadius * gateRadius;
   floodEightConnected(mask.width, mask.height, seeds, (n) => {
     const d = distSq[n] ?? 0;
     if ((radiusSq[n] ?? 0) > 0 || d <= gateSq) return false;
     radiusSq[n] = d;
     return true;
   });
-  return radiusSq;
 }
 
 type Centre = { readonly polylines: Polyline[]; readonly marks: ReadonlySet<Polyline> };
@@ -156,10 +170,11 @@ type Centre = { readonly polylines: Polyline[]; readonly marks: ReadonlySet<Poly
 // The disc gate reads the inscribed radius at pixel centres, so a pen line
 // uniformly a pixel or two wider than the gate can slip under it (its ridge
 // sits on a pixel-centre radius, or wobbles about the gate along a slant).
-// Measuring each stroke straight across catches it: a stroke measurably
-// wider than the Max stroke width joins the wide region as the union of its
-// inscribed discs, and the strokes are clipped again against that region, so
-// a thin stroke running into it still ends on the fill edge (ADR rule 5).
+// Normal measurements identify supported local wide runs, even on a mostly
+// thin branch (or a thin tail on a mostly wide one). Their discs seed the
+// same radius-gated growth as strong cores, continuing through wide bends.
+// The measured discs remain even where pixel-centred radii miss the gate.
+// Clipping again keeps the thin parts attached to the fill edge (ADR rule 5).
 function* withOverwideStrokesFilled(
   centre: Centre,
   mask: InkMask,
@@ -172,17 +187,23 @@ function* withOverwideStrokesFilled(
   },
 ): TraceSteps<{ wide: Uint8Array; strokes: KeptStroke[] }> {
   const strokes = clippedStrokes(centre, mask, cores, gate.gateRadius);
-  const overwide = strokes.filter((stroke) => {
-    if (stroke.mark) return false;
-    if (isCompactBlob(stroke.polyline.points, mask, distSq, gate)) return true;
+  const overwide = strokes.flatMap((stroke) => {
+    if (stroke.mark) return [];
+    if (isCompactBlob(stroke.polyline.points, mask, distSq, gate)) return [stroke.polyline.points];
     const profile = gate.profileOf(stroke);
-    return profile !== null && profile.medianPx > gate.maxWidthPx + OVERWIDE_TOLERANCE_PX;
+    return wideStrokeRuns(profile, gate.maxWidthPx, stroke.polyline.closed);
   });
   if (overwide.length === 0) return { wide: cores, strokes };
+  const radiusSq = strokeDiscRadii(mask, distSq, overwide, 0);
+  const seeds: number[] = [];
+  radiusSq.forEach((radius, i) => {
+    if (radius > gate.gateRadius ** 2) seeds.push(i);
+  });
+  growWideRadii(mask, distSq, radiusSq, gate.gateRadius, seeds);
   const grown = yield* discUnionSteps({
     width: mask.width,
     height: mask.height,
-    radiusSq: strokeDiscRadii(mask, distSq, overwide, 0),
+    radiusSq,
   });
   const wide = cores.map((c, i) => (c === 1 || grown[i] === 1 ? 1 : 0));
   return { wide, strokes: clippedStrokes(centre, mask, wide, gate.gateRadius) };
@@ -304,7 +325,12 @@ function* fillMaskSteps(
 ): TraceSteps<InkMask | null> {
   if (!wide.includes(1)) return null;
   const { width, height } = mask;
-  const strokeRadii = strokeDiscRadii(mask, distSq, strokes, 1);
+  const strokeRadii = strokeDiscRadii(
+    mask,
+    distSq,
+    strokes.map((stroke) => stroke.polyline.points),
+    1,
+  );
   const swallowed = yield* discUnionSteps({ width, height, radiusSq: strokeRadii });
   const fill = new Uint8Array(width * height);
   mask.ink.forEach((ink, i) => {
@@ -319,13 +345,13 @@ function* fillMaskSteps(
 function strokeDiscRadii(
   mask: InkMask,
   distSq: Float64Array,
-  strokes: ReadonlyArray<KeptStroke>,
+  strokes: ReadonlyArray<ReadonlyArray<Vec2>>,
   padPx: number,
 ): Float64Array {
   const { width, height } = mask;
   const radii = new Float64Array(width * height);
   for (const stroke of strokes) {
-    for (const p of densePoints(stroke.polyline.points)) {
+    for (const p of densePoints(stroke)) {
       const x = Math.floor(p.x);
       const y = Math.floor(p.y);
       if (x < 0 || y < 0 || x >= width || y >= height) continue;

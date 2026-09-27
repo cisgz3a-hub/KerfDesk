@@ -2,7 +2,7 @@
 // become continuous G1 sweeps with S0 gaps (ADR-034); wide gaps split into
 // independently planned sweeps (ADR-035). Generic Scan Line gives every sweep
 // bounded feed-matched laser-off entry and exit motion. The 4040 plan retains
-// its qualified bounded-entry policy.
+// its 5 mm limit and shares split exits and entries by the same rule (ADR-445).
 
 import type { DeviceProfile, GrblGcodeDialect } from '../devices';
 import type { FillGroup } from '../job';
@@ -12,6 +12,11 @@ import type { FillSpan } from '../job/fill-sweeps';
 import { offsetForSpeed } from '../job/scan-offset';
 import { formatGcodeCoordinateMm } from '../gcode';
 import { formatGcodeFeedMmPerMin } from '../gcode/feed-word';
+import {
+  createModalMotionWriter,
+  joinMotionWords,
+  motionWordStyleFor,
+} from '../gcode/motion-words';
 import { fillRunwayCommentText } from './fill-runway-comment';
 import {
   LINE_END,
@@ -123,10 +128,12 @@ function sweepSpanLines(
   if (first === undefined) return [];
   const { s, feed, device, dialect, cursor } = context;
   const lines: string[] = [];
-  // Fill sweeps keep the verbose spelling. Their G1s are whole spans — metres
-  // of motion per line at the emitter's 5 mm minimum runway — so the planner
-  // cannot starve on them and the bytes buy nothing (ADR-332). Raster rows,
-  // one short G1 per power change, are where compaction pays.
+  // Narrow ink spans and holes can consume G-code just as quickly as raster
+  // pixels. Keep the same motion/feed/power while omitting redundant words in
+  // dialects that support compact output. A new writer per sweep makes its
+  // first burn self-contained after any seek, runway or held mode transition.
+  const style = motionWordStyleFor(dialect.compactMotionWords);
+  const writer = createModalMotionWriter(style);
   // Head starts where the planned runway move left it: the first span's start.
   let head = emittedHead(first.start.x, first.start.y);
   let feedEmitted = false;
@@ -142,9 +149,14 @@ function sweepSpanLines(
       );
     }
     const feedWord =
-      feedEmitted && dialect.modalFeedrate ? '' : ` F${formatGcodeFeedMmPerMin(feed)}`;
+      feedEmitted && dialect.modalFeedrate ? '' : `F${formatGcodeFeedMmPerMin(feed)}`;
     feedEmitted = true;
-    lines.push(`G1 X${target.x} Y${target.y}${feedWord} S${power}`);
+    lines.push(
+      joinMotionWords(
+        [writer.motion('G1'), writer.axis('X', x), writer.axis('Y', y), feedWord, `S${power}`],
+        style,
+      ),
+    );
     head = target;
     if (power > 0) noteBurn(cursor, target);
     else noteLaserOffMove(cursor, target);

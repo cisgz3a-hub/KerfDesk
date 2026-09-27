@@ -71,15 +71,18 @@ describe('effectiveStartStreamOptions', () => {
     ).toBe(120);
   });
 
-  it('uses the active controller streaming protocol at the final boundary', () => {
-    expect(
-      effectiveStartStreamOptions(
-        { streamingMode: 'char-counted', rxBufferBytes: 96 },
-        noBuildInfo,
-        'marlin',
-      ),
-    ).toMatchObject({ streamingMode: 'ping-pong', rxBufferBytes: 96 });
-  });
+  it.each(['fluidnc', 'marlin', 'smoothieware'] as const)(
+    'uses %s protocol at the final boundary',
+    (controllerKind) => {
+      expect(
+        effectiveStartStreamOptions(
+          { streamingMode: 'char-counted', rxBufferBytes: 96 },
+          noBuildInfo,
+          controllerKind,
+        ),
+      ).toMatchObject({ streamingMode: 'ping-pong', rxBufferBytes: 96 });
+    },
+  );
 
   it('lets a grblHAL profile stream its 1024-byte request once a Bf report proves the ring', () => {
     const window = resolveStartStreamWindow(
@@ -144,13 +147,18 @@ describe('effectiveStartStreamOptions', () => {
     expect(window).toMatchObject({ bytes: 22, source: 'build-info', provenBytes: 22 });
   });
 
-  it('keeps the profile request for firmwares that offer no ring evidence', () => {
+  it('retains a FluidNC window as metadata but never treats it as permission to buffer lines', () => {
     expect(
       resolveStartStreamWindow(
         { streamingMode: 'char-counted', rxBufferBytes: 512 },
         noBuildInfo,
         'fluidnc',
       ),
-    ).toMatchObject({ bytes: 512, source: 'profile', provenBytes: null });
+    ).toMatchObject({
+      streamingMode: 'ping-pong',
+      bytes: 512,
+      source: 'profile',
+      provenBytes: null,
+    });
   });
 });

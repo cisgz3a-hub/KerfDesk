@@ -1,8 +1,8 @@
-// ADR-442 (batch 3 integration): a cubic and its reverse flatten to the same
+// ADR-453 (batch 3 integration): a cubic and its reverse flatten to the same
 // vertices, so two filled paths sharing a seam (colour layers) meet exactly.
 
 import { describe, expect, it } from 'vitest';
-import { flattenCubicChords } from './curve-flatten';
+import { flattenCubicChords, flattenEllipseChords, type ChordEllipse } from './curve-flatten';
 import type { CubicPathSegment, Vec2 } from './scene-object';
 
 function reverse(from: Vec2, segment: CubicPathSegment): [Vec2, CubicPathSegment] {
@@ -40,5 +40,48 @@ describe('cubic flattening is independent of direction', () => {
     // The segment's own ends stay exact in both directions.
     expect(forward.at(-1)).toBe(segment.to);
     expect(backward.at(-1)).toBe(backSegment.to);
+  });
+});
+
+describe('elliptical seams retain the same chords in both directions', () => {
+  it.each([1.8, -1.8, 4.5, -4.5])('preserves an eccentric seam with sweep %s', (delta) => {
+    const arc: ChordEllipse = {
+      center: { x: 200, y: 200 },
+      radiusX: 100,
+      radiusY: 7,
+      rotationRad: 0.4,
+      theta1: 0.3,
+      delta,
+    };
+    const point = (theta: number): Vec2 => ({
+      x:
+        arc.center.x +
+        arc.radiusX * Math.cos(theta) * Math.cos(arc.rotationRad) -
+        arc.radiusY * Math.sin(theta) * Math.sin(arc.rotationRad),
+      y:
+        arc.center.y +
+        arc.radiusX * Math.cos(theta) * Math.sin(arc.rotationRad) +
+        arc.radiusY * Math.sin(theta) * Math.cos(arc.rotationRad),
+    });
+    const from = point(arc.theta1),
+      to = point(arc.theta1 + delta);
+    const forward = flattenEllipseChords(from, to, arc, 0.025, 200_000);
+    const backward = flattenEllipseChords(
+      to,
+      from,
+      { ...arc, theta1: arc.theta1 + delta, delta: -delta },
+      0.025,
+      200_000,
+    );
+    if (forward === null || backward === null) throw new Error('flatten refused');
+    const expected = [to, ...backward].reverse();
+    const actual = [from, ...forward];
+    expect(actual.length).toBe(expected.length);
+    actual.forEach((p, i) => {
+      expect(p.x).toBeCloseTo(expected[i]!.x, 9);
+      expect(p.y).toBeCloseTo(expected[i]!.y, 9);
+    });
+    expect(forward.at(-1)).toBe(to);
+    expect(backward.at(-1)).toBe(from);
   });
 });

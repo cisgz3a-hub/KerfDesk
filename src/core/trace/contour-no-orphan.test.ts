@@ -1,4 +1,4 @@
-// The no-orphan invariant (ADR-458 amendment 1): every boundary loop the area
+// The no-orphan invariant (ADR-488 amendment 1): every boundary loop the area
 // policy admits comes out of finishing and topology repair as exactly one
 // ring, with its source orientation and its source nesting depth. A hole
 // therefore never outlives its outer, and under even-odd or nonzero fill no

@@ -11,6 +11,7 @@ import {
   type ChiploadMaterial,
 } from '../../core/cnc';
 import { DEFAULT_ASSUMED_FLUTE_COUNT } from '../../core/cnc/machine-starters';
+import { nominalChiploadMm } from '../../core/cnc/nominal-chipload';
 import { layerCncTool, type CncLayerSettings, type CncTool, type Layer } from '../../core/scene';
 import { cncAngledToolFeedAdvisory } from '../common/cnc-angled-tool-feed-advisory';
 import { RailSection } from '../kit';
@@ -49,6 +50,7 @@ export function FeedsCalculatorRow(props: {
   return (
     <RailSection
       label="Feeds calculator"
+      badge={material === null ? 'Needs a material' : materialLabel(material)}
       hint="Compute starting feeds from chipload: RPM × flutes × mm-per-tooth for the layer's bit."
     >
       <div style={rowStyle}>
@@ -64,11 +66,15 @@ export function FeedsCalculatorRow(props: {
           </output>
         </span>
       </div>
-      <FeedsCalculatorResultText
-        toolName={tool.name}
-        chiploadMm={material === null ? null : chiploadFor(material, tool.diameterMm)}
-        result={result}
-      />
+      {material === null ? (
+        <p className="lf-cnc-settings-hint">Choose a Material above to get starting values.</p>
+      ) : (
+        <FeedsCalculatorResultText
+          toolName={tool.name}
+          chiploadMm={chiploadFor(material, tool.diameterMm)}
+          result={result}
+        />
+      )}
       <AngledToolFeedNotice tool={tool} />
       <button
         type="button"
@@ -102,22 +108,23 @@ function effectiveFluteCount(tool: CncTool, settings: CncLayerSettings): number 
 }
 
 function ReadOnlyMaterial(props: { readonly material: ChiploadMaterial | null }): JSX.Element {
-  const label =
-    props.material === null
-      ? 'Manual — choose material in Tool & material'
-      : (CHIPLOAD_MATERIALS.find((item) => item.value === props.material)?.label ?? props.material);
+  const label = props.material === null ? 'Manual' : materialLabel(props.material);
   return (
     <span style={fieldStyle}>
       Material
       <output
         aria-label="Material for feeds calculator"
-        title="Read-only here. Change this operation's material in Tool & material above."
+        title="Read-only here. Change this operation's material under Material above."
         style={readOnlyMaterialStyle}
       >
         {label}
       </output>
     </span>
   );
+}
+
+function materialLabel(material: ChiploadMaterial): string {
+  return CHIPLOAD_MATERIALS.find((item) => item.value === material)?.label ?? material;
 }
 
 function FeedsCalculatorResultText(props: {
@@ -129,12 +136,24 @@ function FeedsCalculatorResultText(props: {
   if (result === null) {
     return <p style={errorStyle}>No valid machine-aware starting values are available.</p>;
   }
+  const nominal = nominalChiploadMm(
+    result.feedMmPerMin,
+    result.spindleRpm,
+    result.feedSource.fluteCount,
+  );
+  const chart = props.chiploadMm;
+  const belowChart = nominal !== null && chart !== null && nominal < chart * 0.99;
   return (
     <p style={resultStyle}>
       {toolName} at {result.spindleRpm.toLocaleString()} RPM → chart chipload{' '}
       {props.chiploadMm?.toFixed(3)} mm: machine-aware feed <strong>{result.feedMmPerMin}</strong>,
       plunge <strong>{result.plungeMmPerMin}</strong> mm/min, {result.depthPerPassMm.toFixed(2)}{' '}
-      mm/pass. Active machine limits are applied; verify the cut.
+      mm/pass. Programmed nominal chipload: <strong>{nominal?.toFixed(4)} mm/tooth</strong> after
+      feed limits and output rounding.
+      {belowChart
+        ? ' This is below the chart starting value; check cutter guidance and spindle range before changing RPM or feed.'
+        : ''}{' '}
+      Actual chip thickness also depends on engagement and acceleration. Verify the cut.
     </p>
   );
 }

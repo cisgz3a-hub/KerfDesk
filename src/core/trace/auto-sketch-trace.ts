@@ -23,7 +23,7 @@ export function shouldUseSketchTrace(
  * `options` with the auto-sketch verdict of `image` carried in
  * sourceAutoSketch, so every later reader (the scale plan, the upscale input
  * and the working-grid lanes) takes the route the source took. The veto for
- * toned monochrome (ADR-446) reads stroke widths through a 3x3 window, so a
+ * toned monochrome (ADR-484) reads stroke widths through a 3x3 window, so a
  * resampled grid can otherwise reach a different verdict than the source.
  * Unchanged when auto-sketch is off, forced, or already carried.
  */
@@ -65,7 +65,7 @@ const MEDIAN_ABS_CHROMA_DIFFERENCE_PER_SIGMA = 0.6745 * 2;
 // pixel must be chromatic itself and sit in a 3×3 neighbourhood whose MEAN
 // colour is chromatic beyond what the image's own per-channel noise explains.
 // Coherent colour that is only one weak tint of the artwork's tones on
-// paper-light paper (sepia, duotone) does not promote (ADR-446).
+// paper-light paper (sepia, duotone) does not promote (ADR-484).
 function hasEnoughColourForAutoSketch(image: RawImageData): boolean {
   const pixelCount = image.width * image.height;
   if (pixelCount === 0) return false;

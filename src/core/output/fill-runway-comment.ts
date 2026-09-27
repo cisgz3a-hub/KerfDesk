@@ -36,5 +36,5 @@ export function fillRunwayCommentText(
     );
   }
   const appliedMm = feedMatchedFillRunwayMm(group.overscanMm);
-  return `overscan ${formatMm(group.overscanMm)} mm (4040 entry runway ${formatMm(appliedMm)} mm at fill feed; ADR-234)`;
+  return `overscan ${formatMm(group.overscanMm)} mm (bounded entry and exit up to ${formatMm(appliedMm)} mm at fill feed; ADR-445)`;
 }

@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import type { CameraAlignment, CameraCalibration, CameraProfile } from '../../core/camera';
+import type { CameraProfile } from '../../core/camera';
+import { savedCameraModel } from '../../core/camera/model/model-fixtures';
 import { DEFAULT_DEVICE_PROFILE, type DeviceProfile } from '../../core/devices';
 import {
   MACHINE_PROFILE_FORMAT,
@@ -8,29 +9,11 @@ import {
   serializeMachineProfileDocument,
 } from './machine-profile-io';
 
-const CALIBRATION: CameraCalibration = {
-  intrinsics: { fx: 1200, fy: 1198, cx: 960, cy: 540 },
-  distortion: [0.3, -0.05, 0.01, -0.002],
-  imageWidth: 1920,
-  imageHeight: 1080,
-  rmsPx: 0.24,
-  calibratedAt: 1_750_000_000_000,
-};
-
-const ALIGNMENT: CameraAlignment = {
-  homography: [0.25, 0.01, 12, -0.02, 0.24, 8, 0.0001, 0, 1],
-  frameWidth: 1920,
-  frameHeight: 1080,
-  basis: 'rectified',
-  alignedAt: 1_750_000_000_001,
-};
-
 function profileWithCamera(): DeviceProfile {
   return {
     ...DEFAULT_DEVICE_PROFILE,
     baudRate: 250000,
-    cameraCalibration: CALIBRATION,
-    cameraAlignment: ALIGNMENT,
+    cameraModel: savedCameraModel(),
     capabilities: [...(DEFAULT_DEVICE_PROFILE.capabilities ?? []), 'camera'],
     cameraProfile: {
       id: 'lid-camera',
@@ -75,8 +58,59 @@ describe('machine profile camera metadata', () => {
     expect(cameraMatrix?.fx).toBe(1200);
     expect(result.document.profile.cameraProfile?.transparency).toBe(0.4);
     expect(result.document.profile.baudRate).toBe(250000);
-    expect(result.document.profile.cameraCalibration).toEqual(CALIBRATION);
-    expect(result.document.profile.cameraAlignment).toEqual(ALIGNMENT);
+    expect(result.document.profile.cameraModel).toEqual(savedCameraModel());
+  });
+
+  it('roundtrips other cameras’ calibrations and rejects an invalid one (ADR-446)', () => {
+    const other = savedCameraModel({
+      version: 1,
+      sourceKind: 'usb',
+      sourceId: 'overhead',
+      width: 1280,
+      height: 720,
+      resizeMode: 'none',
+    });
+    const document = (profile: DeviceProfile) =>
+      serializeMachineProfileDocument({
+        format: MACHINE_PROFILE_FORMAT,
+        schemaVersion: MACHINE_PROFILE_SCHEMA_VERSION,
+        profile,
+        source: { kind: 'custom', label: 'Camera bench' },
+        reviewNotes: [],
+      });
+    const result = deserializeMachineProfileDocument(
+      document({ ...profileWithCamera(), laserArcMoves: 'off', otherCameraModels: [other] }),
+    );
+    expect(result.kind).toBe('ok');
+    if (result.kind !== 'ok') return;
+    expect(result.document.profile.otherCameraModels).toEqual([other]);
+    expect(result.document.profile.cameraModel).toEqual(savedCameraModel());
+    expect(result.document.profile.laserArcMoves).toBe('off');
+    // An entry with no camera binding could never be matched to a camera.
+    const raw = JSON.parse(document(profileWithCamera())) as { profile: Record<string, unknown> };
+    raw.profile['otherCameraModels'] = [other, savedCameraModel()];
+    expect(deserializeMachineProfileDocument(JSON.stringify(raw))).toMatchObject({
+      kind: 'invalid',
+      reason: 'profile.otherCameraModels is invalid',
+    });
+  });
+
+  it('accepts an explicit empty list of other camera calibrations as none', () => {
+    const raw = JSON.parse(
+      serializeMachineProfileDocument({
+        format: MACHINE_PROFILE_FORMAT,
+        schemaVersion: MACHINE_PROFILE_SCHEMA_VERSION,
+        profile: profileWithCamera(),
+        source: { kind: 'custom', label: 'Camera bench' },
+        reviewNotes: [],
+      }),
+    ) as { profile: Record<string, unknown> };
+    raw.profile['otherCameraModels'] = [];
+    const result = deserializeMachineProfileDocument(JSON.stringify(raw));
+    expect(result.kind).toBe('ok');
+    if (result.kind !== 'ok') return;
+    expect(result.document.profile.cameraModel).toEqual(savedCameraModel());
+    expect(result.document.profile.otherCameraModels).toBeUndefined();
   });
 
   it('roundtrips RTSP camera source metadata in .lfmachine.json', () => {

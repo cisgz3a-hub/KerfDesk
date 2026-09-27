@@ -1,8 +1,10 @@
 import { sanitizeGcodeCommentValue } from '../gcode-comments';
 import type { CncGroup, CncPath3dPass } from '../job';
+import { rampEntryPlungeCount } from '../cnc/contour-ramp-entry';
 import { requestedCncCoordinateText } from '../cnc/coordinate-representation';
 import { cncGroupMaximumDepth } from '../cnc/output-representation';
 import { fmt, fmtFeed } from './cnc-grbl-emit-head';
+import { cncCuttingStageLabel } from '../scene/cnc-stage-recipe';
 
 const LABEL_BYTES = 48;
 const NUMBER_BYTES = 12;
@@ -11,6 +13,8 @@ const NUMBER_BYTES = 12;
 export function appendCncGroupComments(lines: string[], group: CncGroup): void {
   lines.push(`; cnc layer-id: ${label(group.layerId)}`);
   lines.push(`; cnc operation: ${group.cutType}; passes: ${group.passes.length}`);
+  if (group.cuttingStage !== undefined)
+    lines.push(`; cnc independent-stage: ${cncCuttingStageLabel(group.cuttingStage)}`);
   if (group.toolId !== undefined) lines.push(`; cnc tool-id: ${label(group.toolId)}`);
   if (group.toolName !== undefined) lines.push(`; cnc tool-name: ${label(group.toolName)}`);
   lines.push(toolGeometryComment(group));
@@ -81,10 +85,20 @@ function appendEntryComments(lines: string[], group: CncGroup): void {
   if (entryPaths.length > 0 && hasSteppedDetail(group)) {
     lines.push('; cnc entry-advisory: thin-detail passes use stepped entry');
   }
+  appendPlungeAdvisory(lines, group);
 }
 
 function hasSteppedDetail(group: CncGroup): boolean {
   return group.passes.some((pass) => pass.kind === 'path3d' && pass.entryRamp !== true);
+}
+
+// A path too short to ramp along keeps its straight plunge (ADR-471), so the
+// max-angle line above does not describe that pass's entry.
+function appendPlungeAdvisory(lines: string[], group: CncGroup): void {
+  const plunges = rampEntryPlungeCount(group.passes);
+  if (plunges === 0) return;
+  const passes = plunges === 1 ? '1 pass plunges' : `${plunges} passes plunge`;
+  lines.push(`; cnc entry-advisory: ${passes}: path shorter than one cut width`);
 }
 
 function toolGeometryComment(group: CncGroup): string {

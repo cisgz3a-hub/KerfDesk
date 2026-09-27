@@ -1,4 +1,4 @@
-// Finishing one colour-layer boundary chain into curves (ADR-430). Own design:
+// Finishing one colour-layer boundary chain into curves (ADR-461). Own design:
 // the chain's mid-crack points, moved to their measured sub-pixel edge
 // (colour-chain-offsets.ts), are smoothed with a light Taubin filter while
 // persistent lattice corners and junctions stay pinned, then fitted with
@@ -65,6 +65,16 @@ export function finishChain(
     }
   }
   if (!chain.closed) pushPinned(junctionPoint(chain, chain.xs.length - 1, junctions, width));
+  // These rings are too short for the persistent-corner detector. Smoothing
+  // followed by a 0.3 px fit can turn a deliberate one-pixel dot or counter
+  // into a zero-area line. Keep its few measured crack points exactly; both
+  // incident regions still read this one shared, explicitly closed chain.
+  if (chain.closed && cracks < CORNER_NEAR_SPAN * 4) {
+    const start = dense[0] as Vec2;
+    const samples = [...dense, start];
+    const segments = samples.slice(1).map((to) => ({ kind: 'line' as const, to }));
+    return { start, segments, samples };
+  }
   const smoothed = taubinSmooth(dense, chain.closed, pins);
   const cubics = fitCubicsThroughPoints(smoothed, chain.closed, pins, FIT_TOLERANCE_PX);
   return chainGeometryFromCubics(cubics, smoothed);

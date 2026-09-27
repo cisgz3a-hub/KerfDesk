@@ -150,7 +150,7 @@ test('keeps CNC job setup out of Artwork and opens it through Machine Setup', as
   await expect(startup.getByLabel('Stock origin Y', { exact: true })).toBeVisible();
 });
 
-test('keeps setup-owned CNC references readable at supported Artwork widths', async ({ page }) => {
+test('keeps the machine spindle maximum readable at supported Artwork widths', async ({ page }) => {
   await page.setViewportSize({ width: 1280, height: 900 });
   await page.goto('/');
   await page.getByRole('button', { name: 'CNC', exact: true }).click();
@@ -164,7 +164,7 @@ test('keeps setup-owned CNC references readable at supported Artwork widths', as
 
   const panel = page.getByRole('complementary', { name: 'Artwork / Operations panel' });
   const machineMaximum = panel.getByRole('button', { name: /^Machine maximum:/ });
-  const artworkSpindle = panel.getByRole('spinbutton', { name: /^Artwork spindle speed for/ });
+  const artworkSpindle = panel.getByRole('spinbutton', { name: /^Spindle speed for/ });
   await expect(machineMaximum).toBeVisible();
   await expect(artworkSpindle).toBeVisible();
 
@@ -219,9 +219,12 @@ test('keeps setup-owned CNC references readable at supported Artwork widths', as
       expect(box.top).toBeGreaterThanOrEqual(viewport.top - 1);
       expect(box.bottom).toBeLessThanOrEqual(viewport.bottom + 1);
     }
+    // ADR-431: the maximum sits directly under the requested speed's box.
     expect(
-      maximumBox.right <= spindleBox.left + 1 || maximumBox.bottom <= spindleBox.top + 1,
-      'Machine maximum should be beside or above requested RPM without overlapping it',
+      maximumBox.top >= spindleBox.bottom - 1 &&
+        maximumBox.left < spindleBox.right &&
+        maximumBox.right > spindleBox.left,
+      'Machine maximum should sit under the requested RPM without overlapping it',
     ).toBe(true);
     for (const control of [machineMaximum, artworkSpindle]) {
       expect(
@@ -239,10 +242,6 @@ test('keeps setup-owned CNC references readable at supported Artwork widths', as
   }
 
   await machineMaximum.click();
-  await expect(
-    panel.getByText(
-      'This is the machine maximum spindle speed saved in Machine Setup. Artwork spindle speed is the requested running speed for this operation.',
-    ),
-  ).toBeVisible();
-  await expect(panel.getByRole('button', { name: 'Edit in Machine Setup' })).toBeVisible();
+  await expect(page.getByRole('dialog', { name: 'CNC Machine Setup' })).toBeVisible();
+  await expect(page.getByLabel('Spindle maximum in Machine Setup')).toBeFocused();
 });

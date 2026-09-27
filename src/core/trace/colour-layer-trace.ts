@@ -1,4 +1,4 @@
-// Colour-layer trace backend (ADR-430): split an image into N flat colours and
+// Colour-layer trace backend (ADR-461): split an image into N flat colours and
 // trace every colour as its own filled path, with neighbouring colours sharing
 // one identical boundary. Own design:
 //   1. quantise in OKLab (colour-quantize.ts) and detect the paper colour;
@@ -13,7 +13,7 @@
 // Pure core: deterministic, no clock, no random, no I/O.
 
 import type { ColoredPath, CurveSubpath, Polyline, Vec2 } from '../scene';
-import { resampleBuffer } from '../image-resample';
+import { resampleColourAppearance } from './colour-appearance';
 import {
   assembleRegionLoops,
   extractBoundaryChains,
@@ -94,7 +94,7 @@ function workingImage(requested: RawImageData): RawImageData {
   const pixels = requested.width * requested.height;
   if (pixels <= MAX_WORKING_PIXELS) return requested;
   const scale = Math.sqrt(MAX_WORKING_PIXELS / pixels);
-  return resampleBuffer(
+  return resampleColourAppearance(
     requested,
     Math.max(1, Math.round(requested.width * scale)),
     Math.max(1, Math.round(requested.height * scale)),

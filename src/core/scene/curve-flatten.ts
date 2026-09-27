@@ -1,4 +1,4 @@
-// Chord-optimal flattening of cubic and elliptical-arc segments (ADR-442).
+// Chord-optimal flattening of cubic and elliptical-arc segments (ADR-453).
 //
 // Every chord is accepted only when the true largest distance between the
 // curve piece it replaces and the chord segment is within the tolerance. That
@@ -105,7 +105,18 @@ export function flattenEllipseChords(
 ): Vec2[] | null {
   const angles = [arc.radiusX, arc.radiusY, arc.rotationRad, arc.theta1, arc.delta];
   if (!allFinite([from, to, arc.center]) || !angles.every(Number.isFinite)) return null;
-  return fewestChords(ellipseCurve(from, to, arc), tolerance, budget);
+  const order = comparePoints(from, to);
+  if (order < 0 || (order === 0 && arc.delta >= 0)) {
+    return fewestChords(ellipseCurve(from, to, arc), tolerance, budget);
+  }
+  // Like cubic seams, opposite walks of one ellipse must use one greedy
+  // direction; independent walks can leave gaps between adjacent fills.
+  const reversed = fewestChords(
+    ellipseCurve(to, from, { ...arc, theta1: arc.theta1 + arc.delta, delta: -arc.delta }),
+    tolerance,
+    budget,
+  );
+  return reversed === null ? null : [...reversed.slice(0, -1).reverse(), to];
 }
 
 // Geometry that is not finite has no chord error. It is refused (the caller

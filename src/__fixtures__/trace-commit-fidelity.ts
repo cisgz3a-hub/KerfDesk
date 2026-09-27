@@ -95,7 +95,7 @@ function checkPath(
   } = saved;
   if (!isDeepStrictEqual(sourceMetadata, savedMetadata))
     issue(probe, `Path ${String(index)} metadata changed`);
-  // The carried forest (ADR-441) is keyed to the exact geometry, so a
+  // The carried forest (ADR-483) is keyed to the exact geometry, so a
   // simplifying commit legitimately re-stamps its key. Compare what a reader
   // gets back: the same parents, still valid for the saved geometry.
   if (!isDeepStrictEqual(carriedSubpathParents(source), carriedSubpathParents(saved)))

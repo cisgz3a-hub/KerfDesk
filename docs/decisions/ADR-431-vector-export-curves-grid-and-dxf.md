@@ -136,3 +136,25 @@ hummingbird 1,699,567 bytes with 112,343.
 Not part of this decision: PDF, EPS, PostScript and GeoJSON writers; fitting arcs to cubics for
 DXF bulges; a tight page (Potrace `--tight`) for traced files; a precision control for the scene
 export commands (they use the 0.001 mm default).
+
+### Amendment: retain Edge line paint across traced export (2026-09-27)
+
+The canonical-curve batch writer introduced here retained Centerline's line role but omitted
+Edge Detection. This regressed ADR-407's paint contract: a closed Edge result previewed and
+committed as a line, but exported as a fill. The omission also reached the drawing-writer
+handoff added by ADR-468 and the fitted-page stroke allowance added by ADR-451.
+
+`core/trace/trace-paint.ts` now owns the preview/export paint decision. Centerline and Edge
+stroke every contour. Hybrid keeps its per-path stroke/fill roles; other modes fill closed
+contours and stroke open contours. The batch layer carries the line role through scaling and
+page placement, and visibility uses travel length for line roles, including zero-area closed
+travel. The SVG writer and the PDF/EPS/GeoJSON handoff apply the same role. Fitting a page
+includes Edge's stroke allowance. Native canonical curves, export grids, source-pixel SVG
+stroke width and PDF/EPS hairline width are unchanged.
+
+Regression evidence includes actual default Edge Detection output through SVG, PDF, EPS and
+GeoJSON on both image and fitted pages; canonical closed cubics in SVG/PDF/EPS; zero-area closed
+travel and open contours; and Centerline, filled-contour and per-path Hybrid controls. Tests
+inspect actual SVG paint, PDF/EPS paint operators and GeoJSON geometry/paint, not just injected
+writer options (`traced-paint-intent.test.ts`). The core batch and page tests also cover the
+writer handoff, nonempty travel and stroke padding. Preview paint remains unchanged.

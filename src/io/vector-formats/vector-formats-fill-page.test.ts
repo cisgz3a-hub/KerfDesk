@@ -1,4 +1,4 @@
-// ADR-444 review fixes: GeoJSON follows each item's fill rule (the region the
+// ADR-468 review fixes: GeoJSON follows each item's fill rule (the region the
 // PDF and EPS files paint), crossing contours are reported instead of written
 // as an invalid MultiPolygon, stroked ink stays on the PDF/EPS page, and
 // oversized PDF pages use /UserUnit.

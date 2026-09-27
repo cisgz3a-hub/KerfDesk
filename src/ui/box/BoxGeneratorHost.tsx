@@ -26,8 +26,8 @@ export function BoxGeneratorHost(props: { readonly onClose: () => void }): JSX.E
     <BoxGeneratorDialog
       machine={context}
       onCancel={props.onClose}
-      onGenerate={(panels) => {
-        insertBoxPanels(panels);
+      onGenerate={(panels, spec) => {
+        insertBoxPanels(panels, { thicknessMm: spec.thicknessMm });
         props.onClose();
         pushToast(`Inserted ${panels.length} box panels.`, 'success');
       }}

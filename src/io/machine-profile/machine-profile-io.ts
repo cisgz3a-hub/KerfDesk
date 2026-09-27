@@ -14,11 +14,9 @@ import {
 } from '../../core/devices';
 import { recoverCncSubProfile } from '../../core/devices/cnc-sub-profile-validation';
 import { DEFAULT_CNC_MACHINE_PARAMS } from '../../core/scene';
-import {
-  normalizeCameraAlignment,
-  normalizeCameraCalibration,
-  normalizeCameraProfile,
-} from '../../core/camera';
+import { normalizeCameraProfile } from '../../core/camera';
+import { normalizeCameraModelRecord } from '../../core/camera/model/camera-model-record';
+import { normalizeOtherCameraModels } from '../../core/camera/model/saved-cameras';
 import { laserArcMovesEntry, validateMachineProfileShape } from './machine-profile-shape';
 import { optionalRotarySetup } from '../project/project-device-profile-validator';
 import { firstError } from '../project/project-shape-primitives';
@@ -297,7 +295,7 @@ function canonicalProfile(profile: DeviceProfile): DeviceProfile {
     ...canonicalIdentityMetadata(profile),
     name: profile.name,
     ...canonicalMachineMetadata(profile),
-    ...canonicalCameraGeometry(profile),
+    ...canonicalCameraModel(profile),
     gcodeDialect: normalizeGcodeDialectSelection(profile.gcodeDialect),
     ...(profile.baudRate !== undefined ? { baudRate: profile.baudRate } : {}),
     streamingMode: streamingModeForController(
@@ -330,8 +328,7 @@ function canonicalProfile(profile: DeviceProfile): DeviceProfile {
           controlledLaserOffTravelFeedMmPerMin: profile.controlledLaserOffTravelFeedMmPerMin,
         }),
     noGoZones: profile.noGoZones.map((zone) => ({ ...zone })),
-    ...canonicalCameraCalibration(profile),
-    ...canonicalCameraAlignment(profile),
+    ...canonicalCameraModel(profile),
     ...(profile.rotary !== undefined ? { rotary: { ...profile.rotary } } : {}),
     ...canonicalFireControl(profile),
     origin: profile.origin,
@@ -350,14 +347,13 @@ function canonicalProfile(profile: DeviceProfile): DeviceProfile {
   };
 }
 
-function canonicalCameraCalibration(profile: DeviceProfile): Partial<DeviceProfile> {
-  const calibration = normalizeCameraCalibration(profile.cameraCalibration);
-  return calibration === undefined ? {} : { cameraCalibration: calibration };
-}
-
-function canonicalCameraAlignment(profile: DeviceProfile): Partial<DeviceProfile> {
-  const alignment = normalizeCameraAlignment(profile.cameraAlignment);
-  return alignment === undefined ? {} : { cameraAlignment: alignment };
+function canonicalCameraModel(profile: DeviceProfile): Partial<DeviceProfile> {
+  const cameraModel = normalizeCameraModelRecord(profile.cameraModel);
+  const otherCameraModels = normalizeOtherCameraModels(profile.otherCameraModels);
+  return {
+    ...(cameraModel === undefined ? {} : { cameraModel }),
+    ...(otherCameraModels === undefined ? {} : { otherCameraModels }),
+  };
 }
 
 function canonicalFireControl(profile: DeviceProfile): Partial<DeviceProfile> {
@@ -394,15 +390,6 @@ function canonicalMachineMetadata(profile: DeviceProfile): Partial<DeviceProfile
     ...(profile.cameraProfile !== undefined
       ? { cameraProfile: normalizeCameraProfile(profile.cameraProfile) }
       : {}),
-  };
-}
-
-function canonicalCameraGeometry(profile: DeviceProfile): Partial<DeviceProfile> {
-  const cameraCalibration = normalizeCameraCalibration(profile.cameraCalibration);
-  const cameraAlignment = normalizeCameraAlignment(profile.cameraAlignment);
-  return {
-    ...(cameraCalibration === undefined ? {} : { cameraCalibration }),
-    ...(cameraAlignment === undefined ? {} : { cameraAlignment }),
   };
 }
 

@@ -1,6 +1,6 @@
-// Speck absorption of the colour-layer label map (ADR-430).
+// Speck absorption of the colour-layer label map (ADR-461).
 import { describe, expect, it } from 'vitest';
-import { absorbSmallRegions } from './colour-label-cleanup';
+import { absorbSmallRegions, modeFilterIsolatedPixels } from './colour-label-cleanup';
 
 // A 12 x 12 field of label 3 holding two touching specks: A (label 1, 2 px)
 // is wrapped on two sides by B (label 2, 6 px), and A scans first. A shares
@@ -53,5 +53,24 @@ describe('absorbSmallRegions', () => {
     expect(count(grid.labels, 1)).toBe(2);
     expect(count(grid.labels, 2)).toBe(6);
     expect(grid.labels[0]).toBe(255);
+  });
+
+  it('measures a diagonal run as one region and still removes a short run', () => {
+    for (const minArea of [6, 7]) {
+      const grid = { width: 12, height: 12, labels: new Uint8Array(144).fill(0) };
+      for (let i = 0; i < 6; i += 1) grid.labels[(i + 2) * 12 + i + 2] = 1;
+      modeFilterIsolatedPixels(grid);
+      expect(count(grid.labels, 1)).toBe(6);
+      absorbSmallRegions(grid, minArea);
+      expect(count(grid.labels, 1)).toBe(minArea === 6 ? 6 : 0);
+    }
+  });
+
+  it('does not connect isolated specks across opposite row edges', () => {
+    const grid = { width: 12, height: 12, labels: new Uint8Array(144).fill(0) };
+    grid.labels[35] = 1;
+    grid.labels[36] = 1;
+    absorbSmallRegions(grid, 2);
+    expect(count(grid.labels, 1)).toBe(0);
   });
 });

@@ -1,3 +1,4 @@
+import { cncGroupForPasses } from './compile-cnc-pass-group';
 // compileCncJob — Scene + DeviceProfile + CncMachineConfig → Job of CncGroups.
 //
 // Materialize layer geometry in machine coordinates and order passes safely:
@@ -15,12 +16,11 @@ import {
   layerCncTool,
   type CncLayerSettings,
   type CncMachineConfig,
-  type CncTool,
   type Layer,
   type Polyline,
   type Scene,
 } from '../scene';
-import type { CncGroup, CncPass, Job } from '../job';
+import type { CncGroup, Job } from '../job';
 // Deep type import: core/job's barrel is a ratcheted over-cap legacy barrel
 // (scripts/index-export-baseline.json) and may only shrink.
 import type {
@@ -29,26 +29,18 @@ import type {
   CncStepoverCompilationEvidence,
 } from '../job/job';
 import type { ReliefMaterializationFailure } from '../relief/relief-materialization-failure';
-import { coolantFields } from './coolant-fields';
-import {
-  capFeed,
-  capSpindle,
-  isProfileCutType,
-  resolveRetractBetweenPasses,
-  type CncGroupCompileOptions,
-} from './compile-cnc-helpers';
+import { isProfileCutType } from './compile-cnc-helpers';
 import { compileReliefGroupsForLayer } from './compile-cnc-relief';
 import { cncHeadDevice } from './cnc-head-feeds';
 import { orderGroupsIntoToolSections } from './cnc-tool-sections';
 import { collectLayerContours, layerPolylinesFromContours } from './collect-cnc-contours';
 import type { CollectedCncContour } from './cnc-manual-tab-mapping';
-import { cncGroupProvenance } from './cnc-group-provenance';
 import {
   prepareCncCompilationArtifact,
   resolveCncCompilationArtifact,
   runCncCompilationTask,
   type CncCompilationEvidence,
-  type CncCompilationIdentity,
+  type CncOperationSourceGeometry,
   type CncCompilationRejectionReason,
   type CncCompilationTaskResult,
   type PreparedCncCompilationArtifact,
@@ -56,7 +48,6 @@ import {
 import type { VCarveLadder } from './vcarve-ladder';
 import { passesForCncLayerWithEvidence } from './compile-cnc-layer-passes';
 import { machineFrameHandedness } from './machine-frame-handedness';
-import { parkFields } from './motion-polish';
 import { applyProfileLeadPasses } from './profile-lead-passes';
 import {
   boundVCarveLadder,
@@ -67,9 +58,12 @@ import {
 } from './cnc-compilation-sidecar';
 import { compiledInlayGroups, secondaryClearingGroups } from './compile-cnc-operation-groups';
 import { restAwareVCarveGroup } from './vcarve-rest-finishing';
+import { cncSettingsForStage } from './cnc-stage-settings';
+import { preserveProfileFinishStages, profileStageRuns } from './profile-finishing-stage';
 
 export { xyToolpathsForCutType } from './compile-cnc-layer-passes';
 export { vcarveClearanceGroupForLayer } from './compile-cnc-operation-groups';
+export { prepareCncCompilationArtifact as prepareBoundCncCompilation } from './cnc-compilation-artifact';
 
 /** Pure CNC compilation result used by output preparation and worker finalization. */
 export type CncJobCompilationResult =
@@ -130,17 +124,9 @@ export function finalizeCncCompilationArtifact(
     resolved.device,
     resolved.config,
     resolved.evidence.vcarveLayers,
+    resolved.sourceGeometry,
   );
   return compiled.kind === 'compiled' ? { ...compiled, evidence: resolved.evidence } : compiled;
-}
-
-export function prepareBoundCncCompilation(
-  identity: CncCompilationIdentity,
-  scene: Scene,
-  device: DeviceProfile,
-  config: CncMachineConfig,
-): PreparedCncCompilationArtifact {
-  return prepareCncCompilationArtifact(identity, scene, device, config);
 }
 
 function compileCncSnapshot(
@@ -148,6 +134,7 @@ function compileCncSnapshot(
   sharedDevice: DeviceProfile,
   config: CncMachineConfig,
   vcarveLayers: CncCompilationEvidence['vcarveLayers'],
+  sourceGeometry?: ReadonlyMap<number, CncOperationSourceGeometry>,
 ): CncJobCompilationResult {
   // Feeds cap at CNC's own Max feed, never the laser's.
   const device = cncHeadDevice(sharedDevice, config.params);
@@ -165,6 +152,7 @@ function compileCncSnapshot(
       device,
       config,
       vcarveLayers,
+      sourceGeometry?.get(operationIndex),
     );
     if (operation.kind === 'relief-materialization-failed') return operation;
     clearingGroups.push(...operation.clearingGroups);
@@ -208,13 +196,15 @@ function compileCncOperation(
   device: DeviceProfile,
   config: CncMachineConfig,
   vcarveLayers: CncCompilationEvidence['vcarveLayers'],
+  sourceGeometry?: CncOperationSourceGeometry,
 ): CompiledCncOperation | ReliefMaterializationFailure {
   const { layer, priorityObjectId } = run;
   const settings = layer.cnc ?? DEFAULT_CNC_LAYER_SETTINGS;
   const relief = compileReliefGroupsForLayer(sourceObjects, layer, settings, device, config);
   if (relief.kind === 'relief-materialization-failed') return relief;
-  const contours = collectLayerContours(sourceObjects, layer, device);
-  const polylines = layerPolylinesFromContours(layer, contours);
+  // The private artifact owns these contours and the validated ladder for this operation.
+  const contours = sourceGeometry?.contours ?? collectLayerContours(sourceObjects, layer, device);
+  const polylines = sourceGeometry?.polylines ?? layerPolylinesFromContours(layer, contours);
   const vectorGroups = compileVectorOperationGroups(
     layer,
     settings,
@@ -317,23 +307,31 @@ function compileVectorOperationGroups(
       stepoverUsed: secondary.stepoverUsed || compiledGroup.stepoverUsed,
     };
   }
-  const tagged = tagArtworkGroup(
-    restAwareVCarveGroup(compiledGroup.group, secondary.groups, polylines),
+  const tagged = tagFinishedGroup(
+    compiledGroup.group,
+    secondary.groups,
+    polylines,
     priorityObjectId,
   );
-  return isProfileCutType(settings.cutType)
-    ? {
-        clearingGroups,
-        profileGroups: [tagged],
-        offsetLadderDiagnostics,
-        stepoverUsed: secondary.stepoverUsed || compiledGroup.stepoverUsed,
-      }
-    : {
-        clearingGroups: [...clearingGroups, tagged],
-        profileGroups: [],
-        offsetLadderDiagnostics,
-        stepoverUsed: secondary.stepoverUsed || compiledGroup.stepoverUsed,
-      };
+  const profileGroups = compiledGroup.groups.map((group) =>
+    tagArtworkGroup(group, priorityObjectId),
+  );
+  const profileCut = isProfileCutType(settings.cutType);
+  return {
+    clearingGroups: profileCut ? clearingGroups : [...clearingGroups, tagged],
+    profileGroups: profileCut ? profileGroups : [],
+    offsetLadderDiagnostics,
+    stepoverUsed: secondary.stepoverUsed || compiledGroup.stepoverUsed,
+  };
+}
+
+function tagFinishedGroup(
+  group: CncGroup,
+  clearing: ReadonlyArray<CncGroup>,
+  polylines: ReadonlyArray<Polyline>,
+  sourceObjectId: string,
+): CncGroup {
+  return tagArtworkGroup(restAwareVCarveGroup(group, clearing, polylines), sourceObjectId);
 }
 
 function tagArtworkGroup(group: CncGroup, sourceObjectId: string): CncGroup {
@@ -362,6 +360,7 @@ export function cncGroupForLayer(
 
 type CompiledLayerGroup = {
   readonly group: CncGroup | null;
+  readonly groups: ReadonlyArray<CncGroup>;
   readonly offsetFailed: boolean;
   readonly passLimited: boolean;
   readonly stepoverUsed: boolean;
@@ -391,51 +390,35 @@ function cncGroupForLayerResolvedWithEvidence(
   );
   // ADR-250: bake profile lead-in/out into closed profile passes (default-on
   // for profile-outside/inside; a no-op for other cut types and shape 'none').
-  const led = applyProfileLeadPasses(
+  const led = preserveProfileFinishStages(
     result.passes,
-    settings,
-    tool.diameterMm,
-    machineBoundsForDevice(device),
+    applyProfileLeadPasses(
+      result.passes,
+      settings,
+      tool.diameterMm,
+      machineBoundsForDevice(device),
+    ),
   );
+  const groups = profileStageRuns(led).flatMap((run) => {
+    const stageSettings = run.finishing
+      ? cncSettingsForStage(settings, 'profile-finish', tool)
+      : settings;
+    const group = cncGroupForPasses(
+      layer,
+      stageSettings,
+      tool,
+      run.passes,
+      device,
+      config,
+      run.finishing ? { cuttingStage: 'profile-finish' } : {},
+    );
+    return group === null ? [] : [group];
+  });
   return {
     group: cncGroupForPasses(layer, settings, tool, led, device, config),
+    groups,
     offsetFailed: result.offsetFailed,
     passLimited: result.passLimited,
     stepoverUsed: result.stepoverUsed,
-  };
-}
-
-function cncGroupForPasses(
-  layer: Layer,
-  settings: CncLayerSettings,
-  tool: CncTool,
-  passes: ReadonlyArray<CncPass>,
-  device: DeviceProfile,
-  config: CncMachineConfig,
-  options: CncGroupCompileOptions = {},
-): CncGroup | null {
-  if (passes.length === 0) return null;
-  const cutFeed =
-    settings.cutType === 'drill'
-      ? Math.min(settings.feedMmPerMin, settings.plungeMmPerMin)
-      : settings.feedMmPerMin;
-  return {
-    kind: 'cnc',
-    layerId: layer.id,
-    color: layer.color,
-    cutType: settings.cutType,
-    toolId: tool.id,
-    toolName: tool.name,
-    toolDiameterMm: tool.diameterMm,
-    ...cncGroupProvenance(settings, tool, options),
-    feedMmPerMin: capFeed(cutFeed, device.maxFeed),
-    plungeMmPerMin: capFeed(settings.plungeMmPerMin, device.maxFeed),
-    spindleRpm: capSpindle(settings.spindleRpm, config.params.spindleMaxRpm),
-    spindleSpinupSec: Math.max(0, config.params.spindleSpinupSec),
-    ...coolantFields(config),
-    safeZMm: Math.max(0, config.params.safeZMm),
-    ...parkFields(config),
-    retractBetweenPasses: options.retractBetweenPasses ?? resolveRetractBetweenPasses(settings),
-    passes,
   };
 }

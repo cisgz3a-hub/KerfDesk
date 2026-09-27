@@ -45,6 +45,13 @@
   color: var(--lf-success-fg);
 }
 
+/* "Not framed" or "Frame expired" with Frame pressable: the line is the
+   dock's next step, so it reads in the same copper as the Frame button. */
+.lf-job-dock__status[data-frame-next='true'] .lf-job-dock__readiness {
+  color: var(--lf-accent-fg);
+  font-weight: 600;
+}
+
 .lf-job-dock__estimate {
   max-width: 128px;
   margin-left: auto;
@@ -76,19 +83,28 @@
   flex-shrink: 0;
 }
 
-.lf-job-dock__buttons > .lf-job-dock__start {
-  background: var(--lf-accent-fill, var(--lf-accent));
-  border-color: var(--lf-accent-fill, var(--lf-accent));
+/* One solid copper button at a time: Frame job until this exact job is
+   framed, then Start. A greyed-out button is never copper, and the selectors
+   outrank .lf-btn:disabled so the look does not depend on stylesheet order
+   (the production bundle loads tokens.css after this file, dev before it). */
+.lf-job-dock__buttons > .lf-btn[data-primary='true']:not(:disabled) {
+  background: var(--lf-accent);
+  border-color: var(--lf-accent);
   color: var(--lf-on-fill);
+}
+
+.lf-job-dock__buttons > .lf-btn[data-primary='true']:hover:not(:disabled) {
+  background: var(--lf-accent-hover);
+  border-color: var(--lf-accent-hover);
+}
+
+.lf-job-dock__buttons > .lf-btn[data-primary='true']:active:not(:disabled) {
+  background: var(--lf-accent-active);
+  border-color: var(--lf-accent-active);
 }
 
 .lf-job-dock__buttons > .lf-job-dock__start:disabled {
   opacity: 0.48;
-}
-
-.lf-job-dock__buttons > .lf-job-dock__start:hover:not(:disabled) {
-  background: var(--lf-accent-hover);
-  border-color: var(--lf-accent-hover);
 }
 
 .lf-job-dock__notices {

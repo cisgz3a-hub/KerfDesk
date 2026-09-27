@@ -320,7 +320,7 @@ function collectLineSegmentsForLayer(
   for (const obj of objects) {
     if (appendSegmentsFromObject(obj, layer, device, out)) kerfOffsetFailed = true;
   }
-  // A contour keeps its carried nesting (ADR-441) across the tabs step, whole
+  // A contour keeps its carried nesting (ADR-483) across the tabs step, whole
   // or split into open pieces: a piece lies at its contour's depth.
   const tabbed = layer.tabsEnabled
     ? applyAutomaticTabsBySource(
@@ -392,7 +392,7 @@ function appendPathSegments(
     if (!pathUsesOperation(object, path, layer)) continue;
     const closedForKerf: Polyline[] = [];
     const withArcs = laserArcFitFor(path, object.transform, device);
-    // A traced path's own forest (ADR-441) orders its contours inside first.
+    // A traced path's own forest (ADR-483) orders its contours inside first.
     const nesting = segmentNesting(path, `${object.id}#${pathIndex}`);
     for (const [subpathIndex, polyline] of compilationPolylines(path, object.transform).entries()) {
       const points: Vec2[] = polyline.points.map((p) =>

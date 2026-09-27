@@ -1,4 +1,4 @@
-// GeoJSON writer (ADR-444), written from RFC 7946.
+// GeoJSON writer (ADR-468), written from RFC 7946.
 //
 // GeoJSON has no curves, so every contour is flattened within a stated
 // tolerance (default 0.01 mm) and then snapped to the export grid: each
@@ -166,10 +166,7 @@ function filledPolygons(
     closedRing(polygon.outer, true),
     ...polygon.holes.map((hole) => closedRing(hole, false)),
   ]);
-  // A kept ring with zero net area is not simple (a bow-tie, or a retraced
-  // spike whose edges only overlap): never claim a valid geometry for it.
-  const notSimple = rings.some((ring) => twiceSignedArea(ring) === 0);
-  return { polygons, crossing: region.crossing || notSimple };
+  return { polygons, crossing: region.crossing };
 }
 
 /** An open ring on the grid (first point not repeated, consecutive duplicates removed). */

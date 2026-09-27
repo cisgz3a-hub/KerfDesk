@@ -1,4 +1,4 @@
-// ADR-444 Amendment 1: a contour that collapses on the GeoJSON export grid is
+// ADR-468 Amendment 1: a contour that collapses on the GeoJSON export grid is
 // dropped with its whole subtree, so a hole (or an island) nested in it is
 // never orphaned and written with the wrong fill.
 //

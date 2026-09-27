@@ -17,15 +17,15 @@ export type TraceOptions = {
   // Centerline traces skeletonize dark strokes into open line paths
   // for single-pass vector engraving. Edge detection uses local contrast
   // to find full-colour artwork and traces closed outlines around its ink.
-  // Line + fill ('hybrid', ADR-443) burns ink no wider than
+  // Line + fill ('hybrid', ADR-454) burns ink no wider than
   // hybridMaxStrokeWidthPx once down its centre line and keeps wider ink as
-  // filled outlines, decided per skeleton branch.
+  // filled outlines, decided locally along each skeleton branch.
   readonly traceMode?: 'filled-contours' | 'centerline' | 'edge' | 'hybrid';
   // Line + fill only: the widest ink, in source-image pixels, that still
   // traces as a single centre-line stroke. The dialog converts its
   // millimetre control through the placement; undefined = 4 px.
   readonly hybridMaxStrokeWidthPx?: number;
-  // Colour layers (ADR-430): presence selects the colour-layer backend, which
+  // Colour layers (ADR-461): presence selects the colour-layer backend, which
   // quantises the image to a few flat colours and traces one filled path per
   // colour with shared boundaries (colour-layer-trace.ts).
   readonly colourLayers?: ColourLayerOptions;

@@ -140,11 +140,11 @@ describe('planFillSweeps', () => {
     const second = plans[1];
 
     expect(plans.map(({ leadInMm, leadOutMm }) => [leadInMm, leadOutMm])).toEqual([
-      [10, 0],
-      [6, 10],
+      [10, 3],
+      [3, 10],
     ]);
     if (second === undefined) throw new Error('Expected second Island Fill sweep');
-    expect(expandedEndpoints(second)?.leadStart.x).toBe(10);
+    expect(expandedEndpoints(second)?.leadStart.x).toBe(13);
   });
 
   it('keeps explicitly requested legacy short-fragment behavior available to fixtures', () => {

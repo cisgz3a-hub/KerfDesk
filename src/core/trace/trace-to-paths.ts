@@ -162,7 +162,7 @@ export async function traceImageToColoredPaths(
   );
   const image = polarised.image;
   // The auto-sketch verdict is read once, on the polarised source, so the
-  // scale plan and the working grid it chooses take one route (ADR-446).
+  // scale plan and the working grid it chooses take one route (ADR-484).
   const options = shouldTraceAlphaMask(image, polarised.options)
     ? polarised.options
     : withSourceAutoSketch(image, polarised.options);
@@ -196,7 +196,7 @@ export async function traceImageToColoredPaths(
       effectivePixelScale(options) ** 2;
     const workingOptions = downscaleWorkingOptions(options, areaScale);
     const traced = await dispatchTrace(workingImage, workingOptions, run);
-    // Only binary contours take this route. Their canonical curves (ADR-440)
+    // Only binary contours take this route. Their canonical curves (ADR-482)
     // are mapped with their polylines, so the restored trace keeps its
     // cubics. The resampler covers each axis independently, and rounded
     // working height need not have the same ratio as width.

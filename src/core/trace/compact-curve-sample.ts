@@ -1,10 +1,10 @@
-// The compatibility polyline of a compact curve (ADR-440).
+// The compatibility polyline of a compact curve (ADR-482).
 //
 // These samples are the path's `polylines`, the view that older readers and
 // previews use, and the first thing the contour topology repair tests. They
 // are not what guards the curves: a cubic can cross or touch between its
 // samples, so the repair also tests the curves themselves
-// (compact-curve-contacts.ts, ADR-441), and the samples only need to stay
+// (compact-curve-contacts.ts, ADR-483), and the samples only need to stay
 // close to the curve.
 
 import type { CurveSubpath, Vec2 } from '../scene';

@@ -33,7 +33,7 @@ type OverrideRule =
   | { readonly kind: 'number'; readonly min: number; readonly max: number; readonly auto?: true }
   | { readonly kind: 'boolean'; readonly auto?: true }
   | { readonly kind: 'detection' }
-  // Colour layers' Colours control: 'auto' or a whole count in range (ADR-430).
+  // Colour layers' Colours control: 'auto' or a whole count in range (ADR-461).
   | { readonly kind: 'count-or-auto'; readonly min: number; readonly max: number }
   | { readonly kind: 'choice'; readonly values: ReadonlyArray<string> };
 
@@ -57,7 +57,7 @@ const COLOUR_LAYER_OUTPUTS: ReadonlyArray<string> = Object.keys({
   stacked: true,
 } satisfies Record<ColourLayerOutput, true>);
 
-// Diagonal contacts (ADR-450). A record without the key restores as Auto.
+// Diagonal contacts (ADR-455). A record without the key restores as Auto.
 const TURN_POLICIES: ReadonlyArray<string> = Object.keys({
   auto: true,
   'connect-ink': true,

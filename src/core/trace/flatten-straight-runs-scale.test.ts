@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import type { Vec2 } from '../scene';
 import { flattenStraightRuns } from './flatten-straight-runs';
 
-// ADR-457: the joint-snap limit is denominated in source pixels, so the same
+// ADR-487: the joint-snap limit is denominated in source pixels, so the same
 // artwork traced on a 1x, 1.5x or 2x working grid snaps the same joints.
 // Synthetic soft bend: a straight along +x into the apex (40, 0), then a
 // straight turned by `turnDeg`, both carrying a small deterministic
@@ -37,7 +37,7 @@ function flattenAtScale(source: ReadonlyArray<Vec2>, scale: number, strength = 1
 const APEX: Vec2 = { x: 40, y: 0 };
 const SCALES = [1, 1.5, 2] as const;
 
-describe('flattenStraightRuns joint snap scale invariance (ADR-457)', () => {
+describe('flattenStraightRuns joint snap scale invariance (ADR-487)', () => {
   // Each case snapped to the apex at 1x but fell back to the projection
   // midpoint (~1.5-2 source px down the second leg) at 1.5x/2x before the
   // limit was scaled.
@@ -68,7 +68,7 @@ describe('flattenStraightRuns joint snap scale invariance (ADR-457)', () => {
   );
 });
 
-describe('flattenStraightRuns activity gate scale invariance (ADR-457)', () => {
+describe('flattenStraightRuns activity gate scale invariance (ADR-487)', () => {
   // Smoothness ~0.86 gives strength 0.15: a 0.15 source-px budget, under the
   // 0.2 px activity floor. The flattener must stay off on every grid; gating
   // the SCALED budget turned it on at 1.5x/2x (0.225 and 0.3 grid px).

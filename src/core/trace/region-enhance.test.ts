@@ -285,7 +285,7 @@ describe('enhanceRegionPaths', () => {
   });
 });
 
-describe('replacePathsInRegion with Line + fill strokes (ADR-443)', () => {
+describe('replacePathsInRegion with Line + fill strokes (ADR-454)', () => {
   const interior = { x: 10, y: 10, width: 40, height: 40 };
   const line = (x: number) => ({
     closed: false,

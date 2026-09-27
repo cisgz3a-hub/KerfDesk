@@ -7,9 +7,9 @@
 // bulges past its end points is inside and a control point off the curve does
 // not widen the page), grows it by the margin on every side, and moves the
 // artwork so the fitted page's top-left corner is the origin. Stroked curves
-// (Centerline, open curves) add half the widest hairline any writer draws, so
-// a stroke on the fitted edge is not clipped. The scale (millimetres per
-// source pixel) is untouched: only the page and the offset change.
+// (Centerline, Edge, Hybrid strokes, open curves) add half the widest hairline
+// any writer draws, so a stroke on the fitted edge is not clipped. The scale
+// (millimetres per source pixel) is untouched: only the page and the offset change.
 //
 // On a physical page the fitted box is rounded outward to the export grid, so
 // the offset is a whole number of grid steps and a coordinate differs from the
@@ -30,6 +30,7 @@ import {
 } from '../vector-export/decimal-grid';
 import type { TracedLayer, TracedSvgPage } from './batch-trace-svg';
 import type { TraceOptions } from './trace-option-types';
+import { isLineTraceMode } from './trace-paint';
 
 export type TracedPageFit = 'image' | 'artwork';
 
@@ -88,7 +89,7 @@ export function placeTracedLayers(
   const matrix = { a: 1, b: 0, c: 0, d: 1, e: -box.minX, f: -box.minY };
   return {
     layers: layers.map((layer) => ({
-      color: layer.color,
+      ...layer,
       curves: layer.curves.map((curve) => transformCurveSubpathExact(curve, matrix)),
     })),
     page: { ...page, size: { width: span(box.minX, box.maxX), height: span(box.minY, box.maxY) } },
@@ -176,8 +177,10 @@ function strokedAnywhere(
   layers: ReadonlyArray<TracedLayer>,
   traceMode: TraceOptions['traceMode'],
 ): boolean {
-  if (traceMode === 'centerline') return layers.some((layer) => layer.curves.length > 0);
-  return layers.some((layer) => layer.curves.some((curve) => !curve.closed));
+  if (isLineTraceMode(traceMode)) return layers.some((layer) => layer.curves.length > 0);
+  return layers.some((layer) =>
+    layer.curves.some((curve) => layer.strokeOnly === true || !curve.closed),
+  );
 }
 
 /** Half the widest stroke drawn on this page, in page units. */

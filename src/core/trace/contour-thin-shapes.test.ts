@@ -1,4 +1,4 @@
-// Thin shapes through the whole filled-contour pipeline (ADR-440 review).
+// Thin shapes through the whole filled-contour pipeline (ADR-482 review).
 //
 // Binary thin bars: the binary tail's Catmull-Rom resample bowed each long
 // side of a bar toward its end caps, and the compact fit through it could
@@ -129,7 +129,7 @@ const BAR_CELLS = (['Line Art', 'Smooth'] as const).flatMap((preset) =>
   ).map(([width, degrees]) => ({ preset: preset as string, width, degrees })),
 );
 
-describe('thin shapes keep their size and their topology (ADR-440)', () => {
+describe('thin shapes keep their size and their topology (ADR-482)', () => {
   it.each([
     ...BAR_CELLS,
     { preset: 'Sharp', width: 2, degrees: 15 },

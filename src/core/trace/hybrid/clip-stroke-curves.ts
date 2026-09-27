@@ -1,4 +1,4 @@
-// Clip a centreline curve against the wide-ink region (ADR-443). The parts of
+// Clip a centreline curve against the wide-ink region (ADR-454). The parts of
 // a stroke that run inside the fill are removed; the parts outside survive as
 // exact sub-curves (de Casteljau splits of the original cubics), so a clipped
 // stroke keeps its compact cubic form instead of turning into a dense

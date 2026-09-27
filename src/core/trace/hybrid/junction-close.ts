@@ -1,4 +1,4 @@
-// Line + fill junction closing, against the finished fill outline (ADR-443).
+// Line + fill junction closing, against the finished fill outline (ADR-454).
 //
 // reachIntoFill carries a cut stroke end one pixel on into the wide region,
 // which covers the one-pixel bump a pen line raises on the wide region where

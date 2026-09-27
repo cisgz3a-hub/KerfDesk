@@ -67,23 +67,26 @@ describe('colour-layer trace', () => {
     expect(covers(orange as ColoredPath, { x: 40.3, y: 40.2 })).toBe(true);
   });
 
-  it('places anti-aliased edges sub-pixel and still shares them exactly', () => {
-    // Fractional edges: red [10.25, 30.5) x [8.25, 20.5), green [30.5, 50.75)
-    // over the same rows, blue [10.25, 50.75) x [20.5, 32.25).
-    const image = render(60, 40, (x, y) => {
-      if (x < 10.25 || x >= 50.75 || y < 8.25 || y >= 32.25) return [255, 255, 255];
-      if (y >= 20.5) return [30, 50, 200];
-      return x < 30.5 ? [220, 30, 30] : [30, 160, 40];
-    });
-    const paths = trace(image);
-    expect(paths).toHaveLength(3);
-    for (const path of paths) expect(path.polylines).toHaveLength(1);
-    const areas = paths.map(polygonArea).sort((a, b) => a - b);
-    const expected = [20.25 * 12.25, 20.25 * 12.25, 40.5 * 11.75].sort((a, b) => a - b);
-    areas.forEach((area, i) => expect(Math.abs(area - (expected[i] as number))).toBeLessThan(1));
-    const { counts } = coverageStats(paths, image.width, image.height);
-    expect(counts.every((c) => c <= 1)).toBe(true);
-  });
+  it.each([0, 12])(
+    'places anti-aliased edges sub-pixel with speck area %s and still shares them exactly',
+    (despeckleMinPixels) => {
+      // Fractional edges: red [10.25, 30.5) x [8.25, 20.5), green [30.5, 50.75)
+      // over the same rows, blue [10.25, 50.75) x [20.5, 32.25).
+      const image = render(60, 40, (x, y) => {
+        if (x < 10.25 || x >= 50.75 || y < 8.25 || y >= 32.25) return [255, 255, 255];
+        if (y >= 20.5) return [30, 50, 200];
+        return x < 30.5 ? [220, 30, 30] : [30, 160, 40];
+      });
+      const paths = trace(image, { ...OPTIONS, despeckleMinPixels });
+      expect(paths).toHaveLength(3);
+      for (const path of paths) expect(path.polylines).toHaveLength(1);
+      const areas = paths.map(polygonArea).sort((a, b) => a - b);
+      const expected = [20.25 * 12.25, 20.25 * 12.25, 40.5 * 11.75].sort((a, b) => a - b);
+      areas.forEach((area, i) => expect(Math.abs(area - (expected[i] as number))).toBeLessThan(1));
+      const { counts } = coverageStats(paths, image.width, image.height);
+      expect(counts.every((c) => c <= 1)).toBe(true);
+    },
+  );
 
   it('keeps an anti-aliased disc round and true to its area', () => {
     const image = render(64, 64, (x, y) =>

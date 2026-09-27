@@ -51,7 +51,6 @@
   color: var(--lf-accent);
 }
 
-.lf-laser-process--compact,
 .lf-laser-essentials--compact {
   padding: 0;
   border: 0;
@@ -59,23 +58,84 @@
   background: transparent;
 }
 
-.lf-laser-process--compact .lf-laser-process__choice {
-  margin: 0;
-}
-
-.lf-laser-process--compact {
+/* The inspector's process picker (ADR-430): three equal buttons that never
+   truncate, styled like the Laser | CNC switch. The radios stay focusable. */
+.lf-laser-process-choice {
   display: flex;
   flex-direction: column;
-  gap: 10px;
+  gap: 6px;
 }
 
-.lf-laser-process--compact .lf-laser-process__choice > span {
-  flex-shrink: 0;
+.lf-process-segments {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 2px;
+  padding: 2px;
+  border: 1px solid var(--lf-border);
+  border-radius: 8px;
+  background: var(--lf-bg-1);
 }
 
-.lf-laser-process--compact .lf-laser-process__choice select {
+.lf-process-segment {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  min-width: 0;
   min-height: 34px;
-  font-size: 14px;
+  padding: 4px 6px;
+  border-radius: 6px;
+  color: var(--lf-text-muted);
+  font-size: 13px;
+  font-weight: 600;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.lf-process-segment input {
+  position: absolute;
+  inset: 0;
+  margin: 0;
+  opacity: 0;
+  cursor: pointer;
+}
+
+.lf-process-segment:hover,
+.lf-process-segment[data-checked='true'] {
+  background: var(--lf-accent-wash);
+  color: var(--lf-accent-fg);
+}
+
+.lf-process-segment[data-checked='true'] {
+  box-shadow: inset 0 -2px var(--lf-accent);
+}
+
+.lf-process-segment:has(input:focus-visible) {
+  outline: 2px solid var(--lf-focus);
+  outline-offset: 1px;
+}
+
+.lf-process-segment .lf-laser-process__illustration {
+  flex-shrink: 0;
+  width: 18px;
+  height: 18px;
+  color: currentColor;
+}
+
+.lf-process-segment span {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* Same breakpoint as the Settings / Run order / Materials tabs above: a panel
+   too narrow for picture and word drops the picture, so "Image" is never cut
+   to "Ima…". */
+@container (max-width: 320px) {
+  .lf-process-segment .lf-laser-process__illustration {
+    display: none;
+  }
 }
 
 .lf-inspector-help {
@@ -108,7 +168,11 @@
   margin-top: 0;
 }
 
-.lf-laser-essentials--compact .lf-laser-field__label {
+/* A unit that does not fit beside its name drops to the next line rather than
+   being cut off ("Speed mm/r"); the boxes stay level because the labels share
+   one grid row and the boxes the next (the subgrid below). */
+.lf-laser-essentials--compact .lf-laser-field__label,
+.lf-laser-process-fields .lf-laser-field__label {
   display: flex;
   flex-wrap: wrap;
   align-items: baseline;
@@ -117,7 +181,8 @@
   font-size: 13px;
 }
 
-.lf-laser-essentials--compact .lf-laser-field__label small {
+.lf-laser-essentials--compact .lf-laser-field__label small,
+.lf-laser-process-fields .lf-laser-field__label small {
   display: inline;
   margin-left: 0;
   font-size: 12px;
@@ -139,11 +204,32 @@
   border-radius: 0 6px 6px 0;
 }
 
+/* Power, Speed and Passes get three equal boxes. A panel dragged below about
+   270 px cannot fit a five-digit speed in a third, so Speed takes a larger
+   share there. */
 .lf-laser-essentials__grid {
   display: grid;
-  grid-template-columns: 1fr 1.25fr 0.85fr;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 8px;
   margin-top: 10px;
+}
+
+@container (max-width: 245px) {
+  .lf-laser-essentials__grid {
+    grid-template-columns: minmax(0, 0.95fr) minmax(0, 1.35fr) minmax(0, 0.7fr);
+  }
+}
+
+/* The one or two settings that matter for Fill or Image, laid out like the
+   essentials above them rather than inside another card. */
+.lf-laser-process-fields {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.lf-laser-field--wide {
+  grid-column: 1 / -1;
 }
 
 .lf-laser-field {
@@ -181,45 +267,54 @@
   min-height: 32px;
 }
 
-.lf-laser-essentials__grid .lf-laser-field {
-  display: flex;
-  flex-direction: column;
-  align-items: stretch;
-  gap: 6px;
+/* Each field spans two rows of its grid: every label in a row shares the first
+   and every box the second, so one label wrapping onto two lines moves neither
+   the other labels nor any box. */
+.lf-laser-essentials__grid .lf-laser-field,
+.lf-laser-process-fields .lf-laser-field {
+  display: grid;
+  grid-row: span 2;
+  grid-template-rows: subgrid;
+  grid-template-columns: minmax(0, 1fr);
+  align-items: start;
+  row-gap: 6px;
 }
 
-.lf-laser-essentials__grid .lf-laser-field__label {
+.lf-laser-essentials__grid .lf-laser-field__label,
+.lf-laser-process-fields .lf-laser-field__label {
   color: var(--lf-text);
   font-weight: 500;
 }
 
-.lf-laser-essentials__grid .lf-laser-field input {
+.lf-laser-essentials__grid .lf-laser-field input,
+.lf-laser-process-fields .lf-laser-field input,
+.lf-laser-process-fields .lf-laser-field select {
   flex: 1;
+  min-width: 0;
   font-variant-numeric: tabular-nums;
 }
 
-/* Promoted out of the options disclosure: scan direction is a per-job speed/
-   quality trade-off, so it sits under the essentials grid instead of behind a
-   click. Mirrors the .lf-laser-air-assist row, divided from the numbers above. */
-.lf-laser-scan-direction {
+/* One-line switches (ADR-430). Their explanations are the tooltips. */
+.lf-laser-toggles {
   display: flex;
-  align-items: flex-start;
-  gap: 9px;
-  margin-top: 12px;
-  padding-top: 11px;
-  border-top: 1px solid var(--lf-border);
+  flex-wrap: wrap;
+  gap: 6px 18px;
+}
+
+.lf-laser-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
   font-size: 13px;
-  line-height: 1.5;
+  font-weight: 500;
+  line-height: 1.4;
+  white-space: nowrap;
   cursor: pointer;
 }
 
-.lf-laser-scan-direction input {
-  margin-top: 3px;
+.lf-laser-toggle input {
   flex-shrink: 0;
-}
-
-.lf-laser-scan-direction strong {
-  font-weight: 600;
+  margin: 0;
 }
 
 .lf-laser-options,
@@ -283,29 +378,58 @@
   padding: 0 12px 12px;
 }
 
-.lf-laser-air-assist {
+/* The way into Cut Settings: a quiet row that names what it holds. */
+.lf-laser-more {
   display: flex;
-  align-items: flex-start;
-  gap: 9px;
-  padding: 2px;
-  font-size: 13px;
-  line-height: 1.5;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  width: 100%;
+  min-height: 44px;
+  padding: 8px 10px;
+  border: 1px solid var(--lf-border);
+  border-radius: 8px;
+  background: transparent;
+  color: var(--lf-text);
+  font: inherit;
+  text-align: left;
   cursor: pointer;
 }
 
-.lf-laser-air-assist input {
-  margin-top: 3px;
-  flex-shrink: 0;
+.lf-laser-more > span {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
 }
 
-.lf-laser-air-assist strong {
+.lf-laser-more strong {
+  font-size: 13px;
   font-weight: 600;
 }
 
-.lf-laser-advanced-button {
-  width: 100%;
-  min-height: 36px;
-  justify-content: center;
+.lf-laser-more small {
+  color: var(--lf-text-muted);
+  font-size: 11px;
+  line-height: 1.45;
+}
+
+.lf-laser-more > svg {
+  flex-shrink: 0;
+  color: var(--lf-text-muted);
+}
+
+.lf-laser-more:hover:not(:disabled) {
+  background: var(--lf-bg-2);
+}
+
+.lf-laser-more:focus-visible {
+  outline: 2px solid var(--lf-focus);
+  outline-offset: 2px;
+}
+
+.lf-laser-more:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
 }
 
 .lf-cut-settings-dialog {

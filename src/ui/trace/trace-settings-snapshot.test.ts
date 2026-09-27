@@ -39,7 +39,7 @@ describe('trace settings snapshot (ADR-408)', () => {
     });
   });
 
-  it('restores a Line + fill trace with its Max stroke width (ADR-443)', () => {
+  it('restores a Line + fill trace with its Max stroke width (ADR-454)', () => {
     const captured = captureTraceSettings({
       presetName: 'Line + fill',
       overrides: { hybridMaxStrokeWidthMm: 0.8 },
@@ -164,7 +164,7 @@ describe('trace settings snapshot (ADR-408)', () => {
     expect(restored.boundaryMode).toBe('crop');
   });
 
-  it('keeps the Colour layers controls and reopens their boundary in Crop mode (ADR-430)', () => {
+  it('keeps the Colour layers controls and reopens their boundary in Crop mode (ADR-461)', () => {
     const restored = restoreTraceSettings(
       record({
         presetName: 'Colour layers',

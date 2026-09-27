@@ -4,6 +4,7 @@ import {
   cameraBindingCompatibility,
   type CameraCaptureBinding,
 } from '../../core/camera/camera-capture-binding';
+import { savedCameraModel } from '../../core/camera/model/model-fixtures';
 import { createProject } from '../../core/scene';
 import { deserializeProject } from '../../io/project/deserialize-project';
 import { serializeProject } from '../../io/project/serialize-project';
@@ -97,24 +98,7 @@ describe('RTSP resource capture binding', () => {
       ...project,
       device: {
         ...project.device,
-        cameraAlignment: {
-          homography: [1, 0, 0, 0, 1, 0, 0, 0, 1],
-          frameWidth: 1280,
-          frameHeight: 720,
-          basis: 'rectified',
-          planeHeightMm: 0,
-          alignedAt: 1,
-          capture: binding,
-        },
-        cameraCalibration: {
-          intrinsics: { fx: 1000, fy: 1000, cx: 640, cy: 360 },
-          distortion: [0, 0, 0, 0],
-          imageWidth: 1280,
-          imageHeight: 720,
-          rmsPx: 0,
-          calibratedAt: 1,
-          capture: binding,
-        },
+        cameraModel: savedCameraModel(binding),
       },
     });
     for (const secret of ['operator', 'password', 'private-query', 'secret-fragment', 'channel=1'])
@@ -122,20 +106,19 @@ describe('RTSP resource capture binding', () => {
     const loaded = deserializeProject(encoded);
     expect(loaded.kind).toBe('ok');
     if (loaded.kind !== 'ok') return;
-    expect(loaded.project.device.cameraAlignment?.capture).toEqual(binding);
-    expect(loaded.project.device.cameraCalibration?.capture).toEqual(binding);
+    expect(loaded.project.device.cameraModel?.capture).toEqual(binding);
     const localSecret = localStorage.getItem('laserforge.camera.resourceIdentityKey.v1');
     expect(localSecret).toMatch(/^[0-9a-f]{64}$/);
     expect(encoded).not.toContain(localSecret);
     expect(encoded).not.toContain('resourceIdentityKey');
     const sameAppReload = await capture(url);
     expect(
-      cameraBindingCompatibility(loaded.project.device.cameraAlignment?.capture, sameAppReload),
+      cameraBindingCompatibility(loaded.project.device.cameraModel?.capture, sameAppReload),
     ).toBe('match');
     const different = await capture(`${BASE}?channel=2&token=private-query`);
-    expect(
-      cameraBindingCompatibility(loaded.project.device.cameraAlignment?.capture, different),
-    ).toBe('source-mismatch');
+    expect(cameraBindingCompatibility(loaded.project.device.cameraModel?.capture, different)).toBe(
+      'source-mismatch',
+    );
     saveRtspCameraUrl(url);
     expect(loadRtspCameraUrl()).toBe(BASE);
   });

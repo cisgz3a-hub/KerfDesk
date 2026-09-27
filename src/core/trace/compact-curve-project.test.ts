@@ -5,7 +5,7 @@ import { projectSpan, reverseSpan } from './compact-curve-project';
 import { chordSpanFit } from './compact-curve-span';
 
 // The reference pass: cubic-fit.ts's own Newton step and evaluation, which
-// projectSpan inlines on precomputed terms (ADR-440 speed amendment).
+// projectSpan inlines on precomputed terms (ADR-482 speed amendment).
 function referencePass(span: ReadonlyArray<Vec2>, cubic: CubicBezier, u: ReadonlyArray<number>) {
   const params = [...u];
   let error = 0;

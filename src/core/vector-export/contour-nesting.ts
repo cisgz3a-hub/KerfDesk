@@ -11,7 +11,8 @@
 // PRECONDITION: contours are pairwise nested or disjoint. Crossing or
 // identical contours are not detected: they land in separate islands, and two
 // <path>s fill an overlap that even-odd in one path would cancel. Callers with
-// arbitrary artwork must keep grouping opt-in.
+// arbitrary artwork must prove this precondition (proven-contour-groups.ts)
+// and preserve the original compound when that proof is unavailable.
 //
 // Under that precondition, containment of whole contours is decided by one
 // vertex: a single interior test is exact whenever the vertex is not ON the

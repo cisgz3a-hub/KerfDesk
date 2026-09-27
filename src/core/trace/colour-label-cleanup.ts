@@ -1,4 +1,4 @@
-// Label-map cleanup for the colour-layer trace (ADR-430). Own design. After
+// Label-map cleanup for the colour-layer trace (ADR-461). Own design. After
 // every pixel takes its nearest palette colour:
 //   1. 1-px-wide mixtures between two other palette colours (anti-aliasing
 //      along their seam) are given back to the nearer of the two;
@@ -114,7 +114,7 @@ function mixtureOwner(
   return owner;
 }
 
-/** Mode filter for 1-px islands: a pixel none of whose 4-neighbours shares
+/** Mode filter for 1-px islands: a pixel none of whose 8-neighbours shares
  *  its label takes the most common label of its 8-neighbourhood (ties to the
  *  lower label). Reads the original labels so the pass is order-free. */
 export function modeFilterIsolatedPixels(grid: LabelGrid): void {
@@ -123,16 +123,16 @@ export function modeFilterIsolatedPixels(grid: LabelGrid): void {
   const n = source.labels.length;
   for (let i = 0; i < n; i += 1) {
     const m = source.labels[i] as number;
-    if (m === TRANSPARENT_LABEL || sharesLabel4(source, i, m)) continue;
+    if (m === TRANSPARENT_LABEL || sharesLabel8(source, i, m)) continue;
     const mode = neighbourhoodMode(source, i, counts);
     if (mode >= 0) grid.labels[i] = mode;
   }
 }
 
-function sharesLabel4(grid: LabelGrid, i: number, label: number): boolean {
+function sharesLabel8(grid: LabelGrid, i: number, label: number): boolean {
   const n = grid.labels.length;
-  for (let d = 0; d < 4; d += 1) {
-    const q = neighbour4(i, d, grid.width, n);
+  for (let d = 0; d < 8; d += 1) {
+    const q = neighbour8(i, d, grid.width, n);
     if (q >= 0 && grid.labels[q] === label) return true;
   }
   return false;
@@ -157,7 +157,7 @@ function neighbourhoodMode(grid: LabelGrid, i: number, counts: Int32Array): numb
   return best;
 }
 
-/** Regions (4-connected, one label) smaller than minArea join the neighbour
+/** Regions (8-connected, one label) smaller than minArea join the neighbour
  *  label they share the most boundary with (ties to the lower label).
  *  Transparent regions stay. The smallest regions go first, and a region that
  *  joins another is re-measured as the merged whole (union-find), so two
@@ -185,14 +185,15 @@ export function absorbSmallRegions(grid: LabelGrid, minArea: number): void {
   }
 }
 
-// Keep the invariant "4-adjacent regions never share a label": after region r
-// took `label`, union it with every neighbouring region carrying that label.
+// The cleanup area includes diagonal continuations of a drawn line. This does
+// not change boundary extraction: corner-touching regions still have separate
+// outlines. After absorption, union every 8-adjacent region of the same label.
 function unionWithNeighbours(grid: LabelGrid, regions: Regions, r: number, label: number): number {
   const n = grid.labels.length;
   let root = r;
   for (const p of regions.members[r] ?? []) {
-    for (let d = 0; d < 4; d += 1) {
-      const q = neighbour4(p, d, grid.width, n);
+    for (let d = 0; d < 8; d += 1) {
+      const q = neighbour8(p, d, grid.width, n);
       if (q < 0 || grid.labels[q] !== label) continue;
       const other = regions.find(regions.component[q] as number);
       if (other !== root) root = regions.union(root, other);
@@ -202,7 +203,7 @@ function unionWithNeighbours(grid: LabelGrid, regions: Regions, r: number, label
 }
 
 type Regions = {
-  /** Region id of every pixel (4-connected, one label). */
+  /** Region id of every pixel (8-connected, one label). */
   readonly component: Int32Array;
   readonly size: number[];
   /** Pixels of a region below the speck area; null for a large region. */
@@ -266,8 +267,8 @@ function floodComponent(
   while (top > 0) {
     const p = stack[--top] as number;
     members.push(p);
-    for (let d = 0; d < 4; d += 1) {
-      const q = neighbour4(p, d, grid.width, n);
+    for (let d = 0; d < 8; d += 1) {
+      const q = neighbour8(p, d, grid.width, n);
       if (q < 0 || component[q] !== -1 || grid.labels[q] !== label) continue;
       component[q] = id;
       stack[top++] = q;
@@ -312,4 +313,14 @@ export function neighbour4(p: number, d: number, width: number, n: number): numb
   if (d === 1) return p % width < width - 1 ? p + 1 : -1;
   if (d === 2) return p >= width ? p - width : -1;
   return p + width < n ? p + width : -1;
+}
+
+// Four edge neighbours followed by NW, NE, SW, SE; no wrap across rows.
+function neighbour8(p: number, d: number, width: number, n: number): number {
+  if (d < 4) return neighbour4(p, d, width, n);
+  const dx = d % 2 === 0 ? -1 : 1;
+  const x = (p % width) + dx;
+  if (x < 0 || x >= width) return -1;
+  const q = p + dx + (d < 6 ? -width : width);
+  return q >= 0 && q < n ? q : -1;
 }

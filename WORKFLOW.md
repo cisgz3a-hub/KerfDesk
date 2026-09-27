@@ -94,6 +94,8 @@ opportunity, without an extra branding delay. It introduces no startup interacti
 - **Top command toolbar**: Open, Import, Import Image, Save and Preview lead with readable labels when space permits. Selecting an image brings Trace image into the row; Image Studio remains in **More**. Other commands remain in **More** and the application menus, with their existing shortcuts, disabled reasons, tooltips and actions. The row measures available width and moves commands into More instead of scrolling horizontally. Utility controls share the row down to 520 px. The project name includes an unsaved-change indicator.
 - **Numeric transforms**: X, Y, width, height, rotation, and the aspect-ratio lock remain directly available. **Anchor** opens the existing nine-point transform reference selector in a keyboard-accessible popover. Changing its presentation does not change the X/Y reference, resize anchor, or rotation centre.
 - **Artwork / Operations panel**: docked right with **Settings**, **Run order**, and **Materials** views in Laser mode; CNC keeps Settings and Run order. Settings is the default. Run order shares the same docked rail at the same width while the canvas remains on the left; it is not a modal or a third sidebar, and switching views never resizes the rail (ADR-348). Materials owns reusable preset and saved-library management without displacing the active job workflow. A header chevron collapses the rail to a narrow named strip; the same strip expands it.
+- **Laser artwork settings (ADR-430)**: the selected artwork's name heads the Settings view, with the Operation | Artwork switch under it. The Operation view leads with the operation's colour and name, then one scope line only when an edit reaches other artwork (with **Make unique**). **Line**, **Fill** and **Image** are three buttons; Power, Speed and Passes share one row; Fill adds Line spacing and Angle, and Image adds Dither, Line interval and (Grayscale) Min power. Scan both ways and Air assist are one-line switches whose explanations are tooltips. **More cut settings** opens Cut Settings for everything else and names what it holds. Include in output, Show on canvas and **Add operation** close the view.
+- **CNC artwork settings (ADR-481)**: the same header, scope line and footer lead and close the CNC Operation view. **Cut type** comes first (its explanation is the tooltip), then **Bit** with a **Manage bits** link to the Machine Setup bit library, the second bit the cut type uses (Pocket roughing, Floor clearing or Relief finishing) and **Material**. Cut depth and Depth per pass share one row with **Set to stock thickness** under it; Feed, Plunge and Spindle speed share the next, with the machine maximum under Spindle speed opening Machine Setup. **Traced edges** appears only for imported or traced outlines. Collapsed sections follow only for the cut types they serve, each naming its state (Holding tabs "4 per shape", Clearing strategy "Offset · 40 %", Entry & travel "Climb · Plunge"). Stock, tiling, spin-up, coolant, safe Z and park are edited in Machine Setup only.
 - **Operation cards**: the list comes before the artwork inspector, with the selected operation's process fields before secondary artwork properties. Each card keeps its visibility toggle on the face. Its **•••** disclosure contains order, output, artwork selection, settings clipboard, and delete controls.
 - **Machine controls panel**: in Spacious layout it is docked at the far right with the same collapse/expand pattern. Both panels can be resized or hidden independently. It may be collapsed during a job because active run controls live independently in the Live Motion bar.
 - **Toasts**: share the canvas's available space (lower left of the workspace, above the live controls) or a reserved row inside the open modal — never the rails, where they hid Start/Job and the layer list. Only the newest three render. The toast body does not take pointer input, so a click or drag through it reaches the canvas; the × control dismisses it early. Success confirmations dismiss after 4 s; advisories and failures after 8 s.
@@ -506,15 +508,15 @@ destination and cannot overwrite the template source.
   single **Artwork** selector chooses which one the inspector edits. The selector is UI-only and
   does not change selected-only output, canvas handles, grouping, or machine order.
 - In CNC mode, Artwork settings owns operation cutting behavior: cut type, cut/insert depth,
-  depth per pass, feed, plunge, **Artwork spindle speed**, tabs, and specialist CAM controls.
-  **Tool & material** offers direct per-operation material and primary/secondary cutter choices.
-  Stock, machine maximum RPM, spin-up, coolant, safe Z and park remain read-only references.
-  A reference remains keyboard-focusable;
-  activating it explains its scope and offers a direct **Edit in Startup Setup** route to the exact
-  field. It is not a disabled input and does not add a confirmation before editing.
+  depth per pass, feed, plunge, **Spindle speed**, tabs, and specialist CAM controls. **Bit** and
+  **Material** offer direct per-operation cutter and material choices, with the second bit a cut
+  type uses under Bit. Machine Setup owns stock, machine maximum RPM, spin-up, coolant, safe Z and
+  park (ADR-481); the machine maximum shows under Spindle speed as a link to its field there, and
+  **Manage bits** opens the Machine Setup bit library.
 - Importing, placing, or selecting artwork never opens Startup Setup and never asks for material or
   bit before editing. New CNC operations inherit the committed current-job defaults. Direct choices
-  in **Tool & material** and **Startup Setup > Tool Plan** use the same persisted operation bindings.
+  under **Bit** and **Material** and in **Startup Setup > Tool Plan** use the same persisted
+  operation bindings.
   Changing an operation's assignments leaves job defaults and unrelated operations unchanged.
 - The inspector renders only one detailed settings context at a time. A real multi-selection keeps
   the existing combined/common-operation workflow; unselected artworks are switched through the
@@ -523,20 +525,21 @@ destination and cannot overwrite the template source.
   image adjustments and path tools. Operation opens first; switching tabs keeps the editors mounted
   so in-progress numeric edits and undo reconciliation are retained. Both levels of tabs support
   arrow keys, Home and End, with one tab stop per tab list.
-- Laser settings explain **Line**, **Fill** and **Image**, then show power, speed and passes
-  together. Named sections reveal the applicable line, fill or image options. **Advanced cut
-  settings** groups the full draft editor by purpose; **Apply settings** commits the draft and
+- Laser settings offer **Line**, **Fill** and **Image**, then show power, speed and passes
+  together, followed only by the settings that process needs (ADR-430). **More cut settings**
+  opens the full draft editor grouped by purpose; **Apply settings** commits the draft and
   **Cancel** leaves the operation unchanged.
-- **Saved defaults** in Advanced cut settings offers **Make Default for #rrggbb**, which remembers
+- **Saved defaults** in More cut settings offers **Make Default for #rrggbb**, which remembers
   the operation's applied settings for the colour it names: the colour of the artwork the operation
   was created for, or the operation's own colour when it has no artwork. New operations and **Reset
   to Default** use the default saved for that same colour, otherwise **Make Default for All**. The
   automatic operation colour is never matched for artwork, so a default saved for black artwork
   does not reach other artwork whose operation happens to be black.
-- CNC settings group tool/material choices, cut/depth and feeds/passes, followed by named
-  sections for holding tabs, clearing, finishing, entry/travel, saved feeds, the calculator and
-  machine references. **Machine maximum** remains beside **Artwork spindle speed**. Collapsing a
-  group keeps its numeric editors mounted and does not change any cutting setting.
+- CNC settings lead with cut type, bit and material, then depth and feeds, followed by named
+  sections for holding tabs, clearing, finishing, entry/travel, saved feeds and the calculator,
+  each naming its current state when closed (ADR-481). The machine maximum sits under
+  **Spindle speed**. Collapsing a group keeps its numeric editors mounted and does not change any
+  cutting setting.
 - **All operations**, a compact expandable list, follows the inspector. Each row shows automatic colour, name,
   process summary, visibility, output, and order controls. Operation row order decides the processes
   inside an artwork; artwork run priority is the top-level machine sequence. Jobs with more than
@@ -697,14 +700,14 @@ marks later edits as unapproved without changing the existing Frame/Start policy
 
 ### F-A7a. Perforation, overcut and image overscan (ADR-415)
 
-1. **Advanced cut settings → Line detail → Perforation**: **Enable**, **Cut** and **Skip** (mm) cut
+1. **More cut settings → Line detail → Perforation**: **Enable**, **Cut** and **Skip** (mm) cut
    every line of the operation as dashes with uncut gaps. Closed shapes keep a full gap before their
    start point, so no dash is longer than Cut and no gap shorter than Skip. Perforation applies after
    kerf and tabs.
 2. **Overcut** (mm, 0 is off) keeps cutting past the start of each closed shape on the final pass
    only, retracing its first edges, so the seam is cut through. Shapes opened by tabs or perforation
    are not overcut.
-3. **Advanced cut settings → Image detail → Overscan** (0 to 25 mm, default 5) sets the laser-off
+3. **More cut settings → Image detail → Overscan** (0 to 25 mm, default 5) sets the laser-off
    run-up at both ends of every scan line. The note under it says how much run-up this machine needs
    to reach the operation's saved speed.
 4. Job Review lists these settings on the operation's detail line when they are set. Preview, Frame,
@@ -817,7 +820,7 @@ marks later edits as unapproved without changing the existing Frame/Start policy
 2. **Tools → Multi-File Trace...** first asks for the preset, format (SVG, DXF, PDF, EPS or
    GeoJSON), coordinate precision and, for SVG, **Group islands** (each shape with its holes);
    **Choose Images...** then picks the files. Each image is saved as `<name>-trace.<format>` on the
-   traced image's page, lower-left corner as the origin (ADR-444). **Page → Fit to artwork**
+   traced image's page, lower-left corner as the origin (ADR-468). **Page → Fit to artwork**
    instead trims the page to the exact traced curves plus a **Margin (mm)**; the millimetre scale
    is unchanged and the DXF and GeoJSON origin moves to the fitted page's corner (ADR-451). A
    fitted side under 3 pt (the smallest PDF page) grows to 3 pt, centred, in every format. A
@@ -826,7 +829,7 @@ marks later edits as unapproved without changing the existing Frame/Start policy
 3. An image whose trace has nothing visible writes no file; the rest of the batch is still saved
    and the completion message names the skipped images.
 
-### F-A9d. Export artwork as PDF, EPS or GeoJSON (ADR-444)
+### F-A9d. Export artwork as PDF, EPS or GeoJSON (ADR-468)
 
 1. **File → Export artwork as PDF... / EPS... / GeoJSON...** (or **Export selected artwork as
    ...**) write the selection's or scene's vector artwork, text outlined; bitmaps and reliefs are
@@ -2443,6 +2446,10 @@ Setup has three visible stages for both Laser and CNC (ADR-240/306, amended 2026
 The stage buttons and Back/Next remain available while a draft needs corrections. Only **Save
 machine setup** requires valid configuration; review cards link back to the relevant fields.
 Connecting a controller is optional, so a complete setup can be saved offline.
+The Machine stage keeps **Review & save** visible beside **Check essentials**. After choosing a
+profile, **Review & save** opens the final review directly; **Save machine setup** applies it.
+**Check essentials** remains available to edit values first. Neither selecting the shortcut nor
+saving an ordinary software profile disconnects the controller.
 
 1. **Machine** — **Find my machine** opens the stage (ADR-420). It connects with the draft's
    controller, baud and streaming choice, reusing the remembered port as the rail's Connect does,
@@ -2765,7 +2772,7 @@ settings and Job Review keep their existing read-only setup references.
    halftone treatment; Image mode also offers grayscale and dithered photo engraving.
    **Colour layers** splits flat-colour artwork into a few colours (**Colours**: Auto or 2 to 8,
    counting the paper) and traces one filled layer per colour; neighbouring colours share one
-   edge with no gap or overlap (ADR-430). **Cut-out** burns each colour only in its own area;
+   edge with no gap or overlap (ADR-461). **Cut-out** burns each colour only in its own area;
    **Stacked** also fills each colour under the darker colours above it. The paper colour is left
    untraced unless **Trace background colour** is ticked; only a light border colour counts as
    paper, so light-on-dark art traces every colour. The swatches show the traced colours,
@@ -2953,14 +2960,16 @@ or traced image) with at least one closed polyline.
   sweep. Newly committed generic traced Scan Line operations default one-way when no direction was
   explicitly selected and the profile has no verified or legacy-verified scan-offset calibration;
   ordinary vector layers, calibrated profiles, and explicitly saved choices retain their direction.
-  The 4040-safe, Raster Image, Island Fill, and Offset Fill policies remain separate. For generic
+  Raster Image and bounded 4040-safe/Island Fill now share the same non-overlapping split exit
+  and entry geometry (ADR-445), while keeping their own Overscan limits. Offset Fill follows
+  contours. For generic
   Scan Line, a positive stored Overscan value is the full runway wherever it fits (always at each
   scanline's outer entry and exit), up to the field's 25 mm maximum, and a stored value of zero uses
   the bounded 5 mm generic runway default rather than allowing a rapid-to-powered start; Frame
   includes that effective motion. A larger stored value, such as a LightBurn percentage converted
   at high speed, is applied at 25 mm; the import stores it at 25 mm and says so, and Job Review
   notes "applied at most 25 mm" (ADR-238 Amendment 3).
-- *Overscan above 5 mm on the 4040-safe profile*: 4040-safe Scan Line keeps its ADR-234 entry
+- *Overscan above 5 mm on the 4040-safe profile*: 4040-safe Scan Line keeps its ADR-234 entry/exit
   runway of at most 5 mm. The Overscan field keeps the stored value and says so beside it
   ("stored 10; 4040-safe Scan Line uses up to 5 mm"); 4040-safe Island Fill uses the full value.
 - *Very small spacing* (≤ 0.05 mm): clamped to 0.05 mm at the algorithm
@@ -3229,8 +3238,9 @@ work-Z evidence, but it cannot enable User Origin or Verified Origin.
     blocked.
 12. **Air pump across an Air-off operation (ADR-335).** Build three
     operations with Air on, off, then on, and Start. On a profile with
-    "Air restart" ticked the program must contain exactly one `M8` and
-    one `M9`, the pump must still be running through the middle
+    "Air restart" ticked the program must switch air exactly once each
+    way (`M8`, then `M9` after the last operation; the `M8` repeats of
+    step 13 switch nothing), the pump must still be running through the middle
     operation and the last one, and Job Review must name the held
     operation and `$152=100` (ADR-345: Creality's Falcon A1 parameter
     page defines `$152` as the standby wait, so `100` keeps the pump
@@ -3243,6 +3253,19 @@ work-Z evidence, but it cannot enable User Origin or Verified Origin.
     go back to `M8 M9 M8 M9`. If the pump is audibly off for the last
     operation with the box ticked, the hold is not working; if it is
     off only with the box unticked, the firmware timer is confirmed.
+13. **Qualify air repeats on the installed firmware (ADR-462).** In a
+    separately supervised air check, record the firmware and current
+    `$152` setting. With "Air restart" ticked, inspect a short-block job
+    of a minute or more with Air on: the program attempts `M8` repeats
+    at eligible movement boundaries after about 5 s of estimated time.
+    Observe whether the pump stays on and whether the enclosure fan
+    follows it; program bytes alone establish neither. Long moves or
+    dwells and continuous M3 cutting can exceed the trigger without a
+    repeat, so this mitigation does not guarantee continuous air.
+    Compare with "Air restart" unticked, which emits one `M8` for an
+    all-Air-on job. If air still stops, keep the firmware/`$152=100`
+    remedy from step 12 and verify it separately. Do not treat a pass
+    on short blocks as qualification of every job or firmware version.
 
 When this checklist passes on the Falcon, replace the F.3 status in `PROJECT.md` Phase F
 ("Code shipped; hardware verification pending") with the recorded result and update the F.3
@@ -3790,7 +3813,8 @@ last updated.
    table; with no saved points it remains a useful uncorrected comparison, not proof of calibration.
 2. Qualification concerns are prominent warnings. No acknowledgement checkbox is required and
    missing measured points or a requested speed above the profile ceiling does not disable
-   Generate. The emitted job discloses requested/effective feed through the normal compile path.
+   Generate. Generated layers and burned speed labels use the effective feed after the profile
+   ceiling and G-code rounding (ADR-445). Regenerate if the profile or coupon speed is changed.
 3. Malformed geometry, non-finite values, invalid power, and invalid step counts remain factual
    generation-integrity failures because no valid coupon can be produced from them.
 4. After the physical burn, measure the full signed forward-versus-reverse separation (do not
@@ -3806,6 +3830,9 @@ last updated.
    or profile table resets the corresponding measurement draft. Renaming a profile does not.
 5. Source tests do not qualify belts, focus, optics, firmware timing, or the physical coupon. Frame
    remains the only ordinary Start guard and Job Review remains the warning surface.
+6. Raster Diagnostics checks actual split runways against the profile acceleration distance as
+   well as the calibration margin. Confirm that acceleration against the controller. If runway
+   is too short, lower engraving speed or increase Overscan before measuring scan offsets.
 
 ## Phase H flows (CNC router mode — ADR-098)
 
@@ -3862,12 +3889,12 @@ explicitly marked below; the remaining controls and user-facing flows are planne
 #### Success
 1. User selects artwork, then picks a CNC operation: Outside / Inside / On path, Pocket,
    or Engrave. Each artwork starts with its own operation; a multi-selection can intentionally share.
-2. Cut type, depth, depth-per-pass, feed, plunge, and **Artwork spindle speed** accept typed values;
-   **Tool & material** provides operation material and cutter selectors. **Machine maximum** remains
-   a read-only reference beside the editable spindle speed.
+2. Cut type, depth, depth-per-pass, feed, plunge, and **Spindle speed** accept typed values;
+   **Bit** and **Material** provide operation cutter and material selectors. The machine maximum
+   shows under the editable spindle speed and opens Machine Setup, which owns it.
    Pocket additionally shows stepover %, profile cut types show the tabs
-   group (enabled, height, width, count). Outline and Engrave operations show
-   a **Line art** selector (inner / outer / both, default inner): a traced
+   group (enabled, height, width, count). Outline and Engrave operations that cut imported or
+   traced outlines show a **Traced edges** selector (inner / outer / both, default inner): a traced
    double-line ring — a nested closed pair tighter than the bit diameter —
    machines only the chosen edge, while wider nesting and lone contours
    always cut (ADR-218).
@@ -3875,11 +3902,11 @@ explicitly marked below; the remaining controls and user-facing flows are planne
    engraves first, then profiles inner-before-outer).
 4. Artwork run controls set priority inside each safe phase. The compiler never moves a profile
    ahead of remaining clearing work or splits a contiguous tool section merely to satisfy priority.
-5. Change an operation's material or cutter directly in **Tool & material**, or through the same
+5. Change an operation's material or cutter directly under **Bit** and **Material**, or through the same
    saved bindings in **Startup Setup > Tool Plan**. A material choice applies starting cutting values
    to this operation; Manual keeps the current numbers. A bit change refreshes only material-recipe
    feeds and preserves manual numbers. **Use job default bit** removes the primary-tool override.
-   Applicable clearing, pocket roughing and relief finishing bits appear with the primary choice.
+   Applicable clearing, pocket roughing and relief finishing bits appear under the primary choice.
 
 #### Warning — depth exceeds stock
 1. Preflight (F-CNC3) surfaces depth > stock thickness as a Job Review warning.
@@ -3913,23 +3940,29 @@ explicitly marked below; the remaining controls and user-facing flows are planne
 1. Open polylines cannot be offset; they are cut on-path (documented
    fallback), closed shapes on the same layer still offset normally.
 
-#### Edge — a tapered ball nose sets pocket or profile offsets
-1. A tapered ball nose's stored diameter is its widest, at the top of the flutes, and
-   it cuts narrower at any shallower depth. Outside and inside profiles and pockets
-   offset by the width it cuts at the operation's full depth, so the wall meets the
-   drawn line at the stock surface and follows the taper and then the ball below it.
-   An outside part is its drawn size at the top face and larger below; a hole is its
-   drawn size at the top face and smaller below. Every depth pass rides that one path
-   (ADR-368 Amendment 2).
+#### Edge — a bit that narrows toward its tip sets pocket or profile offsets
+1. A ball nose, V-bit, engraving bit or tapered ball nose stores its widest cutting
+   diameter and cuts narrower at any shallower depth: a ball nose until the cut is as
+   deep as its radius, a V-bit or engraving bit until its cone reaches the diameter, a
+   tapered ball nose until the top of its flutes. Outside and inside profiles and
+   pockets offset by the width the bit cuts at the operation's full depth, so the wall
+   meets the drawn line at the stock surface and follows the bit's shape below it. An
+   outside part is its drawn size at the top face and larger below; a hole is its drawn
+   size at the top face and smaller below. Every depth pass rides that one path
+   (ADR-368 Amendments 2 and 3). A flat end mill, and any cut deeper than the bit
+   narrows, still offset by the diameter.
 2. Pocket rings and raster sweeps, and relief roughing rings, step by the stepover
    percentage of the width the bit cuts in one depth pass, so no rib stands between
    them. Tab windows add the full-depth cut width to the tab width, so a bridge is never
-   narrower than requested. The 3D removal preview shows the taper and the ball corner.
-3. A tapered ball nose without a usable ball tip and taper is planned as a flat
-   cylinder of its stored diameter. When one is the main bit of a pocket, an inside
-   or outside profile, or a relief, Job Review warns that the result comes out
-   off-size or ribbed and asks for the bit's tip and taper or a flat end mill
-   (ADR-368 Amendments 1 and 2). The warning never blocks save or Start.
+   narrower than requested. The 3D removal preview shows the bit's wall and floor shape.
+   Job Review's On path size warning and full-tab-coverage warning give the cut width
+   too. V-carve and engrave never offset by the diameter and are unchanged.
+3. A V-bit or engraving bit without a usable included angle or tip flat, or a tapered
+   ball nose without a usable ball tip and taper, is laid out at its stored diameter.
+   When one is the main bit of a pocket, an inside or outside profile, or a relief,
+   Job Review warns that the result comes out off-size or ribbed and asks for the bit's
+   geometry or a flat end mill (ADR-368 Amendments 1 to 3). The warning never blocks
+   save or Start.
 
 ### F-CNC3. CNC preflight and save G-code
 
@@ -4007,23 +4040,66 @@ explicitly marked below; the remaining controls and user-facing flows are planne
 1. A relief object on an output-enabled layer compiles to waterline
    roughing: object XY scale is first rasterized into square physical-mm
    heightmap cells, then the map is dilated by the active bit's footprint
-   plus a 0.5 mm finishing allowance, sliced into Z levels by the layer's
+   plus the layer's Rough allowance (0.5 mm unless set), sliced into Z levels by the layer's
    depth-per-pass, and each level's region fills with concentric rings at
-   the layer's physical stepover: a percentage of the bit diameter, or for a
-   tapered ball nose of the width it cuts over one level (ADR-368 Amendment 2).
-   Each ring ends where it started. Above a 50% stepover, the stock a level's
-   rings leave standing (the level's centre, cusps between rings) is cleared
-   right after them (ADR-289 Amendment 1).
+   the layer's physical stepover: a percentage of the width the bit cuts over
+   one level. That is the bit diameter for a flat end mill, and narrower for a
+   ball nose, V-bit, engraving bit or tapered ball nose on levels shallower than
+   the bit narrows (ADR-368 Amendments 2 and 3).
+   Each ring ends where it started (ADR-289 Amendment 1).
+   The allowance holds in 3D: roughing plans with the bit widened sideways by
+   the allowance plus the contour clearance, so steep walls keep their stock
+   too, and each ring point clears the model surface between samples as well
+   as at them (ADR-412). When the stepover is wider than the bit reaches on
+   that level's slice (ADR-413), the stock the level's rings leave standing
+   (its centre, cusps between rings) is cleared right after them (ADR-289
+   Amendment 1).
+   Ladder levels below the deepest tip become one level at it, so the floor
+   keeps exactly the allowance, and a flat the ladder would overshoot by more
+   than 0.05 mm gets a level of its own that clears only its band (ADR-422).
+   With a **Slope step** set, band levels that far apart between the
+   depth-per-pass levels cut only the slopes between them, so a slope keeps
+   terraces no taller than the step instead of a whole pass (ADR-422
+   Amendment 1). 0 or unset is off.
+   With **Flats** set to Roughing bit and an end mill roughing, every flat
+   of the model at least as wide as the bit is cut to its exact height,
+   still keeping the allowance off the walls beside it: on the roughing
+   level one allowance above it when that level can reach it within one
+   depth per pass of where its stock stands, otherwise in separate slices
+   after all roughing, each within the requested depth per pass (ADR-450).
+   Any other roughing bit ignores the setting.
 2. Passes run depth-major (whole level before stepping down) as a
    clearing group — before any profile cuts. The preview's removal
    shading shows the terraced relief forming.
+   Within a level the deepest cleanup paths cut first (ADR-427), then
+   each connected ring piece is cut inside out, starting in its
+   middle and widening one stepover at a time, and of the pieces ready the
+   one nearest the bit comes next (ADR-424). Every ring keeps its stock on
+   the side the layer's cut direction asks for, round islands as well as
+   outlines. The bit stays down between rings when the straight move to the
+   next ring is no longer than one cut width and stays where the level may
+   cut, or, between a piece's outline and its islands, stays inside that
+   already cleared piece; otherwise it lifts. With a ramp angle set (the
+   layer's Ramp entry, or **Roughing ramp** where the cut type has none),
+   each run of linked rings descends along its first ring from the level
+   above instead of plunging; a ring shorter than one cut width plunges.
 3. Emitted G-code passes the plunged-travel invariant; scale is resolved
    before cutter geometry, then mirror/rotate/move placement is honored.
+4. Job Review's detail line for the operation names the levels the
+   compiled job roughs, for example `relief roughing 2 levels to 2.5 mm`,
+   instead of a pass count from Cut depth. With several reliefs on one
+   operation it counts their distinct depths, for example
+   `relief roughing at 4 depths to 4.5 mm across 2 reliefs`. An operation
+   that cut only reliefs leaves out its pass count and tabs, and its entry
+   names only the ramp angle, since no helix or V-carve entry reaches a
+   relief. One that also cut other shapes says `1 pass on the other shapes`,
+   and kept tabs add `none on reliefs` (ADR-224 Amendment 3).
 
 #### Error — bit too big for the detail
 1. Regions narrower than the bit's dilated footprint produce no rings
    there — fine detail is left for the H.8 finishing pass (and the
-   preview shows it uncut). This is a sampled-grid region result; roughing's
+   preview shows it uncut). Ring vertices clear the piecewise-linear model
+   surface under the bit (ADR-412); roughing's
    dual-grid/offset vertices, continuous sweep, and subcell detail retain
    ADR-289's qualification boundary.
 
@@ -4044,7 +4120,8 @@ explicitly marked below; the remaining controls and user-facing flows are planne
    interior beyond that limit. The latter two are retained with the exact
    compiled/recovery Job and reach Job Review as warnings only; they never
    refuse Frame, Start, preview, save, or G-code emission, and the probe never
-   adds a cutter move.
+   adds a cutter move. A core-cleanup offset failure reports through the same
+   warning (ADR-413).
 
 ### F-CNC7. Import an STL relief — Phase H.4 (ADR-098/309)
 
@@ -4061,7 +4138,10 @@ explicitly marked below; the remaining controls and user-facing flows are planne
    larger than the bed is scaled down to fit, with a warning (F-A3). The
    worker transfers its typed mesh into the live object without expanding
    it into a boxed number array on the UI thread.
-3. The canvas shows the relief as a grayscale depth map — light = stock
+3. The mesh keeps its CAD top-view orientation: +Y in the STL is the top of
+   the canvas, so raised text reads the right way round (ADR-414). Meshes
+   already saved in projects keep the orientation they were saved with.
+   The canvas shows the relief as a grayscale depth map — light = stock
    top, dark = floor. It selects, moves, and saves/loads like any object;
    `.lf2` embeds the mesh as the existing JSON number-array schema so
    projects stay self-contained and older saved projects still reopen.
@@ -4506,8 +4586,9 @@ and lifts the command's CNC-only gate.)*
 2. Between sections the G-code retracts, stops the spindle (M5), parks,
    and pauses on M0 with comments naming the next bit. GRBL holds until
    cycle start; the streaming UI's Resume continues the job.
-3. Geometry offsets use each layer's OWN bit diameter, or a tapered ball nose's
-   cut width at the layer depth (ADR-368 Amendment 2).
+3. Geometry offsets use each layer's OWN bit: its diameter, or for a bit that
+   narrows toward its tip its cut width at the layer depth (ADR-368 Amendments 2
+   and 3).
 
 #### Error — v-carve layer with a flat bit
 1. Job Review warns with the layer's bit named (not just the machine bit), but
@@ -4631,18 +4712,47 @@ and lifts the command's CNC-only gate.)*
    requests a planar-grid ridge-height target. Compile then emits the
    roughing group AND a finishing group cut with that bit (an M0 change
    separates them when the bits differ).
-2. Finishing rides the sampled max-plus tip surface in serpentine rows. A ball
+2. Finishing rides the max-plus tip surface in serpentine rows, raised on the
+   rows it emits until the bit clears the model surface between samples as
+   well as at them (ADR-412). A ball
    nose uses `2*sqrt(c*(2r-c))` physical-XY spacing after bounding scallop `c`
    to [0.001 mm, bit radius]. A tapered ball nose uses the same law with its
    tip ball radius and samples a grid of at most a tenth of the tip diameter;
    its flank lies below that sphere, so the planar cusp can only be lower, and
    its whole flank constrains the tip (ADR-368). Flat bits use the larger of
-   0.05 mm and 40% of diameter. The grid attempts that resolved spacing and
-   its whole-row stride rounds down so it does not overshoot it. This qualifies sampled finishing
-   vertices and planar cusp, not a continuous included-surface sweep or true
-   along-surface scallop proof (ADR-292/294).
-3. Roughing still leaves its fixed 0.5 mm allowance (it exists FOR this
-   pass); finishing consumes it down to the true surface.
+   0.05 mm and 40% of diameter. The grid cell divides that resolved spacing
+   into whole rows no coarser than a tenth of the contact diameter, so rows
+   land at the requested spacing; the whole-row stride still rounds down so it
+   never overshoots it (ADR-421). This qualifies finishing
+   vertices against the piecewise-linear surface and the planar cusp, not
+   subcell detail or true along-surface scallop (ADR-292/294/412). Every move
+   between vertices, of every strategy, is then checked against the exact
+   contact at sampled points and lifted where those checks exceed 0.002 mm into the part,
+   measured normal to the move (ADR-421 amendment 1).
+3. Without a mask, the rows form one stay-down path: each row steps to the
+   next along its edge column's own tip samples instead of retracting and
+   plunging. A vertex is dropped only where the straight move replacing it
+   stays at or above it by no more than 0.002 mm, so the reduced path clears
+   everything the sampled one did (ADR-421). A mask that excludes cells keeps
+   one pass per run.
+4. Roughing leaves the layer's Rough allowance (0.5 mm unless set; it exists
+   FOR this pass); finishing consumes it down to the true surface.
+5. Raster direction runs the rows along X (default) or along Y (ADR-423).
+6. Finish strategy Raster + waterline narrows the rows to cos 45° of the
+   scallop's spacing and adds waterline passes wherever the tip surface
+   slopes 45° or more, levels sin 45° of that spacing apart, so passes are
+   never further apart along the surface than the scallop's spacing. Each
+   feature is circled top down in one stay-down pass, climb or conventional
+   as the layer's cut direction says on the physical bed. Every waterline
+   vertex clears the model exactly and every move is checked; a relief with a
+   mask outline gets the narrowed raster only (ADR-423).
+7. With **Flats** set to Roughing bit, the raster skips every sample from
+   which the bit would touch only flats the roughing end mill took to their
+   exact height, and cuts what it keeps nearest first: it stays down across
+   gaps up to four bit diameters, lifting to the highest tip along the way,
+   and retracts across longer ones. The part comes out as the full raster
+   leaves it, the flats without scallops (ADR-450). A relief with a mask
+   outline keeps the full raster.
 
 #### Error — unknown finishing bit id
 1. The missing ID stays visible as a disabled diagnostic choice. Prepared
@@ -4678,8 +4788,11 @@ and lifts the command's CNC-only gate.)*
    inside/pocket run CCW) and rotates entry points to the midpoint of
    the longest segment so witness marks land on a flat span.
 3. For profile, pocket, and engrave, a ramp angle > 0 turns plunges into
-   descents ALONG the toolpath at that angle; closed loops re-cut the ramped
-   span level afterwards. V-carve is different: its changing Z is the cutting
+   descents ALONG the toolpath at that angle, from the depth that path was
+   last cut to (the stock top the first time). A closed loop is then cut one
+   whole lap at depth from where its descent ended; an open path zig-zags
+   along its start back to the start at depth, then is cut end to end at
+   depth (ADR-471). V-carve is different: its changing Z is the cutting
    profile itself, so the certified medial path governs and any stored V-carve
    ramp request is reported as advisory provenance rather than being layered
    onto that profile.
@@ -4712,8 +4825,22 @@ and lifts the command's CNC-only gate.)*
    V-carve.
 
 #### Edge — path shorter than the ramp
-1. The descent finishes at the path end (the ramp consumed the whole
-   path); the remainder cuts level on the next lap.
+1. A closed loop keeps descending round itself, lap after lap, until it
+   reaches depth, then cuts one whole lap at depth. An open path zig-zags
+   along its whole length back to its start at depth, then cuts end to end.
+2. A path shorter than one cut width that the ramp would have to go over
+   again keeps its straight plunge at the plunge feed: the cutter covers the
+   whole path, so going round it again would only slow the plunge. The G-code
+   header says `; cnc entry-advisory: N passes plunge: path shorter than one
+   cut width`, and Job Review lists it as an advisory, naming Helical entry
+   for a pocket (ADR-471).
+
+#### Edge — reliefs on a layer with a ramp angle
+1. Relief roughing ramps with the layer's angle (F-CNC17, ADR-424) and its
+   G-code header records that ramp. Relief finishing rows plunge at their
+   starts, so the finishing group's header carries no entry line, and Job
+   Review's operation line names the relief stages that plunge, for example
+   `ramp entry 5° (relief finishing plunges)` (ADR-273 Amendment 1).
 
 ### F-CNC19. Tile a job larger than the bed — Phase H.10
 
@@ -4924,8 +5051,8 @@ and lifts the command's CNC-only gate.)*
 
 #### Success
 1. Every CNC Artwork settings card has a **Feeds calculator**. Its material, resolved cutter,
-   diameter and flute evidence reflect the operation's **Tool & material** choices; RPM comes from
-   the editable Artwork spindle speed. The calculator displays these inputs read-only; change the
+   diameter and flute evidence reflect the operation's **Bit** and **Material** choices; RPM comes
+   from the editable Spindle speed. The calculator displays these inputs read-only; change the
    material or bit above, and edit cutter metadata in the bit library. The row shows the live
    result — feed = RPM × flutes × chipload, plunge as a material
    percentage, depth-per-pass as a fraction of bit diameter.
@@ -4942,7 +5069,7 @@ and lifts the command's CNC-only gate.)*
 
 #### Error — none (inputs are bounded)
 1. Tiny results floor at 50 mm/min feed / 0.1 mm per pass rather than emitting zeros. **Manual**
-   leaves Apply unavailable until a material is chosen in **Tool & material**; the calculator does
+   leaves Apply unavailable until a material is chosen under **Material**; the calculator does
    not silently substitute the job stock's material. Flute count uses cutter metadata or saved
    recipe evidence, falling back to the displayed two-flute assumption when both are absent.
 
@@ -4998,12 +5125,14 @@ and lifts the command's CNC-only gate.)*
 #### Success
 1. With closed shapes selected in CNC mode, the "Dogbone" row (bit
    diameter prefilled from the active bit) relieves every corner
-   sharper than 135° with a bit-radius overcut circle — square parts
+   sharper than 135° with a dogbone the bit can reach — square parts
    then seat fully into routed slots. One undo step; objects are
    replaced in place.
-2. Style is the corner overcut (circle centered on the vertex),
-   documented as the PROVISIONAL v1; directional dogbone/T-bone are
-   future refinements.
+2. Style is the bisector dogbone (ADR-103 Amd 1): the capsule the bit
+   sweeps along the corner's bisector until its edge touches the
+   corner, a hair wider than the bit, so the pocket or inside-profile
+   toolpath runs into it as part of the same loop. T-bone placement is
+   a future refinement.
 
 #### Error — nothing qualifies
 1. Obtuse-only shapes (or open contours) leave the scene untouched.
@@ -5153,7 +5282,7 @@ as the pane's design record.
 ### F-CNC31. Auto-fill operation feeds from a material — ADR-111 #1, amended by ADR-306
 
 #### Success
-1. **Artwork settings > Tool & material** and **Startup Setup > Tool Plan** share a grouped material
+1. **Artwork settings > Material** and **Startup Setup > Tool Plan** share a grouped material
    assignment for each operation (Use job
    material / Manual + common Softwood and Hardwood species / Plywood-MDF / Acrylic / Aluminium).
    Applying an override fills that operation's feed, plunge, and depth-per-pass in the setup draft
@@ -5182,20 +5311,20 @@ as the pane's design record.
 #### Edge — full flute/RPM control
 1. A bit without stored flute evidence starts from the displayed two-flute assumption. Set the
    actual cutter count in **Startup Setup > Manage bits**; set operation RPM with the editable
-   **Artwork spindle speed**. The flute count accepts every positive whole number without an
+   **Spindle speed**. The flute count accepts every positive whole number without an
    artificial upper cap. The Artwork calculator reads both and does not duplicate either input.
 
 ### F-CNC32. Edit grouped operation settings — ADR-111 #4 / ADR-306 amendment
 
 #### Success
-1. CNC Artwork settings lead with **Tool & material** for direct operation material and cutter
-   choices. Stock and machine references remain muted, keyboard-focusable controls that explain
-   their scope and deep-link to Startup Setup.
-2. The editable core follows with Cut type, Cut depth, Depth per pass, Feed, Plunge,
-   **Artwork spindle speed**, and Tabs. **Machine maximum** is shown adjacent to Artwork spindle
-   speed so an RPM ceiling cannot be confused with the requested operation speed. Named expandable
-   sections follow for holding tabs, clearing, finishing, entry/travel, saved feeds, the calculator
-   and machine references. Only applicable cut-type sections appear.
+1. CNC Artwork settings lead with **Cut type**, then **Bit** (with **Manage bits**), the second bit
+   the cut type uses, and **Material** for direct operation choices (ADR-481). Stock, tiling,
+   spin-up, coolant, safe Z and park are edited in Machine Setup and are not repeated here.
+2. Cut depth and Depth per pass share a row; Feed, Plunge and **Spindle speed** share the next.
+   The machine maximum ("Max 12,000") sits under Spindle speed and opens its Machine Setup field,
+   so an RPM ceiling cannot be confused with the requested operation speed. Named expandable
+   sections follow for holding tabs, clearing, finishing, entry/travel, saved feeds and the
+   calculator, each naming its state when closed. Only applicable cut-type sections appear.
 3. Cut depth carries a one-click "Set to stock thickness (N mm)" button. It
    sets the exact measured thickness without silently adding spoilboard
    overcut; any verified overcut remains an explicit operator edit.
@@ -5268,7 +5397,7 @@ as the pane's design record.
    expose common species such as Pine, Cedar, Oak, Hard maple, and Walnut.
    Choosing an entry previews its family model without changing the job;
    **Apply [material] preset** then fills every operation's feed / plunge /
-   depth-per-pass (each operation's resolved bit + Artwork spindle speed) in the draft.
+   depth-per-pass (each operation's resolved bit + Spindle speed) in the draft.
    **Save machine setup** commits the complete setup as one undoable step.
 2. New operations inherit it: add artwork or import an SVG after choosing the
    material and the fresh layers come in with those feeds (not the generic
@@ -5288,7 +5417,7 @@ as the pane's design record.
    leaves current feeds untouched for hand-tuning.
 
 #### Edge — per-operation override and other object types
-1. An operation's explicit **Tool & material** / **Tool Plan** assignment (F-CNC31) overrides the project
+1. An operation's explicit **Bit** / **Tool Plan** assignment (F-CNC31) overrides the project
    material. Fresh text, drawn shapes, raster/trace conversions, fill-isolated
    operations, and generated box operations use the same new-operation resolver.
 
@@ -6321,13 +6450,20 @@ as the pane's design record.
 1. With the machine in CNC mode, the dialog defaults clearance to
    0.15 mm and shows the relief tool diameter prefilled from the active
    tool; stock thickness prefills the material thickness field.
-2. Generated panels carry corner-overcut reliefs (F-CNC26 style: circle
-   of one bit radius centered on the vertex) at exactly the
-   seat-critical reflex corners — notch bottoms where a mating tab must
-   seat. Tabs narrow and recesses widen by clearance/4 per flank, so
-   each joint's notch − tab play equals the clearance exactly.
-3. The panels then flow through the normal CNC pipeline: the layer's
-   profile-outside cutter compensation applies at compile, unchanged.
+2. Generated panels carry dogbone reliefs (ADR-106 Amd 1: the capsule
+   the bit sweeps along the corner's open bisector until its edge touches
+   the corner, a hair wider than the bit) at exactly the seat-critical
+   reflex corners — notch bottoms where a mating tab must seat. The
+   profile-outside bit runs into each dogbone and back as part of the
+   same loop until its edge passes the corner, so square tabs seat. Tabs
+   narrow and recesses widen by clearance/4 per flank, so each joint's
+   notch − tab play equals the clearance exactly.
+3. Inserted panels cut through as generated (ADR-106 Amd 2): the
+   **Box panels** operation profiles the outlines outside at the full
+   material thickness with the default holding tabs, and a second
+   **Box slots** operation pockets the divider slots at the same depth.
+   The pocket clears every slot, so no loose piece is left and no tab
+   bridges a slot; clearing runs before any outline frees a panel.
 
 #### Error — relief tool larger than a finger cell
 1. Validation error per F-K2; generation disabled until resolved.
@@ -6345,7 +6481,9 @@ as the pane's design record.
 #### Success
 1. Style "Open top" drops the Top panel (5 panels) and flattens the
    walls' top edges at the outer face line — no orphan fingers pointing
-   at a missing lid.
+   at a missing lid. The entered inner height is the usable depth: the
+   walls stand the bottom thickness plus that height (outer = inner + T,
+   ADR-106 Amd 1).
 2. Corner cells that the Top would have claimed fall to the
    next-priority panel (Z > Y > X among present panels); the assembled
    rim is flush.
@@ -6398,7 +6536,7 @@ as the pane's design record.
    from the top, Y from the bottom).
 3. Wall slots and cross-laps widen with the clearance pass exactly like
    edge recesses; in CNC mode every slot corner a tab must seat against
-   carries the corner-overcut relief at full bit radius.
+   carries a dogbone the bit can reach (ADR-106 Amd 1).
 
 #### Error — compartments too small
 
@@ -6473,7 +6611,7 @@ as the pane's design record.
 
 #### Edge — CNC relief
 
-1. CNC mode carves corner-overcuts in every notch at full bit radius;
+1. CNC mode carves a reachable dogbone at every notch seat corner;
    validation rejects a tool wider than the finger (F-K2 rule).
 
 ### F-K9. Assembled 3D preview (ADR-119)
@@ -6635,17 +6773,16 @@ as the pane's design record.
 
 ## Camera Mode flows
 
-### F-CAM1. Camera overlay + 4-point alignment (v1 — ADR-107)
+### F-CAM1. Choose a camera (ADR-116, ADR-440, ADR-446)
 
-- **Success / aligned.** The operator opens Camera Mode, picks a camera, and sees the live
-  feed. On a machine (network) camera the manual path is to click the four bed corners in the
-  live preview — the view prompts for each corner in turn ("Click the … bed corner (N / 4)").
-  On the fourth click the homography solves and the feed warps to sit on the bed; the operator
-  presses "Save alignment" (F-CAM3) to persist the calibration to the device profile, selects
-  "Use this camera", then "Update still" before placing artwork over the material and adjusting
-  overlay opacity. If the overlay was hidden, turn "Overlay on" to display it. Saving alignment
-  alone does not capture or display a frame. USB/RTSP cameras have
-  no click-corners path — align them with the "Align to bed…" marker wizard (F-CAM4).
+- **Success / camera running.** The operator opens the Camera panel and starts a USB camera, or
+  presses **Use this camera** on a detected machine camera. The live picture is the one source every
+  camera feature captures through. Closing the panel keeps the camera running while the calibrated
+  overlay shows it on the canvas.
+- **Hosted browser / machine camera.** A laser's built-in camera and RTSP/IP cameras answer on the
+  local network without the permission browsers need to read pixels, so the hosted web app cannot
+  use them. The panel says so and links KerfDesk Desktop, which reads them through its local bridge.
+  USB cameras work in the browser.
 - **Error / permission denied.** If the browser or OS denies camera access (or the page is not
   served over https), a one-line message explains how to grant permission. No overlay is shown
   and the rest of the app is unaffected.
@@ -6658,121 +6795,119 @@ as the pane's design record.
 - **Edge / device list changed.** While Camera Mode is open, browser `devicechange` refreshes the
   picker only. It never opens hardware or prompts for permission. A non-permission `AbortError`
   is shown as a retryable open failure rather than mislabeled as denial.
-- **Empty / no camera.** With no camera detected, Camera Mode shows an empty state ("No camera
-  found — connect a USB camera") and the camera picker is disabled.
-- **Edge / degenerate corners.** If the four chosen points are collinear or coincident (no
-  valid homography), the solve is rejected with "Move the alignment points apart — they can't
-  form a rectangle"; the previous calibration, if any, is retained.
+- **Success / several cameras (ADR-446).** Each camera on the machine keeps its own calibration.
+  Starting a camera uses its own calibration automatically; **Calibrated cameras** in the panel
+  lists them, marks the one in use, and **Forget** removes one (undoable).
+- **Edge / camera without its own calibration.** The setup steps say to calibrate it, the canvas
+  says the saved calibration belongs to another camera, and calibrating it keeps the others.
 
-### F-CAM2. Camera lens calibration wizard (v2 — ADR-108)
+### F-CAM2. One-photo camera calibration (ADR-441, Amendments 1 and 3)
 
-- **Success / calibrated.** With the camera live, the operator opens "Calibrate
-  lens…" from the Camera panel, describes their printed checkerboard (inner
-  corners across/down + measured square size), and holds the board in front of
-  the camera. Detected corners light up on the live view; each genuinely NEW
-  pose held steady is captured automatically (a manual Capture button exists).
-  After five or more poses, Solve runs the focal-sweep calibration and the
-  review step shows the reprojection error plus an Original / Corrected A/B of
-  the last capture. If the corrected view's straight edges LOOK straight, the
-  operator applies; the calibration persists on the device profile (undoable)
-  and survives reload, bound to the source identity and pixel geometry of the
-  accepted capture set.
-- **Error / solve rejected.** A failed solve (too few views, degenerate
-  geometry) shows the typed reason with "Back to capture"; nothing persists.
-  A suspect solve (implausible coefficients, high RMS, uneven coverage, too-
-  similar poses) still shows the A/B but with plain-language warnings telling
-  the operator what to recapture.
-- **Empty / no feed.** Opening the wizard without a live camera shows a
-  one-line pointer back to the Camera panel's Start control; the Calibrate
-  button itself is disabled until the feed runs.
-- **Edge / mid-session changes.** Captures with no full board in view are
-  rejected with a hint (not silently dropped); a camera-resolution change
-  mid-session refuses to mix pixel bases and offers Reset; changing the board
-  description discards captures taken against the old board. Changing the
-  active camera source while collecting discards the in-progress capture set.
-  A completed Review remains bound to its accepted frames; Apply persists that
-  recorded binding rather than whichever camera happens to be active later.
+- **Success / calibrated.** **Calibrate camera…** opens the wizard. The operator covers the bed
+  with one flat sheet, enters its thickness and, optionally, the camera lens height by tape
+  measure, and presses **Engrave target**: the ring target streams as a temporary job through the
+  normal Frame, review and Start path, leaving the project and undo history untouched. When the
+  job finishes the wizard moves to the photo. The operator moves the head clear of the three solid
+  discs and presses **Take photo**; the rings are found and the camera fitted in a worker. The
+  result shows the average and worst error in mm, the rings found, the camera height, and the
+  photo flattened onto the bed with each ring coloured by its error. **Save calibration** stores
+  the camera model on the machine profile (undoable) and turns the overlay on.
+- **Reuse / target already engraved.** **Target already engraved** skips the job and goes to the
+  photo, using the same margins.
+- **Edge / small bed.** When the usual grid of 10 mm rings 40 mm apart does not fit inside the
+  margins, the rings and spacing shrink together so every ring stays on the bed. The grid keeps
+  rings around all three solid anchors. Engrave a new target if an older one ran off the bed or
+  placed an anchor on the grid's edge (Amendment 3).
+- **Error / engrave not started or stopped.** If review, preflight or confirmation stops the job,
+  or the stream errors, is cancelled or disconnects, the wizard returns to setup with the reason.
+- **Error / rings not found.** No rings, anchors covered, a mirrored picture or too few rings each
+  give a plain message saying what to fix; nothing is saved. A long solve can be cancelled.
+- **Edge / rough fit.** A fit with a large error is described with what to check (sheet moved,
+  not flat, out of focus) and can still be saved; the operator decides.
+- **Edge / camera straight down.** When one photo cannot pin the camera height down and none was
+  entered, the result asks for a tape-measured height so thick material lines up.
+- **Edge / minimized wizard.** The wizard can minimize into a small non-modal panel so the
+  operator can watch the camera and reach the machine while the target engraves.
+- **Check / has the camera moved?** With a calibration saved, **Check camera…** opens the wizard
+  at the photo, using the saved target's area and height. The photo is measured against the saved
+  calibration. The result says either that the camera has not moved, or how far and which way on
+  the canvas the saved calibration is off. The suggested button is **Keep saved calibration**
+  when the camera has not moved and **Save new calibration** when it has; both are always offered.
+  Any recalibration while a calibration is saved shows the same comparison.
+- **Edge / target layout not saved.** An older calibration remains usable, but **Check camera…**
+  opens setup instead of guessing the old target's layout. Engrave a new target, or confirm the
+  original bed size, margins and sheet thickness before choosing **Target already engraved**.
+- **Edge / sheet moved since engraving.** The check cannot tell a moved sheet from a moved camera;
+  the photo step says the sheet must lie where it was engraved, and **Back** engraves a new one.
+- **Edge / another camera.** A photo from another camera or with another crop is not compared;
+  the result says why and the new calibration can still be saved.
 
-### F-CAM3. Workspace camera overlay (ADR-107 v1 wiring)
+### F-CAM3. Corrected camera overlay (ADR-440, ADR-441 Amendment 2)
 
-- **Success / overlay on canvas.** After aligning a network camera (F-CAM1), the operator presses
-  "Save alignment": the alignment persists on the device profile (undoable, survives reload).
-  "Use this camera" selects the source, and "Update still" captures the frame for the workspace.
-  Turn "Overlay on" if it was hidden. The image appears under the artwork, tracking zoom and pan.
-  The Camera panel's overlay row
-  offers show/hide, a Fade slider, "Update still" (freeze the current frame —
-  LightBurn's Update Overlay model), and "Live" (continuous video, USB only).
-- **Material surface height.** Enter the material's top height above the bed. A lens-corrected
-  alignment with a recorded marker-plane height compensates for thicker or thinner material in
-  both the overlay and camera trace. Positive height moves the projected surface toward an
-  overhead camera; the workspace remains X-right/Y-down. The exact alignment height leaves the
-  stored homography unchanged.
-- **Network camera resource changed.** Calibration and alignment distinguish the exact URL query,
+- **Success / overlay on canvas.** With a saved calibration, the canvas shows the camera picture
+  through the camera model: lens distortion and parallax are undone per pixel on the GPU, and the
+  picture tracks zoom and pan. The overlay row offers show/hide, a Fade slider, **Update still**
+  (freeze the current frame, LightBurn's Update Overlay model) and **Live** for any camera kind.
+- **Material surface height.** Enter the material's top height above the bed; the overlay and
+  camera trace show the bed as seen at that height, so the material's edges line up.
+- **Object heights.** **Add height area** gives part of the bed its own height, for an object that
+  stands above the material such as a box. With objects selected, the area starts around them
+  with a 10 mm margin; otherwise it starts as a 100 mm square in the middle of the bed. The area's
+  height, X, Y, width and depth are edited in its row, and **Remove** drops it. The overlay shows
+  each area at its own height, with a dashed outline and "Area n: h mm" on the canvas. Where areas
+  overlap the highest wins, and an area lower than the material (an opening in the sheet) still
+  wins inside itself. Areas are not saved with the project (ADR-441 Amendment 2).
+- **Accuracy map.** **Accuracy map on/off** draws every calibration ring over the picture where
+  it was engraved, coloured by its measured error (green, amber, red; hollow when the fit left it
+  out). A dashed outline marks the target's area, outside which the picture is extrapolated. The
+  button is absent for a calibration saved without its rings (ADR-441 Amendment 1).
+- **Network camera resource changed.** The camera calibration distinguishes the exact URL query,
   including an empty query, as well as its redacted host/path. A channel or substream change
   therefore cannot reuse another feed's geometry. The recorded identity uses a private app-local
   key; raw query text, userinfo, fragments, and the key are absent from exported camera bindings.
   Remembered URLs remain redacted. Any query change, including a query credential change, changes
-  identity. Older network bindings did not record enough resource information and require fresh
-  lens calibration and alignment, even for a remembered query-less URL. USB bindings are unchanged.
+  identity. Older network bindings did not record enough resource information and require a fresh
+  calibration, even for a remembered query-less URL. USB bindings are unchanged.
 - **Camera setup on another app or after clearing local data.** The private camera identity key
   survives ordinary reloads in the same app. A different app/browser or loss of that key requires
   fresh network-camera setup. When local storage is unavailable, a temporary key keeps setup
   usable for the current session. If secure identity cannot be established, raw camera capture
   remains available, but saved network geometry cannot be verified for precision placement.
-- **Error / basis mismatch prevented.** The persisted alignment records the
-  pixel basis it was clicked in (raw vs de-fisheyed); frames of the other basis
-  are never warped with it, so a later lens calibration cannot silently
-  mis-register the overlay.
-- **Empty / nothing to show.** With no saved alignment the overlay row is
-  absent and the canvas is untouched; with an alignment but no camera source
-  (no still, feed stopped) nothing renders.
-- **Edge / reload.** A corrupt persisted alignment is dropped on load (never
-  trusted); the overlay simply stays off until re-aligned.
+- **Error / another camera or picture shape.** A frame from a different camera, or of a different
+  aspect ratio than the calibration, is not drawn; the canvas says why. The same camera at another
+  resolution of the same shape is drawn with the lens scaled to it.
+- **Error / no WebGL2.** A browser with graphics acceleration off says the corrected picture cannot
+  be drawn instead of showing an uncorrected one.
+- **Empty / nothing to show.** Without a saved calibration the overlay row is absent and the canvas
+  is untouched; with no still and no running camera nothing renders.
+- **Edge / reload and old files.** A corrupt saved calibration is dropped on load (never trusted).
+  Projects and machine profiles holding the old lens calibration and four-corner or marker
+  alignment load without them; the Camera panel shows calibration pending.
 
-### F-CAM4. Automatic marker alignment (v3 — ADR-109)
+### F-CAM5. Trace from camera (ADR-110, ADR-440, ADR-441 Amendment 2)
 
-- **Success / one-click align.** The operator opens the "Align to bed…" wizard from the
-  Camera panel. Its steps add the five-patch marker target to the project (the scene is
-  replaced by the pattern, like the other calibration generators) and burn it on scrap
-  covering the bed corners — or reuse an already-burned target — then, with the bed cleared of
-  everything else and the camera live, Detect. The five X-corners are detected, the origin
-  pair resolves the camera's rotation, the homography solves, and the alignment persists
-  (undoable) — the workspace overlay is immediately registered. With a lens calibration
-  present the capture is de-fisheyed first and the toast says "lens-corrected".
-- **Error / markers not found.** A cluttered bed, missing patches, or poor
-  lighting produce a typed toast telling the operator what to fix; nothing
-  persists. A degenerate solve (markers nearly collinear) is refused the same
-  way.
-- **Empty / no live feed.** Auto-align is disabled until an active camera
-  source can produce pixel-readable frames. Machine cameras become eligible
-  when the local bridge frame proxy is available (F-CAM6).
-- **Edge / rotated camera.** A camera mounted 180° (or at an angle) still
-  labels the corners correctly — the origin pair, not the operator, carries
-  the orientation.
-
-### F-CAM5. Trace from camera (v4 — ADR-110)
-
-- **Success / trace in place.** With the camera aligned and live, the operator
-  places an object on the bed and presses "Trace from camera": the frame is
-  captured (de-fisheyed if the alignment is lens-corrected), flattened
-  top-down into bed coordinates, and opened in the normal Trace dialog. The
-  traced vectors land exactly where the object physically sits — no manual
-  positioning.
-- **Error / basis mismatch.** If the saved alignment expects lens-corrected
-  frames but the calibration was removed, the capture is refused with a toast
-  (never silently mis-registered).
-- **Empty / no feed or alignment.** The button is disabled without a live
-  feed; without an alignment the overlay row (and the button) is absent.
-- **Edge / encoder failure.** A platform without 2D canvas support fails
-  typed ('could not build the bed image') instead of half-completing.
+- **Success / trace in place.** With a saved calibration and a live camera, the operator places an
+  object on the bed and presses **Trace from camera**: the frame is flattened top-down onto the bed
+  at the material surface height and opened in the normal Trace dialog. The traced vectors land
+  where the object physically sits.
+- **Success / heights and one area.** Inside each height area the frame is flattened at that
+  area's own height. **Trace area** in an area's row traces only that area, at 8 px/mm instead of
+  4 px/mm (lower for a very large area, never below 4 px/mm), and the vectors land inside it
+  (ADR-441 Amendment 2).
+- **Error / another camera or shape.** The capture is refused with a toast saying which, never
+  traced through the wrong geometry.
+- **Empty / no feed or calibration.** **Trace from camera** and **Trace area** are disabled without
+  a live camera; without a calibration the overlay row (and the buttons) is absent.
+- **Edge / encoder failure.** A platform without 2D canvas support fails typed ('could not build
+  the bed image') instead of half-completing.
 
 ### F-CAM6. Machine camera via the local bridge (ADR-121, ADR-141, ADR-248)
 
 - **Success / first-class machine camera.** The operator opens the Camera
   panel, the local bridge is healthy, and **Discover machine camera** finds a
   private-network JPEG or RTSP camera. **Use this camera** makes it the active
-  camera source; calibration, auto-align, overlay updates, trace-from-camera,
-  and snapshots use the same pixel-readable capture path as USB cameras.
+  camera source; calibration, overlay updates, trace-from-camera, and
+  snapshots use the same pixel-readable capture path as USB cameras.
 - **Error / bridge unavailable.** If the bridge is not running, discovery and
   machine-camera capture show an actionable message. Local-development users
   are pointed to the bridge command; the desktop app starts it automatically.
@@ -6836,20 +6971,52 @@ as the pane's design record.
 - **Edge / watching a job.** The camera panel can toggle between compact and
   wide monitoring widths, with the preference kept locally.
 
-### F-CAM9. Bed-alignment wizard with burn-the-target (ADR-122)
+### F-CAM9. Find pieces on the bed and place the design on each (ADR-442, Amendment 1)
 
-- **Success / one wizard, aligned bed.** **Align to bed...** opens a guided
-  wizard: choose marker burn power/speed, burn the five-marker target through
-  the normal Start flow, wait for the stream to finish, clear the bed, capture
-  a frame, detect markers, solve the homography, and persist the alignment.
-- **Error / burn not started or failed.** If readiness, preflight,
-  confirmation, streaming, cancellation, or disconnect stops the burn, the
-  wizard returns to setup with the typed reason and does not persist anything.
-- **Empty / markers already burned.** The operator can skip the burn step and
-  go straight to detection when the target is already on the bed.
-- **Edge / minimized wizard.** The wizard can minimize into a small non-modal
-  panel so the operator can watch the live camera and reach the machine while
-  the capture or burn flow continues.
+- **Success / fill a batch of blanks.** With a saved calibration and a live camera, the operator
+  lays out blanks, puts the design on one of them, selects it and presses **Find pieces** in the
+  Camera panel's **Pieces on the bed** section. The overlay turns on and each piece is outlined on
+  the canvas with its number, centre and long-side line. The panel lists each piece with its size
+  and angle and how the design will move and turn onto it. **Place selection on each piece** adds
+  a copy on every ticked piece, the way the design sits on its own piece, as one undo step.
+- **Success / design not on a piece.** The design is centred on each piece, its long side along
+  the piece's long side, and the design itself moves to the first piece. A design already turned
+  on the canvas is measured along its own turn, so it lies along the piece rather than keeping
+  its old angle (Amendment 1).
+- **Edge / piece partly out of view.** It is listed and outlined but starts unticked, with the
+  reason; ticking it includes it.
+- **Edge / different piece.** A piece of another shape, or more than 3 mm longer or wider than the
+  design's own piece, is flagged and stays ticked. Place is never refused.
+- **Edge / raised pieces.** Pieces on a box are found at the box's height when a height area
+  covers it (F-CAM3).
+- **Edge / Frame.** Frame traces the rectangle around all the copies, not each piece; the panel
+  says so after Place.
+- **Empty / no pieces or no selection.** "No pieces found" explains that pieces need to stand out
+  by colour or brightness. Place with nothing selected, or with every piece unticked, says what to
+  do and changes nothing.
+- **Empty / no feed.** **Find pieces** is disabled without a live camera; without a calibration
+  the section is absent.
+
+### F-CAM10. Print and Cut marks found by the camera (ADR-443)
+
+- **Success / register a printed sheet.** With Print and Cut on in Labs, a saved calibration and a
+  live camera, the operator lays the printed sheet on the bed and sets the material height in the
+  Camera panel. In the design, they select the two registration marks, open **Print and Cut** and
+  press **Use selected marks**, then **Find marks with camera**. Both points fill in as **Camera
+  x, y**, and the dialog reports the measured spacing, print scale and turn. **Apply
+  registration** registers the design on the sheet. The head never moves.
+- **Success / mixed.** **Capture head** still works on either target, so a camera point can be
+  replaced by jogging onto that mark.
+- **Edge / repeated marks.** When other pairs of marks are the same distance apart, the pair
+  nearest the design's targets is used and the dialog says how many others fitted.
+- **Edge / no pair.** When no two marks are the design's spacing apart (within 2 %), the points
+  stay as they were and the dialog says how many mark-like shapes the camera saw, and what to
+  check.
+- **Edge / trust changes.** After a reconnect, reset or frame change, the points must be captured
+  again, as with head captures; **Find marks with camera** does it in one click.
+- **Empty / no selection or no feed.** **Use selected marks** without two selected objects says
+  to select the marks first. **Find marks with camera** is disabled without a live camera, and
+  without a calibration it is absent.
 
 ---
 
@@ -7799,9 +7966,9 @@ the edge it sits on, and a midpoint over the same edge.
    sketch draws on its top face in each layer's colour, and the carve renders
    live underneath — pockets flat-floor, v-carves groove by boundary distance
    with the layer's v-bit angle, profiles slot at bit diameter on the offset
-   side (a tapered ball nose at its cut width at the layer depth, the offset
-   the compiler uses), drills bore at circle centres, and depths at the stock
-   thickness read as through cuts.
+   side (a bit that narrows toward its tip at its cut width at the layer
+   depth, the offset the compiler uses), drills bore at circle centres, and
+   depths at the stock thickness read as through cuts.
 2. The left button always belongs to the armed tool — draw, select, and move
    exactly as in 2D, from any camera angle (the pointer lands on the stock
    plane). Middle drag pans, Shift+middle or right drag orbits, the wheel

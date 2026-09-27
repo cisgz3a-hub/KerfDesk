@@ -1,4 +1,4 @@
-// Line + fill (ADR-443) pen widths through downscaleTracedPaths. Split from
+// Line + fill (ADR-454) pen widths through downscaleTracedPaths. Split from
 // auto-upscale.test.ts to keep that file under the line cap.
 
 import { describe, expect, it } from 'vitest';

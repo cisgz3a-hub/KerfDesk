@@ -1,4 +1,4 @@
-// Work budget of the compact contour fit (ADR-440 review): the points it
+// Work budget of the compact contour fit (ADR-482 review): the points it
 // projects onto candidate cubics (every Newton pass and curve-to-chain check)
 // for one organic-size ring. The first compact fit projected ~92 points per
 // ring point here and made contour traces 2.5-3.4x slower than the tail it
@@ -61,7 +61,7 @@ function blob(n: number): Vec2[] {
   });
 }
 
-describe('compact contour fit work (ADR-440)', () => {
+describe('compact contour fit work (ADR-482)', () => {
   it('projects at most 80 points per ring point on an organic ring', () => {
     const ring = blob(1200);
     work.points = 0;

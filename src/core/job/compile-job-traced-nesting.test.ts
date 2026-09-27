@@ -14,7 +14,7 @@ import { compileJob } from './compile-job';
 import type { CutGroup } from './job';
 import { optimizePaths } from './optimize-paths';
 
-// ADR-441: inside-first cutting reads a traced path's carried forest. A
+// ADR-483: inside-first cutting reads a traced path's carried forest. A
 // hollow C (a C-shaped band whose C-shaped hole ends inside it) is the case
 // the bounds-centre probe gets wrong: the hole's bounds centre lies in the
 // C's mouth, outside the outline, so the hole was ordered as an outer.
@@ -65,7 +65,7 @@ function firstCut(path: ColoredPath): number {
   return (group.segments[0]?.polyline.length ?? 0) - 1;
 }
 
-describe('inside-first ordering of a traced path (ADR-441)', () => {
+describe('inside-first ordering of a traced path (ADR-483)', () => {
   it('cuts the hole of a hollow C before its outline only with the carried forest', () => {
     const plain: ColoredPath = { color, polylines: [outline, hole] };
     expect(outline.points.length).not.toBe(hole.points.length);

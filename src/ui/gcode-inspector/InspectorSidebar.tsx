@@ -6,17 +6,24 @@ import { useMemo } from 'react';
 import type { ProgramTimeModel } from '../../core/gcode-time';
 import type { GcodeRenderModel, ProgramFinding } from '../../core/gcode-view';
 import type { Viewer3dTheme } from '../viewer3d';
+// Deep import: the viewer3d barrel is capped at 20 exports by its index contract.
+import type { Viewer3dLook } from '../viewer3d/viewer3d-look';
 import { InspectorHealthPanel } from './InspectorHealthPanel';
 import { InspectorLensControl } from './InspectorLensControl';
 import { droRows, statsRows, type Readout } from './inspector-readouts';
 import type { LensId } from './lenses';
 import type { PlayheadState } from './playhead';
+import type { ToolSections } from './tool-sections';
 
 export function InspectorSidebar(props: {
   readonly model: GcodeRenderModel;
   readonly theme: Viewer3dTheme;
+  readonly look?: Viewer3dLook | undefined;
+  readonly sections?: ToolSections | null | undefined;
   readonly playhead: PlayheadState;
   readonly time: ProgramTimeModel;
+  /** Device profile the time assumes; null for stock GRBL limits. */
+  readonly timedFor: string | null;
   readonly findings: ReadonlyArray<ProgramFinding>;
   readonly lens: LensId;
   readonly onLensChange: (lens: LensId) => void;
@@ -29,7 +36,10 @@ export function InspectorSidebar(props: {
   // Playback re-renders this column every animation frame. statsRows scans
   // every segment, so derive it per PROGRAM, not per frame. The lens control
   // applies the same memo boundary to its legend; droRows reads one segment.
-  const stats = useMemo(() => statsRows(props.model, props.time), [props.model, props.time]);
+  const stats = useMemo(
+    () => statsRows(props.model, props.time, props.timedFor),
+    [props.model, props.time, props.timedFor],
+  );
   return (
     <aside style={sidebarStyle} aria-label="Program readouts">
       <Section title="Position">
@@ -40,6 +50,8 @@ export function InspectorSidebar(props: {
           model={props.model}
           time={props.time}
           theme={props.theme}
+          look={props.look}
+          sections={props.sections}
           lens={props.lens}
           onLensChange={props.onLensChange}
           variant="sidebar"

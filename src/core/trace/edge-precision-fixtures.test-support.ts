@@ -1,5 +1,5 @@
 // Synthetic anti-aliased fixtures and ring-radius metrics shared by the edge
-// precision tests (ADR-453 / ADR-456). Every fixture is painted from exact
+// precision tests (ADR-485 / ADR-486). Every fixture is painted from exact
 // area coverage (8x8 supersampling), so the true edge is known analytically.
 
 import type { Polyline } from '../scene';

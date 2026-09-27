@@ -324,7 +324,7 @@ export function finalizeStartPreparation(
   const controllerPolicy = startControllerPolicy(controller, gcode, options.machine);
   // Scoped scene/project, so a small selected-output slice of a huge design
   // does not warn as a large job (ADR-241/ADR-243).
-  const largeJobWarning = largeJobPreparationWarning(prepared.project.scene);
+  const largeJobWarning = largeJobPreparationWarning(prepared.project.scene, prepared.job);
   const largeRasterWarning = largeRasterPreparationWarning(prepared.project);
   const warnings = collectStartWarnings(
     prepared.project,

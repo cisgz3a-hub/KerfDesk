@@ -1,4 +1,4 @@
-// One span of the compact contour fit (ADR-440): the best single cubic (and,
+// One span of the compact contour fit (ADR-482): the best single cubic (and,
 // when the span is straight, the single line) between two fixed joints, with
 // its ORTHOGONAL error. The error of a span never depends on the tolerance it
 // is later judged against, which is what makes the merge's segment count

@@ -66,7 +66,7 @@ export function fileCommands(ctx: AppCommandContext): ReadonlyArray<AppCommand> 
   ];
 }
 
-/** Export artwork as SVG / DXF / PDF / EPS / GeoJSON (ADR-431, ADR-444). */
+/** Export artwork as SVG / DXF / PDF / EPS / GeoJSON (ADR-431, ADR-468). */
 function artworkExportCommands(ctx: AppCommandContext): ReadonlyArray<AppCommand> {
   return [
     enabled(

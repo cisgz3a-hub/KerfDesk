@@ -140,7 +140,7 @@ describe('automatic detail recovery retains brightness-selected ink', () => {
     const before = image.data.slice();
     const { prepared, crackField } = prepareTraceForContour(image, requested);
     expect(components(prepared, [0, 0, 128, 128], true).pixels).toBe(128 * 128);
-    // The alpha route places edges from alpha coverage (ADR-456) but gives
+    // The alpha route places edges from alpha coverage (ADR-486) but gives
     // saddles and cleanup no level to read.
     expect(crackField?.crackCrossingAt).toBeDefined();
     expect(crackField?.thresholdAt(0, 0)).toBeNaN();

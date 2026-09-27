@@ -1,5 +1,5 @@
 // The bounded fallback for a contour loop the area policy has already
-// admitted but the finishing tail could not finish (ADR-458). The legacy tail
+// admitted but the finishing tail could not finish (ADR-488). The legacy tail
 // simplifies each smoothed ring with the preset's tolerance. A sliver thinner
 // than about twice that tolerance (a 1 px diagonal hairline, a white 1 px
 // slit, a thresholded anti-aliased line) reduces to its two anchor points and

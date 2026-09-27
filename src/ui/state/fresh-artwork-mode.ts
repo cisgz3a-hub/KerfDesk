@@ -4,7 +4,7 @@
 import type { SceneObject } from '../../core/scene';
 import { isHybridStrokePath } from '../../core/trace/hybrid/hybrid-paths';
 
-// Line + fill (ADR-443): its strokes bind to a LINE operation and its
+// Line + fill (ADR-454): its strokes bind to a LINE operation and its
 // outlines to a FILL operation, whatever the object-level mode says.
 export function freshArtworkModeForColor(
   object: SceneObject,

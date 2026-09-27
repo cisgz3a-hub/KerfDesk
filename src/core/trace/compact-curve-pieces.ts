@@ -1,5 +1,5 @@
 // One ring of fitted outline cut into pieces for the curve crossing guard
-// (ADR-441, compact-curve-contacts.ts).
+// (ADR-483, compact-curve-contacts.ts).
 //
 // A fitted ring becomes its line segments and its cubics halved to about
 // PIECE_PX of control polygon; a ring without a fitted curve becomes its

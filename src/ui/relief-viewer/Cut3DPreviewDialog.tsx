@@ -18,7 +18,10 @@ import { Viewer3DDialogShell } from './Viewer3DDialogShell';
 export function Cut3DPreviewDialog(props: {
   readonly grid: RemovalGrid;
   readonly mesh: ReliefSurfaceMeshWithNormals | null;
-  readonly surfaceRevision?: number;
+  // A newer cut is being prepared; the shown surface and camera stay put.
+  readonly updating?: boolean;
+  // A bit the surface draws at an assumed tip angle (ADR-425).
+  readonly tipAngleNotice?: string;
   readonly unavailableReason?: string;
   readonly stockThicknessMm: number;
   readonly onClose: () => void;
@@ -30,19 +33,19 @@ export function Cut3DPreviewDialog(props: {
     [mesh, stockThicknessMm],
   );
   const { widthMm, heightMm } = grid;
-  const resolutionNotice = previewResolutionMessage(
-    '3D cut preview',
-    cncCut3dDisplayResolution(grid),
-  );
+  const notices = [
+    previewResolutionMessage('3D cut preview', cncCut3dDisplayResolution(grid)),
+    props.tipAngleNotice ?? null,
+  ].filter((notice): notice is string => notice !== null);
   return (
     <Viewer3DDialogShell
       ariaLabel="Cut 3D preview"
       canvasAriaLabel="Cut 3D preview surface"
       title={`Cut preview — ${formatDisplayMillimetres(widthMm)} × ${formatDisplayMillimetres(heightMm)} mm stock`}
       onClose={props.onClose}
-      {...(resolutionNotice === null ? {} : { notice: resolutionNotice })}
+      {...(notices.length === 0 ? {} : { notice: notices.join(' ') })}
       buildScene={buildScene}
-      {...(props.surfaceRevision === undefined ? {} : { canvasKey: props.surfaceRevision })}
+      {...(props.updating === undefined ? {} : { updating: props.updating })}
       {...(props.unavailableReason === undefined
         ? {}
         : { preparationFailure: props.unavailableReason })}

@@ -1,4 +1,4 @@
-// Canonical curves for trace output (ADR-391, ADR-440). The contour finisher
+// Canonical curves for trace output (ADR-391, ADR-482). The contour finisher
 // fits every ring with compact cubic and line segments; those segments become
 // the path's curves, so compile and export flatten them once at their own
 // tolerance. The curve rides EXPLICITLY on the ring object it describes

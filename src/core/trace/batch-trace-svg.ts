@@ -5,7 +5,8 @@
 // decimal grid. The page is the source image rectangle so the trace keeps
 // registration with the image it came from. Paint follows the trace intent:
 // filled contours fill closed curves even-odd with no stroke; Centerline
-// strokes every curve; open curves are always stroked.
+// and Edge stroke every curve; Hybrid carries each path's role. Open curves
+// are always stroked.
 //
 // Pure-core compliant: no clock, no random, no I/O, no DOM.
 
@@ -23,6 +24,7 @@ import {
 } from '../vector-export/decimal-grid';
 import { formatSvgPathData, quantizeCurves } from '../vector-export/svg-path-data';
 import type { TraceOptions } from './trace-option-types';
+import { isLineTraceMode, isLineTracePath } from './trace-paint';
 
 export type TracedSvgPage = {
   readonly pixelWidth: number;
@@ -38,7 +40,12 @@ export type TracedVectorOptions = {
   readonly groupContours?: boolean;
 };
 
-export type TracedLayer = { readonly color: string; readonly curves: ReadonlyArray<CurveSubpath> };
+export type TracedLayer = {
+  readonly color: string;
+  readonly curves: ReadonlyArray<CurveSubpath>;
+  /** A traced line operation remains a stroke even when its contour is closed. */
+  readonly strokeOnly?: boolean;
+};
 
 const VISIBLE_GEOMETRY_EPSILON = 1e-6;
 
@@ -56,10 +63,12 @@ export function tracedLayers(
   const layers: TracedLayer[] = [];
   for (const path of paths) {
     if (!isVisibleColor(path.color)) continue;
+    const strokeOnly = isLineTracePath(path, traceMode);
     const curves = (path.curves ?? path.polylines.map(polylineToCurveSubpath))
-      .filter((curve) => isVisibleCurve(curve, traceMode))
+      .filter((curve) => isVisibleCurve(curve, strokeOnly))
       .map((curve) => transformCurveSubpathExact(curve, matrix));
-    if (curves.length > 0) layers.push({ color: path.color, curves });
+    if (curves.length > 0)
+      layers.push({ color: path.color, curves, ...(strokeOnly ? { strokeOnly: true } : {}) });
   }
   return layers;
 }
@@ -111,7 +120,7 @@ function layerMarkup(
   group: boolean,
 ): string {
   const curves = quantizeCurves(layer.curves, grid);
-  const fillClosed = traceMode !== 'centerline';
+  const fillClosed = !isLineTraceMode(traceMode) && layer.strokeOnly !== true;
   const closed = fillClosed ? curves.filter((curve) => curve.closed) : [];
   const stroked = fillClosed ? curves.filter((curve) => !curve.closed) : curves;
   const fill = (members: ReadonlyArray<CurveSubpath>): string =>
@@ -153,12 +162,12 @@ function isVisibleColor(color: string): boolean {
   return normalized !== '#fff' && normalized !== '#ffffff';
 }
 
-function isVisibleCurve(curve: CurveSubpath, traceMode: TraceOptions['traceMode']): boolean {
+function isVisibleCurve(curve: CurveSubpath, strokeOnly: boolean): boolean {
   if (curve.segments.length === 0) return false;
   const flattened = flattenCurveSubpath(curve, { toleranceMm: 0.05 });
   if (flattened.kind !== 'ok') return true;
   const points = flattened.polyline.points;
-  if (curve.closed && traceMode !== 'centerline') {
+  if (curve.closed && !strokeOnly) {
     return Math.abs(signedArea(points)) > VISIBLE_GEOMETRY_EPSILON;
   }
   return pathLength(points, curve.closed) > VISIBLE_GEOMETRY_EPSILON;

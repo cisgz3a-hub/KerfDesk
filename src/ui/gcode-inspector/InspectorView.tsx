@@ -8,8 +8,10 @@ import type { GcodeInspectorAnalysis } from './gcode-inspector-analysis';
 import type { GcodeSourceLineIndex } from './gcode-source-line-index';
 import { InspectorSourcePane } from './InspectorSourcePane';
 import { InspectorTimeline } from './InspectorTimeline';
+import { InspectorViewerHeader } from './InspectorViewerHeader';
 import { InspectorViewport } from './InspectorViewport';
 import { secondsAtLine } from './playhead';
+import { useFullWindow } from './use-full-window';
 import { useInspectorCamera } from './use-inspector-camera';
 import { useInspectorSession } from './use-inspector-session';
 import { useSceneSync } from './use-scene-sync';
@@ -34,7 +36,10 @@ type Session = ReturnType<typeof useInspectorSession>;
 
 export function InspectorView(props: InspectorViewProps): JSX.Element {
   const [sourceVisible, setSourceVisible] = useState(true);
+  const [readoutsVisible, setReadoutsVisible] = useState(true);
   const [selectedLine, setSelectedLine] = useState<number | null>(null);
+  const bodyRef = useRef<HTMLDivElement | null>(null);
+  const fullWindow = useFullWindow(bodyRef);
   const session = useInspectorSession(props.model, props.analysis, props.source);
   const { canvasRef, handleRef, state, reason, camera } = useInspectorScene(props.model, session);
   const { playhead, liveMode, live } = session;
@@ -45,14 +50,24 @@ export function InspectorView(props: InspectorViewProps): JSX.Element {
     if (target !== null) session.playback.setRouteMm(target);
   };
   const travelChange = session.setTravelVisible;
+  const full = props.variant !== 'preview';
   return (
-    <div className="gcode-viewer-body">
+    <div className="gcode-viewer-body" ref={bodyRef}>
       <div className="gcode-viewer-column">
-        <ViewerHeader
-          session={session}
-          full={props.variant !== 'preview'}
-          sourceVisible={sourceVisible}
-          onSourceToggle={() => setSourceVisible((value) => !value)}
+        <InspectorViewerHeader
+          liveMode={liveMode}
+          liveMatched={live.matched}
+          onFollowLiveToggle={() => session.setFollowLive(!session.followLive)}
+          look={session.look}
+          onLookChange={session.setLook}
+          layout={{
+            full,
+            sourceVisible,
+            onSourceToggle: () => setSourceVisible((value) => !value),
+            readoutsVisible,
+            onReadoutsToggle: () => setReadoutsVisible((value) => !value),
+            fullWindow,
+          }}
         />
         <InspectorViewport
           canvasRef={canvasRef}
@@ -64,6 +79,7 @@ export function InspectorView(props: InspectorViewProps): JSX.Element {
           live={liveMode ? live : null}
           playhead={playhead}
           activeLine={session.activeLine}
+          toolLabel={session.activeTool?.label ?? null}
           playing={session.playback.playing}
           travelVisible={session.travelVisible}
           onTravelChange={travelChange}
@@ -84,7 +100,7 @@ export function InspectorView(props: InspectorViewProps): JSX.Element {
           onSelectLine={locateLine}
         />
       ) : null}
-      {props.variant !== 'preview' ? (
+      {props.variant !== 'preview' && readoutsVisible ? (
         <Readouts
           model={props.model}
           session={session}
@@ -107,6 +123,8 @@ function PreviewLens(props: {
         model={props.model}
         time={s.time}
         theme={s.theme}
+        look={s.look}
+        sections={s.sections}
         lens={s.lens}
         onLensChange={s.setLens}
         variant="overlay"
@@ -134,49 +152,6 @@ function SessionTimeline({ session }: { readonly session: Session }): JSX.Elemen
   );
 }
 
-function ViewerHeader(props: {
-  readonly session: Session;
-  readonly full: boolean;
-  readonly sourceVisible: boolean;
-  readonly onSourceToggle: () => void;
-}): JSX.Element {
-  const { session } = props;
-  return (
-    <div className="gcode-viewer-header">
-      <div className="gcode-viewer-heading">
-        <span className="gcode-viewer-eyebrow">G-CODE / 3D</span>
-        <span className="gcode-viewer-subtitle">
-          {session.liveMode ? 'Watching the started program' : 'Explore the toolpath'}
-        </span>
-      </div>
-      <div className="gcode-viewer-header-actions">
-        {session.live.matched ? (
-          <button
-            type="button"
-            className="lf-btn"
-            aria-pressed={session.liveMode}
-            title="Switch between reported machine progress and local preview playback"
-            onClick={() => session.setFollowLive(!session.followLive)}
-          >
-            {session.liveMode ? 'Preview playback' : 'Watch live run'}
-          </button>
-        ) : null}
-        {props.full ? (
-          <button
-            type="button"
-            className="lf-btn"
-            aria-pressed={props.sourceVisible}
-            title="Show or hide the G-code source beside the 3D view"
-            onClick={props.onSourceToggle}
-          >
-            {props.sourceVisible ? 'Hide source' : 'Show source'}
-          </button>
-        ) : null}
-      </div>
-    </div>
-  );
-}
-
 function Readouts(props: {
   readonly model: GcodeRenderModel;
   readonly session: Session;
@@ -188,8 +163,11 @@ function Readouts(props: {
     <InspectorSidebar
       model={props.model}
       theme={s.theme}
+      look={s.look}
+      sections={s.sections}
       playhead={s.playhead}
       time={s.time}
+      timedFor={s.timedFor}
       findings={s.findings}
       lens={s.lens}
       onLensChange={s.setLens}
@@ -216,6 +194,7 @@ function useInspectorScene(model: GcodeRenderModel, session: Session) {
     arrows: session.arrows,
     hidePlaybackMarker: liveMode,
     travelVisible: session.travelVisible,
+    stage: session.stage,
   });
   const camera = useInspectorCamera(
     handleRef,

@@ -1,4 +1,4 @@
-// Filled-region rings for GeoJSON (ADR-444): which closed contours of one
+// Filled-region rings for GeoJSON (ADR-468): which closed contours of one
 // painted item bound its filled region, and which outer ring each hole
 // belongs to, under the item's own fill rule.
 //
@@ -53,7 +53,7 @@ type RingInfo = {
 /**
  * Rings are open (the first point is not repeated) and have at least three
  * points that are not all collinear. A ring with zero net area is not simple
- * (the GeoJSON writer marks its item unmerged). Output polygons keep input
+ * (the result marks its item as crossing). Output polygons keep input
  * order of outers.
  */
 export function fillRegionPolygons(
@@ -65,7 +65,8 @@ export function fillRegionPolygons(
   const role = ringRoles(infos, nesting, fillRule);
   const { polygons, orphanHole } = assignHoles(infos, nesting, role);
   const undecided = [...nesting.values()].some((entry) => entry.undecided);
-  return { polygons, crossing: orphanHole || undecided || ringsCross(infos) };
+  const zeroNetArea = infos.some((ring) => ring.twiceArea === 0);
+  return { polygons, crossing: zeroNetArea || orphanHole || undecided || ringsCross(infos) };
 }
 
 type Nesting = {
@@ -151,6 +152,13 @@ function ringRoles(
   const filled = (value: number): boolean => (evenOdd ? value % 2 !== 0 : value !== 0);
   const role = new Map<number, 'outer' | 'hole'>();
   for (const ring of infos) {
+    // A bowtie's opposite-winding lobes cancel its net area but still paint.
+    // The nesting model cannot assign it one orientation. Keep the contour
+    // as an unmerged feature under both fill rules, with the crossing warning.
+    if (ring.twiceArea === 0) {
+      role.set(ring.index, 'outer');
+      continue;
+    }
     const entry = nesting.get(ring.index);
     const outside = (evenOdd ? entry?.count : entry?.winding) ?? 0;
     const inside = outside + (evenOdd ? 1 : Math.sign(ring.twiceArea));

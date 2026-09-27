@@ -13,6 +13,7 @@ import { representedCncCoordinateMm } from '../cnc/coordinate-representation';
 import type { ArcMove } from '../geometry/arc-fit';
 import { sampleCircularArcPoints } from '../geometry/arc-representation';
 import type { RasterPowerValues } from '../raster/raster-power-values';
+import type { CncCuttingStage } from '../scene/cnc-stage-recipe';
 import {
   assertNever,
   type CncCoolantMode,
@@ -38,7 +39,7 @@ export type CutSegment = {
   readonly polyline: ReadonlyArray<Vec2>;
   readonly closed: boolean;
   /** Nesting of this contour inside its own path, from the path's carried
-   *  forest (ADR-441): `depth` among the contours sharing `forest`, a key
+   *  forest (ADR-483): `depth` among the contours sharing `forest`, a key
    *  unique to one path of one object. Inside-first ordering reads it instead
    *  of probing those contours; absent, it probes as before. */
   readonly nesting?: { readonly forest: string; readonly depth: number };
@@ -178,6 +179,10 @@ export type CncContourPass = {
   readonly zMm: number; // cutting depth for this pass; negative below stock top
   readonly polyline: ReadonlyArray<Vec2>;
   readonly closed: boolean;
+  // Provenance marker: the layer asked for a ramp entry, but this path is too
+  // short to ramp along, so the pass keeps its straight plunge (ADR-471).
+  // G-code comments and Job Review disclose it; motion is unchanged.
+  readonly entryPlunge?: true;
 };
 
 export type CncPath3dPass = {
@@ -261,6 +266,8 @@ export function cncPassEntryDepthMm(pass: CncPass): number {
 }
 
 export type CncGroup = {
+  /** Explicit independent recipe used for this compiled stage. */
+  readonly cuttingStage?: CncCuttingStage;
   readonly kind: 'cnc';
   readonly layerId: string;
   readonly sourceObjectId?: string;

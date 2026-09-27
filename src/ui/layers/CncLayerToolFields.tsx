@@ -1,9 +1,10 @@
 // Operation-owned relief, entry, and motion-polish fields for CNC artwork.
-// Cutter assignments live with Tool & material in the operation editor.
+// Cutter assignments sit under Bit at the top of the operation editor (ADR-481).
 
 import { sceneObjectUsesOperation, type CncLayerSettings, type Layer } from '../../core/scene';
 import { NumberField as ClearableNumberField } from '../common/NumberField';
 import { useStore } from '../state';
+import { cutTypeShowsCutDirection, ReliefStrategyRows } from './CncReliefStrategyRows';
 
 // Relief roughing (H.5) reads depth-per-pass + stepover from the layer but
 // takes total depth from the relief object — CncLayerFields keys its
@@ -22,6 +23,7 @@ export function ReliefLayerRows(props: {
   readonly layer: Layer;
   readonly settings: CncLayerSettings;
   readonly onCommit: (patch: Partial<CncLayerSettings>) => void;
+  readonly onCommitSettings: (settings: CncLayerSettings) => void;
 }): JSX.Element {
   return (
     <>
@@ -31,11 +33,17 @@ export function ReliefLayerRows(props: {
         shapes only.
       </div>
       <ReliefScallopRow layer={props.layer} settings={props.settings} onCommit={props.onCommit} />
+      <ReliefStrategyRows
+        layer={props.layer}
+        settings={props.settings}
+        onCommit={props.onCommit}
+        onCommitSettings={props.onCommitSettings}
+      />
     </>
   );
 }
 
-// Cutter assignment lives in Tool & material; the operation also owns its
+// Cutter assignment sits under Bit above; the operation also owns its
 // finishing scallop target.
 function ReliefScallopRow(props: {
   readonly layer: Layer;
@@ -51,7 +59,7 @@ function ReliefScallopRow(props: {
         value={props.settings.reliefScallopMm ?? 0.025}
         onCommit={(mm) => props.onCommit({ reliefScallopMm: mm })}
         ariaLabel={`Relief scallop height for ${props.layer.color}`}
-        title="Scallop height target (mm) for the relief finishing bit chosen in Tool & material — smaller = finer finishing rows, longer job."
+        title="Scallop height target (mm) for the Relief finishing bit chosen under Bit above — smaller = finer finishing rows, longer job."
         style={scallopInputStyle}
       />
       <span style={rampUnitStyle}>mm</span>
@@ -67,10 +75,7 @@ export function MotionPolishRows(props: {
   readonly onCommitSettings: (settings: CncLayerSettings) => void;
 }): JSX.Element {
   const isVCarve = props.settings.cutType === 'v-carve';
-  const showCutDirection =
-    props.settings.cutType === 'profile-outside' ||
-    props.settings.cutType === 'profile-inside' ||
-    props.settings.cutType === 'pocket';
+  const showCutDirection = cutTypeShowsCutDirection(props.settings.cutType);
   return (
     <>
       {showCutDirection ? (
@@ -163,14 +168,14 @@ export function HelicalEntryRows(props: {
             });
           }}
           aria-label={`Helical entry for ${props.layer.color}`}
-          title="Descend into offset pockets with native G2/G3 circles instead of plunging. If a pocket roughing bit is assigned, choose Single bit under Tool & material because the two operations cannot currently compile together."
+          title="Descend into offset pockets with native G2/G3 circles instead of plunging. If a pocket roughing bit is assigned, choose Single bit under Pocket roughing bit above because the two operations cannot currently compile together."
         />
         <span style={helixLabelStyle}>Use circular ramp</span>
       </Row>
       {helix !== undefined && props.settings.pocketRoughToolId !== undefined ? (
         <p role="note" style={helixConflictStyle}>
           Helical entry cannot compile while a pocket roughing bit is assigned. Choose Single bit
-          under Pocket roughing bit in Tool &amp; material above.
+          under Pocket roughing bit above.
         </p>
       ) : null}
       {helix === undefined ? null : (

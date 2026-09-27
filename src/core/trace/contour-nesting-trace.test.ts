@@ -11,7 +11,7 @@ import { traceImageToContourColoredPaths } from './contour-trace';
 import type { RawImageData, TraceOptions } from './trace-image';
 import { TRACE_PRESETS } from './trace-presets';
 
-// ADR-441: a binary trace carries its containment forest from the pixel
+// ADR-483: a binary trace carries its containment forest from the pixel
 // lattice. These fixtures check the forest against the drawing's own nesting,
 // the orientation and order it promises, and that even-odd and nonzero fill
 // the same region.
@@ -116,7 +116,7 @@ function expectFillRulesAgree(path: ColoredPath, width: number, height: number):
   expect(disagreements).toBe(0);
 }
 
-describe('traced containment forest (ADR-441)', () => {
+describe('traced containment forest (ADR-483)', () => {
   it.each(PRESETS)('%s: six nested square bands carry depths 0..5, outers first', (preset) => {
     const image = imageOf(64, 64, (x, y) => {
       const band = Math.floor(Math.max(Math.abs(x - 32), Math.abs(y - 32)) / 4);

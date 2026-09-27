@@ -1,4 +1,4 @@
-// Diagonal contacts (ADR-450): the operator's handle on TraceOptions.turnPolicy
+// Diagonal contacts (ADR-455): the operator's handle on TraceOptions.turnPolicy
 // (ADR-403), the choice LightBurn and Potrace call the turn policy. Where two
 // ink pixels touch only at a corner (a checkerboard contact), a bitmap cannot
 // say whether the ink or the paper passes through that corner.

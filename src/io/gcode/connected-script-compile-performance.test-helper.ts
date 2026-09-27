@@ -8,6 +8,7 @@ import type {
 } from '../../core/cnc/cnc-compilation-artifact';
 import { passesForVCarveMedialRegion } from '../../core/cnc/vcarve-medial-region-passes';
 import { planUnrankedVCarveMedialRegion } from '../../core/cnc/vcarve-medial-region-plan';
+import { measureVCarveSourceBoundaryCoverage } from '../../core/cnc/vcarve-source-boundary-coverage';
 import { DEFAULT_OUTPUT_SCOPE, type Project } from '../../core/scene';
 import { emitPreparedGcode } from './index';
 import type { PreparedOutput } from './prepare-output';
@@ -17,6 +18,7 @@ type RegionTiming = {
   readonly taskId: string;
   readonly geometryMs: number;
   readonly passesMs: number;
+  readonly coverageMs: number;
 };
 
 /** Stage and per-region timings from one connected-script output preparation. */
@@ -97,14 +99,24 @@ function profileRegionTask(
     depthPerPassMm: regionTask.depthPerPassMm,
   });
   const passesFinishedAt = performance.now();
+  // Keep this profile aligned with runVCarveMedialRegionTask: the source
+  // coverage measurement is part of real compilation, not optional analysis.
+  const sourceBoundaryCoverage = measureVCarveSourceBoundaryCoverage(
+    regionTask.region.loops,
+    passes.passes,
+    regionTask.law,
+  );
+  const coverageFinishedAt = performance.now();
   regionTimings.push({
     taskId: task.taskId,
     geometryMs: geometryFinishedAt - geometryStartedAt,
     passesMs: passesFinishedAt - geometryFinishedAt,
+    coverageMs: coverageFinishedAt - passesFinishedAt,
   });
   const result: CncCompilationRegionResult = {
     binding: task.payload.binding,
     regionResult: {
+      sourceBoundaryCoverage,
       normalizedIndex: unranked.plan.normalizedIndex,
       witness: unranked.witness,
       passes: passes.passes,

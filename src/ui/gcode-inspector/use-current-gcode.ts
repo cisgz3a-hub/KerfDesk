@@ -3,7 +3,6 @@
 // identity so an edit can cancel stale work and can never publish old bytes.
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { laserPowerControlForDevice } from '../../core/gcode-view';
 import type { OutputCompilationProgress } from '../../io/gcode/prepare-output-async';
 import { usePlatform } from '../app/platform-context';
 import { handleInspectCurrentGcode } from '../app/inspect-current-gcode-action';
@@ -13,7 +12,11 @@ import { useLaserStore } from '../state/laser-store';
 import { useToastStore } from '../state/toast-store';
 import type { CanvasMotionPlan, LiveCanvasLifecycle } from '../state/canvas-motion-plan';
 import { canvasProgramMatchesRunQueue, canvasProgramSource } from '../state/canvas-program-source';
-import { projectInspectionContext, type GcodeInspectionContext } from './gcode-inspection-source';
+import {
+  deviceInspectionContext,
+  projectInspectionContext,
+  type GcodeInspectionContext,
+} from './gcode-inspection-source';
 
 export type CurrentGcode =
   | { readonly kind: 'idle' }
@@ -158,8 +161,7 @@ function currentRunState(run: CurrentRunProgram): Extract<CurrentGcode, { kind: 
 }
 
 function runInspectionContext(plan: CanvasMotionPlan): GcodeInspectionContext {
-  if (plan.machineKind === 'cnc') return { machineKind: 'cnc' };
-  return { machineKind: 'laser', laserPowerControl: laserPowerControlForDevice(plan.device) };
+  return deviceInspectionContext(plan.device, plan.machineKind);
 }
 
 function runProgramName(lifecycle: LiveCanvasLifecycle): string {

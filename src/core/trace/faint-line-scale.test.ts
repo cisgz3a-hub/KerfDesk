@@ -53,7 +53,7 @@ describe('faint-line resolution budget', () => {
     const expected = await traceImageToColoredPaths(image, alpha);
     expect(expected.reduce((sum, path) => sum + path.polylines.length, 0)).toBe(200);
     expect(await traceImageToColoredPaths(image, faint)).toEqual(expected);
-    // Two full 1600 x 1000 traces: ~9 s before ADR-440's compact contour fit,
+    // Two full 1600 x 1000 traces: ~9 s before ADR-482's compact contour fit,
     // ~29 s with it (the tl-geometry-core tip alone measures the same).
   }, 60_000);
 });

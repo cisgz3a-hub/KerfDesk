@@ -30,7 +30,7 @@ export function applyAutomaticTabsToPolylines(
 
 // A tabbed polyline and the index of the input it came from: the input itself
 // when it took no tab, or one of the open pieces it was split into. Callers
-// that attach data to their inputs (a traced contour's nesting, ADR-441) carry
+// that attach data to their inputs (a traced contour's nesting, ADR-483) carry
 // it across the split through `source`.
 export type TabbedPolyline = { readonly polyline: Polyline; readonly source: number };
 

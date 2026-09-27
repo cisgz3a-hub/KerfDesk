@@ -5,7 +5,7 @@
 // MIT-release blocker): binarize via the shared preprocessing, walk the ink
 // boundary on the corner lattice (contour-boundary.ts), then finish each
 // closed loop (corner dial → curvature evening → arc/line evening), and end
-// every loop in the compact fit (compact-curve-fit.ts, ADR-440): the fewest
+// every loop in the compact fit (compact-curve-fit.ts, ADR-482): the fewest
 // cubics and lines within a tolerance, carried as the ring's canonical
 // curve. Measured loops are fitted directly; binary loops keep the
 // centerline's simplify + bounded spline resample as the shape they fit.
@@ -79,7 +79,7 @@ const CONTOUR_COLOR = '#000000';
  *  gate (ADR-123). */
 export function isBinaryContourPreset(options: TraceOptions): boolean {
   if (options.photoDetail !== undefined) return false;
-  // Line + fill (ADR-443) is also 2-colour with a fixed palette, but its
+  // Line + fill (ADR-454) is also 2-colour with a fixed palette, but its
   // strokes carry widths and its gate is in pixels: the contour-only routes
   // (supersample profile, dense-colour downscale) would drop both.
   if (
@@ -108,7 +108,7 @@ const NO_CORNERS: ReadonlySet<Polyline['points'][number]> = new Set();
 // A loop whose cracks mostly interpolated is a sub-pixel MEASUREMENT (see
 // finishLoop): above this fraction the wobble stages disable for that loop.
 const SUBPIXEL_INFORMED_FRACTION = 0.3;
-// Compact-fit tolerance (compact-curve-fit.ts, ADR-440): the largest
+// Compact-fit tolerance (compact-curve-fit.ts, ADR-482): the largest
 // ORTHOGONAL distance of the output curve from the chain it fits, in SOURCE px
 // (scaled by pixelScale like every px knob), at Optimize's neutral 0.2. ~2-3x
 // the sub-pixel measurement noise: tight enough to keep drawn features, loose
@@ -247,7 +247,7 @@ export function* contourPolylinesFromMaskSteps(
 }
 
 /** The finished outlines in boundary scan order, with their containment forest
- *  from the raw lattice loops (contour-nesting.ts, ADR-441). */
+ *  from the raw lattice loops (contour-nesting.ts, ADR-483). */
 export function* contourRingsFromMaskSteps(
   mask: InkMask,
   options: ContourFinishOptions,
@@ -280,7 +280,7 @@ export function* contourRingsFromMaskSteps(
     // Area-based speckle gate — the boundary walker sees paper holes the ink
     // despeckle never touched, so both loop polarities are filtered here.
     if (!isAdmittedLoop(loop, options.minAreaPx)) continue;
-    // No-orphan invariant (ADR-458 amendment 1): finishing and topology
+    // No-orphan invariant (ADR-488 amendment 1): finishing and topology
     // repair return exactly one ring per admitted loop, with its source
     // orientation and nesting, so a hole never outlives its outer.
     contours.push(finishLoop(loop.points, finish));
@@ -293,7 +293,7 @@ export function* contourRingsFromMaskSteps(
 /** The area policy for boundary loops. A loop that encloses nothing is never
  *  admitted. Enclosed area shrinks strictly down the nesting (a loop's area
  *  includes everything inside it), so this rule drops a loop only together
- *  with every loop nested inside it (ADR-458 amendment 1). */
+ *  with every loop nested inside it (ADR-488 amendment 1). */
 export function isAdmittedLoop(loop: BoundaryLoop, minAreaPx: number): boolean {
   const area = Math.abs(loop.area);
   return area > 0 && area >= minAreaPx;
@@ -351,7 +351,7 @@ function finishLoop(staircase: ReadonlyArray<Vec2>, finish: LoopFinish): Finishe
   // The area policy has already admitted this boundary. A tolerance larger
   // than the loop can collapse the finishing tail to two anchors; Optimize
   // must not become another area-removal control. Retain the measured crack
-  // boundary in that case as a compact outline (ADR-458: one bounded
+  // boundary in that case as a compact outline (ADR-488: one bounded
   // fallback, no new fitting search), and include it in the same topology
   // repair as every other admitted contour.
   const retainCracks = (): ContourRefinement =>
@@ -419,7 +419,7 @@ function finishDenseLoop(
   // curves (research brief #2). The simplify + spline tail it replaced bowed
   // every straight edge outward (its spline passed through Douglas-Peucker
   // vertices and a cap of ±ε let it sit ~0.3 px outside the ink): a thin AA
-  // bar gained up to 24% area (ADR-440). Organic-size loops are
+  // bar gained up to 24% area (ADR-482). Organic-size loops are
   // Whittaker-faired between their corners first.
   if (subPixelInformed) {
     return dense.length > organicMin
@@ -436,7 +436,7 @@ function finishDenseLoop(
 
 // The binary tail (saturated / pixel-fidelity sources): straight-run flatten
 // → simplify → flatten → corner-aware spline resample, as tuned for binary
-// art, then the compact fit THROUGH that resample (ADR-440): the shape stays
+// art, then the compact fit THROUGH that resample (ADR-482): the shape stays
 // the approved one, the output becomes a few cubics between its corners and
 // single lines along its straight runs. The shape stages run at Optimize's
 // neutral ε, so Optimize is only the final fit tolerance and the segment
@@ -521,7 +521,7 @@ function fitLoopTail(
 
 // Optimize scales the final tolerance only. Candidate joints are proposed at a
 // fixed share of the tolerance Optimize 0 gives, so they never follow
-// Optimize and the merge's segment count is monotone in it (ADR-440).
+// Optimize and the merge's segment count is monotone in it (ADR-482).
 function compactTolerances(
   tolerancePx: number,
   finish: LoopFinish,
@@ -534,7 +534,7 @@ function compactTolerances(
   };
 }
 
-// Fit the ring's compact curve (compact-curve-fit.ts, ADR-440) through
+// Fit the ring's compact curve (compact-curve-fit.ts, ADR-482) through
 // `target(amount)` and carry it on the ring object itself (trace-curves.ts).
 // The topology repair's weaker refinements scale the tolerances down with
 // the target's own smoothing.

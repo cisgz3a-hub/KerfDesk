@@ -11,8 +11,8 @@ import type { LayerFillStyle } from '../scene';
  *
  * `feed-matched-every-sweep` is the generic Scan Line quality policy: every
  * independent sweep gets a feed-matched laser-off entry and exit, with adjacent
- * split runways sharing the available blank gap. `feed-matched-entry` remains
- * the narrower 4040 policy from ADR-234. The remaining values are retained for
+ * split runways sharing the available blank gap. `feed-matched-entry` retains
+ * ADR-234's 5 mm cap and now also owns bounded exits (ADR-445). The remaining values are retained for
  * explicit legacy fixtures and for the raster-to-fill planner model.
  */
 export type FillRunwayPolicy =
@@ -29,8 +29,8 @@ export function fillRunwayPolicyForDevice(
   fillStyle: LayerFillStyle | undefined = 'scanline',
 ): FillRunwayPolicy | undefined {
   if (resolveGrblDialect(device).id !== 'neotronics-4040-safe') return undefined;
-  // ADR-234 governs ordinary scanline Fill with bounded, non-overlapping entry
-  // runways. Sensitive Island Fill keeps ADR-236's full two-sided runway.
+  // ADR-234's 5 mm limit remains; ADR-445 shares internal gaps between entry
+  // and exit. Sensitive Island Fill keeps its configured full outer runway.
   return fillStyle === 'island' ? 'full' : 'feed-matched-entry';
 }
 

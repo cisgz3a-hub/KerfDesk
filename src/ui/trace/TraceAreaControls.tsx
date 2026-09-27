@@ -85,7 +85,7 @@ export function TraceAreaControls(props: TraceAreaControlsProps): JSX.Element {
   );
 }
 
-// Line + fill (ADR-443): ink up to this wide on the placed artwork burns
+// Line + fill (ADR-454): ink up to this wide on the placed artwork burns
 // once down its centre; wider ink stays a filled outline.
 function HybridStrokeWidthRow(props: TraceAreaControlsProps): JSX.Element {
   const device = useStore((s) => s.project.device);

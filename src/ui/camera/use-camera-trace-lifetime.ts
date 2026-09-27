@@ -2,6 +2,7 @@ import { useEffect, useRef } from 'react';
 import { useStore } from '../state';
 import { useCameraStore } from '../state/camera-store';
 import { useUiStore } from '../state/ui-store';
+import { activeCameraModel } from './active-camera-model';
 
 /** An asynchronous capture belongs to its initiating document, camera setup,
  * mounted button and dialog opening. Abandoned captures publish nothing. */
@@ -26,7 +27,8 @@ export function useCameraTraceLifetime(): () => () => boolean {
       projectDocumentEpoch,
       project: { device },
     } = useStore.getState();
-    const { sourceState, surfaceHeightMm } = useCameraStore.getState();
+    const { sourceState, surfaceHeightMm, heightAreas } = useCameraStore.getState();
+    const model = activeCameraModel(device, sourceState);
     const dialog = useUiStore.getState().imageDialog;
     return () => {
       const current = useStore.getState();
@@ -37,8 +39,8 @@ export function useCameraTraceLifetime(): () => () => boolean {
         useUiStore.getState().imageDialog === dialog &&
         camera.sourceState === sourceState &&
         camera.surfaceHeightMm === surfaceHeightMm &&
-        current.project.device.cameraAlignment === device.cameraAlignment &&
-        current.project.device.cameraCalibration === device.cameraCalibration &&
+        camera.heightAreas === heightAreas &&
+        activeCameraModel(current.project.device, camera.sourceState) === model &&
         current.project.device.bedWidth === device.bedWidth &&
         current.project.device.bedHeight === device.bedHeight
       );

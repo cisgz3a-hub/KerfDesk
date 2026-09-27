@@ -96,9 +96,7 @@ export async function type(input: HTMLInputElement, value: string) {
   });
 }
 export async function openAdvanced(host: HTMLElement) {
-  const button = [...host.querySelectorAll('button')].find(
-    (button) => button.textContent === 'Advanced cut settings',
-  );
-  if (button === undefined) throw new Error('Missing Advanced settings button');
+  const button = host.querySelector<HTMLButtonElement>('button[aria-label="More cut settings"]');
+  if (button === null) throw new Error('Missing More cut settings button');
   await act(async () => button.click());
 }
