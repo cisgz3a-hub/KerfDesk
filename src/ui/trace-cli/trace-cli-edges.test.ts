@@ -11,7 +11,11 @@ import { IMAGE_DENSITY_PROBE_BYTES, readImageHeaderDensity } from '../common/ima
 import { DETECTION_MODES, TRACE_OVERRIDE_RULES } from '../trace/trace-settings-snapshot';
 import { nativeGridOptions, runTraceCli, traceCliTraceOptions } from './run-trace-cli';
 import { traceCliHelp } from './trace-cli-help';
-import { parseTraceCliArgs, TRACE_CLI_OVERRIDE_FLAGS, TraceCliUsageError } from './trace-cli-options';
+import {
+  parseTraceCliArgs,
+  TRACE_CLI_OVERRIDE_FLAGS,
+  TraceCliUsageError,
+} from './trace-cli-options';
 
 function chunk(type: string, body: Uint8Array): Uint8Array {
   const out = new Uint8Array(12 + body.length);
@@ -61,9 +65,7 @@ async function svgWidth(bytes: Uint8Array): Promise<string> {
 
 describe('trace command edges (ADR-477)', () => {
   it('refuses a separated or inline value on switches instead of misreading it', () => {
-    expect(() => parseTraceCliArgs(['--invert', 'false'])).toThrow(
-      /--invert=false or --no-invert/,
-    );
+    expect(() => parseTraceCliArgs(['--invert', 'false'])).toThrow(/--invert=false or --no-invert/);
     expect(() => parseTraceCliArgs(['--group-contours=false'])).toThrow(TraceCliUsageError);
     expect(() => parseTraceCliArgs(['--help=yes'])).toThrow(TraceCliUsageError);
     expect(parseTraceCliArgs(['--invert=false']).overrides.invert).toBe(false);
@@ -95,7 +97,8 @@ describe('trace command edges (ADR-477)', () => {
   });
 
   it('scales pixel-unit settings from the preview grid above the 2048 px cap', () => {
-    const options: TraceOptions = { ignoreLessThanPixels: 10, edgeMinLengthPx: 3 };
+    const lineArt = TRACE_PRESETS['Line Art'] as TraceOptions;
+    const options: TraceOptions = { ...lineArt, ignoreLessThanPixels: 10, edgeMinLengthPx: 3 };
     expect(nativeGridOptions(options, { width: 2048, height: 1024 })).toBe(options);
     // 4096 x 1024 previews at 2048 x 512: lengths x2, areas x4.
     expect(nativeGridOptions(options, { width: 4096, height: 1024 })).toMatchObject({
@@ -109,8 +112,6 @@ describe('trace command edges (ADR-477)', () => {
     const parsed = parseTraceCliArgs(['-p', 'Line + fill', '--max-stroke-width', '0.5']);
     expect(TRACE_PRESETS['Line + fill']).toBeDefined();
     // 4096 px over 409.6 mm is 10 px/mm: 0.5 mm is 5 px, not scaled again.
-    expect(traceCliTraceOptions(parsed, { image, widthMm: 409.6 }).hybridMaxStrokeWidthPx).toBe(
-      5,
-    );
+    expect(traceCliTraceOptions(parsed, { image, widthMm: 409.6 }).hybridMaxStrokeWidthPx).toBe(5);
   });
 });

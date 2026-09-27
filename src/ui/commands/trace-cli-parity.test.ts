@@ -210,7 +210,10 @@ describe('trace command parity with the app (ADR-477)', () => {
   });
 
   it('sizes a pHYs fixture from its embedded density, not the 254 dpi default', async () => {
-    const svg = await cliSvg({ ...png('Line Art', RING), bytes: encodePng(RING, DPI_300_PER_METRE) });
+    const svg = await cliSvg({
+      ...png('Line Art', RING),
+      bytes: encodePng(RING, DPI_300_PER_METRE),
+    });
     // 96 px at 300 dpi is 8.128 mm; at the 254 dpi default it would be 9.6 mm.
     expect(svg).toMatch(/width="8\.128mm"/);
   });
