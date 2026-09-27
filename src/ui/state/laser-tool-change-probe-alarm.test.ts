@@ -19,23 +19,25 @@ import { respondToTestGrblBuildInfo } from './laser-test-start-helpers';
 import { useStore } from './store';
 
 const IDLE = '<Idle|MPos:10.000,20.000,-1.000|FS:0,0|Ov:100,100,100>';
-const RUN = '<Run|MPos:10.000,20.000,-1.000|FS:800,10000|Ov:100,100,100>';
+const RUN = '<Run|MPos:10.000,20.000,-1.000|FS:800,0|Ov:100,100,100>';
 const ALARM = '<Alarm|MPos:10.000,20.000,-1.000|FS:0,0>';
 
 type Device = SerialConnection & { readonly say: (line: string) => void };
 
-// Keep the explicitly reported state on every `?`: polling must not invent an
-// Idle before the test observes motion settling or the alarm clearing. `$X`
-// acknowledges separately, so its reply cannot stand in for that observation.
-// Accepted job motion also enters Run before any background poll can answer.
+// A GRBL 1.1 stand-in: `ok` for the settle dwell, the unlock reply GRBL prints
+// for `$X`, and on `?` the last state it reported (Run once job motion reaches
+// it). The store polls `?` on a real 250 ms timer, so answering Idle in every
+// state let a poll clear the alarm before the unlock check, or settle a hold
+// the test had not let see Idle. `$X` changes no state: the test reports the
+// Idle that proves the unlock.
 function makeDevice(sent: string[]): Device {
   const handlers = new Set<(line: string) => void>();
-  let reported = IDLE;
+  let status = IDLE;
   const device: Device = {
     write: async (data) => {
       sent.push(data);
-      if (data === '?') setTimeout(() => device.say(reported), 0);
-      if (/^G[01]\b/m.test(data)) reported = RUN;
+      if (data === '?') setTimeout(() => device.say(status), 0);
+      if (/^G[01]\b/m.test(data)) status = RUN;
       if (data === 'G4 P0.01\n') setTimeout(() => device.say('ok'), 0);
       if (data === '$X\n') {
         setTimeout(() => {
@@ -52,8 +54,8 @@ function makeDevice(sent: string[]): Device {
     onClose: () => () => undefined,
     close: async () => undefined,
     say: (line) => {
-      if (line.startsWith('<')) reported = line;
-      else if (line.startsWith('ALARM:')) reported = ALARM;
+      if (line.startsWith('<')) status = line;
+      else if (line.startsWith('ALARM:')) status = ALARM;
       for (const handler of handlers) handler(line);
     },
   };
@@ -197,6 +199,8 @@ describe('a missed touch-off probe in a drained tool-change hold', () => {
   it('cancels on ALARM:4 before the hold has seen Idle', async () => {
     const device = makeDevice([]);
     await reachHold(device, false);
+    // A poll in this window must keep reporting motion until the test supplies
+    // Idle; otherwise it falsely qualifies the hold as physically drained.
     await useLaserStore.getState().requestControllerStatus();
     await settle();
     expect(useLaserStore.getState().toolChangeIdleSeen).toBe(false);
