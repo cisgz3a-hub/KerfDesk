@@ -9,6 +9,9 @@ src/core/text/cnc-stroke-font-data.ts
 .claude
 references
 
+# Golden files are byte-exact writer output; reformatting them breaks the comparison.
+**/__golden__
+
 # Spec documents are hand-formatted. Re-enable per-file once we're ready to
 # adopt prettier's markdown style across the docs.
 *.md

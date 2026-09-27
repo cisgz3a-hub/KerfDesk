@@ -1,6 +1,6 @@
 import type { Vec2 } from '../scene';
 import { finiteContourBox, unionContourBoxes, type ContourBox } from './contour-bounds';
-import { ContourBoxIndex } from './contour-box-index';
+import { contourEdgeBandsSteps, type ContourEdgeQuery } from './contour-edge-bands';
 import type { TraceSteps } from './trace-steps';
 
 export type ContourEdge = ContourBox & {
@@ -11,7 +11,7 @@ export type ContourEdge = ContourBox & {
 };
 export type ContourEdges = ContourBox & {
   readonly edges: ReadonlyArray<ContourEdge>;
-  readonly index: ContourBoxIndex<ContourEdge>;
+  readonly index: ContourEdgeQuery<ContourEdge>;
 };
 
 /** Prepare one immutable boundary, retaining the original implicit closure. */
@@ -41,7 +41,7 @@ export function* contourEdgesSteps(points: ReadonlyArray<Vec2>): TraceSteps<Cont
   }
   const bounds = unionContourBoxes(edges);
   if (!finiteContourBox(bounds)) return null;
-  return { ...bounds, edges, index: yield* ContourBoxIndex.createSteps(edges) };
+  return { ...bounds, edges, index: yield* contourEdgeBandsSteps(edges, bounds) };
 }
 
 export function adjacentContourEdges(a: ContourEdge, b: ContourEdge): boolean {

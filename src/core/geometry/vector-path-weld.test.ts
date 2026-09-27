@@ -10,6 +10,7 @@ import {
   type ImportedSvg,
   type Polyline,
   type TextObject,
+  type Vec2,
 } from '../scene';
 import { weldVectorObjects } from './vector-path-weld';
 
@@ -49,6 +50,14 @@ function signedArea(polyline: Polyline): number {
       return next === undefined ? sum : sum + point.x * next.y - next.x * point.y;
     }, 0) / 2
   );
+}
+
+/** Length of the closed ring through the points. */
+function perimeter(points: ReadonlyArray<Vec2>): number {
+  return points.reduce((sum, point, index) => {
+    const next = points[(index + 1) % points.length];
+    return next === undefined ? sum : sum + Math.hypot(next.x - point.x, next.y - point.y);
+  }, 0);
 }
 
 function visibleArea(object: ImportedSvg): number {
@@ -239,10 +248,18 @@ describe('weldVectorObjects render-batch topology', () => {
     const welded = unwrap(weldVectorObjects([source], 'out'));
     const result = welded.paths[0]?.polylines[0];
     expect(result?.points).toHaveLength(machine.polyline.points.length);
-    expect(Math.abs(result === undefined ? 0 : signedArea(result))).toBeCloseTo(
-      Math.abs(signedArea(machine.polyline)),
-      3,
+    // The union snaps vertices to a 0.001 mm grid (VECTOR_PATH_PRECISION_DECIMALS).
+    // Moving every vertex by at most half a grid diagonal changes the area by at
+    // most the perimeter times that distance (about 0.018 mm² here; measured
+    // 0.0005 mm²). The coarse compatibility polyline differs by far more.
+    const snapAreaBound = perimeter(machine.polyline.points) * 0.0005 * Math.SQRT2;
+    const weldedArea = Math.abs(result === undefined ? 0 : signedArea(result));
+    expect(Math.abs(weldedArea - Math.abs(signedArea(machine.polyline)))).toBeLessThan(
+      snapAreaBound,
     );
+    expect(
+      Math.abs(Math.abs(signedArea(coarse.polyline)) - Math.abs(signedArea(machine.polyline))),
+    ).toBeGreaterThan(0.1);
   });
 
   it('stores equivalent disjoint input in identical raw path order', () => {

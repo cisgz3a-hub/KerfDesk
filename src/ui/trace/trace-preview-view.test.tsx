@@ -56,11 +56,13 @@ describe('TracePreview comparison and inspection', () => {
     await render();
     expect(button('Trace').getAttribute('aria-label')).toBe('Show trace result');
     expect(button('Overlay').getAttribute('aria-pressed')).toBe('true');
-    expect(stage().querySelector('[aria-label="Trace points"]')).toBeNull();
+    expect(stage().querySelector('[aria-label="Trace nodes"]')).toBeNull();
     await click('Show Points');
     const trace = host.querySelector('#preview-line');
-    const points = host.querySelector('[aria-label="Trace points"]');
+    const points = host.querySelector('[aria-label="Trace nodes"]');
     expect(points).toBeInstanceOf(HTMLCanvasElement);
+    // The marker legend reaches assistive tech as the accessible description.
+    expect(points?.getAttribute('title')).toMatch(/Squares mark corner nodes; circles mark smooth/);
     const image = source();
 
     await click('Original');
@@ -76,7 +78,7 @@ describe('TracePreview comparison and inspection', () => {
     await click('Overlay');
     expect(image.hidden).toBe(false);
     expect(host.querySelector('#preview-line')).toBe(trace);
-    expect(host.querySelector('[aria-label="Trace points"]')).toBe(points);
+    expect(host.querySelector('[aria-label="Trace nodes"]')).toBe(points);
   });
 
   it('starts with a faded comparison and remembers its preference without fading Original', async () => {
@@ -246,7 +248,7 @@ describe('TracePreview status', () => {
     );
   });
 
-  it('announces an error and reports result polylines and stored points when ready', async () => {
+  it('announces an error and reports result paths and vector nodes when ready', async () => {
     await render({ state: { kind: 'error', message: 'Image could not be traced.' } });
     expect(host.querySelector('[role="alert"]')?.textContent).toBe(
       'Preview failed: Image could not be traced.',
@@ -255,7 +257,7 @@ describe('TracePreview status', () => {
     expect(host.querySelector('[role="alert"]')).toBeNull();
     const status = host.querySelector('[role="status"]');
     expect(status?.textContent).toContain('2 paths');
-    expect(status?.textContent).toContain('4 points');
+    expect(status?.textContent).toContain('4 nodes');
     expect(status?.textContent).toContain('200 × 100 px');
   });
 
@@ -263,7 +265,7 @@ describe('TracePreview status', () => {
     await render({ state: { ...ready, paths: [], svg: '<svg viewBox="0 0 200 100"/>' } });
     const status = host.querySelector('[role="status"]');
     expect(status?.textContent).toContain('No trace paths found.');
-    expect(status?.textContent).toContain('0 points');
+    expect(status?.textContent).toContain('0 nodes');
   });
 });
 

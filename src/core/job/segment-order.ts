@@ -3,6 +3,7 @@
 
 import type { ProjectOptimizationSettings, Vec2 } from '../scene';
 import { containmentDepths } from './containment-depth';
+import { reverseCutSegment } from './cut-arc-moves';
 import type { CutSegment } from './job';
 import { polylineBounds } from './segment-bounds';
 import { createNearestEntryQuery, type SegmentEntry } from './segment-entry-index';
@@ -128,5 +129,5 @@ function collectSegmentEntries(
 }
 
 function reverseSegment<T extends CutSegment>(segment: T): T {
-  return { ...segment, polyline: [...segment.polyline].reverse(), closed: segment.closed };
+  return reverseCutSegment(segment);
 }

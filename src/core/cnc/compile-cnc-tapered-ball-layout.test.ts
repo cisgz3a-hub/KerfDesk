@@ -11,23 +11,28 @@ import {
   taperedBallRadiusAtHeightMm,
   type TaperedBallEnvelope,
 } from '../cnc-tapered-ball';
-import { DEFAULT_DEVICE_PROFILE, toMachineCoords } from '../devices';
-import { buildToolpath, type Job } from '../job';
-import { computeRemovalGrid, kernelForTool, type RemovalGrid } from '../sim';
+import type { Job } from '../job';
+import type { RemovalGrid } from '../sim';
 import {
-  DEFAULT_CNC_LAYER_SETTINGS,
-  DEFAULT_CNC_MACHINE_CONFIG,
   IDENTITY_TRANSFORM,
-  createLayer,
   type CncLayerSettings,
   type CncTool,
-  type ImportedSvg,
   type ReliefObject,
-  type Scene,
   type SceneObject,
 } from '../scene';
-import { compileCncJob } from './compile-cnc-job';
 import { roughingLoops } from '../relief/relief-roughing-chain.test-support';
+import {
+  compileWithTool,
+  contourPassXs,
+  floorResidual,
+  gridCells as cells,
+  insideBy,
+  machineBox,
+  removalGrid,
+  squareObject as square,
+  wallDistanceMm,
+  type Box,
+} from './layout-removal.test-support';
 
 // Amana 46282, as the audit modeled it: 6.25 mm across the top of the flutes,
 // a 1/16" ball tip, 5.4 degrees per side.
@@ -70,139 +75,16 @@ function cutRadiusMm(depthMm: number): number {
 const STEP_MM = STEPOVER * 2 * cutRadiusMm(DEPTH_PER_PASS_MM);
 const NO_RIB_MM = taperedBallHeightMm(envelope(), STEP_MM) + Z_SLACK_MM;
 
-function square(atMm: number, sizeMm: number): ImportedSvg {
-  const points = [
-    { x: atMm, y: atMm },
-    { x: atMm + sizeMm, y: atMm },
-    { x: atMm + sizeMm, y: atMm + sizeMm },
-    { x: atMm, y: atMm + sizeMm },
-  ];
-  return {
-    kind: 'imported-svg',
-    id: 'O1',
-    source: 'O1.svg',
-    bounds: { minX: atMm, minY: atMm, maxX: atMm + sizeMm, maxY: atMm + sizeMm },
-    transform: IDENTITY_TRANSFORM,
-    paths: [{ color: '#ff0000', polylines: [{ closed: true, points }] }],
-  };
-}
-
 function compile(object: SceneObject, patch: Partial<CncLayerSettings>): Job {
-  const scene: Scene = {
-    objects: [object],
-    layers: [
-      {
-        ...createLayer({ id: 'L1', color: '#ff0000' }),
-        cnc: {
-          ...DEFAULT_CNC_LAYER_SETTINGS,
-          toolId: TBN.id,
-          depthPerPassMm: DEPTH_PER_PASS_MM,
-          stepoverPercent: STEPOVER * 100,
-          // A clean wall to measure: no bridges, no lead arcs in the waste.
-          tabsEnabled: false,
-          profileLead: { shape: 'none' },
-          ...patch,
-        },
-      },
-    ],
-  };
-  return compileCncJob(scene, DEFAULT_DEVICE_PROFILE, {
-    ...DEFAULT_CNC_MACHINE_CONFIG,
-    tools: [...DEFAULT_CNC_MACHINE_CONFIG.tools, TBN],
-    toolId: TBN.id,
+  return compileWithTool(object, TBN, {
+    depthPerPassMm: DEPTH_PER_PASS_MM,
+    stepoverPercent: STEPOVER * 100,
+    ...patch,
   });
 }
 
-type Box = {
-  readonly minX: number;
-  readonly maxX: number;
-  readonly minY: number;
-  readonly maxY: number;
-};
-
-// The object's scene bounds in machine coordinates.
-function machineBox(object: SceneObject): Box {
-  const corners = [
-    { x: object.bounds.minX, y: object.bounds.minY },
-    { x: object.bounds.maxX, y: object.bounds.maxY },
-  ].map((point) => toMachineCoords(point, DEFAULT_DEVICE_PROFILE));
-  const xs = corners.map((point) => point.x);
-  const ys = corners.map((point) => point.y);
-  return {
-    minX: Math.min(...xs),
-    maxX: Math.max(...xs),
-    minY: Math.min(...ys),
-    maxY: Math.max(...ys),
-  };
-}
-
 function removal(job: Job, area: Box, cellMm: number): RemovalGrid {
-  const result = computeRemovalGrid(
-    buildToolpath(job),
-    {
-      originX: area.minX,
-      originY: area.minY,
-      widthMm: area.maxX - area.minX,
-      heightMm: area.maxY - area.minY,
-      mmPerCell: cellMm,
-    },
-    kernelForTool(TBN, cellMm),
-  );
-  if (result.kind === 'error') throw new Error(result.reason);
-  return result.grid;
-}
-
-type Cell = { readonly x: number; readonly y: number; readonly depthMm: number };
-
-function cells(grid: RemovalGrid): ReadonlyArray<Cell> {
-  const out: Cell[] = [];
-  for (let row = 0; row < grid.heightCells; row += 1) {
-    for (let col = 0; col < grid.widthCells; col += 1) {
-      out.push({
-        x: grid.originX + (col + 0.5) * grid.mmPerCell,
-        y: grid.originY + (row + 0.5) * grid.mmPerCell,
-        depthMm: grid.depth[row * grid.widthCells + col] ?? 0,
-      });
-    }
-  }
-  return out;
-}
-
-// Where the wall stands at `zMm`: the distance from the line, measured toward
-// the waste, of the first cell cut at least that deep.
-function wallDistanceMm(
-  row: ReadonlyArray<Cell>,
-  lineX: number,
-  wasteSign: 1 | -1,
-  zMm: number,
-): number {
-  const reached = row
-    .filter((cell) => cell.depthMm <= zMm)
-    .map((cell) => (cell.x - lineX) * wasteSign);
-  return reached.length === 0 ? Number.POSITIVE_INFINITY : Math.min(...reached);
-}
-
-// How far a cell lies inside the box; negative outside it.
-function insideBy(cell: Cell, box: Box): number {
-  return Math.min(cell.x - box.minX, box.maxX - cell.x, cell.y - box.minY, box.maxY - cell.y);
-}
-
-// The highest the floor stands above `floorZ` over cells at least `marginMm`
-// inside the box.
-function floorResidual(
-  all: ReadonlyArray<Cell>,
-  box: Box,
-  marginMm: number,
-  floorZ: number,
-): { readonly cells: number; readonly highestMm: number } {
-  let count = 0;
-  let highestMm = Number.NEGATIVE_INFINITY;
-  for (const cell of all) {
-    if (insideBy(cell, box) < marginMm) continue;
-    count += 1;
-    highestMm = Math.max(highestMm, cell.depthMm - floorZ);
-  }
-  return { cells: count, highestMm };
+  return removalGrid(job, TBN, area, cellMm);
 }
 
 describe('tapered ball-nose profile layout', () => {
@@ -239,14 +121,7 @@ describe('tapered ball-nose profile layout', () => {
   it('offsets an inside profile inward by the cut radius at the full depth', () => {
     const object = square(40, 10);
     const box = machineBox(object);
-    const job = compile(object, { cutType: 'profile-inside', depthMm: 3 });
-    const xs: number[] = [];
-    for (const group of job.groups) {
-      if (group.kind !== 'cnc') continue;
-      for (const pass of group.passes) {
-        if (pass.kind === 'contour') xs.push(...pass.polyline.map((point) => point.x));
-      }
-    }
+    const xs = contourPassXs(compile(object, { cutType: 'profile-inside', depthMm: 3 }));
     // Emitted coordinates sit on the 0.001 mm output grid.
     expect(xs.length).toBeGreaterThan(0);
     expect(Math.abs(Math.min(...xs) - box.minX - cutRadiusMm(3))).toBeLessThanOrEqual(0.0005);

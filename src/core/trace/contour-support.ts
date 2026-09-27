@@ -3,10 +3,16 @@ import { coherentContourDetailMask } from './contour-detail-detector';
 import type { ContourTraceInput } from './contour-input';
 import { isValidRawImageData, type RawImageData } from './trace-image';
 
+// Enlarged pixels per source pixel along each axis: the integer factor on an
+// exact grid, and the rounded grid's own ratio on a fractional one (see
+// upscaleToWorkingGrid). Every mapping below reduces to the integer-grid
+// arithmetic when the ratio is an integer.
 type SupportGrid = {
   readonly source: RawImageData;
   readonly enlarged: RawImageData;
   readonly factor: number;
+  readonly scaleX: number;
+  readonly scaleY: number;
   readonly restored: Uint8Array;
 };
 
@@ -25,6 +31,8 @@ export function restoreEnlargedContourSupport(
     source: source.prepared,
     enlarged: enlarged.prepared,
     factor,
+    scaleX: enlarged.prepared.width / source.prepared.width,
+    scaleY: enlarged.prepared.height / source.prepared.height,
     restored: new Uint8Array(source.prepared.width * source.prepared.height),
   };
   restoreErasedThinInk(grid);
@@ -41,11 +49,22 @@ function matchingGrids(source: RawImageData, enlarged: RawImageData, factor: num
   return (
     isValidRawImageData(source) &&
     isValidRawImageData(enlarged) &&
-    Number.isInteger(factor) &&
+    Number.isFinite(factor) &&
     factor > 1 &&
-    enlarged.width === source.width * factor &&
-    enlarged.height === source.height * factor
+    enlarged.width === Math.round(source.width * factor) &&
+    enlarged.height === Math.round(source.height * factor)
   );
+}
+
+// The enlarged pixels [low, high) along one axis whose sample position falls
+// in source pixel `cell`: pixel o samples the source at (o + 0.5) / scale.
+function cellSpan(cell: number, scale: number): { readonly low: number; readonly high: number } {
+  return { low: Math.ceil(cell * scale - 0.5), high: Math.ceil((cell + 1) * scale - 0.5) };
+}
+
+// The source pixel an enlarged pixel samples inside.
+function ownerCell(pixel: number, scale: number): number {
+  return Math.floor((pixel + 0.5) / scale);
 }
 
 function restoreErasedThinInk(grid: SupportGrid): void {
@@ -115,10 +134,12 @@ function paperNeighbours(image: RawImageData, x: number, y: number): number[] {
 }
 
 function cellHasClass(grid: SupportGrid, x: number, y: number, ink: boolean, halo = 0): boolean {
-  const x0 = Math.max(0, x * grid.factor - halo);
-  const y0 = Math.max(0, y * grid.factor - halo);
-  const x1 = Math.min(grid.enlarged.width, (x + 1) * grid.factor + halo);
-  const y1 = Math.min(grid.enlarged.height, (y + 1) * grid.factor + halo);
+  const columns = cellSpan(x, grid.scaleX);
+  const rows = cellSpan(y, grid.scaleY);
+  const x0 = Math.max(0, columns.low - halo);
+  const y0 = Math.max(0, rows.low - halo);
+  const x1 = Math.min(grid.enlarged.width, columns.high + halo);
+  const y1 = Math.min(grid.enlarged.height, rows.high + halo);
   for (let yy = y0; yy < y1; yy += 1) {
     for (let xx = x0; xx < x1; xx += 1) {
       if (inkAt(grid.enlarged, yy * grid.enlarged.width + xx) === ink) return true;
@@ -143,12 +164,12 @@ function restoredMask(grid: SupportGrid): RawImageData {
   const data = grid.enlarged.data.slice();
   for (let index = 0; index < grid.restored.length; index += 1) {
     if (grid.restored[index] !== 1) continue;
-    const x = (index % grid.source.width) * grid.factor;
-    const y = Math.floor(index / grid.source.width) * grid.factor;
-    for (let dy = 0; dy < grid.factor; dy += 1) {
-      for (let dx = 0; dx < grid.factor; dx += 1) {
-        const value = supportLuma(grid, x + dx, y + dy) < 128 ? 0 : 255;
-        data.set([value, value, value, 255], ((y + dy) * grid.enlarged.width + x + dx) * 4);
+    const columns = cellSpan(index % grid.source.width, grid.scaleX);
+    const rows = cellSpan(Math.floor(index / grid.source.width), grid.scaleY);
+    for (let y = rows.low; y < rows.high; y += 1) {
+      for (let x = columns.low; x < columns.high; x += 1) {
+        const value = supportLuma(grid, x, y) < 128 ? 0 : 255;
+        data.set([value, value, value, 255], (y * grid.enlarged.width + x) * 4);
       }
     }
   }
@@ -159,9 +180,7 @@ function restoredField(grid: SupportGrid, original: CrackSubPixelField | null): 
   const patched = (x: number, y: number): boolean => {
     if (x < 0 || y < 0 || x >= grid.enlarged.width || y >= grid.enlarged.height) return false;
     return (
-      grid.restored[
-        Math.floor(y / grid.factor) * grid.source.width + Math.floor(x / grid.factor)
-      ] === 1
+      grid.restored[ownerCell(y, grid.scaleY) * grid.source.width + ownerCell(x, grid.scaleX)] === 1
     );
   };
   return {
@@ -179,8 +198,8 @@ function restoredField(grid: SupportGrid, original: CrackSubPixelField | null): 
  * regions. This adds a consistent support ramp without changing detection
  * settings or replacing the source's other antialiasing gradients. */
 function supportLuma(grid: SupportGrid, x: number, y: number): number {
-  const sx = (x + 0.5) / grid.factor - 0.5;
-  const sy = (y + 0.5) / grid.factor - 0.5;
+  const sx = (x + 0.5) / grid.scaleX - 0.5;
+  const sy = (y + 0.5) / grid.scaleY - 0.5;
   const x0 = Math.floor(sx);
   const y0 = Math.floor(sy);
   const fx = sx - x0;

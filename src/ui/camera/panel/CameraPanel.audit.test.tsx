@@ -139,12 +139,20 @@ it('starts USB through the adapter, reports denial, starts a fake stream and sto
 });
 
 it('opens RTSP details and connects the entered URL through a fake bridge before stopping', async () => {
-  const probe = vi.fn<CameraBridgeAdapter['probeRtspCamera']>().mockResolvedValue({
-    kind: 'ok',
-    url: 'rtsp://camera.invalid/live',
-    ffmpegAvailable: true,
-    previewUrl: 'http://bridge.invalid/preview',
-  });
+  let completeProbe: () => void = () => undefined;
+  const probe = vi.fn<CameraBridgeAdapter['probeRtspCamera']>().mockImplementation(
+    () =>
+      new Promise((resolve) => {
+        completeProbe = () =>
+          resolve({
+            kind: 'ok',
+            url: 'rtsp://camera.invalid/live',
+            ffmpegAvailable: true,
+            previewUrl: 'http://bridge.invalid/preview',
+          });
+      }),
+  );
+  const startRtspSource = vi.spyOn(camera.getState(), 'startRtspSource');
   const bridge: CameraBridgeAdapter = {
     isSupported: () => true,
     probeRtspCamera: probe,
@@ -166,14 +174,21 @@ it('opens RTSP details and connects the entered URL through a fake bridge before
   });
   await clickControl(host, 'Connect');
   expect(probe).toHaveBeenCalledWith({ url: 'rtsp://camera.invalid/live' });
-  // Going live awaits the WebCrypto query fingerprint, which one act() flush
-  // does not always outlast when the whole suite runs.
-  await vi.waitFor(() =>
-    expect(camera.getState().sourceState).toMatchObject({
-      kind: 'live',
-      source: { kind: 'machine-rtsp' },
-    }),
-  );
+  expect(camera.getState().sourceState).toEqual({
+    kind: 'starting',
+    sourceKind: 'machine-rtsp',
+  });
+  expect(control(host, 'Connecting…').disabled).toBe(true);
+  await act(async () => {
+    completeProbe();
+    // The click handler intentionally returns void; await the real action,
+    // including its asynchronous Web Crypto resource fingerprint.
+    await startRtspSource.mock.results[0]?.value;
+  });
+  expect(camera.getState().sourceState).toMatchObject({
+    kind: 'live',
+    source: { kind: 'machine-rtsp' },
+  });
   await clickControl(host, 'Stop');
   expect(camera.getState().sourceState.kind).toBe('idle');
 });

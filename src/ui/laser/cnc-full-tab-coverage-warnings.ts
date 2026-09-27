@@ -1,9 +1,12 @@
 // detectCncFullTabCoverageWarnings — CNC-mode advisory: holding tabs are
-// enabled, but the requested windows (tab width + bit diameter, times tabs
-// per shape) cover the whole perimeter of the layer's shapes, so no material
-// below the tab top is ever removed and the part is NEVER cut through — the loop
-// stays one full bridge (AUDIT A5). Detected from the compiled job: the layer
-// cuts at/above its tab top but nowhere below it.
+// enabled, but the requested windows (tab width + the bit's cut width at full
+// depth, times tabs per shape) cover the whole perimeter of the layer's
+// shapes, so no material below the tab top is ever removed and the part is
+// NEVER cut through — the loop stays one full bridge (AUDIT A5). Detected from
+// the compiled job: the layer cuts at/above its tab top but nowhere below it.
+// The cut width is the bit diameter for a flat end mill, and for a bit that
+// narrows toward its tip the width it cuts at the full depth (ADR-368
+// Amendments 2 and 3).
 //
 // ADR-258 changed the mechanism, not the condition. The split model achieved
 // this by SKIPPING the below-tab-top passes; tabs are now a Z-rise, so the loop
@@ -19,13 +22,17 @@
 
 import { compileCncJob, isProfileCutType, passNeedsTabs, tabTopZMm } from '../../core/cnc';
 import { settingsWithStockTabGate } from '../../core/cnc/cnc-tabs';
+import { cncLayoutCutWidths } from '../../core/cnc/layout-cut-widths';
 import type { Job } from '../../core/job';
 import {
   DEFAULT_CNC_LAYER_SETTINGS,
+  layerCncTool,
   type CncLayerSettings,
+  type CncMachineConfig,
   type Layer,
   type Project,
 } from '../../core/scene';
+import { formatMm } from './job-review/job-review-format';
 
 const Z_EPS = 1e-9;
 
@@ -70,14 +77,24 @@ export function detectCncFullTabCoverageWarnings(
     const cutsBelowTabTop = passZs.some((zMm) => zMm < tabTop - Z_EPS);
     if (cutsAtOrAboveTabTop && !cutsBelowTabTop) {
       warnings.push(
-        `Layer ${layer.id}: the requested holding tabs (tab width + bit diameter × ` +
-          `${settings.tabsPerShape} tabs) cover the whole perimeter, so every pass below the tab ` +
-          'top is skipped and the part will NOT be cut through. Use fewer or narrower tabs, a ' +
-          'smaller bit, or a larger shape.',
+        `Layer ${layer.id}: the requested holding tabs (tab width + ` +
+          `${tabCutWidthLabel(machine, settings)} × ${settings.tabsPerShape} tabs) cover the ` +
+          'whole perimeter, so every pass below the tab top is skipped and the part will NOT ' +
+          'be cut through. Use fewer or narrower tabs, a smaller bit, or a larger shape.',
       );
     }
   }
   return warnings;
+}
+
+// What each tab window adds to the tab width: the width the bit cuts at the
+// full depth, which is its diameter unless it narrows toward its tip.
+function tabCutWidthLabel(machine: CncMachineConfig, settings: CncLayerSettings): string {
+  const tool = layerCncTool(machine, settings);
+  const { wallDiameterMm } = cncLayoutCutWidths(tool, settings.depthMm, settings.depthPerPassMm);
+  return wallDiameterMm < tool.diameterMm
+    ? `the bit's ${formatMm(wallDiameterMm)} mm cut width`
+    : 'bit diameter';
 }
 
 function layerRequestsDeepTabbedProfile(settings: CncLayerSettings): boolean {

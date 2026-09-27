@@ -46,8 +46,52 @@ const APEX_REACH_SCALE_MAX = 4;
 // rebuilt up to 2.3px off the edge), while a multi-point chord averages it
 // away. legIsStraight has already verified the legs hug their chords.
 const TANGENT_CHORD_PX = 3;
+const WALK_DIRECTIONS = [-1, 1] as const;
 
 export type BendVertex = { readonly vertex: Vec2; readonly turnRad: number };
+
+/**
+ * A chain's edge lengths: seg[k] = |pts[k + 1] - pts[k]|, measured exactly
+ * as every arc walk here measures it (an edge's length does not depend on
+ * the direction it is walked). A candidate's gates walk the same few edges
+ * dozens of times, so they read them from here.
+ */
+export function edgeLengths(pts: ReadonlyArray<Vec2>): Float64Array {
+  const seg = new Float64Array(Math.max(0, pts.length - 1));
+  for (let k = 0; k + 1 < pts.length; k += 1) seg[k] = edgeLength(pts, k, k + 1);
+  return seg;
+}
+
+/** |pts[b] - pts[a]| for neighbouring positions a and b. */
+export function edgeLength(pts: ReadonlyArray<Vec2>, a: number, b: number): number {
+  const p = pts[a] as Vec2;
+  const q = pts[b] as Vec2;
+  return Math.hypot(q.x - p.x, q.y - p.y);
+}
+
+/** polyline-window's arcTrimIndex on a chain's edge lengths: the index a
+ *  trim of `arc` from one end of points[first..last] cuts at. */
+export function arcTrimIndexOn(
+  seg: Float64Array,
+  first: number,
+  last: number,
+  end: 'head' | 'tail',
+  arc: number,
+): number {
+  let cum = 0;
+  let cut = end === 'head' ? first + 1 : last;
+  for (let step = 1; step <= last - first; step += 1) {
+    cum += seg[end === 'head' ? first + step - 1 : last - step] as number;
+    cut = end === 'head' ? first + step : last - step + 1;
+    if (cum > arc) break;
+  }
+  return cut;
+}
+
+// The length of the edge left from position k in direction `step`.
+function stepLength(seg: Float64Array, k: number, step: -1 | 1): number {
+  return seg[step === 1 ? k : k - 1] as number;
+}
 
 // Cheap gate: tangent turn across ±QUICK_TANGENT_SPAN points. Smoothing has
 // already flattened the pixel staircase, so only real bends pass this.
@@ -68,9 +112,17 @@ export function quickTurnAt(pts: ReadonlyArray<Vec2>, i: number, closed: boolean
 
 // Widening the window past a corner does not add turn; on an arc, turn
 // accumulates uniformly, so the double window turns roughly twice as far.
-export function turnIsConcentrated(pts: ReadonlyArray<Vec2>, i: number, arm: number): boolean {
-  const near = netTurnAcross(pts, i, arm);
-  const wide = netTurnAcross(pts, i, arm * CONCENTRATION_WINDOW_FACTOR);
+export function turnIsConcentrated(
+  pts: ReadonlyArray<Vec2>,
+  seg: Float64Array,
+  i: number,
+  arm: number,
+): boolean {
+  // One walk each way serves both windows: the wide one continues the near.
+  const back = walkTwice(pts, seg, i, -1, arm, arm * CONCENTRATION_WINDOW_FACTOR);
+  const ahead = walkTwice(pts, seg, i, 1, arm, arm * CONCENTRATION_WINDOW_FACTOR);
+  const near = turnBetween(pts, seg, back.near, ahead.near);
+  const wide = turnBetween(pts, seg, back.far, ahead.far);
   if (near === null || wide === null) return true; // window ran off the chain — no evidence either way
   if (wide < PARALLEL_EPS) return true;
   return near / wide >= MIN_TURN_CONCENTRATION;
@@ -81,14 +133,26 @@ export function turnIsConcentrated(pts: ReadonlyArray<Vec2>, i: number, arm: num
 // (same noise-averaging rationale as bendVertex's chord anchors).
 export function netTurnAcross(
   pts: ReadonlyArray<Vec2>,
+  seg: Float64Array,
   i: number,
   halfSpan: number,
 ): number | null {
-  const before = walkByArc(pts, i, -halfSpan);
-  const after = walkByArc(pts, i, halfSpan);
+  const before = walkByArc(pts, seg, i, -halfSpan);
+  const after = walkByArc(pts, seg, i, halfSpan);
+  return turnBetween(pts, seg, before, after);
+}
+
+// The turn between the tangent chords leading into `before` and out of
+// `after` (null when either window or chord runs off the chain).
+function turnBetween(
+  pts: ReadonlyArray<Vec2>,
+  seg: Float64Array,
+  before: number | null,
+  after: number | null,
+): number | null {
   if (before === null || after === null) return null;
-  const beforeFar = walkByArc(pts, before, -TANGENT_CHORD_PX);
-  const afterFar = walkByArc(pts, after, TANGENT_CHORD_PX);
+  const beforeFar = walkByArc(pts, seg, before, -TANGENT_CHORD_PX);
+  const afterFar = walkByArc(pts, seg, after, TANGENT_CHORD_PX);
   if (beforeFar === null || afterFar === null) return null;
   const pIn1 = pts[beforeFar];
   const pIn2 = pts[before];
@@ -104,21 +168,49 @@ export function netTurnAcross(
 
 // Index reached by walking |arc| of length from i in the sign's direction,
 // or null when the chain ends first.
-function walkByArc(pts: ReadonlyArray<Vec2>, i: number, arc: number): number | null {
+function walkByArc(
+  pts: ReadonlyArray<Vec2>,
+  seg: Float64Array,
+  i: number,
+  arc: number,
+): number | null {
   const step = arc < 0 ? -1 : 1;
-  const target = Math.abs(arc);
-  let cum = 0;
-  let idx = i;
+  return walkOn(pts.length, seg, i, step, 0, Math.abs(arc)).at;
+}
+
+// Walk from `from` (with `startCum` of arc already behind it) until at
+// least `target`; `at` is null when the chain ends first.
+function walkOn(
+  n: number,
+  seg: Float64Array,
+  from: number,
+  step: -1 | 1,
+  startCum: number,
+  target: number,
+): { readonly at: number | null; readonly cum: number } {
+  let cum = startCum;
+  let idx = from;
   while (cum < target) {
     const nextIdx = idx + step;
-    if (nextIdx < 0 || nextIdx >= pts.length) return null;
-    const a = pts[idx];
-    const b = pts[nextIdx];
-    if (a === undefined || b === undefined) return null;
-    cum += Math.hypot(b.x - a.x, b.y - a.y);
+    if (nextIdx < 0 || nextIdx >= n) return { at: null, cum };
+    cum += stepLength(seg, idx, step);
     idx = nextIdx;
   }
-  return idx;
+  return { at: idx, cum };
+}
+
+// walkByArc to `near`, then on to `far`: the same ends two walks reach.
+function walkTwice(
+  pts: ReadonlyArray<Vec2>,
+  seg: Float64Array,
+  i: number,
+  step: -1 | 1,
+  near: number,
+  far: number,
+): { readonly near: number | null; readonly far: number | null } {
+  const first = walkOn(pts.length, seg, i, step, 0, near);
+  if (first.at === null) return { near: null, far: null };
+  return { near: first.at, far: walkOn(pts.length, seg, first.at, step, first.cum, far).at };
 }
 
 // A drawn corner has STRAIGHT legs on both sides of the vertex; a small
@@ -126,29 +218,47 @@ function walkByArc(pts: ReadonlyArray<Vec2>, i: number, arc: number): number | n
 // stay round.
 export function legIsStraight(
   pts: ReadonlyArray<Vec2>,
+  seg: Float64Array,
   bendIndex: number,
   arm: number,
   side: 'before' | 'after',
 ): boolean {
-  const leg: Vec2[] = [];
-  let cum = 0;
+  // The leg is the index run first..last; it is read in place, not copied.
   const step = side === 'before' ? -1 : 1;
-  for (let k = bendIndex + step; k > 0 && k < pts.length - 1 && cum <= arm; k += step) {
-    const a = pts[k];
-    const b = pts[k - step];
-    if (a === undefined || b === undefined) break;
-    cum += Math.hypot(a.x - b.x, a.y - b.y);
-    leg.push(a);
-  }
-  if (leg.length < 3) return true; // too short to measure curvature
-  const first = leg[0];
-  const last = leg[leg.length - 1];
-  if (first === undefined || last === undefined) return true;
-  const chord = Math.hypot(last.x - first.x, last.y - first.y);
+  const { count, last } = legRun(pts.length, seg, bendIndex, arm, step);
+  if (count < 3) return true; // too short to measure curvature
+  const firstPoint = pts[bendIndex + step];
+  const lastPoint = pts[last];
+  if (firstPoint === undefined || lastPoint === undefined) return true;
+  const chord = Math.hypot(lastPoint.x - firstPoint.x, lastPoint.y - firstPoint.y);
   if (chord < MIN_LEG_CHORD_PX) return false; // leg loops back — not a corner
-  let sag = 0;
-  for (const q of leg) sag = Math.max(sag, pointToSegment(q, first, last));
-  return sag <= chord * MAX_LEG_SAG_RATIO;
+  const maxSag = chord * MAX_LEG_SAG_RATIO;
+  for (let k = bendIndex + step; k !== last + step; k += step) {
+    if (pointToSegment(pts[k] as Vec2, firstPoint, lastPoint) > maxSag) return false;
+  }
+  return true;
+}
+
+// The points of one leg: from the bend's neighbour outward until `arm` of
+// arc is passed or the chain's second-to-last point is reached.
+function legRun(
+  n: number,
+  seg: Float64Array,
+  bendIndex: number,
+  arm: number,
+  step: -1 | 1,
+): { readonly count: number; readonly last: number } {
+  let cum = 0;
+  let count = 0;
+  let last = bendIndex;
+  const back = step === 1 ? -1 : 1;
+  for (let k = bendIndex + step; k > 0 && k < n - 1 && cum <= arm; k += step) {
+    // The edge from k back toward the bend.
+    cum += stepLength(seg, k, back);
+    count += 1;
+    last = k;
+  }
+  return { count, last };
 }
 
 export function pointToSegment(p: Vec2, a: Vec2, b: Vec2): number {
@@ -176,6 +286,7 @@ export function arcLengthOf(points: ReadonlyArray<Vec2>): number {
 // the pinched radius at the bend point itself.
 export function bendWindow(
   pts: ReadonlyArray<Vec2>,
+  seg: Float64Array,
   i: number,
   distSq: Float64Array,
   width: number,
@@ -184,18 +295,37 @@ export function bendWindow(
   const localRadius = p === undefined ? 0 : radiusAtPosition(p, distSq, width);
   const reach = Math.max(MIN_WINDOW_RADIUS_PX, localRadius) * WINDOW_RADIUS_FACTOR;
   let maxRadius = Math.max(MIN_WINDOW_RADIUS_PX, localRadius);
-  for (const dir of [-1, 1]) {
+  for (const dir of WALK_DIRECTIONS) {
     let cum = 0;
     for (let k = i; k > 0 && k < pts.length - 1 && cum <= reach; k += dir) {
-      const a = pts[k];
-      const b = pts[k + dir];
-      if (a === undefined || b === undefined) break;
-      cum += Math.hypot(b.x - a.x, b.y - a.y);
-      maxRadius = Math.max(maxRadius, radiusAtPosition(b, distSq, width));
+      cum += stepLength(seg, k, dir);
+      maxRadius = Math.max(maxRadius, radiusAtPosition(pts[k + dir] as Vec2, distSq, width));
     }
   }
   return { arm: Math.min(maxRadius * WINDOW_RADIUS_FACTOR, MAX_WINDOW_ARM_PX), maxRadius };
 }
+
+/**
+ * The farthest arc length, measured from candidate `i`, that any bend gate
+ * reads when every tangent arm is at most `maxArmPx`: the radius walk of
+ * bendWindow, or the widened concentration window plus its tangent chord.
+ * The one-pass closed-ring scan sizes each candidate's neighbourhood by it,
+ * so a gate never sees the neighbourhood's cut ends before the ring's own.
+ */
+export function bendGateReachPx(
+  pts: ReadonlyArray<Vec2>,
+  i: number,
+  distSq: Float64Array,
+  width: number,
+  maxArmPx: number,
+): number {
+  const p = pts[i];
+  const localRadius = p === undefined ? 0 : radiusAtPosition(p, distSq, width);
+  const windowReach = Math.max(MIN_WINDOW_RADIUS_PX, localRadius) * WINDOW_RADIUS_FACTOR;
+  return Math.max(windowReach, maxArmPx * CONCENTRATION_WINDOW_FACTOR + TANGENT_CHORD_PX);
+}
+
+export const MAX_BEND_WINDOW_ARM_PX = MAX_WINDOW_ARM_PX;
 
 // Intersect the head's exit tangent with the tail's entry tangent. Null for
 // gentle bends, near-parallel tangents, or a vertex behind either arm.
@@ -209,13 +339,14 @@ export function bendWindow(
  */
 export function bendVertexAt(
   points: ReadonlyArray<Vec2>,
+  seg: Float64Array,
   headEnd: number,
   tailStart: number,
 ): BendVertex | null {
-  const a1 = chordAnchorIn(points, headEnd - 1, -1, 0, headEnd - 1);
+  const a1 = chordAnchorIn(points, seg, headEnd - 1, -1, 0, headEnd - 1);
   const a2 = points[headEnd - 1];
   const b1 = points[tailStart];
-  const b2 = chordAnchorIn(points, tailStart, 1, tailStart, points.length - 1);
+  const b2 = chordAnchorIn(points, seg, tailStart, 1, tailStart, points.length - 1);
   return bendVertexFrom(a1, a2, b1, b2);
 }
 
@@ -334,13 +465,14 @@ function inkNear(point: Vec2, distSq: Float64Array, width: number): boolean {
 function chordAnchor(points: ReadonlyArray<Vec2>, from: 'head' | 'tail'): Vec2 | undefined {
   const n = points.length;
   const startIdx = from === 'tail' ? n - 1 : 0;
-  return chordAnchorIn(points, startIdx, from === 'tail' ? -1 : 1, 0, n - 1);
+  return chordAnchorIn(points, edgeLengths(points), startIdx, from === 'tail' ? -1 : 1, 0, n - 1);
 }
 
 // The same walk over a range of a larger array: `low`/`high` are the inclusive
 // bounds of the leg, standing in for the sliced-out copy's own ends.
 function chordAnchorIn(
   points: ReadonlyArray<Vec2>,
+  seg: Float64Array,
   startIdx: number,
   step: -1 | 1,
   low: number,
@@ -350,10 +482,7 @@ function chordAnchorIn(
   let cum = 0;
   let idx = startIdx;
   while (idx + step >= low && idx + step <= high && cum < TANGENT_CHORD_PX) {
-    const a = points[idx];
-    const b = points[idx + step];
-    if (a === undefined || b === undefined) break;
-    cum += Math.hypot(b.x - a.x, b.y - a.y);
+    cum += stepLength(seg, idx, step);
     idx += step;
   }
   return points[idx];

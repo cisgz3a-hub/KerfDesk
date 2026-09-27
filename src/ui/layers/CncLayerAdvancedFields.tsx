@@ -67,6 +67,11 @@ function ClearingFields(props: {
       badge={clearingBadge(settings, hasReliefObjects)}
       hint="Choose the spacing and pattern used to remove material inside an area."
     >
+      <p className="lf-cnc-settings-hint">
+        Stepover is the spacing between neighbouring passes, as a percentage of the bit diameter.
+        For a bit that narrows toward its tip (ball nose, V-bit, engraving bit or tapered ball nose)
+        it is a percentage of the width the bit cuts in one depth pass.
+      </p>
       <PocketFillRow layer={props.layer} settings={settings} onCommit={props.onCommit} />
       <StepoverField {...props} />
       <AdaptivePocketFields layer={props.layer} settings={settings} onCommit={props.onCommit} />
