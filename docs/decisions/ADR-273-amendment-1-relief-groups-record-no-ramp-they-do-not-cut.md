@@ -92,11 +92,13 @@ learn which relief planner ramps, and would mislabel PR #939's roughing, which d
 
 ### Verification
 
-- `compile-cnc-relief-entry-provenance.test.ts` compiles the flat relief with a 5 degree ramp and
-  emits it. Neither relief group records a ramp, neither relief section has a `; cnc entry:` line,
-  and each enters with a straight `G1 Z… F300`. On the same layer a square profile keeps
-  `rampEntryDeg` 5, its `contour-ramp` line and a first descent along its path. Against the
-  previous compiler both cases fail: `expected 5 to be undefined`.
+- `compile-cnc-relief-entry-provenance.test.ts` compiles the flat relief with a 5 degree ramp,
+  with a finishing ball nose and beside a square profile, and emits it. It states the rule: a
+  group records `rampEntryDeg` and its header names the ramp exactly when its first descent below
+  the stock top travels along its path; otherwise that descent is a straight `G1 Z… F300`. The
+  relief groups claim nothing and plunge; the square claims its 5 degree ramp and descends along
+  its path. Against the previous compiler both cases fail:
+  `expected 'G1 Z-1.500 F300' to match` the along-path pattern.
 - `job-review-relief-entry.test.ts` checks which compiled relief stages count as plunging, and
   the operation line for ramp, helix and V-carve requests. `JobReviewLayersTable.test.tsx` checks
   the line in the rendered table. Against the previous code the first file fails in all three
@@ -104,4 +106,12 @@ learn which relief planner ramps, and would mislabel PR #939's roughing, which d
 - A 40 mm dome relief with roughing and finishing, emitted before and after: the programs differ
   only by the two removed `; cnc entry: contour-ramp; max-angle-deg: 5.000` lines; all 18,248
   other lines are identical.
+- In the running app (Vite dev server, CNC mode, the flat relief with a 5 degree ramp and a
+  finishing bit), the app's own output preparation gave both relief groups no ramp and no entry
+  line, and Job Review's operation line read `… · ramp entry 5° (relief passes plunge) · …`.
+  The Job Review dialog itself was not opened: Start preparation needs a connected controller.
+- A trial merge with PR #939 at 7832643af: relief roughing claims the ramp and enters along its
+  path (`G1X8.890Y391.110Z-0.097F1000`), finishing claims nothing and plunges
+  (`G1 Z-3.000 F300`), Job Review names only relief finishing, and all the tests above pass. PR
+  #939 alone still has its finishing group claim the ramp above that plunge.
 - No hardware run was made. Motion is unchanged.
