@@ -19,18 +19,25 @@ import { respondToTestGrblBuildInfo } from './laser-test-start-helpers';
 import { useStore } from './store';
 
 const IDLE = '<Idle|MPos:10.000,20.000,-1.000|FS:0,0|Ov:100,100,100>';
+const RUN = '<Run|MPos:10.000,20.000,-1.000|FS:800,0|Ov:100,100,100>';
 const ALARM = '<Alarm|MPos:10.000,20.000,-1.000|FS:0,0>';
 
 type Device = SerialConnection & { readonly say: (line: string) => void };
 
-// A GRBL 1.1 stand-in: Idle on `?`, `ok` for the settle dwell, and the
-// unlock reply GRBL prints for `$X`.
+// A GRBL 1.1 stand-in: `ok` for the settle dwell, the unlock reply GRBL prints
+// for `$X`, and on `?` the last state it reported (Run once job motion reaches
+// it). The store polls `?` on a real 250 ms timer, so answering Idle in every
+// state let a poll clear the alarm before the unlock check, or settle a hold
+// the test had not let see Idle. `$X` changes no state: the test reports the
+// Idle that proves the unlock.
 function makeDevice(sent: string[]): Device {
   const handlers = new Set<(line: string) => void>();
+  let status = IDLE;
   const device: Device = {
     write: async (data) => {
       sent.push(data);
-      if (data === '?') setTimeout(() => device.say(IDLE), 0);
+      if (data === '?') setTimeout(() => device.say(status), 0);
+      if (/^G[01]\b/m.test(data)) status = RUN;
       if (data === 'G4 P0.01\n') setTimeout(() => device.say('ok'), 0);
       if (data === '$X\n') {
         setTimeout(() => {
@@ -47,6 +54,7 @@ function makeDevice(sent: string[]): Device {
     onClose: () => () => undefined,
     close: async () => undefined,
     say: (line) => {
+      if (line.startsWith('<')) status = line;
       for (const handler of handlers) handler(line);
     },
   };
