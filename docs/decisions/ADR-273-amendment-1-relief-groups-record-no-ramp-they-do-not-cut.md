@@ -90,8 +90,9 @@ learn which relief planner ramps, and would mislabel ADR-424's roughing, which d
   pockets, not relief, and needs its own decision.
 - Integration: PR #939 (ADR-424) merged first. Its roughing group sets `rampEntryDeg` itself, so
   on the integrated branch roughing records the ramp it cuts, finishing records none, and Job
-  Review reads `(relief finishing plunges)`. Only the emitter metadata conflicted. PR #952 also
-  changes `EMITTER_REVISION`; whichever lands later takes a combined value.
+  Review reads `(relief finishing plunges)`. Only the emitter metadata conflicted; this amendment
+  landed as 66e073ef2 (PR #957). Open PR #952 also changes `EMITTER_REVISION` and needs a
+  combined value when it lands.
 
 ### Verification
 
@@ -119,8 +120,8 @@ learn which relief planner ramps, and would mislabel ADR-424's roughing, which d
   path (`G1X8.890Y391.110Z-0.097F1000`), finishing claims nothing and plunges
   (`G1 Z-3.000 F300`), Job Review names only relief finishing, and all the tests above pass. PR
   #939 alone still has its finishing group claim the ramp above that plunge.
-- On the branch integrated with main after ADR-424 (9f5c09a12), the same flat relief with a
-  finishing bit: roughing claims its ramp and enters along its first ring, finishing claims none
+- On the branch integrated with main after ADR-424 (9f5c09a12, merged as 66e073ef2), the same
+  flat relief with a finishing bit: roughing claims its ramp and enters along its first ring, finishing claims none
   and enters with `G1 Z-3.000 F300`, and Job Review reads
   `… · ramp entry 5° (relief finishing plunges) · …`. `pnpm typecheck` passes. The relief, CNC,
   output, G-code and Job Review suites pass 2,222 tests. Five others timed out under machine
