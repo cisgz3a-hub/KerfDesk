@@ -326,6 +326,20 @@ function requestedCncEntry(
   const rampEntryDeg =
     settings.cutType === 'v-carve' ? settings.vCarveRampEntryDeg : settings.rampEntryDeg;
   if (rampEntryDeg !== undefined) {
+    const specialised =
+      settings.cutType === 'drill'
+        ? 'drilling entry'
+        : settings.cutType === 'inlay-pair'
+          ? 'inlay entry'
+          : settings.cutType === 'pocket' && settings.pocketStrategy === 'adaptive'
+            ? 'adaptive entry'
+            : null;
+    if (specialised !== null) {
+      return {
+        label: specialised,
+        notes: ['stored contour ramp is not applied to these shape paths'],
+      };
+    }
     return settings.cutType === 'v-carve'
       ? { label: `requested entry ${rampEntryDeg}°`, notes: ['medial depth profile governs'] }
       : { label: `ramp entry ${rampEntryDeg}°`, notes: [] };

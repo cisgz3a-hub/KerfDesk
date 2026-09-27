@@ -305,6 +305,7 @@ describe('reliefRoughingMotion', () => {
     const ramp = rampOf(pass);
 
     expect(pass.lateralFeed).toBe('z-rate-capped');
+    expect(pass.entryRamp).toBe(true);
     expect(ramp[0]?.z).toBe(-0.5);
     expect(ramp[ramp.length - 1]?.z).toBe(-1.5);
     const tangent = Math.tan((3 * Math.PI) / 180);
@@ -332,6 +333,7 @@ describe('reliefRoughingMotion', () => {
 
     expect(passes).toHaveLength(1);
     expect(passes[0]?.kind).toBe('contour');
+    expect(passes[0]).toMatchObject({ entryPlunge: true });
   });
 
   it('keeps a cleanup trace round its stock on the climb side', () => {

@@ -1,8 +1,12 @@
 import { describe, expect, it } from 'vitest';
 import { DEFAULT_DEVICE_PROFILE } from '../devices';
-import type { CncContourPass, CncGroup, Job } from '../job';
+import type { CncContourPass, CncGroup, CncPass, Job } from '../job';
 import { cncGrblStrategy } from '../output/cnc-grbl-strategy';
+import { COMPILE_INTEGRITY_PREFLIGHT_CODES, runCncPreflight } from '../preflight';
+import { createProject, DEFAULT_CNC_MACHINE_CONFIG } from '../scene';
+import { rampContourPass } from './contour-ramp-entry';
 import { applyRampEntry } from './motion-polish';
+import { rampTabbedPath } from './tabbed-ramp-entry';
 import { tileJobs } from './tile-plan';
 
 const SMALL_CONTOUR: CncContourPass = {
@@ -65,8 +69,8 @@ function withoutMarkers(job: Job): Job {
         : {
             ...item,
             passes: item.passes.map((pass) => {
-              if (pass.kind !== 'contour') return pass;
-              const { entryPlunge: _entryPlunge, ...unmarked } = pass;
+              if (pass.kind !== 'contour' && pass.kind !== 'path3d') return pass;
+              const { entryPlunge: _entryPlunge, entryPlungeReason: _reason, ...unmarked } = pass;
               return unmarked;
             }),
           },
@@ -79,6 +83,79 @@ function commandLines(gcode: string): ReadonlyArray<string> {
 }
 
 describe('tiled short-ramp plunge provenance', () => {
+  it.each([
+    { kind: 'contour', split: false },
+    { kind: 'contour', split: true },
+    { kind: 'path3d', split: false },
+    { kind: 'path3d', split: true },
+  ] as const)('preserves precision fallback reasons on $kind, split=$split', ({ kind, split }) => {
+    // Each 0.005 mm span is unable to descend by one output Z quantum at 5 degrees.
+    // Keep every source vertex; no geometry simplification is used to obtain a ramp.
+    const corners = SMALL_CONTOUR.polyline;
+    const points = corners.slice(1).flatMap((b, index) => {
+      const a = corners[index]!;
+      return Array.from({ length: 40 }, (_, step) => ({
+        x: a.x + ((b.x - a.x) * step) / 40,
+        y: a.y + ((b.y - a.y) * step) / 40,
+      }));
+    });
+    points.push(points[0]!);
+    const tangent = Math.tan((5 * Math.PI) / 180);
+    let planned: CncPass;
+    if (kind === 'contour') {
+      planned = rampContourPass({ ...SMALL_CONTOUR, polyline: points }, 0, tangent, 0);
+    } else {
+      const first = points[0]!;
+      // A rectangular tab wall at the seam remains part of the original path.
+      planned = rampTabbedPath(
+        {
+          kind,
+          closed: false,
+          points: [
+            { ...first, z: -0.3 },
+            ...points.map((point) => ({ ...point, z: -1 })),
+            { ...first, z: -0.3 },
+          ],
+        },
+        0,
+        tangent,
+      );
+    }
+    expect(planned).toMatchObject({
+      kind,
+      entryPlunge: true,
+      entryPlungeReason: 'coordinate-precision',
+    });
+    const source: Job = { groups: [group(split ? [EXTENT, planned] : [planned])] };
+    const tiled = tiles(source);
+    expect(tiled).toHaveLength(split ? 2 : 1);
+    for (const tile of tiled) {
+      const tileGroup = tile.groups[0];
+      if (tileGroup?.kind !== 'cnc') throw new Error('Expected CNC tile');
+      const fallbacks = tileGroup.passes.filter(
+        (pass) => (pass.kind === 'contour' || pass.kind === 'path3d') && pass.entryPlunge,
+      );
+      expect(fallbacks.length).toBeGreaterThan(0);
+      for (const pass of fallbacks) {
+        expect(pass).toMatchObject({ kind, entryPlungeReason: 'coordinate-precision' });
+      }
+      const output = cncGrblStrategy.emit(tile, DEFAULT_DEVICE_PROFILE);
+      expect(output).toContain('ramp angle cannot descend at coordinate precision');
+      expect(output).not.toContain('path shorter than one cut width');
+      expect(commandLines(output)).toEqual(
+        commandLines(cncGrblStrategy.emit(withoutMarkers(tile), DEFAULT_DEVICE_PROFILE)),
+      );
+      const advisories = runCncPreflight(createProject(), DEFAULT_CNC_MACHINE_CONFIG, output, {
+        compiledJob: tile,
+        sourceGeometryChecks: 'compiled-evidence-only',
+      }).issues.filter((issue) => issue.code === 'cnc-ramp-entry-plunge');
+      expect(advisories).toHaveLength(1);
+      expect(advisories[0]?.message).toContain('at G-code coordinate precision');
+      expect(advisories[0]?.message).not.toContain('shorter than one cut width');
+      expect(COMPILE_INTEGRITY_PREFLIGHT_CODES.has('cnc-ramp-entry-plunge')).toBe(false);
+    }
+  });
+
   it.each([
     { name: 'a contour wholly contained in one tile', split: false, plungeCounts: [1] },
     { name: 'each fragment of a boundary-split contour', split: true, plungeCounts: [2, 1] },

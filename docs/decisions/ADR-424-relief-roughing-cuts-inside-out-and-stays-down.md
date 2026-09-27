@@ -123,3 +123,13 @@ controls. The captured example is pinned in addition to all 25 generated cases.
 The property reports the first counterexample without synchronous shrinking,
 which Vitest's timeout cannot preempt. Production containment, link geometry,
 motion, settings, warnings and Frame policy are unchanged.
+
+### Entry precision and provenance follow-up (2026-09-27)
+
+ADR-471 Amendment 1 now budgets relief entry Z in output coordinate quanta using final
+machine-space XY placement. Positive requests below 0.5 degrees are honoured without an
+upward clamp. Entry keeps the longest-side seam, complete floor cleanup and checked links.
+Actual ramps carry `entryRamp`; short loops and unrepresentable descent carry explicit
+plunge markers and distinct reasons. The former concern that a lower start was incorrectly
+called tiled is resolved by checking the group's actual tiling marker. These findings stay
+advisory. The tests inspect emitted coordinates; hardware qualification remains pending.

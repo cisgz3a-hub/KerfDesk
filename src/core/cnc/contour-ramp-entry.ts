@@ -1,12 +1,15 @@
 import type { Vec3 } from '../geometry/vec3';
 import type { CncContourPass, CncPass, CncPath3dPass, Job } from '../job';
 import type { Vec2 } from '../scene';
-
-// Floating-point slack when counting how many laps or legs a ramp needs, so
-// a ramp exactly one lap long is not rounded up to two.
-const COUNT_EPSILON = 1e-9;
-// The ECMAScript Array length limit, as tabbed-ramp-entry.ts checks it.
-const MAX_ARRAY_LENGTH = 0xffff_ffff;
+import {
+  assertRampPointCount,
+  rampCapacities,
+  rampDepth,
+  rampDescentSteps,
+  rampSegmentEnd,
+  rampZ,
+  type RampDepth,
+} from './contour-ramp-precision';
 
 /**
  * Enter a contour pass by descending along its own path from `fromZ` to the
@@ -36,96 +39,129 @@ export function rampContourPass(
   const rampMm = drop / tangent;
   const path = pass.closed ? closedRing(pass.polyline) : pass.polyline;
   const lengthMm = pathLengthMm(path);
-  const goesOverAgain = pass.closed ? lengthMm < rampMm : lengthMm < rampMm / 2;
-  if (!(lengthMm > 0) || (goesOverAgain && lengthMm < minPathMm)) {
+  if (keepShortPathPlunge(pass.closed, lengthMm, rampMm, minPathMm)) {
     return { ...pass, entryPlunge: true };
   }
-  const retraces = Math.ceil(rampMm / lengthMm - COUNT_EPSILON) + 1;
-  if (retraces * path.length > MAX_ARRAY_LENGTH) {
-    throw new RangeError('Contour ramp point count exceeds the ECMAScript Array length limit.');
-  }
+  const depth = rampDepth(fromZ, pass.zMm);
+  if (depth === null) return precisionPlunge(pass);
+  if (depth.dropQuanta <= 0) return pass;
+  const capacities = rampCapacities(path, tangent, depth.dropQuanta);
+  if (!capacities.some((capacity) => capacity > 0)) return precisionPlunge(pass);
   const points = pass.closed
-    ? loopRampPoints(path, fromZ, pass.zMm, rampMm)
-    : zigZagRampPoints(path, fromZ, pass.zMm, rampMm, lengthMm);
-  const ramped: CncPath3dPass = { kind: 'path3d', points, closed: false };
+    ? loopRampPoints(path, depth, capacities, tangent)
+    : zigZagRampPoints(path, depth, capacities, tangent);
+  const ramped: CncPath3dPass = {
+    kind: 'path3d',
+    points,
+    closed: false,
+    entryRamp: true,
+    lateralFeed: 'z-rate-capped',
+  };
   return ramped;
+}
+
+function keepShortPathPlunge(
+  closed: boolean,
+  lengthMm: number,
+  rampMm: number,
+  minPathMm: number,
+): boolean {
+  const goesOverAgain = closed ? lengthMm < rampMm : lengthMm < rampMm / 2;
+  return !(lengthMm > 0) || (goesOverAgain && lengthMm < minPathMm);
+}
+
+function precisionPlunge(pass: CncContourPass): CncContourPass {
+  return { ...pass, entryPlunge: true, entryPlungeReason: 'coordinate-precision' };
 }
 
 // Descend round the loop from its start until the ramp reaches depth, lapping
 // as often as that takes, then cut one whole lap at depth from that point.
 function loopRampPoints(
   ring: ReadonlyArray<Vec2>,
-  fromZ: number,
-  zMm: number,
-  rampMm: number,
+  depth: RampDepth,
+  capacities: ReadonlyArray<number>,
+  tangent: number,
 ): Vec3[] {
   const last = ring.length - 1; // ring[last] repeats ring[0]
   const start = ring[0] as Vec2;
-  const points: Vec3[] = [{ x: start.x, y: start.y, z: fromZ }];
-  let travelled = 0;
+  const capacity = capacities.reduce((sum, value) => sum + value, 0);
+  assertRampPointCount((Math.ceil(depth.dropQuanta / capacity) + 1) * last + 2);
+  const points: Vec3[] = [at(start, rampZ(depth.fromQuanta))];
+  const zMm = rampZ(depth.targetQuanta);
+  let remaining = depth.dropQuanta;
   for (let index = 1; ; index = index === last ? 1 : index + 1) {
     const a = ring[index - 1] as Vec2;
     const b = ring[index] as Vec2;
-    const segment = Math.hypot(b.x - a.x, b.y - a.y);
-    if (segment === 0) continue;
-    const remaining = rampMm - travelled;
-    if (segment >= remaining) {
-      const end = along(a, b, remaining / segment);
+    const step = capacities[index - 1] ?? 0;
+    if (step >= remaining) {
+      const end = rampSegmentEnd(a, b, tangent, remaining);
       points.push({ x: end.x, y: end.y, z: zMm });
       for (let k = index; k <= last; k += 1) points.push(at(ring[k] as Vec2, zMm));
       for (let k = 1; k < index; k += 1) points.push(at(ring[k] as Vec2, zMm));
       points.push({ x: end.x, y: end.y, z: zMm });
       return points;
     }
-    travelled += segment;
-    points.push(at(b, fromZ - (travelled / rampMm) * (fromZ - zMm)));
+    remaining -= step;
+    points.push(at(b, rampZ(depth.targetQuanta + remaining)));
   }
 }
 
 // Zig-zag along the path's first span, forward and back an even number of
 // times so the descent lands on the start at depth, then the whole path. The
-// legs share the ramp's length equally, so each descends at the full angle.
+// legs share the integer descent. Each segment stays inside its translated
+// output-coordinate budget; the complete source path is then cut at depth.
 function zigZagRampPoints(
   path: ReadonlyArray<Vec2>,
-  fromZ: number,
-  zMm: number,
-  rampMm: number,
-  lengthMm: number,
+  depth: RampDepth,
+  capacities: ReadonlyArray<number>,
+  tangent: number,
 ): Vec3[] {
-  const legs = 2 * Math.max(1, Math.ceil(rampMm / (2 * lengthMm) - COUNT_EPSILON));
-  const forward = leadingSpan(path, rampMm / legs);
-  const back = [...forward].reverse();
+  const forward = leadingSpan(path, capacities, Math.ceil(depth.dropQuanta / 2), tangent);
+  const forwardCapacities = rampCapacities(forward, tangent, depth.dropQuanta);
+  const capacity = forwardCapacities.reduce((sum, value) => sum + value, 0);
+  const legs = 2 * Math.max(1, Math.ceil(depth.dropQuanta / (2 * capacity)));
+  assertRampPointCount(legs * (forward.length - 1) + path.length);
+  const walks = [forward, [...forward].reverse()] as const;
+  const budgets = [forwardCapacities, [...forwardCapacities].reverse()] as const;
   const start = path[0] as Vec2;
-  const points: Vec3[] = [at(start, fromZ)];
-  let travelled = 0;
+  const points: Vec3[] = [at(start, rampZ(depth.fromQuanta))];
+  let remaining = depth.dropQuanta;
   for (let leg = 0; leg < legs; leg += 1) {
-    const walk = leg % 2 === 0 ? forward : back;
+    const direction = leg % 2;
+    const walk = walks[direction] as ReadonlyArray<Vec2>;
+    const steps = rampDescentSteps(
+      budgets[direction] as ReadonlyArray<number>,
+      Math.ceil(remaining / (legs - leg)),
+    );
     for (let k = 1; k < walk.length; k += 1) {
-      const a = walk[k - 1] as Vec2;
       const b = walk[k] as Vec2;
-      travelled += Math.hypot(b.x - a.x, b.y - a.y);
-      points.push(at(b, fromZ - Math.min(1, travelled / rampMm) * (fromZ - zMm)));
+      remaining -= steps[k - 1] ?? 0;
+      points.push(at(b, rampZ(depth.targetQuanta + remaining)));
     }
   }
-  points[points.length - 1] = at(start, zMm);
-  for (let k = 1; k < path.length; k += 1) points.push(at(path[k] as Vec2, zMm));
+  for (let k = 1; k < path.length; k += 1)
+    points.push(at(path[k] as Vec2, rampZ(depth.targetQuanta)));
   return points;
 }
 
-// The path from its start up to `spanMm` along it.
-function leadingSpan(path: ReadonlyArray<Vec2>, spanMm: number): ReadonlyArray<Vec2> {
+// The shortest source-path prefix with enough representable descent for one leg.
+function leadingSpan(
+  path: ReadonlyArray<Vec2>,
+  capacities: ReadonlyArray<number>,
+  wanted: number,
+  tangent: number,
+): ReadonlyArray<Vec2> {
   const span: Vec2[] = [path[0] as Vec2];
-  let travelled = 0;
+  let remaining = wanted;
   for (let k = 1; k < path.length; k += 1) {
     const a = path[k - 1] as Vec2;
     const b = path[k] as Vec2;
-    const segment = Math.hypot(b.x - a.x, b.y - a.y);
-    if (segment === 0) continue;
-    if (travelled + segment >= spanMm) {
-      span.push(along(a, b, (spanMm - travelled) / segment));
+    const capacity = capacities[k - 1] ?? 0;
+    if (capacity >= remaining) {
+      span.push(rampSegmentEnd(a, b, tangent, remaining));
       return span;
     }
-    travelled += segment;
+    remaining -= capacity;
     span.push(b);
   }
   return span;
@@ -135,6 +171,7 @@ export type RampEntryPlunges = {
   readonly layerId: string;
   readonly passes: number;
   readonly pocket: boolean;
+  readonly coordinatePrecisionPasses?: number;
 };
 
 /** Per layer, the passes its ramp entry left to plunge (ADR-471). */
@@ -145,18 +182,29 @@ export function rampEntryPlungesByLayer(job: Job): ReadonlyArray<RampEntryPlunge
     const passes = rampEntryPlungeCount(group.passes);
     if (passes === 0) continue;
     const seen = byLayer.get(group.layerId);
+    const coordinatePrecisionPasses =
+      (seen?.coordinatePrecisionPasses ?? 0) +
+      group.passes.filter(
+        (pass) =>
+          (pass.kind === 'contour' || pass.kind === 'path3d') &&
+          pass.entryPlunge === true &&
+          pass.entryPlungeReason === 'coordinate-precision',
+      ).length;
     byLayer.set(group.layerId, {
       layerId: group.layerId,
       passes: (seen?.passes ?? 0) + passes,
       pocket: (seen?.pocket ?? false) || group.cutType === 'pocket',
+      ...(coordinatePrecisionPasses === 0 ? {} : { coordinatePrecisionPasses }),
     });
   }
   return [...byLayer.values()];
 }
 
-/** Passes a ramp entry left to plunge because their paths are too short. */
+/** Passes left to plunge because of path length or emitted-coordinate precision. */
 export function rampEntryPlungeCount(passes: ReadonlyArray<CncPass>): number {
-  return passes.filter((pass) => pass.kind === 'contour' && pass.entryPlunge === true).length;
+  return passes.filter(
+    (pass) => (pass.kind === 'contour' || pass.kind === 'path3d') && pass.entryPlunge === true,
+  ).length;
 }
 
 function closedRing(points: ReadonlyArray<Vec2>): ReadonlyArray<Vec2> {
@@ -173,10 +221,6 @@ function pathLengthMm(path: ReadonlyArray<Vec2>): number {
     total += Math.hypot(b.x - a.x, b.y - a.y);
   }
   return total;
-}
-
-function along(a: Vec2, b: Vec2, t: number): Vec2 {
-  return { x: a.x + (b.x - a.x) * t, y: a.y + (b.y - a.y) * t };
 }
 
 function at(point: Vec2, z: number): Vec3 {

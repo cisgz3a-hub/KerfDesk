@@ -157,6 +157,43 @@ shrinking. This is a test-only correction; production relief geometry is unchang
 and matches the current main implementation. Fresh CI applies to the corrected
 candidate, rather than treating an earlier random pass as proof against this case.
 
+## CNC entry follow-up after the first merge
+
+Further emitted-output review found four issues after PR #959 and the later ramp changes:
+coordinate rounding could exceed a requested entry angle; generic ramps could exceed the
+selected plunge component; specialised operations could inherit a misleading contour-ramp
+label; and tile clipping discarded short-path plunge markers. PR #978 preserves tile pass
+metadata. This follow-up integrates that change and repairs the remaining planner and disclosure
+paths described in ADR-471 Amendment 1.
+
+For a 64-vertex 2.8 mm circle at a requested 5 degrees, cutting feed 1000 and plunge 50 mm/min,
+the previous emitted program reached 5.406440 degrees and a commanded Z component of
+94.220216 mm/min. The planner now budgets integer output Z steps against placed XY segment
+capacity and uses the existing Z-rate-capped emitter mode. Positive angle requests below
+0.5 degrees are no longer silently raised to 0.5 degrees. Independent relief tests reproduced
+the same rounding and lower-angle defects, so relief roughing uses the same budget after
+machine-space placement.
+
+Closed paths may need additional ramp laps; open paths may need more zig-zag legs. This is an
+intentional quality cost. Full-depth cleanup retains every source vertex, and rectangular tabs
+retain their raised spans and intentional vertical walls. No simplification tolerance is used
+to make an otherwise unrepresentable ramp fit. An unrepresentable entry retains its original
+path with an explicit coordinate-precision plunge advisory. Short paths retain their separate
+one-cut-width reason. Both reasons survive contained and split contour/path3d tiles.
+
+Exported headers distinguish the requested angle from actual marked contour ramps and from
+specialised drill, adaptive and medial-profile entries. Job Review and the adaptive card use
+the corresponding description. Ordinary later-depth ramps are not called tiled entries.
+Warnings remain advisory; the completed Frame for the reviewed job remains the ordinary
+Start gate. These are emitted-word/software bounds, not controller interpolation, motor-step,
+tool suitability or physical finish guarantees.
+
+Focused regression evidence includes modal emitted XYZ/F replay, half-quantum placements,
+rotated reliefs, requested shallow angles, unchanged specialised motion, complete cleanup,
+tab walls, independent stage recipes, exported tile reasons and advisory policy. Exact candidate
+test logs and release identities belong to the publication evidence directory; earlier failures
+and fixture corrections are retained there separately.
+
 ## Physical qualification
 
 The accompanying pack provides setup records, artwork fixtures, measurement

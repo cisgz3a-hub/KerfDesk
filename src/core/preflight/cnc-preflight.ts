@@ -159,17 +159,24 @@ function appendVCarveEntryIssues(
 }
 
 // ADR-471: the compiled job marks each pass its ramp entry left to plunge.
-// Advisory only: the program is complete and every other entry ramps.
+// Advisory only: the complete program retains explicitly disclosed plunges.
 function appendRampEntryPlungeIssues(compiledJob: Job | undefined, issues: PreflightIssue[]): void {
   if (compiledJob === undefined) return;
   for (const plunges of rampEntryPlungesByLayer(compiledJob)) {
     const passes = plunges.passes === 1 ? '1 pass plunges' : `${plunges.passes} passes plunge`;
     const helix = plunges.pocket ? ' A pocket can use Helical entry instead.' : '';
+    const precision = plunges.coordinatePrecisionPasses ?? 0;
+    const reasons = [
+      ...(plunges.passes > precision ? ['a path is shorter than one cut width'] : []),
+      ...(precision > 0
+        ? ['the requested angle cannot descend on its segments at G-code coordinate precision']
+        : []),
+    ];
     issues.push({
       code: 'cnc-ramp-entry-plunge',
       message:
         `Layer ${plunges.layerId}: ${passes} straight down instead of ramping: ` +
-        `a path shorter than one cut width is too short to ramp along.${helix} ` +
+        `${reasons.join('; ')}.${helix} ` +
         'Set Ramp entry to 0 to remove this notice.',
     });
   }

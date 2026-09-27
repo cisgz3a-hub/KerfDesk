@@ -178,6 +178,9 @@ export type CncContourPass = {
   // short to ramp along, so the pass keeps its straight plunge (ADR-471).
   // G-code comments and Job Review disclose it; motion is unchanged.
   readonly entryPlunge?: true;
+  // No descending 0.001 mm step fits the requested angle on this path's
+  // represented segments. Omission keeps the existing short-path reason.
+  readonly entryPlungeReason?: 'coordinate-precision';
 };
 
 export type CncPath3dPass = {
@@ -199,6 +202,10 @@ export type CncPath3dPass = {
   // its descents against the configured plunge rate.
   // Tiling and G-code comments preserve this marker without changing motion.
   readonly entryRamp?: true;
+  // A tabbed entry can retain its original path and plunge when the requested
+  // ramp has no descending step at the coordinate precision.
+  readonly entryPlunge?: true;
+  readonly entryPlungeReason?: 'coordinate-precision';
 };
 
 export type CncArcPass = {

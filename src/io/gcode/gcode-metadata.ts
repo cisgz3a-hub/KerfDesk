@@ -95,8 +95,9 @@ export type GcodeMetadata = {
 // Native arcs and compact Fill retain scan v2's shared/empty/coincident M3 handoffs.
 // ADR-471 discloses sub-width plunges; ADR-457 finishing recipes survive ramping.
 // Tiling preserves ADR-471's plunge disclosure on each clipped contour fragment.
+// Quantized contour/tabbed/relief entries cap requested angle and plunge component.
 export const EMITTER_REVISION =
-  'trace-arcs-relief-width-ramp-tiles-contact-air-scan-v2-20260927-v8';
+  'trace-arcs-relief-width-ramp-tiles-precision-contact-air-scan-v2-20260927-v9';
 
 // Machine-specific assumption lines (ADR-103 defect fix): router exports
 // previously carried the laser-worded `$32=1 (laser mode)` banner. The S

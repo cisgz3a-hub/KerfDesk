@@ -42,7 +42,14 @@ function entryBadge(settings: CncLayerSettings): string {
     settings.cutType === 'pocket' &&
     settings.pocketStrategy !== 'adaptive' &&
     settings.helixEntry !== undefined;
-  const entry = circularRamp ? 'Circular ramp' : ramp > 0 ? `Ramp ${ramp}°` : 'Plunge';
+  const entry =
+    settings.cutType === 'pocket' && settings.pocketStrategy === 'adaptive'
+      ? 'Adaptive entry'
+      : circularRamp
+        ? 'Circular ramp'
+        : ramp > 0
+          ? `Ramp ${ramp}°`
+          : 'Plunge';
   if (!cutTypeShowsCutDirection(settings.cutType)) return entry;
   const direction =
     settings.cutDirection === 'climb'
