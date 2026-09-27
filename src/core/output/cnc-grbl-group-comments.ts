@@ -4,6 +4,7 @@ import { rampEntryPlungeCount } from '../cnc/contour-ramp-entry';
 import { requestedCncCoordinateText } from '../cnc/coordinate-representation';
 import { cncGroupMaximumDepth } from '../cnc/output-representation';
 import { fmt, fmtFeed } from './cnc-grbl-emit-head';
+import { cncCuttingStageLabel } from '../scene/cnc-stage-recipe';
 
 const LABEL_BYTES = 48;
 const NUMBER_BYTES = 12;
@@ -12,6 +13,8 @@ const NUMBER_BYTES = 12;
 export function appendCncGroupComments(lines: string[], group: CncGroup): void {
   lines.push(`; cnc layer-id: ${label(group.layerId)}`);
   lines.push(`; cnc operation: ${group.cutType}; passes: ${group.passes.length}`);
+  if (group.cuttingStage !== undefined)
+    lines.push(`; cnc independent-stage: ${cncCuttingStageLabel(group.cuttingStage)}`);
   if (group.toolId !== undefined) lines.push(`; cnc tool-id: ${label(group.toolId)}`);
   if (group.toolName !== undefined) lines.push(`; cnc tool-name: ${label(group.toolName)}`);
   lines.push(toolGeometryComment(group));

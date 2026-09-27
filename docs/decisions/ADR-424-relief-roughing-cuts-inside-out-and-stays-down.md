@@ -107,3 +107,19 @@ Deepest cleanup now precedes regular rings, rather than following them. Cleanup
 outline/island stock-side metadata describes that inside-out order. The piece tree,
 nearest selection, checked links, ramps and slice-top contract remain unchanged.
 ADR-427's compile/removal oracle includes links when checking newly removed stock.
+
+### Closed-region property oracle (2026-09-27)
+
+A first-failure diagnostic captured seed 20260927, case 317 (78% stepover).
+The actual link from `(7.800000000000001, 18.8)` to `(7, 16.400000000000002)`
+at Z -3.3 remains inside its proven region. Independent exact rational
+intersection and interval tests over the original binary64 coordinates confirm
+this. Floating interpolation at t = 0.75 rounds onto the hole vertex `(7.2, 17)`;
+the strict ray-cast test oracle incorrectly classified that boundary as outside.
+
+Only the test oracle now admits exact points on the closed region boundary, with
+no epsilon or outside-distance allowance. Adjacent excluded points are negative
+controls. The captured example is pinned in addition to all 25 generated cases.
+The property reports the first counterexample without synchronous shrinking,
+which Vitest's timeout cannot preempt. Production containment, link geometry,
+motion, settings, warnings and Frame policy are unchanged.
