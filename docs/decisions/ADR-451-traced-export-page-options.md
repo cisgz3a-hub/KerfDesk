@@ -116,7 +116,9 @@ source was consulted, ADR-120/123) and LightBurn's paper output against Multi-Fi
    curve extent (as in Decision 3) is centred on the area inside the margins, moved by a whole
    number of export-grid steps, so a paper file differs from the image-page file by one exact
    offset. Artwork larger than that area stays centred and runs past it; the page never shrinks
-   to the artwork and nothing is scaled, so physical size stays exact (Decision 4). Every format
+   to the artwork and nothing is scaled, so physical size stays exact (Decision 4). Artwork that
+   crosses the paper edge, where viewers crop it, is flagged (`runsPastPage`) and the batch notice
+   names those files and asks for a larger page or a smaller size. Every format
    follows the page as in Decision 5 (SVG viewBox and mm size, PDF MediaBox, EPS bounding boxes,
    DXF and GeoJSON origin at the page's lower-left corner). A page with no physical size, or an
    invalid paper size from a direct core caller, keeps the image page.
@@ -131,7 +133,7 @@ source was consulted, ADR-120/123) and LightBurn's paper output against Multi-Fi
    GeoJSON.
 
 Evidence: `src/core/trace/traced-page-paper.test.ts` (centring on the grid, asymmetric margins,
-oversize artwork, invalid paper, per-side margins on a fitted page),
+oversize artwork and its paper-edge flag, invalid paper, per-side margins on a fitted page),
 `src/ui/commands/batch-trace-default-golden.test.ts` (image and fitted pages hash as the base
 commit in all five formats), `src/ui/commands/batch-trace-paper-golden.test.ts` (an A4 page with
 asymmetric margins is 210 x 297 mm in SVG and PDF and centred to one grid step in DXF), and
