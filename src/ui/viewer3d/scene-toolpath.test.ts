@@ -4,7 +4,12 @@ import { LineSegments2 } from 'three/examples/jsm/lines/LineSegments2.js';
 import { LineSegmentsGeometry } from 'three/examples/jsm/lines/LineSegmentsGeometry.js';
 import { describe, expect, it, vi } from 'vitest';
 import { buildGcodeRenderModel } from '../../core/gcode-view';
-import { applyReveal, buildToolpathObjects, setToolpathTravelVisibility } from './scene-toolpath';
+import {
+  applyRecolor,
+  applyReveal,
+  buildToolpathObjects,
+  setToolpathTravelVisibility,
+} from './scene-toolpath';
 import { disposeChildren } from './scene-furniture';
 import { clipObjects } from './scene-isolate';
 import { resolveViewer3dTheme } from './viewer3d-theme';
@@ -59,18 +64,19 @@ describe('toolpath progress geometry', () => {
   it('draws only to the current point inside a long move, retaining a faint program context', () => {
     const f = fixture();
     const geometry = f.reveal.solid?.geometry;
+    // Instance i is move i (ADR-485): the done rapid counts, and the shader drops it.
     applyReveal(f.reveal, { segmentIndex: 1, point: { x: 35, y: 0, z: 0 } });
-    expect(f.reveal.solid?.geometry.instanceCount).toBe(0);
+    expect(f.reveal.solid?.geometry.instanceCount).toBe(1);
     expect(f.reveal.travel?.geometry.drawRange.count).toBe(2);
     expect(f.reveal.solidGhost?.visible).toBe(true);
     const drawn = f.reveal.active.positions();
     expect(drawn[0]).toBe(10);
     expect(drawn[3]).toBe(35);
     applyReveal(f.reveal, { segmentIndex: 2, point: { x: 110, y: 10, z: 0 } });
-    expect(f.reveal.solid?.geometry.instanceCount).toBe(1);
+    expect(f.reveal.solid?.geometry.instanceCount).toBe(2);
     expect(f.reveal.solid?.geometry).toBe(geometry);
     applyReveal(f.reveal, null);
-    expect(f.reveal.solid?.geometry.instanceCount).toBe(2);
+    expect(f.reveal.solid?.geometry.instanceCount).toBe(3);
     expect(f.reveal.solidGhost?.visible).toBe(false);
     expect(f.reveal.active.object.visible).toBe(false);
     disposeChildren(f.group);
@@ -91,8 +97,8 @@ describe('toolpath progress geometry', () => {
     const f = fixture();
     const trail = f.reveal.solid!.trail;
     applyReveal(f.reveal, { segmentIndex: 2, point: { x: 110, y: 25, z: 0 }, trailFrom: 2 });
-    expect(f.reveal.solid?.geometry.instanceCount).toBe(1);
-    expect(trail.trailStart.value).toBe(1);
+    expect(f.reveal.solid?.geometry.instanceCount).toBe(2);
+    expect(trail.trailStart.value).toBe(2);
     expect(trail.trailFade.value).toBeGreaterThan(0);
     expect(f.reveal.travel?.geometry.drawRange).toMatchObject({ start: 2, count: 0 });
     expect(f.reveal.solidGhost?.visible).toBe(true);
@@ -104,7 +110,33 @@ describe('toolpath progress geometry', () => {
     expect(trail.trailFade.value).toBe(0);
     applyReveal(f.reveal, null);
     expect(trail.trailStart.value).toBe(0);
-    expect(f.reveal.solid?.geometry.instanceCount).toBe(2);
+    expect(f.reveal.solid?.geometry.instanceCount).toBe(3);
+    disposeChildren(f.group);
+  });
+
+  it('draws the solid moves and their faint copy from one GPU copy of the program (ADR-485)', () => {
+    const f = fixture();
+    const solid = f.reveal.solid!;
+    const start = solid.geometry.getAttribute('instanceStart') as three.InterleavedBufferAttribute;
+    expect(start.count).toBe(3);
+    const ghost = f.objects.find(
+      (object) => object.renderOrder === -1 && 'isLineSegments2' in object,
+    ) as LineSegments2 | undefined;
+    expect(ghost?.geometry.getAttribute('instanceStart')).toBe(start);
+    expect(ghost?.geometry.instanceCount).toBe(3);
+    disposeChildren(f.group);
+  });
+
+  it('repaints a lens in place, without a new colour buffer (ADR-485)', () => {
+    const f = fixture();
+    const solid = f.reveal.solid!;
+    const colors = solid.colors;
+    const version = (solid.colorBuffer as three.InterleavedBuffer).version;
+    expect(applyRecolor(f.reveal, () => [1, 0, 0])).toBe(true);
+    expect(solid.colors).toBe(colors);
+    expect([...colors.subarray(4, 8)]).toEqual([0xffff, 0, 0, 0xffff]);
+    expect([...colors.subarray(0, 4)]).toEqual([0, 0, 0, 0]);
+    expect((solid.colorBuffer as three.InterleavedBuffer).version).toBe(version + 1);
     disposeChildren(f.group);
   });
 
