@@ -186,7 +186,11 @@ function FitTestFields(props: {
   );
 }
 
-const gridStyle: CSSProperties = { display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 8 };
+const gridStyle: CSSProperties = {
+  display: 'grid',
+  gridTemplateColumns: 'repeat(3, minmax(0, 1fr))',
+  gap: 8,
+};
 const hintStyle: CSSProperties = {
   fontSize: 12,
   color: 'var(--lf-text-muted)',
