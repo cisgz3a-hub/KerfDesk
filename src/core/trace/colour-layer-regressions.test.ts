@@ -1,5 +1,5 @@
 // Public-entry regressions for the 2026-09-27 colour detail/alpha correction
-// (ADR-461 Amendment 2): speck area is measured the way outlines are traced
+// (ADR-461 Amendment 1): speck area is measured the way outlines are traced
 // (4-connected, plus coherent diagonal hairlines only), and anti-aliased art
 // on transparency keeps its ~50 % coverage edge while translucent ink stays.
 import { describe, expect, it } from 'vitest';
@@ -40,8 +40,13 @@ describe('colour-layer anti-aliased art on transparency', () => {
       for (const colours of [undefined, 2, 3] as const) {
         it(`keeps the ${name} edge at half coverage (tagged=${tagged}, colours=${colours ?? 'auto'})`, async () => {
           const options: TraceOptions =
-            colours === undefined ? OPTIONS : { ...OPTIONS, colourLayers: { ...OPTIONS.colourLayers, colours } };
-          const paths = await traceImageToColoredPaths(inkOnTransparency(64, shape, tagged), options);
+            colours === undefined
+              ? OPTIONS
+              : { ...OPTIONS, colourLayers: { ...OPTIONS.colourLayers, colours } };
+          const paths = await traceImageToColoredPaths(
+            inkOnTransparency(64, shape, tagged),
+            options,
+          );
           // One ink layer (no grey fringe layer); its mean may round off pure black.
           expect(paths).toHaveLength(1);
           expect(lightness((paths[0] as ColoredPath).color)).toBeLessThan(40);

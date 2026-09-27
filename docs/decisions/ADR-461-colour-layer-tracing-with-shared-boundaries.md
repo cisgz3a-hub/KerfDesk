@@ -52,13 +52,15 @@ drawing (1254 x 1254 px) the mode took 14 to 19 s and emitted 80,860 subpaths.
    - **Alpha appearance (2026-09-27 correction).** Colour layers compare visible sRGB over white.
      Straight RGBA is composited once; decoder-tagged `rgbCompositedOnWhite` pixels already contain
      that appearance and are not composited again. Every nonzero-alpha pixel participates, so the
-     former alpha-128 cutoff cannot discard a visible grey shape. Alpha-zero pixels remain void
+     former alpha-128 cutoff cannot discard a visible grey shape, except anti-aliased fringe against
+     transparency, which stays void so edges keep ~50 % coverage (Amendment 1). Alpha-zero pixels remain void
      regardless of hidden RGB. Palette selection and sub-pixel boundary placement read the same
      normalized appearance. Working-grid downsampling averages these visible bytes, with a bounded
      two-row cache rather than a second full-source image; entirely transparent cells stay void.
 3. **Clean-up** (`colour-label-cleanup.ts`). A 1-px run of an in-between colour along the seam of
-   two others goes to the nearer of the two; a pixel without a same-label 8-neighbour takes its
-   8-neighbourhood's mode; an 8-connected region under Remove specks (default 12 px, as Line Art) joins the neighbour it
+   two others goes to the nearer of the two; a pixel without a same-label 4-neighbour (and not on
+   a straight 1-px diagonal) takes its 8-neighbourhood's mode; a region, 4-connected like the traced
+   outlines plus straight 1-px diagonal hairlines (Amendment 1), under Remove specks (default 12 px, as Line Art) joins the neighbour it
    shares most edge with. Specks go smallest first and a merged region is re-measured as a whole
    (union-find), so two touching specks are judged together and neither is left behind as an
    orphaned speck. The 2026-09-27 correction counts a coherent diagonal as one component, without
@@ -187,3 +189,78 @@ drawing (1254 x 1254 px) the mode took 14 to 19 s and emitted 80,860 subpaths.
 
 Not part of this decision: removing imagetracerjs's multi-colour mode; keeping shared seams through
 CNC fairing; per-colour operation names; importing a palette from the operator's materials.
+
+### Amendment 1 - specks are measured as traced, and transparency edges stay at half coverage (2026-09-28)
+
+**Context.** The 2026-09-27 correction (PR #950) kept 1-px diagonal hairlines at default settings,
+made Remove specks = 0 keep dots, counters and seam colours, traced straight, tagged and flattened
+alpha the same way, and stopped dropping translucent ink below alpha 128. A review then found two
+regressions it introduced:
+
+- Speck clean-up grouped pixels 8-connected, but outlines are traced 4-connected. A 1-px dot that
+  touched other dots only at corners was neither removed nor merged, and was traced as its own
+  tiny outline. At defaults, a 60 x 60 px checkerboard patch gave 1,801 subpaths instead of 1, and a
+  dithered grey ramp gave 620 instead of 2.
+- Every alpha above zero counted as ink. On a transparent background the anti-aliased edge sat on
+  the outermost faint pixel, so shapes grew. With a requested colour count, the faint edge pixels
+  also became a separate light-grey layer of dozens of crumb rings.
+
+**Decision.**
+
+1. **Speck area follows traced connectivity** (`colour-label-cleanup.ts`). Regions are
+   4-connected, like the traced outlines. The one exception is a straight 1-px diagonal hairline.
+   Two corner-touching pixels count as one region only when all of these hold:
+   - they have the same label;
+   - the diagonal continues straight for at least a third pixel;
+   - neither pixel has more than two same-label 8-neighbours;
+   - both off-diagonal pixels belong to solid surroundings, not 1-px islands.
+
+   A checkerboard fails the last test, dither pairs and zigzags fail the straight-run test, and 2 x 2
+   blocks fail the thinness test. The isolated-pixel mode filter uses the same rule: a pixel is left
+   alone only if it has a same-label 4-neighbour or a hairline link. After a region is absorbed, it
+   joins its 4-neighbours of the same label, plus any hairline it now continues.
+2. **Anti-aliased fringe against transparency stays void** (`colour-appearance.ts`,
+   `transparencyFringe`). A partial-alpha pixel is void when both hold:
+   - its alpha is less than half the peak alpha within 2 px (the nearby ink's own opacity);
+   - it connects (8-way, through such fringe) to an alpha-zero pixel.
+
+   This puts the edge at about 50 % coverage of the ink's own opacity. Alpha 128 and above is never
+   fringe, so this voids a subset of what the old alpha-128 cutoff voided. Translucent ink stays
+   traced: an alpha-64 disc keeps its interior and loses only its own faint rim. Artwork with no
+   alpha-zero pixel is unaffected, so straight, tagged and flattened opaque-canvas alpha still agree.
+   Working-grid downsampling treats fringe pixels as void too.
+3. **Soft shadows and glows are intended to come in as layers.** A drop shadow or glow of partial
+   alpha is visible over white, so it is traced like any other visible colour. Typically it adds 1
+   to 3 grey or tinted band layers (only its faintest outer rim is fringe). Delete those layers, or
+   choose fewer colours, to leave them out.
+
+**Measurements.** Colour layers preset. Synthetic art traced through `traceImageToColoredPaths`,
+decoder-tagged alpha, one session. Columns: pre-correction parent `1f8a3b4de~1` / `origin/main`
+`8e037c2fc` / this amendment.
+
+| Case | Parent | main | Amendment |
+| --- | --- | --- | --- |
+| 60 x 60 checkerboard patch: subpaths, median ms | 1, 14 | 1,801, 116 | 1, 14 |
+| Floyd-Steinberg dithered ramp 128 x 64: subpaths, median ms | 2, 9 | 620, 59 | 2, 9 |
+| Disc r = 20 on transparency, area error: Auto / N = 2 | +1.0 % / 0.0 % | +6.2 % / -0.8 % + grey layer (36 rings) | +1.0 % / +1.0 % |
+| 4 px ring on transparency, area error: Auto / N = 2 | +0.3 % / -2.5 % | +30.3 % / -3.8 % + grey layer (84 rings) | +0.3 % / +0.3 % |
+| Disc r = 5 on transparency, area error: Auto / N = 2 | +5.7 % / -3.6 % | +11.6 % / +11.6 % | +5.7 % / -3.6 % |
+| Owl, subpaths at N = Auto / 2 / 3 / 4 | 2,246 / 2,249 / 3,548 / 4,977 | 6,451 / 6,450 / 8,300 / 14,028 | 2,341 / 2,342 / 3,613 / 5,068 |
+| Hummingbird, subpaths at N = Auto / 2 / 3 / 4 | 1,626 / 1,653 / 2,760 / 3,218 | 5,156 / 5,152 / 7,026 / 8,887 | 1,754 / 1,803 / 2,799 / 3,263 |
+
+The two real-art images come from `colour-layers-real-art.test.ts` (run with
+`COLOUR_LAYER_ART_DIR`). Owl trace time: parent 1.8-2.6 s, main 1.8-3.0 s, amendment 1.7-2.5 s,
+on a shared machine. The amendment keeps up to about 8 % more subpaths than the parent (owl +95 at
+Auto, hummingbird +128). These are the straight diagonal hairlines the 2026-09-27 correction set out
+to keep.
+
+**Tests.** `colour-layer-regressions.test.ts`, 16 cases, 15 of which fail on `origin/main`:
+- the checkerboard and dithered ramp at defaults;
+- the disc and the 4 px ring on transparency, straight and tagged, at Auto, N = 2 and N = 3 (one
+  ink layer, area within 2 % and 5 %);
+- an alpha-64 disc on transparency traced at its own half-coverage edge (within 2 %);
+- the soft drop shadow, which asserts 1 to 3 extra grey layers as intended behaviour.
+
+The 2026-09-27 tests stay green unchanged: `colour-layer-detail.test.ts` (hairlines at speck areas
+0 and 12, dots, counters and seams), `colour-layer-alpha.test.ts`, `colour-appearance.test.ts` and
+`colour-label-cleanup.test.ts`.

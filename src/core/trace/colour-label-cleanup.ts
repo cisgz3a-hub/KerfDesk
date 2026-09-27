@@ -149,7 +149,7 @@ function hasHairlineLink(grid: LabelGrid, p: number): boolean {
 
 /** The diagonal neighbour of p in direction d (4..7) when the corner joins a
  *  coherent 1-px hairline, else -1. Outlines are traced 4-connected, so speck
- *  area is measured 4-connected too (ADR-461 Amendment 2); the one exception
+ *  area is measured 4-connected too (ADR-461 Amendment 1); the one exception
  *  is a thin straight diagonal: both corner pixels carry the same label, the
  *  corner continues straight on for a third pixel, each corner pixel has at
  *  most two same-label 8-neighbours, and both off-diagonal pixels belong to
@@ -164,20 +164,32 @@ function hairlineLink(grid: LabelGrid, p: number, d: number): number {
   if (label === TRANSPARENT_LABEL || labels[q] !== label) return -1;
   const off1 = q - (q - p > 0 ? width : -width);
   const off2 = p + (q - p > 0 ? width : -width);
-  if (labels[off1] === label || labels[off2] === label) return -1;
+  if (!solidOtherLabel(grid, off1, label) || !solidOtherLabel(grid, off2, label)) return -1;
   if (!continuesStraight(grid, p, q, d, label)) return -1;
-  if (!sharesLabel4(grid, off1, labels[off1] as number)) return -1;
-  if (!sharesLabel4(grid, off2, labels[off2] as number)) return -1;
   return thin(grid, p, label) && thin(grid, q, label) ? q : -1;
+}
+
+// An off-diagonal pixel of another label that is not a 1-px island.
+function solidOtherLabel(grid: LabelGrid, p: number, label: number): boolean {
+  const own = grid.labels[p] as number;
+  return own !== label && sharesLabel4(grid, p, own);
 }
 
 // The corner p->q (direction d) extends straight on at least one side, so a
 // run of three or more pixels: a drawn diagonal, not a dither pair or zigzag.
-function continuesStraight(grid: LabelGrid, p: number, q: number, d: number, label: number): boolean {
+function continuesStraight(
+  grid: LabelGrid,
+  p: number,
+  q: number,
+  d: number,
+  label: number,
+): boolean {
   const n = grid.labels.length;
   const after = neighbour8(q, d, grid.width, n);
   const before = neighbour8(p, 11 - d, grid.width, n);
-  return (after >= 0 && grid.labels[after] === label) || (before >= 0 && grid.labels[before] === label);
+  return (
+    (after >= 0 && grid.labels[after] === label) || (before >= 0 && grid.labels[before] === label)
+  );
 }
 
 // At most two 8-neighbours share the label: a pixel of a 1-px line.

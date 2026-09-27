@@ -1,4 +1,4 @@
-// Fixtures for colour-layer-regressions.test.ts (ADR-461 Amendment 2).
+// Fixtures for colour-layer-regressions.test.ts (ADR-461 Amendment 1).
 import type { ColoredPath } from '../scene';
 import type { RawImageData } from './trace-image';
 import { canvas, covers, fillRect } from './colour-layer-trace.test-support';
@@ -80,7 +80,9 @@ export function inkOnTransparency(
       data.set([grey, grey, grey, alpha], (y * size + x) * 4);
     }
   }
-  return tagged ? { width: size, height: size, data, rgbCompositedOnWhite: true } : { width: size, height: size, data };
+  return tagged
+    ? { width: size, height: size, data, rgbCompositedOnWhite: true }
+    : { width: size, height: size, data };
 }
 
 export const disc =

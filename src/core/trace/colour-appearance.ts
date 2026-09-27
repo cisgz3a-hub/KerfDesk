@@ -3,7 +3,7 @@
 // one composite. Normalize before averaging so alpha is never applied twice.
 // Large images read this appearance on demand into a bounded two-row cache,
 // avoiding an additional full-source RGBA allocation before the working cap.
-// Anti-aliased fringe against transparency stays void (ADR-461 Amendment 2):
+// Anti-aliased fringe against transparency stays void (ADR-461 Amendment 1):
 // a partial pixel reached from alpha=0 whose alpha is under half the nearby
 // ink's keeps the edge at ~50 % coverage, while translucent ink itself (alpha
 // near its own local peak, even below 128) is still traced.
