@@ -26,7 +26,8 @@ the bit, not from Cut depth, so its Depth mm cell shows the compiled maximum dep
    summary reads `Actual max depth`. Without a finishing bit it is the deepest roughing level,
    `2.5 mm actual` in the example. With one it is where finishing reaches, `3 mm actual`, because
    finishing cuts the allowance roughing leaves. The title says that depth comes from each relief,
-   not from Cut depth, and that roughing leaves the Rough allowance.
+   not from Cut depth. It includes any flat cleanup or finishing passes: roughing-bit flat
+   cleanup can reach a floor without leaving the roughing allowance there.
 3. **Cut** shows `Relief`. Its title names the cut type that reaches no shape, for example
    `This operation cuts only reliefs. Its cut type, On path, applies to other shapes only.`
 4. Tool, Depth/pass, Feed, Plunge and RPM keep the operation's settings, because relief roughing

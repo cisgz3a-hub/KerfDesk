@@ -194,7 +194,7 @@ function CncDepthCell(props: CncRowCellsProps): JSX.Element {
     return (
       <ActualDepthCell
         ariaContext={props.ariaContext}
-        title="Deepest compiled relief pass. Depth comes from each relief, not from Cut depth, and roughing leaves the Rough allowance."
+        title="Deepest compiled relief pass, including any flat cleanup or finishing passes. Depth comes from each relief, not from Cut depth."
         depthMm={props.relief.maxDepthMm}
       />
     );
