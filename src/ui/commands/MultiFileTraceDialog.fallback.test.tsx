@@ -2,10 +2,20 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import { mockPlatform } from '../../__fixtures__/file-actions';
 import type { BatchTraceFile } from '../../core/trace/batch-trace';
 import { DEFAULT_EXPORT_PRECISION_MM } from '../../core/vector-export/decimal-grid';
-import type { PlatformAdapter, SaveTarget } from '../../platform/types';
+import {
+  saveDirectoryUnsupportedError,
+  type PlatformAdapter,
+  type SaveDirectoryTarget,
+  type SaveTarget,
+} from '../../platform/types';
 import { runChosenMultiFileTrace, type MultiFileTraceSettings } from './MultiFileTraceDialog';
 import type * as multiFileTraceAction from './multi-file-trace-action';
-import { DEFAULT_MULTI_FILE_TRACE_PRESET, runMultiFileTrace } from './multi-file-trace-action';
+import {
+  DEFAULT_MULTI_FILE_TRACE_PRESET,
+  runMultiFileTrace,
+  traceFileWriterForDirectory,
+} from './multi-file-trace-action';
+import { beginMultiFileTraceProgress } from './MultiFileTraceProgress';
 import { DEFAULT_TRACE_PAGE_SETTINGS } from './TracePageFields';
 import { DEFAULT_TRACE_SIZE_SETTINGS } from './TraceSizeFields';
 
@@ -58,9 +68,11 @@ describe('Multi-File Trace without a folder picker (web fallback)', () => {
   it.each([
     ['has no folder picker', undefined],
     [
-      'throws from the folder picker',
+      'says it has no folder picker',
       vi.fn(async () => {
-        throw new Error('File System Access directory picker is required to save files safely.');
+        throw saveDirectoryUnsupportedError(
+          'File System Access directory picker is required to save files safely.',
+        );
       }),
     ],
   ])('offers each file its own save dialog when the platform %s', async (_name, reserve) => {
@@ -91,5 +103,67 @@ describe('Multi-File Trace without a folder picker (web fallback)', () => {
     await runChosenMultiFileTrace(platform, vi.fn(), SETTINGS, [image]);
 
     expect(runMultiFileTrace).not.toHaveBeenCalled();
+  });
+
+  it('reports any other folder-picker failure and starts nothing', async () => {
+    const denied = new Error('The request is not allowed.');
+    denied.name = 'NotAllowedError';
+    const pickFileForSave = vi.fn();
+    const platform = {
+      ...mockPlatform(),
+      pickFileForSave,
+      reserveSaveDirectory: vi.fn(async () => {
+        throw denied;
+      }),
+    } as unknown as PlatformAdapter;
+    const pushToast = vi.fn();
+    const image = new File([new Uint8Array([1])], 'a.png', { type: 'image/png' });
+
+    await runChosenMultiFileTrace(platform, pushToast, SETTINGS, [image]);
+
+    expect(pushToast).toHaveBeenCalledWith(
+      'Could not trace images: The request is not allowed.',
+      'error',
+    );
+    expect(runMultiFileTrace).not.toHaveBeenCalled();
+    expect(pickFileForSave).not.toHaveBeenCalled();
+  });
+
+  it('refuses a second batch while one is running', async () => {
+    const reserveSaveDirectory = vi.fn(async () => null);
+    const platform = { ...mockPlatform(), reserveSaveDirectory } as unknown as PlatformAdapter;
+    const pushToast = vi.fn();
+    const running = beginMultiFileTraceProgress(3, vi.fn());
+    try {
+      await runChosenMultiFileTrace(platform, pushToast, SETTINGS, [new File([], 'a.png')]);
+    } finally {
+      running.end();
+    }
+    expect(pushToast).toHaveBeenCalledWith(
+      'A Multi-File Trace is already running. Cancel it or let it finish first.',
+      'info',
+    );
+    expect(reserveSaveDirectory).not.toHaveBeenCalled();
+  });
+});
+
+describe('Multi-File Trace into a reserved folder', () => {
+  it('never replaces an existing file: it takes the next free name', async () => {
+    const existing = new Set(['a-trace.svg', 'a-trace-2.svg']);
+    const written: string[] = [];
+    const directory: SaveDirectoryTarget = {
+      file: (displayName) =>
+        ({
+          write: async () => {
+            written.push(displayName);
+            existing.add(displayName);
+          },
+        }) as unknown as SaveTarget,
+      exists: async (displayName) => existing.has(displayName),
+    };
+    const write = traceFileWriterForDirectory(directory);
+    await write(TRACED);
+    await write({ ...TRACED, filename: 'b-trace.svg' });
+    expect(written).toEqual(['a-trace-3.svg', 'b-trace.svg']);
   });
 });

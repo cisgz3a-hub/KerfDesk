@@ -1,7 +1,12 @@
 import { act } from 'react';
 import { createRoot } from 'react-dom/client';
 import { describe, expect, it, vi } from 'vitest';
-import { beginMultiFileTraceProgress, MultiFileTraceProgressPanel } from './MultiFileTraceProgress';
+import {
+  beginMultiFileTraceProgress,
+  isMultiFileTraceRunning,
+  MultiFileTraceProgressPanel,
+  useMultiFileTraceProgress,
+} from './MultiFileTraceProgress';
 
 (
   globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT?: boolean }
@@ -37,5 +42,18 @@ describe('Multi-File Trace progress panel', () => {
     expect(host.querySelector('[role="status"]')).toBeNull();
     act(() => root.unmount());
     host.remove();
+  });
+
+  it("closes only its own batch's panel", () => {
+    const first = beginMultiFileTraceProgress(2, vi.fn());
+    const secondAbort = vi.fn();
+    const second = beginMultiFileTraceProgress(3, secondAbort);
+    first.update(2);
+    first.end();
+    expect(isMultiFileTraceRunning()).toBe(true);
+    const progress = useMultiFileTraceProgress.getState().progress;
+    expect([progress?.current, progress?.total]).toEqual([0, 3]);
+    second.end();
+    expect(isMultiFileTraceRunning()).toBe(false);
   });
 });

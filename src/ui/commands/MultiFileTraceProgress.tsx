@@ -9,6 +9,8 @@ export type MultiFileTraceProgressState = {
   readonly total: number;
   readonly cancel: () => void;
   readonly cancelling: boolean;
+  // Which batch the panel belongs to, so a batch closes only its own panel.
+  readonly token: symbol;
 };
 
 type ProgressStore = {
@@ -16,6 +18,11 @@ type ProgressStore = {
 };
 
 export const useMultiFileTraceProgress = create<ProgressStore>(() => ({ progress: null }));
+
+/** Whether a Multi-File Trace batch is running (one runs at a time). */
+export function isMultiFileTraceRunning(): boolean {
+  return useMultiFileTraceProgress.getState().progress !== null;
+}
 
 /** Show the panel for a batch of `total` files; returns its updater and closer. */
 export function beginMultiFileTraceProgress(
@@ -25,22 +32,29 @@ export function beginMultiFileTraceProgress(
   readonly update: (current: number) => void;
   readonly end: () => void;
 } {
-  const cancel = (): void => {
+  const token = Symbol('multi-file-trace');
+  const own = (): MultiFileTraceProgressState | null => {
     const progress = useMultiFileTraceProgress.getState().progress;
+    return progress?.token === token ? progress : null;
+  };
+  const cancel = (): void => {
+    const progress = own();
     if (progress !== null)
       useMultiFileTraceProgress.setState({ progress: { ...progress, cancelling: true } });
     abort();
   };
   useMultiFileTraceProgress.setState({
-    progress: { current: 0, total, cancel, cancelling: false },
+    progress: { current: 0, total, cancel, cancelling: false, token },
   });
   return {
     update: (current) => {
-      const progress = useMultiFileTraceProgress.getState().progress;
+      const progress = own();
       if (progress !== null)
         useMultiFileTraceProgress.setState({ progress: { ...progress, current } });
     },
-    end: () => useMultiFileTraceProgress.setState({ progress: null }),
+    end: () => {
+      if (own() !== null) useMultiFileTraceProgress.setState({ progress: null });
+    },
   };
 }
 

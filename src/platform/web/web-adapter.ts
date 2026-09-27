@@ -13,6 +13,7 @@ import type {
   SaveDirectoryTarget,
   SaveTarget,
 } from '../types';
+import { saveDirectoryUnsupportedError } from '../types';
 import { webCamera } from './web-camera';
 import { webSerial } from './web-serial';
 import { createHttpCameraBridge } from './camera-bridge';
@@ -80,7 +81,9 @@ async function reserveFileForSave(req: FileSaveRequest): Promise<SaveTarget | nu
 
 async function reserveSaveDirectory(): Promise<SaveDirectoryTarget | null> {
   if (typeof window.showDirectoryPicker !== 'function') {
-    throw new Error('File System Access directory picker is required to save files safely.');
+    throw saveDirectoryUnsupportedError(
+      'File System Access directory picker is required to save files safely.',
+    );
   }
   let directory: FileSystemDirectoryHandle;
   try {
@@ -89,7 +92,24 @@ async function reserveSaveDirectory(): Promise<SaveDirectoryTarget | null> {
     if (err instanceof Error && err.name === 'AbortError') return null;
     throw err;
   }
-  return { file: (displayName) => directoryFileTarget(directory, displayName) };
+  return {
+    file: (displayName) => directoryFileTarget(directory, displayName),
+    exists: (displayName) => directoryHasEntry(directory, displayName),
+  };
+}
+
+async function directoryHasEntry(
+  directory: FileSystemDirectoryHandle,
+  displayName: string,
+): Promise<boolean> {
+  try {
+    await directory.getFileHandle(displayName);
+    return true;
+  } catch (err) {
+    // NotFoundError is the only answer that proves the name is free; a folder
+    // of that name (TypeMismatchError) or any other failure counts as taken.
+    return !(err instanceof Error && err.name === 'NotFoundError');
+  }
 }
 
 function directoryFileTarget(

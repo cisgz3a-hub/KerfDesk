@@ -43,7 +43,26 @@ export type SaveTarget = {
  * directory never creates or truncates a file. */
 export type SaveDirectoryTarget = {
   readonly file: (displayName: string) => SaveTarget;
+  /** Whether the folder already holds an entry with this name, so a caller
+   * that must not replace files can pick another name first. */
+  readonly exists?: (displayName: string) => Promise<boolean>;
 };
+
+// A platform that defines reserveSaveDirectory but cannot pick a folder here
+// (a browser without the File System Access directory picker) throws this
+// error, so a caller can fall back to per-file saves for that case alone and
+// still report every other folder-picker failure.
+const SAVE_DIRECTORY_UNSUPPORTED = 'NotSupportedError';
+
+export function saveDirectoryUnsupportedError(message: string): Error {
+  const error = new Error(message);
+  error.name = SAVE_DIRECTORY_UNSUPPORTED;
+  return error;
+}
+
+export function isSaveDirectoryUnsupported(error: unknown): boolean {
+  return error instanceof Error && error.name === SAVE_DIRECTORY_UNSUPPORTED;
+}
 
 export type FileOpenRequest = {
   readonly accept: ReadonlyArray<string>; // e.g. ['.svg'] or ['.lf2']

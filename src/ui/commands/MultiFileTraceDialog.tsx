@@ -2,7 +2,11 @@ import { useState } from 'react';
 import { TRACE_PRESETS } from '../../core/trace';
 import type { BatchTraceFile, BatchTraceFormat } from '../../core/trace/batch-trace';
 import { DEFAULT_EXPORT_PRECISION_MM } from '../../core/vector-export/decimal-grid';
-import type { PlatformAdapter, SaveDirectoryTarget } from '../../platform/types';
+import {
+  isSaveDirectoryUnsupported,
+  type PlatformAdapter,
+  type SaveDirectoryTarget,
+} from '../../platform/types';
 import { usePlatform } from '../app/platform-context';
 import { Button, Dialog, DialogActions } from '../kit';
 import { useStore } from '../state';
@@ -15,7 +19,7 @@ import {
   traceFileWriterForDirectory,
   writeTraceFileWithPlatform,
 } from './multi-file-trace-action';
-import { beginMultiFileTraceProgress } from './MultiFileTraceProgress';
+import { beginMultiFileTraceProgress, isMultiFileTraceRunning } from './MultiFileTraceProgress';
 import {
   batchTraceSettings,
   lastTraceSettingsRecord,
@@ -287,7 +291,12 @@ export async function runChosenMultiFileTrace(
   settings: MultiFileTraceSettings,
   files: ReadonlyArray<File>,
 ): Promise<void> {
-  const write = await reserveTraceOutput(platform);
+  // One batch at a time: two would supersede each other's worker traces.
+  if (isMultiFileTraceRunning()) {
+    pushToast('A Multi-File Trace is already running. Cancel it or let it finish first.', 'info');
+    return;
+  }
+  const write = await reserveTraceOutput(platform, pushToast);
   if (write === null || files.length === 0) return;
   const { project } = useStore.getState();
   const chosen = batchTraceSettings(
@@ -325,17 +334,23 @@ export async function runChosenMultiFileTrace(
 
 type TraceWriter = (file: BatchTraceFile) => Promise<boolean> | boolean;
 
-async function reserveTraceOutput(platform: PlatformAdapter): Promise<TraceWriter | null> {
+async function reserveTraceOutput(
+  platform: PlatformAdapter,
+  pushToast: PushToast,
+): Promise<TraceWriter | null> {
   const perFile: TraceWriter = (file) => writeTraceFileWithPlatform(platform, file);
   if (platform.reserveSaveDirectory === undefined) return perFile;
   let directory: SaveDirectoryTarget | null;
   try {
     // The folder picker must be the first await, inside the click's activation.
     directory = await platform.reserveSaveDirectory();
-  } catch {
+  } catch (err) {
     // No folder picker here (a browser without the File System Access
-    // directory API): each file is offered through its own save dialog.
-    return perFile;
+    // directory API): each file is offered through its own save dialog. Any
+    // other failure is reported and nothing starts, as Save Tiled G-code does.
+    if (isSaveDirectoryUnsupported(err)) return perFile;
+    pushToast(`Could not trace images: ${errMsg(err)}`, 'error');
+    return null;
   }
   return directory === null ? null : traceFileWriterForDirectory(directory);
 }

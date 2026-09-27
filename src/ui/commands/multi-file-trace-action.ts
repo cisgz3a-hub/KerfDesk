@@ -49,6 +49,7 @@ import {
 import { isTraceAbort } from '../trace/trace-cancellation';
 import { isTraceRequestSuperseded, traceImageWithFallback } from '../trace/use-trace-worker-client';
 import type { TraceNotice } from '../trace/trace-notices';
+import { retrySupersededTrace } from './multi-file-trace-retry';
 
 export type MultiFileTraceFile = File;
 export type MultiFileTraceExport = BatchTraceFile & {
@@ -146,14 +147,15 @@ export async function buildMultiFileTraceExports(
     },
   }));
   const previewResolution = new Set<number>();
-  // Cancellation and a superseded request stop the batch; any other failure
-  // is spent on the file's own fallback, then on the file itself.
+  // Cancellation stops the batch; any other failure is spent on the file's
+  // own fallback, then on the file itself. A trace superseded by another
+  // caller (a Trace Image preview) is retried first, then skipped.
   const recoverable = (error: unknown): boolean =>
-    !isTraceAbort(error) && !isTraceRequestSuperseded(error);
+    signal?.aborted !== true && !isTraceAbort(error) && !isTraceRequestSuperseded(error);
   const result = await traceImagesToVectorFiles(
     jobs,
     {
-      trace: deps.trace ?? traceWithWorkerFallback(notices, turn),
+      trace: retrySupersededTrace(deps.trace ?? traceWithWorkerFallback(notices, turn), signal),
       ...(signal === undefined ? {} : { signal }),
       ...(onExport === undefined ? {} : { onFile: (file) => onExport(decorate(file)) }),
       writeDxf: tracedLayersToDxf,
@@ -312,7 +314,8 @@ export async function runMultiFileTrace(
     );
     reportTraceBatch(batch.skipped, tally, pushToast, deps.settingsLabel);
   } catch (err) {
-    if (isTraceAbort(err)) {
+    // The worker answers Cancel with a superseded rejection, not an AbortError.
+    if (isTraceAbort(err) || deps.signal?.aborted === true) {
       pushToast(`Multi-File Trace cancelled. ${writtenSoFar(tally.written, files.length)}`, 'info');
       return;
     }
@@ -350,14 +353,31 @@ export async function writeTraceFileWithPlatform(
   return true;
 }
 
-/** Writes each export into one reserved folder, named <stem>-trace.<ext>. */
+/** Writes each export into one reserved folder, named <stem>-trace.<ext>.
+ * An existing file is never replaced: the export takes the next free
+ * <stem>-trace-2.<ext>, -3 and so on. */
 export function traceFileWriterForDirectory(
   directory: SaveDirectoryTarget,
 ): NonNullable<MultiFileTraceDeps['write']> {
   return async (file) => {
-    await directory.file(file.filename).write(file.text);
+    await directory.file(await freeDirectoryName(directory, file.filename)).write(file.text);
     return true;
   };
+}
+
+async function freeDirectoryName(
+  directory: SaveDirectoryTarget,
+  filename: string,
+): Promise<string> {
+  const exists = directory.exists;
+  if (exists === undefined || !(await exists(filename))) return filename;
+  const dot = filename.lastIndexOf('.');
+  const stem = dot > 0 ? filename.slice(0, dot) : filename;
+  const extension = dot > 0 ? filename.slice(dot) : '';
+  for (let n = 2; ; n += 1) {
+    const candidate = `${stem}-${n}${extension}`;
+    if (!(await exists(candidate))) return candidate;
+  }
 }
 
 function missingTraceExportWriter(): never {
