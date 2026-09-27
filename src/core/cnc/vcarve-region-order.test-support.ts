@@ -1,3 +1,4 @@
+// Frozen pre-optimization oracle for source rank and ring bucket comparisons.
 // A v-carve offset ladder is produced one inset at a time, and each inset can
 // contain contours from several disconnected carved regions. Emitting that raw
 // ladder revisits every region at every depth. This module keeps the ladder's
@@ -7,22 +8,22 @@
 import { pointInPolygon } from '../geometry';
 import type { Polyline } from '../scene';
 import {
-  isClosedFiniteContour,
-  prepareStrictContourNesting,
-  strictContourContainmentDepth,
-} from './strict-contour-nesting';
-import {
-  vcarveRegionCandidates,
-  type VCarveSourceRegion as SourceRegion,
-  type VCarveRegionLayout,
-} from './vcarve-region-spatial-index';
-
-export type { VCarveRegionLayout } from './vcarve-region-spatial-index';
+  originalIsClosedFiniteContour as isClosedFiniteContour,
+  originalStrictContourContainmentDepth as strictContourContainmentDepth,
+} from './strict-contour-nesting.test-support';
 
 export type OrderedVCarvePolyline = {
   readonly step: number;
   readonly polyline: Polyline;
 };
+
+type SourceRegion = {
+  readonly contour: Polyline;
+  readonly containmentDepth: number;
+  readonly sourceIndex: number;
+};
+
+export type VCarveRegionLayout = ReadonlyArray<SourceRegion>;
 
 /** Rank an interior witness by the original filled-root order (ADR-270). */
 export function vcarveSourceRegionRank(
@@ -155,15 +156,9 @@ function nestedSourceRegions(sourceContours: ReadonlyArray<Polyline>): SourceReg
 // probe cannot establish their nesting. Only whole-contour containment may
 // classify a source path as a hole/island for provenance ranking.
 function strictlyNestedSourceRegions(sourceContours: ReadonlyArray<Polyline>): SourceRegion[] {
-  const prepared = prepareStrictContourNesting(sourceContours);
   return sourceContours.flatMap((contour, index) => {
-    if (prepared.contours[index]?.closedFinite !== true) return [];
-    const containmentDepth = strictContourContainmentDepth(
-      contour,
-      index,
-      sourceContours,
-      prepared,
-    );
+    if (!isClosedFiniteContour(contour)) return [];
+    const containmentDepth = strictContourContainmentDepth(contour, index, sourceContours);
     return containmentDepth % 2 === 0 ? [{ contour, containmentDepth, sourceIndex: index }] : [];
   });
 }
@@ -191,7 +186,7 @@ function sourceRankFor(
   if (witness === undefined) return Number.MAX_SAFE_INTEGER;
   let rank = Number.MAX_SAFE_INTEGER;
   let deepest = -1;
-  for (const { region: root } of vcarveRegionCandidates(originalRoots, witness)) {
+  for (const root of originalRoots) {
     if (!pointInPolygon(witness, root.contour.points)) continue;
     if (root.containmentDepth > deepest) {
       deepest = root.containmentDepth;
@@ -211,8 +206,13 @@ function innermostContainingRegion(
   if (probe === undefined) return -1;
   let match = -1;
   let deepest = -1;
-  for (const { region, index } of vcarveRegionCandidates(regions, probe)) {
-    if (region.containmentDepth > deepest && pointInPolygon(probe, region.contour.points)) {
+  for (let index = 0; index < regions.length; index += 1) {
+    const region = regions[index];
+    if (
+      region !== undefined &&
+      region.containmentDepth > deepest &&
+      pointInPolygon(probe, region.contour.points)
+    ) {
       match = index;
       deepest = region.containmentDepth;
     }
