@@ -48,7 +48,7 @@ import {
   resolveCncCompilationArtifact,
   runCncCompilationTask,
   type CncCompilationEvidence,
-  type CncCompilationIdentity,
+  type CncOperationSourceGeometry,
   type CncCompilationRejectionReason,
   type CncCompilationTaskResult,
   type PreparedCncCompilationArtifact,
@@ -70,6 +70,7 @@ import { restAwareVCarveGroup } from './vcarve-rest-finishing';
 
 export { xyToolpathsForCutType } from './compile-cnc-layer-passes';
 export { vcarveClearanceGroupForLayer } from './compile-cnc-operation-groups';
+export { prepareCncCompilationArtifact as prepareBoundCncCompilation } from './cnc-compilation-artifact';
 
 /** Pure CNC compilation result used by output preparation and worker finalization. */
 export type CncJobCompilationResult =
@@ -130,17 +131,9 @@ export function finalizeCncCompilationArtifact(
     resolved.device,
     resolved.config,
     resolved.evidence.vcarveLayers,
+    resolved.sourceGeometry,
   );
   return compiled.kind === 'compiled' ? { ...compiled, evidence: resolved.evidence } : compiled;
-}
-
-export function prepareBoundCncCompilation(
-  identity: CncCompilationIdentity,
-  scene: Scene,
-  device: DeviceProfile,
-  config: CncMachineConfig,
-): PreparedCncCompilationArtifact {
-  return prepareCncCompilationArtifact(identity, scene, device, config);
 }
 
 function compileCncSnapshot(
@@ -148,6 +141,7 @@ function compileCncSnapshot(
   sharedDevice: DeviceProfile,
   config: CncMachineConfig,
   vcarveLayers: CncCompilationEvidence['vcarveLayers'],
+  sourceGeometry?: ReadonlyMap<number, CncOperationSourceGeometry>,
 ): CncJobCompilationResult {
   // Feeds cap at CNC's own Max feed, never the laser's.
   const device = cncHeadDevice(sharedDevice, config.params);
@@ -165,6 +159,7 @@ function compileCncSnapshot(
       device,
       config,
       vcarveLayers,
+      sourceGeometry?.get(operationIndex),
     );
     if (operation.kind === 'relief-materialization-failed') return operation;
     clearingGroups.push(...operation.clearingGroups);
@@ -208,13 +203,15 @@ function compileCncOperation(
   device: DeviceProfile,
   config: CncMachineConfig,
   vcarveLayers: CncCompilationEvidence['vcarveLayers'],
+  sourceGeometry?: CncOperationSourceGeometry,
 ): CompiledCncOperation | ReliefMaterializationFailure {
   const { layer, priorityObjectId } = run;
   const settings = layer.cnc ?? DEFAULT_CNC_LAYER_SETTINGS;
   const relief = compileReliefGroupsForLayer(sourceObjects, layer, settings, device, config);
   if (relief.kind === 'relief-materialization-failed') return relief;
-  const contours = collectLayerContours(sourceObjects, layer, device);
-  const polylines = layerPolylinesFromContours(layer, contours);
+  // The private artifact owns these contours and the validated ladder for this operation.
+  const contours = sourceGeometry?.contours ?? collectLayerContours(sourceObjects, layer, device);
+  const polylines = sourceGeometry?.polylines ?? layerPolylinesFromContours(layer, contours);
   const vectorGroups = compileVectorOperationGroups(
     layer,
     settings,
