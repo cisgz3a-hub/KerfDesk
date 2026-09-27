@@ -4823,8 +4823,16 @@ and lifts the command's CNC-only gate.)*
    next along its edge column's own tip samples instead of retracting and
    plunging. A vertex is dropped only where the straight move replacing it
    stays at or above it by no more than 0.002 mm, so the reduced path clears
-   everything the sampled one did (ADR-421). A mask that excludes cells keeps
-   one pass per run.
+   everything the sampled one did (ADR-421). With a mask that excludes cells,
+   every column's included run keeps the raster's rows plus its two ends,
+   and the rows' runs are cut nearest first, staying down across gaps up to
+   four bit diameters as a skipping raster does (item 7). Every move is
+   checked exactly against the whole-cell blocks of stock the mask leaves
+   standing and lifted where it would dip into them; to keep that check
+   cheap, samples within the bit's reach of the mask stand 0.002 mm above
+   their exact tip (ADR-484). As along any wall parallel to the rows, the
+   raster leaves the foot of a mask edge running along them; Raster +
+   waterline finishes it.
 4. Roughing leaves the layer's Rough allowance (0.5 mm unless set; it exists
    FOR this pass); finishing consumes it down to the true surface.
 5. Raster direction runs the rows along X (default) or along Y (ADR-423).
@@ -4834,8 +4842,10 @@ and lifts the command's CNC-only gate.)*
    never further apart along the surface than the scallop's spacing. Each
    feature is circled top down in one stay-down pass, climb or conventional
    as the layer's cut direction says on the physical bed. Every waterline
-   vertex clears the model exactly and every move is checked; a relief with a
-   mask outline gets the narrowed raster only (ADR-423).
+   vertex clears the model exactly and every move is checked (ADR-423). On a
+   relief with a mask outline the waterline also circles the stock the mask
+   leaves standing, keeping every point of every move clear of it by the
+   mask's own clearance (ADR-484).
 7. With **Flats** set to Roughing bit, the raster skips every sample from
    which the bit would touch only flats the roughing end mill took to their
    exact height, and cuts what it keeps nearest first: it stays down across
