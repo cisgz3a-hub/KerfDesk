@@ -158,6 +158,44 @@ describe('artwork SVG export precision, bounds and grouping', () => {
     expect(outlines).toContain('fill="none"');
   });
 
+  it.each([
+    [5, 5],
+    [0, 0],
+    [10, 0],
+  ])('preserves the original compound for unsafe island topology (%s,%s)', (x, y) => {
+    const source = project([artwork([rect(0, 0, 10, 10), rect(x, y, 10, 10)])]);
+    const original = svgOf(source);
+    const grouped = svgOf(source, { groupContours: true });
+    expect(grouped.match(/<path\b[^>]*>/g)).toEqual(original.match(/<path\b[^>]*>/g));
+    expect(grouped.match(/<g><path/g)).toHaveLength(1);
+  });
+
+  it('keeps nested nonzero winding in its original compound while grouping disjoint nonzero islands', () => {
+    const withRule = (curves: CurveSubpath[]) => {
+      const object = artwork(curves);
+      return project([
+        {
+          ...object,
+          paths: object.paths.map((path) => ({ ...path, fillRule: 'nonzero' as const })),
+        },
+      ]);
+    };
+    const nested = withRule([
+      rect(0, 0, 30, 30),
+      rect(5, 5, 20, 20),
+      rect(10, 10, 10, 10),
+      rect(12, 12, 5, 5),
+    ]);
+    expect(svgOf(nested, { groupContours: true }).match(/<path\b[^>]*>/g)).toEqual(
+      svgOf(nested).match(/<path\b[^>]*>/g),
+    );
+    expect(
+      svgOf(withRule([rect(0, 0, 10, 10), rect(20, 0, 10, 10)]), { groupContours: true }).match(
+        /<g><path/g,
+      ),
+    ).toHaveLength(2);
+  });
+
   it('produces path data the importer reads back to the same points', () => {
     const curves: CurveSubpath[] = [
       {

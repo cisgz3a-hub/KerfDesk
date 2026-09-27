@@ -295,7 +295,10 @@ Linux desktop; macOS Preview moved into the ADR-247/248 Desktop Preview track.)
 - Fit: laser kerf compensation and CNC cutter compensation stay where
   they live today (layer cut settings / profile-outside). The generator
   bakes only joint clearance (uniform contour offset; default 0 laser,
-  0.15 mm CNC) and CNC corner-overcut relief (F-CNC26 convention).
+  0.15 mm CNC) and CNC dogbone relief the compensated bit can reach
+  (ADR-106 Amd 1). CNC insertion cuts the material thickness: outlines
+  profile outside with holding tabs, slots pocket in their own
+  operation (ADR-106 Amd 2).
 - v1: closed 6-panel + open-top 5-panel, inner/outer dimension toggle.
   Deferred: lids, dividers, engraved panel labels, dogbone/T-bone relief
   styles (ADR-106 lists each as a staged follow-up).

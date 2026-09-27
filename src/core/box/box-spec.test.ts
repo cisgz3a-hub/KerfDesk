@@ -23,6 +23,15 @@ describe('deriveBoxDims', () => {
     expect(dims.innerWidthMm).toBe(60);
   });
 
+  it('adds one thickness of height for an open top (bottom only)', () => {
+    // ADR-106 Amd 1: the entered inner height is the usable depth. The walls
+    // stand bottom + cavity, not bottom + cavity + a missing lid.
+    expect(deriveBoxDims({ ...BASE, style: 'open-top' }).outerHeightMm).toBe(33);
+    const outer = deriveBoxDims({ ...BASE, style: 'open-top', dimensionMode: 'outer' });
+    expect(outer.innerHeightMm).toBe(27);
+    expect(outer.innerWidthMm).toBe(54);
+  });
+
   it('subtracts twice the thickness per axis in outer mode', () => {
     const dims = deriveBoxDims({ ...BASE, dimensionMode: 'outer' });
     expect(dims.innerWidthMm).toBe(54);

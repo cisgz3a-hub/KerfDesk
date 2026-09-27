@@ -7,6 +7,7 @@ import {
   DEFAULT_CNC_LAYER_SETTINGS,
   DEFAULT_CNC_MACHINE_CONFIG,
 } from '../../core/scene';
+import { useMachineSetupDialogStore } from '../laser/device-setup/machine-setup-dialog-store';
 import { useStore } from '../state';
 import { resetStore } from '../state/test-helpers';
 import { CncLayerFields } from './CncLayerFields';
@@ -59,77 +60,85 @@ afterEach(async () => {
   vi.useRealTimers();
 });
 
-describe('compact CNC tool details', () => {
-  it('identifies the real job default and active secondary tools while details are closed', () => {
+// ADR-481: the second bit a cut type can use sits under Bit, only while that
+// cut type uses it; the bit library itself lives in Machine Setup.
+describe('CNC operation bits', () => {
+  it('names the job default and shows only the second bit this cut type uses', () => {
     const primary = required<HTMLSelectElement>('select[aria-label="Bit for #123456"]');
     const jobDefault = DEFAULT_CNC_MACHINE_CONFIG.tools.find(
       (tool) => tool.id === DEFAULT_CNC_MACHINE_CONFIG.toolId,
     );
+    const chosen = DEFAULT_CNC_MACHINE_CONFIG.tools.find((tool) => tool.id === 'em-1588');
     expect(primary.value).toBe('em-1588');
     expect(primary.querySelector('option[value=""]')?.textContent).toBe(
       `Job default: ${jobDefault?.name}`,
     );
-    const details = required<HTMLDetailsElement>('.lf-cnc-tool-details');
-    const summary = details.querySelector('summary');
-    expect(details.open).toBe(false);
-    expect(summary?.textContent).toContain('Roughing:');
-    expect(summary?.textContent).toContain(
-      DEFAULT_CNC_MACHINE_CONFIG.tools.find((tool) => tool.id === 'em-6350')?.name,
+    expect(primary.title).toContain(`Current: ${chosen?.name}.`);
+    const roughing = required<HTMLSelectElement>(
+      'select[aria-label="Pocket roughing bit for #123456"]',
     );
-    expect(summary?.textContent).not.toContain('Floor:');
-    expect(summary?.textContent).not.toContain('Finish:');
+    expect(roughing.value).toBe('em-6350');
+    expect(roughing.closest('details')).toBeNull();
+    expect(host.querySelector('select[aria-label="Clearing bit for #123456"]')).toBeNull();
+    expect(host.querySelector('select[aria-label="Relief finishing bit for #123456"]')).toBeNull();
+    expect(host.querySelector('.lf-cnc-tool-details')).toBeNull();
+    expect(host.textContent).not.toContain('Add another bit');
     expect(useStore.getState().undoStack).toEqual([]);
   });
 
-  it('keeps a pending feed edit and secondary binding intact when tool details are folded', async () => {
+  it('keeps a pending feed edit while a second bit is chosen', async () => {
     vi.useFakeTimers();
     const before = useStore.getState().project;
-    const details = required<HTMLDetailsElement>('.lf-cnc-tool-details');
-    const summary = required<HTMLElement>('.lf-cnc-tool-details > summary');
     const feed = required<HTMLInputElement>('input[aria-label="Feed for #123456"]');
-    const secondary = required<HTMLSelectElement>(
+    const roughing = required<HTMLSelectElement>(
       'select[aria-label="Pocket roughing bit for #123456"]',
     );
-    await act(async () => summary.click());
     await act(async () => {
       Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')?.set?.call(feed, '1800');
       feed.dispatchEvent(new Event('input', { bubbles: true }));
-      summary.click();
     });
-    expect(details.open).toBe(false);
-    expect(required('select[aria-label="Pocket roughing bit for #123456"]')).toBe(secondary);
     expect(required('input[aria-label="Feed for #123456"]')).toBe(feed);
-    expect(secondary.value).toBe('em-6350');
+    expect(roughing.value).toBe('em-6350');
     expect(useStore.getState().project).toBe(before);
     await act(async () => vi.advanceTimersByTimeAsync(350));
     expect(useStore.getState().project.scene.layers[0]?.cnc?.feedMmPerMin).toBe(1800);
     expect(useStore.getState().undoStack).toEqual([before]);
     await act(async () => useStore.getState().undo());
-    await act(async () => summary.click());
     expect(feed.value).toBe('731');
-    expect(secondary.value).toBe('em-6350');
+    expect(roughing.value).toBe('em-6350');
   });
 
-  it('updates the collapsed tool summary without deleting dormant operation bindings', async () => {
+  it('swaps the second bit with the cut type without deleting dormant bindings', async () => {
     const cutType = required<HTMLSelectElement>('select[aria-label="Cut type for #123456"]');
     await act(async () => {
       cutType.value = 'v-carve';
       cutType.dispatchEvent(new Event('change', { bubbles: true }));
     });
-    const summary = required<HTMLElement>('.lf-cnc-tool-details > summary');
-    expect(summary.textContent).not.toContain('Roughing:');
-    expect(summary.textContent).not.toContain('Floor:');
+    expect(host.querySelector('select[aria-label="Pocket roughing bit for #123456"]')).toBeNull();
+    expect(host.querySelector('select[aria-label="Clearing bit for #123456"]')).toBeNull();
     await act(async () =>
       required<HTMLInputElement>('input[aria-label="Flat depth for #123456"]').click(),
     );
-    expect(summary.textContent).toContain('Floor:');
-    expect(summary.textContent).toContain(
-      DEFAULT_CNC_MACHINE_CONFIG.tools.find((tool) => tool.id === 'em-3175')?.name,
+    expect(required<HTMLSelectElement>('select[aria-label="Clearing bit for #123456"]').value).toBe(
+      'em-3175',
     );
     expect(useStore.getState().project.scene.layers[0]?.cnc).toMatchObject({
       pocketRoughToolId: 'em-6350',
       vClearToolId: 'em-3175',
     });
+  });
+
+  it('opens the Machine Setup bit library from Manage bits', async () => {
+    const manage = [...host.querySelectorAll('button')].find(
+      (button) => button.textContent === 'Manage bits',
+    );
+    if (manage === undefined) throw new Error('Manage bits missing');
+    await act(async () => manage.click());
+    expect(useMachineSetupDialogStore.getState().state).toMatchObject({
+      kind: 'open',
+      target: { kind: 'cnc', field: 'bit-library' },
+    });
+    useMachineSetupDialogStore.getState().close();
   });
 });
 

@@ -57,9 +57,7 @@ export async function commitTraceOutput(
     ...(args.replaceTraceId === undefined ? {} : { replaceTraceId: args.replaceTraceId }),
   };
   const sourceStatus = deleteSourceAfterTrace ? 'source deleted' : 'source kept';
-  const rasterOutput =
-    (args.traceOutput ?? 'vector') === 'raster' && liveProject.machine?.kind !== 'cnc';
-  if (rasterOutput) {
+  if (usesRasterTraceOutput(args, traced, liveProject)) {
     const outputProject =
       owner.cameraSource === undefined
         ? liveProject
@@ -76,6 +74,20 @@ export async function commitTraceOutput(
     (message) => ctx.pushToast(message, 'warning'),
   );
   return true;
+}
+
+// Line + fill (ADR-454) is vector-only: the raster route renders one
+// style for every path, which would turn its fills into outline rings.
+function usesRasterTraceOutput(
+  args: TraceOutputCommitArgs,
+  traced: TracedImage,
+  liveProject: Project,
+): boolean {
+  return (
+    (args.traceOutput ?? 'vector') === 'raster' &&
+    liveProject.machine?.kind !== 'cnc' &&
+    traced.traceMode !== 'hybrid'
+  );
 }
 
 async function commitRasterTraceOutput(

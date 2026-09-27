@@ -115,32 +115,76 @@ function localScanOffsetPart(settings: LayerOperationSettings): ReadonlyArray<st
 /** Compiled relief stages whose groups record no ramp, so they plunge. */
 export type PlungingReliefStage = 'relief-rough' | 'relief-finish';
 
+/** What the compiled job cut for the relief objects of one CNC operation. */
+export type CompiledReliefFacts = {
+  // Distinct depths the relief roughing cuts at, as emitted, shallowest first.
+  readonly roughingLevelDepthsMm: ReadonlyArray<number>;
+  // How many reliefs the operation compiled, from the job's relief planning
+  // evidence; 0 when the job carries none.
+  readonly reliefCount: number;
+  // Whether the operation's other shapes compiled groups of their own.
+  readonly cutsOtherShapes: boolean;
+};
+
 /** The read-only strategy a CNC operation cuts with, joined for one line.
- * `plungingReliefStages` comes from the compiled job (ADR-273 Amendment 1). */
+ * `plungingReliefStages` comes from the compiled job (ADR-273 Amendment 1), as
+ * does `relief` when the operation cut relief objects (ADR-224 Amendment 3). */
 export function cncOperationDetail(
   settings: CncLayerSettings,
   stockThicknessMm?: number,
   plungingReliefStages: ReadonlyArray<PlungingReliefStage> = [],
+  relief?: CompiledReliefFacts,
 ): string {
+  // A relief roughs to its own depth, level by level, and takes no tabs. An
+  // operation that cut only reliefs cut no shape of its cut type, so that
+  // type's depth, tabs and strategy parts would describe nothing.
+  const shapes = relief === undefined || relief.cutsOtherShapes;
   // Read the pass count from the same helper the compiler steps with, rather
   // than re-deriving it: zPassDepths carries an epsilon and a per-pass clamp,
   // and a bare Math.ceil disagreed with the emitter on imperial depths
   // (19.05 / 1.5875 floats to 12.000000000000002, showing 13 for 12 passes).
   return [
-    ...cncDepthParts(settings),
-    ...cncStepoverPart(settings),
+    ...reliefRoughingPart(relief),
+    ...(shapes ? cncDepthParts(settings, relief !== undefined) : []),
+    ...cncStepoverPart(settings, shapes, relief),
     ...cncDirectionPart(settings),
-    ...cncProfileTabsPart(settings, stockThicknessMm),
-    ...cncEntryPart(settings, plungingReliefStages),
-    ...cncVCarveClearPart(settings),
+    ...(shapes ? cncProfileTabsPart(settings, stockThicknessMm, relief !== undefined) : []),
+    ...cncEntryPart(settings, plungingReliefStages, shapes),
+    ...(shapes ? cncVCarveClearPart(settings) : []),
     ...cncFinishAllowancePart(settings),
-    ...cncPocketStrategyPart(settings),
+    ...(shapes ? cncPocketStrategyPart(settings) : []),
     feedSourcePart(settings),
   ].join(SEPARATOR);
 }
 
-function cncStepoverPart(settings: CncLayerSettings): ReadonlyArray<string> {
-  return settings.cutType === 'v-carve' ? [] : [`stepover ${settings.stepoverPercent}%`];
+// ADR-224 Amendment 3: name the levels the compiled roughing cuts, since a
+// relief's depth comes from the relief, not from the operation's Cut depth.
+function reliefRoughingPart(relief: CompiledReliefFacts | undefined): ReadonlyArray<string> {
+  if (relief === undefined) return [];
+  const levels = relief.roughingLevelDepthsMm;
+  const deepestMm = levels[levels.length - 1];
+  if (deepestMm === undefined) return ['no relief roughing levels'];
+  const to = `to ${formatIntervalMm(deepestMm)} mm`;
+  // The reliefs of one operation share a roughing group, so its levels are
+  // the distinct depths across them all, not a count for each relief.
+  if (relief.reliefCount > 1) {
+    const depths = `${levels.length} ${levels.length === 1 ? 'depth' : 'depths'}`;
+    return [`relief roughing at ${depths} ${to} across ${relief.reliefCount} reliefs`];
+  }
+  const noun = levels.length === 1 ? 'level' : 'levels';
+  return [`relief roughing ${levels.length} ${noun} ${to}`];
+}
+
+// Relief roughing rings step by the stepover on every cut type, V-carve too.
+function cncStepoverPart(
+  settings: CncLayerSettings,
+  shapes: boolean,
+  relief: CompiledReliefFacts | undefined,
+): ReadonlyArray<string> {
+  const reliefRings = (relief?.roughingLevelDepthsMm.length ?? 0) > 0;
+  return reliefRings || (shapes && settings.cutType !== 'v-carve')
+    ? [`stepover ${settings.stepoverPercent}%`]
+    : [];
 }
 
 function cncDirectionPart(settings: CncLayerSettings): ReadonlyArray<string> {
@@ -152,8 +196,13 @@ function cncDirectionPart(settings: CncLayerSettings): ReadonlyArray<string> {
 function cncProfileTabsPart(
   settings: CncLayerSettings,
   stockThicknessMm: number | undefined,
+  besideReliefs: boolean,
 ): ReadonlyArray<string> {
-  return isProfileCutType(settings.cutType) ? [cncTabsPart(settings, stockThicknessMm)] : [];
+  // Relief passes take no tabs, so kept tabs belong to the other shapes alone.
+  const keptNote = besideReliefs ? ', none on reliefs' : '';
+  return isProfileCutType(settings.cutType)
+    ? [cncTabsPart(settings, stockThicknessMm, keptNote)]
+    : [];
 }
 
 function cncVCarveClearPart(settings: CncLayerSettings): ReadonlyArray<string> {
@@ -176,7 +225,7 @@ function cncPocketStrategyPart(settings: CncLayerSettings): ReadonlyArray<string
   return strategy !== undefined && strategy !== 'offset' ? [`${strategy} pocket`] : [];
 }
 
-function cncDepthParts(settings: CncLayerSettings): ReadonlyArray<string> {
+function cncDepthParts(settings: CncLayerSettings, besideReliefs: boolean): ReadonlyArray<string> {
   if (settings.cutType === 'v-carve') {
     return (settings.vCarveFlatDepthEnabled ?? true)
       ? [
@@ -186,7 +235,9 @@ function cncDepthParts(settings: CncLayerSettings): ReadonlyArray<string> {
       : ['flowing V-depth', `max stepdown ${formatMm(settings.depthPerPassMm)} mm`];
   }
   const passes = zPassDepths(settings.depthMm, settings.depthPerPassMm).length;
-  return [`${passes} ${passes === 1 ? 'pass' : 'passes'}`];
+  // Cut depth reaches only the shapes that are not reliefs.
+  const where = besideReliefs ? ' on the other shapes' : '';
+  return [`${passes} ${passes === 1 ? 'pass' : 'passes'}${where}`];
 }
 
 /** Display name for a layer's linked material preset; null = no binding. */
@@ -228,10 +279,14 @@ function laserTabsPart(settings: LayerOperationSettings): string {
   return `tabs ${settings.tabsPerShape} × ${formatMm(settings.tabSizeMm)} mm`;
 }
 
-function cncTabsPart(settings: CncLayerSettings, stockThicknessMm: number | undefined): string {
+function cncTabsPart(
+  settings: CncLayerSettings,
+  stockThicknessMm: number | undefined,
+  keptNote: string,
+): string {
   if (!settings.tabsEnabled) return 'tabs off';
   const configured = `tabs ${settings.tabsPerShape} per shape (${formatMm(settings.tabWidthMm)} × ${formatMm(settings.tabHeightMm)} mm)`;
-  if (stockThicknessMm === undefined) return configured;
+  if (stockThicknessMm === undefined) return `${configured}${keptNote}`;
   // ADR-258 amendment 1: the compiler drops tabs where the floor holds the part,
   // so say so rather than list tabs that will not be cut.
   if (!cutCanFreePart(settings.depthMm, settings.tabHeightMm, stockThicknessMm)) {
@@ -239,18 +294,30 @@ function cncTabsPart(settings: CncLayerSettings, stockThicknessMm: number | unde
   }
   // Amendment 3: a set stock thickness measures a kept tab from the stock bottom.
   return stockThicknessMm === DEFAULT_CNC_STOCK.thicknessMm
-    ? configured
-    : `${configured} above the stock bottom`;
+    ? `${configured}${keptNote}`
+    : `${configured} above the stock bottom${keptNote}`;
 }
 
 function cncEntryPart(
   settings: CncLayerSettings,
   plungingReliefStages: ReadonlyArray<PlungingReliefStage>,
+  shapes: boolean,
 ): ReadonlyArray<string> {
-  const entry = requestedCncEntry(settings);
+  const entry = shapes ? requestedCncEntry(settings) : reliefRoughingEntry(settings);
   if (entry === null) return [];
   const notes = [...entry.notes, ...reliefPlungeNote(plungingReliefStages)];
   return [notes.length === 0 ? entry.label : `${entry.label} (${notes.join('; ')})`];
+}
+
+// ADR-224 Amendment 3: relief roughing ramps at the ramp angle on every cut
+// type (ADR-424), and no helix or V-carve entry reaches a relief, so an
+// operation that cut only reliefs names that ramp alone.
+function reliefRoughingEntry(
+  settings: CncLayerSettings,
+): { readonly label: string; readonly notes: ReadonlyArray<string> } | null {
+  return settings.rampEntryDeg === undefined
+    ? null
+    : { label: `ramp entry ${settings.rampEntryDeg}°`, notes: [] };
 }
 
 function requestedCncEntry(

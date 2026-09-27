@@ -54,7 +54,7 @@ export type FitCouponParts = Extract<FitCouponResult, { kind: 'generated' }>['pa
 export function BoxFitTestDialog(props: {
   readonly machine: BoxMachineContext;
   readonly onCancel: () => void;
-  readonly onGenerate: (parts: FitCouponParts) => void;
+  readonly onGenerate: (parts: FitCouponParts, spec: FitCouponSpec) => void;
 }): JSX.Element {
   const [draft, setDraft] = useState(() =>
     restoreCalibrationDraft(FIT_TEST_DRAFT_KEY, defaults(props.machine), PERSISTED),
@@ -87,7 +87,7 @@ export function BoxFitTestDialog(props: {
         event.preventDefault();
         if (result.kind !== 'generated') return;
         persistCalibrationDraft(FIT_TEST_DRAFT_KEY, draft);
-        props.onGenerate(result.parts);
+        props.onGenerate(result.parts, spec);
       }}
       size="sm"
     >

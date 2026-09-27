@@ -131,7 +131,7 @@ async function installPointPaintProbe(page: Page): Promise<void> {
       CanvasRenderingContext2D.prototype.clearRect,
       {
         apply(target, context: CanvasRenderingContext2D, args: [number, number, number, number]) {
-          if (context.canvas.getAttribute('aria-label') === 'Trace points')
+          if (context.canvas.getAttribute('aria-label') === 'Trace nodes')
             window.__tracerUpgradeProbe.pointPaints += 1;
           Reflect.apply(target, context, args);
         },
@@ -186,7 +186,7 @@ async function inspectPointViews(
   dialog: Locator,
 ): Promise<Record<string, PointSnapshot>> {
   await dialog.getByRole('button', { name: 'Show Points', exact: true }).click();
-  const points = dialog.locator('canvas[aria-label="Trace points"]');
+  const points = dialog.locator('canvas[aria-label="Trace nodes"]');
   await expect(points).toHaveCount(1);
   await expect(dialog.locator('.lf-trace-preview__points circle')).toHaveCount(0);
   const initial = await expectPointPaint(points);

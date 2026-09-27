@@ -135,6 +135,36 @@ describe('hitTest', () => {
       ],
     };
     expect(hitTest(withObjects(curve), { x: 5, y: 7.5 })).toBe('curve');
+    expect(hitTest(withObjects(curve), { x: 5, y: 7.5 })).toBe('curve');
+
+    // Hit polylines are cached per path object: an edited path is a new
+    // object and must be hit-tested against its own curve, not the cached one.
+    if (curve.kind !== 'imported-svg') throw new Error('expected artwork');
+    const path = curve.paths[0]!;
+    const lowered: SceneObject = {
+      ...curve,
+      paths: [
+        {
+          ...path,
+          curves: [
+            {
+              start: { x: 0, y: 0 },
+              segments: [
+                {
+                  kind: 'cubic',
+                  control1: { x: 0, y: 5 },
+                  control2: { x: 10, y: 5 },
+                  to: { x: 10, y: 0 },
+                },
+              ],
+              closed: false,
+            },
+          ],
+        },
+      ],
+    };
+    expect(hitTest(withObjects(lowered), { x: 5, y: 7.5 })).toBeNull();
+    expect(hitTest(withObjects(lowered), { x: 5, y: 3.75 })).toBe('curve');
   });
 
   it('returns null for an empty scene', () => {

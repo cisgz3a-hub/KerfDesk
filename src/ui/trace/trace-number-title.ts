@@ -17,6 +17,8 @@ export function traceNumberTitle(label: string): string {
       return 'Higher values keep fainter detail. Each step of 10 needs one brightness level less contrast.';
     case 'Detail':
       return 'Higher values compare each pixel with a smaller neighbourhood: finer detail, hollower broad shapes.';
+    case 'Max stroke width':
+      return 'Ink up to this wide is traced once down its centre line; wider ink stays a filled outline.';
     case 'Minimum line':
       return 'Discard closed edge outlines whose perimeter is shorter than this many source-image pixels.';
     default:

@@ -260,6 +260,129 @@ describe('cncOperationDetail', () => {
       'Machine starter values: retired-starter (revision 3; catalog entry unavailable)',
     );
   });
+
+  // ADR-224 Amendment 3: a relief roughs to its own depth, level by level, and
+  // takes no tabs. A layer holding only a 20 mm flat relief 3 mm deep (default
+  // on-path cut, 1 mm deep, 1.5 mm per pass, tabs on) read "1 pass · stepover
+  // 40% · tabs 4 per shape (6 × 2 mm)" while its relief roughed two levels.
+  it('names the compiled relief levels and drops the shape parts when only reliefs were cut', () => {
+    const reliefOnly = {
+      roughingLevelDepthsMm: [1.5, 2.5],
+      reliefCount: 1,
+      cutsOtherShapes: false,
+    };
+    expect(cncOperationDetail(DEFAULT_CNC_LAYER_SETTINGS, 18, [], reliefOnly)).toBe(
+      'relief roughing 2 levels to 2.5 mm · stepover 40% · Manual feeds',
+    );
+    const pocket: CncLayerSettings = {
+      ...DEFAULT_CNC_LAYER_SETTINGS,
+      cutType: 'pocket',
+      rampEntryDeg: 3,
+      finishAllowanceMm: 0.3,
+      pocketStrategy: 'raster-x',
+    };
+    // Relief rings keep the direction, ramp and allowance; no pocket is cut.
+    expect(cncOperationDetail(pocket, undefined, [], reliefOnly)).toBe(
+      'relief roughing 2 levels to 2.5 mm · stepover 40% · climb · ramp entry 3° · finish allowance 0.3 mm · Manual feeds',
+    );
+    // ADR-273 Amendment 1 still notes, from the same job, a relief stage that plunges.
+    const ramped: CncLayerSettings = { ...DEFAULT_CNC_LAYER_SETTINGS, rampEntryDeg: 5 };
+    expect(cncOperationDetail(ramped, undefined, ['relief-finish'], reliefOnly)).toBe(
+      'relief roughing 2 levels to 2.5 mm · stepover 40% · ramp entry 5° (relief finishing plunges) · Manual feeds',
+    );
+  });
+
+  it('keeps the pass count and tabs for the other shapes cut beside reliefs', () => {
+    const mixed = { roughingLevelDepthsMm: [1.5, 2.5], reliefCount: 1, cutsOtherShapes: true };
+    expect(cncOperationDetail(DEFAULT_CNC_LAYER_SETTINGS, undefined, [], mixed)).toBe(
+      'relief roughing 2 levels to 2.5 mm · 1 pass on the other shapes · stepover 40% · tabs 4 per shape (6 × 2 mm), none on reliefs · Manual feeds',
+    );
+    const through: CncLayerSettings = { ...DEFAULT_CNC_LAYER_SETTINGS, depthMm: 19 };
+    expect(cncOperationDetail(through, 19, [], mixed)).toContain(
+      '13 passes on the other shapes · stepover 40% · tabs 4 per shape (6 × 2 mm) above the stock bottom, none on reliefs',
+    );
+    // Tabs that no shape keeps need no relief note.
+    expect(cncOperationDetail(DEFAULT_CNC_LAYER_SETTINGS, 18, [], mixed)).toContain(
+      ' · tabs 4 per shape (6 × 2 mm), skipped: the 17 mm floor holds the part · ',
+    );
+    const tabsOff: CncLayerSettings = { ...DEFAULT_CNC_LAYER_SETTINGS, tabsEnabled: false };
+    expect(cncOperationDetail(tabsOff, undefined, [], mixed)).toContain(' · tabs off · ');
+  });
+
+  it('keeps the relief stepover on a V-carve operation and says when reliefs rough no level', () => {
+    const vCarve: CncLayerSettings = {
+      ...DEFAULT_CNC_LAYER_SETTINGS,
+      cutType: 'v-carve',
+      vCarveFlatDepthEnabled: true,
+      vClearToolId: 'clear',
+    };
+    const oneLevel = { roughingLevelDepthsMm: [3], reliefCount: 1, cutsOtherShapes: false };
+    expect(cncOperationDetail(vCarve, undefined, [], oneLevel)).toBe(
+      'relief roughing 1 level to 3 mm · stepover 40% · Manual feeds',
+    );
+    expect(cncOperationDetail(vCarve, undefined, [], { ...oneLevel, cutsOtherShapes: true })).toBe(
+      'relief roughing 1 level to 3 mm · requested flat floor 1 mm · max stepdown 1.5 mm · stepover 40% · clear stepover 40% · Manual feeds',
+    );
+    // A relief no deeper than its allowance compiles only its finishing pass.
+    const noLevels = { roughingLevelDepthsMm: [], reliefCount: 1, cutsOtherShapes: false };
+    expect(cncOperationDetail(DEFAULT_CNC_LAYER_SETTINGS, undefined, [], noLevels)).toBe(
+      'no relief roughing levels · Manual feeds',
+    );
+  });
+
+  // Relief roughing ramps at the ramp angle on every cut type (ADR-424); a helix
+  // or V-carve entry reaches no relief.
+  it('names only the relief roughing ramp as the entry when only reliefs were cut', () => {
+    const reliefOnly = {
+      roughingLevelDepthsMm: [1.5, 2.5],
+      reliefCount: 1,
+      cutsOtherShapes: false,
+    };
+    const helix: CncLayerSettings = {
+      ...DEFAULT_CNC_LAYER_SETTINGS,
+      cutType: 'pocket',
+      helixEntry: { minDiameterMm: 2, maxDiameterMm: 8, angleDeg: 3 },
+    };
+    expect(cncOperationDetail(helix, undefined, ['relief-rough'], reliefOnly)).toBe(
+      'relief roughing 2 levels to 2.5 mm · stepover 40% · climb · Manual feeds',
+    );
+    const vCarve: CncLayerSettings = {
+      ...DEFAULT_CNC_LAYER_SETTINGS,
+      cutType: 'v-carve',
+      vCarveRampEntryDeg: 3,
+      rampEntryDeg: 5,
+    };
+    expect(cncOperationDetail(vCarve, undefined, ['relief-finish'], reliefOnly)).toBe(
+      'relief roughing 2 levels to 2.5 mm · stepover 40% · ramp entry 5° (relief finishing plunges) · Manual feeds',
+    );
+    // Beside other shapes the requested entry is theirs and reads as before.
+    expect(
+      cncOperationDetail(helix, undefined, ['relief-rough'], {
+        ...reliefOnly,
+        cutsOtherShapes: true,
+      }),
+    ).toContain(' · helix entry (relief roughing plunges) · ');
+  });
+
+  // The reliefs of one operation share a roughing group, so its levels are the
+  // distinct depths across them all.
+  it('counts depths rather than levels when several reliefs share the operation', () => {
+    const twoReliefs = {
+      roughingLevelDepthsMm: [1.5, 2.5, 3, 4.5],
+      reliefCount: 2,
+      cutsOtherShapes: false,
+    };
+    expect(cncOperationDetail(DEFAULT_CNC_LAYER_SETTINGS, undefined, [], twoReliefs)).toBe(
+      'relief roughing at 4 depths to 4.5 mm across 2 reliefs · stepover 40% · Manual feeds',
+    );
+    // A legacy job without relief planning evidence cannot tell how many.
+    expect(
+      cncOperationDetail(DEFAULT_CNC_LAYER_SETTINGS, undefined, [], {
+        ...twoReliefs,
+        reliefCount: 0,
+      }),
+    ).toContain('relief roughing 4 levels to 4.5 mm · ');
+  });
 });
 
 describe('boundMaterialLabel', () => {

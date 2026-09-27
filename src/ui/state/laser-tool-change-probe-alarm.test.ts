@@ -151,6 +151,9 @@ describe('a missed touch-off probe in a drained tool-change hold', () => {
     expect(useLaserStore.getState().toolChangeIdleSeen).toBe(true);
 
     await say(device, `ALARM:${code}`, ALARM);
+    // Exercise polling before unlock as well as after its acknowledgement.
+    await device.write('?');
+    await settle();
     const alarmed = useLaserStore.getState();
     expect(alarmed.streamer?.status).toBe('tool-change');
     expect(alarmed.alarmCode).toBe(code);

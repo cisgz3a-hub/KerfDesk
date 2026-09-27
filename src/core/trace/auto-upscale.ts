@@ -304,6 +304,8 @@ export function scaleTracedPathsUniform(
   return paths.map((path) => ({
     color: path.color,
     polylines: path.polylines.map((polyline) => scalePolyline(polyline, scale)),
+    // A Line + fill stroke's pen width lives in the same local units.
+    ...(path.strokeWidthMm === undefined ? {} : { strokeWidthMm: path.strokeWidthMm * scale }),
     ...(path.curves === undefined
       ? {}
       : {

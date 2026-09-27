@@ -1,4 +1,7 @@
+import { useId } from 'react';
 import { CHIPLOAD_MATERIALS } from '../../core/cnc';
+import { cncStageRecipe } from '../../core/cnc/cnc-stage-settings';
+import type { CncCuttingStage } from '../../core/scene/cnc-stage-recipe';
 import {
   layerCncTool,
   type CncLayerSettings,
@@ -7,7 +10,7 @@ import {
 } from '../../core/scene';
 import { CncMaterialOptions } from '../common/CncMaterialOptions';
 import { MANUAL_FEEDS_LABEL } from '../common/cnc-material-vocabulary';
-import { CncToolPicture } from '../machine/CncToolPicture';
+import { openMachineSetup } from '../laser/device-setup';
 import { useStore } from '../state';
 import {
   cncStartupOperationDraft,
@@ -15,7 +18,6 @@ import {
   type CncStartupOperationDraft,
 } from '../state/cnc-startup-setup';
 import { CncOperationToolSelect } from './CncOperationToolSelect';
-import { CncOperationBitLibrary } from './CncOperationBitLibrary';
 
 type BindingPatch = Partial<Omit<CncStartupOperationDraft, 'layerId'>>;
 const JOB_MATERIAL_VALUE = '__job-material__';
@@ -27,27 +29,18 @@ type OperationToolProps = {
   readonly onCommitSettings: (settings: CncLayerSettings, replaceFeedDrafts: boolean) => void;
 };
 
-export function CncOperationToolFields(props: OperationToolProps): JSX.Element {
-  return <OperationToolSection {...props} details={false} />;
-}
-
-export function CncOperationToolDetails(props: OperationToolProps): JSX.Element {
-  return <OperationToolSection {...props} details />;
-}
-
-/** Operation assignments share the exact transform used by Machine Setup's tool plan. */
-function OperationToolSection(
-  props: OperationToolProps & { readonly details: boolean },
-): JSX.Element | null {
+/**
+ * The operation's bit, the second bit its cut type can use, and its material
+ * (ADR-481). Assignments share the exact transform used by Machine Setup's tool plan.
+ */
+export function CncOperationToolFields(props: OperationToolProps): JSX.Element | null {
   const machine = useStore((state) => state.project.machine);
   const profile = useStore((state) => state.project.device);
   const liveCaps = useStore((state) => state.cncLiveCaps);
   if (machine?.kind !== 'cnc') return null;
   const operation = operationWithMaterialBinding(props.layer, props.settings);
   const draft = cncStartupOperationDraft(operation);
-  const primary = layerCncTool(machine, props.settings);
   const jobDefault = machine.tools.find((tool) => tool.id === machine.toolId);
-  const secondarySummary = assignedSecondaryTools(machine, props.settings, props.hasReliefObjects);
   const commit = (patch: BindingPatch): void => {
     const scene = sceneWithCncStartupOperationDrafts({
       scene: { layers: [operation], objects: [] },
@@ -61,52 +54,44 @@ function OperationToolSection(
       props.onCommitSettings(next.cnc, 'materialKey' in patch || 'toolId' in patch);
     }
   };
-  if (props.details) {
-    return (
-      <details className="lf-cnc-tool-details">
-        <summary title="Show the current bit, additional tool assignments and bit library.">
-          <span>Bit details &amp; additional tools</span>
-          {secondarySummary === '' ? null : <small>{secondarySummary}</small>}
-        </summary>
-        <div className="lf-cnc-tool-details__body">
-          <p className="lf-cnc-settings-hint">
-            Material applies starting feeds, RPM and pass depth. Manual keeps your values.{' '}
-            {props.settings.feedSource?.kind === 'material-recipe'
-              ? 'Primary bit changes refresh material starting feeds.'
-              : 'Primary bit changes keep your current feed values.'}
-          </p>
-          <p className="lf-cnc-settings-hint">{primary.name}</p>
-          <CncToolPicture key={primary.id} tool={primary} />
-          <CncSecondaryToolFields {...props} machine={machine} draft={draft} onChange={commit} />
-          <CncOperationBitLibrary machine={machine} />
-        </div>
-      </details>
-    );
-  }
   return (
-    <section className="lf-cnc-settings-card" aria-label="Tool & material">
-      <div className="lf-cnc-primary-assignment">
-        <CncOperationMaterialField
-          layer={props.layer}
-          machine={machine}
-          value={draft.materialKey}
-          onChange={(materialKey) => commit({ materialKey })}
-        />
-        <CncOperationToolSelect
-          label="Bit"
-          ariaLabel={`Bit for ${props.layer.color}`}
-          value={draft.toolId}
-          emptyLabel={
-            jobDefault === undefined ? 'Use job default bit' : `Job default: ${jobDefault.name}`
-          }
-          tools={machine.tools}
-          allTools={machine.tools}
-          defaultTool={jobDefault}
-          showReference={false}
-          onChange={(toolId) => commit({ toolId })}
-        />
-      </div>
+    <section className="lf-cnc-settings-card" aria-label="Bit and material">
+      <CncOperationToolSelect
+        label="Bit"
+        ariaLabel={`Bit for ${props.layer.color}`}
+        value={draft.toolId}
+        emptyLabel={
+          jobDefault === undefined ? 'Use job default bit' : `Job default: ${jobDefault.name}`
+        }
+        tools={machine.tools}
+        allTools={machine.tools}
+        defaultTool={jobDefault}
+        description="The cutter for this operation. Job default follows the default bit in Machine Setup."
+        action={<ManageBitsButton />}
+        onChange={(toolId) => commit({ toolId })}
+      />
+      <CncSecondaryToolFields {...props} machine={machine} draft={draft} onChange={commit} />
+      <CncOperationMaterialField
+        layer={props.layer}
+        machine={machine}
+        value={draft.materialKey}
+        onChange={(materialKey) => commit({ materialKey })}
+      />
     </section>
+  );
+}
+
+// The bit library (catalog and custom bits) lives in Machine Setup.
+function ManageBitsButton(): JSX.Element {
+  return (
+    <button
+      type="button"
+      className="lf-cnc-link-button"
+      title="Add a bit from the catalog or enter your own in the Machine Setup bit library."
+      onClick={() => openMachineSetup({ kind: 'cnc', field: 'bit-library' })}
+    >
+      Manage bits
+    </button>
   );
 }
 
@@ -119,31 +104,31 @@ function CncOperationMaterialField(props: {
   const jobMaterial = props.machine.stock.materialKey;
   const known =
     props.value === null || CHIPLOAD_MATERIALS.some((item) => item.value === props.value);
+  const id = useId();
   return (
     <div className="lf-cnc-tool-field">
-      <label>
-        <span>Material</span>
-        <select
-          value={props.value ?? ''}
-          aria-label={`Material for ${props.layer.color}`}
-          title="Choose a material and apply starting feeds to this operation. Manual keeps the current numbers."
-          onChange={(event) => {
-            const value = event.target.value;
-            props.onChange(value === JOB_MATERIAL_VALUE ? (jobMaterial ?? null) : value || null);
-          }}
-        >
-          <option value="">{MANUAL_FEEDS_LABEL}</option>
-          {jobMaterial === undefined ? null : (
-            <option value={JOB_MATERIAL_VALUE}>
-              Use job material ({materialName(jobMaterial)})
-            </option>
-          )}
-          {!known ? (
-            <option value={props.value ?? ''}>Current material ({props.value})</option>
-          ) : null}
-          <CncMaterialOptions />
-        </select>
-      </label>
+      <div className="lf-cnc-tool-field__label">
+        <label htmlFor={id}>Material</label>
+      </div>
+      <select
+        id={id}
+        value={props.value ?? ''}
+        aria-label={`Material for ${props.layer.color}`}
+        title="Choosing a material applies its starting feed, plunge, spindle speed and depth per pass, and a new bit refreshes them. Manual keeps your numbers."
+        onChange={(event) => {
+          const value = event.target.value;
+          props.onChange(value === JOB_MATERIAL_VALUE ? (jobMaterial ?? null) : value || null);
+        }}
+      >
+        <option value="">{MANUAL_FEEDS_LABEL}</option>
+        {jobMaterial === undefined ? null : (
+          <option value={JOB_MATERIAL_VALUE}>Use job material ({materialName(jobMaterial)})</option>
+        )}
+        {!known ? (
+          <option value={props.value ?? ''}>Current material ({props.value})</option>
+        ) : null}
+        <CncMaterialOptions />
+      </select>
     </div>
   );
 }
@@ -170,7 +155,8 @@ function CncSecondaryToolFields(props: {
           emptyLabel="Single stage (V-bit only)"
           tools={flatTools}
           allTools={machine.tools}
-          hint="Uses the primary bit's feed, plunge, RPM and depth per pass. Check these values for both bits."
+          description="A flat bit that clears the floor where the V-bit cannot reach. Single stage cuts with the V-bit only."
+          hint={secondaryFeedHint(settings, machine, 'v-clear', draft.vClearToolId)}
           onChange={(vClearToolId) => props.onChange({ vClearToolId })}
         />
       ) : null}
@@ -182,7 +168,8 @@ function CncSecondaryToolFields(props: {
           emptyLabel="Single bit"
           tools={roughers}
           allTools={machine.tools}
-          hint="Uses the primary bit's feed, plunge, RPM and depth per pass. Check these values for both bits."
+          description="A larger bit that clears most of the pocket before this operation's bit cuts the edges."
+          hint={secondaryFeedHint(settings, machine, 'pocket-rough', draft.pocketRoughToolId)}
           onChange={(pocketRoughToolId) => props.onChange({ pocketRoughToolId })}
         />
       ) : null}
@@ -194,7 +181,8 @@ function CncSecondaryToolFields(props: {
           emptyLabel="Roughing only"
           tools={machine.tools}
           allTools={machine.tools}
-          hint="Uses the primary bit's feed, plunge and RPM. Check these values for both bits. Relief finishing follows the surface and scallop setting; depth per pass does not apply."
+          description="A bit that follows the relief surface after roughing. Roughing only skips the finishing pass."
+          hint={secondaryFeedHint(settings, machine, 'relief-finish', draft.reliefFinishToolId)}
           onChange={(reliefFinishToolId) => props.onChange({ reliefFinishToolId })}
         />
       ) : null}
@@ -202,31 +190,22 @@ function CncSecondaryToolFields(props: {
   );
 }
 
-function assignedSecondaryTools(
-  machine: CncMachineConfig,
+function secondaryFeedHint(
   settings: CncLayerSettings,
-  hasReliefObjects: boolean,
+  machine: CncMachineConfig,
+  stage: CncCuttingStage,
+  toolId: string | null,
 ): string {
-  const bindings = [
-    {
-      label: 'Floor',
-      id: settings.vClearToolId,
-      active: settings.cutType === 'v-carve' && (settings.vCarveFlatDepthEnabled ?? true),
-    },
-    {
-      label: 'Roughing',
-      id: settings.pocketRoughToolId,
-      active: settings.cutType === 'pocket' && settings.pocketStrategy !== 'adaptive',
-    },
-    { label: 'Finish', id: settings.reliefFinishToolId, active: hasReliefObjects },
-  ];
-  return bindings
-    .filter((binding) => binding.active && binding.id !== undefined)
-    .map((binding) => {
-      const tool = machine.tools.find((candidate) => candidate.id === binding.id);
-      return `${binding.label}: ${tool?.name ?? `Unavailable bit (${binding.id})`}`;
-    })
-    .join(' · ');
+  const tool = machine.tools.find((candidate) => candidate.id === toolId);
+  const independent = tool !== undefined && cncStageRecipe(settings, stage, tool) !== undefined;
+  const values =
+    stage === 'relief-finish' ? 'feed, plunge and RPM' : 'feed, plunge, RPM and depth per pass';
+  const recipeHint = independent
+    ? `Uses separate ${values} for this bit. Edit them in Stage cutting values.`
+    : `Uses the primary bit's ${values}. Set separate values in Stage cutting values.`;
+  return stage === 'relief-finish'
+    ? `${recipeHint} Relief finishing follows the surface and scallop setting; depth per pass does not apply.`
+    : recipeHint;
 }
 
 function materialName(key: string): string {

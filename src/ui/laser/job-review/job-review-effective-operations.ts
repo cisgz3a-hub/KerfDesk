@@ -1,11 +1,17 @@
-import type { CncGroup, Group, Job } from '../../../core/job';
-import { cncGroupMaximumDepth } from '../../../core/cnc/output-representation';
+import type { CncGroup, CncPass, Group, Job } from '../../../core/job';
+import { cncGroupMaximumDepth, cncPassCanEmit } from '../../../core/cnc/output-representation';
 import {
   type CncCoordinateRepresentation,
+  representedCncCoordinateMm,
   requestedCncCoordinateText,
 } from '../../../core/cnc/coordinate-representation';
 import { artworkOperationName, type Layer, type SceneObject } from '../../../core/scene';
-import { laserOperationDetail, type PlungingReliefStage } from './job-review-detail-facts';
+import {
+  laserOperationDetail,
+  type CompiledReliefFacts,
+  type PlungingReliefStage,
+} from './job-review-detail-facts';
+
 import { cncCuttingStageLabel } from '../../../core/scene/cnc-stage-recipe';
 import { nominalChiploadMm } from '../../../core/cnc/nominal-chipload';
 import { effectiveGcodeFeedMmPerMin } from '../../../core/gcode/feed-word';
@@ -15,6 +21,7 @@ export type JobReviewEffectiveOperation = {
   readonly summaries: ReadonlyArray<string>;
   readonly cncActualMaxDepthMm?: number;
   readonly plungingReliefStages?: ReadonlyArray<PlungingReliefStage>;
+  readonly relief?: CompiledReliefFacts;
 };
 
 /** Summarize selected values from the exact prepared Job. Matching displayed
@@ -42,14 +49,17 @@ export function buildEffectiveOperationReview(
     }
   }
   const plungingReliefByLayer = plungingReliefStagesByLayer(job);
+  const reliefByLayer = compiledReliefFactsByLayer(job);
   return [...summariesByLayer].map(([layerId, summaries]) => {
     const cncActualMaxDepth = vCarveDepthByLayer.get(layerId);
     const plungingReliefStages = plungingReliefByLayer.get(layerId);
+    const relief = reliefByLayer.get(layerId);
     return {
       layerId,
       summaries,
       ...(cncActualMaxDepth === undefined ? {} : { cncActualMaxDepthMm: cncActualMaxDepth.value }),
       ...(plungingReliefStages === undefined ? {} : { plungingReliefStages }),
+      ...(relief === undefined ? {} : { relief }),
     };
   });
 }
@@ -68,6 +78,61 @@ function plungingReliefStagesByLayer(
     byLayer.set(group.layerId, stages);
   }
   return byLayer;
+}
+
+// ADR-224 Amendment 3: a relief roughs to its own depth, level by level, and
+// takes no tabs, so the operation line reads from the compiled groups which
+// levels the reliefs cut and whether any other shape was cut beside them.
+function compiledReliefFactsByLayer(job: Job): ReadonlyMap<string, CompiledReliefFacts> {
+  const levelsByLayer = new Map<string, Set<number>>();
+  const otherShapeLayers = new Set<string>();
+  for (const group of job.groups) {
+    if (group.kind !== 'cnc') continue;
+    if (group.cutType !== 'relief-rough' && group.cutType !== 'relief-finish') {
+      otherShapeLayers.add(group.layerId);
+      continue;
+    }
+    const levels = levelsByLayer.get(group.layerId) ?? new Set<number>();
+    if (group.cutType === 'relief-rough') addRoughingLevels(levels, group);
+    levelsByLayer.set(group.layerId, levels);
+  }
+  const reliefCounts = compiledReliefCounts(job);
+  const facts = new Map<string, CompiledReliefFacts>();
+  for (const [layerId, levels] of levelsByLayer) {
+    facts.set(layerId, {
+      roughingLevelDepthsMm: [...levels].sort((a, b) => a - b),
+      reliefCount: reliefCounts.get(layerId) ?? 0,
+      cutsOtherShapes: otherShapeLayers.has(layerId),
+    });
+  }
+  return facts;
+}
+
+// The job's relief planning evidence holds one roughing entry per compiled
+// relief; a legacy job without it counts none.
+function compiledReliefCounts(job: Job): ReadonlyMap<string, number> {
+  const counts = new Map<string, number>();
+  for (const plan of job.cncCompilation?.reliefPlans ?? []) {
+    if (plan.stage === 'roughing') counts.set(plan.layerId, (counts.get(plan.layerId) ?? 0) + 1);
+  }
+  return counts;
+}
+
+// Every emitted roughing pass cuts at one level: a ring or cleanup path at its
+// Z, a ramped one at the depth its ramp descends to (ADR-424).
+function addRoughingLevels(levels: Set<number>, group: CncGroup): void {
+  for (const pass of group.passes) {
+    if (!cncPassCanEmit(pass)) continue;
+    const depthMm = -representedCncCoordinateMm(passLevelZMm(pass));
+    if (depthMm > 0) levels.add(depthMm);
+  }
+}
+
+function passLevelZMm(pass: CncPass): number {
+  if (pass.kind !== 'path3d') return pass.zMm;
+  let lowestZMm = Number.POSITIVE_INFINITY;
+  for (const point of pass.points) lowestZMm = Math.min(lowestZMm, point.z);
+  return lowestZMm;
 }
 
 function effectiveGroupSummary(

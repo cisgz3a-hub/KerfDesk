@@ -85,8 +85,7 @@ function patternCount(spec: BoxSpec, spanMm: number, field: string, saturated: S
 }
 
 function junctionCount(spec: BoxSpec, innerHeightMm: number, saturated: Set<string>): Count {
-  const heightSpanMm = spec.style === 'open-top' ? innerHeightMm + spec.thicknessMm : innerHeightMm;
-  return patternCount(spec, heightSpanMm + 2 * spec.thicknessMm, 'junctionCells', saturated);
+  return patternCount(spec, innerHeightMm + 2 * spec.thicknessMm, 'junctionCells', saturated);
 }
 
 function claimCellVisits(

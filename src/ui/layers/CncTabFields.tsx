@@ -1,7 +1,7 @@
 import { pathUsesOperation, type CncLayerSettings, type Layer } from '../../core/scene';
 import { useStore } from '../state';
 import { useUiStore } from '../state/ui-store';
-import { NumberField, Row } from './CncLayerPrimitives';
+import { NumberField } from './CncLayerPrimitives';
 import { CncTabPositionControls } from './CncTabPositionControls';
 import { RailSection } from '../kit';
 
@@ -19,19 +19,19 @@ export function CncTabFields(props: {
       badge={settings.tabsEnabled ? `${settings.tabsPerShape} per shape` : 'Off'}
       hint="Leave small bridges to hold cut-out parts in the stock."
     >
-      <p className="lf-cnc-settings-hint">Small bridges keep cut-out parts attached.</p>
-      <Row label="Use tabs">
+      <label className="lf-cnc-switch">
         <input
           type="checkbox"
+          title="Leave small bridges on the deepest passes so cut-out parts stay attached."
           checked={settings.tabsEnabled}
           onChange={(e) => {
             onCommit({ tabsEnabled: e.target.checked });
             if (!e.target.checked) disarmMatchingTabEditor(layer);
           }}
           aria-label={`Holding tabs for ${layer.color}`}
-          title="Leave small bridges on the deepest passes so cut-out parts stay attached."
         />
-      </Row>
+        <span>Use tabs</span>
+      </label>
       {settings.tabsEnabled ? (
         <>
           <NumberField
@@ -66,18 +66,11 @@ export function CncTabFields(props: {
             step={1}
             title={
               manualProfile
-                ? 'Changing the count spreads saved tabs evenly on unlocked paths used only by this operation. Shared paths and locked artwork keep their saved positions.'
+                ? 'Changing the count spreads tabs evenly again, replacing dragged positions on unlocked paths used only by this operation. Shared paths and locked artwork keep their saved positions.'
                 : 'Number of tabs spread around each closed shape.'
             }
             onCommit={(tabsPerShape) => onCommit({ tabsPerShape: Math.floor(tabsPerShape) })}
           />
-          {manualProfile ? (
-            <p style={{ fontSize: 11, margin: 0 }}>
-              Changing the count replaces dragged positions on unlocked paths used only by this
-              operation. Paths shared with another operation and locked artwork keep their saved
-              positions.
-            </p>
-          ) : null}
           <CncTabPositionControls layer={layer} settings={settings} />
         </>
       ) : null}

@@ -30,11 +30,18 @@ export const DEFAULT_TRACE_SPOT_MM = 0.1;
  *  73 B/px; plus 16 B/px for the decode canvas, its pixel copy, the composited
  *  copy and the copy moved to the trace worker. Centerline plans with the
  *  contour figure although it needs less memory: its run time grows fastest
- *  (121 s at 6.3 MP on the owl). ADR-409 has the table. */
+ *  (121 s at 6.3 MP on the owl). ADR-409 has the table.
+ *
+ *  Line + fill (ADR-454) is NOT measured. It runs the Centerline lane and
+ *  then the contour finisher on the fill mask while its own grids stay alive
+ *  (ink mask, Float64 distance field, wide region, stroke discs, fill mask:
+ *  about 13 B/px, and transient Float64 disc radii), so it plans with the
+ *  contour figure plus 40 B/px for those grids and headroom. */
 export const TRACE_PEAK_BYTES_PER_PIXEL = {
   contour: 190,
   edge: 220,
   centerline: 190,
+  hybrid: 230,
 } as const;
 /** Share of the device's memory one trace may plan to use. */
 export const TRACE_MEMORY_SHARE = 0.25;
@@ -104,10 +111,12 @@ export function traceCommitPixelBudget(
     deviceMemoryGb !== undefined && Number.isFinite(deviceMemoryGb) && deviceMemoryGb > 0
       ? deviceMemoryGb
       : DEFAULT_DEVICE_MEMORY_GB;
-  const bytesPerPixel = TRACE_PEAK_BYTES_PER_PIXEL[traceLane(options)];
-  const pixels = Math.floor((memoryGb * 2 ** 30 * TRACE_MEMORY_SHARE) / bytesPerPixel);
+  const lane = traceLane(options);
+  const pixels = Math.floor(
+    (memoryGb * 2 ** 30 * TRACE_MEMORY_SHARE) / TRACE_PEAK_BYTES_PER_PIXEL[lane],
+  );
   const ceiling =
-    traceLane(options) === 'centerline'
+    lane === 'centerline' || lane === 'hybrid'
       ? TRACE_CENTERLINE_MAX_WORKING_PIXELS
       : TRACE_MAX_WORKING_PIXELS;
   return Math.min(ceiling, pixels);
@@ -196,7 +205,8 @@ export function commitGridExceedsPreview(plan: TraceCommitGridPlan): boolean {
 
 /**
  * The size controls an operator sets in the dialog (Ignore less than, ink
- * despeckle or the automatic small-mark policy, Minimum line, gap joins) keep the physical meaning they had on
+ * despeckle or the automatic small-mark policy, Minimum line, gap joins, Line + fill's Max stroke
+ * width) keep the physical meaning they had on
  * the preview grid, so the commit drops the same specks the preview dropped.
  * Lengths scale by the longest-edge ratio and areas by the ratio of the two
  * grids' pixel counts: on a tall or narrow source the short edge is a small
@@ -225,6 +235,7 @@ export function traceOptionsForCommitGrid(
     ...scaled('edgeMinLengthPx', options.edgeMinLengthPx, ratio),
     ...scaled('edgeJoinGapPx', options.edgeJoinGapPx, ratio),
     ...scaled('centerlineJoinGapPx', options.centerlineJoinGapPx, ratio),
+    ...scaled('hybridMaxStrokeWidthPx', options.hybridMaxStrokeWidthPx, ratio),
   };
 }
 
@@ -247,6 +258,9 @@ function traceLane(
 ): keyof typeof TRACE_PEAK_BYTES_PER_PIXEL {
   if (options.traceMode === 'edge') return 'edge';
   if (options.traceMode === 'centerline') return 'centerline';
+  // Line + fill runs the centreline lane over the whole mask, then the
+  // contour finisher (ADR-454): its run time caps like Centerline's.
+  if (options.traceMode === 'hybrid') return 'hybrid';
   return 'contour';
 }
 

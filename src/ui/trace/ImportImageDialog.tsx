@@ -17,7 +17,7 @@ import {
 import { positionTraceOverRasterSource, useStore } from '../state';
 import { useToastStore } from '../state/toast-store';
 import { useUiStore } from '../state/ui-store';
-import type { TraceFillStyle, TraceOutput } from './dialog-parts';
+import { effectiveOutput, type TraceFillStyle, type TraceOutput } from './dialog-parts';
 import { rasterDisplayDataUrl } from '../workspace/draw-raster';
 import type { PendingPreparedTrace, PreparedTrace } from './prepared-trace';
 import { TraceDialogView } from './TraceDialogView';
@@ -26,7 +26,7 @@ import { BoundaryModePicker } from './BoundaryModePicker';
 import type { BoundarySelection } from './use-boundary-selection';
 import { TracePreview } from './TracePreview';
 import { conditionTracedImageForMachine } from './trace-machine-conditioning';
-import { useTraceDialogSettings, useTraceOptions } from './use-trace-dialog-settings';
+import { useDialogTraceOptions, useTraceDialogSettings } from './use-trace-dialog-settings';
 import { resolveTraceCommitResult } from './trace-commit-result';
 import { TraceCommitGridNote, traceCommitGridForClaim } from './trace-commit-grid-note';
 import {
@@ -122,8 +122,8 @@ function DialogBody(props: DialogBodyProps): JSX.Element {
   // re-derived from `TRACE_PRESETS[preset]` each render and would
   // otherwise be ref-unstable too.
   const presetOptions = TRACE_PRESETS[choices.preset] ?? DEFAULT_TRACE_OPTIONS;
-  const options = useTraceOptions(presetOptions, choices.traceSettings);
-  const effectiveTraceOutput: TraceOutput = machineKind === 'cnc' ? 'vector' : choices.traceOutput;
+  const options = useDialogTraceOptions(presetOptions, choices.traceSettings, seed);
+  const effectiveTraceOutput = effectiveOutput(machineKind, options, choices.traceOutput);
   const preview = useSelectedTracePreview(file, options, boundarySelection, seed, previewControl);
 
   const onSubmit = (): void =>
@@ -166,7 +166,8 @@ function DialogBody(props: DialogBodyProps): JSX.Element {
       output={{
         photoShading: options.photoDetail !== undefined,
         machineKind,
-        traceOutput: choices.traceOutput,
+        traceOutput: effectiveTraceOutput,
+        rasterUnavailable: options.traceMode === 'hybrid',
         onTraceOutputChange: choices.setTraceOutput,
         supportsFillStyle: isFilledContourTraceOptions(options),
         traceFillStyle: choices.traceFillStyle,
@@ -207,7 +208,11 @@ function useSelectedTracePreview(
 }
 
 function isFilledContourTraceOptions(options: TraceOptions): boolean {
-  return options.traceMode !== 'centerline' && options.traceMode !== 'edge';
+  return (
+    options.traceMode !== 'centerline' &&
+    options.traceMode !== 'edge' &&
+    options.traceMode !== 'hybrid'
+  );
 }
 
 function TracePreviewPanel(props: {
@@ -463,5 +468,6 @@ function operationOverrideForTrace(
 function traceModeForOptions(options: TraceOptions): NonNullable<TracedImage['traceMode']> {
   if (options.traceMode === 'centerline') return 'centerline';
   if (options.traceMode === 'edge') return 'edge';
+  if (options.traceMode === 'hybrid') return 'hybrid';
   return 'filled-contours';
 }

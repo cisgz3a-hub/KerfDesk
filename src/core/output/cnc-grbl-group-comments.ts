@@ -1,5 +1,6 @@
 import { sanitizeGcodeCommentValue } from '../gcode-comments';
 import type { CncGroup, CncPath3dPass } from '../job';
+import { rampEntryPlungeCount } from '../cnc/contour-ramp-entry';
 import { requestedCncCoordinateText } from '../cnc/coordinate-representation';
 import { cncGroupMaximumDepth } from '../cnc/output-representation';
 import { fmt, fmtFeed } from './cnc-grbl-emit-head';
@@ -84,10 +85,20 @@ function appendEntryComments(lines: string[], group: CncGroup): void {
   if (entryPaths.length > 0 && hasSteppedDetail(group)) {
     lines.push('; cnc entry-advisory: thin-detail passes use stepped entry');
   }
+  appendPlungeAdvisory(lines, group);
 }
 
 function hasSteppedDetail(group: CncGroup): boolean {
   return group.passes.some((pass) => pass.kind === 'path3d' && pass.entryRamp !== true);
+}
+
+// A path too short to ramp along keeps its straight plunge (ADR-471), so the
+// max-angle line above does not describe that pass's entry.
+function appendPlungeAdvisory(lines: string[], group: CncGroup): void {
+  const plunges = rampEntryPlungeCount(group.passes);
+  if (plunges === 0) return;
+  const passes = plunges === 1 ? '1 pass plunges' : `${plunges} passes plunge`;
+  lines.push(`; cnc entry-advisory: ${passes}: path shorter than one cut width`);
 }
 
 function toolGeometryComment(group: CncGroup): string {

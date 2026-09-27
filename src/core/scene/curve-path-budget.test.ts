@@ -1,6 +1,11 @@
 import { describe, expect, it } from 'vitest';
-import { flattenColoredPathCurves, polylineToCurveSubpath } from './curve-path';
-import type { ColoredPath, Polyline } from './scene-object';
+import {
+  MAX_FLATTENED_CURVE_SEGMENTS,
+  flattenColoredPathCurves,
+  flattenCurveSubpath,
+  polylineToCurveSubpath,
+} from './curve-path';
+import type { ColoredPath, PathSegment, Polyline } from './scene-object';
 
 const options = { toleranceMm: 0.025, segmentBudget: 5 };
 
@@ -75,5 +80,45 @@ describe('geometry representation segment budget parity', () => {
       segmentCount: 200_001,
       polylines: path.polylines,
     });
+  });
+
+  it.each<[string, PathSegment]>([
+    [
+      'a NaN cubic control',
+      {
+        kind: 'cubic',
+        control1: { x: Number.NaN, y: 0 },
+        control2: { x: 5, y: 5 },
+        to: { x: 10, y: 0 },
+      },
+    ],
+    [
+      'an infinite cubic control',
+      {
+        kind: 'cubic',
+        control1: { x: Infinity, y: 0 },
+        control2: { x: 5, y: 5 },
+        to: { x: 10, y: 0 },
+      },
+    ],
+    [
+      'a NaN arc radius',
+      {
+        kind: 'elliptical-arc',
+        radiusX: Number.NaN,
+        radiusY: 4,
+        rotationDeg: 0,
+        largeArc: false,
+        sweep: true,
+        to: { x: 10, y: 0 },
+      },
+    ],
+  ])('refuses %s instead of drawing it as one straight move', (_name, segment) => {
+    const path = { start: { x: 0, y: 0 }, segments: [segment], closed: false };
+    for (const segmentBudget of [MAX_FLATTENED_CURVE_SEGMENTS, Number.MAX_SAFE_INTEGER]) {
+      expect(flattenCurveSubpath(path, { toleranceMm: 0.025, segmentBudget }).kind).toBe(
+        'segment-budget-exceeded',
+      );
+    }
   });
 });

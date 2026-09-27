@@ -45,7 +45,7 @@ export function DogboneRow(): JSX.Element | null {
         <span>Bit diameter</span>
         <ClearableNumberField
           ariaLabel="Dogbone bit diameter"
-          title="Bit diameter used to size the corner overcut circles."
+          title="Bit diameter used to size the dogbone at each corner."
           min={MIN_BIT_MM}
           max={MAX_BIT_MM}
           step={0.01}
@@ -59,7 +59,7 @@ export function DogboneRow(): JSX.Element | null {
         <button
           type="button"
           onClick={() => dogboneSelection(bitMm)}
-          title="Relieve corners sharper than 135° with bit-radius overcuts so square parts seat fully."
+          title="Relieve corners sharper than 135° with dogbones the bit can reach so square parts seat fully."
         >
           Relieve corners
         </button>

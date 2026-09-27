@@ -48,7 +48,10 @@ export function TracePointsOverlay(props: Props): JSX.Element {
       ref={canvasRef}
       className="lf-trace-preview__points"
       role="img"
-      aria-label="Trace points"
+      aria-label="Trace nodes"
+      // With an aria-label as the name, the title becomes the accessible
+      // description, so the marker legend is not carried by shape alone.
+      title="Squares mark corner nodes; circles mark smooth joints and sampled points."
     />
   );
 }

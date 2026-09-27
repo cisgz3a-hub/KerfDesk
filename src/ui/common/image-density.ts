@@ -6,10 +6,12 @@
 //   - JPEG JFIF APP0: units (1 = DPI, 2 = dots/cm) + X/Y density. cm -> in is
 //     density * 2.54.
 // densityFromBytes is a pure parser (unit-tested with inline fixtures);
-// readImageDensity is the thin File-reading wrapper. Returns null when no
+// readImageDensity is the thin File-reading wrapper (readImageHeaderDensity
+// reads only a bounded header prefix). Returns null when no
 // supported metadata is present, so the caller falls back to the default DPI
 // (254, ADR-048).
 
+import { readImagePrefix } from '../trace/image-header-reader';
 import { jpegExifOrientation, orientationSwapsAxes } from '../trace/jpeg-header';
 
 const MM_NONE = null;
@@ -51,6 +53,20 @@ export async function readImageDensity(file: File): Promise<ImageDensity | null>
   try {
     const bytes = new Uint8Array(await file.arrayBuffer());
     return densityFromBytes(bytes);
+  } catch {
+    return MM_NONE;
+  }
+}
+
+// Every carrier sits in the header: pHYs precedes IDAT, and JFIF/EXIF precede
+// the scan. 1 MiB covers typical ICC, EXIF and text metadata ahead of them, so
+// a caller that does not otherwise hold the file (the Multi-File batch) reads
+// only this prefix instead of the whole, possibly very large, file.
+export const IMAGE_DENSITY_PROBE_BYTES = 1 << 20;
+
+export async function readImageHeaderDensity(file: Blob): Promise<ImageDensity | null> {
+  try {
+    return densityFromBytes(await readImagePrefix(file, IMAGE_DENSITY_PROBE_BYTES));
   } catch {
     return MM_NONE;
   }

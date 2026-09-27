@@ -27,6 +27,11 @@ import {
 } from '../../core/scene';
 import { applyCncTextDefaultsToNewLayer } from './cnc-text-defaults';
 import { duplicateSceneSelection } from './duplicate-scene-selection';
+import {
+  freshArtworkMode,
+  freshArtworkModeForColor,
+  freshArtworkNameForColor,
+} from './fresh-artwork-mode';
 import { applyFreshTraceScanDirection } from './fresh-trace-scan-direction';
 import { positionTraceOverRasterSource } from './trace-placement';
 import { releaseTraceSourcePalette } from './trace-source-palette';
@@ -228,6 +233,8 @@ export function applyFreshImport(
   }
   const created = createArtworkOperations(s.project.scene, positioned, {
     mode: freshArtworkMode(positioned),
+    modeForColor: freshArtworkModeForColor(positioned),
+    nameForColor: freshArtworkNameForColor(positioned),
   });
   const operations = applyFreshTraceScanDirection(positioned, created.operations, s.project.device);
   positioned = created.object;
@@ -243,15 +250,6 @@ export function applyFreshImport(
     redoStack: [],
     dirty: true,
   };
-}
-
-function freshArtworkMode(object: SceneObject): 'line' | 'fill' | 'image' {
-  if (object.kind === 'raster-image') return 'image';
-  if (object.kind === 'traced-image') {
-    if (object.traceMode === 'centerline' || object.traceMode === 'edge') return 'line';
-    return object.operationOverride?.mode ?? 'fill';
-  }
-  return object.operationOverride?.mode ?? 'line';
 }
 
 // Trace paths use the actual capped working grid reported by the tracer, while
@@ -304,6 +302,8 @@ export function applyTraceToExisting(
     scene.objects.some((object) => object.id === positionedTrace.id);
   const created = createArtworkOperations(scene, positionedTrace, {
     mode: freshArtworkMode(positionedTrace),
+    modeForColor: freshArtworkModeForColor(positionedTrace),
+    nameForColor: freshArtworkNameForColor(positionedTrace),
   });
   const operations = withColourLayerPowers(
     created.object,
