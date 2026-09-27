@@ -32,10 +32,12 @@ CI stayed green because every existing check looked at vertices, not between the
    cell (at 1/8, 1/4 and 1/2 of it from the vertex). Vertices sit on samples, and where a
    flat-bottomed cutter's rim leaves a ledge the contact bends sharply within a cell of one;
    without them a flat end mill could cut up to 0.009 mm there between two checks.
-2. **Tolerance, normal to the move.** A move may cut at most 0.002 mm into the part, measured
-   normal to the move as ADR-412 measures cuts into a wall: the same band the one-sided
-   reduction may leave above the contact, so the finishing path stays within 0.002 mm of the
-   exact contact either way. A cutter sitting h under the contact partway along a move inclined
+2. **Sampled tolerance, normal to the move.** Each sampled check uses a 0.002 mm deficit
+   tolerance, measured normal to the move as ADR-412 measures cuts into a wall. This is the
+   same nominal band as the one-sided reduction, not a certified maximum between samples or
+   after G-code rounding. An independent wall/ledge probe sampled at 0.002 mm found a maximum
+   planner deficit of 0.002174 mm and emitted deficit of 0.003134 mm. These observations do not
+   establish a universal bound. A cutter sitting h under the contact partway along a move inclined
    at angle a cuts h cos(a) into the part: at the worst point of a smooth contact the contact
    runs parallel to the move, and where it bends sharply the cutter cuts in less. So a move down
    a near-vertical wall may pass well under the contact's height at its point without touching

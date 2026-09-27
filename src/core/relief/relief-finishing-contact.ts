@@ -29,9 +29,9 @@
 import type { CncPass } from '../job';
 import { FINISHING_REDUCTION_TOLERANCE_MM, type FinishingPoint } from './relief-finishing-path';
 
-// A straight move may cut this far into the part, normal to the move: the
-// same band the one-sided reduction may leave above it, so the finishing path
-// stays within 0.002 mm of the exact contact either way.
+// Sampled contacts use this normal-to-move deficit tolerance: the
+// same band as the one-sided reduction. Finite sampling and output rounding
+// can exceed it between checks; this is not a global clearance guarantee.
 export const FINISHING_CONTACT_TOLERANCE_MM = FINISHING_REDUCTION_TOLERANCE_MM;
 const MAX_SPLITS = 12;
 // Checks per stretch asked about at once: four cells, under the radius of a
