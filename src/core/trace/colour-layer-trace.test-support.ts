@@ -1,4 +1,4 @@
-// Shared fixtures for the colour-layer trace tests (ADR-430).
+// Shared fixtures for the colour-layer trace tests (ADR-461).
 import type { ColoredPath, Vec2 } from '../scene';
 import { runTraceSteps } from './trace-steps';
 import { traceColourLayersSteps } from './colour-layer-trace';

@@ -18,7 +18,7 @@ export type TraceOptions = {
   // for single-pass vector engraving. Edge detection uses local contrast
   // to find full-colour artwork and traces closed outlines around its ink.
   readonly traceMode?: 'filled-contours' | 'centerline' | 'edge';
-  // Colour layers (ADR-430): presence selects the colour-layer backend, which
+  // Colour layers (ADR-461): presence selects the colour-layer backend, which
   // quantises the image to a few flat colours and traces one filled path per
   // colour with shared boundaries (colour-layer-trace.ts).
   readonly colourLayers?: ColourLayerOptions;

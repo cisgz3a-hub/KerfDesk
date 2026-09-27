@@ -2741,7 +2741,7 @@ settings and Job Review keep their existing read-only setup references.
    halftone treatment; Image mode also offers grayscale and dithered photo engraving.
    **Colour layers** splits flat-colour artwork into a few colours (**Colours**: Auto or 2 to 8,
    counting the paper) and traces one filled layer per colour; neighbouring colours share one
-   edge with no gap or overlap (ADR-430). **Cut-out** burns each colour only in its own area;
+   edge with no gap or overlap (ADR-461). **Cut-out** burns each colour only in its own area;
    **Stacked** also fills each colour under the darker colours above it. The paper colour is left
    untraced unless **Trace background colour** is ticked; only a light border colour counts as
    paper, so light-on-dark art traces every colour. The swatches show the traced colours,
