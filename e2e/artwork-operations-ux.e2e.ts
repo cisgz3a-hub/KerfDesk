@@ -121,6 +121,10 @@ test('CNC refinements remain reachable, editable and saved behind their disclosu
     pocketStrategy: 'raster-x',
     stepoverPercent: 35,
   });
+  // ADR-431: the bit library and machine values are edited in Machine Setup.
+  await expect(panel.getByText('Stock & machine reference')).toHaveCount(0);
+  await panel.getByRole('button', { name: 'Manage bits', exact: true }).click();
+  await expect(page.getByLabel('Bit library in Machine Setup')).toBeFocused();
   await expectNoSerial(kerfdesk);
 });
 
@@ -139,7 +143,6 @@ test('direct CNC material and bit choices persist without changing machine defau
   const rougher = panel.getByRole('combobox', { name: /^Pocket roughing bit for/ });
   await material.selectOption('hardwood-birch');
   await bit.selectOption('em-1588');
-  await openSection(panel, /^Bit details & additional tools/);
   await rougher.selectOption('em-6350');
   await expect(page.getByRole('dialog', { name: 'CNC Machine Setup' })).toHaveCount(0);
 
@@ -160,7 +163,6 @@ test('direct CNC material and bit choices persist without changing machine defau
   await expect(page).toHaveTitle(/direct-cnc-roundtrip\.lf2/, { timeout: 30_000 });
   await expect(material).toHaveValue('hardwood-birch');
   await expect(bit).toHaveValue('em-1588');
-  await openSection(panel, /^Bit details & additional tools/);
   await expect(rougher).toHaveValue('em-6350');
 
   await material.selectOption('');
@@ -168,7 +170,7 @@ test('direct CNC material and bit choices persist without changing machine defau
   for (const [name, value] of [
     [/^Feed for/, recipe.feedMmPerMin],
     [/^Plunge for/, recipe.plungeMmPerMin],
-    [/^Artwork spindle speed for/, recipe.spindleRpm],
+    [/^Spindle speed for/, recipe.spindleRpm],
     [/^Depth per pass for/, recipe.depthPerPassMm],
   ] as const) {
     await expect(panel.getByRole('spinbutton', { name })).toHaveValue(String(value));
@@ -186,7 +188,6 @@ test('direct CNC material and bit choices persist without changing machine defau
   await expect(page).toHaveTitle(/manual-cnc-roundtrip\.lf2/, { timeout: 30_000 });
   await expect(material).toHaveValue('');
   await expect(bit).toHaveValue('');
-  await openSection(panel, /^Bit details & additional tools/);
   await expect(rougher).toHaveValue('em-6350');
   await expectNoSerial(kerfdesk);
 });
@@ -227,13 +228,7 @@ for (const viewport of [
       await panel.getByRole('button', { name: 'Edit settings', exact: true }).click();
       await panel.getByRole('button', { name: 'CNC', exact: true }).click();
       await panel.getByRole('combobox', { name: /^Cut type for/ }).selectOption('profile-outside');
-      for (const title of [
-        /^Holding tabs/,
-        /^Wall finish/,
-        /^Entry & travel/,
-        /^Saved feeds/,
-        /^Stock & machine reference/,
-      ]) {
+      for (const title of [/^Holding tabs/, /^Wall finish/, /^Entry & travel/, /^Saved feeds/]) {
         await openSection(panel, title);
       }
       await panel.getByRole('checkbox', { name: /^Holding tabs for/ }).check();

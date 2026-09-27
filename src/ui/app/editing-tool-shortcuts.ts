@@ -5,6 +5,7 @@
 //   Ctrl+Shift+V   Paste in Place
 //   Ctrl+Shift+I   Invert Selection
 //   Alt+W          Filled / Wireframe view
+//   Alt+D          Delete Duplicates (batch 5, ADR-480; LightBurn's key)
 //
 // Plain '.' never collides with Abort: Abort is Ctrl/Cmd+. and this handler
 // ignores any chord with Ctrl or Cmd held.
@@ -21,13 +22,19 @@ export type EditingToolCtx = {
   readonly pasteClipboardInPlace: () => void;
   readonly invertSelection: () => void;
   readonly toggleWireframeView: () => void;
+  readonly deleteDuplicates: () => void;
 };
 
 const ROTATE_KEYS: Readonly<Record<string, QuarterTurnDirection>> = { '.': 1, ',': -1 };
 
 export function handleEditingToolShortcut(e: KeyboardEvent, ctx: EditingToolCtx): boolean {
   if (isEditableShortcutTarget(e.target)) return false;
-  return tryRotate(e, ctx) || tryShiftChord(e, ctx) || tryWireframe(e, ctx);
+  return (
+    tryRotate(e, ctx) ||
+    tryShiftChord(e, ctx) ||
+    tryWireframe(e, ctx) ||
+    tryDeleteDuplicates(e, ctx)
+  );
 }
 
 function hasMeta(e: KeyboardEvent): boolean {
@@ -56,6 +63,11 @@ function tryWireframe(e: KeyboardEvent, ctx: EditingToolCtx): boolean {
   return run(e, ctx.toggleWireframeView);
 }
 
+function tryDeleteDuplicates(e: KeyboardEvent, ctx: EditingToolCtx): boolean {
+  if (!isAltLetterChord(e, 'd')) return false;
+  return run(e, ctx.deleteDuplicates);
+}
+
 function run(e: KeyboardEvent, action: () => void): true {
   e.preventDefault();
   action();
@@ -70,5 +82,6 @@ export function editingToolShortcutContext(): EditingToolCtx {
     pasteClipboardInPlace: app.pasteClipboardInPlace,
     invertSelection: app.invertSelection,
     toggleWireframeView: () => useUiStore.getState().toggleWireframeView(),
+    deleteDuplicates: app.deleteDuplicates,
   };
 }

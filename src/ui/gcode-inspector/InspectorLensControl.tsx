@@ -4,6 +4,8 @@ import { useMemo } from 'react';
 import type { ProgramTimeModel } from '../../core/gcode-time';
 import type { GcodeRenderModel } from '../../core/gcode-view';
 import type { Viewer3dTheme } from '../viewer3d';
+// Deep import: the viewer3d barrel is capped at 20 exports by its index contract.
+import type { Viewer3dLook } from '../viewer3d/viewer3d-look';
 import {
   LENS_IDS,
   LENS_LABEL,
@@ -12,22 +14,30 @@ import {
   type LensId,
   type LensLegend,
 } from './lenses';
+import type { ToolSections } from './tool-sections';
 
 type InspectorLensControlProps = {
   readonly model: GcodeRenderModel;
   readonly time: ProgramTimeModel;
   readonly theme: Viewer3dTheme;
+  readonly look?: Viewer3dLook | undefined;
+  readonly sections?: ToolSections | null | undefined;
   readonly lens: LensId;
   readonly onLensChange: (lens: LensId) => void;
+  /** Legend entries switched off (ADR-470). */
+  readonly hiddenEntries?: ReadonlySet<number>;
+  /** Switches a legend entry's moves off or on; null when the legend has none. */
+  readonly onToggleEntry?: ((entry: number) => void) | null;
   /** Sidebar fills the readout column; overlay adds compact positioned chrome. */
   readonly variant: 'sidebar' | 'overlay';
 };
 
 /** Shared colour selector and accessible legend for both G-code 3D surfaces. */
 export function InspectorLensControl(props: InspectorLensControlProps): JSX.Element {
+  const { model, time, lens, theme, look, sections } = props;
   const legend = useMemo(
-    () => lensLegend(props.model, props.time, props.lens, props.theme),
-    [props.model, props.time, props.lens, props.theme],
+    () => lensLegend(model, time, lens, theme, { look, sections }),
+    [model, time, lens, theme, look, sections],
   );
   return (
     <div style={props.variant === 'overlay' ? overlayStyle : undefined}>
@@ -48,14 +58,28 @@ export function InspectorLensControl(props: InspectorLensControlProps): JSX.Elem
           </option>
         ))}
       </select>
-      <Legend legend={legend} />
+      <Legend
+        legend={legend}
+        hidden={props.hiddenEntries ?? NOTHING_HIDDEN}
+        onToggle={props.onToggleEntry ?? null}
+      />
     </div>
   );
 }
 
-function Legend(props: { readonly legend: LensLegend }): JSX.Element {
+const NOTHING_HIDDEN: ReadonlySet<number> = new Set();
+
+function Legend(props: {
+  readonly legend: LensLegend;
+  readonly hidden: ReadonlySet<number>;
+  readonly onToggle: ((entry: number) => void) | null;
+}): JSX.Element {
   if (props.legend.kind === 'note') return <p style={noteStyle}>{props.legend.note}</p>;
-  if (props.legend.kind === 'swatches') return <SwatchList entries={props.legend.entries} />;
+  if (props.legend.kind === 'swatches') {
+    return (
+      <SwatchList entries={props.legend.entries} hidden={props.hidden} onToggle={props.onToggle} />
+    );
+  }
   return (
     <div style={rampWrapStyle}>
       <p style={noteStyle}>{props.legend.note}</p>
@@ -75,16 +99,42 @@ function Legend(props: { readonly legend: LensLegend }): JSX.Element {
   );
 }
 
-function SwatchList(props: { readonly entries: ReadonlyArray<LegendSwatch> }): JSX.Element {
+// Each entry is a switch for its moves when the view can filter them.
+function SwatchList(props: {
+  readonly entries: ReadonlyArray<LegendSwatch>;
+  readonly hidden: ReadonlySet<number>;
+  readonly onToggle: ((entry: number) => void) | null;
+}): JSX.Element {
+  const { onToggle } = props;
   return (
     <ul style={legendStyle}>
-      {props.entries.map((entry) => (
-        <li key={entry.label} style={legendItemStyle}>
-          <span style={{ ...swatchStyle, background: entry.color }} aria-hidden="true" />
-          <span>{entry.label}</span>
-          <span style={legendCountStyle}>{entry.count}</span>
-        </li>
-      ))}
+      {props.entries.map((entry, index) => {
+        const shown = !props.hidden.has(index);
+        const content = (
+          <>
+            <span style={{ ...swatchStyle, background: entry.color }} aria-hidden="true" />
+            <span style={shown ? undefined : hiddenLabelStyle}>{entry.label}</span>
+            <span style={legendCountStyle}>{entry.count}</span>
+          </>
+        );
+        return (
+          <li key={`${index}:${entry.label}`} style={shown ? undefined : hiddenItemStyle}>
+            {onToggle === null ? (
+              <span style={legendItemStyle}>{content}</span>
+            ) : (
+              <button
+                type="button"
+                style={legendButtonStyle}
+                aria-pressed={shown}
+                title={`${shown ? 'Hide' : 'Show'} ${entry.label.toLowerCase()} moves`}
+                onClick={() => onToggle(index)}
+              >
+                {content}
+              </button>
+            )}
+          </li>
+        );
+      })}
     </ul>
   );
 }
@@ -130,6 +180,20 @@ const legendStyle: React.CSSProperties = {
   gap: 3,
 };
 const legendItemStyle: React.CSSProperties = { display: 'flex', alignItems: 'center', gap: 6 };
+const legendButtonStyle: React.CSSProperties = {
+  ...legendItemStyle,
+  width: '100%',
+  padding: '1px 2px',
+  border: 0,
+  borderRadius: 4,
+  background: 'transparent',
+  color: 'inherit',
+  font: 'inherit',
+  textAlign: 'left',
+  cursor: 'pointer',
+};
+const hiddenItemStyle: React.CSSProperties = { opacity: 0.45 };
+const hiddenLabelStyle: React.CSSProperties = { textDecoration: 'line-through' };
 const swatchStyle: React.CSSProperties = {
   width: 12,
   height: 3,

@@ -88,6 +88,48 @@ export function cropImageAction(
   selected: SceneObject | null,
   pushToast: (message: string, kind: 'success' | 'error') => void,
 ): () => void {
+  return bakeImageMaskAction(app, selected, pushToast, {
+    failure: 'Could not crop image',
+    apply: (image, cropped) => {
+      app.cropImage(image.id, cropped);
+      pushToast(`Cropped image: ${image.source}`, 'success');
+    },
+  });
+}
+
+// Flatten Image Mask (ADR-480): the same bake and crop, then the mask shape
+// is deleted unless it is locked or still used by another object.
+export function flattenImageMaskAction(
+  app: Pick<ImageCommandApp, 'project' | 'projectDocumentEpoch'> & {
+    readonly flattenImageMask: (imageId: string, flattened: RasterImage) => string;
+  },
+  selected: SceneObject | null,
+  pushToast: (message: string, kind: 'success' | 'error') => void,
+): () => void {
+  return bakeImageMaskAction(app, selected, pushToast, {
+    failure: 'Could not flatten the image mask',
+    apply: (image, flattened) => {
+      const outcome = app.flattenImageMask(image.id, flattened);
+      if (outcome === 'unchanged') return;
+      pushToast(
+        outcome === 'mask-deleted'
+          ? `Flattened the mask into ${image.source} and deleted the mask shape.`
+          : `Flattened the mask into ${image.source}. The mask shape stays because it is locked or still in use.`,
+        'success',
+      );
+    },
+  });
+}
+
+function bakeImageMaskAction(
+  app: Pick<ImageCommandApp, 'project' | 'projectDocumentEpoch'>,
+  selected: SceneObject | null,
+  pushToast: (message: string, kind: 'success' | 'error') => void,
+  handlers: {
+    readonly failure: string;
+    readonly apply: (image: RasterImage, baked: RasterImage) => void;
+  },
+): () => void {
   return () => {
     if (selected?.kind !== 'raster-image' || selected.imageMaskId === undefined) return;
     const maskObject = app.project.scene.objects.find(
@@ -101,15 +143,14 @@ export function cropImageAction(
     };
     if (!cropOwnerIsCurrent(owner)) return;
     void cropMaskedRasterImage(selected, maskObject)
-      .then((cropped) => {
+      .then((baked) => {
         if (!cropOwnerIsCurrent(owner)) return;
-        app.cropImage(selected.id, cropped);
-        pushToast(`Cropped image: ${selected.source}`, 'success');
+        handlers.apply(selected, baked);
       })
       .catch((err: unknown) => {
         if (!cropOwnerIsCurrent(owner)) return;
         const message = err instanceof Error ? err.message : String(err);
-        pushToast(`Could not crop image: ${message}`, 'error');
+        pushToast(`${handlers.failure}: ${message}`, 'error');
       });
   };
 }

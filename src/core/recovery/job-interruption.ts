@@ -40,6 +40,13 @@ export type JobInterruption = {
    * not offer the retained-position path (ADR-215 Amendment 1, CNC audit MC-3).
    */
   readonly positionLost?: true;
+  /**
+   * Lines sent before a lost link: acknowledged ones plus those still in
+   * flight, in sendable numbering. A dropped link leaves the controller
+   * running what it had received, so the head stops at the end of the last of
+   * these (ADR-341 Amendment 6).
+   */
+  readonly sentLines?: number;
 };
 
 export function withJobInterruption<T extends { readonly updatedAtIso: string }>(
@@ -60,23 +67,40 @@ export function parseOptionalJobInterruption(
   const rejectedLine = value['rejectedLine'];
   if (!isJobInterruptionKind(kind) || typeof message !== 'string') return null;
   if (rejectedLine !== undefined && typeof rejectedLine !== 'string') return null;
-  const positionLost = parsePositionLost(value['positionLost']);
-  if (positionLost === null) return null;
-  const plannerBacklog = parsePlannerBacklog(value['plannerBacklog']);
-  if (plannerBacklog === null) return null;
+  const evidence = parseStopEvidence(value);
+  if (evidence === null) return null;
   return {
     interruption: {
       kind,
       message,
       ...(rejectedLine === undefined ? {} : { rejectedLine }),
-      ...(plannerBacklog === undefined ? {} : { plannerBacklog }),
-      ...(positionLost === undefined ? {} : { positionLost }),
+      ...evidence,
     },
+  };
+}
+
+/** The optional facts about where the stop left the machine; null when one is corrupt. */
+function parseStopEvidence(
+  value: Record<string, unknown>,
+): Pick<JobInterruption, 'plannerBacklog' | 'positionLost' | 'sentLines'> | null {
+  const positionLost = parsePositionLost(value['positionLost']);
+  const plannerBacklog = parsePlannerBacklog(value['plannerBacklog']);
+  const sentLines = parseSentLines(value['sentLines']);
+  if (positionLost === null || plannerBacklog === null || sentLines === null) return null;
+  return {
+    ...(plannerBacklog === undefined ? {} : { plannerBacklog }),
+    ...(positionLost === undefined ? {} : { positionLost }),
+    ...(sentLines === undefined ? {} : { sentLines }),
   };
 }
 
 function parsePositionLost(value: unknown): true | undefined | null {
   return value === undefined || value === true ? value : null;
+}
+
+function parseSentLines(value: unknown): number | undefined | null {
+  if (value === undefined) return undefined;
+  return isNonNegativeInteger(value) ? value : null;
 }
 
 function parsePlannerBacklog(value: unknown): PlannerBacklog | undefined | null {

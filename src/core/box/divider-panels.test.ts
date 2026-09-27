@@ -38,8 +38,9 @@ describe('dividerLayout', () => {
     expect(tab.toMm).toBeCloseTo(80 / 3, 9);
   });
 
-  it('extends divider height to the rim for open-top', () => {
-    expect(dividerLayout({ ...SPEC, style: 'open-top' }).heightSpanMm).toBe(43);
+  it('runs open-top dividers the full cavity, flush with the rim', () => {
+    // Inner 40 open-top: walls stand 43 (bottom T + cavity), dividers 3 → 43.
+    expect(dividerLayout({ ...SPEC, style: 'open-top' }).heightSpanMm).toBe(40);
   });
 });
 

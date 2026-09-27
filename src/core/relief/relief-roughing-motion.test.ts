@@ -55,10 +55,38 @@ function areaOf(loop: ReadonlyArray<Vec2>): number {
 }
 
 function inRegion(point: Vec2, region: ReadonlyArray<Polyline>): boolean {
+  // The proven tool-centre region is closed. Interpolation can round an
+  // interior link sample onto a vertex, which the strict ray cast excludes.
+  // Admit only exact boundary points; do not add an outside-distance allowance.
+  if (region.some((contour) => onBoundary(point, contour.points))) return true;
   return region.filter((contour) => pointInPolygon(point, contour.points)).length % 2 === 1;
 }
 
+function onBoundary(point: Vec2, points: ReadonlyArray<Vec2>): boolean {
+  return points.some((a, index) => {
+    const b = points[(index + 1) % points.length];
+    if (b === undefined) return false;
+    const cross = (point.x - a.x) * (b.y - a.y) - (point.y - a.y) * (b.x - a.x);
+    return (
+      cross === 0 &&
+      point.x >= Math.min(a.x, b.x) &&
+      point.x <= Math.max(a.x, b.x) &&
+      point.y >= Math.min(a.y, b.y) &&
+      point.y <= Math.max(a.y, b.y)
+    );
+  });
+}
+
 describe('reliefRoughingMotion', () => {
+  it('admits exact link-region boundaries without admitting adjacent excluded points', () => {
+    const region = [rect(0, 0, 30, 30), rect(10, 10, 20, 20)];
+    expect(inRegion({ x: 10, y: 10 }, region)).toBe(true);
+    expect(inRegion({ x: 10, y: 15 }, region)).toBe(true);
+    expect(inRegion({ x: 10 + 1e-8, y: 15 }, region)).toBe(false);
+    expect(inRegion({ x: -1e-8, y: 15 }, region)).toBe(false);
+    expect(inRegion({ x: 15, y: 15 }, region)).toBe(false);
+  });
+
   it('cuts a square level inside out in one chain, every loop closed', () => {
     const square = level([rect(0, 0, 20, 20)]);
     const passes = reliefRoughingMotion([square], { stockOnRight: true, cutWidthMm: CUT_WIDTH_MM });
@@ -231,9 +259,40 @@ describe('reliefRoughingMotion', () => {
           }
         },
       ),
-      { numRuns: 25 },
+      {
+        // fast-check counts the pinned example, leaving all 25 generated cases.
+        numRuns: 26,
+        // Report the first counterexample promptly. Synchronous shrinking
+        // cannot be preempted by Vitest's timeout and can hide the failure.
+        endOnFailure: true,
+        examples: [
+          [
+            [
+              {
+                x: 11.931749529863234,
+                y: 15.638928308827584,
+                r: 3.638261627567463,
+                h: 3.6128908499437324,
+              },
+              {
+                x: 2.0000000000000226,
+                y: 10.37012106297951,
+                r: 2.6837658447448702,
+                h: 1.2073630633385264,
+              },
+              {
+                x: 14.987734028055497,
+                y: 2.0567843913481525,
+                r: 4.4975612810870995,
+                h: 2.105861984062804,
+              },
+            ],
+            78,
+          ],
+        ],
+      },
     );
-  });
+  }, 30_000);
 
   it('ramps down along the first loop from the level above', () => {
     const square = level([rect(0, 0, 20, 20)], -1.5, -0.5);
@@ -273,6 +332,40 @@ describe('reliefRoughingMotion', () => {
 
     expect(passes).toHaveLength(1);
     expect(passes[0]?.kind).toBe('contour');
+  });
+
+  it('marks each chain the ramp leaves to plunge, and only those (ADR-424 Amendment 1)', () => {
+    // A 0.5 mm square, 2 mm round, and a 20 mm square too far away to link:
+    // the first is shorter than the cut width, the second ramps.
+    const pair = level([rect(0, 0, 0.5, 0.5), rect(10, 0, 30, 20)]);
+    const ramped = reliefRoughingMotion([pair], {
+      stockOnRight: true,
+      cutWidthMm: CUT_WIDTH_MM,
+      rampAngleDeg: 3,
+    });
+    const plunged = reliefRoughingMotion([pair], { stockOnRight: true, cutWidthMm: CUT_WIDTH_MM });
+    const tinyChain = (passes: ReadonlyArray<CncPass>): CncPass | undefined =>
+      passes.find((pass) => pass.kind === 'contour' && pass.polyline.every((p) => p.x <= 0.5));
+
+    expect(ramped.map((pass) => pass.kind).sort()).toEqual(['contour', 'path3d']);
+    expect(tinyChain(ramped)).toMatchObject({ kind: 'contour', entryPlunge: true });
+    // The marker only discloses: the motion is the plunge the same loop gets
+    // without a ramp angle, which is not marked.
+    expect(plunged.some((pass) => 'entryPlunge' in pass)).toBe(false);
+    expect(tinyChain(ramped)).toEqual({ ...tinyChain(plunged), entryPlunge: true });
+  });
+
+  it('marks no plunge where the level leaves no stock to ramp through', () => {
+    // The slice top is the level's own depth, so the descent crosses air.
+    const cleared = level([rect(0, 0, 0.5, 0.5)], -1, -1);
+    const [pass] = reliefRoughingMotion([cleared], {
+      stockOnRight: true,
+      cutWidthMm: CUT_WIDTH_MM,
+      rampAngleDeg: 3,
+    });
+
+    expect(pass?.kind).toBe('contour');
+    expect(pass).not.toHaveProperty('entryPlunge');
   });
 
   it('keeps a cleanup trace round its stock on the climb side', () => {

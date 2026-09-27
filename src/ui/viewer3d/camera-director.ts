@@ -5,7 +5,7 @@ import { trackingPlacement, type CameraTracking } from './camera-tracking';
 
 /** An on-demand animation: settles to the latest report then releases rAF.
  * User orbit/pan/zoom cancels immediately and yields ownership to the UI. */
-export function createCameraDirector(rig: CameraRig): {
+export function createCameraDirector(rig: Pick<CameraRig, 'camera' | 'controls' | 'render'>): {
   readonly track: (tracking: CameraTracking) => void;
   readonly setBounds: (bounds: AxisBounds | null) => void;
   readonly onManual: (listener: (() => void) | null) => void;
@@ -74,7 +74,11 @@ export function createCameraDirector(rig: CameraRig): {
   };
 }
 
-function moveCamera(rig: CameraRig, view: CameraPlacement, alpha: number): number {
+function moveCamera(
+  rig: Pick<CameraRig, 'camera' | 'controls'>,
+  view: CameraPlacement,
+  alpha: number,
+): number {
   let error = 0;
   for (const [current, target] of [
     [rig.camera.position, view.position],

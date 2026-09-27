@@ -1,3 +1,4 @@
+import { act } from 'react';
 import { beforeEach, expect, it, vi } from 'vitest';
 import type * as Viewer3d from '../viewer3d';
 import {
@@ -30,6 +31,18 @@ const scene = vi.hoisted(() => ({
   onCameraInteraction: vi.fn(),
   setTravelVisible: vi.fn(),
   setView: vi.fn(),
+  fitView: vi.fn(),
+  setProjection: vi.fn(),
+  onProjectionChange: vi.fn(),
+  onCameraMoving: vi.fn(),
+  setStage: vi.fn(),
+  pickViewCube: vi.fn(() => null),
+  hoverViewCube: vi.fn(),
+  pickMove: vi.fn(() => null),
+  highlightMove: vi.fn(),
+  setMoveFilter: vi.fn(),
+  setClipPlanes: vi.fn(),
+  setMeasure: vi.fn(),
   captureImage: vi.fn(),
   resize: vi.fn(),
   dispose: vi.fn(),
@@ -53,7 +66,7 @@ beforeEach(() => {
   current.followingRun = false;
 });
 
-it('ready Inspector routes every camera control, source toggle and travel/direction switch to the scene', async () => {
+it('ready Inspector routes every camera control, look, layout toggle and travel/direction switch to the scene', async () => {
   const model = liveInspectorModel();
   const host = await mountControl(
     <InspectorView
@@ -76,11 +89,22 @@ it('ready Inspector routes every camera control, source toggle and travel/direct
     ['Top', 'top'],
     ['Front', 'front'],
     ['Right', 'right'],
-    ['Fit', 'iso'],
   ]) {
     await clickControl(host, label!);
     expect(scene.setView).toHaveBeenLastCalledWith(preset);
   }
+  await clickControl(host, 'Fit');
+  expect(scene.fitView).toHaveBeenCalledTimes(1);
+  await clickControl(host, 'Ortho');
+  expect(scene.setProjection).toHaveBeenLastCalledWith('orthographic');
+  await clickControl(host, 'Studio');
+  expect(scene.setStage).toHaveBeenLastCalledWith(expect.objectContaining({ look: 'studio' }));
+  await clickControl(host, 'Classic');
+  expect(scene.setStage).toHaveBeenLastCalledWith(expect.objectContaining({ look: 'classic' }));
+  await clickControl(host, 'Hide readouts');
+  expect(host.querySelector('[aria-label="Program readouts"]')).toBeNull();
+  await clickControl(host, 'Show readouts');
+  expect(host.querySelector('[aria-label="Program readouts"]')).not.toBeNull();
   await clickControl(host, 'PNG');
   expect(scene.captureImage).toHaveBeenCalledTimes(1);
   await clickControl(host, 'Hide source');
@@ -208,3 +232,52 @@ it('Inspector dialog Close and CNC-only simulator handoff invoke their respectiv
   const laser = await mountControl(<GcodeInspectorDialog {...props} machineKind="laser" />);
   expect(laser.textContent).not.toContain('Open in 2D simulator');
 });
+
+it('legend filters, the Z range and the section reach the scene (ADR-470)', async () => {
+  const program = 'G21 G90\nG0 Z5\nG0 X0 Y0\nG1 Z-1 F300\nG1 X20 F900\nG1 Y20\nG0 Z5';
+  const model = liveInspectorModel(program);
+  const host = await mountControl(
+    <InspectorView
+      model={model}
+      analysis={analyzeGcodeModel(model)}
+      source={{ kind: 'text', text: program }}
+      sourceIndex={indexGcodeTextLines(program, () => undefined)}
+    />,
+  );
+  await changeValue(host.querySelector('select[aria-label="Colour lens"]'), 'kind');
+  await clickElement(host.querySelector<HTMLElement>('[title="Hide cut moves"]'));
+  const mask = scene.setMoveFilter.mock.lastCall?.[0] as Uint8Array;
+  const cuts = [...model.segKind].map((kind) => (kind === 1 ? 0 : 1));
+  expect([...mask]).toEqual(cuts);
+  await clickElement(host.querySelector<HTMLElement>('[title="Show cut moves"]'));
+  expect(scene.setMoveFilter).toHaveBeenLastCalledWith(null);
+  await clickElement(host.querySelector<HTMLElement>('[title="Hide traversal moves"]'));
+  expect(scene.setTravelVisible).toHaveBeenLastCalledWith(false);
+
+  await changeValue(host.querySelector('select[aria-label="Section"]'), 'x');
+  expect(scene.setClipPlanes.mock.lastCall?.[0]).toEqual([{ normal: [-1, 0, 0], constant: 10 }]);
+  const highest = host.querySelector<HTMLInputElement>(
+    '[title="Hide every move above this height"]',
+  );
+  await changeValue(highest, '0');
+  expect(scene.setClipPlanes.mock.lastCall?.[0]).toHaveLength(3);
+  await clickControl(host, 'Show all heights');
+  expect(scene.setClipPlanes.mock.lastCall?.[0]).toHaveLength(1);
+});
+
+// Sets a form control the way a person does, so React sees the change.
+async function changeValue(
+  element: HTMLInputElement | HTMLSelectElement | null,
+  value: string,
+): Promise<void> {
+  if (!element) throw new Error('Audit target missing');
+  const prototype = Object.getPrototypeOf(element) as object;
+  Object.getOwnPropertyDescriptor(prototype, 'value')?.set?.call(element, value);
+  await act(async () => {
+    element.dispatchEvent(
+      new Event(element instanceof HTMLSelectElement ? 'change' : 'input', {
+        bubbles: true,
+      }),
+    );
+  });
+}

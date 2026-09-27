@@ -81,13 +81,23 @@ export type GcodeMetadata = {
  * a ramp entry for a relief stage that actually plunges, and ADR-432's native
  * laser G2/G3 arcs with represented-arc validation and G17, and ADR-445's shared
  * split scan exit/entry runways, canonical meeting endpoints and compact
- * Fill/4040 Image motion words, retaining ADR-460's lossless Fill compaction.
+ * Fill/4040 Image motion words, retaining ADR-460's lossless Fill compaction,
+ * and ADR-471's short-loop laps and open-path zig-zags from prior cut depth,
+ * and ADR-421 amendment 1's relief finishing moves lifted where sampled
+ * exact-contact checks exceed the normal-to-move tolerance, with finite
+ * sampling and output-rounding limits retained, and ADR-462's best-effort
+ * air repeats at eligible boundaries, with full-circle/large-arc timing
+ * and unchanged M3 dark-transition ordering, and ADR-424 amendment 1's relief
+ * roughing headers that count the passes plunged into a first loop shorter
+ * than one cut width.
  */
-// ADR-427 integration also cuts deepest cleanup before linked relief rings;
-// all adaptive ring closure and flat depth-slice provenance above is retained.
-// Tracer batch 3 adds bounded chord flattening, canonical shared seams and
-// width-bearing Line + fill, with preserved colour detail/alpha and local widths.
-export const EMITTER_REVISION = 'trace-hybrid-arcs-relief-scan-timing-20260927-v2';
+// ADR-427 keeps deepest cleanup before linked relief rings and flat depth slices.
+// ADR-368 sizes nonflat pocket/profile offsets, tabs and stepover by cut width.
+// Tracer batch 3 preserves bounded chords, shared seams and Line + fill.
+// Native arcs and compact Fill retain scan v2's shared/empty/coincident M3 handoffs.
+// ADR-471 discloses sub-width plunges; ADR-457 finishing recipes survive ramping.
+// ADR-424 Amd 1 discloses relief roughing's sub-width plunges the same way.
+export const EMITTER_REVISION = 'relief-ramp-plunges-disclosed-20260927-v1';
 
 // Machine-specific assumption lines (ADR-103 defect fix): router exports
 // previously carried the laser-worded `$32=1 (laser mode)` banner. The S

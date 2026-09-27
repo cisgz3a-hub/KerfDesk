@@ -14,6 +14,7 @@ import type { CameraModelRecord } from '../../core/camera/model/camera-model-rec
 import { useStore } from '../state';
 import { useCameraStore } from '../state/camera-store';
 import { useUiStore } from '../state/ui-store';
+import { useActiveCameraModel } from './active-camera-model';
 import { computeView } from '../workspace/view-transform';
 import { CameraAccuracyMap } from './accuracy/CameraAccuracyMap';
 import { CameraSourceView } from './CameraSourceView';
@@ -29,7 +30,7 @@ import {
 import { useElementSize, type ElementSize } from './use-element-size';
 
 export function WorkspaceCameraOverlay(): JSX.Element | null {
-  const model = useStore((s) => s.project.device.cameraModel);
+  const model = useActiveCameraModel();
   const visible = useCameraStore((s) => s.overlayVisible);
   if (model === undefined || !visible) return null;
   return <ModelOverlay model={model} />;

@@ -3,15 +3,15 @@
 // one photo of an engraved target); this row says which is next and what is
 // already done, driven by real state (active source, saved camera model).
 
-import { useStore } from '../../state';
 import { useCameraStore } from '../../state/camera-store';
+import { useOwnCameraModel } from '../active-camera-model';
 import { noteStyle } from './panel-styles';
 
 type StepState = 'done' | 'next' | 'todo';
 
 export function CameraSetupSteps(): JSX.Element {
   const sourceState = useCameraStore((s) => s.sourceState);
-  const model = useStore((s) => s.project.device.cameraModel);
+  const model = useOwnCameraModel();
 
   const sourceLive = sourceState.kind === 'live';
   const steps: ReadonlyArray<{ readonly label: string; readonly done: boolean }> = [

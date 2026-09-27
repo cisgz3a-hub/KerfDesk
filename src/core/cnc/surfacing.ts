@@ -43,6 +43,44 @@ export type SurfacingProgramResult =
 export const SURFACING_DEFAULT_STEPOVER_PCT = 40;
 export const SURFACING_DEFAULT_DEPTH_PER_PASS_MM = 0.5;
 export const SURFACING_DEFAULT_TOTAL_DEPTH_MM = 0.5;
+export const SURFACING_DEFAULT_FEED_MM_PER_MIN = 2500;
+export const SURFACING_DEFAULT_PLUNGE_MM_PER_MIN = 600;
+
+export type SurfacingStarterValues = {
+  readonly feedMmPerMin: number;
+  readonly plungeMmPerMin: number;
+  readonly depthPerPassMm: number;
+};
+
+/**
+ * Surfacing starter values never exceed the long-standing surfacing defaults
+ * (0.5 mm/pass, 2500 mm/min feed, 600 mm/min plunge; ADR-457 Amd 1). The
+ * material calculator is a generic slotting/profiling model (stepdown =
+ * factor x diameter), so for a 25.4 mm facing cutter it proposes a 12.7 mm
+ * pass at wide radial engagement. It may LOWER a value (a slower material)
+ * but never raise one. Operator-typed values are not capped here.
+ */
+export function surfacingStarterValues(
+  calculated: Partial<SurfacingStarterValues> | null,
+  maxFeedMmPerMin: number,
+): SurfacingStarterValues {
+  return {
+    feedMmPerMin: Math.min(
+      calculated?.feedMmPerMin ?? SURFACING_DEFAULT_FEED_MM_PER_MIN,
+      SURFACING_DEFAULT_FEED_MM_PER_MIN,
+      maxFeedMmPerMin,
+    ),
+    plungeMmPerMin: Math.min(
+      calculated?.plungeMmPerMin ?? SURFACING_DEFAULT_PLUNGE_MM_PER_MIN,
+      SURFACING_DEFAULT_PLUNGE_MM_PER_MIN,
+      maxFeedMmPerMin,
+    ),
+    depthPerPassMm: Math.min(
+      calculated?.depthPerPassMm ?? SURFACING_DEFAULT_DEPTH_PER_PASS_MM,
+      SURFACING_DEFAULT_DEPTH_PER_PASS_MM,
+    ),
+  };
+}
 
 // Hard ceiling on materialized serpentine rows / depth passes so a pathological
 // but finite request cannot exhaust memory building the arrays. It never changes

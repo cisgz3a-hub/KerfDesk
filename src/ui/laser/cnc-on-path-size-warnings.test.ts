@@ -63,6 +63,25 @@ describe('detectCncOnPathSizeWarnings', () => {
     expect(warnings[0]).toContain('Outside or Inside');
   });
 
+  it('says how much less a narrowing bit cuts at the top face', () => {
+    // 3 mm stock cut 3 mm deep with the 60 degree V-bit: 3.464 mm wide at the
+    // top face, where the diameter said 6.35 mm (ADR-368 Amendment 3).
+    const thin = project({ cutType: 'profile-on-path', depthMm: 3, toolId: 'vb-60' });
+    const warnings = detectCncOnPathSizeWarnings({
+      ...thin,
+      machine: {
+        ...DEFAULT_CNC_MACHINE_CONFIG,
+        stock: { ...DEFAULT_CNC_MACHINE_CONFIG.stock, thicknessMm: 3 },
+      },
+    });
+
+    expect(warnings).toHaveLength(1);
+    expect(warnings[0]).toContain(
+      'at the top face its closed parts come out 3.5 mm (the width the bit cuts there) smaller',
+    );
+    expect(warnings[0]).toContain('holes 3.5 mm larger');
+  });
+
   it('stays quiet for the shallow out-of-box layer', () => {
     expect(detectCncOnPathSizeWarnings(project({ cutType: 'profile-on-path' }))).toEqual([]);
   });

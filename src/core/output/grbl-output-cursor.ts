@@ -37,6 +37,7 @@
 // and its bytes do not change.
 
 import { formatGcodeCoordinateMm } from '../gcode';
+import type { RasterGroupEnd } from '../raster/emit-raster';
 
 export type EmittedHead = { readonly x: string; readonly y: string };
 export type SpindleWordInEffect = 'M3' | 'M4' | 'off';
@@ -151,12 +152,12 @@ export function takeHeldLines(cursor: LaserOutputCursor): string[] {
   return lines;
 }
 
-/** After a raster group, which writes its own spindle lines. Its last position
- * is not tracked here. An M3 group that ended on a burn left its closing `M5`
- * to be held until the next laser-off move. */
-export function noteRasterGroupEnd(cursor: LaserOutputCursor, closingM5Deferred: boolean): void {
-  cursor.head = null;
-  cursor.held = closingM5Deferred ? ['M5'] : [];
+/** Carry the raster's actual last position and held transitions into the next
+ * group. Blank raster groups may still be holding the preceding M3 state. */
+export function noteRasterGroupEnd(cursor: LaserOutputCursor, ending: RasterGroupEnd): void {
+  const { closingM5Deferred, head, deferredEntryLines } = ending;
+  cursor.head = head === null ? null : emittedHead(head.x, head.y);
+  cursor.held = closingM5Deferred ? [...deferredEntryLines, 'M5'] : [];
   cursor.modeInEffect = closingM5Deferred ? 'M3' : 'off';
   cursor.litAtStop = closingM5Deferred;
 }

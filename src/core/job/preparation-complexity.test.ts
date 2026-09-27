@@ -15,6 +15,8 @@ import {
   countOutputVectorSegments,
   estimateFillPreparation,
   outputVectorPreparationTooComplex,
+  scenePreparationSize,
+  scenePreparationTooComplex,
 } from './preparation-complexity';
 
 it('routes the combined primary and independent CNC stage depth work without changing the scene', () => {
@@ -107,6 +109,9 @@ describe('fill preparation estimate', () => {
 
     expect(estimateFillPreparation(scene)).toEqual({ kind: 'work-budget-exceeded' });
     expect(countEstimatedFillSegments(scene)).toBe(Number.POSITIVE_INFINITY);
+    // An exhausted estimate is unknown, never 'too large' (ADR-459 Amd 1).
+    expect(scenePreparationSize(scene)).toBe('unknown');
+    expect(scenePreparationTooComplex(scene)).toBe(false);
     expect(
       scene.objects[0]?.kind === 'shape' && scene.objects[0].paths[0]?.polylines[0]?.points,
     ).toBe(points);
@@ -266,3 +271,19 @@ function square() {
     ],
   };
 }
+
+it('classifies a counted fill over the compiled budget as over-budget and a small one as within', () => {
+  expect(scenePreparationSize(fillScene({ contours: [square()] }))).toBe('within-budget');
+  const wide = {
+    closed: true,
+    points: [
+      { x: 0, y: 0 },
+      { x: 10, y: 0 },
+      { x: 10, y: 3000 },
+      { x: 0, y: 3000 },
+    ],
+  };
+  const scene = fillScene({ contours: [wide], layer: { hatchSpacingMm: 0.1 } });
+  expect(scenePreparationSize(scene)).toBe('over-budget');
+  expect(scenePreparationTooComplex(scene)).toBe(true);
+});

@@ -14,6 +14,7 @@ import {
 import type { LaserResumeDialect } from './laser-resume-dialect';
 import { createNativeLaserBeam, type NativeLaserBeam } from './native-laser-resume-beam';
 import { nativeLaserResume, scanNativeBeamLine } from './native-laser-resume';
+import { canTrackHeadStopBlock } from './resume-head-stop-block';
 
 export type { LaserResumeTransformVersion };
 /** The transform new resumes use; archived resume steps record their own. */
@@ -75,19 +76,7 @@ export function buildResumeProgram(
     return { kind: 'error', reason: `Line must be between 1 and ${lines.length}.` };
   }
   const transform = options.laserTransform ?? LASER_RESUME_TRANSFORM_VERSION;
-  const state: LaserResumeModalState = {
-    units: 'G21',
-    spindle: 'M5',
-    motion: null,
-    wcs: 'G54',
-    plane: null,
-    sValue: null,
-    feed: null,
-    x: null,
-    y: null,
-    mist: false,
-    flood: false,
-  };
+  const state = initialModalState();
   const beam = nativeBeamFor(transform, options.laserDialect);
   const issue = scanToResumeLine(lines, fromLine, state, beam);
   if (issue !== null) return { kind: 'error', reason: issue };
@@ -104,6 +93,27 @@ export function buildResumeProgram(
   };
 }
 
+/**
+ * Where the program's head stands, in mm of G54 work coordinates, when the
+ * replay reaches `fromLine`: the end point of the last move before it. A lost
+ * link leaves the controller running what it had, so after the reconnect the
+ * head sits there, and recovery can set the origin from it (ADR-341 Amendment
+ * 6). Null when the program before that line cannot be followed, has not yet
+ * commanded both X and Y, or ran in another work coordinate system.
+ */
+export function resumeEntryPointMm(
+  gcode: string,
+  fromLine: number,
+): { readonly x: number; readonly y: number } | null {
+  const lines = gcode.split('\n');
+  if (!Number.isInteger(fromLine) || fromLine < 1 || fromLine > lines.length + 1) return null;
+  const state = initialModalState();
+  if (scanToResumeLine(lines, fromLine, state, null, true) !== null) return null;
+  if (state.x === null || state.y === null || state.wcs !== 'G54') return null;
+  const scale = state.units === 'G20' ? 25.4 : 1;
+  return { x: state.x * scale, y: state.y * scale };
+}
+
 // Smoothieware and Marlin programs get their own power commands from
 // transform 3 on (ADR-364). Earlier transforms wrote GRBL's for every program,
 // and their archived steps must still rebuild those exact bytes.
@@ -115,16 +125,33 @@ function nativeBeamFor(
   return createNativeLaserBeam(dialect);
 }
 
+function initialModalState(): LaserResumeModalState {
+  return {
+    units: 'G21',
+    spindle: 'M5',
+    motion: null,
+    wcs: 'G54',
+    plane: null,
+    sValue: null,
+    feed: null,
+    x: null,
+    y: null,
+    mist: false,
+    flood: false,
+  };
+}
+
 /** Follows the program up to the resume line, or says why the replay cannot. */
 function scanToResumeLine(
   lines: ReadonlyArray<string>,
   fromLine: number,
   state: LaserResumeModalState,
   beam: NativeLaserBeam | null,
+  proveHeadStop = false,
 ): string | null {
   for (let i = 0; i < fromLine - 1; i += 1) {
     const line = lines[i] ?? '';
-    const issue = applyLine(state, line);
+    const issue = applyLine(state, line, proveHeadStop);
     if (issue !== null) return `Line ${i + 1}: ${issue}`;
     if (beam !== null) scanNativeBeamLine(beam, line);
   }
@@ -145,13 +172,19 @@ function resumeBody(
 }
 
 // Returns an error string for constructs the replay cannot handle.
-function applyLine(state: LaserResumeModalState, rawLine: string): string | null {
+function applyLine(
+  state: LaserResumeModalState,
+  rawLine: string,
+  proveHeadStop: boolean,
+): string | null {
   const line = stripComments(rawLine);
   if (line.trim() === '' || line.trim() === '%') return null;
   const words: GcodeWord[] = [...line.matchAll(WORD_RE)].map((match) => ({
     letter: (match[1] ?? '').toUpperCase(),
     value: Number(match[2]),
   }));
+  if (proveHeadStop && !canTrackHeadStopBlock(state, words, line.replace(WORD_RE, '').trim()))
+    return 'head-stop position is not provable';
   for (const { letter, value } of words) {
     const issue = applyWord(state, letter, value);
     if (issue !== null) return issue;

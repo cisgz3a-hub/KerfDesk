@@ -79,7 +79,10 @@
   gap: 12px;
   overflow-y: auto;
   scrollbar-gutter: stable;
-  padding: 1px 4px 16px 1px;
+  /* 3px on the left: a 2px focus ring with its 1px offset fits inside the
+   * scroller, and Chromium paints a checkbox that sits against the edge of this
+   * scroller (Scan both ways, Include in output) instead of dropping it. */
+  padding: 1px 4px 16px 3px;
 }
 
 .lf-artwork-view-content > * {
@@ -139,6 +142,22 @@
   margin-top: 10px;
   padding-top: 8px;
   border-top: 1px solid var(--lf-border);
+}
+
+/* The operations-list header reuses the row "•••" menu; its summary sits at
+   the top right of the header instead of the card. */
+.lf-operation-list__header {
+  position: relative;
+  min-height: 30px;
+}
+
+.lf-operation-list__header > .lf-artwork-hint {
+  padding-right: 34px;
+}
+
+.lf-operation-list__header > .lf-operation-card__management > summary {
+  top: 0;
+  right: 0;
 }
 
 .lf-artwork-view-tab.lf-btn[aria-selected='true'] {

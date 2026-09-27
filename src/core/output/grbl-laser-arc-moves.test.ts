@@ -3,6 +3,7 @@
 // and stays byte-identical G1 everywhere else.
 
 import { describe, expect, it } from 'vitest';
+import { findM3LitPlannerDrains } from '../../__fixtures__/controllers/grbl-lit-drain-checker';
 import { DEFAULT_DEVICE_PROFILE, type DeviceProfile } from '../devices';
 import type { ArcMove } from '../geometry/arc-fit';
 import type { CutGroup, CutSegment, Job } from '../job';
@@ -156,4 +157,47 @@ describe('grblStrategy laser arc moves (ADR-432)', () => {
       }
     }
   });
+});
+
+it('darkens a native M3 arc before a coincident Image mode and air change', () => {
+  const segment = withCutArcMoves(
+    { polyline: chordsOf().slice(0, -1), closed: false },
+    QUARTERS.slice(0, -1),
+  );
+  const job: Job = {
+    groups: [
+      ...jobWith(segment, { powerMode: 'constant' }).groups,
+      {
+        kind: 'raster',
+        layerId: 'image',
+        color: '#000',
+        power: 60,
+        speed: 1500,
+        passes: 1,
+        airAssist: true,
+        sValues: new Uint16Array([600, 600]),
+        pixelWidth: 2,
+        pixelHeight: 1,
+        bounds: { minX: 30, maxX: 32, minY: 19.5, maxY: 20.5 },
+        overscanMm: 0,
+        dotWidthCorrectionMm: 0,
+      },
+    ],
+  };
+  const output = grblStrategy.emit(
+    job,
+    { ...ARC_DEVICE, airAssistCommand: 'M8' },
+    { finishPosition: null },
+  );
+  expect(output.match(/^G2 /gm)).toHaveLength(2);
+  expect(findM3LitPlannerDrains(output), output).toEqual([]);
+  const lines = output.split('\n');
+  const lastArc = lines.findLastIndex((line) => line.startsWith('G2 '));
+  const air = lines.indexOf('M8');
+  const entry = lines.slice(lastArc + 1, air);
+  expect(entry, output).toContain('G0X31Y20S0');
+  expect(lines.slice(air + 1), output).toContain('X30S0');
+  const parsed = parseGcodeProgram(output);
+  if (parsed.kind !== 'ok') throw new Error(parsed.reason);
+  expect(parsed.summary.cutMm).toBeCloseTo(10 * Math.PI + 2, 2);
 });

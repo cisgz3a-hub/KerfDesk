@@ -42,6 +42,18 @@
   font-weight: 600;
 }
 
+.lf-artwork-editor-tabs .lf-btn svg {
+  flex-shrink: 0;
+}
+
+/* Same breakpoint as the Settings / Run order / Materials tabs: a narrow panel
+   drops both pictures instead of squeezing the bold Operation tab's to a sliver. */
+@container (max-width: 320px) {
+  .lf-artwork-editor-tabs .lf-btn svg {
+    display: none;
+  }
+}
+
 .lf-artwork-editor-pane[hidden] {
   display: none;
 }

@@ -30,8 +30,8 @@ for (const detail of [60, 100]) {
     await (await toolbarCommand(page, 'Import...')).click();
     const trace = await toolbarCommand(page, 'Trace Image...');
     await expect(trace).toBeEnabled({ timeout: 30_000 });
-    const width = page.getByRole('spinbutton', { name: 'Selection width', exact: true });
-    const height = page.getByRole('spinbutton', { name: 'Selection height', exact: true });
+    const width = page.getByLabel('Selection width', { exact: true });
+    const height = page.getByLabel('Selection height', { exact: true });
     await width.fill('64');
     await width.blur();
     await height.fill('64');

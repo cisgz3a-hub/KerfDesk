@@ -1,7 +1,7 @@
 // slide-lid-panels — the ADR-116 V3 style: bottom and back reuse the
-// open-top claim machinery on a surrogate box whose walls rise one extra
-// thickness (the captive top strip); left/right get a solid front edge, a
-// C-channel notch spliced into it (open at the front, stopping one
+// open-top claim machinery on a surrogate box whose walls rise the lid
+// band and the captive top strip above the cavity; left/right get a solid
+// front edge, a C-channel notch spliced into it (open at the front, stopping one
 // thickness before the back), and keep their strip fingered into the back;
 // the front is a butt-jointed short wall with bottom tabs; the lid rides
 // the channel band full-width and stops against the back wall. Everything
@@ -55,13 +55,15 @@ export function buildSlideLidParts(spec: BoxSpec): ReadonlyArray<SlideLidPart> {
   return parts;
 }
 
-// The open-top surrogate whose walls stand cavity + strip tall; outer mode
-// already carries the extra thickness in the entered height.
+// The open-top surrogate whose walls stand bottom + cavity + lid band +
+// strip tall (outer = inner + 3T). Open-top adds only the bottom T, so its
+// inner height is the cavity plus the two bands; outer mode already carries
+// them in the entered height.
 function surrogateSpec(spec: BoxSpec): BoxSpec {
   return {
     ...spec,
     style: 'open-top',
-    heightMm: spec.dimensionMode === 'inner' ? spec.heightMm + spec.thicknessMm : spec.heightMm,
+    heightMm: spec.dimensionMode === 'inner' ? spec.heightMm + 2 * spec.thicknessMm : spec.heightMm,
   };
 }
 

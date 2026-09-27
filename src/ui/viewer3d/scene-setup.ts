@@ -1,25 +1,39 @@
-// Renderer and camera-rig bootstrap (ADR-255 stage 10 split).
+// Renderer and camera-rig bootstrap (ADR-255 stage 10 split; ADR-426).
 //
 // Split out of viewer3d-scene.ts, which had accumulated every concern and
 // kept hitting both the file and function size caps. Creating the WebGL
 // context and wiring the Z-up camera is one job with one failure mode.
 
 import type * as ThreeNamespace from 'three';
-import type { PerspectiveCamera, WebGLRenderer } from 'three';
+import type { OrthographicCamera, PerspectiveCamera, WebGLRenderer } from 'three';
 import type * as OrbitControlsModule from 'three/examples/jsm/controls/OrbitControls.js';
+import { VIEWER3D_FOV_DEG, type Viewer3dProjection } from './camera-presets';
+import { syncOrthographicCamera } from './camera-projection';
+import { configureViewer3dControls } from './viewer3d-controls';
 import type { Viewer3dTheme } from './viewer3d-theme';
 
 const MAX_PIXEL_RATIO = 2;
-const CAMERA_FOV_DEG = 40;
+// Depth kept around the target by the orthographic camera, as a multiple of
+// the camera distance plus the job's extent.
+const ORTHO_DEPTH_EXTENTS = 4;
 
 type ThreeModule = typeof ThreeNamespace;
 
 export type OrbitControlsCtor = typeof OrbitControlsModule.OrbitControls;
 
+export type ViewCamera = PerspectiveCamera | OrthographicCamera;
+
 export type CameraRig = {
+  /** The pose every control, view and animation moves. */
   readonly camera: PerspectiveCamera;
   readonly controls: InstanceType<OrbitControlsCtor>;
   readonly render: () => void;
+  readonly getProjection: () => Viewer3dProjection;
+  readonly setProjection: (projection: Viewer3dProjection) => void;
+  /** Largest job dimension, so the orthographic depth range covers the job. */
+  readonly setExtent: (extentMm: number) => void;
+  /** The camera to draw with: the perspective pose, or its orthographic twin. */
+  readonly viewCamera: () => ViewCamera;
 };
 
 export type StartRendererResult =
@@ -54,11 +68,14 @@ export function startRenderer(
   const height = canvas.clientHeight || canvas.height;
   renderer.setSize(width, height, false);
   renderer.setClearColor(theme.background);
+  // Z range and section views clip the toolpath's own materials (ADR-470).
+  renderer.localClippingEnabled = true;
   return { kind: 'ok', renderer, width, height };
 }
 
-// Z-up perspective camera + orbit controls, wired to render on demand (no rAF
-// loop — the scene only redraws on interaction, resize, or data change).
+// Z-up camera + shared orbit controls (ADR-426: one mouse map, damping, zoom
+// to the cursor). The scene only redraws on interaction, resize, data change,
+// or while a drag's glide settles.
 export function createCameraRig(
   three: ThreeModule,
   OrbitControls: OrbitControlsCtor,
@@ -71,14 +88,37 @@ export function createCameraRig(
   },
 ): CameraRig {
   const camera = new three.PerspectiveCamera(
-    CAMERA_FOV_DEG,
+    VIEWER3D_FOV_DEG,
     deps.width / deps.height,
     0.1,
     100_000,
   );
   camera.up.set(0, 0, 1); // Z-up: the program's own frame
+  const ortho = new three.OrthographicCamera(-1, 1, 1, -1, -1, 1);
   const controls = new OrbitControls(camera, deps.canvas);
-  const render = (): void => deps.renderer.render(deps.scene, camera);
-  controls.addEventListener('change', render);
-  return { camera, controls, render };
+  configureViewer3dControls(three, controls);
+  let projection: Viewer3dProjection = 'perspective';
+  let extentMm = 100;
+  const viewCamera = (): ViewCamera => {
+    if (projection === 'perspective') return camera;
+    const distance = camera.position.distanceTo(controls.target);
+    syncOrthographicCamera(ortho, camera, distance, distance + extentMm * ORTHO_DEPTH_EXTENTS);
+    return ortho;
+  };
+  // The owner schedules frames from the controls' change events; the rig
+  // only knows how to draw one.
+  const render = (): void => deps.renderer.render(deps.scene, viewCamera());
+  return {
+    camera,
+    controls,
+    render,
+    getProjection: () => projection,
+    setProjection: (next) => {
+      projection = next;
+    },
+    setExtent: (next) => {
+      extentMm = next;
+    },
+    viewCamera,
+  };
 }
