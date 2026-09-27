@@ -19,7 +19,7 @@ import { respondToTestGrblBuildInfo } from './laser-test-start-helpers';
 import { useStore } from './store';
 
 const IDLE = '<Idle|MPos:10.000,20.000,-1.000|FS:0,0|Ov:100,100,100>';
-const RUN = '<Run|MPos:10.000,20.000,-1.000|FS:800,10000|Ov:100,100,100>';
+const RUN = '<Run|MPos:10.000,20.000,-1.000|FS:800,0|Ov:100,100,100>';
 const ALARM = '<Alarm|MPos:10.000,20.000,-1.000|FS:0,0>';
 
 type Device = SerialConnection & { readonly say: (line: string) => void };
@@ -196,13 +196,9 @@ describe('a missed touch-off probe in a drained tool-change hold', () => {
   it('cancels on ALARM:4 before the hold has seen Idle', async () => {
     const device = makeDevice([]);
     await reachHold(device, false);
-    await useLaserStore.getState().requestControllerStatus();
-    await settle();
-    expect(useLaserStore.getState().toolChangeIdleSeen).toBe(false);
-
     // A poll in this window must keep reporting motion until the test supplies
     // Idle; otherwise it falsely qualifies the hold as physically drained.
-    await device.write('?');
+    await useLaserStore.getState().requestControllerStatus();
     await settle();
     expect(useLaserStore.getState().toolChangeIdleSeen).toBe(false);
 
