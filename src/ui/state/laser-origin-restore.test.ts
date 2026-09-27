@@ -6,6 +6,11 @@ import {
   type ControllerDriver,
 } from '../../core/controllers';
 import { parseStatusReport } from '../../core/controllers/grbl';
+import {
+  cancelFreshControllerStatusWait,
+  observeFreshControllerStatus,
+  waitForFreshControllerStatus,
+} from './laser-controller-status-wait';
 import { consumeControllerCommandResponse } from './laser-interactive-command';
 import { OriginTransactionCancelledError } from './laser-origin-transaction';
 import { restoreWorkOrigin } from './laser-origin-restore';
@@ -46,10 +51,9 @@ function harness(driver: ControllerDriver = grblDriver) {
     state = { ...state, ...(typeof patch === 'function' ? patch(state) : patch) };
   };
   const get = () => state;
-  const report = (offset: { x: number; y: number; z: number }) => {
-    const next = parseStatusReport(
-      `<Idle|MPos:100,200,10|WCO:${offset.x},${offset.y},${offset.z}|FS:0,0>`,
-    )!;
+  const status = (line: string) => {
+    const next = parseStatusReport(line);
+    if (next === null) throw new Error(`Invalid status fixture: ${line}`);
     set({
       ...statusPositionPatch(state, next),
       statusSequence: state.statusSequence + 1,
@@ -60,8 +64,15 @@ function harness(driver: ControllerDriver = grblDriver) {
         observedAt: Date.now(),
       },
     });
+    observeFreshControllerStatus(
+      refs,
+      { sessionEpoch: state.controllerSessionEpoch, sequence: state.statusSequence },
+      next,
+    );
   };
-  return { refs, set, get, report };
+  const report = (offset: { x: number; y: number; z: number }) =>
+    status(`<Idle|MPos:100,200,10|WCO:${offset.x},${offset.y},${offset.z}|FS:0,0>`);
+  return { refs, set, get, report, status };
 }
 
 async function flush() {
@@ -70,6 +81,23 @@ async function flush() {
 afterEach(() => vi.useRealTimers());
 
 describe('Restore saved origin controller evidence and units', () => {
+  for (const statusAfterWrite of [null, '<Idle|MPos:100,200,10|FS:0,0>']) {
+    it(`does not confirm a pre-write matching cache from ${statusAfterWrite === null ? 'no new report' : 'a position-only report'}`, async () => {
+      vi.useFakeTimers();
+      const h = harness();
+      h.report({ ...saved, z: 4 });
+      const write = async () => {
+        if (statusAfterWrite !== null) h.status(statusAfterWrite);
+        queueMicrotask(() => consumeControllerCommandResponse(h.refs, { kind: 'ok' }, 'ok'));
+      };
+      const pending = restoreWorkOrigin(h.set, h.get, h.refs, write, saved);
+      await vi.advanceTimersByTimeAsync(3_100);
+      await pending;
+      expect(h.get().wcoCache).toEqual({ ...saved, z: 4 });
+      expect(h.get().log.join('\n')).toContain('has not confirmed the saved work offset');
+    });
+  }
+
   it('positive control: uses current machine position, preserves Z, and finishes after matching report', async () => {
     const h = harness();
     const writes: string[] = [];
@@ -85,6 +113,90 @@ describe('Restore saved origin controller evidence and units', () => {
     expect(h.get().wcoCache).toEqual({ x: 20, y: 30, z: 4 });
     expect(h.get().workOriginVersion).toBe(2);
     expect(h.get().frameVerification).toBeNull();
+  });
+
+  for (const [driver, line] of [
+    [grblDriver, '<Idle|MPos:100,200,10|WCO:20,30,4|FS:0,0>'],
+    [smoothiewareDriver, '<Idle|MPos:100,200,10|WPos:80,170,6|FS:0,0>'],
+  ] as const) {
+    it(`retains fresh ${driver.kind} offset proof followed by a position-only report before ACK`, async () => {
+      const h = harness(driver);
+      const write = async (command: string) => {
+        if (command.includes('G92')) {
+          h.status(line);
+          h.status('<Idle|MPos:100,200,10|FS:0,0>');
+        }
+        queueMicrotask(() => consumeControllerCommandResponse(h.refs, { kind: 'ok' }, 'ok'));
+      };
+      await restoreWorkOrigin(h.set, h.get, h.refs, write, saved);
+      expect(h.get().wcoCache).toEqual({ ...saved, z: 4 });
+      expect(h.get().log.join('\n')).not.toContain('has not confirmed');
+      expect(h.refs.controllerStatusWait).toBeNull();
+    });
+  }
+
+  it('keeps the pre-ACK observer alive until a delayed acknowledgement', async () => {
+    vi.useFakeTimers();
+    const h = harness();
+    const pending = restoreWorkOrigin(h.set, h.get, h.refs, async () => undefined, saved);
+    await flush();
+    await vi.advanceTimersByTimeAsync(7_000);
+    h.report({ ...saved, z: 4 });
+    h.status('<Idle|MPos:100,200,10|FS:0,0>');
+    consumeControllerCommandResponse(h.refs, { kind: 'ok' }, 'ok');
+    await pending;
+    expect(h.get().log.join('\n')).not.toContain('has not confirmed');
+    expect(h.refs.controllerStatusWait).toBeNull();
+  });
+
+  it('does not count a matching report received before the separate G21 acknowledgement', async () => {
+    vi.useFakeTimers();
+    const h = harness(smoothiewareDriver);
+    const write = async (command: string) => {
+      if (command === 'G21\n') h.report({ ...saved, z: 4 });
+      queueMicrotask(() => consumeControllerCommandResponse(h.refs, { kind: 'ok' }, 'ok'));
+    };
+    const pending = restoreWorkOrigin(h.set, h.get, h.refs, write, saved);
+    await vi.advanceTimersByTimeAsync(3_100);
+    await pending;
+    expect(h.get().log.join('\n')).toContain('has not confirmed');
+    expect(h.refs.controllerStatusWait).toBeNull();
+  });
+
+  it('retires its offset observer when the G92 write fails', async () => {
+    const h = harness();
+    const write = async () => {
+      throw new Error('Disconnected during G92');
+    };
+    await expect(restoreWorkOrigin(h.set, h.get, h.refs, write, saved)).rejects.toThrow(
+      'Disconnected during G92',
+    );
+    expect(h.refs.controllerStatusWait).toBeNull();
+  });
+
+  it('does not cancel a replacement status observer when the restore loses ownership', async () => {
+    vi.useFakeTimers();
+    const h = harness();
+    const write = async () => {
+      queueMicrotask(() => consumeControllerCommandResponse(h.refs, { kind: 'ok' }, 'ok'));
+    };
+    const pending = restoreWorkOrigin(h.set, h.get, h.refs, write, saved).catch(
+      (error: unknown) => error,
+    );
+    await flush();
+    cancelFreshControllerStatusWait(h.refs);
+    const replacement = waitForFreshControllerStatus(h.refs, {
+      after: { sessionEpoch: 1, sequence: h.get().statusSequence },
+      accept: () => false,
+      timeoutMessage: 'Replacement timed out',
+    }).catch((error: unknown) => error);
+    const replacementWait = h.refs.controllerStatusWait;
+    h.set({ controllerSessionEpoch: 2 });
+    await vi.advanceTimersByTimeAsync(100);
+    expect(await pending).toBeInstanceOf(OriginTransactionCancelledError);
+    expect(h.refs.controllerStatusWait).toBe(replacementWait);
+    cancelFreshControllerStatusWait(h.refs);
+    await replacement;
   });
 
   for (const driver of [grblDriver, smoothiewareDriver]) {
@@ -193,6 +305,7 @@ describe('Restore saved origin controller evidence and units', () => {
       expect(await pending).toBeInstanceOf(OriginTransactionCancelledError);
       expect(h.get().wcoCache).toEqual({ x: 91, y: 92, z: 93 });
       expect(h.get().log).toEqual(['new owner']);
+      expect(h.refs.controllerStatusWait).toBeNull();
     });
   }
 });

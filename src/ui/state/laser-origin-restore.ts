@@ -17,6 +17,10 @@
 
 import { formatGcodeCoordinateMm } from '../../core/gcode/coordinate-format';
 import { inferCurrentMachinePosition, reportedWorkOffsetMm } from './infer-machine-position';
+import {
+  cancelFreshControllerStatusWait,
+  waitForFreshControllerStatus,
+} from './laser-controller-status-wait';
 import { assertOriginActionReady, usesPrimaryWcs } from './laser-origin-readiness';
 import { runOriginTransaction, type OriginSafeWrite } from './laser-origin-transaction';
 import { pushLog } from './laser-store-helpers';
@@ -75,25 +79,31 @@ export async function restoreWorkOrigin(
   const line = savedOriginRestoreLine(machineMm, savedMm, grblFamily);
   const sessionEpoch = before.controllerSessionEpoch;
   const writeEpoch = refs.writeEpoch;
+  const confirmation = restoredOffsetConfirmation(get, refs, savedMm);
   let confirmed = true;
-  await runOriginTransaction(
-    set,
-    get,
-    refs,
-    safeWrite,
-    'Restore saved origin',
-    async (write) => {
-      if (!grblFamily) await write('G21\n');
-      await write(`${line}\n`);
-    },
-    async (assertCurrent) => {
-      // GRBL reports WCO; Smoothie reports MPos/WPos, from which the status
-      // handler derives it. Marlin instead records the shift it writes itself.
-      if (usesReportedOffset) confirmed = await waitForRestoredOffset(get, savedMm, assertCurrent);
-      return restoredOriginPatch(get(), savedMm, usesReportedOffset);
-    },
-    { changesXyOrigin: true, reestablishesPositionEvidence: true },
-  );
+  try {
+    await runOriginTransaction(
+      set,
+      get,
+      refs,
+      safeWrite,
+      'Restore saved origin',
+      async (write) => {
+        if (!grblFamily) await write('G21\n');
+        if (usesReportedOffset) confirmation.observe();
+        await write(`${line}\n`);
+      },
+      async (assertCurrent) => {
+        // GRBL reports WCO; Smoothie reports MPos/WPos, from which the status
+        // handler derives it. Marlin instead records the shift it writes itself.
+        if (usesReportedOffset) confirmed = await confirmation.wait(assertCurrent);
+        return restoredOriginPatch(get(), savedMm, usesReportedOffset);
+      },
+      { changesXyOrigin: true, reestablishesPositionEvidence: true },
+    );
+  } finally {
+    confirmation.cancel();
+  }
   if (
     !confirmed &&
     get().controllerSessionEpoch === sessionEpoch &&
@@ -103,19 +113,57 @@ export async function restoreWorkOrigin(
   }
 }
 
-async function waitForRestoredOffset(
+function restoredOffsetConfirmation(
   get: GetFn,
+  refs: LiveRefs,
   savedMm: SavedXyOffsetMm,
-  assertCurrent: () => void,
-): Promise<boolean> {
-  const deadline = Date.now() + RESTORE_WCO_WAIT_TIMEOUT_MS;
-  assertCurrent();
-  while (!offsetMatches(get(), savedMm)) {
-    if (Date.now() > deadline) return false;
-    await sleep(RESTORE_WCO_POLL_MS);
-    assertCurrent();
-  }
-  return true;
+): {
+  readonly observe: () => void;
+  readonly wait: (assertCurrent: () => void) => Promise<boolean>;
+  readonly cancel: () => void;
+} {
+  let freshOffsetObserved = false;
+  let ownedWait: LiveRefs['controllerStatusWait'] = null;
+  return {
+    observe: () => {
+      const beforeWrite = get();
+      const alreadyWaiting = refs.controllerStatusWait != null;
+      // Register before G92: WCO can arrive before its ACK, then be omitted
+      // from the next status frame. A position-only frame cannot freshen WCO.
+      const observation = waitForFreshControllerStatus(refs, {
+        after: {
+          sessionEpoch: beforeWrite.controllerSessionEpoch,
+          sequence: beforeWrite.statusSequence,
+        },
+        accept: (report) => report.wco !== null || (report.mPos !== null && report.wPos !== null),
+        // The command owns its ACK timeout; wait() starts our 3 s after ACK.
+        timeoutMs: null,
+        timeoutMessage: RESTORE_ORIGIN_UNCONFIRMED_NOTICE,
+      });
+      ownedWait = alreadyWaiting ? null : refs.controllerStatusWait;
+      void observation.then(
+        () => {
+          freshOffsetObserved = true;
+        },
+        () => undefined,
+      );
+    },
+    wait: async (assertCurrent) => {
+      const deadline = Date.now() + RESTORE_WCO_WAIT_TIMEOUT_MS;
+      assertCurrent();
+      while (!freshOffsetObserved || !offsetMatches(get(), savedMm)) {
+        if (Date.now() > deadline) return false;
+        await sleep(RESTORE_WCO_POLL_MS);
+        assertCurrent();
+      }
+      return true;
+    },
+    cancel: () => {
+      if (ownedWait != null && refs.controllerStatusWait === ownedWait) {
+        cancelFreshControllerStatusWait(refs);
+      }
+    },
+  };
 }
 
 function offsetMatches(state: LaserState, savedMm: SavedXyOffsetMm): boolean {

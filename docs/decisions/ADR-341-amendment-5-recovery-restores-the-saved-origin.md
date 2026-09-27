@@ -46,7 +46,12 @@ pull, and a reconnect to a fresh controller refuses recovery with the Set origin
    since Marlin reads one G command per line. Z is untouched. The action runs through the
    ordinary origin transaction (fresh Idle, exclusive acknowledgement, Frame permit voided)
    and waits for the controller's offset report (`WCO:` on GRBL, `MPos`/`WPos` on Smoothieware).
-   If confirmation times out, it
+   Only an offset-bearing report newer than the `G92` write confirms the result. The
+   observer is registered immediately before that write, so a report received before its
+   acknowledgement still counts, including when a later position-only frame omits WCO.
+   A matching old cache, or a position-only update, is not new offset evidence. The owned
+   observation is retired on success, cancellation or failure; the confirmation deadline
+   remains three seconds after acknowledgement. If confirmation times out, it
    preserves the controller's reported offset (or its absence) and logs that the restore is
    unconfirmed; a contradictory report must never be replaced with the requested numbers.
    Host-recorded dialects retain the shift their acknowledged `G92` wrote.
