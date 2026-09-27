@@ -94,12 +94,21 @@ function hitVectorObject(
   return lineInteriorArea === null ? NO_HIT : { kind: 'line-interior', area: lineInteriorArea };
 }
 
+// Hover and click hit tests flatten the same immutable paths on every pointer
+// move, and chord-optimal flattening (ADR-453) costs several times the old
+// midpoint splitter, so each path's hit polylines are kept while it lives.
+const hitTestPolylineCache = new WeakMap<ColoredPath, ReadonlyArray<Polyline>>();
+
 function hitTestPolylines(path: ColoredPath): ReadonlyArray<Polyline> {
+  const cached = hitTestPolylineCache.get(path);
+  if (cached !== undefined) return cached;
   const flattened = flattenColoredPathCurves(path, {
     toleranceMm: VECTOR_STROKE_HIT_TOLERANCE_MM / 8,
     segmentBudget: 100_000,
   });
-  return flattened.kind === 'ok' ? flattened.polylines : path.polylines;
+  const polylines = flattened.kind === 'ok' ? flattened.polylines : path.polylines;
+  hitTestPolylineCache.set(path, polylines);
+  return polylines;
 }
 
 function hitPolyline(

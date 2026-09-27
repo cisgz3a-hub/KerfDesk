@@ -48,6 +48,24 @@ describe('PDF paths and whole-page fallback', () => {
     ).toBe(true);
   });
 
+  it('keeps a curve whose control points, but not the curve, leave the page', () => {
+    const page = (ys: readonly number[]) =>
+      pdfVectorPage(
+        {
+          fnArray: [91],
+          argsArray: [[20, [[0, 10, ys[0], 2, 20, ys[1], 30, ys[2], 40, ys[3]]], null]],
+        },
+        OPS,
+        viewport,
+      );
+    // Controls at y = -2 lie below the page; the curve bottoms out at y = 1.
+    expect(page([10, -2, -2, 10]).reason).toBeNull();
+    // Controls at y = -8 pull the curve itself to y = -3.5, off the page.
+    expect(page([10, -8, -8, 10]).reason).toBe(
+      'Artwork crossing the page edge is preserved in the rendered image',
+    );
+  });
+
   it('closes implicit filled contours and retains even-odd holes', () => {
     const result = pdfVectorPage(
       {

@@ -26,6 +26,7 @@
 
 import type { ColoredPath } from '../scene';
 import type { TraceOptions } from './trace-option-types';
+import { isLineTracePath } from './trace-paint';
 
 // Decimal-rounding precision. 2 dp = 0.01px on a 400px preview ≈
 // 0.0025% of width — well below display resolution. Higher precision
@@ -57,28 +58,27 @@ export function countVisibleColoredPaths(
   return paths.filter((path) => isVisibleColoredPath(path, traceMode)).length;
 }
 
+// A physical size is authoritative: the viewBox is only the traced grid that
+// samples it. An anisotropic density (e.g. 300 x 150 DPI) or a capped grid's
+// rounding gives the two axes different mm-per-unit scales, and "meet" would
+// letterbox the artwork instead of filling the stated millimetres, so a sized
+// export stretches each axis independently.
 function svgOpen(width: number, height: number, physicalSize?: SvgPhysicalSize): string {
   const sizeAttrs =
     physicalSize === undefined
-      ? ' width="100%" height="100%"'
-      : ` width="${round(physicalSize.widthMm)}mm" height="${round(physicalSize.heightMm)}mm"`;
+      ? ' width="100%" height="100%" preserveAspectRatio="xMidYMid meet"'
+      : ` width="${round(physicalSize.widthMm)}mm" height="${round(physicalSize.heightMm)}mm" preserveAspectRatio="none"`;
   return (
     '<svg xmlns="http://www.w3.org/2000/svg"' +
     ` viewBox="0 0 ${width} ${height}"` +
     sizeAttrs +
-    ' preserveAspectRatio="xMidYMid meet">'
+    '>'
   );
-}
-
-// Mirrors the commit's layer-mode policy (scene-mutations): these trace modes
-// become LINE layers, whose closed rings burn as outlines, never as fills.
-function isLineTraceMode(traceMode: TraceOptions['traceMode']): boolean {
-  return traceMode === 'centerline' || traceMode === 'edge';
 }
 
 function coloredPathToSvgPath(path: ColoredPath, traceMode: TraceOptions['traceMode']): string {
   if (!isVisibleColor(path.color)) return '';
-  const lineMode = isLineTraceMode(traceMode);
+  const lineMode = isLineTracePath(path, traceMode);
   const closedVisible = lineMode ? isVisibleStrokedPolyline : isVisibleClosedPolyline;
   const closed = path.polylines.filter((pl) => pl.closed && closedVisible(pl));
   const open = path.polylines.filter((pl) => !pl.closed && isVisibleStrokedPolyline(pl));
@@ -134,7 +134,7 @@ function polylineToSubPath(polyline: ColoredPath['polylines'][number]): string {
 function isVisibleColoredPath(path: ColoredPath, traceMode: TraceOptions['traceMode']): boolean {
   if (!isVisibleColor(path.color)) return false;
   return path.polylines.some((polyline) =>
-    polyline.closed && !isLineTraceMode(traceMode)
+    polyline.closed && !isLineTracePath(path, traceMode)
       ? isVisibleClosedPolyline(polyline)
       : isVisibleStrokedPolyline(polyline),
   );

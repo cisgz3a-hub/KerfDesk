@@ -93,8 +93,10 @@ slow and indicative only.
    the trace uses the preview resolution." While the finer attempt runs, the dialog shows its
    phases over the preview (reading the image, then the trace phases, with the elapsed time) until
    the commit settles it.
-5. The Multi-File batch plans each file with the same function, using the import size (254 DPI, as
-   `rasterImportGeometry` places it) as the output size and the project's machine for the density.
+5. The Multi-File batch plans each file with the same function, using the import size (the file's
+   embedded density, else 254 DPI, as `rasterImportGeometry` places it) as the output size and the
+   project's machine for the density. The density is parsed from a bounded header prefix, and a
+   sized export uses `preserveAspectRatio="none"` so each axis honours its own density.
    Each file is now decoded on its turn (`BatchTraceImageJob.image` may be a loader), so a batch
    holds one large decode at a time instead of all of them. It has the same fallback as a commit:
    a file whose finer decode or trace fails for any reason other than cancellation is traced on

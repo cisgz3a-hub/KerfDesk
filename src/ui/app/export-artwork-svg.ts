@@ -15,6 +15,8 @@ export type ExportArtworkSvgContext = {
   readonly clock?: () => Date;
   readonly renderer?: typeof renderVariableText;
   readonly readImageSource?: (image: RasterImage) => Promise<string>;
+  /** Group each filled shape with its holes (ADR-451). Default off. */
+  readonly groupContours?: boolean;
 };
 
 export async function handleExportArtworkSvg(ctx: ExportArtworkSvgContext): Promise<void> {
@@ -61,6 +63,7 @@ export async function handleExportArtworkSvg(ctx: ExportArtworkSvgContext): Prom
     const result = exportSceneSvg(
       { ...resolved.project, scene: { ...resolved.project.scene, objects } },
       ids,
+      ctx.groupContours === true ? { groupContours: true } : {},
     );
     if (result.kind === 'error') {
       ctx.pushToast('Could not export SVG: ' + result.error, 'error');
@@ -83,7 +86,10 @@ export async function handleExportArtworkSvg(ctx: ExportArtworkSvgContext): Prom
   }
 }
 
-function exportProjectSelection(project: Project, ids: readonly string[] | undefined): Project {
+export function exportProjectSelection(
+  project: Project,
+  ids: readonly string[] | undefined,
+): Project {
   if (ids === undefined) return project;
   const selected = new Set(ids);
   const objects = new Map(project.scene.objects.map((object) => [object.id, object]));

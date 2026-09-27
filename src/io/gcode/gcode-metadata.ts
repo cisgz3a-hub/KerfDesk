@@ -78,18 +78,21 @@ export type GcodeMetadata = {
  * pass from the allowance-bearing region's cleared stock (2026-09-27), and
  * ADR-154 amendment 2's adaptive pocket finishing rings that end where they
  * start, and ADR-273 amendment 1's relief group headers that no longer claim
- * a ramp entry for a relief stage that actually plunges, and ADR-445's shared
+ * a ramp entry for a relief stage that actually plunges, and ADR-432's native
+ * laser G2/G3 arcs with represented-arc validation and G17, and ADR-445's shared
  * split scan exit/entry runways, canonical meeting endpoints and compact
- * Fill/4040 Image motion words, and ADR-421 amendment 1's relief finishing
- * moves lifted where sampled exact-contact checks exceed the normal-to-move
- * tolerance, with finite sampling and output-rounding limits retained.
+ * Fill/4040 Image motion words, retaining ADR-460's lossless Fill compaction,
+ * and ADR-471's short-loop laps and open-path zig-zags from prior cut depth,
+ * and ADR-421 amendment 1's relief finishing moves lifted where sampled
+ * exact-contact checks exceed the normal-to-move tolerance, with finite
+ * sampling and output-rounding limits retained.
  */
-// ADR-427 integration also cuts deepest cleanup before linked relief rings;
-// all adaptive ring closure and flat depth-slice provenance above is retained.
-// Scan timing v2 also preserves M3 state across shared, empty and coincident
-// Image handoffs (ADR-445); cached v1 output must be regenerated.
-export const EMITTER_REVISION =
-  'adaptive-relief-cleanup-linked-entry-scan-v2-contact-checked-20260927-v1';
+// ADR-427 keeps deepest cleanup before linked relief rings and flat depth slices.
+// ADR-368 sizes nonflat pocket/profile offsets, tabs and stepover by cut width.
+// Tracer batch 3 preserves bounded chords, shared seams and Line + fill.
+// Native arcs and compact Fill retain scan v2's shared/empty/coincident M3 handoffs.
+// ADR-471 discloses sub-width plunges; ADR-457 finishing recipes survive ramping.
+export const EMITTER_REVISION = 'trace-arcs-relief-width-ramp-contact-scan-v2-20260927-v6';
 
 // Machine-specific assumption lines (ADR-103 defect fix): router exports
 // previously carried the laser-worded `$32=1 (laser mode)` banner. The S

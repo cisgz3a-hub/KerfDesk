@@ -125,7 +125,9 @@ function restPocketRoughingGroupForLayer(
     roughToolpaths,
     depths,
   );
-  if (settings.rampEntryDeg !== undefined) passes = applyRampEntry(passes, settings.rampEntryDeg);
+  if (settings.rampEntryDeg !== undefined) {
+    passes = applyRampEntry(passes, settings.rampEntryDeg, false, operation.roughTool.diameterMm);
+  }
   const primaryTool = layerCncTool(config, settings);
   return {
     group: cncGroupForPasses(layer, roughSettings, operation.roughTool, passes, device, config, {

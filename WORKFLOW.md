@@ -790,11 +790,16 @@ marks later edits as unapproved without changing the existing Frame/Start policy
 
 1. Select the artwork to exchange, then choose **File → Export selected artwork as SVG...**.
    With nothing selected, **Export artwork as SVG...** includes the whole scene, including
-   output-disabled artwork.
+   output-disabled artwork. The **Export SVG** dialog offers **Group islands** (off by default,
+   remembered for the session: each filled shape and its holes in their own group); **Choose
+   File...** then asks for the destination (ADR-451).
 2. The export captures the source selection and one clock before choosing a destination.
    It resolves current variable text, outlines text, preserves physical millimetre size and
    canonical curves, embeds original bitmap pixels, and includes image masks and transforms.
    Machine settings and generated toolpaths are excluded; the production cursor does not advance.
+   Vector coordinates are rounded so each point lies within half a 0.001 mm grid diagonal of its
+   true position, and the page is the exact extent of the drawn curves, not their control points
+   (ADR-431).
 3. Cancellation writes nothing. Missing image pixels, unsupported 3D relief or invalid geometry
    report an error without claiming a successful partial export. A write error reports its reason.
 4. Re-import preserves the supported vector/image composition, physical size and image clips
@@ -803,6 +808,40 @@ marks later edits as unapproved without changing the existing Frame/Start policy
 5. Explicit **Re-import source** replaces the complete originally imported SVG composition in one
    Undo step. Unambiguous unchanged components retain settings; changed or ambiguous components
    receive new operations. Copies are independent of the original source's replacement set.
+
+### F-A9c. Export artwork as DXF; Multi-File Trace formats (ADR-431)
+
+1. **File → Export artwork as DXF...** (or **Export selected artwork as DXF...**) writes the
+   selection or scene's vector artwork as a millimetre DXF: one polyline per contour, one layer per
+   colour, circular arcs as exact bulges, cubics and elliptical arcs flattened within 0.01 mm.
+   Bitmaps and reliefs have no DXF form; they are left out and the completion message counts them.
+2. **Tools → Multi-File Trace...** first asks for the preset, format (SVG, DXF, PDF, EPS or
+   GeoJSON), coordinate precision and, for SVG, **Group islands** (each shape with its holes);
+   **Choose Images...** then picks the files. Each image is saved as `<name>-trace.<format>` on the
+   traced image's page, lower-left corner as the origin (ADR-468). **Page → Fit to artwork**
+   instead trims the page to the exact traced curves plus a **Margin (mm)**; the millimetre scale
+   is unchanged and the DXF and GeoJSON origin moves to the fitted page's corner (ADR-451). A
+   fitted side under 3 pt (the smallest PDF page) grows to 3 pt, centred, in every format. A
+   Margin field that is blank means no margin; a negative value or one over 1000 mm is marked
+   invalid and **Choose Images...** waits until it is corrected.
+3. An image whose trace has nothing visible writes no file; the rest of the batch is still saved
+   and the completion message names the skipped images.
+
+### F-A9d. Export artwork as PDF, EPS or GeoJSON (ADR-468)
+
+1. **File → Export artwork as PDF... / EPS... / GeoJSON...** (or **Export selected artwork as
+   ...**) write the selection's or scene's vector artwork, text outlined; bitmaps and reliefs are
+   left out and counted, and an image-only selection warns before any file name is asked.
+2. PDF (1.4, one page) and EPS (EPSF 3.0) keep lines and curves exactly (arcs become cubics); the
+   page / bounding box is the exact extent of the drawn curves, rounded outward, plus half the
+   0.1 mm stroke on every side when strokes are drawn, and never under 3 pt. Filled layers fill
+   even-odd (text nonzero); line layers and open contours are 0.1 mm strokes. A page side over
+   5080 mm is written as PDF 1.6 with /UserUnit.
+3. GeoJSON flattens curves within 0.01 mm into Polygon rings (outer counterclockwise, holes
+   clockwise) and LineStrings. Polygons follow each shape's fill rule, so they cover what the PDF
+   fills; shapes whose outlines cross are written as separate `unmerged` polygons and the export
+   warns. Coordinates are millimetres with y up from the lower-left corner, not longitude and
+   latitude (not georeferenced); the file states this in its `kerfdesk` member and the toast says so.
 
 ### F-A9b. Remove overlapping laser lines (ADR-350)
 
@@ -2729,6 +2768,15 @@ settings and Job Review keep their existing read-only setup references.
    geometry-only limit explains that lowering DPI cannot fix it. CNC keeps the editable shapes;
    choose an appropriate machining operation and tool size for their widths. This is a line
    halftone treatment; Image mode also offers grayscale and dithered photo engraving.
+   **Colour layers** splits flat-colour artwork into a few colours (**Colours**: Auto or 2 to 8,
+   counting the paper) and traces one filled layer per colour; neighbouring colours share one
+   edge with no gap or overlap (ADR-461). **Cut-out** burns each colour only in its own area;
+   **Stacked** also fills each colour under the darker colours above it. The paper colour is left
+   untraced unless **Trace background colour** is ticked; only a light border colour counts as
+   paper, so light-on-dark art traces every colour. The swatches show the traced colours,
+   lightest first. On commit each colour gets its own operation; on a laser each starts at a power
+   set by its darkness (a mid-dark or darker colour keeps the operation's power), which the
+   operator can edit. Paper (near-white, or the traced background) starts with output off.
    For line artwork, choose **Detection** explicitly: the preset's automatic detection, a **Manual brightness band**,
    **Faint lines (keep solid areas)**, or **Sketch (local contrast)**. Faint lines adds coherent
    pale strokes to the preset's solid ink while rejecting isolated pale specks. Sketch uses
@@ -2738,7 +2786,12 @@ settings and Job Review keep their existing read-only setup references.
    use pixels of the decoded image grid supplied to the tracing core and preserve their separate
    preset values. If dense artwork is traced on a smaller working grid, both area thresholds are
    converted using the actual width and height ratios, without rounding the internal values.
-   The preceding UI decode cap still defines that source grid. Expand **Curve finishing** for
+   The preceding UI decode cap still defines that source grid. Smooth's automatic noise cleanup
+   also judges one-pixel specks on that grid, before any supersampling, so a small image drops the
+   same specks it would at full size. Isolated one-pixel dots, such as a fine halftone screen,
+   look exactly like noise. Smooth and Line Art already drop them through **Remove ink specks**
+   and **Fill tiny holes**; the noise cleanup only adds specks those leave, such as specks near
+   an outline. Trace with Sharp to keep one-pixel dots. Expand **Curve finishing** for
    **Smoothness** and **Optimize** on filled outlines and Edge Detection, or **Transparency**
    for alpha-mask tracing. **Fill tiny holes** controls cleanup of small enclosed white marks;
    it does not bridge open gaps. Turn it off to retain those small highlights. Sliders and numeric fields stay in sync. Manual adjustments persist
@@ -2755,7 +2808,13 @@ settings and Job Review keep their existing read-only setup references.
    Submitted results use their captured request's paint intent; a newer preset request still
    supersedes an older result.
    Edge Detection creates closed outlines around dark artwork and locally
-   darker detail. Adjacent dark tones may merge into one outline. Centerline follows stroke centres.
+   darker detail. Adjacent dark tones may merge into one outline. Its **Sensitivity** moves in
+   steps of 10 and **Detail** in steps of 5; every step is a different detector setting (faint
+   detail appears or drops out; hard black-on-white art may not change) (ADR-437). A typed value
+   between steps shows the step being traced once the field loses focus. **Trace alpha mask**
+   also applies to Edge Detection: it outlines the image's transparency, and Invert is
+   unavailable while it is on. Semi-transparent regions (shadows, glows) are outlined like grey
+   tones; a 16%-opacity shadow still outlines at Sensitivity 0. Centerline follows stroke centres.
    Both commit as Line layers, so their preview draws every outline and stroke as a hairline that
    stays one screen pixel wide at any zoom, rather than filling Edge outlines.
    Centerline's separate-end gap bridge uses source-grid distance (preset/default 3 pixels),
@@ -3515,7 +3574,9 @@ and physical material output remain unverified.
 
 ### F-F5. Enhance a region of a trace (region-enhance re-trace)
 
-**ADR:** [ADR-113](DECISIONS.md#adr-113--region-enhance-re-trace-dialog-boundary-mode-trace-fidelity-2026-07-05).
+**ADR:** [ADR-113](DECISIONS.md#adr-113--region-enhance-re-trace-dialog-boundary-mode-trace-fidelity-2026-07-05),
+amended by [ADR-435](docs/decisions/ADR-435-region-enhance-seams.md) and
+[ADR-436](docs/decisions/ADR-436-auto-median-at-source-scale.md).
 
 **Operator intent.** A small feature inside a large raster (a tiny
 letter counter in a full logo) dropped out of the trace because it
@@ -3537,7 +3598,14 @@ re-runs: the full image is traced, the boxed source region is re-traced
 at 2× and downscaled, and its geometry is patched into the full trace
 (polylines fully inside the region's shrunk interior are replaced;
 everything crossing the box border or in the margin ring survives). The
-preview shows the full trace with the boxed feature recovered. Commit
+box is re-traced with a ring of the real neighbouring pixels around it and
+with the whole image's Otsu cut, auto-sketch choice and Smooth noise-cleanup
+verdict (noise is cleaned on the source pixels before the 2× enlargement), so the patch
+binarises exactly like its surroundings, and a shape that both passes
+trace within a pixel of each other at the box edge is kept once. Fitted
+curves and operation bindings survive inside and outside the box. The
+preview shows the full
+trace with the boxed feature recovered. Commit
 (**Trace**) writes the patched paths as the traced image, reusing the
 same overlay registration as any trace.
 
@@ -3849,23 +3917,29 @@ explicitly marked below; the remaining controls and user-facing flows are planne
 1. Open polylines cannot be offset; they are cut on-path (documented
    fallback), closed shapes on the same layer still offset normally.
 
-#### Edge — a tapered ball nose sets pocket or profile offsets
-1. A tapered ball nose's stored diameter is its widest, at the top of the flutes, and
-   it cuts narrower at any shallower depth. Outside and inside profiles and pockets
-   offset by the width it cuts at the operation's full depth, so the wall meets the
-   drawn line at the stock surface and follows the taper and then the ball below it.
-   An outside part is its drawn size at the top face and larger below; a hole is its
-   drawn size at the top face and smaller below. Every depth pass rides that one path
-   (ADR-368 Amendment 2).
+#### Edge — a bit that narrows toward its tip sets pocket or profile offsets
+1. A ball nose, V-bit, engraving bit or tapered ball nose stores its widest cutting
+   diameter and cuts narrower at any shallower depth: a ball nose until the cut is as
+   deep as its radius, a V-bit or engraving bit until its cone reaches the diameter, a
+   tapered ball nose until the top of its flutes. Outside and inside profiles and
+   pockets offset by the width the bit cuts at the operation's full depth, so the wall
+   meets the drawn line at the stock surface and follows the bit's shape below it. An
+   outside part is its drawn size at the top face and larger below; a hole is its drawn
+   size at the top face and smaller below. Every depth pass rides that one path
+   (ADR-368 Amendments 2 and 3). A flat end mill, and any cut deeper than the bit
+   narrows, still offset by the diameter.
 2. Pocket rings and raster sweeps, and relief roughing rings, step by the stepover
    percentage of the width the bit cuts in one depth pass, so no rib stands between
    them. Tab windows add the full-depth cut width to the tab width, so a bridge is never
-   narrower than requested. The 3D removal preview shows the taper and the ball corner.
-3. A tapered ball nose without a usable ball tip and taper is planned as a flat
-   cylinder of its stored diameter. When one is the main bit of a pocket, an inside
-   or outside profile, or a relief, Job Review warns that the result comes out
-   off-size or ribbed and asks for the bit's tip and taper or a flat end mill
-   (ADR-368 Amendments 1 and 2). The warning never blocks save or Start.
+   narrower than requested. The 3D removal preview shows the bit's wall and floor shape.
+   Job Review's On path size warning and full-tab-coverage warning give the cut width
+   too. V-carve and engrave never offset by the diameter and are unchanged.
+3. A V-bit or engraving bit without a usable included angle or tip flat, or a tapered
+   ball nose without a usable ball tip and taper, is laid out at its stored diameter.
+   When one is the main bit of a pocket, an inside or outside profile, or a relief,
+   Job Review warns that the result comes out off-size or ribbed and asks for the bit's
+   geometry or a flat end mill (ADR-368 Amendments 1 to 3). The warning never blocks
+   save or Start.
 
 ### F-CNC3. CNC preflight and save G-code
 
@@ -3945,8 +4019,10 @@ explicitly marked below; the remaining controls and user-facing flows are planne
    heightmap cells, then the map is dilated by the active bit's footprint
    plus the layer's Rough allowance (0.5 mm unless set), sliced into Z levels by the layer's
    depth-per-pass, and each level's region fills with concentric rings at
-   the layer's physical stepover: a percentage of the bit diameter, or for a
-   tapered ball nose of the width it cuts over one level (ADR-368 Amendment 2).
+   the layer's physical stepover: a percentage of the width the bit cuts over
+   one level. That is the bit diameter for a flat end mill, and narrower for a
+   ball nose, V-bit, engraving bit or tapered ball nose on levels shallower than
+   the bit narrows (ADR-368 Amendments 2 and 3).
    Each ring ends where it started (ADR-289 Amendment 1).
    The allowance holds in 3D: roughing plans with the bit widened sideways by
    the allowance plus the contour clearance, so steep walls keep their stock
@@ -4478,8 +4554,9 @@ and lifts the command's CNC-only gate.)*
 2. Between sections the G-code retracts, stops the spindle (M5), parks,
    and pauses on M0 with comments naming the next bit. GRBL holds until
    cycle start; the streaming UI's Resume continues the job.
-3. Geometry offsets use each layer's OWN bit diameter, or a tapered ball nose's
-   cut width at the layer depth (ADR-368 Amendment 2).
+3. Geometry offsets use each layer's OWN bit: its diameter, or for a bit that
+   narrows toward its tip its cut width at the layer depth (ADR-368 Amendments 2
+   and 3).
 
 #### Error — v-carve layer with a flat bit
 1. Job Review warns with the layer's bit named (not just the machine bit), but
@@ -4679,8 +4756,11 @@ and lifts the command's CNC-only gate.)*
    inside/pocket run CCW) and rotates entry points to the midpoint of
    the longest segment so witness marks land on a flat span.
 3. For profile, pocket, and engrave, a ramp angle > 0 turns plunges into
-   descents ALONG the toolpath at that angle; closed loops re-cut the ramped
-   span level afterwards. V-carve is different: its changing Z is the cutting
+   descents ALONG the toolpath at that angle, from the depth that path was
+   last cut to (the stock top the first time). A closed loop is then cut one
+   whole lap at depth from where its descent ended; an open path zig-zags
+   along its start back to the start at depth, then is cut end to end at
+   depth (ADR-471). V-carve is different: its changing Z is the cutting
    profile itself, so the certified medial path governs and any stored V-carve
    ramp request is reported as advisory provenance rather than being layered
    onto that profile.
@@ -4713,8 +4793,15 @@ and lifts the command's CNC-only gate.)*
    V-carve.
 
 #### Edge — path shorter than the ramp
-1. The descent finishes at the path end (the ramp consumed the whole
-   path); the remainder cuts level on the next lap.
+1. A closed loop keeps descending round itself, lap after lap, until it
+   reaches depth, then cuts one whole lap at depth. An open path zig-zags
+   along its whole length back to its start at depth, then cuts end to end.
+2. A path shorter than one cut width that the ramp would have to go over
+   again keeps its straight plunge at the plunge feed: the cutter covers the
+   whole path, so going round it again would only slow the plunge. The G-code
+   header says `; cnc entry-advisory: N passes plunge: path shorter than one
+   cut width`, and Job Review lists it as an advisory, naming Helical entry
+   for a pocket (ADR-471).
 
 #### Edge — reliefs on a layer with a ramp angle
 1. Relief roughing ramps with the layer's angle (F-CNC17, ADR-424) and its
@@ -7836,9 +7923,9 @@ the edge it sits on, and a midpoint over the same edge.
    sketch draws on its top face in each layer's colour, and the carve renders
    live underneath — pockets flat-floor, v-carves groove by boundary distance
    with the layer's v-bit angle, profiles slot at bit diameter on the offset
-   side (a tapered ball nose at its cut width at the layer depth, the offset
-   the compiler uses), drills bore at circle centres, and depths at the stock
-   thickness read as through cuts.
+   side (a bit that narrows toward its tip at its cut width at the layer
+   depth, the offset the compiler uses), drills bore at circle centres, and
+   depths at the stock thickness read as through cuts.
 2. The left button always belongs to the armed tool — draw, select, and move
    exactly as in 2D, from any camera angle (the pointer lands on the stock
    plane). Middle drag pans, Shift+middle or right drag orbits, the wheel
