@@ -32,13 +32,37 @@ import type { TracedLayer, TracedSvgPage } from './batch-trace-svg';
 import type { TraceOptions } from './trace-option-types';
 import { isLineTraceMode } from './trace-paint';
 
-export type TracedPageFit = 'image' | 'artwork';
+// 'paper' (rank 33): a fixed page (A4, Letter or a custom size) with the
+// artwork centred in the area inside the margins, offset by whole export grid
+// steps. It needs a physical page; a pixel page keeps the image page.
+export type TracedPageFit = 'image' | 'artwork' | 'paper';
+
+/** Per-side margins in millimetres. */
+export type TracedPageMargins = {
+  readonly top: number;
+  readonly right: number;
+  readonly bottom: number;
+  readonly left: number;
+};
 
 export type TracedPageLayout = {
   readonly fit: TracedPageFit;
   /** Space around the fitted artwork on every side, in millimetres. */
   readonly marginMm?: number;
+  /** Per-side margins; when present they replace marginMm. */
+  readonly margins?: TracedPageMargins;
+  /** The paper page's size in millimetres ('paper' only). */
+  readonly paperMm?: { readonly width: number; readonly height: number };
 };
+
+/** Standard paper sizes in millimetres, portrait. */
+export const TRACED_PAPER_SIZES_MM = {
+  a4: { width: 210, height: 297 },
+  letter: { width: 215.9, height: 279.4 },
+} as const;
+
+/** Largest accepted paper side, in mm. */
+export const MAX_TRACED_PAPER_SIDE_MM = 10000;
 
 /**
  * The widest stroke a traced writer draws on a physical page, in mm: the PDF
@@ -84,16 +108,77 @@ export function placeTracedLayers(
   precisionMm: number | undefined,
 ): PlacedTrace {
   if (layout === undefined || layout.fit === 'image') return { layers, page };
-  const box = fittedPageBox(layers, page, traceMode, layout.marginMm ?? 0, precisionMm);
+  if (layout.fit === 'paper') return placeOnPaper(layers, page, layout, precisionMm);
+  const box = fittedPageBox(layers, page, traceMode, pageMargins(layout), precisionMm);
   if (box === null) return { layers, page };
-  const matrix = { a: 1, b: 0, c: 0, d: 1, e: -box.minX, f: -box.minY };
   return {
-    layers: layers.map((layer) => ({
-      ...layer,
-      curves: layer.curves.map((curve) => transformCurveSubpathExact(curve, matrix)),
-    })),
+    layers: translated(layers, -box.minX, -box.minY),
     page: { ...page, size: { width: span(box.minX, box.maxX), height: span(box.minY, box.maxY) } },
   };
+}
+
+function translated(
+  layers: ReadonlyArray<TracedLayer>,
+  dx: number,
+  dy: number,
+): ReadonlyArray<TracedLayer> {
+  const matrix = { a: 1, b: 0, c: 0, d: 1, e: dx, f: dy };
+  return layers.map((layer) => ({
+    ...layer,
+    curves: layer.curves.map((curve) => transformCurveSubpathExact(curve, matrix)),
+  }));
+}
+
+/** The layout's margins, each clamped to 0..MAX_TRACED_PAGE_MARGIN_MM. */
+export function pageMargins(layout: TracedPageLayout): TracedPageMargins {
+  const uniform = clampMargin(layout.marginMm ?? 0);
+  const sides = layout.margins;
+  if (sides === undefined) return { top: uniform, right: uniform, bottom: uniform, left: uniform };
+  return {
+    top: clampMargin(sides.top),
+    right: clampMargin(sides.right),
+    bottom: clampMargin(sides.bottom),
+    left: clampMargin(sides.left),
+  };
+}
+
+function clampMargin(value: number): number {
+  return Number.isFinite(value) ? Math.min(Math.max(value, 0), MAX_TRACED_PAGE_MARGIN_MM) : 0;
+}
+
+// The artwork's centre moves to the centre of the area inside the margins,
+// by a whole number of export grid steps, so coordinates differ from the
+// image-page file by an exact offset. Artwork larger than that area stays
+// centred and runs past it; the page never shrinks to the artwork.
+function placeOnPaper(
+  layers: ReadonlyArray<TracedLayer>,
+  page: TracedSvgPage,
+  layout: TracedPageLayout,
+  precisionMm: number | undefined,
+): PlacedTrace {
+  const paper = layout.paperMm;
+  if (page.physicalSizeMm === undefined || paper === undefined || !validPaper(paper)) {
+    return { layers, page };
+  }
+  const extent = curveExtent(layers);
+  const margins = pageMargins(layout);
+  const grid = decimalGridAtMost(precisionMm ?? DEFAULT_EXPORT_PRECISION_MM);
+  const onGrid = (value: number): number =>
+    Number(formatGridIndex(Math.round(value / grid.step), grid));
+  const centreX = margins.left + (paper.width - margins.left - margins.right) / 2;
+  const centreY = margins.top + (paper.height - margins.top - margins.bottom) / 2;
+  const dx = extent === null ? 0 : onGrid(centreX - (extent.minX + extent.maxX) / 2);
+  const dy = extent === null ? 0 : onGrid(centreY - (extent.minY + extent.maxY) / 2);
+  return {
+    layers: dx === 0 && dy === 0 ? layers : translated(layers, dx, dy),
+    page: { ...page, size: { width: paper.width, height: paper.height } },
+  };
+}
+
+function validPaper(paper: { readonly width: number; readonly height: number }): boolean {
+  return [paper.width, paper.height].every(
+    (side) => Number.isFinite(side) && side > 0 && side <= MAX_TRACED_PAPER_SIDE_MM,
+  );
 }
 
 /**
@@ -105,22 +190,23 @@ export function fittedPageBox(
   layers: ReadonlyArray<TracedLayer>,
   page: TracedSvgPage,
   traceMode: TraceOptions['traceMode'],
-  marginMm: number,
+  marginMm: number | TracedPageMargins,
   precisionMm: number | undefined,
 ): TracedPageBox | null {
   const extent = curveExtent(layers);
   if (extent === null) return null;
   const physical = page.physicalSizeMm !== undefined;
   const pad = strokedAnywhere(layers, traceMode) ? strokeAllowance(page) : 0;
-  const margin = Number.isFinite(marginMm)
-    ? Math.min(Math.max(marginMm, 0), MAX_TRACED_PAGE_MARGIN_MM)
-    : 0;
-  const grow = pad + margin;
+  const m = pageMargins(
+    typeof marginMm === 'number'
+      ? { fit: 'artwork', marginMm }
+      : { fit: 'artwork', margins: marginMm },
+  );
   const raw = {
-    minX: extent.minX - grow,
-    minY: extent.minY - grow,
-    maxX: extent.maxX + grow,
-    maxY: extent.maxY + grow,
+    minX: extent.minX - pad - m.left,
+    minY: extent.minY - pad - m.top,
+    maxX: extent.maxX + pad + m.right,
+    maxY: extent.maxY + pad + m.bottom,
   };
   if (!physical) return raw;
   const grid = decimalGridAtMost(precisionMm ?? DEFAULT_EXPORT_PRECISION_MM);
