@@ -161,12 +161,7 @@ function ArtworkAdjustmentFields(props: ArtworkPropertiesInspectorProps): JSX.El
         />
       )}
       {props.isCncMachine ? null : (
-        <>
-          <PowerScaleInput objects={context.objects} selectionActive={context.selectionActive} />
-          <p className="lf-artwork-hint">
-            100% uses the operation’s power. Reduce it to lower power for only this artwork.
-          </p>
-        </>
+        <PowerScaleInput objects={context.objects} selectionActive={context.selectionActive} />
       )}
       <SelectedSourceReimportControl
         object={
@@ -268,7 +263,7 @@ function PowerScaleInput(props: {
   });
   return (
     <label style={rowStyle}>
-      <span style={labelStyle}>Power Scale</span>
+      <span style={labelStyle}>Power scale</span>
       <span style={controlStyle}>
         <input
           type="number"
@@ -297,7 +292,7 @@ function PowerScaleInput(props: {
             debounced.onBlur(event);
           }}
           aria-label={`Power scale for ${props.selectionActive ? 'selected objects' : 'inspected artwork'}`}
-          title="Scale laser power for this artwork context without changing its operation setting."
+          title="100% uses the operation’s power. Reduce it to lower power for only this artwork, without changing the operation."
           style={inputStyle}
         />
         {debounced.errorMessage === null ? null : (

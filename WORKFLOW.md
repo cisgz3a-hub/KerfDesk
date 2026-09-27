@@ -94,6 +94,7 @@ opportunity, without an extra branding delay. It introduces no startup interacti
 - **Top command toolbar**: Open, Import, Import Image, Save and Preview lead with readable labels when space permits. Selecting an image brings Trace image into the row; Image Studio remains in **More**. Other commands remain in **More** and the application menus, with their existing shortcuts, disabled reasons, tooltips and actions. The row measures available width and moves commands into More instead of scrolling horizontally. Utility controls share the row down to 520 px. The project name includes an unsaved-change indicator.
 - **Numeric transforms**: X, Y, width, height, rotation, and the aspect-ratio lock remain directly available. **Anchor** opens the existing nine-point transform reference selector in a keyboard-accessible popover. Changing its presentation does not change the X/Y reference, resize anchor, or rotation centre.
 - **Artwork / Operations panel**: docked right with **Settings**, **Run order**, and **Materials** views in Laser mode; CNC keeps Settings and Run order. Settings is the default. Run order shares the same docked rail at the same width while the canvas remains on the left; it is not a modal or a third sidebar, and switching views never resizes the rail (ADR-348). Materials owns reusable preset and saved-library management without displacing the active job workflow. A header chevron collapses the rail to a narrow named strip; the same strip expands it.
+- **Laser artwork settings (ADR-430)**: the selected artwork's name heads the Settings view, with the Operation | Artwork switch under it. The Operation view leads with the operation's colour and name, then one scope line only when an edit reaches other artwork (with **Make unique**). **Line**, **Fill** and **Image** are three buttons; Power, Speed and Passes share one row; Fill adds Line spacing and Angle, and Image adds Dither, Line interval and (Grayscale) Min power. Scan both ways and Air assist are one-line switches whose explanations are tooltips. **More cut settings** opens Cut Settings for everything else and names what it holds. Include in output, Show on canvas and **Add operation** close the view.
 - **Operation cards**: the list comes before the artwork inspector, with the selected operation's process fields before secondary artwork properties. Each card keeps its visibility toggle on the face. Its **•••** disclosure contains order, output, artwork selection, settings clipboard, and delete controls.
 - **Machine controls panel**: in Spacious layout it is docked at the far right with the same collapse/expand pattern. Both panels can be resized or hidden independently. It may be collapsed during a job because active run controls live independently in the Live Motion bar.
 - **Toasts**: share the canvas's available space (lower left of the workspace, above the live controls) or a reserved row inside the open modal — never the rails, where they hid Start/Job and the layer list. Only the newest three render. The toast body does not take pointer input, so a click or drag through it reaches the canvas; the × control dismisses it early. Success confirmations dismiss after 4 s; advisories and failures after 8 s.
@@ -527,7 +528,7 @@ destination and cannot overwrite the template source.
   together. Named sections reveal the applicable line, fill or image options. **Advanced cut
   settings** groups the full draft editor by purpose; **Apply settings** commits the draft and
   **Cancel** leaves the operation unchanged.
-- **Saved defaults** in Advanced cut settings offers **Make Default for #rrggbb**, which remembers
+- **Saved defaults** in More cut settings offers **Make Default for #rrggbb**, which remembers
   the operation's applied settings for the colour it names: the colour of the artwork the operation
   was created for, or the operation's own colour when it has no artwork. New operations and **Reset
   to Default** use the default saved for that same colour, otherwise **Make Default for All**. The
@@ -697,14 +698,14 @@ marks later edits as unapproved without changing the existing Frame/Start policy
 
 ### F-A7a. Perforation, overcut and image overscan (ADR-415)
 
-1. **Advanced cut settings → Line detail → Perforation**: **Enable**, **Cut** and **Skip** (mm) cut
+1. **More cut settings → Line detail → Perforation**: **Enable**, **Cut** and **Skip** (mm) cut
    every line of the operation as dashes with uncut gaps. Closed shapes keep a full gap before their
    start point, so no dash is longer than Cut and no gap shorter than Skip. Perforation applies after
    kerf and tabs.
 2. **Overcut** (mm, 0 is off) keeps cutting past the start of each closed shape on the final pass
    only, retracing its first edges, so the seam is cut through. Shapes opened by tabs or perforation
    are not overcut.
-3. **Advanced cut settings → Image detail → Overscan** (0 to 25 mm, default 5) sets the laser-off
+3. **More cut settings → Image detail → Overscan** (0 to 25 mm, default 5) sets the laser-off
    run-up at both ends of every scan line. The note under it says how much run-up this machine needs
    to reach the operation's saved speed.
 4. Job Review lists these settings on the operation's detail line when they are set. Preview, Frame,
@@ -3932,28 +3933,55 @@ explicitly marked below; the remaining controls and user-facing flows are planne
 1. A relief object on an output-enabled layer compiles to waterline
    roughing: object XY scale is first rasterized into square physical-mm
    heightmap cells, then the map is dilated by the active bit's footprint
-   plus a 0.5 mm finishing allowance, sliced into Z levels by the layer's
+   plus the layer's Rough allowance (0.5 mm unless set), sliced into Z levels by the layer's
    depth-per-pass, and each level's region fills with concentric rings at
    the layer's physical stepover: a percentage of the bit diameter, or for a
    tapered ball nose of the width it cuts over one level (ADR-368 Amendment 2).
-   Each ring ends where it started. Above a 50% stepover, the stock a level's
-   rings would leave standing (the level's centre, cusps between rings) gets
-   its own cleanup passes (ADR-289 Amendment 1).
+   Each ring ends where it started (ADR-289 Amendment 1).
+   The allowance holds in 3D: roughing plans with the bit widened sideways by
+   the allowance plus the contour clearance, so steep walls keep their stock
+   too, and each ring point clears the model surface between samples as well
+   as at them (ADR-412). When the stepover is wider than the bit reaches on
+   that level's slice (ADR-413), the stock the level's rings leave standing
+   (its centre, cusps between rings) is cleared right after them (ADR-289
+   Amendment 1).
+   Ladder levels below the deepest tip become one level at it, so the floor
+   keeps exactly the allowance, and a flat the ladder would overshoot by more
+   than 0.05 mm gets a level of its own that clears only its band (ADR-422).
+   With a **Slope step** set, band levels that far apart between the
+   depth-per-pass levels cut only the slopes between them, so a slope keeps
+   terraces no taller than the step instead of a whole pass (ADR-422
+   Amendment 1). 0 or unset is off.
+   With **Flats** set to Roughing bit and an end mill roughing, every flat
+   of the model at least as wide as the bit is cut to its exact height,
+   still keeping the allowance off the walls beside it: on the roughing
+   level one allowance above it when that level can reach it within one
+   depth per pass of where its stock stands, otherwise in separate slices
+   after all roughing, each within the requested depth per pass (ADR-450).
+   Any other roughing bit ignores the setting.
 2. Passes run depth-major (whole level before stepping down) as a
-   clearing group — before any profile cuts. Each level is cut like a
-   pocket, from the inside out: the cleanup passes, then the innermost ring,
-   and the level's boundary ring last, one stepover deep along the wall.
-   Every ring follows the layer's cut direction, Climb unless the layer says
-   Conventional, and rings around an island run the opposite way to keep that
-   direction (ADR-427). The preview's removal shading shows the terraced
-   relief forming.
+   clearing group — before any profile cuts. The preview's removal
+   shading shows the terraced relief forming.
+   Within a level the deepest cleanup paths cut first (ADR-427), then
+   each connected ring piece is cut inside out, starting in its
+   middle and widening one stepover at a time, and of the pieces ready the
+   one nearest the bit comes next (ADR-424). Every ring keeps its stock on
+   the side the layer's cut direction asks for, round islands as well as
+   outlines. The bit stays down between rings when the straight move to the
+   next ring is no longer than one cut width and stays where the level may
+   cut, or, between a piece's outline and its islands, stays inside that
+   already cleared piece; otherwise it lifts. With a ramp angle set (the
+   layer's Ramp entry, or **Roughing ramp** where the cut type has none),
+   each run of linked rings descends along its first ring from the level
+   above instead of plunging; a ring shorter than one cut width plunges.
 3. Emitted G-code passes the plunged-travel invariant; scale is resolved
    before cutter geometry, then mirror/rotate/move placement is honored.
 
 #### Error — bit too big for the detail
 1. Regions narrower than the bit's dilated footprint produce no rings
    there — fine detail is left for the H.8 finishing pass (and the
-   preview shows it uncut). This is a sampled-grid region result; roughing's
+   preview shows it uncut). Ring vertices clear the piecewise-linear model
+   surface under the bit (ADR-412); roughing's
    dual-grid/offset vertices, continuous sweep, and subcell detail retain
    ADR-289's qualification boundary.
 
@@ -3974,7 +4002,8 @@ explicitly marked below; the remaining controls and user-facing flows are planne
    interior beyond that limit. The latter two are retained with the exact
    compiled/recovery Job and reach Job Review as warnings only; they never
    refuse Frame, Start, preview, save, or G-code emission, and the probe never
-   adds a cutter move.
+   adds a cutter move. A core-cleanup offset failure reports through the same
+   warning (ADR-413).
 
 ### F-CNC7. Import an STL relief — Phase H.4 (ADR-098/309)
 
@@ -3991,7 +4020,10 @@ explicitly marked below; the remaining controls and user-facing flows are planne
    larger than the bed is scaled down to fit, with a warning (F-A3). The
    worker transfers its typed mesh into the live object without expanding
    it into a boxed number array on the UI thread.
-3. The canvas shows the relief as a grayscale depth map — light = stock
+3. The mesh keeps its CAD top-view orientation: +Y in the STL is the top of
+   the canvas, so raised text reads the right way round (ADR-414). Meshes
+   already saved in projects keep the orientation they were saved with.
+   The canvas shows the relief as a grayscale depth map — light = stock
    top, dark = floor. It selects, moves, and saves/loads like any object;
    `.lf2` embeds the mesh as the existing JSON number-array schema so
    projects stay self-contained and older saved projects still reopen.
@@ -4561,18 +4593,45 @@ and lifts the command's CNC-only gate.)*
    requests a planar-grid ridge-height target. Compile then emits the
    roughing group AND a finishing group cut with that bit (an M0 change
    separates them when the bits differ).
-2. Finishing rides the sampled max-plus tip surface in serpentine rows. A ball
+2. Finishing rides the max-plus tip surface in serpentine rows, raised on the
+   rows it emits until the bit clears the model surface between samples as
+   well as at them (ADR-412). A ball
    nose uses `2*sqrt(c*(2r-c))` physical-XY spacing after bounding scallop `c`
    to [0.001 mm, bit radius]. A tapered ball nose uses the same law with its
    tip ball radius and samples a grid of at most a tenth of the tip diameter;
    its flank lies below that sphere, so the planar cusp can only be lower, and
    its whole flank constrains the tip (ADR-368). Flat bits use the larger of
-   0.05 mm and 40% of diameter. The grid attempts that resolved spacing and
-   its whole-row stride rounds down so it does not overshoot it. This qualifies sampled finishing
-   vertices and planar cusp, not a continuous included-surface sweep or true
-   along-surface scallop proof (ADR-292/294).
-3. Roughing still leaves its fixed 0.5 mm allowance (it exists FOR this
-   pass); finishing consumes it down to the true surface.
+   0.05 mm and 40% of diameter. The grid cell divides that resolved spacing
+   into whole rows no coarser than a tenth of the contact diameter, so rows
+   land at the requested spacing; the whole-row stride still rounds down so it
+   never overshoots it (ADR-421). This qualifies finishing
+   vertices against the piecewise-linear surface and the planar cusp, not the
+   XY chord between vertices, subcell detail, or true along-surface scallop
+   (ADR-292/294/412).
+3. Without a mask, the rows form one stay-down path: each row steps to the
+   next along its edge column's own tip samples instead of retracting and
+   plunging. A vertex is dropped only where the straight move replacing it
+   stays at or above it by no more than 0.002 mm, so the reduced path clears
+   everything the sampled one did (ADR-421). A mask that excludes cells keeps
+   one pass per run.
+4. Roughing leaves the layer's Rough allowance (0.5 mm unless set; it exists
+   FOR this pass); finishing consumes it down to the true surface.
+5. Raster direction runs the rows along X (default) or along Y (ADR-423).
+6. Finish strategy Raster + waterline narrows the rows to cos 45° of the
+   scallop's spacing and adds waterline passes wherever the tip surface
+   slopes 45° or more, levels sin 45° of that spacing apart, so passes are
+   never further apart along the surface than the scallop's spacing. Each
+   feature is circled top down in one stay-down pass, climb or conventional
+   as the layer's cut direction says on the physical bed. Every waterline
+   vertex clears the model exactly and every move is checked; a relief with a
+   mask outline gets the narrowed raster only (ADR-423).
+7. With **Flats** set to Roughing bit, the raster skips every sample from
+   which the bit would touch only flats the roughing end mill took to their
+   exact height, and cuts what it keeps nearest first: it stays down across
+   gaps up to four bit diameters, lifting to the highest tip along the way,
+   and retracts across longer ones. The part comes out as the full raster
+   leaves it, the flats without scallops (ADR-450). A relief with a mask
+   outline keeps the full raster.
 
 #### Error — unknown finishing bit id
 1. The missing ID stays visible as a disabled diagnostic choice. Prepared
@@ -6565,17 +6624,16 @@ as the pane's design record.
 
 ## Camera Mode flows
 
-### F-CAM1. Camera overlay + 4-point alignment (v1 — ADR-107)
+### F-CAM1. Choose a camera (ADR-116, ADR-440)
 
-- **Success / aligned.** The operator opens Camera Mode, picks a camera, and sees the live
-  feed. On a machine (network) camera the manual path is to click the four bed corners in the
-  live preview — the view prompts for each corner in turn ("Click the … bed corner (N / 4)").
-  On the fourth click the homography solves and the feed warps to sit on the bed; the operator
-  presses "Save alignment" (F-CAM3) to persist the calibration to the device profile, selects
-  "Use this camera", then "Update still" before placing artwork over the material and adjusting
-  overlay opacity. If the overlay was hidden, turn "Overlay on" to display it. Saving alignment
-  alone does not capture or display a frame. USB/RTSP cameras have
-  no click-corners path — align them with the "Align to bed…" marker wizard (F-CAM4).
+- **Success / camera running.** The operator opens the Camera panel and starts a USB camera, or
+  presses **Use this camera** on a detected machine camera. The live picture is the one source every
+  camera feature captures through. Closing the panel keeps the camera running while the calibrated
+  overlay shows it on the canvas.
+- **Hosted browser / machine camera.** A laser's built-in camera and RTSP/IP cameras answer on the
+  local network without the permission browsers need to read pixels, so the hosted web app cannot
+  use them. The panel says so and links KerfDesk Desktop, which reads them through its local bridge.
+  USB cameras work in the browser.
 - **Error / permission denied.** If the browser or OS denies camera access (or the page is not
   served over https), a one-line message explains how to grant permission. No overlay is shown
   and the rest of the app is unaffected.
@@ -6588,121 +6646,110 @@ as the pane's design record.
 - **Edge / device list changed.** While Camera Mode is open, browser `devicechange` refreshes the
   picker only. It never opens hardware or prompts for permission. A non-permission `AbortError`
   is shown as a retryable open failure rather than mislabeled as denial.
-- **Empty / no camera.** With no camera detected, Camera Mode shows an empty state ("No camera
-  found — connect a USB camera") and the camera picker is disabled.
-- **Edge / degenerate corners.** If the four chosen points are collinear or coincident (no
-  valid homography), the solve is rejected with "Move the alignment points apart — they can't
-  form a rectangle"; the previous calibration, if any, is retained.
 
-### F-CAM2. Camera lens calibration wizard (v2 — ADR-108)
+### F-CAM2. One-photo camera calibration (ADR-441, Amendment 1)
 
-- **Success / calibrated.** With the camera live, the operator opens "Calibrate
-  lens…" from the Camera panel, describes their printed checkerboard (inner
-  corners across/down + measured square size), and holds the board in front of
-  the camera. Detected corners light up on the live view; each genuinely NEW
-  pose held steady is captured automatically (a manual Capture button exists).
-  After five or more poses, Solve runs the focal-sweep calibration and the
-  review step shows the reprojection error plus an Original / Corrected A/B of
-  the last capture. If the corrected view's straight edges LOOK straight, the
-  operator applies; the calibration persists on the device profile (undoable)
-  and survives reload, bound to the source identity and pixel geometry of the
-  accepted capture set.
-- **Error / solve rejected.** A failed solve (too few views, degenerate
-  geometry) shows the typed reason with "Back to capture"; nothing persists.
-  A suspect solve (implausible coefficients, high RMS, uneven coverage, too-
-  similar poses) still shows the A/B but with plain-language warnings telling
-  the operator what to recapture.
-- **Empty / no feed.** Opening the wizard without a live camera shows a
-  one-line pointer back to the Camera panel's Start control; the Calibrate
-  button itself is disabled until the feed runs.
-- **Edge / mid-session changes.** Captures with no full board in view are
-  rejected with a hint (not silently dropped); a camera-resolution change
-  mid-session refuses to mix pixel bases and offers Reset; changing the board
-  description discards captures taken against the old board. Changing the
-  active camera source while collecting discards the in-progress capture set.
-  A completed Review remains bound to its accepted frames; Apply persists that
-  recorded binding rather than whichever camera happens to be active later.
+- **Success / calibrated.** **Calibrate camera…** opens the wizard. The operator covers the bed
+  with one flat sheet, enters its thickness and, optionally, the camera lens height by tape
+  measure, and presses **Engrave target**: the ring target streams as a temporary job through the
+  normal Frame, review and Start path, leaving the project and undo history untouched. When the
+  job finishes the wizard moves to the photo. The operator moves the head clear of the three solid
+  discs and presses **Take photo**; the rings are found and the camera fitted in a worker. The
+  result shows the average and worst error in mm, the rings found, the camera height, and the
+  photo flattened onto the bed with each ring coloured by its error. **Save calibration** stores
+  the camera model on the machine profile (undoable) and turns the overlay on.
+- **Reuse / target already engraved.** **Target already engraved** skips the job and goes to the
+  photo, using the same margins.
+- **Error / engrave not started or stopped.** If review, preflight or confirmation stops the job,
+  or the stream errors, is cancelled or disconnects, the wizard returns to setup with the reason.
+- **Error / rings not found.** No rings, anchors covered, a mirrored picture or too few rings each
+  give a plain message saying what to fix; nothing is saved. A long solve can be cancelled.
+- **Edge / rough fit.** A fit with a large error is described with what to check (sheet moved,
+  not flat, out of focus) and can still be saved; the operator decides.
+- **Edge / camera straight down.** When one photo cannot pin the camera height down and none was
+  entered, the result asks for a tape-measured height so thick material lines up.
+- **Edge / minimized wizard.** The wizard can minimize into a small non-modal panel so the
+  operator can watch the camera and reach the machine while the target engraves.
+- **Check / has the camera moved?** With a calibration saved, **Check camera…** opens the wizard
+  at the photo, using the saved target's area and height. The photo is measured against the saved
+  calibration. The result says either that the camera has not moved, or how far and which way on
+  the canvas the saved calibration is off. The suggested button is **Keep saved calibration**
+  when the camera has not moved and **Save new calibration** when it has; both are always offered.
+  Any recalibration while a calibration is saved shows the same comparison.
+- **Edge / target layout not saved.** An older calibration remains usable, but **Check camera…**
+  opens setup instead of guessing the old target's layout. Engrave a new target, or confirm the
+  original bed size, margins and sheet thickness before choosing **Target already engraved**.
+- **Edge / sheet moved since engraving.** The check cannot tell a moved sheet from a moved camera;
+  the photo step says the sheet must lie where it was engraved, and **Back** engraves a new one.
+- **Edge / another camera.** A photo from another camera or with another crop is not compared;
+  the result says why and the new calibration can still be saved.
 
-### F-CAM3. Workspace camera overlay (ADR-107 v1 wiring)
+### F-CAM3. Corrected camera overlay (ADR-440, ADR-441 Amendment 2)
 
-- **Success / overlay on canvas.** After aligning a network camera (F-CAM1), the operator presses
-  "Save alignment": the alignment persists on the device profile (undoable, survives reload).
-  "Use this camera" selects the source, and "Update still" captures the frame for the workspace.
-  Turn "Overlay on" if it was hidden. The image appears under the artwork, tracking zoom and pan.
-  The Camera panel's overlay row
-  offers show/hide, a Fade slider, "Update still" (freeze the current frame —
-  LightBurn's Update Overlay model), and "Live" (continuous video, USB only).
-- **Material surface height.** Enter the material's top height above the bed. A lens-corrected
-  alignment with a recorded marker-plane height compensates for thicker or thinner material in
-  both the overlay and camera trace. Positive height moves the projected surface toward an
-  overhead camera; the workspace remains X-right/Y-down. The exact alignment height leaves the
-  stored homography unchanged.
-- **Network camera resource changed.** Calibration and alignment distinguish the exact URL query,
+- **Success / overlay on canvas.** With a saved calibration, the canvas shows the camera picture
+  through the camera model: lens distortion and parallax are undone per pixel on the GPU, and the
+  picture tracks zoom and pan. The overlay row offers show/hide, a Fade slider, **Update still**
+  (freeze the current frame, LightBurn's Update Overlay model) and **Live** for any camera kind.
+- **Material surface height.** Enter the material's top height above the bed; the overlay and
+  camera trace show the bed as seen at that height, so the material's edges line up.
+- **Object heights.** **Add height area** gives part of the bed its own height, for an object that
+  stands above the material such as a box. With objects selected, the area starts around them
+  with a 10 mm margin; otherwise it starts as a 100 mm square in the middle of the bed. The area's
+  height, X, Y, width and depth are edited in its row, and **Remove** drops it. The overlay shows
+  each area at its own height, with a dashed outline and "Area n: h mm" on the canvas. Where areas
+  overlap the highest wins, and an area lower than the material (an opening in the sheet) still
+  wins inside itself. Areas are not saved with the project (ADR-441 Amendment 2).
+- **Accuracy map.** **Accuracy map on/off** draws every calibration ring over the picture where
+  it was engraved, coloured by its measured error (green, amber, red; hollow when the fit left it
+  out). A dashed outline marks the target's area, outside which the picture is extrapolated. The
+  button is absent for a calibration saved without its rings (ADR-441 Amendment 1).
+- **Network camera resource changed.** The camera calibration distinguishes the exact URL query,
   including an empty query, as well as its redacted host/path. A channel or substream change
   therefore cannot reuse another feed's geometry. The recorded identity uses a private app-local
   key; raw query text, userinfo, fragments, and the key are absent from exported camera bindings.
   Remembered URLs remain redacted. Any query change, including a query credential change, changes
-  identity. Older network bindings did not record enough resource information and require fresh
-  lens calibration and alignment, even for a remembered query-less URL. USB bindings are unchanged.
+  identity. Older network bindings did not record enough resource information and require a fresh
+  calibration, even for a remembered query-less URL. USB bindings are unchanged.
 - **Camera setup on another app or after clearing local data.** The private camera identity key
   survives ordinary reloads in the same app. A different app/browser or loss of that key requires
   fresh network-camera setup. When local storage is unavailable, a temporary key keeps setup
   usable for the current session. If secure identity cannot be established, raw camera capture
   remains available, but saved network geometry cannot be verified for precision placement.
-- **Error / basis mismatch prevented.** The persisted alignment records the
-  pixel basis it was clicked in (raw vs de-fisheyed); frames of the other basis
-  are never warped with it, so a later lens calibration cannot silently
-  mis-register the overlay.
-- **Empty / nothing to show.** With no saved alignment the overlay row is
-  absent and the canvas is untouched; with an alignment but no camera source
-  (no still, feed stopped) nothing renders.
-- **Edge / reload.** A corrupt persisted alignment is dropped on load (never
-  trusted); the overlay simply stays off until re-aligned.
+- **Error / another camera or picture shape.** A frame from a different camera, or of a different
+  aspect ratio than the calibration, is not drawn; the canvas says why. The same camera at another
+  resolution of the same shape is drawn with the lens scaled to it.
+- **Error / no WebGL2.** A browser with graphics acceleration off says the corrected picture cannot
+  be drawn instead of showing an uncorrected one.
+- **Empty / nothing to show.** Without a saved calibration the overlay row is absent and the canvas
+  is untouched; with no still and no running camera nothing renders.
+- **Edge / reload and old files.** A corrupt saved calibration is dropped on load (never trusted).
+  Projects and machine profiles holding the old lens calibration and four-corner or marker
+  alignment load without them; the Camera panel shows calibration pending.
 
-### F-CAM4. Automatic marker alignment (v3 — ADR-109)
+### F-CAM5. Trace from camera (ADR-110, ADR-440, ADR-441 Amendment 2)
 
-- **Success / one-click align.** The operator opens the "Align to bed…" wizard from the
-  Camera panel. Its steps add the five-patch marker target to the project (the scene is
-  replaced by the pattern, like the other calibration generators) and burn it on scrap
-  covering the bed corners — or reuse an already-burned target — then, with the bed cleared of
-  everything else and the camera live, Detect. The five X-corners are detected, the origin
-  pair resolves the camera's rotation, the homography solves, and the alignment persists
-  (undoable) — the workspace overlay is immediately registered. With a lens calibration
-  present the capture is de-fisheyed first and the toast says "lens-corrected".
-- **Error / markers not found.** A cluttered bed, missing patches, or poor
-  lighting produce a typed toast telling the operator what to fix; nothing
-  persists. A degenerate solve (markers nearly collinear) is refused the same
-  way.
-- **Empty / no live feed.** Auto-align is disabled until an active camera
-  source can produce pixel-readable frames. Machine cameras become eligible
-  when the local bridge frame proxy is available (F-CAM6).
-- **Edge / rotated camera.** A camera mounted 180° (or at an angle) still
-  labels the corners correctly — the origin pair, not the operator, carries
-  the orientation.
-
-### F-CAM5. Trace from camera (v4 — ADR-110)
-
-- **Success / trace in place.** With the camera aligned and live, the operator
-  places an object on the bed and presses "Trace from camera": the frame is
-  captured (de-fisheyed if the alignment is lens-corrected), flattened
-  top-down into bed coordinates, and opened in the normal Trace dialog. The
-  traced vectors land exactly where the object physically sits — no manual
-  positioning.
-- **Error / basis mismatch.** If the saved alignment expects lens-corrected
-  frames but the calibration was removed, the capture is refused with a toast
-  (never silently mis-registered).
-- **Empty / no feed or alignment.** The button is disabled without a live
-  feed; without an alignment the overlay row (and the button) is absent.
-- **Edge / encoder failure.** A platform without 2D canvas support fails
-  typed ('could not build the bed image') instead of half-completing.
+- **Success / trace in place.** With a saved calibration and a live camera, the operator places an
+  object on the bed and presses **Trace from camera**: the frame is flattened top-down onto the bed
+  at the material surface height and opened in the normal Trace dialog. The traced vectors land
+  where the object physically sits.
+- **Success / heights and one area.** Inside each height area the frame is flattened at that
+  area's own height. **Trace area** in an area's row traces only that area, at 8 px/mm instead of
+  4 px/mm (lower for a very large area, never below 4 px/mm), and the vectors land inside it
+  (ADR-441 Amendment 2).
+- **Error / another camera or shape.** The capture is refused with a toast saying which, never
+  traced through the wrong geometry.
+- **Empty / no feed or calibration.** **Trace from camera** and **Trace area** are disabled without
+  a live camera; without a calibration the overlay row (and the buttons) is absent.
+- **Edge / encoder failure.** A platform without 2D canvas support fails typed ('could not build
+  the bed image') instead of half-completing.
 
 ### F-CAM6. Machine camera via the local bridge (ADR-121, ADR-141, ADR-248)
 
 - **Success / first-class machine camera.** The operator opens the Camera
   panel, the local bridge is healthy, and **Discover machine camera** finds a
   private-network JPEG or RTSP camera. **Use this camera** makes it the active
-  camera source; calibration, auto-align, overlay updates, trace-from-camera,
-  and snapshots use the same pixel-readable capture path as USB cameras.
+  camera source; calibration, overlay updates, trace-from-camera, and
+  snapshots use the same pixel-readable capture path as USB cameras.
 - **Error / bridge unavailable.** If the bridge is not running, discovery and
   machine-camera capture show an actionable message. Local-development users
   are pointed to the bridge command; the desktop app starts it automatically.
@@ -6766,20 +6813,50 @@ as the pane's design record.
 - **Edge / watching a job.** The camera panel can toggle between compact and
   wide monitoring widths, with the preference kept locally.
 
-### F-CAM9. Bed-alignment wizard with burn-the-target (ADR-122)
+### F-CAM9. Find pieces on the bed and place the design on each (ADR-442)
 
-- **Success / one wizard, aligned bed.** **Align to bed...** opens a guided
-  wizard: choose marker burn power/speed, burn the five-marker target through
-  the normal Start flow, wait for the stream to finish, clear the bed, capture
-  a frame, detect markers, solve the homography, and persist the alignment.
-- **Error / burn not started or failed.** If readiness, preflight,
-  confirmation, streaming, cancellation, or disconnect stops the burn, the
-  wizard returns to setup with the typed reason and does not persist anything.
-- **Empty / markers already burned.** The operator can skip the burn step and
-  go straight to detection when the target is already on the bed.
-- **Edge / minimized wizard.** The wizard can minimize into a small non-modal
-  panel so the operator can watch the live camera and reach the machine while
-  the capture or burn flow continues.
+- **Success / fill a batch of blanks.** With a saved calibration and a live camera, the operator
+  lays out blanks, puts the design on one of them, selects it and presses **Find pieces** in the
+  Camera panel's **Pieces on the bed** section. The overlay turns on and each piece is outlined on
+  the canvas with its number, centre and long-side line. The panel lists each piece with its size
+  and angle and how the design will move and turn onto it. **Place selection on each piece** adds
+  a copy on every ticked piece, the way the design sits on its own piece, as one undo step.
+- **Success / design not on a piece.** The design is centred on each piece, its long side along
+  the piece's long side, and the design itself moves to the first piece.
+- **Edge / piece partly out of view.** It is listed and outlined but starts unticked, with the
+  reason; ticking it includes it.
+- **Edge / different piece.** A piece of another shape, or more than 3 mm longer or wider than the
+  design's own piece, is flagged and stays ticked. Place is never refused.
+- **Edge / raised pieces.** Pieces on a box are found at the box's height when a height area
+  covers it (F-CAM3).
+- **Edge / Frame.** Frame traces the rectangle around all the copies, not each piece; the panel
+  says so after Place.
+- **Empty / no pieces or no selection.** "No pieces found" explains that pieces need to stand out
+  by colour or brightness. Place with nothing selected, or with every piece unticked, says what to
+  do and changes nothing.
+- **Empty / no feed.** **Find pieces** is disabled without a live camera; without a calibration
+  the section is absent.
+
+### F-CAM10. Print and Cut marks found by the camera (ADR-443)
+
+- **Success / register a printed sheet.** With Print and Cut on in Labs, a saved calibration and a
+  live camera, the operator lays the printed sheet on the bed and sets the material height in the
+  Camera panel. In the design, they select the two registration marks, open **Print and Cut** and
+  press **Use selected marks**, then **Find marks with camera**. Both points fill in as **Camera
+  x, y**, and the dialog reports the measured spacing, print scale and turn. **Apply
+  registration** registers the design on the sheet. The head never moves.
+- **Success / mixed.** **Capture head** still works on either target, so a camera point can be
+  replaced by jogging onto that mark.
+- **Edge / repeated marks.** When other pairs of marks are the same distance apart, the pair
+  nearest the design's targets is used and the dialog says how many others fitted.
+- **Edge / no pair.** When no two marks are the design's spacing apart (within 2 %), the points
+  stay as they were and the dialog says how many mark-like shapes the camera saw, and what to
+  check.
+- **Edge / trust changes.** After a reconnect, reset or frame change, the points must be captured
+  again, as with head captures; **Find marks with camera** does it in one click.
+- **Empty / no selection or no feed.** **Use selected marks** without two selected objects says
+  to select the marks first. **Find marks with camera** is disabled without a live camera, and
+  without a calibration it is absent.
 
 ---
 

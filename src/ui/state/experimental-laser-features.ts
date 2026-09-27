@@ -1,13 +1,12 @@
 import { create } from 'zustand';
 
-export type ExperimentalLaserFeature = 'lowPowerFire' | 'printAndCut' | 'cameraAlignmentV2';
+export type ExperimentalLaserFeature = 'lowPowerFire' | 'printAndCut';
 
 export type ExperimentalLaserFeatures = Readonly<Record<ExperimentalLaserFeature, boolean>>;
 
 export const DEFAULT_EXPERIMENTAL_LASER_FEATURES: ExperimentalLaserFeatures = {
   lowPowerFire: false,
   printAndCut: false,
-  cameraAlignmentV2: false,
 };
 
 const STORAGE_KEY = 'kerfdesk.experimental-laser-features.v1';
@@ -44,7 +43,6 @@ export function readExperimentalLaserFeatures(
     return {
       lowPowerFire: parsed['lowPowerFire'] === true,
       printAndCut: parsed['printAndCut'] === true,
-      cameraAlignmentV2: parsed['cameraAlignmentV2'] === true,
     };
   } catch {
     return DEFAULT_EXPERIMENTAL_LASER_FEATURES;

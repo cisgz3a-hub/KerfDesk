@@ -7,12 +7,17 @@ import { describe, expect, it } from 'vitest';
 import { testReliefHeightfield } from '../../__fixtures__/relief-heightfield';
 import { DEFAULT_DEVICE_PROFILE, toMachineCoords } from '../devices';
 import { buildToolpath, type CncContourPass, type Job } from '../job';
+import { pointInPolygon } from '../geometry/point-in-polygon';
+import { signedAreaMm2 } from '../geometry/polyline-orientation';
+import { chainLoops, roughingLoops } from '../relief/relief-roughing-chain.test-support';
+import { cncGrblStrategy } from '../output';
 import { computeRemovalGrid, kernelForTool, type RemovalGrid } from '../sim';
 import {
   DEFAULT_CNC_LAYER_SETTINGS,
   DEFAULT_CNC_MACHINE_CONFIG,
   IDENTITY_TRANSFORM,
   createLayer,
+  type CncLayerSettings,
   type CncTool,
   type ReliefObject,
   type Scene,
@@ -67,7 +72,12 @@ function flatRelief(sizeMm: number): ReliefObject {
 }
 
 // No finishing allowance, so the roughing floor is the relief floor.
-function compile(relief: ReliefObject, cutter: CncTool, stepoverPercent: number): Job {
+function compile(
+  relief: ReliefObject,
+  cutter: CncTool,
+  stepoverPercent: number,
+  settings: Partial<CncLayerSettings> = {},
+): Job {
   const scene: Scene = {
     objects: [relief],
     layers: [
@@ -79,6 +89,7 @@ function compile(relief: ReliefObject, cutter: CncTool, stepoverPercent: number)
           depthPerPassMm: 1.5,
           stepoverPercent,
           finishAllowanceMm: 0,
+          ...settings,
         },
       },
     ],
@@ -90,7 +101,7 @@ function compile(relief: ReliefObject, cutter: CncTool, stepoverPercent: number)
   });
 }
 
-function roughingRings(job: Job): ReadonlyArray<CncContourPass> {
+function roughingPasses(job: Job): ReadonlyArray<CncContourPass> {
   return job.groups.flatMap((group) =>
     group.kind === 'cnc' && group.cutType === 'relief-rough'
       ? group.passes.filter((pass): pass is CncContourPass => pass.kind === 'contour')
@@ -158,12 +169,15 @@ describe('relief roughing rings', () => {
       [TBN, 40],
       [tool('em-6350'), 85],
     ] as const) {
-      const rings = roughingRings(compile(relief, cutter, stepoverPercent));
-      expect(rings.length).toBeGreaterThan(0);
-      for (const ring of rings) {
+      const passes = roughingPasses(compile(relief, cutter, stepoverPercent));
+      expect(passes.length).toBeGreaterThan(0);
+      for (const pass of passes) {
         // Before ADR-289 Amendment 1 each ring stopped at the corner before its
-        // start, half a side short on a square ring.
-        expect(ring.polyline[ring.polyline.length - 1]).toEqual(ring.polyline[0]);
+        // start, half a side short on a square ring. A pass now cuts several
+        // rings joined at depth (ADR-424); every one of them closes.
+        const loops = chainLoops(pass.polyline);
+        expect(loops.length).toBeGreaterThan(0);
+        expect(loops.flat()).toHaveLength(pass.polyline.length);
       }
     }
   });
@@ -211,7 +225,175 @@ describe('relief roughing core cleanup', () => {
     const cutter = tool('em-6350');
     const job = compile(relief, cutter, 85);
     // Two rings on each of the two levels, and nothing else.
-    expect(roughingRings(job)).toHaveLength(4);
+    expect(roughingLoops(roughingPasses(job))).toHaveLength(4);
     expect(cellsLeftStanding(removal(job, cutter, machineBox(relief)), FLAT_SLACK_MM)).toBe(0);
   }, 60_000);
 });
+
+describe('relief roughing motion (ADR-424)', () => {
+  it('joins each level of a flat relief into one pass at depth', () => {
+    const relief = flatRelief(20);
+    const job = compile(relief, tool('em-3175'), 40);
+    const passes = roughingPasses(job);
+
+    // Two 1.5 mm levels, each cut without lifting between its rings.
+    expect(passes).toHaveLength(2);
+    expect(roughingLoops(passes).length).toBeGreaterThan(passes.length * 4);
+  });
+
+  it('clears the floor with ramped entries as it does with plunges', () => {
+    const relief = flatRelief(20);
+    const cutter = tool('em-3175');
+    const job = compile(relief, cutter, 40, { rampEntryDeg: 3 });
+    const group = job.groups.find((g) => g.kind === 'cnc' && g.cutType === 'relief-rough');
+    if (group?.kind !== 'cnc') throw new Error('roughing group missing');
+
+    expect(group.passes.every((pass) => pass.kind === 'path3d')).toBe(true);
+    for (const pass of group.passes) {
+      if (pass.kind !== 'path3d') continue;
+      // Each level ramps down from the one above rather than from safe height.
+      expect(pass.points[0]?.z).toBeGreaterThan(pass.points[pass.points.length - 1]?.z ?? 0);
+      expect(pass.points[0]?.z).toBeLessThanOrEqual(0);
+    }
+    expect(cellsLeftStanding(removal(job, cutter, machineBox(relief)), FLAT_SLACK_MM)).toBe(0);
+    // The G-code records the entry, with no advisory about ramps below the
+    // stock top: each starts where the level above has cut.
+    const gcode = cncGrblStrategy.emit({ groups: [group] }, DEFAULT_DEVICE_PROFILE);
+    expect(gcode).toContain('; cnc entry: contour-ramp; max-angle-deg: 3');
+    expect(gcode).not.toContain('entry-advisory');
+  });
+
+  it('climbs round an island as it does round the outside', () => {
+    const relief = bossRelief();
+    const box = machineBox(relief);
+    const centre = { x: (box.minX + box.maxX) / 2, y: (box.minY + box.maxY) / 2 };
+    const cutter = tool('em-3175');
+    // Rings grow out from the island's edge, one tool radius off the boss, and
+    // in from the relief's edge; they meet midway between the two.
+    const meetMm = (BOSS_HALF_MM + cutter.diameterMm / 2 + BOSS_RELIEF_MM / 2) / 2;
+    const chebyshev = (p: { x: number; y: number }) =>
+      Math.max(Math.abs(p.x - centre.x), Math.abs(p.y - centre.y));
+    const windings = (cutDirection: 'climb' | 'conventional') => {
+      const loops = roughingLoops(roughingPasses(compile(relief, cutter, 40, { cutDirection })));
+      // The corner pieces left between the two families do not circle the boss.
+      const island = loops.filter(
+        (loop) =>
+          pointInPolygon(centre, loop.points) && loop.points.every((p) => chebyshev(p) < meetMm),
+      );
+      const outer = loops.filter((loop) => !island.includes(loop));
+      return {
+        island: island.map((loop) => Math.sign(signedAreaMm2(loop.points.slice(0, -1)))),
+        outer: outer.map((loop) => Math.sign(signedAreaMm2(loop.points.slice(0, -1)))),
+      };
+    };
+    const climb = windings('climb');
+    const conventional = windings('conventional');
+
+    expect(climb.island.length).toBeGreaterThan(0);
+    expect(climb.outer.length).toBeGreaterThan(0);
+    // Clockwise round the island keeps its stock right of travel, as the
+    // waterline passes circle a boss; the outer rings run anticlockwise.
+    expect(new Set(climb.island)).toEqual(new Set([-1]));
+    expect(new Set(climb.outer)).toEqual(new Set([1]));
+    expect(new Set(conventional.island)).toEqual(new Set([1]));
+    expect(new Set(conventional.outer)).toEqual(new Set([-1]));
+  });
+});
+
+describe('relief roughing fine steps (ADR-422 Amendment 1)', () => {
+  // The pyramid's faces fall DEPTH_MM over half its width: a 0.2 slope. A flat
+  // end mill's tip stands radius x slope above such a face wherever it may go.
+  const slope = DEPTH_MM / (PYRAMID_MM / 2);
+  const cutter = tool('em-3175');
+  const tipRiseMm = (cutter.diameterMm / 2) * slope;
+
+  function leftover(settings: Partial<CncLayerSettings>): { max: number; min: number } {
+    const relief = pyramidRelief();
+    const box = machineBox(relief);
+    const grid = removal(compile(relief, cutter, 40, settings), cutter, box);
+    const middle = PYRAMID_MM / 2;
+    let max = Number.NEGATIVE_INFINITY;
+    let min = Number.POSITIVE_INFINITY;
+    for (let row = 0; row < grid.heightCells; row += 1) {
+      for (let col = 0; col < grid.widthCells; col += 1) {
+        const off = Math.max(
+          Math.abs((col + 0.5) * CELL_MM - middle),
+          Math.abs((row + 0.5) * CELL_MM - middle),
+        );
+        const left = (grid.depth[row * grid.widthCells + col] ?? 0) + slope * off;
+        max = Math.max(max, left);
+        min = Math.min(min, left);
+      }
+    }
+    return { max, min };
+  }
+
+  it('cuts the terraces on a slope down to one fine step', () => {
+    const coarse = leftover({});
+    const fine = leftover({ reliefFineStepMm: 0.3 });
+
+    // Without fine steps a face keeps the whole 1.5 mm slice as a terrace.
+    expect(coarse.max).toBeGreaterThan(1.5);
+    expect(fine.max).toBeLessThanOrEqual(0.3 + tipRiseMm + 0.1);
+    expect(fine.min).toBeGreaterThanOrEqual(-FLAT_SLACK_MM);
+  });
+});
+
+const PYRAMID_MM = 30;
+const PYRAMID_SAMPLES = 60;
+
+// A square pyramid whose apex touches the stock top and whose base corners
+// reach the full depth.
+function pyramidRelief(): ReliefObject {
+  const pitch = PYRAMID_MM / PYRAMID_SAMPLES;
+  const middle = PYRAMID_MM / 2;
+  const samples: number[] = [];
+  for (let j = 0; j < PYRAMID_SAMPLES; j += 1) {
+    for (let i = 0; i < PYRAMID_SAMPLES; i += 1) {
+      const off = Math.max(
+        Math.abs((i + 0.5) * pitch - middle),
+        Math.abs((j + 0.5) * pitch - middle),
+      );
+      samples.push(Math.round(0xffff * (1 - off / middle)));
+    }
+  }
+  return {
+    ...flatRelief(PYRAMID_MM),
+    reliefSource: testReliefHeightfield({
+      width: PYRAMID_SAMPLES,
+      height: PYRAMID_SAMPLES,
+      physicalWidthMm: PYRAMID_MM,
+      physicalHeightMm: PYRAMID_MM,
+      maxDepthMm: DEPTH_MM,
+      samplesU16: samples,
+    }),
+  };
+}
+
+const BOSS_RELIEF_MM = 30;
+const BOSS_HALF_MM = 4;
+
+// A 30 mm flat relief with an 8 mm boss standing to the stock top in its
+// middle: every level's region has an island.
+function bossRelief(): ReliefObject {
+  const size = BOSS_RELIEF_MM;
+  const middle = size / 2;
+  const samples: number[] = [];
+  for (let j = 0; j < size; j += 1) {
+    for (let i = 0; i < size; i += 1) {
+      const off = Math.max(Math.abs(i + 0.5 - middle), Math.abs(j + 0.5 - middle));
+      samples.push(off < BOSS_HALF_MM ? 255 : 0);
+    }
+  }
+  return {
+    ...flatRelief(size),
+    reliefSource: testReliefHeightfield({
+      width: size,
+      height: size,
+      physicalWidthMm: size,
+      physicalHeightMm: size,
+      maxDepthMm: DEPTH_MM,
+      samplesU8: samples,
+    }),
+  };
+}

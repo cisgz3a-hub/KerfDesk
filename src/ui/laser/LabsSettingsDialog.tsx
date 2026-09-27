@@ -20,11 +20,6 @@ const FEATURE_ROWS: ReadonlyArray<{
     label: 'Print and Cut',
     detail: 'Two-point registration on homed, absolute-position machines.',
   },
-  {
-    id: 'cameraAlignmentV2',
-    label: 'Camera alignment v2',
-    detail: 'Experimental camera registration and validation workflow.',
-  },
 ];
 
 export function LabsSettingsDialog(props: { readonly onClose: () => void }): JSX.Element {

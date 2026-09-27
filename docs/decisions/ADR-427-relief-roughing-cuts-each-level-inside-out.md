@@ -140,3 +140,27 @@ maintainer chose B on 2026-09-27.
 - Autodesk Fusion, 3D Offset Roughing reference (constant-Z layers cleared from the middle to
   the edge along offset passes; Climb or Conventional maintained relative to the boundaries):
   https://help.autodesk.com/cloudhelp/ENU/Fusion-CAM/files/GUID63F97CC8-99FE-40B7-AFF1-061E826955B3.htm
+
+
+### Integration with ADR-424 and ADR-450 (2026-09-27)
+
+ADR-424 independently implemented the same inside-out stock-side direction through
+`reliefRoughingMotion`, using explicit outline/island stock-side metadata. Keep that
+planner, its nearest ready piece scheduling, checked links, slice-top ramps and
+ADR-450 flat finishing with bounded depth slices. It supersedes decisions 3 and 5's
+single orientation call and one plunging pass per ring; the geometry and physical
+cut-side intent remain. This integration retains decision 1's deepest cleanup before
+regular rings and decision 2's normalized raw ladder winding. Cleanup's stock-side
+metadata now describes the reversed inside-out traversal too.
+
+The removal regression decomposes linked contour passes into their exact closed loops
+and cutting links. Every link is stamped in sequence into the prior-stock grid, and
+an edge-by-edge assertion proves the decomposition omits no source motion. All seven
+stock-side cases already passed on ADR-424 before changing cleanup order. The added
+cleanup-first test distinguishes the remaining integration change. Existing ramp,
+allowance, link-region and flat-depth tests continue to cover the preserved planner.
+
+Emitter revision is `adaptive-rings-relief-cleanup-first-linked-20260927-v1`, retaining
+adaptive closure and relief flat depth-slice provenance. The earlier limitations
+about missing roughing ramps/direction controls are historical; ADR-424 supplies them.
+Frame policy and hardware qualification are unchanged.

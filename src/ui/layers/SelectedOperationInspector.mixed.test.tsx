@@ -34,14 +34,7 @@ describe('truthful mixed operation editing', () => {
     const before = JSON.stringify(useStore.getState().project);
     const view = await mount();
     try {
-      for (const label of [
-        'Power',
-        'Speed',
-        'Passes',
-        'Hatch angle',
-        'Hatch spacing',
-        'Fill overscan',
-      ]) {
+      for (const label of ['Power', 'Speed', 'Passes', 'Hatch angle', 'Hatch spacing']) {
         const input = field(view.host, label);
         expect(input.value).toBe('');
         expect(input.placeholder).toBe('Mixed');
@@ -91,13 +84,14 @@ describe('truthful mixed operation editing', () => {
     load({ ...FIRST, mode: 'fill' }, { ...SECOND, mode: 'image' });
     const view = await mount();
     try {
-      const select = view.host.querySelector<HTMLSelectElement>('select[aria-label^="Mode for"]')!;
-      expect(select.value).toBe('');
-      expect(select.selectedOptions[0]?.textContent).toBe('Mixed');
-      await act(async () => {
-        select.value = 'fill';
-        select.dispatchEvent(new Event('change', { bubbles: true }));
-      });
+      const group = view.host.querySelector<HTMLElement>(
+        '[role="radiogroup"][aria-label^="Mode for"]',
+      )!;
+      expect(group.querySelectorAll('input:checked')).toHaveLength(0);
+      expect(view.host.textContent).toContain(
+        'Choose one process to use for all selected artwork.',
+      );
+      await act(async () => group.querySelector<HTMLInputElement>('input[value="fill"]')!.click());
       expect(effective().map((s) => s.mode)).toEqual(['fill', 'fill']);
       expect(effective().map((s) => s.speed)).toEqual([601, 1801]);
     } finally {
@@ -184,13 +178,11 @@ describe('truthful mixed operation editing', () => {
     );
     const view = await mount();
     try {
-      for (const label of ['Minimum power', 'Line interval', 'DPI', 'Dot width correction']) {
+      for (const label of ['Minimum power', 'Line interval']) {
         expect(field(view.host, label).placeholder).toBe('Mixed');
       }
-      for (const label of ['Negative image', 'Bidirectional image scan', 'Pass-through image']) {
-        expect(field(view.host, label).indeterminate).toBe(true);
-      }
-      await edit(field(view.host, 'DPI'), '254');
+      expect(field(view.host, 'Bidirectional image scan').indeterminate).toBe(true);
+      await edit(field(view.host, 'Line interval'), '0.1');
       expect(effective().map((s) => s.linesPerMm)).toEqual([10, 10]);
       expect(field(view.host, 'Line interval').value).toBe('0.1');
       expect(effective().map((s) => s.minPower)).toEqual([5, 11]);
@@ -224,7 +216,6 @@ describe('truthful mixed operation editing', () => {
   it.each([
     ['Speed', { speed: 7777 }, '7777'],
     ['Hatch spacing', { hatchSpacingMm: 0.025 }, '0.025'],
-    ['Fill overscan', { fillOverscanMm: 26.75 }, '26.75'],
   ] as const)('retains the main fix for untouched imported %s', async (label, patch, expected) => {
     load({ ...FIRST, ...patch }, { ...FIRST, ...patch });
     const before = JSON.stringify(useStore.getState().project);
@@ -260,13 +251,8 @@ describe('truthful mixed operation editing', () => {
       const view = await mount();
       try {
         await edit(field(view.host, 'Minimum power'), '60');
-        await edit(field(view.host, 'Dot width correction'), '0.15');
         expect(effective().map((s) => s.minPower)).toEqual(reverse ? [17, 60] : [60, 17]);
-        expect(effective().map((s) => s.dotWidthCorrectionMm)).toEqual(
-          reverse ? [0.1, 0.15] : [0.15, 0.1],
-        );
         expect(field(view.host, 'Minimum power').placeholder).toBe('Mixed');
-        expect(field(view.host, 'Dot width correction').placeholder).toBe('Mixed');
       } finally {
         await view.unmount();
       }
@@ -302,7 +288,7 @@ describe('truthful mixed operation editing', () => {
     );
     const view = await mount();
     try {
-      await edit(field(view.host, 'DPI'), '508');
+      await edit(field(view.host, 'Line interval'), '0.05');
       expect(effective().map((s) => s.linesPerMm)).toEqual([20, 20]);
       expect(effective().map((s) => s.dotWidthCorrectionMm)).toEqual([0.05, 0.04]);
     } finally {

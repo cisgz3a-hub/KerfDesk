@@ -24,6 +24,18 @@ export function emittedChordIsSafe(
     if (depthA > 0 && !pointInsideVCarveBoundary(a, segments)) return false;
     if (depthB > 0 && !pointInsideVCarveBoundary(b, segments)) return false;
   }
+  return emittedChordClearanceIsSafe(a, b, depthA, depthB, segments, envelope);
+}
+
+/** Exact chord clearance for endpoints whose boundary membership is already certified. */
+export function emittedChordClearanceIsSafe(
+  a: Vec2,
+  b: Vec2,
+  depthA: number,
+  depthB: number,
+  segments: VCarveBoundarySegmentSource,
+  envelope: VCarveCertifiedEnvelope,
+): boolean {
   const radii = radialEnvelopeSweepRadiiMm(envelope, depthA, depthB);
   const reserve = depthA > 0 || depthB > 0 ? (envelope.boundaryClearanceMm ?? 0) : 0;
   const radiusA = radii[0] + reserve;
@@ -105,14 +117,18 @@ function radiusChordClearsSegment(
 }
 
 function projectionBreaks(u0: number, uSlope: number): ReadonlyArray<number> {
-  const values = [0, 1];
-  if (uSlope !== 0) {
-    for (const boundary of [0, 1]) {
-      const t = (boundary - u0) / uSlope;
-      if (t > 0 && t < 1) values.push(t);
-    }
-  }
-  return [...new Set(values)].sort((a, b) => a - b);
+  if (uSlope === 0) return [0, 1];
+  const atZero = (0 - u0) / uSlope;
+  const atOne = (1 - u0) / uSlope;
+  const first = Math.min(atZero, atOne);
+  const second = Math.max(atZero, atOne);
+  // There are only two possible interior breaks. Preserve the original
+  // unique ascending sequence without a Set and sort for every boundary edge.
+  const values = [0];
+  if (first > 0 && first < 1) values.push(first);
+  if (second > 0 && second < 1 && second !== first) values.push(second);
+  values.push(1);
+  return values;
 }
 
 function nearestVectorCoefficients(

@@ -1,7 +1,6 @@
 // UsbCameraSection — the UVC/getUserMedia half of the Camera panel: device
-// picker, live feed, start/stop, and the lens-calibration wizard launcher.
-// "Calibrate lens…" is enabled for ANY live source (ADR-116), not just USB —
-// the wizard captures through the active source.
+// picker, live feed, start/stop. Calibration has its own row in the panel and
+// captures through whichever source is active (ADR-116, ADR-441).
 
 import type { CameraAdapter } from '../../../platform/types';
 import {
@@ -10,8 +9,6 @@ import {
   useCameraStore,
 } from '../../state/camera-store';
 import { CameraSourceView } from '../CameraSourceView';
-import { CameraCalibrationWizard } from '../wizard/CameraCalibrationWizard';
-import { useCameraWizardStore } from '../wizard/camera-wizard-store';
 import { errStyle, rowStyle } from './panel-styles';
 
 export function UsbCameraSection(props: {
@@ -25,8 +22,6 @@ export function UsbCameraSection(props: {
   const selectCamera = useCameraStore((s) => s.selectCamera);
   const startUsbSource = useCameraStore((s) => s.startUsbSource);
   const stopSource = useCameraStore((s) => s.stopSource);
-  const wizardOpen = useCameraWizardStore((s) => s.open);
-  const openWizard = useCameraWizardStore((s) => s.openWizard);
 
   const usbLive = sourceState.kind === 'live' && sourceState.source.kind === 'usb';
   const usbStarting = sourceState.kind === 'starting' && sourceState.sourceKind === 'usb';
@@ -78,18 +73,8 @@ export function UsbCameraSection(props: {
             {usbStarting ? 'Starting…' : 'Start USB camera'}
           </button>
         )}
-        <button
-          type="button"
-          className="lf-btn"
-          disabled={sourceState.kind !== 'live'}
-          onClick={openWizard}
-          title="Calibrate the camera lens: print a checkerboard, capture poses, and de-fisheye the feed."
-        >
-          Calibrate lens…
-        </button>
       </div>
       <SourceNote sourceState={sourceState} usbAvailability={usbAvailability} />
-      {wizardOpen ? <CameraCalibrationWizard /> : null}
     </>
   );
 }

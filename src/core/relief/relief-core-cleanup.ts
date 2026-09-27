@@ -24,16 +24,10 @@
 // Every added path lies inside the level's tool-centre region: stock the rings
 // leave is at least a cutter radius inside its boundary, which ring 0's sweep
 // covers, so no path leaves the region the dilated heightmap proved safe.
-//
-// The roughing planner cuts these paths before the level's rings, as the
-// pocket planner cuts its leftover cores first (ADR-427). Each piece's paths
-// come from one offset or boolean result and are wound like the rings: outer
-// boundaries positive, holes negative, so islands can be told apart when the
-// compiler orients them for the cut direction.
 
+import { withOuterContoursPositive } from '../geometry/polyline-orientation';
 import { offsetClosedPolylinesWithRoundJoinsChecked } from '../geometry/kerf-offset';
 import { insetContoursChecked, type OffsetLadder } from '../geometry/offset-ladder';
-import { withOuterContoursPositive } from '../geometry/polyline-orientation';
 import {
   differenceClosedPolylinesChecked,
   normalizeClosedPolylineTreeEvenOddChecked,
@@ -41,6 +35,7 @@ import {
 } from '../geometry/polygon-difference';
 import { roundStrokeOutline } from '../geometry/round-stroke-outline';
 import type { Polyline } from '../scene';
+import { evenOddHoles, openLoop } from './relief-roughing-order';
 
 // The pocket planner's bisection budget and tolerance: 24 halvings resolve any
 // bed-sized span far below 0.01 mm, which also sets the thinnest stock that
@@ -53,9 +48,12 @@ const RING_BISECT_TOLERANCE_MM = 0.01;
 const MAX_CLEANUP_ROUNDS = 4096;
 
 export type ReliefCoreCleanup = {
-  // Closed paths that clear what the level's regular rings leave, round by
-  // round; each piece's outer boundaries wind positive and its holes negative.
+  // Closed paths collected outside in, then cut in reverse before the regular
+  // rings (ADR-427). Every engine result has positive outlines, negative holes.
   readonly paths: ReadonlyArray<Polyline>;
+  // Stock side for inside-out motion: outside an outline, inside a hole.
+  // The first path may slot; subsequent paths widen the cleared area.
+  readonly stockInside: ReadonlyArray<boolean>;
   // True when a sweep, subtraction or grouping failed, so the level may still
   // hold stock. Advisory only, like the ladder's own failure (rule 7).
   readonly offsetFailed: boolean;
@@ -63,7 +61,12 @@ export type ReliefCoreCleanup = {
   readonly passLimited: boolean;
 };
 
-const NO_CLEANUP: ReliefCoreCleanup = { paths: [], offsetFailed: false, passLimited: false };
+const NO_CLEANUP: ReliefCoreCleanup = {
+  paths: [],
+  stockInside: [],
+  offsetFailed: false,
+  passLimited: false,
+};
 
 /** Paths that clear what one level's regular rings leave standing. `region` is
  * the level's tool-centre region, `ladder` its rings (ring k inset k * stepMm),
@@ -89,39 +92,68 @@ export function reliefCoreCleanup(
 
 function clearStock(uncut: ReadonlyArray<Polyline>, cutRadiusMm: number): ReliefCoreCleanup {
   const paths: Polyline[] = [];
+  const stockInside: boolean[] = [];
   let area = uncut;
   for (let round = 0; round < MAX_CLEANUP_ROUNDS; round += 1) {
     const stock = thickPieces(area);
     if (stock === null) {
       // Stock the engine cannot sort is traced once as it stands, and reported.
+      const holes = evenOddHoles(area.map((path) => openLoop(path.points)));
       return {
         paths: [...paths, ...withOuterContoursPositive(area)],
+        stockInside: [...stockInside, ...holes],
         offsetFailed: true,
         passLimited: false,
       };
     }
-    if (stock.length === 0) return { paths, offsetFailed: false, passLimited: false };
-    const added = stock.flatMap((piece) => piecePaths(piece, cutRadiusMm));
-    paths.push(...added);
-    const left = uncutArea(stock.flat(), added, cutRadiusMm);
-    if (left === null) return { paths, offsetFailed: true, passLimited: false };
+    if (stock.length === 0) return { paths, stockInside, offsetFailed: false, passLimited: false };
+    const added = stock.map((piece) => piecePaths(piece, cutRadiusMm));
+    for (const piece of added) {
+      paths.push(...piece.paths);
+      stockInside.push(...piece.stockInside);
+    }
+    const left = uncutArea(
+      stock.flat(),
+      added.flatMap((piece) => piece.paths),
+      cutRadiusMm,
+    );
+    if (left === null) return { paths, stockInside, offsetFailed: true, passLimited: false };
     area = left;
   }
   const stock = thickPieces(area);
-  return { paths, offsetFailed: stock === null, passLimited: (stock?.length ?? 0) > 0 };
+  return {
+    paths,
+    stockInside,
+    offsetFailed: stock === null,
+    passLimited: (stock?.length ?? 0) > 0,
+  };
 }
+
+type PiecePaths = {
+  readonly paths: ReadonlyArray<Polyline>;
+  readonly stockInside: ReadonlyArray<boolean>;
+};
 
 // The ring at a piece's deepest inset when its sweep covers the whole piece,
 // as it covers a core or a cusp; otherwise a trace around the piece.
-function piecePaths(piece: ReadonlyArray<Polyline>, cutRadiusMm: number): ReadonlyArray<Polyline> {
+function piecePaths(piece: ReadonlyArray<Polyline>, cutRadiusMm: number): PiecePaths {
   const centre = deepestRing(piece);
   // A piece deeper than one radius has boundary beyond its centre's reach.
   if (centre.ring.length > 0 && centre.insetMm <= cutRadiusMm) {
     const missed = uncutArea(piece, centre.ring, cutRadiusMm);
     const rest = missed === null ? null : thickPieces(missed);
-    if (rest !== null && rest.length === 0) return withOuterContoursPositive(centre.ring);
+    if (rest !== null && rest.length === 0) {
+      return {
+        paths: withOuterContoursPositive(centre.ring),
+        stockInside: evenOddHoles(centre.ring.map((path) => openLoop(path.points))),
+      };
+    }
   }
-  return withOuterContoursPositive(piece);
+  // A piece is its outer contour followed by its holes (solidRegions).
+  return {
+    paths: withOuterContoursPositive(piece),
+    stockInside: piece.map((_, index) => index !== 0),
+  };
 }
 
 // The part of the region no regular ring reaches. Ring 0 is the region's own

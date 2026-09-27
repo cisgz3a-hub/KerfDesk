@@ -31,7 +31,7 @@ export const LASER_TUTORIALS: readonly Tutorial[] = [
       {
         title: 'Inspect the generated route',
         instruction:
-          'Open Advanced cut settings for Kerf Offset or Tabs / Bridges when needed. Then open Preview and check the outline, gaps and repeated passes.',
+          'Open More cut settings for Kerf Offset or Tabs / Bridges when needed. Then open Preview and check the outline, gaps and repeated passes.',
         focus: 'Preview the outline',
         result: 'You can see the planned cut before using the separate Frame and Start workflow.',
         visual: 'preview',
@@ -60,7 +60,7 @@ export const LASER_TUTORIALS: readonly Tutorial[] = [
     category: 'Laser',
     machine: 'laser',
     minutes: 3,
-    location: 'Select artwork → Process: Fill → Advanced cut settings',
+    location: 'Select artwork → Process: Fill → More cut settings',
     prerequisites: 'Laser mode and closed vector artwork with the area you want to engrave.',
     visual: 'laser-fill',
     steps: [
@@ -74,7 +74,7 @@ export const LASER_TUTORIALS: readonly Tutorial[] = [
       {
         title: 'Choose the pattern and spacing',
         instruction:
-          'In Advanced cut settings, compare Scanline, Follow Shape and Island Fill under Style. For Scanline, change Scan angle and Line Interval; smaller intervals place rows closer together.',
+          'In More cut settings, compare Scanline, Follow Shape and Island Fill under Style. For Scanline, change Scan angle and Line Interval; smaller intervals place rows closer together.',
         focus: 'Style · Scan angle · Line Interval',
         result:
           'The selected style determines whether the operation uses parallel rows, follows the shape, or divides the fill into smaller regions.',
@@ -108,7 +108,7 @@ export const LASER_TUTORIALS: readonly Tutorial[] = [
     category: 'Laser',
     machine: 'laser',
     minutes: 4,
-    location: 'Select an image → Process: Image → Advanced cut settings',
+    location: 'Select an image → Process: Image → More cut settings',
     prerequisites: 'Laser mode and an imported bitmap at the intended physical size.',
     visual: 'raster',
     steps: [
@@ -123,7 +123,7 @@ export const LASER_TUTORIALS: readonly Tutorial[] = [
       {
         title: 'Choose dots or varying power',
         instruction:
-          'Open Advanced cut settings and compare Dither choices. Threshold separates light and dark; dithering uses dot patterns; Grayscale uses a power range and exposes Min Power.',
+          'Choose a Dither under Process: Image, or open More cut settings to compare them. Threshold separates light and dark; dithering uses dot patterns; Grayscale uses a power range and exposes Min Power.',
         focus: 'Dither',
         result:
           'The algorithm determines whether shading becomes dot patterns or varying laser power.',

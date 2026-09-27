@@ -183,9 +183,8 @@ describe('reliefRoughingPasses', () => {
   });
 
   it('cuts each level from the inside out, outer boundaries positive and islands negative', () => {
-    // The first level is a band around the pyramid's top: ring 0 is the band's
-    // boundary, ring 1 lies one stepover in, and each has an outer boundary
-    // and an island ring around the top (ADR-427).
+    // The integrated 3D allowance leaves four separate inner corner pieces
+    // on this level, then the outer boundary and its island (ADRs 412/427).
     const result = heightmapOf(pyramidRelief());
     if (result.kind !== 'ok') throw new Error(result.reason);
     const passes = reliefRoughingPasses(result.heightmap, {
@@ -199,11 +198,11 @@ describe('reliefRoughingPasses', () => {
       .map((pass) => signedAreaMm2(pass.polyline));
     const outers = areas.filter((area) => area > 0);
     const islands = areas.filter((area) => area < 0);
-    expect(outers).toHaveLength(2);
-    expect(islands).toHaveLength(2);
-    // Ring 1 first: its outer boundary is the smaller, its island ring the larger.
-    expect(outers[0]).toBeLessThan(outers[1] ?? 0);
-    expect(islands[0]).toBeLessThan(islands[1] ?? 0);
+    expect(outers).toHaveLength(5);
+    expect(islands).toHaveLength(1);
+    // All four inner pieces precede the boundary and its opposite-wound hole.
+    for (const inner of outers.slice(0, -1)) expect(inner).toBeLessThan(outers[4] ?? 0);
+    expect(areas.slice(-2)).toEqual([outers[4], islands[0]]);
   });
 
   it('is deterministic', () => {

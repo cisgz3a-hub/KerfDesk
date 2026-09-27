@@ -25,6 +25,7 @@ import {
   type CncLayerSettings,
   type ReliefObject,
   type Scene,
+  type Vec2,
 } from '../scene';
 import { computeRemovalGrid, kernelForTool, type RemovalGrid } from '../sim';
 import { compileCncJob } from './compile-cnc-job';
@@ -130,8 +131,7 @@ function newStockByRing(job: Job, device: DeviceProfile): ReadonlyArray<RingStoc
   const physicalSign = machineFrameHandedness(device.origin);
   let before: Float32Array | null = null;
   const rings: RingStock[] = [];
-  for (const pass of group.passes) {
-    if (pass.kind !== 'contour') continue;
+  for (const { pass, ring } of cuttingPieces(group)) {
     const alone = computeRemovalGrid(
       buildToolpath({ ...job, groups: [{ ...group, passes: [pass] }] }),
       spec,
@@ -139,11 +139,57 @@ function newStockByRing(job: Job, device: DeviceProfile): ReadonlyArray<RingStoc
     );
     if (alone.kind === 'error') throw new Error(alone.reason);
     before ??= new Float32Array(alone.grid.depth.length);
+    if (!ring) {
+      for (let i = 0; i < before.length; i += 1) {
+        before[i] = Math.min(before[i] ?? 0, alone.grid.depth[i] ?? 0);
+      }
+      continue;
+    }
     const counterClockwise = signedAreaMm2(pass.polyline) * physicalSign > 0;
     const sides = stockSides(alone.grid, before, pass, counterClockwise);
     rings.push({ pass, clockwise: !counterClockwise, ...sides });
   }
   return rings;
+}
+
+// The compiler may join closed loops with cutting links (ADR-424). Split at
+// exact revisits, retaining every link in its original place so its removed
+// stock contributes to the next loop's before-grid. Never treat an entire
+// linked chain as one polygon: opposite island windings cancel its area.
+function cuttingPieces(group: CncGroup): ReadonlyArray<{ pass: CncContourPass; ring: boolean }> {
+  const pieces: { pass: CncContourPass; ring: boolean }[] = [];
+  for (const pass of group.passes) {
+    if (pass.kind !== 'contour') throw new Error('expected non-ramped fixture');
+    let pending = 0;
+    let seen = new Map<string, number>();
+    const append = (points: ReadonlyArray<Vec2>, ring: boolean): void => {
+      if (points.length > 1)
+        pieces.push({ pass: { ...pass, polyline: points, closed: false }, ring });
+    };
+    for (let index = 0; index < pass.polyline.length; index += 1) {
+      const point = pass.polyline[index];
+      if (point === undefined) throw new Error('missing point');
+      const key = `${point.x},${point.y}`;
+      const start = seen.get(key);
+      if (start !== undefined && index - start >= 3) {
+        append(pass.polyline.slice(pending, start + 1), false);
+        append(pass.polyline.slice(start, index + 1), true);
+        pending = index;
+        seen = new Map([[key, index]]);
+      } else seen.set(key, index);
+    }
+    append(pass.polyline.slice(pending), false);
+    const edges = (points: ReadonlyArray<Vec2>): unknown[] =>
+      points.slice(1).map((point, index) => [points[index], point]);
+    const recovered = pieces.filter(({ pass: part }) => part.zMm === pass.zMm);
+    // Each source chain is itself represented exactly; the assertion below
+    // also guards accidental omission of a cutting link by this test oracle.
+    const count = pass.polyline.length - 1;
+    expect(recovered.flatMap(({ pass: part }) => edges(part.polyline)).slice(-count)).toEqual(
+      edges(pass.polyline),
+    );
+  }
+  return pieces;
 }
 
 // A ring's interior lies on its left when it runs counter-clockwise. Cells the
