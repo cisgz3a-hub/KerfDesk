@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { buildProgramTime, type MotionLimits } from '../../core/gcode-time';
 import { buildGcodeRenderModel, type GcodeRenderModel } from '../../core/gcode-view';
-import { playheadAtTime, secondsAtLine } from './playhead';
+import { playheadAtTime, secondsAtLine, stepMoveSeconds, trailStartSegment } from './playhead';
 
 const LIMITS: MotionLimits = {
   accelMmPerSec2: 500,
@@ -169,3 +169,38 @@ function lcg(seed: number): () => number {
     return state / LCG_MODULUS;
   };
 }
+
+// Four moves ending at 1, 3, 3 (a move that takes no time) and 6 seconds.
+const ENDS = new Float32Array([1, 3, 3, 6]);
+
+describe('trailStartSegment', () => {
+  it('keeps every done move without a trail or before it has run its length', () => {
+    expect(trailStartSegment(ENDS, 4, 5, 0)).toBe(0);
+    expect(trailStartSegment(ENDS, 4, 2, 5)).toBe(0);
+    expect(trailStartSegment(ENDS, 0, 5, 1)).toBe(0);
+  });
+
+  it('starts at the move under way the trail length before the playhead', () => {
+    expect(trailStartSegment(ENDS, 4, 5, 3)).toBe(1);
+    expect(trailStartSegment(ENDS, 4, 5.5, 2)).toBe(3);
+    expect(trailStartSegment(ENDS, 4, 6, 5)).toBe(0);
+  });
+});
+
+describe('stepMoveSeconds', () => {
+  it('steps forward to the end of the next move, over moves that take no time', () => {
+    expect(stepMoveSeconds(ENDS, 4, 0, 1)).toBe(1);
+    expect(stepMoveSeconds(ENDS, 4, 1, 1)).toBe(3);
+    expect(stepMoveSeconds(ENDS, 4, 3, 1)).toBe(6);
+    expect(stepMoveSeconds(ENDS, 4, 6, 1)).toBe(6);
+  });
+
+  it('steps back to the end of the previous move, and to the start before the first', () => {
+    expect(stepMoveSeconds(ENDS, 4, 6, -1)).toBe(3);
+    expect(stepMoveSeconds(ENDS, 4, 4.5, -1)).toBe(3);
+    expect(stepMoveSeconds(ENDS, 4, 3, -1)).toBe(1);
+    expect(stepMoveSeconds(ENDS, 4, 1, -1)).toBe(0);
+    expect(stepMoveSeconds(ENDS, 4, 0.5, -1)).toBe(0);
+    expect(stepMoveSeconds(ENDS, 0, 2, -1)).toBe(0);
+  });
+});

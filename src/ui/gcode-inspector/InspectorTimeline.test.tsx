@@ -135,4 +135,27 @@ describe('InspectorTimeline', () => {
     expect(host?.textContent).not.toContain('Live reported progress');
     expect(host?.querySelector('input, select, button')).toBeNull();
   });
+
+  it('offers a playback trail and reports the chosen length', () => {
+    const onChange = vi.fn();
+    mount(
+      <InspectorTimeline
+        playback={playbackState()}
+        totalRouteMm={10}
+        trail={{ seconds: 0, onChange }}
+      />,
+    );
+    const select = host?.querySelector<HTMLSelectElement>('select[aria-label="Playback trail"]');
+    expect([...(select?.options ?? [])].map((option) => option.text)).toEqual([
+      'Whole path',
+      'Last 60 s',
+      'Last 20 s',
+      'Last 5 s',
+    ]);
+    act(() => {
+      if (select) select.value = '20';
+      select?.dispatchEvent(new Event('change', { bubbles: true }));
+    });
+    expect(onChange).toHaveBeenCalledWith(20);
+  });
 });

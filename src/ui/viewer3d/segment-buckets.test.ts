@@ -41,6 +41,22 @@ describe('buildSegmentBuckets', () => {
   });
 });
 
+describe('buildSegmentBuckets with a move filter (ADR-470)', () => {
+  it('leaves filtered moves out and keeps the rest mapped to their segments', () => {
+    const segments = {
+      segmentCount: 4,
+      positions: new Float32Array(24).map((_, index) => index),
+      segKind: new Uint8Array([SEG_KIND.travel, SEG_KIND.cut, SEG_KIND.travel, SEG_KIND.cut]),
+      visible: new Uint8Array([1, 0, 0, 1]),
+    };
+    const buckets = buildSegmentBuckets(segments, THEME);
+    expect([...buckets.travel.sourceIndex]).toEqual([0]);
+    expect([...buckets.solid.sourceIndex]).toEqual([3]);
+    expect([...buckets.solid.positions]).toEqual([18, 19, 20, 21, 22, 23]);
+    expect(buckets.solid.colors).toHaveLength(6);
+  });
+});
+
 describe('revealCount', () => {
   it('counts bucket entries at or before the playhead segment', () => {
     // Bucket holds render-model segments 0, 2, 5.

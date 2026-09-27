@@ -7,6 +7,7 @@
 // (ADR-424).
 
 import type { CncCutType, CncLayerSettings, Layer } from '../../core/scene';
+import { cutTypeShowsRampEntry } from '../../core/cnc/relief-ramp-field';
 import { DEFAULT_RELIEF_ALLOWANCE_MM } from '../../core/relief';
 import { NumberField, Row, selectStyle } from './CncLayerPrimitives';
 
@@ -17,12 +18,6 @@ const MAX_FINE_STEP_MM = 10;
 /** Cut types whose Cut direction row sits with the entry fields. */
 export function cutTypeShowsCutDirection(cutType: CncCutType): boolean {
   return cutType === 'profile-outside' || cutType === 'profile-inside' || cutType === 'pocket';
-}
-
-/** Cut types whose Ramp entry row (in Entry & travel) edits the ramp angle
- * relief roughing reads; a V-carve layer's row sets its own V-bit angle. */
-export function cutTypeShowsRampEntry(cutType: CncCutType): boolean {
-  return cutType.startsWith('profile') || cutType === 'pocket' || cutType === 'engrave';
 }
 
 type ReliefRowsProps = {

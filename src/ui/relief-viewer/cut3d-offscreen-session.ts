@@ -1,4 +1,4 @@
-import type { ReliefSurfaceMeshWithNormals } from '../../core/relief/relief-surface-mesh';
+import type { Cut3DSurfaceMesh } from '../cnc-viewer3d/viewer3d-work-axes';
 import type { ViewerDialogSceneResult } from './use-viewer-dialog-scene';
 import { Cut3DOffscreenBackpressure } from './cut3d-offscreen-backpressure';
 import { createCut3DOffscreenInput, measureViewport } from './cut3d-offscreen-input';
@@ -35,7 +35,7 @@ const CLONE_ERROR_REASON = 'The background 3D renderer returned an unreadable re
 export class Cut3DOffscreenSession {
   readonly canvas: HTMLCanvasElement;
   readonly sessionId: number;
-  private mesh: ReliefSurfaceMeshWithNormals;
+  private mesh: Cut3DSurfaceMesh;
   private stockThicknessMm: number;
   private surfaceId = 0;
 
@@ -52,7 +52,7 @@ export class Cut3DOffscreenSession {
 
   constructor(input: {
     readonly canvas: HTMLCanvasElement;
-    readonly mesh: ReliefSurfaceMeshWithNormals;
+    readonly mesh: Cut3DSurfaceMesh;
     readonly stockThicknessMm: number;
     readonly sessionId: number;
     readonly worker: Cut3DWorkerPort;
@@ -90,7 +90,7 @@ export class Cut3DOffscreenSession {
     );
   }
 
-  showSurface(mesh: ReliefSurfaceMeshWithNormals, stockThicknessMm: number): void {
+  showSurface(mesh: Cut3DSurfaceMesh, stockThicknessMm: number): void {
     if (mesh === this.mesh && stockThicknessMm === this.stockThicknessMm) return;
     const isNewMesh = mesh !== this.mesh;
     this.mesh = mesh;
@@ -257,7 +257,7 @@ export class Cut3DOffscreenSession {
   }
 }
 
-function meshBuffers(mesh: ReliefSurfaceMeshWithNormals): Transferable[] {
+function meshBuffers(mesh: Cut3DSurfaceMesh): Transferable[] {
   return [mesh.positions.buffer, mesh.indices.buffer, mesh.normals.buffer];
 }
 

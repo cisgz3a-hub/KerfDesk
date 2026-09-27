@@ -68,6 +68,48 @@ function playheadFromCumulative(
   };
 }
 
+/**
+ * The first move a playback trail of `windowSeconds` keeps: the one under way
+ * that many seconds before `seconds`, or the first move until the trail has
+ * run its length (ADR-470).
+ */
+export function trailStartSegment(
+  segTimeEndSec: Float32Array,
+  segmentCount: number,
+  seconds: number,
+  windowSeconds: number,
+): number {
+  const from = seconds - windowSeconds;
+  if (windowSeconds <= 0 || segmentCount === 0 || from <= 0) return 0;
+  return indexInCumulative(segTimeEndSec, segmentCount, from);
+}
+
+// Moves ending within this of the playhead count as where it already is.
+const MOVE_STEP_EPSILON_SEC = 1e-4;
+
+/**
+ * Where stepping one move from `seconds` lands: the end of the next move
+ * forward, or of the previous one back (0 before the first). Moves that take
+ * no time are stepped over (ADR-470).
+ */
+export function stepMoveSeconds(
+  segTimeEndSec: Float32Array,
+  segmentCount: number,
+  seconds: number,
+  direction: 1 | -1,
+): number {
+  if (segmentCount === 0) return 0;
+  if (direction > 0) {
+    const next = indexInCumulative(segTimeEndSec, segmentCount, seconds + MOVE_STEP_EPSILON_SEC);
+    return segTimeEndSec[next] ?? 0;
+  }
+  const index = indexInCumulative(segTimeEndSec, segmentCount, seconds - MOVE_STEP_EPSILON_SEC);
+  const end = segTimeEndSec[index] ?? 0;
+  // Every move ends before the playhead: the last one's end is the step.
+  if (end < seconds - MOVE_STEP_EPSILON_SEC) return end;
+  return index === 0 ? 0 : (segTimeEndSec[index - 1] ?? 0);
+}
+
 function indexInCumulative(cumulative: Float32Array, count: number, value: number): number {
   let low = 0;
   let high = count - 1;
