@@ -99,7 +99,7 @@ async function importRowsImage(page: Page, kerfdesk: KerfDeskFixture): Promise<v
   await runMenuCommand(page, 'Edit', 'Delete');
   await kerfdesk.setOpenFiles([{ name: 'rows.png', kind: 'png-fixture', width: 120, height: 120 }]);
   await (await toolbarCommand(page, 'Import...')).click();
-  await expect(page.getByRole('spinbutton', { name: 'Selection width' })).toHaveValue('12');
+  await expect(page.getByLabel('Selection width', { exact: true })).toHaveValue('12');
 }
 
 /** A second window on the same origin, with its own fake serial port and pickers. */
@@ -239,7 +239,7 @@ test('a keystroke meant for a field does not answer the automatic completion off
   await connectAndHome(page, kerfdesk);
   const baselineLines = await startHeld(page, kerfdesk);
   // The operator has a field focused, about to type, while the last lines run.
-  const field = page.getByRole('spinbutton', { name: 'Selection X position' });
+  const field = page.getByLabel('Selection X position', { exact: true });
   await field.click();
   await field.press('End');
   await drainHeldSerialWrites(page, kerfdesk, baselineLines, 400);
@@ -264,7 +264,7 @@ test('editing the design while a job runs still offers darkening when it complet
   await connectAndHome(page, kerfdesk);
   const baselineLines = await startHeld(page, kerfdesk);
   // The operator nudges the artwork for the next piece while this one burns.
-  const field = page.getByRole('spinbutton', { name: 'Selection X position' });
+  const field = page.getByLabel('Selection X position', { exact: true });
   await field.fill('47');
   await field.press('Tab');
   await expect(field).toHaveValue('47');
