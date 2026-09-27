@@ -93,26 +93,44 @@ function cellTexts(): ReadonlyArray<string | null> {
   return [...host.querySelectorAll('td')].map((cell) => cell.textContent);
 }
 
-// A 20 mm relief with a flat floor 3 mm down.
-function flatRelief(color: string): ReliefObject {
+// A 20 mm relief with a flat floor `depthMm` down, moved `xMm` along X.
+function flatRelief(id: string, depthMm: number, xMm: number): ReliefObject {
   return {
     kind: 'relief',
-    id: 'floor',
-    source: 'floor.png',
+    id,
+    source: `${id}.png`,
     reliefSource: testReliefHeightfield({
       width: 1,
       height: 1,
       physicalWidthMm: 20,
       physicalHeightMm: 20,
-      maxDepthMm: 3,
+      maxDepthMm: depthMm,
       samplesU8: [0],
     }),
     targetWidthMm: 20,
-    reliefDepthMm: 3,
-    color,
+    reliefDepthMm: depthMm,
+    color: '#a0522d',
     bounds: { minX: 0, minY: 0, maxX: 20, maxY: 20 },
-    transform: IDENTITY_TRANSFORM,
+    transform: { ...IDENTITY_TRANSFORM, x: xMm },
   };
+}
+
+// Compile the reliefs on one default operation, then review that exact job.
+async function renderCompiledReliefs(reliefs: ReadonlyArray<ReliefObject>): Promise<void> {
+  const layer: Layer = {
+    ...createLayer({ id: 'relief', color: '#a0522d' }),
+    cnc: DEFAULT_CNC_LAYER_SETTINGS,
+  };
+  seedLayers([layer], 'cnc');
+  useStore.setState((state) => ({
+    project: { ...state.project, scene: { ...state.project.scene, objects: [...reliefs] } },
+  }));
+  const job = compileCncJob(
+    { objects: [...reliefs], layers: [layer] },
+    DEFAULT_DEVICE_PROFILE,
+    DEFAULT_CNC_MACHINE_CONFIG,
+  );
+  await render('cnc', buildEffectiveOperationReview(job));
 }
 
 function ring(zMm: number): CncGroup['passes'][number] {
@@ -345,26 +363,21 @@ describe('JobReviewLayersTable', () => {
   // ADR-224 Amendment 3, end to end: the relief compiler's own output, read
   // back from the exact job the review shows.
   it('names the relief levels a relief-only operation cuts instead of its pass count and tabs', async () => {
-    const layer: Layer = {
-      ...createLayer({ id: 'relief', color: '#a0522d' }),
-      cnc: DEFAULT_CNC_LAYER_SETTINGS,
-    };
-    const relief = flatRelief(layer.color);
-    seedLayers([layer], 'cnc');
-    useStore.setState((state) => ({
-      project: { ...state.project, scene: { ...state.project.scene, objects: [relief] } },
-    }));
-    const job = compileCncJob(
-      { objects: [relief], layers: [layer] },
-      DEFAULT_DEVICE_PROFILE,
-      DEFAULT_CNC_MACHINE_CONFIG,
-    );
-    await render('cnc', buildEffectiveOperationReview(job));
+    await renderCompiledReliefs([flatRelief('floor', 3, 0)]);
 
     // 1.5 mm per pass to the 3 mm floor, less the 0.5 mm roughing allowance.
     // The operation's 1 mm Cut depth and its tabs reach no relief.
     expect(cellTexts()).toContain(
       'relief roughing 2 levels to 2.5 mm · stepover 40% · Manual feeds',
+    );
+  });
+
+  it('counts the depths across reliefs that share an operation', async () => {
+    await renderCompiledReliefs([flatRelief('floor', 3, 0), flatRelief('deep', 5, 30)]);
+
+    // 1.5 and 2.5 mm for the first relief; 1.5, 3 and 4.5 mm for the second.
+    expect(cellTexts()).toContain(
+      'relief roughing at 4 depths to 4.5 mm across 2 reliefs · stepover 40% · Manual feeds',
     );
   });
 
