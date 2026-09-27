@@ -120,5 +120,5 @@ Detailed measurements and profiles are retained locally under
 ## Verification boundary
 
 These are local software measurements and output-equivalence checks. The user's exact
-design, the hosted deployment and physical machine operation have not been measured by this
-change. No merge, publication or hardware operation is part of this work.
+design and physical machine operation have not been measured. These measurements do not
+establish hosted deployment; publication requires separate CI and served-build evidence.

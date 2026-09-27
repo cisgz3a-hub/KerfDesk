@@ -1,7 +1,7 @@
 ## ADR-444 - Reuse exact geometry work during V-carve compilation (2026-09-27)
 
 **Date:** 2026-09-27
-**Status:** Implemented locally; software verification recorded below. Not a deployment or hardware qualification.
+**Status:** Implemented; software verification recorded below. Deployment and hardware qualification require separate evidence.
 
 ## Context
 
