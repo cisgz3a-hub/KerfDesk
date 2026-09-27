@@ -5,6 +5,7 @@ import {
   traceImagesToVectorFiles,
   type BatchTraceFile,
   type BatchTraceImageJob,
+  type BatchTraceJob,
   type RawImageData,
   type TraceOptions,
 } from '../../core/trace';
@@ -98,27 +99,37 @@ export async function buildMultiFileTraceExports(
     targetPxPerMm: deps.targetPxPerMm ?? traceTargetPxPerMm(undefined, undefined),
     deviceMemoryGb: deps.deviceMemoryGb ?? browserDeviceMemoryGb(),
   };
-  const jobs: BatchTraceImageJob[] = [];
   const densitySources: RasterImportGeometry['densitySource'][] = [];
+  const notices: ReadonlyArray<TraceNotice>[] = [];
+  const turn = { index: 0 };
   // Rule 7 / ADR-228: this batch used to SILENTLY skip any file over 25 MB
   // (no toast channel here to say so). A size cap is a policy judgement, so
-  // every selected file is now traced regardless of size.
-  for (const file of files) {
-    const { job, densitySource } = await multiFileTraceJob(file, context);
-    jobs.push(job);
-    densitySources.push(densitySource);
-  }
-  const notices: ReadonlyArray<TraceNotice>[] = [];
+  // every selected file is now traced regardless of size. Each file is read
+  // on its turn, so one unreadable file is that file's skip, not the batch's.
+  const jobs: BatchTraceJob[] = files.map((file, index) => ({
+    sourceName: file.name,
+    prepare: async () => {
+      turn.index = index;
+      const { job, densitySource } = await multiFileTraceJob(file, context);
+      densitySources[index] = densitySource;
+      return job;
+    },
+  }));
   const previewResolution = new Set<number>();
+  // Cancellation and a superseded request stop the batch; any other failure
+  // is spent on the file's own fallback, then on the file itself.
+  const recoverable = (error: unknown): boolean =>
+    !isTraceAbort(error) && !isTraceRequestSuperseded(error);
   const result = await traceImagesToVectorFiles(
     jobs,
     {
-      trace: deps.trace ?? traceWithWorkerFallback(notices),
+      trace: deps.trace ?? traceWithWorkerFallback(notices, turn),
       writeDxf: tracedLayersToDxf,
       // As at a dialog commit, the finer grid is an improvement, not a
       // requirement: a file whose finer decode or trace fails is traced on the
       // preview grid instead of aborting the batch. Cancellation still aborts.
-      canFallBack: (error) => !isTraceAbort(error) && !isTraceRequestSuperseded(error),
+      canFallBack: recoverable,
+      canSkip: recoverable,
       onFallback: (index) => previewResolution.add(index),
       writeDrawing: writeTracedDrawing,
     },
@@ -227,7 +238,8 @@ export async function runMultiFileTrace(
     const write = deps.write ?? missingTraceExportWriter;
     const { written, defaultDensity, notices } = await writeTraceExports(batch.files, write);
     if (written === 0) {
-      if (skippedText !== '') pushToast(skippedText, 'warning');
+      if (skippedText !== '')
+        pushToast(skippedText, onlyFailures(batch.skipped) ? 'error' : 'warning');
       return;
     }
     const format = batchTraceFormatLabel(batch.files[0]?.format ?? 'svg');
@@ -248,12 +260,41 @@ function joinToastParts(parts: ReadonlyArray<string | null>): string {
 }
 
 function skippedMessage(skipped: ReadonlyArray<BatchTraceSkip>): string {
-  if (skipped.length === 0) return '';
-  const names = skipped.map((skip) => skip.sourceName).join(', ');
-  return (
-    `Skipped ${skipped.length} ${skipped.length === 1 ? 'image' : 'images'} with no visible paths` +
-    ` (${names}); try Trace Image with an adjusted threshold or import as Image instead.`
-  );
+  const blank = skipped.filter((skip) => skip.reason === 'no-visible-paths');
+  const parts = [
+    blank.length === 0
+      ? ''
+      : `Skipped ${imageCount(blank.length)} with no visible paths` +
+        ` (${blank.map((skip) => skip.sourceName).join(', ')}); try Trace Image with an adjusted threshold or import as Image instead.`,
+    failedMessage('Could not read', skipped, 'decode-failed'),
+    failedMessage('Could not trace', skipped, 'trace-failed'),
+  ];
+  return joinToastParts(parts);
+}
+
+// One unreadable or untraceable file is skipped with its own reason, so the
+// rest of the batch is still written (rank 19).
+function failedMessage(
+  verb: string,
+  skipped: ReadonlyArray<BatchTraceSkip>,
+  reason: BatchTraceSkip['reason'],
+): string {
+  const failed = skipped.filter((skip) => skip.reason === reason);
+  if (failed.length === 0) return '';
+  const detail = failed
+    .map((skip) =>
+      skip.message === undefined ? skip.sourceName : `${skip.sourceName}: ${skip.message}`,
+    )
+    .join('; ');
+  return `${verb} ${imageCount(failed.length)} (${detail}); ${failed.length === 1 ? 'it was' : 'they were'} skipped.`;
+}
+
+function onlyFailures(skipped: ReadonlyArray<BatchTraceSkip>): boolean {
+  return skipped.length > 0 && skipped.every((skip) => skip.reason !== 'no-visible-paths');
+}
+
+function imageCount(count: number): string {
+  return `${count} ${count === 1 ? 'image' : 'images'}`;
 }
 
 async function writeTraceExports(
@@ -305,12 +346,14 @@ function missingTraceExportWriter(): never {
 
 function traceWithWorkerFallback(
   notices: ReadonlyArray<TraceNotice>[],
+  turn: { readonly index: number },
 ): NonNullable<MultiFileTraceDeps['trace']> {
   // The batch core traces in source order. Keep each result's notices beside
-  // its job so cancelled saves cannot attach a warning to a different file.
+  // its job's index so a cancelled save or a skipped file cannot attach a
+  // warning to a different file.
   return async (image, options) => {
     const result = await traceImageWithFallback(image, options);
-    notices.push(result.notices ?? []);
+    notices[turn.index] = result.notices ?? [];
     return result.paths;
   };
 }
