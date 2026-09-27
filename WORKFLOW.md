@@ -7300,8 +7300,11 @@ recorded below, and only step 4 remains deliberately open:
 4. [ ] Only when a future signed stable release is deliberately authorized, create
    the protected `desktop-production` environment, add the exact reviewed commit as the repository
    Actions variable `STABLE_APPROVED_RELEASE_SHA`, and add
-   `STABLE_WINDOWS_CSC_LINK`, `STABLE_WINDOWS_CSC_KEY_PASSWORD`,
-   `STABLE_R2_API_TOKEN`, and `STABLE_CLOUDFLARE_ACCOUNT_ID` there.
+   `STABLE_ESIGNER_USERNAME`, `STABLE_ESIGNER_PASSWORD`,
+   `STABLE_ESIGNER_TOTP_SECRET`, `STABLE_R2_API_TOKEN`, and
+   `STABLE_CLOUDFLARE_ACCOUNT_ID` there. The three eSigner values come from an
+   SSL.com code-signing certificate enrolled in eSigner (the TOTP secret is shown
+   at enrollment); no `.pfx` exists (ADR-142 Amendment 1).
 5. [x] Use the checked-in local tag-policy/workflow tests—not a remote malformed or
    Preview tag—to prove rejection precedes the protected-environment job.
 
