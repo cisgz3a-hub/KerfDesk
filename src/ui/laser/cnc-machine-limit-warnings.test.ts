@@ -208,3 +208,55 @@ describe('detectCncMachineLimitWarnings (ADR-111)', () => {
     expect(warnings[1]).toContain('above the machine');
   });
 });
+
+// ADR-457 Amd 1: stage recipes emit their own feed, plunge and RPM, so they
+// reach the same advisories. Advisories only; nothing here refuses a job.
+describe('detectCncMachineLimitWarnings with stage recipes', () => {
+  function withWallRecipe(
+    toolId: string,
+    values: { feedMmPerMin: number; plungeMmPerMin: number; spindleRpm: number },
+  ): Project {
+    const project = cncProject({});
+    const layer = project.scene.layers[0]!;
+    return {
+      ...project,
+      scene: {
+        ...project.scene,
+        layers: [
+          {
+            ...layer,
+            cnc: {
+              ...DEFAULT_CNC_LAYER_SETTINGS,
+              stageRecipes: { 'profile-finish': { toolId, depthPerPassMm: 1, ...values } },
+            },
+          },
+        ],
+      },
+    };
+  }
+  const libraryToolId = DEFAULT_CNC_MACHINE_CONFIG.tools[0]!.id;
+  const hot = { feedMmPerMin: 4000, plungeMmPerMin: 1500, spindleRpm: 30_000 };
+
+  it('names a recipe whose feed, plunge or RPM exceeds $110/$112/$30', () => {
+    const limits: ControllerSettingsSnapshot = { maxFeed: 2000, zMaxFeed: 500, maxPowerS: 24_000 };
+    const warnings = detectCncMachineLimitWarnings(withWallRecipe(libraryToolId, hot), limits);
+    expect(warnings.some((w) => w.includes("Wall finishing recipe's feed 4000"))).toBe(true);
+    expect(warnings.some((w) => w.includes("Wall finishing recipe's plunge 1500"))).toBe(true);
+    expect(warnings.some((w) => w.includes('Wall finishing recipe requests spindle 30000'))).toBe(
+      true,
+    );
+  });
+
+  it('compares recipe RPM with the configured spindle ceiling offline', () => {
+    const warnings = detectCncMachineLimitWarnings(withWallRecipe(libraryToolId, hot), null);
+    expect(warnings).toHaveLength(1);
+    expect(warnings[0]).toContain('Wall finishing recipe requests spindle 30000');
+  });
+
+  it('ignores a recipe bound to a cutter that is not in the tool library', () => {
+    const limits: ControllerSettingsSnapshot = { maxFeed: 2000, zMaxFeed: 500, maxPowerS: 24_000 };
+    expect(detectCncMachineLimitWarnings(withWallRecipe('no-such-cutter', hot), limits)).toEqual(
+      [],
+    );
+  });
+});
