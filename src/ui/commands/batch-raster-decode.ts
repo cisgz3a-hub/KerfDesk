@@ -7,6 +7,7 @@ import { resampleBuffer } from '../../core/image-resample';
 import type { RawImageData } from '../../core/trace';
 import { decodePnm, isPnmFileName } from '../../io/pnm/decode-pnm';
 import { decodeTiffPage } from '../../io/tiff/tiff-page';
+import { tiffPageCount } from '../../io/tiff/tiff-structure';
 import { PREVIEW_MAX_EDGE_PX, scaleToCap } from '../trace/trace-decode-cap';
 
 export type DecodedBatchRaster = {
@@ -15,6 +16,8 @@ export type DecodedBatchRaster = {
   readonly rgba: Uint8ClampedArray<ArrayBuffer>;
   /** The file's own physical size (TIFF resolution tags); null, default DPI. */
   readonly sizeMm: { readonly widthMm: number; readonly heightMm: number } | null;
+  /** A multi-page TIFF's page count; only page 1 is traced. */
+  readonly pageCount?: number;
 };
 
 export const BATCH_TIFF_EXTENSIONS = ['.tif', '.tiff'] as const;
@@ -31,7 +34,9 @@ export async function decodeBatchRasterFile(file: File): Promise<DecodedBatchRas
   const bytes = new Uint8Array(await file.arrayBuffer());
   if (!tiff) return { ...decodePnm(bytes), sizeMm: null };
   const page = decodeTiffPage(bytes, 1);
+  const pageCount = tiffPageCount(bytes);
   return {
+    ...(pageCount > 1 ? { pageCount } : {}),
     width: page.width,
     height: page.height,
     rgba: page.rgba,

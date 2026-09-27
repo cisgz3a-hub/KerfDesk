@@ -80,6 +80,27 @@ describe('paper pages and per-side margins (rank 33)', () => {
     expect(svg).toContain('d="M-2-1h10v10h-10z"');
   });
 
+  it('flags artwork that runs past the paper edge, and only that artwork', async () => {
+    const flag = async (paperMm: { width: number; height: number }) => {
+      const { files } = await traceImagesToVectorFiles(
+        [
+          {
+            sourceName: 'a.png',
+            image: rawImage(100, 100),
+            physicalSizeMm: { widthMm: 100, heightMm: 100 },
+          },
+        ],
+        { trace: async () => [SQUARE] },
+        { page: { fit: 'paper', paperMm } },
+      );
+      return files[0]?.runsPastPage;
+    };
+    expect(await flag({ width: 6, height: 8 })).toBe(true);
+    // Exactly the artwork's 10 mm square still fits.
+    expect(await flag({ width: 10, height: 10 })).toBeUndefined();
+    expect(await flag(TRACED_PAPER_SIZES_MM.a4)).toBeUndefined();
+  });
+
   it.each([
     ['a zero side', { width: 0, height: 297 }],
     ['a side over the limit', { width: 210, height: 10001 }],

@@ -15,10 +15,21 @@ export type WriteTally = {
   defaultDensity: number;
   readonly notices: Set<TraceNotice>;
   format: MultiFileTraceExport['format'] | null;
+  /** Written files whose artwork runs past the chosen paper's edge. */
+  readonly pastPage: string[];
+  /** Written multi-page TIFFs, of which only page 1 was traced. */
+  readonly firstPageOnly: string[];
 };
 
 export function emptyWriteTally(): WriteTally {
-  return { written: 0, defaultDensity: 0, notices: new Set(), format: null };
+  return {
+    written: 0,
+    defaultDensity: 0,
+    notices: new Set(),
+    format: null,
+    pastPage: [],
+    firstPageOnly: [],
+  };
 }
 
 export function writtenSoFar(written: number, total: number): string {
@@ -42,8 +53,14 @@ export function reportTraceBatch(
   const summary = `Traced ${count} ${count === 1 ? 'image' : 'images'} to ${format}${using}.`;
   const density = defaultDensityNotice(tally.defaultDensity, count);
   pushToast(
-    joinToastParts([summary, density, skippedText, ...[...tally.notices].map(traceNoticeMessage)]),
-    skippedText === '' ? 'success' : 'warning',
+    joinToastParts([
+      summary,
+      density,
+      skippedText,
+      pageNotice(tally),
+      ...[...tally.notices].map(traceNoticeMessage),
+    ]),
+    skippedText === '' && tally.pastPage.length === 0 ? 'success' : 'warning',
   );
 }
 
@@ -79,6 +96,20 @@ function failedMessage(
     )
     .join('; ');
   return `${verb} ${imageCount(failed.length)} (${detail}); ${failed.length === 1 ? 'it was' : 'they were'} skipped.`;
+}
+
+// Paper pages never shrink to the artwork, and a TIFF batch traces page 1:
+// both are said, naming the files, so nothing is lost silently.
+function pageNotice(tally: WriteTally): string {
+  const past =
+    tally.pastPage.length === 0
+      ? ''
+      : `The artwork runs past the page edge in ${tally.pastPage.join(', ')}; viewers crop it there. Choose a larger page or a smaller size.`;
+  const pages =
+    tally.firstPageOnly.length === 0
+      ? ''
+      : `Only page 1 was traced of ${tally.firstPageOnly.join(', ')}.`;
+  return joinToastParts([past, pages]);
 }
 
 function onlyFailures(skipped: ReadonlyArray<BatchTraceSkip>): boolean {

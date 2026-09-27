@@ -91,7 +91,12 @@ export type TracedPageBox = {
 export type PlacedTrace = {
   readonly layers: ReadonlyArray<TracedLayer>;
   readonly page: TracedSvgPage;
+  /** Artwork larger than the paper runs past its edge, where viewers crop. */
+  readonly runsPastPage?: true;
 };
+
+// Grid rounding can move artwork that exactly fills the paper by a hair.
+const PAPER_EDGE_TOLERANCE_MM = 1e-6;
 
 /** Largest accepted margin, in mm (one metre each side). */
 export const MAX_TRACED_PAGE_MARGIN_MM = 1000;
@@ -149,7 +154,9 @@ function clampMargin(value: number): number {
 // The artwork's centre moves to the centre of the area inside the margins,
 // by a whole number of export grid steps, so coordinates differ from the
 // image-page file by an exact offset. Artwork larger than that area stays
-// centred and runs past it; the page never shrinks to the artwork.
+// centred and runs past it; the page never shrinks to the artwork, and the
+// result says when the artwork crosses the paper edge so the caller can
+// tell the user that part of it will be cropped.
 function placeOnPaper(
   layers: ReadonlyArray<TracedLayer>,
   page: TracedSvgPage,
@@ -169,9 +176,11 @@ function placeOnPaper(
   const centreY = margins.top + (paper.height - margins.top - margins.bottom) / 2;
   const dx = extent === null ? 0 : onGrid(centreX - (extent.minX + extent.maxX) / 2);
   const dy = extent === null ? 0 : onGrid(centreY - (extent.minY + extent.maxY) / 2);
+  const past = extent !== null && runsPastPaper(extent, dx, dy, paper);
   return {
     layers: dx === 0 && dy === 0 ? layers : translated(layers, dx, dy),
     page: { ...page, size: { width: paper.width, height: paper.height } },
+    ...(past ? { runsPastPage: true as const } : {}),
   };
 }
 
@@ -238,6 +247,21 @@ function atLeastMinimumSide(
 // Grid values are at most 4 decimals, so 12 places strip binary noise from the difference.
 function span(min: number, max: number): number {
   return Number((max - min).toFixed(12));
+}
+
+function runsPastPaper(
+  extent: TracedPageBox,
+  dx: number,
+  dy: number,
+  paper: { readonly width: number; readonly height: number },
+): boolean {
+  const slack = PAPER_EDGE_TOLERANCE_MM;
+  return (
+    extent.minX + dx < -slack ||
+    extent.minY + dy < -slack ||
+    extent.maxX + dx > paper.width + slack ||
+    extent.maxY + dy > paper.height + slack
+  );
 }
 
 function curveExtent(layers: ReadonlyArray<TracedLayer>): TracedPageBox | null {

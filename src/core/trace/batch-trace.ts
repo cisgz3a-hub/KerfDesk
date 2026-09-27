@@ -53,6 +53,8 @@ export type BatchTraceFile = {
   readonly pathCount: number;
   /** Position of the source job in the batch. */
   readonly sourceIndex: number;
+  /** The artwork runs past the chosen paper's edge (paper pages only). */
+  readonly runsPastPage?: true;
 };
 
 // Why a file wrote nothing: its trace had no visible geometry, or it could
@@ -176,7 +178,7 @@ export async function traceImagesToVectorFiles(
       skipped.push({ sourceName: job.sourceName, reason: 'no-visible-paths' });
       continue;
     }
-    const { layers, page } = placeTracedLayers(
+    const { layers, page, runsPastPage } = placeTracedLayers(
       traced,
       imagePage,
       options.traceMode,
@@ -190,6 +192,7 @@ export async function traceImagesToVectorFiles(
       text: tracedFileText(format, layers, page, options.traceMode, deps, output),
       pathCount: layers.length,
       sourceIndex,
+      ...(runsPastPage === true ? { runsPastPage } : {}),
     };
     if (deps.onFile === undefined) files.push(file);
     else await deps.onFile(file);

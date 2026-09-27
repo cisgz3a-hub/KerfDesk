@@ -57,6 +57,9 @@ export type MultiFileTraceExport = BatchTraceFile & {
   // Whether the file's mm size came from the file's embedded density or the
   // default bitmap DPI, so the batch toast can say which files fell back.
   readonly densitySource?: MultiFileDensitySource;
+  readonly sourceName?: string;
+  /** A multi-page TIFF's page count: only page 1 was traced. */
+  readonly pageCount?: number;
 };
 export type MultiFileTraceBatch = {
   readonly files: ReadonlyArray<MultiFileTraceExport>;
@@ -130,6 +133,7 @@ export async function buildMultiFileTraceExports(
   const signal = deps.signal;
   const context = multiFileJobContext(deps);
   const densitySources: MultiFileDensitySource[] = [];
+  const pageCounts: Array<number | undefined> = [];
   const notices: ReadonlyArray<TraceNotice>[] = [];
   const turn = { index: 0 };
   // Rule 7 / ADR-228: this batch used to SILENTLY skip any file over 25 MB
@@ -141,8 +145,9 @@ export async function buildMultiFileTraceExports(
     prepare: async () => {
       turn.index = index;
       deps.onProgress?.(index + 1, files.length);
-      const { job, densitySource } = await multiFileTraceJob(file, context);
+      const { job, densitySource, pageCount } = await multiFileTraceJob(file, context);
       densitySources[index] = densitySource;
+      pageCounts[index] = pageCount;
       return job;
     },
   }));
@@ -177,7 +182,13 @@ export async function buildMultiFileTraceExports(
       ...(notices[file.sourceIndex] ?? []),
       ...(previewResolution.has(file.sourceIndex) ? (['preview-resolution'] as const) : []),
     ];
-    const sized = { ...file, densitySource: densitySources[file.sourceIndex] ?? 'default' };
+    const pageCount = pageCounts[file.sourceIndex];
+    const sized = {
+      ...file,
+      densitySource: densitySources[file.sourceIndex] ?? 'default',
+      sourceName: files[file.sourceIndex]?.name ?? file.filename,
+      ...(pageCount === undefined ? {} : { pageCount }),
+    };
     return fileNotices.length === 0 ? sized : { ...sized, notices: fileNotices };
   }
 }
@@ -210,6 +221,7 @@ async function multiFileTraceJob(
 ): Promise<{
   readonly job: BatchTraceImageJob;
   readonly densitySource: MultiFileDensitySource;
+  readonly pageCount?: number;
 }> {
   const raster = await context.decodeRaster(file);
   if (raster !== null) {
@@ -224,6 +236,7 @@ async function multiFileTraceJob(
     return {
       job: planMultiFileTraceJob(file.name, natural, size, load, jobContext),
       densitySource,
+      ...(raster.pageCount === undefined ? {} : { pageCount: raster.pageCount }),
     };
   }
   const density = await context.readDensity(file);
@@ -337,6 +350,9 @@ async function writeTraceExport(
   tally.written += 1;
   tally.format = file.format;
   if (file.densitySource === 'default') tally.defaultDensity += 1;
+  const name = file.sourceName ?? file.filename;
+  if (file.runsPastPage === true) tally.pastPage.push(name);
+  if (file.pageCount !== undefined) tally.firstPageOnly.push(`${name} (${file.pageCount} pages)`);
   for (const notice of file.notices ?? []) tally.notices.add(notice);
 }
 
