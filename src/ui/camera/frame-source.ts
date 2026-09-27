@@ -10,6 +10,7 @@ import {
   cameraSourceIdWithoutCredentials,
   type CameraCaptureBinding,
 } from '../../core/camera/camera-capture-binding';
+import type { CameraSourceIdentity } from '../../core/camera/model/saved-cameras';
 import { assertNever } from '../../core/scene';
 import type { CameraStream } from '../../platform/types';
 import { defaultFrameCaptureIo, type FrameCaptureIo } from './decode-jpeg';
@@ -45,32 +46,24 @@ export function cameraCaptureBindingForFrame(
   width: number,
   height: number,
 ): CameraCaptureBinding {
+  return {
+    version: 1,
+    ...cameraSourceIdentity(source),
+    width,
+    height,
+    resizeMode: source.kind === 'usb' ? source.stream.resizeMode : 'unknown',
+  };
+}
+
+/** Which camera `source` is, as a saved calibration names it (ADR-445). */
+export function cameraSourceIdentity(source: ActiveCameraSource): CameraSourceIdentity {
   switch (source.kind) {
     case 'usb':
-      return {
-        version: 1,
-        sourceKind: 'usb',
-        sourceId: source.stream.sourceId,
-        width,
-        height,
-        resizeMode: source.stream.resizeMode,
-      };
+      return { sourceKind: 'usb', sourceId: source.stream.sourceId };
     case 'machine-jpeg':
-      return networkCaptureBinding(
-        'machine-jpeg',
-        source.cameraUrl,
-        width,
-        height,
-        source.queryFingerprint,
-      );
+      return networkIdentity('machine-jpeg', source.cameraUrl, source.queryFingerprint);
     case 'machine-rtsp':
-      return networkCaptureBinding(
-        'machine-rtsp',
-        source.sourceId,
-        width,
-        height,
-        source.queryFingerprint,
-      );
+      return networkIdentity('machine-rtsp', source.sourceId, source.queryFingerprint);
     default:
       return assertNever(source, 'camera source');
   }
@@ -80,21 +73,15 @@ export function publicCameraSourceId(raw: string): string {
   return cameraSourceIdWithoutCredentials(raw);
 }
 
-function networkCaptureBinding(
+function networkIdentity(
   sourceKind: 'machine-jpeg' | 'machine-rtsp',
   rawId: string,
-  width: number,
-  height: number,
   queryFingerprint: string | undefined,
-): CameraCaptureBinding {
+): CameraSourceIdentity {
   return {
-    version: 1,
     sourceKind,
     sourceId: publicCameraSourceId(rawId),
     ...(queryFingerprint === undefined ? {} : { queryFingerprint }),
-    width,
-    height,
-    resizeMode: 'unknown',
   };
 }
 

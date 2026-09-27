@@ -4,6 +4,7 @@
 // are left behind, and an absent model stays absent (no phantom field).
 
 import { describe, expect, it } from 'vitest';
+import type { CameraCaptureBinding } from '../../core/camera/camera-capture-binding';
 import { savedCameraModel } from '../../core/camera/model/model-fixtures';
 import { createProject, type Project } from '../../core/scene';
 import { deserializeProject } from './deserialize-project';
@@ -54,5 +55,28 @@ describe('project camera model persistence', () => {
     expect(result.kind).toBe('ok');
     if (result.kind !== 'ok') return;
     expect(result.project.device.cameraModel).toBeUndefined();
+  });
+
+  it('round-trips the calibrations of the machine’s other cameras (ADR-445)', () => {
+    const usb = (sourceId: string): CameraCaptureBinding => ({
+      version: 1,
+      sourceKind: 'usb',
+      sourceId,
+      width: 1280,
+      height: 720,
+      resizeMode: 'none',
+    });
+    const others = [savedCameraModel(usb('overhead')), savedCameraModel(usb('side'))];
+    const base = projectWithModel();
+    const project = { ...base, device: { ...base.device, otherCameraModels: others } };
+    const result = deserializeProject(serializeProject(project));
+    expect(result.kind).toBe('ok');
+    if (result.kind !== 'ok') return;
+    expect(result.project.device.otherCameraModels).toEqual(others);
+    const dropped = reloadWithDevice({
+      otherCameraModels: [others[0], { ...savedCameraModel(), pose: { rvec: [1] } }],
+    });
+    if (dropped.kind !== 'ok') throw new Error('reload failed');
+    expect(dropped.project.device.otherCameraModels).toEqual([others[0]]);
   });
 });

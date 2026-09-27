@@ -3,7 +3,7 @@
 // against a new photo (Amendment 1), and says how the saved calibration
 // measured, so the operator sees at a glance whether the camera is ready.
 
-import { useStore } from '../../state';
+import { useOwnCameraModel } from '../active-camera-model';
 import { calibrationGrade } from './calibration-result';
 import { CameraCalibrationWizard } from './CameraCalibrationWizard';
 import { useCameraCalibrationStore } from './camera-calibration-store';
@@ -11,7 +11,7 @@ import { useCameraCalibrationStore } from './camera-calibration-store';
 export function CalibrateCameraControls(): JSX.Element {
   const openWizard = useCameraCalibrationStore((s) => s.openWizard);
   const openCheck = useCameraCalibrationStore((s) => s.openCheck);
-  const model = useStore((s) => s.project.device.cameraModel);
+  const model = useOwnCameraModel();
   return (
     <div style={columnStyle}>
       <div style={rowStyle}>

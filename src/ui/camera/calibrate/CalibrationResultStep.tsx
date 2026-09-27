@@ -4,6 +4,7 @@
 // refused (ADR-228): Save is always available and the operator decides.
 
 import { cameraModelHeightMm } from '../../../core/camera/model/camera-model-record';
+import { withSavedCameraModel } from '../../../core/camera/model/saved-cameras';
 import type { MarkError } from '../../../core/camera/target/bed-calibration';
 import { useStore } from '../../state';
 import { calibrationGrade, type CalibrationGrade } from './calibration-result';
@@ -42,9 +43,30 @@ export function CalibrationResultStep(props: {
       {grade.advice === null ? null : <p style={noteStyle}>{grade.advice}</p>}
       {heightAdvice(result)}
       {checking ? null : check}
+      <OtherCamerasNote result={result} />
       <BedAccuracyMap result={result} />
       <ResultActions result={result} checking={checking} save={props.save} />
     </div>
+  );
+}
+
+// Saving replaces only this camera's own calibration (ADR-445); say so when
+// the machine has others, so a second camera's calibration never looks lost.
+function OtherCamerasNote(props: { readonly result: CalibrationResult }): JSX.Element | null {
+  const cameraModel = useStore((s) => s.project.device.cameraModel);
+  const otherCameraModels = useStore((s) => s.project.device.otherCameraModels);
+  const capture = props.result.record.capture;
+  if (capture === undefined) return null;
+  const kept = withSavedCameraModel({ cameraModel, otherCameraModels }, props.result.record)
+    .otherCameraModels?.length;
+  if (kept === undefined) return null;
+  return (
+    <p style={noteStyle}>
+      {kept === 1
+        ? "Saving keeps the calibration of the machine's other camera"
+        : `Saving keeps the calibrations of the machine's ${kept} other cameras`}
+      ; each camera uses its own when it runs.
+    </p>
   );
 }
 
