@@ -2,9 +2,9 @@
 // WORKFLOW.md F-M1). Used for opened FILES; the same view also renders
 // inline as a main-canvas mode (CanvasGcodeView).
 
-import type { GcodeRenderModel } from '../../core/gcode-view';
 import type { MachineKind } from '../../core/scene';
 import { Dialog } from '../kit/Dialog';
+import type { InspectorRenderModel } from './inspector-model';
 import type { GcodeInspectionSource } from './gcode-inspection-source';
 import { InspectionPressureNotice } from './InspectionPressureNotice';
 import { InspectorView } from './InspectorView';
@@ -97,7 +97,7 @@ function inspectionProgressLabel(
   return 'Preparing preview in worker… Close to cancel.';
 }
 
-export function StatsStrip(props: { readonly model: GcodeRenderModel }): JSX.Element {
+export function StatsStrip(props: { readonly model: InspectorRenderModel }): JSX.Element {
   const { stats, segmentCount, events, unsupportedWords, skippedMotions } = props.model;
   const bounds = stats.motionBounds;
   const size =

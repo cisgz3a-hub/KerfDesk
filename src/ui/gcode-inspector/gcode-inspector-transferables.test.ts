@@ -10,15 +10,32 @@ describe('gcodeInspectorTransferables', () => {
     if (!hasGcodeInspectorAnalysis(result)) return;
 
     const transfers = gcodeInspectorTransferables(result);
-    expect(transfers).toHaveLength(18);
+    expect(transfers).toHaveLength(11);
     expect(new Set(transfers).size).toBe(transfers.length);
     expect(transfers).toContain(result.sourceIndex.starts.buffer);
     expect(transfers).toContain(result.parsed.model.positions.buffer);
     expect(transfers).toContain(result.parsed.model.lineCategories.buffer);
-    expect(transfers).toContain(result.parsed.model.segLengthMm?.buffer);
-    expect(transfers).toContain(result.analysis.time.segSeconds.buffer);
-    expect(transfers).toContain(result.analysis.time.segTimeScale.buffer);
+    expect(transfers).toContain(result.analysis.time.segTimeEndSec.buffer);
     expect(transfers).toContain(result.analysis.time.segFeedLimited.buffer);
+    expect(transfers).toContain(result.analysis.time.kindSeconds.buffer);
+  });
+
+  it('leaves the arrays only timing used in the worker (ADR-485)', () => {
+    const result = inspectGcodeText('G21 G90\nG0 X1\nG1 X2 F600');
+    if (!hasGcodeInspectorAnalysis(result)) throw new Error('Expected a parsed program');
+    for (const dropped of ['segRouteEndMm', 'segLengthMm']) {
+      expect(result.parsed.model).not.toHaveProperty(dropped);
+    }
+    for (const dropped of [
+      'segSeconds',
+      'segTimeScale',
+      'segDistanceMm',
+      'segTargetVelocityMmPerSec',
+      'segEntryVelocityMmPerSec',
+      'segExitVelocityMmPerSec',
+    ]) {
+      expect(result.analysis.time).not.toHaveProperty(dropped);
+    }
   });
 
   it('still transfers the source index for a parse error', () => {

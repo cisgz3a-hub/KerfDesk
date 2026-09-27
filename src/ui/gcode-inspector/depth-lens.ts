@@ -1,7 +1,8 @@
 // Pure depth/pass colour scale for the G-code 3D viewer. It reads only
 // machining moves, so safe-height travel never flattens the useful cut range.
 
-import { SEG_KIND, type GcodeRenderModel } from '../../core/gcode-view';
+import { SEG_KIND } from '../../core/gcode-view';
+import type { InspectorRenderModel } from './inspector-model';
 
 /** Normalized red, green, and blue channels in renderer order. */
 export type Rgb = readonly [number, number, number];
@@ -30,7 +31,7 @@ const MIN_DEPTH_SPAN_MM = 1e-9;
 const FLOATS_PER_SEGMENT = 6;
 
 /** Build the ordered depth scale once per program/lens change. */
-export function buildDepthLensScale(model: GcodeRenderModel): DepthLensScale | null {
+export function buildDepthLensScale(model: InspectorRenderModel): DepthLensScale | null {
   const range = machiningDepthRange(model);
   if (range === null) return null;
   return {
@@ -46,7 +47,7 @@ type DepthRange = {
   readonly deepMm: number;
 };
 
-function machiningDepthRange(model: GcodeRenderModel): DepthRange | null {
+function machiningDepthRange(model: InspectorRenderModel): DepthRange | null {
   const cutRange = rangeForKind(model, SEG_KIND.cut);
   const plungeRange = rangeForKind(model, SEG_KIND.plunge);
   if (cutRange === null) return plungeRange;
@@ -57,7 +58,7 @@ function machiningDepthRange(model: GcodeRenderModel): DepthRange | null {
   };
 }
 
-function rangeForKind(model: GcodeRenderModel, targetKind: number): DepthRange | null {
+function rangeForKind(model: InspectorRenderModel, targetKind: number): DepthRange | null {
   let shallowMm = -Infinity;
   let deepMm = Infinity;
   for (let index = 0; index < model.segmentCount; index += 1) {
@@ -73,7 +74,7 @@ function rangeForKind(model: GcodeRenderModel, targetKind: number): DepthRange |
   return shallowMm === -Infinity ? null : { shallowMm, deepMm };
 }
 
-function depthLevelCount(model: GcodeRenderModel, range: DepthRange): number {
+function depthLevelCount(model: InspectorRenderModel, range: DepthRange): number {
   const levels = new Set<number>();
   for (const level of model.stats.zLevels) {
     if (
@@ -86,7 +87,7 @@ function depthLevelCount(model: GcodeRenderModel, range: DepthRange): number {
   return Math.max(1, levels.size);
 }
 
-function segmentDepth(model: GcodeRenderModel, index: number): number {
+function segmentDepth(model: InspectorRenderModel, index: number): number {
   const base = index * FLOATS_PER_SEGMENT;
   const startZ = model.positions[base + 2] ?? 0;
   const endZ = model.positions[base + 5] ?? 0;

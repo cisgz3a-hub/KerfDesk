@@ -1,6 +1,7 @@
 import type { BuildRenderModelResult } from '../../core/gcode-view';
 import type { GcodeInspectionSource } from './gcode-inspection-source';
 import type { GcodeInspectorAnalysis } from './gcode-inspector-analysis';
+import type { InspectorRenderModel } from './inspector-model';
 import type { GcodeSourceLineIndex } from './gcode-source-line-index';
 
 export const INSPECTOR_RENDER_PRESSURE_THRESHOLD = 250_000;
@@ -17,7 +18,8 @@ type GcodeInspectorWorkerResultBase = {
 
 /** A parsed render model paired with all analysis required by the Inspector UI. */
 export type SuccessfulGcodeInspectorWorkerResult = GcodeInspectorWorkerResultBase & {
-  readonly parsed: Extract<BuildRenderModelResult, { readonly kind: 'ok' }>;
+  /** Only what the Inspector reads; timing's working arrays stay in the worker (ADR-485). */
+  readonly parsed: { readonly kind: 'ok'; readonly model: InspectorRenderModel };
   readonly analysis: GcodeInspectorAnalysis;
 };
 

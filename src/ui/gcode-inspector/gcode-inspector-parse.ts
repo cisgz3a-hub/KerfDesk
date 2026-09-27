@@ -12,6 +12,7 @@ import {
   INSPECTOR_RENDER_PRESSURE_THRESHOLD,
   type GcodeInspectorWorkerResult,
 } from './gcode-inspector-worker-protocol';
+import { inspectorRenderModel } from './inspector-model';
 import { programToolCollector, type ProgramToolMark } from './program-tools';
 
 export function inspectGcodeText(
@@ -63,5 +64,9 @@ function inspectionResult(
 ): GcodeInspectorWorkerResult {
   const base = { sourceIndex, sourceLineCount: sourceIndex.starts.length };
   if (parsed.kind === 'error') return { ...base, parsed, analysis: null };
-  return { ...base, parsed, analysis: analyzeGcodeModel(parsed.model, context, toolMarks) };
+  return {
+    ...base,
+    parsed: { kind: 'ok', model: inspectorRenderModel(parsed.model) },
+    analysis: analyzeGcodeModel(parsed.model, context, toolMarks),
+  };
 }
