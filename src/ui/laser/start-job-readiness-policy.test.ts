@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import type { Job } from '../../core/job';
 import {
   addLayer,
   addObject,
@@ -62,5 +63,46 @@ describe('largeJobPreparationWarning', () => {
 
   it('stays silent for a modest scene', () => {
     expect(largeJobPreparationWarning(modestScene())).toBeNull();
+  });
+});
+
+// ADR-459 Amd 1: a small fill whose dense outline exhausts the bounded estimate
+// is 'unknown', so the compiled job's real Fill span count decides.
+describe('largeJobPreparationWarning with an unknown fill estimate', () => {
+  function denseSmallCircleFill(): Scene {
+    const color = '#0000ff';
+    const points = Array.from({ length: 12_000 }, (_, index) => {
+      const angle = (index / 12_000) * Math.PI * 2;
+      return { x: 5 + 5 * Math.cos(angle), y: 5 + 5 * Math.sin(angle) };
+    });
+    const object: SceneObject = {
+      kind: 'imported-svg',
+      id: 'dense-circle',
+      source: 'dense-circle.svg',
+      bounds: { minX: 0, minY: 0, maxX: 10, maxY: 10 },
+      transform: IDENTITY_TRANSFORM,
+      paths: [{ color, polylines: [{ points, closed: true }] }],
+    };
+    return {
+      objects: [object],
+      layers: [{ ...createLayer({ id: 'fill', color, mode: 'fill' }), hatchSpacingMm: 0.1 }],
+    };
+  }
+  function jobWithFillSpans(count: number): Job {
+    return {
+      groups: [{ kind: 'fill', segments: Array.from({ length: count }, () => ({})) }],
+    } as unknown as Job;
+  }
+
+  it('stays silent before compile and for a small compiled fill', () => {
+    const scene = denseSmallCircleFill();
+    expect(largeJobPreparationWarning(scene)).toBeNull();
+    expect(largeJobPreparationWarning(scene, jobWithFillSpans(100))).toBeNull();
+  });
+
+  it('advises when the compiled fill really is over the budget', () => {
+    expect(largeJobPreparationWarning(denseSmallCircleFill(), jobWithFillSpans(20_001))).toBe(
+      LARGE_JOB_PREPARATION_WARNING,
+    );
   });
 });
