@@ -19,22 +19,40 @@ import {
  * discarded the controller's planner also records its backlog, so recovery
  * restarts before the moves it threw away (controller audit recovery-6). A
  * stop that may have killed the steppers mid-motion is marked position-lost
- * (ADR-215 Amendment 1). */
+ * (ADR-215 Amendment 1). A lost link records the lines sent by then. */
 export function checkpointInterruption(
   status: StreamerStatus,
   notice: LaserSafetyNotice | null,
   stopRequest: JobStopRequest | null = null,
   plannerBacklog?: JobInterruption['plannerBacklog'],
   positionLost = false,
+  sentLines?: number,
 ): JobInterruption | null {
   const cause = interruptionCause(status, notice, stopRequest);
-  const interruption =
-    cause !== null && positionLost ? { ...cause, positionLost: true as const } : cause;
-  if (interruption === null || plannerBacklog === undefined) return interruption;
+  if (cause === null) return null;
+  const interruption = withSentLines(
+    positionLost ? { ...cause, positionLost: true as const } : cause,
+    sentLines,
+  );
+  if (plannerBacklog === undefined) return interruption;
   // The stop sent while the app closed may never have arrived.
   const stopMayNotHaveArrived = stopRequest?.reason === 'app-closing';
   return PLANNER_DISCARDING_KINDS.includes(interruption.kind) && !stopMayNotHaveArrived
     ? { ...interruption, plannerBacklog }
+    : interruption;
+}
+
+/** A lost link leaves the controller running what it had received, so the
+ * head stops at the end of the last line sent. The record keeps how many that
+ * was, acknowledged lines plus those still in flight, so recovery can continue
+ * from where the head stands (ADR-341 Amendment 6). Other stops either
+ * discarded the planner or failed a write whose lines may never have left. */
+function withSentLines(
+  interruption: JobInterruption,
+  sentLines: number | undefined,
+): JobInterruption {
+  return interruption.kind === 'disconnect' && sentLines !== undefined
+    ? { ...interruption, sentLines }
     : interruption;
 }
 

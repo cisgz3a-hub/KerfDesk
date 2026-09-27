@@ -240,3 +240,38 @@ describe('planner backlog on the recorded cause', () => {
     expect(currentRunPlannerBacklog({ ...run, activeControllerKind: 'ruida' })).toBeUndefined();
   });
 });
+
+// ADR-341 Amendment 6: a lost link leaves the controller running what it had,
+// so the record keeps how many lines were sent; other stops do not.
+describe('checkpointInterruption sent lines', () => {
+  const cableLoss: LaserSafetyNotice = {
+    kind: 'disconnect-during-job',
+    message: 'The USB link dropped mid-job.',
+  };
+
+  it('records the lines sent before a lost link', () => {
+    expect(
+      checkpointInterruption('disconnected', cableLoss, null, undefined, false, 207_331),
+    ).toEqual({ kind: 'disconnect', message: cableLoss.message, sentLines: 207_331 });
+  });
+
+  it('records none for a stop that discarded the planner or failed a write', () => {
+    const rejected: LaserSafetyNotice = {
+      kind: 'controller-error',
+      code: 1,
+      message: 'The controller rejected a line.',
+      rejectedLine: 'G1 X1',
+    };
+    const writeFailed: LaserSafetyNotice = {
+      kind: 'write-failed',
+      action: 'start',
+      message: 'Write failed.',
+    };
+    expect(
+      checkpointInterruption('errored', rejected, null, undefined, false, 40),
+    ).not.toHaveProperty('sentLines');
+    expect(
+      checkpointInterruption('errored', writeFailed, null, undefined, false, 40),
+    ).not.toHaveProperty('sentLines');
+  });
+});

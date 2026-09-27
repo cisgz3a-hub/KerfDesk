@@ -396,4 +396,8 @@
   .gcode-viewer-speed {
     margin-left: auto;
   }
+
+  .gcode-viewer-trail {
+    margin-left: 0;
+  }
 }
