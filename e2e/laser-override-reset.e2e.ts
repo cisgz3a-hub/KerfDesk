@@ -166,7 +166,10 @@ async function connectAndHome(page: Page, kerfdesk: KerfDeskFixture): Promise<vo
 async function runMenuCommand(page: Page, family: string, command: string): Promise<void> {
   const applicationMenu = page.getByRole('menubar', { name: 'Application menu' });
   await applicationMenu.getByRole('menuitem', { name: family, exact: true }).click();
-  await applicationMenu.getByRole('menuitem').filter({ hasText: command }).first().click();
+  await applicationMenu
+    .getByRole('menuitem')
+    .filter({ has: page.getByText(command, { exact: true }) })
+    .click();
 }
 
 async function dismissNotifications(page: Page): Promise<void> {
@@ -175,7 +178,7 @@ async function dismissNotifications(page: Page): Promise<void> {
 }
 
 async function fillAndCommit(page: Page, name: string, value: string): Promise<void> {
-  const input = page.getByRole('spinbutton', { name });
+  const input = page.getByLabel(name, { exact: true });
   // A just-imported image can still be settling: its final bounds land after
   // the field first appears, and that re-render mid-fill appends the typed
   // value to the incoming one (CI saw "12" + "10" = "1210"). Retry until the

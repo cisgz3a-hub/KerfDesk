@@ -2,6 +2,12 @@ import { useEffect, useMemo, useState, type Dispatch, type SetStateAction } from
 import lock from 'lucide-static/icons/lock-keyhole.svg?raw';
 import unlock from 'lucide-static/icons/lock-keyhole-open.svg?raw';
 import {
+  evaluateNumericEntry,
+  type NumericEntryKind,
+  type NumericEntryOptions,
+  type NumericEntryResult,
+} from '../../core/numeric-expression';
+import {
   buildSelectionTransformEdit,
   selectionAnchorPoint,
   selectionMetrics,
@@ -15,9 +21,45 @@ import { useUiStore } from '../state/ui-store';
 import { TransformAnchorPicker } from './TransformAnchorPicker';
 import './NumericEditsBar.css';
 
-const FIELD_STEP_MM = 0.1;
-const ROTATION_STEP_DEG = 1;
 const DISPLAY_DECIMALS = 3;
+// Longest slice of a refused entry echoed back in the error toast.
+const ECHO_MAX_CHARS = 32;
+
+// What each box accepts (LBG-F12): math and unit suffixes everywhere, a
+// percentage of the current size in Width and Height only. `step` is the
+// ArrowUp/ArrowDown nudge the old type="number" spinner gave, kept as an
+// editing increment — never a policy that refuses off-grid values.
+type EntrySpec = {
+  readonly kind: NumericEntryKind;
+  readonly percent: boolean;
+  readonly step: number;
+  readonly accepts: string;
+  readonly retry: string;
+};
+
+const LENGTH_ACCEPTS =
+  'Type a number in mm, math like 10+5 or 2*(3+4), or a unit like 1in or 2.5cm.';
+const LENGTH_RETRY =
+  'Type a number, a sum like 10+5, a unit like 1in, or a percentage like 50% in Width or Height.';
+const POSITION_ENTRY: EntrySpec = {
+  kind: 'length',
+  percent: false,
+  step: 0.1,
+  accepts: LENGTH_ACCEPTS,
+  retry: LENGTH_RETRY,
+};
+const SIZE_ENTRY: EntrySpec = {
+  ...POSITION_ENTRY,
+  percent: true,
+  accepts: `${LENGTH_ACCEPTS} A percentage like 50% scales the current size.`,
+};
+const ROTATION_ENTRY: EntrySpec = {
+  kind: 'angle',
+  percent: false,
+  step: 1,
+  accepts: 'Type an angle in degrees or math like 45+15, 360/7 or atan(3/4).',
+  retry: 'Type a number of degrees or a sum like 45+15.',
+};
 
 export function NumericEditsBar(): JSX.Element {
   const model = useNumericEditModel();
@@ -102,6 +144,7 @@ function NumericFields(props: { readonly model: NumericEditModel }): JSX.Element
           disabled={!model.hasSelection}
           unit="mm"
           hideUnit
+          entry={POSITION_ENTRY}
           onCommit={(x) => model.commit({ kind: 'position', anchor: model.anchor, x })}
         />
         <NumberField
@@ -110,6 +153,7 @@ function NumericFields(props: { readonly model: NumericEditModel }): JSX.Element
           value={model.yValue}
           disabled={!model.hasSelection}
           unit="mm"
+          entry={POSITION_ENTRY}
           onCommit={(y) => model.commit({ kind: 'position', anchor: model.anchor, y })}
         />
       </div>
@@ -122,7 +166,7 @@ function NumericFields(props: { readonly model: NumericEditModel }): JSX.Element
         value={model.rotationValue}
         disabled={model.rotationValue === null}
         unit="°"
-        step={ROTATION_STEP_DEG}
+        entry={ROTATION_ENTRY}
         onCommit={(rotationDeg) => model.commit({ kind: 'rotate', rotationDeg })}
       />
     </>
@@ -139,6 +183,7 @@ function SizeFields({ model }: { readonly model: NumericEditModel }): JSX.Elemen
         disabled={!model.hasSelection}
         unit="mm"
         hideUnit
+        entry={SIZE_ENTRY}
         onCommit={(width) =>
           model.commit({
             kind: 'resize',
@@ -168,6 +213,7 @@ function SizeFields({ model }: { readonly model: NumericEditModel }): JSX.Elemen
         value={model.heightValue}
         disabled={!model.hasSelection}
         unit="mm"
+        entry={SIZE_ENTRY}
         onCommit={(height) =>
           model.commit({
             kind: 'resize',
@@ -188,7 +234,7 @@ function NumberField(props: {
   readonly disabled: boolean;
   readonly unit: string;
   readonly hideUnit?: boolean;
-  readonly step?: number;
+  readonly entry: EntrySpec;
   readonly onCommit: (value: number) => void;
 }): JSX.Element {
   const [draft, setDraft] = useState(formatNumber(props.value));
@@ -204,15 +250,32 @@ function NumberField(props: {
     setDraft(formatNumber(props.value));
     setDraftIsValid(true);
   }, [props.value, commitSeq]);
-  const updateDraft = (input: HTMLInputElement): void => {
-    setDraft(input.value);
-    setDraftIsValid(numericInputIsValid(input));
+  const evaluate = (text: string): NumericEntryResult =>
+    evaluateNumericEntry(text, entryOptions(props.entry, props.value));
+  const updateDraft = (text: string): void => {
+    setDraft(text);
+    setDraftIsValid(evaluate(text).kind === 'ok');
   };
-  const commit = (input: HTMLInputElement): void => {
-    const next = Number(input.value);
+  const commit = (text: string): void => {
+    const result = evaluate(text);
     setCommitSeq((seq) => seq + 1);
-    if (!numericInputIsValid(input)) return;
-    props.onCommit(next);
+    if (result.kind === 'ok') {
+      props.onCommit(result.value);
+      return;
+    }
+    // A blank box is the operator backing out, as it always was: it snaps
+    // back without a toast. Anything else they typed deserves a reason.
+    if (text.trim() !== '') pushEntryError(text, result.message, props.entry);
+  };
+  const onKeyDown = (event: React.KeyboardEvent<HTMLInputElement>): void => {
+    if (event.key === 'Enter') {
+      commit(event.currentTarget.value);
+      return;
+    }
+    const stepped = steppedDraft(event.key, evaluate(event.currentTarget.value), props.entry.step);
+    if (stepped === null) return;
+    event.preventDefault();
+    updateDraft(stepped);
   };
   return (
     <label className="lf-numeric-edit-field">
@@ -220,32 +283,42 @@ function NumberField(props: {
       <input
         className="lf-input"
         aria-label={props.label}
-        title={`${props.label}. Values are measured from the selected anchor point.`}
-        type="number"
-        step={props.step ?? FIELD_STEP_MM}
+        title={`${props.label}. Values are measured from the selected anchor point. ${props.entry.accepts}`}
+        type="text"
+        inputMode="decimal"
+        autoComplete="off"
+        spellCheck={false}
         value={draft}
         disabled={props.disabled}
         aria-invalid={!draftIsValid}
-        onInput={(event) => updateDraft(event.currentTarget)}
-        onChange={(event) => updateDraft(event.currentTarget)}
-        onBlur={(event) => commit(event.currentTarget)}
-        onKeyDown={(event) => {
-          if (event.key === 'Enter') commit(event.currentTarget);
-        }}
+        onInput={(event) => updateDraft(event.currentTarget.value)}
+        onChange={(event) => updateDraft(event.currentTarget.value)}
+        onBlur={(event) => commit(event.currentTarget.value)}
+        onKeyDown={onKeyDown}
       />
       {!props.hideUnit && <span className="lf-numeric-edit-unit">{props.unit}</span>}
     </label>
   );
 }
 
-function numericInputIsValid(input: HTMLInputElement): boolean {
-  const value = input.value.trim();
-  // The step attribute is an editing affordance for the spinner, not a value
-  // policy. Valid finite values such as 0.05 mm and 10.5 degrees must not be
-  // refused merely because they do not land on 0.1/1 increments. Browser
-  // number inputs expose unparseable native drafts as blank/badInput; those
-  // and non-finite values are the only input-level failures here.
-  return value !== '' && !input.validity.badInput && Number.isFinite(Number(value));
+function entryOptions(entry: EntrySpec, current: number | null): NumericEntryOptions {
+  return entry.percent && current !== null
+    ? { kind: entry.kind, percentOf: current }
+    : { kind: entry.kind };
+}
+
+// ArrowUp/ArrowDown nudge a readable draft by one step without committing,
+// as the old number spinner did; Enter or blur still commits.
+function steppedDraft(key: string, current: NumericEntryResult, step: number): string | null {
+  const direction = key === 'ArrowUp' ? 1 : key === 'ArrowDown' ? -1 : 0;
+  if (direction === 0 || current.kind !== 'ok') return null;
+  return formatNumber(current.value + direction * step);
+}
+
+function pushEntryError(text: string, reason: string, entry: EntrySpec): void {
+  const typed = text.trim();
+  const echo = typed.length > ECHO_MAX_CHARS ? `${typed.slice(0, ECHO_MAX_CHARS)}…` : typed;
+  useToastStore.getState().pushToast(`Couldn't read "${echo}": ${reason}. ${entry.retry}`, 'error');
 }
 
 function selectedObjects(

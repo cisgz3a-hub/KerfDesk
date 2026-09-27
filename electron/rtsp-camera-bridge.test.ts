@@ -3,6 +3,7 @@ import {
   cameraBridgeCorsOrigin,
   completeRtspDescribeResponse,
   isAllowedBridgeOrigin,
+  isBridgeHost,
   rtspProbeIsOk,
 } from './rtsp-camera-bridge';
 
@@ -35,11 +36,22 @@ describe('RTSP camera bridge request policy', () => {
     // CORS only stops a browser reading the response; the request's side effects
     // (RTSP probe / ffmpeg spawn) still fire. So the server must refuse an
     // untrusted browser Origin BEFORE doing any work.
-    expect(isAllowedBridgeOrigin(undefined)).toBe(true); // same-origin / non-browser local client
+    // ADR-141 Amendment 1: no Origin means a plain cross-site <img> or a
+    // DNS-rebound page; KerfDesk's own requests always carry one.
+    expect(isAllowedBridgeOrigin(undefined)).toBe(false);
     expect(isAllowedBridgeOrigin('app://app')).toBe(true);
     expect(isAllowedBridgeOrigin('https://kerfdesk.com')).toBe(false);
     expect(isAllowedBridgeOrigin('https://evil.example')).toBe(false); // drive-by page — refused
     expect(isAllowedBridgeOrigin('https://kerfdesk.com:444')).toBe(false); // non-canonical port (R3)
+  });
+
+  it('answers only to its own loopback host names (ADR-141 Amendment 1)', () => {
+    expect(isBridgeHost('127.0.0.1:51731', 51731)).toBe(true);
+    expect(isBridgeHost('localhost:51731', 51731)).toBe(true);
+    expect(isBridgeHost('rebind.attacker.example:51731', 51731)).toBe(false);
+    expect(isBridgeHost('127.0.0.1:51732', 51731)).toBe(false);
+    expect(isBridgeHost('127.0.0.1', 51731)).toBe(false);
+    expect(isBridgeHost(undefined, 51731)).toBe(false);
   });
 
   it('treats only successful RTSP DESCRIBE replies as reachable', () => {

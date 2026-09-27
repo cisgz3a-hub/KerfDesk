@@ -23,7 +23,7 @@ const MAX_SPLIT_DEPTH = 4;
 // 0.001 mm grid G-code coordinates are written on. A convex contour's chord
 // always reaches in a little (a 0.28 mm chord of a 1.6 mm ball's corner arc
 // by 0.006 mm), so an exact rule would split every move on a curve.
-const WALL_REACH_MM = 0.001;
+export const WALL_REACH_MM = 0.001;
 const PUSH_BISECTIONS = 20;
 
 export type WaterlinePathOptions = {

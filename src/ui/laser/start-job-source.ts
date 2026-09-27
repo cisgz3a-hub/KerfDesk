@@ -40,6 +40,8 @@ import { publishFramePreparationProgress } from '../state/frame-preparation-stor
 import type { FrameBoundsPreview } from './frame-bounds-preview';
 import type { FramePreparationMotionOwner } from './frame-preparation-motion-owner';
 import { machineSnapshot } from './start-machine-snapshot';
+import { recoveryRefusalMessages, savedWorkOffsetMm } from './laser-recovery-origin';
+import type { WorkCoordinateOffset } from '../state/origin-actions';
 import { projectHasVariableData } from '../../core/variables/object-variable-template';
 
 /** Optional observers of one Start preparation. */
@@ -222,6 +224,8 @@ export function startMachineInputsKey(
 export async function prepareRecoverySource(overrides?: {
   readonly outputScope: OutputScope;
   readonly jobOrigin?: JobOriginPlacement;
+  /** The work offset the run ran with, named if its origin is gone. */
+  readonly savedWorkOffsetMm?: WorkCoordinateOffset | null;
 }): Promise<PreparedRecoverySource | null> {
   const laser = useLaserStore.getState();
   if (!requireFreshControllerQualification(laser)) return null;
@@ -239,6 +243,7 @@ export async function prepareRecoverySource(overrides?: {
         },
     overrides?.outputScope ?? currentOutputScope(app),
     overrides?.jobOrigin,
+    overrides?.savedWorkOffsetMm ?? null,
   );
 }
 
@@ -275,8 +280,7 @@ export function prepareArchivedRecoverySource(
     false,
   );
   if (!qualified.ok) {
-    const lines = qualified.messages.map((message) => `• ${message}`).join('\n');
-    jobAwareAlert(`Cannot resume job:\n\n${lines}`);
+    alertRecoveryRefusal(qualified.messages, savedWorkOffsetMm(artifact));
     return null;
   }
   return {
@@ -329,7 +333,8 @@ async function prepareRecoveryProjectSource(
   laser: ReturnType<typeof useLaserStore.getState>,
   jobPlacement: JobPlacementSettings,
   outputScope: OutputScope,
-  resolvedJobOrigin?: JobOriginPlacement,
+  resolvedJobOrigin: JobOriginPlacement | undefined,
+  savedOffsetMm: WorkCoordinateOffset | null,
 ): Promise<PreparedRecoverySource | null> {
   const { project } = app;
   const machine = machineSnapshot(project, laser, useCameraStore.getState());
@@ -369,8 +374,7 @@ async function prepareRecoveryProjectSource(
     return null;
   }
   if (!prepared.ok) {
-    const lines = prepared.messages.map((message) => `• ${message}`).join('\n');
-    jobAwareAlert(`Cannot resume job:\n\n${lines}`);
+    alertRecoveryRefusal(prepared.messages, savedOffsetMm);
     return null;
   }
   const currentLaser = useLaserStore.getState();
@@ -393,6 +397,18 @@ async function prepareRecoveryProjectSource(
       : { preflightMotionOffset: prepared.preflightMotionOffset }),
     ...(prepared.jobOrigin === undefined ? {} : { jobOrigin: prepared.jobOrigin }),
   };
+}
+
+// A missing origin is said for a recovery: the ordinary Start advice, Set
+// origin here, would put it where the head stopped (ADR-341 Amendment 5).
+function alertRecoveryRefusal(
+  messages: ReadonlyArray<string>,
+  savedOffsetMm: WorkCoordinateOffset | null,
+): void {
+  const lines = recoveryRefusalMessages(messages, savedOffsetMm)
+    .map((message) => `• ${message}`)
+    .join('\n');
+  jobAwareAlert(`Cannot resume job:\n\n${lines}`);
 }
 
 function jobPlacementForArchivedArtifact(artifact: ExecutionArtifactV1): JobPlacementSettings {

@@ -169,6 +169,7 @@ class JobCheckpointTracker {
       currentJobStopRequest(state),
       currentRunPlannerBacklog(state),
       runStopMayHaveLostPosition(state),
+      Math.min(streamer.total, streamer.completed + streamer.inFlight.length),
     );
     this.previous = { runId, status: streamer.status, completed: streamer.completed };
 
