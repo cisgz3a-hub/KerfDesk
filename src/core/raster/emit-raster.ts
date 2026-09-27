@@ -18,8 +18,8 @@
 //     pattern becomes N G1s. The X coordinate on each G1 is the far
 //     edge of the run in the current sweep direction.
 //   - Overscan: each row keeps full entry and exit runways around its outer
-//     ink bounds. Wide internal gaps use one bounded entry runway so the head
-//     never reverses over a completed island. All runways keep the laser off.
+//     ink bounds. Wide internal gaps share bounded exit and entry runways so
+//     the head can brake dark without reversing over a completed island.
 //   - S=0 pixels (white in the source) emit normally — they're part
 //     of the sweep but the dynamic-power M4 controller automatically
 //     keeps the diode dark when S=0.
@@ -208,9 +208,8 @@ function* emitRasterPasses(input: EmitRasterInput, state: RasterEmissionState): 
       if (sweepPlans.length === 0) continue;
       const worldY = input.bounds.minY + (rowIndex + 0.5) * pixelHeightMm;
       for (const sweepPlan of sweepPlans) {
-        // Each island is its own sweep. Internal exits stop at the burn edge;
-        // the next bounded lead-in crosses the remainder with the laser off —
-        // the raster analogue of ADR-035 (ADR-039), without path reversal.
+        // Each island is its own sweep. Internal exits and entries share the
+        // blank gap without overlap; any remainder is positioning travel.
         // F rides only the very first G1 of the whole group.
         const sweep = emitSpanSweep(
           input,
@@ -294,8 +293,12 @@ function sweepExtents(
   return {
     activeStartX,
     activeEndX,
-    startX: reverse ? activeEndX + sweepPlan.leadInMm : activeStartX - sweepPlan.leadInMm,
-    endX: reverse ? activeStartX - sweepPlan.leadOutMm : activeEndX + sweepPlan.leadOutMm,
+    startX:
+      sweepPlan.sharedLeadStartXWorldMm ??
+      (reverse ? activeEndX + sweepPlan.leadInMm : activeStartX - sweepPlan.leadInMm),
+    endX:
+      sweepPlan.sharedLeadEndXWorldMm ??
+      (reverse ? activeStartX - sweepPlan.leadOutMm : activeEndX + sweepPlan.leadOutMm),
     rowShiftX: reverse ? -(input.scanOffsetMm ?? 0) : 0,
   };
 }

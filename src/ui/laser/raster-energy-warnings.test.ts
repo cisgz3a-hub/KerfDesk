@@ -79,7 +79,7 @@ function tunedPreset(settings: Partial<Layer>) {
 describe('raster energy warnings', () => {
   it('warns that 25 lines/mm burns 2.5x the default energy, relative to the unknown tuning', () => {
     expect(energyWarnings(imageProject({ linesPerMm: 25 }))).toEqual([
-      'Image "wing.png" on "Engrave" burns 25 lines/mm (rows 0.04 mm apart): 2.5× the energy per area of 10 lines/mm at the same power and speed. The 0.18 mm beam sweeps each point about 4.5 times, so fine white lines and dots fill in and the image burns darker than the canvas shows. If this power and speed were chosen for 10 lines/mm, use about 40% of that power or about 2.5× that speed, and confirm with an Interval Test.',
+      'Image "wing.png" on "Engrave" burns 25 lines/mm (rows 0.04 mm apart): 2.5× the energy per area of 10 lines/mm at the same power and speed. The profile\'s nominal 0.18 mm spot spans about 4.5 row intervals. Actual burn width depends on focus and material, so fine white lines and dots can fill in and the image can burn darker than the canvas shows. If this power and speed were chosen for 10 lines/mm, use about 40% of that power or about 2.5× that speed, and confirm with an Interval Test.',
     ]);
   });
 
@@ -97,6 +97,22 @@ describe('raster energy warnings', () => {
     expect(energyWarnings(imageProject({ linesPerMm: 14 }))).toEqual([]);
   });
 
+  it('uses the rounded burn-grid row count on a physically small image', () => {
+    const art = {
+      ...wing(40),
+      transform: { ...IDENTITY_TRANSFORM, x: 20, y: 20, scaleY: 0.003 },
+    };
+    const warnings = energyWarnings(imageProject({ linesPerMm: 10 }, { objects: [art] }));
+    expect(warnings).toHaveLength(1);
+    expect(warnings[0]).toContain('burns 33.3 lines/mm (rows 0.03 mm apart): 3.3×');
+  });
+
+  it('compares represented feeds when both settings emit the same whole-number feed', () => {
+    expect(
+      energyWarnings(imageProject({ speed: 1.1, materialBinding: tunedPreset({ speed: 1.9 }) })),
+    ).toEqual([]);
+  });
+
   it('warns about Pass-Through, which burns at the source density past the lines/mm cap', () => {
     const warnings = energyWarnings(imageProject({ linesPerMm: 10, passThrough: true }));
     expect(warnings).toHaveLength(1);
@@ -108,7 +124,7 @@ describe('raster energy warnings', () => {
       imageProject({ linesPerMm: 25, materialBinding: tunedPreset({ linesPerMm: 10 }) }),
     );
     expect(warnings).toEqual([
-      'Image "wing.png" on "Engrave" burns 2.5× the energy per area of its material preset: 25 lines/mm at 30% and 2000 mm/min, where the preset uses 10 lines/mm at 30% and 2000 mm/min. The 0.18 mm beam sweeps each point about 4.5 times, so fine white lines and dots fill in and the image burns darker than the canvas shows. To match the preset, lower power to about 12% or raise speed to about 5000 mm/min, and confirm with an Interval Test.',
+      'Image "wing.png" on "Engrave" burns 2.5× the energy per area of its material preset: 25 lines/mm at 30% and 2000 mm/min, where the preset uses 10 lines/mm at 30% and 2000 mm/min. The profile\'s nominal 0.18 mm spot spans about 4.5 row intervals. Actual burn width depends on focus and material, so fine white lines and dots can fill in and the image can burn darker than the canvas shows. To match the preset, lower power to about 12% or raise speed to about 5000 mm/min, and confirm with an Interval Test.',
     ]);
   });
 

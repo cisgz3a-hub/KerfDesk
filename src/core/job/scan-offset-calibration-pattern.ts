@@ -1,3 +1,5 @@
+import type { DeviceProfile } from '../devices';
+import { effectiveGcodeFeedMmPerMin, formatGcodeFeedMmPerMin } from '../gcode/feed-word';
 import {
   createLayer,
   IDENTITY_TRANSFORM,
@@ -11,7 +13,6 @@ import {
   calibrationLabelWidthMm,
   createCalibrationLabelLayer,
   createCalibrationLabelObject,
-  formatCalibrationNumber,
 } from './calibration-labels';
 
 const MIN_STEPS = 1;
@@ -61,6 +62,7 @@ export type ScanOffsetCalibrationPattern = {
 
 export function generateScanOffsetCalibrationPattern(
   options: ScanOffsetCalibrationPatternOptions,
+  device?: Pick<DeviceProfile, 'maxFeed'>,
 ): ScanOffsetCalibrationPattern {
   const steps = clampInteger(options.steps, MIN_STEPS, MAX_STEPS);
   const [speedLow, speedHigh] = orderedPair(
@@ -87,7 +89,7 @@ export function generateScanOffsetCalibrationPattern(
   const gapMm = Math.max(0, clampFinite(options.gapMm ?? DEFAULT_GAP_MM, DEFAULT_GAP_MM));
   const origin = options.origin ?? DEFAULT_ORIGIN;
   const mode = options.mode ?? 'baseline';
-  const speeds = linspace(speedHigh, speedLow, steps);
+  const speeds = emittedCalibrationSpeeds(linspace(speedHigh, speedLow, steps), device);
   const labelSize = labelSizeForSwatch(Math.min(swatchWidth, swatchHeight));
   const labelGap = Math.max(0.5, Math.min(gapMm / 2, 2));
   const layers: Layer[] = [];
@@ -129,7 +131,7 @@ export function generateScanOffsetCalibrationPattern(
   const labelLayer = createCalibrationLabelLayer('scan-offset-calibration-labels');
   objects.push(
     ...cells.map((cell) => {
-      const label = formatCalibrationNumber(cell.speed);
+      const label = formatGcodeFeedMmPerMin(cell.speed);
       return createCalibrationLabelObject({
         id: `scan-offset-calibration-label-${cell.step}`,
         operationId: labelLayer.id,
@@ -145,6 +147,20 @@ export function generateScanOffsetCalibrationPattern(
   return { scene: { objects, layers }, cells };
 }
 
+function emittedCalibrationSpeeds(
+  requested: ReadonlyArray<number>,
+  device: Pick<DeviceProfile, 'maxFeed'> | undefined,
+): ReadonlyArray<number> {
+  // The burned label is the speed the operator will enter into the calibration
+  // table. Bind both label and saved layer to the represented output feed, not
+  // a requested speed that compilation would cap or floor later.
+  const maxFeed =
+    device !== undefined && Number.isFinite(device.maxFeed) && device.maxFeed > 0
+      ? device.maxFeed
+      : Number.POSITIVE_INFINITY;
+  return requested.map((speed) => effectiveGcodeFeedMmPerMin(Math.min(speed, maxFeed)));
+}
+
 function scanOffsetLayer(args: {
   readonly step: number;
   readonly speed: number;
@@ -157,7 +173,7 @@ function scanOffsetLayer(args: {
   return {
     ...createLayer({
       id: `scan-offset-calibration-step-${args.step}`,
-      name: `Scan offset ${formatCalibrationNumber(args.speed)} mm/min`,
+      name: `Scan offset ${formatGcodeFeedMmPerMin(args.speed)} mm/min`,
       color,
       mode: 'fill',
     }),

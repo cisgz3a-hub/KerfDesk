@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, it } from 'vitest';
 import { effectiveOperationForObject } from '../../core/effective-output';
+import { scanGcodeWords } from '../../core/gcode/word-scan';
 import { compileJob } from '../../core/job';
 import { grblStrategy } from '../../core/output/grbl-strategy';
 import { createLayer, createProject, type LayerMode, type Project } from '../../core/scene';
@@ -136,13 +137,17 @@ function poweredMotionModes(project: Project): string[] {
   const output = grblStrategy.emit(compileJob(project.scene, project.device), project.device);
   const modes = new Set<string>();
   let mode = '';
+  let motion = 0;
   let power = 0;
   for (const line of output.split('\n')) {
-    const nextMode = /^(M[345])\b/.exec(line)?.[1];
-    if (nextMode !== undefined) mode = nextMode;
-    const nextPower = /\bS([\d.]+)/.exec(line)?.[1];
-    if (nextPower !== undefined) power = Number(nextPower);
-    if (/^G1\b/.test(line) && power > 0) modes.add(mode);
+    const words = scanGcodeWords(line.split(';')[0] ?? '');
+    for (const { letter, value } of words) {
+      if (letter === 'M' && [3, 4, 5].includes(value)) mode = `M${value}`;
+      if (letter === 'G' && [0, 1, 2, 3].includes(value)) motion = value;
+      if (letter === 'S') power = value;
+    }
+    const hasAxis = words.some(({ letter }) => ['X', 'Y', 'Z'].includes(letter));
+    if (hasAxis && motion === 1 && power > 0) modes.add(mode);
   }
   expect(modes.size).toBeGreaterThan(0);
   return [...modes];
