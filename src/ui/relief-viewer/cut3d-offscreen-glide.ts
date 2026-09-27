@@ -1,9 +1,7 @@
-// The short glide after a Cut 3D drag (ADR-426). Every other 3D view glides
-// through its orbit controls' damping. Cut 3D's camera lives in its offscreen
-// worker and moves only by the deltas the page sends, so after the pointer
-// lets go the page keeps sending a fading share of the drag's last speed,
-// frame by frame, until it settles. The fade is the shared damping factor, so
-// a flick travels as far as it does in the Inspector.
+// Cut 3D's camera lives in a worker without OrbitControls. Match their
+// damping by applying a share of the remaining pointer displacement on each
+// update, including while dragging. The glide consumes the rest of that same
+// displacement; it must not add extrapolated travel after applying it in full.
 
 import { prefersReducedMotion, VIEWER3D_DAMPING_FACTOR } from '../viewer3d/viewer3d-controls';
 
@@ -12,84 +10,57 @@ export type Cut3DGlideKind = 'pan' | 'rotate';
 export type Cut3DGlide = {
   /** Starts a drag: forgets the last one and ends any glide still running. */
   readonly begin: () => void;
-  /** Records one drag step. */
-  readonly track: (deltaX: number, deltaY: number) => void;
-  /** The pointer let go: glides on at the drag's last speed, fading out. */
-  readonly release: (kind: Cut3DGlideKind) => void;
+  /** Applies part of one drag step and lets its remaining displacement settle. */
+  readonly track: (kind: Cut3DGlideKind, deltaX: number, deltaY: number) => void;
   /** Ends a running glide at once (a new drag, a wheel step, a key). */
   readonly stop: () => void;
 };
 
 type FrameApi = Pick<typeof globalThis, 'requestAnimationFrame' | 'cancelAnimationFrame'>;
-type Sample = {
-  readonly atMs: number;
-  readonly spanMs: number;
-  readonly dx: number;
-  readonly dy: number;
-};
-
-const FRAME_MS = 1000 / 60;
-// Only the last moments of a drag set the glide's speed.
-const SPEED_WINDOW_MS = 80;
-// A drag held still this long before letting go ends without a glide.
-const STILL_MS = 60;
-const SETTLED_PX_PER_FRAME = 0.05;
+// Consume the imperceptible tail exactly rather than leave the camera short
+// of the pointer's requested distance or keep scheduling invisible frames.
+const SETTLED_PX = 0.05;
 
 export function createCut3DGlide(
   send: (kind: Cut3DGlideKind, deltaX: number, deltaY: number) => void,
-  now: () => number = () => performance.now(),
   frames: FrameApi = globalThis,
 ): Cut3DGlide {
-  let samples: Sample[] = [];
-  let lastEventMs = 0;
+  let kind: Cut3DGlideKind | null = null;
+  let remainingX = 0;
+  let remainingY = 0;
   let frameId: number | null = null;
   const stop = (): void => {
     if (frameId !== null) frames.cancelAnimationFrame(frameId);
     frameId = null;
+    kind = null;
+    remainingX = remainingY = 0;
   };
-  const glide = (kind: Cut3DGlideKind, speedX: number, speedY: number): void => {
-    let vx = speedX;
-    let vy = speedY;
-    let previous = now();
-    const step = (): void => {
-      const current = now();
-      const elapsed = Math.max(0, current - previous);
-      previous = current;
-      const fade = (1 - VIEWER3D_DAMPING_FACTOR) ** (elapsed / FRAME_MS);
-      vx *= fade;
-      vy *= fade;
-      if (Math.hypot(vx, vy) * FRAME_MS < SETTLED_PX_PER_FRAME) {
+  const step = (): void => {
+    if (kind === null || (remainingX === 0 && remainingY === 0)) return;
+    const share =
+      prefersReducedMotion() || Math.hypot(remainingX, remainingY) <= SETTLED_PX
+        ? 1
+        : VIEWER3D_DAMPING_FACTOR;
+    const dx = remainingX * share;
+    const dy = remainingY * share;
+    remainingX -= dx;
+    remainingY -= dy;
+    send(kind, dx, dy);
+    if (frameId === null && (remainingX !== 0 || remainingY !== 0)) {
+      frameId = frames.requestAnimationFrame(() => {
         frameId = null;
-        return;
-      }
-      send(kind, vx * elapsed, vy * elapsed);
-      frameId = frames.requestAnimationFrame(step);
-    };
-    frameId = frames.requestAnimationFrame(step);
+        step();
+      });
+    }
   };
   return {
-    begin: () => {
-      stop();
-      samples = [];
-      lastEventMs = now();
-    },
-    track: (deltaX, deltaY) => {
-      const nowMs = now();
-      samples.push({ atMs: nowMs, spanMs: nowMs - lastEventMs, dx: deltaX, dy: deltaY });
-      lastEventMs = nowMs;
-      samples = samples.filter((sample) => sample.atMs >= nowMs - SPEED_WINDOW_MS);
-    },
-    release: (kind) => {
-      const nowMs = now();
-      stop();
-      const recent = samples.filter((sample) => sample.atMs >= nowMs - SPEED_WINDOW_MS);
-      samples = [];
-      if (prefersReducedMotion() || nowMs - lastEventMs > STILL_MS) return;
-      const spanMs = recent.reduce((sum, sample) => sum + sample.spanMs, 0);
-      if (spanMs <= 0) return;
-      const dx = recent.reduce((sum, sample) => sum + sample.dx, 0);
-      const dy = recent.reduce((sum, sample) => sum + sample.dy, 0);
-      glide(kind, dx / spanMs, dy / spanMs);
+    begin: stop,
+    track: (nextKind, deltaX, deltaY) => {
+      if (kind !== nextKind) stop();
+      kind = nextKind;
+      remainingX += deltaX;
+      remainingY += deltaY;
+      step();
     },
     stop,
   };

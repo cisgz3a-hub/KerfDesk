@@ -9,20 +9,16 @@ function harness() {
   const queued = new Map<number, FrameRequestCallback>();
   let nextId = 0;
   const sent: Sent[] = [];
-  const glide = createCut3DGlide(
-    (kind, deltaX, deltaY) => sent.push({ kind, deltaX, deltaY }),
-    () => clock,
-    {
-      requestAnimationFrame: (callback) => {
-        nextId += 1;
-        queued.set(nextId, callback);
-        return nextId;
-      },
-      cancelAnimationFrame: (id) => {
-        queued.delete(id);
-      },
+  const glide = createCut3DGlide((kind, deltaX, deltaY) => sent.push({ kind, deltaX, deltaY }), {
+    requestAnimationFrame: (callback) => {
+      nextId += 1;
+      queued.set(nextId, callback);
+      return nextId;
     },
-  );
+    cancelAnimationFrame: (id) => {
+      queued.delete(id);
+    },
+  });
   const advance = (ms: number): void => {
     clock += ms;
   };
@@ -39,7 +35,8 @@ function harness() {
     glide.begin();
     for (let index = 0; index < frames; index += 1) {
       advance(16);
-      glide.track(pxPerFrame, 0);
+      glide.track('rotate', pxPerFrame, 0);
+      frame(0);
     }
   };
   return { glide, sent, frame, advance, drag, pending: () => queued.size };
@@ -50,41 +47,42 @@ afterEach(() => {
 });
 
 describe('createCut3DGlide', () => {
-  it('glides on after a flick and fades out like the orbit controls damping', () => {
-    const { glide, sent, frame, drag } = harness();
+  it('glides over only the remaining pointer distance and settles within a second', () => {
+    const { sent, frame, drag } = harness();
     drag(10, 5);
-    glide.release('rotate');
+    const dragCount = sent.length;
     let frames = 0;
     while (frame() && frames < 500) frames += 1;
     expect(sent.length).toBeGreaterThan(5);
     expect(sent.every((step) => step.kind === 'rotate' && step.deltaY === 0)).toBe(true);
-    // Each step is smaller than the last, and it settles well within a second.
-    for (let index = 1; index < sent.length; index += 1) {
+    // Each visible settling step is smaller; the final subpixel remainder
+    // is consumed exactly so the camera ends at the requested drag distance.
+    for (let index = dragCount; index < sent.length - 1; index += 1) {
       expect(Math.abs(sent[index]?.deltaX ?? 0)).toBeLessThan(
         Math.abs(sent[index - 1]?.deltaX ?? 0),
       );
     }
     expect(frames).toBeLessThan(60);
-    // The whole glide is what OrbitControls leaves after a steady drag:
-    // speed x (1 - damping) / damping, about 7 frames of travel.
     const travelled = sent.reduce((sum, step) => sum + step.deltaX, 0);
-    expect(travelled).toBeGreaterThan(10 * 6);
-    expect(travelled).toBeLessThan(10 * 9);
+    expect(travelled).toBeCloseTo(50, 10);
+    expect(Math.abs(sent.at(-1)?.deltaX ?? Infinity)).toBeLessThanOrEqual(0.05);
   });
 
-  it('does not glide when the drag was held still before letting go', () => {
-    const { glide, sent, frame, drag, advance } = harness();
+  it('settles while a drag is held still without adding release travel', () => {
+    const { sent, frame, drag, advance } = harness();
     drag(10, 5);
+    let frames = 0;
+    while (frame() && frames < 60) frames += 1;
+    const count = sent.length;
     advance(200);
-    glide.release('pan');
-    frame();
-    expect(sent).toEqual([]);
+    expect(frame()).toBe(false);
+    expect(sent).toHaveLength(count);
+    expect(sent.reduce((sum, step) => sum + step.deltaX, 0)).toBeCloseTo(50, 10);
   });
 
   it('stops when a new drag or any other input starts', () => {
     const { glide, sent, frame, drag, pending } = harness();
     drag(10, 5);
-    glide.release('pan');
     frame();
     const count = sent.length;
     glide.stop();
@@ -93,17 +91,18 @@ describe('createCut3DGlide', () => {
     expect(sent).toHaveLength(count);
 
     drag(10, 5);
-    glide.release('pan');
     glide.begin();
     expect(pending()).toBe(0);
   });
 
   it('does not glide when the operator asks for reduced motion', () => {
     vi.stubGlobal('matchMedia', (query: string) => ({ matches: query.includes('reduce') }));
-    const { glide, sent, frame, drag } = harness();
+    const { sent, frame, drag, pending } = harness();
     drag(10, 5);
-    glide.release('rotate');
-    frame();
-    expect(sent).toEqual([]);
+    expect(frame()).toBe(false);
+    expect(pending()).toBe(0);
+    expect(sent).toEqual(
+      Array.from({ length: 5 }, () => ({ kind: 'rotate', deltaX: 10, deltaY: 0 })),
+    );
   });
 });

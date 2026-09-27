@@ -120,12 +120,11 @@ function createPointerDrag(
       const deltaY = event.clientY - lastY;
       lastX = event.clientX;
       lastY = event.clientY;
-      glide.track(deltaX, deltaY);
-      onControl(controlForDrag(dragKind, deltaX, deltaY));
+      glide.track(dragKind, deltaX, deltaY);
     },
     end: (event) => {
       if (event.pointerId !== activePointerId) return;
-      if (event.type === 'pointerup' && dragKind !== null) glide.release(dragKind);
+      if (event.type === 'pointercancel') glide.stop();
       activePointerId = null;
       dragKind = null;
       canvas.releasePointerCapture?.(event.pointerId);
