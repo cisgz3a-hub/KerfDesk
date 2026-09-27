@@ -49,12 +49,23 @@ drawing (1254 x 1254 px) the mode took 14 to 19 s and emitted 80,860 subpaths.
      dissolves a colour with under 3 % of the flat area that lies on the sRGB mixing line of two
      others (an edge blend), and merges colours closer than 0.08.
    - **A requested count** clusters every pixel equally and merges only duplicates closer than 0.05.
+   - **Alpha appearance (2026-09-27 correction).** Colour layers compare visible sRGB over white.
+     Straight RGBA is composited once; decoder-tagged `rgbCompositedOnWhite` pixels already contain
+     that appearance and are not composited again. Every nonzero-alpha pixel participates, so the
+     former alpha-128 cutoff cannot discard a visible grey shape. Alpha-zero pixels remain void
+     regardless of hidden RGB. Palette selection and sub-pixel boundary placement read the same
+     normalized appearance. Working-grid downsampling averages these visible bytes, with a bounded
+     two-row cache rather than a second full-source image; entirely transparent cells stay void.
 3. **Clean-up** (`colour-label-cleanup.ts`). A 1-px run of an in-between colour along the seam of
-   two others goes to the nearer of the two; an isolated pixel takes its 8-neighbourhood's mode;
-   a 4-connected region under Remove specks (default 12 px, as Line Art) joins the neighbour it
+   two others goes to the nearer of the two; a pixel without a same-label 8-neighbour takes its
+   8-neighbourhood's mode; an 8-connected region under Remove specks (default 12 px, as Line Art) joins the neighbour it
    shares most edge with. Specks go smallest first and a merged region is re-measured as a whole
    (union-find), so two touching specks are judged together and neither is left behind as an
-   orphaned speck. Transparent pixels are never traced.
+   orphaned speck. The 2026-09-27 correction counts a coherent diagonal as one component, without
+   changing corner-touching boundary topology. At Remove specks zero (or a scaled working-grid
+   area at most one), all three label-reassignment passes are disabled: a deliberate dot, counter,
+   or requested intermediate-colour seam is retained. Palette selection still applies, and shared
+   edge extraction and sub-pixel finishing still run. Transparent pixels are never traced.
    - **Paper.** The paper is a colour holding at least half the border pixels that is also
      paper-light: OKLab L at least 0.65 (dark kraft #b08850 is 0.653) and within 0.05 of the
      lightest palette colour. On an exact half-and-half border the lighter candidate is taken. The
@@ -63,7 +74,9 @@ drawing (1254 x 1254 px) the mode took 14 to 19 s and emitted 80,860 subpaths.
      full-bleed red and blue flag traces both whichever colour holds the border (before this rule,
      one row of pixels decided which one was silently dropped). Limit: a light full-bleed field
      (pale yellow, or orange at L 0.73) around darker art is still taken for paper; tick Trace
-     background colour to trace it.
+     background colour to trace it. Partial alpha alone does not disable paper detection. Actual
+     alpha-zero pixels retain the existing no-paper inference for transparent artwork, so white
+     artwork on transparency is not mistaken for a page.
 4. **Shared boundaries** (`colour-regions.ts`). The label map's cracks form a planar graph: lattice
    vertices where three or more cracks meet are junctions, and each crack run between junctions is
    one chain separating exactly one pair of colours. Each chain is extracted once and finished once
@@ -74,7 +87,10 @@ drawing (1254 x 1254 px) the mode took 14 to 19 s and emitted 80,860 subpaths.
    - persistent lattice corners (60 degrees over 2 cracks, still 50 degrees over 6) and junctions
      are pinned; the rest is lightly Taubin-smoothed (G. Taubin, "A signal processing approach to
      fair surface design", SIGGRAPH 1995) and fitted with the in-house least-squares cubic fitter
-     at 0.3 px (`geometry/cubic-fit.ts`); an exactly straight cubic is written as a line.
+     at 0.3 px (`geometry/cubic-fit.ts`); an exactly straight cubic is written as a line. Closed
+     chains shorter than eight cracks retain their measured polygon: they have too few samples
+     for the persistent-corner detector, and smoothing plus the fit tolerance can otherwise
+     collapse a one-pixel dot or counter to a zero-area line.
 
    Every colour's outline is assembled from whole chains, forward or reversed, so two neighbours
    share the identical curve: zero gap and zero overlap by construction. At a vertex where a
@@ -160,6 +176,14 @@ drawing (1254 x 1254 px) the mode took 14 to 19 s and emitted 80,860 subpaths.
   `ColourLayerTraceSettingsControls.test.tsx`, `colour-layer-commit.test.ts`, and
   `colour-layers-real-art.test.ts`, which runs the table above when `COLOUR_LAYER_ART_DIR` names a
   folder holding the two images.
+
+- The 2026-09-27 corrections also have public-entry regressions in `colour-layer-detail.test.ts`
+  (horizontal, vertical and both diagonal hairlines at speck areas zero and 12, deliberate dots,
+  counters and a third-colour seam) and `colour-layer-alpha.test.ts` (straight/tagged/flattened
+  appearance, Keep background, white artwork and holes on transparency, hidden RGB).
+  `colour-appearance.test.ts` checks integer and fractional downsampling against independent
+  byte averages; `colour-trace-alpha.integration.test.ts` uses the real decoder helper. These
+  correctness checks do not requalify the historical real-art timings above or material output.
 
 Not part of this decision: removing imagetracerjs's multi-colour mode; keeping shared seams through
 CNC fairing; per-colour operation names; importing a palette from the operator's materials.

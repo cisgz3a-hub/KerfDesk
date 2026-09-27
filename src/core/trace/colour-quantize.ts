@@ -24,6 +24,7 @@ import {
   TRANSPARENT_LABEL,
 } from './colour-label-cleanup';
 import type { RawImageData } from './trace-image';
+import { colourAppearance } from './colour-appearance';
 
 export { TRANSPARENT_LABEL } from './colour-label-cleanup';
 
@@ -43,7 +44,7 @@ export type QuantizedColours = {
   readonly labels: Uint8Array;
   /** OKLab per pixel (3 floats). */
   readonly lab: Float32Array;
-  /** The source RGBA bytes, read for sub-pixel boundary placement. */
+  /** Visible RGB over white (alpha=0 stays void), read for boundary placement. */
   readonly rgba: RawImageData['data'];
   readonly palette: ReadonlyArray<PaletteColour>;
   /** Palette index of the detected paper colour, or null. */
@@ -54,7 +55,8 @@ export type QuantizedColours = {
 export type QuantizeOptions = {
   /** Maximum palette size including background; undefined = automatic. */
   readonly colours?: number;
-  /** Regions (4-connected) below this pixel area join a neighbour. */
+  /** Regions (8-connected) below this pixel area join a neighbour.
+   *  At 1 or less, retain the quantized labels without destructive cleanup. */
   readonly minRegionPx: number;
 };
 
@@ -70,17 +72,19 @@ const BACKGROUND_MIN_BORDER_SHARE = 0.5;
 // full-bleed flag), so every colour is traced instead of silently dropping one.
 const PAPER_LIGHTNESS_MARGIN = 0.05;
 export const PAPER_MIN_LIGHTNESS = 0.65;
-const ALPHA_OPAQUE_MIN = 128;
 
-export function quantizeColours(image: RawImageData, options: QuantizeOptions): QuantizedColours {
+export function quantizeColours(source: RawImageData, options: QuantizeOptions): QuantizedColours {
+  const image = colourAppearance(source);
   const { width, height } = image;
   const { lab, opaque, hasTransparency } = okLabPixels(image);
   const weights = flatnessWeights(lab, opaque, width);
   const centres = choosePalette(image, opaque, weights, options.colours);
   const grid = { labels: assignLabels(lab, opaque, centres), width, height };
-  if (centres.length > 2) giveMixturesToNeighbours(grid, lab, weights, centres);
-  modeFilterIsolatedPixels(grid);
-  absorbSmallRegions(grid, options.minRegionPx);
+  if (options.minRegionPx > 1) {
+    if (centres.length > 2) giveMixturesToNeighbours(grid, lab, weights, centres);
+    modeFilterIsolatedPixels(grid);
+    absorbSmallRegions(grid, options.minRegionPx);
+  }
   const requested = options.colours !== undefined;
   const palette = finalPalette(grid.labels, lab, weights, centres.length, {
     uniform: requested,
@@ -112,7 +116,7 @@ function okLabPixels(image: RawImageData): {
   const data = image.data;
   for (let i = 0; i < n; i += 1) {
     const o = i * 4;
-    if ((data[o + 3] ?? 255) < ALPHA_OPAQUE_MIN) {
+    if (data[o + 3] === 0) {
       hasTransparency = true;
       continue;
     }
