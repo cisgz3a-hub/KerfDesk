@@ -1,4 +1,4 @@
-## ADR-273 Amendment 1 - Relief groups record no ramp entry, because relief passes plunge (2026-09-27)
+## ADR-273 Amendment 1 - Relief groups record no ramp entry they do not cut (2026-09-27)
 
 **Status:** Accepted; software-verified through compile, emitter and Job Review tests; motion
 unchanged. | **Date:** 2026-09-27
@@ -51,67 +51,80 @@ Two remedies were weighed: stop claiming the ramp, or make relief rings ramp. A 
   so 1.99 of its 2 mm descent stayed a plunge.
 
 A relief ramp that works has to start from the level above, wrap round short rings, and deal with
-loops too small to ramp on. Open PR #939 (ADR-424) plans such a ramp; this amendment does not
-duplicate it.
+loops too small to ramp on. ADR-424 (PR #939) ramps relief roughing that way. It merged on
+2026-09-27 while this amendment was in review; this amendment does not duplicate it. On current
+main, relief finishing is the stage that still plunges under a claimed ramp.
 
 ### Decision
 
 1. **A relief group records no ramp entry it does not cut.** `reliefGroup` passes
    `includeRampEntry: false`, as the V-carve clearing group already does and as relief already
-   declines the layer's requested depth. Relief roughing and finishing G-code headers therefore
-   carry no `; cnc entry:` line, which is how every group that plunges reads. A relief planner
-   that ramps records its angle on the group it ramps.
+   declines the layer's requested depth, so a relief group's generic provenance never copies the
+   layer's angle. A relief stage that ramps records its angle itself: since ADR-424 the roughing
+   group sets `rampEntryDeg` when it ramps, and its header keeps `; cnc entry: contour-ramp`.
+   Relief finishing, whose rows plunge, carries no `; cnc entry:` line, which is how every group
+   that plunges reads.
 2. **Job Review names the relief stages that plunge.** The compiled job decides: a relief group
    without `rampEntryDeg` plunges. The operation line keeps the layer's request and adds those
-   stages: `ramp entry 5° (relief passes plunge)`, or `(relief roughing plunges)` or
-   `(relief finishing plunges)` when only one stage does. The same note qualifies a helix entry
-   request and a V-carve's `requested entry 3° (medial depth profile governs; relief passes
-   plunge)`.
-3. **Motion is unchanged.** Only the header comments of relief groups on a layer with a ramp angle
-   change. `EMITTER_REVISION` advances to `relief-entry-provenance-20260927-v1`.
+   stages: `ramp entry 5° (relief finishing plunges)`, `(relief roughing plunges)`, or
+   `(relief passes plunge)` when both do. The same note qualifies a helix entry request and a
+   V-carve's `requested entry 3° (medial depth profile governs; relief passes plunge)`.
+3. **Motion is unchanged.** Only the entry comments of relief groups that plunge change.
+   `EMITTER_REVISION` advances; merged with main after ADR-424 it reads
+   `adaptive-flat-slices-relief-entry-20260927-v1`.
 
 Not chosen: keeping the angle on relief groups as `requested-max-angle-deg` with a plunge
 advisory, the pattern ADR-285 item 6 uses for V-carve. A V-carve's ramp request belongs to that
 operation alone, while a layer's ramp belongs to its other shapes. The advisory would also have to
-learn which relief planner ramps, and would mislabel PR #939's roughing, which does.
+learn which relief planner ramps, and would mislabel ADR-424's roughing, which does.
 
 ### Consequences
 
-- Relief roughing and finishing headers no longer claim a contour ramp over a straight plunge.
+- No relief header claims a contour ramp over a straight plunge: roughing records only the ramp
+  it cuts (ADR-424), finishing records none.
 - Job Review no longer shows an unqualified ramp on a layer whose relief passes plunge.
 - The layer card still shows Ramp entry on relief layers whose cut type has it. It ramps the
-  layer's other shapes.
+  layer's other shapes and, since ADR-424, relief roughing.
 - Not changed: a generic ramp on a path shorter than the ramp finishes its descent straight down
   at the path end (WORKFLOW F-CNC18) under a `max-angle-deg` header. That concerns profiles and
   pockets, not relief, and needs its own decision.
-- Merge notes: PR #939 (ADR-424) makes relief roughing ramp. Its roughing group sets
-  `rampEntryDeg` explicitly, so with this amendment its roughing records the angle, its finishing
-  group stops claiming one, and Job Review reads `(relief finishing plunges)` with no further
-  edit. PRs #939 and #952 also change `EMITTER_REVISION`; whichever lands later takes a combined
-  value.
+- Integration: PR #939 (ADR-424) merged first. Its roughing group sets `rampEntryDeg` itself, so
+  on the integrated branch roughing records the ramp it cuts, finishing records none, and Job
+  Review reads `(relief finishing plunges)`. Only the emitter metadata conflicted; this amendment
+  landed as 66e073ef2 (PR #957). Open PR #952 also changes `EMITTER_REVISION` and needs a
+  combined value when it lands.
 
 ### Verification
 
 - `compile-cnc-relief-entry-provenance.test.ts` compiles the flat relief with a 5 degree ramp,
   with a finishing ball nose and beside a square profile, and emits it. It states the rule: a
   group records `rampEntryDeg` and its header names the ramp exactly when its first descent below
-  the stock top travels along its path; otherwise that descent is a straight `G1 Z… F300`. The
-  relief groups claim nothing and plunge; the square claims its 5 degree ramp and descends along
-  its path. Against the previous compiler both cases fail:
-  `expected 'G1 Z-1.500 F300' to match` the along-path pattern.
+  the stock top travels along its path; otherwise that descent is a straight `G1 Z… F300`. Before
+  ADR-424 the relief groups claimed nothing and plunged; after it, roughing claims its ramp and
+  descends along its first ring while finishing claims nothing and plunges. The square claims its
+  5 degree ramp and descends along its path. Against the compiler before this amendment both
+  cases fail: `expected 'G1 Z-1.500 F300' to match` the along-path pattern.
 - `job-review-relief-entry.test.ts` checks which compiled relief stages count as plunging, and
   the operation line for ramp, helix and V-carve requests. `JobReviewLayersTable.test.tsx` checks
   the line in the rendered table. Against the previous code the first file fails in all three
   cases.
-- A 40 mm dome relief with roughing and finishing, emitted before and after: the programs differ
-  only by the two removed `; cnc entry: contour-ramp; max-angle-deg: 5.000` lines; all 18,248
-  other lines are identical.
-- In the running app (Vite dev server, CNC mode, the flat relief with a 5 degree ramp and a
-  finishing bit), the app's own output preparation gave both relief groups no ramp and no entry
-  line, and Job Review's operation line read `… · ramp entry 5° (relief passes plunge) · …`.
-  The Job Review dialog itself was not opened: Start preparation needs a connected controller.
+- Before ADR-424 landed, a 40 mm dome relief with roughing and finishing, emitted before and after
+  this change: the programs differ only by the two removed
+  `; cnc entry: contour-ramp; max-angle-deg: 5.000` lines; all 18,248 other lines are identical.
+- Before ADR-424 landed, in the running app (Vite dev server, CNC mode, the flat relief with a
+  5 degree ramp and a finishing bit), the app's own output preparation gave both relief groups no
+  ramp and no entry line, and Job Review's operation line read
+  `… · ramp entry 5° (relief passes plunge) · …`. The Job Review dialog itself was not opened:
+  Start preparation needs a connected controller.
 - A trial merge with PR #939 at 7832643af: relief roughing claims the ramp and enters along its
   path (`G1X8.890Y391.110Z-0.097F1000`), finishing claims nothing and plunges
   (`G1 Z-3.000 F300`), Job Review names only relief finishing, and all the tests above pass. PR
   #939 alone still has its finishing group claim the ramp above that plunge.
+- On the branch integrated with main after ADR-424 (9f5c09a12, merged as 66e073ef2), the same
+  flat relief with a finishing bit: roughing claims its ramp and enters along its first ring, finishing claims none
+  and enters with `G1 Z-3.000 F300`, and Job Review reads
+  `… · ramp entry 5° (relief finishing plunges) · …`. `pnpm typecheck` passes. The relief, CNC,
+  output, G-code and Job Review suites pass 2,222 tests. Five others timed out under machine
+  load. Run alone, three pass; the other two pass their assertions given more time, in 5.1 to
+  6.3 s with or without this change, against vitest's 5 s default.
 - No hardware run was made. Motion is unchanged.
