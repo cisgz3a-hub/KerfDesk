@@ -74,7 +74,7 @@ Sierra variants).
 | LBG-C01 | Perforation (cut length and skip length) on Line layers | `R/CutSettingsEditor/LineMode/` | Missing | S-M | Built (ADR-415) |
 | LBG-C02 | Overcut past the start of closed shapes | `R/CutSettingsEditor/LineMode/` | Missing for laser (CNC dogbone only) | S | Built (ADR-415) |
 | LBG-C03 | Image overscan you can set per operation | `R/CutSettingsEditor/ImageMode/` | Fixed 5 mm (`DEFAULT_OVERSCAN_MM`, `src/core/job/compile-job-raster.ts`) | S | Built (ADR-415). Follow-up: map LightBurn's perforation, overcut and overscan fields in `.lbrn`/`.clb` import |
-| LBG-C04 | Best start point and "choose corners" for closed shapes | `R/OptimizationSettings/` | Closed shapes start at their drawn start point (`src/core/job/segment-entry-index.ts`) | M | Built: Cut Planner "Start closed shapes" (`closedShapeStart`, `src/core/job/closed-shape-start.ts`) |
+| LBG-C04 | Best start point and "choose corners" for closed shapes | `R/OptimizationSettings/` | Closed shapes start at their drawn start point (`src/core/job/segment-entry-index.ts`) | M | Built (ADR-494) |
 | LBG-C05 | Tabs: click-placed laser tabs, even spacing, maximum count, tab cut power | `R/AddTabs/` | Count, size and skip-inner only (`src/core/geometry/tabs-bridges.ts`) | M | Built (ADR-494) |
 | LBG-C06 | Image scan angle 0/90/180 and Angle Increment per pass | `R/CutSettingsEditor/ImageMode/` | Images always scan along X (`src/core/raster/raster-sweep-plan.ts`) | M-L | open |
 | LBG-C07 | Sort Cuts Last; bulk Enable/Disable/Invert/Hide Others in the operations list | `R/CutsLayersWindow/` | Missing | S | Built (ADR-480). Follow-up: bulk air assist switches |
@@ -162,8 +162,10 @@ Each batch is one pull request with its own decision record, tests and WORKFLOW.
   no machine. Built in ADR-480.
 - **Batch 6 — moving the machine:** LBG-T15, LBG-M02, LBG-M07. Chosen with batch 5 on 2026-09-27.
   Built in ADR-493.
-- **Next candidates, in order:** LBG-C04, LBG-C05, LBG-I01, LBG-I02, LBG-C06, LBG-T04, LBG-T06,
-  LBG-T08, LBG-T09, LBG-F06.
+- **Batch 7 — closed-shape starts and laser tabs:** LBG-C04, LBG-C05. Changes G-code only when a
+  project or operation turns them on. Built in ADR-494.
+- **Next candidates, in order:** LBG-I01, LBG-I02, LBG-C06, LBG-T04, LBG-T06, LBG-T08, LBG-T09,
+  LBG-F06.
 - **Not in these batches:** the Camera feature rebuild thread owns LBG-M13 (several cameras per
   device) and is also building camera print-and-cut, trace from the camera image and object
   detection. LBG-M09 (Print and Cut out of Labs) stays unscheduled here until that work lands, so
