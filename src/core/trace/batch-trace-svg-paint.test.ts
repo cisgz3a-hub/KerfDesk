@@ -49,7 +49,11 @@ function svgPaths(text: string): Element[] {
   return [...document.querySelectorAll('path')];
 }
 
-function exportPaths(paths: ColoredPath[], traceMode: TraceOptions['traceMode'], group = false) {
+function exportPaths(
+  paths: ColoredPath[],
+  traceMode: NonNullable<TraceOptions['traceMode']>,
+  group = false,
+) {
   return traceImagesToVectorFiles(
     [
       {
