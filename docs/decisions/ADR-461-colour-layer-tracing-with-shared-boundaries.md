@@ -208,28 +208,46 @@ regressions it introduced:
 **Decision.**
 
 1. **Speck area follows traced connectivity** (`colour-label-cleanup.ts`). Regions are
-   4-connected, like the traced outlines. The one exception is a straight 1-px diagonal hairline.
+   4-connected, like the traced outlines. The one exception is a 1-px aliased hairline at any angle.
    Two corner-touching pixels count as one region only when all of these hold:
    - they have the same label;
-   - the diagonal continues straight for at least a third pixel;
-   - neither pixel has more than two same-label 8-neighbours;
+   - the line carries on past the corner: either straight on along the diagonal (a 45-degree
+     line), or both corner pixels continue into thin same-label runs away from the corner (an
+     aliased line at any other angle joins axis-aligned runs with single diagonal steps), or one
+     continues and the other is the line's last pixel;
+   - neither corner pixel has more than two same-label 8-neighbours;
    - both off-diagonal pixels belong to solid surroundings, not 1-px islands.
 
-   A checkerboard fails the last test, dither pairs and zigzags fail the straight-run test, and 2 x 2
-   blocks fail the thinness test. The isolated-pixel mode filter uses the same rule: a pixel is left
-   alone only if it has a same-label 4-neighbour or a hairline link. After a region is absorbed, it
-   joins its 4-neighbours of the same label, plus any hairline it now continues.
+   A checkerboard fails the last test, isolated dither pairs and zigzags fail the run-on test, and
+   2 x 2 blocks fail the thinness test. The isolated-pixel mode filter uses the same rule: a pixel is
+   left alone only if it has a same-label 4-neighbour or a hairline link. After a region is absorbed,
+   it joins its 4-neighbours of the same label, plus any hairline it now continues.
 2. **Anti-aliased fringe against transparency stays void** (`colour-appearance.ts`,
-   `transparencyFringe`). A partial-alpha pixel is void when both hold:
-   - its alpha is less than half the peak alpha within 2 px (the nearby ink's own opacity);
+   `transparencyEdges`). A partial-alpha pixel is void when both hold:
+   - its alpha is less than half the alpha of ink of the same colour within 2 px;
    - it connects (8-way, through such fringe) to an alpha-zero pixel.
 
    This puts the edge at about 50 % coverage of the ink's own opacity. Alpha 128 and above is never
-   fringe, so this voids a subset of what the old alpha-128 cutoff voided. Translucent ink stays
-   traced: an alpha-64 disc keeps its interior and loses only its own faint rim. Artwork with no
-   alpha-zero pixel is unaffected, so straight, tagged and flattened opaque-canvas alpha still agree.
-   Working-grid downsampling treats fringe pixels as void too.
-3. **Soft shadows and glows are intended to come in as layers.** A drop shadow or glow of partial
+   fringe, so this voids a subset of what the old alpha-128 cutoff voided. The remaining partial
+   pixels of that edge (from the void inwards, alpha rising) show the colour of the same-colour
+   plateau within 2 px, not a lighter mixture, so a requested colour count no longer splits the edge
+   off as a grey crumb layer. A smooth glow or shadow has no plateau nearby and keeps its own
+   appearance. Artwork with no alpha-zero pixel is unaffected, so straight, tagged and flattened
+   opaque-canvas alpha still agree.
+3. **The working grid keeps the same edge.** Above 4 MP, `resampleColourAppearance` treats fringe
+   as void, makes a working cell ink only when at least half of its area is visible, and colours it
+   by its visible pixels alone.
+
+What is kept, precisely:
+- *Hairlines.* A 1-px aliased line keeps every pixel label at the default speck area when it is
+  at least 12 px long, at any angle; the traced outline can still shave one pixel centre near a tip,
+  as on `origin/main`. Shorter strokes are specks by design.
+- *Translucent ink.* Ink below alpha 128 is traced when it is not the faint side of a same-colour
+  edge: a flat alpha-64 disc keeps its interior and loses only its own faint rim, and a flat
+  alpha-100 halo 2 px or wider around different opaque ink is traced whole. A translucent pixel
+  under half the opacity of the same colour within 2 px, and reached from alpha zero through such
+  pixels, is edge fringe and stays void.
+4. **Soft shadows and glows are intended to come in as layers.** A drop shadow or glow of partial
    alpha is visible over white, so it is traced like any other visible colour. Typically it adds 1
    to 3 grey or tinted band layers (only its faintest outer rim is fringe). Delete those layers, or
    choose fewer colours, to leave them out.
@@ -251,16 +269,54 @@ decoder-tagged alpha, one session. Columns: pre-correction parent `1f8a3b4de~1` 
 The two real-art images come from `colour-layers-real-art.test.ts` (run with
 `COLOUR_LAYER_ART_DIR`). Owl trace time: parent 1.8-2.6 s, main 1.8-3.0 s, amendment 1.7-2.5 s,
 on a shared machine. The amendment keeps up to about 8 % more subpaths than the parent (owl +95 at
-Auto, hummingbird +128). These are the straight diagonal hairlines the 2026-09-27 correction set out
-to keep.
+Auto, hummingbird +128), from the 45-degree hairlines it keeps.
+
+**Review round (2026-09-28).** A review of the amendment found that it kept only exact 45-degree
+hairlines, voided a translucent halo 2-3 px wide around different opaque ink, still grew
+anti-aliased art above 4 MP (working grid) and still split a grey crumb layer off at a requested
+colour count there, and scanned every partial pixel of an image with no alpha zero. Decisions 1-3
+above are the corrected rules. Numbers from one session on a shared machine; area is the polygon
+area of the traced outlines. Columns: `origin/main` (review probe, same fixtures) / first cut of
+this amendment `e5eafac32` / after the review.
+
+| Case | main | First cut | After review |
+| --- | --- | --- | --- |
+| 1-px Bresenham lines at about 9-81 degrees (61 px), despeckle 12: pixel centres covered | 59-61 | 0 at about 9, 18, 27, 72 and 81 degrees, 57 at 56 degrees | 59-61 |
+| 60 x 60 checkerboard patch: subpaths, median ms | 1,801, 116 | 1, 13 | 1, 14 |
+| Dithered ramp 128 x 64: subpaths, median ms | 620, 59 | 2, 7 | 21, 8 |
+| Disc r = 20 on transparency, area error: Auto / N = 2 | +6.2 % / -0.8 % + grey layer | +0.9 % / +0.9 % | +0.9 % / +0.9 % |
+| 4 px ring on transparency, area error: Auto / N = 2 | +30.3 % / -3.8 % + grey layer | +0.1 % / +0.1 % (N = 2 ink #020202) | +0.1 % / +0.1 % (#000000) |
+| 2,900 px ring (8.4 MP, working scale 0.69), 10 px thick, area error: Auto / N = 2 | +27.7 % / +26.6 %, #bebebe layer of 1,344 subpaths | +18.8 % / -8.4 %, #b0b0b0 layer of 872 subpaths | +0.7 % / +0.7 %, one layer |
+| 1,900 px ring (native), N = 2 / N = 3 | not measured | not measured | one #000000 layer each (a #505050 / #1f1f1f crumb layer before the edge lift) |
+| Alpha-100 halo around an opaque disc, 2 / 3 / 6 px: halo pixels traced | 32/32, 140/140, 492/492 | 0/32, 0/140, 492/492 | 32/32, 140/140, 492/492 |
+| 2,900 px radial glow, all alpha partial: fringe scan / full trace | - / 3.7 s | 0.62 s / 3.4 s | 0.02 s / 3.5 s |
+| Owl, subpaths at N = Auto / 2 / 3 / 4 | 6,451 / 6,450 / 8,300 / 14,028 | 2,341 / 2,342 / 3,613 / 5,068 | 2,659 / 2,659 / 3,820 / 5,375 |
+| Hummingbird, subpaths at N = Auto / 2 / 3 / 4 | 5,156 / 5,152 / 7,026 / 8,887 | 1,754 / 1,803 / 2,799 / 3,263 | 2,025 / 2,075 / 2,961 / 3,428 |
+
+The angled hairlines cost some subpaths: owl +318 at Auto (+14 % on the first cut, +18 % on the
+parent), hummingbird +271 (+15 %, +25 % on the parent), still 59 % and 61 % fewer than `origin/main`.
+The dithered ramp keeps 21 outlines where diagonal-stepped dither runs read as short aliased lines.
+Owl trace time 1.8-2.7 s for both cuts. Memory: the fringe mask is 1 byte
+a pixel plus one map entry per lifted edge pixel, allocated only when an image has alpha zero beside
+partial alpha.
 
 **Tests.** `colour-layer-regressions.test.ts`, 16 cases, 15 of which fail on `origin/main`:
-- the checkerboard and dithered ramp at defaults;
+- the checkerboard and dithered ramp at defaults (ramp bound 25 subpaths, was 40 in the first cut);
 - the disc and the 4 px ring on transparency, straight and tagged, at Auto, N = 2 and N = 3 (one
   ink layer, area within 2 % and 5 %);
 - an alpha-64 disc on transparency traced at its own half-coverage edge (within 2 %);
 - the soft drop shadow, which asserts 1 to 3 extra grey layers as intended behaviour.
 
-The 2026-09-27 tests stay green unchanged: `colour-layer-detail.test.ts` (hairlines at speck areas
-0 and 12, dots, counters and seams), `colour-layer-alpha.test.ts`, `colour-appearance.test.ts` and
+`colour-layer-edge-cases.test.ts`, 15 cases, 13 of which fail on the first cut `e5eafac32`:
+- Bresenham lines at about 9, 18, 27, 56, 63, 72 and 81 degrees at despeckle 12, Auto and N = 2
+  (at most two tip pixel centres missed);
+- alpha-100 halos 2, 3 and 6 px wide around an opaque disc, straight and tagged, at Auto and N = 3
+  (the 6 px halos pass on both, as controls);
+- a 256 px anti-aliased ring resampled to 177 px as the > 4 MP path does, straight and tagged, at
+  Auto and N = 2 (one layer, area within 3 %).
+
+`colour-appearance.test.ts` changed one expectation on purpose: a half-visible working cell is
+coloured by its visible pixels (127), no longer lightened by its void half (191); a quarter-visible
+cell is now void. The other 2026-09-27 tests stay green unchanged: `colour-layer-detail.test.ts`
+(hairlines at speck areas 0 and 12, dots, counters and seams), `colour-layer-alpha.test.ts` and
 `colour-label-cleanup.test.ts`.
