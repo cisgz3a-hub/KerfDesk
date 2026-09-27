@@ -28,9 +28,7 @@ export {
   countOutputVectorSegments,
   PREPARATION_COMPILED_SEGMENT_BUDGET,
   PREPARATION_RAW_VECTOR_SEGMENT_BUDGET,
-  scenePreparationSize,
   scenePreparationTooComplex,
-  type ScenePreparationSize,
 } from './preparation-complexity';
 export type {
   JobOriginAnchor,

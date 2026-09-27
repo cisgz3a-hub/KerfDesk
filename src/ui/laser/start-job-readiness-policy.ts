@@ -8,11 +8,8 @@ import {
   type StatusReport,
 } from '../../core/controllers/grbl';
 import { hasSendableGcodeLine } from '../../core/controllers/grbl/sendable-line-scan';
-import {
-  PREPARATION_COMPILED_SEGMENT_BUDGET,
-  scenePreparationSize,
-  type Job,
-} from '../../core/job';
+import { PREPARATION_COMPILED_SEGMENT_BUDGET, type Job } from '../../core/job';
+import { scenePreparationSize } from '../../core/job/preparation-complexity';
 import { rasterPreparationTooComplex } from '../../core/job/raster-preparation-complexity';
 import { COMPILE_INTEGRITY_PREFLIGHT_CODES, type PreflightIssue } from '../../core/preflight';
 import { laserModuleAbsentJobWarning } from '../../core/preflight/laser-module-readiness';
