@@ -13,6 +13,6 @@ export function validateTracedImageMetadata(
     optionalString(obj, `${path}.traceSourceId`),
     optionalPositiveInteger(obj, `${path}.tracePixelWidth`),
     optionalPositiveInteger(obj, `${path}.tracePixelHeight`),
-    optionalLiteral(obj, `${path}.traceMode`, ['filled-contours', 'centerline', 'edge']),
+    optionalLiteral(obj, `${path}.traceMode`, ['filled-contours', 'centerline', 'edge', 'hybrid']),
   ]);
 }

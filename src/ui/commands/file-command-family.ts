@@ -61,6 +61,14 @@ export function fileCommands(ctx: AppCommandContext): ReadonlyArray<AppCommand> 
       ctx.saveGcode,
       'Ctrl+Shift+E',
     ),
+    ...artworkExportCommands(ctx),
+    ...gcodeInspectorCommands(ctx),
+  ];
+}
+
+/** Export artwork as SVG / DXF / PDF / EPS / GeoJSON (ADR-431, ADR-468). */
+function artworkExportCommands(ctx: AppCommandContext): ReadonlyArray<AppCommand> {
+  return [
     enabled(
       'file.export-svg',
       'file',
@@ -68,6 +76,33 @@ export function fileCommands(ctx: AppCommandContext): ReadonlyArray<AppCommand> 
       'Export selected artwork, or all artwork when nothing is selected, as SVG',
       ctx.exportSvg,
     ),
-    ...gcodeInspectorCommands(ctx),
+    enabled(
+      'file.export-dxf',
+      'file',
+      ctx.hasSelection ? 'Export selected artwork as DXF...' : 'Export artwork as DXF...',
+      'Export selected artwork, or all artwork when nothing is selected, as a millimetre DXF',
+      ctx.exportDxf,
+    ),
+    enabled(
+      'file.export-pdf',
+      'file',
+      ctx.hasSelection ? 'Export selected artwork as PDF...' : 'Export artwork as PDF...',
+      'Export selected artwork, or all artwork when nothing is selected, as a vector PDF',
+      ctx.exportPdf,
+    ),
+    enabled(
+      'file.export-eps',
+      'file',
+      ctx.hasSelection ? 'Export selected artwork as EPS...' : 'Export artwork as EPS...',
+      'Export selected artwork, or all artwork when nothing is selected, as Encapsulated PostScript',
+      ctx.exportEps,
+    ),
+    enabled(
+      'file.export-geojson',
+      'file',
+      ctx.hasSelection ? 'Export selected artwork as GeoJSON...' : 'Export artwork as GeoJSON...',
+      'Export selected artwork, or all artwork when nothing is selected, as GeoJSON in millimetres',
+      ctx.exportGeoJson,
+    ),
   ];
 }

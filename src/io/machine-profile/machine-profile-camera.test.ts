@@ -79,11 +79,13 @@ describe('machine profile camera metadata', () => {
         reviewNotes: [],
       });
     const result = deserializeMachineProfileDocument(
-      document({ ...profileWithCamera(), otherCameraModels: [other] }),
+      document({ ...profileWithCamera(), laserArcMoves: 'off', otherCameraModels: [other] }),
     );
     expect(result.kind).toBe('ok');
     if (result.kind !== 'ok') return;
     expect(result.document.profile.otherCameraModels).toEqual([other]);
+    expect(result.document.profile.cameraModel).toEqual(savedCameraModel());
+    expect(result.document.profile.laserArcMoves).toBe('off');
     // An entry with no camera binding could never be matched to a camera.
     const raw = JSON.parse(document(profileWithCamera())) as { profile: Record<string, unknown> };
     raw.profile['otherCameraModels'] = [other, savedCameraModel()];

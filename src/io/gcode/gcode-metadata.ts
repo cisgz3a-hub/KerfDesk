@@ -78,22 +78,18 @@ export type GcodeMetadata = {
  * pass from the allowance-bearing region's cleared stock (2026-09-27), and
  * ADR-154 amendment 2's adaptive pocket finishing rings that end where they
  * start, and ADR-273 amendment 1's relief group headers that no longer claim
- * a ramp entry for a relief stage that actually plunges, and ADR-445's shared
+ * a ramp entry for a relief stage that actually plunges, and ADR-432's native
+ * laser G2/G3 arcs with represented-arc validation and G17, and ADR-445's shared
  * split scan exit/entry runways, canonical meeting endpoints and compact
- * Fill/4040 Image motion words, and ADR-471's ramp
- * entries that lap short loops, zig-zag open paths, start from the level
- * their path was last cut to, and disclose the plunges they keep on paths
- * shorter than one cut width.
+ * Fill/4040 Image motion words, retaining ADR-460's lossless Fill compaction,
+ * and ADR-471's short-loop laps and open-path zig-zags from prior cut depth.
  */
-// ADR-427 integration also cuts deepest cleanup before linked relief rings;
-// all adaptive ring closure and flat depth-slice provenance above is retained.
-// Scan timing v2 also preserves M3 state across shared, empty and coincident
-// Image handoffs (ADR-445); cached v1 output must be regenerated.
-// ADR-368 amendment 3 sizes ball-nose, V-bit and engraving pocket and profile
-// offsets, tab windows, and pocket and relief-roughing stepover by the cut
-// width at depth.
-// ADR-457's independent finishing recipes survive the ramp transformation.
-export const EMITTER_REVISION = 'adaptive-relief-ramp-laps-cut-width-scan-timing-20260927-v1';
+// ADR-427 keeps deepest cleanup before linked relief rings and flat depth slices.
+// ADR-368 sizes nonflat pocket/profile offsets, tabs and stepover by cut width.
+// Tracer batch 3 preserves bounded chords, shared seams and Line + fill.
+// Native arcs and compact Fill retain scan v2's shared/empty/coincident M3 handoffs.
+// ADR-471 discloses sub-width plunges; ADR-457 finishing recipes survive ramping.
+export const EMITTER_REVISION = 'trace-arcs-relief-width-ramp-scan-v2-20260927-v5';
 
 // Machine-specific assumption lines (ADR-103 defect fix): router exports
 // previously carried the laser-worded `$32=1 (laser mode)` banner. The S

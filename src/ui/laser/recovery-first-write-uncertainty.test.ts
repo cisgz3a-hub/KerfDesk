@@ -106,7 +106,7 @@ describe('recovery source and first-write authority', () => {
       expect(retained?.interruption.kind).toBe('write-failed');
       expect(retained?.ackedLines).toBe(0);
       if (retained?.artifact.kind !== 'exact-execution') throw new Error('Lost attempted resume.');
-      expect(retained.artifact.laserResumeChain).toEqual([{ fromLine, version: 3 }]);
+      expect(retained.artifact.laserResumeChain).toEqual([{ fromLine, version: 4 }]);
       expect(retained.artifact.gcode).toContain('resume preamble');
       expect(repository.getSnapshot().pendingStart).toBeNull();
       expect(retained.claim).toBeUndefined();

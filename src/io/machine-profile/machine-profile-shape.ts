@@ -21,6 +21,7 @@ import {
 } from '../../core/devices/device-profile';
 import { cncSubProfileIssues } from '../../core/devices/cnc-sub-profile-validation';
 import { isScanOffsetCalibrationStatus } from '../../core/devices/scan-offset-profile';
+export { laserArcMovesEntry } from '../../core/devices/laser-arc-moves';
 import { validateCameraProfileShape } from '../../core/camera';
 import { normalizeCameraModelRecord } from '../../core/camera/model/camera-model-record';
 import { normalizeOtherCameraModels } from '../../core/camera/model/saved-cameras';

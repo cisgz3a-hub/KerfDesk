@@ -36,6 +36,17 @@ const FAMILIES: ReadonlyArray<{
     },
   },
   {
+    preset: 'Line + fill',
+    overrides: {},
+    labels: {
+      'Remove ink specks': 'despeckleMinPixels',
+      'Ignore Less Than': 'ignoreLessThanPixels',
+      'Max stroke width': 'hybridMaxStrokeWidthMm',
+      Smoothness: 'smoothness',
+      Optimize: 'optimize',
+    },
+  },
+  {
     preset: 'Edge Detection',
     overrides: {},
     labels: {

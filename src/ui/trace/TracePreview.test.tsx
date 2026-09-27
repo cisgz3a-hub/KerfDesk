@@ -68,13 +68,13 @@ describe('TracePreview source overlay controls', () => {
   it('shows traced nodes when Show Points is toggled', async () => {
     const { host, root } = await renderPreview();
     try {
-      expect(host.querySelector('[aria-label="Trace points"]')).toBeNull();
+      expect(host.querySelector('[aria-label="Trace nodes"]')).toBeNull();
       const button = findButton(host, 'Show Points');
       expect(button).not.toBeNull();
       await act(async () => {
         button?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
       });
-      const points = host.querySelector('[aria-label="Trace points"]');
+      const points = host.querySelector('[aria-label="Trace nodes"]');
       expect(points).not.toBeNull();
       expect(points).toBeInstanceOf(HTMLCanvasElement);
       expect(points?.children).toHaveLength(0);
