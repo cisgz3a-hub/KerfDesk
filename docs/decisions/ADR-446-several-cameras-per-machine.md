@@ -20,7 +20,8 @@ already refuses with "belongs to a different camera".
    versions still read it. The calibrations of the machine's other cameras go in
    `otherCameraModels`, each bound to its camera. Projects and machine profile files carry the
    list. An invalid entry, or one with no capture binding, is dropped on project load, and a
-   machine profile file with one is refused, like an invalid `cameraModel`.
+   machine profile file with one is refused, like an invalid `cameraModel`. An empty list is
+   accepted as no other calibrations and is omitted from the canonical profile.
 2. **Which model is used (`core/camera/model/saved-cameras.ts`, `ui/camera/active-camera-model.ts`).**
    Every camera feature (overlay, accuracy map, trace, Find pieces, Print and Cut marks, Check
    camera) reads the model through `activeCameraModel`. That is the running camera's own

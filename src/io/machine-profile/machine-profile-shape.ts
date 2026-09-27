@@ -265,7 +265,7 @@ function validateCameraModel(value: unknown): string | null {
 
 function validateOtherCameraModels(value: unknown): string | null {
   if (value === undefined) return null;
-  return Array.isArray(value) && normalizeOtherCameraModels(value)?.length === value.length
+  return Array.isArray(value) && (normalizeOtherCameraModels(value)?.length ?? 0) === value.length
     ? null
     : 'profile.otherCameraModels is invalid';
 }
