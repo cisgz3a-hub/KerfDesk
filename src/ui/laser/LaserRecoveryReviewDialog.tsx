@@ -105,7 +105,10 @@ function useHeadStopContinue(
   if (stop === null || setOrigin === undefined) return undefined;
   const live = props.liveWorkOffsetMm ?? null;
   const anchored =
-    written?.key === selectionKey && live !== null && sameRecoveryOrigin(written.offsetMm, live);
+    props.liveOriginSet !== false &&
+    written?.key === selectionKey &&
+    live !== null &&
+    sameRecoveryOrigin(written.offsetMm, live);
   return {
     stop,
     sendableLines: props.capsule.sendableLines,

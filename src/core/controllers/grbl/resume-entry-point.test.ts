@@ -36,6 +36,36 @@ describe('resumeEntryPointMm', () => {
     });
   });
 
+  it.each([
+    'G21 G90 G54\nG0 X25.4 Y50.8\nG20\nG1 X2\nM5',
+    'G20 G90 G54\nG0 X1 Y2\nG21\nG1 X50.8\nM5',
+    'G21 G90 G54\nG0 X10 Y20\nG10 L2 P2 X100 Y200\nM5',
+    'G21 G90 G54\nG0 X10 Y20\nG55\nG0 X30 Y40\nG54\nM5',
+    'G21 G90 G54\nG0 X10 Y20\nG92.1\nM5',
+    'G21 G90 G54\nG0 X10 Y20\nG38.2 X30\nM5',
+    'G21 G90 G54\nG0 X10 Y20\nG4 X1\nM5',
+    'G21 G90 G54\nG0 X10 Y20\nG1 X.5\nM5',
+    'G21 G90 G54\nG0 X10 Y20\nG1 X+5\nM5',
+    'G21 G90 G54\nG0 X10 Y20\nM6\nM5',
+    'G21 G90 G54\nG0 X10 Y20\nM428\nM5',
+  ])('does not offer an unproved point after coordinate/modal constructs: %s', (program) => {
+    expect(resumeEntryPointMm(program, program.split('\n').length)).toBeNull();
+  });
+
+  it('keeps known points across ordinary dwell, power and feed blocks', () => {
+    const program = 'G21 G90 G54\nG0 X10 Y20\nG4 P1\nM8\nF500 S0\nG1 X30\nM5';
+    expect(resumeEntryPointMm(program, 6)).toEqual({ x: 10, y: 20 });
+    expect(resumeEntryPointMm(program, 7)).toEqual({ x: 30, y: 20 });
+  });
+
+  it.each([
+    'M5 I\nG21 G90\nM3 I S0\nG0 X10 Y20\nG1 X30 S100\nM5 I',
+    'M107\nG21 G90\nG0 X10 Y20\nM106 S100\nG1 X30\nM107',
+    'fire off\nG21 G90\nG0 X10 Y20\nM400\nM221 S100 P0\nG1 X30 S0.5\nM400',
+  ])('retains normal generated native laser power syntax: %s', (program) => {
+    expect(resumeEntryPointMm(program, program.split('\n').length)).toEqual({ x: 30, y: 20 });
+  });
+
   it('is null for a program it cannot follow or one in another work coordinate system', () => {
     expect(resumeEntryPointMm('G21 G91\nG0 X1 Y1\nG1 X1\n', 3)).toBeNull();
     expect(resumeEntryPointMm('G21 G90 G55\nG0 X1 Y1\nG1 X1\n', 3)).toBeNull();

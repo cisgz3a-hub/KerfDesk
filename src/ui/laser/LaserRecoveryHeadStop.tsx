@@ -48,14 +48,15 @@ export function ContinueFromHeadStop(
   return (
     <div style={boxStyle}>
       <p style={noteStyle}>
-        The laser had received {formatCount(stop.sentLines)} of {formatCount(props.sendableLines)}{' '}
-        lines when the link dropped. It keeps running what it has received, so the head should be
-        sitting at the end of the last of them, {point} in the job. Continue from where the head
-        stopped sets the origin so that spot is that point, without moving the head, and restarts
-        from line {stop.line}. Use it when the saved origin cannot come back, for example on a
-        machine that was not homed before the job, and only if nobody has moved the head since the
-        stop. If the laser itself restarted or lost power during the burn, the head stopped earlier
-        than that; Frame remaining area shows the difference before anything burns.
+        KerfDesk had sent {formatCount(stop.sentLines)} of {formatCount(props.sendableLines)} lines
+        when the link dropped. If the controller received and finished all of them, the head should
+        be sitting at the end of the last of them, {point} in the job. Sent counts alone do not
+        prove delivery or completed motion. Continue from where the head stopped sets the origin so
+        that spot is that point, without moving the head, and restarts from line {stop.line}. Use it
+        when the saved origin cannot come back, for example on a machine that was not homed before
+        the job, and only if nobody has moved the head since the stop. If the laser itself restarted
+        or lost power during the burn, the head stopped earlier than that; Frame remaining area
+        shows the difference before anything burns.
       </p>
       <button
         type="button"

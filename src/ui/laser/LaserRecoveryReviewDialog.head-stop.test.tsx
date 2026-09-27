@@ -39,6 +39,28 @@ afterEach(() => {
 const LIVE: WorkCoordinateOffset = { x: 3, y: 4, z: 0 };
 
 describe('LaserRecoveryReviewDialog continue from where the head stopped', () => {
+  it('stops claiming anchoring when a reset clears an origin with the same offset', async () => {
+    const capsule = strokesCapsule({ kind: 'disconnect', message: 'USB lost', sentLines: 8 });
+    const renderOriginState = renderDialog(
+      capsule,
+      vi.fn(async () => true),
+      vi.fn(async () => ({ x: 0, y: 0 })),
+      { x: 0, y: 0, z: 0 },
+    );
+    renderOriginState(false);
+    await act(async () => button('Continue from where the head stopped').click());
+    renderOriginState(true);
+    expect(host?.textContent).toContain('The origin is set from where the head stopped');
+    const selectedLine = host?.querySelector<HTMLInputElement>('#laser-recovery-start-line')?.value;
+    renderOriginState(false);
+    expect(host?.textContent).not.toContain('The origin is set from where the head stopped');
+    expect(host?.textContent).toContain('The controller has no work origin set now');
+    expect(button('Continue from where the head stopped').disabled).toBe(false);
+    expect(host?.querySelector<HTMLInputElement>('#laser-recovery-start-line')?.value).toBe(
+      selectedLine,
+    );
+  });
+
   it('sets the origin from the stop point and restarts from the next line', async () => {
     const capsule = strokesCapsule({ kind: 'disconnect', message: 'USB lost', sentLines: 8 });
     const stop = recoveryHeadStop(capsule);
@@ -100,24 +122,28 @@ function renderDialog(
   capsule: RecoveryCapsule,
   onStart: (capsule: RecoveryCapsule, fromLine?: number) => Promise<boolean>,
   onSetOriginAtHead: (point: { x: number; y: number }) => Promise<{ x: number; y: number }>,
-): void {
+  liveWorkOffsetMm: WorkCoordinateOffset = LIVE,
+): (liveOriginSet: boolean) => void {
   host?.remove();
   host = document.createElement('div');
   document.body.appendChild(host);
   const root = createRoot(host);
-  act(() =>
-    root.render(
-      <LaserRecoveryReviewDialog
-        capsule={capsule}
-        onClose={vi.fn()}
-        onStart={onStart}
-        liveWorkOffsetMm={LIVE}
-        liveOriginSet={false}
-        onSetOriginAtHead={onSetOriginAtHead}
-      />,
-    ),
-  );
+  const render = (liveOriginSet: boolean): void =>
+    act(() =>
+      root.render(
+        <LaserRecoveryReviewDialog
+          capsule={capsule}
+          onClose={vi.fn()}
+          onStart={onStart}
+          liveWorkOffsetMm={liveWorkOffsetMm}
+          liveOriginSet={liveOriginSet}
+          onSetOriginAtHead={onSetOriginAtHead}
+        />,
+      ),
+    );
+  render(true);
   unmount = () => root.unmount();
+  return render;
 }
 
 function button(label: string): HTMLButtonElement {

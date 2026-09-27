@@ -49,6 +49,16 @@ job controls, and the reported attempt went to Start from line instead.
    set from the head stop and no longer warns that the origin moved or offers the restore.
    It is not offered when the program up to the stop cannot be followed (relative moves, a
    work coordinate system other than G54) or has not commanded both X and Y.
+   The new head-stop scan also declines coordinate-setting/probing blocks, axis-bearing dwell,
+   units changes after an axis is known, and words the shared numeric reader cannot consume.
+   Those cases cannot establish this action's point from the retained modal words; normal
+   recovery and archived resume transforms stay unchanged. After a later reset clears the
+   origin, the review no longer claims the head-stop anchor even if the reported offset has
+   the same numbers; the explicitly selected restart line remains selected.
+   A head-stop anchor that times out without a fresh matching reported offset does not return
+   success or advance the restart selection. It retains the actual cache and reports the lack
+   of confirmation. Host-recorded dialects retain their acknowledged-write evidence; the
+   existing Restore saved origin action keeps its best-effort behavior.
 3. **The review says what the continue assumes.** The head must not have been moved since the
    stop, and a controller that itself restarted or lost power mid-burn stopped earlier than the
    last line sent; Frame remaining area shows that before anything burns. Restore saved origin

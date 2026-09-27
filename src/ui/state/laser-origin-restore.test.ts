@@ -13,7 +13,7 @@ import {
 } from './laser-controller-status-wait';
 import { consumeControllerCommandResponse } from './laser-interactive-command';
 import { OriginTransactionCancelledError } from './laser-origin-transaction';
-import { restoreWorkOrigin } from './laser-origin-restore';
+import { restoreWorkOrigin, setOriginAtProgramPoint } from './laser-origin-restore';
 import { statusPositionPatch } from './laser-status-position';
 import { useLaserStore, type LaserState, type LiveRefs } from './laser-store';
 
@@ -81,6 +81,29 @@ async function flush() {
 afterEach(() => vi.useRealTimers());
 
 describe('Restore saved origin controller evidence and units', () => {
+  it.each([null, '<Idle|MPos:100,200,10|FS:0,0>', '<Idle|MPos:100,200,10|WCO:11,12,4|FS:0,0>'])(
+    'does not return a successful head-stop anchor without matching fresh offset proof: %s',
+    async (statusAfterWrite) => {
+      vi.useFakeTimers();
+      const h = harness();
+      h.report({ ...saved, z: 4 });
+      const write = async () => {
+        if (statusAfterWrite !== null) h.status(statusAfterWrite);
+        queueMicrotask(() => consumeControllerCommandResponse(h.refs, { kind: 'ok' }, 'ok'));
+      };
+      const pending = setOriginAtProgramPoint(h.set, h.get, h.refs, write, { x: 80, y: 170 }).catch(
+        (error: unknown) => error,
+      );
+      await vi.advanceTimersByTimeAsync(3_100);
+      expect(await pending).toBeInstanceOf(Error);
+      expect(((await pending) as Error).message).toContain('has not confirmed');
+      expect(h.get().wcoCache).toEqual(
+        statusAfterWrite?.includes('WCO:11') ? { x: 11, y: 12, z: 4 } : { ...saved, z: 4 },
+      );
+      expect(h.refs.controllerStatusWait).toBeNull();
+    },
+  );
+
   for (const statusAfterWrite of [null, '<Idle|MPos:100,200,10|FS:0,0>']) {
     it(`does not confirm a pre-write matching cache from ${statusAfterWrite === null ? 'no new report' : 'a position-only report'}`, async () => {
       vi.useFakeTimers();

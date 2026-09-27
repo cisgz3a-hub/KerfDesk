@@ -14,6 +14,7 @@ import {
 import type { LaserResumeDialect } from './laser-resume-dialect';
 import { createNativeLaserBeam, type NativeLaserBeam } from './native-laser-resume-beam';
 import { nativeLaserResume, scanNativeBeamLine } from './native-laser-resume';
+import { canTrackHeadStopBlock } from './resume-head-stop-block';
 
 export type { LaserResumeTransformVersion };
 /** The transform new resumes use; archived resume steps record their own. */
@@ -107,7 +108,7 @@ export function resumeEntryPointMm(
   const lines = gcode.split('\n');
   if (!Number.isInteger(fromLine) || fromLine < 1 || fromLine > lines.length + 1) return null;
   const state = initialModalState();
-  if (scanToResumeLine(lines, fromLine, state, null) !== null) return null;
+  if (scanToResumeLine(lines, fromLine, state, null, true) !== null) return null;
   if (state.x === null || state.y === null || state.wcs !== 'G54') return null;
   const scale = state.units === 'G20' ? 25.4 : 1;
   return { x: state.x * scale, y: state.y * scale };
@@ -145,10 +146,11 @@ function scanToResumeLine(
   fromLine: number,
   state: LaserResumeModalState,
   beam: NativeLaserBeam | null,
+  proveHeadStop = false,
 ): string | null {
   for (let i = 0; i < fromLine - 1; i += 1) {
     const line = lines[i] ?? '';
-    const issue = applyLine(state, line);
+    const issue = applyLine(state, line, proveHeadStop);
     if (issue !== null) return `Line ${i + 1}: ${issue}`;
     if (beam !== null) scanNativeBeamLine(beam, line);
   }
@@ -169,13 +171,19 @@ function resumeBody(
 }
 
 // Returns an error string for constructs the replay cannot handle.
-function applyLine(state: LaserResumeModalState, rawLine: string): string | null {
+function applyLine(
+  state: LaserResumeModalState,
+  rawLine: string,
+  proveHeadStop: boolean,
+): string | null {
   const line = stripComments(rawLine);
   if (line.trim() === '' || line.trim() === '%') return null;
   const words: GcodeWord[] = [...line.matchAll(WORD_RE)].map((match) => ({
     letter: (match[1] ?? '').toUpperCase(),
     value: Number(match[2]),
   }));
+  if (proveHeadStop && !canTrackHeadStopBlock(state, words, line.replace(WORD_RE, '').trim()))
+    return 'head-stop position is not provable';
   for (const { letter, value } of words) {
     const issue = applyWord(state, letter, value);
     if (issue !== null) return issue;

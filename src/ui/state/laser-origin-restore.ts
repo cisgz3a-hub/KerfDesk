@@ -79,8 +79,9 @@ export async function restoreWorkOrigin(
 
 /**
  * Continue from where the head stopped (ADR-341 Amendment 6): after a lost
- * link the controller ran what it had received and the head sits at the end of
- * the last line sent. One G92 makes that point the program point `pointMm`
+ * link, if the controller received and finished every sent line, the head is
+ * at that predicted endpoint. Transport counts alone do not prove this. One
+ * G92 makes that point the program point `pointMm`
  * without moving the head, so the rest of the job continues from it. Resolves
  * to the XY work offset written, in mm from machine zero.
  */
@@ -91,10 +92,21 @@ export async function setOriginAtProgramPoint(
   safeWrite: OriginSafeWrite,
   pointMm: SavedXyOffsetMm,
 ): Promise<SavedXyOffsetMm> {
-  return writeXyOffset(set, get, refs, safeWrite, HEAD_STOP_ORIGIN_WRITE, (machineMm) => ({
-    x: machineMm.x - pointMm.x,
-    y: machineMm.y - pointMm.y,
-  }));
+  const outcome = await writeXyOffset(
+    set,
+    get,
+    refs,
+    safeWrite,
+    HEAD_STOP_ORIGIN_WRITE,
+    (machineMm) => ({
+      x: machineMm.x - pointMm.x,
+      y: machineMm.y - pointMm.y,
+    }),
+  );
+  // Choosing the later restart line requires the anchor this action promises.
+  // Preserve actual controller evidence on timeout, but do not call it success.
+  if (!outcome.confirmed) throw new Error(HEAD_STOP_ORIGIN_WRITE.unconfirmedNotice);
+  return outcome.offsetMm;
 }
 
 type XyOffsetWrite = { readonly label: string; readonly unconfirmedNotice: string };
@@ -121,7 +133,7 @@ async function writeXyOffset(
   safeWrite: OriginSafeWrite,
   action: XyOffsetWrite,
   targetFor: (machineMm: SavedXyOffsetMm) => SavedXyOffsetMm,
-): Promise<SavedXyOffsetMm> {
+): Promise<{ readonly offsetMm: SavedXyOffsetMm; readonly confirmed: boolean }> {
   await assertOriginActionReady(set, get, refs, safeWrite);
   const before = get();
   const reportInches = before.controllerSettings?.reportInches === true;
@@ -165,7 +177,7 @@ async function writeXyOffset(
   ) {
     set((state) => ({ log: pushLog(state, action.unconfirmedNotice) }));
   }
-  return savedMm;
+  return { offsetMm: savedMm, confirmed };
 }
 
 function restoredOffsetConfirmation(
