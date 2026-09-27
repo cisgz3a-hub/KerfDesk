@@ -85,11 +85,12 @@ export type GcodeMetadata = {
  */
 // ADR-427 integration also cuts deepest cleanup before linked relief rings;
 // all adaptive ring closure and flat depth-slice provenance above is retained.
-// Tracer batch 3 retains bounded chord flattening, canonical shared seams and
-// width-bearing Line + fill, with preserved colour detail/alpha and local widths.
-// Native arcs, compact Fill and linked relief cleanup/entry also retain scan
-// timing v2's M3 shared, empty and coincident Image handoffs (ADR-445).
-export const EMITTER_REVISION = 'trace-hybrid-arcs-relief-scan-timing-v2-20260927-v3';
+// ADR-368 amendment 3 sizes ball-nose, V-bit and engraving pocket and profile
+// offsets, tab windows, and pocket and relief-roughing stepover by cut width.
+// Tracer batch 3 preserves bounded chord flattening, shared seams and Line + fill.
+// Native arcs, compact Fill and linked relief entry retain scan timing v2's
+// shared, empty and coincident M3 Image handoffs (ADR-445).
+export const EMITTER_REVISION = 'trace-hybrid-arcs-relief-cut-width-scan-v2-20260927-v4';
 
 // Machine-specific assumption lines (ADR-103 defect fix): router exports
 // previously carried the laser-worded `$32=1 (laser mode)` banner. The S
