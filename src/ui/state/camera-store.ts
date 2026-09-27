@@ -1,6 +1,6 @@
 // camera-store — ephemeral Zustand store for Camera Mode (ADR-107/116): the
-// active camera source (USB stream or bridge-proxied machine camera) plus the
-// 4-point manual alignment flow. Not project data and not undoable, so it
+// active camera source (USB stream or bridge-proxied machine camera) and the
+// workspace overlay preferences. Not project data and not undoable, so it
 // lives outside the project store (like ui-store).
 //
 // I/O actions take the platform adapters as arguments (the same dependency-
@@ -8,14 +8,9 @@
 // testable with fakes and never imports platform/web directly.
 
 import { create } from 'zustand';
-import {
-  addAlignmentPoint,
-  beginAlignment,
-  type AlignmentState,
-  type RgbaImage,
-} from '../../core/camera';
+import type { RgbaImage } from '../../core/camera/rgba-image';
 import type { CameraCaptureBinding } from '../../core/camera/camera-capture-binding';
-import type { Vec2 } from '../../core/scene';
+import type { SurfaceHeightArea } from '../../core/camera/model/height-areas';
 import type { CameraAdapter, CameraDevice } from '../../platform/types';
 import {
   createCameraSourceActions,
@@ -46,23 +41,30 @@ export type CameraStore = CameraSourceActions & {
   readonly usbAvailability: UsbCameraAvailability;
   // Store-owned listener cleanup/release for the exact active USB stream.
   readonly usbSourceRelease: (() => void) | null;
-  readonly alignment: AlignmentState;
   // Bumped on every stop/restart so an in-flight start that resolves late can
   // tell it has been superseded and release its now-orphaned stream.
   readonly sourceEpoch: number;
   // The machine-integrated camera found by the bridge's server-side probe.
   readonly machineCamera: MachineCameraState;
 
-  // Workspace overlay preferences (ephemeral; the alignment itself persists
-  // on the device profile). `overlayStill` is a captured frame shown instead
+  // Workspace overlay preferences (ephemeral; the camera model itself
+  // persists on the device profile). `overlayStill` is a captured frame shown instead
   // of the live video — LightBurn's "Update Overlay" model.
   readonly overlayVisible: boolean;
   readonly overlayOpacityPercent: number;
   readonly overlayStill: RgbaImage | null;
   readonly overlayStillCapture: CameraCaptureBinding | null;
   // Top surface currently being viewed/placed on, measured above machine bed.
-  // Kept separate from the alignment plane so perspective can be compensated.
+  // The camera model corrects the picture to this height (ADR-440).
   readonly surfaceHeightMm: number;
+  // Rectangles of the bed whose top stands at its own height, such as a box
+  // beside the sheet; the overlay and the trace use them there (ADR-441
+  // Amendment 2). Ephemeral, like the material height: they describe what is
+  // on the bed now.
+  readonly heightAreas: ReadonlyArray<SurfaceHeightArea>;
+  // Each calibration ring's measured error drawn over the overlay (ADR-441
+  // Amendment 1), so the operator sees where on the bed the camera is trusted.
+  readonly accuracyMapVisible: boolean;
   // Latches once the aligned overlay is used for physical placement. Hiding
   // the image does not silently discard the safety contract; the operator
   // exits placement mode explicitly after finishing camera-based layout.
@@ -81,16 +83,19 @@ export type CameraStore = CameraSourceActions & {
     capture?: CameraCaptureBinding | null,
   ) => void;
   readonly setSurfaceHeightMm: (heightMm: number) => void;
+  readonly addHeightArea: (area: SurfaceHeightArea) => void;
+  readonly updateHeightArea: (id: string, patch: HeightAreaPatch) => void;
+  readonly removeHeightArea: (id: string) => void;
+  readonly setAccuracyMapVisible: (on: boolean) => void;
   readonly activatePlacement: () => void;
   readonly deactivatePlacement: () => void;
   readonly confirmPositionEpoch: (epoch: number) => void;
   readonly detectSupport: (camera: CameraAdapter | undefined) => void;
   readonly refreshCameras: (camera: CameraAdapter | undefined) => Promise<void>;
   readonly selectCamera: (deviceId: string) => void;
-  readonly beginAlignment: (targets: ReadonlyArray<Vec2>) => void;
-  readonly addAlignmentPoint: (pixel: Vec2) => void;
-  readonly resetAlignment: () => void;
 };
+
+export type HeightAreaPatch = Partial<Omit<SurfaceHeightArea, 'id'>>;
 
 // Reselection policy on a device-list refresh: keep a still-valid deliberate
 // selection; else restore the remembered camera (the overhead one, not the
@@ -118,7 +123,6 @@ export const useCameraStore = create<CameraStore>((set, get) => ({
   sourceState: { kind: 'idle' },
   usbAvailability: { kind: 'available' },
   usbSourceRelease: null,
-  alignment: { kind: 'idle' },
   sourceEpoch: 0,
   machineCamera: { kind: 'idle' },
 
@@ -127,6 +131,8 @@ export const useCameraStore = create<CameraStore>((set, get) => ({
   overlayStill: null,
   overlayStillCapture: null,
   surfaceHeightMm: 0,
+  heightAreas: [],
+  accuracyMapVisible: false,
   placementActive: false,
   confirmedPositionEpoch: null,
 
@@ -137,7 +143,18 @@ export const useCameraStore = create<CameraStore>((set, get) => ({
     set({ overlayOpacityPercent: Math.max(0, Math.min(100, percent)) }),
   setOverlayStill: (frame, capture = null) =>
     set({ overlayStill: frame, overlayStillCapture: frame === null ? null : capture }),
-  setSurfaceHeightMm: (heightMm) => set({ surfaceHeightMm: clampFinite(heightMm, 0, 500) }),
+  setSurfaceHeightMm: (heightMm) =>
+    set({ surfaceHeightMm: clampFinite(heightMm, 0, MAX_SURFACE_HEIGHT_MM) }),
+  addHeightArea: (area) => set((s) => ({ heightAreas: [...s.heightAreas, sanitizedArea(area)] })),
+  updateHeightArea: (id, patch) =>
+    set((s) => ({
+      heightAreas: s.heightAreas.map((area) =>
+        area.id === id ? sanitizedArea({ ...area, ...patch }) : area,
+      ),
+    })),
+  removeHeightArea: (id) =>
+    set((s) => ({ heightAreas: s.heightAreas.filter((area) => area.id !== id) })),
+  setAccuracyMapVisible: (on) => set({ accuracyMapVisible: on }),
   activatePlacement: () => set({ placementActive: true }),
   deactivatePlacement: () =>
     set({ placementActive: false, overlayVisible: false, confirmedPositionEpoch: null }),
@@ -157,14 +174,22 @@ export const useCameraStore = create<CameraStore>((set, get) => ({
     savePreferredCameraId(deviceId);
     set({ selectedDeviceId: deviceId });
   },
-
-  beginAlignment: (targets) => set({ alignment: beginAlignment(targets) }),
-
-  addAlignmentPoint: (pixel) =>
-    set((state) => ({ alignment: addAlignmentPoint(state.alignment, pixel) })),
-
-  resetAlignment: () => set({ alignment: { kind: 'idle' } }),
 }));
+
+const MAX_SURFACE_HEIGHT_MM = 500;
+
+// Number fields can hand over NaN or a negative size mid-edit; keep the stored
+// area drawable (the same treatment as the material height field).
+function sanitizedArea(area: SurfaceHeightArea): SurfaceHeightArea {
+  return {
+    id: area.id,
+    x: Number.isFinite(area.x) ? area.x : 0,
+    y: Number.isFinite(area.y) ? area.y : 0,
+    width: clampFinite(area.width, 0, Number.MAX_VALUE),
+    height: clampFinite(area.height, 0, Number.MAX_VALUE),
+    surfaceHeightMm: clampFinite(area.surfaceHeightMm, 0, MAX_SURFACE_HEIGHT_MM),
+  };
+}
 
 function clampFinite(value: number, min: number, max: number): number {
   if (!Number.isFinite(value)) return min;

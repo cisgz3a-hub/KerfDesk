@@ -89,5 +89,3 @@ export type { FillHeatRiskSummary } from './fill-heat-risk';
 export { analyzeFillHeatRisk } from './fill-heat-risk';
 export type { IslandFillMotionPolicy } from './island-fill-motion';
 export { islandFillMotionPolicyForDevice, isSensitiveIslandFillPolicy } from './island-fill-motion';
-export { generateCameraAlignPattern } from './camera-align-pattern';
-export type { CameraAlignPattern, CameraAlignPatternOptions } from './camera-align-pattern';

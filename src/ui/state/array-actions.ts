@@ -28,6 +28,15 @@ export type ArrayActions = {
     materialized?: ArrayMaterialization,
     expectedProject?: Project,
   ) => void;
+  /**
+   * The selection repeated at explicit placements (ADR-442 find pieces and
+   * fill): placement 0 moves the selection itself, each later one adds a copy.
+   * One undo step, like an array.
+   */
+  readonly placeSelectionCopies: (
+    placements: ReadonlyArray<ArrayPlacement>,
+    expectedProject?: Project,
+  ) => void;
 };
 
 type Setter = (fn: (state: AppState) => AppState | Partial<AppState>) => void;
@@ -40,6 +49,12 @@ export function arrayActions(set: Setter): ArrayActions {
           ? {}
           : applyArraySelection(state, spec, undefined, materialized),
       ),
+    placeSelectionCopies: (placements, expectedProject) =>
+      set((state) =>
+        expectedProject !== undefined && state.project !== expectedProject
+          ? {}
+          : applySelectionPlacements(state, () => placements),
+      ),
   };
 }
 
@@ -49,10 +64,25 @@ export function applyArraySelection(
   idFactory: () => string = () => crypto.randomUUID(),
   materialized?: ArrayMaterialization,
 ): AppState | Partial<AppState> {
+  return applySelectionPlacements(
+    state,
+    (bounds) => materialized?.placements ?? arrayPlacements(bounds, spec),
+    idFactory,
+    materialized,
+  );
+}
+
+/** The selection moved to the first placement and copied to every later one. */
+export function applySelectionPlacements(
+  state: AppState,
+  placementsFor: (bounds: Bounds) => ReadonlyArray<ArrayPlacement>,
+  idFactory: () => string = () => crypto.randomUUID(),
+  materialized?: ArrayMaterialization,
+): AppState | Partial<AppState> {
   const selection = arraySourceSelection(state, materialized);
   if (selection === null) return state;
   const { selectedIds, sourceObjects, selected, bounds } = selection;
-  const placements = materialized?.placements ?? arrayPlacements(bounds, spec);
+  const placements = placementsFor(bounds);
   const first = placements[0];
   if (first === undefined) return state;
 
