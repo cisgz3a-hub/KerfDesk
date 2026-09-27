@@ -31,7 +31,6 @@
 //   - Async-iterable emit for >100 KB jobs (ADR-020 Q3 threshold).
 //   - Per-pixel feed modulation for grayscale-on-non-M4 controllers.
 
-import { INTENTIONAL_LASER_OFF_MOTION_COMMENT } from '../gcode-comments';
 import { effectiveGcodeFeedMmPerMin, formatGcodeFeedMmPerMin } from '../gcode/feed-word';
 import {
   createModalMotionWriter,
@@ -46,6 +45,7 @@ import {
   rasterControllerCoordinateMm,
   type RasterRowSweepPlan,
 } from './raster-sweep-plan';
+import { rasterSweepOpening, type RasterControllerHead } from './emit-raster-travel';
 import type { RasterRowProviderOrder } from '../job/job';
 import type { RasterPowerValues } from './raster-power-values';
 
@@ -145,6 +145,8 @@ type RasterEmissionState = {
   heldOpening: string | null;
   /** Under M3, the last written line is a burn: a stop now would be lit. */
   endsLit: boolean;
+  /** Where the group's previous sweep left the head. */
+  head: RasterControllerHead | null;
 };
 
 export function* emitRasterGroupChunks(input: EmitRasterInput): Generator<string, RasterGroupEnd> {
@@ -156,6 +158,7 @@ export function* emitRasterGroupChunks(input: EmitRasterInput): Generator<string
   const state: RasterEmissionState = {
     heldOpening: heldOpeningText(input, opening),
     endsLit: false,
+    head: null,
   };
   if (state.heldOpening === null) yield* opening;
   yield* emitRasterPasses(input, state);
@@ -220,9 +223,11 @@ function* emitRasterPasses(input: EmitRasterInput, state: RasterEmissionState): 
           reverse,
           sweepPlan,
           dotWidthCorrectionMm,
+          state.head,
         );
         yield sweepText(sweep.lines, state);
         state.endsLit = sweep.endsLit;
+        state.head = sweep.head;
         feedEmitted = true;
       }
       emittedRowCount += 1;
@@ -307,6 +312,7 @@ type RasterSweepEmission = {
   readonly lines: ReadonlyArray<string>;
   /** Under M3 the sweep ends on a burn, so a stop right after it would be lit. */
   readonly endsLit: boolean;
+  readonly head: RasterControllerHead;
 };
 
 function emitSpanSweep(
@@ -318,6 +324,7 @@ function emitSpanSweep(
   reverse: boolean,
   sweepPlan: RasterRowSweepPlan,
   dotWidthCorrectionMm: number,
+  previousHead: RasterControllerHead | null,
 ): RasterSweepEmission {
   // Under M3 a motion line that does not move the head drains GRBL's planner
   // with the beam still at the last run's power (GRBL motion_control.c:67-76,
@@ -326,33 +333,36 @@ function emitSpanSweep(
   // dark and the historical bytes stay.
   const constantPower = input.laserModeCommand === 'M3';
   const style = motionWordStyleFor(input.compactMotionWords ?? false);
-  // One writer per row: every row opens with a travel that states its motion
-  // word and both axes, so nothing is ever held across a row boundary.
+  // One writer per sweep: every row opens with a travel that states its motion
+  // word and both axes, so nothing is ever held across a row boundary. (Only an
+  // M3 sweep at a shared runway point skips that travel, on the same row.)
   const writer = createModalMotionWriter(style);
-  const lines: string[] = [];
   const { activeStartX, activeEndX, startX, endX, rowShiftX } = sweepExtents(
     input,
     pixelWidthMm,
     reverse,
     sweepPlan,
   );
-  // Rapid into the overscan zone, laser off (M4 + S0 → diode dark).
-  lines.push(
-    formatLaserOffTravel(
-      startX + rowShiftX,
-      worldY,
-      input.controlledLaserOffTravelFeedMmPerMin,
-      writer,
-      style,
-    ),
-  );
-  // The travel above always carries S0, so a compact row may hold that modal
-  // power rather than restating it on the first burn move.
-  let prevS = style.modalMotion ? 0 : -1;
   // The controller only sees three-decimal coordinates. Track that formatted
   // head position so a positive-power fragment which exists in floating-point
   // geometry, but collapses on the controller grid, is never armed in place.
   let controllerHeadX = rasterControllerCoordinateMm(startX + rowShiftX);
+  const controllerY = rasterControllerCoordinateMm(worldY);
+  // Rapid into the overscan zone, laser off (M4 + S0 → diode dark).
+  const opening = rasterSweepOpening(
+    {
+      x: startX + rowShiftX,
+      y: worldY,
+      target: { x: controllerHeadX, y: controllerY },
+      previousHead,
+      constantPower,
+      controlledFeed: input.controlledLaserOffTravelFeedMmPerMin,
+    },
+    writer,
+    style,
+  );
+  const lines: string[] = [...opening.lines];
+  let prevS = opening.prevS;
   // A controlled G1 seek changes modal F, unlike G0. Reassert the engraving
   // feed on the first runway/burn move after every such seek.
   let shouldEmitFeed = emitFeed || input.controlledLaserOffTravelFeedMmPerMin !== undefined;
@@ -399,9 +409,11 @@ function emitSpanSweep(
     })
   ) {
     lines.push(formatLaserOffG1(closeX, feed, input.modalFeedrate ?? true, writer, style));
+    controllerHeadX = rasterControllerCoordinateMm(closeX);
     endsOnBurn = false;
   }
-  return { lines, endsLit: constantPower && endsOnBurn };
+  const head = { x: controllerHeadX, y: controllerY };
+  return { lines, endsLit: constantPower && endsOnBurn, head };
 }
 
 function writesRowClose(
@@ -411,32 +423,6 @@ function writesRowClose(
 ): boolean {
   if (!wanted) return false;
   return !constantPower || rasterControllerCoordinateMm(head.closeX) !== head.controllerHeadX;
-}
-
-function formatLaserOffTravel(
-  x: number,
-  y: number,
-  controlledFeed: number | undefined,
-  writer: ModalMotionWriter,
-  style: MotionWordStyle,
-): string {
-  if (controlledFeed !== undefined) {
-    return joinMotionWords(
-      [
-        writer.motion('G1'),
-        writer.axis('X', x),
-        writer.axis('Y', y),
-        `F${formatGcodeFeedMmPerMin(controlledFeed)}`,
-        'S0',
-      ],
-      style,
-      INTENTIONAL_LASER_OFF_MOTION_COMMENT,
-    );
-  }
-  return joinMotionWords(
-    [writer.motion('G0'), writer.axis('X', x), writer.axis('Y', y), 'S0'],
-    style,
-  );
 }
 
 // The row's closing move. Under M4 its X word is written even when the head

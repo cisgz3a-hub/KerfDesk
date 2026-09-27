@@ -33,7 +33,11 @@ model name nor a synthetic test establishes a machine's measured correction.
    When the two runways consume the entire gap, both reuse one canonical meeting point. This
    prevents independent floating-point expansions from rounding to different 0.001 mm
    controller positions. Fill expansion and Raster output/preview consume that same point;
-   signed offsets and powered coordinates retain their existing meaning.
+   signed offsets and powered coordinates retain their existing meaning. The head crosses a
+   shared point at scan feed without stopping. Under M3, a laser-off move to where the head
+   already is drains GRBL's planner (OR-1), so no such move is written there: Fill already
+   dropped it, and an Image sweep that starts at the point the previous sweep closed on now
+   omits its opening travel. Under M4 the planner drops the empty block and the bytes stay.
 2. Fill honours `compactMotionWords`, resetting modal spelling at each sweep. GRBL Dynamic,
    Raster, and 4040 Safe scan output use compact spelling. The 4040 dialect still repeats F
    and S as configured, and keeps its power modes and controlled seek speed. GRBL Compatible
@@ -43,7 +47,9 @@ model name nor a synthetic test establishes a machine's measured correction.
    scan-offset convention and explicit LightBurn conversion remain unchanged.
 4. Raster Diagnostics compares actual planned runway lengths against both the calibration
    margin and the conservative acceleration distance `v² / (2a)` from the profile. Unknown
-   acceleration is not a passing check. This is an estimate and advice, not a new Start gate
+   acceleration is not a passing check. A runway side that meets its neighbour at a shared
+   point is continuous motion, not a start from rest, so it is not compared; more Overscan
+   could not lengthen it anyway. This is an estimate and advice, not a new Start gate
    or an automatic change to feed, power, controller settings, or the Frame envelope.
 5. Exported G-code receives a distinct scan-timing emitter revision, preserving prior CNC
    provenance, so saved output from before this change can be identified and regenerated.
