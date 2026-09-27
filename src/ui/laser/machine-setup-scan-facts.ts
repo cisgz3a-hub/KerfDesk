@@ -115,12 +115,25 @@ function minimumActualRunwayMm(
   return minimumRunwayMm;
 }
 
-function minimumPlannedRunway(
-  plans: ReadonlyArray<{ readonly leadInMm: number; readonly leadOutMm: number }>,
-): number {
+type PlannedRunway = {
+  readonly leadInMm: number;
+  readonly leadOutMm: number;
+  readonly sharedLeadStart?: unknown;
+  readonly sharedLeadEnd?: unknown;
+  readonly sharedLeadStartXWorldMm?: number;
+  readonly sharedLeadEndXWorldMm?: number;
+};
+
+function minimumPlannedRunway(plans: ReadonlyArray<PlannedRunway>): number {
   let minimumRunwayMm = Number.POSITIVE_INFINITY;
   for (const plan of plans) {
-    minimumRunwayMm = Math.min(minimumRunwayMm, plan.leadInMm, plan.leadOutMm);
+    // Where two split runways meet (ADR-445), the head crosses the gap at scan
+    // speed without stopping, so that side needs no distance from rest.
+    const entryShared =
+      plan.sharedLeadStart !== undefined || plan.sharedLeadStartXWorldMm !== undefined;
+    const exitShared = plan.sharedLeadEnd !== undefined || plan.sharedLeadEndXWorldMm !== undefined;
+    if (!entryShared) minimumRunwayMm = Math.min(minimumRunwayMm, plan.leadInMm);
+    if (!exitShared) minimumRunwayMm = Math.min(minimumRunwayMm, plan.leadOutMm);
   }
   return minimumRunwayMm;
 }

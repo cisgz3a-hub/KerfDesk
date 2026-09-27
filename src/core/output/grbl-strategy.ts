@@ -307,6 +307,9 @@ function emitRasterGroupHere(group: RasterGroup, context: GroupEmissionContext):
     modalFeedrate: dialect.modalFeedrate,
     emitSOnEveryBurnMove: dialect.emitSOnEveryBurnMove,
     compactMotionWords: dialect.compactMotionWords,
+    ...(cursor.head === null
+      ? {}
+      : { initialHead: { x: Number(cursor.head.x), y: Number(cursor.head.y) } }),
     layerId: group.layerId,
     color: group.color,
     powerPercent: group.power,
@@ -314,7 +317,7 @@ function emitRasterGroupHere(group: RasterGroup, context: GroupEmissionContext):
     ...(deferEntry ? { deferredEntry: { entryLines: takeHeldLines(cursor) } } : {}),
     deferClosingM5WhenLit: true,
   });
-  noteRasterGroupEnd(cursor, emission.closingM5Deferred);
+  noteRasterGroupEnd(cursor, emission);
   return emission.gcode;
 }
 

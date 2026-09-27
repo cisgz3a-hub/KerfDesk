@@ -68,8 +68,8 @@ describe('grblStrategy fill zero-length / coincident span guard (audit 2026-06-0
     const out = emit(job);
     expect(hasZeroLengthMove(out)).toBe(false);
     // Touching spans burn as one continuous run; no S0 gap is emitted at x=5.
-    expect(out).not.toContain('X5S0');
-    expect(out).toContain('G1X5Y5F1500S300\nX10S300');
+    expect(out).not.toMatch(/G1 X5\.000 Y5\.000 S0/);
+    expect(out).toContain('G1 X5.000 Y5.000 F1500 S300\nG1 X10.000 Y5.000 S300');
   });
 
   it('drops a degenerate interior span instead of emitting a stationary beam-on G1', () => {
@@ -116,6 +116,6 @@ describe('grblStrategy fill zero-length / coincident span guard (audit 2026-06-0
     const out = emit(job);
     expect(hasZeroLengthMove(out)).toBe(false);
     // No stationary positive-S move at the degenerate span's coordinate.
-    expect(out).not.toContain('X8S300');
+    expect(out).not.toMatch(/G1 X8\.000 Y3\.000 S300/);
   });
 });
