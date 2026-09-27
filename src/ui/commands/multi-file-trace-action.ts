@@ -14,7 +14,13 @@ import { tracedLayersToDxf } from '../../io/dxf/export-dxf';
 import { writeTracedDrawing } from '../../io/vector-formats/traced-drawing';
 import type { PlatformAdapter, SaveDirectoryTarget } from '../../platform/types';
 import { readImageHeaderDensity, type ImageDensity } from '../common/image-density';
-import { rasterImportGeometry, type RasterImportGeometry } from '../common/image-import';
+import {
+  overriddenSizeMm,
+  physicalSizeMm,
+  type MultiFileDensitySource,
+  type MultiFileTraceSize,
+  type SizedFile,
+} from './multi-file-trace-size';
 import {
   emptyWriteTally,
   reportTraceBatch,
@@ -50,7 +56,7 @@ export type MultiFileTraceExport = BatchTraceFile & {
   readonly notices?: ReadonlyArray<TraceNotice>;
   // Whether the file's mm size came from the file's embedded density or the
   // default bitmap DPI, so the batch toast can say which files fell back.
-  readonly densitySource?: RasterImportGeometry['densitySource'];
+  readonly densitySource?: MultiFileDensitySource;
 };
 export type MultiFileTraceBatch = {
   readonly files: ReadonlyArray<MultiFileTraceExport>;
@@ -92,6 +98,9 @@ export type MultiFileTraceDeps = {
   readonly deviceMemoryGb?: number;
   /** File format, precision and contour grouping. */
   readonly output?: BatchTraceOutput;
+  // One DPI or width for every file (the Size row); omitted, each file's
+  // import size.
+  readonly size?: MultiFileTraceSize;
 };
 
 export const DEFAULT_MULTI_FILE_TRACE_PRESET = 'Line Art';
@@ -107,6 +116,7 @@ type MultiFileJobContext = {
   readonly hybridMaxStrokeWidthMm: number | undefined;
   readonly targetPxPerMm: number;
   readonly deviceMemoryGb: number | undefined;
+  readonly size: MultiFileTraceSize | undefined;
 };
 
 // With onExport, each file is handed over as soon as it is traced and the
@@ -119,7 +129,7 @@ export async function buildMultiFileTraceExports(
 ): Promise<MultiFileTraceBatch> {
   const signal = deps.signal;
   const context = multiFileJobContext(deps);
-  const densitySources: RasterImportGeometry['densitySource'][] = [];
+  const densitySources: MultiFileDensitySource[] = [];
   const notices: ReadonlyArray<TraceNotice>[] = [];
   const turn = { index: 0 };
   // Rule 7 / ADR-228: this batch used to SILENTLY skip any file over 25 MB
@@ -185,6 +195,7 @@ function multiFileJobContext(deps: MultiFileTraceDeps): MultiFileJobContext {
     hybridMaxStrokeWidthMm: deps.hybridMaxStrokeWidthMm,
     targetPxPerMm: deps.targetPxPerMm ?? traceTargetPxPerMm(undefined, undefined),
     deviceMemoryGb: deps.deviceMemoryGb ?? browserDeviceMemoryGb(),
+    size: deps.size,
   };
 }
 
@@ -197,15 +208,16 @@ async function multiFileTraceJob(
   context: MultiFileJobContext,
 ): Promise<{
   readonly job: BatchTraceImageJob;
-  readonly densitySource: RasterImportGeometry['densitySource'];
+  readonly densitySource: MultiFileDensitySource;
 }> {
   const raster = await context.decodeRaster(file);
   if (raster !== null) {
     const natural = { width: raster.width, height: raster.height };
     const { densitySource, ...size } =
-      raster.sizeMm === null
+      overriddenSizeMm(natural, context.size) ??
+      (raster.sizeMm === null
         ? physicalSizeMm(natural, null)
-        : { ...raster.sizeMm, densitySource: 'embedded' as const };
+        : { ...raster.sizeMm, densitySource: 'embedded' as const });
     const load: GridLoader = async (maxEdge) => batchRasterAtMaxEdge(raster, maxEdge);
     const jobContext = withFileHybridWidth(context, natural, size.widthMm);
     return {
@@ -216,7 +228,7 @@ async function multiFileTraceJob(
   const density = await context.readDensity(file);
   if (context.readNatural === null) {
     const image = await context.loadImage(file);
-    const { densitySource, ...physicalSize } = physicalSizeMm(image, density);
+    const { densitySource, ...physicalSize } = fileSizeMm(image, density, context);
     const job = {
       sourceName: file.name,
       image,
@@ -226,7 +238,7 @@ async function multiFileTraceJob(
     return { job, densitySource };
   }
   const natural = await context.readNatural(file);
-  const { densitySource, ...size } = physicalSizeMm(natural, density);
+  const { densitySource, ...size } = fileSizeMm(natural, density, context);
   const load: GridLoader = (maxEdge) =>
     maxEdge === undefined ? context.loadImage(file) : context.loadImage(file, maxEdge);
   const jobContext = withFileHybridWidth(context, natural, size.widthMm);
@@ -278,26 +290,12 @@ function planMultiFileTraceJob(
   };
 }
 
-function physicalSizeMm(
+function fileSizeMm(
   natural: { readonly width: number; readonly height: number },
   density: ImageDensity | null,
-): {
-  readonly widthMm: number;
-  readonly heightMm: number;
-  readonly densitySource: RasterImportGeometry['densitySource'];
-} {
-  const geometry = rasterImportGeometry({
-    naturalWidth: natural.width,
-    naturalHeight: natural.height,
-    sampledWidth: natural.width,
-    sampledHeight: natural.height,
-    density,
-  });
-  return {
-    widthMm: geometry.bounds.maxX - geometry.bounds.minX,
-    heightMm: geometry.bounds.maxY - geometry.bounds.minY,
-    densitySource: geometry.densitySource,
-  };
+  context: MultiFileJobContext,
+): SizedFile {
+  return overriddenSizeMm(natural, context.size) ?? physicalSizeMm(natural, density);
 }
 
 export async function runMultiFileTrace(

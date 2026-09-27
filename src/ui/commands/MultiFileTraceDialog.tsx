@@ -29,14 +29,21 @@ import {
   tracePageOutput,
   type TracePageSettings,
 } from './TracePageFields';
+import {
+  DEFAULT_TRACE_SIZE_SETTINGS,
+  TraceSizeFields,
+  traceSizeOutput,
+  type TraceSizeSettings,
+} from './TraceSizeFields';
 
-export type MultiFileTraceSettings = TracePageSettings & {
-  readonly settingsSource: MultiFileTraceSettingsSource;
-  readonly presetName: string;
-  readonly format: BatchTraceFormat;
-  readonly groupContours: boolean;
-  readonly precisionMm: number;
-};
+export type MultiFileTraceSettings = TracePageSettings &
+  TraceSizeSettings & {
+    readonly settingsSource: MultiFileTraceSettingsSource;
+    readonly presetName: string;
+    readonly format: BatchTraceFormat;
+    readonly groupContours: boolean;
+    readonly precisionMm: number;
+  };
 
 // Remembered for the session so a second batch starts where the last one ended.
 let lastSettings: MultiFileTraceSettings = {
@@ -46,6 +53,7 @@ let lastSettings: MultiFileTraceSettings = {
   groupContours: false,
   precisionMm: DEFAULT_EXPORT_PRECISION_MM,
   ...DEFAULT_TRACE_PAGE_SETTINGS,
+  ...DEFAULT_TRACE_SIZE_SETTINGS,
 };
 
 type Choice = { readonly value: string; readonly label: string };
@@ -137,6 +145,7 @@ export function MultiFileTraceDialog(props: {
         choices={PRECISION_CHOICES}
         onChange={(step) => update({ precisionMm: Number(step) })}
       />
+      <TraceSizeFields value={settings} onChange={update} />
       <TracePageFields value={settings} onChange={update} />
       {settings.format === 'svg' ? (
         <label className="lf-field">
@@ -303,6 +312,7 @@ export async function runChosenMultiFileTrace(
       ...(chosen.hybridMaxStrokeWidthMm === undefined
         ? {}
         : { hybridMaxStrokeWidthMm: chosen.hybridMaxStrokeWidthMm }),
+      ...traceSizeOutput(settings),
       settingsLabel: chosen.label,
       signal: controller.signal,
       onProgress: progress.update,

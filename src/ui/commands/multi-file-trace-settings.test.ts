@@ -10,6 +10,8 @@ import type * as multiFileTraceAction from './multi-file-trace-action';
 import { runMultiFileTrace } from './multi-file-trace-action';
 import { batchTraceSettings, lastTraceSettingsRecord } from './multi-file-trace-settings';
 import { runChosenMultiFileTrace, type MultiFileTraceSettings } from './MultiFileTraceDialog';
+import { DEFAULT_TRACE_PAGE_SETTINGS } from './TracePageFields';
+import { DEFAULT_TRACE_SIZE_SETTINGS } from './TraceSizeFields';
 
 vi.mock('./multi-file-trace-action', async (importOriginal) => ({
   ...(await importOriginal<typeof multiFileTraceAction>()),
@@ -39,8 +41,8 @@ const SETTINGS: MultiFileTraceSettings = {
   format: 'svg',
   groupContours: false,
   precisionMm: 0.01,
-  pageFit: 'image',
-  marginMm: 0,
+  ...DEFAULT_TRACE_PAGE_SETTINGS,
+  ...DEFAULT_TRACE_SIZE_SETTINGS,
 };
 
 afterEach(() => vi.mocked(runMultiFileTrace).mockClear());
