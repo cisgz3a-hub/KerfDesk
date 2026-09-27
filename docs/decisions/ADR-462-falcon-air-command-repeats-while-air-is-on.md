@@ -1,4 +1,4 @@
-## ADR-462 - The Falcon's air command is repeated while a job wants air (2026-09-27)
+## ADR-462 - Best-effort air repeats at eligible job boundaries (2026-09-27)
 
 **Date:** 2026-09-27
 **Status:** Implemented; software verification recorded below. Hardware qualification requires
@@ -27,37 +27,51 @@ They first reported air that "works for a few minutes and then stops" on 2026-09
   - LightBurn staff call "air assist turning off after 30 seconds on the Falcon A1 and A1 Pro" a
     confirmed firmware bug (same thread, post 2).
   - On the Creality forum (thread 41420), `M8` is described as switching the exhaust along with
-    the air. That makes "the fans go off" the same event as the pump stopping.
+    the air. This suggests a possible shared control path; the installed A1 Pro's fan mapping
+    remains unverified.
 - **Why ADR-345 was not enough.** Its advisory tells the operator to send `$152=100`. The A1 Pro's
   GRBL page does not list `$152`, and KerfDesk cannot read it back. The job itself still sent a
   single `M8`.
 
 ### Decision
 
-On a profile that declares `airAssistRestartUnreliable`, the GRBL laser emitter repeats the air
-command while air is on. The Falcon A1 Pro preset declares it. `withAirKeepAlive` in
+On a profile that declares `airAssistRestartUnreliable`, the GRBL laser emitter attempts air
+command repeats while air is on. The Falcon A1 Pro preset declares it. `withAirKeepAlive` in
 `core/output/air-keep-alive.ts` post-processes the finished program as follows:
 
-- **When a repeat is written.** Before a motion line, once the time since the last air command
-  reaches `AIR_KEEP_ALIVE_SECONDS` (5 s), it writes the command the program last used to switch
-  air on (`M7` or `M8`). Nothing is written after `M9` or while air is off.
+- **When a repeat is written.** Before an eligible motion line, once estimated time since the
+  last air command reaches `AIR_KEEP_ALIVE_SECONDS` (5 s), it writes the command the program last
+  used to switch air on (`M7` or `M8`). Nothing is written after `M9` or while air is off. The
+  trigger is best effort, not a maximum elapsed-time gap or a promise that a firmware timer
+  cannot expire.
 - **How time is counted.** Each move counts as if it started and ended at rest, under the
-  profile's acceleration and at no more than its maximum feed. `G4` dwells count as well. The
-  resulting figure is higher than the real time, so on a machine at least that quick, two
-  repeats are never further apart than the interval. The shortest standby reported (20 s) is four
-  times longer.
+  profile's acceleration and at no more than its maximum feed. `G4` dwells count as well.
+  Generated absolute-mm XY-plane `G2`/`G3` use the shared I/J/R center and sweep math, including
+  full circles, rather than the endpoint chord. Full-circle center-only blocks are motion
+  boundaries too. Counting short blended moves from rest can overestimate their duration, but
+  these configured assumptions are not a controller wall clock. Unresolved arc duration makes
+  the next eligible boundary due without changing or rejecting the supplied motion.
 - **Where a repeat is placed.** Under `M3`, a repeat waits for a laser-off move, following the
   output cursor's rule for air changes (OR-1). A vendor firmware that drained its planner on the
   repeat would then stop the head with the beam dark. Under `M4` any stop is already dark.
+- **Limits of insertion only.** A single long line or arc, a dwell, or continuous M3 burns can
+  leave a gap longer than 5 s, including longer than the reported 20–30 s standby. No repeat is
+  inserted inside a block and no motion is segmented or otherwise rewritten to force a repeat.
+  A final long burn followed by `M9` may have no repeat at all. Firmware/`$152` advice therefore
+  remains necessary even when this option is enabled.
 - **Firmware that handles `M8` normally.** A repeat changes nothing there. Stock GRBL syncs
   coolant only when the state differs (`grbl/gcode.c` lines 952-956). grblHAL drops an unchanged
   `M8` before executing the block (`gcode.c` line 2647). So on those firmwares a repeat never
   stops the head.
 - **Profiles without the flag.** Their bytes are unchanged, and so are CNC coolant and the Marlin
   and Smoothieware strategies.
+- **Output identity.** `EMITTER_REVISION` becomes
+  `adaptive-rings-relief-flat-depth-air-repeats-20260927-v1`, preserving the existing relief and
+  adaptive-ring provenance while identifying this output behavior.
 
-The Job Review standby advisory, the Machine Setup "Air restart" tooltip, and WORKFLOW F.3 now
-describe the repeat. `$152=100` stays the advice for when air still stops.
+The Job Review standby advisory, the Machine Setup "Air restart" tooltip, and WORKFLOW F.3
+describe the best-effort repeat and its gaps. `$152=100` and installed-firmware qualification
+stay the advice for when air still stops; no controller setting is written automatically.
 
 The repeat uses the existing flag rather than a new profile field. Both behaviours work around
 the same firmware timer, and an operator who clears the flag after sending `$152=100` needs
@@ -65,9 +79,9 @@ neither of them. This also leaves the saved-profile schema unchanged.
 
 ### Consequences
 
-- A dense fill gains one short line roughly every 50 motion lines. The count is conservative
-  because every segment is counted as a full stop. A synthetic 362,007-line fill gained 6,856
-  repeats (20,568 bytes, 0.5%), and the pass took 266 ms.
+- A dense fill can gain frequent short air-command lines. The original owner's synthetic
+  362,007-line fill gained 6,856 repeats (20,568 bytes, 0.5%) in a reported 266 ms run. That
+  fixture measurement is not a throughput or repeat-frequency guarantee for other programs.
 - A program that never switches air on skips the pass entirely.
 - Resume programs are rebuilt from the emitted text, so they carry the repeats too. The selective
   second pass writes its own program and does not repeat the command.
@@ -76,14 +90,25 @@ neither of them. This also leaves the saved-profile schema unchanged.
 ### Evidence and limits
 
 - `air-keep-alive.test.ts` pins the following:
-  - the interval, `M7` versus `M8`, and no repeat after `M9`;
+  - the trigger on short moves, `M7` versus `M8`, and no repeat after `M9`;
   - that under `M3` a repeat waits for a dark move, and that under `M4` it does not;
   - that dwells count and comments are ignored;
-  - the rest-to-rest time bound.
+  - the individual rest-to-rest estimate under supplied limits.
+- `air-keep-alive-arcs.test.ts` independently brackets the timing of radius-10 full circles,
+  minor arcs and 270-degree arcs with I/J and positive/negative R words. It also checks modal
+  arcs and center-only circles. These pin native-arc accounting before integration with the
+  separate native laser-arc emitter work; they do not claim this base already emits native
+  laser circles through its scene compiler.
+- `air-keep-alive-boundaries.test.ts` explicitly retains the limitations: a 100-second G1,
+  30-second dwell and more than 30 seconds of continuous M3 cutting exceed the trigger.
+  Repeats after M3 lines or a full circle remain after a dark move.
 - `prepare-output-air-assist.test.ts` compiles a Falcon A1 Pro fill-and-line job through the real
-  pipeline. Timed by KerfDesk's own planner (`buildProgramTimeline`), no two air commands are more
-  than 6 s apart, the program still switches air exactly once each way, and every repeat precedes
-  a motion line.
+  pipeline. In that specific short-block fixture, timed by KerfDesk's planner
+  (`buildProgramTimeline`), no two air commands are more than 6 s apart; that observation is not
+  a bound for arbitrary jobs. The program switches air once each way, and every repeat precedes
+  a motion line. `prepare-output-air-keep-alive-boundaries.test.ts` compiles a 100-mm line at
+  60 mm/min through the same real Falcon pipeline in constant and dynamic power modes: the
+  single intact burn leaves at least a 100-second gap with only the initial `M8` and final `M9`.
 - The same file pins that the unflagged profile still emits `M8 M9 M8 M9`. Removing the emitter
   hook fails two of its tests.
 - **Not verified:**

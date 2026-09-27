@@ -29,7 +29,7 @@ describe('withAirKeepAlive', () => {
     expect(withAirKeepAlive(source, LIMITS)).toBe(source);
   });
 
-  it('repeats the air command once per interval of motion while air is on', () => {
+  it('repeats at the estimated trigger on a sequence of one-second moves', () => {
     const source = program(['M4 S0', 'M8', 'G1 F3600', ...burns(12), 'M9', 'M5']);
     const lines = withAirKeepAlive(source, LIMITS).split('\n');
 
@@ -113,7 +113,7 @@ describe('withAirKeepAlive', () => {
     expect(indicesOf(withAirKeepAlive(source, LIMITS).split('\n'), 'M8')).toEqual([1, 5]);
   });
 
-  it('costs every move from rest to rest so the real gap is never longer', () => {
+  it('estimates an individual move from rest to rest under the supplied limits', () => {
     // 1 mm at 600 mm/s with 1000 mm/s^2 never reaches speed: a triangle.
     expect(moveSecondsUpperBound(1, 600, 1000)).toBeCloseTo(2 * Math.sqrt(1 / 1000), 12);
     // 100 mm at 10 mm/s is long enough to reach speed: cruise plus both ramps.
@@ -122,8 +122,9 @@ describe('withAirKeepAlive', () => {
     expect(moveSecondsUpperBound(10, 10, 0)).toBe(1);
   });
 
-  it('uses an interval well inside the shortest reported firmware standby', () => {
-    // Creality's `$152` default is reported as 20 or 30 s (ADR-345, ADR-462).
+  it('uses an estimated trigger below the reported standby, without bounding repeat gaps', () => {
+    // A chosen trigger is not a promise that an eligible boundary exists in
+    // time. Long-block, dwell and M3-deferral cases pin that limitation separately.
     expect(AIR_KEEP_ALIVE_SECONDS * 4).toBeLessThanOrEqual(20);
   });
 });

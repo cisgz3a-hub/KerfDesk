@@ -3179,14 +3179,19 @@ work-Z evidence, but it cannot enable User Origin or Verified Origin.
     go back to `M8 M9 M8 M9`. If the pump is audibly off for the last
     operation with the box ticked, the hold is not working; if it is
     off only with the box unticked, the firmware timer is confirmed.
-13. **Air pump through a long job (ADR-462).** Leave `$152` at the
-    machine's default, not `100`. Run a job of a minute or more whose
-    operations all have Air on. With "Air restart" ticked the program
-    repeats `M8` every few seconds of motion, and the pump and the
-    enclosure fan must run until the job's last burn. Untick "Air
-    restart" and run it again: the program carries a single `M8`, and a
-    pump that stops about 20-30 s in confirms the firmware timer the
-    repeats work around.
+13. **Qualify air repeats on the installed firmware (ADR-462).** In a
+    separately supervised air check, record the firmware and current
+    `$152` setting. With "Air restart" ticked, inspect a short-block job
+    of a minute or more with Air on: the program attempts `M8` repeats
+    at eligible movement boundaries after about 5 s of estimated time.
+    Observe whether the pump stays on and whether the enclosure fan
+    follows it; program bytes alone establish neither. Long moves or
+    dwells and continuous M3 cutting can exceed the trigger without a
+    repeat, so this mitigation does not guarantee continuous air.
+    Compare with "Air restart" unticked, which emits one `M8` for an
+    all-Air-on job. If air still stops, keep the firmware/`$152=100`
+    remedy from step 12 and verify it separately. Do not treat a pass
+    on short blocks as qualification of every job or firmware version.
 
 When this checklist passes on the Falcon, replace the F.3 status in `PROJECT.md` Phase F
 ("Code shipped; hardware verification pending") with the recorded result and update the F.3

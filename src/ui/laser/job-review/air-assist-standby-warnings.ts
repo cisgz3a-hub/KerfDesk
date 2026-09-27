@@ -12,9 +12,10 @@
 // and then stops" and a machine that sits Idle for about a minute mid-burn
 // before carrying on. KerfDesk cannot read `$152` on this controller (the
 // vendor contract forbids `$$`), so the remedy is named rather than checked;
-// the Console can write it (ADR-370). The emitter now repeats the air command
-// every AIR_KEEP_ALIVE_SECONDS of motion on these profiles (ADR-462), so the
-// advisory says so and keeps `$152=100` as the remedy if air still stops.
+// the Console can write it (ADR-370). The emitter attempts repeats after an
+// estimated-time trigger at eligible motion boundaries (ADR-462). Long blocks,
+// dwells and M3 dark-boundary deferral can exceed that interval; the advisory
+// keeps `$152=100` and firmware qualification as the remedy if air still stops.
 //
 // Advisory only (rule 7 / ADR-228, ADR-345): it never refuses a Start.
 
@@ -27,8 +28,10 @@ type StandbyDevice = Pick<DeviceProfile, 'airAssistCommand' | 'airAssistRestartU
 export const AIR_STANDBY_WARNING =
   'This controller idles its air pump and laser module on its own standby timer ($152, ' +
   '100 = never), and Creality firmware has been seen stopping the pump about 30 s after the ' +
-  `air command. KerfDesk repeats the air command every ${AIR_KEEP_ALIVE_SECONDS} s of motion ` +
-  'while this job wants air. If air still stops or the machine sits Idle mid-burn and then ' +
+  'air command. KerfDesk attempts to repeat the air command at eligible motion boundaries ' +
+  `after about ${AIR_KEEP_ALIVE_SECONDS} s of estimated motion or dwell time. Long moves, ` +
+  'dwells and continuous constant-power (M3) cutting can leave longer gaps; this does not ' +
+  'guarantee that the pump stays on. If air still stops or the machine sits Idle mid-burn and then ' +
   'continues, send $152=100 from the Console, or install the latest firmware and confirm with ' +
   'an air test. KerfDesk names such a hold in the live bar and keeps waiting; it does not ' +
   'reset the controller.';

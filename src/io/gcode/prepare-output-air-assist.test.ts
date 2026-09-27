@@ -118,10 +118,10 @@ describe('air assist from operation settings to controller bytes', () => {
     expect(lines.slice(m9 + 1).find((line) => line !== '')).toBe('M5');
   });
 
-  it('repeats the Falcon A1 Pro air command before its pump timer can run out', () => {
-    // The firmware stops the pump 20-30 s after the last M8 (ADR-462). Timed by
-    // KerfDesk's own planner, no air command is further from the next than the
-    // keep-alive interval plus the one move that crossed it.
+  it('repeats frequently in this short-block Falcon fill-and-line fixture', () => {
+    // This fixture's moves provide frequent eligible boundaries. Its measured
+    // gaps do not bound other jobs: a long block, dwell or M3 burn can defer a
+    // repeat past the trigger (ADR-462).
     const device = FALCON_A1_PRO_GRBLHAL_PROFILE;
     const lines = emittedLines([{ air: true, mode: 'fill' }, { air: true }], device);
     const timed = buildProgramTimeline(lines.join('\n'), {

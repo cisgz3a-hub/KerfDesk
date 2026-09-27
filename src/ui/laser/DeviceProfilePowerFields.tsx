@@ -171,7 +171,7 @@ export function AirRestartRow({ device, update }: DeviceRowsProps): JSX.Element 
         type="checkbox"
         checked={device.airAssistRestartUnreliable === true}
         aria-label="Controller cannot restart air assist mid-job"
-        title="Tick when the controller cannot switch air off and on again inside a running job — Creality A1 firmware holds the pump in standby after M9 and may not restart it. Air is then held on through operations that sit between two air-on operations, and the air command is repeated every few seconds while air is on so the pump timer cannot stop it; Job Review says so. Untick once $152=100 (no standby) is sent from the Console, or after an air test shows your firmware restarting the pump."
+        title="Tick when the controller cannot switch air off and on again inside a running job — Creality A1 firmware holds the pump in standby after M9 and may not restart it. Air is then held on through operations that sit between two air-on operations. Air-command repeats are also attempted at movement boundaries after about 5 s of estimated time. Long moves, dwells and constant-power cutting can leave longer gaps, so this does not guarantee continuous air. Untick once $152=100 (no standby) is sent from the Console, or after an air test shows your firmware restarting the pump."
         onChange={(event) => update({ airAssistRestartUnreliable: event.target.checked })}
       />
       <span style={{ opacity: 0.7 }}>cannot switch air off and on mid-job</span>
