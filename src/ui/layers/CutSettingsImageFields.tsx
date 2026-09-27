@@ -111,13 +111,14 @@ function ImageOverscanField(props: { readonly layer: Layer }): JSX.Element {
           max={MAX_IMAGE_OVERSCAN_MM}
           step={0.01}
           label="image overscan"
-          title="Laser-off run-up added at both ends of every scan line so the head is at full speed before it burns. Too little darkens the image edges."
+          title="Laser-off run-up at scan edges. The required distance depends on speed and acceleration; short runways can change edge exposure."
         />
         <span className="lf-field-unit">mm</span>
       </Field>
       <p className="lf-laser-help">
         At the saved speed of {formatNumber(feed)} mm/min and {formatNumber(device.accelMmPerSec2)}{' '}
-        mm/s² acceleration, the head needs about {formatNumber(neededMm)} mm to reach full speed.
+        mm/s² acceleration, the saved model needs about {formatNumber(neededMm)} mm to reach full
+        speed from rest. Confirm the setting with a scan-edge test on this machine.
         {neededMm > MAX_IMAGE_OVERSCAN_MM
           ? ` That is more than the ${MAX_IMAGE_OVERSCAN_MM} mm maximum, so lower the speed if the image edges burn darker.`
           : ''}

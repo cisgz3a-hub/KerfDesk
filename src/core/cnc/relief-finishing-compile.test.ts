@@ -132,6 +132,40 @@ function compiledReliefArtifact(
 }
 
 describe('relief finishing compile (H.8)', () => {
+  it('uses the selected finishing cutter recipe while preserving primary roughing values', () => {
+    const job = compile(
+      {
+        feedMmPerMin: 900,
+        plungeMmPerMin: 200,
+        spindleRpm: 12000,
+        reliefFinishToolId: 'bn-3175',
+        stageRecipes: {
+          'relief-finish': {
+            toolId: 'bn-3175',
+            feedMmPerMin: 321,
+            plungeMmPerMin: 123,
+            spindleRpm: 9000,
+            depthPerPassMm: 0.5,
+          },
+        },
+      },
+      depthMapRelief(),
+    );
+    const groups = job.groups.filter((group) => group.kind === 'cnc');
+    expect(groups[0]).toMatchObject({
+      cutType: 'relief-rough',
+      feedMmPerMin: 900,
+      plungeMmPerMin: 200,
+      spindleRpm: 12000,
+    });
+    expect(groups[1]).toMatchObject({
+      cutType: 'relief-finish',
+      cuttingStage: 'relief-finish',
+      feedMmPerMin: 321,
+      plungeMmPerMin: 123,
+      spindleRpm: 9000,
+    });
+  });
   it('routes a durable depth map through existing relief roughing and finishing CAM', () => {
     const job = compile({ reliefFinishToolId: 'bn-3175' }, depthMapRelief());
     const groups = job.groups.filter((group) => group.kind === 'cnc');

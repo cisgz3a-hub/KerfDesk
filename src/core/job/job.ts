@@ -12,6 +12,7 @@
 import { representedCncCoordinateMm } from '../cnc/coordinate-representation';
 import { sampleCircularArcPoints } from '../geometry/arc-representation';
 import type { RasterPowerValues } from '../raster/raster-power-values';
+import type { CncCuttingStage } from '../scene/cnc-stage-recipe';
 import {
   assertNever,
   type CncCoolantMode,
@@ -161,6 +162,9 @@ export type CncContourPass = {
 };
 
 export type CncPath3dPass = {
+  // A proved relief connector precedes the original row. Geometry-changing
+  // placements discard this prefix unless they can requalify the connector.
+  readonly reliefRowLinkPrefixPoints?: number;
   readonly kind: 'path3d';
   // Machine-coord XY plus Z (0 = stock top, negative into the stock).
   readonly points: ReadonlyArray<Vec3>;
@@ -241,6 +245,8 @@ export function cncPassEntryDepthMm(pass: CncPass): number {
 }
 
 export type CncGroup = {
+  /** Explicit independent recipe used for this compiled stage. */
+  readonly cuttingStage?: CncCuttingStage;
   readonly kind: 'cnc';
   readonly layerId: string;
   readonly sourceObjectId?: string;

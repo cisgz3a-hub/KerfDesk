@@ -4,7 +4,8 @@ import { type Job } from '../job';
 import { grblStrategy } from './grbl-strategy';
 
 function emit(job: Job): string {
-  return grblStrategy.emit(job, DEFAULT_DEVICE_PROFILE);
+  // Pin the readable spelling; compact equivalence is covered by grbl-fill-compaction.test.
+  return grblStrategy.emit(job, DEFAULT_DEVICE_PROFILE, { compactMotionWords: false });
 }
 
 function hasZeroLengthMove(gcode: string): boolean {

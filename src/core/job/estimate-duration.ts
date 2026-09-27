@@ -32,6 +32,8 @@ export type JobDurationEstimateOptions = {
   /** Review can reuse the exact program and clock prepared for Start. */
   readonly gcode?: string;
   readonly timeline?: ProgramTimeline;
+  /** Optional consumer of this exact emission; callers own any retention bound. */
+  readonly onEmittedProgram?: (gcode: string) => void;
 };
 
 /** Estimates the emitted moves, including rounding, pecks, arcs, Z and waits. */
@@ -67,6 +69,7 @@ function estimateEmittedJob(
       options.finishPosition === undefined ? {} : { finishPosition: options.finishPosition },
     );
   if (gcode.trim() === '') return emptyDuration();
+  options.onEmittedProgram?.(gcode);
   const result = buildProgramTimeline(
     gcode,
     {

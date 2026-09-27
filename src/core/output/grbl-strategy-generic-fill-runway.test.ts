@@ -40,7 +40,8 @@ function fillGroup(
 }
 
 function emit(job: Job): string {
-  return grblStrategy.emit(job, DEFAULT_DEVICE_PROFILE);
+  // Keep these runway text assertions readable; the compaction suite proves modal equivalence.
+  return grblStrategy.emit(job, DEFAULT_DEVICE_PROFILE, { compactMotionWords: false });
 }
 
 function motionLines(job: Job): ReadonlyArray<string> {

@@ -21,6 +21,7 @@ import { DEFAULT_RELIEF_SCALLOP_MM, reliefFinishingPasses, scallopRowSpacingMm }
 import { reliefRoughingLadder, type ReliefRoughingLadder } from '../relief/relief-roughing';
 import { reliefScallopBallRadiusMm } from '../relief/relief-finishing';
 import { reliefObjectToHeightmap } from '../relief/relief-object-to-heightmap';
+import type { Heightmap } from '../relief/heightmap';
 import {
   reliefMaterializationFailure,
   type ReliefMaterializationFailure,
@@ -37,6 +38,7 @@ import {
   sceneObjectUsesOperation,
   type SceneObject,
   type Vec2,
+  type Transform,
 } from '../scene';
 import { kernelForTool } from '../sim';
 import { coolantFields } from './coolant-fields';
@@ -46,6 +48,7 @@ import { zPassArrayMaterializationError } from './depth-passes';
 import { enforceCutDirection, parkFields } from './motion-polish';
 import { reliefMachineSpaceGeometry, reliefMachineSpaceTransform } from './relief-machine-space';
 import { machineFrameHandedness } from './machine-frame-handedness';
+import { cncSettingsForStage, cncStageProvenance } from './cnc-stage-settings';
 
 const MIN_FEED_MM_PER_MIN = 1;
 const ROUGHING_CELL_TOOL_FRACTION = 8;
@@ -148,6 +151,7 @@ function reliefGroup(
       includeDepthPerPass: cutType !== 'relief-finish',
       includeVResolution: false,
       layerPrimaryTool,
+      ...(cutType === 'relief-finish' ? cncStageProvenance(settings, 'relief-finish', tool) : {}),
     }),
     feedMmPerMin: cap(settings.feedMmPerMin, device.maxFeed),
     plungeMmPerMin: cap(settings.plungeMmPerMin, device.maxFeed),
@@ -213,21 +217,17 @@ function reliefFinishingGroup(
       rowSpacingMm,
       scallopMm,
     });
-    const kernel = kernelForTool(finishTool, heightmap.heightmap.mmPerCell);
-    for (const pass of reliefFinishingPasses(heightmap.heightmap, {
-      tool: finishTool,
-      kernel,
-      scallopMm,
-    })) {
-      if (pass.kind !== 'path3d') continue;
-      passes.push({
-        ...pass,
-        points: pass.points.map((p) => ({
-          ...toMachineCoords(applyTransform(p, machineSpace.residualTransform), device),
-          z: p.z,
-        })),
-      });
-    }
+    passes.push(
+      ...placedFinishingPasses(
+        heightmap.heightmap,
+        finishTool,
+        scallopMm,
+        machineSpace.residualTransform,
+        device,
+        settings,
+        config,
+      ),
+    );
   }
   if (passes.length === 0) return { kind: 'compiled', group: null, plans };
   return {
@@ -235,7 +235,7 @@ function reliefFinishingGroup(
     plans,
     group: reliefGroup(
       layer,
-      settings,
+      cncSettingsForStage(settings, 'relief-finish', finishTool),
       device,
       config,
       finishTool,
@@ -244,6 +244,41 @@ function reliefFinishingGroup(
       layerCncTool(config, settings),
     ),
   };
+}
+
+function placedFinishingPasses(
+  map: Heightmap,
+  tool: CncTool,
+  scallopMm: number,
+  transform: Transform,
+  device: DeviceProfile,
+  settings: CncLayerSettings,
+  config: CncMachineConfig,
+): ReadonlyArray<CncPass> {
+  const stage = cncSettingsForStage(settings, 'relief-finish', tool);
+  const outputXyForPoint = (point: Vec2): Vec2 =>
+    toMachineCoords(applyTransform(point, transform), device);
+  return reliefFinishingPasses(map, {
+    tool,
+    kernel: kernelForTool(tool, map.mmPerCell),
+    scallopMm,
+    linkPlanarRows: Math.abs(transform.scaleX) === 1 && Math.abs(transform.scaleY) === 1,
+    outputXyForPoint,
+    rowLinkCuttingValues: {
+      feedMmPerMin: cap(stage.feedMmPerMin, device.maxFeed),
+      plungeMmPerMin: cap(stage.plungeMmPerMin, device.maxFeed),
+      safeZMm: Math.max(0, config.params.safeZMm),
+    },
+  }).flatMap((pass) =>
+    pass.kind !== 'path3d'
+      ? []
+      : [
+          {
+            ...pass,
+            points: pass.points.map((point) => ({ ...outputXyForPoint(point), z: point.z })),
+          },
+        ],
+  );
 }
 
 // Only a tapered ball nose's cusp depends on a tip smaller than its stored

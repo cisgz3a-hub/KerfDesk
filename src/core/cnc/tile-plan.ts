@@ -19,6 +19,7 @@ import { resolveTileRegistration, type ResolvedTileRegistration } from './tile-r
 import { orderGroupsIntoToolSections } from './cnc-tool-sections';
 import type { EffectiveCncTileGrid } from './effective-cnc-tile-grid';
 import { vcarveConservativeZ } from './vcarve-cutting-constraints';
+import { withoutReliefRowLink } from './relief-row-link';
 
 const MIN_CLIPPED_POINTS = 2;
 
@@ -171,7 +172,8 @@ function cncJobBounds(job: Job): CncTile['rect'] | null {
 
 function clipGroupToTile(group: CncGroup, tile: CncTile): CncGroup | null {
   const passes: CncPass[] = [];
-  for (const pass of group.passes) {
+  for (const sourcePass of group.passes) {
+    const pass = sourcePass.kind === 'path3d' ? withoutReliefRowLink(sourcePass) : sourcePass;
     if (pass.kind === 'contour') {
       const xyz = pass.polyline.map((point) => ({ x: point.x, y: point.y, z: pass.zMm }));
       for (const piece of clipPointsToRect(xyz, tile.rect, pass.closed)) {

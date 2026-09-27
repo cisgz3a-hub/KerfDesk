@@ -21,11 +21,13 @@
 
 import type { ToolKernel } from '../sim';
 import type { CncPass } from '../job';
-import type { CncTool } from '../scene';
+import type { CncTool, Vec2 } from '../scene';
 import { taperedBallEnvelope } from '../cnc-tapered-ball';
 import { partialCellCenter } from '../grid';
 import { dilateHeightmapByToolWithMaskEvidence } from './heightmap-tool-offset';
 import type { Heightmap } from './heightmap';
+import { linkPlanarReliefRows } from './relief-planar-row-links';
+import { economicalReliefRowLinks, type ReliefRowLinkCuttingValues } from './relief-row-link-cost';
 
 export const DEFAULT_RELIEF_SCALLOP_MM = 0.025;
 const FLAT_TOOL_STEPOVER_FRACTION = 0.4;
@@ -35,6 +37,9 @@ export type ReliefFinishingOptions = {
   readonly tool: CncTool;
   readonly kernel: ToolKernel;
   readonly scallopMm: number;
+  readonly linkPlanarRows?: boolean;
+  readonly outputXyForPoint?: (point: FinishingPoint) => Vec2;
+  readonly rowLinkCuttingValues?: ReliefRowLinkCuttingValues;
 };
 
 type FinishingPoint = { readonly x: number; readonly y: number; readonly z: number };
@@ -84,7 +89,7 @@ export function reliefFinishingPasses(
     appendFinishingRun(passes, points);
     leftToRight = !leftToRight;
   }
-  return passes;
+  return finishWithOptionalLinks(map, passes, options, rowSpacingMm);
 }
 
 function maskedFinishingPasses(
@@ -220,4 +225,21 @@ export function reliefScallopBallRadiusMm(tool: CncTool): number | null {
   if (tool.kind === 'ball-nose') return tool.diameterMm / 2;
   if (tool.kind === 'tapered-ball-nose') return taperedBallEnvelope(tool)?.ballRadiusMm ?? null;
   return null;
+}
+
+function finishWithOptionalLinks(
+  map: Heightmap,
+  passes: ReadonlyArray<CncPass>,
+  options: ReliefFinishingOptions,
+  rowSpacingMm: number,
+): ReadonlyArray<CncPass> {
+  if (options.linkPlanarRows !== true) return passes;
+  const linked = linkPlanarReliefRows(
+    map,
+    passes,
+    options.tool.diameterMm,
+    rowSpacingMm,
+    options.outputXyForPoint,
+  );
+  return economicalReliefRowLinks(linked, options.rowLinkCuttingValues, options.outputXyForPoint);
 }

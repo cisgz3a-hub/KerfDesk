@@ -13,6 +13,7 @@ import type {
 import type { JobBounds } from './job-bounds';
 import { computeJobBounds } from './job-bounds';
 import { withContourEntryBounds } from './contour-entry';
+import { withoutReliefRowLink } from '../cnc/relief-row-link';
 
 export type JobStartMode = 'absolute' | 'current-position' | 'user-origin' | 'verified-origin';
 
@@ -276,11 +277,13 @@ function translateCncPass(pass: CncPass, dx: number, dy: number): CncPass {
         ...pass,
         polyline: pass.polyline.map((point) => ({ x: point.x + dx, y: point.y + dy })),
       };
-    case 'path3d':
+    case 'path3d': {
+      const original = withoutReliefRowLink(pass);
       return {
-        ...pass,
-        points: pass.points.map((point) => ({ x: point.x + dx, y: point.y + dy, z: point.z })),
+        ...original,
+        points: original.points.map((point) => ({ x: point.x + dx, y: point.y + dy, z: point.z })),
       };
+    }
     case 'arc':
       return {
         ...pass,

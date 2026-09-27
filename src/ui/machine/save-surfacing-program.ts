@@ -1,5 +1,6 @@
 import { cncMaxFeedMmPerMin } from '../../core/cnc/cnc-head-feeds';
 import { SURFACING_DEFAULT_DEPTH_PER_PASS_MM } from '../../core/cnc/surfacing';
+import type { SurfacingParams } from '../../core/cnc/surfacing';
 import type { ControllerSettingsSnapshot, ReadinessSettingsCapability } from '../../core/preflight';
 import { standaloneCncSetupAdvisories } from '../../core/preflight/standalone-cnc-preflight';
 import { activeCncTool, type CncMachineConfig, type Project } from '../../core/scene';
@@ -17,6 +18,10 @@ export type SurfacingInputs = {
   readonly heightMm: number;
   readonly stepoverPct: number;
   readonly totalDepthMm: number;
+  readonly feedMmPerMin?: number;
+  readonly plungeMmPerMin?: number;
+  readonly spindleRpm?: number;
+  readonly depthPerPassMm?: number;
 };
 
 type SaveSurfacingOptions = {
@@ -65,16 +70,7 @@ export async function saveSurfacingProgram(options: SaveSurfacingOptions): Promi
   pushCncExportControllerMessages(project.device, controllerSettings, warn);
   const task = startSurfacingStream(
     {
-      params: {
-        ...inputs,
-        bitDiameterMm: tool.diameterMm,
-        depthPerPassMm: SURFACING_DEFAULT_DEPTH_PER_PASS_MM,
-        feedMmPerMin: Math.min(2500, cncMaxFeedMmPerMin(project.device, machine.params)),
-        plungeMmPerMin: Math.min(600, cncMaxFeedMmPerMin(project.device, machine.params)),
-        spindleRpm: machine.params.spindleMaxRpm,
-        spindleSpinupSec: machine.params.spindleSpinupSec,
-        safeZMm: machine.params.safeZMm,
-      },
+      params: surfacingParams(inputs, project, machine),
       device: project.device,
       machine,
       metadata: buildGcodeMetadata(),
@@ -114,4 +110,31 @@ export async function saveSurfacingProgram(options: SaveSurfacingOptions): Promi
   } finally {
     task.dispose();
   }
+}
+
+function surfacingParams(
+  inputs: SurfacingInputs,
+  project: Project,
+  machine: CncMachineConfig,
+): SurfacingParams {
+  const tool = activeCncTool(machine);
+  return {
+    ...inputs,
+    bitDiameterMm: tool.diameterMm,
+    depthPerPassMm: inputs.depthPerPassMm ?? SURFACING_DEFAULT_DEPTH_PER_PASS_MM,
+    feedMmPerMin: Math.min(
+      inputs.feedMmPerMin ?? 2500,
+      cncMaxFeedMmPerMin(project.device, machine.params),
+    ),
+    plungeMmPerMin: Math.min(
+      inputs.plungeMmPerMin ?? 600,
+      cncMaxFeedMmPerMin(project.device, machine.params),
+    ),
+    spindleRpm: Math.min(
+      inputs.spindleRpm ?? machine.params.spindleMaxRpm,
+      machine.params.spindleMaxRpm,
+    ),
+    spindleSpinupSec: machine.params.spindleSpinupSec,
+    safeZMm: machine.params.safeZMm,
+  };
 }

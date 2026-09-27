@@ -12,6 +12,11 @@ import type { FillSpan } from '../job/fill-sweeps';
 import { offsetForSpeed } from '../job/scan-offset';
 import { formatGcodeCoordinateMm } from '../gcode';
 import { formatGcodeFeedMmPerMin } from '../gcode/feed-word';
+import {
+  createModalMotionWriter,
+  joinMotionWords,
+  motionWordStyleFor,
+} from '../gcode/motion-words';
 import { fillRunwayCommentText } from './fill-runway-comment';
 import {
   LINE_END,
@@ -123,10 +128,11 @@ function sweepSpanLines(
   if (first === undefined) return [];
   const { s, feed, device, dialect, cursor } = context;
   const lines: string[] = [];
-  // Fill sweeps keep the verbose spelling. Their G1s are whole spans — metres
-  // of motion per line at the emitter's 5 mm minimum runway — so the planner
-  // cannot starve on them and the bytes buy nothing (ADR-332). Raster rows,
-  // one short G1 per power change, are where compaction pays.
+  // Fine traced Fill can contain pixel-sized spans. Use the same lossless
+  // spelling as raster on qualified dialects (ADR-449). Reset per sweep: the
+  // preceding seek, runway, or held mode transition may have changed state.
+  const style = motionWordStyleFor(dialect.compactMotionWords);
+  const writer = createModalMotionWriter(style);
   // Head starts where the planned runway move left it: the first span's start.
   let head = emittedHead(first.start.x, first.start.y);
   let feedEmitted = false;
@@ -142,9 +148,20 @@ function sweepSpanLines(
       );
     }
     const feedWord =
-      feedEmitted && dialect.modalFeedrate ? '' : ` F${formatGcodeFeedMmPerMin(feed)}`;
+      feedEmitted && dialect.modalFeedrate ? '' : `F${formatGcodeFeedMmPerMin(feed)}`;
     feedEmitted = true;
-    lines.push(`G1 X${target.x} Y${target.y}${feedWord} S${power}`);
+    lines.push(
+      joinMotionWords(
+        [
+          writer.motion('G1'),
+          writer.axis('X', Number(target.x)),
+          writer.axis('Y', Number(target.y)),
+          feedWord,
+          `S${power}`,
+        ],
+        style,
+      ),
+    );
     head = target;
     if (power > 0) noteBurn(cursor, target);
     else noteLaserOffMove(cursor, target);

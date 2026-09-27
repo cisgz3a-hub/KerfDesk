@@ -65,12 +65,13 @@ const GENERIC_GRBLHAL_PROFILE: DeviceProfile = {
 const GENERIC_FLUIDNC_PROFILE: DeviceProfile = {
   ...DEFAULT_DEVICE_PROFILE,
   profileId: 'generic-fluidnc',
-  catalogVersion: PROFILE_CATALOG_VERSION,
+  catalogVersion: '2026-09-27',
   vendor: 'Generic',
   model: 'FluidNC (ESP32)',
   name: 'Generic FluidNC 400×400',
   machineFamily: 'generic-fluidnc',
   controllerKind: 'fluidnc',
+  streamingMode: 'ping-pong',
   // FluidNC v4.0.3 LaserSpindle.cpp default speed_map. Saved profiles and live
   // reports retain their configured scale; a YAML speed_map can override it.
   maxPowerS: 255,
@@ -79,7 +80,7 @@ const GENERIC_FLUIDNC_PROFILE: DeviceProfile = {
     {
       label: 'FluidNC GRBL-compatible reporting',
       status: 'simulator-tested',
-      note: 'Firmware template with unspecified machine output kind. Serial GRBL-compatible reporting and streaming have simulator coverage; Wi-Fi is not implemented by this profile. Match the YAML laser speed_map: 255 is the FluidNC v4.0.3 laser default, not a universal S maximum. Numeric $ writes are disabled in-app. Source checked 2026-09-19: https://github.com/bdring/FluidNC/blob/v4.0.3/FluidNC/src/Spindles/LaserSpindle.cpp. No hardware qualification.',
+      note: 'Firmware template with unspecified machine output kind. Serial reporting has simulator coverage; streaming waits for each line acknowledgement, following FluidNC v4.0.3 Serial.cpp. Wi-Fi is not implemented by this profile. Match the YAML laser speed_map: 255 is the FluidNC v4.0.3 laser default, not a universal S maximum. Numeric $ writes are disabled in-app. Sources checked 2026-09-27: https://github.com/bdring/FluidNC/blob/v4.0.3/FluidNC/src/Serial.cpp and https://github.com/bdring/FluidNC/blob/v4.0.3/FluidNC/src/Spindles/LaserSpindle.cpp. No hardware qualification.',
     },
   ],
 };
