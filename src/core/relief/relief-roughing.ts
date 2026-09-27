@@ -21,10 +21,11 @@
 // heightmap's min corner, y down), each ring closed back to its first point.
 // The compiler has already folded object XY scale into that grid, so only its
 // residual isometry and device origin remain. Depth-major: every ring of one
-// level, outside in, then its core cleanup, before the next level. With flat
+// level, cleanup first then inside out, before the next level. With flat
 // finishing on (ADR-450), an end mill then cuts each flat of the model to its
 // exact height, top down (relief-flat-finish.ts). Pure and deterministic.
 
+import { withOuterContoursPositive } from '../geometry/polyline-orientation';
 import { buildOffsetLadder, insetContoursChecked } from '../geometry/offset-ladder';
 import type { CncContourPass, CncPass } from '../job';
 import type { CncTool, Polyline } from '../scene';
@@ -291,7 +292,11 @@ function planFlatLevels(
 }
 
 function appendClosedRings(passes: CncContourPass[], level: ReliefRoughingLevelPaths): void {
-  for (const polyline of [...level.rings.flat(), ...level.cleanup]) {
+  const insideOut = [
+    ...[...level.cleanup].reverse(),
+    ...[...level.rings].reverse().flatMap(withOuterContoursPositive),
+  ];
+  for (const polyline of insideOut) {
     passes.push({ kind: 'contour', zMm: level.zMm, polyline: closeRing(polyline), closed: true });
   }
 }

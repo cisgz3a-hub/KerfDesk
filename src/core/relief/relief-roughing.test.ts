@@ -2,8 +2,9 @@ import { describe, expect, it } from 'vitest';
 import { DEFAULT_DEVICE_PROFILE } from '../devices';
 import { compileCncJob } from '../cnc/compile-cnc-job';
 import { cncGrblStrategy } from '../output';
+import { signedAreaMm2 } from '../geometry/polyline-orientation';
 import { findPlungedTravelIssues } from '../invariants';
-import { computeJobBounds } from '../job';
+import { computeJobBounds, type CncContourPass } from '../job';
 import {
   createLayer,
   DEFAULT_CNC_LAYER_SETTINGS,
@@ -179,6 +180,29 @@ describe('reliefRoughingPasses', () => {
       }
     }
     expect(violations).toBe(0);
+  });
+
+  it('cuts each level from the inside out, outer boundaries positive and islands negative', () => {
+    // The integrated 3D allowance leaves four separate inner corner pieces
+    // on this level, then the outer boundary and its island (ADRs 412/427).
+    const result = heightmapOf(pyramidRelief());
+    if (result.kind !== 'ok') throw new Error(result.reason);
+    const passes = reliefRoughingPasses(result.heightmap, {
+      tool: FLAT_TOOL,
+      reliefDepthMm: 4,
+      depthPerPassMm: 1.5,
+      stepoverPercent: 40,
+    });
+    const areas = passes
+      .filter((pass): pass is CncContourPass => pass.kind === 'contour' && pass.zMm === -1.5)
+      .map((pass) => signedAreaMm2(pass.polyline));
+    const outers = areas.filter((area) => area > 0);
+    const islands = areas.filter((area) => area < 0);
+    expect(outers).toHaveLength(5);
+    expect(islands).toHaveLength(1);
+    // All four inner pieces precede the boundary and its opposite-wound hole.
+    for (const inner of outers.slice(0, -1)) expect(inner).toBeLessThan(outers[4] ?? 0);
+    expect(areas.slice(-2)).toEqual([outers[4], islands[0]]);
   });
 
   it('is deterministic', () => {

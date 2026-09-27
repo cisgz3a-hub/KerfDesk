@@ -73,8 +73,8 @@ export type GrblGcodeDialect = {
    * axis, trim trailing zeros, and drop the spaces between words (ADR-332).
    * Roughly halves the bytes of a dithered raster row, which is what decides
    * how much motion the controller's receive window holds and whether a
-   * 115200-baud link can keep up. Off for the conservative dialects, whose
-   * output stays byte-for-byte what it was.
+   * 115200-baud link can keep up. Off for the legacy GRBL-compatible dialect,
+   * whose output keeps the verbose spelling.
    */
   readonly compactMotionWords: boolean;
 };
@@ -149,9 +149,9 @@ export const GRBL_GCODE_DIALECTS: ReadonlyArray<GrblGcodeDialect> = [
     parkAtOriginAfterJob: false,
     emitSOnEveryBurnMove: true,
     modalFeedrate: false,
-    // This profile family exists because the machine is fussy about
-    // output; its bytes stay exactly as qualified.
-    compactMotionWords: false,
+    // Keep an explicit F and S on every scan move, while using GRBL's standard
+    // modal motion/axis spelling to avoid wasting the limited receive window.
+    compactMotionWords: true,
   },
 ];
 
