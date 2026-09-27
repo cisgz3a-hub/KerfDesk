@@ -263,7 +263,11 @@ describe('Cut 3D offscreen worker client', () => {
     const transfer = vi.fn(() => offscreen());
     const canvas = transferableCanvas(transfer);
     const firstAbort = new AbortController();
-    const first = createCut3DOffscreenCoordinator(MESH, 6, deps).buildScene(
+    const initial = {
+      ...MESH,
+      workAxes: { originMm: { x: 10, y: 20, z: 0 }, xDirection: 1, yDirection: -1 } as const,
+    };
+    const first = createCut3DOffscreenCoordinator(initial, 6, deps).buildScene(
       canvas,
       firstAbort.signal,
       vi.fn(),
@@ -272,7 +276,12 @@ describe('Cut 3D offscreen worker client', () => {
     expect((await first).kind).toBe('ok');
 
     // React releases the old scene and builds the new one in the same commit.
-    const next = { ...MESH, positions: new Float32Array(MESH.positions) };
+    expect(requestOfKind(worker, 'init').mesh.workAxes).toEqual(initial.workAxes);
+    const next = {
+      ...MESH,
+      positions: new Float32Array(MESH.positions),
+      workAxes: { originMm: { x: -30, y: 5, z: 0 }, xDirection: -1, yDirection: 1 } as const,
+    };
     firstAbort.abort();
     const second = createCut3DOffscreenCoordinator(next, 6, deps).buildScene(
       canvas,

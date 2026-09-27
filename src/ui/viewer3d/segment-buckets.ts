@@ -12,6 +12,8 @@ export type Viewer3dSegmentsInput = {
   /** Six floats per segment: x0 y0 z0 x1 y1 z1 (work coordinates, mm). */
   readonly positions: Float32Array;
   readonly segKind: Uint8Array;
+  /** Per segment, 0 leaves the move out of the drawing (ADR-470 filters). */
+  readonly visible?: Uint8Array | null;
 };
 
 export type SolidBucket = {
@@ -42,8 +44,7 @@ export function buildSegmentBuckets(
   segments: Viewer3dSegmentsInput,
   theme: Viewer3dTheme,
 ): SegmentBuckets {
-  const travelCount = countTravelSegments(segments);
-  const solidCount = segments.segmentCount - travelCount;
+  const { travelCount, solidCount } = countSegments(segments);
   const travelPositions = new Float32Array(travelCount * FLOATS_PER_SEGMENT);
   const solidPositions = new Float32Array(solidCount * FLOATS_PER_SEGMENT);
   const solidColors = new Float32Array(solidCount * FLOATS_PER_SEGMENT);
@@ -53,6 +54,7 @@ export function buildSegmentBuckets(
   let travelAt = 0;
   let solidAt = 0;
   for (let index = 0; index < segments.segmentCount; index += 1) {
+    if (segments.visible?.[index] === 0) continue;
     const kind = segments.segKind[index] ?? SEG_KIND.travel;
     if (kind === SEG_KIND.travel) {
       copySegment(segments.positions, index, travelPositions, travelAt);
@@ -93,12 +95,18 @@ export function revealCount(sourceIndex: Uint32Array, segmentIndex: number): num
   return low;
 }
 
-function countTravelSegments(segments: Viewer3dSegmentsInput): number {
-  let count = 0;
+function countSegments(segments: Viewer3dSegmentsInput): {
+  readonly travelCount: number;
+  readonly solidCount: number;
+} {
+  let travelCount = 0;
+  let solidCount = 0;
   for (let index = 0; index < segments.segmentCount; index += 1) {
-    if (segments.segKind[index] === SEG_KIND.travel) count += 1;
+    if (segments.visible?.[index] === 0) continue;
+    if (segments.segKind[index] === SEG_KIND.travel) travelCount += 1;
+    else solidCount += 1;
   }
-  return count;
+  return { travelCount, solidCount };
 }
 
 function copySegment(

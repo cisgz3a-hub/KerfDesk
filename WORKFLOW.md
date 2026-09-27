@@ -4082,7 +4082,9 @@ explicitly marked below; the remaining controls and user-facing flows are planne
    already cleared piece; otherwise it lifts. With a ramp angle set (the
    layer's Ramp entry, or **Roughing ramp** where the cut type has none),
    each run of linked rings descends along its first ring from the level
-   above instead of plunging; a ring shorter than one cut width plunges.
+   above instead of plunging; a ring shorter than one cut width plunges,
+   and the G-code header and Job Review say so (F-CNC18, ADR-424
+   Amendment 1).
 3. Emitted G-code passes the plunged-travel invariant; scale is resolved
    before cutter geometry, then mirror/rotate/move placement is honored.
 4. Job Review's detail line for the operation names the levels the
@@ -4094,6 +4096,12 @@ explicitly marked below; the remaining controls and user-facing flows are planne
    names only the ramp angle, since no helix or V-carve entry reaches a
    relief. One that also cut other shapes says `1 pass on the other shapes`,
    and kept tabs add `none on reliefs` (ADR-224 Amendment 3).
+5. In the same row, an operation that cut only reliefs shows **Relief**
+   under Cut and the deepest compiled relief pass under Depth mm, for
+   example `2.5 mm actual`, or `3 mm actual` where a finishing bit cuts
+   the allowance. Its cut type and Cut depth reach no shape, so the row
+   does not show them. One that also cut other shapes keeps both
+   (ADR-224 Amendment 4).
 
 #### Error — bit too big for the detail
 1. Regions narrower than the bit's dilated footprint produce no rings
@@ -4841,6 +4849,12 @@ and lifts the command's CNC-only gate.)*
    starts, so the finishing group's header carries no entry line, and Job
    Review's operation line names the relief stages that plunge, for example
    `ramp entry 5° (relief finishing plunges)` (ADR-273 Amendment 1).
+2. A roughing run whose first ring is shorter than one cut width still
+   plunges. The roughing header adds the same `; cnc entry-advisory: N
+   passes plunge: path shorter than one cut width` line, and Job Review lists
+   an advisory naming the relief roughing passes and the field that sets
+   their ramp: Ramp entry on a profile, pocket or engrave layer, Roughing
+   ramp on any other (ADR-424 Amendment 1). No ramp angle, no notice.
 
 ### F-CNC19. Tile a job larger than the bed — Phase H.10
 

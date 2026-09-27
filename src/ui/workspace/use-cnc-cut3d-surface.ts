@@ -1,6 +1,8 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import type { ReliefSurfaceMeshWithNormals } from '../../core/relief/relief-surface-mesh';
 import type { RemovalGrid } from '../../core/sim';
+import type { Cut3DSurfaceMesh } from '../cnc-viewer3d/viewer3d-work-axes';
+import { cncCut3DWorkFrame } from './cnc-cut3d-work-frame';
 import {
   isCncRemovalGridSuperseded,
   prepareCncCut3DSurfaceOffThread,
@@ -12,7 +14,7 @@ export type CncCut3DSurfaceState =
   | { readonly kind: 'loading' }
   | {
       readonly kind: 'ready';
-      readonly mesh: ReliefSurfaceMeshWithNormals;
+      readonly mesh: Cut3DSurfaceMesh;
       readonly revision: number;
       /** True while a newer grid is prepared; the last surface stays shown. */
       readonly updating: boolean;
@@ -54,7 +56,7 @@ export function useCncCut3DSurface(
         nextRevision.current += 1;
         const ready: ReadySurface = {
           kind: 'ready',
-          mesh: outcome.value,
+          mesh: { ...outcome.value, workAxes: cncCut3DWorkFrame(target) },
           revision: nextRevision.current,
           updating: false,
         };

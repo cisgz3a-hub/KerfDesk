@@ -11,8 +11,10 @@ import {
   defaultLensFor,
   LENS_IDS,
   lensColorFn,
+  lensEntries,
   lensLegend,
   rgbCss,
+  type LensId,
 } from './lenses';
 
 const THEME: Viewer3dTheme = {
@@ -282,3 +284,54 @@ function firstOfKind(model: GcodeRenderModel, kind: number): number {
   }
   throw new Error(`no segment of kind ${kind}`);
 }
+
+describe('lensEntries (ADR-470)', () => {
+  const TOOLS = [
+    'G21 G90',
+    '; cnc tool-id: a',
+    '; cnc tool-name: Rougher',
+    'G1 Z-1 F200',
+    'G1 X20 F800',
+    'G0 Z5',
+    '; cnc tool-id: b',
+    '; cnc tool-name: Finisher',
+    'G0 X30',
+    'G1 Z-1',
+    'G1 X40',
+    'G0 Z5',
+  ].join('\n');
+
+  // Every legend entry must switch exactly the moves its count claims.
+  function expectEntriesMatchLegend(text: string, lens: LensId, withTools: boolean): void {
+    const { model, time } = built(text);
+    const collector = programToolCollector();
+    for (const line of text.split('\n')) collector.observe(line);
+    const sections = withTools ? buildToolSections(model, collector.marks) : null;
+    const legend = lensLegend(model, time, lens, THEME, { sections });
+    const entries = lensEntries(model, time, lens, sections);
+    if (legend.kind !== 'swatches' || entries === null) throw new Error('expected swatches');
+    const counts = legend.entries.map(() => 0);
+    for (let index = 0; index < model.segmentCount; index += 1) {
+      const entry = entries.entryOf(index);
+      counts[entry] = (counts[entry] ?? 0) + 1;
+    }
+    expect(counts).toEqual(legend.entries.map((entry) => entry.count));
+    const travelLabel = entries.travel === null ? null : legend.entries[entries.travel]?.label;
+    expect(travelLabel).toBe(lens === 'planner' ? null : 'Traversal');
+  }
+
+  it('sorts each move into the legend entry that counts it', () => {
+    expectEntriesMatchLegend(PROGRAM, 'kind', false);
+    expectEntriesMatchLegend(PROGRAM, 'planner', false);
+    expectEntriesMatchLegend(PROGRAM, 'tool', false);
+    expectEntriesMatchLegend(TOOLS, 'tool', true);
+    expectEntriesMatchLegend(TOOLS, 'kind', true);
+  });
+
+  it('has nothing to switch for a ramp lens', () => {
+    const { model, time } = built();
+    for (const lens of ['depth', 'feed', 'power'] as const) {
+      expect(lensEntries(model, time, lens, null)).toBeNull();
+    }
+  });
+});

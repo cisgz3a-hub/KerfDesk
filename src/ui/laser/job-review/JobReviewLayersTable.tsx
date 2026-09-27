@@ -8,7 +8,6 @@ import { Fragment } from 'react';
 import {
   activeCncTool,
   DEFAULT_CNC_LAYER_SETTINGS,
-  cutTypeLabel,
   isRegistrationLayer,
   operationArtworkCount,
   type CncMachineConfig,
@@ -41,6 +40,7 @@ import type { JobReviewEffectiveOperation } from './job-review-effective-operati
 import { artworkOwnerPatches, reviewRowSettings } from './job-review-operation-edit';
 import { JobReviewEffectiveOperationRow } from './JobReviewEffectiveOperationRow';
 import {
+  CncCutCell,
   CncRowCells,
   LaserRowCells,
   ModeChipCell,
@@ -199,11 +199,12 @@ function CncLayersTable(props: {
             <Fragment key={layer.id}>
               <tr>
                 <OperationNameCell color={layer.color} name={layer.name} />
-                <ModeChipCell label={cutTypeLabel(settings.cutType)} />
+                <CncCutCell cutType={settings.cutType} relief={effective?.relief} />
                 <td style={tableCellStyle}>{layerToolName(settings.toolId, machine)}</td>
                 <CncRowCells
                   ariaContext={layer.name}
                   settings={settings}
+                  relief={effective?.relief}
                   {...(effective?.cncActualMaxDepthMm === undefined
                     ? {}
                     : { actualVCarveDepthMm: effective.cncActualMaxDepthMm })}

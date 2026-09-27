@@ -3,7 +3,13 @@
 // plus the shared name / mode-chip / detail-line cells. CNC changes belong in
 // Artwork settings so this remains a review surface.
 
-import type { CncLayerSettings, LayerOperationSettings } from '../../../core/scene';
+import {
+  cutTypeLabel,
+  type CncCutType,
+  type CncLayerSettings,
+  type LayerOperationSettings,
+} from '../../../core/scene';
+import type { CompiledReliefFacts } from './job-review-detail-facts';
 import {
   airCellLabelStyle,
   detailCellStyle,
@@ -41,11 +47,32 @@ export function OperationNameCell(props: {
   );
 }
 
-export function ModeChipCell(props: { readonly label: string }): JSX.Element {
+export function ModeChipCell(props: {
+  readonly label: string;
+  readonly title?: string;
+}): JSX.Element {
   return (
     <td style={tableCellStyle}>
-      <span style={modeChipStyle}>{props.label}</span>
+      <span style={modeChipStyle} title={props.title}>
+        {props.label}
+      </span>
     </td>
+  );
+}
+
+/** The CNC Cut chip: the operation's cut type, or Relief when the compiled job
+ * cuts only reliefs, since that cut type then reaches no shape. */
+export function CncCutCell(props: {
+  readonly cutType: CncCutType;
+  readonly relief: CompiledReliefFacts | undefined;
+}): JSX.Element {
+  const label = cutTypeLabel(props.cutType);
+  if (!cutsOnlyReliefs(props.relief)) return <ModeChipCell label={label} />;
+  return (
+    <ModeChipCell
+      label="Relief"
+      title={`This operation cuts only reliefs. Its cut type, ${label}, applies to other shapes only.`}
+    />
   );
 }
 
@@ -125,31 +152,19 @@ export function LaserRowCells(props: {
   );
 }
 
-export function CncRowCells(props: {
+type CncRowCellsProps = {
   readonly ariaContext: string;
   readonly settings: CncLayerSettings;
+  // What the compiled job cut for the operation's reliefs (ADR-224 Amendment 3).
+  readonly relief: CompiledReliefFacts | undefined;
   readonly actualVCarveDepthMm?: number;
-}): JSX.Element {
+};
+
+export function CncRowCells(props: CncRowCellsProps): JSX.Element {
   const { settings } = props;
   return (
     <>
-      {settings.cutType === 'v-carve' && settings.vCarveFlatDepthEnabled === false ? (
-        <td style={tableCellStyle}>
-          <output
-            aria-label={`Actual compiled max depth mm for ${props.ariaContext}`}
-            title="Flowing V-carve depth is calculated from the artwork width and selected bit"
-          >
-            {props.actualVCarveDepthMm === undefined
-              ? 'Pending'
-              : formatDepth(props.actualVCarveDepthMm)}
-          </output>
-        </td>
-      ) : (
-        <ReadOnlyNumberCell
-          label={`Cut depth mm for ${props.ariaContext}`}
-          value={settings.depthMm}
-        />
-      )}
+      <CncDepthCell {...props} />
       <ReadOnlyNumberCell
         label={`Depth per pass mm for ${props.ariaContext}`}
         value={settings.depthPerPassMm}
@@ -168,6 +183,60 @@ export function CncRowCells(props: {
       />
     </>
   );
+}
+
+// Depth mm shows Cut depth unless no shape is cut to it. A flowing V-carve's
+// depth comes from the artwork width and bit (ADR-285), and an operation that
+// cuts only reliefs takes each relief's own depth (ADR-224 Amendment 4), so
+// both show the deepest compiled pass instead.
+function CncDepthCell(props: CncRowCellsProps): JSX.Element {
+  if (cutsOnlyReliefs(props.relief)) {
+    return (
+      <ActualDepthCell
+        ariaContext={props.ariaContext}
+        title="Deepest compiled relief pass, including any flat cleanup or finishing passes. Depth comes from each relief, not from Cut depth."
+        depthMm={props.relief.maxDepthMm}
+      />
+    );
+  }
+  if (props.settings.cutType === 'v-carve' && props.settings.vCarveFlatDepthEnabled === false) {
+    return (
+      <ActualDepthCell
+        ariaContext={props.ariaContext}
+        title="Flowing V-carve depth is calculated from the artwork width and selected bit"
+        depthMm={props.actualVCarveDepthMm}
+      />
+    );
+  }
+  return (
+    <ReadOnlyNumberCell
+      label={`Cut depth mm for ${props.ariaContext}`}
+      value={props.settings.depthMm}
+    />
+  );
+}
+
+function ActualDepthCell(props: {
+  readonly ariaContext: string;
+  readonly title: string;
+  readonly depthMm: number | undefined;
+}): JSX.Element {
+  return (
+    <td style={tableCellStyle}>
+      <output
+        aria-label={`Actual compiled max depth mm for ${props.ariaContext}`}
+        title={props.title}
+      >
+        {props.depthMm === undefined ? 'Pending' : formatDepth(props.depthMm)}
+      </output>
+    </td>
+  );
+}
+
+// An operation whose compiled job cut reliefs and nothing else: its cut type
+// and Cut depth reach no shape (ADR-224 Amendment 4).
+function cutsOnlyReliefs(relief: CompiledReliefFacts | undefined): relief is CompiledReliefFacts {
+  return relief?.cutsOtherShapes === false;
 }
 
 function ReadOnlyNumberCell(props: {
