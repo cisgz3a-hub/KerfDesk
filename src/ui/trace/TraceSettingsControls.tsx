@@ -1,4 +1,3 @@
-import { useId } from 'react';
 import { DEFAULT_LIGHTBURN_TRACE_SETTINGS, type TraceOptions } from '../../core/trace';
 import {
   DEFAULT_EDGE_MINIMUM_LINE_PX,
@@ -11,9 +10,12 @@ import {
 } from './trace-options';
 import { TraceDetectionControls } from './TraceDetectionControls';
 import { TraceCheckboxRow } from './TraceCheckboxRow';
+import { NumberRow } from './TraceNumberRow';
 import { PhotoTraceSettingsControls } from './PhotoTraceSettingsControls';
-import { traceNumberTitle } from './trace-number-title';
 import { ColourLayerTraceSettingsControls } from './ColourLayerTraceSettingsControls';
+import { useStore } from '../state';
+import { HYBRID_MAX_STROKE_WIDTH_MM_RANGE, hybridMaxStrokeWidthMm } from './hybrid-stroke-width';
+import { DiagonalContactsControl } from './DiagonalContactsControl';
 
 type TraceSettingsControlsProps = {
   readonly preset: TraceOptions;
@@ -109,6 +111,7 @@ function FilledTraceSettingsControls(props: TraceSettingsControlsProps): JSX.Ele
           Curve finishing
         </summary>
         <ContourGeometryControls {...props} />
+        <DiagonalContactsControl {...props} />
       </details>
       <TransparencyDetails {...props} alpha={alpha} />
       <ResetTraceSettingsButton overrides={props.overrides} onChange={props.onChange} />
@@ -229,12 +232,32 @@ function TraceAreaControls(props: TraceSettingsControlsProps): JSX.Element {
           onChange={(ignoreLessThanPixels) => set({ ignoreLessThanPixels })}
         />
       ) : null}
+      {props.preset.traceMode === 'hybrid' ? <HybridStrokeWidthRow {...props} /> : null}
       <TraceCheckboxRow
         label="Fill tiny holes"
         checked={props.overrides.fillPinholeCracks ?? props.preset.fillPinholeCracks ?? false}
         onChange={(fillPinholeCracks) => set({ fillPinholeCracks })}
       />
     </>
+  );
+}
+
+// Line + fill (ADR-454): ink up to this wide on the placed artwork burns
+// once down its centre; wider ink stays a filled outline.
+function HybridStrokeWidthRow(props: TraceSettingsControlsProps): JSX.Element {
+  const device = useStore((s) => s.project.device);
+  const machineKind = useStore((s) => s.project.machine?.kind);
+  return (
+    <NumberRow
+      label="Max stroke width"
+      min={HYBRID_MAX_STROKE_WIDTH_MM_RANGE.min}
+      max={HYBRID_MAX_STROKE_WIDTH_MM_RANGE.max}
+      step={0.05}
+      value={hybridMaxStrokeWidthMm(props.overrides, device, machineKind)}
+      onChange={(hybridMaxStrokeWidthMm) =>
+        props.onChange({ ...props.overrides, hybridMaxStrokeWidthMm })
+      }
+    />
   );
 }
 
@@ -245,7 +268,9 @@ const CENTERLINE_OPTIMIZE_TITLE =
   'Higher values let curves stray further from the stroke centre for fewer nodes.';
 
 function ContourGeometryControls(props: TraceSettingsControlsProps): JSX.Element {
-  const centerline = props.preset.traceMode === 'centerline';
+  // Line + fill's strokes are Centerline strokes: the knobs steer them the
+  // same way (and its fill outlines as usual).
+  const centerline = props.preset.traceMode === 'centerline' || props.preset.traceMode === 'hybrid';
   const set = (patch: LightBurnTraceSettingOverrides): void => {
     props.onChange({ ...props.overrides, ...patch });
   };
@@ -338,68 +363,6 @@ function AlphaMaskUnavailableNote(): JSX.Element {
 
 function AlphaMaskCheckingNote(): JSX.Element {
   return <p style={alphaMaskNoteStyle}>Checking image transparency...</p>;
-}
-
-function NumberRow(props: {
-  readonly label: string;
-  readonly min: number;
-  readonly max: number;
-  readonly step: number;
-  readonly value: number;
-  readonly snapToStep?: boolean; // show the traced stop once typing ends (ADR-437)
-  readonly onChange: (next: number) => void;
-  readonly title?: string;
-}): JSX.Element {
-  const inputId = useId();
-  const snapped = clamp(Math.round(props.value / props.step) * props.step, props.min, props.max);
-  const hintId = useId();
-  const unit = props.max === 10000 ? 'px²' : props.label === 'Minimum line' ? 'px' : undefined;
-  const hasSlider = props.max <= 255;
-  return (
-    <div className="lf-trace-number">
-      <label htmlFor={inputId}>
-        <span>{props.label}</span>
-        <span className="lf-trace-number-input">
-          <input
-            id={inputId}
-            className="lf-input"
-            type="number"
-            min={props.min}
-            max={props.max}
-            step={props.step}
-            value={props.value}
-            onChange={(e) => props.onChange(clamp(Number(e.target.value), props.min, props.max))}
-            onBlur={() => {
-              if (props.snapToStep === true && snapped !== props.value) props.onChange(snapped);
-            }}
-            aria-label={`Trace ${props.label}`}
-            aria-describedby={hintId}
-            title={props.title ?? traceNumberTitle(props.label)}
-          />
-          {unit === undefined ? null : <span>{unit}</span>}
-        </span>
-      </label>
-      {hasSlider ? (
-        <input
-          type="range"
-          min={props.min}
-          max={props.max}
-          step={props.step}
-          value={props.value}
-          aria-label={`Trace ${props.label} slider`}
-          title={props.title ?? traceNumberTitle(props.label)}
-          aria-describedby={hintId}
-          onChange={(e) => props.onChange(clamp(Number(e.target.value), props.min, props.max))}
-        />
-      ) : null}
-      <p id={hintId}>{props.title ?? traceNumberTitle(props.label)}</p>
-    </div>
-  );
-}
-
-function clamp(value: number, min: number, max: number): number {
-  if (!Number.isFinite(value)) return min;
-  return Math.max(min, Math.min(max, value));
 }
 
 const edgeTraceNoteStyle: React.CSSProperties = {

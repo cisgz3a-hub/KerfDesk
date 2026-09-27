@@ -214,3 +214,38 @@ describe('enhanceRegionPaths', () => {
     expect(out).toEqual(fullTracePaths);
   });
 });
+
+describe('replacePathsInRegion with Line + fill strokes (ADR-454)', () => {
+  const interior = { x: 10, y: 10, width: 40, height: 40 };
+  const line = (x: number) => ({
+    closed: false,
+    points: [
+      { x, y: 20 },
+      { x, y: 30 },
+    ],
+  });
+  const curve = (x: number) => ({
+    start: { x, y: 20 },
+    segments: [{ kind: 'line' as const, to: { x, y: 30 } }],
+    closed: false,
+  });
+
+  it('keeps each stroke width group, its pen width and its curves', () => {
+    const existing: ColoredPath[] = [
+      { color: '#000000', polylines: [square(60, 60, 70, 70)] },
+      { color: '#0000ff', polylines: [line(20)], curves: [curve(20)], strokeWidthMm: 3 },
+      { color: '#0000ff', polylines: [line(70)], curves: [curve(70)], strokeWidthMm: 2 },
+    ];
+    const replacement: ColoredPath[] = [
+      { color: '#0000ff', polylines: [line(25)], curves: [curve(25)], strokeWidthMm: 3 },
+      { color: '#0000ff', polylines: [line(30)], curves: [curve(30)], strokeWidthMm: 4 },
+    ];
+    const out = replacePathsInRegion(existing, interior, replacement);
+    const strokes = out.filter((p) => p.color === '#0000ff');
+    expect(strokes.map((p) => p.strokeWidthMm).sort()).toEqual([2, 3, 4]);
+    const three = strokes.find((p) => p.strokeWidthMm === 3);
+    expect(three?.polylines.map((pl) => pl.points[0]?.x)).toEqual([25]);
+    expect(three?.curves?.map((c) => c.start.x)).toEqual([25]);
+    expect(strokes.find((p) => p.strokeWidthMm === 2)?.curves).toHaveLength(1);
+  });
+});

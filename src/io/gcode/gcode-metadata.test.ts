@@ -41,7 +41,7 @@ function laserAssumptions(
 
 describe('gcodeMetadataHeader', () => {
   it('tracks the latest safety-relevant emitter revision', () => {
-    expect(EMITTER_REVISION).toBe('laser-arcs-relief-cleanup-entry-scan-timing-v2-20260927-v3');
+    expect(EMITTER_REVISION).toBe('trace-hybrid-arcs-relief-scan-timing-v2-20260927-v3');
   });
 
   it('emits provenance as GRBL comment lines and ends with a newline', () => {

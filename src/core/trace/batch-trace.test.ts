@@ -100,44 +100,47 @@ function square(x: number, y: number, size: number): Polyline {
 }
 
 describe('traceImagesToVectorFiles', () => {
-  it('carries explicit Centerline intent into SVG paint and visible path counts', async () => {
-    const zeroAreaStroke: ColoredPath = {
-      color: '#000000',
-      polylines: [
-        {
-          closed: true,
-          points: [
-            { x: 1, y: 1 },
-            { x: 3, y: 3 },
-          ],
-        },
-      ],
-    };
-    const trace = vi.fn(async () => [zeroAreaStroke]);
-    const options: TraceOptions = { ...DEFAULT_TRACE_OPTIONS, traceMode: 'centerline' };
-    const result = await traceImagesToVectorFiles(
-      [
-        {
-          sourceName: 'ring.png',
-          image: rawImage(8, 8),
-          options,
-          physicalSizeMm: { widthMm: 16, heightMm: 8 },
-        },
-        { sourceName: 'ring.jpg', image: rawImage(8, 8) },
-      ],
-      { trace },
-    );
-    // Filled-contour intent: a zero-area closed ring is not visible ink.
-    expect(result.files.map((f) => f.filename)).toEqual(['ring-trace.svg']);
-    expect(result.skipped).toEqual([{ sourceName: 'ring.jpg', reason: 'no-visible-paths' }]);
-    expect(result.files[0]?.pathCount).toBe(1);
-    // 1 px = 2 mm across and 1 mm down; the stroke is one source pixel wide.
-    expect(result.files[0]?.text).toContain(
-      'd="M2 1l4 2z" fill="none" stroke="#000000" stroke-width="2"',
-    );
-    expect(result.files[0]?.text).toContain('viewBox="0 0 16 8" width="16mm" height="8mm"');
-    expect(trace).toHaveBeenNthCalledWith(1, rawImage(8, 8), options);
-  });
+  it.each(['centerline', 'edge'] as const)(
+    'carries explicit %s intent into SVG paint and visible path counts',
+    async (traceMode) => {
+      const zeroAreaStroke: ColoredPath = {
+        color: '#000000',
+        polylines: [
+          {
+            closed: true,
+            points: [
+              { x: 1, y: 1 },
+              { x: 3, y: 3 },
+            ],
+          },
+        ],
+      };
+      const trace = vi.fn(async () => [zeroAreaStroke]);
+      const options: TraceOptions = { ...DEFAULT_TRACE_OPTIONS, traceMode };
+      const result = await traceImagesToVectorFiles(
+        [
+          {
+            sourceName: 'ring.png',
+            image: rawImage(8, 8),
+            options,
+            physicalSizeMm: { widthMm: 16, heightMm: 8 },
+          },
+          { sourceName: 'ring.jpg', image: rawImage(8, 8) },
+        ],
+        { trace },
+      );
+      // Filled-contour intent: a zero-area closed ring is not visible ink.
+      expect(result.files.map((f) => f.filename)).toEqual(['ring-trace.svg']);
+      expect(result.skipped).toEqual([{ sourceName: 'ring.jpg', reason: 'no-visible-paths' }]);
+      expect(result.files[0]?.pathCount).toBe(1);
+      // 1 px = 2 mm across and 1 mm down; the stroke is one source pixel wide.
+      expect(result.files[0]?.text).toContain(
+        'd="M2 1l4 2z" fill="none" stroke="#000000" stroke-width="2"',
+      );
+      expect(result.files[0]?.text).toContain('viewBox="0 0 16 8" width="16mm" height="8mm"');
+      expect(trace).toHaveBeenNthCalledWith(1, rawImage(8, 8), options);
+    },
+  );
 
   it('writes the canonical curves in millimetres instead of the dense polylines', async () => {
     const result = await traceImagesToVectorFiles(
@@ -338,6 +341,52 @@ describe('traceImagesToVectorFiles', () => {
       [expect.objectContaining({ color: '#000000' })],
       expect.objectContaining({ pageHeight: 8, precisionMm: 0.01 }),
     );
+  });
+
+  it.each(['centerline', 'edge'] as const)(
+    'hands %s PDF, EPS and GeoJSON output to the drawing writer with the page size',
+    async (traceMode) => {
+      const writeDrawing = vi.fn((format: string) => format.toUpperCase());
+      for (const format of ['pdf', 'eps', 'geojson'] as const) {
+        const result = await traceImagesToVectorFiles(
+          [
+            {
+              sourceName: 'a.png',
+              image: rawImage(4, 4),
+              physicalSizeMm: { widthMm: 8, heightMm: 6 },
+              options: { ...DEFAULT_TRACE_OPTIONS, traceMode },
+            },
+          ],
+          { trace: async () => [SQUARE_PATH], writeDrawing },
+          { format, precisionMm: 0.01 },
+        );
+        expect(result.files[0]).toMatchObject({
+          filename: 'a-trace.' + format,
+          format,
+          text: format.toUpperCase(),
+        });
+        expect(writeDrawing).toHaveBeenLastCalledWith(
+          format,
+          [expect.objectContaining({ color: '#000000' })],
+          expect.objectContaining({
+            pageWidth: 8,
+            pageHeight: 6,
+            strokeOnly: true,
+            precisionMm: 0.01,
+          }),
+        );
+      }
+    },
+  );
+
+  it('refuses a drawing format when no drawing writer is injected', async () => {
+    await expect(
+      traceImagesToVectorFiles(
+        [{ sourceName: 'a.png', image: rawImage(4, 4) }],
+        { trace: async () => [SQUARE_PATH] },
+        { format: 'geojson' },
+      ),
+    ).rejects.toThrow('GeoJSON output is not available here.');
   });
 });
 

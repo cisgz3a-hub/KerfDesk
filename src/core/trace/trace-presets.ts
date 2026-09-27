@@ -104,6 +104,30 @@ export const TRACE_PRESETS: Readonly<Record<string, TraceOptions>> = {
     // vertical wobble to an otherwise flat centerline (trace-pipeline integration
     // test). So Centerline opts OUT of upscaleSmallSmoothSources.
   },
+  'Line + fill': {
+    // Line + fill (ADR-454): pen lines no wider than the Max stroke width
+    // burn once down their centre (the Centerline lane, unchanged), wider ink
+    // stays a filled outline (the contour finisher). Same binarisation and
+    // cleanup as Centerline so a drawing's strokes trace identically in both.
+    // hybridMaxStrokeWidthPx is left to the dialog, which converts its
+    // millimetre control through the placement; the core default is 4 px.
+    traceMode: 'hybrid',
+    numberOfColors: 2,
+    pathOmit: 0,
+    lineTolerance: 1,
+    quadraticTolerance: 1,
+    blurRadius: 0,
+    blurDelta: 0,
+    lineFilter: true,
+    fixedPalette: ['#ffffff', '#000000'],
+    useOtsuThreshold: true,
+    despeckleMinPixels: 12,
+    fillPinholeCracks: true,
+    centerlineJoinGapPx: 3,
+    // Fill outlines drop specks below this area, as Line Art does.
+    ignoreLessThanPixels: 2,
+    autoUpscaleSmallSources: true,
+  },
   'Edge Detection': {
     // Local contrast detects full-colour artwork, then the shared contour
     // finisher produces closed outlines around the detected ink.

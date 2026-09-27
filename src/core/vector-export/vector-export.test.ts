@@ -3,6 +3,7 @@ import { flattenCurveSubpath } from '../scene/curve-path';
 import type { CubicPathSegment, CurveSubpath, Vec2 } from '../scene/scene-object';
 import { applyAffine, curvesBounds, transformCurveSubpathExact } from './affine-curves';
 import { circularBulge, curveToBulgeRing, segmentDistance } from './bulge-rings';
+import { hausdorff, sampleBulges } from './bulge-sampling.test-support';
 import { groupContoursWithHoles } from './contour-nesting';
 import {
   decimalGridAtMost,
@@ -138,20 +139,16 @@ describe('bulge rings', () => {
   ];
 
   it.each(cubics)(
-    'keeps a flattened cubic within the tolerance in both directions',
+    'keeps a fitted cubic within the tolerance in both directions',
     (from, segment) => {
       const tolerance = 0.01;
       const ring = curveToBulgeRing({ start: from, segments: [segment], closed: false }, tolerance);
-      const vertices = ring.vertices.map((v) => ({ x: v.x, y: v.y }));
-      let worst = 0;
-      for (let i = 0; i <= 2000; i += 1) {
-        worst = Math.max(worst, distanceToPolyline(cubicPoint(from, segment, i / 2000), vertices));
-      }
-      expect(worst).toBeLessThanOrEqual(tolerance);
+      const drawn = sampleBulges(ring.vertices, ring.closed);
       const dense = Array.from({ length: 4001 }, (_, i) => cubicPoint(from, segment, i / 4000));
-      for (const vertex of vertices)
+      expect(hausdorff(dense, drawn)).toBeLessThanOrEqual(tolerance);
+      for (const vertex of ring.vertices)
         expect(distanceToPolyline(vertex, dense)).toBeLessThan(1e-9 + 1e-3);
-      expect(ring.vertices.every((v) => v.bulge === 0)).toBe(true);
+      expect(ring.vertices.every((v) => Math.abs(v.bulge) < 1)).toBe(true);
     },
   );
 

@@ -4,10 +4,12 @@
 // smooth-joint angle between curves, or at least the corner angle between
 // lines) is a move end at its exact mapped position. What the controller
 // executes for each move stays within the tolerance of the canonical curve,
-// both ways, after the budget in arc-fit-limits.ts.
+// both ways, after the budget in arc-fit-limits.ts. With `exactArcs` (a CAD
+// file that draws arcs exactly, ADR-452) no controller chord sag is deducted.
 
 import type { CurveSubpath } from '../../scene';
 import { ARC_FIT_EMIT_ROUNDING_MM, ARC_FIT_SOURCE_SAMPLE_ERROR_MM } from './arc-fit-limits';
+import type { ArcFitTolerance } from './arc-piece-check';
 import type { FitPrimitive } from './arc-primitives';
 import type { ArcMove } from './arc-moves';
 import { splitIntoFitRuns } from './curve-runs';
@@ -18,8 +20,11 @@ export function fitArcMoves(
   curve: CurveSubpath,
   placement: ArcFitPlacement,
   toleranceMm: number,
+  options: { readonly exactArcs?: boolean } = {},
 ): ArcMove[] {
-  const fitTolerance = toleranceMm - ARC_FIT_SOURCE_SAMPLE_ERROR_MM - ARC_FIT_EMIT_ROUNDING_MM;
+  const bound = toleranceMm - ARC_FIT_SOURCE_SAMPLE_ERROR_MM - ARC_FIT_EMIT_ROUNDING_MM;
+  const fitTolerance: ArcFitTolerance =
+    options.exactArcs === true ? { toleranceMm: bound, exactArcs: true } : bound;
   const moves: ArcMove[] = [];
   for (const run of splitIntoFitRuns(mapCurveSubpath(curve, placement))) {
     const primitives =

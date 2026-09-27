@@ -159,7 +159,7 @@ export const IMAGE_TUTORIALS: readonly Tutorial[] = [
   {
     id: 'trace-batch',
     title: 'Trace several image files',
-    summary: 'Export a set of images as separate SVG or DXF files.',
+    summary: 'Export a set of images as separate SVG, DXF, PDF, EPS or GeoJSON files.',
     category: 'Images & tracing',
     machine: 'all',
     minutes: 3,

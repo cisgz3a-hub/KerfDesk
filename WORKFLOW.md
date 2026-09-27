@@ -790,7 +790,9 @@ marks later edits as unapproved without changing the existing Frame/Start policy
 
 1. Select the artwork to exchange, then choose **File → Export selected artwork as SVG...**.
    With nothing selected, **Export artwork as SVG...** includes the whole scene, including
-   output-disabled artwork.
+   output-disabled artwork. The **Export SVG** dialog offers **Group islands** (off by default,
+   remembered for the session: each filled shape and its holes in their own group); **Choose
+   File...** then asks for the destination (ADR-451).
 2. The export captures the source selection and one clock before choosing a destination.
    It resolves current variable text, outlines text, preserves physical millimetre size and
    canonical curves, embeds original bitmap pixels, and includes image masks and transforms.
@@ -813,11 +815,33 @@ marks later edits as unapproved without changing the existing Frame/Start policy
    selection or scene's vector artwork as a millimetre DXF: one polyline per contour, one layer per
    colour, circular arcs as exact bulges, cubics and elliptical arcs flattened within 0.01 mm.
    Bitmaps and reliefs have no DXF form; they are left out and the completion message counts them.
-2. **Tools → Multi-File Trace...** first asks for the preset, format (SVG or DXF), coordinate
-   precision and, for SVG, whether to group each shape with its holes; **Choose Images...** then
-   picks the files. Each image is saved as `<name>-trace.svg` or `<name>-trace.dxf`.
+2. **Tools → Multi-File Trace...** first asks for the preset, format (SVG, DXF, PDF, EPS or
+   GeoJSON), coordinate precision and, for SVG, **Group islands** (each shape with its holes);
+   **Choose Images...** then picks the files. Each image is saved as `<name>-trace.<format>` on the
+   traced image's page, lower-left corner as the origin (ADR-468). **Page → Fit to artwork**
+   instead trims the page to the exact traced curves plus a **Margin (mm)**; the millimetre scale
+   is unchanged and the DXF and GeoJSON origin moves to the fitted page's corner (ADR-451). A
+   fitted side under 3 pt (the smallest PDF page) grows to 3 pt, centred, in every format. A
+   Margin field that is blank means no margin; a negative value or one over 1000 mm is marked
+   invalid and **Choose Images...** waits until it is corrected.
 3. An image whose trace has nothing visible writes no file; the rest of the batch is still saved
    and the completion message names the skipped images.
+
+### F-A9d. Export artwork as PDF, EPS or GeoJSON (ADR-468)
+
+1. **File → Export artwork as PDF... / EPS... / GeoJSON...** (or **Export selected artwork as
+   ...**) write the selection's or scene's vector artwork, text outlined; bitmaps and reliefs are
+   left out and counted, and an image-only selection warns before any file name is asked.
+2. PDF (1.4, one page) and EPS (EPSF 3.0) keep lines and curves exactly (arcs become cubics); the
+   page / bounding box is the exact extent of the drawn curves, rounded outward, plus half the
+   0.1 mm stroke on every side when strokes are drawn, and never under 3 pt. Filled layers fill
+   even-odd (text nonzero); line layers and open contours are 0.1 mm strokes. A page side over
+   5080 mm is written as PDF 1.6 with /UserUnit.
+3. GeoJSON flattens curves within 0.01 mm into Polygon rings (outer counterclockwise, holes
+   clockwise) and LineStrings. Polygons follow each shape's fill rule, so they cover what the PDF
+   fills; shapes whose outlines cross are written as separate `unmerged` polygons and the export
+   warns. Coordinates are millimetres with y up from the lower-left corner, not longitude and
+   latitude (not georeferenced); the file states this in its `kerfdesk` member and the toast says so.
 
 ### F-A9b. Remove overlapping laser lines (ADR-350)
 
