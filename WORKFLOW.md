@@ -4640,6 +4640,13 @@ and lifts the command's CNC-only gate.)*
 1. The descent finishes at the path end (the ramp consumed the whole
    path); the remainder cuts level on the next lap.
 
+#### Edge — reliefs on a layer with a ramp angle
+1. Relief roughing rings and finishing rows plunge at their starts; the
+   layer's ramp angle ramps only its other shapes. The relief groups'
+   G-code headers carry no entry line, and Job Review's operation line
+   names the relief stages that plunge, for example
+   `ramp entry 5° (relief passes plunge)` (ADR-273 Amendment 1).
+
 ### F-CNC19. Tile a job larger than the bed — Phase H.10
 
 #### Success

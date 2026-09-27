@@ -41,7 +41,7 @@ function laserAssumptions(
 
 describe('gcodeMetadataHeader', () => {
   it('tracks the latest safety-relevant emitter revision', () => {
-    expect(EMITTER_REVISION).toBe('adaptive-finish-ring-seams-20260927-v1');
+    expect(EMITTER_REVISION).toBe('relief-entry-provenance-20260927-v1');
   });
 
   it('emits provenance as GRBL comment lines and ends with a newline', () => {

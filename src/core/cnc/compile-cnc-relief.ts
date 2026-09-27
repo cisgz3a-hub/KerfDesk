@@ -147,6 +147,10 @@ function reliefGroup(
       includeRequestedDepth: false,
       includeDepthPerPass: cutType !== 'relief-finish',
       includeVResolution: false,
+      // Relief rings and finishing rows plunge at their starts. The layer's
+      // ramp angle ramps only its other shapes, so a relief group must not
+      // record it as its entry (ADR-273 Amendment 1).
+      includeRampEntry: false,
       layerPrimaryTool,
     }),
     feedMmPerMin: cap(settings.feedMmPerMin, device.maxFeed),
