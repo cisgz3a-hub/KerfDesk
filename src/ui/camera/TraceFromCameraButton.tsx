@@ -1,91 +1,21 @@
-// TraceFromCameraButton — capture → basis-correct → top-down bed warp → the
-// normal Trace dialog (ADR-110). Split from OverlayControls: tracing is a
+// TraceFromCameraButton — capture the whole bed, flatten it top-down at the
+// material height and each height area's own height, and open the normal
+// Trace dialog (ADR-110, ADR-440). Split from OverlayControls: tracing is a
 // capture pipeline, not an overlay preference.
 
-import { useStore } from '../state';
-import { useCameraStore } from '../state/camera-store';
-import { useToastStore } from '../state/toast-store';
-import { useUiStore } from '../state/ui-store';
-import { captureSourceFrame } from './frame-source';
-import { cameraCaptureBindingForFrame } from './frame-source';
-import { buildCameraTraceImage } from './trace-from-camera';
-import { cameraBindingIssue } from './camera-binding-guard';
-import { cameraSurfaceHeightIssue, resolveCameraSurfaceHeight } from './camera-surface-height';
-import { useCameraTraceLifetime } from './use-camera-trace-lifetime';
+import { useTraceFromCamera } from './use-trace-from-camera';
 
 export function TraceFromCameraButton(): JSX.Element {
-  const alignment = useStore((s) => s.project.device.cameraAlignment);
-  const calibration = useStore((s) => s.project.device.cameraCalibration);
-  const bedWidth = useStore((s) => s.project.device.bedWidth);
-  const bedHeight = useStore((s) => s.project.device.bedHeight);
-  const sourceState = useCameraStore((s) => s.sourceState);
-  const surfaceHeightMm = useCameraStore((s) => s.surfaceHeightMm);
-  const activatePlacement = useCameraStore((s) => s.activatePlacement);
-  const openImageDialog = useUiStore((s) => s.openImageDialog);
-  const pushToast = useToastStore((s) => s.pushToast);
-  const captureLifetime = useCameraTraceLifetime();
-
-  const traceFromCamera = async (): Promise<void> => {
-    if (sourceState.kind !== 'live') return;
-    const isCurrent = captureLifetime();
-    const raw = await captureSourceFrame(sourceState.source);
-    if (!isCurrent()) return;
-    if (raw === null) {
-      pushToast('Could not capture a camera frame.', 'error');
-      return;
-    }
-    const capture = cameraCaptureBindingForFrame(sourceState.source, raw.width, raw.height);
-    const bindingIssue =
-      (alignment === undefined
-        ? null
-        : cameraBindingIssue('bed alignment', alignment.capture, capture)) ??
-      (calibration === undefined
-        ? null
-        : cameraBindingIssue('lens calibration', calibration.capture, capture));
-    if (bindingIssue !== null) {
-      pushToast(bindingIssue, 'error');
-      return;
-    }
-    const built = buildCameraTraceImage({
-      raw,
-      alignment,
-      calibration,
-      bedWidthMm: bedWidth,
-      bedHeightMm: bedHeight,
-      surfaceHeightMm,
-    });
-    if (built.kind !== 'ok') {
-      const surfaceIssue =
-        alignment === undefined
-          ? null
-          : cameraSurfaceHeightIssue(
-              resolveCameraSurfaceHeight(alignment, calibration, surfaceHeightMm),
-            );
-      pushToast(cameraTraceFailureMessage(built.reason, surfaceIssue), 'error');
-      return;
-    }
-    // Keep camera placement visible in the Camera panel without rewriting the
-    // operator's selected origin mode. The watched Frame verifies exact motion.
-    activatePlacement();
-    openImageDialog(built.source, { sourceOrigin: 'camera-capture' });
-  };
-
+  const { available, trace } = useTraceFromCamera();
   return (
     <button
       type="button"
       className="lf-btn"
-      disabled={sourceState.kind !== 'live'}
-      onClick={() => void traceFromCamera()}
-      title="Capture the bed, flatten it top-down, and trace it — vectors land at the object's true position."
+      disabled={!available}
+      onClick={() => void trace(null)}
+      title="Capture the bed, flatten it top-down at the material height (and each height area's own height), and trace it. Vectors land at the object's true position."
     >
       Trace from camera
     </button>
   );
-}
-
-function cameraTraceFailureMessage(reason: string, surfaceIssue: string | null): string {
-  if (surfaceIssue !== null) return surfaceIssue;
-  return reason === 'basis-mismatch'
-    ? 'The alignment expects a lens-corrected frame but no calibration is saved — recalibrate or re-align.'
-    : 'Could not build the bed image from the camera frame.';
 }

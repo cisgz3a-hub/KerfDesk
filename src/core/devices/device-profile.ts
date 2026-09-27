@@ -2,7 +2,7 @@
 // laser-power scale, and coordinate origin. Used by JobCompiler to honor
 // PROJECT.md non-negotiables #1 (bounds), #2 (origin), #7 (power-scale).
 
-import type { CameraAlignment, CameraCalibration } from '../camera';
+import type { CameraModelRecord } from '../camera/model/camera-model-record';
 import type { RotarySetup } from './rotary';
 import type { LaserFireControl } from './fire-control';
 import type { ScanOffsetCalibrationStatus, ScanOffsetPoint } from './scan-offset-profile';
@@ -245,12 +245,11 @@ export type DeviceProfile = {
   // Optional controlled laser-off seek feed. Absent keeps normal G0 rapid
   // positioning; a positive value emits explicit G1 F... S0 seeks.
   readonly controlledLaserOffTravelFeedMmPerMin?: number | undefined;
-  // Overhead-camera de-fisheye calibration (ADR-107/108). Absent until the operator
-  // runs the calibration wizard; persisted so the rectified overlay survives reload.
-  readonly cameraCalibration?: CameraCalibration;
-  // Camera→bed 4-point alignment (ADR-107). Absent until the operator aligns;
-  // persisted so the workspace camera overlay survives reload.
-  readonly cameraAlignment?: CameraAlignment;
+  // The overhead camera's lens and position over the bed (ADR-440), fitted
+  // from one photo of the engraved target. Absent until the operator
+  // calibrates; it replaces the old lens calibration and bed alignment, whose
+  // saved values are dropped on load rather than trusted.
+  readonly cameraModel?: CameraModelRecord;
   readonly noGoZones: ReadonlyArray<NoGoZone>;
   readonly zTravelMm?: number;
   readonly zTravelConfirmed?: boolean;

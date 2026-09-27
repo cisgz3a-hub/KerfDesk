@@ -201,19 +201,12 @@ test('exports rotary raster through the configured machine-space transform', asy
   expect(Math.max(...yValues)).toBeGreaterThan(30);
 });
 
-test('gates camera bed alignment behind Labs and homing capability', async ({ page }) => {
+test('opens the one-photo camera calibration without a Labs switch', async ({ page }) => {
   await (await toolbarCommand(page, 'Camera')).click();
-  const align = page.getByRole('button', { name: 'Align to bed…' });
-  await expect(align).toBeDisabled();
-  await expect(align).toHaveAttribute('title', /Tools > Labs/);
-
-  await enableLab(page, 'Camera alignment v2');
-  await expect(align).toBeEnabled();
-  await page.getByRole('button', { name: 'Start USB camera' }).click();
-  await align.click();
-  await expect(page.getByText('Align camera to bed', { exact: true })).toBeVisible();
-  await page.getByRole('button', { name: 'Markers already burned' }).click();
-  await expect(page.getByRole('button', { name: 'Detect markers' })).toBeEnabled();
+  await page.getByRole('button', { name: 'Calibrate camera…' }).click();
+  await expect(page.getByText('Calibrate camera', { exact: true })).toBeVisible();
+  await page.getByRole('button', { name: 'Target already engraved' }).click();
+  await expect(page.getByRole('button', { name: 'Take photo' })).toBeVisible();
 });
 
 test('uses one print-and-cut transform for export and invalidates it on trust loss', async ({

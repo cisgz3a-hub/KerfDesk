@@ -1,7 +1,7 @@
 import type { StatusQueryCapability } from '../../core/controllers';
 import type { ControllerKind } from '../../core/devices';
 import type { Project } from '../../core/scene';
-import { cameraPlacementGeometryIssue } from '../camera/camera-surface-height';
+import { cameraPlacementGeometryIssue } from '../camera/camera-model-frame';
 import type { useCameraStore } from '../state/camera-store';
 import type { useLaserStore } from '../state/laser-store';
 import { isActiveJob } from '../state/laser-store-helpers';
@@ -44,11 +44,7 @@ export function machineSnapshot(
     activeControllerCommandSet: laser.activeControllerCommandSet,
     cameraPlacementActive: camera.placementActive,
     cameraConfirmedPositionEpoch: camera.confirmedPositionEpoch,
-    cameraPlacementGeometryIssue: cameraPlacementGeometryIssue(
-      project.device.cameraAlignment,
-      project.device.cameraCalibration,
-      camera.surfaceHeightMm,
-    ),
+    cameraPlacementGeometryIssue: cameraPlacementGeometryIssue(project.device.cameraModel),
     homingState: laser.homingState,
     trustedPositionEpoch: laser.trustedPositionEpoch ?? 0,
     reportInches: laser.controllerSettings?.reportInches === true,
