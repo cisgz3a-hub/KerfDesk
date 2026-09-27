@@ -3,8 +3,8 @@
 // piece gets a copy moved by the offset between the pieces' centres and
 // turned by the angle between them, so the design lands on each blank the way
 // it sits on the sample. Otherwise the design is centred on each piece, its
-// long side along the piece's long side. Moves and turns only, never a scale.
-// Pure core.
+// own long side along the piece's long side, counting any turn the design
+// already has (amendment 1). Moves and turns only, never a scale. Pure core.
 
 import { pointInPolygon } from '../../geometry';
 import type { ArrayPlacement } from '../../scene';
@@ -12,10 +12,13 @@ import type { DetectedPiece } from './find-pieces';
 import type { Point } from './rotated-rect';
 
 export type DesignFrame = {
-  /** Centre of the selection's bounds, bed mm. */
+  /** Centre of the design's box, bed mm. */
   readonly centre: Point;
+  /** The box's sides along and across the design's own frame. */
   readonly width: number;
   readonly height: number;
+  /** How far the design's frame is already turned from the page, degrees. */
+  readonly turnDeg: number;
 };
 
 /** The first piece whose outline contains `point`, or null. */
@@ -89,8 +92,8 @@ export function placementOn(
 
 function alignedRotationDeg(piece: DetectedPiece, design: DesignFrame): number {
   if (piece.shape === 'round') return 0;
-  if (piece.shape === 'square') return wrapped(piece.rect.axisDeg, 90);
-  const designAxisDeg = design.width >= design.height ? 0 : 90;
+  if (piece.shape === 'square') return wrapped(piece.rect.axisDeg - design.turnDeg, 90);
+  const designAxisDeg = design.turnDeg + (design.width >= design.height ? 0 : 90);
   return wrapped(piece.rect.axisDeg - designAxisDeg, 180);
 }
 
