@@ -161,9 +161,9 @@ function reliefGroup(
       includeRequestedDepth: false,
       includeDepthPerPass: cutType !== 'relief-finish',
       includeVResolution: false,
-      // Relief rings and finishing rows plunge at their starts. The layer's
-      // ramp angle ramps only its other shapes, so a relief group must not
-      // record it as its entry (ADR-273 Amendment 1).
+      // Generic provenance must not claim the layer's requested ramp.
+      // A relief stage that actually ramps sets its angle explicitly below;
+      // finishing retains no entry claim (ADR-273 Amendment 1).
       includeRampEntry: false,
       layerPrimaryTool,
     }),
