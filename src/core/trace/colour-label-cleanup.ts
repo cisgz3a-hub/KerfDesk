@@ -150,11 +150,12 @@ function hasHairlineLink(grid: LabelGrid, p: number): boolean {
 /** The diagonal neighbour of p in direction d (4..7) when the corner joins a
  *  coherent 1-px hairline, else -1. Outlines are traced 4-connected, so speck
  *  area is measured 4-connected too (ADR-461 Amendment 1); the one exception
- *  is a thin straight diagonal: both corner pixels carry the same label, the
- *  corner continues straight on for a third pixel, each corner pixel has at
- *  most two same-label 8-neighbours, and both off-diagonal pixels belong to
- *  solid (not 1-px isolated) surroundings. A checkerboard fails the last
- *  test, dither pairs and zigzags the straight run, a 2x2 block thinness. */
+ *  is a thin aliased line at any angle: both corner pixels carry the same
+ *  label, the line runs on beyond the corner (see `continuesBeyond`), each
+ *  corner pixel has at most two same-label 8-neighbours, and both
+ *  off-diagonal pixels belong to solid (not 1-px isolated) surroundings. A
+ *  checkerboard fails the last test, an isolated dither pair or a zigzag the
+ *  run-on test, a 2x2 block thinness. */
 function hairlineLink(grid: LabelGrid, p: number, d: number): number {
   const { labels, width } = grid;
   const n = labels.length;
@@ -165,7 +166,7 @@ function hairlineLink(grid: LabelGrid, p: number, d: number): number {
   const off1 = q - (q - p > 0 ? width : -width);
   const off2 = p + (q - p > 0 ? width : -width);
   if (!solidOtherLabel(grid, off1, label) || !solidOtherLabel(grid, off2, label)) return -1;
-  if (!continuesStraight(grid, p, q, d, label)) return -1;
+  if (!continuesBeyond(grid, p, q, d, label)) return -1;
   return thin(grid, p, label) && thin(grid, q, label) ? q : -1;
 }
 
@@ -175,32 +176,52 @@ function solidOtherLabel(grid: LabelGrid, p: number, label: number): boolean {
   return own !== label && sharesLabel4(grid, p, own);
 }
 
-// The corner p->q (direction d) extends straight on at least one side, so a
-// run of three or more pixels: a drawn diagonal, not a dither pair or zigzag.
-function continuesStraight(
-  grid: LabelGrid,
-  p: number,
-  q: number,
-  d: number,
-  label: number,
-): boolean {
+// The corner p->q (direction d) is part of a drawn line, not a dither pair or
+// a zigzag: either it extends straight on along the diagonal at one side (a
+// 45-degree line and its ends), or the line runs on beyond the corner at both
+// sides, away from it. An aliased line at any other angle joins axis-aligned
+// runs with single diagonal steps, so p continues backwards (W/E, N/S or the
+// diagonal away from q) and q forwards.
+function continuesBeyond(grid: LabelGrid, p: number, q: number, d: number, label: number): boolean {
   const n = grid.labels.length;
-  const after = neighbour8(q, d, grid.width, n);
-  const before = neighbour8(p, 11 - d, grid.width, n);
-  return (
-    (after >= 0 && grid.labels[after] === label) || (before >= 0 && grid.labels[before] === label)
-  );
+  const { width } = grid;
+  const same = (r: number): boolean => r >= 0 && grid.labels[r] === label;
+  if (same(neighbour8(q, d, width, n)) || same(neighbour8(p, 11 - d, width, n))) return true;
+  const east = d === 5 || d === 7;
+  const south = d >= 6;
+  const back = [neighbour4(p, east ? 0 : 1, width, n), neighbour4(p, south ? 2 : 3, width, n)];
+  const on = [neighbour4(q, east ? 1 : 0, width, n), neighbour4(q, south ? 3 : 2, width, n)];
+  // The run beyond the corner is itself part of a 1-px line.
+  const run = (r: number): boolean => same(r) && thin(grid, r, label);
+  return runsOn(grid, label, [p, back.some(run)], [q, on.some(run)]);
+}
+
+// Both corner pixels run on, or one does and the other is the line's last
+// pixel (its only same-label 8-neighbour is the corner partner).
+function runsOn(
+  grid: LabelGrid,
+  label: number,
+  [p, backward]: readonly [number, boolean],
+  [q, onward]: readonly [number, boolean],
+): boolean {
+  if (backward && onward) return true;
+  if (onward && sameNeighbours8(grid, p, label) === 1) return true;
+  return backward && sameNeighbours8(grid, q, label) === 1;
 }
 
 // At most two 8-neighbours share the label: a pixel of a 1-px line.
 function thin(grid: LabelGrid, p: number, label: number): boolean {
+  return sameNeighbours8(grid, p, label) <= 2;
+}
+
+function sameNeighbours8(grid: LabelGrid, p: number, label: number): number {
   const n = grid.labels.length;
   let same = 0;
   for (let d = 0; d < 8; d += 1) {
     const q = neighbour8(p, d, grid.width, n);
     if (q >= 0 && grid.labels[q] === label) same += 1;
   }
-  return same <= 2;
+  return same;
 }
 
 function neighbourhoodMode(grid: LabelGrid, i: number, counts: Int32Array): number {

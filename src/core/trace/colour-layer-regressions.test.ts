@@ -26,7 +26,7 @@ describe('colour-layer speck removal matches traced connectivity', () => {
 
   it('does not trace every dither dot of a halftoned ramp as its own outline', async () => {
     const paths = await traceImageToColoredPaths(ditheredGradient(), OPTIONS);
-    expect(subpaths(paths)).toBeLessThanOrEqual(40);
+    expect(subpaths(paths)).toBeLessThanOrEqual(25);
   });
 });
 
