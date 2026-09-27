@@ -104,6 +104,14 @@ function render(props: Parameters<typeof LaserRecoveryPlacement>[0]): void {
   unmount = () => root.unmount();
 }
 
+function button(label: string): HTMLButtonElement {
+  const candidate = [...(host?.querySelectorAll('button') ?? [])].find(
+    (element) => element.textContent === label,
+  );
+  if (!(candidate instanceof HTMLButtonElement)) throw new Error(`Expected button: ${label}`);
+  return candidate;
+}
+
 describe('recovery placement and work origin', () => {
   it('says the origin matches when it is within 0.05 mm of the one the job ran with', () => {
     render({
@@ -149,6 +157,66 @@ describe('recovery placement and work origin', () => {
     if (restore === undefined) throw new Error('Expected the Restore saved origin button.');
     await act(async () => restore.click());
     expect(onRestoreOrigin).toHaveBeenCalledWith({ x: 20, y: 30, z: 0 });
+  });
+
+  it('homes from beside the restore, and holds the restore while homing', async () => {
+    let finishHome: () => void = () => undefined;
+    const onHome = vi.fn(
+      () =>
+        new Promise<void>((resolve) => {
+          finishHome = resolve;
+        }),
+    );
+    const onRestoreOrigin = vi.fn(async () => undefined);
+    render({
+      capsule: capsule({ x: 20, y: 30, z: 0 }),
+      liveWorkOffsetMm: { x: 0, y: 0, z: 0 },
+      restartLine: 1,
+      disabled: false,
+      onRestoreOrigin,
+      onHome,
+    });
+    expect(host?.textContent).toContain('home it first with Home machine');
+    await act(async () => button('Home machine').click());
+    expect(onHome).toHaveBeenCalledTimes(1);
+    expect(button('Homing…').disabled).toBe(true);
+    expect(button('Restore saved origin').disabled).toBe(true);
+    await act(async () => finishHome());
+    expect(button('Restore saved origin').disabled).toBe(false);
+    await act(async () => button('Restore saved origin').click());
+    expect(onRestoreOrigin).toHaveBeenCalledWith({ x: 20, y: 30, z: 0 });
+  });
+
+  it('says homing rules out continuing from where the head stopped', () => {
+    render({
+      capsule: capsule({ x: 20, y: 30, z: 0 }),
+      liveWorkOffsetMm: { x: 0, y: 0, z: 0 },
+      restartLine: 1,
+      disabled: false,
+      onRestoreOrigin: async () => undefined,
+      onHome: async () => undefined,
+      headStop: {
+        stop: { line: 5, sentLines: 4, pointMm: { x: 9, y: 9 } },
+        sendableLines: 10,
+        anchored: false,
+        onContinue: async () => undefined,
+      },
+    });
+    expect(host?.textContent).toContain(
+      'Homing moves the head off the spot where the job stopped, so after it only the restore can place the job.',
+    );
+    expect(button('Continue from where the head stopped').disabled).toBe(false);
+  });
+
+  it('offers no Home without homing set up', () => {
+    render({
+      capsule: capsule({ x: 20, y: 30, z: 0 }),
+      liveWorkOffsetMm: { x: 0, y: 0, z: 0 },
+      restartLine: 1,
+      disabled: false,
+      onRestoreOrigin: async () => undefined,
+    });
+    expect(host?.textContent).not.toContain('Home machine');
   });
 
   it('shows why the restore failed', async () => {

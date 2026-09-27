@@ -414,6 +414,49 @@ test('recovery after a controller reset warns when the work origin differs from 
   });
 });
 
+test('after a lost link the Review opens by itself, homes, and puts the saved origin back', async ({
+  page,
+  kerfdesk,
+}) => {
+  test.setTimeout(180_000);
+  page.on('dialog', (dialog) => void dialog.accept());
+  await connectAndHome(page, kerfdesk);
+  await page.getByText('Placement & output', { exact: true }).click();
+  await page.getByRole('combobox', { name: 'Start from' }).selectOption('user-origin');
+  await kerfdesk.emitSerialLine('<Idle|MPos:20.000,20.000,0.000|WCO:0.000,0.000,0.000|FS:0,0>');
+  await page.getByRole('button', { name: 'Set origin here', exact: true }).click();
+  await expect.poll(async () => serialWrites(await kerfdesk.events())).toContain('G92 X0 Y0');
+  const atOrigin = '<Idle|MPos:20.000,20.000,0.000|WCO:20.000,20.000,0.000|FS:0,0>';
+  await kerfdesk.emitSerialLine(atOrigin);
+  const baselineLines = await startHeld(page, kerfdesk, atOrigin);
+  await acknowledgeExactly(page, kerfdesk, baselineLines, 2);
+  await kerfdesk.disconnectSerial();
+  await savedCapsule(page);
+
+  // The reconnected controller was reset: no origin. The Review opens by itself
+  // over the Machine panel, so homing and the restore happen inside it.
+  await kerfdesk.emitSerialLine('<Idle|MPos:20.000,20.000,0.000|WCO:0.000,0.000,0.000|FS:0,0>');
+  await kerfdesk.setAutoAcknowledge(true);
+  await page.getByRole('button', { name: /^Connect/ }).click();
+  const review = page.getByRole('dialog', { name: 'Review interrupted laser job' });
+  await expect(review).toContainText('The controller has no work origin set now');
+  const writesBeforeHome = serialWrites(await kerfdesk.events()).length;
+  await review.getByRole('button', { name: 'Home machine', exact: true }).click();
+  await expect
+    .poll(async () => serialWrites(await kerfdesk.events()).slice(writesBeforeHome))
+    .toContain('G4 P0.01');
+  await kerfdesk.emitSerialLine(IDLE);
+  const restore = review.getByRole('button', { name: 'Restore saved origin', exact: true });
+  await expect(restore).toBeEnabled();
+  const writesBeforeRestore = serialWrites(await kerfdesk.events()).length;
+  await restore.click();
+  await expect
+    .poll(async () => serialWrites(await kerfdesk.events()).slice(writesBeforeRestore))
+    .toMatch(/G92 X-20(?:\.0+)? Y-20(?:\.0+)?/);
+  await kerfdesk.emitSerialLine('<Idle|MPos:0.000,0.000,0.000|WCO:20.000,20.000,0.000|FS:0,0>');
+  await expect(review).toContainText('The work origin matches the one this job ran with.');
+});
+
 test('two windows cannot both resume one interrupted job', async ({ page, kerfdesk }) => {
   test.setTimeout(180_000);
   const refusalsA = collectRefusals(page);

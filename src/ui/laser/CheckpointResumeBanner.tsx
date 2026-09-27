@@ -5,6 +5,7 @@
 
 import { useEffect, useMemo, useState } from 'react';
 import type { JobInterruptionKind } from '../../core/recovery';
+import { useStore } from '../state';
 import { jobAwareAlert, jobAwareConfirm } from '../state/job-aware-dialogs';
 import { useLaserStore } from '../state/laser-store';
 import { isActiveJob } from '../state/laser-store-helpers';
@@ -129,6 +130,7 @@ function LaserRecoveryReview(props: {
 }): JSX.Element {
   const liveWorkOffsetMm = useLiveWorkOffsetMm();
   const liveOriginSet = useLaserStore((state) => state.workOriginActive);
+  const homingEnabled = useStore((state) => state.project.device.homing.enabled);
   return (
     <LaserRecoveryReviewDialog
       capsule={props.capsule}
@@ -145,6 +147,7 @@ function LaserRecoveryReview(props: {
       onFrameRemaining={(bounds) => frameRemainingRecoveryArea(props.capsule, bounds)}
       onRestoreOrigin={(saved) => useLaserStore.getState().restoreWorkOrigin(saved)}
       onSetOriginAtHead={(point) => useLaserStore.getState().setOriginAtProgramPoint(point)}
+      {...(homingEnabled ? { onHome: () => useLaserStore.getState().home() } : {})}
     />
   );
 }

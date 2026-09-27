@@ -68,7 +68,11 @@ job controls, and the reported attempt went to Start from line instead.
    controller is connected and nothing else holds the rail (no live job, no pending Start, no
    live recovery claim, the rail not busy). It opens once per run in each app session; closing
    it leaves the card. The operator's own Abort, a rejected line and an unexplained stop do not
-   open it.
+   open it. The open Review covers the Machine panel's Home, and a restore after a reset needs
+   the machine homed first, so when the project has homing set up Restore saved origin sits
+   beside **Home machine**, which runs the same Home as the Machine panel. Either action holds
+   the other until it finishes. When Continue from where the head stopped is also offered, the
+   restore says that homing moves the head off the stop, so after it only the restore fits.
 5. **A recovery refusal for a missing origin** also names Continue from where the head stopped
    for a machine that was not homed.
 
