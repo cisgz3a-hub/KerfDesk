@@ -6933,10 +6933,11 @@ as the pane's design record.
   presses **Use this camera** on a detected machine camera. The live picture is the one source every
   camera feature captures through. Closing the panel keeps the camera running while the calibrated
   overlay shows it on the canvas.
-- **Hosted browser / machine camera.** A laser's built-in camera and RTSP/IP cameras answer on the
-  local network without the permission browsers need to read pixels, so the hosted web app cannot
-  use them. The panel says so and links KerfDesk Desktop, which reads them through its local bridge.
-  USB cameras work in the browser.
+- **Hosted browser / machine camera.** A laser's built-in camera, RTSP/IP cameras and phone camera
+  apps answer on the local network without the permission browsers need to read pixels, so the
+  hosted web app cannot use them. The panel says so and links KerfDesk Desktop, which reads them
+  through its local bridge. USB cameras work in the browser, including a phone that shows up as a
+  webcam (ADR-448).
 - **Error / permission denied.** If the browser or OS denies camera access (or the page is not
   served over https), a one-line message explains how to grant permission. No overlay is shown
   and the rest of the app is unaffected.
@@ -7171,6 +7172,31 @@ as the pane's design record.
 - **Empty / no selection or no feed.** **Use selected marks** without two selected objects says
   to select the marks first. **Find marks with camera** is disabled without a live camera, and
   without a calibration it is absent.
+
+### F-CAM11. A phone as the overhead camera (ADR-448)
+
+- **Success / IP Webcam.** In KerfDesk Desktop the operator opens **Phone camera…** in the Camera
+  panel, keeps **IP Webcam (Android)**, types the address the app shows (such as
+  `192.168.1.50:8080`) and presses **Use phone**. One picture arrives, the phone's picture shows
+  in the section, and it becomes the camera every feature uses. Calibrating it keeps the other
+  cameras' calibrations, and **Calibrated cameras** names it **Phone camera at** its address.
+- **Success / another app.** With **Another app with a picture address**, the full http address
+  of the app's still picture works the same way.
+- **Success / back later.** The app and address are remembered on this computer, and the
+  section opens with them filled in. Login details, query parameters and fragments are used for
+  the current connection only and never stored. The panel tells the operator to paste the full
+  address again if the camera needs those details when reconnecting.
+- **Error / no picture.** A wrong address, a stopped app, or a phone on another network leaves
+  the camera stopped. The section says what to check and offers **Try again**.
+- **Error / video stream address.** An `rtsp://` address is not started. The section says to
+  paste it under **RTSP camera…**.
+- **Edge / laser camera and phone.** Starting the phone stops the laser's built-in camera, and
+  the machine camera's button offers **Use this camera** again instead of **In use**.
+- **Edge / hosted web app.** The section is not shown. The camera notice says Desktop reads phone
+  camera apps, and that a phone that shows up as a webcam works as a USB camera.
+- **Empty / no address.** **Use phone** is disabled until an address is typed, and the section
+  lists the setup steps (largest video resolution, straight down, no zoom, stabilisation, HDR or
+  filters, focus locked, on the charger, calibrate once mounted).
 
 ---
 
