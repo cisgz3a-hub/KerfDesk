@@ -144,6 +144,27 @@ suites. Raw JSON results for the initial full run, the corrected
 power-mode tests and the baseline probe test are retained in the task's external audit
 directory. The temporary baseline checkout was removed after verification.
 
+## Integration review follow-up
+
+PR #960's first integrated CI run passed 21,032 tests and failed 11 assertions in four Fill
+fixtures. The integration retained their explicit verbose-output option but had compact
+expected strings. PR #963 restores the matching verbose expectations while retaining the
+separate compact-output semantic and guard regressions.
+
+That review also found M3 Image wrote a coincident opening travel at shared split runways.
+GRBL can synchronise its planner on this zero-distance M3 motion, interrupting the intended
+continuous dark traversal. The raster emitter now omits that redundant travel and diagnostics
+exclude the shared internal sides from distance-from-rest estimates. Outer runways remain
+subject to the check.
+
+An independent controller-grid probe then found that an entirely collapsed final sweep reset
+the remembered laser state despite emitting no movement. This prematurely wrote M5 after a
+lit M3 burn. A separate initial collapsed sweep could consume the first engraving feed even
+though it emitted only positioning. Ten focused regressions failed before the repair and
+passed afterwards: zero-line sweeps preserve the previous state, and only an actual engraving
+F word satisfies the feed requirement. The tests cover compact and verbose M3/M4 output and
+the real Image-to-Cut handoff; the deferred opening remains after the first positioning move.
+
 ## Physical acceptance after this code is available
 
 1. Use the actual saved machine/head profile. Confirm its acceleration, feed limits, laser

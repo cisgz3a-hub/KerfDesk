@@ -225,10 +225,13 @@ function* emitRasterPasses(input: EmitRasterInput, state: RasterEmissionState): 
           dotWidthCorrectionMm,
           state.head,
         );
+        // A sweep that disappears on the controller grid changes no modal
+        // state. In particular, the preceding M3 burn can still be lit.
+        if (sweep.lines.length === 0) continue;
         yield sweepText(sweep.lines, state);
         state.endsLit = sweep.endsLit;
         state.head = sweep.head;
-        feedEmitted = true;
+        feedEmitted ||= sweep.feedEmitted;
       }
       emittedRowCount += 1;
     }
@@ -310,6 +313,8 @@ function sweepExtents(
 
 type RasterSweepEmission = {
   readonly lines: ReadonlyArray<string>;
+  /** An engraving F word was actually written, rather than only a seek. */
+  readonly feedEmitted: boolean;
   /** Under M3 the sweep ends on a burn, so a stop right after it would be lit. */
   readonly endsLit: boolean;
   readonly head: RasterControllerHead;
@@ -337,6 +342,7 @@ function emitSpanSweep(
   // word and both axes, so nothing is ever held across a row boundary. (Only an
   // M3 sweep at a shared runway point skips that travel, on the same row.)
   const writer = createModalMotionWriter(style);
+  const runFormatting = { input, feed, writer, style };
   const { activeStartX, activeEndX, startX, endX, rowShiftX } = sweepExtents(
     input,
     pixelWidthMm,
@@ -366,24 +372,14 @@ function emitSpanSweep(
   // A controlled G1 seek changes modal F, unlike G0. Reassert the engraving
   // feed on the first runway/burn move after every such seek.
   let shouldEmitFeed = emitFeed || input.controlledLaserOffTravelFeedMmPerMin !== undefined;
+  let feedEmitted = false;
   let endsOnBurn = false;
   const pushRun = (x: number, s: number): void => {
     const targetX = x + rowShiftX;
     const controllerTargetX = rasterControllerCoordinateMm(targetX);
     if ((s > 0 || constantPower) && controllerTargetX === controllerHeadX) return;
-    lines.push(
-      formatRunG1(
-        targetX,
-        s,
-        prevS,
-        feed,
-        shouldEmitFeed,
-        input.modalFeedrate ?? true,
-        input.emitSOnEveryBurnMove ?? false,
-        writer,
-        style,
-      ),
-    );
+    lines.push(formatRunG1(targetX, s, prevS, shouldEmitFeed, runFormatting));
+    feedEmitted ||= shouldEmitFeed || input.modalFeedrate === false;
     shouldEmitFeed = false;
     prevS = s;
     controllerHeadX = controllerTargetX;
@@ -408,12 +404,15 @@ function emitSpanSweep(
       controllerHeadX,
     })
   ) {
-    lines.push(formatLaserOffG1(closeX, feed, input.modalFeedrate ?? true, writer, style));
+    lines.push(
+      formatLaserOffG1(closeX, feed, shouldEmitFeed, input.modalFeedrate ?? true, writer, style),
+    );
+    feedEmitted ||= shouldEmitFeed || input.modalFeedrate === false;
     controllerHeadX = rasterControllerCoordinateMm(closeX);
     endsOnBurn = false;
   }
   const head = { x: controllerHeadX, y: controllerY };
-  return { lines, endsLit: constantPower && endsOnBurn, head };
+  return { lines, feedEmitted, endsLit: constantPower && endsOnBurn, head };
 }
 
 function writesRowClose(
@@ -432,6 +431,7 @@ function writesRowClose(
 function formatLaserOffG1(
   x: number,
   feed: number,
+  emitFeed: boolean,
   modalFeedrate: boolean,
   writer: ModalMotionWriter,
   style: MotionWordStyle,
@@ -442,12 +442,19 @@ function formatLaserOffG1(
     [
       motionWord,
       axisWord === '' ? `X${formatMotionCoordinateMm(x, style)}` : axisWord,
-      modalFeedrate ? '' : `F${formatGcodeFeedMmPerMin(feed)}`,
+      emitFeed || !modalFeedrate ? `F${formatGcodeFeedMmPerMin(feed)}` : '',
       'S0',
     ],
     style,
   );
 }
+
+type RasterRunFormatting = {
+  readonly input: EmitRasterInput;
+  readonly feed: number;
+  readonly writer: ModalMotionWriter;
+  readonly style: MotionWordStyle;
+};
 
 // One G1 closing a run. Emits S only when it changed from the
 // previous run (G-code is modal). Emits F only on the very first
@@ -456,19 +463,16 @@ function formatRunG1(
   x: number,
   s: number,
   prevS: number,
-  feed: number,
   isVeryFirstG1: boolean,
-  modalFeedrate: boolean,
-  emitSOnEveryBurnMove: boolean,
-  writer: ModalMotionWriter,
-  style: MotionWordStyle,
+  formatting: RasterRunFormatting,
 ): string {
+  const { input, feed, writer, style } = formatting;
   return joinMotionWords(
     [
       writer.motion('G1'),
       writer.axis('X', x),
-      isVeryFirstG1 || !modalFeedrate ? `F${formatGcodeFeedMmPerMin(feed)}` : '',
-      s !== prevS || emitSOnEveryBurnMove ? `S${s}` : '',
+      isVeryFirstG1 || input.modalFeedrate === false ? `F${formatGcodeFeedMmPerMin(feed)}` : '',
+      s !== prevS || input.emitSOnEveryBurnMove === true ? `S${s}` : '',
     ],
     style,
   );
