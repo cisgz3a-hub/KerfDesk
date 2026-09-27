@@ -1,4 +1,4 @@
-## ADR-446 - CNC stage recipes and conservative relief links (2026-09-27)
+## ADR-457 - Independent CNC stage cutting recipes (2026-09-27)
 
 **Status:** Accepted. | **Date:** 2026-09-27
 
@@ -13,9 +13,10 @@ cutting conditions, surface and operation completeness.
 
 Secondary cutters and wall finishing previously inherited the primary operation's
 feed, plunge, RPM and stepdown. A calculator's chart chipload also differed from
-the nominal chipload after feed limits. Relief rows kept independent entries even
-on flat interior regions, while an indiscriminate link could cross unknown stock
-or take longer than a retract. The surfacing form concealed its cutting recipe.
+the nominal chipload after feed limits. The surfacing form concealed its cutting
+recipe. During publication, main gained exact-contact relief finishing, linked
+rasters, waterlines and finished-flat skipping (ADR-412/421/423/450). The stage
+recipes must compose with those planners rather than replace them.
 
 ### Decision
 
@@ -39,30 +40,20 @@ or take longer than a retract. The surfacing form concealed its cutting recipe.
    An older reader must not silently discard motion settings. Existing complete
    scene/machine preparation identities and prepared-project recovery persistence
    include recipes and tool edits without a second allowlist.
-4. Optionally join only equal-height unmasked planar finishing rows. Retrace exact
-   existing vertices to an interior connector and back to the next original row
-   start; preserve every original row vertex and one recovery pass per row. A full
-   cutter-cylinder envelope must remain inside the known physical domain and
-   above every overlapping height sample plus an interpolation halo. No external
-   stock is assumed clear. Include actual formatted/GRBL-parsed XY endpoint error
-   under the residual isometry and parsed Z. Non-isometric residual transforms,
-   masks, obstructions, incomplete evidence and boundaries retain independent
-   entries. This model does not qualify fixtures or unsampled source detail.
-5. After the geometry proof, retain a link only when the represented extra
-   connector/retrace distance at the final capped finishing feed costs less than
-   the removed plunge at the final capped plunge feed. Ignore removed rapid
-   savings. Missing or nonfinite values restore independent entries. This cheap
-   filter avoids demonstrated slow-feed regressions; acceleration, transport and
-   actual elapsed time still require qualification.
-6. Record the exact prefix length of an optional row link. Any nonzero later job
-   origin translation, or tile clipping/translation, restores the original row
-   before transforming it; the old placement proof must not travel to new
-   coordinates. Zero translation retains it. The prefix metadata is not G-code.
-7. Reuse supplied compiled output in dropped-vector diagnostics before collecting
+4. Preserve the active relief planner's exact-contact calculation, requested row
+   spacing, raster-axis choice, waterlines, finished-flat evidence and established
+   mask behavior. Apply the finishing recipe to its actual finishing groups while
+   roughing and flat finishing retain their proper cutter and cutting values.
+   Keep the upstream planner's own contact, sampling, representation and path
+   reduction qualifications. This change does not add a second link algorithm.
+   The earlier planar-only prototype and its cost/prefix metadata are superseded
+   before publication; its archived benchmark is not a measurement of this final
+   planner and its clearance proof must not be attributed to upstream links.
+5. Reuse supplied compiled output in dropped-vector diagnostics before collecting
    or planning geometry again. Existing compiled completeness evidence remains
    authoritative. Legacy diagnostic calls without compiled output retain their
    prior planning path.
-8. Expose surfacing feed, plunge, RPM and stepdown. Seed from the active cutter and
+6. Expose surfacing feed, plunge, RPM and stepdown. Seed from the active cutter and
    material when available, preserve manual edits while that source is unchanged,
    and refresh defaults when cutter/material/machine/project changes. Save the
    explicit recipe with existing machine limits and precise final depth. Generic
@@ -74,10 +65,10 @@ or take longer than a retract. The surfacing form concealed its cutting recipe.
   No machine family is enabled beyond its existing CNC output capability.
 - Old projects compile with inherited recipes until the operator explicitly
   enables a stage recipe. Version 11 files need a compatible reader.
-- Links can add points and G-code lines while saving Z travel. A representative
-  21-row flat fixture removes 13 of 22 safe-Z commands and changes the software
-  estimate from 63.561 to 36.271 seconds at F1000/plunge200. The same geometry at
-  F100/plunge1000 retains all entries because retracing would be slower.
+- Relief motion follows the planner already on main. Its bounded one-sided point
+  reduction can leave up to 0.002 mm more stock relative to its unreduced sampled
+  path (ADR-421); that is distinct from the lossless laser Fill compaction. There
+  is no universal cycle-time improvement claim for every recipe or strategy.
 - These are software geometry, persistence and emitted-output guarantees. They
   do not establish spindle accuracy, cutter life, surface finish, controller
   throughput, workholding, stock removal forces or physical cycle-time savings.
@@ -88,9 +79,10 @@ or take longer than a retract. The surfacing form concealed its cutting recipe.
 Focused regression coverage includes independent stage feeds/depths; per-part
 ordering with leads, ramps and tabs; material/schema persistence and malformed
 recipes; represented fractional feeds; explicit surfacing fields through saved
-G-code; reused diagnostic geometry; conservative relief domain/obstruction/Z
-bounds; rotated large-coordinate parser errors; and exact original-row restoration
-after origin and tile changes. Browser coverage exercises wall-recipe editing,
+G-code; reused diagnostic geometry; immutable artifact/stage separation; and
+stage recipes combined with the current relief strategies. Existing upstream
+contact, mask, path, waterline and flat-finishing checks remain applicable.
+Browser coverage exercises wall-recipe editing,
 compilation, Save As/reopen and disabling the recipe. The remediation ledger holds
 the commands and measured fixture details; integration gates are reported there
 by the coordinating task.

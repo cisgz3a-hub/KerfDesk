@@ -1,4 +1,4 @@
-## ADR-449 - Dense Fill uses lossless modal motion spelling (2026-09-27)
+## ADR-460 - Dense Fill uses lossless modal motion spelling (2026-09-27)
 
 **Status:** Accepted. | **Date:** 2026-09-27
 

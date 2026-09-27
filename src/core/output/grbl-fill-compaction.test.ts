@@ -37,7 +37,7 @@ function burns(gcode: string) {
   return oracleBurns(gcode).map((burn) => [burnGeometryKey(burn), burn.air]);
 }
 
-describe('lossless Fill motion compaction (ADR-449)', () => {
+describe('lossless Fill motion compaction (ADR-460)', () => {
   it.each(['grbl-dynamic', 'grbl-raster'] as const)(
     'preserves all motion, feeds, power, air and pass order on %s',
     (dialectId) => {

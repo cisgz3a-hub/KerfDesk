@@ -27,19 +27,19 @@ it does not identify these changes as deployed or physically qualified.
 - Dense preparation is routed to workers earlier; the classifier has its own
   work budget. Preview and ETA reuse bounded emitted source, invisible vector
   artwork avoids repaint work, and paged-asset ownership checks are coalesced.
-- Relief connector optimization requires a conservative sampled-surface proof.
-  Unknown exterior space, masks, uncertain transforms or coordinate representation,
-  and unproved surface clearance keep the existing retract behavior. A feed-cost
-  check rejects links whose added cutting travel would outweigh the saved plunge.
+- CNC stage values compose with main's current relief raster, waterline and
+  flat-finishing planners. These planners supersede the initial planar-link
+  prototype, which was removed before publication. Its historical speed figures
+  and cost filter do not describe the final planner.
 
 The decisions and detailed contracts are in
-[ADR-445](../decisions/ADR-445-fluidnc-acknowledged-line-streaming.md),
-[ADR-446](../decisions/ADR-446-cnc-stage-recipes-and-conservative-relief-links.md),
-[ADR-447](../decisions/ADR-447-scan-quality-advisories-use-output-geometry.md),
-[ADR-448](../decisions/ADR-448-bounded-interactive-preparation-and-scene-work.md), and
-[ADR-449](../decisions/ADR-449-lossless-fill-motion-compaction.md). The
+[ADR-456](../decisions/ADR-456-fluidnc-acknowledged-line-streaming.md),
+[ADR-457](../decisions/ADR-457-independent-cnc-stage-cutting-recipes.md),
+[ADR-458](../decisions/ADR-458-scan-quality-advisories-use-output-geometry.md),
+[ADR-459](../decisions/ADR-459-bounded-interactive-preparation-and-scene-work.md), and
+[ADR-460](../decisions/ADR-460-lossless-fill-motion-compaction.md). The
 [detailed CNC record](2026-09-27-cnc-speed-quality-remediation.md) includes the
-stage contracts and paired relief timing fixture.
+stage contracts, current planner integration and historical prototype evidence.
 
 ## Every audit finding
 
@@ -61,7 +61,7 @@ stage contracts and paired relief timing fixture.
 | C6, chart versus programmed chipload | Fixed: separate chart starting value from the nominal chipload actually represented by the machine-aware feed/RPM. Physical chip thickness remains engagement-dependent. |
 | C7, shared values across different stages | Fixed with optional, persisted cutter-bound stage recipes and explicit stage output/review provenance. Old projects keep their shared values. Separate values remain manual when material changes. |
 | C8, redundant V finish after clearing | Already repaired by clearing-aware finishing and source-containment checks; retained. |
-| C9, redundant relief retracts | Conservative interior connectors added for provable flat row transitions; exact existing row vertices provide approaches. Added travel must cost less than the removed plunge under the represented feed model. Nonzero later origin changes and tiling restore original rows. No blanket retract suppression. |
+| C9, redundant relief retracts | Main's linked raster/roughing, waterline and flat-finishing planners (ADRs 421, 423 and 450) supersede the initial planar shortcut. Preserve those planners and stage values; remove the prototype and its private cost/prefix metadata. Historical prototype timing is not a final-planner speed claim. |
 | C10, repeated diagnostic planning and missing evidence | Current compilation sidecars already carry actual relief/offset/stepover evidence. Fixed the remaining duplicate work in dropped-vector diagnostics by consuming compiled groups before collection or planning. |
 | C11, shallow surfacing silently deepened | Core depth preservation already repaired on main. Added visible feed, plunge, RPM and stepdown controls with cutter/material starting values; tests follow these fields through saved output and its exact final depth. |
 | APP-01, expensive fill classification | Bounded independently of compilation. A 90,000-vertex classifier fixture previously took 3,188.76 ms to count spans. The final classifier immediately returns an explicit unknown estimate and routes the unchanged job to a worker (seven samples, 0.005–0.036 ms). This avoids the count rather than speeding up full compilation. |
@@ -85,7 +85,7 @@ or other hardware support. Machine-brand presets continue through their selected
 shared controller/dialect contract.
 
 No nominal maximum speed is promoted to a recommended quality setting. There is
-no global feed increase, geometric simplification, reduced engraving resolution,
+no global feed increase, laser geometry simplification, reduced engraving resolution,
 automatic power increase, or relaxation of the completed-Frame policy. A completed
 Frame for the exact reviewed artifact remains the sole ordinary Start policy gate;
 quality and configuration findings remain warnings.
@@ -94,7 +94,9 @@ The code cannot manufacture material measurements. Focus, burn width, kerf,
 scan-direction offset, true acceleration, cutter runout, spindle power, chip
 evacuation, workholding, and material variation still need controlled coupons or
 cuts on each physical setup. Unknown fixtures and subcell relief detail are not
-qualified by the sampled connector proof.
+qualified by the sampled relief model. Main's relief path reduction permits up
+to 0.002 mm extra stock relative to its unreduced sampled path; that allowance
+is distinct from the lossless laser Fill text compaction.
 
 ## Initial implementation verification
 
@@ -152,8 +154,8 @@ its failed result instead of being relabelled as a clean run.
 | --- | --- |
 | Dense Fill, 20,000 burns | 932,023 to 366,203 bytes, 60.7% less; all burns and the complete motion manifest preserved. Text line count stays 40,210. This is not a physical cycle-time measurement. |
 | Classifier, 90,000-vertex circle | Previous full estimate: 3,188.76 ms. Final bounded estimate: explicit unknown in 0.005–0.036 ms, followed by worker routing. These tiny timer observations are not a general speed multiplier. |
-| Flat relief, F1000/plunge200 | 21 original rows preserved; safe-Z commands 22 to 9; software estimate 63.561 to 36.271 seconds. Points and G-code lines increase because the proof retraces existing edges. |
-| Same relief, F100/plunge1000 | Cost filter retains the original entries and 138.870-second estimate, avoiding the demonstrated 12.8% slowdown of unconditional links. |
+| Historical superseded relief prototype, F1000/plunge200 | 21 original rows preserved; safe-Z commands 22 to 9; software estimate 63.561 to 36.271 seconds. This removed prototype does not establish current-planner performance. |
+| Historical superseded relief prototype, F100/plunge1000 | Its cost filter retained the original entries and 138.870-second estimate. That filter is not part of the final planner. |
 | Original laser quality probes | Enlarged 100 mm cubic maximum emitted error 0.0186805 mm; opposite-phase checkerboards both retain mean luma 128; Smoothieware native S ranges 1, 100 and 1000 preserve the tested 30/50/100% levels. These revalidate existing baseline repairs. |
 
 Focused evidence, logs, independent reviews and paired benchmark scripts are stored in
@@ -161,9 +163,14 @@ Focused evidence, logs, independent reviews and paired benchmark scripts are sto
 The benchmarks are host-specific software measurements, not material or controller
 runtime promises. This initial verification did not include publication or
 hardware operation. The later publication follow-through integrates main's
-V-carve geometry reuse (`c75ba261e`, ADR-444) and renumbers this remediation's
-decisions to ADR-445 through ADR-449. It preserves both the upstream geometry
-cache and the independent stage settings. Exact release checks, PR/main/deploy
+V-carve geometry reuse (`c75ba261e`, ADR-444), the current relief planners from
+PR #939, and renumbers this remediation's
+decisions to ADR-456 through ADR-460. It preserves both the upstream geometry
+cache and independent stage settings while removing superseded prototype links.
+The V-carve integration selection passed 61 tests across 12 files (one existing
+benchmark skipped); relief reconciliation passed 149 distinct tests across
+13 files, including stage values with X/Y raster, waterlines and flat finishing.
+Exact release checks, PR/main/deploy
 identities, and served-build evidence are recorded separately in the audit
 directory. The user confirmed that no physical machine was available, so material
 qualification remains not run; the accompanying trial pack records that limit.

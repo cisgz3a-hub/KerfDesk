@@ -1,158 +1,130 @@
 # CNC speed and quality remediation
 
-27 September 2026. Quality first; all supported controller families have equal
-priority within their actual capabilities. This is the CNC implementation lane
-for the user's instruction to fix the audit findings.
+27 September 2026. Quality first; all supported controller families receive equal
+attention within their actual capabilities.
 
 ## Evidence boundary
 
-The audit captured dirty checkout `a37082457b76d56b8c9ba92be27db027b5a92cb0`.
-Remediation instead starts from current main
-`c81504fcda188b71652f9fe32597d8c435c5bc54` in the isolated shared worktree
-`D:\LaserForge\speed-quality-remediation-20260927`. The primary C: checkout is
-preserved. Several high-priority findings were already fixed on this newer base;
-they are not represented as newly fixed by this change.
+The original audit captured dirty checkout
+`a37082457b76d56b8c9ba92be27db027b5a92cb0`. Implementation started from main
+`c81504fcda188b71652f9fe32597d8c435c5bc54` in the isolated worktree
+`D:\LaserForge\speed-quality-remediation-20260927`. The primary checkout remains
+preserved. Existing repairs are distinguished from changes made by this task.
 
-No hardware was operated. No merge, deployment or physical cutting qualification
-is implied. Frame for the exact reviewed job remains the sole ordinary Start
-policy gate. CNC motion is still supported only on the existing GRBL, FluidNC and
-grblHAL families; Marlin, Smoothieware and Ruida retain `cncJobs: false`. Equal
-attention does not mean inventing CNC support in a laser-only output strategy.
+Publication integration also includes main's V-carve artifact reuse (PR #958,
+ADR-444) and relief planner changes (PR #939, ADR-412, 413, 421, 422, 423, 424 and
+450). Those relief planners supersede this task's initial planar-link prototype.
+The prototype and its private metadata/helpers were removed before publication;
+its timing figures are historical evidence, not results for the final planner.
 
-## Per-finding status
+No hardware was operated. The user confirmed that no machine is available.
+Physical trials remain **NOT RUN**. A completed Frame for the exact reviewed job
+remains the sole ordinary Start policy gate. CNC output remains supported on
+GRBL, FluidNC and grblHAL; Marlin, Smoothieware and Ruida retain their existing
+laser capabilities without fabricated CNC support.
 
-| Audit finding | Revalidated status and remediation | Main evidence |
-|---|---|---|
-| C1: one-peck drilling omitted | Already fixed on base. A drill cycle explicitly starts at stock top, giving even one peck a real segment. The generic path3d emitter's rejection of degenerate one-point paths remains appropriate. | `src/core/cnc/drill-peck.ts:40`; ADR-318; existing drilling/output regressions |
-| C2: tool grouping broke clearing/profile dependencies | Already fixed on base. Global clearing and profile phases are separate; ready tool sections respect secondary-stage prerequisites. New stage splitting preserves same-cutter part order and existing operation dependencies. | `src/core/cnc/cnc-tool-sections.ts:14`; ADR-310/319; `cnc-stage-recipes.test.ts`; `compile-cnc-part-order.test.ts` |
-| C3: finishing-only shallow relief omitted | Already fixed on base. Finishing is compiled independently of an empty roughing pass list. Preserved under independent finishing recipes. | `src/core/cnc/compile-cnc-relief.ts:120`; `relief-finishing-compile.test.ts` |
-| C4: requested scallop could be exceeded by grid rounding | Already fixed on base. Row stride floors the request; compiler finishing resolution is no coarser than requested spacing and uses the tapered ball tip where relevant. Rows include the far edge. Planar geometric scallop is not a universal material roughness guarantee. | `src/core/relief/relief-finishing.ts:56`; `src/core/cnc/compile-cnc-relief.ts:58`; ADR-289/368 |
-| C5: relief transforms changed physical cutter/spacing | Already fixed on base. XY scale is included before physical cutter dilation and spacing; residual placement is applied afterward. New links require residual isometry. Shared curve flattening was revalidated separately by the coordinating lane. | `src/core/cnc/relief-machine-space.ts:23`; `compile-cnc-relief.ts:249`; ADR-289 |
-| C6: displayed chart chipload differs from programmed value | Fixed. Display chart target separately from nominal chipload after feed limits and exact F/S representation. F>=1 uses the emitter's floor policy; supported fractional feeds remain fractional. Job Review derives nominal chipload from the actual compiled group and cutter flute count. | `src/core/cnc/nominal-chipload.ts`; `src/ui/layers/FeedsCalculatorRow.tsx:133`; `src/ui/laser/job-review/job-review-effective-operations.ts:89` |
-| C7: secondary/finish cutters shared one cutting recipe | Fixed. Optional cutter-bound recipes for pocket roughing, V clearing, relief finishing and profile wall finishing; explicit UI/manual/material-starting values; stage-specific actual feed/plunge/RPM/depth, provenance and review labels; schema 11 persistence. Missing or wrong-cutter recipe preserves shared defaults. Profile stage markers survive lead/ramp conversion and disappear from final passes. | `src/core/scene/cnc-stage-recipe.ts`; `src/core/cnc/cnc-stage-settings.ts:14`; `compile-cnc-job.ts:396`; `profile-finishing-stage.ts`; `src/ui/layers/CncStageRecipeFields.tsx`; `src/io/project/project-cnc-stage-validator.ts` |
-| C8: flat V clearing did not remove redundant V work | Already fixed on base with stock-aware V finishing. Preserved while the clearing cutter obtains its own recipe. This does not promise a shorter total job after manual tool change/touch-off. | `src/core/cnc/vcarve-rest-finishing.ts`; its regression suite; `cnc-stage-recipes.test.ts` |
-| C9: every relief row retracted/replunged | Fixed conservatively for proved planar interior cases. Full cylinder/domain/sample/representation proof, exact existing-row retraces, stage-aware feed-cost rejection, one original pass per row, and exact original-row restoration for later origin/tile changes. All unsupported proofs retain independent entries. | `src/core/relief/relief-planar-row-links.ts:19`; `relief-row-link-cost.ts:15`; `relief-finishing.ts`; `src/core/job/job-origin.ts:281`; `src/core/cnc/tile-plan.ts:176` |
-| C10: diagnostic replanning and incomplete quality-budget disclosure | Most evidence propagation was already fixed on base. Remaining dropped-vector diagnostics now consume compiled groups before any contour collection/planning, and missing compiled operations avoid an unnecessary pocket planner. Existing named completion/materialization and resolution evidence remains intact. Stage depth routing is integrated by the app lane. | `src/core/cnc/compile-cnc-diagnostics.ts:17`; `compile-cnc-diagnostics-prepared.test.ts`; existing relief/offset evidence suites |
-| C11: shallow surfacing depth and hidden cutting recipe | Core shallow-depth preservation was already fixed on base; original observation concerned the API, not a confirmed normal UI path. Newly expose feed, plunge, RPM and stepdown with active-tool/material starting values and machine limits. Visible fields reach saved G-code, including exact final remainder depth. | `src/core/cnc/surfacing.ts:148`; `src/ui/machine/SurfacingFields.tsx:13`; `save-surfacing-program.ts`; `SurfacingPanel.test.tsx` |
+## Finding disposition
 
-## Stage recipe behaviour and identity
+| Finding | Current disposition and evidence |
+| --- | --- |
+| C1: one-peck drilling omitted | Already repaired on the implementation base. The drilling cycle starts at stock top and contains a real cutting segment even for one peck. Existing drilling/output regressions retained. |
+| C2: tool grouping broke clearing/profile order | Already repaired through global phases and tool-section dependencies. Stage splitting preserves same-cutter part order and prerequisite stages; covered by stage and part-order tests. |
+| C3: finishing-only shallow relief omitted | Already repaired. Finishing is independent of an empty roughing pass list; preserved with independent finishing recipes. |
+| C4: requested scallop exceeded by grid rounding | Preserve the request-aligned finishing grid, conservative stride, far-edge coverage and strategy spacing from main. These constrain the sampled geometric model, not measured material roughness. |
+| C5: transforms changed cutter compensation or spacing | Preserve machine-space XY scaling before physical cutter compensation and placement afterward. Main's exact sampled-surface cutter-contact implementation remains authoritative. |
+| C6: chart chipload differed from programmed value | Fixed. Display chart starting values separately from nominal chipload calculated from represented feed/RPM and flute count, including feed limits and output rounding. Engagement still determines actual chip thickness. |
+| C7: different cutting stages shared one recipe | Fixed. Optional cutter-bound feed, plunge, RPM and applicable depth values for pocket roughing, V clearing, relief finishing and profile wall finishing; schema 11 persistence, manual/material-starting controls, provenance and review labels. |
+| C8: clearing left redundant V finishing | Base already used clearing-aware V finishing. Preserve it with stage settings and main's artifact-local V geometry cache. A tool change can still outweigh cutting-time savings. |
+| C9: relief rows repeatedly retract | Main's general linked raster/roughing planners and waterline/flat-finishing strategies supersede the initial planar shortcut. Preserve these planners and remove the prototype, its cost filter and origin/tile prefix metadata. No prototype speed or cost-proof claim is transferred to the new planner. |
+| C10: diagnostics repeated planning | Fixed remaining duplicate work by consuming compiled groups before contour collection or planning. Preserve actual completion, offset, resolution and materialization evidence. |
+| C11: surfacing depth/recipe unclear | Base already preserved shallow final depth. Expose feed, plunge, RPM and stepdown with labelled cutter/material starting values; tests follow edited fields through saved output and exact remainder depth. |
 
-Absent recipes retain the old output policy. Profile wall finishing initially
-seeds its independent stepdown with the whole depth so merely enabling the
-control preserves the old one-pass finish. The operator may then choose smaller
-finish steps. Relief finishing follows its sampled surface, so its recipe shows
-feed/plunge/RPM and does not falsely offer stepdown as an active finishing control.
+## Stage settings and prepared-job identity
 
-The recipe is bound to a cutter ID and does not automatically follow a different
-selected tool. The UI explains inheritance when a retained recipe belongs to a
-different cutter. Explicit numeric recipes remain manual when material changes;
-the operator may request fresh material/tool starting values. The material action
-does not silently overwrite another stage's manual values.
+Absent recipes retain shared values. A recipe is bound to a cutter ID; selecting a
+different cutter does not silently apply the old recipe. Explicit numeric recipes
+remain manual when material changes. The operator can request fresh material/tool
+starting values for a particular stage without overwriting another stage.
 
-Schema 11 prevents an older reader silently discarding these physical motion
-settings. Malformed present recipes fail structural loading instead of reverting
-feeds/depths behind the operator's back. Legacy files migrate with no fabricated
-recipe. The app reviewer independently traced complete scene/machine retention
-keys, immutable CNC/tool edits, exact prepared review keys, Frame signatures and
-prepared-project/nonraster recovery cloning: no omitted stage allowlist was found.
+Profile finishing initially seeds stepdown with the full cut depth to preserve
+the previous one-pass finish. Relief finishing follows its surface, so its recipe
+exposes feed, plunge and RPM without falsely presenting stepdown as active.
 
-## Relief link proof and measured tradeoff
+Schema 11 retains these motion settings. Malformed present recipes fail structural
+loading rather than silently reverting cutting values. Legacy files migrate
+without fabricated recipes. Scene/machine identity, prepared review keys, Frame
+signatures and recovery retain the stage settings.
 
-The first proposed edge shortcut was rejected during independent review because
-the swept strip extended outside the known heightmap domain. The implemented
-version retraces exact row vertices inward, crosses vertically with its entire
-cutter cylinder inside the known physical width/height, then retraces the next
-row's existing vertices to preserve complete original coverage. Every overlapping
-sample plus one sample halo must lie at or below the represented cutting Z.
-Actual transformed/GRBL-parsed endpoint XY error enlarges the envelope; it is not
-assumed to be a fixed decimal-rounding error. Masks and non-isometric residual
-transforms skip linking. Nonzero later origin changes and all tile clipping strip
-the exact prefix and restore the original rows before geometry changes.
+A new V-carve integration regression places a non-V operation before the cached V
+operation and edits stage settings immutably while keeping the same artwork. It
+checks actual operation indices, emitted stage values/depth/order, unchanged old
+artifact output after refinalization, and one V contour collection per artifact.
 
-The represented added prefix distance at the capped stage feed must cost less
-than the removed plunge at the capped plunge feed. Removed rapid time is ignored
-in this conservative selection. The geometric proof runs before this economic
-filter. Unknown values keep independent entries. Neither calculation models
-unrecorded fixtures, unsampled source detail, actual forces or measured surface
-quality; the acceleration/transport model also remains an estimate.
+## Relief integration and quality limits
 
-Deterministic fixture: flat -2 mm heightmap, 40 by 40 cells at 0.25 mm, physical
-10 by 10 mm, 3.175 mm ball nose, 0.025 mm scallop request, safe Z 5 mm, S12000,
-no spindle dwell. Device is the repository's generic GRBL 400 by 400 starter with
-6000 mm/min max feed, 500 mm/s² acceleration and 0.01 mm junction deviation.
-Results come from actual emitted G-code and `estimateJobDuration`:
+The compiled job uses main's X/Y raster, raster-plus-waterline and roughing-endmill
+flat-finishing strategies. Stage recipes apply to the relevant finishing groups
+without changing their passes, bounds or planning evidence. The four integration
+cases check those properties together with represented F321, plunge 123 and S9000.
+There is no separate crosshatch setting in the current implementation.
 
-| Recipe | Rows | Safe-Z commands | Motion points | Lines | Software estimated seconds |
-|---|---:|---:|---:|---:|---:|
-| F1000/plunge200, independent | 21 | 22 | 840 | 897 | 63.561 |
-| F1000/plunge200, qualified links | 21 | 9 | 1009 | 1027 | 36.271 |
-| F100/plunge1000, independent | 21 | 22 | 840 | 897 | 138.870 |
-| F100/plunge1000, final selection | 21 | 22 | 840 | 897 | 138.870 |
+Main's relief path reduction permits up to 0.002 mm of extra stock relative to
+its unreduced sampled path. This is a bounded geometric allowance, unlike the
+lossless laser Fill text compaction. It does not certify subcell source detail,
+fixtures, workholding, cutter runout or a physical surface finish. Final cycle
+speed and quality require machine/material trials; no universal gain is claimed.
 
-The normal fixture removes 13 retracts and reduces this estimate 42.9%. It adds
-points and output lines. An intermediate implementation without the economic
-filter estimated 156.653 seconds for the slow recipe, a 12.8% loss; final selection
-rejects those links and retains byte-equivalent independent geometry. No universal
-runtime or physical finish improvement is claimed.
+The prototype used a planar interior connector with a represented feed-cost
+filter. Its removal avoids stacking two linking systems and leaves the current
+planner responsible for relief geometry. The old prefix metadata and restoration
+hooks have no remaining consumers. Shared Preview/ETA source reuse is retained.
 
-Reproduction source, bundled probe and JSON evidence are in
-`D:\LaserForge\audits\2026-09-27-speed-quality\cnc-remediation\`.
-`row-link-evidence.json` records the intermediate cost comparison;
-`row-link-evidence-final.json` records the final filter. The build command is:
+## Historical prototype measurements
 
-```text
-node node_modules/.pnpm/esbuild@0.28.1/node_modules/esbuild/bin/esbuild D:/LaserForge/audits/2026-09-27-speed-quality/cnc-remediation/row-link-evidence.ts --bundle --platform=node --outfile=D:/LaserForge/audits/2026-09-27-speed-quality/cnc-remediation/row-link-evidence.cjs
-node D:/LaserForge/audits/2026-09-27-speed-quality/cnc-remediation/row-link-evidence.cjs
-```
+These figures describe the superseded implementation at `a016f9063`, not the
+publication candidate. A 10 by 10 mm flat model with a 3.175 mm ball nose and
+0.025 mm requested scallop estimated 63.561 seconds with independent entries and
+36.271 seconds with the prototype at F1000/plunge200. At F100/plunge1000 its cost
+filter retained the original 138.870-second estimate. These software estimates
+were never physical cycle measurements and do not establish current-plan gains.
 
-## Focused verification
+Archived probe source and JSON remain under
+`D:\LaserForge\audits\2026-09-27-speed-quality\cnc-remediation`. They depend on the
+historical implementation; deleted prototype tests are not current release checks.
 
-All commands run from the isolated worktree, with `--maxWorkers=1`. Counts below
-are separate overlapping runs, not distinct-test totals. Full integration gates
-belong to the coordinating report.
+## Verification
 
-1. Initial nominal chipload/feed calculator/UI/compiler/part-order selection:
-   5 files, 41 passed, 22.47 seconds. Later exact feed representation refinements
-   were covered in the final nominal suite below.
-2. Stage recipes, prepared diagnostics, nominal chipload, schema persistence,
-   migrations and surfacing UI-to-output: 6 files, 34 passed, 24.46 seconds.
-3. Relief finishing recipe integration, stage recipes, part ordering, secondary
-   feed advisories and effective Job Review: 5 files, 44 passed, 16.90 seconds.
-4. Final relief cost selection, row-link proof, finishing compile, mask safety
-   and tapered ball: 5 files, 30 passed, 15.03 seconds.
-5. Independent reviewer ran the preceding geometry/origin/tile proof snapshot:
-   4 files, 26 passed, 15.43 seconds. The final cost addition is covered by the
-   30-test run above and has been submitted for independent review.
-6. Coordinating task verified the actual browser stage flow: enable wall recipe,
-   edit F321/plunge72/S7100/0.7 mm stepdown, retain primary F900, compile, Save As,
-   reopen exact groups, and disable to return to shared values. One browser test
-   passed and the laptop layout was visually inspected.
+Initial stage/persistence, chipload, diagnostics, part-order and surfacing checks
+are recorded in the coordinating report and archived logs. Their overlapping run
+counts are not added as a distinct total. The initial browser workflow enabled a
+profile recipe, edited its values, compiled, saved, reopened and disabled it while
+preserving the primary recipe; no machine was connected.
 
-Final selected test commands:
+Publication integration added these checks:
 
-```text
-pnpm exec vitest run src/core/cnc/cnc-stage-recipes.test.ts src/core/cnc/compile-cnc-diagnostics-prepared.test.ts src/core/cnc/nominal-chipload.test.ts src/io/project/project-cnc-stage-recipes.test.ts src/io/project/migrations.test.ts src/ui/machine/SurfacingPanel.test.tsx --maxWorkers=1
-pnpm exec vitest run src/core/cnc/relief-finishing-compile.test.ts src/core/cnc/cnc-stage-recipes.test.ts src/core/cnc/compile-cnc-part-order.test.ts src/core/preflight/cnc-secondary-tool-feed.test.ts src/ui/laser/job-review/job-review-effective-operations.test.ts --maxWorkers=1
-pnpm exec vitest run src/core/relief/relief-row-link-cost.test.ts src/core/relief/relief-planar-row-links.test.ts src/core/cnc/relief-finishing-compile.test.ts src/core/relief/relief-finishing-mask-safety.test.ts src/core/relief/relief-finishing-tapered-ball.test.ts --maxWorkers=1
-```
+- V-carve artifact/stage reuse: 12 files, 61 passed, one existing opt-in benchmark
+  skipped; scoped lint and formatting passed.
+- Relief/contact/mask/origin/tile reconciliation: 149 distinct tests across
+  13 files passed. Four strategy cases preserve exact passes, planning evidence
+  and bounds while emitting the selected stage values. Scoped lint, formatting
+  and diff checks passed.
 
-Earlier iteration failures were test-fixture defects: omitted migration step 10
-in an explicit mock registry; missing tool diameter in a synthetic emitted CNC
-group; and a raised obstruction placed on the wrong side of the serpentine
-connector. These were corrected and rerun. Independent review also strengthened
-initially vacuous boundary-based Z/height tests to interior positive-control cases.
-Final tests include partial terminal cells, 45-degree placement at large machine
-coordinates, exact translation/tile restoration, positive fractional F words and
-unknown-cost fallback. Targeted ESLint checks pass after budget-preserving helper
-extraction; full lint/type/build/format results are owned by the coordinator.
+The first relief run caught four test assertions that assumed spaces between
+compact G-code words. Those assertions were corrected. An existing tiny-ball
+spacing fixture exceeded its default timeout at roughly a million cells; its
+surface was reduced from 12 mm to 1 mm while retaining the same tool, cusp, grid,
+spacing formula and more than 20 rows. Production behavior and timeout policy
+were unchanged. The affected 18-test suite then passed; the other 12 files had
+already passed. Logs and the hash manifest are in the `publication-cnc` directory.
 
-## Remaining physical qualification
+Full release checks and exact PR/main/deployment identities are recorded in the
+publication evidence directory once completed. This report does not turn a
+focused passing run into a full release or physical qualification claim.
 
-Qualify each cutter/material/machine recipe with controlled coupons and record
-dimensional error, surface appearance, burrs/chatter/burning, actual RPM, chip
-evacuation, tool wear, total time including changes, and rework. Compare links on
-representative reliefs only after confirming stock/fixtures and source resolution.
-Retain independent entry whenever proof fails. These changes do not increase
-global feeds, discard geometry, coarsen finish targets or add new Start policy
-gates. General curve fitting, more aggressive pocket linking and universal adaptive
-machining remain separately scoped work rather than unsupported speed claims.
+## Physical qualification
+
+The accompanying pack provides setup records, artwork fixtures, measurement
+sheets and paired A/B trials for all supported families. Applicable trials remain
+**NOT RUN** and unsupported CNC combinations are **NOT APPLICABLE**. Record actual
+cutting time, tool changes, surface appearance, dimensions, burn/kerf or chatter,
+chip evacuation and rework before promoting any machine/material recipe.

@@ -3,7 +3,7 @@ import type { ControllerKind } from './device-profile';
 
 // These firmwares do not expose a qualified GRBL RX-byte window. FluidNC's
 // channel contract explicitly requires an acknowledgement before another line
-// (v4.0.3 Serial.cpp, lines 23-25; ADR-445). GRBL-compatible commands alone do
+// (v4.0.3 Serial.cpp, lines 23-25; ADR-456). GRBL-compatible commands alone do
 // not establish character-counting support.
 const PING_PONG_ONLY_CONTROLLERS: ReadonlySet<ControllerKind> = new Set([
   'fluidnc',

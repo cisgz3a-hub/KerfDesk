@@ -227,6 +227,17 @@ describe('CNC relief planning warnings', () => {
       expect.stringContaining('outside the minor-sagitta cusp domain'),
     );
     expect(warnings).toContainEqual(expect.stringContaining('3.175 mm row spacing'));
+    const waterline: Project = {
+      ...project,
+      scene: {
+        ...project.scene,
+        layers: [{ ...layer, cnc: { ...layer.cnc, reliefFinishStrategy: 'raster-waterline' } }],
+      },
+    };
+    // ADR-423: the waterline strategy narrows the raster by cos 45 degrees.
+    expect(detectCncReliefPlanningWarnings(waterline)).toContainEqual(
+      expect.stringContaining('2.245064 mm row spacing'),
+    );
   });
 
   it('accepts a ball-nose scallop exactly equal to the cutter radius while disclosing interpolation', () => {

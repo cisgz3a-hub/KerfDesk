@@ -1,4 +1,4 @@
-## ADR-448 - Bound interactive preparation and avoid repeated scene work (2026-09-27)
+## ADR-459 - Bound interactive preparation and avoid repeated scene work (2026-09-27)
 
 **Status:** Accepted. | **Date:** 2026-09-27
 

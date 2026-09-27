@@ -1,4 +1,4 @@
-## ADR-447 - Scan quality advice uses compiled geometry and names saved assumptions (2026-09-27)
+## ADR-458 - Scan quality advice uses compiled geometry and names saved assumptions (2026-09-27)
 
 **Status:** Accepted. | **Date:** 2026-09-27
 

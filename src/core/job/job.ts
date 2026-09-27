@@ -162,9 +162,6 @@ export type CncContourPass = {
 };
 
 export type CncPath3dPass = {
-  // A proved relief connector precedes the original row. Geometry-changing
-  // placements discard this prefix unless they can requalify the connector.
-  readonly reliefRowLinkPrefixPoints?: number;
   readonly kind: 'path3d';
   // Machine-coord XY plus Z (0 = stock top, negative into the stock).
   readonly points: ReadonlyArray<Vec3>;

@@ -1,4 +1,4 @@
-## ADR-445 - FluidNC follows its acknowledged-line channel contract (2026-09-27)
+## ADR-456 - FluidNC follows its acknowledged-line channel contract (2026-09-27)
 
 **Status:** Accepted. | **Date:** 2026-09-27
 

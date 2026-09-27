@@ -21,13 +21,22 @@ const RING: Polyline = {
     { x: 0, y: 2 },
   ],
 };
+// A 3 x 3 pit inside a stock-top rim. The planning cutter is widened by the
+// dual-grid clearance (ADR-412), so the pit must span more than one cell for
+// its middle to reach the level.
 const MAP: Heightmap = {
-  widthCells: 3,
-  heightCells: 3,
-  widthMm: 3,
-  heightMm: 3,
+  widthCells: 5,
+  heightCells: 5,
+  widthMm: 5,
+  heightMm: 5,
   mmPerCell: 1,
-  depth: Float32Array.from([0, 0, 0, 0, -1, 0, 0, 0, 0]),
+  depth: Float32Array.from(
+    Array.from({ length: 25 }, (_, index) => {
+      const x = index % 5;
+      const y = Math.floor(index / 5);
+      return x > 0 && x < 4 && y > 0 && y < 4 ? -1 : 0;
+    }),
+  ),
 };
 
 beforeEach(() => {

@@ -129,7 +129,7 @@ function sweepSpanLines(
   const { s, feed, device, dialect, cursor } = context;
   const lines: string[] = [];
   // Fine traced Fill can contain pixel-sized spans. Use the same lossless
-  // spelling as raster on qualified dialects (ADR-449). Reset per sweep: the
+  // spelling as raster on qualified dialects (ADR-460). Reset per sweep: the
   // preceding seek, runway, or held mode transition may have changed state.
   const style = motionWordStyleFor(dialect.compactMotionWords);
   const writer = createModalMotionWriter(style);
