@@ -41,6 +41,8 @@ const MIGRATORS: Readonly<Record<number, Migrator>> = {
   8: (raw) => ({ ...raw, schemaVersion: 9 }),
   // Existing operations have no perforation or overcut and cut as before.
   9: (raw) => ({ ...raw, schemaVersion: 10 }),
+  // Existing path text has no alignment and stays at the start, on top of its path.
+  10: (raw) => ({ ...raw, schemaVersion: 11 }),
 };
 
 function migrateV3ToV4(raw: RawProject): RawProject | MigrationFailure {

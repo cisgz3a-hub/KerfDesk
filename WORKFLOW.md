@@ -324,6 +324,16 @@ destination and cannot overwrite the template source.
 2. A notice reports how many objects and open paths were found and points to **Tools → Join
    paths...**. When nothing is open, the notice says so and the selection is kept.
 
+#### Contained and smaller — Edit menu (ADR-480)
+1. Select a closed shape and choose **Edit → Select Contained**. Every unlocked object on a visible
+   operation lying fully inside one of the selected closed paths is added; the shape stays
+   selected. Rotation, scale and mirroring count, a concave shape's notch is outside it, and a shape
+   straddling two containers is inside neither.
+2. **Edit → Select Smaller Shapes** adds every such object no wider and no taller than the widest
+   and tallest selected object, measured as it sits on the bed.
+3. Each notice says how many objects were added. When none qualify, or no closed shape is
+   selected, it says why and the selection is kept.
+
 #### Deselect — Escape or click in empty space
 1. Selection cleared. Status bar updates: `Nothing selected`.
 2. A stationary right click in empty space also clears selection, then opens the empty-workspace
@@ -425,6 +435,16 @@ destination and cannot overwrite the template source.
   selection is kept.
 - No shortcut: LightBurn's `P` is KerfDesk's Preview.
 
+#### Typed values with math — numeric edits bar (ADR-480)
+- The X, Y, Width, Height and Rotation boxes take a number or a sum: `10+5`, `2*(3+4)`, `2^3`,
+  `pi`, `e`, `sqrt()`, `abs()`, `sin()`, `cos()`, `tan()`, `asin()`, `acos()`, `atan()` (degrees),
+  `log()` (base 10) and `ln()`. Enter or leaving the box applies it.
+- Lengths take `mm`, `cm`, `in` or `"`, and are converted to millimetres; nothing is shown in
+  inches. Rotation takes `deg` or `°`. Width and Height take a percentage of the current size,
+  such as `50%`.
+- A typing mistake shows a notice with what was wrong and what to type, and the box goes back to
+  the current value. An emptied box goes back silently. ArrowUp and ArrowDown nudge by 0.1 mm or 1°.
+
 #### Edge — transform pushes object out of bed
 - Permitted (user may be temporarily repositioning).
 - Out-of-bounds geometry gains the red dashed overlay (F-A3 edge).
@@ -496,6 +516,29 @@ destination and cannot overwrite the template source.
    so overlaps and stray paths show. The menu item shows a check while it is on.
 2. It changes the canvas only: output, Preview and saved projects are unchanged. It resets to
    Filled when the app restarts.
+
+### F-A6e. Rubber-band outline, Close Path, Reverse Direction, Delete Duplicates, Flatten Image Mask (ADR-480)
+
+1. **Tools → Vector → Rubber-Band Outline** adds one closed shape stretched around everything
+   selected, images included, and selects it. It takes a copy of the first selected Line
+   operation's settings, or a new Line operation named Outline. A selection lying on one straight
+   line has no area; the notice says so and nothing changes.
+2. **Tools → Vector → Close Path** closes every open path of three or more points in the selected
+   imported, traced or drawn-line artwork with a straight line. The notice gives the widest gap it
+   closed. Text and drawn rectangles, ellipses and polygons keep their own paths; the notice says
+   to convert them to paths first.
+3. **Tools → Vector → Reverse Direction** reverses the same kinds of paths. Open paths swap ends;
+   closed paths keep their start point and run the other way round. CNC tabs stay where they were
+   on the shape. When Cut Planner may cut open paths from either end, the notice says to set Path
+   direction to Preserve direction to keep the new direction.
+4. **Edit → Delete Duplicates** (`Alt+D`) deletes later copies of artwork drawn twice in the same
+   place on the same operation: moved-back copies, and closed shapes starting at another corner or
+   drawn the other way, count. Copies on another operation, or with another power scale or
+   override, are kept. Locked artwork, image masks and path-text guides are never deleted.
+5. **Tools → Image → Flatten Image Mask** bakes the mask into the selected image and crops it, as
+   **Crop Image** does, then deletes the mask shape. The shape stays when it is locked or another
+   image or path text uses it; the notice says which.
+6. Each tool is one undo step and adds none when nothing changes. None operates a machine.
 
 ### F-A7. Artwork Operations panel
 
@@ -711,6 +754,22 @@ marks later edits as unapproved without changing the existing Frame/Start policy
 4. Job Review lists these settings on the operation's detail line when they are set. Preview, Frame,
    the time estimate and every output format follow them. With none set, output is unchanged.
 5. Material presets do not store them; applying a preset keeps what the operation has.
+
+---
+
+### F-A7b. Operations list tools and Sort cuts last (ADR-480)
+
+1. The **•••** button on the Cuts / Layers header opens **Turn output on for all**, **Turn output
+   off for all**, **Invert output**, **Show all**, **Hide all**, **Invert visibility** and **Sort
+   cuts last**. Each row's **Show only this** hides every other operation.
+2. Each is one undo step. Hidden artwork leaves the selection. The registration jig's output is
+   left alone by Turn output on for all and Invert output, since it burns in its own run; Turn
+   output off for all includes it.
+3. **Sort cuts last** keeps Fill and Image operations in place and moves Line operations after
+   them, weakest first (power × passes ÷ speed). Run order is rewritten to match: engrave-only
+   artwork first, then artwork that engraves and cuts, whose cut follows its own engraving, then
+   cut-only artwork, weakest first. The notice says what moved. Running it again changes nothing.
+4. In CNC, Sort cuts last is unavailable: CNC already runs profiles last.
 
 ---
 
@@ -1066,6 +1125,7 @@ Mac uses `Cmd`, Windows/Linux web uses `Ctrl`.
 - `Cmd/Ctrl+D` — Duplicate selection in place (LightBurn parity)
 - `Cmd/Ctrl+A` — Select all
 - `Cmd/Ctrl+Shift+I` — Invert selection (ADR-410)
+- `Alt+D` — Delete duplicates (ADR-480; Option+D on macOS)
 - `Delete` / `Backspace` — Delete selected
 - `Escape` — Deselect / cancel current operation
 
@@ -2588,6 +2648,9 @@ settings and Job Review keep their existing read-only setup references.
   Italianno, and Corinthia for names and calligraphic signs. Cinzel Decorative provides ornamental
   serif companion lettering. These fonts are bundled with the app, remain editable on canvas,
   and work with **Weld overlaps**; no system-font installation or font-service connection is needed.
+- **Path text** (ADR-480): **Place at** puts the text at the Start, Middle or End of its guide
+  path; **Path offset** moves it away from that point. **Text sits** puts the text on top of the
+  path, centred on it, or hanging below it. Text that does not fit is reported and not placed.
 - F-D3. Choose font. The picker draws real `Aa` toolpath previews for Relief
   SingleLine, EMS Nixish, EMS Decorous Script, and EMS Casual Hand. These create
   open center strokes, so use **Engrave** or **Profile on path**; V-carve,

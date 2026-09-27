@@ -17,6 +17,7 @@ import type {
   TextAlignment,
   VariableTemplate,
 } from '../../core/scene';
+import type { PathTextAcrossAlign, PathTextAlongAlign } from '../../core/scene/scene-object';
 import { variableTemplateToSource } from '../../core/variables';
 import type { TextDialogState } from '../state/ui-store';
 import {
@@ -59,6 +60,8 @@ export type DialogFields = {
   readonly setPathGuideId: (id: string) => void;
   readonly setPathOffsetMm: (offset: number) => void;
   readonly setPathReverse: (reverse: boolean) => void;
+  readonly setPathAlongAlign: (align: PathTextAlongAlign) => void;
+  readonly setPathAcrossAlign: (align: PathTextAcrossAlign) => void;
   readonly variableEnabled: boolean;
   readonly setVariableEnabled: (enabled: boolean) => void;
 };
@@ -198,15 +201,37 @@ function usePathFields(
   const [guideObjectId, setPathGuideId] = useState(initialGuideId);
   const [offsetMm, setPathOffsetMm] = useState(existing?.offsetMm ?? 0);
   const [reverse, setPathReverse] = useState(existing?.reverse ?? false);
+  const [alongAlign, setPathAlongAlign] = useState(existing?.alongAlign ?? 'start');
+  const [acrossAlign, setPathAcrossAlign] = useState(existing?.acrossAlign ?? 'above');
   const settings = enabled
-    ? { guideObjectId, offsetMm: Math.max(0, offsetMm), reverse }
+    ? pathTextSettings({ guideObjectId, offsetMm, reverse, alongAlign, acrossAlign })
     : undefined;
   return {
     enabled,
     guides,
     settings,
     guide: guides.find((guide) => guide.id === guideObjectId),
-    setters: { setPathEnabled, setPathGuideId, setPathOffsetMm, setPathReverse },
+    setters: {
+      setPathEnabled,
+      setPathGuideId,
+      setPathOffsetMm,
+      setPathReverse,
+      setPathAlongAlign,
+      setPathAcrossAlign,
+    },
+  };
+}
+
+// The defaults stay absent so a file keeps the fields only when they matter.
+function pathTextSettings(
+  values: Required<Omit<PathTextSettings, 'offsetMm'>> & { readonly offsetMm: number },
+): PathTextSettings {
+  return {
+    guideObjectId: values.guideObjectId,
+    offsetMm: Math.max(0, values.offsetMm),
+    reverse: values.reverse,
+    ...(values.alongAlign === 'start' ? {} : { alongAlign: values.alongAlign }),
+    ...(values.acrossAlign === 'above' ? {} : { acrossAlign: values.acrossAlign }),
   };
 }
 

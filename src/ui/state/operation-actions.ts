@@ -7,6 +7,7 @@ import {
   type SceneObject,
 } from '../../core/scene';
 import { cloneArtworkOperations } from './clone-artwork-operations';
+import { operationListActions, type OperationListActions } from './operation-list-actions';
 import { pruneOrphanLayers, pushUndo, type StateSlice } from './scene-mutations';
 
 type OperationActionState = StateSlice & {
@@ -37,7 +38,7 @@ export type OperationActions = {
   readonly addOperationForObjects: (objectIds: ReadonlyArray<string>) => void;
   readonly renameOperation: (operationId: string, name: string) => void;
   readonly setCncDepthForOperations: (operationIds: ReadonlyArray<string>, depthMm: number) => void;
-};
+} & OperationListActions;
 
 export const CNC_BULK_DEPTH_MIN_MM = 0.05;
 export const CNC_BULK_DEPTH_MAX_MM = 200;
@@ -81,6 +82,7 @@ export function operationActions(set: OperationSet): OperationActions {
       }),
     setCncDepthForOperations: (operationIds, depthMm) =>
       set((state) => setCncDepthForOperations(state, operationIds, depthMm)),
+    ...operationListActions(set),
   };
 }
 

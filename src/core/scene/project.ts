@@ -11,7 +11,9 @@ import type { PrintAndCutDesignTargets } from './print-and-cut';
 // bitmap if allowed to silently ignore its clip geometry.
 // v10 adds perforation and overcut (ADR-415). An older reader would ignore them
 // and cut straight through a perforated line.
-export const PROJECT_SCHEMA_VERSION = 10 as const;
+// v11 adds path text alignment (ADR-480). An older reader would ignore it and
+// place re-rendered path text, such as serial numbers, at the wrong spot.
+export const PROJECT_SCHEMA_VERSION = 11 as const;
 
 export type EmbeddedFont = {
   readonly key: string;
