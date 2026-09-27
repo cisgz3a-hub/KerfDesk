@@ -135,26 +135,38 @@ export type RampEntryPlunges = {
   readonly layerId: string;
   readonly passes: number;
   readonly pocket: boolean;
+  // Relief roughing chains (ADR-424 Amendment 1), counted apart from the
+  // layer's other passes: a relief layer may set their ramp in its own field.
+  readonly relief: boolean;
 };
 
-/** Per layer, the passes its ramp entry left to plunge (ADR-471). */
+/** Per layer, the passes its ramp entry left to plunge (ADR-471), with the
+ * layer's relief roughing reported on its own. */
 export function rampEntryPlungesByLayer(job: Job): ReadonlyArray<RampEntryPlunges> {
-  const byLayer = new Map<string, RampEntryPlunges>();
+  const found: RampEntryPlunges[] = [];
   for (const group of job.groups) {
     if (group.kind !== 'cnc') continue;
     const passes = rampEntryPlungeCount(group.passes);
     if (passes === 0) continue;
-    const seen = byLayer.get(group.layerId);
-    byLayer.set(group.layerId, {
+    const relief = group.cutType === 'relief-rough';
+    const index = found.findIndex(
+      (seen) => seen.layerId === group.layerId && seen.relief === relief,
+    );
+    const seen = index < 0 ? undefined : found[index];
+    const merged: RampEntryPlunges = {
       layerId: group.layerId,
       passes: (seen?.passes ?? 0) + passes,
       pocket: (seen?.pocket ?? false) || group.cutType === 'pocket',
-    });
+      relief,
+    };
+    if (index < 0) found.push(merged);
+    else found[index] = merged;
   }
-  return [...byLayer.values()];
+  return found;
 }
 
-/** Passes a ramp entry left to plunge because their paths are too short. */
+/** Passes a ramp entry left to plunge because their paths are too short:
+ * contour ramps (ADR-471) and relief roughing chains (ADR-424 Amendment 1). */
 export function rampEntryPlungeCount(passes: ReadonlyArray<CncPass>): number {
   return passes.filter((pass) => pass.kind === 'contour' && pass.entryPlunge === true).length;
 }
