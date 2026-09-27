@@ -17,6 +17,7 @@ import {
 import { compileJob } from './compile-job';
 import { validCutArcMoves } from './cut-arc-moves';
 import type { CutSegment } from './job';
+import { withLayerKerf } from './layer-kerf';
 import { polylineBounds, type SegmentBounds } from './segment-bounds';
 
 const COLOR = '#000000';
@@ -216,5 +217,37 @@ describe('kerf-offset contours keep arcs (ADR-486)', () => {
   it('adds no arcs where the machine does not take them', () => {
     const [segment] = cutSegments([circleObject()], kerfLayer(0.1), DEFAULT_DEVICE_PROFILE);
     expect(segment?.arcMoves).toBeUndefined();
+  });
+});
+
+describe('hand-placed tabs through the layer-wide kerf (ADR-486 with ADR-494)', () => {
+  it('re-keys tabs by each segment’s new index and gives offset contours their source’s tabs', () => {
+    const open: CutSegment = {
+      polyline: [
+        { x: 0, y: 150 },
+        { x: 50, y: 150 },
+      ],
+      closed: false,
+    };
+    const later: CutSegment = { ...open, polyline: open.polyline.map((p) => ({ ...p, y: 160 })) };
+    const openTab = [{ x: 25, y: 150 }];
+    const holeTab = [{ x: 50, y: 40 }];
+    const result = withLayerKerf(
+      {
+        segments: [open, later],
+        placedTabs: new Map([[1, openTab]]),
+        kerf: [
+          { insertAt: 0, sources: [{ polyline: PLATE, points: [] }] },
+          { insertAt: 1, sources: [{ polyline: HOLE, points: holeTab }] },
+        ],
+      },
+      kerfLayer(),
+      DEFAULT_DEVICE_PROFILE,
+    );
+    expect(result.segments.map((segment) => segment.closed)).toEqual([true, false, true, false]);
+    expect(result.placedTabs.get(2)).toEqual(holeTab);
+    expect(result.placedTabs.get(3)).toEqual(openTab);
+    expect(result.placedTabs.size).toBe(2);
+    expect(round(width(polylineBounds(result.segments[2]?.polyline ?? [])))).toBe(18);
   });
 });

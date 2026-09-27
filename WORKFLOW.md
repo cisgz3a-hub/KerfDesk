@@ -772,8 +772,6 @@ marks later edits as unapproved without changing the existing Frame/Start policy
    the time estimate and every output format follow them. With none set, output is unchanged.
 5. Material presets do not store them; applying a preset keeps what the operation has.
 
----
-
 ### F-A7b. Operations list tools and Sort cuts last (ADR-480)
 
 1. The **•••** button on the Cuts / Layers header opens **Turn output on for all**, **Turn output
@@ -787,6 +785,28 @@ marks later edits as unapproved without changing the existing Frame/Start policy
    artwork first, then artwork that engraves and cuts, whose cut follows its own engraving, then
    cut-only artwork, weakest first. The notice says what moved. Running it again changes nothing.
 4. In CNC, Sort cuts last is unavailable: CNC already runs profiles last.
+
+---
+
+### F-A7c. Laser tabs by spacing, with a tab power, and placed by hand (ADR-494)
+
+1. **More cut settings → Line detail → Tabs / Bridges**: **Place by** chooses **Count** (the same
+   number of tabs on every closed shape) or **Spacing** (one tab per that length of outline, at
+   least one per shape, and **At most** per shape when above 0).
+2. **Tab power** (%, 0 is off) burns the tabs at that share of the cut power, with the same speed,
+   passes and air, so parts hold in the sheet but snap out cleanly. The tabs burn as a second Line
+   group right after the cut; Job Review names it "Line tabs (N% of cut power)".
+3. **Place tabs** applies the settings and starts the tab tool for the one selected, unlocked
+   artwork that uses the operation; its tooltip says why when it is disabled (tabs off, no or
+   several artworks selected, artwork locked). On the canvas, click the outline to add a tab, click
+   a tab to remove it, or drag a tab to move it; each is one undo step. Placed tabs draw filled and
+   the automatic tabs they replace draw hollow. **Done** or Esc returns to Select.
+4. Placed tabs replace the automatic tabs on their shape only, and only while tabs are on. They
+   move, rotate and scale with the artwork and survive copy and paste and break apart. **Clear
+   placed tabs** (in Cut Settings or in the canvas hint) returns the artwork to automatic tabs.
+5. Job Review's detail line reads e.g. "tabs every 50 mm (at most 6) × 0.5 mm, cut at 20%" or
+   "tabs 4 × 0.5 mm, 3 placed by hand". With none of this set, output is unchanged.
+6. Material presets do not store these settings; applying a preset keeps what the operation has.
 
 ---
 
@@ -929,6 +949,22 @@ marks later edits as unapproved without changing the existing Frame/Start policy
 3. Separate operations and pass counts, deliberate retracing within one contour, materialized
    kerf/tabs, Fill, Image and CNC output retain their meaning. Changing this setting invalidates
    the existing reviewed artifact and Frame just like other output changes.
+
+### F-A9e. Where closed shapes start (ADR-494)
+
+1. Open **Tools → Cut Planner** and choose **Start closed shapes**: **Where drawn** (the default;
+   output unchanged), **Nearest point** or **Nearest corner**. It is saved with the project.
+2. **Nearest point** starts each closed laser shape at its point nearest the head, so travel is
+   shorter. **Nearest corner** starts it at its nearest corner, a point where the outline turns by
+   at least 30°, so the small mark where a cut starts and stops lands on a corner. A shape without
+   corners, such as a circle, starts at its nearest point.
+3. Cut order is chosen as before (inside shapes first when that is on); only where each closed shape
+   starts changes. With **Keep source order** the order and direction stay as drawn and each closed
+   shape starts nearest where the previous one ended.
+4. Overcut follows the new start. On machines that take arcs (ADR-432) a shape only starts where
+   one line or arc ends, so its arcs are kept; sharp corners always qualify.
+5. Line operations and Offset Fill rings follow it; Fill, Image and CNC output do not change. Preview,
+   the time estimate, Job Review and every output format read the same planned job.
 
 ### F-A10. Pre-flight check (before G-code save)
 

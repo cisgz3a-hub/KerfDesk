@@ -352,19 +352,24 @@ function remapClipboardTabAnchors(
   operationIdMap: ReadonlyMap<string, string>,
   targetOperations: ReadonlyArray<Layer>,
 ): SceneObject {
-  if (object.cncTabAnchors === undefined || object.cncTabAnchors.length === 0) return object;
+  const cnc = object.cncTabAnchors ?? [];
+  const laser = object.laserTabAnchors ?? [];
+  if (cnc.length === 0 && laser.length === 0) return object;
   const colorMap = new Map<string, string>();
   for (const source of sourceOperations) {
     const targetId = operationIdMap.get(source.id);
     const target = targetOperations.find((operation) => operation.id === targetId);
     if (target !== undefined) colorMap.set(source.color.toLowerCase(), target.color);
   }
+  const remap = <T extends { readonly layerColor: string }>(anchor: T): T => ({
+    ...anchor,
+    layerColor: colorMap.get(anchor.layerColor.toLowerCase()) ?? anchor.layerColor,
+  });
   return {
     ...object,
-    cncTabAnchors: object.cncTabAnchors.map((anchor) => ({
-      ...anchor,
-      layerColor: colorMap.get(anchor.layerColor.toLowerCase()) ?? anchor.layerColor,
-    })),
+    ...(cnc.length === 0 ? {} : { cncTabAnchors: cnc.map(remap) }),
+    // ADR-494: pasted laser tabs follow their operation's colour the same way.
+    ...(laser.length === 0 ? {} : { laserTabAnchors: laser.map(remap) }),
   } as SceneObject;
 }
 

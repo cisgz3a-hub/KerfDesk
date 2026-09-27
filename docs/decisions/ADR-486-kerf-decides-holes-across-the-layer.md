@@ -41,7 +41,8 @@ kerf-compensated circle reached an arc-capable GRBL machine as dozens of short G
 2. **Nothing else moves.** A layer with no contour inside another path's contour compiles
    byte-identically to before. Each path's kerf contours keep their place among the layer's other
    segments, so "keep source order" cuts in the same order. A failed offset still drops only that
-   path's contours and reports `kerf-offset-failed`.
+   path's contours and reports `kerf-offset-failed`. Tabs placed by hand (ADR-494) still follow each
+   source contour to the offset contour closest to it.
 3. **Kerf contours carry arcs.** On a machine `laserArcMovesEnabled` accepts, a kerf-offset contour
    is fitted with the ADR-432 fitter against its own chords. At the usual 0.025 mm flattening, an arc
    through a circle's chords misses their midpoints by about the whole tolerance, so the contours of
@@ -72,5 +73,6 @@ kerf-compensated circle reached an arc-capable GRBL machine as dozens of short G
 
 `compile-job-layer-kerf.test.ts` (separate object, separate path of one object, island, compound
 path inside another object, a path straddled by another object, separate parts stay apart,
-coincident copies, unchanged layouts, source order, arcs on and off, tabs keep the usual chords);
+coincident copies, unchanged layouts, source order, arcs on and off, tabs keep the usual chords,
+hand-placed tabs re-keyed through the offset);
 `cut-arc-moves.test.ts` (kerf contours now carry valid arc moves).

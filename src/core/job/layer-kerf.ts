@@ -18,6 +18,9 @@
 // so those contours are flattened at KERF_ARC_SOURCE_TOLERANCE_MM instead and
 // the fit spends the difference. Tabs and perforation cut contours into pieces
 // that drop arcs anyway, so they keep the usual flattening.
+//
+// Tabs placed by hand on a source contour follow it to the offset contour that
+// lies closest (ADR-494's rule, unchanged).
 
 import { toMachineCoords, type DeviceProfile } from '../devices';
 import { laserArcMovesEnabled } from '../devices/laser-arc-moves';
@@ -28,27 +31,42 @@ import {
   type Layer,
   type Polyline,
   type Transform,
+  type Vec2,
 } from '../scene';
 import { compilationPolylines } from './compilation-polylines';
 import { containmentDepths } from './containment-depth';
 import { laserArcFitForMachineChords } from './cut-arc-moves';
 import type { CutSegment } from './job';
+import { placedTabPointsForKerfContours } from './laser-tab-anchors';
 import { perforationPatternFor } from './operation-cut-extras';
 
 /** Flattening for kerf contours that will be fitted with arcs. */
 export const KERF_ARC_SOURCE_TOLERANCE_MM = 0.005;
 
+/** A closed contour in machine coordinates and the tabs placed on it by hand. */
+export type KerfSource = { readonly polyline: Polyline; readonly points: ReadonlyArray<Vec2> };
+
 export type PendingKerfGroup = {
   /** Index in the layer's other segments that this path's contours precede. */
   readonly insertAt: number;
-  /** The path's closed contours in machine coordinates. */
-  readonly rings: ReadonlyArray<Polyline>;
+  /** The path's closed contours. */
+  readonly sources: ReadonlyArray<KerfSource>;
 };
 
-export type LayerKerfResult = {
+/** A layer's line segments with hand-placed tabs keyed by segment index. */
+export type LineSegmentsWithTabs = {
   readonly segments: ReadonlyArray<CutSegment>;
+  readonly placedTabs: ReadonlyMap<number, ReadonlyArray<Vec2>>;
+};
+
+export type LayerKerfResult = LineSegmentsWithTabs & {
   /** True when the offset engine failed for any path, whose contours are then missing. */
   readonly failed: boolean;
+};
+
+type OffsetContours = {
+  readonly segments: ReadonlyArray<CutSegment>;
+  readonly tabs: ReadonlyArray<ReadonlyArray<Vec2>>;
 };
 
 /**
@@ -79,23 +97,27 @@ function kerfContoursTakeArcs(layer: Layer, device: DeviceProfile): boolean {
 }
 
 export function withLayerKerf(
-  segments: ReadonlyArray<CutSegment>,
-  pending: ReadonlyArray<PendingKerfGroup>,
+  collected: LineSegmentsWithTabs & { readonly kerf: ReadonlyArray<PendingKerfGroup> },
   layer: Layer,
   device: DeviceProfile,
 ): LayerKerfResult {
-  if (pending.length === 0) return { segments, failed: false };
-  const outside = enclosingOtherPaths(pending.map((group) => group.rings));
+  const pending = collected.kerf;
+  if (pending.length === 0) return { ...collected, failed: false };
+  const rings = pending.map((group) => group.sources.map((source) => source.polyline));
+  const outside = enclosingOtherPaths(rings);
   const fit = kerfContoursTakeArcs(layer, device)
     ? laserArcFitForMachineChords(device, KERF_ARC_SOURCE_TOLERANCE_MM)
     : (segment: CutSegment) => segment;
   let failed = false;
-  const offsets = pending.map((group, index) => {
-    const offset = offsetGroup(group.rings, outside[index] ?? [], layer.kerfOffsetMm);
+  const offsets = pending.map((group, index): OffsetContours => {
+    const offset = offsetGroup(rings[index] ?? [], outside[index] ?? [], layer.kerfOffsetMm);
     if (offset === null) failed = true;
-    return (offset ?? []).map((ring) => fit({ polyline: ring.points, closed: true }));
+    return {
+      segments: (offset ?? []).map((ring) => fit({ polyline: ring.points, closed: true })),
+      tabs: placedTabPointsForKerfContours(offset ?? [], group.sources),
+    };
   });
-  return { segments: interleave(segments, pending, offsets), failed };
+  return { ...interleave(collected, pending, offsets), failed };
 }
 
 // For every ring of every group: how many rings of OTHER groups enclose it.
@@ -149,20 +171,28 @@ function offsetOrNull(
   return offset.kind === 'error' ? null : offset.value;
 }
 
+// Puts each path's offset contours back where its segments were collected, and
+// re-keys every hand-placed tab by its segment's new index.
 function interleave(
-  segments: ReadonlyArray<CutSegment>,
+  collected: LineSegmentsWithTabs,
   pending: ReadonlyArray<PendingKerfGroup>,
-  offsets: ReadonlyArray<ReadonlyArray<CutSegment>>,
-): CutSegment[] {
-  const out: CutSegment[] = [];
+  offsets: ReadonlyArray<OffsetContours>,
+): LineSegmentsWithTabs {
+  const segments: CutSegment[] = [];
+  const placedTabs = new Map<number, ReadonlyArray<Vec2>>();
+  const push = (segment: CutSegment, tabs: ReadonlyArray<Vec2> | undefined): void => {
+    if (tabs !== undefined && tabs.length > 0) placedTabs.set(segments.length, tabs);
+    segments.push(segment);
+  };
   let next = 0;
-  for (let index = 0; index <= segments.length; index += 1) {
+  for (let index = 0; index <= collected.segments.length; index += 1) {
     while (next < pending.length && (pending[next]?.insertAt ?? 0) <= index) {
-      out.push(...(offsets[next] ?? []));
+      const offset = offsets[next];
+      offset?.segments.forEach((segment, ring) => push(segment, offset.tabs[ring]));
       next += 1;
     }
-    const segment = segments[index];
-    if (segment !== undefined) out.push(segment);
+    const segment = collected.segments[index];
+    if (segment !== undefined) push(segment, collected.placedTabs.get(index));
   }
-  return out;
+  return { segments, placedTabs };
 }

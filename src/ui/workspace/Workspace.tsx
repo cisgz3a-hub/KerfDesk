@@ -34,10 +34,12 @@ import { ArtworkNumberingPrompt } from './ArtworkNumberingPrompt';
 import { WorkspacePointerOverlays } from './WorkspacePointerOverlays';
 import { WorkspacePreviewDock } from './WorkspacePreviewDock';
 import { NodeEditHint } from './NodeEditHint';
+import { LaserTabHint } from './LaserTabHint';
 import './workspace-preview.css';
 import { WorkspaceCanvasLayers } from './WorkspaceCanvasLayers';
 import { usePreviewBitmapRenderer } from './use-preview-bitmap-renderer';
 import { canvasTextSelection, useCanvasTextDisplayProject } from './workspace-text-interaction';
+import type { LaserTabEditor } from './laser-tab-editor';
 
 export function Workspace(): JSX.Element {
   const ref = useRef<HTMLCanvasElement | null>(null);
@@ -67,6 +69,7 @@ export function Workspace(): JSX.Element {
     selectedPathNodes,
     showPathNodeHandles: toolMode.kind === 'node',
     ...(toolMode.kind === 'cnc-tabs' ? { cncTabLayerColor: toolMode.layerColor } : {}),
+    ...(toolMode.kind === 'laser-tabs' ? { laserTabEditor: toolMode } : {}),
     previewMode,
     previewToolpath,
     cncRemovalGrid,
@@ -137,6 +140,7 @@ function WorkspaceDesignChrome(props: {
       <CanvasMotionBadge overlay={props.overlay} />
       <ArtworkNumberingPrompt />
       <NodeEditHint />
+      <LaserTabHint />
       <ZoomControls />
     </>
   );
@@ -210,6 +214,7 @@ type WorkspaceDrawArgs = {
   readonly selectedPathNodes: ReturnType<typeof useStore.getState>['selectedPathNodes'];
   readonly showPathNodeHandles: boolean;
   readonly cncTabLayerColor?: string;
+  readonly laserTabEditor?: LaserTabEditor;
   readonly additionalSelectedIds: ReadonlySet<string>;
   readonly previewMode: boolean;
   readonly previewToolpath: Toolpath | null;
@@ -271,6 +276,7 @@ function useWorkspaceDraw(args: WorkspaceDrawArgs): void {
     args.selectedPathNodes,
     args.showPathNodeHandles,
     args.cncTabLayerColor,
+    args.laserTabEditor,
     args.additionalSelectedIds,
     args.previewMode,
     args.scrubberT,
@@ -333,6 +339,7 @@ function drawWorkspaceScene(
     ...(state.measureDraft === null ? {} : { measureDraft: state.measureDraft }),
     ...(state.snapGuides.length === 0 ? {} : { snapGuides: state.snapGuides }),
     ...(args.cncTabLayerColor === undefined ? {} : { cncTabLayerColor: args.cncTabLayerColor }),
+    ...(args.laserTabEditor === undefined ? {} : { laserTabEditor: args.laserTabEditor }),
     ...(args.artworkRunFocus === null ? {} : { artworkRunFocus: args.artworkRunFocus }),
     wireframe: state.wireframe,
   });
