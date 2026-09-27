@@ -4,6 +4,9 @@ import type { WorkCoordinateOffset } from '../state/origin-actions';
 import type { RecoveryCapsule } from '../state/recovery';
 import { Dialog, DialogActions } from '../kit';
 import { automaticRecoveryRestart } from './laser-recovery-automatic-restart';
+import { recoveryHeadStop } from './laser-recovery-head-stop';
+import { sameRecoveryOrigin } from './laser-recovery-origin';
+import type { HeadStopContinue } from './LaserRecoveryHeadStop';
 import type { RecoveryWorkBounds } from './laser-recovery-picker-model';
 import { LaserRecoveryPlacement } from './LaserRecoveryPlacement';
 import { LaserRecoveryRestartPicker } from './LaserRecoveryRestartPicker';
@@ -14,8 +17,19 @@ export type LaserRecoveryReviewDialogProps = {
   readonly onStart: (capsule: RecoveryCapsule, fromLine?: number) => Promise<boolean>;
   /** The controller's current work offset in mm, supplied by the host. */
   readonly liveWorkOffsetMm?: WorkCoordinateOffset | null;
+  /** Whether the controller has a work origin set now, supplied by the host. */
+  readonly liveOriginSet?: boolean;
   /** Traces the remaining area with the current origin; supplied by the host. */
   readonly onFrameRemaining?: (bounds: RecoveryWorkBounds) => Promise<void>;
+  /** Writes the saved origin back to the controller; supplied by the host. */
+  readonly onRestoreOrigin?: (savedMm: WorkCoordinateOffset) => Promise<void>;
+  /** Makes the head's current spot a program point; resolves to the XY offset written. */
+  readonly onSetOriginAtHead?: (pointMm: {
+    readonly x: number;
+    readonly y: number;
+  }) => Promise<{ readonly x: number; readonly y: number }>;
+  /** Runs the homing cycle before a restore; supplied by the host when homing is set up. */
+  readonly onHome?: () => Promise<void>;
 };
 
 /**
@@ -35,17 +49,24 @@ export function LaserRecoveryReviewDialog(props: LaserRecoveryReviewDialogProps)
   const fromLine = selection?.key === selectionKey ? selection.fromLine : undefined;
   const start = useRecoveryStart(props, fromLine);
   const automatic = useMemo(() => automaticRecoveryRestart(props.capsule), [props.capsule]);
+  const headStop = useHeadStopContinue(props, selectionKey, (line) =>
+    setSelection({ key: selectionKey, fromLine: line }),
+  );
   return (
     <Dialog title="Review interrupted laser job" size="lg" onClose={start.closeReadOnly}>
       <RecoveryReviewContent capsule={props.capsule} />
       <LaserRecoveryPlacement
         capsule={props.capsule}
         liveWorkOffsetMm={props.liveWorkOffsetMm}
+        {...(props.liveOriginSet === undefined ? {} : { liveOriginSet: props.liveOriginSet })}
         restartLine={fromLine ?? automatic?.line}
         disabled={start.state === 'starting'}
         {...(props.onFrameRemaining === undefined
           ? {}
           : { onFrameRemaining: props.onFrameRemaining })}
+        {...(props.onRestoreOrigin === undefined ? {} : { onRestoreOrigin: props.onRestoreOrigin })}
+        {...(headStop === undefined ? {} : { headStop })}
+        {...(props.onHome === undefined ? {} : { onHome: props.onHome })}
       />
       <LaserRecoveryRestartPicker
         key={selectionKey}
@@ -67,6 +88,40 @@ export function LaserRecoveryReviewDialog(props: LaserRecoveryReviewDialogProps)
       />
     </Dialog>
   );
+}
+
+/** Continue from where the head stopped (ADR-341 Amendment 6): offered when a
+ * lost link recorded the stop and the host can set the origin. Setting it also
+ * picks the line after the stop as the restart, and the review reads as
+ * anchored while the controller keeps the offset that was written. */
+function useHeadStopContinue(
+  props: LaserRecoveryReviewDialogProps,
+  selectionKey: string,
+  chooseLine: (line: number) => void,
+): HeadStopContinue | undefined {
+  const stop = useMemo(() => recoveryHeadStop(props.capsule), [props.capsule]);
+  const [written, setWritten] = useState<{
+    readonly key: string;
+    readonly offsetMm: { readonly x: number; readonly y: number };
+  } | null>(null);
+  const setOrigin = props.onSetOriginAtHead;
+  if (stop === null || setOrigin === undefined) return undefined;
+  const live = props.liveWorkOffsetMm ?? null;
+  const anchored =
+    props.liveOriginSet !== false &&
+    written?.key === selectionKey &&
+    live !== null &&
+    sameRecoveryOrigin(written.offsetMm, live);
+  return {
+    stop,
+    sendableLines: props.capsule.sendableLines,
+    anchored,
+    onContinue: async () => {
+      const offsetMm = await setOrigin(stop.pointMm);
+      setWritten({ key: selectionKey, offsetMm });
+      chooseLine(stop.line);
+    },
+  };
 }
 
 type RecoveryStartState = 'idle' | 'starting' | 'failed';
@@ -143,6 +198,12 @@ function TransportProgress({ capsule }: { readonly capsule: RecoveryCapsule }): 
         <strong>{formatCount(capsule.sendableLines)}</strong> sendable lines acknowledged
         {remainingLines > 0 ? ` / ${formatCount(remainingLines)} remaining` : ''}
       </p>
+      {capsule.interruption.sentLines === undefined ? null : (
+        <p style={progressStyle}>
+          <strong>{formatCount(capsule.interruption.sentLines)}</strong> sent before the connection
+          dropped
+        </p>
+      )}
       <p style={diagnosticNoteStyle}>
         Controller acknowledgements are diagnostic evidence only. They do not prove where the head
         moved or which laser marks physically completed.

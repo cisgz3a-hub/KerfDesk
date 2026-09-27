@@ -9,6 +9,7 @@ import {
   type SceneObject,
   type Vec2,
 } from '../scene';
+import type { PathTextAcrossAlign } from '../scene/scene-object';
 import type { TextRenderResult } from './text-to-polylines';
 
 export type PathTextResult =
@@ -25,14 +26,14 @@ export function placeTextOnPath(
     return { kind: 'invalid-guide', message: 'Select a vector path with at least two points.' };
   }
   const metric = pathMetric(guidePoints);
-  const offset = Math.max(0, settings.offsetMm);
   const textWidth = rendered.bounds.maxX - rendered.bounds.minX;
-  if (offset + textWidth > metric.length + 1e-6) {
+  const start = alongStartMm(metric.length, textWidth, settings);
+  if (start === null) {
     return { kind: 'text-too-long', message: 'Text is longer than the available guide path.' };
   }
-  const baseline = rendered.bounds.maxY;
+  const baseline = acrossReferenceY(rendered.bounds, settings.acrossAlign ?? 'above');
   const map = (point: Vec2): Vec2 => {
-    const sample = samplePath(metric, offset + point.x - rendered.bounds.minX);
+    const sample = samplePath(metric, start + point.x - rendered.bounds.minX);
     const height = baseline - point.y;
     return {
       x: sample.point.x + sample.normal.x * height,
@@ -46,6 +47,29 @@ export function placeTextOnPath(
     rendered: normalizePaths(worldPaths, bounds),
     origin: { x: bounds.minX, y: bounds.minY },
   };
+}
+
+// Distance along the guide where the text's left edge lands, or null when the
+// text (plus the offset) does not fit. The offset always pushes away from the
+// aligned end: forward from the start, back from the end, forward from centre.
+function alongStartMm(
+  pathLength: number,
+  textWidth: number,
+  settings: PathTextSettings,
+): number | null {
+  const offset = Math.max(0, settings.offsetMm);
+  const spare = pathLength - textWidth;
+  const align = settings.alongAlign ?? 'start';
+  const start = align === 'start' ? offset : align === 'end' ? spare - offset : spare / 2 + offset;
+  return start < -1e-6 || start > spare + 1e-6 ? null : Math.max(0, start);
+}
+
+// The text line that lands on the guide: its bottom ('above': the text sits on
+// the path), its middle, or its top ('below': the text hangs under the path).
+function acrossReferenceY(bounds: Bounds, align: PathTextAcrossAlign): number {
+  if (align === 'below') return bounds.minY;
+  if (align === 'center') return (bounds.minY + bounds.maxY) / 2;
+  return bounds.maxY;
 }
 
 type PathMetric = {
