@@ -16,7 +16,11 @@ import {
   machineKindOf,
 } from '../../core/scene';
 import type { Sketch } from '../../core/design';
-import { applyInsertBoxPanels, type InsertablePart } from './box-insert-mutation';
+import {
+  applyInsertBoxPanels,
+  type InsertablePart,
+  type InsertableSheet,
+} from './box-insert-mutation';
 import { applyCarveSettingsToOperations, applyDesignSketch } from './design-apply-mutation';
 import { reportDependencyRepairs } from './object-delete-actions';
 import type { DesignApplyRecord } from './design-apply-record';
@@ -191,9 +195,9 @@ function drawShapeAction(set: Setter): AppState['drawShape'] {
 }
 
 function insertBoxPanelsAction(set: Setter): AppState['insertBoxPanels'] {
-  return (panels: ReadonlyArray<InsertablePart>) => {
+  return (panels: ReadonlyArray<InsertablePart>, sheet: InsertableSheet) => {
     set((state) => {
-      const next = applyInsertBoxPanels(state, panels);
+      const next = applyInsertBoxPanels(state, panels, sheet);
       return next === null
         ? state
         : applyLayerDefaultsToFreshLayers(

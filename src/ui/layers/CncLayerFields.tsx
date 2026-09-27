@@ -1,14 +1,14 @@
 // CncLayerFields — per-layer CNC operation editor (Easel's per-object cut
-// panel, applied per color layer). Rendered by LayerRow instead of the laser
-// fields when the project machine is CNC. Writes flow through the existing
-// setLayerParam action as a whole `cnc` patch, so undo/dirty tracking and
-// .lf2 persistence come for free.
+// panel, applied per color layer). Rendered by the Artwork inspector instead of
+// the laser fields when the project machine is CNC. Writes flow through the
+// existing setLayerParam action as a whole `cnc` patch, so undo/dirty tracking
+// and .lf2 persistence come for free.
 //
-// Operation material and cutter choices stay beside their cutting settings.
-// Cut depth and feeds lead the editor; named disclosures organise the remaining
-// controls without unmounting inputs or discarding their in-progress edits.
-// Shared row/input controls live in CncLayerPrimitives; the advanced group in
-// CncLayerAdvancedFields.
+// ADR-481: the cut type, bit and material, depth and feeds lead; each
+// remaining section appears only for the cut types it serves and names its
+// state when closed. Machine and stock values stay in Machine Setup. Named
+// disclosures keep their inputs mounted, so folding one never discards an
+// in-progress edit. Shared row/input controls live in CncLayerPrimitives.
 
 import { useState } from 'react';
 import { cncMaxFeedMmPerMin } from '../../core/cnc/cnc-head-feeds';
@@ -22,14 +22,18 @@ import {
 } from '../../core/scene';
 import { useStore } from '../state';
 import { withManualCncFeedPatch } from '../state/cnc-feed-provenance';
-import { CncCoreCutFields, CncLayerAdvancedGroup } from './CncLayerAdvancedFields';
+import {
+  CncFeedFields,
+  CncLayerAdvancedGroup,
+  DepthPerPassField,
+  VCarveToolWarning,
+} from './CncLayerAdvancedFields';
 import { CncTabFields } from './CncTabFields';
 import { CncLineArtContoursField } from './CncLineArtContoursField';
 import { CncOpenPathNote } from './CncOpenPathNote';
 import { useLayerHasReliefObjects } from './CncLayerToolFields';
 import { NumberField, Row, selectStyle } from './CncLayerPrimitives';
-import { CncSetupReferenceFields } from './CncSetupReferenceFields';
-import { CncOperationToolDetails, CncOperationToolFields } from './CncOperationToolFields';
+import { CncOperationToolFields } from './CncOperationToolFields';
 import './cnc-operation-settings.css';
 
 export function CncLayerFields(props: {
@@ -62,87 +66,40 @@ export function CncLayerFields(props: {
     if (replaceFeedDrafts) setAssignmentRevision((revision) => revision + 1);
     commitSettings(next);
   };
+  // Material and bit recipes rewrite these numbers, so their drafts restart.
+  const recipeKey = JSON.stringify([
+    settings.materialKey ?? null,
+    settings.toolId ?? null,
+    assignmentRevision,
+  ]);
 
   return (
     <div className="lf-cnc-settings">
+      <CncCutTypeField layer={layer} settings={settings} onCommit={commit} />
       <CncOperationToolFields
         layer={layer}
         settings={settings}
         hasReliefObjects={hasReliefObjects}
         onCommitSettings={commitAssignment}
       />
-      <CncCutDepthSection
-        layer={layer}
-        settings={settings}
-        hasReliefObjects={hasReliefObjects}
-        onCommit={commit}
-      />
-      <CncCoreCutFields
-        key={JSON.stringify([
-          settings.materialKey ?? null,
-          settings.toolId ?? null,
-          assignmentRevision,
-        ])}
-        layer={layer}
-        settings={settings}
-        maxFeed={maxFeed}
-        spindleMaxRpm={spindleMaxRpm}
-        onCommit={commit}
-      />
-      <CncCutOptions
-        layer={layer}
-        settings={settings}
-        stockThicknessMm={stockThicknessMm}
-        onCommit={commit}
-      />
-      <CncOperationToolDetails
-        layer={layer}
-        settings={settings}
-        hasReliefObjects={hasReliefObjects}
-        onCommitSettings={commitAssignment}
-      />
-      {isProfile ? <CncTabFields layer={layer} settings={settings} onCommit={commit} /> : null}
-      <CncLayerAdvancedGroup
-        layer={layer}
-        settings={settings}
-        hasReliefObjects={hasReliefObjects}
-        onCommit={commit}
-        onCommitSettings={commitSettings}
-      />
-      <CncSetupReferenceFields />
-    </div>
-  );
-}
-
-function CncCutDepthSection(props: {
-  readonly layer: Layer;
-  readonly settings: CncLayerSettings;
-  readonly hasReliefObjects: boolean;
-  readonly onCommit: (patch: Partial<CncLayerSettings>) => void;
-}): JSX.Element {
-  const { layer, settings, hasReliefObjects, onCommit: commit } = props;
-  return (
-    <section className="lf-cnc-settings-card" aria-label="Cut & depth">
-      <div className="lf-cnc-cut-grid">
-        <Row label="Cut type" stacked>
-          <select
-            value={settings.cutType}
-            onChange={(e) => commit(cutTypePatch(settings, e.target.value as CncCutType))}
-            aria-label={`Cut type for ${layer.color}`}
-            title="How this layer's shapes are machined: outline (with bit-radius offset), pocket, or engrave."
-            style={selectStyle}
-          >
-            {CNC_CUT_TYPES.map((cutType) => (
-              <option key={cutType} value={cutType}>
-                {cutTypeLabel(cutType)}
-              </option>
-            ))}
-          </select>
-        </Row>
-        <div className="lf-cnc-depth-field">
-          <CutDepthField layer={layer} settings={settings} onCommit={commit} />
-        </div>
-      </div>
+      <VCarveToolWarning settings={settings} />
+      <section className="lf-cnc-settings-card" aria-label="Depth and feeds">
+        <CncDepthFields
+          layer={layer}
+          settings={settings}
+          stockThicknessMm={stockThicknessMm}
+          recipeKey={recipeKey}
+          onCommit={commit}
+        />
+        <CncFeedFields
+          key={recipeKey}
+          layer={layer}
+          settings={settings}
+          maxFeed={maxFeed}
+          spindleMaxRpm={spindleMaxRpm}
+          onCommit={commit}
+        />
+      </section>
       <CncOpenPathNote layer={layer} settings={settings} />
       {/*
         CncThinDetailNote is deliberately not rendered here. It ran the whole
@@ -161,34 +118,45 @@ function CncCutDepthSection(props: {
           shapes only.
         </p>
       ) : null}
-    </section>
+      {isProfile ? <CncTabFields layer={layer} settings={settings} onCommit={commit} /> : null}
+      <CncLayerAdvancedGroup
+        layer={layer}
+        settings={settings}
+        hasReliefObjects={hasReliefObjects}
+        onCommit={commit}
+        onCommitSettings={commitSettings}
+      />
+    </div>
   );
 }
 
-function CncCutOptions(props: {
+// The cut type's one-line explanation is its tooltip. Traced edges follows
+// only when the operation cuts imported or traced outlines.
+function CncCutTypeField(props: {
   readonly layer: Layer;
   readonly settings: CncLayerSettings;
-  readonly stockThicknessMm: number;
   readonly onCommit: (patch: Partial<CncLayerSettings>) => void;
 }): JSX.Element {
+  const { layer, settings, onCommit: commit } = props;
   return (
-    <details className="lf-section">
-      <summary title="Show cut-type guidance and stock-depth options.">Cut options</summary>
-      <div className="lf-section-body">
-        <p className="lf-cnc-settings-hint">{cutTypeHint(props.settings.cutType)}</p>
-        <CncLineArtContoursField {...props} />
-        {props.settings.cutType !== 'v-carve' && props.stockThicknessMm > 0 ? (
-          <button
-            type="button"
-            onClick={() => props.onCommit({ depthMm: props.stockThicknessMm })}
-            title="Set exactly to the measured stock thickness. Add a verified overcut manually only when the setup needs it."
-            style={throughButtonStyle}
-          >
-            Set to stock thickness ({props.stockThicknessMm} mm)
-          </button>
-        ) : null}
-      </div>
-    </details>
+    <section className="lf-cnc-settings-card" aria-label="Cut type">
+      <Row label="Cut type" stacked>
+        <select
+          value={settings.cutType}
+          onChange={(e) => commit(cutTypePatch(settings, e.target.value as CncCutType))}
+          aria-label={`Cut type for ${layer.color}`}
+          title={`${cutTypeLabel(settings.cutType)}: ${cutTypeHint(settings.cutType)}`}
+          style={selectStyle}
+        >
+          {CNC_CUT_TYPES.map((cutType) => (
+            <option key={cutType} value={cutType} title={cutTypeHint(cutType)}>
+              {cutTypeLabel(cutType)}
+            </option>
+          ))}
+        </select>
+      </Row>
+      <CncLineArtContoursField layer={layer} settings={settings} onCommit={commit} />
+    </section>
   );
 }
 
@@ -224,78 +192,82 @@ function cutTypeHint(cutType: CncCutType): string {
   }
 }
 
-// The numeric depth stays visible; the measured stock-depth shortcut is in Cut options.
+// Cut depth and Depth per pass share one row. The measured stock thickness is
+// one click away under Cut depth; V-carve asks about a flat floor first.
+function CncDepthFields(props: {
+  readonly layer: Layer;
+  readonly settings: CncLayerSettings;
+  readonly stockThicknessMm: number;
+  readonly recipeKey: string;
+  readonly onCommit: (patch: Partial<CncLayerSettings>) => void;
+}): JSX.Element {
+  const { layer, settings, onCommit } = props;
+  const isVCarve = settings.cutType === 'v-carve';
+  const flatDepthEnabled = settings.vCarveFlatDepthEnabled ?? true;
+  const showDepth = !isVCarve || flatDepthEnabled;
+  return (
+    <>
+      {isVCarve ? (
+        <label className="lf-cnc-switch">
+          <input
+            type="checkbox"
+            title="Limit the V-carve to a flat floor at Floor depth; areas wider than the V-bit reaches there are cleared flat. Leave off for an ordinary V-carve, where depth follows stroke width and the V-bit angle."
+            checked={flatDepthEnabled}
+            onChange={(event) => onCommit({ vCarveFlatDepthEnabled: event.target.checked })}
+            aria-label={`Flat depth for ${layer.color}`}
+          />
+          <span>Flat floor</span>
+        </label>
+      ) : null}
+      <div className="lf-cnc-depth-grid">
+        {showDepth ? <CutDepthField {...props} /> : null}
+        <DepthPerPassField
+          key={props.recipeKey}
+          layer={layer}
+          settings={settings}
+          onCommit={onCommit}
+        />
+        {!isVCarve && props.stockThicknessMm > 0 ? (
+          <button
+            type="button"
+            className="lf-cnc-link-button lf-cnc-depth-grid__stock"
+            onClick={() => onCommit({ depthMm: props.stockThicknessMm })}
+            title="Set exactly to the measured stock thickness. Add a verified overcut manually only when the setup needs it."
+          >
+            Set to stock thickness ({props.stockThicknessMm} mm)
+          </button>
+        ) : null}
+      </div>
+    </>
+  );
+}
+
 function CutDepthField(props: {
   readonly layer: Layer;
   readonly settings: CncLayerSettings;
   readonly onCommit: (patch: Partial<CncLayerSettings>) => void;
 }): JSX.Element {
-  const isVCarve = props.settings.cutType === 'v-carve';
-  const flatDepthEnabled = props.settings.vCarveFlatDepthEnabled ?? true;
-  if (isVCarve) {
-    return (
-      <>
-        <Row label="Flat depth" stacked>
-          <input
-            type="checkbox"
-            checked={flatDepthEnabled}
-            onChange={(event) => props.onCommit({ vCarveFlatDepthEnabled: event.target.checked })}
-            aria-label={`Flat depth for ${props.layer.color}`}
-            title="Limit the V-carve to a flat floor. Wide areas then require additional clearing paths. Leave off for an ordinary flowing-depth V-carve."
-          />
-        </Row>
-        {flatDepthEnabled ? (
-          <NumberField
-            stacked
-            layer={props.layer}
-            label="Floor depth"
-            unit="mm"
-            value={props.settings.depthMm}
-            min={0.05}
-            max={200}
-            step={0.5}
-            title="Maximum V-carve depth. Areas wider than the V-bit reaches at this depth are cleared as a flat core."
-            onCommit={(depthMm) => props.onCommit({ depthMm })}
-          />
-        ) : (
-          <p role="note" style={plainVCarveNoteStyle}>
-            Depth follows stroke width and the selected V-bit angle. Extra clearing lines appear
-            only where the artwork is wider than the bit can physically cut.
-          </p>
-        )}
-      </>
-    );
-  }
+  const { cutType } = props.settings;
+  const label =
+    cutType === 'v-carve' ? 'Floor depth' : cutType === 'inlay-pair' ? 'Insert depth' : 'Cut depth';
+  const title =
+    cutType === 'v-carve'
+      ? 'Maximum V-carve depth. Areas wider than the V-bit reaches at this depth are cleared as a flat core.'
+      : cutType === 'inlay-pair'
+        ? 'Male insert profile depth. Equal to stock thickness to free the insert.'
+        : 'Total depth below the stock top. Equal to stock thickness for a through cut.';
   return (
-    <>
-      <NumberField
-        stacked
-        layer={props.layer}
-        label={props.settings.cutType === 'inlay-pair' ? 'Insert depth' : 'Cut depth'}
-        unit="mm"
-        value={props.settings.depthMm}
-        min={0.05}
-        max={200}
-        step={0.5}
-        title={
-          props.settings.cutType === 'inlay-pair'
-            ? 'Male insert profile depth. Equal to stock thickness to free the insert.'
-            : 'Total depth below the stock top. Equal to stock thickness for a through cut.'
-        }
-        onCommit={(depthMm) => props.onCommit({ depthMm })}
-      />
-    </>
+    <NumberField
+      stacked
+      layer={props.layer}
+      label={label}
+      unit="mm"
+      value={props.settings.depthMm}
+      min={0.05}
+      max={200}
+      step={0.5}
+      title={title}
+      onCommit={(depthMm) => props.onCommit({ depthMm })}
+    />
   );
 }
-
-const throughButtonStyle: React.CSSProperties = {
-  width: '100%',
-  fontSize: 11,
-  padding: '4px 8px',
-};
-
-const plainVCarveNoteStyle: React.CSSProperties = {
-  fontSize: 11,
-  margin: '2px 0 6px 0',
-  color: 'var(--lf-text-dim)',
-};

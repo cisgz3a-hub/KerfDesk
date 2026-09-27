@@ -90,6 +90,8 @@ function normalizeCncLayerField(out: Record<string, unknown>): void {
       ? raw['cutType']
       : d.cutType,
     ...optionalCncLayerFields(raw),
+    // Validated as an intact physical recipe before normalization.
+    ...(raw['stageRecipes'] === undefined ? {} : { stageRecipes: raw['stageRecipes'] }),
     depthMm: positiveOr(raw['depthMm'], d.depthMm),
     depthPerPassMm: positiveOr(raw['depthPerPassMm'], d.depthPerPassMm),
     // 0 = automatic medial sampling and flat-core pitch (H.3).

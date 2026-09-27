@@ -9,6 +9,7 @@ import type {
   Transform,
   Vec2,
 } from './scene-object';
+import { flattenCubicChords, flattenEllipseChords } from './curve-flatten';
 
 export const DEFAULT_MACHINE_CURVE_TOLERANCE_MM = 0.025;
 export const MAX_FLATTENED_CURVE_SEGMENTS = 200_000;
@@ -180,49 +181,7 @@ function flattenCubic(
   tolerance: number,
   budget: number,
 ): Vec2[] | null {
-  const out: Vec2[] = [];
-  return subdivideCubic(
-    from,
-    segment.control1,
-    segment.control2,
-    segment.to,
-    tolerance,
-    0,
-    budget,
-    out,
-  )
-    ? out
-    : null;
-}
-
-function subdivideCubic(
-  p0: Vec2,
-  p1: Vec2,
-  p2: Vec2,
-  p3: Vec2,
-  tolerance: number,
-  depth: number,
-  budget: number,
-  out: Vec2[],
-): boolean {
-  if (
-    depth >= 24 ||
-    Math.max(pointLineDistance(p1, p0, p3), pointLineDistance(p2, p0, p3)) <= tolerance
-  ) {
-    if (out.length >= budget) return false;
-    out.push(p3);
-    return true;
-  }
-  const p01 = midpoint(p0, p1);
-  const p12 = midpoint(p1, p2);
-  const p23 = midpoint(p2, p3);
-  const p012 = midpoint(p01, p12);
-  const p123 = midpoint(p12, p23);
-  const p0123 = midpoint(p012, p123);
-  return (
-    subdivideCubic(p0, p01, p012, p0123, tolerance, depth + 1, budget, out) &&
-    subdivideCubic(p0123, p123, p23, p3, tolerance, depth + 1, budget, out)
-  );
+  return flattenCubicChords(from, segment, tolerance, budget);
 }
 
 function flattenArc(
@@ -233,14 +192,35 @@ function flattenArc(
 ): Vec2[] | null {
   const arc = endpointArc(from, segment);
   if (arc === null) return [segment.to];
-  const maxRadius = Math.max(arc.radiusX, arc.radiusY);
-  const ratio = Math.max(-1, Math.min(1, 1 - tolerance / maxRadius));
-  const maxStep = Math.max(1e-6, 2 * Math.acos(ratio));
-  const count = Math.max(1, Math.ceil(Math.abs(arc.delta) / maxStep));
-  if (count > budget) return null;
-  return Array.from({ length: count }, (_, index) =>
-    pointOnArc(arc, arc.theta1 + (arc.delta * (index + 1)) / count),
-  );
+  return flattenEllipseChords(from, segment.to, arc, tolerance, budget);
+}
+
+/** The arc's direction at one end, taken analytically from its centre
+ *  parametrisation (never from flattened samples, whose spacing the flattener
+ *  chooses). `start` points along travel from `from`; `end` points from
+ *  `segment.to` back into the arc. Not normalised. A degenerate arc (zero radius)
+ *  is its chord, as the flattener draws it; null when the arc has no length. */
+export function ellipticalArcEndDirection(
+  from: Vec2,
+  segment: EllipticalArcPathSegment,
+  side: 'start' | 'end',
+): Vec2 | null {
+  const arc = endpointArc(from, segment);
+  if (arc === null) {
+    if (samePoint(from, segment.to)) return null;
+    const chord = { x: segment.to.x - from.x, y: segment.to.y - from.y };
+    return side === 'start' ? chord : { x: -chord.x, y: -chord.y };
+  }
+  const theta = side === 'start' ? arc.theta1 : arc.theta1 + arc.delta;
+  const travel = Math.sign(arc.delta) * (side === 'start' ? 1 : -1);
+  const cosPhi = Math.cos(arc.rotationRad);
+  const sinPhi = Math.sin(arc.rotationRad);
+  const dx = -arc.radiusX * Math.sin(theta);
+  const dy = arc.radiusY * Math.cos(theta);
+  return {
+    x: travel * (dx * cosPhi - dy * sinPhi),
+    y: travel * (dx * sinPhi + dy * cosPhi),
+  };
 }
 
 function segmentExtrema(from: Vec2, segment: PathSegment): Vec2[] {
@@ -388,19 +368,6 @@ function boundsOf(points: ReadonlyArray<Vec2>): Bounds {
     }),
     { minX: Infinity, minY: Infinity, maxX: -Infinity, maxY: -Infinity },
   );
-}
-
-function pointLineDistance(point: Vec2, from: Vec2, to: Vec2): number {
-  const dx = to.x - from.x;
-  const dy = to.y - from.y;
-  const length = Math.hypot(dx, dy);
-  return length <= 1e-15
-    ? Math.hypot(point.x - from.x, point.y - from.y)
-    : Math.abs(dy * point.x - dx * point.y + to.x * from.y - to.y * from.x) / length;
-}
-
-function midpoint(a: Vec2, b: Vec2): Vec2 {
-  return { x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 };
 }
 
 function samePoint(a: Vec2, b: Vec2): boolean {

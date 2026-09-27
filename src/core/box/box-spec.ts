@@ -65,13 +65,15 @@ export type BoxSpecValidation =
     };
 
 /**
- * Derive both dimension sets. Outer = inner + 2T per axis — except the
- * slide-lid height, which adds 3T (bottom + lid + captive top strip,
- * ADR-116 V3) so the entered inner height stays the cavity under the lid.
+ * Derive both dimension sets. Outer = inner + 2T per axis, except the
+ * height, which adds one T per horizontal layer the style stacks around the
+ * cavity: closed 2T (bottom + top), open-top T (bottom only, ADR-106 Amd 1),
+ * slide-lid 3T (bottom + lid + captive top strip, ADR-116 V3). The entered
+ * inner height therefore always stays the usable cavity height.
  */
 export function deriveBoxDims(spec: BoxSpec): BoxDims {
   const t2 = 2 * spec.thicknessMm;
-  const zExtra = spec.style === 'slide-lid' ? 3 * spec.thicknessMm : t2;
+  const zExtra = heightLayers(spec.style) * spec.thicknessMm;
   if (spec.dimensionMode === 'inner') {
     return {
       innerWidthMm: spec.widthMm,
@@ -90,6 +92,11 @@ export function deriveBoxDims(spec: BoxSpec): BoxDims {
     innerDepthMm: spec.depthMm - t2,
     innerHeightMm: spec.heightMm - zExtra,
   };
+}
+
+function heightLayers(style: BoxStyle): number {
+  if (style === 'open-top') return 1;
+  return style === 'slide-lid' ? 3 : 2;
 }
 
 /** Validate a spec; generation must be gated on `kind === 'valid'`. */
@@ -238,9 +245,8 @@ function collectDividerReliefIssues(spec: BoxSpec, issues: BoxSpecIssue[]): void
 function minFingerCellMm(spec: BoxSpec, dims: BoxDims): number {
   const spans = [dims.outerWidthMm, dims.outerDepthMm, dims.outerHeightMm];
   if ((spec.dividersXCount ?? 0) > 0 || (spec.dividersYCount ?? 0) > 0) {
-    const heightSpanMm =
-      spec.style === 'open-top' ? dims.innerHeightMm + spec.thicknessMm : dims.innerHeightMm;
-    spans.push(heightSpanMm + 2 * spec.thicknessMm);
+    // Dividers rise the full cavity: inner height for every style.
+    spans.push(dims.innerHeightMm + 2 * spec.thicknessMm);
   }
   return Math.min(
     ...spans.map(

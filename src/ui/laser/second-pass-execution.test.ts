@@ -381,7 +381,7 @@ describe('exact second-pass Frame and Start ownership', () => {
       true,
     );
     const recovered = activeExactArtifact();
-    expect(recovered.laserResumeChain).toEqual([{ fromLine: 1, version: 3 }]);
+    expect(recovered.laserResumeChain).toEqual([{ fromLine: 1, version: 4 }]);
     expect(recovered.laserSecondPassChain).toHaveLength(1);
     expect(recoveryArtifactPreparedProgramMatches(recovered)).toBe(true);
     await expect(executionArtifactIntegrityIsValid(recovered)).resolves.toBe(true);
@@ -404,7 +404,7 @@ describe('exact second-pass Frame and Start ownership', () => {
     expect(artifact.laserSecondPassChain).toHaveLength(2);
     // Each saved step names the transform and writer that built its bytes.
     expect(artifact.laserSecondPassChain?.[1]?.resumeChainBefore).toEqual([
-      { fromLine: 1, version: 3 },
+      { fromLine: 1, version: 4 },
     ]);
     expect(artifact.laserSecondPassChain?.map((stage) => stage.writerVersion)).toEqual([2, 2]);
     expect(artifact.laserResumeChain).toBeUndefined();

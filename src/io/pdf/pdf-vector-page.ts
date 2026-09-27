@@ -1,3 +1,4 @@
+import { curveSubpathBounds, type Vec2 } from '../../core/scene';
 import { applySvgMatrix, type SvgMatrix } from '../svg/svg-curve-transform';
 import { multiplySvgMatrix } from '../svg/svg-transform-attribute';
 
@@ -198,19 +199,85 @@ function pathData(
   const counts = [2, 2, 6, 4, 0];
   const parts: string[] = [];
   let cursor = 0;
+  const pen: Pen = { current: null, subpathStart: null };
   while (cursor < values.length) {
     const op = finite(values[cursor++]);
     const count = counts[op];
     if (count === undefined || cursor + count > values.length)
       throw new Error('Invalid vector path');
     const coords = values.slice(cursor, cursor + count).map(finite);
-    assertPagePoints(coords, transform, viewport);
+    // A curve's control points may lie off the page while the curve itself
+    // stays on it: test the curve's extent, not its hull.
+    assertSegmentOnPage(op, coords, pen.current, transform, viewport);
+    movePen(pen, op, coords);
     if (op === 0 && closed.all && parts.length > 0 && parts.at(-1) !== 'Z') parts.push('Z');
     parts.push((commands[op] ?? '') + coords.join(' '));
     cursor += count;
   }
   if (closed.last && parts.length > 0 && parts.at(-1) !== 'Z') parts.push('Z');
   return parts.join(' ');
+}
+
+/**
+ * Throw when the segment leaves the page. A cubic or quadratic is tested by
+ * its exact extent (endpoints and derivative-root extrema), not by its
+ * control points: an affine transform maps a Bezier to the Bezier of the
+ * mapped control points, so the extent is taken after the transform.
+ */
+function assertSegmentOnPage(
+  op: number,
+  coords: readonly number[],
+  from: Vec2 | null,
+  transform: SvgMatrix,
+  viewport: { readonly width: number; readonly height: number },
+): void {
+  if (from === null || (op !== 2 && op !== 3)) {
+    assertPagePoints(coords, transform, viewport);
+    return;
+  }
+  const [c1, c2, to] =
+    op === 2
+      ? [
+          { x: coords[0] as number, y: coords[1] as number },
+          { x: coords[2] as number, y: coords[3] as number },
+          { x: coords[4] as number, y: coords[5] as number },
+        ]
+      : quadraticAsCubic(from, coords);
+  const page = (point: Vec2): Vec2 => applySvgMatrix(transform, point);
+  const bounds = curveSubpathBounds({
+    start: page(from),
+    segments: [{ kind: 'cubic', control1: page(c1), control2: page(c2), to: page(to) }],
+    closed: false,
+  });
+  const identity: SvgMatrix = { a: 1, b: 0, c: 0, d: 1, e: 0, f: 0 };
+  assertPagePoints([bounds.minX, bounds.minY, bounds.maxX, bounds.maxY], identity, viewport);
+}
+
+type Pen = { current: Vec2 | null; subpathStart: Vec2 | null };
+
+/** Track the current point: a segment ends at its last pair; closepath returns to the start. */
+function movePen(pen: Pen, op: number, coords: readonly number[]): void {
+  if (op === 4) {
+    pen.current = pen.subpathStart;
+    return;
+  }
+  if (coords.length >= 2) {
+    pen.current = {
+      x: coords[coords.length - 2] as number,
+      y: coords[coords.length - 1] as number,
+    };
+  }
+  if (op === 0) pen.subpathStart = pen.current;
+}
+
+function quadraticAsCubic(from: Vec2, coords: readonly number[]): [Vec2, Vec2, Vec2] {
+  const q = { x: coords[0] as number, y: coords[1] as number };
+  const to = { x: coords[2] as number, y: coords[3] as number };
+  return [
+    { x: from.x + (2 / 3) * (q.x - from.x), y: from.y + (2 / 3) * (q.y - from.y) },
+    { x: to.x + (2 / 3) * (q.x - to.x), y: to.y + (2 / 3) * (q.y - to.y) },
+    to,
+  ];
 }
 
 function assertPagePoints(

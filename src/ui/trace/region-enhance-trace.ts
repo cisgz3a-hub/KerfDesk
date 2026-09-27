@@ -27,6 +27,15 @@ import type { TraceProgress } from '../../core/trace/trace-progress';
 
 export type BoundaryMode = 'crop' | 'enhance';
 
+// The whole-source decisions (ADR-435) depend only on the source pixels and
+// the settings. The preview re-traces the same decoded image while the
+// operator drags or resizes the box, so reuse them across those re-traces
+// instead of paying the worker's full-image median and histogram again.
+const frozenBySource = new WeakMap<
+  RawImageData,
+  { readonly key: string; readonly options: TraceOptions }
+>();
+
 /** Trace `image` honouring the dialog's boundary box and its mode. With no
  *  boundary, or in 'crop' mode, this is the existing crop behaviour. In
  *  'enhance' mode with a boundary, the full-image trace is re-traced inside the
@@ -39,11 +48,33 @@ export async function traceImageWithBoundaryMode(
   signal?: AbortSignal,
   progress?: TraceProgress,
 ): Promise<TraceResult> {
-  const options = resolveTraceSourceOptions(image, requestedOptions);
   if (mode === 'crop' || boundary === null || boundary === undefined) {
-    return traceImageRegion(image, options, boundary, signal, progress);
+    return traceImageRegion(
+      image,
+      resolveTraceSourceOptions(image, requestedOptions),
+      boundary,
+      signal,
+      progress,
+    );
   }
-  const full = await traceImageWithFallback(image, options, signal, progress);
+  // The full pass and the region re-trace share one set of whole-image
+  // binarisation decisions (Otsu cut, auto-sketch verdict), so the patch
+  // cuts exactly where its surroundings did (ADR-435). The full pass resolves
+  // them next to its trace, off the UI thread, and returns them; resolving
+  // already-resolved options again is a cheap no-op.
+  const key = JSON.stringify(requestedOptions);
+  const cached = frozenBySource.get(image);
+  const full = await traceImageWithFallback(
+    image,
+    cached?.key === key ? cached.options : requestedOptions,
+    signal,
+    progress,
+    { freezeSourceDecisions: true },
+  );
+  const options = full.sourceOptions ?? resolveTraceSourceOptions(image, requestedOptions);
+  if (full.sourceOptions !== undefined) {
+    frozenBySource.set(image, { key, options: full.sourceOptions });
+  }
   const notices = new Set(full.notices);
   const paths = await enhanceRegionPaths({
     image,

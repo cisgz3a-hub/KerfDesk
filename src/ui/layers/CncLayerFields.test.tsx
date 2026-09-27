@@ -19,6 +19,7 @@ import {
 } from '../../core/scene';
 import { useStore } from '../state';
 import { useUiStore } from '../state/ui-store';
+import { useMachineSetupDialogStore } from '../laser/device-setup/machine-setup-dialog-store';
 import { resetStore } from '../state/test-helpers';
 import { CncLayerFields } from './CncLayerFields';
 
@@ -163,25 +164,31 @@ describe('CncLayerFields essentials and named refinements', () => {
     };
   }
 
-  it('shows operation cut parameters and setup-owned references', async () => {
+  it('shows operation cut parameters and the machine maximum, and leaves machine values to Machine Setup', async () => {
     const layer = profileLayer();
     installProject(layer, false);
     const { host, root } = await render(layer);
     try {
-      for (const field of [
-        'Cut depth',
-        'Depth per pass',
-        'Feed',
-        'Plunge',
-        'Artwork spindle speed',
-      ]) {
+      for (const field of ['Cut depth', 'Depth per pass', 'Feed', 'Plunge', 'Spindle speed']) {
         expect(
           host.querySelector(`input[aria-label="${field} for ${layer.color}"]`),
         ).not.toBeNull();
       }
       expect(host.querySelector(`select[aria-label="Material for ${layer.color}"]`)).not.toBeNull();
-      expect(host.querySelector('button[aria-label^="Machine maximum:"]')).not.toBeNull();
+      const maximum = host.querySelector<HTMLButtonElement>(
+        'button[aria-label^="Machine maximum:"]',
+      );
+      expect(maximum?.textContent).toBe('Max 12,000');
+      // ADR-481: stock, safe Z, coolant and the rest are edited in Machine Setup only.
+      expect(host.textContent).not.toContain('Stock & machine reference');
+      expect(host.textContent).not.toContain('Safe Z');
+      await act(async () => maximum?.click());
+      expect(useMachineSetupDialogStore.getState().state).toMatchObject({
+        kind: 'open',
+        target: { kind: 'cnc', field: 'spindle-max' },
+      });
     } finally {
+      useMachineSetupDialogStore.getState().close();
       await act(async () => root.unmount());
       host.remove();
     }
@@ -199,7 +206,8 @@ describe('CncLayerFields essentials and named refinements', () => {
       expect(feed).not.toBeNull();
       expect(feed?.closest('details')).toBeNull();
       const clearing = stepoverInput(host, layer.color)?.closest('details');
-      expect(clearing?.querySelector('summary')?.textContent).toBe('Clearing strategy');
+      expect(clearing?.querySelector('summary > span')?.textContent).toBe('Clearing strategy');
+      expect(clearing?.querySelector('.lf-section-badge')?.textContent).toBe('Offset · 40 %');
       expect(clearing?.open).toBe(false);
     } finally {
       await act(async () => root.unmount());
@@ -312,7 +320,7 @@ describe('CncLayerFields essentials and named refinements', () => {
     try {
       const checkbox = host.querySelector(`input[aria-label="Helical entry for ${layer.color}"]`);
       if (!(checkbox instanceof HTMLInputElement)) throw new Error('Helical entry toggle missing');
-      expect(checkbox.title).toContain('Tool & material');
+      expect(checkbox.title).toContain('Pocket roughing bit above');
       await act(async () => checkbox.click());
       const settings = useStore.getState().project.scene.layers[0]?.cnc;
       expect(settings?.rampEntryDeg).toBeUndefined();
@@ -328,7 +336,7 @@ describe('CncLayerFields essentials and named refinements', () => {
     }
   });
 
-  it('shows how to resolve the helical and roughing-bit compile conflict in Tool & material', async () => {
+  it('shows how to resolve the helical and roughing-bit compile conflict under Bit', async () => {
     const layer: Layer = {
       ...createLayer({ id: '#00aa00', color: '#00aa00' }),
       cnc: {
@@ -342,7 +350,7 @@ describe('CncLayerFields essentials and named refinements', () => {
     const { host, root } = await render(layer);
     try {
       expect(host.textContent).toContain('cannot compile while a pocket roughing bit is assigned');
-      expect(host.textContent).toContain('Pocket roughing bit in Tool & material above');
+      expect(host.textContent).toContain('Choose Single bit under Pocket roughing bit above.');
     } finally {
       await act(async () => root.unmount());
       host.remove();
@@ -373,7 +381,7 @@ describe('CncLayerFields essentials and named refinements', () => {
     }
   });
 
-  it('offers the assigned V-carve floor-clearing bit in Tool & material', async () => {
+  it('offers the assigned V-carve floor-clearing bit under Bit', async () => {
     const layer: Layer = {
       ...createLayer({ id: '#00aa00', color: '#00aa00' }),
       cnc: {

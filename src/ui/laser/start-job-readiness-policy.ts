@@ -8,7 +8,8 @@ import {
   type StatusReport,
 } from '../../core/controllers/grbl';
 import { hasSendableGcodeLine } from '../../core/controllers/grbl/sendable-line-scan';
-import { scenePreparationTooComplex, type Job } from '../../core/job';
+import { PREPARATION_COMPILED_SEGMENT_BUDGET, type Job } from '../../core/job';
+import { scenePreparationSize } from '../../core/job/preparation-complexity';
 import { rasterPreparationTooComplex } from '../../core/job/raster-preparation-complexity';
 import { COMPILE_INTEGRITY_PREFLIGHT_CODES, type PreflightIssue } from '../../core/preflight';
 import { laserModuleAbsentJobWarning } from '../../core/preflight/laser-module-readiness';
@@ -52,8 +53,28 @@ export const LARGE_RASTER_PREPARATION_WARNING =
 
 // The former pre-emit curve/fill segment budget refusal, demoted to a Job
 // Review advisory (rule 7 / ADR-241): the operator is informed, never blocked.
-export function largeJobPreparationWarning(scene: Scene): string | null {
-  return scenePreparationTooComplex(scene) ? LARGE_JOB_PREPARATION_WARNING : null;
+// When the bounded fill estimate cannot count (work budget exhausted), the size
+// is unknown, not large: the compiled job's real Fill span count decides
+// (ADR-459 Amd 1). Without a compiled job an unknown size stays silent.
+export function largeJobPreparationWarning(scene: Scene, job?: Job): string | null {
+  const size = scenePreparationSize(scene);
+  if (size === 'over-budget') return LARGE_JOB_PREPARATION_WARNING;
+  if (size === 'unknown' && job !== undefined && compiledFillSpansOverBudget(job)) {
+    return LARGE_JOB_PREPARATION_WARNING;
+  }
+  return null;
+}
+
+// The compiled counterpart of the scene fill estimate: actual Fill spans,
+// counted only until the budget is passed.
+function compiledFillSpansOverBudget(job: Job): boolean {
+  let spans = 0;
+  for (const group of job.groups) {
+    if (group.kind !== 'fill') continue;
+    spans += group.segments.length;
+    if (spans > PREPARATION_COMPILED_SEGMENT_BUDGET) return true;
+  }
+  return false;
 }
 
 // The former pre-emit raster-too-large refusal, demoted the same way

@@ -1,10 +1,13 @@
-// Dogbone corner relief (ADR-103 G6): vertex-centered overcut circles on
-// sharp convex corners, reflex corners untouched, islands skipped, errors
-// on no-op selections.
+// Dogbone corner relief (ADR-103 G6, Amd 1): the compensated bit must reach
+// every sharp convex corner in one loop, reflex corners untouched, errors on
+// no-op selections. The relief is judged on the inside-profile toolpath (the
+// first ring of a pocket), never on the drawn shape: the pre-amendment
+// vertex-centred circle looked right and left the toolpath unchanged.
 
 import { describe, expect, it } from 'vitest';
 import { type Result } from '../result';
-import { IDENTITY_TRANSFORM, type ImportedSvg } from '../scene';
+import { profileToolpathPolylines } from '../cnc/profile-paths';
+import { IDENTITY_TRANSFORM, type ImportedSvg, type Polyline, type Vec2 } from '../scene';
 import { dogboneVectorObject } from './dogbone';
 import { type VectorOpError } from './vector-path-tools';
 
@@ -61,19 +64,78 @@ function totalArea(object: ImportedSvg): number {
   return area;
 }
 
+function segmentDistance(p: Vec2, a: Vec2, b: Vec2): number {
+  const dx = b.x - a.x;
+  const dy = b.y - a.y;
+  const lengthSq = dx * dx + dy * dy;
+  const t =
+    lengthSq === 0 ? 0 : Math.max(0, Math.min(1, ((p.x - a.x) * dx + (p.y - a.y) * dy) / lengthSq));
+  return Math.hypot(p.x - a.x - t * dx, p.y - a.y - t * dy);
+}
+
+// Closest approach of the bit centre to `corner` along the closed toolpath.
+function bitCentreDistance(corner: Vec2, loops: ReadonlyArray<Polyline>): number {
+  let best = Number.POSITIVE_INFINITY;
+  for (const loop of loops) {
+    const points = loop.points;
+    for (let i = 0; i < points.length; i += 1) {
+      const a = points[i];
+      const b = points[(i + 1) % points.length];
+      if (a === undefined || b === undefined) continue;
+      best = Math.min(best, segmentDistance(corner, a, b));
+    }
+  }
+  return best;
+}
+
+function insideToolpath(object: ImportedSvg, toolMm: number): ReadonlyArray<Polyline> {
+  return profileToolpathPolylines(object.paths[0]?.polylines ?? [], 'inside', toolMm);
+}
+
 describe('dogboneVectorObject', () => {
-  it('relieves all four corners of a square with vertex-centered circles', () => {
-    const result = unwrap(dogboneVectorObject(SQUARE, 6.35));
-    const r = 6.35 / 2;
-    // The circles push the bounds out by one radius at every corner.
-    expect(result.bounds.minX).toBeCloseTo(-r, 2);
-    expect(result.bounds.maxX).toBeCloseTo(20 + r, 2);
-    // Each corner adds ~3/4 of a circle outside the square.
-    const expected = 400 + 4 * 0.75 * Math.PI * r * r;
-    expect(totalArea(result)).toBeGreaterThan(400);
-    expect(Math.abs(totalArea(result) - expected)).toBeLessThan(3);
+  const corners = [
+    { x: 0, y: 0 },
+    { x: 20, y: 0 },
+    { x: 20, y: 20 },
+    { x: 0, y: 20 },
+  ];
+
+  it('lets the bit reach all four corners of a square slot in one loop', () => {
+    const toolMm = 6.35;
+    const result = unwrap(dogboneVectorObject(SQUARE, toolMm));
+    const toolpath = insideToolpath(result, toolMm);
+    expect(toolpath).toHaveLength(1);
+    for (const corner of corners) {
+      expect(bitCentreDistance(corner, toolpath)).toBeLessThanOrEqual(toolMm / 2);
+    }
+    // Without relief the bit centre stops √2·r from each corner.
+    const plain = insideToolpath(SQUARE, toolMm);
+    expect(bitCentreDistance({ x: 0, y: 0 }, plain)).toBeCloseTo(Math.SQRT2 * (toolMm / 2), 2);
     expect(result.source).toBe('square (dogbone)');
     expect(result.id).toBe('square');
+  });
+
+  it('reaches acute and obtuse corners too', () => {
+    const triangle = pathObject('triangle', [
+      { x: 0, y: 0 },
+      { x: 30, y: 0 },
+      { x: 30, y: 30 },
+    ]);
+    const hexagon = pathObject(
+      'hexagon',
+      Array.from({ length: 6 }, (_, i) => ({
+        x: 15 * Math.cos((i * Math.PI) / 3),
+        y: 15 * Math.sin((i * Math.PI) / 3),
+      })),
+    );
+    for (const shape of [triangle, hexagon]) {
+      const toolMm = 3.175;
+      const toolpath = insideToolpath(unwrap(dogboneVectorObject(shape, toolMm)), toolMm);
+      expect(toolpath).toHaveLength(1);
+      for (const corner of shape.paths[0]?.polylines[0]?.points ?? []) {
+        expect(bitCentreDistance(corner, toolpath)).toBeLessThanOrEqual(toolMm / 2);
+      }
+    }
   });
 
   it('leaves the reflex corner of an L-shape alone', () => {

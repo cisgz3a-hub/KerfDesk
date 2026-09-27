@@ -4,6 +4,7 @@ import type { BoxSpec } from './box-spec';
 import { buildPanelClaims } from './panel-claims';
 import { panelOutline } from './panel-outline';
 import { applyPanelFit } from './panel-fit';
+import { profileToolpathPolylines } from '../cnc/profile-paths';
 
 // Canonical 60×40×30 T=3, finger 9 → x edges: 5 cells of 12 mm at
 // boundaries 3, 15, 27, 39, 51, 63. Bottom owns cells 0/2/4.
@@ -22,10 +23,9 @@ const SPEC: BoxSpec = {
 
 const RELIEF_TOOL_MM = 3.175;
 const RELIEF_RADIUS_MM = RELIEF_TOOL_MM / 2;
-// A 24-gon inscribed in the relief circle puts the boundary between
-// r·cos(π/24) and r; clipper adds ±1e-3 rounding.
-const RELIEF_DISTANCE_MIN = 0.98 * RELIEF_RADIUS_MM;
-const RELIEF_DISTANCE_MAX = RELIEF_RADIUS_MM + 2e-3;
+// The bit edge reaches a corner when its centre passes within one radius
+// (clipper rounds to 1e-3). Unrelieved, the centre stops √2·r away.
+const REACH_MAX_MM = RELIEF_RADIUS_MM + 2e-3;
 
 function outlineOf(panel: string): Polyline {
   const claims = buildPanelClaims(SPEC).find((c) => c.panel === panel);
@@ -72,6 +72,17 @@ function minDistanceToBoundary(point: Vec2, outline: Polyline): number {
     best = Math.min(best, pointSegmentDistance(point, a, b));
   }
   return best;
+}
+
+// How close the shipped profile-outside toolpath brings the bit's centre to
+// a corner — the fabrication truth a drawn relief must deliver.
+function bitCentreDistance(corner: Vec2, rings: ReadonlyArray<Polyline>): number {
+  const paths = profileToolpathPolylines(rings, 'outside', RELIEF_TOOL_MM);
+  return Math.min(
+    ...paths.map((path) =>
+      minDistanceToBoundary(corner, { ...path, points: [...path.points, path.points[0]!] }),
+    ),
+  );
 }
 
 function pointSegmentDistance(p: Vec2, a: Vec2, b: Vec2): number {
@@ -141,29 +152,28 @@ describe('applyPanelFit — clearance', () => {
 });
 
 describe('applyPanelFit — corner relief', () => {
-  it('subtracts a full-radius overcut at every notch floor corner', () => {
-    const relieved = fitted(outlineOf('bottom'), 0, RELIEF_TOOL_MM);
+  it('lets the compensated bit reach every notch floor corner (dogbone)', () => {
+    const nominal = outlineOf('bottom');
+    const relieved = fitted(nominal, 0, RELIEF_TOOL_MM);
     // Nominal reflex corners of the cell-1 notch on the bottom edge.
     for (const corner of [
       { x: 15, y: 3 },
       { x: 27, y: 3 },
     ]) {
-      const distance = minDistanceToBoundary(corner, relieved);
-      expect(distance).toBeGreaterThanOrEqual(RELIEF_DISTANCE_MIN);
-      expect(distance).toBeLessThanOrEqual(RELIEF_DISTANCE_MAX);
+      expect(bitCentreDistance(corner, [relieved])).toBeLessThanOrEqual(REACH_MAX_MM);
+      // Without relief the bit stops short and leaves a radius-r fillet.
+      expect(bitCentreDistance(corner, [nominal])).toBeGreaterThan(1.4 * RELIEF_RADIUS_MM);
     }
   });
 
-  it('keeps the full bit radius when clearance is applied first (pinned ordering)', () => {
+  it('keeps the bit reach when clearance is applied first (pinned ordering)', () => {
     const c = 0.3;
     const relieved = fitted(outlineOf('bottom'), c, RELIEF_TOOL_MM);
     // The cell-1 notch after offset: walls at 15−c/4 and 27+c/4 … the reflex
-    // corner sits at (15 − c/4, 3 + c/4). Relief-then-offset would leave the
-    // arc at r − c/4 ≈ 1.51 mm — outside the accepted band.
+    // corner sits at (15 − c/4, 3 + c/4). Relief-then-offset would shrink
+    // every dogbone by c/4 below the bit and the bit could not enter it.
     const offsetCorner = { x: 15 - c / 4, y: 3 + c / 4 };
-    const distance = minDistanceToBoundary(offsetCorner, relieved);
-    expect(distance).toBeGreaterThanOrEqual(RELIEF_DISTANCE_MIN);
-    expect(distance).toBeLessThanOrEqual(RELIEF_DISTANCE_MAX);
+    expect(bitCentreDistance(offsetCorner, [relieved])).toBeLessThanOrEqual(REACH_MAX_MM);
   });
 
   it('never emits reliefs in laser mode and leaves relief-free faces alone', () => {
@@ -229,7 +239,7 @@ describe('applyPanelFit — cutout rings (ADR-116)', () => {
     expect(Math.abs(holeSpan.y - (10 + c / 2))).toBeLessThanOrEqual(4e-3);
   });
 
-  it('carves a full-radius overcut at every slot corner', () => {
+  it('lets the compensated bit reach every slot corner', () => {
     const result = applyPanelFit(
       { outline, cutouts: [slot] },
       { clearanceMm: 0, relief: { kind: 'corner-overcut', toolDiameterMm: RELIEF_TOOL_MM } },
@@ -237,17 +247,15 @@ describe('applyPanelFit — cutout rings (ADR-116)', () => {
     expect(result.kind).toBe('fitted');
     if (result.kind !== 'fitted') return;
     expect(result.cutouts).toHaveLength(1);
-    const hole = result.cutouts[0];
-    if (hole === undefined) return;
     for (const corner of [
       { x: 20, y: 25 },
       { x: 30, y: 25 },
       { x: 30, y: 35 },
       { x: 20, y: 35 },
     ]) {
-      const distance = minDistanceToBoundary(corner, hole);
-      expect(distance).toBeGreaterThanOrEqual(RELIEF_DISTANCE_MIN);
-      expect(distance).toBeLessThanOrEqual(RELIEF_DISTANCE_MAX);
+      const rings = [result.outline, ...result.cutouts];
+      expect(bitCentreDistance(corner, rings)).toBeLessThanOrEqual(REACH_MAX_MM);
+      expect(bitCentreDistance(corner, [outline, slot])).toBeGreaterThan(1.4 * RELIEF_RADIUS_MM);
     }
   });
 

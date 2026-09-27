@@ -10,7 +10,9 @@ import { handleUnifiedArtworkImport } from '../app/import-dispatch';
 import { openProjectCommand } from './open-project-command';
 import { openTemplateCommand, saveTemplateCommand } from './template-command-actions';
 import { handleImportHeightMaps } from '../app/height-map-import-action';
-import { handleExportArtworkSvg } from '../app/export-artwork-svg';
+import { handleExportArtworkDxf } from '../app/export-artwork-dxf';
+import { handleExportArtworkFormat, type ArtworkVectorFormat } from '../app/export-artwork-format';
+import { useExportSvgDialogStore } from './export-svg-dialog-store';
 import type { PlatformAdapter } from '../../platform/types';
 import type { CommandShellCallbacks } from './app-command-context-types';
 import type { AppCommandContext } from './command-types';
@@ -36,6 +38,10 @@ type FileCommandContext = Pick<
   | 'importHeightMap'
   | 'saveGcode'
   | 'exportSvg'
+  | 'exportDxf'
+  | 'exportPdf'
+  | 'exportEps'
+  | 'exportGeoJson'
   | 'openGcodePreview'
   | 'inspectCurrentGcode'
 >;
@@ -99,9 +105,11 @@ export function fileCommandContext(
       });
     },
     saveGcode: () => useUiStore.getState().openGcodeSaveDialog(),
-    exportSvg: () => {
+    // Options first (ADR-451); the dialog's Choose File... opens the picker.
+    exportSvg: () => useExportSvgDialogStore.getState().show(),
+    exportDxf: () => {
       const current = useStore.getState();
-      void handleExportArtworkSvg({
+      void handleExportArtworkDxf({
         platform,
         project: current.project,
         selectedIds: selectedObjectIds(current.selectedObjectId, current.additionalSelectedIds),
@@ -109,9 +117,37 @@ export function fileCommandContext(
         pushToast,
       });
     },
+    ...artworkFormatExports(platform, pushToast),
     openGcodePreview: () => openGcodeInspectorAction(gcodeDeps())(),
     inspectCurrentGcode: () => inspectCurrentGcodeAction(gcodeDeps())(),
   };
+}
+
+function artworkFormatExports(
+  platform: PlatformAdapter,
+  pushToast: ReturnType<typeof useToastStore.getState>['pushToast'],
+): Pick<AppCommandContext, 'exportPdf' | 'exportEps' | 'exportGeoJson'> {
+  return {
+    exportPdf: () => exportArtworkFormat(platform, pushToast, 'pdf'),
+    exportEps: () => exportArtworkFormat(platform, pushToast, 'eps'),
+    exportGeoJson: () => exportArtworkFormat(platform, pushToast, 'geojson'),
+  };
+}
+
+function exportArtworkFormat(
+  platform: PlatformAdapter,
+  pushToast: ReturnType<typeof useToastStore.getState>['pushToast'],
+  format: ArtworkVectorFormat,
+): void {
+  const current = useStore.getState();
+  void handleExportArtworkFormat({
+    format,
+    platform,
+    project: current.project,
+    selectedIds: selectedObjectIds(current.selectedObjectId, current.additionalSelectedIds),
+    savedName: current.savedName,
+    pushToast,
+  });
 }
 
 function saveProject(

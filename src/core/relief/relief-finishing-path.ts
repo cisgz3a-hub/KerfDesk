@@ -7,7 +7,9 @@
 //   bit rides the surface from one row to the next instead of retracting to
 //   safe Z and plunging again. A link is a short column of exact tip samples
 //   (the dilation computes both edge columns exactly), so it carries the same
-//   qualification as a row.
+//   qualification as a row: exact at its samples. Between samples, where a
+//   link or a row crosses the edge of a wall, both are checked against the
+//   exact contact afterwards (ADR-421 Amendment 1).
 // - One-sided point reduction. A vertex is dropped only when the straight
 //   segment replacing it runs over the same XY and stays at or above every
 //   dropped vertex, by no more than the tolerance. Both the old and new motion

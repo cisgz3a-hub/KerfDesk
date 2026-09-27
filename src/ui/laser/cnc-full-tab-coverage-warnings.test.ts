@@ -67,7 +67,25 @@ describe('detectCncFullTabCoverageWarnings', () => {
 
     expect(warnings).toHaveLength(1);
     expect(warnings[0]).toContain('Layer L1');
+    expect(warnings[0]).toContain('(tab width + bit diameter × 6 tabs)');
     expect(warnings[0]).toContain('NOT be cut through');
+  });
+
+  it('names the cut width a narrowing bit adds to each window', () => {
+    // 3 mm down the 60 degree V-bit cuts 3.464 mm wide, so each window is the
+    // tab width plus that (ADR-368 Amendment 3); 6 of them still cover the
+    // 10 mm square's 51 mm toolpath.
+    const cnc = {
+      ...FULL_COVERAGE_TABS,
+      toolId: 'vb-60',
+      depthMm: 3,
+      depthPerPassMm: 1.5,
+      tabHeightMm: 1,
+    };
+    const warnings = detectCncFullTabCoverageWarnings(cncProject(cnc, 10));
+
+    expect(warnings).toHaveLength(1);
+    expect(warnings[0]).toContain("(tab width + the bit's 3.5 mm cut width × 6 tabs)");
   });
 
   it('is silent when the shape is large enough to keep burnable arcs between tabs', () => {

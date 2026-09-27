@@ -39,6 +39,20 @@ describe('trace settings snapshot (ADR-408)', () => {
     });
   });
 
+  it('restores a Line + fill trace with its Max stroke width (ADR-454)', () => {
+    const captured = captureTraceSettings({
+      presetName: 'Line + fill',
+      overrides: { hybridMaxStrokeWidthMm: 0.8 },
+      output: 'vector',
+      fillStyle: 'scanline',
+      boundary: null,
+      boundaryMode: 'crop',
+    });
+    const restored = restoreTraceSettings(captured, GRID);
+    expect(restored.presetName).toBe('Line + fill');
+    expect(restored.overrides).toEqual({ hybridMaxStrokeWidthMm: 0.8 });
+  });
+
   it('does not record a boundary mode without a boundary', () => {
     const captured = captureTraceSettings({
       presetName: 'Line Art',
@@ -148,5 +162,28 @@ describe('trace settings snapshot (ADR-408)', () => {
       GRID,
     );
     expect(restored.boundaryMode).toBe('crop');
+  });
+
+  it('keeps the Colour layers controls and reopens their boundary in Crop mode (ADR-461)', () => {
+    const restored = restoreTraceSettings(
+      record({
+        presetName: 'Colour layers',
+        overrides: { colourCount: 11.4, colourLayerOutput: 'stacked', keepBackground: true },
+        boundary: { x: 1, y: 1, width: 10, height: 10 },
+        boundaryMode: 'enhance',
+      }),
+      GRID,
+    );
+    expect(restored.overrides).toEqual({
+      colourCount: 8,
+      colourLayerOutput: 'stacked',
+      keepBackground: true,
+    });
+    expect(restored.boundaryMode).toBe('crop');
+    const auto = restoreTraceSettings(
+      record({ overrides: { colourCount: 'auto', colourLayerOutput: 'glued' } }),
+      GRID,
+    );
+    expect(auto.overrides).toEqual({ colourCount: 'auto' });
   });
 });

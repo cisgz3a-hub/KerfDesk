@@ -1,5 +1,5 @@
 import type { Polyline, Vec2 } from '../scene';
-import { unionContourBoxes } from './contour-bounds';
+import { unionContourBoxes, type ContourBox } from './contour-bounds';
 import {
   contourEdgesSteps,
   adjacentContourEdges,
@@ -15,7 +15,7 @@ import {
   type SweepAxis,
 } from './contour-contact-order';
 import { ContourOrientation } from './contour-orientation';
-import { visitContourBoxPairsSteps } from './contour-spatial';
+import { ContourPairCache } from './contour-pair-cache';
 import type { TraceSteps } from './trace-steps';
 
 type Loop = ContourEdges & { readonly loop: number; readonly geometry: ContourEdges };
@@ -29,6 +29,8 @@ export class ContourContactCache {
     WeakMap<ContourEdges, ContactChoices>
   >();
   private readonly orientation = new ContourOrientation();
+  private readonly loopPairs = new ContourPairCache();
+  private readonly occupancy = new WeakMap<ContourEdges, Set<number> | null>();
 
   *findSteps(polylines: ReadonlyArray<Polyline>): TraceSteps<Set<number> | undefined> {
     const cooperate = yield;
@@ -68,13 +70,16 @@ export class ContourContactCache {
       const contact = choices[axis];
       if (contact !== null) events.push(ownedContact(contact, loop, loop));
     }
-    const pairs: [Loop, Loop][] = [];
-    yield* visitContourBoxPairsSteps(loops, (a, b) =>
-      pairs.push(a.loop < b.loop ? [a, b] : [b, a]),
-    );
-    for (const [a, b] of pairs) {
+    // Loop i's box is its geometry's, so the geometry is the pair key.
+    const overlapping = yield* this.loopPairs.pairsSteps(loops, (loop) => loop.geometry);
+    for (const { first, second, slot } of overlapping) {
+      const [a, b] = first.loop < second.loop ? [first, second] : [second, first];
       if (cooperate) yield;
-      const choices = yield* this.pairSteps(a.geometry, b.geometry);
+      let choices = this.loopPairs.recall(slot) as ContactChoices | undefined;
+      if (choices === undefined) {
+        choices = yield* this.pairSteps(a.geometry, b.geometry);
+        this.loopPairs.remember(slot, choices);
+      }
       const contact = choices[axis];
       if (contact !== null) events.push(ownedContact(contact, a.loop, b.loop));
     }
@@ -90,11 +95,55 @@ export class ContourContactCache {
     }
     let choices = pairs.get(b);
     if (choices === undefined) {
-      choices = yield* findContactsSteps(a, b, false, this.orientation);
+      // Meeting edges have touching boxes, which share a coarse cell; two
+      // boundaries with no cell in common cannot meet.
+      choices = this.shareCell(a, b)
+        ? yield* findContactsSteps(a, b, false, this.orientation)
+        : { minX: null, minY: null };
       pairs.set(b, choices);
     }
     return choices;
   }
+
+  private shareCell(a: ContourEdges, b: ContourEdges): boolean {
+    const cellsA = this.cellsOf(a);
+    const cellsB = this.cellsOf(b);
+    if (cellsA === null || cellsB === null) return true;
+    const [small, large] = cellsA.size <= cellsB.size ? [cellsA, cellsB] : [cellsB, cellsA];
+    for (const cell of small) if (large.has(cell)) return true;
+    return false;
+  }
+
+  // The coarse cells a boundary's edge boxes touch (inclusive), or null when
+  // an edge spans too many cells to list (the pair is then just measured).
+  private cellsOf(geometry: ContourEdges): Set<number> | null {
+    let cells = this.occupancy.get(geometry);
+    if (cells === undefined) {
+      cells = occupiedCells(geometry.edges);
+      this.occupancy.set(geometry, cells);
+    }
+    return cells;
+  }
+}
+
+const OCCUPANCY_CELL_PX = 8;
+const MAX_CELLS_PER_EDGE = 64;
+const OCCUPANCY_KEY_STRIDE = 2 ** 26;
+
+function occupiedCells(edges: ReadonlyArray<ContourEdge>): Set<number> | null {
+  const cells = new Set<number>();
+  const cell = (value: number): number => Math.floor(value / OCCUPANCY_CELL_PX);
+  for (const edge of edges) {
+    const x0 = cell(edge.minX);
+    const x1 = cell(edge.maxX);
+    const y0 = cell(edge.minY);
+    const y1 = cell(edge.maxY);
+    if ((x1 - x0 + 1) * (y1 - y0 + 1) > MAX_CELLS_PER_EDGE) return null;
+    for (let cx = x0; cx <= x1; cx += 1) {
+      for (let cy = y0; cy <= y1; cy += 1) cells.add(cx * OCCUPANCY_KEY_STRIDE + cy);
+    }
+  }
+  return cells;
 }
 
 function* findContactsSteps(
@@ -105,11 +154,10 @@ function* findContactsSteps(
 ): TraceSteps<ContactChoices> {
   const cooperate = yield;
   const choices: ContactChoices = { minX: null, minY: null };
-  const scanFirst = a.edges.length <= b.edges.length;
-  const scan = scanFirst ? a : b,
-    target = scanFirst ? b : a;
+  const { scanFirst, edges } = scanPlan(a, b, sameLoop);
+  const target = scanFirst ? b : a;
   let visited = 0;
-  for (const edge of scan.edges) {
+  for (const edge of edges) {
     if (cooperate) yield;
     for (const other of target.index.query(edge)) {
       if (cooperate && ++visited % 256 === 0) yield;
@@ -120,6 +168,49 @@ function* findContactsSteps(
     }
   }
   return choices;
+}
+
+// Which boundary's edges to walk. An edge can only meet the other boundary
+// inside that boundary's box, so two different boundaries walk just the
+// edges of one that lie in the other's box, taking the side with fewer: a
+// ring nested in another then walks the few edges of the outer one near the
+// inner one's box, not every edge of the inner one. One boundary against
+// itself walks every edge.
+function scanPlan(
+  a: ContourEdges,
+  b: ContourEdges,
+  sameLoop: boolean,
+): { readonly scanFirst: boolean; readonly edges: ReadonlyArray<ContourEdge> } {
+  if (sameLoop) return { scanFirst: true, edges: a.edges };
+  // Inside the other's box every edge qualifies, so only the other side
+  // needs a query (and is walked when it is the shorter list).
+  if (boxWithin(a, b)) {
+    const fromB = b.index.query(a);
+    return fromB.length < a.edges.length
+      ? { scanFirst: false, edges: fromB }
+      : { scanFirst: true, edges: a.edges };
+  }
+  if (boxWithin(b, a)) {
+    const fromA = a.index.query(b);
+    return fromA.length <= b.edges.length
+      ? { scanFirst: true, edges: fromA }
+      : { scanFirst: false, edges: b.edges };
+  }
+  const fromA = a.index.query(b);
+  if (fromA.length === 0) return { scanFirst: true, edges: fromA };
+  const fromB = b.index.query(a);
+  return fromA.length <= fromB.length
+    ? { scanFirst: true, edges: fromA }
+    : { scanFirst: false, edges: fromB };
+}
+
+function boxWithin(inner: ContourBox, outer: ContourBox): boolean {
+  return (
+    inner.minX >= outer.minX &&
+    inner.maxX <= outer.maxX &&
+    inner.minY >= outer.minY &&
+    inner.maxY <= outer.maxY
+  );
 }
 
 function skipContact(edge: ContourEdge, other: ContourEdge, sameLoop: boolean): boolean {

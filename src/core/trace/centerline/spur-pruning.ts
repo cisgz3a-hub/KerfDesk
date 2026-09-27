@@ -13,6 +13,7 @@ import type { StrokeGraph, StrokeNode } from './stroke-graph';
 import { runTraceSteps, type TraceSteps } from '../trace-steps';
 import { PruningWorklist, type MutablePruneChain as MutableChain } from './pruning-worklist';
 import { hasShortBranchSupport } from './short-branch-support';
+import { PassthroughQueue, firstIncidence } from './passthrough-queue';
 
 export type SpurPruneOptions = {
   /** Multiplier on the junction's local stroke radius. */
@@ -53,6 +54,10 @@ const MAX_SPUR_BUDGET_PX = 12;
 type OpenComponent = { size: number };
 type PruneState = {
   readonly degree: Map<number, number>;
+  /** Nodes whose degree or incident chains changed since the last
+   *  dissolution; they are re-queued before the next one. */
+  readonly changed: Set<number>;
+  readonly passthrough: PassthroughQueue;
   readonly component: Map<MutableChain, OpenComponent>;
   readonly worklist: PruningWorklist;
 };
@@ -82,17 +87,26 @@ export function* pruneSpursSteps(
   }));
   const nodeKind = new Map<number, StrokeNode['kind']>();
   for (const node of graph.nodes) nodeKind.set(node.id, node.kind);
+  const degree = liveDegrees(chains);
+  const worklist = new PruningWorklist(chains);
+  const rank = new Map(chains.map((chain, index) => [chain, index]));
   const state: PruneState = {
-    degree: liveDegrees(chains),
+    degree,
+    changed: new Set(degree.keys()),
+    passthrough: new PassthroughQueue((node) =>
+      degree.get(node) === 2 && nodeKind.get(node) === 'junction'
+        ? firstIncidence(node, worklist.incidentTo(node), rank)
+        : Infinity,
+    ),
     component: yield* liveComponentsSteps(chains),
-    worklist: new PruningWorklist(chains),
+    worklist,
   };
 
   let changed = true;
   while (changed) {
     if (cooperate) yield;
     changed = yield* pruneOneSpurSteps(state, nodeKind, distSq, width, options);
-    if (!changed && (yield* dissolvePassthroughJunctionsSteps(chains, state, nodeKind))) {
+    if (!changed && (yield* dissolvePassthroughJunctionsSteps(state))) {
       changed = true;
     }
   }
@@ -163,7 +177,7 @@ function* pruneOneSpurSteps(
     if (!isArtifactSpur(chain, state, distSq, width, options)) continue;
     chain.alive = false;
     worklist.detach(chain);
-    adjustDegree(degree, chain, -1);
+    adjustDegree(state, chain, -1);
     group.size -= 1;
     worklist.changedAt(chain.a);
     worklist.changedAt(chain.b);
@@ -219,10 +233,12 @@ function* liveComponentsSteps(
   return byChain;
 }
 
-function adjustDegree(degree: Map<number, number>, chain: MutableChain, change: number): void {
+function adjustDegree(state: PruneState, chain: MutableChain, change: number): void {
   if (chain.closed) return;
-  degree.set(chain.a, (degree.get(chain.a) ?? 0) + change);
-  degree.set(chain.b, (degree.get(chain.b) ?? 0) + change);
+  for (const node of [chain.a, chain.b]) {
+    state.degree.set(node, (state.degree.get(node) ?? 0) + change);
+    state.changed.add(node);
+  }
 }
 
 // The pinched-tip discriminator. A leaf's arc length includes its run INSIDE
@@ -309,30 +325,31 @@ export function arcLength(points: ReadonlyArray<Vec2>): number {
 }
 
 // Merge the two surviving chains of any degree-2 node into one through-chain.
-function* dissolvePassthroughJunctionsSteps(
-  chains: MutableChain[],
-  state: PruneState,
-  nodeKind: Map<number, StrokeNode['kind']>,
-): TraceSteps<boolean> {
+function* dissolvePassthroughJunctionsSteps(state: PruneState): TraceSteps<boolean> {
   const cooperate = yield;
-  // Recreate insertion order from the current chains, as before. A cached
-  // map's historic order can choose a different first node after merges.
-  const degree = liveDegrees(chains);
-  for (const [nodeId, d] of degree) {
+  // Visit degree-two junctions in the order a fresh liveDegrees(chains) map
+  // would list them (a cached map's historic order can choose a different
+  // first node after merges), without rebuilding that map on every call.
+  for (const node of state.changed) state.passthrough.touch(node);
+  state.changed.clear();
+  for (let nodeId = state.passthrough.take(); nodeId !== undefined; ) {
     if (cooperate) yield;
-    if (d !== 2 || nodeKind.get(nodeId) !== 'junction') continue;
     const incident = state.worklist.at(nodeId);
     const first = incident[0];
     const second = incident[1];
-    if (first === undefined || second === undefined || first === second) continue;
+    // Such a node stays unusable until its chains change, which re-queues it.
+    if (first === undefined || second === undefined || first === second) {
+      nodeId = state.passthrough.take();
+      continue;
+    }
     const affected = [first.a, first.b, second.a, second.b];
     state.worklist.detach(first);
     state.worklist.detach(second);
-    adjustDegree(state.degree, first, -1);
-    adjustDegree(state.degree, second, -1);
+    adjustDegree(state, first, -1);
+    adjustDegree(state, second, -1);
     mergeThroughNode(first, second, nodeId);
     state.worklist.attach(first);
-    adjustDegree(state.degree, first, 1);
+    adjustDegree(state, first, 1);
     const group = state.component.get(first);
     if (group !== undefined) group.size -= first.closed ? 2 : 1;
     for (const node of affected) state.worklist.changedAt(node);

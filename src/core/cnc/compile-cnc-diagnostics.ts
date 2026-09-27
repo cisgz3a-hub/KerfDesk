@@ -24,16 +24,19 @@ export function findDroppedCncLayers(
   for (const layer of scene.layers) {
     if (!layer.output) continue;
     const settings = layer.cnc ?? DEFAULT_CNC_LAYER_SETTINGS;
+    if (
+      compiledJob !== undefined &&
+      compiledVectorLayerHasPaths(compiledJob, layer.id, settings.cutType)
+    )
+      continue;
     const polylines = collectLayerPolylines(scene.objects, layer, device);
     if (polylines.length === 0) continue;
     if (settings.cutType === 'inlay-pair') continue;
-    if (explicitPocketPlannerHasBasePaths(polylines, settings, config)) continue;
     if (compiledJob !== undefined) {
-      if (!compiledVectorLayerHasPaths(compiledJob, layer.id, settings.cutType)) {
-        dropped.push(layer.id);
-      }
+      dropped.push(layer.id);
       continue;
     }
+    if (explicitPocketPlannerHasBasePaths(polylines, settings, config)) continue;
     const clearance = vcarveClearanceGroupForLayer(layer, settings, polylines, device, config);
     const group = cncGroupForLayer(layer, settings, polylines, device, config);
     if (clearance === null && group === null) dropped.push(layer.id);

@@ -124,13 +124,15 @@ which then aimed leads into the kept part. The outer boundary is identified by `
 (line 65) — largest absolute area — chosen because winding survives concentric roughing/finishing
 offsets where containment depth does not.
 
-**Ramp entry** — `applyRampEntry` (line 114). Converts a contour plunge into a descent *along* the
-toolpath at a configured angle, clamped to 45° (`MAX_RAMP_ANGLE_DEG`, line 35). The pass becomes
-`path3d`: ramp over the leading span, cut the loop at depth, then **re-cut the ramped span level** so
-no slope is left (closed loops only, `appendLevelRampSpan`, line 204). Two bugs are recorded as fixed
-in comments: the resume index must be the vertex where the ramp *actually* reached depth, not always
-`source[1]` (lines 154-156), and a ramp longer than the path finishes vertically at the end point
-(lines 187-189).
+**Ramp entry** — `applyRampEntry` (`motion-polish.ts`) with the path geometry in
+`contour-ramp-entry.ts` (**ADR-471**). Converts a contour plunge into a descent *along* the toolpath
+at a configured angle, clamped to 45° (`MAX_RAMP_ANGLE_DEG`), starting from the level the same path
+was last cut to (the stock top the first time). The pass becomes `path3d`: a closed loop is descended
+round, **lapping when it is shorter than its ramp**, then cut one whole lap at depth from where the
+descent ended; an open path **zig-zags** along its start back to the start at depth, then is cut end to
+end at depth, so no slope is left. A path shorter than one cut width that the ramp would have to go
+over again keeps its plunge as a contour pass marked `entryPlunge`, which the G-code header and a Job
+Review advisory disclose.
 
 **Lead-in/out** — **ADR-250** (`DECISIONS.md:12313`) adds arc/line leads to closed profile cuts,
 default-on for profile-outside/inside, no-op elsewhere. Applied at `compile-cnc-job.ts:119-124` via

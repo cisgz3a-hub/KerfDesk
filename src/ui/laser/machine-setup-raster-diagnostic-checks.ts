@@ -118,7 +118,8 @@ function accelerationMarginCheck(lowOverscanGroups: number | null): DiagnosticCh
     return {
       label: 'Head acceleration margin',
       status: 'check',
-      detail: 'Inspect compiled effective overscan in Job Review for this large canvas.',
+      detail:
+        'Runway analysis is unavailable. Confirm the profile acceleration and inspect compiled output in Job Review.',
     };
   }
   return {
@@ -126,8 +127,8 @@ function accelerationMarginCheck(lowOverscanGroups: number | null): DiagnosticCh
     status: lowOverscanGroups > 0 ? 'check' : 'ok',
     detail:
       lowOverscanGroups > 0
-        ? 'Some bidirectional groups are below the 5%-of-speed calibration runway reference. Increase runway if edges look darker, stretched, or uneven, then verify against controller acceleration.'
-        : 'Executable bidirectional groups meet the 5%-of-speed calibration runway reference; low axis acceleration can still require more.',
+        ? 'Some bidirectional sweeps have too little runway for the profile acceleration or calibration margin. Lower engraving speed or increase Overscan, then calibrate at that speed. Confirm the profile acceleration against the controller.'
+        : 'Runways meet the estimated acceleration distance and calibration margin. This uses the profile acceleration; confirm it against the controller before relying on scan alignment.',
   };
 }
 

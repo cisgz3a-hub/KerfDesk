@@ -7,7 +7,7 @@ const MM_PER_INCH = 25.4;
 // parity: LightBurn staff say "There isn't a default DPI for images - that
 // setting is for SVG files only" (forum thread 173939). This is the BITMAP
 // default only; SVG px stay 96 DPI per ADR-046.
-const DEFAULT_DPI = 254;
+export const DEFAULT_DPI = 254;
 
 export type RasterImportGeometryInput = {
   readonly naturalWidth: number;

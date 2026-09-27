@@ -2,14 +2,26 @@ import type { ColoredPath } from '../../core/scene';
 import {
   DEFAULT_TRACE_OPTIONS,
   TRACE_PRESETS,
-  traceImagesToSvgFiles,
+  traceImagesToVectorFiles,
+  type BatchTraceFile,
   type BatchTraceImageJob,
-  type BatchTraceSvgFile,
   type RawImageData,
   type TraceOptions,
 } from '../../core/trace';
+import {
+  batchTraceFormatLabel,
+  type BatchTraceOutput,
+  type BatchTraceSkip,
+} from '../../core/trace/batch-trace';
+import { tracedLayersToDxf } from '../../io/dxf/export-dxf';
+import { writeTracedDrawing } from '../../io/vector-formats/traced-drawing';
 import type { PlatformAdapter } from '../../platform/types';
-import { rasterImportGeometry } from '../common/image-import';
+import { readImageHeaderDensity, type ImageDensity } from '../common/image-density';
+import {
+  DEFAULT_DPI,
+  rasterImportGeometry,
+  type RasterImportGeometry,
+} from '../common/image-import';
 import type { ToastVariant } from '../state/toast-store';
 import { loadImageAsRawData, readImageNaturalSize } from '../trace/image-loader';
 import { browserDeviceMemoryGb } from '../trace/trace-commit-at-grid';
@@ -24,8 +36,15 @@ import { isTraceRequestSuperseded, traceImageWithFallback } from '../trace/use-t
 import { traceNoticeMessage, type TraceNotice } from '../trace/trace-notices';
 
 export type MultiFileTraceFile = File;
-export type MultiFileTraceExport = BatchTraceSvgFile & {
+export type MultiFileTraceExport = BatchTraceFile & {
   readonly notices?: ReadonlyArray<TraceNotice>;
+  // Whether the file's mm size came from the file's embedded density or the
+  // default bitmap DPI, so the batch toast can say which files fell back.
+  readonly densitySource?: RasterImportGeometry['densitySource'];
+};
+export type MultiFileTraceBatch = {
+  readonly files: ReadonlyArray<MultiFileTraceExport>;
+  readonly skipped: ReadonlyArray<BatchTraceSkip>;
 };
 
 export type MultiFileTraceDeps = {
@@ -34,25 +53,33 @@ export type MultiFileTraceDeps = {
   readonly readNaturalSize?: (
     file: MultiFileTraceFile,
   ) => Promise<{ readonly width: number; readonly height: number }>;
+  // The file's embedded density (PNG pHYs, JFIF, EXIF, BMP); omitted, parsed
+  // as a single-image import parses it, from a bounded header prefix only.
+  readonly readDensity?: (file: MultiFileTraceFile) => Promise<ImageDensity | null>;
   readonly trace?: (
     image: RawImageData,
     options: TraceOptions,
   ) => Promise<ReadonlyArray<ColoredPath>>;
-  readonly write?: (file: BatchTraceSvgFile) => Promise<boolean> | boolean;
+  readonly write?: (file: BatchTraceFile) => Promise<boolean> | boolean;
+  /** Trace settings for every image (default: the Line Art preset). */
   readonly options?: TraceOptions;
   // The project's machine density; omitted, the default spot's (ADR-409).
   readonly targetPxPerMm?: number;
   readonly deviceMemoryGb?: number;
+  /** File format, precision and contour grouping. */
+  readonly output?: BatchTraceOutput;
 };
 
 type PushToast = (message: string, variant?: ToastVariant) => void;
 
+export const DEFAULT_MULTI_FILE_TRACE_PRESET = 'Line Art';
 const DEFAULT_MULTI_FILE_TRACE_OPTIONS: TraceOptions =
-  TRACE_PRESETS['Line Art'] ?? DEFAULT_TRACE_OPTIONS;
+  TRACE_PRESETS[DEFAULT_MULTI_FILE_TRACE_PRESET] ?? DEFAULT_TRACE_OPTIONS;
 
 type MultiFileJobContext = {
   readonly loadImage: NonNullable<MultiFileTraceDeps['loadImage']>;
   readonly readNatural: NonNullable<MultiFileTraceDeps['readNaturalSize']> | null;
+  readonly readDensity: NonNullable<MultiFileTraceDeps['readDensity']>;
   readonly options: TraceOptions;
   readonly targetPxPerMm: number;
   readonly deviceMemoryGb: number | undefined;
@@ -61,57 +88,90 @@ type MultiFileJobContext = {
 export async function buildMultiFileTraceExports(
   files: ReadonlyArray<MultiFileTraceFile>,
   deps: MultiFileTraceDeps = {},
-): Promise<ReadonlyArray<MultiFileTraceExport>> {
+): Promise<MultiFileTraceBatch> {
   const context: MultiFileJobContext = {
     loadImage: deps.loadImage ?? loadImageAsRawData,
     readNatural:
       deps.readNaturalSize ?? (deps.loadImage === undefined ? readImageNaturalSize : null),
+    readDensity: deps.readDensity ?? readImageHeaderDensity,
     options: deps.options ?? DEFAULT_MULTI_FILE_TRACE_OPTIONS,
     targetPxPerMm: deps.targetPxPerMm ?? traceTargetPxPerMm(undefined, undefined),
     deviceMemoryGb: deps.deviceMemoryGb ?? browserDeviceMemoryGb(),
   };
   const jobs: BatchTraceImageJob[] = [];
+  const densitySources: RasterImportGeometry['densitySource'][] = [];
   // Rule 7 / ADR-228: this batch used to SILENTLY skip any file over 25 MB
   // (no toast channel here to say so). A size cap is a policy judgement, so
   // every selected file is now traced regardless of size.
-  for (const file of files) jobs.push(await multiFileTraceJob(file, context));
+  for (const file of files) {
+    const { job, densitySource } = await multiFileTraceJob(file, context);
+    jobs.push(job);
+    densitySources.push(densitySource);
+  }
   const notices: ReadonlyArray<TraceNotice>[] = [];
   const previewResolution = new Set<number>();
-  const exports = await traceImagesToSvgFiles(jobs, {
-    trace: deps.trace ?? traceWithWorkerFallback(notices),
-    // As at a dialog commit, the finer grid is an improvement, not a
-    // requirement: a file whose finer decode or trace fails is traced on the
-    // preview grid instead of aborting the batch. Cancellation still aborts.
-    canFallBack: (error) => !isTraceAbort(error) && !isTraceRequestSuperseded(error),
-    onFallback: (index) => previewResolution.add(index),
-  });
-  return exports.map((file, index) => {
-    const fileNotices = [
-      ...(notices[index] ?? []),
-      ...(previewResolution.has(index) ? (['preview-resolution'] as const) : []),
-    ];
-    return fileNotices.length === 0 ? file : { ...file, notices: fileNotices };
-  });
+  const result = await traceImagesToVectorFiles(
+    jobs,
+    {
+      trace: deps.trace ?? traceWithWorkerFallback(notices),
+      writeDxf: tracedLayersToDxf,
+      // As at a dialog commit, the finer grid is an improvement, not a
+      // requirement: a file whose finer decode or trace fails is traced on the
+      // preview grid instead of aborting the batch. Cancellation still aborts.
+      canFallBack: (error) => !isTraceAbort(error) && !isTraceRequestSuperseded(error),
+      onFallback: (index) => previewResolution.add(index),
+      writeDrawing: writeTracedDrawing,
+    },
+    deps.output ?? {},
+  );
+  return {
+    skipped: result.skipped,
+    files: result.files.map((file) => {
+      // Notices are recorded per traced job, including skipped ones.
+      const fileNotices = [
+        ...(notices[file.sourceIndex] ?? []),
+        ...(previewResolution.has(file.sourceIndex) ? (['preview-resolution'] as const) : []),
+      ];
+      const sized = { ...file, densitySource: densitySources[file.sourceIndex] ?? 'default' };
+      return fileNotices.length === 0 ? sized : { ...sized, notices: fileNotices };
+    }),
+  };
 }
 
 // One batch job on the same working-grid policy as a dialog commit (ADR-409):
-// the placed size is the import size, and the image is decoded on its turn so
-// the batch holds one large decode at a time.
+// the placed size is the import size — the file's embedded density when it has
+// one, the default bitmap DPI otherwise, exactly as Import Image sizes it — and
+// the image is decoded on its turn so the batch holds one large decode at a time.
 async function multiFileTraceJob(
   file: MultiFileTraceFile,
   context: MultiFileJobContext,
-): Promise<BatchTraceImageJob> {
+): Promise<{
+  readonly job: BatchTraceImageJob;
+  readonly densitySource: RasterImportGeometry['densitySource'];
+}> {
+  const density = await context.readDensity(file);
   if (context.readNatural === null) {
     const image = await context.loadImage(file);
-    return {
+    const { densitySource, ...physicalSize } = physicalSizeMm(image, density);
+    const job = {
       sourceName: file.name,
       image,
-      physicalSizeMm: physicalSizeMm(image, image),
+      physicalSizeMm: physicalSize,
       options: context.options,
     };
+    return { job, densitySource };
   }
   const natural = await context.readNatural(file);
-  const size = physicalSizeMm(natural, natural);
+  const { densitySource, ...size } = physicalSizeMm(natural, density);
+  return { job: planMultiFileTraceJob(file, natural, size, context), densitySource };
+}
+
+function planMultiFileTraceJob(
+  file: MultiFileTraceFile,
+  natural: { readonly width: number; readonly height: number },
+  size: { readonly widthMm: number; readonly heightMm: number },
+  context: MultiFileJobContext,
+): BatchTraceImageJob {
   const plan = planTraceCommitGridFor(
     natural,
     {
@@ -135,17 +195,23 @@ async function multiFileTraceJob(
 
 function physicalSizeMm(
   natural: { readonly width: number; readonly height: number },
-  sampled: { readonly width: number; readonly height: number },
-): { readonly widthMm: number; readonly heightMm: number } {
+  density: ImageDensity | null,
+): {
+  readonly widthMm: number;
+  readonly heightMm: number;
+  readonly densitySource: RasterImportGeometry['densitySource'];
+} {
   const geometry = rasterImportGeometry({
     naturalWidth: natural.width,
     naturalHeight: natural.height,
-    sampledWidth: sampled.width,
-    sampledHeight: sampled.height,
+    sampledWidth: natural.width,
+    sampledHeight: natural.height,
+    density,
   });
   return {
     widthMm: geometry.bounds.maxX - geometry.bounds.minX,
     heightMm: geometry.bounds.maxY - geometry.bounds.minY,
+    densitySource: geometry.densitySource,
   };
 }
 
@@ -156,54 +222,81 @@ export async function runMultiFileTrace(
 ): Promise<void> {
   if (files.length === 0) return;
   try {
-    const svgFiles = await buildMultiFileTraceExports(files, deps);
-    if (svgFiles.length === 0) return;
-    assertTraceProducedVisiblePaths(svgFiles);
+    const batch = await buildMultiFileTraceExports(files, deps);
+    const skippedText = skippedMessage(batch.skipped);
     const write = deps.write ?? missingTraceExportWriter;
-    const { written, notices } = await writeTraceExports(svgFiles, write);
-    if (written === 0) return;
-    const summary = `Traced ${written} ${written === 1 ? 'image' : 'images'} to SVG.`;
-    pushToast([summary, ...notices.map(traceNoticeMessage)].join(' '), 'success');
+    const { written, defaultDensity, notices } = await writeTraceExports(batch.files, write);
+    if (written === 0) {
+      if (skippedText !== '') pushToast(skippedText, 'warning');
+      return;
+    }
+    const format = batchTraceFormatLabel(batch.files[0]?.format ?? 'svg');
+    const summary = `Traced ${written} ${written === 1 ? 'image' : 'images'} to ${format}.`;
+    const density = defaultDensityNotice(defaultDensity, written);
+    pushToast(
+      joinToastParts([summary, density, skippedText, ...notices.map(traceNoticeMessage)]),
+      skippedText === '' ? 'success' : 'warning',
+    );
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
     pushToast(`Could not trace images: ${message}`, 'error');
   }
 }
 
+function joinToastParts(parts: ReadonlyArray<string | null>): string {
+  return parts.filter((part): part is string => part !== null && part !== '').join(' ');
+}
+
+function skippedMessage(skipped: ReadonlyArray<BatchTraceSkip>): string {
+  if (skipped.length === 0) return '';
+  const names = skipped.map((skip) => skip.sourceName).join(', ');
+  return (
+    `Skipped ${skipped.length} ${skipped.length === 1 ? 'image' : 'images'} with no visible paths` +
+    ` (${names}); try Trace Image with an adjusted threshold or import as Image instead.`
+  );
+}
+
 async function writeTraceExports(
   files: ReadonlyArray<MultiFileTraceExport>,
   write: NonNullable<MultiFileTraceDeps['write']>,
-): Promise<{ readonly written: number; readonly notices: ReadonlyArray<TraceNotice> }> {
+): Promise<{
+  readonly written: number;
+  readonly defaultDensity: number;
+  readonly notices: ReadonlyArray<TraceNotice>;
+}> {
   let written = 0;
+  let defaultDensity = 0;
   const notices = new Set<TraceNotice>();
   for (const file of files) {
     if (!(await write(file))) continue;
     written += 1;
+    if (file.densitySource === 'default') defaultDensity += 1;
     for (const notice of file.notices ?? []) notices.add(notice);
   }
-  return { written, notices: [...notices] };
+  return { written, defaultDensity, notices: [...notices] };
 }
 
-export async function writeTraceSvgFileWithPlatform(
+// As Import Image's toast says "default 254 DPI — no usable embedded density",
+// the batch says which written files were sized at the default, so a file
+// that fell back cannot pass for one sized by its own DPI.
+function defaultDensityNotice(defaultDensity: number, written: number): string | null {
+  if (defaultDensity === 0) return null;
+  if (written === 1) return `It had no embedded DPI, so it was sized at ${DEFAULT_DPI} DPI.`;
+  const was = defaultDensity === 1 ? 'was' : 'were';
+  return `${defaultDensity} of ${written} images had no embedded DPI and ${was} sized at ${DEFAULT_DPI} DPI.`;
+}
+
+export async function writeTraceFileWithPlatform(
   platform: PlatformAdapter,
-  file: BatchTraceSvgFile,
+  file: BatchTraceFile,
 ): Promise<boolean> {
   const target = await platform.pickFileForSave({
     suggestedName: file.filename,
-    extensions: ['.svg'],
+    extensions: ['.' + file.format],
   });
   if (target === null) return false;
-  await target.write(file.svg);
+  await target.write(file.text);
   return true;
-}
-
-function assertTraceProducedVisiblePaths(files: ReadonlyArray<BatchTraceSvgFile>): void {
-  const emptyFiles = files.filter((file) => file.pathCount === 0);
-  if (emptyFiles.length === 0) return;
-  const filenames = emptyFiles.map((file) => file.filename).join(', ');
-  throw new Error(
-    `Trace produced no visible paths for ${filenames}. Try Trace Image with adjusted threshold or import as Image instead.`,
-  );
 }
 
 function missingTraceExportWriter(): never {
@@ -214,7 +307,7 @@ function traceWithWorkerFallback(
   notices: ReadonlyArray<TraceNotice>[],
 ): NonNullable<MultiFileTraceDeps['trace']> {
   // The batch core traces in source order. Keep each result's notices beside
-  // its SVG so cancelled saves cannot attach a warning to a different file.
+  // its job so cancelled saves cannot attach a warning to a different file.
   return async (image, options) => {
     const result = await traceImageWithFallback(image, options);
     notices.push(result.notices ?? []);

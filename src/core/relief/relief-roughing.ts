@@ -10,21 +10,23 @@
 // region boundary directly — no additional tool-radius inset (deliberate
 // deviation from pocketToolpathRings, which would double-count the radius).
 // The stepover is a percentage of the cut width over one level, which is the
-// stored diameter except for a tapered ball nose: its rings then overlap
-// inside every level instead of leaving ribs (ADR-368 Amendment 2). When the
-// stepover is wider than the cutter reaches on a level's slice (ADR-413), the
-// innermost ring can stop short of the level's centre; relief-core-cleanup.ts
-// then adds the paths that clear what the rings leave, as the pocket planner
-// does (ADR-289 Amendment 1).
+// stored diameter for a flat end mill. A ball nose, V-bit, engraving bit or
+// tapered ball nose cuts narrower on a level shallower than it narrows, and its
+// rings then overlap inside every level instead of leaving ribs (ADR-368
+// Amendments 2 and 3). When the stepover is wider than the cutter reaches on a
+// level's slice (ADR-413), the innermost ring can stop short of the level's
+// centre; relief-core-cleanup.ts then adds the paths that clear what the rings
+// leave, as the pocket planner does (ADR-289 Amendment 1).
 //
 // Output passes are contour passes in heightmap physical mm (origin at the
 // heightmap's min corner, y down), each ring closed back to its first point.
 // The compiler has already folded object XY scale into that grid, so only its
 // residual isometry and device origin remain. Depth-major: every ring of one
-// level, outside in, then its core cleanup, before the next level. With flat
+// level, cleanup first then inside out, before the next level. With flat
 // finishing on (ADR-450), an end mill then cuts each flat of the model to its
 // exact height, top down (relief-flat-finish.ts). Pure and deterministic.
 
+import { withOuterContoursPositive } from '../geometry/polyline-orientation';
 import { buildOffsetLadder, insetContoursChecked } from '../geometry/offset-ladder';
 import type { CncContourPass, CncPass } from '../job';
 import type { CncTool, Polyline } from '../scene';
@@ -291,7 +293,11 @@ function planFlatLevels(
 }
 
 function appendClosedRings(passes: CncContourPass[], level: ReliefRoughingLevelPaths): void {
-  for (const polyline of [...level.rings.flat(), ...level.cleanup]) {
+  const insideOut = [
+    ...[...level.cleanup].reverse(),
+    ...[...level.rings].reverse().flatMap(withOuterContoursPositive),
+  ];
+  for (const polyline of insideOut) {
     passes.push({ kind: 'contour', zMm: level.zMm, polyline: closeRing(polyline), closed: true });
   }
 }

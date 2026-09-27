@@ -229,6 +229,11 @@ export type DeviceProfile = {
   // to get per-operation air back on an A1 once `$152=100` is set on the
   // controller or the firmware is updated.
   readonly airAssistRestartUnreliable?: boolean;
+  // ADR-432: 'off' keeps every laser burn move a G1 line; 'on' lets the laser
+  // emitter write G2/G3 arcs for curved line-mode work on a controller family
+  // that accepts them. Absent is the per-profile default (laserArcMovesEnabled
+  // in laser-arc-moves.ts): on for firmware-family profiles, off for brands.
+  readonly laserArcMoves?: 'off' | 'on' | undefined;
   // Optional Z metadata. XY bed dimensions are used for bounds checks today;
   // Z is informational/setup-facing until a dedicated Z workflow is enabled.
   // Bidirectional fill/raster compensation. Empty keeps emitted output
@@ -248,8 +253,11 @@ export type DeviceProfile = {
   // The overhead camera's lens and position over the bed (ADR-440), fitted
   // from one photo of the engraved target. Absent until the operator
   // calibrates; it replaces the old lens calibration and bed alignment, whose
-  // saved values are dropped on load rather than trusted.
-  readonly cameraModel?: CameraModelRecord;
+  // saved values are dropped on load rather than trusted. With several
+  // cameras (ADR-446) this is the newest calibration, and the others keep
+  // theirs in `otherCameraModels`, each bound to its own camera.
+  readonly cameraModel?: CameraModelRecord | undefined;
+  readonly otherCameraModels?: ReadonlyArray<CameraModelRecord> | undefined;
   readonly noGoZones: ReadonlyArray<NoGoZone>;
   readonly zTravelMm?: number;
   readonly zTravelConfirmed?: boolean;
