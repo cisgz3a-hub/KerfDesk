@@ -7,6 +7,7 @@ import {
   type JogVector,
   type PhysicalJogDirection,
 } from './jog-control-policy';
+import { keyboardJogHint } from './jog-keyboard-map';
 import { useHoldJog } from './use-hold-jog';
 
 const DIRECTIONS: ReadonlyArray<{
@@ -60,6 +61,9 @@ function JogArrowButton(
 ): JSX.Element {
   const stepVector = stepJogVector(props.direction, props.stepMm, props.signs, props.feed);
   const label = jogVectorLabel(stepVector, props.stepMm);
+  // The tooltip names this arrow's keyboard keys (ADR-493); the accessible name
+  // stays the wire command.
+  const hinted = `${label} (${keyboardJogHint(props.direction)})`;
   const handlers = useHoldJog({
     disabled: props.disabled,
     holdEnabled: props.continuousJogSupported,
@@ -82,7 +86,7 @@ function JogArrowButton(
       disabled={props.disabled}
       style={btnStyle}
       aria-label={label}
-      title={props.continuousJogSupported ? `${label}. Hold for continuous jog.` : label}
+      title={props.continuousJogSupported ? `${hinted}. Hold for continuous jog.` : hinted}
       {...handlers}
     >
       {props.glyph}

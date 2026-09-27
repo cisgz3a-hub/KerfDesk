@@ -3,15 +3,18 @@ import type { GcodeInspectionContext, GcodeInspectionSource } from './gcode-insp
 import { inspectGcodeText } from './gcode-inspector-parse';
 import { inspectGcodeOffThread } from './gcode-inspector-worker-client';
 import type { GcodeInspectorWorkerResult } from './gcode-inspector-worker-protocol';
+import { addPreviewChunk, type InspectionPreview } from './inspection-preview';
 
 export type InspectionState =
   | { readonly kind: 'idle' }
   | {
       readonly kind: 'loading';
-      readonly phase: 'queued' | 'reading' | 'parsing' | 'fallback';
+      readonly phase: 'queued' | 'reading' | 'parsing' | 'timing' | 'fallback';
       readonly queuePosition: number;
       readonly bytesRead?: number;
       readonly totalBytes?: number;
+      /** The moves the worker has read so far (ADR-485); null before any. */
+      readonly preview?: InspectionPreview | null;
     }
   | {
       readonly kind: 'ready';
@@ -21,6 +24,12 @@ export type InspectionState =
     }
   | { readonly kind: 'error'; readonly reason: string };
 
+/** The moves to show while the worker reads, once it has sent any. */
+export function loadingPreview(state: InspectionState): InspectionPreview | null {
+  if (state.kind !== 'loading' || state.phase === 'fallback') return null;
+  return state.preview ?? null;
+}
+
 export function useGcodeInspection(source: GcodeInspectionSource | null): InspectionState {
   const [state, setState] = useState<InspectionState>({ kind: 'idle' });
   useEffect(() => {
@@ -29,12 +38,19 @@ export function useGcodeInspection(source: GcodeInspectionSource | null): Inspec
       return;
     }
     let isCurrent = true;
+    let preview: InspectionPreview | null = null;
     const controller = new AbortController();
     setState({ kind: 'loading', phase: 'queued', queuePosition: 0 });
     const offThread = inspectGcodeOffThread(source, {
       signal: controller.signal,
       onProgress: (progress) => {
-        if (isCurrent) setState({ kind: 'loading', ...progress });
+        if (isCurrent) setState({ kind: 'loading', ...progress, preview });
+      },
+      onPreview: (chunk) => {
+        if (!isCurrent) return;
+        preview = addPreviewChunk(preview, chunk);
+        const current = preview;
+        setState((state) => (state.kind === 'loading' ? { ...state, preview: current } : state));
       },
     });
     const mainThreadFallback = offThread === null;

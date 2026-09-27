@@ -1,11 +1,10 @@
-// Pure segment→render-bucket builder (ADR-255 stage 4): splits render-model
-// segments into a recessive travel bucket and a solid bucket colored per
-// kind, as plain typed arrays — unit-testable without WebGL (the ADR-102 §2
-// pure-seam pattern). The scene feeds the solid bucket to fat lines and the
-// travel bucket to a thin translucent line object.
+// The rapids' render bucket (ADR-255 stage 4; ADR-485): the travel moves
+// copied out as plain typed arrays, unit-testable without WebGL (the ADR-102
+// §2 pure-seam pattern), for the thin translucent line the looks restyle. The
+// solid moves draw straight from the program instead (program-lines.ts).
 
 import { SEG_KIND } from '../../core/gcode-view';
-import type { Viewer3dTheme } from './viewer3d-theme';
+import type { MoveDetail } from './move-detail';
 
 export type Viewer3dSegmentsInput = {
   readonly segmentCount: number;
@@ -14,15 +13,8 @@ export type Viewer3dSegmentsInput = {
   readonly segKind: Uint8Array;
   /** Per segment, 0 leaves the move out of the drawing (ADR-470 filters). */
   readonly visible?: Uint8Array | null;
-};
-
-export type SolidBucket = {
-  readonly count: number;
-  readonly positions: Float32Array;
-  /** Normalized rgb at both segment endpoints (6 floats per segment). */
-  readonly colors: Float32Array;
-  /** Render-model segment index of each bucket entry, ascending. */
-  readonly sourceIndex: Uint32Array;
+  /** Lighter drawings of a big program for zoomed-out views (ADR-485). */
+  readonly detail?: MoveDetail | null;
 };
 
 export type TravelBucket = {
@@ -32,50 +24,23 @@ export type TravelBucket = {
   readonly sourceIndex: Uint32Array;
 };
 
-export type SegmentBuckets = {
-  readonly solid: SolidBucket;
-  readonly travel: TravelBucket;
-};
-
 const FLOATS_PER_SEGMENT = 6;
-const FALLBACK_RGB: readonly [number, number, number] = [1, 1, 1];
 
-export function buildSegmentBuckets(
-  segments: Viewer3dSegmentsInput,
-  theme: Viewer3dTheme,
-): SegmentBuckets {
-  const { travelCount, solidCount } = countSegments(segments);
-  const travelPositions = new Float32Array(travelCount * FLOATS_PER_SEGMENT);
-  const solidPositions = new Float32Array(solidCount * FLOATS_PER_SEGMENT);
-  const solidColors = new Float32Array(solidCount * FLOATS_PER_SEGMENT);
-  const travelSource = new Uint32Array(travelCount);
-  const solidSource = new Uint32Array(solidCount);
-  const kindRgb = kindColorTable(theme);
-  let travelAt = 0;
-  let solidAt = 0;
+export function buildTravelBucket(segments: Viewer3dSegmentsInput): TravelBucket {
+  const count = countTravel(segments);
+  const positions = new Float32Array(count * FLOATS_PER_SEGMENT);
+  const sourceIndex = new Uint32Array(count);
+  let at = 0;
   for (let index = 0; index < segments.segmentCount; index += 1) {
-    if (segments.visible?.[index] === 0) continue;
-    const kind = segments.segKind[index] ?? SEG_KIND.travel;
-    if (kind === SEG_KIND.travel) {
-      copySegment(segments.positions, index, travelPositions, travelAt);
-      travelSource[travelAt / FLOATS_PER_SEGMENT] = index;
-      travelAt += FLOATS_PER_SEGMENT;
-      continue;
-    }
-    copySegment(segments.positions, index, solidPositions, solidAt);
-    writeEndpointColors(solidColors, solidAt, kindRgb.get(kind) ?? FALLBACK_RGB);
-    solidSource[solidAt / FLOATS_PER_SEGMENT] = index;
-    solidAt += FLOATS_PER_SEGMENT;
+    if (!isDrawnTravel(segments, index)) continue;
+    positions.set(
+      segments.positions.subarray(index * FLOATS_PER_SEGMENT, (index + 1) * FLOATS_PER_SEGMENT),
+      at * FLOATS_PER_SEGMENT,
+    );
+    sourceIndex[at] = index;
+    at += 1;
   }
-  return {
-    solid: {
-      count: solidCount,
-      positions: solidPositions,
-      colors: solidColors,
-      sourceIndex: solidSource,
-    },
-    travel: { count: travelCount, positions: travelPositions, sourceIndex: travelSource },
-  };
+  return { count, positions, sourceIndex };
 }
 
 /**
@@ -95,52 +60,16 @@ export function revealCount(sourceIndex: Uint32Array, segmentIndex: number): num
   return low;
 }
 
-function countSegments(segments: Viewer3dSegmentsInput): {
-  readonly travelCount: number;
-  readonly solidCount: number;
-} {
-  let travelCount = 0;
-  let solidCount = 0;
+function countTravel(segments: Viewer3dSegmentsInput): number {
+  let count = 0;
   for (let index = 0; index < segments.segmentCount; index += 1) {
-    if (segments.visible?.[index] === 0) continue;
-    if (segments.segKind[index] === SEG_KIND.travel) travelCount += 1;
-    else solidCount += 1;
+    if (isDrawnTravel(segments, index)) count += 1;
   }
-  return { travelCount, solidCount };
+  return count;
 }
 
-function copySegment(
-  source: Float32Array,
-  index: number,
-  target: Float32Array,
-  offset: number,
-): void {
-  const base = index * FLOATS_PER_SEGMENT;
-  for (let component = 0; component < FLOATS_PER_SEGMENT; component += 1) {
-    target[offset + component] = source[base + component] ?? 0;
-  }
-}
-
-function writeEndpointColors(
-  colors: Float32Array,
-  offset: number,
-  rgb: readonly [number, number, number],
-): void {
-  for (let end = 0; end < 2; end += 1) {
-    colors[offset + end * 3] = rgb[0];
-    colors[offset + end * 3 + 1] = rgb[1];
-    colors[offset + end * 3 + 2] = rgb[2];
-  }
-}
-
-function kindColorTable(
-  theme: Viewer3dTheme,
-): ReadonlyMap<number, readonly [number, number, number]> {
-  return new Map([
-    [SEG_KIND.cut, rgbTriple(theme.cut)],
-    [SEG_KIND.plunge, rgbTriple(theme.plunge)],
-    [SEG_KIND.retract, rgbTriple(theme.retract)],
-  ]);
+function isDrawnTravel(segments: Viewer3dSegmentsInput, index: number): boolean {
+  return segments.segKind[index] === SEG_KIND.travel && segments.visible?.[index] !== 0;
 }
 
 export function rgbTriple(color: number): readonly [number, number, number] {
@@ -162,9 +91,12 @@ export function cssHexColor(color: number): string {
  * the same encoding or its swatches never match the toolpath.
  */
 export function renderedLineCss(rgb: readonly [number, number, number]): string {
-  const channel = (value: number): number =>
-    Math.round(linearToSrgb(Math.min(1, Math.max(0, value))) * 255);
-  return `rgb(${channel(rgb[0])}, ${channel(rgb[1])}, ${channel(rgb[2])})`;
+  return `rgb(${renderedLineByte(rgb[0])}, ${renderedLineByte(rgb[1])}, ${renderedLineByte(rgb[2])})`;
+}
+
+/** One channel of `renderedLineCss`, 0 to 255. */
+export function renderedLineByte(value: number): number {
+  return Math.round(linearToSrgb(Math.min(1, Math.max(0, value))) * 255);
 }
 
 /** Stops for a CSS gradient matching a linearly blended line-colour ramp. */

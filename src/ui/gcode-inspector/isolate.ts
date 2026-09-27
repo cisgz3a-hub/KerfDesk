@@ -3,9 +3,9 @@
 // section stays. Pure, so the planes and masks are unit-tested apart from the
 // scene that applies them.
 
-import type { GcodeRenderModel } from '../../core/gcode-view';
 // Deep import: the viewer3d barrel is capped at 20 exports by its index contract.
 import type { Viewer3dClipPlane } from '../viewer3d/scene-isolate';
+import type { InspectorRenderModel } from './inspector-model';
 
 export type SectionAxis = 'x' | 'y';
 
@@ -51,7 +51,7 @@ export function isolatePlanes(state: IsolateState): ReadonlyArray<Viewer3dClipPl
  * and top and every cutting level between, or even steps when a finishing
  * pass has too many levels to list. Null when the program never moves.
  */
-export function zStops(model: GcodeRenderModel): ReadonlyArray<number> | null {
+export function zStops(model: InspectorRenderModel): ReadonlyArray<number> | null {
   const bounds = model.stats.motionBounds;
   if (bounds === null) return null;
   if (model.stats.zLevels.length > MAX_Z_STOPS) {
