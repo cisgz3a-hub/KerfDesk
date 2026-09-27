@@ -71,6 +71,24 @@ describe('paper pages and per-side margins (rank 33)', () => {
     expect(svg).toMatch(/M\s*4[ ,]1(?![\d.])/);
   });
 
+  it('keeps oversize artwork centred on the page instead of shrinking the page', async () => {
+    const svg = await svgFor({
+      page: { fit: 'paper', paperMm: { width: 6, height: 8 }, marginMm: 1 },
+    });
+    expect(svg).toContain('viewBox="0 0 6 8"');
+    // The 10 mm square's centre (15, 25) moves to (3, 4): it starts at (-2, -1).
+    expect(svg).toContain('d="M-2-1h10v10h-10z"');
+  });
+
+  it.each([
+    ['a zero side', { width: 0, height: 297 }],
+    ['a side over the limit', { width: 210, height: 10001 }],
+    ['a non-finite side', { width: Number.NaN, height: 297 }],
+  ])('keeps the image page for %s', async (_name, paperMm) => {
+    const svg = await svgFor({ page: { fit: 'paper', paperMm } });
+    expect(svg).toBe(await svgFor({}));
+  });
+
   it('keeps the image page byte-identical when no page option is set', async () => {
     expect(await svgFor({ page: { fit: 'image' } })).toBe(await svgFor({}));
   });

@@ -5,11 +5,10 @@ import {
   traceImagesToVectorFiles,
   type BatchTraceFile,
   type BatchTraceImageJob,
-  type BatchTraceJob,
   type RawImageData,
   type TraceOptions,
 } from '../../core/trace';
-import type { BatchTraceOutput, BatchTraceSkip } from '../../core/trace/batch-trace';
+import type { BatchTraceJob, BatchTraceOutput, BatchTraceSkip } from '../../core/trace/batch-trace';
 import { tracedLayersToDxf } from '../../io/dxf/export-dxf';
 import { writeTracedDrawing } from '../../io/vector-formats/traced-drawing';
 import type { PlatformAdapter, SaveDirectoryTarget } from '../../platform/types';
