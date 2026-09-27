@@ -54,6 +54,7 @@ import { computeView, type ViewState, type ViewTransform } from './view-transfor
 import { drawLargeSceneNotice, strokePolylinesBatched } from './draw-vector-strokes';
 import { drawArtworkRunFocus } from './draw-artwork-run-focus';
 import { drawBed, drawGrid, drawOriginMarker } from './draw-bed-chrome';
+import { objectIntersectsCanvas } from './object-viewport';
 
 export type DrawOpts = {
   readonly selectedId: string | null;
@@ -291,11 +292,13 @@ function drawObjects(
       ctx.globalAlpha = 0.24;
     }
     const isVisible = sceneLayerVisibility.hasObject(obj, layerByColor);
+    const onCanvas = isVisible && objectIntersectsCanvas(obj, view, ctx.canvas);
     // ImportedSvg and TextObject share the same polyline shape after text renders
     // to paths — single drawing path. ADR-057: dash the jig box so it reads as a
     // placement fixture, not artwork; reset after, before the overlays below.
     ctx.setLineDash(isRegistrationBox(obj) ? [8, 5] : []);
     if (
+      onCanvas &&
       drawObjectPolylines(
         ctx,
         obj,
@@ -309,20 +312,7 @@ function drawObjects(
       simplified = true;
     }
     ctx.setLineDash([]);
-    // F.2.c: raster images render via Canvas2D drawImage rather than
-    // polyline strokes. The bitmap displays at its mm-bounds; the
-    // dither preview overlay is a separate render layer we can add
-    // later if needed. Hiding the layer hides its bitmaps (M23) —
-    // an orphan color with no layer stays visible so artwork never
-    // silently disappears.
-    if (obj.kind === 'raster-image' && isVisible) {
-      drawRasterImage(ctx, obj, view, {
-        adjustments: burnedImageAdjustments(obj, layerByColor),
-        ...(onRasterBitmapReady === undefined ? {} : { onBitmapReady: onRasterBitmapReady }),
-      });
-    }
-    // H.4: reliefs render as grayscale depth maps (light = top, dark = floor).
-    if (obj.kind === 'relief') drawReliefObject(ctx, obj, layerByColor, view);
+    if (onCanvas) drawObjectBitmap(ctx, obj, layerByColor, view, onRasterBitmapReady);
     drawObjectSelectionOverlay(ctx, obj, view, {
       isVisible,
       selectedId,
@@ -341,6 +331,26 @@ function drawObjects(
   );
   if (selectionObjects.length > 1) drawSelectionSetOverlay(ctx, selectionObjects, view);
   return simplified;
+}
+
+function drawObjectBitmap(
+  ctx: CanvasRenderingContext2D,
+  obj: SceneObject,
+  layerByColor: Map<string, Layer>,
+  view: ViewTransform,
+  onRasterBitmapReady: (() => void) | undefined,
+): void {
+  // F.2.c: raster images render via Canvas2D drawImage rather than
+  // polyline strokes. Hidden layers also hide bitmaps; orphan colors
+  // stay visible so artwork never silently disappears.
+  if (obj.kind === 'raster-image') {
+    drawRasterImage(ctx, obj, view, {
+      adjustments: burnedImageAdjustments(obj, layerByColor),
+      ...(onRasterBitmapReady === undefined ? {} : { onBitmapReady: onRasterBitmapReady }),
+    });
+  }
+  // H.4: reliefs render as grayscale depth maps (light = top, dark = floor).
+  if (obj.kind === 'relief') drawReliefObject(ctx, obj, layerByColor, view);
 }
 
 function selectedObjectsForOverlay(

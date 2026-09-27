@@ -31,10 +31,12 @@ export function* squaredDistanceFieldSteps(mask: InkMask): TraceSteps<Float64Arr
   const { width, height } = mask;
   const distSq = new Float64Array(width * height);
   const column = new Float64Array(height);
+  // One scratch envelope serves every 1D transform of both passes.
+  const scratch = envelopeScratch(Math.max(width, height));
   // Pass 1: per-column 1D transform of the 0/INF indicator.
   for (let x = 0; x < width; x += 1) {
     if (cooperate) yield;
-    transformColumn(mask, x, column, distSq);
+    transformColumn(mask, x, column, distSq, scratch);
   }
   // Pass 2: per-row 1D transform of the column result.
   const row = new Float64Array(width);
@@ -43,7 +45,7 @@ export function* squaredDistanceFieldSteps(mask: InkMask): TraceSteps<Float64Arr
     for (let x = 0; x < width; x += 1) {
       row[x] = distSq[y * width + x] ?? 0;
     }
-    const transformed = distanceTransform1d(row, width);
+    const transformed = distanceTransform1d(row, width, scratch);
     for (let x = 0; x < width; x += 1) {
       distSq[y * width + x] = transformed[x] ?? 0;
     }
@@ -57,11 +59,12 @@ function transformColumn(
   x: number,
   column: Float64Array,
   distSq: Float64Array,
+  scratch: EnvelopeScratch,
 ): void {
   for (let y = 0; y < height; y += 1) {
     column[y] = (ink[y * width + x] ?? 0) === 1 ? INF : 0;
   }
-  const transformed = distanceTransform1d(column, height);
+  const transformed = distanceTransform1d(column, height, scratch);
   for (let y = 0; y < height; y += 1) {
     distSq[y * width + x] = transformed[y] ?? 0;
   }
@@ -82,22 +85,26 @@ function clampToVirtualBorder(distSq: Float64Array, width: number, height: numbe
   }
 }
 
-type Envelope = {
+// Working arrays for 1D transforms of up to `size` samples.
+type EnvelopeScratch = {
   readonly v: Int32Array; // parabola roots
   readonly z: Float64Array; // envelope boundaries
-  readonly k: number; // last envelope index
+  readonly d: Float64Array; // sampled result
 };
 
-// 1D squared-distance transform via the lower envelope of parabolas
-// rooted at (i, f[i]).
-function distanceTransform1d(f: Float64Array, n: number): Float64Array {
-  const envelope = buildLowerEnvelope(f, n);
-  return sampleEnvelope(f, n, envelope);
+function envelopeScratch(size: number): EnvelopeScratch {
+  return { v: new Int32Array(size), z: new Float64Array(size + 1), d: new Float64Array(size) };
 }
 
-function buildLowerEnvelope(f: Float64Array, n: number): Envelope {
-  const v = new Int32Array(n);
-  const z = new Float64Array(n + 1);
+// 1D squared-distance transform via the lower envelope of parabolas
+// rooted at (i, f[i]). The result lives in the scratch until the next call.
+function distanceTransform1d(f: Float64Array, n: number, scratch: EnvelopeScratch): Float64Array {
+  buildLowerEnvelope(f, n, scratch);
+  return sampleEnvelope(f, n, scratch);
+}
+
+function buildLowerEnvelope(f: Float64Array, n: number, scratch: EnvelopeScratch): void {
+  const { v, z } = scratch;
   let k = 0;
   v[0] = 0;
   z[0] = -Infinity;
@@ -117,12 +124,10 @@ function buildLowerEnvelope(f: Float64Array, n: number): Envelope {
     z[k] = s;
     z[k + 1] = Infinity;
   }
-  return { v, z, k };
 }
 
-function sampleEnvelope(f: Float64Array, n: number, envelope: Envelope): Float64Array {
-  const { v, z } = envelope;
-  const d = new Float64Array(n);
+function sampleEnvelope(f: Float64Array, n: number, scratch: EnvelopeScratch): Float64Array {
+  const { v, z, d } = scratch;
   let k = 0;
   for (let q = 0; q < n; q += 1) {
     while ((z[k + 1] ?? Infinity) < q) k += 1;

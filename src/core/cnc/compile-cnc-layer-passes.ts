@@ -34,6 +34,8 @@ import { hasFinitePoints, profileToolpathPolylines } from './profile-paths';
 import { specializedPassesForLayer } from './compile-cnc-special-passes';
 import { manualTabCentersForToolpaths, type CollectedCncContour } from './cnc-manual-tab-mapping';
 import type { VCarveLadder } from './vcarve-ladder';
+import { cncSettingsForStage, cncStageRecipe } from './cnc-stage-settings';
+import { preserveProfileFinishStages } from './profile-finishing-stage';
 
 export function passesForCncLayer(
   polylines: ReadonlyArray<Polyline>,
@@ -104,16 +106,22 @@ export function passesForCncLayerWithEvidence(
     allowanceMm,
     handedness,
     sourceContours,
+    cncStageRecipe(settings, 'profile-finish', tool) === undefined
+      ? undefined
+      : cncSettingsForStage(settings, 'profile-finish', tool),
   );
   return {
     ...raw,
     passes:
       settings.rampEntryDeg === undefined || settings.rampEntryDeg <= 0
         ? passes
-        : applyRampEntry(
+        : preserveProfileFinishStages(
             passes,
-            settings.rampEntryDeg,
-            settings.tabsEnabled && isProfileCutType(settings.cutType),
+            applyRampEntry(
+              passes,
+              settings.rampEntryDeg,
+              settings.tabsEnabled && isProfileCutType(settings.cutType),
+            ),
           ),
   };
 }
@@ -190,6 +198,7 @@ function passesForDepths(
   allowanceMm: number,
   handedness: FrameHandedness,
   sourceContours: ReadonlyArray<CollectedCncContour>,
+  finishingSettings?: CncLayerSettings,
 ): ReadonlyArray<CncPass> {
   const helicalPasses = helicalPocketPassesBySourceRegion(
     settings,
@@ -209,6 +218,7 @@ function passesForDepths(
       handedness,
       sourceContours,
       (part) => contourMajorPasses(part, depths, settings, wallDiameterMm, manualTabCenters),
+      finishingSettings,
     );
   }
   if (settings.cutType === 'pocket') {
@@ -218,8 +228,9 @@ function passesForDepths(
 }
 
 // ADR-218: select the surviving edge of a traced double-line ring before
-// offsetting. Pairing remains provenance-scoped (ADR-277).
-function lineArtContoursForLayer(
+// offsetting. Pairing remains provenance-scoped (ADR-277). The minimum-feature
+// check (ADR-433) reads the same selection.
+export function lineArtContoursForLayer(
   polylines: ReadonlyArray<Polyline>,
   settings: CncLayerSettings,
   toolDiameterMm: number,

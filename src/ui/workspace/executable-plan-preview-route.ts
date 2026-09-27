@@ -3,7 +3,11 @@ import type { JobOriginPlacement, Toolpath, ToolpathStep } from '../../core/job'
 import type { DeviceProfile } from '../../core/devices';
 import type { Vec2 } from '../../core/scene';
 import type { PreparedOutput } from '../../io/gcode';
-import { emitPreparedGcodeWithExecutablePlan } from '../../io/gcode/executable-plan';
+import { jobWritesArcMoves } from '../../core/job/cut-arc-moves';
+import {
+  buildExecutablePlanSidecar,
+  emitPreparedGcodeWithExecutablePlan,
+} from '../../io/gcode/executable-plan';
 import { comparePreviewRoutesAtEmitPrecision } from './preview-route-parity';
 import { mapToolpathToScene } from './preview-scene-frame';
 import { previewRouteExceedsBudget } from './preview-route-budget';
@@ -60,6 +64,11 @@ export function planPreviewRouteEligible(args: {
   ) {
     return false;
   }
+  // ADR-432: the v1 plan draws G2/G3 with the display parser's chords and
+  // declares arc-true lengths, so its route can never match the prepared
+  // route at emitted precision. Skip the emission, plan and comparison an arc
+  // job would only throw away; the prepared route draws the arcs.
+  if (jobWritesArcMoves(args.prepared.job)) return false;
   return !previewRouteExceedsBudget(args.route);
 }
 
@@ -75,6 +84,8 @@ export function registerExecutablePlanPreviewRoute(args: {
   readonly jobOrigin?: JobOriginPlacement;
   readonly jobOriginOffset: Vec2;
   readonly device: DeviceProfile;
+  /** Exact source already emitted for this preparation's ETA, when bounded. */
+  readonly emittedProgram?: string;
 }): PreviewRouteSource {
   if (
     !planPreviewRouteEligible({
@@ -86,18 +97,21 @@ export function registerExecutablePlanPreviewRoute(args: {
     return 'legacy-toolpath';
   }
   try {
-    const emission = emitPreparedGcodeWithExecutablePlan(args.prepared, {
-      ...(args.jobOrigin === undefined ? {} : { jobOrigin: args.jobOrigin }),
-    });
-    if (emission.sidecar.kind !== 'ok') return 'legacy-toolpath';
-    const planMachineToolpath = buildExecutablePlanPreviewToolpath(emission.sidecar.plan);
+    const sidecar =
+      args.emittedProgram === undefined
+        ? emitPreparedGcodeWithExecutablePlan(args.prepared, {
+            ...(args.jobOrigin === undefined ? {} : { jobOrigin: args.jobOrigin }),
+          }).sidecar
+        : buildExecutablePlanSidecar(args.emittedProgram, args.prepared.project);
+    if (sidecar.kind !== 'ok') return 'legacy-toolpath';
+    const planMachineToolpath = buildExecutablePlanPreviewToolpath(sidecar.plan);
     if (!comparePreviewRoutesAtEmitPrecision(args.legacyMachineToolpath, planMachineToolpath).ok) {
       return 'legacy-toolpath';
     }
     executableRouteCache.set(args.previewToolpath, {
       source: 'executable-plan',
-      schema: emission.sidecar.plan.schema,
-      schemaVersion: emission.sidecar.plan.schemaVersion,
+      schema: sidecar.plan.schema,
+      schemaVersion: sidecar.plan.schemaVersion,
       toolpath: mapToolpathToScene(planMachineToolpath, args.jobOriginOffset, args.device),
     });
     return 'executable-plan';

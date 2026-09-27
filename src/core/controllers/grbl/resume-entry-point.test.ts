@@ -2,7 +2,7 @@
 // Amendment 6): continuing after a lost link sets the origin from it.
 
 import { describe, expect, it } from 'vitest';
-import { resumeEntryPointMm } from './resume-program';
+import { buildResumeProgram, resumeEntryPointMm } from './resume-program';
 
 const PROGRAM = [
   'G21 G90 G54',
@@ -16,6 +16,47 @@ const PROGRAM = [
 ].join('\n');
 
 describe('resumeEntryPointMm', () => {
+  it('shares the native arc endpoint with the plane-pinned replay without changing archived transforms', () => {
+    const lines = [
+      'G21 G90 G54 G17',
+      'M4 S0',
+      'G0 X10 Y20',
+      'G2 X20 Y30 I10 J0 F1500 S500',
+      'G3 X30 Y20 I0 J-10',
+      'M5',
+    ];
+    const program = lines.join('\n');
+    expect(resumeEntryPointMm(program, 5)).toEqual({ x: 20, y: 30 });
+    expect(resumeEntryPointMm(program, 6)).toEqual({ x: 30, y: 20 });
+    for (const laserTransform of [1, 2, 3, 4] as const) {
+      const resumed = buildResumeProgram(program, 5, {
+        machineKind: 'laser',
+        safeZMm: 0,
+        spindleSpinupSec: 0,
+        plungeMmPerMin: 300,
+        laserTransform,
+      });
+      if (resumed.kind !== 'ok') throw new Error(resumed.reason);
+      expect(resumed.lines).toContain('G0 X20 Y30 S0');
+      expect(resumed.lines.includes('G17')).toBe(laserTransform === 4);
+      expect(resumed.lines[resumed.preambleCount]).toBe('G3 X30 Y20 I0 J-10 S500');
+    }
+  });
+
+  it('keeps inch arc endpoints and same-point complete-circle endpoints in millimetres', () => {
+    const program = 'G20 G90 G54 G17\nG0 X1 Y2\nG2 X2 Y3 I1 J0\nG3 X2 Y3 I1 J0\nM5';
+    expect(resumeEntryPointMm(program, 4)).toEqual({ x: 50.8, y: 76.19999999999999 });
+    expect(resumeEntryPointMm(program, 5)).toEqual(resumeEntryPointMm(program, 4));
+  });
+
+  it.each(['G2 X.5 Y3 I1 J0', 'G3 X+5 Y3 I1 J0', 'M400 X100', 'M106 Y100'])(
+    'keeps strict word and non-motion checks after native arcs: %s',
+    (block) => {
+      const program = `G21 G90 G54 G17\nG0 X10 Y20\nG2 X20 Y30 I10 J0\n${block}\nM5`;
+      expect(resumeEntryPointMm(program, 5)).toBeNull();
+    },
+  );
+
   it('is the end point of the last move before the line', () => {
     expect(resumeEntryPointMm(PROGRAM, 4)).toEqual({ x: 10, y: 20 });
     expect(resumeEntryPointMm(PROGRAM, 5)).toEqual({ x: 15.5, y: 20 });

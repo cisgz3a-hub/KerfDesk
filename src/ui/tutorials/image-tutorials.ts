@@ -159,26 +159,26 @@ export const IMAGE_TUTORIALS: readonly Tutorial[] = [
   {
     id: 'trace-batch',
     title: 'Trace several image files',
-    summary: 'Export a set of images as separate SVG files.',
+    summary: 'Export a set of images as separate SVG or DXF files.',
     category: 'Images & tracing',
     machine: 'all',
     minutes: 3,
     location: 'Tools → Multi-File Trace',
-    prerequisites: 'Several image files that suit the Line Art trace preset.',
+    prerequisites: 'Several image files that suit one trace preset.',
     visual: 'trace',
     steps: [
       {
         title: 'Choose several files',
         instruction:
-          'Open Multi-File Trace and select the image files to process. This workflow uses the Line Art preset for the batch.',
+          'Open Multi-File Trace, pick the preset, format and precision for the batch, then choose the image files to process.',
         focus: 'Multi-file picker',
         result: 'The selected sources are queued for vector conversion.',
       },
       {
-        title: 'Save the SVG results',
+        title: 'Save the results',
         instruction:
-          'Wait for processing, then complete the offered saves for the generated SVG files. Read the completion message and any notices.',
-        focus: 'SVG export saves',
+          'Wait for processing, then complete the offered saves for the generated files. Read the completion message: images with nothing to trace are skipped and named there.',
+        focus: 'Export saves',
         result: 'Each saved result is a separate vector file.',
       },
       {

@@ -32,6 +32,107 @@ const ASSET = {
 } as const;
 
 describe('PagedRasterAssetLifecycle', () => {
+  it('does not visit project/history objects on unrelated store updates', async () => {
+    const readObjects = vi.fn(() => [pagedRaster('untouched')]);
+    const objects = new Proxy([pagedRaster('untouched')], {
+      get(target, key, receiver) {
+        if (key === Symbol.iterator) readObjects();
+        return Reflect.get(target, key, receiver) as unknown;
+      },
+    });
+    const project = createProject();
+    const owned = state({ ...project, scene: { ...project.scene, objects } });
+    const lifecycle = new PagedRasterAssetLifecycle({ cancelDelete: vi.fn(async () => undefined) });
+
+    await lifecycle.transition(owned, { ...owned });
+    expect(readObjects).not.toHaveBeenCalled();
+  });
+
+  it('caches immutable object lists shared by history without exposing mutable cached sets', () => {
+    const raster = pagedRaster('shared-history');
+    const readAsset = vi.fn(() => ASSET);
+    Object.defineProperty(raster, 'imageAsset', { get: readAsset });
+    const project = projectWith(raster);
+    const owned = state(project, {
+      undoStack: Array.from({ length: 100 }, () => ({ ...project })),
+    });
+
+    const first = collectPagedRasterAssetIds(owned);
+    const firstReadCount = readAsset.mock.calls.length;
+    first.clear();
+    expect([...collectPagedRasterAssetIds({ ...owned })].sort()).toEqual([
+      'luma-pages',
+      'source-pages',
+    ]);
+    expect(readAsset).toHaveBeenCalledTimes(firstReadCount);
+    expect(firstReadCount).toBeGreaterThan(0);
+    expect(firstReadCount).toBeLessThan(4);
+  });
+
+  it('coalesces bursts and still retains assets added while a repair is in flight', async () => {
+    let release: (() => void) | undefined;
+    const firstRepair = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    const repository = {
+      cancelDelete: vi.fn<(id: string) => Promise<void>>().mockResolvedValue(undefined),
+    };
+    repository.cancelDelete.mockImplementationOnce(() => firstRepair);
+    const lifecycle = new PagedRasterAssetLifecycle(repository);
+    const empty = state(createProject());
+    const owned = state(projectWith(pagedRaster('first')));
+    const firstDrain = lifecycle.transition(empty, owned);
+    await Promise.resolve();
+    const second = {
+      ...pagedRaster('second'),
+      imageAsset: { ...ASSET, sourceAssetId: 'source-2', lumaAssetId: 'luma-2' },
+    };
+    const updated = state(projectWith(pagedRaster('first'), second));
+    expect(lifecycle.transition(owned, updated)).toBe(firstDrain);
+    for (let index = 0; index < 100; index += 1) {
+      expect(lifecycle.transition(updated, { ...updated })).toBe(firstDrain);
+    }
+    release?.();
+    await firstDrain;
+    expect(repository.cancelDelete.mock.calls).toEqual([
+      ['source-pages'],
+      ['luma-pages'],
+      ['source-2'],
+      ['luma-2'],
+    ]);
+  });
+
+  it('re-reads a replaced object array while undo retains the former page assets', async () => {
+    const raster = pagedRaster('replacement');
+    const previousProject = projectWith(raster);
+    const previous = state(previousProject);
+    collectPagedRasterAssetIds(previous);
+    const current = state(
+      projectWith({
+        ...raster,
+        imageAsset: {
+          ...ASSET,
+          sourceAssetId: 'replacement-source',
+          lumaAssetId: 'replacement-luma',
+        },
+      }),
+      { undoStack: [previousProject] },
+    );
+    const repository = { cancelDelete: vi.fn(async () => undefined) };
+    const lifecycle = new PagedRasterAssetLifecycle(repository);
+    await lifecycle.transition(previous, current);
+    expect([...collectPagedRasterAssetIds(current)].sort()).toEqual([
+      'luma-pages',
+      'replacement-luma',
+      'replacement-source',
+      'source-pages',
+    ]);
+    expect(repository.cancelDelete.mock.calls).toEqual([
+      ['replacement-source'],
+      ['replacement-luma'],
+    ]);
+  });
+
   it('does not classify ready assets as orphaned from live-state absence alone', async () => {
     const repository = {
       cancelDelete: vi.fn(async () => undefined),

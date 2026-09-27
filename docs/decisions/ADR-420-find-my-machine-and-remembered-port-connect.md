@@ -104,6 +104,16 @@ Platform limits that shape the design:
 
 ### Consequences
 
+#### Amendment 1 - Make saving a selected profile visible (2026-09-27)
+
+After auto-connect, choosing a profile changed only the setup draft, while the final Save was
+hidden behind **Check essentials** and **Review setup**. The Machine stage now offers a primary
+**Review & save** shortcut beside **Check essentials**, and the catalog explains the route.
+The shortcut opens the existing Review stage; the final Save keeps its validation, atomic project
+update and explicitly queued firmware-write behavior. The live connection stays in place.
+
+#### Existing consequences
+
 - On Windows, and for adapters with a USB serial number elsewhere, a machine set up once connects
   when KerfDesk opens or when it is plugged in, with no click. A CH340 on macOS or Linux needs one
   click on Connect after a replug or browser restart; that is Chrome's grant rule, not a choice.

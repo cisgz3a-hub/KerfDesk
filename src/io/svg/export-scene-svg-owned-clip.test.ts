@@ -131,9 +131,7 @@ describe('owned SVG image clips', () => {
       ],
     };
     const curve = exported([{ ...image, imageClip: [arc] }]);
-    expect(curve.querySelector('clipPath path')?.getAttribute('d')).toBe(
-      'M 0 0 A 2 1 17 0 1 4 0 Z',
-    );
+    expect(curve.querySelector('clipPath path')?.getAttribute('d')).toBe('M0 0A2 1 17 0 1 4 0z');
     const empty = exported([{ ...image, imageClip: [] }]);
     expect(empty.querySelector('image')?.parentElement?.getAttribute('clip-path')).toBe(
       'url(#image-clip-0)',

@@ -12,6 +12,7 @@ import {
   mergeLightBurnTraceSettings,
   relaxAggressivePreprocessing,
 } from './trace-options';
+import { edgeContrastDelta, edgeSourceRadiusPx } from '../../core/trace/edge-input';
 
 const LINE_ART = TRACE_PRESETS['Line Art'] as TraceOptions;
 const SMOOTH = TRACE_PRESETS['Smooth'] as TraceOptions;
@@ -98,7 +99,7 @@ describe('mergeLightBurnTraceSettings', () => {
     expect(merged.useOtsuThreshold).toBe(true);
   });
 
-  it('maps simple Edge Detection controls to Canny options', () => {
+  it('maps simple Edge Detection controls onto the detector settings', () => {
     const merged = mergeLightBurnTraceSettings(EDGE, {
       edgeSensitivity: 85,
       edgeDetail: 20,
@@ -106,28 +107,27 @@ describe('mergeLightBurnTraceSettings', () => {
     });
 
     expect(merged.traceMode).toBe('edge');
-    expect(merged.edgeHighThresholdRatio).toBeLessThan(EDGE.edgeHighThresholdRatio ?? 0.2);
+    // 85 takes the nearest stop, 90: delta 3. Detail 20: radius 20.
+    expect(edgeContrastDelta(merged)).toBe(3);
+    expect(edgeSourceRadiusPx(merged)).toBe(20);
     expect(merged.edgeLowThresholdRatio).toBeLessThan(EDGE.edgeLowThresholdRatio ?? 0.08);
     expect(merged.edgeBlurSigma).toBeGreaterThan(EDGE.edgeBlurSigma ?? 1.2);
-    // Join gap scales WITH blur (heavier smoothing widens Canny dropouts);
-    // lower Detail must therefore RAISE the gap, never collapse it below the
-    // preset the way the old outline-era [0.5, 2] mapping did.
-    expect(merged.edgeJoinGapPx).toBeGreaterThan(EDGE.edgeJoinGapPx ?? 5);
     expect(merged.edgeMinLengthPx).toBe(9);
+    // The dialog no longer writes the Canny-era values nothing reads.
+    expect(merged).not.toHaveProperty('edgeHighThresholdRatio');
+    expect(merged).not.toHaveProperty('edgeJoinGapPx');
   });
 
-  it('roundtrips displayed Edge Detection defaults back to the preset Canny values', () => {
+  it('roundtrips displayed Edge Detection defaults back to the preset values', () => {
+    expect(edgeSensitivityFromOptions(EDGE)).toBe(60);
+    expect(edgeDetailFromOptions(EDGE)).toBe(60);
     const merged = mergeLightBurnTraceSettings(EDGE, {
       edgeSensitivity: edgeSensitivityFromOptions(EDGE),
       edgeDetail: edgeDetailFromOptions(EDGE),
       edgeMinimumLinePx: EDGE.edgeMinLengthPx ?? 3,
     });
 
-    expect(merged.edgeLowThresholdRatio).toBe(EDGE.edgeLowThresholdRatio);
-    expect(merged.edgeHighThresholdRatio).toBe(EDGE.edgeHighThresholdRatio);
-    expect(merged.edgeBlurSigma).toBe(EDGE.edgeBlurSigma);
-    expect(merged.edgeJoinGapPx).toBe(EDGE.edgeJoinGapPx);
-    expect(merged.edgeMinLengthPx).toBe(EDGE.edgeMinLengthPx);
+    expect(merged).toEqual(EDGE);
   });
 
   it('ignores Edge Detection controls for non-edge presets', () => {
@@ -146,8 +146,24 @@ describe('mergeLightBurnTraceSettings', () => {
 });
 
 describe('hasAggressivePreprocessing', () => {
-  it('is true for Line Art (uses Otsu + fixedPalette + despeckle)', () => {
+  it('is true for Line Art (fixedPalette + automatic small-mark cleanup)', () => {
+    expect(LINE_ART.fixedPalette).toBeDefined();
+    expect(LINE_ART.smallMarkPolicy).toBe('auto');
     expect(hasAggressivePreprocessing(LINE_ART)).toBe(true);
+  });
+
+  it('is true when only the automatic small-mark cleanup is on (ADR-434)', () => {
+    const bare: TraceOptions = {
+      numberOfColors: 2,
+      pathOmit: 8,
+      lineTolerance: 1,
+      quadraticTolerance: 1,
+      blurRadius: 0,
+      blurDelta: 0,
+      lineFilter: true,
+      smallMarkPolicy: 'auto',
+    };
+    expect(hasAggressivePreprocessing(bare)).toBe(true);
   });
 
   it('is false for an options object with none of the three levers', () => {
@@ -203,6 +219,41 @@ describe('relaxAggressivePreprocessing', () => {
     // (colorquantcycles:1 disables every recovery), committing a full-frame
     // rectangle instead of an honest "no paths" (the IoU-0.25 degeneracy).
     expect(relaxed.fixedPalette).toEqual(LINE_ART.fixedPalette);
+  });
+
+  it.each([
+    ['Line Art', LINE_ART],
+    ['Smooth', SMOOTH],
+    ['Line Art with an explicit speck value', { ...LINE_ART, despeckleMinPixels: 12 }],
+  ])('turns the small-mark cleanup OFF for %s, not back to automatic (ADR-434)', (_, preset) => {
+    const relaxed = relaxAggressivePreprocessing(preset);
+    expect(relaxed.smallMarkPolicy).toBeUndefined();
+    expect(relaxed.despeckleMinPixels).toBeUndefined();
+  });
+
+  it('recovers small-mark-only art on the zero-paths retry (ADR-434)', async () => {
+    // A sparse grid of 3x2 black dots, 9 px apart: no dot has a like mark
+    // within the support radius, so the automatic cleanup removes them all
+    // and the trace is empty. The relaxed retry must bring them back.
+    const { traceImageToColoredPaths } = await import('../../core/trace');
+    const width = 90;
+    const height = 60;
+    const data = new Uint8ClampedArray(width * height * 4).fill(255);
+    for (let row = 0; row < 5; row += 1)
+      for (let col = 0; col < 9; col += 1)
+        for (let y = 0; y < 2; y += 1)
+          for (let x = 0; x < 3; x += 1) {
+            const i = ((8 + row * 9 + y) * width + 5 + col * 9 + x) * 4;
+            data[i] = data[i + 1] = data[i + 2] = 0;
+          }
+    const image = { width, height, data };
+    const loops = async (options: TraceOptions): Promise<number> =>
+      (await traceImageToColoredPaths(image, options))
+        .flatMap((path) => path.polylines)
+        .filter((line) => line.closed).length;
+    expect(await loops(LINE_ART)).toBe(0);
+    expect(hasAggressivePreprocessing(LINE_ART)).toBe(true);
+    expect(await loops(relaxAggressivePreprocessing(LINE_ART))).toBe(45);
   });
 
   it('keeps the retry on the contour backend for two-color presets (M10)', async () => {

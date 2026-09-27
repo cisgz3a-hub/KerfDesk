@@ -12,6 +12,7 @@ import {
 } from '../../core/scene';
 import { createImageMaskPixelTest } from '../../core/raster/image-mask';
 import { exportSceneSvg } from './export-scene-svg';
+import { parsePathD } from './parse-path-d';
 import { parseSvg } from './parse-svg';
 
 const square: ImportedSvg = {
@@ -162,8 +163,8 @@ describe('artwork SVG export', () => {
       .parseFromString(svg, 'image/svg+xml')
       .querySelector('path')
       ?.getAttribute('d');
-    expect(d).toContain('C 1 2 3 4 5 6');
-    expect(d).toContain('A 3 2 30 0 1 8 9');
+    // A subpath with an arc is written absolute at full precision.
+    expect(d).toBe('M0 0C1 2 3 4 5 6A3 2 30 0 1 8 9');
   });
 
   it.each([
@@ -191,7 +192,8 @@ describe('artwork SVG export', () => {
           },
         ],
       };
-      const svg = exported(project([source]));
+      const result = exportSceneSvg(project([source]), undefined, { precisionMm: null });
+      const svg = result.kind === 'ok' ? result.value.svg : '';
       const doc = new DOMParser().parseFromString(svg, 'image/svg+xml');
       const positions = svgLineWorldX(doc);
       expect(positions[0]).toBe(offset);
@@ -215,7 +217,7 @@ describe('artwork SVG export', () => {
     expect(doc.querySelector('image')?.getAttribute('width')).toBe('20');
     expect(doc.querySelector('image')?.getAttribute('transform')).toContain('matrix(');
     expect(doc.querySelector('clipPath')?.getAttribute('clipPathUnits')).toBe('userSpaceOnUse');
-    expect(doc.querySelector('clipPath path')?.getAttribute('d')).toContain('M 3 3');
+    expect(doc.querySelector('clipPath path')?.getAttribute('d')).toContain('M3 3');
     expect(doc.querySelector('[id^="artwork-"]')).toBeNull();
   });
 
@@ -292,7 +294,7 @@ describe('artwork SVG export', () => {
     const clip = new DOMParser()
       .parseFromString(svg, 'image/svg+xml')
       .querySelector('clipPath path');
-    expect(clip?.getAttribute('d')).toBe('M 0 0 A 5 3 15 0 1 10 0 Z');
+    expect(clip?.getAttribute('d')).toBe('M0 0A5 3 15 0 1 10 0z');
     const matrix = clip?.getAttribute('transform')?.slice(7, -1).split(' ').map(Number);
     expect(matrix?.[0]).toBeCloseTo(Math.sqrt(3) / 2, 12);
     expect(matrix?.[1]).toBeCloseTo(0.5, 12);
@@ -368,10 +370,9 @@ function expectPointNear(actual: Vec2 | undefined, expected: Vec2): void {
 function svgLineWorldX(doc: Document): readonly [number, number] {
   const path = doc.querySelector('path');
   if (path === null) throw new Error('Expected an exported line.');
-  const coordinates = (path.getAttribute('d') ?? '')
-    .split(' ')
-    .filter((part) => part !== 'M' && part !== 'L')
-    .map(Number);
+  const coordinates = parsePathD(path.getAttribute('d') ?? '').flatMap((subpath) =>
+    subpath.points.flatMap((point) => [point.x, point.y]),
+  );
   const matrix = (path.getAttribute('transform') ?? '').slice(7, -1).split(' ').map(Number);
   expect(coordinates).toHaveLength(4);
   expect(matrix).toHaveLength(6);

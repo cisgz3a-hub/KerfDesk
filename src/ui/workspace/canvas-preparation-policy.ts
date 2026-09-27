@@ -22,6 +22,10 @@ export type CanvasPreparationClass = 'direct' | 'background-worker';
 // Keep only modest source + output work direct. Workers still prepare every
 // requested pixel/pass with the same compiler, without a new output limit.
 const DIRECT_RASTER_CANVAS_WORK_BUDGET = 250_000;
+// This is an interactive execution threshold, not the core large-job warning
+// or an output cap. Counting includes laser passes and CNC depth passes, so a
+// modest drawing that emits a large route also leaves the UI thread.
+const DIRECT_VECTOR_CANVAS_WORK_BUDGET = 20_000;
 
 /** Shared routing policy for costly output-derived canvas work. */
 export function classifyCanvasPreparation(
@@ -35,7 +39,7 @@ export function classifyCanvasPreparation(
   return projectHasPagedRasterAssets(scopedProject) ||
     cncReliefPreparationIsCostly(scopedProject) ||
     operationAmplifiesPreparation(scopedProject) ||
-    outputVectorPreparationTooComplex(scopedProject) ||
+    outputVectorPreparationTooComplex(scopedProject, DIRECT_VECTOR_CANVAS_WORK_BUDGET) ||
     interactiveRasterPreparationIsCostly(scopedProject) ||
     rasterPreparationTooComplex(scopedProject)
     ? 'background-worker'

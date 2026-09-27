@@ -21,8 +21,10 @@ import {
 } from '../../core/devices/device-profile';
 import { cncSubProfileIssues } from '../../core/devices/cnc-sub-profile-validation';
 import { isScanOffsetCalibrationStatus } from '../../core/devices/scan-offset-profile';
+export { laserArcMovesEntry } from '../../core/devices/laser-arc-moves';
 import { validateCameraProfileShape } from '../../core/camera';
 import { normalizeCameraModelRecord } from '../../core/camera/model/camera-model-record';
+import { normalizeOtherCameraModels } from '../../core/camera/model/saved-cameras';
 
 const ORIGINS = ['front-left', 'front-right', 'rear-left', 'rear-right', 'center'] as const;
 const PROFILE_SOURCES = ['built-in', 'custom', 'imported', 'lightburn'] as const;
@@ -60,6 +62,7 @@ export function validateMachineProfileShape(value: Record<string, unknown>): str
     validateToolheadProfiles(value) ??
     validateCameraProfile(value['cameraProfile']) ??
     validateCameraModel(value['cameraModel']) ??
+    validateOtherCameraModels(value['otherCameraModels']) ??
     validateLaserFireControl(value['fireControl'])
   );
 }
@@ -259,6 +262,13 @@ function validateCameraProfile(value: unknown): string | null {
 function validateCameraModel(value: unknown): string | null {
   if (value === undefined) return null;
   return normalizeCameraModelRecord(value) === undefined ? 'profile.cameraModel is invalid' : null;
+}
+
+function validateOtherCameraModels(value: unknown): string | null {
+  if (value === undefined) return null;
+  return Array.isArray(value) && (normalizeOtherCameraModels(value)?.length ?? 0) === value.length
+    ? null
+    : 'profile.otherCameraModels is invalid';
 }
 
 function validateLaserFireControl(value: unknown): string | null {

@@ -141,17 +141,9 @@ describe('Trace Image workflow controls', () => {
         expect(select.value).toBe('Smooth');
         // Rule 7 / ADR-228 pin: recommending a preset must never disable the
         // others. Greying them out would be a new guard on an available input.
-        const disabledByName = Object.fromEntries(
-          Array.from(select.options).map((option) => [option.value, option.disabled]),
-        );
-        expect(disabledByName).toEqual({
-          'Line Art': false,
-          'Photo shading': false,
-          Smooth: false,
-          Sharp: false,
-          Centerline: false,
-          'Edge Detection': false,
-        });
+        const options = Array.from(select.options);
+        expect(options.map((option) => option.value)).toContain('Colour layers');
+        expect(options.filter((option) => option.disabled)).toEqual([]);
       });
     } finally {
       useStore.setState({ project: prior });

@@ -153,7 +153,8 @@ function CalibrationFeedback(props: {
       ) : (
         <p style={guidanceStyle}>
           After burning: measure the full signed forward-versus-reverse separation. Do not divide
-          the measurement in half. KerfDesk moves reverse rows only.
+          the measurement in half. KerfDesk moves reverse rows only. Swatch labels show the emitted
+          speed after the profile ceiling and G-code rounding are applied.
         </p>
       )}
     </>
@@ -241,7 +242,7 @@ function qualificationWarnings(
   }
   if (isFinitePositive(maxFeedMmPerMin) && options.speedMax > maxFeedMmPerMin) {
     warnings.push(
-      `Requested maximum speed ${options.speedMax} mm/min exceeds the profile ceiling of ${maxFeedMmPerMin} mm/min; compiled output will disclose and use its effective capped feed.`,
+      `Requested maximum speed ${options.speedMax} mm/min exceeds the profile ceiling of ${maxFeedMmPerMin} mm/min; generated swatches and their labels will use the effective capped feed.`,
     );
   }
   return warnings;

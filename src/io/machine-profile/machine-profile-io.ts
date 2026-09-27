@@ -16,7 +16,8 @@ import { recoverCncSubProfile } from '../../core/devices/cnc-sub-profile-validat
 import { DEFAULT_CNC_MACHINE_PARAMS } from '../../core/scene';
 import { normalizeCameraProfile } from '../../core/camera';
 import { normalizeCameraModelRecord } from '../../core/camera/model/camera-model-record';
-import { validateMachineProfileShape } from './machine-profile-shape';
+import { normalizeOtherCameraModels } from '../../core/camera/model/saved-cameras';
+import { laserArcMovesEntry, validateMachineProfileShape } from './machine-profile-shape';
 import { optionalRotarySetup } from '../project/project-device-profile-validator';
 import { firstError } from '../project/project-shape-primitives';
 
@@ -305,6 +306,7 @@ function canonicalProfile(profile: DeviceProfile): DeviceProfile {
       ? { workerHostedStreaming: profile.workerHostedStreaming }
       : {}),
     ...(profile.airAssistRestartUnreliable === true ? { airAssistRestartUnreliable: true } : {}),
+    ...laserArcMovesEntry(profile.laserArcMoves),
     rxBufferBytes: normalizeGrblRxBufferBytes(profile.rxBufferBytes),
     bedWidth: profile.bedWidth,
     bedHeight: profile.bedHeight,
@@ -347,7 +349,11 @@ function canonicalProfile(profile: DeviceProfile): DeviceProfile {
 
 function canonicalCameraModel(profile: DeviceProfile): Partial<DeviceProfile> {
   const cameraModel = normalizeCameraModelRecord(profile.cameraModel);
-  return cameraModel === undefined ? {} : { cameraModel };
+  const otherCameraModels = normalizeOtherCameraModels(profile.otherCameraModels);
+  return {
+    ...(cameraModel === undefined ? {} : { cameraModel }),
+    ...(otherCameraModels === undefined ? {} : { otherCameraModels }),
+  };
 }
 
 function canonicalFireControl(profile: DeviceProfile): Partial<DeviceProfile> {

@@ -166,15 +166,15 @@ export function hasImpulseNoise(image: RawImageData): boolean {
 }
 
 /** Selective automatic cleanup; computes the median only once. An explicit
- * medianFilter:true keeps using the full median's historical behaviour. */
-export function autoMedianFilter(image: RawImageData): RawImageData {
+ * medianFilter:true keeps using the full median's historical behaviour.
+ * `minimumRatio` 0 repairs every isolated impulse: a crop whose whole source
+ * already crossed the density floor (ADR-436). */
+export function autoMedianFilter(
+  image: RawImageData,
+  minimumRatio = IMPULSE_NOISE_MIN_RATIO,
+): RawImageData {
   const filtered = medianFilter(medianSourceOverPaper(image));
-  return repairIsolatedMedianChanges(
-    image,
-    filtered,
-    IMPULSE_NOISE_LUMA_DELTA,
-    IMPULSE_NOISE_MIN_RATIO,
-  );
+  return repairIsolatedMedianChanges(image, filtered, IMPULSE_NOISE_LUMA_DELTA, minimumRatio);
 }
 
 // Fraction of pixels whose luma the median changed by more than the impulse
@@ -303,26 +303,42 @@ function totalScatter(hist: Uint32Array, mean: number): number {
 // Plain 4 remains the historical four-connected rule.
 // BFS using a single Uint8 visited mask + an index queue. O(N) total
 // work for N pixels regardless of region count.
+//
+// judge (the automatic small-mark policy, small-mark-policy.ts): when given,
+// a region under minPixels is erased only if the judge rejects it. It sees
+// the mask as it was BEFORE any erasure, so the result does not depend on
+// scan order.
 export function despeckle(
   image: RawImageData,
   minPixels: number,
   connectivity: 4 | 8 | SaddlePolicyInput = 4,
+  judge?: InkMarkJudge,
 ): RawImageData {
   if (minPixels <= 1) return image;
   const { width: w, height: h } = image;
   const out = new Uint8ClampedArray(image.data);
   const visited = new Uint8Array(w * h);
-  const diagonal = diagonalLinks(image, connectivity);
+  const ink = binaryInk(image);
+  const diagonal = diagonalLinks(image, ink, connectivity);
   for (let startIdx = 0; startIdx < w * h; startIdx += 1) {
     if (visited[startIdx] !== 0) continue;
     visited[startIdx] = 1;
-    if (lumaAt(out, startIdx * 4) >= 128) continue; // background pixel — skip
-    const region = bfsInkRegion(out, visited, w, h, startIdx, diagonal);
-    if (region.length < minPixels) {
+    if (ink[startIdx] !== 1) continue; // background pixel — skip
+    const region = bfsInkRegion(ink, visited, w, h, startIdx, diagonal);
+    if (region.length < minPixels && judge?.(region, ink) !== true) {
       eraseRegion(out, region);
     }
   }
   return { width: w, height: h, data: out };
+}
+
+/** true = keep this sub-threshold ink region. `ink` is the pre-erasure mask. */
+export type InkMarkJudge = (region: ReadonlyArray<number>, ink: Uint8Array) => boolean;
+
+function binaryInk(image: RawImageData): Uint8Array {
+  const ink = new Uint8Array(image.width * image.height);
+  for (let i = 0; i < ink.length; i += 1) ink[i] = lumaAt(image.data, i * 4) < 128 ? 1 : 0;
+  return ink;
 }
 
 // Which diagonal ink steps join a region: none (4), all (8), or those whose
@@ -336,12 +352,11 @@ type DiagonalLinks =
 
 function diagonalLinks(
   image: RawImageData,
+  ink: Uint8Array,
   connectivity: 4 | 8 | SaddlePolicyInput,
 ): DiagonalLinks {
   if (connectivity === 4) return 'none';
   if (connectivity === 8) return 'all';
-  const ink = new Uint8Array(image.width * image.height);
-  for (let i = 0; i < ink.length; i += 1) ink[i] = lumaAt(image.data, i * 4) < 128 ? 1 : 0;
   const mask = { width: image.width, height: image.height, ink };
   const saddles = createSaddleResolver(
     mask,
@@ -355,7 +370,7 @@ function diagonalLinks(
 // BFS the connected ink region (luma < 128) starting at `startIdx`.
 // Marks every visited cell in `visited`.
 function bfsInkRegion(
-  out: Uint8ClampedArray,
+  ink: Uint8Array,
   visited: Uint8Array,
   w: number,
   h: number,
@@ -368,14 +383,14 @@ function bfsInkRegion(
     const cur = queue.pop() ?? 0;
     const cx = cur % w;
     const cy = (cur - cx) / w;
-    visitNeighbour(out, visited, w, h, cx - 1, cy, region, queue);
-    visitNeighbour(out, visited, w, h, cx + 1, cy, region, queue);
-    visitNeighbour(out, visited, w, h, cx, cy - 1, region, queue);
-    visitNeighbour(out, visited, w, h, cx, cy + 1, region, queue);
+    visitNeighbour(ink, visited, w, h, cx - 1, cy, region, queue);
+    visitNeighbour(ink, visited, w, h, cx + 1, cy, region, queue);
+    visitNeighbour(ink, visited, w, h, cx, cy - 1, region, queue);
+    visitNeighbour(ink, visited, w, h, cx, cy + 1, region, queue);
     if (diagonal === 'none') continue;
     for (const [sx, sy] of DIAGONAL_STEPS) {
       if (!diagonalStepJoins(diagonal, w, cx, cy, sx, sy)) continue;
-      visitNeighbour(out, visited, w, h, cx + sx, cy + sy, region, queue);
+      visitNeighbour(ink, visited, w, h, cx + sx, cy + sy, region, queue);
     }
   }
   return region;
@@ -408,7 +423,7 @@ function diagonalStepJoins(
 }
 
 function visitNeighbour(
-  out: Uint8ClampedArray,
+  ink: Uint8Array,
   visited: Uint8Array,
   w: number,
   h: number,
@@ -421,7 +436,7 @@ function visitNeighbour(
   const ni = ny * w + nx;
   if (visited[ni] !== 0) return;
   visited[ni] = 1;
-  if (lumaAt(out, ni * 4) < 128) {
+  if (ink[ni] === 1) {
     region.push(ni);
     queue.push(ni);
   }

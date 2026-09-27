@@ -22,10 +22,33 @@ test('paints the splash before the bundle and honours reduced motion', async ({ 
     // scripts to execute before checking the mounted workspace's readiness.
     await page.waitForLoadState('domcontentloaded');
     await expect(page.locator('canvas[aria-label="KerfDesk workspace"]')).toBeVisible();
+    await expect(page.locator('canvas[aria-label="KerfDesk workspace"]')).toHaveAttribute(
+      'data-workspace-painted',
+      'true',
+    );
     await expect(splash).toHaveCount(0);
   } finally {
     await main.release();
   }
+});
+
+test('waits for a successful workspace paint after a canvas mounts', async ({ page }) => {
+  await page.route(/\/src\/ui\/app\/App\.tsx(?:\?|$)/, (route) =>
+    route.fulfill({
+      contentType: 'text/javascript',
+      // A minimal React 18 element keeps the real entry point/splash running
+      // while deliberately mounting a canvas with no painter attached.
+      body: 'export function App() { return { $$typeof: Symbol.for("react.element"), type: "canvas", key: null, ref: null, props: { "aria-label": "Unpainted fixture" }, _owner: null }; }',
+    }),
+  );
+  await page.goto('/', { waitUntil: 'domcontentloaded' });
+  const canvas = page.getByLabel('Unpainted fixture');
+  await expect(canvas).toBeVisible();
+  await expect(page.locator('#app-splash')).toBeVisible();
+  await canvas.evaluate((element) => {
+    element.setAttribute('data-workspace-painted', 'true');
+  });
+  await expect(page.locator('#app-splash')).toHaveCount(0, { timeout: 2000 });
 });
 
 test('reveals the workspace while the decorative artwork is still pending', async ({ page }) => {

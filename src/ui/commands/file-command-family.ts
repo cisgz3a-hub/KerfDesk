@@ -68,6 +68,13 @@ export function fileCommands(ctx: AppCommandContext): ReadonlyArray<AppCommand> 
       'Export selected artwork, or all artwork when nothing is selected, as SVG',
       ctx.exportSvg,
     ),
+    enabled(
+      'file.export-dxf',
+      'file',
+      ctx.hasSelection ? 'Export selected artwork as DXF...' : 'Export artwork as DXF...',
+      'Export selected artwork, or all artwork when nothing is selected, as a millimetre DXF',
+      ctx.exportDxf,
+    ),
     ...gcodeInspectorCommands(ctx),
   ];
 }

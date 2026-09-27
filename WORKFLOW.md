@@ -795,6 +795,9 @@ marks later edits as unapproved without changing the existing Frame/Start policy
    It resolves current variable text, outlines text, preserves physical millimetre size and
    canonical curves, embeds original bitmap pixels, and includes image masks and transforms.
    Machine settings and generated toolpaths are excluded; the production cursor does not advance.
+   Vector coordinates are rounded so each point lies within half a 0.001 mm grid diagonal of its
+   true position, and the page is the exact extent of the drawn curves, not their control points
+   (ADR-431).
 3. Cancellation writes nothing. Missing image pixels, unsupported 3D relief or invalid geometry
    report an error without claiming a successful partial export. A write error reports its reason.
 4. Re-import preserves the supported vector/image composition, physical size and image clips
@@ -803,6 +806,18 @@ marks later edits as unapproved without changing the existing Frame/Start policy
 5. Explicit **Re-import source** replaces the complete originally imported SVG composition in one
    Undo step. Unambiguous unchanged components retain settings; changed or ambiguous components
    receive new operations. Copies are independent of the original source's replacement set.
+
+### F-A9c. Export artwork as DXF; Multi-File Trace formats (ADR-431)
+
+1. **File → Export artwork as DXF...** (or **Export selected artwork as DXF...**) writes the
+   selection or scene's vector artwork as a millimetre DXF: one polyline per contour, one layer per
+   colour, circular arcs as exact bulges, cubics and elliptical arcs flattened within 0.01 mm.
+   Bitmaps and reliefs have no DXF form; they are left out and the completion message counts them.
+2. **Tools → Multi-File Trace...** first asks for the preset, format (SVG or DXF), coordinate
+   precision and, for SVG, whether to group each shape with its holes; **Choose Images...** then
+   picks the files. Each image is saved as `<name>-trace.svg` or `<name>-trace.dxf`.
+3. An image whose trace has nothing visible writes no file; the rest of the batch is still saved
+   and the completion message names the skipped images.
 
 ### F-A9b. Remove overlapping laser lines (ADR-350)
 
@@ -2429,6 +2444,10 @@ Setup has three visible stages for both Laser and CNC (ADR-240/306, amended 2026
 The stage buttons and Back/Next remain available while a draft needs corrections. Only **Save
 machine setup** requires valid configuration; review cards link back to the relevant fields.
 Connecting a controller is optional, so a complete setup can be saved offline.
+The Machine stage keeps **Review & save** visible beside **Check essentials**. After choosing a
+profile, **Review & save** opens the final review directly; **Save machine setup** applies it.
+**Check essentials** remains available to edit values first. Neither selecting the shortcut nor
+saving an ordinary software profile disconnects the controller.
 
 1. **Machine** — **Find my machine** opens the stage (ADR-420). It connects with the draft's
    controller, baud and streaming choice, reusing the remembered port as the rail's Connect does,
@@ -2749,6 +2768,15 @@ settings and Job Review keep their existing read-only setup references.
    geometry-only limit explains that lowering DPI cannot fix it. CNC keeps the editable shapes;
    choose an appropriate machining operation and tool size for their widths. This is a line
    halftone treatment; Image mode also offers grayscale and dithered photo engraving.
+   **Colour layers** splits flat-colour artwork into a few colours (**Colours**: Auto or 2 to 8,
+   counting the paper) and traces one filled layer per colour; neighbouring colours share one
+   edge with no gap or overlap (ADR-461). **Cut-out** burns each colour only in its own area;
+   **Stacked** also fills each colour under the darker colours above it. The paper colour is left
+   untraced unless **Trace background colour** is ticked; only a light border colour counts as
+   paper, so light-on-dark art traces every colour. The swatches show the traced colours,
+   lightest first. On commit each colour gets its own operation; on a laser each starts at a power
+   set by its darkness (a mid-dark or darker colour keeps the operation's power), which the
+   operator can edit. Paper (near-white, or the traced background) starts with output off.
    For line artwork, choose **Detection** explicitly: the preset's automatic detection, a **Manual brightness band**,
    **Faint lines (keep solid areas)**, or **Sketch (local contrast)**. Faint lines adds coherent
    pale strokes to the preset's solid ink while rejecting isolated pale specks. Sketch uses
@@ -2758,7 +2786,12 @@ settings and Job Review keep their existing read-only setup references.
    use pixels of the decoded image grid supplied to the tracing core and preserve their separate
    preset values. If dense artwork is traced on a smaller working grid, both area thresholds are
    converted using the actual width and height ratios, without rounding the internal values.
-   The preceding UI decode cap still defines that source grid. Expand **Curve finishing** for
+   The preceding UI decode cap still defines that source grid. Smooth's automatic noise cleanup
+   also judges one-pixel specks on that grid, before any supersampling, so a small image drops the
+   same specks it would at full size. Isolated one-pixel dots, such as a fine halftone screen,
+   look exactly like noise. Smooth and Line Art already drop them through **Remove ink specks**
+   and **Fill tiny holes**; the noise cleanup only adds specks those leave, such as specks near
+   an outline. Trace with Sharp to keep one-pixel dots. Expand **Curve finishing** for
    **Smoothness** and **Optimize** on filled outlines and Edge Detection, or **Transparency**
    for alpha-mask tracing. **Fill tiny holes** controls cleanup of small enclosed white marks;
    it does not bridge open gaps. Turn it off to retain those small highlights. Sliders and numeric fields stay in sync. Manual adjustments persist
@@ -2775,7 +2808,13 @@ settings and Job Review keep their existing read-only setup references.
    Submitted results use their captured request's paint intent; a newer preset request still
    supersedes an older result.
    Edge Detection creates closed outlines around dark artwork and locally
-   darker detail. Adjacent dark tones may merge into one outline. Centerline follows stroke centres.
+   darker detail. Adjacent dark tones may merge into one outline. Its **Sensitivity** moves in
+   steps of 10 and **Detail** in steps of 5; every step is a different detector setting (faint
+   detail appears or drops out; hard black-on-white art may not change) (ADR-437). A typed value
+   between steps shows the step being traced once the field loses focus. **Trace alpha mask**
+   also applies to Edge Detection: it outlines the image's transparency, and Invert is
+   unavailable while it is on. Semi-transparent regions (shadows, glows) are outlined like grey
+   tones; a 16%-opacity shadow still outlines at Sensitivity 0. Centerline follows stroke centres.
    Both commit as Line layers, so their preview draws every outline and stroke as a hairline that
    stays one screen pixel wide at any zoom, rather than filling Edge outlines.
    Centerline's separate-end gap bridge uses source-grid distance (preset/default 3 pixels),
@@ -2912,14 +2951,16 @@ or traced image) with at least one closed polyline.
   sweep. Newly committed generic traced Scan Line operations default one-way when no direction was
   explicitly selected and the profile has no verified or legacy-verified scan-offset calibration;
   ordinary vector layers, calibrated profiles, and explicitly saved choices retain their direction.
-  The 4040-safe, Raster Image, Island Fill, and Offset Fill policies remain separate. For generic
+  Raster Image and bounded 4040-safe/Island Fill now share the same non-overlapping split exit
+  and entry geometry (ADR-445), while keeping their own Overscan limits. Offset Fill follows
+  contours. For generic
   Scan Line, a positive stored Overscan value is the full runway wherever it fits (always at each
   scanline's outer entry and exit), up to the field's 25 mm maximum, and a stored value of zero uses
   the bounded 5 mm generic runway default rather than allowing a rapid-to-powered start; Frame
   includes that effective motion. A larger stored value, such as a LightBurn percentage converted
   at high speed, is applied at 25 mm; the import stores it at 25 mm and says so, and Job Review
   notes "applied at most 25 mm" (ADR-238 Amendment 3).
-- *Overscan above 5 mm on the 4040-safe profile*: 4040-safe Scan Line keeps its ADR-234 entry
+- *Overscan above 5 mm on the 4040-safe profile*: 4040-safe Scan Line keeps its ADR-234 entry/exit
   runway of at most 5 mm. The Overscan field keeps the stored value and says so beside it
   ("stored 10; 4040-safe Scan Line uses up to 5 mm"); 4040-safe Island Fill uses the full value.
 - *Very small spacing* (≤ 0.05 mm): clamped to 0.05 mm at the algorithm
@@ -3533,7 +3574,9 @@ and physical material output remain unverified.
 
 ### F-F5. Enhance a region of a trace (region-enhance re-trace)
 
-**ADR:** [ADR-113](DECISIONS.md#adr-113--region-enhance-re-trace-dialog-boundary-mode-trace-fidelity-2026-07-05).
+**ADR:** [ADR-113](DECISIONS.md#adr-113--region-enhance-re-trace-dialog-boundary-mode-trace-fidelity-2026-07-05),
+amended by [ADR-435](docs/decisions/ADR-435-region-enhance-seams.md) and
+[ADR-436](docs/decisions/ADR-436-auto-median-at-source-scale.md).
 
 **Operator intent.** A small feature inside a large raster (a tiny
 letter counter in a full logo) dropped out of the trace because it
@@ -3555,7 +3598,14 @@ re-runs: the full image is traced, the boxed source region is re-traced
 at 2× and downscaled, and its geometry is patched into the full trace
 (polylines fully inside the region's shrunk interior are replaced;
 everything crossing the box border or in the margin ring survives). The
-preview shows the full trace with the boxed feature recovered. Commit
+box is re-traced with a ring of the real neighbouring pixels around it and
+with the whole image's Otsu cut, auto-sketch choice and Smooth noise-cleanup
+verdict (noise is cleaned on the source pixels before the 2× enlargement), so the patch
+binarises exactly like its surroundings, and a shape that both passes
+trace within a pixel of each other at the box edge is kept once. Fitted
+curves and operation bindings survive inside and outside the box. The
+preview shows the full
+trace with the boxed feature recovered. Commit
 (**Trace**) writes the patched paths as the traced image, reusing the
 same overlay registration as any trace.
 
@@ -3740,7 +3790,8 @@ last updated.
    table; with no saved points it remains a useful uncorrected comparison, not proof of calibration.
 2. Qualification concerns are prominent warnings. No acknowledgement checkbox is required and
    missing measured points or a requested speed above the profile ceiling does not disable
-   Generate. The emitted job discloses requested/effective feed through the normal compile path.
+   Generate. Generated layers and burned speed labels use the effective feed after the profile
+   ceiling and G-code rounding (ADR-445). Regenerate if the profile or coupon speed is changed.
 3. Malformed geometry, non-finite values, invalid power, and invalid step counts remain factual
    generation-integrity failures because no valid coupon can be produced from them.
 4. After the physical burn, measure the full signed forward-versus-reverse separation (do not
@@ -3756,6 +3807,9 @@ last updated.
    or profile table resets the corresponding measurement draft. Renaming a profile does not.
 5. Source tests do not qualify belts, focus, optics, firmware timing, or the physical coupon. Frame
    remains the only ordinary Start guard and Job Review remains the warning surface.
+6. Raster Diagnostics checks actual split runways against the profile acceleration distance as
+   well as the calibration margin. Confirm that acceleration against the controller. If runway
+   is too short, lower engraving speed or increase Overscan before measuring scan offsets.
 
 ## Phase H flows (CNC router mode — ADR-098)
 
@@ -3986,7 +4040,8 @@ explicitly marked below; the remaining controls and user-facing flows are planne
 2. Passes run depth-major (whole level before stepping down) as a
    clearing group — before any profile cuts. The preview's removal
    shading shows the terraced relief forming.
-   Within a level each connected piece is cut inside out, starting in its
+   Within a level the deepest cleanup paths cut first (ADR-427), then
+   each connected ring piece is cut inside out, starting in its
    middle and widening one stepover at a time, and of the pieces ready the
    one nearest the bit comes next (ADR-424). Every ring keeps its stock on
    the side the layer's cut direction asks for, round islands as well as
@@ -4728,11 +4783,11 @@ and lifts the command's CNC-only gate.)*
    path); the remainder cuts level on the next lap.
 
 #### Edge — reliefs on a layer with a ramp angle
-1. Relief roughing rings and finishing rows plunge at their starts; the
-   layer's ramp angle ramps only its other shapes. The relief groups'
-   G-code headers carry no entry line, and Job Review's operation line
-   names the relief stages that plunge, for example
-   `ramp entry 5° (relief passes plunge)` (ADR-273 Amendment 1).
+1. Relief roughing ramps with the layer's angle (F-CNC17, ADR-424) and its
+   G-code header records that ramp. Relief finishing rows plunge at their
+   starts, so the finishing group's header carries no entry line, and Job
+   Review's operation line names the relief stages that plunge, for example
+   `ramp entry 5° (relief finishing plunges)` (ADR-273 Amendment 1).
 
 ### F-CNC19. Tile a job larger than the bed — Phase H.10
 
@@ -6654,7 +6709,7 @@ as the pane's design record.
 
 ## Camera Mode flows
 
-### F-CAM1. Choose a camera (ADR-116, ADR-440)
+### F-CAM1. Choose a camera (ADR-116, ADR-440, ADR-446)
 
 - **Success / camera running.** The operator opens the Camera panel and starts a USB camera, or
   presses **Use this camera** on a detected machine camera. The live picture is the one source every
@@ -6676,6 +6731,11 @@ as the pane's design record.
 - **Edge / device list changed.** While Camera Mode is open, browser `devicechange` refreshes the
   picker only. It never opens hardware or prompts for permission. A non-permission `AbortError`
   is shown as a retryable open failure rather than mislabeled as denial.
+- **Success / several cameras (ADR-446).** Each camera on the machine keeps its own calibration.
+  Starting a camera uses its own calibration automatically; **Calibrated cameras** in the panel
+  lists them, marks the one in use, and **Forget** removes one (undoable).
+- **Edge / camera without its own calibration.** The setup steps say to calibrate it, the canvas
+  says the saved calibration belongs to another camera, and calibrating it keeps the others.
 
 ### F-CAM2. One-photo camera calibration (ADR-441, Amendments 1 and 3)
 

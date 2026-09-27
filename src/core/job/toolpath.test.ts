@@ -201,7 +201,7 @@ describe('buildToolpath', () => {
     expect(tp.totalLength).toBe(20);
   });
 
-  it('previews the 4040 J split as controlled remainder then 5 mm feed-matched entry', () => {
+  it('previews the J split with dark exit and entry sharing its gap', () => {
     const tp = buildToolpath({
       groups: [
         {
@@ -236,7 +236,8 @@ describe('buildToolpath', () => {
       ],
     });
 
-    expect(tp.steps.map((step) => step.kind)).toEqual([
+    const steps = [...tp.steps].filter((step) => step.kind !== 'travel' || step.length > 1e-9);
+    expect(steps.map((step) => step.kind)).toEqual([
       'travel',
       'cut',
       'travel',
@@ -244,26 +245,26 @@ describe('buildToolpath', () => {
       'cut',
       'travel',
     ]);
-    const controlledRemainder = tp.steps.at(2);
-    expect(controlledRemainder).toMatchObject({
+    const feedExit = steps.at(2);
+    expect(feedExit).toMatchObject({
       kind: 'travel',
-      motion: 'rapid',
+      motion: 'feed',
       from: { x: 7.015, y: 43 },
     });
-    if (controlledRemainder?.kind !== 'travel') {
-      throw new Error('Expected controlled-travel remainder');
+    if (feedExit?.kind !== 'travel') {
+      throw new Error('Expected feed-matched exit');
     }
-    expect(controlledRemainder.to.x).toBeCloseTo(11.62, 6);
-    expect(controlledRemainder.length).toBeCloseTo(4.605, 6);
-    const feedEntry = tp.steps.at(3);
+    expect(feedExit.to.x).toBeCloseTo(11.8175, 6);
+    expect(feedExit.length).toBeCloseTo(4.8025, 6);
+    const feedEntry = steps.at(3);
     expect(feedEntry).toMatchObject({
       kind: 'travel',
       motion: 'feed',
       to: { x: 16.62, y: 43 },
-      length: 5,
     });
     if (feedEntry?.kind !== 'travel') throw new Error('Expected feed-matched entry');
-    expect(feedEntry.from.x).toBeCloseTo(11.62, 6);
+    expect(feedEntry.from.x).toBeCloseTo(11.8175, 6);
+    expect(feedEntry.length).toBeCloseTo(4.8025, 6);
   });
 
   it('applies device scan offset to reverse fill sweeps in the preview route', () => {

@@ -1,7 +1,7 @@
 // Shared raster row geometry for the emitter, route preview, and duration
-// model. Wide white gaps become separate sweeps. At an internal split, the
-// previous sweep stops at its burn edge and the next entry runway is bounded
-// by the gap, so neither forward nor reverse motion can double back.
+// model. Wide white gaps become separate sweeps. Each side shares the gap
+// without overlap, keeping acceleration and braking outside the burn where
+// the available runway permits (ADR-445).
 
 import { rasterPixelRuns, rasterSweepRunsForPixelRun, type RasterSweepRun } from '../raster-output';
 import type { RasterPowerValues } from './raster-power-values';
@@ -19,6 +19,9 @@ export type RasterRowSweepPlan = {
   readonly span: RasterActiveSpan;
   readonly leadInMm: number;
   readonly leadOutMm: number;
+  /** Adjacent runways which consume their gap reuse one exact meeting point. */
+  readonly sharedLeadStartXWorldMm?: number;
+  readonly sharedLeadEndXWorldMm?: number;
   /** Ordered G1 motion inside the active span, in world millimetres. */
   readonly runs: ReadonlyArray<RasterSweepRun>;
 };
@@ -41,6 +44,7 @@ type BoundedSplitRunwayInput = {
   readonly count: number;
   readonly requestedMm: number;
   readonly gapBeforeMm: number;
+  readonly gapAfterMm: number;
 };
 
 export function rasterActiveSpans(input: RasterActiveSpanInput): RasterActiveSpan[] {
@@ -70,14 +74,24 @@ export function planRasterRowSweeps(input: RasterRowSweepPlanInput): RasterRowSw
   const ordered = input.reverse ? [...spans].reverse() : spans;
   const requestedMm = Math.max(0, input.overscanMm);
   const dotWidthCorrectionMm = Math.max(0, input.dotWidthCorrectionMm ?? 0);
+  const joins = rasterSplitRunwayJoins(ordered, input, requestedMm);
   return ordered.map((span, index) => {
     const previous = ordered[index - 1];
+    const next = ordered[index + 1];
     const gapBeforeMm =
       previous === undefined
         ? requestedMm
         : gapBetweenSpansMm(previous, span, input.pixelWidthMm, input.reverse);
+    const gapAfterMm =
+      next === undefined
+        ? requestedMm
+        : gapBetweenSpansMm(span, next, input.pixelWidthMm, input.reverse);
+    const sharedLeadStartXWorldMm = joins[index - 1];
+    const sharedLeadEndXWorldMm = joins[index];
     return {
       span,
+      ...(sharedLeadStartXWorldMm === undefined ? {} : { sharedLeadStartXWorldMm }),
+      ...(sharedLeadEndXWorldMm === undefined ? {} : { sharedLeadEndXWorldMm }),
       runs: planRasterSweepRuns(
         input.row,
         span,
@@ -91,8 +105,27 @@ export function planRasterRowSweeps(input: RasterRowSweepPlanInput): RasterRowSw
         count: ordered.length,
         requestedMm,
         gapBeforeMm,
+        gapAfterMm,
       }),
     };
+  });
+}
+
+function rasterSplitRunwayJoins(
+  ordered: ReadonlyArray<RasterActiveSpan>,
+  input: RasterRowSweepPlanInput,
+  requestedMm: number,
+): ReadonlyArray<number | undefined> {
+  return ordered.slice(1).map((next, index) => {
+    const previous = ordered[index];
+    if (previous === undefined || requestedMm <= 0) return undefined;
+    const gapMm = gapBetweenSpansMm(previous, next, input.pixelWidthMm, input.reverse);
+    if (gapMm > 2 * requestedMm) return undefined;
+    const endPixel = input.reverse ? previous.firstX : previous.lastX + 1;
+    const startPixel = input.reverse ? next.lastX + 1 : next.firstX;
+    // Compute once for both sweeps. Separate endpoint +/- half-gap arithmetic
+    // can straddle a 0.001 mm rounding tie and invent a backwards seek.
+    return (input.minXWorldMm ?? 0) + ((endPixel + startPixel) / 2) * input.pixelWidthMm;
   });
 }
 
@@ -125,10 +158,16 @@ export function boundedSplitRunwayLengths(
   input: BoundedSplitRunwayInput,
 ): Pick<RasterRowSweepPlan, 'leadInMm' | 'leadOutMm'> {
   const requestedMm = Math.max(0, input.requestedMm);
-  const gapBeforeMm = Math.max(0, input.gapBeforeMm);
+  // An entry-only split forces a slower seek's deceleration into the preceding
+  // powered span. The speed-dependent scan offset then no longer matches that
+  // edge. Reserve a dark exit too; two full runways would overlap on short gaps.
   return {
-    leadInMm: input.index === 0 ? requestedMm : Math.min(requestedMm, gapBeforeMm),
-    leadOutMm: input.index === input.count - 1 ? requestedMm : 0,
+    leadInMm:
+      input.index === 0 ? requestedMm : Math.min(requestedMm, Math.max(0, input.gapBeforeMm) / 2),
+    leadOutMm:
+      input.index === input.count - 1
+        ? requestedMm
+        : Math.min(requestedMm, Math.max(0, input.gapAfterMm) / 2),
   };
 }
 

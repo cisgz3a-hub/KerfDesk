@@ -251,8 +251,10 @@ describe('selective pass construction (writer 1, replayed for saved stages)', ()
 
 describe('explicit unsupported or empty selective output', () => {
   it.each([
-    'G2 X10 I5',
+    'G2 X10 I7',
+    'G2 I5',
     'G3 X10 R5',
+    'G1 X10 I5',
     'G4 P1',
     'G92 X0',
     'G53 G0 X1',
@@ -314,6 +316,6 @@ describe('explicit unsupported or empty selective output', () => {
     expect(parsed.kind).toBe('ready');
     if (parsed.kind === 'ready')
       expect(parsed.segments.filter((motion) => motion.power > 0)).toHaveLength(1);
-    expect(parseLaserSecondPassSource(`${source}G2 X10 I5`).kind).toBe('error');
+    expect(parseLaserSecondPassSource(`${source}G2 X10 I7`).kind).toBe('error');
   });
 });
