@@ -48,6 +48,9 @@ Every control was checked for a home before anything left the inspector:
    (`bit-library` field). The second bit the cut type uses appears under it only while it applies:
    **Pocket roughing bit** (non-adaptive pocket), **Floor clearing bit** (flat-floor V-carve) or
    **Relief finishing bit** (relief). Bindings the current cut type does not use are kept.
+   When composed with ADR-457, the bit hint distinguishes inherited operation values from a
+   matching cutter's separate recipe and points to **Stage cutting values**. Changing the
+   material or temporarily choosing another cutter keeps saved independent recipes.
 3. **Material** follows; its tooltip says that choosing one applies starting values and a new
    bit refreshes them.
 4. Cut depth (Floor depth for a flat V-carve, Insert depth for an inlay pair) and Depth per pass
@@ -61,7 +64,9 @@ Every control was checked for a home before anything left the inspector:
 7. The remaining sections appear only for the cut types they serve and name their state when
    closed: Holding tabs ("4 per shape" or "Off"), Clearing strategy ("Offset · 40 %"), Inlay fit,
    Wall finish, Relief finish, V-carve detail ("Automatic"), Entry & travel ("Climb · Plunge"),
-   Saved feeds ("2 saved") and Feeds calculator (its material, or "Needs a material"). Their
+   Stage cutting values (ADR-457), Saved feeds ("2 saved") and Feeds calculator (its material,
+   or "Needs a material"). Entry names **Circular ramp** when enabled; the Wall finish tooltip
+   distinguishes a separate finish recipe from the inherited single full-depth finish. Their
    explanations are the summary tooltips, not opening paragraphs. Folding a section keeps its
    inputs mounted.
 8. Messages that pointed at "Tool & material" now name the control ("choose one under Bit above",

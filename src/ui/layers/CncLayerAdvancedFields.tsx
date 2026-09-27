@@ -3,6 +3,7 @@
 // and its tooltip says what it holds.
 
 import { isVCarveToolCompatible } from '../../core/cnc/vcarve-tool-compatibility';
+import { cncStageRecipe } from '../../core/cnc/cnc-stage-settings';
 import { layerCncTool, type CncLayerSettings, type Layer } from '../../core/scene';
 import { useStore } from '../state';
 import { RailSection } from '../kit';
@@ -254,6 +255,12 @@ export function CutTypeSections(props: {
   readonly onCommitSettings: (settings: CncLayerSettings) => void;
 }): JSX.Element {
   const { layer, settings, onCommit } = props;
+  const separateWallValues = useStore(
+    (state) =>
+      state.project.machine?.kind === 'cnc' &&
+      cncStageRecipe(settings, 'profile-finish', layerCncTool(state.project.machine, settings)) !==
+        undefined,
+  );
   const offsetProfile =
     settings.cutType === 'profile-outside' || settings.cutType === 'profile-inside';
   return (
@@ -262,7 +269,11 @@ export function CutTypeSections(props: {
         <RailSection
           label="Wall finish"
           badge={(settings.finishAllowanceMm ?? 0) > 0 ? 'Finish pass' : 'No allowance'}
-          hint="Leave a small allowance during roughing, then remove it in a true-wall finish. It uses one full-depth pass unless separate wall finishing values specify smaller depth passes. Zero uses no separate finish pass."
+          hint={
+            separateWallValues
+              ? 'Leave a small allowance during roughing, then remove it using the separate wall finishing values in Stage cutting values. Zero uses no separate finish pass.'
+              : 'Leave a small allowance during roughing, then remove it in one full-depth pass along the wall. Set separate wall finishing values in Stage cutting values to use smaller depth passes. Zero uses no separate finish pass.'
+          }
         >
           <CncFinishAllowanceField layer={layer} settings={settings} onCommit={onCommit} />
         </RailSection>

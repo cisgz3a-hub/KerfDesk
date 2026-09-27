@@ -38,7 +38,11 @@ export function CncEntryFields(props: {
 function entryBadge(settings: CncLayerSettings): string {
   const ramp =
     (settings.cutType === 'v-carve' ? settings.vCarveRampEntryDeg : settings.rampEntryDeg) ?? 0;
-  const entry = ramp > 0 ? `Ramp ${ramp}°` : 'Plunge';
+  const circularRamp =
+    settings.cutType === 'pocket' &&
+    settings.pocketStrategy !== 'adaptive' &&
+    settings.helixEntry !== undefined;
+  const entry = circularRamp ? 'Circular ramp' : ramp > 0 ? `Ramp ${ramp}°` : 'Plunge';
   if (!cutTypeShowsCutDirection(settings.cutType)) return entry;
   const direction =
     settings.cutDirection === 'climb'

@@ -1,5 +1,7 @@
 import { useId } from 'react';
 import { CHIPLOAD_MATERIALS } from '../../core/cnc';
+import { cncStageRecipe } from '../../core/cnc/cnc-stage-settings';
+import type { CncCuttingStage } from '../../core/scene/cnc-stage-recipe';
 import {
   layerCncTool,
   type CncLayerSettings,
@@ -154,7 +156,7 @@ function CncSecondaryToolFields(props: {
           tools={flatTools}
           allTools={machine.tools}
           description="A flat bit that clears the floor where the V-bit cannot reach. Single stage cuts with the V-bit only."
-          hint="Uses the primary bit's feed, plunge, RPM and depth per pass. Check these values for both bits."
+          hint={secondaryFeedHint(settings, machine, 'v-clear', draft.vClearToolId)}
           onChange={(vClearToolId) => props.onChange({ vClearToolId })}
         />
       ) : null}
@@ -167,7 +169,7 @@ function CncSecondaryToolFields(props: {
           tools={roughers}
           allTools={machine.tools}
           description="A larger bit that clears most of the pocket before this operation's bit cuts the edges."
-          hint="Uses the primary bit's feed, plunge, RPM and depth per pass. Check these values for both bits."
+          hint={secondaryFeedHint(settings, machine, 'pocket-rough', draft.pocketRoughToolId)}
           onChange={(pocketRoughToolId) => props.onChange({ pocketRoughToolId })}
         />
       ) : null}
@@ -180,12 +182,30 @@ function CncSecondaryToolFields(props: {
           tools={machine.tools}
           allTools={machine.tools}
           description="A bit that follows the relief surface after roughing. Roughing only skips the finishing pass."
-          hint="Uses the primary bit's feed, plunge and RPM. Check these values for both bits. Relief finishing follows the surface and scallop setting; depth per pass does not apply."
+          hint={secondaryFeedHint(settings, machine, 'relief-finish', draft.reliefFinishToolId)}
           onChange={(reliefFinishToolId) => props.onChange({ reliefFinishToolId })}
         />
       ) : null}
     </>
   );
+}
+
+function secondaryFeedHint(
+  settings: CncLayerSettings,
+  machine: CncMachineConfig,
+  stage: CncCuttingStage,
+  toolId: string | null,
+): string {
+  const tool = machine.tools.find((candidate) => candidate.id === toolId);
+  const independent = tool !== undefined && cncStageRecipe(settings, stage, tool) !== undefined;
+  const values =
+    stage === 'relief-finish' ? 'feed, plunge and RPM' : 'feed, plunge, RPM and depth per pass';
+  const recipeHint = independent
+    ? `Uses separate ${values} for this bit. Edit them in Stage cutting values.`
+    : `Uses the primary bit's ${values}. Set separate values in Stage cutting values.`;
+  return stage === 'relief-finish'
+    ? `${recipeHint} Relief finishing follows the surface and scallop setting; depth per pass does not apply.`
+    : recipeHint;
 }
 
 function materialName(key: string): string {
