@@ -3968,7 +3968,8 @@ explicitly marked below; the remaining controls and user-facing flows are planne
 2. Passes run depth-major (whole level before stepping down) as a
    clearing group — before any profile cuts. The preview's removal
    shading shows the terraced relief forming.
-   Within a level each connected piece is cut inside out, starting in its
+   Within a level the deepest cleanup paths cut first (ADR-427), then
+   each connected ring piece is cut inside out, starting in its
    middle and widening one stepover at a time, and of the pieces ready the
    one nearest the bit comes next (ADR-424). Every ring keeps its stock on
    the side the layer's cut direction asks for, round islands as well as
@@ -4708,6 +4709,13 @@ and lifts the command's CNC-only gate.)*
 #### Edge — path shorter than the ramp
 1. The descent finishes at the path end (the ramp consumed the whole
    path); the remainder cuts level on the next lap.
+
+#### Edge — reliefs on a layer with a ramp angle
+1. Relief roughing rings and finishing rows plunge at their starts; the
+   layer's ramp angle ramps only its other shapes. The relief groups'
+   G-code headers carry no entry line, and Job Review's operation line
+   names the relief stages that plunge, for example
+   `ramp entry 5° (relief passes plunge)` (ADR-273 Amendment 1).
 
 ### F-CNC19. Tile a job larger than the bed — Phase H.10
 

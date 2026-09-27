@@ -5,12 +5,13 @@ import {
   requestedCncCoordinateText,
 } from '../../../core/cnc/coordinate-representation';
 import { artworkOperationName, type Layer, type SceneObject } from '../../../core/scene';
-import { laserOperationDetail } from './job-review-detail-facts';
+import { laserOperationDetail, type PlungingReliefStage } from './job-review-detail-facts';
 
 export type JobReviewEffectiveOperation = {
   readonly layerId: string;
   readonly summaries: ReadonlyArray<string>;
   readonly cncActualMaxDepthMm?: number;
+  readonly plungingReliefStages?: ReadonlyArray<PlungingReliefStage>;
 };
 
 /** Summarize selected values from the exact prepared Job. Matching displayed
@@ -37,12 +38,33 @@ export function buildEffectiveOperationReview(
       }
     }
   }
+  const plungingReliefByLayer = plungingReliefStagesByLayer(job);
   return [...summariesByLayer].map(([layerId, summaries]) => {
     const cncActualMaxDepth = vCarveDepthByLayer.get(layerId);
-    return cncActualMaxDepth === undefined
-      ? { layerId, summaries }
-      : { layerId, summaries, cncActualMaxDepthMm: cncActualMaxDepth.value };
+    const plungingReliefStages = plungingReliefByLayer.get(layerId);
+    return {
+      layerId,
+      summaries,
+      ...(cncActualMaxDepth === undefined ? {} : { cncActualMaxDepthMm: cncActualMaxDepth.value }),
+      ...(plungingReliefStages === undefined ? {} : { plungingReliefStages }),
+    };
   });
+}
+
+// A relief group records a ramp only where it ramps (ADR-273 Amendment 1), so
+// one without it plunges at every start, whatever entry its layer asks for.
+function plungingReliefStagesByLayer(
+  job: Job,
+): ReadonlyMap<string, ReadonlyArray<PlungingReliefStage>> {
+  const byLayer = new Map<string, PlungingReliefStage[]>();
+  for (const group of job.groups) {
+    if (group.kind !== 'cnc' || group.rampEntryDeg !== undefined) continue;
+    if (group.cutType !== 'relief-rough' && group.cutType !== 'relief-finish') continue;
+    const stages = byLayer.get(group.layerId) ?? [];
+    if (!stages.includes(group.cutType)) stages.push(group.cutType);
+    byLayer.set(group.layerId, stages);
+  }
+  return byLayer;
 }
 
 function effectiveGroupSummary(
