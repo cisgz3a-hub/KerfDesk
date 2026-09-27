@@ -18,7 +18,8 @@ import { traceCliHelp } from './trace-cli-help';
 
 function square(size = 48): Uint8Array {
   const rgb = new Uint8Array(size * size * 3).fill(255);
-  for (let y = 12; y < size - 12; y += 1) rgb.fill(0, (y * size + 12) * 3, (y * size + size - 12) * 3);
+  for (let y = 12; y < size - 12; y += 1)
+    rgb.fill(0, (y * size + 12) * 3, (y * size + size - 12) * 3);
   return encodeRgbPng(rgb, size, size);
 }
 
@@ -59,7 +60,12 @@ describe('trace command (ADR-477)', () => {
   });
 
   it('exits 2 on invalid options and 1 on an unreadable image', async () => {
-    const usage = [['--smoothness', '9'], ['--preset', 'Nope'], ['--frobnicate'], ['a.png', 'b.png']];
+    const usage = [
+      ['--smoothness', '9'],
+      ['--preset', 'Nope'],
+      ['--frobnicate'],
+      ['a.png', 'b.png'],
+    ];
     for (const argv of usage) expect((await run(argv)).code).toBe(TRACE_CLI_EXIT.usage);
     const garbage = await run([], new TextEncoder().encode('not an image'));
     expect(garbage.code).toBe(TRACE_CLI_EXIT.failed);

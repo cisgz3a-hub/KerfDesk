@@ -34,7 +34,10 @@ export function traceCliHelp(): string {
     row('--precision <mm>', 'Coordinate grid of the file (default: 0.001)'),
     row('--group-contours', 'Group each colour into one path'),
     row('--page <image|artwork>', 'Page: the whole image, or the artwork (default: image)'),
-    row('--margin <mm>', `Space around the artwork page, 0-${MAX_TRACED_PAGE_MARGIN_MM} (default: 0)`),
+    row(
+      '--margin <mm>',
+      `Space around the artwork page, 0-${MAX_TRACED_PAGE_MARGIN_MM} (default: 0)`,
+    ),
     row('-h, --help', 'Show this help'),
     '',
     'Trace settings (the Trace dialog controls; unset ones keep the preset value):',

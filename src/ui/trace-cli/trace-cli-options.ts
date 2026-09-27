@@ -132,17 +132,51 @@ function applyFlag(draft: Draft, arg: string, queue: string[]): void {
   throw new TraceCliUsageError(`Unknown option ${arg}. Run with --help for the list.`);
 }
 
+type GeneralFlag = (draft: Draft, value: () => string) => void;
+
+const GENERAL_FLAGS: Readonly<Record<string, GeneralFlag>> = {
+  help: (draft) => {
+    draft.help = true;
+  },
+  output: (draft, value) => {
+    draft.output = outputPath(value());
+  },
+  preset: (draft, value) => {
+    draft.presetName = presetName(value());
+  },
+  format: (draft, value) => {
+    draft.format = formatName(value());
+  },
+  dpi: (draft, value) => {
+    draft.dpi = dpiValue(value());
+  },
+  precision: (draft, value) => {
+    draft.precisionMm = numberIn('precision', value(), 1e-6, 1);
+  },
+  'group-contours': (draft) => {
+    draft.groupContours = true;
+  },
+  page: (draft, value) => {
+    draft.pageFit = pageFit(value());
+  },
+  margin: (draft, value) => {
+    draft.marginMm = numberIn('margin', value(), 0, MAX_TRACED_PAGE_MARGIN_MM);
+  },
+};
+
+const SHORT_FLAGS: Readonly<Record<string, string>> = {
+  h: 'help',
+  o: 'output',
+  p: 'preset',
+  f: 'format',
+  r: 'dpi',
+};
+
 function applyGeneralFlag(draft: Draft, name: string, value: () => string): boolean {
-  if (name === 'h' || name === 'help') draft.help = true;
-  else if (name === 'o' || name === 'output') draft.output = outputPath(value());
-  else if (name === 'p' || name === 'preset') draft.presetName = presetName(value());
-  else if (name === 'f' || name === 'format') draft.format = formatName(value());
-  else if (name === 'r' || name === 'dpi') draft.dpi = dpiValue(value());
-  else if (name === 'precision') draft.precisionMm = numberIn('precision', value(), 1e-6, 1);
-  else if (name === 'group-contours') draft.groupContours = true;
-  else if (name === 'page') draft.pageFit = pageFit(value());
-  else if (name === 'margin') draft.marginMm = numberIn('margin', value(), 0, MAX_TRACED_PAGE_MARGIN_MM);
-  else return false;
+  const long = SHORT_FLAGS[name] ?? name;
+  const apply = Object.hasOwn(GENERAL_FLAGS, long) ? GENERAL_FLAGS[long] : undefined;
+  if (apply === undefined) return false;
+  apply(draft, value);
   return true;
 }
 
@@ -160,8 +194,10 @@ function applyOverrideFlag(
   const key = FLAG_TO_KEY.get(name);
   if (key === undefined) return false;
   const rule = TRACE_OVERRIDE_RULES[key];
-  if (rule.kind === 'boolean') draft.overrides[key] = inline === undefined || flagBool(name, inline);
-  else if (rule.kind === 'number') draft.overrides[key] = numberIn(name, value(), rule.min, rule.max);
+  if (rule.kind === 'boolean')
+    draft.overrides[key] = inline === undefined || flagBool(name, inline);
+  else if (rule.kind === 'number')
+    draft.overrides[key] = numberIn(name, value(), rule.min, rule.max);
   else if (rule.kind === 'count-or-auto') draft.overrides[key] = countOrAuto(name, value(), rule);
   else draft.overrides[key] = choice(name, value(), choices(rule));
   return true;

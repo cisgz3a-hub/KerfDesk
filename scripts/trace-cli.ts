@@ -26,6 +26,6 @@ const io: TraceCliIo = {
   writeError: (text) => process.stderr.write(text),
 };
 
-export async function main(argv: ReadonlyArray<string>): Promise<number> {
+export async function main(argv: readonly string[]): Promise<number> {
   return runTraceCli(argv, io);
 }

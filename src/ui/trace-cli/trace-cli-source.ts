@@ -85,7 +85,7 @@ function sourcePixel(
       return [w - 1 - y, h - 1 - x];
     case 8:
       return [w - 1 - y, x];
-    default:
+    case 1:
       return [x, y];
   }
 }

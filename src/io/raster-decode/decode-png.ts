@@ -65,24 +65,8 @@ export async function decodePng(bytes: Uint8Array): Promise<DecodedRaster> {
 
 function readPngChunks(bytes: Uint8Array): PngHeader {
   if (!isPng(bytes)) throw new Error('Not a PNG file.');
-  const view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
-  const idat: Uint8Array[] = [];
-  let ihdr: Uint8Array | null = null;
-  let palette: Uint8Array | null = null;
-  let transparency: Uint8Array | null = null;
-  let offset = SIGNATURE.length;
-  while (offset + 8 <= bytes.length) {
-    const length = view.getUint32(offset);
-    const type = String.fromCharCode(...bytes.subarray(offset + 4, offset + 8));
-    const body = bytes.subarray(offset + 8, offset + 8 + length);
-    if (body.length !== length) throw new Error('The PNG file is truncated.');
-    if (type === 'IHDR') ihdr = body;
-    else if (type === 'PLTE') palette = body;
-    else if (type === 'tRNS') transparency = body;
-    else if (type === 'IDAT') idat.push(body);
-    else if (type === 'IEND') break;
-    offset += 12 + length;
-  }
+  const chunks = collectChunks(bytes);
+  const ihdr = firstChunk(chunks, 'IHDR');
   if (ihdr === null || ihdr.length < 13) throw new Error('The PNG file has no image header.');
   const head = new DataView(ihdr.buffer, ihdr.byteOffset, ihdr.byteLength);
   const header = {
@@ -91,18 +75,39 @@ function readPngChunks(bytes: Uint8Array): PngHeader {
     bitDepth: ihdr[8] ?? 0,
     colorType: ihdr[9] ?? 0,
     interlaced: ihdr[12] === 1,
-    palette,
-    transparency,
-    idat: concat(idat),
+    palette: firstChunk(chunks, 'PLTE'),
+    transparency: firstChunk(chunks, 'tRNS'),
+    idat: concat(chunks.get('IDAT') ?? []),
   };
   validateHeader(header);
   return header;
 }
 
+function firstChunk(chunks: Map<string, Uint8Array[]>, type: string): Uint8Array | null {
+  return chunks.get(type)?.[0] ?? null;
+}
+
+function collectChunks(bytes: Uint8Array): Map<string, Uint8Array[]> {
+  const view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
+  const chunks = new Map<string, Uint8Array[]>();
+  let offset = SIGNATURE.length;
+  while (offset + 8 <= bytes.length) {
+    const length = view.getUint32(offset);
+    const type = String.fromCharCode(...bytes.subarray(offset + 4, offset + 8));
+    const body = bytes.subarray(offset + 8, offset + 8 + length);
+    if (body.length !== length) throw new Error('The PNG file is truncated.');
+    if (type === 'IEND') break;
+    chunks.set(type, [...(chunks.get(type) ?? []), body]);
+    offset += 12 + length;
+  }
+  return chunks;
+}
+
 function validateHeader(header: PngHeader): void {
   assertRasterSize(header.width, header.height);
   const channels = CHANNELS[header.colorType];
-  const depths = header.colorType === 0 ? [1, 2, 4, 8, 16] : header.colorType === 3 ? [1, 2, 4, 8] : [8, 16];
+  const depths =
+    header.colorType === 0 ? [1, 2, 4, 8, 16] : header.colorType === 3 ? [1, 2, 4, 8] : [8, 16];
   if (channels === undefined || !depths.includes(header.bitDepth)) {
     throw new Error(`Unsupported PNG colour type ${header.colorType} at ${header.bitDepth} bits.`);
   }
@@ -139,21 +144,32 @@ function unfilter(
   if (start + (stride + 1) * rows > raw.length) throw new Error('The PNG image data is truncated.');
   const out = new Uint8Array(stride * rows);
   for (let row = 0; row < rows; row += 1) {
-    const filter = raw[start + row * (stride + 1)];
-    const src = start + row * (stride + 1) + 1;
-    const at = row * stride;
-    for (let i = 0; i < stride; i += 1) {
-      const a = i >= bpp ? (out[at + i - bpp] ?? 0) : 0;
-      const b = row > 0 ? (out[at - stride + i] ?? 0) : 0;
-      const c = row > 0 && i >= bpp ? (out[at - stride + i - bpp] ?? 0) : 0;
-      out[at + i] = ((raw[src + i] ?? 0) + predictor(filter, a, b, c)) & 0xff;
-    }
-    if (filter === undefined || filter > 4) throw new Error('The PNG uses an unknown row filter.');
+    const filter = raw[start + row * (stride + 1)] ?? 0;
+    if (filter > 4) throw new Error('The PNG uses an unknown row filter.');
+    const line = raw.subarray(start + row * (stride + 1) + 1, start + (row + 1) * (stride + 1));
+    unfilterRow(line, out, row * stride, row > 0 ? stride : 0, bpp, filter);
   }
   return out;
 }
 
-function predictor(filter: number | undefined, a: number, b: number, c: number): number {
+// `up` is the distance back to the previous row in `out`, 0 on the first row.
+function unfilterRow(
+  line: Uint8Array,
+  out: Uint8Array,
+  at: number,
+  up: number,
+  bpp: number,
+  filter: number,
+): void {
+  for (let i = 0; i < line.length; i += 1) {
+    const a = i >= bpp ? (out[at + i - bpp] ?? 0) : 0;
+    const b = up > 0 ? (out[at - up + i] ?? 0) : 0;
+    const c = up > 0 && i >= bpp ? (out[at - up + i - bpp] ?? 0) : 0;
+    out[at + i] = ((line[i] ?? 0) + predictor(filter, a, b, c)) & 0xff;
+  }
+}
+
+function predictor(filter: number, a: number, b: number, c: number): number {
   if (filter === 1) return a;
   if (filter === 2) return b;
   if (filter === 3) return (a + b) >> 1;
@@ -185,21 +201,29 @@ function writePixel(
   const max = (1 << depth) - 1;
   const scale = (value: number): number => Math.round((value * 255) / max);
   if (header.colorType === 3) {
-    const index = sample(line, col, depth);
-    data[target] = header.palette?.[index * 3] ?? 0;
-    data[target + 1] = header.palette?.[index * 3 + 1] ?? 0;
-    data[target + 2] = header.palette?.[index * 3 + 2] ?? 0;
-    data[target + 3] = header.transparency?.[index] ?? 255;
+    palettePixel(data, target, sample(line, col, depth), header);
     return;
   }
-  const values = Array.from({ length: channels }, (_, c) => sample(line, col * channels + c, depth));
-  const grey = channels <= 2;
-  const [r = 0, g = r, b = r] = grey ? [values[0], values[0], values[0]] : values;
-  data[target] = scale(r);
-  data[target + 1] = scale(g);
-  data[target + 2] = scale(b);
-  const alpha = channels === 2 || channels === 4 ? values[channels - 1] : undefined;
-  data[target + 3] = alpha !== undefined ? scale(alpha) : keyedAlpha(values, header);
+  const values = Array.from({ length: channels }, (_, c) =>
+    sample(line, col * channels + c, depth),
+  );
+  const rgb = channels <= 2 ? [values[0], values[0], values[0]] : values.slice(0, 3);
+  const hasAlpha = channels === 2 || channels === 4;
+  const alpha = hasAlpha ? scale(values[channels - 1] ?? 0) : keyedAlpha(values, header);
+  data.set([...rgb.map((value) => scale(value ?? 0)), alpha], target);
+}
+
+function palettePixel(
+  data: Uint8ClampedArray,
+  target: number,
+  index: number,
+  header: PngHeader,
+): void {
+  const entry = header.palette?.subarray(index * 3, index * 3 + 3) ?? new Uint8Array(3);
+  data.set(
+    [entry[0] ?? 0, entry[1] ?? 0, entry[2] ?? 0, header.transparency?.[index] ?? 255],
+    target,
+  );
 }
 
 // tRNS on grey or RGB names one exact sample value that is fully transparent.

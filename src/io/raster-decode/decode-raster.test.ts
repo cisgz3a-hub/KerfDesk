@@ -72,7 +72,13 @@ describe('headless raster decoders (ADR-477)', () => {
 
   it('decodes 16-bit RGBA and a keyed grey transparency', async () => {
     const rgba = await decodeRaster(
-      png({ width: 1, height: 1, bitDepth: 16, colorType: 6, raw: [0, 255, 255, 0, 0, 128, 0, 255, 255] }),
+      png({
+        width: 1,
+        height: 1,
+        bitDepth: 16,
+        colorType: 6,
+        raw: [0, 255, 255, 0, 0, 128, 0, 255, 255],
+      }),
     );
     expect(pixels(rgba.data)).toEqual([[255, 0, 128, 255]]);
     const key = chunk('tRNS', Uint8Array.from([0, 7]));

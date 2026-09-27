@@ -244,6 +244,18 @@ pnpm preview:web
 
 Serves the built bundle on **http://localhost:4173**.
 
+### Headless trace command
+
+```bash
+pnpm trace --preset "Line Art" --format svg -o art.svg art.png
+cat art.png | pnpm -s trace -f dxf > art.dxf
+```
+
+Traces one PNG, JPEG, BMP, TIFF or PBM/PGM/PPM image to SVG, DXF, PDF, EPS or GeoJSON with the
+app's own tracer, presets and Trace dialog settings, byte for byte as Multi-File Trace writes it
+(ADR-477). The package also exposes it as the `kerfdesk-trace` bin. `pnpm trace --help` lists
+every flag; the exit status is 0 traced, 1 failed, 2 invalid options, 3 nothing to draw.
+
 ### Desktop (Electron)
 
 ```bash

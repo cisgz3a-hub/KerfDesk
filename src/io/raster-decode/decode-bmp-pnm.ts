@@ -19,33 +19,23 @@ export function isPnm(bytes: Uint8Array): boolean {
 
 export function decodeBmp(bytes: Uint8Array): DecodedRaster {
   const view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
-  if (bytes.length < 54) throw new Error('The BMP file is truncated.');
-  const pixelOffset = view.getUint32(10, true);
-  const dibSize = view.getUint32(14, true);
-  if (dibSize < 40) throw new Error('This BMP header version is not supported.');
-  const width = view.getInt32(18, true);
-  const signedHeight = view.getInt32(22, true);
-  const height = Math.abs(signedHeight);
-  const bpp = view.getUint16(28, true);
-  const compression = view.getUint32(30, true);
-  assertRasterSize(width, height);
-  if (compression !== 0 && compression !== 3 && compression !== 6) {
-    throw new Error('Compressed (RLE/JPEG/PNG) BMP files are not supported.');
-  }
-  const masks = bitfieldMasks(view, dibSize, bpp, compression);
+  const header = readBmpHeader(bytes, view);
+  const { width, height, bpp, dibSize } = header;
+  const masks = bitfieldMasks(view, dibSize, bpp, header.compression);
   const colours = view.getUint32(46, true) || (bpp <= 8 ? 1 << bpp : 0);
   const palette = bytes.subarray(14 + dibSize, 14 + dibSize + colours * 4);
   const stride = Math.ceil((bpp * width) / 32) * 4;
-  if (pixelOffset + stride * height > bytes.length) throw new Error('The BMP file is truncated.');
+  if (header.pixelOffset + stride * height > bytes.length) {
+    throw new Error('The BMP file is truncated.');
+  }
   const data = new Uint8ClampedArray(width * height * 4);
   // Only a real alpha mask reports alpha; every other pixel is written opaque.
   let anyAlpha = masks[3] === 0;
   for (let y = 0; y < height; y += 1) {
-    const row = pixelOffset + (signedHeight > 0 ? height - 1 - y : y) * stride;
+    const stored = header.bottomUp ? height - 1 - y : y;
+    const src = { bytes, view, row: header.pixelOffset + stored * stride, bpp, palette, masks };
     for (let x = 0; x < width; x += 1) {
-      const target = (y * width + x) * 4;
-      const alpha = bmpPixel(bytes, view, row, x, bpp, palette, masks, data, target);
-      anyAlpha ||= alpha > 0;
+      if (bmpPixel(src, x, data, (y * width + x) * 4) > 0) anyAlpha = true;
     }
   }
   // Like browsers, a BMP whose alpha channel is entirely zero is opaque.
@@ -53,6 +43,37 @@ export function decodeBmp(bytes: Uint8Array): DecodedRaster {
   const x = view.getInt32(38, true) * INCH_PER_METRE;
   const y = view.getInt32(42, true) * INCH_PER_METRE;
   return { width, height, data, ...(x > 0 && y > 0 ? { dpi: { x, y } } : {}) };
+}
+
+type BmpHeader = {
+  readonly pixelOffset: number;
+  readonly dibSize: number;
+  readonly width: number;
+  readonly height: number;
+  readonly bottomUp: boolean;
+  readonly bpp: number;
+  readonly compression: number;
+};
+
+function readBmpHeader(bytes: Uint8Array, view: DataView): BmpHeader {
+  if (bytes.length < 54) throw new Error('The BMP file is truncated.');
+  const dibSize = view.getUint32(14, true);
+  if (dibSize < 40) throw new Error('This BMP header version is not supported.');
+  const signedHeight = view.getInt32(22, true);
+  const header = {
+    pixelOffset: view.getUint32(10, true),
+    dibSize,
+    width: view.getInt32(18, true),
+    height: Math.abs(signedHeight),
+    bottomUp: signedHeight > 0,
+    bpp: view.getUint16(28, true),
+    compression: view.getUint32(30, true),
+  };
+  assertRasterSize(header.width, header.height);
+  if (header.compression !== 0 && header.compression !== 3 && header.compression !== 6) {
+    throw new Error('Compressed (RLE/JPEG/PNG) BMP files are not supported.');
+  }
+  return header;
 }
 
 type Masks = readonly [number, number, number, number];
@@ -67,33 +88,38 @@ function bitfieldMasks(view: DataView, dibSize: number, bpp: number, compression
   return [view.getUint32(54, true), view.getUint32(58, true), view.getUint32(62, true), alpha];
 }
 
-function bmpPixel(
-  bytes: Uint8Array,
-  view: DataView,
-  row: number,
-  x: number,
-  bpp: number,
-  palette: Uint8Array,
-  masks: Masks,
-  data: Uint8ClampedArray,
-  target: number,
-): number {
-  if (bpp <= 8) {
-    const bit = x * bpp;
-    const index = ((bytes[row + (bit >> 3)] ?? 0) >> (8 - bpp - (bit & 7))) & ((1 << bpp) - 1);
-    data[target] = palette[index * 4 + 2] ?? 0;
-    data[target + 1] = palette[index * 4 + 1] ?? 0;
-    data[target + 2] = palette[index * 4] ?? 0;
-    data[target + 3] = 255;
+type BmpRow = {
+  readonly bytes: Uint8Array;
+  readonly view: DataView;
+  readonly row: number;
+  readonly bpp: number;
+  readonly palette: Uint8Array;
+  readonly masks: Masks;
+};
+
+// Writes pixel x of the row to data[target..]; returns its alpha when the
+// file carries a real alpha mask, else 0.
+function bmpPixel(src: BmpRow, x: number, data: Uint8ClampedArray, target: number): number {
+  if (src.bpp <= 8) return palettePixel(src, x, data, target);
+  if (src.bpp === 24) {
+    const at = src.row + x * 3;
+    data.set([src.bytes[at + 2] ?? 0, src.bytes[at + 1] ?? 0, src.bytes[at] ?? 0, 255], target);
     return 0;
   }
-  if (bpp === 24) {
-    data[target] = bytes[row + x * 3 + 2] ?? 0;
-    data[target + 1] = bytes[row + x * 3 + 1] ?? 0;
-    data[target + 2] = bytes[row + x * 3] ?? 0;
-    data[target + 3] = 255;
-    return 0;
-  }
+  return maskedPixel(src, x, data, target);
+}
+
+function palettePixel(src: BmpRow, x: number, data: Uint8ClampedArray, target: number): number {
+  const bit = x * src.bpp;
+  const byte = src.bytes[src.row + (bit >> 3)] ?? 0;
+  const index = (byte >> (8 - src.bpp - (bit & 7))) & ((1 << src.bpp) - 1);
+  const entry = src.palette.subarray(index * 4, index * 4 + 3);
+  data.set([entry[2] ?? 0, entry[1] ?? 0, entry[0] ?? 0, 255], target);
+  return 0;
+}
+
+function maskedPixel(src: BmpRow, x: number, data: Uint8ClampedArray, target: number): number {
+  const { bpp, view, row, masks } = src;
   if (bpp !== 16 && bpp !== 32) throw new Error(`Unsupported BMP depth: ${bpp} bits.`);
   const value = bpp === 16 ? view.getUint16(row + x * 2, true) : view.getUint32(row + x * 4, true);
   data[target] = maskedByte(value, masks[0]);
@@ -117,32 +143,41 @@ export function decodePnm(bytes: Uint8Array): DecodedRaster {
   const reader = { bytes, offset: 2 };
   const width = headerInt(reader);
   const height = headerInt(reader);
-  const maxval = kind === 1 || kind === 4 ? 1 : headerInt(reader);
+  const maxval = pnmMaxval(reader, kind);
   assertRasterSize(width, height);
-  if (maxval < 1 || maxval > 65535) throw new Error('The PNM maxval is out of range.');
   reader.offset += 1; // the single whitespace byte before binary samples
   const channels = kind === 3 || kind === 6 ? 3 : 1;
   const data = new Uint8ClampedArray(width * height * 4);
   const rowBytes = Math.ceil(width / 8);
   for (let p = 0; p < width * height; p += 1) {
-    let rgb: number[];
-    if (kind === 4) {
-      const y = Math.floor(p / width);
-      const x = p % width;
-      const byte = bytes[reader.offset + y * rowBytes + (x >> 3)];
-      if (byte === undefined) throw new Error('The PNM file is truncated.');
-      rgb = [(byte >> (7 - (x & 7))) & 1 ? 0 : 255];
-    } else {
-      rgb = Array.from({ length: channels }, () => pnmSample(reader, kind, maxval));
-      if (kind === 1) rgb = [rgb[0] === 1 ? 0 : 255];
-      else rgb = rgb.map((v) => Math.round((v * 255) / maxval));
-    }
-    data[p * 4] = rgb[0] ?? 0;
-    data[p * 4 + 1] = rgb[channels === 3 ? 1 : 0] ?? 0;
-    data[p * 4 + 2] = rgb[channels === 3 ? 2 : 0] ?? 0;
-    data[p * 4 + 3] = 255;
+    const rgb =
+      kind === 4
+        ? [packedBit(bytes, reader.offset + Math.floor(p / width) * rowBytes, p % width)]
+        : pnmPixel(reader, kind, channels, maxval);
+    const [r = 0, g = r, b = r] = rgb;
+    data.set([r, g, b, 255], p * 4);
   }
   return { width, height, data };
+}
+
+function pnmMaxval(reader: Reader, kind: number): number {
+  if (kind === 1 || kind === 4) return 1;
+  const maxval = headerInt(reader);
+  if (maxval < 1 || maxval > 65535) throw new Error('The PNM maxval is out of range.');
+  return maxval;
+}
+
+// P4: one bit per pixel, 1 is ink (black), rows padded to whole bytes.
+function packedBit(bytes: Uint8Array, rowStart: number, x: number): number {
+  const byte = bytes[rowStart + (x >> 3)];
+  if (byte === undefined) throw new Error('The PNM file is truncated.');
+  return (byte >> (7 - (x & 7))) & 1 ? 0 : 255;
+}
+
+function pnmPixel(reader: Reader, kind: number, channels: number, maxval: number): number[] {
+  const samples = Array.from({ length: channels }, () => pnmSample(reader, kind, maxval));
+  if (kind === 1) return [samples[0] === 1 ? 0 : 255];
+  return samples.map((v) => Math.round((v * 255) / maxval));
 }
 
 type Reader = { readonly bytes: Uint8Array; offset: number };
@@ -163,7 +198,10 @@ function skipSpaceAndComments(reader: Reader): void {
 function headerInt(reader: Reader): number {
   skipSpaceAndComments(reader);
   let text = '';
-  for (let byte = reader.bytes[reader.offset]; byte !== undefined && byte >= 0x30 && byte <= 0x39; ) {
+  for (
+    let byte = reader.bytes[reader.offset];
+    byte !== undefined && byte >= 0x30 && byte <= 0x39;
+  ) {
     text += String.fromCharCode(byte);
     reader.offset += 1;
     byte = reader.bytes[reader.offset];
