@@ -4087,6 +4087,12 @@ explicitly marked below; the remaining controls and user-facing flows are planne
    names only the ramp angle, since no helix or V-carve entry reaches a
    relief. One that also cut other shapes says `1 pass on the other shapes`,
    and kept tabs add `none on reliefs` (ADR-224 Amendment 3).
+5. In the same row, an operation that cut only reliefs shows **Relief**
+   under Cut and the deepest compiled relief pass under Depth mm, for
+   example `2.5 mm actual`, or `3 mm actual` where a finishing bit cuts
+   the allowance. Its cut type and Cut depth reach no shape, so the row
+   does not show them. One that also cut other shapes keeps both
+   (ADR-224 Amendment 4).
 
 #### Error — bit too big for the detail
 1. Regions narrower than the bit's dilated footprint produce no rings
