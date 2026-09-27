@@ -151,6 +151,7 @@ function optionalCncLayerFields(raw: Record<string, unknown>): Record<string, un
     // for eligible cuts). Persisted so an operator's explicit OFF survives a
     // save/load — absent stays absent and reads as the compile default.
     ...booleanPassthrough('retractBetweenPasses', raw['retractBetweenPasses']),
+    ...booleanPassthrough('pocketLiftBetweenRings', raw['pocketLiftBetweenRings']),
     // Finish allowance: non-negative (0 = off), so a hand-edited negative value
     // is dropped rather than inflating the roughing offset the wrong way.
     ...(isNonNegativeNumber(raw['finishAllowanceMm'])

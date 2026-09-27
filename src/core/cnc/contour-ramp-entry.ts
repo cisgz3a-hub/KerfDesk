@@ -18,6 +18,9 @@ const MAX_ARRAY_LENGTH = 0xffff_ffff;
  * - An open path cannot be lapped. It zig-zags along its first span (the whole
  *   path when that is short) back to its start at depth, then cuts the whole
  *   path at depth, so no sloped floor stays behind.
+ * - `endAtStart` (a stay-down link leaves from the ring's start, ADR-491):
+ *   the loop is descended into its start from one ramp length before it, so
+ *   the lap at depth ends on the start instead of where the descent ended.
  * - A path the ramp would have to go over again that is shorter than
  *   `minPathMm` (one cut width) keeps its plunge: the cutter's footprint then
  *   covers the whole path, so going round it again would only be a slower
@@ -29,6 +32,7 @@ export function rampContourPass(
   fromZ: number,
   tangent: number,
   minPathMm: number,
+  endAtStart: boolean,
 ): CncPass {
   const drop = fromZ - pass.zMm;
   // Already cut this deep, no ramp asked for, or no path to enter.
@@ -45,7 +49,7 @@ export function rampContourPass(
     throw new RangeError('Contour ramp point count exceeds the ECMAScript Array length limit.');
   }
   const points = pass.closed
-    ? loopRampPoints(path, fromZ, pass.zMm, rampMm)
+    ? endingLoopRampPoints(path, fromZ, pass.zMm, rampMm, endAtStart)
     : zigZagRampPoints(path, fromZ, pass.zMm, rampMm, lengthMm);
   const ramped: CncPath3dPass = { kind: 'path3d', points, closed: false };
   return ramped;
@@ -80,6 +84,48 @@ function loopRampPoints(
     travelled += segment;
     points.push(at(b, fromZ - (travelled / rampMm) * (fromZ - zMm)));
   }
+}
+
+// A loop ramp, or with `endAtStart` one that ends on the ring's start.
+function endingLoopRampPoints(
+  ring: ReadonlyArray<Vec2>,
+  fromZ: number,
+  zMm: number,
+  rampMm: number,
+  endAtStart: boolean,
+): Vec3[] {
+  return endAtStart
+    ? loopRampIntoStart(ring, fromZ, zMm, rampMm)
+    : loopRampPoints(ring, fromZ, zMm, rampMm);
+}
+
+// Descend along the loop INTO its start, lapping as often as that takes, then
+// cut one whole lap at depth from the start, so the pass ends on its start.
+// Built backwards from the start, so the start sits exactly at depth.
+function loopRampIntoStart(
+  ring: ReadonlyArray<Vec2>,
+  fromZ: number,
+  zMm: number,
+  rampMm: number,
+): Vec3[] {
+  const last = ring.length - 1; // ring[last] repeats ring[0]
+  const descent: Vec3[] = [at(ring[last] as Vec2, zMm)];
+  let back = 0;
+  for (let index = last; ; index = index === 1 ? last : index - 1) {
+    const nearer = ring[index] as Vec2;
+    const farther = ring[index - 1] as Vec2;
+    const segment = Math.hypot(nearer.x - farther.x, nearer.y - farther.y);
+    if (segment === 0) continue;
+    const remaining = rampMm - back;
+    if (segment >= remaining) {
+      descent.push(at(along(nearer, farther, remaining / segment), fromZ));
+      break;
+    }
+    back += segment;
+    descent.push(at(farther, zMm + (back / rampMm) * (fromZ - zMm)));
+  }
+  descent.reverse();
+  return [...descent, ...ring.slice(1).map((point) => at(point, zMm))];
 }
 
 // Zig-zag along the path's first span, forward and back an even number of

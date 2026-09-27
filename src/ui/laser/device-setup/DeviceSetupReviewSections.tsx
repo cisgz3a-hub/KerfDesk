@@ -122,6 +122,7 @@ function cncRows(state: DeviceSetupStepProps['state']): ReviewRows {
       `${cncMaxFeedMmPerMin(state.draft, params)} / ${cncFramingFeedMmPerMin(state.draft, params)} mm/min`,
     ],
     ['Safe Z', `${params.safeZMm} mm`],
+    ['Park height', `${Math.max(params.safeZMm, params.parkZMm ?? params.safeZMm)} mm`],
     ['Spindle', `${params.spindleMaxRpm} RPM; ${params.spindleSpinupSec} s dwell`],
     ['Coolant', params.coolant ?? 'off'],
     [

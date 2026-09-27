@@ -178,6 +178,9 @@ export type CncContourPass = {
   // short to ramp along, so the pass keeps its straight plunge (ADR-471).
   // G-code comments and Job Review disclose it; motion is unchanged.
   readonly entryPlunge?: true;
+  // ADR-491: a stay-down link fed the bit here at this depth, so the pass needs
+  // no entry of its own (ramp entry leaves it alone).
+  readonly stayDownEntry?: true;
 };
 
 export type CncPath3dPass = {
@@ -199,6 +202,9 @@ export type CncPath3dPass = {
   // its descents against the configured plunge rate.
   // Tiling and G-code comments preserve this marker without changing motion.
   readonly entryRamp?: true;
+  // ADR-491: a short level move between two pocket passes, fed at the plunge
+  // feed in place of a lift and re-plunge. Provenance only.
+  readonly stayDownLink?: true;
 };
 
 export type CncArcPass = {
@@ -315,6 +321,8 @@ export type CncGroup = {
   // machine origin (pre-H.9 output stays byte-identical).
   readonly parkXMm?: number;
   readonly parkYMm?: number;
+  // ADR-491: lift height before the park move. Absent = safe Z.
+  readonly parkZMm?: number;
   readonly passes: ReadonlyArray<CncPass>;
 };
 

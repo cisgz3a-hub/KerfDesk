@@ -59,6 +59,7 @@ import {
   appendGroupTransition,
   appendModalState,
   appendSpindleStart,
+  parkHeightMm,
   parkTarget,
   type EmitState,
 } from './cnc-grbl-transitions';
@@ -160,7 +161,7 @@ function appendPostamble(
   lastGroup: CncGroup | undefined,
   coolantIsOn: boolean,
 ): void {
-  appendRetract(lines, head, state.maxSafeZ);
+  appendRetract(lines, head, parkHeightMm(lastGroup, state.maxSafeZ));
   lines.push('M5');
   if (coolantIsOn) lines.push('M9');
   const park = parkTarget(lastGroup, state.finish);
