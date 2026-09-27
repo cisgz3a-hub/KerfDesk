@@ -262,7 +262,7 @@ describe('buildEffectiveOperationReview', () => {
     expect(buildEffectiveOperationReview(job)[0]?.summaries[0]).not.toContain('Emitted max depth');
   });
 
-  it('discloses exact relief depth without replacing the layer depth editor', () => {
+  it('discloses exact relief depth as a relief fact, not as a flowing V-carve depth', () => {
     const job: Job = {
       groups: [
         {
@@ -294,6 +294,8 @@ describe('buildEffectiveOperationReview', () => {
     const review = buildEffectiveOperationReview(job)[0];
     expect(review?.summaries[0]).toContain('Actual max depth 4.25 mm');
     expect(review?.cncActualMaxDepthMm).toBeUndefined();
+    // Depth mm shows it only where nothing but reliefs is cut (ADR-224 Amendment 4).
+    expect(review?.relief?.maxDepthMm).toBe(4.25);
   });
 
   it('discloses the requested feed when compilation caps the emitted feed', () => {

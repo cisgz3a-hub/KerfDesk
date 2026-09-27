@@ -85,6 +85,7 @@ function plungingReliefStagesByLayer(
 // levels the reliefs cut and whether any other shape was cut beside them.
 function compiledReliefFactsByLayer(job: Job): ReadonlyMap<string, CompiledReliefFacts> {
   const levelsByLayer = new Map<string, Set<number>>();
+  const maxDepthByLayer = new Map<string, number>();
   const otherShapeLayers = new Set<string>();
   for (const group of job.groups) {
     if (group.kind !== 'cnc') continue;
@@ -95,6 +96,10 @@ function compiledReliefFactsByLayer(job: Job): ReadonlyMap<string, CompiledRelie
     const levels = levelsByLayer.get(group.layerId) ?? new Set<number>();
     if (group.cutType === 'relief-rough') addRoughingLevels(levels, group);
     levelsByLayer.set(group.layerId, levels);
+    // Amendment 4: finishing cuts the allowance roughing leaves, so it can
+    // reach deeper than the deepest roughing level.
+    const depthMm = cncGroupMaximumDepth(group).value;
+    maxDepthByLayer.set(group.layerId, Math.max(maxDepthByLayer.get(group.layerId) ?? 0, depthMm));
   }
   const reliefCounts = compiledReliefCounts(job);
   const facts = new Map<string, CompiledReliefFacts>();
@@ -102,6 +107,7 @@ function compiledReliefFactsByLayer(job: Job): ReadonlyMap<string, CompiledRelie
     facts.set(layerId, {
       roughingLevelDepthsMm: [...levels].sort((a, b) => a - b),
       reliefCount: reliefCounts.get(layerId) ?? 0,
+      maxDepthMm: maxDepthByLayer.get(layerId) ?? 0,
       cutsOtherShapes: otherShapeLayers.has(layerId),
     });
   }
