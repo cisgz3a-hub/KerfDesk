@@ -193,10 +193,9 @@ describe('CNC tab settings and canvas editor', () => {
       const input = host.querySelector<HTMLInputElement>(
         `input[aria-label="Tabs per shape for ${layer.color}"]`,
       );
+      // ADR-431: the note lives on the field it explains, not in a paragraph.
+      expect(input?.title).toContain('replacing dragged positions');
       expect(input?.title).toContain('Shared paths and locked artwork keep their saved positions');
-      expect(host.textContent?.replace(/\s+/g, ' ')).toContain(
-        'Paths shared with another operation and locked artwork keep their saved positions.',
-      );
     } finally {
       await act(async () => root.unmount());
       host.remove();

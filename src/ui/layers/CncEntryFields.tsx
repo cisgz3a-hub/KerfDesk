@@ -3,6 +3,7 @@ import { RailSection } from '../kit';
 import { HelicalEntryRows, MotionPolishRows } from './CncLayerToolFields';
 import { CncProfileLeadFields } from './CncProfileLeadFields';
 import { CncRetractPassesField } from './CncRetractPassesField';
+import { cutTypeShowsCutDirection } from './CncReliefStrategyRows';
 
 export function CncEntryFields(props: {
   readonly layer: Layer;
@@ -20,11 +21,9 @@ export function CncEntryFields(props: {
   return (
     <RailSection
       label="Entry & travel"
+      badge={entryBadge(settings)}
       hint="Choose cut direction, how the bit enters the material and movement between passes."
     >
-      <p className="lf-cnc-settings-hint">
-        Control how the bit enters a cut and moves between passes.
-      </p>
       <MotionPolishRows {...props} />
       <CncProfileLeadFields layer={layer} settings={settings} onCommit={onCommit} />
       {settings.cutType === 'pocket' && settings.pocketStrategy !== 'adaptive' ? (
@@ -33,4 +32,19 @@ export function CncEntryFields(props: {
       <CncRetractPassesField layer={layer} settings={settings} onCommit={onCommit} />
     </RailSection>
   );
+}
+
+// The closed summary names direction and entry, the two choices that change the cut.
+function entryBadge(settings: CncLayerSettings): string {
+  const ramp =
+    (settings.cutType === 'v-carve' ? settings.vCarveRampEntryDeg : settings.rampEntryDeg) ?? 0;
+  const entry = ramp > 0 ? `Ramp ${ramp}°` : 'Plunge';
+  if (!cutTypeShowsCutDirection(settings.cutType)) return entry;
+  const direction =
+    settings.cutDirection === 'climb'
+      ? 'Climb'
+      : settings.cutDirection === 'conventional'
+        ? 'Conventional'
+        : 'Default direction';
+  return `${direction} · ${entry}`;
 }

@@ -202,7 +202,7 @@ describe('direct CNC operation assignments', () => {
     const beforeSecondary = selectedSettings();
     await choose('Pocket roughing bit', 'em-3175');
     expect(selectedSettings()).toEqual({ ...beforeSecondary, pocketRoughToolId: 'em-3175' });
-    expect(host.textContent).toContain('Primary bit changes refresh material starting feeds.');
+    expect(field('Material').title).toContain('a new bit refreshes them');
     const roughingNote = field('Pocket roughing bit')
       .closest('.lf-cnc-tool-field')
       ?.querySelector('[role="note"]');

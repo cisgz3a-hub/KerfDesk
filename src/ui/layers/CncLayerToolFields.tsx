@@ -1,5 +1,5 @@
 // Operation-owned relief, entry, and motion-polish fields for CNC artwork.
-// Cutter assignments live with Tool & material in the operation editor.
+// Cutter assignments sit under Bit at the top of the operation editor (ADR-431).
 
 import { sceneObjectUsesOperation, type CncLayerSettings, type Layer } from '../../core/scene';
 import { NumberField as ClearableNumberField } from '../common/NumberField';
@@ -43,7 +43,7 @@ export function ReliefLayerRows(props: {
   );
 }
 
-// Cutter assignment lives in Tool & material; the operation also owns its
+// Cutter assignment sits under Bit above; the operation also owns its
 // finishing scallop target.
 function ReliefScallopRow(props: {
   readonly layer: Layer;
@@ -59,7 +59,7 @@ function ReliefScallopRow(props: {
         value={props.settings.reliefScallopMm ?? 0.025}
         onCommit={(mm) => props.onCommit({ reliefScallopMm: mm })}
         ariaLabel={`Relief scallop height for ${props.layer.color}`}
-        title="Scallop height target (mm) for the relief finishing bit chosen in Tool & material — smaller = finer finishing rows, longer job."
+        title="Scallop height target (mm) for the Relief finishing bit chosen under Bit above — smaller = finer finishing rows, longer job."
         style={scallopInputStyle}
       />
       <span style={rampUnitStyle}>mm</span>
@@ -168,14 +168,14 @@ export function HelicalEntryRows(props: {
             });
           }}
           aria-label={`Helical entry for ${props.layer.color}`}
-          title="Descend into offset pockets with native G2/G3 circles instead of plunging. If a pocket roughing bit is assigned, choose Single bit under Tool & material because the two operations cannot currently compile together."
+          title="Descend into offset pockets with native G2/G3 circles instead of plunging. If a pocket roughing bit is assigned, choose Single bit under Pocket roughing bit above because the two operations cannot currently compile together."
         />
         <span style={helixLabelStyle}>Use circular ramp</span>
       </Row>
       {helix !== undefined && props.settings.pocketRoughToolId !== undefined ? (
         <p role="note" style={helixConflictStyle}>
           Helical entry cannot compile while a pocket roughing bit is assigned. Choose Single bit
-          under Pocket roughing bit in Tool &amp; material above.
+          under Pocket roughing bit above.
         </p>
       ) : null}
       {helix === undefined ? null : (

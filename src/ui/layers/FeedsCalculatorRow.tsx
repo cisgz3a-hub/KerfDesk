@@ -49,6 +49,7 @@ export function FeedsCalculatorRow(props: {
   return (
     <RailSection
       label="Feeds calculator"
+      badge={material === null ? 'Needs a material' : materialLabel(material)}
       hint="Compute starting feeds from chipload: RPM × flutes × mm-per-tooth for the layer's bit."
     >
       <div style={rowStyle}>
@@ -64,11 +65,15 @@ export function FeedsCalculatorRow(props: {
           </output>
         </span>
       </div>
-      <FeedsCalculatorResultText
-        toolName={tool.name}
-        chiploadMm={material === null ? null : chiploadFor(material, tool.diameterMm)}
-        result={result}
-      />
+      {material === null ? (
+        <p className="lf-cnc-settings-hint">Choose a Material above to get starting values.</p>
+      ) : (
+        <FeedsCalculatorResultText
+          toolName={tool.name}
+          chiploadMm={chiploadFor(material, tool.diameterMm)}
+          result={result}
+        />
+      )}
       <AngledToolFeedNotice tool={tool} />
       <button
         type="button"
@@ -102,22 +107,23 @@ function effectiveFluteCount(tool: CncTool, settings: CncLayerSettings): number 
 }
 
 function ReadOnlyMaterial(props: { readonly material: ChiploadMaterial | null }): JSX.Element {
-  const label =
-    props.material === null
-      ? 'Manual — choose material in Tool & material'
-      : (CHIPLOAD_MATERIALS.find((item) => item.value === props.material)?.label ?? props.material);
+  const label = props.material === null ? 'Manual' : materialLabel(props.material);
   return (
     <span style={fieldStyle}>
       Material
       <output
         aria-label="Material for feeds calculator"
-        title="Read-only here. Change this operation's material in Tool & material above."
+        title="Read-only here. Change this operation's material under Material above."
         style={readOnlyMaterialStyle}
       >
         {label}
       </output>
     </span>
   );
+}
+
+function materialLabel(material: ChiploadMaterial): string {
+  return CHIPLOAD_MATERIALS.find((item) => item.value === material)?.label ?? material;
 }
 
 function FeedsCalculatorResultText(props: {

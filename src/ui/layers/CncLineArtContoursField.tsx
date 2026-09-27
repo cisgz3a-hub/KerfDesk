@@ -8,7 +8,8 @@
 // and only traced/imported contours pair at all (ADR-277): text glyph
 // counters and drawn-shape holes always machine, whatever this selects.
 
-import type { CncLayerSettings, Layer } from '../../core/scene';
+import { pathUsesOperation, type CncLayerSettings, type Layer } from '../../core/scene';
+import { useStore } from '../state';
 import { Row, selectStyle } from './CncLayerPrimitives';
 
 type LineArtContourSide = NonNullable<CncLayerSettings['lineArtContours']>;
@@ -32,14 +33,15 @@ export function CncLineArtContoursField(props: {
   readonly onCommit: (patch: Partial<CncLayerSettings>) => void;
 }): JSX.Element | null {
   const { cutType } = props.settings;
+  const hasTracedOutlines = useLayerHasTracedOutlines(props.layer);
   const applies =
     cutType === 'profile-outside' ||
     cutType === 'profile-inside' ||
     cutType === 'profile-on-path' ||
     cutType === 'engrave';
-  if (!applies) return null;
+  if (!applies || !hasTracedOutlines) return null;
   return (
-    <Row label="Traced edges">
+    <Row label="Traced edges" stacked>
       <select
         value={props.settings.lineArtContours ?? 'inner'}
         onChange={(e) => props.onCommit({ lineArtContours: e.target.value as LineArtContourSide })}
@@ -54,5 +56,19 @@ export function CncLineArtContoursField(props: {
         ))}
       </select>
     </Row>
+  );
+}
+
+// Only imported and traced outlines pair (ADR-277): text and drawn shapes
+// always cut every edge, so the choice is shown only when it can matter (ADR-431).
+function useLayerHasTracedOutlines(layer: Layer): boolean {
+  return useStore((state) =>
+    state.project.scene.objects.some(
+      (object) =>
+        (object.kind === 'imported-svg' || object.kind === 'traced-image') &&
+        object.paths.some(
+          (path) => path.fillRule !== 'nonzero' && pathUsesOperation(object, path, layer),
+        ),
+    ),
   );
 }

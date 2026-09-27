@@ -58,19 +58,26 @@ async function renderFields(
 }
 
 describe('CNC layer clarity', () => {
-  it('offers operation material and bit choices before cutting values', async () => {
+  // ADR-431: the cut type leads, then the bit and material, then the numbers.
+  it('offers the cut type, bit and material before cutting values', async () => {
     installCnc();
     const view = await renderFields();
     try {
       const selectLabels = [...view.host.querySelectorAll('select')].map((select) =>
         select.getAttribute('aria-label'),
       );
-      expect(selectLabels.slice(0, 4)).toEqual([
-        'Material for #000000',
-        'Bit for #000000',
+      expect(selectLabels.slice(0, 3)).toEqual([
         'Cut type for #000000',
-        'Traced edges for #000000',
+        'Bit for #000000',
+        'Material for #000000',
       ]);
+      const material = view.host.querySelector('select[aria-label="Material for #000000"]');
+      const depth = view.host.querySelector('input[aria-label="Cut depth for #000000"]');
+      expect(
+        material !== null &&
+          depth !== null &&
+          material.compareDocumentPosition(depth) & Node.DOCUMENT_POSITION_FOLLOWING,
+      ).toBeTruthy();
       expect(view.host.querySelector('button[aria-label^="Material:"]')).toBeNull();
       expect(view.host.querySelector('button[aria-label^="Bit:"]')).toBeNull();
     } finally {
@@ -79,7 +86,7 @@ describe('CNC layer clarity', () => {
     }
   });
 
-  it('opens the named V-carve detail group so cutter guidance is visible', async () => {
+  it('folds V-carve detail into a named group that states its value', async () => {
     const layer: Layer = {
       ...LAYER,
       cnc: { ...DEFAULT_CNC_LAYER_SETTINGS, cutType: 'v-carve' },
@@ -89,8 +96,9 @@ describe('CNC layer clarity', () => {
     try {
       const detail = view.host.querySelector(`input[aria-label="Detail for ${layer.color}"]`);
       const section = detail?.closest('details');
-      expect(section?.querySelector('summary')?.textContent).toBe('V-carve detail');
-      expect(section?.open).toBe(true);
+      expect(section?.querySelector('summary > span')?.textContent).toBe('V-carve detail');
+      expect(section?.querySelector('.lf-section-badge')?.textContent).toBe('Automatic');
+      expect(section?.open).toBe(false);
       expect(view.host.querySelector('section[aria-label="Advanced cut settings"]')).toBeNull();
     } finally {
       await act(async () => view.root.unmount());
@@ -98,7 +106,7 @@ describe('CNC layer clarity', () => {
     }
   });
 
-  it('shows the machine RPM ceiling immediately above the requested artwork spindle speed', async () => {
+  it('shows the machine RPM ceiling immediately under the requested spindle speed', async () => {
     installCnc();
     useStore.setState((state) => ({
       project: {
@@ -115,17 +123,14 @@ describe('CNC layer clarity', () => {
       expect(references).toHaveLength(1);
       const reference = references[0];
       const spindle = view.host.querySelector<HTMLInputElement>(
-        'input[aria-label="Artwork spindle speed for #000000"]',
+        'input[aria-label="Spindle speed for #000000"]',
       );
       expect(reference?.getAttribute('aria-label')).toContain('9,000 RPM');
       expect(reference?.closest('details')).toBeNull();
       expect(spindle?.max).toBe('9000');
       expect(spindle?.value).toBe(String(DEFAULT_CNC_LAYER_SETTINGS.spindleRpm));
-      expect(
-        spindle
-          ?.closest('.lf-cnc-setting-row')
-          ?.previousElementSibling?.contains(reference ?? null),
-      ).toBe(true);
+      expect(reference?.textContent).toBe('Max 9,000');
+      expect(spindle?.closest('.lf-cnc-setting-row')?.nextElementSibling).toBe(reference);
     } finally {
       await act(async () => view.root.unmount());
       view.host.remove();
@@ -171,7 +176,7 @@ describe('CNC layer clarity', () => {
     try {
       const alert = view.host.querySelector('[role="alert"]');
       expect(alert?.textContent).toContain('V-carve needs a V-bit or modeled angled engraving bit');
-      expect(alert?.textContent).toContain('Tool & material');
+      expect(alert?.textContent).toContain('Choose one under Bit above');
     } finally {
       await act(async () => view.root.unmount());
       view.host.remove();
@@ -192,7 +197,7 @@ describe('CNC layer clarity', () => {
       expect(flatDepth).not.toBeNull();
       expect(flatDepth?.checked).toBe(false);
       expect(view.host.textContent).not.toContain('Floor depth');
-      expect(view.host.textContent).toContain('Depth follows stroke width');
+      expect(flatDepth?.title).toContain('depth follows stroke width');
 
       await act(async () => flatDepth?.click());
       expect(useStore.getState().project.scene.layers[0]?.cnc?.vCarveFlatDepthEnabled).toBe(true);
