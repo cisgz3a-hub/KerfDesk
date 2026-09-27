@@ -4,13 +4,13 @@
 // toolpath only; the program, timing and readouts are unchanged.
 
 import { useMemo } from 'react';
-import type { GcodeRenderModel } from '../../core/gcode-view';
+import type { InspectorRenderModel } from './inspector-model';
 import { zStops, type IsolateState, type SectionAxis } from './isolate';
 
 const SECTION_STEPS = 200;
 
 export function InspectorIsolateControl(props: {
-  readonly model: GcodeRenderModel;
+  readonly model: InspectorRenderModel;
   readonly isolate: IsolateState;
   readonly onChange: (next: IsolateState) => void;
 }): JSX.Element {
@@ -101,7 +101,7 @@ function ZRange(props: {
 }
 
 function Section(props: {
-  readonly bounds: NonNullable<GcodeRenderModel['stats']['motionBounds']>;
+  readonly bounds: NonNullable<InspectorRenderModel['stats']['motionBounds']>;
   readonly isolate: IsolateState;
   readonly onChange: (next: IsolateState) => void;
 }): JSX.Element {

@@ -10,6 +10,9 @@
 
 import { SEG_KIND, SEG_MOTION, type GcodeRenderModel } from '../../core/gcode-view';
 
+// Only what arrows are placed from, so any model that carries these will do.
+type ArrowModel = Pick<GcodeRenderModel, 'segmentCount' | 'positions' | 'segKind' | 'segMotion'>;
+
 export type ArrowPlacement = {
   /** Position sampled by distance along the cutting route. */
   readonly position: { readonly x: number; readonly y: number; readonly z: number };
@@ -27,7 +30,7 @@ const TARGET_ARROWS = 60;
  * segment index: a program whose curves are finely sampled would otherwise
  * crowd every arrow into the curves and leave long straights bare.
  */
-export function directionArrows(model: GcodeRenderModel): ReadonlyArray<ArrowPlacement> {
+export function directionArrows(model: ArrowModel): ReadonlyArray<ArrowPlacement> {
   const cutLength = cutPathLength(model);
   if (cutLength <= 0) return [];
   const spacing = Math.max(MIN_ARROW_SPACING_MM, cutLength / TARGET_ARROWS);
@@ -56,13 +59,13 @@ export function directionArrows(model: GcodeRenderModel): ReadonlyArray<ArrowPla
   return arrows;
 }
 
-function isCutting(model: GcodeRenderModel, index: number): boolean {
+function isCutting(model: ArrowModel, index: number): boolean {
   if (model.segMotion[index] === SEG_MOTION.rapid) return false;
   const kind = model.segKind[index];
   return kind === SEG_KIND.cut || kind === SEG_KIND.plunge;
 }
 
-function cutPathLength(model: GcodeRenderModel): number {
+function cutPathLength(model: ArrowModel): number {
   let total = 0;
   for (let index = 0; index < model.segmentCount; index += 1) {
     if (isCutting(model, index)) total += segmentSpan(model, index)?.length ?? 0;
@@ -71,7 +74,7 @@ function cutPathLength(model: GcodeRenderModel): number {
 }
 
 function segmentSpan(
-  model: GcodeRenderModel,
+  model: ArrowModel,
   index: number,
 ): {
   readonly length: number;
