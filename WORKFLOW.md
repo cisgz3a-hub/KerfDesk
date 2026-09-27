@@ -6653,7 +6653,7 @@ as the pane's design record.
   picker only. It never opens hardware or prompts for permission. A non-permission `AbortError`
   is shown as a retryable open failure rather than mislabeled as denial.
 
-### F-CAM2. One-photo camera calibration (ADR-441, Amendment 1)
+### F-CAM2. One-photo camera calibration (ADR-441, Amendments 1 and 3)
 
 - **Success / calibrated.** **Calibrate camera…** opens the wizard. The operator covers the bed
   with one flat sheet, enters its thickness and, optionally, the camera lens height by tape
@@ -6666,6 +6666,10 @@ as the pane's design record.
   the camera model on the machine profile (undoable) and turns the overlay on.
 - **Reuse / target already engraved.** **Target already engraved** skips the job and goes to the
   photo, using the same margins.
+- **Edge / small bed.** When the usual grid of 10 mm rings 40 mm apart does not fit inside the
+  margins, the rings and spacing shrink together so every ring stays on the bed. The grid keeps
+  rings around all three solid anchors. Engrave a new target if an older one ran off the bed or
+  placed an anchor on the grid's edge (Amendment 3).
 - **Error / engrave not started or stopped.** If review, preflight or confirmation stops the job,
   or the stream errors, is cancelled or disconnects, the wizard returns to setup with the reason.
 - **Error / rings not found.** No rings, anchors covered, a mirrored picture or too few rings each
@@ -6819,7 +6823,7 @@ as the pane's design record.
 - **Edge / watching a job.** The camera panel can toggle between compact and
   wide monitoring widths, with the preference kept locally.
 
-### F-CAM9. Find pieces on the bed and place the design on each (ADR-442)
+### F-CAM9. Find pieces on the bed and place the design on each (ADR-442, Amendment 1)
 
 - **Success / fill a batch of blanks.** With a saved calibration and a live camera, the operator
   lays out blanks, puts the design on one of them, selects it and presses **Find pieces** in the
@@ -6828,7 +6832,9 @@ as the pane's design record.
   and angle and how the design will move and turn onto it. **Place selection on each piece** adds
   a copy on every ticked piece, the way the design sits on its own piece, as one undo step.
 - **Success / design not on a piece.** The design is centred on each piece, its long side along
-  the piece's long side, and the design itself moves to the first piece.
+  the piece's long side, and the design itself moves to the first piece. A design already turned
+  on the canvas is measured along its own turn, so it lies along the piece rather than keeping
+  its old angle (Amendment 1).
 - **Edge / piece partly out of view.** It is listed and outlined but starts unticked, with the
   reason; ticking it includes it.
 - **Edge / different piece.** A piece of another shape, or more than 3 mm longer or wider than the
