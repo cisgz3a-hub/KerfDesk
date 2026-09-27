@@ -1,10 +1,12 @@
-// MachineModeToggle — segmented Laser | CNC switch at the top of the
-// Cuts/Layers rail. Sets project.machine; the compile/emit pipeline, layer
-// cards, and jog panel all follow this choice.
+// MachineModeToggle — segmented Laser | CNC switch in the Artwork panel
+// heading. Sets project.machine; the compile/emit pipeline, layer cards, and
+// jog panel all follow this choice. The chosen mode is a solid copper fill so
+// it never reads as one of the Settings / Run order / Materials tabs below it.
 
 import { selectControllerDriver } from '../../core/controllers';
 import { deviceSupportsMachineKind, type DeviceProfile } from '../../core/devices/device-profile';
 import { machineKindOf, type MachineKind } from '../../core/scene';
+import { Icon, type IconName } from '../kit';
 import { useStore } from '../state';
 import { useLaserStore } from '../state/laser-store';
 import { isActiveJob, isActiveJobStatus } from '../state/laser-store-helpers';
@@ -13,6 +15,7 @@ import {
   cncControllerWarningMessage,
   machineCapabilityWarningMessage,
 } from './machine-capability-messages';
+import './machine-mode-toggle.css';
 
 export function MachineModeToggle(): JSX.Element {
   const kind = useStore((s) => machineKindOf(s.project.machine));
@@ -36,6 +39,7 @@ export function MachineModeToggle(): JSX.Element {
     <div role="group" aria-label="Machine type" className="lf-machine-mode">
       <SegButton
         label="Laser"
+        icon="laser"
         title="Laser cutter/engraver mode: layers carry power, speed, and passes."
         active={kind === 'laser'}
         locked={jobActive}
@@ -44,6 +48,7 @@ export function MachineModeToggle(): JSX.Element {
       />
       <SegButton
         label="CNC"
+        icon="cnc"
         title="CNC router mode: layers carry cut type, depth, and feeds; G-code drives the spindle and Z axis."
         active={kind === 'cnc'}
         locked={jobActive}
@@ -72,6 +77,7 @@ export const MODE_LOCKED_DURING_JOB =
 
 function SegButton(props: {
   readonly label: string;
+  readonly icon: IconName;
   readonly title: string;
   readonly active: boolean;
   readonly locked: boolean;
@@ -93,7 +99,8 @@ function SegButton(props: {
       title={title}
       className="lf-machine-mode__choice"
     >
-      {props.label}
+      <Icon name={props.icon} size={15} />
+      <span>{props.label}</span>
     </button>
   );
 }

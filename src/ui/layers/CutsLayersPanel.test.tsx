@@ -96,14 +96,13 @@ describe('Artwork Operations panel', () => {
     useStore.getState().selectObject('Johann');
     const { host, unmount } = await renderPanel();
     try {
-      const mode = host.querySelector('select[aria-label="Mode for selected objects"]');
+      const fill = host.querySelector(
+        '[role="radiogroup"][aria-label="Mode for selected objects"] input[value="fill"]',
+      );
       const power = host.querySelector('input[aria-label="Power for selected objects"]');
-      if (!(mode instanceof HTMLSelectElement)) throw new Error('mode missing');
+      if (!(fill instanceof HTMLInputElement)) throw new Error('mode missing');
       if (!(power instanceof HTMLInputElement)) throw new Error('power missing');
-      await act(async () => {
-        mode.value = 'fill';
-        Simulate.change(mode);
-      });
+      await act(async () => fill.click());
       await act(async () => {
         power.value = '55';
         Simulate.change(power);

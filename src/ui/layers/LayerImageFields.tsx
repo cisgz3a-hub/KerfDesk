@@ -74,6 +74,59 @@ export function LayerImageFields(props: {
   );
 }
 
+// The inspector's image essentials (ADR-430): the dither and the scan density,
+// plus Minimum power when grayscale maps brightness to power. DPI, dot width,
+// invert and original pixels stay in Cut Settings.
+export function LayerImageEssentials(props: {
+  readonly layer: Layer;
+  readonly settings: LayerOperationSettings;
+  readonly mixedFields?: MixedOperationFields;
+  readonly reconcileKey?: unknown;
+  readonly commit: (patch: Partial<LayerOperationSettings>) => void;
+  readonly labelContext: string;
+}): JSX.Element {
+  const { layer, settings, commit } = props;
+  const controlProps = {
+    labelContext: props.labelContext,
+    settings,
+    commit,
+    reconcileKey: props.reconcileKey,
+    ...(props.mixedFields === undefined ? {} : { mixedFields: props.mixedFields }),
+  };
+  const grayscale = !props.mixedFields?.ditherAlgorithm && settings.ditherAlgorithm === 'grayscale';
+  return (
+    <div className="lf-laser-process-fields">
+      <label className="lf-laser-field lf-laser-field--wide">
+        <span className="lf-laser-field__label">Dither</span>
+        <span className="lf-laser-field__value">
+          <DitherSelect {...controlProps} />
+        </span>
+      </label>
+      <label className="lf-laser-field">
+        <span className="lf-laser-field__label">
+          Line interval<small>mm</small>
+        </span>
+        <span className="lf-laser-field__value">
+          <LineIntervalInput {...controlProps} />
+        </span>
+      </label>
+      {grayscale ? (
+        <label className="lf-laser-field">
+          <span className="lf-laser-field__label">
+            Min power<small>%</small>
+          </span>
+          <span className="lf-laser-field__value">
+            <MinPowerInput
+              {...controlProps}
+              maxPower={props.mixedFields?.power ? 100 : layer.power}
+            />
+          </span>
+        </label>
+      ) : null}
+    </div>
+  );
+}
+
 function FieldRow(props: {
   readonly label: string;
   readonly children: React.ReactNode;

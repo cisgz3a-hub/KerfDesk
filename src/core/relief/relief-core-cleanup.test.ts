@@ -77,7 +77,12 @@ describe('reliefCoreCleanup', () => {
   it('adds nothing at or below a 50% stepover, where the sweeps overlap to the centre', () => {
     for (const stepoverPercent of [40, 50]) {
       const { ladder, cleanup } = cleanupFor([square(0, 20)], stepoverPercent);
-      expect(cleanup).toEqual({ paths: [], offsetFailed: false, passLimited: false });
+      expect(cleanup).toEqual({
+        paths: [],
+        stockInside: [],
+        offsetFailed: false,
+        passLimited: false,
+      });
       expect(thickestMissMm([square(0, 20)], ladder.rings.flat())).toBe(0);
     }
   });
@@ -101,7 +106,12 @@ describe('reliefCoreCleanup', () => {
   it('adds nothing where the rings already reach the centre', () => {
     // A 13 mm square at 85%: the second ring passes 1.1 mm from the centre.
     const { cleanup } = cleanupFor([square(0, 13)], 85);
-    expect(cleanup).toEqual({ paths: [], offsetFailed: false, passLimited: false });
+    expect(cleanup).toEqual({
+      paths: [],
+      stockInside: [],
+      offsetFailed: false,
+      passLimited: false,
+    });
   });
 
   it('clears split lobes, islands and corner cusps up to a 150% stepover', () => {
@@ -135,6 +145,7 @@ describe('reliefCoreCleanup', () => {
     expect(capped.capped).toBe(true);
     expect(reliefCoreCleanup(region, capped, stepMm, RADIUS_MM)).toEqual({
       paths: [],
+      stockInside: [],
       offsetFailed: false,
       passLimited: false,
     });

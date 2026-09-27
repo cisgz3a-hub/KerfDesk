@@ -169,12 +169,11 @@ describe('Machine dialog control audit', () => {
     const onClose = vi.fn();
     act(() => root.render(<LabsSettingsDialog onClose={onClose} />));
     const toggles = [...host.querySelectorAll<HTMLInputElement>('input[type="checkbox"]')];
-    expect(toggles).toHaveLength(3);
+    expect(toggles).toHaveLength(2);
     for (const toggle of toggles) act(() => toggle.click());
     expect(useExperimentalLaserFeatures.getState().features).toEqual({
       lowPowerFire: true,
       printAndCut: true,
-      cameraAlignmentV2: true,
     });
     expect(localStorage.getItem('kerfdesk.experimental-laser-features.v1')).toContain(
       '"printAndCut":true',
@@ -183,7 +182,6 @@ describe('Machine dialog control audit', () => {
     expect(useExperimentalLaserFeatures.getState().features).toEqual({
       lowPowerFire: false,
       printAndCut: false,
-      cameraAlignmentV2: false,
     });
     expect(toggles.every((toggle) => !toggle.checked)).toBe(true);
     act(() => button('Done').click());

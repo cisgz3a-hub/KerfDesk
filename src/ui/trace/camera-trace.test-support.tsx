@@ -19,6 +19,7 @@ vi.mock('../raster/vector-to-bitmap', () => ({ buildBitmapFromVectors: vi.fn() }
 
 import { createLayer, createProject, IDENTITY_TRANSFORM, type RasterImage } from '../../core/scene';
 import type { RgbaImage } from '../../core/camera';
+import { lookAt, savedCameraModel } from '../../core/camera/model/model-fixtures';
 import { TraceFromCameraButton } from '../camera/TraceFromCameraButton';
 import { cameraCaptureBindingForFrame, captureSourceFrame } from '../camera/frame-source';
 import { useStore } from '../state';
@@ -115,14 +116,16 @@ beforeEach(async () => {
       ...project.device,
       bedWidth: 64,
       bedHeight: 32,
-      cameraAlignment: {
-        homography: [0.25, 0, 0, 0, 0.25, 0, 0, 0, 1],
-        frameWidth: 256,
-        frameHeight: 128,
-        basis: 'raw',
-        alignedAt: 0,
-        planeHeightMm: 0,
-        capture: cameraCaptureBindingForFrame(camera, 256, 128),
+      cameraModel: {
+        ...savedCameraModel(cameraCaptureBindingForFrame(camera, 256, 128)),
+        // A 256 × 128 camera 100 mm above the middle of the 64 × 32 mm bed.
+        lens: {
+          intrinsics: { fx: 300, fy: 300, cx: 128, cy: 64 },
+          distortion: [0, 0, 0, 0],
+          imageWidth: 256,
+          imageHeight: 128,
+        },
+        pose: lookAt([32, 16, -100], [32, 16.001, 0]),
       },
     },
     scene: {
