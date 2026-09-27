@@ -3,6 +3,7 @@ import { Object3D, type Scene } from 'three';
 import type * as ThreeNamespace from 'three';
 import type { ReliefSurfaceMeshWithNormals } from '../../core/relief/relief-surface-mesh';
 import type { ViewerContentHandle } from '../cnc-viewer3d';
+import type { Cut3DSurfaceMesh, ViewerWorkAxes } from '../cnc-viewer3d/viewer3d-work-axes';
 import type {
   Cut3DOffscreenWorkerRequest,
   Cut3DOffscreenWorkerResponse,
@@ -31,6 +32,7 @@ vi.mock('three', async (importOriginal) => {
 type Build = {
   readonly mesh: ReliefSurfaceMeshWithNormals;
   readonly stockThicknessMm: number;
+  readonly workAxes: ViewerWorkAxes | null;
   readonly content: ViewerContentHandle;
   readonly finish: () => void;
 };
@@ -48,7 +50,7 @@ beforeEach(async () => {
   responses.length = 0;
   mocks.render.mockClear();
   mocks.build.mockImplementation(
-    (_three: unknown, input: Pick<Build, 'mesh' | 'stockThicknessMm'>) =>
+    (_three: unknown, input: Pick<Build, 'mesh' | 'stockThicknessMm' | 'workAxes'>) =>
       new Promise<ViewerContentHandle>((resolve) => {
         const object = new Object3D();
         object.userData = input;
@@ -75,12 +77,12 @@ function send(request: Cut3DOffscreenWorkerRequest): void {
   scope.onmessage?.(new MessageEvent('message', { data: request }));
 }
 
-async function start(): Promise<Build> {
+async function start(mesh: Cut3DSurfaceMesh = MESH): Promise<Build> {
   send({
     kind: 'init',
     sessionId: 1,
     canvas: new EventTarget() as OffscreenCanvas,
-    mesh: MESH,
+    mesh,
     stockThicknessMm: 6,
     widthPx: 400,
     heightPx: 300,
@@ -94,7 +96,7 @@ async function buildAt(index: number): Promise<Build> {
   return builds[index] as Build;
 }
 
-function replace(surfaceId: number, mesh: ReliefSurfaceMeshWithNormals | null, thickness = 6) {
+function replace(surfaceId: number, mesh: Cut3DSurfaceMesh | null, thickness = 6) {
   send({ kind: 'surface', sessionId: 1, surfaceId, mesh, stockThicknessMm: thickness });
 }
 
@@ -112,8 +114,45 @@ async function expectShown(build: Build, surfaceId: number): Promise<void> {
 }
 
 describe('Cut 3D requested surface ownership', () => {
+  it('keeps work axes with the latest requested mesh through a thickness-only replacement', async () => {
+    const firstAxes = {
+      originMm: { x: 0, y: 0, z: 0 },
+      xDirection: 1,
+      yDirection: 1,
+    } as const;
+    const nextAxes = {
+      originMm: { x: 12, y: -5, z: 0 },
+      xDirection: -1,
+      yDirection: -1,
+    } as const;
+    const first = await start({ ...MESH, workAxes: firstAxes });
+    expect(first.workAxes).toEqual(firstAxes);
+    first.finish();
+    await vi.waitFor(() => expect(responses).toContainEqual({ kind: 'ready', sessionId: 1 }));
+    const next = { ...replacement, workAxes: nextAxes };
+    replace(1, next);
+    const stale = await buildAt(1);
+    replace(2, null, 12);
+    const final = await buildAt(2);
+    expect(final.mesh).toBe(next);
+    expect(final.workAxes).toEqual(nextAxes);
+    final.finish();
+    await vi.waitFor(() =>
+      expect(responses).toContainEqual(expect.objectContaining({ source: 'surface', inputId: 2 })),
+    );
+    stale.finish();
+    await vi.waitFor(() => expect(stale.content.dispose).toHaveBeenCalledOnce());
+    expect(responses).not.toContainEqual(
+      expect.objectContaining({ source: 'surface', inputId: 1 }),
+    );
+    const scene = mocks.render.mock.lastCall?.[0] as Scene;
+    expect(scene.children).toContain(final.content.object);
+    expect(final.content.object.userData.workAxes).toEqual(nextAxes);
+  });
+
   it('keeps the new mesh when thickness changes before renderer initialization finishes', async () => {
     const initial = await start();
+    expect(initial.workAxes).toBeNull();
     replace(1, replacement);
     replace(2, null, 12);
     initial.finish();
