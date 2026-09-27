@@ -1,18 +1,24 @@
 // Dogbone corner relief (ADR-103 G6, F-CNC26). A round bit cannot reach into
 // a corner sharper than its radius, so slot-fit joinery relieves each sharp
-// corner with a bit-sized overcut. Style (PROVISIONAL, documented in the
-// flow): a circle of one bit RADIUS centered ON the corner vertex — the
-// "corner overcut" variant that guarantees a square mating part seats fully;
-// directional dogbone/T-bone placement is future refinement.
+// corner with the capsule the bit sweeps to touch it (corner-dogbone.ts,
+// ADR-103 Amd 1). The earlier circle centred ON the vertex could only be cut
+// with the bit centre exactly on the corner, an isolated point that pocket
+// and inside-profile compensation skip, so it never changed the toolpath.
 //
 // Model: the object's rings are unioned into a region (NonZero); convex
 // corners of the region's OUTER boundaries with interior angle below the
-// threshold get relief circles; hole rings (islands of remaining material)
-// are left alone in v1. The circles are unioned back into the region.
+// threshold get dogbones; hole rings (islands of remaining material) are left
+// alone in v1. The dogbones are unioned back into the region.
 
 import { unionD, FillRule, type PathD, type PathsD } from 'clipper2-ts';
 import { err, ok, type Result } from '../result';
-import { IDENTITY_TRANSFORM, type ColoredPath, type ImportedSvg, type Vec2 } from '../scene';
+import { IDENTITY_TRANSFORM, type ColoredPath, type ImportedSvg } from '../scene';
+import {
+  dogboneCorner,
+  dogboneReliefPath,
+  DOGBONE_PRECISION_DECIMALS,
+  type DogboneCorner,
+} from './corner-dogbone';
 import {
   boundsForPaths,
   isClosedPolygon,
@@ -25,7 +31,6 @@ import {
 } from './vector-path-tools';
 
 export const DOGBONE_MAX_CORNER_DEG = 135;
-const CIRCLE_SEGMENTS = 24;
 const MIN_EDGE_MM = 1e-6;
 const FALLBACK_COLOR = '#000000';
 
@@ -49,14 +54,16 @@ export function dogboneVectorObject(
   if (regionResult.kind === 'error') return regionResult;
   const region = regionResult.value;
   const radius = bitDiameterMm / 2;
-  const circles = reliefCircles(region, radius);
-  if (circles.length === 0) {
+  const reliefs = dogboneReliefs(region, radius);
+  if (reliefs.length === 0) {
     return err({
       kind: 'no-corners',
       message: `No corners sharper than ${DOGBONE_MAX_CORNER_DEG}° to relieve in this selection.`,
     });
   }
-  const relieved = tryVectorOp(() => unionD([...region, ...circles], FillRule.NonZero));
+  const relieved = tryVectorOp(() =>
+    unionD(region, reliefs, FillRule.NonZero, DOGBONE_PRECISION_DECIMALS),
+  );
   if (relieved.kind === 'error') return relieved;
   const paths: ColoredPath[] = [
     {
@@ -74,17 +81,17 @@ export function dogboneVectorObject(
   });
 }
 
-function reliefCircles(region: PathsD, radius: number): PathsD {
-  const circles: PathsD = [];
+function dogboneReliefs(region: PathsD, radius: number): PathsD {
+  const reliefs: PathsD = [];
   for (const ring of region) {
     // Clipper orients outers CCW (positive area); holes CW. Holes = islands
     // of remaining material — not relieved in v1.
     if (signedArea(ring) <= 0) continue;
     for (const corner of sharpConvexCorners(ring)) {
-      circles.push(circlePath(corner, radius));
+      reliefs.push(dogboneReliefPath(corner, radius));
     }
   }
-  return circles;
+  return reliefs;
 }
 
 function collectClosedRings(materialized: ImportedSvg): Result<PathsD, VectorOpError> {
@@ -111,9 +118,10 @@ function signedArea(ring: PathD): number {
   return sum / 2;
 }
 
-// Convex (for a CCW ring) vertices whose interior angle < the threshold.
-function sharpConvexCorners(ring: PathD): ReadonlyArray<Vec2> {
-  const corners: Vec2[] = [];
+// Convex (for a CCW ring) vertices whose interior angle < the threshold; the
+// open wedge is the region's interior.
+function sharpConvexCorners(ring: PathD): ReadonlyArray<DogboneCorner> {
+  const corners: DogboneCorner[] = [];
   const n = ring.length;
   const maxRad = (DOGBONE_MAX_CORNER_DEG * Math.PI) / 180;
   for (let i = 0; i < n; i += 1) {
@@ -133,19 +141,9 @@ function sharpConvexCorners(ring: PathD): ReadonlyArray<Vec2> {
     if (cross >= 0) continue;
     const cos = Math.min(1, Math.max(-1, (ax * bx + ay * by) / (la * lb)));
     const interior = Math.acos(cos);
-    if (interior < maxRad) corners.push({ x: curr.x, y: curr.y });
+    if (interior >= maxRad) continue;
+    const corner = dogboneCorner(prev, curr, next);
+    if (corner !== null) corners.push(corner);
   }
   return corners;
-}
-
-function circlePath(center: Vec2, radius: number): PathD {
-  const points: PathD = [];
-  for (let i = 0; i < CIRCLE_SEGMENTS; i += 1) {
-    const angle = (i / CIRCLE_SEGMENTS) * 2 * Math.PI;
-    points.push({
-      x: center.x + radius * Math.cos(angle),
-      y: center.y + radius * Math.sin(angle),
-    });
-  }
-  return points;
 }

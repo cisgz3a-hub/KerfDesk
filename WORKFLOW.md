@@ -5004,12 +5004,14 @@ and lifts the command's CNC-only gate.)*
 #### Success
 1. With closed shapes selected in CNC mode, the "Dogbone" row (bit
    diameter prefilled from the active bit) relieves every corner
-   sharper than 135° with a bit-radius overcut circle — square parts
+   sharper than 135° with a dogbone the bit can reach — square parts
    then seat fully into routed slots. One undo step; objects are
    replaced in place.
-2. Style is the corner overcut (circle centered on the vertex),
-   documented as the PROVISIONAL v1; directional dogbone/T-bone are
-   future refinements.
+2. Style is the bisector dogbone (ADR-103 Amd 1): the capsule the bit
+   sweeps along the corner's bisector until its edge touches the
+   corner, a hair wider than the bit, so the pocket or inside-profile
+   toolpath runs into it as part of the same loop. T-bone placement is
+   a future refinement.
 
 #### Error — nothing qualifies
 1. Obtuse-only shapes (or open contours) leave the scene untouched.
@@ -6327,13 +6329,20 @@ as the pane's design record.
 1. With the machine in CNC mode, the dialog defaults clearance to
    0.15 mm and shows the relief tool diameter prefilled from the active
    tool; stock thickness prefills the material thickness field.
-2. Generated panels carry corner-overcut reliefs (F-CNC26 style: circle
-   of one bit radius centered on the vertex) at exactly the
-   seat-critical reflex corners — notch bottoms where a mating tab must
-   seat. Tabs narrow and recesses widen by clearance/4 per flank, so
-   each joint's notch − tab play equals the clearance exactly.
-3. The panels then flow through the normal CNC pipeline: the layer's
-   profile-outside cutter compensation applies at compile, unchanged.
+2. Generated panels carry dogbone reliefs (ADR-106 Amd 1: the capsule
+   the bit sweeps along the corner's open bisector until its edge touches
+   the corner, a hair wider than the bit) at exactly the seat-critical
+   reflex corners — notch bottoms where a mating tab must seat. The
+   profile-outside bit runs into each dogbone and back as part of the
+   same loop until its edge passes the corner, so square tabs seat. Tabs
+   narrow and recesses widen by clearance/4 per flank, so each joint's
+   notch − tab play equals the clearance exactly.
+3. Inserted panels cut through as generated (ADR-106 Amd 2): the
+   **Box panels** operation profiles the outlines outside at the full
+   material thickness with the default holding tabs, and a second
+   **Box slots** operation pockets the divider slots at the same depth.
+   The pocket clears every slot, so no loose piece is left and no tab
+   bridges a slot; clearing runs before any outline frees a panel.
 
 #### Error — relief tool larger than a finger cell
 1. Validation error per F-K2; generation disabled until resolved.
@@ -6351,7 +6360,9 @@ as the pane's design record.
 #### Success
 1. Style "Open top" drops the Top panel (5 panels) and flattens the
    walls' top edges at the outer face line — no orphan fingers pointing
-   at a missing lid.
+   at a missing lid. The entered inner height is the usable depth: the
+   walls stand the bottom thickness plus that height (outer = inner + T,
+   ADR-106 Amd 1).
 2. Corner cells that the Top would have claimed fall to the
    next-priority panel (Z > Y > X among present panels); the assembled
    rim is flush.
@@ -6404,7 +6415,7 @@ as the pane's design record.
    from the top, Y from the bottom).
 3. Wall slots and cross-laps widen with the clearance pass exactly like
    edge recesses; in CNC mode every slot corner a tab must seat against
-   carries the corner-overcut relief at full bit radius.
+   carries a dogbone the bit can reach (ADR-106 Amd 1).
 
 #### Error — compartments too small
 
@@ -6479,7 +6490,7 @@ as the pane's design record.
 
 #### Edge — CNC relief
 
-1. CNC mode carves corner-overcuts in every notch at full bit radius;
+1. CNC mode carves a reachable dogbone at every notch seat corner;
    validation rejects a tool wider than the finger (F-K2 rule).
 
 ### F-K9. Assembled 3D preview (ADR-119)

@@ -24,13 +24,14 @@ export function BoxFitTestHost(props: { readonly onClose: () => void }): JSX.Ele
     <BoxFitTestDialog
       machine={context}
       onCancel={props.onClose}
-      onGenerate={(parts) => {
+      onGenerate={(parts, spec) => {
         insertBoxPanels(
           parts.map((part) => ({
             name: part.name,
             outline: part.rings.outline,
             cutouts: part.rings.cutouts,
           })),
+          { thicknessMm: spec.thicknessMm },
         );
         props.onClose();
         pushToast('Inserted fit test strips — press each rung, best fit wins.', 'success');
