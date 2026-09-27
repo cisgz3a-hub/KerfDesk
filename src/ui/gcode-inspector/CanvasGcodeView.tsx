@@ -10,8 +10,9 @@
 import { useMemo } from 'react';
 import { InspectorView } from './InspectorView';
 import { useCurrentGcode, type CurrentGcode } from './use-current-gcode';
-import { useGcodeInspection, type InspectionState } from './use-gcode-inspection';
+import { loadingPreview, useGcodeInspection, type InspectionState } from './use-gcode-inspection';
 import { InspectionPressureNotice } from './InspectionPressureNotice';
+import { InspectionPreviewView } from './InspectionPreviewView';
 import { MainThreadInspectionNotice } from './MainThreadInspectionNotice';
 import { hasGcodeInspectorAnalysis } from './gcode-inspector-worker-protocol';
 
@@ -65,6 +66,14 @@ function Body(props: {
   }
   if (props.inspection.kind === 'loading') {
     if (props.inspection.phase === 'fallback') return <MainThreadInspectionNotice />;
+    const preview = loadingPreview(props.inspection);
+    if (preview !== null) {
+      const label =
+        props.inspection.phase === 'timing'
+          ? 'Timing the moves in worker…'
+          : 'Reading G-code in worker…';
+      return <InspectionPreviewView preview={preview} label={label} />;
+    }
     const queued =
       props.inspection.phase === 'queued' && props.inspection.queuePosition > 0
         ? ` (${props.inspection.queuePosition} ahead)`

@@ -3,11 +3,11 @@
 // readout helpers, and the traversal toggle uses LightBurn's exact wording.
 
 import { useMemo } from 'react';
-import type { ProgramTimeModel } from '../../core/gcode-time';
-import type { GcodeRenderModel, ProgramFinding } from '../../core/gcode-view';
+import type { ProgramFinding } from '../../core/gcode-view';
 import type { Viewer3dTheme } from '../viewer3d';
 // Deep import: the viewer3d barrel is capped at 20 exports by its index contract.
 import type { Viewer3dLook } from '../viewer3d/viewer3d-look';
+import type { InspectorProgramTime, InspectorRenderModel } from './inspector-model';
 import { InspectorHealthPanel } from './InspectorHealthPanel';
 import { InspectorIsolateControl } from './InspectorIsolateControl';
 import { InspectorLensControl } from './InspectorLensControl';
@@ -18,12 +18,12 @@ import type { PlayheadState } from './playhead';
 import type { ToolSections } from './tool-sections';
 
 type InspectorSidebarProps = {
-  readonly model: GcodeRenderModel;
+  readonly model: InspectorRenderModel;
   readonly theme: Viewer3dTheme;
   readonly look?: Viewer3dLook | undefined;
   readonly sections?: ToolSections | null | undefined;
   readonly playhead: PlayheadState;
-  readonly time: ProgramTimeModel;
+  readonly time: InspectorProgramTime;
   /** Device profile the time assumes; null for stock GRBL limits. */
   readonly timedFor: string | null;
   readonly findings: ReadonlyArray<ProgramFinding>;

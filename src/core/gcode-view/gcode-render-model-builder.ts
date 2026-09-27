@@ -72,6 +72,7 @@ export type GcodeRenderModelBuilder = {
 
 export function createGcodeRenderModelBuilder(
   options: BuildRenderModelOptions = {},
+  segments: SegmentBuilder = createSegmentBuilder(options.retainPreciseSegmentLengths),
 ): GcodeRenderModelBuilder {
   // No line or display ceiling (rule 7 / ADR-268). `maxSegments` stays because
   // it is opt-in: only the live countdown passes it as a responsiveness budget
@@ -81,7 +82,7 @@ export function createGcodeRenderModelBuilder(
     controllerArcToleranceMm: options.controllerArcToleranceMm,
     laser: createLaserRenderState(options),
     modal: freshRenderModal(options.initialPositionMm),
-    segments: createSegmentBuilder(1024, options.retainPreciseSegmentLengths),
+    segments,
     events: [],
     skipped: [],
     unsupported: new Map(),

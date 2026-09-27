@@ -1,13 +1,22 @@
-// Pointing at a move (ADR-470). The pick pass draws the thin copy of every
-// move into a small square around the pointer, each move in a colour that
-// spells its segment index, and reads the square back. That costs one tiny
+// Pointing at a move (ADR-470). The pick pass draws every move one pixel wide
+// into a small square around the pointer, each move in a colour that spells
+// its segment index, and reads the square back. That costs one tiny
 // draw per pointer update however long the program is, and it respects what
 // is in front: the move the operator sees under the pointer is the one named.
 // The hovered move is then outlined over the rest of the path.
 
 import type * as ThreeNamespace from 'three';
 import type { WebGLRenderer } from 'three';
-import { encodePickIds, nearestEnd, nearestPickedSegment, PICK_WINDOW_PX } from './pick-ids';
+import type { LineSegmentsGeometry } from 'three/examples/jsm/lines/LineSegmentsGeometry.js';
+import { editLineMaterial, withShownMoves } from './line-shader-edits';
+import {
+  encodePickIds,
+  nearestEnd,
+  nearestPickedSegment,
+  PICK_WINDOW_PX,
+  withInstancePickIds,
+} from './pick-ids';
+import { shareProgramGeometry } from './program-lines';
 import type { Point3 } from './scene-parts';
 import type { ViewCamera } from './scene-setup';
 import type { RevealTargets } from './scene-toolpath';
@@ -85,7 +94,7 @@ export function createToolpathPicker(
   },
 ): ToolpathPicker {
   const { three } = modules;
-  const pass = createPickPass(three, deps.renderer);
+  const pass = createPickPass(modules, deps.renderer);
   const outline = createOutline(modules, deps);
   let targets: RevealTargets | null = null;
   let travelPick: ThreeNamespace.LineSegments | null = null;
@@ -102,7 +111,7 @@ export function createToolpathPicker(
       if (targets === null) return null;
       if (!built) {
         built = true;
-        pass.add(targets.solidGhost, targets.solidSource);
+        pass.addProgram(targets.solid);
         travelPick = pass.add(targets.travelGhost, targets.travelSource);
       }
       if (travelPick !== null) travelPick.visible = targets.travelVisible;
@@ -113,7 +122,7 @@ export function createToolpathPicker(
     highlight: (segmentIndex) => outline.show(segmentIndex, targets?.positions ?? null),
     resize: outline.resize,
     setClipPlanes: (planes) => {
-      pass.material.clippingPlanes = planes;
+      pass.setClipPlanes(planes);
       outline.setClipPlanes(planes);
     },
     dispose: () => {
@@ -124,21 +133,26 @@ export function createToolpathPicker(
 }
 
 type PickPass = {
+  /** The solid moves, drawn from the toolpath's own GPU copy (ADR-485). */
+  readonly addProgram: (solid: RevealTargets['solid']) => void;
   readonly add: (
-    ghost: RevealTargets['solidGhost'],
+    ghost: RevealTargets['travelGhost'],
     source: Uint32Array,
   ) => ThreeNamespace.LineSegments | null;
   readonly read: (camera: ViewCamera, pointer: PickPointer) => number | null;
-  readonly material: ThreeNamespace.ShaderMaterial;
+  readonly setClipPlanes: (planes: ThreeNamespace.Plane[] | null) => void;
   readonly clear: () => void;
   readonly dispose: () => void;
 };
 
-// The ID scene shares the ghost lines' geometry, so it costs one extra
-// attribute and no second copy of the positions. The toolpath rebuild
-// disposes that geometry; `clear` only lets go of it.
-function createPickPass(three: ThreeModule, renderer: WebGLRenderer): PickPass {
+// The ID scene shares the toolpath's buffers: the solid moves' fat lines, and
+// the rapids' ghost with one extra attribute, so no positions are copied.
+// The toolpath rebuild disposes those buffers; `clear` lets go of them.
+function createPickPass(modules: ThreeModules, renderer: WebGLRenderer): PickPass {
+  const { three } = modules;
   const scene = new three.Scene();
+  const programMaterial = createProgramPickMaterial(modules);
+  let programGeometry: LineSegmentsGeometry | null = null;
   const target = new three.WebGLRenderTarget(PICK_WINDOW_PX, PICK_WINDOW_PX);
   const pixels = new Uint8Array(PICK_WINDOW_PX * PICK_WINDOW_PX * 4);
   const material = new three.ShaderMaterial({
@@ -151,7 +165,15 @@ function createPickPass(three: ThreeModule, renderer: WebGLRenderer): PickPass {
   const savedClear = new three.Color();
   const half = (PICK_WINDOW_PX - 1) / 2;
   return {
-    material,
+    addProgram: (solid) => {
+      if (solid === null) return;
+      programGeometry = shareProgramGeometry(modules.LineSegmentsGeometry, solid.geometry);
+      const lines = new modules.LineSegments2(programGeometry, programMaterial);
+      // The line width is in the pick window's pixels, not the view's.
+      lines.onBeforeRender = () => undefined;
+      lines.frustumCulled = false;
+      scene.add(lines);
+    },
     add: (ghost, source) => {
       if (ghost === null) return null;
       const ids = new three.BufferAttribute(encodePickIds(source), 4, true);
@@ -188,13 +210,36 @@ function createPickPass(three: ThreeModule, renderer: WebGLRenderer): PickPass {
       }
       return nearestPickedSegment(pixels, PICK_WINDOW_PX);
     },
-    clear: () => scene.clear(),
+    setClipPlanes: (planes) => {
+      material.clippingPlanes = planes;
+      programMaterial.clippingPlanes = planes;
+    },
+    clear: () => {
+      scene.clear();
+      programGeometry?.dispose();
+      programGeometry = null;
+    },
     dispose: () => {
       scene.clear();
+      programGeometry?.dispose();
       material.dispose();
+      programMaterial.dispose();
       target.dispose();
     },
   };
+}
+
+// One pixel wide in the pick window, each instance in its identity, and the
+// moves the view does not show left out.
+function createProgramPickMaterial(modules: ThreeModules) {
+  const material = new modules.LineMaterial({ linewidth: 1 });
+  material.blending = modules.three.NoBlending;
+  material.toneMapped = false;
+  material.resolution.set(PICK_WINDOW_PX, PICK_WINDOW_PX);
+  editLineMaterial(material, 'kerfdesk-pick-moves', (shader) =>
+    withInstancePickIds(withShownMoves(shader)),
+  );
+  return material;
 }
 
 // The point of the picked move nearest the pointer's ray. An orthographic ray
