@@ -30,6 +30,13 @@ const scene = vi.hoisted(() => ({
   onCameraInteraction: vi.fn(),
   setTravelVisible: vi.fn(),
   setView: vi.fn(),
+  fitView: vi.fn(),
+  setProjection: vi.fn(),
+  onProjectionChange: vi.fn(),
+  onCameraMoving: vi.fn(),
+  setStage: vi.fn(),
+  pickViewCube: vi.fn(() => null),
+  hoverViewCube: vi.fn(),
   captureImage: vi.fn(),
   resize: vi.fn(),
   dispose: vi.fn(),
@@ -53,7 +60,7 @@ beforeEach(() => {
   current.followingRun = false;
 });
 
-it('ready Inspector routes every camera control, source toggle and travel/direction switch to the scene', async () => {
+it('ready Inspector routes every camera control, look, layout toggle and travel/direction switch to the scene', async () => {
   const model = liveInspectorModel();
   const host = await mountControl(
     <InspectorView
@@ -76,11 +83,22 @@ it('ready Inspector routes every camera control, source toggle and travel/direct
     ['Top', 'top'],
     ['Front', 'front'],
     ['Right', 'right'],
-    ['Fit', 'iso'],
   ]) {
     await clickControl(host, label!);
     expect(scene.setView).toHaveBeenLastCalledWith(preset);
   }
+  await clickControl(host, 'Fit');
+  expect(scene.fitView).toHaveBeenCalledTimes(1);
+  await clickControl(host, 'Ortho');
+  expect(scene.setProjection).toHaveBeenLastCalledWith('orthographic');
+  await clickControl(host, 'Studio');
+  expect(scene.setStage).toHaveBeenLastCalledWith(expect.objectContaining({ look: 'studio' }));
+  await clickControl(host, 'Classic');
+  expect(scene.setStage).toHaveBeenLastCalledWith(expect.objectContaining({ look: 'classic' }));
+  await clickControl(host, 'Hide readouts');
+  expect(host.querySelector('[aria-label="Program readouts"]')).toBeNull();
+  await clickControl(host, 'Show readouts');
+  expect(host.querySelector('[aria-label="Program readouts"]')).not.toBeNull();
   await clickControl(host, 'PNG');
   expect(scene.captureImage).toHaveBeenCalledTimes(1);
   await clickControl(host, 'Hide source');

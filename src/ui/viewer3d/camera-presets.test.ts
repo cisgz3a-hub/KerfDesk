@@ -6,8 +6,12 @@ import {
   boundsExtent,
   CAMERA_PRESETS,
   cameraPlacement,
+  projectionForView,
+  VIEWER3D_VIEWS,
   type CameraPreset,
 } from './camera-presets';
+import { orthographicHalfHeight } from './camera-projection';
+import { tweenPose } from './camera-tween';
 
 // A 100 x 60 x 10 job centred on (50, 30, -5).
 const BOUNDS: AxisBounds = { minX: 0, maxX: 100, minY: 0, maxY: 60, minZ: -10, maxZ: 0 };
@@ -41,13 +45,20 @@ describe('cameraPlacement', () => {
     }
   });
 
-  it('places Top directly above, looking straight down', () => {
+  it('places Top above the job, looking down to within a tenth of a degree, still Z-up', () => {
     const view = cameraPlacement('top', BOUNDS);
+    const offset = new Vector3(
+      view.position.x - view.target.x,
+      view.position.y - view.target.y,
+      view.position.z - view.target.z,
+    );
     expect(view.position.x).toBeCloseTo(50, 6);
-    expect(view.position.y).toBeCloseTo(30, 6);
     expect(view.position.z).toBeGreaterThan(0);
-    // +Z up would be degenerate looking down the Z axis.
-    expect(view.up).toEqual({ x: 0, y: 1, z: 0 });
+    // A hair toward the operator (-Y) keeps the Z-up orbit from degenerating,
+    // so +Y still reads as "up the screen" and the orbit never flips.
+    expect(view.position.y).toBeLessThan(30);
+    expect(offset.angleTo(new Vector3(0, 0, 1))).toBeLessThan((0.1 * Math.PI) / 180);
+    expect(view.up).toEqual({ x: 0, y: 0, z: 1 });
   });
 
   it('places Front on -Y and Right on +X, both Z-up', () => {
@@ -75,6 +86,32 @@ describe('cameraPlacement', () => {
     const reach = (view: { position: { y: number }; target: { y: number } }): number =>
       Math.abs(view.target.y - view.position.y);
     expect(reach(big)).toBeGreaterThan(reach(small));
+  });
+
+  it('keeps the camera off a straight-line job seen end-on, in every view', () => {
+    const lines: ReadonlyArray<AxisBounds> = [
+      { minX: 0, maxX: 100, minY: 30, maxY: 30, minZ: 0, maxZ: 0 },
+      { minX: 50, maxX: 50, minY: 0, maxY: 100, minZ: 0, maxZ: 0 },
+      // A single deep plunge: a drilled hole seen from above.
+      { minX: 50, maxX: 50, minY: 30, maxY: 30, minZ: -40, maxZ: 0 },
+    ];
+    const start = cameraPlacement('iso', lines[0] ?? null);
+    for (const bounds of lines) {
+      for (const view of VIEWER3D_VIEWS) {
+        for (const aspect of [0.4, 1, 2]) {
+          const placement = cameraPlacement(view, bounds, aspect, projectionForView(view));
+          const distance = Math.hypot(
+            placement.position.x - placement.target.x,
+            placement.position.y - placement.target.y,
+            placement.position.z - placement.target.z,
+          );
+          // At least the minimum 10 mm view either side of the target.
+          expect(orthographicHalfHeight(distance, 40) * Math.min(1, aspect)).toBeGreaterThan(5);
+          const middle = tweenPose(start, placement, 0.5).position;
+          expect([middle.x, middle.y, middle.z].every(Number.isFinite)).toBe(true);
+        }
+      }
+    }
   });
 
   it('still produces a usable view with no bounds at all', () => {
