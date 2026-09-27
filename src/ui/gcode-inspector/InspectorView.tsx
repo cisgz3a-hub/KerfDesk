@@ -149,6 +149,8 @@ function PreviewLens(props: {
         sections={s.sections}
         lens={s.lens}
         onLensChange={s.setLens}
+        hiddenEntries={s.legendHidden}
+        onToggleEntry={s.toggleEntry}
         variant="overlay"
       />
     </div>
@@ -198,6 +200,10 @@ function Readouts(props: {
       travelVisible={s.travelVisible}
       onTravelVisibleChange={props.onTravelChange}
       onLocateLine={props.onLocateLine}
+      hiddenEntries={s.legendHidden}
+      onToggleEntry={s.toggleEntry}
+      isolate={s.isolate}
+      onIsolateChange={s.setIsolate}
     />
   );
 }
@@ -217,6 +223,8 @@ function useInspectorScene(model: GcodeRenderModel, session: Session) {
     hidePlaybackMarker: liveMode,
     travelVisible: session.travelVisible,
     stage: session.stage,
+    moveFilter: session.moveFilter,
+    clipPlanes: session.clipPlanes,
   });
   const camera = useInspectorCamera(
     handleRef,

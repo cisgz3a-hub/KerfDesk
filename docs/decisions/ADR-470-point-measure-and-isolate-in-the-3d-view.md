@@ -12,6 +12,9 @@ points, and what does this part of the job look like on its own.
 1. **The view could not be asked about a move.** The 3D view drew every move but could not say
    which line of G-code a stroke came from. Finding the line behind a suspicious move meant
    scrubbing the timeline until the playhead reached it, or reading the source by eye.
+2. **No way to look at part of a job.** A pocket's passes, a relief's roughing and finishing, or a
+   tool's moves all drew on top of each other. The legend named each kind of move but could not
+   switch one off, and there was no way to see one depth level or cut the view through the job.
 
 ### Decision
 
@@ -39,6 +42,24 @@ points, and what does this part of the job look like on its own.
      same places from the keyboard, so the card is a pointer convenience and stays hidden from
      screen readers.
 
+2. **Isolating part of the job** (`ui/viewer3d/scene-isolate.ts`, `ui/gcode-inspector/isolate.ts`,
+   `ui/gcode-inspector/use-inspector-isolate.ts`, `ui/gcode-inspector/InspectorIsolateControl.tsx`).
+   - **Legend filters.** Each entry of a listed legend (Move kind, Tool, Reached feed) is a switch
+     for its moves. The Traversal entry is the existing traversal toggle, not a second switch for
+     the same moves. Switched-off moves are left out of the drawn geometry (`setMoveFilter` rebuilds
+     the buckets without them), so they cannot be pointed at either. Ramp lenses have nothing to
+     switch. Filters belong to the lens they were set in, and a new lens or program shows all.
+   - **Z range.** Two sliders keep the heights between a highest and a lowest Z. They stop at the
+     job's bottom and top and at every cutting level, or step evenly when a finishing pass has more
+     than 200 levels. A move lying exactly on a limit stays drawn.
+   - **Section.** A vertical cut through X or Y at a slider position shows the job's profile, and
+     "Show the other side" keeps the far half.
+   - The Z range and section are clipping planes on every material that draws the toolpath: the
+     solid and traversal lines, the playback ghosts, the direction arrows, the pick pass and the
+     hover outline. Clipping runs per pixel, so dragging a slider redraws without touching
+     geometry and a move crossing a limit is cut exactly where it crosses. The grid, the job box,
+     the tool model and the markers are not clipped.
+
 ### Consequences
 
 - **Picking reads pixels back synchronously.** One 13 x 13 read per animation frame while the
@@ -59,7 +80,14 @@ points, and what does this part of the job look like on its own.
   - `InspectorMoveTip`: one pick per frame at canvas coordinates, the outline follows the pick,
     nothing while a button is held or the view is not ready, a click locates while a drag does not,
     and a click still locates while the camera reports movement.
+  - `isolatePlanes` keeps a Z range including its limits and the near or far side of a section;
+    `zStops` lists levels or even steps; `moveFilterMask`; `lensEntries` sorts every move into the
+    legend entry whose count includes it, for Move kind, Tool (one tool and two) and Reached feed.
+  - `buildSegmentBuckets` leaves filtered moves out and keeps the rest mapped to their segments.
+  - Inspector controls: the legend switches, the traversal entry, the section and the Z range
+    reach the scene.
 - Browser (`e2e/gcode-viewer-pick.e2e.ts`): hovering a real square job names a cut on its lines
   with its feed and time; clicking it moves the playhead to that line; moving off clears the card;
-  in Studio's orthographic Top view the same pick reads X 0 or 80 and Z -1. Screenshots of the
-  hover in both looks.
+  in Studio's orthographic Top view the same pick reads X 0 or 80 and Z -1. On a three-pass
+  pocket, a Z range of one pass leaves only that pass to point at, and switching Cut off in the
+  legend leaves nothing there. Screenshots of the hover, the section and the Z range in both looks.

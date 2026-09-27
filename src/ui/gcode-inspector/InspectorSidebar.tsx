@@ -9,13 +9,15 @@ import type { Viewer3dTheme } from '../viewer3d';
 // Deep import: the viewer3d barrel is capped at 20 exports by its index contract.
 import type { Viewer3dLook } from '../viewer3d/viewer3d-look';
 import { InspectorHealthPanel } from './InspectorHealthPanel';
+import { InspectorIsolateControl } from './InspectorIsolateControl';
 import { InspectorLensControl } from './InspectorLensControl';
 import { droRows, statsRows, type Readout } from './inspector-readouts';
+import type { IsolateState } from './isolate';
 import type { LensId } from './lenses';
 import type { PlayheadState } from './playhead';
 import type { ToolSections } from './tool-sections';
 
-export function InspectorSidebar(props: {
+type InspectorSidebarProps = {
   readonly model: GcodeRenderModel;
   readonly theme: Viewer3dTheme;
   readonly look?: Viewer3dLook | undefined;
@@ -32,7 +34,14 @@ export function InspectorSidebar(props: {
   readonly travelVisible: boolean;
   readonly onTravelVisibleChange: (visible: boolean) => void;
   readonly onLocateLine: (line: number) => void;
-}): JSX.Element {
+  /** Legend filters and the Z range and section (ADR-470). */
+  readonly hiddenEntries: ReadonlySet<number>;
+  readonly onToggleEntry: ((entry: number) => void) | null;
+  readonly isolate: IsolateState;
+  readonly onIsolateChange: (next: IsolateState) => void;
+};
+
+export function InspectorSidebar(props: InspectorSidebarProps): JSX.Element {
   // Playback re-renders this column every animation frame. statsRows scans
   // every segment, so derive it per PROGRAM, not per frame. The lens control
   // applies the same memo boundary to its legend; droRows reads one segment.
@@ -54,6 +63,8 @@ export function InspectorSidebar(props: {
           sections={props.sections}
           lens={props.lens}
           onLensChange={props.onLensChange}
+          hiddenEntries={props.hiddenEntries}
+          onToggleEntry={props.onToggleEntry}
           variant="sidebar"
         />
         <label style={toggleStyle}>
@@ -74,6 +85,13 @@ export function InspectorSidebar(props: {
           />
           Show direction arrows
         </label>
+      </Section>
+      <Section title="Isolate">
+        <InspectorIsolateControl
+          model={props.model}
+          isolate={props.isolate}
+          onChange={props.onIsolateChange}
+        />
       </Section>
       <Section title="Program">
         <ReadoutGrid rows={stats} />

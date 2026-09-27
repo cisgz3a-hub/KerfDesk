@@ -18,8 +18,10 @@ import { createSceneCameraControl, type SceneCameraControl } from './scene-camer
 import { boundsExtent, disposeChildren } from './scene-furniture';
 import { createMarkers, disposeMarkers, type SceneMarkers } from './scene-markers';
 import { placeMarker, type Point3 } from './scene-parts';
+import { clipObjects } from './scene-isolate';
 import { createToolpathPicker, type ToolpathPicker } from './scene-pick';
 import type { CameraRig } from './scene-setup';
+import type { Viewer3dSegmentsInput } from './segment-buckets';
 import { applyRecolor, type RevealTargets, type TravelLine } from './scene-toolpath';
 import { applyTravelLook } from './scene-travel-look';
 import { createViewCube, type ViewCube } from './scene-view-cube';
@@ -68,6 +70,12 @@ export type SceneState = {
   playhead: PlayheadMarker | null;
   stage: Viewer3dStage;
   overlays: boolean;
+  /** The program last installed, kept so a move filter can rebuild from it. */
+  segments: Viewer3dSegmentsInput | null;
+  /** Per segment, 0 leaves the move out (ADR-470); null draws every move. */
+  moveFilter: Uint8Array | null;
+  /** Planes the toolpath is clipped to (ADR-470); null draws it whole. */
+  clipPlanes: ThreeNamespace.Plane[] | null;
 };
 
 type Listen<T> = (listener: ((value: T) => void) | null) => void;
@@ -95,6 +103,8 @@ export type SceneCore = {
   readonly repaint: () => void;
   /** Dashed Studio rapids or Classic solid ones, sized to the job. */
   readonly applyTravel: () => void;
+  /** Hands the current clipping planes to every toolpath material. */
+  readonly applyClipping: () => void;
   readonly dispose: () => void;
 };
 
@@ -147,16 +157,28 @@ export function createSceneCore(deps: SceneHandleDeps): SceneCore {
     repaint: () => {
       if (state.colorOf !== null) applyRecolor(state.reveal, state.colorOf, encode());
     },
-    applyTravel: () =>
+    applyTravel: () => {
       applyTravelLook(
         three,
         state.travelLine,
         state.stage.look,
         deps.theme,
         boundsExtent(state.bounds),
-      ),
+      );
+      clipToolpath(core);
+    },
+    applyClipping: () => clipToolpath(core),
   };
   return { ...core, dispose: () => disposeCore(core) };
+}
+
+// The travel look swaps its material, and arrows and rebuilds bring new ones,
+// so each of those re-applies the planes.
+function clipToolpath(core: Pick<SceneCore, 'deps' | 'state' | 'picker'>): void {
+  const planes = core.state.clipPlanes;
+  clipObjects(core.deps.toolpathGroup, planes);
+  clipObjects(core.state.arrowMesh, planes);
+  core.picker.setClipPlanes(planes);
 }
 
 function initialState(deps: SceneHandleDeps): SceneState {
@@ -174,6 +196,9 @@ function initialState(deps: SceneHandleDeps): SceneState {
     playhead: null,
     stage: CLASSIC_STAGE,
     overlays: true,
+    segments: null,
+    moveFilter: null,
+    clipPlanes: null,
   };
 }
 

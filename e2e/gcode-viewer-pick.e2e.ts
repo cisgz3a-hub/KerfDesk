@@ -59,6 +59,59 @@ test('hovering a move reads it out, and clicking it goes to its line (ADR-470)',
   expect(pageErrors).toEqual([]);
 });
 
+// The same square cut in three passes, at Z -1, -2 and -3.
+const POCKET_PROGRAM = ['G21 G90', 'G0 Z5']
+  .concat(
+    ...[-1, -2, -3].map((depth) => [
+      'G0 X0 Y0',
+      `G1 Z${depth} F300`,
+      'G1 X80 Y0 F900',
+      'G1 X80 Y80',
+      'G1 X0 Y80',
+      'G1 X0 Y0',
+      'G0 Z5',
+    ]),
+  )
+  .join('\n');
+
+test('the Z range and legend filters decide what is drawn and pointed at (ADR-470)', async ({
+  page,
+  kerfdesk,
+}) => {
+  const pageErrors: string[] = [];
+  page.on('pageerror', (error) => pageErrors.push(error.message));
+  await page.goto('/');
+  await kerfdesk.setOpenFiles([{ name: 'pick-pocket.nc', text: POCKET_PROGRAM }]);
+  await page.getByText('File', { exact: true }).click();
+  await page.getByRole('menuitem').filter({ hasText: 'Open G-code...' }).click();
+  const dialog = page.getByRole('dialog', { name: 'G-code Inspector: pick-pocket.nc' });
+  await expect(dialog.locator('[data-viewer-state="ready"]')).toBeVisible({ timeout: 30_000 });
+
+  // Keep only the -2 pass: the stops run -3, -2, -1, 5.
+  const highest = dialog.getByTitle('Hide every move above this height');
+  await highest.focus();
+  await page.keyboard.press('End');
+  await page.keyboard.press('ArrowLeft');
+  await page.keyboard.press('ArrowLeft');
+  const lowest = dialog.getByTitle('Hide every move below this height');
+  await lowest.focus();
+  await page.keyboard.press('Home');
+  await page.keyboard.press('ArrowRight');
+  await expect(highest).toHaveAttribute('aria-valuetext', '-2.00 mm');
+  await expect(lowest).toHaveAttribute('aria-valuetext', '-2.00 mm');
+
+  const card = dialog.locator('.gcode-viewer-move-tip');
+  const hit = await scanForMove(page, dialog.getByLabel('3D G-code toolpath', { exact: true }));
+  await expect(card).toContainText(/Z -2\.00 mm/);
+
+  await dialog.getByLabel('Colour lens').selectOption('kind');
+  await dialog.getByTitle('Hide cut moves').click();
+  await page.mouse.move(hit.x, hit.y - 1);
+  await page.mouse.move(hit.x, hit.y);
+  await expect(card).toHaveCount(0);
+  expect(pageErrors).toEqual([]);
+});
+
 // Sweeps the pointer along the canvas's middle row until the card names a cut.
 async function scanForMove(
   page: Page,

@@ -30,6 +30,7 @@ import {
   type Point3,
 } from './scene-parts';
 import { loadThree } from './viewer3d-modules';
+import { toThreePlanes, type Viewer3dClipPlane } from './scene-isolate';
 import type { Viewer3dPick } from './scene-pick';
 import type { Viewer3dStage } from './viewer3d-look';
 import { resolveViewer3dTheme } from './viewer3d-theme';
@@ -39,6 +40,7 @@ export type Viewer3dSegments = Viewer3dSegmentsInput;
 
 export type { PlayheadMarker } from './scene-handle-core';
 export type { Viewer3dPick } from './scene-pick';
+export type { Viewer3dClipPlane } from './scene-isolate';
 
 export type Viewer3dSceneHandle = {
   readonly setSegments: (segments: Viewer3dSegments) => void;
@@ -90,6 +92,13 @@ export type Viewer3dSceneHandle = {
   readonly pickMove: (xPx: number, yPx: number) => Viewer3dPick | null;
   /** Outlines one move over the rest of the path; null clears it. */
   readonly highlightMove: (segmentIndex: number | null) => void;
+  /**
+   * Leaves out every move whose entry is 0, for the legend's filters; null
+   * draws every move. A new program clears it (ADR-470).
+   */
+  readonly setMoveFilter: (visible: Uint8Array | null) => void;
+  /** Clips the toolpath to the kept side of each plane; none draws it whole. */
+  readonly setClipPlanes: (planes: ReadonlyArray<Viewer3dClipPlane>) => void;
   /** Direction arrowheads over the cut path; null clears them. */
   readonly setDirectionArrows: (placements: ReadonlyArray<ArrowPlacement> | null) => void;
   readonly resize: (width: number, height: number) => void;
@@ -144,13 +153,51 @@ function createSceneHandle(deps: SceneHandleDeps): Viewer3dSceneHandle {
     ...toolpathMethods(core),
     ...cameraMethods(core),
     ...lifecycleMethods(core),
-    ...pickMethods(core),
+    ...isolateMethods(core),
   };
 }
 
-function pickMethods(core: SceneCore): Pick<Viewer3dSceneHandle, 'pickMove' | 'highlightMove'> {
+// Builds the drawn toolpath from the installed program and the move filter.
+function installToolpath(core: SceneCore): void {
+  const { deps, state } = core;
+  if (state.segments === null) return;
+  const built = rebuildToolpath(deps.toolpathGroup, {
+    ...deps.modules,
+    segments: { ...state.segments, visible: state.moveFilter },
+    theme: deps.theme,
+    viewWidth: state.viewWidth,
+    viewHeight: state.viewHeight,
+    travelVisible: state.travelVisible,
+  });
+  state.fatMaterial = built.fatMaterial;
+  state.travelObject = built.travelObject;
+  state.travelLine = built.travelLine;
+  state.reveal = built.reveal;
+  core.picker.setTargets(built.reveal);
+  core.applyTravel();
+}
+
+type IsolateMethods = Pick<
+  Viewer3dSceneHandle,
+  'pickMove' | 'highlightMove' | 'setMoveFilter' | 'setClipPlanes'
+>;
+
+function isolateMethods(core: SceneCore): IsolateMethods {
   const { deps, state } = core;
   return {
+    setMoveFilter: (visible) => {
+      if (state.segments === null || visible === state.moveFilter) return;
+      state.moveFilter = visible;
+      installToolpath(core);
+      core.repaint();
+      applyReveal(state.reveal, state.playhead);
+      core.requestRender();
+    },
+    setClipPlanes: (planes) => {
+      state.clipPlanes = toThreePlanes(deps.modules.three, planes);
+      core.applyClipping();
+      core.requestRender();
+    },
     pickMove: (xPx, yPx) =>
       core.picker.pick(deps.rig.viewCamera(), {
         xPx,
@@ -180,20 +227,9 @@ function toolpathMethods(core: SceneCore): ToolpathMethods {
   const { modules, theme } = deps;
   return {
     setSegments: (segments) => {
-      const built = rebuildToolpath(deps.toolpathGroup, {
-        ...modules,
-        segments,
-        theme,
-        viewWidth: state.viewWidth,
-        viewHeight: state.viewHeight,
-        travelVisible: state.travelVisible,
-      });
-      state.fatMaterial = built.fatMaterial;
-      state.travelObject = built.travelObject;
-      state.travelLine = built.travelLine;
-      state.reveal = built.reveal;
-      core.picker.setTargets(built.reveal);
-      core.applyTravel();
+      state.segments = segments;
+      state.moveFilter = null;
+      installToolpath(core);
       sizeMarkers(markers, segments);
       requestRender();
     },
@@ -227,6 +263,7 @@ function toolpathMethods(core: SceneCore): ToolpathMethods {
       const extent = boundsExtent(state.bounds);
       const { three } = modules;
       state.arrowMesh = swapArrows(three, deps.scene, state.arrowMesh, placements, extent, theme);
+      core.applyClipping();
       requestRender();
     },
   };

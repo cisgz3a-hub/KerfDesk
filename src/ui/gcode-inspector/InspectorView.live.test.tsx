@@ -33,6 +33,8 @@ const scene = vi.hoisted(() => ({
   hoverViewCube: vi.fn(),
   pickMove: vi.fn(() => null),
   highlightMove: vi.fn(),
+  setMoveFilter: vi.fn(),
+  setClipPlanes: vi.fn(),
   captureImage: vi.fn(),
   resize: vi.fn(),
   dispose: vi.fn(),

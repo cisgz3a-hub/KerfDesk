@@ -5,6 +5,7 @@ import { buildProgramTime, type MotionLimits, type ProgramTimeModel } from '../.
 import { buildGcodeRenderModel, type GcodeRenderModel } from '../../core/gcode-view';
 import { resolveViewer3dTheme } from '../viewer3d';
 import { InspectorSidebar } from './InspectorSidebar';
+import { NO_ISOLATE } from './isolate';
 import type * as InspectorReadoutsModule from './inspector-readouts';
 import type * as LensesModule from './lenses';
 import { playheadAtTime } from './playhead';
@@ -51,6 +52,7 @@ const PROGRAM = [
 // so the harness holds one value too — a fresh object per render would be a
 // prop change, not a re-render of the same props.
 const THEME = resolveViewer3dTheme(null);
+const NOTHING_HIDDEN: ReadonlySet<number> = new Set();
 
 let host: HTMLDivElement | null = null;
 let root: Root | null = null;
@@ -77,6 +79,10 @@ function sidebar(model: GcodeRenderModel, time: ProgramTimeModel, seconds: numbe
       travelVisible
       onTravelVisibleChange={() => undefined}
       onLocateLine={() => undefined}
+      hiddenEntries={NOTHING_HIDDEN}
+      onToggleEntry={null}
+      isolate={NO_ISOLATE}
+      onIsolateChange={() => undefined}
     />
   );
 }

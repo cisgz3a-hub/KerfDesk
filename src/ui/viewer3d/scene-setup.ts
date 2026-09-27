@@ -68,6 +68,8 @@ export function startRenderer(
   const height = canvas.clientHeight || canvas.height;
   renderer.setSize(width, height, false);
   renderer.setClearColor(theme.background);
+  // Z range and section views clip the toolpath's own materials (ADR-470).
+  renderer.localClippingEnabled = true;
   return { kind: 'ok', renderer, width, height };
 }
 

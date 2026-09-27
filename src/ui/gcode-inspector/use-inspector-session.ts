@@ -8,6 +8,7 @@ import { useInspectorLook } from './inspector-look-preference';
 import { defaultLensFor, lensColorFn, type LensId } from './lenses';
 import { playheadAtTime } from './playhead';
 import { buildToolSections, toolAtSegment, type ToolSections } from './tool-sections';
+import { useInspectorIsolate } from './use-inspector-isolate';
 import { useInspectorStage } from './use-inspector-stage';
 import { useInspectorPlayback } from './use-inspector-playback';
 import { useInspectorLiveProgress } from './use-inspector-live-progress';
@@ -52,6 +53,14 @@ export function useInspectorSession(
     workArea: source?.workArea,
     playheadSegment: playhead.segmentIndex,
   });
+  const isolate = useInspectorIsolate({
+    model,
+    time: derived.time,
+    lens,
+    sections,
+    travelVisible,
+    setTravelVisible,
+  });
   const activeLine = liveMode ? live.activeLine : derived.activeLine;
   const progress = liveMode
     ? (live.progress ?? 0)
@@ -60,6 +69,7 @@ export function useInspectorSession(
       : 0;
   return {
     ...derived,
+    ...isolate,
     playhead,
     activeLine,
     progress,

@@ -39,6 +39,8 @@ export type ToolpathPicker = {
   /** Outlines one move; returns whether anything changed. */
   readonly highlight: (segmentIndex: number | null) => boolean;
   readonly resize: (width: number, height: number) => void;
+  /** Clips the pick pass and the outline like the drawn toolpath. */
+  readonly setClipPlanes: (planes: ThreeNamespace.Plane[] | null) => void;
   readonly dispose: () => void;
 };
 
@@ -108,6 +110,10 @@ export function createToolpathPicker(
     },
     highlight: (segmentIndex) => outline.show(segmentIndex, targets?.positions ?? null),
     resize: outline.resize,
+    setClipPlanes: (planes) => {
+      pass.material.clippingPlanes = planes;
+      outline.setClipPlanes(planes);
+    },
     dispose: () => {
       pass.dispose();
       outline.dispose();
@@ -121,6 +127,7 @@ type PickPass = {
     source: Uint32Array,
   ) => ThreeNamespace.LineSegments | null;
   readonly read: (camera: ViewCamera, pointer: PickPointer) => number | null;
+  readonly material: ThreeNamespace.ShaderMaterial;
   readonly clear: () => void;
   readonly dispose: () => void;
 };
@@ -137,10 +144,12 @@ function createPickPass(three: ThreeModule, renderer: WebGLRenderer): PickPass {
     fragmentShader: PICK_FRAGMENT,
     blending: three.NoBlending,
     toneMapped: false,
+    clipping: true,
   });
   const savedClear = new three.Color();
   const half = (PICK_WINDOW_PX - 1) / 2;
   return {
+    material,
     add: (ghost, source) => {
       if (ghost === null) return null;
       const ids = new three.BufferAttribute(encodePickIds(source), 4, true);
@@ -217,6 +226,7 @@ function closestOnMove(
 type Outline = {
   readonly show: (segmentIndex: number | null, positions: Float32Array | null) => boolean;
   readonly resize: (width: number, height: number) => void;
+  readonly setClipPlanes: (planes: ThreeNamespace.Plane[] | null) => void;
   readonly dispose: () => void;
 };
 
@@ -261,6 +271,9 @@ function createOutline(
     },
     resize: (width, height) => {
       for (const { material } of strokes) material.resolution.set(width, height);
+    },
+    setClipPlanes: (planes) => {
+      for (const { material } of strokes) material.clippingPlanes = planes;
     },
     dispose: () => {
       for (const { line, material } of strokes) {
