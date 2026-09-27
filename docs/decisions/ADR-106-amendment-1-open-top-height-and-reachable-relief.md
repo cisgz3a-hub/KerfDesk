@@ -29,18 +29,22 @@ compensation. Two contracts in ADR-106 did not hold.
    2T (bottom and top), open-top T (bottom), slide-lid 3T (bottom, lid band and captive strip,
    unchanged). Dividers rise the full inner height for every style, which on an open top is
    flush with the rim. The slide-lid builder's open-top surrogate adds 2T to keep its 3T walls.
-2. Each CNC relief is a dogbone: a circle whose centre sits one bit radius from the corner
-   along the bisector of the open (waste) side, of radius bit radius + 0.05 mm, drawn as a
-   24-gon that circumscribes that circle. A bit centred there touches the corner, and the lane
-   along the bisector lets the compensated toolpath run in and out. The 0.05 mm margin keeps
-   that lane wider than clipper rounding. The relief Boolean runs at 1e-3 mm precision. A bit
-   edge now passes each seat corner by about 0.05 mm. The ordering (clearance offset first,
-   then relief) and which corners are relieved are unchanged. The thumb notch on the loose lid
-   is still never relieved.
+2. Each CNC relief is a dogbone the bit can cut: the capsule a bit sweeps along the bisector of
+   the open (waste) side, from the centre one bit radius from the corner (where its edge touches
+   the corner) out to the centre where it meets both walls (r / sin(θ/2), √2·r for a square
+   corner). The capsule's radius is the bit radius + 0.05 mm, and it is drawn as a polygon that
+   circumscribes it. Its eroded interior is a lane at least 0.1 mm wide, so the compensated
+   toolpath runs from the main contour into each corner and back as part of the same loop. A
+   dogbone circle alone leaves the lane pinched shut under clipper's miter joins, so the bit
+   reaches it only as a separate island loop, which a holding tab can bridge whole. The relief
+   Boolean runs at 1e-3 mm precision. A bit edge now passes each seat corner by about 0.05 mm.
+   The ordering (clearance offset first, then relief) and which corners are relieved are
+   unchanged. The thumb notch on the loose lid is still never relieved. The shape lives in
+   `corner-dogbone.ts`, shared with the standalone Dogbone tool (ADR-103 Amendment 1).
 3. The verification contract for relief is the toolpath, not the drawing. After
    profile-outside compensation with the relief tool, the bit centre passes within one radius
-   of every seat corner (reflex outline corners and convex cutout corners), for every style,
-   dividers and the Box Fit Test strips. A sampled 3D occupancy test checks every style and
+   of every seat corner (reflex outline corners and convex cutout corners), in one loop per
+   ring, for every style, dividers and the Box Fit Test strips. A sampled 3D occupancy test checks every style and
    mode against the requested outer and inner dimensions, not against `deriveBoxDims`.
 
 ### Consequences
@@ -48,9 +52,9 @@ compensation. Two contracts in ADR-106 did not hold.
 - Open-top boxes generated before this change came out one thickness taller than entered.
   Regenerating the same inner values now gives the requested depth. Outer-mode open-top panels
   keep their size, and the dialog now reports the true inner height.
-- CNC panels with relief on change shape: small dogbone bites replace the larger centred
-  overcuts, and the bit reaches every seat. Laser output and relief-off CNC output are
+- CNC panels with relief on change shape: dogbone bites along each corner's bisector replace the
+  larger centred overcuts, and the bit reaches every seat. Laser output and relief-off CNC output are
   unchanged apart from the open-top height.
-- The standalone Dogbone tool (F-CNC26, `dogbone.ts`) uses the same centred-circle convention
-  and has the same reach defect. It is outside the Box Generator and is not changed here.
+- The standalone Dogbone tool (F-CNC26, `dogbone.ts`) used the same centred-circle convention
+  and had the same reach defect; ADR-103 Amendment 1 moves it to the shared capsule.
 - Physical fit remains unverified until the named hardware cuts in ADR-106 are made.

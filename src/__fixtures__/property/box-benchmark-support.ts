@@ -173,7 +173,9 @@ function shoelace(ring: ReadonlyArray<Vec2>): number {
 // within one bit radius of every seat corner — reflex corners of the nominal
 // outline and convex corners of its cutouts — so a square tab can seat.
 // Measuring the drawn relief alone is not enough: a relief the compensated
-// bit cannot enter leaves the corner filleted.
+// bit cannot enter leaves the corner filleted. Each relief must also join its
+// ring's loop (one toolpath loop per ring): a relief reached only as its own
+// island loop is a separate contour that holding tabs can bridge whole.
 export function bitReachesSeatCorners(
   nominal: { readonly outline: Polyline; readonly cutouts: ReadonlyArray<Polyline> },
   relieved: { readonly outline: Polyline; readonly cutouts: ReadonlyArray<Polyline> },
@@ -184,6 +186,7 @@ export function bitReachesSeatCorners(
     'outside',
     toolMm,
   );
+  if (toolPath.length !== 1 + relieved.cutouts.length) return false;
   const corners = [
     ...ringCorners(nominal.outline, 'reflex'),
     ...nominal.cutouts.flatMap((cutout) => ringCorners(cutout, 'convex')),

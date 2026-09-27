@@ -3,7 +3,7 @@ import type { SvgFragmentActions } from './svg-fragment-mutation';
 // Slice factories keep the create call within ADR-015's size rule.
 
 import { create } from 'zustand';
-import type { InsertablePart } from './box-insert-mutation';
+import type { InsertBoxPanels } from './box-insert-mutation';
 import type { Sketch } from '../../core/design';
 import type { DesignApplyRecord } from './design-apply-record';
 import type { DeviceProfile } from '../../core/devices';
@@ -285,7 +285,7 @@ export type AppState = ObjectPropertiesActions &
     readonly drawShape: (shape: ShapeObject) => void;
     // Phase K (ADR-106): insert a generated box panel sheet — one polyline
     // shape per panel, one undo step, every panel selected.
-    readonly insertBoxPanels: (panels: ReadonlyArray<InsertablePart>) => void;
+    readonly insertBoxPanels: InsertBoxPanels;
     // Design Studio Apply (ADR-272 DS-5): ids come from the caller because pure
     // core may not generate identity. `previous` names the artwork an earlier
     // Apply from the same session created, which this one REPLACES rather than

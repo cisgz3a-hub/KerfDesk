@@ -11,33 +11,29 @@
 // tabs into a press fit). Interior cutouts ride the same offset: shrinking
 // material WIDENS every slot by c/4 per flank — exactly the slot play the
 // contract requires. Reliefs subtract AFTER the offset so every relief
-// circle keeps the full bit radius (offsetting afterwards would shrink the
+// keeps the full bit radius (offsetting afterwards would shrink the
 // relief below the tool diameter and the bit could not follow it).
 //
-// Relief placement (ADR-106 Amd 1): each relief is a dogbone — a circle a
-// hair wider than the bit whose centre sits one bit radius from the corner
-// along the bisector of the open (waste) side. The bit's own centre can run
-// in along that bisector until its edge touches the corner. A bit-radius
+// Relief placement (ADR-106 Amd 1): each relief is a dogbone the bit can
+// cut (corner-dogbone.ts) — the capsule the bit sweeps along the bisector of
+// the open (waste) side until its edge touches the corner. A bit-radius
 // circle centred ON the corner cannot be reached at all: any bit centre
 // short of the exact corner gouges the recess walls, so the compensated
 // toolpath skipped it and every seat kept a bit-radius fillet.
 
 import { differenceD, FillRule, type PathD, type PathsD } from 'clipper2-ts';
-import type { Polyline, Vec2 } from '../scene';
+import type { Polyline } from '../scene';
+import {
+  dogboneCorner,
+  dogboneReliefPath,
+  DOGBONE_PRECISION_DECIMALS,
+  type DogboneCorner,
+} from '../geometry/corner-dogbone';
 import { offsetClosedPolylinesForKerfChecked } from '../geometry/kerf-offset';
 import { normalizeClosedPolylineTreeEvenOddChecked } from '../geometry/polygon-difference';
 import { pathDToPolyline, polylineToPathD, tryVectorOp } from '../geometry/vector-path-tools';
 import type { BoxRelief } from './box-spec';
 
-const CIRCLE_SEGMENTS = 24;
-// Extra relief radius beyond the bit. The bit's approach lane into a
-// dogbone is only about this wide at its tip, so it must sit well above
-// clipper's 1e-3 mm rounding and the 5 µm segment floor; the bit edge then
-// reaches this far past the corner.
-const RELIEF_REACH_MARGIN_MM = 0.05;
-// Keep relief booleans at the offset precision (1e-3 mm), not clipper's
-// default 1e-2, which can pinch the approach lane shut.
-const RELIEF_PRECISION_DECIMALS = 3;
 // δ = c/4 inward per the play derivation in the header.
 const CLEARANCE_TO_OFFSET_FACTOR = -0.25;
 const REFLEX_CROSS_EPS = 1e-9;
@@ -105,7 +101,7 @@ function offsetRings(rings: PanelRings, clearanceMm: number): PanelFitResult {
 function subtractCornerReliefs(rings: PanelRings, radiusMm: number): PanelFitResult {
   const outline = orient(polylineToPathD(rings.outline), true);
   const holes = rings.cutouts.map((cutout) => orient(polylineToPathD(cutout), false));
-  const circles: PathsD = [
+  const reliefs: PathsD = [
     // CCW outline: right turns are reflex material corners.
     ...seatCorners(outline, false),
     // Each hole as its own CCW ring: left turns are convex slot corners,
@@ -113,13 +109,13 @@ function subtractCornerReliefs(rings: PanelRings, radiusMm: number): PanelFitRes
     ...holes.map((hole) => seatCorners(orient(hole, true), true)),
   ]
     .flat()
-    .map((corner) => dogbonePath(corner, radiusMm));
-  if (circles.length === 0) return { kind: 'fitted', ...rings };
+    .map((corner) => dogboneReliefPath(corner, radiusMm));
+  if (reliefs.length === 0) return { kind: 'fitted', ...rings };
   // clipper2-ts can throw internally on pathological geometry; catch it here so
   // it never escapes the pure core and aborts the box generator (R6). A failed
   // subtraction reports as degenerate, the same contract classifyRings uses.
   const relieved = tryVectorOp(() =>
-    differenceD([outline, ...holes], circles, FillRule.NonZero, RELIEF_PRECISION_DECIMALS),
+    differenceD([outline, ...holes], reliefs, FillRule.NonZero, DOGBONE_PRECISION_DECIMALS),
   );
   if (relieved.kind === 'error') {
     return { kind: 'degenerate', detail: `corner relief r=${radiusMm} mm failed` };
@@ -161,18 +157,12 @@ function ringArea(ring: Polyline): number {
   return Math.abs(signedArea(polylineToPathD(ring)));
 }
 
-type SeatCorner = {
-  readonly at: Vec2;
-  /** Unit bisector of the open (waste) wedge between the corner's two edges. */
-  readonly open: Vec2;
-};
-
 // Seat-critical corners of one CCW ring: right turns (material reflex) on
 // the outline, left turns (convex slot corner) when scanning a hole. Either
 // way the open side is the wedge between the rays back to the previous
 // vertex and on to the next one.
-function seatCorners(ring: PathD, convex: boolean): ReadonlyArray<SeatCorner> {
-  const corners: SeatCorner[] = [];
+function seatCorners(ring: PathD, convex: boolean): ReadonlyArray<DogboneCorner> {
+  const corners: DogboneCorner[] = [];
   const n = ring.length;
   for (let i = 0; i < n; i += 1) {
     const prev = ring[(i + n - 1) % n];
@@ -188,11 +178,8 @@ function seatCorners(ring: PathD, convex: boolean): ReadonlyArray<SeatCorner> {
     const cross = inX * outY - inY * outX;
     const threshold = REFLEX_CROSS_EPS * inLength * outLength;
     if (!(convex ? cross > threshold : cross < -threshold)) continue;
-    const open = unit({
-      x: outX / outLength - inX / inLength,
-      y: outY / outLength - inY / inLength,
-    });
-    if (open !== null) corners.push({ at: { x: curr.x, y: curr.y }, open });
+    const corner = dogboneCorner(prev, curr, next);
+    if (corner !== null) corners.push(corner);
   }
   return corners;
 }
@@ -210,29 +197,4 @@ function signedArea(ring: PathD): number {
     sum += a.x * b.y - b.x * a.y;
   }
   return sum / 2;
-}
-
-function unit(v: Vec2): Vec2 | null {
-  const length = Math.hypot(v.x, v.y);
-  return length > 0 ? { x: v.x / length, y: v.y / length } : null;
-}
-
-// A polygon circumscribing the (bit radius + margin) circle, centred one bit
-// radius out along the open bisector: a bit centred there touches the corner.
-function dogbonePath(corner: SeatCorner, bitRadiusMm: number): PathD {
-  const center = {
-    x: corner.at.x + bitRadiusMm * corner.open.x,
-    y: corner.at.y + bitRadiusMm * corner.open.y,
-  };
-  const vertexRadiusMm =
-    (bitRadiusMm + RELIEF_REACH_MARGIN_MM) / Math.cos(Math.PI / CIRCLE_SEGMENTS);
-  const points: PathD = [];
-  for (let i = 0; i < CIRCLE_SEGMENTS; i += 1) {
-    const angle = (i / CIRCLE_SEGMENTS) * 2 * Math.PI;
-    points.push({
-      x: center.x + vertexRadiusMm * Math.cos(angle),
-      y: center.y + vertexRadiusMm * Math.sin(angle),
-    });
-  }
-  return points;
 }
