@@ -10,6 +10,7 @@ const TRACKED_G_WORDS = new Set([0, 1, 2, 3, 4, 17, 18, 19, 20, 21, 54, 90, 90.1
 // Native laser power/air controls and planner synchronization, not tool changes
 // or firmware commands whose coordinate effects this scan cannot reconstruct.
 const TRACKED_M_WORDS = new Set([3, 4, 5, 7, 8, 9, 106, 107, 221, 400]);
+const NON_MOTION_M_WORDS = new Set([106, 107, 221, 400]);
 
 export function canTrackHeadStopBlock(
   state: LaserResumeModalState,
@@ -22,6 +23,9 @@ export function canTrackHeadStopBlock(
   if (gWords.some((value) => !TRACKED_G_WORDS.has(value))) return false;
   if (!preservesAxisUnits(state, gWords)) return false;
   if (!words.some((word) => word.letter === 'X' || word.letter === 'Y')) return true;
+  // These native controls accept parameters, not modal XY motion. Only their
+  // normal axis-free generated forms have a point this scan can preserve.
+  if (words.some((word) => word.letter === 'M' && NON_MOTION_M_WORDS.has(word.value))) return false;
   if (gWords.includes(4)) return false;
   if (state.motion === null && !gWords.some((value) => value >= 0 && value <= 3)) return false;
   return true;

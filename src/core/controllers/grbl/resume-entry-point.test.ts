@@ -58,6 +58,13 @@ describe('resumeEntryPointMm', () => {
     expect(resumeEntryPointMm(program, 7)).toEqual({ x: 30, y: 20 });
   });
 
+  it.each([106, 107, 221, 400])('does not read M%d axis parameters as head motion', (command) => {
+    for (const axis of ['X', 'Y']) {
+      const program = `G21 G90 G54\nG0 X10 Y20\nM${command} ${axis}100\nM5`;
+      expect(resumeEntryPointMm(program, 4)).toBeNull();
+    }
+  });
+
   it.each([
     'M5 I\nG21 G90\nM3 I S0\nG0 X10 Y20\nG1 X30 S100\nM5 I',
     'M107\nG21 G90\nG0 X10 Y20\nM106 S100\nG1 X30\nM107',
