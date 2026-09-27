@@ -79,7 +79,10 @@
   gap: 12px;
   overflow-y: auto;
   scrollbar-gutter: stable;
-  padding: 1px 4px 16px 1px;
+  /* 3px on the left: a 2px focus ring with its 1px offset fits inside the
+   * scroller, and Chromium paints a checkbox that sits against the edge of this
+   * scroller (Scan both ways, Include in output) instead of dropping it. */
+  padding: 1px 4px 16px 3px;
 }
 
 .lf-artwork-view-content > * {
