@@ -96,6 +96,6 @@ describe('isEmittableFillSegment', () => {
     const gcode = grblStrategy.emit({ groups: [candidate] }, DEFAULT_DEVICE_PROFILE);
 
     expect(planFillSweeps(candidate, CALIBRATED_OFFSET_MM)).toHaveLength(1);
-    expect(gcode).toContain('G1 X9.999 Y4.000 F1500 S300');
+    expect(gcode).toContain('G1X9.999Y4F1500S300');
   });
 });

@@ -46,7 +46,7 @@ function emit(job: Job): string {
 function motionLines(job: Job): ReadonlyArray<string> {
   return emit(job)
     .split('\n')
-    .filter((line) => /^G[01]\b/.test(line));
+    .filter((line) => /^(?:G[01](?:\s|X|Y)|[XY])/.test(line));
 }
 
 function fillMotionLines(group: FillGroup): ReadonlyArray<string> {
@@ -58,8 +58,8 @@ function assertEveryPoweredStartFollowsFeedMatchedLaserOffMotion(
 ): void {
   for (let index = 0; index < lines.length; index += 1) {
     const line = lines[index];
-    if (line === undefined || !new RegExp(`\\bS${LASER_POWER_S}\\b`).test(line)) continue;
-    expect(lines[index - 1]).toMatch(/^G1\b.*\bS0\b/);
+    if (line === undefined || !new RegExp(`S${LASER_POWER_S}(?:[^\\d.]|$)`).test(line)) continue;
+    expect(lines[index - 1]).toMatch(/^(?:G1(?=\s|X|Y)|[XY]).*S0(?:[^\d.]|$)/);
   }
 }
 
@@ -70,7 +70,7 @@ describe('generic Scan Line feed-matched runway emission', () => {
     expect(lines.slice(0, 4)).toEqual([
       'G0 X5.000 Y4.000 S0',
       'G1 X10.000 Y4.000 F1500 S0 ; kerfdesk:laser-off-motion',
-      'G1 X10.470 Y4.000 F1500 S300',
+      'G1X10.47Y4F1500S300',
       'G1 X15.470 Y4.000 F1500 S0 ; kerfdesk:laser-off-motion',
     ]);
     assertEveryPoweredStartFollowsFeedMatchedLaserOffMotion(lines);
@@ -82,9 +82,9 @@ describe('generic Scan Line feed-matched runway emission', () => {
     expect(lines.slice(0, 6)).toEqual([
       'G0 X5.000 Y4.000 S0',
       'G1 X10.000 Y4.000 F1500 S0 ; kerfdesk:laser-off-motion',
-      'G1 X12.000 Y4.000 F1500 S300',
-      'G1 X12.500 Y4.000 S0',
-      'G1 X14.000 Y4.000 S300',
+      'G1X12Y4F1500S300',
+      'X12.5S0',
+      'X14S300',
       'G1 X19.000 Y4.000 F1500 S0 ; kerfdesk:laser-off-motion',
     ]);
     expect(lines.filter((line) => line.startsWith('G0 '))).toHaveLength(2);
@@ -96,11 +96,11 @@ describe('generic Scan Line feed-matched runway emission', () => {
     expect(lines.slice(0, 8)).toEqual([
       'G0 X-5.000 Y4.000 S0',
       'G1 X0.000 Y4.000 F1500 S0 ; kerfdesk:laser-off-motion',
-      'G1 X1.000 Y4.000 F1500 S300',
+      'G1X1Y4F1500S300',
       'G1 X4.000 Y4.000 F1500 S0 ; kerfdesk:laser-off-motion',
       'G0 X4.000 Y4.000 S0',
       'G1 X7.000 Y4.000 F1500 S0 ; kerfdesk:laser-off-motion',
-      'G1 X8.000 Y4.000 F1500 S300',
+      'G1X8Y4F1500S300',
       'G1 X13.000 Y4.000 F1500 S0 ; kerfdesk:laser-off-motion',
     ]);
     assertEveryPoweredStartFollowsFeedMatchedLaserOffMotion(lines);
@@ -110,11 +110,11 @@ describe('generic Scan Line feed-matched runway emission', () => {
     const lines = fillMotionLines(fillGroup([segment(0, 1), segment(13, 14)]));
 
     expect(lines.slice(2, 7)).toEqual([
-      'G1 X1.000 Y4.000 F1500 S300',
+      'G1X1Y4F1500S300',
       'G1 X6.000 Y4.000 F1500 S0 ; kerfdesk:laser-off-motion',
       'G0 X8.000 Y4.000 S0',
       'G1 X13.000 Y4.000 F1500 S0 ; kerfdesk:laser-off-motion',
-      'G1 X14.000 Y4.000 F1500 S300',
+      'G1X14Y4F1500S300',
     ]);
   });
 
@@ -124,11 +124,11 @@ describe('generic Scan Line feed-matched runway emission', () => {
     expect(fillMotionLines(group).slice(0, 8)).toEqual([
       'G0 X10.000 Y4.000 S0',
       'G1 X20.000 Y4.000 F1500 S0 ; kerfdesk:laser-off-motion',
-      'G1 X21.000 Y4.000 F1500 S300',
+      'G1X21Y4F1500S300',
       'G1 X24.000 Y4.000 F1500 S0 ; kerfdesk:laser-off-motion',
       'G0 X24.000 Y4.000 S0',
       'G1 X27.000 Y4.000 F1500 S0 ; kerfdesk:laser-off-motion',
-      'G1 X28.000 Y4.000 F1500 S300',
+      'G1X28Y4F1500S300',
       'G1 X38.000 Y4.000 F1500 S0 ; kerfdesk:laser-off-motion',
     ]);
     expect(emit({ groups: [group] })).toContain(
@@ -140,7 +140,7 @@ describe('generic Scan Line feed-matched runway emission', () => {
     const segments = [segment(0, 1), segment(7, 8)];
     const poweredTargets = (overscanMm: number): ReadonlyArray<string> =>
       fillMotionLines(fillGroup(segments, overscanMm)).filter((line) =>
-        new RegExp(`\\bS${LASER_POWER_S}\\b`).test(line),
+        new RegExp(`S${LASER_POWER_S}(?:[^\\d.]|$)`).test(line),
       );
 
     expect(poweredTargets(DEFAULT_RUNWAY_MM)).toEqual(poweredTargets(2));
@@ -154,7 +154,7 @@ describe('generic Scan Line feed-matched runway emission', () => {
     expect(lines.slice(0, 4)).toEqual([
       'G0 X5.000 Y4.000 S0',
       'G1 X10.000 Y4.000 F1500 S0 ; kerfdesk:laser-off-motion',
-      'G1 X10.470 Y4.000 F1500 S300',
+      'G1X10.47Y4F1500S300',
       'G1 X15.470 Y4.000 F1500 S0 ; kerfdesk:laser-off-motion',
     ]);
     expect(gcode).toContain('overscan 0.000 mm; generic minimum 5.000 mm applied');

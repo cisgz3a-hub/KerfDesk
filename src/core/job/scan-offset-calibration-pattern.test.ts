@@ -157,4 +157,34 @@ describe('generateScanOffsetCalibrationPattern', () => {
       pattern.scene.layers.some((layer) => layer.id === 'scan-offset-calibration-labels'),
     ).toBe(true);
   });
+
+  it.each([
+    { device: undefined, expected: [2000, 1500, 1000] },
+    { device: { maxFeed: 1750.9 }, expected: [1750, 1500, 1000] },
+    { device: { maxFeed: 0.125 }, expected: [0.125, 0.125, 0.125] },
+  ])('keeps cell, layer, and label speeds on the emitted feed grid: $expected', (args) => {
+    const pattern = generateScanOffsetCalibrationPattern(
+      {
+        steps: 3,
+        speedMin: 1000.25,
+        speedMax: 2000.75,
+        power: 12,
+        swatchWidthMm: 18,
+        swatchHeightMm: 6,
+      },
+      args.device,
+    );
+
+    expect(pattern.cells.map((cell) => cell.speed)).toEqual(args.expected);
+    expect(
+      pattern.scene.layers.filter((layer) => layer.mode === 'fill').map((layer) => layer.speed),
+    ).toEqual(args.expected);
+    const labels = pattern.scene.objects.filter(
+      (object): object is ImportedSvg =>
+        object.kind === 'imported-svg' && object.source.startsWith('calibration-label:'),
+    );
+    expect(labels.map((label) => label.source)).toEqual(
+      args.expected.map((speed) => `calibration-label:${speed}`),
+    );
+  });
 });

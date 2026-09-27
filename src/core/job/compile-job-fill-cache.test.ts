@@ -136,7 +136,7 @@ describe('compileJob fill hatch cache', () => {
 
     expect(job.groups).toHaveLength(1);
     expect(job.diagnostics).toBeUndefined();
-    expect(gcode).toContain('G1 X9.999 Y0.000');
+    expect(gcode).toContain('G1X9.999Y0');
   });
 
   it('removes a generic fill group when every hatch collapses at emitted precision', () => {

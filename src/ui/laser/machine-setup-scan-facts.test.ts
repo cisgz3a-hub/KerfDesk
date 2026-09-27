@@ -57,17 +57,18 @@ describe('buildMachineSetupScanFacts', () => {
   });
 
   it('compares runway with the emitted-speed 5 percent calibration reference', () => {
-    const justBelow = fillProject(DEFAULT_DEVICE_PROFILE, {
+    const device = { ...DEFAULT_DEVICE_PROFILE, accelMmPerSec2: 1000 };
+    const justBelow = fillProject(device, {
       speed: 6000,
       fillBidirectional: true,
       fillOverscanMm: 4.9,
     });
-    const atReference = fillProject(DEFAULT_DEVICE_PROFILE, {
+    const atReference = fillProject(device, {
       speed: 6000,
       fillBidirectional: true,
       fillOverscanMm: 5,
     });
-    const slower = fillProject(DEFAULT_DEVICE_PROFILE, {
+    const slower = fillProject(device, {
       speed: 1200,
       fillBidirectional: true,
       fillOverscanMm: 1,
@@ -76,6 +77,25 @@ describe('buildMachineSetupScanFacts', () => {
     expect(buildMachineSetupScanFacts(justBelow).lowOverscanGroups).toBe(1);
     expect(buildMachineSetupScanFacts(atReference).lowOverscanGroups).toBe(0);
     expect(buildMachineSetupScanFacts(slower).lowOverscanGroups).toBe(0);
+  });
+
+  it('detects low-acceleration profiles that need more runway than the speed-percent heuristic', () => {
+    const settings = { speed: 3000, fillBidirectional: true, fillOverscanMm: 5 };
+    const slow = fillProject({ ...DEFAULT_DEVICE_PROFILE, accelMmPerSec2: 100 }, settings);
+    const fast = fillProject({ ...DEFAULT_DEVICE_PROFILE, accelMmPerSec2: 1000 }, settings);
+
+    // At 50 mm/s, v²/(2a) needs 12.5 mm with a=100, but only 1.25 mm with a=1000.
+    // Both pass the old 2.5 mm speed-percent reference.
+    expect(buildMachineSetupScanFacts(slow).lowOverscanGroups).toBe(1);
+    expect(buildMachineSetupScanFacts(fast).lowOverscanGroups).toBe(0);
+  });
+
+  it('does not call unknown acceleration a passing runway check', () => {
+    const project = fillProject(
+      { ...DEFAULT_DEVICE_PROFILE, accelMmPerSec2: Number.NaN },
+      { speed: 1500, fillBidirectional: true, fillOverscanMm: 5 },
+    );
+    expect(buildMachineSetupScanFacts(project).lowOverscanGroups).toBeNull();
   });
 
   it('flags split fill sweeps whose actual internal runways fall below the reference', () => {
