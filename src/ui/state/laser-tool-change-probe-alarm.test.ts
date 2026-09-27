@@ -55,6 +55,7 @@ function makeDevice(sent: string[]): Device {
     close: async () => undefined,
     say: (line) => {
       if (line.startsWith('<')) status = line;
+      else if (line.startsWith('ALARM:')) status = ALARM;
       for (const handler of handlers) handler(line);
     },
   };
@@ -109,6 +110,7 @@ async function reachHold(device: Device, seeIdle: boolean): Promise<void> {
       cncControllerEpochOf(useLaserStore.getState()),
     ),
   });
+  device.say(RUN);
   while ((useLaserStore.getState().streamer?.inFlight.length ?? 0) > 0) {
     device.say('ok');
     await settle(0);
@@ -142,20 +144,16 @@ afterEach(async () => {
 });
 
 describe('a missed touch-off probe in a drained tool-change hold', () => {
-  it('keeps the job held, unlocks, and continues once the new bit is zeroed', async () => {
+  it.each([4, 5])('requires fresh Idle and work-Z after ALARM:%i', async (code) => {
     const sent: string[] = [];
     const device = makeDevice(sent);
     await reachHold(device, true);
     expect(useLaserStore.getState().toolChangeIdleSeen).toBe(true);
 
-    await say(device, 'ALARM:5', ALARM);
-    // Polling can interleave with this exchange. The device must keep reporting
-    // Alarm until the test explicitly supplies the fresh post-unlock Idle.
-    await device.write('?');
-    await settle();
+    await say(device, `ALARM:${code}`, ALARM);
     const alarmed = useLaserStore.getState();
     expect(alarmed.streamer?.status).toBe('tool-change');
-    expect(alarmed.alarmCode).toBe(5);
+    expect(alarmed.alarmCode).toBe(code);
     // Continue waits for a fresh Idle after the unlock.
     expect(alarmed.toolChangeIdleSeen).toBe(false);
     expect(toolChangeContinueBlockMessage(alarmed)).toBe(TOOL_CHANGE_NOT_IDLE_MESSAGE);
@@ -165,9 +163,15 @@ describe('a missed touch-off probe in a drained tool-change hold', () => {
     expect(sent).toContain('$X\n');
     // The acknowledgement alone does not prove the unlock (FluidNC acks `$X`
     // in its Critical state); the next report that is not Alarm clears it.
-    await device.write('?');
+    expect(useLaserStore.getState().alarmCode).toBe(code);
+
+    await useLaserStore.getState().requestControllerStatus();
     await settle();
-    expect(useLaserStore.getState().alarmCode).toBe(5);
+    const stillAlarmed = useLaserStore.getState();
+    expect(stillAlarmed.statusReport?.state).toBe('Alarm');
+    expect(stillAlarmed.alarmCode).toBe(code);
+    expect(stillAlarmed.streamer?.status).toBe('tool-change');
+    expect(stillAlarmed.toolChangeIdleSeen).toBe(false);
 
     await say(device, IDLE);
     const unlocked = useLaserStore.getState();
@@ -192,10 +196,9 @@ describe('a missed touch-off probe in a drained tool-change hold', () => {
   it('cancels on ALARM:4 before the hold has seen Idle', async () => {
     const device = makeDevice([]);
     await reachHold(device, false);
-
     // A poll in this window must keep reporting motion until the test supplies
     // Idle; otherwise it falsely qualifies the hold as physically drained.
-    await device.write('?');
+    await useLaserStore.getState().requestControllerStatus();
     await settle();
     expect(useLaserStore.getState().toolChangeIdleSeen).toBe(false);
 

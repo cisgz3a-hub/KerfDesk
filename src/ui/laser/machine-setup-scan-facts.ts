@@ -46,6 +46,7 @@ export function buildMachineSetupScanFacts(project: Project): MachineSetupScanFa
   const effectiveBidirectionalGroups = groups.filter(
     (group) => group.scanDirection?.bidirectional === true,
   );
+  const acceleration = project.device.accelMmPerSec2;
   return {
     requestedImageOperations,
     requestedFillOperations,
@@ -61,18 +62,25 @@ export function buildMachineSetupScanFacts(project: Project): MachineSetupScanFa
         reason === 'uncalibrated-4040-fallback'
       );
     }).length,
-    lowOverscanGroups: effectiveBidirectionalGroups.filter(
-      (group) =>
-        minimumActualRunwayMm(group, project.device.scanningOffsets) + 1e-9 <
-        calibrationReferenceRunwayMm(group.speed),
-    ).length,
+    lowOverscanGroups:
+      Number.isFinite(acceleration) && acceleration > 0
+        ? effectiveBidirectionalGroups.filter(
+            (group) =>
+              minimumActualRunwayMm(group, project.device.scanningOffsets) + 1e-9 <
+              calibrationReferenceRunwayMm(group.speed, acceleration),
+          ).length
+        : null,
     compiledJob,
     operationLayers,
   };
 }
 
-function calibrationReferenceRunwayMm(feedMmPerMin: number): number {
-  return (effectiveGcodeFeedMmPerMin(feedMmPerMin) / 60) * CALIBRATION_OVERSCAN_FRACTION;
+function calibrationReferenceRunwayMm(feedMmPerMin: number, acceleration: number): number {
+  const speed = effectiveGcodeFeedMmPerMin(feedMmPerMin) / 60;
+  // The 5%-of-speed reference alone misses slow axes. Use the conservative
+  // from-rest distance too, based on the profile's estimate (not hardware proof).
+  // This is advisory only: do not silently change feed, power or the Frame area.
+  return Math.max(speed * CALIBRATION_OVERSCAN_FRACTION, (speed * speed) / (2 * acceleration));
 }
 
 function minimumActualRunwayMm(
@@ -107,12 +115,25 @@ function minimumActualRunwayMm(
   return minimumRunwayMm;
 }
 
-function minimumPlannedRunway(
-  plans: ReadonlyArray<{ readonly leadInMm: number; readonly leadOutMm: number }>,
-): number {
+type PlannedRunway = {
+  readonly leadInMm: number;
+  readonly leadOutMm: number;
+  readonly sharedLeadStart?: unknown;
+  readonly sharedLeadEnd?: unknown;
+  readonly sharedLeadStartXWorldMm?: number;
+  readonly sharedLeadEndXWorldMm?: number;
+};
+
+function minimumPlannedRunway(plans: ReadonlyArray<PlannedRunway>): number {
   let minimumRunwayMm = Number.POSITIVE_INFINITY;
   for (const plan of plans) {
-    minimumRunwayMm = Math.min(minimumRunwayMm, plan.leadInMm, plan.leadOutMm);
+    // Where two split runways meet (ADR-445), the head crosses the gap at scan
+    // speed without stopping, so that side needs no distance from rest.
+    const entryShared =
+      plan.sharedLeadStart !== undefined || plan.sharedLeadStartXWorldMm !== undefined;
+    const exitShared = plan.sharedLeadEnd !== undefined || plan.sharedLeadEndXWorldMm !== undefined;
+    if (!entryShared) minimumRunwayMm = Math.min(minimumRunwayMm, plan.leadInMm);
+    if (!exitShared) minimumRunwayMm = Math.min(minimumRunwayMm, plan.leadOutMm);
   }
   return minimumRunwayMm;
 }
