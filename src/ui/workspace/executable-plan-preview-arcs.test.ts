@@ -5,6 +5,7 @@
 
 import { describe, expect, it, vi } from 'vitest';
 import { projectWithLine } from '../../__fixtures__/file-actions';
+import { DEFAULT_DEVICE_PROFILE } from '../../core/devices';
 import type { CutSegment, Job } from '../../core/job';
 import { buildToolpath } from '../../core/job';
 import { withCutArcMoves } from '../../core/job/cut-arc-moves';
@@ -46,7 +47,12 @@ function jobWith(segment: CutSegment, entryRunwayMm?: number): Job {
 }
 
 function prepared(job: Job) {
-  return { ok: true as const, project: createProject(), job, jobOriginOffset: { x: 0, y: 0 } };
+  return {
+    ok: true as const,
+    project: createProject({ ...DEFAULT_DEVICE_PROFILE, controllerKind: 'grbl-v1.1' }),
+    job,
+    jobOriginOffset: { x: 0, y: 0 },
+  };
 }
 
 describe('preview route for arc jobs (ADR-432)', () => {
