@@ -16,10 +16,10 @@ import { CncSelectionDepthField } from './CncSelectionDepthField';
 import { hasMixedFields, mixedOperationFields } from './selected-operation-mixed';
 import { LaserOperationFields } from './SelectedLaserOperationFields';
 import {
-  OperationContextActions,
+  OperationFooter,
   OperationNameInput,
+  OperationScope,
   OperationSelect,
-  OperationToggles,
 } from './OperationInspectorControls';
 
 export function SelectedOperationInspector(props: {
@@ -110,16 +110,21 @@ function SelectedOperationEditor(props: {
         activeId={props.active.id}
         onSelect={props.onSelect}
       />
-      {affected > 1 && !(overrideEditing && props.machineKind === 'laser') ? (
-        <p className="lf-artwork-hint lf-operation-scope">
-          Shared by {affected} artworks. Edits apply to all of them.
-        </p>
-      ) : null}
-      {props.machineKind === 'laser' && overrideEditing && !hasMixedFields(mixedFields) ? (
-        <p className="lf-artwork-hint lf-operation-scope">
-          This artwork has its own settings. The values shown here are used for its output.
-        </p>
-      ) : null}
+      <OperationIdentity operation={props.active} onRename={renameOperation} />
+      <OperationScope
+        affected={affected}
+        selectedUsingActive={activeObjects.length}
+        overrideEditing={overrideEditing && props.machineKind === 'laser'}
+        mixed={hasMixedFields(mixedFields)}
+        onMakeUnique={() =>
+          inspectCreatedOperation(() => makeUnique(objectIds, props.active.id), props.onSelect)
+        }
+      />
+      <CompatibilityNote
+        objects={props.objects}
+        operation={effectiveOperation}
+        machineKind={props.machineKind}
+      />
       {props.machineKind === 'cnc' ? (
         <CncLayerFields layer={props.active} />
       ) : (
@@ -134,21 +139,11 @@ function SelectedOperationEditor(props: {
           reconcileKey={reconcileKey}
         />
       )}
-      <OperationIdentity operation={props.active} onRename={renameOperation} />
-      <OperationToggles operation={props.active} affected={affected} />
-      <OperationContextActions
+      <OperationFooter
+        operation={props.active}
         affected={affected}
-        selectedUsingActive={activeObjects.length}
         overrideEditing={overrideEditing && props.machineKind === 'laser'}
-        onMakeUnique={() =>
-          inspectCreatedOperation(() => makeUnique(objectIds, props.active.id), props.onSelect)
-        }
         onAdd={() => inspectCreatedOperation(() => addOperation(objectIds), props.onSelect)}
-      />
-      <CompatibilityNote
-        objects={props.objects}
-        operation={effectiveOperation}
-        machineKind={props.machineKind}
       />
     </section>
   );
@@ -169,22 +164,26 @@ function OperationChoice(props: {
   );
 }
 
+// The operation leads the editor: its drawing colour and its name, which is
+// what the operation list, Run order and Job Review call it.
 function OperationIdentity(props: {
   readonly operation: Layer;
   readonly onRename: (id: string, name: string) => void;
 }): JSX.Element {
   return (
-    <div className="lf-operation-identity">
-      <span className="lf-operation-swatch" style={{ background: props.operation.color }} />
-      <label>
-        <span className="lf-artwork-eyebrow">Operation name</span>
-        <OperationNameInput
-          operationId={props.operation.id}
-          name={props.operation.name}
-          onRename={props.onRename}
-        />
-      </label>
-    </div>
+    <label className="lf-operation-identity">
+      <span
+        className="lf-operation-swatch"
+        title={`Drawing colour ${props.operation.color}`}
+        style={{ background: props.operation.color }}
+      />
+      <span className="lf-artwork-eyebrow">Operation</span>
+      <OperationNameInput
+        operationId={props.operation.id}
+        name={props.operation.name}
+        onRename={props.onRename}
+      />
+    </label>
   );
 }
 

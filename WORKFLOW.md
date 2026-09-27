@@ -94,6 +94,7 @@ opportunity, without an extra branding delay. It introduces no startup interacti
 - **Top command toolbar**: Open, Import, Import Image, Save and Preview lead with readable labels when space permits. Selecting an image brings Trace image into the row; Image Studio remains in **More**. Other commands remain in **More** and the application menus, with their existing shortcuts, disabled reasons, tooltips and actions. The row measures available width and moves commands into More instead of scrolling horizontally. Utility controls share the row down to 520 px. The project name includes an unsaved-change indicator.
 - **Numeric transforms**: X, Y, width, height, rotation, and the aspect-ratio lock remain directly available. **Anchor** opens the existing nine-point transform reference selector in a keyboard-accessible popover. Changing its presentation does not change the X/Y reference, resize anchor, or rotation centre.
 - **Artwork / Operations panel**: docked right with **Settings**, **Run order**, and **Materials** views in Laser mode; CNC keeps Settings and Run order. Settings is the default. Run order shares the same docked rail at the same width while the canvas remains on the left; it is not a modal or a third sidebar, and switching views never resizes the rail (ADR-348). Materials owns reusable preset and saved-library management without displacing the active job workflow. A header chevron collapses the rail to a narrow named strip; the same strip expands it.
+- **Laser artwork settings (ADR-430)**: the selected artwork's name heads the Settings view, with the Operation | Artwork switch under it. The Operation view leads with the operation's colour and name, then one scope line only when an edit reaches other artwork (with **Make unique**). **Line**, **Fill** and **Image** are three buttons; Power, Speed and Passes share one row; Fill adds Line spacing and Angle, and Image adds Dither, Line interval and (Grayscale) Min power. Scan both ways and Air assist are one-line switches whose explanations are tooltips. **More cut settings** opens Cut Settings for everything else and names what it holds. Include in output, Show on canvas and **Add operation** close the view.
 - **Operation cards**: the list comes before the artwork inspector, with the selected operation's process fields before secondary artwork properties. Each card keeps its visibility toggle on the face. Its **•••** disclosure contains order, output, artwork selection, settings clipboard, and delete controls.
 - **Machine controls panel**: in Spacious layout it is docked at the far right with the same collapse/expand pattern. Both panels can be resized or hidden independently. It may be collapsed during a job because active run controls live independently in the Live Motion bar.
 - **Toasts**: share the canvas's available space (lower left of the workspace, above the live controls) or a reserved row inside the open modal — never the rails, where they hid Start/Job and the layer list. Only the newest three render. The toast body does not take pointer input, so a click or drag through it reaches the canvas; the × control dismisses it early. Success confirmations dismiss after 4 s; advisories and failures after 8 s.
@@ -527,7 +528,7 @@ destination and cannot overwrite the template source.
   together. Named sections reveal the applicable line, fill or image options. **Advanced cut
   settings** groups the full draft editor by purpose; **Apply settings** commits the draft and
   **Cancel** leaves the operation unchanged.
-- **Saved defaults** in Advanced cut settings offers **Make Default for #rrggbb**, which remembers
+- **Saved defaults** in More cut settings offers **Make Default for #rrggbb**, which remembers
   the operation's applied settings for the colour it names: the colour of the artwork the operation
   was created for, or the operation's own colour when it has no artwork. New operations and **Reset
   to Default** use the default saved for that same colour, otherwise **Make Default for All**. The
@@ -697,14 +698,14 @@ marks later edits as unapproved without changing the existing Frame/Start policy
 
 ### F-A7a. Perforation, overcut and image overscan (ADR-415)
 
-1. **Advanced cut settings → Line detail → Perforation**: **Enable**, **Cut** and **Skip** (mm) cut
+1. **More cut settings → Line detail → Perforation**: **Enable**, **Cut** and **Skip** (mm) cut
    every line of the operation as dashes with uncut gaps. Closed shapes keep a full gap before their
    start point, so no dash is longer than Cut and no gap shorter than Skip. Perforation applies after
    kerf and tabs.
 2. **Overcut** (mm, 0 is off) keeps cutting past the start of each closed shape on the final pass
    only, retracing its first edges, so the seam is cut through. Shapes opened by tabs or perforation
    are not overcut.
-3. **Advanced cut settings → Image detail → Overscan** (0 to 25 mm, default 5) sets the laser-off
+3. **More cut settings → Image detail → Overscan** (0 to 25 mm, default 5) sets the laser-off
    run-up at both ends of every scan line. The note under it says how much run-up this machine needs
    to reach the operation's saved speed.
 4. Job Review lists these settings on the operation's detail line when they are set. Preview, Frame,

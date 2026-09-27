@@ -1,4 +1,5 @@
 .lf-artwork-panel {
+  container-type: inline-size;
   box-sizing: border-box;
   display: flex;
   flex-direction: column;
@@ -93,6 +94,19 @@
 
 .lf-artwork-view-tab svg {
   flex-shrink: 0;
+}
+
+.lf-artwork-view-tab span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* A narrow rail keeps each tab's words on one line by dropping its icon. */
+@container (max-width: 320px) {
+  .lf-artwork-view-tab svg {
+    display: none;
+  }
 }
 
 .lf-artwork-view-content {
