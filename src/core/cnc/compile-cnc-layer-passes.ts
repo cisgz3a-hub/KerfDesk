@@ -94,13 +94,19 @@ export function passesForCncLayerWithEvidence(
 
   // The finishing wall and the tab windows ride the same offset as the
   // toolpaths above: the cut width at the full depth (ADR-368 Amendment 2).
+  // It is also the shortest path a ramp goes over more than once (ADR-471).
+  const cutWidthMm = cncLayoutCutWidths(
+    tool,
+    settings.depthMm,
+    settings.depthPerPassMm,
+  ).wallDiameterMm;
   const passes = passesForDepths(
     polylines,
     contours,
     toolpaths,
     depths,
     settings,
-    cncLayoutCutWidths(tool, settings.depthMm, settings.depthPerPassMm).wallDiameterMm,
+    cutWidthMm,
     allowanceMm,
     handedness,
     sourceContours,
@@ -114,6 +120,7 @@ export function passesForCncLayerWithEvidence(
             passes,
             settings.rampEntryDeg,
             settings.tabsEnabled && isProfileCutType(settings.cutType),
+            cutWidthMm,
           ),
   };
 }
