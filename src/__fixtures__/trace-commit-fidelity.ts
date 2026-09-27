@@ -1,6 +1,7 @@
 import { isDeepStrictEqual } from 'node:util';
 import { compilationPolylines } from '../core/job/compilation-polylines';
 import type { ColoredPath, CurveSubpath, Polyline, Transform, Vec2 } from '../core/scene';
+import { carriedSubpathParents } from '../core/scene/subpath-nesting';
 import { traceCommitTopology, type TraceCommitTopology } from './trace-commit-topology';
 
 // Independent acceptance constants from ADR-391, rather than the production
@@ -80,10 +81,25 @@ function checkPath(
   index: number,
 ): void {
   if (saved === undefined) return issue(probe, `Path ${String(index)} missing`);
-  const { polylines: _sourceLines, curves: _sourceCurves, ...sourceMetadata } = source;
-  const { polylines: _savedLines, curves: _savedCurves, ...savedMetadata } = saved;
+  const {
+    polylines: _sourceLines,
+    curves: _sourceCurves,
+    subpathNesting: _sourceNesting,
+    ...sourceMetadata
+  } = source;
+  const {
+    polylines: _savedLines,
+    curves: _savedCurves,
+    subpathNesting: _savedNesting,
+    ...savedMetadata
+  } = saved;
   if (!isDeepStrictEqual(sourceMetadata, savedMetadata))
     issue(probe, `Path ${String(index)} metadata changed`);
+  // The carried forest (ADR-441) is keyed to the exact geometry, so a
+  // simplifying commit legitimately re-stamps its key. Compare what a reader
+  // gets back: the same parents, still valid for the saved geometry.
+  if (!isDeepStrictEqual(carriedSubpathParents(source), carriedSubpathParents(saved)))
+    issue(probe, `Path ${String(index)} subpath nesting changed`);
   if (source.polylines.length !== saved.polylines.length)
     issue(probe, `Path ${String(index)} contour count changed`);
   if (saved.curves !== undefined && saved.curves.length !== saved.polylines.length) {
