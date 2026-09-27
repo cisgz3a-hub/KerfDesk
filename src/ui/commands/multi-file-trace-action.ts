@@ -31,7 +31,9 @@ import {
   loadImageAsRawData,
   PREVIEW_MAX_EDGE_PX,
   readImageNaturalSize,
+  scaleToCap,
 } from '../trace/image-loader';
+import { withHybridMaxStrokeWidth } from '../trace/hybrid-stroke-width';
 import { browserDeviceMemoryGb } from '../trace/trace-commit-at-grid';
 import {
   commitGridExceedsPreview,
@@ -79,6 +81,12 @@ export type MultiFileTraceDeps = {
   readonly write?: (file: BatchTraceFile) => Promise<boolean> | boolean;
   /** Trace settings for every image (default: the Line Art preset). */
   readonly options?: TraceOptions;
+  // Line + fill's Max stroke width in millimetres, converted to each file's
+  // preview grid as the Trace dialog converts it (ADR-454); omitted, the
+  // options' own pixel width.
+  readonly hybridMaxStrokeWidthMm?: number;
+  /** Which settings the batch used ("the Line Art preset"), for its notice. */
+  readonly settingsLabel?: string;
   // The project's machine density; omitted, the default spot's (ADR-409).
   readonly targetPxPerMm?: number;
   readonly deviceMemoryGb?: number;
@@ -96,6 +104,7 @@ type MultiFileJobContext = {
   readonly readDensity: NonNullable<MultiFileTraceDeps['readDensity']>;
   readonly decodeRaster: NonNullable<MultiFileTraceDeps['decodeRaster']>;
   readonly options: TraceOptions;
+  readonly hybridMaxStrokeWidthMm: number | undefined;
   readonly targetPxPerMm: number;
   readonly deviceMemoryGb: number | undefined;
 };
@@ -173,6 +182,7 @@ function multiFileJobContext(deps: MultiFileTraceDeps): MultiFileJobContext {
     readDensity: deps.readDensity ?? readImageHeaderDensity,
     decodeRaster: deps.decodeRaster ?? decodeBatchRasterFile,
     options: deps.options ?? DEFAULT_MULTI_FILE_TRACE_OPTIONS,
+    hybridMaxStrokeWidthMm: deps.hybridMaxStrokeWidthMm,
     targetPxPerMm: deps.targetPxPerMm ?? traceTargetPxPerMm(undefined, undefined),
     deviceMemoryGb: deps.deviceMemoryGb ?? browserDeviceMemoryGb(),
   };
@@ -197,7 +207,11 @@ async function multiFileTraceJob(
         ? physicalSizeMm(natural, null)
         : { ...raster.sizeMm, densitySource: 'embedded' as const };
     const load: GridLoader = async (maxEdge) => batchRasterAtMaxEdge(raster, maxEdge);
-    return { job: planMultiFileTraceJob(file.name, natural, size, load, context), densitySource };
+    const jobContext = withFileHybridWidth(context, natural, size.widthMm);
+    return {
+      job: planMultiFileTraceJob(file.name, natural, size, load, jobContext),
+      densitySource,
+    };
   }
   const density = await context.readDensity(file);
   if (context.readNatural === null) {
@@ -207,7 +221,7 @@ async function multiFileTraceJob(
       sourceName: file.name,
       image,
       physicalSizeMm: physicalSize,
-      options: context.options,
+      options: withFileHybridWidth(context, image, physicalSize.widthMm).options,
     };
     return { job, densitySource };
   }
@@ -215,7 +229,22 @@ async function multiFileTraceJob(
   const { densitySource, ...size } = physicalSizeMm(natural, density);
   const load: GridLoader = (maxEdge) =>
     maxEdge === undefined ? context.loadImage(file) : context.loadImage(file, maxEdge);
-  return { job: planMultiFileTraceJob(file.name, natural, size, load, context), densitySource };
+  const jobContext = withFileHybridWidth(context, natural, size.widthMm);
+  return { job: planMultiFileTraceJob(file.name, natural, size, load, jobContext), densitySource };
+}
+
+// The Trace dialog sizes Line + fill's Max stroke width on the preview grid
+// of the placed image; each file gets the same conversion for its own size.
+function withFileHybridWidth(
+  context: MultiFileJobContext,
+  natural: { readonly width: number; readonly height: number },
+  widthMm: number,
+): MultiFileJobContext {
+  const width = context.hybridMaxStrokeWidthMm;
+  if (width === undefined || !(widthMm > 0)) return context;
+  const preview = scaleToCap(natural.width, natural.height, PREVIEW_MAX_EDGE_PX);
+  const options = withHybridMaxStrokeWidth(context.options, width, preview.width / widthMm);
+  return { ...context, options };
 }
 
 // Decodes the file capped to maxEdge; omitted, the preview cap.
@@ -284,7 +313,7 @@ export async function runMultiFileTrace(
     const batch = await buildMultiFileTraceExports(files, deps, (file) =>
       writeTraceExport(file, write, tally, deps.signal),
     );
-    reportTraceBatch(batch.skipped, tally, pushToast);
+    reportTraceBatch(batch.skipped, tally, pushToast, deps.settingsLabel);
   } catch (err) {
     if (isTraceAbort(err)) {
       pushToast(`Multi-File Trace cancelled. ${writtenSoFar(tally.written, files.length)}`, 'info');

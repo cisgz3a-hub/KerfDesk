@@ -16,6 +16,12 @@ import {
   writeTraceFileWithPlatform,
 } from './multi-file-trace-action';
 import { beginMultiFileTraceProgress } from './MultiFileTraceProgress';
+import {
+  batchTraceSettings,
+  lastTraceSettingsRecord,
+  type MultiFileTraceSettingsSource,
+} from './multi-file-trace-settings';
+import type { TraceSettingsRecord } from '../../core/scene/scene-object';
 import { pickPlatformBatchTraceImageFiles } from './platform-image-files';
 import {
   DEFAULT_TRACE_PAGE_SETTINGS,
@@ -25,6 +31,7 @@ import {
 } from './TracePageFields';
 
 export type MultiFileTraceSettings = TracePageSettings & {
+  readonly settingsSource: MultiFileTraceSettingsSource;
   readonly presetName: string;
   readonly format: BatchTraceFormat;
   readonly groupContours: boolean;
@@ -33,6 +40,7 @@ export type MultiFileTraceSettings = TracePageSettings & {
 
 // Remembered for the session so a second batch starts where the last one ended.
 let lastSettings: MultiFileTraceSettings = {
+  settingsSource: 'preset',
   presetName: DEFAULT_MULTI_FILE_TRACE_PRESET,
   format: 'svg',
   groupContours: false,
@@ -65,6 +73,7 @@ function ChoiceField(props: {
   readonly value: string;
   readonly choices: ReadonlyArray<Choice>;
   readonly onChange: (value: string) => void;
+  readonly disabled?: boolean;
 }): JSX.Element {
   return (
     <label className="lf-field">
@@ -74,6 +83,7 @@ function ChoiceField(props: {
         aria-label={props.ariaLabel}
         title={props.title}
         value={props.value}
+        disabled={props.disabled === true}
         onChange={(event) => props.onChange(event.currentTarget.value)}
       >
         {props.choices.map((choice) => (
@@ -94,6 +104,7 @@ export function MultiFileTraceDialog(props: {
 }): JSX.Element {
   const [settings, setSettings] = useState<MultiFileTraceSettings>(lastSettings);
   const [files, setFiles] = useState<ReadonlyArray<File>>([]);
+  const lastTrace = useStore((state) => lastTraceSettingsRecord(state.project.scene.objects));
   const update = (patch: Partial<MultiFileTraceSettings>): void =>
     setSettings((current) => ({ ...current, ...patch }));
   return (
@@ -109,14 +120,7 @@ export function MultiFileTraceDialog(props: {
         props.onRun(settings, files);
       }}
     >
-      <ChoiceField
-        label="Preset"
-        ariaLabel="Trace preset"
-        title="Trace style used for every selected image."
-        value={settings.presetName}
-        choices={PRESET_CHOICES}
-        onChange={(presetName) => update({ presetName })}
-      />
+      <TraceSettingsSourceFields settings={settings} lastTrace={lastTrace} onChange={update} />
       <ChoiceField
         label="Format"
         ariaLabel="Output format"
@@ -162,6 +166,55 @@ export function MultiFileTraceDialog(props: {
         canTrace={files.length > 0}
       />
     </Dialog>
+  );
+}
+
+const SOURCE_CHOICES: ReadonlyArray<Choice> = [
+  { value: 'preset', label: 'Preset defaults' },
+  { value: 'last-trace', label: 'Last Trace Image settings' },
+];
+
+function TraceSettingsSourceFields(props: {
+  readonly settings: MultiFileTraceSettings;
+  readonly lastTrace: TraceSettingsRecord | null;
+  readonly onChange: (patch: Partial<MultiFileTraceSettings>) => void;
+}): JSX.Element {
+  const fromLast = props.settings.settingsSource === 'last-trace' && props.lastTrace !== null;
+  const shown = batchTraceSettings(
+    props.settings.settingsSource,
+    props.settings.presetName,
+    props.lastTrace,
+  );
+  return (
+    <>
+      <ChoiceField
+        label="Settings"
+        ariaLabel="Trace settings"
+        title={
+          props.lastTrace === null
+            ? 'Preset defaults. Trace an image with Trace Image to reuse its settings here.'
+            : 'Preset defaults, or the settings of the last Trace Image in this project (as Re-trace reopens them).'
+        }
+        value={fromLast ? 'last-trace' : 'preset'}
+        choices={props.lastTrace === null ? SOURCE_CHOICES.slice(0, 1) : SOURCE_CHOICES}
+        onChange={(value) =>
+          props.onChange({ settingsSource: value === 'last-trace' ? 'last-trace' : 'preset' })
+        }
+      />
+      <ChoiceField
+        label="Preset"
+        ariaLabel="Trace preset"
+        title={
+          fromLast
+            ? 'The preset the last Trace Image used.'
+            : 'Trace style used for every selected image.'
+        }
+        value={shown.presetName}
+        choices={PRESET_CHOICES}
+        disabled={fromLast}
+        onChange={(presetName) => props.onChange({ presetName })}
+      />
+    </>
   );
 }
 
@@ -227,8 +280,13 @@ export async function runChosenMultiFileTrace(
 ): Promise<void> {
   const write = await reserveTraceOutput(platform);
   if (write === null || files.length === 0) return;
-  const options = TRACE_PRESETS[settings.presetName];
   const { project } = useStore.getState();
+  const chosen = batchTraceSettings(
+    settings.settingsSource,
+    settings.presetName,
+    lastTraceSettingsRecord(project.scene.objects),
+  );
+  const options = chosen.options;
   const controller = new AbortController();
   const progress = beginMultiFileTraceProgress(files.length, () => controller.abort());
   try {
@@ -242,6 +300,10 @@ export async function runChosenMultiFileTrace(
         precisionMm: settings.precisionMm,
         ...tracePageOutput(settings),
       },
+      ...(chosen.hybridMaxStrokeWidthMm === undefined
+        ? {}
+        : { hybridMaxStrokeWidthMm: chosen.hybridMaxStrokeWidthMm }),
+      settingsLabel: chosen.label,
       signal: controller.signal,
       onProgress: progress.update,
       write,

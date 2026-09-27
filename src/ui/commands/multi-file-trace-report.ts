@@ -29,6 +29,7 @@ export function reportTraceBatch(
   skipped: ReadonlyArray<BatchTraceSkip>,
   tally: WriteTally,
   pushToast: PushToast,
+  settingsLabel?: string,
 ): void {
   const skippedText = skippedMessage(skipped);
   if (tally.written === 0) {
@@ -37,7 +38,8 @@ export function reportTraceBatch(
   }
   const count = tally.written;
   const format = batchTraceFormatLabel(tally.format ?? 'svg');
-  const summary = `Traced ${count} ${count === 1 ? 'image' : 'images'} to ${format}.`;
+  const using = settingsLabel === undefined ? '' : ` with ${settingsLabel}`;
+  const summary = `Traced ${count} ${count === 1 ? 'image' : 'images'} to ${format}${using}.`;
   const density = defaultDensityNotice(tally.defaultDensity, count);
   pushToast(
     joinToastParts([summary, density, skippedText, ...[...tally.notices].map(traceNoticeMessage)]),
