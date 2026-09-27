@@ -33,14 +33,18 @@ export function useMovePointer(args: {
   /** Any change clears the hover: a new program has new moves. */
   readonly resetKey: unknown;
   readonly onLocate: (pick: Viewer3dPick) => void;
+  /** Every change of the move under the pointer, null when there is none. */
+  readonly onHover?: ((pick: Viewer3dPick | null) => void) | undefined;
 }): MoveHover | null {
   const { canvasRef, handleRef, enabled, paused, resetKey } = args;
   const [hover, setHover] = useState<MoveHover | null>(null);
   const locateRef = useRef(args.onLocate);
+  const hoverRef = useRef(args.onHover);
   const pausedRef = useRef(paused);
   const listenersRef = useRef<MoveListeners | null>(null);
   useEffect(() => {
     locateRef.current = args.onLocate;
+    hoverRef.current = args.onHover;
   });
   useEffect(() => {
     pausedRef.current = paused;
@@ -51,7 +55,10 @@ export function useMovePointer(args: {
     if (!enabled || canvas === null) return;
     const listeners = createMoveListeners(canvas, {
       handleRef,
-      setHover,
+      setHover: (next) => {
+        setHover(next);
+        hoverRef.current?.(next?.pick ?? null);
+      },
       locate: (pick) => locateRef.current(pick),
       isPaused: () => pausedRef.current,
     });

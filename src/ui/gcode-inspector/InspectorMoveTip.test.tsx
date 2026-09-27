@@ -5,7 +5,7 @@ import { buildGcodeRenderModel, type GcodeRenderModel } from '../../core/gcode-v
 import type { Viewer3dSceneHandle } from '../viewer3d';
 // Deep import: the viewer3d barrel is capped at 20 exports by its index contract.
 import type { Viewer3dPick } from '../viewer3d/scene-pick';
-import { InspectorMoveTip } from './InspectorMoveTip';
+import { InspectorMoveTip, type MoveTipMeasure } from './InspectorMoveTip';
 
 (
   globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT?: boolean }
@@ -18,7 +18,12 @@ function model(text: string): GcodeRenderModel {
 }
 
 const PROGRAM = model(['G21 G90', 'G0 X10', 'G1 X30 F600'].join('\n'));
-const CUT: Viewer3dPick = { segmentIndex: 1, fraction: 0.5, point: { x: 20, y: 0, z: 0 } };
+const CUT: Viewer3dPick = {
+  segmentIndex: 1,
+  fraction: 0.5,
+  point: { x: 20, y: 0, z: 0 },
+  vertex: null,
+};
 
 let frames: FrameRequestCallback[] = [];
 let host: HTMLDivElement;
@@ -58,6 +63,7 @@ function mount(options: {
   readonly pick: Viewer3dPick | null;
   readonly enabled?: boolean;
   readonly paused?: boolean;
+  readonly measure?: MoveTipMeasure;
 }) {
   const canvas = document.createElement('canvas');
   canvas.getBoundingClientRect = () =>
@@ -74,6 +80,7 @@ function mount(options: {
         handleRef={{ current: handle as unknown as Viewer3dSceneHandle }}
         enabled={options.enabled ?? true}
         paused={options.paused ?? false}
+        measure={options.measure ?? null}
       />,
     ),
   );
@@ -134,6 +141,22 @@ describe('InspectorMoveTip', () => {
     pointer(canvas, 'pointerdown', { clientX: 100, clientY: 100, button: 0 });
     pointer(canvas, 'pointerup', { clientX: 100, clientY: 100, button: 0 });
     expect(onLocate).toHaveBeenCalledWith(CUT);
+  });
+
+  it('while measuring, clicks set points and the card offers the snapped end', () => {
+    const measure = { addPoint: vi.fn(), hover: vi.fn(), clickHint: 'Click to measure from here' };
+    const snapped: Viewer3dPick = { ...CUT, vertex: { x: 30, y: 0, z: 0 } };
+    const { canvas, onLocate } = mount({ pick: snapped, measure });
+    pointer(canvas, 'pointermove', { clientX: 50, clientY: 60 });
+    flushFrames();
+    expect(measure.hover).toHaveBeenLastCalledWith(snapped);
+    const card = host.querySelector('.gcode-viewer-move-tip');
+    expect(card?.textContent).toContain('X 30.00');
+    expect(card?.textContent).toContain('Click to measure from here (end of move)');
+    pointer(canvas, 'pointerdown', { clientX: 100, clientY: 100, button: 0 });
+    pointer(canvas, 'pointerup', { clientX: 100, clientY: 100, button: 0 });
+    expect(measure.addPoint).toHaveBeenCalledWith(snapped);
+    expect(onLocate).not.toHaveBeenCalled();
   });
 
   it('stays quiet while the view is not ready', () => {

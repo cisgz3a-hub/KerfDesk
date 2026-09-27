@@ -31,6 +31,7 @@ import {
 } from './scene-parts';
 import { loadThree } from './viewer3d-modules';
 import { toThreePlanes, type Viewer3dClipPlane } from './scene-isolate';
+import type { Viewer3dMeasure } from './scene-measure';
 import type { Viewer3dPick } from './scene-pick';
 import type { Viewer3dStage } from './viewer3d-look';
 import { resolveViewer3dTheme } from './viewer3d-theme';
@@ -41,6 +42,7 @@ export type Viewer3dSegments = Viewer3dSegmentsInput;
 export type { PlayheadMarker } from './scene-handle-core';
 export type { Viewer3dPick } from './scene-pick';
 export type { Viewer3dClipPlane } from './scene-isolate';
+export type { Viewer3dMeasure } from './scene-measure';
 
 export type Viewer3dSceneHandle = {
   readonly setSegments: (segments: Viewer3dSegments) => void;
@@ -99,6 +101,8 @@ export type Viewer3dSceneHandle = {
   readonly setMoveFilter: (visible: Uint8Array | null) => void;
   /** Clips the toolpath to the kept side of each plane; none draws it whole. */
   readonly setClipPlanes: (planes: ReadonlyArray<Viewer3dClipPlane>) => void;
+  /** Draws a measurement between two points; null clears it (ADR-470). */
+  readonly setMeasure: (measure: Viewer3dMeasure | null) => void;
   /** Direction arrowheads over the cut path; null clears them. */
   readonly setDirectionArrows: (placements: ReadonlyArray<ArrowPlacement> | null) => void;
   readonly resize: (width: number, height: number) => void;
@@ -179,7 +183,7 @@ function installToolpath(core: SceneCore): void {
 
 type IsolateMethods = Pick<
   Viewer3dSceneHandle,
-  'pickMove' | 'highlightMove' | 'setMoveFilter' | 'setClipPlanes'
+  'pickMove' | 'highlightMove' | 'setMoveFilter' | 'setClipPlanes' | 'setMeasure'
 >;
 
 function isolateMethods(core: SceneCore): IsolateMethods {
@@ -196,6 +200,10 @@ function isolateMethods(core: SceneCore): IsolateMethods {
     setClipPlanes: (planes) => {
       state.clipPlanes = toThreePlanes(deps.modules.three, planes);
       core.applyClipping();
+      core.requestRender();
+    },
+    setMeasure: (measure) => {
+      core.measure.set(measure);
       core.requestRender();
     },
     pickMove: (xPx, yPx) =>
@@ -350,6 +358,7 @@ function lifecycleMethods(core: SceneCore): LifecycleMethods {
       applyResize(parts, nextWidth, nextHeight);
       core.studio.resize(nextWidth, nextHeight);
       core.picker.resize(nextWidth, nextHeight);
+      core.measure.resize(nextWidth, nextHeight);
       requestRender();
     },
     requestRender,

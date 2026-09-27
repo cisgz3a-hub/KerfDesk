@@ -15,6 +15,8 @@ points, and what does this part of the job look like on its own.
 2. **No way to look at part of a job.** A pocket's passes, a relief's roughing and finishing, or a
    tool's moves all drew on top of each other. The legend named each kind of move but could not
    switch one off, and there was no way to see one depth level or cut the view through the job.
+3. **No way to measure.** Checking a stepover, a tab's length or the depth between two passes
+   meant reading coordinates off the source and doing the sums by hand.
 
 ### Decision
 
@@ -60,6 +62,20 @@ points, and what does this part of the job look like on its own.
      geometry and a move crossing a limit is cut exactly where it crosses. The grid, the job box,
      the tool model and the markers are not clipped.
 
+3. **Measuring** (`ui/viewer3d/scene-measure.ts`, `ui/gcode-inspector/use-measure.ts`).
+   - A Measure switch beside the Travel toggle turns clicks on moves into measure points: the
+     first click sets the start, the second the end, and a third starts over. Turning it off, or
+     opening another program, clears the measurement.
+   - A point snaps to the end of a move when the pointer is within 10 pixels of it on screen, so
+     corners and pass ends measure exactly; elsewhere it is the point on the move nearest the
+     pointer. The hover card shows the point a click would take and says when it snapped.
+   - Between the clicks the line follows the pointer. The view draws a dot on each point and the
+     line between them in the hover outline's cyan and casing, over everything, with the distance
+     as a label at its middle. The readout panel gives the distance and its X, Y and Z parts.
+   - The overlay is not clipped, so a measurement stays whole when the Z range or a section hides
+     one of its ends. It works in both looks and both projections; its label layer is its own, so
+     Classic shows it too.
+
 ### Consequences
 
 - **Picking reads pixels back synchronously.** One 13 x 13 read per animation frame while the
@@ -76,7 +92,11 @@ points, and what does this part of the job look like on its own.
     past 2^24; `nearestPickedSegment` names the move nearest the centre, finds one at the window's
     edge and names nothing over empty space.
   - `moveReadout` wording for a cut, a rapid and a program without power; `secondsAtPick`
-    interpolates along the move and clamps.
+    interpolates along the move and clamps; `measureReadout` gives the distance and signed parts
+    and never shows "-0.00".
+  - `nearestEnd` snaps within reach to the nearer end and ignores an end off screen; `useMeasure`
+    takes a first and second point, follows the pointer between them, starts over on a third
+    click, and clears on a new program, on Clear and when switched off.
   - `InspectorMoveTip`: one pick per frame at canvas coordinates, the outline follows the pick,
     nothing while a button is held or the view is not ready, a click locates while a drag does not,
     and a click still locates while the camera reports movement.
@@ -90,4 +110,6 @@ points, and what does this part of the job look like on its own.
   with its feed and time; clicking it moves the playhead to that line; moving off clears the card;
   in Studio's orthographic Top view the same pick reads X 0 or 80 and Z -1. On a three-pass
   pocket, a Z range of one pass leaves only that pass to point at, and switching Cut off in the
-  legend leaves nothing there. Screenshots of the hover, the section and the Z range in both looks.
+  legend leaves nothing there. Measuring across the square seen from above reads 80.00 mm in the
+  readout and on the line's label, and switching Measure off clears it and clicks go to lines
+  again. Screenshots of the hover, the section, the Z range and a measurement in both looks.

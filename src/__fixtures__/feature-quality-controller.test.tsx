@@ -21,6 +21,7 @@ import { Cnc3DFullPage } from '../ui/workspace/Cnc3DFullPage';
 import { PlatformProvider } from '../ui/app/platform-context';
 import { useShortcuts } from '../ui/app/use-shortcuts';
 import { useUiStore } from '../ui/state/ui-store';
+import { fakeViewer3dSceneHandle } from './viewer3d-scene-handle';
 
 const mocks = vi.hoisted(() => ({ createScene: vi.fn(), activate: vi.fn() }));
 vi.mock('../ui/viewer3d', async (load) => ({
@@ -219,34 +220,7 @@ describe('feature controller and workspace regressions', () => {
     document.body.appendChild(host);
     const root = createRoot(host);
     const setTravelVisible = vi.fn();
-    const handle: Viewer3dModule.Viewer3dSceneHandle = {
-      setSegments: vi.fn(),
-      setCameraTracking: vi.fn(),
-      onCameraInteraction: vi.fn(),
-      fitToBounds: vi.fn(),
-      setTravelVisible,
-      setPlayhead: vi.fn(),
-      setLiveMachine: vi.fn(),
-      recolor: vi.fn(),
-      setView: vi.fn(),
-      fitView: vi.fn(),
-      setProjection: vi.fn(),
-      onProjectionChange: vi.fn(),
-      setStage: vi.fn(),
-      pickViewCube: vi.fn(() => null),
-      hoverViewCube: vi.fn(),
-      pickMove: vi.fn(() => null),
-      highlightMove: vi.fn(),
-      setMoveFilter: vi.fn(),
-      setClipPlanes: vi.fn(),
-      onCameraMoving: vi.fn(),
-      captureImage: vi.fn(() => ''),
-      setDirectionArrows: vi.fn(),
-      resize: vi.fn(),
-      requestRender: vi.fn(),
-      prepareToShow: vi.fn(async () => undefined),
-      dispose: vi.fn(),
-    };
+    const handle = fakeViewer3dSceneHandle({ setTravelVisible });
     try {
       await act(async () =>
         root.render(

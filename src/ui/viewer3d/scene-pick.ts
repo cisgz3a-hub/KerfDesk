@@ -7,7 +7,7 @@
 
 import type * as ThreeNamespace from 'three';
 import type { WebGLRenderer } from 'three';
-import { encodePickIds, nearestPickedSegment, PICK_WINDOW_PX } from './pick-ids';
+import { encodePickIds, nearestEnd, nearestPickedSegment, PICK_WINDOW_PX } from './pick-ids';
 import type { Point3 } from './scene-parts';
 import type { ViewCamera } from './scene-setup';
 import type { RevealTargets } from './scene-toolpath';
@@ -22,6 +22,8 @@ export type Viewer3dPick = {
   readonly fraction: number;
   /** That closest point, in work coordinates (mm). */
   readonly point: Point3;
+  /** The move's end nearest the pointer when it is within a snap distance. */
+  readonly vertex: Point3 | null;
 };
 
 /** Where the pointer is over a view of the given size, in CSS pixels. */
@@ -220,7 +222,22 @@ function closestOnMove(
   raycaster.ray.distanceSqToSegment(start, end, undefined, onMove);
   const length = start.distanceTo(end);
   const fraction = length > 0 ? Math.min(1, Math.max(0, start.distanceTo(onMove) / length)) : 1;
-  return { segmentIndex, fraction, point: { x: onMove.x, y: onMove.y, z: onMove.z } };
+  const onScreen = (point: ThreeNamespace.Vector3): { x: number; y: number } | null => {
+    const projected = point.clone().project(camera);
+    if (!Number.isFinite(projected.x) || Math.abs(projected.z) > 1) return null;
+    return {
+      x: ((projected.x + 1) / 2) * pointer.widthPx,
+      y: ((1 - projected.y) / 2) * pointer.heightPx,
+    };
+  };
+  const snap = nearestEnd({ x: pointer.xPx, y: pointer.yPx }, onScreen(start), onScreen(end));
+  const vertex = snap === null ? null : snap === 'start' ? start : end;
+  return {
+    segmentIndex,
+    fraction,
+    point: { x: onMove.x, y: onMove.y, z: onMove.z },
+    vertex: vertex === null ? null : { x: vertex.x, y: vertex.y, z: vertex.z },
+  };
 }
 
 type Outline = {
