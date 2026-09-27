@@ -48,7 +48,16 @@ export function clickToIntrinsicPixel(
 
 export function NetworkCameraView(props: { readonly frameUrl: string }): JSX.Element {
   const tick = usePollTick();
-  return <img src={`${props.frameUrl}?t=${tick}`} alt="Laser machine camera" style={feedStyle} />;
+  // crossOrigin makes the request carry this page's Origin, which the bridge
+  // requires (ADR-141 Amendment 1).
+  return (
+    <img
+      crossOrigin="anonymous"
+      src={`${props.frameUrl}?t=${tick}`}
+      alt="Laser machine camera"
+      style={feedStyle}
+    />
+  );
 }
 
 function usePollTick(): number {
