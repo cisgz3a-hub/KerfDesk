@@ -54,7 +54,9 @@ Every control was checked for a home before anything left the inspector:
    share one row, with **Set to stock thickness** under it. A V-carve asks **Flat floor** first.
 5. Feed, Plunge and **Spindle speed** share the next row, like the laser Power, Speed and Passes.
    The machine maximum ("Max 12,000") sits directly under Spindle speed and opens its Machine
-   Setup field. Its accessible name still starts "Machine maximum:".
+   Setup field. Its accessible name still starts "Machine maximum:". In a panel narrower than
+   about 290 px a third of the row cannot show five digits beside the number arrows, so Spindle
+   speed takes its own row there, with the maximum still under it.
 6. The V-carve cutter warning shows right after Bit and Material, not inside a section.
 7. The remaining sections appear only for the cut types they serve and name their state when
    closed: Holding tabs ("4 per shape" or "Off"), Clearing strategy ("Offset · 40 %"), Inlay fit,

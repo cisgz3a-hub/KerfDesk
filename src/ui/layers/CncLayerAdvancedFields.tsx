@@ -240,7 +240,7 @@ function stepoverDescription(hasReliefObjects: boolean, vCarveClearing: boolean)
   }
   return vCarveClearing
     ? 'Flat-floor clearing spacing as a percentage of the clearing bit diameter. Detail controls the V-bit finishing pitch separately.'
-    : 'Pocket clearing spacing as a percentage of the bit diameter. For a tapered ball nose it is a percentage of the width the bit cuts in one depth pass.';
+    : 'Pocket clearing spacing as a percentage of the bit diameter. For a bit that narrows toward its tip (ball nose, V-bit, engraving bit or tapered ball nose) it is a percentage of the width the bit cuts in one depth pass.';
 }
 
 // Only show refinements that apply to the current cut type or artwork.
