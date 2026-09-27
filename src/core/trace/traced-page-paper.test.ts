@@ -68,7 +68,7 @@ describe('paper pages and per-side margins (rank 33)', () => {
     });
     // Artwork 10 x 10 mm plus 4 + 2 across and 1 + 3 down.
     expect(svg).toContain('viewBox="0 0 16 14"');
-    expect(svg).toMatch(/M\s*4[ ,]1\b/);
+    expect(svg).toMatch(/M\s*4[ ,]1(?![\d.])/);
   });
 
   it('keeps the image page byte-identical when no page option is set', async () => {
