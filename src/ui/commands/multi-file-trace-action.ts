@@ -234,25 +234,33 @@ export async function runMultiFileTrace(
   if (files.length === 0) return;
   try {
     const batch = await buildMultiFileTraceExports(files, deps);
-    const skippedText = skippedMessage(batch.skipped);
     const write = deps.write ?? missingTraceExportWriter;
-    const { written, defaultDensity, notices } = await writeTraceExports(batch.files, write);
-    if (written === 0) {
-      if (skippedText !== '')
-        pushToast(skippedText, onlyFailures(batch.skipped) ? 'error' : 'warning');
-      return;
-    }
-    const format = batchTraceFormatLabel(batch.files[0]?.format ?? 'svg');
-    const summary = `Traced ${written} ${written === 1 ? 'image' : 'images'} to ${format}.`;
-    const density = defaultDensityNotice(defaultDensity, written);
-    pushToast(
-      joinToastParts([summary, density, skippedText, ...notices.map(traceNoticeMessage)]),
-      skippedText === '' ? 'success' : 'warning',
-    );
+    reportTraceBatch(batch, await writeTraceExports(batch.files, write), pushToast);
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
     pushToast(`Could not trace images: ${message}`, 'error');
   }
+}
+
+function reportTraceBatch(
+  batch: MultiFileTraceBatch,
+  written: Awaited<ReturnType<typeof writeTraceExports>>,
+  pushToast: PushToast,
+): void {
+  const skippedText = skippedMessage(batch.skipped);
+  if (written.written === 0) {
+    if (skippedText !== '')
+      pushToast(skippedText, onlyFailures(batch.skipped) ? 'error' : 'warning');
+    return;
+  }
+  const count = written.written;
+  const format = batchTraceFormatLabel(batch.files[0]?.format ?? 'svg');
+  const summary = `Traced ${count} ${count === 1 ? 'image' : 'images'} to ${format}.`;
+  const density = defaultDensityNotice(written.defaultDensity, count);
+  pushToast(
+    joinToastParts([summary, density, skippedText, ...written.notices.map(traceNoticeMessage)]),
+    skippedText === '' ? 'success' : 'warning',
+  );
 }
 
 function joinToastParts(parts: ReadonlyArray<string | null>): string {
