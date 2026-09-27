@@ -114,28 +114,81 @@ function mixtureOwner(
   return owner;
 }
 
-/** Mode filter for 1-px islands: a pixel none of whose 8-neighbours shares
- *  its label takes the most common label of its 8-neighbourhood (ties to the
- *  lower label). Reads the original labels so the pass is order-free. */
+/** Mode filter for 1-px islands: a pixel none of whose 4-neighbours shares
+ *  its label, and that continues no hairline diagonally, takes the most
+ *  common label of its 8-neighbourhood (ties to the lower label). Reads the
+ *  original labels so the pass is order-free. */
 export function modeFilterIsolatedPixels(grid: LabelGrid): void {
   const source: LabelGrid = { ...grid, labels: grid.labels.slice() };
   const counts = new Int32Array(256);
   const n = source.labels.length;
   for (let i = 0; i < n; i += 1) {
     const m = source.labels[i] as number;
-    if (m === TRANSPARENT_LABEL || sharesLabel8(source, i, m)) continue;
+    if (m === TRANSPARENT_LABEL || sharesLabel4(source, i, m)) continue;
+    if (hasHairlineLink(source, i)) continue;
     const mode = neighbourhoodMode(source, i, counts);
     if (mode >= 0) grid.labels[i] = mode;
   }
 }
 
-function sharesLabel8(grid: LabelGrid, i: number, label: number): boolean {
+function sharesLabel4(grid: LabelGrid, i: number, label: number): boolean {
   const n = grid.labels.length;
-  for (let d = 0; d < 8; d += 1) {
-    const q = neighbour8(i, d, grid.width, n);
+  for (let d = 0; d < 4; d += 1) {
+    const q = neighbour4(i, d, grid.width, n);
     if (q >= 0 && grid.labels[q] === label) return true;
   }
   return false;
+}
+
+function hasHairlineLink(grid: LabelGrid, p: number): boolean {
+  for (let d = 4; d < 8; d += 1) {
+    if (hairlineLink(grid, p, d) >= 0) return true;
+  }
+  return false;
+}
+
+/** The diagonal neighbour of p in direction d (4..7) when the corner joins a
+ *  coherent 1-px hairline, else -1. Outlines are traced 4-connected, so speck
+ *  area is measured 4-connected too (ADR-461 Amendment 2); the one exception
+ *  is a thin straight diagonal: both corner pixels carry the same label, the
+ *  corner continues straight on for a third pixel, each corner pixel has at
+ *  most two same-label 8-neighbours, and both off-diagonal pixels belong to
+ *  solid (not 1-px isolated) surroundings. A checkerboard fails the last
+ *  test, dither pairs and zigzags the straight run, a 2x2 block thinness. */
+function hairlineLink(grid: LabelGrid, p: number, d: number): number {
+  const { labels, width } = grid;
+  const n = labels.length;
+  const q = neighbour8(p, d, width, n);
+  if (q < 0) return -1;
+  const label = labels[p] as number;
+  if (label === TRANSPARENT_LABEL || labels[q] !== label) return -1;
+  const off1 = q - (q - p > 0 ? width : -width);
+  const off2 = p + (q - p > 0 ? width : -width);
+  if (labels[off1] === label || labels[off2] === label) return -1;
+  if (!continuesStraight(grid, p, q, d, label)) return -1;
+  if (!sharesLabel4(grid, off1, labels[off1] as number)) return -1;
+  if (!sharesLabel4(grid, off2, labels[off2] as number)) return -1;
+  return thin(grid, p, label) && thin(grid, q, label) ? q : -1;
+}
+
+// The corner p->q (direction d) extends straight on at least one side, so a
+// run of three or more pixels: a drawn diagonal, not a dither pair or zigzag.
+function continuesStraight(grid: LabelGrid, p: number, q: number, d: number, label: number): boolean {
+  const n = grid.labels.length;
+  const after = neighbour8(q, d, grid.width, n);
+  const before = neighbour8(p, 11 - d, grid.width, n);
+  return (after >= 0 && grid.labels[after] === label) || (before >= 0 && grid.labels[before] === label);
+}
+
+// At most two 8-neighbours share the label: a pixel of a 1-px line.
+function thin(grid: LabelGrid, p: number, label: number): boolean {
+  const n = grid.labels.length;
+  let same = 0;
+  for (let d = 0; d < 8; d += 1) {
+    const q = neighbour8(p, d, grid.width, n);
+    if (q >= 0 && grid.labels[q] === label) same += 1;
+  }
+  return same <= 2;
 }
 
 function neighbourhoodMode(grid: LabelGrid, i: number, counts: Int32Array): number {
@@ -157,7 +210,7 @@ function neighbourhoodMode(grid: LabelGrid, i: number, counts: Int32Array): numb
   return best;
 }
 
-/** Regions (8-connected, one label) smaller than minArea join the neighbour
+/** Regions (4-connected plus hairline diagonals, one label) smaller than minArea join the neighbour
  *  label they share the most boundary with (ties to the lower label).
  *  Transparent regions stay. The smallest regions go first, and a region that
  *  joins another is re-measured as the merged whole (union-find), so two
@@ -185,15 +238,14 @@ export function absorbSmallRegions(grid: LabelGrid, minArea: number): void {
   }
 }
 
-// The cleanup area includes diagonal continuations of a drawn line. This does
-// not change boundary extraction: corner-touching regions still have separate
-// outlines. After absorption, union every 8-adjacent region of the same label.
+// Keep the invariant "4-adjacent regions never share a label": after region r
+// took `label`, union it with every 4-neighbouring region carrying that label
+// (and any hairline it now continues diagonally).
 function unionWithNeighbours(grid: LabelGrid, regions: Regions, r: number, label: number): number {
-  const n = grid.labels.length;
   let root = r;
   for (const p of regions.members[r] ?? []) {
     for (let d = 0; d < 8; d += 1) {
-      const q = neighbour8(p, d, grid.width, n);
+      const q = regionNeighbour(grid, p, d);
       if (q < 0 || grid.labels[q] !== label) continue;
       const other = regions.find(regions.component[q] as number);
       if (other !== root) root = regions.union(root, other);
@@ -203,7 +255,7 @@ function unionWithNeighbours(grid: LabelGrid, regions: Regions, r: number, label
 }
 
 type Regions = {
-  /** Region id of every pixel (8-connected, one label). */
+  /** Region id of every pixel (4-connected plus hairline diagonals). */
   readonly component: Int32Array;
   readonly size: number[];
   /** Pixels of a region below the speck area; null for a large region. */
@@ -258,7 +310,6 @@ function floodComponent(
   component: Int32Array,
   stack: Int32Array,
 ): number[] {
-  const n = grid.labels.length;
   const label = grid.labels[start];
   const members: number[] = [];
   let top = 0;
@@ -268,7 +319,7 @@ function floodComponent(
     const p = stack[--top] as number;
     members.push(p);
     for (let d = 0; d < 8; d += 1) {
-      const q = neighbour8(p, d, grid.width, n);
+      const q = regionNeighbour(grid, p, d);
       if (q < 0 || component[q] !== -1 || grid.labels[q] !== label) continue;
       component[q] = id;
       stack[top++] = q;
@@ -313,6 +364,11 @@ export function neighbour4(p: number, d: number, width: number, n: number): numb
   if (d === 1) return p % width < width - 1 ? p + 1 : -1;
   if (d === 2) return p >= width ? p - width : -1;
   return p + width < n ? p + width : -1;
+}
+
+// A region's neighbour: the four edge neighbours, then hairline diagonals.
+function regionNeighbour(grid: LabelGrid, p: number, d: number): number {
+  return d < 4 ? neighbour4(p, d, grid.width, grid.labels.length) : hairlineLink(grid, p, d);
 }
 
 // Four edge neighbours followed by NW, NE, SW, SE; no wrap across rows.
