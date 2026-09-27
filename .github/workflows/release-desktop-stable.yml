@@ -138,19 +138,75 @@ jobs:
           runtime_count=$(node -p "require('./artifacts/dependency-audit/report.json').runtimeCount")
           test "${runtime_count}" = '0'
 
+      # The signing key lives in SSL.com's eSigner cloud vault; no .pfx exists
+      # (ADR-142 Amendment 1). The TOTP secret is the one shown when the
+      # certificate was enrolled in eSigner.
       - name: Require tag-release signing credentials
         if: github.event_name == 'push' && github.ref_type == 'tag'
         shell: pwsh
         env:
-          WIN_CSC_LINK: ${{ secrets.STABLE_WINDOWS_CSC_LINK }}
-          WIN_CSC_KEY_PASSWORD: ${{ secrets.STABLE_WINDOWS_CSC_KEY_PASSWORD }}
+          ESIGNER_USERNAME: ${{ secrets.STABLE_ESIGNER_USERNAME }}
+          ESIGNER_PASSWORD: ${{ secrets.STABLE_ESIGNER_PASSWORD }}
+          ESIGNER_TOTP_SECRET: ${{ secrets.STABLE_ESIGNER_TOTP_SECRET }}
         run: |
-          if ([string]::IsNullOrWhiteSpace($env:WIN_CSC_LINK)) {
-            throw 'Tag releases require the CSC_LINK signing certificate secret.'
+          foreach ($name in 'ESIGNER_USERNAME', 'ESIGNER_PASSWORD', 'ESIGNER_TOTP_SECRET') {
+            if ([string]::IsNullOrWhiteSpace([Environment]::GetEnvironmentVariable($name))) {
+              throw "Tag releases require the STABLE_$name secret."
+            }
           }
-          if ([string]::IsNullOrWhiteSpace($env:WIN_CSC_KEY_PASSWORD)) {
-            throw 'Tag releases require the CSC_KEY_PASSWORD secret.'
+
+      # eSigner CKA presents the cloud certificate to Windows as an ordinary
+      # certificate in CurrentUser\My, so signtool signs with it by thumbprint.
+      # The installer is pinned by URL and SHA-256.
+      - name: Load the eSigner signing certificate
+        id: signing-certificate
+        if: github.event_name == 'push' && github.ref_type == 'tag' && steps.retry.outputs.reuse-artifact == 'false'
+        shell: pwsh
+        env:
+          ESIGNER_CKA_URL: https://github.com/SSLcom/eSignerCKA/releases/download/v1.1.2/SSL.COM-eSigner-CKA_1.1.2.zip
+          ESIGNER_CKA_SHA256: 071ca52986795e7a00dfbd87cc5818d03af74daac32dfe32afd4171b676c4d13
+          ESIGNER_USERNAME: ${{ secrets.STABLE_ESIGNER_USERNAME }}
+          ESIGNER_PASSWORD: ${{ secrets.STABLE_ESIGNER_PASSWORD }}
+          ESIGNER_TOTP_SECRET: ${{ secrets.STABLE_ESIGNER_TOTP_SECRET }}
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $zip = Join-Path $env:RUNNER_TEMP 'esigner-cka.zip'
+          Invoke-WebRequest -Uri $env:ESIGNER_CKA_URL -OutFile $zip
+          $hash = (Get-FileHash -Algorithm SHA256 -LiteralPath $zip).Hash.ToLowerInvariant()
+          if ($hash -ne $env:ESIGNER_CKA_SHA256) {
+            throw "eSigner CKA download has SHA-256 $hash, expected $env:ESIGNER_CKA_SHA256."
           }
+          $setupDir = Join-Path $env:RUNNER_TEMP 'esigner-cka-setup'
+          Expand-Archive -LiteralPath $zip -DestinationPath $setupDir -Force
+          $setup = @(Get-ChildItem -LiteralPath $setupDir -Recurse -Filter '*.exe')
+          if ($setup.Count -ne 1) { throw "Expected one eSigner CKA installer, found $($setup.Count)." }
+          $installDir = Join-Path $env:USERPROFILE 'eSignerCKA'
+          Start-Process -FilePath $setup[0].FullName -Wait -ArgumentList @(
+            '/CURRENTUSER', '/VERYSILENT', '/SUPPRESSMSGBOXES', "/DIR=`"$installDir`"")
+          # SSL.com's GitHub Actions sample registers the key provider next.
+          foreach ($helper in 'RegisterKSP.exe', 'eSignerCSP.Config.exe') {
+            $helperPath = Join-Path $installDir $helper
+            if (Test-Path -LiteralPath $helperPath) { & $helperPath | Out-Null }
+          }
+          $tool = Join-Path $installDir 'eSignerCKATool.exe'
+          if (-not (Test-Path -LiteralPath $tool)) { throw "eSigner CKA did not install $tool." }
+          & $tool config -mode product -user $env:ESIGNER_USERNAME -pass $env:ESIGNER_PASSWORD `
+            -totp $env:ESIGNER_TOTP_SECRET -key (Join-Path $installDir 'master.key') -r
+          & $tool unload
+          & $tool load
+          $certificates = @(Get-ChildItem Cert:\CurrentUser\My -CodeSigningCert)
+          if ($certificates.Count -ne 1) {
+            throw ("Expected one eSigner code-signing certificate, found $($certificates.Count). " +
+              'Check the eSigner username, password and TOTP secret.')
+          }
+          # The newest Windows SDK signtool, as SSL.com's sample uses.
+          $signtool = Get-ChildItem -Path "${env:ProgramFiles(x86)}\Windows Kits\10\bin\*\x64\signtool.exe" |
+            Sort-Object { [version]$_.Directory.Parent.Name } -Descending |
+            Select-Object -First 1
+          if ($null -eq $signtool) { throw 'No Windows SDK signtool.exe on this runner.' }
+          "Signing as $($certificates[0].Subject) with $($signtool.FullName)"
+          "thumbprint=$($certificates[0].Thumbprint)" >> $env:GITHUB_OUTPUT
+          "signtool=$($signtool.FullName)" >> $env:GITHUB_OUTPUT
 
       - name: Build signed Windows installer + update feed
         if: github.event_name == 'push' && github.ref_type == 'tag' && steps.retry.outputs.reuse-artifact == 'false'
@@ -159,16 +215,20 @@ jobs:
         # them. `-c.extraMetadata.version` overrides package.json's static
         # 0.1.0 so the .exe, app.getVersion(), and latest.yml all agree.
         # `--publish never` still emits latest.yml + .blockmap locally; upload
-        # to R2 happens in a later step.
+        # to R2 happens in a later step. electron-builder signs every .exe with
+        # the store certificate named by thumbprint (sha256, ts.ssl.com; see
+        # electron-builder.yml) and writes its CN into app-update.yml as the
+        # publisherName that electron-updater checks each update against.
         run: |
           pnpm exec electron-builder --win --x64 \
             --config.extraMetadata.version="${{ steps.version.outputs.version }}" \
             --config.extraMetadata.kerfdeskUpdateChannelTrusted=true \
             --config.forceCodeSigning=true \
+            --config.win.signtoolOptions.certificateSha1="${WIN_CERTIFICATE_SHA1}" \
             --publish never
         env:
-          WIN_CSC_LINK: ${{ secrets.STABLE_WINDOWS_CSC_LINK }}
-          WIN_CSC_KEY_PASSWORD: ${{ secrets.STABLE_WINDOWS_CSC_KEY_PASSWORD }}
+          WIN_CERTIFICATE_SHA1: ${{ steps.signing-certificate.outputs.thumbprint }}
+          SIGNTOOL_PATH: ${{ steps.signing-certificate.outputs.signtool }}
           CSC_IDENTITY_AUTO_DISCOVERY: 'true'
 
       - name: Restore the original signed release instance
@@ -196,12 +256,28 @@ jobs:
           if ([string]::IsNullOrWhiteSpace($signature.SignerCertificate.Subject)) {
             throw 'Installer signature has no publisher identity.'
           }
+          # Without a timestamp the signature stops validating when the
+          # certificate expires, and installed copies would refuse the update.
+          if ($null -eq $signature.TimeStamperCertificate) {
+            throw 'Installer signature has no timestamp.'
+          }
           & ./scripts/verify-windows-package-identity.ps1 `
             -Executable $installer `
             -Kind Installer
           if ($env:REUSE_ARTIFACT -ne 'true') {
             $executable = "release/$env:VERSION/win-unpacked/KerfDesk.exe"
             & ./scripts/verify-windows-package-identity.ps1 -Executable $executable
+            $appSignature = Get-AuthenticodeSignature -LiteralPath $executable
+            if ($appSignature.Status -ne 'Valid' -or
+                $appSignature.SignerCertificate.Thumbprint -ne $signature.SignerCertificate.Thumbprint) {
+              throw 'KerfDesk.exe is not validly signed by the installer certificate.'
+            }
+            # Installed copies accept an update only from this publisher
+            # (ADR-135); a missing publisherName would skip that check.
+            node scripts/verify-update-publisher.mjs `
+              "release/$env:VERSION/win-unpacked/resources/app-update.yml" `
+              $signature.SignerCertificate.Subject
+            if ($LASTEXITCODE -ne 0) { throw 'app-update.yml does not name the installer signer.' }
           }
           "Verified publisher: $($signature.SignerCertificate.Subject)"
 

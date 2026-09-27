@@ -50,24 +50,9 @@ import {
   desktopApplicationMenuTemplate,
   shouldEnableDesktopDevTools,
 } from './application-menu-policy.js';
-import {
-  serialPortDialogButtons,
-  serialPortIdForDialogResponse,
-  serialPortLabel,
-  type ElectronSerialPortSummary,
-} from './serial-port-choice.js';
-import {
-  serialPortDiscoveryDiagnostic,
-  serialPortSelectionDiagnostic,
-  type SerialDiagnosticPolicy,
-} from './serial-port-diagnostics.js';
-import {
-  waitForSerialPorts,
-  type NoPortsPrompt,
-  type SerialPortEventSource,
-} from './serial-port-wait.js';
 import { mainWindowWebPreferences } from './desktop-window-options.js';
 import {
+  PACKAGED_RENDERER_URL,
   resolveRendererRuntime,
   shouldAllowNavigation,
   shouldAllowWindowOpen,
@@ -81,7 +66,11 @@ import {
 } from './rtsp-camera-bridge.js';
 import { configureAutoUpdater } from './auto-update.js';
 import { installApplicationFinalCleanup } from './application-final-cleanup.js';
-import { DESKTOP_PRODUCT_NAME, legacyDesktopDataPath } from './desktop-identity.js';
+import {
+  DESKTOP_APP_USER_MODEL_ID,
+  DESKTOP_PRODUCT_NAME,
+  legacyDesktopDataPath,
+} from './desktop-identity.js';
 import { installPackagedNativeSmoke, readNativeSmokeConfig } from './native-smoke.js';
 import {
   canonicalOfficialDesktopDownloadUrl,
@@ -101,6 +90,12 @@ import { installWindowReadinessPolicy } from './window-readiness-policy.js';
 import { installDesktopWindowClose } from './desktop-window-close.js';
 import { sessionPermissionsOnce } from './session-permissions-once.js';
 import { installDesktopProjectOpens } from './desktop-project-open.js';
+import { handleSelectSerialPort, type ElectronSerialPort } from './desktop-serial-chooser.js';
+import { externalBrowserUrl } from './external-links.js';
+import { installDesktopContextMenu } from './desktop-context-menu.js';
+import { loadWindowPlacement, rememberWindowPlacement } from './desktop-window-placement.js';
+import { installRendererCrashRecovery } from './renderer-crash-recovery.js';
+import { rendererContentSecurityPolicy } from './renderer-content-security-policy.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -113,6 +108,7 @@ const DESKTOP_DATA_PATH = NATIVE_SMOKE_CONFIG?.userDataPath ?? LEGACY_DESKTOP_DA
 app.setName(DESKTOP_PRODUCT_NAME);
 app.setPath('userData', DESKTOP_DATA_PATH);
 app.setPath('sessionData', DESKTOP_DATA_PATH);
+if (process.platform === 'win32') app.setAppUserModelId(DESKTOP_APP_USER_MODEL_ID);
 
 // One process owns the shared Chromium profile and the serial-capable UI. A
 // second launch raises that primary window and hands over any project file it
@@ -139,6 +135,7 @@ const RENDERER_RUNTIME = resolveRendererRuntime({
   isPackaged: app.isPackaged,
 });
 const TRUSTED_RENDERER_ORIGINS = RENDERER_RUNTIME.trustedOrigins;
+const IS_DEV_SERVER_RENDERER = RENDERER_RUNTIME.rendererUrl !== PACKAGED_RENDERER_URL;
 const CAMERA_BRIDGE_ORIGIN = `http://127.0.0.1:${CAMERA_BRIDGE_PORT}`;
 // ADR-171: tag releases embed this flag only after forceCodeSigning succeeds.
 // Missing, malformed, and manual-build metadata all fail closed.
@@ -175,14 +172,6 @@ app.on('before-quit', () => {
   quitRequested = true;
 });
 const installSessionPermissions = sessionPermissionsOnce(installPermissionHandlers);
-
-type ElectronSerialPort = ElectronSerialPortSummary & {
-  readonly vendorId?: string;
-  readonly productId?: string;
-  readonly serialNumber?: string;
-  readonly usbDriverName?: string;
-  readonly deviceInstanceId?: string;
-};
 
 // Custom-scheme registration MUST happen before app.whenReady(). Per the
 // Electron security checklist, declaring `standard: true` + `secure: true`
@@ -233,10 +222,9 @@ function makeAppProtocolHandler(distRoot: string) {
   };
 }
 
-function createMainWindow(): BrowserWindow {
+function createMainWindow(bounds: ReturnType<typeof loadWindowPlacement>['bounds']): BrowserWindow {
   return new BrowserWindow({
-    width: 1280,
-    height: 800,
+    ...bounds,
     show: false,
     autoHideMenuBar: true,
     backgroundColor: '#fafafa',
@@ -250,74 +238,12 @@ function installContentSecurityPolicy(ses: Session): void {
     callback({
       responseHeaders: {
         ...details.responseHeaders,
-        'Content-Security-Policy': [CSP_POLICY],
+        'Content-Security-Policy': [
+          rendererContentSecurityPolicy(CSP_POLICY, IS_DEV_SERVER_RENDERER),
+        ],
       },
     });
   });
-}
-
-async function chooseSerialPortId(
-  webContents: WebContents,
-  portList: ReadonlyArray<ElectronSerialPortSummary>,
-): Promise<string> {
-  const owner = BrowserWindow.fromWebContents(webContents) ?? undefined;
-  const showMessageBox: NoPortsPrompt = (options) =>
-    owner === undefined ? dialog.showMessageBox(options) : dialog.showMessageBox(owner, options);
-  // An empty list waits with the operator for a port (serial-port-wait.ts).
-  const ports =
-    portList.length > 0
-      ? portList
-      : await waitForSerialPorts(
-          webContents.session as unknown as SerialPortEventSource,
-          webContents,
-          showMessageBox,
-        );
-  if (ports.length === 0) {
-    console.log('[serial] No ports - is the laser plugged in and powered on?');
-    return '';
-  }
-  const buttons = serialPortDialogButtons(ports);
-  const options = {
-    type: 'question' as const,
-    buttons: [...buttons],
-    cancelId: buttons.length - 1,
-    defaultId: 0,
-    noLink: true,
-    message: 'Select laser serial port',
-    detail: ports.map((port, i) => `${i + 1}. ${serialPortLabel(port)}`).join('\n'),
-  };
-  const result = await showMessageBox(options);
-  return serialPortIdForDialogResponse(ports, result.response);
-}
-
-function logSerialPorts(portList: ReadonlyArray<ElectronSerialPort>): void {
-  console.log(...serialPortDiscoveryDiagnostic(portList, serialDiagnosticPolicy()));
-}
-
-function serialDiagnosticPolicy(): SerialDiagnosticPolicy {
-  return {
-    isPackaged: app.isPackaged,
-    detailedOptIn: process.env.KERFDESK_DETAILED_SERIAL_DIAGNOSTICS === '1',
-  };
-}
-
-function handleSelectSerialPort(
-  event: ElectronEvent,
-  portList: ReadonlyArray<ElectronSerialPort>,
-  webContents: WebContents,
-  callback: (portId: string) => void,
-): void {
-  event.preventDefault();
-  logSerialPorts(portList);
-  void chooseSerialPortId(webContents, portList)
-    .then((chosen) => {
-      console.log(serialPortSelectionDiagnostic(chosen, serialDiagnosticPolicy()));
-      callback(chosen);
-    })
-    .catch((err: unknown) => {
-      console.error('Serial port picker failed:', err);
-      callback('');
-    });
 }
 
 function installPermissionHandlers(ses: Session): void {
@@ -401,6 +327,15 @@ function installNavigationPolicy(window: BrowserWindow): void {
       });
       return { action: 'deny' };
     }
+    // Other https links (Help > Report a Bug, preset sources, design licences)
+    // open in the operator's browser, never as a second app window (ADR-482).
+    const browserUrl = externalBrowserUrl(details.url);
+    if (browserUrl !== null) {
+      void shell.openExternal(browserUrl).catch((error: unknown) => {
+        console.warn('Could not open the link in the browser:', error);
+      });
+      return { action: 'deny' };
+    }
     return {
       action: shouldAllowWindowOpen(details.url, TRUSTED_RENDERER_ORIGINS) ? 'allow' : 'deny',
     };
@@ -413,26 +348,47 @@ async function loadRenderer(window: BrowserWindow): Promise<void> {
 
 function installDevTools(window: BrowserWindow): void {
   if (app.isPackaged) return;
-  window.webContents.on('console-message', (_event, level, message, line, source) => {
-    console.log(`[renderer ${level}] ${source}:${line}  ${message}`);
+  window.webContents.on('console-message', ({ level, message, lineNumber, sourceId }) => {
+    console.log(`[renderer ${level}] ${sourceId}:${lineNumber}  ${message}`);
   });
   window.webContents.openDevTools({ mode: 'detach' });
 }
 
 async function createWindow(): Promise<void> {
-  const window = createMainWindow();
+  const placement = loadWindowPlacement(app.getPath('userData'));
+  const window = createMainWindow(placement.bounds);
   installWindowReadinessPolicy(window, {
     reportFailure: (message) => dialog.showErrorBox('KerfDesk window error', message),
+    reveal: () => (placement.maximized ? window.maximize() : window.show()),
   });
+  rememberWindowPlacement(window, app.getPath('userData'));
   installPackagedNativeSmoke({ app, window, config: NATIVE_SMOKE_CONFIG });
   installNavigationPolicy(window);
-  installDesktopWindowClose(window, {
+  installDesktopContextMenu(window);
+  const closeGuard = installDesktopWindowClose(window, {
     isTrustedRenderer: (url) => shouldAllowNavigation(url, TRUSTED_RENDERER_ORIGINS),
     isQuitRequested: () => quitRequested,
     cancelQuit: () => {
       quitRequested = false;
     },
     quit: () => app.quit(),
+  });
+  installRendererCrashRecovery(window, {
+    isClosing: () => closeGuard.isClosing(),
+    askToReload: async (prompt) => {
+      const result = await dialog.showMessageBox(window, {
+        type: 'warning',
+        buttons: [...prompt.buttons],
+        defaultId: 0,
+        cancelId: 1,
+        noLink: true,
+        title: 'KerfDesk',
+        message: prompt.message,
+        detail: prompt.detail,
+      });
+      return result.response === 0;
+    },
+    reportFailure: (error: unknown) => console.warn('Renderer reload offer failed:', error),
   });
 
   // F-9 audit fix: set Content-Security-Policy via webRequest headers

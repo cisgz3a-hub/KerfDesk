@@ -37,6 +37,14 @@ async function handleBridgeRequest(
   bridgePort: number,
   previewSessions: RtspPreviewSessions,
 ): Promise<void> {
+  // DNS rebinding: a hostile page whose own host name resolves to 127.0.0.1
+  // talks to the bridge as a same-origin page. It cannot choose the Host
+  // header, so only the loopback names KerfDesk uses are served (ADR-141
+  // Amendment 1; Node's fix for CVE-2018-7160).
+  if (!isBridgeHost(req.headers.host, bridgePort)) {
+    res.writeHead(403).end('Forbidden');
+    return;
+  }
   const requestUrl = new URL(req.url ?? '/', `http://127.0.0.1:${bridgePort}`);
   setCorsHeaders(req, res);
   if (req.method === 'OPTIONS') {
@@ -207,11 +215,18 @@ function isLoopbackDevOrigin(origin: string): boolean {
 
 // S03-001 server-side request gate. CORS only stops a browser READING a
 // cross-origin response; the request's side effects (RTSP probe / ffmpeg spawn)
-// still fire. A request with no Origin (same-origin app://app document, or a
-// non-browser local client that already has machine access) is allowed; a
-// browser Origin we do not trust is refused before any work happens.
+// still fire, so a browser Origin we do not trust is refused before any work.
+// A request with NO Origin is refused too (ADR-141 Amendment 1). KerfDesk never
+// sends one: its fetch() calls are cross-origin from app://app, and its camera
+// <img> elements load with crossOrigin="anonymous". A no-Origin request is a
+// plain <img> on another site or a DNS-rebound same-origin page, which could
+// otherwise make the bridge probe and proxy cameras on the local network.
 export function isAllowedBridgeOrigin(origin: string | undefined): boolean {
-  return origin === undefined || cameraBridgeCorsOrigin(origin) !== null;
+  return origin !== undefined && cameraBridgeCorsOrigin(origin) !== null;
+}
+
+export function isBridgeHost(host: string | undefined, bridgePort: number): boolean {
+  return host === `127.0.0.1:${bridgePort}` || host === `localhost:${bridgePort}`;
 }
 
 // Hosted pages are intentionally not trusted. A token readable by a hosted
