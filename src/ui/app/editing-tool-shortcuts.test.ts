@@ -8,6 +8,7 @@ function ctx(patch: Partial<EditingToolCtx> = {}): EditingToolCtx {
     pasteClipboardInPlace: vi.fn(),
     invertSelection: vi.fn(),
     toggleWireframeView: vi.fn(),
+    deleteDuplicates: vi.fn(),
     ...patch,
   };
 }
@@ -74,5 +75,14 @@ describe('editing tool shortcuts (ADR-410)', () => {
     Object.defineProperty(event, 'target', { value: input });
     expect(handleEditingToolShortcut(event, context)).toBe(false);
     input.remove();
+  });
+
+  it('deletes duplicates with Alt+D, also where Option+D types a symbol (ADR-480)', () => {
+    const context = ctx();
+    const chord = key({ key: '∂', code: 'KeyD', altKey: true });
+    expect(handleEditingToolShortcut(chord, context)).toBe(true);
+    expect(chord.defaultPrevented).toBe(true);
+    expect(handleEditingToolShortcut(key({ key: 'd' }), context)).toBe(false);
+    expect(context.deleteDuplicates).toHaveBeenCalledOnce();
   });
 });

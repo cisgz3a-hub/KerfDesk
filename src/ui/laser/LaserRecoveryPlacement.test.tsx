@@ -9,6 +9,7 @@ import {
   IDENTITY_TRANSFORM,
   type SceneObject,
 } from '../../core/scene';
+import type { JobOriginPlacement } from '../../core/job';
 import { oracleBurns } from '../../core/controllers/grbl/laser-burn-oracle.test-helper';
 import { emitPreparedGcode, prepareOutput } from '../../io/gcode';
 import { buildCanvasMotionPlan } from '../state/canvas-motion-plan';
@@ -33,7 +34,11 @@ afterEach(() => {
 });
 
 /** Two strokes on separate lines of the program: (1,1)-(9,9) then (20,5)-(30,5). */
-function capsule(wco: WorkCoordinateOffset | null, reportInches = false): RecoveryCapsule {
+function capsule(
+  wco: WorkCoordinateOffset | null,
+  reportInches = false,
+  jobOrigin?: JobOriginPlacement,
+): RecoveryCapsule {
   const stroke = (id: string, from: { x: number; y: number }, to: { x: number; y: number }) =>
     ({
       kind: 'imported-svg',
@@ -69,6 +74,7 @@ function capsule(wco: WorkCoordinateOffset | null, reportInches = false): Recove
     gcode: emitted.gcode,
     prepared,
     outputScope: DEFAULT_OUTPUT_SCOPE,
+    ...(jobOrigin === undefined ? {} : { jobOrigin }),
     canvasPlan: buildCanvasMotionPlan({
       gcode: emitted.gcode,
       prepared,
@@ -98,6 +104,14 @@ function render(props: Parameters<typeof LaserRecoveryPlacement>[0]): void {
   unmount = () => root.unmount();
 }
 
+function button(label: string): HTMLButtonElement {
+  const candidate = [...(host?.querySelectorAll('button') ?? [])].find(
+    (element) => element.textContent === label,
+  );
+  if (!(candidate instanceof HTMLButtonElement)) throw new Error(`Expected button: ${label}`);
+  return candidate;
+}
+
 describe('recovery placement and work origin', () => {
   it('says the origin matches when it is within 0.05 mm of the one the job ran with', () => {
     render({
@@ -122,6 +136,142 @@ describe('recovery placement and work origin', () => {
       'The work origin has moved X 15 mm, Y 15 mm since this job ran.',
     );
     expect(host?.querySelector('button')).toBeNull();
+  });
+
+  it('offers Restore saved origin when the origin moved, and hands it the saved offset', async () => {
+    const onRestoreOrigin = vi.fn(async () => undefined);
+    render({
+      capsule: capsule({ x: 20, y: 30, z: 0 }),
+      liveWorkOffsetMm: { x: 0, y: 0, z: 0 },
+      restartLine: 1,
+      disabled: false,
+      onRestoreOrigin,
+    });
+    expect(host?.textContent).toContain(
+      'Restore saved origin puts work zero back at X 20, Y 30 mm from machine zero',
+    );
+    expect(host?.textContent).toContain('home it first');
+    const restore = [...(host?.querySelectorAll('button') ?? [])].find(
+      (element) => element.textContent === 'Restore saved origin',
+    );
+    if (restore === undefined) throw new Error('Expected the Restore saved origin button.');
+    await act(async () => restore.click());
+    expect(onRestoreOrigin).toHaveBeenCalledWith({ x: 20, y: 30, z: 0 });
+  });
+
+  it('homes from beside the restore, and holds the restore while homing', async () => {
+    let finishHome: () => void = () => undefined;
+    const onHome = vi.fn(
+      () =>
+        new Promise<void>((resolve) => {
+          finishHome = resolve;
+        }),
+    );
+    const onRestoreOrigin = vi.fn(async () => undefined);
+    render({
+      capsule: capsule({ x: 20, y: 30, z: 0 }),
+      liveWorkOffsetMm: { x: 0, y: 0, z: 0 },
+      restartLine: 1,
+      disabled: false,
+      onRestoreOrigin,
+      onHome,
+    });
+    expect(host?.textContent).toContain('home it first with Home machine');
+    await act(async () => button('Home machine').click());
+    expect(onHome).toHaveBeenCalledTimes(1);
+    expect(button('Homing…').disabled).toBe(true);
+    expect(button('Restore saved origin').disabled).toBe(true);
+    await act(async () => finishHome());
+    expect(button('Restore saved origin').disabled).toBe(false);
+    await act(async () => button('Restore saved origin').click());
+    expect(onRestoreOrigin).toHaveBeenCalledWith({ x: 20, y: 30, z: 0 });
+  });
+
+  it('says homing rules out continuing from where the head stopped', () => {
+    render({
+      capsule: capsule({ x: 20, y: 30, z: 0 }),
+      liveWorkOffsetMm: { x: 0, y: 0, z: 0 },
+      restartLine: 1,
+      disabled: false,
+      onRestoreOrigin: async () => undefined,
+      onHome: async () => undefined,
+      headStop: {
+        stop: { line: 5, sentLines: 4, pointMm: { x: 9, y: 9 } },
+        sendableLines: 10,
+        anchored: false,
+        onContinue: async () => undefined,
+      },
+    });
+    expect(host?.textContent).toContain(
+      'Homing moves the head off the spot where the job stopped, so after it only the restore can place the job.',
+    );
+    expect(button('Continue from where the head stopped').disabled).toBe(false);
+  });
+
+  it('offers no Home without homing set up', () => {
+    render({
+      capsule: capsule({ x: 20, y: 30, z: 0 }),
+      liveWorkOffsetMm: { x: 0, y: 0, z: 0 },
+      restartLine: 1,
+      disabled: false,
+      onRestoreOrigin: async () => undefined,
+    });
+    expect(host?.textContent).not.toContain('Home machine');
+  });
+
+  it('shows why the restore failed', async () => {
+    render({
+      capsule: capsule({ x: 20, y: 30, z: 0 }),
+      liveWorkOffsetMm: null,
+      restartLine: 1,
+      disabled: false,
+      onRestoreOrigin: async () => {
+        throw new Error('Machine must be Idle before changing origin (currently Alarm).');
+      },
+    });
+    const restore = [...(host?.querySelectorAll('button') ?? [])].find(
+      (element) => element.textContent === 'Restore saved origin',
+    );
+    await act(async () => restore?.click());
+    expect(host?.querySelector('[role="alert"]')?.textContent).toBe(
+      'Machine must be Idle before changing origin (currently Alarm).',
+    );
+  });
+
+  it('says a User Origin that a reset cleared is gone, even when it sat at machine zero', () => {
+    const onRestoreOrigin = vi.fn(async () => undefined);
+    render({
+      capsule: capsule({ x: 0, y: 0, z: 0 }, false, {
+        startFrom: 'user-origin',
+        anchor: 'front-left',
+      }),
+      liveWorkOffsetMm: { x: 0, y: 0, z: 0 },
+      liveOriginSet: false,
+      restartLine: 1,
+      disabled: false,
+      onRestoreOrigin,
+    });
+    expect(host?.textContent).not.toContain('matches the one this job ran with');
+    expect(host?.querySelector('[role="note"]')?.textContent).toContain(
+      'The controller has no work origin set now',
+    );
+    expect(host?.textContent).toContain('Restore saved origin');
+  });
+
+  it('offers no restore once the origin matches and is set', () => {
+    render({
+      capsule: capsule({ x: 20, y: 30, z: 0 }, false, {
+        startFrom: 'user-origin',
+        anchor: 'front-left',
+      }),
+      liveWorkOffsetMm: { x: 20, y: 30, z: 0 },
+      liveOriginSet: true,
+      restartLine: 1,
+      disabled: false,
+      onRestoreOrigin: async () => undefined,
+    });
+    expect(host?.textContent).toContain('matches the one this job ran with');
+    expect(host?.textContent).not.toContain('Restore saved origin');
   });
 
   it('converts an origin the controller reported in inches', () => {

@@ -27,3 +27,24 @@ describe('parseOptionalJobInterruption position loss', () => {
     }
   });
 });
+
+// ADR-341 Amendment 6: a lost link records how many lines had been sent, so
+// recovery knows where the head stopped.
+describe('parseOptionalJobInterruption sent lines', () => {
+  const dropped: JobInterruption = {
+    kind: 'disconnect',
+    message: 'The serial connection closed during the job.',
+    sentLines: 207_331,
+  };
+
+  it('keeps the count through a storage round trip', () => {
+    const stored: unknown = JSON.parse(JSON.stringify(dropped));
+    expect(parseOptionalJobInterruption(stored)).toEqual({ interruption: dropped });
+  });
+
+  it('rejects a count that is not a non-negative whole number', () => {
+    for (const sentLines of [-1, 1.5, '12', null]) {
+      expect(parseOptionalJobInterruption({ ...dropped, sentLines })).toBeNull();
+    }
+  });
+});

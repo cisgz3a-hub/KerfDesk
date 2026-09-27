@@ -313,8 +313,8 @@ export function interactionActions(
   };
 }
 
-function visibleSelectionState(
-  state: AppState,
+export function visibleSelectionState(
+  state: Pick<AppState, 'selectedObjectId' | 'additionalSelectedIds'>,
   project: Project,
 ): Pick<AppState, 'selectedObjectId' | 'additionalSelectedIds'> {
   const selectedIds = [
