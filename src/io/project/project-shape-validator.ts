@@ -114,6 +114,7 @@ function validateDevice(device: Record<string, unknown>): string | null {
     profileField.optionalEstimateTimeScales(device, 'device'),
     profileField.optionalRotarySetup(device, 'device.rotary'),
     profileField.optionalLaserFireControl(device, 'device.fireControl'),
+    profileField.optionalHeadPositions(device, 'device'),
   ]);
 }
 
