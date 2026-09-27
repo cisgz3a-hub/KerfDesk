@@ -62,6 +62,10 @@ export type CncLayerPassesResult = {
   readonly offsetFailed: boolean;
   readonly passLimited: boolean;
   readonly stepoverUsed: boolean;
+  // Whether the layer's ramp angle shaped these passes' entries. Only the
+  // ordinary contour ladder ramps: V-carve, drill and adaptive passes and a
+  // helical pocket's passes enter their own way (ADR-273 Amendment 2).
+  readonly rampedEntry: boolean;
 };
 
 export function passesForCncLayerWithEvidence(
@@ -91,7 +95,7 @@ export function passesForCncLayerWithEvidence(
   const toolpaths = directedToolpaths(raw.toolpaths, settings, handedness);
   const depths = zPassDepths(settings.depthMm, settings.depthPerPassMm);
   if (toolpaths.length === 0 || depths.length === 0) {
-    return { ...raw, passes: [] };
+    return { ...raw, passes: [], rampedEntry: false };
   }
 
   // The finishing wall and the tab windows ride the same offset as the
@@ -130,11 +134,30 @@ export function passesForCncLayerWithEvidence(
               cutWidthMm,
             ),
           ),
+    rampedEntry: rampsContourEntry(settings, passes),
   };
 }
 
 function completePasses(passes: ReadonlyArray<CncPass>): CncLayerPassesResult {
-  return { passes, offsetFailed: false, passLimited: false, stepoverUsed: false };
+  return {
+    passes,
+    offsetFailed: false,
+    passLimited: false,
+    stepoverUsed: false,
+    rampedEntry: false,
+  };
+}
+
+// The ramp above descends along contour passes and tabbed profile paths. A
+// helical pocket's passes are neither: they keep their own helix, so the
+// layer's angle shapes nothing there.
+function rampsContourEntry(settings: CncLayerSettings, passes: ReadonlyArray<CncPass>): boolean {
+  const rampEntryDeg = settings.rampEntryDeg;
+  return (
+    rampEntryDeg !== undefined &&
+    rampEntryDeg > 0 &&
+    passes.some((pass) => pass.kind === 'contour' || pass.kind === 'path3d')
+  );
 }
 
 function resolvedSpecializedPasses(

@@ -128,12 +128,15 @@ export type CompiledReliefFacts = {
 
 /** The read-only strategy a CNC operation cuts with, joined for one line.
  * `plungingReliefStages` comes from the compiled job (ADR-273 Amendment 1), as
- * does `relief` when the operation cut relief objects (ADR-224 Amendment 3). */
+ * do `relief` when the operation cut relief objects (ADR-224 Amendment 3) and
+ * `unrampedShapes` when none of its shape groups records the ramp it asks for
+ * (ADR-273 Amendment 2). */
 export function cncOperationDetail(
   settings: CncLayerSettings,
   stockThicknessMm?: number,
   plungingReliefStages: ReadonlyArray<PlungingReliefStage> = [],
   relief?: CompiledReliefFacts,
+  unrampedShapes = false,
 ): string {
   // A relief roughs to its own depth, level by level, and takes no tabs. An
   // operation that cut only reliefs cut no shape of its cut type, so that
@@ -149,7 +152,7 @@ export function cncOperationDetail(
     ...cncStepoverPart(settings, shapes, relief),
     ...cncDirectionPart(settings),
     ...(shapes ? cncProfileTabsPart(settings, stockThicknessMm, relief !== undefined) : []),
-    ...cncEntryPart(settings, plungingReliefStages, shapes),
+    ...cncEntryPart(settings, plungingReliefStages, shapes, unrampedShapes),
     ...(shapes ? cncVCarveClearPart(settings) : []),
     ...cncFinishAllowancePart(settings),
     ...(shapes ? cncPocketStrategyPart(settings) : []),
@@ -302,8 +305,11 @@ function cncEntryPart(
   settings: CncLayerSettings,
   plungingReliefStages: ReadonlyArray<PlungingReliefStage>,
   shapes: boolean,
+  unrampedShapes: boolean,
 ): ReadonlyArray<string> {
-  const entry = shapes ? requestedCncEntry(settings) : reliefRoughingEntry(settings);
+  const entry = shapes
+    ? requestedCncEntry(settings, unrampedShapes)
+    : reliefRoughingEntry(settings);
   if (entry === null) return [];
   const notes = [...entry.notes, ...reliefPlungeNote(plungingReliefStages)];
   return [notes.length === 0 ? entry.label : `${entry.label} (${notes.join('; ')})`];
@@ -322,17 +328,35 @@ function reliefRoughingEntry(
 
 function requestedCncEntry(
   settings: CncLayerSettings,
+  unrampedShapes: boolean,
 ): { readonly label: string; readonly notes: ReadonlyArray<string> } | null {
   const rampEntryDeg =
     settings.cutType === 'v-carve' ? settings.vCarveRampEntryDeg : settings.rampEntryDeg;
   if (rampEntryDeg !== undefined) {
     return settings.cutType === 'v-carve'
       ? { label: `requested entry ${rampEntryDeg}°`, notes: ['medial depth profile governs'] }
-      : { label: `ramp entry ${rampEntryDeg}°`, notes: [] };
+      : {
+          label: `ramp entry ${rampEntryDeg}°`,
+          notes: unrampedShapes ? [unrampedShapesNote(settings)] : [],
+        };
   }
   if (settings.cutType === 'v-carve') return null;
   if (settings.helixEntry !== undefined) return { label: 'helix entry', notes: [] };
   return null;
+}
+
+// Shapes whose passes never ramp record no ramp (ADR-273 Amendment 2), so an
+// operation whose compiled shapes carry none names what its angle misses.
+function unrampedShapesNote(settings: CncLayerSettings): string {
+  if (settings.cutType === 'drill') return 'not used by drilling';
+  if (settings.cutType === 'inlay-pair') return 'not used by the inlay pocket or insert';
+  if (settings.cutType === 'pocket' && settings.pocketStrategy === 'adaptive') {
+    return 'not used by adaptive clearing';
+  }
+  if (settings.cutType === 'pocket' && settings.helixEntry !== undefined) {
+    return 'not used by the helical pocket';
+  }
+  return 'not used by these shapes';
 }
 
 // A relief group that records no ramp plunges at every start, whatever entry
