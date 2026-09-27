@@ -20,6 +20,17 @@ function rectangle(x: number, y: number, width: number, height: number): Polylin
   };
 }
 
+function rightTriangle(leg: number): Polyline {
+  return {
+    closed: true,
+    points: [
+      { x: 0, y: 0 },
+      { x: leg, y: 0 },
+      { x: 0, y: leg },
+    ],
+  };
+}
+
 function regularPolygon(segments: number): Polyline {
   return {
     closed: true,
@@ -55,6 +66,50 @@ describe('verifyAdaptivePocket', () => {
     if (!result.ok) return;
     expect(result.coverageRatio).toBeGreaterThanOrEqual(0.985);
     expect(result.maxSimulatedEngagementMm).toBeLessThanOrEqual(0.5 + result.gridMm * Math.SQRT2);
+  });
+
+  it('counts only the stock the cutter can reach', () => {
+    // Each corner of a 12 mm square keeps r^2 (1 - pi/4) that no 3.175 mm
+    // cutter reaches, 1.5% of the area in all. Counted as stock, it failed the
+    // 98.5% coverage target with nothing reachable left (ADR-154 Amendment 3).
+    const contours = [square(0, 0, 12)];
+    const result = verifyAdaptivePocket(
+      contours,
+      3.175,
+      planAdaptivePocket(contours, 3.175, 0.3175),
+    );
+    expect(result).toMatchObject({ ok: true, coverageRatio: 1 });
+  });
+
+  it('still refuses a plan that leaves reachable stock', () => {
+    const contours = [square(0, 0, 20)];
+    const plan = planAdaptivePocket(contours, 4, 0.5);
+    const sequence = plan.ok ? plan.sequences[0] : undefined;
+    if (!plan.ok || sequence === undefined) throw new Error('expected an adaptive plan');
+    // The outer half of the roughing and the finishing ring left out.
+    const rings = sequence.rings.slice(0, Math.floor(sequence.rings.length / 2));
+    const unfinished: AdaptivePocketPlan = {
+      ...plan,
+      sequences: [{ ...sequence, rings, finishRings: [] }],
+    };
+    expect(verifyAdaptivePocket(contours, 4, unfinished)).toMatchObject({
+      ok: false,
+      reason: 'Adaptive verification found reachable stock left behind.',
+    });
+  });
+
+  it('measures the contact exactly, not on the stock grid', () => {
+    // A right triangle with 30 mm legs at the default 10% engagement. The grid,
+    // whose cell is as wide as the ring spacing here, read up to 0.59 mm and
+    // refused the pocket; the plan's contact stays within the 0.3175 mm limit.
+    const contours = [rightTriangle(30)];
+    const result = verifyAdaptivePocket(
+      contours,
+      3.175,
+      planAdaptivePocket(contours, 3.175, 0.3175),
+    );
+    expect(result).toMatchObject({ ok: true, coverageRatio: 1 });
+    if (result.ok) expect(result.maxSimulatedEngagementMm).toBeLessThanOrEqual(0.3175);
   });
 
   it('rejects an unverified full-slot path', () => {
