@@ -70,7 +70,10 @@ export async function traceCliText(
       format: options.format,
       precisionMm: options.precisionMm,
       groupContours: options.groupContours,
-      page: { fit: options.pageFit, marginMm: options.marginMm },
+      // As the Multi-File Trace dialog: the image page is the writers' default.
+      ...(options.pageFit === 'artwork'
+        ? { page: { fit: 'artwork', marginMm: options.marginMm } }
+        : {}),
     },
   );
   return result.files[0]?.text ?? null;
@@ -87,7 +90,8 @@ export function traceCliTraceOptions(
   const widthMm = options.overrides.hybridMaxStrokeWidthMm;
   // Line + fill's Max stroke width is in placed millimetres (ADR-454); the
   // image traces on its stored grid, so that grid's density converts it.
-  return widthMm === undefined ? merged : withHybridMaxStrokeWidth(merged, widthMm, source.image.width / source.widthMm);
+  if (widthMm === undefined) return merged;
+  return withHybridMaxStrokeWidth(merged, widthMm, source.image.width / source.widthMm);
 }
 
 function message(error: unknown): string {

@@ -1,6 +1,7 @@
 // --help text of the headless trace command (ADR-477), built from the same
 // preset, format and override tables the parser reads, so the two cannot drift.
 
+import { MAX_TRACED_PAGE_MARGIN_MM } from '../../core/trace/traced-page-box';
 import { TRACE_OVERRIDE_RULES } from '../trace/trace-settings-snapshot';
 import {
   TRACE_CLI_FORMATS,
@@ -13,8 +14,9 @@ const COLUMN = 30;
 export function traceCliHelp(): string {
   const overrides = Object.entries(TRACE_CLI_OVERRIDE_FLAGS).map(([key, entry]) => {
     const rule = TRACE_OVERRIDE_RULES[key as keyof typeof TRACE_OVERRIDE_RULES];
-    const flag = rule.kind === 'boolean' ? `--[no-]${entry.flag}` : `--${entry.flag} <value>`;
-    return row(flag, entry.help);
+    if (rule.kind === 'boolean') return row(`--[no-]${entry.flag}`, entry.help);
+    const values = rule.kind === 'choice' ? ` (${rule.values.join(', ')})` : '';
+    return row(`--${entry.flag} <value>`, entry.help + values);
   });
   return [
     'Usage: kerfdesk-trace [options] [input]',
@@ -32,7 +34,7 @@ export function traceCliHelp(): string {
     row('--precision <mm>', 'Coordinate grid of the file (default: 0.001)'),
     row('--group-contours', 'Group each colour into one path'),
     row('--page <image|artwork>', 'Page: the whole image, or the artwork (default: image)'),
-    row('--margin <mm>', 'Space around the artwork page (default: 0)'),
+    row('--margin <mm>', `Space around the artwork page, 0-${MAX_TRACED_PAGE_MARGIN_MM} (default: 0)`),
     row('-h, --help', 'Show this help'),
     '',
     'Trace settings (the Trace dialog controls; unset ones keep the preset value):',

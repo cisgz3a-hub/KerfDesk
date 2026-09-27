@@ -1,0 +1,54 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`trace command (ADR-477) > prints its help text 1`] = `
+"Usage: kerfdesk-trace [options] [input]
+
+Trace a raster image to vector artwork with the KerfDesk tracer, headless.
+Reads PNG, JPEG, BMP, TIFF (first page) or PBM/PGM/PPM from the input file,
+or from standard input when the input is "-" or omitted. Writes to the
+output file, or to standard output when it is "-" or omitted.
+
+Options:
+  -o, --output <file>           Output file (default: standard output)
+  -p, --preset <name>           Trace preset (default: Line Art)
+  -f, --format <format>         Output format: svg, dxf, pdf, eps, geojson (default: svg)
+  -r, --dpi <n>[x<n>]           Image density (default: embedded, else 254)
+  --precision <mm>              Coordinate grid of the file (default: 0.001)
+  --group-contours              Group each colour into one path
+  --page <image|artwork>        Page: the whole image, or the artwork (default: image)
+  --margin <mm>                 Space around the artwork page, 0-1000 (default: 0)
+  -h, --help                    Show this help
+
+Trace settings (the Trace dialog controls; unset ones keep the preset value):
+  --cutoff <value>              Cutoff: darkest luma counted as ink (0-255)
+  --threshold <value>           Threshold: lightest luma counted as ink (0-255)
+  --ignore-less-than <value>    Ignore shapes under N pixels
+  --smoothness <value>          Smoothness (0-1.33)
+  --optimize <value>            Optimize: curve fit tolerance (0-2)
+  --diagonal-contacts <value>   Diagonal contacts (auto, connect-ink, connect-paper)
+  --[no-]invert                 Trace light artwork on a dark ground
+  --detection <value>           preset | manual | sketch | faint-lines
+  --despeckle <value>           Remove specks under N pixels
+  --[no-]fill-pinholes          Close pinholes and hairline cracks
+  --[no-]trace-transparency     Trace the alpha mask
+  --[no-]sketch                 Sketch (pencil) detection
+  --edge-sensitivity <value>    Edge Detection sensitivity (0-100)
+  --edge-detail <value>         Edge Detection detail (0-100)
+  --edge-min-line <value>       Edge Detection shortest line (px)
+  --max-stroke-width <value>    Line + fill max stroke (mm)
+  --photo-detail <value>        Photo shading detail (0-100)
+  --photo-brightness <value>    Photo shading brightness (-100 to 100)
+  --photo-contrast <value>      Photo shading contrast (-100 to 100)
+  --photo-gamma <value>         Photo shading gamma (0.1-5)
+  --[no-]photo-invert           Photo shading invert
+  --colours <value>             Colour layers count, or auto
+  --colour-output <value>       Colour layers output style (cut-out, stacked)
+  --[no-]keep-background        Colour layers: keep the background
+
+Presets: Line Art, Photo shading, Smooth, Sharp, Centerline, Line + fill, Edge Detection, Colour layers.
+Preset names ignore case; dashes or underscores may stand for spaces.
+
+Exit status: 0 traced, 1 the image could not be read or traced,
+2 invalid options, 3 the trace found nothing to draw.
+"
+`;

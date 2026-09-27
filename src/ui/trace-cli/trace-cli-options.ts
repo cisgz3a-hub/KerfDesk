@@ -6,7 +6,7 @@
 // dialog merges them. Output defaults are the Multi-File Trace dialog's.
 
 import type { BatchTraceFormat } from '../../core/trace/batch-trace';
-import type { TracedPageFit } from '../../core/trace/traced-page-box';
+import { MAX_TRACED_PAGE_MARGIN_MM, type TracedPageFit } from '../../core/trace/traced-page-box';
 import { DEFAULT_EXPORT_PRECISION_MM } from '../../core/vector-export/decimal-grid';
 import type { ImageDensity } from '../common/image-density';
 import type { LightBurnTraceSettingOverrides } from '../trace/trace-options';
@@ -59,7 +59,7 @@ export const TRACE_CLI_OVERRIDE_FLAGS: Readonly<
   ignoreLessThanPixels: { flag: 'ignore-less-than', help: 'Ignore shapes under N pixels' },
   smoothness: { flag: 'smoothness', help: 'Smoothness (0-1.33)' },
   optimize: { flag: 'optimize', help: 'Optimize: curve fit tolerance (0-2)' },
-  turnPolicy: { flag: 'diagonal-contacts', help: 'auto | connect-ink | connect-paper' },
+  turnPolicy: { flag: 'diagonal-contacts', help: 'Diagonal contacts' },
   invert: { flag: 'invert', help: 'Trace light artwork on a dark ground' },
   detectionMode: { flag: 'detection', help: 'preset | manual | sketch | faint-lines' },
   despeckleMinPixels: { flag: 'despeckle', help: 'Remove specks under N pixels' },
@@ -71,8 +71,8 @@ export const TRACE_CLI_OVERRIDE_FLAGS: Readonly<
   edgeMinimumLinePx: { flag: 'edge-min-line', help: 'Edge Detection shortest line (px)' },
   hybridMaxStrokeWidthMm: { flag: 'max-stroke-width', help: 'Line + fill max stroke (mm)' },
   photoDetail: { flag: 'photo-detail', help: 'Photo shading detail (0-100)' },
-  photoBrightness: { flag: 'photo-brightness', help: 'Photo shading brightness (-100-100)' },
-  photoContrast: { flag: 'photo-contrast', help: 'Photo shading contrast (-100-100)' },
+  photoBrightness: { flag: 'photo-brightness', help: 'Photo shading brightness (-100 to 100)' },
+  photoContrast: { flag: 'photo-contrast', help: 'Photo shading contrast (-100 to 100)' },
   photoGamma: { flag: 'photo-gamma', help: 'Photo shading gamma (0.1-5)' },
   photoInvert: { flag: 'photo-invert', help: 'Photo shading invert' },
   colourCount: { flag: 'colours', help: 'Colour layers count, or auto' },
@@ -141,7 +141,7 @@ function applyGeneralFlag(draft: Draft, name: string, value: () => string): bool
   else if (name === 'precision') draft.precisionMm = numberIn('precision', value(), 1e-6, 1);
   else if (name === 'group-contours') draft.groupContours = true;
   else if (name === 'page') draft.pageFit = pageFit(value());
-  else if (name === 'margin') draft.marginMm = numberIn('margin', value(), 0, 1000);
+  else if (name === 'margin') draft.marginMm = numberIn('margin', value(), 0, MAX_TRACED_PAGE_MARGIN_MM);
   else return false;
   return true;
 }
