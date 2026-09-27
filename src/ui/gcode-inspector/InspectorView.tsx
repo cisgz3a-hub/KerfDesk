@@ -44,7 +44,7 @@ export function InspectorView(props: InspectorViewProps): JSX.Element {
   const bodyRef = useRef<HTMLDivElement | null>(null);
   const fullWindow = useFullWindow(bodyRef);
   const session = useInspectorSession(props.model, props.analysis, props.source);
-  const scene = useInspectorScene(props.model, session, props.source?.machineKind);
+  const scene = useInspectorScene(props.model, session, props.source);
   const { canvasRef, handleRef, state, reason, camera } = scene;
   const { playhead, liveMode, live } = session;
   const { selectedLine, locateLine, locateMove } = useLocators(props.model, session);
@@ -242,7 +242,7 @@ function stockTarget(model: InspectorRenderModel, session: Session) {
 function useInspectorScene(
   model: InspectorRenderModel,
   session: Session,
-  machineKind: 'laser' | 'cnc' | undefined,
+  source: GcodeInspectionSource | undefined,
 ) {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const { handleRef, state, reason } = useViewer3dScene(canvasRef, model);
@@ -251,7 +251,8 @@ function useInspectorScene(
     state,
     model,
     sections: session.sections,
-    machineKind,
+    machineKind: source?.machineKind,
+    design: source?.design,
     target: stockTarget(model, session),
   });
   const { playhead, liveMode, live } = session;

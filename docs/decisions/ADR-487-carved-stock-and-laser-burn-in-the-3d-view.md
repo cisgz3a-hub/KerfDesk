@@ -22,9 +22,12 @@ burn a laser job will leave. This batch shows both in the Inspector.
    the readouts with "Show carved stock" and "Toolpath over the stock", both off to start with.
    Shown, the 3D view draws a block of material that playback carves as it runs, in both looks.
    - **The stock is a removal grid over the moves below Z0**, the stock top, as Cut 3D assumes,
-     with the widest bit's radius and 2 mm of room round them. Its bottom is 1 mm below the
-     deepest move: a program does not say how thick the stock is. The grid keeps to about a million
-     cells, no finer than 0.05 mm and at most 2,048 a side (the texture size every WebGL 2 takes).
+     with the widest bit's radius and 2 mm of room round them. For the project's own program
+     ("Inspect G-code (3D)" and the canvas's G-code view) its bottom is the project's stock
+     thickness below Z0, so a cut through the stock leaves a hole. An opened file does not say how
+     thick its stock is, so its bottom is 1 mm below the deepest move. The grid keeps to about a
+     million cells, no finer than 0.05 mm and at most 2,048 a side (the texture size every WebGL 2
+     takes).
    - **Every move carves, rapids included.** A rapid below the stock top cuts on the machine, or
      breaks the bit, so it shows. Each cell keeps the deepest the bit's cutting surface has been
      over it.
@@ -58,8 +61,10 @@ burn a laser job will leave. This batch shows both in the Inspector.
    stock as wood (the default), MDF, acrylic, aluminium, a two-colour laminate, flat grey or a
    height map. Each is worked out per pixel from where the pixel is in the block, so a cut shows
    what is under the surface:
-   - wood has growth rings round a trunk along X, which a carving cuts across and the block's end
-     shows as end grain;
+   - wood is Cut 3D's timber (ADR-284, `WOOD_GRAIN_GLSL`): growth rings round a log along X
+     below the board, which a carving cuts across, pores, and cut faces lighter and rougher than
+     the top, in the colours and figure of the project's species (walnut dark, pine pale and
+     wide-ringed) or Cut 3D's own timber without one;
    - MDF has a darker skin 0.4 mm deep over a paler core;
    - acrylic has a gloss top and frosted, paler cuts;
    - aluminium is rolled plate with faint streaks along X, with brighter, shinier machined faces;
@@ -67,10 +72,55 @@ burn a laser job will leave. This batch shows both in the Inspector.
    - flat grey shows only the shape;
    - the height map colours each depth from pale at the top through green and blue to dark at the
      stock's bottom.
-   One shader serves them all, so a new material changes a uniform and the surface's shine, and
-   nothing is rebuilt. Studio's key light and environment are brighter than Classic's rig, so
+   The project's own program starts on the project's stock material (softwoods and hardwoods as
+   wood, plywood and MDF as MDF, acrylic, aluminium); an opened file starts on the one last
+   chosen. One shader serves them all, so a new material changes a uniform and the surface's
+   shine, and nothing is rebuilt. Studio's key light and environment are brighter than Classic's rig, so
    colours are drawn a little darker there; Classic has no environment for metal to reflect, so
    aluminium is only part metal there.
+
+3. **Compare with the design.** For the project's own program, when a relief lies on the stock,
+   the Stock section has "Compare with the design" and a tolerance of ±0.05, 0.1 (the default),
+   0.25 or 0.5 mm. On, the stock's top is coloured by how far each cell's carving is from the
+   depth the relief design wants there: green within the tolerance; blue where material is left
+   above the design, deeper blue the more is left; red where the carving is below it, darker the
+   deeper. Under the colours the section counts the share of the design's cells within, with
+   material left and cut too deep, with the most left and the deepest cut, as far as playback has
+   got.
+   - **The design is the relief as the compiler carves it.** Each relief is read from the same
+     heightmap relief CAM reads (`reliefObjectToHeightmap` at the scales relief planning uses),
+     placed in the program as the compiler places it: the relief's own placement less the scale
+     planning takes out, the machine's origin, then the job's placement from Save's preparation
+     (`jobOriginOffset`). Each step is affine, so the page works out one matrix per relief and the
+     worker samples the heightmap under every stock cell, between its cells. Where reliefs overlap
+     the deeper wins. Only reliefs on operations the program outputs count.
+   - **Only the reliefs are compared.** Cells no relief covers, and cells a relief's mask leaves
+     out, keep the material's colours: profiles, pockets and V-carves say where they cut, not what
+     they should leave, and this batch keeps to the relief (the 3D carving thread keeps
+     `core/relief` and `compile-cnc-relief`; this only reads them).
+   - **Where it comes from.** Save's emission reports the job placement and the reliefs it
+     carves; "Inspect G-code (3D)" and the canvas's G-code view hand them to the Inspector with
+     the project's stock. The Inspector keeps them on the page: the parse worker is sent the
+     program without them. The carving worker builds the design's depths once and sends a copy
+     to the view, which draws it as a second float texture and colours each pixel from its cell.
+
+4. **Save the carved stock as STL.** With the stock shown, "Save as STL…" writes the stock as
+   carved so far (as far as playback has got) as a binary STL solid in the program's
+   millimetres, Z0 the stock top, for another CAM, a slicer or a model viewer to open.
+   - **One closed surface.** The top is the surface the view draws, a vertex at every cell's
+     centre, except that the outermost vertices sit on the stock's edges, so the solid is the
+     stock's full size. Walls go down to the bottom round the stock and round every hole a cut
+     through leaves (a square with any corner cut through is left out, as the view leaves it
+     out), and the bottom is flat.
+   - **Flat stays small.** Each row of squares is split into runs; a run of level squares, such
+     as the uncut top or a pocket's floor, is one strip of triangles between the vertices its
+     two edges need, and the bottom needs vertices only where walls stand and runs end. Every
+     run's edge keeps each vertex a neighbouring run or wall has on it, so no vertex sits part
+     way along another triangle's edge: every edge is walked once each way by the triangles
+     either side, and slicers and CAM read the solid as closed.
+   - **The file is picked first**, while the click still counts as the operator's (the browser
+     refuses a save picker later), and the carving worker, which holds the grid, writes the
+     solid and hands the bytes over without copying them.
 
 ### Consequences
 
@@ -82,8 +132,19 @@ burn a laser job will leave. This batch shows both in the Inspector.
 - **Going back re-carves from the start.** A 300,000-move relief takes about 1.5 seconds in the
   worker, during which the view shows the stock as it was.
 - **Materials are looks, not stock data.** The material changes nothing about the carving: the
-  grid, the bit and the depths are the same whatever is chosen, and the program says nothing
+  grid, the bit and the depths are the same whatever is chosen. An opened file says nothing
   about what it is cut from.
+- **The compare is a picture, not a check.** It flags nothing and blocks nothing (ADR-228). It is
+  as exact as the grid: a sloped ball move is carved exact to half a cell, and a finishing
+  ball's scallops show as material left at a tolerance tighter than the scallop. It assumes the
+  program is run where Save placed it; a job run from another origin carves the same shape
+  elsewhere, and the program alone cannot tell. An opened file has no design to compare with.
+- **The STL is the grid.** It is as fine as the cells, heights between cell centres are
+  straight, and a wall one cell wide leans across that cell. A 30 mm pocket in its 34 mm block
+  (462,400 cells) saves as 15,548 triangles (0.8 MB), within 0.5% of the pocket's volume; a
+  million-cell relief is about two million triangles, 100 MB, written in about a second (Node,
+  one core). Only the top of a carving has detail to save, so the file grows with its
+  sloped area, not the stock's.
 - **Memory:** the worker holds a copy of the moves and the grid (4 bytes a cell, about 4 MB); the
   page holds the grid's depths and the GPU a texture of them and one vertex a cell (about 36 MB
   for a million cells), while the stock is shown.
@@ -106,12 +167,32 @@ burn a laser job will leave. This batch shows both in the Inspector.
   material code lands after three's colour and roughness in both shaders, with a branch for each
   material; a new material or look changes the uniforms and shine, fully metal in Studio and part
   metal in Classic; the choice is remembered, and unknown or unavailable storage gives wood.
+- Unit tests (`stock-design-target.test.ts`): each relief lies where it is placed and nothing
+  elsewhere; the deeper wins where reliefs overlap; a mask's left-out cells have no design; no
+  relief on the stock gives no design; the one matrix places a turned, scaled, mirrored relief as
+  the compiler's own steps do on a centre-origin machine with a job offset; the counts split
+  cells into left, within and too deep.
+- Unit tests (`stock-stl.test.ts`): an uncut block, a pocket, a hole cut through, a surface
+  with no two squares alike and one where flat, sloped and cut-through squares meet each save
+  as a closed solid (every edge walked once each way) of the right volume, facing out; the flat
+  top is a strip a row and the flat bottom needs vertices only at its edges; the header does not
+  start "solid"; a stock cut through everywhere saves nothing. (`stock-worker-client.test.ts`):
+  the STL waits for the carve asked before it, the view does not hear it, and a stopped worker
+  or a program that carves nothing gives none.
+- End to end (`stock-design-compare.test.ts`): a 30 mm dome relief turned 30°, compiled through
+  Save's preparation with a front-left user origin, read back from its G-code and carved whole,
+  lies on its design: 99.5% of its 360,000 cells within 0.25 mm and none cut too deep. Moved
+  2 mm, the same design finds cuts up to 0.6 mm too deep and under three quarters within.
 - Browser (`e2e/gcode-viewer-stock.e2e.ts`): a 30 mm pocket with a 6 mm end mill shows a whole
   block at the start of the program, a carved pocket at the end, the same whole block going back
   and the same carving going forward again; the laminate shows no wood colours and wood again
   gives the same picture; the toolpath can be drawn over it; Studio shows it too; hiding it
   leaves no stock. A program without its bit says it carves with a 3.175 mm end
-  mill.
+  mill. A CNC project of 9 mm MDF with the dome relief, inspected from the canvas, starts on MDF,
+  compares with its design (none too deep, most within 0.1 mm, green in the view, fewer within
+  0.05 mm) and stops colouring when compare is off. The carved pocket, saved as STL through the
+  save picker, reads back as a closed solid within 2% of the block less the pocket, in under
+  40,000 triangles.
 - Timings (Node, one core): a 150 x 100 mm pocket in three depths with a 6 mm end mill carved
   whole in 39.7 s with Cut 3D's stamping (measured beside a test run) and in 0.16 s swept; a
   300,000-move relief with a 3.175 mm ball nose in 1.4 s; playback's worst carve between frames

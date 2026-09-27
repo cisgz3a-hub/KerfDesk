@@ -8,6 +8,7 @@
 // the only refusal is the factual "no program could be produced" case.
 
 import { DEFAULT_JOB_PLACEMENT, resolveExportJobPlacement } from '../job-placement';
+import type { EmittedDesignPlacement } from '../laser/save-output-emission';
 import type { SaveGcodeCtx } from './file-actions';
 import { emitSaveGcode } from './save-gcode-emission';
 import type { OutputCompilationProgress } from '../../io/gcode/prepare-output-async';
@@ -28,7 +29,7 @@ export type InspectCurrentGcodeResult =
 
 export async function handleInspectCurrentGcode(
   ctx: InspectCtx,
-  openInspector: (programName: string, text: string) => void,
+  openInspector: (programName: string, text: string, placement?: EmittedDesignPlacement) => void,
   options: InspectCurrentGcodeOptions = {},
 ): Promise<InspectCurrentGcodeResult> {
   const placement = resolveExportJobPlacement(ctx.jobPlacement ?? DEFAULT_JOB_PLACEMENT, {
@@ -56,11 +57,12 @@ export async function handleInspectCurrentGcode(
     return { kind: 'unavailable', message: emission.message };
   }
   const { gcode } = emission;
+  const design = emission.kind === 'emitted' ? emission.placement : undefined;
   if (gcode.trim() === '') {
     ctx.pushToast('Nothing to inspect — this project produces no G-code yet.', 'warning');
     return { kind: 'empty' };
   }
-  openInspector(currentProgramName(ctx.savedName), gcode);
+  openInspector(currentProgramName(ctx.savedName), gcode, design);
   return { kind: 'ready' };
 }
 

@@ -45,6 +45,14 @@ async function watchPreviewDraws(page: Page): Promise<void> {
       }
       return lit;
     };
+    // Everything the preview's status line said, kept as it changes.
+    const said = new Set<string>();
+    Object.assign(window, { __previewSaid: said });
+    new MutationObserver(() => {
+      for (const status of document.querySelectorAll('.gcode-viewer-preview [role="status"]')) {
+        said.add(status.textContent ?? '');
+      }
+    }).observe(document, { subtree: true, childList: true, characterData: true });
     const proto = WebGL2RenderingContext.prototype;
     const { drawArrays } = proto;
     proto.drawArrays = function (this: Gl, mode: number, first: number, count: number) {
@@ -62,6 +70,14 @@ interface PreviewDrawn {
   readonly draws: number;
   readonly moves: number;
   readonly litPixels: number;
+}
+
+// What the preview's status line has said so far. Read from a record rather
+// than the page, so the check does not race the full view replacing it.
+async function previewSaid(page: Page): Promise<string> {
+  return page.evaluate(() =>
+    [...(window as unknown as { __previewSaid: Set<string> }).__previewSaid].join('\n'),
+  );
 }
 
 async function previewDrawn(page: Page): Promise<PreviewDrawn> {
@@ -90,8 +106,8 @@ test('the Inspector draws the moves read so far while its worker reads a big fil
   const dialog = page.getByRole('dialog', { name: 'G-code Inspector: big-preview.nc' });
   const preview = dialog.locator('.gcode-viewer-preview');
   await expect(preview).toBeVisible({ timeout: 30_000 });
-  await expect(preview.getByRole('status')).toContainText(/worker.*cancel/i);
-  await expect(preview.getByRole('status')).toContainText(/[\d,]+ moves read/);
+  await expect.poll(() => previewSaid(page)).toMatch(/worker.*cancel/i);
+  await expect.poll(() => previewSaid(page)).toMatch(/[\d,]+ moves read/);
 
   // Says how many draws there were, so a failure tells a blank canvas from none.
   await expect

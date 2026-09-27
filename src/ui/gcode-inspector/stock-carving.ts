@@ -21,7 +21,7 @@ export type StockLayout = {
   readonly widthMm: number;
   readonly heightMm: number;
   readonly mmPerCell: number;
-  /** The deepest cut, less a margin: the program does not say how thick the stock is. */
+  /** The stock's bottom: the project's thickness below Z0, or else the deepest cut less a margin. */
   readonly bottomZ: number;
 };
 
@@ -57,7 +57,11 @@ const MARGIN_MM = 2;
 const BOTTOM_MARGIN_MM = 1;
 const FLOATS_PER_MOVE = 6;
 
-export function stockLayout(moves: StockMoves): StockLayout | null {
+/**
+ * Where the stock is. Its bottom is `thicknessMm` below Z0 when the project
+ * says how thick the stock is: a cut through it then leaves a hole.
+ */
+export function stockLayout(moves: StockMoves, thicknessMm?: number): StockLayout | null {
   const cut = cutExtent(moves);
   if (cut === null) return null;
   const room = widestRadius(moves.tools) + MARGIN_MM;
@@ -75,7 +79,8 @@ export function stockLayout(moves: StockMoves): StockLayout | null {
     widthMm,
     heightMm,
     mmPerCell,
-    bottomZ: cut.minZ - BOTTOM_MARGIN_MM,
+    bottomZ:
+      thicknessMm !== undefined && thicknessMm > 0 ? -thicknessMm : cut.minZ - BOTTOM_MARGIN_MM,
   };
 }
 

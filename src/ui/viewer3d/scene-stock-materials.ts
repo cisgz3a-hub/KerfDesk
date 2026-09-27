@@ -1,8 +1,9 @@
 // What the carved stock is made of (ADR-487), drawn in its shaders: the
 // colour and shine of each material, worked out per pixel from where the
-// pixel is in the block, so a cut shows what is under the surface. Wood has
-// growth rings that a carving cuts across; MDF a darker skin over a paler
-// core; acrylic a gloss top and frosted cuts; aluminium rolled plate with
+// pixel is in the block, so a cut shows what is under the surface. Wood is
+// Cut 3D's timber (ADR-284): growth rings round a log below the board, which
+// a carving cuts across, in the colours and figure of the project's species;
+// MDF a darker skin over a paler core; acrylic a gloss top and frosted cuts; aluminium rolled plate with
 // brighter, shinier machined faces; the two-colour laminate a thin cap over a core of
 // the other colour, as engraving plastics are; flat grey shows only the
 // shape; the height map colours each depth, from pale at the top to dark at
@@ -10,6 +11,10 @@
 // uniform and nothing is rebuilt.
 
 import type * as ThreeNamespace from 'three';
+import { isChiploadMaterialKey } from '../../core/cnc';
+import { WOOD_GRAIN_GLSL } from '../cnc-viewer3d/viewer3d-wood-shader';
+import { materialAppearance } from '../theme/material-appearance';
+import { woodGrainFor, type GrainAppearance } from '../theme/wood-grain-appearance';
 import type { Viewer3dLook } from './viewer3d-look';
 
 export const STOCK_MATERIALS = [
@@ -50,31 +55,105 @@ const STUDIO_GAIN = 0.78;
 // Classic has no environment for metal to reflect: it would draw black.
 const CLASSIC_METAL = 0.35;
 
+// Where Cut 3D puts the log the rings grow round: a little behind the
+// board's middle and well below its top (viewer3d-wood-material.ts).
+const LOG_BEHIND_FRACTION = 0.18;
+const LOG_DEPTH_MM = -45;
+
+type Vec3Value = [number, number, number];
+
 /** The uniforms both the stock's top and its sides read. */
 export type StockUniforms = {
   readonly stockKind: { value: number };
   readonly stockBottom: { value: number };
   readonly stockGain: { value: number };
+  /** The block's middle in X and Y: the grain is worked out from it. */
+  readonly stockCentre: { value: [number, number] };
+  readonly uGrainEarly: { value: Vec3Value };
+  readonly uGrainLate: { value: Vec3Value };
+  readonly uGrainLogCentre: { value: [number, number] };
+  readonly uGrainRingFreq: { value: number };
+  readonly uGrainSharp: { value: number };
+  readonly uGrainWarp: { value: number };
+  readonly uGrainPore: { value: number };
+  readonly uGrainFresh: { value: number };
 };
 
-export function createStockUniforms(bottomZ: number): StockUniforms {
-  return { stockKind: { value: 0 }, stockBottom: { value: bottomZ }, stockGain: { value: 1 } };
+/** The block the uniforms are for: its bottom, middle and depth front to back. */
+export type StockBlock = {
+  readonly bottomZ: number;
+  readonly centreX: number;
+  readonly centreY: number;
+  readonly lengthY: number;
+};
+
+export function createStockUniforms(block: StockBlock): StockUniforms {
+  return {
+    stockKind: { value: 0 },
+    stockBottom: { value: block.bottomZ },
+    stockGain: { value: 1 },
+    stockCentre: { value: [block.centreX, block.centreY] },
+    uGrainEarly: { value: [0, 0, 0] },
+    uGrainLate: { value: [0, 0, 0] },
+    uGrainLogCentre: { value: [block.lengthY * LOG_BEHIND_FRACTION, LOG_DEPTH_MM] },
+    uGrainRingFreq: { value: 0 },
+    uGrainSharp: { value: 1 },
+    uGrainWarp: { value: 0 },
+    uGrainPore: { value: 0 },
+    uGrainFresh: { value: 1 },
+  };
 }
 
-/** Puts the material and look into the uniforms and the materials' shine. */
+/**
+ * Puts the material and look into the uniforms and the materials' shine.
+ * `materialKey` is the project's stock (a CNC material key): wood takes that
+ * species' colours and grain, or Cut 3D's own timber without one.
+ */
 export function applyStockMaterial(
   uniforms: StockUniforms,
   materials: ReadonlyArray<ThreeNamespace.MeshStandardMaterial>,
-  material: StockMaterial,
+  choice: { readonly material: StockMaterial; readonly materialKey?: string | undefined },
   look: Viewer3dLook,
 ): void {
+  const { material } = choice;
   const shine = SHINE[material];
   uniforms.stockKind.value = STOCK_MATERIALS.indexOf(material);
   uniforms.stockGain.value = look === 'studio' ? STUDIO_GAIN : 1;
+  applyGrain(uniforms, choice.materialKey);
   for (const each of materials) {
     each.roughness = shine.roughness;
     each.metalness = shine.metalness * (look === 'studio' ? 1 : CLASSIC_METAL);
   }
+}
+
+// A timber key gives its species; any other (acrylic, aluminium, none) the
+// timber Cut 3D draws for a project without a material.
+function applyGrain(uniforms: StockUniforms, materialKey: string | undefined): void {
+  const key = isChiploadMaterialKey(materialKey) ? materialKey : undefined;
+  const timber = key !== undefined && woodGrainFor(key) !== null ? key : undefined;
+  const grain: GrainAppearance | null = woodGrainFor(timber);
+  if (grain === null) return;
+  const appearance = materialAppearance(timber);
+  const early = linearRgb(appearance.shallowRgb);
+  const deep = linearRgb(appearance.deepRgb);
+  uniforms.uGrainEarly.value = early;
+  uniforms.uGrainLate.value = [0, 1, 2].map(
+    (at) => (early[at] ?? 0) + ((deep[at] ?? 0) - (early[at] ?? 0)) * grain.contrast,
+  ) as Vec3Value;
+  uniforms.uGrainRingFreq.value = grain.ringFreq;
+  uniforms.uGrainSharp.value = grain.sharp;
+  uniforms.uGrainWarp.value = grain.warp;
+  uniforms.uGrainPore.value = grain.pore;
+  uniforms.uGrainFresh.value = grain.fresh;
+}
+
+// The appearance table is in sRGB; the shader works in linear light, as
+// three.Color converts it for Cut 3D.
+function linearRgb(rgb: readonly [number, number, number]): Vec3Value {
+  return rgb.map((channel) => {
+    const c = channel / 255;
+    return c <= 0.04045 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4;
+  }) as Vec3Value;
 }
 
 /** Passes each vertex's place in the block on to the fragment shader. */
@@ -107,7 +186,18 @@ roughnessFactor = stockRoughness(vStockPoint, roughnessFactor);`,
 const STOCK_FUNCTIONS = `uniform int stockKind;
 uniform float stockBottom;
 uniform float stockGain;
+uniform vec2 stockCentre;
+uniform vec3 uGrainEarly;
+uniform vec3 uGrainLate;
+uniform vec2 uGrainLogCentre;
+uniform float uGrainRingFreq;
+uniform float uGrainSharp;
+uniform float uGrainWarp;
+uniform float uGrainPore;
+uniform float uGrainFresh;
 varying vec3 vStockPoint;
+${WOOD_GRAIN_GLSL}
+float stockWoodRough = 0.78;
 float stockHash(vec3 p) {
   p = fract(p * 0.3183099 + 0.1);
   p *= 17.0;
@@ -125,14 +215,15 @@ float stockNoise(vec3 x) {
     f.z);
 }
 bool stockCut(vec3 p) { return p.z < -0.02; }
+// Cut 3D's timber, worked out from the block's middle, so the noise keeps its
+// detail far from the machine's zero. A cut face is fresh fibre, lighter and
+// rougher than the sanded top.
 vec3 stockWood(vec3 p) {
-  // Growth rings round a trunk along X, below and behind the board.
-  float radius = length(vec2(p.y + 140.0, (p.z + 60.0) * 2.5));
-  radius += 3.0 * stockNoise(p * vec3(0.02, 0.15, 0.15));
-  float ring = fract(radius / 2.4);
-  float late = smoothstep(0.6, 0.82, ring) * (1.0 - smoothstep(0.9, 1.0, ring));
-  vec3 colour = mix(vec3(0.70, 0.46, 0.23), vec3(0.43, 0.24, 0.10), late);
-  return colour * (0.93 + 0.07 * stockNoise(p * vec3(0.1, 5.0, 5.0)));
+  float rough;
+  vec3 colour = carveWoodAlbedo(vec3(p.xy - stockCentre, p.z), rough);
+  float cut = smoothstep(0.02, 0.45, -p.z);
+  stockWoodRough = mix(rough * 0.72, min(0.95, rough * 1.25), cut);
+  return mix(colour * 0.88, colour * uGrainFresh, cut);
 }
 vec3 stockMdf(vec3 p) {
   vec3 colour = p.z > -0.4 ? vec3(0.40, 0.23, 0.11) : vec3(0.56, 0.36, 0.19);
@@ -163,6 +254,7 @@ vec3 stockColour(vec3 p) {
   return stockHeight(p);
 }
 float stockRoughness(vec3 p, float roughness) {
+  if (stockKind == 0) return stockWoodRough;
   if (stockKind == 2) return stockCut(p) ? 0.62 : roughness;
   if (stockKind == 3) return stockCut(p) ? 0.2 : roughness;
   return roughness;

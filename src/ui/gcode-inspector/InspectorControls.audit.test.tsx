@@ -39,6 +39,7 @@ const scene = vi.hoisted(() => ({
   setStock: vi.fn(),
   updateStock: vi.fn(),
   setStockMaterial: vi.fn(),
+  setStockCompare: vi.fn(),
   setToolpathVisible: vi.fn(),
   setStage: vi.fn(),
   pickViewCube: vi.fn(() => null),

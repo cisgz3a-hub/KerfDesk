@@ -55,6 +55,13 @@ describe('the carved stock (ADR-487)', () => {
     expect(carvesStock(moves([[0, 0, 5, 10, 0, 0]]))).toBe(false);
   });
 
+  it("sits the stock's bottom at the project's thickness when it is known", () => {
+    expect(stockLayout(SLOT, 12)?.bottomZ).toBe(-12);
+    // Thinner than the cut is deep: the cut goes through it.
+    expect(stockLayout(SLOT, 0.5)?.bottomZ).toBe(-0.5);
+    expect(stockLayout(SLOT, 0)?.bottomZ).toBe(-2);
+  });
+
   it('carves as far as playback has got', () => {
     const made = carver(SLOT);
     // Half way along the cut: every move before it, and half of it.

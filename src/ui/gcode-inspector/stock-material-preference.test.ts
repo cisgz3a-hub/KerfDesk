@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import {
   STOCK_MATERIAL_KEY,
   readStockMaterial,
+  stockMaterialFor,
   writeStockMaterial,
 } from './stock-material-preference';
 
@@ -37,5 +38,15 @@ describe('carved stock material preference (ADR-487)', () => {
     expect(readStockMaterial(broken)).toBe('wood');
     expect(() => writeStockMaterial('mdf', broken)).not.toThrow();
     expect(readStockMaterial(null)).toBe('wood');
+  });
+
+  it("draws the project's stock material as the nearest stock material", () => {
+    expect(stockMaterialFor('hardwood-walnut')).toBe('wood');
+    expect(stockMaterialFor('softwood')).toBe('wood');
+    expect(stockMaterialFor('plywood-mdf')).toBe('mdf');
+    expect(stockMaterialFor('acrylic')).toBe('acrylic');
+    expect(stockMaterialFor('aluminum')).toBe('aluminium');
+    expect(stockMaterialFor(undefined)).toBeNull();
+    expect(stockMaterialFor('granite')).toBeNull();
   });
 });

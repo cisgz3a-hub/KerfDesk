@@ -8,9 +8,9 @@ import {
 
 const LIMITS = { accelMmPerSec2: 500, junctionDeviationMm: 0.01, maxFeedMmPerMin: 6000 };
 
-// Machine kind and power dialect only; timing has its own tests below.
+// Machine kind and power dialect only; timing and the design have their own tests.
 function projectInspectionContext(project: Project): GcodeInspectionContext {
-  const { timing: _timing, ...context } = contextWithTiming(project);
+  const { timing: _timing, design: _design, ...context } = contextWithTiming(project);
   return context;
 }
 
@@ -52,6 +52,19 @@ describe('compiled Inspector source context', () => {
     expect(
       projectInspectionContext({ ...project, device, machine: DEFAULT_CNC_MACHINE_CONFIG }),
     ).toEqual({ machineKind: 'cnc' });
+  });
+});
+
+describe('Inspector design context (ADR-487)', () => {
+  it("carries a CNC project's stock, and its reliefs where Save placed them", () => {
+    const project = { ...createProject(), machine: DEFAULT_CNC_MACHINE_CONFIG };
+    const stock = DEFAULT_CNC_MACHINE_CONFIG.stock;
+    expect(contextWithTiming(project).design).toEqual({
+      stockThicknessMm: stock.thicknessMm,
+      ...(stock.materialKey === undefined ? {} : { stockMaterialKey: stock.materialKey }),
+      reliefs: [],
+    });
+    expect(contextWithTiming(createProject()).design).toBeUndefined();
   });
 });
 

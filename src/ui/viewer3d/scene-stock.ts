@@ -7,12 +7,20 @@
 // faces from the stock's bottom to its top. Cells cut below the bottom are
 // cut through and draw nothing, so a profile leaves a hole.
 //
+// Compared with the design, the top is coloured by how far each cell is from
+// the depth the design wants there (scene-stock-compare.ts).
+//
 // Classic has no lights of its own, so the stock brings a soft rig of its
 // own there; Studio's lights and environment light it in Studio. Classic's
 // grid lies at Z0, the stock's top, so while the stock shows the grid drops
 // to the stock's bottom and the block sits on it; it goes back after.
 
 import type * as ThreeNamespace from 'three';
+import {
+  createCompareUniforms,
+  stockCompareFragment,
+  type StockCompareUniforms,
+} from './scene-stock-compare';
 import {
   applyStockMaterial,
   createStockUniforms,
@@ -37,6 +45,18 @@ export type Viewer3dStock = {
   readonly depth: Float32Array;
   /** The stock's bottom, below Z0. */
   readonly bottomZ: number;
+  /**
+   * The depth the design wants in each cell, laid out as `depth`, and above
+   * Z0 where there is no design to compare with; absent without a design.
+   */
+  readonly target?: Float32Array;
+};
+
+/** What the stock is made of: a material, and the project's stock for wood. */
+export type StockMaterialChoice = {
+  readonly material: StockMaterial;
+  /** The project's stock material (a CNC material key), for its species. */
+  readonly materialKey?: string | undefined;
 };
 
 export type StockView = {
@@ -44,7 +64,9 @@ export type StockView = {
   /** The depths changed: uploads them. */
   readonly update: () => void;
   readonly setLook: (look: Viewer3dLook) => void;
-  readonly setMaterial: (material: StockMaterial) => void;
+  readonly setMaterial: (choice: StockMaterialChoice) => void;
+  /** Colours the top against the design within the tolerance, or stops. */
+  readonly setCompare: (toleranceMm: number | null) => void;
   /** Classic's grid was built again: puts it under the stock. */
   readonly placeGrid: () => void;
   readonly dispose: () => void;
@@ -65,10 +87,14 @@ export function createStockView(
   scene.add(root);
   let built: BuiltStock | null = null;
   let look: Viewer3dLook = 'classic';
-  let material: StockMaterial = 'wood';
+  let material: StockMaterialChoice = { material: 'wood' };
+  let compare: number | null = null;
   let gridZ = 0;
   const shade = (): void => {
-    if (built !== null) applyStockMaterial(built.uniforms, built.materials, material, look);
+    if (built === null) return;
+    applyStockMaterial(built.uniforms, built.materials, material, look);
+    built.compare.stockCompare.value = compare === null ? 0 : 1;
+    built.compare.stockTolerance.value = compare ?? 0;
   };
   const placeGrid = (): void => {
     for (const child of classicFurniture.children) {
@@ -104,6 +130,10 @@ export function createStockView(
       material = next;
       shade();
     },
+    setCompare: (toleranceMm) => {
+      compare = toleranceMm;
+      shade();
+    },
     placeGrid,
     dispose: () => {
       clear();
@@ -116,23 +146,27 @@ type BuiltStock = {
   readonly group: ThreeNamespace.Group;
   readonly texture: ThreeNamespace.DataTexture;
   readonly uniforms: StockUniforms;
+  readonly compare: StockCompareUniforms;
   readonly materials: ReadonlyArray<ThreeNamespace.MeshStandardMaterial>;
   readonly dispose: () => void;
 };
 
 function buildStock(three: ThreeModule, stock: Viewer3dStock): BuiltStock {
-  const texture = new three.DataTexture(
-    stock.depth,
-    stock.columns,
-    stock.rows,
-    three.RedFormat,
-    three.FloatType,
-  );
-  texture.minFilter = three.NearestFilter;
-  texture.magFilter = three.NearestFilter;
-  texture.needsUpdate = true;
-  const uniforms = createStockUniforms(stock.bottomZ);
-  const top = topMesh(three, stock, texture, uniforms);
+  const texture = cellTexture(three, stock.depth, stock.columns, stock.rows);
+  // A cell above Z0 has no design to compare with: one of them stands for none.
+  const target =
+    stock.target === undefined
+      ? cellTexture(three, new Float32Array([1]), 1, 1)
+      : cellTexture(three, stock.target, stock.columns, stock.rows);
+  const lengthY = stock.rows * stock.mmPerCell;
+  const uniforms = createStockUniforms({
+    bottomZ: stock.bottomZ,
+    centreX: stock.originX + (stock.columns * stock.mmPerCell) / 2,
+    centreY: stock.originY + lengthY / 2,
+    lengthY,
+  });
+  const compare = createCompareUniforms(target);
+  const top = topMesh(three, stock, texture, { ...uniforms, ...compare });
   const sides = sideMesh(three, stock, uniforms);
   const group = new three.Group();
   group.add(top, sides);
@@ -140,15 +174,31 @@ function buildStock(three: ThreeModule, stock: Viewer3dStock): BuiltStock {
     group,
     texture,
     uniforms,
+    compare,
     materials: [top.material, sides.material],
     dispose: () => {
       texture.dispose();
+      target.dispose();
       for (const mesh of [top, sides]) {
         mesh.geometry.dispose();
         mesh.material.dispose();
       }
     },
   };
+}
+
+// One float a cell, read exactly: no filtering between cells.
+function cellTexture(
+  three: ThreeModule,
+  cells: Float32Array,
+  columns: number,
+  rows: number,
+): ThreeNamespace.DataTexture {
+  const texture = new three.DataTexture(cells, columns, rows, three.RedFormat, three.FloatType);
+  texture.minFilter = three.NearestFilter;
+  texture.magFilter = three.NearestFilter;
+  texture.needsUpdate = true;
+  return texture;
 }
 
 type StockMesh = ThreeNamespace.Mesh<
@@ -161,7 +211,7 @@ function topMesh(
   three: ThreeModule,
   stock: Viewer3dStock,
   texture: ThreeNamespace.DataTexture,
-  shared: StockUniforms,
+  shared: StockUniforms & StockCompareUniforms,
 ): StockMesh {
   const spanX = Math.max(stock.columns - 1, 1) * stock.mmPerCell;
   const spanY = Math.max(stock.rows - 1, 1) * stock.mmPerCell;
@@ -185,7 +235,9 @@ function topMesh(
   material.onBeforeCompile = (shader) => {
     Object.assign(shader.uniforms, uniforms);
     shader.vertexShader = stockVertexChunks(carveVertex(shader.vertexShader));
-    shader.fragmentShader = carveFragment(stockFragmentChunks(shader.fragmentShader));
+    shader.fragmentShader = stockCompareFragment(
+      carveFragment(stockFragmentChunks(shader.fragmentShader)),
+    );
   };
   material.customProgramCacheKey = () => 'carved-stock-top';
   const mesh = new three.Mesh(geometry, material);
@@ -230,6 +282,7 @@ function carveVertex(source: string): string {
 uniform float stockCell;
 uniform float stockBottom;
 varying float vStockDepth;
+varying vec2 vStockUv;
 float stockDepthAt(ivec2 cell) {
   ivec2 size = textureSize(stockDepth, 0);
   return texelFetch(stockDepth, clamp(cell, ivec2(0), size - 1), 0).r;
@@ -255,6 +308,7 @@ vec3 objectNormal = normalize(vec3(
     .replace(
       '#include <begin_vertex>',
       `vStockDepth = stockDepthAt(stockCellHere);
+vStockUv = uv;
 vec3 transformed = vec3(position.xy, max(vStockDepth, stockBottom));`,
     );
 }
