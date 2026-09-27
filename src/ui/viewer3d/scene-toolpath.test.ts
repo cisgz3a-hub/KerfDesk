@@ -35,27 +35,48 @@ describe('toolpath progress geometry', () => {
     expect(f.reveal.solid?.geometry.instanceCount).toBe(0);
     expect(f.reveal.travel?.geometry.drawRange.count).toBe(2);
     expect(f.reveal.solidGhost?.visible).toBe(true);
-    const position = f.reveal.active.geometry.getAttribute('position');
-    expect(position.getX(0)).toBe(10);
-    expect(position.getX(1)).toBe(35);
+    const drawn = f.reveal.active.positions();
+    expect(drawn[0]).toBe(10);
+    expect(drawn[3]).toBe(35);
     applyReveal(f.reveal, { segmentIndex: 2, point: { x: 110, y: 10, z: 0 } });
     expect(f.reveal.solid?.geometry.instanceCount).toBe(1);
     expect(f.reveal.solid?.geometry).toBe(geometry);
     applyReveal(f.reveal, null);
     expect(f.reveal.solid?.geometry.instanceCount).toBe(2);
     expect(f.reveal.solidGhost?.visible).toBe(false);
-    expect(f.reveal.active.visible).toBe(false);
+    expect(f.reveal.active.object.visible).toBe(false);
     disposeChildren(f.group);
   });
 
   it('does not leak a highlighted rapid through the hidden travel toggle', () => {
     const f = fixture();
     applyReveal(f.reveal, { segmentIndex: 0, point: { x: 5, y: 0, z: 0 } });
-    expect(f.reveal.active.visible).toBe(true);
+    expect(f.reveal.active.object.visible).toBe(true);
     setToolpathTravelVisibility(f.reveal, false);
-    expect(f.reveal.active.visible).toBe(false);
+    expect(f.reveal.active.object.visible).toBe(false);
     applyReveal(f.reveal, { segmentIndex: 1, point: { x: 25, y: 0, z: 0 } });
-    expect(f.reveal.active.visible).toBe(true);
+    expect(f.reveal.active.object.visible).toBe(true);
+    disposeChildren(f.group);
+  });
+
+  it('keeps only the trail bold, fading it, while the ghost shows the rest', () => {
+    const f = fixture();
+    const trail = f.reveal.solid!.trail;
+    applyReveal(f.reveal, { segmentIndex: 2, point: { x: 110, y: 25, z: 0 }, trailFrom: 2 });
+    expect(f.reveal.solid?.geometry.instanceCount).toBe(1);
+    expect(trail.trailStart.value).toBe(1);
+    expect(trail.trailFade.value).toBeGreaterThan(0);
+    expect(f.reveal.travel?.geometry.drawRange).toMatchObject({ start: 2, count: 0 });
+    expect(f.reveal.solidGhost?.visible).toBe(true);
+    applyReveal(f.reveal, { segmentIndex: 2, point: { x: 110, y: 25, z: 0 }, trailFrom: 0 });
+    expect(trail.trailStart.value).toBe(0);
+    expect(trail.trailFade.value).toBeGreaterThan(0);
+    expect(f.reveal.travel?.geometry.drawRange).toMatchObject({ start: 0, count: 2 });
+    applyReveal(f.reveal, { segmentIndex: 2, point: { x: 110, y: 25, z: 0 } });
+    expect(trail.trailFade.value).toBe(0);
+    applyReveal(f.reveal, null);
+    expect(trail.trailStart.value).toBe(0);
+    expect(f.reveal.solid?.geometry.instanceCount).toBe(2);
     disposeChildren(f.group);
   });
 

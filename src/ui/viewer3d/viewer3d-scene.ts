@@ -173,7 +173,7 @@ function installToolpath(core: SceneCore): void {
     viewHeight: state.viewHeight,
     travelVisible: state.travelVisible,
   });
-  state.fatMaterial = built.fatMaterial;
+  state.fatMaterials = built.fatMaterials;
   state.travelObject = built.travelObject;
   state.travelLine = built.travelLine;
   state.reveal = built.reveal;
@@ -353,7 +353,7 @@ function lifecycleMethods(core: SceneCore): LifecycleMethods {
       const parts = {
         renderer: deps.renderer,
         camera: deps.rig.camera,
-        fatMaterial: state.fatMaterial,
+        fatMaterials: state.fatMaterials,
       };
       applyResize(parts, nextWidth, nextHeight);
       core.studio.resize(nextWidth, nextHeight);

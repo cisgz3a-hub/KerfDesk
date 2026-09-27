@@ -44,3 +44,13 @@
   font-weight: 600;
   font-variant-numeric: tabular-nums;
 }
+
+/* The 3D view takes keys while focused (ADR-470); a keyboard focus shows. */
+.gcode-viewer-canvas:focus {
+  outline: none;
+}
+
+.gcode-viewer-canvas:focus-visible {
+  outline: 2px solid var(--lf-accent);
+  outline-offset: -2px;
+}

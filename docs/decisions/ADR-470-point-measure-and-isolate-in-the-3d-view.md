@@ -17,6 +17,9 @@ points, and what does this part of the job look like on its own.
    switch one off, and there was no way to see one depth level or cut the view through the job.
 3. **No way to measure.** Checking a stepover, a tab's length or the depth between two passes
    meant reading coordinates off the source and doing the sums by hand.
+4. **Playback was hard to follow.** The move under way was a one-pixel line, easy to lose among
+   the done moves, and on a long job the done moves filled the view. The view had no keys: every
+   play, step and view change was a trip to a button.
 
 ### Decision
 
@@ -76,6 +79,23 @@ points, and what does this part of the job look like on its own.
      one of its ends. It works in both looks and both projections; its label layer is its own, so
      Classic shows it too.
 
+4. **Playback and keys** (`ui/viewer3d/scene-current-move.ts`, `ui/viewer3d/line-trail.ts`,
+   `ui/gcode-inspector/use-viewport-keys.ts`).
+   - Three states: done moves in their lens colours, the move under way drawn bold from its start
+     to the playhead in the arrow colour inside a dark casing, and the moves still to come faint.
+   - **Trail.** A Trail choice beside Speed keeps only the last 60, 20 or 5 seconds of done moves
+     bold, fading toward the background the older they are; earlier done moves show faint like the
+     moves to come. "Whole path" (the default) draws every done move as before. The trail is two
+     numbers in the solid lines' shader, the first and last move it keeps, so nothing is copied or
+     rebuilt as the playhead moves. It applies to playback only; live mode draws the whole path.
+   - **Keys**, while the view has focus (click it or tab to it): Space plays and pauses, the left
+     and right arrows step one move (to the end of the previous or next move, stepping over moves
+     that take no time), Home and End go to the start and end, F fits the job, 1 to 4 pick Iso,
+     Top, Front and Right, O switches orthographic, M turns Measure on and off. Esc drops the
+     measured points, then turns Measure off; with Measure off it closes the Inspector as before.
+     Keys typed in fields, Space and Enter on a focused button, and key chords pass through. The
+     hint bar lists the keys while the view has focus. Live mode has no playback keys.
+
 ### Consequences
 
 - **Picking reads pixels back synchronously.** One 13 x 13 read per animation frame while the
@@ -97,6 +117,14 @@ points, and what does this part of the job look like on its own.
   - `nearestEnd` snaps within reach to the nearer end and ignores an end off screen; `useMeasure`
     takes a first and second point, follows the pointer between them, starts over on a third
     click, and clears on a new program, on Clear and when switched off.
+  - `withTrail` finds its anchors in the fat-line shader three ships and leaves an unknown shader
+    alone; the trail's uniforms reach the compiled shader. `applyReveal` with a trail draws from
+    the trail's first move, fades only while a trail is on, and starts the traversal range there
+    too. `trailStartSegment` and `stepMoveSeconds` on a program with a move that takes no time.
+  - `viewportKeyAction` names each key in either case and leaves chords alone; `runViewportKey`
+    needs the transport for playback keys and a ready view for camera keys, and Esc drops points,
+    then the tool, then lets the dialog close. A key the view uses never reaches the dialog; field
+    typing and Space on a button pass through. The timeline's Trail choice reports its length.
   - `InspectorMoveTip`: one pick per frame at canvas coordinates, the outline follows the pick,
     nothing while a button is held or the view is not ready, a click locates while a drag does not,
     and a click still locates while the camera reports movement.
@@ -113,3 +141,8 @@ points, and what does this part of the job look like on its own.
   legend leaves nothing there. Measuring across the square seen from above reads 80.00 mm in the
   readout and on the line's label, and switching Measure off clears it and clicks go to lines
   again. Screenshots of the hover, the section, the Z range and a measurement in both looks.
+- Browser (`e2e/gcode-viewer-keys.e2e.ts`): with the view focused, Home, the arrows and End step
+  through the square's moves line by line, Space plays and pauses, 2 turns to the orthographic Top
+  view and O back, M and Esc turn Measure on and off without closing the Inspector, a 5-second
+  trail draws with no shader error, and a last Esc closes the Inspector. Screenshots of a 20-second
+  trail in both looks.

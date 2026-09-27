@@ -41,6 +41,11 @@ export type PlayheadMarker = {
   readonly segmentIndex: number;
   /** Interpolated tool position, or null to hide the marker. */
   readonly point: Point3 | null;
+  /**
+   * With a playback trail, the first move it keeps bold; done moves before it
+   * show faint like the moves to come. Absent draws every done move (ADR-470).
+   */
+  readonly trailFrom?: number;
 };
 
 export type SceneHandleDeps = {
@@ -60,7 +65,7 @@ export type SceneHandleDeps = {
 export type SceneState = {
   viewWidth: number;
   viewHeight: number;
-  fatMaterial: LineMaterialType | null;
+  fatMaterials: ReadonlyArray<LineMaterialType>;
   travelObject: Object3D | null;
   travelLine: TravelLine | null;
   travelVisible: boolean;
@@ -191,7 +196,7 @@ function initialState(deps: SceneHandleDeps): SceneState {
   return {
     viewWidth: deps.width,
     viewHeight: deps.height,
-    fatMaterial: null,
+    fatMaterials: [],
     travelObject: null,
     travelLine: null,
     travelVisible: true,

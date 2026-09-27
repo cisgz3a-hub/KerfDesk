@@ -121,7 +121,11 @@ function setScenePlayhead(handle: Viewer3dSceneHandle, next: SceneSyncArgs): voi
 
 function samePlayhead(left: PlayheadMarker | null, right: PlayheadMarker | null): boolean {
   if (left === null || right === null) return left === right;
-  return left.segmentIndex === right.segmentIndex && samePoint(left.point, right.point);
+  return (
+    left.segmentIndex === right.segmentIndex &&
+    left.trailFrom === right.trailFrom &&
+    samePoint(left.point, right.point)
+  );
 }
 
 function samePoint(left: SceneSyncArgs['live'], right: SceneSyncArgs['live']): boolean {

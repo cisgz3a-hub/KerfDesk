@@ -13,7 +13,7 @@ import { InspectorTimeline } from './InspectorTimeline';
 import { InspectorViewerHeader } from './InspectorViewerHeader';
 import { InspectorViewport } from './InspectorViewport';
 import { secondsAtPick } from './pick-readout';
-import { secondsAtLine } from './playhead';
+import { secondsAtLine, stepMoveSeconds, trailStartSegment } from './playhead';
 import { useFullWindow } from './use-full-window';
 import { useInspectorCamera } from './use-inspector-camera';
 import { useInspectorSession } from './use-inspector-session';
@@ -85,6 +85,7 @@ export function InspectorView(props: InspectorViewProps): JSX.Element {
             segTimeEndSec: session.time.segTimeEndSec,
             onLocate: locateMove,
           }}
+          transport={liveMode ? undefined : keyTransport(props.model, session)}
         >
           {props.variant === 'preview' ? (
             <PreviewLens model={props.model} session={session} />
@@ -134,6 +135,20 @@ function useLocators(model: GcodeRenderModel, session: Session) {
   };
 }
 
+// What the 3D view's keys play and step (ADR-470).
+function keyTransport(model: GcodeRenderModel, session: Session) {
+  const { playback, time } = session;
+  return {
+    togglePlay: playback.togglePlay,
+    stepMove: (direction: 1 | -1): void =>
+      playback.setRouteMm(
+        stepMoveSeconds(time.segTimeEndSec, model.segmentCount, playback.routeMm, direction),
+      ),
+    toStart: (): void => playback.setRouteMm(0),
+    toEnd: (): void => playback.setRouteMm(time.motionSeconds),
+  };
+}
+
 function PreviewLens(props: {
   readonly model: GcodeRenderModel;
   readonly session: Session;
@@ -162,6 +177,7 @@ function SessionTimeline({ session }: { readonly session: Session }): JSX.Elemen
   return (
     <InspectorTimeline
       playback={session.playback}
+      trail={{ seconds: session.trailSeconds, onChange: session.setTrailSeconds }}
       totalRouteMm={session.time.motionSeconds}
       live={
         liveMode
@@ -212,11 +228,23 @@ function useInspectorScene(model: GcodeRenderModel, session: Session) {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const { handleRef, state, reason } = useViewer3dScene(canvasRef, model);
   const { playhead, liveMode, live } = session;
+  const trailing = !liveMode && session.trailSeconds > 0;
+  const trailed = trailing
+    ? {
+        ...playhead,
+        trailFrom: trailStartSegment(
+          session.time.segTimeEndSec,
+          model.segmentCount,
+          playhead.routeMm,
+          session.trailSeconds,
+        ),
+      }
+    : playhead;
   useSceneSync({
     handleRef,
     state,
     model: model,
-    playhead: liveMode ? playhead : session.atEnd ? null : playhead,
+    playhead: liveMode ? playhead : session.atEnd ? null : trailed,
     colorOf: session.colorOf,
     live: liveMode ? live.point : null,
     arrows: session.arrows,

@@ -25,6 +25,8 @@ export function useInspectorSession(
   const programLens = useMemo(() => defaultLensFor(model, machineKind), [model, machineKind]);
   const lens = chosenLens ?? programLens;
   const [arrowsVisible, setArrowsVisible] = useState(false);
+  // Seconds of done moves playback keeps bold behind the tool; 0 keeps all.
+  const [trailSeconds, setTrailSeconds] = useState(0);
   const [followLive, setFollowLive] = useState(true);
   const theme = useMemo(() => resolveViewer3dTheme(), []);
   const [look, setLook] = useInspectorLook();
@@ -83,6 +85,8 @@ export function useInspectorSession(
     setLens,
     arrowsVisible,
     setArrowsVisible,
+    trailSeconds,
+    setTrailSeconds,
     theme,
     look,
     setLook,
