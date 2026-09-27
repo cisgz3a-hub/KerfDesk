@@ -60,7 +60,7 @@ Batch letters say which fix batch covers each one.
 
 | # | Finding |
 |---|---|
-| C1 | The RTSP camera bridge on `127.0.0.1:51731` accepts any `Host` header and any request with no `Origin` header (`isAllowedBridgeOrigin` returns true for `undefined`, `electron/rtsp-camera-bridge.ts:213`). A web page open in any browser on the same PC can reach it through DNS rebinding or a plain `<img>` tag, and make it connect to RTSP addresses on the local network. Fix: accept only `Host: 127.0.0.1:<port>` or `localhost:<port>`, and require a per-launch token on the stream URL. The camera thread owns this file, so the fix goes through it. |
+| C1 | The RTSP camera bridge on `127.0.0.1:51731` accepts any `Host` header and any request with no `Origin` header (`isAllowedBridgeOrigin` returns true for `undefined`, `electron/rtsp-camera-bridge.ts:213`). A web page open in any browser on the same PC can reach it through DNS rebinding or a plain `<img>` tag, and make it connect to RTSP addresses on the local network. Fix: accept only `Host: 127.0.0.1:<port>` or `localhost:<port>`, and refuse requests with no Origin (KerfDesk's own camera images already send one). Done in ADR-141 Amendment 1. |
 | C2 | The bridge runs inside the main process. Electron recommends a `utilityProcess` for network-facing or crash-prone work, so a bad camera stream cannot take the app down. Lower priority. |
 
 ### Serial port (Batch D, proposal)
@@ -102,6 +102,6 @@ Whichever is picked, the workflow change is small and can be made the day the ac
 - **Batch B**: fuses on both configs, ASAR integrity enforced, renderer-only packages out of `app.asar`, Electron
   42.11.8, electron-builder 26.17.0, electron-updater 6.8.10, and a Linux packaged-launch check on every PR that
   fails if the app does not start or the fuses are not set.
-- **Batch C**: camera bridge Host check and token, handed to the camera thread.
+- **Batch C**: camera bridge Host check and required Origin (ADR-141 Amendment 1).
 - **Batch D**: persisted serial grant, proposed to the Machine setup thread.
 - **Electron 44**: its own draft PR once A and B land, before 42's support ends on 20 Oct 2026.
