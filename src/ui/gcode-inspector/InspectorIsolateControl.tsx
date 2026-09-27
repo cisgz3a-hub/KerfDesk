@@ -87,7 +87,12 @@ function ZRange(props: {
         />
       </label>
       {isolate.zRange !== null ? (
-        <button type="button" style={resetStyle} onClick={() => setRange(0, last)}>
+        <button
+          type="button"
+          style={resetStyle}
+          title="Remove the Z range filter to show moves at every height"
+          onClick={() => setRange(0, last)}
+        >
           Show all heights
         </button>
       ) : null}
@@ -144,6 +149,7 @@ function Section(props: {
               value={section.at}
               aria-label="Section position"
               aria-valuetext={`${section.at.toFixed(2)} mm`}
+              title="Move the section through the job along the selected axis"
               onChange={(event) =>
                 props.onChange({
                   ...isolate,
@@ -156,6 +162,7 @@ function Section(props: {
             <input
               type="checkbox"
               checked={section.flip}
+              title="Show the opposite side of the section"
               onChange={(event) =>
                 props.onChange({
                   ...isolate,
