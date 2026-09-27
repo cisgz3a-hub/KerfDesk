@@ -84,7 +84,9 @@ export type GcodeMetadata = {
  */
 // ADR-427 integration also cuts deepest cleanup before linked relief rings;
 // all adaptive ring closure and flat depth-slice provenance above is retained.
-export const EMITTER_REVISION = 'adaptive-relief-cleanup-linked-entry-scan-timing-20260927-v1';
+// Scan timing v2 also preserves M3 state across shared, empty and coincident
+// Image handoffs (ADR-445); cached v1 output must be regenerated.
+export const EMITTER_REVISION = 'adaptive-relief-cleanup-linked-entry-scan-timing-20260927-v2';
 
 // Machine-specific assumption lines (ADR-103 defect fix): router exports
 // previously carried the laser-worded `$32=1 (laser mode)` banner. The S
