@@ -45,19 +45,31 @@ export const DEFAULT_RING_DIAMETER_MM = 10;
 const RING_WIDTH_SHARE = 0.18;
 // Keep every ring fully inside the area.
 const EDGE_CLEARANCE_SHARE = 0.75;
+// The fewest columns and rows that hold the anchor L with rings around it.
+const MIN_COLS = 4;
+const MIN_ROWS = 5;
+// Rounding slack when the smallest grid exactly fills the area.
+const FIT_EPSILON_MM = 1e-9;
 
 export function bedTargetLayout(options: BedTargetOptions): BedTargetLayout {
-  const spacing = options.spacingMm ?? DEFAULT_TARGET_SPACING_MM;
-  const diameter = options.ringDiameterMm ?? DEFAULT_RING_DIAMETER_MM;
   const { area } = options;
+  // An area too small for the smallest grid shrinks the rings and their
+  // spacing together, so the grid still fits and the step stays the same
+  // number of ring radii, which the ring detector expects.
+  const wantedSpacing = options.spacingMm ?? DEFAULT_TARGET_SPACING_MM;
+  const wantedDiameter = options.ringDiameterMm ?? DEFAULT_RING_DIAMETER_MM;
+  const scale = fitScale(area, wantedSpacing, wantedDiameter);
+  const spacing = wantedSpacing * scale;
+  const diameter = wantedDiameter * scale;
   const clearance = diameter * EDGE_CLEARANCE_SHARE;
-  const cols = Math.max(3, Math.floor((area.width - 2 * clearance) / spacing) + 1);
-  const rows = Math.max(4, Math.floor((area.height - 2 * clearance) / spacing) + 1);
+  const cols = Math.max(MIN_COLS, gridCount(area.width - 2 * clearance, spacing));
+  const rows = Math.max(MIN_ROWS, gridCount(area.height - 2 * clearance, spacing));
   const x0 = area.x + (area.width - (cols - 1) * spacing) / 2;
   const y0 = area.y + (area.height - (rows - 1) * spacing) / 2;
-  // Origin anchor near the middle, with room for both arms of the L.
-  const originCol = Math.min(Math.floor((cols - 1) / 2), cols - 2);
-  const originRow = Math.min(Math.floor((rows - 1) / 2), rows - 3);
+  // Leave a ring beyond both arms: the detector rejects an anchor whose
+  // neighbours all lie on one side, even when the anchor itself fits.
+  const originCol = Math.min(Math.floor((cols - 1) / 2), cols - 3);
+  const originRow = Math.min(Math.floor((rows - 1) / 2), rows - 4);
   const marks: BedTargetMark[] = [];
   for (let r = 0; r < rows; r += 1) {
     for (let c = 0; c < cols; c += 1) {
@@ -78,6 +90,21 @@ export function bedTargetLayout(options: BedTargetOptions): BedTargetLayout {
     ringDiameterMm: diameter,
     ringWidthMm: diameter * RING_WIDTH_SHARE,
   };
+}
+
+// 1, or the share of the wanted size at which the smallest grid's outer
+// rings just touch the area's edges. A grid that already fits keeps its size.
+function fitScale(area: BedTargetArea, spacing: number, diameter: number): number {
+  return Math.min(
+    1,
+    area.width / ((MIN_COLS - 1) * spacing + diameter),
+    area.height / ((MIN_ROWS - 1) * spacing + diameter),
+  );
+}
+
+// Grid points that fit along `span`, one step apart.
+function gridCount(span: number, spacing: number): number {
+  return Math.floor((span + FIT_EPSILON_MM) / spacing) + 1;
 }
 
 /** The mark at grid index (col, row), if the layout has one. */

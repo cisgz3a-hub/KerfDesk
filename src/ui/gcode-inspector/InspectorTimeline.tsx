@@ -5,6 +5,13 @@ import type { PlaybackState } from './use-inspector-playback';
 import './inspector-viewer.css';
 
 const SPEEDS: ReadonlyArray<number> = [0.25, 0.5, 1, 2, 4, 8];
+// Seconds of done moves the trail keeps bold behind the tool; 0 keeps all.
+const TRAILS: ReadonlyArray<number> = [0, 60, 20, 5];
+
+export type TrailChoice = {
+  readonly seconds: number;
+  readonly onChange: (seconds: number) => void;
+};
 const STEP_SECONDS = 0.25;
 const SECONDS_PER_MINUTE = 60;
 const SCRUB_STEPS = 2000;
@@ -31,6 +38,8 @@ export function formatClock(seconds: number): string {
 
 export function InspectorTimeline(props: {
   readonly playback: PlaybackState;
+  /** The playback trail (ADR-470); absent where the view has none. */
+  readonly trail?: TrailChoice;
   /** Program motion time in planner seconds. */
   readonly totalRouteMm: number;
   readonly live?: ReportedProgress | null;
@@ -66,7 +75,12 @@ export function InspectorTimeline(props: {
           detail={live.label}
         />
       ) : (
-        <PlaybackTransport playback={playback} total={total} position={position} />
+        <PlaybackTransport
+          playback={playback}
+          total={total}
+          position={position}
+          trail={props.trail}
+        />
       )}
     </div>
   );
@@ -104,6 +118,7 @@ function PlaybackTransport(props: {
   readonly playback: PlaybackState;
   readonly total: number;
   readonly position: number;
+  readonly trail: TrailChoice | undefined;
 }): JSX.Element {
   const { playback, total, position } = props;
   return (
@@ -161,21 +176,48 @@ function PlaybackTransport(props: {
         aria-valuetext={`${formatClock(position)} of ${formatClock(total)} estimated`}
         disabled={total <= 0}
       />
-      <label className="gcode-viewer-speed">
-        Speed
-        <select
-          value={playback.speed}
-          onChange={(event) => playback.setSpeed(Number(event.currentTarget.value))}
-          aria-label="Playback speed"
-          title="Change preview playback speed"
-        >
-          {SPEEDS.map((speed) => (
-            <option key={speed} value={speed}>
-              {speed}×
-            </option>
-          ))}
-        </select>
-      </label>
+      <SpeedSelect playback={playback} />
+      {props.trail !== undefined ? <TrailSelect trail={props.trail} /> : null}
     </div>
+  );
+}
+
+function SpeedSelect({ playback }: { readonly playback: PlaybackState }): JSX.Element {
+  return (
+    <label className="gcode-viewer-speed">
+      Speed
+      <select
+        value={playback.speed}
+        onChange={(event) => playback.setSpeed(Number(event.currentTarget.value))}
+        aria-label="Playback speed"
+        title="Change preview playback speed"
+      >
+        {SPEEDS.map((speed) => (
+          <option key={speed} value={speed}>
+            {speed}×
+          </option>
+        ))}
+      </select>
+    </label>
+  );
+}
+
+function TrailSelect({ trail }: { readonly trail: TrailChoice }): JSX.Element {
+  return (
+    <label className="gcode-viewer-speed gcode-viewer-trail">
+      Trail
+      <select
+        value={trail.seconds}
+        onChange={(event) => trail.onChange(Number(event.currentTarget.value))}
+        aria-label="Playback trail"
+        title="How much of the finished path stays bold behind the tool during playback"
+      >
+        {TRAILS.map((seconds) => (
+          <option key={seconds} value={seconds}>
+            {seconds === 0 ? 'Whole path' : `Last ${seconds} s`}
+          </option>
+        ))}
+      </select>
+    </label>
   );
 }

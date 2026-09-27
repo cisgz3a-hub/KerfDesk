@@ -12,7 +12,7 @@ type ControllerStatusWaitRequest = {
   readonly onFreshReport?: (report: StatusReport) => void;
   readonly resolve: (report: StatusReport) => void;
   readonly reject: (error: Error) => void;
-  readonly timer: ReturnType<typeof setTimeout>;
+  readonly timer: ReturnType<typeof setTimeout> | null;
 };
 
 export type ControllerStatusWaitRefs = {
@@ -23,7 +23,8 @@ type FreshControllerStatusOptions = {
   readonly after: ControllerStatusStamp;
   readonly accept: (report: StatusReport) => boolean;
   readonly onFreshReport?: (report: StatusReport) => void;
-  readonly timeoutMs?: number;
+  /** null leaves the deadline to an owned caller, which must cancel in finally. */
+  readonly timeoutMs?: number | null;
   readonly timeoutMessage: string;
 };
 
@@ -44,9 +45,12 @@ export function waitForFreshControllerStatus(
       ...(options.onFreshReport === undefined ? {} : { onFreshReport: options.onFreshReport }),
       resolve,
       reject,
-      timer: setTimeout(() => {
-        finishControllerStatusWait(refs, request, 'reject', options.timeoutMessage);
-      }, options.timeoutMs ?? DEFAULT_STATUS_TIMEOUT_MS),
+      timer:
+        options.timeoutMs === null
+          ? null
+          : setTimeout(() => {
+              finishControllerStatusWait(refs, request, 'reject', options.timeoutMessage);
+            }, options.timeoutMs ?? DEFAULT_STATUS_TIMEOUT_MS),
     };
     refs.controllerStatusWait = request;
   });
@@ -90,7 +94,7 @@ function finishControllerStatusWait(
 ): void {
   if (refs.controllerStatusWait !== request) return;
   refs.controllerStatusWait = null;
-  clearTimeout(request.timer);
+  if (request.timer !== null) clearTimeout(request.timer);
   if (mode === 'resolve' && report !== undefined) request.resolve(report);
   else request.reject(new Error(message ?? 'Controller status was not confirmed.'));
 }

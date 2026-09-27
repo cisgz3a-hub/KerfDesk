@@ -22,6 +22,8 @@ function scene() {
     recolor: vi.fn(),
     setDirectionArrows: vi.fn(),
     setLiveMachine: vi.fn(),
+    setMoveFilter: vi.fn(),
+    setClipPlanes: vi.fn(),
   };
 }
 
@@ -117,5 +119,22 @@ describe('useSceneSync preparation', () => {
     const second = scene();
     await render({ ...defaults(second), model: MODEL_B });
     for (const method of Object.values(second)) expect(method).toHaveBeenCalledOnce();
+  });
+});
+
+describe('useSceneSync isolate (ADR-470)', () => {
+  it('applies the legend filter and clipping once, then only when they change', async () => {
+    const handle = scene();
+    const filter = new Uint8Array([1, 0, 1]);
+    const planes = [{ normal: [0, 0, 1] as const, constant: 2 }];
+    const args = { ...defaults(handle), state: 'ready' as const };
+    await render({ ...args, moveFilter: filter, clipPlanes: planes });
+    await render({ ...args, moveFilter: filter, clipPlanes: planes });
+    expect(handle.setMoveFilter).toHaveBeenCalledTimes(1);
+    expect(handle.setMoveFilter).toHaveBeenLastCalledWith(filter);
+    expect(handle.setClipPlanes).toHaveBeenCalledTimes(1);
+    await render({ ...args, moveFilter: null, clipPlanes: [] });
+    expect(handle.setMoveFilter).toHaveBeenLastCalledWith(null);
+    expect(handle.setClipPlanes).toHaveBeenLastCalledWith([]);
   });
 });

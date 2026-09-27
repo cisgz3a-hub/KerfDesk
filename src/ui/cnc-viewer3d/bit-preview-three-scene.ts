@@ -8,6 +8,8 @@ import type { CncTool } from '../../core/scene';
 import { viewer3dTheme } from '../theme/viewer3d-theme';
 import { bitPreviewProfile } from './bit-preview-profile';
 import { buildToolMesh, type ToolMeshHandle } from './viewer3d-tool';
+// Deep import: the viewer3d barrel is capped at 20 exports by its index contract.
+import { disposeViewer3dRenderer } from '../viewer3d/viewer3d-context';
 
 export type BitPreviewThreeModule = typeof ThreeNamespace;
 
@@ -186,7 +188,7 @@ function disposePreviewResources(resources: PreviewResources): void {
     try {
       resources.toolMesh?.dispose();
     } finally {
-      resources.renderer.dispose();
+      disposeViewer3dRenderer(resources.renderer);
     }
   }
 }

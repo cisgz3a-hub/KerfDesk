@@ -177,6 +177,18 @@ describe('designCarveHeightmap', () => {
     expect(depthAtMm(map, 2.5, 10)).toBe(0); // past the cut width; the top diameter reached it
   });
 
+  it('slots a V-bit profile on the compiler offset, at its cut width', () => {
+    // ADR-368 Amendment 3: 1 mm deep, the 90 degree bit cuts 2 mm wide at the
+    // stock surface, so the compiler offsets by 1 mm rather than half its 6.35 mm.
+    const outside = layer({ id: 'L', cutType: 'profile-outside', depthMm: 1, toolId: 'vb' });
+    const map = designCarveHeightmap(
+      input({ entities: [rect('r', 'L', 5, 5, 10)], layers: [outside] }),
+    );
+    expect(depthAtMm(map, 4.25, 10)).toBeCloseTo(-1, 5); // inside the slot
+    expect(depthAtMm(map, 5.5, 10)).toBe(0); // the part keeps its drawn size
+    expect(depthAtMm(map, 2.5, 10)).toBe(0); // past the cut width; the full diameter reached it
+  });
+
   it('drills a bit-diameter hole at a circle centre and ignores other shapes', () => {
     const drill = layer({ id: 'L', cutType: 'drill', depthMm: 3, toolId: 'em' });
     const circle: SketchEntity = {

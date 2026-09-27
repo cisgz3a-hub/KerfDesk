@@ -12,6 +12,8 @@ export type DepthLensScale = {
   readonly deepMm: number;
   readonly levelCount: number;
   readonly colorOf: (segmentIndex: number) => Rgb;
+  /** 0 at the shallowest machining depth, 1 at the deepest (ADR-426 ramps). */
+  readonly progressOf: (segmentIndex: number) => number;
 };
 
 // One ordered blue-to-red scale: shallow passes are light blue, intermediate
@@ -35,6 +37,7 @@ export function buildDepthLensScale(model: GcodeRenderModel): DepthLensScale | n
     ...range,
     levelCount: depthLevelCount(model, range),
     colorOf: (segmentIndex) => depthColor(segmentDepth(model, segmentIndex), range),
+    progressOf: (segmentIndex) => depthProgress(segmentDepth(model, segmentIndex), range),
   };
 }
 
@@ -93,9 +96,13 @@ function segmentDepth(model: GcodeRenderModel, index: number): number {
   return Math.min(startZ, endZ);
 }
 
-function depthColor(value: number, range: DepthRange): Rgb {
+function depthProgress(value: number, range: DepthRange): number {
   const span = range.shallowMm - range.deepMm;
-  const progress = span <= MIN_DEPTH_SPAN_MM ? 0.5 : clamp01((range.shallowMm - value) / span);
+  return span <= MIN_DEPTH_SPAN_MM ? 0.5 : clamp01((range.shallowMm - value) / span);
+}
+
+function depthColor(value: number, range: DepthRange): Rgb {
+  const progress = depthProgress(value, range);
   const mix = (shallow: number, deep: number): number => shallow + (deep - shallow) * progress;
   return [
     mix(DEPTH_RAMP_SHALLOW[0], DEPTH_RAMP_DEEP[0]),

@@ -5,11 +5,11 @@
 // swap in place. Render-on-demand — no rAF loop; a still viewport costs zero
 // GPU (the discipline every shipped viewer here follows).
 //
-// Input mapping is the Fusion synthesis recorded in the research doc: the
-// LEFT button never touches the camera (mouseButtons.LEFT = null falls
-// through OrbitControls' dispatch to state NONE, verified in the installed
-// r180 source), MIDDLE pans with the built-in Shift-orbit modifier, RIGHT
-// orbits, and the wheel zooms at the cursor.
+// Input mapping is the shared map of every 3D view (ADR-426) with the LEFT
+// button left to the armed tool: it never touches the camera
+// (mouseButtons.LEFT = null falls through OrbitControls' dispatch to state
+// NONE, verified in the installed r180 source), MIDDLE pans with the built-in
+// Shift-orbit modifier, RIGHT orbits, and the wheel zooms at the cursor.
 
 import type { WebGLRenderer } from 'three';
 import type * as ThreeNamespace from 'three';
@@ -23,6 +23,10 @@ import { localFromScene, pointerNdc, sceneFromLocal } from '../../cnc-viewer3d/v
 import { applySceneLighting } from '../../relief-viewer/scene-lighting';
 import { viewer3dTheme } from '../../theme/viewer3d-theme';
 import { cameraPlacement, type CameraPreset } from '../../viewer3d';
+// Deep imports: the viewer3d barrel is capped at 20 exports by its index contract.
+import { configureViewer3dControls, stopViewer3dGlide } from '../../viewer3d/viewer3d-controls';
+import { disposeViewer3dRenderer } from '../../viewer3d/viewer3d-context';
+import { createViewer3dGlideRendering } from '../../viewer3d/viewer3d-glide-rendering';
 import {
   buildOverlayDrawable,
   loadViewportLinesAddons,
@@ -83,12 +87,11 @@ export async function createDesignViewportScene(
   const controls = new OrbitControls(camera, canvas);
   // LEFT is the armed tool's button, never the camera: null falls through
   // OrbitControls' action switch to state NONE (research doc §2/§3).
-  controls.mouseButtons = { LEFT: null, MIDDLE: three.MOUSE.PAN, RIGHT: three.MOUSE.ROTATE };
-  controls.zoomToCursor = true;
+  configureViewer3dControls(three, controls, { leftButtonFree: true });
   controls.minDistance = MIN_DOLLY_MM;
   controls.maxDistance = MAX_DOLLY_MM;
-  const render = (): void => renderer.render(scene, camera);
-  controls.addEventListener('change', render);
+  const rendering = createViewer3dGlideRendering(controls, () => renderer.render(scene, camera));
+  const render = rendering.render;
 
   const handle = buildViewportHandle({
     three,
@@ -101,11 +104,11 @@ export async function createDesignViewportScene(
     controls,
     render,
     teardown: () => {
-      controls.removeEventListener('change', render);
+      rendering.dispose();
       controls.dispose();
       stage.dispose();
       lighting.dispose();
-      renderer.dispose();
+      disposeViewer3dRenderer(renderer);
     },
   });
   handle.setPreset('top');
@@ -121,7 +124,11 @@ type HandleDeps = {
   readonly renderer: WebGLRenderer;
   readonly scene: ThreeNamespace.Scene;
   readonly camera: ThreeNamespace.PerspectiveCamera;
-  readonly controls: { target: ThreeNamespace.Vector3; update: () => void };
+  readonly controls: {
+    target: ThreeNamespace.Vector3;
+    enableDamping: boolean;
+    update: () => boolean;
+  };
   readonly render: () => void;
   readonly teardown: () => void;
 };
@@ -170,6 +177,7 @@ function buildViewportHandle(deps: HandleDeps): DesignViewportHandle {
       render();
     },
     setPreset: (preset) => {
+      stopViewer3dGlide(controls);
       const placement = cameraPlacement(preset, {
         minX: -frame.widthMm / 2,
         maxX: frame.widthMm / 2,

@@ -27,6 +27,7 @@ import { assertNever } from '../scene';
 import { formatGcodeFeedMmPerMin } from '../gcode/feed-word';
 import type { OutputEmitOptions, OutputStrategy } from './output-strategy';
 import { bridgedAirGapIndices } from './air-assist-hold';
+import { withAirKeepAlive } from './air-keep-alive';
 import { emitScanlineFillGroup } from './grbl-fill-emission';
 import {
   LINE_END,
@@ -307,6 +308,9 @@ function emitRasterGroupHere(group: RasterGroup, context: GroupEmissionContext):
     modalFeedrate: dialect.modalFeedrate,
     emitSOnEveryBurnMove: dialect.emitSOnEveryBurnMove,
     compactMotionWords: dialect.compactMotionWords,
+    ...(cursor.head === null
+      ? {}
+      : { initialHead: { x: Number(cursor.head.x), y: Number(cursor.head.y) } }),
     layerId: group.layerId,
     color: group.color,
     powerPercent: group.power,
@@ -314,7 +318,7 @@ function emitRasterGroupHere(group: RasterGroup, context: GroupEmissionContext):
     ...(deferEntry ? { deferredEntry: { entryLines: takeHeldLines(cursor) } } : {}),
     deferClosingM5WhenLit: true,
   });
-  noteRasterGroupEnd(cursor, emission.closingM5Deferred);
+  noteRasterGroupEnd(cursor, emission);
   return emission.gcode;
 }
 
@@ -425,7 +429,15 @@ function emitJob(job: Job, device: DeviceProfile, options: OutputEmitOptions = {
   // A raster group last in the job already issued its trailing M5, so the
   // postamble must not emit a redundant second one (mode === 'off').
   parts.push(postamble(mode === 'off', device, dialect, options.finishPosition));
-  return parts.join('');
+  const program = parts.join('');
+  // The same firmware whose pump cannot be restarted also switches it off on
+  // its own timer while air is still wanted, so the command is repeated (ADR-462).
+  return device.airAssistRestartUnreliable === true
+    ? withAirKeepAlive(program, {
+        maxFeedMmPerMin: device.maxFeed,
+        accelMmPerSec2: device.accelMmPerSec2,
+      })
+    : program;
 }
 
 function powerModeForGroup(group: Group, dialect: GrblGcodeDialect): 'M3' | 'M4' | 'group-managed' {

@@ -12,11 +12,9 @@ export function CncInlayFields(props: {
   return (
     <RailSection
       label="Inlay fit"
-      hint="Set the pocket depth, space between matching edges and layout of the mirrored insert."
+      badge={`${props.settings.inlayAllowanceMm ?? 0.1} mm clearance`}
+      hint="Set the matching pocket depth, the gap between pocket and insert edges and the layout of the mirrored insert."
     >
-      <p className="lf-cnc-settings-hint">
-        Set the matching pocket depth and the gap between pocket and insert edges.
-      </p>
       <NumberField
         layer={props.layer}
         label="Pocket depth"

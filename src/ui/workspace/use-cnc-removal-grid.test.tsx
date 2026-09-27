@@ -6,6 +6,7 @@ import type { RemovalGrid } from '../../core/sim';
 import type { Toolpath } from '../../core/job';
 import { useCncRemovalGrid, useCncRemovalGridState } from './use-cnc-removal-grid';
 import { registerPreviewJobOriginOffset } from './preview-scene-frame';
+import { cncCut3DWorkFrame } from './cnc-cut3d-work-frame';
 
 (
   globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT?: boolean }
@@ -75,6 +76,11 @@ describe('useCncRemovalGrid', () => {
       jobOriginOffset: { x: 150, y: 25 },
     });
     expect(observed).toBe(GRID);
+    expect(cncCut3DWorkFrame(GRID)).toEqual({
+      originMm: { x: -150.5, y: -(PROJECT.device.bedHeight + 25) + 0.5, z: 0 },
+      xDirection: 1,
+      yDirection: 1,
+    });
   });
 
   it('cancels hidden preview work and suppresses a delayed completion', async () => {

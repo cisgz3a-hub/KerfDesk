@@ -90,6 +90,7 @@ describe('BoxGeneratorDialog background generation', () => {
       expect(direct.kind).toBe('generated');
       expect(rendered.onGenerate).toHaveBeenCalledWith(
         direct.kind === 'generated' ? direct.panels : [],
+        request.spec,
       );
     } finally {
       await unmount(rendered);
@@ -234,6 +235,7 @@ describe('BoxGeneratorDialog background generation', () => {
       expect(direct.kind).toBe('generated');
       expect(rendered.onGenerate).toHaveBeenCalledWith(
         direct.kind === 'generated' ? direct.panels : [],
+        DEFAULT_SPEC,
       );
     } finally {
       await unmount(rendered);
@@ -341,6 +343,7 @@ describe('BoxGeneratorDialog background generation', () => {
       expect(result.kind).toBe('generated');
       expect(rendered.onGenerate).toHaveBeenCalledWith(
         result.kind === 'generated' ? result.panels : [],
+        expect.objectContaining({ widthMm: 5000, targetFingerWidthMm: 3 }),
       );
     } finally {
       await unmount(rendered);

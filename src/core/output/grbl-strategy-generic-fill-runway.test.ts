@@ -71,7 +71,7 @@ describe('generic Scan Line feed-matched runway emission', () => {
     expect(lines.slice(0, 4)).toEqual([
       'G0 X5.000 Y4.000 S0',
       'G1 X10.000 Y4.000 F1500 S0 ; kerfdesk:laser-off-motion',
-      'G1X10.47Y4F1500S300',
+      'G1 X10.470 Y4.000 F1500 S300',
       'G1 X15.470 Y4.000 F1500 S0 ; kerfdesk:laser-off-motion',
     ]);
     assertEveryPoweredStartFollowsFeedMatchedLaserOffMotion(lines);
@@ -83,9 +83,9 @@ describe('generic Scan Line feed-matched runway emission', () => {
     expect(lines.slice(0, 6)).toEqual([
       'G0 X5.000 Y4.000 S0',
       'G1 X10.000 Y4.000 F1500 S0 ; kerfdesk:laser-off-motion',
-      'G1X12Y4F1500S300',
-      'X12.5S0',
-      'X14S300',
+      'G1 X12.000 Y4.000 F1500 S300',
+      'G1 X12.500 Y4.000 S0',
+      'G1 X14.000 Y4.000 S300',
       'G1 X19.000 Y4.000 F1500 S0 ; kerfdesk:laser-off-motion',
     ]);
     expect(lines.filter((line) => line.startsWith('G0 '))).toHaveLength(2);
@@ -97,11 +97,11 @@ describe('generic Scan Line feed-matched runway emission', () => {
     expect(lines.slice(0, 8)).toEqual([
       'G0 X-5.000 Y4.000 S0',
       'G1 X0.000 Y4.000 F1500 S0 ; kerfdesk:laser-off-motion',
-      'G1X1Y4F1500S300',
+      'G1 X1.000 Y4.000 F1500 S300',
       'G1 X4.000 Y4.000 F1500 S0 ; kerfdesk:laser-off-motion',
       'G0 X4.000 Y4.000 S0',
       'G1 X7.000 Y4.000 F1500 S0 ; kerfdesk:laser-off-motion',
-      'G1X8Y4F1500S300',
+      'G1 X8.000 Y4.000 F1500 S300',
       'G1 X13.000 Y4.000 F1500 S0 ; kerfdesk:laser-off-motion',
     ]);
     assertEveryPoweredStartFollowsFeedMatchedLaserOffMotion(lines);
@@ -111,11 +111,11 @@ describe('generic Scan Line feed-matched runway emission', () => {
     const lines = fillMotionLines(fillGroup([segment(0, 1), segment(13, 14)]));
 
     expect(lines.slice(2, 7)).toEqual([
-      'G1X1Y4F1500S300',
+      'G1 X1.000 Y4.000 F1500 S300',
       'G1 X6.000 Y4.000 F1500 S0 ; kerfdesk:laser-off-motion',
       'G0 X8.000 Y4.000 S0',
       'G1 X13.000 Y4.000 F1500 S0 ; kerfdesk:laser-off-motion',
-      'G1X14Y4F1500S300',
+      'G1 X14.000 Y4.000 F1500 S300',
     ]);
   });
 
@@ -125,11 +125,11 @@ describe('generic Scan Line feed-matched runway emission', () => {
     expect(fillMotionLines(group).slice(0, 8)).toEqual([
       'G0 X10.000 Y4.000 S0',
       'G1 X20.000 Y4.000 F1500 S0 ; kerfdesk:laser-off-motion',
-      'G1X21Y4F1500S300',
+      'G1 X21.000 Y4.000 F1500 S300',
       'G1 X24.000 Y4.000 F1500 S0 ; kerfdesk:laser-off-motion',
       'G0 X24.000 Y4.000 S0',
       'G1 X27.000 Y4.000 F1500 S0 ; kerfdesk:laser-off-motion',
-      'G1X28Y4F1500S300',
+      'G1 X28.000 Y4.000 F1500 S300',
       'G1 X38.000 Y4.000 F1500 S0 ; kerfdesk:laser-off-motion',
     ]);
     expect(emit({ groups: [group] })).toContain(
@@ -155,7 +155,7 @@ describe('generic Scan Line feed-matched runway emission', () => {
     expect(lines.slice(0, 4)).toEqual([
       'G0 X5.000 Y4.000 S0',
       'G1 X10.000 Y4.000 F1500 S0 ; kerfdesk:laser-off-motion',
-      'G1X10.47Y4F1500S300',
+      'G1 X10.470 Y4.000 F1500 S300',
       'G1 X15.470 Y4.000 F1500 S0 ; kerfdesk:laser-off-motion',
     ]);
     expect(gcode).toContain('overscan 0.000 mm; generic minimum 5.000 mm applied');

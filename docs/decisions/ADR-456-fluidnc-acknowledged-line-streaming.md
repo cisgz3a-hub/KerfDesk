@@ -37,6 +37,14 @@ Quality and the documented transport contract take precedence over assumed
 buffer capacity. A future buffered FluidNC mode requires a separately evidenced
 channel/version contract, not a larger guessed byte window.
 
+The throughput cost is unmeasured. No FluidNC hardware run has compared
+acknowledged-line and character-counted streaming on a dense raster or Fill job,
+and the 2026-09-25 controller audit had judged the profile window conservative
+from the same firmware version. This rule rests only on the cited firmware source
+comment. It stays the conservative behaviour until a hardware measurement shows
+either a planner-starvation cost that needs a buffered mode or no measurable
+cost. Nothing here claims a hardware result.
+
 Focused tests cover every controller kind, family transitions, idempotent profile
 normalization, preset version/hash, old project and profile import, final stream
 options, and a synthetic FluidNC connection through the real store. The store

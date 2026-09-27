@@ -4,13 +4,17 @@ import { buildGcodeRenderModel, SEG_KIND, type GcodeRenderModel } from '../../co
 import type { Viewer3dTheme } from '../viewer3d';
 import { rgbTriple } from '../viewer3d';
 import { renderedLineCss } from '../viewer3d/segment-buckets';
+import { programToolCollector } from './program-tools';
+import { buildToolSections } from './tool-sections';
 import {
   DEFAULT_LENS_ID,
   defaultLensFor,
   LENS_IDS,
   lensColorFn,
+  lensEntries,
   lensLegend,
   rgbCss,
+  type LensId,
 } from './lenses';
 
 const THEME: Viewer3dTheme = {
@@ -188,6 +192,73 @@ describe('lensLegend', () => {
   });
 });
 
+describe('Studio look (ADR-426)', () => {
+  const TWO_TOOLS = [
+    'G21 G90',
+    '; cnc tool-id: a',
+    '; cnc tool-name: Rougher',
+    '; cnc tool: end-mill; diameter-mm: 6',
+    'G1 Z-1 F200',
+    'G1 X20 F800',
+    '; cnc tool-id: b',
+    '; cnc tool-name: Finisher',
+    '; cnc tool: ball-nose; diameter-mm: 3',
+    'G1 X40',
+    'G0 Z5',
+  ].join('\n');
+
+  function sectionsOf(text: string) {
+    const { model, time } = built(text);
+    const collector = programToolCollector();
+    for (const line of text.split('\n')) collector.observe(line);
+    return { model, time, sections: buildToolSections(model, collector.marks) };
+  }
+
+  it('colours each tool on its own and names them in the legend', () => {
+    const { model, time, sections } = sectionsOf(TWO_TOOLS);
+    const colorOf = lensColorFn(model, time, 'tool', THEME, { sections });
+    const last = model.segmentCount - 2;
+    expect(rgbCss(colorOf(0))).not.toBe(rgbCss(colorOf(last)));
+    const legend = lensLegend(model, time, 'tool', THEME, { sections });
+    if (legend.kind !== 'swatches') throw new Error('expected swatches');
+    expect(legend.entries.map((entry) => entry.label)).toEqual([
+      'Rougher',
+      'Finisher',
+      'Traversal',
+    ]);
+    // Classic keeps its cut blue for the first tool.
+    expect(legend.entries[0]?.color).toBe(renderedLineCss(rgbTriple(THEME.cut)));
+  });
+
+  it('shows Studio lines in the exact colour of their swatch', () => {
+    const { model, time } = built();
+    const legend = lensLegend(model, time, 'kind', THEME, { look: 'studio' });
+    if (legend.kind !== 'swatches') throw new Error('expected swatches');
+    const colorOf = lensColorFn(model, time, 'kind', THEME, { look: 'studio' });
+    const cut = legend.entries.find((entry) => entry.label === 'Cut');
+    expect(cut?.color).toBe(rgbCss(colorOf(firstOfKind(model, SEG_KIND.cut))));
+    expect(cut?.color).toBe('rgb(86, 180, 233)');
+    expect(legend.entries.find((entry) => entry.label === 'Traversal')?.color).toBe('#d08a7e');
+  });
+
+  it('runs Studio depth from bright shallow to dark deep', () => {
+    const { model, time } = built();
+    const legend = lensLegend(model, time, 'depth', THEME, { look: 'studio' });
+    if (legend.kind !== 'ramp') throw new Error('expected ramp');
+    expect(legend.note).toContain('bright to dark');
+    expect(legend.stops[0]).toBe('rgb(252, 255, 164)');
+    expect(legend.stops.at(-1)).toBe('rgb(165, 44, 96)');
+    const colorOf = lensColorFn(model, time, 'depth', THEME, { look: 'studio' });
+    const luminance = ([r, g, b]: readonly [number, number, number]): number =>
+      0.2126 * r + 0.7152 * g + 0.0722 * b;
+    const deepest = [...model.segKind].findIndex(
+      (kind, index) => kind === SEG_KIND.plunge && model.positions[index * 6 + 5] === -3,
+    );
+    const shallowCut = firstOfKind(model, SEG_KIND.cut);
+    expect(luminance(colorOf(shallowCut))).toBeGreaterThan(luminance(colorOf(deepest)));
+  });
+});
+
 describe('defaultLensFor', () => {
   const RASTER = ['G21 G90', 'M4', 'G0 X0 Y0', 'G1 X10 S200 F3000', 'G1 X20 S800', 'M5'];
 
@@ -213,3 +284,54 @@ function firstOfKind(model: GcodeRenderModel, kind: number): number {
   }
   throw new Error(`no segment of kind ${kind}`);
 }
+
+describe('lensEntries (ADR-470)', () => {
+  const TOOLS = [
+    'G21 G90',
+    '; cnc tool-id: a',
+    '; cnc tool-name: Rougher',
+    'G1 Z-1 F200',
+    'G1 X20 F800',
+    'G0 Z5',
+    '; cnc tool-id: b',
+    '; cnc tool-name: Finisher',
+    'G0 X30',
+    'G1 Z-1',
+    'G1 X40',
+    'G0 Z5',
+  ].join('\n');
+
+  // Every legend entry must switch exactly the moves its count claims.
+  function expectEntriesMatchLegend(text: string, lens: LensId, withTools: boolean): void {
+    const { model, time } = built(text);
+    const collector = programToolCollector();
+    for (const line of text.split('\n')) collector.observe(line);
+    const sections = withTools ? buildToolSections(model, collector.marks) : null;
+    const legend = lensLegend(model, time, lens, THEME, { sections });
+    const entries = lensEntries(model, time, lens, sections);
+    if (legend.kind !== 'swatches' || entries === null) throw new Error('expected swatches');
+    const counts = legend.entries.map(() => 0);
+    for (let index = 0; index < model.segmentCount; index += 1) {
+      const entry = entries.entryOf(index);
+      counts[entry] = (counts[entry] ?? 0) + 1;
+    }
+    expect(counts).toEqual(legend.entries.map((entry) => entry.count));
+    const travelLabel = entries.travel === null ? null : legend.entries[entries.travel]?.label;
+    expect(travelLabel).toBe(lens === 'planner' ? null : 'Traversal');
+  }
+
+  it('sorts each move into the legend entry that counts it', () => {
+    expectEntriesMatchLegend(PROGRAM, 'kind', false);
+    expectEntriesMatchLegend(PROGRAM, 'planner', false);
+    expectEntriesMatchLegend(PROGRAM, 'tool', false);
+    expectEntriesMatchLegend(TOOLS, 'tool', true);
+    expectEntriesMatchLegend(TOOLS, 'kind', true);
+  });
+
+  it('has nothing to switch for a ramp lens', () => {
+    const { model, time } = built();
+    for (const lens of ['depth', 'feed', 'power'] as const) {
+      expect(lensEntries(model, time, lens, null)).toBeNull();
+    }
+  });
+});

@@ -144,6 +144,50 @@ suites. Raw JSON results for the initial full run, the corrected
 power-mode tests and the baseline probe test are retained in the task's external audit
 directory. The temporary baseline checkout was removed after verification.
 
+## Integration review follow-up
+
+PR #960's first integrated CI run passed 21,032 tests and failed 11 assertions in four Fill
+fixtures. The integration retained their explicit verbose-output option but had compact
+expected strings. PR #963 restores the matching verbose expectations while retaining the
+separate compact-output semantic and guard regressions.
+
+That review also found M3 Image wrote a coincident opening travel at shared split runways.
+GRBL can synchronise its planner on this zero-distance M3 motion, interrupting the intended
+continuous dark traversal. The raster emitter now omits that redundant travel and diagnostics
+exclude the shared internal sides from distance-from-rest estimates. Outer runways remain
+subject to the check.
+
+An independent controller-grid probe then found that an entirely collapsed final sweep reset
+the remembered laser state despite emitting no movement. This prematurely wrote M5 after a
+lit M3 burn. A separate initial collapsed sweep could consume the first engraving feed even
+though it emitted only positioning. Ten focused regressions failed before the repair and
+passed afterwards: zero-line sweeps preserve the previous state, and only an actual engraving
+F word satisfies the feed requirement. The tests cover compact and verbose M3/M4 output and
+the real Image-to-Cut handoff; the deferred opening remains after the first positioning move.
+
+A separate, pre-existing OR-1 handoff defect was reproduced in 11 more tests: the strategy did
+not pass known head positions into or out of Image emission. A Cut/Fill ending exactly at
+the next Image entry therefore wrote a coincident seek while still lit. Image-to-vector and
+Image-to-Image handoffs lost the same position, and blank Images could flush pending mode or
+air changes too early. The repair carries the known position and pending opening across the
+boundary. When no real positioning move precedes the next burn, it uses the existing vector
+policy of a dark excursion along that first burn and back, bounded to 1 mm and the burn edge.
+Tests verify unchanged powered geometry and power, the bounded motion envelope, and the held
+air commands. All 11 failed before the repair and passed afterwards. The broader combined
+raster/output/metadata cohort then passed 248 tests across 35 files. Sweep emission was
+subsequently extracted into its own module to meet the repository's function and file limits.
+
+A post-extraction combined rerun crashed with V8 `Zone Allocation failed` while the host had
+about 1.2 GB free physical memory. It reported a controller-grid property failure before the
+crash, without a counterexample; that run is failed/incomplete. The isolated ten-test suite
+passed, followed by a bounded 1,000-case run using seed `20260927` with no failures. The latter
+JSON result is retained as `controller-grid-seed20260927.json` in the external audit directory.
+This is non-reproduction evidence, not a claim that the interrupted run passed. Final-source
+TypeScript, scoped lint/format, file-size, soft-size, export and ADR gates pass.
+The subsequent serial rerun passed all 248 tests across 35 files; its JSON is retained as
+`final-handoff-cohort.json`. The scan-timing emitter revision advances to v2 so prepared output
+from before the shared/empty/coincident Image repairs cannot retain the same identity.
+
 ## Physical acceptance after this code is available
 
 1. Use the actual saved machine/head profile. Confirm its acceleration, feed limits, laser

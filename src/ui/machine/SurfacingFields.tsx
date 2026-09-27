@@ -2,7 +2,7 @@ import { useState } from 'react';
 import {
   SURFACING_DEFAULT_STEPOVER_PCT,
   SURFACING_DEFAULT_TOTAL_DEPTH_MM,
-  SURFACING_DEFAULT_DEPTH_PER_PASS_MM,
+  surfacingStarterValues,
 } from '../../core/cnc/surfacing';
 import { cncMaxFeedMmPerMin } from '../../core/cnc/cnc-head-feeds';
 import { activeCncTool, type CncMachineConfig, type Project } from '../../core/scene';
@@ -37,22 +37,16 @@ export function useSurfacingValues(
     maxFeed,
     machine.params.spindleMaxRpm,
   ]);
-  const [feedMmPerMin, setFeed] = useSourceTrackedState(
-    starter?.feedMmPerMin ?? Math.min(2500, maxFeed),
-    recipeKey,
-  );
-  const [plungeMmPerMin, setPlunge] = useSourceTrackedState(
-    starter?.plungeMmPerMin ?? Math.min(600, maxFeed),
-    recipeKey,
-  );
+  // The calculator may lower a surfacing starter value but never raise it past
+  // the conservative surfacing defaults (ADR-457 Amd 1).
+  const seed = surfacingStarterValues(starter, maxFeed);
+  const [feedMmPerMin, setFeed] = useSourceTrackedState(seed.feedMmPerMin, recipeKey);
+  const [plungeMmPerMin, setPlunge] = useSourceTrackedState(seed.plungeMmPerMin, recipeKey);
   const [spindleRpm, setRpm] = useSourceTrackedState(
     starter?.spindleRpm ?? machine.params.spindleMaxRpm,
     recipeKey,
   );
-  const [depthPerPassMm, setStepdown] = useSourceTrackedState(
-    starter?.depthPerPassMm ?? SURFACING_DEFAULT_DEPTH_PER_PASS_MM,
-    recipeKey,
-  );
+  const [depthPerPassMm, setStepdown] = useSourceTrackedState(seed.depthPerPassMm, recipeKey);
   // The facing area prefills from the stock footprint and must FOLLOW it: a
   // plain useState seed froze at mount, so changing stock size (or opening
   // another project) left this panel saving a program for the old area.

@@ -253,8 +253,11 @@ export type DeviceProfile = {
   // The overhead camera's lens and position over the bed (ADR-440), fitted
   // from one photo of the engraved target. Absent until the operator
   // calibrates; it replaces the old lens calibration and bed alignment, whose
-  // saved values are dropped on load rather than trusted.
-  readonly cameraModel?: CameraModelRecord;
+  // saved values are dropped on load rather than trusted. With several
+  // cameras (ADR-446) this is the newest calibration, and the others keep
+  // theirs in `otherCameraModels`, each bound to its own camera.
+  readonly cameraModel?: CameraModelRecord | undefined;
+  readonly otherCameraModels?: ReadonlyArray<CameraModelRecord> | undefined;
   readonly noGoZones: ReadonlyArray<NoGoZone>;
   readonly zTravelMm?: number;
   readonly zTravelConfirmed?: boolean;

@@ -34,7 +34,7 @@ export function createArrowMesh(
   if (placements.length === 0) return null;
   const length = Math.max(ARROW_MIN_LENGTH_MM, extentMm * ARROW_LENGTH_FRACTION);
   const geometry = new three.ConeGeometry(length * ARROW_ASPECT, length, 8);
-  const material = new three.MeshBasicMaterial({ color: theme.arrow });
+  const material = new three.MeshBasicMaterial({ color: theme.arrow, toneMapped: false });
   const mesh: ArrowMesh = new three.InstancedMesh(geometry, material, placements.length);
   const matrix = new three.Matrix4();
   const quaternion = new three.Quaternion();

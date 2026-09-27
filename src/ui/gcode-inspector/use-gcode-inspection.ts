@@ -89,6 +89,7 @@ function inspectionContextOf(source: GcodeInspectionSource): GcodeInspectionCont
       ? {}
       : { laserPowerControl: source.laserPowerControl }),
     ...(source.timing === undefined ? {} : { timing: source.timing }),
+    ...(source.workArea === undefined ? {} : { workArea: source.workArea }),
   };
 }
 

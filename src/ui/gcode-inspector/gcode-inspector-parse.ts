@@ -12,6 +12,7 @@ import {
   INSPECTOR_RENDER_PRESSURE_THRESHOLD,
   type GcodeInspectorWorkerResult,
 } from './gcode-inspector-worker-protocol';
+import { programToolCollector, type ProgramToolMark } from './program-tools';
 
 export function inspectGcodeText(
   text: string,
@@ -23,8 +24,12 @@ export function inspectGcodeText(
     retainPreciseSegmentLengths: true,
     renderPressureThreshold: INSPECTOR_RENDER_PRESSURE_THRESHOLD,
   });
-  const sourceIndex = indexGcodeTextLines(text, (line) => builder.pushLine(line));
-  return inspectionResult(builder.finish(), sourceIndex, context);
+  const tools = programToolCollector();
+  const sourceIndex = indexGcodeTextLines(text, (line) => {
+    tools.observe(line);
+    builder.pushLine(line);
+  });
+  return inspectionResult(builder.finish(), sourceIndex, context, tools.marks);
 }
 
 export async function inspectGcodeSource(
@@ -38,20 +43,25 @@ export async function inspectGcodeSource(
     retainPreciseSegmentLengths: true,
     renderPressureThreshold: INSPECTOR_RENDER_PRESSURE_THRESHOLD,
   });
+  const tools = programToolCollector();
   const sourceIndex = await indexGcodeBlobLines(
     source.blob,
-    (line) => builder.pushLine(line),
+    (line) => {
+      tools.observe(line);
+      builder.pushLine(line);
+    },
     onProgress,
   );
-  return inspectionResult(builder.finish(), sourceIndex, source);
+  return inspectionResult(builder.finish(), sourceIndex, source, tools.marks);
 }
 
 function inspectionResult(
   parsed: BuildRenderModelResult,
   sourceIndex: GcodeSourceLineIndex,
   context: GcodeInspectionContext,
+  toolMarks: ReadonlyArray<ProgramToolMark>,
 ): GcodeInspectorWorkerResult {
   const base = { sourceIndex, sourceLineCount: sourceIndex.starts.length };
   if (parsed.kind === 'error') return { ...base, parsed, analysis: null };
-  return { ...base, parsed, analysis: analyzeGcodeModel(parsed.model, context) };
+  return { ...base, parsed, analysis: analyzeGcodeModel(parsed.model, context, toolMarks) };
 }

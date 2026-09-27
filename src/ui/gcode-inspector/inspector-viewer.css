@@ -106,7 +106,8 @@
   white-space: nowrap;
 }
 
-.gcode-viewer-button.lf-btn[aria-pressed='true'] {
+.gcode-viewer-button.lf-btn[aria-pressed='true'],
+.gcode-viewer-button.lf-btn[aria-pressed='true']:hover:not(:disabled) {
   color: var(--lf-accent-fg);
   border-color: var(--lf-accent);
   background: var(--lf-tint-info);
@@ -293,6 +294,91 @@
   border: 1px dashed var(--lf-border-strong);
 }
 
+.gcode-viewer-segmented {
+  display: flex;
+  gap: 2px;
+  padding: 2px;
+  border: 1px solid var(--lf-border);
+  border-radius: 7px;
+  background: var(--lf-bg-0);
+}
+
+/* View cube hit area: the scene draws the cube underneath (ADR-426). */
+.gcode-viewer-view-cube {
+  position: absolute;
+  z-index: 1;
+  cursor: pointer;
+  touch-action: none;
+}
+
+/* Overlays step back while the camera is dragged, after a short delay so a
+   single scroll step does not flicker them. */
+.gcode-viewer-hud,
+.gcode-viewer-controls,
+.gcode-viewer-view-hint {
+  transition: opacity 160ms ease;
+}
+
+.gcode-viewer-viewport[data-moving='true']
+  :is(.gcode-viewer-hud, .gcode-viewer-controls, .gcode-viewer-view-hint) {
+  opacity: 0.22;
+  transition-delay: 140ms;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .gcode-viewer-hud,
+  .gcode-viewer-controls,
+  .gcode-viewer-view-hint {
+    transition: none;
+  }
+}
+
+.gcode-viewer-body:fullscreen {
+  width: 100vw;
+  height: 100vh;
+}
+
+/* Studio's labels: sizes on the job box and the axis letters. The scene's
+   background is dark in every app theme, so their colours are fixed. */
+.viewer3d-label-layer {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  overflow: hidden;
+  pointer-events: none;
+}
+
+.viewer3d-dim-label {
+  padding: 1px 6px;
+  border: 1px solid rgb(255 255 255 / 14%);
+  border-radius: 4px;
+  color: #e8ecf1;
+  background: rgb(16 19 23 / 78%);
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0.02em;
+  white-space: nowrap;
+}
+
+.viewer3d-axis-label {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-shadow: 0 1px 2px rgb(0 0 0 / 70%);
+}
+
+.viewer3d-axis-label-x {
+  color: #e5928b;
+}
+
+.viewer3d-axis-label-y {
+  color: #8fdca6;
+}
+
+.viewer3d-axis-label-z {
+  color: #8fbdf6;
+}
+
 @container (max-width: 660px) {
   .gcode-viewer-hud {
     top: 94px;
@@ -309,5 +395,9 @@
 
   .gcode-viewer-speed {
     margin-left: auto;
+  }
+
+  .gcode-viewer-trail {
+    margin-left: 0;
   }
 }
