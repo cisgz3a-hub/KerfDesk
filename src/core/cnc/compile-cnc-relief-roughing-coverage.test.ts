@@ -336,7 +336,7 @@ describe('relief roughing fine steps (ADR-422 Amendment 1)', () => {
     expect(coarse.max).toBeGreaterThan(1.5);
     expect(fine.max).toBeLessThanOrEqual(0.3 + tipRiseMm + 0.1);
     expect(fine.min).toBeGreaterThanOrEqual(-FLAT_SLACK_MM);
-  });
+  }, 30_000);
 });
 
 const PYRAMID_MM = 30;

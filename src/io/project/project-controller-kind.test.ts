@@ -16,6 +16,20 @@ function withDevicePatch(patch: Record<string, unknown>): string {
 }
 
 describe('.lf2 controllerKind + baudRate round-trip', () => {
+  it('repairs an older FluidNC buffered profile while preserving its saved window', () => {
+    const result = deserializeProject(
+      withDevicePatch({
+        controllerKind: 'fluidnc',
+        streamingMode: 'char-counted',
+        rxBufferBytes: 512,
+      }),
+    );
+    if (result.kind !== 'ok') throw new Error(`expected ok, got ${result.kind}`);
+    expect(result.project.device).toMatchObject({ streamingMode: 'ping-pong', rxBufferBytes: 512 });
+    const again = deserializeProject(serializeProject(result.project));
+    if (again.kind !== 'ok') throw new Error(`expected ok, got ${again.kind}`);
+    expect(again.project.device.streamingMode).toBe('ping-pong');
+  });
   it('preserves a known vendor command contract and drops unknown command sets', () => {
     const loaded = deserializeProject(
       withDevicePatch({ controllerCommandSet: 'creality-falcon-a1-pro' }),

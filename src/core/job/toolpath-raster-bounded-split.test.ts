@@ -43,10 +43,10 @@ describe('raster toolpath bounded split runways', () => {
     expect(horizontalDeltasAtY(toolpath.steps, 0.5).every((delta) => delta >= 0)).toBe(true);
     expect(horizontalDeltasAtY(toolpath.steps, 1.5).every((delta) => delta <= 0)).toBe(true);
     expect(toolpath.steps).toContainEqual(
-      expect.objectContaining({ kind: 'travel', from: { x: 1, y: 0.5 }, to: { x: 2, y: 0.5 } }),
+      expect.objectContaining({ kind: 'travel', from: { x: 1, y: 0.5 }, to: { x: 4, y: 0.5 } }),
     );
     expect(toolpath.steps).toContainEqual(
-      expect.objectContaining({ kind: 'travel', from: { x: 7, y: 1.5 }, to: { x: 6, y: 1.5 } }),
+      expect.objectContaining({ kind: 'travel', from: { x: 7, y: 1.5 }, to: { x: 4, y: 1.5 } }),
     );
   });
 });

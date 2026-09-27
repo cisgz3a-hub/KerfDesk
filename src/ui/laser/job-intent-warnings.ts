@@ -21,6 +21,7 @@ import { effectiveOperationForObject } from '../../core/scene/effective-operatio
 import { compileDiagnosticWarnings } from './compile-diagnostic-warnings';
 import { rasterEnergyWarnings } from './raster-energy-warnings';
 import { rasterThresholdWarnings } from './raster-threshold-warnings';
+import { scanQualityWarnings } from './scan-quality-warnings';
 import { stackedCopyWarnings } from './stacked-copy-warnings';
 import { detectUncalibratedJobWarnings } from './uncalibrated-job-warnings';
 
@@ -42,6 +43,7 @@ export function detectJobIntentWarnings(
   const warnings = [
     ...rasterEnergyWarnings(job, project),
     ...rasterThresholdWarnings(job, project),
+    ...scanQualityWarnings(job, project),
     ...stackedCopyWarnings(project),
     ...detectUncalibratedJobWarnings(job, project.scene.layers),
     ...compileDiagnosticWarnings(job),
