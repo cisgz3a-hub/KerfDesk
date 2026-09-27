@@ -19,8 +19,12 @@ export function useTracePreset(
     preset,
     selectPreset: (next) => {
       setPreset(next);
-      // Enhance replaces whole contours; ribbons spanning a photo need Crop.
-      if (TRACE_PRESETS[next]?.photoDetail !== undefined) setBoundaryMode('crop');
+      // Enhance replaces whole contours; ribbons spanning a photo and colour
+      // regions sharing boundaries need Crop.
+      const options = TRACE_PRESETS[next];
+      if (options?.photoDetail !== undefined || options?.colourLayers !== undefined) {
+        setBoundaryMode('crop');
+      }
     },
   };
 }

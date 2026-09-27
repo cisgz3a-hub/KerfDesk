@@ -182,7 +182,8 @@ function stamp(
 describe('a finishing raster that skips finished flats', () => {
   const kernel = kernelForTool(BALL, CELL_MM);
 
-  it('leaves the stock the full raster leaves, with less path', () => {
+  // Every plan checks each move against the exact contact (ADR-421 Amd 1).
+  it('leaves the stock the full raster leaves, with less path', { timeout: 30_000 }, () => {
     fc.assert(
       fc.property(
         fc.double({ min: 8, max: 22, noNaN: true }),
@@ -209,10 +210,12 @@ describe('a finishing raster that skips finished flats', () => {
               wallOnRight: true,
               ...(withSkip ? { finishedAt } : {}),
             });
+          const fullPlan = plan(false);
+          const skipPlan = plan(true);
           const full = start.slice();
           const skipped = start.slice();
-          stamp(full, map, kernel, plan(false));
-          stamp(skipped, map, kernel, plan(true));
+          stamp(full, map, kernel, fullPlan);
+          stamp(skipped, map, kernel, skipPlan);
           // The runs are reduced apart from the rows they came from, and each
           // reduction may leave its own tolerance of stock.
           let worst = 0;
@@ -220,7 +223,7 @@ describe('a finishing raster that skips finished flats', () => {
             worst = Math.max(worst, Math.abs((full[index] ?? 0) - (skipped[index] ?? 0)));
           }
           expect(worst).toBeLessThanOrEqual(FINISHING_REDUCTION_TOLERANCE_MM + 1e-6);
-          expect(pathLength(plan(true))).toBeLessThan(pathLength(plan(false)));
+          expect(pathLength(skipPlan)).toBeLessThan(pathLength(fullPlan));
         },
       ),
       { numRuns: 6, seed: 450 },

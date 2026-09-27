@@ -54,12 +54,27 @@ export function smoothChainCurvature(
 ): Vec2[] {
   if (points.length < 3) return [...points];
   const pinned = classifyAnchors(points, closed, anchors);
-  let current: Vec2[] = [...points];
-  for (let pass = 0; pass < CURVATURE_SMOOTHING_PASSES; pass += 1) {
-    current = taubinStep(current, closed, pinned, TAUBIN_LAMBDA);
-    current = taubinStep(current, closed, pinned, TAUBIN_MU);
+  // The passes run on coordinate buffers; points are materialised once at the
+  // end instead of one fresh object per vertex per pass. Pinned vertices hold
+  // their coordinates in both buffers, so a pass writes only the free ones.
+  const n = points.length;
+  const xs = new Float64Array(n);
+  const ys = new Float64Array(n);
+  for (let i = 0; i < n; i += 1) {
+    const p = points[i] as Vec2;
+    xs[i] = p.x;
+    ys[i] = p.y;
   }
-  return current;
+  const nextXs = xs.slice();
+  const nextYs = ys.slice();
+  const free = freeIndices(pinned);
+  for (let pass = 0; pass < CURVATURE_SMOOTHING_PASSES; pass += 1) {
+    taubinStep(xs, ys, nextXs, nextYs, free, TAUBIN_LAMBDA);
+    taubinStep(nextXs, nextYs, xs, ys, free, TAUBIN_MU);
+  }
+  return points.map((p, i) =>
+    pinned[i] === true ? p : { x: xs[i] as number, y: ys[i] as number },
+  );
 }
 
 // Anchor = pinned exactly. Classification uses the ORIGINAL geometry so it is
@@ -79,36 +94,40 @@ export function classifyAnchors(
   });
 }
 
-// One Taubin pass. Pinned vertices are carried through as their ORIGINAL
-// objects (identity preserved for reference-based corner pinning); every
-// other interior vertex moves toward the midpoint of its neighbours by
-// `factor`. Open-chain endpoints have no neighbour pair and stay put.
+// The vertices a pass moves: every one not pinned. Open-chain endpoints are
+// pinned (they have no neighbour pair).
+function freeIndices(pinned: ReadonlyArray<boolean>): Int32Array {
+  let count = 0;
+  for (const isPinned of pinned) if (!isPinned) count += 1;
+  const free = new Int32Array(count);
+  let at = 0;
+  for (let i = 0; i < pinned.length; i += 1) if (!pinned[i]) free[at++] = i;
+  return free;
+}
+
+// One Taubin pass from (xs, ys) into (outX, outY). Pinned vertices keep their
+// coordinates (and, at the end, their ORIGINAL objects, for reference-based
+// corner pinning); every free vertex moves toward the midpoint of its
+// neighbours by `factor`.
 function taubinStep(
-  src: ReadonlyArray<Vec2>,
-  closed: boolean,
-  pinned: ReadonlyArray<boolean>,
+  xs: Float64Array,
+  ys: Float64Array,
+  outX: Float64Array,
+  outY: Float64Array,
+  free: Int32Array,
   factor: number,
-): Vec2[] {
-  const n = src.length;
-  const out: Vec2[] = new Array<Vec2>(n);
-  for (let i = 0; i < n; i += 1) {
-    const p = src[i];
-    if (p === undefined) continue;
-    if (pinned[i] === true) {
-      out[i] = p;
-      continue;
-    }
-    const prev = closed ? src[(i - 1 + n) % n] : src[i - 1];
-    const next = closed ? src[(i + 1) % n] : src[i + 1];
-    if (prev === undefined || next === undefined) {
-      out[i] = p;
-      continue;
-    }
-    const midX = (prev.x + next.x) / 2;
-    const midY = (prev.y + next.y) / 2;
-    out[i] = { x: p.x + factor * (midX - p.x), y: p.y + factor * (midY - p.y) };
+): void {
+  const n = xs.length;
+  for (const i of free) {
+    const x = xs[i] as number;
+    const y = ys[i] as number;
+    const prev = i === 0 ? n - 1 : i - 1;
+    const next = i === n - 1 ? 0 : i + 1;
+    const midX = ((xs[prev] as number) + (xs[next] as number)) / 2;
+    const midY = ((ys[prev] as number) + (ys[next] as number)) / 2;
+    outX[i] = x + factor * (midX - x);
+    outY[i] = y + factor * (midY - y);
   }
-  return out.filter((p): p is Vec2 => p !== undefined);
 }
 
 function turnAtIndex(points: ReadonlyArray<Vec2>, i: number, closed: boolean): number {

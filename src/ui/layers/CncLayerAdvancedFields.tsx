@@ -66,7 +66,8 @@ function ClearingFields(props: {
     >
       <p className="lf-cnc-settings-hint">
         Stepover is the spacing between neighbouring passes, as a percentage of the bit diameter.
-        For a tapered ball nose it is a percentage of the width the bit cuts in one depth pass.
+        For a bit that narrows toward its tip (ball nose, V-bit, engraving bit or tapered ball nose)
+        it is a percentage of the width the bit cuts in one depth pass.
       </p>
       <PocketFillRow layer={props.layer} settings={settings} onCommit={props.onCommit} />
       <StepoverField {...props} />

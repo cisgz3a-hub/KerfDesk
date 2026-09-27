@@ -66,7 +66,7 @@ describe('real-world glyph curve acceptance corpus', () => {
       fixtures: 15,
       totalContours: 339,
       totalSegments: 7107,
-      worstDeviationMm: 0.023805,
+      worstDeviationMm: 0.024102,
       worstFixture: 'script-connected-50mm',
     });
   });

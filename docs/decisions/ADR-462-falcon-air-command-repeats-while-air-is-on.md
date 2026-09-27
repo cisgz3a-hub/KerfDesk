@@ -66,9 +66,9 @@ command repeats while air is on. The Falcon A1 Pro preset declares it. `withAirK
 - **Profiles without the flag.** Their bytes are unchanged, and so are CNC coolant and the Marlin
   and Smoothieware strategies.
 - **Output identity.** `EMITTER_REVISION` becomes
-  `adaptive-relief-cleanup-linked-entry-scan-v2-air-repeats-20260927-v1`, preserving the existing
-  relief and adaptive-ring provenance plus ADR-445's scan-v2 state and dark handoff repairs
-  while identifying this output behavior.
+  `trace-arcs-relief-width-ramp-contact-air-scan-v2-20260927-v7`, preserving the existing relief,
+  adaptive-ring, cutter-width, ramp and sampled-contact provenance, native laser arcs and
+  compact Fill, plus ADR-445's scan-v2 state and dark handoff repairs.
 
 The Job Review standby advisory, the Machine Setup "Air restart" tooltip, and WORKFLOW F.3
 describe the best-effort repeat and its gaps. `$152=100` and installed-firmware qualification
@@ -97,9 +97,8 @@ neither of them. This also leaves the saved-profile schema unchanged.
   - the individual rest-to-rest estimate under supplied limits.
 - `air-keep-alive-arcs.test.ts` independently brackets the timing of radius-10 full circles,
   minor arcs and 270-degree arcs with I/J and positive/negative R words. It also checks modal
-  arcs and center-only circles. These pin native-arc accounting before integration with the
-  separate native laser-arc emitter work; they do not claim this base already emits native
-  laser circles through its scene compiler.
+  arcs and center-only circles. These independently check duration beyond chord length;
+  integration with ADR-432 preserves native G2/G3 output and existing per-profile arc eligibility.
 - `air-keep-alive-boundaries.test.ts` explicitly retains the limitations: a 100-second G1,
   30-second dwell and more than 30 seconds of continuous M3 cutting exceed the trigger.
   Repeats after M3 lines or a full circle remain after a dark move.

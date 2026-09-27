@@ -4,8 +4,14 @@
 import { useMemo, useState } from 'react';
 import type { RasterImage } from '../../core/scene';
 import type { TraceSettingsRecord } from '../../core/scene/scene-object';
-import type { TraceOptions } from '../../core/trace';
+import { TRACE_PRESETS, type TraceOptions } from '../../core/trace';
+import { useStore } from '../state';
 import type { TraceFillStyle, TraceOutput } from './dialog-parts';
+import {
+  hybridMaxStrokeWidthMm,
+  previewPxPerMm,
+  withHybridMaxStrokeWidth,
+} from './hybrid-stroke-width';
 import { mergeLightBurnTraceSettings, type LightBurnTraceSettingOverrides } from './trace-options';
 import { captureTraceSettings, restoreTraceSettings } from './trace-settings-snapshot';
 import { useBoundarySelection, type BoundarySelection } from './use-boundary-selection';
@@ -54,6 +60,7 @@ export function useTraceDialogSettings(
     boundarySelection.setBoundaryMode,
     initial.presetName,
   );
+  const device = useStore((s) => s.project.device);
   const [traceSettings, setTraceSettings] = useState<LightBurnTraceSettingOverrides>(
     initial.overrides ?? {},
   );
@@ -79,12 +86,28 @@ export function useTraceDialogSettings(
     record: () =>
       captureTraceSettings({
         presetName: preset,
-        overrides: traceSettings,
+        overrides: withResolvedHybridWidth(preset, traceSettings, device, machineKind),
         output: traceOutput,
         fillStyle: traceFillStyle,
         boundary: boundarySelection.boundary,
         boundaryMode: boundarySelection.boundaryMode,
       }),
+  };
+}
+
+// A Line + fill trace records the Max stroke width it used, default or not
+// (ADR-454 rule 10): the default follows the machine's spot size, so a
+// Re-trace on another device profile would otherwise re-split the ink.
+function withResolvedHybridWidth(
+  presetName: string,
+  overrides: LightBurnTraceSettingOverrides,
+  device: Parameters<typeof hybridMaxStrokeWidthMm>[1],
+  machineKind: 'laser' | 'cnc',
+): LightBurnTraceSettingOverrides {
+  if (TRACE_PRESETS[presetName]?.traceMode !== 'hybrid') return overrides;
+  return {
+    ...overrides,
+    hybridMaxStrokeWidthMm: hybridMaxStrokeWidthMm(overrides, device, machineKind),
   };
 }
 
@@ -95,4 +118,23 @@ export function useTraceOptions(
   overrides: LightBurnTraceSettingOverrides,
 ): TraceOptions {
   return useMemo(() => mergeLightBurnTraceSettings(preset, overrides), [preset, overrides]);
+}
+
+/** The dialog's trace options; for Line + fill, with the operator's millimetre Max stroke width
+ *  converted to preview pixels through the source's placement (ADR-454).
+ *  Every other trace mode gets `options` back unchanged. */
+export function useDialogTraceOptions(
+  preset: TraceOptions,
+  overrides: LightBurnTraceSettingOverrides,
+  source: RasterImage,
+): TraceOptions {
+  const options = useTraceOptions(preset, overrides);
+  const device = useStore((s) => s.project.device);
+  const machineKind = useStore((s) => s.project.machine?.kind);
+  const widthMm = hybridMaxStrokeWidthMm(overrides, device, machineKind);
+  const pxPerMm = previewPxPerMm(source);
+  return useMemo(
+    () => withHybridMaxStrokeWidth(options, widthMm, pxPerMm),
+    [options, widthMm, pxPerMm],
+  );
 }

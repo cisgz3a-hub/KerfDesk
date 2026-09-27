@@ -17,7 +17,7 @@ import { DEFAULT_CNC_MACHINE_PARAMS } from '../../core/scene';
 import { normalizeCameraProfile } from '../../core/camera';
 import { normalizeCameraModelRecord } from '../../core/camera/model/camera-model-record';
 import { normalizeOtherCameraModels } from '../../core/camera/model/saved-cameras';
-import { validateMachineProfileShape } from './machine-profile-shape';
+import { laserArcMovesEntry, validateMachineProfileShape } from './machine-profile-shape';
 import { optionalRotarySetup } from '../project/project-device-profile-validator';
 import { firstError } from '../project/project-shape-primitives';
 
@@ -306,6 +306,7 @@ function canonicalProfile(profile: DeviceProfile): DeviceProfile {
       ? { workerHostedStreaming: profile.workerHostedStreaming }
       : {}),
     ...(profile.airAssistRestartUnreliable === true ? { airAssistRestartUnreliable: true } : {}),
+    ...laserArcMovesEntry(profile.laserArcMoves),
     rxBufferBytes: normalizeGrblRxBufferBytes(profile.rxBufferBytes),
     bedWidth: profile.bedWidth,
     bedHeight: profile.bedHeight,
