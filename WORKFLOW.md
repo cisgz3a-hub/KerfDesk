@@ -4703,9 +4703,11 @@ and lifts the command's CNC-only gate.)*
    into whole rows no coarser than a tenth of the contact diameter, so rows
    land at the requested spacing; the whole-row stride still rounds down so it
    never overshoots it (ADR-421). This qualifies finishing
-   vertices against the piecewise-linear surface and the planar cusp, not the
-   XY chord between vertices, subcell detail, or true along-surface scallop
-   (ADR-292/294/412).
+   vertices against the piecewise-linear surface and the planar cusp, not
+   subcell detail or true along-surface scallop (ADR-292/294/412). Every move
+   between vertices, of every strategy, is then checked against the exact
+   contact at sampled points and lifted where those checks exceed 0.002 mm into the part,
+   measured normal to the move (ADR-421 amendment 1).
 3. Without a mask, the rows form one stay-down path: each row steps to the
    next along its edge column's own tip samples instead of retracting and
    plunging. A vertex is dropped only where the straight move replacing it
