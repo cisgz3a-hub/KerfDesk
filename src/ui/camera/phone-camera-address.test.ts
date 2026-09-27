@@ -7,6 +7,9 @@ describe('phoneCameraAddress', () => {
     ['192.168.1.50:8080', 'http://192.168.1.50:8080/shot.jpg'],
     [' http://192.168.1.50:8080/ ', 'http://192.168.1.50:8080/shot.jpg'],
     ['192.168.1.50:8081', 'http://192.168.1.50:8081/shot.jpg'],
+    ['192.168.1.50:80', 'http://192.168.1.50/shot.jpg'],
+    ['http://192.168.1.50:80', 'http://192.168.1.50/shot.jpg'],
+    ['https://192.168.1.50:443', 'https://192.168.1.50/shot.jpg'],
     ['https://10.0.0.7:8080', 'https://10.0.0.7:8080/shot.jpg'],
     ['admin:secret@192.168.1.50', 'http://admin:secret@192.168.1.50:8080/shot.jpg'],
   ])('turns what IP Webcam shows (%s) into its still address', (typed, url) => {
@@ -34,7 +37,10 @@ describe('phoneCameraAddress', () => {
   it.each([
     ['admin:secret@192.168.1.50:8080', '192.168.1.50:8080'],
     ['http://admin:secret@192.168.1.50:8080/', 'http://192.168.1.50:8080/'],
-    ['http://192.168.1.61/?action=snapshot', 'http://192.168.1.61/?action=snapshot'],
+    ['http://192.168.1.61/?action=snapshot', 'http://192.168.1.61/'],
+    ['http://admin:first@secret-tail@192.168.1.50/frame', 'http://192.168.1.50/frame'],
+    ['admin:first@secret-tail@192.168.1.50', '192.168.1.50'],
+    ['http://admin:pw%40word@192.168.1.50/frame?token=secret#private', 'http://192.168.1.50/frame'],
   ])('never keeps a login in the address it stores (%s)', (typed, stored) => {
     expect(phoneCameraAddressWithoutLogin(typed)).toBe(stored);
   });
@@ -49,4 +55,19 @@ describe('phoneCameraAddress', () => {
       message: 'Enter the full picture address from the app, starting with http://.',
     });
   });
+
+  it.each(['192.168.1.50:80', 'http://admin:secret@192.168.1.50:80', 'https://192.168.1.50:443'])(
+    'preserves the selected standard port after remembering %s',
+    (typed) => {
+      const stored = phoneCameraAddressWithoutLogin(typed);
+      const original = phoneCameraAddress('ip-webcam', typed);
+      const restored = phoneCameraAddress('ip-webcam', stored);
+      if (original.kind !== 'snapshot' || restored.kind !== 'snapshot')
+        throw new Error('Invalid fixture');
+      const expected = new URL(original.url);
+      expected.username = '';
+      expected.password = '';
+      expect(restored.url).toBe(expected.toString());
+    },
+  );
 });

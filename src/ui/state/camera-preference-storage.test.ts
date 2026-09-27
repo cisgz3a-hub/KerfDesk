@@ -37,7 +37,7 @@ describe('phone camera preference (ADR-448)', () => {
     savePhoneCamera({ app: 'other', address: 'http://me:pw@192.168.1.60/?action=snapshot' });
     expect(loadPhoneCamera()).toEqual({
       app: 'other',
-      address: 'http://192.168.1.60/?action=snapshot',
+      address: 'http://192.168.1.60/',
     });
     expect(localStorage.getItem('laserforge.camera.phone.v1')).not.toContain('pw');
   });
@@ -47,5 +47,19 @@ describe('phone camera preference (ADR-448)', () => {
     expect(loadPhoneCamera()).toBeNull();
     localStorage.setItem('laserforge.camera.phone.v1', 'not json');
     expect(loadPhoneCamera()).toBeNull();
+  });
+
+  it('scrubs legacy phone login, query and fragment on read and in storage', () => {
+    localStorage.setItem(
+      'laserforge.camera.phone.v1',
+      JSON.stringify({
+        app: 'other',
+        address: 'http://operator:first@secret-tail@192.168.1.50/frame?token=secret#private',
+      }),
+    );
+    expect(loadPhoneCamera()).toEqual({ app: 'other', address: 'http://192.168.1.50/frame' });
+    expect(localStorage.getItem('laserforge.camera.phone.v1')).toBe(
+      JSON.stringify({ app: 'other', address: 'http://192.168.1.50/frame' }),
+    );
   });
 });

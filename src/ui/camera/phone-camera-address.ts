@@ -6,6 +6,8 @@
 // on the phone's screen into the address KerfDesk fetches. A stream (rtsp)
 // address belongs in the RTSP camera section, which already reads those.
 
+import { cameraSourceIdWithoutCredentials } from '../../core/camera/camera-capture-binding';
+
 export type PhoneCameraApp = 'ip-webcam' | 'other';
 
 // IP Webcam (Android) serves a full-size still at /shot.jpg on port 8080.
@@ -28,7 +30,8 @@ export function phoneCameraAddress(app: PhoneCameraApp, typed: string): PhoneCam
 }
 
 function ipWebcamAddress(text: string): PhoneCameraAddress {
-  const url = parsed(/^[a-z]+:\/\//i.test(text) ? text : `http://${text}`);
+  const input = /^[a-z]+:\/\//i.test(text) ? text : `http://${text}`;
+  const url = parsed(input);
   if (url === null || (url.protocol !== 'http:' && url.protocol !== 'https:')) {
     return {
       kind: 'invalid',
@@ -36,7 +39,10 @@ function ipWebcamAddress(text: string): PhoneCameraAddress {
     };
   }
   // Keeps a login typed as user:password@ (IP Webcam can ask for one).
-  if (url.port === '') url.port = String(IP_WEBCAM_PORT);
+  // URL normalizes explicit :80/:443 away; only a genuinely omitted port
+  // should select IP Webcam's default.
+  const authority = input.match(/^[a-z]+:\/\/([^/?#]*)/i)?.[1] ?? '';
+  if (url.port === '' && !/:\d+$/.test(authority)) url.port = String(IP_WEBCAM_PORT);
   url.pathname = IP_WEBCAM_STILL_PATH;
   url.search = '';
   url.hash = '';
@@ -65,9 +71,25 @@ export function phoneSnapshotUrl(app: PhoneCameraApp, typed: string): string | n
   return address.kind === 'snapshot' ? address.url : null;
 }
 
-/** `typed` without a user name and password, so they are never stored. */
+/** Remember only the public address, as for RTSP; query/fragment can hold secrets. */
 export function phoneCameraAddressWithoutLogin(typed: string): string {
-  return typed.trim().replace(/^([a-z][a-z0-9+.-]*:\/\/)?[^/@?#]*@/i, '$1');
+  const text = typed.trim();
+  const hasScheme = /^[a-z][a-z0-9+.-]*:\/\//i.test(text);
+  const input = hasScheme ? text : `http://${text}`;
+  let safe = cameraSourceIdWithoutCredentials(input);
+  // Retain an explicitly selected standard port across reconnects. Otherwise
+  // URL normalization would turn :80 into an omitted port, selecting 8080.
+  const defaultPort = /^http:\/\/[^/?#]*:80(?=[/?#]|$)/i.test(input)
+    ? '80'
+    : /^https:\/\/[^/?#]*:443(?=[/?#]|$)/i.test(input)
+      ? '443'
+      : undefined;
+  if (defaultPort !== undefined && parsed(input) !== null) {
+    safe = safe.replace(/^(https?:\/\/[^/?#]+)/, `$1:${defaultPort}`);
+  }
+  if (hasScheme) return safe;
+  const bare = safe.replace(/^http:\/\//, '');
+  return text.includes('/') ? bare : bare.replace(/\/$/, '');
 }
 
 function parsed(text: string): URL | null {

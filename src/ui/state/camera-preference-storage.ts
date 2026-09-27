@@ -68,7 +68,11 @@ export function loadPhoneCamera(): StoredPhoneCamera | null {
     if (typeof stored !== 'object' || stored === null) return null;
     const { app, address } = stored as Record<string, unknown>;
     if ((app !== 'ip-webcam' && app !== 'other') || typeof address !== 'string') return null;
-    return { app, address };
+    const safe = phoneCameraAddressWithoutLogin(address);
+    if (safe !== address) {
+      localStorage.setItem(PHONE_CAMERA_KEY, JSON.stringify({ app, address: safe }));
+    }
+    return { app, address: safe };
   } catch {
     return null;
   }

@@ -6891,7 +6891,9 @@ as the pane's design record.
 - **Success / another app.** With **Another app with a picture address**, the full http address
   of the app's still picture works the same way.
 - **Success / back later.** The app and address are remembered on this computer, and the
-  section opens with them filled in. A login typed as `user:password@` is used but never stored.
+  section opens with them filled in. Login details, query parameters and fragments are used for
+  the current connection only and never stored. The panel tells the operator to paste the full
+  address again if the camera needs those details when reconnecting.
 - **Error / no picture.** A wrong address, a stopped app, or a phone on another network leaves
   the camera stopped. The section says what to check and offers **Try again**.
 - **Error / video stream address.** An `rtsp://` address is not started. The section says to

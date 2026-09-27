@@ -45,6 +45,10 @@ export function PhoneCameraSection(): JSX.Element {
         <option value="other">Another app with a picture address</option>
       </select>
       <PhoneAddressRow phone={phone} />
+      <p style={noteStyle}>
+        Login details and anything after ? or # are used for this connection only, not saved. Paste
+        the full address again when reconnecting if the app needs them.
+      </p>
       {message === null ? null : (
         <p role="status" style={errStyle}>
           {message}

@@ -101,6 +101,17 @@ describe('PhoneCameraSection', () => {
     expect(host.textContent).toContain('Paste it under RTSP camera… instead.');
   });
 
+  it('uses the complete query for this connection and explains that it is not remembered', async () => {
+    const host = await mountSection();
+    await chooseApp(host, 'other');
+    const url = 'http://operator:password@192.168.1.50/frame?action=snapshot&token=secret';
+    await typeAddress(host, url);
+    await clickElement(button(host, 'Use phone'));
+    expect(startSnapshotSource).toHaveBeenCalledWith(undefined, url);
+    expect(loadPhoneCamera()).toEqual({ app: 'other', address: 'http://192.168.1.50/frame' });
+    expect(host.textContent).toContain('Paste the full address again when reconnecting');
+  });
+
   it('shows the running phone with its picture and a Stop button', async () => {
     savePhoneCamera({ app: 'ip-webcam', address: '192.168.1.50:8080' });
     useCameraStore.setState({ sourceState: liveStill(PHONE_URL) });

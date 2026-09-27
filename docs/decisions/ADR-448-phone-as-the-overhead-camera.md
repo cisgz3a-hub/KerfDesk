@@ -43,9 +43,12 @@ real hardware.
 3. **Its own calibration.** The phone is a camera like any other (ADR-446). Its calibration is
    bound to its address (plus a keyed fingerprint of any query), and **Calibrated cameras** names
    it **Phone camera at** its address.
-4. **Remembered address, never a login.** The app and the address are remembered on this
-   computer, like the RTSP address. A login typed as `user:password@` is used for the connection
-   and never stored.
+4. **Remembered public address, never credentials.** Like the RTSP preference, storage strips
+   userinfo, query and fragment, including legacy stored values. The full typed address is used
+   for the current connection; the panel explains that login details and query parameters must
+   be entered again later. HTTP userinfo is decoded into a Basic Authorization header in the
+   bridge, not passed to Fetch in the URL. Redirects remain refused and errors never echo the
+   credential-bearing URL. Authentication modes beyond HTTP Basic are not added here.
 5. **Setup steps.** The section lists what makes a phone a good bed camera: the largest video
    resolution (IP Webcam serves its pictures at that size), mounted straight down clear of the
    head and gantry, no zoom, stabilisation, HDR or filters, focus locked where the app allows,

@@ -2,7 +2,7 @@ import { webcrypto } from 'node:crypto';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { CameraBridgeAdapter } from '../../platform/types';
 import type * as frameSource from '../camera/frame-source';
-import { captureSourceFrame } from '../camera/frame-source';
+import { cameraCaptureBindingForFrame, captureSourceFrame } from '../camera/frame-source';
 import {
   SNAPSHOT_CAMERA_NO_PICTURE,
   SNAPSHOT_CAMERA_POLL_INTERVAL_MS,
@@ -39,6 +39,45 @@ afterEach(() => {
 });
 
 describe('startSnapshotSource', () => {
+  it('keeps secrets only in the live request and distinguishes query-specific calibration identity', async () => {
+    vi.mocked(captureSourceFrame).mockResolvedValue(PICTURE);
+    const firstUrl = 'http://operator:first@secret-tail@192.168.1.50/frame?token=secret&camera=1';
+    await useCameraStore.getState().startSnapshotSource(bridge, firstUrl);
+    const first = useCameraStore.getState().sourceState;
+    if (first.kind !== 'live') throw new Error('First source not live');
+    const firstBinding = cameraCaptureBindingForFrame(first.source, 2, 2);
+    expect(firstBinding.sourceId).toBe('http://192.168.1.50/frame');
+    expect(JSON.stringify(firstBinding)).not.toMatch(/secret|operator|token|camera=1/);
+    await useCameraStore
+      .getState()
+      .startSnapshotSource(bridge, firstUrl.replace('camera=1', 'camera=2'));
+    const second = useCameraStore.getState().sourceState;
+    if (second.kind !== 'live') throw new Error('Second source not live');
+    const secondBinding = cameraCaptureBindingForFrame(second.source, 2, 2);
+    expect(secondBinding.sourceId).toBe(firstBinding.sourceId);
+    expect(secondBinding.queryFingerprint).not.toBe(firstBinding.queryFingerprint);
+    expect(firstBinding.queryFingerprint).toMatch(/^hmac-sha256:/);
+  });
+
+  it('does not let an older initial picture replace a newer camera', async () => {
+    let send: (picture: typeof PICTURE) => void = () => undefined;
+    vi.mocked(captureSourceFrame).mockReturnValueOnce(
+      new Promise((resolve) => {
+        send = resolve;
+      }),
+    );
+    const older = useCameraStore.getState().startSnapshotSource(bridge, PHONE_URL);
+    vi.mocked(captureSourceFrame).mockResolvedValue(PICTURE);
+    const newerUrl = PHONE_URL.replace('.50:', '.51:');
+    await useCameraStore.getState().startSnapshotSource(bridge, newerUrl);
+    send(PICTURE);
+    await older;
+    expect(useCameraStore.getState().sourceState).toMatchObject({
+      kind: 'live',
+      source: { cameraUrl: newerUrl },
+    });
+  });
+
   it('goes live on the phone once it sends a picture', async () => {
     vi.mocked(captureSourceFrame).mockResolvedValue(PICTURE);
     await useCameraStore.getState().startSnapshotSource(bridge, PHONE_URL);

@@ -1,6 +1,7 @@
 import { act } from 'react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { CameraCaptureBinding } from '../../../core/camera/camera-capture-binding';
+import { cameraSourceIdWithoutCredentials } from '../../../core/camera/camera-capture-binding';
 import { savedCameraModel } from '../../../core/camera/model/model-fixtures';
 import { clickElement, mountControl } from '../../image-editor/control-audit-test-support';
 import { useStore } from '../../state';
@@ -137,5 +138,17 @@ describe('SavedCamerasSection', () => {
     const host = await mountControl(<SavedCamerasSection />);
     expect(host.textContent).toContain('Machine camera at 192.168.10.1:8080');
     expect(host.textContent).toContain('The running camera has no calibration of its own yet.');
+  });
+
+  it('keeps phone credentials out of saved calibration labels and titles', async () => {
+    const address = 'http://operator:first@secret-tail@192.168.1.50/frame?token=secret#private';
+    savePhoneCamera({ app: 'other', address });
+    const phone = savedCameraModel(
+      binding('machine-jpeg', cameraSourceIdWithoutCredentials(address)),
+    );
+    useStore.getState().updateDeviceProfile({ cameraModel: phone, otherCameraModels: [builtIn] });
+    const host = await mountControl(<SavedCamerasSection />);
+    expect(host.textContent).toContain('Phone camera at 192.168.1.50');
+    expect(host.innerHTML).not.toMatch(/operator|secret|token|private/);
   });
 });
