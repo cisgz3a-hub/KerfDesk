@@ -54,6 +54,8 @@ function handle(): Viewer3dModule.Viewer3dSceneHandle {
     setStage: vi.fn(),
     pickViewCube: vi.fn(() => null),
     hoverViewCube: vi.fn(),
+    pickMove: vi.fn(() => null),
+    highlightMove: vi.fn(),
     onCameraMoving: vi.fn(),
     setCameraTracking: vi.fn(),
     onCameraInteraction: vi.fn(),

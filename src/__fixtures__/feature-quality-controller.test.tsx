@@ -235,6 +235,8 @@ describe('feature controller and workspace regressions', () => {
       setStage: vi.fn(),
       pickViewCube: vi.fn(() => null),
       hoverViewCube: vi.fn(),
+      pickMove: vi.fn(() => null),
+      highlightMove: vi.fn(),
       onCameraMoving: vi.fn(),
       captureImage: vi.fn(() => ''),
       setDirectionArrows: vi.fn(),

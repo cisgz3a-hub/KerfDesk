@@ -18,6 +18,7 @@ import { createSceneCameraControl, type SceneCameraControl } from './scene-camer
 import { boundsExtent, disposeChildren } from './scene-furniture';
 import { createMarkers, disposeMarkers, type SceneMarkers } from './scene-markers';
 import { placeMarker, type Point3 } from './scene-parts';
+import { createToolpathPicker, type ToolpathPicker } from './scene-pick';
 import type { CameraRig } from './scene-setup';
 import { applyRecolor, type RevealTargets, type TravelLine } from './scene-toolpath';
 import { applyTravelLook } from './scene-travel-look';
@@ -82,6 +83,8 @@ export type SceneCore = {
   readonly director: ReturnType<typeof createCameraDirector>;
   readonly views: SceneCameraControl;
   readonly markers: SceneMarkers;
+  /** Names the move under the pointer and outlines it (ADR-470). */
+  readonly picker: ToolpathPicker;
   readonly projection: { readonly listen: Listen<Viewer3dProjection>; readonly report: () => void };
   readonly moving: { readonly listen: Listen<boolean>; readonly dispose: () => void };
   /** Studio hands the line shaders linear colours; Classic keeps raw ones. */
@@ -132,6 +135,7 @@ export function createSceneCore(deps: SceneHandleDeps): SceneCore {
     director: createCameraDirector({ ...rig, render: requestRender }),
     views: createSceneCameraControl(rig, requestRender),
     markers,
+    picker: createToolpathPicker(modules, deps),
     projection: createProjectionReporter(rig),
     moving: createMovingReporter(rig.controls),
     encode,
@@ -184,6 +188,7 @@ function disposeCore(core: Omit<SceneCore, 'dispose'>): void {
   disposeChildren(deps.toolpathGroup);
   disposeChildren(deps.furnitureGroup);
   disposeMarkers(deps.scene, core.markers);
+  core.picker.dispose();
   disposeArrowMesh(deps.scene, core.state.arrowMesh);
   core.cube.dispose();
   core.studio.dispose();

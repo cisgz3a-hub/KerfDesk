@@ -1,6 +1,8 @@
 // Shared read-only working surface for the canvas and the full Inspector.
 import { useRef, useState } from 'react';
 import type { GcodeRenderModel } from '../../core/gcode-view';
+// Deep import: the viewer3d barrel is capped at 20 exports by its index contract.
+import type { Viewer3dPick } from '../viewer3d/scene-pick';
 import { InspectorSidebar } from './InspectorSidebar';
 import { InspectorLensControl } from './InspectorLensControl';
 import type { GcodeInspectionSource } from './gcode-inspection-source';
@@ -10,6 +12,7 @@ import { InspectorSourcePane } from './InspectorSourcePane';
 import { InspectorTimeline } from './InspectorTimeline';
 import { InspectorViewerHeader } from './InspectorViewerHeader';
 import { InspectorViewport } from './InspectorViewport';
+import { secondsAtPick } from './pick-readout';
 import { secondsAtLine } from './playhead';
 import { useFullWindow } from './use-full-window';
 import { useInspectorCamera } from './use-inspector-camera';
@@ -37,18 +40,12 @@ type Session = ReturnType<typeof useInspectorSession>;
 export function InspectorView(props: InspectorViewProps): JSX.Element {
   const [sourceVisible, setSourceVisible] = useState(true);
   const [readoutsVisible, setReadoutsVisible] = useState(true);
-  const [selectedLine, setSelectedLine] = useState<number | null>(null);
   const bodyRef = useRef<HTMLDivElement | null>(null);
   const fullWindow = useFullWindow(bodyRef);
   const session = useInspectorSession(props.model, props.analysis, props.source);
   const { canvasRef, handleRef, state, reason, camera } = useInspectorScene(props.model, session);
   const { playhead, liveMode, live } = session;
-  const locateLine = (line: number): void => {
-    setSelectedLine(line);
-    if (liveMode) return;
-    const target = secondsAtLine(props.model, session.time.segTimeEndSec, line);
-    if (target !== null) session.playback.setRouteMm(target);
-  };
+  const { selectedLine, locateLine, locateMove } = useLocators(props.model, session);
   const travelChange = session.setTravelVisible;
   const full = props.variant !== 'preview';
   return (
@@ -83,6 +80,11 @@ export function InspectorView(props: InspectorViewProps): JSX.Element {
           playing={session.playback.playing}
           travelVisible={session.travelVisible}
           onTravelChange={travelChange}
+          movePick={{
+            model: props.model,
+            segTimeEndSec: session.time.segTimeEndSec,
+            onLocate: locateMove,
+          }}
         >
           {props.variant === 'preview' ? (
             <PreviewLens model={props.model} session={session} />
@@ -110,6 +112,26 @@ export function InspectorView(props: InspectorViewProps): JSX.Element {
       ) : null}
     </div>
   );
+}
+
+// Jumps to a place in the program: its source line selected and, outside
+// live mode, the playhead moved there.
+function useLocators(model: GcodeRenderModel, session: Session) {
+  const [selectedLine, setSelectedLine] = useState<number | null>(null);
+  const segTimeEndSec = session.time.segTimeEndSec;
+  const jumpTo = (line: number, seconds: number | null): void => {
+    setSelectedLine(line);
+    if (!session.liveMode && seconds !== null) session.playback.setRouteMm(seconds);
+  };
+  return {
+    selectedLine,
+    locateLine: (line: number): void => jumpTo(line, secondsAtLine(model, segTimeEndSec, line)),
+    // A clicked move: its line, and the playhead at the clicked point on it.
+    locateMove: (pick: Viewer3dPick): void => {
+      const line = model.segLine[pick.segmentIndex];
+      if (line !== undefined) jumpTo(line, secondsAtPick(segTimeEndSec, pick));
+    },
+  };
 }
 
 function PreviewLens(props: {

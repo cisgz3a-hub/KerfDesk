@@ -30,6 +30,7 @@ import {
   type Point3,
 } from './scene-parts';
 import { loadThree } from './viewer3d-modules';
+import type { Viewer3dPick } from './scene-pick';
 import type { Viewer3dStage } from './viewer3d-look';
 import { resolveViewer3dTheme } from './viewer3d-theme';
 import { yieldViewer3dInitialization } from './yield-viewer3d-initialization';
@@ -37,6 +38,7 @@ import { yieldViewer3dInitialization } from './yield-viewer3d-initialization';
 export type Viewer3dSegments = Viewer3dSegmentsInput;
 
 export type { PlayheadMarker } from './scene-handle-core';
+export type { Viewer3dPick } from './scene-pick';
 
 export type Viewer3dSceneHandle = {
   readonly setSegments: (segments: Viewer3dSegments) => void;
@@ -81,6 +83,13 @@ export type Viewer3dSceneHandle = {
    * so a deferred read returns a blank image. The view cube is left out.
    */
   readonly captureImage: () => string;
+  /**
+   * The move drawn under a point of the canvas (CSS pixels from its top-left),
+   * with the point on it nearest the pointer; null over empty space (ADR-470).
+   */
+  readonly pickMove: (xPx: number, yPx: number) => Viewer3dPick | null;
+  /** Outlines one move over the rest of the path; null clears it. */
+  readonly highlightMove: (segmentIndex: number | null) => void;
   /** Direction arrowheads over the cut path; null clears them. */
   readonly setDirectionArrows: (placements: ReadonlyArray<ArrowPlacement> | null) => void;
   readonly resize: (width: number, height: number) => void;
@@ -135,6 +144,23 @@ function createSceneHandle(deps: SceneHandleDeps): Viewer3dSceneHandle {
     ...toolpathMethods(core),
     ...cameraMethods(core),
     ...lifecycleMethods(core),
+    ...pickMethods(core),
+  };
+}
+
+function pickMethods(core: SceneCore): Pick<Viewer3dSceneHandle, 'pickMove' | 'highlightMove'> {
+  const { deps, state } = core;
+  return {
+    pickMove: (xPx, yPx) =>
+      core.picker.pick(deps.rig.viewCamera(), {
+        xPx,
+        yPx,
+        widthPx: state.viewWidth,
+        heightPx: state.viewHeight,
+      }),
+    highlightMove: (segmentIndex) => {
+      if (core.picker.highlight(segmentIndex)) core.requestRender();
+    },
   };
 }
 
@@ -166,6 +192,7 @@ function toolpathMethods(core: SceneCore): ToolpathMethods {
       state.travelObject = built.travelObject;
       state.travelLine = built.travelLine;
       state.reveal = built.reveal;
+      core.picker.setTargets(built.reveal);
       core.applyTravel();
       sizeMarkers(markers, segments);
       requestRender();
@@ -285,6 +312,7 @@ function lifecycleMethods(core: SceneCore): LifecycleMethods {
       };
       applyResize(parts, nextWidth, nextHeight);
       core.studio.resize(nextWidth, nextHeight);
+      core.picker.resize(nextWidth, nextHeight);
       requestRender();
     },
     requestRender,

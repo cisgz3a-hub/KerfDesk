@@ -2,6 +2,7 @@ import type { CameraTracking, Viewer3dSceneHandle } from '../viewer3d';
 // Deep imports: the viewer3d barrel is capped at 20 exports by its index contract.
 import type { Viewer3dView } from '../viewer3d/camera-presets';
 import { VIEWER3D_MOUSE_HINT } from '../viewer3d/viewer3d-controls';
+import { InspectorMoveTip, type MovePickProps } from './InspectorMoveTip';
 import { InspectorViewControls } from './InspectorViewControls';
 import { InspectorViewCube } from './InspectorViewCube';
 import type { PlayheadState } from './playhead';
@@ -9,7 +10,7 @@ import type { InspectorLiveProgress } from './use-inspector-live-progress';
 import { useViewportCameraUi } from './use-viewport-camera-ui';
 import type { Viewer3dSceneState } from './use-viewer3d-scene';
 
-export function InspectorViewport(props: {
+type InspectorViewportProps = {
   readonly canvasRef: React.RefObject<HTMLCanvasElement>;
   readonly handleRef: React.RefObject<Viewer3dSceneHandle | null>;
   readonly state: Viewer3dSceneState;
@@ -24,8 +25,12 @@ export function InspectorViewport(props: {
   readonly playing: boolean;
   readonly travelVisible: boolean;
   readonly onTravelChange: (visible: boolean) => void;
+  /** Hover a move to read it, click it to go to its line (ADR-470). */
+  readonly movePick?: MovePickProps;
   readonly children?: React.ReactNode;
-}): JSX.Element {
+};
+
+export function InspectorViewport(props: InspectorViewportProps): JSX.Element {
   const { projection, moving } = useViewportCameraUi(props.handleRef, props.state);
   const manual = (action: () => void): void => {
     props.onCameraModeChange('manual');
@@ -63,6 +68,15 @@ export function InspectorViewport(props: {
         disabled={!ready}
       />
       {ready ? <InspectorViewCube handleRef={props.handleRef} onSelectView={selectView} /> : null}
+      {props.movePick !== undefined ? (
+        <InspectorMoveTip
+          {...props.movePick}
+          canvasRef={props.canvasRef}
+          handleRef={props.handleRef}
+          enabled={ready}
+          paused={moving}
+        />
+      ) : null}
       {props.children}
       <ViewHint
         cameraMode={props.cameraMode}
