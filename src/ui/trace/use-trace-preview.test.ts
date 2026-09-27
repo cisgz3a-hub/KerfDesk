@@ -277,8 +277,8 @@ describe('runTrace stale-result guard (P2-A)', () => {
           },
         ],
         bounds: { minX: 20, minY: 20, maxX: 40, maxY: 40 },
-        width: 820,
-        height: 820,
+        width: 856,
+        height: 856,
       });
     const setState = vi.fn();
 
@@ -292,9 +292,11 @@ describe('runTrace stale-result guard (P2-A)', () => {
       setState,
     });
 
+    // The 410 px working box plus a 9 px context ring each side (ADR-435),
+    // supersampled 2x.
     expect(traceImageWithFallback).toHaveBeenNthCalledWith(
       2,
-      expect.objectContaining({ width: 820, height: 820 }),
+      expect.objectContaining({ width: 856, height: 856 }),
       expect.objectContaining({ pixelScale: 2 }),
       undefined,
       undefined,
@@ -382,15 +384,16 @@ describe('runTrace stale-result guard (P2-A)', () => {
         width: 20,
         height: 20,
       })
-      // Region re-trace on the 20x20 supersample; downscaled /2 + offset (5,5).
+      // Region re-trace of the box plus its context ring (the whole 20x20
+      // image, ADR-435) supersampled to 40x40; downscaled /2, offset (0,0).
       .mockResolvedValueOnce({
         paths: [
           {
             color: '#000000',
             polylines: [
               pl([
-                [6, 6],
-                [10, 10],
+                [16, 16],
+                [20, 20],
               ]),
             ],
           },
@@ -412,8 +415,8 @@ describe('runTrace stale-result guard (P2-A)', () => {
 
     const ready = setState.mock.calls[0]?.[0];
     const previewPolylines = ready.paths.flatMap((p: ColoredPath) => p.polylines);
-    // Outside corner survived; re-traced replacement present ((8,8)->(4,4)->(8,8),
-    // (10,10)->(5,5)->(10,10)) — inside the interior.
+    // Outside corner survived; re-traced replacement present ((16,16)->(8,8),
+    // (20,20)->(10,10)) — inside the interior.
     expect(previewPolylines).toContainEqual(
       pl([
         [0, 0],

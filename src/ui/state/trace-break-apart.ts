@@ -1,3 +1,4 @@
+import { isHybridStrokePath } from '../../core/trace/hybrid/hybrid-paths';
 import {
   DEFAULT_MACHINE_CURVE_TOLERANCE_MM,
   flattenCurveSubpath,
@@ -53,8 +54,12 @@ function pieceGeometries(object: TracedImage): ReadonlyArray<PieceGeometry> {
   // Centerline traces are strokes: a closed stroke inside another is a
   // separate mark, not a hole. Edge Detection output is filled closed contours
   // like filled-contours (edge-trace.ts), so its holes group with their outer.
-  const strokes = object.traceMode === 'centerline';
+  // Line + fill (ADR-454) holds both: strokes split per stroke, outlines
+  // group with their holes.
   return object.paths.flatMap((path, pathIndex) => {
+    const strokes =
+      object.traceMode === 'centerline' ||
+      (object.traceMode === 'hybrid' && isHybridStrokePath(path));
     const groups = strokes
       ? Array.from({ length: subpathCount(path) }, (_, index) => [index])
       : groupSubpathsByOuterShape(path);

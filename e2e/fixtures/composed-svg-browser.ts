@@ -49,6 +49,10 @@ export async function exportComposedSvg(page: Page, kerfdesk: KerfDeskFixture): 
   ).length;
   await page.getByRole('menuitem', { name: 'File', exact: true }).click();
   await page.getByRole('menuitem', { name: /Export .*artwork as SVG/ }).click();
+  // ADR-451: the options dialog opens the save picker from its Choose File... button.
+  const options = page.getByRole('dialog', { name: 'Export SVG' });
+  await expect(options.getByRole('checkbox', { name: 'Group islands' })).not.toBeChecked();
+  await options.getByRole('button', { name: 'Choose File...' }).click();
   await expect
     .poll(
       async () => (await kerfdesk.events()).filter((event) => event.kind === 'file-saved').length,

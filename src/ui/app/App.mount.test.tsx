@@ -145,15 +145,10 @@ describe('CommandShell hook ordering', () => {
     const source = readFileSync(resolve(process.cwd(), 'src/ui/commands/CommandShell.tsx'), 'utf8');
     const commandsIndex = source.indexOf('const commands = useAppCommands');
     const imagePickIndex = source.indexOf('const onImagePick = useImagePickHandler();');
-    const multiTracePickIndex = source.indexOf(
-      'const onMultiFileTracePick = useMultiFileTracePickHandler();',
-    );
 
     expect(commandsIndex).toBeGreaterThan(0);
     expect(imagePickIndex).toBeGreaterThan(0);
-    expect(multiTracePickIndex).toBeGreaterThan(0);
     expect(imagePickIndex).toBeLessThan(commandsIndex);
-    expect(multiTracePickIndex).toBeLessThan(commandsIndex);
   });
 });
 

@@ -68,11 +68,16 @@ describe('project camera model persistence', () => {
     });
     const others = [savedCameraModel(usb('overhead')), savedCameraModel(usb('side'))];
     const base = projectWithModel();
-    const project = { ...base, device: { ...base.device, otherCameraModels: others } };
+    const project = {
+      ...base,
+      device: { ...base.device, laserArcMoves: 'on' as const, otherCameraModels: others },
+    };
     const result = deserializeProject(serializeProject(project));
     expect(result.kind).toBe('ok');
     if (result.kind !== 'ok') return;
     expect(result.project.device.otherCameraModels).toEqual(others);
+    expect(result.project.device.cameraModel).toEqual(savedCameraModel());
+    expect(result.project.device.laserArcMoves).toBe('on');
     const dropped = reloadWithDevice({
       otherCameraModels: [others[0], { ...savedCameraModel(), pose: { rvec: [1] } }],
     });

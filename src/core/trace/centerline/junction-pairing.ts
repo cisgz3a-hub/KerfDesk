@@ -5,7 +5,8 @@
 
 import type { Vec2 } from '../../scene';
 import { runTraceSteps, type TraceSteps } from '../trace-steps';
-import { EndpointGrid } from './endpoint-grid';
+import { ChainEndIndex } from './chain-end-index';
+import { BridgeQueue } from './bridge-queue';
 import { pointAtArcDistance } from './polyline-window';
 import { arcLength } from './spur-pruning';
 import type { StrokeGraph } from './stroke-graph';
@@ -29,16 +30,19 @@ export function pairThroughJunctions(chains: Chain[], graph: StrokeGraph): void 
 
 export function* pairThroughJunctionsSteps(chains: Chain[], graph: StrokeGraph): TraceSteps<void> {
   const cooperate = yield;
+  // Each junction reads only the chains filed near it, not every chain.
+  const index = new ChainEndIndex(chains, POINT_MATCH_EPS);
   for (const node of graph.nodes) {
     if (cooperate) yield;
     if (node.kind !== 'junction') continue;
-    let ends = endsAtPoint(chains, node.pos);
+    let ends = endsAtPoint(index.near(node.pos), node.pos);
     while (ends.length >= 2) {
       if (cooperate) yield;
       const pair = straightestPair(ends);
       if (pair === null) break;
       mergeEnds(pair[0], pair[1]);
-      ends = endsAtPoint(chains, node.pos);
+      index.file(pair[0].chain);
+      ends = endsAtPoint(index.near(node.pos), node.pos);
     }
   }
 }
@@ -68,11 +72,32 @@ export function* bridgeNearbyEndsSteps(
   alignedFactor = 1,
   pieceGapRatio = 0,
 ): TraceSteps<void> {
+  const cooperate = yield;
   if (joinGapPx <= 0) return;
-  for (;;) {
-    const pair = yield* nearestBridgeableEndsSteps(chains, joinGapPx, alignedFactor, pieceGapRatio);
-    if (pair === null) return;
+  // Each round bridges the closest bridgeable pair (ties to the pair first in
+  // chain order); the queue re-measures only the chains each merge changes.
+  // A merge changes only its two chains' lengths, so the piece-length cache
+  // forgets exactly those (ADR-405's dash guard reads the merged length).
+  const reach = joinGapPx * Math.max(1, alignedFactor);
+  const lengths = new Map<Chain, number>();
+  const lengthOf = (chain: Chain): number => {
+    let length = lengths.get(chain);
+    if (length === undefined) {
+      length = arcLength(chain.points);
+      lengths.set(chain, length);
+    }
+    return length;
+  };
+  const bridges = new BridgeQueue(chains, reach, (a, b) =>
+    bridgeGap(a, b, reach, joinGapPx, alignedFactor, pieceGapRatio, lengthOf),
+  );
+  yield* bridges.measureAllSteps();
+  for (let pair = bridges.take(); pair !== null; pair = bridges.take()) {
+    if (cooperate) yield;
     mergeEnds(pair[0], pair[1]);
+    lengths.delete(pair[0].chain);
+    lengths.delete(pair[1].chain);
+    bridges.merged(pair[0].chain, pair[1].chain);
   }
 }
 
@@ -154,57 +179,25 @@ const MIN_BRIDGE_FORWARDNESS_SUM = 0.25;
 const CORNER_BRIDGE_FACTOR = 2;
 const MIN_CORNER_FORWARDNESS = 0.25;
 
-function* nearestBridgeableEndsSteps(
-  chains: ReadonlyArray<Chain>,
+// The gap of a pair of ends that may bridge, or null. No bridge spans
+// `reach` or more.
+function bridgeGap(
+  a: ChainEnd,
+  b: ChainEnd,
+  reach: number,
   joinGapPx: number,
   alignedFactor: number,
   pieceGapRatio: number,
-): TraceSteps<readonly [ChainEnd, ChainEnd] | null> {
-  const cooperate = yield;
-  const ends = collectOpenEnds(chains);
-  const lengths = new Map<Chain, number>();
-  const lengthOf = (chain: Chain): number => {
-    let length = lengths.get(chain);
-    if (length === undefined) {
-      length = arcLength(chain.points);
-      lengths.set(chain, length);
-    }
-    return length;
-  };
-  let best: readonly [ChainEnd, ChainEnd] | null = null;
-  let bestDist = joinGapPx * Math.max(1, alignedFactor);
-  const grid = EndpointGrid.create(ends.map(endPoint), bestDist);
-  for (let i = 0; i < ends.length; i += 1) {
-    if (cooperate) yield;
-    const a = ends[i];
-    if (a === undefined) continue;
-    for (const j of laterEndIndices(ends, i, grid)) {
-      const b = ends[j];
-      if (b === undefined) continue;
-      const d = endGap(a, b);
-      if (d === null || d >= bestDist) continue;
-      const forward = bridgeForwardness(a, b);
-      if (forward === null) continue;
-      if (!passesBridgeTier(d, joinGapPx, alignedFactor, forward)) continue;
-      if (pieceGapRatio > 0 && d * pieceGapRatio >= Math.min(lengthOf(a.chain), lengthOf(b.chain)))
-        continue;
-      bestDist = d;
-      best = [a, b];
-    }
-  }
-  return best;
-}
-
-function laterEndIndices(
-  ends: ReadonlyArray<ChainEnd>,
-  index: number,
-  grid: EndpointGrid | null,
-): number[] {
-  const end = ends[index];
-  const point = end === undefined ? undefined : endPoint(end);
-  if (grid !== null && point !== undefined)
-    return grid.nearbyIndices(point).filter((i) => i > index);
-  return Array.from({ length: ends.length - index - 1 }, (_, i) => index + i + 1);
+  lengthOf: (chain: Chain) => number,
+): number | null {
+  const d = endGap(a, b);
+  if (d === null || d >= reach) return null;
+  const forward = bridgeForwardness(a, b);
+  if (forward === null) return null;
+  if (!passesBridgeTier(d, joinGapPx, alignedFactor, forward)) return null;
+  if (pieceGapRatio > 0 && d * pieceGapRatio >= Math.min(lengthOf(a.chain), lengthOf(b.chain)))
+    return null;
+  return d;
 }
 
 function passesBridgeTier(
@@ -224,15 +217,6 @@ function passesBridgeTier(
     return true;
   }
   return continuesBoth(forward);
-}
-
-function collectOpenEnds(chains: ReadonlyArray<Chain>): ChainEnd[] {
-  const ends: ChainEnd[] = [];
-  for (const chain of chains) {
-    if (!chain.alive || chain.closed || chain.points.length < 2) continue;
-    ends.push({ chain, atStart: true }, { chain, atStart: false });
-  }
-  return ends;
 }
 
 function endGap(a: ChainEnd, b: ChainEnd): number | null {

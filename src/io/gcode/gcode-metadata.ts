@@ -78,18 +78,19 @@ export type GcodeMetadata = {
  * pass from the allowance-bearing region's cleared stock (2026-09-27), and
  * ADR-154 amendment 2's adaptive pocket finishing rings that end where they
  * start, and ADR-273 amendment 1's relief group headers that no longer claim
- * a ramp entry for a relief stage that actually plunges, and ADR-445's shared
+ * a ramp entry for a relief stage that actually plunges, and ADR-432's native
+ * laser G2/G3 arcs with represented-arc validation and G17, and ADR-445's shared
  * split scan exit/entry runways, canonical meeting endpoints and compact
- * Fill/4040 Image motion words.
+ * Fill/4040 Image motion words, retaining ADR-460's lossless Fill compaction.
  */
 // ADR-427 integration also cuts deepest cleanup before linked relief rings;
 // all adaptive ring closure and flat depth-slice provenance above is retained.
 // ADR-368 amendment 3 sizes ball-nose, V-bit and engraving pocket and profile
-// offsets, tab windows, and pocket and relief-roughing stepover by the cut
-// width at depth.
-// Scan timing v2 also preserves M3 state across shared, empty and coincident
-// Image handoffs (ADR-445); cached v1 output must be regenerated.
-export const EMITTER_REVISION = 'adaptive-relief-cut-width-scan-timing-20260927-v2';
+// offsets, tab windows, and pocket and relief-roughing stepover by cut width.
+// Tracer batch 3 preserves bounded chord flattening, shared seams and Line + fill.
+// Native arcs, compact Fill and linked relief entry retain scan timing v2's
+// shared, empty and coincident M3 Image handoffs (ADR-445).
+export const EMITTER_REVISION = 'trace-hybrid-arcs-relief-cut-width-scan-v2-20260927-v4';
 
 // Machine-specific assumption lines (ADR-103 defect fix): router exports
 // previously carried the laser-worded `$32=1 (laser mode)` banner. The S
