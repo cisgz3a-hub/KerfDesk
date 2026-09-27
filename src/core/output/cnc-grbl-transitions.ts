@@ -133,6 +133,7 @@ export function appendSpindleStart(
   lines.push(`M3 S${Math.max(0, Math.round(rpm))}`);
   // This is deliberately time-based. Stock GRBL's FS value reflects its
   // commanded/limited spindle output, not tachometer-backed physical RPM.
-  // CNC preflight rejects non-positive durations before output can be written.
+  // A spin-up time of 0 s writes no dwell; Pause and lift then waits its own
+  // default spin-up above the cut before re-entering (ADR-411 Amendment 1).
   if (spinupSec > 0) lines.push(`G4 P${fmt(spinupSec)}`);
 }

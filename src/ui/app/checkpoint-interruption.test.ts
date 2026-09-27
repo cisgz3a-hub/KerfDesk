@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { currentJobStopRequest } from '../state/job-stop-request';
-import type { LaserSafetyNotice } from '../state/laser-safety-notice';
+import { cncPauseLiftFailedNotice, type LaserSafetyNotice } from '../state/laser-safety-notice';
 import {
   checkpointInterruption,
   currentRunPlannerBacklog,
@@ -48,6 +48,15 @@ describe('checkpointInterruption', () => {
       kind: 'disconnect-stop-unconfirmed',
       message: 'Buffered motion may still be active.',
     };
+
+    expect(checkpointInterruption('cancelled', notice)).toEqual({
+      kind: 'cancelled',
+      message: notice.message,
+    });
+  });
+
+  it('files a failed Pause and lift as a stop from the app, not a rejected stream', () => {
+    const notice = cncPauseLiftFailedNotice('The machine did not reach the lift height.');
 
     expect(checkpointInterruption('cancelled', notice)).toEqual({
       kind: 'cancelled',

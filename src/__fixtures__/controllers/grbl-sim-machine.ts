@@ -51,6 +51,11 @@
 import { formatVec3, SIM_ZERO_VEC3 } from './grbl-sim-gcode';
 import { reduceGrblSimLine } from './grbl-sim-lines';
 import {
+  applyGrblSimOverrideByte,
+  GRBL_SIM_BASELINE_OVERRIDES,
+  grblSimOverrideField,
+} from './grbl-sim-overrides';
+import {
   emit,
   startDwell,
   totalWco,
@@ -111,6 +116,7 @@ export function initialGrblSimState(settings: ReadonlyMap<number, string>): Grbl
     critical: false,
     lastError: null,
     resetEpoch: 0,
+    overrides: GRBL_SIM_BASELINE_OVERRIDES,
   };
 }
 
@@ -122,6 +128,7 @@ export function reduceGrblSim(
   if (event.kind === 'rx-realtime') return reduceRealtime(state, event.byte, opts);
   if (event.kind === 'rx-line') return reduceGrblSimLine(state, event.line, opts);
   if (event.kind === 'alarm') return reduceAlarm(state, event.code, opts);
+  if (event.kind === 'door-input') return reduceDoorInput(state, event.open);
   if (event.epoch !== undefined && event.epoch !== state.resetEpoch) return { state, effects: [] };
   return reduceTimedEvent(state, event, opts);
 }
@@ -134,14 +141,15 @@ export function grblSimParsesLines(state: GrblSimState, opts: GrblSimOptions): b
 }
 
 export function statusReportLine(state: GrblSimState): string {
+  const door = state.doorAjar === true ? 'Door:1' : 'Door:0';
   const label =
-    state.machine === 'Hold' ? 'Hold:0' : state.machine === 'Door' ? 'Door:0' : state.machine;
+    state.machine === 'Hold' ? 'Hold:0' : state.machine === 'Door' ? door : state.machine;
   const isMoving = state.machine === 'Run' || state.machine === 'Jog' || state.machine === 'Hold';
   const feed = isMoving ? Math.round(state.feed) : 0;
   const spindle = isMoving ? Math.round(state.spindle) : 0;
   const wco = totalWco(state);
-  const stoppedAccessories = state.machine === 'Door' ? '|Ov:100,100,100' : '';
-  return `<${label}|MPos:${formatVec3(state.mpos)}|FS:${feed},${spindle}|WCO:${formatVec3(wco)}${stoppedAccessories}>`;
+  const overrides = grblSimOverrideField(state.overrides, state.machine === 'Door');
+  return `<${label}|MPos:${formatVec3(state.mpos)}|FS:${feed},${spindle}|WCO:${formatVec3(wco)}${overrides}>`;
 }
 
 function reduceTimedEvent(
@@ -235,9 +243,11 @@ function reduceRealtime(state: GrblSimState, byte: string, opts: GrblSimOptions)
       return state.machine === 'Jog'
         ? { state: { ...state, machine: 'Idle', pendingMotions: 0 }, effects: [] }
         : { state, effects: [] };
-    default:
-      // Overrides and unassigned bytes above 0x7F: taken off the stream, not modelled.
-      return { state, effects: [] };
+    default: {
+      // Unassigned bytes above 0x7F are taken off the stream and ignored.
+      const overrides = applyGrblSimOverrideByte(state.overrides, byte);
+      return { state: overrides === null ? state : { ...state, overrides }, effects: [] };
+    }
   }
 }
 
@@ -259,8 +269,16 @@ function reduceSafetyDoor(state: GrblSimState): GrblSimReaction {
   };
 }
 
+// A door input opening parks like the software door; closing it lets cycle
+// start resume (system.c:87-93 with ENABLE_SAFETY_DOOR_INPUT_PIN).
+function reduceDoorInput(state: GrblSimState, open: boolean): GrblSimReaction {
+  if (!open) return { state: { ...state, doorAjar: false }, effects: [] };
+  return { state: { ...reduceSafetyDoor(state).state, doorAjar: true }, effects: [] };
+}
+
 function reduceCycleStart(state: GrblSimState, opts: GrblSimOptions): GrblSimReaction {
   if (state.machine !== 'Hold' && state.machine !== 'Door') return { state, effects: [] };
+  if (state.machine === 'Door' && state.doorAjar === true) return { state, effects: [] };
   const pending = state.pendingLine;
   if (pending?.kind === 'program-pause' && pending.phase === 'hold') {
     // M0 synced before it held, so nothing is queued: the resume ends the
@@ -293,6 +311,7 @@ function reduceSoftReset(state: GrblSimState, opts: GrblSimOptions): GrblSimReac
     critical: false,
     lastError: null,
     resetEpoch: state.resetEpoch + 1,
+    overrides: GRBL_SIM_BASELINE_OVERRIDES,
   };
   if (wasMoving && opts.alarmOnResetDuringMotion) {
     // Firmware order: protocol_exec_rt_system reports the abort alarm, then
