@@ -1,8 +1,10 @@
-// ADR-273 Amendment 1: relief roughing rings and finishing rows plunge at
-// their starts, so a relief group must not record the layer's ramp angle as
-// its entry. Before the amendment both relief groups carried it, and the
-// G-code header said `; cnc entry: contour-ramp; max-angle-deg: 5.000` above a
-// straight `G1 Z-1.500 F300` plunge. The layer's other shapes still ramp.
+// ADR-273 Amendment 1: a group records a ramp entry only where it enters along
+// its path. Relief roughing rings and finishing rows plunge at their starts, so
+// before the amendment both relief groups carried the layer's ramp angle, and
+// the G-code header said `; cnc entry: contour-ramp; max-angle-deg: 5.000`
+// above a straight `G1 Z-1.500 F300` plunge. The layer's other shapes still
+// ramp. Stated as the rule, the test also holds for a relief planner that
+// ramps and records it (ADR-424, PR #939).
 
 import { describe, expect, it } from 'vitest';
 import { testReliefHeightfield } from '../../__fixtures__/relief-heightfield';
@@ -119,36 +121,34 @@ function firstDescent(lines: ReadonlyArray<string>): string | undefined {
   return lines.find((line) => /^G1[ XYZ].*Z-/.test(line));
 }
 
-describe('relief entry provenance', () => {
-  it('records no ramp on relief groups, whose passes plunge', () => {
-    const job = compile([flatRelief()], { reliefFinishToolId: 'bn-3175' });
-    const rough = group(job, 'relief-rough');
-    const finish = group(job, 'relief-finish');
-    expect(rough.rampEntryDeg).toBeUndefined();
-    expect(finish.rampEntryDeg).toBeUndefined();
-    // Nothing ramps them: roughing rings stay flat contour passes.
-    expect(rough.passes.every((pass) => pass.kind === 'contour')).toBe(true);
+// Straight down at the plunge feed, or down along the path as X and Y move.
+const PLUNGE = /^G1 Z-\d+\.\d{3} F300$/;
+const ALONG_PATH = /^G1 ?X-?[\d.]+ ?Y-?[\d.]+ ?Z-[\d.]+/;
 
-    for (const operation of ['relief-rough', 'relief-finish']) {
-      const lines = section(job, operation);
-      expect(lines.filter((line) => line.startsWith('; cnc entry'))).toEqual([]);
-      // A straight plunge at the plunge feed, not a descent along the path.
-      expect(firstDescent(lines)).toMatch(/^G1 Z-\d+\.\d{3} F300$/);
-    }
+// A group records a ramp, and its header names one, exactly when it enters
+// along its path.
+function expectEntryMatchesClaim(job: Job, operation: CncGroup['cutType']): void {
+  const lines = section(job, operation);
+  const claims = lines.filter((line) => line.startsWith('; cnc entry'));
+  expect(claims).toEqual(
+    claims.length === 0 ? [] : ['; cnc entry: contour-ramp; max-angle-deg: 5.000'],
+  );
+  expect(group(job, operation).rampEntryDeg).toBe(claims.length === 0 ? undefined : 5);
+  expect(firstDescent(lines)).toMatch(claims.length === 0 ? PLUNGE : ALONG_PATH);
+}
+
+describe('relief entry provenance', () => {
+  it('claims a ramp on a relief group only where the group ramps', () => {
+    const job = compile([flatRelief()], { reliefFinishToolId: 'bn-3175' });
+    // Both relief groups claimed the ramp above a straight plunge.
+    expectEntryMatchesClaim(job, 'relief-rough');
+    expectEntryMatchesClaim(job, 'relief-finish');
   });
 
   it('keeps the layer ramp on the shapes it ramps', () => {
     const job = compile([square(), flatRelief()], { depthMm: 1, tabsEnabled: false });
-    const profile = group(job, 'profile-on-path');
-    expect(profile.rampEntryDeg).toBe(5);
-    const profileLines = section(job, 'profile-on-path');
-    expect(profileLines).toContain('; cnc entry: contour-ramp; max-angle-deg: 5.000');
-    // The profile descends along its path: X and Y move with Z.
-    expect(firstDescent(profileLines)).toMatch(/^G1 X-?[\d.]+ Y-?[\d.]+ Z-[\d.]+ F1000$/);
-
-    expect(group(job, 'relief-rough').rampEntryDeg).toBeUndefined();
-    const reliefLines = section(job, 'relief-rough');
-    expect(reliefLines.filter((line) => line.startsWith('; cnc entry'))).toEqual([]);
-    expect(firstDescent(reliefLines)).toBe('G1 Z-1.500 F300');
+    expect(group(job, 'profile-on-path').rampEntryDeg).toBe(5);
+    expectEntryMatchesClaim(job, 'profile-on-path');
+    expectEntryMatchesClaim(job, 'relief-rough');
   });
 });
