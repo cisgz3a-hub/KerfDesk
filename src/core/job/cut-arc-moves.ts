@@ -15,6 +15,7 @@ import { laserArcMovesEnabled } from '../devices/laser-arc-moves';
 import { toMachineCoords, type DeviceProfile } from '../devices';
 import { formatGcodeCoordinateMm } from '../gcode';
 import {
+  ARC_FIT_SOURCE_SAMPLE_ERROR_MM,
   arcMovesConnect,
   arcSweep,
   extendBoundsByArcMoves,
@@ -74,14 +75,40 @@ export function laserArcFitFor(
   };
 }
 
+const MACHINE_CHORDS: ArcFitPlacement = { map: (point) => point, largestScale: 1 };
+
+/**
+ * For a contour that exists only as machine-space chords, such as a kerf
+ * offset (ADR-486): arc moves fitted against those chords, when the machine
+ * takes arcs and they save moves. `chordErrorMm` is how far the chords may sit
+ * from the curve they stand for; it comes out of the fit's tolerance, so the
+ * arcs stay within the machine curve tolerance of that curve.
+ */
+export function laserArcFitForMachineChords(
+  device: DeviceProfile,
+  chordErrorMm: number,
+): (segment: CutSegment) => CutSegment {
+  if (!laserArcMovesEnabled(device)) return (segment) => segment;
+  const toleranceMm =
+    DEFAULT_MACHINE_CURVE_TOLERANCE_MM - Math.max(0, chordErrorMm - ARC_FIT_SOURCE_SAMPLE_ERROR_MM);
+  return (segment) =>
+    withArcMoves(
+      segment,
+      polylineToCurveSubpath({ points: segment.polyline, closed: false }),
+      MACHINE_CHORDS,
+      toleranceMm,
+    );
+}
+
 function withArcMoves(
   segment: CutSegment,
   curve: CurveSubpath,
   placement: ArcFitPlacement,
+  toleranceMm: number = DEFAULT_MACHINE_CURVE_TOLERANCE_MM,
 ): CutSegment {
   const last = segment.polyline[segment.polyline.length - 1];
   if (last === undefined || segment.polyline.length < 3) return segment;
-  const fitted = fitArcMoves(curve, placement, DEFAULT_MACHINE_CURVE_TOLERANCE_MM);
+  const fitted = fitArcMoves(curve, placement, toleranceMm);
   if (fitted.length === 0 || fitted.length >= segment.polyline.length - 1) return segment;
   // The fit ends on the mapped canonical end point; the compiled polyline may
   // end a float-noise step away (an elliptical arc's last sample, a closure

@@ -11,7 +11,6 @@
 
 import { type DeviceProfile, toMachineCoords } from '../devices';
 import { artworkOperationRuns, orderedArtworkObjects } from '../artwork-order';
-import { offsetClosedPolylinesForKerfChecked } from '../geometry/kerf-offset';
 import { applyAutomaticTabsToPolylines } from '../geometry/tabs-bridges';
 import {
   applyTransform,
@@ -45,6 +44,7 @@ import { hasExecutableFillSweep } from './fill-group-emission';
 import { buildFillGroup } from './fill-group-build';
 import { collectFillSegmentsForLayer, islandFillGroupsForLayer } from './layer-fill';
 import type { CutSegment, Group, Job, JobDiagnostic } from './job';
+import { kerfArcSourceRings, withLayerKerf, type PendingKerfGroup } from './layer-kerf';
 import { lineOvercutFields, perforateLineSegments } from './line-cut-extras';
 import { offsetFillDiagnostics } from './offset-fill-diagnostics';
 import { commonVectorGroupFields } from './vector-group-fields';
@@ -315,40 +315,46 @@ function collectLineSegmentsForLayer(
   device: DeviceProfile,
 ): LineSegmentCollection {
   const out: CutSegment[] = [];
-  let kerfOffsetFailed = false;
-  for (const obj of objects) {
-    if (appendSegmentsFromObject(obj, layer, device, out)) kerfOffsetFailed = true;
-  }
+  const kerf: PendingKerfGroup[] = [];
+  for (const obj of objects) appendSegmentsFromObject(obj, layer, device, { out, kerf });
+  // The kerf offset runs once for the whole layer, so a hole drawn as its own
+  // object is offset as a hole (ADR-486). A failure is reported, not dropped.
+  const kerfed = withLayerKerf(out, kerf, layer, device);
   const tabbed = layer.tabsEnabled
     ? applyAutomaticTabsToPolylines(
-        out.map((segment) => ({ points: segment.polyline, closed: segment.closed })),
+        kerfed.segments.map((segment) => ({ points: segment.polyline, closed: segment.closed })),
         layer,
       ).map((polyline) => ({ polyline: polyline.points, closed: polyline.closed }))
-    : out;
-  return { segments: perforateLineSegments(tabbed, layer), kerfOffsetFailed };
+    : kerfed.segments;
+  return { segments: perforateLineSegments(tabbed, layer), kerfOffsetFailed: kerfed.failed };
 }
 
-// Returns true when the kerf offset failed for this object, so the caller can
-// report the loss instead of emitting a job that is quietly missing a cut.
+// A layer's line segments so far, plus the closed contours still waiting for
+// the layer-wide kerf offset.
+type LineSegmentSink = {
+  readonly out: CutSegment[];
+  readonly kerf: PendingKerfGroup[];
+};
+
 function appendSegmentsFromObject(
   obj: SceneObject,
   layer: Layer,
   device: DeviceProfile,
-  out: CutSegment[],
-): boolean {
+  sink: LineSegmentSink,
+): void {
   // Exhaustive over SceneObject.kind — enforced by
   // `@typescript-eslint/switch-exhaustiveness-check`. The default arm's
   // assertNever turns missing arms into compile errors when a new
   // variant lands (per ADR-014).
   switch (obj.kind) {
     case 'imported-svg':
-      return appendPathSegments(obj, layer, device, out);
+      return appendPathSegments(obj, layer, device, sink);
     case 'text':
-      return appendPathSegments(obj, layer, device, out);
+      return appendPathSegments(obj, layer, device, sink);
     case 'traced-image':
-      return appendPathSegments(obj, layer, device, out);
+      return appendPathSegments(obj, layer, device, sink);
     case 'shape':
-      return appendPathSegments(obj, layer, device, out);
+      return appendPathSegments(obj, layer, device, sink);
     case 'raster-image':
       // F.2.c: SceneObject union now includes raster-image. The
       // dedicated raster emit path (compileRasterGroup → emitRaster)
@@ -356,10 +362,10 @@ function appendSegmentsFromObject(
       // contribute polyline segments and the compile path skips
       // them. Behaviour parity with the F.2.b standalone emit-raster
       // tests preserved.
-      return false;
+      return;
     case 'relief':
       // CNC-only geometry — the laser compiler never emits it.
-      return false;
+      return;
     default:
       assertNever(obj, 'SceneObject');
   }
@@ -378,19 +384,19 @@ function appendPathSegments(
   object: Extract<SceneObject, { readonly paths: ReadonlyArray<ColoredPath> }>,
   layer: Layer,
   device: DeviceProfile,
-  out: CutSegment[],
-): boolean {
-  let kerfOffsetFailed = false;
+  { out, kerf }: LineSegmentSink,
+): void {
   for (const path of object.paths) {
     if (!pathUsesOperation(object, path, layer)) continue;
     const closedForKerf: Polyline[] = [];
     const withArcs = laserArcFitFor(path, object.transform, device);
+    const kerfArcSource = kerfArcSourceRings(path, object.transform, layer, device);
     for (const [index, polyline] of compilationPolylines(path, object.transform).entries()) {
       const points: Vec2[] = polyline.points.map((p) =>
         toMachineCoords(applyTransform(p, object.transform), device),
       );
       if (shouldApplyKerf(polyline, layer)) {
-        closedForKerf.push({ points, closed: true });
+        closedForKerf.push({ points: kerfArcSource?.[index]?.points ?? points, closed: true });
       } else {
         // Enforce the CutSegment invariant "a closed segment's last point
         // equals its first" so the emitter (which walks points and ignores the
@@ -403,19 +409,8 @@ function appendPathSegments(
         out.push(withArcs(index, segment));
       }
     }
-    // Checked: the unchecked variant flattens a clipper2 failure to an empty
-    // list, which reads identically to "this path had no closed contours" — so
-    // a failed kerf offset silently deleted the cut instead of reporting it.
-    const offset = offsetClosedPolylinesForKerfChecked(closedForKerf, layer.kerfOffsetMm);
-    if (offset.kind === 'error') {
-      kerfOffsetFailed = true;
-      continue;
-    }
-    for (const polyline of offset.value) {
-      out.push({ polyline: polyline.points, closed: true });
-    }
+    if (closedForKerf.length > 0) kerf.push({ insertAt: out.length, rings: closedForKerf });
   }
-  return kerfOffsetFailed;
 }
 
 function shouldApplyKerf(polyline: Polyline, layer: Layer): boolean {
