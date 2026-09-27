@@ -5,6 +5,10 @@
 // "no preference" silently.
 
 import { cameraSourceIdWithoutCredentials } from '../../core/camera/camera-capture-binding';
+import {
+  phoneCameraAddressWithoutLogin,
+  type PhoneCameraApp,
+} from '../camera/phone-camera-address';
 
 const PREFERRED_CAMERA_KEY = 'laserforge.camera.preferredDeviceId.v1';
 
@@ -50,6 +54,35 @@ export function saveRtspCameraUrl(url: string): void {
 
 export function rtspUrlWithoutCredentials(raw: string): string {
   return cameraSourceIdWithoutCredentials(raw);
+}
+
+// The phone camera's app and address (ADR-448): machine-local operator input
+// like the RTSP URL, and stored without any login for the same reason.
+const PHONE_CAMERA_KEY = 'laserforge.camera.phone.v1';
+
+export type StoredPhoneCamera = { readonly app: PhoneCameraApp; readonly address: string };
+
+export function loadPhoneCamera(): StoredPhoneCamera | null {
+  try {
+    const stored: unknown = JSON.parse(localStorage.getItem(PHONE_CAMERA_KEY) ?? 'null');
+    if (typeof stored !== 'object' || stored === null) return null;
+    const { app, address } = stored as Record<string, unknown>;
+    if ((app !== 'ip-webcam' && app !== 'other') || typeof address !== 'string') return null;
+    return { app, address };
+  } catch {
+    return null;
+  }
+}
+
+export function savePhoneCamera(camera: StoredPhoneCamera): void {
+  try {
+    localStorage.setItem(
+      PHONE_CAMERA_KEY,
+      JSON.stringify({ app: camera.app, address: phoneCameraAddressWithoutLogin(camera.address) }),
+    );
+  } catch {
+    // Storage unavailable: the address simply won't survive reload.
+  }
 }
 
 // Compact vs large (monitoring) camera panel — a viewing preference, so
