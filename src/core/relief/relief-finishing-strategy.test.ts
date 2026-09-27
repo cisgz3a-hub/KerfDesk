@@ -152,7 +152,7 @@ describe('reliefFinishingPlan (ADR-423)', { timeout: 30_000 }, () => {
     expect(y.slice(y.length - (x.length - rows))).toEqual(x.slice(rows));
   });
 
-  it('leaves a masked map to the raster alone', () => {
+  it("adds waterline passes around a masked map's excluded stock (ADR-482)", () => {
     const masked = { ...map, inclusion: new Uint8Array(50 * 50).fill(1) };
     masked.inclusion[0] = 0;
     const narrowed = reliefFinishingPasses(masked, {
@@ -161,10 +161,11 @@ describe('reliefFinishingPlan (ADR-423)', { timeout: 30_000 }, () => {
       scallopMm: 0.025,
       rowSpacingMm: reliefFinishRowSpacingMm(BALL, 0.025, 'raster-waterline'),
     });
+    const passes = reliefFinishingPlan(masked, { ...OPTIONS, strategy: 'raster-waterline' });
 
-    expect(reliefFinishingPlan(masked, { ...OPTIONS, strategy: 'raster-waterline' })).toEqual(
-      checked(masked, narrowed),
-    );
+    expect(passes.slice(0, narrowed.length)).toEqual(checked(masked, narrowed));
+    // The corner block's waterline, once the boss's.
+    expect(passes.length).toBeGreaterThan(narrowed.length);
   });
 
   it('transposes a map and its mask', () => {

@@ -3,9 +3,12 @@
 // surface: serpentine rows of per-vertex XYZ motion whose Z at every sampled
 // grid point is the max-plus tip surface — dilateHeightmapByTool with ZERO
 // allowance. Ball-nose samples follow their sphere profile via the tool
-// kernel. Excluded-mask chords use a whole-cell emitted-precision envelope;
-// interpolation over included subcell surface features retains ADR-289's
-// explicit qualification boundary.
+// kernel. A masked raster's rows run through every selected sample, their
+// runs are linked nearest first across short gaps, and each move is checked
+// exactly against the whole-cell blocks of excluded stock and lifted where it
+// would dip into them (ADR-482, relief-mask-stock-path.ts); interpolation over
+// included subcell surface features retains ADR-289's explicit qualification
+// boundary.
 //
 // Requested row spacing is scallop-driven for ball noses: a ball of radius r
 // stepping s_row leaves planar ridges of height c with
@@ -28,10 +31,19 @@ import type { CncPass } from '../job';
 import type { CncTool } from '../scene';
 import { taperedBallEnvelope } from '../cnc-tapered-ball';
 import { partialCellCenter } from '../grid';
-import { dilateHeightmapByToolWithMaskEvidence } from './heightmap-tool-offset';
+import {
+  dilateHeightmapByTool,
+  dilateHeightmapByToolWithMaskEvidence,
+} from './heightmap-tool-offset';
 import type { Heightmap } from './heightmap';
 import { createSurfaceContactField } from './heightmap-surface-contact';
-import { reduceFinishingPath, type FinishingPoint } from './relief-finishing-path';
+import {
+  FINISHING_REDUCTION_TOLERANCE_MM,
+  reduceFinishingPath,
+  type FinishingPoint,
+} from './relief-finishing-path';
+import { createMaskStock, type MaskStock, raisedOverStock } from './relief-mask-stock';
+import { stockCheckedPath } from './relief-mask-stock-path';
 import {
   finishedSkipFlags,
   linkFinishingRuns,
@@ -73,10 +85,17 @@ export function reliefFinishingPasses(
   if (map.inclusion !== undefined && map.inclusion.includes(0)) {
     const selected = selectMaskedFinishingCells(map, map.inclusion, rowStep);
     const rows = maskedRows(map, selected);
-    const dilation = dilateHeightmapByToolWithMaskEvidence(map, options.kernel, 0, {
+    const dilated = dilateHeightmapByTool(map, options.kernel, 0, {
       rows: rowFlags(heightCells, rows),
     });
-    return maskedFinishingPasses(map, dilation.tipDepth, rows, selected, dilation.touchesExcluded);
+    const stock = createMaskStock(
+      map,
+      options.kernel,
+      options.kernel.maskPathUncertaintyMm,
+      FINISHING_REDUCTION_TOLERANCE_MM,
+    );
+    const tip = stock === null ? dilated : raisedOverStock(map, dilated, stock);
+    return maskedFinishingPasses(map, maskedRuns(map, tip, rows, selected), stock, options);
   }
 
   // Row indices at the scallop stride, plus the far-Y row whenever the stride
@@ -231,54 +250,66 @@ function maskedRows(map: Heightmap, selected: Uint8Array): ReadonlyArray<number>
   return rows;
 }
 
+// The masked rows' runs, linked nearest first across short gaps as ADR-450
+// links a skipping raster's; every hop, like every move, is then checked
+// against the excluded stock (ADR-482).
 function maskedFinishingPasses(
+  map: Heightmap,
+  runs: ReadonlyArray<FinishingRun>,
+  stock: MaskStock | null,
+  options: ReliefFinishingOptions,
+): ReadonlyArray<CncPass> {
+  const contact = createSurfaceContactField(map, options.kernel);
+  const tipAt = (x: number, y: number, lowerBound: number): number =>
+    Math.max(
+      contact?.constraintAtPoint(x, y, lowerBound) ?? lowerBound,
+      stock?.tipAt(x, y) ?? lowerBound,
+    );
+  const passes: CncPass[] = [];
+  const chains = linkFinishingRuns(
+    runs,
+    (row) => partialCellCenter(map, 'y', row),
+    { tipAt },
+    {
+      maxLinkMm: SKIP_LINK_DIAMETERS * options.tool.diameterMm,
+      checkSpacingMm: map.mmPerCell / 4,
+    },
+  );
+  for (const chain of chains) appendFinishingRun(passes, chain, stock);
+  return passes;
+}
+
+// Per row, each run of neighbouring selected samples that stand below stock
+// top, left to right: one the stock beside the mask holds at or above it cuts
+// nothing.
+function maskedRuns(
   map: Heightmap,
   tip: Float32Array,
   rows: ReadonlyArray<number>,
   selected: Uint8Array,
-  touchesExcluded: Uint8Array | undefined,
-): ReadonlyArray<CncPass> {
-  const passes: CncPass[] = [];
-  let leftToRight = true;
+): ReadonlyArray<FinishingRun> {
+  const runs: FinishingRun[] = [];
   for (const row of rows) {
-    appendMaskedFinishingRow(passes, map, tip, row, leftToRight, selected, touchesExcluded);
-    leftToRight = !leftToRight;
-  }
-  return passes;
-}
-
-function appendMaskedFinishingRow(
-  passes: CncPass[],
-  map: Heightmap,
-  tip: Float32Array,
-  row: number,
-  leftToRight: boolean,
-  selected: Uint8Array,
-  touchesExcluded: Uint8Array | undefined,
-): void {
-  const y = partialCellCenter(map, 'y', row);
-  let points: FinishingPoint[] = [];
-  for (let i = 0; i < map.widthCells; i += 1) {
-    const col = leftToRight ? i : map.widthCells - 1 - i;
-    const index = row * map.widthCells + col;
-    if (selected[index] === 0 || touchesExcluded?.[index] !== 0) {
-      appendFinishingRun(passes, points);
-      points = [];
-      if (selected[index] !== 0) {
-        appendFinishingRun(passes, [
-          { x: partialCellCenter(map, 'x', col), y, z: tip[index] ?? 0 },
-        ]);
+    let points: FinishingPoint[] = [];
+    for (let col = 0; col <= map.widthCells; col += 1) {
+      const index = row * map.widthCells + col;
+      if (col < map.widthCells && selected[index] !== 0 && (tip[index] ?? 0) < 0) {
+        points.push(finishingSample(map, tip, col, row));
+      } else if (points.length > 0) {
+        runs.push({ row, points });
+        points = [];
       }
-      continue;
     }
-    points.push({ x: partialCellCenter(map, 'x', col), y, z: tip[index] ?? 0 });
   }
-  appendFinishingRun(passes, points);
+  return runs;
 }
 
-// Give every contiguous vertical mask run the unchanged sampled stride plus
-// its far edge. A narrow lobe therefore cannot disappear merely because it is
-// attached to a taller component whose global row phase steps past the lobe.
+// Give every contiguous vertical mask run the raster's rows (every rowStep-th
+// row, the phase an unmasked raster uses) plus both its ends, so no two of
+// its selected samples lie more than a stride apart. A narrow lobe therefore
+// cannot disappear merely because the global row phase steps past it. One
+// phase for every run keeps a row's selected samples side by side, so they
+// run together instead of each plunging alone (ADR-482).
 // Selecting cells by column also permits one global O(width*height) row scan;
 // adversarial checkerboards never multiply full-width scans by component count.
 function selectMaskedFinishingCells(
@@ -311,12 +342,11 @@ function selectVerticalRun(
   endRow: number,
   rowStep: number,
 ): void {
-  let lastSelected = startRow;
-  for (let row = startRow; row <= endRow; row += rowStep) {
+  selected[startRow * widthCells + col] = 1;
+  for (let row = Math.ceil(startRow / rowStep) * rowStep; row <= endRow; row += rowStep) {
     selected[row * widthCells + col] = 1;
-    lastSelected = row;
   }
-  if (lastSelected !== endRow) selected[endRow * widthCells + col] = 1;
+  selected[endRow * widthCells + col] = 1;
 }
 
 function rowHasSelection(selected: Uint8Array, row: number, widthCells: number): boolean {
@@ -327,11 +357,17 @@ function rowHasSelection(selected: Uint8Array, row: number, widthCells: number):
   return false;
 }
 
-function appendFinishingRun(passes: CncPass[], points: ReadonlyArray<FinishingPoint>): void {
+function appendFinishingRun(
+  passes: CncPass[],
+  points: ReadonlyArray<FinishingPoint>,
+  stock: MaskStock | null = null,
+): void {
   if (points.length >= 2) {
+    const reduced = reduceFinishingPath(points);
     passes.push({
       kind: 'path3d',
-      points: reduceFinishingPath(points),
+      // Reduced first: the reduction keeps to the samples, not the stock.
+      points: stock === null ? reduced : stockCheckedPath(reduced, stock),
       closed: false,
       lateralFeed: 'z-rate-capped',
     });

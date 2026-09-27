@@ -17,6 +17,10 @@
 // roughing finished with an end mill (ADR-450); the waterline passes stay on
 // the steep walls, which no flat level finishes.
 //
+// A masked relief gets waterline passes too: they circle its excluded stock
+// like any other wall, the foot of which its raster leaves wherever the mask
+// edge runs along the rows (ADR-482).
+//
 // Every move of every strategy is then checked against the exact contact
 // between its vertices (ADR-421 Amendment 1, relief-finishing-contact.ts).
 
@@ -89,10 +93,15 @@ function plannedPasses(
   options: ReliefFinishingPlanOptions,
 ): ReadonlyArray<CncPass> {
   const rowSpacingMm = reliefFinishRowSpacingMm(options.tool, options.scallopMm, options.strategy);
-  const waterline = options.strategy === 'raster-waterline' && map.inclusion?.includes(0) !== true;
-  // The waterline contours the whole tip surface; the raster then reads its
-  // rows from the same field instead of computing them again.
-  const tip = waterline ? dilateHeightmapByTool(withoutMask(map), options.kernel, 0) : undefined;
+  const masked = map.inclusion?.includes(0) === true;
+  // The waterline contours the whole tip surface; an unmasked raster then
+  // reads its rows from the same field instead of computing them again. A
+  // masked raster computes its own rows with the mask evidence it needs.
+  const dilated =
+    options.strategy === 'raster-waterline'
+      ? dilateHeightmapByTool(masked ? map : withoutMask(map), options.kernel, 0)
+      : undefined;
+  const tip = masked ? undefined : dilated;
   const rasterOptions = {
     tool: options.tool,
     kernel: options.kernel,
@@ -116,12 +125,12 @@ function plannedPasses(
           ...(tip === undefined ? {} : { tip }),
           ...(finishedAt === undefined ? {} : { finishedAt }),
         });
-  if (tip === undefined) return raster;
+  if (dilated === undefined) return raster;
   const levelStepMm =
     scallopRowSpacingMm(options.tool, options.scallopMm) * Math.sin(STEEP_ANGLE_RAD);
   return [
     ...raster,
-    ...reliefWaterlinePasses(map, tip, {
+    ...reliefWaterlinePasses(map, dilated, {
       kernel: options.kernel,
       steepAngleDeg: RELIEF_STEEP_ANGLE_DEG,
       levelStepMm,

@@ -115,7 +115,7 @@ function ReliefFinishRows(props: ReliefRowsProps): JSX.Element {
             })
           }
           aria-label={`Relief finish strategy for ${layer.color}`}
-          title="Raster rows the whole surface along one axis. Raster + waterline also circles every wall steeper than 45° level by level and packs the rows closer, so steep walls are finished as finely as flats; it takes longer. A relief with a mask outline finishes with the raster only."
+          title="Raster rows the whole surface along one axis. Raster + waterline also circles every wall steeper than 45° level by level, the edge of a mask outline included, and packs the rows closer, so steep walls are finished as finely as flats; it takes longer."
           style={selectStyle}
         >
           <option value="raster">Raster</option>

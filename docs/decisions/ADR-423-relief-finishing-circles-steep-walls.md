@@ -1,6 +1,6 @@
 ## ADR-423 - Relief finishing can circle steep walls and run its raster along Y (2026-09-26)
 
-**Status:** Accepted. | **Date:** 2026-09-26
+**Status:** Accepted; item 8 (masked reliefs) amended by ADR-482. | **Date:** 2026-09-26
 
 This adds two opt-in choices to the Phase H.8 relief finishing planner (ADR-098, ADR-421) and
 builds on the exact surface contact of ADR-412. The default plan, a raster along X at the scallop's
@@ -58,6 +58,7 @@ raster or offset alone. Vectric and Carveco also let the raster run along X or Y
    climb when climb is asked for.
 8. **Masked reliefs** (a mask that excludes cells) get the narrower raster only; their excluded
    cells have no triangulated surface to contour against. This is disclosed in the setting's hint.
+   *Amended by ADR-482: masked reliefs now get waterline passes, which circle the excluded stock.*
 
 ### Consequences
 
