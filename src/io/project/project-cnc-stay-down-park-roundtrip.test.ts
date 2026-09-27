@@ -30,6 +30,12 @@ function project(pocketLiftBetweenRings: boolean, parkZMm: number): Project {
   };
 }
 
+function parkZMm(loaded: Project): number | undefined {
+  const machine = loaded.machine;
+  if (machine?.kind !== 'cnc') throw new Error('expected a CNC machine');
+  return machine.params.parkZMm;
+}
+
 function deserializeOk(text: string): Project {
   const result = deserializeProject(text);
   if (result.kind !== 'ok') throw new Error(`expected ok, got ${result.kind}`);
@@ -41,7 +47,7 @@ describe('.lf2 stay-down pocket and park height round-trip (ADR-491)', () => {
     for (const lift of [true, false]) {
       const loaded = deserializeOk(serializeProject(project(lift, 25)));
       expect(loaded.scene.layers[0]?.cnc?.pocketLiftBetweenRings).toBe(lift);
-      expect(loaded.machine.kind === 'cnc' ? loaded.machine.params.parkZMm : null).toBe(25);
+      expect(parkZMm(loaded)).toBe(25);
     }
   });
 
@@ -51,7 +57,7 @@ describe('.lf2 stay-down pocket and park height round-trip (ADR-491)', () => {
     };
     raw.machine.params['parkZMm'] = -4;
     const loaded = deserializeOk(`${JSON.stringify(raw)}\n`);
-    expect(loaded.machine.kind === 'cnc' ? loaded.machine.params.parkZMm : null).toBeUndefined();
+    expect(parkZMm(loaded)).toBeUndefined();
   });
 
   it('saves both without a validation drift', () => {
