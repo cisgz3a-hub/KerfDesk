@@ -24,6 +24,7 @@ import type { CommandDialogs, CommandShellCallbacks } from './app-command-contex
 import { buildAppCommands, type AppCommand } from './command-registry';
 import { toolCommandContext } from './tool-command-context';
 import { editingToolsCommandContext } from './editing-tools-command-context';
+import { moveLaserToSelection } from '../laser/move-laser-to-selection';
 import type { AppCommandContext } from './command-types';
 import { selectedImageMaskPair } from './image-mask-command-state';
 import { traceSourceForTracedImage } from './image-command-actions';
@@ -267,6 +268,7 @@ function arrangeCommandContext(
   | 'flipVertical'
   | 'createArray'
   | 'quickNest'
+  | 'moveLaserToSelection'
 > {
   return {
     alignSelection: app.alignSelection,
@@ -276,6 +278,7 @@ function arrangeCommandContext(
     flipVertical: () => app.flipSelection('vertical'),
     createArray: callbacks.requestArray,
     quickNest: callbacks.requestQuickNest,
+    moveLaserToSelection,
   };
 }
 

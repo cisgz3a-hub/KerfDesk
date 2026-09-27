@@ -125,11 +125,23 @@ export type FetchFrameResult =
 /** Server-side GET of a camera snapshot; exported for direct timeout tests. */
 export async function fetchFrameBytes(url: string, timeoutMs: number): Promise<FetchFrameResult> {
   try {
+    const target = new URL(url);
+    const login = target.username !== '' || target.password !== '';
+    const headers = login
+      ? {
+          Authorization: `Basic ${Buffer.from(
+            `${decodeURIComponent(target.username)}:${decodeURIComponent(target.password)}`,
+          ).toString('base64')}`,
+        }
+      : undefined;
+    target.username = '';
+    target.password = '';
     // redirect: 'error' — a compromised private device must not be able to
     // bounce the proxy to a public URL (SSRF hardening).
-    const response = await fetch(url, {
+    const response = await fetch(target.toString(), {
       signal: AbortSignal.timeout(timeoutMs),
       redirect: 'error',
+      ...(headers === undefined ? {} : { headers }),
     });
     if (!response.ok) {
       await cancelCameraFrameBody(response);
@@ -148,9 +160,16 @@ export async function fetchFrameBytes(url: string, timeoutMs: number): Promise<F
       contentType: contentType.startsWith('image/') ? contentType : 'image/jpeg',
     };
   } catch (err) {
-    const reason = err instanceof Error ? err.message : 'Camera frame fetch failed.';
-    return { kind: 'failed', reason };
+    return { kind: 'failed', reason: publicFrameError(err) };
   }
+}
+
+function publicFrameError(err: unknown): string {
+  // Fetch errors may echo a URL containing query credentials. Keep those
+  // in the request only, never in a bridge diagnostic response.
+  if (err instanceof Error && err.message === 'Camera frame is too large.') return err.message;
+  if (err instanceof Error && err.name === 'TimeoutError') return 'Camera frame fetch timed out.';
+  return 'Camera frame fetch failed.';
 }
 
 export type MachineCameraDiscoveryOptions = {

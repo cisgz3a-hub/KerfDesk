@@ -50,6 +50,61 @@ function bossRelief(transform: Transform = IDENTITY_TRANSFORM): ReliefObject {
   };
 }
 
+// A flat relief 5 mm deep inside a round mask outline: the only steep wall is
+// the stock the mask leaves standing round it (ADR-484).
+function maskedDiscRelief(): ReliefObject {
+  const inclusionMask = Array.from({ length: CELLS * CELLS }, (_, index) => {
+    const x = (index % CELLS) + 0.5;
+    const y = Math.floor(index / CELLS) + 0.5;
+    return Math.hypot(x - 6, y - 6) < 4.5 ? 255 : 0;
+  });
+  return {
+    ...bossRelief(),
+    id: 'D1',
+    source: 'disc.png',
+    reliefSource: testReliefHeightfield({
+      width: CELLS,
+      height: CELLS,
+      physicalWidthMm: 12,
+      physicalHeightMm: 12,
+      maxDepthMm: 5,
+      samplesU8: new Array<number>(CELLS * CELLS).fill(0),
+      inclusionMask,
+      provenance: { sourceName: 'disc.png' },
+    }),
+  };
+}
+
+// Loops at one level: 20 or more consecutive points at one height whose extent
+// reaches 4 mm both ways. The raster's rows climb to the mask at both ends,
+// so none of its level stretches spans both ways.
+function levelLoops(passes: ReadonlyArray<CncPass>): number {
+  let loops = 0;
+  for (const pass of passes) {
+    if (pass.kind !== 'path3d') continue;
+    let stretch: Array<{ x: number; y: number; z: number }> = [];
+    for (const point of [...pass.points, null]) {
+      if (point !== null && (stretch.length === 0 || stretch[0]?.z === point.z)) {
+        stretch.push(point);
+        continue;
+      }
+      if (isLoop(stretch)) loops += 1;
+      stretch = point === null ? [] : [point];
+    }
+  }
+  return loops;
+}
+
+function isLoop(points: ReadonlyArray<{ x: number; y: number }>): boolean {
+  const xs = points.map((point) => point.x);
+  const ys = points.map((point) => point.y);
+  return (
+    points.length >= 20 &&
+    Math.max(...xs) - Math.min(...xs) >= 4 &&
+    Math.max(...ys) - Math.min(...ys) >= 4
+  );
+}
+
 function finishPasses(
   cnc: Partial<CncLayerSettings>,
   object: ReliefObject = bossRelief(),
@@ -126,6 +181,14 @@ describe('relief finish strategy compile (ADR-423)', { timeout: 60_000 }, () => 
     // Clockwise round a raised boss keeps it right of travel: climb.
     expect(waterlineTurn(climb)).toBeLessThan(0);
     expect(waterlineTurn(conventional)).toBeGreaterThan(0);
+  });
+
+  it('circles the stock a mask outline leaves standing (ADR-484)', () => {
+    const raster = finishPasses({}, maskedDiscRelief());
+    const passes = finishPasses({ reliefFinishStrategy: 'raster-waterline' }, maskedDiscRelief());
+
+    expect(levelLoops(raster)).toBe(0);
+    expect(levelLoops(passes)).toBeGreaterThanOrEqual(3);
   });
 
   it('keeps climb on the physical bed through a mirrored placement or origin', () => {
