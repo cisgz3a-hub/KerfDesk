@@ -88,6 +88,36 @@ describe('controllerCompatibleProfile', () => {
     );
   });
 
+  it('normalizes saved and detected FluidNC profiles to the channel acknowledgement contract', () => {
+    for (const controllerKind of [undefined, 'fluidnc', 'marlin', 'grblhal'] as const) {
+      const result = controllerCompatibleProfile(
+        {
+          ...DEFAULT_DEVICE_PROFILE,
+          ...(controllerKind === undefined ? {} : { controllerKind }),
+          streamingMode: 'char-counted',
+        },
+        'fluidnc',
+      );
+      expect(result.profile.streamingMode).toBe('ping-pong');
+      expect(result.corrections).toContainEqual(
+        expect.objectContaining({ field: 'streamingMode', from: 'char-counted', to: 'ping-pong' }),
+      );
+      expect(controllerCompatibleProfile(result.profile).corrections).toEqual([]);
+    }
+  });
+
+  it.each(['grbl-v1.1', 'grblhal'] as const)(
+    'restores buffered streaming when moving from FluidNC to %s',
+    (controllerKind) => {
+      expect(
+        controllerCompatibleProfile(
+          { ...DEFAULT_DEVICE_PROFILE, controllerKind: 'fluidnc', streamingMode: 'ping-pong' },
+          controllerKind,
+        ).profile.streamingMode,
+      ).toBe('char-counted');
+    },
+  );
+
   it('removes 4040-only output semantics from non-GRBL controller families', () => {
     const result = controllerCompatibleProfile(
       {

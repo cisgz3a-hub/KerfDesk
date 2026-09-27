@@ -19,18 +19,21 @@ import { respondToTestGrblBuildInfo } from './laser-test-start-helpers';
 import { useStore } from './store';
 
 const IDLE = '<Idle|MPos:10.000,20.000,-1.000|FS:0,0|Ov:100,100,100>';
+const RUN = '<Run|MPos:10.000,20.000,-1.000|FS:800,10000|Ov:100,100,100>';
 const ALARM = '<Alarm|MPos:10.000,20.000,-1.000|FS:0,0>';
 
 type Device = SerialConnection & { readonly say: (line: string) => void };
 
-// A GRBL 1.1 stand-in: Idle on `?`, `ok` for the settle dwell, and the
-// unlock reply GRBL prints for `$X`.
+// Keep the explicitly reported state on every `?`: polling must not invent an
+// Idle before the test observes motion settling or the alarm clearing. `$X`
+// acknowledges separately, so its reply cannot stand in for that observation.
 function makeDevice(sent: string[]): Device {
   const handlers = new Set<(line: string) => void>();
+  let reported = IDLE;
   const device: Device = {
     write: async (data) => {
       sent.push(data);
-      if (data === '?') setTimeout(() => device.say(IDLE), 0);
+      if (data === '?') setTimeout(() => device.say(reported), 0);
       if (data === 'G4 P0.01\n') setTimeout(() => device.say('ok'), 0);
       if (data === '$X\n') {
         setTimeout(() => {
@@ -47,6 +50,8 @@ function makeDevice(sent: string[]): Device {
     onClose: () => () => undefined,
     close: async () => undefined,
     say: (line) => {
+      if (line.startsWith('<')) reported = line;
+      else if (line.startsWith('ALARM:')) reported = ALARM;
       for (const handler of handlers) handler(line);
     },
   };
@@ -101,6 +106,7 @@ async function reachHold(device: Device, seeIdle: boolean): Promise<void> {
       cncControllerEpochOf(useLaserStore.getState()),
     ),
   });
+  device.say(RUN);
   while ((useLaserStore.getState().streamer?.inFlight.length ?? 0) > 0) {
     device.say('ok');
     await settle(0);
@@ -134,16 +140,16 @@ afterEach(async () => {
 });
 
 describe('a missed touch-off probe in a drained tool-change hold', () => {
-  it('keeps the job held, unlocks, and continues once the new bit is zeroed', async () => {
+  it.each([4, 5])('requires fresh Idle and work-Z after ALARM:%i', async (code) => {
     const sent: string[] = [];
     const device = makeDevice(sent);
     await reachHold(device, true);
     expect(useLaserStore.getState().toolChangeIdleSeen).toBe(true);
 
-    await say(device, 'ALARM:5', ALARM);
+    await say(device, `ALARM:${code}`, ALARM);
     const alarmed = useLaserStore.getState();
     expect(alarmed.streamer?.status).toBe('tool-change');
-    expect(alarmed.alarmCode).toBe(5);
+    expect(alarmed.alarmCode).toBe(code);
     // Continue waits for a fresh Idle after the unlock.
     expect(alarmed.toolChangeIdleSeen).toBe(false);
     expect(toolChangeContinueBlockMessage(alarmed)).toBe(TOOL_CHANGE_NOT_IDLE_MESSAGE);
@@ -153,7 +159,15 @@ describe('a missed touch-off probe in a drained tool-change hold', () => {
     expect(sent).toContain('$X\n');
     // The acknowledgement alone does not prove the unlock (FluidNC acks `$X`
     // in its Critical state); the next report that is not Alarm clears it.
-    expect(useLaserStore.getState().alarmCode).toBe(5);
+    expect(useLaserStore.getState().alarmCode).toBe(code);
+
+    await useLaserStore.getState().requestControllerStatus();
+    await settle();
+    const stillAlarmed = useLaserStore.getState();
+    expect(stillAlarmed.statusReport?.state).toBe('Alarm');
+    expect(stillAlarmed.alarmCode).toBe(code);
+    expect(stillAlarmed.streamer?.status).toBe('tool-change');
+    expect(stillAlarmed.toolChangeIdleSeen).toBe(false);
 
     await say(device, IDLE);
     const unlocked = useLaserStore.getState();
@@ -178,6 +192,9 @@ describe('a missed touch-off probe in a drained tool-change hold', () => {
   it('cancels on ALARM:4 before the hold has seen Idle', async () => {
     const device = makeDevice([]);
     await reachHold(device, false);
+    await useLaserStore.getState().requestControllerStatus();
+    await settle();
+    expect(useLaserStore.getState().toolChangeIdleSeen).toBe(false);
 
     await say(device, 'ALARM:4', ALARM);
     expect(useLaserStore.getState().streamer?.status).toBe('cancelled');

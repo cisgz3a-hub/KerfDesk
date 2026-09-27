@@ -5,6 +5,7 @@ import {
   type GrblStreamingMode,
 } from '../grbl-streaming';
 import type { ControllerKind, DeviceProfile } from './device-profile';
+import { streamingModeForController } from './controller-streaming-mode';
 import { isMarlinGcodeDialectId, type GcodeDialectId } from './gcode-dialects';
 
 export type ControllerProfileCorrectionField =
@@ -190,8 +191,13 @@ function requiredStreamingModeFor(
   configuredControllerKind: ControllerKind | undefined,
   current: GrblStreamingMode,
 ): GrblStreamingMode {
-  if (controllerKind === 'marlin' || controllerKind === 'smoothieware') return 'ping-pong';
-  if (isGrblFamily(controllerKind) && !isGrblFamily(configuredControllerKind ?? 'grbl-v1.1')) {
+  if (streamingModeForController(controllerKind, 'char-counted') === 'ping-pong')
+    return 'ping-pong';
+  if (
+    isGrblFamily(controllerKind) &&
+    (!isGrblFamily(configuredControllerKind ?? 'grbl-v1.1') ||
+      streamingModeForController(configuredControllerKind, 'char-counted') === 'ping-pong')
+  ) {
     return 'char-counted';
   }
   return current;

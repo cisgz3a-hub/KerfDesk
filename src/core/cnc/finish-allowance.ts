@@ -8,6 +8,8 @@ import type { FrameHandedness } from './machine-frame-handedness';
 import { enforceCutDirection } from './motion-polish';
 import { groupInnerFirstByPart, orderInnerFirst } from './profile-ordering';
 import { profileToolpathPolylines } from './profile-paths';
+import { zPassDepths } from './depth-passes';
+import { profileFinishStagePass } from './profile-finishing-stage';
 
 const COORD_EPS = 1e-9;
 
@@ -28,6 +30,7 @@ export function profilePassesWithFinishAllowance(
   handedness: FrameHandedness,
   tabSources: ReadonlyArray<CollectedCncContour>,
   roughingPassesForPart: (part: ReadonlyArray<Polyline>) => ReadonlyArray<CncPass>,
+  finishingSettings?: CncLayerSettings,
 ): ReadonlyArray<CncPass> {
   const sourceParts = groupInnerFirstByPart(polylines);
   const roughParts = groupInnerFirstByPart(roughingToolpaths);
@@ -52,6 +55,7 @@ export function profilePassesWithFinishAllowance(
         toolDiameterMm,
         roughingToolpaths: sourceRough,
         manualTabCenters,
+        ...(finishingSettings === undefined ? {} : { finishingSettings }),
       }),
     );
   }
@@ -63,6 +67,7 @@ export function profilePassesWithFinishAllowance(
     toolDiameterMm,
     manualTabCenters,
     roughingPassesForPart,
+    finishingSettings,
   );
   return passes;
 }
@@ -84,6 +89,7 @@ function finishingProfileToolpaths(
 }
 
 type FinishingPassesContext = {
+  readonly finishingSettings?: CncLayerSettings;
   readonly settings: CncLayerSettings;
   readonly toolDiameterMm: number;
   readonly roughingToolpaths: ReadonlyArray<Polyline>;
@@ -95,15 +101,23 @@ function finishingPasses(
   zMm: number,
   ctx: FinishingPassesContext,
 ): ReadonlyArray<CncPass> {
-  return toolpaths.flatMap((toolpath) => {
-    const pass = finishingPass(toolpath, zMm, {
-      settings: ctx.settings,
-      toolDiameterMm: ctx.toolDiameterMm,
-      roughingToolpaths: ctx.roughingToolpaths,
-      manualCenters: ctx.manualTabCenters.get(toolpath),
-    });
-    return pass === null ? [] : [pass];
-  });
+  const depths =
+    ctx.finishingSettings === undefined
+      ? [zMm]
+      : zPassDepths(-zMm, ctx.finishingSettings.depthPerPassMm);
+  return toolpaths.flatMap((toolpath) =>
+    depths.flatMap((depth) => {
+      const pass = finishingPass(toolpath, depth, {
+        settings: ctx.settings,
+        toolDiameterMm: ctx.toolDiameterMm,
+        roughingToolpaths: ctx.roughingToolpaths,
+        manualCenters: ctx.manualTabCenters.get(toolpath),
+      });
+      return pass === null
+        ? []
+        : [ctx.finishingSettings === undefined ? pass : profileFinishStagePass(pass)];
+    }),
+  );
 }
 
 function appendUnassignedParts(
@@ -114,6 +128,7 @@ function appendUnassignedParts(
   toolDiameterMm: number,
   manualTabCenters: ReadonlyMap<Polyline, ReadonlyArray<number>>,
   roughingPassesForPart: (part: ReadonlyArray<Polyline>) => ReadonlyArray<CncPass>,
+  finishingSettings?: CncLayerSettings,
 ): void {
   const partCount = Math.max(roughParts.length, finishParts.length);
   for (let index = 0; index < partCount; index += 1) {
@@ -126,6 +141,7 @@ function appendUnassignedParts(
         toolDiameterMm,
         roughingToolpaths: rough,
         manualTabCenters,
+        ...(finishingSettings === undefined ? {} : { finishingSettings }),
       }),
     );
   }

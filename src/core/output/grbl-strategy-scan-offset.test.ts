@@ -91,8 +91,8 @@ describe('grblStrategy scan-offset compensation (ADR-052)', () => {
 
     const out = emitWithDevice(job, calibratedDevice);
 
-    expect(out).toContain('G0 X10.000 Y0.000 S0\nG1 X20.000 Y0.000 F6000 S300');
-    expect(out).toContain('G0 X19.750 Y5.000 S0\nG1 X9.750 Y5.000 F6000 S300');
+    expect(out).toContain('G0 X10.000 Y0.000 S0\nG1X20Y0F6000S300');
+    expect(out).toContain('G0 X19.750 Y5.000 S0\nG1X9.75Y5F6000S300');
   });
 
   it('shifts angled reverse fill sweeps along their own travel vector', () => {
@@ -127,7 +127,7 @@ describe('grblStrategy scan-offset compensation (ADR-052)', () => {
 
     const out = emitWithDevice(job, angledDevice);
 
-    expect(out).toContain('G0 X9.000 Y9.000 S0\nG1 X-1.000 Y-1.000 F6000 S300');
+    expect(out).toContain('G0 X9.000 Y9.000 S0\nG1X-1Y-1F6000S300');
   });
 
   it('looks up fill compensation at the same rounded feed emitted to GRBL', () => {

@@ -16,6 +16,53 @@ import { classifyCanvasPreparation } from './canvas-preparation-policy';
 const COLOR = '#ff0000';
 
 describe('canvas preparation classification', () => {
+  it.each(['laser', 'cnc'] as const)(
+    'routes a 25k-segment %s drawing below the core warning budget off-thread',
+    (machine) => {
+      const project = denseVectorProject(machine, 25_000);
+      expect(classifyCanvasPreparation(project)).toBe('background-worker');
+      expect(classifyCanvasPreparation(denseVectorProject(machine, 100))).toBe('direct');
+    },
+  );
+
+  it('classifies only selected output when a large unselected drawing is present', () => {
+    const large = denseVectorProject('laser', 25_000);
+    const smallObject = denseVectorProject('laser', 10).scene.objects[0];
+    if (smallObject === undefined) throw new Error('small fixture missing');
+    const project = {
+      ...large,
+      scene: { ...large.scene, objects: [...large.scene.objects, { ...smallObject, id: 'small' }] },
+    };
+    expect(classifyCanvasPreparation(project)).toBe('background-worker');
+    expect(
+      classifyCanvasPreparation(project, {
+        cutSelectedGraphics: true,
+        useSelectionOrigin: false,
+        selectedObjectIds: ['small'],
+      }),
+    ).toBe('direct');
+  });
+
+  it.each(['laser', 'cnc'] as const)(
+    'counts pass amplification against the interactive %s threshold',
+    (machine) => {
+      const project = denseVectorProject(machine, 1_000);
+      expect(
+        classifyCanvasPreparation({
+          ...project,
+          scene: {
+            ...project.scene,
+            layers: project.scene.layers.map((layer) => ({
+              ...layer,
+              passes: 25,
+              cnc: { ...DEFAULT_CNC_LAYER_SETTINGS, depthMm: 25, depthPerPassMm: 1 },
+            })),
+          },
+        }),
+      ).toBe('background-worker');
+    },
+  );
+
   it('keeps low-cost laser scanline and CNC profile work direct', () => {
     expect(classifyCanvasPreparation(vectorProject('laser', 'line'))).toBe('direct');
     expect(classifyCanvasPreparation(vectorProject('cnc', 'profile-on-path'))).toBe('direct');
@@ -81,6 +128,37 @@ describe('canvas preparation classification', () => {
     expect(classifyCanvasPreparation(project)).toBe('background-worker');
   });
 });
+
+function denseVectorProject(machine: 'laser' | 'cnc', segments: number): Project {
+  const project = vectorProject(machine, machine === 'laser' ? 'line' : 'profile-on-path');
+  const object = project.scene.objects[0];
+  if (object?.kind !== 'imported-svg') throw new Error('vector fixture missing');
+  return {
+    ...project,
+    scene: {
+      ...project.scene,
+      objects: [
+        {
+          ...object,
+          paths: [
+            {
+              color: COLOR,
+              polylines: [
+                {
+                  closed: false,
+                  points: Array.from({ length: segments + 1 }, (_, index) => ({
+                    x: index / 100,
+                    y: index % 2,
+                  })),
+                },
+              ],
+            },
+          ],
+        },
+      ],
+    },
+  };
+}
 
 function vectorProject(
   machine: 'laser' | 'cnc',
