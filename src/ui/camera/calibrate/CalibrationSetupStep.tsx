@@ -1,15 +1,17 @@
 // CalibrationSetupStep — step 1 of the camera calibration wizard (ADR-441):
 // the engrave settings, the sheet thickness and the optional tape-measured
 // camera height, then either engrave the ring target as a temporary job or
-// go straight to the photo when a target is already on the bed.
+// go straight to the photo when a target is already on the bed. A camera on
+// the laser head (ADR-449) gets a small square target in the middle of the bed.
 
 import { useState } from 'react';
 import { bedTargetLayout } from '../../../core/camera/target/bed-target';
 import { useStore } from '../../state';
 import { useLaserStore } from '../../state/laser-store';
-import { engraveCalibrationTarget, targetAreaForBed } from './calibration-actions';
+import { calibrationTargetArea, engraveCalibrationTarget } from './calibration-actions';
 import { useCameraCalibrationStore, type CalibrationSettings } from './camera-calibration-store';
 import {
+  checkStyle,
   columnStyle,
   errStyle,
   fieldStyle,
@@ -24,11 +26,11 @@ export function CalibrationSetupStep(props: { readonly note: string | null }): J
   const connected = useLaserStore((s) => s.connection.kind === 'connected');
   const bedWidth = useStore((s) => s.project.device.bedWidth);
   const bedHeight = useStore((s) => s.project.device.bedHeight);
-  const area = targetAreaForBed(bedWidth, bedHeight, settings.marginMm);
+  const area = calibrationTargetArea(bedWidth, bedHeight, settings);
   const rings = bedTargetLayout({ area }).marks.length;
 
   const engrave = async (): Promise<void> => {
-    // A new target is engraved where the margin puts it, whatever area an
+    // A new target is engraved where these settings put it, whatever area an
     // earlier target (a check of the saved calibration) had.
     useCameraCalibrationStore.setState({ targetArea: null });
     const earlierJob = useLaserStore.getState().streamer;
@@ -47,10 +49,13 @@ export function CalibrationSetupStep(props: { readonly note: string | null }): J
   return (
     <div style={columnStyle}>
       <p style={noteStyle}>
-        Cover the bed with one flat sheet of scrap (card, plywood or anodised aluminium). KerfDesk
-        engraves {rings} small rings across {Math.round(area.width)} × {Math.round(area.height)} mm,
-        then one photo of them calibrates the lens, finds where the camera is, and maps the picture
-        onto the bed. Your project and undo history are not touched.
+        {settings.headCamera
+          ? 'Put a flat sheet of scrap in the middle of the bed'
+          : 'Cover the bed with one flat sheet of scrap'}{' '}
+        (card, plywood or anodised aluminium). KerfDesk engraves {rings} small rings across{' '}
+        {Math.round(area.width)} × {Math.round(area.height)} mm, then one photo of them calibrates
+        the lens, finds where the camera is, and maps the picture onto the bed. Your project and
+        undo history are not touched.
       </p>
       <SettingsFields settings={settings} />
       <div style={rowStyle}>
@@ -117,17 +122,36 @@ function SettingsFields(props: { readonly settings: CalibrationSettings }): JSX.
           title="Engrave speed for the rings."
           onChange={(value) => update({ speedMmPerMin: value ?? settings.speedMmPerMin })}
         />
-        <NumberField
-          label="Margin (mm)"
-          value={settings.marginMm}
-          step={1}
-          title="Space kept clear around the target on every side of the bed."
-          onChange={(value) => update({ marginMm: value ?? settings.marginMm })}
-        />
+        {settings.headCamera ? (
+          <NumberField
+            label="Target size (mm)"
+            value={settings.headTargetSizeMm}
+            step={5}
+            title="Width of the square target in the middle of the bed. Pick a size the head camera sees whole, with some room around it."
+            onChange={(value) => update({ headTargetSizeMm: value ?? settings.headTargetSizeMm })}
+          />
+        ) : (
+          <NumberField
+            label="Margin (mm)"
+            value={settings.marginMm}
+            step={1}
+            title="Space kept clear around the target on every side of the bed."
+            onChange={(value) => update({ marginMm: value ?? settings.marginMm })}
+          />
+        )}
       </div>
+      <label style={checkStyle}>
+        <input
+          type="checkbox"
+          checked={settings.headCamera}
+          onChange={(event) => update({ headCamera: event.currentTarget.checked })}
+        />
+        Camera rides on the laser head
+      </label>
       <p style={noteStyle}>
-        A camera height is optional. For a camera that looks almost straight down, one photo cannot
-        tell how high the camera is, and the measured height keeps thick material lined up.
+        {settings.headCamera
+          ? 'A camera on the head sees a small patch of the bed, so the target is a small square in the middle. After engraving, move the head until the camera sees the whole square; KerfDesk records where the head was for the photo.'
+          : 'A camera height is optional. For a camera that looks almost straight down, one photo cannot tell how high the camera is, and the measured height keeps thick material lined up.'}
       </p>
     </>
   );

@@ -6,6 +6,7 @@ import { ownModelFor, withSavedCameraModel } from '../../../core/camera/model/sa
 import { useStore } from '../../state';
 import { useCameraStore } from '../../state/camera-store';
 import { cameraSourceIdentity } from '../frame-source';
+import { headPositionNow } from '../head/head-position';
 import { photographTarget } from './calibration-actions';
 import {
   useCameraCalibrationStore,
@@ -81,6 +82,7 @@ export function useCalibrationPhoto(): CalibrationPhotoControls {
         bedHeightMm: app.project.device.bedHeight,
         ...(wizard.targetArea === null ? {} : { area: wizard.targetArea }),
         ...(saved === undefined ? {} : { saved }),
+        headMm: wizard.settings.headCamera ? headPositionNow() : null,
         signal: run.controller.signal,
       });
       publish(
