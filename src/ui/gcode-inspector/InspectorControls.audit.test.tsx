@@ -35,6 +35,7 @@ const scene = vi.hoisted(() => ({
   setProjection: vi.fn(),
   onProjectionChange: vi.fn(),
   onCameraMoving: vi.fn(),
+  onDetailChange: vi.fn(),
   setStage: vi.fn(),
   pickViewCube: vi.fn(() => null),
   hoverViewCube: vi.fn(),
@@ -58,7 +59,10 @@ vi.mock('../viewer3d', async (original) => ({
   createViewer3dScene: vi.fn(async () => ({ kind: 'ok', handle: scene })),
 }));
 vi.mock('./use-current-gcode', () => ({ useCurrentGcode: () => ({ ...current, stale: false }) }));
-vi.mock('./use-gcode-inspection', () => ({ useGcodeInspection: () => ({ kind: 'idle' }) }));
+vi.mock('./use-gcode-inspection', () => ({
+  useGcodeInspection: () => ({ kind: 'idle' }),
+  loadingPreview: () => null,
+}));
 beforeEach(() => {
   vi.clearAllMocks();
   useLaserStore.setState(initialLaserState());

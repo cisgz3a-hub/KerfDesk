@@ -6,7 +6,7 @@
 // v1 parameterizes playback by route distance. Stage 8 swaps the parameter
 // for planner-true seconds; this module's shape does not change.
 
-import type { GcodeRenderModel } from '../../core/gcode-view';
+import type { InspectorRenderModel } from './inspector-model';
 
 export type PlayheadPoint = {
   readonly x: number;
@@ -35,7 +35,7 @@ export type PlayheadState = {
  * is the planner's, not a constant-speed guess.
  */
 export function playheadAtTime(
-  model: GcodeRenderModel,
+  model: InspectorRenderModel,
   segTimeEndSec: Float32Array,
   seconds: number,
 ): PlayheadState {
@@ -43,7 +43,7 @@ export function playheadAtTime(
 }
 
 function playheadFromCumulative(
-  model: GcodeRenderModel,
+  model: InspectorRenderModel,
   cumulative: Float32Array,
   value: number,
 ): PlayheadState {
@@ -128,7 +128,7 @@ function indexInCumulative(cumulative: Float32Array, count: number, value: numbe
  * model is built in one pass over the source, so a click on a line near the
  * end of a large program no longer walks every segment before it. */
 export function secondsAtLine(
-  model: GcodeRenderModel,
+  model: InspectorRenderModel,
   segTimeEndSec: Float32Array,
   line: number,
 ): number | null {
