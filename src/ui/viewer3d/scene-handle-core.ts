@@ -19,6 +19,7 @@ import { boundsExtent, disposeChildren } from './scene-furniture';
 import { createMarkers, disposeMarkers, type SceneMarkers } from './scene-markers';
 import { placeMarker, type Point3 } from './scene-parts';
 import { clipObjects } from './scene-isolate';
+import { createMeasureOverlay, type MeasureOverlay } from './scene-measure';
 import { createToolpathPicker, type ToolpathPicker } from './scene-pick';
 import type { CameraRig } from './scene-setup';
 import type { Viewer3dSegmentsInput } from './segment-buckets';
@@ -93,6 +94,8 @@ export type SceneCore = {
   readonly markers: SceneMarkers;
   /** Names the move under the pointer and outlines it (ADR-470). */
   readonly picker: ToolpathPicker;
+  /** The line and distance between two measured points (ADR-470). */
+  readonly measure: MeasureOverlay;
   readonly projection: { readonly listen: Listen<Viewer3dProjection>; readonly report: () => void };
   readonly moving: { readonly listen: Listen<boolean>; readonly dispose: () => void };
   /** Studio hands the line shaders linear colours; Classic keeps raw ones. */
@@ -125,6 +128,7 @@ export function createSceneCore(deps: SceneHandleDeps): SceneCore {
     renderer.render(scene, camera);
     if (state.overlays) cube.render(renderer, rig.camera, rig.controls.target);
     studio.renderLabels(camera);
+    measure.renderLabel(camera);
   };
   const scheduler = createViewer3dRenderScheduler({
     render: drawFrame,
@@ -132,6 +136,7 @@ export function createSceneCore(deps: SceneHandleDeps): SceneCore {
   });
   const requestRender = scheduler.requestRender;
   const markers = createMarkers(three, scene);
+  const measure = createMeasureOverlay(modules, deps);
   const encode = (): ((channel: number) => number) | undefined =>
     state.stage.look === 'studio' ? srgbToLinear : undefined;
   const core: Omit<SceneCore, 'dispose'> = {
@@ -146,6 +151,7 @@ export function createSceneCore(deps: SceneHandleDeps): SceneCore {
     views: createSceneCameraControl(rig, requestRender),
     markers,
     picker: createToolpathPicker(modules, deps),
+    measure,
     projection: createProjectionReporter(rig),
     moving: createMovingReporter(rig.controls),
     encode,
@@ -214,6 +220,7 @@ function disposeCore(core: Omit<SceneCore, 'dispose'>): void {
   disposeChildren(deps.furnitureGroup);
   disposeMarkers(deps.scene, core.markers);
   core.picker.dispose();
+  core.measure.dispose();
   disposeArrowMesh(deps.scene, core.state.arrowMesh);
   core.cube.dispose();
   core.studio.dispose();

@@ -58,6 +58,7 @@ function handle(): Viewer3dModule.Viewer3dSceneHandle {
     highlightMove: vi.fn(),
     setMoveFilter: vi.fn(),
     setClipPlanes: vi.fn(),
+    setMeasure: vi.fn(),
     onCameraMoving: vi.fn(),
     setCameraTracking: vi.fn(),
     onCameraInteraction: vi.fn(),

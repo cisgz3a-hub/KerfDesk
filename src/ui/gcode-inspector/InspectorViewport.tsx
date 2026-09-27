@@ -3,10 +3,12 @@ import type { CameraTracking, Viewer3dSceneHandle } from '../viewer3d';
 import type { Viewer3dView } from '../viewer3d/camera-presets';
 import { VIEWER3D_MOUSE_HINT } from '../viewer3d/viewer3d-controls';
 import { InspectorMoveTip, type MovePickProps } from './InspectorMoveTip';
+import { measureReadout } from './pick-readout';
 import { InspectorViewControls } from './InspectorViewControls';
 import { InspectorViewCube } from './InspectorViewCube';
 import type { PlayheadState } from './playhead';
 import type { InspectorLiveProgress } from './use-inspector-live-progress';
+import { useMeasure, type MeasureTool } from './use-measure';
 import { useViewportCameraUi } from './use-viewport-camera-ui';
 import type { Viewer3dSceneState } from './use-viewer3d-scene';
 
@@ -39,6 +41,7 @@ export function InspectorViewport(props: InspectorViewportProps): JSX.Element {
   const selectView = (view: Viewer3dView): void =>
     manual(() => props.handleRef.current?.setView(view));
   const ready = props.state === 'ready';
+  const measure = useMeasure(props.handleRef, ready, props.movePick?.model);
   return (
     <div
       className="gcode-viewer-viewport"
@@ -56,6 +59,7 @@ export function InspectorViewport(props: InspectorViewportProps): JSX.Element {
         activeLine={props.activeLine}
         toolLabel={props.toolLabel}
         playing={props.playing}
+        measure={measure}
       />
       <InspectorViewControls
         cameraMode={props.cameraMode}
@@ -75,6 +79,7 @@ export function InspectorViewport(props: InspectorViewportProps): JSX.Element {
           handleRef={props.handleRef}
           enabled={ready}
           paused={moving}
+          measure={measure.active ? measure : null}
         />
       ) : null}
       {props.children}
@@ -82,18 +87,29 @@ export function InspectorViewport(props: InspectorViewportProps): JSX.Element {
         cameraMode={props.cameraMode}
         travelVisible={props.travelVisible}
         onTravelChange={props.onTravelChange}
+        measure={props.movePick !== undefined && ready ? measure : null}
       />
-      {props.state === 'loading' || props.state === 'preparing' ? (
-        <p className="gcode-viewer-message" role="status">
-          Preparing 3D view…
-        </p>
-      ) : null}
-      {props.state === 'no-webgl' ? (
-        <p className="gcode-viewer-message">
-          3D view unavailable: {props.reason} The program parsed — readouts are live.
-        </p>
-      ) : null}
+      <ViewportMessage state={props.state} reason={props.reason} />
     </div>
+  );
+}
+
+function ViewportMessage(props: {
+  readonly state: Viewer3dSceneState;
+  readonly reason: string;
+}): JSX.Element | null {
+  if (props.state === 'loading' || props.state === 'preparing') {
+    return (
+      <p className="gcode-viewer-message" role="status">
+        Preparing 3D view…
+      </p>
+    );
+  }
+  if (props.state !== 'no-webgl') return null;
+  return (
+    <p className="gcode-viewer-message">
+      3D view unavailable: {props.reason} The program parsed — readouts are live.
+    </p>
   );
 }
 
@@ -101,9 +117,23 @@ function ViewHint(props: {
   readonly cameraMode: CameraTracking['mode'];
   readonly travelVisible: boolean;
   readonly onTravelChange: (visible: boolean) => void;
+  /** Null where the view has no toolpath to measure. */
+  readonly measure: MeasureTool | null;
 }): JSX.Element {
+  const { measure } = props;
   return (
     <div className="gcode-viewer-view-hint">
+      {measure !== null ? (
+        <button
+          type="button"
+          className="lf-btn gcode-viewer-button"
+          aria-pressed={measure.active}
+          title="Measure between two points on the toolpath"
+          onClick={measure.toggle}
+        >
+          Measure
+        </button>
+      ) : null}
       <label>
         <input
           type="checkbox"
@@ -114,9 +144,11 @@ function ViewHint(props: {
         Travel
       </label>
       <span>
-        {props.cameraMode === 'manual'
-          ? VIEWER3D_MOUSE_HINT
-          : 'Following progress · Drag for manual view'}
+        {measure?.active === true
+          ? 'Click two points on the toolpath; ends of moves snap'
+          : props.cameraMode === 'manual'
+            ? VIEWER3D_MOUSE_HINT
+            : 'Following progress · Drag for manual view'}
       </span>
       <span>Faint path: program context</span>
     </div>
@@ -129,6 +161,7 @@ function ViewportHud(props: {
   readonly activeLine: number | null;
   readonly toolLabel: string | null;
   readonly playing: boolean;
+  readonly measure: MeasureTool;
 }): JSX.Element {
   const point = props.live === null ? props.playhead.point : props.live.point;
   const label = progressLabel(props.live, props.playing);
@@ -154,7 +187,27 @@ function ViewportHud(props: {
       {props.live?.reason ? (
         <div className="gcode-viewer-hud-detail">{props.live.reason}</div>
       ) : null}
+      <MeasureLines measure={props.measure} />
     </div>
+  );
+}
+
+function MeasureLines(props: { readonly measure: MeasureTool }): JSX.Element | null {
+  const { active, from, to } = props.measure;
+  if (!active) return null;
+  if (from === null || to === null) {
+    return (
+      <div className="gcode-viewer-hud-detail">
+        Measure: click {from === null ? 'a first' : 'a second'} point
+      </div>
+    );
+  }
+  const readout = measureReadout(from, to);
+  return (
+    <>
+      <div className="gcode-viewer-hud-measure">Distance {readout.distance}</div>
+      <div className="gcode-viewer-hud-detail">{readout.deltas}</div>
+    </>
   );
 }
 

@@ -15,6 +15,8 @@ const SQUARE_PROGRAM = [
   'G0 Z5',
 ].join('\n');
 const SCAN_STEP_PX = 4;
+// Far enough past a found move that the next sweep starts clear of it.
+const SCAN_CLEAR_PX = 40;
 // Long enough for a view change's camera animation to finish.
 const VIEW_SETTLE_MS = 1_200;
 
@@ -112,16 +114,62 @@ test('the Z range and legend filters decide what is drawn and pointed at (ADR-47
   expect(pageErrors).toEqual([]);
 });
 
+test('measuring between two moves reads their distance (ADR-470)', async ({ page, kerfdesk }) => {
+  const pageErrors: string[] = [];
+  page.on('pageerror', (error) => pageErrors.push(error.message));
+  await page.goto('/');
+  await kerfdesk.setOpenFiles([{ name: 'measure-square.nc', text: SQUARE_PROGRAM }]);
+  await page.getByText('File', { exact: true }).click();
+  await page.getByRole('menuitem').filter({ hasText: 'Open G-code...' }).click();
+  const dialog = page.getByRole('dialog', { name: 'G-code Inspector: measure-square.nc' });
+  await expect(dialog.locator('[data-viewer-state="ready"]')).toBeVisible({ timeout: 30_000 });
+  await dialog.getByRole('button', { name: 'Top', exact: true }).click();
+  await page.waitForTimeout(VIEW_SETTLE_MS);
+
+  const measure = dialog.getByRole('button', { name: 'Measure', exact: true });
+  await measure.click();
+  await expect(measure).toHaveAttribute('aria-pressed', 'true');
+  const hud = dialog.getByLabel('Viewer position');
+  await expect(hud).toContainText('Measure: click a first point');
+
+  // Seen from above, the middle row crosses the square's two sides at the
+  // same Y, so the two points are exactly the square's width apart.
+  const canvas = dialog.getByLabel('3D G-code toolpath', { exact: true });
+  const card = dialog.locator('.gcode-viewer-move-tip');
+  const first = await scanForMove(page, canvas);
+  await expect(card).toContainText('Click to measure from here');
+  await page.mouse.down();
+  await page.mouse.up();
+  await expect(hud).toContainText('Measure: click a second point');
+  await scanForMove(page, canvas, first.x + SCAN_CLEAR_PX);
+  await expect(card).toContainText('Click to measure to here');
+  await page.mouse.down();
+  await page.mouse.up();
+  await expect(hud).toContainText('Distance 80.00 mm');
+  await expect(hud).toContainText('ΔX 80.00');
+  await expect(dialog.locator('.viewer3d-measure-label')).toHaveText('80.00 mm');
+
+  // A click on a move now goes back to measuring from it; switching the tool
+  // off clears the measurement and a click goes to the line again.
+  await measure.click();
+  await expect(hud).not.toContainText('Distance');
+  await expect(dialog.locator('.viewer3d-measure-label')).toBeHidden();
+  await scanForMove(page, canvas);
+  await expect(card).toContainText('Click to go to this line');
+  expect(pageErrors).toEqual([]);
+});
+
 // Sweeps the pointer along the canvas's middle row until the card names a cut.
 async function scanForMove(
   page: Page,
   canvas: ReturnType<Page['locator']>,
+  fromX?: number,
 ): Promise<{ readonly x: number; readonly y: number }> {
   const box = await canvas.boundingBox();
   if (box === null) throw new Error('3D view has no size');
   const y = box.y + box.height / 2;
   const card = page.locator('.gcode-viewer-move-tip');
-  for (let x = box.x + SCAN_STEP_PX; x < box.x + box.width; x += SCAN_STEP_PX) {
+  for (let x = fromX ?? box.x + SCAN_STEP_PX; x < box.x + box.width; x += SCAN_STEP_PX) {
     await page.mouse.move(x, y);
     await page.evaluate(
       () => new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve))),

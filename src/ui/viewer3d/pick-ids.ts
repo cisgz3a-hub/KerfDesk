@@ -61,3 +61,29 @@ function pixelId(pixels: Uint8Array, at: number): number {
     (pixels[at + 3] ?? 0) * BYTE ** 3
   );
 }
+
+/** How near a move's end the pointer snaps to it, for measuring, in CSS pixels. */
+export const SNAP_PX = 10;
+
+type ScreenPoint = { readonly x: number; readonly y: number };
+
+/**
+ * Which end of a move is within `snapPx` of the pointer on screen, the
+ * nearer one when both are; null when neither is, or an end is off screen
+ * (null).
+ */
+export function nearestEnd(
+  pointer: ScreenPoint,
+  start: ScreenPoint | null,
+  end: ScreenPoint | null,
+  snapPx = SNAP_PX,
+): 'start' | 'end' | null {
+  const reach = (point: ScreenPoint | null): number =>
+    point === null
+      ? Number.POSITIVE_INFINITY
+      : Math.hypot(point.x - pointer.x, point.y - pointer.y);
+  const toStart = reach(start);
+  const toEnd = reach(end);
+  if (Math.min(toStart, toEnd) > snapPx) return null;
+  return toStart <= toEnd ? 'start' : 'end';
+}

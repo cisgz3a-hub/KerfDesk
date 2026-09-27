@@ -78,3 +78,28 @@ function settingsText(model: GcodeRenderModel, index: number, motion: number): s
   if (model.stats.powerMax === null) return feedText;
   return `${feedText}   S ${Number(power.toFixed(2))}`;
 }
+
+export type MeasureReadout = {
+  readonly distance: string;
+  readonly deltas: string;
+};
+
+/** The straight-line distance between two measured points and its X Y Z parts. */
+export function measureReadout(
+  from: Viewer3dPick['point'],
+  to: Viewer3dPick['point'],
+): MeasureReadout {
+  const dx = to.x - from.x;
+  const dy = to.y - from.y;
+  const dz = to.z - from.z;
+  return {
+    distance: `${Math.hypot(dx, dy, dz).toFixed(2)} mm`,
+    deltas: `ΔX ${hundredths(dx)}   ΔY ${hundredths(dy)}   ΔZ ${hundredths(dz)} mm`,
+  };
+}
+
+// Two decimals, without the "-0.00" a rounding speck below zero would show.
+function hundredths(value: number): string {
+  const text = value.toFixed(2);
+  return text === '-0.00' ? '0.00' : text;
+}

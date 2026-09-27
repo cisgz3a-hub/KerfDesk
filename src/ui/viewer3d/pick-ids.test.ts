@@ -1,5 +1,11 @@
 import { describe, expect, it } from 'vitest';
-import { encodePickIds, nearestPickedSegment, PICK_WINDOW_PX } from './pick-ids';
+import {
+  encodePickIds,
+  nearestEnd,
+  nearestPickedSegment,
+  PICK_WINDOW_PX,
+  SNAP_PX,
+} from './pick-ids';
 
 // A read-back square with the given pixels painted, as the pick pass returns it.
 function square(size: number, painted: ReadonlyArray<[column: number, row: number, id: number]>) {
@@ -51,5 +57,28 @@ describe('nearestPickedSegment', () => {
   it('still finds a move at the edge of the window', () => {
     const pixels = square(PICK_WINDOW_PX, [[PICK_WINDOW_PX - 1, 0, 12]]);
     expect(nearestPickedSegment(pixels, PICK_WINDOW_PX)).toBe(11);
+  });
+});
+
+describe('nearestEnd', () => {
+  const start = { x: 100, y: 100 };
+  const end = { x: 200, y: 100 };
+
+  it('snaps to an end within reach and to nothing past it', () => {
+    expect(nearestEnd({ x: 106, y: 108 }, start, end)).toBe('start');
+    expect(nearestEnd({ x: 195, y: 100 }, start, end)).toBe('end');
+    expect(nearestEnd({ x: 150, y: 100 }, start, end)).toBeNull();
+    expect(nearestEnd({ x: 100, y: 100 + SNAP_PX + 1 }, start, end)).toBeNull();
+  });
+
+  it('picks the nearer end of a move shorter than the reach', () => {
+    expect(nearestEnd({ x: 104, y: 100 }, start, { x: 106, y: 100 })).toBe('end');
+    expect(nearestEnd({ x: 101, y: 100 }, start, { x: 106, y: 100 })).toBe('start');
+  });
+
+  it('ignores an end that is off screen', () => {
+    expect(nearestEnd({ x: 101, y: 100 }, null, end)).toBeNull();
+    expect(nearestEnd({ x: 199, y: 100 }, null, end)).toBe('end');
+    expect(nearestEnd({ x: 0, y: 0 }, null, null)).toBeNull();
   });
 });

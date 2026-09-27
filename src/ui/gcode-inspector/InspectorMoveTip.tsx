@@ -20,6 +20,13 @@ export type MovePickProps = {
   readonly onLocate: (pick: Viewer3dPick) => void;
 };
 
+/** While measuring, clicks set points (snapped to move ends) instead of locating. */
+export type MoveTipMeasure = {
+  readonly addPoint: (pick: Viewer3dPick) => void;
+  readonly hover: (pick: Viewer3dPick | null) => void;
+  readonly clickHint: string;
+};
+
 const CARD_GAP_PX = 16;
 // Room the card needs before it flips to the pointer's other side.
 const CARD_WIDTH_PX = 250;
@@ -31,25 +38,37 @@ export function InspectorMoveTip(
     readonly handleRef: RefObject<Viewer3dSceneHandle | null>;
     readonly enabled: boolean;
     readonly paused: boolean;
+    readonly measure: MoveTipMeasure | null;
   },
 ): JSX.Element | null {
+  const { measure } = props;
   const hover = useMovePointer({
     canvasRef: props.canvasRef,
     handleRef: props.handleRef,
     enabled: props.enabled,
     paused: props.paused,
     resetKey: props.model,
-    onLocate: props.onLocate,
+    onLocate: measure?.addPoint ?? props.onLocate,
+    onHover: measure?.hover,
   });
   if (hover === null || hover.pick.segmentIndex >= props.model.segmentCount) return null;
-  const readout = moveReadout(props.model, props.segTimeEndSec, hover.pick);
+  // Measuring shows the point a click would take: the move's end when snapped.
+  const snapped = measure !== null && hover.pick.vertex !== null;
+  const pick = snapped
+    ? { ...hover.pick, point: hover.pick.vertex ?? hover.pick.point }
+    : hover.pick;
+  const readout = moveReadout(props.model, props.segTimeEndSec, pick);
   return (
     <div className="gcode-viewer-move-tip" style={cardPlacement(hover)} aria-hidden="true">
       <strong>{readout.title}</strong>
       <span>{readout.position}</span>
       <span>{readout.settings}</span>
       {readout.time !== null ? <span>{readout.time}</span> : null}
-      <em>Click to go to this line</em>
+      <em>
+        {measure === null
+          ? 'Click to go to this line'
+          : `${measure.clickHint}${snapped ? ' (end of move)' : ''}`}
+      </em>
     </div>
   );
 }

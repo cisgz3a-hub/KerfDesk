@@ -35,6 +35,7 @@ const scene = vi.hoisted(() => ({
   highlightMove: vi.fn(),
   setMoveFilter: vi.fn(),
   setClipPlanes: vi.fn(),
+  setMeasure: vi.fn(),
   captureImage: vi.fn(),
   resize: vi.fn(),
   dispose: vi.fn(),

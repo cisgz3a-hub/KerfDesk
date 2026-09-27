@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { buildGcodeRenderModel, type GcodeRenderModel } from '../../core/gcode-view';
-import { moveReadout, secondsAtPick } from './pick-readout';
+import { measureReadout, moveReadout, secondsAtPick } from './pick-readout';
 
 function model(text: string): GcodeRenderModel {
   const result = buildGcodeRenderModel(text);
@@ -27,6 +27,7 @@ describe('moveReadout', () => {
       segmentIndex,
       fraction: 0.5,
       point: { x: 20, y: 0, z: -2 },
+      vertex: null,
     });
     expect(readout.line).toBe(4);
     expect(readout.title).toBe('Line 5 · Cut (G1)');
@@ -42,6 +43,7 @@ describe('moveReadout', () => {
       segmentIndex,
       fraction: 1,
       point: { x: 10, y: 0, z: 0 },
+      vertex: null,
     });
     expect(readout.title).toBe('Line 3 · Traversal (G0)');
     expect(readout.settings.startsWith('F rapid')).toBe(true);
@@ -53,6 +55,7 @@ describe('moveReadout', () => {
       segmentIndex: 0,
       fraction: 0,
       point: { x: 0, y: 0, z: 0 },
+      vertex: null,
     });
     expect(readout.settings).toBe('F 300 mm/min');
   });
@@ -64,6 +67,7 @@ describe('moveReadout', () => {
       segmentIndex: 1,
       fraction: 0.5,
       point: { x: 10, y: 0, z: -1 },
+      vertex: null,
     });
     expect(readout.seconds).toBe(45);
     expect(readout.time).toBe('Reached at 0:45');
@@ -82,5 +86,21 @@ describe('secondsAtPick', () => {
     expect(secondsAtPick(times, { segmentIndex: 1, fraction: 2 })).toBe(6);
     expect(secondsAtPick(times, { segmentIndex: 3, fraction: 0 })).toBeNull();
     expect(secondsAtPick(null, { segmentIndex: 0, fraction: 0 })).toBeNull();
+  });
+});
+
+describe('measureReadout', () => {
+  it('gives the straight-line distance and each axis part, signed', () => {
+    const readout = measureReadout({ x: 10, y: 20, z: 0 }, { x: 13, y: 16, z: -12 });
+    expect(readout.distance).toBe('13.00 mm');
+    expect(readout.deltas).toBe('ΔX 3.00   ΔY -4.00   ΔZ -12.00 mm');
+  });
+
+  it('reads zero between a point and itself', () => {
+    const point = { x: 1.5, y: 2.5, z: -3 };
+    expect(measureReadout(point, point).distance).toBe('0.00 mm');
+    expect(measureReadout(point, { ...point, y: 2.499_999 }).deltas).toBe(
+      'ΔX 0.00   ΔY 0.00   ΔZ 0.00 mm',
+    );
   });
 });
