@@ -27,13 +27,28 @@ import {
 export const PREPARATION_RAW_VECTOR_SEGMENT_BUDGET = 100_000;
 export const PREPARATION_COMPILED_SEGMENT_BUDGET = 20_000;
 
+/**
+ * Advisory size class for a scene. 'unknown' means the bounded fill estimate
+ * ran out of its work budget (or met invalid input) before counting spans: a
+ * dense-vertex outline is not evidence of a large job (ADR-459 Amd 1), so the
+ * caller measures the compiled job instead of guessing 'over-budget'.
+ */
+export type ScenePreparationSize = 'within-budget' | 'over-budget' | 'unknown';
+
+export function scenePreparationSize(scene: Scene): ScenePreparationSize {
+  if (countOutputVectorSegments(scene) > PREPARATION_RAW_VECTOR_SEGMENT_BUDGET) {
+    return 'over-budget';
+  }
+  const fill = estimateFillPreparation(scene);
+  if (fill.kind !== 'counted') return 'unknown';
+  return fill.segments > PREPARATION_COMPILED_SEGMENT_BUDGET ? 'over-budget' : 'within-budget';
+}
+
 // Advisory for scene size. Amplifying operations have their own output and UI
-// routing policy below; this predicate does not refuse executable output.
+// routing policy below; this predicate does not refuse executable output. An
+// unknown estimate is not 'too complex' (see scenePreparationSize).
 export function scenePreparationTooComplex(scene: Scene): boolean {
-  return (
-    countOutputVectorSegments(scene) > PREPARATION_RAW_VECTOR_SEGMENT_BUDGET ||
-    countEstimatedFillSegments(scene) > PREPARATION_COMPILED_SEGMENT_BUDGET
-  );
+  return scenePreparationSize(scene) === 'over-budget';
 }
 
 /**
