@@ -4,6 +4,7 @@
 // mode (gate-and-hide, ADR-101 / F-K3).
 
 import type { ChangeEvent, CSSProperties } from 'react';
+import { calibrationFieldStyle } from '../calibration/calibration-dialog-styles';
 import { CalibrationNumberField } from '../calibration/CalibrationNumberField';
 import type { BoxDraft, BoxMachineContext } from './box-draft';
 
@@ -174,7 +175,7 @@ function SelectField(props: {
   readonly onChange: (event: ChangeEvent<HTMLSelectElement>) => void;
 }): JSX.Element {
   return (
-    <label style={selectLabelStyle}>
+    <label style={calibrationFieldStyle}>
       <span>{props.label}</span>
       <select
         className="lf-input"
@@ -208,13 +209,6 @@ const materialRowStyle: CSSProperties = {
 
 const gridStyle: CSSProperties = {
   display: 'grid',
-  gridTemplateColumns: 'repeat(3, 1fr)',
+  gridTemplateColumns: 'repeat(3, minmax(0, 1fr))',
   gap: 8,
-};
-
-const selectLabelStyle: CSSProperties = {
-  display: 'flex',
-  flexDirection: 'column',
-  gap: 3,
-  fontSize: 12,
 };
