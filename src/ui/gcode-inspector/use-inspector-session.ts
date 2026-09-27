@@ -8,6 +8,7 @@ import { useInspectorLook } from './inspector-look-preference';
 import { defaultLensFor, lensColorFn, type LensId } from './lenses';
 import { playheadAtTime } from './playhead';
 import { buildToolSections, toolAtSegment, type ToolSections } from './tool-sections';
+import { useInspectorIsolate } from './use-inspector-isolate';
 import { useInspectorStage } from './use-inspector-stage';
 import { useInspectorPlayback } from './use-inspector-playback';
 import { useInspectorLiveProgress } from './use-inspector-live-progress';
@@ -24,6 +25,8 @@ export function useInspectorSession(
   const programLens = useMemo(() => defaultLensFor(model, machineKind), [model, machineKind]);
   const lens = chosenLens ?? programLens;
   const [arrowsVisible, setArrowsVisible] = useState(false);
+  // Seconds of done moves playback keeps bold behind the tool; 0 keeps all.
+  const [trailSeconds, setTrailSeconds] = useState(0);
   const [followLive, setFollowLive] = useState(true);
   const theme = useMemo(() => resolveViewer3dTheme(), []);
   const [look, setLook] = useInspectorLook();
@@ -52,6 +55,14 @@ export function useInspectorSession(
     workArea: source?.workArea,
     playheadSegment: playhead.segmentIndex,
   });
+  const isolate = useInspectorIsolate({
+    model,
+    time: derived.time,
+    lens,
+    sections,
+    travelVisible,
+    setTravelVisible,
+  });
   const activeLine = liveMode ? live.activeLine : derived.activeLine;
   const progress = liveMode
     ? (live.progress ?? 0)
@@ -60,6 +71,7 @@ export function useInspectorSession(
       : 0;
   return {
     ...derived,
+    ...isolate,
     playhead,
     activeLine,
     progress,
@@ -73,6 +85,8 @@ export function useInspectorSession(
     setLens,
     arrowsVisible,
     setArrowsVisible,
+    trailSeconds,
+    setTrailSeconds,
     theme,
     look,
     setLook,

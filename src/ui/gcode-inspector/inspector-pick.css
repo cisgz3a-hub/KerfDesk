@@ -1,0 +1,56 @@
+/* The card that follows the pointer over a move (ADR-470). It never takes the
+   pointer, so hovering and clicking stay on the canvas under it. */
+.gcode-viewer-move-tip {
+  position: absolute;
+  z-index: 3;
+  display: grid;
+  gap: 3px;
+  max-width: 250px;
+  padding: 7px 10px;
+  border: 1px solid var(--lf-border);
+  border-radius: 8px;
+  background: var(--lf-bg-1);
+  box-shadow: 0 6px 18px rgb(0 0 0 / 28%);
+  font-size: var(--lf-text-xs);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+  pointer-events: none;
+}
+
+.gcode-viewer-move-tip span {
+  color: var(--lf-text-muted);
+}
+
+.gcode-viewer-move-tip em {
+  color: var(--lf-text-muted);
+  font-style: normal;
+  opacity: 0.75;
+}
+
+/* The measured distance over the middle of the measure line (ADR-470). The
+   scene's background is dark in every app theme, so its colours are fixed. */
+.viewer3d-measure-label {
+  padding: 1px 7px;
+  border: 1px solid rgb(56 225 255 / 70%);
+  border-radius: 4px;
+  color: #e8fbff;
+  background: rgb(13 15 18 / 86%);
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.gcode-viewer-hud-measure {
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+
+/* The 3D view takes keys while focused (ADR-470); a keyboard focus shows. */
+.gcode-viewer-canvas:focus {
+  outline: none;
+}
+
+.gcode-viewer-canvas:focus-visible {
+  outline: 2px solid var(--lf-accent);
+  outline-offset: -2px;
+}

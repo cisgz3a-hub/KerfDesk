@@ -1,4 +1,4 @@
-import type { ReliefSurfaceMeshWithNormals } from '../../core/relief/relief-surface-mesh';
+import type { Cut3DSurfaceMesh } from '../cnc-viewer3d/viewer3d-work-axes';
 import type { Viewer3DCameraControl } from './viewer3d-keyboard-controls';
 
 export type Cut3DOffscreenControl = Viewer3DCameraControl;
@@ -8,7 +8,7 @@ export type Cut3DOffscreenWorkerRequest =
       readonly kind: 'init';
       readonly sessionId: number;
       readonly canvas: OffscreenCanvas;
-      readonly mesh: ReliefSurfaceMeshWithNormals;
+      readonly mesh: Cut3DSurfaceMesh;
       readonly stockThicknessMm: number;
       readonly widthPx: number;
       readonly heightPx: number;
@@ -35,7 +35,7 @@ export type Cut3DOffscreenWorkerRequest =
       readonly sessionId: number;
       readonly surfaceId: number;
       /** Null keeps the latest requested mesh, even while it is still building. */
-      readonly mesh: ReliefSurfaceMeshWithNormals | null;
+      readonly mesh: Cut3DSurfaceMesh | null;
       readonly stockThicknessMm: number;
     }
   | { readonly kind: 'dispose'; readonly sessionId: number };

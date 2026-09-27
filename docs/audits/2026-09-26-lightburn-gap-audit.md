@@ -47,9 +47,9 @@ Sierra variants).
 | LBG-T02 | Rotate 90° clockwise and counter-clockwise commands | `R/TransformControls/` | Built: Arrange menu and `.` / `,`, exact quarter turns (ADR-410) | S | built (ADR-410) |
 | LBG-T03 | Offset Shapes: Both directions, Round/Bevel/Corner joins, delete original, open paths, Tools menu entry | `R/OffsetShapes/` | Built: Tools → Offset Shapes... with a live preview (ADR-410). Optimize / Simplify results is still open | S | built (ADR-410) |
 | LBG-T04 | Trim Shapes (click a segment to delete it back to the intersections) | `R/TrimShapes/` | Planned stub in Design Studio only (`src/ui/design-studio/design-tool.ts`) | M-L | open |
-| LBG-T05 | Apply Path to Text alignment (X left/middle/right, Y top/middle/bottom) | `R/ApplyPathToText/` | Guide, start offset and reverse only (`src/core/text/text-on-path.ts`) | S | open |
+| LBG-T05 | Apply Path to Text alignment (X left/middle/right, Y top/middle/bottom) | `R/ApplyPathToText/` | Guide, start offset and reverse only (`src/core/text/text-on-path.ts`) | S | Built (ADR-480) |
 | LBG-T06 | Warp (4 point) and Deform (16 point) | `R/WarpDeform/` | Missing; `src/core/camera/homography.ts` exists for reuse | M | open |
-| LBG-T07 | Create Rubber-Band Outline around a selection | `R/CreateRubberBandOutline/` | Missing | S | open |
+| LBG-T07 | Create Rubber-Band Outline around a selection | `R/CreateRubberBandOutline/` | Missing | S | Built (ADR-480) |
 | LBG-T08 | Cut Shapes (split shapes by a closed cutter) | `R/CutShapes/` | Missing | M | open |
 | LBG-T09 | Copy Along Path | `R/CopyAlongPath/` | Missing; `src/core/scene/array-layout.ts` and `text-on-path.ts` path sampling can be reused | M | open |
 | LBG-T10 | Resize Slots in Selection | `R/ResizeSlots/` | Missing for artwork; Box Generator only | M | open |
@@ -77,7 +77,7 @@ Sierra variants).
 | LBG-C04 | Best start point and "choose corners" for closed shapes | `R/OptimizationSettings/` | Closed shapes start at their drawn start point (`src/core/job/segment-entry-index.ts`) | M | open |
 | LBG-C05 | Tabs: click-placed laser tabs, even spacing, maximum count, tab cut power | `R/AddTabs/` | Count, size and skip-inner only (`src/core/geometry/tabs-bridges.ts`) | M | open |
 | LBG-C06 | Image scan angle 0/90/180 and Angle Increment per pass | `R/CutSettingsEditor/ImageMode/` | Images always scan along X (`src/core/raster/raster-sweep-plan.ts`) | M-L | open |
-| LBG-C07 | Sort Cuts Last; bulk Enable/Disable/Invert/Hide Others in the operations list | `R/CutsLayersWindow/` | Missing | S | open |
+| LBG-C07 | Sort Cuts Last; bulk Enable/Disable/Invert/Hide Others in the operations list | `R/CutsLayersWindow/` | Missing | S | Built (ADR-480). Follow-up: bulk air assist switches |
 | LBG-C08 | Start and end dwell on Line layers | `R/CutSettingsEditor/LineMode/` | Missing | S | open |
 | LBG-C09 | Tool layers (never output, for guides and masks) | `https://docs.lightburnsoftware.com/1.7/Reference/UI/ColorPalette/` | An operation with output off comes close | S | open |
 | LBG-C10 | Ramp length (sloped edges for stamps) | `R/CutSettingsEditor/FillMode/` | Missing | M-L | open |
@@ -94,7 +94,7 @@ Sierra variants).
 | LBG-I01 | Non-destructive Enhance (radius, amount, denoise) | `R/ShapeProperties/` | Destructive Image Studio filters only (`src/core/image-adjust/unsharp-mask.ts`, `median.ts`) | M | open |
 | LBG-I02 | Halftone (cells per inch, angle) and Newsprint as image modes | `R/CutSettingsEditor/ImageMode/` | Destructive Image Studio filters; the Newsprint filter draws lines, not dots (`src/core/image-adjust/halftone.ts`) | M | open |
 | LBG-I03 | Sketch image mode | `R/CutSettingsEditor/ImageMode/` | High-pass plus threshold in Image Studio, two destructive steps | M | open |
-| LBG-I04 | Flatten Image Mask (bake, keep the mask) | `R/ApplyMaskToImage/` | Apply, Remove and Crop exist | S | open |
+| LBG-I04 | Flatten Image Mask (bake, keep the mask) | `R/ApplyMaskToImage/` | Apply, Remove and Crop exist | S | Built (ADR-480). LightBurn deletes the mask shape; the "keep the mask" in this row was wrong |
 | LBG-I05 | `.clb` import maps the image mode and dot width | `R/MaterialLibrary/` | Hard-coded Floyd-Steinberg and 0 (`src/io/lightburn/clb-import.ts`) | S | open |
 | LBG-I06 | Tracing quality against Potrace | `R/TraceImage/` | Draft #924 (ADR-401..409) and its planned batches | — | IN #924 |
 
@@ -122,16 +122,16 @@ Sierra variants).
 |---|---|---|---|---|---|
 | LBG-F01 | Paste in Place | `R/UI/EditMenu/` | Built: Edit → Paste in Place, `Ctrl/Cmd+Shift+V` (ADR-410) | S | built (ADR-410) |
 | LBG-F02 | Invert Selection, Select Open Shapes on every layer | `R/UI/EditMenu/` | Built: Edit menu, `Ctrl/Cmd+Shift+I` for Invert (ADR-410) | S | built (ADR-410) |
-| LBG-F03 | Select Contained, Select Smaller Than | `R/UI/EditMenu/` | Missing | S | open |
+| LBG-F03 | Select Contained, Select Smaller Than | `R/UI/EditMenu/` | Missing | S | Built (ADR-480) |
 | LBG-F04 | Filled or Wireframe view toggle | `R/ViewStyle/` | Built: Window → Wireframe View, `Alt+W` (ADR-410) | S | built (ADR-410) |
 | LBG-F05 | Pasting SVG or images copied from other apps | `R/UI/EditMenu/` | In-app clipboard only | M | open |
 | LBG-F06 | Snapping to nodes, midpoints, centres and intersections; settable grid and distance | `R/Snapping/` | Bounding-box edges and centres, fixed 10 mm grid and 2 mm distance (`src/ui/workspace/snapping.ts`) | M | open |
 | LBG-F07 | Guidelines dragged from the rulers | `R/AutomaticGuidelines/` | Missing | M-L | open |
-| LBG-F08 | Delete Duplicates in the design, Close Path on any layer, Reverse Direction | `R/UI/EditMenu/` | Output-time overlap removal and Fill-only close | S-M | open |
+| LBG-F08 | Delete Duplicates in the design, Close Path on any layer, Reverse Direction | `R/UI/EditMenu/` | Output-time overlap removal and Fill-only close | S-M | Built (ADR-480) |
 | LBG-F09 | Text Upper Case, vertical alignment, faux bold and italic, Max Width and Squeeze | `R/Text/`, `R/ShapeProperties/` | Missing | S-M | open |
 | LBG-F10 | Variable text: custom date and time formats, more cut-setting codes, hex serial, Test and Bake | `R/VariableText/VariableTextFormatting/` | Three fixed date formats; power, speed, passes and air codes | S-M | open |
 | LBG-F11 | DXF export; saving LightBurn `.lbrn2` | `R/UI/FileMenu/` | SVG export only | M | open |
-| LBG-F12 | Numeric fields accept expressions, unit suffixes and percentages | `R/NumericEditsToolbar/` | Plain numbers in mm | S | open |
+| LBG-F12 | Numeric fields accept expressions, unit suffixes and percentages | `R/NumericEditsToolbar/` | Plain numbers in mm | S | Built (ADR-480) |
 | LBG-F13 | Print at 1:1 | `R/Print/` | Missing | S-M | open |
 | LBG-F14 | Replace or refresh a bitmap | `R/UI/EditMenu/` | Re-import works for SVG and DXF only (`src/ui/app/reimport-selected-artwork.ts`) | S | open |
 | LBG-F15 | Hotkey editor | `R/EditHotkeys/` | Read-only shortcut list | M | open |
@@ -158,9 +158,12 @@ Each batch is one pull request with its own decision record, tests and WORKFLOW.
   changes. Built in ADR-410.
 - **Batch 4 — Line and Image cut settings:** LBG-C01, LBG-C02, LBG-C03. Changes G-code only when an
   operation turns one of them on. Built in ADR-415.
-- **Next candidates, in order:** LBG-T05, LBG-T07, LBG-T15, LBG-F03, LBG-F08, LBG-F12, LBG-C07,
-  LBG-M02, LBG-M07, LBG-I04 (small, daily use), then LBG-C04, LBG-C05, LBG-I01, LBG-I02, LBG-C06,
-  LBG-T04, LBG-T06, LBG-T08, LBG-T09, LBG-F06.
+- **Batch 5 — design tools:** LBG-T05, LBG-T07, LBG-F03, LBG-F08, LBG-F12, LBG-C07, LBG-I04. Moves
+  no machine. Built in ADR-480.
+- **Batch 6 — moving the machine:** LBG-T15, LBG-M02, LBG-M07. Chosen with batch 5 on 2026-09-27.
+  Built in ADR-493.
+- **Next candidates, in order:** LBG-C04, LBG-C05, LBG-I01, LBG-I02, LBG-C06, LBG-T04, LBG-T06,
+  LBG-T08, LBG-T09, LBG-F06.
 - **Not in these batches:** the Camera feature rebuild thread owns LBG-M13 (several cameras per
   device) and is also building camera print-and-cut, trace from the camera image and object
   detection. LBG-M09 (Print and Cut out of Labs) stays unscheduled here until that work lands, so

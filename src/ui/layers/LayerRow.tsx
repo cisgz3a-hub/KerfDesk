@@ -12,6 +12,7 @@ import { DeleteLayerButton } from './DeleteLayerButton';
 import { LayerOrderControls } from './LayerOrderControls';
 import { LayerSettingsClipboardButtons } from './LayerSettingsClipboardButtons';
 import { SelectLayerObjectsButton } from './SelectLayerObjectsButton';
+import { ShowOnlyLayerButton } from './ShowOnlyLayerButton';
 
 export function LayerRow(props: {
   readonly layer: Layer;
@@ -98,6 +99,7 @@ function OperationManagement(props: {
         </div>
         <div style={actionsStyle}>
           <SelectLayerObjectsButton layer={props.layer} />
+          <ShowOnlyLayerButton layer={props.layer} />
           <LayerSettingsClipboardButtons layer={props.layer} />
           <DeleteLayerButton layer={props.layer} />
         </div>

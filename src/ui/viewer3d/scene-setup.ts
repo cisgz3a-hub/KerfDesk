@@ -5,7 +5,7 @@
 // context and wiring the Z-up camera is one job with one failure mode.
 
 import type * as ThreeNamespace from 'three';
-import type { Camera, PerspectiveCamera, WebGLRenderer } from 'three';
+import type { OrthographicCamera, PerspectiveCamera, WebGLRenderer } from 'three';
 import type * as OrbitControlsModule from 'three/examples/jsm/controls/OrbitControls.js';
 import { VIEWER3D_FOV_DEG, type Viewer3dProjection } from './camera-presets';
 import { syncOrthographicCamera } from './camera-projection';
@@ -21,6 +21,8 @@ type ThreeModule = typeof ThreeNamespace;
 
 export type OrbitControlsCtor = typeof OrbitControlsModule.OrbitControls;
 
+export type ViewCamera = PerspectiveCamera | OrthographicCamera;
+
 export type CameraRig = {
   /** The pose every control, view and animation moves. */
   readonly camera: PerspectiveCamera;
@@ -31,7 +33,7 @@ export type CameraRig = {
   /** Largest job dimension, so the orthographic depth range covers the job. */
   readonly setExtent: (extentMm: number) => void;
   /** The camera to draw with: the perspective pose, or its orthographic twin. */
-  readonly viewCamera: () => Camera;
+  readonly viewCamera: () => ViewCamera;
 };
 
 export type StartRendererResult =
@@ -66,6 +68,8 @@ export function startRenderer(
   const height = canvas.clientHeight || canvas.height;
   renderer.setSize(width, height, false);
   renderer.setClearColor(theme.background);
+  // Z range and section views clip the toolpath's own materials (ADR-470).
+  renderer.localClippingEnabled = true;
   return { kind: 'ok', renderer, width, height };
 }
 
@@ -95,7 +99,7 @@ export function createCameraRig(
   configureViewer3dControls(three, controls);
   let projection: Viewer3dProjection = 'perspective';
   let extentMm = 100;
-  const viewCamera = (): Camera => {
+  const viewCamera = (): ViewCamera => {
     if (projection === 'perspective') return camera;
     const distance = camera.position.distanceTo(controls.target);
     syncOrthographicCamera(ortho, camera, distance, distance + extentMm * ORTHO_DEPTH_EXTENTS);

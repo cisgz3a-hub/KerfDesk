@@ -70,7 +70,7 @@ export function applyResize(
   parts: {
     readonly renderer: WebGLRenderer;
     readonly camera: PerspectiveCamera;
-    readonly fatMaterial: LineMaterialType | null;
+    readonly fatMaterials: ReadonlyArray<LineMaterialType>;
   },
   width: number,
   height: number,
@@ -78,7 +78,7 @@ export function applyResize(
   parts.renderer.setSize(width, height, false);
   parts.camera.aspect = width / height;
   parts.camera.updateProjectionMatrix();
-  parts.fatMaterial?.resolution.set(width, height);
+  for (const material of parts.fatMaterials) material.resolution.set(width, height);
 }
 
 // Show a marker at a point, or hide it when there is nothing to show.

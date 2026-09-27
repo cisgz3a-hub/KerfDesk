@@ -4,6 +4,7 @@
 import type { useStore } from '../state';
 import { useUiStore } from '../state/ui-store';
 import type { CommandShellCallbacks } from './app-command-context-types';
+import { designToolsCommandContext } from './design-tools-command-context';
 import type { EditingToolsCommandContext } from './editing-tools-command-types';
 import { selectionHasUnlockedVectorObject } from './selection-command-state';
 
@@ -14,6 +15,7 @@ export function editingToolsCommandContext(
   wireframeActive: boolean,
 ): EditingToolsCommandContext {
   return {
+    ...designToolsCommandContext(app, selectedIds),
     pasteInPlace: app.pasteClipboardInPlace,
     invertSelection: app.invertSelection,
     selectOpenShapes: app.selectOpenShapes,

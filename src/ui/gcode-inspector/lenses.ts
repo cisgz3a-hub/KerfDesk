@@ -256,6 +256,44 @@ function plannerSwatches(
   ];
 }
 
+/**
+ * Which legend swatch each move belongs to, in the order the legend lists
+ * them, for the lenses whose legend is a list (ADR-470 filters). Null for the
+ * ramp lenses, which have nothing to switch off. `travel` is the Traversal
+ * swatch's index, which stands for the traversal toggle; null when the legend
+ * has none.
+ */
+export function lensEntries(
+  model: GcodeRenderModel,
+  time: ProgramTimeModel,
+  lens: LensId,
+  sections?: ToolSections | null,
+): { readonly entryOf: (segmentIndex: number) => number; readonly travel: number | null } | null {
+  const isTravel = (index: number): boolean => model.segKind[index] === SEG_KIND.travel;
+  if (lens === 'kind') {
+    // Cut, Plunge, Retract, Traversal, as kindSwatches lists them.
+    const order = new Map<number, number>([
+      [SEG_KIND.cut, 0],
+      [SEG_KIND.plunge, 1],
+      [SEG_KIND.retract, 2],
+      [SEG_KIND.travel, 3],
+    ]);
+    return { entryOf: (index) => order.get(model.segKind[index] ?? SEG_KIND.cut) ?? 0, travel: 3 };
+  }
+  if (lens === 'tool') {
+    // Each tool in order of first use, then Traversal, as toolSwatches lists them.
+    const travel = sections?.tools.length ?? 1;
+    return {
+      entryOf: (index) => (isTravel(index) ? travel : (sections?.segTool[index] ?? 0)),
+      travel,
+    };
+  }
+  if (lens === 'planner') {
+    return { entryOf: (index) => (time.segFeedLimited[index] === 1 ? 1 : 0), travel: null };
+  }
+  return null;
+}
+
 export function rgbCss(rgb: Rgb): string {
   const channel = (value: number): number => Math.round(Math.min(1, Math.max(0, value)) * 255);
   return `rgb(${channel(rgb[0])}, ${channel(rgb[1])}, ${channel(rgb[2])})`;

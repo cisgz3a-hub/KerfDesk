@@ -14,6 +14,7 @@
 import type * as ThreeNamespace from 'three';
 import type { Object3D } from 'three';
 import { viewer3dTheme } from '../theme/viewer3d-theme';
+import type { ViewerWorkAxes } from './viewer3d-work-axes';
 
 type ThreeModule = typeof ThreeNamespace;
 
@@ -43,12 +44,15 @@ const GRID_DROP_MM = 0.2;
  * @param three The dynamically-imported three module.
  * @param extents Stock extents in mm, as used for the surface mesh.
  * @param stockThicknessMm Stock thickness, so the grid sits under the part.
+ * @param workAxes Work zero in this frame; null means unavailable. Other
+ *   surface viewers may omit it to retain their existing stock-corner marker.
  * @returns A group of inert scenery plus its disposer.
  */
 export function buildStageFurniture(
   three: ThreeModule,
   extents: Extents,
   stockThicknessMm: number,
+  workAxes?: ViewerWorkAxes | null,
 ): StageFurnitureHandle {
   const group = new three.Group();
   group.name = 'stage';
@@ -86,20 +90,25 @@ export function buildStageFurniture(
     });
   }
 
-  const axes = new three.AxesHelper(span * AXIS_LENGTH_FRACTION);
-  // Anchored at the stock's min-XY corner at the stock top: that is the corner
-  // depths are measured down from, so it is the one worth marking.
-  axes.position.set(-extents.widthMm / 2, -extents.heightMm / 2, 0);
-  group.add(axes);
-  disposers.push(() => {
-    axes.geometry.dispose();
-    // three types Object3D.material as one material OR an array; AxesHelper
-    // uses a single one, but the type does not narrow, so handle both rather
-    // than assert and risk leaking if that ever changes.
-    for (const material of Array.isArray(axes.material) ? axes.material : [axes.material]) {
-      material.dispose();
-    }
-  });
+  if (workAxes !== null) {
+    const axes = new three.AxesHelper(span * AXIS_LENGTH_FRACTION);
+    const origin = workAxes?.originMm ?? {
+      x: -extents.widthMm / 2,
+      y: -extents.heightMm / 2,
+      z: 0,
+    };
+    axes.name = workAxes === undefined ? 'stock-corner-axes' : 'work-zero-axes';
+    axes.position.set(origin.x, origin.y, origin.z);
+    axes.scale.set(workAxes?.xDirection ?? 1, workAxes?.yDirection ?? 1, 1);
+    group.add(axes);
+    disposers.push(() => {
+      axes.geometry.dispose();
+      // AxesHelper currently has one material; retain array-safe disposal.
+      for (const material of Array.isArray(axes.material) ? axes.material : [axes.material]) {
+        material.dispose();
+      }
+    });
+  }
 
   return {
     object: group,
