@@ -27,11 +27,7 @@ export function tweenPose(from: CameraPose, to: CameraPose, t: number): CameraPo
   const toOffset = subtract(to.position, to.target);
   const fromDistance = length(fromOffset);
   const toDistance = length(toOffset);
-  const direction = slerpUnit(
-    scale(fromOffset, 1 / fromDistance),
-    scale(toOffset, 1 / toDistance),
-    t,
-  );
+  const direction = slerpUnit(normalize(fromOffset), normalize(toOffset), t);
   const distance = fromDistance + (toDistance - fromDistance) * t;
   const target = lerp(from.target, to.target, t);
   return { target, position: add(target, scale(direction, distance)) };

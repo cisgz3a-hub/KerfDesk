@@ -6,8 +6,12 @@ import {
   boundsExtent,
   CAMERA_PRESETS,
   cameraPlacement,
+  projectionForView,
+  VIEWER3D_VIEWS,
   type CameraPreset,
 } from './camera-presets';
+import { orthographicHalfHeight } from './camera-projection';
+import { tweenPose } from './camera-tween';
 
 // A 100 x 60 x 10 job centred on (50, 30, -5).
 const BOUNDS: AxisBounds = { minX: 0, maxX: 100, minY: 0, maxY: 60, minZ: -10, maxZ: 0 };
@@ -82,6 +86,32 @@ describe('cameraPlacement', () => {
     const reach = (view: { position: { y: number }; target: { y: number } }): number =>
       Math.abs(view.target.y - view.position.y);
     expect(reach(big)).toBeGreaterThan(reach(small));
+  });
+
+  it('keeps the camera off a straight-line job seen end-on, in every view', () => {
+    const lines: ReadonlyArray<AxisBounds> = [
+      { minX: 0, maxX: 100, minY: 30, maxY: 30, minZ: 0, maxZ: 0 },
+      { minX: 50, maxX: 50, minY: 0, maxY: 100, minZ: 0, maxZ: 0 },
+      // A single deep plunge: a drilled hole seen from above.
+      { minX: 50, maxX: 50, minY: 30, maxY: 30, minZ: -40, maxZ: 0 },
+    ];
+    const start = cameraPlacement('iso', lines[0] ?? null);
+    for (const bounds of lines) {
+      for (const view of VIEWER3D_VIEWS) {
+        for (const aspect of [0.4, 1, 2]) {
+          const placement = cameraPlacement(view, bounds, aspect, projectionForView(view));
+          const distance = Math.hypot(
+            placement.position.x - placement.target.x,
+            placement.position.y - placement.target.y,
+            placement.position.z - placement.target.z,
+          );
+          // At least the minimum 10 mm view either side of the target.
+          expect(orthographicHalfHeight(distance, 40) * Math.min(1, aspect)).toBeGreaterThan(5);
+          const middle = tweenPose(start, placement, 0.5).position;
+          expect([middle.x, middle.y, middle.z].every(Number.isFinite)).toBe(true);
+        }
+      }
+    }
   });
 
   it('still produces a usable view with no bounds at all', () => {

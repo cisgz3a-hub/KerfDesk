@@ -33,11 +33,21 @@ function dragName(action: Viewer3dDragAction): string {
 }
 
 // Damping gives a short glide after a drag instead of a dead stop. Low enough
-// that a flick settles in well under a second.
-const DAMPING_FACTOR = 0.12;
+// that a flick settles in well under a second. Each frame of the glide moves
+// the camera by this share of what is left of it.
+export const VIEWER3D_DAMPING_FACTOR = 0.12;
 const ROTATE_SPEED = 0.8;
 
 const BUTTON_NAMES = ['left', 'middle', 'right'] as const;
+
+/**
+ * The orbit turn for one dragged pixel, the way OrbitControls turns it: a
+ * full turn per view height, scaled by the shared rotate speed. Cut 3D's
+ * worker camera uses it so its orbit feels like every other view's.
+ */
+export function viewer3dOrbitRadiansPerPixel(viewportHeightPx: number): number {
+  return (2 * Math.PI * ROTATE_SPEED) / Math.max(1, viewportHeightPx);
+}
 
 /** The drag action for a PointerEvent.button, or null for other buttons. */
 export function viewer3dDragAction(button: number): Viewer3dDragAction | null {
@@ -69,7 +79,7 @@ export function configureViewer3dControls(
     RIGHT: button(VIEWER3D_MOUSE_MAP.right),
   };
   controls.enableDamping = !prefersReducedMotion();
-  controls.dampingFactor = DAMPING_FACTOR;
+  controls.dampingFactor = VIEWER3D_DAMPING_FACTOR;
   controls.zoomToCursor = true;
   controls.screenSpacePanning = true;
   controls.rotateSpeed = ROTATE_SPEED;

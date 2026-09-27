@@ -116,11 +116,15 @@ export function fitDistance(
   const tanY = Math.tan((VIEWER3D_FOV_DEG * Math.PI) / 360);
   const tanX = tanY * safeAspect;
   const basis = viewBasis(direction);
+  // A job seen end-on (a straight line down its own length, a drilled hole
+  // from above) projects to a point. Its view still shows the minimum extent,
+  // so the camera never sits on the target, where the orbit has no direction.
+  const minReach = ((MIN_EXTENT_MM / 2) * FIT_MARGIN) / Math.min(tanX, tanY);
   let distance = 0;
   for (const corner of boxCorners(bounds)) {
     const across = Math.abs(dot(corner, basis.right)) * FIT_MARGIN;
     const upward = Math.abs(dot(corner, basis.up)) * FIT_MARGIN;
-    const reach = Math.max(across / tanX, upward / tanY);
+    const reach = Math.max(across / tanX, upward / tanY, minReach);
     distance = Math.max(
       distance,
       projection === 'orthographic' ? reach : reach + dot(corner, direction),

@@ -46,6 +46,11 @@ Studio is a switch.
    in screen space. The glide is off when the operator asks the system for reduced motion, and a
    named view ends any glide first (`stopViewer3dGlide`). `createViewer3dGlideRendering` keeps
    rendering while a glide runs and stops when it settles, so an idle view draws nothing.
+   - Cut 3D draws in an offscreen worker without orbit controls, so it gets the same feel by hand.
+     Its worker camera turns by the same angle per dragged pixel (`viewer3dOrbitRadiansPerPixel`)
+     and zooms toward the cursor. After a drag, the page keeps sending a fading share of the
+     drag's last speed, with the same damping factor (`cut3d-offscreen-glide.ts`). A new drag, the
+     wheel or a key ends the glide.
 3. **Named views, orthographic views and a view cube** (Inspector).
    - Up is always +Z in every view, so orbiting after Top never rolls.
    - Top, Front, Right and the cube's faces draw orthographically; Iso draws in perspective. An
@@ -54,6 +59,9 @@ Studio is a switch.
      jumps and zoom, follow and view animations work the same in both.
    - A view change animates on the shortest arc around the target (about half a second, and at
      once with reduced motion). Fit frames the whole job from the current angle.
+   - A job seen end-on, such as a straight line along its own length or one plunge seen from
+     above, projects to a point. Its view still spans the minimum 10 mm, so the camera never sits
+     on the target, where the orbit has no direction.
    - The view cube is drawn in a scissored corner of the main renderer, so it costs no second
      WebGL context. A DOM hit area over the corner takes the clicks and keeps a drag there from
      orbiting the view. Clicking a face turns the view to face it.
@@ -109,6 +117,13 @@ Studio is a switch.
   - Camera: `tweenPose` follows the shortest arc and lands on the target pose; `easeOutCubic`;
     `syncOrthographicCamera` frames the same target plane as the perspective camera; Top looks
     straight down with up +Z; the mouse map and hint.
+  - End-on jobs: a straight line along X, along Y, and a single deep plunge, in every named view
+    and three aspect ratios, keep a view of at least 10 mm and a finite animation path. Before the
+    fix, an orthographic view of such a job put the camera on its target (distance 0), and the
+    animation to it produced NaN positions.
+  - Cut 3D: the orbit turns by the shared angle per pixel; a wheel zoom keeps the point under the
+    cursor in place; a flick glides and fades out within a second, travelling what the orbit
+    controls' damping leaves; a drag held still, a new input or reduced motion gives no glide.
   - Tools: `programToolCollector` reads id, name and geometry and ignores `(blank)` names;
     `buildToolSections` assigns each move to its tool with and without T words; `toolAtSegment`.
   - Studio: `studioToolSpec` builds the bit from the stated geometry, a laser head for a laser
