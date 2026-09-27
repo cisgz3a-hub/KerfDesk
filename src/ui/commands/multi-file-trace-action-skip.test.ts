@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 import type { ColoredPath } from '../../core/scene';
-import type { RawImageData } from '../../core/trace';
+import type { BatchTraceFile, RawImageData } from '../../core/trace';
 import {
   buildMultiFileTraceExports,
   runMultiFileTrace,
@@ -33,7 +33,7 @@ function namedFile(name: string): MultiFileTraceFile {
 describe('Multi-File Trace per-file failures (rank 19)', () => {
   it('writes the rest of the batch when the middle file cannot be decoded (rank 19)', async () => {
     const pushToast = vi.fn();
-    const write = vi.fn(async () => true);
+    const write = vi.fn(async (_file: BatchTraceFile) => true);
     const trace = vi.fn(async () => [SQUARE_PATH]);
 
     await runMultiFileTrace(

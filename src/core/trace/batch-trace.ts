@@ -91,7 +91,14 @@ export type BatchTraceDependencies = {
   readonly trace?: (
     image: RawImageData,
     options: TraceOptions,
+    signal?: AbortSignal,
   ) => Promise<ReadonlyArray<ColoredPath>>;
+  // Cancels the batch: checked before each file and passed to every trace.
+  readonly signal?: AbortSignal;
+  // Receives each file as soon as it is serialized. The batch then keeps no
+  // file text itself, so at most one export is held at a time; the result's
+  // files list is empty.
+  readonly onFile?: (file: BatchTraceFile) => Promise<void>;
   // Whether a failed attempt may use the job's fallback; omitted, every error.
   readonly canFallBack?: (error: unknown) => boolean;
   // Called with the job's index before its fallback runs.
@@ -149,12 +156,13 @@ export async function traceImagesToVectorFiles(
   deps: BatchTraceDependencies = {},
   output: BatchTraceOutput = {},
 ): Promise<BatchTraceResult> {
-  const trace = deps.trace ?? traceImageToColoredPaths;
+  const trace = deps.trace ?? ((image, options) => traceImageToColoredPaths(image, options));
   const format = output.format ?? 'svg';
   const seenNames = new Map<string, number>();
   const files: BatchTraceFile[] = [];
   const skipped: BatchTraceSkip[] = [];
   for (const [sourceIndex, source] of jobs.entries()) {
+    deps.signal?.throwIfAborted();
     const outcome = await runJob(source, sourceIndex, trace, deps);
     if (outcome.kind === 'failed') {
       skipped.push(outcome.skip);
@@ -176,13 +184,15 @@ export async function traceImagesToVectorFiles(
       output.precisionMm,
     );
     const stem = uniqueStem(safeSourceStem(job.sourceName), seenNames);
-    files.push({
+    const file: BatchTraceFile = {
       filename: `${stem}-trace.${format}`,
       format,
       text: tracedFileText(format, layers, page, options.traceMode, deps, output),
       pathCount: layers.length,
       sourceIndex,
-    });
+    };
+    if (deps.onFile === undefined) files.push(file);
+    else await deps.onFile(file);
   }
   return { files, skipped };
 }
@@ -267,12 +277,12 @@ async function traceJob(
   stage: JobStage,
 ): Promise<TracedAttempt> {
   try {
-    return await traceAttempt(job, trace, stage);
+    return await traceAttempt(job, trace, stage, deps.signal);
   } catch (error) {
     const fallback = job.fallback;
     if (fallback === undefined || deps.canFallBack?.(error) === false) throw error;
     deps.onFallback?.(index, error);
-    return traceAttempt(fallback, trace, stage);
+    return traceAttempt(fallback, trace, stage, deps.signal);
   }
 }
 
@@ -280,12 +290,16 @@ async function traceAttempt(
   attempt: BatchTraceAttempt,
   trace: NonNullable<BatchTraceDependencies['trace']>,
   stage: JobStage,
+  signal: AbortSignal | undefined,
 ): Promise<TracedAttempt> {
   const options = attempt.options ?? DEFAULT_TRACE_OPTIONS;
   stage.current = 'decode';
   const image = typeof attempt.image === 'function' ? await attempt.image() : attempt.image;
   stage.current = 'trace';
-  return { image, options, paths: await trace(image, options) };
+  const paths = await (signal === undefined
+    ? trace(image, options)
+    : trace(image, options, signal));
+  return { image, options, paths };
 }
 
 function uniqueStem(stem: string, seen: Map<string, number>): string {

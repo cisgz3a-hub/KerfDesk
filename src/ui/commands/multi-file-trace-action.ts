@@ -9,27 +9,29 @@ import {
   type RawImageData,
   type TraceOptions,
 } from '../../core/trace';
-import {
-  batchTraceFormatLabel,
-  type BatchTraceOutput,
-  type BatchTraceSkip,
-} from '../../core/trace/batch-trace';
+import type { BatchTraceOutput, BatchTraceSkip } from '../../core/trace/batch-trace';
 import { tracedLayersToDxf } from '../../io/dxf/export-dxf';
 import { writeTracedDrawing } from '../../io/vector-formats/traced-drawing';
-import type { PlatformAdapter } from '../../platform/types';
+import type { PlatformAdapter, SaveDirectoryTarget } from '../../platform/types';
 import { readImageHeaderDensity, type ImageDensity } from '../common/image-density';
+import { rasterImportGeometry, type RasterImportGeometry } from '../common/image-import';
 import {
-  DEFAULT_DPI,
-  rasterImportGeometry,
-  type RasterImportGeometry,
-} from '../common/image-import';
-import type { ToastVariant } from '../state/toast-store';
+  emptyWriteTally,
+  reportTraceBatch,
+  writtenSoFar,
+  type PushToast,
+  type WriteTally,
+} from './multi-file-trace-report';
 import {
   batchRasterAtMaxEdge,
   decodeBatchRasterFile,
   type DecodedBatchRaster,
 } from './batch-raster-decode';
-import { loadImageAsRawData, readImageNaturalSize } from '../trace/image-loader';
+import {
+  loadImageAsRawData,
+  PREVIEW_MAX_EDGE_PX,
+  readImageNaturalSize,
+} from '../trace/image-loader';
 import { browserDeviceMemoryGb } from '../trace/trace-commit-at-grid';
 import {
   commitGridExceedsPreview,
@@ -39,7 +41,7 @@ import {
 } from '../trace/trace-commit-grid';
 import { isTraceAbort } from '../trace/trace-cancellation';
 import { isTraceRequestSuperseded, traceImageWithFallback } from '../trace/use-trace-worker-client';
-import { traceNoticeMessage, type TraceNotice } from '../trace/trace-notices';
+import type { TraceNotice } from '../trace/trace-notices';
 
 export type MultiFileTraceFile = File;
 export type MultiFileTraceExport = BatchTraceFile & {
@@ -68,7 +70,12 @@ export type MultiFileTraceDeps = {
   readonly trace?: (
     image: RawImageData,
     options: TraceOptions,
+    signal?: AbortSignal,
   ) => Promise<ReadonlyArray<ColoredPath>>;
+  // Cancels the batch (rank 21): no file is decoded, traced or written after.
+  readonly signal?: AbortSignal;
+  // Called as each file's turn starts, with its 1-based position.
+  readonly onProgress?: (current: number, total: number) => void;
   readonly write?: (file: BatchTraceFile) => Promise<boolean> | boolean;
   /** Trace settings for every image (default: the Line Art preset). */
   readonly options?: TraceOptions;
@@ -78,8 +85,6 @@ export type MultiFileTraceDeps = {
   /** File format, precision and contour grouping. */
   readonly output?: BatchTraceOutput;
 };
-
-type PushToast = (message: string, variant?: ToastVariant) => void;
 
 export const DEFAULT_MULTI_FILE_TRACE_PRESET = 'Line Art';
 const DEFAULT_MULTI_FILE_TRACE_OPTIONS: TraceOptions =
@@ -95,20 +100,16 @@ type MultiFileJobContext = {
   readonly deviceMemoryGb: number | undefined;
 };
 
+// With onExport, each file is handed over as soon as it is traced and the
+// batch keeps none of them (the result's files are empty), so a long batch
+// holds one export at a time.
 export async function buildMultiFileTraceExports(
   files: ReadonlyArray<MultiFileTraceFile>,
   deps: MultiFileTraceDeps = {},
+  onExport?: (file: MultiFileTraceExport) => Promise<void>,
 ): Promise<MultiFileTraceBatch> {
-  const context: MultiFileJobContext = {
-    loadImage: deps.loadImage ?? loadImageAsRawData,
-    readNatural:
-      deps.readNaturalSize ?? (deps.loadImage === undefined ? readImageNaturalSize : null),
-    readDensity: deps.readDensity ?? readImageHeaderDensity,
-    decodeRaster: deps.decodeRaster ?? decodeBatchRasterFile,
-    options: deps.options ?? DEFAULT_MULTI_FILE_TRACE_OPTIONS,
-    targetPxPerMm: deps.targetPxPerMm ?? traceTargetPxPerMm(undefined, undefined),
-    deviceMemoryGb: deps.deviceMemoryGb ?? browserDeviceMemoryGb(),
-  };
+  const signal = deps.signal;
+  const context = multiFileJobContext(deps);
   const densitySources: RasterImportGeometry['densitySource'][] = [];
   const notices: ReadonlyArray<TraceNotice>[] = [];
   const turn = { index: 0 };
@@ -120,6 +121,7 @@ export async function buildMultiFileTraceExports(
     sourceName: file.name,
     prepare: async () => {
       turn.index = index;
+      deps.onProgress?.(index + 1, files.length);
       const { job, densitySource } = await multiFileTraceJob(file, context);
       densitySources[index] = densitySource;
       return job;
@@ -134,6 +136,8 @@ export async function buildMultiFileTraceExports(
     jobs,
     {
       trace: deps.trace ?? traceWithWorkerFallback(notices, turn),
+      ...(signal === undefined ? {} : { signal }),
+      ...(onExport === undefined ? {} : { onFile: (file) => onExport(decorate(file)) }),
       writeDxf: tracedLayersToDxf,
       // As at a dialog commit, the finer grid is an improvement, not a
       // requirement: a file whose finer decode or trace fails is traced on the
@@ -145,17 +149,32 @@ export async function buildMultiFileTraceExports(
     },
     deps.output ?? {},
   );
+  return { skipped: result.skipped, files: result.files.map(decorate) };
+
+  function decorate(file: BatchTraceFile): MultiFileTraceExport {
+    // Notices are recorded per traced job, including skipped ones.
+    const fileNotices = [
+      ...(notices[file.sourceIndex] ?? []),
+      ...(previewResolution.has(file.sourceIndex) ? (['preview-resolution'] as const) : []),
+    ];
+    const sized = { ...file, densitySource: densitySources[file.sourceIndex] ?? 'default' };
+    return fileNotices.length === 0 ? sized : { ...sized, notices: fileNotices };
+  }
+}
+
+function multiFileJobContext(deps: MultiFileTraceDeps): MultiFileJobContext {
+  const signal = deps.signal;
   return {
-    skipped: result.skipped,
-    files: result.files.map((file) => {
-      // Notices are recorded per traced job, including skipped ones.
-      const fileNotices = [
-        ...(notices[file.sourceIndex] ?? []),
-        ...(previewResolution.has(file.sourceIndex) ? (['preview-resolution'] as const) : []),
-      ];
-      const sized = { ...file, densitySource: densitySources[file.sourceIndex] ?? 'default' };
-      return fileNotices.length === 0 ? sized : { ...sized, notices: fileNotices };
-    }),
+    loadImage:
+      deps.loadImage ??
+      ((file, maxEdge) => loadImageAsRawData(file, maxEdge ?? PREVIEW_MAX_EDGE_PX, signal)),
+    readNatural:
+      deps.readNaturalSize ?? (deps.loadImage === undefined ? readImageNaturalSize : null),
+    readDensity: deps.readDensity ?? readImageHeaderDensity,
+    decodeRaster: deps.decodeRaster ?? decodeBatchRasterFile,
+    options: deps.options ?? DEFAULT_MULTI_FILE_TRACE_OPTIONS,
+    targetPxPerMm: deps.targetPxPerMm ?? traceTargetPxPerMm(undefined, undefined),
+    deviceMemoryGb: deps.deviceMemoryGb ?? browserDeviceMemoryGb(),
   };
 }
 
@@ -258,107 +277,38 @@ export async function runMultiFileTrace(
   deps: MultiFileTraceDeps = {},
 ): Promise<void> {
   if (files.length === 0) return;
+  const write = deps.write ?? missingTraceExportWriter;
+  const tally = emptyWriteTally();
   try {
-    const batch = await buildMultiFileTraceExports(files, deps);
-    const write = deps.write ?? missingTraceExportWriter;
-    reportTraceBatch(batch, await writeTraceExports(batch.files, write), pushToast);
+    // Each file is written as soon as it is traced (rank 21).
+    const batch = await buildMultiFileTraceExports(files, deps, (file) =>
+      writeTraceExport(file, write, tally, deps.signal),
+    );
+    reportTraceBatch(batch.skipped, tally, pushToast);
   } catch (err) {
+    if (isTraceAbort(err)) {
+      pushToast(`Multi-File Trace cancelled. ${writtenSoFar(tally.written, files.length)}`, 'info');
+      return;
+    }
     const message = err instanceof Error ? err.message : String(err);
-    pushToast(`Could not trace images: ${message}`, 'error');
+    const kept = tally.written === 0 ? '' : ` ${writtenSoFar(tally.written, files.length)}`;
+    pushToast(`Could not trace images: ${message}${kept}`, 'error');
   }
 }
 
-function reportTraceBatch(
-  batch: MultiFileTraceBatch,
-  written: Awaited<ReturnType<typeof writeTraceExports>>,
-  pushToast: PushToast,
-): void {
-  const skippedText = skippedMessage(batch.skipped);
-  if (written.written === 0) {
-    if (skippedText !== '')
-      pushToast(skippedText, onlyFailures(batch.skipped) ? 'error' : 'warning');
-    return;
-  }
-  const count = written.written;
-  const format = batchTraceFormatLabel(batch.files[0]?.format ?? 'svg');
-  const summary = `Traced ${count} ${count === 1 ? 'image' : 'images'} to ${format}.`;
-  const density = defaultDensityNotice(written.defaultDensity, count);
-  pushToast(
-    joinToastParts([summary, density, skippedText, ...written.notices.map(traceNoticeMessage)]),
-    skippedText === '' ? 'success' : 'warning',
-  );
-}
-
-function joinToastParts(parts: ReadonlyArray<string | null>): string {
-  return parts.filter((part): part is string => part !== null && part !== '').join(' ');
-}
-
-function skippedMessage(skipped: ReadonlyArray<BatchTraceSkip>): string {
-  const blank = skipped.filter((skip) => skip.reason === 'no-visible-paths');
-  const parts = [
-    blank.length === 0
-      ? ''
-      : `Skipped ${imageCount(blank.length)} with no visible paths` +
-        ` (${blank.map((skip) => skip.sourceName).join(', ')}); try Trace Image with an adjusted threshold or import as Image instead.`,
-    failedMessage('Could not read', skipped, 'decode-failed'),
-    failedMessage('Could not trace', skipped, 'trace-failed'),
-  ];
-  return joinToastParts(parts);
-}
-
-// One unreadable or untraceable file is skipped with its own reason, so the
-// rest of the batch is still written (rank 19).
-function failedMessage(
-  verb: string,
-  skipped: ReadonlyArray<BatchTraceSkip>,
-  reason: BatchTraceSkip['reason'],
-): string {
-  const failed = skipped.filter((skip) => skip.reason === reason);
-  if (failed.length === 0) return '';
-  const detail = failed
-    .map((skip) =>
-      skip.message === undefined ? skip.sourceName : `${skip.sourceName}: ${skip.message}`,
-    )
-    .join('; ');
-  return `${verb} ${imageCount(failed.length)} (${detail}); ${failed.length === 1 ? 'it was' : 'they were'} skipped.`;
-}
-
-function onlyFailures(skipped: ReadonlyArray<BatchTraceSkip>): boolean {
-  return skipped.length > 0 && skipped.every((skip) => skip.reason !== 'no-visible-paths');
-}
-
-function imageCount(count: number): string {
-  return `${count} ${count === 1 ? 'image' : 'images'}`;
-}
-
-async function writeTraceExports(
-  files: ReadonlyArray<MultiFileTraceExport>,
+async function writeTraceExport(
+  file: MultiFileTraceExport,
   write: NonNullable<MultiFileTraceDeps['write']>,
-): Promise<{
-  readonly written: number;
-  readonly defaultDensity: number;
-  readonly notices: ReadonlyArray<TraceNotice>;
-}> {
-  let written = 0;
-  let defaultDensity = 0;
-  const notices = new Set<TraceNotice>();
-  for (const file of files) {
-    if (!(await write(file))) continue;
-    written += 1;
-    if (file.densitySource === 'default') defaultDensity += 1;
-    for (const notice of file.notices ?? []) notices.add(notice);
-  }
-  return { written, defaultDensity, notices: [...notices] };
-}
-
-// As Import Image's toast says "default 254 DPI — no usable embedded density",
-// the batch says which written files were sized at the default, so a file
-// that fell back cannot pass for one sized by its own DPI.
-function defaultDensityNotice(defaultDensity: number, written: number): string | null {
-  if (defaultDensity === 0) return null;
-  if (written === 1) return `It had no embedded DPI, so it was sized at ${DEFAULT_DPI} DPI.`;
-  const was = defaultDensity === 1 ? 'was' : 'were';
-  return `${defaultDensity} of ${written} images had no embedded DPI and ${was} sized at ${DEFAULT_DPI} DPI.`;
+  tally: WriteTally,
+  signal: AbortSignal | undefined,
+): Promise<void> {
+  // After Cancel nothing more is written, even a file already traced.
+  signal?.throwIfAborted();
+  if (!(await write(file))) return;
+  tally.written += 1;
+  tally.format = file.format;
+  if (file.densitySource === 'default') tally.defaultDensity += 1;
+  for (const notice of file.notices ?? []) tally.notices.add(notice);
 }
 
 export async function writeTraceFileWithPlatform(
@@ -374,6 +324,16 @@ export async function writeTraceFileWithPlatform(
   return true;
 }
 
+/** Writes each export into one reserved folder, named <stem>-trace.<ext>. */
+export function traceFileWriterForDirectory(
+  directory: SaveDirectoryTarget,
+): NonNullable<MultiFileTraceDeps['write']> {
+  return async (file) => {
+    await directory.file(file.filename).write(file.text);
+    return true;
+  };
+}
+
 function missingTraceExportWriter(): never {
   throw new Error('Trace export writer is not configured.');
 }
@@ -385,8 +345,8 @@ function traceWithWorkerFallback(
   // The batch core traces in source order. Keep each result's notices beside
   // its job's index so a cancelled save or a skipped file cannot attach a
   // warning to a different file.
-  return async (image, options) => {
-    const result = await traceImageWithFallback(image, options);
+  return async (image, options, signal) => {
+    const result = await traceImageWithFallback(image, options, signal);
     notices[turn.index] = result.notices ?? [];
     return result.paths;
   };
