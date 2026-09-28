@@ -41,6 +41,7 @@ import { useWindowTitle } from './use-window-title';
 import { WorkspaceSidePanels } from './WorkspaceSidePanels';
 import './workspace-layout.css';
 import { ProjectBedReconciliationBanner } from './ProjectBedReconciliationBanner';
+import { MachineSetupBanner } from './MachineSetupBanner';
 import { ExternalGcodePreviewBanner } from './ExternalGcodePreviewBanner';
 import { DesktopCloseNotice } from './DesktopCloseNotice';
 import { TutorialHost } from '../tutorials/TutorialHost';
@@ -53,6 +54,7 @@ export function App(): JSX.Element {
       <DesktopCloseNotice />
       <AutosaveRecoveryBanner />
       <ProjectBedReconciliationBanner />
+      <MachineSetupBanner />
       <ExternalGcodePreviewBanner />
       <RecentProjectsHost />
       <main style={mainStyle}>
