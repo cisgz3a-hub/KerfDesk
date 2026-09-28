@@ -33,7 +33,10 @@ function withFloor(pass: CncPass, trace: Trace, cut: ReadonlyArray<Trace>): CncP
   if (pass.kind === 'contour' && pass.stayDownEntry === true) return pass;
   if (pass.kind === 'path3d' && pass.stayDownLink === true) return pass;
   let floor = Number.POSITIVE_INFINITY;
-  for (const earlier of cut) {
+  // A deepening pass usually repeats the latest cut. Still check every lower
+  // floor: the most recent matching pass need not be the deepest one.
+  for (let index = cut.length - 1; index >= 0; index -= 1) {
+    const earlier = cut[index] as Trace;
     if (earlier.highestZ < floor && repeats(earlier, trace)) floor = earlier.highestZ;
   }
   return Number.isFinite(floor) ? { ...pass, airFloorZMm: floor } : pass;

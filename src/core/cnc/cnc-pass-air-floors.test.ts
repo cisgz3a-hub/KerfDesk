@@ -116,6 +116,20 @@ describe('withPassAirFloors', () => {
     expect(floors([ring(-2), ring(-4), ring(-6)])[2]).toBe(-4);
   });
 
+  it('keeps the deepest matching floor when later cuts return to shallower depths', () => {
+    const elsewhere = ring(
+      -12,
+      SQUARE.map((point) => ({ x: point.x + 30, y: point.y })),
+    );
+    expect(floors([ring(-6), elsewhere, ring(-2), ring(-4), ring(-9)])).toEqual([
+      undefined,
+      undefined,
+      -6,
+      -6,
+      -6,
+    ]);
+  });
+
   it('floors a Z-only pass only where an earlier pass reached its point', () => {
     const peck = (x: number, z: number): CncPath3dPass => ({
       kind: 'path3d',
