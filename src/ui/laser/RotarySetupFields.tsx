@@ -3,13 +3,16 @@
 // driven roller's diameter and Motion per turn, as LightBurn's roller setup
 // does (ADR-373). A chuck always scales from Motion per turn.
 
+import { useState } from 'react';
 import type { RotarySetup, RotaryType } from '../../core/devices/rotary';
+import type { RotaryPreset } from '../../core/devices/rotary-presets';
 import { hintStyle, segmentStyle } from './rotary-setup-dialog.styles';
 import {
   displayRotaryMm,
   editRollerDiameter,
   editRollerScaling,
   editRotaryFields,
+  editRotaryPreset,
   editRotaryType,
   type RotaryEdit,
 } from './rotary-setup-edit';
@@ -19,12 +22,17 @@ import { FieldRow, RotaryNumberField, SegmentButton, ToggleRow } from './RotaryS
 export function RotarySetupFields(props: {
   readonly edit: RotaryEdit;
   readonly onEdit: RotaryEditUpdate;
+  /** Published rotaries for this machine, if any (ADR-503). */
+  readonly presets?: ReadonlyArray<RotaryPreset>;
 }): JSX.Element {
   const { edit, onEdit } = props;
   const { setup } = edit;
   const setType = (type: RotaryType): void => onEdit((current) => editRotaryType(current, type));
   return (
     <>
+      {props.presets === undefined || props.presets.length === 0 ? null : (
+        <RotaryPresetField presets={props.presets} onEdit={onEdit} />
+      )}
       <ToggleRow
         checked={setup.enabled}
         label="Enable rotary for this machine profile"
@@ -48,6 +56,40 @@ export function RotarySetupFields(props: {
         label="Reverse rotary direction"
         onChange={(reverseAxis) => onEdit((current) => editRotaryFields(current, { reverseAxis }))}
       />
+    </>
+  );
+}
+
+function RotaryPresetField(props: {
+  readonly presets: ReadonlyArray<RotaryPreset>;
+  readonly onEdit: RotaryEditUpdate;
+}): JSX.Element {
+  const [chosen, setChosen] = useState<RotaryPreset | null>(null);
+  return (
+    <>
+      <FieldRow label="Rotary preset">
+        <select
+          className="lf-input"
+          aria-label="Rotary preset"
+          value={chosen?.id ?? ''}
+          onChange={(event) => {
+            const preset = props.presets.find((item) => item.id === event.currentTarget.value);
+            if (preset === undefined) return;
+            setChosen(preset);
+            props.onEdit((current) => editRotaryPreset(current, preset));
+          }}
+        >
+          <option value="" disabled>
+            Fill in a published rotary…
+          </option>
+          {props.presets.map((preset) => (
+            <option key={preset.id} value={preset.id}>
+              {preset.label}
+            </option>
+          ))}
+        </select>
+      </FieldRow>
+      {chosen === null ? null : <p style={hintStyle}>{chosen.source}</p>}
     </>
   );
 }

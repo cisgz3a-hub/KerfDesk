@@ -1421,6 +1421,17 @@ Status bar messages (toasts that appear in the bar for 3 s) for non-blocking eve
 #### Edge — Brave with WebSerial behind a flag
 1. Same as "not supported"; Brave issue #24404 is noted in `PROJECT.md` delivery targets.
 
+#### Success — pick the fitted laser module (ADR-503)
+1. On a machine whose laser modules swap on one carriage (the Falcon A1 Pro's 20 W blue and
+   2 W infrared), the machine rail shows **Laser module** under the status readout. It names the
+   fitted module by power and colour; the preset ships with the blue one fitted.
+2. After swapping the module on the machine, pick it here. The profile's laser head becomes that
+   module, as one undoable machine change: recipes, the spot-size checks, tracing and the burn
+   preview follow it. The G-code does not change.
+3. Job Review names the module the job was prepared for and asks to check it is fitted. A Falcon
+   saved before it had a head shows "Pick the fitted module" here and a "Not chosen" warning row
+   in the review. Neither stops Start.
+
 ### F-B2. Disconnect
 
 #### Success
@@ -2623,6 +2634,10 @@ the lock when the owning window closes, reloads or crashes, so crash recovery is
    disabled while it has no effect. A chuck never stores a roller diameter.
 4. The preview shows the surface circumference, the machine travel for one revolution (the wrap
    limit the bounds preflight enforces), the Y scale, and the tallest artwork one revolution holds.
+5. **Rotary preset** (ADR-503) shows when the machine's family has a rotary whose maker publishes
+   its settings (today the Creality Rotary Kit Pro as a chuck, 40 mm per rotation, for Falcon
+   machines). Picking it fills in the type and Motion per turn, keeps the object's diameter and
+   the toggles, and shows where the figures come from. Test rotation still checks them.
 
 #### Success — test rotation
 1. With the controller connected, Idle, unalarmed, no job or other motion, auto-focus idle and
