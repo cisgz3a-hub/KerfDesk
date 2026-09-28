@@ -48,7 +48,12 @@ export function applyProfileLeadPasses(
   toolDiameterMm: number,
   bed: MachineBounds,
 ): ReadonlyArray<CncPass> {
-  if ((settings.rampEntryDeg ?? 0) > 0) return passes; // active ramp owns the entry
+  // A ramp owns the entry of the passes it shaped, so `settings` must describe
+  // the ramp these passes were compiled with: the layer ladder ramps whenever
+  // the angle is positive, and the inlay pair, which never ramps, passes none
+  // (ADR-250 Amendment 2). The passes alone cannot say: a ramped loop is no
+  // longer closed, and without it a hole reads as an outer boundary.
+  if ((settings.rampEntryDeg ?? 0) > 0) return passes;
   // ADR-258 removed the `tabsEnabled` early return that used to live here. Tabs
   // are now a Z-rise inside ONE continuous path (cnc-tab-ramp.ts). Treat that
   // XY-closed path3d ring as the same contour for lead placement, while keeping

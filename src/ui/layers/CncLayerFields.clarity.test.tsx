@@ -74,7 +74,7 @@ describe('CNC layer clarity', () => {
       const entry = [...view.host.querySelectorAll('details')].find(
         (item) => item.querySelector('summary > span')?.textContent === 'Entry & travel',
       );
-      expect(entry?.querySelector('.lf-section-badge')?.textContent).toContain('Adaptive entry');
+      expect(entry?.querySelector('.lf-section-badge')?.textContent).toContain('Adaptive helix');
       expect(entry?.querySelector('.lf-section-badge')?.textContent).not.toContain('Ramp 5');
       const ramp = view.host.querySelector<HTMLInputElement>(
         `input[aria-label="Ramp entry angle for ${layer.color}"]`,

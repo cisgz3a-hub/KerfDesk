@@ -8,6 +8,7 @@ import { cutTypeShowsCutDirection } from './CncReliefStrategyRows';
 export function CncEntryFields(props: {
   readonly layer: Layer;
   readonly settings: CncLayerSettings;
+  readonly hasReliefObjects: boolean;
   readonly onCommit: (patch: Partial<CncLayerSettings>) => void;
   readonly onCommitSettings: (settings: CncLayerSettings) => void;
 }): JSX.Element | null {
@@ -21,7 +22,7 @@ export function CncEntryFields(props: {
   return (
     <RailSection
       label="Entry & travel"
-      badge={entryBadge(settings)}
+      badge={entryBadge(settings, props.hasReliefObjects)}
       hint="Choose cut direction, how the bit enters the material and movement between passes."
     >
       <MotionPolishRows {...props} />
@@ -35,21 +36,8 @@ export function CncEntryFields(props: {
 }
 
 // The closed summary names direction and entry, the two choices that change the cut.
-function entryBadge(settings: CncLayerSettings): string {
-  const ramp =
-    (settings.cutType === 'v-carve' ? settings.vCarveRampEntryDeg : settings.rampEntryDeg) ?? 0;
-  const circularRamp =
-    settings.cutType === 'pocket' &&
-    settings.pocketStrategy !== 'adaptive' &&
-    settings.helixEntry !== undefined;
-  const entry =
-    settings.cutType === 'pocket' && settings.pocketStrategy === 'adaptive'
-      ? 'Adaptive entry'
-      : circularRamp
-        ? 'Circular ramp'
-        : ramp > 0
-          ? `Ramp ${ramp}°`
-          : 'Plunge';
+function entryBadge(settings: CncLayerSettings, hasReliefObjects: boolean): string {
+  const entry = entrySummary(settings, hasReliefObjects);
   if (!cutTypeShowsCutDirection(settings.cutType)) return entry;
   const direction =
     settings.cutDirection === 'climb'
@@ -58,4 +46,19 @@ function entryBadge(settings: CncLayerSettings): string {
         ? 'Conventional'
         : 'Default direction';
   return `${direction} · ${entry}`;
+}
+
+// Adaptive clearing enters each depth on its planner's own helix and skips
+// the ramp angle, which still ramps the roughing of any relief on the layer
+// (ADR-424). An adaptive pocket names its helix, and the angle only as the
+// reliefs' entry (ADR-481 Amendment 1).
+function entrySummary(settings: CncLayerSettings, hasReliefObjects: boolean): string {
+  const ramp =
+    (settings.cutType === 'v-carve' ? settings.vCarveRampEntryDeg : settings.rampEntryDeg) ?? 0;
+  if (settings.cutType === 'pocket' && settings.pocketStrategy === 'adaptive') {
+    if (!hasReliefObjects) return 'Adaptive helix';
+    return ramp > 0 ? `Adaptive helix · Relief ramp ${ramp}°` : 'Adaptive helix · Relief plunge';
+  }
+  const circularRamp = settings.cutType === 'pocket' && settings.helixEntry !== undefined;
+  return circularRamp ? 'Circular ramp' : ramp > 0 ? `Ramp ${ramp}°` : 'Plunge';
 }

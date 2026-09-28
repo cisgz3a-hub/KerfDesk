@@ -1,0 +1,148 @@
+// The headless trace command (ADR-477): one image in, one vector file out,
+// through the pipeline Multi-File Trace runs in the app (traceImagesToVectorFiles
+// with the same DXF and PDF/EPS/GeoJSON writers), with the Trace dialog's
+// preset and override merge. Node I/O stays in scripts/trace-cli.ts, so this
+// module is testable in-process and the bytes it writes are the app's.
+
+import { TRACE_PRESETS, traceImagesToVectorFiles, type TraceOptions } from '../../core/trace';
+import { tracedLayersToDxf } from '../../io/dxf/export-dxf';
+import { writeTracedDrawing } from '../../io/vector-formats/traced-drawing';
+import { withHybridMaxStrokeWidth } from '../trace/hybrid-stroke-width';
+import { traceOptionsForCommitGrid } from '../trace/trace-commit-grid';
+import { PREVIEW_MAX_EDGE_PX, scaleToCap } from '../trace/trace-decode-cap';
+import { traceNoticeMessage, type TraceNotice } from '../trace/trace-notices';
+import { mergeLightBurnTraceSettings } from '../trace/trace-options';
+import { traceImageInThreadWithFallback } from '../trace/use-trace-worker-client';
+import { traceCliHelp } from './trace-cli-help';
+import { parseTraceCliArgs, TraceCliUsageError, type TraceCliOptions } from './trace-cli-options';
+import { traceCliSource, type TraceCliSource } from './trace-cli-source';
+
+export type TraceCliIo = {
+  /** The input file's bytes; `null` reads standard input. */
+  readonly readInput: (path: string | null) => Promise<Uint8Array>;
+  /** Writes the output text; `null` writes standard output. */
+  readonly writeOutput: (path: string | null, text: string) => Promise<void>;
+  readonly writeError: (text: string) => void;
+};
+
+export const TRACE_CLI_EXIT = { ok: 0, failed: 1, usage: 2, empty: 3 } as const;
+
+export async function runTraceCli(argv: ReadonlyArray<string>, io: TraceCliIo): Promise<number> {
+  let options: TraceCliOptions;
+  try {
+    options = parseTraceCliArgs(argv);
+  } catch (error) {
+    io.writeError(`kerfdesk-trace: ${message(error)}\n`);
+    return TRACE_CLI_EXIT.usage;
+  }
+  if (options.help) {
+    await io.writeOutput(null, traceCliHelp());
+    return TRACE_CLI_EXIT.ok;
+  }
+  try {
+    const { text, notices } = await traceCliText(await io.readInput(options.input), options);
+    // The app shows these as a toast beside the written file; here they are
+    // warnings on standard error, so standard output stays the file alone.
+    for (const notice of notices) {
+      io.writeError(`kerfdesk-trace: warning: ${traceNoticeMessage(notice)}\n`);
+    }
+    if (text === null) {
+      io.writeError('kerfdesk-trace: the trace found nothing to draw; no file written.\n');
+      return TRACE_CLI_EXIT.empty;
+    }
+    await io.writeOutput(options.output, text);
+    return TRACE_CLI_EXIT.ok;
+  } catch (error) {
+    io.writeError(`kerfdesk-trace: ${message(error)}\n`);
+    return error instanceof TraceCliUsageError ? TRACE_CLI_EXIT.usage : TRACE_CLI_EXIT.failed;
+  }
+}
+
+export type TraceCliResult = {
+  /** The vector file text, or null when nothing traced. */
+  readonly text: string | null;
+  /** What the app would disclose about this trace, e.g. a relaxed-settings retry. */
+  readonly notices: ReadonlyArray<TraceNotice>;
+};
+
+/** The vector file text for one encoded image, and the trace's notices. */
+export async function traceCliText(
+  bytes: Uint8Array,
+  options: TraceCliOptions,
+): Promise<TraceCliResult> {
+  if (bytes.length === 0) throw new Error('The input is empty.');
+  const source = await traceCliSource(bytes, options.dpi);
+  const notices: TraceNotice[] = [];
+  const result = await traceImagesToVectorFiles(
+    [
+      {
+        sourceName: options.input ?? 'stdin',
+        image: source.image,
+        physicalSizeMm: { widthMm: source.widthMm, heightMm: source.heightMm },
+        options: traceCliTraceOptions(options, source),
+      },
+    ],
+    {
+      // Multi-File Trace's trace function: a first pass that finds nothing
+      // under aggressive preprocessing is retried with relaxed settings. Node
+      // has no Worker, so it traces in-thread at any size (the app's inline
+      // bound exists to keep its UI thread responsive).
+      trace: async (image, traceOptions) => {
+        const traced = await traceImageInThreadWithFallback(image, traceOptions);
+        notices.push(...(traced.notices ?? []));
+        return traced.paths;
+      },
+      writeDxf: tracedLayersToDxf,
+      writeDrawing: writeTracedDrawing,
+    },
+    {
+      format: options.format,
+      precisionMm: options.precisionMm,
+      groupContours: options.groupContours,
+      // As the Multi-File Trace dialog: the image page is the writers' default.
+      ...(options.pageFit === 'artwork'
+        ? { page: { fit: 'artwork', marginMm: options.marginMm } }
+        : {}),
+    },
+  );
+  return { text: result.files[0]?.text ?? null, notices };
+}
+
+/** Preset plus overrides, merged as the Trace dialog merges them. */
+export function traceCliTraceOptions(
+  options: Pick<TraceCliOptions, 'presetName' | 'overrides'>,
+  source: Pick<TraceCliSource, 'image' | 'widthMm'>,
+): TraceOptions {
+  const preset = TRACE_PRESETS[options.presetName];
+  if (preset === undefined) throw new TraceCliUsageError(`Unknown preset ${options.presetName}.`);
+  const merged = nativeGridOptions(
+    mergeLightBurnTraceSettings(preset, options.overrides),
+    source.image,
+  );
+  const widthMm = options.overrides.hybridMaxStrokeWidthMm;
+  // Line + fill's Max stroke width is in placed millimetres (ADR-454); the
+  // image traces on its stored grid, so that grid's density converts it.
+  if (widthMm === undefined) return merged;
+  return withHybridMaxStrokeWidth(merged, widthMm, source.image.width / source.widthMm);
+}
+
+/**
+ * The CLI traces the stored grid, while the Trace dialog's pixel-unit
+ * settings (Ignore less than, despeckle, Minimum line, gap joins) are judged
+ * on its preview grid, capped at PREVIEW_MAX_EDGE_PX. Above that cap they
+ * scale as the app scales them for a finer commit grid (ADR-409), so a given
+ * --ignore-less-than drops the same physical specks it drops in the dialog.
+ * At or under the cap the options are returned unchanged.
+ */
+export function nativeGridOptions(
+  options: TraceOptions,
+  grid: { readonly width: number; readonly height: number },
+): TraceOptions {
+  const native = { width: grid.width, height: grid.height };
+  const preview = scaleToCap(native.width, native.height, PREVIEW_MAX_EDGE_PX);
+  return traceOptionsForCommitGrid(options, { grid: native, preview });
+}
+
+function message(error: unknown): string {
+  return error instanceof Error ? error.message : String(error);
+}

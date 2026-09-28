@@ -41,9 +41,7 @@ function laserAssumptions(
 
 describe('gcodeMetadataHeader', () => {
   it('tracks the latest safety-relevant emitter revision', () => {
-    expect(EMITTER_REVISION).toBe(
-      'park-kerf-arcs-scan-angle-overscan-tiles-ramp-precision-20260928-v9',
-    );
+    expect(EMITTER_REVISION).toBe('adaptive-inlay-tile-ramp-precision-audited-20260928-v12');
   });
 
   it('emits provenance as GRBL comment lines and ends with a newline', () => {
