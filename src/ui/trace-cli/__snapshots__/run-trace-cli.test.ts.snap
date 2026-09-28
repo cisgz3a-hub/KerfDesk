@@ -1,0 +1,67 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`trace command (ADR-477) > prints its help text 1`] = `
+"Usage: kerfdesk-trace [options] [input]
+
+Trace a raster image to vector artwork with the KerfDesk tracer, headless.
+Reads PNG, JPEG, BMP, TIFF (first page) or PBM/PGM/PPM from the input file,
+or from standard input when the input is "-" or omitted. Writes to the
+output file, or to standard output when it is "-" or omitted. GIF is not read;
+save the frame to trace as PNG. Retry and other trace warnings go to stderr.
+
+Output matches the app's Multi-File Trace for 8-bit sRGB PNG and BMP images
+up to 2048 px on the long edge. The app has no Netpbm import: PBM/PGM/PPM
+trace the pixels they hold, as an app import of the same pixels would. JPEG
+decodes with a different IDCT and chroma upsampling than the browser, and
+colour profiles (ICC, gAMA) are not applied, so edge pixels of such images
+can trace slightly differently.
+
+Options:
+  -o, --output <file>           Output file (default: standard output)
+  -p, --preset <name>           Trace preset (default: Line Art)
+  -f, --format <format>         Output format: svg, dxf, pdf, eps, geojson (default: svg)
+  -r, --dpi <n>[x<n>]           Image density, 10 to 10000 (default: embedded, else 254)
+  --precision <mm>              Coordinate grid of the file, 0.000001 to 1 (default: 0.001)
+  --group-contours              Group each colour into one path
+  --page <image|artwork>        Page: the whole image, or the artwork (default: image)
+  --margin <mm>                 Space around the artwork page, 0 to 1000 (default: 0)
+  -h, --help                    Show this help
+
+Trace settings (the Trace dialog controls; unset ones keep the preset value).
+Values outside the range are refused. Switches take --flag, --no-flag or
+--flag=true|false. Pixel counts and lengths are pixels of the image, as the
+dialog sees them for images up to 2048 px on the long edge; larger images
+trace at full resolution with those settings scaled as the app's finer
+commit grid scales them.
+  --cutoff <value>              Cutoff: darkest luma counted as ink (0 to 255)
+  --threshold <value>           Threshold: lightest luma counted as ink (0 to 255)
+  --ignore-less-than <value>    Ignore shapes under N pixels (0 to 10000)
+  --smoothness <value>          Smoothness (0 to 1.33)
+  --optimize <value>            Optimize: curve fit tolerance (0 to 2)
+  --diagonal-contacts <value>   Diagonal contacts (auto, connect-ink, connect-paper)
+  --[no-]invert                 Trace light artwork on a dark ground
+  --detection <value>           Ink detection (preset, manual, sketch, faint-lines)
+  --despeckle <value>           Remove specks under N pixels (0 to 10000)
+  --[no-]fill-pinholes          Close pinholes and hairline cracks
+  --[no-]trace-transparency     Trace the alpha mask
+  --[no-]sketch                 Sketch (pencil) detection
+  --edge-sensitivity <value>    Edge Detection sensitivity (0 to 100)
+  --edge-detail <value>         Edge Detection detail (0 to 100)
+  --edge-min-line <value>       Edge Detection shortest line in px (0 to 1000)
+  --max-stroke-width <value>    Line + fill max stroke in mm (0.05 to 3)
+  --photo-detail <value>        Photo shading detail (0 to 100)
+  --photo-brightness <value>    Photo shading brightness (-100 to 100)
+  --photo-contrast <value>      Photo shading contrast (-100 to 100)
+  --photo-gamma <value>         Photo shading gamma (0.1 to 5)
+  --[no-]photo-invert           Photo shading invert
+  --colours <value>             Colour layers count (2 to 8, or auto)
+  --colour-output <value>       Colour layers output style (cut-out, stacked)
+  --[no-]keep-background        Colour layers: keep the background
+
+Presets: Line Art, Photo shading, Smooth, Sharp, Centerline, Line + fill, Edge Detection, Colour layers.
+Preset names ignore case; dashes or underscores may stand for spaces.
+
+Exit status: 0 traced, 1 the image could not be read or traced,
+2 invalid options, 3 the trace found nothing to draw.
+"
+`;

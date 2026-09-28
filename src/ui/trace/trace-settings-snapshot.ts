@@ -93,8 +93,9 @@ export const TRACE_OVERRIDE_RULES = {
   turnPolicy: { kind: 'choice', values: TURN_POLICIES },
 } as const satisfies Record<PersistedOverrideKey, OverrideRule>;
 
-// Exhaustive by construction, like the rules above.
-const DETECTION_MODES: ReadonlyArray<string> = Object.keys({
+// Exhaustive by construction, like the rules above. Exported for the headless
+// trace command's parser and --help (ADR-477).
+export const DETECTION_MODES: ReadonlyArray<string> = Object.keys({
   preset: true,
   manual: true,
   sketch: true,
