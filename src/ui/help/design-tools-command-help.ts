@@ -1,8 +1,12 @@
 import type { DesignToolsCommandId } from '../commands/design-tools-command-types';
 import type { CommandHelpTopic } from './command-help-topics';
+import { VECTOR_CUT_COMMAND_HELP } from './vector-cut-command-help';
+import { WARP_DEFORM_COMMAND_HELP } from './warp-deform-command-help';
 
-// LightBurn gap batch 5 (ADR-480) commands.
+// LightBurn gap batch 5 (ADR-480) commands, and Copy Along Path (LBG-T09).
 export const DESIGN_TOOLS_COMMAND_HELP: Readonly<Record<DesignToolsCommandId, CommandHelpTopic>> = {
+  ...VECTOR_CUT_COMMAND_HELP,
+  ...WARP_DEFORM_COMMAND_HELP,
   'edit.select-contained': {
     family: 'edit',
     tooltip:
@@ -32,6 +36,11 @@ export const DESIGN_TOOLS_COMMAND_HELP: Readonly<Record<DesignToolsCommandId, Co
     family: 'tools',
     tooltip:
       'Add one closed outline stretched around everything selected, as a rubber band would be, on a Line operation.',
+  },
+  'arrange.copy-along-path': {
+    family: 'arrange',
+    tooltip:
+      'Copy the selected artwork along a guide path: a number of copies, a set spacing between centres or a set gap between edges, turned to follow the path. The top-most (last added) single path in the selection is the guide; the dialog can pick another. Reverse Direction on the guide flips which way turned copies face.',
   },
   'tools.flatten-image-mask': {
     family: 'tools',

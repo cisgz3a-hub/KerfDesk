@@ -223,6 +223,16 @@ export function ellipticalArcEndDirection(
   };
 }
 
+/** The point halfway through an arc's sweep angle, from its centre
+ *  parametrisation — on a circular arc that is also halfway along its length.
+ *  A degenerate arc (zero radius, or no length) is its chord, as the flattener
+ *  draws it, so its midpoint is the chord's. */
+export function ellipticalArcMidpoint(from: Vec2, segment: EllipticalArcPathSegment): Vec2 {
+  const arc = endpointArc(from, segment);
+  if (arc === null) return { x: (from.x + segment.to.x) / 2, y: (from.y + segment.to.y) / 2 };
+  return pointOnArc(arc, arc.theta1 + arc.delta / 2);
+}
+
 function segmentExtrema(from: Vec2, segment: PathSegment): Vec2[] {
   if (segment.kind === 'line') return [segment.to];
   if (segment.kind === 'cubic') return cubicExtrema(from, segment);
@@ -285,7 +295,7 @@ function cubicPoint(from: Vec2, segment: CubicPathSegment, t: number): Vec2 {
   };
 }
 
-type CenterArc = {
+export type CenterArc = {
   readonly center: Vec2;
   readonly radiusX: number;
   readonly radiusY: number;
@@ -294,7 +304,9 @@ type CenterArc = {
   readonly delta: number;
 };
 
-function endpointArc(from: Vec2, segment: EllipticalArcPathSegment): CenterArc | null {
+/** An SVG endpoint arc in centre form, with radii already scaled up to reach
+ *  its end; null for a zero-length or zero-radius arc (drawn as its chord). */
+export function endpointArc(from: Vec2, segment: EllipticalArcPathSegment): CenterArc | null {
   if (samePoint(from, segment.to)) return null;
   let rx = Math.abs(segment.radiusX);
   let ry = Math.abs(segment.radiusY);
@@ -333,7 +345,7 @@ function endpointArc(from: Vec2, segment: EllipticalArcPathSegment): CenterArc |
   return { center, radiusX: rx, radiusY: ry, rotationRad: phi, theta1, delta };
 }
 
-function pointOnArc(arc: CenterArc, theta: number): Vec2 {
+export function pointOnArc(arc: CenterArc, theta: number): Vec2 {
   const cosPhi = Math.cos(arc.rotationRad);
   const sinPhi = Math.sin(arc.rotationRad);
   return {

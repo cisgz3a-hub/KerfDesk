@@ -556,6 +556,49 @@ destination and cannot overwrite the template source.
    image or path text uses it; the notice says which.
 6. Each tool is one undo step and adds none when nothing changes. None operates a machine.
 
+### F-A6f. Trim Shapes, Cut Shapes, Warp and Deform, Copy Along Path (ADR-498)
+
+1. **Tools → Vector → Trim Shapes** turns on the Trim tool. Hovering an outline highlights in red
+   the stretch between its nearest crossings with other visible outlines or itself; a click deletes
+   it. An outline that crosses nothing is deleted whole. Locked artwork is trimmed back to but never
+   cut. Text and drawn shapes become plain paths when trimmed, and the notice says so. Esc, Done or
+   another tool ends it. Each click is one undo step.
+2. **Tools → Vector → Cut Shapes** splits every selected shape along the top-most selected closed
+   shape into an inside piece and an outside piece, removes that cutter and selects the pieces.
+   Pieces keep their operations. Shapes the cutter does not cross are left as they were, and the
+   notice counts them.
+3. **Tools → Vector → Warp** (four corner handles) and **Deform** (a grid of 16 handles) bend the
+   selected vector artwork. The artwork previews live while the handles are dragged; Enter or Apply
+   applies it as one undo step, Esc or Cancel leaves it as it was, and Reset handles starts again.
+   Shift keeps the Warp corners a parallelogram. Curves become fine lines within 0.05 mm; images,
+   reliefs and locked artwork are left as they are, and the notice says how many.
+4. **Arrange → Layout → Copy Along Path…** copies the selected artwork along the top-most selected
+   single path (or the path picked under Guide path): by number of copies, spacing between centres
+   or gap between copies, from the start offset to the end offset, turned to follow the path unless
+   that box is cleared. A closed guide gets copies all the way round with none doubled at the seam.
+   The status line says what Apply will do. The guide stays and the copies are selected.
+5. When a selection gives a tool nothing to do, a notice says what to select, and nothing changes.
+   None of these tools operates a machine or changes how other artwork compiles.
+
+### F-A6g. Snapping to nodes, midpoints, centres and intersections (ADR-498)
+
+1. The chevron beside the canvas `#` snap toggle opens **Snap settings**: Nodes, Midpoints,
+   Centres, Intersections, Grid and Alignment guides (all on), **Grid spacing** (10 mm; the drawn
+   grid follows it) and **Snap distance** (8 screen pixels). The settings belong to this computer,
+   not to the project.
+2. While drawing shapes, clicking pen points, measuring, dragging nodes or moving artwork, the
+   pointer snaps to the nearest point in reach on visible, unlocked artwork, and a glyph shows what
+   it caught: ■ node, △ midpoint, ⊕ centre, ✕ intersection, + grid. A node wins over an
+   intersection, an intersection over a midpoint and a midpoint over a centre; any point on artwork
+   wins over the grid.
+3. Moving artwork snaps the selection's point nearest the press onto other artwork; when none is in
+   reach, the edge and centre alignment guides and the grid work as before.
+4. Hold **Alt** to place freely during any drag or draw, or **Ctrl/Cmd** while moving. **Shift**
+   keeps its constrain meaning and skips point snapping. Alt pressed at the start of a click in the
+   Select or node tools still picks the next overlapping object.
+5. A very large trace pauses once, briefly, the first time the pointer comes near it with snapping
+   on; after that snapping keeps up with the pointer.
+
 ### F-A7. Artwork Operations panel
 
 #### Layout

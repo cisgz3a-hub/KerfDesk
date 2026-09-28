@@ -46,12 +46,12 @@ Sierra variants).
 | LBG-T01 | Move Selected Objects to the bed centre, corners and edges | `R/MoveSelectedObjects/` | Built: Arrange → Move to bed, nine positions (ADR-410). Move to the laser position is still open; it needs Frame's machine-to-scene mapping | S | built (ADR-410) |
 | LBG-T02 | Rotate 90° clockwise and counter-clockwise commands | `R/TransformControls/` | Built: Arrange menu and `.` / `,`, exact quarter turns (ADR-410) | S | built (ADR-410) |
 | LBG-T03 | Offset Shapes: Both directions, Round/Bevel/Corner joins, delete original, open paths, Tools menu entry | `R/OffsetShapes/` | Built: Tools → Offset Shapes... with a live preview (ADR-410). Optimize / Simplify results is still open | S | built (ADR-410) |
-| LBG-T04 | Trim Shapes (click a segment to delete it back to the intersections) | `R/TrimShapes/` | Planned stub in Design Studio only (`src/ui/design-studio/design-tool.ts`) | M-L | open |
+| LBG-T04 | Trim Shapes (click a segment to delete it back to the intersections) | `R/TrimShapes/` | Planned stub in Design Studio only (`src/ui/design-studio/design-tool.ts`) | M-L | Built (ADR-498) |
 | LBG-T05 | Apply Path to Text alignment (X left/middle/right, Y top/middle/bottom) | `R/ApplyPathToText/` | Guide, start offset and reverse only (`src/core/text/text-on-path.ts`) | S | Built (ADR-480) |
-| LBG-T06 | Warp (4 point) and Deform (16 point) | `R/WarpDeform/` | Missing; `src/core/camera/homography.ts` exists for reuse | M | open |
+| LBG-T06 | Warp (4 point) and Deform (16 point) | `R/WarpDeform/` | Missing; `src/core/camera/homography.ts` exists for reuse | M | Built (ADR-498) |
 | LBG-T07 | Create Rubber-Band Outline around a selection | `R/CreateRubberBandOutline/` | Missing | S | Built (ADR-480) |
-| LBG-T08 | Cut Shapes (split shapes by a closed cutter) | `R/CutShapes/` | Missing | M | open |
-| LBG-T09 | Copy Along Path | `R/CopyAlongPath/` | Missing; `src/core/scene/array-layout.ts` and `text-on-path.ts` path sampling can be reused | M | open |
+| LBG-T08 | Cut Shapes (split shapes by a closed cutter) | `R/CutShapes/` | Missing | M | Built (ADR-498) |
+| LBG-T09 | Copy Along Path | `R/CopyAlongPath/` | Missing; `src/core/scene/array-layout.ts` and `text-on-path.ts` path sampling can be reused | M | Built (ADR-498) |
 | LBG-T10 | Resize Slots in Selection | `R/ResizeSlots/` | Missing for artwork; Box Generator only | M | open |
 | LBG-T11 | Boolean Assistant preview | `R/BooleanTools/` | Missing | S-M | open |
 | LBG-T12 | Measure shape readout (perimeter, area, node count, open or closed) and node snapping | `R/Measure/` | Distance and angle line (`src/ui/workspace/measure-tool.ts`) | S-M | open |
@@ -125,7 +125,7 @@ Sierra variants).
 | LBG-F03 | Select Contained, Select Smaller Than | `R/UI/EditMenu/` | Missing | S | Built (ADR-480) |
 | LBG-F04 | Filled or Wireframe view toggle | `R/ViewStyle/` | Built: Window → Wireframe View, `Alt+W` (ADR-410) | S | built (ADR-410) |
 | LBG-F05 | Pasting SVG or images copied from other apps | `R/UI/EditMenu/` | In-app clipboard only | M | open |
-| LBG-F06 | Snapping to nodes, midpoints, centres and intersections; settable grid and distance | `R/Snapping/` | Bounding-box edges and centres, fixed 10 mm grid and 2 mm distance (`src/ui/workspace/snapping.ts`) | M | open |
+| LBG-F06 | Snapping to nodes, midpoints, centres and intersections; settable grid and distance | `R/Snapping/` | Bounding-box edges and centres, fixed 10 mm grid and 2 mm distance (`src/ui/workspace/snapping.ts`) | M | Built (ADR-498) |
 | LBG-F07 | Guidelines dragged from the rulers | `R/AutomaticGuidelines/` | Missing | M-L | open |
 | LBG-F08 | Delete Duplicates in the design, Close Path on any layer, Reverse Direction | `R/UI/EditMenu/` | Output-time overlap removal and Fill-only close | S-M | Built (ADR-480) |
 | LBG-F09 | Text Upper Case, vertical alignment, faux bold and italic, Max Width and Squeeze | `R/Text/`, `R/ShapeProperties/` | Missing | S-M | open |
@@ -164,7 +164,11 @@ Each batch is one pull request with its own decision record, tests and WORKFLOW.
   Built in ADR-493.
 - **Batch 7 — closed-shape starts and laser tabs:** LBG-C04, LBG-C05. Changes G-code only when a
   project or operation turns them on. Built in ADR-494.
-- **Next candidates, in order:** LBG-I01, LBG-I02, LBG-T04, LBG-T06, LBG-T08, LBG-T09, LBG-F06.
+- **Batch 8 — trimming, cutting, bending and snapping:** LBG-T04, LBG-T06, LBG-T08, LBG-T09,
+  LBG-F06. Design tools only; no machine motion and no change to how existing projects compile.
+  Built in ADR-498.
+- **Next candidates, in order:** LBG-I01, LBG-I02 (after the Rayforge thread's image scan work
+  lands, since both change the image pipeline).
 - **Taken by the Rayforge comparison thread (2026-09-27):** LBG-C06 (image scan angle and cross-hatch,
   ADR-492) and LBG-M05 (more material test grids, ADR-497), plus automatic overscan from speed and
   acceleration (ADR-495) and recipes that apply themselves (ADR-496). Not built in these batches.
