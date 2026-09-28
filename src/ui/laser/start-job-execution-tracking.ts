@@ -1,7 +1,7 @@
 import { fingerprintGcode, fingerprintsEqual } from '../../core/recovery';
 import type { SimilarityTransform } from '../../core/registration';
 import type { JobOriginPlacement } from '../../core/job';
-import type { MachineKind, OutputScope } from '../../core/scene';
+import { machineKindOf, type MachineKind, type OutputScope } from '../../core/scene';
 import { currentOutputScope, useStore } from '../state';
 import { canvasPlanRetentionKey } from '../state/canvas-motion-plan';
 import type { LaserState } from '../state/laser-store';
@@ -11,6 +11,7 @@ import type { LaserModeStartEvidence } from '../state/laser-mode-start-evidence'
 import {
   createArchivedControllerObservation,
   createExecutionArtifact,
+  type ExecutionArtifactV1,
   type LastCompletedReceipt,
   type RecoveryRepository,
   type RunId,
@@ -19,11 +20,13 @@ import { reportedWorkOffsetMm } from '../state/infer-machine-position';
 import { createStartIntent } from '../state/recovery/start-intent';
 import type { UntrackedRunRecord } from '../state/recovery/untracked-run-record';
 import { useToastStore } from '../state/toast-store';
+import { rememberUnarchivedRun } from '../state/laser-unarchived-run';
 import type { JobReviewModel } from './job-review';
 import { createExecutionProvenance } from '../state/recovery/execution-provenance';
 import { ordinaryExecutionEvidence } from '../state/recovery/execution-workflow-evidence';
 import { currentPrintCutOutputRegistration } from './print-cut-output';
 import type { prepareCurrentStartJob } from './start-job-source';
+import { secondPassOfferableFor } from './second-pass/second-pass-offer';
 
 type PreparedCurrentStart = Extract<
   Awaited<ReturnType<typeof prepareCurrentStartJob>>,
@@ -101,6 +104,7 @@ export async function stageFreshExecutionArtifact(args: {
   readonly cncSetupAttestation?: CncSetupAttestation;
   readonly completedReplaySourceRunId?: RunId;
 }): Promise<boolean> {
+  let keep: (() => ExecutionArtifactV1) | null = null;
   try {
     const evidence = ordinaryExecutionEvidence({
       reviewedAtIso: args.reviewedAtIso,
@@ -132,7 +136,7 @@ export async function stageFreshExecutionArtifact(args: {
         ? {}
         : { workflow: { kind: 'laser-second-pass', stages: args.prepared.laserSecondPassChain } }),
     });
-    const artifact = createExecutionArtifact({
+    const artifactArgs: Parameters<typeof createExecutionArtifact>[0] = {
       runId: args.runId,
       gcode: args.prepared.gcode,
       prepared: args.prepared.prepared,
@@ -149,13 +153,33 @@ export async function stageFreshExecutionArtifact(args: {
       archivedControllerObservation,
       createdAtIso,
       provenance,
-    });
+    };
+    keep = () => createExecutionArtifact({ ...artifactArgs, enforceArchiveBudget: false });
+    const artifact = createExecutionArtifact(artifactArgs);
+    keep = () => artifact;
     const staged = await args.repository.stageArtifact(artifact);
     if (staged.ok) return true;
   } catch {
     // Recovery persistence is best-effort and must never refuse current Start.
   }
+  if (keep !== null) keepUnarchivedLaserRun(args.runId, args.prepared, keep);
   return false;
+}
+
+/** A laser run the archive refused keeps its artifact in this page, so the job
+ * that just finished is still offered a second pass (ADR-341 Amendment 7). The
+ * copy is built only when the operator opens it: building it at Start would
+ * delay acknowledgements the way a full archive walk did (ADR-352). */
+function keepUnarchivedLaserRun(
+  runId: RunId,
+  prepared: PreparedCurrentStart,
+  build: () => ExecutionArtifactV1,
+): void {
+  const project = prepared.prepared.project;
+  if (!secondPassOfferableFor(machineKindOf(project.machine), project.device.controllerKind)) {
+    return;
+  }
+  rememberUnarchivedRun(runId, async () => build());
 }
 
 export async function activateAcceptedFreshRun(

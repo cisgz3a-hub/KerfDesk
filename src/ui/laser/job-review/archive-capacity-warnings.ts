@@ -1,9 +1,11 @@
 // A job whose program text and motion data alone exceed the recovery archive
 // budget streams normally, but no recovery copy can be kept: an interruption
-// cannot be resumed from a saved copy and the completion darkening offer never
-// appears. The operator used to learn that only from a toast after Start
-// (ADR-341 Amendment 3). Information only; it never blocks the start. A laser
-// job still keeps a short record of an interruption (Amendment 8).
+// cannot be resumed from a saved copy. The completion darkening offer still
+// appears, from the copy this page keeps until another job starts or the page
+// closes (ADR-341 Amendment 7). The operator used to learn that only from a
+// toast after Start (ADR-341 Amendment 3). Information only; it never blocks
+// the start. A laser job still keeps a short record of an interruption
+// (Amendment 8).
 
 import type { CanvasMotionPlan } from '../../state/canvas-motion-plan';
 import {
@@ -32,7 +34,8 @@ export function detectArchiveCapacityWarnings(
       `${Math.ceil(bytes / MEGABYTE)} MB, and a recovery copy holds at most ` +
       `${MAX_EXECUTION_ARTIFACT_ESTIMATED_BYTES / MEGABYTE} MB. ` +
       interruptedSentence(keepsShortRecord) +
-      ' The offer to darken areas after it finishes will not appear.',
+      ' The offer to darken areas after it finishes still appears until you start another job ' +
+      'or close KerfDesk.',
   ];
 }
 
