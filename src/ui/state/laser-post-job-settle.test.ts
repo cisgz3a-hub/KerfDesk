@@ -247,3 +247,111 @@ describe('post-job settle failure handling', () => {
     expect(writes).toContain('M9\n');
   });
 });
+
+// Chrome runs the timers of a tab hidden for five minutes once a minute: the
+// 250 ms status poll (a chained interval) sends `?` once a minute, while a
+// one-off timeout armed from a serial read still fires on time. The settle's
+// silence timeouts must not read the page's own throttled poll as a silent
+// controller, or every job finished while Chrome was minimised was recorded as
+// interrupted and never offered a second pass (ADR-356 Amendment 1).
+describe('post-job settle in a throttled hidden tab', () => {
+  const THROTTLED_TICK_MS = 60_000;
+  let pollTick: (() => void) | null = null;
+
+  beforeEach(() => {
+    pollTick = null;
+    const realSetInterval = globalThis.setInterval;
+    vi.spyOn(globalThis, 'setInterval').mockImplementation(((
+      handler: () => void,
+      delay?: number,
+    ) => {
+      if (delay !== 250) return realSetInterval(handler, delay);
+      pollTick = handler;
+      return realSetInterval(() => undefined, 1 << 30);
+    }) as typeof setInterval);
+  });
+
+  function tickPoll(): void {
+    if (pollTick === null) throw new Error('Expected the status poll to be running.');
+    pollTick();
+  }
+
+  async function hiddenMinute(connection: FakeConnection, reply: string): Promise<void> {
+    await vi.advanceTimersByTimeAsync(THROTTLED_TICK_MS);
+    tickPoll();
+    connection.emitLine(reply);
+    await flush();
+  }
+
+  it('completes on the Idle reports of the minute-throttled poll', async () => {
+    const connection = makeConnection(async () => undefined);
+    await connectWith(connection);
+    tickPoll();
+    await runJobUntilSettleAwaitsIdle(connection);
+
+    await hiddenMinute(connection, '<Idle|MPos:10.000,0.000,0.000|FS:0,0>');
+    expect(controllerOperation()).toMatchObject({
+      kind: 'post-job-settle',
+      phase: 'awaiting-idle',
+    });
+    await hiddenMinute(connection, '<Idle|MPos:10.000,0.000,0.000|FS:0,0>');
+
+    expect(useLaserStore.getState()).toMatchObject({
+      streamer: null,
+      controllerOperation: null,
+      safetyNotice: null,
+      lastWriteError: null,
+    });
+  });
+
+  it('waits for the settle marker while the final moves outlast its activity timeout', async () => {
+    const connection = makeConnection(async () => undefined);
+    await connectWith(connection);
+    tickPoll();
+    await startTestLaserJob(JOB_GCODE, {
+      ...laserCountdownTestHandoff({
+        gcode: JOB_GCODE,
+        retentionKey: POST_JOB_COUNTDOWN_RETENTION_KEY,
+        capability: 'realtime',
+      }),
+    });
+    for (let i = 0; i < 5; i += 1) connection.emitLine('ok');
+    await flush();
+    expect(controllerOperation()).toMatchObject({ kind: 'post-job-settle', phase: 'dwell' });
+
+    await hiddenMinute(connection, '<Run|MPos:5.000,0.000,0.000|FS:600,100>');
+    await vi.advanceTimersByTimeAsync(THROTTLED_TICK_MS);
+    expect(controllerOperation()).toMatchObject({ kind: 'post-job-settle', phase: 'dwell' });
+    connection.emitLine('ok');
+    await flush();
+    expect(controllerOperation()).toMatchObject({
+      kind: 'post-job-settle',
+      phase: 'awaiting-idle',
+    });
+    await hiddenMinute(connection, '<Idle|MPos:10.000,0.000,0.000|FS:0,0>');
+    await hiddenMinute(connection, '<Idle|MPos:10.000,0.000,0.000|FS:0,0>');
+
+    expect(useLaserStore.getState()).toMatchObject({
+      streamer: null,
+      controllerOperation: null,
+      safetyNotice: null,
+    });
+  });
+
+  it('still fails a controller that stays silent once the poll runs on schedule again', async () => {
+    const connection = makeConnection(async () => undefined);
+    await connectWith(connection);
+    tickPoll();
+    await runJobUntilSettleAwaitsIdle(connection);
+
+    await vi.advanceTimersByTimeAsync(THROTTLED_TICK_MS);
+    // The tab is visible again: the poll ticks every 250 ms and nothing answers.
+    for (let elapsed = 0; elapsed <= IDLE_WAIT_TIMEOUT_MS; elapsed += 250) {
+      tickPoll();
+      await vi.advanceTimersByTimeAsync(250);
+    }
+    await flush();
+
+    expect(useLaserStore.getState().controllerOperation?.kind).not.toBe('post-job-settle');
+  });
+});
