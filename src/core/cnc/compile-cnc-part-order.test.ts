@@ -144,7 +144,9 @@ describe('compileCncJob profile part order', () => {
     const job = compileCncJob(pocketScene, dev, config);
     const group = job.groups[0];
     if (group?.kind !== 'cnc') throw new Error('expected a cnc group');
-    const sequence = group.passes.map((pass) => {
+    // Stay-down links (ADR-491) only step between rings of one letter.
+    const cuts = group.passes.filter((pass) => !(pass.kind === 'path3d' && pass.stayDownLink));
+    const sequence = cuts.map((pass) => {
       const contour = contourPass(pass);
       const minX = Math.min(...contour.polyline.map((point) => point.x));
       return { letter: minX < 30 ? 'A' : 'B', zMm: contour.zMm } as const;
