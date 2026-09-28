@@ -61,7 +61,10 @@ function fill(angleDegrees: number, offset: number, pixelWidth = PIXEL_WIDTH): F
 }
 
 function represented(value: number): number {
-  return Number(value.toFixed(3));
+  const rounded = Number(value.toFixed(3));
+  // Both signed zero spellings are the same controller position. Vitest's
+  // deep equality distinguishes them even though no motion distinguishes them.
+  return rounded === 0 ? 0 : rounded;
 }
 
 type EmittedMove = { readonly xy: ReadonlyArray<number>; readonly power: number | undefined };
@@ -210,7 +213,7 @@ describe('shared split runway endpoints on the controller grid', () => {
           inspect(image(0.834125 + index * 0.00025, offset / 1000));
         },
       ),
-      { numRuns: 100 },
+      { numRuns: 100, examples: [[2, 835]] },
     );
   });
 });
