@@ -4443,7 +4443,7 @@ explicitly marked below; the remaining controls and user-facing flows are planne
    Amendment 1). Below the first level, the bit rapids down from safe Z to
    1 mm above the stock the level above left (its depth plus the bit's rise
    at full radius) and feeds only the rest, on each pass whose whole path
-   the earlier cuts are checked to have cleared to within 0.01 mm (ADR-489
+   the earlier cuts are conservatively checked to have cleared (ADR-489
    Amendment 1); the first level, a level below one that stopped short, and
    recovery jobs plunge from safe Z (ADR-489).
    Each straight run of a ring is one G-code move, however many cells it

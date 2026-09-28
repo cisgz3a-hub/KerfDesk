@@ -197,8 +197,7 @@ function pathOf(pass: FlooredPass): PathD {
 // into and out of a run, which rise above it part way, are left out). A run
 // of one point is swept as a disc.
 function runsAtOrBelow(pass: FlooredPass, ceiling: number): ReadonlyArray<Run> {
-  if (pass.kind === 'contour' && cncContourEmissionVertices(pass).length < 2) return [];
-  if (pass.kind === 'path3d' && pass.points.length < 2) return [];
+  if (!passEmitsCut(pass)) return [];
   const low = (z: number): boolean => z <= ceiling + CEILING_EPS_MM;
   const last = pathOf(pass).length - 1;
   if (pass.kind === 'contour') return low(pass.zMm) ? [{ from: 0, to: last }] : [];
@@ -216,4 +215,10 @@ function runsAtOrBelow(pass: FlooredPass, ceiling: number): ReadonlyArray<Run> {
   }
   if (from >= 0) runs.push({ from, to: last });
   return runs;
+}
+
+function passEmitsCut(pass: FlooredPass): boolean {
+  return pass.kind === 'contour'
+    ? cncContourEmissionVertices(pass).length >= 2
+    : pass.points.length >= 2;
 }
