@@ -33,6 +33,11 @@ on: turning it off gave byte-identical G-code, with nothing saying why.
      stock stands above the bit's own shape there, so the same bit at that XY with its tip at z or
      higher touches nothing. Tabs and ramps only raise the earlier pass's highest Z, so they need
      no special case, and a lead is either on both paths or the pass gets no floor.
+   - The proof holds on the path, not over a region: a cusp a high stepover leaves between two
+     rings is off both paths, so it never stands under a floor. This is where it differs from
+     relief roughing's slice-top floors, which a cusp between offset rings can stand above.
+   - Arcs and helices count as the circles G2/G3 follows, not the chords of their samples; a
+     straight move is never floored by an arc, except a Z-only one at a point of it.
    - A Z-only pass (a drill peck) is floored only where its XY lies on the earlier path.
    - No floor: the first pass along any path, helical entries (they keep their own plunge from
      safe Z), stay-down links and linked rings (reached at depth, ADR-491), and passes that
@@ -59,12 +64,17 @@ rapids:
 
 Stock simulation (`cnc-pass-air-floors.stock.test.ts`): every pass of each group cut in order into
 a height grid at a tenth of the bit diameter; before each floored pass, no cell within the bit's
-reach of its path stands above the bit held at the floor. Thirteen jobs: the 12-part sheet with
+reach of its path stands above the bit held at the floor. Fifteen jobs: the 12-part sheet with
 tabs and arc leads, a profile with retract off, a ramped inside profile of a circle, an on-path
 profile with a finish allowance, an engraved open line, offset pockets with and without lifts, a
-raster U, a pocket with an island, ramped, helical-entry and round pockets, and drilled holes.
+raster U, a pocket with an island, ramped, helical-entry and round pockets, drilled holes, and an
+island pocket and a raster U at 90% stepover. Pockets above 50% stepover add paths that clear the
+cusps between rings, so a further case builds bare rectangle rings at 70% and 95% stepover by
+hand: cusps stand above the first depth, every later ring is floored, and nothing stands under a
+floor; the same move given a floor by region, across the corner cusps, meets over 1 mm of stock.
 Unit tests (`cnc-pass-air-floors.test.ts`) cover re-started rings, leads, longer paths, tabs,
-several covering passes, Z-only passes and the passes left alone.
+several covering passes, Z-only passes, arcs within and beyond an earlier sweep, chords of an
+earlier arc, a ring after a helix and the passes left alone.
 
 ### Consequences
 

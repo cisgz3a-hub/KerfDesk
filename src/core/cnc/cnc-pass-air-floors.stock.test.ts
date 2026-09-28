@@ -19,6 +19,7 @@ import {
   type Vec2,
 } from '../scene';
 import { kernelForTool, type ToolKernel } from '../sim';
+import { withPassAirFloors } from './cnc-pass-air-floors';
 import { compileCncJob } from './compile-cnc-job';
 
 type Point = { readonly x: number; readonly y: number; readonly z: number };
@@ -144,7 +145,7 @@ function forCellsNear(
   }
 }
 
-type Report = { readonly floored: number; readonly worstMm: number };
+type Report = { readonly floored: number; readonly worstMm: number; readonly stock: Stock };
 
 // Cut the group's passes in order, each segment at the higher of its ends'
 // heights (so a ramp cuts no more here than it really does). Before each pass
@@ -188,7 +189,23 @@ function checkGroup(group: CncGroup): Report {
       });
     });
   }
-  return { floored, worstMm };
+  return { floored, worstMm, stock };
+}
+
+// Cells inside a rectangle whose stock stands above `zMm` after the group:
+// the cusps a high stepover leaves between rings.
+function standingCells(stock: Stock, area: Vec2[], zMm: number): number {
+  const xs = area.map((p) => p.x);
+  const ys = area.map((p) => p.y);
+  let count = 0;
+  stock.top.forEach((top, cell) => {
+    const x = stock.minX + ((cell % stock.width) + 0.5) * stock.cellMm;
+    const y = stock.minY + (Math.floor(cell / stock.width) + 0.5) * stock.cellMm;
+    const inside =
+      x > Math.min(...xs) && x < Math.max(...xs) && y > Math.min(...ys) && y < Math.max(...ys);
+    if (inside && top > zMm) count += 1;
+  });
+  return count;
 }
 
 const TWELVE_PARTS = Array.from({ length: 12 }, (_, i) =>
@@ -287,6 +304,21 @@ const CASES: ReadonlyArray<readonly [string, Scene]> = [
   ],
   ['round pocket', scene([shape('C', '#ff0000', [circle(60, 60, 30, 72)])], POCKET)],
   [
+    'offset pocket with an island at 90% stepover',
+    scene([shape('I', '#ff0000', [rect(20, 20, 100, 60), rect(50, 35, 40, 30)])], {
+      ...POCKET,
+      stepoverPercent: 90,
+    }),
+  ],
+  [
+    'raster pocket in a U at 90% stepover',
+    scene([shape('U', '#ff0000', [U_SHAPE])], {
+      ...POCKET,
+      pocketStrategy: 'raster-x',
+      stepoverPercent: 90,
+    }),
+  ],
+  [
     'drilled holes',
     scene([shape('D', '#ff0000', [circle(30, 30, 1.6, 16), circle(60, 30, 1.6, 16)])], {
       cutType: 'drill',
@@ -302,6 +334,50 @@ const CASES: ReadonlyArray<readonly [string, Scene]> = [
 const WITHOUT_FLOORS = new Set(['helical-entry pocket', 'drilled holes']);
 
 describe('2D air floors against a stock simulation (CW-02)', () => {
+  // The case that broke relief roughing's region floors: rings far enough
+  // apart to leave cusps of full-height stock between them. Pockets above 50%
+  // stepover add paths that clear those cusps, so this builds the bare rings
+  // by hand. A 2D floor is proven on its own pass's path, which an earlier
+  // pass's bit centre followed, so a cusp off that path never stands under it.
+  it('floors past the cusps bare rings at 70% and 95% stepover leave standing', () => {
+    const area = rect(20, 20, 80, 50);
+    const job = compileCncJob(
+      scene([shape('A', '#ff0000', [area])], POCKET),
+      DEFAULT_DEVICE_PROFILE,
+      MACHINE,
+    );
+    const group = job.groups.find((candidate): candidate is CncGroup => candidate.kind === 'cnc');
+    if (group === undefined) throw new Error('no CNC group');
+    const radius = toolOf(group).diameterMm / 2;
+    for (const stepoverPercent of [70, 95]) {
+      const step = (stepoverPercent / 100) * 2 * radius;
+      const rings: Vec2[][] = [];
+      for (let inset = radius; 2 * inset < 50; inset += step) {
+        rings.push(rect(20 + inset, 20 + inset, 80 - 2 * inset, 50 - 2 * inset));
+      }
+      const passes = [-2, -4, -6].flatMap((zMm) =>
+        rings.map((polyline): CncPass => ({ kind: 'contour', zMm, polyline, closed: true })),
+      );
+      const report = checkGroup({ ...group, passes: withPassAirFloors(passes) });
+      expect(standingCells(report.stock, area, -2)).toBeGreaterThan(0);
+      expect(report.floored).toBe(2 * rings.length);
+      expect(report.worstMm).toBeLessThanOrEqual(1e-6);
+      // A floor given by region instead, to a move across the corner cusps,
+      // is what the simulation must catch.
+      const byRegion: CncPass = {
+        kind: 'contour',
+        zMm: -4,
+        closed: false,
+        polyline: [
+          { x: 20 + radius, y: 20 + radius },
+          { x: 45, y: 45 },
+        ],
+        airFloorZMm: -2,
+      };
+      expect(checkGroup({ ...group, passes: [...passes, byRegion] }).worstMm).toBeGreaterThan(1);
+    }
+  });
+
   it.each(CASES)(
     '%s: no stock stands above any floor',
     (name, jobScene) => {

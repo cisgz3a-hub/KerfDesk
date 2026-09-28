@@ -11,9 +11,10 @@
 // earlier pass (the first depth, or a path no earlier pass traced) keeps its
 // plunge from safe Z. Leads, tabs and ramps need no special case: a tab or a
 // ramp only raises the earlier pass's highest Z, and a lead is part of both
-// paths or the covering test fails.
+// paths or the covering test fails. The claim holds on the path, not over a
+// region: a cusp a wide stepover leaves between two rings is off both paths.
 
-import { sampleCircularArcPoints } from '../geometry/circular-arc';
+import { circularArcGeometry, type CircularArc2d } from '../geometry/circular-arc';
 import type { CncPass } from '../job';
 import type { Vec2 } from '../scene';
 
@@ -22,8 +23,21 @@ import type { Vec2 } from '../scene';
  *  rounding of points a ramp interpolates along a segment. */
 const ON_PATH_MM = 1e-6;
 
+// A circular move the bit's centre followed (G2/G3), counter-clockwise from
+// `fromRad` through `sweepRad` (0 to a full turn).
+type Arc = {
+  readonly center: Vec2;
+  readonly radius: number;
+  readonly fromRad: number;
+  readonly sweepRad: number;
+};
+
+// Where a pass's bit centre went: straight moves along `points`, and `arcs`.
+// Only these count as cut; the chords of an arc do not, since G2/G3 moves
+// follow the circle itself.
 type Trace = {
   readonly points: ReadonlyArray<Vec2>;
+  readonly arcs: ReadonlyArray<Arc>;
   readonly highestZ: number;
   readonly minX: number;
   readonly minY: number;
@@ -61,20 +75,29 @@ function withFloor(pass: CncPass, trace: Trace, cut: ReadonlyArray<Trace>): CncP
 function traceOf(pass: CncPass): Trace | null {
   switch (pass.kind) {
     case 'contour':
-      return trace(closedPoints(pass.polyline, pass.closed), pass.zMm);
+      return trace(closedPoints(pass.polyline, pass.closed), [], pass.zMm);
     case 'path3d':
       return trace(
         pass.points,
+        [],
         pass.points.reduce((high, point) => Math.max(high, point.z), Number.NEGATIVE_INFINITY),
       );
-    case 'arc':
-      return trace(sampleCircularArcPoints(pass), pass.zMm);
-    case 'helical-contour':
+    case 'arc': {
+      // An invalid arc is emitted as the straight line from start to end.
+      const arc = arcOf(pass);
+      return arc === null
+        ? trace([pass.start, pass.end], [], pass.zMm)
+        : trace([], [arc], pass.zMm);
+    }
+    case 'helical-contour': {
       // Only ever an earlier cut: the helix circle, then its ring.
+      const circle = arcOf({ ...pass, end: pass.start });
       return trace(
-        [...sampleHelixCircle(pass), ...closedPoints(pass.polyline, pass.closed)],
+        closedPoints(pass.polyline, pass.closed),
+        circle === null ? [] : [circle],
         pass.startZMm,
       );
+    }
   }
 }
 
@@ -83,28 +106,40 @@ function closedPoints(points: ReadonlyArray<Vec2>, closed: boolean): ReadonlyArr
   return closed && first !== undefined ? [...points, first] : points;
 }
 
-function sampleHelixCircle(pass: Extract<CncPass, { kind: 'helical-contour' }>): Vec2[] {
-  return sampleCircularArcPoints({
-    start: pass.start,
-    end: pass.start,
-    center: pass.center,
-    clockwise: pass.clockwise,
-  });
+function arcOf(arc: CircularArc2d): Arc | null {
+  const geometry = circularArcGeometry(arc);
+  if (geometry.kind === 'invalid') return null;
+  const { radiusMm, startRad, sweepRad } = geometry;
+  return {
+    center: arc.center,
+    radius: radiusMm,
+    fromRad: sweepRad < 0 ? startRad + sweepRad : startRad,
+    sweepRad: Math.abs(sweepRad),
+  };
 }
 
-function trace(points: ReadonlyArray<Vec2>, highestZ: number): Trace | null {
-  if (points.length < 2 || !Number.isFinite(highestZ)) return null;
+function trace(
+  points: ReadonlyArray<Vec2>,
+  arcs: ReadonlyArray<Arc>,
+  highestZ: number,
+): Trace | null {
+  if ((points.length < 2 && arcs.length === 0) || !Number.isFinite(highestZ)) return null;
+  // An arc's box is its whole circle's: a looser box only filters less.
+  const corners = arcs.flatMap(({ center, radius }) => [
+    { x: center.x - radius, y: center.y - radius },
+    { x: center.x + radius, y: center.y + radius },
+  ]);
   let minX = Number.POSITIVE_INFINITY;
   let minY = Number.POSITIVE_INFINITY;
   let maxX = Number.NEGATIVE_INFINITY;
   let maxY = Number.NEGATIVE_INFINITY;
-  for (const point of points) {
+  for (const point of [...points, ...corners]) {
     minX = Math.min(minX, point.x);
     minY = Math.min(minY, point.y);
     maxX = Math.max(maxX, point.x);
     maxY = Math.max(maxY, point.y);
   }
-  return { points, highestZ, minX, minY, maxX, maxY };
+  return { points, arcs, highestZ, minX, minY, maxX, maxY };
 }
 
 function boxContains(outer: Trace, inner: Trace): boolean {
@@ -116,15 +151,52 @@ function boxContains(outer: Trace, inner: Trace): boolean {
   );
 }
 
-/** Every segment of `inner` lies on `outer`'s path. */
+/** Every move of `inner` lies on `outer`'s path: a straight move on its
+ *  straight moves, an arc on one of its arcs. A straight move never lies on
+ *  an arc, except a Z-only one at a point of it. */
 function covers(outer: Trace, inner: Trace): boolean {
+  if (!inner.arcs.every((arc) => outer.arcs.some((path) => arcContains(path, arc)))) {
+    return false;
+  }
   for (let index = 1; index < inner.points.length; index += 1) {
     const a = inner.points[index - 1];
     const b = inner.points[index];
     if (a === undefined || b === undefined) continue;
-    if (!segmentCovered(a, b, outer.points)) return false;
+    if (Math.hypot(b.x - a.x, b.y - a.y) <= ON_PATH_MM) {
+      if (!pointOnPath(a, outer.points) && !outer.arcs.some((arc) => pointOnArc(arc, a))) {
+        return false;
+      }
+    } else if (!segmentCovered(a, b, outer.points)) {
+      return false;
+    }
   }
   return true;
+}
+
+function pointOnArc(arc: Arc, point: Vec2): boolean {
+  const dx = point.x - arc.center.x;
+  const dy = point.y - arc.center.y;
+  if (Math.abs(Math.hypot(dx, dy) - arc.radius) > ON_PATH_MM) return false;
+  return turnFrom(arc.fromRad, Math.atan2(dy, dx)) <= arc.sweepRad + ON_PATH_MM / arc.radius;
+}
+
+// `inner` runs round the same circle as `outer`, within its sweep.
+function arcContains(outer: Arc, inner: Arc): boolean {
+  if (distance(outer.center, inner.center) > ON_PATH_MM) return false;
+  if (Math.abs(outer.radius - inner.radius) > ON_PATH_MM) return false;
+  const slack = ON_PATH_MM / outer.radius;
+  if (outer.sweepRad >= 2 * Math.PI - slack) return true;
+  return turnFrom(outer.fromRad, inner.fromRad) + inner.sweepRad <= outer.sweepRad + slack;
+}
+
+/** The counter-clockwise turn from one angle to another, in [0, 2π). */
+function turnFrom(fromRad: number, toRad: number): number {
+  const turn = (toRad - fromRad) % (2 * Math.PI);
+  return turn < 0 ? turn + 2 * Math.PI : turn;
+}
+
+function distance(a: Vec2, b: Vec2): number {
+  return Math.hypot(a.x - b.x, a.y - b.y);
 }
 
 // The segment a->b is covered when the outer path's segments that lie on the
@@ -133,7 +205,6 @@ function segmentCovered(a: Vec2, b: Vec2, path: ReadonlyArray<Vec2>): boolean {
   const dx = b.x - a.x;
   const dy = b.y - a.y;
   const length = Math.hypot(dx, dy);
-  if (length <= ON_PATH_MM) return pointOnPath(a, path);
   const spans: Array<readonly [number, number]> = [];
   for (let index = 1; index < path.length; index += 1) {
     const c = path[index - 1];

@@ -1,7 +1,8 @@
 // CW-02: a 2D pass gets an air floor only when every segment of it lies on
 // the path of an earlier pass of its group; the floor is that pass's highest Z.
 import { describe, expect, it } from 'vitest';
-import type { CncContourPass, CncPass, CncPath3dPass } from '../job';
+import { sampleCircularArcPoints } from '../geometry/circular-arc';
+import type { CncArcPass, CncContourPass, CncPass, CncPath3dPass } from '../job';
 import type { Vec2 } from '../scene';
 import { withPassAirFloors } from './cnc-pass-air-floors';
 
@@ -120,6 +121,74 @@ describe('withPassAirFloors', () => {
       ],
     });
     expect(floors([ring(-3), peck(5, -3), peck(25, -3)])).toEqual([undefined, -3, undefined]);
+  });
+
+  it('floors an arc under an earlier arc on the same circle, within its sweep', () => {
+    const arc = (zMm: number, end: { x: number; y: number }): CncArcPass => ({
+      kind: 'arc',
+      start: { x: 10, y: 0 },
+      end,
+      center: { x: 0, y: 0 },
+      clockwise: false,
+      zMm,
+      closed: false,
+    });
+    const half = arc(-3, { x: -10, y: 0 });
+    expect(floors([half, arc(-6, { x: 0, y: 10 })])).toEqual([undefined, -3]);
+    expect(floors([half, arc(-6, { x: 0, y: -10 })])).toEqual([undefined, undefined]);
+  });
+
+  it("gives no floor to straight moves along an earlier arc's chords", () => {
+    // G2/G3 follows the circle; the chords between its samples were never cut.
+    const arc: CncArcPass = {
+      kind: 'arc',
+      start: { x: 10, y: 0 },
+      end: { x: -10, y: 0 },
+      center: { x: 0, y: 0 },
+      clockwise: false,
+      zMm: -3,
+      closed: false,
+    };
+    const chords: CncContourPass = {
+      kind: 'contour',
+      zMm: -6,
+      closed: false,
+      polyline: sampleCircularArcPoints(arc),
+    };
+    expect(floors([arc, chords])).toEqual([undefined, undefined]);
+  });
+
+  it('floors a peck on an earlier arc and a ring after an earlier helix', () => {
+    const arc: CncArcPass = {
+      kind: 'arc',
+      start: { x: 10, y: 0 },
+      end: { x: -10, y: 0 },
+      center: { x: 0, y: 0 },
+      clockwise: false,
+      zMm: -3,
+      closed: false,
+    };
+    const peck: CncPath3dPass = {
+      kind: 'path3d',
+      closed: false,
+      points: [
+        { x: 0, y: 10, z: -3 },
+        { x: 0, y: 10, z: -5 },
+      ],
+    };
+    expect(floors([arc, peck])).toEqual([undefined, -3]);
+    const helix: CncPass = {
+      kind: 'helical-contour',
+      start: { x: 12, y: 10 },
+      center: { x: 10, y: 10 },
+      clockwise: true,
+      startZMm: 0,
+      zMm: -3,
+      revolutions: 2,
+      polyline: SQUARE,
+      closed: true,
+    };
+    expect(floors([helix, ring(-6)])).toEqual([undefined, 0]);
   });
 
   it('leaves stay-down links, linked rings and existing floors alone', () => {
