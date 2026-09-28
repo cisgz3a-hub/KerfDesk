@@ -114,6 +114,7 @@ function AddReminderRow(props: { readonly machine: HoursMachine }): JSX.Element 
       <input
         className="lf-input"
         aria-label="New reminder"
+        title="What to do, such as clean the lens or check the belts. Add sets it due after the hours beside it."
         placeholder="New reminder"
         value={label}
         style={labelInputStyle}
