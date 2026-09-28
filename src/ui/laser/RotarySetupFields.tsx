@@ -71,6 +71,7 @@ function RotaryPresetField(props: {
         <select
           className="lf-input"
           aria-label="Rotary preset"
+          title="Fill in the type and motion per turn from a rotary whose maker publishes them. The work's diameter and the switches stay as they are."
           value={chosen?.id ?? ''}
           onChange={(event) => {
             const preset = props.presets.find((item) => item.id === event.currentTarget.value);
