@@ -47,6 +47,40 @@ describe('planAdaptivePocket', () => {
     expect(Math.max(...finishPoints.map((point) => point.x))).toBeCloseTo(18, 3);
   });
 
+  it('links each ring to the next by one ring spacing', () => {
+    // The ring starts are chosen from the wall inward, so on a straight wall
+    // each link steps straight out by the spacing (half the engagement limit).
+    // Starting at the ring vertex nearest the previous start chained the links
+    // up the right triangle's corner bisector instead, where rings stand the
+    // spacing over sin(45 degrees) apart (ADR-154 Amendment 3).
+    const triangle: Polyline = {
+      closed: true,
+      points: [
+        { x: 0, y: 0 },
+        { x: 30, y: 0 },
+        { x: 0, y: 30 },
+      ],
+    };
+    const cases: ReadonlyArray<readonly [Polyline, number, number]> = [
+      [square(0, 0, 20), 4, 0.5],
+      [triangle, 3.175, 0.3175],
+    ];
+    for (const [pocket, diameter, load] of cases) {
+      const plan = planAdaptivePocket([pocket], diameter, load);
+      if (!plan.ok) throw new Error(plan.reason);
+      for (const sequence of plan.sequences) {
+        const starts = sequence.rings.map((ring) => ring.points[0]);
+        for (let index = 1; index < starts.length; index += 1) {
+          const from = starts[index - 1];
+          const to = starts[index];
+          if (from === undefined || to === undefined) throw new Error('expected ring starts');
+          // Interior rings sit on a 0.01 mm grid.
+          expect(Math.hypot(to.x - from.x, to.y - from.y)).toBeLessThanOrEqual(load / 2 + 0.015);
+        }
+      }
+    }
+  });
+
   it('refuses island topology instead of crossing uncleared stock', () => {
     const result = planAdaptivePocket([square(0, 0, 30), square(10, 10, 10)], 4, 0.5);
     expect(result).toMatchObject({
