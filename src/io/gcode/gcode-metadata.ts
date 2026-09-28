@@ -117,7 +117,8 @@ export type GcodeMetadata = {
 // Inlay inserts retain their lead move without a contour-ramp request.
 // Tiling preserves plunge disclosure but drops whole-job clearance certificates.
 // Generic, tabbed and relief ramps bound the represented angle and Z feed.
-export const EMITTER_REVISION = 'adaptive-inlay-tile-ramp-precision-audited-20260928-v12';
+// Entry provenance reflects compiled passes, including specialised entry paths.
+export const EMITTER_REVISION = 'adaptive-inlay-tile-ramp-provenance-audited-20260928-v13';
 
 // Machine-specific assumption lines (ADR-103 defect fix): router exports
 // previously carried the laser-worded `$32=1 (laser mode)` banner. The S

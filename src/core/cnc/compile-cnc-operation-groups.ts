@@ -36,6 +36,8 @@ export function compiledInlayGroups(
     polylines,
     settings,
     config,
+    // Neither the pocket nor the insert ramps, so neither records the layer's
+    // ramp angle (ADR-273 Amendment 2).
     (groupSettings, tool, passes) =>
       cncGroupForPasses(
         layer,
@@ -49,6 +51,7 @@ export function compiledInlayGroups(
         ),
         device,
         config,
+        { includeRampEntry: false },
       ),
     jogAxisSignsForOrigin(device.origin).x,
   );

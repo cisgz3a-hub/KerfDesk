@@ -90,8 +90,7 @@ describe('entry provenance follows compiled paths', () => {
       expect(requested.split('\n').filter(isSendableGcodeLine)).toEqual(
         without.split('\n').filter(isSendableGcodeLine),
       );
-      expect(requested).toContain('; cnc entry: requested-only; requested-max-angle-deg: 5.000');
-      expect(requested).toContain('requested contour ramp is not applied to these passes');
+      expect(requested).not.toContain('; cnc entry:');
       expect(requested).not.toContain('; cnc entry: contour-ramp;');
     },
     30_000,

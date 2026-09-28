@@ -5280,6 +5280,16 @@ and lifts the command's CNC-only gate.)*
    their ramp: Ramp entry on a profile, pocket or engrave layer, Roughing
    ramp on any other (ADR-424 Amendment 1). No ramp angle, no notice.
 
+#### Edge — operations that enter their own way
+1. Adaptive clearing enters on its own helix and plunges its finishing
+   rings, a helical pocket enters on its helix, drilling pecks straight down,
+   and an inlay pair plunges its pocket and insert. None of them ramps with
+   the layer's angle, so their G-code headers carry no entry line, and Job
+   Review's operation line says so, for example
+   `ramp entry 5° (not used by adaptive clearing)` (ADR-273 Amendment 2).
+   Drill and inlay layers do not show the Ramp entry row; an angle they
+   carry is left over from an earlier cut type.
+
 ### F-CNC19. Tile a job larger than the bed — Phase H.10
 
 #### Success
