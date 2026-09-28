@@ -25,15 +25,8 @@ async function render(): Promise<HTMLButtonElement> {
 }
 
 function draw(id: string): void {
-  useStore
-    .getState()
-    .drawShape(
-      createRectangle({
-        id,
-        color: '#000000',
-        spec: { widthMm: 5, heightMm: 5, cornerRadiusMm: 0 },
-      }),
-    );
+  const spec = { widthMm: 5, heightMm: 5, cornerRadiusMm: 0 };
+  useStore.getState().drawShape(createRectangle({ id, color: '#000000', spec }));
 }
 
 function rows(): ReadonlyArray<HTMLButtonElement> {
