@@ -47,6 +47,11 @@ describe('normalizeCameraModelRecord', () => {
     expect(normalizeCameraModelRecord(bare)).toEqual(bare);
   });
 
+  it('round-trips a camera on the laser head with where the head was', () => {
+    const head = { ...record, mount: { kind: 'head', headAtCalibrationMm: { x: 120, y: 80 } } };
+    expect(normalizeCameraModelRecord(JSON.parse(JSON.stringify(head)))).toEqual(head);
+  });
+
   it('keeps a record saved without a capture binding', () => {
     const { capture: _capture, ...unbound } = record;
     expect(normalizeCameraModelRecord(unbound)).toEqual(unbound);
@@ -66,6 +71,11 @@ describe('normalizeCameraModelRecord', () => {
     ['a negative error', { ...record, accuracy: { ...record.accuracy, rmsErrorMm: -1 } }],
     ['an empty calibration time', { ...record, calibratedAt: '' }],
     ['a broken capture binding', { ...record, capture: { version: 2 } }],
+    ['an unknown mount', { ...record, mount: { kind: 'gantry' } }],
+    [
+      'a head mount without a finite head position',
+      { ...record, mount: { kind: 'head', headAtCalibrationMm: { x: 1, y: Number.NaN } } },
+    ],
     [
       'a ring without an error',
       { ...record, accuracy: { ...record.accuracy, marks: [{ x: 1, y: 2, dxMm: 0.1 }] } },

@@ -14,6 +14,7 @@ import { isEditableShortcutTarget } from '../common/keyboard-targets';
 import { isAltLetterChord } from './shortcuts';
 import { useStore } from '../state';
 import { useUiStore } from '../state/ui-store';
+import { namedUndoAction, withUndoStepName } from '../state/undo-step-names';
 import type { QuarterTurnDirection } from '../../core/scene/selection-placement';
 
 export type EditingToolCtx = {
@@ -78,10 +79,15 @@ export function editingToolShortcutContext(): EditingToolCtx {
   const app = useStore.getState();
   return {
     hasSelection: app.selectedObjectId !== null,
-    rotateSelectionQuarterTurn: app.rotateSelectionQuarterTurn,
-    pasteClipboardInPlace: app.pasteClipboardInPlace,
+    // The same Undo-list names as the Arrange and Edit menu commands.
+    rotateSelectionQuarterTurn: (direction) =>
+      withUndoStepName(
+        direction === 1 ? 'Rotate 90° Clockwise' : 'Rotate 90° Counter-clockwise',
+        () => app.rotateSelectionQuarterTurn(direction),
+      ),
+    pasteClipboardInPlace: namedUndoAction('Paste in Place', app.pasteClipboardInPlace),
     invertSelection: app.invertSelection,
     toggleWireframeView: () => useUiStore.getState().toggleWireframeView(),
-    deleteDuplicates: app.deleteDuplicates,
+    deleteDuplicates: namedUndoAction('Delete Duplicates', app.deleteDuplicates),
   };
 }

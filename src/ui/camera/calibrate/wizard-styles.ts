@@ -13,3 +13,4 @@ export const fieldStyle: CSSProperties = {
   fontSize: 12,
 };
 export const inputStyle: CSSProperties = { width: 120 };
+export const checkStyle: CSSProperties = { display: 'flex', alignItems: 'center', gap: 6 };

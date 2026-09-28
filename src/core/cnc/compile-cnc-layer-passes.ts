@@ -36,6 +36,7 @@ import { manualTabCentersForToolpaths, type CollectedCncContour } from './cnc-ma
 import type { VCarveLadder } from './vcarve-ladder';
 import { cncSettingsForStage, cncStageRecipe } from './cnc-stage-settings';
 import { preserveProfileFinishStages } from './profile-finishing-stage';
+import { pocketPassLinks } from './pocket-stay-down-links';
 
 export function passesForCncLayer(
   polylines: ReadonlyArray<Polyline>,
@@ -213,7 +214,9 @@ function passesForDepths(
     toolpaths,
     depths,
   );
-  if (helicalPasses !== null) return helicalPasses;
+  if (helicalPasses !== null) {
+    return pocketPassLinks(helicalPasses, sourcePolylines, settings, wallDiameterMm);
+  }
 
   const manualTabCenters = manualTabCentersForToolpaths(toolpaths, sourceContours);
   if (allowanceMm > 0) {
@@ -229,7 +232,12 @@ function passesForDepths(
     );
   }
   if (settings.cutType === 'pocket') {
-    return sourceRegionMajorDepthPasses(sourcePolylines, toolpaths, depths);
+    return pocketPassLinks(
+      sourceRegionMajorDepthPasses(sourcePolylines, toolpaths, depths),
+      sourcePolylines,
+      settings,
+      wallDiameterMm,
+    );
   }
   return contourMajorPasses(toolpaths, depths, settings, wallDiameterMm, manualTabCenters);
 }

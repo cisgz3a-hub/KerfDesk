@@ -5,7 +5,7 @@ import { automaticRestart } from '../../core/recovery/automatic-restart-line';
 import { rebuildCanvasPlanForGcode, reportedWorkPositionMm } from '../state/canvas-motion-plan';
 import { canvasJobTimingPlan } from '../state/canvas-job-timing-plan';
 import { jobAwareAlert, jobAwareConfirm } from '../state/job-aware-dialogs';
-import { useLaserStore } from '../state/laser-store';
+import type { useLaserStore } from '../state/laser-store';
 import { currentPlannerCapacityEvidence } from '../state/laser-rx-capacity-evidence';
 import type { LaserModeStartEvidence } from '../state/laser-mode-start-evidence';
 import {
@@ -28,7 +28,13 @@ import { confirmLaserModeStartEvidence } from './laser-mode-start-acknowledgemen
 import { buildLaserResumeProgram } from './laser-resume-program';
 import { cleanupRejectedRecoveryAttempt } from './recovery-attempt-cleanup';
 import { finalRecoveryStartAssertion } from './recovery-start-authorization';
-import { isJobStartTransmissionError } from '../state/laser-start-transmission-error';
+import { savedWorkOffsetMm } from './laser-recovery-origin';
+import {
+  acceptLaserRecoveryRun,
+  untrackedLaserRecovery,
+  type UntrackedLaserRecovery,
+} from './laser-recovery-untracked';
+import { resolveFailedAttempt } from './laser-recovery-attempt-failure';
 
 /** Final, explicit activation for the sealed laser recovery dialog. Review and
  * cancellation never call this function and therefore cannot claim a capsule. */
@@ -49,6 +55,7 @@ type PlannedLaserRecovery = {
   readonly capsule: RecoveryCapsule;
   readonly source: PreparedRecoverySource;
   readonly resumeGcode: string;
+  readonly resumePreambleLines: number;
   readonly resumeFromLine: number;
   readonly effectiveResumeFromLine: number;
   readonly reviewedAtIso: string;
@@ -66,6 +73,8 @@ type StagedLaserRecovery = PlannedLaserRecovery &
     readonly canvasPlan: ReturnType<typeof rebuildCanvasPlanForGcode>;
     readonly jobTimingPlan: ReturnType<typeof canvasJobTimingPlan>;
     readonly laser: ReturnType<typeof useLaserStore.getState>;
+    /** Set when the recovery is over the archive budget and runs without one. */
+    readonly untracked?: UntrackedLaserRecovery;
   };
 
 async function planLaserRecovery(
@@ -105,6 +114,7 @@ async function planLaserRecovery(
     capsule,
     source,
     resumeGcode: resume.lines.join('\n'),
+    resumePreambleLines: resume.preambleCount,
     resumeFromLine: fromLine,
     effectiveResumeFromLine: resume.fromLine,
     reviewedAtIso: new Date().toISOString(),
@@ -164,9 +174,14 @@ async function stageLaserRecoveryAttempt(
     staged = await repository.stageArtifact(
       await buildLaserRecoveryArtifact(planned, claim, recoveryRunId, canvasPlan, laser),
     );
-  } catch {
-    // The common cleanup below releases the recovery claim when provenance
-    // hashing or exact-integrity staging cannot seal this attempt.
+  } catch (error) {
+    // Over the archive budget, the attempt runs without an archive (Amendment
+    // 8). Otherwise the common cleanup below releases the recovery claim when
+    // provenance hashing or exact-integrity staging cannot seal this attempt.
+    const untracked = untrackedRecoveryAfter(error, planned, recoveryRunId, laser);
+    if (untracked !== null) {
+      return { ...planned, ...claim, recoveryRunId, canvasPlan, jobTimingPlan, laser, untracked };
+    }
   }
   if (staged?.ok !== true || staged.value !== recoveryRunId) {
     const cleanup = await cleanupRejectedRecoveryAttempt({
@@ -201,6 +216,24 @@ async function stageLaserRecoveryAttempt(
     return null;
   }
   return { ...planned, ...claim, recoveryRunId, canvasPlan, jobTimingPlan, laser };
+}
+
+function untrackedRecoveryAfter(
+  error: unknown,
+  planned: PlannedLaserRecovery,
+  recoveryRunId: string,
+  laser: ReturnType<typeof useLaserStore.getState>,
+): UntrackedLaserRecovery | null {
+  return untrackedLaserRecovery(error, {
+    recoveryRunId,
+    jobGcode: planned.source.gcode,
+    resumeGcode: planned.resumeGcode,
+    resumeFromLine: planned.effectiveResumeFromLine,
+    resumePreambleLines: planned.resumePreambleLines,
+    outputScope: planned.capsule.artifact.outputScope,
+    jobOrigin: planned.capsule.artifact.jobOrigin,
+    laser,
+  });
 }
 
 async function buildLaserRecoveryArtifact(
@@ -286,17 +319,22 @@ async function streamLaserRecoveryAttempt(
       attemptId: attempt.attemptId,
       recoveryRunId: attempt.recoveryRunId,
       error,
+      untracked: attempt.untracked,
     });
     return false;
   }
 
-  const activated = await repository.activateClaimedRecovery({
-    sourceRunId: attempt.capsule.runId,
-    sourceRevision: attempt.capsule.revision,
-    attemptId: attempt.attemptId,
-    recoveryRunId: attempt.recoveryRunId,
-  });
-  if (!activated.ok || !activated.value) {
+  const activated = await acceptLaserRecoveryRun(
+    repository,
+    {
+      sourceRunId: attempt.capsule.runId,
+      sourceRevision: attempt.capsule.revision,
+      attemptId: attempt.attemptId,
+      recoveryRunId: attempt.recoveryRunId,
+    },
+    attempt.untracked,
+  );
+  if (!activated) {
     await repository.noteUntrackedRunAccepted(attempt.recoveryRunId);
     jobAwareAlert(
       'Laser recovery started, but recovery tracking is unavailable for this attempt. Supervise the machine and use Abort if anything is unsafe.',
@@ -312,68 +350,16 @@ async function recoverySource(capsule: RecoveryCapsule): Promise<PreparedRecover
   const source = await prepareRecoverySource({
     outputScope: capsule.artifact.outputScope,
     ...(capsule.artifact.jobOrigin === undefined ? {} : { jobOrigin: capsule.artifact.jobOrigin }),
+    savedWorkOffsetMm: savedWorkOffsetMm(capsule.artifact),
   });
   if (source === null) return null;
   if (!fingerprintsEqual(fingerprintGcode(source.gcode), capsule.artifact.fingerprint)) {
     jobAwareAlert(
-      'Cannot start laser recovery:\n\nThe current project does not reproduce the saved G-code fingerprint. No controller command was sent.',
+      'Cannot start laser recovery:\n\nThe current project does not reproduce the saved G-code fingerprint. This record keeps only that fingerprint, so open the project the job ran from, as it was then, with the same selection, and try again. No controller command was sent.',
     );
     return null;
   }
   return source;
-}
-
-async function resolveFailedAttempt(args: {
-  readonly repository: RecoveryRepository;
-  readonly sourceCapsule: RecoveryCapsule;
-  readonly attemptId: string;
-  readonly recoveryRunId: string;
-  readonly error: unknown;
-}): Promise<void> {
-  const state = useLaserStore.getState();
-  const message = args.error instanceof Error ? args.error.message : String(args.error);
-  const attemptedAckedLines = attemptedRunAcknowledgements(args.error, args.recoveryRunId);
-  if (
-    attemptedAckedLines === null &&
-    (state.streamer === null || state.activeRunId !== args.recoveryRunId)
-  ) {
-    const cleanup = await cleanupRejectedRecoveryAttempt({
-      repository: args.repository,
-      sourceRunId: args.sourceCapsule.runId,
-      attemptId: args.attemptId,
-      stagedRunId: args.recoveryRunId,
-    });
-    const cleanupMessage = cleanup.retryable
-      ? message
-      : `${message}\n\nNo controller command was accepted, but the durable Start handoff or recovery claim could not be cleared. Reload after recovery storage is available.`;
-    jobAwareAlert(`Could not start laser recovery:\n\n${cleanupMessage}`);
-    return;
-  }
-  const activated = await args.repository.activateClaimedRecovery({
-    sourceRunId: args.sourceCapsule.runId,
-    sourceRevision: args.sourceCapsule.revision,
-    attemptId: args.attemptId,
-    recoveryRunId: args.recoveryRunId,
-  });
-  if (activated.ok && activated.value) {
-    await args.repository.interruptRun(
-      args.recoveryRunId,
-      attemptedAckedLines ?? state.streamer?.completed ?? 0,
-      {
-        kind: 'write-failed',
-        message,
-      },
-    );
-  } else {
-    await args.repository.noteUntrackedRunAccepted(args.recoveryRunId);
-  }
-  jobAwareAlert(
-    `Laser recovery transmission became uncertain:\n\n${message}\n\nInspect and requalify the machine before any further motion.`,
-  );
-}
-
-function attemptedRunAcknowledgements(error: unknown, runId: string): number | null {
-  return isJobStartTransmissionError(error) && error.runId === runId ? error.ackedLines : null;
 }
 
 function controllerObservation(laser: ReturnType<typeof useLaserStore.getState>) {

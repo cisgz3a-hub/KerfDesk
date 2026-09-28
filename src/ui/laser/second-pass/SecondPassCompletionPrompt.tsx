@@ -4,19 +4,14 @@ import { useLaserStore } from '../../state/laser-store';
 import { useLaserSecondPassUiStore } from '../../state/laser-second-pass-ui-store';
 import type { RecoveryRepository } from '../../state/recovery';
 import { isModalOpen, useUiStore } from '../../state/ui-store';
-import { useRecoveryRepositorySelection } from '../../state/use-recovery-repository';
 import { jobControlsBusy } from '../job-controls-busy';
-import {
-  anotherRunHoldsTheStream,
-  secondPassOfferable,
-  selectLastCompletedReceipt,
-} from './second-pass-offer';
+import { anotherRunHoldsTheStream, useCompletionOffer } from './second-pass-offer';
 
 export function SecondPassCompletionPrompt(props: {
   repository: RecoveryRepository;
 }): JSX.Element | null {
-  const receipt = useRecoveryRepositorySelection(selectLastCompletedReceipt, props.repository);
   const runId = useLaserSecondPassUiStore((s) => s.completionRunId);
+  const { offerable, refused, unarchived } = useCompletionOffer(runId, props.repository);
   const request = useLaserSecondPassUiStore((s) => s.editorRequest);
   const dismiss = useLaserSecondPassUiStore((s) => s.dismissCompletion);
   const openEditor = useLaserSecondPassUiStore((s) => s.openEditor);
@@ -30,19 +25,17 @@ export function SecondPassCompletionPrompt(props: {
   const modalOpen = useUiStore(isModalOpen);
   const [presentedRunId, setPresentedRunId] = useState<string | null>(null);
   const returnFocusTo = useRef<HTMLElement | null>(null);
-  const matching = receipt?.runId === runId;
-  const offerable = receipt != null && matching && secondPassOfferable(receipt.artifact);
 
   useEffect(() => {
     if (!runId) return;
-    if (superseded || (matching && !offerable)) {
+    if (superseded || refused) {
       dismiss(runId);
     } else if (offerable && !busy && !modalOpen && !request) {
       if (presentedRunId !== runId)
         returnFocusTo.current = document.activeElement as HTMLElement | null;
       setPresentedRunId(runId);
     }
-  }, [runId, superseded, matching, offerable, busy, modalOpen, request, dismiss, presentedRunId]);
+  }, [runId, superseded, refused, offerable, busy, modalOpen, request, dismiss, presentedRunId]);
 
   // modalOpen gates the initial presentation only: this Dialog itself then
   // registers as a modal. Hydrated receipts alone never set completionRunId.
@@ -60,6 +53,12 @@ export function SecondPassCompletionPrompt(props: {
       <p>
         Until you start another job, you can also open Paint a second pass from the Machine panel.
       </p>
+      {unarchived ? (
+        <p>
+          This job could not be saved to the job archive, so this offer also ends when KerfDesk is
+          closed or reloaded.
+        </p>
+      ) : null}
       <DialogActions>
         <button
           className="lf-btn"

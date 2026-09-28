@@ -11,6 +11,7 @@ import {
   type Scene,
 } from '../scene';
 import { compileCncJob } from './compile-cnc-job';
+import { cncGrblStrategy } from '../output/cnc-grbl-strategy';
 import { compileStraightInlayOperation } from './inlay-pair-operation';
 
 function inlayScene(tabsEnabled = true, rampEntryDeg?: number): Scene {
@@ -153,6 +154,14 @@ describe('compileCncJob inlay pair', () => {
       expect(ramped.male.passes.every((pass) => pass.kind === 'path3d')).toBe(true);
       expect(ramped.male.passes).toEqual(plain.male.passes);
       expect(ramped.female.passes).toEqual(plain.female.passes);
+      // Follow the compiled insert through the emitter: a leftover angle
+      // changes no movement, plunge, cutting feed or raised tab wall.
+      const commands = (group: typeof ramped.male) =>
+        cncGrblStrategy
+          .emit({ groups: [group] }, DEFAULT_DEVICE_PROFILE)
+          .split('\n')
+          .filter((line) => line.length > 0 && !line.startsWith(';'));
+      expect(commands(ramped.male)).toEqual(commands(plain.male));
     },
   );
 

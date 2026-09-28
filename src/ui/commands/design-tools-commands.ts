@@ -3,6 +3,8 @@
 // Direction, Create Rubber-Band Outline and Flatten Image Mask.
 
 import { disabled, enabled, type AppCommand, type AppCommandContext } from './command-types';
+import { optimizeShapesCommand } from './optimize-shapes-commands';
+import { warpDeformCommands } from './warp-deform-commands';
 
 export const DELETE_DUPLICATES_SHORTCUT = 'Alt+D';
 
@@ -85,6 +87,8 @@ export function designToolsCommands(ctx: AppCommandContext): ReadonlyArray<AppCo
       'Reverse the direction the selected paths are cut in',
       ctx.reverseSelectedPaths,
     ),
+    ...warpDeformCommands(ctx),
+    optimizeShapesCommand(ctx),
     ctx.hasMaskedRasterSelection
       ? enabled(
           'tools.flatten-image-mask',
@@ -101,6 +105,26 @@ export function designToolsCommands(ctx: AppCommandContext): ReadonlyArray<AppCo
           ctx.flattenImageMask,
         ),
   ];
+}
+
+// LBG-T09, in the Arrange menu beside Array. Any selection may try it: a
+// selection without artwork and a guide path gets a notice saying what to add.
+export function copyAlongPathCommand(ctx: AppCommandContext): AppCommand {
+  return ctx.hasSelection
+    ? enabled(
+        'arrange.copy-along-path',
+        'arrange',
+        'Copy Along Path...',
+        'Copy the selected artwork along a selected guide path',
+        ctx.copyAlongPath,
+      )
+    : disabled(
+        'arrange.copy-along-path',
+        'arrange',
+        'Copy Along Path...',
+        'Select the artwork and a guide path first.',
+        ctx.copyAlongPath,
+      );
 }
 
 function pathCommand(

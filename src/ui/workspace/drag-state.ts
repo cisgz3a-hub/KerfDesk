@@ -21,6 +21,8 @@ import { handleAltSelectionCycle } from './selection-hit-cycle';
 import { hitSelectionMoveHandle } from './selection-move-handle';
 import type { PathNodeDragState } from './path-node-drag';
 import type { CncTabDragState } from './cnc-tab-editor';
+import type { LaserTabDragState } from './laser-tab-editor';
+import type { WarpHandleDragState } from './warp-deform-tool';
 import {
   hitRotateHandle,
   hitSelectionRotateHandle,
@@ -93,7 +95,9 @@ export type DragState =
       readonly startScenePoint: Vec2;
     }
   | PathNodeDragState
-  | CncTabDragState;
+  | CncTabDragState
+  | LaserTabDragState
+  | WarpHandleDragState;
 
 // Decide what kind of drag a mouse-down on `point` initiates, based on the
 // selected object's handle layout. Returns null if the click missed all

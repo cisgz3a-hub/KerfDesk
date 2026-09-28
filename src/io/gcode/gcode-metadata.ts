@@ -89,10 +89,15 @@ export type GcodeMetadata = {
  * air repeats at eligible boundaries, with full-circle/large-arc timing
  * and unchanged M3 dark-transition ordering, ADR-424 amendment 1's relief
  * roughing headers that count the passes plunged into a first loop shorter
- * than one cut width, and ADR-484's masked relief finishing: waterline round
- * the excluded stock, rows linked across short gaps, and every move kept out
- * of that stock, and ADR-250 amendment 2's inlay inserts that keep their
- * lead-in and lead-out when the layer carries a ramp angle the pair never cuts.
+ * than one cut width, ADR-484's masked relief finishing: waterline round the
+ * excluded stock, rows linked across short gaps, and every move kept out of
+ * that stock, ADR-489's CNC passes rapided down from safe Z to just above the
+ * air their earlier passes cleared, ADR-488's relief roughing moves, one per
+ * straight run, and ADR-491's pocket rings and rows linked at depth at the
+ * plunge feed and its park height before the job-end and bit-change parks,
+ * ADR-486's kerf-offset circles kept as native arcs, ADR-492's image scans at
+ * an angle and angle turns between passes, and ADR-495's overscan worked out
+ * from the scan speed and acceleration when it is on.
  */
 // ADR-427 keeps deepest cleanup before linked relief rings and flat depth slices.
 // ADR-368 sizes nonflat pocket/profile offsets, tabs and stepover by cut width.
@@ -101,9 +106,12 @@ export type GcodeMetadata = {
 // ADR-471 discloses sub-width plunges; ADR-457 finishing recipes survive ramping.
 // ADR-424 Amd 1 discloses relief roughing's sub-width plunges the same way.
 // ADR-484 keeps masked relief finishing out of the excluded stock.
-// ADR-250 Amd 2 keeps the inlay insert's lead under a ramp the pair never cuts.
-export const EMITTER_REVISION =
-  'relief-ramp-plunges-disclosed-masked-relief-inlay-lead-20260928-v3';
+// ADR-489 rapids CNC entries down through air earlier passes cleared.
+// ADR-488 emits one relief roughing move per straight run.
+// ADR-491 links pocket rings at depth and lifts to the park height.
+// ADR-486 keeps kerf-offset circles as G2/G3; ADR-492 angles image scans;
+// ADR-495 sizes overscan from speed and acceleration when it is on.
+export const EMITTER_REVISION = 'park-kerf-arcs-scan-angle-overscan-inlay-lead-20260928-v8';
 
 // Machine-specific assumption lines (ADR-103 defect fix): router exports
 // previously carried the laser-worded `$32=1 (laser mode)` banner. The S

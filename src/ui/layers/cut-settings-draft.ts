@@ -9,6 +9,7 @@ import {
 import {
   DEFAULT_PERFORATION_CUT_MM,
   DEFAULT_PERFORATION_SKIP_MM,
+  DEFAULT_TAB_SPACING_MM,
   imageOverscanMmFor,
   MAX_IMAGE_OVERSCAN_MM,
 } from '../../core/job/operation-cut-extras';
@@ -21,9 +22,12 @@ export type CutSettingsLimits = {
 };
 
 const MAX_KERF_OFFSET_MM = 10;
+export const MAX_PASS_ANGLE_STEP_DEG = 180;
 const MIN_TAB_SIZE_MM = 0.01;
 const MAX_TAB_SIZE_MM = 100;
-const MAX_TABS_PER_SHAPE = 100;
+export const MAX_TABS_PER_SHAPE = 100;
+export const MIN_TAB_SPACING_MM = 1;
+export const MAX_TAB_SPACING_MM = 1000;
 export const MAX_OVERCUT_MM = 50;
 export const MIN_PERFORATION_MM = 0.01;
 export const MAX_PERFORATION_MM = 100;
@@ -62,7 +66,10 @@ export function readCutSettingsPatch(
     airAssist: data.has('airAssist') ? true : layer.airAssist,
     ...lineSettings,
     ...readLineExtrasPatch(data, layer, mode),
+    ...readLineTabPatch(data, layer, mode),
     ...readImageOverscanPatch(data, layer, mode),
+    ...readScanPatternPatch(data, layer, mode),
+    ...readAutoOverscanPatch(data, mode),
     ...fillSettings,
     ditherAlgorithm: parseDither(String(data.get('ditherAlgorithm') ?? layer.ditherAlgorithm)),
     linesPerMm,
@@ -177,6 +184,40 @@ function readLineExtrasPatch(data: FormData, layer: Layer, mode: LayerMode): Lay
   };
 }
 
+// ADR-494, like the ADR-415 controls above. Spacing and At most are shown only
+// for spacing, so a form without them keeps the stored values.
+function readLineTabPatch(data: FormData, layer: Layer, mode: LayerMode): LayerPatch {
+  if (mode !== 'line' || !data.has('tabLayout')) return {};
+  return {
+    tabLayout: data.get('tabLayout') === 'spacing' ? 'spacing' : 'count',
+    ...(data.has('tabSpacingMm')
+      ? {
+          tabSpacingMm: numberField(
+            data,
+            'tabSpacingMm',
+            layer.tabSpacingMm ?? DEFAULT_TAB_SPACING_MM,
+            MIN_TAB_SPACING_MM,
+            MAX_TAB_SPACING_MM,
+          ),
+        }
+      : {}),
+    ...(data.has('tabMaxPerShape')
+      ? {
+          tabMaxPerShape: Math.floor(
+            numberField(data, 'tabMaxPerShape', layer.tabMaxPerShape ?? 0, 0, MAX_TABS_PER_SHAPE),
+          ),
+        }
+      : {}),
+    tabCutPowerPercent: numberField(
+      data,
+      'tabCutPowerPercent',
+      layer.tabCutPowerPercent ?? 0,
+      0,
+      100,
+    ),
+  };
+}
+
 function readImageOverscanPatch(data: FormData, layer: Layer, mode: LayerMode): LayerPatch {
   if (mode !== 'image' || !data.has('imageOverscanMm')) return {};
   return {
@@ -188,6 +229,34 @@ function readImageOverscanPatch(data: FormData, layer: Layer, mode: LayerMode): 
       MAX_IMAGE_OVERSCAN_MM,
     ),
   };
+}
+
+// ADR-492, like the ADR-415 extras: only a form with these controls changes them.
+function readScanPatternPatch(data: FormData, layer: Layer, mode: LayerMode): LayerPatch {
+  const step =
+    (mode === 'image' || mode === 'fill') && data.has('passAngleStepDeg')
+      ? {
+          passAngleStepDeg: numberField(
+            data,
+            'passAngleStepDeg',
+            layer.passAngleStepDeg ?? 0,
+            -MAX_PASS_ANGLE_STEP_DEG,
+            MAX_PASS_ANGLE_STEP_DEG,
+          ),
+        }
+      : {};
+  if (mode !== 'image' || !data.has('imageScanAngleDeg')) return step;
+  return {
+    ...step,
+    imageScanAngleDeg: numberField(data, 'imageScanAngleDeg', layer.imageScanAngleDeg ?? 0, 0, 180),
+    imageCrossHatch: data.has('imageCrossHatch'),
+  };
+}
+
+// ADR-495: the switch sends nothing when off, so the form marks that it showed it.
+function readAutoOverscanPatch(data: FormData, mode: LayerMode): LayerPatch {
+  if ((mode !== 'image' && mode !== 'fill') || !data.has('autoOverscanShown')) return {};
+  return { autoOverscan: data.has('autoOverscan') };
 }
 
 export function dotWidthCorrectionMax(linesPerMm: number): number {

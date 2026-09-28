@@ -44,11 +44,11 @@ export function saveGcodeAction(deps: GcodeActionDeps): () => void {
  */
 export function inspectCurrentGcodeAction(deps: GcodeActionDeps): () => void {
   return () =>
-    void handleInspectCurrentGcode(saveGcodeContext(deps), (programName, text) =>
+    void handleInspectCurrentGcode(saveGcodeContext(deps), (programName, text, placement) =>
       deps.openInspector(programName, {
         kind: 'text',
         text,
-        ...projectInspectionContext(deps.app.project),
+        ...projectInspectionContext(deps.app.project, placement),
       }),
     );
 }

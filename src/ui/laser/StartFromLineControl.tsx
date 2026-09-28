@@ -137,7 +137,7 @@ function savedLaserRestart({
     line: automatic?.line ?? null,
     hint:
       automatic === null
-        ? stopped
+        ? `${stopped} Only its fingerprint was saved, so the Interrupted job saved card's Review finds its restart line in this project and shows the origin.`
         : `${stopped} Its automatic restart is file line ${automatic.line}, filled in above. The Interrupted job saved card's Review restarts there too and shows the origin.`,
   };
 }

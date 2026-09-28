@@ -11,10 +11,15 @@ import {
 } from '../../core/scene';
 import type { JobOriginPlacement } from '../../core/job';
 import { oracleBurns } from '../../core/controllers/grbl/laser-burn-oracle.test-helper';
+import { resumeEntryPointMm } from '../../core/controllers/grbl/resume-program';
 import { emitPreparedGcode, prepareOutput } from '../../io/gcode';
 import { buildCanvasMotionPlan } from '../state/canvas-motion-plan';
 import type { WorkCoordinateOffset } from '../state/origin-actions';
-import { createExecutionArtifact, type RecoveryCapsule } from '../state/recovery';
+import {
+  createExecutionArtifact,
+  type ExecutionArtifactV1,
+  type RecoveryCapsule,
+} from '../state/recovery';
 import { buildLaserRecoveryPreviewRoute } from './laser-recovery-preview-route';
 import { remainingRecoveryWorkBounds } from './laser-recovery-picker-model';
 import { LaserRecoveryPlacement } from './LaserRecoveryPlacement';
@@ -196,7 +201,13 @@ describe('recovery placement and work origin', () => {
       onRestoreOrigin: async () => undefined,
       onHome: async () => undefined,
       headStop: {
-        stop: { line: 5, sentLines: 4, pointMm: { x: 9, y: 9 } },
+        stop: {
+          line: 5,
+          sentLines: 4,
+          pointMm: { x: 9, y: 9 },
+          unconfirmedLines: 0,
+          unconfirmedTravelMm: null,
+        },
         sendableLines: 10,
         anchored: false,
         onContinue: async () => undefined,
@@ -206,6 +217,40 @@ describe('recovery placement and work origin', () => {
       'Homing moves the head off the spot where the job stopped, so after it only the restore can place the job.',
     );
     expect(button('Continue from where the head stopped').disabled).toBe(false);
+  });
+
+  it('moves to the job origin and the restart point once the origin is in place', async () => {
+    const saved = capsule({ x: 20, y: 30, z: 0 });
+    const artifact = saved.artifact as ExecutionArtifactV1;
+    const lines = artifact.gcode.split('\n');
+    const restartLine = lines.findIndex((line, index) => index > 2 && /X/.test(line)) + 2;
+    const entry = resumeEntryPointMm(artifact.gcode, restartLine);
+    if (entry === null) throw new Error('Expected a followable restart line.');
+    const onMoveToWorkPoint = vi.fn(async () => undefined);
+    render({
+      capsule: saved,
+      liveWorkOffsetMm: { x: 20, y: 30, z: 0 },
+      liveOriginSet: true,
+      restartLine,
+      disabled: false,
+      onMoveToWorkPoint,
+    });
+    await act(async () => button('Go to job origin').click());
+    expect(onMoveToWorkPoint).toHaveBeenLastCalledWith({ x: 0, y: 0 });
+    await act(async () => button('Go to restart point').click());
+    expect(onMoveToWorkPoint).toHaveBeenLastCalledWith(entry);
+  });
+
+  it('offers no moves while the origin is not the one the job ran with', () => {
+    render({
+      capsule: capsule({ x: 20, y: 30, z: 0 }),
+      liveWorkOffsetMm: { x: 35, y: 35, z: 0 },
+      restartLine: 1,
+      disabled: false,
+      onMoveToWorkPoint: async () => undefined,
+    });
+    expect(host?.textContent).not.toContain('Go to job origin');
+    expect(host?.textContent).not.toContain('Go to restart point');
   });
 
   it('offers no Home without homing set up', () => {
@@ -272,6 +317,37 @@ describe('recovery placement and work origin', () => {
     });
     expect(host?.textContent).toContain('matches the one this job ran with');
     expect(host?.textContent).not.toContain('Restore saved origin');
+  });
+
+  it('offers the origin a run too large to archive kept at its Start', async () => {
+    const exact = capsule(null);
+    const fingerprintOnly: RecoveryCapsule = {
+      ...exact,
+      artifactKind: 'legacy-fingerprint-only',
+      artifact: {
+        schemaVersion: 1,
+        kind: 'legacy-fingerprint-only',
+        runId: exact.runId,
+        createdAtIso: exact.artifact.createdAtIso,
+        migratedAtIso: exact.artifact.createdAtIso,
+        fingerprint: exact.artifact.fingerprint,
+        sendableLines: exact.sendableLines,
+        machineKind: 'laser',
+        outputScope: DEFAULT_OUTPUT_SCOPE,
+        startWorkOffsetMm: { x: 20, y: 30, z: 0 },
+      },
+    };
+    const onRestoreOrigin = vi.fn(async () => undefined);
+    render({
+      capsule: fingerprintOnly,
+      liveWorkOffsetMm: { x: 0, y: 0, z: 0 },
+      restartLine: 1,
+      disabled: false,
+      onRestoreOrigin,
+    });
+    expect(host?.textContent).toContain('Origin thenX 20 · Y 30 mm from machine zero');
+    await act(async () => button('Restore saved origin').click());
+    expect(onRestoreOrigin).toHaveBeenCalledWith({ x: 20, y: 30, z: 0 });
   });
 
   it('converts an origin the controller reported in inches', () => {
