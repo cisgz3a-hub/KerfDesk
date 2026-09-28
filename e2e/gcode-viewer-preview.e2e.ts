@@ -1,7 +1,8 @@
 import { expect, test, type Page } from './fixtures/kerfdesk-test';
 
-// 300,000 moves across rows. Read on a throttled CPU, the worker takes
-// seconds, long enough to watch the picture grow.
+// 300,000 moves across rows, read with the page's CPU slowed. The slowdown
+// does not reach the worker, so the test holds the finished program back until
+// the preview has drawn, as a bigger file keeps the preview up (holdTheRead).
 const ROWS = 1500;
 const CPU_SLOWDOWN = 6;
 const STEPS_PER_ROW = 200;
@@ -86,6 +87,40 @@ async function previewDrawn(page: Page): Promise<PreviewDrawn> {
   );
 }
 
+// Holds the Inspector worker's finished program back until the test lets it
+// go. The worker is not slowed with the page: on a busy machine it read the
+// whole file before the slowed page had started the preview's 3D scene, and
+// the full view replaced a preview that had drawn nothing (0 draws).
+async function holdTheRead(page: Page): Promise<void> {
+  await page.addInitScript(() => {
+    const NativeWorker = window.Worker;
+    const held: (() => void)[] = [];
+    let holding = true;
+    window.Worker = class extends NativeWorker {
+      constructor(url: string | URL, options?: WorkerOptions) {
+        super(url, options);
+        if (!String(url).includes('gcode-inspector-worker')) return;
+        // Added before the page's own handler, so it can keep the message from it.
+        this.addEventListener('message', (event: MessageEvent<{ kind?: string }>) => {
+          if (!holding || event.data.kind !== 'complete') return;
+          event.stopImmediatePropagation();
+          held.push(() => this.dispatchEvent(new MessageEvent('message', { data: event.data })));
+        });
+      }
+    };
+    Object.assign(window, {
+      __finishRead: (): void => {
+        holding = false;
+        for (const deliver of held.splice(0)) deliver();
+      },
+    });
+  });
+}
+
+async function finishTheRead(page: Page): Promise<void> {
+  await page.evaluate(() => (window as unknown as { __finishRead: () => void }).__finishRead());
+}
+
 test('the Inspector draws the moves read so far while its worker reads a big file (ADR-485)', async ({
   page,
   kerfdesk,
@@ -96,6 +131,7 @@ test('the Inspector draws the moves read so far while its worker reads a big fil
     if (message.type() === 'error') errors.push(message.text());
   });
   await watchPreviewDraws(page);
+  await holdTheRead(page);
   await page.goto('/');
   await kerfdesk.setOpenFiles([{ name: 'big-preview.nc', text: bigProgram() }]);
   const cdp = await page.context().newCDPSession(page);
@@ -116,10 +152,11 @@ test('the Inspector draws the moves read so far while its worker reads a big fil
         const { draws, litPixels } = await previewDrawn(page);
         return `${litPixels > 500 ? 'lit' : 'not lit'} after ${draws} draws (${litPixels} px)`;
       },
-      { timeout: 30_000 },
+      { timeout: 60_000 },
     )
     .toMatch(/^lit/);
   await cdp.send('Emulation.setCPUThrottlingRate', { rate: 1 });
+  await finishTheRead(page);
 
   await expect(dialog.getByText(/shown segments/)).toBeVisible({ timeout: 150_000 });
   await expect(preview).toHaveCount(0);
