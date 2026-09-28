@@ -91,9 +91,9 @@ evidence, and the reminder is an issue.
   desktop results can queue when many branches push at once. Superseded pull request runs are
   cancelled.
 - A change that breaks the Windows or macOS Preview package fails on its own pull request, not
-  on the next tag. The first run proved it: the Preview package contract had failed on every
-  commit since 24 Sep 2026, because the Smoothieware firmware banner (`Build version:`, #868)
-  put the Build badge's marker into four more renderer chunks. The contract now finds the badge
+  on the next tag. The first run proved it: the Preview package contract failed, and would have
+  failed any Preview tagged since #868 (24 Sep 2026), because that change's Smoothieware firmware
+  banner (`Build version:`) put the Build badge's marker into four more renderer chunks. The contract now finds the badge
   by its class name, `lf-menu-build`.
 - The weekly Windows native smoke (`packaged-native-smoke.yml`) stays: it feeds the release
   readiness evidence lane, which the per-PR check does not.
