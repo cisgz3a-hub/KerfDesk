@@ -52,6 +52,8 @@ function baseCtxEditingTools(): Partial<AppCommandContext> {
     reverseSelectedPaths: vi.fn(),
     addRubberBandOutline: vi.fn(),
     flattenImageMask: vi.fn(),
+    // LBG-T09 Copy Along Path.
+    copyAlongPath: vi.fn(),
   };
 }
 

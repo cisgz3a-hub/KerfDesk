@@ -103,6 +103,26 @@ export function designToolsCommands(ctx: AppCommandContext): ReadonlyArray<AppCo
   ];
 }
 
+// LBG-T09, in the Arrange menu beside Array. Any selection may try it: a
+// selection without artwork and a guide path gets a notice saying what to add.
+export function copyAlongPathCommand(ctx: AppCommandContext): AppCommand {
+  return ctx.hasSelection
+    ? enabled(
+        'arrange.copy-along-path',
+        'arrange',
+        'Copy Along Path...',
+        'Copy the selected artwork along a selected guide path',
+        ctx.copyAlongPath,
+      )
+    : disabled(
+        'arrange.copy-along-path',
+        'arrange',
+        'Copy Along Path...',
+        'Select the artwork and a guide path first.',
+        ctx.copyAlongPath,
+      );
+}
+
 function pathCommand(
   ctx: AppCommandContext,
   id: 'tools.close-paths' | 'tools.reverse-paths',

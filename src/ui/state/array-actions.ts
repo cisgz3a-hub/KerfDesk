@@ -170,7 +170,8 @@ function selectionIds(state: AppState): ReadonlySet<string> {
   ]);
 }
 
-function cloneSelectedGroups(
+/** New groups for a copy: one per source group that travelled with it whole. */
+export function cloneSelectedGroups(
   groups: ReadonlyArray<SceneGroup>,
   selectedIds: ReadonlySet<string>,
   copiedIds: ReadonlyMap<string, string>,

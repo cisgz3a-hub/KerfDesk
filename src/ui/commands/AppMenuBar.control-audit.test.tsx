@@ -123,6 +123,7 @@ const OUTCOMES: Record<CommandId, Outcome> = {
   },
   'arrange.break-apart': { callback: 'breakApartSelection' },
   'arrange.array': { callback: 'createArray' },
+  'arrange.copy-along-path': { callback: 'copyAlongPath' },
   'arrange.quick-nest': { callback: 'quickNest' },
   'arrange.flip-horizontal': { callback: 'flipHorizontal' },
   'arrange.flip-vertical': { callback: 'flipVertical' },

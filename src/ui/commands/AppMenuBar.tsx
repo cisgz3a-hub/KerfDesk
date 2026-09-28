@@ -15,6 +15,7 @@ import { AppMenuChrome } from './AppMenuChrome';
 import { MenuBarHistoryControls } from './MenuBarHistoryControls';
 import { RecentProjectMenuGroup } from '../recent-projects/RecentProjectMenuGroup';
 import { MOVE_LASER_TO_SELECTION_IDS } from './machine-move-commands';
+import { ARRANGE_LAYOUT_IDS } from './arrange-command-family';
 
 export function AppMenuBar(props: {
   readonly commands: ReadonlyArray<AppCommand>;
@@ -216,7 +217,7 @@ const MENU_GROUPS: Partial<Record<CommandFamily, ReadonlyArray<MenuGroupLayout>>
       ],
     },
     { label: 'Move laser to selection', ids: MOVE_LASER_TO_SELECTION_IDS },
-    { label: 'Layout', ids: ['arrange.array', 'arrange.quick-nest', 'arrange.break-apart'] },
+    { label: 'Layout', ids: ARRANGE_LAYOUT_IDS },
   ],
   window: [
     {

@@ -10,6 +10,8 @@ export type DesignToolsCommandContext = {
   readonly reverseSelectedPaths: () => void;
   readonly addRubberBandOutline: () => void;
   readonly flattenImageMask: () => void;
+  // LBG-T09: opens the Copy Along Path dialog, or explains why it cannot.
+  readonly copyAlongPath: () => void;
 };
 
 export type DesignToolsCommandId =
@@ -19,4 +21,5 @@ export type DesignToolsCommandId =
   | 'tools.close-paths'
   | 'tools.reverse-paths'
   | 'tools.rubber-band-outline'
-  | 'tools.flatten-image-mask';
+  | 'tools.flatten-image-mask'
+  | 'arrange.copy-along-path';

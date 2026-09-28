@@ -164,6 +164,7 @@ function baseCtx(overrides: Partial<AppCommandContext> = {}): AppCommandContext 
     reverseSelectedPaths: vi.fn(),
     addRubberBandOutline: vi.fn(),
     flattenImageMask: vi.fn(),
+    copyAlongPath: vi.fn(),
     ...overrides,
   };
 }

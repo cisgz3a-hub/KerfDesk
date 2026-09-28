@@ -3,6 +3,7 @@
 import type { Project } from '../../core/scene';
 import type { useStore } from '../state';
 import { useToastStore } from '../state/toast-store';
+import { openCopyAlongPathDialog } from './copy-along-path-dialog-store';
 import type { DesignToolsCommandContext } from './design-tools-command-types';
 import { flattenImageMaskAction } from './image-command-actions';
 
@@ -25,6 +26,7 @@ export function designToolsCommandContext(
     flattenImageMask: flattenImageMaskAction(app, selected, (message, kind) =>
       useToastStore.getState().pushToast(message, kind),
     ),
+    copyAlongPath: openCopyAlongPathDialog,
   };
 }
 

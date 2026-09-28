@@ -1,6 +1,8 @@
-// The LightBurn gap batch 5 store actions (ADR-480), composed into the batch 3
-// editing-tools slice so the store gains no new slice.
+// The LightBurn gap batch 5 store actions (ADR-480), and Copy Along Path
+// (LBG-T09), composed into the batch 3 editing-tools slice so the store gains
+// no new slice.
 
+import { copyAlongPathActions, type CopyAlongPathActions } from './copy-along-path-actions';
 import {
   imageMaskFlattenActions,
   type ImageMaskFlattenActions,
@@ -16,7 +18,8 @@ import type { AppState } from './store';
 export type DesignToolsActions = ShapeQueryActions &
   PathCleanupActions &
   RubberBandOutlineActions &
-  ImageMaskFlattenActions;
+  ImageMaskFlattenActions &
+  CopyAlongPathActions;
 
 type Setter = (fn: (state: AppState) => AppState | Partial<AppState>) => void;
 
@@ -26,5 +29,6 @@ export function designToolsActions(set: Setter): DesignToolsActions {
     ...pathCleanupActions(set),
     ...rubberBandOutlineActions(set),
     ...imageMaskFlattenActions(set),
+    ...copyAlongPathActions(set),
   };
 }
