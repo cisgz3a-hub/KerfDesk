@@ -169,6 +169,18 @@ function recolorPaths(
 }
 
 function recolorSceneObjectLayer(object: SceneObject, from: string, to: string): SceneObject {
+  return recolorLaserTabAnchors(recolorSceneObjectKind(object, from, to), from, to);
+}
+
+// ADR-494: laser tab anchors follow their path's colour, as the CNC ones do.
+function recolorLaserTabAnchors(object: SceneObject, from: string, to: string): SceneObject {
+  const anchors = recolorMatchingAnchors(object.laserTabAnchors, from, to);
+  return anchors === undefined || anchors === object.laserTabAnchors
+    ? object
+    : { ...object, laserTabAnchors: anchors };
+}
+
+function recolorSceneObjectKind(object: SceneObject, from: string, to: string): SceneObject {
   switch (object.kind) {
     case 'imported-svg':
     case 'traced-image':

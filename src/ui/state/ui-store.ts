@@ -72,6 +72,9 @@ export type ToolMode =
   | { readonly kind: 'node' }
   | { readonly kind: 'measure' }
   | { readonly kind: 'cnc-tabs'; readonly layerColor: string; readonly operationId?: string }
+  // ADR-494: place, move and remove laser Line tabs on the selected artwork's
+  // `layerColor` contours for one operation. Esc returns to select.
+  | { readonly kind: 'laser-tabs'; readonly layerColor: string; readonly operationId: string }
   // Camera/positioning aid (ADR-116 follow-up): the next canvas click jogs
   // the laser head to that bed point (absolute, beam off). Esc returns to
   // select like every other mode.

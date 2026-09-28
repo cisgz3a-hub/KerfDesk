@@ -92,10 +92,18 @@ export type CutGroup = {
   // or no closed segments, so existing output stays byte-identical. Offset
   // fill groups drop it via the Omit below; overcut is a Line setting.
   readonly finalPassOvercutMm?: number;
+  // ADR-494: present only on the group that burns a Line operation's tab
+  // spans, which follows that operation's cut group; the share of the cut's
+  // power it runs at (`power` already includes it). Absent on every other
+  // group, so their output is unchanged.
+  readonly tabSpanPowerPercent?: number;
   readonly segments: ReadonlyArray<CutSegment>;
 };
 
-export type FillGroup = Omit<CutGroup, 'kind' | 'segments' | 'finalPassOvercutMm'> & {
+export type FillGroup = Omit<
+  CutGroup,
+  'kind' | 'segments' | 'finalPassOvercutMm' | 'tabSpanPowerPercent'
+> & {
   readonly kind: 'fill';
   readonly fillStyle?: LayerFillStyle;
   readonly islandMotionPolicy?: IslandFillMotionPolicy;
