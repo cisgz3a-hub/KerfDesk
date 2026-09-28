@@ -76,6 +76,15 @@ export function defaultArrayForm(bounds: Bounds): ArrayForm {
   };
 }
 
+/**
+ * The settings the dialog reopens with in this session: everything but a
+ * centre object, which may not be there next time, so the circle falls back
+ * to the selection centre.
+ */
+export function rememberedArrayForm(form: ArrayForm): ArrayForm {
+  return form.centre.kind === 'object' ? { ...form, centre: { kind: 'selection' } } : form;
+}
+
 export function arraySpecFromForm(form: ArrayForm, context: ArrayDialogContext): ArraySpec {
   switch (form.mode) {
     case 'grid':

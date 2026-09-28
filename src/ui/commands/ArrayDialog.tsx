@@ -28,7 +28,11 @@ export function ArrayDialog(props: {
   readonly selectionBounds: Bounds;
   /** The selection in stacking order; lets a circular array centre on one of its objects. */
   readonly selected?: ReadonlyArray<SceneObject>;
+  /** Settings to open with, such as the ones last applied; the defaults when absent. */
+  readonly initial?: ArrayForm;
   readonly onCancel: () => void;
+  /** The settings behind the request, just before `onApply`. */
+  readonly onSubmitForm?: (form: ArrayForm) => void;
   readonly onApply: (spec: ArraySpec, advanceVariables?: boolean) => void;
   readonly hasVariableText?: boolean;
   readonly errorMessage?: string;
@@ -40,7 +44,7 @@ export function ArrayDialog(props: {
     [props.selectionBounds, selected],
   );
   const centreObjects = useMemo(() => centreObjectOptions(selected), [selected]);
-  const [form, setForm] = useState(() => defaultArrayForm(props.selectionBounds));
+  const [form, setForm] = useState(() => props.initial ?? defaultArrayForm(props.selectionBounds));
   const [advanceVariables, setAdvanceVariables] = useState(false);
   const spec = arraySpecFromForm(form, context);
   const onChange = (patch: Partial<ArrayForm>): void =>
@@ -53,6 +57,7 @@ export function ArrayDialog(props: {
       onClose={props.onCancel}
       onSubmit={(event) => {
         event.preventDefault();
+        props.onSubmitForm?.(form);
         return advanceVariables ? props.onApply(spec, true) : props.onApply(spec);
       }}
     >
