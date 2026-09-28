@@ -6,7 +6,8 @@ import {
   STOCK_MATERIALS,
   type StockMaterial,
 } from '../viewer3d/scene-stock-materials';
-import type { LaserBurn } from './use-laser-burn';
+import type { BurnShadeBy, LaserBurn } from './use-laser-burn';
+import { BurnEnergyNote } from './BurnEnergyNote';
 
 // On a burn the height map shades the burn itself.
 const BURN_MATERIAL_LABEL: Readonly<Record<StockMaterial, string>> = {
@@ -66,11 +67,27 @@ export function InspectorBurnControl(props: { readonly burn: LaserBurn }): JSX.E
           ))}
         </select>
       </label>
-      {burn.shown ? (
+      <label style={toggleStyle}>
+        Shade by
+        <select
+          aria-label="Shade the burn by"
+          title="Energy counts power, speed, the laser's watts and its beam against the material; power alone is LightBurn's preview"
+          value={burn.shadeBy}
+          disabled={!burn.shown}
+          onChange={(event) => burn.onShadeByChange(event.currentTarget.value as BurnShadeBy)}
+          style={selectStyle}
+        >
+          <option value="energy">Energy (power and speed)</option>
+          <option value="power">Power only</option>
+        </select>
+      </label>
+      {!burn.shown ? null : burn.shadeBy === 'energy' ? (
+        <BurnEnergyNote energy={burn.energy} material={burn.material} />
+      ) : (
         <p style={noteStyle}>
           Darker the more power, S {burn.fullPowerS} darkest. Speed is not counted.
         </p>
-      ) : null}
+      )}
       {burn.failed ? <p style={noteStyle}>The burn could not be shown here.</p> : null}
     </div>
   );

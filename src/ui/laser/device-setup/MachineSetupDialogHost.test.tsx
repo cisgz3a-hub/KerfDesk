@@ -8,6 +8,7 @@ import { MODELED_CNC_BIT_CATALOG } from '../../machine/cnc-bit-catalog';
 import type { PlatformAdapter } from '../../../platform/types';
 import { PlatformProvider } from '../../app/platform-context';
 import { useStore } from '../../state';
+import { loadLastMachine } from '../../state/last-machine-persistence';
 import { resetStore, svgObj } from '../../state/test-helpers';
 import { MachineSetupDialogHost } from './MachineSetupDialogHost';
 import { openMachineSetup, useMachineSetupDialogStore } from './machine-setup-dialog-store';
@@ -136,6 +137,8 @@ describe('MachineSetupDialogHost', () => {
       expect(useStore.getState().project.scene.layers[0]?.cnc?.materialKey).toBe(material.value);
       expect(useStore.getState().project.scene.layers[0]?.cnc?.toolId).toBe(nextTool.id);
       expect(useStore.getState().undoStack).toHaveLength(beforeUndo + 1);
+      // ADR-500: the next session's banner offers the machine just saved.
+      expect(loadLastMachine(localStorage)).toEqual(useStore.getState().project.device);
     } finally {
       await view.unmount();
     }

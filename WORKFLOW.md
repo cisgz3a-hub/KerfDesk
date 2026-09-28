@@ -43,6 +43,10 @@ opportunity, without an extra branding delay. It introduces no startup interacti
 1. App opens to **empty workspace** state (see F-A2).
 2. Status bar shows: `Ready · No device configured · Empty workspace`.
 3. **No** welcome modal, **no** onboarding tour, **no** "what's new" dialog. Just the workspace.
+   A card over the canvas's top right corner says the machine is the generic starter (ADR-500):
+   **Set up machine** opens Machine Setup, or, once a machine was saved there, **Use *name***
+   applies it as one undo step. **Not now** hides it until the next launch. It blocks nothing,
+   takes no focus or canvas room, and goes as soon as the project's machine changes by any route.
 4. Default device profile is auto-loaded:
    - Name: `Default 400×400`
    - Bed: 400 × 400 mm
@@ -1516,6 +1520,17 @@ Status bar messages (toasts that appear in the bar for 3 s) for non-blocking eve
 #### Edge — Brave with WebSerial behind a flag
 1. Same as "not supported"; Brave issue #24404 is noted in `PROJECT.md` delivery targets.
 
+#### Success — pick the fitted laser module (ADR-503)
+1. On a machine whose laser modules swap on one carriage (the Falcon A1 Pro's 20 W blue and
+   2 W infrared), the machine rail shows **Laser module** under the status readout. It names the
+   fitted module by power and colour; the preset ships with the blue one fitted.
+2. After swapping the module on the machine, pick it here. The profile's laser head becomes that
+   module, as one undoable machine change: recipes, the spot-size checks, tracing and the burn
+   preview follow it. The G-code does not change.
+3. Job Review names the module the job was prepared for and asks to check it is fitted. A Falcon
+   saved before it had a head shows "Pick the fitted module" here and a "Not chosen" warning row
+   in the review. Neither stops Start.
+
 ### F-B2. Disconnect
 
 #### Success
@@ -2030,6 +2045,21 @@ existing scalar machine-limit model, so axis-specific acceleration, controller b
 response, spindle-at-speed behavior, and real material/machine pacing remain hardware-calibration
 limits rather than software proof. This display model changes no emitted output, Start
 authorization, Frame proof, controller command, or safety boundary.
+
+### F-B11a. Machine hours and maintenance reminders (ADR-502)
+
+1. Each started job adds the time it spent running to the machine it started on: wall-clock time
+   from Start to its end, without pauses and tool changes. A stopped job counts the time it ran.
+   Frames, jogs, console moves and Preview are not jobs and add nothing.
+2. The machine rail's **Machine hours** section shows the machine's hours and jobs, and its
+   reminders: laser machines start with lens (20 h), air assist and fans (50 h), and belts, wheels
+   and rails (100 h); CNC machines with collet and bit (20 h), rails and lead screws (50 h), and
+   spindle mount and belts (100 h). Each shows when it is due. Intervals can be changed, reminders
+   added and removed, and **Done** counts the interval again from the machine's current hours.
+3. When a job's time makes a reminder due, a warning toast names the machine and the task. The
+   section heading shows how many are due. Nothing is blocked and nothing waits.
+4. Hours are kept in browser storage per machine setup (profile, bed and controller; laser and
+   CNC apart), not in projects. A machine left on the generic starter profile shares one record.
 
 ### F-B12. Disconnect during job (cable yank)
 
@@ -2703,6 +2733,10 @@ the lock when the owning window closes, reloads or crashes, so crash recovery is
    disabled while it has no effect. A chuck never stores a roller diameter.
 4. The preview shows the surface circumference, the machine travel for one revolution (the wrap
    limit the bounds preflight enforces), the Y scale, and the tallest artwork one revolution holds.
+5. **Rotary preset** (ADR-503) shows when the machine's family has a rotary whose maker publishes
+   its settings (today the Creality Rotary Kit Pro as a chuck, 40 mm per rotation, for Falcon
+   machines). Picking it fills in the type and Motion per turn, keeps the object's diameter and
+   the toggles, and shows where the figures come from. Test rotation still checks them.
 
 #### Success — test rotation
 1. With the controller connected, Idle, unalarmed, no job or other motion, auto-focus idle and

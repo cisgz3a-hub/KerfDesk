@@ -25,6 +25,8 @@ import { StatusDisplay } from './StatusDisplay';
 import { JogPad } from './JogPad';
 import { MoveToPositionSection } from './MoveToPositionSection';
 import { JobControls } from './JobControls';
+import { MachineHoursSection } from './MachineHoursSection';
+import { LaserModuleRow } from './LaserModuleRow';
 import { ProbePanel } from './ProbePanel';
 import { runStartJobFlow } from './start-job-flow';
 import { jobAwareConfirm } from '../state/job-aware-dialogs';
@@ -102,6 +104,7 @@ export function LaserWindow({
       )}
       {controllerDisplay.sleep && <SleepBanner onWake={control.runWake} />}
       <StatusDisplay />
+      <LaserModuleRow />
       <JogPad disabled={jogPadDisabled} />
       <MoveToPositionSection disabled={jogPadDisabled} />
       <ProbePanel />
@@ -115,6 +118,7 @@ export function LaserWindow({
         onConfigureHoming={openHomingSetup}
         onStartJob={() => void runStartJobFlow()}
       />
+      <MachineHoursSection />
       <MachineConsoleSection />
     </aside>
   );

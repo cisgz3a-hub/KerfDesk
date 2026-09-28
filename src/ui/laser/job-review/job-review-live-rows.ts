@@ -34,6 +34,7 @@ import { frameMotionFeeds } from '../../state/frame-feed-limits';
 import { parkLabel } from './job-review-park-label';
 import { buildContourEntryReviewFacts } from './job-review-contour-entry-facts';
 import { rotaryReviewSummary } from '../rotary-summary';
+import { laserModuleFacts } from './job-review-laser-module';
 
 export type JobReviewFact = {
   readonly label: string;
@@ -130,6 +131,7 @@ export function buildMachineReviewFacts(
   return [
     ...shared,
     fact('G-code dialect', device.gcodeDialect.dialectId),
+    ...laserModuleFacts(device),
     scanOffsetProvenanceFact(project),
     fact('Laser power scale', `S max $30 = ${device.maxPowerS}`),
     fact(

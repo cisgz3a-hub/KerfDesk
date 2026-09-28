@@ -7,6 +7,7 @@ import {
   loadConfiguredSignatures,
   persistConfiguredSignatures,
 } from '../../state/device-setup-configured-persistence';
+import { rememberLastMachine } from '../../state/last-machine-persistence';
 import { deviceProfileSignature } from './device-setup-nudge';
 import {
   machineSetupHighlight,
@@ -47,4 +48,6 @@ function persistConfiguredProfile(profile: DeviceProfile): void {
     deviceProfileSignature(profile, machineKindOf(useStore.getState().project.machine)),
   );
   persistConfiguredSignatures(storage, configured);
+  // ADR-500: a later session starts on the starter machine and offers this one back.
+  rememberLastMachine(storage, profile);
 }

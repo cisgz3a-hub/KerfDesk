@@ -276,3 +276,11 @@ burn a laser job will leave. This batch shows both in the Inspector.
   whole in 39.7 s with Cut 3D's stamping (measured beside a test run) and in 0.16 s swept; a
   300,000-move relief with a 3.175 mm ball nose in 1.4 s; playback's worst carve between frames
   was 9 ms.
+
+#### Amendment 1 - The burn shades by energy (2026-09-28)
+
+ADR-501 makes energy per square millimetre the burn preview's default shading: each move's power
+and programmed feed on the head's optical power and beam, against a full-burn dose per material,
+with the program's energy range on a scale and the note "Uncalibrated". **Shade by** keeps this
+ADR's power-only shading as **Power only**. "Power, not speed" above and "The burn is a picture of
+power" below describe that choice.

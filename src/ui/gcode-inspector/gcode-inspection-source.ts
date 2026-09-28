@@ -45,6 +45,8 @@ export type GcodeInspectionLaser = {
   readonly maxPowerS: number;
   /** The beam's width on the work: the head's spot, or 0.1 mm without one. */
   readonly spotMm: number;
+  /** The head's optical power, when the machine profile states it (ADR-501). */
+  readonly opticalPowerW?: number;
   /** A rotary set up and on: the work's diameter and the Y that turns it once. */
   readonly rotary?: { readonly diameterMm: number; readonly wrapYMm: number };
 };
@@ -100,10 +102,12 @@ export function deviceInspectionContext(
 /** The device's laser as the burn preview draws it. */
 export function deviceInspectionLaser(device: DeviceProfile): GcodeInspectionLaser {
   const spot = device.laserSubProfile?.spotSizeMm;
+  const opticalPowerW = device.laserSubProfile?.opticalPowerW;
   const rotary = isRotaryActive(device.rotary) ? device.rotary : undefined;
   return {
     maxPowerS: device.maxPowerS,
     spotMm: spot === undefined ? DEFAULT_SPOT_MM : (spot.x + spot.y) / 2,
+    ...(opticalPowerW === undefined ? {} : { opticalPowerW }),
     ...(rotary === undefined
       ? {}
       : { rotary: { diameterMm: rotary.objectDiameterMm, wrapYMm: rotaryYLimitMm(rotary) } }),

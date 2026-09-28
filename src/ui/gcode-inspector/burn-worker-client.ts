@@ -45,9 +45,14 @@ export function startBurnWorker(
   const positions = moves.positions.slice();
   const segKind = moves.segKind.slice();
   const segPower = moves.segPower.slice();
+  const segFeed = moves.segFeed.slice();
   worker.postMessage(
-    { kind: 'start', moves: { ...moves, positions, segKind, segPower }, laser: start.laser },
-    [positions.buffer, segKind.buffer, segPower.buffer],
+    {
+      kind: 'start',
+      moves: { ...moves, positions, segKind, segPower, segFeed },
+      laser: start.laser,
+    },
+    [positions.buffer, segKind.buffer, segPower.buffer, segFeed.buffer],
   );
   return {
     burn: (target) => {

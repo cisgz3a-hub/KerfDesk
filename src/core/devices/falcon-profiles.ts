@@ -1,5 +1,6 @@
 import { GRBLHAL_DEFAULT_RX_BUFFER_BYTES } from '../grbl-streaming';
 import { DEFAULT_DEVICE_PROFILE, type DeviceProfile } from './device-profile';
+import { FALCON_A1_PRO_BLUE_20W_MODULE } from './laser-modules';
 
 export const FALCON_A1_PRO_GRBLHAL_PROFILE: DeviceProfile = {
   ...DEFAULT_DEVICE_PROFILE,
@@ -7,7 +8,7 @@ export const FALCON_A1_PRO_GRBLHAL_PROFILE: DeviceProfile = {
   vendor: 'Creality',
   model: 'Falcon A1 Pro',
   name: 'Creality Falcon A1 Pro (vendor command set)',
-  catalogVersion: '2026-09-24',
+  catalogVersion: '2026-09-28',
   machineFamily: 'creality-falcon',
   controllerKind: 'grblhal',
   controllerCommandSet: 'creality-falcon-a1-pro',
@@ -29,6 +30,9 @@ export const FALCON_A1_PRO_GRBLHAL_PROFILE: DeviceProfile = {
   // cycled over it (ADR-335).
   airAssistRestartUnreliable: true,
   autofocusCommand: '$HZ1',
+  // The 20 W blue module ships fitted; the 2 W infrared module swaps with it
+  // (laser-modules.ts, ADR-503).
+  laserSubProfile: FALCON_A1_PRO_BLUE_20W_MODULE,
   // The output ceiling follows Creality's rated 600 mm/s (36000 mm/min). The
   // vendor contract disables `$$`, so $110/$111 can never correct this value,
   // and the old 10000 (chosen to speed up Frame) held every layer at 28% of the
@@ -58,6 +62,11 @@ export const FALCON_A1_PRO_GRBLHAL_PROFILE: DeviceProfile = {
       label: 'Creality Falcon A1 Pro manufacturer configuration',
       status: 'public-spec-starter',
       note: 'Creality LightBurn bundle checked 2026-09-19: Width 358, Height 268, S scale 1000, baud 115200, M8 air, autofocus $HZ1, no $J jogging or settings fetch. Vendor labels the connection GRBL-LPC; the exact firmware build is not independently established. The retained grblHAL family selection uses model-specific command overrides; it is not hardware qualification. A live 2026-07-19 status report from a maintainer A1 Pro read Bf:512,65535 (512 planner blocks and 65535 receive-buffer bytes free; informal, not qualification), so the profile requests the grblHAL 1024-byte streaming window; Start bounds it by the controller-reported capacity (ADR-331). Source: https://wiki.creality.com/en/laser-engraver/falcon-a1-pro/lightburn-guide',
+    },
+    {
+      label: 'Creality Falcon A1 Pro laser modules',
+      status: 'public-spec-starter',
+      note: 'The 20 W blue module (455 nm, 0.08 x 0.1 mm spot) ships fitted; the optional 2 W infrared module (1064 nm, 0.03 mm spot) swaps with it on the same carriage, so one is fitted at a time. Pick the fitted one under Laser module. Sources: https://www.crealityfalcon.com/products/falcon-a1-pro-20w-dual-laser-engraver, https://www.tomshardware.com/maker-stem/creality-falcon-a1-pro-20-watt-review. Not measured on a machine.',
     },
   ],
 };

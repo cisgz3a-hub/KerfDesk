@@ -28,6 +28,7 @@ const MOVES: BurnMoves = {
   positions: new Float32Array([0, 0, 0, 10, 0, 0]),
   segKind: new Uint8Array([1]),
   segPower: new Float32Array([800]),
+  segFeed: new Float32Array([3000]),
 };
 
 const READY: BurnWorkerResponse = {
@@ -63,6 +64,8 @@ describe('the burn preview worker client (ADR-487)', () => {
     if (request?.kind !== 'start') throw new Error('no start');
     expect(request.moves.segPower).not.toBe(MOVES.segPower);
     expect([...request.moves.segPower]).toEqual([800]);
+    expect(request.moves.segFeed).not.toBe(MOVES.segFeed);
+    expect([...request.moves.segFeed]).toEqual([3000]);
     expect(request.laser).toEqual({ maxPowerS: 1000, spotMm: 0.1 });
     expect(worker.transferred[0]).toContain(request.moves.positions.buffer);
     expect(MOVES.positions.length).toBe(6);

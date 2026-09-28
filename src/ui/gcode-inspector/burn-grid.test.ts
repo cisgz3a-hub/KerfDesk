@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { SEG_KIND } from '../../core/gcode-view';
 import {
+  burnDoseRange,
   burnLayout,
   burnsAnything,
   createBurner,
@@ -9,19 +10,28 @@ import {
   type BurnMoves,
 } from './burn-grid';
 
-type Move = readonly [x0: number, y0: number, x1: number, y1: number, power: number];
+type Move = readonly [
+  x0: number,
+  y0: number,
+  x1: number,
+  y1: number,
+  power: number,
+  feedMmPerMin?: number,
+];
 
-// Moves at Z0: a power above 0 burns, 0 is a traversal.
+// Moves at Z0: a power above 0 burns, 0 is a traversal. 3000 mm/min unless given.
 function moves(list: ReadonlyArray<Move>, z = 0): BurnMoves {
   const positions = new Float32Array(list.length * 6);
   const segKind = new Uint8Array(list.length);
   const segPower = new Float32Array(list.length);
-  list.forEach(([x0, y0, x1, y1, power], index) => {
+  const segFeed = new Float32Array(list.length);
+  list.forEach(([x0, y0, x1, y1, power, feed = 3000], index) => {
     positions.set([x0, y0, z, x1, y1, z], index * 6);
     segKind[index] = power > 0 ? SEG_KIND.cut : SEG_KIND.travel;
     segPower[index] = power;
+    segFeed[index] = feed;
   });
-  return { segmentCount: list.length, positions, segKind, segPower };
+  return { segmentCount: list.length, positions, segKind, segPower, segFeed };
 }
 
 const LASER: BurnLaser = { maxPowerS: 1000, spotMm: 0.1 };
@@ -142,5 +152,57 @@ describe('the burn a laser program leaves (ADR-487)', () => {
     expect(burner.darkness[row * layout.columns + column]).toBe(
       Math.round(255 * (1 - 0.08 * 0.08)),
     );
+  });
+});
+
+describe('shading the burn by energy (ADR-501)', () => {
+  // A 10 W laser on wood, burned fully by 2 J/mm².
+  const ENERGY: BurnLaser = {
+    ...LASER,
+    shading: { by: 'energy', opticalPowerW: 10, fullDoseJPerMm2: 2 },
+  };
+
+  it('burns as the power shading does where the dose follows the power', () => {
+    // 10 W, 0.1 mm beam, 50 mm/s: full power is 2 J/mm², the full burn.
+    const full = burned([[0, 0.55, 1, 0.55, 1000, 3000]], GRID, ENERGY);
+    expect(full(4, 5)).toBe(Math.round(255 * 0.92));
+    const half = burned([[0, 0.55, 1, 0.55, 500, 3000]], GRID, ENERGY);
+    expect(half(4, 5)).toBe(Math.round(255 * 0.46));
+  });
+
+  it('burns lighter faster and darker slower at the same power', () => {
+    const at = (feed: number) => burned([[0, 0.55, 1, 0.55, 500, feed]], GRID, ENERGY)(4, 5);
+    // Twice the speed halves the dose: 0.5 J/mm² leaves 77% of the light.
+    expect(at(6000)).toBe(Math.round(255 * 0.23));
+    expect(at(1500)).toBe(Math.round(255 * 0.92));
+    expect(at(6000)).toBeLessThan(at(3000));
+    const power = burned([[0, 0.55, 1, 0.55, 500, 6000]])(4, 5);
+    expect(power).toBe(Math.round(255 * 0.46));
+  });
+
+  it('needs more energy for a material that burns harder', () => {
+    const acrylic: BurnLaser = {
+      ...LASER,
+      shading: { by: 'energy', opticalPowerW: 10, fullDoseJPerMm2: 4 },
+    };
+    expect(burned([[0, 0.55, 1, 0.55, 1000, 3000]], GRID, acrylic)(4, 5)).toBe(
+      Math.round(255 * 0.46),
+    );
+  });
+
+  it('burns nothing on a move with no feed', () => {
+    expect(burned([[0, 0.55, 1, 0.55, 1000, 0]], GRID, ENERGY)(4, 5)).toBe(0);
+  });
+
+  it('reads the least and most energy the program puts in', () => {
+    const program = moves([
+      [0, 0, 1, 0, 1000, 3000],
+      [0, 1, 1, 1, 0, 3000],
+      [0, 2, 1, 2, 250, 6000],
+    ]);
+    const range = burnDoseRange(program, LASER, 10);
+    expect(range?.min).toBeCloseTo(0.25);
+    expect(range?.max).toBeCloseTo(2);
+    expect(burnDoseRange(moves([[0, 0, 1, 0, 0]]), LASER, 10)).toBeNull();
   });
 });
