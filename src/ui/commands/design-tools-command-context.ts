@@ -6,6 +6,7 @@ import { useToastStore } from '../state/toast-store';
 import { openCopyAlongPathDialog } from './copy-along-path-dialog-store';
 import type { DesignToolsCommandContext } from './design-tools-command-types';
 import { flattenImageMaskAction } from './image-command-actions';
+import { openOptimizeShapesDialog } from './optimize-shapes-dialog-store';
 import { vectorCutCommandContext } from './vector-cut-command-context';
 import { warpDeformCommandContext } from './warp-deform-command-context';
 
@@ -31,6 +32,7 @@ export function designToolsCommandContext(
       useToastStore.getState().pushToast(message, kind),
     ),
     copyAlongPath: openCopyAlongPathDialog,
+    optimizeShapes: openOptimizeShapesDialog,
   };
 }
 

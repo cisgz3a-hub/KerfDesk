@@ -92,6 +92,7 @@ const OUTCOMES: Record<CommandId, Outcome> = {
   'tools.rubber-band-outline': { callback: 'addRubberBandOutline' },
   'tools.close-paths': { callback: 'closeSelectedPaths' },
   'tools.reverse-paths': { callback: 'reverseSelectedPaths' },
+  'tools.optimize-shapes': { callback: 'optimizeShapes' },
   'tools.warp': { callback: 'startWarp' },
   'tools.deform': { callback: 'startDeform' },
   'tools.subtract': { callback: 'subtractSelection' },

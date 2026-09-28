@@ -64,6 +64,8 @@ function baseCtxEditingTools(): Partial<AppCommandContext> {
     deformToolActive: false,
     startWarp: vi.fn(),
     startDeform: vi.fn(),
+    // LBG-T22 Optimize Shapes.
+    optimizeShapes: vi.fn(),
   };
 }
 

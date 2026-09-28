@@ -174,6 +174,7 @@ function baseCtx(overrides: Partial<AppCommandContext> = {}): AppCommandContext 
     deformToolActive: false,
     startWarp: vi.fn(),
     startDeform: vi.fn(),
+    optimizeShapes: vi.fn(),
     ...overrides,
   };
 }

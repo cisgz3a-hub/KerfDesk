@@ -34,6 +34,7 @@ import { useGcodeInspectorSlot } from './use-gcode-inspector-slot';
 import { WorkspaceContextBar } from './WorkspaceContextBar';
 import { ArrayDialogHost } from './ArrayDialogHost';
 import { CopyAlongPathDialogHost } from './CopyAlongPathDialogHost';
+import { OptimizeShapesDialogHost } from './OptimizeShapesDialogHost';
 import { QuickNestDialogHost } from './QuickNestDialogHost';
 import { PrintAndCutDialogHost } from '../laser/PrintAndCutDialogHost';
 import { ScanOffsetCommandDialog } from './ScanOffsetCommandDialog';
@@ -156,6 +157,7 @@ function StoreOpenedDialogs(): JSX.Element {
       <GcodeSaveDialogHost />
       <BarcodeDialogHost />
       <CopyAlongPathDialogHost />
+      <OptimizeShapesDialogHost />
       <ExportSvgDialogHost />
       <SettingsWindowHost />
     </>
