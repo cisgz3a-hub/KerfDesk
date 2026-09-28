@@ -41,7 +41,7 @@ function laserAssumptions(
 
 describe('gcodeMetadataHeader', () => {
   it('tracks the latest safety-relevant emitter revision', () => {
-    expect(EMITTER_REVISION).toBe('proven-air-floor-runs-stay-down-park-20260928-v6');
+    expect(EMITTER_REVISION).toBe('proven-air-floors-kerf-arcs-scan-angle-20260928-v8');
   });
 
   it('emits provenance as GRBL comment lines and ends with a newline', () => {

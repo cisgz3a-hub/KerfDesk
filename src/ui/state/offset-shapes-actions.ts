@@ -106,7 +106,7 @@ function offsetShapesMutation(
     selectedPathNode: null,
     selectedPathNodes: [],
     additionalSelectedIds: new Set(createdIds.slice(1)),
-    undoStack: pushUndo(state.project, state.undoStack),
+    undoStack: pushUndo(state.project, state.undoStack, 'Offset Shapes'),
     redoStack: [],
     dirty: true,
   };

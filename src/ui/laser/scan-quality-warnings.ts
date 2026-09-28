@@ -4,6 +4,7 @@ import {
   feedMatchedFillRunwayMm,
   genericFeedMatchedFillRunwayMm,
 } from '../../core/job/fill-sweep-plan';
+import { alongScanAccelMmPerSec2 } from '../../core/job/automatic-overscan';
 import { accelerationDistanceMm } from '../../core/job/operation-cut-extras';
 import { outputOperationLayers, type Project } from '../../core/scene';
 
@@ -50,16 +51,35 @@ function runwayWarning(
   acceleration: number,
 ): string | null {
   const feed = effectiveGcodeFeedMmPerMin(group.speed);
-  const needed = accelerationDistanceMm(feed, acceleration);
+  // ADR-495: a scan off the axes gets more acceleration than either axis alone.
+  const angleDeg = scanAngleDegOf(group);
+  const alongScan = alongScanAccelMmPerSec2(acceleration, angleDeg);
+  const needed = accelerationDistanceMm(feed, alongScan);
   const available = maximumRunway(group);
   if (!Number.isFinite(needed) || needed <= available + CONTROLLER_GRID_MM) return null;
+  const accelText =
+    alongScan === acceleration
+      ? `${formatMm(acceleration)} mm/s²`
+      : `${formatMm(acceleration)} mm/s² (${formatMm(alongScan)} mm/s² along its ${formatMm(angleDeg)}° scan)`;
   return (
     `${label} has at most ${formatMm(available)} mm of scan-entry runway. ` +
-    `At ${formatMm(feed)} mm/min, the saved acceleration of ${formatMm(acceleration)} mm/s² ` +
+    `At ${formatMm(feed)} mm/min, the saved acceleration of ${accelText} ` +
     `needs about ${formatMm(needed)} mm to reach that speed from rest. ` +
     'Blank gaps can shorten the runway further. Review Overscan or reduce speed, then test the ' +
     'scan edges on scrap. This is a saved-motion estimate, not a measured machine limit.'
   );
+}
+
+// The direction a group scans in: an image's scan angle, a fill's first hatch.
+function scanAngleDegOf(group: FillGroup | RasterGroup): number {
+  if (group.kind === 'raster') return group.scanAngleDeg ?? 0;
+  for (const segment of group.segments) {
+    const [a, b] = segment.polyline;
+    if (a === undefined || b === undefined || (a.x === b.x && a.y === b.y)) continue;
+    const deg = (Math.atan2(b.y - a.y, b.x - a.x) * 180) / Math.PI;
+    return ((deg % 180) + 180) % 180;
+  }
+  return 0;
 }
 
 function maximumRunway(group: FillGroup | RasterGroup): number {

@@ -61,6 +61,19 @@ export type LayerOperationSettings = {
   readonly tabSpacingMm?: number | undefined;
   readonly tabMaxPerShape?: number | undefined;
   readonly tabCutPowerPercent?: number | undefined;
+  // ADR-492. Optional for the same reason: absent means an image scanned along
+  // X, no image cross-hatch and no angle change between passes, which compiles
+  // byte-identically to the output before them. An older build ignores them and
+  // scans the same picture along X.
+  readonly imageScanAngleDeg?: number | undefined;
+  readonly imageCrossHatch?: boolean | undefined;
+  /** Added to a Fill's hatch angle or an Image's scan angle on every pass. */
+  readonly passAngleStepDeg?: number | undefined;
+  // ADR-495. Optional for the same reason: absent means the stored overscan,
+  // as before. When true an Image or a scanline or island Fill works out its
+  // runway from its speed and the machine's acceleration at compile time; an
+  // older build uses the stored overscan instead.
+  readonly autoOverscan?: boolean | undefined;
 };
 
 // ADR-494: 'count' puts tabsPerShape tabs on every contour; 'spacing' puts one
@@ -169,6 +182,10 @@ const LAYER_OPERATION_SETTING_KEYS = [
   'tabSpacingMm',
   'tabMaxPerShape',
   'tabCutPowerPercent',
+  'imageScanAngleDeg',
+  'imageCrossHatch',
+  'passAngleStepDeg',
+  'autoOverscan',
 ] as const satisfies ReadonlyArray<keyof LayerOperationSettings>;
 
 const LAYER_COLOR_RE = /^#[0-9a-fA-F]{6}$/;
@@ -251,6 +268,10 @@ export const OPTIONAL_CUT_SETTING_KEYS = [
   'tabSpacingMm',
   'tabMaxPerShape',
   'tabCutPowerPercent',
+  'imageScanAngleDeg',
+  'imageCrossHatch',
+  'passAngleStepDeg',
+  'autoOverscan',
 ] as const satisfies ReadonlyArray<keyof LayerOperationSettings>;
 
 // Written only when set, so a capture of an operation that never used them

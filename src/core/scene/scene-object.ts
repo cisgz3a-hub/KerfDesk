@@ -143,6 +143,10 @@ export type ObjectOperationSettingsOverride = {
   readonly tabSpacingMm?: number | undefined;
   readonly tabMaxPerShape?: number | undefined;
   readonly tabCutPowerPercent?: number | undefined;
+  readonly imageScanAngleDeg?: number | undefined;
+  readonly imageCrossHatch?: boolean | undefined;
+  readonly passAngleStepDeg?: number | undefined;
+  readonly autoOverscan?: boolean | undefined;
 };
 
 export type ObjectOperationOverride = ObjectOperationSettingsOverride & {

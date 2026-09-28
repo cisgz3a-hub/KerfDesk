@@ -64,7 +64,12 @@ type PathOptimizationSettings = Pick<
   ProjectOptimizationSettings,
   'travelPolicy' | 'insideFirst' | 'layerPriority' | 'pathDirection' | 'startPoint'
 > &
-  Partial<Pick<ProjectOptimizationSettings, 'removeOverlappingLines' | 'closedShapeStart'>>;
+  Partial<
+    Pick<
+      ProjectOptimizationSettings,
+      'removeOverlappingLines' | 'overlapMergeToleranceMm' | 'closedShapeStart'
+    >
+  >;
 const DEFAULT_PATH_OPTIMIZATION: PathOptimizationSettings = {
   travelPolicy: 'nearest-neighbor',
   insideFirst: true,
@@ -89,7 +94,11 @@ export function optimizePaths(
     // shared edges afterwards cannot turn an inner contour into a new outer cut.
     groups:
       settings.removeOverlappingLines === true
-        ? ordered.map((group) => (group.kind === 'cut' ? removeCutOverlaps(group) : group))
+        ? ordered.map((group) =>
+            group.kind === 'cut'
+              ? removeCutOverlaps(group, settings.overlapMergeToleranceMm ?? 0)
+              : group,
+          )
         : ordered,
   };
 }

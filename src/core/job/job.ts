@@ -161,6 +161,12 @@ export type RasterGroup = {
   readonly bidirectionalScanOffsetMm?: number;
   readonly bidirectional?: boolean;
   readonly scanDirection?: EffectiveScanDirection;
+  // ADR-492: present only for an image scanned at an angle, in (0, 180). Then
+  // `bounds`, the pixel grid, rows, overscan and scan offset are all in the
+  // scan frame, which reaches machine coordinates by rotating this many
+  // degrees counter-clockwise about the machine origin (raster-scan-frame.ts).
+  // Absent means along machine X, exactly as before.
+  readonly scanAngleDeg?: number;
 };
 
 export type RasterRowProviderOrder = 'ascending-y' | 'descending-y';
@@ -370,6 +376,14 @@ export type JobDiagnostic =
       readonly source: string;
       readonly expectedPixels: number;
       readonly actualPixels: number;
+    }
+  // ADR-492: the operation asks for a scan angle, cross-hatch or an angle change
+  // per pass, but a rotary only keeps rows along X straight, so every pass
+  // scans along X.
+  | {
+      readonly kind: 'image-scan-angle-rotary';
+      readonly layerName: string;
+      readonly source: string;
     };
 
 /** Complete compile evidence for one scheduled V-carve operation. */

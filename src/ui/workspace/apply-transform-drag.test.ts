@@ -8,16 +8,12 @@ import {
 } from '../../core/scene';
 import { applyTransformDrag } from './apply-transform-drag';
 import type { DragState } from './drag-state';
-import type { SnapGuide } from './snapping';
+import { DEFAULT_SNAP_SETTINGS, type SnapGuide } from './snapping';
 
 const event = { shiftKey: false, ctrlKey: false, metaKey: false };
-const snapSettings = {
-  enabled: true,
-  snapToGrid: false,
-  snapToObjects: true,
-  distanceMm: 2,
-  gridMm: 10,
-};
+const snapSettings = { ...DEFAULT_SNAP_SETTINGS, snapToGrid: false };
+// The default 8 px reach is 2 mm at this zoom.
+const pxToMm = 0.25;
 
 describe('applyTransformDrag', () => {
   it('does not snap a multi-selected move to another selected object stale position', () => {
@@ -33,6 +29,8 @@ describe('applyTransformDrag', () => {
       project: projectWithObjects([first, second]),
       selectionAnchor: 'c',
       snapSettings,
+      pxToMm,
+      setSnapMarker: () => undefined,
       setObjectTransform: (id, transform) => updates.push({ id, transform }),
       setSnapGuides: (next) => {
         guides = next;
@@ -59,6 +57,8 @@ describe('applyTransformDrag', () => {
       project: projectWithObjects([a, b]),
       selectionAnchor: 'c',
       snapSettings,
+      pxToMm,
+      setSnapMarker: () => undefined,
       setObjectTransform: (id, transform) => updates.push({ id, transform }),
       setSnapGuides: () => undefined,
     });
