@@ -1,4 +1,4 @@
-// Colour layers trace visible sRGB over white, with alpha=0 remaining void.
+// Colour layers trace visible sRGB over white, retaining the alpha-64 floor.
 // The decoder already composites RGB and tags it; straight RGBA needs exactly
 // one composite. Normalize before averaging so alpha is never applied twice.
 // Large images read this appearance on demand into a bounded two-row cache,
@@ -6,7 +6,7 @@
 // Anti-aliased fringe against transparency stays void (ADR-461 Amendment 1):
 // a partial pixel reached from alpha=0 whose alpha is under half that of
 // nearby ink of the same colour keeps the edge at ~50 % coverage, while
-// translucent ink itself (alpha near its own local peak, even below 128, or a
+// visible translucent ink itself (alpha >= 64 near its local peak, or a
 // translucent colour hugging different opaque ink) is still traced. The rest
 // of that edge shows its ink's own colour (lifted to the plateau's opacity),
 // and the resampled working grid applies the same half-coverage rule per cell.
@@ -18,6 +18,8 @@ import type { RawImageData } from './trace-image';
 
 const CHANNELS = 4;
 const MAX_BYTE = 255;
+/** Keep the quarter-opacity floor from ADR-461 Amendment 1. */
+export const VISIBLE_ALPHA_MIN = 64;
 // The nearby ink's opacity is the peak alpha within this many pixels.
 const FRINGE_REACH = 2;
 // A working cell is ink when at least this share of its area is visible.
@@ -34,7 +36,7 @@ export function colourAppearance(source: RawImageData): RawImageData {
     const alpha = source.data[offset + 3] as number;
     if (alpha === 0 || alpha === MAX_BYTE) continue;
     data ??= source.data.slice();
-    if (fringe?.[offset / CHANNELS] === 1) {
+    if (alpha < VISIBLE_ALPHA_MIN || fringe?.[offset / CHANNELS] === 1) {
       data[offset + 3] = 0;
       continue;
     }
@@ -135,7 +137,7 @@ function horizontalRow(
       // visible RGB. Weighting it again would disagree with flattened artwork.
       // A void source pixel adds neither colour (its RGB is hidden) nor
       // coverage; the cell's colour is the mean of its visible pixels.
-      if (alpha === 0) continue;
+      if (alpha < VISIBLE_ALPHA_MIN) continue;
       const shown = lift?.get(pixel) ?? alpha;
       for (let channel = 0; channel < 3; channel += 1) {
         const value = visibleChannel(source, src, channel, alpha, shown);

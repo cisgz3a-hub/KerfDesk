@@ -15,11 +15,13 @@ const ARROW_SPREAD = 0.45;
 export function CutSettingsFillDirectionPreview(props: {
   readonly angleDeg: number;
   readonly crossHatch: boolean;
+  /** Names the process the preview shows; Fill unless told otherwise. */
+  readonly ariaLabel?: string;
 }): JSX.Element {
   const lineCount = props.crossHatch ? PREVIEW_CROSS_LINE_COUNT : PREVIEW_PRIMARY_LINE_COUNT;
   return (
     <svg
-      aria-label="Fill scan direction preview"
+      aria-label={props.ariaLabel ?? 'Fill scan direction preview'}
       role="img"
       viewBox={`0 0 ${PREVIEW_WIDTH} ${PREVIEW_HEIGHT}`}
       width={PREVIEW_WIDTH}

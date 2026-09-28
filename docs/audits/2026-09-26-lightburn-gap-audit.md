@@ -46,17 +46,17 @@ Sierra variants).
 | LBG-T01 | Move Selected Objects to the bed centre, corners and edges | `R/MoveSelectedObjects/` | Built: Arrange → Move to bed, nine positions (ADR-410). Move to the laser position is still open; it needs Frame's machine-to-scene mapping | S | built (ADR-410) |
 | LBG-T02 | Rotate 90° clockwise and counter-clockwise commands | `R/TransformControls/` | Built: Arrange menu and `.` / `,`, exact quarter turns (ADR-410) | S | built (ADR-410) |
 | LBG-T03 | Offset Shapes: Both directions, Round/Bevel/Corner joins, delete original, open paths, Tools menu entry | `R/OffsetShapes/` | Built: Tools → Offset Shapes... with a live preview (ADR-410). Optimize / Simplify results is still open | S | built (ADR-410) |
-| LBG-T04 | Trim Shapes (click a segment to delete it back to the intersections) | `R/TrimShapes/` | Planned stub in Design Studio only (`src/ui/design-studio/design-tool.ts`) | M-L | open |
+| LBG-T04 | Trim Shapes (click a segment to delete it back to the intersections) | `R/TrimShapes/` | Planned stub in Design Studio only (`src/ui/design-studio/design-tool.ts`) | M-L | Built (ADR-498) |
 | LBG-T05 | Apply Path to Text alignment (X left/middle/right, Y top/middle/bottom) | `R/ApplyPathToText/` | Guide, start offset and reverse only (`src/core/text/text-on-path.ts`) | S | Built (ADR-480) |
-| LBG-T06 | Warp (4 point) and Deform (16 point) | `R/WarpDeform/` | Missing; `src/core/camera/homography.ts` exists for reuse | M | open |
+| LBG-T06 | Warp (4 point) and Deform (16 point) | `R/WarpDeform/` | Missing; `src/core/camera/homography.ts` exists for reuse | M | Built (ADR-498) |
 | LBG-T07 | Create Rubber-Band Outline around a selection | `R/CreateRubberBandOutline/` | Missing | S | Built (ADR-480) |
-| LBG-T08 | Cut Shapes (split shapes by a closed cutter) | `R/CutShapes/` | Missing | M | open |
-| LBG-T09 | Copy Along Path | `R/CopyAlongPath/` | Missing; `src/core/scene/array-layout.ts` and `text-on-path.ts` path sampling can be reused | M | open |
+| LBG-T08 | Cut Shapes (split shapes by a closed cutter) | `R/CutShapes/` | Missing | M | Built (ADR-498) |
+| LBG-T09 | Copy Along Path | `R/CopyAlongPath/` | Missing; `src/core/scene/array-layout.ts` and `text-on-path.ts` path sampling can be reused | M | Built (ADR-498) |
 | LBG-T10 | Resize Slots in Selection | `R/ResizeSlots/` | Missing for artwork; Box Generator only | M | open |
 | LBG-T11 | Boolean Assistant preview | `R/BooleanTools/` | Missing | S-M | open |
 | LBG-T12 | Measure shape readout (perimeter, area, node count, open or closed) and node snapping | `R/Measure/` | Distance and angle line (`src/ui/workspace/measure-tool.ts`) | S-M | open |
-| LBG-T13 | Grid Array extras: centre-to-centre spacing, row/column shift, reverse, mirror alternate, virtual array | `R/GridArray/` | Rows, columns, edge gap, variable advance (`array-layout.ts`) | S-L | open |
-| LBG-T14 | Circular Array end/step angle and last-selected-as-centre | `R/CircularArray/` | Count, centre, radius, start angle, rotate copies | S | open |
+| LBG-T13 | Grid Array extras: centre-to-centre spacing, row/column shift, reverse, mirror alternate, virtual array | `R/GridArray/` | Rows, columns, edge gap, variable advance (`array-layout.ts`) | S-L | Built (ADR-499), except the virtual array (needs a new object kind) |
+| LBG-T14 | Circular Array end/step angle and last-selected-as-centre | `R/CircularArray/` | Count, centre, radius, start angle, rotate copies | S | Built (ADR-499) |
 | LBG-T15 | Move Laser to Selection (centre, corners, edges) | `R/MoveLaserToSelection/` | Missing; click-to-move exists (`src/ui/workspace/position-laser-click.ts`) | S | Built (ADR-493) |
 | LBG-T16 | Mirror Across Line | `R/FlipMirror/` | Missing | S | open |
 | LBG-T17 | Two-Point Rotate/Scale | `R/TwoPointRotateScale/` | Missing | M | open |
@@ -64,7 +64,7 @@ Sierra variants).
 | LBG-T19 | Unlock Selected (not only Unlock All) | `R/LockShapes/` | Lock Selection and Unlock All (`src/ui/commands/edit-command-family.ts`) | S | open |
 | LBG-T20 | Auto-Group shapes contained in another shape | `R/Grouping/` | Missing | S | open |
 | LBG-T21 | Dock, and Distribute "Move Together" | `R/Dock/`, `R/Distribute/` | Missing | S | open |
-| LBG-T22 | Optimize Selected Shapes (smooth, fit to arcs and lines) | `R/UI/EditMenu/` | Arc fairing exists inside Trace only (`src/core/trace/centerline/arc-fairing.ts`) | M | open |
+| LBG-T22 | Optimize Selected Shapes (smooth, fit to arcs and lines) | `R/UI/EditMenu/` | Arc fairing exists inside Trace only (`src/core/trace/centerline/arc-fairing.ts`) | M | Built (ADR-499) |
 | LBG-T23 | Tangent Circle, display draw-order push | `R/TangentCircleGenerator/`, `R/DrawOrder/` | Missing (Run order already covers cut order) | S | open |
 
 ## Gaps: cut settings and cut planning
@@ -74,16 +74,16 @@ Sierra variants).
 | LBG-C01 | Perforation (cut length and skip length) on Line layers | `R/CutSettingsEditor/LineMode/` | Missing | S-M | Built (ADR-415) |
 | LBG-C02 | Overcut past the start of closed shapes | `R/CutSettingsEditor/LineMode/` | Missing for laser (CNC dogbone only) | S | Built (ADR-415) |
 | LBG-C03 | Image overscan you can set per operation | `R/CutSettingsEditor/ImageMode/` | Fixed 5 mm (`DEFAULT_OVERSCAN_MM`, `src/core/job/compile-job-raster.ts`) | S | Built (ADR-415). Follow-up: map LightBurn's perforation, overcut and overscan fields in `.lbrn`/`.clb` import |
-| LBG-C04 | Best start point and "choose corners" for closed shapes | `R/OptimizationSettings/` | Closed shapes start at their drawn start point (`src/core/job/segment-entry-index.ts`) | M | open |
-| LBG-C05 | Tabs: click-placed laser tabs, even spacing, maximum count, tab cut power | `R/AddTabs/` | Count, size and skip-inner only (`src/core/geometry/tabs-bridges.ts`) | M | open |
-| LBG-C06 | Image scan angle 0/90/180 and Angle Increment per pass | `R/CutSettingsEditor/ImageMode/` | Images always scan along X (`src/core/raster/raster-sweep-plan.ts`) | M-L | open |
+| LBG-C04 | Best start point and "choose corners" for closed shapes | `R/OptimizationSettings/` | Closed shapes start at their drawn start point (`src/core/job/segment-entry-index.ts`) | M | Built (ADR-494) |
+| LBG-C05 | Tabs: click-placed laser tabs, even spacing, maximum count, tab cut power | `R/AddTabs/` | Count, size and skip-inner only (`src/core/geometry/tabs-bridges.ts`) | M | Built (ADR-494) |
+| LBG-C06 | Image scan angle 0/90/180 and Angle Increment per pass | `R/CutSettingsEditor/ImageMode/` | Images always scan along X (`src/core/raster/raster-sweep-plan.ts`) | M-L | Built in ADR-492 by the Rayforge comparison thread, with image cross-hatch and an angle per pass for fills too; LightBurn import does not map Angle Increment yet |
 | LBG-C07 | Sort Cuts Last; bulk Enable/Disable/Invert/Hide Others in the operations list | `R/CutsLayersWindow/` | Missing | S | Built (ADR-480). Follow-up: bulk air assist switches |
 | LBG-C08 | Start and end dwell on Line layers | `R/CutSettingsEditor/LineMode/` | Missing | S | open |
 | LBG-C09 | Tool layers (never output, for guides and masks) | `https://docs.lightburnsoftware.com/1.7/Reference/UI/ColorPalette/` | An operation with output off comes close | S | open |
 | LBG-C10 | Ramp length (sloped edges for stamps) | `R/CutSettingsEditor/FillMode/` | Missing | M-L | open |
 | LBG-C11 | Hide Backlash, Cut in Direction Order, Reduce Direction Changes | `R/OptimizationSettings/` | Missing | S-M | open |
 | LBG-C12 | Flood fill travel planning | `R/CutSettingsEditor/FillMode/` | Island Fill covers part of it (`src/core/job/island-fill.ts`) | L | open |
-| LBG-C13 | Remove Overlapping Lines tolerance you can set | `R/OptimizationSettings/` | Fixed tolerance (`src/core/job/remove-cut-overlaps.ts`) | S | open |
+| LBG-C13 | Remove Overlapping Lines tolerance you can set | `R/OptimizationSettings/` | Fixed tolerance (`src/core/job/remove-cut-overlaps.ts`) | S | Built (ADR-499) |
 | LBG-C14 | Laser lead-in and lead-out | `R/CutSettingsEditor/LineMode/` | Laser-off contour entry on the 4040-safe profile only | M | DECISION (PROJECT.md lists laser lead-in/out out of scope) |
 | LBG-C15 | Laser Z offset and Z step per pass | `R/CutSettingsEditor/LineMode/` | Missing | M | DECISION (laser Z out of scope in PROJECT.md) |
 
@@ -106,7 +106,7 @@ Sierra variants).
 | LBG-M02 | Numeric Move-to, saved positions, laser Finish Position | `R/MoveWindow/`, `R/CoordinatesOrigin/` | Click-to-move only; laser finish is fixed (`src/core/output/job-park-target.ts`) | S | Built (ADR-493) |
 | LBG-M03 | Rubber-band frame (outline that hugs the artwork) | `R/LaserWindow/` | Bounding-box frame (`src/core/job/frame-bounds.ts`) | M | open (needs an ADR) |
 | LBG-M04 | Red-dot pointer offset | `R/DeviceSettings/DimensionsUnits/` | Missing | M | open |
-| LBG-M05 | Material Test: choose the varied parameters (interval, passes), Line and Image modes, border | `R/MaterialTest/` | Speed by power, Fill only (`src/core/job/material-test-grid.ts`) | M | open |
+| LBG-M05 | Material Test: choose the varied parameters (interval, passes), Line and Image modes, border | `R/MaterialTest/` | Speed by power, Fill only (`src/core/job/material-test-grid.ts`) | M | Built in ADR-497: rows and columns vary any two of speed, power, passes and hatch spacing; Engrave or Cut; runway sized for the fastest cell. Image mode and a border remain open |
 | LBG-M06 | Frame continuously (does not grant Start) | `R/DeviceSettings/BasicSettings/` | Missing | S-M | open |
 | LBG-M07 | Keyboard XY jog with modifier keys | `R/MoveWindow/` | Z only (`src/ui/laser/use-jog-shortcuts.ts`) | S | Built (ADR-493) |
 | LBG-M08 | Rotary on an A axis for 4-axis grblHAL and FluidNC boards | `R/RotaryMode/RotaryModeGCode/` | Y substitution only (`src/core/devices/rotary.ts`) | M | open |
@@ -125,7 +125,7 @@ Sierra variants).
 | LBG-F03 | Select Contained, Select Smaller Than | `R/UI/EditMenu/` | Missing | S | Built (ADR-480) |
 | LBG-F04 | Filled or Wireframe view toggle | `R/ViewStyle/` | Built: Window → Wireframe View, `Alt+W` (ADR-410) | S | built (ADR-410) |
 | LBG-F05 | Pasting SVG or images copied from other apps | `R/UI/EditMenu/` | In-app clipboard only | M | open |
-| LBG-F06 | Snapping to nodes, midpoints, centres and intersections; settable grid and distance | `R/Snapping/` | Bounding-box edges and centres, fixed 10 mm grid and 2 mm distance (`src/ui/workspace/snapping.ts`) | M | open |
+| LBG-F06 | Snapping to nodes, midpoints, centres and intersections; settable grid and distance | `R/Snapping/` | Bounding-box edges and centres, fixed 10 mm grid and 2 mm distance (`src/ui/workspace/snapping.ts`) | M | Built (ADR-498) |
 | LBG-F07 | Guidelines dragged from the rulers | `R/AutomaticGuidelines/` | Missing | M-L | open |
 | LBG-F08 | Delete Duplicates in the design, Close Path on any layer, Reverse Direction | `R/UI/EditMenu/` | Output-time overlap removal and Fill-only close | S-M | Built (ADR-480) |
 | LBG-F09 | Text Upper Case, vertical alignment, faux bold and italic, Max Width and Squeeze | `R/Text/`, `R/ShapeProperties/` | Missing | S-M | open |
@@ -137,7 +137,7 @@ Sierra variants).
 | LBG-F15 | Hotkey editor | `R/EditHotkeys/` | Read-only shortcut list | M | open |
 | LBG-F16 | Preview: shade vectors by power, legend, save image | `R/Preview/` | Rasters shaded only | S-M | open |
 | LBG-F17 | Import: editable text and bitmaps from `.lbrn`, `.lbrn` image and Offset Fill settings, WebP and TGA images, mixed PDF pages | `R/FileManagement/` | Rect, Ellipse, Path and Group only (`src/io/lightburn/lbrn-geometry.ts`); `CutSetting_Img` skipped (`lbrn-import.ts`) | S-L | open |
-| LBG-F18 | Preferences dialog (grid, snap, nudge, wheel, import options, autosave interval) | `R/SettingsPreferences/` | Scattered settings | M | open |
+| LBG-F18 | Preferences dialog (grid, snap, nudge, wheel, import options, autosave interval) | `R/SettingsPreferences/` | Scattered settings | M | Built (ADR-499): one Settings window with grid, snap and nudge; no wheel, import or autosave-interval preferences exist yet |
 
 ## Deliberate differences that need a maintainer decision
 
@@ -162,8 +162,20 @@ Each batch is one pull request with its own decision record, tests and WORKFLOW.
   no machine. Built in ADR-480.
 - **Batch 6 — moving the machine:** LBG-T15, LBG-M02, LBG-M07. Chosen with batch 5 on 2026-09-27.
   Built in ADR-493.
-- **Next candidates, in order:** LBG-C04, LBG-C05, LBG-I01, LBG-I02, LBG-C06, LBG-T04, LBG-T06,
-  LBG-T08, LBG-T09, LBG-F06.
+- **Batch 7 — closed-shape starts and laser tabs:** LBG-C04, LBG-C05. Changes G-code only when a
+  project or operation turns them on. Built in ADR-494.
+- **Batch 8 — trimming, cutting, bending and snapping:** LBG-T04, LBG-T06, LBG-T08, LBG-T09,
+  LBG-F06. Design tools only; no machine motion and no change to how existing projects compile.
+  Built in ADR-498.
+- **Batch 9 — arrays, undo list, Settings, keys and smoothing:** LBG-T13, LBG-T14, LBG-F18, LBG-T22,
+  LBG-C13, plus a named undo list, align and distribute keys and a 0.1 mm nudge from the Rayforge
+  comparison. Built in ADR-499.
+- **Next candidates, in order:** LBG-I01, LBG-I02 (after the Rayforge thread's image scan work
+  lands, since both change the image pipeline).
+- **Taken by the Rayforge comparison thread (2026-09-27):** LBG-C06 (image scan angle and cross-hatch,
+  built in ADR-492) and LBG-M05 (more material test grids, built in ADR-497), plus automatic
+  overscan from speed and acceleration (ADR-495) and recipes that apply themselves (ADR-496),
+  outside these batches.
 - **Not in these batches:** the Camera feature rebuild thread owns LBG-M13 (several cameras per
   device) and is also building camera print-and-cut, trace from the camera image and object
   detection. LBG-M09 (Print and Cut out of Labs) stays unscheduled here until that work lands, so

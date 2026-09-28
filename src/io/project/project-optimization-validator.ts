@@ -1,4 +1,10 @@
-import { firstError, isObject, optionalBoolean, optionalLiteral } from './project-shape-primitives';
+import {
+  firstError,
+  isObject,
+  optionalBoolean,
+  optionalLiteral,
+  optionalNumber,
+} from './project-shape-primitives';
 
 export function validateOptimization(value: unknown): string | null {
   if (value === undefined) return null;
@@ -8,6 +14,7 @@ export function validateOptimization(value: unknown): string | null {
     optionalLiteral(value, 'optimization.travelPolicy', ['nearest-neighbor', 'source-order']),
     optionalBoolean(value, 'optimization.insideFirst'),
     optionalBoolean(value, 'optimization.removeOverlappingLines'),
+    optionalNumber(value, 'optimization.overlapMergeToleranceMm'),
     optionalLiteral(value, 'optimization.layerPriority', [
       'project-order',
       'reverse-project-order',
@@ -18,5 +25,6 @@ export function validateOptimization(value: unknown): string | null {
       'job-lower-left',
       'job-center',
     ]),
+    optionalLiteral(value, 'optimization.closedShapeStart', ['drawn', 'nearest', 'nearest-corner']),
   ]);
 }

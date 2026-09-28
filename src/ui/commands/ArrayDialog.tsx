@@ -1,46 +1,54 @@
-import { useState } from 'react';
-import { assertNever, type ArraySpec, type Bounds } from '../../core/scene';
+import { useMemo, useState } from 'react';
+import type { ArraySpec } from '../../core/scene/array-layout-types';
+import { combinedBBox } from '../../core/scene/hit-test';
+import type { Bounds, SceneObject } from '../../core/scene/scene-object';
 import { Button, Dialog, DialogActions } from '../kit';
 import {
-  CircularArrayFields,
-  GridArrayFields,
-  PointRotationArrayFields,
-} from './ArrayDialogFields';
+  centreObjectOptions,
+  displayedCentre,
+  type ArrayDialogContext,
+} from './array-dialog-centre';
+import {
+  arraySpecFromForm,
+  defaultArrayForm,
+  withCenterField,
+  withCentre,
+  withSpaceBy,
+  withSpread,
+  type ArrayForm,
+} from './array-dialog-form';
+import { arraySummary } from './array-dialog-summary';
+import { CircularArrayFields } from './ArrayCircularFields';
+import { PointRotationArrayFields } from './ArrayDialogFields';
+import { GridArrayFields } from './ArrayGridFields';
+
+const NO_OBJECTS: ReadonlyArray<SceneObject> = [];
 
 export function ArrayDialog(props: {
   readonly selectionBounds: Bounds;
+  /** The selection in stacking order; lets a circular array centre on one of its objects. */
+  readonly selected?: ReadonlyArray<SceneObject>;
+  /** Settings to open with, such as the ones last applied; the defaults when absent. */
+  readonly initial?: ArrayForm;
   readonly onCancel: () => void;
+  /** The settings behind the request, just before `onApply`. */
+  readonly onSubmitForm?: (form: ArrayForm) => void;
   readonly onApply: (spec: ArraySpec, advanceVariables?: boolean) => void;
   readonly hasVariableText?: boolean;
   readonly errorMessage?: string;
   readonly preparing?: boolean;
 }): JSX.Element {
-  const [mode, setMode] = useState<ArraySpec['kind']>('grid');
+  const selected = props.selected ?? NO_OBJECTS;
+  const context = useMemo<ArrayDialogContext>(
+    () => ({ bounds: props.selectionBounds, selected }),
+    [props.selectionBounds, selected],
+  );
+  const centreObjects = useMemo(() => centreObjectOptions(selected), [selected]);
+  const [form, setForm] = useState(() => props.initial ?? defaultArrayForm(props.selectionBounds));
   const [advanceVariables, setAdvanceVariables] = useState(false);
-  const [rows, setRows] = useState('2');
-  const [columns, setColumns] = useState('2');
-  const [spacingX, setSpacingX] = useState('2');
-  const [spacingY, setSpacingY] = useState('2');
-  const [count, setCount] = useState('6');
-  const [centerX, setCenterX] = useState(center(props.selectionBounds, 'x').toFixed(2));
-  const [centerY, setCenterY] = useState(center(props.selectionBounds, 'y').toFixed(2));
-  const [radius, setRadius] = useState('25');
-  const [startAngle, setStartAngle] = useState('0');
-  const [rotateCopies, setRotateCopies] = useState(false);
-  const [totalAngle, setTotalAngle] = useState('360');
-  const draft = {
-    rows,
-    columns,
-    spacingX,
-    spacingY,
-    count,
-    centerX,
-    centerY,
-    radius,
-    startAngle,
-    rotateCopies,
-    totalAngle,
-  };
+  const spec = arraySpecFromForm(form, context);
+  const onChange = (patch: Partial<ArrayForm>): void =>
+    setForm((current) => ({ ...current, ...patch }));
   return (
     <Dialog
       title="Array"
@@ -49,34 +57,43 @@ export function ArrayDialog(props: {
       onClose={props.onCancel}
       onSubmit={(event) => {
         event.preventDefault();
-        const spec = arraySpecFromDraft(mode, draft);
+        props.onSubmitForm?.(form);
         return advanceVariables ? props.onApply(spec, true) : props.onApply(spec);
       }}
     >
-      <ArrayModes mode={mode} onChange={setMode} />
-      {mode === 'grid' ? (
+      <ArrayModes mode={form.mode} onChange={(mode) => onChange({ mode })} />
+      {form.mode === 'grid' ? (
         <GridArrayFields
-          values={{ rows, columns, spacingX, spacingY }}
-          setters={{ setRows, setColumns, setSpacingX, setSpacingY }}
+          form={form}
+          onChange={onChange}
+          onSpaceBy={(spaceBy) =>
+            setForm((current) => withSpaceBy(current, spaceBy, context.bounds))
+          }
         />
-      ) : mode === 'point-rotation' ? (
-        <PointRotationArrayFields
-          values={{ count, totalAngle }}
-          setters={{ setCount, setTotalAngle }}
-        />
+      ) : form.mode === 'point-rotation' ? (
+        <PointRotationArrayFields form={form} onChange={onChange} />
       ) : (
         <CircularArrayFields
-          values={{ count, centerX, centerY, radius, startAngle, rotateCopies }}
-          setters={{ setCount, setCenterX, setCenterY, setRadius, setStartAngle, setRotateCopies }}
+          form={form}
+          shownCentre={displayedCentre(form, context)}
+          centreObjects={centreObjects}
+          onChange={onChange}
+          onCentre={(centre) => setForm((current) => withCentre(current, centre, context))}
+          onCenterField={(axis, text) =>
+            setForm((current) => withCenterField(current, axis, text, context))
+          }
+          onSpread={(spread) => setForm((current) => withSpread(current, spread, context))}
         />
       )}
       <VariableArrayOption
         visible={props.hasVariableText === true}
-        mode={mode}
+        hint={variableArrayHint(form)}
         checked={advanceVariables}
         onChange={setAdvanceVariables}
       />
-      {props.preparing === true ? <p role="status">Preparing variable copies…</p> : null}
+      <p role="status" aria-live="polite" style={statusStyle}>
+        {props.preparing === true ? 'Preparing variable copies…' : summaryFor(spec, context)}
+      </p>
       {props.errorMessage === undefined ? null : <p role="alert">{props.errorMessage}</p>}
       <DialogActions>
         <Button onClick={props.onCancel}>Cancel</Button>
@@ -86,6 +103,17 @@ export function ArrayDialog(props: {
       </DialogActions>
     </Dialog>
   );
+}
+
+// A circle centred on a selected object copies the rest of the selection.
+function summaryFor(spec: ArraySpec, context: ArrayDialogContext): string {
+  const centreId = spec.kind === 'circular' ? spec.centerObjectId : undefined;
+  const copied =
+    centreId === undefined
+      ? context.bounds
+      : (combinedBBox(context.selected.filter((object) => object.id !== centreId)) ??
+        context.bounds);
+  return arraySummary(spec, copied);
 }
 
 function ArrayModes(props: {
@@ -115,7 +143,7 @@ function ArrayModes(props: {
 
 function VariableArrayOption(props: {
   readonly visible: boolean;
-  readonly mode: ArraySpec['kind'];
+  readonly hint: string;
   readonly checked: boolean;
   readonly onChange: (checked: boolean) => void;
 }): JSX.Element | null {
@@ -133,22 +161,26 @@ function VariableArrayOption(props: {
       </label>
       {props.checked ? (
         <p style={{ margin: 0, fontSize: 13 }}>
-          {VARIABLE_ARRAY_HINTS[props.mode]} Values use Advance by and wrap at range ends. Later
-          data changes keep your placements; preview again. Creating copies does not advance the
-          current record.
+          {props.hint} Values use Advance by and wrap at range ends. Later data changes keep your
+          placements; preview again. Creating copies does not advance the current record.
         </p>
       ) : null}
     </div>
   );
 }
 
-const VARIABLE_ARRAY_HINTS: Record<ArraySpec['kind'], string> = {
-  grid: 'Records run left to right in each row. Spacing fits all current values.',
-  circular:
-    'Records follow increasing angles from the start angle. Each copy is centred on the chosen ring. The radius stays fixed, so wide copies can overlap.',
-  'point-rotation':
-    'Records start at the original placement and follow the signed total angle. All copies share the first evaluated design’s centre. Rotated copies can overlap.',
-};
+function variableArrayHint(form: ArrayForm): string {
+  switch (form.mode) {
+    case 'grid':
+      return form.spaceBy === 'centres'
+        ? 'Records follow the copies along each row, then row by row. The centre distances stay fixed, so wide values can overlap.'
+        : 'Records follow the copies along each row, then row by row. Spacing fits all current values.';
+    case 'circular':
+      return 'Records follow the copies round from the start angle. Each copy is centred on the chosen ring. The radius stays fixed, so wide copies can overlap.';
+    case 'point-rotation':
+      return 'Records start at the original placement and follow the signed total angle. All copies share the first evaluated design’s centre. Rotated copies can overlap.';
+  }
+}
 
 function ModeButton(props: {
   readonly active: boolean;
@@ -170,71 +202,10 @@ function ModeButton(props: {
   );
 }
 
-function center(bounds: Bounds, axis: 'x' | 'y'): number {
-  return axis === 'x' ? (bounds.minX + bounds.maxX) / 2 : (bounds.minY + bounds.maxY) / 2;
-}
-
-type ArrayDialogDraft = {
-  readonly rows: string;
-  readonly columns: string;
-  readonly spacingX: string;
-  readonly spacingY: string;
-  readonly count: string;
-  readonly centerX: string;
-  readonly centerY: string;
-  readonly radius: string;
-  readonly startAngle: string;
-  readonly rotateCopies: boolean;
-  readonly totalAngle: string;
-};
-
-function arraySpecFromDraft(mode: ArraySpec['kind'], draft: ArrayDialogDraft): ArraySpec {
-  switch (mode) {
-    case 'grid':
-      return {
-        kind: 'grid',
-        rows: positiveInteger(draft.rows),
-        columns: positiveInteger(draft.columns),
-        spacingX: nonNegative(draft.spacingX),
-        spacingY: nonNegative(draft.spacingY),
-      };
-    case 'point-rotation':
-      return {
-        kind: 'point-rotation',
-        count: positiveInteger(draft.count),
-        totalAngleDeg: finiteNumber(draft.totalAngle),
-      };
-    case 'circular':
-      return {
-        kind: 'circular',
-        count: positiveInteger(draft.count),
-        centerX: finiteNumber(draft.centerX),
-        centerY: finiteNumber(draft.centerY),
-        radius: nonNegative(draft.radius),
-        startAngleDeg: finiteNumber(draft.startAngle),
-        rotateCopies: draft.rotateCopies,
-      };
-    default:
-      return assertNever(mode, 'Array mode');
-  }
-}
-
-function positiveInteger(raw: string): number {
-  return Math.max(1, Math.floor(finiteNumber(raw)));
-}
-
-function nonNegative(raw: string): number {
-  return Math.max(0, finiteNumber(raw));
-}
-
-function finiteNumber(raw: string): number {
-  const value = Number(raw);
-  return Number.isFinite(value) ? value : 0;
-}
-
 const tabsStyle: React.CSSProperties = {
   display: 'grid',
   gridTemplateColumns: 'repeat(3, minmax(0, 1fr))',
   gap: 4,
 };
 const tabStyle: React.CSSProperties = { minHeight: 32 };
+const statusStyle: React.CSSProperties = { fontSize: 13, marginBottom: 0 };

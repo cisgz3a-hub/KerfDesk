@@ -19,9 +19,10 @@ const COMPILATION_SEGMENT_BUDGET = Number.MAX_SAFE_INTEGER;
 export function compilationPolylines(
   path: ColoredPath,
   transform: Transform,
+  toleranceMm: number = DEFAULT_MACHINE_CURVE_TOLERANCE_MM,
 ): ReadonlyArray<Polyline> {
   const flattened = flattenColoredPathCurvesForTransform(path, transform, {
-    toleranceMm: DEFAULT_MACHINE_CURVE_TOLERANCE_MM,
+    toleranceMm,
     segmentBudget: COMPILATION_SEGMENT_BUDGET,
   });
   if (flattened.kind !== 'ok') {

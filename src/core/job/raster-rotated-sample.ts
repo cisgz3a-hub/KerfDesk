@@ -1,15 +1,24 @@
-// Rotated raster sampling — maps machine scan-grid pixel centers back into
-// the source bitmap. Scan rows must stay horizontal in machine space, so a
-// rotated image cannot reuse the axis-aligned resample + flip pipeline;
-// instead each machine pixel center is mapped through the device-origin
-// inverse and the inverse object transform into source pixels. Points outside
-// the image footprint read white, so the bounding-box padding around the
-// rotated content stays unburned. Zero-rotation images keep the legacy
-// pipeline (byte-identical output; see compile-job-raster.ts).
+// Rotated raster sampling — maps scan-grid pixel centers back into the source
+// bitmap. Scan rows run along the group's scan direction (machine X unless the
+// operation scans at an angle, ADR-492), so a rotated image, or an image
+// scanned at an angle, cannot reuse the axis-aligned resample + flip pipeline;
+// instead each scan-grid pixel center is rotated into machine space and mapped
+// through the device-origin inverse and the inverse object transform into
+// source pixels. Points outside the image footprint read white, so the
+// bounding-box padding around the rotated content stays unburned.
+// Zero-rotation images scanned along X keep the legacy pipeline (byte-identical
+// output; see compile-job-raster.ts).
 
 import { toSceneCoords, type DeviceProfile } from '../devices';
 import { applyImageMaskToLuma, resampleLuma } from '../raster';
 import type { BurnGridKernel } from '../raster/luma-resample';
+import {
+  isAlongXScan,
+  scanToMachine,
+  ALONG_X_SCAN_FRAME,
+  type RasterScanFrame,
+} from '../raster/raster-scan-frame';
+import { originFlipsRasterX, originFlipsRasterY } from '../raster-output';
 import type { RasterImage, SceneObject, Transform, Vec2 } from '../scene';
 import type { RasterMachineBounds } from './raster-bounds';
 
@@ -21,13 +30,21 @@ export function isRotatedRaster(obj: RasterImage): boolean {
   return ((obj.transform.rotationDeg % FULL_TURN_DEG) + FULL_TURN_DEG) % FULL_TURN_DEG !== 0;
 }
 
+/** Whether the scan grid must sample the source through the inverse transform. */
+export function needsRotatedSampling(obj: RasterImage, frame: RasterScanFrame): boolean {
+  return isRotatedRaster(obj) || !isAlongXScan(frame);
+}
+
 export type RotatedRasterSampler = {
   readonly sourceLuma: Uint8Array;
   readonly obj: RasterImage;
   readonly device: DeviceProfile;
+  /** The scan grid's box, in the scan frame (machine space along X). */
   readonly bounds: RasterMachineBounds;
   readonly pixelWidth: number;
   readonly pixelHeight: number;
+  /** ADR-492: the scan direction; omitted means along machine X. */
+  readonly scanFrame?: RasterScanFrame;
   /** Burn-grid kernel (ADR-359); omitted means 'area'. */
   readonly kernel?: BurnGridKernel;
   /** Pass-Through burns the source pixels as they are, never reduced. */
@@ -103,9 +120,9 @@ function reducedSampleGrid(input: RotatedRasterSampler): ReducedGrid | null {
   const { obj, bounds, pixelWidth, pixelHeight } = input;
   const cellX = (bounds.maxX - bounds.minX) / pixelWidth;
   const cellY = (bounds.maxY - bounds.minY) / pixelHeight;
-  const turn = quarterTurn(obj.transform.rotationDeg);
+  const turn = sourceQuarterTurn(obj, input.device, input.scanFrame ?? ALONG_X_SCAN_FRAME);
   // The burn-cell size along each SOURCE axis: exact for a quarter turn, where
-  // the source axes run along the machine axes; the smaller cell otherwise.
+  // the source axes run along the scan axes; the smaller cell otherwise.
   const swapped = turn === 1 || turn === 3;
   const nominal = Math.min(cellX, cellY);
   const cellAlongWidth = turn === null ? nominal : swapped ? cellY : cellX;
@@ -124,11 +141,34 @@ function reducedExtent(sourcePixels: number, cells: number): number {
   return sourcePixels > target * REDUCTION_TOLERANCE ? target : sourcePixels;
 }
 
+/**
+ * How far the image's source axes are turned from the scan axes, in quarter
+ * turns, or null when they are not lined up. Along X that is the object's own
+ * rotation. At a scan angle the device origin's mirror (an odd number of axis
+ * flips reverses the turn's sense in machine space) and the scan angle count
+ * too, so an image turned with the scan lines up with its cells again.
+ */
+export function sourceQuarterTurn(
+  obj: RasterImage,
+  device: DeviceProfile,
+  frame: RasterScanFrame,
+): 0 | 1 | 2 | 3 | null {
+  if (isAlongXScan(frame)) return quarterTurn(obj.transform.rotationDeg);
+  const mirrored = originFlipsRasterX(device) !== originFlipsRasterY(device);
+  const machineRotation = mirrored ? -obj.transform.rotationDeg : obj.transform.rotationDeg;
+  const turn = normalizedTurn(machineRotation - frame.angleDeg);
+  return turn === 0 ? 0 : quarterTurn(turn);
+}
+
 function quarterTurn(rotationDeg: number): 1 | 2 | 3 | null {
-  const turn = ((rotationDeg % FULL_TURN_DEG) + FULL_TURN_DEG) % FULL_TURN_DEG;
+  const turn = normalizedTurn(rotationDeg);
   if (turn === 90) return 1;
   if (turn === 180) return 2;
   return turn === 270 ? 3 : null;
+}
+
+function normalizedTurn(deg: number): number {
+  return ((deg % FULL_TURN_DEG) + FULL_TURN_DEG) % FULL_TURN_DEG;
 }
 
 // One machine-grid row of (prepared) source luma. The machine→source mapping
@@ -210,10 +250,11 @@ export function rotatedMaskedRasterLuma(
 
 function sourcePixelPoint(input: RotatedRasterSampler, x: number, y: number): Vec2 {
   const { bounds, pixelWidth, pixelHeight, obj, device } = input;
-  const machine = {
+  const scan = {
     x: bounds.minX + ((x + 0.5) / pixelWidth) * (bounds.maxX - bounds.minX),
     y: bounds.minY + ((y + 0.5) / pixelHeight) * (bounds.maxY - bounds.minY),
   };
+  const machine = scanToMachine(input.scanFrame ?? ALONG_X_SCAN_FRAME, scan);
   const local = invertObjectTransform(toSceneCoords(machine, device), obj.transform);
   return {
     x: ((local.x - obj.bounds.minX) / (obj.bounds.maxX - obj.bounds.minX)) * obj.pixelWidth,

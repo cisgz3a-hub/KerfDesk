@@ -4,7 +4,8 @@
 // WITHOUT running the full compile + its large allocations. Pure-core.
 
 import { type DeviceProfile, toMachineCoords } from '../devices';
-import { applyTransform, type RasterImage } from '../scene';
+import { isAlongXScan, scanFrameBoundsOf, type RasterScanFrame } from '../raster/raster-scan-frame';
+import { applyTransform, type RasterImage, type Vec2 } from '../scene';
 
 export type RasterMachineBounds = {
   readonly minX: number;
@@ -17,12 +18,7 @@ export function rasterBoundsInMachineCoords(
   obj: RasterImage,
   device: DeviceProfile,
 ): RasterMachineBounds {
-  const corners = [
-    { x: obj.bounds.minX, y: obj.bounds.minY },
-    { x: obj.bounds.maxX, y: obj.bounds.minY },
-    { x: obj.bounds.maxX, y: obj.bounds.maxY },
-    { x: obj.bounds.minX, y: obj.bounds.maxY },
-  ].map((p) => toMachineCoords(applyTransform(p, obj.transform), device));
+  const corners = rasterMachineCorners(obj, device);
   const xs = corners.map((p) => p.x);
   const ys = corners.map((p) => p.y);
   return {
@@ -31,4 +27,26 @@ export function rasterBoundsInMachineCoords(
     minY: Math.min(...ys),
     maxY: Math.max(...ys),
   };
+}
+
+/**
+ * ADR-492: the box around the image in its scan frame, where rows run along X.
+ * Along X it is exactly rasterBoundsInMachineCoords.
+ */
+export function rasterScanBounds(
+  obj: RasterImage,
+  device: DeviceProfile,
+  frame: RasterScanFrame,
+): RasterMachineBounds {
+  if (isAlongXScan(frame)) return rasterBoundsInMachineCoords(obj, device);
+  return scanFrameBoundsOf(frame, rasterMachineCorners(obj, device));
+}
+
+function rasterMachineCorners(obj: RasterImage, device: DeviceProfile): Vec2[] {
+  return [
+    { x: obj.bounds.minX, y: obj.bounds.minY },
+    { x: obj.bounds.maxX, y: obj.bounds.minY },
+    { x: obj.bounds.maxX, y: obj.bounds.maxY },
+    { x: obj.bounds.minX, y: obj.bounds.maxY },
+  ].map((p) => toMachineCoords(applyTransform(p, obj.transform), device));
 }

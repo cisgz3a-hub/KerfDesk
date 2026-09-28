@@ -35,16 +35,17 @@ import {
 import { applyFreshTraceScanDirection } from './fresh-trace-scan-direction';
 import { positionTraceOverRasterSource } from './trace-placement';
 import { releaseTraceSourcePalette } from './trace-source-palette';
+import { pushUndo } from './undo-stack';
 import type { BedFit } from '../../core/scene/fit-to-bed';
 import { pruneSceneObjectOperationOverrides } from '../../core/scene/operation-binding';
+import { objectTabAnchorFields } from '../../core/scene/object-tab-anchors';
 import { withColourLayerPowers, type ColourLayerCommit } from '../../core/trace/colour-layer-power';
 
 export { positionTraceOverRasterSource } from './trace-placement';
 
-// Shared undo/redo stack ceiling. store-actions caps the redo stack against the
-// same value, so it lives here (the module both stacks depend on) rather than
-// being redeclared — keeping the two ceilings from silently desyncing.
-export const HISTORY_DEPTH = 50;
+// The undo push and its depth cap live in undo-stack.ts; re-exported for the
+// actions that import them from here.
+export { HISTORY_DEPTH, pushUndo } from './undo-stack';
 const MULTI_IMPORT_OFFSET_MM = 10;
 
 export type ImportOutcome =
@@ -92,13 +93,6 @@ type PreparedTraceSource = {
   readonly source?: RasterImage;
   readonly shouldPruneLayers: boolean;
 };
-
-// Push the previous project onto undoStack with a depth cap. Co-located
-// with the mutation helpers since every action that calls them needs
-// the same shape.
-export function pushUndo(prev: Project, stack: ReadonlyArray<Project>): ReadonlyArray<Project> {
-  return [...stack, prev].slice(-HISTORY_DEPTH);
-}
 
 // F.2.c: dedicated layer-ensurer for raster images. The new layer comes up in mode='image'
 // instead of the default 'line'. If a layer with that color already
@@ -471,7 +465,7 @@ export function applyUpsertText(
         ? {}
         : { operationOverride: existing.operationOverride }),
       ...(existing.locked === undefined ? {} : { locked: existing.locked }),
-      ...(existing.cncTabAnchors === undefined ? {} : { cncTabAnchors: existing.cncTabAnchors }),
+      ...objectTabAnchorFields(existing),
       transform: text.pathText === undefined ? existing.transform : text.transform,
       ...(existing.operationIds === undefined ? {} : { operationIds: existing.operationIds }),
       paths: text.paths.map((path, index) => {

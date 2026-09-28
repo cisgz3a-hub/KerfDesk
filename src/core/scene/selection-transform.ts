@@ -365,7 +365,8 @@ function rotatePoint(point: Vec2, anchor: Vec2, deltaDeg: number): Vec2 {
   };
 }
 
-function flipTransformAboutPoint(
+/** The Flip command's reflection of one object about a scene-space point. */
+export function flipTransformAboutPoint(
   object: SceneObject,
   axis: SelectionFlipAxis,
   anchor: Vec2,

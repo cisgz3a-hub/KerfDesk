@@ -27,7 +27,11 @@ import {
   isCncCoolantMode,
   type Project,
 } from '../../core/scene';
-import { DEFAULT_PROJECT_OPTIMIZATION, PROJECT_SCHEMA_VERSION } from '../../core/scene/project';
+import {
+  clampOverlapMergeTolerance,
+  DEFAULT_PROJECT_OPTIMIZATION,
+  PROJECT_SCHEMA_VERSION,
+} from '../../core/scene/project';
 import { DEFAULT_TEXT_LETTER_SPACING } from '../../core/text';
 import { migrateToCurrent } from './migrations';
 import { normalizeCncTools } from './normalize-cnc-tools';
@@ -183,6 +187,8 @@ export function normalizeCncMachineConfig(raw: unknown): CncMachineConfig | null
       // H.9 park position: optional, any finite mm value.
       ...(isFiniteNumber(params['parkXMm']) ? { parkXMm: params['parkXMm'] } : {}),
       ...(isFiniteNumber(params['parkYMm']) ? { parkYMm: params['parkYMm'] } : {}),
+      // ADR-491 park height above the stock top; absent = safe Z.
+      ...positiveField(params, 'parkZMm'),
       // CNC's own Max feed and Frame speed; absent = the shared device values.
       ...positiveField(params, 'maxFeedMmPerMin'),
       ...positiveField(params, 'framingFeedMmPerMin'),
@@ -402,6 +408,7 @@ function normalizeOptimization(value: unknown): Project['optimization'] {
     travelPolicy,
     insideFirst: booleanOrDefault(value['insideFirst'], DEFAULT_PROJECT_OPTIMIZATION.insideFirst),
     removeOverlappingLines: booleanOrDefault(value['removeOverlappingLines'], false),
+    ...overlapMergeTolerance(value['overlapMergeToleranceMm']),
     layerPriority:
       value['layerPriority'] === 'reverse-project-order'
         ? 'reverse-project-order'
@@ -411,7 +418,22 @@ function normalizeOptimization(value: unknown): Project['optimization'] {
       value['startPoint'] === 'job-lower-left' || value['startPoint'] === 'job-center'
         ? value['startPoint']
         : 'machine-origin',
+    // Absent in files written before LBG-C04: they start closed shapes where drawn.
+    closedShapeStart:
+      value['closedShapeStart'] === 'nearest' || value['closedShapeStart'] === 'nearest-corner'
+        ? value['closedShapeStart']
+        : 'drawn',
   };
+}
+
+// LBG-C13. Kept absent when a file never set it (every file before the option),
+// so such a project saves byte for byte as it was read.
+function overlapMergeTolerance(
+  value: unknown,
+): Pick<Project['optimization'], 'overlapMergeToleranceMm'> {
+  return typeof value === 'number' && Number.isFinite(value)
+    ? { overlapMergeToleranceMm: clampOverlapMergeTolerance(value) }
+    : {};
 }
 
 function normalizeAirAssistCommand(value: unknown): Project['device']['airAssistCommand'] {

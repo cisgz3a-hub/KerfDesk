@@ -109,6 +109,7 @@ beforeEach(() => {
     overlayOpacityPercent: 60,
     overlayStill: null,
     overlayStillCapture: null,
+    bedPicture: null,
     surfaceHeightMm: 12,
     heightAreas: [],
     accuracyMapVisible: false,
@@ -141,6 +142,18 @@ describe('WorkspaceCameraOverlay', () => {
     useCameraStore.setState({ overlayStill: still() });
     render();
     expect(container.innerHTML).toBe('');
+  });
+
+  it('draws a head camera’s stitched picture without a camera model (ADR-449)', () => {
+    const image = { data: new Uint8ClampedArray(4 * 4 * 4), width: 4, height: 4 };
+    useCameraStore.setState({
+      bedPicture: { image, region: { x: 10, y: 10, width: 4, height: 4 }, surfaceHeightMm: 0 },
+    });
+    render();
+    expect(container.querySelector('canvas')).not.toBeNull();
+    // A still taken afterwards replaces it.
+    useCameraStore.getState().setOverlayStill(still());
+    expect(useCameraStore.getState().bedPicture).toBeNull();
   });
 
   it('renders nothing when the overlay is hidden', () => {

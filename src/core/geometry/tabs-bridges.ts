@@ -414,3 +414,18 @@ function pointsEqual(a: Vec2, b: Vec2): boolean {
 function cleanCoord(value: number): number {
   return Object.is(value, -0) ? 0 : value;
 }
+
+// ADR-494 (LBG-C05): the laser Line tab layouts in tab-layout.ts (by spacing,
+// click-placed, tab spans burned at reduced power) split contours with these
+// same steps, so tabs placed by count stay byte-identical. Additive: nothing
+// above changes.
+export type { Interval as TabInterval, SplitContext as TabSplitContext };
+export {
+  burnSegmentsBetweenTabs,
+  isTabEligible,
+  mergeIntervals as mergeTabIntervals,
+  nearestDistanceOnClosedPolyline,
+  sampleInterval as sampleTabInterval,
+  splitContext as tabSplitContext,
+  splitModuloInterval as splitTabInterval,
+};

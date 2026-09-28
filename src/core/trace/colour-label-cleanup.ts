@@ -114,8 +114,8 @@ function mixtureOwner(
   return owner;
 }
 
-/** Mode filter for 1-px islands: a pixel none of whose 4-neighbours shares
- *  its label, and that continues no hairline diagonally, takes the most
+/** Mode filter for 1-px islands: a pixel with no same-label 4-neighbour and
+ *  no linked diagonal continuation (see `linkedNeighbour8`) takes the most
  *  common label of its 8-neighbourhood (ties to the lower label). Reads the
  *  original labels so the pass is order-free. */
 export function modeFilterIsolatedPixels(grid: LabelGrid): void {
@@ -124,104 +124,18 @@ export function modeFilterIsolatedPixels(grid: LabelGrid): void {
   const n = source.labels.length;
   for (let i = 0; i < n; i += 1) {
     const m = source.labels[i] as number;
-    if (m === TRANSPARENT_LABEL || sharesLabel4(source, i, m)) continue;
-    if (hasHairlineLink(source, i)) continue;
+    if (m === TRANSPARENT_LABEL || sharesLabel8(source, i, m)) continue;
     const mode = neighbourhoodMode(source, i, counts);
     if (mode >= 0) grid.labels[i] = mode;
   }
 }
 
-function sharesLabel4(grid: LabelGrid, i: number, label: number): boolean {
-  const n = grid.labels.length;
-  for (let d = 0; d < 4; d += 1) {
-    const q = neighbour4(i, d, grid.width, n);
+function sharesLabel8(grid: LabelGrid, i: number, label: number): boolean {
+  for (let d = 0; d < 8; d += 1) {
+    const q = linkedNeighbour8(grid, i, d);
     if (q >= 0 && grid.labels[q] === label) return true;
   }
   return false;
-}
-
-function hasHairlineLink(grid: LabelGrid, p: number): boolean {
-  for (let d = 4; d < 8; d += 1) {
-    if (hairlineLink(grid, p, d) >= 0) return true;
-  }
-  return false;
-}
-
-/** The diagonal neighbour of p in direction d (4..7) when the corner joins a
- *  coherent 1-px hairline, else -1. Outlines are traced 4-connected, so speck
- *  area is measured 4-connected too (ADR-461 Amendment 1); the one exception
- *  is a thin aliased line at any angle: both corner pixels carry the same
- *  label, the line runs on beyond the corner (see `continuesBeyond`), each
- *  corner pixel has at most two same-label 8-neighbours, and both
- *  off-diagonal pixels belong to solid (not 1-px isolated) surroundings. A
- *  checkerboard fails the last test, an isolated dither pair or a zigzag the
- *  run-on test, a 2x2 block thinness. */
-function hairlineLink(grid: LabelGrid, p: number, d: number): number {
-  const { labels, width } = grid;
-  const n = labels.length;
-  const q = neighbour8(p, d, width, n);
-  if (q < 0) return -1;
-  const label = labels[p] as number;
-  if (label === TRANSPARENT_LABEL || labels[q] !== label) return -1;
-  const off1 = q - (q - p > 0 ? width : -width);
-  const off2 = p + (q - p > 0 ? width : -width);
-  if (!solidOtherLabel(grid, off1, label) || !solidOtherLabel(grid, off2, label)) return -1;
-  if (!continuesBeyond(grid, p, q, d, label)) return -1;
-  return thin(grid, p, label) && thin(grid, q, label) ? q : -1;
-}
-
-// An off-diagonal pixel of another label that is not a 1-px island.
-function solidOtherLabel(grid: LabelGrid, p: number, label: number): boolean {
-  const own = grid.labels[p] as number;
-  return own !== label && sharesLabel4(grid, p, own);
-}
-
-// The corner p->q (direction d) is part of a drawn line, not a dither pair or
-// a zigzag: either it extends straight on along the diagonal at one side (a
-// 45-degree line and its ends), or the line runs on beyond the corner at both
-// sides, away from it. An aliased line at any other angle joins axis-aligned
-// runs with single diagonal steps, so p continues backwards (W/E, N/S or the
-// diagonal away from q) and q forwards.
-function continuesBeyond(grid: LabelGrid, p: number, q: number, d: number, label: number): boolean {
-  const n = grid.labels.length;
-  const { width } = grid;
-  const same = (r: number): boolean => r >= 0 && grid.labels[r] === label;
-  if (same(neighbour8(q, d, width, n)) || same(neighbour8(p, 11 - d, width, n))) return true;
-  const east = d === 5 || d === 7;
-  const south = d >= 6;
-  const back = [neighbour4(p, east ? 0 : 1, width, n), neighbour4(p, south ? 2 : 3, width, n)];
-  const on = [neighbour4(q, east ? 1 : 0, width, n), neighbour4(q, south ? 3 : 2, width, n)];
-  // The run beyond the corner is itself part of a 1-px line.
-  const run = (r: number): boolean => same(r) && thin(grid, r, label);
-  return runsOn(grid, label, [p, back.some(run)], [q, on.some(run)]);
-}
-
-// Both corner pixels run on, or one does and the other is the line's last
-// pixel (its only same-label 8-neighbour is the corner partner).
-function runsOn(
-  grid: LabelGrid,
-  label: number,
-  [p, backward]: readonly [number, boolean],
-  [q, onward]: readonly [number, boolean],
-): boolean {
-  if (backward && onward) return true;
-  if (onward && sameNeighbours8(grid, p, label) === 1) return true;
-  return backward && sameNeighbours8(grid, q, label) === 1;
-}
-
-// At most two 8-neighbours share the label: a pixel of a 1-px line.
-function thin(grid: LabelGrid, p: number, label: number): boolean {
-  return sameNeighbours8(grid, p, label) <= 2;
-}
-
-function sameNeighbours8(grid: LabelGrid, p: number, label: number): number {
-  const n = grid.labels.length;
-  let same = 0;
-  for (let d = 0; d < 8; d += 1) {
-    const q = neighbour8(p, d, grid.width, n);
-    if (q >= 0 && grid.labels[q] === label) same += 1;
-  }
-  return same;
 }
 
 function neighbourhoodMode(grid: LabelGrid, i: number, counts: Int32Array): number {
@@ -243,7 +157,7 @@ function neighbourhoodMode(grid: LabelGrid, i: number, counts: Int32Array): numb
   return best;
 }
 
-/** Regions (4-connected plus hairline diagonals, one label) smaller than minArea join the neighbour
+/** Regions (linked 8-connected, one label) smaller than minArea join the neighbour
  *  label they share the most boundary with (ties to the lower label).
  *  Transparent regions stay. The smallest regions go first, and a region that
  *  joins another is re-measured as the merged whole (union-find), so two
@@ -271,14 +185,14 @@ export function absorbSmallRegions(grid: LabelGrid, minArea: number): void {
   }
 }
 
-// Keep the invariant "4-adjacent regions never share a label": after region r
-// took `label`, union it with every 4-neighbouring region carrying that label
-// (and any hairline it now continues diagonally).
+// The cleanup area includes diagonal continuations of a drawn line. This does
+// not change boundary extraction: corner-touching regions still have separate
+// outlines. After absorption, union every linked region of the same label.
 function unionWithNeighbours(grid: LabelGrid, regions: Regions, r: number, label: number): number {
   let root = r;
   for (const p of regions.members[r] ?? []) {
     for (let d = 0; d < 8; d += 1) {
-      const q = regionNeighbour(grid, p, d);
+      const q = linkedNeighbour8(grid, p, d);
       if (q < 0 || grid.labels[q] !== label) continue;
       const other = regions.find(regions.component[q] as number);
       if (other !== root) root = regions.union(root, other);
@@ -288,7 +202,7 @@ function unionWithNeighbours(grid: LabelGrid, regions: Regions, r: number, label
 }
 
 type Regions = {
-  /** Region id of every pixel (4-connected plus hairline diagonals). */
+  /** Region id of every pixel (linked 8-connected, one label). */
   readonly component: Int32Array;
   readonly size: number[];
   /** Pixels of a region below the speck area; null for a large region. */
@@ -352,7 +266,7 @@ function floodComponent(
     const p = stack[--top] as number;
     members.push(p);
     for (let d = 0; d < 8; d += 1) {
-      const q = regionNeighbour(grid, p, d);
+      const q = linkedNeighbour8(grid, p, d);
       if (q < 0 || component[q] !== -1 || grid.labels[q] !== label) continue;
       component[q] = id;
       stack[top++] = q;
@@ -399,11 +313,6 @@ export function neighbour4(p: number, d: number, width: number, n: number): numb
   return p + width < n ? p + width : -1;
 }
 
-// A region's neighbour: the four edge neighbours, then hairline diagonals.
-function regionNeighbour(grid: LabelGrid, p: number, d: number): number {
-  return d < 4 ? neighbour4(p, d, grid.width, grid.labels.length) : hairlineLink(grid, p, d);
-}
-
 // Four edge neighbours followed by NW, NE, SW, SE; no wrap across rows.
 function neighbour8(p: number, d: number, width: number, n: number): number {
   if (d < 4) return neighbour4(p, d, width, n);
@@ -412,4 +321,35 @@ function neighbour8(p: number, d: number, width: number, n: number): number {
   if (x < 0 || x >= width) return -1;
   const q = p + dx + (d < 6 ? -width : width);
   return q >= 0 && q < n ? q : -1;
+}
+
+// The d-th 8-neighbour of p when cleanup treats the two as touching, else -1.
+// Edge neighbours always touch, and so does a diagonal neighbour of the same
+// label that a same-label edge neighbour already joins. A corner-only contact
+// links a 1-px diagonal hairline into one region, also where it meets another
+// line. Dither is the exception: a pixel with corner-only contacts along both
+// diagonals (a checkerboard, an ordered or error-diffused dither) links to
+// nothing, so, as before 2026-09-27, the mode filter and speck removal make
+// the pattern solid rather than one outline per pixel (ADR-461 Amendment 1).
+function linkedNeighbour8(grid: LabelGrid, p: number, d: number): number {
+  const q = neighbour8(p, d, grid.width, grid.labels.length);
+  if (d < 4 || q < 0 || grid.labels[q] !== grid.labels[p]) return q;
+  if (!cornerOnly(grid, p, d)) return q;
+  return isDither(grid, p) || isDither(grid, q) ? -1 : q;
+}
+
+// Same-label diagonal neighbour d of p that no same-label edge pixel joins.
+function cornerOnly(grid: LabelGrid, p: number, d: number): boolean {
+  const q = neighbour8(p, d, grid.width, grid.labels.length);
+  const label = grid.labels[p];
+  if (q < 0 || grid.labels[q] !== label) return false;
+  const dx = d % 2 === 0 ? -1 : 1;
+  const dy = d < 6 ? -grid.width : grid.width;
+  return grid.labels[p + dx] !== label && grid.labels[p + dy] !== label;
+}
+
+// NW (4) and SE (7) lie along one diagonal, NE (5) and SW (6) along the other.
+function isDither(grid: LabelGrid, i: number): boolean {
+  const back = cornerOnly(grid, i, 4) || cornerOnly(grid, i, 7);
+  return back && (cornerOnly(grid, i, 5) || cornerOnly(grid, i, 6));
 }

@@ -295,6 +295,7 @@ async function clickToAdd(position: { x: number; y: number }): Promise<void> {
       onPointerUp: vi.fn(),
       onPointerCancel: vi.fn(),
       onLostPointerCapture: vi.fn(),
+      onPointerLeave: vi.fn(),
     },
   });
   await act(async () =>

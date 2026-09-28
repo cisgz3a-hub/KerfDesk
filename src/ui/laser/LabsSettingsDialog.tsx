@@ -23,11 +23,26 @@ const FEATURE_ROWS: ReadonlyArray<{
 ];
 
 export function LabsSettingsDialog(props: { readonly onClose: () => void }): JSX.Element {
-  const features = useExperimentalLaserFeatures((state) => state.features);
-  const setFeature = useExperimentalLaserFeatures((state) => state.setFeature);
   const resetFeatures = useExperimentalLaserFeatures((state) => state.resetFeatures);
   return (
     <Dialog title="Labs" size="sm" onClose={props.onClose}>
+      <LabsFeatureList />
+      <DialogActions>
+        <Button onClick={resetFeatures}>Reset all</Button>
+        <Button variant="primary" onClick={props.onClose}>
+          Done
+        </Button>
+      </DialogActions>
+    </Dialog>
+  );
+}
+
+/** The Labs notice and switches; also the Labs section of the Settings window. */
+export function LabsFeatureList(): JSX.Element {
+  const features = useExperimentalLaserFeatures((state) => state.features);
+  const setFeature = useExperimentalLaserFeatures((state) => state.setFeature);
+  return (
+    <>
       <p style={noticeStyle}>
         These machine workflows are still being hardware-validated. They are off by default and
         remain subject to normal device and safety checks.
@@ -42,13 +57,7 @@ export function LabsSettingsDialog(props: { readonly onClose: () => void }): JSX
           />
         ))}
       </div>
-      <DialogActions>
-        <Button onClick={resetFeatures}>Reset all</Button>
-        <Button variant="primary" onClick={props.onClose}>
-          Done
-        </Button>
-      </DialogActions>
-    </Dialog>
+    </>
   );
 }
 

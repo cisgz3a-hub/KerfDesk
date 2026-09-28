@@ -1,6 +1,6 @@
-// The two pointer-following canvas overlays (ADR-348), composed in one place
-// so Workspace.tsx stays a layout shell: the ruler-strip cursor marks, and the
-// hover size readout.
+// The pointer-following canvas overlays (ADR-348), composed in one place so
+// Workspace.tsx stays a layout shell: the ruler-strip cursor marks, the hover
+// size readout, and the Trim Shapes highlight (LBG-T04).
 //
 // Both are display-only DOM over the canvas, `pointer-events: none`, and
 // neither participates in the scene redraw. They read the scene, view and tool
@@ -12,6 +12,7 @@ import { useStore } from '../state';
 import { useUiStore } from '../state/ui-store';
 import { HoverSizeReadout } from './HoverSizeReadout';
 import { RulerCursorOverlay } from './RulerCursorOverlay';
+import { TrimShapesOverlay } from './TrimShapesOverlay';
 import type { CanvasBitmapSize } from './use-canvas-bitmap-size';
 import type { ViewState } from './view-transform';
 
@@ -33,6 +34,12 @@ export function WorkspacePointerOverlays(props: {
         // Measuring is for the select tool at rest: a drag has its own readout
         // and owns the pointer, and Preview is not an editing surface.
         enabled={!previewMode && !props.dragging && toolMode.kind === 'select'}
+      />
+      <TrimShapesOverlay
+        project={project}
+        canvasSize={props.canvasSize}
+        viewState={viewState}
+        enabled={!previewMode && !props.dragging}
       />
     </>
   );

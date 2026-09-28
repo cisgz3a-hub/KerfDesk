@@ -225,6 +225,20 @@ describe('Line + fill local width classification', () => {
     },
   );
 
+  // ADR-454 Amendment 3: a hand-drawn line wobbling between 5 and 4 px at a
+  // 4 px gate is one fill, not alternating fill and stroke that burn twice
+  // at every join.
+  it.each([1, 2, 4])('keeps a line wobbling around the gate in one fill at %ix', async (scale) => {
+    const source = drawing(15, 150, (x) => (Math.floor((x - 15) / 15) % 2 === 0 ? 5 : 4));
+    const { image, point } = transformed(source, scale);
+    const paths = await traceImageToColoredPaths(image, {
+      ...OPTIONS,
+      hybridMaxStrokeWidthPx: 4 * scale,
+    });
+    expect(paths.filter((path) => path.color === HYBRID_STROKE_COLOR)).toHaveLength(0);
+    for (let x = 17; x < 150; x += 5) expect(fillContains(paths, point({ x, y: 50 }))).toBe(true);
+  });
+
   it.each([1, 2, 4])(
     'keeps a thin stroke attached to its wide end at %ix source resolution',
     async (scale) => {

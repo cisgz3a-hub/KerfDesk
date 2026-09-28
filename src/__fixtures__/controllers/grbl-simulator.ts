@@ -73,6 +73,8 @@ export type GrblSimulator = {
   readonly triggerAlarm: (code: number) => void;
   /** Simulate the USB cable being pulled. */
   readonly yankCable: () => void;
+  /** Open or close a safety-door input switch. */
+  readonly setDoorInput: (open: boolean) => void;
   /** RX ring occupancy, peak, and dropped bytes. Inert unless `plannerBlocks` is set. */
   readonly rxWindow: () => GrblSimRxWindow;
   /** Planner occupancy and any withheld ack. Inert unless `plannerBlocks` is set. */
@@ -245,6 +247,7 @@ export function createGrblSimulator(options: CreateGrblSimulatorOptions = {}): G
       feeder.drain();
     },
     yankCable: () => port.emitClose(),
+    setDoorInput: (open) => dispatch({ kind: 'door-input', open }),
     rxWindow: () => backpressure?.rxWindow() ?? inertRxWindow,
     planner: () => backpressure?.planner() ?? inertPlanner,
   };

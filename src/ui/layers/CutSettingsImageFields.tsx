@@ -15,6 +15,9 @@ import {
 import { DITHER_ALGORITHMS, type Layer } from '../../core/scene';
 import { useStore } from '../state';
 import { dotWidthCorrectionMax } from './cut-settings-draft';
+import { ImageScanPatternFields } from './CutSettingsScanPatternFields';
+import { AutoOverscanSwitch, automaticOverscanNote } from './CutSettingsAutoOverscan';
+import { normalizedScanAngleDeg } from '../../core/raster/raster-scan-frame';
 
 export function CutSettingsImageFields(props: {
   readonly layer: Layer;
@@ -24,6 +27,8 @@ export function CutSettingsImageFields(props: {
   readonly deferArtworkBounds?: boolean;
   /** Material presets do not store image overscan (ADR-415), so their wizard hides it. */
   readonly showOverscan?: boolean;
+  /** Scan angle, cross-hatch and angle per pass (ADR-492): Cut Settings only, like overscan. */
+  readonly showScanPattern?: boolean;
   readonly onDitherChange: (dither: Layer['ditherAlgorithm']) => void;
   readonly onImageLinesPerMmChange: (linesPerMm: number) => void;
 }): JSX.Element {
@@ -78,6 +83,7 @@ export function CutSettingsImageFields(props: {
         <span className="lf-field-unit">mm</span>
       </Field>
       {props.showOverscan === true ? <ImageOverscanField layer={props.layer} /> : null}
+      {props.showScanPattern === true ? <ImageScanPatternFields layer={props.layer} /> : null}
       <ImageCheckboxField
         label="Invert brightness"
         name="negativeImage"
@@ -97,8 +103,10 @@ export function CutSettingsImageFields(props: {
 
 // ADR-415: per-operation overscan, with the run-up this machine actually needs
 // to reach the operation's speed (v² / 2a from its acceleration setting).
+// ADR-495: or Automatic, which works that run-up out at every compile.
 function ImageOverscanField(props: { readonly layer: Layer }): JSX.Element {
   const device = useStore((state) => state.project.device);
+  const [automatic, setAutomatic] = useState(props.layer.autoOverscan === true);
   const feed = Math.min(props.layer.speed, device.maxFeed);
   const neededMm = accelerationDistanceMm(feed, device.accelMmPerSec2);
   return (
@@ -110,20 +118,44 @@ function ImageOverscanField(props: { readonly layer: Layer }): JSX.Element {
           min={0}
           max={MAX_IMAGE_OVERSCAN_MM}
           step={0.01}
+          disabled={automatic}
           label="image overscan"
           title="Laser-off run-up at scan edges. The required distance depends on speed and acceleration; short runways can change edge exposure."
         />
         <span className="lf-field-unit">mm</span>
       </Field>
-      <p className="lf-laser-help">
-        At the saved speed of {formatNumber(feed)} mm/min and {formatNumber(device.accelMmPerSec2)}{' '}
-        mm/s² acceleration, the saved model needs about {formatNumber(neededMm)} mm to reach full
-        speed from rest. Confirm the setting with a scan-edge test on this machine.
-        {neededMm > MAX_IMAGE_OVERSCAN_MM
-          ? ` That is more than the ${MAX_IMAGE_OVERSCAN_MM} mm maximum, so lower the speed if the image edges burn darker.`
-          : ''}
-      </p>
+      <AutoOverscanSwitch checked={automatic} onChange={setAutomatic} />
+      {automatic ? (
+        <p className="lf-laser-help">
+          {automaticOverscanNote({
+            speed: props.layer.speed,
+            scanAngleDeg: normalizedScanAngleDeg(props.layer.imageScanAngleDeg),
+            device,
+            maxMm: MAX_IMAGE_OVERSCAN_MM,
+          })}
+        </p>
+      ) : (
+        <ManualOverscanNote feed={feed} accel={device.accelMmPerSec2} neededMm={neededMm} />
+      )}
     </>
+  );
+}
+
+function ManualOverscanNote(props: {
+  readonly feed: number;
+  readonly accel: number;
+  readonly neededMm: number;
+}): JSX.Element {
+  const { feed, accel, neededMm } = props;
+  return (
+    <p className="lf-laser-help">
+      At the saved speed of {formatNumber(feed)} mm/min and {formatNumber(accel)} mm/s²
+      acceleration, the saved model needs about {formatNumber(neededMm)} mm to reach full speed from
+      rest. Confirm the setting with a scan-edge test on this machine.
+      {neededMm > MAX_IMAGE_OVERSCAN_MM
+        ? ` That is more than the ${MAX_IMAGE_OVERSCAN_MM} mm maximum, so lower the speed if the image edges burn darker.`
+        : ''}
+    </p>
   );
 }
 
@@ -253,6 +285,7 @@ function NumberInput(props: {
   readonly step?: number;
   readonly label?: string;
   readonly title?: string;
+  readonly disabled?: boolean;
 }): JSX.Element {
   return (
     <input
@@ -263,6 +296,7 @@ function NumberInput(props: {
       {...(props.max !== undefined ? { max: props.max } : {})}
       step={props.step ?? 1}
       defaultValue={props.value}
+      disabled={props.disabled === true}
       style={numberStyle}
       aria-label={`Cut settings ${props.label ?? props.name}`}
       title={props.title ?? `Set image cut setting ${props.label ?? props.name}.`}
