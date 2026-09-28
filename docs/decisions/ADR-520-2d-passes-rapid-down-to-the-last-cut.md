@@ -38,6 +38,9 @@ on: turning it off gave byte-identical G-code, with nothing saying why.
      relief roughing's slice-top floors, which a cusp between offset rings can stand above.
    - Arcs and helices count as the circles G2/G3 follows, not the chords of their samples; a
      straight move is never floored by an arc, except a Z-only one at a point of it.
+     An arc whose distinct endpoints round to the same output words falls back to sampled
+     G1 chords; only those chords count as cleared. Contours and helices skipped by the emitter
+     do not count as earlier cuts. A rising helix uses its highest endpoint as the floor.
    - A Z-only pass (a drill peck) is floored only where its XY lies on the earlier path.
    - No floor: the first pass along any path, helical entries (they keep their own plunge from
      safe Z), stay-down links and linked rings (reached at depth, ADR-491), and passes that
@@ -76,12 +79,17 @@ Unit tests (`cnc-pass-air-floors.test.ts`) cover re-started rings, leads, longer
 several covering passes, Z-only passes, arcs within and beyond an earlier sweep, chords of an
 earlier arc, a ring after a helix and the passes left alone.
 
+The PR audit reproduced three unsafe first-entry rapids in emitted G-code: a skipped stationary
+contour, a skipped zero-radius helix, and a nearly full arc emitted as straight chords but credited
+as a circle. `cnc-pass-air-floors-emission.test.ts` checks that each now plunges from safe Z.
+Identical depth paths also use a linear vertex comparison before the general segment proof.
+
 ### Consequences
 
 - Each depth pass after the first rapids down to 1 mm above the cut before its plunge. A Z axis
   that lost more than 1 mm of steps since the pass above would meet that cut at rapid speed, as it
   already could in relief roughing (ADR-489). Pause and lift, recovery and tiling are unchanged.
-- `EMITTER_REVISION` advances to `air-floor-2d-kerf-arcs-scan-angle-20260928-v8` (merged over main's `park-kerf-arcs-scan-angle-overscan-20260928-v7`).
+- `EMITTER_REVISION` advances to `air-floor-emitted-cuts-20260928-v10` (merged over main's `park-kerf-arcs-scan-angle-overscan-20260928-v7`).
 - Hardware qualification: an air cut, then a profile in scrap, on the 4040.
 - Not built here: separate retract and clearance heights per operation (CNG-J04), and floors for
   helical entries.

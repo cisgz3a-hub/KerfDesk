@@ -14,9 +14,17 @@
 // paths or the covering test fails. The claim holds on the path, not over a
 // region: a cusp a wide stepover leaves between two rings is off both paths.
 
-import { circularArcGeometry, type CircularArc2d } from '../geometry/circular-arc';
+import {
+  circularArcGeometry,
+  isCircularArcFullCircle,
+  sampleCircularArcPoints,
+  type CircularArc2d,
+} from '../geometry/circular-arc';
 import type { CncPass } from '../job';
+import { cncHelicalContourCanEmit } from '../job/helical-representation';
 import type { Vec2 } from '../scene';
+import { cncContourEmissionPrecision } from './cnc-contour-emission';
+import { formatCncCoordinateMm } from './cnc-output-precision';
 
 /** How far a point may lie off an earlier path and still be on it. The
  *  producers reuse the same coordinates for every depth; this absorbs the
@@ -75,27 +83,34 @@ function withFloor(pass: CncPass, trace: Trace, cut: ReadonlyArray<Trace>): CncP
 function traceOf(pass: CncPass): Trace | null {
   switch (pass.kind) {
     case 'contour':
+      if (cncContourEmissionPrecision(pass) === null) return null;
       return trace(closedPoints(pass.polyline, pass.closed), [], pass.zMm);
     case 'path3d':
+      if (pass.points.length < 2) return null;
       return trace(
         pass.points,
         [],
         pass.points.reduce((high, point) => Math.max(high, point.z), Number.NEGATIVE_INFINITY),
       );
     case 'arc': {
-      // An invalid arc is emitted as the straight line from start to end.
+      // The emitter also falls back to sampled straight moves when rounded
+      // endpoints coincide on an arc that is not geometrically a full circle.
       const arc = arcOf(pass);
-      return arc === null
-        ? trace([pass.start, pass.end], [], pass.zMm)
+      const endpointsMatch =
+        formatCncCoordinateMm(pass.start.x) === formatCncCoordinateMm(pass.end.x) &&
+        formatCncCoordinateMm(pass.start.y) === formatCncCoordinateMm(pass.end.y);
+      return arc === null || (endpointsMatch && !isCircularArcFullCircle(pass))
+        ? trace(closedPoints(sampleCircularArcPoints(pass), pass.closed), [], pass.zMm)
         : trace([], [arc], pass.zMm);
     }
     case 'helical-contour': {
+      if (!cncHelicalContourCanEmit(pass)) return null;
       // Only ever an earlier cut: the helix circle, then its ring.
       const circle = arcOf({ ...pass, end: pass.start });
       return trace(
         closedPoints(pass.polyline, pass.closed),
         circle === null ? [] : [circle],
-        pass.startZMm,
+        Math.max(pass.startZMm, pass.zMm),
       );
     }
   }
@@ -158,6 +173,16 @@ function covers(outer: Trace, inner: Trace): boolean {
   if (!inner.arcs.every((arc) => outer.arcs.some((path) => arcContains(path, arc)))) {
     return false;
   }
+  // Depth passes normally reuse every vertex. Prove that common case in
+  // linear time instead of comparing every segment with every earlier one.
+  if (
+    outer.points.length === inner.points.length &&
+    inner.points.every((point, index) => {
+      const previous = outer.points[index];
+      return previous !== undefined && point.x === previous.x && point.y === previous.y;
+    })
+  )
+    return true;
   for (let index = 1; index < inner.points.length; index += 1) {
     const a = inner.points[index - 1];
     const b = inner.points[index];
