@@ -78,7 +78,19 @@ describe('CommandShell file boundaries', () => {
       // The batch settings dialog opens first; its primary action picks images.
       await clickButton(document.body, 'Choose Images...');
       expect(platform.pickFilesForOpen).toHaveBeenLastCalledWith({
-        accept: ['.png', '.jpg', '.jpeg', '.bmp', '.gif'],
+        accept: [
+          '.png',
+          '.jpg',
+          '.jpeg',
+          '.bmp',
+          '.gif',
+          '.tif',
+          '.tiff',
+          '.pbm',
+          '.pgm',
+          '.ppm',
+          '.pnm',
+        ],
         multiple: true,
       });
     } finally {

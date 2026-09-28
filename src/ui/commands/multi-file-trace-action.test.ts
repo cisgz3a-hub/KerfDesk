@@ -311,7 +311,7 @@ describe('runMultiFileTrace', () => {
     expect(pushToast).not.toHaveBeenCalled();
   });
 
-  it('reports trace failures without writing partial output', async () => {
+  it('skips a file it cannot read and reports why when nothing is written', async () => {
     const pushToast = vi.fn();
     const write = vi.fn();
 
@@ -323,7 +323,10 @@ describe('runMultiFileTrace', () => {
     });
 
     expect(write).not.toHaveBeenCalled();
-    expect(pushToast).toHaveBeenCalledWith('Could not trace images: decode failed', 'error');
+    expect(pushToast).toHaveBeenCalledWith(
+      'Could not read 1 image (broken.png: decode failed); it was skipped.',
+      'error',
+    );
   });
 
   it.each([

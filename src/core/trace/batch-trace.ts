@@ -53,12 +53,30 @@ export type BatchTraceFile = {
   readonly pathCount: number;
   /** Position of the source job in the batch. */
   readonly sourceIndex: number;
+  /** The artwork runs past the chosen paper's edge (paper pages only). */
+  readonly runsPastPage?: true;
 };
+
+// Why a file wrote nothing: its trace had no visible geometry, or it could
+// not be decoded or traced and the caller chose to skip it (canSkip) rather
+// than fail the batch.
+export type BatchTraceSkipReason = 'no-visible-paths' | 'decode-failed' | 'trace-failed';
 
 export type BatchTraceSkip = {
   readonly sourceName: string;
-  readonly reason: 'no-visible-paths';
+  readonly reason: BatchTraceSkipReason;
+  /** The failure's message, for decode-failed and trace-failed skips. */
+  readonly message?: string;
 };
+
+// A job whose size and decode plan are only known once its file is read. The
+// batch prepares it on its turn; a prepare failure is a decode failure.
+export type BatchTracePreparedJob = {
+  readonly sourceName: string;
+  readonly prepare: () => Promise<BatchTraceImageJob>;
+};
+
+export type BatchTraceJob = BatchTraceImageJob | BatchTracePreparedJob;
 
 export type BatchTraceResult = {
   readonly files: ReadonlyArray<BatchTraceFile>;
@@ -75,11 +93,21 @@ export type BatchTraceDependencies = {
   readonly trace?: (
     image: RawImageData,
     options: TraceOptions,
+    signal?: AbortSignal,
   ) => Promise<ReadonlyArray<ColoredPath>>;
+  // Cancels the batch: checked before each file and passed to every trace.
+  readonly signal?: AbortSignal;
+  // Receives each file as soon as it is serialized. The batch then keeps no
+  // file text itself, so at most one export is held at a time; the result's
+  // files list is empty.
+  readonly onFile?: (file: BatchTraceFile) => Promise<void>;
   // Whether a failed attempt may use the job's fallback; omitted, every error.
   readonly canFallBack?: (error: unknown) => boolean;
   // Called with the job's index before its fallback runs.
   readonly onFallback?: (jobIndex: number, error: unknown) => void;
+  // Whether a job whose decode or trace failed (after its fallback) becomes a
+  // skip instead of failing the batch; omitted, every failure is rethrown.
+  readonly canSkip?: (error: unknown) => boolean;
   /**
    * DXF serializer (io layer). Receives visible layers in page units
    * (millimetres when the physical size is known; Y down) and the page
@@ -112,6 +140,12 @@ type TracedAttempt = {
   readonly paths: ReadonlyArray<ColoredPath>;
 };
 
+type JobStage = { current: 'decode' | 'trace' };
+
+type JobOutcome =
+  | { readonly kind: 'traced'; readonly job: BatchTraceImageJob; readonly attempt: TracedAttempt }
+  | { readonly kind: 'failed'; readonly skip: BatchTraceSkip };
+
 const FORBIDDEN_FILENAME_CHARS = new Set(['<', '>', ':', '"', '/', '\\', '|', '?', '*']);
 
 /**
@@ -120,24 +154,31 @@ const FORBIDDEN_FILENAME_CHARS = new Set(['<', '>', ':', '"', '/', '\\', '|', '?
  * the batch still completes.
  */
 export async function traceImagesToVectorFiles(
-  jobs: ReadonlyArray<BatchTraceImageJob>,
+  jobs: ReadonlyArray<BatchTraceJob>,
   deps: BatchTraceDependencies = {},
   output: BatchTraceOutput = {},
 ): Promise<BatchTraceResult> {
-  const trace = deps.trace ?? traceImageToColoredPaths;
+  const trace = deps.trace ?? ((image, options) => traceImageToColoredPaths(image, options));
   const format = output.format ?? 'svg';
   const seenNames = new Map<string, number>();
   const files: BatchTraceFile[] = [];
   const skipped: BatchTraceSkip[] = [];
-  for (const [sourceIndex, job] of jobs.entries()) {
-    const { image, options, paths } = await traceJob(job, sourceIndex, trace, deps);
+  for (const [sourceIndex, source] of jobs.entries()) {
+    deps.signal?.throwIfAborted();
+    const outcome = await runJob(source, sourceIndex, trace, deps);
+    if (outcome.kind === 'failed') {
+      skipped.push(outcome.skip);
+      continue;
+    }
+    const { job } = outcome;
+    const { image, options, paths } = outcome.attempt;
     const imagePage = tracedPage(image, job.physicalSizeMm);
     const traced = tracedLayers(paths, imagePage, options.traceMode);
     if (traced.length === 0) {
       skipped.push({ sourceName: job.sourceName, reason: 'no-visible-paths' });
       continue;
     }
-    const { layers, page } = placeTracedLayers(
+    const { layers, page, runsPastPage } = placeTracedLayers(
       traced,
       imagePage,
       options.traceMode,
@@ -145,13 +186,16 @@ export async function traceImagesToVectorFiles(
       output.precisionMm,
     );
     const stem = uniqueStem(safeSourceStem(job.sourceName), seenNames);
-    files.push({
+    const file: BatchTraceFile = {
       filename: `${stem}-trace.${format}`,
       format,
       text: tracedFileText(format, layers, page, options.traceMode, deps, output),
       pathCount: layers.length,
       sourceIndex,
-    });
+      ...(runsPastPage === true ? { runsPastPage } : {}),
+    };
+    if (deps.onFile === undefined) files.push(file);
+    else await deps.onFile(file);
   }
   return { files, skipped };
 }
@@ -201,29 +245,64 @@ function requireDxfWriter(
   return deps.writeDxf;
 }
 
+// One file's turn: prepare, decode and trace it. A failure the caller may
+// skip (canSkip) is reported as that file's skip; anything else — a
+// cancellation, a superseded request — still fails the whole batch.
+async function runJob(
+  source: BatchTraceJob,
+  index: number,
+  trace: NonNullable<BatchTraceDependencies['trace']>,
+  deps: BatchTraceDependencies,
+): Promise<JobOutcome> {
+  const stage: JobStage = { current: 'decode' };
+  try {
+    const job = 'prepare' in source ? await source.prepare() : source;
+    return { kind: 'traced', job, attempt: await traceJob(job, index, trace, deps, stage) };
+  } catch (error) {
+    if (deps.canSkip?.(error) !== true) throw error;
+    const reason = stage.current === 'decode' ? 'decode-failed' : 'trace-failed';
+    return {
+      kind: 'failed',
+      skip: { sourceName: source.sourceName, reason, message: errorText(error) },
+    };
+  }
+}
+
+function errorText(error: unknown): string {
+  return error instanceof Error ? error.message : String(error);
+}
+
 async function traceJob(
   job: BatchTraceImageJob,
   index: number,
   trace: NonNullable<BatchTraceDependencies['trace']>,
   deps: BatchTraceDependencies,
+  stage: JobStage,
 ): Promise<TracedAttempt> {
   try {
-    return await traceAttempt(job, trace);
+    return await traceAttempt(job, trace, stage, deps.signal);
   } catch (error) {
     const fallback = job.fallback;
     if (fallback === undefined || deps.canFallBack?.(error) === false) throw error;
     deps.onFallback?.(index, error);
-    return traceAttempt(fallback, trace);
+    return traceAttempt(fallback, trace, stage, deps.signal);
   }
 }
 
 async function traceAttempt(
   attempt: BatchTraceAttempt,
   trace: NonNullable<BatchTraceDependencies['trace']>,
+  stage: JobStage,
+  signal: AbortSignal | undefined,
 ): Promise<TracedAttempt> {
   const options = attempt.options ?? DEFAULT_TRACE_OPTIONS;
+  stage.current = 'decode';
   const image = typeof attempt.image === 'function' ? await attempt.image() : attempt.image;
-  return { image, options, paths: await trace(image, options) };
+  stage.current = 'trace';
+  const paths = await (signal === undefined
+    ? trace(image, options)
+    : trace(image, options, signal));
+  return { image, options, paths };
 }
 
 function uniqueStem(stem: string, seen: Map<string, number>): string {

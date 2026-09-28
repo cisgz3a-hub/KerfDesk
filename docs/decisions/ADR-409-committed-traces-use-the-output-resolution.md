@@ -151,3 +151,24 @@ slow and indicative only.
 
 Not part of this decision: tiling sources beyond the budget; a finer preview; scaling the preview's
 size controls to native pixels; measuring peak memory in a browser rather than Node.
+
+### Amendment: Multi-File Trace Size row (2026-09-27)
+
+Decision 5 sizes every batch file at its import size: the embedded density, else 254 DPI. A
+scanner batch with missing or wrong density tags therefore came out at the wrong physical size,
+and LightBurn and Potrace (`--resolution`, `--width`, `--height` in its documented CLI) let the
+user set the output size.
+
+1. Multi-File Trace gains an *Output size* select: *From file* (the default, Decision 5
+   unchanged), *DPI* (above 0, at most 100000) or *Width (mm)* (above 0, at most 10000 mm). A DPI
+   gives every file 25.4 / DPI mm per pixel; a width gives every file that width and the height
+   from the file's own aspect ratio (`ui/commands/multi-file-trace-size.ts`).
+2. The chosen size is the output size of Decision 5, so the working grid is planned for it with
+   the same function, and TIFF and Netpbm files (whose size otherwise comes from the TIFF
+   resolution tags or the default DPI) follow it too.
+3. A file sized by the Size row reports its density source as `override`, so the batch notice
+   does not count it among the files that fell back to the default DPI.
+
+Evidence: `src/ui/commands/multi-file-trace-action-size.test.ts` (a DPI and a width override
+change the exported size, the aspect ratio holds, overridden files are not reported as
+default-DPI) and `MultiFileTraceDialog.paper.test.tsx` (the Size row's fields and what they send).

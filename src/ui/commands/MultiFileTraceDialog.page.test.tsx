@@ -3,6 +3,7 @@ import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { mockPlatform } from '../../__fixtures__/file-actions';
 import { DEFAULT_EXPORT_PRECISION_MM } from '../../core/vector-export/decimal-grid';
+import { chooseImagesAndTrace, chosenImageHandle } from './multi-file-trace-dialog.test-helpers';
 import { PlatformProvider } from '../app/platform-context';
 import { MultiFileTraceDialogHost } from './MultiFileTraceDialog';
 import type * as multiFileTraceAction from './multi-file-trace-action';
@@ -35,7 +36,9 @@ function mount(): void {
   root = mounted;
   act(() =>
     mounted.render(
-      <PlatformProvider adapter={{ ...mockPlatform(), pickFilesForOpen: vi.fn(async () => []) }}>
+      <PlatformProvider
+        adapter={{ ...mockPlatform(), pickFilesForOpen: vi.fn(async () => [chosenImageHandle()]) }}
+      >
         <MultiFileTraceDialogHost onClose={() => undefined} />
       </PlatformProvider>,
     ),
@@ -61,11 +64,7 @@ function typeInto(input: HTMLInputElement, text: string): void {
 }
 
 async function submitAndReadOutput(): Promise<unknown> {
-  const submit = [...document.querySelectorAll('button')].find(
-    (button) => button.textContent === 'Choose Images...',
-  );
-  if (submit === undefined) throw new Error('No Choose Images button.');
-  act(() => submit.click());
+  await chooseImagesAndTrace();
   await act(async () => {
     await vi.waitFor(() => expect(runMultiFileTrace).toHaveBeenCalledTimes(1));
   });

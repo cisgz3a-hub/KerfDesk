@@ -1,4 +1,5 @@
 import type { FileHandle, PlatformAdapter } from '../../platform/types';
+import { BATCH_PNM_EXTENSIONS, BATCH_TIFF_EXTENSIONS } from './batch-raster-decode';
 
 const IMAGE_FILE_EXTENSIONS = ['.png', '.jpg', '.jpeg', '.bmp', '.gif'] as const;
 
@@ -20,6 +21,19 @@ export async function pickPlatformImageFiles(
   for (const handle of handles) {
     files.push(await fileFromHandle(handle));
   }
+  return files;
+}
+
+/** Multi-File Trace's picker: browser images plus TIFF (page 1) and Netpbm. */
+export async function pickPlatformBatchTraceImageFiles(
+  platform: PlatformAdapter,
+): Promise<ReadonlyArray<File>> {
+  const handles = await platform.pickFilesForOpen({
+    accept: [...IMAGE_FILE_EXTENSIONS, ...BATCH_TIFF_EXTENSIONS, ...BATCH_PNM_EXTENSIONS],
+    multiple: true,
+  });
+  const files: File[] = [];
+  for (const handle of handles) files.push(await fileFromHandle(handle));
   return files;
 }
 
