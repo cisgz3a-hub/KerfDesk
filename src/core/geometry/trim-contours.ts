@@ -1,5 +1,5 @@
 // The outlines Trim Shapes works on (LightBurn gap LBG-T04). Every contour of
-// visible, unlocked vector artwork is flattened into world millimetres once,
+// visible vector artwork is flattened into world millimetres once,
 // with each point remembering where it lies on the exact contour (segment +
 // t), so a crossing found on the chords maps straight back onto the curve.
 // Objects are flattened lazily, only when the pointer or a crossing search
@@ -64,7 +64,8 @@ export function createTrimModel(scene: Scene): TrimModel {
   const entries: TrimObjectEntry[] = [];
   for (let index = scene.objects.length - 1; index >= 0; index -= 1) {
     const object = scene.objects[index];
-    if (object === undefined || !isUnlockedVectorArtwork(object)) continue;
+    // Locked artwork still acts as a cutting edge; it is never cut itself.
+    if (object === undefined || !isTrimEdgeArtwork(object)) continue;
     const local = localPolylineBounds(object.paths);
     if (local === null) continue;
     entries.push({ object, bounds: expand(transformedBounds(local, object.transform)) });
@@ -81,6 +82,11 @@ export function createTrimModel(scene: Scene): TrimModel {
       return contours;
     },
   };
+}
+
+/** Vector artwork other than a registration box: what other outlines are trimmed back to. */
+function isTrimEdgeArtwork(object: Scene['objects'][number]): object is VectorSceneObject {
+  return isVectorPathObject(object) && !isRegistrationBox(object);
 }
 
 /** Unlocked vector artwork other than a registration box. */
@@ -108,7 +114,7 @@ function objectContours(
         pathIndex,
         polylineIndex,
         closed: source.segments.closed,
-        trimmable: source.trimmable,
+        trimmable: source.trimmable && object.locked !== true,
         segments: source.segments,
         transform: object.transform,
         ...flattened,

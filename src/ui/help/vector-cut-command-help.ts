@@ -6,7 +6,7 @@ export const VECTOR_CUT_COMMAND_HELP: Readonly<Record<VectorCutCommandId, Comman
   'tools.trim-shapes': {
     family: 'tools',
     tooltip:
-      'Turn on the Trim tool: hovering an outline highlights the stretch between its nearest crossings with other visible, unlocked outlines or itself, and a click deletes it. An outline that crosses nothing is deleted whole. Text and drawn shapes become plain paths when trimmed. Esc or another tool ends it.',
+      'Turn on the Trim tool: hovering an outline highlights the stretch between its nearest crossings with other visible outlines or itself, and a click deletes it. Locked artwork is trimmed back to but never cut. An outline that crosses nothing is deleted whole. Text and drawn shapes become plain paths when trimmed. Esc or another tool ends it.',
   },
   'tools.cut-shapes': {
     family: 'tools',

@@ -1,6 +1,6 @@
 // Trim Shapes (LightBurn gap LBG-T04): the stretch of outline under the
-// pointer, bounded by the nearest crossings with any other visible, unlocked
-// vector outline or with itself. A contour that crosses nothing is the stretch
+// pointer, bounded by the nearest crossings with any other visible vector
+// outline (locked ones included, as cutting edges only) or with itself. A contour that crosses nothing is the stretch
 // whole. The hovered stretch is what the canvas highlights and what a click
 // deletes; trim-shape-edit.ts turns it into the object's new paths.
 

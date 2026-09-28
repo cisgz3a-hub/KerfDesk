@@ -246,7 +246,7 @@ describe('Trim Shapes target', () => {
     expect(target(s, [10, -5]).whole).toBe(true);
   });
 
-  it('ignores locked artwork and artwork on hidden operations', () => {
+  it('trims back to locked artwork without cutting it, and ignores hidden operations', () => {
     const hidden = { ...createLayer({ id: 'hidden', name: 'Hidden', color: '#ff0000' }) };
     const s = scene(
       [
@@ -281,7 +281,12 @@ describe('Trim Shapes target', () => {
     );
     expect(findTrimTarget(s, { x: 10, y: 5 }, 0.5)).toBeNull();
     expect(findTrimTarget(s, { x: 20, y: 5 }, 0.5)).toBeNull();
-    expect(target(s, [15, 10]).whole).toBe(true);
+    const found = target(s, [15, 10]);
+    expect(found.whole).toBe(false);
+    expect(rounded(found.highlight)).toEqual([
+      [10, 10],
+      [30, 10],
+    ]);
   });
 
   it('works in world space and edits the object in its own coordinates', () => {
