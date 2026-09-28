@@ -174,6 +174,13 @@ describe('Desktop Preview release workflow gate (ADR-248/249)', () => {
       2,
     );
     expect(packageCheck).not.toContain('${{ secrets.');
+    // A volume macOS still holds right after the checks must not fail a passed job.
+    const dmgDetach = repoFile('scripts/detach-macos-dmg.sh');
+    expect(dmgDetach).toContain('hdiutil detach -force "${mount_dir}"');
+    expect(macVerifier).toContain('bash scripts/detach-macos-dmg.sh "${mount_dir}"');
+    expect(packageCheck).toContain(`trap 'bash scripts/detach-macos-dmg.sh "\${mount_dir}"' EXIT`);
+    expect(macVerifier).not.toContain('hdiutil detach');
+    expect(packageCheck).not.toContain('hdiutil detach');
   });
 
   it('publishes changelog notes with every Preview and only reminds about tagging (ADR-522)', () => {
