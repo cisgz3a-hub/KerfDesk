@@ -31,6 +31,9 @@ type OffsetNode = {
 const MAX_LEVELS = 4096;
 const COARSE_INTERIOR_PRECISION_DECIMALS = 2;
 const COARSE_INTERIOR_MIN_STEP_MM = 0.05;
+// A ring start this close to a vertex uses the vertex, so no near-zero segment
+// is emitted (G-code XY words carry 0.001 mm).
+const VERTEX_SNAP_MM = 0.001;
 
 export function sequencesForComponent(
   component: PathsD,
@@ -148,16 +151,27 @@ function offsetLevels(centerRegion: PathsD, optimalLoadMm: number): PathsD[] | n
   return levels;
 }
 
+// Rings are cut from the innermost outward, and each ring's start is linked to
+// the previous ring's start by a straight move into uncut stock. The starts are
+// chosen from the wall inward: the outermost ring starts at its point nearest
+// the entry, and each inner ring at its point nearest the start outside it. On
+// straight walls every link is then the perpendicular step of one ring spacing.
+// Chosen from the entry outward, the chain could begin on a corner fillet of the
+// small innermost ring and stay on that corner, where each link pushes the
+// corner gap (the spacing over sin of half the corner angle) into stock
+// (ADR-154 Amendment 3).
 function alignRingStarts(
   rings: ReadonlyArray<Polyline>,
-  initialPoint: Vec2,
+  entryPoint: Vec2,
 ): ReadonlyArray<Polyline> {
   const out: Polyline[] = [];
-  let previous = initialPoint;
-  for (const ring of rings) {
-    const rotated = rotateClosedRingToNearest(ring, previous);
-    out.push(rotated);
-    previous = rotated.points[0] ?? previous;
+  let anchor = entryPoint;
+  for (let index = rings.length - 1; index >= 0; index -= 1) {
+    const ring = rings[index];
+    if (ring === undefined) continue;
+    const rotated = rotateClosedRingToNearest(ring, anchor);
+    out.unshift(rotated);
+    anchor = rotated.points[0] ?? anchor;
   }
   return out;
 }
@@ -165,18 +179,47 @@ function alignRingStarts(
 function rotateClosedRingToNearest(ring: Polyline, point: Vec2): Polyline {
   const points = withoutDuplicateClosure(ring.points);
   if (points.length < 2) return ring;
-  let nearest = 0;
-  let distance = Number.POSITIVE_INFINITY;
-  for (let index = 0; index < points.length; index += 1) {
-    const candidate = points[index];
-    if (candidate === undefined) continue;
-    const nextDistance = Math.hypot(candidate.x - point.x, candidate.y - point.y);
-    if (nextDistance < distance) {
-      distance = nextDistance;
-      nearest = index;
-    }
-  }
-  const rotated = [...points.slice(nearest), ...points.slice(0, nearest)];
+  const nearest = nearestRingPoint(points, point);
+  const rotated = [
+    ...(nearest.inserted === null ? [] : [nearest.inserted]),
+    ...points.slice(nearest.index),
+    ...points.slice(0, nearest.index),
+  ];
   const first = rotated[0];
   return { closed: true, points: first === undefined ? rotated : [...rotated, first] };
+}
+
+// The point where the ring passes closest to `point`, anywhere along its
+// segments rather than only at a vertex: between two offset rings it is the
+// foot of the perpendicular. Restricted to vertices, a start on a straight wall
+// could only sit at a fillet's end, and the link then ran diagonally.
+function nearestRingPoint(
+  points: ReadonlyArray<Vec2>,
+  point: Vec2,
+): { readonly index: number; readonly inserted: Vec2 | null } {
+  let best = { index: 0, inserted: null as Vec2 | null, distance: Number.POSITIVE_INFINITY };
+  for (let index = 0; index < points.length; index += 1) {
+    const start = points[index];
+    const end = points[(index + 1) % points.length];
+    if (start === undefined || end === undefined) continue;
+    const dx = end.x - start.x;
+    const dy = end.y - start.y;
+    const lengthSquared = dx * dx + dy * dy;
+    const t =
+      lengthSquared === 0
+        ? 0
+        : Math.max(
+            0,
+            Math.min(1, ((point.x - start.x) * dx + (point.y - start.y) * dy) / lengthSquared),
+          );
+    const foot = { x: start.x + dx * t, y: start.y + dy * t };
+    const distance = Math.hypot(foot.x - point.x, foot.y - point.y);
+    if (distance >= best.distance) continue;
+    const length = Math.sqrt(lengthSquared);
+    if (t * length <= VERTEX_SNAP_MM) best = { index, inserted: null, distance };
+    else if ((1 - t) * length <= VERTEX_SNAP_MM) {
+      best = { index: (index + 1) % points.length, inserted: null, distance };
+    } else best = { index: (index + 1) % points.length, inserted: foot, distance };
+  }
+  return best;
 }

@@ -96,8 +96,10 @@ export type GcodeMetadata = {
  * straight run, and ADR-491's pocket rings and rows linked at depth at the
  * plunge feed and its park height before the job-end and bit-change parks,
  * ADR-486's kerf-offset circles kept as native arcs, ADR-492's image scans at
- * an angle and angle turns between passes, and ADR-495's overscan worked out
- * from the scan speed and acceleration when it is on.
+ * an angle and angle turns between passes, ADR-495's overscan worked out from
+ * the scan speed and acceleration when it is on, and ADR-154 amendment 3's
+ * adaptive roughing rings linked straight out by one ring spacing from starts
+ * chosen from the wall inward.
  */
 // ADR-427 keeps deepest cleanup before linked relief rings and flat depth slices.
 // ADR-368 sizes nonflat pocket/profile offsets, tabs and stepover by cut width.
@@ -111,7 +113,8 @@ export type GcodeMetadata = {
 // ADR-491 links pocket rings at depth and lifts to the park height.
 // ADR-486 keeps kerf-offset circles as G2/G3; ADR-492 angles image scans;
 // ADR-495 sizes overscan from speed and acceleration when it is on.
-export const EMITTER_REVISION = 'park-kerf-arcs-scan-angle-overscan-20260928-v7';
+// ADR-154 Amd 3 links adaptive rings straight out; all of the above is retained.
+export const EMITTER_REVISION = 'adaptive-contact-audited-20260928-v9';
 
 // Machine-specific assumption lines (ADR-103 defect fix): router exports
 // previously carried the laser-worded `$32=1 (laser mode)` banner. The S
