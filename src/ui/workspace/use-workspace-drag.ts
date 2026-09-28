@@ -23,7 +23,8 @@ import type { MeasureDraft } from './measure-tool';
 import { handlePenMouseDown } from './pen-tool';
 import { beginPathNodeDrag } from './path-node-drag';
 import { hitCncTabAnchor } from './cnc-tab-editor';
-import { beginLaserTabPointer, finishLaserTabDrag } from './laser-tab-editor';
+import { finishLaserTabDrag } from './laser-tab-editor';
+import { beginHandleToolDrag } from './handle-tool-drag';
 import { selectObjectsInMarquee } from './selection-marquee';
 import { runClickTool } from './workspace-click-tools';
 import { useEscCancelsDrag } from './use-esc-cancels-drag';
@@ -245,10 +246,8 @@ function beginToolDrag(args: {
       ),
     };
   }
-  if (args.toolMode.kind === 'laser-tabs') {
-    const drag = beginLaserTabPointer({ ...args, canvas: args.ref.current, mode: args.toolMode });
-    return { kind: 'handled', drag };
-  }
+  const handleTool = beginHandleToolDrag({ ...args, canvas: args.ref.current });
+  if (handleTool !== null) return handleTool;
   // Position Laser and Trim Shapes act on the click itself and never start a drag.
   if (runClickTool({ ...args, canvas: args.ref.current })) return { kind: 'handled', drag: null };
   return { kind: 'fallthrough' };

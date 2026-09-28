@@ -51,6 +51,8 @@ import { drawOutOfBoundsOutlines } from './draw-out-of-bounds-outlines';
 import { drawObjectSelectionOverlay, drawSelectionSetOverlay } from './draw-selection-overlay';
 import { drawCncTabAnchors } from './cnc-tab-editor';
 import { drawLaserTabAnchors, type LaserTabEditor } from './laser-tab-editor';
+import { drawWarpDeformHandles } from './warp-deform-tool';
+import type { WarpDeformRequest } from '../state/warp-deform-session';
 import { computeView, type ViewState, type ViewTransform } from './view-transform';
 import { drawLargeSceneNotice, strokePolylinesBatched } from './draw-vector-strokes';
 import { drawArtworkRunFocus } from './draw-artwork-run-focus';
@@ -101,6 +103,7 @@ export type DrawOpts = {
   readonly snapGuides?: ReadonlyArray<SnapGuide>;
   readonly cncTabLayerColor?: string;
   readonly laserTabEditor?: LaserTabEditor;
+  readonly warpDeformEditor?: WarpDeformRequest;
   readonly artworkRunFocus?: ArtworkRunFocus;
   // ADR-410 Wireframe view: outline Fill artwork instead of filling it.
   readonly wireframe?: boolean;
@@ -236,6 +239,7 @@ function drawLiveWorkspaceOverlays(
     if (selected !== undefined)
       drawLaserTabAnchors(ctx, project, selected, opts.laserTabEditor, view);
   }
+  if (opts.warpDeformEditor !== undefined) drawWarpDeformHandles(ctx, opts.warpDeformEditor, view);
 }
 
 // Phase G (B5): render the shape being dragged out as a dashed accent outline.

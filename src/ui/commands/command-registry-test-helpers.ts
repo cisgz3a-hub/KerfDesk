@@ -58,6 +58,12 @@ function baseCtxEditingTools(): Partial<AppCommandContext> {
     trimShapesActive: false,
     trimShapes: vi.fn(),
     cutShapes: vi.fn(),
+    // LBG-T06 Warp and Deform.
+    canWarpSelection: false,
+    warpToolActive: false,
+    deformToolActive: false,
+    startWarp: vi.fn(),
+    startDeform: vi.fn(),
   };
 }
 

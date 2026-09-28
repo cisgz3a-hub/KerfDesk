@@ -143,9 +143,10 @@ function initializeDragSurface(drag: DragState, deps: WorkspaceDragDeps): void {
     deps.setSelectionMarquee({ start: drag.startScenePoint, end: drag.startScenePoint });
   } else if (drag.kind === 'measure') {
     deps.setMeasureDraft({ start: drag.startScenePoint, end: drag.startScenePoint });
-  } else if (drag.kind !== 'pan' && drag.kind !== 'draw') {
-    // Draw commits own one atomic history entry; only mutating live drags need
-    // the rollback snapshot used by cancellation and pointer-capture loss.
+  } else if (drag.kind !== 'pan' && drag.kind !== 'draw' && drag.kind !== 'warp-handle') {
+    // Draw commits own one atomic history entry, and a Warp or Deform handle
+    // changes no project data; only mutating live drags need the rollback
+    // snapshot used by cancellation and pointer-capture loss.
     deps.beginInteraction();
   }
 }

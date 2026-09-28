@@ -186,5 +186,6 @@ function isActive(current: ToolMode, tool: ToolMode): boolean {
   if (current.kind === 'position-laser') return tool.kind === 'position-laser';
   if (current.kind === 'cnc-tabs' || current.kind === 'laser-tabs') return false;
   if (current.kind === 'trim-shapes') return false;
+  if (current.kind === 'warp-deform') return false;
   return tool.kind === 'draw' && tool.shape === current.shape;
 }

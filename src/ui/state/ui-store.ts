@@ -15,6 +15,7 @@ import type {
   Vec2,
 } from '../../core/scene';
 import type { TraceSettingsRecord } from '../../core/scene/scene-object';
+import type { WarpDeformGrid } from '../../core/geometry/warp-deform-map';
 import type { TextAlignment } from '../../core/text';
 import type { MeasureDraft } from '../workspace/measure-tool';
 import { DEFAULT_SNAP_SETTINGS, type SnapGuide, type SnapSettings } from '../workspace/snapping';
@@ -75,6 +76,8 @@ export type ToolMode =
   // ADR-494: place, move and remove laser Line tabs on the selected artwork's
   // `layerColor` contours for one operation. Esc returns to select.
   | { readonly kind: 'laser-tabs'; readonly layerColor: string; readonly operationId: string }
+  // LBG-T06: drag the Warp or Deform handles held in warp-deform-session.ts.
+  | { readonly kind: 'warp-deform'; readonly grid: WarpDeformGrid }
   // Camera/positioning aid (ADR-116 follow-up): the next canvas click jogs
   // the laser head to that bed point (absolute, beam off). Esc returns to
   // select like every other mode.

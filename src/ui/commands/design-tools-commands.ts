@@ -3,6 +3,7 @@
 // Direction, Create Rubber-Band Outline and Flatten Image Mask.
 
 import { disabled, enabled, type AppCommand, type AppCommandContext } from './command-types';
+import { warpDeformCommands } from './warp-deform-commands';
 
 export const DELETE_DUPLICATES_SHORTCUT = 'Alt+D';
 
@@ -85,6 +86,7 @@ export function designToolsCommands(ctx: AppCommandContext): ReadonlyArray<AppCo
       'Reverse the direction the selected paths are cut in',
       ctx.reverseSelectedPaths,
     ),
+    ...warpDeformCommands(ctx),
     ctx.hasMaskedRasterSelection
       ? enabled(
           'tools.flatten-image-mask',

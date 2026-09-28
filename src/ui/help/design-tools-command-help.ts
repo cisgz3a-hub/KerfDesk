@@ -1,10 +1,12 @@
 import type { DesignToolsCommandId } from '../commands/design-tools-command-types';
 import type { CommandHelpTopic } from './command-help-topics';
 import { VECTOR_CUT_COMMAND_HELP } from './vector-cut-command-help';
+import { WARP_DEFORM_COMMAND_HELP } from './warp-deform-command-help';
 
 // LightBurn gap batch 5 (ADR-480) commands, and Copy Along Path (LBG-T09).
 export const DESIGN_TOOLS_COMMAND_HELP: Readonly<Record<DesignToolsCommandId, CommandHelpTopic>> = {
   ...VECTOR_CUT_COMMAND_HELP,
+  ...WARP_DEFORM_COMMAND_HELP,
   'edit.select-contained': {
     family: 'edit',
     tooltip:

@@ -168,6 +168,11 @@ function baseCtx(overrides: Partial<AppCommandContext> = {}): AppCommandContext 
     trimShapesActive: false,
     trimShapes: vi.fn(),
     cutShapes: vi.fn(),
+    canWarpSelection: false,
+    warpToolActive: false,
+    deformToolActive: false,
+    startWarp: vi.fn(),
+    startDeform: vi.fn(),
     ...overrides,
   };
 }
