@@ -176,6 +176,19 @@ describe('Desktop Preview release workflow gate (ADR-248/249)', () => {
     expect(packageCheck).not.toContain('${{ secrets.');
   });
 
+  it('publishes changelog notes with every Preview and only reminds about tagging (ADR-521)', () => {
+    const cadence = repoFile('.github/workflows/desktop-preview-cadence.yml');
+    expect(workflow).toContain(
+      'node scripts/desktop-release-notes.mjs release-body "${VERSION}" >> release-notes.md',
+    );
+    expect(workflow.indexOf('release-body')).toBeLessThan(workflow.indexOf('gh release create'));
+    expect(repoFile('CHANGELOG.md')).toMatch(/^## Unreleased$/m);
+    // The v* tag ruleset keeps release tags with the maintainer; the cadence only drafts.
+    expect(cadence).toContain('node scripts/desktop-preview-cadence.mjs');
+    expect(cadence).not.toMatch(/contents: write|\bgit tag\b|\bgit push\b|gh release/);
+    expect(cadence).toContain('persist-credentials: false');
+  });
+
   it('cannot publish Preview updater metadata, R2 objects, or secret-backed output', () => {
     const windowsBuild = workflow.indexOf('Build unsigned Windows Preview');
     const windowsCleanup = workflow.indexOf(
