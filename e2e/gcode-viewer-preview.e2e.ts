@@ -1,7 +1,8 @@
 import { expect, test, type Page } from './fixtures/kerfdesk-test';
 
-// 300,000 moves across rows. Read on a throttled CPU, the worker takes
-// seconds, long enough to watch the picture grow.
+// 300,000 moves across rows, read with the page's CPU slowed. The slowdown
+// does not reach the worker, so the test holds the finished program back until
+// the preview has drawn, as a bigger file keeps the preview up (holdTheRead).
 const ROWS = 1500;
 const CPU_SLOWDOWN = 6;
 const STEPS_PER_ROW = 200;
@@ -45,6 +46,14 @@ async function watchPreviewDraws(page: Page): Promise<void> {
       }
       return lit;
     };
+    // Everything the preview's status line said, kept as it changes.
+    const said = new Set<string>();
+    Object.assign(window, { __previewSaid: said });
+    new MutationObserver(() => {
+      for (const status of document.querySelectorAll('.gcode-viewer-preview [role="status"]')) {
+        said.add(status.textContent ?? '');
+      }
+    }).observe(document, { subtree: true, childList: true, characterData: true });
     const proto = WebGL2RenderingContext.prototype;
     const { drawArrays } = proto;
     proto.drawArrays = function (this: Gl, mode: number, first: number, count: number) {
@@ -64,10 +73,52 @@ interface PreviewDrawn {
   readonly litPixels: number;
 }
 
+// What the preview's status line has said so far. Read from a record rather
+// than the page, so the check does not race the full view replacing it.
+async function previewSaid(page: Page): Promise<string> {
+  return page.evaluate(() =>
+    [...(window as unknown as { __previewSaid: Set<string> }).__previewSaid].join('\n'),
+  );
+}
+
 async function previewDrawn(page: Page): Promise<PreviewDrawn> {
   return page.evaluate(
     () => (window as unknown as { __previewDrawn: PreviewDrawn }).__previewDrawn,
   );
+}
+
+// Holds the Inspector worker's finished program back until the test lets it
+// go. The worker is not slowed with the page: on a busy machine it read the
+// whole file before the slowed page had started the preview's 3D scene, and
+// the full view replaced a preview that had drawn nothing (0 draws).
+async function holdTheRead(page: Page): Promise<void> {
+  await page.addInitScript(() => {
+    const NativeWorker = window.Worker;
+    const held: (() => void)[] = [];
+    let holding = true;
+    window.Worker = class extends NativeWorker {
+      constructor(url: string | URL, options?: WorkerOptions) {
+        super(url, options);
+        if (!String(url).includes('gcode-inspector-worker')) return;
+        // Added before the page's own handler, so it can keep the message from it.
+        this.addEventListener('message', (event: MessageEvent<{ kind?: string }>) => {
+          if (!holding || event.data.kind !== 'complete') return;
+          event.stopImmediatePropagation();
+          held.push(() => this.dispatchEvent(new MessageEvent('message', { data: event.data })));
+        });
+      }
+    };
+    Object.assign(window, {
+      __finishRead: (): void => {
+        holding = false;
+        for (const deliver of held.splice(0)) deliver();
+      },
+    });
+  });
+}
+
+async function finishTheRead(page: Page): Promise<void> {
+  await page.evaluate(() => (window as unknown as { __finishRead: () => void }).__finishRead());
 }
 
 test('the Inspector draws the moves read so far while its worker reads a big file (ADR-485)', async ({
@@ -80,6 +131,7 @@ test('the Inspector draws the moves read so far while its worker reads a big fil
     if (message.type() === 'error') errors.push(message.text());
   });
   await watchPreviewDraws(page);
+  await holdTheRead(page);
   await page.goto('/');
   await kerfdesk.setOpenFiles([{ name: 'big-preview.nc', text: bigProgram() }]);
   const cdp = await page.context().newCDPSession(page);
@@ -90,8 +142,8 @@ test('the Inspector draws the moves read so far while its worker reads a big fil
   const dialog = page.getByRole('dialog', { name: 'G-code Inspector: big-preview.nc' });
   const preview = dialog.locator('.gcode-viewer-preview');
   await expect(preview).toBeVisible({ timeout: 30_000 });
-  await expect(preview.getByRole('status')).toContainText(/worker.*cancel/i);
-  await expect(preview.getByRole('status')).toContainText(/[\d,]+ moves read/);
+  await expect.poll(() => previewSaid(page)).toMatch(/worker.*cancel/i);
+  await expect.poll(() => previewSaid(page)).toMatch(/[\d,]+ moves read/);
 
   // Says how many draws there were, so a failure tells a blank canvas from none.
   await expect
@@ -100,10 +152,11 @@ test('the Inspector draws the moves read so far while its worker reads a big fil
         const { draws, litPixels } = await previewDrawn(page);
         return `${litPixels > 500 ? 'lit' : 'not lit'} after ${draws} draws (${litPixels} px)`;
       },
-      { timeout: 30_000 },
+      { timeout: 60_000 },
     )
     .toMatch(/^lit/);
   await cdp.send('Emulation.setCPUThrottlingRate', { rate: 1 });
+  await finishTheRead(page);
 
   await expect(dialog.getByText(/shown segments/)).toBeVisible({ timeout: 150_000 });
   await expect(preview).toHaveCount(0);
