@@ -170,19 +170,21 @@ export function applyRampEntry(
   const tangent = Math.tan((angle * Math.PI) / 180);
   let previousZ = 0;
   const cutPaths = new Map<string, CutPath[]>();
-  return passes.map((pass) => {
+  return passes.map((pass, index) => {
     if (includeTabbedPaths && pass.kind === 'path3d') {
       const depth = pass.points.reduce((min, point) => Math.min(min, point.z), Infinity);
       const fromZ = depth >= previousZ ? 0 : previousZ;
       previousZ = depth;
       return rampTabbedPath(pass, fromZ, tangent);
     }
-    if (pass.kind !== 'contour') return pass;
+    if (pass.kind !== 'contour' || pass.stayDownEntry === true) return pass;
     const path = cutPathOf(cutPaths, pass);
     const fromZ = path.levelZ;
     path.levelZ = Math.min(fromZ, pass.zMm);
     previousZ = pass.zMm;
-    return rampContourPass(pass, fromZ, tangent, minRampPathMm);
+    const next = passes[index + 1];
+    const linkFollows = next?.kind === 'path3d' && next.stayDownLink === true;
+    return rampContourPass(pass, fromZ, tangent, minRampPathMm, linkFollows);
   });
 }
 
@@ -218,11 +220,13 @@ function samePoints(a: ReadonlyArray<Vec2>, b: ReadonlyArray<Vec2>): boolean {
 
 // H.9 parking parity: park fields are only present on groups when the
 // operator configured a park position, so default output stays
-// byte-identical to pre-H.9 jobs.
+// byte-identical to pre-H.9 jobs. The park height (ADR-491) is separate: it
+// lifts the bit before whichever park move the job makes.
 export function parkFields(
   config: CncMachineConfig,
-): Pick<CncGroup, 'parkXMm' | 'parkYMm'> | Record<string, never> {
-  const { parkXMm, parkYMm } = config.params;
-  if (parkXMm === undefined && parkYMm === undefined) return {};
-  return { parkXMm: parkXMm ?? 0, parkYMm: parkYMm ?? 0 };
+): Pick<CncGroup, 'parkXMm' | 'parkYMm' | 'parkZMm'> {
+  const { parkXMm, parkYMm, parkZMm } = config.params;
+  const height = parkZMm === undefined ? {} : { parkZMm };
+  if (parkXMm === undefined && parkYMm === undefined) return height;
+  return { parkXMm: parkXMm ?? 0, parkYMm: parkYMm ?? 0, ...height };
 }

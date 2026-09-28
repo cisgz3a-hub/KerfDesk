@@ -30,7 +30,8 @@ export function DeviceSetupCncMachineStep(props: {
           end or tool-change parking. A park is a bed position that moves with the job like every
           cut, and a job whose place on the bed is unknown parks at its origin instead. With no
           park, a Current Position job returns to its start and any other job ends at program X0 Y0.
-          CNC mode assumes an installed, powered Z axis; choosing CNC does not prove Z hardware or
+          Park height is how far above the stock top the bit lifts before any of those moves. CNC
+          mode assumes an installed, powered Z axis; choosing CNC does not prove Z hardware or
           direction. Recorded Z travel is informational. Artwork chooses its running spindle speed
           separately.
         </span>
@@ -43,9 +44,9 @@ export function DeviceSetupCncMachineStep(props: {
       />
       <div style={warningStyle}>
         <strong>Hardware check required:</strong> confirm a powered Z is installed, Z-positive moves
-        away from the stock, Safe Z clears clamps, M3/S reaches the expected RPM, the dwell is long
-        enough, and M7/M8 drives only the intended coolant output. These are warnings, not a mode or
-        Start gate.
+        away from the stock, Safe Z clears clamps, Park height stays inside your Z travel, M3/S
+        reaches the expected RPM, the dwell is long enough, and M7/M8 drives only the intended
+        coolant output. These are warnings, not a mode or Start gate.
       </div>
     </section>
   );
@@ -193,6 +194,15 @@ function ParkRows(props: {
           />
         </>
       ) : null}
+      <MachineNumberRow
+        label="Park height"
+        unit="mm"
+        value={Math.max(params.safeZMm, params.parkZMm ?? params.safeZMm)}
+        min={0.5}
+        max={200}
+        step={1}
+        onCommit={(parkZMm) => props.setParams({ ...params, parkZMm })}
+      />
     </MachineSetupFieldAnchor>
   );
 }
