@@ -38,7 +38,7 @@ mount_dir="$(mktemp -d)"
 is_mounted=false
 cleanup() {
   if [[ "${is_mounted}" == true ]]; then
-    hdiutil detach "${mount_dir}" >/dev/null
+    bash scripts/detach-macos-dmg.sh "${mount_dir}"
   fi
   rmdir "${mount_dir}"
 }

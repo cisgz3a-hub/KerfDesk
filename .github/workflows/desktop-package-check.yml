@@ -236,7 +236,7 @@ jobs:
           mount_dir="$(mktemp -d)"
           hdiutil attach -readonly -nobrowse -mountpoint "${mount_dir}" \
             "release/${VERSION}/KerfDesk-${VERSION}-macos-${ARCH}.dmg" >/dev/null
-          trap 'hdiutil detach "${mount_dir}" >/dev/null' EXIT
+          trap 'bash scripts/detach-macos-dmg.sh "${mount_dir}"' EXIT
           app="${mount_dir}/KerfDesk.app"
           # On macOS the fuse wire lives in the Electron framework binary.
           node scripts/verify-packaged-desktop.mjs \
