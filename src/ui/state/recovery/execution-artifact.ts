@@ -169,6 +169,9 @@ type CreateExecutionArtifactBase = {
   readonly controllerObservation?: ArchivedControllerObservationInput;
   readonly archivedControllerObservation?: ArchivedControllerObservationV1;
   readonly createdAtIso: string;
+  /** False builds a copy that stays in this page and is never archived, so
+   * it is neither measured nor refused for its size (ADR-341 Amendment 7). */
+  readonly enforceArchiveBudget?: boolean;
 };
 
 type CreateExecutionArtifactArgs = CreateExecutionArtifactBase &
@@ -187,8 +190,9 @@ type CreateExecutionArtifactArgs = CreateExecutionArtifactBase &
   );
 
 export function createExecutionArtifact(args: CreateExecutionArtifactArgs): ExecutionArtifactV1 {
+  const archived = args.enforceArchiveBudget !== false;
   assertArchiveMayFit(args);
-  const canvasPlan = archiveCanvasMotionPlan(args.canvasPlan);
+  const canvasPlan = archiveCanvasMotionPlan(args.canvasPlan, { enforceArchiveBudget: archived });
   // No budget walk here: the measurement below walks the finished artifact,
   // which holds the same job, and enforces the same budget. Walking the inputs
   // first doubled a node-per-motion-point traversal that runs while the first
@@ -232,8 +236,13 @@ export function createExecutionArtifact(args: CreateExecutionArtifactArgs): Exec
     archivedControllerObservation,
     ...(args.provenance === undefined ? {} : { provenance: args.provenance }),
   };
-  // One traversal, not two: the budget guard already produced the exact size
-  // whenever it did not throw, and this runs between Start and the first byte.
+  return withArchiveSize(artifact, archived);
+}
+
+// One traversal, not two: the budget guard already produced the exact size
+// whenever it did not throw, and this runs between Start and the first byte.
+function withArchiveSize(artifact: ExecutionArtifactV1, archived: boolean): ExecutionArtifactV1 {
+  if (!archived) return artifact;
   return {
     ...artifact,
     estimatedArtifactBytes: measureExecutionArtifactBytesWithinBudget(artifact),
@@ -246,8 +255,9 @@ export function createExecutionArtifact(args: CreateExecutionArtifactArgs): Exec
 // points and building the full artifact only to measure it cost a dense fill
 // over a second of acknowledgement latency at every Start (ADR-345).
 function assertArchiveMayFit(
-  args: Pick<CreateExecutionArtifactArgs, 'gcode' | 'canvasPlan'>,
+  args: Pick<CreateExecutionArtifactArgs, 'gcode' | 'canvasPlan' | 'enforceArchiveBudget'>,
 ): void {
+  if (args.enforceArchiveBudget === false) return;
   const manifest = args.canvasPlan.manifest;
   assertExecutionArtifactSizeWithinBudget(
     { gcode: args.gcode },

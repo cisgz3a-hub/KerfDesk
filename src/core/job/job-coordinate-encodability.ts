@@ -56,6 +56,7 @@ function collectCncCoordinates(group: CncGroup, path: string, values: JobCoordin
   values.push({ path: `${path}.safeZMm`, value: group.safeZMm });
   if (group.parkXMm !== undefined) values.push({ path: `${path}.parkXMm`, value: group.parkXMm });
   if (group.parkYMm !== undefined) values.push({ path: `${path}.parkYMm`, value: group.parkYMm });
+  if (group.parkZMm !== undefined) values.push({ path: `${path}.parkZMm`, value: group.parkZMm });
   group.passes.forEach((pass, index) =>
     collectCncPassCoordinates(pass, `${path}.passes[${index}]`, values),
   );

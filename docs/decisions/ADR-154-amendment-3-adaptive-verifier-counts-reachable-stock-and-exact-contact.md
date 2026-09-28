@@ -114,7 +114,7 @@ Two things the investigation found were left as they are:
    then the perpendicular step of one ring spacing, and its engagement is that spacing, half the
    limit. Ring order, ring geometry, the entry helix, the cut direction and the finishing rings are
    unchanged. A start within 0.001 mm of a vertex uses the vertex.
-4. **Emitter revision** advances to `adaptive-ring-links-straight-out-20260928-v3`. Every adaptive
+4. **Emitter revision** advances to `adaptive-ring-links-straight-out-20260928-v4`. Every adaptive
    pocket's roughing starts each ring at a new point and links the rings differently.
 
 ### Consequences

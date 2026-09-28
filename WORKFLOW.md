@@ -2261,10 +2261,15 @@ authorization, Frame proof, controller command, or safety boundary.
   instead of in one uninterruptible task. Order and content are unchanged (ADR-356). This
   keeps the page answering during catch-up; it does not make a stalled page keep feeding
   the controller, which still depends on the page unless the transport runs in a worker.
+- The end-of-job check that waits for the controller to report Idle, and the other waits on
+  status reports, also count only time the status poll ran on schedule. A job that finishes
+  while Chrome is minimised or its tab is hidden is recorded as completed on the reports of the
+  slowed poll, instead of timing out as interrupted (ADR-356 Amendment 1). A controller that
+  stays silent once the page polls normally still fails the check after the same time.
 
 #### Painted second passes (2026-09-22, ADR-341)
 
-- After a settled laser completion and successful archive capture, **Job complete** asks
+- After a settled laser completion, **Job complete** asks
   **Would you like to darken selected areas?** Choose **Darken selected areas…** to open
   that exact saved job in the paintbrush/eraser editor, or **Not now** to close the offer. No
   motion is started by this choice. The prompt also works with the Machine panel collapsed, waits
@@ -2275,7 +2280,9 @@ authorization, Frame proof, controller command, or safety boundary.
 - **Paint a second pass…** in the Machine panel reopens the same job after dismissing the
   prompt, until another job starts. It offers only the job that just finished: there is no
   list of older jobs, and a later job that is aborted or interrupted removes the button
-  rather than bringing back an older one (ADR-341 Amendment 4). When the finished run
+  rather than bringing back an older one (ADR-341 Amendment 4). A job too large for the
+  execution archive is offered too: the page keeps its program until another job starts or
+  KerfDesk is closed or reloaded, and the prompt says so (ADR-341 Amendment 7). When the finished run
   was a recovery or a painted pass, the preview follows its independently verified retained
   ancestor so the original full engraving is available where that archive still exists.
   The current artwork document is never replaced or recompiled by this workflow.
@@ -7282,8 +7289,8 @@ behavior or create a second product implementation.
    or the stable R2 update feed:
    - **Windows 10/11, x64:** `KerfDesk-<version>-windows-x64-setup.exe`
      (NSIS, per-user, `oneClick:false`, user-selectable install directory).
-   - **macOS 12+, Intel x64:** `KerfDesk-<version>-macos-x64.dmg`.
-   - **macOS 12+, Apple Silicon arm64:**
+   - **macOS 13+, Intel x64:** `KerfDesk-<version>-macos-x64.dmg`.
+   - **macOS 13+, Apple Silicon arm64:**
      `KerfDesk-<version>-macos-arm64.dmg`.
    Here `<version>` is the tag text without its leading `v` (for example,
    `0.2.0-preview.1`). The companion files are
@@ -7307,10 +7314,9 @@ behavior or create a second product implementation.
    unsigned and unnotarized. The `/download` page labels both Mac assets
    **Unsigned, unnotarized Preview** before download.
 2. The page documents the deliberate manual-open path supported by macOS:
-   Control-click **KerfDesk.app** → **Open**. After a blocked attempt, macOS 12
-   Monterey uses **System Preferences → Security & Privacy → General → Open
-   Anyway**; newer macOS uses **System Settings → Privacy & Security → Open
-   Anyway**. Preview never claims Apple notarization or silently weakens
+   Control-click **KerfDesk.app** → **Open**. After a blocked attempt, macOS
+   13 and newer use **System Settings → Privacy & Security → Open Anyway**
+   (Electron 44 needs macOS 13 or newer). Preview never claims Apple notarization or silently weakens
    Gatekeeper.
 
 #### Empty — no desktop build on Linux
@@ -7538,11 +7544,11 @@ cache, rollback, and installed upgrade tests remain release qualification work.
       launches `app://app/index.html` after the documented SmartScreen path.
 - [ ] **Intel Mac packaging:** the x64 DMG installs and launches KerfDesk over
       `app://app/index.html` on a real Intel Mac after the documented Gatekeeper
-      manual-open path. Evidence includes macOS 12.x for the claimed floor and a
+      manual-open path. Evidence includes macOS 13.x for the claimed floor and a
       currently supported macOS version for the architecture.
 - [ ] **Apple Silicon packaging:** the arm64 DMG installs and launches KerfDesk
       over `app://app/index.html` natively on a real Apple Silicon Mac after the
-      documented Gatekeeper manual-open path. Evidence includes macOS 12.x for
+      documented Gatekeeper manual-open path. Evidence includes macOS 13.x for
       the claimed floor and a currently supported macOS version for the
       architecture.
 - [ ] **Serial (hardware, each desktop architecture):** a plugged-in GRBL
@@ -7565,11 +7571,11 @@ cache, rollback, and installed upgrade tests remain release qualification work.
 - [ ] **Mac permission metadata:** both DMGs contain accurate
       `NSCameraUsageDescription` and `NSLocalNetworkUsageDescription` strings,
       `CFBundleIdentifier=com.kerfdesk.app`, and
-      `LSMinimumSystemVersion=12.0`; first-use prompts match USB camera and
+      `LSMinimumSystemVersion=13.0`; first-use prompts match USB camera and
       private-network JPEG discovery/capture workflows. The bundle identifier
       names the app but is not represented as durable TCC identity for unsigned
       builds.
-- [ ] **Mac permission behavior:** at the macOS 12 floor, test launch, USB-camera
+- [ ] **Mac permission behavior:** at the macOS 13 floor, test launch, USB-camera
       allow, deny, recovery in System Settings, retry, and private-network JPEG
       capture. On macOS 15+ and on both architectures, additionally test camera
       and local-network allow/deny/Settings recovery/retry plus Preview upgrade

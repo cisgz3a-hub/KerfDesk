@@ -80,6 +80,9 @@ function recoveredOptionalFields(value: Record<string, unknown>): Partial<CncSub
   const recovered: { -readonly [K in keyof CncSubProfile]?: CncSubProfile[K] } = {};
   if (isFiniteNumber(value['parkXMm'])) recovered.parkXMm = value['parkXMm'];
   if (isFiniteNumber(value['parkYMm'])) recovered.parkYMm = value['parkYMm'];
+  // ADR-491 park height: never a reason to refuse output (the emitter parks at
+  // safe Z without a usable one), so it is only carried when usable.
+  if (isPositiveFinite(value['parkZMm'])) recovered.parkZMm = value['parkZMm'];
   for (const field of CNC_FEED_FIELDS) {
     const feed = value[field];
     if (isPositiveFinite(feed)) recovered[field] = feed;

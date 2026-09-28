@@ -6,7 +6,7 @@
 import { useCallback, useState } from 'react';
 import { open2dSimulatorFromSource } from '../app/gcode-open-action';
 import { createImportWorkerControls } from '../app/import-worker-controls';
-import { GcodeInspectorDialog, withDeviceTiming } from '../gcode-inspector';
+import { GcodeInspectorDialog, withCurrentDevice } from '../gcode-inspector';
 import type { GcodeInspectionSource } from '../gcode-inspector';
 import { useStore } from '../state';
 import { useToastStore } from '../state/toast-store';
@@ -20,7 +20,7 @@ export function useGcodeInspectorSlot(): {
   const [program, setProgram] = useState<InspectorProgram | null>(null);
   const open = useCallback(
     (name: string, source: GcodeInspectionSource) =>
-      setProgram({ name, source: withDeviceTiming(source, useStore.getState().project.device) }),
+      setProgram({ name, source: withCurrentDevice(source, useStore.getState().project.device) }),
     [],
   );
   const element =

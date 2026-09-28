@@ -89,6 +89,26 @@ describe('Machine Setup park (ADR-392 Amendment 1)', () => {
     expect(params.safeZMm).toBe(DEFAULT_CNC_MACHINE_CONFIG.params.safeZMm);
   });
 
+  it('shows Park height at Safe Z until one is set, with or without a park position', () => {
+    renderStep(DEFAULT_CNC_MACHINE_CONFIG);
+
+    expect(host.querySelector<HTMLInputElement>('input[aria-label="Park height"]')?.value).toBe(
+      String(DEFAULT_CNC_MACHINE_CONFIG.params.safeZMm),
+    );
+  });
+
+  it('keeps the park height when the park position is turned off (ADR-491)', () => {
+    const machine = parked(10, 380);
+    const dispatch = renderStep({ ...machine, params: { ...machine.params, parkZMm: 30 } });
+    expect(host.querySelector<HTMLInputElement>('input[aria-label="Park height"]')?.value).toBe(
+      '30',
+    );
+
+    act(() => parkToggle().click());
+
+    expect(editedParams(dispatch).parkZMm).toBe(30);
+  });
+
   it('shows the configured bed position in Park X and Y', () => {
     renderStep(parked(10, 380));
 

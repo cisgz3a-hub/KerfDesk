@@ -55,8 +55,21 @@ describe('CncRetractPassesField', () => {
     expect(box?.checked).toBe(false);
   });
 
-  it('renders nothing for cut types that manage their own motion (pocket)', () => {
-    expect(checkbox(renderField(withCut({ cutType: 'pocket' }), vi.fn()))).toBeNull();
+  it('renders nothing for cut types that manage their own motion (adaptive pocket)', () => {
+    expect(
+      checkbox(renderField(withCut({ cutType: 'pocket', pocketStrategy: 'adaptive' }), vi.fn())),
+    ).toBeNull();
+  });
+
+  it('offers Lift between rings on an offset or raster pocket, off by default', () => {
+    const onCommit = vi.fn();
+    const box = checkbox(renderField(withCut({ cutType: 'pocket' }), onCommit));
+    expect(box?.getAttribute('aria-label')).toBe('Lift between rings for #ff0000');
+    expect(box?.checked).toBe(false);
+    act(() => {
+      box?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+    });
+    expect(onCommit).toHaveBeenCalledWith({ pocketLiftBetweenRings: true });
   });
 
   it('commits false when toggled off', () => {
