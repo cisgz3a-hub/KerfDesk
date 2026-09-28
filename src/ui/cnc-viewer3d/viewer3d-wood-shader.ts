@@ -186,6 +186,13 @@ float carveAo(vec3 p) {
 /** Helper functions for the fragment stage, in dependency order. */
 export const WOOD_FUNCTIONS_GLSL = SAMPLING_GLSL + NOISE_GLSL + GRAIN_GLSL + OCCLUSION_GLSL;
 
+/**
+ * The grain alone, `carveWoodAlbedo` and the noise it needs, for another
+ * surface to figure its timber the same way (the Inspector's carved stock,
+ * ADR-487). It reads the `uGrain*` uniforms but no depth texture.
+ */
+export const WOOD_GRAIN_GLSL = NOISE_GLSL + GRAIN_GLSL;
+
 // Declared without a wrapping block so `carveRough`, `carveAoValue` and
 // `carveShadowValue` stay in scope for the later chunk injections — every
 // three.js chunk is inlined into the same main().

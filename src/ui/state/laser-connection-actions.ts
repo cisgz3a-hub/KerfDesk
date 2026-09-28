@@ -55,6 +55,7 @@ import { useToastStore } from './toast-store';
 import type { TranscriptSource } from './laser-transcript';
 import { clearCncLiveCaps } from './detected-settings-action';
 import { createLaserStatusPollWriter } from './laser-status-poll-writer';
+import { recordStatusPollTick } from './laser-status-poll-schedule';
 import { cancelAttemptOwnsStatusBoundary } from './laser-motion-operation';
 import { browserLocalStorage } from './browser-local-storage';
 import { forgetRememberedSerialPort } from './serial-port-memory';
@@ -407,6 +408,8 @@ function startStatusPolling(set: SetFn, get: GetFn, refs: LiveRefs, safeWrite: S
   let pollTick = 0;
   const writeStatusPoll = createLaserStatusPollWriter(safeWrite);
   refs.pollHandle = setInterval(() => {
+    // Silence deadlines count only time this timer ran (ADR-356 Amendment 1).
+    recordStatusPollTick(refs, Date.now());
     pollTick++;
     const s = get();
     if (containLostStreamHeartbeat(set, s, refs, safeWrite)) return;

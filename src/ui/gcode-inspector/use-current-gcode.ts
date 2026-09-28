@@ -206,10 +206,11 @@ function useCurrentGcodeRefresh(args: {
     setState({ kind: 'compiling' });
     void handleInspectCurrentGcode(
       saveGcodeContext({ platform, app, laser, pushToast, openInspector: () => undefined }),
-      (programName, text) => {
+      (programName, text, placement) => {
         if (runSequence.current !== runId || controller.signal.aborted) return;
         compiledFor.current = snapshot;
-        setState({ kind: 'ready', programName, text, context: projectInspectionContext(snapshot) });
+        const context = projectInspectionContext(snapshot, placement);
+        setState({ kind: 'ready', programName, text, context });
       },
       {
         signal: controller.signal,
