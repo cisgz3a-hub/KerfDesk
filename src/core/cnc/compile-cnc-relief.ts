@@ -439,6 +439,7 @@ function appendReliefPasses(
     stockOnRight: materialOnRightInMap(residualTransform, device, settings),
     cutWidthMm: result.ladder.cutWidthMm,
     rampOutputPoint: place,
+    cutterRadiusMm: tool.diameterMm / 2,
     ...(settings.rampEntryDeg === undefined ? {} : { rampAngleDeg: settings.rampEntryDeg }),
   });
   for (const pass of motion) {

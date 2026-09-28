@@ -234,12 +234,12 @@ function ladderOf(
   };
 }
 
-// ADR-489: the air a level's paths are entered through. The level above cut
-// its whole region to this level's slice top (a region only shrinks with
-// depth), and every point within the cutter's radius of that region lies
-// within the radius of one of its paths, so no stock there stands higher than
-// the slice top plus the cutter's rise at its full radius. A level cut from
-// the uncut stock top, or below a level that stopped short, has no floor.
+// ADR-489: the air a level's paths may be entered through: its slice top
+// plus the cutter's rise at its full radius, where every earlier cut at or
+// below the slice top leaves the stock. It is a candidate: each pass keeps it
+// only where the passes before it swept everything within the cutter's radius
+// of its path (ADR-489 Amendment 1, relief-air-floor-proof.ts). A level cut
+// from the uncut stock top, or below a level that stopped short, has none.
 function airFloorMm(level: ReliefRoughingLevelPaths, toolRiseMm: number): number | null {
   if (!(level.sliceTopMm < -LEVEL_EPS) || !Number.isFinite(toolRiseMm)) return null;
   return level.sliceTopMm + Math.max(0, toolRiseMm);

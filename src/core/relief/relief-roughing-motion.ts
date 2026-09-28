@@ -23,6 +23,9 @@
 // - Moves: vertices on the straight line between their neighbours (a
 //   staircase ring's cell-by-cell runs, a ramp's along one side) are dropped,
 //   so each straight run is one move; the path is unchanged (ADR-488).
+// - Air floors: a pass keeps its level's air floor only when the passes cut
+//   before it repeated the same complete path with the same output primitive
+//   (ADR-489 Amendment 1, relief-air-floor-proof.ts).
 //
 // Everything stays in heightmap mm; the compiler maps it to the machine.
 
@@ -32,6 +35,7 @@ import { dropCollinearPoints } from '../geometry/drop-collinear-points';
 import { signedAreaMm2 } from '../geometry/polyline-orientation';
 import { pointInPolygon } from '../geometry/point-in-polygon';
 import type { Polyline, Vec2 } from '../scene';
+import { keepProvenAirFloors } from './relief-air-floor-proof';
 import { insideOutNearest, openLoop, ringPieces, type RoughingLoop } from './relief-roughing-order';
 import { reliefRampAlong } from './relief-ramp-entry';
 
@@ -57,8 +61,9 @@ export type ReliefRoughingLevelPaths = {
   // Core cleanup paths and, for each, whether its stock lies inside it.
   readonly cleanup: ReadonlyArray<Polyline>;
   readonly cleanupStockInside: ReadonlyArray<boolean>;
-  // ADR-489: with its tip at or above this Z the cutter touches no stock
-  // anywhere on the level's paths; absent when that is not proven.
+  // ADR-489: the level's air floor, its slice top plus the cutter's rise at
+  // its full radius; absent when the ladder rules it out. Each pass keeps it
+  // only when the passes before it prove it (ADR-489 Amendment 1).
   readonly airFloorZMm?: number;
 };
 
@@ -72,6 +77,8 @@ export type ReliefRoughingMotionOptions = {
   readonly rampAngleDeg?: number;
   // Final machine-space XY placement, used only for emitted ramp angle budgets.
   readonly rampOutputPoint?: (point: Vec2) => Vec2;
+  // The cutter's radius must be known before retaining a proved air floor.
+  readonly cutterRadiusMm?: number;
 };
 
 type Chain = {
@@ -93,8 +100,13 @@ export function reliefRoughingMotion(
   options: ReliefRoughingMotionOptions,
 ): ReadonlyArray<CncPass> {
   const passes: CncPass[] = [];
-  for (const level of levels) appendLevel(passes, level, options);
-  return passes;
+  const ceilings: Array<number | null> = [];
+  for (const level of levels) {
+    appendLevel(passes, level, options);
+    const ceiling = level.airFloorZMm === undefined ? null : level.sliceTopMm;
+    while (ceilings.length < passes.length) ceilings.push(ceiling);
+  }
+  return keepProvenAirFloors(passes, ceilings, options.cutterRadiusMm ?? 0);
 }
 
 function appendLevel(

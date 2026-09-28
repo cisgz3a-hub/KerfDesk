@@ -45,6 +45,8 @@ Roughing fed 324 mm straight down and took 11.05 min.
    the region. The first level (slice top at the uncut stock top, which may be warped) and every
    level after one whose ladder stopped short (an offset failure or the ring limit) get no floor.
    Ramped entries keep their ramp: they start at the slice top as before, after the rapid.
+   Amendment 1 (2026-09-28) makes this floor a candidate that each pass keeps only when the
+   cuts before it are checked to have swept everything within the cutter's radius of its path.
 4. **Plunged-travel check.** A rapid below safe Z is still a finding, except an air descent:
    Z-only, starting at safe Z, no deeper than the deepest Z the program has already fed to plus
    the clearance, and followed at once by a Z-only G1 going lower. A descent that cutting,
