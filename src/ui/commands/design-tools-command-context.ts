@@ -3,8 +3,11 @@
 import type { Project } from '../../core/scene';
 import type { useStore } from '../state';
 import { useToastStore } from '../state/toast-store';
+import { openCopyAlongPathDialog } from './copy-along-path-dialog-store';
 import type { DesignToolsCommandContext } from './design-tools-command-types';
 import { flattenImageMaskAction } from './image-command-actions';
+import { vectorCutCommandContext } from './vector-cut-command-context';
+import { warpDeformCommandContext } from './warp-deform-command-context';
 
 export function designToolsCommandContext(
   app: ReturnType<typeof useStore.getState>,
@@ -13,6 +16,8 @@ export function designToolsCommandContext(
   const selected =
     app.project.scene.objects.find((object) => object.id === app.selectedObjectId) ?? null;
   return {
+    ...vectorCutCommandContext(app),
+    ...warpDeformCommandContext(app.project, selectedIds),
     selectContainedShapes: app.selectContainedShapes,
     selectSmallerShapes: app.selectSmallerShapes,
     deleteDuplicates: app.deleteDuplicates,
@@ -25,6 +30,7 @@ export function designToolsCommandContext(
     flattenImageMask: flattenImageMaskAction(app, selected, (message, kind) =>
       useToastStore.getState().pushToast(message, kind),
     ),
+    copyAlongPath: openCopyAlongPathDialog,
   };
 }
 

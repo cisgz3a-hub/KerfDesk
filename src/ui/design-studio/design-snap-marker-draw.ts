@@ -28,13 +28,22 @@ export function paintSnapMarker(
   view: DesignView,
   target: SnapTarget,
 ): void {
-  const at = mmToPx(view, target.atMm);
+  paintSnapGlyphPx(ctx, mmToPx(view, target.atMm), target.kind);
+}
+
+// The glyph alone, at a canvas-pixel point. The main workspace draws its snap
+// marker with this too (LBG-F06), so one symbol means one snap kind app-wide.
+export function paintSnapGlyphPx(
+  ctx: CanvasRenderingContext2D,
+  at: Vec2,
+  kind: SnapTarget['kind'],
+): void {
   ctx.save();
   ctx.strokeStyle = canvasTheme.snapGuide;
   ctx.fillStyle = canvasTheme.snapGuide;
   ctx.lineWidth = LINE_WIDTH_PX;
   ctx.setLineDash([]);
-  drawGlyph(ctx, at, target.kind);
+  drawGlyph(ctx, at, kind);
   ctx.restore();
 }
 

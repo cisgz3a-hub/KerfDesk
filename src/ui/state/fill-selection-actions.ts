@@ -17,6 +17,8 @@ import { defaultSettingsForOperation, type LayerDefaultsState } from './layer-de
 import { pruneOrphanLayers, pushUndo, type StateSlice } from './scene-mutations';
 import { seedFreshCncLayer } from './cnc-auto-seeding';
 import type { CncLiveCapsState } from './cnc-live-caps-actions';
+import { seedFreshLaserLayer } from './laser-recipe-seeding';
+import type { MaterialLibraryDocument } from '../../io/material-library';
 
 export type FillSelectionActions = {
   readonly fillSelectionSeparately: () => void;
@@ -27,6 +29,7 @@ type FillSelectionState = StateSlice &
     readonly selectedObjectId: string | null;
     readonly additionalSelectedIds: ReadonlySet<string>;
     readonly layerDefaults: LayerDefaultsState;
+    readonly materialLibrary?: MaterialLibraryDocument | null;
   };
 
 type FillSelectionMutation = {
@@ -95,7 +98,7 @@ function isolateSelectionToNewFillOperation(
           machine,
           liveCaps: state.cncLiveCaps,
         })
-      : withDefaults;
+      : seedFreshLaserLayer(withDefaults, state.project, state.materialLibrary ?? null);
   const objects = state.project.scene.objects.map((object) =>
     selectedIds.has(object.id) ? bindSceneObjectToOperations(object, [operation.id]) : object,
   );

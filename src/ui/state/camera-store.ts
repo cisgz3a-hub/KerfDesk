@@ -11,6 +11,7 @@ import { create } from 'zustand';
 import type { RgbaImage } from '../../core/camera/rgba-image';
 import type { CameraCaptureBinding } from '../../core/camera/camera-capture-binding';
 import type { SurfaceHeightArea } from '../../core/camera/model/height-areas';
+import type { BedArea } from '../../core/camera/model/camera-model-accuracy';
 import type { CameraAdapter, CameraDevice } from '../../platform/types';
 import {
   createCameraSourceActions,
@@ -54,6 +55,9 @@ export type CameraStore = CameraSourceActions & {
   readonly overlayOpacityPercent: number;
   readonly overlayStill: RgbaImage | null;
   readonly overlayStillCapture: CameraCaptureBinding | null;
+  // A head camera's pictures stitched into one top-down picture of part of
+  // the bed (ADR-449), shown instead of the live video until cleared.
+  readonly bedPicture: BedPicture | null;
   // Top surface currently being viewed/placed on, measured above machine bed.
   // The camera model corrects the picture to this height (ADR-440).
   readonly surfaceHeightMm: number;
@@ -82,6 +86,7 @@ export type CameraStore = CameraSourceActions & {
     frame: RgbaImage | null,
     capture?: CameraCaptureBinding | null,
   ) => void;
+  readonly setBedPicture: (picture: BedPicture | null) => void;
   readonly setSurfaceHeightMm: (heightMm: number) => void;
   readonly addHeightArea: (area: SurfaceHeightArea) => void;
   readonly updateHeightArea: (id: string, patch: HeightAreaPatch) => void;
@@ -96,6 +101,14 @@ export type CameraStore = CameraSourceActions & {
 };
 
 export type HeightAreaPatch = Partial<Omit<SurfaceHeightArea, 'id'>>;
+
+export type BedPicture = {
+  readonly image: RgbaImage;
+  /** The part of the bed pictured, scene mm. */
+  readonly region: BedArea;
+  /** The surface height the pictures were flattened at, mm. */
+  readonly surfaceHeightMm: number;
+};
 
 // Reselection policy on a device-list refresh: keep a still-valid deliberate
 // selection; else restore the remembered camera (the overhead one, not the
@@ -130,6 +143,7 @@ export const useCameraStore = create<CameraStore>((set, get) => ({
   overlayOpacityPercent: 50,
   overlayStill: null,
   overlayStillCapture: null,
+  bedPicture: null,
   surfaceHeightMm: 0,
   heightAreas: [],
   accuracyMapVisible: false,
@@ -141,8 +155,19 @@ export const useCameraStore = create<CameraStore>((set, get) => ({
   setOverlayVisible: (on) => set({ overlayVisible: on }),
   setOverlayOpacityPercent: (percent) =>
     set({ overlayOpacityPercent: Math.max(0, Math.min(100, percent)) }),
+  // A still and a head camera's stitched picture each replace the other.
   setOverlayStill: (frame, capture = null) =>
-    set({ overlayStill: frame, overlayStillCapture: frame === null ? null : capture }),
+    set({
+      overlayStill: frame,
+      overlayStillCapture: frame === null ? null : capture,
+      ...(frame === null ? {} : { bedPicture: null }),
+    }),
+  setBedPicture: (picture) =>
+    set(
+      picture === null
+        ? { bedPicture: null }
+        : { bedPicture: picture, overlayStill: null, overlayStillCapture: null },
+    ),
   setSurfaceHeightMm: (heightMm) =>
     set({ surfaceHeightMm: clampFinite(heightMm, 0, MAX_SURFACE_HEIGHT_MM) }),
   addHeightArea: (area) => set((s) => ({ heightAreas: [...s.heightAreas, sanitizedArea(area)] })),

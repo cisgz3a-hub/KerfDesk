@@ -22,6 +22,7 @@ export type CutSettingsLimits = {
 };
 
 const MAX_KERF_OFFSET_MM = 10;
+export const MAX_PASS_ANGLE_STEP_DEG = 180;
 const MIN_TAB_SIZE_MM = 0.01;
 const MAX_TAB_SIZE_MM = 100;
 export const MAX_TABS_PER_SHAPE = 100;
@@ -67,6 +68,8 @@ export function readCutSettingsPatch(
     ...readLineExtrasPatch(data, layer, mode),
     ...readLineTabPatch(data, layer, mode),
     ...readImageOverscanPatch(data, layer, mode),
+    ...readScanPatternPatch(data, layer, mode),
+    ...readAutoOverscanPatch(data, mode),
     ...fillSettings,
     ditherAlgorithm: parseDither(String(data.get('ditherAlgorithm') ?? layer.ditherAlgorithm)),
     linesPerMm,
@@ -226,6 +229,34 @@ function readImageOverscanPatch(data: FormData, layer: Layer, mode: LayerMode): 
       MAX_IMAGE_OVERSCAN_MM,
     ),
   };
+}
+
+// ADR-492, like the ADR-415 extras: only a form with these controls changes them.
+function readScanPatternPatch(data: FormData, layer: Layer, mode: LayerMode): LayerPatch {
+  const step =
+    (mode === 'image' || mode === 'fill') && data.has('passAngleStepDeg')
+      ? {
+          passAngleStepDeg: numberField(
+            data,
+            'passAngleStepDeg',
+            layer.passAngleStepDeg ?? 0,
+            -MAX_PASS_ANGLE_STEP_DEG,
+            MAX_PASS_ANGLE_STEP_DEG,
+          ),
+        }
+      : {};
+  if (mode !== 'image' || !data.has('imageScanAngleDeg')) return step;
+  return {
+    ...step,
+    imageScanAngleDeg: numberField(data, 'imageScanAngleDeg', layer.imageScanAngleDeg ?? 0, 0, 180),
+    imageCrossHatch: data.has('imageCrossHatch'),
+  };
+}
+
+// ADR-495: the switch sends nothing when off, so the form marks that it showed it.
+function readAutoOverscanPatch(data: FormData, mode: LayerMode): LayerPatch {
+  if ((mode !== 'image' && mode !== 'fill') || !data.has('autoOverscanShown')) return {};
+  return { autoOverscan: data.has('autoOverscan') };
 }
 
 export function dotWidthCorrectionMax(linesPerMm: number): number {

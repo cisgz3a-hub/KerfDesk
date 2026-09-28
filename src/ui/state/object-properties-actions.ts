@@ -268,6 +268,10 @@ function sanitizeOperationOverridePatch(patch: ObjectOperationOverride): ObjectO
   setNonNegativeNumber(out, 'overcutMm', patch.overcutMm);
   setNonNegativeNumber(out, 'imageOverscanMm', patch.imageOverscanMm);
   setTabLayoutFields(out, patch);
+  setFiniteNumber(out, 'imageScanAngleDeg', patch.imageScanAngleDeg);
+  setBoolean(out, 'imageCrossHatch', patch.imageCrossHatch);
+  setFiniteNumber(out, 'passAngleStepDeg', patch.passAngleStepDeg);
+  setBoolean(out, 'autoOverscan', patch.autoOverscan);
   return out as ObjectOperationOverride;
 }
 

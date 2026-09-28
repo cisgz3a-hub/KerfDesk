@@ -298,6 +298,7 @@ function emitRasterGroupHere(group: RasterGroup, context: GroupEmissionContext):
     passes: group.passes,
     overscanMm: group.overscanMm,
     dotWidthCorrectionMm: group.dotWidthCorrectionMm,
+    ...(group.scanAngleDeg === undefined ? {} : { scanAngleDeg: group.scanAngleDeg }),
     scanOffsetMm: group.bidirectionalScanOffsetMm ?? offsetForSpeed(device.scanningOffsets, feed),
     ...(device.controlledLaserOffTravelFeedMmPerMin === undefined
       ? {}

@@ -13,9 +13,13 @@ import { fileURLToPath } from 'node:url';
 const ASAR_SIZE_PICKLE_BYTES = 8;
 
 const RENDERER_ASSET_PATTERN = /^dist\/web\/assets\/[^/]+\.js$/;
+// Each marker must appear in exactly one renderer asset. The Build badge is
+// found by its class name: its "Build version" label also matches the
+// Smoothieware firmware banner (`Build version:`), which the core chunk and
+// every job worker carry.
 const RENDERER_SURFACES = [
   { label: 'About', marker: 'Free and open-source under the MIT License' },
-  { label: 'Build badge', marker: 'Build version' },
+  { label: 'Build badge', marker: 'lf-menu-build' },
 ];
 const SURFACE_VERSION_RADIUS = 512;
 const VERSION_TOKEN_CHARACTER = /[0-9A-Za-z.-]/;
