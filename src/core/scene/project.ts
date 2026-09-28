@@ -35,6 +35,14 @@ export type ProjectOptimizationSettings = {
   readonly insideFirst: boolean;
   /** Opt-in removal of coincident laser Line spans within each operation. */
   readonly removeOverlappingLines: boolean;
+  /**
+   * How far apart two near-parallel Line spans may lie and still be cut once
+   * when removeOverlappingLines is on (LBG-C13), mm, 0 to 0.5. Absent or 0
+   * merges only spans that coincide at emitted precision, as before. No schema
+   * bump: an older reader ignores the field and cuts near-coincident spans
+   * twice, which is what every earlier build did.
+   */
+  readonly overlapMergeToleranceMm?: number;
   readonly layerPriority: 'project-order' | 'reverse-project-order';
   readonly pathDirection: 'allow-reverse' | 'preserve';
   readonly startPoint: 'machine-origin' | 'job-lower-left' | 'job-center';
@@ -72,6 +80,22 @@ export type ProjectJobSetup = {
     readonly selectedObjectIds: ReadonlyArray<string>;
   };
 };
+
+/**
+ * The merge tolerance's range (LBG-C13). 0 is the exact rule; half a millimetre
+ * is already wider than a laser kerf, beyond which merging would move edges by
+ * more than the beam covers.
+ */
+export const OVERLAP_MERGE_TOLERANCE_RANGE_MM = { min: 0, max: 0.5 } as const;
+
+/** A merge tolerance inside its range; anything but a finite number is 0. */
+export function clampOverlapMergeTolerance(value: number): number {
+  if (!Number.isFinite(value)) return OVERLAP_MERGE_TOLERANCE_RANGE_MM.min;
+  return Math.min(
+    OVERLAP_MERGE_TOLERANCE_RANGE_MM.max,
+    Math.max(OVERLAP_MERGE_TOLERANCE_RANGE_MM.min, value),
+  );
+}
 
 export const DEFAULT_PROJECT_OPTIMIZATION: ProjectOptimizationSettings = {
   reduceTravelMoves: true,

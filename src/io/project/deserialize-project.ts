@@ -27,7 +27,11 @@ import {
   isCncCoolantMode,
   type Project,
 } from '../../core/scene';
-import { DEFAULT_PROJECT_OPTIMIZATION, PROJECT_SCHEMA_VERSION } from '../../core/scene/project';
+import {
+  clampOverlapMergeTolerance,
+  DEFAULT_PROJECT_OPTIMIZATION,
+  PROJECT_SCHEMA_VERSION,
+} from '../../core/scene/project';
 import { DEFAULT_TEXT_LETTER_SPACING } from '../../core/text';
 import { migrateToCurrent } from './migrations';
 import { normalizeCncTools } from './normalize-cnc-tools';
@@ -402,6 +406,7 @@ function normalizeOptimization(value: unknown): Project['optimization'] {
     travelPolicy,
     insideFirst: booleanOrDefault(value['insideFirst'], DEFAULT_PROJECT_OPTIMIZATION.insideFirst),
     removeOverlappingLines: booleanOrDefault(value['removeOverlappingLines'], false),
+    ...overlapMergeTolerance(value['overlapMergeToleranceMm']),
     layerPriority:
       value['layerPriority'] === 'reverse-project-order'
         ? 'reverse-project-order'
@@ -417,6 +422,16 @@ function normalizeOptimization(value: unknown): Project['optimization'] {
         ? value['closedShapeStart']
         : 'drawn',
   };
+}
+
+// LBG-C13. Kept absent when a file never set it (every file before the option),
+// so such a project saves byte for byte as it was read.
+function overlapMergeTolerance(
+  value: unknown,
+): Pick<Project['optimization'], 'overlapMergeToleranceMm'> {
+  return typeof value === 'number' && Number.isFinite(value)
+    ? { overlapMergeToleranceMm: clampOverlapMergeTolerance(value) }
+    : {};
 }
 
 function normalizeAirAssistCommand(value: unknown): Project['device']['airAssistCommand'] {

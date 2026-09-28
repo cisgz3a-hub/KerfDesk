@@ -119,6 +119,43 @@ describe('OptimizationSettingsDialog', () => {
     }
   });
 
+  it('sets a merge tolerance for overlap removal, clamped to its range', async () => {
+    const { host, root, onApply } = await renderDialog();
+    try {
+      const tolerance = host.querySelector<HTMLInputElement>(
+        'input[name="overlapMergeToleranceMm"]',
+      );
+      const overlaps = host.querySelector<HTMLInputElement>('input[name="removeOverlappingLines"]');
+      if (tolerance === null || overlaps === null) throw new Error('overlap fields missing');
+      expect(tolerance.value).toBe('0');
+      expect(tolerance.disabled).toBe(true);
+      expect(tolerance.title).toContain('Turn on Remove overlapping lines');
+
+      await act(async () => {
+        overlaps.checked = true;
+        Simulate.change(overlaps);
+      });
+      expect(tolerance.disabled).toBe(false);
+      expect(tolerance.title).toContain('0 to 0.5 mm');
+      await act(async () => {
+        tolerance.value = '0.8';
+        Simulate.change(tolerance);
+      });
+      await act(async () => {
+        const form = host.querySelector('form');
+        if (!(form instanceof HTMLFormElement)) throw new Error('form missing');
+        Simulate.submit(form);
+      });
+      expect(onApply).toHaveBeenCalledWith({
+        ...DEFAULT_PROJECT_OPTIMIZATION,
+        removeOverlappingLines: true,
+        overlapMergeToleranceMm: 0.5,
+      });
+    } finally {
+      await act(async () => root.unmount());
+    }
+  });
+
   it('keeps Planning start live under Keep source order when it seeds closed-shape starts', async () => {
     const { host, root } = await renderDialog(vi.fn(), {
       ...DEFAULT_PROJECT_OPTIMIZATION,

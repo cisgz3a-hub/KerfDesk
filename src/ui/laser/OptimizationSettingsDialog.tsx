@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import type { ProjectOptimizationSettings } from '../../core/scene';
 import { Button, Dialog, DialogActions } from '../kit';
+import { OverlapRemovalFields } from './OverlapRemovalFields';
 
 export function OptimizationSettingsDialog(props: {
   readonly settings: ProjectOptimizationSettings;
@@ -67,19 +68,12 @@ function PlannerFields(props: {
         title={orderingControlTitle ?? 'Cut enclosed paths before their containing paths.'}
         update={update}
       />
-      <OverlapRemovalField checked={settings.removeOverlappingLines} update={update} />
-      <PlannerSelect
-        label="Layer priority"
-        name="layerPriority"
-        value={settings.layerPriority}
-        onChange={(layerPriority) =>
-          update({ layerPriority: layerPriority as ProjectOptimizationSettings['layerPriority'] })
-        }
-        options={[
-          ['project-order', 'Cuts / Layers order'],
-          ['reverse-project-order', 'Reverse layer order'],
-        ]}
+      <OverlapRemovalFields
+        checked={settings.removeOverlappingLines}
+        toleranceMm={settings.overlapMergeToleranceMm}
+        update={update}
       />
+      <LayerPriorityField value={settings.layerPriority} update={update} />
       <PlannerSelect
         label="Path direction"
         name="pathDirection"
@@ -114,6 +108,28 @@ function PlannerFields(props: {
         <SourceOrderPrecedenceNote choosesClosedStarts={choosesClosedStarts} />
       ) : null}
     </>
+  );
+}
+
+function LayerPriorityField(props: {
+  readonly value: ProjectOptimizationSettings['layerPriority'];
+  readonly update: (patch: Partial<ProjectOptimizationSettings>) => void;
+}): JSX.Element {
+  return (
+    <PlannerSelect
+      label="Layer priority"
+      name="layerPriority"
+      value={props.value}
+      onChange={(layerPriority) =>
+        props.update({
+          layerPriority: layerPriority as ProjectOptimizationSettings['layerPriority'],
+        })
+      }
+      options={[
+        ['project-order', 'Cuts / Layers order'],
+        ['reverse-project-order', 'Reverse layer order'],
+      ]}
+    />
   );
 }
 
@@ -169,25 +185,6 @@ function InsideFirstField(props: {
         onChange={(event) => props.update({ insideFirst: event.currentTarget.checked })}
       />
       <span>Inside paths first</span>
-    </label>
-  );
-}
-
-function OverlapRemovalField(props: {
-  readonly checked: boolean;
-  readonly update: (patch: Partial<ProjectOptimizationSettings>) => void;
-}): JSX.Element {
-  return (
-    <label style={checkboxRowStyle}>
-      <input
-        name="removeOverlappingLines"
-        type="checkbox"
-        className="lf-checkbox"
-        checked={props.checked}
-        title="Cut shared Line spans once within each operation. Separate operations and pass counts are preserved."
-        onChange={(event) => props.update({ removeOverlappingLines: event.currentTarget.checked })}
-      />
-      <span>Remove overlapping lines</span>
     </label>
   );
 }
