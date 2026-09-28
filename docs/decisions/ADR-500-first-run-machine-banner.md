@@ -22,9 +22,10 @@ F-A1 rules out a welcome modal or tour on launch.
 
 ### Decision
 
-1. **A banner above the workspace**, like the opened-project machine banner, while the project's
-   machine is the starter machine exactly as it ships. It is a status line with buttons, not a
-   dialog, and does not take focus.
+1. **A card over the canvas's top right corner** while the project's machine is the starter
+   machine exactly as it ships. It is a status note with buttons, not a dialog, does not take
+   focus, and takes no room from the canvas: a line above the workspace cost a compact window a
+   quarter of its canvas height.
 2. **What it offers.**
    - First time: "Generic 400 × 400 mm machine. The bed, power and speeds are guesses until you set
      up your machine. You can design now and set it up later." **Set up machine** opens Machine
@@ -58,7 +59,8 @@ F-A1 rules out a welcome modal or tour on launch.
 - A new operator sees at once that the machine is not theirs yet, and where to set it up.
 - A returning operator gets their machine back in one click. The CNC side's stock, bits and Tool
   Plan are not part of the machine profile; they come from saved CNC machine profiles as before.
-- The banner takes one line above the workspace while it shows.
+- The card covers the canvas's top right corner (340 px wide at most) while it shows; the canvas
+  keeps its size, and the far corner of the bed stays reachable by panning or Not now.
 
 ### Verification
 

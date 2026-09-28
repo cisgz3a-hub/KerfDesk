@@ -43,10 +43,10 @@ opportunity, without an extra branding delay. It introduces no startup interacti
 1. App opens to **empty workspace** state (see F-A2).
 2. Status bar shows: `Ready · No device configured · Empty workspace`.
 3. **No** welcome modal, **no** onboarding tour, **no** "what's new" dialog. Just the workspace.
-   A one-line banner above it says the machine is the generic starter (ADR-500): **Set up
-   machine** opens Machine Setup, or, once a machine was saved there, **Use *name*** applies it
-   as one undo step. **Not now** hides it until the next launch. It blocks nothing, takes no
-   focus, and goes as soon as the project's machine changes by any route.
+   A card over the canvas's top right corner says the machine is the generic starter (ADR-500):
+   **Set up machine** opens Machine Setup, or, once a machine was saved there, **Use *name***
+   applies it as one undo step. **Not now** hides it until the next launch. It blocks nothing,
+   takes no focus or canvas room, and goes as soon as the project's machine changes by any route.
 4. Default device profile is auto-loaded:
    - Name: `Default 400×400`
    - Bed: 400 × 400 mm

@@ -1,7 +1,7 @@
-// ADR-500: a banner above the workspace while the job is still on the generic
-// starter machine. It is not a modal and blocks nothing (F-A1); it offers the
-// machine last saved in Machine Setup, or Machine Setup itself. Not now hides it
-// until the next launch.
+// ADR-500: a card over the canvas's top right corner while the job is still on
+// the generic starter machine. It is not a modal and blocks nothing (F-A1); it
+// takes no room from the canvas, and offers the machine last saved in Machine
+// Setup, or Machine Setup itself. Not now hides it until the next launch.
 
 import { useMemo, useState } from 'react';
 import type { DeviceProfile } from '../../core/devices';
@@ -79,19 +79,28 @@ function formatMm(value: number): string {
 }
 
 const bannerStyle: React.CSSProperties = {
-  display: 'flex',
-  alignItems: 'center',
-  justifyContent: 'space-between',
-  gap: 12,
-  padding: '8px 12px',
-  borderBottom: '1px solid var(--lf-border)',
-  background: 'var(--lf-tint-info)',
+  position: 'absolute',
+  top: 12,
+  right: 12,
+  zIndex: 5,
+  width: 340,
+  maxWidth: 'calc(100% - 24px)',
+  boxSizing: 'border-box',
+  display: 'grid',
+  gap: 8,
+  padding: '10px 12px',
+  border: '1px solid var(--lf-border)',
+  borderLeft: '3px solid var(--lf-accent)',
+  borderRadius: 6,
+  background: 'var(--lf-bg-1)',
+  boxShadow: 'var(--lf-shadow)',
   color: 'var(--lf-text)',
   fontSize: 12,
+  lineHeight: 1.45,
 };
 
 const actionsStyle: React.CSSProperties = {
   display: 'flex',
+  flexWrap: 'wrap',
   gap: 8,
-  flexShrink: 0,
 };

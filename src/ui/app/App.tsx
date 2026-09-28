@@ -54,7 +54,6 @@ export function App(): JSX.Element {
       <DesktopCloseNotice />
       <AutosaveRecoveryBanner />
       <ProjectBedReconciliationBanner />
-      <MachineSetupBanner />
       <ExternalGcodePreviewBanner />
       <RecentProjectsHost />
       <main style={mainStyle}>
@@ -139,6 +138,7 @@ function CanvasArea(): JSX.Element {
       <CameraPanel />
       <BoardCapturePanel />
       {!showGcode ? <CncStockCanvasHud /> : null}
+      <MachineSetupBanner />
     </>
   );
   return (
