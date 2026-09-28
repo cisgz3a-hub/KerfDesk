@@ -32,6 +32,7 @@ import {
 import { loadThree } from './viewer3d-modules';
 import { toThreePlanes, type Viewer3dClipPlane } from './scene-isolate';
 import type { Viewer3dMeasure } from './scene-measure';
+import { disposeDetail, type Viewer3dDetail } from './scene-detail';
 import type { Viewer3dPick } from './scene-pick';
 import type { Viewer3dStage } from './viewer3d-look';
 import { resolveViewer3dTheme } from './viewer3d-theme';
@@ -43,6 +44,7 @@ export type { PlayheadMarker } from './scene-handle-core';
 export type { Viewer3dPick } from './scene-pick';
 export type { Viewer3dClipPlane } from './scene-isolate';
 export type { Viewer3dMeasure } from './scene-measure';
+export type { Viewer3dDetail } from './scene-detail';
 
 export type Viewer3dSceneHandle = {
   readonly setSegments: (segments: Viewer3dSegments) => void;
@@ -79,6 +81,11 @@ export type Viewer3dSceneHandle = {
   readonly hoverViewCube: (view: Viewer3dView | null) => void;
   readonly setCameraTracking: (tracking: CameraTracking) => void;
   readonly onCameraInteraction: (listener: (() => void) | null) => void;
+  /**
+   * Reports whether the drawn path is simplified for the zoom, and how; null
+   * when every move is drawn (ADR-485).
+   */
+  readonly onDetailChange: (listener: ((detail: Viewer3dDetail | null) => void) | null) => void;
   /** Reports orbit, pan and zoom drags starting (true) and ending (false). */
   readonly onCameraMoving: (listener: ((moving: boolean) => void) | null) => void;
   /**
@@ -165,6 +172,7 @@ function createSceneHandle(deps: SceneHandleDeps): Viewer3dSceneHandle {
 function installToolpath(core: SceneCore): void {
   const { deps, state } = core;
   if (state.segments === null) return;
+  disposeDetail(state.reveal?.detail ?? null);
   const built = rebuildToolpath(deps.toolpathGroup, {
     ...deps.modules,
     segments: { ...state.segments, visible: state.moveFilter },
@@ -282,6 +290,7 @@ type CameraMethods = Pick<
   | 'setCameraTracking'
   | 'onCameraInteraction'
   | 'onCameraMoving'
+  | 'onDetailChange'
   | 'onProjectionChange'
   | 'fitToBounds'
   | 'setView'
@@ -297,6 +306,7 @@ function cameraMethods(core: SceneCore): CameraMethods {
     setCameraTracking: director.track,
     onCameraInteraction: director.onManual,
     onCameraMoving: core.moving.listen,
+    onDetailChange: core.detail.listen,
     onProjectionChange: projection.listen,
     fitToBounds: (bounds) => {
       state.bounds = bounds;

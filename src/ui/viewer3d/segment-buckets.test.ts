@@ -1,59 +1,37 @@
 import { describe, expect, it } from 'vitest';
 import { SEG_KIND } from '../../core/gcode-view';
 import {
-  buildSegmentBuckets,
+  buildTravelBucket,
   cssHexColor,
   renderedLineCss,
   renderedLineRampStops,
   revealCount,
   rgbTriple,
 } from './segment-buckets';
-import type { Viewer3dTheme } from './viewer3d-theme';
 
-const THEME: Viewer3dTheme = {
-  background: 0x000000,
-  gridMinor: 0x111111,
-  gridMajor: 0x222222,
-  travel: 0xcc4444,
-  cut: 0x0000ff,
-  plunge: 0x00ff00,
-  retract: 0xff0000,
-  arrow: 0xf2f4f8,
-};
-
-describe('buildSegmentBuckets', () => {
-  it('splits travel from solid kinds and colors solids per kind', () => {
+describe('buildTravelBucket', () => {
+  it('copies out the rapids only, mapped to their segments', () => {
     const segments = {
       segmentCount: 3,
       positions: new Float32Array([0, 0, 0, 1, 0, 0, 1, 0, 0, 1, 0, -1, 1, 0, -1, 2, 0, -1]),
       segKind: new Uint8Array([SEG_KIND.travel, SEG_KIND.plunge, SEG_KIND.cut]),
     };
-    const buckets = buildSegmentBuckets(segments, THEME);
-    expect(buckets.travel.count).toBe(1);
-    expect(buckets.solid.count).toBe(2);
-    expect([...buckets.travel.positions]).toEqual([0, 0, 0, 1, 0, 0]);
-    // Plunge segment endpoints are pure green; cut endpoints pure blue.
-    expect(buckets.solid.colors[1]).toBeCloseTo(1, 6);
-    expect(buckets.solid.colors[4]).toBeCloseTo(1, 6);
-    expect(buckets.solid.colors[8]).toBeCloseTo(1, 6);
-    expect(buckets.solid.colors[11]).toBeCloseTo(1, 6);
-    expect(buckets.solid.colors[0]).toBeCloseTo(0, 6);
+    const bucket = buildTravelBucket(segments);
+    expect(bucket.count).toBe(1);
+    expect([...bucket.positions]).toEqual([0, 0, 0, 1, 0, 0]);
+    expect([...bucket.sourceIndex]).toEqual([0]);
   });
-});
 
-describe('buildSegmentBuckets with a move filter (ADR-470)', () => {
-  it('leaves filtered moves out and keeps the rest mapped to their segments', () => {
+  it('leaves filtered rapids out (ADR-470)', () => {
     const segments = {
       segmentCount: 4,
       positions: new Float32Array(24).map((_, index) => index),
-      segKind: new Uint8Array([SEG_KIND.travel, SEG_KIND.cut, SEG_KIND.travel, SEG_KIND.cut]),
-      visible: new Uint8Array([1, 0, 0, 1]),
+      segKind: new Uint8Array([SEG_KIND.travel, SEG_KIND.cut, SEG_KIND.travel, SEG_KIND.travel]),
+      visible: new Uint8Array([1, 1, 0, 1]),
     };
-    const buckets = buildSegmentBuckets(segments, THEME);
-    expect([...buckets.travel.sourceIndex]).toEqual([0]);
-    expect([...buckets.solid.sourceIndex]).toEqual([3]);
-    expect([...buckets.solid.positions]).toEqual([18, 19, 20, 21, 22, 23]);
-    expect(buckets.solid.colors).toHaveLength(6);
+    const bucket = buildTravelBucket(segments);
+    expect([...bucket.sourceIndex]).toEqual([0, 3]);
+    expect([...bucket.positions]).toEqual([0, 1, 2, 3, 4, 5, 18, 19, 20, 21, 22, 23]);
   });
 });
 
@@ -68,19 +46,6 @@ describe('revealCount', () => {
     expect(revealCount(source, 4)).toBe(2);
     expect(revealCount(source, 5)).toBe(3);
     expect(revealCount(source, 99)).toBe(3);
-  });
-
-  it('maps buckets back to their source segments', () => {
-    const segments = {
-      segmentCount: 4,
-      positions: new Float32Array(24),
-      segKind: new Uint8Array([SEG_KIND.travel, SEG_KIND.cut, SEG_KIND.travel, SEG_KIND.plunge]),
-    };
-    const buckets = buildSegmentBuckets(segments, THEME);
-    expect([...buckets.travel.sourceIndex]).toEqual([0, 2]);
-    expect([...buckets.solid.sourceIndex]).toEqual([1, 3]);
-    expect(revealCount(buckets.solid.sourceIndex, 1)).toBe(1);
-    expect(revealCount(buckets.travel.sourceIndex, 1)).toBe(1);
   });
 });
 

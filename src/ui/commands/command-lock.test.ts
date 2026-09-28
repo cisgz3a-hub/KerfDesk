@@ -153,6 +153,7 @@ function baseCtx(overrides: Partial<AppCommandContext> = {}): AppCommandContext 
     offsetShapes: vi.fn(),
     rotateSelectionQuarterTurn: vi.fn(),
     moveSelectionToBed: vi.fn(),
+    moveLaserToSelection: vi.fn(),
     wireframeActive: false,
     toggleWireframe: vi.fn(),
     selectContainedShapes: vi.fn(),

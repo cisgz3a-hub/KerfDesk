@@ -139,9 +139,10 @@ function noticeKind(status: StreamerStatus, notice: LaserSafetyNotice): JobInter
     return status === 'cancelled' ? 'cancelled' : 'disconnect';
   }
   if (notice.kind === 'frame-limit' || notice.kind === 'home-unfinished') return 'unknown';
-  // The lift's own reset kept position (ADR-411); the stop that followed
-  // discarded the planner the way a rejected line's auto-stop does.
-  if (notice.kind === 'cnc-pause-lift-failed') return 'controller-error';
+  // The lift's own reset kept position (ADR-411), and KerfDesk's stop that
+  // ended the job left the spindle off: the job was stopped from the app, not
+  // rejected by the controller (ADR-411 Amendment 1).
+  if (notice.kind === 'cnc-pause-lift-failed') return 'cancelled';
   return notice.kind;
 }
 

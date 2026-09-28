@@ -3,9 +3,10 @@
 // and power in force, and when the tool gets there. Pure, so the words and
 // numbers are unit-tested apart from the pick pass that finds the move.
 
-import { SEG_KIND, SEG_MOTION, type GcodeRenderModel } from '../../core/gcode-view';
+import { SEG_KIND, SEG_MOTION } from '../../core/gcode-view';
 // Deep import: the viewer3d barrel is capped at 20 exports by its index contract.
 import type { Viewer3dPick } from '../viewer3d/scene-pick';
+import type { InspectorRenderModel } from './inspector-model';
 import { formatClock } from './InspectorTimeline';
 
 export type MoveReadout = {
@@ -34,7 +35,7 @@ const MOTION_WORD: Readonly<Record<number, string>> = {
 };
 
 export function moveReadout(
-  model: GcodeRenderModel,
+  model: InspectorRenderModel,
   segTimeEndSec: Float32Array | null,
   pick: Viewer3dPick,
 ): MoveReadout {
@@ -66,7 +67,7 @@ export function secondsAtPick(
   return start + (end - start) * Math.min(1, Math.max(0, pick.fraction));
 }
 
-function settingsText(model: GcodeRenderModel, index: number, motion: number): string {
+function settingsText(model: InspectorRenderModel, index: number, motion: number): string {
   const feed = model.segFeed[index] ?? 0;
   const power = model.segPower[index] ?? 0;
   const feedText =

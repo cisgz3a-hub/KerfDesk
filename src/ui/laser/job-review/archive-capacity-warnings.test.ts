@@ -33,6 +33,18 @@ describe('recovery archive capacity warning in Job Review', () => {
     expect(warnings[0]).toContain('cannot be resumed from a saved copy');
   });
 
+  it('says a laser job keeps its origin and where it stopped instead', () => {
+    const manifest = manifestWithPoints(1000);
+    const gcodeLength =
+      MAX_EXECUTION_ARTIFACT_ESTIMATED_BYTES - packedMotionManifestBytes(manifest) + 1;
+    const warnings = detectArchiveCapacityWarnings(
+      { gcode: 'X'.repeat(gcodeLength), canvasPlan: { manifest } },
+      true,
+    );
+    expect(warnings[0]).toContain('keeps only its origin and where it stopped');
+    expect(warnings[0]).not.toContain('cannot be resumed from a saved copy');
+  });
+
   it('agrees with the archive limit exactly at the boundary', () => {
     const manifest = manifestWithPoints(10);
     const fits = MAX_EXECUTION_ARTIFACT_ESTIMATED_BYTES - packedMotionManifestBytes(manifest);

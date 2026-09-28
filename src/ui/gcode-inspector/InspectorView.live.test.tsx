@@ -28,6 +28,7 @@ const scene = vi.hoisted(() => ({
   setProjection: vi.fn(),
   onProjectionChange: vi.fn(),
   onCameraMoving: vi.fn(),
+  onDetailChange: vi.fn(),
   setStage: vi.fn(),
   pickViewCube: vi.fn(() => null),
   hoverViewCube: vi.fn(),

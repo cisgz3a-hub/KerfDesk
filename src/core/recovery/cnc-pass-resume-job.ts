@@ -16,6 +16,7 @@
 // review); this function only slices the sealed prepared Job.
 
 import type { CncGroup, Job } from '../job';
+import { withoutAirFloors } from './cnc-recovery-air-floors';
 import { retainedCncCompilationSidecar } from './cnc-retained-compilation-sidecar';
 
 export type CncPassResumeJob = {
@@ -48,7 +49,10 @@ export function buildCncPassResumeJob(
     return { kind: 'error', reason: 'invalid-resume-index' };
   }
   const resumeGroup: CncGroup = { ...group, passes: group.passes.slice(passIndex) };
-  const groups = [resumeGroup, ...source.groups.slice(groupIndex + 1)];
+  // ADR-489: every pass plunges from safe Z, as recovery always has.
+  const groups = [resumeGroup, ...source.groups.slice(groupIndex + 1)].map((next) =>
+    next.kind === 'cnc' ? withoutAirFloors(next) : next,
+  );
   const cncCompilation = retainedCncCompilationSidecar(source, groups);
   return {
     kind: 'resume-job',

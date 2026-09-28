@@ -9,6 +9,7 @@ import {
 import {
   DEFAULT_PERFORATION_CUT_MM,
   DEFAULT_PERFORATION_SKIP_MM,
+  DEFAULT_TAB_SPACING_MM,
   imageOverscanMmFor,
   MAX_IMAGE_OVERSCAN_MM,
 } from '../../core/job/operation-cut-extras';
@@ -23,7 +24,9 @@ export type CutSettingsLimits = {
 const MAX_KERF_OFFSET_MM = 10;
 const MIN_TAB_SIZE_MM = 0.01;
 const MAX_TAB_SIZE_MM = 100;
-const MAX_TABS_PER_SHAPE = 100;
+export const MAX_TABS_PER_SHAPE = 100;
+export const MIN_TAB_SPACING_MM = 1;
+export const MAX_TAB_SPACING_MM = 1000;
 export const MAX_OVERCUT_MM = 50;
 export const MIN_PERFORATION_MM = 0.01;
 export const MAX_PERFORATION_MM = 100;
@@ -62,6 +65,7 @@ export function readCutSettingsPatch(
     airAssist: data.has('airAssist') ? true : layer.airAssist,
     ...lineSettings,
     ...readLineExtrasPatch(data, layer, mode),
+    ...readLineTabPatch(data, layer, mode),
     ...readImageOverscanPatch(data, layer, mode),
     ...fillSettings,
     ditherAlgorithm: parseDither(String(data.get('ditherAlgorithm') ?? layer.ditherAlgorithm)),
@@ -173,6 +177,40 @@ function readLineExtrasPatch(data: FormData, layer: Layer, mode: LayerMode): Lay
       layer.perforationSkipMm ?? DEFAULT_PERFORATION_SKIP_MM,
       MIN_PERFORATION_MM,
       MAX_PERFORATION_MM,
+    ),
+  };
+}
+
+// ADR-494, like the ADR-415 controls above. Spacing and At most are shown only
+// for spacing, so a form without them keeps the stored values.
+function readLineTabPatch(data: FormData, layer: Layer, mode: LayerMode): LayerPatch {
+  if (mode !== 'line' || !data.has('tabLayout')) return {};
+  return {
+    tabLayout: data.get('tabLayout') === 'spacing' ? 'spacing' : 'count',
+    ...(data.has('tabSpacingMm')
+      ? {
+          tabSpacingMm: numberField(
+            data,
+            'tabSpacingMm',
+            layer.tabSpacingMm ?? DEFAULT_TAB_SPACING_MM,
+            MIN_TAB_SPACING_MM,
+            MAX_TAB_SPACING_MM,
+          ),
+        }
+      : {}),
+    ...(data.has('tabMaxPerShape')
+      ? {
+          tabMaxPerShape: Math.floor(
+            numberField(data, 'tabMaxPerShape', layer.tabMaxPerShape ?? 0, 0, MAX_TABS_PER_SHAPE),
+          ),
+        }
+      : {}),
+    tabCutPowerPercent: numberField(
+      data,
+      'tabCutPowerPercent',
+      layer.tabCutPowerPercent ?? 0,
+      0,
+      100,
     ),
   };
 }

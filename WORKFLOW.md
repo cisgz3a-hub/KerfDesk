@@ -436,6 +436,21 @@ destination and cannot overwrite the template source.
   selection is kept.
 - No shortcut: LightBurn's `P` is KerfDesk's Preview.
 
+#### Move laser to selection — menu (ADR-493)
+- `Arrange → Move laser to selection` → **Center**, **Top Left**, **Top**, **Top Right**, **Left**,
+  **Right**, **Bottom Left**, **Bottom**, **Bottom Right** of the selection's bounds.
+- The head moves there with the beam off, at the jog pad's speed, through the same machine-position
+  jog as Go to work zero: CNC lifts to safe Z first, and configured bounds and no-go zones warn
+  without refusing (ADR-232).
+- The target is where an Absolute Coordinates job burns that canvas point. With a verified bed
+  mapping (ADR-342) that is the physical spot on the bed; without one the head goes where the
+  Absolute job would go, and a warning says the spot must be checked at the machine.
+- In User Origin, Verified Origin and Current Position the job is placed from the origin when it is
+  prepared, so a canvas point has no fixed place yet: a notice says so and points at Frame, and
+  nothing moves. Not connected or not Idle is a notice too.
+- With the rotary on, only X moves and Y stays where it is, with a notice: Y on the rotary is
+  rotation from where the job starts. The same applies to Move to position.
+
 #### Typed values with math — numeric edits bar (ADR-480)
 - The X, Y, Width, Height and Rotation boxes take a number or a sum: `10+5`, `2*(3+4)`, `2^3`,
   `pi`, `e`, `sqrt()`, `abs()`, `sin()`, `cos()`, `tan()`, `asin()`, `acos()`, `atan()` (degrees),
@@ -757,8 +772,6 @@ marks later edits as unapproved without changing the existing Frame/Start policy
    the time estimate and every output format follow them. With none set, output is unchanged.
 5. Material presets do not store them; applying a preset keeps what the operation has.
 
----
-
 ### F-A7b. Operations list tools and Sort cuts last (ADR-480)
 
 1. The **•••** button on the Cuts / Layers header opens **Turn output on for all**, **Turn output
@@ -772,6 +785,28 @@ marks later edits as unapproved without changing the existing Frame/Start policy
    artwork first, then artwork that engraves and cuts, whose cut follows its own engraving, then
    cut-only artwork, weakest first. The notice says what moved. Running it again changes nothing.
 4. In CNC, Sort cuts last is unavailable: CNC already runs profiles last.
+
+---
+
+### F-A7c. Laser tabs by spacing, with a tab power, and placed by hand (ADR-494)
+
+1. **More cut settings → Line detail → Tabs / Bridges**: **Place by** chooses **Count** (the same
+   number of tabs on every closed shape) or **Spacing** (one tab per that length of outline, at
+   least one per shape, and **At most** per shape when above 0).
+2. **Tab power** (%, 0 is off) burns the tabs at that share of the cut power, with the same speed,
+   passes and air, so parts hold in the sheet but snap out cleanly. The tabs burn as a second Line
+   group right after the cut; Job Review names it "Line tabs (N% of cut power)".
+3. **Place tabs** applies the settings and starts the tab tool for the one selected, unlocked
+   artwork that uses the operation; its tooltip says why when it is disabled (tabs off, no or
+   several artworks selected, artwork locked). On the canvas, click the outline to add a tab, click
+   a tab to remove it, or drag a tab to move it; each is one undo step. Placed tabs draw filled and
+   the automatic tabs they replace draw hollow. **Done** or Esc returns to Select.
+4. Placed tabs replace the automatic tabs on their shape only, and only while tabs are on. They
+   move, rotate and scale with the artwork and survive copy and paste and break apart. **Clear
+   placed tabs** (in Cut Settings or in the canvas hint) returns the artwork to automatic tabs.
+5. Job Review's detail line reads e.g. "tabs every 50 mm (at most 6) × 0.5 mm, cut at 20%" or
+   "tabs 4 × 0.5 mm, 3 placed by hand". With none of this set, output is unchanged.
+6. Material presets do not store these settings; applying a preset keeps what the operation has.
 
 ---
 
@@ -914,6 +949,22 @@ marks later edits as unapproved without changing the existing Frame/Start policy
 3. Separate operations and pass counts, deliberate retracing within one contour, materialized
    kerf/tabs, Fill, Image and CNC output retain their meaning. Changing this setting invalidates
    the existing reviewed artifact and Frame just like other output changes.
+
+### F-A9e. Where closed shapes start (ADR-494)
+
+1. Open **Tools → Cut Planner** and choose **Start closed shapes**: **Where drawn** (the default;
+   output unchanged), **Nearest point** or **Nearest corner**. It is saved with the project.
+2. **Nearest point** starts each closed laser shape at its point nearest the head, so travel is
+   shorter. **Nearest corner** starts it at its nearest corner, a point where the outline turns by
+   at least 30°, so the small mark where a cut starts and stops lands on a corner. A shape without
+   corners, such as a circle, starts at its nearest point.
+3. Cut order is chosen as before (inside shapes first when that is on); only where each closed shape
+   starts changes. With **Keep source order** the order and direction stay as drawn and each closed
+   shape starts nearest where the previous one ended.
+4. Overcut follows the new start. On machines that take arcs (ADR-432) a shape only starts where
+   one line or arc ends, so its arcs are kept; sharp corners always qualify.
+5. Line operations and Offset Fill rings follow it; Fill, Image and CNC output do not change. Preview,
+   the time estimate, Job Review and every output format read the same planned job.
 
 ### F-A10. Pre-flight check (before G-code save)
 
@@ -1206,6 +1257,13 @@ Mac uses `Cmd`, Windows/Linux web uses `Ctrl`.
   (ADR-362).
 - `PageUp` / `PageDown` — Jog Z. When a scrolling list, tab panel or the Artwork panel has focus,
   the keys scroll it instead (ADR-362).
+- `Cmd/Ctrl+Shift+]` / `Cmd/Ctrl+Shift+[` — Jog up / down one step; `Cmd/Ctrl+Alt+[` /
+  `Cmd/Ctrl+Alt+]` — Jog left / right one step (LightBurn's Move-window keys, ADR-493).
+  Numpad `8`/`2`/`4`/`6` jog the same way and `7`/`9`/`1`/`3` diagonally, only with Num Lock on:
+  with Num Lock off the keypad sends arrow keys, which nudge the selected artwork and never move
+  the machine. Directions, step and speed are exactly the jog pad arrows'. Like the Z keys, they
+  work only while the jog pad is shown and enabled, send one step per press (no auto-repeat), and
+  do nothing in a dialog, a text field or a focused scrolling list.
 
 ---
 
@@ -1639,14 +1697,18 @@ minimum target size.
    - GRBL 1.1 or grblHAL;
    - `$32=0` is confirmed;
    - the build has no parking (`P` in `$I`);
+   - (A later Pause of the same job relies on the `$32` and parking check an earlier lift made
+     before its reset, ADR-411 Amendment 1.)
    - no pendant (MPG) is in control;
    - the report is `Door:0` or `Hold:0`;
    - the work offset is known.
 2. It also needs a re-entry plan from the program:
    - The stop point lies within 0.1 mm of a line the controller may still have been running. The
      earliest such line wins.
-   - The spindle was on, and the program has a `G4 P` spin-up dwell after its M3/M4.
-   - The bit stopped below the program's highest rapid Z.
+   - The spindle was on. Its spin-up is the program's `G4 P` dwell after its M3/M4, or 4 s when
+     the program has none (spin-up time 0 s).
+   - The bit stopped below the program's highest rapid Z since its last bit change. That height
+     is the lift height, so a bit-change park height is never used.
    - The program stays inside the supported code subset.
 3. The primary control reads **Lifting…**. The app:
    1. writes a soft reset (`0x18`);
@@ -1654,7 +1716,9 @@ minimum target size.
    3. checks the machine position did not move;
    4. writes `G21 G90 G54 G94 G17`;
    5. writes a `G92` if the work offset came back different, and verifies it;
-   6. writes `G0 Z<safe>`.
+   6. writes `G0 Z<safe>`;
+   7. when any override was off 100%, writes the realtime override bytes that put it back and
+      waits for the `Ov:` report to show it (logged, not failed, if none arrives).
 4. The job stays paused with the bit at safe height and the spindle off. The advice beside
    **Resume** says Resume spins up there, returns over the stop point and feeds back into its cut.
 
@@ -1666,7 +1730,7 @@ minimum target size.
    - the modal line;
    - `G0 Z<safe>`;
    - `M3`/`M4 S<rpm>`;
-   - the program's `G4 P<spin-up>`;
+   - `G4 P<spin-up>`;
    - its `M7`/`M8`;
    - `G0 X Y` over the entry point;
    - `G1 Z<entry> F<plunge>`;
@@ -1675,13 +1739,15 @@ minimum target size.
 
 #### Exempt — no lift
 1. If a condition in the lift's step 1 or 2 is not met, the app logs why and keeps the plain door
-   pause of F-B7.
+   pause of F-B7. The advice beside **Resume** starts with that reason.
+2. **Resume** on such a pause tries the lift again first (the door may have been open). If it
+   lifts, the re-entry follows at once; if not, the door resume of F-B7 runs.
 
 #### Error — failure after the reset
 1. Any failure after the reset ends the job with Abort's reset: a refused line, a timeout, an
    alarm, a moved frame, or a lost port. The controller no longer holds the job.
-2. The safety notice **Pause and lift stopped** says what failed. The Interrupted job card offers
-   pass recovery (ADR-215).
+2. The safety notice **Pause and lift stopped** says what failed. The Interrupted job card files it
+   as a stop from the app, with the spindle commanded off, and offers pass recovery (ADR-215).
 3. Pause while lifting or returning is refused; **ABORT JOB** and the physical E-stop stay
    available.
 
@@ -2133,7 +2199,12 @@ authorization, Frame proof, controller command, or safety boundary.
   before the job, and only while nobody has moved the head since the stop; if the controller
   itself restarted or lost power mid-burn the head stopped earlier, which Frame remaining area
   shows before anything burns. The Review then reads as set from the head stop instead of
-  warning that the origin moved (ADR-341 Amendment 6).
+  warning that the origin moved (ADR-341 Amendment 6). It also says how far back along the path
+  the lines sent after the last confirmed one reach, the stretch a laser that lost power may
+  not have burned (ADR-341 Amendment 8).
+- Once the controller has the origin the job ran with, or one set from where the head stopped,
+  **Go to job origin** and **Go to restart point** jog the head, beam off, to work X0 Y0 and to
+  where the chosen restart line re-enters the job (ADR-341 Amendment 8).
 - The Review of an interrupted laser job opens by itself once the controller is connected after
   a lost link, a controller restart, a failed write or a stalled stream, once per run in each
   app session. It does not open after the operator's own Abort or a rejected line; the card
@@ -2290,7 +2361,12 @@ provider from the archived project and refuses unless the re-emitted program mat
 G-code exactly. The complete artifact is bounded by a conservative 64 MiB allocation-free estimate
 including G-code and embedded project data. A larger job may still
 Start, but it runs without recovery/archive capture and the operator receives the forensic-record
-warning. A fresh Start arms only its small start intent before the wire (ADR-337); the execution
+warning. A laser run without an archive keeps its start intent and the work offset at Start in
+memory, and an interruption writes them as a fingerprint-only capsule: the card, the Review and
+Restore saved origin work, and the Review's recovery rebuilds the program from the open project
+when it reproduces the fingerprint, running without an archive when its own is over the budget
+too; its record maps progress back onto the job's lines, so a second interruption can be
+continued again (ADR-341 Amendment 8). A fresh Start arms only its small start intent before the wire (ADR-337); the execution
 archive, including its full G-code hashing and IndexedDB clone, is built and stored after the
 controller accepts the program, off the Start-to-motion path. Until activation hands the run to
 `activeRun`, the `pendingStart` intent owns it and no progress checkpoint is written. A crash in
@@ -3201,6 +3277,32 @@ homing direction or change work zero. Home uses the selected controller's comman
 (for example, generic GRBL `$H`, or the Falcon A1 Pro's `$HX` then `$HY`); firmware determines
 the physical direction. **Go to work zero** is a separate movement to the workpiece reference.
 
+**Move to position** (under the jog pad, ADR-493) moves the head, beam off, to typed X and Y.
+**Coordinates** picks the frame: **Canvas** is the numbers on the rulers, the spot where an
+Absolute job burns that point (as Move laser to selection); **From origin** is millimetres from
+the work origin, the numbers in the job's G-code, and needs no homing (MPos = work position +
+work offset). It starts on Canvas in Absolute Coordinates and on From origin otherwise, with X and
+Y on machine X0 Y0 or work zero until they are typed.
+**Use current** fills X and Y with where the head is now. **Save** keeps the typed position under a
+name (blank gives Position N; the same name replaces the old entry) in the machine profile, so it
+travels with the profile and the project and is one undo step. Each saved row has **Go** and
+**Delete**. Go needs a connected, Idle machine, like the jog arrows; a missing work offset for a
+From origin move is a notice and nothing moves.
+
+**After a job** (Machine Setup's laser step, ADR-493; LightBurn's Finish Position) sets where a laser
+job leaves the head: **Go to the work origin** (the default, which stores nothing; a Current
+Position job still returns to its start), **Stay where the job ends** (no park move in any mode),
+or **Go to a bed position**, given in canvas coordinates as on the rulers; it starts on machine X0
+Y0 (the front-left corner of a front-left machine). Stay and a bed position also apply to a
+Current Position job, so the next Start begins where the head was left. **Finish jobs here** in
+Move to position sets that bed position from typed Canvas numbers. The bed position moves with the
+job like the CNC park (ADR-392): canvas → machine coordinates → the job's bed-to-program shift.
+Where that shift is unknown (a placed job before a confirmed Home, any Verified Origin job) or the
+rotary is on, the finish is set aside for that job, the default applies, and Job Review says why.
+The G-code, preview, estimates and Job Review's park-outside-frame note all read the same placed
+finish. Changing the finish changes the G-code, so it needs a fresh Frame; saving a head position
+does not.
+
 The controller's native MPos is distinct from the drawn bed coordinates (ADR-342). Stock GRBL
 can report negative machine positions after homing. With current-session build, travel and homing
 evidence, KerfDesk maps that native frame to the profile bed and translates Absolute output back
@@ -4052,7 +4154,9 @@ explicitly marked below; the remaining controls and user-facing flows are planne
 1. User clicks **Save G-code** in CNC mode.
 2. CNC preflight runs: settings validity, depth vs stock thickness, machine
    bounds, no-go zones, plunged-travel scan (no XY rapid below safe Z, no
-   rapid plunge), non-empty output. Findings surface as Job Review warnings,
+   rapid plunge other than ADR-489's Z-only descent from safe Z to 1 mm above
+   air the job has already cut, which a plunge at the plunge feed follows),
+   non-empty output. Findings surface as Job Review warnings,
    not refusals (ADR-228).
 3. The file emits through `cncGrblStrategy`: G21/G90/G94 preamble, M3 +
    spin-up dwell, safe-Z discipline, per-layer comment headers, M5 + park
@@ -4166,7 +4270,12 @@ explicitly marked below; the remaining controls and user-facing flows are planne
    each run of linked rings descends along its first ring from the level
    above instead of plunging; a ring shorter than one cut width plunges,
    and the G-code header and Job Review say so (F-CNC18, ADR-424
-   Amendment 1).
+   Amendment 1). Below the first level, the bit rapids down from safe Z to
+   1 mm above the stock the level above left (its depth plus the bit's rise
+   at full radius) and feeds only the rest; the first level, a level below
+   one that stopped short, and recovery jobs plunge from safe Z (ADR-489).
+   Each straight run of a ring is one G-code move, however many cells it
+   was traced across; the path is the same (ADR-488).
 3. Emitted G-code passes the plunged-travel invariant; scale is resolved
    before cutter geometry, then mirror/rotate/move placement is honored.
 4. Job Review's detail line for the operation names the levels the
@@ -6885,10 +6994,11 @@ as the pane's design record.
   presses **Use this camera** on a detected machine camera. The live picture is the one source every
   camera feature captures through. Closing the panel keeps the camera running while the calibrated
   overlay shows it on the canvas.
-- **Hosted browser / machine camera.** A laser's built-in camera and RTSP/IP cameras answer on the
-  local network without the permission browsers need to read pixels, so the hosted web app cannot
-  use them. The panel says so and links KerfDesk Desktop, which reads them through its local bridge.
-  USB cameras work in the browser.
+- **Hosted browser / machine camera.** A laser's built-in camera, RTSP/IP cameras and phone camera
+  apps answer on the local network without the permission browsers need to read pixels, so the
+  hosted web app cannot use them. The panel says so and links KerfDesk Desktop, which reads them
+  through its local bridge. USB cameras work in the browser, including a phone that shows up as a
+  webcam (ADR-448).
 - **Error / permission denied.** If the browser or OS denies camera access (or the page is not
   served over https), a one-line message explains how to grant permission. No overlay is shown
   and the rest of the app is unaffected.
@@ -7123,6 +7233,31 @@ as the pane's design record.
 - **Empty / no selection or no feed.** **Use selected marks** without two selected objects says
   to select the marks first. **Find marks with camera** is disabled without a live camera, and
   without a calibration it is absent.
+
+### F-CAM11. A phone as the overhead camera (ADR-448)
+
+- **Success / IP Webcam.** In KerfDesk Desktop the operator opens **Phone camera…** in the Camera
+  panel, keeps **IP Webcam (Android)**, types the address the app shows (such as
+  `192.168.1.50:8080`) and presses **Use phone**. One picture arrives, the phone's picture shows
+  in the section, and it becomes the camera every feature uses. Calibrating it keeps the other
+  cameras' calibrations, and **Calibrated cameras** names it **Phone camera at** its address.
+- **Success / another app.** With **Another app with a picture address**, the full http address
+  of the app's still picture works the same way.
+- **Success / back later.** The app and address are remembered on this computer, and the
+  section opens with them filled in. Login details, query parameters and fragments are used for
+  the current connection only and never stored. The panel tells the operator to paste the full
+  address again if the camera needs those details when reconnecting.
+- **Error / no picture.** A wrong address, a stopped app, or a phone on another network leaves
+  the camera stopped. The section says what to check and offers **Try again**.
+- **Error / video stream address.** An `rtsp://` address is not started. The section says to
+  paste it under **RTSP camera…**.
+- **Edge / laser camera and phone.** Starting the phone stops the laser's built-in camera, and
+  the machine camera's button offers **Use this camera** again instead of **In use**.
+- **Edge / hosted web app.** The section is not shown. The camera notice says Desktop reads phone
+  camera apps, and that a phone that shows up as a webcam works as a USB camera.
+- **Empty / no address.** **Use phone** is disabled until an address is typed, and the section
+  lists the setup steps (largest video resolution, straight down, no zoom, stabilisation, HDR or
+  filters, focus locked, on the charger, calibrate once mounted).
 
 ---
 

@@ -53,7 +53,19 @@ export type LayerOperationSettings = {
   readonly perforationSkipMm?: number | undefined;
   readonly overcutMm?: number | undefined;
   readonly imageOverscanMm?: number | undefined;
+  // ADR-494 (LBG-C05). Optional for the same reason: absent means tabs placed
+  // by count, uncut, which compiles byte-identically to the output before
+  // them. An older build ignores them and places tabs by count, uncut, so a
+  // part it cuts is never freed (no project schema bump).
+  readonly tabLayout?: TabLayoutMode | undefined;
+  readonly tabSpacingMm?: number | undefined;
+  readonly tabMaxPerShape?: number | undefined;
+  readonly tabCutPowerPercent?: number | undefined;
 };
+
+// ADR-494: 'count' puts tabsPerShape tabs on every contour; 'spacing' puts one
+// tab per tabSpacingMm of perimeter, at most tabMaxPerShape when that is set.
+export type TabLayoutMode = 'count' | 'spacing';
 
 export type LinkedMaterialBinding = {
   readonly libraryId: string;
@@ -153,6 +165,10 @@ const LAYER_OPERATION_SETTING_KEYS = [
   'perforationSkipMm',
   'overcutMm',
   'imageOverscanMm',
+  'tabLayout',
+  'tabSpacingMm',
+  'tabMaxPerShape',
+  'tabCutPowerPercent',
 ] as const satisfies ReadonlyArray<keyof LayerOperationSettings>;
 
 const LAYER_COLOR_RE = /^#[0-9a-fA-F]{6}$/;
@@ -231,6 +247,10 @@ export const OPTIONAL_CUT_SETTING_KEYS = [
   'perforationSkipMm',
   'overcutMm',
   'imageOverscanMm',
+  'tabLayout',
+  'tabSpacingMm',
+  'tabMaxPerShape',
+  'tabCutPowerPercent',
 ] as const satisfies ReadonlyArray<keyof LayerOperationSettings>;
 
 // Written only when set, so a capture of an operation that never used them

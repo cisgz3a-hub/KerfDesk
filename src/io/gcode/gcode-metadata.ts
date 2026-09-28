@@ -89,9 +89,11 @@ export type GcodeMetadata = {
  * air repeats at eligible boundaries, with full-circle/large-arc timing
  * and unchanged M3 dark-transition ordering, ADR-424 amendment 1's relief
  * roughing headers that count the passes plunged into a first loop shorter
- * than one cut width, and ADR-484's masked relief finishing: waterline round
- * the excluded stock, rows linked across short gaps, and every move kept out
- * of that stock, and ADR-154 amendment 3's adaptive roughing rings linked
+ * than one cut width, ADR-484's masked relief finishing: waterline round the
+ * excluded stock, rows linked across short gaps, and every move kept out of
+ * that stock, ADR-489's CNC passes rapided down from safe Z to just above the
+ * air their earlier passes cleared, and ADR-488's relief roughing moves, one
+ * per straight run, and ADR-154 amendment 3's adaptive roughing rings linked
  * straight out by one ring spacing from starts chosen from the wall inward.
  */
 // ADR-427 keeps deepest cleanup before linked relief rings and flat depth slices.
@@ -101,8 +103,10 @@ export type GcodeMetadata = {
 // ADR-471 discloses sub-width plunges; ADR-457 finishing recipes survive ramping.
 // ADR-424 Amd 1 discloses relief roughing's sub-width plunges the same way.
 // ADR-484 keeps masked relief finishing out of the excluded stock.
+// ADR-489 rapids CNC entries down through air earlier passes cleared.
+// ADR-488 emits one relief roughing move per straight run.
 // ADR-154 Amd 3 links adaptive rings straight out; all of the above is retained.
-export const EMITTER_REVISION = 'adaptive-ring-links-straight-out-20260928-v2';
+export const EMITTER_REVISION = 'adaptive-ring-links-straight-out-20260928-v3';
 
 // Machine-specific assumption lines (ADR-103 defect fix): router exports
 // previously carried the laser-worded `$32=1 (laser mode)` banner. The S

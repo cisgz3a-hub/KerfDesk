@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { VISIBLE_ALPHA_MIN } from './colour-appearance';
 import type { RawImageData } from './trace-image';
 import { traceImageToColoredPaths } from './trace-to-paths';
 import { canvas, covers, fillRect, OPTIONS, type Rgb } from './colour-layer-trace.test-support';
@@ -34,7 +35,21 @@ function artwork(alpha: number, colour: Rgb): RawImageData {
 }
 
 describe('colour-layer appearance of partial alpha', () => {
-  it.each([1, 64, 127, 128, 192, 255])(
+  it.each([1, 63])(
+    'leaves near-invisible alpha %s untraced, straight or tagged (ADR-461 Amendment 1)',
+    async (alpha) => {
+      expect(alpha).toBeLessThan(VISIBLE_ALPHA_MIN);
+      for (const colour of COLOURS) {
+        const raw = artwork(alpha, colour);
+        const paths = await traceImageToColoredPaths(raw, SETTINGS);
+        expect(await traceImageToColoredPaths(whiteComposite(raw, true), SETTINGS)).toEqual(paths);
+        // The faint rectangle is a hole in the opaque white canvas, not a layer.
+        expect(paths.some((path) => covers(path, { x: 40.5, y: 30.5 }))).toBe(false);
+      }
+    },
+  );
+
+  it.each([64, 127, 128, 192, 255])(
     'agrees across straight, tagged and flattened alpha %s',
     async (alpha) => {
       for (const colour of COLOURS) {
@@ -46,14 +61,12 @@ describe('colour-layer appearance of partial alpha', () => {
           flattened,
         );
         expect(raw.data).toEqual(before);
-        // Alpha=1 can legitimately quantize into paper; visible medium tones cannot.
-        if (alpha >= 64) {
-          expect(flattened).toHaveLength(1);
-          const path = flattened[0];
-          if (path === undefined) continue;
-          expect(covers(path, { x: 40.5, y: 30.5 })).toBe(true);
-          expect(covers(path, { x: 4.5, y: 4.5 })).toBe(false);
-        }
+        // Visible medium tones never quantize into paper.
+        expect(flattened).toHaveLength(1);
+        const path = flattened[0];
+        if (path === undefined) continue;
+        expect(covers(path, { x: 40.5, y: 30.5 })).toBe(true);
+        expect(covers(path, { x: 4.5, y: 4.5 })).toBe(false);
       }
     },
   );

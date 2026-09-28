@@ -1,7 +1,9 @@
 import { beforeEach, describe, expect, it } from 'vitest';
 import {
+  loadPhoneCamera,
   loadRtspCameraUrl,
   rtspUrlWithoutCredentials,
+  savePhoneCamera,
   saveRtspCameraUrl,
 } from './camera-preference-storage';
 
@@ -26,6 +28,38 @@ describe('RTSP camera preference security', () => {
   it('best-effort scrubs malformed URL-like input', () => {
     expect(rtspUrlWithoutCredentials('rtsp://user:password@camera/live bad')).not.toContain(
       'password',
+    );
+  });
+});
+
+describe('phone camera preference (ADR-448)', () => {
+  it('keeps the app and address, never the login', () => {
+    savePhoneCamera({ app: 'other', address: 'http://me:pw@192.168.1.60/?action=snapshot' });
+    expect(loadPhoneCamera()).toEqual({
+      app: 'other',
+      address: 'http://192.168.1.60/',
+    });
+    expect(localStorage.getItem('laserforge.camera.phone.v1')).not.toContain('pw');
+  });
+
+  it('reads nothing from a damaged preference', () => {
+    localStorage.setItem('laserforge.camera.phone.v1', '{"app":"webcam","address":7}');
+    expect(loadPhoneCamera()).toBeNull();
+    localStorage.setItem('laserforge.camera.phone.v1', 'not json');
+    expect(loadPhoneCamera()).toBeNull();
+  });
+
+  it('scrubs legacy phone login, query and fragment on read and in storage', () => {
+    localStorage.setItem(
+      'laserforge.camera.phone.v1',
+      JSON.stringify({
+        app: 'other',
+        address: 'http://operator:first@secret-tail@192.168.1.50/frame?token=secret#private',
+      }),
+    );
+    expect(loadPhoneCamera()).toEqual({ app: 'other', address: 'http://192.168.1.50/frame' });
+    expect(localStorage.getItem('laserforge.camera.phone.v1')).toBe(
+      JSON.stringify({ app: 'other', address: 'http://192.168.1.50/frame' }),
     );
   });
 });

@@ -1,15 +1,15 @@
 import { useEffect, type Dispatch, type MutableRefObject, type SetStateAction } from 'react';
-import type { GcodeRenderModel } from '../../core/gcode-view';
 import type { Viewer3dSceneHandle } from '../viewer3d';
+import type { InspectorRenderModel } from './inspector-model';
 
 /** Observable lifecycle of the Inspector's current WebGL scene. */
 export type Viewer3dSceneState = 'loading' | 'preparing' | 'ready' | 'no-webgl';
 
 type Viewer3dModelInstallationArgs = {
-  readonly model: GcodeRenderModel;
+  readonly model: InspectorRenderModel;
   readonly state: Viewer3dSceneState;
   readonly handleRef: MutableRefObject<Viewer3dSceneHandle | null>;
-  readonly drawnModelRef: MutableRefObject<GcodeRenderModel | null>;
+  readonly drawnModelRef: MutableRefObject<InspectorRenderModel | null>;
   readonly setState: Dispatch<SetStateAction<Viewer3dSceneState>>;
   readonly setReason: Dispatch<SetStateAction<string>>;
 };

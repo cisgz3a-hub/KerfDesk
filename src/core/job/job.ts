@@ -92,10 +92,18 @@ export type CutGroup = {
   // or no closed segments, so existing output stays byte-identical. Offset
   // fill groups drop it via the Omit below; overcut is a Line setting.
   readonly finalPassOvercutMm?: number;
+  // ADR-494: present only on the group that burns a Line operation's tab
+  // spans, which follows that operation's cut group; the share of the cut's
+  // power it runs at (`power` already includes it). Absent on every other
+  // group, so their output is unchanged.
+  readonly tabSpanPowerPercent?: number;
   readonly segments: ReadonlyArray<CutSegment>;
 };
 
-export type FillGroup = Omit<CutGroup, 'kind' | 'segments' | 'finalPassOvercutMm'> & {
+export type FillGroup = Omit<
+  CutGroup,
+  'kind' | 'segments' | 'finalPassOvercutMm' | 'tabSpanPowerPercent'
+> & {
   readonly kind: 'fill';
   readonly fillStyle?: LayerFillStyle;
   readonly islandMotionPolicy?: IslandFillMotionPolicy;
@@ -179,6 +187,11 @@ export type CncContourPass = {
   // pass keeps its straight plunge (ADR-471, ADR-424 Amendment 1). G-code
   // comments and Job Review disclose it; motion is unchanged.
   readonly entryPlunge?: true;
+  // ADR-489: earlier passes of this job have cut away everything the cutter
+  // would touch at or above this Z anywhere along this pass's path, so the
+  // emitter may rapid down to it plus CNC_AIR_RAPID_CLEARANCE_MM before the
+  // plunge instead of feeding down from safe Z. Absent: plunge from safe Z.
+  readonly airFloorZMm?: number;
 };
 
 export type CncPath3dPass = {
@@ -200,6 +213,8 @@ export type CncPath3dPass = {
   // its descents against the configured plunge rate.
   // Tiling and G-code comments preserve this marker without changing motion.
   readonly entryRamp?: true;
+  // ADR-489: see CncContourPass.airFloorZMm.
+  readonly airFloorZMm?: number;
 };
 
 export type CncArcPass = {
@@ -210,6 +225,8 @@ export type CncArcPass = {
   readonly clockwise: boolean;
   readonly zMm: number;
   readonly closed: boolean;
+  // ADR-489: see CncContourPass.airFloorZMm.
+  readonly airFloorZMm?: number;
 };
 
 export type CncHelicalContourPass = {
@@ -414,6 +431,16 @@ export type Job = {
   } | null;
   readonly diagnostics?: ReadonlyArray<JobDiagnostic>;
   readonly cncCompilation?: CncCompilationSidecar;
+  /** Laser finish placed by preparation (ADR-493). Absent keeps the default. */
+  readonly laserFinish?: JobLaserFinish;
 };
+
+/** Where a laser job leaves the head (ADR-493): `point` is in this job's program
+ * coordinates; `set-aside` is a configured bed finish that could not be placed,
+ * so the default applies and Job Review says why. */
+export type JobLaserFinish =
+  | { readonly kind: 'stay' }
+  | { readonly kind: 'point'; readonly x: number; readonly y: number }
+  | { readonly kind: 'set-aside'; readonly reason: 'unplaced' | 'rotary' };
 
 export const EMPTY_JOB: Job = { groups: [] };
