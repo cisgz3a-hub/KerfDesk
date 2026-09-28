@@ -31,6 +31,7 @@ describe('recovery archive capacity warning in Job Review', () => {
     expect(warnings[0]).toContain('too large to keep a recovery copy');
     expect(warnings[0]).toContain('at most 64 MB');
     expect(warnings[0]).toContain('cannot be resumed from a saved copy');
+    expect(warnings[0]).toContain('darken areas after it finishes still appears');
   });
 
   it('says a laser job keeps its origin and where it stopped instead', () => {
