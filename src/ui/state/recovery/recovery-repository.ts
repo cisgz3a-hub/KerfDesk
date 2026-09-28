@@ -17,7 +17,6 @@ import {
   claimRecoveryMutation,
   discardCompletedReceiptMutation,
   discardRecoveryMutation,
-  noteUntrackedRunAcceptedMutation,
   promoteStaleActiveRunMutation,
   releaseRecoveryClaimMutation,
 } from './recovery-slot-mutations';
@@ -42,6 +41,8 @@ import type { RecoveryAuthoritativeResetBase } from './recovery-repository-state
 import { RecoverySnapshotCoordinator } from './recovery-snapshot-coordinator';
 import { ownRecoveryRuns, type RecoveryRunOwnership } from './recovery-run-lock';
 import type { UntrackedRunRecord } from './untracked-run-record';
+import { acceptUntrackedRun, type UntrackedAcceptanceGuard } from './recovery-untracked-acceptance';
+import { freshRunGuard } from './fresh-run-ownership';
 
 export type {
   RecoveryRepositoryOptions,
@@ -172,15 +173,19 @@ export class RecoveryRepository {
     return this.own(args.recoveryRunId, () => this.startHandoff.armClaimedRecoveryStart(args));
   }
 
-  async cancelPendingStart(runId: RunId): Promise<RecoveryRepositoryResult<boolean>> {
-    return this.startHandoff.cancel(runId);
-  }
+  cancelPendingStart = (runId: RunId): Promise<RecoveryRepositoryResult<boolean>> =>
+    this.startHandoff.cancel(runId);
+
+  finishUnarchivedStart = (runId: RunId, completed: boolean) =>
+    this.startHandoff.finishUnarchived(runId, completed);
 
   async activateFreshRun(
     runId: RunId,
     acceptedAtIso = this.nowIso(),
+    stillCurrent?: () => boolean,
   ): Promise<RecoveryRepositoryResult<boolean>> {
-    return this.own(runId, () => this.activationCoordinator.fresh(runId, acceptedAtIso));
+    const guard = freshRunGuard(this.getSnapshot(), runId, stillCurrent);
+    return this.own(runId, () => this.activationCoordinator.fresh(runId, acceptedAtIso, guard));
   }
 
   async updateProgress(
@@ -222,16 +227,21 @@ export class RecoveryRepository {
   async noteUntrackedRunAccepted(
     runId?: RunId,
     record?: UntrackedRunRecord,
+    guard?: UntrackedAcceptanceGuard,
   ): Promise<RecoveryRepositoryResult<boolean>> {
-    const result = await this.mutateAndRefresh(
-      'supersede recovery after untracked Start',
-      noteUntrackedRunAcceptedMutation,
+    return acceptUntrackedRun(
+      {
+        snapshot: this.getSnapshot,
+        mutate: (mutation) =>
+          this.mutateAndRefresh('supersede recovery after untracked Start', mutation),
+        discard: (id) => this.artifactStore.discard(id),
+        remember: (value) => this.fingerprintCapsules.rememberUntracked(value),
+        purge: () => this.purgeControllerData(),
+      },
+      runId,
+      record,
+      guard,
     );
-    if (result.ok && runId !== undefined) await this.artifactStore.discard(runId);
-    await this.fingerprintCapsules.rememberUntracked(result.ok ? (record ?? null) : null);
-    if (result.ok) return result;
-    const purged = await this.purgeControllerData();
-    return purged.ok ? ok(true) : result;
   }
 
   async discardRecovery(expected?: {

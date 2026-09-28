@@ -27,8 +27,8 @@ export function SecondPassTools(props: SecondPassToolsProps): JSX.Element {
       <BrushControls {...props} />
       <p className="second-pass-hint">
         100% repeats the saved power. 150% adds half as much power again, up to the machine maximum.
-        Grayscale and speed stay as saved. Colour shows the painted mask, not a prediction of
-        darkness.
+        Grayscale and programmed feed stay as saved. Colour shows the painted mask, not a prediction
+        of darkness.
       </p>
       <HistoryControls {...props} />
       <h3>Brush strokes · {props.strokes.length}</h3>

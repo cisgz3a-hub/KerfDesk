@@ -406,7 +406,7 @@ describe('exact second-pass Frame and Start ownership', () => {
     expect(artifact.laserSecondPassChain?.[1]?.resumeChainBefore).toEqual([
       { fromLine: 1, version: 4 },
     ]);
-    expect(artifact.laserSecondPassChain?.map((stage) => stage.writerVersion)).toEqual([2, 2]);
+    expect(artifact.laserSecondPassChain?.map((stage) => stage.writerVersion)).toEqual([3, 3]);
     expect(artifact.laserResumeChain).toBeUndefined();
     expect(recoveryArtifactPreparedProgramMatches(artifact)).toBe(true);
     await expect(executionArtifactIntegrityIsValid(artifact)).resolves.toBe(true);
