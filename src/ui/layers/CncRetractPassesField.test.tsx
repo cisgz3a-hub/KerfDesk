@@ -80,4 +80,16 @@ describe('CncRetractPassesField', () => {
     });
     expect(onCommit).toHaveBeenCalledWith({ retractBetweenPasses: false });
   });
+
+  it('says a profile with leads lifts between passes either way', () => {
+    const note = (over: Partial<CncLayerSettings>): string | null =>
+      renderField(withCut(over), vi.fn()).querySelector('[role="note"]')?.textContent ?? null;
+    expect(note({ cutType: 'profile-outside' })).toMatch(/lifts between passes either way/);
+    act(() => root?.unmount());
+    root = null;
+    expect(note({ cutType: 'profile-inside', profileLead: { shape: 'none' } })).toBeNull();
+    act(() => root?.unmount());
+    root = null;
+    expect(note({ cutType: 'profile-on-path' })).toBeNull();
+  });
 });

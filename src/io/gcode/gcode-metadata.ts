@@ -99,7 +99,7 @@ export type GcodeMetadata = {
  * an angle and angle turns between passes, ADR-495's overscan worked out from
  * the scan speed and acceleration when it is on, and ADR-154 amendment 3's
  * adaptive roughing rings linked straight out by one ring spacing from starts
- * chosen from the wall inward.
+ * chosen from the wall inward, plus ADR-520's repeated-path clearance proof.
  */
 // ADR-427 keeps deepest cleanup before linked relief rings and flat depth slices.
 // ADR-368 sizes nonflat pocket/profile offsets, tabs and stepover by cut width.
@@ -118,7 +118,8 @@ export type GcodeMetadata = {
 // Tiling preserves plunge disclosure but drops whole-job clearance certificates.
 // Generic, tabbed and relief ramps bound the represented angle and Z feed.
 // Entry provenance reflects compiled passes, including specialised entry paths.
-export const EMITTER_REVISION = 'adaptive-inlay-tile-ramp-provenance-audited-20260928-v13';
+// Repeated CNC depth passes retain only placement-stable clearance proofs.
+export const EMITTER_REVISION = 'cnc-entry-clearance-adaptive-audited-20260928-v14';
 
 // Machine-specific assumption lines (ADR-103 defect fix): router exports
 // previously carried the laser-worded `$32=1 (laser mode)` banner. The S

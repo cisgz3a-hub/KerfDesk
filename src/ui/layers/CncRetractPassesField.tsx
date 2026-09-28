@@ -1,6 +1,8 @@
 // CncRetractPassesField — when on (default), a profile or engrave "line" cut
 // lifts to safe Z and replunges before every pass instead of stepping the bit
 // straight down in place (ADR-253). Shown for the outline cut types + engrave.
+// A profile with leads starts every pass at its lead, off the end of the last
+// one, so it lifts either way; the row says so (CNC gap audit CW-02).
 // Offset and raster pockets get "Lift between rings" instead: off (default),
 // they step to the next ring or row at the plunge feed and stay in the cut;
 // on, they lift and re-plunge between them as before (ADR-491). V-carve,
@@ -22,18 +24,35 @@ export function CncRetractPassesField(props: {
     cutType === 'profile-on-path' ||
     cutType === 'engrave';
   if (!applies) return null;
+  const leadsLift =
+    (cutType === 'profile-outside' || cutType === 'profile-inside') &&
+    props.settings.profileLead?.shape !== 'none';
   return (
-    <Row label="Retract between passes">
-      <input
-        type="checkbox"
-        checked={props.settings.retractBetweenPasses ?? true}
-        onChange={(e) => props.onCommit({ retractBetweenPasses: e.target.checked })}
-        aria-label={`Retract between passes for ${props.layer.color}`}
-        title="Lift to safe Z and replunge before each pass, instead of stepping the bit straight down in place. Clears chips and gives a clean re-entry — the same motion a pocket uses."
-      />
-    </Row>
+    <>
+      <Row label="Retract between passes">
+        <input
+          type="checkbox"
+          checked={props.settings.retractBetweenPasses ?? true}
+          onChange={(e) => props.onCommit({ retractBetweenPasses: e.target.checked })}
+          aria-label={`Retract between passes for ${props.layer.color}`}
+          title="Lift to safe Z before each pass, instead of stepping the bit straight down in place. Clears chips and gives a clean re-entry. The bit rapids back down to 1 mm above the last cut and feeds in from there."
+        />
+      </Row>
+      {leadsLift ? (
+        <p role="note" style={noteStyle}>
+          With profile leads, every pass starts at its lead, away from where the last one ended, so
+          the bit lifts between passes either way. Set Profile leads to None to step straight down.
+        </p>
+      ) : null}
+    </>
   );
 }
+
+const noteStyle: React.CSSProperties = {
+  fontSize: 11,
+  color: 'var(--lf-text-faint)',
+  margin: '2px 0 6px 0',
+};
 
 function PocketLiftRow(props: {
   readonly layer: Layer;

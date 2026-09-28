@@ -176,28 +176,9 @@ describe('the reported 6 mm pocket (ADR-471)', () => {
   });
 
   it('never finishes a ramp straight down, and says which passes plunge', () => {
-    // Every straight descent below the stock top starts a pass after a rapid.
-    const word = (line: string, letter: string): string | undefined =>
-      new RegExp(`${letter}(-?\\d+\\.\\d+)`).exec(line)?.[1];
-    let at = { x: '', y: '', z: 0 };
-    let previous = '';
-    let motion: GcodeMotionMode | null = null;
-    for (const raw of gcode.split('\n')) {
-      const line = raw.split(';')[0] ?? '';
-      const parsed = scanModalMotionLine(line, motion);
-      motion = parsed.motion;
-      if (!parsed.isMotion) continue;
-      const next = {
-        x: word(line, 'X') ?? at.x,
-        y: word(line, 'Y') ?? at.y,
-        z: Number(word(line, 'Z') ?? at.z),
-      };
-      if (motion === 1 && next.x === at.x && next.y === at.y && next.z < Math.min(at.z, 0)) {
-        expect(previous).toMatch(/^G0 X/);
-      }
-      previous = line;
-      at = next;
-    }
+    // Every straight descent starts a pass after positioning, including a
+    // rapid through air proved clear by an earlier identical path.
+    for (const before of linesBeforeStraightDescents(gcode)) expect(before).toMatch(/^G0 X/);
     expect(gcode).toContain('; cnc entry: contour-ramp; requested-max-angle-deg: 5.000');
     expect(gcode).toContain(
       '; cnc entry-advisory: 2 passes plunge: path shorter than one cut width',
@@ -251,3 +232,32 @@ describe('applyRampEntry before a stay-down link (ADR-491)', () => {
     expect(applyRampEntry([link, entered], 5, false, 3)[1]).toBe(entered);
   });
 });
+
+// The motion line before each straight G1 descent below the stock top,
+// skipping an ADR-489 rapid down that directly follows a rapid across.
+function linesBeforeStraightDescents(gcode: string): string[] {
+  const word = (line: string, letter: string): string | undefined =>
+    new RegExp(`${letter}(-?\\d+\\.\\d+)`).exec(line)?.[1];
+  const found: string[] = [];
+  let at = { x: '', y: '', z: 0 };
+  let previous = '';
+  let motion: GcodeMotionMode | null = null;
+  for (const raw of gcode.split('\n')) {
+    const line = raw.replace(/;.*/, '');
+    const parsed = scanModalMotionLine(line, motion);
+    motion = parsed.motion;
+    if (!parsed.isMotion) continue;
+    const next = {
+      x: word(line, 'X') ?? at.x,
+      y: word(line, 'Y') ?? at.y,
+      z: Number(word(line, 'Z') ?? at.z),
+    };
+    const airDescent = /^G0 Z/.test(line) && /^G0 X/.test(previous);
+    const straightDown =
+      motion === 1 && next.x === at.x && next.y === at.y && next.z < Math.min(at.z, 0);
+    if (straightDown) found.push(previous);
+    if (!airDescent) previous = line;
+    at = next;
+  }
+  return found;
+}

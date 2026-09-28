@@ -41,7 +41,7 @@ function laserAssumptions(
 
 describe('gcodeMetadataHeader', () => {
   it('tracks the latest safety-relevant emitter revision', () => {
-    expect(EMITTER_REVISION).toBe('adaptive-inlay-tile-ramp-provenance-audited-20260928-v13');
+    expect(EMITTER_REVISION).toBe('cnc-entry-clearance-adaptive-audited-20260928-v14');
   });
 
   it('emits provenance as GRBL comment lines and ends with a newline', () => {
