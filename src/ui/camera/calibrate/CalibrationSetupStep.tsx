@@ -144,6 +144,7 @@ function SettingsFields(props: { readonly settings: CalibrationSettings }): JSX.
         <input
           type="checkbox"
           checked={settings.headCamera}
+          title="Tick when the camera is fixed to the laser head and moves with it. The target becomes a small square, and the photo is taken wherever you move the head."
           onChange={(event) => update({ headCamera: event.currentTarget.checked })}
         />
         Camera rides on the laser head
