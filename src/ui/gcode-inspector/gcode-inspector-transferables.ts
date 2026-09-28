@@ -17,17 +17,11 @@ export function gcodeInspectorTransferables(
     model.segLine.buffer,
     model.segFeed.buffer,
     model.segPower.buffer,
-    model.segRouteEndMm.buffer,
-    ...(model.segLengthMm === undefined ? [] : [model.segLengthMm.buffer]),
     model.lineCategories.buffer,
-    time.segSeconds.buffer,
-    time.segTimeScale.buffer,
-    time.segDistanceMm.buffer,
-    time.segTargetVelocityMmPerSec.buffer,
-    time.segEntryVelocityMmPerSec.buffer,
-    time.segExitVelocityMmPerSec.buffer,
     time.segTimeEndSec.buffer,
     time.segFeedLimited.buffer,
+    time.kindSeconds.buffer,
+    ...(model.detail?.levels.flatMap((level) => [level.starts.buffer, level.ends.buffer]) ?? []),
   ]);
 }
 

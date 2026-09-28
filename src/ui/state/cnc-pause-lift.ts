@@ -29,7 +29,10 @@ import {
   waitForCncLiftStatus,
   type CncPauseLiftContext,
 } from './cnc-pause-lift-commands';
+import { restoreCncLiftOverrides } from './cnc-pause-lift-overrides';
 import {
+  cncPauseLiftJobPatch,
+  currentCncPauseLiftJob,
   nextCncPauseLiftToken,
   ownsCncPauseLift,
   reportedMachinePositionMm,
@@ -53,14 +56,18 @@ type LiftStart =
   | { readonly kind: 'skip'; readonly reason: string | null };
 
 /**
- * Runs after a confirmed CNC Pause. Resolves once the bit is at safe height,
- * once the lift was skipped (the plain pause stays), or once a failed lift
- * has ended the job with its notice.
+ * Runs after a confirmed CNC Pause, and again from Resume when that Pause
+ * left the bit in the cut. Resolves once the bit is at safe height, once the
+ * lift was skipped (the plain pause stays), or once a failed lift has ended
+ * the job with its notice.
  */
-export async function liftPausedCncJob(context: CncPauseLiftContext): Promise<void> {
+export async function liftPausedCncJob(
+  context: CncPauseLiftContext,
+  options: { readonly retry?: boolean } = {},
+): Promise<void> {
   const start = startingLift(context);
   if (start.kind === 'skip') {
-    if (start.reason !== null) logNoLift(context, start.reason);
+    if (start.reason !== null) recordNoLift(context, start.reason, options.retry === true);
     return;
   }
   const { lift } = start;
@@ -77,6 +84,7 @@ export async function liftPausedCncJob(context: CncPauseLiftContext): Promise<vo
       { z: lift.plan.safeZMm },
       'pause',
     );
+    await restoreCncLiftOverrides(context, lift);
     finishLift(context, lift, wroteG92);
   } catch (error) {
     if (resetAttempted) {
@@ -86,6 +94,9 @@ export async function liftPausedCncJob(context: CncPauseLiftContext): Promise<vo
     // Nothing reached the controller: the settled door pause still holds.
     context.set((state) => ({
       ...(state.cncPauseLift?.token === lift.token ? { cncPauseLift: null } : {}),
+      ...(state.streamer?.status === 'paused'
+        ? cncPauseLiftJobPatch(state, { skipReason: messageOf(error) })
+        : {}),
       log: pushLog(state, `[lf2] Pause and lift skipped: ${messageOf(error)}`),
     }));
   }
@@ -97,26 +108,23 @@ function startingLift(context: CncPauseLiftContext): LiftStart {
   if (state.activeJobMachineKind !== 'cnc' || state.streamer?.status !== 'paused') {
     return { kind: 'skip', reason: null };
   }
-  const refusal = liftRefusal(context, state);
+  // A lift of this job already checked the settings its reset cleared.
+  const confirmedReportInches = currentCncPauseLiftJob(state)?.confirmedReportInches ?? null;
+  const refusal = liftRefusal(context, state, confirmedReportInches !== null);
   if (refusal !== null) return { kind: 'skip', reason: refusal };
-  const { statusReport: report, wcoCache } = state;
-  const reportInches = state.controllerSettings?.reportInches === true;
-  const machineMm =
-    report === null ? null : reportedMachinePositionMm(report, wcoCache, reportInches);
-  if (machineMm === null || wcoCache === null) {
-    return { kind: 'skip', reason: 'The paused position is not known.' };
-  }
-  const workOffsetMm = scaled(wcoCache, reportInches);
-  const stopPoint = {
-    x: machineMm.x - workOffsetMm.x,
-    y: machineMm.y - workOffsetMm.y,
-    z: machineMm.z - workOffsetMm.z,
-  };
+  const reportInches = confirmedReportInches ?? state.controllerSettings?.reportInches === true;
+  const position = pausedPosition(state, reportInches);
+  if (position === null) return { kind: 'skip', reason: 'The paused position is not known.' };
+  const { machineMm, workOffsetMm } = position;
   const planned = planCncPauseReentry({
     lines: state.streamer.queued,
     ackedLines: state.streamer.completed,
     sentLines: state.streamer.queueIndex,
-    stopPoint,
+    stopPoint: {
+      x: machineMm.x - workOffsetMm.x,
+      y: machineMm.y - workOffsetMm.y,
+      z: machineMm.z - workOffsetMm.z,
+    },
     controllerKind: driver.kind,
     plannerBlocks: controllerPlannerSizeBlocks(state),
   });
@@ -134,15 +142,41 @@ function startingLift(context: CncPauseLiftContext): LiftStart {
       workOffsetMm,
       workOriginActive: state.workOriginActive,
       workOriginSource: state.workOriginSource,
+      // Only a controller with realtime overrides reports Ov:.
+      overrides: state.ovCache ?? null,
     },
   };
 }
 
+/** Machine position and work offset of the settled pause, millimetres. */
+function pausedPosition(
+  state: LaserState,
+  reportInches: boolean,
+): { readonly machineMm: MotionPoint; readonly workOffsetMm: MotionPoint } | null {
+  const { statusReport: report, wcoCache } = state;
+  if (report === null || wcoCache === null) return null;
+  const machineMm = reportedMachinePositionMm(report, wcoCache, reportInches);
+  return machineMm === null ? null : { machineMm, workOffsetMm: scaled(wcoCache, reportInches) };
+}
+
 /** Why the controller evidence rules the lift out, or null. */
-function liftRefusal(context: CncPauseLiftContext, state: LaserState): string | null {
+function liftRefusal(
+  context: CncPauseLiftContext,
+  state: LaserState,
+  settingsConfirmed: boolean,
+): string | null {
   if (state.connection.kind !== 'connected' || context.driver().realtime.softReset === null) {
     return 'The controller has no soft reset to clear its hold with.';
   }
+  const settings = settingsConfirmed ? null : settingsRefusal(state);
+  if (settings !== null) return settings;
+  if (state.mpgActive === true) return 'A pendant (MPG) has control of the machine.';
+  if (context.refs.controllerResetWait != null) return 'Another controller reset is pending.';
+  return holdRefusal(state);
+}
+
+/** Why the controller settings KerfDesk read on connect rule the lift out. */
+function settingsRefusal(state: LaserState): string | null {
   if (state.controllerSettings?.laserModeEnabled !== false) {
     // With $32=1 GRBL does not spin the spindle up while idle.
     return 'Laser mode ($32) is on or unconfirmed, so the spindle cannot spin up above the cut.';
@@ -150,9 +184,7 @@ function liftRefusal(context: CncPauseLiftContext, state: LaserState): string | 
   if (state.controllerBuildInfo?.optionCodes.includes('P') === true) {
     return 'The controller parks the spindle itself (parking is compiled in).';
   }
-  if (state.mpgActive === true) return 'A pendant (MPG) has control of the machine.';
-  if (context.refs.controllerResetWait != null) return 'Another controller reset is pending.';
-  return holdRefusal(state);
+  return null;
 }
 
 /** Why the paused hold itself rules the lift out, or null. */
@@ -184,6 +216,8 @@ async function resetForLift(
   const boundary = waitForControllerResetBoundary(context.refs, epoch, RESET_TIMEOUT_MS);
   context.set((state) => ({
     cncPauseLift: { ...lift, resetWriteEpoch: epoch },
+    // The settings checked above outlast the reset that clears KerfDesk's copy.
+    ...cncPauseLiftJobPatch(state, { confirmedReportInches: lift.reportInches, skipReason: null }),
     log: pushLog(
       state,
       `[lf2] Pause and lift: resetting the settled hold to lift the bit to Z${formatGcodeCoordinateMm(lift.plan.safeZMm)}.`,
@@ -286,9 +320,15 @@ function liftedMessage(plan: CncPauseReentryPlan): string {
   );
 }
 
-function logNoLift(context: CncPauseLiftContext, reason: string): void {
+/** Keeps why this Pause left the bit in the cut, for the advice beside
+ *  Resume and for Resume's own retry. A retry refused for the same reason
+ *  is not logged again. */
+function recordNoLift(context: CncPauseLiftContext, reason: string, retry: boolean): void {
   context.set((state) => ({
-    log: pushLog(state, `[lf2] Paused without lifting the bit: ${reason}`),
+    ...cncPauseLiftJobPatch(state, { skipReason: reason }),
+    ...(retry && currentCncPauseLiftJob(state)?.skipReason === reason
+      ? {}
+      : { log: pushLog(state, `[lf2] Paused without lifting the bit: ${reason}`) }),
   }));
 }
 

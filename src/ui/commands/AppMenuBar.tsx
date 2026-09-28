@@ -14,6 +14,9 @@ import { useMenuBarState } from './use-menu-bar-state';
 import { AppMenuChrome } from './AppMenuChrome';
 import { MenuBarHistoryControls } from './MenuBarHistoryControls';
 import { RecentProjectMenuGroup } from '../recent-projects/RecentProjectMenuGroup';
+import { MOVE_LASER_TO_SELECTION_IDS } from './machine-move-commands';
+import { ARRANGE_LAYOUT_IDS } from './arrange-command-family';
+import { TOOLS_VECTOR_IDS } from './tools-vector-menu-ids';
 
 export function AppMenuBar(props: {
   readonly commands: ReadonlyArray<AppCommand>;
@@ -214,7 +217,8 @@ const MENU_GROUPS: Partial<Record<CommandFamily, ReadonlyArray<MenuGroupLayout>>
         'arrange.move-to-bed-se',
       ],
     },
-    { label: 'Layout', ids: ['arrange.array', 'arrange.quick-nest', 'arrange.break-apart'] },
+    { label: 'Move laser to selection', ids: MOVE_LASER_TO_SELECTION_IDS },
+    { label: 'Layout', ids: ARRANGE_LAYOUT_IDS },
   ],
   window: [
     {
@@ -282,22 +286,7 @@ const MENU_GROUPS: Partial<Record<CommandFamily, ReadonlyArray<MenuGroupLayout>>
       label: 'Trace',
       ids: ['tools.trace-image', 'tools.retrace-original', 'tools.multi-file-trace'],
     },
-    {
-      label: 'Vector',
-      ids: [
-        'tools.convert-to-path',
-        'tools.weld',
-        'tools.union-silhouette',
-        'tools.join-paths',
-        'tools.offset-shapes',
-        'tools.rubber-band-outline',
-        'tools.close-paths',
-        'tools.reverse-paths',
-        'tools.subtract',
-        'tools.intersect',
-        'tools.exclude',
-      ],
-    },
+    { label: 'Vector', ids: TOOLS_VECTOR_IDS },
     {
       label: 'Fill repair',
       ids: [

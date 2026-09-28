@@ -12,11 +12,12 @@ import {
   makeStopSource,
   monitorRtspSource,
 } from './camera-source-lifecycle';
+import { makeStartSnapshotSource } from './camera-snapshot-source';
 import { managedUsbCameraSource } from './camera-usb-source';
 
 export type UsbCameraAvailability = { readonly kind: 'available' } | { readonly kind: 'muted' };
 
-type StartableCameraSourceKind = 'usb' | 'machine-rtsp';
+type StartableCameraSourceKind = 'usb' | 'machine-jpeg' | 'machine-rtsp';
 
 export type CameraSourceState =
   | { readonly kind: 'idle' }
@@ -48,6 +49,11 @@ export type CameraSourceActions = {
   readonly activateMachineCamera: () => void;
   readonly startUsbSource: (camera: CameraAdapter | undefined) => Promise<void>;
   readonly startRtspSource: (bridge: CameraBridgeAdapter | undefined, url: string) => Promise<void>;
+  /** A phone or IP camera that serves still pictures at `url` (ADR-448). */
+  readonly startSnapshotSource: (
+    bridge: CameraBridgeAdapter | undefined,
+    url: string,
+  ) => Promise<void>;
   readonly reportSourceFailure: (source: ActiveCameraSource) => void;
   readonly stopSource: () => void;
 };
@@ -94,6 +100,7 @@ export function createCameraSourceActions(
     activateMachineCamera: makeActivateMachineCamera(set, get),
     startUsbSource: makeStartUsbSource(set, get),
     startRtspSource: makeStartRtspSource(set, get),
+    startSnapshotSource: makeStartSnapshotSource(set, get, BRIDGE_MISSING),
     reportSourceFailure: makeReportSourceFailure(set, get),
     stopSource: makeStopSource(set, get),
   };

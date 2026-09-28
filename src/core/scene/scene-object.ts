@@ -6,7 +6,10 @@
 
 import type { VariableTemplate } from './variable-template';
 import type { ReliefHeightfield } from './relief/relief-heightfield';
-import type { LayerPowerMode } from './layer';
+import type { LayerPowerMode, TabLayoutMode } from './layer';
+import type { LaserTabAnchor } from './laser-tab-anchor';
+
+export type { LaserTabAnchor } from './laser-tab-anchor';
 
 export type Vec2 = { readonly x: number; readonly y: number };
 
@@ -136,6 +139,14 @@ export type ObjectOperationSettingsOverride = {
   readonly perforationSkipMm?: number | undefined;
   readonly overcutMm?: number | undefined;
   readonly imageOverscanMm?: number | undefined;
+  readonly tabLayout?: TabLayoutMode | undefined;
+  readonly tabSpacingMm?: number | undefined;
+  readonly tabMaxPerShape?: number | undefined;
+  readonly tabCutPowerPercent?: number | undefined;
+  readonly imageScanAngleDeg?: number | undefined;
+  readonly imageCrossHatch?: boolean | undefined;
+  readonly passAngleStepDeg?: number | undefined;
+  readonly autoOverscan?: boolean | undefined;
 };
 
 export type ObjectOperationOverride = ObjectOperationSettingsOverride & {
@@ -166,6 +177,10 @@ export type ObjectPowerScale = {
   // Manual CNC holding-tab locations. The normalized contour position keeps
   // each tab attached when its object is moved, rotated, mirrored, or scaled.
   readonly cncTabAnchors?: ReadonlyArray<CncTabAnchor>;
+  // ADR-494: click-placed laser Line tabs, keyed by path colour like the CNC
+  // ones. They replace a contour's automatic tabs only while tabs are on, so an
+  // older build that ignores them still cuts tabs: no project schema bump.
+  readonly laserTabAnchors?: ReadonlyArray<LaserTabAnchor>;
 };
 
 export type CncTabAnchor = {

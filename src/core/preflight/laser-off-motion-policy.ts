@@ -1,7 +1,7 @@
 import { INTENTIONAL_LASER_OFF_MOTION_COMMENT } from '../gcode-comments';
 import { effectiveGcodeFeedMmPerMin } from '../gcode/feed-word';
 import { parseGcodeWord } from '../invariants';
-import { imageOverscanMmFor } from '../job/operation-cut-extras';
+import { fillScanOverscanMm, imageScanOverscanMm } from '../job/automatic-overscan';
 import {
   outputOperationLayers,
   sceneObjectUsesOperation,
@@ -26,7 +26,9 @@ export function controlledLaserOffTravelFeedIssue(device: DeviceProfile): string
     : `Controlled laser-off seek feed ${String(feed)} is outside 1..${device.maxFeed} mm/min.`;
 }
 
-export function maxOutputOverscanMm(scene: Scene): number {
+// ADR-495: an operation on automatic overscan runs the runway its speed and the
+// machine's acceleration call for, which only the device knows.
+export function maxOutputOverscanMm(scene: Scene, device: DeviceProfile): number {
   const outputLayers = scene.layers.flatMap(outputOperationLayers);
   const imageLayers = outputLayers.filter((layer) => layer.mode === 'image');
   // ADR-415: each image operation (and artwork override) sets its own overscan.
@@ -36,7 +38,11 @@ export function maxOutputOverscanMm(scene: Scene): number {
       object.kind === 'raster-image' && object.role !== 'trace-source'
         ? imageLayers
             .filter((layer) => sceneObjectUsesOperation(object, layer))
-            .map((layer) => imageOverscanMmFor(effectiveOperationForObject(layer, object)))
+            // Along X (0 degrees) is the longest automatic runway; any scan
+            // angle the operation adds can only shorten it.
+            .map((layer) =>
+              imageScanOverscanMm(effectiveOperationForObject(layer, object), device, 0),
+            )
         : [],
     ),
   );
@@ -44,13 +50,15 @@ export function maxOutputOverscanMm(scene: Scene): number {
     0,
     ...outputLayers
       .filter((layer) => layer.mode === 'fill')
-      .map((layer) => Math.max(0, layer.fillOverscanMm)),
+      .map((layer) => longestFillOverscanMm(layer, device)),
     ...scene.objects.flatMap((object) =>
       outputLayers.flatMap((layer) => {
         if (object.kind === 'raster-image' || object.kind === 'relief') return [];
         if (!sceneObjectUsesOperation(object, layer)) return [];
         const effectiveLayer = effectiveOperationForObject(layer, object);
-        return effectiveLayer.mode === 'fill' ? [Math.max(0, effectiveLayer.fillOverscanMm)] : [];
+        return effectiveLayer.mode === 'fill'
+          ? [longestFillOverscanMm(effectiveLayer, device)]
+          : [];
       }),
     ),
   );
@@ -73,6 +81,15 @@ export function isConfiguredIntentionalLaserOffMotion(
   }
   return (
     issue.distanceMm <=
-    maxOutputOverscanMm(project.scene) + EMITTED_MOVE_DISTANCE_ROUNDING_TOLERANCE_MM
+    maxOutputOverscanMm(project.scene, project.device) + EMITTED_MOVE_DISTANCE_ROUNDING_TOLERANCE_MM
   );
+}
+
+// A hatch along an axis needs the longest automatic runway, and a per-pass
+// angle change (ADR-492) can put a pass there whatever the stored angle.
+function longestFillOverscanMm(
+  layer: Parameters<typeof fillScanOverscanMm>[0],
+  device: DeviceProfile,
+): number {
+  return fillScanOverscanMm({ ...layer, hatchAngleDeg: 0 }, device);
 }

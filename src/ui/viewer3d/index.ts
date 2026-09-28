@@ -8,14 +8,7 @@ export {
   type Viewer3dSceneResult,
   type Viewer3dSegments,
 } from './viewer3d-scene';
-export {
-  buildSegmentBuckets,
-  cssHexColor,
-  revealCount,
-  rgbTriple,
-  type SegmentBuckets,
-  type Viewer3dSegmentsInput,
-} from './segment-buckets';
+export { cssHexColor, revealCount, rgbTriple, type Viewer3dSegmentsInput } from './segment-buckets';
 export {
   CAMERA_PRESETS,
   CAMERA_PRESET_LABEL,

@@ -2,7 +2,7 @@
 // The bridge is Node code; jsdom's patched AbortSignal is a different realm
 // than undici fetch's, which rejects AbortSignal.timeout() under jsdom.
 
-import { createServer, type Server } from 'node:http';
+import { createServer, request, type Server } from 'node:http';
 import type { AddressInfo } from 'node:net';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import {
@@ -107,10 +107,49 @@ describe('camera frame proxy over the real bridge server', () => {
     expect(upstreamHits).toBe(hitsBefore);
   });
 
+  it('refuses a request with no Origin before contacting the camera (ADR-141 Amd 1)', async () => {
+    // A plain <img> on another site, or a DNS-rebound same-origin page, sends
+    // no Origin. KerfDesk's own requests always carry one.
+    const hitsBefore = upstreamHits;
+    const response = await fetch(frameProxyUrl('/frame'));
+    expect(response.status).toBe(403);
+    expect(upstreamHits).toBe(hitsBefore);
+  });
+
+  it('refuses any Host but its own loopback names (DNS rebinding, ADR-141 Amd 1)', async () => {
+    const rebound = await rawGet('/health', { Host: `rebind.example:${bridge.port}` });
+    expect(rebound.status).toBe(403);
+    const rebinding = await rawGet('/health', {
+      Host: `rebind.example:${bridge.port}`,
+      Origin: TRUSTED_ORIGIN,
+    });
+    expect(rebinding.status).toBe(403);
+    const localhost = await rawGet('/health', {
+      Host: `localhost:${bridge.port}`,
+      Origin: TRUSTED_ORIGIN,
+    });
+    expect(localhost.status).toBe(200);
+  });
+
+  function rawGet(
+    path: string,
+    headers: Record<string, string>,
+  ): Promise<{ readonly status: number | undefined }> {
+    return new Promise((resolve, reject) => {
+      const req = request({ host: '127.0.0.1', port: bridge.port, path, headers }, (res) => {
+        res.resume();
+        res.on('end', () => resolve({ status: res.statusCode }));
+      });
+      req.on('error', reject);
+      req.end();
+    });
+  }
+
   it('rejects policy-invalid frame URLs without fetching', async () => {
     const hitsBefore = upstreamHits;
     const response = await fetch(
       bridgeUrl(`/frame.jpg?url=${encodeURIComponent('http://example.com/frame.jpg')}`),
+      { headers: { Origin: TRUSTED_ORIGIN } },
     );
     const body: unknown = await response.json();
     expect(body).toMatchObject({ kind: 'invalid' });
@@ -146,7 +185,7 @@ describe('camera frame proxy over the real bridge server', () => {
   }
 
   it('reports the frame proxy in /health', async () => {
-    const response = await fetch(bridgeUrl('/health'));
+    const response = await fetch(bridgeUrl('/health'), { headers: { Origin: TRUSTED_ORIGIN } });
     expect(await response.json()).toMatchObject({ kind: 'ok', frameProxy: true });
   });
 

@@ -5,16 +5,16 @@
 // the keyboard.
 
 import type { RefObject } from 'react';
-import type { GcodeRenderModel } from '../../core/gcode-view';
 import type { Viewer3dSceneHandle } from '../viewer3d';
 // Deep import: the viewer3d barrel is capped at 20 exports by its index contract.
 import type { Viewer3dPick } from '../viewer3d/scene-pick';
+import type { InspectorRenderModel } from './inspector-model';
 import { moveReadout } from './pick-readout';
 import { useMovePointer, type MoveHover } from './use-move-pointer';
 import './inspector-pick.css';
 
 export type MovePickProps = {
-  readonly model: GcodeRenderModel;
+  readonly model: InspectorRenderModel;
   readonly segTimeEndSec: Float32Array | null;
   /** The pointed move, and the point along it, for click-to-line. */
   readonly onLocate: (pick: Viewer3dPick) => void;

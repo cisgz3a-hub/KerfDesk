@@ -4,9 +4,10 @@ import type {
   GcodeInspectorWorkerResponse,
   GcodeInspectorWorkerResult,
 } from './gcode-inspector-worker-protocol';
+import type { PreviewChunk } from './inspection-preview';
 
 export type GcodeInspectorProgress = {
-  readonly phase: 'queued' | 'reading' | 'parsing';
+  readonly phase: 'queued' | 'reading' | 'parsing' | 'timing';
   readonly queuePosition: number;
   readonly bytesRead?: number;
   readonly totalBytes?: number;
@@ -15,6 +16,8 @@ export type GcodeInspectorProgress = {
 export type GcodeInspectorRequestOptions = {
   readonly signal?: AbortSignal;
   readonly onProgress?: (progress: GcodeInspectorProgress) => void;
+  /** The moves read so far, a chunk at a time (ADR-485). */
+  readonly onPreview?: (chunk: PreviewChunk) => void;
 };
 
 type Pending = {
@@ -42,7 +45,7 @@ export function inspectGcodeOffThread(
   return new Promise((resolve, reject) => {
     const handleAbort = (): void => cancelRequest(id);
     pendingByRequestId.set(id, {
-      request: { id, source },
+      request: { id, source: withoutDesign(source) },
       resolve,
       reject,
       options,
@@ -95,6 +98,10 @@ function handleMessage(event: MessageEvent<GcodeInspectorWorkerResponse>): void 
       ...(event.data.bytesRead === undefined ? {} : { bytesRead: event.data.bytesRead }),
       ...(event.data.totalBytes === undefined ? {} : { totalBytes: event.data.totalBytes }),
     });
+    return;
+  }
+  if (event.data.kind === 'preview') {
+    pending.options.onPreview?.(event.data.chunk);
     return;
   }
   if (event.data.kind === 'error') pending.reject(new Error(event.data.message));
@@ -175,4 +182,12 @@ function abortError(): Error {
   const error = new Error('G-code Inspector request cancelled');
   error.name = 'AbortError';
   return error;
+}
+
+// The design stays on the page (it can hold a relief's whole mesh): the
+// parse worker reads only the program and how to time it.
+function withoutDesign(source: GcodeInspectionSource): GcodeInspectionSource {
+  if (source.design === undefined) return source;
+  const { design: _design, ...rest } = source;
+  return rest;
 }

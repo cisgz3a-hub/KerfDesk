@@ -65,6 +65,7 @@ export function PhotoStep(props: {
   const sourceState = useCameraStore((s) => s.sourceState);
   const setStep = useCameraCalibrationStore((s) => s.setStep);
   const checking = useCameraCalibrationStore((s) => s.mode) === 'check';
+  const headCamera = useCameraCalibrationStore((s) => s.settings.headCamera);
   const { take, cancel } = props;
   const running = props.status.kind === 'running';
 
@@ -72,8 +73,7 @@ export function PhotoStep(props: {
     <div style={columnStyle}>
       <p style={noteStyle}>
         {checking ? CHECK_GUIDANCE : 'Leave the engraved sheet exactly where it is. '}
-        Move the laser head to a corner so it does not cover the three solid discs in the middle,
-        light the bed evenly, and put the lid where it normally sits when you work.
+        {headCamera ? HEAD_GUIDANCE : FIXED_GUIDANCE}
       </p>
       {sourceState.kind === 'live' ? (
         <CameraSourceView source={sourceState.source} />
@@ -116,6 +116,13 @@ export function PhotoStep(props: {
     </div>
   );
 }
+
+const FIXED_GUIDANCE =
+  'Move the laser head to a corner so it does not cover the three solid discs in the middle, light the bed evenly, and put the lid where it normally sits when you work.';
+// A head camera is placed by where the head is, so the photo needs the head
+// position from a homed machine, taken with the laser off.
+const HEAD_GUIDANCE =
+  'Jog the head, with the laser off, until the whole square target is in the picture with a little room around it, and light the bed evenly. Keep the machine connected and homed so KerfDesk knows where the head is when the photo is taken.';
 
 // The check compares the photo with where the rings were engraved, so a
 // sheet moved since then reads as a moved camera.

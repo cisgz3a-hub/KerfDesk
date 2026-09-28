@@ -177,7 +177,7 @@ export const PROJECT_TUTORIALS: readonly Tutorial[] = [
       {
         title: 'Open the reference',
         instruction:
-          'Click Keyboard Shortcuts in the top toolbar. Browse the File, Tools, Edit, Transform and View groups, then the final group named after your machine.',
+          'Click Keyboard Shortcuts in the top toolbar. Browse the File, Tools, Edit, Transform, Arrange and View groups, then the final group named after your machine.',
         focus: 'Keyboard Shortcuts',
         result: 'You can look up a shortcut when you need it.',
       },

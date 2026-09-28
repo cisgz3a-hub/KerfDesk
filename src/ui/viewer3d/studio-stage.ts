@@ -44,7 +44,8 @@ export type StudioStage = {
 
 const ENVIRONMENT_BLUR = 0.04;
 const ENVIRONMENT_INTENSITY = 0.7;
-const SUN_DIRECTION = [-0.45, -0.62, 0.9] as const;
+/** Towards Studio's key light, the sun; the carved stock's shadows fall from it too. */
+export const SUN_DIRECTION = [-0.45, -0.62, 0.9] as const;
 
 export function createStudioStage(
   modules: StudioModules,
