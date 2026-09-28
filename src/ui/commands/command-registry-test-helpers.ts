@@ -40,8 +40,32 @@ function baseCtxEditingTools(): Partial<AppCommandContext> {
     offsetShapes: vi.fn(),
     rotateSelectionQuarterTurn: vi.fn(),
     moveSelectionToBed: vi.fn(),
+    moveLaserToSelection: vi.fn(),
     wireframeActive: false,
     toggleWireframe: vi.fn(),
+    // ADR-480 (LightBurn gap batch 5) design tools.
+    selectContainedShapes: vi.fn(),
+    selectSmallerShapes: vi.fn(),
+    deleteDuplicates: vi.fn(),
+    canEditSelectedPaths: false,
+    closeSelectedPaths: vi.fn(),
+    reverseSelectedPaths: vi.fn(),
+    addRubberBandOutline: vi.fn(),
+    flattenImageMask: vi.fn(),
+    // LBG-T09 Copy Along Path.
+    copyAlongPath: vi.fn(),
+    // LBG-T04 and LBG-T08: Trim Shapes and Cut Shapes.
+    trimShapesActive: false,
+    trimShapes: vi.fn(),
+    cutShapes: vi.fn(),
+    // LBG-T06 Warp and Deform.
+    canWarpSelection: false,
+    warpToolActive: false,
+    deformToolActive: false,
+    startWarp: vi.fn(),
+    startDeform: vi.fn(),
+    // LBG-T22 Optimize Shapes.
+    optimizeShapes: vi.fn(),
   };
 }
 
@@ -171,7 +195,7 @@ function baseCtxActions(): Partial<AppCommandContext> {
 }
 
 function baseCtxAppearance(): Partial<AppCommandContext> {
-  return { appTheme: 'light', setAppTheme: vi.fn() };
+  return { appTheme: 'light', setAppTheme: vi.fn(), openSettings: vi.fn() };
 }
 
 function baseCtxArrangeActions(): Partial<AppCommandContext> {

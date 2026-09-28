@@ -154,6 +154,8 @@ describe('compileCncJob', () => {
           depthMm: 4,
           depthPerPassMm: 2,
           helixEntry: { minDiameterMm: 2, maxDiameterMm: 8, angleDeg: 3 },
+          // Every ring enters on its own helix only with the lift between rings.
+          pocketLiftBetweenRings: true,
         }),
       ],
       [squareObject('O1', '#ff0000', 20)],
@@ -176,6 +178,27 @@ describe('compileCncJob', () => {
     ).toBeGreaterThan(1);
     for (const pass of firstDepthPasses) {
       if (pass.kind === 'helical-contour') expect(pass.polyline[0]).toEqual(pass.start);
+    }
+  });
+
+  it('enters each depth of a helical pocket once and steps over to the other rings (ADR-491)', () => {
+    const scene = sceneWith(
+      [
+        cncLayer('L1', '#ff0000', {
+          cutType: 'pocket',
+          depthMm: 4,
+          depthPerPassMm: 2,
+          helixEntry: { minDiameterMm: 2, maxDiameterMm: 8, angleDeg: 3 },
+        }),
+      ],
+      [squareObject('O1', '#ff0000', 20)],
+    );
+    const passes = onlyGroup(scene).passes;
+    const helixes = passes.filter((pass) => pass.kind === 'helical-contour');
+    expect(helixes.map((pass) => pass.zMm)).toEqual([-2, -4]);
+    expect(passes.some((pass) => pass.kind === 'path3d' && pass.stayDownLink)).toBe(true);
+    for (const pass of passes) {
+      if (pass.kind === 'contour') expect(pass.stayDownEntry).toBe(true);
     }
   });
 

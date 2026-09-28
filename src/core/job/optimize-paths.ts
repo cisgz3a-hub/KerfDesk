@@ -35,7 +35,10 @@
 // reversed traversal — whichever has its start closer to the cursor
 // wins. Closed polylines have identical start/end by construction
 // (per job.ts CutSegment docs), so reversal is semantically a no-op
-// and we skip it.
+// and we skip it. Where a closed polyline starts is its own setting
+// (closedShapeStart, LBG-C04; see closed-shape-start.ts): by default it
+// starts where drawn, otherwise at the candidate vertex nearest the head,
+// under Keep source order too.
 //
 // Determinism: tie-broken by original segment index. Same input → same
 // output across runs and platforms. Required by PROJECT.md
@@ -50,14 +53,23 @@ import { planFillSweeps } from './fill-sweep-plan';
 import type { CutGroup, FillGroup, Group, Job } from './job';
 import { offsetForEmittedFeed } from './scan-offset';
 import { createNearestEntryQuery, type SegmentEntry } from './segment-entry-index';
-import { configuredSegmentOrder, startCursorForSegments } from './segment-order';
+import {
+  configuredSegmentOrder,
+  sourceOrderClosedShapeStarts,
+  startCursorForSegments,
+} from './segment-order';
 import { removeCutOverlaps } from './remove-cut-overlaps';
 
 type PathOptimizationSettings = Pick<
   ProjectOptimizationSettings,
   'travelPolicy' | 'insideFirst' | 'layerPriority' | 'pathDirection' | 'startPoint'
 > &
-  Partial<Pick<ProjectOptimizationSettings, 'removeOverlappingLines'>>;
+  Partial<
+    Pick<
+      ProjectOptimizationSettings,
+      'removeOverlappingLines' | 'overlapMergeToleranceMm' | 'closedShapeStart'
+    >
+  >;
 const DEFAULT_PATH_OPTIMIZATION: PathOptimizationSettings = {
   travelPolicy: 'nearest-neighbor',
   insideFirst: true,
@@ -74,7 +86,7 @@ export function optimizePaths(
   const prioritized = prioritizeLayerGroups(job.groups, settings.layerPriority);
   const ordered =
     settings.travelPolicy === 'source-order'
-      ? prioritized
+      ? prioritized.map((group) => startClosedShapesInSourceOrder(group, settings))
       : optimizeGroups(prioritized, settings, scanningOffsets);
   return {
     ...job,
@@ -82,7 +94,11 @@ export function optimizePaths(
     // shared edges afterwards cannot turn an inner contour into a new outer cut.
     groups:
       settings.removeOverlappingLines === true
-        ? ordered.map((group) => (group.kind === 'cut' ? removeCutOverlaps(group) : group))
+        ? ordered.map((group) =>
+            group.kind === 'cut'
+              ? removeCutOverlaps(group, settings.overlapMergeToleranceMm ?? 0)
+              : group,
+          )
         : ordered,
   };
 }
@@ -174,6 +190,20 @@ function optimizeGroup(group: CutGroup, settings: PathOptimizationSettings): Cut
   // endpoint; reversal isn't a no-op when start ≠ origin.
   const ordered = configuredSegmentOrder(group.segments, settings);
   return { ...group, segments: ordered };
+}
+
+// Keep source order still honours closedShapeStart on the groups the planner
+// would otherwise order (Line cuts, Offset Fill rings). Under 'drawn' each
+// group comes back as the same object, so the output is unchanged.
+function startClosedShapesInSourceOrder(group: Group, settings: PathOptimizationSettings): Group {
+  if ((settings.closedShapeStart ?? 'drawn') === 'drawn') return group;
+  if (group.kind === 'cut') {
+    return { ...group, segments: sourceOrderClosedShapeStarts(group.segments, settings) };
+  }
+  if (isOffsetFillGroup(group)) {
+    return { ...group, segments: sourceOrderClosedShapeStarts(group.segments, settings) };
+  }
+  return group;
 }
 
 function optimizeOffsetFillGroup(group: FillGroup, settings: PathOptimizationSettings): FillGroup {

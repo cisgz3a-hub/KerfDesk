@@ -32,6 +32,8 @@ function diagnosticWarning(diagnostic: CompileDiagnostic): string {
       return kerfOffsetFailedWarning(diagnostic.layerName);
     case 'fill-collapsed-at-precision':
       return FILL_COLLAPSED_AT_PRECISION_WARNING(diagnostic.layerName);
+    case 'image-scan-angle-rotary':
+      return `Image "${diagnostic.source}" on layer "${diagnostic.layerName}" asks for a scan angle, cross-hatch or an angle change per pass. The rotary only keeps rows along X straight, so every pass of this image scans along X.`;
     case 'raster-source-luma-mismatch':
       return `Image "${diagnostic.source}" on layer "${diagnostic.layerName}" is missing from the job because its pixel buffer has ${diagnostic.actualPixels} samples, but its declared dimensions require ${diagnostic.expectedPixels}. Reopen or re-import the image before running.`;
     default:

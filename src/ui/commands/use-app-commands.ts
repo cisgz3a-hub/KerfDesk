@@ -1,5 +1,6 @@
 import { fileCommandContext } from './file-command-context';
 import { recentProjectsCommandContext } from './recent-projects-command';
+import { settingsCommandContext } from './settings-command';
 import { profileSupportsCapability } from '../../core/devices';
 import { machineKindOf } from '../../core/scene';
 import { resetWorkspaceLayout, toggleWorkspaceSidePanels } from '../app/workspace-panel-actions';
@@ -24,6 +25,7 @@ import type { CommandDialogs, CommandShellCallbacks } from './app-command-contex
 import { buildAppCommands, type AppCommand } from './command-registry';
 import { toolCommandContext } from './tool-command-context';
 import { editingToolsCommandContext } from './editing-tools-command-context';
+import { moveLaserToSelection } from '../laser/move-laser-to-selection';
 import type { AppCommandContext } from './command-types';
 import { selectedImageMaskPair } from './image-mask-command-state';
 import { traceSourceForTracedImage } from './image-command-actions';
@@ -113,7 +115,7 @@ function appCommandContext(
   const activeStreamer = isActiveStreamerStatus(laser.streamer?.status);
   return {
     ...fileCommandContext(callbacks, platform, app, pushToast),
-    ...recentProjectsCommandContext(),
+    ...storeOwnedCommandContext(),
     ...editCommandContext(app, dialogs),
     ...toolCommandContext(callbacks, app, platform, dialogs, pushToast, selection),
     ...editingToolsCommandContext(app, callbacks, selectedIds, dialogs.wireframeActive),
@@ -174,6 +176,11 @@ function appCommandContext(
     previewActive: app.previewMode,
     hasPreviewableContent: hasPreviewableContent(app.project),
   };
+}
+
+// File → Recent Projects and Edit → Settings act on their own stores.
+function storeOwnedCommandContext() {
+  return { ...recentProjectsCommandContext(), ...settingsCommandContext() };
 }
 
 function isActiveStreamerStatus(status: string | undefined): boolean {
@@ -267,6 +274,7 @@ function arrangeCommandContext(
   | 'flipVertical'
   | 'createArray'
   | 'quickNest'
+  | 'moveLaserToSelection'
 > {
   return {
     alignSelection: app.alignSelection,
@@ -276,6 +284,7 @@ function arrangeCommandContext(
     flipVertical: () => app.flipSelection('vertical'),
     createArray: callbacks.requestArray,
     quickNest: callbacks.requestQuickNest,
+    moveLaserToSelection,
   };
 }
 

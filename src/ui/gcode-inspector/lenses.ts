@@ -6,14 +6,17 @@
 // scene recolours an existing colour attribute from it, so switching lenses
 // never rebuilds geometry (§11 R2).
 
-import type { ProgramTimeModel } from '../../core/gcode-time';
-import { SEG_KIND, type GcodeRenderModel } from '../../core/gcode-view';
+import { SEG_KIND } from '../../core/gcode-view';
 import type { Viewer3dTheme } from '../viewer3d';
 // Deep import: the viewer3d barrel is capped at 20 exports by its index contract.
 import type { Viewer3dLook } from '../viewer3d/viewer3d-look';
+import type { InspectorProgramTime, InspectorRenderModel } from './inspector-model';
 import { buildDepthLensScale, type Rgb } from './depth-lens';
 import { lensPalette, rampAt, rampCss, toolColor, type LensPalette } from './lens-palette';
 import type { ToolSections } from './tool-sections';
+
+/** The lenses read only which moves never reached their feed. */
+type FeedLimited = Pick<InspectorProgramTime, 'segFeedLimited'>;
 
 /** Stable lens identifiers in the order presented by both viewer controls. */
 export const LENS_IDS = ['depth', 'tool', 'kind', 'feed', 'power', 'planner'] as const;
@@ -34,14 +37,14 @@ const FLAT_DEPTH_SPAN_MM = 0.001;
  * programs and everything else open on Depth / pass. The operator's own pick
  * always wins over this.
  */
-export function defaultLensFor(model: GcodeRenderModel, machineKind?: 'laser' | 'cnc'): LensId {
+export function defaultLensFor(model: InspectorRenderModel, machineKind?: 'laser' | 'cnc'): LensId {
   if (machineKind === 'cnc') return DEFAULT_LENS_ID;
   const scale = buildDepthLensScale(model);
   const flat = scale === null || scale.shallowMm - scale.deepMm < FLAT_DEPTH_SPAN_MM;
   return flat && cutPowerVaries(model) ? 'power' : DEFAULT_LENS_ID;
 }
 
-function cutPowerVaries(model: GcodeRenderModel): boolean {
+function cutPowerVaries(model: InspectorRenderModel): boolean {
   let first: number | null = null;
   for (let index = 0; index < model.segmentCount; index += 1) {
     if (model.segKind[index] === SEG_KIND.travel) continue;
@@ -95,8 +98,8 @@ type Range = { readonly min: number; readonly max: number };
 /** Colour function in RENDER-MODEL segment index space. The scene maps its
  * own buffer order through this, so callers never deal with bucket order. */
 export function lensColorFn(
-  model: GcodeRenderModel,
-  time: ProgramTimeModel,
+  model: InspectorRenderModel,
+  time: FeedLimited,
   lens: LensId,
   theme: Viewer3dTheme,
   options: LensOptions = {},
@@ -121,8 +124,8 @@ export function lensColorFn(
 }
 
 export function lensLegend(
-  model: GcodeRenderModel,
-  time: ProgramTimeModel,
+  model: InspectorRenderModel,
+  time: FeedLimited,
   lens: LensId,
   theme: Viewer3dTheme,
   options: LensOptions = {},
@@ -146,7 +149,10 @@ export function lensLegend(
   };
 }
 
-function kindColorFn(model: GcodeRenderModel, palette: LensPalette): (segmentIndex: number) => Rgb {
+function kindColorFn(
+  model: InspectorRenderModel,
+  palette: LensPalette,
+): (segmentIndex: number) => Rgb {
   const byKind = new Map<number, Rgb>([
     [SEG_KIND.cut, palette.cut],
     [SEG_KIND.plunge, palette.plunge],
@@ -159,7 +165,7 @@ function kindColorFn(model: GcodeRenderModel, palette: LensPalette): (segmentInd
 // Each tool in its own colour, in order of first use (ADR-426). A program
 // that never changes tool shows one colour, as the lens always did.
 function toolColorFn(
-  model: GcodeRenderModel,
+  model: InspectorRenderModel,
   palette: LensPalette,
   sections: ToolSections | null,
 ): (segmentIndex: number) => Rgb {
@@ -169,7 +175,7 @@ function toolColorFn(
   };
 }
 
-function lensValues(model: GcodeRenderModel, lens: 'feed' | 'power'): Float32Array {
+function lensValues(model: InspectorRenderModel, lens: 'feed' | 'power'): Float32Array {
   if (lens === 'feed') return model.segFeed;
   return model.segPower;
 }
@@ -190,7 +196,10 @@ function normalized(value: number, range: Range | null): number {
   return Math.min(1, Math.max(0, (value - range.min) / (range.max - range.min)));
 }
 
-function kindSwatches(model: GcodeRenderModel, palette: LensPalette): ReadonlyArray<LegendSwatch> {
+function kindSwatches(
+  model: InspectorRenderModel,
+  palette: LensPalette,
+): ReadonlyArray<LegendSwatch> {
   const counts = new Map<number, number>();
   for (let index = 0; index < model.segmentCount; index += 1) {
     const kind = model.segKind[index] ?? SEG_KIND.travel;
@@ -206,7 +215,7 @@ function kindSwatches(model: GcodeRenderModel, palette: LensPalette): ReadonlyAr
 }
 
 function toolSwatches(
-  model: GcodeRenderModel,
+  model: InspectorRenderModel,
   palette: LensPalette,
   sections: ToolSections | null,
 ): ReadonlyArray<LegendSwatch> {
@@ -223,7 +232,7 @@ function toolSwatches(
   return [...entries, { label: 'Traversal', color: palette.travelCss, count: travel }];
 }
 
-function depthLegend(model: GcodeRenderModel, palette: LensPalette): LensLegend {
+function depthLegend(model: InspectorRenderModel, palette: LensPalette): LensLegend {
   const scale = buildDepthLensScale(model);
   if (scale === null) return { kind: 'note', note: 'No cutting depth data' };
   const levelWord = scale.levelCount === 1 ? 'level' : 'levels';
@@ -238,8 +247,8 @@ function depthLegend(model: GcodeRenderModel, palette: LensPalette): LensLegend 
 }
 
 function plannerSwatches(
-  model: GcodeRenderModel,
-  time: ProgramTimeModel,
+  model: InspectorRenderModel,
+  time: FeedLimited,
   palette: LensPalette,
 ): ReadonlyArray<LegendSwatch> {
   let limited = 0;
@@ -254,6 +263,44 @@ function plannerSwatches(
     },
     { label: 'Below set feed', color: palette.lineCss(palette.limited), count: limited },
   ];
+}
+
+/**
+ * Which legend swatch each move belongs to, in the order the legend lists
+ * them, for the lenses whose legend is a list (ADR-470 filters). Null for the
+ * ramp lenses, which have nothing to switch off. `travel` is the Traversal
+ * swatch's index, which stands for the traversal toggle; null when the legend
+ * has none.
+ */
+export function lensEntries(
+  model: InspectorRenderModel,
+  time: FeedLimited,
+  lens: LensId,
+  sections?: ToolSections | null,
+): { readonly entryOf: (segmentIndex: number) => number; readonly travel: number | null } | null {
+  const isTravel = (index: number): boolean => model.segKind[index] === SEG_KIND.travel;
+  if (lens === 'kind') {
+    // Cut, Plunge, Retract, Traversal, as kindSwatches lists them.
+    const order = new Map<number, number>([
+      [SEG_KIND.cut, 0],
+      [SEG_KIND.plunge, 1],
+      [SEG_KIND.retract, 2],
+      [SEG_KIND.travel, 3],
+    ]);
+    return { entryOf: (index) => order.get(model.segKind[index] ?? SEG_KIND.cut) ?? 0, travel: 3 };
+  }
+  if (lens === 'tool') {
+    // Each tool in order of first use, then Traversal, as toolSwatches lists them.
+    const travel = sections?.tools.length ?? 1;
+    return {
+      entryOf: (index) => (isTravel(index) ? travel : (sections?.segTool[index] ?? 0)),
+      travel,
+    };
+  }
+  if (lens === 'planner') {
+    return { entryOf: (index) => (time.segFeedLimited[index] === 1 ? 1 : 0), travel: null };
+  }
+  return null;
 }
 
 export function rgbCss(rgb: Rgb): string {

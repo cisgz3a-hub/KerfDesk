@@ -21,11 +21,11 @@ import {
 import { gcodeCoordinateFailure } from '../../core/job/job-coordinate-encodability';
 import {
   emitCncJobWithPassSpans,
-  finishOptionsForJobOrigin,
   grblPowerModeWordsForJob,
   selectOutputStrategy,
   type CncPassSpan,
 } from '../../core/output';
+import { finishOptionsForJob } from '../../core/output/output-strategy';
 import type { OutputScope, Project, Vec2 } from '../../core/scene';
 import { findFluidncNonExecutableLines } from '../../core/controllers/fluidnc/fluidnc-line-limit';
 import {
@@ -145,15 +145,13 @@ export function emitPreparedGcodeWithCncPassSpans(
   // CNC router projects always emit through the Z-aware GRBL strategy; laser
   // projects pick their controller dialect via the ADR-094 driver seam. Both
   // receive the current-position finish so a head-relative job parks back at
-  // its own start instead of rapiding to work zero (arbitrary on no-homing).
+  // its own start instead of rapiding to work zero (arbitrary on no-homing),
+  // unless preparation placed a laser finish position (ADR-493).
+  const finish = finishOptionsForJob(job, options.jobOrigin);
   const emission = materializeProgram(() => {
     const cnc =
       machine !== undefined && machine.kind === 'cnc'
-        ? emitCncJobWithPassSpans(
-            job,
-            prepared.project.device,
-            finishOptionsForJobOrigin(options.jobOrigin),
-          )
+        ? emitCncJobWithPassSpans(job, prepared.project.device, finish)
         : null;
     return {
       cnc,
@@ -163,7 +161,7 @@ export function emitPreparedGcodeWithCncPassSpans(
           : selectOutputStrategy(prepared.project.device).emit(
               job,
               prepared.project.device,
-              finishOptionsForJobOrigin(options.jobOrigin),
+              finish,
             ),
     };
   });

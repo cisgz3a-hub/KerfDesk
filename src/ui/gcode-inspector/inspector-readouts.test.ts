@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { buildProgramTime } from '../../core/gcode-time';
 import { buildGcodeRenderModel, type GcodeRenderModel } from '../../core/gcode-view';
 import { droRows, statsRows } from './inspector-readouts';
+import { inspectorProgramTime } from './inspector-model';
 
 function model(text: string): GcodeRenderModel {
   const result = buildGcodeRenderModel(text);
@@ -46,11 +47,14 @@ describe('statsRows', () => {
 
   it('says whose limits the estimated time assumes (ADR-425)', () => {
     const parsed = model(PROGRAM);
-    const time = buildProgramTime(parsed, {
-      accelMmPerSec2: 500,
-      junctionDeviationMm: 0.01,
-      maxFeedMmPerMin: 6000,
-    });
+    const time = inspectorProgramTime(
+      parsed,
+      buildProgramTime(parsed, {
+        accelMmPerSec2: 500,
+        junctionDeviationMm: 0.01,
+        maxFeedMmPerMin: 6000,
+      }),
+    );
     const timedFor = (name: string | null): string | undefined =>
       statsRows(parsed, time, name).find((row) => row.label === 'Timed for')?.value;
     expect(timedFor('Shop laser')).toBe('Shop laser');

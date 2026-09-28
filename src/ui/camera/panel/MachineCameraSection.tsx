@@ -14,7 +14,12 @@ export function MachineCameraSection(props: {
   const { state } = props;
   const sourceState = useCameraStore((s) => s.sourceState);
   const activateMachineCamera = useCameraStore((s) => s.activateMachineCamera);
-  const machineActive = sourceState.kind === 'live' && sourceState.source.kind === 'machine-jpeg';
+  // A phone camera is a still-picture source too (ADR-448), so match the address.
+  const machineActive =
+    state.kind === 'found' &&
+    sourceState.kind === 'live' &&
+    sourceState.source.kind === 'machine-jpeg' &&
+    sourceState.source.cameraUrl === state.cameraUrl;
   return (
     <div style={sectionStyle}>
       <div style={rowStyle}>

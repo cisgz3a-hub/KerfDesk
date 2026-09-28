@@ -11,9 +11,13 @@ import {
   withoutSavedCameraModel,
 } from '../../../core/camera/model/saved-cameras';
 import type { CameraDevice } from '../../../platform/types';
+import { useState } from 'react';
 import { useStore } from '../../state';
+import { loadPhoneCamera } from '../../state/camera-preference-storage';
 import { useCameraStore } from '../../state/camera-store';
 import { useOwnCameraModel } from '../active-camera-model';
+import { publicCameraSourceId } from '../frame-source';
+import { phoneSnapshotUrl } from '../phone-camera-address';
 import { noteStyle, sectionStyle } from './panel-styles';
 
 export function SavedCamerasSection(): JSX.Element | null {
@@ -23,6 +27,7 @@ export function SavedCamerasSection(): JSX.Element | null {
   const cameras = useCameraStore((s) => s.cameras);
   const live = useCameraStore((s) => s.sourceState.kind === 'live');
   const own = useOwnCameraModel();
+  const [phoneCameraId] = useState(storedPhoneCameraId);
   const saved = savedCameraModels({ cameraModel, otherCameraModels });
   if (saved.length === 0 || (saved.length === 1 && (!live || own !== undefined))) return null;
 
@@ -37,7 +42,7 @@ export function SavedCamerasSection(): JSX.Element | null {
           <li key={`${model.calibratedAt}-${index}`} style={itemStyle}>
             <div style={textStyle}>
               <span>
-                {savedCameraLabel(model.capture, cameras)}
+                {savedCameraLabel(model.capture, cameras, phoneCameraId)}
                 {live && model === own ? <span style={inUseStyle}> · in use</span> : null}
               </span>
               <span style={noteStyle}>
@@ -65,10 +70,14 @@ export function SavedCamerasSection(): JSX.Element | null {
   );
 }
 
-/** A short name for the camera a calibration was fitted on. */
+/**
+ * A short name for the camera a calibration was fitted on. `phoneCameraId`
+ * names the phone camera's address, so its calibration reads as the phone's.
+ */
 export function savedCameraLabel(
   capture: CameraCaptureBinding | undefined,
   cameras: ReadonlyArray<CameraDevice>,
+  phoneCameraId?: string,
 ): string {
   if (capture === undefined) return 'Camera from an older calibration';
   switch (capture.sourceKind) {
@@ -77,10 +86,18 @@ export function savedCameraLabel(
       return label === undefined || label === '' ? 'USB camera' : label;
     }
     case 'machine-jpeg':
-      return `Machine camera at ${hostOf(capture.sourceId)}`;
+      return capture.sourceId === phoneCameraId
+        ? `Phone camera at ${hostOf(capture.sourceId)}`
+        : `Machine camera at ${hostOf(capture.sourceId)}`;
     case 'machine-rtsp':
       return `RTSP camera at ${hostOf(capture.sourceId)}`;
   }
+}
+
+function storedPhoneCameraId(): string | undefined {
+  const stored = loadPhoneCamera();
+  const url = stored === null ? null : phoneSnapshotUrl(stored.app, stored.address);
+  return url === null ? undefined : publicCameraSourceId(url);
 }
 
 function hostOf(sourceId: string): string {

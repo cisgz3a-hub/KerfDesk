@@ -1,10 +1,12 @@
 import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { buildProgramTime, type MotionLimits, type ProgramTimeModel } from '../../core/gcode-time';
+import { buildProgramTime, type MotionLimits } from '../../core/gcode-time';
 import { buildGcodeRenderModel, type GcodeRenderModel } from '../../core/gcode-view';
 import { resolveViewer3dTheme } from '../viewer3d';
+import { inspectorProgramTime, type InspectorProgramTime } from './inspector-model';
 import { InspectorSidebar } from './InspectorSidebar';
+import { NO_ISOLATE } from './isolate';
 import type * as InspectorReadoutsModule from './inspector-readouts';
 import type * as LensesModule from './lenses';
 import { playheadAtTime } from './playhead';
@@ -51,6 +53,7 @@ const PROGRAM = [
 // so the harness holds one value too — a fresh object per render would be a
 // prop change, not a re-render of the same props.
 const THEME = resolveViewer3dTheme(null);
+const NOTHING_HIDDEN: ReadonlySet<number> = new Set();
 
 let host: HTMLDivElement | null = null;
 let root: Root | null = null;
@@ -61,7 +64,11 @@ function renderModel(): GcodeRenderModel {
   return result.model;
 }
 
-function sidebar(model: GcodeRenderModel, time: ProgramTimeModel, seconds: number): JSX.Element {
+function sidebar(
+  model: GcodeRenderModel,
+  time: InspectorProgramTime,
+  seconds: number,
+): JSX.Element {
   return (
     <InspectorSidebar
       model={model}
@@ -77,6 +84,10 @@ function sidebar(model: GcodeRenderModel, time: ProgramTimeModel, seconds: numbe
       travelVisible
       onTravelVisibleChange={() => undefined}
       onLocateLine={() => undefined}
+      hiddenEntries={NOTHING_HIDDEN}
+      onToggleEntry={null}
+      isolate={NO_ISOLATE}
+      onIsolateChange={() => undefined}
     />
   );
 }
@@ -106,7 +117,7 @@ describe('InspectorSidebar', () => {
   // per frame for numbers that cannot have changed.
   it('does not rescan the program when only the playhead moves', () => {
     const model = renderModel();
-    const time = buildProgramTime(model, LIMITS);
+    const time = inspectorProgramTime(model, buildProgramTime(model, LIMITS));
     mount(sidebar(model, time, 0));
     expect(spies.statsRows).toHaveBeenCalledTimes(1);
     expect(spies.lensLegend).toHaveBeenCalledTimes(1);
@@ -121,11 +132,11 @@ describe('InspectorSidebar', () => {
 
   it('recomputes both when the program changes', () => {
     const model = renderModel();
-    const time = buildProgramTime(model, LIMITS);
+    const time = inspectorProgramTime(model, buildProgramTime(model, LIMITS));
     mount(sidebar(model, time, 0));
 
     const nextModel = renderModel();
-    const nextTime = buildProgramTime(nextModel, LIMITS);
+    const nextTime = inspectorProgramTime(nextModel, buildProgramTime(nextModel, LIMITS));
     act(() => root?.render(sidebar(nextModel, nextTime, 0)));
 
     expect(spies.statsRows).toHaveBeenCalledTimes(2);
@@ -134,7 +145,7 @@ describe('InspectorSidebar', () => {
 
   it('still shows the program stats and the move-kind legend', () => {
     const model = renderModel();
-    const time = buildProgramTime(model, LIMITS);
+    const time = inspectorProgramTime(model, buildProgramTime(model, LIMITS));
     mount(sidebar(model, time, 0));
 
     const text = host?.textContent ?? '';

@@ -160,7 +160,11 @@ describe('operation-owned settings through persisted editor mutations', () => {
     const before = useStore.getState().project;
     const original = cncGroups(before);
     expect(original).toHaveLength(1);
-    expect(original[0]?.passes).toHaveLength(4);
+    // Four rings; stay-down links (ADR-491) step between them.
+    const pocket = original[0];
+    if (pocket?.kind !== 'cnc') throw new Error('expected a CNC group');
+    const cuts = pocket.passes.filter((pass) => !(pass.kind === 'path3d' && pass.stayDownLink));
+    expect(cuts).toHaveLength(4);
     useStore.getState().addOperationForSelection();
     const added = useStore.getState().project;
     expect(added.scene.layers).toHaveLength(2);

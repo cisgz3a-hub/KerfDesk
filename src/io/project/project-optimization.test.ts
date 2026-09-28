@@ -83,6 +83,7 @@ describe('project cut-planner settings', () => {
         layerPriority: 'reverse-project-order',
         pathDirection: 'preserve',
         startPoint: 'job-center',
+        closedShapeStart: 'nearest-corner',
       },
     };
 
@@ -90,6 +91,30 @@ describe('project cut-planner settings', () => {
 
     expect(result.kind).toBe('ok');
     if (result.kind === 'ok') expect(result.project.optimization).toEqual(project.optimization);
+  });
+
+  it('starts closed shapes where drawn when a file predates the option, and rejects junk', () => {
+    const project = createProject();
+    const { closedShapeStart: _start, ...legacy } = project.optimization;
+    const old = deserializeProject(JSON.stringify({ ...project, optimization: legacy }));
+    expect(old.kind === 'ok' ? old.project.optimization.closedShapeStart : null).toBe('drawn');
+    for (const closedShapeStart of ['drawn', 'nearest', 'nearest-corner'] as const) {
+      const text = serializeProject({
+        ...project,
+        optimization: { ...project.optimization, closedShapeStart },
+      });
+      const result = deserializeProject(text);
+      expect(result.kind === 'ok' ? result.project.optimization.closedShapeStart : null).toBe(
+        closedShapeStart,
+      );
+    }
+    const invalid = deserializeProject(
+      JSON.stringify({ ...project, optimization: { ...legacy, closedShapeStart: 'corners' } }),
+    );
+    expect(invalid.kind).toBe('invalid');
+    if (invalid.kind === 'invalid') {
+      expect(invalid.reason).toMatch(/optimization\.closedShapeStart/);
+    }
   });
 
   it('defaults a missing overlap option off and rejects non-boolean values', () => {
@@ -101,5 +126,46 @@ describe('project cut-planner settings', () => {
       JSON.stringify({ ...project, optimization: { ...legacy, removeOverlappingLines: 'yes' } }),
     );
     expect(invalid.kind).toBe('invalid');
+  });
+
+  it('round-trips the overlap merge tolerance, keeps it absent when unset, and clamps it', () => {
+    const project = createProject();
+    const unset = serializeProject(project);
+    const reread = deserializeProject(unset);
+    if (reread.kind !== 'ok') throw new Error('default project did not load');
+    expect('overlapMergeToleranceMm' in reread.project.optimization).toBe(false);
+    // A project that never set it saves byte for byte as before.
+    expect(serializeProject(reread.project)).toBe(unset);
+
+    for (const overlapMergeToleranceMm of [0, 0.05, 0.5]) {
+      const set: Project = {
+        ...project,
+        optimization: { ...project.optimization, overlapMergeToleranceMm },
+      };
+      const result = deserializeProject(serializeProject(set));
+      expect(result.kind === 'ok' ? result.project.optimization : null).toEqual(set.optimization);
+    }
+
+    const clamped = (value: number): number | undefined => {
+      const text = JSON.stringify({
+        ...project,
+        optimization: { ...project.optimization, overlapMergeToleranceMm: value },
+      });
+      const result = deserializeProject(text);
+      return result.kind === 'ok' ? result.project.optimization.overlapMergeToleranceMm : undefined;
+    };
+    expect(clamped(-1)).toBe(0);
+    expect(clamped(7)).toBe(0.5);
+
+    const invalid = deserializeProject(
+      JSON.stringify({
+        ...project,
+        optimization: { ...project.optimization, overlapMergeToleranceMm: '0.05' },
+      }),
+    );
+    expect(invalid.kind).toBe('invalid');
+    if (invalid.kind === 'invalid') {
+      expect(invalid.reason).toMatch(/optimization\.overlapMergeToleranceMm/);
+    }
   });
 });

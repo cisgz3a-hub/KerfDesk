@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { currentJobStopRequest } from '../state/job-stop-request';
-import type { LaserSafetyNotice } from '../state/laser-safety-notice';
+import { cncPauseLiftFailedNotice, type LaserSafetyNotice } from '../state/laser-safety-notice';
 import {
   checkpointInterruption,
   currentRunPlannerBacklog,
@@ -48,6 +48,15 @@ describe('checkpointInterruption', () => {
       kind: 'disconnect-stop-unconfirmed',
       message: 'Buffered motion may still be active.',
     };
+
+    expect(checkpointInterruption('cancelled', notice)).toEqual({
+      kind: 'cancelled',
+      message: notice.message,
+    });
+  });
+
+  it('files a failed Pause and lift as a stop from the app, not a rejected stream', () => {
+    const notice = cncPauseLiftFailedNotice('The machine did not reach the lift height.');
 
     expect(checkpointInterruption('cancelled', notice)).toEqual({
       kind: 'cancelled',
@@ -229,5 +238,40 @@ describe('planner backlog on the recorded cause', () => {
     });
     // Ruida is never streamed.
     expect(currentRunPlannerBacklog({ ...run, activeControllerKind: 'ruida' })).toBeUndefined();
+  });
+});
+
+// ADR-341 Amendment 6: a lost link leaves the controller running what it had,
+// so the record keeps how many lines were sent; other stops do not.
+describe('checkpointInterruption sent lines', () => {
+  const cableLoss: LaserSafetyNotice = {
+    kind: 'disconnect-during-job',
+    message: 'The USB link dropped mid-job.',
+  };
+
+  it('records the lines sent before a lost link', () => {
+    expect(
+      checkpointInterruption('disconnected', cableLoss, null, undefined, false, 207_331),
+    ).toEqual({ kind: 'disconnect', message: cableLoss.message, sentLines: 207_331 });
+  });
+
+  it('records none for a stop that discarded the planner or failed a write', () => {
+    const rejected: LaserSafetyNotice = {
+      kind: 'controller-error',
+      code: 1,
+      message: 'The controller rejected a line.',
+      rejectedLine: 'G1 X1',
+    };
+    const writeFailed: LaserSafetyNotice = {
+      kind: 'write-failed',
+      action: 'start',
+      message: 'Write failed.',
+    };
+    expect(
+      checkpointInterruption('errored', rejected, null, undefined, false, 40),
+    ).not.toHaveProperty('sentLines');
+    expect(
+      checkpointInterruption('errored', writeFailed, null, undefined, false, 40),
+    ).not.toHaveProperty('sentLines');
   });
 });

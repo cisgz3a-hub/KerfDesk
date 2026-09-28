@@ -15,6 +15,7 @@ import { projectAfterDeviceProfileChange } from './cnc-machine-setup-scene';
 import { captureSetupHistoryContext, setupHistoryContextFor } from './setup-history-context';
 import { machineSetupActions } from './machine-setup-actions';
 import { synchronizeCncTabCount } from './cnc-tab-count-sync';
+import { sceneWithModeSwitchRecipe } from './laser-recipe-seeding';
 import {
   nextProbeSetupState,
   projectsShareProbeSetupIdentity,
@@ -43,13 +44,16 @@ export function sceneActions(
   return {
     setLayerParam: (layerId, patch) =>
       set((s) => {
+        const updated = sceneWithModeSwitchRecipe(
+          s.project,
+          updateLayer(s.project.scene, layerId, patch),
+          layerId,
+          patch,
+          s.materialLibrary,
+        );
         const project = {
           ...s.project,
-          scene: synchronizeCncTabCount(
-            s.project.scene,
-            updateLayer(s.project.scene, layerId, patch),
-            layerId,
-          ),
+          scene: synchronizeCncTabCount(s.project.scene, updated, layerId),
         };
         return {
           project,
@@ -313,8 +317,8 @@ export function interactionActions(
   };
 }
 
-function visibleSelectionState(
-  state: AppState,
+export function visibleSelectionState(
+  state: Pick<AppState, 'selectedObjectId' | 'additionalSelectedIds'>,
   project: Project,
 ): Pick<AppState, 'selectedObjectId' | 'additionalSelectedIds'> {
   const selectedIds = [

@@ -30,13 +30,25 @@ import {
   type Point3,
 } from './scene-parts';
 import { loadThree } from './viewer3d-modules';
+import { toThreePlanes, type Viewer3dClipPlane } from './scene-isolate';
+import type { Viewer3dMeasure } from './scene-measure';
+import { disposeDetail, type Viewer3dDetail } from './scene-detail';
+import type { Viewer3dPick } from './scene-pick';
 import type { Viewer3dStage } from './viewer3d-look';
+import { createStockView, type StockMaterialChoice, type Viewer3dStock } from './scene-stock';
+import { createBurnView, type Viewer3dBurn } from './scene-burn';
 import { resolveViewer3dTheme } from './viewer3d-theme';
 import { yieldViewer3dInitialization } from './yield-viewer3d-initialization';
 
 export type Viewer3dSegments = Viewer3dSegmentsInput;
 
 export type { PlayheadMarker } from './scene-handle-core';
+export type { Viewer3dPick } from './scene-pick';
+export type { Viewer3dClipPlane } from './scene-isolate';
+export type { Viewer3dMeasure } from './scene-measure';
+export type { Viewer3dDetail } from './scene-detail';
+export type { Viewer3dStock } from './scene-stock';
+export type { Viewer3dBurn } from './scene-burn';
 
 export type Viewer3dSceneHandle = {
   readonly setSegments: (segments: Viewer3dSegments) => void;
@@ -73,6 +85,11 @@ export type Viewer3dSceneHandle = {
   readonly hoverViewCube: (view: Viewer3dView | null) => void;
   readonly setCameraTracking: (tracking: CameraTracking) => void;
   readonly onCameraInteraction: (listener: (() => void) | null) => void;
+  /**
+   * Reports whether the drawn path is simplified for the zoom, and how; null
+   * when every move is drawn (ADR-485).
+   */
+  readonly onDetailChange: (listener: ((detail: Viewer3dDetail | null) => void) | null) => void;
   /** Reports orbit, pan and zoom drags starting (true) and ending (false). */
   readonly onCameraMoving: (listener: ((moving: boolean) => void) | null) => void;
   /**
@@ -81,6 +98,40 @@ export type Viewer3dSceneHandle = {
    * so a deferred read returns a blank image. The view cube is left out.
    */
   readonly captureImage: () => string;
+  /**
+   * The move drawn under a point of the canvas (CSS pixels from its top-left),
+   * with the point on it nearest the pointer; null over empty space (ADR-470).
+   */
+  readonly pickMove: (xPx: number, yPx: number) => Viewer3dPick | null;
+  /** Outlines one move over the rest of the path; null clears it. */
+  readonly highlightMove: (segmentIndex: number | null) => void;
+  /**
+   * Leaves out every move whose entry is 0, for the legend's filters; null
+   * draws every move. A new program clears it (ADR-470).
+   */
+  readonly setMoveFilter: (visible: Uint8Array | null) => void;
+  /** Clips the toolpath to the kept side of each plane; none draws it whole. */
+  readonly setClipPlanes: (planes: ReadonlyArray<Viewer3dClipPlane>) => void;
+  /** Draws a measurement between two points; null clears it (ADR-470). */
+  readonly setMeasure: (measure: Viewer3dMeasure | null) => void;
+  /** The carved stock, in the program's frame; null removes it (ADR-487). */
+  readonly setStock: (stock: Viewer3dStock | null) => void;
+  /** The stock's depths changed in place. */
+  readonly updateStock: () => void;
+  /** What the stock is made of, as drawn. */
+  readonly setStockMaterial: (choice: StockMaterialChoice) => void;
+  /** Colours the stock against the design within the tolerance; null stops. */
+  readonly setStockCompare: (toleranceMm: number | null) => void;
+  /** Shadows and occlusion on the stock's top, or none. */
+  readonly setStockShaded: (shaded: boolean) => void;
+  /** A laser program's burn, in the program's frame; null removes it (ADR-487). */
+  readonly setBurn: (burn: Viewer3dBurn | null) => void;
+  /** The burn's darkness changed in place. */
+  readonly updateBurn: () => void;
+  /** What the burned sheet is made of, as drawn. */
+  readonly setBurnMaterial: (choice: StockMaterialChoice) => void;
+  /** Shows or hides the drawn toolpath, as over the carved stock. */
+  readonly setToolpathVisible: (visible: boolean) => void;
   /** Direction arrowheads over the cut path; null clears them. */
   readonly setDirectionArrows: (placements: ReadonlyArray<ArrowPlacement> | null) => void;
   readonly resize: (width: number, height: number) => void;
@@ -131,10 +182,101 @@ export async function createViewer3dScene(canvas: HTMLCanvasElement): Promise<Vi
 // The handle's methods, grouped by what they touch, over one shared core.
 function createSceneHandle(deps: SceneHandleDeps): Viewer3dSceneHandle {
   const core = createSceneCore(deps);
+  const toolpath = toolpathMethods(core);
+  const camera = cameraMethods(core);
+  const lifecycle = lifecycleMethods(core);
+  const stock = createStockView(deps.modules.three, deps.scene, deps.furnitureGroup);
+  const burn = createBurnView(deps.modules.three, deps.scene);
   return {
-    ...toolpathMethods(core),
-    ...cameraMethods(core),
-    ...lifecycleMethods(core),
+    ...toolpath,
+    ...camera,
+    ...lifecycle,
+    ...isolateMethods(core),
+    fitToBounds: (bounds) => {
+      camera.fitToBounds(bounds);
+      stock.placeGrid();
+    },
+    setStage: (stage) => {
+      stock.setLook(stage.look);
+      burn.setLook(stage.look);
+      toolpath.setStage(stage);
+    },
+    setStock: (next) => (stock.set(next), core.requestRender()),
+    updateStock: () => (stock.update(), core.requestRender()),
+    setStockMaterial: (choice) => (stock.setMaterial(choice), core.requestRender()),
+    setStockCompare: (tolerance) => (stock.setCompare(tolerance), core.requestRender()),
+    setStockShaded: (shaded) => (stock.setShaded(shaded), core.requestRender()),
+    setBurn: (next) => (burn.set(next), core.requestRender()),
+    updateBurn: () => (burn.update(), core.requestRender()),
+    setBurnMaterial: (choice) => (burn.setMaterial(choice), core.requestRender()),
+    setToolpathVisible: (visible) => {
+      deps.toolpathGroup.visible = visible;
+      core.requestRender();
+    },
+    dispose: () => {
+      stock.dispose();
+      burn.dispose();
+      lifecycle.dispose();
+    },
+  };
+}
+
+// Builds the drawn toolpath from the installed program and the move filter.
+function installToolpath(core: SceneCore): void {
+  const { deps, state } = core;
+  if (state.segments === null) return;
+  disposeDetail(state.reveal?.detail ?? null);
+  const built = rebuildToolpath(deps.toolpathGroup, {
+    ...deps.modules,
+    segments: { ...state.segments, visible: state.moveFilter },
+    theme: deps.theme,
+    viewWidth: state.viewWidth,
+    viewHeight: state.viewHeight,
+    travelVisible: state.travelVisible,
+  });
+  state.fatMaterials = built.fatMaterials;
+  state.travelObject = built.travelObject;
+  state.travelLine = built.travelLine;
+  state.reveal = built.reveal;
+  core.picker.setTargets(built.reveal);
+  core.applyTravel();
+}
+
+type IsolateMethods = Pick<
+  Viewer3dSceneHandle,
+  'pickMove' | 'highlightMove' | 'setMoveFilter' | 'setClipPlanes' | 'setMeasure'
+>;
+
+function isolateMethods(core: SceneCore): IsolateMethods {
+  const { deps, state } = core;
+  return {
+    setMoveFilter: (visible) => {
+      if (state.segments === null || visible === state.moveFilter) return;
+      state.moveFilter = visible;
+      installToolpath(core);
+      core.repaint();
+      applyReveal(state.reveal, state.playhead);
+      core.requestRender();
+    },
+    setClipPlanes: (planes) => {
+      state.clipPlanes = toThreePlanes(deps.modules.three, planes);
+      core.applyClipping();
+      core.requestRender();
+    },
+    setMeasure: (measure) => {
+      core.measure.set(measure);
+      core.requestRender();
+    },
+    pickMove: (xPx, yPx) =>
+      core.picker.pick(deps.rig.viewCamera(), {
+        xPx,
+        yPx,
+        widthPx: state.viewWidth,
+        heightPx: state.viewHeight,
+      }),
+    highlightMove: (segmentIndex) => {
+      if (core.picker.highlight(segmentIndex)) core.requestRender();
+    },
   };
 }
 
@@ -154,19 +296,9 @@ function toolpathMethods(core: SceneCore): ToolpathMethods {
   const { modules, theme } = deps;
   return {
     setSegments: (segments) => {
-      const built = rebuildToolpath(deps.toolpathGroup, {
-        ...modules,
-        segments,
-        theme,
-        viewWidth: state.viewWidth,
-        viewHeight: state.viewHeight,
-        travelVisible: state.travelVisible,
-      });
-      state.fatMaterial = built.fatMaterial;
-      state.travelObject = built.travelObject;
-      state.travelLine = built.travelLine;
-      state.reveal = built.reveal;
-      core.applyTravel();
+      state.segments = segments;
+      state.moveFilter = null;
+      installToolpath(core);
       sizeMarkers(markers, segments);
       requestRender();
     },
@@ -200,6 +332,7 @@ function toolpathMethods(core: SceneCore): ToolpathMethods {
       const extent = boundsExtent(state.bounds);
       const { three } = modules;
       state.arrowMesh = swapArrows(three, deps.scene, state.arrowMesh, placements, extent, theme);
+      core.applyClipping();
       requestRender();
     },
   };
@@ -210,6 +343,7 @@ type CameraMethods = Pick<
   | 'setCameraTracking'
   | 'onCameraInteraction'
   | 'onCameraMoving'
+  | 'onDetailChange'
   | 'onProjectionChange'
   | 'fitToBounds'
   | 'setView'
@@ -225,6 +359,7 @@ function cameraMethods(core: SceneCore): CameraMethods {
     setCameraTracking: director.track,
     onCameraInteraction: director.onManual,
     onCameraMoving: core.moving.listen,
+    onDetailChange: core.detail.listen,
     onProjectionChange: projection.listen,
     fitToBounds: (bounds) => {
       state.bounds = bounds;
@@ -281,10 +416,12 @@ function lifecycleMethods(core: SceneCore): LifecycleMethods {
       const parts = {
         renderer: deps.renderer,
         camera: deps.rig.camera,
-        fatMaterial: state.fatMaterial,
+        fatMaterials: state.fatMaterials,
       };
       applyResize(parts, nextWidth, nextHeight);
       core.studio.resize(nextWidth, nextHeight);
+      core.picker.resize(nextWidth, nextHeight);
+      core.measure.resize(nextWidth, nextHeight);
       requestRender();
     },
     requestRender,

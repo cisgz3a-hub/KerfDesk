@@ -103,3 +103,9 @@ touched:
 - **Not verified:** a real Chrome Web Serial port, the Falcon, or whether Chromium's readable
   enqueues buffered bytes synchronously on pull. The dispatch bound holds either way. No
   machine is available to this project.
+
+### Amendments
+
+- Amendment 1 (`ADR-356-amendment-1-status-silence-counts-only-on-schedule-polling.md`):
+  status-silence deadlines, such as the post-job settle's, count only time the status poll ran
+  on schedule.

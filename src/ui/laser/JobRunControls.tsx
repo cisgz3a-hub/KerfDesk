@@ -5,7 +5,11 @@
 // (no realtime feed hold) and may lack jog cancel — the copy says so.
 
 import { useLaserStore } from '../state/laser-store';
-import { cncPauseLiftPhase } from '../state/cnc-pause-lift-state';
+import {
+  cncJobLaserModeEnabled,
+  cncPauseLiftPhase,
+  cncPauseLiftSkipReason,
+} from '../state/cnc-pause-lift-state';
 import { cncResumeAdvisoryNotice } from '../state/cnc-pause-resume-policy';
 import { rowStyle, runningSafetyStyle } from './JobControls.styles';
 import { OverrideControls } from './OverrideControls';
@@ -30,9 +34,15 @@ export function RunningControls(props: {
   const hasOverrides = useLaserStore((s) => s.capabilities.overrides);
   const pendingToolLabel = useLaserStore((s) => s.pendingToolLabel);
   const activeJobMachineKind = useLaserStore((s) => s.activeJobMachineKind);
-  const laserModeEnabled = useLaserStore((s) => s.controllerSettings?.laserModeEnabled);
+  const laserModeEnabled = useLaserStore(cncJobLaserModeEnabled);
   const liftPhase = useLaserStore(cncPauseLiftPhase);
-  const resumeAdvisory = cncResumeAdvisoryNotice(activeJobMachineKind, laserModeEnabled, liftPhase);
+  const liftSkipReason = useLaserStore(cncPauseLiftSkipReason);
+  const resumeAdvisory = cncResumeAdvisoryNotice(
+    activeJobMachineKind,
+    laserModeEnabled,
+    liftPhase,
+    liftSkipReason,
+  );
   const pauseMessage = pauseControlMessage(
     activeJobMachineKind,
     hasRealtimePause,

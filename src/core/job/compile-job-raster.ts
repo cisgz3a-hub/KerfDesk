@@ -6,6 +6,7 @@ import { burnGridKernel } from '../raster/luma-resample';
 import { STREAMED_RASTER_PIXEL_THRESHOLD } from '../raster/raster-budget';
 import type { RasterPowerValues } from '../raster/raster-power-values';
 import { rasterCompilationPowerScale, rescaleRasterValues } from '../raster/controller-power-scale';
+import { isAlongXScan, rasterScanFrame, type RasterScanFrame } from '../raster/raster-scan-frame';
 import { originFlipsRasterX, originFlipsRasterY } from '../raster-output';
 import {
   captureLayerOperationSettings,
@@ -21,17 +22,19 @@ import {
 import type { JobDiagnostic, RasterGroup } from './job';
 import { streamedRasterRowProvider } from './compile-job-raster-stream';
 import { effectiveObjectMinPowerPercent, effectiveObjectPowerPercent } from './object-power-scale';
-import { imageOverscanMmFor } from './operation-cut-extras';
-import { rasterBoundsInMachineCoords, type RasterMachineBounds } from './raster-bounds';
+import { imageScanOverscanMm } from './automatic-overscan';
+import { rasterScanBounds, type RasterMachineBounds } from './raster-bounds';
 import { decodeRasterLuma } from './raster-luma-decode';
-import { isRotatedRaster, rotatedMaskedRasterLuma } from './raster-rotated-sample';
+import {
+  needsRotatedSampling,
+  rotatedMaskedRasterLuma,
+  sourceQuarterTurn,
+} from './raster-rotated-sample';
 import { resolveImageScanDirection } from './scan-direction-policy';
+import { imageScanPassRuns, type ScanPassRun } from './scan-pass-angles';
 import { validatedScanOffsetMm } from './scan-offset';
 
 const WHITE_LUMA_BYTE = 255;
-const FULL_TURN_DEG = 360;
-const QUARTER_TURN_DEG = 90;
-const THREE_QUARTER_TURN_DEG = 270;
 
 type CompileRasterGroupsOptions = {
   readonly sceneObjects?: ReadonlyArray<SceneObject>;
@@ -41,6 +44,7 @@ type CompileRasterGroupsOptions = {
 type CompileRasterGroupOptions = {
   readonly objects: ReadonlyArray<SceneObject>;
   readonly sourceLumaOverride: Uint8Array | undefined;
+  readonly scanFrame: RasterScanFrame;
 };
 
 type RasterCompilation = {
@@ -60,30 +64,76 @@ export function compileRasterGroupsForLayer(
   options: CompileRasterGroupsOptions = {},
 ): RasterCompilation {
   const sceneObjects = options.sceneObjects ?? objects;
-  const groups: RasterGroup[] = [];
-  const diagnostics: JobDiagnostic[] = [];
+  const out: { groups: RasterGroup[]; diagnostics: JobDiagnostic[] } = {
+    groups: [],
+    diagnostics: [],
+  };
   for (const obj of objects) {
     if (obj.kind !== 'raster-image' || !sceneObjectUsesOperation(obj, layer)) continue;
     if (obj.role === 'trace-source') continue;
     const effectiveLayer = effectiveOperationForObject(layer, obj);
     if (effectiveLayer.mode !== 'image') continue;
-    const sourceLumaOverride = options.sourceLumaByObjectId?.get(obj.id);
-    const group = compileRasterGroup(obj, effectiveLayer, device, {
+    appendObjectRasterGroups(obj, effectiveLayer, device, out, {
       objects: sceneObjects,
-      sourceLumaOverride,
+      sourceLumaOverride: options.sourceLumaByObjectId?.get(obj.id),
     });
-    if (group !== null) groups.push(group);
-    else {
-      diagnostics.push({
+  }
+  return out;
+}
+
+// ADR-492: one group per run of passes at one scan angle, in pass order. Runs
+// at the same angle share one compiled grid.
+function appendObjectRasterGroups(
+  obj: RasterImage,
+  layer: Layer,
+  device: DeviceProfile,
+  out: { readonly groups: RasterGroup[]; readonly diagnostics: JobDiagnostic[] },
+  options: Omit<CompileRasterGroupOptions, 'scanFrame'>,
+): void {
+  const scans = rasterScanRuns(layer, device);
+  if (scans.rotaryIgnoresAngles) {
+    out.diagnostics.push({
+      kind: 'image-scan-angle-rotary',
+      layerName: layer.name,
+      source: obj.source,
+    });
+  }
+  const byAngle = new Map<number, RasterGroup>();
+  for (const run of scans.runs) {
+    const group =
+      byAngle.get(run.angleDeg) ??
+      compileRasterGroup(obj, layer, device, {
+        ...options,
+        scanFrame: rasterScanFrame(run.angleDeg),
+      });
+    if (group === null) {
+      out.diagnostics.push({
         kind: 'raster-source-luma-mismatch',
-        layerName: effectiveLayer.name,
+        layerName: layer.name,
         source: obj.source,
         expectedPixels: obj.pixelWidth * obj.pixelHeight,
-        actualPixels: sourceLumaOverride?.length ?? 0,
+        actualPixels: options.sourceLumaOverride?.length ?? 0,
       });
+      return;
     }
+    byAngle.set(run.angleDeg, group);
+    out.groups.push(group.passes === run.passes ? group : { ...group, passes: run.passes });
   }
-  return { groups, diagnostics };
+}
+
+// A rotary maps Y through a scale that only keeps rows along X straight, so it
+// scans every pass along X and Job Review says the angles were set aside.
+function rasterScanRuns(
+  layer: Layer,
+  device: DeviceProfile,
+): { readonly runs: ReadonlyArray<ScanPassRun>; readonly rotaryIgnoresAngles: boolean } {
+  const runs = imageScanPassRuns(layer);
+  if (device.rotary?.enabled !== true) return { runs, rotaryIgnoresAngles: false };
+  const alongX = runs.length === 1 && runs[0]?.angleDeg === 0;
+  return {
+    runs: [{ angleDeg: 0, passes: Math.max(1, Math.floor(layer.passes)) }],
+    rotaryIgnoresAngles: !alongX,
+  };
 }
 
 function compileRasterGroup(
@@ -102,8 +152,8 @@ function compileRasterGroup(
   const compilationMaxS = rasterCompilationPowerScale(device);
   const sMax = Math.round((powerPercent / 100) * compilationMaxS);
   const sMin = Math.round((minPowerPercent / 100) * compilationMaxS);
-  const bounds = rasterBoundsInMachineCoords(obj, device);
-  const passThroughDimensions = rasterPassThroughDimensions(obj);
+  const bounds = rasterScanBounds(obj, device, options.scanFrame);
+  const passThroughDimensions = rasterPassThroughDimensions(obj, device, options.scanFrame);
   const pixelWidth = layer.passThrough
     ? passThroughDimensions.width
     : pixelExtentForMm(bounds.maxX - bounds.minX, layer.linesPerMm);
@@ -123,6 +173,7 @@ function compileRasterGroup(
     pixelHeight,
     sMax,
     sMin,
+    scanFrame: options.scanFrame,
   };
   const rasterValues = rasterValuesFor(rasterInput);
   return {
@@ -143,20 +194,25 @@ function compileRasterGroup(
     pixelWidth,
     pixelHeight,
     bounds,
-    overscanMm: imageOverscanMmFor(layer),
+    overscanMm: imageScanOverscanMm(layer, device, options.scanFrame.angleDeg),
     dotWidthCorrectionMm: clamp(layer.dotWidthCorrectionMm, 0, lineIntervalMm),
     bidirectional: scanDirection.bidirectional,
     scanDirection,
     ...(bidirectionalScanOffsetMm === undefined ? {} : { bidirectionalScanOffsetMm }),
+    ...(isAlongXScan(options.scanFrame) ? {} : { scanAngleDeg: options.scanFrame.angleDeg }),
   };
 }
 
-function rasterPassThroughDimensions(obj: RasterImage): {
+function rasterPassThroughDimensions(
+  obj: RasterImage,
+  device: DeviceProfile,
+  scanFrame: RasterScanFrame,
+): {
   readonly width: number;
   readonly height: number;
 } {
-  const rotation = ((obj.transform.rotationDeg % FULL_TURN_DEG) + FULL_TURN_DEG) % FULL_TURN_DEG;
-  const swapsAxes = rotation === QUARTER_TURN_DEG || rotation === THREE_QUARTER_TURN_DEG;
+  const turn = sourceQuarterTurn(obj, device, scanFrame);
+  const swapsAxes = turn === 1 || turn === 3;
   return swapsAxes
     ? { width: obj.pixelHeight, height: obj.pixelWidth }
     : { width: obj.pixelWidth, height: obj.pixelHeight };
@@ -185,6 +241,7 @@ function rasterValuesFor(
     maskObject: input.maskObject,
     device: input.device,
     bounds: input.bounds,
+    scanFrame: input.scanFrame,
     algorithm: imageDitherAlgorithm(input.layer),
     passThrough: input.layer.passThrough,
     sMax: input.sMax,
@@ -215,12 +272,13 @@ type MaterializedRasterInput = {
   readonly pixelHeight: number;
   readonly sMax: number;
   readonly sMin: number;
+  readonly scanFrame: RasterScanFrame;
 };
 
 function materializedRasterValues(input: MaterializedRasterInput): RasterPowerValues {
-  // Rotated images bypass the axis-aligned resample + flip pipeline: the
-  // machine scan grid samples the rotated content directly.
-  if (isRotatedRaster(input.obj)) {
+  // Rotated images and angled scans bypass the axis-aligned resample + flip
+  // pipeline: the scan grid samples the rotated content directly.
+  if (needsRotatedSampling(input.obj, input.scanFrame)) {
     const rotatedLuma = rotatedMaskedRasterLuma(
       {
         sourceLuma: input.preparedLuma,
@@ -229,6 +287,7 @@ function materializedRasterValues(input: MaterializedRasterInput): RasterPowerVa
         bounds: input.bounds,
         pixelWidth: input.pixelWidth,
         pixelHeight: input.pixelHeight,
+        scanFrame: input.scanFrame,
         kernel: burnGridKernel(imageDitherAlgorithm(input.layer)),
         passThrough: input.layer.passThrough,
       },

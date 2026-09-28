@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { buildProgramTime } from '../../core/gcode-time';
 import { buildGcodeRenderModel, findProgramIssues } from '../../core/gcode-view';
 import { analyzeGcodeModel } from './gcode-inspector-analysis';
+import { inspectorProgramTime } from './inspector-model';
 
 describe('analyzeGcodeModel', () => {
   it('preserves the Inspector fixed-limit timeline and informational findings', () => {
@@ -14,11 +15,14 @@ describe('analyzeGcodeModel', () => {
 
     const analysis = analyzeGcodeModel(parsed.model);
     expect(analysis.time).toEqual(
-      buildProgramTime(parsed.model, {
-        accelMmPerSec2,
-        junctionDeviationMm,
-        maxFeedMmPerMin,
-      }),
+      inspectorProgramTime(
+        parsed.model,
+        buildProgramTime(parsed.model, {
+          accelMmPerSec2,
+          junctionDeviationMm,
+          maxFeedMmPerMin,
+        }),
+      ),
     );
     expect(analysis.findings).toEqual(findProgramIssues(parsed.model));
   });
@@ -38,7 +42,10 @@ describe('analyzeGcodeModel', () => {
     expect(stock.timedFor).toBeNull();
     expect(timed.timedFor).toBe('Shop laser');
     expect(timed.time).toEqual(
-      buildProgramTime(parsed.model, limits, { cutTimeScale: 1.25, machineKind: 'laser' }),
+      inspectorProgramTime(
+        parsed.model,
+        buildProgramTime(parsed.model, limits, { cutTimeScale: 1.25, machineKind: 'laser' }),
+      ),
     );
     expect(timed.time.totalSeconds).toBeLessThan(stock.time.totalSeconds);
   });

@@ -33,6 +33,8 @@ import { useAppCommands } from './use-app-commands';
 import { useGcodeInspectorSlot } from './use-gcode-inspector-slot';
 import { WorkspaceContextBar } from './WorkspaceContextBar';
 import { ArrayDialogHost } from './ArrayDialogHost';
+import { CopyAlongPathDialogHost } from './CopyAlongPathDialogHost';
+import { OptimizeShapesDialogHost } from './OptimizeShapesDialogHost';
 import { QuickNestDialogHost } from './QuickNestDialogHost';
 import { PrintAndCutDialogHost } from '../laser/PrintAndCutDialogHost';
 import { ScanOffsetCommandDialog } from './ScanOffsetCommandDialog';
@@ -40,6 +42,8 @@ import { IntervalDialog, MaterialDialog } from './CalibrationGridDialogs';
 import { GcodeSaveDialog } from '../app/GcodeSaveDialog';
 import { VectorRepairDialogHost } from './VectorRepairDialogHost';
 import { OffsetShapesDialogHost } from './OffsetShapesDialogHost';
+import { SettingsWindowHost } from '../settings/SettingsWindowHost';
+import { redoSteps, undoSteps } from '../state/undo-history';
 
 type SettingsDialogKind =
   | 'optimization'
@@ -127,9 +131,7 @@ export function CommandShell(): JSX.Element {
       {closeToleranceDialogOpen ? (
         <CloseOpenFillContoursPanel onClose={() => setCloseToleranceDialogOpen(false)} />
       ) : null}
-      <GcodeSaveDialogHost />
-      <BarcodeDialogHost />
-      <ExportSvgDialogHost />
+      <StoreOpenedDialogs />
       {gcodeInspector.element}
     </>
   );
@@ -146,6 +148,20 @@ function BitmapDialog(): JSX.Element | null {
   const close = useUiStore((state) => state.closeConvertBitmapDialog);
   const convertibles = useSelectedConvertibles();
   return open ? <ConvertBitmapDialogHost convertibles={convertibles} onClose={close} /> : null;
+}
+
+// Dialogs that open from their own stores rather than from CommandShell state.
+function StoreOpenedDialogs(): JSX.Element {
+  return (
+    <>
+      <GcodeSaveDialogHost />
+      <BarcodeDialogHost />
+      <CopyAlongPathDialogHost />
+      <OptimizeShapesDialogHost />
+      <ExportSvgDialogHost />
+      <SettingsWindowHost />
+    </>
+  );
 }
 
 function GcodeSaveDialogHost(): JSX.Element | null {
@@ -233,6 +249,8 @@ function UndoHistoryPanel(props: { readonly onClose: () => void }): JSX.Element 
       redoStack={redoStack}
       onUndo={undo}
       onRedo={redo}
+      onUndoSteps={undoSteps}
+      onRedoSteps={redoSteps}
       onClose={props.onClose}
     />
   );

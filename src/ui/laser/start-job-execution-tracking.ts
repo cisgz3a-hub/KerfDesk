@@ -1,6 +1,7 @@
 import { fingerprintGcode, fingerprintsEqual } from '../../core/recovery';
 import type { SimilarityTransform } from '../../core/registration';
-import type { OutputScope } from '../../core/scene';
+import type { JobOriginPlacement } from '../../core/job';
+import { machineKindOf, type MachineKind, type OutputScope } from '../../core/scene';
 import { currentOutputScope, useStore } from '../state';
 import { canvasPlanRetentionKey } from '../state/canvas-motion-plan';
 import type { LaserState } from '../state/laser-store';
@@ -10,16 +11,22 @@ import type { LaserModeStartEvidence } from '../state/laser-mode-start-evidence'
 import {
   createArchivedControllerObservation,
   createExecutionArtifact,
+  type ExecutionArtifactV1,
   type LastCompletedReceipt,
   type RecoveryRepository,
   type RunId,
 } from '../state/recovery';
+import { reportedWorkOffsetMm } from '../state/infer-machine-position';
+import { createStartIntent } from '../state/recovery/start-intent';
+import type { UntrackedRunRecord } from '../state/recovery/untracked-run-record';
 import { useToastStore } from '../state/toast-store';
+import { rememberUnarchivedRun } from '../state/laser-unarchived-run';
 import type { JobReviewModel } from './job-review';
 import { createExecutionProvenance } from '../state/recovery/execution-provenance';
 import { ordinaryExecutionEvidence } from '../state/recovery/execution-workflow-evidence';
 import { currentPrintCutOutputRegistration } from './print-cut-output';
 import type { prepareCurrentStartJob } from './start-job-source';
+import { secondPassOfferableFor } from './second-pass/second-pass-offer';
 
 type PreparedCurrentStart = Extract<
   Awaited<ReturnType<typeof prepareCurrentStartJob>>,
@@ -97,6 +104,7 @@ export async function stageFreshExecutionArtifact(args: {
   readonly cncSetupAttestation?: CncSetupAttestation;
   readonly completedReplaySourceRunId?: RunId;
 }): Promise<boolean> {
+  let keep: (() => ExecutionArtifactV1) | null = null;
   try {
     const evidence = ordinaryExecutionEvidence({
       reviewedAtIso: args.reviewedAtIso,
@@ -128,7 +136,7 @@ export async function stageFreshExecutionArtifact(args: {
         ? {}
         : { workflow: { kind: 'laser-second-pass', stages: args.prepared.laserSecondPassChain } }),
     });
-    const artifact = createExecutionArtifact({
+    const artifactArgs: Parameters<typeof createExecutionArtifact>[0] = {
       runId: args.runId,
       gcode: args.prepared.gcode,
       prepared: args.prepared.prepared,
@@ -145,29 +153,87 @@ export async function stageFreshExecutionArtifact(args: {
       archivedControllerObservation,
       createdAtIso,
       provenance,
-    });
+    };
+    keep = () => createExecutionArtifact({ ...artifactArgs, enforceArchiveBudget: false });
+    const artifact = createExecutionArtifact(artifactArgs);
+    keep = () => artifact;
     const staged = await args.repository.stageArtifact(artifact);
     if (staged.ok) return true;
   } catch {
     // Recovery persistence is best-effort and must never refuse current Start.
   }
+  if (keep !== null) keepUnarchivedLaserRun(args.runId, args.prepared, keep);
   return false;
+}
+
+/** A laser run the archive refused keeps its artifact in this page, so the job
+ * that just finished is still offered a second pass (ADR-341 Amendment 7). The
+ * copy is built only when the operator opens it: building it at Start would
+ * delay acknowledgements the way a full archive walk did (ADR-352). */
+function keepUnarchivedLaserRun(
+  runId: RunId,
+  prepared: PreparedCurrentStart,
+  build: () => ExecutionArtifactV1,
+): void {
+  const project = prepared.prepared.project;
+  if (!secondPassOfferableFor(machineKindOf(project.machine), project.device.controllerKind)) {
+    return;
+  }
+  rememberUnarchivedRun(runId, async () => build());
 }
 
 export async function activateAcceptedFreshRun(
   runId: RunId,
   staged: boolean,
   repository: RecoveryRepository,
+  untracked?: UntrackedRunRecord,
 ): Promise<void> {
   if (staged) {
     const activated = await repository.activateFreshRun(runId);
     if (activated.ok && activated.value) return;
   }
-  await repository.noteUntrackedRunAccepted(runId);
+  await repository.noteUntrackedRunAccepted(runId, untracked);
   useToastStore
     .getState()
     .pushToast(
-      'Job recovery is unavailable for this run, and no execution archive was retained. The job can continue, but this burn will not have a forensic record.',
+      untracked === undefined
+        ? 'Job recovery is unavailable for this run, and no execution archive was retained. The job can continue, but this burn will not have a forensic record.'
+        : 'KerfDesk could not keep the full recovery archive for this job, so its exact G-code is not saved. If the job is interrupted, KerfDesk keeps its origin and where it stopped, and the Review can continue it while this project is open and unchanged.',
       'warning',
     );
+}
+
+/** The short record a laser run without an archive keeps instead (ADR-341
+ * Amendment 8): its Start intent and the work offset at Start. */
+export function untrackedLaserRunRecord(args: {
+  readonly runId: RunId;
+  readonly gcode: string;
+  readonly machineKind: MachineKind;
+  readonly outputScope: OutputScope;
+  readonly jobOrigin: JobOriginPlacement | undefined;
+  readonly laser: LaserState;
+}): UntrackedRunRecord | undefined {
+  if (args.machineKind !== 'laser') return undefined;
+  try {
+    const intent = createStartIntent({
+      gcode: args.gcode,
+      machineKind: args.machineKind,
+      outputScope: args.outputScope,
+      ...(args.jobOrigin === undefined ? {} : { jobOrigin: args.jobOrigin }),
+      nowIso: new Date().toISOString(),
+    });
+    return { runId: args.runId, intent, startWorkOffsetMm: laserWorkOffsetMm(args.laser) };
+  } catch {
+    // Best-effort like the archive: an accepted run is never held up by it.
+    return undefined;
+  }
+}
+
+/** The work offset the controller last reported, in mm. */
+export function laserWorkOffsetMm(
+  laser: Pick<LaserState, 'controllerSettings' | 'wcoCache'>,
+): UntrackedRunRecord['startWorkOffsetMm'] {
+  const reportInches = laser.controllerSettings?.reportInches === true;
+  const offset = reportedWorkOffsetMm(laser.wcoCache, reportInches);
+  return offset === null ? null : { x: offset.x, y: offset.y, z: offset.z };
 }

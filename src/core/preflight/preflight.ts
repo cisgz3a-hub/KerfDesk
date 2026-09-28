@@ -384,7 +384,7 @@ function appendBoundsIssues(
   // side of the artwork, so an image within that distance of the bed's X
   // edges always fails bounds with a bare coordinate error — name the real
   // cause and the remedy instead of pointing at the artwork.
-  const overscanMm = maxOutputOverscanMm(project.scene);
+  const overscanMm = maxOutputOverscanMm(project.scene, project.device);
   if (oob.length > 0 && overscanMm > 0) {
     issues.push({
       code: 'out-of-bed',

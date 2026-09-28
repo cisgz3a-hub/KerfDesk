@@ -54,3 +54,47 @@ describe('findPlungedTravelIssues', () => {
     expect(findPlungedTravelIssues(gcode, SAFE)).toEqual([]);
   });
 });
+
+// ADR-489: a pass whose air is proven clear is rapided down to just above it.
+describe('findPlungedTravelIssues air descents', () => {
+  const cutToMinusFour = ['G0 Z3.810', 'G0 X0 Y0', 'G1 Z-4.000 F300', 'G1 X10 Y0 F1000'];
+  const lines = (...rest: string[]): string => [...cutToMinusFour, ...rest].join('\n');
+
+  it('accepts a Z-only rapid from safe Z that a lower plunge follows', () => {
+    const gcode = lines('G0 Z3.810', 'G0 X5 Y5', 'G0 Z-3.000', 'G1 Z-6.000 F300');
+    expect(findPlungedTravelIssues(gcode, SAFE)).toEqual([]);
+  });
+
+  it('flags an air descent deeper than the program has cut plus the clearance', () => {
+    const gcode = lines('G0 Z3.810', 'G0 X5 Y5', 'G0 Z-3.500', 'G1 Z-6.000 F300');
+    expect(findPlungedTravelIssues(gcode, SAFE).map((issue) => issue.lineNumber)).toEqual([7]);
+  });
+
+  it('flags an air descent before anything has been cut', () => {
+    const gcode = ['G0 Z3.810', 'G0 X5 Y5', 'G0 Z2.000', 'G1 Z-1.000 F300'].join('\n');
+    expect(findPlungedTravelIssues(gcode, SAFE).map((issue) => issue.lineNumber)).toEqual([3]);
+  });
+
+  it('flags an air descent that no plunge follows', () => {
+    const cutAfter = lines('G0 Z3.810', 'G0 X5 Y5', 'G0 Z-3.000', 'G1 X9 Y9 F1000');
+    const endsThere = lines('G0 Z3.810', 'G0 X5 Y5', 'G0 Z-3.000');
+    const risesAgain = lines('G0 Z3.810', 'G0 X5 Y5', 'G0 Z-3.000', 'G1 Z-2.000 F300');
+    for (const gcode of [cutAfter, endsThere, risesAgain]) {
+      const issues = findPlungedTravelIssues(gcode, SAFE);
+      expect(issues.map((issue) => issue.lineNumber)).toEqual([7]);
+      expect(issues[0]?.reason).toMatch(/without a plunge following it/);
+    }
+  });
+
+  it('flags a rapid descent that does not start at safe Z', () => {
+    // The partial lift to Z1 is itself a rapid below safe Z.
+    const gcode = lines('G0 Z1.000', 'G0 Z-3.000', 'G1 Z-6.000 F300');
+    expect(findPlungedTravelIssues(gcode, SAFE).map((issue) => issue.lineNumber)).toEqual([5, 6]);
+  });
+
+  it('still flags an XY rapid after an air descent', () => {
+    const gcode = lines('G0 Z3.810', 'G0 X5 Y5', 'G0 Z-3.000', 'G0 X9 Y9');
+    const issues = findPlungedTravelIssues(gcode, SAFE);
+    expect(issues.map((issue) => issue.lineNumber)).toEqual([7, 8]);
+  });
+});

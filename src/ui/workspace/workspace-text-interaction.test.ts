@@ -226,6 +226,7 @@ function pointerHarness(project: Project, previewMode = false) {
     onPointerUp: vi.fn(),
     onPointerCancel: vi.fn(),
     onLostPointerCapture: vi.fn(),
+    onPointerLeave: vi.fn(),
   };
   return {
     canvas,

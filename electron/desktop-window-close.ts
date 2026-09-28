@@ -13,8 +13,8 @@ interface DesktopCloseOptions {
 export function installDesktopWindowClose(
   window: BrowserWindow,
   options: DesktopCloseOptions,
-): void {
-  new WindowCloseGuard(window, {
+): WindowCloseGuard {
+  return new WindowCloseGuard(window, {
     ...options,
     request: async (operation, requestId) => {
       if (!options.isTrustedRenderer(window.webContents.getURL())) {

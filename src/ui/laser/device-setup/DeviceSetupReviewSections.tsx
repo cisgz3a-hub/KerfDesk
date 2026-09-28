@@ -4,6 +4,7 @@ import { Button } from '../../kit';
 import type { DeviceSetupStepProps } from './device-setup-flow';
 import { deviceSetupSupportsMachineKind } from './device-setup-flow';
 import type { FirmwareDiff } from './device-setup-firmware-diff';
+import { laserFinishSummary } from './DeviceSetupLaserFinishRows';
 import { machineSetupControllerGuide } from './machine-setup-controller-guide';
 
 type ReviewRows = ReadonlyArray<readonly [label: string, value: string]>;
@@ -107,6 +108,7 @@ function laserRows(state: DeviceSetupStepProps['state']): ReviewRows {
     ['Power range', `${state.draft.minPowerS}–${state.draft.maxPowerS} S`],
     ['Laser mode', state.draft.laserModeEnabled ? 'Expected on' : 'Off'],
     ['Air output', state.draft.airAssistCommand],
+    ['After a job', laserFinishSummary(state.draft)],
     [
       'Low-power Fire',
       fire?.enabled === true ? `Enabled, ${fire.maxPowerPercent}% cap` : 'Disabled',
@@ -122,6 +124,7 @@ function cncRows(state: DeviceSetupStepProps['state']): ReviewRows {
       `${cncMaxFeedMmPerMin(state.draft, params)} / ${cncFramingFeedMmPerMin(state.draft, params)} mm/min`,
     ],
     ['Safe Z', `${params.safeZMm} mm`],
+    ['Park height', `${Math.max(params.safeZMm, params.parkZMm ?? params.safeZMm)} mm`],
     ['Spindle', `${params.spindleMaxRpm} RPM; ${params.spindleSpinupSec} s dwell`],
     ['Coolant', params.coolant ?? 'off'],
     [

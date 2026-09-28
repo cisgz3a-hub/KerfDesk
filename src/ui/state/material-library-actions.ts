@@ -5,13 +5,10 @@ import {
   materialRecipePatch,
   type MaterialRecipe,
 } from '../../core/material-library';
-import {
-  captureLayerOperationSettings,
-  type Layer,
-  type Project,
-  type Scene,
-} from '../../core/scene';
+import type { Layer, Project, Scene } from '../../core/scene';
+import type { ProjectLaserMaterial } from '../../core/scene/project';
 import type { MaterialLibraryDocument } from '../../io/material-library';
+import { bestPresetForLayer, linkedPresetLayer } from './laser-recipe-seeding';
 import { pushUndo, type StateSlice } from './scene-mutations';
 
 export const MATERIAL_LIBRARY_STATE_DEFAULTS = {
@@ -31,6 +28,16 @@ export type MaterialLibraryActions = {
   readonly deleteMaterialPreset: (presetId: string) => boolean;
   readonly linkMaterialPresetToLayer: (layerId: string, presetId: string) => boolean;
   readonly refreshLinkedMaterialLayer: (layerId: string) => boolean;
+  /** ADR-496: the job's material, and whether new operations take its best recipe. */
+  readonly setJobLaserMaterial: (material: ProjectLaserMaterial | undefined) => void;
+  /** ADR-496: link every output operation to its best recipe; one undo step. */
+  readonly applyBestRecipesToOperations: () => BestRecipeResult;
+};
+
+export type BestRecipeResult = {
+  readonly applied: number;
+  readonly alreadyCurrent: number;
+  readonly unmatched: ReadonlyArray<string>;
 };
 
 export function currentMaterialLibraryState(state: MaterialLibraryState): MaterialLibraryState {
@@ -92,7 +99,63 @@ export function materialLibraryActions(set: MaterialLibrarySet): MaterialLibrary
     linkMaterialPresetToLayer: (layerId, presetId) =>
       applyLinkedPreset(set, layerId, presetId, false),
     refreshLinkedMaterialLayer: (layerId) => applyLinkedPreset(set, layerId, null, true),
+    setJobLaserMaterial: (material) =>
+      set((state) => {
+        const current = state.project.jobSetup.laserMaterial;
+        if (JSON.stringify(current) === JSON.stringify(material)) return {};
+        const { laserMaterial: _previous, ...jobSetup } = state.project.jobSetup;
+        return {
+          project: {
+            ...state.project,
+            jobSetup: material === undefined ? jobSetup : { ...jobSetup, laserMaterial: material },
+          },
+          undoStack: pushUndo(state.project, state.undoStack),
+          redoStack: [],
+          dirty: true,
+        };
+      }),
+    applyBestRecipesToOperations: () => applyBestRecipes(set),
   };
+}
+
+function applyBestRecipes(set: MaterialLibrarySet): BestRecipeResult {
+  let result: BestRecipeResult = { applied: 0, alreadyCurrent: 0, unmatched: [] };
+  set((state) => {
+    const library = state.materialLibrary;
+    if (library === null) return {};
+    let applied = 0;
+    let alreadyCurrent = 0;
+    const unmatched: string[] = [];
+    const layers = state.project.scene.layers.map((layer) => {
+      if (!layer.output) return layer;
+      const preset = bestPresetForLayer(state.project, library, layer);
+      if (preset === undefined) {
+        unmatched.push(layer.name);
+        return layer;
+      }
+      const linked = linkedPresetLayer(layer, library, preset);
+      const binding = linked.materialBinding;
+      if (
+        binding !== undefined &&
+        recipeMatchesLayer(layer, preset.recipe) &&
+        bindingMatches(layer, binding)
+      ) {
+        alreadyCurrent += 1;
+        return layer;
+      }
+      applied += 1;
+      return linked;
+    });
+    result = { applied, alreadyCurrent, unmatched };
+    if (applied === 0) return {};
+    return {
+      project: { ...state.project, scene: { ...state.project.scene, layers } },
+      undoStack: pushUndo(state.project, state.undoStack),
+      redoStack: [],
+      dirty: true,
+    };
+  });
+  return result;
 }
 
 function applyLinkedPreset(
@@ -109,20 +172,14 @@ function applyLinkedPreset(
     if (linkedPresetId === undefined || linkedPresetId === null) return {};
     const preset = state.materialLibrary.entries.find((entry) => entry.id === linkedPresetId);
     if (preset === undefined) return {};
-    const recipe = materialRecipePatch(preset.recipe);
-    const materialBinding = {
-      libraryId: state.materialLibrary.libraryId,
-      presetId: preset.id,
-      presetRevision: preset.revision,
-      lastResolved: { ...captureLayerOperationSettings(target), ...recipe },
-    };
-    if (recipeMatchesLayer(target, preset.recipe) && bindingMatches(target, materialBinding)) {
+    const next = linkedPresetLayer(target, state.materialLibrary, preset);
+    if (
+      recipeMatchesLayer(target, preset.recipe) &&
+      next.materialBinding !== undefined &&
+      bindingMatches(target, next.materialBinding)
+    ) {
       return {};
     }
-    const next = {
-      ...applyMaterialRecipe(target, preset.recipe),
-      materialBinding,
-    };
     applied = true;
     return {
       project: {

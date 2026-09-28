@@ -35,6 +35,15 @@ export function parkTarget(group: CncGroup | undefined, finish: Vec2 | undefined
   };
 }
 
+// ADR-491: the height the bit lifts to before a park move, never below the
+// job's safe Z. Without a park height it is the safe Z, as it always was.
+export function parkHeightMm(group: CncGroup | undefined, maxSafeZMm: number): number {
+  const parkZMm = group?.parkZMm;
+  return parkZMm !== undefined && Number.isFinite(parkZMm)
+    ? Math.max(maxSafeZMm, parkZMm)
+    : maxSafeZMm;
+}
+
 // The modal state every KerfDesk CNC program runs in, stated in the preamble
 // and again after each tool-change hold, since a Console command or `$N`
 // startup block may have changed any of it.
@@ -79,7 +88,7 @@ export function appendGroupTransition(
 // continues. Touch-off leaves the new bit at Z0 on the stock, so the first
 // resumed command lifts to safe Z with the spindle off; only then may M3 run.
 function appendToolChange(lines: string[], head: Head, group: CncGroup, state: EmitState): void {
-  appendRetract(lines, head, state.maxSafeZ);
+  appendRetract(lines, head, parkHeightMm(group, state.maxSafeZ));
   lines.push('M5');
   appendCoolantStop(lines, state.coolant);
   const park = parkTarget(group, state.finish);
@@ -124,6 +133,7 @@ export function appendSpindleStart(
   lines.push(`M3 S${Math.max(0, Math.round(rpm))}`);
   // This is deliberately time-based. Stock GRBL's FS value reflects its
   // commanded/limited spindle output, not tachometer-backed physical RPM.
-  // CNC preflight rejects non-positive durations before output can be written.
+  // A spin-up time of 0 s writes no dwell; Pause and lift then waits its own
+  // default spin-up above the cut before re-entering (ADR-411 Amendment 1).
   if (spinupSec > 0) lines.push(`G4 P${fmt(spinupSec)}`);
 }

@@ -77,6 +77,9 @@ describe('editorKerfThickenTarget', () => {
     ['mask', image({ imageMaskId: 'M1' }), layer(), group()],
     ['resampling', image(), layer(), group({ pixelWidth: 1 })],
     ['luma adjustment', image({ brightness: 1 }), layer(), group()],
+    ['scan angle', image(), layer({ imageScanAngleDeg: 45 }), group()],
+    ['cross-hatch', image(), layer({ imageCrossHatch: true }), group()],
+    ['angle per pass', image(), layer({ passes: 2, passAngleStepDeg: 90 }), group()],
   ] as const)('keeps %s warning-only', (_label, object, operation, raster) => {
     const session = createSession('R1', 'image.png', createRgbaBuffer(2, 1), BOUNDS);
     expect(

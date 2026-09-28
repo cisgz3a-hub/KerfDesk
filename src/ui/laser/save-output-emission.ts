@@ -1,5 +1,6 @@
 import { emitPreparedGcode, type EmitGcodeOptions, type PreparedOutput } from '../../io/gcode';
 import type { PreflightResult } from '../../core/preflight';
+import { sceneObjectUsesOperation, type Scene, type Vec2 } from '../../core/scene';
 import { outputPreparationFailure } from './output-preparation-errors';
 import {
   compiledVCarveLayerDepths,
@@ -10,6 +11,17 @@ const FACTUAL_EMISSION_REFUSAL_CODES = new Set([
   'coordinate-unencodable',
   'program-materialization-failed',
 ]);
+
+/**
+ * Where preparation put the design in the program, for the G-code Inspector's
+ * carved stock to compare with (ADR-487).
+ */
+export type EmittedDesignPlacement = {
+  /** What preparation added to the design's machine X and Y. */
+  readonly jobOriginOffset: Vec2;
+  /** The reliefs on operations the program carves. */
+  readonly reliefIds: ReadonlyArray<string>;
+};
 
 /**
  * Tagged Save emission result. Callers must branch on `kind`;
@@ -40,6 +52,7 @@ export type SaveOutputEmission =
       readonly preflight: ReturnType<typeof emitPreparedGcode>['preflight'];
       readonly cncVCarveDepths: ReadonlyArray<CompiledVCarveLayerDepth>;
       readonly machineWarnings?: ReadonlyArray<string>;
+      readonly placement?: EmittedDesignPlacement;
     };
 
 /**
@@ -70,7 +83,22 @@ export function emitSavePreparedOutput(
     ...emitted,
     cncVCarveDepths: compiledVCarveLayerDepths(prepared.job),
     machineWarnings,
+    placement: {
+      jobOriginOffset: prepared.jobOriginOffset,
+      reliefIds: outputReliefIds(prepared.project.scene),
+    },
   };
+}
+
+// The reliefs an output operation carves, as the CNC compiler picks them.
+function outputReliefIds(scene: Scene): ReadonlyArray<string> {
+  const output = scene.layers.filter((layer) => layer.output);
+  return scene.objects
+    .filter(
+      (object) =>
+        object.kind === 'relief' && output.some((layer) => sceneObjectUsesOperation(object, layer)),
+    )
+    .map((object) => object.id);
 }
 
 export function unavailableSaveOutput(message: string): SaveOutputEmission {
