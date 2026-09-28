@@ -46,7 +46,8 @@ roughing allowance, with no tabs. This was found while working on ADR-273 Amendm
 - A relief row's line agrees with the compiled summary under it, for example `Actual max depth
   2.5 mm`.
 - The Cut and Depth mm columns still show the operation's settings. The line now says which
-  shapes they reach.
+  shapes they reach. Amendment 4 shows the reliefs and their compiled depth there instead when
+  the operation cuts nothing else.
 - ADR-273 Amendment 1 still notes, from the same compiled job, the relief stages that plunge. A
   relief-only operation with a 5° ramp and a finishing bit reads `relief roughing 2 levels to
   2.5 mm · stepover 40% · ramp entry 5° (relief finishing plunges) · Manual feeds`.

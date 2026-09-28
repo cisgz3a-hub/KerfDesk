@@ -5,16 +5,21 @@ import { useStore } from '../state';
 import { CutSettingsFillDirectionPreview } from './CutSettingsFillDirectionPreview';
 import { CutSettingsFillDensityFields } from './CutSettingsFillDensityFields';
 import { scanLineOverscanNote } from './fill-overscan-fallback';
+import { PassAngleStepField } from './CutSettingsScanPatternFields';
+import { AutoOverscanSwitch, automaticOverscanNote } from './CutSettingsAutoOverscan';
 
 export function CutSettingsFillFields(props: {
   readonly layer: Layer;
   readonly lineIntervalMm: number;
   readonly onLineIntervalMmChange: (lineIntervalMm: number) => void;
+  /** Angle per pass (ADR-492) and Automatic overscan (ADR-495): Cut Settings only. */
+  readonly showCutSettingsExtras?: boolean;
 }): JSX.Element {
   const [fillStyle, setFillStyle] = useState(props.layer.fillStyle);
   const [hatchAngleDeg, setHatchAngleDeg] = useState(props.layer.hatchAngleDeg);
   const [fillCrossHatch, setFillCrossHatch] = useState(props.layer.fillCrossHatch);
   const [fillOverscanMm, setFillOverscanMm] = useState(props.layer.fillOverscanMm);
+  const [automatic, setAutomatic] = useState(props.layer.autoOverscan === true);
   return (
     <fieldset className="lf-fieldset lf-cut-settings-group">
       <legend className="lf-legend">Fill detail</legend>
@@ -22,25 +27,7 @@ export function CutSettingsFillFields(props: {
         Choose a pattern, then adjust the spacing and direction of the engraved lines.
       </p>
       <CutSettingsFillDirectionPreview angleDeg={hatchAngleDeg} crossHatch={fillCrossHatch} />
-      <Field label="Style">
-        <select
-          name="fillStyle"
-          className="lf-select"
-          value={fillStyle}
-          onChange={(event) => {
-            const value = event.currentTarget.value;
-            if (value === 'scanline' || value === 'offset' || value === 'island') {
-              setFillStyle(value);
-            }
-          }}
-          aria-label="Cut settings fill style"
-          title="Choose Scanline, Follow Shape, or Island Fill for filled paths."
-        >
-          <option value="scanline">Scanline</option>
-          <option value="offset">Follow Shape</option>
-          <option value="island">Island Fill</option>
-        </select>
-      </Field>
+      <FillStyleField value={fillStyle} onChange={setFillStyle} />
       <Field label="Scan angle">
         <NumberInput
           name="hatchAngleDeg"
@@ -64,13 +51,53 @@ export function CutSettingsFillFields(props: {
         fillStyle={fillStyle}
         value={fillOverscanMm}
         onChange={setFillOverscanMm}
+        automatic={
+          props.showCutSettingsExtras === true && fillStyle !== 'offset'
+            ? {
+                checked: automatic,
+                onChange: setAutomatic,
+                hatchAngleDeg,
+                speed: props.layer.speed,
+              }
+            : null
+        }
       />
       <FillScanDirectionFields
         layer={props.layer}
         crossHatch={fillCrossHatch}
         onCrossHatchChange={setFillCrossHatch}
       />
+      {props.showCutSettingsExtras === true && fillStyle !== 'offset' ? (
+        <PassAngleStepField layer={props.layer} />
+      ) : null}
     </fieldset>
+  );
+}
+
+function FillStyleField(props: {
+  readonly value: Layer['fillStyle'];
+  readonly onChange: (value: Layer['fillStyle']) => void;
+}): JSX.Element {
+  return (
+    <Field label="Style">
+      <select
+        name="fillStyle"
+        className="lf-select"
+        value={props.value}
+        onChange={(event) => {
+          const value = event.currentTarget.value;
+          if (value === 'scanline' || value === 'offset' || value === 'island') {
+            props.onChange(value);
+          }
+        }}
+        aria-label="Cut settings fill style"
+        title="Choose Scanline, Follow Shape, or Island Fill for filled paths."
+      >
+        <option value="scanline">Scanline</option>
+        <option value="offset">Follow Shape</option>
+        <option value="island">Island Fill</option>
+      </select>
+    </Field>
   );
 }
 
@@ -121,22 +148,50 @@ function FillOverscanField(props: {
   readonly fillStyle: Layer['fillStyle'];
   readonly value: number;
   readonly onChange: (value: number) => void;
+  /** ADR-495's switch; null where it is not offered. */
+  readonly automatic: {
+    readonly checked: boolean;
+    readonly onChange: (checked: boolean) => void;
+    readonly hatchAngleDeg: number;
+    readonly speed: number;
+  } | null;
 }): JSX.Element {
   const device = useStore((state) => state.project.device);
-  const note = props.fillStyle === 'scanline' ? scanLineOverscanNote(device, props.value) : null;
+  const automatic = props.automatic;
+  const isAutomatic = automatic?.checked === true;
+  const note =
+    props.fillStyle === 'scanline' && !isAutomatic
+      ? scanLineOverscanNote(device, props.value)
+      : null;
   return (
-    <Field label="Overscan">
-      <NumberInput
-        name="fillOverscanMm"
-        value={props.value}
-        min={0}
-        max={MAX_FILL_OVERSCAN_MM}
-        step={0.5}
-        onChange={props.onChange}
-      />
-      <span className="lf-field-unit">mm</span>
-      {note === null ? null : <span style={FALLBACK_STYLE}>{note}</span>}
-    </Field>
+    <>
+      <Field label="Overscan">
+        <NumberInput
+          name="fillOverscanMm"
+          value={props.value}
+          min={0}
+          max={MAX_FILL_OVERSCAN_MM}
+          step={0.5}
+          disabled={isAutomatic}
+          onChange={props.onChange}
+        />
+        <span className="lf-field-unit">mm</span>
+        {note === null ? null : <span style={FALLBACK_STYLE}>{note}</span>}
+      </Field>
+      {automatic === null ? null : (
+        <AutoOverscanSwitch checked={automatic.checked} onChange={automatic.onChange} />
+      )}
+      {automatic?.checked === true ? (
+        <p className="lf-laser-help">
+          {automaticOverscanNote({
+            speed: automatic.speed,
+            scanAngleDeg: automatic.hatchAngleDeg,
+            device,
+            maxMm: MAX_FILL_OVERSCAN_MM,
+          })}
+        </p>
+      ) : null}
+    </>
   );
 }
 
@@ -161,6 +216,7 @@ function NumberInput(props: {
   readonly max?: number;
   readonly step?: number;
   readonly label?: string;
+  readonly disabled?: boolean;
   readonly onChange?: (value: number) => void;
 }): JSX.Element {
   return (
@@ -171,6 +227,7 @@ function NumberInput(props: {
       min={props.min}
       {...(props.max !== undefined ? { max: props.max } : {})}
       step={props.step ?? 1}
+      disabled={props.disabled === true}
       {...(props.onChange !== undefined
         ? {
             value: props.value,

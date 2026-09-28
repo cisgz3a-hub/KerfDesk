@@ -9,6 +9,7 @@ import {
   type Polyline,
 } from '../scene';
 import { sourceRegionMajorDepthPasses } from './compile-cnc-helpers';
+import { pocketPassLinks } from './pocket-stay-down-links';
 import { resolveRestPocketOperation } from './cnc-rest-operation';
 import { zPassDepths } from './depth-passes';
 import { compileStraightInlayGroupsWithEvidence } from './inlay-pair-operation';
@@ -123,10 +124,12 @@ function restPocketRoughingGroupForLayer(
           'pocket',
           machineFrameHandedness(device.origin),
         );
-  let passes: ReadonlyArray<CncPass> = sourceRegionMajorDepthPasses(
+  // Roughing bits are end mills, so their wall ring sits one diameter wide.
+  let passes: ReadonlyArray<CncPass> = pocketPassLinks(
+    sourceRegionMajorDepthPasses(polylines, roughToolpaths, depths),
     polylines,
-    roughToolpaths,
-    depths,
+    settings,
+    operation.roughTool.diameterMm,
   );
   if (settings.rampEntryDeg !== undefined) {
     passes = applyRampEntry(passes, settings.rampEntryDeg, false, operation.roughTool.diameterMm);

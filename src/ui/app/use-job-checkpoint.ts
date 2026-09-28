@@ -14,10 +14,26 @@ import { settledCleanly } from '../state/post-job-clean-settle';
 import { useToastStore } from '../state/toast-store';
 import { useLaserSecondPassUiStore } from '../state/laser-second-pass-ui-store';
 import {
+  completeUnarchivedRun,
+  forgetUnarchivedRunOtherThan,
+  isUnarchivedRun,
+  releaseUnarchivedRun,
+} from '../state/laser-unarchived-run';
+import {
   checkpointInterruption,
   currentRunPlannerBacklog,
   runStopMayHaveLostPosition,
 } from './checkpoint-interruption';
+import {
+  activeInRepository,
+  cachedAck,
+  clearInactiveRunOwnership,
+  disappearedStreamInterruption,
+  onceTrackingFailureReporter,
+  progressDeferredOrSettled,
+  terminalRecordedOrUnarchived,
+  type TrackingFailureReporter,
+} from './job-checkpoint-repository';
 import {
   checkpointArchiveHandoffIsCurrent,
   pendingCheckpointArchiveHandoff,
@@ -57,8 +73,6 @@ type FirstInterruption = {
   readonly ackedLines: number;
   readonly interruption: JobInterruption;
 };
-
-type TrackingFailureReporter = (error: unknown) => void;
 
 /** The one progress write allowed to wait behind the write in flight. */
 type WaitingProgress = { readonly runId: RunId; ackedLines: number };
@@ -150,6 +164,7 @@ class JobCheckpointTracker {
             interruption: first?.interruption ?? disappearedStreamInterruption(ended.status, state),
             settledAtIso: this.nowIso(),
           };
+      if (this.pendingMissingTerminal.kind === 'interrupted') releaseUnarchivedRun(ended.runId);
     }
     this.clearRunWatermarks();
     this.queueMissingTerminalSettlement();
@@ -169,10 +184,12 @@ class JobCheckpointTracker {
       currentJobStopRequest(state),
       currentRunPlannerBacklog(state),
       runStopMayHaveLostPosition(state),
+      Math.min(streamer.total, streamer.completed + streamer.inFlight.length),
     );
     this.previous = { runId, status: streamer.status, completed: streamer.completed };
 
     if (interruption !== null) {
+      releaseUnarchivedRun(runId);
       // A terminal streamer still counts the trailing oks for lines GRBL had
       // buffered. The interruption records the exact ack it saw; a progress
       // write carrying a later ack would only raise it or fail as a no-op.
@@ -209,7 +226,7 @@ class JobCheckpointTracker {
           interruption,
           this.nowIso(),
         );
-        if (interrupted.ok && interrupted.value) {
+        if (terminalRecordedOrUnarchived(interrupted, runId)) {
           this.clearDeferredArchiveHandoff(runId);
           return;
         }
@@ -312,6 +329,7 @@ class JobCheckpointTracker {
     }
     if (updated.ok && progressDeferredOrSettled(this.repository, runId, ackedLines)) return;
     if (updated.ok) this.untrackedRunId = runId;
+    if (updated.ok && isUnarchivedRun(runId)) return;
     this.reportQueueFailure(updated);
   }
 
@@ -320,6 +338,8 @@ class JobCheckpointTracker {
   }
 
   private beginRun(runId: RunId): void {
+    // A new run supersedes the kept one: it is no longer the job that just finished.
+    forgetUnarchivedRunOtherThan(runId);
     if (this.pendingMissingTerminal?.runId !== runId) this.pendingMissingTerminal = null;
     if (this.deferredArchiveHandoff?.runId !== runId) this.deferredArchiveHandoff = null;
     if (this.firstInterruption?.runId !== runId) this.firstInterruption = null;
@@ -358,13 +378,7 @@ class JobCheckpointTracker {
                 pending.settledAtIso,
               );
         if (!settled.ok || !settled.value) {
-          const handoff = this.archiveHandoffOrRetire(before, pending.runId);
-          if (this.deferMissingTerminal(pending, handoff)) {
-            retryAfterActivation = this.repository.getSnapshot().activeRun?.runId === pending.runId;
-            if (!settled.ok) this.reportQueueFailure(settled);
-            return;
-          }
-          this.reportQueueFailure(settled);
+          retryAfterActivation = this.missingTerminalNotSettled(pending, before, settled);
           return;
         }
         this.clearDeferredArchiveHandoff(pending.runId);
@@ -387,6 +401,35 @@ class JobCheckpointTracker {
     });
   }
 
+  /** Defers a no-op to archive activation, settles a run the archive never
+   * held, or reports. Returns whether to retry once activation lands. */
+  private missingTerminalNotSettled(
+    pending: PendingMissingTerminal,
+    before: ReturnType<RecoveryRepository['getSnapshot']>,
+    settled: Awaited<ReturnType<RecoveryRepository['completeRun']>>,
+  ): boolean {
+    const handoff = this.archiveHandoffOrRetire(before, pending.runId);
+    if (this.deferMissingTerminal(pending, handoff)) {
+      if (!settled.ok) this.reportQueueFailure(settled);
+      return this.repository.getSnapshot().activeRun?.runId === pending.runId;
+    }
+    if (!settled.ok || !this.settleUnarchivedRun(pending)) this.reportQueueFailure(settled);
+    return false;
+  }
+
+  /** The archive never held this run, so only this page knows how it ended:
+   * a clean finish is still the job that just finished (ADR-341 Amendment 7). */
+  private settleUnarchivedRun(pending: PendingMissingTerminal): boolean {
+    if (!isUnarchivedRun(pending.runId)) return false;
+    clearInactiveRunOwnership(pending.runId);
+    if (this.pendingMissingTerminal !== pending) return true;
+    this.pendingMissingTerminal = null;
+    if (pending.kind === 'completed' && completeUnarchivedRun(pending.runId)) {
+      this.onCompleted(pending.runId);
+    }
+    return true;
+  }
+
   private retryOwnedMissingTerminal(pending: PendingMissingTerminal): void {
     if (this.pendingMissingTerminal === pending) this.queueMissingTerminalSettlement();
   }
@@ -402,68 +445,6 @@ class JobCheckpointTracker {
     if (this.pendingMissingTerminal !== pending || handoff === null) return false;
     this.deferredArchiveHandoff = handoff;
     return true;
-  }
-}
-
-function progressDeferredOrSettled(
-  repository: RecoveryRepository,
-  runId: RunId,
-  ackedLines: number,
-): boolean {
-  const snapshot = repository.getSnapshot();
-  if (snapshot.activeRun?.runId === runId) return false;
-  if (snapshot.pendingStart?.runId === runId) return true;
-  if (snapshot.lastCompletedReceipt?.runId === runId) return true;
-  return (
-    snapshot.recoveryCapsule?.runId === runId && snapshot.recoveryCapsule.ackedLines >= ackedLines
-  );
-}
-
-function activeInRepository(repository: RecoveryRepository, runId: RunId): boolean {
-  return repository.getSnapshot().activeRun?.runId === runId;
-}
-
-function onceTrackingFailureReporter(
-  reportTrackingFailure: TrackingFailureReporter,
-): TrackingFailureReporter {
-  let hasReported = false;
-  return (error) => {
-    if (hasReported) return;
-    hasReported = true;
-    reportTrackingFailure(error);
-  };
-}
-
-function cachedAck(repository: RecoveryRepository, runId: RunId): number {
-  const active = repository.getSnapshot().activeRun;
-  return active?.runId === runId ? active.ackedLines : 0;
-}
-
-function disappearedStreamInterruption(
-  previousStatus: StreamerStatus,
-  state: LaserState,
-): JobInterruption {
-  return (
-    checkpointInterruption(
-      previousStatus,
-      state.safetyNotice,
-      currentJobStopRequest(state),
-      currentRunPlannerBacklog(state),
-      runStopMayHaveLostPosition(state),
-    ) ?? {
-      kind: state.connection.kind === 'connected' ? 'unknown' : 'disconnect',
-      message:
-        state.connection.kind === 'connected'
-          ? 'The job stream ended before clean physical completion.'
-          : 'The controller connection ended before clean physical completion.',
-    }
-  );
-}
-
-function clearInactiveRunOwnership(runId: RunId): void {
-  const state = useLaserStore.getState();
-  if (state.streamer === null && state.activeRunId === runId) {
-    useLaserStore.setState({ activeRunId: null });
   }
 }
 

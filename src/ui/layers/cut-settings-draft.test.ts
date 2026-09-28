@@ -235,6 +235,60 @@ describe('cut settings draft helpers', () => {
         .imageBidirectional,
     ).toBe(true);
   });
+
+  it('reads the scan pattern only from forms that show it (ADR-492)', () => {
+    const layer = imageLayer({ passes: 2 });
+    expect(
+      readCutSettingsPatch(
+        formData({
+          mode: 'image',
+          imageScanAngleDeg: '225',
+          imageCrossHatch: 'on',
+          passAngleStepDeg: '-400',
+        }),
+        layer,
+      ),
+    ).toMatchObject({ imageScanAngleDeg: 180, imageCrossHatch: true, passAngleStepDeg: -180 });
+    expect(
+      readCutSettingsPatch(formData({ mode: 'image', imageScanAngleDeg: '30' }), {
+        ...layer,
+        imageCrossHatch: true,
+      }).imageCrossHatch,
+    ).toBe(false);
+    const untouched = readCutSettingsPatch(formData({ mode: 'image' }), layer);
+    expect('imageScanAngleDeg' in untouched).toBe(false);
+    expect('imageCrossHatch' in untouched).toBe(false);
+    expect('passAngleStepDeg' in untouched).toBe(false);
+    const fill = readCutSettingsPatch(
+      formData({ mode: 'fill', passAngleStepDeg: '45', imageScanAngleDeg: '30' }),
+      fillLayer(),
+    );
+    expect(fill.passAngleStepDeg).toBe(45);
+    expect('imageScanAngleDeg' in fill).toBe(false);
+    expect(
+      'passAngleStepDeg' in
+        readCutSettingsPatch(formData({ mode: 'line', passAngleStepDeg: '45' }), lineLayer()),
+    ).toBe(false);
+  });
+
+  it('reads Automatic overscan only from forms that show the switch (ADR-495)', () => {
+    const layer = imageLayer({ autoOverscan: true });
+    expect(
+      readCutSettingsPatch(formData({ mode: 'image', autoOverscanShown: 'on' }), layer)
+        .autoOverscan,
+    ).toBe(false);
+    expect(
+      readCutSettingsPatch(
+        formData({ mode: 'fill', autoOverscanShown: 'on', autoOverscan: 'on' }),
+        fillLayer(),
+      ).autoOverscan,
+    ).toBe(true);
+    expect('autoOverscan' in readCutSettingsPatch(formData({ mode: 'image' }), layer)).toBe(false);
+    expect(
+      'autoOverscan' in
+        readCutSettingsPatch(formData({ mode: 'line', autoOverscanShown: 'on' }), lineLayer()),
+    ).toBe(false);
+  });
 });
 
 function formData(entries: Record<string, string>): FormData {

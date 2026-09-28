@@ -17,6 +17,8 @@ import {
 import { recolorLayer } from '../../core/scene/scene';
 import { applyLayerDefaultSettings } from '../layers/layer-default-settings';
 import { seedFreshCncLayer } from './cnc-auto-seeding';
+import { seedFreshLaserLayer } from './laser-recipe-seeding';
+import type { MaterialLibraryDocument } from '../../io/material-library';
 import type { CncLiveCapsState } from './cnc-live-caps-actions';
 import { cncSettingsForArtworkPaste } from './cnc-settings-clipboard';
 import { pruneSceneObjectOperationOverrides } from '../../core/scene/operation-binding';
@@ -35,6 +37,7 @@ type LayerActionState = StateSlice &
     readonly additionalSelectedIds: ReadonlySet<string>;
     readonly copiedLayerSettings: LayerSettingsClipboard | null;
     readonly layerDefaults: LayerDefaultsState;
+    readonly materialLibrary?: MaterialLibraryDocument | null;
   };
 
 type LayerActionMutation = {
@@ -176,7 +179,7 @@ function createManualLayerAction(set: LayerActionSet): LayerActions['createManua
               machine,
               liveCaps: state.cncLiveCaps,
             })
-          : base;
+          : seedFreshLaserLayer(base, state.project, state.materialLibrary ?? null);
       const scene = addLayer(state.project.scene, layer);
       return mutation(state, { ...state.project, scene });
     });
@@ -309,6 +312,14 @@ const LAYER_SETTING_KEYS = [
   'perforationSkipMm',
   'overcutMm',
   'imageOverscanMm',
+  'tabLayout',
+  'tabSpacingMm',
+  'tabMaxPerShape',
+  'tabCutPowerPercent',
+  'imageScanAngleDeg',
+  'imageCrossHatch',
+  'passAngleStepDeg',
+  'autoOverscan',
   'subLayers',
 ] as const satisfies ReadonlyArray<keyof LayerSettingsClipboard>;
 
@@ -341,12 +352,22 @@ function layerSettingsFrom(layer: Layer): LayerSettingsClipboard {
     passThrough: layer.passThrough,
     dotWidthCorrectionMm: layer.dotWidthCorrectionMm,
     // Explicitly undefined when unset, so pasting settings that never used
-    // perforation, overcut or image overscan turns them off on the target.
+    // perforation, overcut, image overscan, a tab layout or tab power
+    // (ADR-494), a scan pattern (ADR-492) or automatic overscan (ADR-495)
+    // turns them off on the target.
     perforationEnabled: layer.perforationEnabled,
     perforationCutMm: layer.perforationCutMm,
     perforationSkipMm: layer.perforationSkipMm,
     overcutMm: layer.overcutMm,
     imageOverscanMm: layer.imageOverscanMm,
+    tabLayout: layer.tabLayout,
+    tabSpacingMm: layer.tabSpacingMm,
+    tabMaxPerShape: layer.tabMaxPerShape,
+    tabCutPowerPercent: layer.tabCutPowerPercent,
+    imageScanAngleDeg: layer.imageScanAngleDeg,
+    imageCrossHatch: layer.imageCrossHatch,
+    passAngleStepDeg: layer.passAngleStepDeg,
+    autoOverscan: layer.autoOverscan,
     subLayers: layer.subLayers,
     ...(layer.materialBinding === undefined ? {} : { materialBinding: layer.materialBinding }),
     ...(layer.cnc === undefined ? {} : { cnc: layer.cnc }),

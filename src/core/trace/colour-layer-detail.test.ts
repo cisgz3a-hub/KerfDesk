@@ -73,4 +73,23 @@ describe('colour-layer deliberate small features', () => {
     expect(covers(red, { x: 8.5, y: 8.5 })).toBe(false);
     expect(covers(red, { x: 35.5, y: 35.5 })).toBe(true);
   });
+
+  // ADR-461 Amendment 1: a dithered area cleans up into solid colour, as
+  // before 2026-09-27, instead of one outline per pixel.
+  it.each([
+    ['checkerboard', (x: number, y: number) => (x + y) % 2 === 0],
+    ['Bayer gradient', (x: number, y: number) => (x - 10) / 10 > BAYER[(y % 4) * 4 + (x % 4)]!],
+  ] as const)('traces a %s dither as a few solid shapes', async (_, inked) => {
+    const image = canvas(180, 80, [255, 255, 255]);
+    fillRect(image, 20, 70, 160, 76, [0, 0, 0]);
+    for (let y = 10; y < 60; y += 1)
+      for (let x = 10; x < 170; x += 1)
+        if (inked(x, y)) fillRect(image, x, y, x + 1, y + 1, [30, 50, 200]);
+    const paths = await traceImageToColoredPaths(image, OPTIONS);
+    const outlines = paths.reduce((sum, path) => sum + path.polylines.length, 0);
+    expect(outlines).toBeGreaterThan(0);
+    expect(outlines).toBeLessThanOrEqual(3);
+  });
 });
+
+const BAYER = [0, 8, 2, 10, 12, 4, 14, 6, 3, 11, 1, 9, 15, 7, 13, 5];

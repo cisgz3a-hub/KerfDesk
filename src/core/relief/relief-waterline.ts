@@ -16,15 +16,22 @@
 // With dz = rowSpacing x sin(steep angle), every slope at or above the steep
 // angle is covered at no more than the row spacing, the same across-pass
 // spacing the raster keeps on the shallow slopes it covers.
+//
+// A masked map's excluded stock stands as blocks the contours ride round like
+// any wall (ADR-484, relief-mask-stock.ts). Every waterline move is level and
+// checked a quarter cell apart, beside the wall; the blocks keep the cutter
+// off by the dilation's clearance plus half that spacing and that reach, so
+// no point of a move comes nearer than a checked one allows.
 
 import type { CncPath3dPass } from '../job';
 import type { ToolKernel } from '../sim';
 import type { Heightmap } from './heightmap';
-import { createSurfaceContactField } from './heightmap-surface-contact';
+import { createSurfaceContactField, type SurfaceContactField } from './heightmap-surface-contact';
 import { FINISHING_REDUCTION_TOLERANCE_MM } from './relief-finishing-path';
+import { createMaskStock, type MaskStock, raisedOverStock } from './relief-mask-stock';
 import { waterlineContours, type WaterlineSurface } from './relief-waterline-contours';
 import { orderWaterlinePaths, type WaterlineLevelPath } from './relief-waterline-order';
-import { waterlinePath } from './relief-waterline-path';
+import { WALL_REACH_MM, waterlinePath } from './relief-waterline-path';
 
 // Floating-point slack on "the tip clears z": far below the 0.001 mm emit grid.
 const CLEARANCE_SLACK_MM = 1e-6;
@@ -41,24 +48,25 @@ export type ReliefWaterlineOptions = {
 };
 
 /**
- * Waterline passes over the steep part of an unmasked map's tip surface `tip`
- * (the zero-allowance dilation). A masked map returns none: its excluded
- * cells have no triangulated surface to contour against.
+ * Waterline passes over the steep part of the map's tip surface: `dilated`,
+ * its zero-allowance dilation with the map's mask, raised over excluded stock.
  */
 export function reliefWaterlinePasses(
   map: Heightmap,
-  tip: Float32Array,
+  dilated: Float32Array,
   options: ReliefWaterlineOptions,
 ): ReadonlyArray<CncPath3dPass> {
-  if (map.inclusion?.includes(0) === true || !(options.levelStepMm > 0)) return [];
+  if (!(options.levelStepMm > 0)) return [];
   const contact = createSurfaceContactField(map, options.kernel);
   if (contact === null) return [];
-  const surface: WaterlineSurface = {
-    // Asking with z as the floor lets the contact prune every element that
-    // cannot reach z, which is most of them.
-    clears: (x, y, z) => contact.clearsAtPoint(x, y, z, CLEARANCE_SLACK_MM),
-    tipAt: (x, y) => contact.constraintAtPoint(x, y, Number.NEGATIVE_INFINITY),
-  };
+  const checkSpacingMm = map.mmPerCell / 4;
+  const stock = createMaskStock(
+    map,
+    options.kernel,
+    options.kernel.maskPathUncertaintyMm + checkSpacingMm / 2 + WALL_REACH_MM,
+  );
+  const surface = waterlineSurface(contact, stock);
+  const tip = stock === null ? dilated : raisedOverStock(map, dilated, stock);
   const steep = steepSamples(map, tip, Math.tan((options.steepAngleDeg * Math.PI) / 180));
   const region = squaresTouching(map, steep.flags);
   if (!steep.any) return [];
@@ -70,7 +78,7 @@ export function reliefWaterlinePasses(
       const points = waterlinePath(contour.points, contour.closed, {
         z,
         surface,
-        checkSpacingMm: map.mmPerCell / 4,
+        checkSpacingMm,
         toleranceMm: FINISHING_REDUCTION_TOLERANCE_MM,
       });
       if (points.length < 2) continue;
@@ -84,8 +92,22 @@ export function reliefWaterlinePasses(
   return orderWaterlinePaths(paths, {
     surface,
     maxLinkMm: options.maxLinkMm,
-    checkSpacingMm: map.mmPerCell / 4,
+    checkSpacingMm,
   });
+}
+
+function waterlineSurface(contact: SurfaceContactField, stock: MaskStock | null): WaterlineSurface {
+  // Asking with z as the floor lets the contact prune every element that
+  // cannot reach z, which is most of them.
+  const surfaceClears = (x: number, y: number, z: number): boolean =>
+    contact.clearsAtPoint(x, y, z, CLEARANCE_SLACK_MM);
+  const surfaceTip = (x: number, y: number): number =>
+    contact.constraintAtPoint(x, y, Number.NEGATIVE_INFINITY);
+  if (stock === null) return { clears: surfaceClears, tipAt: surfaceTip };
+  return {
+    clears: (x, y, z) => stock.tipAt(x, y) <= z && surfaceClears(x, y, z),
+    tipAt: (x, y) => Math.max(stock.tipAt(x, y), surfaceTip(x, y)),
+  };
 }
 
 // Samples whose tip-surface slope reaches the steep angle, by central

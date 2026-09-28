@@ -11,6 +11,7 @@ import {
   type CompiledReliefFacts,
   type PlungingReliefStage,
 } from './job-review-detail-facts';
+import { tabSpanGroupLabel } from './job-review-laser-tabs';
 
 import { cncCuttingStageLabel } from '../../../core/scene/cnc-stage-recipe';
 import { nominalChiploadMm } from '../../../core/cnc/nominal-chipload';
@@ -90,6 +91,7 @@ function plungingReliefStagesByLayer(
 // levels the reliefs cut and whether any other shape was cut beside them.
 function compiledReliefFactsByLayer(job: Job): ReadonlyMap<string, CompiledReliefFacts> {
   const levelsByLayer = new Map<string, Set<number>>();
+  const maxDepthByLayer = new Map<string, number>();
   const otherShapeLayers = new Set<string>();
   for (const group of job.groups) {
     if (group.kind !== 'cnc') continue;
@@ -100,6 +102,10 @@ function compiledReliefFactsByLayer(job: Job): ReadonlyMap<string, CompiledRelie
     const levels = levelsByLayer.get(group.layerId) ?? new Set<number>();
     if (group.cutType === 'relief-rough') addRoughingLevels(levels, group);
     levelsByLayer.set(group.layerId, levels);
+    // Amendment 4: finishing cuts the allowance roughing leaves, so it can
+    // reach deeper than the deepest roughing level.
+    const depthMm = cncGroupMaximumDepth(group).value;
+    maxDepthByLayer.set(group.layerId, Math.max(maxDepthByLayer.get(group.layerId) ?? 0, depthMm));
   }
   const reliefCounts = compiledReliefCounts(job);
   const facts = new Map<string, CompiledReliefFacts>();
@@ -107,6 +113,7 @@ function compiledReliefFactsByLayer(job: Job): ReadonlyMap<string, CompiledRelie
     facts.set(layerId, {
       roughingLevelDepthsMm: [...levels].sort((a, b) => a - b),
       reliefCount: reliefCounts.get(layerId) ?? 0,
+      maxDepthMm: maxDepthByLayer.get(layerId) ?? 0,
       cutsOtherShapes: otherShapeLayers.has(layerId),
     });
   }
@@ -221,7 +228,7 @@ function laserGroupSummary(
       }
     | undefined,
 ): string {
-  const kind = group.kind === 'cut' ? 'Line' : group.kind === 'fill' ? 'Fill' : 'Image';
+  const kind = laserGroupKindLabel(group);
   const powerMode =
     group.kind !== 'raster' && group.powerMode !== undefined ? ` · ${group.powerMode} power` : '';
   const speed =
@@ -242,6 +249,15 @@ function laserGroupSummary(
     ` · ${group.passes} ${plural(group.passes, 'pass', 'passes')}` +
     ` · air ${group.airAssist ? 'on' : 'off'}${powerMode}${contourEntry}${overrideFacts}`
   );
+}
+
+function laserGroupKindLabel(group: Exclude<Group, CncGroup>): string {
+  if (group.kind === 'fill') return 'Fill';
+  if (group.kind === 'raster') return 'Image';
+  // ADR-494: the group that burns a Line operation's tab spans.
+  return group.tabSpanPowerPercent === undefined
+    ? 'Line'
+    : tabSpanGroupLabel(group.tabSpanPowerPercent);
 }
 
 function reportsGeometryDerivedDepth(cutType: string): boolean {

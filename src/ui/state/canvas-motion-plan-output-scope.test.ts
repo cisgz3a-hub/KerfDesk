@@ -34,3 +34,31 @@ describe('canvasPlanRetentionKey output scope (ADR-327)', () => {
     expect(second).not.toBe(first);
   });
 });
+
+// Saved head positions (ADR-493) never reach the program; the finish position does.
+describe('canvasPlanRetentionKey head positions (ADR-493)', () => {
+  const placement = { startFrom: 'absolute' as const, anchor: 'front-left' as const };
+
+  it('ignores a saved head position but keys on the laser finish position', () => {
+    const project = createProject();
+    const base = canvasPlanRetentionKey(project, DEFAULT_OUTPUT_SCOPE, placement);
+    const saved = canvasPlanRetentionKey(
+      {
+        ...project,
+        device: {
+          ...project.device,
+          savedPositions: [{ name: 'Corner', frame: 'origin', xMm: 1, yMm: 2 }],
+        },
+      },
+      DEFAULT_OUTPUT_SCOPE,
+      placement,
+    );
+    const finish = canvasPlanRetentionKey(
+      { ...project, device: { ...project.device, laserFinishPosition: { kind: 'stay' } } },
+      DEFAULT_OUTPUT_SCOPE,
+      placement,
+    );
+    expect(saved).toBe(base);
+    expect(finish).not.toBe(base);
+  });
+});

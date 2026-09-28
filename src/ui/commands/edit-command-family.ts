@@ -1,5 +1,7 @@
 import { disabled, enabled, type AppCommand, type AppCommandContext } from './command-types';
+import { deleteDuplicatesCommand, designSelectionCommands } from './design-tools-commands';
 import { pasteInPlaceCommand, selectionEditCommands } from './editing-tools-commands';
+import { settingsCommand } from './settings-command';
 
 export function editCommands(ctx: AppCommandContext): ReadonlyArray<AppCommand> {
   return [
@@ -7,6 +9,7 @@ export function editCommands(ctx: AppCommandContext): ReadonlyArray<AppCommand> 
     redoCommand(ctx),
     enabled('edit.select-all', 'edit', 'Select All', 'Select all artwork', ctx.selectAll, 'Ctrl+A'),
     ...selectionEditCommands(ctx),
+    ...designSelectionCommands(ctx),
     selectionCommand(
       ctx,
       'edit.copy',
@@ -45,6 +48,7 @@ export function editCommands(ctx: AppCommandContext): ReadonlyArray<AppCommand> 
       ctx.deleteSelection,
       'Delete',
     ),
+    deleteDuplicatesCommand(ctx),
     enabled(
       'edit.clear-selection',
       'edit',
@@ -53,6 +57,7 @@ export function editCommands(ctx: AppCommandContext): ReadonlyArray<AppCommand> 
       ctx.clearSelection,
       'Esc',
     ),
+    settingsCommand(ctx),
   ];
 }
 

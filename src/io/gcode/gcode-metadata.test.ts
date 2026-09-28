@@ -41,9 +41,7 @@ function laserAssumptions(
 
 describe('gcodeMetadataHeader', () => {
   it('tracks the latest safety-relevant emitter revision', () => {
-    expect(EMITTER_REVISION).toBe(
-      'trace-arcs-relief-width-ramp-contact-air-scan-v2-unramped-groups-20260928-v8',
-    );
+    expect(EMITTER_REVISION).toBe('park-kerf-arcs-scan-angle-overscan-unramped-20260928-v8');
   });
 
   it('emits provenance as GRBL comment lines and ends with a newline', () => {

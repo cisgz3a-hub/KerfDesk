@@ -13,6 +13,7 @@ import {
   type Origin,
 } from '../../core/devices';
 import { recoverCncSubProfile } from '../../core/devices/cnc-sub-profile-validation';
+import { canonicalHeadPositions } from '../../core/devices/head-position-shape';
 import { DEFAULT_CNC_MACHINE_PARAMS } from '../../core/scene';
 import { normalizeCameraProfile } from '../../core/camera';
 import { normalizeCameraModelRecord } from '../../core/camera/model/camera-model-record';
@@ -344,6 +345,7 @@ function canonicalProfile(profile: DeviceProfile): DeviceProfile {
       ? {}
       : { estimateTravelTimeScale: profile.estimateTravelTimeScale }),
     ...canonicalZMetadata(profile),
+    ...canonicalHeadPositions(profile),
   };
 }
 

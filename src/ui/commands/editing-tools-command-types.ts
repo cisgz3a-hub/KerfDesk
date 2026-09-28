@@ -1,10 +1,12 @@
 // The AppCommandContext slice for LightBurn gap batch 3 (ADR-410), kept in its
-// own file so command-types.ts stays inside the size cap.
+// own file so command-types.ts stays inside the size cap. Batch 5 (ADR-480)
+// joins it from design-tools-command-types.ts.
 
 import type { SelectionAnchor } from '../../core/scene';
 import type { QuarterTurnDirection } from '../../core/scene/selection-placement';
+import type { DesignToolsCommandContext, DesignToolsCommandId } from './design-tools-command-types';
 
-export type EditingToolsCommandContext = {
+export type EditingToolsCommandContext = DesignToolsCommandContext & {
   readonly pasteInPlace: () => void;
   readonly invertSelection: () => void;
   readonly selectOpenShapes: () => void;
@@ -17,6 +19,7 @@ export type EditingToolsCommandContext = {
 };
 
 export type EditingToolsCommandId =
+  | DesignToolsCommandId
   | 'edit.paste-in-place'
   | 'edit.invert-selection'
   | 'edit.select-open-shapes'

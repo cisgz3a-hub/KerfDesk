@@ -27,6 +27,8 @@ import type { DesignApplyRecord } from './design-apply-record';
 import { createRegistrationBox, createRegistrationCircle } from '../../core/shapes';
 import { applyLayerDefaultSettings } from '../layers/layer-default-settings';
 import { seedFreshCncLayer } from './cnc-auto-seeding';
+import { seedFreshLaserLayer } from './laser-recipe-seeding';
+import type { MaterialLibraryDocument } from '../../io/material-library';
 import type { CncLiveCapsState } from './cnc-live-caps-actions';
 import { defaultSettingsForOperation, type LayerDefaultsState } from './layer-default-actions';
 import type { AppState } from './store';
@@ -128,6 +130,7 @@ function importSvgObjectAction(set: Setter, get: Getter): AppState['importSvgObj
           applyFreshImport(state, object, batchOffsetIdx),
           state.layerDefaults,
           state.cncLiveCaps,
+          state.materialLibrary,
         ),
       );
       outcome = fitted.outcome;
@@ -161,6 +164,7 @@ function reimportSvgObjectAction(set: Setter, get: Getter): AppState['reimportSv
         next.state,
         state.layerDefaults,
         state.cncLiveCaps,
+        state.materialLibrary,
       );
     });
     if (outcome !== null) fitAllObjects(get);
@@ -176,6 +180,7 @@ function upsertTextObjectAction(set: Setter): AppState['upsertTextObject'] {
         applyTextAndEmbeddedFont(state, text, embeddedFont, options),
         state.layerDefaults,
         state.cncLiveCaps,
+        state.materialLibrary,
       ),
     );
   };
@@ -189,6 +194,7 @@ function drawShapeAction(set: Setter): AppState['drawShape'] {
         applyDrawShape(state, shape),
         state.layerDefaults,
         state.cncLiveCaps,
+        state.materialLibrary,
       ),
     );
   };
@@ -205,6 +211,7 @@ function insertBoxPanelsAction(set: Setter): AppState['insertBoxPanels'] {
             next,
             state.layerDefaults,
             state.cncLiveCaps,
+            state.materialLibrary,
           );
     });
   };
@@ -230,6 +237,7 @@ function applyDesignSketchAction(set: Setter): AppState['applyDesignSketch'] {
         nextState,
         state.layerDefaults,
         state.cncLiveCaps,
+        state.materialLibrary,
       );
       return applyCarveSettingsToOperations(withDefaults, next.carveOperations);
     });
@@ -255,6 +263,7 @@ export function applyLayerDefaultsToFreshLayers<T extends { readonly project: Pr
   result: T,
   defaults: LayerDefaultsState,
   liveCaps: CncLiveCapsState['cncLiveCaps'],
+  materialLibrary: MaterialLibraryDocument | null,
 ): T {
   const existing = new Set(previousLayers.map((layer) => layer.id));
   const machine = result.project.machine;
@@ -266,8 +275,9 @@ export function applyLayerDefaultsToFreshLayers<T extends { readonly project: Pr
       Object.keys(settings).length === 0
         ? layer
         : applyLayerDefaultSettings(layer, settings, machineKindOf(machine));
-    // Seed fresh CNC layers from the project stock material (ADR-112); no-op
-    // for laser or when no material is chosen.
+    // Seed fresh CNC layers from the project stock material (ADR-112), and
+    // fresh laser layers from the job material's best recipe (ADR-496); each
+    // is a no-op when no material is chosen.
     const seeded =
       machine?.kind === 'cnc'
         ? seedFreshCncLayer(withDefaults, {
@@ -275,7 +285,7 @@ export function applyLayerDefaultsToFreshLayers<T extends { readonly project: Pr
             machine,
             liveCaps,
           })
-        : withDefaults;
+        : seedFreshLaserLayer(withDefaults, result.project, materialLibrary);
     if (seeded !== layer) changed = true;
     return seeded;
   });
@@ -303,6 +313,7 @@ function svgFragmentActions(
             applySvgFragmentImport(state, fragment, batchIndex),
             svgStructuralDefaults(state.layerDefaults),
             state.cncLiveCaps,
+            state.materialLibrary,
           ),
         );
         outcome = fitted.outcome;
@@ -322,6 +333,7 @@ function svgFragmentActions(
           next.state,
           svgStructuralDefaults(state.layerDefaults),
           state.cncLiveCaps,
+          state.materialLibrary,
         );
       });
       if (outcome !== null) fitAllObjects(get);

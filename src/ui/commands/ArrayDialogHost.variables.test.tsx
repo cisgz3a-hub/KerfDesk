@@ -4,7 +4,7 @@ import { Simulate } from 'react-dom/test-utils';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { useStore } from '../state';
 import { fixtureState, renderFixture } from '../state/variable-array-test-fixture';
-import { ArrayDialogHost } from './ArrayDialogHost';
+import { ArrayDialogHost, resetArrayDialogMemory } from './ArrayDialogHost';
 
 const mocks = vi.hoisted(() => ({ render: vi.fn() }));
 vi.mock('../text/render-variable-text', () => ({
@@ -18,6 +18,7 @@ let host: HTMLDivElement | null = null;
 const initial = useStore.getState();
 
 beforeEach(() => {
+  resetArrayDialogMemory();
   useStore.setState(fixtureState());
   mocks.render.mockReset().mockImplementation(renderFixture);
 });
