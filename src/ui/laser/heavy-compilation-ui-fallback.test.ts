@@ -180,7 +180,12 @@ describe('heavy preparation failure never falls back to the UI thread', () => {
       onProgress,
       controller.signal,
     );
-    expect(openInspector).toHaveBeenCalledWith('mixed-viewer (current canvas)', 'G21\nG90\n');
+    expect(openInspector).toHaveBeenCalledWith(
+      'mixed-viewer (current canvas)',
+      'G21\nG90\n',
+      // The mocked emission says nothing of where the design went.
+      undefined,
+    );
     expect(workerMocks.prepareSnapshot).not.toHaveBeenCalled();
   });
 });

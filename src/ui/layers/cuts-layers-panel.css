@@ -144,6 +144,22 @@
   border-top: 1px solid var(--lf-border);
 }
 
+/* The operations-list header reuses the row "•••" menu; its summary sits at
+   the top right of the header instead of the card. */
+.lf-operation-list__header {
+  position: relative;
+  min-height: 30px;
+}
+
+.lf-operation-list__header > .lf-artwork-hint {
+  padding-right: 34px;
+}
+
+.lf-operation-list__header > .lf-operation-card__management > summary {
+  top: 0;
+  right: 0;
+}
+
 .lf-artwork-view-tab.lf-btn[aria-selected='true'] {
   color: var(--lf-accent-fg);
   background: transparent;

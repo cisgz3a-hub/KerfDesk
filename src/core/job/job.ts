@@ -92,10 +92,18 @@ export type CutGroup = {
   // or no closed segments, so existing output stays byte-identical. Offset
   // fill groups drop it via the Omit below; overcut is a Line setting.
   readonly finalPassOvercutMm?: number;
+  // ADR-494: present only on the group that burns a Line operation's tab
+  // spans, which follows that operation's cut group; the share of the cut's
+  // power it runs at (`power` already includes it). Absent on every other
+  // group, so their output is unchanged.
+  readonly tabSpanPowerPercent?: number;
   readonly segments: ReadonlyArray<CutSegment>;
 };
 
-export type FillGroup = Omit<CutGroup, 'kind' | 'segments' | 'finalPassOvercutMm'> & {
+export type FillGroup = Omit<
+  CutGroup,
+  'kind' | 'segments' | 'finalPassOvercutMm' | 'tabSpanPowerPercent'
+> & {
   readonly kind: 'fill';
   readonly fillStyle?: LayerFillStyle;
   readonly islandMotionPolicy?: IslandFillMotionPolicy;
@@ -153,6 +161,12 @@ export type RasterGroup = {
   readonly bidirectionalScanOffsetMm?: number;
   readonly bidirectional?: boolean;
   readonly scanDirection?: EffectiveScanDirection;
+  // ADR-492: present only for an image scanned at an angle, in (0, 180). Then
+  // `bounds`, the pixel grid, rows, overscan and scan offset are all in the
+  // scan frame, which reaches machine coordinates by rotating this many
+  // degrees counter-clockwise about the machine origin (raster-scan-frame.ts).
+  // Absent means along machine X, exactly as before.
+  readonly scanAngleDeg?: number;
 };
 
 export type RasterRowProviderOrder = 'ascending-y' | 'descending-y';
@@ -174,13 +188,22 @@ export type CncContourPass = {
   readonly zMm: number; // cutting depth for this pass; negative below stock top
   readonly polyline: ReadonlyArray<Vec2>;
   readonly closed: boolean;
-  // Provenance marker: the layer asked for a ramp entry, but this path is too
-  // short to ramp along, so the pass keeps its straight plunge (ADR-471).
-  // G-code comments and Job Review disclose it; motion is unchanged.
+  // Provenance marker: the layer asked for a ramp entry, but this path (for
+  // relief roughing, the chain's first loop) is too short to ramp along, so the
+  // pass keeps its straight plunge (ADR-471, ADR-424 Amendment 1). G-code
+  // comments and Job Review disclose it; motion is unchanged.
   readonly entryPlunge?: true;
   // No descending 0.001 mm step fits the requested angle on this path's
   // represented segments. Omission keeps the existing short-path reason.
   readonly entryPlungeReason?: 'coordinate-precision';
+  // ADR-491: a stay-down link fed the bit here at this depth, so the pass needs
+  // no entry of its own (ramp entry leaves it alone).
+  readonly stayDownEntry?: true;
+  // ADR-489: earlier passes of this job have cut away everything the cutter
+  // would touch at or above this Z anywhere along this pass's path, so the
+  // emitter may rapid down to it plus CNC_AIR_RAPID_CLEARANCE_MM before the
+  // plunge instead of feeding down from safe Z. Absent: plunge from safe Z.
+  readonly airFloorZMm?: number;
 };
 
 export type CncPath3dPass = {
@@ -206,6 +229,11 @@ export type CncPath3dPass = {
   // ramp has no descending step at the coordinate precision.
   readonly entryPlunge?: true;
   readonly entryPlungeReason?: 'coordinate-precision';
+  // ADR-491: a short level move between two pocket passes, fed at the plunge
+  // feed in place of a lift and re-plunge. Provenance only.
+  readonly stayDownLink?: true;
+  // ADR-489: see CncContourPass.airFloorZMm.
+  readonly airFloorZMm?: number;
 };
 
 export type CncArcPass = {
@@ -216,6 +244,8 @@ export type CncArcPass = {
   readonly clockwise: boolean;
   readonly zMm: number;
   readonly closed: boolean;
+  // ADR-489: see CncContourPass.airFloorZMm.
+  readonly airFloorZMm?: number;
 };
 
 export type CncHelicalContourPass = {
@@ -322,6 +352,8 @@ export type CncGroup = {
   // machine origin (pre-H.9 output stays byte-identical).
   readonly parkXMm?: number;
   readonly parkYMm?: number;
+  // ADR-491: lift height before the park move. Absent = safe Z.
+  readonly parkZMm?: number;
   readonly passes: ReadonlyArray<CncPass>;
 };
 
@@ -351,6 +383,14 @@ export type JobDiagnostic =
       readonly source: string;
       readonly expectedPixels: number;
       readonly actualPixels: number;
+    }
+  // ADR-492: the operation asks for a scan angle, cross-hatch or an angle change
+  // per pass, but a rotary only keeps rows along X straight, so every pass
+  // scans along X.
+  | {
+      readonly kind: 'image-scan-angle-rotary';
+      readonly layerName: string;
+      readonly source: string;
     };
 
 /** Complete compile evidence for one scheduled V-carve operation. */
@@ -420,6 +460,16 @@ export type Job = {
   } | null;
   readonly diagnostics?: ReadonlyArray<JobDiagnostic>;
   readonly cncCompilation?: CncCompilationSidecar;
+  /** Laser finish placed by preparation (ADR-493). Absent keeps the default. */
+  readonly laserFinish?: JobLaserFinish;
 };
+
+/** Where a laser job leaves the head (ADR-493): `point` is in this job's program
+ * coordinates; `set-aside` is a configured bed finish that could not be placed,
+ * so the default applies and Job Review says why. */
+export type JobLaserFinish =
+  | { readonly kind: 'stay' }
+  | { readonly kind: 'point'; readonly x: number; readonly y: number }
+  | { readonly kind: 'set-aside'; readonly reason: 'unplaced' | 'rotary' };
 
 export const EMPTY_JOB: Job = { groups: [] };

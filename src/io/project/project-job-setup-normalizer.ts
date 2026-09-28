@@ -1,5 +1,5 @@
 import type { Project } from '../../core/scene';
-import type { ProjectJobPlacement } from '../../core/scene/project';
+import type { ProjectJobPlacement, ProjectLaserMaterial } from '../../core/scene/project';
 
 export function normalizeProjectJobSetup(raw: unknown): Project['jobSetup'] {
   const setup = isObject(raw) ? raw : {};
@@ -19,6 +19,19 @@ export function normalizeProjectJobSetup(raw: unknown): Project['jobSetup'] {
         ? [...new Set(outputScope['selectedObjectIds'] as ReadonlyArray<string>)]
         : [],
     },
+    ...(isObject(setup['laserMaterial'])
+      ? { laserMaterial: normalizeLaserMaterial(setup['laserMaterial']) }
+      : {}),
+  };
+}
+
+// ADR-496; shape validation has checked the fields.
+function normalizeLaserMaterial(raw: Record<string, unknown>): ProjectLaserMaterial {
+  const thicknessMm = raw['thicknessMm'];
+  return {
+    name: String(raw['name']),
+    ...(typeof thicknessMm === 'number' ? { thicknessMm } : {}),
+    autoApplyRecipes: raw['autoApplyRecipes'] === true,
   };
 }
 

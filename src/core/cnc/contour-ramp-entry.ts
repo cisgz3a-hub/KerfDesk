@@ -21,6 +21,9 @@ import {
  * - An open path cannot be lapped. It zig-zags along its first span (the whole
  *   path when that is short) back to its start at depth, then cuts the whole
  *   path at depth, so no sloped floor stays behind.
+ * - `endAtStart` (a stay-down link leaves from the ring's start, ADR-491):
+ *   the loop is descended into its start from one ramp length before it, so
+ *   the lap at depth ends on the start instead of where the descent ended.
  * - A path the ramp would have to go over again that is shorter than
  *   `minPathMm` (one cut width) keeps its plunge: the cutter's footprint then
  *   covers the whole path, so going round it again would only be a slower
@@ -32,6 +35,7 @@ export function rampContourPass(
   fromZ: number,
   tangent: number,
   minPathMm: number,
+  endAtStart = false,
 ): CncPass {
   const drop = fromZ - pass.zMm;
   // Already cut this deep, no ramp asked for, or no path to enter.
@@ -48,7 +52,7 @@ export function rampContourPass(
   const capacities = rampCapacities(path, tangent, depth.dropQuanta);
   if (!capacities.some((capacity) => capacity > 0)) return precisionPlunge(pass);
   const points = pass.closed
-    ? loopRampPoints(path, depth, capacities, tangent)
+    ? endingLoopRampPoints(path, depth, capacities, tangent, endAtStart)
     : zigZagRampPoints(path, depth, capacities, tangent);
   const ramped: CncPath3dPass = {
     kind: 'path3d',
@@ -104,6 +108,39 @@ function loopRampPoints(
     remaining -= step;
     points.push(at(b, rampZ(depth.targetQuanta + remaining)));
   }
+}
+
+// A link leaves the original ring seam, so build its descent backwards into
+// that seam using the same represented-coordinate budget as ordinary ramps.
+function endingLoopRampPoints(
+  ring: ReadonlyArray<Vec2>,
+  depth: RampDepth,
+  capacities: ReadonlyArray<number>,
+  tangent: number,
+  endAtStart: boolean,
+): Vec3[] {
+  if (!endAtStart) return loopRampPoints(ring, depth, capacities, tangent);
+  const last = ring.length - 1;
+  const capacity = capacities.reduce((sum, value) => sum + value, 0);
+  assertRampPointCount((Math.ceil(depth.dropQuanta / capacity) + 1) * last + 2);
+  const zMm = rampZ(depth.targetQuanta);
+  const descent: Vec3[] = [at(ring[last] as Vec2, zMm)];
+  let remaining = depth.dropQuanta;
+  for (let index = last; ; index = index === 1 ? last : index - 1) {
+    const nearer = ring[index] as Vec2;
+    const farther = ring[index - 1] as Vec2;
+    const step = capacities[index - 1] ?? 0;
+    if (step >= remaining) {
+      descent.push(
+        at(rampSegmentEnd(nearer, farther, tangent, remaining), rampZ(depth.fromQuanta)),
+      );
+      break;
+    }
+    remaining -= step;
+    descent.push(at(farther, rampZ(depth.fromQuanta - remaining)));
+  }
+  descent.reverse();
+  return [...descent, ...ring.slice(1).map((point) => at(point, zMm))];
 }
 
 // Zig-zag along the path's first span, forward and back an even number of
@@ -172,32 +209,51 @@ export type RampEntryPlunges = {
   readonly passes: number;
   readonly pocket: boolean;
   readonly coordinatePrecisionPasses?: number;
+  // Relief roughing chains (ADR-424 Amendment 1), counted apart from the
+  // layer's other passes: a relief layer may set their ramp in its own field.
+  readonly relief: boolean;
 };
 
-/** Per layer, the passes its ramp entry left to plunge (ADR-471). */
+/** Per layer, the passes its ramp entry left to plunge (ADR-471), with the
+ * layer's relief roughing reported on its own. */
 export function rampEntryPlungesByLayer(job: Job): ReadonlyArray<RampEntryPlunges> {
-  const byLayer = new Map<string, RampEntryPlunges>();
+  const found: RampEntryPlunges[] = [];
   for (const group of job.groups) {
     if (group.kind !== 'cnc') continue;
     const passes = rampEntryPlungeCount(group.passes);
     if (passes === 0) continue;
-    const seen = byLayer.get(group.layerId);
-    const coordinatePrecisionPasses =
-      (seen?.coordinatePrecisionPasses ?? 0) +
-      group.passes.filter(
-        (pass) =>
-          (pass.kind === 'contour' || pass.kind === 'path3d') &&
-          pass.entryPlunge === true &&
-          pass.entryPlungeReason === 'coordinate-precision',
-      ).length;
-    byLayer.set(group.layerId, {
+    const relief = group.cutType === 'relief-rough';
+    const index = found.findIndex(
+      (seen) => seen.layerId === group.layerId && seen.relief === relief,
+    );
+    const seen = index < 0 ? undefined : found[index];
+    const coordinatePrecisionPasses = precisionPlungeTotal(group.passes, seen);
+    const merged: RampEntryPlunges = {
       layerId: group.layerId,
       passes: (seen?.passes ?? 0) + passes,
       pocket: (seen?.pocket ?? false) || group.cutType === 'pocket',
-      ...(coordinatePrecisionPasses === 0 ? {} : { coordinatePrecisionPasses }),
-    });
+      relief,
+      ...(coordinatePrecisionPasses > 0 ? { coordinatePrecisionPasses } : {}),
+    };
+    if (index < 0) found.push(merged);
+    else found[index] = merged;
   }
-  return [...byLayer.values()];
+  return found;
+}
+
+function precisionPlungeTotal(
+  passes: ReadonlyArray<CncPass>,
+  seen: RampEntryPlunges | undefined,
+): number {
+  return (
+    (seen?.coordinatePrecisionPasses ?? 0) +
+    passes.filter(
+      (pass) =>
+        (pass.kind === 'contour' || pass.kind === 'path3d') &&
+        pass.entryPlunge === true &&
+        pass.entryPlungeReason === 'coordinate-precision',
+    ).length
+  );
 }
 
 /** Passes left to plunge because of path length or emitted-coordinate precision. */

@@ -6,12 +6,19 @@ import type { LineMaterial as LineMaterialType } from 'three/examples/jsm/lines/
 import type * as LineMaterialModule from 'three/examples/jsm/lines/LineMaterial.js';
 import type * as LineSegments2Module from 'three/examples/jsm/lines/LineSegments2.js';
 import type * as LineSegmentsGeometryModule from 'three/examples/jsm/lines/LineSegmentsGeometry.js';
+import { editLineMaterial, withShownMoves } from './line-shader-edits';
+import { addTrail, setTrail, type TrailUniforms } from './line-trail';
 import {
-  buildSegmentBuckets,
-  revealCount,
-  type SegmentBuckets,
-  type Viewer3dSegmentsInput,
-} from './segment-buckets';
+  COLOR_STRIDE,
+  createProgramGeometry,
+  programColors,
+  shareProgramGeometry,
+  writeProgramColors,
+} from './program-lines';
+import { createDetailLines, paintDetailLines } from './detail-lines';
+import { createCurrentMove, type CurrentMove } from './scene-current-move';
+import type { DetailTargets } from './scene-detail';
+import { buildTravelBucket, revealCount, type Viewer3dSegmentsInput } from './segment-buckets';
 import type { PlayheadMarker } from './viewer3d-scene';
 import type { Viewer3dTheme } from './viewer3d-theme';
 type ThreeModule = typeof ThreeNamespace;
@@ -22,80 +29,97 @@ export type TravelLine = ThreeNamespace.LineSegments<
 >;
 export const TRAVEL_OPACITY = 0.35;
 const FAT_LINE_PX = 2.5;
+const GHOST_PX = 1;
+const GHOST_OPACITY = 0.18;
 
 export type RevealTargets = {
   activeSegment: number;
   travelVisible: boolean;
+  /** What an old trail fades toward: the background, encoded as the lines are. */
+  fadeColor: readonly [number, number, number];
+  readonly background: number;
   readonly segKind: Uint8Array;
+  /** The same legend mask the drawn moves were built with. */
+  readonly moveFilter: Uint8Array | null;
   readonly positions: Float32Array;
-  readonly active: ReturnType<typeof lineSegmentsObject>;
-  readonly solidGhost: ReturnType<typeof lineSegmentsObject> | null;
+  /** The move under way, drawn bold to the playhead (ADR-470). */
+  readonly active: CurrentMove;
+  /** The faint copy of every solid move shown during playback. */
+  readonly solidGhost: { visible: boolean } | null;
   readonly travelGhost: ReturnType<typeof lineSegmentsObject> | null;
+  /** The solid moves in program order: instance i is move i (ADR-485). */
   readonly solid: {
-    // Narrow structural type rather than the addon class: only the instance
-    // count (reveal) and colour upload (lenses) are ever touched.
-    readonly geometry: {
-      instanceCount: number;
-      setColors: (colors: Float32Array) => unknown;
-    };
+    /** The drawn lines' geometry, whose instance count is the reveal. */
+    readonly geometry: LineSegmentsGeometryModule.LineSegmentsGeometry;
+    /** Every move in the program, shown or not. */
     readonly total: number;
+    /** Which done moves the playback trail keeps (ADR-470). */
+    readonly trail: TrailUniforms;
+    /** Red, green, blue and shown per move, rewritten in place by a lens. */
+    readonly colors: Uint16Array;
+    readonly colorBuffer: { needsUpdate: boolean };
   } | null;
-  readonly solidSource: Uint32Array;
   readonly travel: {
     readonly geometry: ThreeNamespace.BufferGeometry;
     readonly total: number;
   } | null;
   readonly travelSource: Uint32Array;
+  /** The simplified drawings of a big program, when it has them (ADR-485). */
+  readonly detail: DetailTargets | null;
 };
 
-// Rewrites the solid batch's colour attribute in place from a render-model
-// segment → rgb function. Returns whether anything was repainted. `encode`
-// maps each channel on the way in: Studio passes sRGB-to-linear so its lines
-// show their legend colour exactly (ADR-426); Classic passes nothing.
+// Repaints the solid moves in place from a render-model segment → rgb
+// function. Returns whether anything was repainted. `encode` maps each
+// channel on the way in: Studio passes sRGB-to-linear so its lines show their
+// legend colour exactly (ADR-426); Classic passes nothing.
 export function applyRecolor(
   targets: RevealTargets | null,
   colorOf: (segmentIndex: number) => readonly [number, number, number],
   encode?: (channel: number) => number,
 ): boolean {
   if (targets?.solid == null) return false;
-  const source = targets.solidSource;
-  const colors = new Float32Array(source.length * 6);
   const channel = encode ?? ((value: number): number => value);
-  for (let entry = 0; entry < source.length; entry += 1) {
-    const rgb = colorOf(source[entry] ?? 0);
-    const red = channel(rgb[0]);
-    const green = channel(rgb[1]);
-    const blue = channel(rgb[2]);
-    for (let end = 0; end < 2; end += 1) {
-      const at = entry * 6 + end * 3;
-      colors[at] = red;
-      colors[at + 1] = green;
-      colors[at + 2] = blue;
-    }
-  }
-  targets.solid.geometry.setColors(colors);
+  targets.fadeColor = hexRgb(targets.background).map(channel) as [number, number, number];
+  writeProgramColors(targets.solid.colors, colorOf, encode);
+  targets.solid.colorBuffer.needsUpdate = true;
+  if (targets.detail !== null) paintDetailLines(targets.detail.levels, targets.solid.colors);
   return true;
 }
 
 // Reveal by draw count only — no buffer reallocation. Fat lines are instanced
-// (one instance per segment), thin lines use setDrawRange over vertex pairs.
+// in program order (instance i is move i), thin lines use setDrawRange over
+// vertex pairs. A trail starts the drawn range later; the ghost still shows
+// what it skips.
 export function applyReveal(targets: RevealTargets | null, playhead: PlayheadMarker | null): void {
   if (targets === null) return;
-  const showAll = playhead === null;
   const partial = playhead?.point != null && playhead.segmentIndex >= 0;
-  const completedIndex = (playhead?.segmentIndex ?? -1) - (partial ? 1 : 0);
+  const drawn = drawnRange(playhead, partial);
   if (targets.solid !== null) {
-    targets.solid.geometry.instanceCount = showAll
-      ? targets.solid.total
-      : revealCount(targets.solidSource, completedIndex);
+    const { total } = targets.solid;
+    const [first, count] = drawn((index) => Math.min(total, Math.max(0, index + 1)), total);
+    targets.solid.geometry.instanceCount = count;
+    const trailing = playhead?.trailFrom !== undefined;
+    setTrail(targets.solid.trail, first, count, trailing ? targets.fadeColor : null);
   }
   if (targets.travel !== null) {
-    const count = showAll
-      ? targets.travel.total
-      : revealCount(targets.travelSource, completedIndex);
-    targets.travel.geometry.setDrawRange(0, count * 2);
+    const source = targets.travelSource;
+    const [first, count] = drawn((index) => revealCount(source, index), targets.travel.total);
+    targets.travel.geometry.setDrawRange(first * 2, (count - first) * 2);
   }
   applyActiveMove(targets, playhead, partial);
+}
+
+// The [first, end) entries of a batch drawn bold: the done moves, from the
+// trail's first move when there is a trail. `through(i)` counts the batch's
+// entries for moves 0 to i.
+function drawnRange(playhead: PlayheadMarker | null, partial: boolean) {
+  const completedIndex = (playhead?.segmentIndex ?? -1) - (partial ? 1 : 0);
+  const trailFrom = playhead?.trailFrom ?? 0;
+  return (through: (index: number) => number, total: number): readonly [number, number] => {
+    if (playhead === null) return [0, total];
+    const count = through(completedIndex);
+    return [Math.min(through(trailFrom - 1), count), count];
+  };
 }
 
 function applyActiveMove(
@@ -109,25 +133,18 @@ function applyActiveMove(
   targets.activeSegment = partial ? (playhead?.segmentIndex ?? -1) : -1;
   setToolpathTravelVisibility(targets, targets.travelVisible);
   if (partial && playhead?.point != null) {
-    const attribute = targets.active.geometry.getAttribute('position');
     const base = playhead.segmentIndex * 6;
-    attribute.setXYZ(
-      0,
-      targets.positions[base] ?? 0,
-      targets.positions[base + 1] ?? 0,
-      targets.positions[base + 2] ?? 0,
-    );
-    attribute.setXYZ(1, playhead.point.x, playhead.point.y, playhead.point.z);
-    attribute.needsUpdate = true;
-    targets.active.geometry.computeBoundingSphere();
+    const { point } = playhead;
+    targets.active.place(targets.positions.subarray(base, base + 3), [point.x, point.y, point.z]);
   }
 }
 
 export function setToolpathTravelVisibility(targets: RevealTargets | null, visible: boolean): void {
   if (targets === null) return;
   targets.travelVisible = visible;
-  targets.active.visible =
+  targets.active.object.visible =
     targets.activeSegment >= 0 &&
+    targets.moveFilter?.[targets.activeSegment] !== 0 &&
     (visible || targets.segKind[targets.activeSegment] !== SEG_KIND.travel);
 }
 
@@ -148,45 +165,38 @@ export type ToolpathBuildArgs = {
 // recessive-rapid convention), toggleable without a geometry rebuild.
 export function buildToolpathObjects(args: ToolpathBuildArgs): {
   readonly objects: ReadonlyArray<Object3D>;
-  readonly fatMaterial: LineMaterialType | null;
+  /** Every fat-line material, for the view's size. */
+  readonly fatMaterials: ReadonlyArray<LineMaterialType>;
   readonly travelObject: Object3D | null;
   /** The drawn traversal line, whose material the look swaps (ADR-426). */
   readonly travelLine: TravelLine | null;
   readonly reveal: RevealTargets;
 } {
-  const buckets = buildSegmentBuckets(args.segments, args.theme);
+  const travelBucket = buildTravelBucket(args.segments);
+  const program = programColors(args.segments, args.theme);
   const objects: Object3D[] = [];
-  let fatMaterial: LineMaterialType | null = null;
+  let fatMaterials: LineMaterialType[] = [];
   let travelObject: Object3D | null = null;
   let travelLine: TravelLine | null = null;
   let solidTarget: RevealTargets['solid'] = null;
   let travelTarget: RevealTargets['travel'] = null;
   let solidGhost: RevealTargets['solidGhost'] = null;
+  let detail: DetailTargets | null = null;
   let travelGhost: RevealTargets['travelGhost'] = null;
-  const active = lineSegmentsObject(args.three, new Float32Array(6), args.theme.arrow, 1, 2);
-  active.visible = false;
-  objects.push(active);
-  if (buckets.solid.count > 0) {
-    const geometry = new args.LineSegmentsGeometry();
-    geometry.setPositions(buckets.solid.positions);
-    geometry.setColors(buckets.solid.colors);
-    fatMaterial = new args.LineMaterial({ vertexColors: true, linewidth: FAT_LINE_PX });
-    // Studio tone maps its lit tool model; line colours stay exact (ADR-426).
-    fatMaterial.toneMapped = false;
-    fatMaterial.resolution.set(args.viewWidth, args.viewHeight);
-    const lines = new args.LineSegments2(geometry, fatMaterial);
-    lines.renderOrder = 1;
-    objects.push(lines);
-    solidGhost = lineSegmentsObject(args.three, buckets.solid.positions, args.theme.cut, 0.18, -1);
-    solidGhost.material.depthWrite = false;
-    solidGhost.visible = false;
-    objects.push(solidGhost);
-    solidTarget = { geometry, total: buckets.solid.count };
+  const active = createCurrentMove(args);
+  objects.push(active.object);
+  if (program.shown > 0) {
+    const solid = buildSolid(args, program.colors);
+    objects.push(solid.lines, solid.ghost);
+    fatMaterials = solid.materials;
+    solidGhost = solid.ghost;
+    solidTarget = solid.target;
+    detail = solid.detail;
   }
-  if (buckets.travel.count > 0) {
+  if (travelBucket.count > 0) {
     const travel = lineSegmentsObject(
       args.three,
-      buckets.travel.positions,
+      travelBucket.positions,
       args.theme.travel,
       TRAVEL_OPACITY,
       0,
@@ -197,7 +207,7 @@ export function buildToolpathObjects(args: ToolpathBuildArgs): {
     travel.visible = true;
     travelGhost = lineSegmentsObject(
       args.three,
-      buckets.travel.positions,
+      travelBucket.positions,
       args.theme.travel,
       0.1,
       -1,
@@ -207,38 +217,111 @@ export function buildToolpathObjects(args: ToolpathBuildArgs): {
     travelGroup.add(travel, travelGhost);
     travelObject = travelGroup;
     objects.push(travelGroup);
-    travelTarget = { geometry: travel.geometry, total: buckets.travel.count };
+    travelTarget = { geometry: travel.geometry, total: travelBucket.count };
     travelLine = travel;
   }
   return {
     objects,
-    fatMaterial,
+    fatMaterials: [...fatMaterials, ...active.materials],
     travelObject,
     travelLine,
     reveal: {
-      ...revealTargets(buckets, solidTarget, travelTarget),
+      solid: solidTarget,
+      travel: travelTarget,
+      travelSource: travelBucket.sourceIndex,
       positions: args.segments.positions,
       segKind: args.segments.segKind,
+      moveFilter: args.segments.visible ?? null,
       activeSegment: -1,
       travelVisible: args.travelVisible,
+      fadeColor: hexRgb(args.theme.background),
+      background: args.theme.background,
       active,
       solidGhost,
       travelGhost,
+      detail,
     },
   };
 }
 
-function revealTargets(
-  buckets: SegmentBuckets,
-  solid: RevealTargets['solid'],
-  travel: RevealTargets['travel'],
-): Pick<RevealTargets, 'solid' | 'solidSource' | 'travel' | 'travelSource'> {
-  return {
-    solid,
-    solidSource: buckets.solid.sourceIndex,
-    travel,
-    travelSource: buckets.travel.sourceIndex,
+// The done moves as fat lines, and their faint copy for the moves to come,
+// both drawn from one GPU copy of the program (ADR-485).
+function buildSolid(args: ToolpathBuildArgs, colors: Uint16Array) {
+  const { geometry, colorBuffer } = createProgramGeometry(
+    args.three,
+    args.LineSegmentsGeometry,
+    args.segments.positions,
+    colors,
+  );
+  const material = fatLineMaterial(args, { vertexColors: true, linewidth: FAT_LINE_PX });
+  const trail = addTrail(args.three, material);
+  const lines = new args.LineSegments2(geometry, material);
+  lines.renderOrder = 1;
+  const ghostMaterial = fatLineMaterial(args, {
+    color: args.theme.cut,
+    linewidth: GHOST_PX,
+    transparent: true,
+    opacity: GHOST_OPACITY,
+    depthWrite: false,
+  });
+  editLineMaterial(ghostMaterial, 'kerfdesk-shown-moves', withShownMoves);
+  const ghost = new args.LineSegments2(
+    shareProgramGeometry(args.LineSegmentsGeometry, geometry),
+    ghostMaterial,
+  );
+  ghost.renderOrder = -1;
+  ghost.visible = false;
+  const target: NonNullable<RevealTargets['solid']> = {
+    geometry,
+    total: colors.length / COLOR_STRIDE,
+    trail,
+    colors,
+    colorBuffer,
   };
+  return {
+    lines,
+    ghost,
+    materials: [material, ghostMaterial],
+    target,
+    detail: detailOf(args, lines, ghost, colors),
+  };
+}
+
+// A big program's simplified drawings, unless a legend filter is on: they
+// stand for every move (ADR-485).
+function detailOf(
+  args: ToolpathBuildArgs,
+  lines: DetailTargets['lines'],
+  ghost: DetailTargets['ghost'],
+  colors: Uint16Array,
+): DetailTargets | null {
+  const { detail } = args.segments;
+  if (detail == null || args.segments.visible != null) return null;
+  const levels = createDetailLines(
+    args.three,
+    args.LineSegmentsGeometry,
+    args.segments.positions,
+    detail,
+  );
+  paintDetailLines(levels, colors);
+  return {
+    lines,
+    ghost,
+    full: { lines: lines.geometry, ghost: ghost.geometry },
+    levels,
+    moves: detail.solidMoves,
+  };
+}
+
+// Studio tone maps its lit tool model; line colours stay exact (ADR-426).
+function fatLineMaterial(
+  args: ToolpathBuildArgs,
+  parameters: ConstructorParameters<typeof LineMaterialModule.LineMaterial>[0],
+): LineMaterialType {
+  const material = new args.LineMaterial(parameters);
+  material.toneMapped = false;
+  material.resolution.set(args.viewWidth, args.viewHeight);
+  return material;
 }
 
 function lineSegmentsObject(
@@ -259,4 +342,8 @@ function lineSegmentsObject(
   const lines = new three.LineSegments(geometry, material);
   lines.renderOrder = renderOrder;
   return lines;
+}
+
+function hexRgb(hex: number): [number, number, number] {
+  return [((hex >> 16) & 0xff) / 255, ((hex >> 8) & 0xff) / 255, (hex & 0xff) / 255];
 }

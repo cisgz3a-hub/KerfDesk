@@ -115,6 +115,48 @@ describe('output preparation worker payload', () => {
     ).toBe(response.result.gcode);
   });
 
+  it('rehydrates each angle of a cross-hatched streamed image to the sealed bytes', async () => {
+    const base = streamedProject();
+    const project: Project = {
+      ...base,
+      scene: {
+        ...base.scene,
+        layers: base.scene.layers.map((layer) =>
+          layer.mode === 'image'
+            ? { ...layer, imageScanAngleDeg: 30, imageCrossHatch: true }
+            : layer,
+        ),
+      },
+    };
+    const response = await prepareOutputRequest({
+      kind: 'start',
+      project,
+      controllerSettings: null,
+      machine: {
+        statusReport: IDLE,
+        alarmCode: null,
+        hasActiveStreamer: false,
+        settingsCapability: 'none',
+      },
+      jobPlacement: DEFAULT_JOB_PLACEMENT,
+      outputScope: DEFAULT_OUTPUT_SCOPE,
+      requireFrame: false,
+    });
+
+    if (response.kind !== 'start' || !response.result.ok) throw new Error('Start did not prepare.');
+    const rasters = response.result.prepared.job.groups.filter((group) => group.kind === 'raster');
+    expect(rasters.map((group) => (group.kind === 'raster' ? group.scanAngleDeg : null))).toEqual([
+      30, 120,
+    ]);
+    const hydrated = hydratePreparedExecutionOutput(response.result.prepared);
+    expect(hydrated).not.toBeNull();
+    expect(
+      emitPreparedGcode(hydrated ?? response.result.prepared, {
+        outputScope: DEFAULT_OUTPUT_SCOPE,
+      }).gcode,
+    ).toBe(response.result.gcode);
+  });
+
   it('uses the same verified plan for calculated bounds without changing emitted bytes', async () => {
     const response = await prepareOutputRequest({
       kind: 'start',

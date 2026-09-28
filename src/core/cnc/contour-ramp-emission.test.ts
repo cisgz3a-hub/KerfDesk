@@ -136,6 +136,15 @@ describe('contour ramp guarantees in emitted, placed XYZ/F words', () => {
     assertEmittedRamp([ramped]);
   });
 
+  it('bounds a ramp ending at the original ring seam before a stay-down link', () => {
+    const source = circle();
+    const ramped = rampContourPass(source, 0, TANGENT, 1, true);
+    if (ramped.kind !== 'path3d') throw new Error('Expected an actual ramp');
+    expect(ramped.points.at(-1)).toEqual({ ...source.polyline[0], z: -1 });
+    for (const point of source.polyline) expect(ramped.points).toContainEqual({ ...point, z: -1 });
+    assertEmittedRamp([ramped]);
+  });
+
   it('keeps bends and zero-capacity spans on an open path, then cuts every vertex at depth', () => {
     const source: CncContourPass = {
       ...line(5),
@@ -179,7 +188,7 @@ describe('contour ramp guarantees in emitted, placed XYZ/F words', () => {
       entryPlungeReason: 'coordinate-precision',
     });
     expect(rampEntryPlungesByLayer({ groups: [group([result])] })).toEqual([
-      { layerId: 'ramp', passes: 1, pocket: false, coordinatePrecisionPasses: 1 },
+      { layerId: 'ramp', passes: 1, pocket: false, relief: false, coordinatePrecisionPasses: 1 },
     ]);
   });
 

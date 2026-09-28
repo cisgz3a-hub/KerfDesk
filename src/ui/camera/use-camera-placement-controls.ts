@@ -20,6 +20,8 @@ export function useCameraPlacementControls(overlayGeometryReady: boolean): {
   const setVisible = useCameraStore((s) => s.setOverlayVisible);
   const still = useCameraStore((s) => s.overlayStill);
   const setStill = useCameraStore((s) => s.setOverlayStill);
+  const bedPicture = useCameraStore((s) => s.bedPicture);
+  const setBedPicture = useCameraStore((s) => s.setBedPicture);
   const active = useCameraStore((s) => s.placementActive);
   const activate = useCameraStore((s) => s.activatePlacement);
   const exit = useCameraStore((s) => s.deactivatePlacement);
@@ -28,7 +30,7 @@ export function useCameraPlacementControls(overlayGeometryReady: boolean): {
   const homingEnabled = useStore((s) => s.project.device.homing.enabled);
   const homingState = useLaserStore((s) => s.homingState);
   const positionEpoch = useLaserStore((s) => s.trustedPositionEpoch ?? 0);
-  const overlayUsable = still !== null || sourceState.kind === 'live';
+  const overlayUsable = still !== null || bedPicture !== null || sourceState.kind === 'live';
 
   useEffect(() => {
     if (!overlayGeometryReady || !visible || !overlayUsable || active) return;
@@ -48,6 +50,7 @@ export function useCameraPlacementControls(overlayGeometryReady: boolean): {
   };
   const useLive = (): void => {
     setStill(null);
+    setBedPicture(null);
     if (overlayGeometryReady) activate();
   };
   const positionTrusted = homingEnabled

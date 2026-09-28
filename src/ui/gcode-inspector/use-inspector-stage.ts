@@ -5,7 +5,7 @@
 // marker rather than guess.
 
 import { useMemo } from 'react';
-import type { AxisBounds, GcodeRenderModel } from '../../core/gcode-view';
+import type { AxisBounds } from '../../core/gcode-view';
 import { toolProfile } from '../../core/sim';
 import { bitPreviewGeometryIssue } from '../cnc-viewer3d/bit-preview-profile';
 // Deep import: the viewer3d barrel is capped at 20 exports by its index contract.
@@ -15,6 +15,7 @@ import type {
   Viewer3dRect,
   Viewer3dStage,
 } from '../viewer3d/viewer3d-look';
+import type { InspectorRenderModel } from './inspector-model';
 import type { ProgramToolGeometry } from './program-tools';
 import { toolAtSegment, type ProgramTool, type ToolSections } from './tool-sections';
 
@@ -22,7 +23,7 @@ const NO_TOOL: StudioToolSpec = { kind: 'none' };
 const LASER: StudioToolSpec = { kind: 'laser' };
 
 export function useInspectorStage(args: {
-  readonly model: GcodeRenderModel;
+  readonly model: InspectorRenderModel;
   readonly sections: ToolSections;
   readonly look: Viewer3dLook;
   readonly machineKind: 'laser' | 'cnc' | undefined;

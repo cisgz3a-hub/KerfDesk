@@ -39,8 +39,8 @@ export const CNC_LIFT_PHASE_MESSAGES: Readonly<Record<CncPauseLiftPhase, string>
     'if unsafe.',
   lifted:
     'The bit is lifted to safe height with the spindle off. Resume spins the spindle up there, ' +
-    "waits the program's spin-up dwell, moves back over the stop point and feeds down into " +
-    'its own cut before the job continues.',
+    'waits the spin-up time, moves back over the stop point and feeds down into its own cut ' +
+    'before the job continues.',
   entering:
     'Resume is spinning up above the cut and taking the bit back to where it stopped. Use ' +
     'ABORT JOB or the physical E-stop if unsafe.',
@@ -49,14 +49,24 @@ export const CNC_LIFT_PHASE_MESSAGES: Readonly<Record<CncPauseLiftPhase, string>
 /**
  * Advisory shown beside a paused CNC job's Resume control. Informational only —
  * Resume is never gated on this (ADR-180 amendment, rule 7). Null for laser.
+ * A Pause that left the bit in the cut says why first (ADR-411 Amendment 1).
  */
 export function cncResumeAdvisoryNotice(
   machineKind: MachineKind | null,
   laserModeEnabled: boolean | undefined,
   liftPhase: CncPauseLiftPhase | null = null,
+  liftSkipReason: string | null = null,
 ): string | null {
   if (machineKind !== 'cnc') return null;
   if (liftPhase !== null) return CNC_LIFT_PHASE_MESSAGES[liftPhase];
+  const doorResume = doorResumeAdvisory(laserModeEnabled);
+  return liftSkipReason === null
+    ? doorResume
+    : `Pause did not lift the bit: ${liftSkipReason} Resume tries to lift it first. If it ` +
+        `still cannot: ${doorResume}`;
+}
+
+function doorResumeAdvisory(laserModeEnabled: boolean | undefined): string {
   if (laserModeEnabled === undefined) return CNC_RESUME_UNCONFIRMED_MODE_MESSAGE;
   return laserModeEnabled === false
     ? CNC_RESUME_ADVISORY_MESSAGE

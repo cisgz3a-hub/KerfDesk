@@ -5,6 +5,7 @@
 //   Ctrl+Shift+V   Paste in Place
 //   Ctrl+Shift+I   Invert Selection
 //   Alt+W          Filled / Wireframe view
+//   Alt+D          Delete Duplicates (batch 5, ADR-480; LightBurn's key)
 //
 // Plain '.' never collides with Abort: Abort is Ctrl/Cmd+. and this handler
 // ignores any chord with Ctrl or Cmd held.
@@ -13,6 +14,7 @@ import { isEditableShortcutTarget } from '../common/keyboard-targets';
 import { isAltLetterChord } from './shortcuts';
 import { useStore } from '../state';
 import { useUiStore } from '../state/ui-store';
+import { namedUndoAction, withUndoStepName } from '../state/undo-step-names';
 import type { QuarterTurnDirection } from '../../core/scene/selection-placement';
 
 export type EditingToolCtx = {
@@ -21,13 +23,19 @@ export type EditingToolCtx = {
   readonly pasteClipboardInPlace: () => void;
   readonly invertSelection: () => void;
   readonly toggleWireframeView: () => void;
+  readonly deleteDuplicates: () => void;
 };
 
 const ROTATE_KEYS: Readonly<Record<string, QuarterTurnDirection>> = { '.': 1, ',': -1 };
 
 export function handleEditingToolShortcut(e: KeyboardEvent, ctx: EditingToolCtx): boolean {
   if (isEditableShortcutTarget(e.target)) return false;
-  return tryRotate(e, ctx) || tryShiftChord(e, ctx) || tryWireframe(e, ctx);
+  return (
+    tryRotate(e, ctx) ||
+    tryShiftChord(e, ctx) ||
+    tryWireframe(e, ctx) ||
+    tryDeleteDuplicates(e, ctx)
+  );
 }
 
 function hasMeta(e: KeyboardEvent): boolean {
@@ -56,6 +64,11 @@ function tryWireframe(e: KeyboardEvent, ctx: EditingToolCtx): boolean {
   return run(e, ctx.toggleWireframeView);
 }
 
+function tryDeleteDuplicates(e: KeyboardEvent, ctx: EditingToolCtx): boolean {
+  if (!isAltLetterChord(e, 'd')) return false;
+  return run(e, ctx.deleteDuplicates);
+}
+
 function run(e: KeyboardEvent, action: () => void): true {
   e.preventDefault();
   action();
@@ -66,9 +79,15 @@ export function editingToolShortcutContext(): EditingToolCtx {
   const app = useStore.getState();
   return {
     hasSelection: app.selectedObjectId !== null,
-    rotateSelectionQuarterTurn: app.rotateSelectionQuarterTurn,
-    pasteClipboardInPlace: app.pasteClipboardInPlace,
+    // The same Undo-list names as the Arrange and Edit menu commands.
+    rotateSelectionQuarterTurn: (direction) =>
+      withUndoStepName(
+        direction === 1 ? 'Rotate 90° Clockwise' : 'Rotate 90° Counter-clockwise',
+        () => app.rotateSelectionQuarterTurn(direction),
+      ),
+    pasteClipboardInPlace: namedUndoAction('Paste in Place', app.pasteClipboardInPlace),
     invertSelection: app.invertSelection,
     toggleWireframeView: () => useUiStore.getState().toggleWireframeView(),
+    deleteDuplicates: namedUndoAction('Delete Duplicates', app.deleteDuplicates),
   };
 }

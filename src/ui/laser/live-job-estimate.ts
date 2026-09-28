@@ -13,6 +13,7 @@ import type {
   JobDurationEstimate,
   JobDurationEstimateOptions,
 } from '../../core/job/estimate-duration';
+import { finishOptionsForJob } from '../../core/output/output-strategy';
 import {
   DEFAULT_OUTPUT_SCOPE,
   validateOutputScope,
@@ -153,11 +154,13 @@ export function estimateLiveJobFromPrepared(
     return { kind: 'too-large' };
   }
 
-  const finishPosition =
+  const jobStart =
     jobOrigin?.startFrom === 'current-position' ? jobOrigin.currentPosition : undefined;
-  // Placement controls the job's coordinates and return target, while the
-  // physical head may begin elsewhere in any placement mode.
-  const initialPosition = options.initialPosition ?? finishPosition;
+  // Where the head ends comes from the one finish source emission uses
+  // (ADR-493). Placement controls the job's coordinates, while the physical
+  // head may begin elsewhere in any placement mode.
+  const { finishPosition } = finishOptionsForJob(prepared.job, jobOrigin);
+  const initialPosition = options.initialPosition ?? jobStart;
   // ADR-127: measure the machine-space job. Identity when no rotary is active,
   // so flat jobs are unchanged. Kept in step with buildPreparedJobMetrics so
   // the live tile and Job Review cannot report different durations.

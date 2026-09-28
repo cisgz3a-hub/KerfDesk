@@ -14,6 +14,8 @@ import {
   perforationPatternFor,
 } from '../../../core/job/operation-cut-extras';
 import { DEFAULT_OVERSCAN_MM, MAX_FILL_OVERSCAN_MM } from '../../../core/job/compile-job-defaults';
+import { passAngleStepApplies } from '../../../core/job/scan-pass-angles';
+import { normalizedScanAngleDeg } from '../../../core/raster/raster-scan-frame';
 import {
   DEFAULT_CNC_STOCK,
   type CncLayerSettings,
@@ -23,6 +25,7 @@ import {
 import type { MaterialLibraryDocument } from '../../../io/material-library';
 import { materialBindingStatus } from '../../layers/material-binding-status';
 import { formatMm } from './job-review-format';
+import { laserTabsPart } from './job-review-laser-tabs';
 
 const FILL_STYLE_LABELS: Readonly<Record<LayerOperationSettings['fillStyle'], string>> = {
   scanline: 'Scanline',
@@ -32,11 +35,12 @@ const FILL_STYLE_LABELS: Readonly<Record<LayerOperationSettings['fillStyle'], st
 
 const SEPARATOR = ' · ';
 
-/** The read-only settings a laser operation runs with, joined for one line. */
-export function laserOperationDetail(settings: LayerOperationSettings): string {
+/** The read-only settings a laser operation runs with, joined for one line.
+ * `placedTabCount` is how many Line tabs were placed by hand on its artwork. */
+export function laserOperationDetail(settings: LayerOperationSettings, placedTabCount = 0): string {
   switch (settings.mode) {
     case 'line':
-      return lineDetail(settings);
+      return lineDetail(settings, placedTabCount);
     case 'fill':
       return fillDetail(settings);
     case 'image':
@@ -44,11 +48,11 @@ export function laserOperationDetail(settings: LayerOperationSettings): string {
   }
 }
 
-function lineDetail(settings: LayerOperationSettings): string {
+function lineDetail(settings: LayerOperationSettings, placedTabCount: number): string {
   return [
     `Kerf ${formatMm(settings.kerfOffsetMm)} mm`,
     `stored contour entry target ${formatMm(settings.fillOverscanMm)} mm`,
-    laserTabsPart(settings),
+    laserTabsPart(settings, placedTabCount),
     ...lineCutExtrasParts(settings),
     ...(settings.passThrough ? ['pass-through'] : []),
     `min power ${settings.minPower}%`,
@@ -62,10 +66,8 @@ function fillDetail(settings: LayerOperationSettings): string {
     `${formatIntervalMm(settings.hatchSpacingMm)} mm hatch at ${settings.hatchAngleDeg}°`,
     settings.fillBidirectional ? 'bidirectional' : 'one-way',
     ...(settings.fillCrossHatch ? ['cross-hatch'] : []),
-    `stored overscan ${formatMm(settings.fillOverscanMm)} mm`,
-    ...(settings.fillStyle === 'scanline' && settings.fillOverscanMm > MAX_FILL_OVERSCAN_MM
-      ? [`applied at most ${MAX_FILL_OVERSCAN_MM} mm`]
-      : []),
+    ...passAngleStepPart(settings),
+    ...fillOverscanParts(settings),
     ...localScanOffsetPart(settings),
     ...powerModePart(settings),
   ].join(SEPARATOR);
@@ -84,11 +86,49 @@ function imageDetail(settings: LayerOperationSettings): string {
     ...(settings.dotWidthCorrectionMm !== 0
       ? [`dot width ${formatMm(settings.dotWidthCorrectionMm)} mm`]
       : []),
-    ...(imageOverscanMmFor(settings) !== DEFAULT_OVERSCAN_MM
-      ? [`overscan ${formatMm(imageOverscanMmFor(settings))} mm`]
-      : []),
+    ...imageOverscanParts(settings),
+    ...imageScanPatternParts(settings),
     ...localScanOffsetPart(settings),
   ].join(SEPARATOR);
+}
+
+// ADR-495: automatic overscan follows the speed and the machine, so Job Review
+// names it rather than the stored length it replaces.
+function fillOverscanParts(settings: LayerOperationSettings): ReadonlyArray<string> {
+  if (settings.autoOverscan === true && settings.fillStyle !== 'offset') {
+    return [AUTOMATIC_OVERSCAN_PART];
+  }
+  return [
+    `stored overscan ${formatMm(settings.fillOverscanMm)} mm`,
+    ...(settings.fillStyle === 'scanline' && settings.fillOverscanMm > MAX_FILL_OVERSCAN_MM
+      ? [`applied at most ${MAX_FILL_OVERSCAN_MM} mm`]
+      : []),
+  ];
+}
+
+function imageOverscanParts(settings: LayerOperationSettings): ReadonlyArray<string> {
+  if (settings.autoOverscan === true) return [AUTOMATIC_OVERSCAN_PART];
+  const overscanMm = imageOverscanMmFor(settings);
+  return overscanMm !== DEFAULT_OVERSCAN_MM ? [`overscan ${formatMm(overscanMm)} mm`] : [];
+}
+
+const AUTOMATIC_OVERSCAN_PART = 'automatic overscan from speed and acceleration';
+
+// ADR-492: shown only when set, so images scanned along X read as before.
+function imageScanPatternParts(settings: LayerOperationSettings): ReadonlyArray<string> {
+  const angleDeg = normalizedScanAngleDeg(settings.imageScanAngleDeg);
+  return [
+    ...(angleDeg === 0 ? [] : [`scan at ${formatIntervalMm(angleDeg)}°`]),
+    ...(settings.imageCrossHatch === true ? ['cross-hatch'] : []),
+    ...passAngleStepPart(settings),
+  ];
+}
+
+function passAngleStepPart(settings: LayerOperationSettings): ReadonlyArray<string> {
+  if (!passAngleStepApplies(settings)) return [];
+  const stepDeg = settings.passAngleStepDeg ?? 0;
+  const signed = stepDeg > 0 ? `+${formatIntervalMm(stepDeg)}` : formatIntervalMm(stepDeg);
+  return [`angle ${signed}° per pass`];
 }
 
 // ADR-415: shown only when set, so operations that never used them read as before.
@@ -122,6 +162,8 @@ export type CompiledReliefFacts = {
   // How many reliefs the operation compiled, from the job's relief planning
   // evidence; 0 when the job carries none.
   readonly reliefCount: number;
+  // The deepest any relief pass reaches, roughing or finishing, as emitted.
+  readonly maxDepthMm: number;
   // Whether the operation's other shapes compiled groups of their own.
   readonly cutsOtherShapes: boolean;
 };
@@ -273,11 +315,6 @@ const DIRECTED_CUT_TYPES: ReadonlySet<CncLayerSettings['cutType']> = new Set([
   'profile-inside',
   'pocket',
 ]);
-
-function laserTabsPart(settings: LayerOperationSettings): string {
-  if (!settings.tabsEnabled) return 'tabs off';
-  return `tabs ${settings.tabsPerShape} × ${formatMm(settings.tabSizeMm)} mm`;
-}
 
 function cncTabsPart(
   settings: CncLayerSettings,

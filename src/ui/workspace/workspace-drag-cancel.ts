@@ -23,6 +23,7 @@ export function cancelWorkspaceDrag(
   deps.setDraftShape(null);
   deps.setCursorMm(null);
   deps.setSnapGuides([]);
+  useUiStore.getState().setSnapMarker(null);
   if (drag?.kind === 'pan') {
     useUiStore.getState().setPan(drag.startPanX, drag.startPanY);
   }

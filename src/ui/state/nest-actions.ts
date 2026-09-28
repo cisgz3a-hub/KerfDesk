@@ -148,7 +148,7 @@ function applyNestPlan(
         objects: state.project.scene.objects.map((object) => transformed.get(object.id) ?? object),
       },
     },
-    undoStack: pushUndo(state.project, state.undoStack),
+    undoStack: pushUndo(state.project, state.undoStack, 'Quick Nest'),
     redoStack: [],
     dirty: true,
   };

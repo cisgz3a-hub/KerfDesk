@@ -50,6 +50,8 @@ export const canvasTheme = {
   },
   outOfBounds: '#b43337',
   openFillContour: '#f57c00',
+  // Trim Shapes (LBG-T04): the stretch a click would delete.
+  trimHighlight: '#e5484d',
   cncTabHandleFill: '#f7c948',
   cncTabHandleStroke: '#5b4512',
   noGoZoneFill: 'rgba(180, 51, 55, 0.12)',

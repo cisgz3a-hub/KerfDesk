@@ -8,12 +8,13 @@ import {
   type ModalMotionWriter,
   type MotionWordStyle,
 } from '../gcode/motion-words';
-import { rasterControllerCoordinateMm, type RasterRowSweepPlan } from './raster-sweep-plan';
+import type { RasterRowSweepPlan } from './raster-sweep-plan';
 import {
   rasterEntryExcursion,
   rasterSweepOpening,
   type RasterControllerHead,
 } from './emit-raster-travel';
+import { sameRasterHead, type RasterRowLine } from './emit-raster-row-line';
 import type { EmitRasterInput } from './emit-raster';
 type SweepExtents = {
   readonly activeStartX: number;
@@ -61,7 +62,7 @@ type RasterSweepEmission = {
 
 export function emitSpanSweep(
   input: EmitRasterInput,
-  worldY: number,
+  line: RasterRowLine,
   pixelWidthMm: number,
   feed: number,
   emitFeed: boolean,
@@ -91,14 +92,12 @@ export function emitSpanSweep(
   // The controller only sees three-decimal coordinates. Track that formatted
   // head position so a positive-power fragment which exists in floating-point
   // geometry, but collapses on the controller grid, is never armed in place.
-  const controllerHeadX = rasterControllerCoordinateMm(startX + rowShiftX);
-  const controllerY = rasterControllerCoordinateMm(worldY);
+  const startHead = line.head(startX + rowShiftX);
   // Rapid into the overscan zone, laser off (M4 + S0 → diode dark).
   const opening = rasterSweepOpening(
     {
-      x: startX + rowShiftX,
-      y: worldY,
-      target: { x: controllerHeadX, y: controllerY },
+      ...line.point(startX + rowShiftX),
+      target: startHead,
       previousHead,
       constantPower: constantPower || deferredOpening,
       controlledFeed: input.controlledLaserOffTravelFeedMmPerMin,
@@ -108,14 +107,15 @@ export function emitSpanSweep(
   );
   const state: SweepState = {
     lines: [...opening.lines],
-    headX: controllerHeadX,
+    head: startHead,
+    headScanX: line.scanX(startX + rowShiftX),
     prevS: opening.prevS,
     // A controlled G1 seek changes F; reassert engraving feed after it.
     feedPending: emitFeed || input.controlledLaserOffTravelFeedMmPerMin !== undefined,
     feedEmitted: false,
     endsOnBurn: false,
   };
-  const formatting = { input, feed, writer, style, controllerY, constantPower, deferredOpening };
+  const formatting = { input, feed, writer, style, line, constantPower, deferredOpening };
   const pushRun = (x: number, s: number): void =>
     pushRasterRun(state, x + rowShiftX, s, formatting);
   if (sweepPlan.leadInMm > 0) {
@@ -140,13 +140,16 @@ export function emitSpanSweep(
     lines: state.lines,
     feedEmitted: state.feedEmitted,
     endsLit: constantPower && state.endsOnBurn,
-    head: { x: state.headX, y: controllerY },
+    head: state.head,
   };
 }
 
 type SweepState = {
   readonly lines: string[];
-  headX: number;
+  /** Where the controller holds the head, on its grid. */
+  head: RasterControllerHead;
+  /** The same position along the row, in the scan frame (see RasterRowLine.scanX). */
+  headScanX: number;
   prevS: number;
   feedPending: boolean;
   feedEmitted: boolean;
@@ -154,26 +157,29 @@ type SweepState = {
 };
 
 type SweepFormatting = RasterRunFormatting & {
-  readonly controllerY: number;
   readonly constantPower: boolean;
   readonly deferredOpening: boolean;
 };
 
 function pushRasterRun(state: SweepState, x: number, s: number, formatting: SweepFormatting): void {
-  const target = rasterControllerCoordinateMm(x);
+  const { line } = formatting;
+  const target = line.head(x);
   const previousM3StillLit = formatting.deferredOpening && state.lines.length === 0;
-  if ((s > 0 || formatting.constantPower || previousM3StillLit) && target === state.headX) return;
+  if (
+    (s > 0 || formatting.constantPower || previousM3StillLit) &&
+    sameRasterHead(target, state.head)
+  )
+    return;
   if (s > 0 && previousM3StillLit) {
-    state.lines.push(
-      ...rasterEntryExcursion(state.headX, formatting.controllerY, target, formatting),
-    );
+    state.lines.push(...rasterEntryExcursion(line, state.headScanX, line.scanX(x), formatting));
     state.prevS = 0;
   }
   state.lines.push(formatRunG1(x, s, state.prevS, state.feedPending, formatting));
   state.feedEmitted ||= state.feedPending || formatting.input.modalFeedrate === false;
   state.feedPending = false;
   state.prevS = s;
-  state.headX = target;
+  state.head = target;
+  state.headScanX = line.scanX(x);
   state.endsOnBurn = s > 0;
 }
 
@@ -183,29 +189,31 @@ function closeRasterSweep(
   wanted: boolean,
   formatting: SweepFormatting,
 ): void {
-  const { input, feed, writer, style, constantPower, deferredOpening } = formatting;
+  const { input, feed, line, constantPower, deferredOpening } = formatting;
+  const closeHead = line.head(x);
   if (
     !writesRowClose(wanted, constantPower || (deferredOpening && state.lines.length === 0), {
-      closeX: x,
-      controllerHeadX: state.headX,
+      closeHead,
+      controllerHead: state.head,
     })
   )
     return;
   state.lines.push(
-    formatLaserOffG1(x, feed, state.feedPending, input.modalFeedrate ?? true, writer, style),
+    formatLaserOffG1(x, feed, state.feedPending, input.modalFeedrate ?? true, formatting),
   );
   state.feedEmitted ||= state.feedPending || input.modalFeedrate === false;
-  state.headX = rasterControllerCoordinateMm(x);
+  state.head = closeHead;
+  state.headScanX = line.scanX(x);
   state.endsOnBurn = false;
 }
 
 function writesRowClose(
   wanted: boolean,
   constantPower: boolean,
-  head: { readonly closeX: number; readonly controllerHeadX: number },
+  head: { readonly closeHead: RasterControllerHead; readonly controllerHead: RasterControllerHead },
 ): boolean {
   if (!wanted) return false;
-  return !constantPower || rasterControllerCoordinateMm(head.closeX) !== head.controllerHeadX;
+  return !constantPower || !sameRasterHead(head.closeHead, head.controllerHead);
 }
 
 // The row's closing move. Under M4 its X word is written even when the head
@@ -217,15 +225,17 @@ function formatLaserOffG1(
   feed: number,
   emitFeed: boolean,
   modalFeedrate: boolean,
-  writer: ModalMotionWriter,
-  style: MotionWordStyle,
+  formatting: RasterRunFormatting,
 ): string {
+  const { writer, style, line } = formatting;
   const motionWord = writer.motion('G1');
-  const axisWord = writer.axis('X', x);
+  const axisWords = line.axisWords(writer, x);
   return joinMotionWords(
     [
       motionWord,
-      axisWord === '' ? `X${formatMotionCoordinateMm(x, style)}` : axisWord,
+      ...(axisWords.every((word) => word === '')
+        ? [`X${formatMotionCoordinateMm(line.point(x).x, style)}`]
+        : axisWords),
       emitFeed || !modalFeedrate ? `F${formatGcodeFeedMmPerMin(feed)}` : '',
       'S0',
     ],
@@ -238,6 +248,7 @@ type RasterRunFormatting = {
   readonly feed: number;
   readonly writer: ModalMotionWriter;
   readonly style: MotionWordStyle;
+  readonly line: RasterRowLine;
 };
 
 // One G1 closing a run. Emits S only when it changed from the
@@ -250,11 +261,11 @@ function formatRunG1(
   isVeryFirstG1: boolean,
   formatting: RasterRunFormatting,
 ): string {
-  const { input, feed, writer, style } = formatting;
+  const { input, feed, writer, style, line } = formatting;
   return joinMotionWords(
     [
       writer.motion('G1'),
-      writer.axis('X', x),
+      ...line.axisWords(writer, x),
       isVeryFirstG1 || input.modalFeedrate === false ? `F${formatGcodeFeedMmPerMin(feed)}` : '',
       s !== prevS || input.emitSOnEveryBurnMove === true ? `S${s}` : '',
     ],

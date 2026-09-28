@@ -71,7 +71,7 @@ function isTrustedPermissionCheckContext(
   input: PermissionCheckPolicyInput,
   trustedOrigins: ReadonlySet<string>,
 ): boolean {
-  // Electron 42's FileSystemAccessPermissionContext::PermissionGrantImpl::GetStatus
+  // Electron's (42 through 44) FileSystemAccessPermissionContext::PermissionGrantImpl::GetStatus
   // checks existing grants with a null frame/WebContents and the grant's origin.
   // Permit only that exact origin-scoped API when no window is supplied. An
   // existing empty/untrusted window URL and every other permission still fail.
@@ -114,9 +114,16 @@ function isAllowedNonMediaAppPermission(permission: string): boolean {
   // the shipped 42-x-y branch). Chromium browsers grant it without a prompt;
   // denying it here silently disables keep-awake on the desktop app, letting
   // the OS sleep the display mid-burn while Web Serial is still streaming.
+  //
+  // 'clipboard-sanitized-write' backs navigator.clipboard.writeText (ADR-482):
+  // Copy transcript, the Super Console copy and the crash report copy. Chromium
+  // grants plain-text writes to a focused page without a prompt; denying it
+  // made every Copy button fail on the desktop app only. Clipboard reads stay
+  // denied.
   return (
     permission === 'serial' ||
     permission === 'screen-wake-lock' ||
+    permission === 'clipboard-sanitized-write' ||
     permission.startsWith('fileSystem')
   );
 }

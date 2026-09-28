@@ -4,6 +4,7 @@
 import { useEffect, useRef, type RefObject } from 'react';
 import type { ArrowPlacement, PlayheadMarker, Viewer3dSceneHandle } from '../viewer3d';
 // Deep import: the viewer3d barrel is capped at 20 exports by its index contract.
+import type { Viewer3dClipPlane } from '../viewer3d/scene-isolate';
 import type { Viewer3dStage } from '../viewer3d/viewer3d-look';
 import type { Viewer3dSceneState } from './use-viewer3d-scene';
 
@@ -22,7 +23,12 @@ type SceneSyncArgs = {
   readonly travelVisible: boolean;
   /** Classic or Studio, and what Studio dresses the job with (ADR-426). */
   readonly stage?: Viewer3dStage;
+  /** Legend filters and the Z range and section planes (ADR-470). */
+  readonly moveFilter?: Uint8Array | null;
+  readonly clipPlanes?: ReadonlyArray<Viewer3dClipPlane>;
 };
+
+const NO_PLANES: ReadonlyArray<Viewer3dClipPlane> = [];
 
 type AppliedSceneSync = SceneSyncArgs & { readonly handle: Viewer3dSceneHandle };
 
@@ -73,14 +79,15 @@ function syncSceneValues(
   if (force || previous === null) {
     if (next.stage !== undefined) handle.setStage(next.stage);
     handle.setTravelVisible(next.travelVisible);
+    handle.setMoveFilter(next.moveFilter ?? null);
+    handle.setClipPlanes(next.clipPlanes ?? NO_PLANES);
     setScenePlayhead(handle, next);
     handle.recolor(next.colorOf);
     handle.setDirectionArrows(next.arrows);
     handle.setLiveMachine(next.live);
     return;
   }
-  if (next.stage !== undefined && previous.stage !== next.stage) handle.setStage(next.stage);
-  if (previous.travelVisible !== next.travelVisible) handle.setTravelVisible(next.travelVisible);
+  syncDrawnMoves(handle, next, previous);
   if (
     !samePlayhead(previous.playhead, next.playhead) ||
     Boolean(previous.hidePlaybackMarker) !== Boolean(next.hidePlaybackMarker)
@@ -90,6 +97,18 @@ function syncSceneValues(
   if (previous.colorOf !== next.colorOf) handle.recolor(next.colorOf);
   if (previous.arrows !== next.arrows) handle.setDirectionArrows(next.arrows);
   if (!samePoint(previous.live, next.live)) handle.setLiveMachine(next.live);
+}
+
+// Which moves are drawn: the look, traversal, legend filters and clipping.
+function syncDrawnMoves(
+  handle: Viewer3dSceneHandle,
+  next: SceneSyncArgs,
+  previous: AppliedSceneSync,
+): void {
+  if (next.stage !== undefined && previous.stage !== next.stage) handle.setStage(next.stage);
+  if (previous.travelVisible !== next.travelVisible) handle.setTravelVisible(next.travelVisible);
+  if (previous.moveFilter !== next.moveFilter) handle.setMoveFilter(next.moveFilter ?? null);
+  if (previous.clipPlanes !== next.clipPlanes) handle.setClipPlanes(next.clipPlanes ?? NO_PLANES);
 }
 
 function setScenePlayhead(handle: Viewer3dSceneHandle, next: SceneSyncArgs): void {
@@ -102,7 +121,11 @@ function setScenePlayhead(handle: Viewer3dSceneHandle, next: SceneSyncArgs): voi
 
 function samePlayhead(left: PlayheadMarker | null, right: PlayheadMarker | null): boolean {
   if (left === null || right === null) return left === right;
-  return left.segmentIndex === right.segmentIndex && samePoint(left.point, right.point);
+  return (
+    left.segmentIndex === right.segmentIndex &&
+    left.trailFrom === right.trailFrom &&
+    samePoint(left.point, right.point)
+  );
 }
 
 function samePoint(left: SceneSyncArgs['live'], right: SceneSyncArgs['live']): boolean {

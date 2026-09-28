@@ -28,8 +28,8 @@ function harness() {
     quit: vi.fn(() => window.close()),
     reportFailure: vi.fn(),
   };
-  new WindowCloseGuard(window, options);
-  return { window, options, allowed, requestQuit: () => (quitting = true) };
+  const guard = new WindowCloseGuard(window, options);
+  return { window, options, allowed, guard, requestQuit: () => (quitting = true) };
 }
 
 describe('ordinary desktop close and quit', () => {
@@ -148,5 +148,19 @@ describe('ordinary desktop close and quit', () => {
     await vi.waitFor(() => expect(h.options.forceClose).toHaveBeenCalledTimes(1));
     expect(h.options.quit).toHaveBeenCalledTimes(1);
     expect(h.allowed).not.toHaveBeenCalled();
+  });
+});
+
+describe('close state for crash recovery (ADR-482)', () => {
+  it('reports a close attempt only while one owns the window', async () => {
+    const h = harness();
+    let finish: (reply: unknown) => void = () => undefined;
+    h.options.request.mockImplementationOnce(() => new Promise((resolve) => (finish = resolve)));
+    expect(h.guard.isClosing()).toBe(false);
+    h.window.close();
+    expect(h.guard.isClosing()).toBe(true);
+    finish({ status: 'cancelled', dirty: false });
+    await vi.waitFor(() => expect(h.options.cancelQuit).toHaveBeenCalled());
+    expect(h.guard.isClosing()).toBe(false);
   });
 });

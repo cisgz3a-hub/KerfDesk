@@ -20,7 +20,8 @@ import {
   findDroppedCncLayers,
 } from '../cnc';
 import { cncMaxFeedMmPerMin } from '../cnc/cnc-head-feeds';
-import { rampEntryPlungesByLayer } from '../cnc/contour-ramp-entry';
+import { rampEntryPlungesByLayer, type RampEntryPlunges } from '../cnc/contour-ramp-entry';
+import { reliefRampFieldLabel } from '../cnc/relief-ramp-field';
 import { findCncVCarveEntryIssues } from '../cnc/vcarve-entry-diagnostics';
 import { isVCarveToolCompatible } from '../cnc/vcarve-tool-compatibility';
 import { machineBoundsForDevice } from '../devices';
@@ -74,7 +75,7 @@ export function runCncPreflight(
     appendCncLayerIssues(layer, cncMaxFeedMmPerMin(project.device, config.params), config, issues);
   }
   appendSourceGeometryIssues(project, config, options, issues);
-  appendRampEntryPlungeIssues(options.compiledJob, issues);
+  appendRampEntryPlungeIssues(project, options.compiledJob, issues);
   issues.push(...findCncMotionBoundsPreflightIssues(project.device, gcode, options));
   appendNonFiniteCoordIssues(gcode, issues);
   appendNoGoZoneIssues(project, config, gcode, options, issues);
@@ -159,27 +160,64 @@ function appendVCarveEntryIssues(
 }
 
 // ADR-471: the compiled job marks each pass its ramp entry left to plunge.
-// Advisory only: the complete program retains explicitly disclosed plunges.
-function appendRampEntryPlungeIssues(compiledJob: Job | undefined, issues: PreflightIssue[]): void {
+// Advisory only: the program is complete and every other entry ramps.
+function appendRampEntryPlungeIssues(
+  project: Project,
+  compiledJob: Job | undefined,
+  issues: PreflightIssue[],
+): void {
   if (compiledJob === undefined) return;
   for (const plunges of rampEntryPlungesByLayer(compiledJob)) {
-    const passes = plunges.passes === 1 ? '1 pass plunges' : `${plunges.passes} passes plunge`;
-    const helix = plunges.pocket ? ' A pocket can use Helical entry instead.' : '';
-    const precision = plunges.coordinatePrecisionPasses ?? 0;
-    const reasons = [
-      ...(plunges.passes > precision ? ['a path is shorter than one cut width'] : []),
-      ...(precision > 0
-        ? ['the requested angle cannot descend on its segments at G-code coordinate precision']
-        : []),
-    ];
     issues.push({
       code: 'cnc-ramp-entry-plunge',
-      message:
-        `Layer ${plunges.layerId}: ${passes} straight down instead of ramping: ` +
-        `${reasons.join('; ')}.${helix} ` +
-        'Set Ramp entry to 0 to remove this notice.',
+      message: plunges.relief
+        ? reliefRampPlungeMessage(project, plunges)
+        : contourRampPlungeMessage(plunges),
     });
   }
+}
+
+function contourRampPlungeMessage(plunges: RampEntryPlunges): string {
+  const passes = plunges.passes === 1 ? '1 pass plunges' : `${plunges.passes} passes plunge`;
+  const helix = plunges.pocket ? ' A pocket can use Helical entry instead.' : '';
+  return (
+    `Layer ${plunges.layerId}: ${passes} straight down instead of ramping: ` +
+    `${rampPlungeReason(plunges, false)}.${helix} ` +
+    'Set Ramp entry to 0 to remove this notice.'
+  );
+}
+
+// ADR-424 Amendment 1: a relief roughing pass is entered on its first loop,
+// and a relief layer whose cut type has no Ramp entry row sets that ramp as
+// Roughing ramp.
+function reliefRampPlungeMessage(project: Project, plunges: RampEntryPlunges): string {
+  const passes =
+    plunges.passes === 1
+      ? '1 relief roughing pass plunges'
+      : `${plunges.passes} relief roughing passes plunge`;
+  const layer = project.scene.layers.find((candidate) => candidate.id === plunges.layerId);
+  const field = reliefRampFieldLabel(layer?.cnc?.cutType ?? DEFAULT_CNC_LAYER_SETTINGS.cutType);
+  return (
+    `Layer ${plunges.layerId}: ${passes} straight down instead of ramping: ` +
+    `${rampPlungeReason(plunges, true)}. ` +
+    `Set ${field} to 0 to remove this notice.`
+  );
+}
+
+function rampPlungeReason(plunges: RampEntryPlunges, relief: boolean): string {
+  const precision = plunges.coordinatePrecisionPasses ?? 0;
+  return [
+    ...(plunges.passes > precision
+      ? [
+          relief
+            ? 'a loop shorter than one cut width is too tight to ramp round'
+            : 'a path shorter than one cut width is too short to ramp along',
+        ]
+      : []),
+    ...(precision > 0
+      ? ['the requested angle cannot descend on its segments at G-code coordinate precision']
+      : []),
+  ].join('; ');
 }
 
 function appendEmptyOutputIssue(gcode: string, issues: PreflightIssue[]): void {

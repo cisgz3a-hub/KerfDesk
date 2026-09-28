@@ -1,5 +1,6 @@
 import fc from 'fast-check';
 import { describe, expect, it } from 'vitest';
+import { dropCollinearPoints } from '../geometry/drop-collinear-points';
 import { buildOffsetLadder } from '../geometry/offset-ladder';
 import { pointInPolygon } from '../geometry/point-in-polygon';
 import { signedAreaMm2 } from '../geometry/polyline-orientation';
@@ -334,6 +335,68 @@ describe('reliefRoughingMotion', () => {
     expect(passes).toHaveLength(1);
     expect(passes[0]?.kind).toBe('contour');
     expect(passes[0]).toMatchObject({ entryPlunge: true });
+  });
+
+  it('marks each chain the ramp leaves to plunge, and only those (ADR-424 Amendment 1)', () => {
+    // A 0.5 mm square, 2 mm round, and a 20 mm square too far away to link:
+    // the first is shorter than the cut width, the second ramps.
+    const pair = level([rect(0, 0, 0.5, 0.5), rect(10, 0, 30, 20)]);
+    const ramped = reliefRoughingMotion([pair], {
+      stockOnRight: true,
+      cutWidthMm: CUT_WIDTH_MM,
+      rampAngleDeg: 3,
+    });
+    const plunged = reliefRoughingMotion([pair], { stockOnRight: true, cutWidthMm: CUT_WIDTH_MM });
+    const tinyChain = (passes: ReadonlyArray<CncPass>): CncPass | undefined =>
+      passes.find((pass) => pass.kind === 'contour' && pass.polyline.every((p) => p.x <= 0.5));
+
+    expect(ramped.map((pass) => pass.kind).sort()).toEqual(['contour', 'path3d']);
+    expect(tinyChain(ramped)).toMatchObject({ kind: 'contour', entryPlunge: true });
+    // The marker only discloses: the motion is the plunge the same loop gets
+    // without a ramp angle, which is not marked.
+    expect(plunged.some((pass) => 'entryPlunge' in pass)).toBe(false);
+    expect(tinyChain(ramped)).toEqual({ ...tinyChain(plunged), entryPlunge: true });
+  });
+
+  it('marks no plunge where the level leaves no stock to ramp through', () => {
+    // The slice top is the level's own depth, so the descent crosses air.
+    const cleared = level([rect(0, 0, 0.5, 0.5)], -1, -1);
+    const [pass] = reliefRoughingMotion([cleared], {
+      stockOnRight: true,
+      cutWidthMm: CUT_WIDTH_MM,
+      rampAngleDeg: 3,
+    });
+
+    expect(pass?.kind).toBe('contour');
+    expect(pass).not.toHaveProperty('entryPlunge');
+  });
+
+  it('emits each straight run of a traced ring as one move (ADR-488)', () => {
+    const tool: CncTool = { id: 'em', name: 'end mill', kind: 'end-mill', diameterMm: 3.175 };
+    const ladder = reliefRoughingLadder(bumpMap([{ x: 15, y: 15, r: 9, h: 4 }]), {
+      tool,
+      reliefDepthMm: 5,
+      depthPerPassMm: 1.5,
+      stepoverPercent: 40,
+    });
+    // The rings are traced cell by cell, so their straight runs carry
+    // vertices in line with their neighbours.
+    const rings = ladder.levels.flatMap((next) => next.rings.flat());
+    expect(rings.some((ring) => dropCollinearPoints(ring.points).length < ring.points.length)).toBe(
+      true,
+    );
+    for (const rampAngleDeg of [0, 3]) {
+      const passes = reliefRoughingMotion(ladder.levels, {
+        stockOnRight: true,
+        cutWidthMm: ladder.cutWidthMm,
+        rampAngleDeg,
+      });
+      const paths = passes.map((pass) =>
+        pass.kind === 'contour' ? pass.polyline : pass.kind === 'path3d' ? pass.points : [],
+      );
+      expect(paths.some((path) => path.length > 2)).toBe(true);
+      for (const path of paths) expect(dropCollinearPoints(path)).toEqual(path);
+    }
   });
 
   it('keeps a cleanup trace round its stock on the climb side', () => {

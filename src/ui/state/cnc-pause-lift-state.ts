@@ -3,7 +3,12 @@
 // evidence from before its soft reset that everything after the reset is
 // checked against.
 
-import { wipeInFlight, type StatusReport, type StreamerStatus } from '../../core/controllers/grbl';
+import {
+  wipeInFlight,
+  type OverrideValues,
+  type StatusReport,
+  type StreamerStatus,
+} from '../../core/controllers/grbl';
 import type { MotionPoint } from '../../core/job/motion-manifest';
 import type { CncPauseReentryPlan } from '../../core/recovery/cnc-pause-reentry';
 import type { LaserState, WorkOriginSource } from './laser-store';
@@ -28,6 +33,36 @@ export type CncPauseLift = {
   readonly workOffsetMm: MotionPoint;
   readonly workOriginActive: boolean;
   readonly workOriginSource: WorkOriginSource;
+  /** Feed, rapid and spindle overrides of the settled pause, when the
+   *  controller reported them. The lift's reset puts them back to 100%. */
+  readonly overrides: OverrideValues | null;
+};
+
+/**
+ * What the current job's pauses learned about lifting it (ADR-411 Amendment
+ * 1). A lift's own soft reset makes KerfDesk forget the controller settings
+ * it read on connect until the job ends. The lift checked laser mode ($32)
+ * and firmware parking before that reset. `$` settings and build options live
+ * in the controller's non-volatile memory, a reset does not change them, and
+ * setup lines are refused while a job is active, so a later Pause of the same
+ * stream relies on that check.
+ */
+export type CncPauseLiftJob = {
+  readonly streamerEpoch: number;
+  /** Report units ($13) a lift of this job confirmed before its reset, or
+   *  null while no lift of this job has reset the controller. */
+  readonly confirmedReportInches: boolean | null;
+  /** Why the latest Pause of this job left the bit in the cut, or null. */
+  readonly skipReason: string | null;
+};
+
+/** The store's Pause and lift fields. Optional only so older hand-built test
+ *  states remain valid. */
+export type CncPauseLiftStoreState = {
+  /** A CNC Pause that lifted the bit out of the cut, and the evidence its
+   *  re-entry is checked against (ADR-411). Null when Pause stopped in place. */
+  readonly cncPauseLift?: CncPauseLift | null;
+  readonly cncPauseLiftJob?: CncPauseLiftJob | null;
 };
 
 const INCH_MM = 25.4;
@@ -63,6 +98,43 @@ export function currentCncPauseLift(state: LaserState): CncPauseLift | null {
 /** Store selector: the phase of the current paused stream's lift, if any. */
 export function cncPauseLiftPhase(state: LaserState): CncPauseLiftPhase | null {
   return currentCncPauseLift(state)?.phase ?? null;
+}
+
+/** The current stream's Pause and lift record, if any. */
+export function currentCncPauseLiftJob(state: LaserState): CncPauseLiftJob | null {
+  const job = state.cncPauseLiftJob ?? null;
+  return job !== null && state.streamer !== null && job.streamerEpoch === state.streamerEpoch
+    ? job
+    : null;
+}
+
+/** The record after a Pause of the current stream decided whether to lift. */
+export function cncPauseLiftJobPatch(
+  state: LaserState,
+  change: Partial<Omit<CncPauseLiftJob, 'streamerEpoch'>>,
+): Pick<CncPauseLiftStoreState, 'cncPauseLiftJob'> {
+  const job = currentCncPauseLiftJob(state) ?? {
+    streamerEpoch: state.streamerEpoch,
+    confirmedReportInches: null,
+    skipReason: null,
+  };
+  return { cncPauseLiftJob: { ...job, ...change } };
+}
+
+/** Store selector: why the current paused stream's Pause left the bit in the
+ *  cut, while no lift holds it. */
+export function cncPauseLiftSkipReason(state: LaserState): string | null {
+  if (state.streamer?.status !== 'paused' || currentCncPauseLift(state) !== null) return null;
+  return currentCncPauseLiftJob(state)?.skipReason ?? null;
+}
+
+/** Store selector: laser mode ($32) as far as the current job knows it. A
+ *  lift of this job confirmed it off before its own reset cleared the
+ *  settings KerfDesk had read. */
+export function cncJobLaserModeEnabled(state: LaserState): boolean | undefined {
+  const read = state.controllerSettings?.laserModeEnabled;
+  if (read !== undefined) return read;
+  return currentCncPauseLiftJob(state)?.confirmedReportInches == null ? undefined : false;
 }
 
 /**

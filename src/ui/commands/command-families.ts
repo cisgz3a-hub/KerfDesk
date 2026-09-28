@@ -6,6 +6,8 @@ import { placeBoardCommand } from './board-capture-command-family';
 import { adjustImageCommand, processedRasterToolCommands } from './command-raster-family';
 import { vectorBooleanCommands } from './vector-boolean-commands';
 import { offsetShapesCommand, wireframeCommand } from './editing-tools-commands';
+import { designToolsCommands } from './design-tools-commands';
+import { vectorCutCommands } from './vector-cut-commands';
 import { windowPanelCommands } from './window-panel-commands';
 import { rotarySetupCommand } from './rotary-command-family';
 import { labsCommand } from './labs-command-family';
@@ -58,6 +60,8 @@ export function toolsCommands(ctx: AppCommandContext): ReadonlyArray<AppCommand>
     weldCommand(ctx),
     ...vectorBooleanCommands(ctx),
     offsetShapesCommand(ctx),
+    ...designToolsCommands(ctx),
+    ...vectorCutCommands(ctx),
     ctx.hasFillableSelection
       ? enabled(
           'tools.fill-selection',

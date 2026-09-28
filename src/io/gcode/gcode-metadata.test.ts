@@ -42,7 +42,7 @@ function laserAssumptions(
 describe('gcodeMetadataHeader', () => {
   it('tracks the latest safety-relevant emitter revision', () => {
     expect(EMITTER_REVISION).toBe(
-      'trace-arcs-relief-width-ramp-tiles-precision-contact-air-scan-v2-20260927-v9',
+      'park-kerf-arcs-scan-angle-overscan-tiles-ramp-precision-20260928-v9',
     );
   });
 

@@ -3,25 +3,31 @@
 // readout helpers, and the traversal toggle uses LightBurn's exact wording.
 
 import { useMemo } from 'react';
-import type { ProgramTimeModel } from '../../core/gcode-time';
-import type { GcodeRenderModel, ProgramFinding } from '../../core/gcode-view';
+import type { ProgramFinding } from '../../core/gcode-view';
 import type { Viewer3dTheme } from '../viewer3d';
 // Deep import: the viewer3d barrel is capped at 20 exports by its index contract.
 import type { Viewer3dLook } from '../viewer3d/viewer3d-look';
+import type { InspectorProgramTime, InspectorRenderModel } from './inspector-model';
 import { InspectorHealthPanel } from './InspectorHealthPanel';
+import { InspectorIsolateControl } from './InspectorIsolateControl';
 import { InspectorLensControl } from './InspectorLensControl';
 import { droRows, statsRows, type Readout } from './inspector-readouts';
+import type { IsolateState } from './isolate';
 import type { LensId } from './lenses';
 import type { PlayheadState } from './playhead';
 import type { ToolSections } from './tool-sections';
+import { InspectorStockControl } from './InspectorStockControl';
+import type { CarvedStock } from './use-carved-stock';
+import { InspectorBurnControl } from './InspectorBurnControl';
+import type { LaserBurn } from './use-laser-burn';
 
-export function InspectorSidebar(props: {
-  readonly model: GcodeRenderModel;
+type InspectorSidebarProps = {
+  readonly model: InspectorRenderModel;
   readonly theme: Viewer3dTheme;
   readonly look?: Viewer3dLook | undefined;
   readonly sections?: ToolSections | null | undefined;
   readonly playhead: PlayheadState;
-  readonly time: ProgramTimeModel;
+  readonly time: InspectorProgramTime;
   /** Device profile the time assumes; null for stock GRBL limits. */
   readonly timedFor: string | null;
   readonly findings: ReadonlyArray<ProgramFinding>;
@@ -32,7 +38,18 @@ export function InspectorSidebar(props: {
   readonly travelVisible: boolean;
   readonly onTravelVisibleChange: (visible: boolean) => void;
   readonly onLocateLine: (line: number) => void;
-}): JSX.Element {
+  /** Legend filters and the Z range and section (ADR-470). */
+  readonly hiddenEntries: ReadonlySet<number>;
+  readonly onToggleEntry: ((entry: number) => void) | null;
+  readonly isolate: IsolateState;
+  readonly onIsolateChange: (next: IsolateState) => void;
+  /** The carved stock's switches; shown for programs that carve (ADR-487). */
+  readonly stock?: CarvedStock | undefined;
+  /** The laser burn preview's switches; shown for programs that burn (ADR-487). */
+  readonly burn?: LaserBurn | undefined;
+};
+
+export function InspectorSidebar(props: InspectorSidebarProps): JSX.Element {
   // Playback re-renders this column every animation frame. statsRows scans
   // every segment, so derive it per PROGRAM, not per frame. The lens control
   // applies the same memo boundary to its legend; droRows reads one segment.
@@ -54,6 +71,8 @@ export function InspectorSidebar(props: {
           sections={props.sections}
           lens={props.lens}
           onLensChange={props.onLensChange}
+          hiddenEntries={props.hiddenEntries}
+          onToggleEntry={props.onToggleEntry}
           variant="sidebar"
         />
         <label style={toggleStyle}>
@@ -75,6 +94,23 @@ export function InspectorSidebar(props: {
           Show direction arrows
         </label>
       </Section>
+      <Section title="Isolate">
+        <InspectorIsolateControl
+          model={props.model}
+          isolate={props.isolate}
+          onChange={props.onIsolateChange}
+        />
+      </Section>
+      {props.stock?.available ? (
+        <Section title="Stock">
+          <InspectorStockControl stock={props.stock} />
+        </Section>
+      ) : null}
+      {props.burn?.available ? (
+        <Section title="Burn">
+          <InspectorBurnControl burn={props.burn} />
+        </Section>
+      ) : null}
       <Section title="Program">
         <ReadoutGrid rows={stats} />
       </Section>

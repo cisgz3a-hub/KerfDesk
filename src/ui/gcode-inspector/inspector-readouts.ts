@@ -3,8 +3,8 @@
 // components stay presentational and the numbers stay unit-testable.
 // Legend rendering moved to lenses.ts in stage 9.
 
-import type { ProgramTimeModel } from '../../core/gcode-time';
-import type { GcodeRenderModel, ProgramStats } from '../../core/gcode-view';
+import type { ProgramStats } from '../../core/gcode-view';
+import type { InspectorProgramTime, InspectorRenderModel } from './inspector-model';
 import type { PlayheadState } from './playhead';
 import { timeSplit } from './time-split';
 
@@ -27,7 +27,10 @@ const EMPTY_DRO: ReadonlyArray<Readout> = [
  * the F / S / source line of the segment being executed. Falls back to the
  * program's final segment when no playhead is supplied.
  */
-export function droRows(model: GcodeRenderModel, playhead?: PlayheadState): ReadonlyArray<Readout> {
+export function droRows(
+  model: InspectorRenderModel,
+  playhead?: PlayheadState,
+): ReadonlyArray<Readout> {
   const index =
     playhead === undefined || playhead.segmentIndex < 0
       ? model.segmentCount - 1
@@ -47,7 +50,7 @@ export function droRows(model: GcodeRenderModel, playhead?: PlayheadState): Read
 }
 
 function segmentEndPoint(
-  model: GcodeRenderModel,
+  model: InspectorRenderModel,
   index: number,
 ): { readonly x: number; readonly y: number; readonly z: number } {
   const base = index * 6;
@@ -59,14 +62,14 @@ function segmentEndPoint(
 }
 
 export function statsRows(
-  model: GcodeRenderModel,
-  time?: ProgramTimeModel,
+  model: InspectorRenderModel,
+  time?: InspectorProgramTime,
   timedFor: string | null = null,
 ): ReadonlyArray<Readout> {
   const { stats } = model;
   return [
     ...(time === undefined ? [] : timeRows(time, timedFor)),
-    ...(time === undefined ? [] : timeSplitRows(model, time)),
+    ...(time === undefined ? [] : timeSplitRows(time)),
     { label: 'Size', value: boundsSize(stats) },
     { label: 'Cut', value: `${num(stats.cutMm)} mm` },
     { label: 'Traversal', value: `${num(stats.travelMm)} mm` },
@@ -82,7 +85,7 @@ export function statsRows(
 // Planner-grade against the device profile's limits and calibration, as Job
 // Review times it (ADR-425). It still cannot see serial delivery or the real
 // controller's firmware, so it is labelled an estimate rather than a promise.
-function timeRows(time: ProgramTimeModel, timedFor: string | null): ReadonlyArray<Readout> {
+function timeRows(time: InspectorProgramTime, timedFor: string | null): ReadonlyArray<Readout> {
   const limited = countFeedLimited(time.segFeedLimited);
   const rows: Readout[] = [
     { label: 'Est. time', value: `~${clock(time.totalSeconds)}` },
@@ -99,8 +102,8 @@ function timeRows(time: ProgramTimeModel, timedFor: string | null): ReadonlyArra
 
 // Where the minutes actually go. Distance answers a different question:
 // a long rapid and a short plunge can cost the same time.
-function timeSplitRows(model: GcodeRenderModel, time: ProgramTimeModel): ReadonlyArray<Readout> {
-  return timeSplit(model, time).map((share) => ({
+function timeSplitRows(time: InspectorProgramTime): ReadonlyArray<Readout> {
+  return timeSplit(time).map((share) => ({
     label: share.label,
     value: `${clock(share.seconds)} (${Math.round(share.percent)}%)`,
   }));
