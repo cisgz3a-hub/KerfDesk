@@ -1,6 +1,6 @@
 name: Desktop Preview cadence
 
-# Keeps desktop Previews regular (ADR-521). Once a day: when main has
+# Keeps desktop Previews regular (ADR-522). Once a day: when main has
 # user-facing changes the newest Preview lacks and that Preview is at least a
 # week old, keep ONE issue open that names the next Preview tag, the newest
 # main commit that CI, Browser smoke and the Desktop package check all passed

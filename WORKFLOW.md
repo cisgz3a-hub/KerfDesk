@@ -7649,7 +7649,7 @@ desktop artifact stays **CLAIMED** under `PROJECT.md` Desktop Preview acceptance
   `Could not open <name>: it is not a KerfDesk or LightBurn project file.`
 - Unreadable: `Could not open <name>: KerfDesk could not read it.`
 
-### F-DESK5. Regular desktop Previews and the changelog (ADR-521)
+### F-DESK5. Regular desktop Previews and the changelog (ADR-522)
 
 1. Every pull request runs the **Desktop package check** on Linux, Windows and macOS (Apple
    silicon and Intel). Windows builds the Preview installer as the release lane does, runs its

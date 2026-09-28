@@ -1,7 +1,7 @@
 # Changelog
 
 What changed in each KerfDesk desktop release. The web app updates from `main` as changes land;
-desktop Previews are tagged from `main` (ADR-521, and "Desktop Preview releases" in `WORKFLOW.md`).
+desktop Previews are tagged from `main` (ADR-522, and "Desktop Preview releases" in `WORKFLOW.md`).
 
 Highlights are written by hand. **All changes** is generated from the merged pull requests by
 `node scripts/desktop-release-notes.mjs refresh`, and `stamp <version>` turns Unreleased into a

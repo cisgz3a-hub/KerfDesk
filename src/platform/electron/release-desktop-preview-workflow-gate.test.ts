@@ -152,7 +152,7 @@ describe('Desktop Preview release workflow gate (ADR-248/249)', () => {
     expect(workflow).toContain('Release verification and legal-closure gate');
   });
 
-  it('builds and checks the Windows and macOS Preview on every pull request (ADR-521)', () => {
+  it('builds and checks the Windows and macOS Preview on every pull request (ADR-522)', () => {
     expect(packageCheck).toMatch(/^ {2}pull_request:$/m);
     expect(packageCheck).toContain('runs-on: windows-latest');
     expect(packageCheck).toMatch(/runner: macos-15\n/);
@@ -176,7 +176,7 @@ describe('Desktop Preview release workflow gate (ADR-248/249)', () => {
     expect(packageCheck).not.toContain('${{ secrets.');
   });
 
-  it('publishes changelog notes with every Preview and only reminds about tagging (ADR-521)', () => {
+  it('publishes changelog notes with every Preview and only reminds about tagging (ADR-522)', () => {
     const cadence = repoFile('.github/workflows/desktop-preview-cadence.yml');
     expect(workflow).toContain(
       'node scripts/desktop-release-notes.mjs release-body "${VERSION}" >> release-notes.md',

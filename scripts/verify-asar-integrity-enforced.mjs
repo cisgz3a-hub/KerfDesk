@@ -1,6 +1,6 @@
 // Proves a packaged app refuses to start from a modified app.asar (ADR-483's
 // enableEmbeddedAsarIntegrityValidation fuse, checked on every pull request by
-// ADR-521). One hex digit of a file hash in the archive header is changed, so
+// ADR-522). One hex digit of a file hash in the archive header is changed, so
 // the header stays valid JSON and keeps its length but no longer matches the
 // hash electron-builder embedded in the executable. The app is then launched on
 // a throwaway profile with the native smoke switches: a refusing app stops

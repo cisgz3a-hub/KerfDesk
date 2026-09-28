@@ -359,7 +359,7 @@ jobs:
 
           EOF
           # CHANGELOG.md's section for this version, or its Unreleased highlights
-          # plus every pull request since the previous Preview tag (ADR-521).
+          # plus every pull request since the previous Preview tag (ADR-522).
           node scripts/desktop-release-notes.mjs release-body "${VERSION}" >> release-notes.md
 
       - name: Attest release companions

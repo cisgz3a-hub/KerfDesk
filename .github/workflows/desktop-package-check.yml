@@ -2,7 +2,7 @@ name: Desktop package check
 
 # Packages the desktop app on Linux, Windows and macOS (Apple silicon and Intel)
 # on every pull request and push to main, checks what shipped, and launches it
-# (ADR-483, ADR-521). Unit tests cannot see what electron-builder actually
+# (ADR-483, ADR-522). Unit tests cannot see what electron-builder actually
 # packs: its file patterns and fuse flips apply silently, and the release
 # lanes' own package checks otherwise ran only when a release was tagged.
 #

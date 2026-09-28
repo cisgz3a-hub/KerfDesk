@@ -1,4 +1,4 @@
-## ADR-521 - Every pull request builds, installs and launches the desktop app on Windows and macOS, and Previews ship regularly with a changelog (2026-09-28)
+## ADR-522 - Every pull request builds, installs and launches the desktop app on Windows and macOS, and Previews ship regularly with a changelog (2026-09-28)
 
 **Status:** Implemented | **Date:** 2026-09-28 | **Extends:** ADR-483 (desktop package check),
 ADR-248/249 (Preview release lane)

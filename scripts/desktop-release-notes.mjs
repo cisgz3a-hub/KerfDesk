@@ -1,4 +1,4 @@
-// Release notes and CHANGELOG.md for desktop Previews (ADR-521). Every merge
+// Release notes and CHANGELOG.md for desktop Previews (ADR-522). Every merge
 // on main's first-parent history names its pull request; this groups them
 // into what is new, fixed and faster, by area, in the user's words.
 //

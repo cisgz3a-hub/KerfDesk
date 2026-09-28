@@ -30,7 +30,7 @@ export function validateNativeSmokeResult(result, expectedUserData) {
 
 async function runCli() {
   // Every pull request runs this smoke against the packaged app on Windows,
-  // macOS and Linux (ADR-483, ADR-521).
+  // macOS and Linux (ADR-483, ADR-522).
   if (!['win32', 'darwin', 'linux'].includes(process.platform)) {
     throw new Error('Packaged smoke runs on Windows, macOS or Linux');
   }

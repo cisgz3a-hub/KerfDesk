@@ -1,4 +1,4 @@
-// CHANGELOG.md sections for desktop Previews (ADR-521). Unreleased holds
+// CHANGELOG.md sections for desktop Previews (ADR-522). Unreleased holds
 // hand-written highlights and a generated list of every change between two
 // markers; scripts/desktop-release-notes.mjs fills the list and stamps
 // Unreleased as a version before it is tagged.

@@ -4,7 +4,7 @@ param(
 
 # The Windows Preview package contract (ADR-248/249). The Preview release lane
 # runs it on every tag and the desktop package check on every pull request
-# (ADR-521), so a change that breaks the next Preview fails before anyone tags.
+# (ADR-522), so a change that breaks the next Preview fails before anyone tags.
 # Run it after the build's updater metadata has been removed.
 
 $ErrorActionPreference = 'Stop'

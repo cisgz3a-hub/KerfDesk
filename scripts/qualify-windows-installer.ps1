@@ -7,7 +7,7 @@ param(
   [Parameter(Mandatory = $true)][string]$EvidenceRoot,
   # Full: the dry run's install, save/reopen, upgrade and uninstall qualification.
   # Launch: every pull request's install, packaged launch/import/save and
-  # uninstall (ADR-521), with no upgrade candidate and no file dialogs.
+  # uninstall (ADR-522), with no upgrade candidate and no file dialogs.
   [ValidateSet('Full', 'Launch')][string]$Scenario = 'Full'
 )
 

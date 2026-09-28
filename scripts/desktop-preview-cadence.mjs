@@ -1,4 +1,4 @@
-// Keeps desktop Previews regular (ADR-521). Run daily by
+// Keeps desktop Previews regular (ADR-522). Run daily by
 // .github/workflows/desktop-preview-cadence.yml: when main has user-facing
 // changes the newest Preview lacks and that Preview is at least a week old,
 // it drafts one issue naming the next Preview tag, the newest main commit
@@ -70,7 +70,7 @@ export function cadenceIssue({ lastTag, days, nextTag, commit, userFacingChanges
     '',
     '</details>',
     '',
-    '_Refreshed daily by `.github/workflows/desktop-preview-cadence.yml` (ADR-521)._',
+    '_Refreshed daily by `.github/workflows/desktop-preview-cadence.yml` (ADR-522)._',
   ].join('\n');
 }
 
