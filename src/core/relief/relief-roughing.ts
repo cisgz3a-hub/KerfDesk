@@ -170,7 +170,7 @@ export function reliefRoughingLadder(
     for (const flat of separate.finished) finished.push(flat);
   }
   return {
-    ...ladderOf(completions),
+    ...ladderOf(completions, context.toolLaw.surfaceDzAtRadius(context.toolLaw.radiusMm)),
     cutWidthMm: clearingDiameterMm,
     ...(flats === null
       ? {}
@@ -213,13 +213,18 @@ function planRoughingLevel(
 // Every planned level's closed passes and paths, and whether any stopped short.
 function ladderOf(
   completions: ReadonlyArray<ReliefLevelCompletion>,
+  toolRiseMm: number,
 ): Pick<ReliefRoughingLadder, 'passes' | 'levels' | 'offsetFailed' | 'passLimited'> {
   const passes: CncContourPass[] = [];
   const levels: ReliefRoughingLevelPaths[] = [];
+  let aboveCleared = true;
   for (const completion of completions) {
-    if (completion.paths === null) continue;
-    levels.push(completion.paths);
-    appendClosedRings(passes, completion.paths);
+    if (completion.paths !== null) {
+      const floor = aboveCleared ? airFloorMm(completion.paths, toolRiseMm) : null;
+      levels.push(floor === null ? completion.paths : { ...completion.paths, airFloorZMm: floor });
+      appendClosedRings(passes, completion.paths);
+    }
+    if (completion.offsetFailed || completion.passLimited) aboveCleared = false;
   }
   return {
     passes,
@@ -227,6 +232,17 @@ function ladderOf(
     offsetFailed: completions.some((completion) => completion.offsetFailed),
     passLimited: completions.some((completion) => completion.passLimited),
   };
+}
+
+// ADR-489: the air a level's paths are entered through. The level above cut
+// its whole region to this level's slice top (a region only shrinks with
+// depth), and every point within the cutter's radius of that region lies
+// within the radius of one of its paths, so no stock there stands higher than
+// the slice top plus the cutter's rise at its full radius. A level cut from
+// the uncut stock top, or below a level that stopped short, has no floor.
+function airFloorMm(level: ReliefRoughingLevelPaths, toolRiseMm: number): number | null {
+  if (!(level.sliceTopMm < -LEVEL_EPS) || !Number.isFinite(toolRiseMm)) return null;
+  return level.sliceTopMm + Math.max(0, toolRiseMm);
 }
 
 type FlatPlan = {

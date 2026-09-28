@@ -92,10 +92,18 @@ export type CutGroup = {
   // or no closed segments, so existing output stays byte-identical. Offset
   // fill groups drop it via the Omit below; overcut is a Line setting.
   readonly finalPassOvercutMm?: number;
+  // ADR-494: present only on the group that burns a Line operation's tab
+  // spans, which follows that operation's cut group; the share of the cut's
+  // power it runs at (`power` already includes it). Absent on every other
+  // group, so their output is unchanged.
+  readonly tabSpanPowerPercent?: number;
   readonly segments: ReadonlyArray<CutSegment>;
 };
 
-export type FillGroup = Omit<CutGroup, 'kind' | 'segments' | 'finalPassOvercutMm'> & {
+export type FillGroup = Omit<
+  CutGroup,
+  'kind' | 'segments' | 'finalPassOvercutMm' | 'tabSpanPowerPercent'
+> & {
   readonly kind: 'fill';
   readonly fillStyle?: LayerFillStyle;
   readonly islandMotionPolicy?: IslandFillMotionPolicy;
@@ -182,6 +190,11 @@ export type CncContourPass = {
   // ADR-491: a stay-down link fed the bit here at this depth, so the pass needs
   // no entry of its own (ramp entry leaves it alone).
   readonly stayDownEntry?: true;
+  // ADR-489: earlier passes of this job have cut away everything the cutter
+  // would touch at or above this Z anywhere along this pass's path, so the
+  // emitter may rapid down to it plus CNC_AIR_RAPID_CLEARANCE_MM before the
+  // plunge instead of feeding down from safe Z. Absent: plunge from safe Z.
+  readonly airFloorZMm?: number;
 };
 
 export type CncPath3dPass = {
@@ -206,6 +219,8 @@ export type CncPath3dPass = {
   // ADR-491: a short level move between two pocket passes, fed at the plunge
   // feed in place of a lift and re-plunge. Provenance only.
   readonly stayDownLink?: true;
+  // ADR-489: see CncContourPass.airFloorZMm.
+  readonly airFloorZMm?: number;
 };
 
 export type CncArcPass = {
@@ -216,6 +231,8 @@ export type CncArcPass = {
   readonly clockwise: boolean;
   readonly zMm: number;
   readonly closed: boolean;
+  // ADR-489: see CncContourPass.airFloorZMm.
+  readonly airFloorZMm?: number;
 };
 
 export type CncHelicalContourPass = {

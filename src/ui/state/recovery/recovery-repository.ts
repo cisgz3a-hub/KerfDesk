@@ -1,10 +1,9 @@
 import type { JobCheckpoint, JobInterruption } from '../../../core/recovery';
 import type { ExecutionArtifactV1, RunId } from './execution-artifact';
 import { RecoveryActivationCoordinator } from './recovery-activation-coordinator';
-import { legacyArtifact, readLegacyCheckpoint } from './legacy-checkpoint-migration';
 import { RecoveryArtifactCleanupCoordinator } from './recovery-artifact-cleanup-coordinator';
 import { RecoveryArtifactStore } from './recovery-artifact-store';
-import { insertLegacyRecoveryCapsule } from './recovery-legacy-insert';
+import { RecoveryFingerprintCapsules } from './recovery-fingerprint-capsules';
 import { compensateFailedRecoveryClaim } from './recovery-claim-compensation';
 import {
   type PersistedRecoverySlots,
@@ -42,6 +41,7 @@ import { RecoveryRepositoryState } from './recovery-repository-state';
 import type { RecoveryAuthoritativeResetBase } from './recovery-repository-state';
 import { RecoverySnapshotCoordinator } from './recovery-snapshot-coordinator';
 import { ownRecoveryRuns, type RecoveryRunOwnership } from './recovery-run-lock';
+import type { UntrackedRunRecord } from './untracked-run-record';
 
 export type {
   RecoveryRepositoryOptions,
@@ -51,6 +51,13 @@ export type {
 export class RecoveryRepository {
   private readonly state = new RecoveryRepositoryState(() => this.startHandoff.clearTimer());
   private readonly terminalCoordinator = new RecoveryTerminalCoordinator();
+  private readonly fingerprintCapsules = new RecoveryFingerprintCapsules(() => ({
+    backend: this.options.backend,
+    generation: this.currentGeneration(),
+    nowIso: this.nowIso(),
+    refresh: () => this.refreshAfterMutation(),
+    storageFailure: (operation, error) => this.storageFailure(operation, error),
+  }));
   private readonly nowIso: () => string;
   private initialization: Promise<RecoveryRepositoryResult<RecoveryRepositorySnapshot>> | null =
     null;
@@ -210,12 +217,18 @@ export class RecoveryRepository {
     );
   }
 
-  async noteUntrackedRunAccepted(runId?: RunId): Promise<RecoveryRepositoryResult<boolean>> {
+  /** `record` keeps a laser run too large to archive, so an interruption
+   * still leaves a fingerprint-only capsule (ADR-341 Amendment 8). */
+  async noteUntrackedRunAccepted(
+    runId?: RunId,
+    record?: UntrackedRunRecord,
+  ): Promise<RecoveryRepositoryResult<boolean>> {
     const result = await this.mutateAndRefresh(
       'supersede recovery after untracked Start',
       noteUntrackedRunAcceptedMutation,
     );
     if (result.ok && runId !== undefined) await this.artifactStore.discard(runId);
+    await this.fingerprintCapsules.rememberUntracked(result.ok ? (record ?? null) : null);
     if (result.ok) return result;
     const purged = await this.purgeControllerData();
     return purged.ok ? ok(true) : result;
@@ -299,24 +312,7 @@ export class RecoveryRepository {
   async migrateLegacyCheckpoint(): Promise<RecoveryRepositoryResult<boolean>> {
     const ready = await this.ensureLoaded();
     if (!ready.ok) return ready;
-    const checkpoint = readLegacyCheckpoint(this.options.legacyStorage);
-    if (checkpoint === null) return ok(false);
-    const artifact = legacyArtifact(checkpoint, this.nowIso());
-    try {
-      const generation = this.currentGeneration();
-      const inserted = await insertLegacyRecoveryCapsule({
-        backend: this.options.backend,
-        generation,
-        artifact,
-        checkpoint,
-      });
-      if (inserted === 'conflict') return failure('conflict');
-      this.options.legacyStorage.clear();
-      await this.refreshAfterMutation();
-      return ok(inserted === 'inserted');
-    } catch (error) {
-      return this.storageFailure('migrate legacy job checkpoint', error);
-    }
+    return this.fingerprintCapsules.migrateLegacy(this.options.legacyStorage);
   }
 
   async purgeControllerData(): Promise<RecoveryRepositoryResult<number>> {
@@ -425,12 +421,13 @@ export class RecoveryRepository {
     if (!refreshed.ok) throw new Error('Recovery data was written but could not be reloaded.');
   }
 
-  private persistTerminal = (
+  private persistTerminal = async (
     runId: RunId,
     terminal: PendingRecoveryTerminal,
   ): Promise<RecoveryRepositoryResult<boolean>> => {
     const plan = recoveryTerminalPersistencePlan(runId, terminal);
-    return this.mutateAndRefresh(plan.operation, plan.mutate);
+    const settled = await this.mutateAndRefresh(plan.operation, plan.mutate);
+    return this.fingerprintCapsules.afterTerminal(runId, terminal, settled);
   };
 
   private storageFailure<T>(operation: string, error: unknown): RecoveryRepositoryResult<T> {

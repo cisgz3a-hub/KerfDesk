@@ -23,6 +23,7 @@ import { CncPassRecoveryWizard } from './CncPassRecoveryWizard';
 import { LaserRecoveryReviewDialog } from './LaserRecoveryReviewDialog';
 import { frameRemainingRecoveryArea } from './laser-recovery-frame';
 import { runLaserRecoveryCapsuleFlow } from './laser-recovery-flow';
+import { moveHeadToWorkPoint } from './laser-recovery-move';
 
 export function CheckpointResumeBanner(props: {
   readonly busy: boolean;
@@ -148,6 +149,7 @@ function LaserRecoveryReview(props: {
       onRestoreOrigin={(saved) => useLaserStore.getState().restoreWorkOrigin(saved)}
       onSetOriginAtHead={(point) => useLaserStore.getState().setOriginAtProgramPoint(point)}
       {...(homingEnabled ? { onHome: () => useLaserStore.getState().home() } : {})}
+      onMoveToWorkPoint={moveHeadToWorkPoint}
     />
   );
 }

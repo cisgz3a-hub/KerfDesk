@@ -63,7 +63,7 @@ rapid to the park position, so a clamp taller than that stood in the way.
    (the retract every job already makes comes first). It is not given a default: a lift past the
    top of the Z travel stalls the axis, and a Z that lost steps at the top would cut the next job
    deeper, so only the operator can say how much room the machine has.
-4. `EMITTER_REVISION` advances to `relief-masked-stay-down-park-20260927-v3`.
+4. `EMITTER_REVISION` advances to `air-floor-runs-stay-down-park-20260928-v5`.
 
 ### Evidence
 

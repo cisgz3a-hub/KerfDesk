@@ -5,7 +5,10 @@
 //   * Every XY rapid (G0 with X/Y) happens with Z parked at the group's safe
 //     height. The emitter retracts before any XY travel, by construction.
 //   * Plunges are always G1 at the plunge feed — never rapids.
-//   * A rapid never targets Z below the safe height.
+//   * A rapid never targets Z below the safe height, except the Z-only
+//     descent from safe Z to just above a pass's proven air floor, which a
+//     plunge at the plunge feed always follows (ADR-489,
+//     cnc-grbl-entry-descent.ts).
 // checked again post-emit by findPlungedTravelIssues (core/invariants).
 //
 // Coordinates: Z0 = stock top (operator zeros the bit on the stock before
@@ -53,6 +56,7 @@ import { assertNever } from '../scene';
 import { appendCoolantStart } from './cnc-grbl-coolant';
 import { appendRetract, fmt, fmtFeed, type Head } from './cnc-grbl-emit-head';
 import { appendCncGroupComments } from './cnc-grbl-group-comments';
+import { appendEntryDescent } from './cnc-grbl-entry-descent';
 import { prepareHelicalMotion, type PreparedHelicalMotion } from './cnc-grbl-helical';
 import { collectIndexedCncGroups } from './cnc-grbl-job-groups';
 import {
@@ -305,10 +309,12 @@ function appendContourPass(
     head.x = startX;
     head.y = startY;
   }
-  if (head.z !== passZ) {
-    lines.push(`G1 Z${passZ} F${formatGcodeFeedMmPerMin(plunge)}`);
-    head.z = passZ;
-  }
+  appendEntryDescent(lines, head, {
+    startZ: passZ,
+    safeZMm,
+    airFloorZMm: pass.airFloorZMm,
+    plunge,
+  });
   appendCutMoves(lines, head, pass, feed, formatXy, cncContourCoordinateEquals);
 }
 
@@ -338,10 +344,12 @@ function appendArcPass(
     head.x = startX;
     head.y = startY;
   }
-  if (head.z !== passZ) {
-    lines.push(`G1 Z${passZ} F${formatGcodeFeedMmPerMin(plunge)}`);
-    head.z = passZ;
-  }
+  appendEntryDescent(lines, head, {
+    startZ: passZ,
+    safeZMm,
+    airFloorZMm: pass.airFloorZMm,
+    plunge,
+  });
 
   const geometry = circularArcGeometry(pass);
   const endX = fmt(pass.end.x);
@@ -394,10 +402,7 @@ function appendPath3dPass(
     head.x = startX;
     head.y = startY;
   }
-  if (head.z !== startZ) {
-    lines.push(`G1 Z${startZ} F${formatGcodeFeedMmPerMin(plunge)}`);
-    head.z = startZ;
-  }
+  appendEntryDescent(lines, head, { startZ, safeZMm, airFloorZMm: pass.airFloorZMm, plunge });
   appendPath3dCutMoves(lines, head, pass, feed, plunge);
 }
 

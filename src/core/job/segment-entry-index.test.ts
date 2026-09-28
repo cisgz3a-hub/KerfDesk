@@ -99,6 +99,82 @@ describe('createNearestEntryQuery', () => {
     expect(pick?.reverse).toBe(false);
   });
 
+  it('returns the exhaustive pick with many start vertices per segment', () => {
+    // Pushed in segment, then vertex order, as collectSegmentEntries does, so
+    // the first strictly nearer entry is the comparator's minimum. Coarse
+    // coordinates make exact ties common, within and across segments.
+    for (let seed = 1; seed <= 10; seed += 1) {
+      const random = seededRandom(seed);
+      const entries: SegmentEntry[] = [];
+      for (let segmentIndex = 0; segmentIndex < 60; segmentIndex += 1) {
+        const count = 1 + Math.floor(random() * 6);
+        for (let vertexIndex = 0; vertexIndex < count; vertexIndex += 1) {
+          const point = { x: Math.floor(random() * 12), y: Math.floor(random() * 12) };
+          entries.push({ point, segmentIndex, reverse: false, vertexIndex });
+        }
+      }
+      const query = createNearestEntryQuery(entries);
+      const taken = new Set<number>();
+      const isAvailable = (segmentIndex: number): boolean => !taken.has(segmentIndex);
+      let cursor = { x: 6, y: 6 };
+      for (let step = 0; step < 60; step += 1) {
+        const actual = query(cursor, isAvailable);
+        expect(actual, `seed ${seed} step ${step}`).toBe(
+          referenceNearest(entries, cursor, isAvailable),
+        );
+        if (actual === null) break;
+        taken.add(actual.segmentIndex);
+        cursor = actual.point;
+      }
+    }
+  });
+
+  it('breaks remaining ties by start vertex, so the drawn start wins', () => {
+    // LBG-C04: a closed segment offers several start vertices. The old scan
+    // never saw them; the comparator's fourth key orders them by vertex index.
+    const point = { x: 4, y: 4 };
+    const entries: SegmentEntry[] = [
+      { point, segmentIndex: 5, reverse: false, vertexIndex: 7 },
+      { point, segmentIndex: 5, reverse: false, vertexIndex: 2 },
+      { point, segmentIndex: 6, reverse: false },
+      { point, segmentIndex: 5, reverse: false, vertexIndex: 0 },
+    ];
+    expect(createNearestEntryQuery(entries)({ x: 0, y: 0 }, () => true)).toBe(entries[3]);
+    expect(createNearestEntryQuery(entries.slice(0, 3))({ x: 0, y: 0 }, () => true)).toBe(
+      entries[1],
+    );
+  });
+
+  it('checks each retired entry at most once more, however often it is passed', () => {
+    // One placed segment with 10,000 entries round the cursor, the live ones
+    // beyond them: every query has to search past the dead cluster.
+    const entries: SegmentEntry[] = [];
+    for (let i = 0; i < 10_000; i += 1) {
+      entries.push({
+        point: { x: (i % 100) / 10, y: Math.floor(i / 100) / 10 },
+        segmentIndex: 0,
+        reverse: false,
+        vertexIndex: i,
+      });
+    }
+    for (let i = 1; i <= 200; i += 1) {
+      entries.push({ point: { x: 20 + i, y: 5 }, segmentIndex: i, reverse: false });
+    }
+    const query = createNearestEntryQuery(entries);
+    const taken = new Set<number>([0]);
+    let checked = 0;
+    const isAvailable = (segmentIndex: number): boolean => {
+      checked += 1;
+      return !taken.has(segmentIndex);
+    };
+    for (let step = 1; step <= 200; step += 1) {
+      const pick = query({ x: 5, y: 5 }, isAvailable);
+      expect(pick?.segmentIndex).toBe(step);
+      taken.add(step);
+    }
+    expect(checked).toBeLessThan(3 * entries.length);
+  });
+
   it('skips unavailable segments entirely', () => {
     const entries: SegmentEntry[] = [
       { point: { x: 1, y: 0 }, segmentIndex: 0, reverse: false },

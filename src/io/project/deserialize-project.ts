@@ -413,6 +413,11 @@ function normalizeOptimization(value: unknown): Project['optimization'] {
       value['startPoint'] === 'job-lower-left' || value['startPoint'] === 'job-center'
         ? value['startPoint']
         : 'machine-origin',
+    // Absent in files written before LBG-C04: they start closed shapes where drawn.
+    closedShapeStart:
+      value['closedShapeStart'] === 'nearest' || value['closedShapeStart'] === 'nearest-corner'
+        ? value['closedShapeStart']
+        : 'drawn',
   };
 }
 
