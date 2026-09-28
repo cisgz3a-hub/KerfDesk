@@ -7,6 +7,7 @@ import { IDENTITY_TRANSFORM, type RasterImage, type SceneObject } from '../scene
 import { streamedRasterRowProvider } from './compile-job-raster-stream';
 import { originFlipsRasterX, originFlipsRasterY } from '../raster-output';
 import { rotatedMaskedRasterLuma } from './raster-rotated-sample';
+import { rasterScanFrame } from '../raster/raster-scan-frame';
 
 const SOURCE_W = 12;
 const SOURCE_H = 9;
@@ -156,6 +157,56 @@ describe('streamedRasterRowProvider', () => {
         maskObject: mask,
         device,
         bounds,
+        algorithm: 'floyd-steinberg',
+        sMax: S_MAX,
+        sMin: 0,
+      });
+      for (let y = 0; y < TARGET_H; y += 1) {
+        expect(rowAt(y), `row ${y}`).toEqual(reference.subarray(y * TARGET_W, (y + 1) * TARGET_W));
+      }
+    });
+  }
+  // ADR-492: an unrotated image scanned at an angle samples through the same
+  // inverse transform, streamed and materialized alike.
+  for (const [rotationDeg, angleDeg] of [
+    [0, 45],
+    [30, 120],
+  ] as const) {
+    it(`matches the materialized pipeline scanned at ${angleDeg} degrees (rotation ${rotationDeg})`, () => {
+      const device = { ...DEFAULT_DEVICE_PROFILE, origin: 'front-right' as const };
+      const obj = { ...image(true), transform: { ...IDENTITY_TRANSFORM, rotationDeg } };
+      const bounds = { minX: -30, minY: -40, maxX: 20, maxY: 5 };
+      const scanFrame = rasterScanFrame(angleDeg);
+      const reference = dither(
+        {
+          luma: rotatedMaskedRasterLuma(
+            {
+              sourceLuma: sourceLuma(),
+              obj,
+              device,
+              bounds,
+              pixelWidth: TARGET_W,
+              pixelHeight: TARGET_H,
+              scanFrame,
+            },
+            maskObject(),
+          ),
+          width: TARGET_W,
+          height: TARGET_H,
+        },
+        { algorithm: 'floyd-steinberg', sMax: S_MAX, sMin: 0 },
+      );
+      const rowAt = streamedRasterRowProvider({
+        sourceLuma: sourceLuma(),
+        sourceWidth: SOURCE_W,
+        sourceHeight: SOURCE_H,
+        pixelWidth: TARGET_W,
+        pixelHeight: TARGET_H,
+        obj,
+        maskObject: maskObject(),
+        device,
+        bounds,
+        scanFrame,
         algorithm: 'floyd-steinberg',
         sMax: S_MAX,
         sMin: 0,

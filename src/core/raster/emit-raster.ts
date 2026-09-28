@@ -34,6 +34,8 @@
 import { effectiveGcodeFeedMmPerMin, formatGcodeFeedMmPerMin } from '../gcode/feed-word';
 import { planRasterRowSweeps } from './raster-sweep-plan';
 import { emitSpanSweep } from './emit-raster-sweep';
+import { rasterRowLine } from './emit-raster-row-line';
+import { isAlongXScan, rasterScanFrame } from './raster-scan-frame';
 import type { RasterControllerHead } from './emit-raster-travel';
 import type { RasterRowProviderOrder } from '../job/job';
 import type { RasterPowerValues } from './raster-power-values';
@@ -56,7 +58,8 @@ export type EmitRasterInput = {
   readonly height: number;
   // World bounds of the image in mm. The image is rendered with its
   // top-left at (minX, minY) and bottom-right at (maxX, maxY); the
-  // emitter does not apply any transform (the caller bakes that in).
+  // emitter does not apply any transform (the caller bakes that in),
+  // except the scan angle's rotation below.
   readonly bounds: {
     readonly minX: number;
     readonly minY: number;
@@ -67,6 +70,9 @@ export type EmitRasterInput = {
   // M4 controllers modulate power, not speed.
   readonly feedMmPerMin: number;
   readonly passes?: number;
+  // ADR-492: rows run at this angle; `bounds` and every per-row distance are in
+  // the scan frame and each move is rotated into machine X/Y. Absent = along X.
+  readonly scanAngleDeg?: number;
   // Distance to overshoot at each row end, in mm. 5 mm is a typical
   // default for diode lasers; higher feeds want more. 0 disables.
   readonly overscanMm: number;
@@ -177,6 +183,7 @@ function* emitRasterPasses(input: EmitRasterInput, state: RasterEmissionState): 
   const pixelHeightMm = (input.bounds.maxY - input.bounds.minY) / input.height;
   const dotWidthCorrectionMm = Math.max(0, input.dotWidthCorrectionMm ?? 0);
   const passes = normalizedPasses(input.passes);
+  const scanFrame = rasterScanFrame(input.scanAngleDeg);
   // Body — one row at a time. Three optimizations on top of the naive
   // "sweep every row across the full width" version:
   //   1. Skip rows whose pixels are all S=0. They contribute zero
@@ -209,14 +216,14 @@ function* emitRasterPasses(input: EmitRasterInput, state: RasterEmissionState): 
         minXWorldMm: input.bounds.minX,
       });
       if (sweepPlans.length === 0) continue;
-      const worldY = input.bounds.minY + (rowIndex + 0.5) * pixelHeightMm;
+      const line = rasterRowLine(scanFrame, input.bounds.minY + (rowIndex + 0.5) * pixelHeightMm);
       for (const sweepPlan of sweepPlans) {
         // Each island is its own sweep. Internal exits and entries share the
         // blank gap without overlap; any remainder is positioning travel.
         // F rides only the very first G1 of the whole group.
         const sweep = emitSpanSweep(
           input,
-          worldY,
+          line,
           pixelWidthMm,
           feed,
           !feedEmitted,
@@ -289,10 +296,18 @@ function headerComment(input: EmitRasterInput): string {
     // ASCII only: GRBL runs any byte above 0x7F as a realtime command.
     `; ${input.width} x ${input.height} px, ${fmt(input.bounds.maxX - input.bounds.minX)} x ${fmt(input.bounds.maxY - input.bounds.minY)} mm`,
     `; feed ${formatGcodeFeedMmPerMin(input.feedMmPerMin)} mm/min, overscan ${fmt(input.overscanMm)} mm, dot width correction ${fmt(input.dotWidthCorrectionMm ?? 0)} mm`,
+    ...scanAngleComment(input.scanAngleDeg),
     ...(input.effectiveOperationComment === undefined
       ? []
       : [`; ${input.effectiveOperationComment}`]),
   ].join(LINE_END);
+}
+
+// Sizes above are along and across the scan when it runs at an angle.
+function scanAngleComment(scanAngleDeg: number | undefined): ReadonlyArray<string> {
+  const frame = rasterScanFrame(scanAngleDeg);
+  if (isAlongXScan(frame)) return [];
+  return [`; scan angle ${Number(frame.angleDeg.toFixed(3))} deg`];
 }
 
 // Split out to keep validate() under the cyclomatic-complexity cap. Finite-check

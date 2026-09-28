@@ -106,55 +106,11 @@ jobs:
           }
 
       - name: Verify Windows Preview package contract
+        # The same contract runs on every pull request (desktop-package-check.yml).
         shell: pwsh
         env:
           VERSION: ${{ steps.version.outputs.version }}
-        run: |
-          $releaseDir = "release/$env:VERSION"
-          $installer = "$releaseDir/KerfDesk-$env:VERSION-windows-x64-setup.exe"
-          if (-not (Test-Path -LiteralPath $installer -PathType Leaf)) {
-            throw "Missing canonical Windows Preview installer: $installer"
-          }
-
-          $signature = Get-AuthenticodeSignature -LiteralPath $installer
-          if ($signature.Status -ne 'NotSigned') {
-            throw "Preview installer must be unsigned; found $($signature.Status)."
-          }
-          & ./scripts/verify-windows-package-identity.ps1 `
-            -Executable $installer `
-            -Kind Installer
-
-          $unexpectedMetadata = Get-ChildItem -LiteralPath $releaseDir -Recurse -File |
-            Where-Object { $_.Name -match '^latest.*\.(yml|yaml|json)$' -or $_.Extension -eq '.blockmap' }
-          if ($unexpectedMetadata) {
-            throw "Preview emitted updater metadata: $($unexpectedMetadata.FullName -join ', ')"
-          }
-
-          $unpacked = Join-Path $releaseDir 'win-unpacked'
-          $executable = Join-Path $unpacked 'KerfDesk.exe'
-          & ./scripts/verify-windows-package-identity.ps1 -Executable $executable
-          $bytes = [IO.File]::ReadAllBytes($executable)
-          $peOffset = [BitConverter]::ToInt32($bytes, 0x3c)
-          $machine = [BitConverter]::ToUInt16($bytes, $peOffset + 4)
-          if ($machine -ne 0x8664) {
-            throw "Preview executable must be x64 PE32+; machine field was 0x$($machine.ToString('x4'))."
-          }
-
-          $required = @(
-            (Join-Path $unpacked 'LICENSE.electron.txt'),
-            (Join-Path $unpacked 'LICENSES.chromium.html'),
-            (Join-Path $unpacked 'resources/legal/LICENSE'),
-            (Join-Path $unpacked 'resources/legal/THIRD_PARTY_NOTICES.md'),
-            (Join-Path $unpacked 'resources/legal/third-party-notices.txt')
-          )
-          foreach ($path in $required) {
-            if (-not (Test-Path -LiteralPath $path -PathType Leaf)) {
-              throw "Packaged legal material is missing: $path"
-            }
-          }
-
-          $archive = Join-Path $unpacked 'resources/app.asar'
-          node scripts/verify-packaged-preview-metadata.mjs $archive $env:VERSION
+        run: ./scripts/verify-windows-preview-package.ps1 -Version $env:VERSION
 
       - name: Attest Windows binary on its native builder
         uses: actions/attest@36051bcae73b7c2a8a6945a48cbf80953c6baa35 # v4
@@ -398,7 +354,13 @@ jobs:
           - sourceSha: ${SOURCE_SHA}
           - sourceRef: ${GITHUB_REF}
           - signerWorkflow: ${SIGNER_WORKFLOW}
+
+          ## What changed since the last Preview
+
           EOF
+          # CHANGELOG.md's section for this version, or its Unreleased highlights
+          # plus every pull request since the previous Preview tag (ADR-522).
+          node scripts/desktop-release-notes.mjs release-body "${VERSION}" >> release-notes.md
 
       - name: Attest release companions
         uses: actions/attest@36051bcae73b7c2a8a6945a48cbf80953c6baa35 # v4

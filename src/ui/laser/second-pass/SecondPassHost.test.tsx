@@ -7,6 +7,12 @@ import { Dialog } from '../../kit';
 import { useLaserStore } from '../../state/laser-store';
 import { initialLaserState } from '../../state/laser-store-helpers';
 import { useLaserSecondPassUiStore } from '../../state/laser-second-pass-ui-store';
+import {
+  clearUnarchivedRun,
+  completeUnarchivedRun,
+  forgetUnarchivedRunOtherThan,
+  rememberUnarchivedRun,
+} from '../../state/laser-unarchived-run';
 import { RecoveryRepository, type ExecutionArtifactV1 } from '../../state/recovery';
 import { MemoryRecoveryStorageBackend } from '../../state/recovery/recovery-backend';
 import { MemoryRecoveryGenerationStore } from '../../state/recovery/recovery-generation';
@@ -59,6 +65,7 @@ afterEach(async () => {
   await act(async () => root.unmount());
   host.remove();
   vi.restoreAllMocks();
+  clearUnarchivedRun();
   useLaserStore.setState(initialLaserState());
   useLaserSecondPassUiStore.setState({
     completionRunId: null,
@@ -342,6 +349,56 @@ describe('controller families the transformer cannot read', () => {
     await complete('marlin', marlinProject());
     await render(true);
     expect(host.querySelector('select')).toBeNull();
+    expect(host.textContent).not.toContain('Paint a second pass…');
+  });
+});
+
+// Photo engravings over the archive budget ran without an archive, so they were
+// never offered a second pass (ADR-341 Amendment 7).
+describe('a finished job the archive could not keep', () => {
+  async function finishUnarchived(runId: string): Promise<ExecutionArtifactV1> {
+    const artifact = await createCurrentTestExecutionArtifact({ runId, createdAtIso: NOW });
+    rememberUnarchivedRun(runId, async () => artifact);
+    await act(async () => {
+      completeUnarchivedRun(runId);
+    });
+    return artifact;
+  }
+
+  it('offers the job that just finished and opens it from this page', async () => {
+    await complete('older-saved');
+    await repository.noteUntrackedRunAccepted('too-large');
+    const archive = vi.spyOn(repository, 'getArchivedExecution');
+    await render(true);
+    await finishUnarchived('too-large');
+    await offer('too-large');
+
+    expect(host.textContent).toContain('Would you like to darken selected areas?');
+    expect(host.textContent).toContain('could not be saved to the job archive');
+    await act(async () => button('Darken selected areas…').click());
+    await expectOpenedSource('too-large');
+    expect(archive).not.toHaveBeenCalled();
+    await act(async () => button('Close editor').click());
+
+    await act(async () => button('Paint a second pass…').click());
+    await expectOpenedSource('too-large');
+  });
+
+  it('withdraws the Machine-panel entry once another run begins', async () => {
+    await render(true);
+    await finishUnarchived('too-large');
+    expect(host.textContent).toContain('Paint a second pass…');
+
+    await act(async () => forgetUnarchivedRunOtherThan('next-run'));
+    expect(host.textContent).not.toContain('Paint a second pass…');
+  });
+
+  it('does not offer a kept run that never settled cleanly', async () => {
+    const artifact = await createCurrentTestExecutionArtifact({ runId: 'unsettled' });
+    rememberUnarchivedRun('unsettled', async () => artifact);
+    await render(true);
+    await offer('unsettled');
+    expect(host.querySelector('[role="dialog"]')).toBeNull();
     expect(host.textContent).not.toContain('Paint a second pass…');
   });
 });

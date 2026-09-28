@@ -402,7 +402,9 @@ destination and cannot overwrite the template source.
 #### Move — keyboard
 - Arrow key: 1 mm nudge in that direction.
 - Shift+Arrow: 10 mm nudge.
-- No other modifiers in Phase A.
+- Ctrl/Cmd+Arrow: 0.1 mm nudge (ADR-499).
+- All three distances are set in **Settings → Canvas** (0.01 to 1000 mm).
+- Alt+Arrow aligns instead of nudging (ADR-499, F-A6h).
 
 #### Scale — drag handles
 - Corner handles: locked aspect ratio by default.
@@ -484,10 +486,21 @@ destination and cannot overwrite the template source.
    remain on the first instance; later objects and copied complete groups receive fresh IDs.
 6. **Create array** commits one undo entry and selects all instances. **Cancel** or Escape leaves the
    project unchanged.
-7. Array settings remain transient. Every mode can optionally **Advance variables per copy** (F-D6);
-   its per-text sequence offsets persist with the resulting ordinary objects. Preview, save,
-   compilation, Frame, and Start consume those objects through the existing exact-artifact path. This mode creates no
+7. Array settings are not saved in the project. Array... reopens with the settings last applied in
+   this session (ADR-499), except a circle's centre object, and Cancel remembers nothing. Every mode
+   can optionally **Advance variables per copy** (F-D6), which always starts off; its per-text
+   sequence offsets persist with the resulting ordinary objects. Preview, save, compilation, Frame,
+   and Start consume those objects through the existing exact-artifact path. This mode creates no
    new output path or guard.
+8. **Grid extras (ADR-499).** **Space by** Gap between copies or Distance between centres (switching
+   converts the numbers). **Row shift** moves rows 2, 4... right and **Column shift** moves columns
+   2, 4... down (negative values go left or up). **Mirror alternate columns / rows** flips every
+   other copy horizontally, vertically or both. **Build right to left** and **Build bottom to top**
+   change where the copies grow; the original stays at row 1, column 1.
+9. **Circular extras (ADR-499).** **Centre** is the selection centre, a typed point or, with two or
+   more objects selected, one of them, which stays put and is not copied. **Spread copies** evenly
+   all the way round, from a start to an end angle (both ends included), or by a step angle. 0° is
+   to the right and angles run clockwise. The status line says what Apply will do.
 
 ---
 
@@ -555,6 +568,81 @@ destination and cannot overwrite the template source.
    **Crop Image** does, then deletes the mask shape. The shape stays when it is locked or another
    image or path text uses it; the notice says which.
 6. Each tool is one undo step and adds none when nothing changes. None operates a machine.
+
+### F-A6f. Trim Shapes, Cut Shapes, Warp and Deform, Copy Along Path (ADR-498)
+
+1. **Tools → Vector → Trim Shapes** turns on the Trim tool. Hovering an outline highlights in red
+   the stretch between its nearest crossings with other visible outlines or itself; a click deletes
+   it. An outline that crosses nothing is deleted whole. Locked artwork is trimmed back to but never
+   cut. Text and drawn shapes become plain paths when trimmed, and the notice says so. Esc, Done or
+   another tool ends it. Each click is one undo step.
+2. **Tools → Vector → Cut Shapes** splits every selected shape along the top-most selected closed
+   shape into an inside piece and an outside piece, removes that cutter and selects the pieces.
+   Pieces keep their operations. Shapes the cutter does not cross are left as they were, and the
+   notice counts them.
+3. **Tools → Vector → Warp** (four corner handles) and **Deform** (a grid of 16 handles) bend the
+   selected vector artwork. The artwork previews live while the handles are dragged; Enter or Apply
+   applies it as one undo step, Esc or Cancel leaves it as it was, and Reset handles starts again.
+   Shift keeps the Warp corners a parallelogram. Curves become fine lines within 0.05 mm; images,
+   reliefs and locked artwork are left as they are, and the notice says how many.
+4. **Arrange → Layout → Copy Along Path…** copies the selected artwork along the top-most selected
+   single path (or the path picked under Guide path): by number of copies, spacing between centres
+   or gap between copies, from the start offset to the end offset, turned to follow the path unless
+   that box is cleared. A closed guide gets copies all the way round with none doubled at the seam.
+   The status line says what Apply will do. The guide stays and the copies are selected.
+5. When a selection gives a tool nothing to do, a notice says what to select, and nothing changes.
+   None of these tools operates a machine or changes how other artwork compiles.
+
+### F-A6g. Snapping to nodes, midpoints, centres and intersections (ADR-498)
+
+1. The chevron beside the canvas `#` snap toggle opens **Snap settings**: Nodes, Midpoints,
+   Centres, Intersections, Grid and Alignment guides (all on), **Grid spacing** (10 mm; the drawn
+   grid follows it) and **Snap distance** (8 screen pixels). The settings belong to this computer,
+   not to the project.
+2. While drawing shapes, clicking pen points, measuring, dragging nodes or moving artwork, the
+   pointer snaps to the nearest point in reach on visible, unlocked artwork, and a glyph shows what
+   it caught: ■ node, △ midpoint, ⊕ centre, ✕ intersection, + grid. A node wins over an
+   intersection, an intersection over a midpoint and a midpoint over a centre; any point on artwork
+   wins over the grid.
+3. Moving artwork snaps the selection's point nearest the press onto other artwork; when none is in
+   reach, the edge and centre alignment guides and the grid work as before.
+4. Hold **Alt** to place freely during any drag or draw, or **Ctrl/Cmd** while moving. **Shift**
+   keeps its constrain meaning and skips point snapping. Alt pressed at the start of a click in the
+   Select or node tools still picks the next overlapping object.
+5. A very large trace pauses once, briefly, the first time the pointer comes near it with snapping
+   on; after that snapping keeps up with the pointer.
+
+### F-A6h. Named undo list, Settings window and align keys (ADR-499)
+
+1. Every undo step has a name: the tool or command that made it ("Trim Shapes", "Delete 3
+   objects"), else what changed ("Move rectangle", "Change Cut settings").
+2. The **Undo list** button between Undo and Redo lists the last 15 steps, newest first. Choosing
+   one undoes back to just before it; Redo then walks forward again one step at a time.
+3. **Window → Undo History** shows every undo and redo step by name, with a "Current project" row.
+   Clicking an undo step goes back to just before it; clicking a redo step redoes through it. The
+   window stays open.
+4. **Edit → Settings...** or **Ctrl+,** (Cmd+, on macOS) opens Settings: General (theme, workspace
+   layout, recent projects), Canvas (snapping, frame and start markers, nudge distances), Machine &
+   materials (links to Machine Setup, the Bit Library, Materials or Recipes) and Labs (laser only).
+   Changes apply at once and belong to this computer, not the project. Each setting also stays
+   where it was before.
+5. **Alt+arrows** align the selection left, right, top or bottom; **Alt+PgUp** and **Alt+PgDn**
+   centre it on X or Y; **Alt+Shift+H** and **Alt+Shift+V** distribute spacing. Aligning needs two
+   or more objects and distributing three or more; a group counts as one. Each is one undo step.
+
+### F-A6i. Optimize Shapes: smooth and fit outlines (ADR-499)
+
+1. Select vector artwork and choose **Tools → Vector → Optimize Shapes...**.
+2. **Smooth** (0.25 mm, 0.02 to 5) evens out jitter without shrinking the shape; corners sharper
+   than the **Corner angle** (30°) stay exactly where they are. **Fit to lines, arcs and curves**
+   (tolerance 0.05 mm) replaces runs of points with as few lines, arcs and curves as stay within
+   the tolerance, or with lines and arcs only for controllers that should get G2/G3 arcs.
+3. The status line says how many points become how many segments and the most any point of the
+   outline moves, measured both ways between old and new. It updates as settings change; a very
+   large trace shows its progress.
+4. **Optimize** applies it as one undo step. Imported and traced artwork keeps its operations and
+   tabs; text and drawn shapes that change become paths in the same step, and locked artwork is
+   left as it is. The notice says what changed. Settings are remembered for the session.
 
 ### F-A7. Artwork Operations panel
 
@@ -772,8 +860,6 @@ marks later edits as unapproved without changing the existing Frame/Start policy
    the time estimate and every output format follow them. With none set, output is unchanged.
 5. Material presets do not store them; applying a preset keeps what the operation has.
 
----
-
 ### F-A7b. Operations list tools and Sort cuts last (ADR-480)
 
 1. The **•••** button on the Cuts / Layers header opens **Turn output on for all**, **Turn output
@@ -787,6 +873,92 @@ marks later edits as unapproved without changing the existing Frame/Start policy
    artwork first, then artwork that engraves and cuts, whose cut follows its own engraving, then
    cut-only artwork, weakest first. The notice says what moved. Running it again changes nothing.
 4. In CNC, Sort cuts last is unavailable: CNC already runs profiles last.
+
+---
+
+### F-A7c. Laser tabs by spacing, with a tab power, and placed by hand (ADR-494)
+
+1. **More cut settings → Line detail → Tabs / Bridges**: **Place by** chooses **Count** (the same
+   number of tabs on every closed shape) or **Spacing** (one tab per that length of outline, at
+   least one per shape, and **At most** per shape when above 0).
+2. **Tab power** (%, 0 is off) burns the tabs at that share of the cut power, with the same speed,
+   passes and air, so parts hold in the sheet but snap out cleanly. The tabs burn as a second Line
+   group right after the cut; Job Review names it "Line tabs (N% of cut power)".
+3. **Place tabs** applies the settings and starts the tab tool for the one selected, unlocked
+   artwork that uses the operation; its tooltip says why when it is disabled (tabs off, no or
+   several artworks selected, artwork locked). On the canvas, click the outline to add a tab, click
+   a tab to remove it, or drag a tab to move it; each is one undo step. Placed tabs draw filled and
+   the automatic tabs they replace draw hollow. **Done** or Esc returns to Select.
+4. Placed tabs replace the automatic tabs on their shape only, and only while tabs are on. They
+   move, rotate and scale with the artwork and survive copy and paste and break apart. **Clear
+   placed tabs** (in Cut Settings or in the canvas hint) returns the artwork to automatic tabs.
+5. Job Review's detail line reads e.g. "tabs every 50 mm (at most 6) × 0.5 mm, cut at 20%" or
+   "tabs 4 × 0.5 mm, 3 placed by hand". With none of this set, output is unchanged.
+6. Material presets do not store these settings; applying a preset keeps what the operation has.
+
+### F-A7d. Image scan angle, image cross-hatch and an angle change per pass (ADR-492)
+
+1. **More cut settings → Image detail**: **Scan angle** (0 to 180°, counter-clockwise from the X
+   axis, like a Fill's scan angle) sets the direction the image rows run. 0 scans along X as
+   before; 90 scans along Y. The direction preview above it shows the rows.
+2. **Cross-hatch** scans the image a second time at 90° to the first on every pass.
+3. **Angle per pass** (−180 to 180°, 0 is off) adds that angle on every pass after the first, in
+   Image detail and in Fill detail for scanline and island fills. With one pass it does nothing.
+4. Overscan and the bidirectional scan offset follow the rows at any angle. Preview, Frame, the time
+   estimate, job placement and the recovery archive follow them too. An angled row writes X and Y on
+   every move.
+5. On a rotary, images always scan along X; Job Review says the angle settings were set aside.
+6. Job Review's detail line reads e.g. "scan at 45° · cross-hatch · angle −30° per pass". With none
+   set, output is unchanged. The image editor's Thicken stays warning-only for angled scans.
+7. Material presets do not store these settings; applying a preset keeps what the operation has.
+
+### F-A7e. Automatic overscan (ADR-495)
+
+1. **More cut settings → Image detail** or **Fill detail** (Scanline or Island Fill): turn on
+   **Automatic** under Overscan. The typed length greys out and is kept for when Automatic is
+   turned off.
+2. The note under it gives the length Automatic runs now: the run-up from rest at the operation's
+   speed (capped at the machine's maximum feed) and Machine Setup's acceleration, measured along the
+   scan angle, plus 10%, at most 25 mm. A diagonal scan needs less than a scan along an axis.
+3. The length is worked out again every time the job is prepared, so it follows changes to the
+   speed, the scan angle or Machine Setup. Preview, Frame, the time estimate and every output
+   format use it.
+4. Follow Shape fills keep their typed length. The operations list shows "Automatic (Cut
+   Settings)" beside a fill's Overscan; Job Review reads "automatic overscan from speed and
+   acceleration".
+5. The runway is only as right as Machine Setup's acceleration: read $120 and $121 from the
+   controller where the firmware reports them, and check the scan edges on scrap.
+
+### F-A7f. Material Test grids that vary any two settings (ADR-497)
+
+1. **Tools → Material Test**: **Test** picks **Engrave** (each cell filled) or **Cut** (each cell's
+   outline, to find what cuts through).
+2. **Rows vary** and **Columns vary** each pick speed, power, passes or, for Engrave, hatch
+   spacing. Picking the other axis's setting swaps the two. Each varied setting has a Min and Max;
+   the others take one value. Speed rows by power columns is the default.
+3. Every axis starts from its gentlest value: fastest speed, lowest power, fewest passes, widest
+   hatch spacing. A passes axis keeps one row or column per whole number in its range.
+4. Engraved rows run at least 5 mm of runway, longer where the row's fastest cell needs it to reach
+   speed at Machine Setup's acceleration; the dialog says when, and the grid leaves room for it on
+   the left.
+5. Burned labels show each row's and column's value (speeds as the feed the job runs). The toast
+   names what rows and columns vary.
+
+### F-A7g. Recipes that apply themselves (ADR-496)
+
+1. **Material Library → Job material**: pick the material this job runs on, from the materials the
+   library has recipes for, and its **Thickness**. **Take the best recipe** is on once a material
+   is picked.
+2. Each new laser operation (import, text, shapes, images, trace, Add layer) links the library's
+   best recipe for that material and its mode: this machine's own recipes first, then calibrated
+   ones. A cut takes only a recipe for the job's thickness (or any thickness); an engraving takes
+   another thickness when none matches.
+3. Switching an untouched operation to another mode takes that mode's recipe. An operation edited
+   since its recipe keeps its settings. Operations with no matching recipe keep their settings.
+4. **Apply to all operations** links every output operation to its best recipe as one undo step
+   and names any with no recipe.
+5. Refresh and the stale-preset notice work as for a hand-linked preset. The job material is saved
+   with the project.
 
 ---
 
@@ -929,6 +1101,28 @@ marks later edits as unapproved without changing the existing Frame/Start policy
 3. Separate operations and pass counts, deliberate retracing within one contour, materialized
    kerf/tabs, Fill, Image and CNC output retain their meaning. Changing this setting invalidates
    the existing reviewed artifact and Frame just like other output changes.
+4. **Merge tolerance (mm)** (ADR-499), under Remove overlapping lines, is 0 by default, which keeps
+   the exact rule above and the same G-code. Above 0 (up to 0.5 mm), a later contour's stretch is
+   also dropped where it runs within that distance of, and within 5° of parallel to, a stretch an
+   earlier contour in the same operation keeps. Lines that cross or meet at a T keep their full
+   cut, merges never chain along a row of near lines, and nothing is joined or extended. Keep it
+   under half the kerf. It is saved with the project.
+
+### F-A9e. Where closed shapes start (ADR-494)
+
+1. Open **Tools → Cut Planner** and choose **Start closed shapes**: **Where drawn** (the default;
+   output unchanged), **Nearest point** or **Nearest corner**. It is saved with the project.
+2. **Nearest point** starts each closed laser shape at its point nearest the head, so travel is
+   shorter. **Nearest corner** starts it at its nearest corner, a point where the outline turns by
+   at least 30°, so the small mark where a cut starts and stops lands on a corner. A shape without
+   corners, such as a circle, starts at its nearest point.
+3. Cut order is chosen as before (inside shapes first when that is on); only where each closed shape
+   starts changes. With **Keep source order** the order and direction stay as drawn and each closed
+   shape starts nearest where the previous one ended.
+4. Overcut follows the new start. On machines that take arcs (ADR-432) a shape only starts where
+   one line or arc ends, so its arcs are kept; sharp corners always qualify.
+5. Line operations and Offset Fill rings follow it; Fill, Image and CNC output do not change. Preview,
+   the time estimate, Job Review and every output format read the same planned job.
 
 ### F-A10. Pre-flight check (before G-code save)
 
@@ -1184,10 +1378,15 @@ Mac uses `Cmd`, Windows/Linux web uses `Ctrl`.
 - `Alt+D` — Delete duplicates (ADR-480; Option+D on macOS)
 - `Delete` / `Backspace` — Delete selected
 - `Escape` — Deselect / cancel current operation
+- `Cmd/Ctrl+,` — Settings (ADR-499)
 
 #### Transform
 - Arrow keys — Nudge 1 mm
 - Shift+Arrow — Nudge 10 mm
+- `Cmd/Ctrl+Arrow` — Nudge 0.1 mm (ADR-499; all three distances are set in Settings → Canvas)
+- `Alt+Left` / `Alt+Right` / `Alt+Up` / `Alt+Down` — Align left / right / top / bottom (ADR-499)
+- `Alt+PgUp` / `Alt+PgDn` — Align centres on X / Y (ADR-499)
+- `Alt+Shift+H` / `Alt+Shift+V` — Distribute horizontal / vertical spacing (ADR-499)
 - `H` — Flip horizontal
 - `V` — Flip vertical
 - `.` / `,` — Rotate 90° clockwise / counter-clockwise (ADR-410)
@@ -2163,7 +2362,12 @@ authorization, Frame proof, controller command, or safety boundary.
   before the job, and only while nobody has moved the head since the stop; if the controller
   itself restarted or lost power mid-burn the head stopped earlier, which Frame remaining area
   shows before anything burns. The Review then reads as set from the head stop instead of
-  warning that the origin moved (ADR-341 Amendment 6).
+  warning that the origin moved (ADR-341 Amendment 6). It also says how far back along the path
+  the lines sent after the last confirmed one reach, the stretch a laser that lost power may
+  not have burned (ADR-341 Amendment 8).
+- Once the controller has the origin the job ran with, or one set from where the head stopped,
+  **Go to job origin** and **Go to restart point** jog the head, beam off, to work X0 Y0 and to
+  where the chosen restart line re-enters the job (ADR-341 Amendment 8).
 - The Review of an interrupted laser job opens by itself once the controller is connected after
   a lost link, a controller restart, a failed write or a stalled stream, once per run in each
   app session. It does not open after the operator's own Abort or a rejected line; the card
@@ -2220,10 +2424,15 @@ authorization, Frame proof, controller command, or safety boundary.
   instead of in one uninterruptible task. Order and content are unchanged (ADR-356). This
   keeps the page answering during catch-up; it does not make a stalled page keep feeding
   the controller, which still depends on the page unless the transport runs in a worker.
+- The end-of-job check that waits for the controller to report Idle, and the other waits on
+  status reports, also count only time the status poll ran on schedule. A job that finishes
+  while Chrome is minimised or its tab is hidden is recorded as completed on the reports of the
+  slowed poll, instead of timing out as interrupted (ADR-356 Amendment 1). A controller that
+  stays silent once the page polls normally still fails the check after the same time.
 
 #### Painted second passes (2026-09-22, ADR-341)
 
-- After a settled laser completion and successful archive capture, **Job complete** asks
+- After a settled laser completion, **Job complete** asks
   **Would you like to darken selected areas?** Choose **Darken selected areas…** to open
   that exact saved job in the paintbrush/eraser editor, or **Not now** to close the offer. No
   motion is started by this choice. The prompt also works with the Machine panel collapsed, waits
@@ -2234,7 +2443,9 @@ authorization, Frame proof, controller command, or safety boundary.
 - **Paint a second pass…** in the Machine panel reopens the same job after dismissing the
   prompt, until another job starts. It offers only the job that just finished: there is no
   list of older jobs, and a later job that is aborted or interrupted removes the button
-  rather than bringing back an older one (ADR-341 Amendment 4). When the finished run
+  rather than bringing back an older one (ADR-341 Amendment 4). A job too large for the
+  execution archive is offered too: the page keeps its program until another job starts or
+  KerfDesk is closed or reloaded, and the prompt says so (ADR-341 Amendment 7). When the finished run
   was a recovery or a painted pass, the preview follows its independently verified retained
   ancestor so the original full engraving is available where that archive still exists.
   The current artwork document is never replaced or recompiled by this workflow.
@@ -2320,7 +2531,12 @@ provider from the archived project and refuses unless the re-emitted program mat
 G-code exactly. The complete artifact is bounded by a conservative 64 MiB allocation-free estimate
 including G-code and embedded project data. A larger job may still
 Start, but it runs without recovery/archive capture and the operator receives the forensic-record
-warning. A fresh Start arms only its small start intent before the wire (ADR-337); the execution
+warning. A laser run without an archive keeps its start intent and the work offset at Start in
+memory, and an interruption writes them as a fingerprint-only capsule: the card, the Review and
+Restore saved origin work, and the Review's recovery rebuilds the program from the open project
+when it reproduces the fingerprint, running without an archive when its own is over the budget
+too; its record maps progress back onto the job's lines, so a second interruption can be
+continued again (ADR-341 Amendment 8). A fresh Start arms only its small start intent before the wire (ADR-337); the execution
 archive, including its full G-code hashing and IndexedDB clone, is built and stored after the
 controller accepts the program, off the Start-to-motion path. Until activation hands the run to
 `activeRun`, the `pendingStart` intent owns it and no progress checkpoint is written. A crash in
@@ -4108,7 +4324,9 @@ explicitly marked below; the remaining controls and user-facing flows are planne
 1. User clicks **Save G-code** in CNC mode.
 2. CNC preflight runs: settings validity, depth vs stock thickness, machine
    bounds, no-go zones, plunged-travel scan (no XY rapid below safe Z, no
-   rapid plunge), non-empty output. Findings surface as Job Review warnings,
+   rapid plunge other than ADR-489's Z-only descent from safe Z to 1 mm above
+   air the job has already cut, which a plunge at the plunge feed follows),
+   non-empty output. Findings surface as Job Review warnings,
    not refusals (ADR-228).
 3. The file emits through `cncGrblStrategy`: G21/G90/G94 preamble, M3 +
    spin-up dwell, safe-Z discipline, per-layer comment headers, M5 + park
@@ -4222,7 +4440,12 @@ explicitly marked below; the remaining controls and user-facing flows are planne
    each run of linked rings descends along its first ring from the level
    above instead of plunging; a ring shorter than one cut width plunges,
    and the G-code header and Job Review say so (F-CNC18, ADR-424
-   Amendment 1).
+   Amendment 1). Below the first level, the bit rapids down from safe Z to
+   1 mm above the stock the level above left (its depth plus the bit's rise
+   at full radius) and feeds only the rest; the first level, a level below
+   one that stopped short, and recovery jobs plunge from safe Z (ADR-489).
+   Each straight run of a ring is one G-code move, however many cells it
+   was traced across; the path is the same (ADR-488).
 3. Emitted G-code passes the plunged-travel invariant; scale is resolved
    before cutter geometry, then mirror/rotate/move placement is honored.
 4. Job Review's detail line for the operation names the levels the
@@ -7206,6 +7429,55 @@ as the pane's design record.
   lists the setup steps (largest video resolution, straight down, no zoom, stabilisation, HDR or
   filters, focus locked, on the charger, calibrate once mounted).
 
+### F-CAM12. A camera on the laser head (ADR-449)
+
+- **Success / calibrate.** In the calibration wizard the operator ticks **Camera rides on the
+  laser head**. **Margin** becomes **Target size** (40 mm), and the setup says a small square is
+  engraved in the middle of the bed. After engraving, the photo step asks to jog the head until
+  the whole square is in the picture. **Take photo** records where the head is, and the saved
+  calibration follows the head from then on.
+- **Success / capture here.** With the machine connected and homed, **Capture here** in the
+  Camera panel shows the patch under the camera on the canvas, where it is on the bed, without
+  moving the head.
+- **Success / capture an area.** **Capture selection** (or **Capture bed** with nothing selected)
+  moves the head with the laser off, takes a picture at each stop ("Taking picture 3 of 12…"),
+  and shows one joined top-down picture of the area on the canvas.
+- **Success / check.** **Check camera** on a head camera measures the saved calibration from
+  wherever the head is for the check photo.
+- **Edge / stop.** **Stop** cancels the move in progress. The panel says how many pictures were
+  taken and shows them.
+- **Edge / out of reach.** When the head cannot travel far enough for the camera to see an edge
+  of the area, the picture stops short of that edge and the panel says why.
+- **Edge / back to live.** **Live** clears the joined picture and shows the live camera again.
+- **Error / head position unknown.** Not connected or not homed: the Camera panel says the camera
+  rides on the head and asks to connect and home; the photo step and the captures say the same.
+- **Error / machine busy.** A capture that needs moves while the machine cannot jog shows the
+  usual jog message. A head that stops moving (Hold, Alarm, disconnect) ends the capture with the
+  reason, keeping the pictures already taken.
+
+### F-CAM13. Watching a job with the camera (ADR-490)
+
+- **Success / timelapse.** With **Record a timelapse** ticked in the Camera panel's **Watch the
+  job**, starting a job records a frame every interval while it runs ("Recording the timelapse:
+  12 frames"). When the job ends, a last frame shows the result, and the panel plays the frames.
+  **Save video…** saves them as a video file. With a calibrated camera fixed over the bed, the
+  frames show the job's area square-on.
+- **Success / burn check.** With **Check the burn when a laser job finishes** ticked, a finished
+  laser job gets a verdict in the panel: how much of the path the camera saw change, any marks
+  outside it, and how much it could not see. The after picture appears on the canvas with missed
+  path in red and stray marks in amber. **Hide from canvas** and **Show on canvas** toggle it.
+- **Edge / head in the way.** When the head or gantry covered part of the job, the panel says what
+  share was hidden. The operator jogs the head clear and presses **Take the after picture
+  again**.
+- **Edge / long job.** A long job keeps at most 480 frames, spread evenly over the whole job.
+- **Edge / panel closed.** While either choice is ticked, the camera stays on with the panel
+  closed.
+- **Error / no camera.** A job that starts without a running camera gets a note instead: no
+  timelapse, and "The camera was not running when the job started."
+- **Error / cannot check.** A CNC job, a camera that is not fixed and calibrated, or a job that
+  was stopped says why it was not checked. The camera stopping mid-job ends the timelapse with the
+  frames it has.
+
 ---
 
 ## Desktop app (Windows + macOS Preview) flows
@@ -7229,8 +7501,8 @@ behavior or create a second product implementation.
    or the stable R2 update feed:
    - **Windows 10/11, x64:** `KerfDesk-<version>-windows-x64-setup.exe`
      (NSIS, per-user, `oneClick:false`, user-selectable install directory).
-   - **macOS 12+, Intel x64:** `KerfDesk-<version>-macos-x64.dmg`.
-   - **macOS 12+, Apple Silicon arm64:**
+   - **macOS 13+, Intel x64:** `KerfDesk-<version>-macos-x64.dmg`.
+   - **macOS 13+, Apple Silicon arm64:**
      `KerfDesk-<version>-macos-arm64.dmg`.
    Here `<version>` is the tag text without its leading `v` (for example,
    `0.2.0-preview.1`). The companion files are
@@ -7254,10 +7526,9 @@ behavior or create a second product implementation.
    unsigned and unnotarized. The `/download` page labels both Mac assets
    **Unsigned, unnotarized Preview** before download.
 2. The page documents the deliberate manual-open path supported by macOS:
-   Control-click **KerfDesk.app** → **Open**. After a blocked attempt, macOS 12
-   Monterey uses **System Preferences → Security & Privacy → General → Open
-   Anyway**; newer macOS uses **System Settings → Privacy & Security → Open
-   Anyway**. Preview never claims Apple notarization or silently weakens
+   Control-click **KerfDesk.app** → **Open**. After a blocked attempt, macOS
+   13 and newer use **System Settings → Privacy & Security → Open Anyway**
+   (Electron 44 needs macOS 13 or newer). Preview never claims Apple notarization or silently weakens
    Gatekeeper.
 
 #### Empty — no desktop build on Linux
@@ -7485,11 +7756,11 @@ cache, rollback, and installed upgrade tests remain release qualification work.
       launches `app://app/index.html` after the documented SmartScreen path.
 - [ ] **Intel Mac packaging:** the x64 DMG installs and launches KerfDesk over
       `app://app/index.html` on a real Intel Mac after the documented Gatekeeper
-      manual-open path. Evidence includes macOS 12.x for the claimed floor and a
+      manual-open path. Evidence includes macOS 13.x for the claimed floor and a
       currently supported macOS version for the architecture.
 - [ ] **Apple Silicon packaging:** the arm64 DMG installs and launches KerfDesk
       over `app://app/index.html` natively on a real Apple Silicon Mac after the
-      documented Gatekeeper manual-open path. Evidence includes macOS 12.x for
+      documented Gatekeeper manual-open path. Evidence includes macOS 13.x for
       the claimed floor and a currently supported macOS version for the
       architecture.
 - [ ] **Serial (hardware, each desktop architecture):** a plugged-in GRBL
@@ -7512,11 +7783,11 @@ cache, rollback, and installed upgrade tests remain release qualification work.
 - [ ] **Mac permission metadata:** both DMGs contain accurate
       `NSCameraUsageDescription` and `NSLocalNetworkUsageDescription` strings,
       `CFBundleIdentifier=com.kerfdesk.app`, and
-      `LSMinimumSystemVersion=12.0`; first-use prompts match USB camera and
+      `LSMinimumSystemVersion=13.0`; first-use prompts match USB camera and
       private-network JPEG discovery/capture workflows. The bundle identifier
       names the app but is not represented as durable TCC identity for unsigned
       builds.
-- [ ] **Mac permission behavior:** at the macOS 12 floor, test launch, USB-camera
+- [ ] **Mac permission behavior:** at the macOS 13 floor, test launch, USB-camera
       allow, deny, recovery in System Settings, retry, and private-network JPEG
       capture. On macOS 15+ and on both architectures, additionally test camera
       and local-network allow/deny/Settings recovery/retry plus Preview upgrade
@@ -7589,6 +7860,39 @@ desktop artifact stays **CLAIMED** under `PROJECT.md` Desktop Preview acceptance
 - Not a project, such as a folder named `x.lf2`:
   `Could not open <name>: it is not a KerfDesk or LightBurn project file.`
 - Unreadable: `Could not open <name>: KerfDesk could not read it.`
+
+### F-DESK5. Regular desktop Previews and the changelog (ADR-522)
+
+1. Every pull request runs the **Desktop package check** on Linux, Windows and macOS (Apple
+   silicon and Intel). Windows builds the Preview installer as the release lane does, runs its
+   package contract, installs it, launches the installed app (SVG import and project save),
+   uninstalls it and checks nothing is left. macOS builds the Preview DMG, runs its package
+   contract and launches the app from inside the DMG. Both check that a modified `app.asar`
+   stops the app. A red desktop job means the next Preview would fail or ship broken.
+2. When `main` has user-facing changes the newest Preview lacks and that Preview is at least a
+   week old, the daily **Desktop Preview cadence** workflow keeps one issue open:
+   `Desktop Preview due: v<next>`. It names the newest `main` commit that CI, Browser smoke and
+   the Desktop package check all passed on, the tag commands and the drafted notes.
+3. Optional, before tagging: stamp the changelog so the release carries the hand-written
+   highlights under its own version, then tag the stamp's merge commit once its checks pass.
+
+   ```sh
+   node scripts/desktop-release-notes.mjs stamp 0.2.0-preview.14
+   ```
+
+4. The maintainer tags that commit exactly as the issue shows (F-DESK3):
+   `git tag -a v0.2.0-preview.14 -m "KerfDesk v0.2.0 Preview 14" <commit>`, then
+   `git push origin v0.2.0-preview.14`. The workflow never tags; the `v*` tag ruleset keeps that
+   with the maintainer.
+5. The Preview release lane publishes the downloads. Its notes are the version's `CHANGELOG.md`
+   section, or, without a stamp, the Unreleased highlights plus every pull request since the
+   previous Preview. The issue closes on the next daily run.
+
+#### Keeping the changelog
+- `node scripts/desktop-release-notes.mjs draft` prints the notes since the last Preview.
+- `node scripts/desktop-release-notes.mjs refresh` rewrites the generated list under Unreleased.
+- Highlights under Unreleased are written by hand and are optional; nothing blocks a pull
+  request without one.
 
 ### F-CNC-PROBE. Owned and settlement-qualified probe cycle
 

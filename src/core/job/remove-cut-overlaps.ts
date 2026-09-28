@@ -5,6 +5,7 @@ import {
 import type { Vec2 } from '../scene';
 import { firstContourIntervals, type OwnedInterval } from './cut-overlap-intervals';
 import { withoutArcMoves } from './cut-arc-moves';
+import { removeNearCutOverlaps } from './remove-near-cut-overlaps';
 import type { CutGroup, CutSegment } from './job';
 
 const SCALE = 10 ** GCODE_COORDINATE_DECIMAL_PLACES;
@@ -20,8 +21,11 @@ type Span = readonly [Vec2, Vec2];
 /** Opt-in output cleanup within ONE compiled laser operation/settings group.
  * Kerf and tabs already exist in these polylines. We only remove powered spans;
  * never join across a removed interval, extend a cut or compare separate passes.
- * Retracing within a single contour is retained as deliberate path motion. */
-export function removeCutOverlaps(group: CutGroup): CutGroup {
+ * Retracing within a single contour is retained as deliberate path motion.
+ * A merge tolerance above zero (LBG-C13) also merges near-coincident spans
+ * (remove-near-cut-overlaps.ts); zero, the default, keeps this exact rule. */
+export function removeCutOverlaps(group: CutGroup, mergeToleranceMm = 0): CutGroup {
+  if (mergeToleranceMm > 0) return removeNearCutOverlaps(group, mergeToleranceMm);
   if (group.segments.length < 2 || group.segments.some(isCncProjection)) return group;
   const lines = new Map<string, Edge[]>();
   const contours = group.segments.map((segment, owner) => {

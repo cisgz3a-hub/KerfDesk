@@ -1,10 +1,19 @@
 name: Desktop package check
 
-# Packages the stable desktop config as an unpacked Linux app on every pull
-# request and push to main, then checks what shipped and launches it
-# (ADR-483). Unit tests cannot see what electron-builder actually packs:
-# its file patterns and fuse flips apply silently, and a broken package was
-# otherwise found only by the weekly Windows smoke or after a release.
+# Packages the desktop app on Linux, Windows and macOS (Apple silicon and Intel)
+# on every pull request and push to main, checks what shipped, and launches it
+# (ADR-483, ADR-522). Unit tests cannot see what electron-builder actually
+# packs: its file patterns and fuse flips apply silently, and the release
+# lanes' own package checks otherwise ran only when a release was tagged.
+#
+# - Linux packages the stable config as an unpacked app.
+# - Windows and macOS build the unsigned Preview exactly as the Preview release
+#   lane does, and run that lane's package contract. Windows then installs it,
+#   launches the installed app and uninstalls it; macOS launches the app from
+#   inside its DMG. Both prove a modified app.asar stops the app.
+# - Every launch is the packaged native smoke: launch, SVG import, project
+#   save, on a throwaway profile.
+#
 # Kept out of ci.yml so a desktop packaging failure never holds a web deploy.
 on:
   push:
@@ -26,6 +35,8 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: false
 
       - name: Set up pnpm
         uses: pnpm/action-setup@0ebf47130e4866e96fce0953f49152a61190b271 # v6
@@ -71,6 +82,179 @@ jobs:
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
         with:
           name: desktop-package-check-${{ github.sha }}
+          path: artifacts/native-smoke/
+          if-no-files-found: warn
+          retention-days: 14
+
+  windows-package:
+    name: Package, install and launch the Windows desktop app
+    runs-on: windows-latest
+    timeout-minutes: 45
+    env:
+      # Same shape as the dry run's 0.0.0-dispatch.N: never a real release number.
+      VERSION: 0.0.0-check.${{ github.run_number }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: false
+
+      - name: Set up pnpm
+        uses: pnpm/action-setup@0ebf47130e4866e96fce0953f49152a61190b271 # v6
+
+      - name: Set up Node.js
+        uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Run the desktop and release script tests on Windows
+        run: pnpm exec vitest run electron && pnpm test:release-integrity
+
+      - name: Build renderer and Electron main at the check version
+        shell: bash
+        env:
+          KERFDESK_DESKTOP_VERSION: ${{ env.VERSION }}
+        run: pnpm build:web && pnpm build:electron-main
+
+      - name: Build the unsigned Windows Preview installer as the release lane does
+        shell: bash
+        env:
+          CSC_IDENTITY_AUTO_DISCOVERY: 'false'
+        run: |
+          pnpm exec electron-builder --win --x64 \
+            --config electron-builder.preview.yml \
+            --config.extraMetadata.version="${VERSION}" \
+            --config.extraMetadata.kerfdeskUpdateChannelTrusted=false \
+            --config.extraMetadata.kerfdeskDesktopReleaseChannel=preview \
+            --config.forceCodeSigning=false \
+            --publish never
+
+      - name: Remove local updater metadata, as the release lane does
+        shell: pwsh
+        run: |
+          Get-ChildItem -LiteralPath "release/$env:VERSION" -Recurse -File |
+            Where-Object { $_.Name -match '^latest.*\.(yml|yaml|json)$' -or $_.Extension -eq '.blockmap' } |
+            ForEach-Object { Remove-Item -LiteralPath $_.FullName -Force }
+
+      - name: Check the Windows Preview package contract
+        shell: pwsh
+        run: ./scripts/verify-windows-preview-package.ps1 -Version $env:VERSION
+
+      - name: Check fuses and app.asar contents
+        shell: pwsh
+        run: |
+          $unpacked = "release/$env:VERSION/win-unpacked"
+          node scripts/verify-packaged-desktop.mjs "$unpacked/KerfDesk.exe" "$unpacked/resources/app.asar" electron-builder.preview.yml
+
+      - name: Install, launch, import, save and uninstall
+        shell: pwsh
+        run: |
+          & ./scripts/qualify-windows-installer.ps1 `
+            -Scenario Launch `
+            -Installer "$env:GITHUB_WORKSPACE/release/$env:VERSION/KerfDesk-$env:VERSION-windows-x64-setup.exe" `
+            -Version $env:VERSION `
+            -SourceCommit $env:GITHUB_SHA `
+            -EvidenceRoot "$env:GITHUB_WORKSPACE/artifacts/installed-launch"
+
+      - name: Check that a modified app.asar stops the app
+        shell: pwsh
+        run: |
+          $unpacked = (Resolve-Path "release/$env:VERSION/win-unpacked").Path
+          node scripts/verify-asar-integrity-enforced.mjs "$unpacked\KerfDesk.exe" "$unpacked\resources\app.asar"
+
+      - name: Upload install and launch evidence
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        with:
+          name: desktop-package-check-windows-${{ github.sha }}
+          path: artifacts/installed-launch/
+          if-no-files-found: warn
+          retention-days: 14
+
+  macos-package:
+    name: Package and launch the macOS desktop app (${{ matrix.arch }})
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 45
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - runner: macos-15
+            arch: arm64
+          - runner: macos-15-intel
+            arch: x64
+    env:
+      VERSION: 0.0.0-check.${{ github.run_number }}
+      ARCH: ${{ matrix.arch }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: false
+
+      - name: Set up pnpm
+        uses: pnpm/action-setup@0ebf47130e4866e96fce0953f49152a61190b271 # v6
+
+      - name: Set up Node.js
+        uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Run the desktop and release script tests on macOS
+        run: pnpm exec vitest run electron && pnpm test:release-integrity
+
+      - name: Build renderer and Electron main at the check version
+        env:
+          KERFDESK_DESKTOP_VERSION: ${{ env.VERSION }}
+        run: pnpm build:web && pnpm build:electron-main
+
+      - name: Build the unsigned macOS Preview DMG as the release lane does
+        env:
+          CSC_IDENTITY_AUTO_DISCOVERY: 'false'
+        run: |
+          pnpm exec electron-builder --mac "--${ARCH}" \
+            --config electron-builder.preview.yml \
+            --config.extraMetadata.version="${VERSION}" \
+            --config.extraMetadata.kerfdeskUpdateChannelTrusted=false \
+            --config.extraMetadata.kerfdeskDesktopReleaseChannel=preview \
+            --config.forceCodeSigning=false \
+            --publish never
+
+      - name: Check the macOS Preview package contract
+        run: bash scripts/verify-macos-preview-package.sh "${VERSION}" "${ARCH}"
+
+      - name: Check fuses and app.asar, then launch, import and save from the DMG
+        run: |
+          mount_dir="$(mktemp -d)"
+          hdiutil attach -readonly -nobrowse -mountpoint "${mount_dir}" \
+            "release/${VERSION}/KerfDesk-${VERSION}-macos-${ARCH}.dmg" >/dev/null
+          trap 'hdiutil detach "${mount_dir}" >/dev/null' EXIT
+          app="${mount_dir}/KerfDesk.app"
+          # On macOS the fuse wire lives in the Electron framework binary.
+          node scripts/verify-packaged-desktop.mjs \
+            "${app}/Contents/Frameworks/Electron Framework.framework/Electron Framework" \
+            "${app}/Contents/Resources/app.asar" electron-builder.preview.yml
+          pnpm smoke:desktop:native -- "${app}/Contents/MacOS/KerfDesk"
+
+      - name: Check that a modified app.asar stops the app
+        run: |
+          app="$(pwd)/$(ls -d "release/${VERSION}"/mac*/KerfDesk.app)"
+          node scripts/verify-asar-integrity-enforced.mjs \
+            "${app}/Contents/MacOS/KerfDesk" "${app}/Contents/Resources/app.asar"
+
+      - name: Upload native smoke evidence
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        with:
+          name: desktop-package-check-macos-${{ matrix.arch }}-${{ github.sha }}
           path: artifacts/native-smoke/
           if-no-files-found: warn
           retention-days: 14

@@ -62,6 +62,11 @@ export function overcutComment(overcutMm: number | undefined): string {
     : ` overcut ${formatGcodeCoordinateMm(overcutMm)} mm on final pass`;
 }
 
+// ADR-494: only the group burning an operation's tab spans says so.
+export function tabSpanComment(percent: number | undefined): string {
+  return percent === undefined ? '' : ` tab spans at ${percent}% of cut power`;
+}
+
 export function pushOperationProvenanceComment(
   chunks: string[],
   group: CutGroup | FillGroup,

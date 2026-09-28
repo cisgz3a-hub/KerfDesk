@@ -45,7 +45,7 @@ export function inspectGcodeOffThread(
   return new Promise((resolve, reject) => {
     const handleAbort = (): void => cancelRequest(id);
     pendingByRequestId.set(id, {
-      request: { id, source },
+      request: { id, source: withoutDesign(source) },
       resolve,
       reject,
       options,
@@ -182,4 +182,12 @@ function abortError(): Error {
   const error = new Error('G-code Inspector request cancelled');
   error.name = 'AbortError';
   return error;
+}
+
+// The design stays on the page (it can hold a relief's whole mesh): the
+// parse worker reads only the program and how to time it.
+function withoutDesign(source: GcodeInspectionSource): GcodeInspectionSource {
+  if (source.design === undefined) return source;
+  const { design: _design, ...rest } = source;
+  return rest;
 }

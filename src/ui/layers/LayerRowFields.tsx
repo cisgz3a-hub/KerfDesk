@@ -148,9 +148,15 @@ function FillFields(props: {
 }): JSX.Element {
   const { layer, operationTarget } = props;
   const device = useStore((state) => state.project.device);
-  const overscanNote =
-    !operationTarget.mixedFields?.fillOverscanMm &&
-    operationTarget.settings.fillStyle === 'scanline'
+  const automatic =
+    operationTarget.mixedFields?.autoOverscan !== true &&
+    operationTarget.settings.autoOverscan === true &&
+    operationTarget.settings.fillStyle !== 'offset';
+  // ADR-495: Automatic replaces the stored value, which Cut Settings turns off.
+  const overscanNote = automatic
+    ? 'Automatic (Cut Settings)'
+    : !operationTarget.mixedFields?.fillOverscanMm &&
+        operationTarget.settings.fillStyle === 'scanline'
       ? scanLineOverscanNote(device, operationTarget.settings.fillOverscanMm)
       : null;
   return (

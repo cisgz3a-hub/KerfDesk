@@ -9,7 +9,7 @@ import {
   materializeVariableText,
   type VariableTextRenderer,
 } from '../../io/gcode/prepare-output-snapshot';
-import type { ArrayMaterialization } from './array-actions';
+import { arraySelectionIds, type ArrayMaterialization } from './array-actions';
 import { sceneObjectCopyClosure } from './scene-object-copy-dependencies';
 import { variableArrayMaterialization } from './variable-array-placement';
 import type { AppState } from './store';
@@ -29,10 +29,7 @@ export async function prepareVariableArray(
     readonly isCurrent?: () => boolean;
   },
 ): Promise<VariableArrayResult> {
-  const selectedIds = new Set([
-    ...(state.selectedObjectId === null ? [] : [state.selectedObjectId]),
-    ...state.additionalSelectedIds,
-  ]);
+  const selectedIds = arraySelectionIds(state, spec);
   const sources = sceneObjectCopyClosure(state.project.scene.objects, selectedIds);
   const selected = sources.filter((object) => selectedIds.has(object.id));
   const bounds = combinedBBox(selected);

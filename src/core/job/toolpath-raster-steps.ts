@@ -6,6 +6,7 @@
 
 import type { Vec2 } from '../scene';
 import { planRasterRowSweeps, type RasterRowSweepPlan } from '../raster/raster-sweep-plan';
+import { rasterScanFrame, scanToMachine, type RasterScanFrame } from '../raster/raster-scan-frame';
 import type { RasterGroup } from './job';
 import { rasterRowsInProviderOrder } from './raster-rows';
 import { offsetForEmittedFeed, type ScanOffsetPoint } from './scan-offset';
@@ -24,6 +25,7 @@ export function appendRasterGroupSteps(
   const scanOffsetMm =
     group.bidirectionalScanOffsetMm ?? offsetForEmittedFeed(scanningOffsets, group.speed);
   const passes = Math.max(1, Math.floor(group.passes));
+  const frame = rasterScanFrame(group.scanAngleDeg);
   let prevEnd = initialPrevEnd;
   for (let pass = 0; pass < passes; pass += 1) {
     let emittedRowCount = 0;
@@ -47,7 +49,7 @@ export function appendRasterGroupSteps(
           prevEnd,
           group,
           sweepPlan,
-          worldY,
+          { frame, worldY },
           reverse,
           scanOffsetMm,
           {
@@ -79,7 +81,7 @@ function appendRasterSpanSweepSteps(
   prevEnd: Vec2 | null,
   group: RasterGroup,
   sweepPlan: RasterRowSweepPlan,
-  worldY: number,
+  row: { readonly frame: RasterScanFrame; readonly worldY: number },
   reverse: boolean,
   scanOffsetMm: number,
   sourcePosition: {
@@ -93,24 +95,20 @@ function appendRasterSpanSweepSteps(
   const activeStartX = group.bounds.minX + span.firstX * pixelWidthMm;
   const activeEndX = group.bounds.minX + (span.lastX + 1) * pixelWidthMm;
   const rowShiftX = reverse ? -scanOffsetMm : 0;
-  const leadStart = {
-    x:
-      (sweepPlan.sharedLeadStartXWorldMm ??
-        (reverse ? activeEndX + sweepPlan.leadInMm : activeStartX - sweepPlan.leadInMm)) +
+  // Planned along the row in the scan frame; each point is placed on the bed
+  // through the scan angle (ADR-492), the identity along X.
+  const at = (x: number): Vec2 => scanToMachine(row.frame, { x, y: row.worldY });
+  const leadStart = at(
+    (sweepPlan.sharedLeadStartXWorldMm ??
+      (reverse ? activeEndX + sweepPlan.leadInMm : activeStartX - sweepPlan.leadInMm)) + rowShiftX,
+  );
+  const burnStartX = (reverse ? activeEndX : activeStartX) + rowShiftX;
+  const burnStart = at(burnStartX);
+  const leadEnd = at(
+    (sweepPlan.sharedLeadEndXWorldMm ??
+      (reverse ? activeStartX - sweepPlan.leadOutMm : activeEndX + sweepPlan.leadOutMm)) +
       rowShiftX,
-    y: worldY,
-  };
-  const burnStart = {
-    x: (reverse ? activeEndX : activeStartX) + rowShiftX,
-    y: worldY,
-  };
-  const leadEnd = {
-    x:
-      (sweepPlan.sharedLeadEndXWorldMm ??
-        (reverse ? activeStartX - sweepPlan.leadOutMm : activeEndX + sweepPlan.leadOutMm)) +
-      rowShiftX,
-    y: worldY,
-  };
+  );
   appendTravelStep(steps, prevEnd, leadStart);
   appendTravelStep(steps, leadStart, burnStart);
   // Walk the plan's runs rather than drawing one polyline across the whole
@@ -119,9 +117,11 @@ function appendRasterSpanSweepSteps(
   // internal white pixels and across the dot-width-corrected ends. Same order
   // and same targets as rasterSweepDurationRuns so all three agree.
   let head = burnStart;
+  let headX = burnStartX;
   for (const run of sweepPlan.runs) {
-    const target = { x: run.endXWorldMm + rowShiftX, y: worldY };
-    if (target.x === head.x) continue;
+    const targetX = run.endXWorldMm + rowShiftX;
+    if (targetX === headX) continue;
+    const target = at(targetX);
     if (run.s > 0) {
       steps.push({
         kind: 'cut',
@@ -133,7 +133,7 @@ function appendRasterSpanSweepSteps(
           passIndex: sourcePosition.passIndex,
           rowIndex: sourcePosition.rowIndex,
           spanIndex: sourcePosition.spanIndex,
-          ...runPixelRange(head.x - rowShiftX, target.x - rowShiftX, group, pixelWidthMm),
+          ...runPixelRange(headX - rowShiftX, targetX - rowShiftX, group, pixelWidthMm),
         },
         polyline: [head, target],
         length: dist(head, target),
@@ -142,6 +142,7 @@ function appendRasterSpanSweepSteps(
       appendTravelStep(steps, head, target);
     }
     head = target;
+    headX = targetX;
   }
   appendTravelStep(steps, head, leadEnd);
   return leadEnd;

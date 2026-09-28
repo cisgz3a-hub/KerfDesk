@@ -26,6 +26,8 @@ import { projectWithFreshCncLayers } from './cnc-auto-seeding';
 import type { CncLiveCapsState } from './cnc-live-caps-actions';
 import type { LayerDefaultsState } from './layer-default-actions';
 import { applyCameraTraceImport } from './camera-trace-import';
+import type { MaterialLibraryDocument } from '../../io/material-library';
+import { projectWithFreshLaserRecipes } from './laser-recipe-seeding';
 
 // Narrow `set`: every action here dispatches a pure mutation helper
 // returning a MutationResult. AppState's full Setter is assignable to
@@ -35,6 +37,7 @@ import { applyCameraTraceImport } from './camera-trace-import';
 type ImportState = StateSlice &
   Partial<CncLiveCapsState> & {
     readonly layerDefaults?: LayerDefaultsState;
+    readonly materialLibrary?: MaterialLibraryDocument | null;
   };
 type ImportSet = (fn: (s: ImportState) => MutationResult) => void;
 
@@ -105,13 +108,18 @@ export function imageImportActions(
 
 function withFreshCncLayers(state: ImportState, result: MutationResult): MutationResult {
   // Laser Make Default never carries CNC settings, so every new CNC operation
-  // from an import or trace is seeded from the machine setup.
+  // from an import or trace is seeded from the machine setup, and every new
+  // laser operation from the job material's best recipe (ADR-496).
   return {
     ...result,
-    project: projectWithFreshCncLayers(
+    project: projectWithFreshLaserRecipes(
       state.project.scene.layers,
-      result.project,
-      state.cncLiveCaps ?? null,
+      projectWithFreshCncLayers(
+        state.project.scene.layers,
+        result.project,
+        state.cncLiveCaps ?? null,
+      ),
+      state.materialLibrary ?? null,
     ),
   };
 }

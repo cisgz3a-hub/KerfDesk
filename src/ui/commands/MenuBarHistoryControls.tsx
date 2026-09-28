@@ -8,12 +8,13 @@
 // Disabled rather than hidden, so the pair never reflows the menu bar.
 //
 // They sit OUTSIDE the menubar nav: a `role="menubar"` may only contain
-// menuitems, and these are plain buttons that run on one click rather than
-// opening anything.
+// menuitems, and these are plain buttons that run on one click. The arrow
+// between them opens the Undo list (UndoListButton.tsx).
 
 import { Icon, type IconName } from '../kit';
 import { commandHelpId, controlHelp } from '../help/help-topics';
 import { runCommand, type AppCommand } from './command-registry';
+import { UndoListButton } from './UndoListButton';
 
 export function MenuBarHistoryControls(props: {
   readonly commands: ReadonlyArray<AppCommand>;
@@ -24,6 +25,7 @@ export function MenuBarHistoryControls(props: {
   return (
     <div role="group" aria-label="Edit history" className="lf-menu-history">
       <HistoryButton command={undo} icon="undo" />
+      <UndoListButton />
       <HistoryButton command={redo} icon="redo" />
     </div>
   );

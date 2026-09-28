@@ -54,7 +54,7 @@ test "$(/usr/libexec/PlistBuddy -c 'Print :CFBundleIdentifier' "${plist}")" = 'c
 test "$(/usr/libexec/PlistBuddy -c 'Print :CFBundleName' "${plist}")" = 'KerfDesk'
 test "$(/usr/libexec/PlistBuddy -c 'Print :NSHumanReadableCopyright' "${plist}")" = \
   'Copyright © 2026 Johann Stolk'
-test "$(/usr/libexec/PlistBuddy -c 'Print :LSMinimumSystemVersion' "${plist}")" = '12.0'
+test "$(/usr/libexec/PlistBuddy -c 'Print :LSMinimumSystemVersion' "${plist}")" = '13.0'
 /usr/libexec/PlistBuddy -c 'Print :NSCameraUsageDescription' "${plist}" | grep -q 'KerfDesk'
 /usr/libexec/PlistBuddy -c 'Print :NSLocalNetworkUsageDescription' "${plist}" | grep -q 'KerfDesk'
 expected_macho_arch="${arch}"

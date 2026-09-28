@@ -1,11 +1,15 @@
-// ADR-415 operation settings, shared by the operation, sub-operation and
-// artwork-override validators. All optional: files written before them load
-// as they did.
+// ADR-415, ADR-494, ADR-492 and ADR-495 operation settings, shared by the operation,
+// sub-operation and artwork-override validators. All optional: files written
+// before them load as they did.
 
 import {
   optionalBoolean,
+  optionalLiteral,
   optionalNonNegativeNumber,
+  optionalPercent,
+  optionalNumber,
   optionalPositiveNumber,
+  valueAtPath,
 } from './project-shape-primitives';
 
 export function cutExtrasFieldErrors(
@@ -18,5 +22,21 @@ export function cutExtrasFieldErrors(
     optionalPositiveNumber(value, `${path}.perforationSkipMm`),
     optionalNonNegativeNumber(value, `${path}.overcutMm`),
     optionalNonNegativeNumber(value, `${path}.imageOverscanMm`),
+    optionalLiteral(value, `${path}.tabLayout`, ['count', 'spacing']),
+    optionalPositiveNumber(value, `${path}.tabSpacingMm`),
+    optionalNonNegativeInteger(value, `${path}.tabMaxPerShape`),
+    optionalPercent(value, `${path}.tabCutPowerPercent`),
+    optionalNumber(value, `${path}.imageScanAngleDeg`),
+    optionalBoolean(value, `${path}.imageCrossHatch`),
+    optionalNumber(value, `${path}.passAngleStepDeg`),
+    optionalBoolean(value, `${path}.autoOverscan`),
   ];
+}
+
+// 0 means no cap on tabs per shape.
+function optionalNonNegativeInteger(value: Record<string, unknown>, path: string): string | null {
+  const field = valueAtPath(value, path);
+  return field === undefined || (typeof field === 'number' && Number.isInteger(field) && field >= 0)
+    ? null
+    : `missing or invalid \`${path}\``;
 }

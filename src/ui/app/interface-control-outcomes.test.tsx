@@ -306,6 +306,8 @@ describe('individual editing dialog actions', () => {
         redoStack={[]}
         onUndo={undo}
         onRedo={redo}
+        onUndoSteps={undo}
+        onRedoSteps={redo}
         onClose={close}
       />,
     );

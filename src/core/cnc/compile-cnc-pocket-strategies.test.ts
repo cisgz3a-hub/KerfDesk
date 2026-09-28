@@ -71,7 +71,9 @@ function sceneWith(
 }
 
 function sourceRegionDepthSequence(passes: ReadonlyArray<CncPass>): ReadonlyArray<string> {
-  const sequence = passes.map((pass) => {
+  // Stay-down links (ADR-491) only step between rings of one region and depth.
+  const cuts = passes.filter((pass) => !(pass.kind === 'path3d' && pass.stayDownLink));
+  const sequence = cuts.map((pass) => {
     if (pass.kind !== 'contour' && pass.kind !== 'helical-contour') {
       throw new Error('expected a pocket contour pass');
     }
