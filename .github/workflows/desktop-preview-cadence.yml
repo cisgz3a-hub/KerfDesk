@@ -5,7 +5,8 @@ name: Desktop Preview cadence
 # week old, keep ONE issue open that names the next Preview tag, the newest
 # main commit that CI, Browser smoke and the Desktop package check all passed
 # on, the commands to tag it and the drafted release notes. The issue closes
-# once a newer Preview exists.
+# once a newer Preview exists, and any second open issue with that title is
+# closed as a duplicate.
 #
 # Tagging stays with the maintainer: the v* tag ruleset lets only the
 # maintainer create release tags (ADR-248). This workflow reads the repository
@@ -16,9 +17,10 @@ on:
     - cron: '23 6 * * *'
   workflow_dispatch:
 
+# Runs queue rather than overlap, so two runs never both open an issue.
 concurrency:
   group: ${{ github.workflow }}
-  cancel-in-progress: true
+  cancel-in-progress: false
 
 permissions:
   contents: read
@@ -65,26 +67,27 @@ jobs:
           --issue="${RUNNER_TEMP}/issue.md"
           --github-output="${GITHUB_OUTPUT}"
 
-      - name: Refresh the Preview issue
-        if: steps.cadence.outputs.due == 'true'
+      - name: Keep one Preview issue, current or closed
+        if: steps.cadence.outputs.due != 'waiting'
         env:
+          DUE: ${{ steps.cadence.outputs.due }}
           ISSUE_TITLE: ${{ steps.cadence.outputs.title }}
         run: |
           set -euo pipefail
-          existing=$(gh issue list --state open --limit 100 --json number,title \
-            --jq '.[] | select(.title | startswith(env.ISSUE_PREFIX)) | .number' | head -1)
-          if [ -n "${existing}" ]; then
-            gh issue edit "${existing}" --title "${ISSUE_TITLE}" --body-file "${RUNNER_TEMP}/issue.md"
-          else
-            gh issue create --title "${ISSUE_TITLE}" --body-file "${RUNNER_TEMP}/issue.md"
-          fi
-
-      - name: Close the Preview issue when the newest Preview is current
-        if: steps.cadence.outputs.due == 'false'
-        run: |
-          set -euo pipefail
-          existing=$(gh issue list --state open --limit 100 --json number,title \
-            --jq '.[] | select(.title | startswith(env.ISSUE_PREFIX)) | .number' | head -1)
-          if [ -n "${existing}" ]; then
-            gh issue close "${existing}" --comment "$(cat "${RUNNER_TEMP}/issue.md")"
+          # Every open issue whose title starts with the prefix, oldest first.
+          mapfile -t open_issues < <(gh issue list --state open --limit 1000 --json number,title \
+            --jq '[.[] | select(.title | startswith(env.ISSUE_PREFIX)) | .number] | sort | .[]')
+          keep="${open_issues[0]:-}"
+          # There is only ever one: a second one (opened by hand, say) is closed.
+          for extra in "${open_issues[@]:1}"; do
+            gh issue close "${extra}" --reason "not planned" --comment "Duplicate of #${keep}."
+          done
+          if [ "${DUE}" = "true" ]; then
+            if [ -n "${keep}" ]; then
+              gh issue edit "${keep}" --title "${ISSUE_TITLE}" --body-file "${RUNNER_TEMP}/issue.md"
+            else
+              gh issue create --title "${ISSUE_TITLE}" --body-file "${RUNNER_TEMP}/issue.md"
+            fi
+          elif [ -n "${keep}" ]; then
+            gh issue close "${keep}" --comment "$(cat "${RUNNER_TEMP}/issue.md")"
           fi

@@ -73,8 +73,9 @@ two cannot drift apart.
   is at least 7 days old.
 - While one is due, one issue titled `Desktop Preview due: v<next>` names the next tag, the
   newest `main` commit that CI, Browser smoke and the Desktop package check all passed on, the
-  exact `git tag -a` and `git push` commands, and the drafted notes. It closes itself once a newer
-  Preview exists.
+  exact `git tag -a` and `git push` commands, and the drafted notes. Each day's run edits that
+  issue rather than filing another, closes any second open issue with the same title as a
+  duplicate, and closes the issue once a newer Preview exists. Runs queue instead of overlapping.
 - The workflow reads the repository and edits that one issue. It has no `contents: write`, and
   it never tags, pushes or publishes; the maintainer tags.
 

@@ -187,6 +187,14 @@ describe('Desktop Preview release workflow gate (ADR-248/249)', () => {
     expect(cadence).toContain('node scripts/desktop-preview-cadence.mjs');
     expect(cadence).not.toMatch(/contents: write|\bgit tag\b|\bgit push\b|gh release/);
     expect(cadence).toContain('persist-credentials: false');
+    // One Preview issue at most: runs queue instead of overlapping, the only
+    // create is the no-open-issue branch, and a second open issue is closed.
+    expect(cadence).toContain('cancel-in-progress: false');
+    expect(cadence.match(/gh issue create/g)).toHaveLength(1);
+    expect(cadence).toMatch(
+      /if \[ -n "\$\{keep\}" \]; then\s+gh issue edit[^\n]+\n\s+else\s+gh issue create/,
+    );
+    expect(cadence).toContain('for extra in "${open_issues[@]:1}"; do');
   });
 
   it('cannot publish Preview updater metadata, R2 objects, or secret-backed output', () => {
