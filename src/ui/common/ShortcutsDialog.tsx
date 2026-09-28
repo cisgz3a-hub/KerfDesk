@@ -4,16 +4,18 @@
 
 import type { MachineKind } from '../../core/scene';
 import { Button, Dialog, DialogActions } from '../kit';
+import { useNudgeStore } from '../state/nudge-preferences';
 import { shortcutFamilies } from './shortcut-list';
 
 export function ShortcutsDialog(props: {
   readonly machineKind: MachineKind;
   readonly onClose: () => void;
 }): JSX.Element {
+  const nudgeSteps = useNudgeStore((state) => state.nudgeSteps);
   return (
     <Dialog title="Keyboard Shortcuts" size="lg" onClose={props.onClose}>
       <div style={columnsStyle}>
-        {shortcutFamilies(props.machineKind).map((entry) => (
+        {shortcutFamilies(props.machineKind, nudgeSteps).map((entry) => (
           <section key={entry.family} style={familyStyle}>
             <h3 style={familyHeadingStyle}>{entry.family}</h3>
             <dl style={rowsStyle}>
