@@ -1,4 +1,4 @@
-// Chord bands for the binary contour tail's spline resample (ADR-482).
+// Chord bands for the binary contour tail's spline resample (ADR-530).
 //
 // Douglas-Peucker collapses a stretch of the dense chain onto each chord of
 // the simplified outline. The Catmull-Rom resample through those vertices

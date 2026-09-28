@@ -250,7 +250,7 @@ export function effectivePixelScale(options: TraceOptions): number {
 // edge crossings instead of quantizing to crack midpoints — the
 // anti-aliasing ramp holds the sub-pixel edge position that binarization
 // discards. Mirrors preprocessForTrace's branch order; alpha masks and
-// Cutoff > 0 bands get a walker-only band crossing (ADR-486).
+// Cutoff > 0 bands get a walker-only band crossing (ADR-534).
 export function crackFieldForTrace(
   image: RawImageData,
   options: TraceOptions,

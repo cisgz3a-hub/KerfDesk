@@ -1,4 +1,4 @@
-## ADR-485 - Automatic-cut edges cross at the local plateau mid-level (2026-09-27)
+## ADR-533 - Automatic-cut edges cross at the local plateau mid-level (2026-09-27)
 
 **Status:** Accepted | **Date:** 2026-09-27
 
@@ -102,7 +102,7 @@ Hairline recall (`trace-diagonal-hairline.test.ts`; thin strokes take the unchan
 all 36 cells are identical at base and head):
 Smooth AA 30 deg / 60 deg is 0.9750 / 0.9375 alone and 0.8875 / 0.8875 beside the square. Smooth
 binary is 1.0000 / 0.9130 alone and 0.8986 / 0.8986 beside the square. All are at or above the
-0.887 target. The 0.75 floor the backlog refers to (ADR-482, from the geometry-core branch) did
+0.887 target. The 0.75 floor the backlog refers to (ADR-530, from the geometry-core branch) did
 not exist on this base: its Smooth-beside-square floor is 0.85, and it is left as is. The square-apex
 gate the backlog cites is not on this base either. The bake-off's `maxApexErrPx` (px, identical for
 O-smooth and O-sharp) still gives the apex numbers, base -> this change:
@@ -235,7 +235,7 @@ call-site edit by hand). A synthetic probe traced anti-aliased bars at (40.3, 50
 disc through the full pipeline (traceImageToColoredPaths). Area error is traced area over true area,
 minus 1. Four builds were measured: base, this change, geometry-core, and geometry-core plus this change.
 
-| fixture, preset         | a10013827 | + ADR-485 | geometry-core | + ADR-485 |
+| fixture, preset         | a10013827 | + ADR-533 | geometry-core | + ADR-533 |
 | ----------------------- | --------- | --------- | ------------- | --------- |
 | bar 100x8, Smooth       | +14.3%    | +18.1%    | -4.77%        | -0.36%    |
 | bar 100x8, Sharp        | +0.73%    | +4.68%    | -4.77%        | +0.01%    |
@@ -259,3 +259,13 @@ on the 8 and 20 px bars. So the calibration-bar loss on this base reverses once 
 - Line Art is byte-identical: its field has no hook.
 - The hook is a general seam: any future edge-level policy can place crossings without touching
   topology.
+### Amendment 1 - saturated one-row bars (2026-09-28)
+
+A saturated one-row core can fail the broad-block gate even though its ink and paper
+levels are known. Against a paper plateau, a straight run with paper on both sides now
+places each edge by the neighbouring paper pixel's box coverage. The walker clamps and
+connectivity remain unchanged. Unsaturated thin ink and two-row cores keep their cut.
+
+The calibration bar 100 x 1.5 px at Sharp previously traced at IoU 0.4675 against its
+analytic outline; the independent audit harness now measures 0.9209. The regression
+also asserts the 0.376 / 1 / 0.125 coverage cross-section at y=23.624 and y=25.125.

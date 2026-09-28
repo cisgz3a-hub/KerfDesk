@@ -242,6 +242,17 @@ describe('corner dial', () => {
 });
 
 describe('pixel-exact corners through the whole trace', () => {
+  it('keeps intentional one- and two-pixel marks at the Sharp defaults', async () => {
+    for (const side of [1, 2]) {
+      const { image, mask } = square(side);
+      const traced = rings(await traceImageToColoredPaths(image, TRACE_PRESETS.Sharp!));
+      expect(traced).toHaveLength(1);
+      expect(pixelBoundaryDistance(traced, image.width, image.height, mask)).toBeLessThanOrEqual(
+        0.01,
+      );
+    }
+  });
+
   it('traces binary squares from 8 px up with exact right-angle apexes at Line Art', async () => {
     // The small canvases take Line Art's supersampled route; low Smoothness
     // must not round what s = 1 keeps (fails on the first corner-dial commit

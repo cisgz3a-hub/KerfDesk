@@ -1,4 +1,4 @@
-// Edge placement on synthetic anti-aliased fixtures (ADR-485, ADR-486): the
+// Edge placement on synthetic anti-aliased fixtures (ADR-533, ADR-534): the
 // crack-chain layer (mid-crack chain of the traced mask, interpolated by the
 // walker's field) against the analytic edge. The finishing stages above it
 // are unchanged by these levels, so the chain is where the gain is measured.
@@ -28,7 +28,7 @@ const preset = (name: string): TraceOptions => TRACE_PRESETS[name] as TraceOptio
 type Chains = { readonly placed: Polyline[]; readonly cutOnly: Polyline[] };
 
 // Mid-crack chains of the traced mask, with the walker's field and with the
-// same field stripped of its crossing hook (the arithmetic before ADR-485).
+// same field stripped of its crossing hook (the arithmetic before ADR-533).
 function chains(image: RawImageData, options: TraceOptions): Chains {
   const prep = prepareTraceForContour(image, options);
   const loops = traceBoundaryLoops(inkMaskFromPrepared(prep.prepared));
@@ -74,11 +74,11 @@ describe('isoCrossing / bandCrossing', () => {
   });
 });
 
-describe('automatic cut: plateau mid-level on broad edges (ADR-485)', () => {
+describe('automatic cut: plateau mid-level on broad edges (ADR-533)', () => {
   it('removes the inward bias of a far automatic cut on Smooth and Sharp', () => {
     // A grey patch clear of the disc pulls Otsu to <= 115 (mid-level 127.5):
     // the cut's own crossings sit inside the ink (fails +/-0.03 before
-    // ADR-485); the plateau mid-level places the disc at 50% coverage.
+    // ADR-533); the plateau mid-level places the disc at 50% coverage.
     const image = discOnPaper(180, 170);
     expect(otsuThreshold(image)).toBeLessThanOrEqual(115);
     for (const name of ['Smooth', 'Sharp']) {
@@ -109,7 +109,7 @@ describe('automatic cut: plateau mid-level on broad edges (ADR-485)', () => {
     // A symmetric blur leaves both block extremes equally short of their
     // plateaus, so the mid-level itself holds; what remains is the crossing
     // being confined to the mask's own crack pair (t in 0.1..0.9), which a
-    // wide ramp outgrows. Measured on this fixture (ADR-485 Limits): sigma 1
+    // wide ramp outgrows. Measured on this fixture (ADR-533 Limits): sigma 1
     // -0.145 -> -0.067 px, sigma 2 -0.262 -> -0.151 px mean radius.
     const residual = { 1: [-0.09, -0.04], 2: [-0.18, -0.12] } as const;
     for (const sigma of [1, 2] as const) {
@@ -128,7 +128,7 @@ describe('automatic cut: plateau mid-level on broad edges (ADR-485)', () => {
     // pixelScale 2 doubles the block radius and reach. On this 1x disc the
     // wider blocks leave -0.037 px (cut alone -0.07), just outside +/-0.03;
     // end to end a small upscaled Smooth source moves the other way (the fit
-    // tail's outward push, ADR-485 Limits), so it is recorded, not claimed.
+    // tail's outward push, ADR-533 Limits), so it is recorded, not claimed.
     const image = discOnPaper(180, 170);
     const { placed, cutOnly } = chains(image, { ...preset('Sharp'), pixelScale: 2 });
     const before = radiusStats(cutOnly, DISC);
@@ -149,13 +149,40 @@ describe('automatic cut: plateau mid-level on broad edges (ADR-485)', () => {
     expect(placed).toEqual(cutOnly);
   });
 
+  // ADR-533 Amendment 1: the calibration bar's column (coverage 0.376 / 1 /
+  // 0.125) under Sharp's dark Otsu cut crossed at 24.01 / 24.85 (0.84 px
+  // wide); a saturated one-row core's edges sit at their box coverage.
+  it('places a saturated one-row core by box coverage; other thin ink keeps the cut', () => {
+    const bar = (rows: ReadonlyArray<number>): RawImageData =>
+      lumaImage(200, (x, y) => {
+        const coverage = x >= 38 && x < 137 ? (rows[y - 23] ?? 0) : 0;
+        return 255 * (1 - coverage);
+      });
+    const sides = (loops: Polyline[]): { top: number; bottom: number } => {
+      const ys = loops.flatMap((l) =>
+        l.points.filter((p) => p.x > 50 && p.x < 120).map((p) => p.y),
+      );
+      return { top: Math.min(...ys), bottom: Math.max(...ys) };
+    };
+    const thin = chains(bar([0.376, 1, 0.125]), preset('Sharp'));
+    expect(sides(thin.cutOnly).top).toBeGreaterThan(23.95);
+    expect(sides(thin.placed).top).toBeCloseTo(23.624, 2);
+    expect(sides(thin.placed).bottom).toBeCloseTo(25.125, 2);
+    const twoRow = chains(bar([0.376, 1, 1, 0.125]), preset('Sharp'));
+    expect(twoRow.placed).toEqual(twoRow.cutOnly);
+    // An unsaturated one-row core (luma 12.75) never reached its ink level.
+    const grey = chains(bar([0.376, 0.95, 0.125]), preset('Sharp'));
+    expect(grey.placed.length).toBeGreaterThan(0);
+    expect(grey.placed).toEqual(grey.cutOnly);
+  });
+
   it('leaves Line Art (explicit threshold) on the plain field', () => {
     const prep = prepareTraceForContour(discOnPaper(180, 170), preset('Line Art'));
     expect(prep.crackField?.crackCrossingAt).toBeUndefined();
   });
 });
 
-describe('alpha route and Cutoff > 0 bands (ADR-486)', () => {
+describe('alpha route and Cutoff > 0 bands (ADR-534)', () => {
   it('traces an alpha cut-out disc at 50% coverage', () => {
     const disc: Disc = { cx: 70.4, cy: 69.7, r: 40 };
     const options = { ...preset('Sharp'), traceTransparency: true };
@@ -165,7 +192,7 @@ describe('alpha route and Cutoff > 0 bands (ADR-486)', () => {
 
   it('records the inward bias of semi-transparent ink (alpha 127 crossing)', () => {
     // The crossing is at 255 - alpha = 128, i.e. 50% of FULL alpha, not of
-    // the ink's own 200 (ADR-486 Decision 3): bias worsens, RMS improves.
+    // the ink's own 200 (ADR-534 Decision 3): bias worsens, RMS improves.
     const disc: Disc = { cx: 70.4, cy: 69.7, r: 40 };
     const options = { ...preset('Sharp'), traceTransparency: true };
     const { placed, cutOnly } = chains(alphaDiscImage(140, disc, 200), options);

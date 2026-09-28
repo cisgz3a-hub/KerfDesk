@@ -26,7 +26,7 @@ import {
   type Vec2,
   withClosingPoint,
 } from '../scene';
-import { carriedSubpathDepths } from '../scene/subpath-nesting';
+import { segmentNesting } from './cut-segment-nesting';
 import {
   effectiveOperationForObject,
   operationOverrideForObject,
@@ -437,7 +437,11 @@ function appendPathSegments(
           closed: polyline.closed,
         };
         const known = polyline.closed ? nesting(index) : undefined;
-        pushLineSegment(out, withArcs(index, known === undefined ? segment : { ...segment, nesting: known }), placed);
+        pushLineSegment(
+          out,
+          withArcs(index, known === undefined ? segment : { ...segment, nesting: known }),
+          placed,
+        );
       }
     }
     if (closedForKerf.length > 0) {
@@ -453,19 +457,6 @@ function pushLineSegment(
 ): void {
   if (placedTabs.length > 0) out.placedTabs.set(out.segments.length, placedTabs);
   out.segments.push(segment);
-}
-
-// The nesting a subpath's segment carries, from the path's valid forest only.
-function segmentNesting(
-  path: ColoredPath,
-  forest: string,
-): (subpathIndex: number) => CutSegment['nesting'] {
-  const depths = carriedSubpathDepths(path);
-  if (depths === null) return () => undefined;
-  return (subpathIndex) => {
-    const depth = depths[subpathIndex];
-    return depth === undefined ? undefined : { forest, depth };
-  };
 }
 
 function shouldApplyKerf(polyline: Polyline, layer: Layer): boolean {

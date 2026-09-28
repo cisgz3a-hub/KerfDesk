@@ -1,5 +1,5 @@
 // Allocation-free projection passes for the compact contour fit's spans
-// (ADR-482, speed amendment). The arithmetic is exactly the centreline fit's
+// (ADR-530, speed amendment). The arithmetic is exactly the centreline fit's
 // two-way error (centerline/curve-fit-error.ts: orthogonalError and
 // reverseError, with evaluateCubic, distance and pointToSegment inlined in the
 // same operation order), so every value keeps its bits. Two things differ:

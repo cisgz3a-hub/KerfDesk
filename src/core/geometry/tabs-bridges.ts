@@ -25,37 +25,20 @@ export function applyAutomaticTabsToPolylines(
   polylines: ReadonlyArray<Polyline>,
   settings: AutomaticTabsSettings,
 ): ReadonlyArray<Polyline> {
-  return applyAutomaticTabsBySource(polylines, settings).map((entry) => entry.polyline);
-}
-
-// A tabbed polyline and the index of the input it came from: the input itself
-// when it took no tab, or one of the open pieces it was split into. Callers
-// that attach data to their inputs (a traced contour's nesting, ADR-483) carry
-// it across the split through `source`.
-export type TabbedPolyline = { readonly polyline: Polyline; readonly source: number };
-
-export function applyAutomaticTabsBySource(
-  polylines: ReadonlyArray<Polyline>,
-  settings: AutomaticTabsSettings,
-): ReadonlyArray<TabbedPolyline> {
-  const unchanged = (): TabbedPolyline[] =>
-    polylines.map((polyline, source) => ({ polyline, source }));
-  if (!settings.tabsEnabled) return unchanged();
+  if (!settings.tabsEnabled) return polylines;
   const count = Math.max(1, Math.floor(settings.tabsPerShape));
   const sizeMm = Number.isFinite(settings.tabSizeMm) ? Math.max(0, settings.tabSizeMm) : 0;
-  if (sizeMm <= 0) return unchanged();
+  if (sizeMm <= 0) return polylines;
 
-  const out: TabbedPolyline[] = [];
+  const out: Polyline[] = [];
   for (let i = 0; i < polylines.length; i += 1) {
     const polyline = polylines[i];
     if (polyline === undefined) continue;
     if (!polyline.closed || !isTabEligible(polyline, polylines, i, settings)) {
-      out.push({ polyline, source: i });
+      out.push(polyline);
       continue;
     }
-    for (const piece of splitClosedPolylineForTabs(polyline, count, sizeMm)) {
-      out.push({ polyline: piece, source: i });
-    }
+    out.push(...splitClosedPolylineForTabs(polyline, count, sizeMm));
   }
   return out;
 }

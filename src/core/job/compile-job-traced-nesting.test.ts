@@ -14,7 +14,7 @@ import { compileJob } from './compile-job';
 import type { CutGroup } from './job';
 import { optimizePaths } from './optimize-paths';
 
-// ADR-483: inside-first cutting reads a traced path's carried forest. A
+// ADR-531: inside-first cutting reads a traced path's carried forest. A
 // hollow C (a C-shaped band whose C-shaped hole ends inside it) is the case
 // the bounds-centre probe gets wrong: the hole's bounds centre lies in the
 // C's mouth, outside the outline, so the hole was ordered as an outer.
@@ -65,7 +65,7 @@ function firstCut(path: ColoredPath): number {
   return (group.segments[0]?.polyline.length ?? 0) - 1;
 }
 
-describe('inside-first ordering of a traced path (ADR-483)', () => {
+describe('inside-first ordering of a traced path (ADR-531)', () => {
   it('cuts the hole of a hollow C before its outline only with the carried forest', () => {
     const plain: ColoredPath = { color, polylines: [outline, hole] };
     expect(outline.points.length).not.toBe(hole.points.length);
@@ -93,6 +93,36 @@ describe('inside-first ordering of a traced path (ADR-483)', () => {
     const job = optimizePaths(compiled, { ...DEFAULT_PROJECT_OPTIMIZATION, insideFirst: true });
     expect((job.groups[0] as CutGroup).segments[0]?.closed).toBe(true);
   });
+
+  it.each(['all tabs', 'perforation'] as const)(
+    'keeps inside-first depths when %s opens every contour',
+    (mode) => {
+      const nested = withSubpathNesting({ color, polylines: [outline, hole] }, [-1, 0]);
+      const settings =
+        mode === 'all tabs'
+          ? {
+              ...layer,
+              tabsEnabled: true,
+              tabSkipInnerShapes: false,
+              tabSizeMm: 2,
+              tabsPerShape: 4,
+              tabCutPowerPercent: 10,
+            }
+          : { ...layer, perforationEnabled: true, perforationCutMm: 3, perforationSkipMm: 1 };
+      const compiled = compileJob({ objects: [trace(nested)], layers: [settings] }, device);
+      const job = optimizePaths(compiled, { ...DEFAULT_PROJECT_OPTIMIZATION, insideFirst: true });
+      for (const group of job.groups) {
+        if (group.kind !== 'cut') continue;
+        expect(group.segments.every((segment) => !segment.closed)).toBe(true);
+        expect(group.segments[0]?.nesting?.depth).toBe(1);
+        const firstOuter = group.segments.findIndex((segment) => segment.nesting?.depth === 0);
+        expect(firstOuter).toBeGreaterThan(0);
+        expect(
+          group.segments.slice(firstOuter).every((segment) => segment.nesting?.depth === 0),
+        ).toBe(true);
+      }
+    },
+  );
 
   it('ignores a forest whose geometry changed since it was written', () => {
     const nested = withSubpathNesting({ color, polylines: [outline, hole] }, [-1, 0]);

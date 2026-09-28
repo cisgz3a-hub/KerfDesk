@@ -19,7 +19,7 @@
 // bounds, so any container that passed the original test necessarily contains
 // the probe point and is therefore registered in the probe point's cell.
 //
-// CARRIED NESTING (ADR-483): the probe is the centre of the target's bounds,
+// CARRIED NESTING (ADR-531): the probe is the centre of the target's bounds,
 // which misses when the target is concave (the centre of a C-shaped hole lies
 // in its mouth, outside the outline around it). A traced path knows its own
 // nesting exactly, and its segments carry it: contours of the same forest are
@@ -53,7 +53,7 @@ export function containmentDepths(
 ): number[] {
   const bounds = segments.map((segment) => polylineBounds(segment.polyline));
   const containers = collectContainers(segments, bounds);
-  if (containers.length === 0) return segments.map(() => 0);
+  if (containers.length === 0) return segments.map((segment) => segment.nesting?.depth ?? 0);
   const grid = buildContainerGrid(containers, bounds);
 
   const context: DepthContext = { segments, bounds, containers, grid, options };

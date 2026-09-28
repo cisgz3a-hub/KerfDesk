@@ -18,7 +18,11 @@ export function perforateLineSegments(
   if (pattern === null) return segments;
   return segments.flatMap((segment) =>
     perforatePolyline({ points: segment.polyline, closed: segment.closed }, pattern).map(
-      (dash) => ({ polyline: dash.points, closed: false }),
+      (dash) => ({
+        polyline: dash.points,
+        closed: false,
+        ...(segment.nesting === undefined ? {} : { nesting: segment.nesting }),
+      }),
     ),
   );
 }

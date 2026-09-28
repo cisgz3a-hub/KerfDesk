@@ -4,7 +4,7 @@
 // back. V8 (Chrome, Electron, Node) computes Math.hypot exactly this way; a
 // replay of 2e7 random pairs over eight decades matched it in every bit, and
 // the unit test pins that. About 4x faster in the compact contour fit's hot
-// loops (ADR-482 speed amendment). Infinite or NaN arguments fall back to
+// loops (ADR-530 speed amendment). Infinite or NaN arguments fall back to
 // Math.hypot itself.
 
 export function hypot2(x: number, y: number): number {

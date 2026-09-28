@@ -1,4 +1,4 @@
-## ADR-484 - Line Art traces sepia and duotone artwork like greyscale (2026-09-27)
+## ADR-532 - Line Art traces sepia and duotone artwork like greyscale (2026-09-27)
 
 **Status:** Accepted. | **Date:** 2026-09-27
 

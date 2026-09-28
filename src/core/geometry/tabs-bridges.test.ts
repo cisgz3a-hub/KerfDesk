@@ -1,7 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { Polyline } from '../scene';
 import {
-  applyAutomaticTabsBySource,
   applyAutomaticTabsToPolylines,
   applyManualTabsToPolyline,
   automaticTabAnchorPoints,
@@ -34,21 +33,6 @@ describe('automatic tabs / bridges geometry', () => {
       { x: 6, y: 0 },
       { x: 10, y: 0 },
       { x: 10, y: 4 },
-    ]);
-  });
-
-  it('names the input each tabbed piece came from', () => {
-    const open: Polyline = { closed: false, points: squarePoints(40, 0, 5) };
-    const result = applyAutomaticTabsBySource(
-      [open, { closed: true, points: squarePoints(0, 0, 10) }],
-      SETTINGS,
-    );
-
-    expect(result.map((entry) => entry.source)).toEqual([0, 1, 1, 1, 1]);
-    expect(result[0]?.polyline).toBe(open);
-    expect(result.slice(1).every((entry) => !entry.polyline.closed)).toBe(true);
-    expect(applyAutomaticTabsBySource([open], { ...SETTINGS, tabsEnabled: false })).toEqual([
-      { polyline: open, source: 0 },
     ]);
   });
 

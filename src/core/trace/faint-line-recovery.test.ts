@@ -171,7 +171,7 @@ describe('explicit coherent faint-line recovery', () => {
     const recovered = prepareTraceForContour(image, { ...options, faintLineRecovery: true });
     const plain = prepareTraceForContour(image, options);
     expect(recovered.prepared).toEqual(plain.prepared);
-    // Both carry the alpha route's band field (ADR-486), never faint-line's:
+    // Both carry the alpha route's band field (ADR-534), never faint-line's:
     // no single threshold, and the same crossing on every edge crack.
     expect(recovered.crackField?.thresholdAt(5, 5)).toBeNaN();
     expect(plain.crackField?.thresholdAt(5, 5)).toBeNaN();

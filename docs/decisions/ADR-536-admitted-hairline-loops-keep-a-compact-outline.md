@@ -1,4 +1,4 @@
-## ADR-488 - Admitted hairline loops keep a compact outline instead of the raw crack chain (2026-09-27)
+## ADR-536 - Admitted hairline loops keep a compact outline instead of the raw crack chain (2026-09-27)
 
 **Status:** Accepted. | **Date:** 2026-09-27
 
@@ -238,7 +238,7 @@ vanish:
 
 Merged onto ADR-439..441, the fallback keeps its place (`retainCracks` in `finishLoop` calls
 `admittedLoopFallback`), but Smooth's 2x hairlines are sub-pixel informed and now finish through the
-compact cubic fit (ADR-482), which does not collapse them, so the fallback is not reached on these
+compact cubic fit (ADR-530), which does not collapse them, so the fallback is not reached on these
 cases. A ring's cost is therefore counted in its canonical curve's segments, not its polyline (only a
 sampling of the curve): the 1 px diagonals are 4 to 6 segments. The 52 degree hairline beside a
 square costs 57 cubics (the raw-crack chain it replaced was 457 moves) and keeps both ends; its test

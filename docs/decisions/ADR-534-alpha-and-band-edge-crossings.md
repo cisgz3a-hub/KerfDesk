@@ -1,10 +1,10 @@
-## ADR-486 - Sub-pixel edges on the alpha route and Cutoff > 0 bands (2026-09-27)
+## ADR-534 - Sub-pixel edges on the alpha route and Cutoff > 0 bands (2026-09-27)
 
 **Status:** Accepted | **Date:** 2026-09-27
 
 Amends the sub-pixel crack field of ADR-128 for the two routes that had none: Trace Transparency
 (the alpha route) and brightness bands with Cutoff > 0. It uses the walker-only crossing hook of
-ADR-485, so the mask, cleanup and topology are unchanged. Opaque sources on the default band
+ADR-533, so the mask, cleanup and topology are unchanged. Opaque sources on the default band
 (Cutoff 0) keep their field unchanged and trace to the same bytes.
 
 ### Context
@@ -31,7 +31,7 @@ vertex RMS at the crack-chain layer, against about 0.055 px where a field exists
    ink. Semi-transparent ink crosses at alpha 127, not at half of the ink's own alpha, so its edge
    sits inside the ink. On an alpha disc r=40 whose ink alpha peaks at 200 (Sharp, crack-chain
    layer), mean bias moves from -0.136 to -0.170 px while RMS improves from 0.271 to 0.182 px; a test
-   records it. Reading a local alpha plateau, as ADR-485 does for luma, would fix this and is left
+   records it. Reading a local alpha plateau, as ADR-533 does for luma, would fix this and is left
    open.
 4. **Luma bands** (Cutoff > 0) get `bandCrackField` on the leveled luma the band was cut from.
 

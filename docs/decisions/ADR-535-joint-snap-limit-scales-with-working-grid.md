@@ -1,4 +1,4 @@
-## ADR-487 - The flattener's joint-snap limit scales with the working grid (2026-09-27)
+## ADR-535 - The flattener's joint-snap limit scales with the working grid (2026-09-27)
 
 **Status:** Accepted. | **Date:** 2026-09-27
 

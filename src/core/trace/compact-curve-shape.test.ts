@@ -45,7 +45,7 @@ function pointToSegment(p: Vec2, a: Vec2, b: Vec2): number {
   return Math.hypot(p.x - a.x - t * vx, p.y - a.y - t * vy);
 }
 
-describe('compact curve shape checks (ADR-482)', () => {
+describe('compact curve shape checks (ADR-530)', () => {
   it('finds the loop the review found in a traced Edge Detection C-arc', () => {
     // 'from 25.906,29.482 C 24.879,29.711 26.219,30.108 24.812,29.383'
     expect(

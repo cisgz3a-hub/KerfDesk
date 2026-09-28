@@ -1,4 +1,4 @@
-// ADR-484: sepia / duotone artwork (one weak tint riding on its tones, on
+// ADR-532: sepia / duotone artwork (one weak tint riding on its tones, on
 // paper-light paper) is traced like greyscale art; multi-hue, saturated and
 // tinted-paper images keep the colour promotion of ADR-401.
 import { describe, expect, it } from 'vitest';
@@ -41,7 +41,7 @@ const WARM_PAPER: Rgb = [253, 251, 246];
 const SEPIA = (_x: number, darkness: number): Rgb => [0.06 * darkness, 0, -0.07 * darkness];
 const COOL = (_x: number, darkness: number): Rgb => [-0.07 * darkness, 0, 0.06 * darkness];
 
-describe('toned monochrome artwork is traced like greyscale (ADR-484)', () => {
+describe('toned monochrome artwork is traced like greyscale (ADR-532)', () => {
   it('does not promote a sepia tone ramp on paper-light paper', () => {
     const image = toneDisc(WARM_PAPER, SEPIA);
     expect(shouldUseSketchTrace(image, LINE_ART)).toBe(false);
@@ -120,7 +120,7 @@ function strokes(size: number, ink: Rgb): RawImageData {
   return { width: size, height: size, data };
 }
 
-describe('thin pale-toned strokes (ADR-484)', () => {
+describe('thin pale-toned strokes (ADR-532)', () => {
   it('vetoes 2 px greige strokes at source scale', () => {
     expect(shouldUseSketchTrace(strokes(300, GREIGE), LINE_ART)).toBe(false);
   });

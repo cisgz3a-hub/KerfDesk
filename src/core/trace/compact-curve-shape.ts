@@ -1,4 +1,4 @@
-// Shape checks for the compact contour fit (ADR-482): does a cubic cross
+// Shape checks for the compact contour fit (ADR-530): does a cubic cross
 // itself, and how finely must a cubic be sampled to stay within a flatness
 // bound. Closed forms, own derivations. Pure core, deterministic.
 

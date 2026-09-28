@@ -1,6 +1,6 @@
 import type { RawImageData } from './trace-image';
 
-// Toned monochrome (ADR-484): sepia, cream-toned and duotone artwork whose
+// Toned monochrome (ADR-532): sepia, cream-toned and duotone artwork whose
 // colour is one weak tint riding on its tones. Such an image carries no
 // information beyond its luma, so the colour trigger must not promote it
 // onto the local-contrast mask (and the dense-colour working grid) that

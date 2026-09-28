@@ -46,7 +46,11 @@ export function applyLineTabs(
     closed: segment.closed,
   }));
   const sizeMm = Number.isFinite(settings.tabSizeMm) ? Math.max(0, settings.tabSizeMm) : 0;
-  if (sizeMm <= 0) return { segments: polylines.map((polyline, index) => cutSegment(polyline, segments[index])), tabSpans: [] };
+  if (sizeMm <= 0)
+    return {
+      segments: polylines.map((polyline, index) => cutSegment(polyline, segments[index])),
+      tabSpans: [],
+    };
   const eligible = automaticTabEligibility(polylines, settings);
   const layout = automaticTabLayoutFor(settings);
   const burns: CutSegment[] = [];

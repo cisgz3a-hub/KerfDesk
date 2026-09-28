@@ -75,7 +75,7 @@ function pieceGeometries(object: TracedImage): ReadonlyArray<PieceGeometry> {
   });
 }
 
-// Each piece keeps the part of a traced forest (ADR-483) that its subpaths span.
+// Each piece keeps the part of a traced forest (ADR-531) that its subpaths span.
 function pathSubset(path: ColoredPath, indices: ReadonlyArray<number>): ColoredPath {
   return subsetSubpathNesting(path, indices, subsetGeometry(path, indices));
 }

@@ -1,4 +1,4 @@
-// Which sub-pixel crack field the contour walker gets (ADR-485, ADR-486).
+// Which sub-pixel crack field the contour walker gets (ADR-533, ADR-534).
 // Split from trace-image.ts (file cap); pure functions.
 
 import type { CrackSubPixelField } from './contour-boundary';
@@ -15,7 +15,7 @@ function pixelScaleOf(options: TraceOptions): number {
   return Number.isFinite(scale) && scale >= 1 ? scale : 1;
 }
 
-// Edge placement for the contour walker only (ADR-485, ADR-486); the
+// Edge placement for the contour walker only (ADR-533, ADR-534); the
 // cleanup and recovery stages above keep reading `field`, so the mask and
 // its topology are unchanged. A Cutoff > 0 band gets per-crack band edges;
 // the automatic cut gets the local plateau mid-level on broad edges.
@@ -46,7 +46,7 @@ export function walkerCrackField(
   return withPlateauCrossing(field, lumaPlane(leveled), ink, cut, pixelScaleOf(options));
 }
 
-// The alpha route cuts 255 − alpha with the same band as luma (ADR-486).
+// The alpha route cuts 255 − alpha with the same band as luma (ADR-534).
 export function alphaBandField(image: RawImageData, options: TraceOptions): CrackSubPixelField {
   const cutoff = options.cutoffLuma ?? 0;
   const threshold = options.thresholdLuma ?? 128;

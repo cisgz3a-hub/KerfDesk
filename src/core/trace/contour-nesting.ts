@@ -1,4 +1,4 @@
-// Containment forest of the contour tracer's boundary loops (ADR-483), built
+// Containment forest of the contour tracer's boundary loops (ADR-531), built
 // once, exactly, on the pixel-corner lattice before any smoothing moves a
 // vertex.
 //

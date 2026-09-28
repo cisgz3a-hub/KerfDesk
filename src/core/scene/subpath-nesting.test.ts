@@ -26,7 +26,7 @@ const polylines = [square(0, 0, 30), square(5, 5, 20), square(10, 10, 5), square
 const parents = [-1, 0, 1, -1];
 const plain: ColoredPath = { color: '#000000', polylines };
 
-describe('carried subpath nesting (ADR-483)', () => {
+describe('carried subpath nesting (ADR-531)', () => {
   it('reads back parents and depths while the geometry is unchanged', () => {
     const nested = withSubpathNesting(plain, parents);
     expect(carriedSubpathParents(nested)).toEqual(parents);

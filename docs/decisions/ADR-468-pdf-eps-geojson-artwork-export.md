@@ -179,7 +179,7 @@ Option (b) would invent ink the source does not have, a polygon at least one gri
 the snapped band has none. Option (a) keeps the writers consistent with each other and follows
 one rule, stated here on its own terms: **no orphans** - a contour is only ever dropped together
 with everything nested inside it. (The tracer states the same invariant for admitted hairline
-loops in ADR-488 Amendment 1, which reached main with tracing batch 4 (numbered ADR-458 on
+loops in ADR-536 Amendment 1, which reached main with tracing batch 4 (numbered ADR-458 on
 its branch); this amendment does not depend on it.) Everything in a dropped subtree lies inside the
 collapsed contour. Per-axis rounding can collapse a contour up to about one grid diagonal
 (sqrt(2) grid steps) wide, so what is lost is at most that wide: the same order of error as the

@@ -8,7 +8,7 @@
 // cube (about once in 2^47 random x, or an exact tie), it rounds the exact
 // integer cube instead. Outside [2^-300, 1] it defers to `x ** 3`: the arm
 // solve's parameters never go there. About 2-3x faster than pow in the cubic
-// fit's arm solve (ADR-482 Amendments 6 and 7).
+// fit's arm solve (ADR-530 Amendments 6 and 7).
 
 const SPLIT = 134217729; // 2^27 + 1: Veltkamp's splitter for doubles
 const BOUNDARY_BAND = 2 ** -100;

@@ -7,7 +7,7 @@ import { intersectingContourLoopsSteps } from './contour-intersections';
 import { curvedTraceRing } from './trace-curves';
 import { runTraceSteps } from './trace-steps';
 
-// ADR-483: the crossing guard tests the fitted curves, not only their
+// ADR-531: the crossing guard tests the fitted curves, not only their
 // compatibility samples. Every fixture below is a real trace output whose
 // curves meet while its samples do not show it.
 
@@ -223,7 +223,7 @@ const circle = (cx: number, cy: number, r: number, parts = 8): CurveSubpath => {
   return { start: at(0, r), segments, closed: true };
 };
 
-describe('the crossing guard on the fitted curves (ADR-483)', () => {
+describe('the crossing guard on the fitted curves (ADR-531)', () => {
   it.each<[string, CurveSubpath]>([
     ['a sliver whose cubics double back on themselves', SLIVER],
     ['spike legs that cross beside the tip', SPIKE],

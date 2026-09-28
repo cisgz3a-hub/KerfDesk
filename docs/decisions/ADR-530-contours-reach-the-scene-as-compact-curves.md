@@ -1,4 +1,4 @@
-## ADR-482 - Traced contours reach the scene as compact curves (2026-09-26)
+## ADR-530 - Traced contours reach the scene as compact curves (2026-09-26)
 
 **Status:** Accepted. | **Date:** 2026-09-26
 
@@ -53,7 +53,7 @@ out of process only to measure its output):
      a closed-form test solves B(s) = B(t) for s != t through the sum and product of the two
      parameters (own derivation). Within tolerance such a loop is invisible to both distance
      checks; without the test Edge Detection drew one on a binary 3 px C-arc at Optimize 1 and 2.
-   - Work bounds (ADR-482 review). The first version re-fitted every merge extension from scratch
+   - Work bounds (ADR-530 review). The first version re-fitted every merge extension from scratch
      and made contour traces 2.5 to 3.4x slower than the tail it replaced. Now a single candidate
      piece is the proposal's own fit (same span, same joint tangents); a span straight within the
      tolerance that meets its joints along their tangents is its chord without a cubic fit; a merge
@@ -316,7 +316,7 @@ Status against the speed targets (owl Line Art at most 4.0 s, perf-noise-1024 at
 not above main): not met. The fit is now about a quarter of the trace (owl 22%, noise 26%), so even
 a free fit leaves both traces well above the targets and above main. The rest is outside the fit and not yet profiled (the likely
 owners are the 0.02 px compatibility sampling that the topology repair and the curve contacts of
-ADR-483 test, and the memory that sampling and the carried cubics hold: peak RSS is 2.8x main on
+ADR-531 test, and the memory that sampling and the carried cubics hold: peak RSS is 2.8x main on
 perf-noise-1024).
 Within the fit, about 75% of the remaining projection work is the candidate proposal's split-at-
 worst recursion, whose joints decide the output; the earlier proposal shortcuts moved joints and

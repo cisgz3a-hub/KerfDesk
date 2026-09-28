@@ -1,4 +1,4 @@
-// The containment forest a filled path carries (ADR-483).
+// The containment forest a filled path carries (ADR-531).
 //
 // The contour tracer knows exactly which closed subpath lies inside which: it
 // builds the forest on the pixel lattice before any smoothing. It stores that

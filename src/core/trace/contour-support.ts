@@ -191,7 +191,7 @@ function restoredField(grid: SupportGrid, original: CrackSubPixelField | null): 
       return inkAt(grid.enlarged, y * grid.enlarged.width + x) ? 0 : 255;
     },
     thresholdAt: (x, y) => (patched(x, y) ? 128 : (original?.thresholdAt(x, y) ?? 128)),
-    // Unpatched cracks keep the original field's edge placement (ADR-485).
+    // Unpatched cracks keep the original field's edge placement (ADR-533).
     // Its plateau gate read the pre-restoration mask, so a gate block may
     // overlap a restored cell; that moves vertices only, never topology.
     ...(original?.crackCrossingAt === undefined

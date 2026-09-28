@@ -33,7 +33,7 @@ describe('traceImageToContourColoredPaths', () => {
   it('makes a high Optimize value emit fewer segments on curved artwork', () => {
     const fixture = PERCEPTUAL_FIXTURES.find((candidate) => candidate.name === 'filled-disc');
     expect(fixture).toBeDefined();
-    // The canonical curve is the output (ADR-482); its polyline is sampling.
+    // The canonical curve is the output (ADR-530); its polyline is sampling.
     const count = (optimize: number): number =>
       traceImageToContourColoredPaths(fixture!.image, { ...LINE_ART, optimize })
         .flatMap((path) => path.curves ?? [])

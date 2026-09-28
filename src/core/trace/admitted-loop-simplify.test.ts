@@ -126,7 +126,7 @@ function onHairline(loop: Polyline): boolean {
 }
 
 // Moves a traced ring costs: its canonical curve's segments when the path
-// carries one (compact curves reach the scene, ADR-482; the polyline is only
+// carries one (compact curves reach the scene, ADR-530; the polyline is only
 // their sampling), else its polyline's edges.
 const curveMoves = new WeakMap<Polyline, number>();
 
@@ -185,7 +185,7 @@ async function loopsBesideSquare(image: RawImageData, preset: string): Promise<P
 // for the diagonal beside the square, 457 for the 52 degree line.
 const SPAN_BESIDE_SQUARE_BEFORE = { diagonal: 81.388, deg52: 80.5927 };
 
-describe('admitted hairline loops keep a compact outline (ADR-488)', () => {
+describe('admitted hairline loops keep a compact outline (ADR-536)', () => {
   it('Smooth: a 1 px binary 45 degree diagonal is one loop of < 40 points', async () => {
     const image = blank(255);
     binaryDiagonal(image, 0);
@@ -227,7 +227,7 @@ describe('admitted hairline loops keep a compact outline (ADR-488)', () => {
     const loops = await loopsBesideSquare(image, 'Smooth');
     expect(loops).toHaveLength(1);
     const loop = loops[0]!;
-    // Geometry-core's compact fit (ADR-482) spends 57 cubics on this beaded
+    // Geometry-core's compact fit (ADR-530) spends 57 cubics on this beaded
     // 2x sliver (the raw-crack chain it replaced was 457 moves); the no-wedge
     // ends below are the invariant, the bound pins today's cost.
     expect(moves(loop)).toBeLessThan(64);

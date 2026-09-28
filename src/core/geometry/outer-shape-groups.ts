@@ -16,7 +16,7 @@
 // so within each shape the even-odd parity or nonzero winding equals the
 // original's. The shapes therefore partition the original burn area.
 //
-// A traced path carries its forest exactly (ADR-483, built on the pixel
+// A traced path carries its forest exactly (ADR-531, built on the pixel
 // lattice before smoothing); while it matches the geometry it is used as the
 // tree, and the probe vote of loop-nesting.ts is the fallback for every other
 // path.

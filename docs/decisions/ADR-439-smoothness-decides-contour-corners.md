@@ -225,3 +225,14 @@ straightness gate (contour-straightness.test) and the jittered-ring roundness ga
     text-lowres.scan 31 -> 33, text-lowres.clean 18 -> 17, counter-letters.scan 3 -> 2; the other
     text fixtures are equal.
   - Discs of radius 8 px or less can still take 1 to 4 corners at s = 0.45 to 0.75.
+### Sharp small-mark audit (2026-09-28)
+
+The speckle.clean benchmark calls forty one-pixel and forty two-by-two-pixel marks
+unwanted noise. Sharp explicitly preserves single-pixel marks for pixel artwork; its
+old and new output both have 93 outlines and retain all twelve genuine 5 px dots.
+The old rounded one-pixel shapes fell below the benchmark's 50 percent survival test,
+while the new square marks survive at their intended size. Consequently noise-removal
+IoU changes from 0.9891 to 0.9855 even though intentional pixel fidelity improves.
+This is a preset tradeoff, not lost artwork. A public-entry regression verifies Sharp's
+one- and two-pixel square boundaries within 0.01 px. Line Art and Smooth remove the
+same nuisance marks and independently measure IoU 0.9980 and 0.9981 respectively.

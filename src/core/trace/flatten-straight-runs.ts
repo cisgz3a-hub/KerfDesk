@@ -51,7 +51,7 @@ const OUTLIER_FRACTION = 0.05;
 // (the trace dialog's Smoothness knob), not a constant.
 const BASE_MAX_DEVIATION_PX = 1.0;
 // Below this the flattener is effectively off; skip the scan. Source pixels,
-// compared against the UNSCALED budget (ADR-487): against the scaled one, a
+// compared against the UNSCALED budget (ADR-535): against the scaled one, a
 // strength in [0.1, 0.2) was off at 1x and on at 1.5x/2x.
 const MIN_ACTIVE_DEVIATION_PX = 0.2;
 // The line model may lose to the quadratic-arc model by this factor and
@@ -77,7 +77,7 @@ const FLAT_LINE_SLACK_PX = 0.02;
 // this distance of the original vertex; near-parallel fits intersect far
 // away and fall back to the projection midpoint. Denominated in SOURCE
 // pixels and multiplied by the working-grid scale like its siblings
-// (ADR-487): unscaled, a 2x trace snapped only within 1 source px, so the
+// (ADR-535): unscaled, a 2x trace snapped only within 1 source px, so the
 // same soft bend kept its apex at 1x and lost it at 1.5x/2x.
 const JOINT_SNAP_LIMIT_PX = 2;
 // Direction cross-products under this magnitude are parallel lines.
