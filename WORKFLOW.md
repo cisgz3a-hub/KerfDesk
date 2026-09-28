@@ -7268,6 +7268,32 @@ as the pane's design record.
   lists the setup steps (largest video resolution, straight down, no zoom, stabilisation, HDR or
   filters, focus locked, on the charger, calibrate once mounted).
 
+### F-CAM12. A camera on the laser head (ADR-449)
+
+- **Success / calibrate.** In the calibration wizard the operator ticks **Camera rides on the
+  laser head**. **Margin** becomes **Target size** (40 mm), and the setup says a small square is
+  engraved in the middle of the bed. After engraving, the photo step asks to jog the head until
+  the whole square is in the picture. **Take photo** records where the head is, and the saved
+  calibration follows the head from then on.
+- **Success / capture here.** With the machine connected and homed, **Capture here** in the
+  Camera panel shows the patch under the camera on the canvas, where it is on the bed, without
+  moving the head.
+- **Success / capture an area.** **Capture selection** (or **Capture bed** with nothing selected)
+  moves the head with the laser off, takes a picture at each stop ("Taking picture 3 of 12…"),
+  and shows one joined top-down picture of the area on the canvas.
+- **Success / check.** **Check camera** on a head camera measures the saved calibration from
+  wherever the head is for the check photo.
+- **Edge / stop.** **Stop** cancels the move in progress. The panel says how many pictures were
+  taken and shows them.
+- **Edge / out of reach.** When the head cannot travel far enough for the camera to see an edge
+  of the area, the picture stops short of that edge and the panel says why.
+- **Edge / back to live.** **Live** clears the joined picture and shows the live camera again.
+- **Error / head position unknown.** Not connected or not homed: the Camera panel says the camera
+  rides on the head and asks to connect and home; the photo step and the captures say the same.
+- **Error / machine busy.** A capture that needs moves while the machine cannot jog shows the
+  usual jog message. A head that stops moving (Hold, Alarm, disconnect) ends the capture with the
+  reason, keeping the pictures already taken.
+
 ---
 
 ## Desktop app (Windows + macOS Preview) flows

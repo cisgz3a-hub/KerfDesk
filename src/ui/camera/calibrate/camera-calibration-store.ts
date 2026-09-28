@@ -50,6 +50,10 @@ export type CalibrationSettings = {
   readonly speedMmPerMin: number;
   /** Margin kept clear around the target on every side of the bed, mm. */
   readonly marginMm: number;
+  /** The camera rides on the laser head (ADR-449): a small target it sees whole. */
+  readonly headCamera: boolean;
+  /** Side of the head camera's square target, mm. */
+  readonly headTargetSizeMm: number;
 };
 
 // 'check' starts at the photo of a target already engraved, to see whether
@@ -81,6 +85,8 @@ export const DEFAULT_CALIBRATION_SETTINGS: CalibrationSettings = {
   powerPercent: 35,
   speedMmPerMin: 3000,
   marginMm: 5,
+  headCamera: false,
+  headTargetSizeMm: 40,
 };
 
 const INITIAL_STEP: CalibrationStep = { kind: 'setup', note: null };
@@ -109,16 +115,24 @@ export const useCameraCalibrationStore = create<CameraCalibrationStore>((set) =>
         saved.accuracy.targetArea === undefined
           ? { kind: 'setup', note: MISSING_TARGET_LAYOUT_NOTE }
           : { kind: 'photo', status: { kind: 'idle' } },
-      settings: { ...s.settings, sheetThicknessMm: saved.accuracy.targetHeightMm },
+      settings: {
+        ...s.settings,
+        sheetThicknessMm: saved.accuracy.targetHeightMm,
+        headCamera: saved.mount?.kind === 'head',
+      },
       targetArea: saved.accuracy.targetArea ?? null,
     })),
   closeWizard: () => set({ open: false, minimized: false, step: INITIAL_STEP }),
   toggleMinimized: () => set((s) => ({ minimized: !s.minimized })),
-  // A new margin describes a new target, so a known area no longer applies.
+  // A new margin or target size describes a new target, so a known area no longer applies.
   updateSettings: (patch) =>
     set((s) => ({
       settings: sanitized({ ...s.settings, ...patch }),
-      ...(patch.marginMm === undefined ? {} : { targetArea: null }),
+      ...(patch.marginMm === undefined &&
+      patch.headCamera === undefined &&
+      patch.headTargetSizeMm === undefined
+        ? {}
+        : { targetArea: null }),
     })),
   setStep: (step) => set({ step }),
 }));
@@ -138,6 +152,11 @@ function sanitized(settings: CalibrationSettings): CalibrationSettings {
     powerPercent: Math.min(100, atLeast(settings.powerPercent, 0, d.powerPercent)),
     speedMmPerMin: settings.speedMmPerMin > 0 ? settings.speedMmPerMin : d.speedMmPerMin,
     marginMm: atLeast(settings.marginMm, 0, d.marginMm),
+    headCamera: settings.headCamera,
+    headTargetSizeMm:
+      settings.headTargetSizeMm > 0 && Number.isFinite(settings.headTargetSizeMm)
+        ? settings.headTargetSizeMm
+        : d.headTargetSizeMm,
   };
 }
 

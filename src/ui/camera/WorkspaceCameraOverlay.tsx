@@ -6,8 +6,9 @@
 // over the real material. It shares the drawable stage's grid cell, measures
 // its own box (the canvas's box) and recomputes the same fit-to-bed view the
 // canvas renderer uses, so the picture tracks zoom and pan. Sources, in
-// priority order: a captured still (LightBurn's Update Overlay model), else the
-// live camera, whichever kind it is.
+// priority order: a head camera's stitched picture of the bed (ADR-449), a
+// captured still (LightBurn's Update Overlay model), else the live camera,
+// whichever kind it is.
 
 import { useMemo, useState } from 'react';
 import type { CameraModelRecord } from '../../core/camera/model/camera-model-record';
@@ -18,6 +19,7 @@ import { useActiveCameraModel } from './active-camera-model';
 import { computeView } from '../workspace/view-transform';
 import { CameraAccuracyMap } from './accuracy/CameraAccuracyMap';
 import { CameraSourceView } from './CameraSourceView';
+import { BedPictureOverlay } from './head/BedPictureOverlay';
 import { HeightAreaOutlines } from './heights/HeightAreaOutlines';
 import { PieceOutlines } from './pieces/PieceOutlines';
 import { usePieceScanStore } from './pieces/piece-scan-store';
@@ -32,7 +34,11 @@ import { useElementSize, type ElementSize } from './use-element-size';
 export function WorkspaceCameraOverlay(): JSX.Element | null {
   const model = useActiveCameraModel();
   const visible = useCameraStore((s) => s.overlayVisible);
-  if (model === undefined || !visible) return null;
+  const bedPicture = useCameraStore((s) => s.bedPicture);
+  if (!visible) return null;
+  // Already on the bed's own grid, so it needs no model (or head position).
+  if (bedPicture !== null) return <BedPictureOverlay picture={bedPicture} />;
+  if (model === undefined) return null;
   return <ModelOverlay model={model} />;
 }
 
