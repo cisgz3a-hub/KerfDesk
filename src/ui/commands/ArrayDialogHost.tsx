@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { combinedBBox, type ArraySpec, type Project } from '../../core/scene';
 import { useStore } from '../state';
 import { prepareVariableArray } from '../state/prepare-variable-array';
@@ -20,8 +20,11 @@ export function ArrayDialogHost(props: { readonly onClose: () => void }): JSX.El
     },
     [],
   );
-  const selected = selectedObjects(project, selectedObjectId, additionalSelectedIds);
-  const bounds = combinedBBox(selected);
+  const selected = useMemo(
+    () => selectedObjects(project, selectedObjectId, additionalSelectedIds),
+    [project, selectedObjectId, additionalSelectedIds],
+  );
+  const bounds = useMemo(() => combinedBBox(selected), [selected]);
   if (bounds === null) return null;
   const close = (): void => {
     request.current += 1;
@@ -71,6 +74,7 @@ export function ArrayDialogHost(props: { readonly onClose: () => void }): JSX.El
   return (
     <ArrayDialog
       selectionBounds={bounds}
+      selected={selected}
       hasVariableText={selected.some((object) => objectVariableTemplate(object) !== undefined)}
       preparing={preparing}
       {...(errorMessage === undefined ? {} : { errorMessage })}

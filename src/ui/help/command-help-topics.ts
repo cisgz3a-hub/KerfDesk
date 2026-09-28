@@ -265,7 +265,8 @@ export const COMMAND_HELP: Readonly<Record<CommandId, CommandHelpTopic>> = {
   },
   'arrange.array': {
     family: 'arrange',
-    tooltip: 'Create a grid, point-rotation, or circular array from selected artwork.',
+    tooltip:
+      'Create a grid, point-rotation, or circular array from selected artwork. A grid can space copies by the gap between them or the distance between centres, shift or mirror every other row or column, and build leftward or upward. A circle can cover part of a turn and centre on one selected object, which stays put.',
   },
   'arrange.quick-nest': {
     family: 'arrange',

@@ -69,7 +69,22 @@ export function applyArraySelection(
     (bounds) => materialized?.placements ?? arrayPlacements(bounds, spec),
     idFactory,
     materialized,
+    arraySelectionIds(state, spec),
   );
+}
+
+/**
+ * The objects an array repeats: the selection, less the object a circular
+ * array is centred on, which stays where it is (LightBurn gap LBG-T14).
+ */
+export function arraySelectionIds(
+  state: Pick<AppState, 'selectedObjectId' | 'additionalSelectedIds'>,
+  spec: ArraySpec,
+): ReadonlySet<string> {
+  const ids = selectionIds(state);
+  const centerId = spec.kind === 'circular' ? spec.centerObjectId : undefined;
+  if (centerId === undefined || !ids.has(centerId)) return ids;
+  return new Set([...ids].filter((id) => id !== centerId));
 }
 
 /** The selection moved to the first placement and copied to every later one. */
@@ -78,8 +93,9 @@ export function applySelectionPlacements(
   placementsFor: (bounds: Bounds) => ReadonlyArray<ArrayPlacement>,
   idFactory: () => string = () => crypto.randomUUID(),
   materialized?: ArrayMaterialization,
+  sourceIds: ReadonlySet<string> = selectionIds(state),
 ): AppState | Partial<AppState> {
-  const selection = arraySourceSelection(state, materialized);
+  const selection = arraySourceSelection(state, materialized, sourceIds);
   if (selection === null) return state;
   const { selectedIds, sourceObjects, selected, bounds } = selection;
   const placements = placementsFor(bounds);
@@ -144,8 +160,11 @@ export function applySelectionPlacements(
   };
 }
 
-function arraySourceSelection(state: AppState, materialized: ArrayMaterialization | undefined) {
-  const selectedIds = selectionIds(state);
+function arraySourceSelection(
+  state: AppState,
+  materialized: ArrayMaterialization | undefined,
+  selectedIds: ReadonlySet<string>,
+) {
   const firstSources = new Map(materialized?.sources[0]?.map((object) => [object.id, object]));
   const sourceObjects = state.project.scene.objects.map(
     (object) => firstSources.get(object.id) ?? object,
@@ -163,7 +182,9 @@ function arraySourceSelection(state: AppState, materialized: ArrayMaterializatio
   return bounds === null ? null : { selectedIds, sourceObjects, selected, bounds };
 }
 
-function selectionIds(state: AppState): ReadonlySet<string> {
+function selectionIds(
+  state: Pick<AppState, 'selectedObjectId' | 'additionalSelectedIds'>,
+): ReadonlySet<string> {
   return new Set([
     ...(state.selectedObjectId === null ? [] : [state.selectedObjectId]),
     ...state.additionalSelectedIds,
