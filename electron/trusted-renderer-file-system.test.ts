@@ -7,7 +7,7 @@ describe('Electron file-system grants without a WebContents', () => {
     permission: 'fileSystem',
     requestingOrigin: 'app://app/',
     currentUrl: null,
-    // Electron 42 passes a null frame when checking an existing file grant.
+    // Electron (42 through 44) passes a null frame when checking an existing file grant.
     isMainFrame: false,
   };
 
