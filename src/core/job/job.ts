@@ -193,6 +193,9 @@ export type CncContourPass = {
   // pass keeps its straight plunge (ADR-471, ADR-424 Amendment 1). G-code
   // comments and Job Review disclose it; motion is unchanged.
   readonly entryPlunge?: true;
+  // No descending 0.001 mm step fits the requested angle on this path's
+  // represented segments. Omission keeps the existing short-path reason.
+  readonly entryPlungeReason?: 'coordinate-precision';
   // ADR-491: a stay-down link fed the bit here at this depth, so the pass needs
   // no entry of its own (ramp entry leaves it alone).
   readonly stayDownEntry?: true;
@@ -222,6 +225,10 @@ export type CncPath3dPass = {
   // its descents against the configured plunge rate.
   // Tiling and G-code comments preserve this marker without changing motion.
   readonly entryRamp?: true;
+  // A tabbed entry can retain its original path and plunge when the requested
+  // ramp has no descending step at the coordinate precision.
+  readonly entryPlunge?: true;
+  readonly entryPlungeReason?: 'coordinate-precision';
   // ADR-491: a short level move between two pocket passes, fed at the plunge
   // feed in place of a lift and re-plunge. Provenance only.
   readonly stayDownLink?: true;

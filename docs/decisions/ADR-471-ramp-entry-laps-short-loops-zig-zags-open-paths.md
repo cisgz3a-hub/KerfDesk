@@ -73,12 +73,19 @@ operator's choice for pockets.
    ADR-424's rule for relief loops. The G-code header adds
    `; cnc entry-advisory: N passes plunge: path shorter than one cut width`, and preflight reports
    the advisory `cnc-ramp-entry-plunge` to Job Review and Save, naming Helical entry for pockets.
+   Tiling retains this marker on every clipped contour fragment, including a contour wholly
+   inside one tile. Each tile's header counts its marked fragments, rather than reusing the
+   original whole-job count. Clipping does not assign the marker to previously unmarked paths.
 5. **No new refusal.** An impossible lap count throws a `RangeError` at the ECMAScript Array
    length limit, as the tabbed ramp does; nothing smaller is refused.
 6. After integration with independent stage recipes, narrowed cutter widths and scan timing,
    `EMITTER_REVISION` advances to `adaptive-relief-ramp-laps-cut-width-scan-timing-20260927-v1`.
    The finishing-stage wrapper retains each pass's cutting recipe around the ramp transform,
    and the minimum retraced path uses the same full-depth cutter width as its wall layout.
+   The tiled-provenance repair subsequently advances the integrated revision to
+   `trace-arcs-relief-width-ramp-tiles-contact-air-scan-v2-20260927-v8`, retaining the prior
+   trace, native arc, relief, cutter-width, contact, air-repeat and scan provenance. Only
+   the previously omitted plunge disclosure changes; emitted machine commands are unchanged.
 
 The maintainer chose items 2 and 4 over the alternatives on 2026-09-27: lapping loops shorter
 than one cut width too (ADR-278's rule: no plunge left, but the 0.285 mm ring would take 15 laps
@@ -138,4 +145,56 @@ Not changed, recorded for follow-up:
   finishing recipes through both lapping and disclosed-plunge paths. It checks separate depth
   ladders, emitted feed/plunge/spindle values, a complete lap at depth and the narrowed V-bit
   wall geometry and ramp threshold after integration with ADR-457 and ADR-368 Amendment 3.
+- `tile-ramp-provenance.test.ts` runs the actual ramp planner, tiler and emitter for a sub-width
+  contour contained in one tile and split across two tiles. Each file discloses its marked
+  plunges at the configured feed, while every non-comment command matches the same tile with
+  its markers removed. An unmarked contour stays unmarked even when split. Both disclosure
+  cases fail against the previous tiler.
 - NOT verified: air cuts, material cuts, or any hardware. There is no machine for this project.
+
+### Amendment 1 - Emitted ramp angle, plunge component and truthful entry provenance (2026-09-27)
+
+The follow-up findings above are repaired for generic contour, tabbed contour and relief
+roughing entries. A 64-vertex 2.8 mm circle requested at 5 degrees previously emitted a
+5.406440 degree segment. At cutting feed 1000 and plunge 50 mm/min, its commanded Z component
+was 94.220216 mm/min. A positive 0.1 degree request was also silently raised to 0.5 degrees
+by both generic and relief planners. These are emitted-word calculations, not machine measurements.
+
+The shared planner now allocates integer 0.001 mm Z quanta. Each XY span reserves one full
+coordinate quantum per axis for subsequent output rounding and shared translation. Zero-capacity
+spans stay level. Closed entries add laps and open entries add even zig-zag legs as necessary;
+every original vertex remains in the full-depth cleanup. Tabbed entries retain their original
+raised spans and intentional vertical walls. A request below 0.5 degrees is not raised.
+
+Relief roughing applies the same budget to the final machine-space XY placement, while retaining
+source-space loop seams, winding, complete cleanup and checked links. This placement matters:
+a capacity calculated before rotation cannot assume the same component rounding afterwards.
+The emitter's existing represented-coordinate `z-rate-capped` mode caps descending ramp feed
+to the selected plunge component and leaves level cleanup at cutting feed.
+
+When no segment has representable descent capacity, preserve the original contour or tabbed
+path and mark `entryPlungeReason: coordinate-precision`. A path below one cut width retains
+its existing short-path reason. Both are advisory in Job Review and exported comments, including
+contained and split tiles. Only an actual array materialisation limit is a factual failure.
+
+Headers always call the setting `requested-max-angle-deg`. An actual marked ramp is
+`contour-ramp`; a specialised path that ignores the generic request is `requested-only`, or
+`medial-profile` for the existing V-carve path. Drill, adaptive pocket and inlay review text
+names the applicable entry. Below-stock starts are described as tiled only on actual tiled
+groups. Relief short-loop plunges are explicitly marked. The header is not a promise about
+tab walls, variable-depth cutting profiles, controller dynamics or clipped tile entries.
+
+Regression evidence covers emitted modal XYZ/F words, dense circles, long and repeated open
+paths, multiple placements including half-quantum ties, shallow angles, tabs, stage recipes,
+rotated reliefs, compiler/emitter provenance, and contour/path3d fallback reasons through tiles.
+Physical cut quality, tool suitability, controller interpolation and motor steps remain NOT RUN.
+
+### Tile clearance audit (2026-09-28)
+
+Clipped contour and path3d passes retain their entry advisories but discard
+`airFloorZMm`. A preceding cutter centre can lie outside a tile while its
+footprint cleared stock inside it. Clipping drops that earlier pass, so its
+whole-job air-clearance certificate cannot authorise a rapid inside this tile.
+The regression constructs both pass kinds at the boundary and confirms the
+emitted tile feeds down to depth without a below-stock rapid. No new Start gate
+or hardware claim is introduced.

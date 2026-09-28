@@ -58,6 +58,36 @@ async function renderFields(
 }
 
 describe('CNC layer clarity', () => {
+  it('names adaptive entry without claiming the stored contour ramp', async () => {
+    const layer: Layer = {
+      ...LAYER,
+      cnc: {
+        ...DEFAULT_CNC_LAYER_SETTINGS,
+        cutType: 'pocket',
+        pocketStrategy: 'adaptive',
+        rampEntryDeg: 5,
+      },
+    };
+    installCnc(layer);
+    const view = await renderFields(layer);
+    try {
+      const entry = [...view.host.querySelectorAll('details')].find(
+        (item) => item.querySelector('summary > span')?.textContent === 'Entry & travel',
+      );
+      expect(entry?.querySelector('.lf-section-badge')?.textContent).toContain('Adaptive helix');
+      expect(entry?.querySelector('.lf-section-badge')?.textContent).not.toContain('Ramp 5');
+      const ramp = view.host.querySelector<HTMLInputElement>(
+        `input[aria-label="Ramp entry angle for ${layer.color}"]`,
+      );
+      expect(ramp?.value).toBe('5');
+      expect(ramp?.title).toContain('Adaptive pockets use their own entry');
+      expect(useStore.getState().project.scene.layers[0]?.cnc?.rampEntryDeg).toBe(5);
+    } finally {
+      await act(async () => view.root.unmount());
+      view.host.remove();
+    }
+  });
+
   // ADR-481: the cut type leads, then the bit and material, then the numbers.
   it('offers the cut type, bit and material before cutting values', async () => {
     installCnc();
