@@ -172,7 +172,11 @@ function Assert-Installed([string]$ExpectedVersion, [string]$Candidate) {
     throw 'Expected desktop and Start Menu shortcuts to the installed executable.'
   }
   $association = Get-ProjectAssociation
-  if ($association.extensionClass -ne 'KerfDesk.Project' -or $association.openCommand -ne "`"$executable`" `"%1`"") {
+  # electron-builder 26.16.1 writes the executable path unquoted (NsisTarget.js:
+  # '"$appExe $\"%1$\""'); Windows still resolves it. Either form must name
+  # the installed executable.
+  $openCommands = @("`"$executable`" `"%1`"", "$executable `"%1`"")
+  if ($association.extensionClass -ne 'KerfDesk.Project' -or $association.openCommand -notin $openCommands) {
     throw "Expected .lf2 projects to open in the installed executable: $($association | ConvertTo-Json -Compress)"
   }
   return [pscustomobject]@{
