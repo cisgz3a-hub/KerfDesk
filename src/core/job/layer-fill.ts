@@ -13,6 +13,7 @@ import {
   type Polyline,
   type SceneObject,
 } from '../scene';
+import { fillScanOverscanMm } from './automatic-overscan';
 import { compilationPolylines } from './compilation-polylines';
 import { memoizedFillHatchingWithMetadata } from './fill-hatching-cache';
 import { fillRuleForLayer, layerFillCacheKey } from './fill-rule';
@@ -78,7 +79,7 @@ export function islandFillGroupsForLayer(
         ...(fillRunwayPolicy === undefined ? {} : { fillRunwayPolicy }),
         scanDirection,
         ...(bidirectionalScanOffsetMm === undefined ? {} : { bidirectionalScanOffsetMm }),
-        overscanMm: Math.max(0, layer.fillOverscanMm),
+        overscanMm: fillScanOverscanMm(layer, device),
         segments,
       },
     ];

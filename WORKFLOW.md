@@ -851,6 +851,70 @@ marks later edits as unapproved without changing the existing Frame/Start policy
    "tabs 4 × 0.5 mm, 3 placed by hand". With none of this set, output is unchanged.
 6. Material presets do not store these settings; applying a preset keeps what the operation has.
 
+### F-A7d. Image scan angle, image cross-hatch and an angle change per pass (ADR-492)
+
+1. **More cut settings → Image detail**: **Scan angle** (0 to 180°, counter-clockwise from the X
+   axis, like a Fill's scan angle) sets the direction the image rows run. 0 scans along X as
+   before; 90 scans along Y. The direction preview above it shows the rows.
+2. **Cross-hatch** scans the image a second time at 90° to the first on every pass.
+3. **Angle per pass** (−180 to 180°, 0 is off) adds that angle on every pass after the first, in
+   Image detail and in Fill detail for scanline and island fills. With one pass it does nothing.
+4. Overscan and the bidirectional scan offset follow the rows at any angle. Preview, Frame, the time
+   estimate, job placement and the recovery archive follow them too. An angled row writes X and Y on
+   every move.
+5. On a rotary, images always scan along X; Job Review says the angle settings were set aside.
+6. Job Review's detail line reads e.g. "scan at 45° · cross-hatch · angle −30° per pass". With none
+   set, output is unchanged. The image editor's Thicken stays warning-only for angled scans.
+7. Material presets do not store these settings; applying a preset keeps what the operation has.
+
+### F-A7e. Automatic overscan (ADR-495)
+
+1. **More cut settings → Image detail** or **Fill detail** (Scanline or Island Fill): turn on
+   **Automatic** under Overscan. The typed length greys out and is kept for when Automatic is
+   turned off.
+2. The note under it gives the length Automatic runs now: the run-up from rest at the operation's
+   speed (capped at the machine's maximum feed) and Machine Setup's acceleration, measured along the
+   scan angle, plus 10%, at most 25 mm. A diagonal scan needs less than a scan along an axis.
+3. The length is worked out again every time the job is prepared, so it follows changes to the
+   speed, the scan angle or Machine Setup. Preview, Frame, the time estimate and every output
+   format use it.
+4. Follow Shape fills keep their typed length. The operations list shows "Automatic (Cut
+   Settings)" beside a fill's Overscan; Job Review reads "automatic overscan from speed and
+   acceleration".
+5. The runway is only as right as Machine Setup's acceleration: read $120 and $121 from the
+   controller where the firmware reports them, and check the scan edges on scrap.
+
+### F-A7f. Material Test grids that vary any two settings (ADR-497)
+
+1. **Tools → Material Test**: **Test** picks **Engrave** (each cell filled) or **Cut** (each cell's
+   outline, to find what cuts through).
+2. **Rows vary** and **Columns vary** each pick speed, power, passes or, for Engrave, hatch
+   spacing. Picking the other axis's setting swaps the two. Each varied setting has a Min and Max;
+   the others take one value. Speed rows by power columns is the default.
+3. Every axis starts from its gentlest value: fastest speed, lowest power, fewest passes, widest
+   hatch spacing. A passes axis keeps one row or column per whole number in its range.
+4. Engraved rows run at least 5 mm of runway, longer where the row's fastest cell needs it to reach
+   speed at Machine Setup's acceleration; the dialog says when, and the grid leaves room for it on
+   the left.
+5. Burned labels show each row's and column's value (speeds as the feed the job runs). The toast
+   names what rows and columns vary.
+
+### F-A7g. Recipes that apply themselves (ADR-496)
+
+1. **Material Library → Job material**: pick the material this job runs on, from the materials the
+   library has recipes for, and its **Thickness**. **Take the best recipe** is on once a material
+   is picked.
+2. Each new laser operation (import, text, shapes, images, trace, Add layer) links the library's
+   best recipe for that material and its mode: this machine's own recipes first, then calibrated
+   ones. A cut takes only a recipe for the job's thickness (or any thickness); an engraving takes
+   another thickness when none matches.
+3. Switching an untouched operation to another mode takes that mode's recipe. An operation edited
+   since its recipe keeps its settings. Operations with no matching recipe keep their settings.
+4. **Apply to all operations** links every output operation to its best recipe as one undo step
+   and names any with no recipe.
+5. Refresh and the stale-preset notice work as for a hand-linked preset. The job material is saved
+   with the project.
+
 ---
 
 ### F-A8. Preview

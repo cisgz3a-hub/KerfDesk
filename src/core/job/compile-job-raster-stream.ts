@@ -17,8 +17,13 @@ import { ditherIndependentRow, isErrorDiffusionMode } from '../raster/dither';
 import { createErrorDiffusionRowDitherer } from '../raster/dither-rows';
 import { originFlipsRasterX, originFlipsRasterY } from '../raster-output';
 import type { Layer, RasterImage, SceneObject } from '../scene';
+import { ALONG_X_SCAN_FRAME, type RasterScanFrame } from '../raster/raster-scan-frame';
 import type { RasterMachineBounds } from './raster-bounds';
-import { isRotatedRaster, prepareRotatedRaster, rotatedRasterRow } from './raster-rotated-sample';
+import {
+  needsRotatedSampling,
+  prepareRotatedRaster,
+  rotatedRasterRow,
+} from './raster-rotated-sample';
 
 const WHITE_LUMA_BYTE = 255;
 
@@ -31,7 +36,9 @@ export type StreamedRasterInput = {
   readonly obj: RasterImage;
   readonly maskObject: SceneObject | null;
   readonly device: DeviceProfile;
+  /** In the scan frame (ADR-492). */
   readonly bounds: RasterMachineBounds;
+  readonly scanFrame?: RasterScanFrame;
   readonly algorithm: Layer['ditherAlgorithm'];
   readonly passThrough?: boolean;
   readonly sMax: number;
@@ -42,9 +49,9 @@ export type StreamedRasterInput = {
  * Row provider for a streamed raster group: `(y) => RasterPowerValues` of S values
  * for the machine-oriented target row y. Byte-identical to the materialized
  * pipeline for every dither algorithm — the axis-aligned
- * resample→mask→orient path for unrotated images, the inverse-transform
- * sampler for rotated ones (masked at source resolution, matching
- * rotatedMaskedRasterLuma).
+ * resample→mask→orient path for unrotated images scanned along X, the
+ * inverse-transform sampler for rotated ones and angled scans (masked at
+ * source resolution, matching rotatedMaskedRasterLuma).
  */
 export function streamedRasterRowProvider(
   input: StreamedRasterInput,
@@ -69,7 +76,8 @@ export function streamedRasterRowProvider(
 }
 
 function streamedLumaRowAt(input: StreamedRasterInput): (y: number) => Uint8Array {
-  if (isRotatedRaster(input.obj)) {
+  const scanFrame = input.scanFrame ?? ALONG_X_SCAN_FRAME;
+  if (needsRotatedSampling(input.obj, scanFrame)) {
     // Masked (and, for the area kernel, reduced) once per provider, exactly
     // as the materialized rotatedMaskedRasterLuma prepares it.
     const prepared = prepareRotatedRaster(
@@ -80,6 +88,7 @@ function streamedLumaRowAt(input: StreamedRasterInput): (y: number) => Uint8Arra
         bounds: input.bounds,
         pixelWidth: input.pixelWidth,
         pixelHeight: input.pixelHeight,
+        scanFrame,
         kernel: burnGridKernel(input.algorithm),
         passThrough: input.passThrough === true,
       },

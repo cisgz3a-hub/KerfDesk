@@ -76,7 +76,7 @@ Sierra variants).
 | LBG-C03 | Image overscan you can set per operation | `R/CutSettingsEditor/ImageMode/` | Fixed 5 mm (`DEFAULT_OVERSCAN_MM`, `src/core/job/compile-job-raster.ts`) | S | Built (ADR-415). Follow-up: map LightBurn's perforation, overcut and overscan fields in `.lbrn`/`.clb` import |
 | LBG-C04 | Best start point and "choose corners" for closed shapes | `R/OptimizationSettings/` | Closed shapes start at their drawn start point (`src/core/job/segment-entry-index.ts`) | M | Built (ADR-494) |
 | LBG-C05 | Tabs: click-placed laser tabs, even spacing, maximum count, tab cut power | `R/AddTabs/` | Count, size and skip-inner only (`src/core/geometry/tabs-bridges.ts`) | M | Built (ADR-494) |
-| LBG-C06 | Image scan angle 0/90/180 and Angle Increment per pass | `R/CutSettingsEditor/ImageMode/` | Images always scan along X (`src/core/raster/raster-sweep-plan.ts`) | M-L | Taken by the Rayforge comparison thread (ADR-492), with image cross-hatch |
+| LBG-C06 | Image scan angle 0/90/180 and Angle Increment per pass | `R/CutSettingsEditor/ImageMode/` | Images always scan along X (`src/core/raster/raster-sweep-plan.ts`) | M-L | Built in ADR-492 by the Rayforge comparison thread, with image cross-hatch and an angle per pass for fills too; LightBurn import does not map Angle Increment yet |
 | LBG-C07 | Sort Cuts Last; bulk Enable/Disable/Invert/Hide Others in the operations list | `R/CutsLayersWindow/` | Missing | S | Built (ADR-480). Follow-up: bulk air assist switches |
 | LBG-C08 | Start and end dwell on Line layers | `R/CutSettingsEditor/LineMode/` | Missing | S | open |
 | LBG-C09 | Tool layers (never output, for guides and masks) | `https://docs.lightburnsoftware.com/1.7/Reference/UI/ColorPalette/` | An operation with output off comes close | S | open |
@@ -106,7 +106,7 @@ Sierra variants).
 | LBG-M02 | Numeric Move-to, saved positions, laser Finish Position | `R/MoveWindow/`, `R/CoordinatesOrigin/` | Click-to-move only; laser finish is fixed (`src/core/output/job-park-target.ts`) | S | Built (ADR-493) |
 | LBG-M03 | Rubber-band frame (outline that hugs the artwork) | `R/LaserWindow/` | Bounding-box frame (`src/core/job/frame-bounds.ts`) | M | open (needs an ADR) |
 | LBG-M04 | Red-dot pointer offset | `R/DeviceSettings/DimensionsUnits/` | Missing | M | open |
-| LBG-M05 | Material Test: choose the varied parameters (interval, passes), Line and Image modes, border | `R/MaterialTest/` | Speed by power, Fill only (`src/core/job/material-test-grid.ts`) | M | Taken by the Rayforge comparison thread (ADR-497): Power × Passes, Speed × Passes, cut-mode grid |
+| LBG-M05 | Material Test: choose the varied parameters (interval, passes), Line and Image modes, border | `R/MaterialTest/` | Speed by power, Fill only (`src/core/job/material-test-grid.ts`) | M | Built in ADR-497: rows and columns vary any two of speed, power, passes and hatch spacing; Engrave or Cut; runway sized for the fastest cell. Image mode and a border remain open |
 | LBG-M06 | Frame continuously (does not grant Start) | `R/DeviceSettings/BasicSettings/` | Missing | S-M | open |
 | LBG-M07 | Keyboard XY jog with modifier keys | `R/MoveWindow/` | Z only (`src/ui/laser/use-jog-shortcuts.ts`) | S | Built (ADR-493) |
 | LBG-M08 | Rotary on an A axis for 4-axis grblHAL and FluidNC boards | `R/RotaryMode/RotaryModeGCode/` | Y substitution only (`src/core/devices/rotary.ts`) | M | open |
@@ -170,8 +170,9 @@ Each batch is one pull request with its own decision record, tests and WORKFLOW.
 - **Next candidates, in order:** LBG-I01, LBG-I02 (after the Rayforge thread's image scan work
   lands, since both change the image pipeline).
 - **Taken by the Rayforge comparison thread (2026-09-27):** LBG-C06 (image scan angle and cross-hatch,
-  ADR-492) and LBG-M05 (more material test grids, ADR-497), plus automatic overscan from speed and
-  acceleration (ADR-495) and recipes that apply themselves (ADR-496). Not built in these batches.
+  built in ADR-492) and LBG-M05 (more material test grids, built in ADR-497), plus automatic
+  overscan from speed and acceleration (ADR-495) and recipes that apply themselves (ADR-496),
+  outside these batches.
 - **Not in these batches:** the Camera feature rebuild thread owns LBG-M13 (several cameras per
   device) and is also building camera print-and-cut, trace from the camera image and object
   detection. LBG-M09 (Print and Cut out of Labs) stays unscheduled here until that work lands, so

@@ -8,6 +8,7 @@
 import { pixelExtentForMm } from '../raster';
 import { effectiveOperationForObject } from '../effective-output';
 import { MAX_RASTER_WORK_UNITS } from '../raster/raster-budget';
+import { rasterScanFrame } from '../raster/raster-scan-frame';
 import {
   outputOperationLayers,
   sceneObjectUsesOperation,
@@ -15,7 +16,8 @@ import {
   type Project,
   type RasterImage,
 } from '../scene';
-import { rasterBoundsInMachineCoords } from './raster-bounds';
+import { rasterScanBounds } from './raster-bounds';
+import { imageScanPassRuns } from './scan-pass-angles';
 
 export const RASTER_PREPARATION_WORK_UNIT_BUDGET = MAX_RASTER_WORK_UNITS;
 
@@ -42,12 +44,20 @@ export function rasterPreparationTooComplex(project: Project): boolean {
 }
 
 function rasterLayerWorkUnits(obj: RasterImage, layer: Layer, project: Project): number {
-  const passes = Math.max(1, Math.floor(layer.passes));
-  if (layer.passThrough) return obj.pixelWidth * obj.pixelHeight * passes;
-  const bounds = rasterBoundsInMachineCoords(obj, project.device);
-  const pixelWidth = pixelExtentForMm(bounds.maxX - bounds.minX, layer.linesPerMm);
-  const pixelHeight = pixelExtentForMm(bounds.maxY - bounds.minY, layer.linesPerMm);
-  return pixelWidth * pixelHeight * passes;
+  // ADR-492: an angled scan covers the box around the image in its scan frame,
+  // and every cross-hatch or per-pass angle is its own scan.
+  let workUnits = 0;
+  for (const run of imageScanPassRuns(layer)) {
+    if (layer.passThrough) {
+      workUnits += obj.pixelWidth * obj.pixelHeight * run.passes;
+      continue;
+    }
+    const bounds = rasterScanBounds(obj, project.device, rasterScanFrame(run.angleDeg));
+    const pixelWidth = pixelExtentForMm(bounds.maxX - bounds.minX, layer.linesPerMm);
+    const pixelHeight = pixelExtentForMm(bounds.maxY - bounds.minY, layer.linesPerMm);
+    workUnits += pixelWidth * pixelHeight * run.passes;
+  }
+  return workUnits;
 }
 
 function matchingImageLayers(project: Project, obj: RasterImage): Layer[] {
