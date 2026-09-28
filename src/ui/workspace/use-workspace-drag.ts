@@ -22,10 +22,10 @@ import { beginDrawDrag, commitDraftShape } from './draw-tool';
 import type { MeasureDraft } from './measure-tool';
 import { handlePenMouseDown } from './pen-tool';
 import { beginPathNodeDrag } from './path-node-drag';
-import { dispatchPositionLaser } from './position-laser-click';
 import { hitCncTabAnchor } from './cnc-tab-editor';
 import { beginLaserTabPointer, finishLaserTabDrag } from './laser-tab-editor';
 import { selectObjectsInMarquee } from './selection-marquee';
+import { runClickTool } from './workspace-click-tools';
 import { useEscCancelsDrag } from './use-esc-cancels-drag';
 import type { SnapGuide, SnapSettings } from './snapping';
 import { canvasMouseToScene, pxToMmForCanvas } from './view-transform';
@@ -249,11 +249,8 @@ function beginToolDrag(args: {
     const drag = beginLaserTabPointer({ ...args, canvas: args.ref.current, mode: args.toolMode });
     return { kind: 'handled', drag };
   }
-  if (args.toolMode.kind === 'position-laser') {
-    const point = canvasMouseToScene(args.e, args.ref.current, args.project, args.viewState);
-    if (point !== null) dispatchPositionLaser(point, args.project.device);
-    return { kind: 'handled', drag: null }; // a positioning click never starts a drag
-  }
+  // Position Laser and Trim Shapes act on the click itself and never start a drag.
+  if (runClickTool({ ...args, canvas: args.ref.current })) return { kind: 'handled', drag: null };
   return { kind: 'fallthrough' };
 }
 

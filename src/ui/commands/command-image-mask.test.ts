@@ -165,6 +165,9 @@ function baseCtx(overrides: Partial<AppCommandContext> = {}): AppCommandContext 
     addRubberBandOutline: vi.fn(),
     flattenImageMask: vi.fn(),
     copyAlongPath: vi.fn(),
+    trimShapesActive: false,
+    trimShapes: vi.fn(),
+    cutShapes: vi.fn(),
     ...overrides,
   };
 }

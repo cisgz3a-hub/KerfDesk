@@ -35,6 +35,7 @@ import { WorkspacePointerOverlays } from './WorkspacePointerOverlays';
 import { WorkspacePreviewDock } from './WorkspacePreviewDock';
 import { NodeEditHint } from './NodeEditHint';
 import { LaserTabHint } from './LaserTabHint';
+import { TrimShapesHint } from './TrimShapesHint';
 import './workspace-preview.css';
 import { WorkspaceCanvasLayers } from './WorkspaceCanvasLayers';
 import { usePreviewBitmapRenderer } from './use-preview-bitmap-renderer';
@@ -141,6 +142,7 @@ function WorkspaceDesignChrome(props: {
       <ArtworkNumberingPrompt />
       <NodeEditHint />
       <LaserTabHint />
+      <TrimShapesHint />
       <ZoomControls />
     </>
   );

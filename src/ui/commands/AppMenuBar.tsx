@@ -299,6 +299,8 @@ const MENU_GROUPS: Partial<Record<CommandFamily, ReadonlyArray<MenuGroupLayout>>
         'tools.subtract',
         'tools.intersect',
         'tools.exclude',
+        'tools.cut-shapes',
+        'tools.trim-shapes',
       ],
     },
     {

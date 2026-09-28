@@ -1,7 +1,10 @@
 // The AppCommandContext slice for LightBurn gap batch 5 (ADR-480), folded into
 // the batch 3 slice so command-types.ts and use-app-commands.ts stay as they are.
+// Trim Shapes and Cut Shapes (LBG-T04, LBG-T08) join it.
 
-export type DesignToolsCommandContext = {
+import type { VectorCutCommandContext, VectorCutCommandId } from './vector-cut-command-types';
+
+export type DesignToolsCommandContext = VectorCutCommandContext & {
   readonly selectContainedShapes: () => void;
   readonly selectSmallerShapes: () => void;
   readonly deleteDuplicates: () => void;
@@ -15,6 +18,7 @@ export type DesignToolsCommandContext = {
 };
 
 export type DesignToolsCommandId =
+  | VectorCutCommandId
   | 'edit.select-contained'
   | 'edit.select-smaller'
   | 'edit.delete-duplicates'
