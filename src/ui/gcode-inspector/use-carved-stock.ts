@@ -42,9 +42,14 @@ export type CarvedStock = {
   /** The toolpath is drawn over the stock too. */
   readonly toolpathShown: boolean;
   readonly onToolpathShownChange: (shown: boolean) => void;
+  /** The stock covers the toolpath, so the view leaves it out. */
+  readonly hidesToolpath: boolean;
   readonly material: StockMaterial;
   readonly onMaterialChange: (material: StockMaterial) => void;
   readonly compare: StockCompare;
+  /** Shadows in the carving and its hollows darkened. */
+  readonly shaded: boolean;
+  readonly onShadedChange: (shaded: boolean) => void;
   /** The stock as carved so far as an STL solid; null while there is none. */
   readonly stl: (() => Promise<StockStl | null>) | null;
   /** Some moves cut with a bit the program gives no size for. */
@@ -71,6 +76,7 @@ export function useCarvedStock(options: CarvedStockOptions): CarvedStock {
   const { handleRef, state, model, sections, machineKind, design, target } = options;
   const [shown, setShown] = useState(false);
   const [toolpathShown, setToolpathShown] = useState(false);
+  const [shaded, setShaded] = useState(true);
   const [material, setMaterial] = useStockMaterial(stockMaterialFor(design?.stockMaterialKey));
   const compare = useCompareState();
   const available = useMemo(
@@ -90,16 +96,17 @@ export function useCarvedStock(options: CarvedStockOptions): CarvedStock {
   useEffect(() => {
     if (state !== 'ready') return;
     const handle = handleRef.current;
-    handle?.setToolpathVisible(!carving || toolpathShown);
     handle?.setStockMaterial({ material, materialKey: design?.stockMaterialKey });
     handle?.setStockCompare(comparing ? compare.toleranceMm : null);
-  }, [handleRef, state, carving, toolpathShown, material, design, comparing, compare.toleranceMm]);
+    handle?.setStockShaded(shaded);
+  }, [handleRef, state, material, design, comparing, compare.toleranceMm, shaded]);
   return {
     available,
     shown,
     onShownChange: setShown,
     toolpathShown,
     onToolpathShownChange: setToolpathShown,
+    hidesToolpath: carving && !toolpathShown,
     material,
     onMaterialChange: setMaterial,
     compare: {
@@ -110,6 +117,8 @@ export function useCarvedStock(options: CarvedStockOptions): CarvedStock {
       onToleranceChange: compare.setToleranceMm,
       result: comparing ? carver.comparison : null,
     },
+    shaded,
+    onShadedChange: setShaded,
     stl: carver.stl,
     unknownTool: available && start.moves.tools.some((tool) => tool === null),
     failed: carving && carver.failed,

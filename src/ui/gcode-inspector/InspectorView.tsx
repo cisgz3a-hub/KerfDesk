@@ -19,7 +19,9 @@ import { useInspectorCamera } from './use-inspector-camera';
 import { useInspectorSession } from './use-inspector-session';
 import { useSceneSync } from './use-scene-sync';
 import { useViewer3dScene } from './use-viewer3d-scene';
-import { useCarvedStock, type CarvedStock } from './use-carved-stock';
+import type { CarvedStock } from './use-carved-stock';
+import { useInspectorMaterials } from './use-inspector-materials';
+import type { LaserBurn } from './use-laser-burn';
 
 export type InspectorVariant = 'full' | 'preview';
 type InspectorViewProps =
@@ -112,7 +114,7 @@ export function InspectorView(props: InspectorViewProps): JSX.Element {
           session={session}
           onTravelChange={travelChange}
           onLocateLine={locateLine}
-          stock={scene.stock}
+          materials={scene}
         />
       ) : null}
     </div>
@@ -201,7 +203,8 @@ function Readouts(props: {
   readonly session: Session;
   readonly onTravelChange: (visible: boolean) => void;
   readonly onLocateLine: (line: number) => void;
-  readonly stock: CarvedStock;
+  /** The carved stock's and the burn preview's switches (ADR-487). */
+  readonly materials: { readonly stock: CarvedStock; readonly burn: LaserBurn };
 }): JSX.Element {
   const s = props.session;
   return (
@@ -225,7 +228,8 @@ function Readouts(props: {
       onToggleEntry={s.toggleEntry}
       isolate={s.isolate}
       onIsolateChange={s.setIsolate}
-      stock={props.stock}
+      stock={props.materials.stock}
+      burn={props.materials.burn}
     />
   );
 }
@@ -246,13 +250,12 @@ function useInspectorScene(
 ) {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const { handleRef, state, reason } = useViewer3dScene(canvasRef, model);
-  const stock = useCarvedStock({
+  const { stock, burn } = useInspectorMaterials({
     handleRef,
     state,
     model,
     sections: session.sections,
-    machineKind: source?.machineKind,
-    design: source?.design,
+    source,
     target: stockTarget(model, session),
   });
   const { playhead, liveMode, live } = session;
@@ -291,7 +294,7 @@ function useInspectorScene(
     },
     model,
   );
-  return { canvasRef, handleRef, state, reason, camera, stock };
+  return { canvasRef, handleRef, state, reason, camera, stock, burn };
 }
 
 const previewLensStyle: React.CSSProperties = {

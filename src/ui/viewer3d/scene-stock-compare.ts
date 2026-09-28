@@ -58,11 +58,10 @@ if (stockComparing) {
 
 // Colours are linear. `off` is the carving's depth less the design's: above
 // the design it is positive.
+// The depths and the pixel's place on them are the top's (scene-stock.ts).
 const COMPARE_FUNCTIONS = `uniform sampler2D stockTarget;
-uniform sampler2D stockDepth;
 uniform int stockCompare;
 uniform float stockTolerance;
-varying vec2 vStockUv;
 vec3 stockCompareColour(float off) {
   if (off > stockTolerance) {
     float more = clamp((off - stockTolerance) / 2.0, 0.0, 1.0);

@@ -51,6 +51,16 @@ export function InspectorStockControl(props: { readonly stock: CarvedStock }): J
           ))}
         </select>
       </label>
+      <label style={toggleStyle}>
+        <input
+          type="checkbox"
+          title="Shade the carving: the key light's shadows fall into it, and its corners and deep narrow cuts darken"
+          checked={stock.shaded}
+          disabled={!stock.shown}
+          onChange={(event) => stock.onShadedChange(event.currentTarget.checked)}
+        />
+        Shadows and occlusion
+      </label>
       {stock.compare.available ? <CompareControl compare={stock.compare} /> : null}
       {stock.shown ? <InspectorStockSave stl={stock.stl} /> : null}
       {stock.shown && stock.unknownTool ? (

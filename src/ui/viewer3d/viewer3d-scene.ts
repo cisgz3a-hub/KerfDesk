@@ -36,6 +36,7 @@ import { disposeDetail, type Viewer3dDetail } from './scene-detail';
 import type { Viewer3dPick } from './scene-pick';
 import type { Viewer3dStage } from './viewer3d-look';
 import { createStockView, type StockMaterialChoice, type Viewer3dStock } from './scene-stock';
+import { createBurnView, type Viewer3dBurn } from './scene-burn';
 import { resolveViewer3dTheme } from './viewer3d-theme';
 import { yieldViewer3dInitialization } from './yield-viewer3d-initialization';
 
@@ -47,6 +48,7 @@ export type { Viewer3dClipPlane } from './scene-isolate';
 export type { Viewer3dMeasure } from './scene-measure';
 export type { Viewer3dDetail } from './scene-detail';
 export type { Viewer3dStock } from './scene-stock';
+export type { Viewer3dBurn } from './scene-burn';
 
 export type Viewer3dSceneHandle = {
   readonly setSegments: (segments: Viewer3dSegments) => void;
@@ -120,6 +122,14 @@ export type Viewer3dSceneHandle = {
   readonly setStockMaterial: (choice: StockMaterialChoice) => void;
   /** Colours the stock against the design within the tolerance; null stops. */
   readonly setStockCompare: (toleranceMm: number | null) => void;
+  /** Shadows and occlusion on the stock's top, or none. */
+  readonly setStockShaded: (shaded: boolean) => void;
+  /** A laser program's burn, in the program's frame; null removes it (ADR-487). */
+  readonly setBurn: (burn: Viewer3dBurn | null) => void;
+  /** The burn's darkness changed in place. */
+  readonly updateBurn: () => void;
+  /** What the burned sheet is made of, as drawn. */
+  readonly setBurnMaterial: (choice: StockMaterialChoice) => void;
   /** Shows or hides the drawn toolpath, as over the carved stock. */
   readonly setToolpathVisible: (visible: boolean) => void;
   /** Direction arrowheads over the cut path; null clears them. */
@@ -176,6 +186,7 @@ function createSceneHandle(deps: SceneHandleDeps): Viewer3dSceneHandle {
   const camera = cameraMethods(core);
   const lifecycle = lifecycleMethods(core);
   const stock = createStockView(deps.modules.three, deps.scene, deps.furnitureGroup);
+  const burn = createBurnView(deps.modules.three, deps.scene);
   return {
     ...toolpath,
     ...camera,
@@ -187,18 +198,24 @@ function createSceneHandle(deps: SceneHandleDeps): Viewer3dSceneHandle {
     },
     setStage: (stage) => {
       stock.setLook(stage.look);
+      burn.setLook(stage.look);
       toolpath.setStage(stage);
     },
     setStock: (next) => (stock.set(next), core.requestRender()),
     updateStock: () => (stock.update(), core.requestRender()),
     setStockMaterial: (choice) => (stock.setMaterial(choice), core.requestRender()),
     setStockCompare: (tolerance) => (stock.setCompare(tolerance), core.requestRender()),
+    setStockShaded: (shaded) => (stock.setShaded(shaded), core.requestRender()),
+    setBurn: (next) => (burn.set(next), core.requestRender()),
+    updateBurn: () => (burn.update(), core.requestRender()),
+    setBurnMaterial: (choice) => (burn.setMaterial(choice), core.requestRender()),
     setToolpathVisible: (visible) => {
       deps.toolpathGroup.visible = visible;
       core.requestRender();
     },
     dispose: () => {
       stock.dispose();
+      burn.dispose();
       lifecycle.dispose();
     },
   };

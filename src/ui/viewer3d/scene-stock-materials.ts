@@ -168,7 +168,7 @@ ${source}`.replace(
 
 /** Colours and shines each pixel as the material is there. */
 export function stockFragmentChunks(source: string): string {
-  return `${STOCK_FUNCTIONS}
+  return `${STOCK_MATERIAL_GLSL}
 ${source}`
     .replace(
       '#include <color_fragment>',
@@ -182,8 +182,12 @@ roughnessFactor = stockRoughness(vStockPoint, roughnessFactor);`,
     );
 }
 
-// Colours are linear. Lengths are millimetres.
-const STOCK_FUNCTIONS = `uniform int stockKind;
+/**
+ * The materials' colour and shine at a point of the block, for the laser burn
+ * too (scene-burn.ts): stockColour and stockRoughness, reading vStockPoint.
+ * Colours are linear. Lengths are millimetres.
+ */
+export const STOCK_MATERIAL_GLSL = `uniform int stockKind;
 uniform float stockBottom;
 uniform float stockGain;
 uniform vec2 stockCentre;

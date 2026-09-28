@@ -122,6 +122,50 @@ burn a laser job will leave. This batch shows both in the Inspector.
      refuses a save picker later), and the carving worker, which holds the grid, writes the
      solid and hands the bytes over without copying them.
 
+5. **Laser burn preview.** A laser program, or an opened file that burns and cuts nothing below
+   Z0, has a "Burn" section in the readouts with "Show burn preview", "Toolpath over the burn"
+   and a material, and "Wrap round the rotary" when the machine has a rotary set up and on.
+   Shown, the view draws the sheet the program burns, darkened as playback runs, in both looks.
+   - **Power, not speed.** Each move the laser is on for lays its beam's width of burn along it.
+     How dark depends on its power alone (S against full power, the controller's `$30`), as
+     LightBurn's preview shades by power. A pass at full power leaves 8% of the surface's light
+     and one at half power about half; passes over the same place darken it further (their
+     optical densities add), and a beam narrower than a cell darkens it by the share of it the
+     beam covers, so a fill keeps its tone on a coarser grid. The beam is the laser head's spot
+     from the machine profile, or 0.1 mm without one.
+   - **A worker burns it**, as the carved stock's worker carves: at most 4 million cells, no
+     finer than 0.05 mm and 2,048 a side. It burns on from where it stopped, part way along a
+     move included, so nothing burns twice; going back starts again; and it sends back only the
+     rows that changed, one byte a cell.
+   - **The view** draws the sheet as a plane just under the burned moves, the darkness a texture
+     filtered between cells, so a burn rewrites only the texture. The sheet is drawn in the
+     carved stock's materials at their top face, and each burns as it does: wood and MDF scorch
+     brown, then char black; acrylic frosts pale; aluminium marks dark and loses its shine; the
+     two-colour laminate loses its black cap and shows its white core; flat grey darkens; the
+     height map (a "Burn map" here) colours the burn itself. Its choice is remembered per
+     browser apart from the carved stock's.
+   - **Round a rotary.** For the project's own program, or an opened file on a machine with a
+     rotary on, the burn wraps round the work: a cylinder along X of the work's diameter with
+     its top at the burn's height and closed ends, the grid's rows going once round it (the Y
+     that turns the work once, from Rotary Setup). The middle of the program's Y is on top and Y
+     runs on over the back, as the surface moves under the laser. A job longer than one turn
+     burns over its own start, as it would on the machine. Unwrapped, the same burn lies flat.
+   - An opened file is burned with the current machine's full power, beam and rotary, as it is
+     already timed for the current machine.
+
+6. **Shadows and occlusion on the carved stock.** "Shadows and occlusion" in the Stock section,
+   on by default, lets the key light (Classic's own, Studio's sun) cast soft shadows into the
+   carving, and darkens its corners, the bottoms of its grooves and the feet of its walls, where
+   less of the room's light reaches.
+   - **From the depths, not a shadow map.** The top is a height field, so the shader finds both
+     from the texture the carving already fills. A pixel steps up to 40 times across the cells
+     towards the light, only as far as a ray could still pass under the stock's top, and its
+     light falls off softly the nearer the ray passes under a higher cell. Its ambient light falls
+     with how much of the stock stands above it, eight ways at 1 mm and 3 mm. Nothing is built
+     as the stock carves, and the uncut top, with nothing above it, skips both.
+   - Only the stock's top is shaded. The lines, the burn preview and the view without the stock
+     are drawn as before.
+
 ### Consequences
 
 - **The carved stock is a picture, not a check.** It assumes Z0 is the stock top and the stock is
@@ -145,6 +189,17 @@ burn a laser job will leave. This batch shows both in the Inspector.
   million-cell relief is about two million triangles, 100 MB, written in about a second (Node,
   one core). Only the top of a carving has detail to save, so the file grows with its
   sloped area, not the stock's.
+- **The burn is a picture of power, not a prediction.** How dark a material burns depends on
+  the speed, the focus, the air and the material itself; the preview counts only power and
+  where the beam went, so a job that shades by speed at one power shows one tone. It flags
+  nothing, blocks nothing and asks nothing (ADR-228), and the G-code is unchanged. The burn's
+  worker holds a copy of the moves and 4 bytes a cell (16 MB at most); the page and the GPU one
+  byte a cell.
+- **Shadows are approximate.** The shadow darkens all the direct light, Studio's weak rim light
+  too, not only the key's. A ray samples every cell or so near the pixel and farther apart as it
+  goes, so a wall thinner than the gap between samples (about half a millimetre for a pocket 18
+  mm deep) can let light through at its edge; the ray starts a cell up, so slopes do not shadow
+  themselves. Turned off, the stock is lit exactly as before.
 - **Memory:** the worker holds a copy of the moves and the grid (4 bytes a cell, about 4 MB); the
   page holds the grid's depths and the GPU a texture of them and one vertex a cell (about 36 MB
   for a million cells), while the stock is shown.
@@ -179,6 +234,20 @@ burn a laser job will leave. This batch shows both in the Inspector.
   start "solid"; a stock cut through everywhere saves nothing. (`stock-worker-client.test.ts`):
   the STL waits for the carve asked before it, the view does not hear it, and a stopped worker
   or a program that carves nothing gives none.
+- Unit tests (`burn-grid.test.ts`): a full-power beam one cell wide leaves 8% of the light
+  along its line and nothing beside it, half power 46%; a second pass darkens as the densities
+  add; traversals and S0 burn nothing; 0.1 mm fill lines over 0.4 mm cells keep a full pass's
+  tone; a beam wider than a cell spreads across the cells it covers; playback in four steps
+  burns the same as in one; going back starts again, and each step reports only its rows; the
+  grid covers the burn with room for the beam at the burned surface's height; round a rotary
+  the rows go exactly once round, and a move a turn later burns over the first.
+  (`burn-worker-client.test.ts`) the worker gets its own copy of the moves and the laser; only
+  the latest burn waits. (`scene-burn.test.ts`) the sheet lies under the burned cells and goes
+  when hidden; each material burns in the shader after three's colour and shine; the rotary's
+  cylinder is closed, faces out everywhere and has the middle row on top.
+  (`gcode-inspection-source.test.ts`) a laser project's program burns at its `$30` and its
+  head's spot, on its rotary only while the rotary is on; a CNC project has no laser; an
+  opened file takes the current machine's laser.
 - End to end (`stock-design-compare.test.ts`): a 30 mm dome relief turned 30°, compiled through
   Save's preparation with a front-left user origin, read back from its G-code and carved whole,
   lies on its design: 99.5% of its 360,000 cells within 0.25 mm and none cut too deep. Moved
@@ -192,7 +261,17 @@ burn a laser job will leave. This batch shows both in the Inspector.
   compares with its design (none too deep, most within 0.1 mm, green in the view, fewer within
   0.05 mm) and stops colouring when compare is off. The carved pocket, saved as STL through the
   save picker, reads back as a closed solid within 2% of the block less the pocket, in under
-  40,000 triangles.
+  40,000 triangles. With shadows and occlusion off the carved pocket is lighter, and on again
+  it is the same picture.
+- Unit tests (`scene-stock-shade.test.ts`): the shading lands after three sums its light, the
+  direct light darkened by the shadow and the ambient by the occlusion; it falls from Classic's
+  key or Studio's sun, and turns off; only the stock's top has it, with the depths declared once
+  before the functions that read them.
+- Browser (`e2e/gcode-viewer-burn.e2e.ts`): a laser program of two filled 20 mm squares, at full
+  power and at 30%, has a burn and no stock; the sheet is bare wood at the start and at the end
+  the full-power square is charred and the 30% one scorched; the laminate shows its white core
+  where it burned; hiding the burn leaves the view as it was. With a chuck rotary on, turning 40
+  mm work once in 100 mm, the burn wraps round the work, and unwrapped is a different picture.
 - Timings (Node, one core): a 150 x 100 mm pocket in three depths with a 6 mm end mill carved
   whole in 39.7 s with Cut 3D's stamping (measured beside a test run) and in 0.16 s swept; a
   300,000-move relief with a 3.175 mm ball nose in 1.4 s; playback's worst carve between frames

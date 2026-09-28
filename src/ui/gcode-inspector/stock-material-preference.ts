@@ -1,7 +1,7 @@
 // The carved stock's material (ADR-487). The project's own program starts on
 // the project's stock material; any other starts on the one last chosen,
 // remembered per browser, or wood. An operator who cuts aluminium keeps it
-// across sessions.
+// across sessions. The laser burn preview remembers its own under its own key.
 
 import { useCallback, useState } from 'react';
 import { CHIPLOAD_MATERIALS } from '../../core/cnc';
@@ -10,14 +10,16 @@ import { browserLocalStorage } from '../state/browser-local-storage';
 import { STOCK_MATERIALS, type StockMaterial } from '../viewer3d/scene-stock-materials';
 
 export const STOCK_MATERIAL_KEY = 'laserforge.inspector-stock-material.v1';
+export const BURN_MATERIAL_KEY = 'laserforge.inspector-burn-material.v1';
 
 type PreferenceStorage = Pick<Storage, 'getItem' | 'setItem'>;
 
 export function readStockMaterial(
   storage: PreferenceStorage | null = browserLocalStorage(),
+  key = STOCK_MATERIAL_KEY,
 ): StockMaterial {
   try {
-    const stored = storage?.getItem(STOCK_MATERIAL_KEY);
+    const stored = storage?.getItem(key);
     return STOCK_MATERIALS.find((material) => material === stored) ?? 'wood';
   } catch {
     return 'wood';
@@ -27,9 +29,10 @@ export function readStockMaterial(
 export function writeStockMaterial(
   material: StockMaterial,
   storage: PreferenceStorage | null = browserLocalStorage(),
+  key = STOCK_MATERIAL_KEY,
 ): void {
   try {
-    storage?.setItem(STOCK_MATERIAL_KEY, material);
+    storage?.setItem(key, material);
   } catch {
     // Storage is optional; the in-memory choice still applies this session.
   }
@@ -52,8 +55,11 @@ export function stockMaterialFor(materialKey: string | undefined): StockMaterial
 
 export function useStockMaterial(
   fromProject: StockMaterial | null,
+  key = STOCK_MATERIAL_KEY,
 ): readonly [StockMaterial, (material: StockMaterial) => void] {
-  const [remembered, setRemembered] = useState<StockMaterial>(() => readStockMaterial());
+  const [remembered, setRemembered] = useState<StockMaterial>(() =>
+    readStockMaterial(browserLocalStorage(), key),
+  );
   // A choice holds for the program it was made on; a program from another
   // project starts on its own material again.
   const [chosen, setChosen] = useState<{
@@ -66,9 +72,9 @@ export function useStockMaterial(
     (next: StockMaterial) => {
       setChosen({ over: fromProject, material: next });
       setRemembered(next);
-      writeStockMaterial(next);
+      writeStockMaterial(next, browserLocalStorage(), key);
     },
-    [fromProject],
+    [fromProject, key],
   );
   return [material, choose] as const;
 }

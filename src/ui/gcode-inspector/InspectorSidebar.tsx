@@ -18,6 +18,8 @@ import type { PlayheadState } from './playhead';
 import type { ToolSections } from './tool-sections';
 import { InspectorStockControl } from './InspectorStockControl';
 import type { CarvedStock } from './use-carved-stock';
+import { InspectorBurnControl } from './InspectorBurnControl';
+import type { LaserBurn } from './use-laser-burn';
 
 type InspectorSidebarProps = {
   readonly model: InspectorRenderModel;
@@ -43,6 +45,8 @@ type InspectorSidebarProps = {
   readonly onIsolateChange: (next: IsolateState) => void;
   /** The carved stock's switches; shown for programs that carve (ADR-487). */
   readonly stock?: CarvedStock | undefined;
+  /** The laser burn preview's switches; shown for programs that burn (ADR-487). */
+  readonly burn?: LaserBurn | undefined;
 };
 
 export function InspectorSidebar(props: InspectorSidebarProps): JSX.Element {
@@ -100,6 +104,11 @@ export function InspectorSidebar(props: InspectorSidebarProps): JSX.Element {
       {props.stock?.available ? (
         <Section title="Stock">
           <InspectorStockControl stock={props.stock} />
+        </Section>
+      ) : null}
+      {props.burn?.available ? (
+        <Section title="Burn">
+          <InspectorBurnControl burn={props.burn} />
         </Section>
       ) : null}
       <Section title="Program">

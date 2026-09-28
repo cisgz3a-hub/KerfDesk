@@ -8,7 +8,9 @@
 // cut through and draw nothing, so a profile leaves a hole.
 //
 // Compared with the design, the top is coloured by how far each cell is from
-// the depth the design wants there (scene-stock-compare.ts).
+// the depth the design wants there (scene-stock-compare.ts). The top casts
+// soft shadows into the carving and darkens its hollows, from the same depths
+// (scene-stock-shade.ts).
 //
 // Classic has no lights of its own, so the stock brings a soft rig of its
 // own there; Studio's lights and environment light it in Studio. Classic's
@@ -29,6 +31,13 @@ import {
   type StockMaterial,
   type StockUniforms,
 } from './scene-stock-materials';
+import {
+  applyStockShade,
+  CLASSIC_KEY_DIRECTION,
+  createShadeUniforms,
+  stockShadeFragment,
+  type StockShadeUniforms,
+} from './scene-stock-shade';
 import type { Viewer3dLook } from './viewer3d-look';
 
 type ThreeModule = typeof ThreeNamespace;
@@ -67,6 +76,8 @@ export type StockView = {
   readonly setMaterial: (choice: StockMaterialChoice) => void;
   /** Colours the top against the design within the tolerance, or stops. */
   readonly setCompare: (toleranceMm: number | null) => void;
+  /** Shadows and occlusion on the top, or none. */
+  readonly setShaded: (shaded: boolean) => void;
   /** Classic's grid was built again: puts it under the stock. */
   readonly placeGrid: () => void;
   readonly dispose: () => void;
@@ -89,12 +100,14 @@ export function createStockView(
   let look: Viewer3dLook = 'classic';
   let material: StockMaterialChoice = { material: 'wood' };
   let compare: number | null = null;
+  let shaded = true;
   let gridZ = 0;
   const shade = (): void => {
     if (built === null) return;
     applyStockMaterial(built.uniforms, built.materials, material, look);
     built.compare.stockCompare.value = compare === null ? 0 : 1;
     built.compare.stockTolerance.value = compare ?? 0;
+    applyStockShade(built.shade, shaded, look);
   };
   const placeGrid = (): void => {
     for (const child of classicFurniture.children) {
@@ -134,6 +147,10 @@ export function createStockView(
       compare = toleranceMm;
       shade();
     },
+    setShaded: (next) => {
+      shaded = next;
+      shade();
+    },
     placeGrid,
     dispose: () => {
       clear();
@@ -147,6 +164,7 @@ type BuiltStock = {
   readonly texture: ThreeNamespace.DataTexture;
   readonly uniforms: StockUniforms;
   readonly compare: StockCompareUniforms;
+  readonly shade: StockShadeUniforms;
   readonly materials: ReadonlyArray<ThreeNamespace.MeshStandardMaterial>;
   readonly dispose: () => void;
 };
@@ -166,7 +184,8 @@ function buildStock(three: ThreeModule, stock: Viewer3dStock): BuiltStock {
     lengthY,
   });
   const compare = createCompareUniforms(target);
-  const top = topMesh(three, stock, texture, { ...uniforms, ...compare });
+  const shade = createShadeUniforms();
+  const top = topMesh(three, stock, texture, { ...uniforms, ...compare, ...shade });
   const sides = sideMesh(three, stock, uniforms);
   const group = new three.Group();
   group.add(top, sides);
@@ -175,6 +194,7 @@ function buildStock(three: ThreeModule, stock: Viewer3dStock): BuiltStock {
     texture,
     uniforms,
     compare,
+    shade,
     materials: [top.material, sides.material],
     dispose: () => {
       texture.dispose();
@@ -211,7 +231,7 @@ function topMesh(
   three: ThreeModule,
   stock: Viewer3dStock,
   texture: ThreeNamespace.DataTexture,
-  shared: StockUniforms & StockCompareUniforms,
+  shared: StockUniforms & StockCompareUniforms & StockShadeUniforms,
 ): StockMesh {
   const spanX = Math.max(stock.columns - 1, 1) * stock.mmPerCell;
   const spanY = Math.max(stock.rows - 1, 1) * stock.mmPerCell;
@@ -235,8 +255,9 @@ function topMesh(
   material.onBeforeCompile = (shader) => {
     Object.assign(shader.uniforms, uniforms);
     shader.vertexShader = stockVertexChunks(carveVertex(shader.vertexShader));
-    shader.fragmentShader = stockCompareFragment(
-      carveFragment(stockFragmentChunks(shader.fragmentShader)),
+    // The top's declarations come first, for the compare and shade functions.
+    shader.fragmentShader = carveFragment(
+      stockCompareFragment(stockShadeFragment(stockFragmentChunks(shader.fragmentShader))),
     );
   };
   material.customProgramCacheKey = () => 'carved-stock-top';
@@ -315,7 +336,10 @@ vec3 transformed = vec3(position.xy, max(vStockDepth, stockBottom));`,
 
 // stockBottom comes with the material's own uniforms (scene-stock-materials.ts).
 function carveFragment(source: string): string {
-  return `varying float vStockDepth;
+  return `uniform sampler2D stockDepth;
+uniform float stockCell;
+varying float vStockDepth;
+varying vec2 vStockUv;
 ${source}`.replace(
     '#include <clipping_planes_fragment>',
     `#include <clipping_planes_fragment>
@@ -323,13 +347,13 @@ if (vStockDepth < stockBottom - ${THROUGH_MM.toFixed(4)}) discard;`,
   );
 }
 
-// A sky and ground fill with a key light from the front left, for Classic.
-function classicLights(three: ThreeModule): ThreeNamespace.Group {
+/** A sky and ground fill with a key light from the front left, for Classic. */
+export function classicLights(three: ThreeModule): ThreeNamespace.Group {
   const group = new three.Group();
   const fill = new three.HemisphereLight(0xe8ecf2, 0x3a3632, 1.1);
   fill.position.set(0, 0, 1);
   const key = new three.DirectionalLight(0xfff6ec, 1.6);
-  key.position.set(-0.5, -0.8, 1);
+  key.position.set(...CLASSIC_KEY_DIRECTION);
   group.add(fill, key);
   return group;
 }

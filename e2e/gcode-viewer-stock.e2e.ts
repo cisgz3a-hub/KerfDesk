@@ -74,6 +74,40 @@ async function countPixels(page: Page, view: Locator, kind: 'wood' | 'green'): P
   );
 }
 
+// Pixels of one picture of the view darker than another's by more than a
+// trace, away from the view's frame, where its focus ring is.
+async function darkerPixels(page: Page, darker: Buffer, than: Buffer): Promise<number> {
+  return page.evaluate(
+    async ({ pictures }) => {
+      const read = async (data: string): Promise<ImageData | null> => {
+        const image = new Image();
+        image.src = `data:image/png;base64,${data}`;
+        await image.decode();
+        const canvas = document.createElement('canvas');
+        canvas.width = image.width;
+        canvas.height = image.height;
+        const context = canvas.getContext('2d');
+        context?.drawImage(image, 0, 0);
+        return context?.getImageData(0, 0, image.width, image.height) ?? null;
+      };
+      const [a, b] = await Promise.all(pictures.map(read));
+      if (a === null || b === null || a === undefined || b === undefined) return 0;
+      const frame = 4;
+      let count = 0;
+      for (let y = frame; y < a.height - frame; y += 1) {
+        for (let x = frame; x < a.width - frame; x += 1) {
+          const at = (y * a.width + x) * 4;
+          const sum = (data: Uint8ClampedArray): number =>
+            (data[at] ?? 0) + (data[at + 1] ?? 0) + (data[at + 2] ?? 0);
+          if (sum(b.data) - sum(a.data) > 24) count += 1;
+        }
+      }
+      return count;
+    },
+    { pictures: [darker.toString('base64'), than.toString('base64')] },
+  );
+}
+
 type Corner = readonly [number, number, number];
 
 // Saves the carved stock through a stand-in save picker that keeps the bytes,
@@ -223,6 +257,27 @@ test('the Inspector carves the stock as playback runs (ADR-487)', async ({ page,
   await expect.poll(() => woodPixels(page, view), { timeout: 20_000 }).toBeLessThan(wood / 4);
   await material.selectOption('wood');
   await expect.poll(async () => (await view.screenshot()).equals(carved)).toBe(true);
+
+  // Shadows fall into the pocket and its corners darken; without them the
+  // carving is lighter, and with them again the same picture.
+  const shading = dialog.getByRole('checkbox', { name: 'Shadows and occlusion' });
+  await expect(shading).toBeChecked();
+  await shading.uncheck();
+  // The view keeps the keys' hint, as when the pictures before were taken.
+  await view.focus();
+  await expect.poll(async () => (await view.screenshot()).equals(carved)).toBe(false);
+  const unshaded = await settled(view);
+  const shadowed = await darkerPixels(page, carved, unshaded);
+  expect(shadowed).toBeGreaterThan(3_000);
+  expect(await darkerPixels(page, unshaded, carved)).toBeLessThan(shadowed / 10);
+  await shading.check();
+  await view.focus();
+  await expect
+    .poll(async () => {
+      const again = await view.screenshot();
+      return (await darkerPixels(page, again, carved)) + (await darkerPixels(page, carved, again));
+    })
+    .toBe(0);
 
   // The toolpath can be drawn over the stock, in both looks.
   await over.check();
