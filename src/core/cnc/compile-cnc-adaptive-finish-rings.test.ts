@@ -136,14 +136,19 @@ function expectRingEndsWhereItStarts(pass: CncContourPass): void {
 }
 
 // The finishing pass at one depth as emitted, from its rapid to its start
-// through the retract that ends it.
+// through the retract that ends it. A deeper pass rapids down to just above
+// the ring it retraces before its plunge (ADR-489 air floor).
 function emittedFinishingPass(gcode: string, start: string, zWord: string): ReadonlyArray<string> {
   const lines = gcode.split('\n');
   const first = lines.findIndex(
-    (line, index) => line === `G0 ${start}` && lines[index + 1]?.startsWith(`G1 ${zWord} `),
+    (line, index) =>
+      line === `G0 ${start}` &&
+      (lines[index + 1]?.startsWith(`G1 ${zWord} `) === true ||
+        (lines[index + 1]?.startsWith('G0 Z') === true &&
+          lines[index + 2]?.startsWith(`G1 ${zWord} `) === true)),
   );
   if (first < 0) throw new Error(`no finishing pass at ${zWord}`);
-  const retract = lines.findIndex((line, index) => index > first && line.startsWith('G0 Z'));
+  const retract = lines.findIndex((line, index) => index > first + 1 && line.startsWith('G0 Z'));
   return lines.slice(first, retract + 1);
 }
 
@@ -171,9 +176,13 @@ describe('adaptive pocket finishing rings', () => {
     }
 
     const gcode = cncGrblStrategy.emit(job, DEFAULT_DEVICE_PROFILE);
-    for (const zWord of ['Z-1.500', 'Z-3.000']) {
+    for (const [zWord, descent] of [
+      ['Z-1.500', []],
+      ['Z-3.000', ['G0 Z-0.500']],
+    ] as const) {
       expect(emittedFinishingPass(gcode, 'X68.413 Y345.000', zWord)).toEqual([
         'G0 X68.413 Y345.000',
+        ...descent,
         `G1 ${zWord} F300`,
         'G1 X68.413 Y358.413 F1000',
         'G1 X41.588 Y358.413',
