@@ -14,6 +14,9 @@
   "packageManager": "pnpm@11.3.0",
   "type": "module",
   "main": "dist-electron/main.js",
+  "bin": {
+    "kerfdesk-trace": "scripts/trace-cli.mjs"
+  },
   "scripts": {
     "lint": "node --max-old-space-size=4096 node_modules/eslint/bin/eslint.js .",
     "lint:electron": "eslint --config eslint.electron.config.mjs electron/**/*.ts",
@@ -45,6 +48,7 @@
     "release:check": "pnpm typecheck && pnpm lint && pnpm lint:electron && pnpm format:check && pnpm check:adr-numbers && pnpm check:action-pins && pnpm license-check && pnpm test && pnpm test:release-integrity && pnpm build:web && pnpm build:electron-main && pnpm check:file-size && pnpm check:soft-size && pnpm check:index-exports",
     "guard:repo": "node scripts/assert-correct-repo.mjs",
     "dev:web": "vite",
+    "trace": "node scripts/trace-cli.mjs",
     "build": "pnpm build:web",
     "generate:notices": "node scripts/generate-third-party-notices.mjs",
     "build:web": "pnpm generate:notices && pnpm typecheck && pnpm build:bundle",

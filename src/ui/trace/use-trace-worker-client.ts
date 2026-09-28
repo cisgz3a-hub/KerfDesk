@@ -436,7 +436,42 @@ export async function traceImageWithFallback(
   progress?: TraceProgress,
   flags: TraceRequestFlags = {},
 ): Promise<TraceResult> {
-  const first = await traceImage(image, options, signal, progress, flags);
+  return traceWithRelaxedRetry(
+    (passOptions, passFlags) => traceImage(image, passOptions, signal, progress, passFlags),
+    options,
+    flags,
+  );
+}
+
+/**
+ * The same first pass and relaxed-settings retry as traceImageWithFallback,
+ * traced in the calling thread at any image size. For headless callers (the
+ * trace command under Node) that have no Worker and no UI thread to keep
+ * responsive, so the app's inline-size bound does not apply to them.
+ */
+export async function traceImageInThreadWithFallback(
+  image: RawImageData,
+  options: TraceOptions,
+): Promise<TraceResult> {
+  return traceWithRelaxedRetry(async (passOptions) => {
+    const paths = await traceImageToColoredPaths(image, passOptions);
+    return {
+      paths,
+      bounds: boundsFromColoredPaths(paths),
+      width: image.width,
+      height: image.height,
+    };
+  }, options);
+}
+
+type TracePass = (options: TraceOptions, flags: TraceRequestFlags) => Promise<TraceResult>;
+
+async function traceWithRelaxedRetry(
+  pass: TracePass,
+  options: TraceOptions,
+  flags: TraceRequestFlags = {},
+): Promise<TraceResult> {
+  const first = await pass(options, flags);
   if (first.paths.length > 0) return first;
   if (!hasAggressivePreprocessing(options)) return first;
   // Keep the same palette/backend and disclose that Otsu, ink despeckle,
@@ -444,12 +479,7 @@ export async function traceImageWithFallback(
   // result together so recovered artwork never masquerades as the first pass.
   // A frozen first pass hands the retry its resolved decisions, and its
   // unrelaxed options stay the ones any derived pass inherits.
-  const retried = await traceImage(
-    image,
-    relaxAggressivePreprocessing(first.sourceOptions ?? options),
-    signal,
-    progress,
-  );
+  const retried = await pass(relaxAggressivePreprocessing(first.sourceOptions ?? options), {});
   return {
     ...retried,
     notices: ['relaxed-settings'],
