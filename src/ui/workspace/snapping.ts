@@ -1,4 +1,5 @@
 import { transformedBBox, type Project, type SceneObject, type Transform } from '../../core/scene';
+import type { SnapSettings } from './snap-settings';
 import { visibleSnapTargetPredicate } from './snap-target-visibility';
 
 export type SnapAxis = 'x' | 'y';
@@ -10,23 +11,7 @@ export type SnapGuide = {
   readonly toMm: number;
 };
 
-export type SnapSettings = {
-  readonly enabled: boolean;
-  readonly snapToGrid: boolean;
-  readonly snapToObjects: boolean;
-  readonly distanceMm: number;
-  readonly gridMm: number;
-};
-
-export const DEFAULT_SNAP_DISTANCE_MM = 2;
-export const DEFAULT_SNAP_GRID_MM = 10;
-export const DEFAULT_SNAP_SETTINGS: SnapSettings = {
-  enabled: true,
-  snapToGrid: true,
-  snapToObjects: true,
-  distanceMm: DEFAULT_SNAP_DISTANCE_MM,
-  gridMm: DEFAULT_SNAP_GRID_MM,
-};
+export { DEFAULT_SNAP_SETTINGS, type SnapSettings } from './snap-settings';
 
 export type SnapMoveResult = {
   readonly transform: Transform;
@@ -46,8 +31,11 @@ export function snapMoveTransform(args: {
   readonly ignoredObjectIds?: ReadonlySet<string>;
   readonly proposedTransform: Transform;
   readonly settings: SnapSettings;
+  // Reach in scene millimetres: the caller converts the pixel preference
+  // through the live zoom.
+  readonly distanceMm: number;
 }): SnapMoveResult {
-  if (!canSnap(args.settings)) return noSnap(args.proposedTransform);
+  if (!canSnap(args.settings, args.distanceMm)) return noSnap(args.proposedTransform);
   const moving = args.project.scene.objects.find((object) => object.id === args.movingObjectId);
   if (moving === undefined) return noSnap(args.proposedTransform);
   const moved = { ...moving, transform: args.proposedTransform };
@@ -58,6 +46,7 @@ export function snapMoveTransform(args: {
     ignoredObjectIds: args.ignoredObjectIds ?? NO_IGNORED_OBJECT_IDS,
     movedBox,
     settings: args.settings,
+    distanceMm: args.distanceMm,
   };
   const x = bestSnapForAxis({ ...snapArgs, axis: 'x' });
   const y = bestSnapForAxis({ ...snapArgs, axis: 'y' });
@@ -71,8 +60,8 @@ export function snapMoveTransform(args: {
   };
 }
 
-function canSnap(settings: SnapSettings): boolean {
-  return settings.enabled && isPositiveFinite(settings.distanceMm);
+function canSnap(settings: SnapSettings, distanceMm: number): boolean {
+  return settings.enabled && isPositiveFinite(distanceMm);
 }
 
 function noSnap(transform: Transform): SnapMoveResult {
@@ -88,10 +77,11 @@ function bestSnapForAxis(args: {
   readonly ignoredObjectIds: ReadonlySet<string>;
   readonly movedBox: Aabb;
   readonly settings: SnapSettings;
+  readonly distanceMm: number;
 }): SnapCandidate | null {
   let best: SnapCandidate | null = null;
   for (const candidate of snapCandidates(args)) {
-    if (Math.abs(candidate.deltaMm) > args.settings.distanceMm) continue;
+    if (Math.abs(candidate.deltaMm) > args.distanceMm) continue;
     if (best === null || Math.abs(candidate.deltaMm) < Math.abs(best.deltaMm)) best = candidate;
   }
   return best;

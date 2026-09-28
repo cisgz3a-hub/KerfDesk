@@ -26,6 +26,8 @@ import type { MeasureDraft } from './measure-tool';
 import { drawSelectionMarquee } from './draw-selection-marquee';
 import { drawSnapGuides } from './draw-snap-guides';
 import type { SnapGuide } from './snapping';
+import type { SnapMarker } from './snap/snap-kinds';
+import { drawSnapMarker } from './draw-snap-marker';
 import type { DisplayPolylineCache } from './display-polylines';
 import {
   drawObjectDisplay,
@@ -101,6 +103,9 @@ export type DrawOpts = {
   readonly selectionMarquee?: SelectionMarquee;
   readonly measureDraft?: MeasureDraft;
   readonly snapGuides?: ReadonlyArray<SnapGuide>;
+  // LBG-F06: what the pointer snapped to, and the grid spacing to draw.
+  readonly snapMarker?: SnapMarker;
+  readonly gridMm?: number;
   readonly cncTabLayerColor?: string;
   readonly laserTabEditor?: LaserTabEditor;
   readonly warpDeformEditor?: WarpDeformRequest;
@@ -132,7 +137,7 @@ export function drawScene(
     opts.view,
   );
   drawBed(ctx, project, view);
-  drawGrid(ctx, project, view);
+  drawGrid(ctx, project, view, opts.gridMm);
   // Stock footprint under everything else (CNC mode only — no-op for laser).
   drawCncStock(ctx, project, view);
   drawNoGoZones(ctx, project, view);
@@ -172,10 +177,19 @@ export function drawScene(
     drawRegistrationBoxDimensions(ctx, project, view);
     drawLiveWorkspaceOverlays(ctx, project, opts, view);
   }
-  if (!opts.preview) drawSnapGuides(ctx, opts.snapGuides ?? [], view);
+  if (!opts.preview) drawSnapFeedback(ctx, opts, view);
   drawOutOfBoundsOutlines(ctx, project, view);
   // Rulers go LAST so they're on top of everything else (F-A2).
   drawRulers(ctx, canvasW, canvasH, view);
+}
+
+function drawSnapFeedback(
+  ctx: CanvasRenderingContext2D,
+  opts: DrawOpts,
+  view: ViewTransform,
+): void {
+  drawSnapGuides(ctx, opts.snapGuides ?? [], view);
+  if (opts.snapMarker !== undefined) drawSnapMarker(ctx, opts.snapMarker, view);
 }
 
 // Preview-mode frame: faint artwork, raster sim, CNC removal shading, then

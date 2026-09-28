@@ -10,12 +10,14 @@ import { transformUpdatesForMoveDrag, type DragState } from './drag-state';
 import { transformDragWithSnap } from './drag-snap';
 import { rotateSelectionByDrag } from './rotate-handle';
 import { selectionResizeEditFromDrag } from './selection-handles';
+import type { SnapMarker } from './snap/snap-kinds';
 import type { SnapGuide, SnapSettings } from './snapping';
 
 type DragEventModifiers = {
   readonly shiftKey: boolean;
   readonly ctrlKey: boolean;
   readonly metaKey: boolean;
+  readonly altKey?: boolean;
 };
 
 export function applyTransformDrag(args: {
@@ -25,10 +27,14 @@ export function applyTransformDrag(args: {
   readonly project: Project;
   readonly selectionAnchor: SelectionAnchor;
   readonly snapSettings: SnapSettings;
+  // Scene millimetres per canvas pixel, so the pixel snap reach tracks zoom.
+  readonly pxToMm: number;
   readonly setObjectTransform: (id: string, transform: Transform) => void;
   readonly setSnapGuides: (next: ReadonlyArray<SnapGuide>) => void;
+  readonly setSnapMarker: (next: SnapMarker | null) => void;
 }): void {
   const { drag, point } = args;
+  if (drag?.kind !== 'move') args.setSnapMarker(null);
   if (drag !== null && point !== null && applySelectionScaleDrag({ ...args, drag, point })) return;
   if (!isTransformDrag(drag) || point === null) {
     args.setSnapGuides([]);
@@ -38,6 +44,7 @@ export function applyTransformDrag(args: {
   const obj = args.project.scene.objects.find((o) => o.id === drag.objectId);
   if (obj === undefined) {
     args.setSnapGuides([]);
+    args.setSnapMarker(null);
     return;
   }
   const ignoredSnapObjectIds = ignoredSnapObjectIdsForDrag(drag);
@@ -48,10 +55,12 @@ export function applyTransformDrag(args: {
     event: args.e,
     project: args.project,
     snapSettings: args.snapSettings,
+    pxToMm: args.pxToMm,
     selectionAnchor: args.selectionAnchor,
     ...(ignoredSnapObjectIds === undefined ? {} : { ignoredSnapObjectIds }),
   });
   args.setSnapGuides(result.guides);
+  args.setSnapMarker(result.marker);
   if (drag.kind === 'move') {
     transformUpdatesForMoveDrag(drag, result.transform).forEach((update) => {
       args.setObjectTransform(update.id, update.transform);

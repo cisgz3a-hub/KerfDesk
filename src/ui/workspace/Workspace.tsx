@@ -240,6 +240,8 @@ function useWorkspaceDraw(args: WorkspaceDrawArgs): void {
   const draftShape = useUiStore((s) => s.draftShape);
   const selectionMarquee = useUiStore((s) => s.selectionMarquee);
   const snapGuides = useUiStore((s) => s.snapGuides);
+  const snapMarker = useUiStore((s) => s.snapMarker);
+  const gridMm = useUiStore((s) => s.snapSettings.gridMm);
   const measureDraft = useUiStore((s) => s.measureDraft);
   // Phase G (B6): the pen tool's in-progress polyline (also redraws per click /
   // cursor move).
@@ -269,6 +271,8 @@ function useWorkspaceDraw(args: WorkspaceDrawArgs): void {
       selectionMarquee,
       measureDraft,
       snapGuides,
+      snapMarker,
+      gridMm,
       wireframe,
     });
     // `args` is recreated by Workspace; its consumed fields are listed below.
@@ -303,6 +307,8 @@ function useWorkspaceDraw(args: WorkspaceDrawArgs): void {
     penDraft,
     selectionMarquee,
     snapGuides,
+    snapMarker,
+    gridMm,
     wireframe,
   ]);
 }
@@ -320,6 +326,8 @@ function drawWorkspaceScene(
     readonly selectionMarquee: ReturnType<typeof useUiStore.getState>['selectionMarquee'];
     readonly measureDraft: ReturnType<typeof useUiStore.getState>['measureDraft'];
     readonly snapGuides: ReturnType<typeof useUiStore.getState>['snapGuides'];
+    readonly snapMarker: ReturnType<typeof useUiStore.getState>['snapMarker'];
+    readonly gridMm: number;
     readonly wireframe: boolean;
   },
 ): void {
@@ -344,6 +352,8 @@ function drawWorkspaceScene(
     ...(state.selectionMarquee === null ? {} : { selectionMarquee: state.selectionMarquee }),
     ...(state.measureDraft === null ? {} : { measureDraft: state.measureDraft }),
     ...(state.snapGuides.length === 0 ? {} : { snapGuides: state.snapGuides }),
+    ...(state.snapMarker === null ? {} : { snapMarker: state.snapMarker }),
+    gridMm: state.gridMm,
     ...(args.cncTabLayerColor === undefined ? {} : { cncTabLayerColor: args.cncTabLayerColor }),
     ...(args.laserTabEditor === undefined ? {} : { laserTabEditor: args.laserTabEditor }),
     ...(args.warpDeformEditor === undefined ? {} : { warpDeformEditor: args.warpDeformEditor }),

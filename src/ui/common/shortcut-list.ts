@@ -2,7 +2,7 @@
 // Keyboard Shortcuts dialog.
 //
 // Keep in sync with shortcuts.ts, use-job-shortcuts.ts, use-jog-shortcuts.ts,
-// jog-keyboard-map.ts, and drag-state.ts —
+// jog-keyboard-map.ts, drag-state.ts, and workspace-pointer-snap.ts —
 // the audit (M27/A.5) caught the old hint omitting four shipped shortcuts.
 // The job-control family is machine-aware (ADR-101 §7): same keys, right noun.
 
@@ -29,6 +29,15 @@ const JOG_SHORTCUT_ROWS: ReadonlyArray<ShortcutRow> = [
     keys: 'Numpad 8/2/4/6 (Num Lock on)',
     action: 'jog up/down/left/right one step; 7/9/1/3 jog diagonally',
   },
+];
+
+// Canvas snapping overrides (LBG-F06, workspace-pointer-snap.ts, drag-snap.ts).
+const SNAP_SHORTCUT_ROWS: ReadonlyArray<ShortcutRow> = [
+  {
+    keys: 'Alt (hold while dragging)',
+    action: 'move, draw, measure or edit nodes without snapping',
+  },
+  { keys: 'Ctrl (hold while moving)', action: 'move without snapping' },
 ];
 
 export function shortcutFamilies(machineKind: MachineKind): ReadonlyArray<ShortcutFamily> {
@@ -85,6 +94,7 @@ export function shortcutFamilies(machineKind: MachineKind): ReadonlyArray<Shortc
         { keys: 'H', action: 'flip horizontal' },
         { keys: 'V', action: 'flip vertical' },
         { keys: '. or ,', action: 'rotate 90° clockwise or counter-clockwise' },
+        ...SNAP_SHORTCUT_ROWS,
       ],
     },
     {

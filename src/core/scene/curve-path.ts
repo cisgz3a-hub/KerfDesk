@@ -223,6 +223,16 @@ export function ellipticalArcEndDirection(
   };
 }
 
+/** The point halfway through an arc's sweep angle, from its centre
+ *  parametrisation — on a circular arc that is also halfway along its length.
+ *  A degenerate arc (zero radius, or no length) is its chord, as the flattener
+ *  draws it, so its midpoint is the chord's. */
+export function ellipticalArcMidpoint(from: Vec2, segment: EllipticalArcPathSegment): Vec2 {
+  const arc = endpointArc(from, segment);
+  if (arc === null) return { x: (from.x + segment.to.x) / 2, y: (from.y + segment.to.y) / 2 };
+  return pointOnArc(arc, arc.theta1 + arc.delta / 2);
+}
+
 function segmentExtrema(from: Vec2, segment: PathSegment): Vec2[] {
   if (segment.kind === 'line') return [segment.to];
   if (segment.kind === 'cubic') return cubicExtrema(from, segment);
