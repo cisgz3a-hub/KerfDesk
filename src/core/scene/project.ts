@@ -61,6 +61,16 @@ export type ProjectJobPlacement = {
     | 'back-right';
 };
 
+/**
+ * ADR-496: the material this laser job runs on. With `autoApplyRecipes` on,
+ * each new laser operation takes the active library's best recipe for it.
+ */
+export type ProjectLaserMaterial = {
+  readonly name: string;
+  readonly thicknessMm?: number;
+  readonly autoApplyRecipes: boolean;
+};
+
 export type ProjectJobSetup = {
   // The active mode's placement. The other mode's waits in `parkedPlacement`
   // and the two change places on every Laser/CNC switch (ADR-416).
@@ -71,6 +81,7 @@ export type ProjectJobSetup = {
     readonly useSelectionOrigin: boolean;
     readonly selectedObjectIds: ReadonlyArray<string>;
   };
+  readonly laserMaterial?: ProjectLaserMaterial;
 };
 
 export const DEFAULT_PROJECT_OPTIMIZATION: ProjectOptimizationSettings = {

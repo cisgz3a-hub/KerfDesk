@@ -17,10 +17,12 @@ import type { CncLiveCapsState } from './cnc-live-caps-actions';
 import type { LayerDefaultsState } from './layer-default-actions';
 import { applyLayerDefaultsToFreshLayers } from './object-insert-actions';
 import { pushUndo, type MutationResult, type StateSlice } from './scene-mutations';
+import type { MaterialLibraryDocument } from '../../io/material-library';
 
 type BarcodeInsertState = StateSlice & {
   readonly layerDefaults: LayerDefaultsState;
   readonly cncLiveCaps: CncLiveCapsState['cncLiveCaps'];
+  readonly materialLibrary?: MaterialLibraryDocument | null;
 };
 
 export type BarcodeInsertResult = MutationResult & {
@@ -50,6 +52,7 @@ export function applyInsertBarcode(
     inserted,
     fillDefaultsOnly(s.layerDefaults),
     s.cncLiveCaps,
+    s.materialLibrary ?? null,
   );
   const layers = defaulted.project.scene.layers.map((layer) =>
     layer.id === created.operation.id ? { ...layer, mode: 'fill' as const } : layer,

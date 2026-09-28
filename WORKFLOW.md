@@ -856,6 +856,22 @@ marks later edits as unapproved without changing the existing Frame/Start policy
 5. Burned labels show each row's and column's value (speeds as the feed the job runs). The toast
    names what rows and columns vary.
 
+### F-A7g. Recipes that apply themselves (ADR-496)
+
+1. **Material Library → Job material**: pick the material this job runs on, from the materials the
+   library has recipes for, and its **Thickness**. **Take the best recipe** is on once a material
+   is picked.
+2. Each new laser operation (import, text, shapes, images, trace, Add layer) links the library's
+   best recipe for that material and its mode: this machine's own recipes first, then calibrated
+   ones. A cut takes only a recipe for the job's thickness (or any thickness); an engraving takes
+   another thickness when none matches.
+3. Switching an untouched operation to another mode takes that mode's recipe. An operation edited
+   since its recipe keeps its settings. Operations with no matching recipe keep their settings.
+4. **Apply to all operations** links every output operation to its best recipe as one undo step
+   and names any with no recipe.
+5. Refresh and the stale-preset notice work as for a hand-linked preset. The job material is saved
+   with the project.
+
 ---
 
 ### F-A8. Preview

@@ -17,6 +17,8 @@ import {
 import { recolorLayer } from '../../core/scene/scene';
 import { applyLayerDefaultSettings } from '../layers/layer-default-settings';
 import { seedFreshCncLayer } from './cnc-auto-seeding';
+import { seedFreshLaserLayer } from './laser-recipe-seeding';
+import type { MaterialLibraryDocument } from '../../io/material-library';
 import type { CncLiveCapsState } from './cnc-live-caps-actions';
 import { cncSettingsForArtworkPaste } from './cnc-settings-clipboard';
 import { pruneSceneObjectOperationOverrides } from '../../core/scene/operation-binding';
@@ -35,6 +37,7 @@ type LayerActionState = StateSlice &
     readonly additionalSelectedIds: ReadonlySet<string>;
     readonly copiedLayerSettings: LayerSettingsClipboard | null;
     readonly layerDefaults: LayerDefaultsState;
+    readonly materialLibrary?: MaterialLibraryDocument | null;
   };
 
 type LayerActionMutation = {
@@ -176,7 +179,7 @@ function createManualLayerAction(set: LayerActionSet): LayerActions['createManua
               machine,
               liveCaps: state.cncLiveCaps,
             })
-          : base;
+          : seedFreshLaserLayer(base, state.project, state.materialLibrary ?? null);
       const scene = addLayer(state.project.scene, layer);
       return mutation(state, { ...state.project, scene });
     });
