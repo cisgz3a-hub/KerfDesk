@@ -163,6 +163,10 @@ export type CncLayerSettings = {
   // Pocket clearing strategy (ADR-105 G10). Absent = contour-parallel
   // offset rings (the original behavior, byte-identical).
   readonly pocketStrategy?: 'offset' | 'raster-x' | 'raster-y' | 'adaptive';
+  // ADR-491: offset and raster pockets step to the next ring or row at the
+  // plunge feed without leaving the cut. True restores the lift to safe Z and
+  // re-plunge between them. Absent = stay down.
+  readonly pocketLiftBetweenRings?: boolean;
   // Legacy persisted name for a compile-time geometric radial-engagement
   // ceiling in millimetres. This is not measured machine load and never
   // changes feed at runtime. Absent uses 10% of the selected bit diameter.
@@ -224,6 +228,9 @@ export type CncMachineParams = {
   // M0 bit changes). Absent = the machine origin, the pre-H.9 behavior.
   readonly parkXMm?: number;
   readonly parkYMm?: number;
+  // ADR-491: how high above the stock top the bit lifts before that park move,
+  // so it clears clamps on the way. Absent = safe Z, the height it always used.
+  readonly parkZMm?: number;
   // CNC's own output feed ceiling and Frame speed, so the laser's Max feed
   // and Frame speed never reach router jobs. Absent on projects saved before
   // the split: the shared device values apply (cnc-head-feeds.ts).

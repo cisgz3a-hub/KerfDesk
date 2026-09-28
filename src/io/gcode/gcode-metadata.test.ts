@@ -41,7 +41,7 @@ function laserAssumptions(
 
 describe('gcodeMetadataHeader', () => {
   it('tracks the latest safety-relevant emitter revision', () => {
-    expect(EMITTER_REVISION).toBe('masked-relief-air-floor-runs-20260927-v4');
+    expect(EMITTER_REVISION).toBe('air-floor-runs-stay-down-park-20260928-v5');
   });
 
   it('emits provenance as GRBL comment lines and ends with a newline', () => {
