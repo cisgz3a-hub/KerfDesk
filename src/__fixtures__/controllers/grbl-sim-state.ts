@@ -3,6 +3,7 @@
 // (grbl-sim-lines.ts). See grbl-sim-machine.ts for what is modelled.
 
 import { addVec3, SIM_ZERO_VEC3, type SimVec3 } from './grbl-sim-gcode';
+import type { GrblSimOverrides } from './grbl-sim-overrides';
 
 export type GrblSimMachineLabel =
   | 'Idle'
@@ -41,6 +42,10 @@ export type GrblSimState = {
   readonly lastError: number | null;
   /** Bumped by every reset and alarm; timed events from before it are void. */
   readonly resetEpoch: number;
+  /** Realtime feed, rapid and spindle overrides, percent (grbl-sim-overrides.ts). */
+  readonly overrides: GrblSimOverrides;
+  /** A door input held open: the door state reports Door:1 and refuses cycle start. */
+  readonly doorAjar?: boolean;
 };
 
 export type GrblSimTimedEvent =
@@ -52,6 +57,7 @@ export type GrblSimEvent =
   | { readonly kind: 'rx-realtime'; readonly byte: string }
   | { readonly kind: 'rx-line'; readonly line: string }
   | { readonly kind: 'alarm'; readonly code: number }
+  | { readonly kind: 'door-input'; readonly open: boolean }
   | GrblSimTimedEvent;
 
 export type GrblSimEffect =

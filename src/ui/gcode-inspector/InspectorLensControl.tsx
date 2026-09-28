@@ -1,11 +1,10 @@
 // Shared colour-lens selector and legend for both G-code 3D surfaces.
 
 import { useMemo } from 'react';
-import type { ProgramTimeModel } from '../../core/gcode-time';
-import type { GcodeRenderModel } from '../../core/gcode-view';
 import type { Viewer3dTheme } from '../viewer3d';
 // Deep import: the viewer3d barrel is capped at 20 exports by its index contract.
 import type { Viewer3dLook } from '../viewer3d/viewer3d-look';
+import type { InspectorProgramTime, InspectorRenderModel } from './inspector-model';
 import {
   LENS_IDS,
   LENS_LABEL,
@@ -17,8 +16,8 @@ import {
 import type { ToolSections } from './tool-sections';
 
 type InspectorLensControlProps = {
-  readonly model: GcodeRenderModel;
-  readonly time: ProgramTimeModel;
+  readonly model: InspectorRenderModel;
+  readonly time: Pick<InspectorProgramTime, 'segFeedLimited'>;
   readonly theme: Viewer3dTheme;
   readonly look?: Viewer3dLook | undefined;
   readonly sections?: ToolSections | null | undefined;

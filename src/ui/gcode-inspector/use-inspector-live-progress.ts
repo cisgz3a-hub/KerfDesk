@@ -1,8 +1,8 @@
 import { useEffect, useMemo, useState } from 'react';
-import type { GcodeRenderModel } from '../../core/gcode-view';
 import type { LiveCanvasLifecycle, LiveCanvasRun } from '../state/canvas-motion-plan';
 import { canvasProgramMatchesRunQueue, canvasProgramSource } from '../state/canvas-program-source';
 import { useLaserStore } from '../state/laser-store';
+import type { InspectorRenderModel } from './inspector-model';
 import type { GcodeInspectionSource } from './gcode-inspection-source';
 import { inspectorPlayheadAtRoute } from './inspector-live-progress';
 import { inspectorSourceMatchesProgram } from './inspector-live-source';
@@ -22,7 +22,7 @@ export type InspectorLiveProgress = {
 };
 
 export function useInspectorLiveProgress(
-  model: GcodeRenderModel,
+  model: InspectorRenderModel,
   source?: GcodeInspectionSource,
 ): InspectorLiveProgress {
   const run = useLaserStore((state) => state.liveCanvasRun ?? null);
@@ -65,7 +65,7 @@ function useSourceMatch(source: GcodeInspectionSource | undefined, text: string 
 }
 
 function deriveProgress(
-  model: GcodeRenderModel,
+  model: InspectorRenderModel,
   run: LiveCanvasRun | null,
   matched: boolean,
   connected: boolean,

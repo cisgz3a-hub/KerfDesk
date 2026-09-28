@@ -1,8 +1,8 @@
 // Shared read-only working surface for the canvas and the full Inspector.
 import { useRef, useState } from 'react';
-import type { GcodeRenderModel } from '../../core/gcode-view';
 // Deep import: the viewer3d barrel is capped at 20 exports by its index contract.
 import type { Viewer3dPick } from '../viewer3d/scene-pick';
+import type { InspectorRenderModel } from './inspector-model';
 import { InspectorSidebar } from './InspectorSidebar';
 import { InspectorLensControl } from './InspectorLensControl';
 import type { GcodeInspectionSource } from './gcode-inspection-source';
@@ -23,14 +23,14 @@ import { useViewer3dScene } from './use-viewer3d-scene';
 export type InspectorVariant = 'full' | 'preview';
 type InspectorViewProps =
   | {
-      readonly model: GcodeRenderModel;
+      readonly model: InspectorRenderModel;
       readonly analysis: GcodeInspectorAnalysis;
       readonly source: GcodeInspectionSource;
       readonly sourceIndex: GcodeSourceLineIndex;
       readonly variant?: 'full';
     }
   | {
-      readonly model: GcodeRenderModel;
+      readonly model: InspectorRenderModel;
       readonly analysis: GcodeInspectorAnalysis;
       readonly source?: GcodeInspectionSource;
       readonly variant: 'preview';
@@ -71,6 +71,7 @@ export function InspectorView(props: InspectorViewProps): JSX.Element {
           handleRef={handleRef}
           state={state}
           reason={reason}
+          topView={{ model: props.model, colorOf: session.colorOf }}
           cameraMode={camera.cameraMode}
           onCameraModeChange={camera.setCameraMode}
           live={liveMode ? live : null}
@@ -117,7 +118,7 @@ export function InspectorView(props: InspectorViewProps): JSX.Element {
 
 // Jumps to a place in the program: its source line selected and, outside
 // live mode, the playhead moved there.
-function useLocators(model: GcodeRenderModel, session: Session) {
+function useLocators(model: InspectorRenderModel, session: Session) {
   const [selectedLine, setSelectedLine] = useState<number | null>(null);
   const segTimeEndSec = session.time.segTimeEndSec;
   const jumpTo = (line: number, seconds: number | null): void => {
@@ -136,7 +137,7 @@ function useLocators(model: GcodeRenderModel, session: Session) {
 }
 
 // What the 3D view's keys play and step (ADR-470).
-function keyTransport(model: GcodeRenderModel, session: Session) {
+function keyTransport(model: InspectorRenderModel, session: Session) {
   const { playback, time } = session;
   return {
     togglePlay: playback.togglePlay,
@@ -150,7 +151,7 @@ function keyTransport(model: GcodeRenderModel, session: Session) {
 }
 
 function PreviewLens(props: {
-  readonly model: GcodeRenderModel;
+  readonly model: InspectorRenderModel;
   readonly session: Session;
 }): JSX.Element {
   const s = props.session;
@@ -193,7 +194,7 @@ function SessionTimeline({ session }: { readonly session: Session }): JSX.Elemen
 }
 
 function Readouts(props: {
-  readonly model: GcodeRenderModel;
+  readonly model: InspectorRenderModel;
   readonly session: Session;
   readonly onTravelChange: (visible: boolean) => void;
   readonly onLocateLine: (line: number) => void;
@@ -224,7 +225,7 @@ function Readouts(props: {
   );
 }
 
-function useInspectorScene(model: GcodeRenderModel, session: Session) {
+function useInspectorScene(model: InspectorRenderModel, session: Session) {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const { handleRef, state, reason } = useViewer3dScene(canvasRef, model);
   const { playhead, liveMode, live } = session;

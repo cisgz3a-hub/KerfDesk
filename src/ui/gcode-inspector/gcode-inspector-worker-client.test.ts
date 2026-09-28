@@ -115,6 +115,24 @@ describe('G-code Inspector worker client', () => {
     await expect(second).resolves.toEqual(result);
   });
 
+  it('hands preview chunks over while the request stays active (ADR-485)', async () => {
+    const onPreview = vi.fn();
+    const pending = inspectGcodeOffThread({ kind: 'text', text: 'G0 X1' }, { onPreview });
+    const worker = latest();
+    const id = worker.posted[0]?.id ?? -1;
+    const chunk = {
+      solid: new Float32Array(6),
+      travel: new Float32Array(0),
+      moves: 1,
+      fraction: 1,
+    };
+    worker.reply({ id, kind: 'preview', chunk });
+    worker.reply({ id, kind: 'progress', phase: 'timing' });
+    expect(onPreview).toHaveBeenCalledWith(chunk);
+    worker.reply({ id, kind: 'complete', result });
+    await expect(pending).resolves.toEqual(result);
+  });
+
   it('cancels queued work without posting it', async () => {
     const first = inspectGcodeOffThread({ kind: 'text', text: 'G0 X1' });
     const controller = new AbortController();

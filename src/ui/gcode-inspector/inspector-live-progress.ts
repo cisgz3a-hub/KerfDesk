@@ -1,12 +1,12 @@
-import type { GcodeRenderModel } from '../../core/gcode-view';
 import type { MotionBlock, MotionManifest, MotionPoint } from '../../core/job/motion-manifest';
+import type { InspectorRenderModel } from './inspector-model';
 import type { PlayheadState } from './playhead';
 
 /** Map confirmed physical route through its raw source line, not total time or ACKs.
  * Runtime-seeded approach moves can differ from a file's assumed initial zero;
  * those moves deliberately have no overlay until the geometries agree. */
 export function inspectorPlayheadAtRoute(
-  model: GcodeRenderModel,
+  model: InspectorRenderModel,
   manifest: MotionManifest,
   routeMm: number,
 ): PlayheadState | null {
@@ -51,7 +51,7 @@ function blockAtRoute(manifest: MotionManifest, route: number): MotionBlock | un
   return manifest.blocks[low];
 }
 
-function firstSegmentAtLine(model: GcodeRenderModel, line: number): number {
+function firstSegmentAtLine(model: InspectorRenderModel, line: number): number {
   let low = 0;
   let high = model.segmentCount;
   while (low < high) {
@@ -62,7 +62,11 @@ function firstSegmentAtLine(model: GcodeRenderModel, line: number): number {
   return low;
 }
 
-function blockMatchesModel(model: GcodeRenderModel, block: MotionBlock, first: number): boolean {
+function blockMatchesModel(
+  model: InspectorRenderModel,
+  block: MotionBlock,
+  first: number,
+): boolean {
   const count = block.points.length - 1;
   if (count <= 0 || first + count > model.segmentCount) return false;
   for (let offset = 0; offset < count; offset += 1) {

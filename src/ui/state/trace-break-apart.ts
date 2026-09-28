@@ -47,6 +47,9 @@ export function splitTracedImage(
     ...(object.cncTabAnchors === undefined
       ? {}
       : { cncTabAnchors: pieceTabAnchors(object.cncTabAnchors, piece) }),
+    ...(object.laserTabAnchors === undefined
+      ? {}
+      : { laserTabAnchors: pieceTabAnchors(object.laserTabAnchors, piece) }),
   }));
 }
 

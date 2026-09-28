@@ -181,6 +181,9 @@ function validateSceneObject(obj: unknown, path: string): string | null {
   if (operationIdsError !== null) return operationIdsError;
   const tabAnchorError = validateCncTabAnchors(obj['cncTabAnchors'], `${path}.cncTabAnchors`);
   if (tabAnchorError !== null) return tabAnchorError;
+  // ADR-494: laser tab anchors have the CNC anchors' shape and limits.
+  const laserTabError = validateCncTabAnchors(obj['laserTabAnchors'], `${path}.laserTabAnchors`);
+  if (laserTabError !== null) return laserTabError;
   const svgImportError = validateSvgImport(obj['svgImport'], `${path}.svgImport`);
   if (svgImportError !== null) return svgImportError;
   const kind = obj['kind'];
