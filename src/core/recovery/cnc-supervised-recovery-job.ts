@@ -1,4 +1,5 @@
 import type { CncContourPass, CncGroup, Job } from '../job';
+import { withoutAirFloors } from './cnc-recovery-air-floors';
 import { retainedCncCompilationSidecar } from './cnc-retained-compilation-sidecar';
 import {
   planCncContourRunway,
@@ -61,7 +62,10 @@ export function buildCncSupervisedRecoveryJob(
   if (laterGroups.some((group) => group.kind !== 'cnc')) {
     return { kind: 'error', reason: 'invalid-source-job' };
   }
-  const groups = [recoveryGroup(sourceGroup, sourcePass, plan), ...laterGroups];
+  // ADR-489: every pass plunges from safe Z, as recovery always has.
+  const groups = [recoveryGroup(sourceGroup, sourcePass, plan), ...laterGroups].map((group) =>
+    group.kind === 'cnc' ? withoutAirFloors(group) : group,
+  );
   const cncCompilation = retainedCncCompilationSidecar(request.job, groups);
   return {
     kind: 'recovery-job',

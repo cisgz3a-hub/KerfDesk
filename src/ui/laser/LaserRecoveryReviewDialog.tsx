@@ -30,6 +30,11 @@ export type LaserRecoveryReviewDialogProps = {
   }) => Promise<{ readonly x: number; readonly y: number }>;
   /** Runs the homing cycle before a restore; supplied by the host when homing is set up. */
   readonly onHome?: () => Promise<void>;
+  /** Jogs the head, beam off, to a point in work mm; supplied by the host. */
+  readonly onMoveToWorkPoint?: (pointMm: {
+    readonly x: number;
+    readonly y: number;
+  }) => Promise<void>;
 };
 
 /**
@@ -67,6 +72,9 @@ export function LaserRecoveryReviewDialog(props: LaserRecoveryReviewDialogProps)
         {...(props.onRestoreOrigin === undefined ? {} : { onRestoreOrigin: props.onRestoreOrigin })}
         {...(headStop === undefined ? {} : { headStop })}
         {...(props.onHome === undefined ? {} : { onHome: props.onHome })}
+        {...(props.onMoveToWorkPoint === undefined
+          ? {}
+          : { onMoveToWorkPoint: props.onMoveToWorkPoint })}
       />
       <LaserRecoveryRestartPicker
         key={selectionKey}

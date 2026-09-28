@@ -267,7 +267,19 @@ function sanitizeOperationOverridePatch(patch: ObjectOperationOverride): ObjectO
   setMinimumNumber(out, 'perforationSkipMm', patch.perforationSkipMm, 0.01);
   setNonNegativeNumber(out, 'overcutMm', patch.overcutMm);
   setNonNegativeNumber(out, 'imageOverscanMm', patch.imageOverscanMm);
+  setTabLayoutFields(out, patch);
   return out as ObjectOperationOverride;
+}
+
+// ADR-494 tab layout and tab power.
+function setTabLayoutFields(out: Record<string, unknown>, patch: ObjectOperationOverride): void {
+  if (patch.tabLayout === 'count' || patch.tabLayout === 'spacing') out.tabLayout = patch.tabLayout;
+  setMinimumNumber(out, 'tabSpacingMm', patch.tabSpacingMm, 0.01);
+  const maxPerShape = patch.tabMaxPerShape;
+  if (maxPerShape !== undefined && Number.isFinite(maxPerShape)) {
+    out.tabMaxPerShape = Math.max(0, Math.floor(maxPerShape));
+  }
+  setPercent(out, 'tabCutPowerPercent', patch.tabCutPowerPercent);
 }
 
 function setPowerMode(out: Record<string, unknown>, patch: ObjectOperationOverride): void {

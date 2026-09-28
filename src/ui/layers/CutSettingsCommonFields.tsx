@@ -6,7 +6,9 @@ import type { Layer, LayerMode } from '../../core/scene';
 import { MAX_OVERCUT_MM, MAX_PERFORATION_MM, MIN_PERFORATION_MM } from './cut-settings-draft';
 import { useStore } from '../state';
 import { CutPowerModeField } from './CutPowerModeField';
+import { Field, NumberInput } from './CutSettingsInputs';
 import { LaserProcessField } from './LaserProcessField';
+import { LineTabFields } from './LineTabFields';
 
 export function CutSettingsCommonFields(props: {
   readonly layer: Layer;
@@ -151,7 +153,7 @@ function LineModeFields(props: { readonly layer: Layer }): JSX.Element {
         />
         <span className="lf-field-unit">mm</span>
       </Field>
-      <LineBridgeFields layer={props.layer} />
+      <LineTabFields layer={props.layer} />
       <LinePerforationFields layer={props.layer} />
     </fieldset>
   );
@@ -205,103 +207,3 @@ function LinePerforationFields(props: { readonly layer: Layer }): JSX.Element {
     </fieldset>
   );
 }
-
-function LineBridgeFields(props: { readonly layer: Layer }): JSX.Element {
-  return (
-    <fieldset
-      className="lf-fieldset"
-      title="Leave small uncut bridges on closed Line cuts so parts stay attached until you remove them."
-    >
-      <legend>Tabs / Bridges</legend>
-      <p className="lf-laser-help">Small uncut gaps keep parts attached to the sheet.</p>
-      <Field label="Enable">
-        <input
-          name="tabsEnabled"
-          type="checkbox"
-          className="lf-checkbox"
-          defaultChecked={props.layer.tabsEnabled}
-          aria-label="Cut settings enable tabs"
-          title="Enable automatic bridge gaps on closed Line cuts."
-        />
-      </Field>
-      <Field label="Size">
-        <NumberInput
-          name="tabSizeMm"
-          value={props.layer.tabSizeMm}
-          min={0.01}
-          max={100}
-          step={0.01}
-          label="tab size"
-          title="Set the length of each uncut bridge gap in millimeters."
-        />
-        <span className="lf-field-unit">mm</span>
-      </Field>
-      <Field label="Count">
-        <NumberInput
-          name="tabsPerShape"
-          value={props.layer.tabsPerShape}
-          min={1}
-          max={100}
-          step={1}
-          label="tabs per shape"
-          title="Set how many evenly spaced bridge gaps to add to each closed outer contour."
-        />
-      </Field>
-      <Field label="Holes">
-        <input
-          name="tabSkipInnerShapes"
-          type="checkbox"
-          className="lf-checkbox"
-          defaultChecked={props.layer.tabSkipInnerShapes}
-          aria-label="Cut settings skip inner tabs"
-          title="Leave inner contours and holes whole instead of adding tabs to them."
-        />
-        <span className="lf-field-help">Skip inner shapes</span>
-      </Field>
-    </fieldset>
-  );
-}
-
-function NumberInput(props: {
-  readonly name: string;
-  readonly value: number;
-  readonly min: number;
-  readonly max?: number;
-  readonly step?: number;
-  readonly label?: string;
-  readonly title?: string;
-  readonly onChange?: (event: React.ChangeEvent<HTMLInputElement>) => void;
-}): JSX.Element {
-  return (
-    <input
-      name={props.name}
-      type="number"
-      className="lf-input"
-      min={props.min}
-      {...(props.max !== undefined ? { max: props.max } : {})}
-      step={props.step ?? 1}
-      defaultValue={props.value}
-      onChange={props.onChange}
-      style={numberStyle}
-      aria-label={`Cut settings ${props.label ?? props.name}`}
-      title={props.title ?? `Set cut settings ${props.label ?? props.name}.`}
-    />
-  );
-}
-
-function Field(props: { readonly label: string; readonly children: React.ReactNode }): JSX.Element {
-  return (
-    <label className="lf-field">
-      <span className="lf-field-label lf-field-label--md">{props.label}</span>
-      <span style={controlStyle}>{props.children}</span>
-    </label>
-  );
-}
-
-const controlStyle: React.CSSProperties = {
-  flex: 1,
-  display: 'flex',
-  alignItems: 'center',
-  gap: 6,
-};
-const numberStyle: React.CSSProperties = { width: 96 };
