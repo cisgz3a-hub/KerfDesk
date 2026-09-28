@@ -81,7 +81,7 @@ earlier arc, a ring after a helix and the passes left alone.
 - Each depth pass after the first rapids down to 1 mm above the cut before its plunge. A Z axis
   that lost more than 1 mm of steps since the pass above would meet that cut at rapid speed, as it
   already could in relief roughing (ADR-489). Pause and lift, recovery and tiling are unchanged.
-- `EMITTER_REVISION` advances to `air-floor-2d-passes-stay-down-park-20260928-v6`.
+- `EMITTER_REVISION` advances to `air-floor-2d-kerf-arcs-scan-angle-20260928-v8` (merged over main's `park-kerf-arcs-scan-angle-overscan-20260928-v7`).
 - Hardware qualification: an air cut, then a profile in scrap, on the 4040.
 - Not built here: separate retract and clearance heights per operation (CNG-J04), and floors for
   helical entries.

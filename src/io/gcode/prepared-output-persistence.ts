@@ -67,6 +67,8 @@ function rasterRecipeMatches(stored: RasterGroup, candidate: RasterGroup): boole
     stored.layerId === candidate.layerId &&
     stored.sourceObjectId === candidate.sourceObjectId &&
     stored.pixelWidth === candidate.pixelWidth &&
-    stored.pixelHeight === candidate.pixelHeight
+    stored.pixelHeight === candidate.pixelHeight &&
+    // ADR-492: cross-hatch scans the same image twice at different angles.
+    stored.scanAngleDeg === candidate.scanAngleDeg
   );
 }

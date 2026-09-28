@@ -1,5 +1,11 @@
 import { assertNever } from '../scene';
 import type { CncGroup, CncPass, Group, Job } from './job';
+import {
+  isAlongXScan,
+  rasterScanFrame,
+  scanRectMachineCorners,
+  type RasterScanFrame,
+} from '../raster/raster-scan-frame';
 
 export type JobCoordinateValue = { readonly path: string; readonly value: number };
 
@@ -40,6 +46,11 @@ function collectRasterCoordinates(
   path: string,
   values: JobCoordinateValue[],
 ): void {
+  const frame = rasterScanFrame(group.scanAngleDeg);
+  if (!isAlongXScan(frame)) {
+    collectAngledRasterCoordinates(group, frame, path, values);
+    return;
+  }
   const { minX, minY, maxX, maxY } = group.bounds;
   const offset = group.initialXOffsetMm ?? 0;
   values.push(
@@ -49,6 +60,24 @@ function collectRasterCoordinates(
     { path: `${path}.bounds.maxY`, value: maxY },
     { path: `${path}.sweep.minX`, value: minX - group.overscanMm + offset },
     { path: `${path}.sweep.maxX`, value: maxX + group.overscanMm + offset },
+  );
+}
+
+// ADR-492: an angled scan's bounds are in its scan frame; what reaches the
+// controller are the rotated corners of the image and of its overscan.
+function collectAngledRasterCoordinates(
+  group: Extract<Group, { readonly kind: 'raster' }>,
+  frame: RasterScanFrame,
+  path: string,
+  values: JobCoordinateValue[],
+): void {
+  const { bounds, overscanMm } = group;
+  const sweep = { ...bounds, minX: bounds.minX - overscanMm, maxX: bounds.maxX + overscanMm };
+  scanRectMachineCorners(frame, bounds).forEach((corner, index) =>
+    pushPoint(values, `${path}.bounds.corner[${index}]`, corner),
+  );
+  scanRectMachineCorners(frame, sweep).forEach((corner, index) =>
+    pushPoint(values, `${path}.sweep.corner[${index}]`, corner),
   );
 }
 

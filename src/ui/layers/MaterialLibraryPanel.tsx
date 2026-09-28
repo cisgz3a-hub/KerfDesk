@@ -13,6 +13,7 @@ import {
   materialBindingStatusText,
   type MaterialBindingStatus,
 } from './material-binding-status';
+import { JobMaterialControls } from './JobMaterialControls';
 import { MaterialLibraryRecipeControls } from './MaterialLibraryRecipeControls';
 import {
   materialLibraryPresetOptions,
@@ -111,6 +112,7 @@ function LoadedMaterialLibraryPanel(props: {
     <section aria-label="Material Library" style={sectionStyle}>
       <Header />
       <p style={libraryNameStyle}>{props.library.name}</p>
+      <JobMaterialControls library={props.library} />
       <ProcessRecipePanel />
       <MaterialLibrarySelectors
         layers={layers}

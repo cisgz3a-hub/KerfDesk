@@ -1,6 +1,21 @@
-import { disabled, enabled, type AppCommand, type AppCommandContext } from './command-types';
+import {
+  disabled,
+  enabled,
+  type AppCommand,
+  type AppCommandContext,
+  type CommandId,
+} from './command-types';
+import { copyAlongPathCommand } from './design-tools-commands';
 import { placementCommands } from './editing-tools-commands';
 import { machineMoveCommands } from './machine-move-commands';
+
+// The Arrange menu's Layout group: Copy Along Path (LBG-T09) sits beside Array.
+export const ARRANGE_LAYOUT_IDS: ReadonlyArray<CommandId> = [
+  'arrange.array',
+  'arrange.copy-along-path',
+  'arrange.quick-nest',
+  'arrange.break-apart',
+];
 
 export function arrangeCommands(ctx: AppCommandContext): ReadonlyArray<AppCommand> {
   const align = ALIGN_COMMANDS.map((spec) =>
@@ -31,6 +46,7 @@ export function arrangeCommands(ctx: AppCommandContext): ReadonlyArray<AppComman
     ...align,
     ...distribute,
     arrayCommand(ctx),
+    copyAlongPathCommand(ctx),
     quickNestCommand(ctx),
     breakApartCommand(ctx),
     flipHorizontalCommand(ctx),

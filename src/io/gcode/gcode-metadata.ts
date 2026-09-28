@@ -95,8 +95,11 @@ export type GcodeMetadata = {
  * air their earlier passes cleared, ADR-488's relief roughing moves, one per
  * straight run, and ADR-491's pocket rings and rows linked at depth at the
  * plunge feed and its park height before the job-end and bit-change parks,
- * and ADR-520's 2D depth passes rapided down to just above the cut an earlier
- * pass of their operation left on the same path.
+ * ADR-486's kerf-offset circles kept as native arcs, ADR-492's image scans at
+ * an angle and angle turns between passes, ADR-495's overscan worked out
+ * from the scan speed and acceleration when it is on, and ADR-520's 2D depth
+ * passes rapided down to just above the cut an earlier pass of their
+ * operation left on the same path.
  */
 // ADR-427 keeps deepest cleanup before linked relief rings and flat depth slices.
 // ADR-368 sizes nonflat pocket/profile offsets, tabs and stepover by cut width.
@@ -108,8 +111,10 @@ export type GcodeMetadata = {
 // ADR-489 rapids CNC entries down through air earlier passes cleared.
 // ADR-488 emits one relief roughing move per straight run.
 // ADR-491 links pocket rings at depth and lifts to the park height.
+// ADR-486 keeps kerf-offset circles as G2/G3; ADR-492 angles image scans;
+// ADR-495 sizes overscan from speed and acceleration when it is on.
 // ADR-520 rapids 2D depth passes down to just above the pass before.
-export const EMITTER_REVISION = 'air-floor-2d-passes-stay-down-park-20260928-v6';
+export const EMITTER_REVISION = 'air-floor-2d-kerf-arcs-scan-angle-20260928-v8';
 
 // Machine-specific assumption lines (ADR-103 defect fix): router exports
 // previously carried the laser-worded `$32=1 (laser mode)` banner. The S

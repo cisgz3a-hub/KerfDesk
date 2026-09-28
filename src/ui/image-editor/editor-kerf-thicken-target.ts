@@ -1,6 +1,7 @@
 import type { SelectionMask } from '../../core/image-select';
 import { effectiveOperationForObject } from '../../core/effective-output';
 import type { DeviceProfile } from '../../core/devices';
+import { imageScanPassRuns } from '../../core/job/scan-pass-angles';
 import type { Layer, RasterImage } from '../../core/scene';
 import { editorHorizontalMaskRepair } from './editor-horizontal-mask-repair';
 import type { RasterKerfGroupFacts } from './editor-kerf-output-parity';
@@ -118,9 +119,15 @@ function isCompiledGridDirect(
   );
 }
 
+// The repair paints along editor rows, which are output rows only when every
+// pass scans along X (ADR-492).
 function isOperationLocallyMappable(layer: Layer, object: RasterImage): boolean {
   const effective = effectiveOperationForObject(layer, object);
-  return !effective.negativeImage && isDeterministicBlackDither(effective.ditherAlgorithm);
+  return (
+    !effective.negativeImage &&
+    isDeterministicBlackDither(effective.ditherAlgorithm) &&
+    imageScanPassRuns(effective).every((run) => run.angleDeg === 0)
+  );
 }
 
 function rasterPixelWidthMm(group: RasterKerfGroupFacts): number | null {

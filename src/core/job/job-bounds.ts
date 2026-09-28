@@ -19,6 +19,11 @@ import {
   type RasterGroup,
 } from './job';
 import { rasterRowsInProviderOrder } from './raster-rows';
+import {
+  rasterScanFrame,
+  scanRectMachineCorners,
+  type ScanRect,
+} from '../raster/raster-scan-frame';
 import { offsetForEmittedFeed } from './scan-offset';
 
 export type JobBounds = {
@@ -229,7 +234,9 @@ function extendBoundsForFill(
 }
 
 // F.2.d: raster groups carry their burn bounds directly. Motion bounds add the
-// same overscan and reverse-row shift the emitted raster path uses.
+// same overscan and reverse-row shift the emitted raster path uses. Those are
+// all scan-frame rectangles; an angled scan (ADR-492) bounds their rotated
+// corners, which along X are the rectangles themselves.
 function extendBoundsForRaster(
   b: MutableBounds,
   group: RasterGroup,
@@ -238,23 +245,29 @@ function extendBoundsForRaster(
 ): boolean {
   const scanOffsetMm = group.bidirectionalScanOffsetMm ?? scanOffsetForGroup(device, group.speed);
   const reverseShiftX = hasActiveReverseRasterRow(group) ? -scanOffsetMm : 0;
-  if (group.bounds.minX < b.minX) b.minX = group.bounds.minX;
-  if (group.bounds.maxX > b.maxX) b.maxX = group.bounds.maxX;
-  if (group.bounds.minY < b.minY) b.minY = group.bounds.minY;
-  if (group.bounds.maxY > b.maxY) b.maxY = group.bounds.maxY;
-  if (reverseShiftX !== 0) {
-    b.minX = Math.min(b.minX, group.bounds.minX + reverseShiftX);
-    b.maxX = Math.max(b.maxX, group.bounds.maxX + reverseShiftX);
-  }
+  const rects: ScanRect[] = [group.bounds];
+  if (reverseShiftX !== 0) rects.push(shiftedScanRect(group.bounds, 0, reverseShiftX));
   if (includeOverscanMotion && hasActiveRasterPixel(group)) {
-    b.minX = Math.min(b.minX, group.bounds.minX - group.overscanMm);
-    b.maxX = Math.max(b.maxX, group.bounds.maxX + group.overscanMm);
+    rects.push(shiftedScanRect(group.bounds, group.overscanMm, 0));
     if (reverseShiftX !== 0) {
-      b.minX = Math.min(b.minX, group.bounds.minX - group.overscanMm + reverseShiftX);
-      b.maxX = Math.max(b.maxX, group.bounds.maxX + group.overscanMm + reverseShiftX);
+      rects.push(shiftedScanRect(group.bounds, group.overscanMm, reverseShiftX));
     }
   }
+  const frame = rasterScanFrame(group.scanAngleDeg);
+  for (const rect of rects) {
+    for (const corner of scanRectMachineCorners(frame, rect)) extendBoundsForPoint(b, corner);
+  }
   return true;
+}
+
+// The rectangle widened along the scan by `widenMm` each side, then shifted.
+function shiftedScanRect(rect: ScanRect, widenMm: number, shiftMm: number): ScanRect {
+  return {
+    minX: rect.minX - widenMm + shiftMm,
+    maxX: rect.maxX + widenMm + shiftMm,
+    minY: rect.minY,
+    maxY: rect.maxY,
+  };
 }
 
 // ADR-239: tangential contour entries are physical motion outside the artwork

@@ -164,6 +164,15 @@ function baseCtx(overrides: Partial<AppCommandContext> = {}): AppCommandContext 
     reverseSelectedPaths: vi.fn(),
     addRubberBandOutline: vi.fn(),
     flattenImageMask: vi.fn(),
+    copyAlongPath: vi.fn(),
+    trimShapesActive: false,
+    trimShapes: vi.fn(),
+    cutShapes: vi.fn(),
+    canWarpSelection: false,
+    warpToolActive: false,
+    deformToolActive: false,
+    startWarp: vi.fn(),
+    startDeform: vi.fn(),
     ...overrides,
   };
 }
