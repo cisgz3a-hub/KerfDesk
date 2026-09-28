@@ -70,10 +70,26 @@ function readBmpHeader(bytes: Uint8Array, view: DataView): BmpHeader {
     compression: view.getUint32(30, true),
   };
   assertRasterSize(header.width, header.height);
+  validateBmpLayout(bytes, view, header);
   if (header.compression !== 0 && header.compression !== 3 && header.compression !== 6) {
     throw new Error('Compressed (RLE/JPEG/PNG) BMP files are not supported.');
   }
   return header;
+}
+
+function validateBmpLayout(bytes: Uint8Array, view: DataView, header: BmpHeader): void {
+  const masksBytes =
+    header.dibSize === 40 && header.compression !== 0 ? (header.compression === 6 ? 16 : 12) : 0;
+  const paletteBytes = header.bpp <= 8 ? (view.getUint32(46, true) || 1 << header.bpp) * 4 : 0;
+  if (![1, 4, 8, 16, 24, 32].includes(header.bpp) || view.getUint16(26, true) !== 1) {
+    throw new Error('The BMP pixel format is not supported.');
+  }
+  if (
+    14 + header.dibSize + masksBytes + paletteBytes > header.pixelOffset ||
+    header.pixelOffset > bytes.length
+  ) {
+    throw new Error('The BMP header or palette is truncated.');
+  }
 }
 
 type Masks = readonly [number, number, number, number];
@@ -145,8 +161,8 @@ export function decodePnm(bytes: Uint8Array): DecodedRaster {
   const height = headerInt(reader);
   const maxval = pnmMaxval(reader, kind);
   assertRasterSize(width, height);
-  reader.offset += 1; // the single whitespace byte before binary samples
   const channels = kind === 3 || kind === 6 ? 3 : 1;
+  requirePnmPayload(reader, kind, width, height, channels, maxval);
   const data = new Uint8ClampedArray(width * height * 4);
   const rowBytes = Math.ceil(width / 8);
   for (let p = 0; p < width * height; p += 1) {
@@ -158,6 +174,32 @@ export function decodePnm(bytes: Uint8Array): DecodedRaster {
     data.set([r, g, b, 255], p * 4);
   }
   return { width, height, data };
+}
+
+function requirePnmPayload(
+  reader: Reader,
+  kind: number,
+  width: number,
+  height: number,
+  channels: number,
+  maxval: number,
+): void {
+  const { bytes } = reader;
+  const delimiter = bytes[reader.offset];
+  if (delimiter === undefined || !(delimiter === 32 || (delimiter >= 9 && delimiter <= 13))) {
+    throw new Error('The PNM header is malformed.');
+  }
+  reader.offset += 1; // the single whitespace byte before binary samples
+  const samples = width * height * channels;
+  const minimum =
+    kind === 4
+      ? Math.ceil(width / 8) * height
+      : kind <= 3
+        ? kind === 1
+          ? samples
+          : 2 * samples - 1
+        : samples * (maxval > 255 ? 2 : 1);
+  if (bytes.length - reader.offset < minimum) throw new Error('The PNM file is truncated.');
 }
 
 function pnmMaxval(reader: Reader, kind: number): number {

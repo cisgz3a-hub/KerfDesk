@@ -39,7 +39,7 @@ export function isPng(bytes: Uint8Array): boolean {
 
 export async function decodePng(bytes: Uint8Array): Promise<DecodedRaster> {
   const header = readPngChunks(bytes);
-  const raw = await inflate(header.idat);
+  const raw = await inflate(header.idat, scanlineBytes(header));
   const channels = CHANNELS[header.colorType] ?? 0;
   const bitsPerPixel = channels * header.bitDepth;
   const data = new Uint8ClampedArray(header.width * header.height * 4);
@@ -117,7 +117,17 @@ function validateHeader(header: PngHeader): void {
   if (header.idat.length === 0) throw new Error('The PNG file has no image data.');
 }
 
-async function inflate(compressed: Uint8Array): Promise<Uint8Array> {
+function scanlineBytes(header: PngHeader): number {
+  const bits = (CHANNELS[header.colorType] ?? 0) * header.bitDepth;
+  const passes = header.interlaced ? ADAM7 : ([[0, 0, 1, 1]] as const);
+  return passes.reduce((total, [x0, y0, dx, dy]) => {
+    const width = Math.max(0, Math.ceil((header.width - x0) / dx));
+    const height = Math.max(0, Math.ceil((header.height - y0) / dy));
+    return total + (width === 0 ? 0 : (Math.ceil((width * bits) / 8) + 1) * height);
+  }, 0);
+}
+
+async function inflate(compressed: Uint8Array, expected: number): Promise<Uint8Array> {
   // A copy, so the stream holds a plain ArrayBuffer-backed view.
   const input = new Uint8Array(compressed);
   const source = new ReadableStream<Uint8Array<ArrayBuffer>>({
@@ -128,9 +138,15 @@ async function inflate(compressed: Uint8Array): Promise<Uint8Array> {
   });
   const reader = source.pipeThrough(new DecompressionStream('deflate')).getReader();
   const parts: Uint8Array[] = [];
+  let size = 0;
   for (;;) {
     const { done, value } = await reader.read();
     if (done) break;
+    size += value.length;
+    if (size > expected) {
+      await reader.cancel();
+      throw new Error('The PNG image data exceeds its declared dimensions.');
+    }
     parts.push(value);
   }
   return concat(parts);

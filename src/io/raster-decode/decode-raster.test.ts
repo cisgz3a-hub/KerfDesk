@@ -48,6 +48,17 @@ const pixels = (data: Uint8ClampedArray): number[][] => {
 };
 
 describe('headless raster decoders (ADR-477)', () => {
+  it('stops a PNG stream that inflates past its declared scanlines', async () => {
+    const input = png({
+      width: 1,
+      height: 1,
+      bitDepth: 8,
+      colorType: 0,
+      raw: new Array<number>(65536).fill(0),
+    });
+    await expect(decodeRaster(input)).rejects.toThrow('exceeds its declared dimensions');
+  });
+
   it('decodes 8-bit grey PNG rows through every filter', async () => {
     // Row 0 None, row 1 Sub, row 2 Up, row 3 Average, row 4 Paeth.
     const raw = [0, 10, 20, 1, 30, 5, 2, 1, 1, 3, 10, 10, 4, 0, 0];
@@ -108,6 +119,7 @@ describe('headless raster decoders (ADR-477)', () => {
     view.setUint32(14, 40, true);
     view.setInt32(18, 2, true);
     view.setInt32(22, 2, true);
+    view.setUint16(26, 1, true);
     view.setUint16(28, 24, true);
     view.setInt32(38, 11811, true);
     view.setInt32(42, 11811, true);
