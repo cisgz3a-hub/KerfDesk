@@ -41,13 +41,22 @@ export type ContainmentSegment = {
 const MAX_CELLS_PER_CONTAINER = 64;
 const MAX_GRID_SIDE = 128;
 
-export function containmentDepths(segments: ReadonlyArray<ContainmentSegment>): number[] {
+export type ContainmentOptions = {
+  /** Skip a container whose bounds equal the target's, so two coincident
+   * copies of one shape do not each count the other as enclosing it. */
+  readonly strict?: boolean;
+};
+
+export function containmentDepths(
+  segments: ReadonlyArray<ContainmentSegment>,
+  options: ContainmentOptions = {},
+): number[] {
   const bounds = segments.map((segment) => polylineBounds(segment.polyline));
   const containers = collectContainers(segments, bounds);
   if (containers.length === 0) return segments.map(() => 0);
   const grid = buildContainerGrid(containers, bounds);
 
-  const context: DepthContext = { segments, bounds, containers, grid };
+  const context: DepthContext = { segments, bounds, containers, grid, options };
   return segments.map((_, index) => containmentDepth(context, index));
 }
 
@@ -56,6 +65,7 @@ type DepthContext = {
   readonly bounds: ReadonlyArray<SegmentBounds | null>;
   readonly containers: ReadonlyArray<number>;
   readonly grid: ContainerGrid | null;
+  readonly options: ContainmentOptions;
 };
 
 function containmentDepth(context: DepthContext, index: number): number {
@@ -84,12 +94,21 @@ function probedContainer(
   const containerBounds = context.bounds[containerIndex] ?? null;
   if (container === undefined || containerBounds === null) return false;
   if (sameForest(target.nesting, container)) return false;
-  if (!boundsContains(containerBounds, targetBounds)) return false;
+  if (!boundsMayEnclose(containerBounds, targetBounds, context.options)) return false;
   return pointInPolygon(probe, container.polyline);
 }
 
 function sameForest(target: ContainmentSegment['nesting'], container: ContainmentSegment): boolean {
   return target !== undefined && container.nesting?.forest === target.forest;
+}
+
+function boundsMayEnclose(
+  container: SegmentBounds,
+  target: SegmentBounds,
+  options: ContainmentOptions,
+): boolean {
+  if (!boundsContains(container, target)) return false;
+  return options.strict !== true || !boundsContains(target, container);
 }
 
 function collectContainers(

@@ -18,22 +18,30 @@ import { useUiStore } from '../state/ui-store';
 import { computeMouseDownDrag, type DragState } from './drag-state';
 import { panOffsetForDrag } from './pan-drag';
 import { applyTransformDrag } from './apply-transform-drag';
-import { beginDrawDrag, commitDraftShape } from './draw-tool';
+import { beginDrawDrag } from './draw-tool';
 import type { MeasureDraft } from './measure-tool';
 import { handlePenMouseDown } from './pen-tool';
 import { beginPathNodeDrag } from './path-node-drag';
-import { dispatchPositionLaser } from './position-laser-click';
 import { hitCncTabAnchor } from './cnc-tab-editor';
+import { finishLaserTabDrag } from './laser-tab-editor';
+import { beginHandleToolDrag } from './handle-tool-drag';
 import { selectObjectsInMarquee } from './selection-marquee';
+import { runClickTool } from './workspace-click-tools';
 import { useEscCancelsDrag } from './use-esc-cancels-drag';
 import type { SnapGuide, SnapSettings } from './snapping';
 import { canvasMouseToScene, pxToMmForCanvas } from './view-transform';
+import {
+  clearSnapFeedback,
+  snappedDragEndPoint,
+  snapWorkspacePointer,
+  transformSnapDeps,
+} from './workspace-pointer-snap';
 import { openContextBarForRightClick } from './workspace-context-menu';
 import { useWorkspaceDragDeps } from './workspace-drag-deps';
 import { updateSelectionMoveCursor } from './selection-move-cursor';
 import {
+  commitDrawDraft,
   handleNonTransformDragUpdate,
-  updateDrawDraft,
   updateMeasureDraft,
 } from './workspace-drag-updates';
 import { handleArtworkNumberingPointerDown } from './artwork-numbering-click';
@@ -224,7 +232,7 @@ function beginToolDrag(args: {
     return { kind: 'handled', drag: beginDrawDrag({ ...args, shape: args.toolMode.shape }) };
   }
   if (args.toolMode.kind === 'measure') {
-    const point = canvasMouseToScene(args.e, args.ref.current, args.project, args.viewState);
+    const { point } = snapWorkspacePointer({ ...args, canvas: args.ref.current, drag: null });
     return {
       kind: 'handled',
       drag: point === null ? null : { kind: 'measure', startScenePoint: point },
@@ -244,11 +252,10 @@ function beginToolDrag(args: {
       ),
     };
   }
-  if (args.toolMode.kind === 'position-laser') {
-    const point = canvasMouseToScene(args.e, args.ref.current, args.project, args.viewState);
-    if (point !== null) dispatchPositionLaser(point, args.project.device);
-    return { kind: 'handled', drag: null }; // a positioning click never starts a drag
-  }
+  const handleTool = beginHandleToolDrag({ ...args, canvas: args.ref.current });
+  if (handleTool !== null) return handleTool;
+  // Position Laser and Trim Shapes act on the click itself and never start a drag.
+  if (runClickTool({ ...args, canvas: args.ref.current })) return { kind: 'handled', drag: null };
   return { kind: 'fallthrough' };
 }
 
@@ -301,15 +308,21 @@ function updateWorkspaceDrag(args: {
 }): void {
   const canvas = args.ref.current;
   if (args.drag?.kind === 'pan' && canvas !== null) {
-    args.setSnapGuides([]);
+    clearSnapFeedback();
     const next = panOffsetForDrag({ ...args, drag: args.drag, canvas });
     useUiStore.getState().setPan(next.panX, next.panY);
     return;
   }
-  const point = canvasMouseToScene(args.e, canvas, args.project, args.viewState);
+  const { point, ownsFeedback } = snapWorkspacePointer({ ...args, canvas });
   args.setCursorMm(point);
   if (handleNonTransformDragUpdate({ ...args, point })) return;
-  applyTransformDrag({ ...args, point });
+  // A hovering draw or measure tool owns the marker; there is nothing to move.
+  if (args.drag === null && ownsFeedback) return;
+  applyTransformDrag({
+    ...args,
+    point,
+    ...transformSnapDeps(canvas, args.project, args.viewState),
+  });
 }
 
 function finishWorkspaceDrag(args: {
@@ -336,7 +349,7 @@ function finishWorkspaceDrag(args: {
     return;
   }
   if (args.drag.kind === 'measure') {
-    const point = canvasMouseToScene(args.e, args.ref.current, args.project, args.viewState);
+    const point = snappedDragEndPoint({ ...args, drag: args.drag });
     updateMeasureDraft({
       drag: args.drag,
       point,
@@ -361,6 +374,10 @@ function finishWorkspaceDrag(args: {
     commitSelectionMarquee({ ...args, drag: args.drag });
     return;
   }
+  if (args.drag.kind === 'laser-tab') {
+    finishLaserTabDrag(args.drag);
+    return;
+  }
   args.endInteraction();
 }
 
@@ -383,20 +400,6 @@ function commitSelectionMarquee(args: {
   if (end === null) return;
   const ids = selectObjectsInMarquee(args.project.scene, args.drag.startScenePoint, end);
   args.selectObjects(ids, { additive: args.drag.additive });
-}
-
-function commitDrawDraft(args: {
-  readonly drag: Extract<DragState, { kind: 'draw' }>;
-  readonly e: CanvasMouseEvent;
-  readonly ref: CanvasRef;
-  readonly project: Project;
-  readonly viewState: WorkspaceViewState;
-  readonly setDraftShape: (shape: ShapeObject | null) => void;
-  readonly drawShape: (shape: ShapeObject) => void;
-}): void {
-  const point = canvasMouseToScene(args.e, args.ref.current, args.project, args.viewState);
-  updateDrawDraft({ ...args, point });
-  commitDraftShape(args.drawShape);
 }
 
 function visibleDragKind(drag: DragState | null): DragMoveResult['dragKind'] {

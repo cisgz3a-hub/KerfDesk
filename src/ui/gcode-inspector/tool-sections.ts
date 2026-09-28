@@ -3,7 +3,8 @@
 // tool with T words. The Tool lens colours each tool on its own, and Studio
 // draws the bit in use at the playhead.
 
-import { SEG_KIND, type GcodeRenderModel } from '../../core/gcode-view';
+import { SEG_KIND } from '../../core/gcode-view';
+import type { InspectorRenderModel } from './inspector-model';
 import type { ProgramToolGeometry, ProgramToolMark } from './program-tools';
 
 export type ProgramTool = {
@@ -32,7 +33,7 @@ const NO_TOOL: Omit<ProgramToolMark, 'line'> = {
 };
 
 export function buildToolSections(
-  model: GcodeRenderModel,
+  model: InspectorRenderModel,
   marks: ReadonlyArray<ProgramToolMark>,
 ): ToolSections {
   const boundaries = toolBoundaries(model, marks);
@@ -84,7 +85,7 @@ function toolIndex(
 
 // Comment marks and T words, in source order.
 function toolBoundaries(
-  model: GcodeRenderModel,
+  model: InspectorRenderModel,
   marks: ReadonlyArray<ProgramToolMark>,
 ): ReadonlyArray<ProgramToolMark> {
   const boundaries: ProgramToolMark[] = [...marks];

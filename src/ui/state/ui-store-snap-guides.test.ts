@@ -28,6 +28,8 @@ function hoverMoves(count: number): void {
       project,
       selectionAnchor: 'c',
       snapSettings: DEFAULT_SNAP_SETTINGS,
+      pxToMm: 1,
+      setSnapMarker: useUiStore.getState().setSnapMarker,
       setObjectTransform: () => {
         throw new Error('Hover must not transform artwork');
       },

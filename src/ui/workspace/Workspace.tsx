@@ -34,10 +34,15 @@ import { ArtworkNumberingPrompt } from './ArtworkNumberingPrompt';
 import { WorkspacePointerOverlays } from './WorkspacePointerOverlays';
 import { WorkspacePreviewDock } from './WorkspacePreviewDock';
 import { NodeEditHint } from './NodeEditHint';
+import { LaserTabHint } from './LaserTabHint';
+import { TrimShapesHint } from './TrimShapesHint';
+import { WarpDeformHint } from './WarpDeformHint';
 import './workspace-preview.css';
 import { WorkspaceCanvasLayers } from './WorkspaceCanvasLayers';
 import { usePreviewBitmapRenderer } from './use-preview-bitmap-renderer';
-import { canvasTextSelection, useCanvasTextDisplayProject } from './workspace-text-interaction';
+import type { LaserTabEditor } from './laser-tab-editor';
+import type { WarpDeformRequest } from '../state/warp-deform-session';
+import { useCanvasDisplay } from './use-warp-deform-preview';
 
 export function Workspace(): JSX.Element {
   const ref = useRef<HTMLCanvasElement | null>(null);
@@ -58,15 +63,15 @@ export function Workspace(): JSX.Element {
   const cncRemovalGrid = cncRemoval.grid;
   const canvasSize = useCanvasBitmapSize(ref);
   const previewBitmap = usePreviewBitmapRenderer(previewMode);
-  const { displayProject, textEditing } = useCanvasTextDisplayProject(project, previewMode);
+  const display = useCanvasDisplay(project, previewMode, selectedObjectId, additionalSelectedIds);
   useWorkspaceDraw({
     ref,
-    project: displayProject,
-    ...canvasTextSelection(textEditing, selectedObjectId, additionalSelectedIds),
+    ...display,
     selectedPathNode,
     selectedPathNodes,
     showPathNodeHandles: toolMode.kind === 'node',
     ...(toolMode.kind === 'cnc-tabs' ? { cncTabLayerColor: toolMode.layerColor } : {}),
+    ...(toolMode.kind === 'laser-tabs' ? { laserTabEditor: toolMode } : {}),
     previewMode,
     previewToolpath,
     cncRemovalGrid,
@@ -137,6 +142,9 @@ function WorkspaceDesignChrome(props: {
       <CanvasMotionBadge overlay={props.overlay} />
       <ArtworkNumberingPrompt />
       <NodeEditHint />
+      <LaserTabHint />
+      <TrimShapesHint />
+      <WarpDeformHint />
       <ZoomControls />
     </>
   );
@@ -210,6 +218,8 @@ type WorkspaceDrawArgs = {
   readonly selectedPathNodes: ReturnType<typeof useStore.getState>['selectedPathNodes'];
   readonly showPathNodeHandles: boolean;
   readonly cncTabLayerColor?: string;
+  readonly laserTabEditor?: LaserTabEditor;
+  readonly warpDeformEditor?: WarpDeformRequest;
   readonly additionalSelectedIds: ReadonlySet<string>;
   readonly previewMode: boolean;
   readonly previewToolpath: Toolpath | null;
@@ -230,6 +240,8 @@ function useWorkspaceDraw(args: WorkspaceDrawArgs): void {
   const draftShape = useUiStore((s) => s.draftShape);
   const selectionMarquee = useUiStore((s) => s.selectionMarquee);
   const snapGuides = useUiStore((s) => s.snapGuides);
+  const snapMarker = useUiStore((s) => s.snapMarker);
+  const gridMm = useUiStore((s) => s.snapSettings.gridMm);
   const measureDraft = useUiStore((s) => s.measureDraft);
   // Phase G (B6): the pen tool's in-progress polyline (also redraws per click /
   // cursor move).
@@ -259,6 +271,8 @@ function useWorkspaceDraw(args: WorkspaceDrawArgs): void {
       selectionMarquee,
       measureDraft,
       snapGuides,
+      snapMarker,
+      gridMm,
       wireframe,
     });
     // `args` is recreated by Workspace; its consumed fields are listed below.
@@ -271,6 +285,8 @@ function useWorkspaceDraw(args: WorkspaceDrawArgs): void {
     args.selectedPathNodes,
     args.showPathNodeHandles,
     args.cncTabLayerColor,
+    args.laserTabEditor,
+    args.warpDeformEditor,
     args.additionalSelectedIds,
     args.previewMode,
     args.scrubberT,
@@ -291,6 +307,8 @@ function useWorkspaceDraw(args: WorkspaceDrawArgs): void {
     penDraft,
     selectionMarquee,
     snapGuides,
+    snapMarker,
+    gridMm,
     wireframe,
   ]);
 }
@@ -308,6 +326,8 @@ function drawWorkspaceScene(
     readonly selectionMarquee: ReturnType<typeof useUiStore.getState>['selectionMarquee'];
     readonly measureDraft: ReturnType<typeof useUiStore.getState>['measureDraft'];
     readonly snapGuides: ReturnType<typeof useUiStore.getState>['snapGuides'];
+    readonly snapMarker: ReturnType<typeof useUiStore.getState>['snapMarker'];
+    readonly gridMm: number;
     readonly wireframe: boolean;
   },
 ): void {
@@ -332,7 +352,11 @@ function drawWorkspaceScene(
     ...(state.selectionMarquee === null ? {} : { selectionMarquee: state.selectionMarquee }),
     ...(state.measureDraft === null ? {} : { measureDraft: state.measureDraft }),
     ...(state.snapGuides.length === 0 ? {} : { snapGuides: state.snapGuides }),
+    ...(state.snapMarker === null ? {} : { snapMarker: state.snapMarker }),
+    gridMm: state.gridMm,
     ...(args.cncTabLayerColor === undefined ? {} : { cncTabLayerColor: args.cncTabLayerColor }),
+    ...(args.laserTabEditor === undefined ? {} : { laserTabEditor: args.laserTabEditor }),
+    ...(args.warpDeformEditor === undefined ? {} : { warpDeformEditor: args.warpDeformEditor }),
     ...(args.artworkRunFocus === null ? {} : { artworkRunFocus: args.artworkRunFocus }),
     wireframe: state.wireframe,
   });

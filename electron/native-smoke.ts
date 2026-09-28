@@ -42,8 +42,8 @@ export function installPackagedNativeSmoke(input: {
   input.window.webContents.on('did-fail-load', (_event, code, description, url) => {
     failures.push(`load ${code}: ${description} (${url})`);
   });
-  input.window.webContents.on('console-message', (_event, level, message, line, source) => {
-    if (level >= 3) failures.push(`console ${source}:${line}: ${message}`);
+  input.window.webContents.on('console-message', ({ level, message, lineNumber, sourceId }) => {
+    if (level === 'error') failures.push(`console ${sourceId}:${lineNumber}: ${message}`);
   });
   input.window.once('ready-to-show', () => {
     void runRendererSmoke(input.window)

@@ -41,7 +41,7 @@ function laserAssumptions(
 
 describe('gcodeMetadataHeader', () => {
   it('tracks the latest safety-relevant emitter revision', () => {
-    expect(EMITTER_REVISION).toBe('relief-ramp-plunges-disclosed-20260927-v1');
+    expect(EMITTER_REVISION).toBe('park-kerf-arcs-scan-angle-overscan-20260928-v7');
   });
 
   it('emits provenance as GRBL comment lines and ends with a newline', () => {

@@ -137,8 +137,12 @@ function planDistinctJoin(context: ReadyJoinContext): CurveJoinPlan {
   const curves = context.path.curves
     .map((curve, index) => (index === context.firstRef.polylineIndex ? result.curve : curve))
     .filter((_curve, index) => index !== context.secondRef.polylineIndex);
-  const object = remapTabAnchorsAfterCurveRemoval(
-    context.object,
+  const object = remapLaserTabAnchorsAfterCurveRemoval(
+    remapTabAnchorsAfterCurveRemoval(
+      context.object,
+      context.pathIndex,
+      context.secondRef.polylineIndex,
+    ),
     context.pathIndex,
     context.secondRef.polylineIndex,
   );
@@ -161,6 +165,25 @@ function remapTabAnchorsAfterCurveRemoval(
     return [{ ...anchor, polylineIndex: anchor.polylineIndex - 1 }];
   });
   return changed ? { ...object, cncTabAnchors } : object;
+}
+
+// ADR-494: laser tab anchors move with the curves exactly like the CNC ones.
+function remapLaserTabAnchorsAfterCurveRemoval(
+  object: CurveCommandObject,
+  pathIndex: number,
+  removedPolylineIndex: number,
+): CurveCommandObject {
+  if (object.laserTabAnchors === undefined) return object;
+  let changed = false;
+  const laserTabAnchors = object.laserTabAnchors.flatMap((anchor) => {
+    if (anchor.pathIndex !== pathIndex || anchor.polylineIndex < removedPolylineIndex) {
+      return [anchor];
+    }
+    changed = true;
+    if (anchor.polylineIndex === removedPolylineIndex) return [];
+    return [{ ...anchor, polylineIndex: anchor.polylineIndex - 1 }];
+  });
+  return changed ? { ...object, laserTabAnchors } : object;
 }
 
 function materializePlan(

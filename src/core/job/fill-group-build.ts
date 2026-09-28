@@ -5,6 +5,7 @@
 
 import type { DeviceProfile } from '../devices';
 import type { Layer } from '../scene';
+import { fillScanOverscanMm } from './automatic-overscan';
 import { contourEntryRunwayMm } from './contour-entry';
 import { fillRunwayPolicyForDevice } from './fill-runway-policy';
 import type { FillGroup, FillSegment } from './job';
@@ -38,7 +39,7 @@ export function buildFillGroup(args: {
     ...(entryRunwayMm === undefined ? {} : { entryRunwayMm }),
     ...(isOffset ? {} : { scanDirection: args.scanDirection }),
     ...(isOffset || scanOffsetMm === undefined ? {} : { bidirectionalScanOffsetMm: scanOffsetMm }),
-    overscanMm: Math.max(0, layer.fillOverscanMm),
+    overscanMm: fillScanOverscanMm(layer, device),
     segments: args.segments,
   };
 }

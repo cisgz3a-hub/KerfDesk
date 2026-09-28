@@ -1,9 +1,11 @@
 import type { EditingToolsCommandId } from '../commands/editing-tools-command-types';
 import type { CommandHelpTopic } from './command-help-topics';
+import { DESIGN_TOOLS_COMMAND_HELP } from './design-tools-command-help';
 
-// LightBurn gap batch 3 (ADR-410) commands.
+// LightBurn gap batch 3 (ADR-410) commands, plus batch 5 (ADR-480).
 export const EDITING_TOOLS_COMMAND_HELP: Readonly<Record<EditingToolsCommandId, CommandHelpTopic>> =
   {
+    ...DESIGN_TOOLS_COMMAND_HELP,
     'edit.paste-in-place': {
       family: 'edit',
       tooltip:

@@ -23,6 +23,7 @@ import { DetectedSettingsToast } from './DetectedSettingsToast';
 import { openMachineSetup } from './device-setup';
 import { StatusDisplay } from './StatusDisplay';
 import { JogPad } from './JogPad';
+import { MoveToPositionSection } from './MoveToPositionSection';
 import { JobControls } from './JobControls';
 import { ProbePanel } from './ProbePanel';
 import { runStartJobFlow } from './start-job-flow';
@@ -57,6 +58,12 @@ export function LaserWindow({
   const jogBlocked = useJogBlocked();
   const controllerDisplay = controllerDisplayState(controllerState, alarmCode);
   const connected = connection.kind === 'connected';
+  const jogPadDisabled = isJogPadDisabled(
+    connected,
+    controllerDisplay.idle,
+    machineOperationBusy,
+    jogBlocked,
+  );
   // Homing lives on the Confirm settings step, which is not collapsed, so the
   // deep-link needs no section highlight.
   const openHomingSetup = (): void => openMachineSetup({ kind: 'step', step: 'confirm' });
@@ -95,14 +102,8 @@ export function LaserWindow({
       )}
       {controllerDisplay.sleep && <SleepBanner onWake={control.runWake} />}
       <StatusDisplay />
-      <JogPad
-        disabled={isJogPadDisabled(
-          connected,
-          controllerDisplay.idle,
-          machineOperationBusy,
-          jogBlocked,
-        )}
-      />
+      <JogPad disabled={jogPadDisabled} />
+      <MoveToPositionSection disabled={jogPadDisabled} />
       <ProbePanel />
       <JobControls
         setupExtras={<CncUtilitiesPanel />}

@@ -116,9 +116,9 @@ describe('compile attaches laser arc moves (ADR-432)', () => {
     expect(only(compileCut(rotary)).arcMoves).toBeUndefined();
   });
 
-  it('attaches nothing to kerf-offset contours', () => {
+  it('fits kerf-offset contours too (ADR-486)', () => {
     const layer = { ...createLayer({ id: 'l', color: '#000000' }), kerfOffsetMm: 0.1 };
-    expect(only(compileCut(ARC_DEVICE, layer)).arcMoves).toBeUndefined();
+    expect(validCutArcMoves(only(compileCut(ARC_DEVICE, layer)))).not.toBeNull();
   });
 });
 

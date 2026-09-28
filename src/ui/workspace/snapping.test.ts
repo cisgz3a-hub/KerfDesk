@@ -7,15 +7,10 @@ import {
   type SceneObject,
   type Transform,
 } from '../../core/scene';
-import { snapMoveTransform, type SnapSettings } from './snapping';
+import { DEFAULT_SNAP_SETTINGS, snapMoveTransform, type SnapSettings } from './snapping';
 
-const BASE_SETTINGS: SnapSettings = {
-  enabled: true,
-  snapToGrid: false,
-  snapToObjects: true,
-  distanceMm: 2,
-  gridMm: 10,
-};
+const BASE_SETTINGS: SnapSettings = { ...DEFAULT_SNAP_SETTINGS, snapToGrid: false };
+const DISTANCE_MM = 2;
 
 describe('snapMoveTransform', () => {
   it('snaps a moving object edge to a nearby object edge', () => {
@@ -28,6 +23,7 @@ describe('snapMoveTransform', () => {
       movingObjectId: 'moving',
       proposedTransform: proposed,
       settings: BASE_SETTINGS,
+      distanceMm: DISTANCE_MM,
     });
 
     expect(result.transform.x).toBeCloseTo(20);
@@ -43,6 +39,7 @@ describe('snapMoveTransform', () => {
       movingObjectId: 'moving',
       proposedTransform: transformAt(19.4, 4.2),
       settings: { ...BASE_SETTINGS, snapToGrid: true, snapToObjects: false },
+      distanceMm: DISTANCE_MM,
     });
 
     expect(result.transform.x).toBeCloseTo(20);
@@ -63,6 +60,7 @@ describe('snapMoveTransform', () => {
         movingObjectId: 'moving',
         proposedTransform: proposed,
         settings: BASE_SETTINGS,
+        distanceMm: DISTANCE_MM,
       }),
     ).toEqual({ transform: proposed, guides: [] });
 
@@ -72,6 +70,7 @@ describe('snapMoveTransform', () => {
         movingObjectId: 'moving',
         proposedTransform: transformAt(19.2, 0),
         settings: { ...BASE_SETTINGS, enabled: false },
+        distanceMm: DISTANCE_MM,
       }),
     ).toEqual({ transform: transformAt(19.2, 0), guides: [] });
   });
@@ -85,6 +84,7 @@ describe('snapMoveTransform', () => {
       movingObjectId: 'moving',
       proposedTransform: transformAt(19.2, 0),
       settings: BASE_SETTINGS,
+      distanceMm: DISTANCE_MM,
     });
 
     expect(result.transform.x).toBeCloseTo(19.2);
@@ -101,6 +101,7 @@ describe('snapMoveTransform', () => {
       ignoredObjectIds: new Set([selectionPeer.id]),
       proposedTransform: transformAt(19.2, 0),
       settings: BASE_SETTINGS,
+      distanceMm: DISTANCE_MM,
     });
 
     expect(result.transform.x).toBeCloseTo(19.2);
@@ -124,6 +125,7 @@ describe('snapMoveTransform', () => {
       movingObjectId: 'moving',
       proposedTransform: transformAt(19.2, 0),
       settings: BASE_SETTINGS,
+      distanceMm: DISTANCE_MM,
     });
 
     expect(result.transform.x).toBeCloseTo(19.2);

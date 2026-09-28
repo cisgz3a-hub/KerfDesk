@@ -1,0 +1,93 @@
+name: Desktop Preview cadence
+
+# Keeps desktop Previews regular (ADR-522). Once a day: when main has
+# user-facing changes the newest Preview lacks and that Preview is at least a
+# week old, keep ONE issue open that names the next Preview tag, the newest
+# main commit that CI, Browser smoke and the Desktop package check all passed
+# on, the commands to tag it and the drafted release notes. The issue closes
+# once a newer Preview exists, and any second open issue with that title is
+# closed as a duplicate.
+#
+# Tagging stays with the maintainer: the v* tag ruleset lets only the
+# maintainer create release tags (ADR-248). This workflow reads the repository
+# and edits one issue; it never tags, pushes or publishes.
+on:
+  schedule:
+    # 06:23 UTC, off the hour: GitHub delays cron runs scheduled on the hour.
+    - cron: '23 6 * * *'
+  workflow_dispatch:
+
+# Runs queue rather than overlap, so two runs never both open an issue.
+concurrency:
+  group: ${{ github.workflow }}
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+  # Reads which main commits the three workflows passed on.
+  actions: read
+  # Only the tracking-issue steps below.
+  issues: write
+
+jobs:
+  cadence:
+    name: Draft the next desktop Preview
+    runs-on: ubuntu-latest
+    env:
+      GH_TOKEN: ${{ github.token }}
+      GH_REPO: ${{ github.repository }}
+      ISSUE_PREFIX: Desktop Preview due
+    steps:
+      - name: Checkout main with its tags
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          ref: main
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Set up Node.js
+        uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
+        with:
+          node-version: 22
+
+      - name: List the main commits each workflow passed on
+        run: |
+          for workflow in ci.yml e2e.yml desktop-package-check.yml; do
+            gh run list --workflow "${workflow}" --branch main --event push --status success \
+              --limit 200 --json headSha --jq '.[].headSha' > "${RUNNER_TEMP}/green-${workflow%.yml}.txt"
+          done
+
+      - name: Draft the next Preview
+        id: cadence
+        run: >-
+          node scripts/desktop-preview-cadence.mjs
+          --green="${RUNNER_TEMP}/green-ci.txt"
+          --green="${RUNNER_TEMP}/green-e2e.txt"
+          --green="${RUNNER_TEMP}/green-desktop-package-check.txt"
+          --issue="${RUNNER_TEMP}/issue.md"
+          --github-output="${GITHUB_OUTPUT}"
+
+      - name: Keep one Preview issue, current or closed
+        if: steps.cadence.outputs.due != 'waiting'
+        env:
+          DUE: ${{ steps.cadence.outputs.due }}
+          ISSUE_TITLE: ${{ steps.cadence.outputs.title }}
+        run: |
+          set -euo pipefail
+          # Every open issue whose title starts with the prefix, oldest first.
+          mapfile -t open_issues < <(gh issue list --state open --limit 1000 --json number,title \
+            --jq '[.[] | select(.title | startswith(env.ISSUE_PREFIX)) | .number] | sort | .[]')
+          keep="${open_issues[0]:-}"
+          # There is only ever one: a second one (opened by hand, say) is closed.
+          for extra in "${open_issues[@]:1}"; do
+            gh issue close "${extra}" --reason "not planned" --comment "Duplicate of #${keep}."
+          done
+          if [ "${DUE}" = "true" ]; then
+            if [ -n "${keep}" ]; then
+              gh issue edit "${keep}" --title "${ISSUE_TITLE}" --body-file "${RUNNER_TEMP}/issue.md"
+            else
+              gh issue create --title "${ISSUE_TITLE}" --body-file "${RUNNER_TEMP}/issue.md"
+            fi
+          elif [ -n "${keep}" ]; then
+            gh issue close "${keep}" --comment "$(cat "${RUNNER_TEMP}/issue.md")"
+          fi

@@ -63,9 +63,13 @@ async function startHeld(page: Page, kerfdesk: KerfDeskFixture, status = IDLE): 
 }
 
 /** Reconnect, start the saved recovery, acknowledge everything; return the lines sent. */
-async function recoverAndDrain(page: Page, kerfdesk: KerfDeskFixture): Promise<string[]> {
+async function recoverAndDrain(
+  page: Page,
+  kerfdesk: KerfDeskFixture,
+  automaticReview = true,
+): Promise<string[]> {
   await kerfdesk.setAutoAcknowledge(true);
-  await connectAndHome(page, kerfdesk);
+  await connectAndHome(page, kerfdesk, { closeRecoveryReview: automaticReview });
   await kerfdesk.setAutoAcknowledge(false);
   const recovery = page.locator('details[aria-label="Interrupted job recovery"]');
   if (!(await recovery.getByRole('button', { name: 'Review recovery', exact: true }).isVisible()))
@@ -99,7 +103,7 @@ async function importRowsImage(page: Page, kerfdesk: KerfDeskFixture): Promise<v
   await runMenuCommand(page, 'Edit', 'Delete');
   await kerfdesk.setOpenFiles([{ name: 'rows.png', kind: 'png-fixture', width: 120, height: 120 }]);
   await (await toolbarCommand(page, 'Import...')).click();
-  await expect(page.getByRole('spinbutton', { name: 'Selection width' })).toHaveValue('12');
+  await expect(page.getByLabel('Selection width', { exact: true })).toHaveValue('12');
 }
 
 /** A second window on the same origin, with its own fake serial port and pickers. */
@@ -239,7 +243,7 @@ test('a keystroke meant for a field does not answer the automatic completion off
   await connectAndHome(page, kerfdesk);
   const baselineLines = await startHeld(page, kerfdesk);
   // The operator has a field focused, about to type, while the last lines run.
-  const field = page.getByRole('spinbutton', { name: 'Selection X position' });
+  const field = page.getByLabel('Selection X position', { exact: true });
   await field.click();
   await field.press('End');
   await drainHeldSerialWrites(page, kerfdesk, baselineLines, 400);
@@ -264,7 +268,7 @@ test('editing the design while a job runs still offers darkening when it complet
   await connectAndHome(page, kerfdesk);
   const baselineLines = await startHeld(page, kerfdesk);
   // The operator nudges the artwork for the next piece while this one burns.
-  const field = page.getByRole('spinbutton', { name: 'Selection X position' });
+  const field = page.getByLabel('Selection X position', { exact: true });
   await field.fill('47');
   await field.press('Tab');
   await expect(field).toHaveValue('47');
@@ -322,7 +326,8 @@ test('a page reload mid-job saves a recoverable capsule no older than one checkp
   expect(saved.ackedLines).toBeGreaterThan(60 - 25);
   // The capsule outlives the project session: reopen the design's machine.
   await reopenProject(page);
-  const sent = await recoverAndDrain(page, kerfdesk);
+  // A page close/restart is not one of the controller failures that auto-opens review.
+  const sent = await recoverAndDrain(page, kerfdesk, false);
   expect(sent.length).toBeGreaterThan(0);
   await expect(page.getByRole('dialog', { name: 'Job complete', exact: true })).toContainText(
     'Would you like to darken selected areas?',
@@ -383,7 +388,7 @@ test('recovery after a controller reset warns when the work origin differs from 
   // Reconnecting resets the controller: G92 is gone and the head reads machine 20,20.
   await kerfdesk.emitSerialLine('<Idle|MPos:20.000,20.000,0.000|WCO:0.000,0.000,0.000|FS:0,0>');
   await kerfdesk.setAutoAcknowledge(true);
-  await connectAndHome(page, kerfdesk);
+  await connectAndHome(page, kerfdesk, { closeRecoveryReview: true });
   // The operator re-creates an origin by eye, 15 mm away from the original one.
   await kerfdesk.emitSerialLine('<Idle|MPos:35.000,35.000,0.000|WCO:0.000,0.000,0.000|FS:0,0>');
   await page.getByRole('button', { name: 'Set origin here', exact: true }).click();
@@ -409,6 +414,49 @@ test('recovery after a controller reset warns when the work origin differs from 
   });
 });
 
+test('after a lost link the Review opens by itself, homes, and puts the saved origin back', async ({
+  page,
+  kerfdesk,
+}) => {
+  test.setTimeout(180_000);
+  page.on('dialog', (dialog) => void dialog.accept());
+  await connectAndHome(page, kerfdesk);
+  await page.getByText('Placement & output', { exact: true }).click();
+  await page.getByRole('combobox', { name: 'Start from' }).selectOption('user-origin');
+  await kerfdesk.emitSerialLine('<Idle|MPos:20.000,20.000,0.000|WCO:0.000,0.000,0.000|FS:0,0>');
+  await page.getByRole('button', { name: 'Set origin here', exact: true }).click();
+  await expect.poll(async () => serialWrites(await kerfdesk.events())).toContain('G92 X0 Y0');
+  const atOrigin = '<Idle|MPos:20.000,20.000,0.000|WCO:20.000,20.000,0.000|FS:0,0>';
+  await kerfdesk.emitSerialLine(atOrigin);
+  const baselineLines = await startHeld(page, kerfdesk, atOrigin);
+  await acknowledgeExactly(page, kerfdesk, baselineLines, 2);
+  await kerfdesk.disconnectSerial();
+  await savedCapsule(page);
+
+  // The reconnected controller was reset: no origin. The Review opens by itself
+  // over the Machine panel, so homing and the restore happen inside it.
+  await kerfdesk.emitSerialLine('<Idle|MPos:20.000,20.000,0.000|WCO:0.000,0.000,0.000|FS:0,0>');
+  await kerfdesk.setAutoAcknowledge(true);
+  await page.getByRole('button', { name: /^Connect/ }).click();
+  const review = page.getByRole('dialog', { name: 'Review interrupted laser job' });
+  await expect(review).toContainText('The controller has no work origin set now');
+  const writesBeforeHome = serialWrites(await kerfdesk.events()).length;
+  await review.getByRole('button', { name: 'Home machine', exact: true }).click();
+  await expect
+    .poll(async () => serialWrites(await kerfdesk.events()).slice(writesBeforeHome))
+    .toContain('G4 P0.01');
+  await kerfdesk.emitSerialLine(IDLE);
+  const restore = review.getByRole('button', { name: 'Restore saved origin', exact: true });
+  await expect(restore).toBeEnabled();
+  const writesBeforeRestore = serialWrites(await kerfdesk.events()).length;
+  await restore.click();
+  await expect
+    .poll(async () => serialWrites(await kerfdesk.events()).slice(writesBeforeRestore))
+    .toMatch(/G92 X-20(?:\.0+)? Y-20(?:\.0+)?/);
+  await kerfdesk.emitSerialLine('<Idle|MPos:0.000,0.000,0.000|WCO:20.000,20.000,0.000|FS:0,0>');
+  await expect(review).toContainText('The work origin matches the one this job ran with.');
+});
+
 test('two windows cannot both resume one interrupted job', async ({ page, kerfdesk }) => {
   test.setTimeout(180_000);
   const refusalsA = collectRefusals(page);
@@ -428,7 +476,7 @@ test('two windows cannot both resume one interrupted job', async ({ page, kerfde
   await selectWorkspacePanel(other.page, 'Machine');
   const cardB = other.page.locator('details[aria-label="Interrupted job recovery"]');
   await expect(cardB.getByText('Interrupted job saved', { exact: true })).toBeVisible();
-  await connectAndHome(other.page, other.fixture);
+  await connectAndHome(other.page, other.fixture, { closeRecoveryReview: true });
 
   // Window A resumes first. Chrome holds a background tab's native confirm until
   // the tab is shown, so each window is brought forward before it acts.
@@ -462,7 +510,7 @@ test('a recovery review open in another window closes when this window resumes t
   const other = await secondWindow(page);
   other.page.on('dialog', (dialog) => void dialog.accept());
   await selectWorkspacePanel(other.page, 'Machine');
-  await connectAndHome(other.page, other.fixture);
+  await connectAndHome(other.page, other.fixture, { closeRecoveryReview: true });
   // Window B opens its review first; window A then resumes the same capsule.
   const cardB = other.page.locator('details[aria-label="Interrupted job recovery"]');
   if (!(await cardB.getByRole('button', { name: 'Review recovery', exact: true }).isVisible()))

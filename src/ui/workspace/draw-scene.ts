@@ -26,6 +26,8 @@ import type { MeasureDraft } from './measure-tool';
 import { drawSelectionMarquee } from './draw-selection-marquee';
 import { drawSnapGuides } from './draw-snap-guides';
 import type { SnapGuide } from './snapping';
+import type { SnapMarker } from './snap/snap-kinds';
+import { drawSnapMarker } from './draw-snap-marker';
 import type { DisplayPolylineCache } from './display-polylines';
 import {
   drawObjectDisplay,
@@ -50,6 +52,9 @@ import { drawRulers } from './draw-rulers';
 import { drawOutOfBoundsOutlines } from './draw-out-of-bounds-outlines';
 import { drawObjectSelectionOverlay, drawSelectionSetOverlay } from './draw-selection-overlay';
 import { drawCncTabAnchors } from './cnc-tab-editor';
+import { drawLaserTabAnchors, type LaserTabEditor } from './laser-tab-editor';
+import { drawWarpDeformHandles } from './warp-deform-tool';
+import type { WarpDeformRequest } from '../state/warp-deform-session';
 import { computeView, type ViewState, type ViewTransform } from './view-transform';
 import { drawLargeSceneNotice, strokePolylinesBatched } from './draw-vector-strokes';
 import { drawArtworkRunFocus } from './draw-artwork-run-focus';
@@ -98,7 +103,12 @@ export type DrawOpts = {
   readonly selectionMarquee?: SelectionMarquee;
   readonly measureDraft?: MeasureDraft;
   readonly snapGuides?: ReadonlyArray<SnapGuide>;
+  // LBG-F06: what the pointer snapped to, and the grid spacing to draw.
+  readonly snapMarker?: SnapMarker;
+  readonly gridMm?: number;
   readonly cncTabLayerColor?: string;
+  readonly laserTabEditor?: LaserTabEditor;
+  readonly warpDeformEditor?: WarpDeformRequest;
   readonly artworkRunFocus?: ArtworkRunFocus;
   // ADR-410 Wireframe view: outline Fill artwork instead of filling it.
   readonly wireframe?: boolean;
@@ -127,7 +137,7 @@ export function drawScene(
     opts.view,
   );
   drawBed(ctx, project, view);
-  drawGrid(ctx, project, view);
+  drawGrid(ctx, project, view, opts.gridMm);
   // Stock footprint under everything else (CNC mode only — no-op for laser).
   drawCncStock(ctx, project, view);
   drawNoGoZones(ctx, project, view);
@@ -167,10 +177,19 @@ export function drawScene(
     drawRegistrationBoxDimensions(ctx, project, view);
     drawLiveWorkspaceOverlays(ctx, project, opts, view);
   }
-  if (!opts.preview) drawSnapGuides(ctx, opts.snapGuides ?? [], view);
+  if (!opts.preview) drawSnapFeedback(ctx, opts, view);
   drawOutOfBoundsOutlines(ctx, project, view);
   // Rulers go LAST so they're on top of everything else (F-A2).
   drawRulers(ctx, canvasW, canvasH, view);
+}
+
+function drawSnapFeedback(
+  ctx: CanvasRenderingContext2D,
+  opts: DrawOpts,
+  view: ViewTransform,
+): void {
+  drawSnapGuides(ctx, opts.snapGuides ?? [], view);
+  if (opts.snapMarker !== undefined) drawSnapMarker(ctx, opts.snapMarker, view);
 }
 
 // Preview-mode frame: faint artwork, raster sim, CNC removal shading, then
@@ -229,6 +248,12 @@ function drawLiveWorkspaceOverlays(
     const selected = project.scene.objects.find((object) => object.id === opts.selectedId);
     if (selected !== undefined) drawCncTabAnchors(ctx, selected, opts.cncTabLayerColor, view);
   }
+  if (opts.laserTabEditor !== undefined && opts.selectedId !== null) {
+    const selected = project.scene.objects.find((object) => object.id === opts.selectedId);
+    if (selected !== undefined)
+      drawLaserTabAnchors(ctx, project, selected, opts.laserTabEditor, view);
+  }
+  if (opts.warpDeformEditor !== undefined) drawWarpDeformHandles(ctx, opts.warpDeformEditor, view);
 }
 
 // Phase G (B5): render the shape being dragged out as a dashed accent outline.

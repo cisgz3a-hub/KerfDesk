@@ -111,6 +111,8 @@ function useStableTextValues(values: DialogValues): DialogValues {
   const guideObjectId = values.pathText?.guideObjectId;
   const offsetMm = values.pathText?.offsetMm ?? 0;
   const reverse = values.pathText?.reverse ?? false;
+  const alongAlign = values.pathText?.alongAlign;
+  const acrossAlign = values.pathText?.acrossAlign;
   return useMemo(
     () => ({
       content,
@@ -125,7 +127,17 @@ function useStableTextValues(values: DialogValues): DialogValues {
       embeddedFonts,
       ...(importedFont === undefined ? {} : { importedFont }),
       ...(pathGuide === undefined ? {} : { pathGuide }),
-      ...(guideObjectId === undefined ? {} : { pathText: { guideObjectId, offsetMm, reverse } }),
+      ...(guideObjectId === undefined
+        ? {}
+        : {
+            pathText: {
+              guideObjectId,
+              offsetMm,
+              reverse,
+              ...(alongAlign === undefined ? {} : { alongAlign }),
+              ...(acrossAlign === undefined ? {} : { acrossAlign }),
+            },
+          }),
       ...(variableEnabled
         ? {
             variableTemplate: {
@@ -151,6 +163,8 @@ function useStableTextValues(values: DialogValues): DialogValues {
       guideObjectId,
       offsetMm,
       reverse,
+      alongAlign,
+      acrossAlign,
       variableEnabled,
       sequenceOffset,
     ],

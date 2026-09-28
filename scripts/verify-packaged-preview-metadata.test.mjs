@@ -51,7 +51,10 @@ const NEAR_COLLISION_RENDERER_VERSION = '0.2.0-preview.140';
 const WRONG_RENDERER_VERSION = '0.1.822';
 const PACKAGE_AUTHOR_NAME = 'Johann Stolk';
 const ABOUT_MARKER = 'Free and open-source under the MIT License';
-const BUILD_BADGE_MARKER = 'Build version';
+const BUILD_BADGE_MARKER = 'lf-menu-build';
+// The Smoothieware firmware banner prefix, bundled into the core chunk and the
+// job workers alongside the Build badge's own "Build version" label.
+const FIRMWARE_BANNER = 'Build version:';
 
 async function createPreviewArchive(options = {}) {
   const aboutVersion = options.aboutVersion ?? PREVIEW_VERSION;
@@ -76,8 +79,14 @@ async function createPreviewArchive(options = {}) {
   );
   fs.writeFileSync(
     path.join(assets, 'ui-workbench-fixture.js'),
-    `const buildBadge = ${JSON.stringify(`${BUILD_BADGE_MARKER} ${buildBadgeVersion}`)};\n`,
+    `const buildBadge = { className: ${JSON.stringify(BUILD_BADGE_MARKER)}, 'aria-label': 'Build version', version: ${JSON.stringify(buildBadgeVersion)} };\n`,
   );
+  for (const chunk of ['core-fixture.js', 'preparation-worker-fixture.js']) {
+    fs.writeFileSync(
+      path.join(assets, chunk),
+      `const banner = ${JSON.stringify(FIRMWARE_BANNER)};\n`,
+    );
+  }
   await asar.createPackage(source, archive);
   await settledArchive(archive);
   return { archive, root };
