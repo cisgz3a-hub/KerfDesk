@@ -106,7 +106,7 @@ Sierra variants).
 | LBG-M02 | Numeric Move-to, saved positions, laser Finish Position | `R/MoveWindow/`, `R/CoordinatesOrigin/` | Click-to-move only; laser finish is fixed (`src/core/output/job-park-target.ts`) | S | Built (ADR-493) |
 | LBG-M03 | Rubber-band frame (outline that hugs the artwork) | `R/LaserWindow/` | Bounding-box frame (`src/core/job/frame-bounds.ts`) | M | open (needs an ADR) |
 | LBG-M04 | Red-dot pointer offset | `R/DeviceSettings/DimensionsUnits/` | Missing | M | open |
-| LBG-M05 | Material Test: choose the varied parameters (interval, passes), Line and Image modes, border | `R/MaterialTest/` | Speed by power, Fill only (`src/core/job/material-test-grid.ts`) | M | Taken by the Rayforge comparison thread (ADR-497): Power × Passes, Speed × Passes, cut-mode grid |
+| LBG-M05 | Material Test: choose the varied parameters (interval, passes), Line and Image modes, border | `R/MaterialTest/` | Speed by power, Fill only (`src/core/job/material-test-grid.ts`) | M | Built in ADR-497: rows and columns vary any two of speed, power, passes and hatch spacing; Engrave or Cut; runway sized for the fastest cell. Image mode and a border remain open |
 | LBG-M06 | Frame continuously (does not grant Start) | `R/DeviceSettings/BasicSettings/` | Missing | S-M | open |
 | LBG-M07 | Keyboard XY jog with modifier keys | `R/MoveWindow/` | Z only (`src/ui/laser/use-jog-shortcuts.ts`) | S | Built (ADR-493) |
 | LBG-M08 | Rotary on an A axis for 4-axis grblHAL and FluidNC boards | `R/RotaryMode/RotaryModeGCode/` | Y substitution only (`src/core/devices/rotary.ts`) | M | open |
@@ -166,8 +166,9 @@ Each batch is one pull request with its own decision record, tests and WORKFLOW.
   project or operation turns them on. Built in ADR-494.
 - **Next candidates, in order:** LBG-I01, LBG-I02, LBG-T04, LBG-T06, LBG-T08, LBG-T09, LBG-F06.
 - **Taken by the Rayforge comparison thread (2026-09-27):** LBG-C06 (image scan angle and cross-hatch,
-  built in ADR-492) and LBG-M05 (more material test grids, ADR-497), plus automatic overscan from speed and
-  acceleration (ADR-495) and recipes that apply themselves (ADR-496), outside these batches.
+  built in ADR-492) and LBG-M05 (more material test grids, built in ADR-497), plus automatic
+  overscan from speed and acceleration (ADR-495) and recipes that apply themselves (ADR-496),
+  outside these batches.
 - **Not in these batches:** the Camera feature rebuild thread owns LBG-M13 (several cameras per
   device) and is also building camera print-and-cut, trace from the camera image and object
   detection. LBG-M09 (Print and Cut out of Labs) stays unscheduled here until that work lands, so

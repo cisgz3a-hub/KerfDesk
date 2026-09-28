@@ -841,6 +841,21 @@ marks later edits as unapproved without changing the existing Frame/Start policy
 5. The runway is only as right as Machine Setup's acceleration: read $120 and $121 from the
    controller where the firmware reports them, and check the scan edges on scrap.
 
+### F-A7f. Material Test grids that vary any two settings (ADR-497)
+
+1. **Tools → Material Test**: **Test** picks **Engrave** (each cell filled) or **Cut** (each cell's
+   outline, to find what cuts through).
+2. **Rows vary** and **Columns vary** each pick speed, power, passes or, for Engrave, hatch
+   spacing. Picking the other axis's setting swaps the two. Each varied setting has a Min and Max;
+   the others take one value. Speed rows by power columns is the default.
+3. Every axis starts from its gentlest value: fastest speed, lowest power, fewest passes, widest
+   hatch spacing. A passes axis keeps one row or column per whole number in its range.
+4. Engraved rows run at least 5 mm of runway, longer where the row's fastest cell needs it to reach
+   speed at Machine Setup's acceleration; the dialog says when, and the grid leaves room for it on
+   the left.
+5. Burned labels show each row's and column's value (speeds as the feed the job runs). The toast
+   names what rows and columns vary.
+
 ---
 
 ### F-A8. Preview
