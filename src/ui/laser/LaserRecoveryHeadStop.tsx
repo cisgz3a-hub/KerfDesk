@@ -55,8 +55,8 @@ export function ContinueFromHeadStop(
         that spot is that point, without moving the head, and restarts from line {stop.line}. Use it
         when the saved origin cannot come back, for example on a machine that was not homed before
         the job, and only if nobody has moved the head since the stop. If the laser itself restarted
-        or lost power during the burn, the head stopped earlier than that; Frame remaining area
-        shows the difference before anything burns.
+        or lost power during the burn, the head stopped earlier than that{earlierStopReach(stop)};
+        Frame remaining area shows the difference before anything burns.
       </p>
       <button
         type="button"
@@ -72,6 +72,19 @@ export function ContinueFromHeadStop(
         </p>
       )}
     </div>
+  );
+}
+
+// How far back an earlier stop can sit (Amendment 8): the lines sent after the
+// last confirmed one, and the confirmed lines still queued in the controller.
+function earlierStopReach(stop: RecoveryHeadStop): string {
+  if (stop.unconfirmedLines <= 0 || stop.unconfirmedTravelMm === null) return '';
+  const lines =
+    stop.unconfirmedLines === 1 ? 'the 1 line' : `the ${formatCount(stop.unconfirmedLines)} lines`;
+  return (
+    `: ${lines} sent after the last one it confirmed cover about ` +
+    `${formatOriginMm(stop.unconfirmedTravelMm)} mm of travel, and confirmed lines may still ` +
+    'have been waiting in its queue'
   );
 }
 

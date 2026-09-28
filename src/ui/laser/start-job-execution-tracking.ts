@@ -1,6 +1,7 @@
 import { fingerprintGcode, fingerprintsEqual } from '../../core/recovery';
 import type { SimilarityTransform } from '../../core/registration';
-import { machineKindOf, type OutputScope } from '../../core/scene';
+import type { JobOriginPlacement } from '../../core/job';
+import { machineKindOf, type MachineKind, type OutputScope } from '../../core/scene';
 import { currentOutputScope, useStore } from '../state';
 import { canvasPlanRetentionKey } from '../state/canvas-motion-plan';
 import type { LaserState } from '../state/laser-store';
@@ -15,6 +16,9 @@ import {
   type RecoveryRepository,
   type RunId,
 } from '../state/recovery';
+import { reportedWorkOffsetMm } from '../state/infer-machine-position';
+import { createStartIntent } from '../state/recovery/start-intent';
+import type { UntrackedRunRecord } from '../state/recovery/untracked-run-record';
 import { useToastStore } from '../state/toast-store';
 import { rememberUnarchivedRun } from '../state/laser-unarchived-run';
 import type { JobReviewModel } from './job-review';
@@ -182,16 +186,54 @@ export async function activateAcceptedFreshRun(
   runId: RunId,
   staged: boolean,
   repository: RecoveryRepository,
+  untracked?: UntrackedRunRecord,
 ): Promise<void> {
   if (staged) {
     const activated = await repository.activateFreshRun(runId);
     if (activated.ok && activated.value) return;
   }
-  await repository.noteUntrackedRunAccepted(runId);
+  await repository.noteUntrackedRunAccepted(runId, untracked);
   useToastStore
     .getState()
     .pushToast(
-      'Job recovery is unavailable for this run, and no execution archive was retained. The job can continue, but this burn will not have a forensic record.',
+      untracked === undefined
+        ? 'Job recovery is unavailable for this run, and no execution archive was retained. The job can continue, but this burn will not have a forensic record.'
+        : 'KerfDesk could not keep the full recovery archive for this job, so its exact G-code is not saved. If the job is interrupted, KerfDesk keeps its origin and where it stopped, and the Review can continue it while this project is open and unchanged.',
       'warning',
     );
+}
+
+/** The short record a laser run without an archive keeps instead (ADR-341
+ * Amendment 8): its Start intent and the work offset at Start. */
+export function untrackedLaserRunRecord(args: {
+  readonly runId: RunId;
+  readonly gcode: string;
+  readonly machineKind: MachineKind;
+  readonly outputScope: OutputScope;
+  readonly jobOrigin: JobOriginPlacement | undefined;
+  readonly laser: LaserState;
+}): UntrackedRunRecord | undefined {
+  if (args.machineKind !== 'laser') return undefined;
+  try {
+    const intent = createStartIntent({
+      gcode: args.gcode,
+      machineKind: args.machineKind,
+      outputScope: args.outputScope,
+      ...(args.jobOrigin === undefined ? {} : { jobOrigin: args.jobOrigin }),
+      nowIso: new Date().toISOString(),
+    });
+    return { runId: args.runId, intent, startWorkOffsetMm: laserWorkOffsetMm(args.laser) };
+  } catch {
+    // Best-effort like the archive: an accepted run is never held up by it.
+    return undefined;
+  }
+}
+
+/** The work offset the controller last reported, in mm. */
+export function laserWorkOffsetMm(
+  laser: Pick<LaserState, 'controllerSettings' | 'wcoCache'>,
+): UntrackedRunRecord['startWorkOffsetMm'] {
+  const reportInches = laser.controllerSettings?.reportInches === true;
+  const offset = reportedWorkOffsetMm(laser.wcoCache, reportInches);
+  return offset === null ? null : { x: offset.x, y: offset.y, z: offset.z };
 }

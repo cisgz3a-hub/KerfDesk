@@ -17,6 +17,9 @@
 // the reversed one. That is exactly a lexicographic minimum over
 // (distanceSquared, segmentIndex, reverse). This module reproduces that
 // comparator, so ties resolve identically and G-code stays byte-identical.
+// A closed segment may also offer other start vertices (LBG-C04); the fourth
+// key, vertexIndex (absent = 0, the drawn start), breaks their exact ties, so
+// the drawn start wins a tie and entries without one compare as before.
 
 import type { Vec2 } from '../scene';
 
@@ -24,8 +27,15 @@ export type SegmentEntry = {
   readonly point: Vec2;
   readonly segmentIndex: number;
   readonly reverse: boolean;
+  /** The closed polyline vertex this entry starts at; absent means 0. */
+  readonly vertexIndex?: number;
 };
 
+// `isAvailable` must be monotone: once a segment is unavailable it stays so.
+// Both optimizer loops only ever retire segments, which lets the query drop
+// retired entries as it meets them. A closed segment can bring one entry per
+// vertex, so without that every later query near a placed shape would rescan
+// its dead vertices, and ordering would stop being linear-ish in vertex count.
 export type NearestEntryQuery = (
   cursor: Vec2,
   isAvailable: (segmentIndex: number) => boolean,
@@ -44,7 +54,8 @@ export function createNearestEntryQuery(entries: ReadonlyArray<SegmentEntry>): N
 
 type Grid = {
   readonly entries: ReadonlyArray<SegmentEntry>;
-  readonly cells: ReadonlyArray<ReadonlyArray<number>>;
+  // Mutable: retired entries are compacted out as queries meet them.
+  readonly cells: ReadonlyArray<number[]>;
   readonly minX: number;
   readonly minY: number;
   readonly cellWidth: number;
@@ -98,24 +109,30 @@ function clampIndex(value: number, side: number): number {
 }
 
 function linearQuery(entries: ReadonlyArray<SegmentEntry>): NearestEntryQuery {
+  const live = [...entries];
   return (cursor, isAvailable) => {
     let best: SegmentEntry | null = null;
     let bestDistSq = Number.POSITIVE_INFINITY;
-    for (const entry of entries) {
+    let kept = 0;
+    for (const entry of live) {
       if (!isAvailable(entry.segmentIndex)) continue;
+      live[kept] = entry;
+      kept += 1;
       const distSq = distanceSquared(cursor, entry.point);
       if (isBetter(distSq, entry, bestDistSq, best)) {
         bestDistSq = distSq;
         best = entry;
       }
     }
+    live.length = kept;
     return best;
   };
 }
 
 // The comparator the linear scan implied. Strictly-smaller distance wins;
 // on an exact tie the lower segment index wins, and within one segment the
-// forward entry wins - the order the old scan visited them in.
+// forward entry wins - the order the old scan visited them in - then the lower
+// start vertex, so a closed segment's drawn start wins its own ties.
 function isBetter(
   distSq: number,
   candidate: SegmentEntry,
@@ -133,7 +150,8 @@ function isBetter(
   if (candidate.segmentIndex !== best.segmentIndex) {
     return candidate.segmentIndex < best.segmentIndex;
   }
-  return !candidate.reverse && best.reverse;
+  if (candidate.reverse !== best.reverse) return !candidate.reverse;
+  return (candidate.vertexIndex ?? 0) < (best.vertexIndex ?? 0);
 }
 
 function gridNearest(
@@ -148,15 +166,21 @@ function gridNearest(
   const maxRing = Math.max(cx, grid.cols - 1 - cx, cy, grid.rows - 1 - cy);
   for (let ring = 0; ring <= maxRing; ring += 1) {
     for (const cellIndex of ringCells(grid, cx, cy, ring)) {
-      for (const entryIndex of grid.cells[cellIndex] ?? []) {
+      const cell = grid.cells[cellIndex];
+      if (cell === undefined) continue;
+      let kept = 0;
+      for (const entryIndex of cell) {
         const entry = grid.entries[entryIndex];
         if (entry === undefined || !isAvailable(entry.segmentIndex)) continue;
+        cell[kept] = entryIndex;
+        kept += 1;
         const distSq = distanceSquared(cursor, entry.point);
         if (isBetter(distSq, entry, bestDistSq, best)) {
           bestDistSq = distSq;
           best = entry;
         }
       }
+      cell.length = kept;
     }
     // Everything not yet scanned lies outside the box of scanned cells, so it
     // is at least `safeRadius` away. Once the best hit is nearer than that, no

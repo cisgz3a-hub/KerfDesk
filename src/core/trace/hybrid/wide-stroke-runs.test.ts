@@ -70,6 +70,37 @@ describe('local wide-stroke evidence', () => {
     ).toHaveLength(1);
   });
 
+  // ADR-454 Amendment 3: a pen line wobbling around the gate stays one run.
+  it.each([1, 2, 4])('joins wide runs across near-gate ink at %ix', (scale) => {
+    const wobble = profile(
+      (x) => (Math.floor(x / (12 * scale)) % 2 === 0 ? 5 : 4) * scale,
+      108 * scale,
+    );
+    const runs = wideStrokeRuns(wobble, 4 * scale);
+    expect(runs).toHaveLength(1);
+    expect(runs[0]?.[0]).toEqual({ x: 0, y: 0 });
+    expect(runs[0]?.at(-1)).toEqual({ x: 108 * scale - 0.5, y: 0 });
+    for (const [width, joined] of [
+      [3.4, false],
+      [3.6, true],
+    ] as const) {
+      const neck = profile(
+        (x) => (x >= 30 * scale && x < 50 * scale ? width : 6) * scale,
+        80 * scale,
+      );
+      expect(wideStrokeRuns(neck, 4 * scale), `${width} px neck`).toHaveLength(joined ? 1 : 2);
+    }
+  });
+
+  it('leaves a near-gate end beyond the last wide run out of the run', () => {
+    const runs = wideStrokeRuns(
+      profile((x) => (x < 40 ? 6 : 4)),
+      4,
+    );
+    expect(runs).toHaveLength(1);
+    expect(runs[0]!.at(-1)!.x).toBeLessThan(44);
+  });
+
   it("does not split a closed stroke's wide evidence at its arbitrary seam", () => {
     const widths = profile((x) => (x < 4 || x >= 96 ? 6 : 2));
     expect(wideStrokeRuns(widths, 4, true)).toHaveLength(1);

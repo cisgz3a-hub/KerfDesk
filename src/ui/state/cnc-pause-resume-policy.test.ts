@@ -40,4 +40,17 @@ describe('CNC pause/resume policy', () => {
     expect(cncResumeAdvisoryNotice('cnc', false, 'entering')).toMatch(/spinning up above the cut/);
     expect(cncResumeAdvisoryNotice('laser', false, 'lifted')).toBeNull();
   });
+
+  // ADR-411 Amendment 1: a Pause that left the bit in the cut says why beside
+  // Resume, not only in the log.
+  it('says why a Pause did not lift the bit, then the door-resume advice', () => {
+    const advisory = cncResumeAdvisoryNotice('cnc', false, null, 'The door input is open.');
+    expect(advisory).toBe(
+      'Pause did not lift the bit: The door input is open. Resume tries to lift it first. ' +
+        `If it still cannot: ${CNC_RESUME_ADVISORY_MESSAGE}`,
+    );
+    expect(cncResumeAdvisoryNotice('cnc', false, 'lifted', 'The door input is open.')).toBe(
+      CNC_LIFT_PHASE_MESSAGES.lifted,
+    );
+  });
 });
