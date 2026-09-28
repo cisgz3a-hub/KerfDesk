@@ -8,7 +8,7 @@ import {
 import { AnchoredPopover, movePopoverFocus } from './AnchoredPopover';
 import './WorkspaceLayoutSelect.css';
 
-const LAYOUT_OPTIONS: ReadonlyArray<{
+export const LAYOUT_OPTIONS: ReadonlyArray<{
   value: WorkspaceLayoutPreference;
   label: string;
   title: string;

@@ -2,6 +2,7 @@ import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { describe, expect, it, vi, afterEach } from 'vitest';
 import { createProject, type Project } from '../../core/scene';
+import { createRectangle } from '../../core/shapes/primitives';
 import { UndoHistoryDialog } from './UndoHistoryDialog';
 
 (
@@ -15,6 +16,8 @@ async function renderDialog(
     readonly redoStack?: ReadonlyArray<Project>;
     readonly onUndo?: () => void;
     readonly onRedo?: () => void;
+    readonly onUndoSteps?: (count: number) => void;
+    readonly onRedoSteps?: (count: number) => void;
     readonly onClose?: () => void;
   } = {},
 ): Promise<{ readonly host: HTMLDivElement; readonly root: Root }> {
@@ -30,6 +33,8 @@ async function renderDialog(
         redoStack={props.redoStack ?? []}
         onUndo={props.onUndo ?? vi.fn()}
         onRedo={props.onRedo ?? vi.fn()}
+        onUndoSteps={props.onUndoSteps ?? vi.fn()}
+        onRedoSteps={props.onRedoSteps ?? vi.fn()}
         onClose={props.onClose ?? vi.fn()}
       />,
     );
@@ -79,11 +84,60 @@ describe('UndoHistoryDialog', () => {
       await act(async () => root.unmount());
     }
   });
+
+  it('names every step as one newest-first timeline and jumps to the clicked one', async () => {
+    // Timeline: empty → add a → add b → (current) … redo: add c → add d.
+    const empty = createProject();
+    const withA = withObjects(empty, ['a']);
+    const withAB = withObjects(empty, ['a', 'b']);
+    const withABC = withObjects(empty, ['a', 'b', 'c']);
+    const withABCD = withObjects(empty, ['a', 'b', 'c', 'd']);
+    const onUndoSteps = vi.fn();
+    const onRedoSteps = vi.fn();
+    const { host, root } = await renderDialog({
+      current: withAB,
+      undoStack: [empty, withA],
+      redoStack: [withABCD, withABC],
+      onUndoSteps,
+      onRedoSteps,
+    });
+    try {
+      const rows = [...host.querySelectorAll<HTMLButtonElement>('[data-history-direction]')];
+      expect(rows.map((row) => row.dataset['historyDirection'])).toEqual([
+        'redo',
+        'redo',
+        'undo',
+        'undo',
+      ]);
+      expect(rows.map((row) => row.textContent)).toEqual([
+        'Add rectangle2 steps forward',
+        'Add rectangle1 step forward',
+        'Add rectangle1 step back',
+        'Add rectangle2 steps back',
+      ]);
+      for (const row of rows) expect(row.title).not.toBe('');
+      await act(async () => {
+        rows[3]?.click();
+        rows[0]?.click();
+      });
+      expect(onUndoSteps).toHaveBeenCalledWith(2);
+      expect(onRedoSteps).toHaveBeenCalledWith(2);
+    } finally {
+      await act(async () => root.unmount());
+    }
+  });
 });
 
+function withObjects(base: Project, ids: ReadonlyArray<string>): Project {
+  const objects = ids.map((id) =>
+    createRectangle({ id, color: '#000000', spec: { widthMm: 5, heightMm: 5, cornerRadiusMm: 0 } }),
+  );
+  return { ...base, scene: { ...base.scene, objects } };
+}
+
 function button(host: HTMLElement, label: string): HTMLButtonElement {
-  const match = [...host.querySelectorAll('button')].find((candidate) =>
-    candidate.textContent?.includes(label),
+  const match = [...host.querySelectorAll('button')].find(
+    (candidate) => candidate.textContent?.trim() === label,
   );
   if (!(match instanceof HTMLButtonElement)) throw new Error(`button not found: ${label}`);
   return match;

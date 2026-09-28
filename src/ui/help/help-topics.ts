@@ -76,7 +76,7 @@ export const TOOL_HELP: Readonly<Record<ToolHelpKey, HelpTopic>> = {
   select: {
     label: 'Select / transform',
     tooltip:
-      'Select, move, rotate, and resize artwork. Drag the center arrows to move a selection; Alt+click cycles crossing objects.',
+      'Select, move, rotate, and resize artwork. Drag the center arrows to move a selection; Alt+click cycles crossing objects. A moved selection snaps the node, midpoint or centre you grabbed onto other artwork; hold Alt or Ctrl while dragging to move freely.',
   },
   text: {
     label: 'Text',
@@ -84,31 +84,38 @@ export const TOOL_HELP: Readonly<Record<ToolHelpKey, HelpTopic>> = {
   },
   node: {
     label: 'Edit nodes',
-    tooltip: 'Edit vector path nodes without moving or resizing the whole object.',
+    tooltip:
+      'Edit vector path nodes without moving or resizing the whole object. A dragged node snaps to other nodes, midpoints, centres, crossings and the grid; hold Alt to place it freely.',
   },
   measure: {
     label: 'Measure',
-    tooltip: 'Measure distance, delta, and angle on the workspace. Hold Shift to snap the line.',
+    tooltip:
+      'Measure distance, delta, and angle on the workspace. Both ends snap to artwork and the grid; hold Shift to lock the angle to 45° steps or Alt to measure freely.',
   },
   rect: {
     label: 'Draw rectangle',
-    tooltip: 'Draw a rectangle by dragging on the workspace.',
+    tooltip:
+      'Draw a rectangle by dragging on the workspace. Corners snap to nodes, midpoints, centres, crossings and the grid; hold Alt to place freely.',
   },
   ellipse: {
     label: 'Draw ellipse',
-    tooltip: 'Draw an ellipse or circle by dragging on the workspace.',
+    tooltip:
+      'Draw an ellipse or circle by dragging on the workspace. The drag snaps to nodes, midpoints, centres, crossings and the grid; hold Alt to place freely.',
   },
   polygon: {
     label: 'Draw polygon',
-    tooltip: 'Draw a polygon by dragging to set its size on the workspace.',
+    tooltip:
+      'Draw a polygon by dragging to set its size on the workspace. The drag snaps like the other drawing tools; hold Alt to place freely.',
   },
   star: {
     label: 'Draw star',
-    tooltip: 'Draw a star by dragging to set its size on the workspace.',
+    tooltip:
+      'Draw a star by dragging to set its size on the workspace. The drag snaps like the other drawing tools; hold Alt to place freely.',
   },
   polyline: {
     label: 'Draw polyline',
-    tooltip: 'Draw connected line segments. Press Enter or double-click to finish.',
+    tooltip:
+      'Draw connected line segments. Press Enter or double-click to finish. Each click snaps to nodes, midpoints, centres, crossings and the grid; hold Alt to place freely.',
   },
 };
 

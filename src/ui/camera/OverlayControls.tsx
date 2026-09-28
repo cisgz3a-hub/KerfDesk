@@ -3,12 +3,15 @@
 // still-vs-live source choice, the material's surface height, which the
 // camera model uses to undo parallax exactly (ADR-440), and height areas for
 // objects that stand above the material (ADR-441 Amendment 2), and the pieces
-// on the bed to repeat a design on (ADR-442). Camera placement
+// on the bed to repeat a design on (ADR-442). A camera on the laser head
+// captures and stitches pictures instead of freezing one (ADR-449). Camera placement
 // stays latched after hiding the image so its status remains visible until
 // the operator exits it.
 
+import { isHeadCameraModel } from '../../core/camera/model/head-camera';
 import { useCameraStore } from '../state/camera-store';
-import { useActiveCameraModel } from './active-camera-model';
+import { useActiveCameraModel, useOwnCameraModel } from './active-camera-model';
+import { HeadCaptureControls } from './head/HeadCaptureControls';
 import { useCameraPlacementControls } from './use-camera-placement-controls';
 import { TraceFromCameraButton } from './TraceFromCameraButton';
 import { AccuracyMapToggle } from './accuracy/AccuracyMapToggle';
@@ -17,15 +20,29 @@ import { PiecesControl } from './pieces/PiecesControl';
 
 export function OverlayControls(): JSX.Element | null {
   const model = useActiveCameraModel();
-  return model === undefined ? null : <CalibratedOverlayControls />;
+  const own = useOwnCameraModel();
+  if (model !== undefined)
+    return <CalibratedOverlayControls headCamera={isHeadCameraModel(model)} />;
+  return isHeadCameraModel(own) ? <HeadPositionNotice /> : null;
 }
 
-function CalibratedOverlayControls(): JSX.Element {
+// A head camera's picture is placed by where the head is, so it waits for that.
+function HeadPositionNotice(): JSX.Element {
+  return (
+    <p role="status" style={headNoticeStyle}>
+      This camera rides on the laser head. Connect the machine and home it, so KerfDesk knows where
+      the head is and puts the camera picture in the right place.
+    </p>
+  );
+}
+
+function CalibratedOverlayControls(props: { readonly headCamera: boolean }): JSX.Element {
   const sourceState = useCameraStore((s) => s.sourceState);
   const visible = useCameraStore((s) => s.overlayVisible);
   const opacity = useCameraStore((s) => s.overlayOpacityPercent);
   const setOpacity = useCameraStore((s) => s.setOverlayOpacityPercent);
   const still = useCameraStore((s) => s.overlayStill);
+  const bedPicture = useCameraStore((s) => s.bedPicture);
   const surfaceHeightMm = useCameraStore((s) => s.surfaceHeightMm);
   const setSurfaceHeightMm = useCameraStore((s) => s.setSurfaceHeightMm);
   const placement = useCameraPlacementControls(true);
@@ -37,8 +54,10 @@ function CalibratedOverlayControls(): JSX.Element {
         placement={placement}
         visible={visible}
         sourceLive={sourceLive}
-        hasStill={still !== null}
+        hasStill={still !== null || bedPicture !== null}
+        headCamera={props.headCamera}
       />
+      {props.headCamera ? <HeadCaptureControls /> : null}
       {placement.active ? <CameraPlacementStatus placement={placement} /> : null}
       <SurfaceHeightControl heightMm={surfaceHeightMm} onChange={setSurfaceHeightMm} />
       <HeightAreasControl />
@@ -55,6 +74,7 @@ function OverlayActionRow(props: {
   readonly visible: boolean;
   readonly sourceLive: boolean;
   readonly hasStill: boolean;
+  readonly headCamera: boolean;
 }): JSX.Element {
   return (
     <div style={rowStyle}>
@@ -67,15 +87,17 @@ function OverlayActionRow(props: {
       >
         {props.visible ? 'Overlay on' : 'Overlay off'}
       </button>
-      <button
-        type="button"
-        className="lf-btn"
-        disabled={!props.sourceLive}
-        onClick={() => void props.placement.updateStill()}
-        title="Freeze the current camera frame as the workspace overlay."
-      >
-        Update still
-      </button>
+      {props.headCamera ? null : (
+        <button
+          type="button"
+          className="lf-btn"
+          disabled={!props.sourceLive}
+          onClick={() => void props.placement.updateStill()}
+          title="Freeze the current camera frame as the workspace overlay."
+        >
+          Update still
+        </button>
+      )}
       <button
         type="button"
         className="lf-btn"
@@ -213,6 +235,13 @@ const heightStyle: React.CSSProperties = {
 const heightInputStyle: React.CSSProperties = { display: 'flex', alignItems: 'center', gap: 4 };
 
 const heightMessageStyle: React.CSSProperties = { fontSize: 12, color: 'var(--lf-text-faint)' };
+const headNoticeStyle: React.CSSProperties = {
+  margin: 0,
+  paddingTop: 8,
+  borderTop: '1px solid var(--lf-border)',
+  fontSize: 12,
+  color: 'var(--lf-text-faint)',
+};
 
 function placementStatusStyle(trusted: boolean): React.CSSProperties {
   return {

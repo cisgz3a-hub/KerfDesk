@@ -17,6 +17,8 @@ import { useLaserStore } from '../state/laser-store';
 import { nativeBedEvidenceSnapshot } from '../state/native-bed-frame';
 import { useToastStore } from '../state/toast-store';
 import { useUiStore } from '../state/ui-store';
+import { namedUndoAction, withUndoStepName } from '../state/undo-step-names';
+import { useNudgeStore } from '../state/nudge-preferences';
 import { confirmDiscardAsync } from './confirm-discard';
 import type { EditCtx, FileCtx, ToolCtx, TransformCtx, ViewCtx } from './shortcuts';
 import { toggleWorkspaceSidePanels } from './workspace-panel-actions';
@@ -72,11 +74,12 @@ export function editShortcutContext(): EditCtx {
     selectObject: app.selectObject,
     selectAllObjects: app.selectAllObjects,
     copySelection: app.copySelection,
-    cutSelection: app.cutSelection,
-    pasteClipboard: app.pasteClipboard,
-    groupSelection: app.groupSelection,
-    ungroupSelection: app.ungroupSelection,
-    duplicateSelection: app.duplicateSelection,
+    // Keyboard steps carry the same Undo-list names as their menu commands.
+    cutSelection: namedUndoAction('Cut', app.cutSelection),
+    pasteClipboard: namedUndoAction('Paste', app.pasteClipboard),
+    groupSelection: namedUndoAction('Group', app.groupSelection),
+    ungroupSelection: namedUndoAction('Ungroup', app.ungroupSelection),
+    duplicateSelection: namedUndoAction('Duplicate', app.duplicateSelection),
     resetToolMode: useUiStore.getState().resetToolMode,
   };
 }
@@ -90,7 +93,11 @@ export function transformShortcutContext(): TransformCtx {
     applyObjectTransform: app.applyObjectTransform,
     nudgeSelection: app.nudgeSelection,
     nudgeSelectedPathNode: app.nudgeSelectedPathNode,
-    flipSelection: app.flipSelection,
+    flipSelection: (axis) =>
+      withUndoStepName(axis === 'horizontal' ? 'Flip Horizontal' : 'Flip Vertical', () =>
+        app.flipSelection(axis),
+      ),
+    nudgeSteps: useNudgeStore.getState().nudgeSteps,
   };
 }
 

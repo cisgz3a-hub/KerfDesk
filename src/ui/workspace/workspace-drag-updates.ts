@@ -1,11 +1,14 @@
 import type { Project, ShapeObject, Vec2 } from '../../core/scene';
 import type { ToolMode } from '../state/ui-store';
 import type { DragState } from './drag-state';
-import { draftForDrawDrag, drawModifiersFromEvent } from './draw-tool';
+import { commitDraftShape, draftForDrawDrag, drawModifiersFromEvent } from './draw-tool';
 import { constrainMeasureEnd, type MeasureDraft } from './measure-tool';
 import { moveLaserTabDrag } from './laser-tab-editor';
+import { moveWarpHandleDrag } from './warp-deform-tool';
 import { updatePathNodeDrag } from './path-node-drag';
 import { updatePenCursor } from './pen-tool';
+import type { ViewState } from './view-transform';
+import { snappedDragEndPoint } from './workspace-pointer-snap';
 
 type CanvasMouseEvent = React.MouseEvent<HTMLCanvasElement>;
 
@@ -68,6 +71,10 @@ function handleLiveToolUpdate(args: NonTransformDragUpdateArgs): boolean {
     moveLaserTabDrag(args.drag, args.e.clientX, args.e.clientY, args.point);
     return true;
   }
+  if (args.drag?.kind === 'warp-handle') {
+    moveWarpHandleDrag(args.drag, args.point, args.e.shiftKey);
+    return true;
+  }
   if (args.drag?.kind === 'cnc-tab') {
     if (args.point !== null) {
       args.setSelectedCncTabAnchorDuringInteraction(
@@ -94,6 +101,22 @@ export function updateMeasureDraft(args: {
     start: args.drag.startScenePoint,
     end: constrainMeasureEnd(args.drag.startScenePoint, args.point, args.constrained),
   });
+}
+
+// The pointer-up of a draw drag: the draft follows the snapped end point one
+// last time (so the commit is exactly what the marker showed), then commits.
+export function commitDrawDraft(args: {
+  readonly drag: Extract<DragState, { kind: 'draw' }>;
+  readonly e: CanvasMouseEvent;
+  readonly ref: React.RefObject<HTMLCanvasElement | null>;
+  readonly project: Project;
+  readonly viewState: ViewState;
+  readonly setDraftShape: (shape: ShapeObject | null) => void;
+  readonly drawShape: (shape: ShapeObject) => void;
+}): void {
+  const point = snappedDragEndPoint(args);
+  updateDrawDraft({ ...args, point });
+  commitDraftShape(args.drawShape);
 }
 
 export function updateDrawDraft(args: {

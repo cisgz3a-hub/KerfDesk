@@ -14,7 +14,7 @@ import {
 import { type Project, type ShapeObject, type Vec2 } from '../../core/scene';
 import { useUiStore } from '../state/ui-store';
 import { type DragState } from './drag-state';
-import { canvasMouseToScene } from './view-transform';
+import { snapWorkspacePointer } from './workspace-pointer-snap';
 
 type ViewArg = { readonly zoomFactor: number; readonly panX: number; readonly panY: number };
 
@@ -29,7 +29,8 @@ export const DEFAULT_SHAPE_COLOR = '#000000';
 const DRAFT_SHAPE_ID = 'draft';
 
 // Begin a draw drag from a left-button mouse-down while a draw tool is armed.
-// Returns null when the point is off-canvas.
+// The start point snaps like the drag's end (LBG-F06). Returns null when the
+// point is off-canvas.
 export function beginDrawDrag(args: {
   readonly e: React.MouseEvent<HTMLCanvasElement>;
   readonly ref: React.RefObject<HTMLCanvasElement | null>;
@@ -38,7 +39,14 @@ export function beginDrawDrag(args: {
   readonly shape: DrawShapeKind;
 }): DragState | null {
   if (isLeftDoubleClick(args.e)) return null;
-  const point = canvasMouseToScene(args.e, args.ref.current, args.project, args.viewState);
+  const { point } = snapWorkspacePointer({
+    e: args.e,
+    canvas: args.ref.current,
+    project: args.project,
+    viewState: args.viewState,
+    drag: null,
+    toolMode: { kind: 'draw', shape: args.shape },
+  });
   if (point === null) return null;
   return { kind: 'draw', shape: args.shape, startScenePoint: point };
 }

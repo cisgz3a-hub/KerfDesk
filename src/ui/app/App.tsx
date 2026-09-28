@@ -25,6 +25,7 @@ import { PwaUpdateWatcherGate } from './PwaUpdateWatcherGate';
 import { useAutosave } from './use-autosave';
 import { AutosaveRecoveryBanner } from './AutosaveRecoveryBanner';
 import { useActiveJobWakeLock } from './use-active-job-wake-lock';
+import { useJobWatch } from '../camera/job-watch/job-watch-runner';
 import { useAutoConnectController } from './use-auto-connect-controller';
 import { useCncLibraryPersistence } from './use-cnc-library-persistence';
 import { useGlobalErrorHandlers } from './use-global-error-handlers';
@@ -116,6 +117,7 @@ function AppLifecycle(): null {
   useShortcuts();
   useSpacePan();
   useActiveJobWakeLock();
+  useJobWatch();
   useAutoConnectController();
   useJobCheckpoint();
   useMachineHoursTracking();

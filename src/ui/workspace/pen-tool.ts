@@ -10,7 +10,8 @@ import { assertNever, type Project, type ShapeObject, type Vec2 } from '../../co
 import { createPolyline } from '../../core/shapes';
 import { type PenDraft, useUiStore } from '../state/ui-store';
 import { currentDrawingColor } from './draw-tool';
-import { canvasMouseToScene, pxToMmForCanvas } from './view-transform';
+import { pxToMmForCanvas } from './view-transform';
+import { snapWorkspacePointer } from './workspace-pointer-snap';
 
 type ViewArg = { readonly zoomFactor: number; readonly panX: number; readonly panY: number };
 
@@ -62,7 +63,15 @@ export function handlePenMouseDown(args: {
   readonly viewState: ViewArg;
   readonly drawShape: (shape: ShapeObject) => void;
 }): void {
-  const rawPoint = canvasMouseToScene(args.e, args.ref.current, args.project, args.viewState);
+  // Snapped like the drawing tools (LBG-F06), except while Shift constrains.
+  const { point: rawPoint } = snapWorkspacePointer({
+    e: args.e,
+    canvas: args.ref.current,
+    project: args.project,
+    viewState: args.viewState,
+    drag: null,
+    toolMode: { kind: 'draw', shape: 'polyline' },
+  });
   if (rawPoint === null) return;
   const pxToMm = pxToMmForCanvas(args.ref.current, args.project, args.viewState);
   const penDraft = useUiStore.getState().penDraft;

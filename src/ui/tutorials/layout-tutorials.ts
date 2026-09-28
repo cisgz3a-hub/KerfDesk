@@ -95,7 +95,7 @@ export const LAYOUT_TUTORIALS: readonly Tutorial[] = [
       {
         title: 'Set rows and columns',
         instruction:
-          'Choose Grid. Enter Rows and Columns. Set Horizontal spacing and Vertical spacing for the gaps between copies.',
+          'Choose Grid. Enter Rows and Columns. Set Horizontal spacing and Vertical spacing for the gaps between copies, or set Space by to Distance between centres.',
         focus: 'Grid · Rows · Columns',
         result: 'The grid size and gaps are set.',
       },
@@ -107,7 +107,7 @@ export const LAYOUT_TUTORIALS: readonly Tutorial[] = [
         result: 'Your copies appear on the canvas.',
       },
     ],
-    tip: 'Circular places copies on a circle. Point Rotation turns copies around the selection centre; its Copies count includes the original.',
+    tip: 'Row shift and Mirror alternate columns nest bricks, hexagons and triangles. Circular places copies on a circle, all the way round or over part of it. Point Rotation turns copies around the selection centre; its Copies count includes the original.',
     keywords: ['array', 'repeat', 'copies', 'grid', 'circular', 'rotation'],
     related: ['nest', 'align', 'operations'],
   },

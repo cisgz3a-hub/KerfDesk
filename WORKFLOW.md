@@ -406,7 +406,9 @@ destination and cannot overwrite the template source.
 #### Move — keyboard
 - Arrow key: 1 mm nudge in that direction.
 - Shift+Arrow: 10 mm nudge.
-- No other modifiers in Phase A.
+- Ctrl/Cmd+Arrow: 0.1 mm nudge (ADR-499).
+- All three distances are set in **Settings → Canvas** (0.01 to 1000 mm).
+- Alt+Arrow aligns instead of nudging (ADR-499, F-A6h).
 
 #### Scale — drag handles
 - Corner handles: locked aspect ratio by default.
@@ -488,10 +490,21 @@ destination and cannot overwrite the template source.
    remain on the first instance; later objects and copied complete groups receive fresh IDs.
 6. **Create array** commits one undo entry and selects all instances. **Cancel** or Escape leaves the
    project unchanged.
-7. Array settings remain transient. Every mode can optionally **Advance variables per copy** (F-D6);
-   its per-text sequence offsets persist with the resulting ordinary objects. Preview, save,
-   compilation, Frame, and Start consume those objects through the existing exact-artifact path. This mode creates no
+7. Array settings are not saved in the project. Array... reopens with the settings last applied in
+   this session (ADR-499), except a circle's centre object, and Cancel remembers nothing. Every mode
+   can optionally **Advance variables per copy** (F-D6), which always starts off; its per-text
+   sequence offsets persist with the resulting ordinary objects. Preview, save, compilation, Frame,
+   and Start consume those objects through the existing exact-artifact path. This mode creates no
    new output path or guard.
+8. **Grid extras (ADR-499).** **Space by** Gap between copies or Distance between centres (switching
+   converts the numbers). **Row shift** moves rows 2, 4... right and **Column shift** moves columns
+   2, 4... down (negative values go left or up). **Mirror alternate columns / rows** flips every
+   other copy horizontally, vertically or both. **Build right to left** and **Build bottom to top**
+   change where the copies grow; the original stays at row 1, column 1.
+9. **Circular extras (ADR-499).** **Centre** is the selection centre, a typed point or, with two or
+   more objects selected, one of them, which stays put and is not copied. **Spread copies** evenly
+   all the way round, from a start to an end angle (both ends included), or by a step angle. 0° is
+   to the right and angles run clockwise. The status line says what Apply will do.
 
 ---
 
@@ -559,6 +572,81 @@ destination and cannot overwrite the template source.
    **Crop Image** does, then deletes the mask shape. The shape stays when it is locked or another
    image or path text uses it; the notice says which.
 6. Each tool is one undo step and adds none when nothing changes. None operates a machine.
+
+### F-A6f. Trim Shapes, Cut Shapes, Warp and Deform, Copy Along Path (ADR-498)
+
+1. **Tools → Vector → Trim Shapes** turns on the Trim tool. Hovering an outline highlights in red
+   the stretch between its nearest crossings with other visible outlines or itself; a click deletes
+   it. An outline that crosses nothing is deleted whole. Locked artwork is trimmed back to but never
+   cut. Text and drawn shapes become plain paths when trimmed, and the notice says so. Esc, Done or
+   another tool ends it. Each click is one undo step.
+2. **Tools → Vector → Cut Shapes** splits every selected shape along the top-most selected closed
+   shape into an inside piece and an outside piece, removes that cutter and selects the pieces.
+   Pieces keep their operations. Shapes the cutter does not cross are left as they were, and the
+   notice counts them.
+3. **Tools → Vector → Warp** (four corner handles) and **Deform** (a grid of 16 handles) bend the
+   selected vector artwork. The artwork previews live while the handles are dragged; Enter or Apply
+   applies it as one undo step, Esc or Cancel leaves it as it was, and Reset handles starts again.
+   Shift keeps the Warp corners a parallelogram. Curves become fine lines within 0.05 mm; images,
+   reliefs and locked artwork are left as they are, and the notice says how many.
+4. **Arrange → Layout → Copy Along Path…** copies the selected artwork along the top-most selected
+   single path (or the path picked under Guide path): by number of copies, spacing between centres
+   or gap between copies, from the start offset to the end offset, turned to follow the path unless
+   that box is cleared. A closed guide gets copies all the way round with none doubled at the seam.
+   The status line says what Apply will do. The guide stays and the copies are selected.
+5. When a selection gives a tool nothing to do, a notice says what to select, and nothing changes.
+   None of these tools operates a machine or changes how other artwork compiles.
+
+### F-A6g. Snapping to nodes, midpoints, centres and intersections (ADR-498)
+
+1. The chevron beside the canvas `#` snap toggle opens **Snap settings**: Nodes, Midpoints,
+   Centres, Intersections, Grid and Alignment guides (all on), **Grid spacing** (10 mm; the drawn
+   grid follows it) and **Snap distance** (8 screen pixels). The settings belong to this computer,
+   not to the project.
+2. While drawing shapes, clicking pen points, measuring, dragging nodes or moving artwork, the
+   pointer snaps to the nearest point in reach on visible, unlocked artwork, and a glyph shows what
+   it caught: ■ node, △ midpoint, ⊕ centre, ✕ intersection, + grid. A node wins over an
+   intersection, an intersection over a midpoint and a midpoint over a centre; any point on artwork
+   wins over the grid.
+3. Moving artwork snaps the selection's point nearest the press onto other artwork; when none is in
+   reach, the edge and centre alignment guides and the grid work as before.
+4. Hold **Alt** to place freely during any drag or draw, or **Ctrl/Cmd** while moving. **Shift**
+   keeps its constrain meaning and skips point snapping. Alt pressed at the start of a click in the
+   Select or node tools still picks the next overlapping object.
+5. A very large trace pauses once, briefly, the first time the pointer comes near it with snapping
+   on; after that snapping keeps up with the pointer.
+
+### F-A6h. Named undo list, Settings window and align keys (ADR-499)
+
+1. Every undo step has a name: the tool or command that made it ("Trim Shapes", "Delete 3
+   objects"), else what changed ("Move rectangle", "Change Cut settings").
+2. The **Undo list** button between Undo and Redo lists the last 15 steps, newest first. Choosing
+   one undoes back to just before it; Redo then walks forward again one step at a time.
+3. **Window → Undo History** shows every undo and redo step by name, with a "Current project" row.
+   Clicking an undo step goes back to just before it; clicking a redo step redoes through it. The
+   window stays open.
+4. **Edit → Settings...** or **Ctrl+,** (Cmd+, on macOS) opens Settings: General (theme, workspace
+   layout, recent projects), Canvas (snapping, frame and start markers, nudge distances), Machine &
+   materials (links to Machine Setup, the Bit Library, Materials or Recipes) and Labs (laser only).
+   Changes apply at once and belong to this computer, not the project. Each setting also stays
+   where it was before.
+5. **Alt+arrows** align the selection left, right, top or bottom; **Alt+PgUp** and **Alt+PgDn**
+   centre it on X or Y; **Alt+Shift+H** and **Alt+Shift+V** distribute spacing. Aligning needs two
+   or more objects and distributing three or more; a group counts as one. Each is one undo step.
+
+### F-A6i. Optimize Shapes: smooth and fit outlines (ADR-499)
+
+1. Select vector artwork and choose **Tools → Vector → Optimize Shapes...**.
+2. **Smooth** (0.25 mm, 0.02 to 5) evens out jitter without shrinking the shape; corners sharper
+   than the **Corner angle** (30°) stay exactly where they are. **Fit to lines, arcs and curves**
+   (tolerance 0.05 mm) replaces runs of points with as few lines, arcs and curves as stay within
+   the tolerance, or with lines and arcs only for controllers that should get G2/G3 arcs.
+3. The status line says how many points become how many segments and the most any point of the
+   outline moves, measured both ways between old and new. It updates as settings change; a very
+   large trace shows its progress.
+4. **Optimize** applies it as one undo step. Imported and traced artwork keeps its operations and
+   tabs; text and drawn shapes that change become paths in the same step, and locked artwork is
+   left as it is. The notice says what changed. Settings are remembered for the session.
 
 ### F-A7. Artwork Operations panel
 
@@ -1017,6 +1105,12 @@ marks later edits as unapproved without changing the existing Frame/Start policy
 3. Separate operations and pass counts, deliberate retracing within one contour, materialized
    kerf/tabs, Fill, Image and CNC output retain their meaning. Changing this setting invalidates
    the existing reviewed artifact and Frame just like other output changes.
+4. **Merge tolerance (mm)** (ADR-499), under Remove overlapping lines, is 0 by default, which keeps
+   the exact rule above and the same G-code. Above 0 (up to 0.5 mm), a later contour's stretch is
+   also dropped where it runs within that distance of, and within 5° of parallel to, a stretch an
+   earlier contour in the same operation keeps. Lines that cross or meet at a T keep their full
+   cut, merges never chain along a row of near lines, and nothing is joined or extended. Keep it
+   under half the kerf. It is saved with the project.
 
 ### F-A9e. Where closed shapes start (ADR-494)
 
@@ -1288,10 +1382,15 @@ Mac uses `Cmd`, Windows/Linux web uses `Ctrl`.
 - `Alt+D` — Delete duplicates (ADR-480; Option+D on macOS)
 - `Delete` / `Backspace` — Delete selected
 - `Escape` — Deselect / cancel current operation
+- `Cmd/Ctrl+,` — Settings (ADR-499)
 
 #### Transform
 - Arrow keys — Nudge 1 mm
 - Shift+Arrow — Nudge 10 mm
+- `Cmd/Ctrl+Arrow` — Nudge 0.1 mm (ADR-499; all three distances are set in Settings → Canvas)
+- `Alt+Left` / `Alt+Right` / `Alt+Up` / `Alt+Down` — Align left / right / top / bottom (ADR-499)
+- `Alt+PgUp` / `Alt+PgDn` — Align centres on X / Y (ADR-499)
+- `Alt+Shift+H` / `Alt+Shift+V` — Distribute horizontal / vertical spacing (ADR-499)
 - `H` — Flip horizontal
 - `V` — Flip vertical
 - `.` / `,` — Rotate 90° clockwise / counter-clockwise (ADR-410)
@@ -7364,6 +7463,55 @@ as the pane's design record.
   lists the setup steps (largest video resolution, straight down, no zoom, stabilisation, HDR or
   filters, focus locked, on the charger, calibrate once mounted).
 
+### F-CAM12. A camera on the laser head (ADR-449)
+
+- **Success / calibrate.** In the calibration wizard the operator ticks **Camera rides on the
+  laser head**. **Margin** becomes **Target size** (40 mm), and the setup says a small square is
+  engraved in the middle of the bed. After engraving, the photo step asks to jog the head until
+  the whole square is in the picture. **Take photo** records where the head is, and the saved
+  calibration follows the head from then on.
+- **Success / capture here.** With the machine connected and homed, **Capture here** in the
+  Camera panel shows the patch under the camera on the canvas, where it is on the bed, without
+  moving the head.
+- **Success / capture an area.** **Capture selection** (or **Capture bed** with nothing selected)
+  moves the head with the laser off, takes a picture at each stop ("Taking picture 3 of 12…"),
+  and shows one joined top-down picture of the area on the canvas.
+- **Success / check.** **Check camera** on a head camera measures the saved calibration from
+  wherever the head is for the check photo.
+- **Edge / stop.** **Stop** cancels the move in progress. The panel says how many pictures were
+  taken and shows them.
+- **Edge / out of reach.** When the head cannot travel far enough for the camera to see an edge
+  of the area, the picture stops short of that edge and the panel says why.
+- **Edge / back to live.** **Live** clears the joined picture and shows the live camera again.
+- **Error / head position unknown.** Not connected or not homed: the Camera panel says the camera
+  rides on the head and asks to connect and home; the photo step and the captures say the same.
+- **Error / machine busy.** A capture that needs moves while the machine cannot jog shows the
+  usual jog message. A head that stops moving (Hold, Alarm, disconnect) ends the capture with the
+  reason, keeping the pictures already taken.
+
+### F-CAM13. Watching a job with the camera (ADR-490)
+
+- **Success / timelapse.** With **Record a timelapse** ticked in the Camera panel's **Watch the
+  job**, starting a job records a frame every interval while it runs ("Recording the timelapse:
+  12 frames"). When the job ends, a last frame shows the result, and the panel plays the frames.
+  **Save video…** saves them as a video file. With a calibrated camera fixed over the bed, the
+  frames show the job's area square-on.
+- **Success / burn check.** With **Check the burn when a laser job finishes** ticked, a finished
+  laser job gets a verdict in the panel: how much of the path the camera saw change, any marks
+  outside it, and how much it could not see. The after picture appears on the canvas with missed
+  path in red and stray marks in amber. **Hide from canvas** and **Show on canvas** toggle it.
+- **Edge / head in the way.** When the head or gantry covered part of the job, the panel says what
+  share was hidden. The operator jogs the head clear and presses **Take the after picture
+  again**.
+- **Edge / long job.** A long job keeps at most 480 frames, spread evenly over the whole job.
+- **Edge / panel closed.** While either choice is ticked, the camera stays on with the panel
+  closed.
+- **Error / no camera.** A job that starts without a running camera gets a note instead: no
+  timelapse, and "The camera was not running when the job started."
+- **Error / cannot check.** A CNC job, a camera that is not fixed and calibrated, or a job that
+  was stopped says why it was not checked. The camera stopping mid-job ends the timelapse with the
+  frames it has.
+
 ---
 
 ## Desktop app (Windows + macOS Preview) flows
@@ -7746,6 +7894,39 @@ desktop artifact stays **CLAIMED** under `PROJECT.md` Desktop Preview acceptance
 - Not a project, such as a folder named `x.lf2`:
   `Could not open <name>: it is not a KerfDesk or LightBurn project file.`
 - Unreadable: `Could not open <name>: KerfDesk could not read it.`
+
+### F-DESK5. Regular desktop Previews and the changelog (ADR-522)
+
+1. Every pull request runs the **Desktop package check** on Linux, Windows and macOS (Apple
+   silicon and Intel). Windows builds the Preview installer as the release lane does, runs its
+   package contract, installs it, launches the installed app (SVG import and project save),
+   uninstalls it and checks nothing is left. macOS builds the Preview DMG, runs its package
+   contract and launches the app from inside the DMG. Both check that a modified `app.asar`
+   stops the app. A red desktop job means the next Preview would fail or ship broken.
+2. When `main` has user-facing changes the newest Preview lacks and that Preview is at least a
+   week old, the daily **Desktop Preview cadence** workflow keeps one issue open:
+   `Desktop Preview due: v<next>`. It names the newest `main` commit that CI, Browser smoke and
+   the Desktop package check all passed on, the tag commands and the drafted notes.
+3. Optional, before tagging: stamp the changelog so the release carries the hand-written
+   highlights under its own version, then tag the stamp's merge commit once its checks pass.
+
+   ```sh
+   node scripts/desktop-release-notes.mjs stamp 0.2.0-preview.14
+   ```
+
+4. The maintainer tags that commit exactly as the issue shows (F-DESK3):
+   `git tag -a v0.2.0-preview.14 -m "KerfDesk v0.2.0 Preview 14" <commit>`, then
+   `git push origin v0.2.0-preview.14`. The workflow never tags; the `v*` tag ruleset keeps that
+   with the maintainer.
+5. The Preview release lane publishes the downloads. Its notes are the version's `CHANGELOG.md`
+   section, or, without a stamp, the Unreleased highlights plus every pull request since the
+   previous Preview. The issue closes on the next daily run.
+
+#### Keeping the changelog
+- `node scripts/desktop-release-notes.mjs draft` prints the notes since the last Preview.
+- `node scripts/desktop-release-notes.mjs refresh` rewrites the generated list under Unreleased.
+- Highlights under Unreleased are written by hand and are optional; nothing blocks a pull
+  request without one.
 
 ### F-CNC-PROBE. Owned and settlement-qualified probe cycle
 

@@ -4,6 +4,7 @@ import { capturePointer, releasePointer } from './pointer-capture';
 import type { useWorkspaceDragDeps } from './workspace-drag-deps';
 import { cancelWorkspaceDrag } from './workspace-drag-cancel';
 import { useUiStore } from '../state/ui-store';
+import { clearSnapFeedback } from './workspace-pointer-snap';
 
 type WorkspaceDragDeps = ReturnType<typeof useWorkspaceDragDeps>;
 type ActivePointerRef = MutableRefObject<number | null>;
@@ -16,6 +17,7 @@ export type OwnedPointerHandlers = {
   readonly onPointerUp: (event: CanvasPointerEvent) => void;
   readonly onPointerCancel: (event: CanvasPointerEvent) => void;
   readonly onLostPointerCapture: (event: CanvasPointerEvent) => void;
+  readonly onPointerLeave: (event: CanvasPointerEvent) => void;
 };
 
 export function createOwnedPointerHandlers(args: {
@@ -63,6 +65,11 @@ export function createOwnedPointerHandlers(args: {
       }),
     onPointerCancel: (event) => cancel(event, true),
     onLostPointerCapture: (event) => cancel(event, false),
+    // A hover marker must not stay behind when the pointer leaves the canvas;
+    // a captured drag keeps its feedback until it ends.
+    onPointerLeave: () => {
+      if (args.activePointerId.current === null) clearSnapFeedback();
+    },
   };
 }
 
@@ -106,8 +113,9 @@ export function finishOwnedPointerDrag(args: {
   args.activePointerId.current = null;
   releasePointer(args.canvas, args.pointerId);
   args.deps.setCursorMm(null);
-  args.deps.setSnapGuides([]);
   if (args.drag !== null) args.finish(args.drag);
+  // After finish: a finishing draw or measure re-reads its snapped end point.
+  clearSnapFeedback();
   args.setDrag(null);
 }
 
@@ -143,9 +151,10 @@ function initializeDragSurface(drag: DragState, deps: WorkspaceDragDeps): void {
     deps.setSelectionMarquee({ start: drag.startScenePoint, end: drag.startScenePoint });
   } else if (drag.kind === 'measure') {
     deps.setMeasureDraft({ start: drag.startScenePoint, end: drag.startScenePoint });
-  } else if (drag.kind !== 'pan' && drag.kind !== 'draw') {
-    // Draw commits own one atomic history entry; only mutating live drags need
-    // the rollback snapshot used by cancellation and pointer-capture loss.
+  } else if (drag.kind !== 'pan' && drag.kind !== 'draw' && drag.kind !== 'warp-handle') {
+    // Draw commits own one atomic history entry, and a Warp or Deform handle
+    // changes no project data; only mutating live drags need the rollback
+    // snapshot used by cancellation and pointer-capture loss.
     deps.beginInteraction();
   }
 }
