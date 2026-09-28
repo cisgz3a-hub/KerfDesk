@@ -97,12 +97,47 @@ and text and drawn shapes handled explicitly because they rebuild from their set
    - A selection with no guide, a guide of no length, only a guide, offsets that leave no room, or a
      spacing of zero gets a notice saying what to change, and nothing changes.
 
-5. **Snapping (LBG-F06).** SNAPPING_DECISION
+5. **Snapping (LBG-F06).** Snapping reaches points on the artwork, not just boxes, and is set
+   from a **Snap settings** popover beside the canvas `#` snap toggle.
+   - Kinds, each switchable: **Nodes** (path points and curve ends, ■), **Midpoints** (the middle of
+     each segment, taken on the true curve for cubics and arcs, △), **Centres** (box, circle and
+     ellipse centres, ⊕), **Intersections** (real crossings between visible outlines, including
+     crossings inside one path, ✕), **Grid** (+) and the existing **Alignment guides**. All are on
+     by default.
+   - **Grid spacing** (10 mm, 0.1 to 1000) is settable and the canvas grid follows it, skipping
+     lines that would be closer than 8 pixels so the drawn lines always lie on the snap grid.
+     **Snap distance** is in screen pixels (8, 1 to 50), so it feels the same at every zoom; it
+     replaces the fixed 2 mm reach, alignment guides included.
+   - A node beats an intersection, which beats a midpoint, which beats a centre, whatever the
+     distance; distance breaks ties within a kind; any point on artwork beats the grid. The grid
+     snaps each axis on its own when that coordinate is in reach.
+   - Point snapping applies to the start and end of rectangles, ellipses, polygons and stars, each
+     pen click, both ends of the Measure tool, dragged nodes (never onto themselves or what they
+     bend, but onto other nodes of their own path, so a shape can be closed) and moved objects: the
+     selection's node, midpoint or centre nearest the press snaps onto other artwork, and when none
+     is in reach the alignment guides and grid apply as before.
+   - A glyph marks the snapped point while dragging, and while hovering with a drawing or Measure
+     tool before the press.
+   - Only visible, unlocked artwork is a target, checked path by path. Points and segments are
+     indexed per path the first time the pointer comes near an object, and each query has a scan
+     budget, so a 200,000-point trace costs one short pause (about 0.35 s measured) and then well
+     under a millisecond per pointer move.
+   - **Alt** held turns snapping off for any drag or draw; **Ctrl/Cmd** still turns off move
+     snapping; **Shift** keeps its constrain meaning and skips point snapping for that gesture. Alt
+     at pointer-down in the Select and node tools still cycles through overlapping objects, so press
+     Alt after grabbing, or use Ctrl, to move freely.
+   - The settings are an app preference kept in local storage (`laserforge.snap-settings.v1`), not
+     project data. A damaged field falls back to its default and out-of-range numbers are clamped.
+   - The crossing maths, priority ranking and glyphs are shared with the Design Studio's snap engine
+     (`src/core/design/snap/`, PROJECT.md DS-4). Its resolver is not reused because it works on
+     sketch entities and builds every candidate on each query; the workspace adds the per-path
+     index, path point extraction and exclusion rules in `src/ui/workspace/snap/`.
 
 Better than LightBurn, in short: Trim keeps exact curves, counts touches and trims back to locked
 edges; Cut Shapes leaves shapes it does not cross untouched; Warp previews live with a dashed
 original, a parallelogram lock and a reset; Copy Along Path adds edge-to-edge gaps, a guide picker
-and a safe first spacing; SNAPPING_BETTER
+and a safe first spacing; snapping keeps its reach in screen pixels at every zoom, previews the snap before the press, snaps
+the Measure tool, takes midpoints on the true curve and keeps the drawn grid on the snap grid.
 
 ### Alternatives
 
@@ -125,8 +160,10 @@ and a safe first spacing; SNAPPING_BETTER
 - Two canvas tool modes are added (`trim-shapes`, `warp-deform`); laser-tab, warp-handle, Trim and
   Position Laser clicks are routed from `handle-tool-drag.ts` and `workspace-click-tools.ts`.
 - No G-code, schema or project-format change, and no output snapshot changes.
-- Not tried in a browser by hand: the hover highlight, handle dragging and snapping markers are
-  covered by unit and component tests only.
+- Snapping reaches farther or nearer than before depending on zoom, since 2 mm became 8 pixels,
+  and the canvas grid follows the grid spacing.
+- Not tried in a browser by hand: the hover highlight, handle dragging, snapping markers and the
+  settings popover are covered by unit and component tests only.
 
 ### Verification
 
@@ -146,4 +183,9 @@ and a safe first spacing; SNAPPING_BETTER
   `src/ui/commands/vector-cut-commands.test.ts`, `command-copy-along-path.test.ts`,
   `CopyAlongPathDialogHost.test.tsx` and `AppMenuBar.control-audit.test.tsx`: hints, keys, the
   dialog and every new menu entry.
-- SNAPPING_TESTS
+- `src/ui/workspace/snap/*.test.ts`, `snapping.test.ts`, `drag-snap.test.ts`,
+  `workspace-pointer-snap.test.ts`, `use-workspace-drag-snap.test.tsx`, `snap-settings.test.ts` and
+  `src/ui/state/ui-snap-slice.test.ts`: each snap kind including cubic and arc midpoints, the reach
+  and switches, hidden and locked artwork, moved and dragged geometry excluded, rotated and scaled
+  objects, the 200,000-point timing bound, crossing maths, grid magnetism and thinning, Alt, Shift
+  and Ctrl, the stored settings, the popover and a full drawing gesture.
