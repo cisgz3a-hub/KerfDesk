@@ -24,7 +24,7 @@
 //   staircase ring's cell-by-cell runs, a ramp's along one side) are dropped,
 //   so each straight run is one move; the path is unchanged (ADR-488).
 // - Air floors: a pass keeps its level's air floor only when the passes cut
-//   before it swept everything within the cutter's radius of its path
+//   before it repeated the same complete path with the same output primitive
 //   (ADR-489 Amendment 1, relief-air-floor-proof.ts).
 //
 // Everything stays in heightmap mm; the compiler maps it to the machine.

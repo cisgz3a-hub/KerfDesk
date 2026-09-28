@@ -40,7 +40,7 @@ describe('keepProvenAirFloors (ADR-489 Amendment 1)', () => {
 
   it('keeps a floor on a path an earlier cut at the ceiling followed exactly', () => {
     expect(lastKeepsFloor([line(0, CEILING_MM)], floored(line(0, -3)))).toBe(true);
-    expect(lastKeepsFloor([line(0, CEILING_MM)], floored(line(0, -3, 2, 8)))).toBe(true);
+    expect(lastKeepsFloor([line(0, CEILING_MM)], floored(line(0, -3, 2, 8)))).toBe(false);
     // The same closed loop, cut again deeper.
     const square: CncContourPass = {
       kind: 'contour',
@@ -65,10 +65,9 @@ describe('keepProvenAirFloors (ADR-489 Amendment 1)', () => {
     expect(lastKeepsFloor([], floored(line(0, -3)))).toBe(false);
   });
 
-  it('counts two earlier cuts together, and finds the strip between them', () => {
-    // Overlapping sweeps prove the area between them conservatively.
+  it('declines area-based coverage until final placed geometry is available', () => {
     const close = [line(0, CEILING_MM), line(2 * RADIUS_MM - 0.1, CEILING_MM)];
-    expect(lastKeepsFloor(close, floored(line(RADIUS_MM, -3, 2, 8)))).toBe(true);
+    expect(lastKeepsFloor(close, floored(line(RADIUS_MM, -3, 2, 8)))).toBe(false);
     // Merely tangent sweeps cannot survive conservative polygon rounding.
     const tangent = [line(0, CEILING_MM), line(2 * RADIUS_MM, CEILING_MM)];
     expect(lastKeepsFloor(tangent, floored(line(RADIUS_MM, -3, 2, 8)))).toBe(false);
@@ -90,8 +89,18 @@ describe('keepProvenAirFloors (ADR-489 Amendment 1)', () => {
       ],
       closed: false,
     };
-    expect(lastKeepsFloor([ramp], floored(line(0, -3, 5, 10)))).toBe(true);
+    expect(lastKeepsFloor([ramp], floored(line(0, -3, 5, 10)))).toBe(false);
     expect(lastKeepsFloor([ramp], floored(line(0, -3, 3, 10)))).toBe(false);
+    const flat: CncPath3dPass = {
+      ...ramp,
+      points: ramp.points.map((p) => ({ ...p, z: CEILING_MM })),
+    };
+    expect(
+      lastKeepsFloor(
+        [flat],
+        floored({ ...flat, points: flat.points.map((p) => ({ ...p, z: -3 })) }),
+      ),
+    ).toBe(true);
   });
 
   it('keeps no floor without a ceiling or a cutter radius, and leaves other passes alone', () => {

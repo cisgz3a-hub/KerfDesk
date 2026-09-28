@@ -114,7 +114,7 @@ export type GcodeMetadata = {
 // ADR-486 keeps kerf-offset circles as G2/G3; ADR-492 angles image scans;
 // ADR-495 sizes overscan from speed and acceleration when it is on.
 // ADR-489 Amd 1 keeps a relief air floor only where earlier cuts prove it.
-export const EMITTER_REVISION = 'air-floor-conservative-retrace-20260928-v11';
+export const EMITTER_REVISION = 'relief-repeated-paths-20260928-v13';
 
 // Machine-specific assumption lines (ADR-103 defect fix): router exports
 // previously carried the laser-worded `$32=1 (laser mode)` banner. The S
