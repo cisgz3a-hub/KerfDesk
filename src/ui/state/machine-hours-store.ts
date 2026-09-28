@@ -1,6 +1,6 @@
 // ADR-502: the machine hours book the UI reads, kept in step with browser
-// storage. Every change re-reads storage first, so another window's hours are
-// not written over.
+// storage. Changes refresh persisted records and retain failed writes as
+// pending edits. localStorage itself does not provide cross-window transactions.
 
 import { create } from 'zustand';
 import type { MachineKind } from '../../core/scene';
@@ -37,31 +37,40 @@ type MachineHoursStore = {
   readonly addReminder: (machine: HoursMachine, label: string, hours: number) => void;
 };
 
-function readBook(): MachineHoursBook {
+function readBook(fallback: MachineHoursBook = {}): MachineHoursBook {
   const storage = browserLocalStorage();
-  return storage === null ? {} : loadMachineHours(storage);
+  return storage === null ? fallback : loadMachineHours(storage, fallback);
 }
 
-function writeBook(book: MachineHoursBook): void {
+function writeBook(book: MachineHoursBook): boolean {
   const storage = browserLocalStorage();
-  if (storage !== null) persistMachineHours(storage, book);
+  return storage !== null && persistMachineHours(storage, book);
 }
 
 export const useMachineHoursStore = create<MachineHoursStore>((set) => {
+  let persisted = readBook();
+  let pending: Array<(book: MachineHoursBook) => MachineHoursBook> = [];
+  const latest = (): MachineHoursBook => {
+    persisted = readBook(persisted);
+    return pending.reduce((book, update) => update(book), persisted);
+  };
   const change = (next: (book: MachineHoursBook) => MachineHoursBook): void => {
-    const book = next(readBook());
-    writeBook(book);
+    const book = next(latest());
+    pending.push(next);
+    if (writeBook(book)) {
+      persisted = book;
+      pending = [];
+    }
     set({ book });
   };
   return {
-    book: readBook(),
-    reload: () => set({ book: readBook() }),
+    book: persisted,
+    reload: () => set({ book: latest() }),
     addRun: (machine, runMs, jobEnded) => {
-      const before = readBook();
+      const before = latest();
       const after = addRunTime(before, machine, runMs, jobEnded);
       if (after === before) return [];
-      writeBook(after);
-      set({ book: after });
+      change((book) => addRunTime(book, machine, runMs, jobEnded));
       return newlyDueReminders(
         machineRecord(before, machine.signature, machine.name, machine.kind),
         machineRecord(after, machine.signature, machine.name, machine.kind),

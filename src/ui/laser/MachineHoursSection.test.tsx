@@ -38,6 +38,40 @@ afterEach(async () => {
 });
 
 describe('MachineHoursSection (ADR-502)', () => {
+  it('flushes each minute even when the controller store does not change', async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(0);
+    function Tracker(): null {
+      useMachineHoursTracking();
+      return null;
+    }
+    await act(async () => root.render(<Tracker />));
+    const machine = currentHoursMachine();
+    useLaserStore.setState({
+      liveCanvasRun: { plan: {}, startedAtMs: 0, lifecycle: 'running' } as LiveCanvasRun,
+    });
+    await act(async () => vi.advanceTimersByTime(120_000));
+    expect(useMachineHoursStore.getState().book[machine.signature]?.runMs).toBe(120_000);
+  });
+
+  it('keeps unpersisted hours through a storage quota failure and retries them once', () => {
+    const machine = currentHoursMachine();
+    const setItem = vi.spyOn(Storage.prototype, 'setItem').mockImplementation(() => {
+      throw new Error('Quota exceeded');
+    });
+    useMachineHoursStore.getState().addRun(machine, 60_000, false);
+    useMachineHoursStore.getState().addRun(machine, 60_000, false);
+    const duringFailure = useMachineHoursStore.getState().book[machine.signature]?.runMs;
+    setItem.mockRestore();
+    useMachineHoursStore.getState().addRun(machine, 5_000, true);
+    useMachineHoursStore.getState().reload();
+    expect(duringFailure).toBe(120_000);
+    expect(useMachineHoursStore.getState().book[machine.signature]).toMatchObject({
+      runMs: 125_000,
+      jobs: 1,
+    });
+  });
+
   it("shows this machine's hours and its reminders, and Done restarts one", async () => {
     const machine = currentHoursMachine();
     useMachineHoursStore.getState().addRun(machine, 21 * HOUR_MS, true);

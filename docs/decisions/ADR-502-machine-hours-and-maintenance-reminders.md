@@ -2,16 +2,13 @@
 
 **Status:** Accepted. | **Date:** 2026-09-28
 
-Builds item 17 of the Rayforge comparison's build list, under the owner's direction of 2026-09-27 to
-build everything Rayforge does better and make it better than theirs. No new guard or refusal
-(ADR-228): a due reminder is a note, and jobs start as before.
+A due reminder is advisory (ADR-228), and jobs start as before.
 
 ### Context
 
 KerfDesk kept no record of how long a machine had run, so lens cleaning, belt checks and collet
-care were left to memory. Rayforge counts machine hours and has maintenance counters, but it adds
-each job's estimated time, including cancelled jobs and frames, so its hours drift from the
-machine's.
+care were left to memory. Adding each job's estimated duration would count cancelled work in
+full; the counter therefore follows the observed running lifecycle.
 
 ### Decision
 
@@ -20,12 +17,15 @@ machine's.
    - The job ends at its first stop, disconnect, error or finish.
    - A stopped job counts the time it ran, because the machine ran it.
    - Only Start makes a live run, so frames, jogs, console moves and Preview never count.
-   - While a job runs, time is handed over every minute, so a crash loses at most that minute.
+   - A timer checkpoints running time every minute even without controller events. Browser
+     timer suspension or unavailable storage can delay persistence.
 2. **Per machine.** Hours belong to the machine the job started on, keyed like Machine Setup's
    marks (`deviceProfileSignature`: profile, bed and controller, with CNC apart from laser). They
-   live in browser storage (`kerfdesk.machine-hours.v1`), not in projects, and every change
-   re-reads storage first so another window's hours are not written over. Reads drop entries that
-   do not validate.
+   live in browser storage (`kerfdesk.machine-hours.v1`), not in projects. Each change re-reads
+   available storage; this reduces stale writes but is not a transaction across windows.
+   Failed writes retain pending changes in memory and retry them once storage becomes available.
+   Reads drop entries that do not validate. Mounting with an already terminal canvas run does
+   not count that completed job again.
 3. **Reminders.**
    - Each machine starts with three. A laser gets the lens (20 h), the air-assist nozzle and fans
      (50 h), and belts, wheels and rails (100 h). A CNC gets the collet and bit (20 h), rails and
@@ -39,7 +39,7 @@ machine's.
 
 ### Alternatives
 
-- **Count estimates, as Rayforge does.** Rejected: an estimate is not what the machine did, and a
+- **Count estimated durations.** Rejected: an estimate is not what the machine did, and a
   cancelled job or a frame would count in full.
 - **Count laser-on time only.** Not now: the controller does not report when the beam is on, so it
   would be an estimate again. Run time is measured; for a diode, laser-on time is below it.

@@ -2,16 +2,13 @@
 
 **Status:** Accepted. Amends ADR-487. | **Date:** 2026-09-28
 
-Builds item 24 of the Rayforge comparison's build list, under the owner's direction of 2026-09-27
-to build everything Rayforge does better and make it better than theirs. The preview flags,
-blocks and asks nothing (ADR-228), and the G-code is unchanged.
+The preview is advisory (ADR-228), and the G-code is unchanged.
 
 ### Context
 
 ADR-487's burn preview shades each move by its power alone, as LightBurn's preview does, so a job
 that shades by speed at one power shows one tone, and a fast photo engrave looks as dark as a slow
-cut. Rayforge's preview works from energy per area: power, speed and spot size, times a material
-absorption, and says it is uncalibrated.
+cut. An uncalibrated energy model can distinguish these moves using power, speed and spot size.
 
 ### Decision
 
@@ -33,7 +30,7 @@ absorption, and says it is uncalibrated.
    and the full burn marked. It ends: "Uncalibrated: it shows which parts burn darker, not the
    exact colour."
 
-Better than Rayforge's: the choice of LightBurn's shading stays one click away; the note gives
+Power-only shading stays one click away; the note gives
 the program's own energy range against the material, so an engrave that cannot reach a full burn
 or a cut far past it shows before anything burns; and it keeps ADR-487's playback, rotary wrap
 and 3D materials.

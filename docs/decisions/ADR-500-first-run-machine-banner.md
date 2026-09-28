@@ -2,9 +2,7 @@
 
 **Status:** Accepted. | **Date:** 2026-09-28
 
-Builds item 7 of the Rayforge comparison's build list, under the owner's direction of 2026-09-27 to
-build everything Rayforge does better and make it better than theirs. No new guard or refusal
-(ADR-228): the banner blocks nothing and nothing waits on it.
+The banner is advisory (ADR-228): it blocks nothing and nothing waits on it.
 
 ### Context
 
@@ -17,8 +15,8 @@ That also held for someone who had already set up their machine: nothing restore
 sessions, so each new session was back on the starter machine until a project or its autosave was
 opened.
 
-Rayforge shows a banner until a machine is configured, and keeps its machines between sessions.
-F-A1 rules out a welcome modal or tour on launch.
+F-A1 rules out a welcome modal or tour on launch. A passive banner can explain the starter
+profile and offer the last saved machine without interrupting the workspace.
 
 ### Decision
 

@@ -8,7 +8,7 @@ import { deviceProfileSignature } from '../laser/device-setup/device-setup-nudge
 import { useStore } from '../state';
 import { useLaserStore } from '../state/laser-store';
 import { useMachineHoursStore, type HoursMachine } from '../state/machine-hours-store';
-import { advanceRunClock, type RunClock } from '../state/machine-hours-tracker';
+import { advanceRunClock, RUN_CLOCK_FLUSH_MS, type RunClock } from '../state/machine-hours-tracker';
 import { useToastStore } from '../state/toast-store';
 
 export function currentHoursMachine(): HoursMachine {
@@ -46,7 +46,12 @@ export function useMachineHoursTracking(): void {
       }
     };
     observe();
-    return useLaserStore.subscribe(observe);
+    const unsubscribe = useLaserStore.subscribe(observe);
+    const timer = setInterval(observe, RUN_CLOCK_FLUSH_MS);
+    return () => {
+      clearInterval(timer);
+      unsubscribe();
+    };
   }, []);
 }
 

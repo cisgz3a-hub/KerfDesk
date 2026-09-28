@@ -2,19 +2,15 @@
 
 **Status:** Accepted. | **Date:** 2026-09-28
 
-Builds item 6 of the Rayforge comparison's build list, under the owner's direction of 2026-09-27 to
-build everything Rayforge does better and make it better than theirs. No new guard or refusal
-(ADR-228): nothing here blocks, gates or asks before an action, and the G-code is unchanged.
+Module information is advisory (ADR-228): it adds no Start gate or new controller commands.
 
 ### Context
 
 The Falcon A1 Pro takes a 20 W blue diode module and an optional 2 W infrared module that swap on
 the same carriage; only one is fitted at a time. KerfDesk's Falcon A1 Pro preset had no laser head
 at all, so recipes could not match a head, the burn preview took a 0.1 mm beam and the spot-size
-checks fell back to defaults. Rayforge lists both modules as two heads with a tool number each and
-a 36 mm Creality roller, but the modules cannot both be fitted, and neither its roller diameter nor
-its 363 × 273 mm bed matches a published figure (Creality's LightBurn bundle gives 358 × 268 mm; a
-Creality forum measurement gives a 17 mm roller).
+checks fell back to defaults. The profile must represent the single fitted module. Rotary
+dimensions and settings need their own published source rather than an assumed attachment size.
 
 ### Decision
 
@@ -42,7 +38,7 @@ Creality forum measurement gives a 17 mm roller).
    the setup. No roller preset: Creality publishes no roller diameter or motion per turn, so the
    roller keeps the measured setup (ADR-373) and Test rotation.
 
-Better than Rayforge's: the list matches the machine (one module at a time, no tool numbers the
+The list matches the machine (one module at a time, no tool numbers the
 controller would ignore), the review names the module before a job runs, every figure has a
 source, and nothing unsourced is shipped as a preset.
 

@@ -80,4 +80,13 @@ describe('measured run time (ADR-502)', () => {
       ]),
     ).toEqual({ ms: 0, jobs: 0 });
   });
+
+  it('does not count an already completed run when a tracker mounts again', () => {
+    expect(
+      replay([
+        [5_000, run('finished')],
+        [6_000, null],
+      ]),
+    ).toEqual({ ms: 0, jobs: 0 });
+  });
 });

@@ -15,12 +15,15 @@ export const MACHINE_HOURS_STORAGE_KEY = 'kerfdesk.machine-hours.v1';
 
 type StorageLike = Pick<Storage, 'getItem' | 'setItem'>;
 
-export function loadMachineHours(storage: StorageLike): MachineHoursBook {
+export function loadMachineHours(
+  storage: StorageLike,
+  fallback: MachineHoursBook = {},
+): MachineHoursBook {
   let raw: string | null;
   try {
     raw = storage.getItem(MACHINE_HOURS_STORAGE_KEY);
   } catch {
-    return {};
+    return fallback;
   }
   if (raw === null) return {};
   let parsed: unknown;

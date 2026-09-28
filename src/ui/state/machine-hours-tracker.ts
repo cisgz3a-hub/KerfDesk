@@ -3,8 +3,7 @@
 // A job counts while it is running; pauses and tool changes stop the clock,
 // and the job ends at its first stop, disconnect, error or finish. Only a
 // started job has a live run, so frames, jogs and console moves never count.
-// While a job runs, time is handed over every minute, so a crash or a closed
-// window loses at most that minute.
+// The observing hook checkpoints every minute while timers can run.
 
 import type { LiveCanvasLifecycle, LiveCanvasRun } from './canvas-motion-plan';
 
@@ -43,6 +42,11 @@ export function advanceRunClock(
   // The run changed or went away: whatever was still open ends here.
   const closed = clock === null ? NOTHING : endRun(clock, now);
   if (run === null) return { ...closed, clock: null };
+  // A completed run is retained for the canvas. A newly mounted observer did
+  // not watch that job run and must not count it again.
+  if (run.lifecycle !== 'running' && !HELD.has(run.lifecycle)) {
+    return { ...closed, clock: null };
+  }
   const opened = advanceSameRun(
     { plan: run.plan, startedAtMs: run.startedAtMs, runningSinceMs: null, ended: false },
     run.lifecycle,
