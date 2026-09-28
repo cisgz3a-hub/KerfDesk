@@ -106,9 +106,11 @@ async function directoryHasEntry(
     await directory.getFileHandle(displayName);
     return true;
   } catch (err) {
-    // NotFoundError is the only answer that proves the name is free; a folder
-    // of that name (TypeMismatchError) or any other failure counts as taken.
-    return !(err instanceof Error && err.name === 'NotFoundError');
+    if (err instanceof Error && err.name === 'NotFoundError') return false;
+    if (err instanceof Error && err.name === 'TypeMismatchError') return true;
+    // Lost permission or I/O failure cannot prove a collision. Propagate it
+    // rather than searching an unbounded sequence of names that all fail.
+    throw err;
   }
 }
 

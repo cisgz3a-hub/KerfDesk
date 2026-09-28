@@ -300,6 +300,11 @@ export async function runChosenMultiFileTrace(
   }
   const write = await reserveTraceOutput(platform, pushToast);
   if (write === null || files.length === 0) return;
+  // Another picker may have resolved and started its batch while ours waited.
+  if (isMultiFileTraceRunning()) {
+    pushToast('A Multi-File Trace is already running. Cancel it or let it finish first.', 'info');
+    return;
+  }
   const { project } = useStore.getState();
   const chosen = batchTraceSettings(
     settings.settingsSource,

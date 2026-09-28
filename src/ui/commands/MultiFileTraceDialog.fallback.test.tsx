@@ -129,6 +129,21 @@ describe('Multi-File Trace without a folder picker (web fallback)', () => {
     expect(pickFileForSave).not.toHaveBeenCalled();
   });
 
+  it('does not replace a batch that started while its folder picker was open', async () => {
+    let running: ReturnType<typeof beginMultiFileTraceProgress> | undefined;
+    const reserveSaveDirectory = vi.fn(async () => {
+      running = beginMultiFileTraceProgress(3, vi.fn());
+      return { file: () => saveTarget() };
+    });
+    const platform = { ...mockPlatform(), reserveSaveDirectory } as unknown as PlatformAdapter;
+    try {
+      await runChosenMultiFileTrace(platform, vi.fn(), SETTINGS, [new File([], 'a.png')]);
+      expect(runMultiFileTrace).not.toHaveBeenCalled();
+    } finally {
+      running?.end();
+    }
+  });
+
   it('refuses a second batch while one is running', async () => {
     const reserveSaveDirectory = vi.fn(async () => null);
     const platform = { ...mockPlatform(), reserveSaveDirectory } as unknown as PlatformAdapter;
