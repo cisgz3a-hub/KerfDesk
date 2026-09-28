@@ -48,8 +48,11 @@ a radius of the strip would have been given a floor all the same.
 2. **How it is checked.** The earlier cuts' sweeps (every point within the radius of their
    paths) are Clipper2 round offsets, unioned and eroded by the radius; the pass keeps its floor
    when no part of its path leaves the eroded area. Cuts are swept once each and the union is
-   kept per slice top, so each pass adds one sweep. A pass whose check fails, or throws inside
-   Clipper, plunges from safe Z as before.
+   kept per slice top, so each pass adds one sweep. The pass's own path is checked against the
+   eroded area with a plain crossing test (`core/geometry/polyline-stays-inside.ts`), touching
+   its edge counting as leaving it: Clipper's open-path clip looped forever on a ramp that
+   doubled back along a loop 0.001 mm wide. A pass whose check fails, or throws inside Clipper,
+   plunges from safe Z as before.
 3. **Tolerance: 0.01 mm.** Stock standing no further than `AIR_FLOOR_TOLERANCE_MM` beyond an
    earlier cut's reach counts as cut. Offsets draw arcs as chords inside the circle on a
    0.0001 mm grid, so they cannot tell a pass that retraces an earlier path (the map's edge, a
@@ -78,6 +81,8 @@ a radius of the strip would have been given a floor all the same.
 - Tests: `relief-air-floor-proof.test.ts` (a retrace keeps its floor, a sweep past every earlier
   cut or into the strip between two drops it, cuts above the slice top and the risen part of a
   ramp do not count, no radius keeps nothing); `relief-roughing-air-floor.test.ts` now passes
-  the radius, counts stock within the tolerance of a cut as cut, pins the two CI shapes, and adds
-  the 0.8 mm strip, which the old floors fail. 900 random reliefs pass with the check.
+  the radius, counts stock within the tolerance of a cut as cut, pins the two CI shapes and the
+  ball-nose ramp that doubled back, and adds the 0.8 mm strip, which the old floors fail;
+  `polyline-stays-inside.test.ts` covers crossing, touching, holes, single points and the
+  doubled-back ramp. 1,500 random reliefs pass with the check, 300 of them at 70-95% stepover.
   EMITTER_REVISION bumped.

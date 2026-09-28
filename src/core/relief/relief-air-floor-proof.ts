@@ -21,8 +21,6 @@
 // retrace; a real cutter's diameter and runout are not known that closely.
 
 import {
-  ClipperD,
-  ClipType,
   EndType,
   FillRule,
   inflatePathsD,
@@ -31,6 +29,7 @@ import {
   type PathD,
   type PathsD,
 } from 'clipper2-ts';
+import { polylineStaysInside } from '../geometry/polyline-stays-inside';
 import { tryVectorOp } from '../geometry/vector-path-tools';
 import type { CncContourPass, CncPass, CncPath3dPass } from '../job';
 
@@ -38,7 +37,8 @@ import type { CncContourPass, CncPass, CncPath3dPass } from '../job';
 export const AIR_FLOOR_TOLERANCE_MM = 0.01;
 
 const PRECISION_DECIMALS = 4;
-// The 0.0001 mm grid rounds each path and each offset by up to 0.00007 mm.
+// The 0.0001 mm grid rounds each swept path and each offset by up to
+// 0.00007 mm.
 const GRID_ROUNDING_MM = 0.0003;
 const MITER_LIMIT = 2;
 const COVER_ARC_TOLERANCE_MM = 0.006;
@@ -162,16 +162,11 @@ function runSweep(proof: Proof, index: number, run: Run): PathsD {
   return sweep;
 }
 
-// True when no part of the path leaves the cover's inside.
+// True when no part of the path leaves the cover's inside. A plain crossing
+// test on the unrounded path: Clipper's open-path clip looped forever on a
+// ramp that doubled back along a 0.001 mm-wide loop.
 function liesInside(path: PathD, cover: Cover): boolean {
-  if (path.length < 2 || cover.inside.length === 0) return false;
-  const clipper = new ClipperD(PRECISION_DECIMALS);
-  clipper.addOpenSubject(path);
-  clipper.addClipPaths(cover.inside);
-  const closed: PathsD = [];
-  const outside: PathsD = [];
-  clipper.execute(ClipType.Difference, FillRule.NonZero, closed, outside);
-  return outside.length === 0;
+  return polylineStaysInside(path, cover.inside);
 }
 
 function pathOf(pass: FlooredPass): PathD {
