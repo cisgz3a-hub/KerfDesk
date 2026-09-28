@@ -11,7 +11,6 @@
 
 import { type DeviceProfile, toMachineCoords } from '../devices';
 import { artworkOperationRuns, orderedArtworkObjects } from '../artwork-order';
-import { offsetClosedPolylinesForKerfChecked } from '../geometry/kerf-offset';
 import {
   applyTransform,
   assertNever,
@@ -44,7 +43,13 @@ import { hasExecutableFillSweep } from './fill-group-emission';
 import { buildFillGroup } from './fill-group-build';
 import { collectFillSegmentsForLayer, islandFillGroupsForLayer } from './layer-fill';
 import type { CutGroup, CutSegment, Group, Job, JobDiagnostic } from './job';
-import { placedTabPointsForContour, placedTabPointsForKerfContours } from './laser-tab-anchors';
+import { placedTabPointsForContour } from './laser-tab-anchors';
+import {
+  kerfArcSourceRings,
+  withLayerKerf,
+  type KerfSource,
+  type PendingKerfGroup,
+} from './layer-kerf';
 import { lineOvercutFields, perforateLineSegments } from './line-cut-extras';
 import { applyLineTabs, lineTabSpanGroups } from './line-tabs';
 import { offsetFillDiagnostics } from './offset-fill-diagnostics';
@@ -71,10 +76,12 @@ type LineSegmentCollection = {
 };
 
 // Line segments as collected, with the machine-space centres of any tabs
-// placed by hand on each, keyed by segment index (ADR-494).
+// placed by hand on each, keyed by segment index (ADR-494), and the closed
+// contours still waiting for the layer-wide kerf offset (ADR-486).
 type LineSegmentSink = {
   readonly segments: CutSegment[];
   readonly placedTabs: Map<number, ReadonlyArray<Vec2>>;
+  readonly kerf: PendingKerfGroup[];
 };
 
 const NO_DIAGNOSTICS: ReadonlyArray<JobDiagnostic> = [];
@@ -328,27 +335,25 @@ function collectLineSegmentsForLayer(
   layer: Layer,
   device: DeviceProfile,
 ): LineSegmentCollection {
-  const out: LineSegmentSink = { segments: [], placedTabs: new Map() };
-  let kerfOffsetFailed = false;
-  for (const obj of objects) {
-    if (appendSegmentsFromObject(obj, layer, device, out)) kerfOffsetFailed = true;
-  }
-  const tabbed = applyLineTabs(out.segments, out.placedTabs, layer);
+  const out: LineSegmentSink = { segments: [], placedTabs: new Map(), kerf: [] };
+  for (const obj of objects) appendSegmentsFromObject(obj, layer, device, out);
+  // The kerf offset runs once for the whole layer, so a hole drawn as its own
+  // object is offset as a hole (ADR-486). A failure is reported, not dropped.
+  const kerfed = withLayerKerf(out, layer, device);
+  const tabbed = applyLineTabs(kerfed.segments, kerfed.placedTabs, layer);
   return {
     segments: perforateLineSegments(tabbed.segments, layer),
     tabSpans: tabbed.tabSpans,
-    kerfOffsetFailed,
+    kerfOffsetFailed: kerfed.failed,
   };
 }
 
-// Returns true when the kerf offset failed for this object, so the caller can
-// report the loss instead of emitting a job that is quietly missing a cut.
 function appendSegmentsFromObject(
   obj: SceneObject,
   layer: Layer,
   device: DeviceProfile,
   out: LineSegmentSink,
-): boolean {
+): void {
   // Exhaustive over SceneObject.kind — enforced by
   // `@typescript-eslint/switch-exhaustiveness-check`. The default arm's
   // assertNever turns missing arms into compile errors when a new
@@ -369,10 +374,10 @@ function appendSegmentsFromObject(
       // contribute polyline segments and the compile path skips
       // them. Behaviour parity with the F.2.b standalone emit-raster
       // tests preserved.
-      return false;
+      return;
     case 'relief':
       // CNC-only geometry — the laser compiler never emits it.
-      return false;
+      return;
     default:
       assertNever(obj, 'SceneObject');
   }
@@ -392,12 +397,12 @@ function appendPathSegments(
   layer: Layer,
   device: DeviceProfile,
   out: LineSegmentSink,
-): boolean {
-  let kerfOffsetFailed = false;
+): void {
   for (const [pathIndex, path] of object.paths.entries()) {
     if (!pathUsesOperation(object, path, layer)) continue;
     const closedForKerf: KerfSource[] = [];
     const withArcs = laserArcFitFor(path, object.transform, device);
+    const kerfArcSource = kerfArcSourceRings(path, object.transform, layer, device);
     for (const [index, polyline] of compilationPolylines(path, object.transform).entries()) {
       const points: Vec2[] = polyline.points.map((p) =>
         toMachineCoords(applyTransform(p, object.transform), device),
@@ -407,7 +412,8 @@ function appendPathSegments(
         ? placedTabPointsForContour(object, pathIndex, index, device)
         : [];
       if (shouldApplyKerf(polyline, layer)) {
-        closedForKerf.push({ polyline: { points, closed: true }, points: placed });
+        const ring = kerfArcSource?.[index]?.points ?? points;
+        closedForKerf.push({ polyline: { points: ring, closed: true }, points: placed });
       } else {
         // Enforce the CutSegment invariant "a closed segment's last point
         // equals its first" so the emitter (which walks points and ignores the
@@ -420,32 +426,10 @@ function appendPathSegments(
         pushLineSegment(out, withArcs(index, segment), placed);
       }
     }
-    if (appendKerfSegments(closedForKerf, layer, out)) kerfOffsetFailed = true;
+    if (closedForKerf.length > 0) {
+      out.kerf.push({ insertAt: out.segments.length, sources: closedForKerf });
+    }
   }
-  return kerfOffsetFailed;
-}
-
-type KerfSource = { readonly polyline: Polyline; readonly points: ReadonlyArray<Vec2> };
-
-// Returns true when the offset failed. Checked: the unchecked variant flattens
-// a clipper2 failure to an empty list, which reads identically to "this path
-// had no closed contours" — so a failed kerf offset silently deleted the cut
-// instead of reporting it.
-function appendKerfSegments(
-  sources: ReadonlyArray<KerfSource>,
-  layer: Layer,
-  out: LineSegmentSink,
-): boolean {
-  const offset = offsetClosedPolylinesForKerfChecked(
-    sources.map((source) => source.polyline),
-    layer.kerfOffsetMm,
-  );
-  if (offset.kind === 'error') return true;
-  const placed = placedTabPointsForKerfContours(offset.value, sources);
-  offset.value.forEach((polyline, index) => {
-    pushLineSegment(out, { polyline: polyline.points, closed: true }, placed[index] ?? []);
-  });
-  return false;
 }
 
 function pushLineSegment(

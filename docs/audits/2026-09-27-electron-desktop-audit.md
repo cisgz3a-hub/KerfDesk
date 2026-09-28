@@ -54,7 +54,7 @@ Batch letters say which fix batch covers each one.
 | B4 | Electron 42.11.5 is three patches behind 42.11.8 (Chromium and V8 security backports). Electron 42 support ends about 20 Oct 2026 when 45 ships. |
 | B5 | electron-updater 6.8.9 has multi-range differential download bugs fixed in 6.8.10. |
 | B6 | Pull requests never launch the packaged app. The packaged smoke test runs weekly on Windows only, so a packaging break (like B3) is found after release. |
-| B7 | The macOS preview config skips signing (`identity: null`). Once fuses are flipped, Apple Silicon refuses to launch it unless `resetAdHocDarwinSignature` is set. Electron 44 also drops macOS 12, so `minimumSystemVersion` must move to 13 then. |
+| B7 | The macOS preview config skips signing (`identity: null`). Once fuses are flipped, Apple Silicon refuses to launch it unless `resetAdHocDarwinSignature` is set. Electron 44 also drops macOS 12, so `minimumSystemVersion` must move to 13 then (done with Electron 44). |
 
 ### Local camera bridge (Batch C, built)
 
@@ -111,4 +111,5 @@ whose `publisherName` matches the signer (S2). It needs the certificate bought a
 - **Batch C**: camera bridge Host check and required Origin (ADR-141 Amendment 1).
 - **Signing**: SSL.com eSigner signing and the update-publisher check (ADR-142 Amendment 1).
 - **Batch D**: persisted serial grant, proposed to the Machine setup thread.
-- **Electron 44**: its own draft PR once A and B land, before 42's support ends on 20 Oct 2026.
+- **Electron 44** (built): Electron 44.4.5, Mac Preview needs macOS 13, packaged and launched with every Batch A
+  and C check re-run. ADR-483 Amendment 1.

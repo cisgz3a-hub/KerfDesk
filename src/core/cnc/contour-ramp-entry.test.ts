@@ -140,6 +140,9 @@ describe('the reported 6 mm pocket (ADR-471)', () => {
     depthMm: 3,
     depthPerPassMm: 1.5,
     rampEntryDeg: 5,
+    // The ramp on every ring entry, as reported; stay-down links (ADR-491)
+    // enter the outer ring from the inner one instead.
+    pocketLiftBetweenRings: true,
   };
   const object: ImportedSvg = {
     kind: 'imported-svg',
@@ -207,5 +210,41 @@ describe('the reported 6 mm pocket (ADR-471)', () => {
     expect(issues).toHaveLength(1);
     expect(issues[0]?.message).toContain('Layer #ff0000: 2 passes plunge straight down');
     expect(COMPILE_INTEGRITY_PREFLIGHT_CODES.has('cnc-ramp-entry-plunge')).toBe(false);
+  });
+});
+
+describe('applyRampEntry before a stay-down link (ADR-491)', () => {
+  const link: CncPass = {
+    kind: 'path3d',
+    points: [
+      { x: 0, y: 0, z: -2 },
+      { x: -2, y: 0, z: -2 },
+    ],
+    closed: false,
+    lateralFeed: 'plunge',
+    stayDownLink: true,
+  };
+
+  for (const size of [30, 3]) {
+    it(`ends a ${size} mm ring's lap on its start, where the link leaves from`, () => {
+      const [ramped, after] = applyRampEntry([contour(square(0, 0, size), -2), link], 5, false, 3);
+      const points = path3d(ramped);
+      expectRampWithin(points, TAN_5);
+      expect(points.at(-1)).toEqual({ x: 0, y: 0, z: -2 });
+      // One whole lap at depth after the descent, as without the link.
+      expect(lengthAt(points, -2)).toBeCloseTo(4 * size, 6);
+      expect(after).toBe(link);
+    });
+  }
+
+  it('leaves a ring with no link after it ending where its descent ended', () => {
+    const [ramped] = applyRampEntry([contour(square(0, 0, 30), -2)], 5, false, 3);
+    expect(path3d(ramped)[0]).toEqual({ x: 0, y: 0, z: 0 });
+    expect(path3d(ramped).at(-1)).not.toEqual({ x: 0, y: 0, z: -2 });
+  });
+
+  it('leaves a ring the link already enters alone', () => {
+    const entered: CncContourPass = { ...contour(square(0, 0, 30), -2), stayDownEntry: true };
+    expect(applyRampEntry([link, entered], 5, false, 3)[1]).toBe(entered);
   });
 });

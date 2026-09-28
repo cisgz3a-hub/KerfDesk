@@ -172,6 +172,7 @@ export type CncSubProfile = {
   readonly coolant?: 'off' | 'mist' | 'flood';
   readonly parkXMm?: number;
   readonly parkYMm?: number;
+  readonly parkZMm?: number;
   readonly maxFeedMmPerMin?: number;
   readonly framingFeedMmPerMin?: number;
 };

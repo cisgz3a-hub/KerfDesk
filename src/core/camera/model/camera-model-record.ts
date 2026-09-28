@@ -10,7 +10,13 @@ import {
 } from '../camera-capture-binding';
 import type { FisheyeDistortion } from '../fisheye';
 import { normalizeCameraModelAccuracy, type CameraModelAccuracy } from './camera-model-accuracy';
-import { cameraCentre, scaleLens, type CameraPose, type LensModel } from './camera-model';
+import {
+  cameraCentre,
+  scaleLens,
+  type CameraPose,
+  type LensModel,
+  type Vec2,
+} from './camera-model';
 
 export type { CameraModelAccuracy } from './camera-model-accuracy';
 
@@ -23,6 +29,15 @@ export type CameraModelRecord = {
   readonly accuracy: CameraModelAccuracy;
   /** ISO-8601 time of the calibration. */
   readonly calibratedAt: string;
+  /** A camera that rides on the laser head (ADR-449); absent for a fixed camera. */
+  readonly mount?: CameraMount;
+};
+
+/** Where a camera sits when it is not fixed above the bed (ADR-449). */
+export type CameraMount = {
+  readonly kind: 'head';
+  /** The head's bed position (scene mm) when the calibration photo was taken. */
+  readonly headAtCalibrationMm: Vec2;
 };
 
 // A frame whose aspect ratio differs from the calibrated one by more than this
@@ -60,9 +75,9 @@ export function normalizeCameraModelRecord(value: unknown): CameraModelRecord | 
   const calibratedAt = value['calibratedAt'];
   if (lens === undefined || pose === undefined || accuracy === undefined) return undefined;
   if (typeof calibratedAt !== 'string' || calibratedAt.length === 0) return undefined;
-  const capture =
-    value['capture'] === undefined ? undefined : normalizeCameraCaptureBinding(value['capture']);
-  if (value['capture'] !== undefined && capture === undefined) return undefined;
+  const capture = optionalField(value['capture'], normalizeCameraCaptureBinding);
+  const mount = optionalField(value['mount'], normalizeMount);
+  if (capture === null || mount === null) return undefined;
   return {
     version: 1,
     lens,
@@ -70,7 +85,26 @@ export function normalizeCameraModelRecord(value: unknown): CameraModelRecord | 
     ...(capture === undefined ? {} : { capture }),
     accuracy,
     calibratedAt,
+    ...(mount === undefined ? {} : { mount }),
   };
+}
+
+// A field saved only by some records: absent is fine, present must be valid (else null).
+function optionalField<T>(
+  value: unknown,
+  normalize: (value: unknown) => T | undefined,
+): T | undefined | null {
+  return value === undefined ? undefined : (normalize(value) ?? null);
+}
+
+function normalizeMount(value: unknown): CameraMount | undefined {
+  if (!isRecord(value) || value['kind'] !== 'head') return undefined;
+  const head = value['headAtCalibrationMm'];
+  if (!isRecord(head)) return undefined;
+  const x = finite(head['x']);
+  const y = finite(head['y']);
+  if (x === undefined || y === undefined) return undefined;
+  return { kind: 'head', headAtCalibrationMm: { x, y } };
 }
 
 function normalizeLens(value: unknown): LensModel | undefined {

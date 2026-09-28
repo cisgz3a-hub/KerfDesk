@@ -71,7 +71,7 @@ function isTrustedPermissionCheckContext(
   input: PermissionCheckPolicyInput,
   trustedOrigins: ReadonlySet<string>,
 ): boolean {
-  // Electron 42's FileSystemAccessPermissionContext::PermissionGrantImpl::GetStatus
+  // Electron's (42 through 44) FileSystemAccessPermissionContext::PermissionGrantImpl::GetStatus
   // checks existing grants with a null frame/WebContents and the grant's origin.
   // Permit only that exact origin-scoped API when no window is supplied. An
   // existing empty/untrusted window URL and every other permission still fail.

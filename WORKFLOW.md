@@ -7365,6 +7365,32 @@ as the pane's design record.
   lists the setup steps (largest video resolution, straight down, no zoom, stabilisation, HDR or
   filters, focus locked, on the charger, calibrate once mounted).
 
+### F-CAM12. A camera on the laser head (ADR-449)
+
+- **Success / calibrate.** In the calibration wizard the operator ticks **Camera rides on the
+  laser head**. **Margin** becomes **Target size** (40 mm), and the setup says a small square is
+  engraved in the middle of the bed. After engraving, the photo step asks to jog the head until
+  the whole square is in the picture. **Take photo** records where the head is, and the saved
+  calibration follows the head from then on.
+- **Success / capture here.** With the machine connected and homed, **Capture here** in the
+  Camera panel shows the patch under the camera on the canvas, where it is on the bed, without
+  moving the head.
+- **Success / capture an area.** **Capture selection** (or **Capture bed** with nothing selected)
+  moves the head with the laser off, takes a picture at each stop ("Taking picture 3 of 12…"),
+  and shows one joined top-down picture of the area on the canvas.
+- **Success / check.** **Check camera** on a head camera measures the saved calibration from
+  wherever the head is for the check photo.
+- **Edge / stop.** **Stop** cancels the move in progress. The panel says how many pictures were
+  taken and shows them.
+- **Edge / out of reach.** When the head cannot travel far enough for the camera to see an edge
+  of the area, the picture stops short of that edge and the panel says why.
+- **Edge / back to live.** **Live** clears the joined picture and shows the live camera again.
+- **Error / head position unknown.** Not connected or not homed: the Camera panel says the camera
+  rides on the head and asks to connect and home; the photo step and the captures say the same.
+- **Error / machine busy.** A capture that needs moves while the machine cannot jog shows the
+  usual jog message. A head that stops moving (Hold, Alarm, disconnect) ends the capture with the
+  reason, keeping the pictures already taken.
+
 ---
 
 ## Desktop app (Windows + macOS Preview) flows
@@ -7388,8 +7414,8 @@ behavior or create a second product implementation.
    or the stable R2 update feed:
    - **Windows 10/11, x64:** `KerfDesk-<version>-windows-x64-setup.exe`
      (NSIS, per-user, `oneClick:false`, user-selectable install directory).
-   - **macOS 12+, Intel x64:** `KerfDesk-<version>-macos-x64.dmg`.
-   - **macOS 12+, Apple Silicon arm64:**
+   - **macOS 13+, Intel x64:** `KerfDesk-<version>-macos-x64.dmg`.
+   - **macOS 13+, Apple Silicon arm64:**
      `KerfDesk-<version>-macos-arm64.dmg`.
    Here `<version>` is the tag text without its leading `v` (for example,
    `0.2.0-preview.1`). The companion files are
@@ -7413,10 +7439,9 @@ behavior or create a second product implementation.
    unsigned and unnotarized. The `/download` page labels both Mac assets
    **Unsigned, unnotarized Preview** before download.
 2. The page documents the deliberate manual-open path supported by macOS:
-   Control-click **KerfDesk.app** → **Open**. After a blocked attempt, macOS 12
-   Monterey uses **System Preferences → Security & Privacy → General → Open
-   Anyway**; newer macOS uses **System Settings → Privacy & Security → Open
-   Anyway**. Preview never claims Apple notarization or silently weakens
+   Control-click **KerfDesk.app** → **Open**. After a blocked attempt, macOS
+   13 and newer use **System Settings → Privacy & Security → Open Anyway**
+   (Electron 44 needs macOS 13 or newer). Preview never claims Apple notarization or silently weakens
    Gatekeeper.
 
 #### Empty — no desktop build on Linux
@@ -7644,11 +7669,11 @@ cache, rollback, and installed upgrade tests remain release qualification work.
       launches `app://app/index.html` after the documented SmartScreen path.
 - [ ] **Intel Mac packaging:** the x64 DMG installs and launches KerfDesk over
       `app://app/index.html` on a real Intel Mac after the documented Gatekeeper
-      manual-open path. Evidence includes macOS 12.x for the claimed floor and a
+      manual-open path. Evidence includes macOS 13.x for the claimed floor and a
       currently supported macOS version for the architecture.
 - [ ] **Apple Silicon packaging:** the arm64 DMG installs and launches KerfDesk
       over `app://app/index.html` natively on a real Apple Silicon Mac after the
-      documented Gatekeeper manual-open path. Evidence includes macOS 12.x for
+      documented Gatekeeper manual-open path. Evidence includes macOS 13.x for
       the claimed floor and a currently supported macOS version for the
       architecture.
 - [ ] **Serial (hardware, each desktop architecture):** a plugged-in GRBL
@@ -7671,11 +7696,11 @@ cache, rollback, and installed upgrade tests remain release qualification work.
 - [ ] **Mac permission metadata:** both DMGs contain accurate
       `NSCameraUsageDescription` and `NSLocalNetworkUsageDescription` strings,
       `CFBundleIdentifier=com.kerfdesk.app`, and
-      `LSMinimumSystemVersion=12.0`; first-use prompts match USB camera and
+      `LSMinimumSystemVersion=13.0`; first-use prompts match USB camera and
       private-network JPEG discovery/capture workflows. The bundle identifier
       names the app but is not represented as durable TCC identity for unsigned
       builds.
-- [ ] **Mac permission behavior:** at the macOS 12 floor, test launch, USB-camera
+- [ ] **Mac permission behavior:** at the macOS 13 floor, test launch, USB-camera
       allow, deny, recovery in System Settings, retry, and private-network JPEG
       capture. On macOS 15+ and on both architectures, additionally test camera
       and local-network allow/deny/Settings recovery/retry plus Preview upgrade

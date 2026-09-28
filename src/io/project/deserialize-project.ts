@@ -187,6 +187,8 @@ export function normalizeCncMachineConfig(raw: unknown): CncMachineConfig | null
       // H.9 park position: optional, any finite mm value.
       ...(isFiniteNumber(params['parkXMm']) ? { parkXMm: params['parkXMm'] } : {}),
       ...(isFiniteNumber(params['parkYMm']) ? { parkYMm: params['parkYMm'] } : {}),
+      // ADR-491 park height above the stock top; absent = safe Z.
+      ...positiveField(params, 'parkZMm'),
       // CNC's own Max feed and Frame speed; absent = the shared device values.
       ...positiveField(params, 'maxFeedMmPerMin'),
       ...positiveField(params, 'framingFeedMmPerMin'),

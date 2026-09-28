@@ -6,6 +6,7 @@
 import type { CameraCaptureBinding } from '../../../core/camera/camera-capture-binding';
 import { savedMarkErrors, type BedArea } from '../../../core/camera/model/camera-model-accuracy';
 import type { CameraModelRecord } from '../../../core/camera/model/camera-model-record';
+import type { Vec2 } from '../../../core/scene';
 import type {
   BedCalibration,
   BedCalibrationFailure,
@@ -17,6 +18,8 @@ export function cameraModelFromCalibration(args: {
   readonly targetHeightMm: number;
   readonly targetArea: BedArea;
   readonly calibratedAt: Date;
+  /** The head's bed position at the photo, for a camera on the head (ADR-449). */
+  readonly headAtCalibrationMm?: Vec2 | null;
 }): CameraModelRecord {
   const { calibration } = args;
   return {
@@ -34,6 +37,9 @@ export function cameraModelFromCalibration(args: {
       marks: savedMarkErrors(calibration.markErrors),
     },
     calibratedAt: args.calibratedAt.toISOString(),
+    ...(args.headAtCalibrationMm === undefined || args.headAtCalibrationMm === null
+      ? {}
+      : { mount: { kind: 'head', headAtCalibrationMm: args.headAtCalibrationMm } }),
   };
 }
 
