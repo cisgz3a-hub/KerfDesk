@@ -13,7 +13,12 @@ export function AutoOverscanSwitch(props: {
     <label className="lf-field">
       <span className="lf-field-label lf-field-label--md">Automatic</span>
       <span style={controlStyle}>
-        <input type="hidden" name="autoOverscanShown" value="on" />
+        <input
+          type="hidden"
+          name="autoOverscanShown"
+          value="on"
+          title="Hidden marker that the Automatic overscan switch was shown, used when saving cut settings."
+        />
         <input
           name="autoOverscan"
           type="checkbox"

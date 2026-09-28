@@ -122,6 +122,7 @@ function JobMaterialDetail(props: {
             type="checkbox"
             className="lf-checkbox"
             aria-label="New operations take the best recipe"
+            title="Each new operation, or one switched to another mode, links the best recipe for the job material."
             checked={props.material.autoApplyRecipes}
             onChange={(event) => props.onAutoApply(event.currentTarget.checked)}
           />
