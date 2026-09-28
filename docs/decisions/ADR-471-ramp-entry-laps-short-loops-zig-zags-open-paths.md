@@ -151,3 +151,13 @@ Not changed, recorded for follow-up:
   its markers removed. An unmarked contour stays unmarked even when split. Both disclosure
   cases fail against the previous tiler.
 - NOT verified: air cuts, material cuts, or any hardware. There is no machine for this project.
+
+### Tile clearance audit (2026-09-28)
+
+Clipped contour and path3d passes retain their entry advisories but discard
+`airFloorZMm`. A preceding cutter centre can lie outside a tile while its
+footprint cleared stock inside it. Clipping drops that earlier pass, so its
+whole-job air-clearance certificate cannot authorise a rapid inside this tile.
+The regression constructs both pass kinds at the boundary and confirms the
+emitted tile feeds down to depth without a below-stock rapid. No new Start gate
+or hardware claim is introduced.
