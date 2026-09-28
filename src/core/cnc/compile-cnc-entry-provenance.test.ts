@@ -201,7 +201,7 @@ describe('CNC entry provenance', { timeout: 30_000 }, () => {
       const ramps = found[index]?.firstDescent === 'along the path';
       expect(group.rampEntryDeg).toBe(ramps ? 5 : undefined);
       expect(found[index]?.claims).toEqual(
-        ramps ? ['; cnc entry: contour-ramp; max-angle-deg: 5.000'] : [],
+        ramps ? ['; cnc entry: contour-ramp; requested-max-angle-deg: 5.000'] : [],
       );
     }
   });

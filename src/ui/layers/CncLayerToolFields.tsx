@@ -113,7 +113,9 @@ export function MotionPolishRows(props: {
           title={
             isVCarve
               ? "Requested maximum entry angle. The certified medial depth profile may supersede it; Job Review reports that explicitly. Use only the cutter manufacturer's approved angle. 0 = profile-controlled entry."
-              : 'Descend into cuts along the path at this angle instead of plunging straight down. 0 = plunge (default).'
+              : props.settings.cutType === 'pocket' && props.settings.pocketStrategy === 'adaptive'
+                ? 'Adaptive pockets use their own entry. This setting applies only to any relief roughing in this operation.'
+                : 'Requested maximum entry angle along the path. Paths that cannot ramp retain a disclosed plunge. 0 = plunge (default).'
           }
           style={rampInputStyle}
         />

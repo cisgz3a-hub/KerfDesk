@@ -180,8 +180,8 @@ function reliefGroup(
     // per-pass retract mode does not apply (ADR-253).
     retractBetweenPasses: false,
     // Roughing ramps into each level from the one above (ADR-424); recorded
-    // as the group's entry. Its ramps carry no entryRamp marker: they start
-    // on stock the level above has cleared, not below an uncut top.
+    // as the group's requested entry. Actual ramps and retained short-loop
+    // plunges carry separate markers; a lower start alone is not a tiled entry.
     ...(cutType === 'relief-rough' && settings.rampEntryDeg !== undefined
       ? { rampEntryDeg: settings.rampEntryDeg }
       : {}),
@@ -438,6 +438,7 @@ function appendReliefPasses(
   const motion = reliefRoughingMotion(result.ladder.levels, {
     stockOnRight: materialOnRightInMap(residualTransform, device, settings),
     cutWidthMm: result.ladder.cutWidthMm,
+    rampOutputPoint: place,
     ...(settings.rampEntryDeg === undefined ? {} : { rampAngleDeg: settings.rampEntryDeg }),
   });
   for (const pass of motion) {

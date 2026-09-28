@@ -95,7 +95,7 @@ opportunity, without an extra branding delay. It introduces no startup interacti
 - **Numeric transforms**: X, Y, width, height, rotation, and the aspect-ratio lock remain directly available. **Anchor** opens the existing nine-point transform reference selector in a keyboard-accessible popover. Changing its presentation does not change the X/Y reference, resize anchor, or rotation centre.
 - **Artwork / Operations panel**: docked right with **Settings**, **Run order**, and **Materials** views in Laser mode; CNC keeps Settings and Run order. Settings is the default. Run order shares the same docked rail at the same width while the canvas remains on the left; it is not a modal or a third sidebar, and switching views never resizes the rail (ADR-348). Materials owns reusable preset and saved-library management without displacing the active job workflow. A header chevron collapses the rail to a narrow named strip; the same strip expands it.
 - **Laser artwork settings (ADR-430)**: the selected artwork's name heads the Settings view, with the Operation | Artwork switch under it. The Operation view leads with the operation's colour and name, then one scope line only when an edit reaches other artwork (with **Make unique**). **Line**, **Fill** and **Image** are three buttons; Power, Speed and Passes share one row; Fill adds Line spacing and Angle, and Image adds Dither, Line interval and (Grayscale) Min power. Scan both ways and Air assist are one-line switches whose explanations are tooltips. **More cut settings** opens Cut Settings for everything else and names what it holds. Include in output, Show on canvas and **Add operation** close the view.
-- **CNC artwork settings (ADR-481)**: the same header, scope line and footer lead and close the CNC Operation view. **Cut type** comes first (its explanation is the tooltip), then **Bit** with a **Manage bits** link to the Machine Setup bit library, the second bit the cut type uses (Pocket roughing, Floor clearing or Relief finishing) and **Material**. Cut depth and Depth per pass share one row with **Set to stock thickness** under it; Feed, Plunge and Spindle speed share the next, with the machine maximum under Spindle speed opening Machine Setup. **Traced edges** appears only for imported or traced outlines. Collapsed sections follow only for the cut types they serve, each naming its state (Holding tabs "4 per shape", Clearing strategy "Offset · 40 %", Entry & travel "Climb · Plunge"). Stock, tiling, spin-up, coolant, safe Z and park are edited in Machine Setup only.
+- **CNC artwork settings (ADR-481)**: the same header, scope line and footer lead and close the CNC Operation view. **Cut type** comes first (its explanation is the tooltip), then **Bit** with a **Manage bits** link to the Machine Setup bit library, the second bit the cut type uses (Pocket roughing, Floor clearing or Relief finishing) and **Material**. Cut depth and Depth per pass share one row with **Set to stock thickness** under it; Feed, Plunge and Spindle speed share the next, with the machine maximum under Spindle speed opening Machine Setup. **Traced edges** appears only for imported or traced outlines. Collapsed sections follow only for the cut types they serve, each naming its state (Holding tabs "4 per shape", Clearing strategy "Offset · 40 %", Entry & travel "Climb · Plunge"). An adaptive pocket's Entry & travel names its own helix ("Climb · Adaptive helix"), and names the Ramp entry angle only as the entry of reliefs on the same operation ("Relief ramp 5°", ADR-481 Amendment 1). Stock, tiling, spin-up, coolant, safe Z and park are edited in Machine Setup only.
 - **Operation cards**: the list comes before the artwork inspector, with the selected operation's process fields before secondary artwork properties. Each card keeps its visibility toggle on the face. Its **•••** disclosure contains order, output, artwork selection, settings clipboard, and delete controls.
 - **Machine controls panel**: in Spacious layout it is docked at the far right with the same collapse/expand pattern. Both panels can be resized or hidden independently. It may be collapsed during a job because active run controls live independently in the Live Motion bar.
 - **Toasts**: share the canvas's available space (lower left of the workspace, above the live controls) or a reserved row inside the open modal — never the rails, where they hid Start/Job and the layer list. Only the newest three render. The toast body does not take pointer input, so a click or drag through it reaches the canvas; the × control dismisses it early. Success confirmations dismiss after 4 s; advisories and failures after 8 s.
@@ -5186,10 +5186,16 @@ and lifts the command's CNC-only gate.)*
    Ramp entry owns entry motion when requested, while the lead settings stay
    stored. Tabbed profile ramps retain the raised tab windows and intentional
    vertical tab walls, then finish the original complete contour.
+   An inlay pair never ramps, so its insert keeps its lead even when the
+   layer carries a Ramp entry angle left from an earlier cut type, which an
+   inlay layer does not show (ADR-250 Amendment 2).
 
 #### Advisory — invalid or unrepresentable V-carve entry
-1. Ordinary profile/pocket/engrave ramp angles retain their [0.5°, 45°]
-   behavior. A V-carve uses the separate `vCarveRampEntryDeg` stored request,
+1. Ordinary profile/pocket/engrave and relief roughing retain positive requested
+   angles up to 45° without raising requests below 0.5°. Descent is budgeted in
+   0.001 mm Z steps against placed XY segment lengths, allowing for output rounding.
+   Its commanded Z component is capped to the selected plunge rate. A V-carve
+   uses the separate `vCarveRampEntryDeg` stored request,
    so a generic ramp retained from an older cut type cannot activate it. The
    requested value is preserved in Job Review and G-code provenance, while
    the medial variable-depth profile governs actual motion. This is advisory
@@ -5213,6 +5219,15 @@ and lifts the command's CNC-only gate.)*
    header says `; cnc entry-advisory: N passes plunge: path shorter than one
    cut width`, and Job Review lists it as an advisory, naming Helical entry
    for a pocket (ADR-471).
+3. If no source segment can represent a descent at the requested angle, the
+   original contour or tabbed path keeps its plunge. Job Review and the exported
+   header identify coordinate precision as the reason. Vertices are not removed
+   to obtain a ramp. The finding remains advisory; Frame is the ordinary Start gate.
+4. Headers label the requested angle as `requested-max-angle-deg`. Only marked
+   ramp paths claim `contour-ramp`; drill, adaptive pocket and inlay paths do not
+   inherit that claim from a stored setting. Adaptive entry is named in the card
+   and review. Intentional tab walls and clipped tile entries are separate from
+   the contour entry-angle bound.
 
 #### Edge — reliefs on a layer with a ramp angle
 1. Relief roughing ramps with the layer's angle (F-CNC17, ADR-424) and its
@@ -5220,6 +5235,10 @@ and lifts the command's CNC-only gate.)*
    starts, so the finishing group's header carries no entry line, and Job
    Review's operation line names the relief stages that plunge, for example
    `ramp entry 5° (relief finishing plunges)` (ADR-273 Amendment 1).
+2. Roughing uses the final machine-space XY placement when budgeting its entry.
+   Its actual ramps and retained short-loop or precision plunges carry distinct
+   markers. A later-depth start below stock top is not labelled as a tiled entry
+   unless the job was actually tiled.
 2. A roughing run whose first ring is shorter than one cut width still
    plunges. The roughing header adds the same `; cnc entry-advisory: N
    passes plunge: path shorter than one cut width` line, and Job Review lists
@@ -5247,6 +5266,10 @@ and lifts the command's CNC-only gate.)*
    (clipped at boundaries, Z interpolated), translated so the tile's
    corner is the machine origin: cut tile 1, slide the stock, re-zero
    XY on the next tile frame, cut tile 2, and so on.
+   A ramp entry kept as a plunge because its source path is shorter than one
+   cut width or cannot descend at coordinate precision remains disclosed in
+   each affected tile's G-code header, including tabbed path3d output. Split
+   fragments count separately in that tile's plunge advisory.
 3. With registration holes on, **Configure registration** starts a separate
    saved plan from the current default cutter and operation cutting values.
    Review its cutter, hole diameter, depth, depth per pass, feed, plunge and

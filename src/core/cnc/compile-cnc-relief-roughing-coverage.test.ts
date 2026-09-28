@@ -259,7 +259,7 @@ describe('relief roughing motion (ADR-424)', () => {
     // The G-code records the entry, with no advisory about ramps below the
     // stock top: each starts where the level above has cut.
     const gcode = cncGrblStrategy.emit({ groups: [group] }, DEFAULT_DEVICE_PROFILE);
-    expect(gcode).toContain('; cnc entry: contour-ramp; max-angle-deg: 3');
+    expect(gcode).toContain('; cnc entry: contour-ramp; requested-max-angle-deg: 3');
     expect(gcode).not.toContain('entry-advisory');
   });
 

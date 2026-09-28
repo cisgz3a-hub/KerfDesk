@@ -182,7 +182,7 @@ function contourRampPlungeMessage(plunges: RampEntryPlunges): string {
   const helix = plunges.pocket ? ' A pocket can use Helical entry instead.' : '';
   return (
     `Layer ${plunges.layerId}: ${passes} straight down instead of ramping: ` +
-    `a path shorter than one cut width is too short to ramp along.${helix} ` +
+    `${rampPlungeReason(plunges, false)}.${helix} ` +
     'Set Ramp entry to 0 to remove this notice.'
   );
 }
@@ -199,9 +199,25 @@ function reliefRampPlungeMessage(project: Project, plunges: RampEntryPlunges): s
   const field = reliefRampFieldLabel(layer?.cnc?.cutType ?? DEFAULT_CNC_LAYER_SETTINGS.cutType);
   return (
     `Layer ${plunges.layerId}: ${passes} straight down instead of ramping: ` +
-    'a loop shorter than one cut width is too tight to ramp round. ' +
+    `${rampPlungeReason(plunges, true)}. ` +
     `Set ${field} to 0 to remove this notice.`
   );
+}
+
+function rampPlungeReason(plunges: RampEntryPlunges, relief: boolean): string {
+  const precision = plunges.coordinatePrecisionPasses ?? 0;
+  return [
+    ...(plunges.passes > precision
+      ? [
+          relief
+            ? 'a loop shorter than one cut width is too tight to ramp round'
+            : 'a path shorter than one cut width is too short to ramp along',
+        ]
+      : []),
+    ...(precision > 0
+      ? ['the requested angle cannot descend on its segments at G-code coordinate precision']
+      : []),
+  ].join('; ');
 }
 
 function appendEmptyOutputIssue(gcode: string, issues: PreflightIssue[]): void {

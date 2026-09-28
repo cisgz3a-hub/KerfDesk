@@ -318,7 +318,9 @@ describe('handleSaveTiledGcode', () => {
     );
     expect(toasts.join('\n')).not.toContain('not a re-verified emitted maximum');
     expect(toasts.join('\n')).not.toContain('direct plunge');
-    expect(written.join('\n')).toContain('; cnc entry: medial-profile; max-angle-deg: 3.000');
+    expect(written.join('\n')).toContain(
+      '; cnc entry: medial-profile; requested-max-angle-deg: 3.000',
+    );
   }, 15_000);
 
   it('prepends provenance, machine assumptions, and tile identity to every file', async () => {

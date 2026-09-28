@@ -166,7 +166,13 @@ export function applyRampEntry(
   includeTabbedPaths = false,
   minRampPathMm = 0,
 ): ReadonlyArray<CncPass> {
-  const angle = Math.min(Math.max(rampAngleDeg, 0.5), MAX_RAMP_ANGLE_DEG);
+  // A positive sub-degree request must remain a maximum, not be raised to
+  // the former 0.5-degree minimum. Retain the legacy invalid-input fallback
+  // and upper cap; specialized V-carve planning does not enter this helper.
+  const angle = Math.min(
+    rampAngleDeg > 0 ? rampAngleDeg : Math.max(rampAngleDeg, 0.5),
+    MAX_RAMP_ANGLE_DEG,
+  );
   const tangent = Math.tan((angle * Math.PI) / 180);
   let previousZ = 0;
   const cutPaths = new Map<string, CutPath[]>();
