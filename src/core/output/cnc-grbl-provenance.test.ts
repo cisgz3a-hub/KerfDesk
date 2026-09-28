@@ -64,7 +64,8 @@ describe('CNC G-code provenance comments', () => {
       '; cnc depth: requested-mm: 1.191; per-pass-mm: 0.500; emitted-max-mm: 3.000',
     );
     expect(enrichedGcode).toContain('; cnc v-resolution-mm: auto');
-    expect(enrichedGcode).toContain('; cnc entry: contour-ramp; max-angle-deg: 3.000');
+    expect(enrichedGcode).toContain('; cnc entry: requested-only; requested-max-angle-deg: 3.000');
+    expect(enrichedGcode).toContain('requested contour ramp is not applied to these passes');
     expect(enrichedGcode).toContain('; cnc feed-source: machine-starter');
     expect(enrichedGcode).toContain('; cnc starter-id: neotronics-4040-safe; revision: 2');
     expect(sendableLines(enrichedGcode)).toEqual(sendableLines(plainGcode));
@@ -167,7 +168,7 @@ describe('CNC G-code provenance comments', () => {
       { groups: [group({ cutType: 'v-carve', rampEntryDeg: 3 })] },
       DEFAULT_DEVICE_PROFILE,
     );
-    expect(fallback).toContain('; cnc entry: medial-profile; max-angle-deg: 3.000');
+    expect(fallback).toContain('; cnc entry: medial-profile; requested-max-angle-deg: 3.000');
     expect(fallback).toContain(
       '; cnc entry-advisory: requested max angle is not applied to the variable-depth path',
     );
@@ -194,7 +195,7 @@ describe('CNC G-code provenance comments', () => {
       },
       DEFAULT_DEVICE_PROFILE,
     );
-    expect(detailFallback).toContain('; cnc entry: medial-profile; max-angle-deg: 3.000');
+    expect(detailFallback).toContain('; cnc entry: medial-profile; requested-max-angle-deg: 3.000');
     expect(detailFallback).toContain('; cnc v-carve-actual-max-depth-mm: 0.200');
 
     const clipped = cncGrblStrategy.emit(

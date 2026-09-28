@@ -5225,8 +5225,11 @@ and lifts the command's CNC-only gate.)*
    inlay layer does not show (ADR-250 Amendment 2).
 
 #### Advisory — invalid or unrepresentable V-carve entry
-1. Ordinary profile/pocket/engrave ramp angles retain their [0.5°, 45°]
-   behavior. A V-carve uses the separate `vCarveRampEntryDeg` stored request,
+1. Ordinary profile/pocket/engrave and relief roughing retain positive requested
+   angles up to 45° without raising requests below 0.5°. Descent is budgeted in
+   0.001 mm Z steps against placed XY segment lengths, allowing for output rounding.
+   Its commanded Z component is capped to the selected plunge rate. A V-carve
+   uses the separate `vCarveRampEntryDeg` stored request,
    so a generic ramp retained from an older cut type cannot activate it. The
    requested value is preserved in Job Review and G-code provenance, while
    the medial variable-depth profile governs actual motion. This is advisory
@@ -5250,6 +5253,15 @@ and lifts the command's CNC-only gate.)*
    header says `; cnc entry-advisory: N passes plunge: path shorter than one
    cut width`, and Job Review lists it as an advisory, naming Helical entry
    for a pocket (ADR-471).
+3. If no source segment can represent a descent at the requested angle, the
+   original contour or tabbed path keeps its plunge. Job Review and the exported
+   header identify coordinate precision as the reason. Vertices are not removed
+   to obtain a ramp. The finding remains advisory; Frame is the ordinary Start gate.
+4. Headers label the requested angle as `requested-max-angle-deg`. Only marked
+   ramp paths claim `contour-ramp`; drill, adaptive pocket and inlay paths do not
+   inherit that claim from a stored setting. Adaptive entry is named in the card
+   and review. Intentional tab walls and clipped tile entries are separate from
+   the contour entry-angle bound.
 
 #### Edge — reliefs on a layer with a ramp angle
 1. Relief roughing ramps with the layer's angle (F-CNC17, ADR-424) and its
@@ -5257,6 +5269,10 @@ and lifts the command's CNC-only gate.)*
    starts, so the finishing group's header carries no entry line, and Job
    Review's operation line names the relief stages that plunge, for example
    `ramp entry 5° (relief finishing plunges)` (ADR-273 Amendment 1).
+2. Roughing uses the final machine-space XY placement when budgeting its entry.
+   Its actual ramps and retained short-loop or precision plunges carry distinct
+   markers. A later-depth start below stock top is not labelled as a tiled entry
+   unless the job was actually tiled.
 2. A roughing run whose first ring is shorter than one cut width still
    plunges. The roughing header adds the same `; cnc entry-advisory: N
    passes plunge: path shorter than one cut width` line, and Job Review lists
@@ -5275,7 +5291,8 @@ and lifts the command's CNC-only gate.)*
    corner is the machine origin: cut tile 1, slide the stock, re-zero
    XY on the next tile frame, cut tile 2, and so on.
    A ramp entry kept as a plunge because its source path is shorter than one
-   cut width remains disclosed in each affected tile's G-code header. Split
+   cut width or cannot descend at coordinate precision remains disclosed in
+   each affected tile's G-code header, including tabbed path3d output. Split
    fragments count separately in that tile's plunge advisory.
 3. With registration holes on, **Configure registration** starts a separate
    saved plan from the current default cutter and operation cutting values.

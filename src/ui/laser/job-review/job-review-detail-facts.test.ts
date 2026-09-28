@@ -182,6 +182,16 @@ describe('cncOperationDetail', () => {
     );
   });
 
+  it.each([
+    { cutType: 'drill' as const },
+    { cutType: 'inlay-pair' as const },
+    { cutType: 'pocket' as const, pocketStrategy: 'adaptive' as const },
+  ])('does not describe an ignored ramp as active for $cutType', (patch) => {
+    const detail = cncOperationDetail({ ...DEFAULT_CNC_LAYER_SETTINGS, ...patch, rampEntryDeg: 5 });
+    expect(detail).toContain('stored contour ramp is not applied to these shape paths');
+    expect(detail).not.toContain('ramp entry 5');
+  });
+
   // Audit 1.8: the count used to be a bare Math.ceil, which disagreed with the
   // emitter's zPassDepths on 3/4" stock with imperial bits.
   it('reports the pass count the emitter actually steps on imperial depths', () => {

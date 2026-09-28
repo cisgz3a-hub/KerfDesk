@@ -152,6 +152,43 @@ Not changed, recorded for follow-up:
   cases fail against the previous tiler.
 - NOT verified: air cuts, material cuts, or any hardware. There is no machine for this project.
 
+### Amendment 1 - Emitted ramp angle, plunge component and truthful entry provenance (2026-09-27)
+
+The follow-up findings above are repaired for generic contour, tabbed contour and relief
+roughing entries. A 64-vertex 2.8 mm circle requested at 5 degrees previously emitted a
+5.406440 degree segment. At cutting feed 1000 and plunge 50 mm/min, its commanded Z component
+was 94.220216 mm/min. A positive 0.1 degree request was also silently raised to 0.5 degrees
+by both generic and relief planners. These are emitted-word calculations, not machine measurements.
+
+The shared planner now allocates integer 0.001 mm Z quanta. Each XY span reserves one full
+coordinate quantum per axis for subsequent output rounding and shared translation. Zero-capacity
+spans stay level. Closed entries add laps and open entries add even zig-zag legs as necessary;
+every original vertex remains in the full-depth cleanup. Tabbed entries retain their original
+raised spans and intentional vertical walls. A request below 0.5 degrees is not raised.
+
+Relief roughing applies the same budget to the final machine-space XY placement, while retaining
+source-space loop seams, winding, complete cleanup and checked links. This placement matters:
+a capacity calculated before rotation cannot assume the same component rounding afterwards.
+The emitter's existing represented-coordinate `z-rate-capped` mode caps descending ramp feed
+to the selected plunge component and leaves level cleanup at cutting feed.
+
+When no segment has representable descent capacity, preserve the original contour or tabbed
+path and mark `entryPlungeReason: coordinate-precision`. A path below one cut width retains
+its existing short-path reason. Both are advisory in Job Review and exported comments, including
+contained and split tiles. Only an actual array materialisation limit is a factual failure.
+
+Headers always call the setting `requested-max-angle-deg`. An actual marked ramp is
+`contour-ramp`; a specialised path that ignores the generic request is `requested-only`, or
+`medial-profile` for the existing V-carve path. Drill, adaptive pocket and inlay review text
+names the applicable entry. Below-stock starts are described as tiled only on actual tiled
+groups. Relief short-loop plunges are explicitly marked. The header is not a promise about
+tab walls, variable-depth cutting profiles, controller dynamics or clipped tile entries.
+
+Regression evidence covers emitted modal XYZ/F words, dense circles, long and repeated open
+paths, multiple placements including half-quantum ties, shallow angles, tabs, stage recipes,
+rotated reliefs, compiler/emitter provenance, and contour/path3d fallback reasons through tiles.
+Physical cut quality, tool suitability, controller interpolation and motor steps remain NOT RUN.
+
 ### Tile clearance audit (2026-09-28)
 
 Clipped contour and path3d passes retain their entry advisories but discard

@@ -4,6 +4,7 @@
 
 import { describe, expect, it } from 'vitest';
 import { DEFAULT_DEVICE_PROFILE } from '../devices';
+import { scanModalMotionLine, type GcodeMotionMode } from '../gcode/modal-motion-line';
 import type { Vec3 } from '../geometry/vec3';
 import type { CncContourPass, CncGroup, CncPass } from '../job';
 import { cncGrblStrategy } from '../output';
@@ -84,7 +85,10 @@ describe('applyRampEntry on paths shorter than their ramp (ADR-471)', () => {
       const b = points[index]!;
       ramp += Math.hypot(b.x - a.x, b.y - a.y);
     }
-    expect(ramp).toBeCloseTo(1.5 / TAN_5, 9);
+    const minimumRamp = 1.5 / TAN_5;
+    expect(ramp).toBeGreaterThanOrEqual(minimumRamp);
+    // One Z quantum and at most sqrt(2) XY quanta are reserved per span.
+    expect(ramp - minimumRamp).toBeLessThanOrEqual(reached * (0.001 / TAN_5 + Math.SQRT2 * 0.001));
     expect(lengthAt(points, -1.5)).toBeCloseTo(8, 9);
     expect(points.at(-1)).toEqual(points[reached]);
   });
@@ -177,25 +181,24 @@ describe('the reported 6 mm pocket (ADR-471)', () => {
       new RegExp(`${letter}(-?\\d+\\.\\d+)`).exec(line)?.[1];
     let at = { x: '', y: '', z: 0 };
     let previous = '';
-    for (const line of gcode.split('\n')) {
-      if (!/^G[01]\b/.test(line)) continue;
+    let motion: GcodeMotionMode | null = null;
+    for (const raw of gcode.split('\n')) {
+      const line = raw.split(';')[0] ?? '';
+      const parsed = scanModalMotionLine(line, motion);
+      motion = parsed.motion;
+      if (!parsed.isMotion) continue;
       const next = {
         x: word(line, 'X') ?? at.x,
         y: word(line, 'Y') ?? at.y,
         z: Number(word(line, 'Z') ?? at.z),
       };
-      if (
-        line.startsWith('G1') &&
-        next.x === at.x &&
-        next.y === at.y &&
-        next.z < Math.min(at.z, 0)
-      ) {
+      if (motion === 1 && next.x === at.x && next.y === at.y && next.z < Math.min(at.z, 0)) {
         expect(previous).toMatch(/^G0 X/);
       }
       previous = line;
       at = next;
     }
-    expect(gcode).toContain('; cnc entry: contour-ramp; max-angle-deg: 5.000');
+    expect(gcode).toContain('; cnc entry: contour-ramp; requested-max-angle-deg: 5.000');
     expect(gcode).toContain(
       '; cnc entry-advisory: 2 passes plunge: path shorter than one cut width',
     );
