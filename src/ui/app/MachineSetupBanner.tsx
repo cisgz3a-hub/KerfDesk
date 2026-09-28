@@ -1,7 +1,9 @@
 // ADR-500: a card over the canvas's top right corner while the job is still on
 // the generic starter machine. It is not a modal and blocks nothing (F-A1); it
 // takes no room from the canvas, and offers the machine last saved in Machine
-// Setup, or Machine Setup itself. Not now hides it until the next launch.
+// Setup, or Machine Setup itself. Not now hides it until the next launch. It
+// gives the corner up to the G-code view's bar and the registration jig panel,
+// which sit there too, so it never covers their buttons.
 
 import { useMemo, useState } from 'react';
 import type { DeviceProfile } from '../../core/devices';
@@ -9,6 +11,8 @@ import { Button } from '../kit';
 import { openMachineSetup } from '../laser/device-setup';
 import { useMachineSetupDialogStore } from '../laser/device-setup/machine-setup-dialog-store';
 import { useStore } from '../state';
+import { useCanvasViewStore } from '../state/canvas-view-store';
+import { useUiStore } from '../state/ui-store';
 import { browserLocalStorage } from '../state/browser-local-storage';
 import { loadConfiguredSignatures } from '../state/device-setup-configured-persistence';
 import { loadLastMachine } from '../state/last-machine-persistence';
@@ -18,11 +22,14 @@ export function MachineSetupBanner(): JSX.Element | null {
   const device = useStore((state) => state.project.device);
   const replaceDeviceProfile = useStore((state) => state.replaceDeviceProfile);
   const configuredRevision = useMachineSetupDialogStore((store) => store.configuredRevision);
+  const showGcode = useCanvasViewStore((store) => store.showGcode);
+  const jigPanelOpen = useUiStore((store) => store.registrationPanelOpen);
   const [dismissed, setDismissed] = useState(false);
   const saved = useMemo(() => savedMachines(configuredRevision), [configuredRevision]);
+  const cornerTaken = showGcode || jigPanelOpen;
   const banner = useMemo(
-    () => machineSetupBannerState({ device, dismissed, ...saved }),
-    [device, dismissed, saved],
+    () => machineSetupBannerState({ device, dismissed, cornerTaken, ...saved }),
+    [device, dismissed, cornerTaken, saved],
   );
   if (banner.kind === 'hidden') return null;
   const size = bedSize(device);

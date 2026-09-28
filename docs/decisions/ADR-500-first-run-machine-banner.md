@@ -26,6 +26,8 @@ F-A1 rules out a welcome modal or tour on launch.
    machine exactly as it ships. It is a status note with buttons, not a dialog, does not take
    focus, and takes no room from the canvas: a line above the workspace cost a compact window a
    quarter of its canvas height.
+   It gives the corner up while the G-code view's bar or the registration jig panel, which sit
+   there too, is showing, so it never covers their buttons, and comes back when they go.
 2. **What it offers.**
    - First time: "Generic 400 × 400 mm machine. The bed, power and speeds are guesses until you set
      up your machine. You can design now and set it up later." **Set up machine** opens Machine

@@ -6,6 +6,8 @@ import { DEFAULT_DEVICE_PROFILE } from '../../core/devices';
 import { FALCON_A1_PRO_GRBLHAL_PROFILE } from '../../core/devices/falcon-profiles';
 import { useMachineSetupDialogStore } from '../laser/device-setup/machine-setup-dialog-store';
 import { useStore } from '../state';
+import { useCanvasViewStore } from '../state/canvas-view-store';
+import { useUiStore } from '../state/ui-store';
 import { rememberLastMachine } from '../state/last-machine-persistence';
 import { resetStore } from '../state/test-helpers';
 import { MachineSetupBanner } from './MachineSetupBanner';
@@ -21,6 +23,8 @@ beforeEach(() => {
   resetStore();
   localStorage.clear();
   useMachineSetupDialogStore.setState({ state: { kind: 'idle' }, configuredRevision: 0 });
+  useCanvasViewStore.getState().setShowGcode(false);
+  useUiStore.getState().closeRegistrationPanel();
   host = document.createElement('div');
   document.body.append(host);
   root = createRoot(host);
@@ -72,6 +76,19 @@ describe('MachineSetupBanner (ADR-500)', () => {
 
     expect(banner()).toBeNull();
     expect(useStore.getState().project.device).toEqual(DEFAULT_DEVICE_PROFILE);
+  });
+
+  it('gives the corner up to the G-code view and the registration jig panel, then returns', async () => {
+    await render();
+    await act(async () => useCanvasViewStore.getState().setShowGcode(true));
+    expect(banner()).toBeNull();
+    await act(async () => useCanvasViewStore.getState().setShowGcode(false));
+    expect(banner()).not.toBeNull();
+
+    await act(async () => useUiStore.getState().openRegistrationPanel());
+    expect(banner()).toBeNull();
+    await act(async () => useUiStore.getState().closeRegistrationPanel());
+    expect(banner()).not.toBeNull();
   });
 });
 

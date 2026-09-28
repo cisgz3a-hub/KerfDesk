@@ -30,8 +30,12 @@ export function machineSetupBannerState(input: {
   readonly configured: ReadonlySet<string>;
   readonly lastMachine: DeviceProfile | null;
   readonly dismissed: boolean;
+  /** The G-code view's bar or the registration jig panel holds the canvas's top right corner. */
+  readonly cornerTaken?: boolean;
 }): MachineSetupBannerState {
-  if (input.dismissed || !isStarterMachine(input.device)) return { kind: 'hidden' };
+  if (input.dismissed || input.cornerTaken === true || !isStarterMachine(input.device)) {
+    return { kind: 'hidden' };
+  }
   // Someone who set up the starter machine itself, as a laser or a CNC, chose it.
   if (
     input.configured.has(deviceProfileSignature(input.device, 'laser')) ||

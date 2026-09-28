@@ -61,4 +61,14 @@ describe('when the machine setup banner shows (ADR-500)', () => {
         .kind,
     ).toBe('hidden');
   });
+
+  it('gives the corner up to the G-code view bar and the registration jig panel', () => {
+    const device = DEFAULT_DEVICE_PROFILE;
+    expect(machineSetupBannerState({ ...NOTHING_SAVED, cornerTaken: true, device }).kind).toBe(
+      'hidden',
+    );
+    expect(machineSetupBannerState({ ...NOTHING_SAVED, cornerTaken: false, device }).kind).toBe(
+      'first-run',
+    );
+  });
 });
