@@ -42,6 +42,7 @@ export type BurnHead = {
 export type BurnPass = {
   /** Share of full power, 0 to 1 (S over the controller's `$30`). */
   readonly power: number;
+  /** Programmed travel rate along the work's surface, after any rotary mapping. */
   readonly feedMmPerMin: number;
 };
 

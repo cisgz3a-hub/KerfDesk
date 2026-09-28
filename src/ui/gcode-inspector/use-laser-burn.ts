@@ -152,10 +152,14 @@ function useEnergy(
   shown: boolean,
 ): BurnEnergy {
   const { maxPowerS, spotMm } = laser;
+  const surfaceYScale = laserSurfaceYScale(laser);
   const opticalPowerW = laser.opticalPowerW ?? ASSUMED_OPTICAL_POWER_W;
   const range = useMemo(
-    () => (shown ? burnDoseRange(burnMoves(model), { maxPowerS, spotMm }, opticalPowerW) : null),
-    [model, maxPowerS, spotMm, opticalPowerW, shown],
+    () =>
+      shown
+        ? burnDoseRange(burnMoves(model), { maxPowerS, spotMm, surfaceYScale }, opticalPowerW)
+        : null,
+    [model, maxPowerS, spotMm, surfaceYScale, opticalPowerW, shown],
   );
   return useMemo(
     () => ({
@@ -167,6 +171,13 @@ function useEnergy(
     }),
     [opticalPowerW, laser.opticalPowerW, spotMm, material, range],
   );
+}
+
+// Energy always counts surface travel, even when the rotary is drawn flat.
+function laserSurfaceYScale(laser: GcodeInspectionLaser): number {
+  return laser.rotary === undefined
+    ? 1
+    : (Math.PI * laser.rotary.diameterMm) / laser.rotary.wrapYMm;
 }
 
 function burnMoves(model: InspectorRenderModel): BurnMoves {
@@ -193,17 +204,18 @@ function useStart(
   shading: BurnShading,
 ): BurnStart {
   const { maxPowerS, spotMm, rotary } = laser;
+  const surfaceYScale = laserSurfaceYScale(laser);
   return useMemo(() => {
     const moves = burnMoves(model);
     if (!wrapping || rotary === undefined) {
-      return { moves, laser: { maxPowerS, spotMm, shading } };
+      return { moves, laser: { maxPowerS, spotMm, shading, surfaceYScale } };
     }
     return {
       moves,
-      laser: { maxPowerS, spotMm, shading, wrapYMm: rotary.wrapYMm },
+      laser: { maxPowerS, spotMm, shading, surfaceYScale, wrapYMm: rotary.wrapYMm },
       wrapDiameterMm: rotary.diameterMm,
     };
-  }, [model, maxPowerS, spotMm, rotary, wrapping, shading]);
+  }, [model, maxPowerS, spotMm, rotary, wrapping, shading, surfaceYScale]);
 }
 
 // Runs one worker while the burn is shown, and puts the burn into the view.

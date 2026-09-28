@@ -34,6 +34,8 @@ export type BurnLaser = {
   readonly maxPowerS: number;
   /** The beam's width on the work. */
   readonly spotMm: number;
+  /** Surface mm per machine Y mm; independent of whether the view wraps. */
+  readonly surfaceYScale?: number;
   /** Machine Y that turns the work once round a rotary; absent on a flat bed. */
   readonly wrapYMm?: number;
   /** By power alone when absent. */
@@ -204,8 +206,23 @@ export function moveDoseJPerMm2(
   index: number,
   opticalPowerW: number,
 ): number {
-  const pass = { power: movePower(moves, laser, index), feedMmPerMin: moves.segFeed[index] ?? 0 };
+  const pass = {
+    power: movePower(moves, laser, index),
+    feedMmPerMin: surfaceFeed(moves, laser, index),
+  };
   return passDoseJPerMm2({ opticalPowerW, beamMm: laser.spotMm }, pass);
+}
+
+// F measures commanded XYZ travel per minute. Energy covers the surface XY
+// strip, whose Y travel can differ on a rotary. Z contributes time, not area.
+function surfaceFeed(moves: BurnMoves, laser: BurnLaser, index: number): number {
+  const at = index * FLOATS_PER_MOVE;
+  const dx = (moves.positions[at + 3] ?? 0) - (moves.positions[at] ?? 0);
+  const dy = (moves.positions[at + 4] ?? 0) - (moves.positions[at + 1] ?? 0);
+  const dz = (moves.positions[at + 5] ?? 0) - (moves.positions[at + 2] ?? 0);
+  const machineLength = Math.hypot(dx, dy, dz);
+  const surfaceLength = Math.hypot(dx, dy * (laser.surfaceYScale ?? 1));
+  return machineLength > 0 ? ((moves.segFeed[index] ?? 0) * surfaceLength) / machineLength : 0;
 }
 
 // The optical density one pass of this move leaves.

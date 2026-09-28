@@ -14,8 +14,12 @@ cut. An uncalibrated energy model can distinguish these moves using power, speed
 
 1. **Energy per square millimetre.** A move puts `W × p ÷ (v × b)` joules into each mm² its beam
    covers: `W` the head's optical power from the machine profile, `p` its share of full power (S
-   over `$30`), `v` its programmed feed in mm/s and `b` the beam width (the head's spot, or 0.1
+   over `$30`), `v` its programmed surface speed in mm/s and `b` the beam width (the head's spot, or 0.1
    mm). A head that states no optical power is taken as 10 W, and the note says so.
+   On a rotary, one machine Y millimetre moves `pi * diameter / wrapY` surface millimetres.
+   Each segment's surface speed is its feed times its surface XY length divided by commanded
+   XYZ length. The readout and burn worker share this conversion, including when the Wrap
+   display is off. Stationary XY moves have no swept strip and remain omitted.
 2. **Against the material.** Each burn material has a dose that burns it fully (leaves 8% of its
    light): wood 2 J/mm², MDF 1.5, acrylic 4, anodised aluminium 1.2, laminate 1.5; flat grey and
    the burn map burn as wood. A pass at a share of that dose darkens as a pass at that share of
@@ -45,6 +49,9 @@ and 3D materials.
   darker on the machine than here.
 - A move with no feed (a file that never set one) puts no energy in and draws no burn by energy;
   by power it burns as before.
+- The existing texture deposits a circular beam in program coordinates before wrapping it.
+  Its footprint is still an approximation on scaled rotaries: this repair corrects the energy
+  per surface area and program range, but does not correct that pre-existing visual stretching.
 - Changing the material or the shading starts the burn again from the program's start, as a new
   rotary wrap does; it then catches up with the playhead.
 
@@ -65,3 +72,9 @@ and 3D materials.
   0.6 J/mm² to 2 J/mm²" on the default machine with 10 W taken; Power only reads "S 1000
   darkest"; the burn on wood and laminate as before.
 - Not compared with a real burn.
+- Audit regression (`burn-rotary-energy.test.ts`, `use-laser-burn.test.tsx`): a 60 mm chuck
+  with 40 machine mm per revolution, 10 W and a 0.1 mm beam at F3000 gives 2 J/mm² along X,
+  0.424413 J/mm² along Y, and 0.523922 J/mm² along a 3-by-4 machine-space diagonal. Tests
+  cover reverse Y, combined Z travel, no XY travel, grid deposition, and identical worker
+  and readout dose before and after changing the Wrap display. The pre-repair code failed
+  these independent numerical and hook probes.
