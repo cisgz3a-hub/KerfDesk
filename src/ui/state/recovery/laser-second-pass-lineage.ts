@@ -103,7 +103,7 @@ function isStage(value: unknown): value is LaserSecondPassStage {
     isFingerprint(value['sourceFingerprint']) &&
     Array.isArray(resume) &&
     resume.every(isLaserResumeStep) &&
-    (writer === undefined || writer === 1 || writer === 2) &&
+    (writer === undefined || writer === 1 || writer === 2 || writer === 3) &&
     isSelection(value['selection'])
   );
 }

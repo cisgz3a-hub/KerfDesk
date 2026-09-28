@@ -25,23 +25,26 @@ export function SecondPassWorkbench(props: {
       panelClassName="second-pass-workbench"
       onClose={model.close}
     >
-      <p className="second-pass-intro">
-        Brush over the parts you want darker or cut deeper, then erase any spill. Preview the pass,
-        Frame its path, and Start when you are ready.
-      </p>
-      <p className="second-pass-hint">
-        Saved run: {new Date(props.source.createdAtIso).toLocaleString()} ·{' '}
-        {props.source.prepared.project.device.name} · Keep the workpiece and work origin in their
-        original positions.
-      </p>
-      {props.source.laserSecondPassChain?.length || props.source.laserResumeChain?.length ? (
-        <p className="second-pass-hint">
-          This retained source is a recovered remainder or an earlier second pass. You can paint
-          only the engraving shown here.
+      <div className="second-pass-body">
+        <p className="second-pass-intro">
+          Brush over the parts you want darker or cut deeper, then erase any spill. Preview the
+          pass, Frame its path, and Start when you are ready.
         </p>
-      ) : null}
-      <WorkbenchDrawing source={props.source} model={model} />
-      <WorkbenchStatus model={model} />
+        <p className="second-pass-hint">
+          Saved run: {new Date(props.source.createdAtIso).toLocaleString()} ·{' '}
+          {props.source.prepared.project.device.name} · Keep the workpiece and work origin in their
+          original positions. The head may cross unpainted areas with the laser off to preserve the
+          saved motion.
+        </p>
+        {props.source.laserSecondPassChain?.length || props.source.laserResumeChain?.length ? (
+          <p className="second-pass-hint">
+            This retained source is a recovered remainder or an earlier second pass. You can paint
+            only the engraving shown here.
+          </p>
+        ) : null}
+        <WorkbenchDrawing source={props.source} model={model} />
+        <WorkbenchStatus model={model} />
+      </div>
       <WorkbenchFooter model={model} />
     </Dialog>
   );
@@ -62,6 +65,7 @@ function WorkbenchDrawing({
         preview={model.preview?.drawing ?? null}
         device={source.prepared.project.device}
         strokes={model.strokes}
+        selected={model.selected}
         tool={model.tool}
         radiusMm={model.diameter / 2}
         powerScale={model.power / 100}
@@ -100,7 +104,7 @@ function WorkbenchStatus({ model }: { model: SecondPassWorkbenchModel }): JSX.El
 function WorkbenchFooter({ model: m }: { model: SecondPassWorkbenchModel }): JSX.Element {
   return (
     <div className="second-pass-footer">
-      <p>{previewDescription(m)}</p>
+      <PreviewSummary model={m} />
       <SecondPassAbortButton />
       <button
         className="lf-btn lf-btn--sm"
@@ -150,6 +154,19 @@ function WorkbenchFooter({ model: m }: { model: SecondPassWorkbenchModel }): JSX
       >
         Start second pass
       </button>
+    </div>
+  );
+}
+
+function PreviewSummary({ model }: { model: SecondPassWorkbenchModel }): JSX.Element {
+  return (
+    <div className="second-pass-summary">
+      <p>{previewDescription(model)}</p>
+      {model.preview?.clamped ? (
+        <p className="second-pass-cap-warning" role="status">
+          Some painted power is capped at the saved machine maximum.
+        </p>
+      ) : null}
     </div>
   );
 }
