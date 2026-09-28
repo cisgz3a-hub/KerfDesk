@@ -96,10 +96,11 @@ export type GcodeMetadata = {
  * straight run, and ADR-491's pocket rings and rows linked at depth at the
  * plunge feed and its park height before the job-end and bit-change parks,
  * ADR-486's kerf-offset circles kept as native arcs, ADR-492's image scans at
- * an angle and angle turns between passes, ADR-495's overscan worked out
- * from the scan speed and acceleration when it is on, and ADR-489 amendment
- * 1's relief air floors kept only on passes whose whole sweep the earlier
- * cuts proved clear.
+ * an angle and angle turns between passes, ADR-495's overscan worked out from
+ * the scan speed and acceleration when it is on, and ADR-154 amendment 3's
+ * adaptive roughing rings linked straight out by one ring spacing from starts
+ * chosen from the wall inward, plus ADR-520 and ADR-489 amendment 1's
+ * repeated-path clearance proofs for CNC and relief passes.
  */
 // ADR-427 keeps deepest cleanup before linked relief rings and flat depth slices.
 // ADR-368 sizes nonflat pocket/profile offsets, tabs and stepover by cut width.
@@ -113,8 +114,14 @@ export type GcodeMetadata = {
 // ADR-491 links pocket rings at depth and lifts to the park height.
 // ADR-486 keeps kerf-offset circles as G2/G3; ADR-492 angles image scans;
 // ADR-495 sizes overscan from speed and acceleration when it is on.
-// ADR-489 Amd 1 keeps a relief air floor only where earlier cuts prove it.
-export const EMITTER_REVISION = 'relief-repeated-paths-20260928-v13';
+// ADR-154 Amd 3 links adaptive rings straight out; all of the above is retained.
+// Inlay inserts retain their lead move without a contour-ramp request.
+// Tiling preserves plunge disclosure but drops whole-job clearance certificates.
+// Generic, tabbed and relief ramps bound the represented angle and Z feed.
+// Entry provenance reflects compiled passes, including specialised entry paths.
+// Repeated CNC depth passes retain only placement-stable clearance proofs.
+// Relief floors require the same complete repeated path and represented Z bounds.
+export const EMITTER_REVISION = 'cnc-entry-clearance-relief-adaptive-audited-20260928-v15';
 
 // Machine-specific assumption lines (ADR-103 defect fix): router exports
 // previously carried the laser-worded `$32=1 (laser mode)` banner. The S

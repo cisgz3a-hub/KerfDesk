@@ -399,6 +399,7 @@ function cncGroupForLayerResolvedWithEvidence(
       machineBoundsForDevice(device),
     ),
   );
+  const includeRampEntry = recordsRampEntry(settings, result.rampedEntry);
   const groups = profileStageRuns(led).flatMap((run) => {
     const stageSettings = run.finishing
       ? cncSettingsForStage(settings, 'profile-finish', tool)
@@ -410,15 +411,23 @@ function cncGroupForLayerResolvedWithEvidence(
       run.passes,
       device,
       config,
-      run.finishing ? { cuttingStage: 'profile-finish' } : {},
+      run.finishing ? { cuttingStage: 'profile-finish', includeRampEntry } : { includeRampEntry },
     );
     return group === null ? [] : [group];
   });
   return {
-    group: cncGroupForPasses(layer, settings, tool, led, device, config),
+    group: cncGroupForPasses(layer, settings, tool, led, device, config, { includeRampEntry }),
     groups,
     offsetFailed: result.offsetFailed,
     passLimited: result.passLimited,
     stepoverUsed: result.stepoverUsed,
   };
+}
+
+// A group records the layer's ramp angle only when its passes ramp (ADR-273
+// Amendment 2), so adaptive, drill and helical pocket groups record none. A
+// V-carve keeps its own requested entry: its header says whether the planner
+// ramped or the medial depth profile governs (ADR-285 item 6).
+function recordsRampEntry(settings: CncLayerSettings, rampedEntry: boolean): boolean {
+  return settings.cutType === 'v-carve' || rampedEntry;
 }

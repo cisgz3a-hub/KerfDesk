@@ -122,9 +122,15 @@ function expectFullRampLap(pass: CncPass, fromZ: number, zMm: number, perimeterM
   expect(points[0]?.z).toBeCloseTo(fromZ, 9);
   expect(atDepth).toBeGreaterThan(0);
   // The independent fixture is a 1-degree descent, longer than either square.
-  const expectedRampMm = (fromZ - zMm) / Math.tan(Math.PI / 180);
+  const tangent = Math.tan(Math.PI / 180);
+  const expectedRampMm = (fromZ - zMm) / tangent;
   expect(expectedRampMm).toBeGreaterThan(perimeterMm);
-  expect(xyLength(points.slice(0, atDepth + 1))).toBeCloseTo(expectedRampMm, 7);
+  const actualRampMm = xyLength(points.slice(0, atDepth + 1));
+  expect(actualRampMm).toBeGreaterThanOrEqual(expectedRampMm);
+  expect(actualRampMm - expectedRampMm).toBeLessThanOrEqual(
+    atDepth * (0.001 / tangent + Math.SQRT2 * 0.001),
+  );
+  expect(pass).toMatchObject({ entryRamp: true, lateralFeed: 'z-rate-capped' });
   expect(xyLength(points.slice(atDepth))).toBeCloseTo(perimeterMm, 7);
   expect(points.slice(atDepth).every((point) => point.z === zMm)).toBe(true);
   expect(points.at(-1)).toEqual(points[atDepth]);

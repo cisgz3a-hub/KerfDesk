@@ -11,9 +11,10 @@ import {
   type Scene,
 } from '../scene';
 import { compileCncJob } from './compile-cnc-job';
+import { cncGrblStrategy } from '../output/cnc-grbl-strategy';
 import { compileStraightInlayOperation } from './inlay-pair-operation';
 
-function inlayScene(tabsEnabled = true): Scene {
+function inlayScene(tabsEnabled = true, rampEntryDeg?: number): Scene {
   const color = '#ff0000';
   const layer = {
     ...createLayer({ id: 'L1', color }),
@@ -26,6 +27,7 @@ function inlayScene(tabsEnabled = true): Scene {
       inlayAllowanceMm: 0.1,
       inlayPairSpacingMm: 10,
       tabsEnabled,
+      ...(rampEntryDeg === undefined ? {} : { rampEntryDeg }),
     },
   };
   const object: ImportedSvg = {
@@ -129,6 +131,39 @@ describe('compileCncJob inlay pair', () => {
     // The lead is profile-only, so the female pocket keeps plain contours.
     expect(female.passes.every((pass) => pass.kind === 'contour')).toBe(true);
   });
+
+  // ADR-250 Amendment 2: neither group of the pair ramps, so a Ramp entry angle
+  // left on the layer from an earlier cut type (inlay layers hide the row) must
+  // not take the insert's lead. It used to plunge onto the fit wall at every
+  // depth instead.
+  it.each([false, true])(
+    'keeps the insert lead when the layer carries a ramp the pair never cuts (tabs %s)',
+    (tabsEnabled) => {
+      const compiled = (rampEntryDeg?: number) => {
+        const job = compileCncJob(
+          inlayScene(tabsEnabled, rampEntryDeg),
+          DEFAULT_DEVICE_PROFILE,
+          DEFAULT_CNC_MACHINE_CONFIG,
+        );
+        const [female, male] = job.groups;
+        if (female?.kind !== 'cnc' || male?.kind !== 'cnc') throw new Error('expected CNC groups');
+        return { female, male };
+      };
+      const plain = compiled();
+      const ramped = compiled(5);
+      expect(ramped.male.passes.every((pass) => pass.kind === 'path3d')).toBe(true);
+      expect(ramped.male.passes).toEqual(plain.male.passes);
+      expect(ramped.female.passes).toEqual(plain.female.passes);
+      // Follow the compiled insert through the emitter: a leftover angle
+      // changes no movement, plunge, cutting feed or raised tab wall.
+      const commands = (group: typeof ramped.male) =>
+        cncGrblStrategy
+          .emit({ groups: [group] }, DEFAULT_DEVICE_PROFILE)
+          .split('\n')
+          .filter((line) => line.length > 0 && !line.startsWith(';'));
+      expect(commands(ramped.male)).toEqual(commands(plain.male));
+    },
+  );
 
   it("places the insert on the operator's right for a right-origin machine", () => {
     const device = { ...DEFAULT_DEVICE_PROFILE, origin: 'front-right' as const };

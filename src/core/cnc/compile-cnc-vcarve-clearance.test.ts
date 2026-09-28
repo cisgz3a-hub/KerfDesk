@@ -202,7 +202,7 @@ describe('two-stage V-carve effective floor depth', () => {
       if (rampAngleDeg === undefined) {
         expect(gcode).not.toContain('; cnc entry:');
       } else {
-        expect(gcode).toContain('; cnc entry: medial-profile; max-angle-deg: 3.000');
+        expect(gcode).toContain('; cnc entry: medial-profile; requested-max-angle-deg: 3.000');
       }
     },
   );

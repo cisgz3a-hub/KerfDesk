@@ -65,24 +65,34 @@ function appendEntryComments(lines: string[], group: CncGroup): void {
     (pass): pass is CncPath3dPass => pass.kind === 'path3d' && pass.entryRamp === true,
   );
   const strategy =
-    group.cutType === 'v-carve' && entryPaths.length === 0 ? 'medial-profile' : 'contour-ramp';
-  const angleLabel = group.rampEntryTiled ? 'requested-max-angle-deg' : 'max-angle-deg';
-  lines.push(`; cnc entry: ${strategy}; ${angleLabel}: ${fmt(group.rampEntryDeg)}`);
+    entryPaths.length > 0
+      ? 'contour-ramp'
+      : group.cutType === 'v-carve'
+        ? 'medial-profile'
+        : 'requested-only';
+  // The setting is a requested entry angle, not a maximum over every later
+  // cutting move (tabs, cleanup, specialised planners or clipped tile entries).
+  lines.push(
+    `; cnc entry: ${strategy}; requested-max-angle-deg: ${requestedCncCoordinateText(group.rampEntryDeg)}`,
+  );
   if (strategy === 'medial-profile') {
     lines.push(
       '; cnc entry-advisory: requested max angle is not applied to the variable-depth path',
     );
   }
+  if (strategy === 'requested-only') {
+    lines.push('; cnc entry-advisory: requested contour ramp is not applied to these passes');
+  }
   if (group.rampEntryTiled) {
     lines.push('; cnc entry-advisory: tiled output does not retain the max-angle guarantee');
   }
-  if (entryPaths.some((pass) => (pass.points[0]?.z ?? 0) < 0)) {
+  if (group.rampEntryTiled && entryPaths.some((pass) => (pass.points[0]?.z ?? 0) < 0)) {
     lines.push('; cnc entry-advisory: tiled ramp starts below stock top');
   }
   // A v-carve layer can ramp its constant-depth ring ladder while its
   // variable-depth thin-detail passes keep stepped entry (ADR-282 Amendment 5).
   // Without this line the strategy above would claim the whole layer ramped.
-  if (entryPaths.length > 0 && hasSteppedDetail(group)) {
+  if (group.cutType === 'v-carve' && entryPaths.length > 0 && hasSteppedDetail(group)) {
     lines.push('; cnc entry-advisory: thin-detail passes use stepped entry');
   }
   appendPlungeAdvisory(lines, group);
@@ -97,8 +107,20 @@ function hasSteppedDetail(group: CncGroup): boolean {
 function appendPlungeAdvisory(lines: string[], group: CncGroup): void {
   const plunges = rampEntryPlungeCount(group.passes);
   if (plunges === 0) return;
-  const passes = plunges === 1 ? '1 pass plunges' : `${plunges} passes plunge`;
-  lines.push(`; cnc entry-advisory: ${passes}: path shorter than one cut width`);
+  const precision = group.passes.filter(
+    (pass) =>
+      (pass.kind === 'contour' || pass.kind === 'path3d') &&
+      pass.entryPlunge === true &&
+      pass.entryPlungeReason === 'coordinate-precision',
+  ).length;
+  for (const [count, reason] of [
+    [plunges - precision, 'path shorter than one cut width'],
+    [precision, 'ramp angle cannot descend at coordinate precision'],
+  ] as const) {
+    if (count === 0) continue;
+    const passes = count === 1 ? '1 pass plunges' : `${count} passes plunge`;
+    lines.push(`; cnc entry-advisory: ${passes}: ${reason}`);
+  }
 }
 
 function toolGeometryComment(group: CncGroup): string {

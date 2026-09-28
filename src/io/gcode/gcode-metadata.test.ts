@@ -41,7 +41,7 @@ function laserAssumptions(
 
 describe('gcodeMetadataHeader', () => {
   it('tracks the latest safety-relevant emitter revision', () => {
-    expect(EMITTER_REVISION).toBe('relief-repeated-paths-20260928-v13');
+    expect(EMITTER_REVISION).toBe('cnc-entry-clearance-relief-adaptive-audited-20260928-v15');
   });
 
   it('emits provenance as GRBL comment lines and ends with a newline', () => {

@@ -29,7 +29,9 @@ describe('ramp composition with rectangular tabs', () => {
     const b = output.points[index]!;
     expect(a).toEqual({ x: 5, y: 0, z: -2 });
     expect(Math.hypot(b.x - a.x, b.y - a.y)).toBeGreaterThan(0);
-    expect((a.z - b.z) / Math.hypot(b.x - a.x, b.y - a.y)).toBeCloseTo(tangent, 9);
+    const run = Math.hypot(b.x - a.x, b.y - a.y);
+    expect((a.z - b.z) / run).toBeLessThanOrEqual(tangent);
+    expect(a.z - b.z).toBeGreaterThanOrEqual((run - Math.SQRT2 * 0.001) * tangent - 0.001);
     expect(output.points.at(-1)?.z).toBe(-4);
   });
 
@@ -87,6 +89,17 @@ describe('ramp composition with rectangular tabs', () => {
   });
 
   it('reports an unmaterializable array instead of iterating an unrepresentable ramp', () => {
-    expect(() => rampTabbedPath(ring(0.1), 1e20, 0.01)).toThrow('ECMAScript Array length limit');
+    expect(() => rampTabbedPath(ring(0.1), 1e8, 0.01)).toThrow('ECMAScript Array length limit');
+  });
+
+  it('keeps every tab wall and discloses a ramp with no representable low-span descent', () => {
+    const source = ring(0.0001);
+    const result = rampTabbedPath(source, -2, Math.tan(Math.PI / 180));
+    expect(result).toEqual({
+      ...source,
+      entryPlunge: true,
+      entryPlungeReason: 'coordinate-precision',
+    });
+    expect(result.points).toBe(source.points);
   });
 });

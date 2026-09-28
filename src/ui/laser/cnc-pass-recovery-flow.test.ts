@@ -34,6 +34,7 @@ import {
   expectRecoveryWarningEvidence,
   injectPreflightIssues,
   injectRecoveryJobCompileIntegrityFailure,
+  expectWholeProgramReplay,
   recoveryWarningFixtureIssues,
 } from './cnc-recovery-flow-testing';
 import { cncPassRecoveryDefaultPoint } from './cnc-pass-recovery-model';
@@ -209,7 +210,6 @@ describe('runCncPassRecoveryFlow', () => {
   it('streams the sealed job from the default boundary without touching the open project', async () => {
     const repo = repository();
     const capsule = await saveInterruptedRun(repo);
-    const originalGcode = capsule.artifact.kind === 'exact-execution' ? capsule.artifact.gcode : '';
     const unrelatedOpenProject = createProject();
     useStore.setState({ project: unrelatedOpenProject });
     const startJob = vi.fn<(gcode: string, options?: object) => Promise<void>>(
@@ -223,8 +223,7 @@ describe('runCncPassRecoveryFlow', () => {
     expect(useStore.getState().project).toBe(unrelatedOpenProject);
     expect(startJob).toHaveBeenCalledTimes(1);
     const recoveryGcode = startJob.mock.calls[0]?.[0] ?? '';
-    // A boundary at the very first pass replays the entire sealed program.
-    expect(recoveryGcode).toBe(originalGcode);
+    expectWholeProgramReplay(recoveryGcode, capsule);
     expect(repo.getSnapshot().recoveryCapsule).toBeNull();
     const options = startJob.mock.calls[0]?.[1] as
       | {

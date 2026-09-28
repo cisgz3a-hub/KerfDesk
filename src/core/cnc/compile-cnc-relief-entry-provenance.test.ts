@@ -129,11 +129,15 @@ const ALONG_PATH = /^G1 ?X-?[\d.]+ ?Y-?[\d.]+ ?Z-[\d.]+/;
 // along its path.
 function expectEntryMatchesClaim(job: Job, operation: CncGroup['cutType']): void {
   const lines = section(job, operation);
-  const claims = lines.filter((line) => line.startsWith('; cnc entry'));
+  const claims = lines.filter((line) => line.startsWith('; cnc entry:'));
   expect(claims).toEqual(
-    claims.length === 0 ? [] : ['; cnc entry: contour-ramp; max-angle-deg: 5.000'],
+    claims.length === 0 ? [] : ['; cnc entry: contour-ramp; requested-max-angle-deg: 5.000'],
   );
   expect(group(job, operation).rampEntryDeg).toBe(claims.length === 0 ? undefined : 5);
+  expect(
+    group(job, operation).passes.some((pass) => pass.kind === 'path3d' && pass.entryRamp),
+  ).toBe(claims.length > 0);
+  expect(lines.some((line) => line.includes('tiled ramp starts below stock top'))).toBe(false);
   expect(firstDescent(lines)).toMatch(claims.length === 0 ? PLUNGE : ALONG_PATH);
 }
 
@@ -150,5 +154,26 @@ describe('relief entry provenance', () => {
     expect(group(job, 'profile-on-path').rampEntryDeg).toBe(5);
     expectEntryMatchesClaim(job, 'profile-on-path');
     expectEntryMatchesClaim(job, 'relief-rough');
+  });
+
+  it('preserves and discloses short relief-loop plunges after compilation', () => {
+    const source = flatRelief();
+    const small: ReliefObject = {
+      ...source,
+      reliefSource: testReliefHeightfield({
+        width: 1,
+        height: 1,
+        physicalWidthMm: 3.3,
+        physicalHeightMm: 3.3,
+        maxDepthMm: 3,
+        samplesU8: [0],
+      }),
+      targetWidthMm: 3.3,
+      bounds: { minX: 0, minY: 0, maxX: 3.3, maxY: 3.3 },
+    };
+    const job = compile([small], {});
+    const rough = group(job, 'relief-rough');
+    expect(rough.passes.some((pass) => pass.kind === 'contour' && pass.entryPlunge)).toBe(true);
+    expect(section(job, 'relief-rough').join('\n')).toContain('path shorter than one cut width');
   });
 });

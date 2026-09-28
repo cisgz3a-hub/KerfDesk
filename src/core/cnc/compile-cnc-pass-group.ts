@@ -9,6 +9,7 @@ import {
   type CncGroupCompileOptions,
 } from './compile-cnc-helpers';
 import { cncGroupProvenance } from './cnc-group-provenance';
+import { withPassAirFloors } from './cnc-pass-air-floors';
 import { parkFields } from './motion-polish';
 
 export function cncGroupForPasses(
@@ -42,6 +43,6 @@ export function cncGroupForPasses(
     safeZMm: Math.max(0, config.params.safeZMm),
     ...parkFields(config),
     retractBetweenPasses: options.retractBetweenPasses ?? resolveRetractBetweenPasses(settings),
-    passes,
+    passes: withPassAirFloors(passes),
   };
 }
