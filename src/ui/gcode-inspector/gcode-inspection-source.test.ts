@@ -134,6 +134,9 @@ describe('Inspector laser context (ADR-487)', () => {
     };
     const turned = contextWithTiming({ ...project, device: { ...device, rotary } }).laser;
     expect(turned?.rotary?.diameterMm).toBe(50);
+    // A head that states its optical power burns by it (ADR-501).
+    const rated = { ...device, laserSubProfile: { ...device.laserSubProfile, opticalPowerW: 20 } };
+    expect(contextWithTiming({ ...project, device: rated }).laser?.opticalPowerW).toBe(20);
     // A chuck turns the work once in its own mm a rotation.
     expect(turned?.rotary?.wrapYMm).toBeCloseTo(360, 9);
     const off = { ...rotary, enabled: false };
