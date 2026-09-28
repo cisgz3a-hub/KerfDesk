@@ -114,7 +114,7 @@ export type GcodeMetadata = {
 // ADR-486 keeps kerf-offset circles as G2/G3; ADR-492 angles image scans;
 // ADR-495 sizes overscan from speed and acceleration when it is on.
 // ADR-520 rapids 2D depth passes down to just above the pass before.
-export const EMITTER_REVISION = 'air-floor-emitted-cuts-20260928-v10';
+export const EMITTER_REVISION = 'air-floor-repeated-paths-20260928-v12';
 
 // Machine-specific assumption lines (ADR-103 defect fix): router exports
 // previously carried the laser-worded `$32=1 (laser mode)` banner. The S

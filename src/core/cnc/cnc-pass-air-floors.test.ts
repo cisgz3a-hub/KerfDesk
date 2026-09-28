@@ -39,7 +39,7 @@ describe('withPassAirFloors', () => {
     expect(withPassAirFloors(passes)).toBe(passes);
   });
 
-  it('floors a ring that starts elsewhere on the same square', () => {
+  it('declines a restarted or subdivided ring until final represented coverage is known', () => {
     // Re-started mid-side, as a stay-down link or a cut direction leaves it.
     const rotated: Vec2[] = [
       { x: 20, y: 7 },
@@ -48,7 +48,7 @@ describe('withPassAirFloors', () => {
       { x: 0, y: 0 },
       { x: 20, y: 0 },
     ];
-    expect(floors([ring(-3), ring(-6, rotated)])).toEqual([undefined, -3]);
+    expect(floors([ring(-3), ring(-6, rotated)])).toEqual([undefined, undefined]);
   });
 
   it('gives no floor to a pass that leaves the earlier path, even by a lead', () => {
@@ -104,7 +104,12 @@ describe('withPassAirFloors', () => {
         { x: 20, y: 0 },
       ],
     };
-    expect(floors([tabbed, next])).toEqual([undefined, -7]);
+    expect(floors([tabbed, next])).toEqual([undefined, undefined]);
+    const repeated: CncPath3dPass = {
+      ...tabbed,
+      points: tabbed.points.map((p) => ({ ...p, z: -12 })),
+    };
+    expect(floors([tabbed, repeated])).toEqual([undefined, -7]);
   });
 
   it('takes the lowest of several earlier passes that cover the path', () => {
@@ -120,10 +125,15 @@ describe('withPassAirFloors', () => {
         { x, y: 0, z: z - 2 },
       ],
     });
-    expect(floors([ring(-3), peck(5, -3), peck(25, -3)])).toEqual([undefined, -3, undefined]);
+    expect(floors([ring(-3), peck(5, -3), peck(25, -3)])).toEqual([
+      undefined,
+      undefined,
+      undefined,
+    ]);
+    expect(floors([peck(5, -3), peck(5, -5)])).toEqual([undefined, -3]);
   });
 
-  it('floors an arc under an earlier arc on the same circle, within its sweep', () => {
+  it('floors identical arc commands but declines different sweeps', () => {
     const arc = (zMm: number, end: { x: number; y: number }): CncArcPass => ({
       kind: 'arc',
       start: { x: 10, y: 0 },
@@ -134,7 +144,8 @@ describe('withPassAirFloors', () => {
       closed: false,
     });
     const half = arc(-3, { x: -10, y: 0 });
-    expect(floors([half, arc(-6, { x: 0, y: 10 })])).toEqual([undefined, -3]);
+    expect(floors([half, arc(-6, { x: -10, y: 0 })])).toEqual([undefined, -3]);
+    expect(floors([half, arc(-6, { x: 0, y: 10 })])).toEqual([undefined, undefined]);
     expect(floors([half, arc(-6, { x: 0, y: -10 })])).toEqual([undefined, undefined]);
   });
 
@@ -158,7 +169,7 @@ describe('withPassAirFloors', () => {
     expect(floors([arc, chords])).toEqual([undefined, undefined]);
   });
 
-  it('floors a peck on an earlier arc and a ring after an earlier helix', () => {
+  it('declines cross-primitive credit from arcs and helices', () => {
     const arc: CncArcPass = {
       kind: 'arc',
       start: { x: 10, y: 0 },
@@ -176,7 +187,7 @@ describe('withPassAirFloors', () => {
         { x: 0, y: 10, z: -5 },
       ],
     };
-    expect(floors([arc, peck])).toEqual([undefined, -3]);
+    expect(floors([arc, peck])).toEqual([undefined, undefined]);
     const helix: CncPass = {
       kind: 'helical-contour',
       start: { x: 12, y: 10 },
@@ -188,7 +199,7 @@ describe('withPassAirFloors', () => {
       polyline: SQUARE,
       closed: true,
     };
-    expect(floors([helix, ring(-6)])).toEqual([undefined, 0]);
+    expect(floors([helix, ring(-6)])).toEqual([undefined, undefined]);
   });
 
   it('leaves stay-down links, linked rings and existing floors alone', () => {

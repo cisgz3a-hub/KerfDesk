@@ -4,7 +4,7 @@ import type { CncGroup, CncPass } from '../job';
 import { cncGrblStrategy } from '../output/cnc-grbl-strategy';
 import { withPassAirFloors } from './cnc-pass-air-floors';
 
-function emit(passes: ReadonlyArray<CncPass>): string {
+function emit(passes: ReadonlyArray<CncPass>, mirror = 1, offset = 0): string {
   const group: CncGroup = {
     kind: 'cnc',
     layerId: 'L1',
@@ -17,12 +17,76 @@ function emit(passes: ReadonlyArray<CncPass>): string {
     spindleSpinupSec: 0,
     safeZMm: 5,
     retractBetweenPasses: true,
-    passes: withPassAirFloors(passes),
+    passes: withPassAirFloors(passes).map((pass) =>
+      pass.kind === 'contour'
+        ? {
+            ...pass,
+            polyline: pass.polyline.map((point) => ({ x: offset + mirror * point.x, y: point.y })),
+          }
+        : pass,
+    ),
   };
   return cncGrblStrategy.emit({ groups: [group] }, DEFAULT_DEVICE_PROFILE);
 }
 
 describe('air floors require an earlier emitted cut', () => {
+  it.each([1, -1])(
+    'does not prove collapsed source coordinates before later placement (mirror %s)',
+    (mirror) => {
+      const line = (x: number, zMm: number): CncPass => ({
+        kind: 'contour',
+        closed: false,
+        zMm,
+        polyline: [
+          { x, y: 0 },
+          { x, y: 20 },
+        ],
+      });
+      const program = emit([line(0, -3), line(0.0000004, -6)], mirror, 10.0004998);
+      expect(program).not.toContain('G0 Z-2.000');
+      // The exact repeated path remains provable under the same placement.
+      expect(emit([line(0, -3), line(0, -6)], mirror, 10.0004998)).toContain('G0 Z-2.000');
+    },
+  );
+
+  it('does not expand a prior cut across a coordinate rounding boundary', () => {
+    const line = (x: number, zMm: number): CncPass => ({
+      kind: 'contour',
+      closed: false,
+      zMm,
+      polyline: [
+        { x, y: 0 },
+        { x, y: 20 },
+      ],
+    });
+    const program = emit([line(0.0004998, -3), line(0.0005002, -6)]);
+    expect(program).toContain('G0 X0.000 Y0.000');
+    expect(program).toContain('G0 X0.001 Y0.000');
+    expect(program).not.toContain('G0 Z-2.000');
+  });
+
+  it('does not credit a raw-collinear subdivision that rounds off the earlier line', () => {
+    const earlier: CncPass = {
+      kind: 'contour',
+      closed: false,
+      zMm: -3,
+      polyline: [
+        { x: 0, y: 0 },
+        { x: 10, y: 0.001 },
+      ],
+    };
+    const later: CncPass = {
+      kind: 'contour',
+      closed: false,
+      zMm: -6,
+      polyline: [
+        { x: 5, y: 0.0005 },
+        { x: 10, y: 0.001 },
+      ],
+    };
+    expect(emit([earlier, later])).not.toContain('G0 Z-2.000');
+  });
+
   it('does not claim the circle when a near-full arc emits sampled chords', () => {
     const earlier: CncPass = {
       kind: 'arc',
