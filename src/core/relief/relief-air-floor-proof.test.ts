@@ -32,6 +32,12 @@ function lastKeepsFloor(earlier: ReadonlyArray<CncPass>, last: CncPass, radiusMm
 }
 
 describe('keepProvenAirFloors (ADR-489 Amendment 1)', () => {
+  it('does not count a thin strip of tall stock as cleared', () => {
+    // A flat bit shifted 0.001 mm meets an uncut strip at the far side.
+    // Its small width does not bound its height; a rapid can enter stock.
+    expect(lastKeepsFloor([line(0, CEILING_MM)], floored(line(0.001, -3)))).toBe(false);
+  });
+
   it('keeps a floor on a path an earlier cut at the ceiling followed exactly', () => {
     expect(lastKeepsFloor([line(0, CEILING_MM)], floored(line(0, -3)))).toBe(true);
     expect(lastKeepsFloor([line(0, CEILING_MM)], floored(line(0, -3, 2, 8)))).toBe(true);
@@ -60,9 +66,12 @@ describe('keepProvenAirFloors (ADR-489 Amendment 1)', () => {
   });
 
   it('counts two earlier cuts together, and finds the strip between them', () => {
-    // 3.175 mm apart: their sweeps meet, so a pass between them is proven.
-    const close = [line(0, CEILING_MM), line(2 * RADIUS_MM, CEILING_MM)];
+    // Overlapping sweeps prove the area between them conservatively.
+    const close = [line(0, CEILING_MM), line(2 * RADIUS_MM - 0.1, CEILING_MM)];
     expect(lastKeepsFloor(close, floored(line(RADIUS_MM, -3, 2, 8)))).toBe(true);
+    // Merely tangent sweeps cannot survive conservative polygon rounding.
+    const tangent = [line(0, CEILING_MM), line(2 * RADIUS_MM, CEILING_MM)];
+    expect(lastKeepsFloor(tangent, floored(line(RADIUS_MM, -3, 2, 8)))).toBe(false);
     // 3.5 mm apart: a strip about 0.3 mm wide between them was never cut.
     const apart = [line(0, CEILING_MM), line(3.5, CEILING_MM)];
     expect(lastKeepsFloor(apart, floored(line(1.75, -3, 2, 8)))).toBe(false);

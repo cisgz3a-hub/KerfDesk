@@ -16,6 +16,22 @@ const BOX = [square(0, 10)];
 const BAND = [square(0, 10), square(3, 7)];
 
 describe('polylineStaysInside', () => {
+  it('checks a dense region without exceeding the JavaScript argument limit', () => {
+    const contour = Array.from({ length: 150_000 }, (_, index) => {
+      const angle = (index / 150_000) * 2 * Math.PI;
+      return { x: 10 * Math.cos(angle), y: 10 * Math.sin(angle) };
+    });
+    expect(
+      polylineStaysInside(
+        [
+          { x: 0, y: 0 },
+          { x: 1, y: 1 },
+        ],
+        [contour],
+      ),
+    ).toBe(true);
+  });
+
   it('keeps a path wholly inside', () => {
     expect(
       polylineStaysInside(

@@ -53,18 +53,24 @@ a radius of the strip would have been given a floor all the same.
    its edge counting as leaving it: Clipper's open-path clip looped forever on a ramp that
    doubled back along a loop 0.001 mm wide. A pass whose check fails, or throws inside Clipper,
    plunges from safe Z as before.
-3. **Tolerance: 0.01 mm.** Stock standing no further than `AIR_FLOOR_TOLERANCE_MM` beyond an
-   earlier cut's reach counts as cut. Offsets draw arcs as chords inside the circle on a
-   0.0001 mm grid, so they cannot tell a pass that retraces an earlier path (the map's edge, a
-   vertical wall, a mask outline: the same ring at every level) from one a micron outside it. The
-   earlier sweeps are drawn 0.0097 mm wider than the cutter and eroded by the radius plus
-   0.0015 mm; the rounding left over (0.0003 mm) keeps the whole within 0.01 mm. A retraced
-   ring keeps its floor with about 0.002 mm to spare. A real bit's diameter and runout are not
-   known to 0.01 mm, and a sliver of stock that thin cannot stand.
+3. **No radial stock tolerance.** A thin strip is still stock; its width does not bound its
+   height. The PR audit reproduced a false proof for a flat cutter shifted sideways by
+   0.001 mm. Earlier sweeps are now drawn 0.0003 mm inside the true radius to cover grid
+   rounding and eroded by the radius plus 0.0015 mm, covering the erosion's chord error.
+   Exact centre-line retraces are proven separately by interval coverage of earlier cut
+   segments (`relief-cut-path-coverage.ts`), retaining repeated rings without expanding the
+   cutter. Merely tangent sweeps may conservatively lose their floor. The stock simulation
+   uses the actual radius and no longer shares an inflated-radius tolerance with the proof.
 4. **The compiler passes the bit's radius** (`cutterRadiusMm`). Without it no pass keeps a
    floor.
 
 ### Consequences
+
+The benchmark table below records the original tolerant candidate, before the PR audit removed
+radial stock expansion. Its retained-floor counts and byte-identity results are historical,
+not a promise for the conservative implementation. The focused stock simulations retain fast
+descents and pass with the actual cutter radius. Dense-region containment also now computes
+bounds iteratively; a 150,000-vertex regression previously exceeded the JavaScript argument limit.
 
 | Relief roughing, 60 x 40 mm bench relief (heightfield image, default allowance) | Air descents, main / now | G-code | Estimated time |
 |---|---|---|---|
@@ -81,7 +87,7 @@ a radius of the strip would have been given a floor all the same.
 - Tests: `relief-air-floor-proof.test.ts` (a retrace keeps its floor, a sweep past every earlier
   cut or into the strip between two drops it, cuts above the slice top and the risen part of a
   ramp do not count, no radius keeps nothing); `relief-roughing-air-floor.test.ts` now passes
-  the radius, counts stock within the tolerance of a cut as cut, pins the two CI shapes and the
+  the radius, uses the actual cutter reach, pins the two CI shapes and the
   ball-nose ramp that doubled back, and adds the 0.8 mm strip, which the old floors fail;
   `polyline-stays-inside.test.ts` covers crossing, touching, holes, single points and the
   doubled-back ramp. 1,500 random reliefs pass with the check, 300 of them at 70-95% stepover.

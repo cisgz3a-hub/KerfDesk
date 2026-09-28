@@ -41,16 +41,23 @@ export function polylineStaysInside(
 }
 
 function edgeGrid(contours: ReadonlyArray<ReadonlyArray<Vec2>>): EdgeGrid | null {
-  const points = contours.flat();
-  if (points.length === 0) return null;
-  const xs = points.map((point) => point.x);
-  const ys = points.map((point) => point.y);
-  const minX = Math.min(...xs);
-  const minY = Math.min(...ys);
-  const span = Math.max(Math.max(...xs) - minX, Math.max(...ys) - minY);
+  let minX = Number.POSITIVE_INFINITY;
+  let minY = Number.POSITIVE_INFINITY;
+  let maxX = Number.NEGATIVE_INFINITY;
+  let maxY = Number.NEGATIVE_INFINITY;
+  for (const contour of contours)
+    for (const point of contour) {
+      if (!Number.isFinite(point.x) || !Number.isFinite(point.y)) return null;
+      minX = Math.min(minX, point.x);
+      minY = Math.min(minY, point.y);
+      maxX = Math.max(maxX, point.x);
+      maxY = Math.max(maxY, point.y);
+    }
+  if (!Number.isFinite(minX)) return null;
+  const span = Math.max(maxX - minX, maxY - minY);
   const cellMm = span > 0 ? span / GRID_BUCKETS : 1;
-  const columns = Math.floor((Math.max(...xs) - minX) / cellMm) + 1;
-  const rows = Math.floor((Math.max(...ys) - minY) / cellMm) + 1;
+  const columns = Math.floor((maxX - minX) / cellMm) + 1;
+  const rows = Math.floor((maxY - minY) / cellMm) + 1;
   const buckets: Edge[][] = Array.from({ length: columns * rows }, () => []);
   const grid = { minX, minY, cellMm, columns, rows, buckets };
   for (const contour of contours) {

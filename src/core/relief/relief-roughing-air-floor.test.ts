@@ -4,16 +4,14 @@ import type { CncPass } from '../job';
 import type { CncTool, Polyline } from '../scene';
 import { kernelForTool } from '../sim';
 import type { Heightmap } from './heightmap';
-import { AIR_FLOOR_TOLERANCE_MM } from './relief-air-floor-proof';
 import { reliefRoughingLadder, type ReliefRoughingOptions } from './relief-roughing';
 import { reliefRoughingMotion, type ReliefRoughingLevelPaths } from './relief-roughing-motion';
 
 // ADR-489: a roughing pass's air floor is proven by the job's own earlier
 // cuts. Cutting every earlier pass in a stock simulation must leave nothing
 // the cutter would touch with its tip at the floor, anywhere on the pass.
-// Stock within AIR_FLOOR_TOLERANCE_MM beyond a cut's reach counts as cut, as
-// the proof states (ADR-489 Amendment 1): the stock samples sit on a grid
-// that puts some of them a micron outside a ring's exact reach.
+// Use the real cutter radius: expanding it would conceal uncut stock from
+// the oracle and make a false clearance claim pass its own test.
 
 const END_MILL: CncTool = { id: 'em', name: 'end mill', kind: 'end-mill', diameterMm: 3.175 };
 const BALL: CncTool = { id: 'bn', name: 'ball nose', kind: 'ball-nose', diameterMm: 3.175 };
@@ -148,7 +146,7 @@ function simulate(map: Heightmap, tool: CncTool, passes: ReadonlyArray<CncPass>)
     points.forEach((a, index) => {
       const b = points[index + 1] ?? a;
       const z = Math.max(a.z, b.z);
-      forCellsNear(stock, a, b, radius + AIR_FLOOR_TOLERANCE_MM, (cell, distance) => {
+      forCellsNear(stock, a, b, radius, (cell, distance) => {
         const cut = z + law.surfaceDzAtRadius(Math.min(distance, radius));
         stock.top[cell] = Math.min(stock.top[cell] ?? 0, cut);
       });

@@ -11,14 +11,9 @@
 // the union of those cuts' sweeps eroded by the radius. Nothing assumes the
 // level above left no stock between its rings.
 //
-// The proof holds to AIR_FLOOR_TOLERANCE_MM: stock standing no further than
-// that beyond an earlier cut's reach counts as cut. The sweeps and the
-// erosion are Clipper2 round offsets, whose arcs are chords inside the true
-// circle, on a 0.0001 mm grid, so they cannot tell a pass that retraces an
-// earlier path (the map's edge, a vertical wall: the same ring at every
-// level) from one a micron outside it. The earlier cuts' sweeps are drawn the
-// tolerance wider than the cutter, less the grid's rounding, which proves the
-// retrace; a real cutter's diameter and runout are not known that closely.
+// Earlier sweeps are conservative: stock beyond their true reach never
+// counts as cut, however thin it is. Exact centre-line retraces are proven
+// separately, so polygon offset rounding cannot discard that common case.
 
 import {
   EndType,
@@ -32,9 +27,8 @@ import {
 import { polylineStaysInside } from '../geometry/polyline-stays-inside';
 import { tryVectorOp } from '../geometry/vector-path-tools';
 import type { CncContourPass, CncPass, CncPath3dPass } from '../job';
-
-/** Stock this close beyond an earlier cut's reach counts as cut. */
-export const AIR_FLOOR_TOLERANCE_MM = 0.01;
+import { cncContourEmissionVertices } from '../cnc/coordinate-representation';
+import { ReliefCutPathCoverage } from './relief-cut-path-coverage';
 
 const PRECISION_DECIMALS = 4;
 // The 0.0001 mm grid rounds each swept path and each offset by up to
@@ -46,9 +40,8 @@ const ERODE_ARC_TOLERANCE_MM = 0.001;
 // At least the erosion's chord error plus the grid's rounding, so the
 // erosion never admits a point nearer the cover's edge than the radius.
 const ERODE_MARGIN_MM = 0.0015;
-// At least the sweeps' chord error, the erosion margin and the rounding, so a
-// retraced path stays inside (0.0079 mm); at most the tolerance.
-const COVER_SLACK_MM = AIR_FLOOR_TOLERANCE_MM - GRID_ROUNDING_MM;
+// Keep the swept polygon inside the real cutter reach after grid rounding.
+const COVER_SLACK_MM = -GRID_ROUNDING_MM;
 // Long paths are swept in pieces this many segments long and unioned, which
 // Clipper does several times faster than one path of thousands of vertices.
 const SWEEP_PIECE_SEGMENTS = 60;
@@ -58,7 +51,12 @@ type FlooredPass = CncContourPass | CncPath3dPass;
 
 // Where a pass may stand with its floor proven at one ceiling: the union of
 // the sweeps of the cuts before `upTo` at or below it, eroded by the radius.
-type Cover = { readonly upTo: number; readonly sweep: PathsD; readonly inside: PathsD };
+type Cover = {
+  readonly upTo: number;
+  readonly sweep: PathsD;
+  readonly inside: PathsD;
+  readonly retrace: ReliefCutPathCoverage;
+};
 
 // A stretch of a pass's path, points `from` to `to` inclusive.
 type Run = { readonly from: number; readonly to: number };
@@ -105,23 +103,41 @@ function withoutFloor(pass: FlooredPass): CncPass {
 
 // The cover at `ceiling`, extended to every pass before `index`.
 function coverBefore(proof: Proof, index: number, ceiling: number): Cover {
-  const known = proof.covers.get(ceiling) ?? { upTo: 0, sweep: [], inside: [] };
+  const known = proof.covers.get(ceiling) ?? {
+    upTo: 0,
+    sweep: [],
+    inside: [],
+    retrace: new ReliefCutPathCoverage(),
+  };
   if (known.upTo === index) return known;
   const added: PathsD = [];
   for (let earlier = known.upTo; earlier < index; earlier += 1) {
     const pass = proof.passes[earlier];
     if (pass === undefined || (pass.kind !== 'contour' && pass.kind !== 'path3d')) continue;
-    for (const run of runsAtOrBelow(pass, ceiling)) added.push(...runSweep(proof, earlier, run));
+    for (const run of runsAtOrBelow(pass, ceiling)) {
+      known.retrace.add(pathOf(pass).slice(run.from, run.to + 1));
+      added.push(...runSweep(proof, earlier, run));
+    }
   }
   const cover =
     added.length === 0
       ? { ...known, upTo: index }
-      : withInside(proof, index, unionD(known.sweep, added, FillRule.NonZero, PRECISION_DECIMALS));
+      : withInside(
+          proof,
+          index,
+          unionD(known.sweep, added, FillRule.NonZero, PRECISION_DECIMALS),
+          known.retrace,
+        );
   proof.covers.set(ceiling, cover);
   return cover;
 }
 
-function withInside(proof: Proof, upTo: number, sweep: PathsD): Cover {
+function withInside(
+  proof: Proof,
+  upTo: number,
+  sweep: PathsD,
+  retrace: ReliefCutPathCoverage,
+): Cover {
   const inside = inflatePathsD(
     sweep,
     -(proof.radiusMm + ERODE_MARGIN_MM),
@@ -131,10 +147,10 @@ function withInside(proof: Proof, upTo: number, sweep: PathsD): Cover {
     PRECISION_DECIMALS,
     ERODE_ARC_TOLERANCE_MM,
   );
-  return { upTo, sweep, inside };
+  return { upTo, sweep, inside, retrace };
 }
 
-// Every point within the radius (plus the slack) of a run of a pass, swept
+// Every point within the conservatively rounded radius of a run, swept
 // piece by piece; the pieces overlap where they meet, as the path does.
 function runSweep(proof: Proof, index: number, run: Run): PathsD {
   const key = `${index}:${run.from}:${run.to}`;
@@ -166,7 +182,7 @@ function runSweep(proof: Proof, index: number, run: Run): PathsD {
 // test on the unrounded path: Clipper's open-path clip looped forever on a
 // ramp that doubled back along a 0.001 mm-wide loop.
 function liesInside(path: PathD, cover: Cover): boolean {
-  return polylineStaysInside(path, cover.inside);
+  return cover.retrace.covers(path) || polylineStaysInside(path, cover.inside);
 }
 
 function pathOf(pass: FlooredPass): PathD {
@@ -181,6 +197,8 @@ function pathOf(pass: FlooredPass): PathD {
 // into and out of a run, which rise above it part way, are left out). A run
 // of one point is swept as a disc.
 function runsAtOrBelow(pass: FlooredPass, ceiling: number): ReadonlyArray<Run> {
+  if (pass.kind === 'contour' && cncContourEmissionVertices(pass).length < 2) return [];
+  if (pass.kind === 'path3d' && pass.points.length < 2) return [];
   const low = (z: number): boolean => z <= ceiling + CEILING_EPS_MM;
   const last = pathOf(pass).length - 1;
   if (pass.kind === 'contour') return low(pass.zMm) ? [{ from: 0, to: last }] : [];
