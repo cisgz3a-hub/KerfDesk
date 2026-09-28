@@ -16,6 +16,9 @@ import { isModalOpen, useUiStore } from '../state/ui-store';
 import { useCanvasTextStore } from '../text/canvas-text-store';
 import { usePlatform } from './platform-context';
 import { editingToolShortcutContext, handleEditingToolShortcut } from './editing-tool-shortcuts';
+import { arrangeShortcutContext, handleArrangeShortcut } from './arrange-shortcuts';
+import { handleSettingsShortcut } from './settings-shortcut';
+import { openSettings } from '../settings/settings-dialog-store';
 import {
   editShortcutContext,
   fileShortcutContext,
@@ -39,12 +42,14 @@ export function useShortcuts(): void {
   useEffect(() => {
     const onFileEditKey = (e: KeyboardEvent): void => {
       if (keyboardOwnedElsewhere()) return;
+      if (handleSettingsShortcut(e, openSettings)) return;
       if (handleFileShortcut(e, fileShortcutContext(platformRef.current))) return;
       if (handleToolShortcut(e, TOOL_SHORTCUT_CONTEXT)) return;
       handleEditShortcut(e, editShortcutContext());
     };
     const onTransformViewKey = (e: KeyboardEvent): void => {
       if (keyboardOwnedElsewhere()) return;
+      if (handleArrangeShortcut(e, arrangeShortcutContext)) return;
       if (handleEditingToolShortcut(e, editingToolShortcutContext())) return;
       if (handleTransformShortcut(e, transformShortcutContext())) return;
       handleViewShortcut(e, VIEW_SHORTCUT_CONTEXT);

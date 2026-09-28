@@ -20,4 +20,5 @@ export {
   ARC_FIT_MAX_SWEEP_RAD,
   ARC_FIT_MIN_RADIUS_MM,
   ARC_FIT_SMOOTH_JOINT_DEG,
+  ARC_FIT_SOURCE_SAMPLE_ERROR_MM,
 } from './arc-fit-limits';

@@ -7,6 +7,7 @@ import {
   type ModalMotionWriter,
   type MotionWordStyle,
 } from '../gcode/motion-words';
+import type { RasterRowLine } from './emit-raster-row-line';
 
 /** A head position on the controller's three-decimal grid. */
 export type RasterControllerHead = { readonly x: number; readonly y: number };
@@ -53,10 +54,11 @@ export function rasterSweepOpening(
  * that burn's existing path and return before arming the image, just as the
  * vector cursor does. The caller inserts its held opening after the first
  * move. Both endpoints are on the controller grid; no new reach is added.
+ * Positions are along the row (scan-frame x); the row line places them.
  */
 export function rasterEntryExcursion(
+  line: RasterRowLine,
   startX: number,
-  y: number,
   firstTargetX: number,
   formatting: {
     readonly input: { readonly controlledLaserOffTravelFeedMmPerMin?: number };
@@ -68,9 +70,11 @@ export function rasterEntryExcursion(
   const feed = input.controlledLaserOffTravelFeedMmPerMin;
   const distance = Math.min(1, Math.abs(firstTargetX - startX));
   const asideX = startX + Math.sign(firstTargetX - startX) * distance;
+  const aside = line.point(asideX);
+  const start = line.point(startX);
   return [
-    formatLaserOffTravel(asideX, y, feed, writer, style),
-    formatLaserOffTravel(startX, y, feed, writer, style),
+    formatLaserOffTravel(aside.x, aside.y, feed, writer, style),
+    formatLaserOffTravel(start.x, start.y, feed, writer, style),
   ];
 }
 

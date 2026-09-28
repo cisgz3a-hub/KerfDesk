@@ -15,16 +15,16 @@ import type {
   Vec2,
 } from '../../core/scene';
 import type { TraceSettingsRecord } from '../../core/scene/scene-object';
+import type { WarpDeformGrid } from '../../core/geometry/warp-deform-map';
 import type { TextAlignment } from '../../core/text';
 import type { MeasureDraft } from '../workspace/measure-tool';
-import { DEFAULT_SNAP_SETTINGS, type SnapGuide, type SnapSettings } from '../workspace/snapping';
 import {
   readCanvasStartMarkersVisible,
   writeCanvasStartMarkersVisible,
 } from './canvas-motion-preferences';
 import { artworkRunOrderUiSlice, type ArtworkRunOrderUiState } from './artwork-run-order-ui';
 import { uiRailPanelSlice, type UiRailPanelState } from './ui-rail-panel';
-import { snapGuideStateUpdate } from './snap-guide-state';
+import { uiSnapSlice, type UiSnapState } from './ui-snap-slice';
 
 export type { CutsLayersView, RailPanelId, RailPanelVisibility } from './ui-rail-panel';
 
@@ -72,10 +72,17 @@ export type ToolMode =
   | { readonly kind: 'node' }
   | { readonly kind: 'measure' }
   | { readonly kind: 'cnc-tabs'; readonly layerColor: string; readonly operationId?: string }
+  // ADR-494: place, move and remove laser Line tabs on the selected artwork's
+  // `layerColor` contours for one operation. Esc returns to select.
+  | { readonly kind: 'laser-tabs'; readonly layerColor: string; readonly operationId: string }
+  // LBG-T06: drag the Warp or Deform handles held in warp-deform-session.ts.
+  | { readonly kind: 'warp-deform'; readonly grid: WarpDeformGrid }
   // Camera/positioning aid (ADR-116 follow-up): the next canvas click jogs
   // the laser head to that bed point (absolute, beam off). Esc returns to
   // select like every other mode.
   | { readonly kind: 'position-laser' }
+  // LBG-T04 Trim Shapes: hover highlights a stretch of outline, a click deletes it.
+  | { readonly kind: 'trim-shapes' }
   | { readonly kind: 'draw'; readonly shape: 'rect' | 'ellipse' | 'polygon' | 'star' | 'polyline' };
 
 // Pen-tool in-progress polyline (ADR-051 B6). Null unless the pen is mid-draw.
@@ -106,7 +113,8 @@ export type FloatingPanelPosition = {
 export type PreviewPlaybackSpeed = 'slow' | 'normal' | 'fast';
 
 export type UiState = ArtworkRunOrderUiState &
-  UiRailPanelState & {
+  UiRailPanelState &
+  UiSnapState & {
     readonly dragOverlay: boolean;
     readonly setDragOverlay: (next: boolean) => void;
     readonly scrubberT: number; // 0..1 fraction along total path length; F-A8
@@ -130,10 +138,6 @@ export type UiState = ArtworkRunOrderUiState &
     readonly workspaceContextBar: WorkspaceContextBarState | null;
     readonly openWorkspaceContextBar: (next: WorkspaceContextBarState) => void;
     readonly closeWorkspaceContextBar: () => void;
-    readonly snapSettings: SnapSettings;
-    readonly setSnapSettings: (next: Partial<SnapSettings>) => void;
-    readonly snapGuides: ReadonlyArray<SnapGuide>;
-    readonly setSnapGuides: (next: ReadonlyArray<SnapGuide>) => void;
     // Current drawing layer color. LightBurn's color/layer palette sets the
     // target color for subsequently-created vectors; this mirrors that behavior
     // without making layer selection undoable project data.
@@ -283,9 +287,28 @@ function uiDialogSlice(
   };
 }
 
+// A tool change also drops the snap marker of the tool being left, which would
+// otherwise hang on the canvas until the pointer next moved.
+function toolModeUpdate(next: ToolMode): Partial<UiState> {
+  if (next.kind === 'draw' && next.shape === 'polyline') {
+    return { toolMode: next, measureDraft: null, snapMarker: null };
+  }
+  if (next.kind === 'measure') return { toolMode: next, penDraft: null, snapMarker: null };
+  return { toolMode: next, penDraft: null, measureDraft: null, snapMarker: null };
+}
+
+const RESET_TOOL_MODE: Partial<UiState> = {
+  toolMode: { kind: 'select' },
+  draftShape: null,
+  penDraft: null,
+  measureDraft: null,
+  snapMarker: null,
+};
+
 export const useUiStore = create<UiState>((set) => ({
   ...uiRailPanelSlice(set),
   ...artworkRunOrderUiSlice(set),
+  ...uiSnapSlice(set),
   dragOverlay: false,
   setDragOverlay: (next) => set({ dragOverlay: next }),
   scrubberT: 1,
@@ -310,10 +333,6 @@ export const useUiStore = create<UiState>((set) => ({
   workspaceContextBar: null,
   openWorkspaceContextBar: (next) => set({ workspaceContextBar: next }),
   closeWorkspaceContextBar: () => set({ workspaceContextBar: null }),
-  snapSettings: DEFAULT_SNAP_SETTINGS,
-  setSnapSettings: (next) => set((s) => ({ snapSettings: { ...s.snapSettings, ...next } })),
-  snapGuides: [],
-  setSnapGuides: (next) => set((state) => snapGuideStateUpdate(state, next)),
   activeLayerColor: null,
   setActiveLayerColor: (next) => set({ activeLayerColor: normalizeLayerColor(next) }),
   zoomFactor: 1,
@@ -339,16 +358,8 @@ export const useUiStore = create<UiState>((set) => ({
   // Switching to any non-pen tool discards a half-drawn pen polyline so it can't
   // linger as a ghost (or get appended to on return). Re-selecting the pen keeps
   // the draft. resetToolMode (Esc / Select) clears it too.
-  setToolMode: (next) =>
-    set(
-      next.kind === 'draw' && next.shape === 'polyline'
-        ? { toolMode: next, measureDraft: null }
-        : next.kind === 'measure'
-          ? { toolMode: next, penDraft: null }
-          : { toolMode: next, penDraft: null, measureDraft: null },
-    ),
-  resetToolMode: () =>
-    set({ toolMode: { kind: 'select' }, draftShape: null, penDraft: null, measureDraft: null }),
+  setToolMode: (next) => set(toolModeUpdate(next)),
+  resetToolMode: () => set(RESET_TOOL_MODE),
   draftShape: null,
   setDraftShape: (next) => set({ draftShape: next }),
   penDraft: null,

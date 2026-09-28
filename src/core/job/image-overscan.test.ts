@@ -62,8 +62,12 @@ describe('per-operation image overscan (ADR-415)', () => {
     const image: RasterImage = { ...IMAGE, operationOverride: { imageOverscanMm: 12 } };
     const job = compileJob({ objects: [image], layers: [layer] }, DEFAULT_DEVICE_PROFILE);
     expect(overscanOf(job)).toBe(12);
-    expect(maxOutputOverscanMm({ objects: [image], layers: [layer] })).toBe(12);
-    expect(maxOutputOverscanMm({ objects: [IMAGE], layers: [layer] })).toBe(3);
+    expect(maxOutputOverscanMm({ objects: [image], layers: [layer] }, DEFAULT_DEVICE_PROFILE)).toBe(
+      12,
+    );
+    expect(maxOutputOverscanMm({ objects: [IMAGE], layers: [layer] }, DEFAULT_DEVICE_PROFILE)).toBe(
+      3,
+    );
   });
 
   it('resolves invalid stored values to the default', () => {

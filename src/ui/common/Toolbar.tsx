@@ -3,6 +3,7 @@ import { useState } from 'react';
 import type { AppCommand } from '../commands/command-registry';
 import type { MachineKind } from '../../core/scene';
 import { useStore } from '../state';
+import { useNudgeStore } from '../state/nudge-preferences';
 import { ConnectionBadge } from './ConnectionBadge';
 import { InstallButton } from './InstallButton';
 import { ShortcutsDialog } from './ShortcutsDialog';
@@ -18,6 +19,7 @@ export function Toolbar(props: {
   readonly machineKind: MachineKind;
 }): JSX.Element {
   const [isShortcutsOpen, setShortcutsOpen] = useState(false);
+  const nudgeSteps = useNudgeStore((state) => state.nudgeSteps);
   return (
     <header aria-label="Toolbar" className="lf-toolbar-shell">
       <ToolbarCommands commands={props.commands} />
@@ -33,7 +35,7 @@ export function Toolbar(props: {
           type="button"
           className="lf-btn lf-btn--ghost lf-toolbar-command lf-toolbar-command--icon-only"
           aria-label="Keyboard Shortcuts"
-          title={shortcutHint(props.machineKind)}
+          title={shortcutHint(props.machineKind, nudgeSteps)}
           onClick={() => setShortcutsOpen(true)}
         >
           <ToolbarIcon icon="shortcuts" />

@@ -35,9 +35,24 @@ export type ProjectOptimizationSettings = {
   readonly insideFirst: boolean;
   /** Opt-in removal of coincident laser Line spans within each operation. */
   readonly removeOverlappingLines: boolean;
+  /**
+   * How far apart two near-parallel Line spans may lie and still be cut once
+   * when removeOverlappingLines is on (LBG-C13), mm, 0 to 0.5. Absent or 0
+   * merges only spans that coincide at emitted precision, as before. No schema
+   * bump: an older reader ignores the field and cuts near-coincident spans
+   * twice, which is what every earlier build did.
+   */
+  readonly overlapMergeToleranceMm?: number;
   readonly layerPriority: 'project-order' | 'reverse-project-order';
   readonly pathDirection: 'allow-reverse' | 'preserve';
   readonly startPoint: 'machine-origin' | 'job-lower-left' | 'job-center';
+  /**
+   * Where each closed laser shape starts and stops (LBG-C04): where it was
+   * drawn, at the vertex nearest the head, or at the nearest corner so the
+   * start/stop mark lands on one. No schema bump: an older reader ignores the
+   * field and starts closed shapes where drawn, which cuts the same outline.
+   */
+  readonly closedShapeStart: 'drawn' | 'nearest' | 'nearest-corner';
 };
 
 export type ProjectJobPlacement = {
@@ -54,6 +69,16 @@ export type ProjectJobPlacement = {
     | 'back-right';
 };
 
+/**
+ * ADR-496: the material this laser job runs on. With `autoApplyRecipes` on,
+ * each new laser operation takes the active library's best recipe for it.
+ */
+export type ProjectLaserMaterial = {
+  readonly name: string;
+  readonly thicknessMm?: number;
+  readonly autoApplyRecipes: boolean;
+};
+
 export type ProjectJobSetup = {
   // The active mode's placement. The other mode's waits in `parkedPlacement`
   // and the two change places on every Laser/CNC switch (ADR-416).
@@ -64,7 +89,24 @@ export type ProjectJobSetup = {
     readonly useSelectionOrigin: boolean;
     readonly selectedObjectIds: ReadonlyArray<string>;
   };
+  readonly laserMaterial?: ProjectLaserMaterial;
 };
+
+/**
+ * The merge tolerance's range (LBG-C13). 0 is the exact rule; half a millimetre
+ * is already wider than a laser kerf, beyond which merging would move edges by
+ * more than the beam covers.
+ */
+export const OVERLAP_MERGE_TOLERANCE_RANGE_MM = { min: 0, max: 0.5 } as const;
+
+/** A merge tolerance inside its range; anything but a finite number is 0. */
+export function clampOverlapMergeTolerance(value: number): number {
+  if (!Number.isFinite(value)) return OVERLAP_MERGE_TOLERANCE_RANGE_MM.min;
+  return Math.min(
+    OVERLAP_MERGE_TOLERANCE_RANGE_MM.max,
+    Math.max(OVERLAP_MERGE_TOLERANCE_RANGE_MM.min, value),
+  );
+}
 
 export const DEFAULT_PROJECT_OPTIMIZATION: ProjectOptimizationSettings = {
   reduceTravelMoves: true,
@@ -74,6 +116,7 @@ export const DEFAULT_PROJECT_OPTIMIZATION: ProjectOptimizationSettings = {
   layerPriority: 'project-order',
   pathDirection: 'allow-reverse',
   startPoint: 'machine-origin',
+  closedShapeStart: 'drawn',
 };
 
 export type Project = {

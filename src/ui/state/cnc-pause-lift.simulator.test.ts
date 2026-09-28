@@ -10,24 +10,35 @@ import {
   type GrblSimulator,
 } from '../../__fixtures__/controllers';
 import { grblDriver } from '../../core/controllers';
+import {
+  RT_FEED_OV_MINUS_10,
+  RT_SPINDLE_OV_MINUS_10,
+  type RealtimeOverrideByte,
+} from '../../core/controllers/grbl';
+import { cncPauseLiftSkipReason } from './cnc-pause-lift-state';
 import { cncControllerEpochOf, createCncSetupAttestation } from './cnc-setup-attestation';
 import { currentStreamResetMayLosePosition } from './job-stop-request';
 import { useLaserStore } from './laser-store';
 import { resetStore } from './test-helpers';
 
 const SEGMENTS = 20;
-const PROGRAM = [
-  'G21',
-  'G90',
-  'G0 Z5',
-  'M3 S12000',
-  'G4 P1',
-  'G0 X0 Y0',
-  'G1 Z-1 F150',
-  ...Array.from({ length: SEGMENTS }, (_, index) => `G1 X${index + 1} F600`),
-  'G0 Z5',
-  'M5',
-].join('\n');
+
+function cncProgram(segments: number, spinup: ReadonlyArray<string> = ['G4 P1']): string {
+  return [
+    'G21',
+    'G90',
+    'G0 Z5',
+    'M3 S12000',
+    ...spinup,
+    'G0 X0 Y0',
+    'G1 Z-1 F150',
+    ...Array.from({ length: segments }, (_, index) => `G1 X${index + 1} F600`),
+    'G0 Z5',
+    'M5',
+  ].join('\n');
+}
+
+const PROGRAM = cncProgram(SEGMENTS);
 const CNC_SETTINGS: CreateGrblSimulatorOptions['settings'] = [[32, '0']];
 const ORIGIN_X = 10;
 
@@ -52,6 +63,8 @@ afterEach(async () => {
     motionOperation: null,
     streamer: null,
     cncPauseLift: null,
+    cncPauseLiftJob: null,
+    ovCache: null,
     log: [],
     controllerSettings: null,
     wcoCache: null,
@@ -245,5 +258,112 @@ describe('CNC Pause and lift against the GRBL simulator', () => {
     expect(
       state.log.some((line) => line.includes('Paused without lifting the bit: Laser mode')),
     ).toBe(true);
+  });
+});
+
+// ADR-411 Amendment 1: the re-audit's gaps in the lift itself.
+describe('CNC Pause and lift, re-audit fixes', () => {
+  it('lifts again on a second Pause in the same job', async () => {
+    const segments = 60;
+    const sim = await connectCnc({ settings: CNC_SETTINGS });
+    await startCnc(cncProgram(segments));
+    await pump(1500);
+    await settle(useLaserStore.getState().pauseJob());
+    expect(useLaserStore.getState().cncPauseLift?.phase).toBe('lifted');
+    await settle(useLaserStore.getState().resumeJob());
+    expect(useLaserStore.getState().streamer?.status).toBe('streaming');
+    await pump(1500);
+
+    await settle(useLaserStore.getState().pauseJob());
+    const second = useLaserStore.getState();
+    // The first lift's reset cleared the settings KerfDesk read on connect.
+    expect(second.controllerSettings).toBeNull();
+    expect(second.cncPauseLift?.phase).toBe('lifted');
+    expect(second.log.some((line) => line.includes('Paused without lifting'))).toBe(false);
+    expect(sim.outbound().filter((write) => write === '\x18')).toHaveLength(2);
+    expect(sim.state().mpos.z).toBe(5);
+    expect(sim.state().spindle).toBe(0);
+
+    await settle(useLaserStore.getState().resumeJob());
+    await pump(20_000);
+    expect(useLaserStore.getState().streamer).toBeNull();
+    expect(useLaserStore.getState().safetyNotice).toBeNull();
+    expect(sim.state().mpos).toEqual({ x: segments, y: 0, z: 5 });
+  });
+
+  it('puts feed and spindle overrides back after the lift reset', async () => {
+    const sim = await connectCnc({ settings: CNC_SETTINGS });
+    await startCnc(PROGRAM);
+    const slower: RealtimeOverrideByte[] = [
+      RT_FEED_OV_MINUS_10,
+      RT_FEED_OV_MINUS_10,
+      RT_FEED_OV_MINUS_10,
+      RT_SPINDLE_OV_MINUS_10,
+      RT_SPINDLE_OV_MINUS_10,
+    ];
+    for (const byte of slower) await useLaserStore.getState().sendRealtimeOverride(byte);
+    await pump(1500);
+    expect(useLaserStore.getState().ovCache).toEqual({ feed: 70, rapid: 100, spindle: 80 });
+
+    await settle(useLaserStore.getState().pauseJob());
+    const lifted = useLaserStore.getState();
+    expect(lifted.cncPauseLift?.phase).toBe('lifted');
+    expect(sim.state().overrides).toEqual({ feed: 70, rapid: 100, spindle: 80 });
+    expect(lifted.ovCache).toEqual({ feed: 70, rapid: 100, spindle: 80 });
+    expect(
+      lifted.log.some((line) =>
+        line.includes('overrides put back to feed 70%, rapid 100%, spindle 80%'),
+      ),
+    ).toBe(true);
+    // The reset put them to 100% before the lift set them again.
+    const reset = indexOfWrite(sim, '\x18');
+    const restore = sim.outbound().findIndex((write, i) => i > reset && write.startsWith('\x90'));
+    expect(restore).toBeGreaterThan(indexOfWrite(sim, 'G0 Z5.000\n', reset));
+  });
+
+  it('lifts a program with no spin-up dwell and waits the default spin-up above the cut', async () => {
+    const sim = await connectCnc({ settings: CNC_SETTINGS });
+    await startCnc(cncProgram(SEGMENTS, []));
+    await pump(1500);
+    await settle(useLaserStore.getState().pauseJob());
+    expect(useLaserStore.getState().cncPauseLift?.phase).toBe('lifted');
+
+    const beforeResume = sim.outbound().length;
+    await settle(useLaserStore.getState().resumeJob());
+    const reentry = sim
+      .outbound()
+      .slice(beforeResume)
+      .filter((write) => write !== '?');
+    expect(reentry.slice(2, 4)).toEqual(['M3 S12000\n', 'G4 P4\n']);
+    expect(useLaserStore.getState().streamer?.status).toBe('streaming');
+  });
+
+  it('says why a Pause with the door open did not lift, and lifts on Resume once it closes', async () => {
+    const sim = await connectCnc({ settings: CNC_SETTINGS });
+    await startCnc(PROGRAM);
+    await pump(1500);
+    const pausing = useLaserStore.getState().pauseJob();
+    sim.setDoorInput(true);
+    await settle(pausing);
+    const paused = useLaserStore.getState();
+    expect(paused.cncPauseLift ?? null).toBeNull();
+    expect(paused.streamer?.status).toBe('paused');
+    expect(cncPauseLiftSkipReason(paused)).toBe('The door input is open.');
+    expect(sim.outbound()).not.toContain('\x18');
+
+    sim.setDoorInput(false);
+    await pump(500);
+    const beforeResume = sim.outbound().length;
+    await settle(useLaserStore.getState().resumeJob());
+    const resumed = sim
+      .outbound()
+      .slice(beforeResume)
+      .filter((write) => write !== '?');
+    expect(resumed[0]).toBe('\x18');
+    expect(resumed).toContain('G0 Z5.000\n');
+    expect(resumed).toContain('M3 S12000\n');
+    expect(resumed).not.toContain('~');
+    expect(useLaserStore.getState().streamer?.status).toBe('streaming');
+    expect(cncPauseLiftSkipReason(useLaserStore.getState())).toBeNull();
   });
 });

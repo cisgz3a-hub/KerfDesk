@@ -3,7 +3,7 @@ import type { Tutorial } from './tutorial-types';
 export const CALIBRATION_TUTORIALS: readonly Tutorial[] = [
   {
     id: 'material-test',
-    title: 'Compare speed and power on material',
+    title: 'Compare laser settings on material',
     summary: 'Generate a labelled engraving grid and turn the best result into a reusable recipe.',
     category: 'Laser',
     machine: 'laser',
@@ -16,9 +16,9 @@ export const CALIBRATION_TUTORIALS: readonly Tutorial[] = [
       {
         title: 'Choose what the grid compares',
         instruction:
-          'Set Rows and Columns, then Min speed, Max speed, Min power and Max power using a range appropriate to your machine and material. Speeds vary by row and powers by column.',
-        focus: 'Speed rows × power columns',
-        result: 'Each filled cell compares one speed and power combination.',
+          'Choose Engrave to fill each cell or Cut to burn its outline, then pick what Rows vary and Columns vary: speed, power, passes or (for Engrave) hatch spacing. Set Rows and Columns and a minimum and maximum for the two settings that vary, and one value for the others. Speed by row and power by column is the default.',
+        focus: 'Rows vary × Columns vary',
+        result: 'Each cell compares one combination of the two settings.',
       },
       {
         title: 'Size the sample and read the feed disclosure',

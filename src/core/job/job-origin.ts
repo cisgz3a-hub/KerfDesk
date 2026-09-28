@@ -14,6 +14,7 @@ import type { JobBounds } from './job-bounds';
 import { computeJobBounds } from './job-bounds';
 import { withContourEntryBounds } from './contour-entry';
 import { translateCutSegment } from './cut-arc-moves';
+import { machineToScan, rasterScanFrame } from '../raster/raster-scan-frame';
 
 export type JobStartMode = 'absolute' | 'current-position' | 'user-origin' | 'verified-origin';
 
@@ -315,8 +316,11 @@ function translateFillGroup(group: FillGroup, dx: number, dy: number): FillGroup
   };
 }
 
+// ADR-492: an angled raster's bounds are in its scan frame, so the machine
+// translation is turned into that frame first.
 function translateRasterGroup(group: RasterGroup, dx: number, dy: number): RasterGroup {
-  return { ...group, bounds: offsetJobBounds(group.bounds, { x: dx, y: dy }) };
+  const offset = machineToScan(rasterScanFrame(group.scanAngleDeg), { x: dx, y: dy });
+  return { ...group, bounds: offsetJobBounds(group.bounds, offset) };
 }
 
 function translateSegment<T extends CutSegment>(segment: T, dx: number, dy: number): T {

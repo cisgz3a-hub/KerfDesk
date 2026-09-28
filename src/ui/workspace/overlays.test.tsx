@@ -52,13 +52,15 @@ describe('ZoomControls snap toggle', () => {
 });
 
 describe('ZoomControls start marker toggle', () => {
-  it('sits after Snap, defaults on, and persists the hidden state', async () => {
+  it('sits after Snap and its settings, defaults on, and persists the hidden state', async () => {
     const h = await render(<ZoomControls />);
     const snap = h.querySelector('button[aria-label="Toggle snapping"]');
+    const snapSettings = h.querySelector('button[aria-label="Snap settings"]');
     const markers = h.querySelector('button[aria-label="Show frame and job start markers"]');
     const zoomOut = h.querySelector('button[aria-label="Zoom out"]');
 
-    expect(snap?.nextElementSibling).toBe(markers);
+    expect(snap?.nextElementSibling).toBe(snapSettings);
+    expect(snapSettings?.nextElementSibling).toBe(markers);
     expect(markers?.nextElementSibling).toBe(zoomOut);
     expect(markers?.getAttribute('aria-pressed')).toBe('true');
 

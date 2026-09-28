@@ -7,7 +7,7 @@ import type { SvgArtworkFragment } from '../state/svg-fragment-mutation';
 //   * Edit: Cmd/Ctrl+Z, Shift+Z, Delete/Backspace, Escape
 //   * Tools: T, Cmd/Ctrl+R/E/L, Alt+M (measure), Alt+T (trace image),
 //     Cmd/Ctrl+Shift+B (convert to bitmap)
-//   * Transform: arrow keys (nudge), H/V (flip)
+//   * Transform: arrow keys (nudge; Shift large, Ctrl/Cmd fine), H/V (flip)
 //   * View: P (preview toggle)
 
 import type { ActiveWorkCoordinateSystem } from '../../core/controllers/grbl/work-offset-readback';
@@ -32,9 +32,8 @@ import { useUiStore, type ToolMode } from '../state/ui-store';
 import { finishPen } from '../workspace/pen-tool';
 import { isEditableShortcutTarget } from '../common/keyboard-targets';
 import { projectWithCurrentJobSetup } from '../state/project-job-setup';
-
-const NUDGE_MM = 1;
-const NUDGE_BIG_MM = 10;
+import type { NudgeSteps } from '../state/nudge-preferences';
+import { tryNudge } from './nudge-step';
 
 export type FileCtx = {
   readonly platform: PlatformAdapter;
@@ -98,6 +97,8 @@ export type TransformCtx = {
   readonly nudgeSelection: (dx: number, dy: number) => void;
   readonly nudgeSelectedPathNode: (dx: number, dy: number) => void;
   readonly flipSelection: (axis: SelectionFlipAxis) => void;
+  // The Settings window's nudge distances; the defaults when absent.
+  readonly nudgeSteps?: NudgeSteps;
 };
 
 export type ViewCtx = {
@@ -415,23 +416,6 @@ export function handleToolShortcut(e: KeyboardEvent, ctx: ToolCtx): boolean {
   return true;
 }
 
-const ARROW_DELTAS: Readonly<Record<string, { dx: number; dy: number }>> = {
-  ArrowLeft: { dx: -1, dy: 0 },
-  ArrowRight: { dx: 1, dy: 0 },
-  ArrowUp: { dx: 0, dy: -1 },
-  ArrowDown: { dx: 0, dy: 1 },
-};
-
-function tryNudge(e: KeyboardEvent, ctx: TransformCtx): boolean {
-  const arrow = ARROW_DELTAS[e.key];
-  if (arrow === undefined) return false;
-  e.preventDefault();
-  const step = e.shiftKey ? NUDGE_BIG_MM : NUDGE_MM;
-  if (ctx.selectedPathNode !== null) ctx.nudgeSelectedPathNode(arrow.dx * step, arrow.dy * step);
-  else ctx.nudgeSelection(arrow.dx * step, arrow.dy * step);
-  return true;
-}
-
 function tryFlip(e: KeyboardEvent, ctx: TransformCtx): boolean {
   const key = e.key.toLowerCase();
   if (key !== 'h' && key !== 'v') return false;
@@ -442,9 +426,9 @@ function tryFlip(e: KeyboardEvent, ctx: TransformCtx): boolean {
 
 export function handleTransformShortcut(e: KeyboardEvent, ctx: TransformCtx): boolean {
   if (ctx.selectedObjectId === null) return false;
-  if (hasMeta(e) || e.altKey) return false;
   if (isEditableTarget(e)) return false;
   if (tryNudge(e, ctx)) return true;
+  if (hasMeta(e) || e.altKey) return false;
   if (tryFlip(e, ctx)) return true;
   return false;
 }

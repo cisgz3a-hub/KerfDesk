@@ -14,6 +14,7 @@ import { useLaserStore } from '../state/laser-store';
 import type { ExecutionArtifactV1 } from '../state/recovery';
 import { recoveryHeadStop } from './laser-recovery-head-stop';
 import { runLaserRecoveryCapsuleFlow } from './laser-recovery-flow';
+import { moveHeadToWorkPoint } from './laser-recovery-move';
 import {
   connectSimulator,
   drive,
@@ -80,6 +81,14 @@ describe('Continue from where the head stopped after a lost link', () => {
       expect(written.y).toBeCloseTo(-stop.pointMm.y, 3);
       expect(totalWco(h.simulator.state()).x).toBeCloseTo(written.x, 3);
       expect(h.simulator.state().mpos).toMatchObject({ x: 0, y: 0 });
+
+      // Go to job origin lands on work X0 Y0, where the first controller had it.
+      await drive(moveHeadToWorkPoint({ x: 0, y: 0 }));
+      await tick(3_000);
+      expect(h.simulator.state().mpos.x).toBeCloseTo(written.x, 3);
+      expect(h.simulator.state().mpos.y).toBeCloseTo(written.y, 3);
+      expect(head.x + h.simulator.state().mpos.x).toBeCloseTo(ORIGIN.x, 3);
+      expect(head.y + h.simulator.state().mpos.y).toBeCloseTo(ORIGIN.y, 3);
 
       const resumed = runLaserRecoveryCapsuleFlow(capsule, h.repository, { fromLine: stop.line });
       expect(await drive(resumed)).toBe(true);

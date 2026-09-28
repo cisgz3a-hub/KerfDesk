@@ -90,6 +90,9 @@ function collectJoinSources(
         const protectedPath =
           object.cncTabAnchors?.some(
             (tab) => tab.pathIndex === pathIndex && tab.polylineIndex === curveIndex,
+          ) === true ||
+          object.laserTabAnchors?.some(
+            (tab) => tab.pathIndex === pathIndex && tab.polylineIndex === curveIndex,
           ) === true;
         const world = transformVectorCurve(curve, object.transform);
         if (!finiteCurve(world)) return invalidGeometry();
@@ -184,6 +187,7 @@ function repairMetadata(
   | 'locked'
   | 'libraryProvenance'
   | 'cncTabAnchors'
+  | 'laserTabAnchors'
 > {
   return {
     ...(object.operationIds === undefined ? {} : { operationIds: object.operationIds }),
@@ -199,6 +203,14 @@ function repairMetadata(
       ? {}
       : {
           cncTabAnchors: object.cncTabAnchors.flatMap((anchor) => {
+            const position = anchorMap.get(curveKey(anchor.pathIndex, anchor.polylineIndex));
+            return position === undefined ? [] : [{ ...anchor, ...position }];
+          }),
+        }),
+    ...(object.laserTabAnchors === undefined
+      ? {}
+      : {
+          laserTabAnchors: object.laserTabAnchors.flatMap((anchor) => {
             const position = anchorMap.get(curveKey(anchor.pathIndex, anchor.polylineIndex));
             return position === undefined ? [] : [{ ...anchor, ...position }];
           }),

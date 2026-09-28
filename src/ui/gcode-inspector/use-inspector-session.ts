@@ -1,7 +1,6 @@
 import { useMemo, useState } from 'react';
-import type { ProgramTimeModel } from '../../core/gcode-time';
-import type { GcodeRenderModel } from '../../core/gcode-view';
 import { directionArrows, resolveViewer3dTheme } from '../viewer3d';
+import type { InspectorProgramTime, InspectorRenderModel } from './inspector-model';
 import type { GcodeInspectionSource } from './gcode-inspection-source';
 import type { GcodeInspectorAnalysis } from './gcode-inspector-analysis';
 import { useInspectorLook } from './inspector-look-preference';
@@ -14,7 +13,7 @@ import { useInspectorPlayback } from './use-inspector-playback';
 import { useInspectorLiveProgress } from './use-inspector-live-progress';
 
 export function useInspectorSession(
-  model: GcodeRenderModel,
+  model: InspectorRenderModel,
   analysis: GcodeInspectorAnalysis,
   source?: GcodeInspectionSource,
 ) {
@@ -106,11 +105,11 @@ type DerivedOptions = {
 };
 
 function useInspectorDerived(
-  model: GcodeRenderModel,
+  model: InspectorRenderModel,
   analysis: GcodeInspectorAnalysis,
   options: DerivedOptions,
 ): {
-  readonly time: ProgramTimeModel;
+  readonly time: InspectorProgramTime;
   readonly playback: ReturnType<typeof useInspectorPlayback>;
   readonly playhead: ReturnType<typeof playheadAtTime>;
   readonly findings: GcodeInspectorAnalysis['findings'];

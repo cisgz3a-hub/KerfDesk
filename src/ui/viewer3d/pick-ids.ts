@@ -3,6 +3,14 @@
 // so a pixel read back from under the pointer names the move exactly, with
 // no search over the program. Zero is left for "nothing here".
 
+import {
+  insertAfter,
+  insertBefore,
+  MAIN,
+  VERTEX_END,
+  type ShaderSource,
+} from './line-shader-edits';
+
 /** Side of the square read around the pointer, in CSS pixels. Odd, so the
  * pointer sits on the centre pixel. Lines are 1 px wide in this pass, so the
  * window is the reach within which a move still counts as pointed at. */
@@ -86,4 +94,34 @@ export function nearestEnd(
   const toEnd = reach(end);
   if (Math.min(toStart, toEnd) > snapPx) return null;
   return toStart <= toEnd ? 'start' : 'end';
+}
+
+// The solid moves are instances in program order (ADR-485), so the shader
+// spells each one's identity from its instance number: no per-move attribute.
+const INSTANCE_ID_VARYING = `flat varying vec4 vPickId;
+`;
+const INSTANCE_ID_VERTEX = `
+  uint pickValue = uint( gl_InstanceID ) + 1u;
+  vPickId = vec4( pickValue & 255u, ( pickValue >> 8u ) & 255u,
+    ( pickValue >> 16u ) & 255u, pickValue >> 24u ) / 255.0;
+`;
+const FRAGMENT_END = '#include <premultiplied_alpha_fragment>';
+const INSTANCE_ID_FRAGMENT = `
+  gl_FragColor = vPickId;
+`;
+
+/** Paints a fat-line instance in the colour that spells its index plus one. */
+export function withInstancePickIds(shader: ShaderSource): ShaderSource {
+  return {
+    vertexShader: insertAfter(
+      insertBefore(shader.vertexShader, MAIN, INSTANCE_ID_VARYING),
+      VERTEX_END,
+      INSTANCE_ID_VERTEX,
+    ),
+    fragmentShader: insertAfter(
+      insertBefore(shader.fragmentShader, MAIN, INSTANCE_ID_VARYING),
+      FRAGMENT_END,
+      INSTANCE_ID_FRAGMENT,
+    ),
+  };
 }

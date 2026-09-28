@@ -9,6 +9,7 @@ import { useStore } from '../state';
 import { useUiStore } from '../state/ui-store';
 import { Icon } from '../kit';
 import { measureReadout } from './measure-tool';
+import { SnapSettingsButton } from './SnapSettingsPopover';
 import { computeView } from './view-transform';
 
 export function DragOverlay(): JSX.Element {
@@ -38,13 +39,14 @@ export function ZoomControls(): JSX.Element {
       <button
         type="button"
         onClick={() => setSnapSettings({ enabled: !snapEnabled })}
-        title="Toggle snapping"
+        title="Toggle snapping (hold Alt while dragging to place freely)"
         aria-label="Toggle snapping"
         aria-pressed={snapEnabled}
         style={snapEnabled ? activeZoomBtnStyle : zoomBtnStyle}
       >
         #
       </button>
+      <SnapSettingsButton style={snapSettingsBtnStyle} />
       <StartMarkersToggle />
       <button
         type="button"
@@ -302,6 +304,13 @@ const zoomBtnStyle: React.CSSProperties = {
   fontSize: 16,
   color: 'inherit',
   padding: 0,
+};
+const snapSettingsBtnStyle: React.CSSProperties = {
+  ...zoomBtnStyle,
+  width: 16,
+  display: 'inline-flex',
+  alignItems: 'center',
+  justifyContent: 'center',
 };
 const activeZoomBtnStyle: React.CSSProperties = {
   ...zoomBtnStyle,

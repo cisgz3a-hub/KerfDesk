@@ -19,6 +19,13 @@ import { boundsExtent, disposeChildren } from './scene-furniture';
 import { createMarkers, disposeMarkers, type SceneMarkers } from './scene-markers';
 import { placeMarker, type Point3 } from './scene-parts';
 import { clipObjects } from './scene-isolate';
+import {
+  applyDetail,
+  disposeDetail,
+  mmPerPixel,
+  sameDetail,
+  type Viewer3dDetail,
+} from './scene-detail';
 import { createMeasureOverlay, type MeasureOverlay } from './scene-measure';
 import { createToolpathPicker, type ToolpathPicker } from './scene-pick';
 import type { CameraRig } from './scene-setup';
@@ -103,6 +110,8 @@ export type SceneCore = {
   readonly measure: MeasureOverlay;
   readonly projection: { readonly listen: Listen<Viewer3dProjection>; readonly report: () => void };
   readonly moving: { readonly listen: Listen<boolean>; readonly dispose: () => void };
+  /** Whether the drawn path is simplified for the zoom, and how (ADR-485). */
+  readonly detail: { readonly listen: Listen<Viewer3dDetail | null> };
   /** Studio hands the line shaders linear colours; Classic keeps raw ones. */
   readonly encode: () => ((channel: number) => number) | undefined;
   /** The Classic marker, or Studio's tool model, at the playhead. */
@@ -127,9 +136,19 @@ export function createSceneCore(deps: SceneHandleDeps): SceneCore {
     canvas: deps.canvas,
     classicObjects: [deps.furnitureGroup],
   });
+  const detail = createDetailReporter();
   const drawFrame = (): void => {
     rig.controls.update();
     const camera = rig.viewCamera();
+    const targets = state.reveal?.detail ?? null;
+    detail.report(
+      targets === null
+        ? null
+        : applyDetail(targets, {
+            wholePath: state.playhead === null,
+            mmPerPixel: mmPerPixel(camera, state.bounds, state.viewHeight),
+          }),
+    );
     renderer.render(scene, camera);
     if (state.overlays) cube.render(renderer, rig.camera, rig.controls.target);
     studio.renderLabels(camera);
@@ -159,6 +178,7 @@ export function createSceneCore(deps: SceneHandleDeps): SceneCore {
     measure,
     projection: createProjectionReporter(rig),
     moving: createMovingReporter(rig.controls),
+    detail,
     encode,
     placePlayhead: () => {
       const point = state.playhead?.hideMarker ? null : (state.playhead?.point ?? null);
@@ -221,6 +241,7 @@ function disposeCore(core: Omit<SceneCore, 'dispose'>): void {
   core.views.dispose();
   core.moving.dispose();
   deps.rig.controls.dispose();
+  disposeDetail(core.state.reveal?.detail ?? null);
   disposeChildren(deps.toolpathGroup);
   disposeChildren(deps.furnitureGroup);
   disposeMarkers(deps.scene, core.markers);
@@ -242,6 +263,25 @@ function createProjectionReporter(rig: CameraRig): SceneCore['projection'] {
       next?.(rig.getProjection());
     },
     report: () => listener?.(rig.getProjection()),
+  };
+}
+
+// Tells the viewport when the drawn path turns simplified or whole again.
+function createDetailReporter(): SceneCore['detail'] & {
+  readonly report: (detail: Viewer3dDetail | null) => void;
+} {
+  let listener: ((detail: Viewer3dDetail | null) => void) | null = null;
+  let last: Viewer3dDetail | null = null;
+  return {
+    listen: (next) => {
+      listener = next;
+      next?.(last);
+    },
+    report: (detail) => {
+      if (sameDetail(last, detail)) return;
+      last = detail;
+      listener?.(detail);
+    },
   };
 }
 

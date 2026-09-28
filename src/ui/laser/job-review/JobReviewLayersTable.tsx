@@ -9,11 +9,15 @@ import {
   activeCncTool,
   DEFAULT_CNC_LAYER_SETTINGS,
   isRegistrationLayer,
+  layerFromSubLayer,
   operationArtworkCount,
   type CncMachineConfig,
   type Layer,
+  type LayerSubLayer,
   type MachineKind,
+  type SceneObject,
 } from '../../../core/scene';
+import { placedLaserTabCount } from '../../../core/job/laser-tab-anchors';
 import { layerSubLayerOperationId } from '../../../core/scene/layer';
 import type { MaterialLibraryDocument } from '../../../io/material-library';
 import { useStore } from '../../state';
@@ -132,7 +136,7 @@ function LaserLayersTable(props: {
             <OperationDetailRow
               colSpan={LASER_COLUMNS.length}
               chip={materialChip(layer, materialLibrary)}
-              text={laserOperationReviewDetail(layer, operationArtworkCount(objects, layer))}
+              text={laserOperationReviewDetail(layer, objects)}
             />
             <JobReviewEffectiveOperationRow
               colSpan={LASER_COLUMNS.length}
@@ -159,7 +163,7 @@ function LaserLayersTable(props: {
                   <OperationDetailRow
                     colSpan={LASER_COLUMNS.length}
                     chip={null}
-                    text={laserOperationDetail(subLayer.settings)}
+                    text={subLayerReviewDetail(layer, subLayer, objects)}
                   />
                   <JobReviewEffectiveOperationRow
                     colSpan={LASER_COLUMNS.length}
@@ -175,8 +179,18 @@ function LaserLayersTable(props: {
   );
 }
 
-function laserOperationReviewDetail(layer: Layer, artworkCount: number): string {
-  const detail = laserOperationDetail(layer);
+function subLayerReviewDetail(
+  layer: Layer,
+  subLayer: LayerSubLayer,
+  objects: ReadonlyArray<SceneObject>,
+): string {
+  const placed = placedLaserTabCount(objects, layerFromSubLayer(layer, subLayer));
+  return laserOperationDetail(subLayer.settings, placed);
+}
+
+function laserOperationReviewDetail(layer: Layer, objects: ReadonlyArray<SceneObject>): string {
+  const detail = laserOperationDetail(layer, placedLaserTabCount(objects, layer));
+  const artworkCount = operationArtworkCount(objects, layer);
   if (!isRegistrationLayer(layer)) return detail;
   return `Registration jig outline operation (${artworkCount} ${artworkCount === 1 ? 'outline' : 'outlines'}) · ${detail}`;
 }

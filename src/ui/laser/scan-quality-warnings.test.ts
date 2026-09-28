@@ -55,6 +55,16 @@ describe('compiled scan quality advisories', () => {
     expect(warnings(raster({ speed: 6000.9, overscanMm: 10 }))).toEqual([]);
   });
 
+  it('measures the run-up along an angled scan (ADR-495)', () => {
+    // 6000 mm/min needs 10 mm along an axis, 7.07 mm on a diagonal.
+    expect(warnings(raster({ speed: 6000, overscanMm: 7.8, scanAngleDeg: 45 }))).toEqual([]);
+    const short = warnings(raster({ speed: 6000, overscanMm: 5, scanAngleDeg: 45 }));
+    expect(short).toHaveLength(1);
+    expect(short[0]).toContain('500 mm/s² (707.1068 mm/s² along its 45° scan)');
+    expect(short[0]).toContain('needs about 7.0711 mm');
+    expect(warnings(raster({ speed: 6000, overscanMm: 7.8, scanAngleDeg: 90 }))).toHaveLength(1);
+  });
+
   it('compares the qualified Fill entry rather than its larger stored setting', () => {
     const fill: FillGroup = {
       kind: 'fill',
