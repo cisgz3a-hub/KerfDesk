@@ -402,7 +402,9 @@ destination and cannot overwrite the template source.
 #### Move — keyboard
 - Arrow key: 1 mm nudge in that direction.
 - Shift+Arrow: 10 mm nudge.
-- No other modifiers in Phase A.
+- Ctrl/Cmd+Arrow: 0.1 mm nudge (ADR-499).
+- All three distances are set in **Settings → Canvas** (0.01 to 1000 mm).
+- Alt+Arrow aligns instead of nudging (ADR-499, F-A6h).
 
 #### Scale — drag handles
 - Corner handles: locked aspect ratio by default.
@@ -484,10 +486,21 @@ destination and cannot overwrite the template source.
    remain on the first instance; later objects and copied complete groups receive fresh IDs.
 6. **Create array** commits one undo entry and selects all instances. **Cancel** or Escape leaves the
    project unchanged.
-7. Array settings remain transient. Every mode can optionally **Advance variables per copy** (F-D6);
-   its per-text sequence offsets persist with the resulting ordinary objects. Preview, save,
-   compilation, Frame, and Start consume those objects through the existing exact-artifact path. This mode creates no
+7. Array settings are not saved in the project. Array... reopens with the settings last applied in
+   this session (ADR-499), except a circle's centre object, and Cancel remembers nothing. Every mode
+   can optionally **Advance variables per copy** (F-D6), which always starts off; its per-text
+   sequence offsets persist with the resulting ordinary objects. Preview, save, compilation, Frame,
+   and Start consume those objects through the existing exact-artifact path. This mode creates no
    new output path or guard.
+8. **Grid extras (ADR-499).** **Space by** Gap between copies or Distance between centres (switching
+   converts the numbers). **Row shift** moves rows 2, 4... right and **Column shift** moves columns
+   2, 4... down (negative values go left or up). **Mirror alternate columns / rows** flips every
+   other copy horizontally, vertically or both. **Build right to left** and **Build bottom to top**
+   change where the copies grow; the original stays at row 1, column 1.
+9. **Circular extras (ADR-499).** **Centre** is the selection centre, a typed point or, with two or
+   more objects selected, one of them, which stays put and is not copied. **Spread copies** evenly
+   all the way round, from a start to an end angle (both ends included), or by a step angle. 0° is
+   to the right and angles run clockwise. The status line says what Apply will do.
 
 ---
 
@@ -598,6 +611,24 @@ destination and cannot overwrite the template source.
    Select or node tools still picks the next overlapping object.
 5. A very large trace pauses once, briefly, the first time the pointer comes near it with snapping
    on; after that snapping keeps up with the pointer.
+
+### F-A6h. Named undo list, Settings window and align keys (ADR-499)
+
+1. Every undo step has a name: the tool or command that made it ("Trim Shapes", "Delete 3
+   objects"), else what changed ("Move rectangle", "Change Cut settings").
+2. The **Undo list** button between Undo and Redo lists the last 15 steps, newest first. Choosing
+   one undoes back to just before it; Redo then walks forward again one step at a time.
+3. **Window → Undo History** shows every undo and redo step by name, with a "Current project" row.
+   Clicking an undo step goes back to just before it; clicking a redo step redoes through it. The
+   window stays open.
+4. **Edit → Settings...** or **Ctrl+,** (Cmd+, on macOS) opens Settings: General (theme, workspace
+   layout, recent projects), Canvas (snapping, frame and start markers, nudge distances), Machine &
+   materials (links to Machine Setup, the Bit Library, Materials or Recipes) and Labs (laser only).
+   Changes apply at once and belong to this computer, not the project. Each setting also stays
+   where it was before.
+5. **Alt+arrows** align the selection left, right, top or bottom; **Alt+PgUp** and **Alt+PgDn**
+   centre it on X or Y; **Alt+Shift+H** and **Alt+Shift+V** distribute spacing. Aligning needs two
+   or more objects and distributing three or more; a group counts as one. Each is one undo step.
 
 ### F-A7. Artwork Operations panel
 
@@ -1263,10 +1294,15 @@ Mac uses `Cmd`, Windows/Linux web uses `Ctrl`.
 - `Alt+D` — Delete duplicates (ADR-480; Option+D on macOS)
 - `Delete` / `Backspace` — Delete selected
 - `Escape` — Deselect / cancel current operation
+- `Cmd/Ctrl+,` — Settings (ADR-499)
 
 #### Transform
 - Arrow keys — Nudge 1 mm
 - Shift+Arrow — Nudge 10 mm
+- `Cmd/Ctrl+Arrow` — Nudge 0.1 mm (ADR-499; all three distances are set in Settings → Canvas)
+- `Alt+Left` / `Alt+Right` / `Alt+Up` / `Alt+Down` — Align left / right / top / bottom (ADR-499)
+- `Alt+PgUp` / `Alt+PgDn` — Align centres on X / Y (ADR-499)
+- `Alt+Shift+H` / `Alt+Shift+V` — Distribute horizontal / vertical spacing (ADR-499)
 - `H` — Flip horizontal
 - `V` — Flip vertical
 - `.` / `,` — Rotate 90° clockwise / counter-clockwise (ADR-410)

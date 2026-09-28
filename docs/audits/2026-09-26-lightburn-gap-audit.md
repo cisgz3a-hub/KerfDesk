@@ -55,8 +55,8 @@ Sierra variants).
 | LBG-T10 | Resize Slots in Selection | `R/ResizeSlots/` | Missing for artwork; Box Generator only | M | open |
 | LBG-T11 | Boolean Assistant preview | `R/BooleanTools/` | Missing | S-M | open |
 | LBG-T12 | Measure shape readout (perimeter, area, node count, open or closed) and node snapping | `R/Measure/` | Distance and angle line (`src/ui/workspace/measure-tool.ts`) | S-M | open |
-| LBG-T13 | Grid Array extras: centre-to-centre spacing, row/column shift, reverse, mirror alternate, virtual array | `R/GridArray/` | Rows, columns, edge gap, variable advance (`array-layout.ts`) | S-L | open |
-| LBG-T14 | Circular Array end/step angle and last-selected-as-centre | `R/CircularArray/` | Count, centre, radius, start angle, rotate copies | S | open |
+| LBG-T13 | Grid Array extras: centre-to-centre spacing, row/column shift, reverse, mirror alternate, virtual array | `R/GridArray/` | Rows, columns, edge gap, variable advance (`array-layout.ts`) | S-L | Built (ADR-499), except the virtual array (needs a new object kind) |
+| LBG-T14 | Circular Array end/step angle and last-selected-as-centre | `R/CircularArray/` | Count, centre, radius, start angle, rotate copies | S | Built (ADR-499) |
 | LBG-T15 | Move Laser to Selection (centre, corners, edges) | `R/MoveLaserToSelection/` | Missing; click-to-move exists (`src/ui/workspace/position-laser-click.ts`) | S | Built (ADR-493) |
 | LBG-T16 | Mirror Across Line | `R/FlipMirror/` | Missing | S | open |
 | LBG-T17 | Two-Point Rotate/Scale | `R/TwoPointRotateScale/` | Missing | M | open |
@@ -137,7 +137,7 @@ Sierra variants).
 | LBG-F15 | Hotkey editor | `R/EditHotkeys/` | Read-only shortcut list | M | open |
 | LBG-F16 | Preview: shade vectors by power, legend, save image | `R/Preview/` | Rasters shaded only | S-M | open |
 | LBG-F17 | Import: editable text and bitmaps from `.lbrn`, `.lbrn` image and Offset Fill settings, WebP and TGA images, mixed PDF pages | `R/FileManagement/` | Rect, Ellipse, Path and Group only (`src/io/lightburn/lbrn-geometry.ts`); `CutSetting_Img` skipped (`lbrn-import.ts`) | S-L | open |
-| LBG-F18 | Preferences dialog (grid, snap, nudge, wheel, import options, autosave interval) | `R/SettingsPreferences/` | Scattered settings | M | open |
+| LBG-F18 | Preferences dialog (grid, snap, nudge, wheel, import options, autosave interval) | `R/SettingsPreferences/` | Scattered settings | M | Built (ADR-499): one Settings window with grid, snap and nudge; no wheel, import or autosave-interval preferences exist yet |
 
 ## Deliberate differences that need a maintainer decision
 
@@ -167,6 +167,9 @@ Each batch is one pull request with its own decision record, tests and WORKFLOW.
 - **Batch 8 — trimming, cutting, bending and snapping:** LBG-T04, LBG-T06, LBG-T08, LBG-T09,
   LBG-F06. Design tools only; no machine motion and no change to how existing projects compile.
   Built in ADR-498.
+- **Batch 9 — arrays, undo list, Settings, keys and smoothing:** LBG-T13, LBG-T14, LBG-F18, LBG-T22,
+  LBG-C13, plus a named undo list, align and distribute keys and a 0.1 mm nudge from the Rayforge
+  comparison. Built in ADR-499.
 - **Next candidates, in order:** LBG-I01, LBG-I02 (after the Rayforge thread's image scan work
   lands, since both change the image pipeline).
 - **Taken by the Rayforge comparison thread (2026-09-27):** LBG-C06 (image scan angle and cross-hatch,
