@@ -7,10 +7,24 @@ function repoFile(path: string): string {
   return readFileSync(join(process.cwd(), path), 'utf8');
 }
 
+/** The electron-builder flags of each Preview build in a workflow, version aside. */
+function previewBuildFlags(workflow: string): string[] {
+  return [
+    ...workflow.matchAll(/--config electron-builder\.preview\.yml \\\n([\s\S]*?)--publish never/g),
+  ].map((build) =>
+    (build[1] ?? '')
+      .replace(/--config\.extraMetadata\.version="[^"]+"/, '--config.extraMetadata.version=V')
+      .replace(/\s+/g, ' ')
+      .trim(),
+  );
+}
+
 describe('Desktop Preview release workflow gate (ADR-248/249)', () => {
   const workflow = repoFile('.github/workflows/release-desktop-preview.yml');
   const builder = repoFile('electron-builder.preview.yml');
   const macVerifier = repoFile('scripts/verify-macos-preview-package.sh');
+  const windowsVerifier = repoFile('scripts/verify-windows-preview-package.ps1');
+  const packageCheck = repoFile('.github/workflows/desktop-package-check.yml');
   const afterPack = repoFile('scripts/electron-builder-preview-after-pack.mjs');
   // package.json is repository-controlled; this gate consumes only its optional author name.
   const packageJson = JSON.parse(repoFile('package.json')) as {
@@ -72,7 +86,10 @@ describe('Desktop Preview release workflow gate (ADR-248/249)', () => {
     expect(builder).toMatch(/^productName: KerfDesk$/m);
     expect(builder).toMatch(/^copyright: Copyright © 2026 Johann Stolk$/m);
     expect(builder).toContain('shortcutName: KerfDesk');
-    expect(workflow.match(/scripts\/verify-windows-package-identity\.ps1/g)).toHaveLength(2);
+    expect(workflow).toContain(
+      './scripts/verify-windows-preview-package.ps1 -Version $env:VERSION',
+    );
+    expect(windowsVerifier.match(/verify-windows-package-identity\.ps1'\)/g)).toHaveLength(2);
     expect(macVerifier).toContain('NSHumanReadableCopyright');
     expect(macVerifier).toContain('Copyright © 2026 Johann Stolk');
   });
@@ -88,8 +105,9 @@ describe('Desktop Preview release workflow gate (ADR-248/249)', () => {
     expect(builder).toContain('differentialPackage: false');
     expect(workflow).toContain("CSC_IDENTITY_AUTO_DISCOVERY: 'false'");
     expect(workflow).toContain('--config.forceCodeSigning=false');
-    expect(workflow).toContain("$signature.Status -ne 'NotSigned'");
-    expect(workflow).toContain('$machine -ne 0x8664');
+    expect(windowsVerifier).toContain("$signature.Status -ne 'NotSigned'");
+    expect(windowsVerifier).toContain('$machine -ne 0x8664');
+    expect(windowsVerifier).toContain("'verify-packaged-preview-metadata.mjs') $archive $Version");
     expect(macVerifier).toContain('lipo -archs');
     expect(`${workflow}\n${macVerifier}`).toContain(
       'node scripts/verify-packaged-preview-metadata.mjs',
@@ -121,8 +139,9 @@ describe('Desktop Preview release workflow gate (ADR-248/249)', () => {
     expect(macVerifier).toContain(`Print :LSMinimumSystemVersion' "\${plist}")" = '${floor}'`);
     expect(builder).toContain('NSCameraUsageDescription:');
     expect(builder).toContain('NSLocalNetworkUsageDescription:');
-    expect(`${workflow}\n${macVerifier}`).toContain('LICENSE.electron.txt');
-    expect(`${workflow}\n${macVerifier}`).toContain('LICENSES.chromium.html');
+    expect(windowsVerifier).toContain("'LICENSE.electron.txt'");
+    expect(windowsVerifier).toContain("'LICENSES.chromium.html'");
+    expect(windowsVerifier).toContain("'resources/legal/THIRD_PARTY_NOTICES.md'");
     expect(macVerifier).toContain('${app_dir}/Contents/Resources/legal/electron/LICENSE');
     expect(macVerifier).toContain(
       '${app_dir}/Contents/Resources/legal/electron/LICENSES.chromium.html',
@@ -131,6 +150,30 @@ describe('Desktop Preview release workflow gate (ADR-248/249)', () => {
     expect(macVerifier).toContain('hdiutil attach -readonly -nobrowse');
     expect(macVerifier).toContain('app_dir="${mount_dir}/KerfDesk.app"');
     expect(workflow).toContain('Release verification and legal-closure gate');
+  });
+
+  it('builds and checks the Windows and macOS Preview on every pull request (ADR-521)', () => {
+    expect(packageCheck).toMatch(/^ {2}pull_request:$/m);
+    expect(packageCheck).toContain('runs-on: windows-latest');
+    expect(packageCheck).toMatch(/runner: macos-15\n/);
+    expect(packageCheck).toContain('runner: macos-15-intel');
+    // A pull request builds the Preview exactly as the tag does, so the contract means the same.
+    const releaseBuilds = previewBuildFlags(workflow);
+    const pullRequestBuilds = previewBuildFlags(packageCheck);
+    expect(releaseBuilds).toHaveLength(3);
+    expect(pullRequestBuilds).toHaveLength(2);
+    expect(new Set([...releaseBuilds, ...pullRequestBuilds]).size).toBe(1);
+    expect(packageCheck).toContain(
+      './scripts/verify-windows-preview-package.ps1 -Version $env:VERSION',
+    );
+    expect(packageCheck).toContain(
+      'bash scripts/verify-macos-preview-package.sh "${VERSION}" "${ARCH}"',
+    );
+    expect(packageCheck).toContain('-Scenario Launch');
+    expect(packageCheck.match(/node scripts\/verify-asar-integrity-enforced\.mjs/g)).toHaveLength(
+      2,
+    );
+    expect(packageCheck).not.toContain('${{ secrets.');
   });
 
   it('cannot publish Preview updater metadata, R2 objects, or secret-backed output', () => {
@@ -146,7 +189,7 @@ describe('Desktop Preview release workflow gate (ADR-248/249)', () => {
     expect(windowsCleanup).toBeGreaterThan(windowsBuild);
     expect(windowsCleanup).toBeLessThan(windowsVerify);
     expect(workflow).toContain('Remove-Item -LiteralPath $path.FullName -Force');
-    expect(`${workflow}\n${macVerifier}`).toContain("-name 'latest*.yml'");
+    expect(`${windowsVerifier}\n${macVerifier}`).toContain("-name 'latest*.yml'");
     expect(`${workflow}\n${macVerifier}`).toContain("-name '*.blockmap'");
     expect(workflow).not.toContain('wrangler r2');
     expect(workflow).not.toContain('dl.kerfdesk.com');

@@ -1,10 +1,14 @@
 param(
   [Parameter(Mandatory = $true)][string]$Installer,
-  [Parameter(Mandatory = $true)][string]$UpgradeInstaller,
+  [string]$UpgradeInstaller,
   [Parameter(Mandatory = $true)][string]$Version,
-  [Parameter(Mandatory = $true)][string]$UpgradeVersion,
+  [string]$UpgradeVersion,
   [Parameter(Mandatory = $true)][string]$SourceCommit,
-  [Parameter(Mandatory = $true)][string]$EvidenceRoot
+  [Parameter(Mandatory = $true)][string]$EvidenceRoot,
+  # Full: the dry run's install, save/reopen, upgrade and uninstall qualification.
+  # Launch: every pull request's install, packaged launch/import/save and
+  # uninstall (ADR-521), with no upgrade candidate and no file dialogs.
+  [ValidateSet('Full', 'Launch')][string]$Scenario = 'Full'
 )
 
 $ErrorActionPreference = 'Stop'
@@ -19,6 +23,10 @@ if ($env:OS -ne 'Windows_NT' -or $env:GITHUB_ACTIONS -ne 'true' -or
   throw 'Installer qualification requires a disposable GitHub-hosted Windows runner.'
 }
 if ($SourceCommit -notmatch '^[a-f0-9]{40}$') { throw 'Expected a full source commit.' }
+if ($Scenario -eq 'Full' -and
+    ([string]::IsNullOrWhiteSpace($UpgradeInstaller) -or [string]::IsNullOrWhiteSpace($UpgradeVersion))) {
+  throw 'The full qualification needs an upgrade installer and version.'
+}
 
 function Assert-ChildPath([string]$Path, [string]$Parent) {
   $full = [IO.Path]::GetFullPath($Path)
@@ -30,7 +38,7 @@ function Assert-ChildPath([string]$Path, [string]$Parent) {
 }
 
 $Installer = Assert-ChildPath $Installer $env:GITHUB_WORKSPACE
-$UpgradeInstaller = Assert-ChildPath $UpgradeInstaller $env:GITHUB_WORKSPACE
+if ($Scenario -eq 'Full') { $UpgradeInstaller = Assert-ChildPath $UpgradeInstaller $env:GITHUB_WORKSPACE }
 $EvidenceRoot = Assert-ChildPath $EvidenceRoot $env:GITHUB_WORKSPACE
 $ownedRoot = Assert-ChildPath (Join-Path $env:RUNNER_TEMP "kerfdesk-installer-$env:GITHUB_RUN_ID-$env:GITHUB_RUN_ATTEMPT") $env:RUNNER_TEMP
 $installRoot = Assert-ChildPath (Join-Path $ownedRoot 'KerfDesk Installed') $ownedRoot
@@ -39,6 +47,9 @@ $uninstaller = Join-Path $installRoot 'Uninstall KerfDesk.exe'
 $profile = Join-Path ([Environment]::GetFolderPath('ApplicationData')) 'laserforge'
 $project = Join-Path $ownedRoot 'projects\real saved project.lf2'
 $sentinel = Join-Path $profile 'installer-qualification-sentinel.json'
+# Double-clicking a project opens KerfDesk (ADR-378); a per-user install registers it in HKCU.
+$projectExtensionKey = 'HKCU:\Software\Classes\.lf2'
+$projectClassKey = 'HKCU:\Software\Classes\KerfDesk.Project'
 $shortcutPaths = @(
   (Join-Path ([Environment]::GetFolderPath('Desktop')) 'KerfDesk.lnk'),
   (Join-Path ([Environment]::GetFolderPath('Programs')) 'KerfDesk.lnk')
@@ -57,10 +68,17 @@ $receipt = [ordered]@{
   os = (Get-CimInstance Win32_OperatingSystem | Select-Object Caption, Version, BuildNumber, OSArchitecture)
   elevated = ([Security.Principal.WindowsPrincipal][Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)
   installRoot = $installRoot; profile = $profile; project = $project
-  versions = @($Version, $UpgradeVersion); steps = $steps
-  packaging = 'electron-builder.yml Windows NSIS, unsigned with preview metadata and trusted updater disabled'
+  scenario = $Scenario; steps = $steps
+  versions = @(if ($Scenario -eq 'Full') { $Version, $UpgradeVersion } else { $Version })
+  packaging = $(if ($Scenario -eq 'Full') {
+    'electron-builder.yml Windows NSIS, unsigned with preview metadata and trusted updater disabled'
+  } else { 'Windows NSIS, unsigned with preview metadata and trusted updater disabled' })
   limitations = @(
-    'Unsigned manual installer upgrade; production signed automatic updates remain unqualified.',
+    $(if ($Scenario -eq 'Full') {
+      'Unsigned manual installer upgrade; production signed automatic updates remain unqualified.'
+    } else {
+      'Install, packaged launch/import/save on a throwaway profile, and uninstall only; no upgrade and no real file dialogs.'
+    }),
     'Both candidates use this same source commit; historical release/profile migrations remain separate checks.',
     'Hosted runner OS and account only; consumer Windows, standard-user UAC and SmartScreen remain separate checks.',
     'No physical controller, camera, laser, spindle or other hardware was operated.'
@@ -98,6 +116,15 @@ function Get-Shortcuts {
     if (Test-Path -LiteralPath $path) {
       [pscustomobject]@{ path = $path; target = $shell.CreateShortcut($path).TargetPath }
     }
+  }
+}
+
+function Get-ProjectAssociation {
+  $command = Join-Path $projectClassKey 'shell\open\command'
+  [pscustomobject]@{
+    extensionClass = if (Test-Path -LiteralPath $projectExtensionKey) { (Get-Item -LiteralPath $projectExtensionKey).GetValue('') } else { $null }
+    openCommand = if (Test-Path -LiteralPath $command) { (Get-Item -LiteralPath $command).GetValue('') } else { $null }
+    classRegistered = Test-Path -LiteralPath $projectClassKey
   }
 }
 
@@ -144,10 +171,15 @@ function Assert-Installed([string]$ExpectedVersion, [string]$Candidate) {
   if ($shortcuts.Count -ne 2 -or @($shortcuts | Where-Object target -NE $executable).Count -ne 0) {
     throw 'Expected desktop and Start Menu shortcuts to the installed executable.'
   }
+  $association = Get-ProjectAssociation
+  if ($association.extensionClass -ne 'KerfDesk.Project' -or $association.openCommand -ne "`"$executable`" `"%1`"") {
+    throw "Expected .lf2 projects to open in the installed executable: $($association | ConvertTo-Json -Compress)"
+  }
   return [pscustomobject]@{
     registry = $records; asar = $installedAsar; candidateAsar = $candidateAsar
     executable = $installedExecutable; candidateExecutable = $candidateExecutable
-    shortcuts = $shortcuts; previewMetadataVerified = $true; trustedUpdater = $false
+    shortcuts = $shortcuts; projectAssociation = $association
+    previewMetadataVerified = $true; trustedUpdater = $false
   }
 }
 
@@ -217,13 +249,24 @@ function Uninstall-Candidate([string]$Label) {
     $shortcuts = @(Get-Shortcuts)
     $remaining = @(if (Test-Path -LiteralPath $installRoot) { Get-ChildItem -LiteralPath $installRoot -Force -ErrorAction Stop })
     $remainingKeys = @($priorRecords | Where-Object { Test-Path -LiteralPath $_.identityKey })
-    if ($records.Count -eq 0 -and $shortcuts.Count -eq 0 -and $remaining.Count -eq 0 -and $remainingKeys.Count -eq 0) { break }
+    $projectClass = Test-Path -LiteralPath $projectClassKey
+    if ($records.Count -eq 0 -and $shortcuts.Count -eq 0 -and $remaining.Count -eq 0 -and $remainingKeys.Count -eq 0 -and -not $projectClass) { break }
     Start-Sleep -Milliseconds 250
   } while ([DateTime]::UtcNow -lt $deadline)
-  if ($records.Count -ne 0 -or $shortcuts.Count -ne 0 -or $remaining.Count -ne 0 -or $remainingKeys.Count -ne 0) {
-    throw 'Uninstall left application files, shortcuts or registration behind.'
+  if ($records.Count -ne 0 -or $shortcuts.Count -ne 0 -or $remaining.Count -ne 0 -or $remainingKeys.Count -ne 0 -or $projectClass) {
+    throw 'Uninstall left application files, shortcuts, registration or the .lf2 project type behind.'
   }
   $steps.Add([pscustomobject]@{ name = $Label; exitCode = $exitCode; registry = $records; shortcuts = $shortcuts; remainingFiles = $remaining.Count })
+  Write-Receipt
+}
+
+function Invoke-InstalledSmoke([string]$Label) {
+  # The installed app launches, imports an SVG and saves a project on a throwaway
+  # profile; the smoke's own deadline bounds it.
+  $output = Join-Path $EvidenceRoot $Label
+  & node (Join-Path $PSScriptRoot 'verify-windows-packaged-native-smoke.mjs') $executable "--output=$output"
+  if ($LASTEXITCODE -ne 0) { throw "Installed app launch/import/save failed: $Label" }
+  $steps.Add([pscustomobject]@{ name = $Label; evidence = $output })
   Write-Receipt
 }
 
@@ -235,7 +278,7 @@ try {
       @(Get-Process -Name KerfDesk, LaserForge -ErrorAction SilentlyContinue).Count -ne 0) {
     throw 'Runner already contains KerfDesk installation, profile, shortcuts or processes; refusing.'
   }
-  $candidates = foreach ($candidate in @($Installer, $UpgradeInstaller)) {
+  $candidates = foreach ($candidate in @($Installer, $UpgradeInstaller | Where-Object { $_ })) {
     $signature = (Get-AuthenticodeSignature -LiteralPath $candidate).Status.ToString()
     if ($signature -ne 'NotSigned') { throw "Expected unsigned test candidate, found $signature" }
     & (Join-Path $PSScriptRoot 'verify-windows-package-identity.ps1') -Executable $candidate -Kind Installer | Out-Null
@@ -244,6 +287,13 @@ try {
   $receipt.candidates = @($candidates)
   New-Item -ItemType Directory -Path (Split-Path -Parent $project) -Force | Out-Null
   Write-Receipt
+  if ($Scenario -eq 'Launch') {
+    Install-Candidate 'fresh-install' $Installer $Version
+    Invoke-InstalledSmoke 'installed-launch'
+    Uninstall-Candidate 'final-uninstall'
+    $receipt.status = 'passed'
+    return
+  }
   Install-Candidate 'fresh-install' $Installer $Version
   Invoke-FileRoundtrip 'create-real-project' 'create' $Version
   if (-not (Test-Path -LiteralPath $profile -PathType Container)) { throw 'Normal app profile was not created.' }
