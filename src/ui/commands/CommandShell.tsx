@@ -34,6 +34,7 @@ import { useGcodeInspectorSlot } from './use-gcode-inspector-slot';
 import { WorkspaceContextBar } from './WorkspaceContextBar';
 import { ArrayDialogHost } from './ArrayDialogHost';
 import { CopyAlongPathDialogHost } from './CopyAlongPathDialogHost';
+import { OptimizeShapesDialogHost } from './OptimizeShapesDialogHost';
 import { QuickNestDialogHost } from './QuickNestDialogHost';
 import { PrintAndCutDialogHost } from '../laser/PrintAndCutDialogHost';
 import { ScanOffsetCommandDialog } from './ScanOffsetCommandDialog';
@@ -41,6 +42,8 @@ import { IntervalDialog, MaterialDialog } from './CalibrationGridDialogs';
 import { GcodeSaveDialog } from '../app/GcodeSaveDialog';
 import { VectorRepairDialogHost } from './VectorRepairDialogHost';
 import { OffsetShapesDialogHost } from './OffsetShapesDialogHost';
+import { SettingsWindowHost } from '../settings/SettingsWindowHost';
+import { redoSteps, undoSteps } from '../state/undo-history';
 
 type SettingsDialogKind =
   | 'optimization'
@@ -154,7 +157,9 @@ function StoreOpenedDialogs(): JSX.Element {
       <GcodeSaveDialogHost />
       <BarcodeDialogHost />
       <CopyAlongPathDialogHost />
+      <OptimizeShapesDialogHost />
       <ExportSvgDialogHost />
+      <SettingsWindowHost />
     </>
   );
 }
@@ -244,6 +249,8 @@ function UndoHistoryPanel(props: { readonly onClose: () => void }): JSX.Element 
       redoStack={redoStack}
       onUndo={undo}
       onRedo={redo}
+      onUndoSteps={undoSteps}
+      onRedoSteps={redoSteps}
       onClose={props.onClose}
     />
   );

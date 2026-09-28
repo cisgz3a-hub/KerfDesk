@@ -57,7 +57,7 @@ function cutShapesMutation(state: AppState): AppState | Partial<AppState> {
     additionalSelectedIds: new Set(pieces.slice(1)),
     selectedPathNode: null,
     selectedPathNodes: [],
-    undoStack: pushUndo(state.project, state.undoStack),
+    undoStack: pushUndo(state.project, state.undoStack, 'Cut Shapes'),
     redoStack: [],
     dirty: true,
   };

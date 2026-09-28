@@ -42,7 +42,11 @@ function applyWarpDeformMutation(
   if (plan.warped === 0) return state;
   return {
     project: { ...state.project, scene: { ...scene, objects: plan.objects } },
-    undoStack: pushUndo(state.project, state.undoStack),
+    undoStack: pushUndo(
+      state.project,
+      state.undoStack,
+      request.grid === 'warp' ? 'Warp' : 'Deform',
+    ),
     redoStack: [],
     dirty: true,
     selectedPathNode: null,

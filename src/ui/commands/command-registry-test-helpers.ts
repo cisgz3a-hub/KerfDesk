@@ -64,6 +64,8 @@ function baseCtxEditingTools(): Partial<AppCommandContext> {
     deformToolActive: false,
     startWarp: vi.fn(),
     startDeform: vi.fn(),
+    // LBG-T22 Optimize Shapes.
+    optimizeShapes: vi.fn(),
   };
 }
 
@@ -193,7 +195,7 @@ function baseCtxActions(): Partial<AppCommandContext> {
 }
 
 function baseCtxAppearance(): Partial<AppCommandContext> {
-  return { appTheme: 'light', setAppTheme: vi.fn() };
+  return { appTheme: 'light', setAppTheme: vi.fn(), openSettings: vi.fn() };
 }
 
 function baseCtxArrangeActions(): Partial<AppCommandContext> {

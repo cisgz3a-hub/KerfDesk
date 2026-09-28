@@ -1,6 +1,7 @@
 import { disabled, enabled, type AppCommand, type AppCommandContext } from './command-types';
 import { deleteDuplicatesCommand, designSelectionCommands } from './design-tools-commands';
 import { pasteInPlaceCommand, selectionEditCommands } from './editing-tools-commands';
+import { settingsCommand } from './settings-command';
 
 export function editCommands(ctx: AppCommandContext): ReadonlyArray<AppCommand> {
   return [
@@ -56,6 +57,7 @@ export function editCommands(ctx: AppCommandContext): ReadonlyArray<AppCommand> 
       ctx.clearSelection,
       'Esc',
     ),
+    settingsCommand(ctx),
   ];
 }
 

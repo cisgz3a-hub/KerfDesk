@@ -3,6 +3,7 @@
 // Direction, Create Rubber-Band Outline and Flatten Image Mask.
 
 import { disabled, enabled, type AppCommand, type AppCommandContext } from './command-types';
+import { optimizeShapesCommand } from './optimize-shapes-commands';
 import { warpDeformCommands } from './warp-deform-commands';
 
 export const DELETE_DUPLICATES_SHORTCUT = 'Alt+D';
@@ -87,6 +88,7 @@ export function designToolsCommands(ctx: AppCommandContext): ReadonlyArray<AppCo
       ctx.reverseSelectedPaths,
     ),
     ...warpDeformCommands(ctx),
+    optimizeShapesCommand(ctx),
     ctx.hasMaskedRasterSelection
       ? enabled(
           'tools.flatten-image-mask',
