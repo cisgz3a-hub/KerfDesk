@@ -1,13 +1,18 @@
 // The AppCommandContext slice for LightBurn gap batch 5 (ADR-480), folded into
 // the batch 3 slice so command-types.ts and use-app-commands.ts stay as they are.
-// Trim Shapes and Cut Shapes (LBG-T04, LBG-T08) and Warp and Deform (LBG-T06)
-// join it.
+// Trim Shapes and Cut Shapes (LBG-T04, LBG-T08), Warp and Deform (LBG-T06) and
+// Optimize Shapes (LBG-T22) join it.
 
+import type {
+  OptimizeShapesCommandContext,
+  OptimizeShapesCommandId,
+} from './optimize-shapes-command-types';
 import type { VectorCutCommandContext, VectorCutCommandId } from './vector-cut-command-types';
 import type { WarpDeformCommandContext, WarpDeformCommandId } from './warp-deform-command-types';
 
 export type DesignToolsCommandContext = VectorCutCommandContext &
-  WarpDeformCommandContext & {
+  WarpDeformCommandContext &
+  OptimizeShapesCommandContext & {
     readonly selectContainedShapes: () => void;
     readonly selectSmallerShapes: () => void;
     readonly deleteDuplicates: () => void;
@@ -23,6 +28,7 @@ export type DesignToolsCommandContext = VectorCutCommandContext &
 export type DesignToolsCommandId =
   | VectorCutCommandId
   | WarpDeformCommandId
+  | OptimizeShapesCommandId
   | 'edit.select-contained'
   | 'edit.select-smaller'
   | 'edit.delete-duplicates'

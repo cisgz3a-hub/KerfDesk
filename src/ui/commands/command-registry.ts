@@ -16,6 +16,8 @@ import { editCommands } from './edit-command-family';
 import { arrangeCommands } from './arrange-command-family';
 import { laserCommands } from './laser-command-family';
 import { gateCommandsForMachineKind } from './machine-command-gate';
+import { commandUndoStepName } from './command-undo-step-name';
+import { withUndoStepName } from '../state/undo-step-names';
 import type { AppCommand, AppCommandContext, CommandId } from './command-types';
 
 export { COMMAND_FAMILY_ORDER } from './command-types';
@@ -51,6 +53,6 @@ export function commandById(commands: ReadonlyArray<AppCommand>, id: CommandId):
 
 export function runCommand(command: AppCommand): boolean {
   if (!command.enabled) return false;
-  command.invoke();
+  withUndoStepName(commandUndoStepName(command), command.invoke);
   return true;
 }

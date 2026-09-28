@@ -75,7 +75,7 @@ export function copyAlongPathMutation(
     additionalSelectedIds: new Set(copies.selectedIds.slice(1)),
     selectedPathNode: null,
     selectedPathNodes: [],
-    undoStack: pushUndo(state.project, state.undoStack),
+    undoStack: pushUndo(state.project, state.undoStack, 'Copy Along Path'),
     redoStack: [],
     dirty: true,
   };

@@ -15,6 +15,8 @@ import { useCameraStore } from '../../state/camera-store';
 import { CalibrateCameraControls } from '../calibrate/CalibrateCameraControls';
 import { activeCameraModelNow } from '../active-camera-model';
 import { OverlayControls } from '../OverlayControls';
+import { JobWatchSection } from '../job-watch/JobWatchSection';
+import { jobWatchWantsCamera } from '../job-watch/job-watch-store';
 import { CameraDiagnostics } from './CameraDiagnostics';
 import { CameraSetupSteps } from './CameraSetupSteps';
 import { MachineCameraSection } from './MachineCameraSection';
@@ -94,6 +96,7 @@ function CameraPanelOpen(): JSX.Element {
       <SavedCamerasSection />
       <OverlayControls />
       <SnapshotControls wide={wide} onToggleWide={toggleWide} />
+      <JobWatchSection />
       <CameraDiagnostics bridgeAvailable={bridgeAvailable} />
     </div>
   );
@@ -122,7 +125,7 @@ function useCameraPanelOpenState() {
     if (bridgeAvailable && machineCamera.kind === 'idle') void detectMachineCamera(bridge);
     return () => {
       stopWatchingDevices?.();
-      if (!cameraShownOnCanvas()) stopSource();
+      if (!cameraShownOnCanvas() && !jobWatchWantsCamera()) stopSource();
     };
     // machineCamera is deliberately NOT a dependency: the probe fires once per
     // panel open, not on every probe-state transition.
@@ -149,7 +152,8 @@ function useCameraPanelOpenState() {
 }
 
 // The canvas overlay draws the live camera, so the source outlives the panel
-// while the overlay is on and there is a calibration to draw it with.
+// while the overlay is on and there is a calibration to draw it with. Watching
+// jobs (ADR-490) keeps it too, so the camera is there when a job starts.
 function cameraShownOnCanvas(): boolean {
   return useCameraStore.getState().overlayVisible && activeCameraModelNow() !== undefined;
 }

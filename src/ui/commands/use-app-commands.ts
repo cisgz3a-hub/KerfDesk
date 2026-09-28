@@ -1,5 +1,6 @@
 import { fileCommandContext } from './file-command-context';
 import { recentProjectsCommandContext } from './recent-projects-command';
+import { settingsCommandContext } from './settings-command';
 import { profileSupportsCapability } from '../../core/devices';
 import { machineKindOf } from '../../core/scene';
 import { resetWorkspaceLayout, toggleWorkspaceSidePanels } from '../app/workspace-panel-actions';
@@ -114,7 +115,7 @@ function appCommandContext(
   const activeStreamer = isActiveStreamerStatus(laser.streamer?.status);
   return {
     ...fileCommandContext(callbacks, platform, app, pushToast),
-    ...recentProjectsCommandContext(),
+    ...storeOwnedCommandContext(),
     ...editCommandContext(app, dialogs),
     ...toolCommandContext(callbacks, app, platform, dialogs, pushToast, selection),
     ...editingToolsCommandContext(app, callbacks, selectedIds, dialogs.wireframeActive),
@@ -175,6 +176,11 @@ function appCommandContext(
     previewActive: app.previewMode,
     hasPreviewableContent: hasPreviewableContent(app.project),
   };
+}
+
+// File → Recent Projects and Edit → Settings act on their own stores.
+function storeOwnedCommandContext() {
+  return { ...recentProjectsCommandContext(), ...settingsCommandContext() };
 }
 
 function isActiveStreamerStatus(status: string | undefined): boolean {

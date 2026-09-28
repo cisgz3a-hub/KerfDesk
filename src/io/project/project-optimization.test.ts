@@ -127,4 +127,45 @@ describe('project cut-planner settings', () => {
     );
     expect(invalid.kind).toBe('invalid');
   });
+
+  it('round-trips the overlap merge tolerance, keeps it absent when unset, and clamps it', () => {
+    const project = createProject();
+    const unset = serializeProject(project);
+    const reread = deserializeProject(unset);
+    if (reread.kind !== 'ok') throw new Error('default project did not load');
+    expect('overlapMergeToleranceMm' in reread.project.optimization).toBe(false);
+    // A project that never set it saves byte for byte as before.
+    expect(serializeProject(reread.project)).toBe(unset);
+
+    for (const overlapMergeToleranceMm of [0, 0.05, 0.5]) {
+      const set: Project = {
+        ...project,
+        optimization: { ...project.optimization, overlapMergeToleranceMm },
+      };
+      const result = deserializeProject(serializeProject(set));
+      expect(result.kind === 'ok' ? result.project.optimization : null).toEqual(set.optimization);
+    }
+
+    const clamped = (value: number): number | undefined => {
+      const text = JSON.stringify({
+        ...project,
+        optimization: { ...project.optimization, overlapMergeToleranceMm: value },
+      });
+      const result = deserializeProject(text);
+      return result.kind === 'ok' ? result.project.optimization.overlapMergeToleranceMm : undefined;
+    };
+    expect(clamped(-1)).toBe(0);
+    expect(clamped(7)).toBe(0.5);
+
+    const invalid = deserializeProject(
+      JSON.stringify({
+        ...project,
+        optimization: { ...project.optimization, overlapMergeToleranceMm: '0.05' },
+      }),
+    );
+    expect(invalid.kind).toBe('invalid');
+    if (invalid.kind === 'invalid') {
+      expect(invalid.reason).toMatch(/optimization\.overlapMergeToleranceMm/);
+    }
+  });
 });
