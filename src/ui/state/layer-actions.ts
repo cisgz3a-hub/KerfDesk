@@ -316,6 +316,7 @@ const LAYER_SETTING_KEYS = [
   'imageScanAngleDeg',
   'imageCrossHatch',
   'passAngleStepDeg',
+  'autoOverscan',
   'subLayers',
 ] as const satisfies ReadonlyArray<keyof LayerSettingsClipboard>;
 
@@ -349,7 +350,8 @@ function layerSettingsFrom(layer: Layer): LayerSettingsClipboard {
     dotWidthCorrectionMm: layer.dotWidthCorrectionMm,
     // Explicitly undefined when unset, so pasting settings that never used
     // perforation, overcut, image overscan, a tab layout or tab power
-    // (ADR-494) or a scan pattern (ADR-492) turns them off on the target.
+    // (ADR-494), a scan pattern (ADR-492) or automatic overscan (ADR-495)
+    // turns them off on the target.
     perforationEnabled: layer.perforationEnabled,
     perforationCutMm: layer.perforationCutMm,
     perforationSkipMm: layer.perforationSkipMm,
@@ -362,6 +364,7 @@ function layerSettingsFrom(layer: Layer): LayerSettingsClipboard {
     imageScanAngleDeg: layer.imageScanAngleDeg,
     imageCrossHatch: layer.imageCrossHatch,
     passAngleStepDeg: layer.passAngleStepDeg,
+    autoOverscan: layer.autoOverscan,
     subLayers: layer.subLayers,
     ...(layer.materialBinding === undefined ? {} : { materialBinding: layer.materialBinding }),
     ...(layer.cnc === undefined ? {} : { cnc: layer.cnc }),

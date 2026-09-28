@@ -27,3 +27,18 @@ describe('Job Review scan pattern facts (ADR-492)', () => {
     );
   });
 });
+
+describe('Job Review automatic overscan (ADR-495)', () => {
+  it('names Automatic instead of the stored overscan it replaces', () => {
+    const image: Layer = { ...baseLayer, mode: 'image', imageOverscanMm: 9, autoOverscan: true };
+    expect(laserOperationDetail(image)).toContain('automatic overscan from speed and acceleration');
+    expect(laserOperationDetail(image)).not.toContain('overscan 9 mm');
+    const fill: Layer = { ...baseLayer, mode: 'fill', fillOverscanMm: 40, autoOverscan: true };
+    expect(laserOperationDetail(fill)).toContain('automatic overscan');
+    expect(laserOperationDetail(fill)).not.toContain('stored overscan');
+    expect(laserOperationDetail({ ...fill, fillStyle: 'offset' })).toContain(
+      'stored overscan 40 mm',
+    );
+    expect(laserOperationDetail({ ...image, autoOverscan: false })).toContain('overscan 9 mm');
+  });
+});

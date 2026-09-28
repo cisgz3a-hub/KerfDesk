@@ -824,6 +824,23 @@ marks later edits as unapproved without changing the existing Frame/Start policy
    set, output is unchanged. The image editor's Thicken stays warning-only for angled scans.
 7. Material presets do not store these settings; applying a preset keeps what the operation has.
 
+### F-A7e. Automatic overscan (ADR-495)
+
+1. **More cut settings → Image detail** or **Fill detail** (Scanline or Island Fill): turn on
+   **Automatic** under Overscan. The typed length greys out and is kept for when Automatic is
+   turned off.
+2. The note under it gives the length Automatic runs now: the run-up from rest at the operation's
+   speed (capped at the machine's maximum feed) and Machine Setup's acceleration, measured along the
+   scan angle, plus 10%, at most 25 mm. A diagonal scan needs less than a scan along an axis.
+3. The length is worked out again every time the job is prepared, so it follows changes to the
+   speed, the scan angle or Machine Setup. Preview, Frame, the time estimate and every output
+   format use it.
+4. Follow Shape fills keep their typed length. The operations list shows "Automatic (Cut
+   Settings)" beside a fill's Overscan; Job Review reads "automatic overscan from speed and
+   acceleration".
+5. The runway is only as right as Machine Setup's acceleration: read $120 and $121 from the
+   controller where the firmware reports them, and check the scan edges on scrap.
+
 ---
 
 ### F-A8. Preview

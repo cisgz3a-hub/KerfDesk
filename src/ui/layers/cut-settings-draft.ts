@@ -69,6 +69,7 @@ export function readCutSettingsPatch(
     ...readLineTabPatch(data, layer, mode),
     ...readImageOverscanPatch(data, layer, mode),
     ...readScanPatternPatch(data, layer, mode),
+    ...readAutoOverscanPatch(data, mode),
     ...fillSettings,
     ditherAlgorithm: parseDither(String(data.get('ditherAlgorithm') ?? layer.ditherAlgorithm)),
     linesPerMm,
@@ -250,6 +251,12 @@ function readScanPatternPatch(data: FormData, layer: Layer, mode: LayerMode): La
     imageScanAngleDeg: numberField(data, 'imageScanAngleDeg', layer.imageScanAngleDeg ?? 0, 0, 180),
     imageCrossHatch: data.has('imageCrossHatch'),
   };
+}
+
+// ADR-495: the switch sends nothing when off, so the form marks that it showed it.
+function readAutoOverscanPatch(data: FormData, mode: LayerMode): LayerPatch {
+  if ((mode !== 'image' && mode !== 'fill') || !data.has('autoOverscanShown')) return {};
+  return { autoOverscan: data.has('autoOverscan') };
 }
 
 export function dotWidthCorrectionMax(linesPerMm: number): number {

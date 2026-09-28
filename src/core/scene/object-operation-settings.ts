@@ -40,6 +40,7 @@ const SETTING_KEYS: ReadonlyArray<keyof ObjectOperationSettingsOverride> = [
   'imageScanAngleDeg',
   'imageCrossHatch',
   'passAngleStepDeg',
+  'autoOverscan',
 ];
 
 export const objectOperationSettingKeys: ReadonlySet<string> = new Set(SETTING_KEYS);

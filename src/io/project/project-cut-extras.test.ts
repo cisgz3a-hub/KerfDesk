@@ -138,10 +138,11 @@ const SCAN_PATTERN = {
   imageScanAngleDeg: 45,
   imageCrossHatch: true,
   passAngleStepDeg: -30,
+  autoOverscan: true,
 } as const;
 
-describe('ADR-492 scan pattern in project files', () => {
-  it('round-trips the scan angle, cross-hatch and angle change per pass', () => {
+describe('ADR-492 scan pattern and ADR-495 automatic overscan in project files', () => {
+  it('round-trips the scan angle, cross-hatch, angle per pass and Automatic overscan', () => {
     const loaded = deserializeProject(serializeProject(projectWith(SCAN_PATTERN)));
     if (loaded.kind !== 'ok') throw new Error(`Expected load, got ${loaded.kind}`);
     expect(loaded.project.scene.layers[0]).toMatchObject(SCAN_PATTERN);
@@ -162,6 +163,7 @@ describe('ADR-492 scan pattern in project files', () => {
     const plain = captureLayerOperationSettings({ ...LAYER_DEFAULTS, mode: 'image' });
     expect(Object.keys(plain)).not.toContain('imageScanAngleDeg');
     expect(Object.keys(plain)).not.toContain('passAngleStepDeg');
+    expect(Object.keys(plain)).not.toContain('autoOverscan');
     expect(captureLayerOperationSettings({ ...LAYER_DEFAULTS, ...SCAN_PATTERN })).toMatchObject(
       SCAN_PATTERN,
     );

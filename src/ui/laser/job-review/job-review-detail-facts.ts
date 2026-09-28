@@ -67,10 +67,7 @@ function fillDetail(settings: LayerOperationSettings): string {
     settings.fillBidirectional ? 'bidirectional' : 'one-way',
     ...(settings.fillCrossHatch ? ['cross-hatch'] : []),
     ...passAngleStepPart(settings),
-    `stored overscan ${formatMm(settings.fillOverscanMm)} mm`,
-    ...(settings.fillStyle === 'scanline' && settings.fillOverscanMm > MAX_FILL_OVERSCAN_MM
-      ? [`applied at most ${MAX_FILL_OVERSCAN_MM} mm`]
-      : []),
+    ...fillOverscanParts(settings),
     ...localScanOffsetPart(settings),
     ...powerModePart(settings),
   ].join(SEPARATOR);
@@ -89,13 +86,33 @@ function imageDetail(settings: LayerOperationSettings): string {
     ...(settings.dotWidthCorrectionMm !== 0
       ? [`dot width ${formatMm(settings.dotWidthCorrectionMm)} mm`]
       : []),
-    ...(imageOverscanMmFor(settings) !== DEFAULT_OVERSCAN_MM
-      ? [`overscan ${formatMm(imageOverscanMmFor(settings))} mm`]
-      : []),
+    ...imageOverscanParts(settings),
     ...imageScanPatternParts(settings),
     ...localScanOffsetPart(settings),
   ].join(SEPARATOR);
 }
+
+// ADR-495: automatic overscan follows the speed and the machine, so Job Review
+// names it rather than the stored length it replaces.
+function fillOverscanParts(settings: LayerOperationSettings): ReadonlyArray<string> {
+  if (settings.autoOverscan === true && settings.fillStyle !== 'offset') {
+    return [AUTOMATIC_OVERSCAN_PART];
+  }
+  return [
+    `stored overscan ${formatMm(settings.fillOverscanMm)} mm`,
+    ...(settings.fillStyle === 'scanline' && settings.fillOverscanMm > MAX_FILL_OVERSCAN_MM
+      ? [`applied at most ${MAX_FILL_OVERSCAN_MM} mm`]
+      : []),
+  ];
+}
+
+function imageOverscanParts(settings: LayerOperationSettings): ReadonlyArray<string> {
+  if (settings.autoOverscan === true) return [AUTOMATIC_OVERSCAN_PART];
+  const overscanMm = imageOverscanMmFor(settings);
+  return overscanMm !== DEFAULT_OVERSCAN_MM ? [`overscan ${formatMm(overscanMm)} mm`] : [];
+}
+
+const AUTOMATIC_OVERSCAN_PART = 'automatic overscan from speed and acceleration';
 
 // ADR-492: shown only when set, so images scanned along X read as before.
 function imageScanPatternParts(settings: LayerOperationSettings): ReadonlyArray<string> {

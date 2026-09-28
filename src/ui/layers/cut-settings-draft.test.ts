@@ -270,6 +270,25 @@ describe('cut settings draft helpers', () => {
         readCutSettingsPatch(formData({ mode: 'line', passAngleStepDeg: '45' }), lineLayer()),
     ).toBe(false);
   });
+
+  it('reads Automatic overscan only from forms that show the switch (ADR-495)', () => {
+    const layer = imageLayer({ autoOverscan: true });
+    expect(
+      readCutSettingsPatch(formData({ mode: 'image', autoOverscanShown: 'on' }), layer)
+        .autoOverscan,
+    ).toBe(false);
+    expect(
+      readCutSettingsPatch(
+        formData({ mode: 'fill', autoOverscanShown: 'on', autoOverscan: 'on' }),
+        fillLayer(),
+      ).autoOverscan,
+    ).toBe(true);
+    expect('autoOverscan' in readCutSettingsPatch(formData({ mode: 'image' }), layer)).toBe(false);
+    expect(
+      'autoOverscan' in
+        readCutSettingsPatch(formData({ mode: 'line', autoOverscanShown: 'on' }), lineLayer()),
+    ).toBe(false);
+  });
 });
 
 function formData(entries: Record<string, string>): FormData {

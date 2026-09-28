@@ -1,4 +1,4 @@
-// ADR-415, ADR-494 and ADR-492 operation settings, shared by the operation,
+// ADR-415, ADR-494, ADR-492 and ADR-495 operation settings, shared by the operation,
 // sub-operation and artwork-override validators. All optional: files written
 // before them load as they did.
 
@@ -29,6 +29,7 @@ export function cutExtrasFieldErrors(
     optionalNumber(value, `${path}.imageScanAngleDeg`),
     optionalBoolean(value, `${path}.imageCrossHatch`),
     optionalNumber(value, `${path}.passAngleStepDeg`),
+    optionalBoolean(value, `${path}.autoOverscan`),
   ];
 }
 

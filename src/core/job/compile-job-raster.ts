@@ -22,7 +22,7 @@ import {
 import type { JobDiagnostic, RasterGroup } from './job';
 import { streamedRasterRowProvider } from './compile-job-raster-stream';
 import { effectiveObjectMinPowerPercent, effectiveObjectPowerPercent } from './object-power-scale';
-import { imageOverscanMmFor } from './operation-cut-extras';
+import { imageScanOverscanMm } from './automatic-overscan';
 import { rasterScanBounds, type RasterMachineBounds } from './raster-bounds';
 import { decodeRasterLuma } from './raster-luma-decode';
 import {
@@ -194,7 +194,7 @@ function compileRasterGroup(
     pixelWidth,
     pixelHeight,
     bounds,
-    overscanMm: imageOverscanMmFor(layer),
+    overscanMm: imageScanOverscanMm(layer, device, options.scanFrame.angleDeg),
     dotWidthCorrectionMm: clamp(layer.dotWidthCorrectionMm, 0, lineIntervalMm),
     bidirectional: scanDirection.bidirectional,
     scanDirection,

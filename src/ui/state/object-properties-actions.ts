@@ -271,6 +271,7 @@ function sanitizeOperationOverridePatch(patch: ObjectOperationOverride): ObjectO
   setFiniteNumber(out, 'imageScanAngleDeg', patch.imageScanAngleDeg);
   setBoolean(out, 'imageCrossHatch', patch.imageCrossHatch);
   setFiniteNumber(out, 'passAngleStepDeg', patch.passAngleStepDeg);
+  setBoolean(out, 'autoOverscan', patch.autoOverscan);
   return out as ObjectOperationOverride;
 }
 

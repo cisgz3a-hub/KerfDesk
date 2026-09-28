@@ -120,7 +120,7 @@ function CutSettingsBody(props: {
           layer={props.layer}
           lineIntervalMm={fillLineIntervalMm}
           onLineIntervalMmChange={setFillLineIntervalMm}
-          showPassAngleStep
+          showCutSettingsExtras
         />
       ) : null}
       {mode === 'image' ? (
