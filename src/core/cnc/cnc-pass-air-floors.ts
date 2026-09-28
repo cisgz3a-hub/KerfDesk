@@ -20,7 +20,7 @@ import {
   sampleCircularArcPoints,
   type CircularArc2d,
 } from '../geometry/circular-arc';
-import type { CncPass } from '../job';
+import type { CncArcPass, CncPass } from '../job';
 import { cncHelicalContourCanEmit } from '../job/helical-representation';
 import type { Vec2 } from '../scene';
 import { cncContourEmissionPrecision } from './cnc-contour-emission';
@@ -92,17 +92,8 @@ function traceOf(pass: CncPass): Trace | null {
         [],
         pass.points.reduce((high, point) => Math.max(high, point.z), Number.NEGATIVE_INFINITY),
       );
-    case 'arc': {
-      // The emitter also falls back to sampled straight moves when rounded
-      // endpoints coincide on an arc that is not geometrically a full circle.
-      const arc = arcOf(pass);
-      const endpointsMatch =
-        formatCncCoordinateMm(pass.start.x) === formatCncCoordinateMm(pass.end.x) &&
-        formatCncCoordinateMm(pass.start.y) === formatCncCoordinateMm(pass.end.y);
-      return arc === null || (endpointsMatch && !isCircularArcFullCircle(pass))
-        ? trace(closedPoints(sampleCircularArcPoints(pass), pass.closed), [], pass.zMm)
-        : trace([], [arc], pass.zMm);
-    }
+    case 'arc':
+      return arcTrace(pass);
     case 'helical-contour': {
       if (!cncHelicalContourCanEmit(pass)) return null;
       // Only ever an earlier cut: the helix circle, then its ring.
@@ -114,6 +105,17 @@ function traceOf(pass: CncPass): Trace | null {
       );
     }
   }
+}
+
+function arcTrace(pass: CncArcPass): Trace | null {
+  // Match the emitter's fallback when distinct endpoints round together.
+  const arc = arcOf(pass);
+  const endpointsMatch =
+    formatCncCoordinateMm(pass.start.x) === formatCncCoordinateMm(pass.end.x) &&
+    formatCncCoordinateMm(pass.start.y) === formatCncCoordinateMm(pass.end.y);
+  return arc === null || (endpointsMatch && !isCircularArcFullCircle(pass))
+    ? trace(closedPoints(sampleCircularArcPoints(pass), pass.closed), [], pass.zMm)
+    : trace([], [arc], pass.zMm);
 }
 
 function closedPoints(points: ReadonlyArray<Vec2>, closed: boolean): ReadonlyArray<Vec2> {
