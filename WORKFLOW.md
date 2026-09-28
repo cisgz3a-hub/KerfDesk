@@ -4108,7 +4108,9 @@ explicitly marked below; the remaining controls and user-facing flows are planne
 1. User clicks **Save G-code** in CNC mode.
 2. CNC preflight runs: settings validity, depth vs stock thickness, machine
    bounds, no-go zones, plunged-travel scan (no XY rapid below safe Z, no
-   rapid plunge), non-empty output. Findings surface as Job Review warnings,
+   rapid plunge other than ADR-489's Z-only descent from safe Z to 1 mm above
+   air the job has already cut, which a plunge at the plunge feed follows),
+   non-empty output. Findings surface as Job Review warnings,
    not refusals (ADR-228).
 3. The file emits through `cncGrblStrategy`: G21/G90/G94 preamble, M3 +
    spin-up dwell, safe-Z discipline, per-layer comment headers, M5 + park
@@ -4222,7 +4224,12 @@ explicitly marked below; the remaining controls and user-facing flows are planne
    each run of linked rings descends along its first ring from the level
    above instead of plunging; a ring shorter than one cut width plunges,
    and the G-code header and Job Review say so (F-CNC18, ADR-424
-   Amendment 1).
+   Amendment 1). Below the first level, the bit rapids down from safe Z to
+   1 mm above the stock the level above left (its depth plus the bit's rise
+   at full radius) and feeds only the rest; the first level, a level below
+   one that stopped short, and recovery jobs plunge from safe Z (ADR-489).
+   Each straight run of a ring is one G-code move, however many cells it
+   was traced across; the path is the same (ADR-488).
 3. Emitted G-code passes the plunged-travel invariant; scale is resolved
    before cutter geometry, then mirror/rotate/move placement is honored.
 4. Job Review's detail line for the operation names the levels the
