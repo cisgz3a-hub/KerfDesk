@@ -188,3 +188,13 @@ Regression evidence covers emitted modal XYZ/F words, dense circles, long and re
 paths, multiple placements including half-quantum ties, shallow angles, tabs, stage recipes,
 rotated reliefs, compiler/emitter provenance, and contour/path3d fallback reasons through tiles.
 Physical cut quality, tool suitability, controller interpolation and motor steps remain NOT RUN.
+
+### Tile clearance audit (2026-09-28)
+
+Clipped contour and path3d passes retain their entry advisories but discard
+`airFloorZMm`. A preceding cutter centre can lie outside a tile while its
+footprint cleared stock inside it. Clipping drops that earlier pass, so its
+whole-job air-clearance certificate cannot authorise a rapid inside this tile.
+The regression constructs both pass kinds at the boundary and confirms the
+emitted tile feeds down to depth without a below-stock rapid. No new Start gate
+or hardware claim is introduced.

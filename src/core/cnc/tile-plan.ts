@@ -173,11 +173,14 @@ function clipGroupToTile(group: CncGroup, tile: CncTile): CncGroup | null {
   const passes: CncPass[] = [];
   for (const pass of group.passes) {
     if (pass.kind === 'contour') {
+      // Clipping can remove earlier cutter footprints that proved air clear.
+      // Entry advisories transfer; a whole-job clearance certificate does not.
+      const { airFloorZMm: _airFloorZMm, ...clipped } = pass;
       const xyz = pass.polyline.map((point) => ({ x: point.x, y: point.y, z: pass.zMm }));
       for (const piece of clipPointsToRect(xyz, tile.rect, pass.closed)) {
         // A clipped loop is no longer closed — it continues in a neighbor.
         passes.push({
-          ...pass,
+          ...clipped,
           closed: false,
           polyline: piece.map((point) => ({ x: point.x, y: point.y })),
         });
@@ -216,8 +219,9 @@ function clippedPath3dPass(
   points: ReadonlyArray<Xyz>,
   vcarve: boolean,
 ): Extract<CncPass, { readonly kind: 'path3d' }> {
+  const { airFloorZMm: _airFloorZMm, ...clipped } = pass;
   return {
-    ...pass,
+    ...clipped,
     closed: false,
     // The V-carve certificate reserves final XY rounding. Keep interpolated
     // Z shallow so this later split cannot consume an additional cone radius.
