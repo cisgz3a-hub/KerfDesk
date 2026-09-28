@@ -73,12 +73,19 @@ operator's choice for pockets.
    ADR-424's rule for relief loops. The G-code header adds
    `; cnc entry-advisory: N passes plunge: path shorter than one cut width`, and preflight reports
    the advisory `cnc-ramp-entry-plunge` to Job Review and Save, naming Helical entry for pockets.
+   Tiling retains this marker on every clipped contour fragment, including a contour wholly
+   inside one tile. Each tile's header counts its marked fragments, rather than reusing the
+   original whole-job count. Clipping does not assign the marker to previously unmarked paths.
 5. **No new refusal.** An impossible lap count throws a `RangeError` at the ECMAScript Array
    length limit, as the tabbed ramp does; nothing smaller is refused.
 6. After integration with independent stage recipes, narrowed cutter widths and scan timing,
    `EMITTER_REVISION` advances to `adaptive-relief-ramp-laps-cut-width-scan-timing-20260927-v1`.
    The finishing-stage wrapper retains each pass's cutting recipe around the ramp transform,
    and the minimum retraced path uses the same full-depth cutter width as its wall layout.
+   The tiled-provenance repair subsequently advances the integrated revision to
+   `trace-arcs-relief-width-ramp-tiles-contact-air-scan-v2-20260927-v8`, retaining the prior
+   trace, native arc, relief, cutter-width, contact, air-repeat and scan provenance. Only
+   the previously omitted plunge disclosure changes; emitted machine commands are unchanged.
 
 The maintainer chose items 2 and 4 over the alternatives on 2026-09-27: lapping loops shorter
 than one cut width too (ADR-278's rule: no plunge left, but the 0.285 mm ring would take 15 laps
@@ -138,4 +145,19 @@ Not changed, recorded for follow-up:
   finishing recipes through both lapping and disclosed-plunge paths. It checks separate depth
   ladders, emitted feed/plunge/spindle values, a complete lap at depth and the narrowed V-bit
   wall geometry and ramp threshold after integration with ADR-457 and ADR-368 Amendment 3.
+- `tile-ramp-provenance.test.ts` runs the actual ramp planner, tiler and emitter for a sub-width
+  contour contained in one tile and split across two tiles. Each file discloses its marked
+  plunges at the configured feed, while every non-comment command matches the same tile with
+  its markers removed. An unmarked contour stays unmarked even when split. Both disclosure
+  cases fail against the previous tiler.
 - NOT verified: air cuts, material cuts, or any hardware. There is no machine for this project.
+
+### Tile clearance audit (2026-09-28)
+
+Clipped contour and path3d passes retain their entry advisories but discard
+`airFloorZMm`. A preceding cutter centre can lie outside a tile while its
+footprint cleared stock inside it. Clipping drops that earlier pass, so its
+whole-job air-clearance certificate cannot authorise a rapid inside this tile.
+The regression constructs both pass kinds at the boundary and confirms the
+emitted tile feeds down to depth without a below-stock rapid. No new Start gate
+or hardware claim is introduced.

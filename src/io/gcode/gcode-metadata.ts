@@ -115,7 +115,8 @@ export type GcodeMetadata = {
 // ADR-495 sizes overscan from speed and acceleration when it is on.
 // ADR-154 Amd 3 links adaptive rings straight out; all of the above is retained.
 // Inlay inserts retain their lead move without a contour-ramp request.
-export const EMITTER_REVISION = 'adaptive-contact-inlay-lead-audited-20260928-v10';
+// Tiling preserves plunge disclosure but drops whole-job clearance certificates.
+export const EMITTER_REVISION = 'adaptive-inlay-tile-entry-audited-20260928-v11';
 
 // Machine-specific assumption lines (ADR-103 defect fix): router exports
 // previously carried the laser-worded `$32=1 (laser mode)` banner. The S
