@@ -550,7 +550,8 @@ Project
       mode: 'line' | 'fill' | 'image'
       power, speed, passes, visible, output
       fill settings: hatch angle, spacing, overscan, cross-hatch, offset fill
-      image settings: dither, lines/mm, dot-width correction, overscan (default 5 mm, ADR-415)
+      image settings: dither, lines/mm, dot-width correction, overscan (default 5 mm, ADR-415),
+      scan angle, cross-hatch, angle per pass (ADR-492; the angle per pass also on fills)
       cut settings: kerf, tabs (count or spacing, tab power, ADR-494), perforation, overcut,
       pass-through, air assist
   material libraries and presets

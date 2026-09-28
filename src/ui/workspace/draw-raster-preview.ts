@@ -9,9 +9,17 @@
 // preview shows what burns, not what is merely visible.
 
 import { toSceneCoords, type DeviceProfile } from '../../core/devices';
-import { rasterBoundsInMachineCoords, type RasterMachineBounds } from '../../core/job';
+import { type RasterGroup, type RasterMachineBounds } from '../../core/job';
 import { compileRasterGroupsForLayer } from '../../core/job/compile-job-raster';
+import { rasterScanBounds } from '../../core/job/raster-bounds';
 import { pixelExtentForMm } from '../../core/raster';
+import {
+  isAlongXScan,
+  normalizedScanAngleDeg,
+  rasterScanFrame,
+  scanToMachine,
+  type RasterScanFrame,
+} from '../../core/raster/raster-scan-frame';
 import {
   outputOperationLayers,
   sceneObjectUsesOperation,
@@ -115,10 +123,17 @@ function drawOnePreview(
 ): void {
   const canvas = previewCanvasFor(obj, layer, device, sceneObjects, options);
   if (canvas === null) return;
+  const frame = previewScanFrame(layer, device);
   ctx.save();
   ctx.imageSmoothingEnabled = false;
-  drawMachineRasterBitmap(ctx, canvas, rasterBoundsInMachineCoords(obj, device), device, view);
+  drawMachineRasterBitmap(ctx, canvas, rasterScanBounds(obj, device, frame), frame, device, view);
   ctx.restore();
+}
+
+// The preview shows the first pass's scan grid (ADR-492); a rotary scans
+// along X whatever the operation asks.
+function previewScanFrame(layer: Layer, device: DeviceProfile): RasterScanFrame {
+  return rasterScanFrame(device.rotary?.enabled === true ? 0 : layer.imageScanAngleDeg);
 }
 
 function previewCanvasFor(
@@ -148,7 +163,8 @@ function previewSettingsKey(
   maskObject: SceneObject | null,
 ): string {
   const dimensions = compiledGridDimensions(obj, layer, device);
-  return `${adjustmentKey(obj)}|${layer.negativeImage ? 'negative' : 'positive'}|${layer.passThrough ? 'pass' : 'resample'}|${layer.ditherAlgorithm}|${layer.minPower}-${layer.power}-${obj.powerScale ?? 100}-${device.maxPowerS}|${layer.linesPerMm}|${dimensions.width}x${dimensions.height}|${transformCacheKey(obj, device)}|${maskCacheKey(maskObject)}`;
+  const scanKey = `scan:${normalizedScanAngleDeg(previewScanFrame(layer, device).angleDeg)}`;
+  return `${adjustmentKey(obj)}|${layer.negativeImage ? 'negative' : 'positive'}|${layer.passThrough ? 'pass' : 'resample'}|${layer.ditherAlgorithm}|${layer.minPower}-${layer.power}-${obj.powerScale ?? 100}-${device.maxPowerS}|${layer.linesPerMm}|${dimensions.width}x${dimensions.height}|${scanKey}|${transformCacheKey(obj, device)}|${maskCacheKey(maskObject)}`;
 }
 
 function schedulePreviewCanvasBuild(
@@ -250,7 +266,7 @@ function buildPreviewCanvas(
   sceneObjects: ReadonlyArray<SceneObject>,
 ): HTMLCanvasElement | null {
   const compilation = compileRasterGroupsForLayer([obj], layer, device, { sceneObjects });
-  const group = compilation.groups[0];
+  const group: RasterGroup | undefined = compilation.groups[0];
   if (group === undefined) return null;
   const bitmap = compiledRasterPreview(group, device);
   const canvas = document.createElement('canvas');
@@ -315,7 +331,7 @@ function compiledGridDimensions(
   device: DeviceProfile,
 ): { readonly width: number; readonly height: number } {
   if (layer.passThrough) return { width: obj.pixelWidth, height: obj.pixelHeight };
-  const bounds = rasterBoundsInMachineCoords(obj, device);
+  const bounds = rasterScanBounds(obj, device, previewScanFrame(layer, device));
   return {
     width: pixelExtentForMm(bounds.maxX - bounds.minX, layer.linesPerMm),
     height: pixelExtentForMm(bounds.maxY - bounds.minY, layer.linesPerMm),
@@ -326,15 +342,51 @@ function drawMachineRasterBitmap(
   ctx: CanvasRenderingContext2D,
   bitmap: CanvasImageSource,
   bounds: RasterMachineBounds,
+  frame: RasterScanFrame,
   device: DeviceProfile,
   view: ViewTransform,
 ): void {
+  if (!isAlongXScan(frame)) {
+    drawAngledRasterBitmap(ctx, bitmap, bounds, frame, device, view);
+    return;
+  }
   const start = toSceneCoords({ x: bounds.minX, y: bounds.minY }, device);
   const end = toSceneCoords({ x: bounds.maxX, y: bounds.maxY }, device);
   ctx.save();
   ctx.translate(view.offsetX + start.x * view.scale, view.offsetY + start.y * view.scale);
   ctx.scale(Math.sign(end.x - start.x) * view.scale, Math.sign(end.y - start.y) * view.scale);
   ctx.drawImage(bitmap, 0, 0, Math.abs(end.x - start.x), Math.abs(end.y - start.y));
+  ctx.restore();
+}
+
+// ADR-492: the bitmap's rows run along the scan. Scan frame, machine, scene
+// and screen are all affine, so three mapped points give the one transform
+// that places every bitmap millimetre.
+function drawAngledRasterBitmap(
+  ctx: CanvasRenderingContext2D,
+  bitmap: CanvasImageSource,
+  bounds: RasterMachineBounds,
+  frame: RasterScanFrame,
+  device: DeviceProfile,
+  view: ViewTransform,
+): void {
+  const screen = (x: number, y: number): { readonly x: number; readonly y: number } => {
+    const scene = toSceneCoords(scanToMachine(frame, { x, y }), device);
+    return { x: view.offsetX + scene.x * view.scale, y: view.offsetY + scene.y * view.scale };
+  };
+  const origin = screen(bounds.minX, bounds.minY);
+  const alongRow = screen(bounds.minX + 1, bounds.minY);
+  const acrossRows = screen(bounds.minX, bounds.minY + 1);
+  ctx.save();
+  ctx.transform(
+    alongRow.x - origin.x,
+    alongRow.y - origin.y,
+    acrossRows.x - origin.x,
+    acrossRows.y - origin.y,
+    origin.x,
+    origin.y,
+  );
+  ctx.drawImage(bitmap, 0, 0, bounds.maxX - bounds.minX, bounds.maxY - bounds.minY);
   ctx.restore();
 }
 

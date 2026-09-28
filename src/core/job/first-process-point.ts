@@ -5,6 +5,7 @@ import {
 } from '../cnc/cnc-contour-emission';
 import { circularArcGeometry, isCircularArcFullCircle } from '../geometry/arc-representation';
 import { planRasterRowSweeps, type RasterRowSweepPlan } from '../raster/raster-sweep-plan';
+import { rasterScanFrame, scanToMachine } from '../raster/raster-scan-frame';
 import { assertNever, type Vec2 } from '../scene';
 import { cncHelicalContourCanEmit } from './cnc-helical-representation';
 import { isEmittableFillSegment } from './fill-emission-resolution';
@@ -132,7 +133,8 @@ function firstRasterProcessPoint(group: RasterGroup, options: BuildToolpathOptio
     const y = group.bounds.minY + (rowIndex + 0.5) * pixelHeightMm;
     for (const plan of plans) {
       const point = firstRasterSweepPoint(group, plan, pixelWidthMm, y, reverse, offset);
-      if (point !== null) return point;
+      // ADR-492: the sweep is planned in the scan frame.
+      if (point !== null) return scanToMachine(rasterScanFrame(group.scanAngleDeg), point);
     }
     emittedRows += 1;
   }

@@ -76,7 +76,7 @@ Sierra variants).
 | LBG-C03 | Image overscan you can set per operation | `R/CutSettingsEditor/ImageMode/` | Fixed 5 mm (`DEFAULT_OVERSCAN_MM`, `src/core/job/compile-job-raster.ts`) | S | Built (ADR-415). Follow-up: map LightBurn's perforation, overcut and overscan fields in `.lbrn`/`.clb` import |
 | LBG-C04 | Best start point and "choose corners" for closed shapes | `R/OptimizationSettings/` | Closed shapes start at their drawn start point (`src/core/job/segment-entry-index.ts`) | M | Built (ADR-494) |
 | LBG-C05 | Tabs: click-placed laser tabs, even spacing, maximum count, tab cut power | `R/AddTabs/` | Count, size and skip-inner only (`src/core/geometry/tabs-bridges.ts`) | M | Built (ADR-494) |
-| LBG-C06 | Image scan angle 0/90/180 and Angle Increment per pass | `R/CutSettingsEditor/ImageMode/` | Images always scan along X (`src/core/raster/raster-sweep-plan.ts`) | M-L | Taken by the Rayforge comparison thread (ADR-492), with image cross-hatch |
+| LBG-C06 | Image scan angle 0/90/180 and Angle Increment per pass | `R/CutSettingsEditor/ImageMode/` | Images always scan along X (`src/core/raster/raster-sweep-plan.ts`) | M-L | Built in ADR-492 by the Rayforge comparison thread, with image cross-hatch and an angle per pass for fills too; LightBurn import does not map Angle Increment yet |
 | LBG-C07 | Sort Cuts Last; bulk Enable/Disable/Invert/Hide Others in the operations list | `R/CutsLayersWindow/` | Missing | S | Built (ADR-480). Follow-up: bulk air assist switches |
 | LBG-C08 | Start and end dwell on Line layers | `R/CutSettingsEditor/LineMode/` | Missing | S | open |
 | LBG-C09 | Tool layers (never output, for guides and masks) | `https://docs.lightburnsoftware.com/1.7/Reference/UI/ColorPalette/` | An operation with output off comes close | S | open |
@@ -166,8 +166,8 @@ Each batch is one pull request with its own decision record, tests and WORKFLOW.
   project or operation turns them on. Built in ADR-494.
 - **Next candidates, in order:** LBG-I01, LBG-I02, LBG-T04, LBG-T06, LBG-T08, LBG-T09, LBG-F06.
 - **Taken by the Rayforge comparison thread (2026-09-27):** LBG-C06 (image scan angle and cross-hatch,
-  ADR-492) and LBG-M05 (more material test grids, ADR-497), plus automatic overscan from speed and
-  acceleration (ADR-495) and recipes that apply themselves (ADR-496). Not built in these batches.
+  built in ADR-492) and LBG-M05 (more material test grids, ADR-497), plus automatic overscan from speed and
+  acceleration (ADR-495) and recipes that apply themselves (ADR-496), outside these batches.
 - **Not in these batches:** the Camera feature rebuild thread owns LBG-M13 (several cameras per
   device) and is also building camera print-and-cut, trace from the camera image and object
   detection. LBG-M09 (Print and Cut out of Labs) stays unscheduled here until that work lands, so

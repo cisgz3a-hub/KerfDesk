@@ -15,6 +15,7 @@ import {
 import { DITHER_ALGORITHMS, type Layer } from '../../core/scene';
 import { useStore } from '../state';
 import { dotWidthCorrectionMax } from './cut-settings-draft';
+import { ImageScanPatternFields } from './CutSettingsScanPatternFields';
 
 export function CutSettingsImageFields(props: {
   readonly layer: Layer;
@@ -24,6 +25,8 @@ export function CutSettingsImageFields(props: {
   readonly deferArtworkBounds?: boolean;
   /** Material presets do not store image overscan (ADR-415), so their wizard hides it. */
   readonly showOverscan?: boolean;
+  /** Scan angle, cross-hatch and angle per pass (ADR-492): Cut Settings only, like overscan. */
+  readonly showScanPattern?: boolean;
   readonly onDitherChange: (dither: Layer['ditherAlgorithm']) => void;
   readonly onImageLinesPerMmChange: (linesPerMm: number) => void;
 }): JSX.Element {
@@ -78,6 +81,7 @@ export function CutSettingsImageFields(props: {
         <span className="lf-field-unit">mm</span>
       </Field>
       {props.showOverscan === true ? <ImageOverscanField layer={props.layer} /> : null}
+      {props.showScanPattern === true ? <ImageScanPatternFields layer={props.layer} /> : null}
       <ImageCheckboxField
         label="Invert brightness"
         name="negativeImage"

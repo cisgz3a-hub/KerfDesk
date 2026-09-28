@@ -808,6 +808,22 @@ marks later edits as unapproved without changing the existing Frame/Start policy
    "tabs 4 × 0.5 mm, 3 placed by hand". With none of this set, output is unchanged.
 6. Material presets do not store these settings; applying a preset keeps what the operation has.
 
+### F-A7d. Image scan angle, image cross-hatch and an angle change per pass (ADR-492)
+
+1. **More cut settings → Image detail**: **Scan angle** (0 to 180°, counter-clockwise from the X
+   axis, like a Fill's scan angle) sets the direction the image rows run. 0 scans along X as
+   before; 90 scans along Y. The direction preview above it shows the rows.
+2. **Cross-hatch** scans the image a second time at 90° to the first on every pass.
+3. **Angle per pass** (−180 to 180°, 0 is off) adds that angle on every pass after the first, in
+   Image detail and in Fill detail for scanline and island fills. With one pass it does nothing.
+4. Overscan and the bidirectional scan offset follow the rows at any angle. Preview, Frame, the time
+   estimate, job placement and the recovery archive follow them too. An angled row writes X and Y on
+   every move.
+5. On a rotary, images always scan along X; Job Review says the angle settings were set aside.
+6. Job Review's detail line reads e.g. "scan at 45° · cross-hatch · angle −30° per pass". With none
+   set, output is unchanged. The image editor's Thicken stays warning-only for angled scans.
+7. Material presets do not store these settings; applying a preset keeps what the operation has.
+
 ---
 
 ### F-A8. Preview

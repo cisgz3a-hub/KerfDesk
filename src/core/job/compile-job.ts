@@ -50,6 +50,7 @@ import {
   type KerfSource,
   type PendingKerfGroup,
 } from './layer-kerf';
+import { fillPassLayers } from './scan-pass-angles';
 import { lineOvercutFields, perforateLineSegments } from './line-cut-extras';
 import { applyLineTabs, lineTabSpanGroups } from './line-tabs';
 import { offsetFillDiagnostics } from './offset-fill-diagnostics';
@@ -243,13 +244,23 @@ function vectorGroupsForLayer(
   sourceObjectId?: string,
 ): VectorCompilation {
   if (layer.mode === 'fill') {
-    if (layer.fillStyle === 'island') {
-      return {
-        groups: islandFillGroupsForLayer(objects, layer, device, powerSource, sourceObjectId),
-        diagnostics: NO_DIAGNOSTICS,
-      };
-    }
-    return offsetOrHatchFillGroups(objects, layer, device, powerSource, sourceObjectId);
+    // ADR-492: with an angle change per pass, each angle hatches as its own group.
+    return vectorCompilation(
+      fillPassLayers(layer).map((passLayer) =>
+        passLayer.fillStyle === 'island'
+          ? {
+              groups: islandFillGroupsForLayer(
+                objects,
+                passLayer,
+                device,
+                powerSource,
+                sourceObjectId,
+              ),
+              diagnostics: NO_DIAGNOSTICS,
+            }
+          : offsetOrHatchFillGroups(objects, passLayer, device, powerSource, sourceObjectId),
+      ),
+    );
   }
   const line = collectLineSegmentsForLayer(objects, layer, device);
   // Reported even when no segments survived: a failed kerf offset takes every

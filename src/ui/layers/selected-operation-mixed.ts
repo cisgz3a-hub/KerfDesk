@@ -38,6 +38,9 @@ const OPERATION_SETTING_KEYS = [
   'tabSpacingMm',
   'tabMaxPerShape',
   'tabCutPowerPercent',
+  'imageScanAngleDeg',
+  'imageCrossHatch',
+  'passAngleStepDeg',
 ] as const satisfies ReadonlyArray<keyof LayerOperationSettings>;
 
 export function mixedOperationFields(

@@ -37,6 +37,9 @@ const SETTING_KEYS: ReadonlyArray<keyof ObjectOperationSettingsOverride> = [
   'tabSpacingMm',
   'tabMaxPerShape',
   'tabCutPowerPercent',
+  'imageScanAngleDeg',
+  'imageCrossHatch',
+  'passAngleStepDeg',
 ];
 
 export const objectOperationSettingKeys: ReadonlySet<string> = new Set(SETTING_KEYS);

@@ -14,6 +14,8 @@ import {
   perforationPatternFor,
 } from '../../../core/job/operation-cut-extras';
 import { DEFAULT_OVERSCAN_MM, MAX_FILL_OVERSCAN_MM } from '../../../core/job/compile-job-defaults';
+import { passAngleStepApplies } from '../../../core/job/scan-pass-angles';
+import { normalizedScanAngleDeg } from '../../../core/raster/raster-scan-frame';
 import {
   DEFAULT_CNC_STOCK,
   type CncLayerSettings,
@@ -64,6 +66,7 @@ function fillDetail(settings: LayerOperationSettings): string {
     `${formatIntervalMm(settings.hatchSpacingMm)} mm hatch at ${settings.hatchAngleDeg}°`,
     settings.fillBidirectional ? 'bidirectional' : 'one-way',
     ...(settings.fillCrossHatch ? ['cross-hatch'] : []),
+    ...passAngleStepPart(settings),
     `stored overscan ${formatMm(settings.fillOverscanMm)} mm`,
     ...(settings.fillStyle === 'scanline' && settings.fillOverscanMm > MAX_FILL_OVERSCAN_MM
       ? [`applied at most ${MAX_FILL_OVERSCAN_MM} mm`]
@@ -89,8 +92,26 @@ function imageDetail(settings: LayerOperationSettings): string {
     ...(imageOverscanMmFor(settings) !== DEFAULT_OVERSCAN_MM
       ? [`overscan ${formatMm(imageOverscanMmFor(settings))} mm`]
       : []),
+    ...imageScanPatternParts(settings),
     ...localScanOffsetPart(settings),
   ].join(SEPARATOR);
+}
+
+// ADR-492: shown only when set, so images scanned along X read as before.
+function imageScanPatternParts(settings: LayerOperationSettings): ReadonlyArray<string> {
+  const angleDeg = normalizedScanAngleDeg(settings.imageScanAngleDeg);
+  return [
+    ...(angleDeg === 0 ? [] : [`scan at ${formatIntervalMm(angleDeg)}°`]),
+    ...(settings.imageCrossHatch === true ? ['cross-hatch'] : []),
+    ...passAngleStepPart(settings),
+  ];
+}
+
+function passAngleStepPart(settings: LayerOperationSettings): ReadonlyArray<string> {
+  if (!passAngleStepApplies(settings)) return [];
+  const stepDeg = settings.passAngleStepDeg ?? 0;
+  const signed = stepDeg > 0 ? `+${formatIntervalMm(stepDeg)}` : formatIntervalMm(stepDeg);
+  return [`angle ${signed}° per pass`];
 }
 
 // ADR-415: shown only when set, so operations that never used them read as before.

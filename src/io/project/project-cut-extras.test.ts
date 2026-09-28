@@ -133,3 +133,37 @@ describe('ADR-415 settings in project files', () => {
     });
   });
 });
+
+const SCAN_PATTERN = {
+  imageScanAngleDeg: 45,
+  imageCrossHatch: true,
+  passAngleStepDeg: -30,
+} as const;
+
+describe('ADR-492 scan pattern in project files', () => {
+  it('round-trips the scan angle, cross-hatch and angle change per pass', () => {
+    const loaded = deserializeProject(serializeProject(projectWith(SCAN_PATTERN)));
+    if (loaded.kind !== 'ok') throw new Error(`Expected load, got ${loaded.kind}`);
+    expect(loaded.project.scene.layers[0]).toMatchObject(SCAN_PATTERN);
+  });
+
+  it.each([{ imageScanAngleDeg: '45' }, { imageCrossHatch: 'yes' }, { passAngleStepDeg: null }])(
+    'rejects an invalid stored value (%o)',
+    (bad) => {
+      const raw = JSON.parse(serializeProject(projectWith({}))) as {
+        scene: { layers: Array<Record<string, unknown>> };
+      };
+      raw.scene.layers[0] = { ...raw.scene.layers[0], ...bad };
+      expect(deserializeProject(JSON.stringify(raw)).kind).toBe('invalid');
+    },
+  );
+
+  it('captures the scan pattern only when an operation sets it', () => {
+    const plain = captureLayerOperationSettings({ ...LAYER_DEFAULTS, mode: 'image' });
+    expect(Object.keys(plain)).not.toContain('imageScanAngleDeg');
+    expect(Object.keys(plain)).not.toContain('passAngleStepDeg');
+    expect(captureLayerOperationSettings({ ...LAYER_DEFAULTS, ...SCAN_PATTERN })).toMatchObject(
+      SCAN_PATTERN,
+    );
+  });
+});

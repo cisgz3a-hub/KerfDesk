@@ -120,6 +120,7 @@ function CutSettingsBody(props: {
           layer={props.layer}
           lineIntervalMm={fillLineIntervalMm}
           onLineIntervalMmChange={setFillLineIntervalMm}
+          showPassAngleStep
         />
       ) : null}
       {mode === 'image' ? (
@@ -130,6 +131,7 @@ function CutSettingsBody(props: {
           maxPower={power}
           imageLinesPerMm={imageLinesPerMm}
           showOverscan
+          showScanPattern
           onDitherChange={setDither}
           onImageLinesPerMmChange={setImageLinesPerMm}
         />

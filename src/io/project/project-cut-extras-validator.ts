@@ -1,4 +1,4 @@
-// ADR-415 and ADR-494 operation settings, shared by the operation,
+// ADR-415, ADR-494 and ADR-492 operation settings, shared by the operation,
 // sub-operation and artwork-override validators. All optional: files written
 // before them load as they did.
 
@@ -7,6 +7,7 @@ import {
   optionalLiteral,
   optionalNonNegativeNumber,
   optionalPercent,
+  optionalNumber,
   optionalPositiveNumber,
   valueAtPath,
 } from './project-shape-primitives';
@@ -25,6 +26,9 @@ export function cutExtrasFieldErrors(
     optionalPositiveNumber(value, `${path}.tabSpacingMm`),
     optionalNonNegativeInteger(value, `${path}.tabMaxPerShape`),
     optionalPercent(value, `${path}.tabCutPowerPercent`),
+    optionalNumber(value, `${path}.imageScanAngleDeg`),
+    optionalBoolean(value, `${path}.imageCrossHatch`),
+    optionalNumber(value, `${path}.passAngleStepDeg`),
   ];
 }
 

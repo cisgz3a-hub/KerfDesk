@@ -5,11 +5,14 @@ import { useStore } from '../state';
 import { CutSettingsFillDirectionPreview } from './CutSettingsFillDirectionPreview';
 import { CutSettingsFillDensityFields } from './CutSettingsFillDensityFields';
 import { scanLineOverscanNote } from './fill-overscan-fallback';
+import { PassAngleStepField } from './CutSettingsScanPatternFields';
 
 export function CutSettingsFillFields(props: {
   readonly layer: Layer;
   readonly lineIntervalMm: number;
   readonly onLineIntervalMmChange: (lineIntervalMm: number) => void;
+  /** Angle change per pass (ADR-492): Cut Settings only. */
+  readonly showPassAngleStep?: boolean;
 }): JSX.Element {
   const [fillStyle, setFillStyle] = useState(props.layer.fillStyle);
   const [hatchAngleDeg, setHatchAngleDeg] = useState(props.layer.hatchAngleDeg);
@@ -70,6 +73,9 @@ export function CutSettingsFillFields(props: {
         crossHatch={fillCrossHatch}
         onCrossHatchChange={setFillCrossHatch}
       />
+      {props.showPassAngleStep === true && fillStyle !== 'offset' ? (
+        <PassAngleStepField layer={props.layer} />
+      ) : null}
     </fieldset>
   );
 }
