@@ -94,7 +94,9 @@ export type GcodeMetadata = {
  * that stock, ADR-489's CNC passes rapided down from safe Z to just above the
  * air their earlier passes cleared, ADR-488's relief roughing moves, one per
  * straight run, and ADR-491's pocket rings and rows linked at depth at the
- * plunge feed and its park height before the job-end and bit-change parks.
+ * plunge feed and its park height before the job-end and bit-change parks,
+ * and ADR-489 amendment 1's relief air floors kept only on passes whose whole
+ * sweep the earlier cuts proved clear.
  */
 // ADR-427 keeps deepest cleanup before linked relief rings and flat depth slices.
 // ADR-368 sizes nonflat pocket/profile offsets, tabs and stepover by cut width.
@@ -106,7 +108,8 @@ export type GcodeMetadata = {
 // ADR-489 rapids CNC entries down through air earlier passes cleared.
 // ADR-488 emits one relief roughing move per straight run.
 // ADR-491 links pocket rings at depth and lifts to the park height.
-export const EMITTER_REVISION = 'air-floor-runs-stay-down-park-20260928-v5';
+// ADR-489 Amd 1 keeps a relief air floor only where earlier cuts prove it.
+export const EMITTER_REVISION = 'proven-air-floor-runs-stay-down-park-20260928-v6';
 
 // Machine-specific assumption lines (ADR-103 defect fix): router exports
 // previously carried the laser-worded `$32=1 (laser mode)` banner. The S

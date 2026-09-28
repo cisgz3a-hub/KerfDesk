@@ -1,15 +1,19 @@
 import fc from 'fast-check';
 import { describe, expect, it } from 'vitest';
 import type { CncPass } from '../job';
-import type { CncTool } from '../scene';
+import type { CncTool, Polyline } from '../scene';
 import { kernelForTool } from '../sim';
 import type { Heightmap } from './heightmap';
+import { AIR_FLOOR_TOLERANCE_MM } from './relief-air-floor-proof';
 import { reliefRoughingLadder, type ReliefRoughingOptions } from './relief-roughing';
-import { reliefRoughingMotion } from './relief-roughing-motion';
+import { reliefRoughingMotion, type ReliefRoughingLevelPaths } from './relief-roughing-motion';
 
 // ADR-489: a roughing pass's air floor is proven by the job's own earlier
 // cuts. Cutting every earlier pass in a stock simulation must leave nothing
 // the cutter would touch with its tip at the floor, anywhere on the pass.
+// Stock within AIR_FLOOR_TOLERANCE_MM beyond a cut's reach counts as cut, as
+// the proof states (ADR-489 Amendment 1): the stock samples sit on a grid
+// that puts some of them a micron outside a ring's exact reach.
 
 const END_MILL: CncTool = { id: 'em', name: 'end mill', kind: 'end-mill', diameterMm: 3.175 };
 const BALL: CncTool = { id: 'bn', name: 'ball nose', kind: 'ball-nose', diameterMm: 3.175 };
@@ -144,8 +148,9 @@ function simulate(map: Heightmap, tool: CncTool, passes: ReadonlyArray<CncPass>)
     points.forEach((a, index) => {
       const b = points[index + 1] ?? a;
       const z = Math.max(a.z, b.z);
-      forCellsNear(stock, a, b, radius, (cell, distance) => {
-        stock.top[cell] = Math.min(stock.top[cell] ?? 0, z + law.surfaceDzAtRadius(distance));
+      forCellsNear(stock, a, b, radius + AIR_FLOOR_TOLERANCE_MM, (cell, distance) => {
+        const cut = z + law.surfaceDzAtRadius(Math.min(distance, radius));
+        stock.top[cell] = Math.min(stock.top[cell] ?? 0, cut);
       });
     });
   }
@@ -161,9 +166,75 @@ function roughAndCheck(
   const passes = reliefRoughingMotion(ladder.levels, {
     stockOnRight: true,
     cutWidthMm: ladder.cutWidthMm,
+    cutterRadiusMm: options.tool.diameterMm / 2,
     ...(rampAngleDeg === undefined ? {} : { rampAngleDeg }),
   });
   return simulate(map, options.tool, passes);
+}
+
+type Peak = { readonly x: number; readonly y: number; readonly h: number; readonly r: number };
+type Extras = {
+  readonly fineStepMm: number | undefined;
+  readonly finishFlats: boolean;
+  readonly ramp: number | undefined;
+};
+
+const NO_EXTRAS: Extras = { fineStepMm: undefined, finishFlats: false, ramp: undefined };
+const BIG_AND_SMALL_BUMP: ReadonlyArray<Peak> = [
+  { x: 7, y: 7, h: 5, r: 8 },
+  { x: 3, y: 3, h: 1, r: 2 },
+];
+
+// Bumps on a floor 8 mm down, roughed and checked.
+function bumpsAndCheck(
+  peaks: ReadonlyArray<Peak>,
+  tool: CncTool,
+  stepoverPercent: number,
+  depthPerPassMm: number,
+  extra: Extras,
+): Report {
+  const map = bumps(tool.diameterMm / 8, 8, peaks);
+  return roughAndCheck(
+    map,
+    {
+      tool,
+      reliefDepthMm: 8,
+      depthPerPassMm,
+      stepoverPercent,
+      finishFlats: extra.finishFlats,
+      ...(extra.fineStepMm === undefined ? {} : { fineStepMm: extra.fineStepMm }),
+    },
+    extra.ramp,
+  );
+}
+
+function square(from: number, to: number): Polyline {
+  return {
+    closed: true,
+    points: [
+      { x: from, y: from },
+      { x: to, y: from },
+      { x: to, y: to },
+      { x: from, y: to },
+    ],
+  };
+}
+
+function ringsLevel(
+  rings: ReadonlyArray<ReadonlyArray<Polyline>>,
+  zMm: number,
+  sliceTopMm: number,
+): ReliefRoughingLevelPaths {
+  const region = rings[0] ?? [];
+  return {
+    zMm,
+    sliceTopMm,
+    region,
+    linkRegion: region,
+    rings,
+    cleanup: [],
+    cleanupStockInside: [],
+  };
 }
 
 describe('relief roughing air floors (ADR-489)', () => {
@@ -201,6 +272,16 @@ describe('relief roughing air floors (ADR-489)', () => {
     }
   });
 
+  // The two shapes CI drew (seeds 594578632 and 1167848472) where the level
+  // above left stock a micron beyond its reach (ADR-489 Amendment 1).
+  it.each([
+    ['84% stepover, two bumps', [BIG_AND_SMALL_BUMP, 84]],
+    ['53% stepover, the floor level', [[{ x: 5, y: 4, h: 1, r: 3 }], 53]],
+  ] as const)('holds where the level above leaves stock: %s', (_name, [peaks, stepoverPercent]) => {
+    const report = bumpsAndCheck(peaks, END_MILL, stepoverPercent, 0.8, NO_EXTRAS);
+    expect(report.worstMm).toBeLessThanOrEqual(1e-6);
+  });
+
   it('holds on random bumps for every bit (15 seeds)', { timeout: 60_000 }, () => {
     const peak = fc.record({
       x: fc.integer({ min: 3, max: 21 }),
@@ -220,24 +301,34 @@ describe('relief roughing air floors (ADR-489)', () => {
           ramp: fc.option(fc.constant(3), { nil: undefined }),
         }),
         (peaks, tool, stepoverPercent, depthPerPassMm, extra) => {
-          const map = bumps(tool.diameterMm / 8, 8, peaks);
-          const report = roughAndCheck(
-            map,
-            {
-              tool,
-              reliefDepthMm: 8,
-              depthPerPassMm,
-              stepoverPercent,
-              finishFlats: extra.finishFlats,
-              ...(extra.fineStepMm === undefined ? {} : { fineStepMm: extra.fineStepMm }),
-            },
-            extra.ramp,
-          );
+          const report = bumpsAndCheck(peaks, tool, stepoverPercent, depthPerPassMm, extra);
           expect(report.worstMm).toBeLessThanOrEqual(1e-6);
         },
       ),
       { numRuns: 15 },
     );
+  });
+
+  it('drops a floor next to a strip the level above left uncut, and keeps a retrace', () => {
+    // Rings 4 mm apart with a 3.175 mm cutter leave a strip 0.8 mm wide
+    // between them; a ring 2 mm in sweeps into it, the same outer ring does not.
+    const above = ringsLevel([[square(0, 20)], [square(4, 16)]], -1, 0);
+    const into = { ...ringsLevel([[square(2, 18)]], -2, -1), airFloorZMm: -1 };
+    const retrace = { ...ringsLevel([[square(0, 20)]], -2, -1), airFloorZMm: -1 };
+    const options = { stockOnRight: true, cutWidthMm: END_MILL.diameterMm };
+    const radius = { cutterRadiusMm: END_MILL.diameterMm / 2 };
+    const floorOfLast = (
+      levels: ReadonlyArray<ReliefRoughingLevelPaths>,
+      extra: { readonly cutterRadiusMm?: number } = radius,
+    ) => {
+      const passes = reliefRoughingMotion(levels, { ...options, ...extra });
+      const last = passes[passes.length - 1];
+      return last?.kind === 'contour' ? last.airFloorZMm : undefined;
+    };
+    expect(floorOfLast([above, into])).toBeUndefined();
+    expect(floorOfLast([above, retrace])).toBe(-1);
+    // Without the cutter's radius nothing is proven.
+    expect(floorOfLast([above, retrace], {})).toBeUndefined();
   });
 
   it('gives the first level no floor, since it starts at the uncut stock top', () => {
