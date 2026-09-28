@@ -114,7 +114,8 @@ export type GcodeMetadata = {
 // ADR-486 keeps kerf-offset circles as G2/G3; ADR-492 angles image scans;
 // ADR-495 sizes overscan from speed and acceleration when it is on.
 // ADR-154 Amd 3 links adaptive rings straight out; all of the above is retained.
-export const EMITTER_REVISION = 'adaptive-contact-audited-20260928-v9';
+// Inlay inserts retain their lead move without a contour-ramp request.
+export const EMITTER_REVISION = 'adaptive-contact-inlay-lead-audited-20260928-v10';
 
 // Machine-specific assumption lines (ADR-103 defect fix): router exports
 // previously carried the laser-worded `$32=1 (laser mode)` banner. The S

@@ -5220,6 +5220,9 @@ and lifts the command's CNC-only gate.)*
    Ramp entry owns entry motion when requested, while the lead settings stay
    stored. Tabbed profile ramps retain the raised tab windows and intentional
    vertical tab walls, then finish the original complete contour.
+   An inlay pair never ramps, so its insert keeps its lead even when the
+   layer carries a Ramp entry angle left from an earlier cut type, which an
+   inlay layer does not show (ADR-250 Amendment 2).
 
 #### Advisory — invalid or unrepresentable V-carve entry
 1. Ordinary profile/pocket/engrave ramp angles retain their [0.5°, 45°]
