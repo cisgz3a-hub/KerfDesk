@@ -62,13 +62,13 @@ describe('colour appearance before working-grid resampling', () => {
       expect(rawResult).toEqual(resampleColourAppearance(seen, width, height));
     }
     // Independently average one complete 2x2 cell, including unequal alpha.
-    // Pixels 0 and 8 (alpha 1) are void and contribute white.
+    // Pixels 0 and 8 (alpha 1) are void; only visible pixels colour the cell.
     const appearance = (pixel: number, channel: number): number =>
       (source.data[pixel * 4 + 3] as number) < VISIBLE_ALPHA_MIN
         ? 255
         : (flat.data[pixel * 4 + channel] as number);
     const expected = [0, 1, 2].map((channel) =>
-      Math.round([0, 1, 8, 9].reduce((sum, pixel) => sum + appearance(pixel, channel), 0) / 4),
+      Math.round([1, 9].reduce((sum, pixel) => sum + appearance(pixel, channel), 0) / 2),
     );
     expect(Array.from(resampleColourAppearance(source, 4, 3).data.slice(0, 4))).toEqual([
       ...expected,
@@ -77,17 +77,21 @@ describe('colour appearance before working-grid resampling', () => {
     expect(source.data).toEqual(before);
   });
 
-  it('keeps void cells and ignores hidden RGB beside visible pixels', () => {
+  it('keeps void cells, voids under-half cells and ignores hidden RGB', () => {
     const data = new Uint8ClampedArray([
       255, 0, 255, 0, 0, 255, 0, 0, 0, 0, 0, 128, 255, 255, 0, 0, 0, 0, 255, 0, 255, 0, 0, 0, 0, 0,
       0, 128, 0, 255, 255, 0,
     ]);
     const source = { width: 4, height: 2, data };
     const result = resampleColourAppearance(source, 2, 1);
-    expect(Array.from(result.data)).toEqual([0, 0, 0, 0, 191, 191, 191, 255]);
-    expect(result.data.slice(4)).toEqual(
-      resampleColourAppearance(flattened(source), 2, 1).data.slice(4),
-    );
+    // The right cell is half visible (ADR-461 Amendment 1 half coverage): it
+    // is ink, coloured by its visible pixels only, not lightened by the void.
+    expect(Array.from(result.data)).toEqual([0, 0, 0, 0, 127, 127, 127, 255]);
+    const quarter = data.slice();
+    quarter[27] = 0;
+    expect(Array.from(resampleColourAppearance({ ...source, data: quarter }, 2, 1).data)).toEqual([
+      0, 0, 0, 0, 0, 0, 0, 0,
+    ]);
     const hiddenChanged = data.slice();
     for (let i = 0; i < hiddenChanged.length; i += 4) {
       if (hiddenChanged[i + 3] === 0) hiddenChanged.set([3, 7, 11], i);
