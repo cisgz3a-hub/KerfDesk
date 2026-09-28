@@ -302,17 +302,21 @@ const CASES: ReadonlyArray<readonly [string, Scene]> = [
 const WITHOUT_FLOORS = new Set(['helical-entry pocket', 'drilled holes']);
 
 describe('2D air floors against a stock simulation (CW-02)', () => {
-  it.each(CASES)('%s: no stock stands above any floor', (name, jobScene) => {
-    const job = compileCncJob(jobScene, DEFAULT_DEVICE_PROFILE, MACHINE);
-    const groups = job.groups.filter((group): group is CncGroup => group.kind === 'cnc');
-    expect(groups.length).toBeGreaterThan(0);
-    let floored = 0;
-    for (const group of groups) {
-      const report = checkGroup(group);
-      floored += report.floored;
-      if (report.floored > 0) expect(report.worstMm).toBeLessThanOrEqual(1e-6);
-    }
-    if (WITHOUT_FLOORS.has(name)) expect(floored).toBe(0);
-    else expect(floored).toBeGreaterThan(0);
-  }, 120_000);
+  it.each(CASES)(
+    '%s: no stock stands above any floor',
+    (name, jobScene) => {
+      const job = compileCncJob(jobScene, DEFAULT_DEVICE_PROFILE, MACHINE);
+      const groups = job.groups.filter((group): group is CncGroup => group.kind === 'cnc');
+      expect(groups.length).toBeGreaterThan(0);
+      let floored = 0;
+      for (const group of groups) {
+        const report = checkGroup(group);
+        floored += report.floored;
+        if (report.floored > 0) expect(report.worstMm).toBeLessThanOrEqual(1e-6);
+      }
+      if (WITHOUT_FLOORS.has(name)) expect(floored).toBe(0);
+      else expect(floored).toBeGreaterThan(0);
+    },
+    120_000,
+  );
 });
