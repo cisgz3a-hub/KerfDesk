@@ -17,6 +17,7 @@ import {
   cancelControllerResetWait,
   type ControllerResetWaitRefs,
 } from './laser-controller-reset-wait';
+import { armSilenceTimer, type StatusPollScheduleRefs } from './laser-status-poll-schedule';
 
 export {
   observeControllerResetBoundary,
@@ -47,7 +48,8 @@ export type ControllerCommandKind =
 
 export type ControllerLifecycleRefs = ControllerStatusWaitRefs &
   PauseResumeTransitionRefs &
-  ControllerResetWaitRefs & {
+  ControllerResetWaitRefs &
+  StatusPollScheduleRefs & {
     controllerCommand: ControllerCommandRequest | null;
     controllerIdleWait: ControllerIdleWaitRequest | null;
     // Serial-session/reset generation. Late transport promises from an older
@@ -157,10 +159,13 @@ export function startControllerCommand(
       sawActiveState: false,
       activeCycleSettled: false,
       pendingResponses: [],
-      timer: setTimeout(() => {
-        finishControllerCommand(refs, request, 'reject', `${options.label} timed out.`);
-      }, timeoutMs),
+      timer: setTimeout(() => undefined, 0),
     };
+    const timedOut = (): void =>
+      finishControllerCommand(refs, request, 'reject', `${options.label} timed out.`);
+    if (request.timeoutMode === 'non-idle-status-activity')
+      armSilenceTimer(refs, request, timedOut);
+    else request.timer = setTimeout(timedOut, timeoutMs);
     refs.controllerCommand = request;
     write(options.command, options.action, options.source)
       .then(() => {
@@ -326,10 +331,9 @@ export function waitForFreshIdle(
       resolve,
       reject,
       idleReports: 0,
-      timer: setTimeout(() => {
-        finishIdleWait(refs, request, 'reject', 'Timed out waiting for fresh Idle.');
-      }, timeoutMs),
+      timer: setTimeout(() => undefined, 0),
     };
+    armIdleWaitTimer(refs, request);
     refs.controllerIdleWait = request;
   });
 }
@@ -349,10 +353,7 @@ export function observeControllerIdleWait(
   // fixed wall-clock budget (slow feeds run minutes past the last ok). Every
   // status report proves the controller is alive, so the timeout measures
   // status silence, not elapsed time.
-  clearTimeout(request.timer);
-  request.timer = setTimeout(() => {
-    finishIdleWait(refs, request, 'reject', 'Timed out waiting for fresh Idle.');
-  }, request.timeoutMs);
+  armIdleWaitTimer(refs, request);
   request.idleReports = report.state === 'Idle' ? request.idleReports + 1 : 0;
   set((state) => updateOperationIdleReports(state, request.kind, request.idleReports));
   if (request.idleReports >= request.requiredReports) {
@@ -406,10 +407,15 @@ function rearmActivityTimeout(
   request: ControllerCommandRequest,
 ): void {
   if (request.timeoutMode !== 'non-idle-status-activity') return;
-  clearTimeout(request.timer);
-  request.timer = setTimeout(() => {
-    finishControllerCommand(refs, request, 'reject', `${request.label} timed out.`);
-  }, request.timeoutMs);
+  armSilenceTimer(refs, request, () =>
+    finishControllerCommand(refs, request, 'reject', `${request.label} timed out.`),
+  );
+}
+
+function armIdleWaitTimer(refs: ControllerLifecycleRefs, request: ControllerIdleWaitRequest): void {
+  armSilenceTimer(refs, request, () =>
+    finishIdleWait(refs, request, 'reject', 'Timed out waiting for fresh Idle.'),
+  );
 }
 
 function finishIdleWait(

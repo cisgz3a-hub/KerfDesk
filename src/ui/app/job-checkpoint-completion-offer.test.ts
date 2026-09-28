@@ -7,6 +7,11 @@ import {
 } from '../../core/controllers/grbl';
 import { useLaserStore } from '../state/laser-store';
 import { initialLaserState } from '../state/laser-store-helpers';
+import {
+  clearUnarchivedRun,
+  rememberUnarchivedRun,
+  useUnarchivedRunStore,
+} from '../state/laser-unarchived-run';
 import { RecoveryRepository } from '../state/recovery';
 import { MemoryRecoveryStorageBackend } from '../state/recovery/recovery-backend';
 import { MemoryRecoveryGenerationStore } from '../state/recovery/recovery-generation';
@@ -31,6 +36,7 @@ afterEach(() => {
   uninstall?.();
   uninstall = undefined;
   useLaserStore.setState(initialLaserState());
+  clearUnarchivedRun();
   vi.restoreAllMocks();
 });
 
@@ -234,5 +240,83 @@ describe('live job completion offers', () => {
     settle();
     await vi.waitFor(() => expect(onCompleted).toHaveBeenCalledWith('newer-run'));
     expect(onCompleted.mock.calls).toEqual([['newer-run']]);
+  });
+});
+
+// A photo engraving over the archive budget streams with no archive. Its clean
+// finish is still the job that just finished (ADR-341 Amendment 7).
+describe('a run the archive could not keep', () => {
+  async function startUnarchived(repo: RecoveryRepository, runId: string): Promise<void> {
+    beginStream(runId);
+    const artifact = await createCurrentTestExecutionArtifact({ runId, gcode: GCODE });
+    rememberUnarchivedRun(runId, async () => artifact);
+    await repo.noteUntrackedRunAccepted(runId);
+  }
+
+  it('offers its clean finish without reporting a tracking failure', async () => {
+    const repo = repository();
+    const onCompleted = vi.fn();
+    const reportFailure = vi.fn();
+    await repo.initialize();
+    uninstall = installJobCheckpointTracking(() => LATER, repo, reportFailure, onCompleted);
+    await startUnarchived(repo, 'too-large');
+
+    finishAcknowledgements();
+    await flushQueuedWork();
+    expect(onCompleted).not.toHaveBeenCalled();
+    useLaserStore.setState({ streamer: null, controllerOperation: null });
+
+    await vi.waitFor(() => expect(onCompleted).toHaveBeenCalledWith('too-large'));
+    expect(useUnarchivedRunStore.getState().completedRun?.runId).toBe('too-large');
+    expect(useLaserStore.getState().activeRunId).toBeNull();
+    expect(repo.getSnapshot().lastCompletedReceipt).toBeNull();
+    expect(reportFailure).not.toHaveBeenCalled();
+  });
+
+  it('releases an interrupted run without offering it or reporting a failure', async () => {
+    const repo = repository();
+    const onCompleted = vi.fn();
+    const reportFailure = vi.fn();
+    await repo.initialize();
+    uninstall = installJobCheckpointTracking(() => LATER, repo, reportFailure, onCompleted);
+    await startUnarchived(repo, 'too-large-stopped');
+    const streamer = useLaserStore.getState().streamer as StreamerState;
+    useLaserStore.setState({ streamer: { ...streamer, completed: 20, status: 'cancelled' } });
+    expect(useUnarchivedRunStore.getState().openArtifact).toBeNull();
+    await flushQueuedWork();
+    useLaserStore.setState({ streamer: null });
+    await flushQueuedWork();
+
+    expect(onCompleted).not.toHaveBeenCalled();
+    expect(reportFailure).not.toHaveBeenCalled();
+  });
+
+  it('releases the kept run when the repository records the interruption itself', async () => {
+    const repo = repository();
+    await repo.initialize();
+    uninstall = installJobCheckpointTracking(() => LATER, repo, vi.fn(), vi.fn());
+    await startUnarchived(repo, 'too-large-recorded');
+    vi.spyOn(repo, 'interruptRun').mockResolvedValue({ ok: true, value: true });
+    const streamer = useLaserStore.getState().streamer as StreamerState;
+    useLaserStore.setState({ streamer: { ...streamer, completed: 20, status: 'done' } });
+    useLaserStore.setState({ streamer: null });
+
+    expect(useUnarchivedRunStore.getState().openArtifact).toBeNull();
+    await flushQueuedWork();
+    expect(useUnarchivedRunStore.getState().completedRun).toBeNull();
+  });
+
+  it('forgets the kept run once a later run begins', async () => {
+    const repo = repository();
+    await repo.initialize();
+    uninstall = installJobCheckpointTracking(() => LATER, repo, vi.fn(), vi.fn());
+    await startUnarchived(repo, 'too-large-first');
+    settle();
+    await vi.waitFor(() =>
+      expect(useUnarchivedRunStore.getState().completedRun?.runId).toBe('too-large-first'),
+    );
+
+    await start(repo, 'next-archived');
+    expect(useUnarchivedRunStore.getState().runId).toBeNull();
   });
 });
