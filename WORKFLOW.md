@@ -630,6 +630,20 @@ destination and cannot overwrite the template source.
    centre it on X or Y; **Alt+Shift+H** and **Alt+Shift+V** distribute spacing. Aligning needs two
    or more objects and distributing three or more; a group counts as one. Each is one undo step.
 
+### F-A6i. Optimize Shapes: smooth and fit outlines (ADR-499)
+
+1. Select vector artwork and choose **Tools → Vector → Optimize Shapes...**.
+2. **Smooth** (0.25 mm, 0.02 to 5) evens out jitter without shrinking the shape; corners sharper
+   than the **Corner angle** (30°) stay exactly where they are. **Fit to lines, arcs and curves**
+   (tolerance 0.05 mm) replaces runs of points with as few lines, arcs and curves as stay within
+   the tolerance, or with lines and arcs only for controllers that should get G2/G3 arcs.
+3. The status line says how many points become how many segments and the most any point of the
+   outline moves, measured both ways between old and new. It updates as settings change; a very
+   large trace shows its progress.
+4. **Optimize** applies it as one undo step. Imported and traced artwork keeps its operations and
+   tabs; text and drawn shapes that change become paths in the same step, and locked artwork is
+   left as it is. The notice says what changed. Settings are remembered for the session.
+
 ### F-A7. Artwork Operations panel
 
 #### Layout
@@ -1023,6 +1037,12 @@ marks later edits as unapproved without changing the existing Frame/Start policy
 3. Separate operations and pass counts, deliberate retracing within one contour, materialized
    kerf/tabs, Fill, Image and CNC output retain their meaning. Changing this setting invalidates
    the existing reviewed artifact and Frame just like other output changes.
+4. **Merge tolerance (mm)** (ADR-499), under Remove overlapping lines, is 0 by default, which keeps
+   the exact rule above and the same G-code. Above 0 (up to 0.5 mm), a later contour's stretch is
+   also dropped where it runs within that distance of, and within 5° of parallel to, a stretch an
+   earlier contour in the same operation keeps. Lines that cross or meet at a T keep their full
+   cut, merges never chain along a row of near lines, and nothing is joined or extended. Keep it
+   under half the kerf. It is saved with the project.
 
 ### F-A9e. Where closed shapes start (ADR-494)
 

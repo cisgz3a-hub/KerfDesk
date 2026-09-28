@@ -64,7 +64,7 @@ Sierra variants).
 | LBG-T19 | Unlock Selected (not only Unlock All) | `R/LockShapes/` | Lock Selection and Unlock All (`src/ui/commands/edit-command-family.ts`) | S | open |
 | LBG-T20 | Auto-Group shapes contained in another shape | `R/Grouping/` | Missing | S | open |
 | LBG-T21 | Dock, and Distribute "Move Together" | `R/Dock/`, `R/Distribute/` | Missing | S | open |
-| LBG-T22 | Optimize Selected Shapes (smooth, fit to arcs and lines) | `R/UI/EditMenu/` | Arc fairing exists inside Trace only (`src/core/trace/centerline/arc-fairing.ts`) | M | open |
+| LBG-T22 | Optimize Selected Shapes (smooth, fit to arcs and lines) | `R/UI/EditMenu/` | Arc fairing exists inside Trace only (`src/core/trace/centerline/arc-fairing.ts`) | M | Built (ADR-499) |
 | LBG-T23 | Tangent Circle, display draw-order push | `R/TangentCircleGenerator/`, `R/DrawOrder/` | Missing (Run order already covers cut order) | S | open |
 
 ## Gaps: cut settings and cut planning
@@ -83,7 +83,7 @@ Sierra variants).
 | LBG-C10 | Ramp length (sloped edges for stamps) | `R/CutSettingsEditor/FillMode/` | Missing | M-L | open |
 | LBG-C11 | Hide Backlash, Cut in Direction Order, Reduce Direction Changes | `R/OptimizationSettings/` | Missing | S-M | open |
 | LBG-C12 | Flood fill travel planning | `R/CutSettingsEditor/FillMode/` | Island Fill covers part of it (`src/core/job/island-fill.ts`) | L | open |
-| LBG-C13 | Remove Overlapping Lines tolerance you can set | `R/OptimizationSettings/` | Fixed tolerance (`src/core/job/remove-cut-overlaps.ts`) | S | open |
+| LBG-C13 | Remove Overlapping Lines tolerance you can set | `R/OptimizationSettings/` | Fixed tolerance (`src/core/job/remove-cut-overlaps.ts`) | S | Built (ADR-499) |
 | LBG-C14 | Laser lead-in and lead-out | `R/CutSettingsEditor/LineMode/` | Laser-off contour entry on the 4040-safe profile only | M | DECISION (PROJECT.md lists laser lead-in/out out of scope) |
 | LBG-C15 | Laser Z offset and Z step per pass | `R/CutSettingsEditor/LineMode/` | Missing | M | DECISION (laser Z out of scope in PROJECT.md) |
 

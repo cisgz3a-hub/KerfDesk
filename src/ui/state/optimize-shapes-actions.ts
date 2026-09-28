@@ -69,7 +69,7 @@ export function optimizeShapesMutation(
   const objects = scene.objects.map((object) => replacements.get(object.id) ?? object);
   return {
     project: { ...state.project, scene: { ...scene, objects } },
-    undoStack: pushUndo(state.project, state.undoStack),
+    undoStack: pushUndo(state.project, state.undoStack, 'Optimize Shapes'),
     redoStack: [],
     dirty: true,
     selectedPathNode: null,
