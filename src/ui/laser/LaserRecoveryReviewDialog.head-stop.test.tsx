@@ -71,6 +71,12 @@ describe('LaserRecoveryReviewDialog continue from where the head stopped', () =>
 
     expect(host?.textContent).toContain('8 sent before the connection dropped');
     expect(host?.textContent).toContain(`restarts from line ${stop.line}`);
+    expect(stop.unconfirmedLines).toBe(5);
+    expect(host?.textContent).toContain(
+      `the 5 lines sent after the last one it confirmed cover about ${String(
+        Math.round((stop.unconfirmedTravelMm ?? Number.NaN) * 100) / 100,
+      )} mm of travel`,
+    );
     await act(async () => button('Continue from where the head stopped').click());
 
     expect(onSetOriginAtHead).toHaveBeenCalledWith(stop.pointMm);

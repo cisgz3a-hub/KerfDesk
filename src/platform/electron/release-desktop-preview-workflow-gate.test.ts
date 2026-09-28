@@ -115,7 +115,10 @@ describe('Desktop Preview release workflow gate (ADR-248/249)', () => {
     expect(afterPack).toContain("'Contents', 'Resources'");
     expect(afterPack).toContain("'legal', 'electron', 'LICENSE'");
     expect(afterPack).toContain("'legal', 'electron', 'LICENSES.chromium.html'");
-    expect(builder).toContain("minimumSystemVersion: '12.0'");
+    expect(builder).toContain("minimumSystemVersion: '13.0'");
+    // The package check reads the floor back from Info.plist; the two move together.
+    const floor = /minimumSystemVersion: '([\d.]+)'/.exec(builder)?.[1];
+    expect(macVerifier).toContain(`Print :LSMinimumSystemVersion' "\${plist}")" = '${floor}'`);
     expect(builder).toContain('NSCameraUsageDescription:');
     expect(builder).toContain('NSLocalNetworkUsageDescription:');
     expect(`${workflow}\n${macVerifier}`).toContain('LICENSE.electron.txt');

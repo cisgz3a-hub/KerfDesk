@@ -1,9 +1,11 @@
 import { act } from 'react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { CameraCaptureBinding } from '../../../core/camera/camera-capture-binding';
+import { cameraSourceIdWithoutCredentials } from '../../../core/camera/camera-capture-binding';
 import { savedCameraModel } from '../../../core/camera/model/model-fixtures';
 import { clickElement, mountControl } from '../../image-editor/control-audit-test-support';
 import { useStore } from '../../state';
+import { savePhoneCamera } from '../../state/camera-preference-storage';
 import { useCameraStore, type CameraSourceState } from '../../state/camera-store';
 import { resetStore } from '../../state/test-helpers';
 import { activeCameraModel, ownCameraModel } from '../active-camera-model';
@@ -61,6 +63,7 @@ function forgetButtons(host: HTMLElement): HTMLButtonElement[] {
 }
 
 beforeEach(() => {
+  localStorage.clear();
   resetStore();
   useCameraStore.setState({
     sourceState: { kind: 'idle' },
@@ -120,11 +123,32 @@ describe('SavedCamerasSection', () => {
     expect(host.textContent).toBe('');
   });
 
+  it('names a phone camera’s calibration as the phone’s (ADR-448)', async () => {
+    savePhoneCamera({ app: 'ip-webcam', address: '192.168.1.50' });
+    const phone = savedCameraModel(binding('machine-jpeg', 'http://192.168.1.50:8080/shot.jpg'));
+    useStore.getState().updateDeviceProfile({ cameraModel: phone, otherCameraModels: [builtIn] });
+    const host = await mountControl(<SavedCamerasSection />);
+    expect(host.textContent).toContain('Phone camera at 192.168.1.50:8080');
+    expect(host.textContent).toContain('Machine camera at 192.168.10.1:8080');
+  });
+
   it('explains a running camera that is not the calibrated one', async () => {
     useStore.getState().updateDeviceProfile({ cameraModel: builtIn });
     useCameraStore.setState({ sourceState: usbLive('overhead-cam') });
     const host = await mountControl(<SavedCamerasSection />);
     expect(host.textContent).toContain('Machine camera at 192.168.10.1:8080');
     expect(host.textContent).toContain('The running camera has no calibration of its own yet.');
+  });
+
+  it('keeps phone credentials out of saved calibration labels and titles', async () => {
+    const address = 'http://operator:first@secret-tail@192.168.1.50/frame?token=secret#private';
+    savePhoneCamera({ app: 'other', address });
+    const phone = savedCameraModel(
+      binding('machine-jpeg', cameraSourceIdWithoutCredentials(address)),
+    );
+    useStore.getState().updateDeviceProfile({ cameraModel: phone, otherCameraModels: [builtIn] });
+    const host = await mountControl(<SavedCamerasSection />);
+    expect(host.textContent).toContain('Phone camera at 192.168.1.50');
+    expect(host.innerHTML).not.toMatch(/operator|secret|token|private/);
   });
 });

@@ -50,6 +50,11 @@ export class WindowCloseGuard {
     window.webContents.on('did-finish-load', () => (this.rendererUnavailable = false));
   }
 
+  /** True while a close attempt owns the window (ADR-482 crash recovery defers to it). */
+  isClosing(): boolean {
+    return this.preparing || this.awaitingUnload;
+  }
+
   private onClose(event: CloseEvent): void {
     if (this.allowNextClose) {
       this.allowNextClose = false;

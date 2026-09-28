@@ -12,6 +12,8 @@ interface WindowReadinessTarget {
 
 type WindowReadinessOptions = {
   readonly reportFailure?: (message: string) => void;
+  /** How to reveal the window; a remembered maximized window opens maximized. */
+  readonly reveal?: () => void;
 };
 
 /**
@@ -24,10 +26,11 @@ export function installWindowReadinessPolicy(
   options: WindowReadinessOptions = {},
 ): void {
   let shown = false;
+  const reveal = options.reveal ?? (() => window.show());
   const showOnce = (): void => {
     if (shown) return;
     shown = true;
-    window.show();
+    reveal();
   };
   window.once('ready-to-show', showOnce);
   // A successful renderer load is a deterministic fallback if Chromium never
@@ -37,8 +40,7 @@ export function installWindowReadinessPolicy(
     showOnce();
     options.reportFailure?.('KerfDesk could not load its application window.');
   });
-  window.webContents.on('render-process-gone', () => {
-    showOnce();
-    options.reportFailure?.('The KerfDesk application window stopped unexpectedly.');
-  });
+  // A dead renderer still shows the window; renderer-crash-recovery.ts then
+  // offers the reload (ADR-482).
+  window.webContents.on('render-process-gone', showOnce);
 }

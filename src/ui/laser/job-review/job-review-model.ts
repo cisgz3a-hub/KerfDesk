@@ -141,7 +141,7 @@ export function buildJobReviewModel(args: JobReviewModelArgs): JobReviewModel {
         args.prepared.prepared.project,
         args.prepared.prepared.job,
       ),
-      ...detectArchiveCapacityWarnings(args.prepared),
+      ...detectArchiveCapacityWarnings(args.prepared, machineKind === 'laser'),
       ...detectMinFeatureWarnings(args.prepared.prepared.project, args.prepared.jobOrigin),
       ...(args.streamThroughput === undefined
         ? []

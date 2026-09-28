@@ -1,8 +1,8 @@
 // Shared read-only working surface for the canvas and the full Inspector.
 import { useRef, useState } from 'react';
-import type { GcodeRenderModel } from '../../core/gcode-view';
 // Deep import: the viewer3d barrel is capped at 20 exports by its index contract.
 import type { Viewer3dPick } from '../viewer3d/scene-pick';
+import type { InspectorRenderModel } from './inspector-model';
 import { InspectorSidebar } from './InspectorSidebar';
 import { InspectorLensControl } from './InspectorLensControl';
 import type { GcodeInspectionSource } from './gcode-inspection-source';
@@ -19,18 +19,21 @@ import { useInspectorCamera } from './use-inspector-camera';
 import { useInspectorSession } from './use-inspector-session';
 import { useSceneSync } from './use-scene-sync';
 import { useViewer3dScene } from './use-viewer3d-scene';
+import type { CarvedStock } from './use-carved-stock';
+import { useInspectorMaterials } from './use-inspector-materials';
+import type { LaserBurn } from './use-laser-burn';
 
 export type InspectorVariant = 'full' | 'preview';
 type InspectorViewProps =
   | {
-      readonly model: GcodeRenderModel;
+      readonly model: InspectorRenderModel;
       readonly analysis: GcodeInspectorAnalysis;
       readonly source: GcodeInspectionSource;
       readonly sourceIndex: GcodeSourceLineIndex;
       readonly variant?: 'full';
     }
   | {
-      readonly model: GcodeRenderModel;
+      readonly model: InspectorRenderModel;
       readonly analysis: GcodeInspectorAnalysis;
       readonly source?: GcodeInspectionSource;
       readonly variant: 'preview';
@@ -43,7 +46,8 @@ export function InspectorView(props: InspectorViewProps): JSX.Element {
   const bodyRef = useRef<HTMLDivElement | null>(null);
   const fullWindow = useFullWindow(bodyRef);
   const session = useInspectorSession(props.model, props.analysis, props.source);
-  const { canvasRef, handleRef, state, reason, camera } = useInspectorScene(props.model, session);
+  const scene = useInspectorScene(props.model, session, props.source);
+  const { canvasRef, handleRef, state, reason, camera } = scene;
   const { playhead, liveMode, live } = session;
   const { selectedLine, locateLine, locateMove } = useLocators(props.model, session);
   const travelChange = session.setTravelVisible;
@@ -71,6 +75,7 @@ export function InspectorView(props: InspectorViewProps): JSX.Element {
           handleRef={handleRef}
           state={state}
           reason={reason}
+          topView={{ model: props.model, colorOf: session.colorOf }}
           cameraMode={camera.cameraMode}
           onCameraModeChange={camera.setCameraMode}
           live={liveMode ? live : null}
@@ -109,6 +114,7 @@ export function InspectorView(props: InspectorViewProps): JSX.Element {
           session={session}
           onTravelChange={travelChange}
           onLocateLine={locateLine}
+          materials={scene}
         />
       ) : null}
     </div>
@@ -117,7 +123,7 @@ export function InspectorView(props: InspectorViewProps): JSX.Element {
 
 // Jumps to a place in the program: its source line selected and, outside
 // live mode, the playhead moved there.
-function useLocators(model: GcodeRenderModel, session: Session) {
+function useLocators(model: InspectorRenderModel, session: Session) {
   const [selectedLine, setSelectedLine] = useState<number | null>(null);
   const segTimeEndSec = session.time.segTimeEndSec;
   const jumpTo = (line: number, seconds: number | null): void => {
@@ -136,7 +142,7 @@ function useLocators(model: GcodeRenderModel, session: Session) {
 }
 
 // What the 3D view's keys play and step (ADR-470).
-function keyTransport(model: GcodeRenderModel, session: Session) {
+function keyTransport(model: InspectorRenderModel, session: Session) {
   const { playback, time } = session;
   return {
     togglePlay: playback.togglePlay,
@@ -150,7 +156,7 @@ function keyTransport(model: GcodeRenderModel, session: Session) {
 }
 
 function PreviewLens(props: {
-  readonly model: GcodeRenderModel;
+  readonly model: InspectorRenderModel;
   readonly session: Session;
 }): JSX.Element {
   const s = props.session;
@@ -193,10 +199,12 @@ function SessionTimeline({ session }: { readonly session: Session }): JSX.Elemen
 }
 
 function Readouts(props: {
-  readonly model: GcodeRenderModel;
+  readonly model: InspectorRenderModel;
   readonly session: Session;
   readonly onTravelChange: (visible: boolean) => void;
   readonly onLocateLine: (line: number) => void;
+  /** The carved stock's and the burn preview's switches (ADR-487). */
+  readonly materials: { readonly stock: CarvedStock; readonly burn: LaserBurn };
 }): JSX.Element {
   const s = props.session;
   return (
@@ -220,13 +228,36 @@ function Readouts(props: {
       onToggleEntry={s.toggleEntry}
       isolate={s.isolate}
       onIsolateChange={s.setIsolate}
+      stock={props.materials.stock}
+      burn={props.materials.burn}
     />
   );
 }
 
-function useInspectorScene(model: GcodeRenderModel, session: Session) {
+// The stock carves as far as the playhead: the whole program with playback
+// at its end, nothing while a live job has not started.
+function stockTarget(model: InspectorRenderModel, session: Session) {
+  const { playhead } = session;
+  if (!session.liveMode && session.atEnd) return { index: model.segmentCount, fraction: 0 };
+  if (playhead.segmentIndex < 0) return { index: 0, fraction: 0 };
+  return { index: playhead.segmentIndex, fraction: playhead.segmentFraction };
+}
+
+function useInspectorScene(
+  model: InspectorRenderModel,
+  session: Session,
+  source: GcodeInspectionSource | undefined,
+) {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const { handleRef, state, reason } = useViewer3dScene(canvasRef, model);
+  const { stock, burn } = useInspectorMaterials({
+    handleRef,
+    state,
+    model,
+    sections: session.sections,
+    source,
+    target: stockTarget(model, session),
+  });
   const { playhead, liveMode, live } = session;
   const trailing = !liveMode && session.trailSeconds > 0;
   const trailed = trailing
@@ -263,7 +294,7 @@ function useInspectorScene(model: GcodeRenderModel, session: Session) {
     },
     model,
   );
-  return { canvasRef, handleRef, state, reason, camera };
+  return { canvasRef, handleRef, state, reason, camera, stock, burn };
 }
 
 const previewLensStyle: React.CSSProperties = {

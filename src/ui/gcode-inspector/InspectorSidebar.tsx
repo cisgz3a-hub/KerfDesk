@@ -3,11 +3,11 @@
 // readout helpers, and the traversal toggle uses LightBurn's exact wording.
 
 import { useMemo } from 'react';
-import type { ProgramTimeModel } from '../../core/gcode-time';
-import type { GcodeRenderModel, ProgramFinding } from '../../core/gcode-view';
+import type { ProgramFinding } from '../../core/gcode-view';
 import type { Viewer3dTheme } from '../viewer3d';
 // Deep import: the viewer3d barrel is capped at 20 exports by its index contract.
 import type { Viewer3dLook } from '../viewer3d/viewer3d-look';
+import type { InspectorProgramTime, InspectorRenderModel } from './inspector-model';
 import { InspectorHealthPanel } from './InspectorHealthPanel';
 import { InspectorIsolateControl } from './InspectorIsolateControl';
 import { InspectorLensControl } from './InspectorLensControl';
@@ -16,14 +16,18 @@ import type { IsolateState } from './isolate';
 import type { LensId } from './lenses';
 import type { PlayheadState } from './playhead';
 import type { ToolSections } from './tool-sections';
+import { InspectorStockControl } from './InspectorStockControl';
+import type { CarvedStock } from './use-carved-stock';
+import { InspectorBurnControl } from './InspectorBurnControl';
+import type { LaserBurn } from './use-laser-burn';
 
 type InspectorSidebarProps = {
-  readonly model: GcodeRenderModel;
+  readonly model: InspectorRenderModel;
   readonly theme: Viewer3dTheme;
   readonly look?: Viewer3dLook | undefined;
   readonly sections?: ToolSections | null | undefined;
   readonly playhead: PlayheadState;
-  readonly time: ProgramTimeModel;
+  readonly time: InspectorProgramTime;
   /** Device profile the time assumes; null for stock GRBL limits. */
   readonly timedFor: string | null;
   readonly findings: ReadonlyArray<ProgramFinding>;
@@ -39,6 +43,10 @@ type InspectorSidebarProps = {
   readonly onToggleEntry: ((entry: number) => void) | null;
   readonly isolate: IsolateState;
   readonly onIsolateChange: (next: IsolateState) => void;
+  /** The carved stock's switches; shown for programs that carve (ADR-487). */
+  readonly stock?: CarvedStock | undefined;
+  /** The laser burn preview's switches; shown for programs that burn (ADR-487). */
+  readonly burn?: LaserBurn | undefined;
 };
 
 export function InspectorSidebar(props: InspectorSidebarProps): JSX.Element {
@@ -93,6 +101,16 @@ export function InspectorSidebar(props: InspectorSidebarProps): JSX.Element {
           onChange={props.onIsolateChange}
         />
       </Section>
+      {props.stock?.available ? (
+        <Section title="Stock">
+          <InspectorStockControl stock={props.stock} />
+        </Section>
+      ) : null}
+      {props.burn?.available ? (
+        <Section title="Burn">
+          <InspectorBurnControl burn={props.burn} />
+        </Section>
+      ) : null}
       <Section title="Program">
         <ReadoutGrid rows={stats} />
       </Section>

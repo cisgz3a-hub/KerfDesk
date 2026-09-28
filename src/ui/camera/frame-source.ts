@@ -27,6 +27,8 @@ export type ActiveCameraSource =
       readonly frameUrl: string;
       readonly cameraUrl: string;
       readonly queryFingerprint?: string;
+      /** How often to fetch a new picture; the embedded-camera pace when absent. */
+      readonly pollIntervalMs?: number;
     }
   // A machine RTSP camera — `previewUrl` is the bridge's continuous MJPEG for
   // display; `frameUrl` is the bridge's ffmpeg single-frame decode for stills.
@@ -98,7 +100,7 @@ export function sourcePollIntervalMs(source: ActiveCameraSource): number {
     case 'usb':
       return USB_DETECT_INTERVAL_MS;
     case 'machine-jpeg':
-      return MACHINE_JPEG_POLL_INTERVAL_MS;
+      return source.pollIntervalMs ?? MACHINE_JPEG_POLL_INTERVAL_MS;
     case 'machine-rtsp':
       return MACHINE_RTSP_DETECT_INTERVAL_MS;
     default:

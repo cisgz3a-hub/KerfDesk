@@ -50,7 +50,7 @@ User profile:
 - **Web app/PWA:** unchanged first-class delivery target on Chromium browsers (Chrome, Edge, Brave, Arc) on any OS. WebSerial provides machine connection; the File System Access API handles projects. It remains PWA-installable and fully offline (ADR-060).
   - *Brave note:* WebSerial is shipped but Brave may gate it behind a Shields/flags toggle in some versions (upstream issue brave-browser#24404, status last re-verified 2026-05-28 — still open). Surface a one-line "Enable WebSerial in Brave settings" hint in the F-B1 connect error path.
 - **Windows desktop preview packaging:** the checked-in Preview workflow builds an unsigned KerfDesk NSIS package for Windows 10/11 x64. Publication still requires an authorized exact-version tag and recorded real-OS qualification.
-- **macOS desktop preview packaging:** the checked-in Preview workflow builds separate unsigned and unnotarized KerfDesk DMGs for macOS 12+ x64 and arm64. Publication still requires an authorized exact-version tag and recorded real-OS qualification.
+- **macOS desktop preview packaging:** the checked-in Preview workflow builds separate unsigned and unnotarized KerfDesk DMGs for macOS 13+ x64 and arm64. Publication still requires an authorized exact-version tag and recorded real-OS qualification.
 - **Linux:** web/PWA only. A Linux desktop build remains Phase J.
 
 Every current and planned target uses one codebase, sharing every line of pipeline and UI code, separated only by a thin **platform adapter** for file I/O, serial port, and drag-and-drop. See ADR-011 and ADR-248.
@@ -59,7 +59,7 @@ Every current and planned target uses one codebase, sharing every line of pipeli
 
 The Desktop Preview track is additive packaging and release governance. Its application-facing changes are visible KerfDesk branding, the desktop-download surface, and ADR-249's passive notify-only status-bar link. It changes no machining workflow, core logic, project format, preview/toolpath behavior, G-code, controller behavior, machine guard, or web/PWA behavior.
 
-1. Build one Windows 10/11 x64 NSIS installer and separate macOS 12+ x64 and arm64 DMGs. Every visible product, installer, artifact, download, and release title says **KerfDesk**.
+1. Build one Windows 10/11 x64 NSIS installer and separate macOS 13+ x64 and arm64 DMGs. Every visible product, installer, artifact, download, and release title says **KerfDesk**.
 2. Publish only exact-version assets through a draft-to-immutable prerelease in the same public source repository, using the existing source tag and never marking Preview latest. Each prerelease includes checksums, an artifact manifest, an SBOM, and build-provenance evidence bound to the repository, source SHA/ref, and signer workflow; strict tag guards keep Preview and stable/R2 workflows mutually exclusive.
 3. Preview artifacts are explicitly labeled unsigned and, on macOS, unnotarized. Mac builds disable electron-builder bundle signing, identity auto-discovery, notarization, and hardened runtime; no Developer ID identity or notarization ticket is present, any tooling-created nested ad-hoc signature is not treated as trust, installation is manual, and permission prompts may recur across upgrades.
 4. Do not publish Preview artifacts to R2, a mutable `latest` path, or an update feed. Updater trust remains false. A packaged Preview may make one anonymous, metadata-only request per app launch to the fixed public GitHub Actions workflow-runs API to surface only a newer Preview whose complete immutable-release workflow succeeded; it never downloads, executes, installs, or silently navigates to an update (ADR-249).
@@ -505,7 +505,7 @@ phase; tracked here so they don't get lost.
 - **Text (Phase D):** `opentype.js` (MIT) for outlines. Twenty-five bundled permissive fonts — twenty-one outline plus four native CNC stroke faces (Roboto / Special Elite Apache-2.0; Poppins / Tinos Regular + Bold / Inconsolata / Courier Prime / Pacifico / Dancing Script / Great Vibes / Allura / Alex Brush / Parisienne / Pinyon Script / Italianno / Corinthia / Cinzel Decorative / Anton / UnifrakturMaguntia / Stardos Stencil / Saira Stencil One / Relief SingleLine / three reviewed EMS stroke faces OFL-1.1). Stencil faces bridge their counters so cut-out lettering leaves no loose centres (ADR-267).
 - **Vectorize (Phase E):** in-house contour/centerline/edge trace engine (ADR-123); `imagetracerjs` (Unlicense — MIT-compatible) kept only as a multi-colour fallback.
 - **Testing:** Vitest (unit + pipeline + snapshot), `fast-check` (property), and Playwright for a dedicated real-browser smoke workflow (ADR-158).
-- **Build:** Vite produces the unchanged web/PWA bundle. The checked-in electron-builder Preview config/workflows package an unsigned Windows 10/11 x64 NSIS Preview and separate unsigned/unnotarized macOS 12+ x64 and arm64 DMG Previews. This source capability is not evidence that an artifact was published or qualified. Production code signing and notarization remain secret-gated and inactive until credentials and release governance exist (ADR-024/135/248).
+- **Build:** Vite produces the unchanged web/PWA bundle. The checked-in electron-builder Preview config/workflows package an unsigned Windows 10/11 x64 NSIS Preview and separate unsigned/unnotarized macOS 13+ x64 and arm64 DMG Previews. This source capability is not evidence that an artifact was published or qualified. Production code signing and notarization remain secret-gated and inactive until credentials and release governance exist (ADR-024/135/248).
 - **Lint/format:**
   - ESLint with `eslint-plugin-boundaries` (module isolation).
   - `eslint max-lines`, `max-lines-per-function`, `complexity` (file-size enforcement).
@@ -551,7 +551,8 @@ Project
       power, speed, passes, visible, output
       fill settings: hatch angle, spacing, overscan, cross-hatch, offset fill
       image settings: dither, lines/mm, dot-width correction, overscan (default 5 mm, ADR-415)
-      cut settings: kerf, tabs, perforation, overcut, pass-through, air assist
+      cut settings: kerf, tabs (count or spacing, tab power, ADR-494), perforation, overcut,
+      pass-through, air assist
   material libraries and presets
 ```
 
@@ -699,11 +700,12 @@ Reject any of these mid-development without a `PROJECT.md` revision and a `DECIS
   own model/license/runtime/privacy ADR. Externally produced relative-depth maps are accepted input
   under ADR-291/P2R.1 once their provenance and relative-not-metric UI lands; today's ADR-290 path
   imports qualified files only as explicit height maps and makes no AI or metric-depth claim.
-- Manual tabs / bridges, lead-in / lead-out, advanced fill patterns. Several
+- Lead-in / lead-out, advanced fill patterns. Several
   narrow parity features have since shipped and are no longer out of scope:
   Line-mode kerf compensation (`core/geometry/kerf-offset.ts`, per-layer
   `kerfOffsetMm`), automatic Line-mode hard-skip tabs
-  (`core/geometry/tabs-bridges.ts`), simple Cross-Hatch fill (per-layer
+  (`core/geometry/tabs-bridges.ts`; by spacing, with a tab cut power and
+  placed by hand since ADR-494), simple Cross-Hatch fill (per-layer
   `fillCrossHatch`), simple Offset Fill output (`core/job/offset-fill.ts`), and
   CNC profile arc/line lead-in/out (`core/cnc/profile-lead.ts`, ADR-250;
   profile-outside/inside only — laser lead-in/out stays out of scope);

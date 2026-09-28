@@ -3,6 +3,7 @@ import type { ToolMode } from '../state/ui-store';
 import type { DragState } from './drag-state';
 import { draftForDrawDrag, drawModifiersFromEvent } from './draw-tool';
 import { constrainMeasureEnd, type MeasureDraft } from './measure-tool';
+import { moveLaserTabDrag } from './laser-tab-editor';
 import { updatePathNodeDrag } from './path-node-drag';
 import { updatePenCursor } from './pen-tool';
 
@@ -63,6 +64,10 @@ export function handleNonTransformDragUpdate(args: NonTransformDragUpdateArgs): 
 }
 
 function handleLiveToolUpdate(args: NonTransformDragUpdateArgs): boolean {
+  if (args.drag?.kind === 'laser-tab') {
+    moveLaserTabDrag(args.drag, args.e.clientX, args.e.clientY, args.point);
+    return true;
+  }
   if (args.drag?.kind === 'cnc-tab') {
     if (args.point !== null) {
       args.setSelectedCncTabAnchorDuringInteraction(

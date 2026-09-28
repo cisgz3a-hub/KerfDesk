@@ -11,6 +11,7 @@ import type { JobReviewModel } from './job-review';
 import {
   activateAcceptedFreshRun,
   stageFreshExecutionArtifact,
+  untrackedLaserRunRecord,
 } from './start-job-execution-tracking';
 import {
   currentLaserForAuthorizedStartNow,
@@ -131,7 +132,20 @@ async function archiveAcceptedFreshRun(
       ? {}
       : { completedReplaySourceRunId: args.completedReceipt.runId }),
   });
-  await activateAcceptedFreshRun(runId, staged, args.repository);
+  // A painted second pass is not the project's own program, so a record of it
+  // could never be continued from the project (ADR-341 Amendment 8).
+  const untracked =
+    staged || args.prepared.laserSecondPassChain !== undefined
+      ? undefined
+      : untrackedLaserRunRecord({
+          runId,
+          gcode: args.prepared.gcode,
+          machineKind: args.machineKind,
+          outputScope: args.outputScope,
+          jobOrigin: args.prepared.jobOrigin,
+          laser: args.laser,
+        });
+  await activateAcceptedFreshRun(runId, staged, args.repository, untracked);
 }
 
 function preparedStartOptions(

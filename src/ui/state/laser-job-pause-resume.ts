@@ -33,7 +33,7 @@ import {
 } from './laser-pause-resume-failure';
 import { beginPostJobSettle, type PostJobSettleRefs } from './laser-post-job-settle';
 import { liftPausedCncJob } from './cnc-pause-lift';
-import { currentCncPauseLift } from './cnc-pause-lift-state';
+import { cncPauseLiftSkipReason, currentCncPauseLift } from './cnc-pause-lift-state';
 import { CNC_REENTRY_BUSY_MESSAGE, resumeLiftedCncJob } from './cnc-pause-reentry-run';
 import {
   cncPauseResumeStalledNotice,
@@ -161,6 +161,15 @@ export async function runConfirmedPauseJob(context: PauseResumeContext): Promise
 export async function runConfirmedResumeJob(context: PauseResumeContext): Promise<void> {
   assertResumeCommandOwnership(context);
   assertNoPauseResumeTransition(context);
+  // A Pause that left the bit in the cut tries the lift again first: its door
+  // may have been open, or its hold not yet settled (ADR-411 Amendment 1).
+  const retryLift =
+    currentCncPauseLift(context.get()) === null && cncPauseLiftSkipReason(context.get()) !== null;
+  if (retryLift) {
+    await liftPausedCncJob(context, { retry: true });
+    // A lift that failed after its reset, or an Abort meanwhile, ended the job.
+    if (context.get().streamer?.status !== 'paused') return;
+  }
   // A lifted job no longer lives in the controller: Resume re-enters it.
   if (currentCncPauseLift(context.get()) !== null) return resumeLiftedCncJob(context);
   // ADR-180 amendment 2 (2026-07-25): Resume is door-confirmed whenever the

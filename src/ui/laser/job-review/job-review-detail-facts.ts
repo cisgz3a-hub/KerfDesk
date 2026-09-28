@@ -23,6 +23,7 @@ import {
 import type { MaterialLibraryDocument } from '../../../io/material-library';
 import { materialBindingStatus } from '../../layers/material-binding-status';
 import { formatMm } from './job-review-format';
+import { laserTabsPart } from './job-review-laser-tabs';
 
 const FILL_STYLE_LABELS: Readonly<Record<LayerOperationSettings['fillStyle'], string>> = {
   scanline: 'Scanline',
@@ -32,11 +33,12 @@ const FILL_STYLE_LABELS: Readonly<Record<LayerOperationSettings['fillStyle'], st
 
 const SEPARATOR = ' · ';
 
-/** The read-only settings a laser operation runs with, joined for one line. */
-export function laserOperationDetail(settings: LayerOperationSettings): string {
+/** The read-only settings a laser operation runs with, joined for one line.
+ * `placedTabCount` is how many Line tabs were placed by hand on its artwork. */
+export function laserOperationDetail(settings: LayerOperationSettings, placedTabCount = 0): string {
   switch (settings.mode) {
     case 'line':
-      return lineDetail(settings);
+      return lineDetail(settings, placedTabCount);
     case 'fill':
       return fillDetail(settings);
     case 'image':
@@ -44,11 +46,11 @@ export function laserOperationDetail(settings: LayerOperationSettings): string {
   }
 }
 
-function lineDetail(settings: LayerOperationSettings): string {
+function lineDetail(settings: LayerOperationSettings, placedTabCount: number): string {
   return [
     `Kerf ${formatMm(settings.kerfOffsetMm)} mm`,
     `stored contour entry target ${formatMm(settings.fillOverscanMm)} mm`,
-    laserTabsPart(settings),
+    laserTabsPart(settings, placedTabCount),
     ...lineCutExtrasParts(settings),
     ...(settings.passThrough ? ['pass-through'] : []),
     `min power ${settings.minPower}%`,
@@ -275,11 +277,6 @@ const DIRECTED_CUT_TYPES: ReadonlySet<CncLayerSettings['cutType']> = new Set([
   'profile-inside',
   'pocket',
 ]);
-
-function laserTabsPart(settings: LayerOperationSettings): string {
-  if (!settings.tabsEnabled) return 'tabs off';
-  return `tabs ${settings.tabsPerShape} × ${formatMm(settings.tabSizeMm)} mm`;
-}
 
 function cncTabsPart(
   settings: CncLayerSettings,

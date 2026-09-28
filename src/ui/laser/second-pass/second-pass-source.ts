@@ -1,9 +1,13 @@
+import { unarchivedRunArtifact } from '../../state/laser-unarchived-run';
 import type { ExecutionArtifactV1, RecoveryRepository } from '../../state/recovery';
 
 export async function openRetainedSecondPassSource(
   runId: string,
   repository: RecoveryRepository,
 ): Promise<ExecutionArtifactV1> {
+  // A job the archive could not keep is opened from this page (ADR-341 Amendment 7).
+  const kept = unarchivedRunArtifact(runId);
+  if (kept !== null) return kept;
   const result = await repository.getArchivedExecution(runId);
   if (!result.ok) throw new Error('This completed job is no longer in the execution archive.');
   if (result.value.machineKind !== 'laser')

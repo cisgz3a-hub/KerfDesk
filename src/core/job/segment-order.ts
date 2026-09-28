@@ -2,29 +2,66 @@
 // module separate lets optimize-paths own group orchestration only.
 
 import type { ProjectOptimizationSettings, Vec2 } from '../scene';
+import {
+  closedStartCandidates,
+  nearestClosedStart,
+  type ClosedShapeStart,
+} from './closed-shape-start';
 import { containmentDepths } from './containment-depth';
-import { reverseCutSegment } from './cut-arc-moves';
+import { reverseCutSegment, rotateClosedCutSegment } from './cut-arc-moves';
 import type { CutSegment } from './job';
 import { polylineBounds } from './segment-bounds';
 import { createNearestEntryQuery, type SegmentEntry } from './segment-entry-index';
 
 const ORIGIN: Vec2 = { x: 0, y: 0 };
 
+// closedShapeStart is optional here: absent means 'drawn', today's behaviour.
 export type SegmentOrderSettings = Pick<
   ProjectOptimizationSettings,
   'insideFirst' | 'pathDirection' | 'startPoint'
->;
+> &
+  Partial<Pick<ProjectOptimizationSettings, 'closedShapeStart'>>;
+
+type EntryPolicy = {
+  readonly allowsReverse: boolean;
+  readonly closedShapeStart: ClosedShapeStart;
+};
 
 export function configuredSegmentOrder<T extends CutSegment>(
   segments: ReadonlyArray<T>,
   settings: SegmentOrderSettings,
 ): T[] {
   const startCursor = startCursorForSegments(segments, settings.startPoint);
-  const allowsReverse = settings.pathDirection === 'allow-reverse';
+  const policy: EntryPolicy = {
+    allowsReverse: settings.pathDirection === 'allow-reverse',
+    closedShapeStart: settings.closedShapeStart ?? 'drawn',
+  };
   if (!settings.insideFirst) {
-    return nearestNeighborOrderFrom(segments, startCursor, allowsReverse).segments;
+    return nearestNeighborOrderFrom(segments, startCursor, policy).segments;
   }
-  return insideFirstNearestNeighborOrder(segments, startCursor, allowsReverse);
+  return insideFirstNearestNeighborOrder(segments, startCursor, policy);
+}
+
+/**
+ * Keep source order (LBG-C04): the segments keep their order and direction,
+ * but each closed one starts at its candidate nearest where the previous one
+ * ended, the first nearest the planning start. 'drawn' returns them as given.
+ */
+export function sourceOrderClosedShapeStarts<T extends CutSegment>(
+  segments: ReadonlyArray<T>,
+  settings: Pick<SegmentOrderSettings, 'startPoint' | 'closedShapeStart'>,
+): ReadonlyArray<T> {
+  const policy = settings.closedShapeStart ?? 'drawn';
+  if (policy === 'drawn') return segments;
+  let cursor = startCursorForSegments(segments, settings.startPoint);
+  return segments.map((segment) => {
+    const started = segment.closed
+      ? startClosedSegmentAt(segment, nearestClosedStart(segment, cursor, policy))
+      : segment;
+    const last = started.polyline[started.polyline.length - 1];
+    if (last !== undefined) cursor = last;
+    return started;
+  });
 }
 
 /** Computes the selected planning seed without allocating a bounds array. */
@@ -54,14 +91,14 @@ export function startCursorForSegments(
 function insideFirstNearestNeighborOrder<T extends CutSegment>(
   segments: ReadonlyArray<T>,
   startCursor: Vec2,
-  allowsReverse: boolean,
+  policy: EntryPolicy,
 ): T[] {
   const buckets = bucketSegmentsByContainmentDepth(segments, containmentDepths(segments));
 
   const out: T[] = [];
   let cursor = startCursor;
   for (const [, bucket] of [...buckets.entries()].sort(([left], [right]) => right - left)) {
-    const ordered = nearestNeighborOrderFrom(bucket, cursor, allowsReverse);
+    const ordered = nearestNeighborOrderFrom(bucket, cursor, policy);
     for (const segment of ordered.segments) out.push(segment);
     cursor = ordered.cursor;
   }
@@ -88,9 +125,9 @@ export function bucketSegmentsByContainmentDepth<T>(
 function nearestNeighborOrderFrom<T extends CutSegment>(
   segments: ReadonlyArray<T>,
   startCursor: Vec2,
-  allowsReverse: boolean,
+  policy: EntryPolicy,
 ): { readonly segments: T[]; readonly cursor: Vec2 } {
-  const nearest = createNearestEntryQuery(collectSegmentEntries(segments, allowsReverse));
+  const nearest = createNearestEntryQuery(collectSegmentEntries(segments, policy));
   const placed = new Set<number>();
   const isAvailable = (index: number): boolean => !placed.has(index);
   const out: T[] = [];
@@ -101,7 +138,9 @@ function nearestNeighborOrderFrom<T extends CutSegment>(
     placed.add(pick.segmentIndex);
     const segment = segments[pick.segmentIndex];
     if (segment === undefined) continue;
-    const next = pick.reverse ? reverseSegment(segment) : segment;
+    const next = pick.reverse
+      ? reverseSegment(segment)
+      : startClosedSegmentAt(segment, pick.vertexIndex ?? 0);
     out.push(next);
     const last = next.polyline[next.polyline.length - 1];
     if (last !== undefined) cursor = last;
@@ -109,9 +148,12 @@ function nearestNeighborOrderFrom<T extends CutSegment>(
   return { segments: out, cursor };
 }
 
+// A closed segment offers one entry per candidate start vertex (LBG-C04); the
+// index's vertexIndex tie-break keeps its drawn start ahead on exact ties.
+// Under 'drawn' every segment offers exactly the entries it always did.
 function collectSegmentEntries(
   segments: ReadonlyArray<CutSegment>,
-  allowsReverse: boolean,
+  policy: EntryPolicy,
 ): SegmentEntry[] {
   const entries: SegmentEntry[] = [];
   for (let index = 0; index < segments.length; index += 1) {
@@ -119,13 +161,36 @@ function collectSegmentEntries(
     if (segment === undefined) continue;
     const start = segment.polyline[0];
     if (start === undefined) continue;
+    if (segment.closed && policy.closedShapeStart !== 'drawn') {
+      pushClosedStartEntries(entries, segment, index, policy.closedShapeStart);
+      continue;
+    }
     entries.push({ point: start, segmentIndex: index, reverse: false });
     const end = segment.polyline[segment.polyline.length - 1];
-    if (!segment.closed && allowsReverse && end !== undefined) {
+    if (!segment.closed && policy.allowsReverse && end !== undefined) {
       entries.push({ point: end, segmentIndex: index, reverse: true });
     }
   }
   return entries;
+}
+
+function pushClosedStartEntries(
+  entries: SegmentEntry[],
+  segment: CutSegment,
+  segmentIndex: number,
+  policy: ClosedShapeStart,
+): void {
+  for (const vertexIndex of closedStartCandidates(segment, policy)) {
+    const point = segment.polyline[vertexIndex];
+    if (point !== undefined) entries.push({ point, segmentIndex, reverse: false, vertexIndex });
+  }
+}
+
+// Candidates are only offered where the rotation keeps any arcs, so the
+// fallback to the drawn start is defensive, never a silent arc drop.
+function startClosedSegmentAt<T extends CutSegment>(segment: T, vertexIndex: number): T {
+  if (vertexIndex === 0) return segment;
+  return rotateClosedCutSegment(segment, vertexIndex) ?? segment;
 }
 
 function reverseSegment<T extends CutSegment>(segment: T): T {
