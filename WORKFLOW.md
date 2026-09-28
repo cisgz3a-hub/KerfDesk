@@ -556,6 +556,30 @@ destination and cannot overwrite the template source.
    image or path text uses it; the notice says which.
 6. Each tool is one undo step and adds none when nothing changes. None operates a machine.
 
+### F-A6f. Trim Shapes, Cut Shapes, Warp and Deform, Copy Along Path (ADR-498)
+
+1. **Tools → Vector → Trim Shapes** turns on the Trim tool. Hovering an outline highlights in red
+   the stretch between its nearest crossings with other visible outlines or itself; a click deletes
+   it. An outline that crosses nothing is deleted whole. Locked artwork is trimmed back to but never
+   cut. Text and drawn shapes become plain paths when trimmed, and the notice says so. Esc, Done or
+   another tool ends it. Each click is one undo step.
+2. **Tools → Vector → Cut Shapes** splits every selected shape along the top-most selected closed
+   shape into an inside piece and an outside piece, removes that cutter and selects the pieces.
+   Pieces keep their operations. Shapes the cutter does not cross are left as they were, and the
+   notice counts them.
+3. **Tools → Vector → Warp** (four corner handles) and **Deform** (a grid of 16 handles) bend the
+   selected vector artwork. The artwork previews live while the handles are dragged; Enter or Apply
+   applies it as one undo step, Esc or Cancel leaves it as it was, and Reset handles starts again.
+   Shift keeps the Warp corners a parallelogram. Curves become fine lines within 0.05 mm; images,
+   reliefs and locked artwork are left as they are, and the notice says how many.
+4. **Arrange → Layout → Copy Along Path…** copies the selected artwork along the top-most selected
+   single path (or the path picked under Guide path): by number of copies, spacing between centres
+   or gap between copies, from the start offset to the end offset, turned to follow the path unless
+   that box is cleared. A closed guide gets copies all the way round with none doubled at the seam.
+   The status line says what Apply will do. The guide stays and the copies are selected.
+5. When a selection gives a tool nothing to do, a notice says what to select, and nothing changes.
+   None of these tools operates a machine or changes how other artwork compiles.
+
 ### F-A7. Artwork Operations panel
 
 #### Layout
