@@ -7455,6 +7455,29 @@ as the pane's design record.
   usual jog message. A head that stops moving (Hold, Alarm, disconnect) ends the capture with the
   reason, keeping the pictures already taken.
 
+### F-CAM13. Watching a job with the camera (ADR-490)
+
+- **Success / timelapse.** With **Record a timelapse** ticked in the Camera panel's **Watch the
+  job**, starting a job records a frame every interval while it runs ("Recording the timelapse:
+  12 frames"). When the job ends, a last frame shows the result, and the panel plays the frames.
+  **Save video…** saves them as a video file. With a calibrated camera fixed over the bed, the
+  frames show the job's area square-on.
+- **Success / burn check.** With **Check the burn when a laser job finishes** ticked, a finished
+  laser job gets a verdict in the panel: how much of the path the camera saw change, any marks
+  outside it, and how much it could not see. The after picture appears on the canvas with missed
+  path in red and stray marks in amber. **Hide from canvas** and **Show on canvas** toggle it.
+- **Edge / head in the way.** When the head or gantry covered part of the job, the panel says what
+  share was hidden. The operator jogs the head clear and presses **Take the after picture
+  again**.
+- **Edge / long job.** A long job keeps at most 480 frames, spread evenly over the whole job.
+- **Edge / panel closed.** While either choice is ticked, the camera stays on with the panel
+  closed.
+- **Error / no camera.** A job that starts without a running camera gets a note instead: no
+  timelapse, and "The camera was not running when the job started."
+- **Error / cannot check.** A CNC job, a camera that is not fixed and calibrated, or a job that
+  was stopped says why it was not checked. The camera stopping mid-job ends the timelapse with the
+  frames it has.
+
 ---
 
 ## Desktop app (Windows + macOS Preview) flows
