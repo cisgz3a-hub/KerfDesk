@@ -129,6 +129,7 @@ function baseCtx(overrides: Partial<AppCommandContext> = {}): AppCommandContext 
     resetView: vi.fn(),
     projectNotes: vi.fn(),
     undoHistory: vi.fn(),
+    openSettings: vi.fn(),
     showAbout: vi.fn(),
     showConnectionHelp: vi.fn(),
     showSafety: vi.fn(),

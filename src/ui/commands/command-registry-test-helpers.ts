@@ -193,7 +193,7 @@ function baseCtxActions(): Partial<AppCommandContext> {
 }
 
 function baseCtxAppearance(): Partial<AppCommandContext> {
-  return { appTheme: 'light', setAppTheme: vi.fn() };
+  return { appTheme: 'light', setAppTheme: vi.fn(), openSettings: vi.fn() };
 }
 
 function baseCtxArrangeActions(): Partial<AppCommandContext> {

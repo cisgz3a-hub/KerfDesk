@@ -4,7 +4,7 @@ import { enabled, type AppCommand, type AppCommandContext } from './command-type
 // Appearance (ADR-339). KerfDesk opens light on every machine; these three are
 // the only way dark is reached, so they behave as a radio group — `active`
 // marks the one in force rather than toggling independently.
-const THEME_CHOICES: ReadonlyArray<{
+export const THEME_CHOICES: ReadonlyArray<{
   readonly preference: AppThemePreference;
   readonly id: 'window.theme-light' | 'window.theme-dark' | 'window.theme-system';
   readonly label: string;

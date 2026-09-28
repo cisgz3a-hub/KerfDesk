@@ -11,6 +11,7 @@ import type {
   EditingToolsCommandId,
 } from './editing-tools-command-types';
 import type { MachineMoveCommandContext, MachineMoveCommandId } from './machine-move-command-types';
+import type { SettingsCommandContext, SettingsCommandId } from './settings-command-types';
 
 export const COMMAND_FAMILY_ORDER = [
   'file',
@@ -27,6 +28,7 @@ export type CommandFamily = (typeof COMMAND_FAMILY_ORDER)[number];
 export type CommandId =
   | EditingToolsCommandId
   | MachineMoveCommandId
+  | SettingsCommandId
   | 'file.new'
   | 'file.open'
   | 'file.open-recent'
@@ -148,7 +150,9 @@ export type AppCommand = {
 };
 
 // Per-family slices kept in their own files so this one stays inside the size cap.
-type CommandContextSlices = EditingToolsCommandContext & MachineMoveCommandContext;
+type CommandContextSlices = EditingToolsCommandContext &
+  MachineMoveCommandContext &
+  SettingsCommandContext;
 
 export type AppCommandContext = CommandContextSlices & {
   // ADR-101 gate-and-hide: laser-only commands are filtered out of the

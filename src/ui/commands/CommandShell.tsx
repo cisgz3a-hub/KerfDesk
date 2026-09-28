@@ -41,6 +41,8 @@ import { IntervalDialog, MaterialDialog } from './CalibrationGridDialogs';
 import { GcodeSaveDialog } from '../app/GcodeSaveDialog';
 import { VectorRepairDialogHost } from './VectorRepairDialogHost';
 import { OffsetShapesDialogHost } from './OffsetShapesDialogHost';
+import { SettingsWindowHost } from '../settings/SettingsWindowHost';
+import { redoSteps, undoSteps } from '../state/undo-history';
 
 type SettingsDialogKind =
   | 'optimization'
@@ -155,6 +157,7 @@ function StoreOpenedDialogs(): JSX.Element {
       <BarcodeDialogHost />
       <CopyAlongPathDialogHost />
       <ExportSvgDialogHost />
+      <SettingsWindowHost />
     </>
   );
 }
@@ -244,6 +247,8 @@ function UndoHistoryPanel(props: { readonly onClose: () => void }): JSX.Element 
       redoStack={redoStack}
       onUndo={undo}
       onRedo={redo}
+      onUndoSteps={undoSteps}
+      onRedoSteps={redoSteps}
       onClose={props.onClose}
     />
   );

@@ -54,7 +54,7 @@ function trimShapeMutation(
   const edit = trimEdit(object, target);
   if (edit === null) return state;
   const history = {
-    undoStack: pushUndo(state.project, state.undoStack),
+    undoStack: pushUndo(state.project, state.undoStack, 'Trim Shapes'),
     redoStack: [],
     dirty: true,
     selectedPathNode: null,

@@ -2,6 +2,7 @@ import type { CommandFamily, CommandId } from '../commands/command-types';
 import { EDITING_TOOLS_COMMAND_HELP } from './editing-tools-command-help';
 import { FILE_COMMAND_HELP } from './file-command-help';
 import { MACHINE_MOVE_COMMAND_HELP } from './machine-move-command-help';
+import { SETTINGS_COMMAND_HELP } from './settings-command-help';
 
 export type CommandHelpTopic = {
   readonly family: CommandFamily;
@@ -12,9 +13,11 @@ export const COMMAND_HELP: Readonly<Record<CommandId, CommandHelpTopic>> = {
   ...FILE_COMMAND_HELP,
   ...EDITING_TOOLS_COMMAND_HELP,
   ...MACHINE_MOVE_COMMAND_HELP,
+  ...SETTINGS_COMMAND_HELP,
   'edit.undo': {
     family: 'edit',
-    tooltip: 'Undo the most recent scene edit.',
+    tooltip:
+      'Undo the most recent scene edit. The arrow beside the Undo button lists the last 15 steps by name; pick one to undo back to just before it.',
   },
   'edit.redo': {
     family: 'edit',
@@ -337,7 +340,8 @@ export const COMMAND_HELP: Readonly<Record<CommandId, CommandHelpTopic>> = {
   },
   'window.undo-history': {
     family: 'window',
-    tooltip: 'Review undo and redo history for the current project.',
+    tooltip:
+      'Review the named undo and redo steps of the current project. Click an undo step to go back to just before it, or a redo step to redo through it.',
   },
   'help.about': {
     family: 'help',

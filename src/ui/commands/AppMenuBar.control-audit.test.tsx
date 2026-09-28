@@ -57,6 +57,7 @@ const OUTCOMES: Record<CommandId, Outcome> = {
   'edit.delete': { callback: 'deleteSelection' },
   'edit.delete-duplicates': { callback: 'deleteDuplicates' },
   'edit.clear-selection': { callback: 'clearSelection' },
+  'edit.settings': { callback: 'openSettings' },
   'tools.measure': { callback: 'measureTool' },
   'tools.add-text': { callback: 'addText' },
   'tools.registration-jig': { callback: 'toggleRegistrationPanel' },

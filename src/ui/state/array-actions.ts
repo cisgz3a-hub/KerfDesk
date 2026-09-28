@@ -154,7 +154,7 @@ export function applySelectionPlacements(
     },
     selectedObjectId: selectedResultIds[0] ?? null,
     additionalSelectedIds: new Set(selectedResultIds.slice(1)),
-    undoStack: pushUndo(state.project, state.undoStack),
+    undoStack: pushUndo(state.project, state.undoStack, 'Array'),
     redoStack: [],
     dirty: true,
   };

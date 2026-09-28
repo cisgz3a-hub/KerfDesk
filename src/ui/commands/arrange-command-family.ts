@@ -8,6 +8,7 @@ import {
 import { copyAlongPathCommand } from './design-tools-commands';
 import { placementCommands } from './editing-tools-commands';
 import { machineMoveCommands } from './machine-move-commands';
+import { arrangeShortcutLabel } from './arrange-shortcut-keys';
 
 // The Arrange menu's Layout group: Copy Along Path (LBG-T09) sits beside Array.
 export const ARRANGE_LAYOUT_IDS: ReadonlyArray<CommandId> = [
@@ -20,19 +21,32 @@ export const ARRANGE_LAYOUT_IDS: ReadonlyArray<CommandId> = [
 export function arrangeCommands(ctx: AppCommandContext): ReadonlyArray<AppCommand> {
   const align = ALIGN_COMMANDS.map((spec) =>
     ctx.canAlignSelection
-      ? enabled(spec.id, 'arrange', spec.label, spec.title, () => ctx.alignSelection(spec.kind))
+      ? enabled(
+          spec.id,
+          'arrange',
+          spec.label,
+          spec.title,
+          () => ctx.alignSelection(spec.kind),
+          arrangeShortcutLabel(spec.id),
+        )
       : disabled(
           spec.id,
           'arrange',
           spec.label,
           'Select at least two objects or groups to align.',
           () => ctx.alignSelection(spec.kind),
+          arrangeShortcutLabel(spec.id),
         ),
   );
   const distribute = DISTRIBUTE_COMMANDS.map((spec) =>
     ctx.canDistributeSelection
-      ? enabled(spec.id, 'arrange', spec.label, spec.title, () =>
-          ctx.distributeSelection(spec.kind),
+      ? enabled(
+          spec.id,
+          'arrange',
+          spec.label,
+          spec.title,
+          () => ctx.distributeSelection(spec.kind),
+          arrangeShortcutLabel(spec.id),
         )
       : disabled(
           spec.id,
@@ -40,6 +54,7 @@ export function arrangeCommands(ctx: AppCommandContext): ReadonlyArray<AppComman
           spec.label,
           'Select at least three objects or groups to distribute.',
           () => ctx.distributeSelection(spec.kind),
+          arrangeShortcutLabel(spec.id),
         ),
   );
   return [
@@ -144,7 +159,8 @@ function flipVerticalCommand(ctx: AppCommandContext): AppCommand {
       );
 }
 
-const ALIGN_COMMANDS = [
+// Exported for the align and distribute keyboard shortcuts (app/arrange-shortcuts.ts).
+export const ALIGN_COMMANDS = [
   {
     id: 'arrange.align-left',
     kind: 'left',
@@ -189,7 +205,7 @@ const ALIGN_COMMANDS = [
   },
 ] as const;
 
-const DISTRIBUTE_COMMANDS = [
+export const DISTRIBUTE_COMMANDS = [
   {
     id: 'arrange.distribute-horizontal-centers',
     kind: 'horizontal-centers',
