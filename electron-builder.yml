@@ -59,6 +59,7 @@ win:
   artifactName: KerfDesk-${version}-windows-${arch}-setup.${ext}
 
 nsis:
+  include: scripts/nsis-file-associations.nsh
   oneClick: false
   perMachine: false
   allowToChangeInstallationDirectory: true

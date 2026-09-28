@@ -1,6 +1,10 @@
 import { useStore } from '../state';
 import { useLaserStore } from '../state/laser-store';
 import { isActiveJob } from '../state/laser-store-helpers';
+import {
+  controllerOperationOwner,
+  isUnsafeControllerOperation,
+} from '../state/laser-controller-operation';
 import { createAutosaveProjectSnapshot } from '../state/autosave-project-snapshot';
 import { DesktopCloseController, type DesktopCloseReply } from './desktop-close-controller';
 
@@ -17,6 +21,8 @@ export const desktopCloseController = new DesktopCloseController(() => {
   return {
     active: isActiveJob(laser.streamer),
     fireLatched: laser.fireActive,
+    motionOwner: laser.motionOperation?.operationId ?? null,
+    controllerOwner: controllerOwner(laser),
     epoch: laser.streamerEpoch,
     dirty: useStore.getState().dirty,
     document: documentSnapshot(useStore.getState()),
@@ -30,9 +36,23 @@ export const desktopCloseController = new DesktopCloseController(() => {
 async function stopBeforeClose(): Promise<void> {
   if (useLaserStore.getState().fireActive) await useLaserStore.getState().setFireActive(false);
   // Recovery records this stop as the app closing, not as an operator Abort.
-  if (isActiveJob(useLaserStore.getState().streamer)) {
-    await useLaserStore.getState().stopJob('app-closing');
+  const laser = useLaserStore.getState();
+  if (
+    isActiveJob(laser.streamer) ||
+    laser.motionOperation !== null ||
+    isUnsafeControllerOperation(laser.controllerOperation)
+  ) {
+    await laser.stopJob('app-closing');
   }
+}
+
+function controllerOwner(laser: ReturnType<typeof useLaserStore.getState>): object | string | null {
+  const operation = laser.controllerOperation;
+  if (!isUnsafeControllerOperation(operation) || operation === null) return null;
+  // Status/phase updates replace these records while preserving their owner.
+  if (operation.kind === 'home') return `home:${operation.operationId}`;
+  if (operation.kind === 'probe') return `probe:${operation.transactionId}`;
+  return controllerOperationOwner(operation);
 }
 
 function closeWarning(laser: ReturnType<typeof useLaserStore.getState>): string | null {

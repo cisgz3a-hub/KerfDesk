@@ -49,23 +49,27 @@ function createPreviewActivityWatch(onTimeout: () => void): PreviewActivityWatch
 }
 
 function spawnPreviewFfmpeg(url: URL) {
-  return spawn('ffmpeg', [
-    '-hide_banner',
-    '-loglevel',
-    'error',
-    '-rtsp_transport',
-    'tcp',
-    '-i',
-    url.toString(),
-    '-an',
-    '-vf',
-    'fps=10',
-    '-f',
-    'mpjpeg',
-    '-q:v',
-    '5',
-    'pipe:1',
-  ]);
+  return spawn(
+    'ffmpeg',
+    [
+      '-hide_banner',
+      '-loglevel',
+      'error',
+      '-rtsp_transport',
+      'tcp',
+      '-i',
+      url.toString(),
+      '-an',
+      '-vf',
+      'fps=10',
+      '-f',
+      'mpjpeg',
+      '-q:v',
+      '5',
+      'pipe:1',
+    ],
+    { stdio: ['ignore', 'pipe', 'ignore'], windowsHide: true },
+  );
 }
 
 export type RtspPreviewLifecycleObserver = {
@@ -81,7 +85,6 @@ export function streamWithFfmpeg(
 ): void {
   const ffmpeg = spawnPreviewFfmpeg(url);
   const releaseSlot = acquireFfmpegSlot();
-  const stderrChunks: Buffer[] = [];
   let clientClosed = false;
   let responseStarted = false;
   let settled = false;
@@ -111,9 +114,6 @@ export function streamWithFfmpeg(
     );
   });
 
-  ffmpeg.stderr.on('data', (chunk: Buffer) => {
-    appendLimitedStderrChunk(stderrChunks, chunk);
-  });
   ffmpeg.stdout.on('data', (chunk: Buffer) => {
     if (settled || clientClosed) return;
     responseStarted = writePreviewChunk(
@@ -127,9 +127,7 @@ export function streamWithFfmpeg(
   });
   ffmpeg.stdout.on('end', () => {
     if (!settled && !clientClosed) {
-      failStream(
-        new Error(ffmpegFailureReason(stderrChunks, 'FFmpeg camera preview ended unexpectedly.')),
-      );
+      failStream(new Error('FFmpeg camera preview ended unexpectedly.'));
     }
   });
   res.on('drain', () => {
@@ -145,16 +143,16 @@ export function streamWithFfmpeg(
     ffmpeg.kill('SIGTERM');
     if (closedWhileActive) lifecycle?.onClosed();
   });
-  ffmpeg.on('error', (err) => {
+  ffmpeg.on('error', () => {
     releaseSlot();
-    failStream(err);
+    // Spawn errors and decoder output may echo the input URL, including login
+    // or query credentials. Only app-owned diagnostic text crosses the bridge.
+    failStream(new Error('FFmpeg camera preview could not start.'));
   });
   ffmpeg.on('exit', () => {
     releaseSlot();
     if (settled) return;
-    failStream(
-      new Error(ffmpegFailureReason(stderrChunks, 'FFmpeg camera preview ended unexpectedly.')),
-    );
+    failStream(new Error('FFmpeg camera preview ended unexpectedly.'));
   });
 }
 
@@ -178,20 +176,11 @@ function writePreviewChunk(
   return true;
 }
 
-function appendLimitedStderrChunk(chunks: Buffer[], chunk: Buffer): void {
-  if (Buffer.concat(chunks).length < 8192) chunks.push(Buffer.from(chunk));
-}
-
 function writeMjpegResponseHeaders(res: ServerResponse): void {
   res.writeHead(200, {
     'Content-Type': 'multipart/x-mixed-replace; boundary=ffmpeg',
     'Cache-Control': 'no-store',
   });
-}
-
-export function ffmpegFailureReason(chunks: ReadonlyArray<Buffer>, fallback: string): string {
-  const stderr = Buffer.concat(chunks).toString('utf8').trim();
-  return stderr.length > 0 ? `${fallback}: ${stderr}` : fallback;
 }
 
 const SINGLE_FRAME_TIMEOUT_MS = 10000;
@@ -212,32 +201,34 @@ export function captureRtspFrameJpeg(url: URL): Promise<RtspFrameCaptureResult> 
   }
   const releaseSlot = acquireFfmpegSlot();
   return new Promise((resolve) => {
-    const ffmpeg = spawn('ffmpeg', [
-      '-hide_banner',
-      '-loglevel',
-      'error',
-      '-rtsp_transport',
-      'tcp',
-      '-i',
-      url.toString(),
-      '-an',
-      '-frames:v',
-      '1',
-      '-f',
-      'image2',
-      '-q:v',
-      '4',
-      'pipe:1',
-    ]);
+    const ffmpeg = spawn(
+      'ffmpeg',
+      [
+        '-hide_banner',
+        '-loglevel',
+        'error',
+        '-rtsp_transport',
+        'tcp',
+        '-i',
+        url.toString(),
+        '-an',
+        '-frames:v',
+        '1',
+        '-f',
+        'image2',
+        '-q:v',
+        '4',
+        'pipe:1',
+      ],
+      { stdio: ['ignore', 'pipe', 'ignore'], windowsHide: true },
+    );
     const out: Buffer[] = [];
-    const stderrChunks: Buffer[] = [];
     let outBytes = 0;
     let settled = false;
     const finish = (result: RtspFrameCaptureResult): void => {
       if (settled) return;
       settled = true;
       clearTimeout(timer);
-      releaseSlot();
       resolve(result);
     };
     const timer = setTimeout(() => {
@@ -245,6 +236,7 @@ export function captureRtspFrameJpeg(url: URL): Promise<RtspFrameCaptureResult> 
       finish({ kind: 'failed', reason: 'FFmpeg did not produce a camera frame in time.' });
     }, SINGLE_FRAME_TIMEOUT_MS);
     ffmpeg.stdout.on('data', (chunk: Buffer) => {
+      if (settled) return;
       outBytes += chunk.length;
       if (outBytes > MAX_SINGLE_FRAME_BYTES) {
         ffmpeg.kill('SIGTERM');
@@ -253,20 +245,20 @@ export function captureRtspFrameJpeg(url: URL): Promise<RtspFrameCaptureResult> 
       }
       out.push(Buffer.from(chunk));
     });
-    ffmpeg.stderr.on('data', (chunk: Buffer) => {
-      appendLimitedStderrChunk(stderrChunks, chunk);
+    ffmpeg.on('error', () => {
+      finish({ kind: 'failed', reason: 'FFmpeg camera frame capture could not start.' });
     });
-    ffmpeg.on('error', (err) => {
-      finish({ kind: 'failed', reason: err.message });
-    });
-    ffmpeg.on('exit', (code) => {
+    // Child 'exit' can precede the last stdout data. 'close' proves every pipe
+    // has closed, so both the JPEG and the process concurrency count are final.
+    ffmpeg.on('close', (code) => {
+      releaseSlot();
       if (code === 0 && out.length > 0) {
         finish({ kind: 'ok', jpeg: Buffer.concat(out) });
         return;
       }
       finish({
         kind: 'failed',
-        reason: ffmpegFailureReason(stderrChunks, 'FFmpeg could not capture a camera frame.'),
+        reason: 'FFmpeg could not capture a camera frame.',
       });
     });
   });
@@ -276,7 +268,7 @@ let ffmpegAvailable: Promise<boolean> | null = null;
 
 export function hasFfmpeg(): Promise<boolean> {
   ffmpegAvailable ??= new Promise((resolve) => {
-    const ffmpeg = spawn('ffmpeg', ['-version'], { stdio: 'ignore' });
+    const ffmpeg = spawn('ffmpeg', ['-version'], { stdio: 'ignore', windowsHide: true });
     ffmpeg.on('error', () => resolve(false));
     ffmpeg.on('exit', (code) => resolve(code === 0));
   });

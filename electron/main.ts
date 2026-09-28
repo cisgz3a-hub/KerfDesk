@@ -96,6 +96,7 @@ import { installDesktopContextMenu } from './desktop-context-menu.js';
 import { loadWindowPlacement, rememberWindowPlacement } from './desktop-window-placement.js';
 import { installRendererCrashRecovery } from './renderer-crash-recovery.js';
 import { rendererContentSecurityPolicy } from './renderer-content-security-policy.js';
+import { createDesktopWindowReopener } from './desktop-window-reopen.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -110,11 +111,22 @@ app.setPath('userData', DESKTOP_DATA_PATH);
 app.setPath('sessionData', DESKTOP_DATA_PATH);
 if (process.platform === 'win32') app.setAppUserModelId(DESKTOP_APP_USER_MODEL_ID);
 
+let desktopWindowReady = false;
+let quitRequested = false;
+const reopenDesktopWindow = createDesktopWindowReopener({
+  isReady: () => desktopWindowReady,
+  isQuitting: () => quitRequested,
+  hasWindow: () => BrowserWindow.getAllWindows().some((window) => !window.isDestroyed()),
+  createWindow,
+  onError: (error: unknown) => console.error('Failed to reopen window:', error),
+});
+
 // One process owns the shared Chromium profile and the serial-capable UI. A
 // second launch raises that primary window and hands over any project file it
 // was asked to open (ADR-378).
 const DESKTOP_PROJECT_OPENS = installDesktopProjectOpens(app, {
   isTrustedRenderer: (url) => shouldAllowNavigation(url, TRUSTED_RENDERER_ORIGINS),
+  reopenWindow: reopenDesktopWindow,
 });
 const HAS_SINGLE_INSTANCE_LOCK = DESKTOP_PROJECT_OPENS.hasSingleInstanceLock;
 if (!HAS_SINGLE_INSTANCE_LOCK) app.quit();
@@ -167,7 +179,6 @@ const CSP_POLICY = [
   "frame-ancestors 'none'",
 ].join('; ');
 let cameraBridge: RtspCameraBridgeHandle | null = null;
-let quitRequested = false;
 app.on('before-quit', () => {
   quitRequested = true;
 });
@@ -496,7 +507,8 @@ if (HAS_SINGLE_INSTANCE_LOCK)
         isChannelTrusted: IS_DESKTOP_UPDATE_CHANNEL_TRUSTED,
         onError: (error: unknown) => console.warn('Desktop update check failed:', error),
       });
-      return createWindow();
+      await createWindow();
+      desktopWindowReady = true;
     })
     .catch((err: unknown) => {
       console.error('Failed to create window:', err);
@@ -511,8 +523,4 @@ installApplicationFinalCleanup(app, () => cameraBridge?.close(), {
   reportFailure: (error: unknown) => console.warn('RTSP camera bridge cleanup failed:', error),
 });
 
-app.on('activate', () => {
-  if (BrowserWindow.getAllWindows().length === 0) {
-    void createWindow();
-  }
-});
+app.on('activate', reopenDesktopWindow);

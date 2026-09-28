@@ -13,10 +13,21 @@
 // usage: node scripts/verify-asar-integrity-enforced.mjs <executable> <app.asar> [--timeout-ms=N]
 
 import { spawn } from 'node:child_process';
-import { closeSync, existsSync, mkdtempSync, openSync, readSync, rmSync, writeSync } from 'node:fs';
+import {
+  closeSync,
+  existsSync,
+  mkdtempSync,
+  openSync,
+  readFileSync,
+  readSync,
+  rmSync,
+  writeSync,
+} from 'node:fs';
 import { tmpdir } from 'node:os';
-import { dirname, isAbsolute, join, resolve } from 'node:path';
+import { isAbsolute, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { collectNativeSmokeProcess } from './native-smoke-process.mjs';
+import { validateNativeSmokeResult } from './verify-windows-packaged-native-smoke.mjs';
 
 const HASH_KEY = '"hash":"';
 const DEFAULT_TIMEOUT_MS = 30_000;
@@ -44,20 +55,15 @@ export function headerTamper(prefix, header) {
 }
 
 /** Whether one launch of the tampered package shows the app refused to start. */
-export function integrityVerdict({ code, signal, timedOut, resultWritten, stderr }) {
+export function integrityVerdict({ resultWritten, stderr, spawned, childClosed, errors = [] }) {
+  if (!spawned || errors.length > 0)
+    return { refused: false, reason: 'the integrity probe could not launch or observe the app' };
+  if (!childClosed) return { refused: false, reason: 'the owned app process did not close' };
   if (resultWritten) return { refused: false, reason: 'the app started and wrote a smoke result' };
   if (stderr.includes(INTEGRITY_FAILURE)) return { refused: true, reason: INTEGRITY_FAILURE };
-  if (timedOut)
-    return { refused: false, reason: 'the app neither stopped nor reported an integrity failure' };
-  if (code === 0 && signal === null) {
-    return {
-      refused: false,
-      reason: 'the app exited cleanly without reporting an integrity failure',
-    };
-  }
   return {
-    refused: true,
-    reason: `the app stopped at launch (exit ${code}, signal ${signal ?? 'none'})`,
+    refused: false,
+    reason: 'the app reported no ASAR integrity failure; an unrelated crash is not evidence',
   };
 }
 
@@ -83,53 +89,70 @@ function writeByte(asarPath, offset, value) {
   }
 }
 
-function launch(executable, timeoutMs) {
+async function launch(executable, timeoutMs) {
   const root = mkdtempSync(join(tmpdir(), 'kerfdesk-asar-integrity-'));
   const resultPath = join(root, 'native-smoke-result.json');
   const userData = join(root, 'user-data');
-  return new Promise((resolveLaunch) => {
-    let stderr = '';
-    let settled = false;
-    const child = spawn(
-      executable,
-      [
-        `--kerfdesk-native-smoke-user-data=${userData}`,
-        `--kerfdesk-native-smoke-result=${resultPath}`,
-      ],
-      {
-        cwd: dirname(executable),
-        stdio: ['ignore', 'ignore', 'pipe'],
-        // Chromium writes its fatal log line to stderr only when asked to.
-        env: { ...process.env, ELECTRON_ENABLE_LOGGING: '1' },
-      },
-    );
-    const settle = (outcome) => {
-      if (settled) return;
-      settled = true;
-      clearTimeout(timer);
-      if (child.exitCode === null && child.signalCode === null) child.kill();
-      const resultWritten = existsSync(resultPath);
-      try {
-        rmSync(root, { recursive: true, force: true });
-      } catch {
-        // A killed app can hold its profile briefly; the directory is in the temp folder.
-      }
-      resolveLaunch({ ...outcome, resultWritten, stderr });
-    };
-    const timer = setTimeout(() => settle({ code: null, signal: null, timedOut: true }), timeoutMs);
-    child.stderr.setEncoding('utf8');
-    child.stderr.on('data', (chunk) => {
-      stderr += chunk;
-      // A crash dialog can keep a refusing process alive; the log line decides.
-      if (stderr.includes(INTEGRITY_FAILURE)) settle({ code: null, signal: null, timedOut: false });
-    });
-    child.on('error', (error) => {
-      stderr += `\nspawn failed: ${error.message}`;
-      settle({ code: null, signal: null, timedOut: false });
-    });
-    // 'close' waits for stderr to drain, so a late log line still counts.
-    child.on('close', (code, signal) => settle({ code, signal, timedOut: false }));
-  });
+  const observed = await collectNativeSmokeProcess(
+    executable,
+    [
+      `--kerfdesk-native-smoke-user-data=${userData}`,
+      `--kerfdesk-native-smoke-result=${resultPath}`,
+    ],
+    {
+      timeoutMs,
+      spawnProcess: (file, args, options) =>
+        spawn(file, args, {
+          ...options,
+          // Chromium's fatal integrity diagnostic must be observable.
+          env: { ...process.env, ELECTRON_ENABLE_LOGGING: '1' },
+        }),
+    },
+  );
+  const resultWritten = existsSync(resultPath);
+  let smokeResult = null;
+  try {
+    if (resultWritten) smokeResult = JSON.parse(readFileSync(resultPath, 'utf8'));
+  } catch {
+    // An unreadable result is not a passing baseline, but still proves main ran.
+  }
+  if (observed.childClosed) {
+    try {
+      rmSync(root, { recursive: true, force: true });
+    } catch {
+      // Windows can briefly retain profile locks after the owned process closes.
+    }
+  }
+  return { ...observed, resultWritten, smokeResult, userData };
+}
+
+/** Prove the same package works before changing it, and always restore its header. */
+export async function verifyAsarIntegrity(executable, archive, timeoutMs, launchProcess = launch) {
+  const baseline = await launchProcess(executable, timeoutMs);
+  if (
+    baseline.code !== 0 ||
+    baseline.signal !== null ||
+    baseline.failure !== null ||
+    !baseline.spawned ||
+    !baseline.childClosed
+  ) {
+    throw new Error('unmodified package did not complete its native smoke baseline');
+  }
+  validateNativeSmokeResult(baseline.smokeResult, baseline.userData);
+  const { prefix, header } = readHeader(archive);
+  const tamper = headerTamper(prefix, header);
+  writeByte(archive, tamper.offset, tamper.replacement);
+  let observed;
+  try {
+    observed = await launchProcess(executable, timeoutMs);
+  } finally {
+    // The launch observer waits for close, with a bounded termination attempt.
+    // A still-live child fails qualification, and the on-disk package is restored.
+    writeByte(archive, tamper.offset, tamper.original);
+  }
+  const verdict = integrityVerdict(observed);
+  if (!verdict.refused) throw new Error(`modified app.asar was not refused: ${verdict.reason}`);
+  return { observed, verdict };
 }
 
 async function runCli() {
@@ -143,19 +166,8 @@ async function runCli() {
   const timeoutArg = args.find((arg) => arg.startsWith('--timeout-ms='));
   const timeoutMs = timeoutArg === undefined ? DEFAULT_TIMEOUT_MS : Number(timeoutArg.slice(13));
   if (!Number.isFinite(timeoutMs) || timeoutMs <= 0) throw new Error('timeout must be positive');
-  const archive = resolve(asarPath);
-  const { prefix, header } = readHeader(archive);
-  const tamper = headerTamper(prefix, header);
-  writeByte(archive, tamper.offset, tamper.replacement);
-  let observed;
-  try {
-    observed = await launch(executable, timeoutMs);
-  } finally {
-    writeByte(archive, tamper.offset, tamper.original);
-  }
-  const verdict = integrityVerdict(observed);
+  const { observed, verdict } = await verifyAsarIntegrity(executable, resolve(asarPath), timeoutMs);
   process.stdout.write(`${observed.stderr.trim().slice(-4000)}\n`);
-  if (!verdict.refused) throw new Error(`modified app.asar was not refused: ${verdict.reason}`);
   process.stdout.write(`ASAR_INTEGRITY_ENFORCED=true (${verdict.reason})\n`);
 }
 

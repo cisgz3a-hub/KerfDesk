@@ -1,4 +1,4 @@
-import type { App, BrowserWindow } from 'electron';
+import type { App, BrowserWindow, WebPreferences } from 'electron';
 import { mkdir, writeFile } from 'node:fs/promises';
 import { dirname, isAbsolute, resolve } from 'node:path';
 import { createNativeSmokeTerminalClaim } from './native-smoke-terminal-claim.js';
@@ -12,6 +12,53 @@ export type NativeSmokeConfig = {
   readonly userDataPath: string;
   readonly resultPath: string;
 };
+
+type NativeSmokeInspection = {
+  readonly getLastWebPreferences?: () => WebPreferences | null;
+};
+
+type NativeSmokeDevToolsTarget = {
+  on(event: 'devtools-opened', listener: () => void): unknown;
+  removeListener(event: 'devtools-opened', listener: () => void): unknown;
+  openDevTools(options: { mode: 'detach'; activate: false }): void;
+  closeDevTools(): void;
+  isDevToolsOpened(): boolean;
+};
+
+export async function probeNativeSmokeDevTools(contents: NativeSmokeDevToolsTarget) {
+  let opened = false;
+  const onOpened = () => {
+    opened = true;
+  };
+  contents.on('devtools-opened', onOpened);
+  try {
+    contents.openDevTools({ mode: 'detach', activate: false });
+    await new Promise((resolve) => setTimeout(resolve, 200));
+    return opened || contents.isDevToolsOpened();
+  } finally {
+    contents.removeListener('devtools-opened', onOpened);
+    contents.closeDevTools();
+  }
+}
+
+// These runtime inspection methods are internal to the pinned Electron build.
+// Missing methods/values stay unknown, so a future API change fails the smoke
+// instead of silently replacing actual values with the intended configuration.
+export function readNativeSmokeWebPreferences(contents: object) {
+  const inspection = contents as NativeSmokeInspection;
+  const preferences = inspection.getLastWebPreferences?.call(contents) ?? null;
+  const reported = preferences ?? {};
+  return {
+    available: preferences !== null,
+    sandbox: reported.sandbox ?? null,
+    contextIsolation: reported.contextIsolation ?? null,
+    nodeIntegration: reported.nodeIntegration ?? null,
+    webSecurity: reported.webSecurity ?? null,
+    // Electron 44 does not report preload or devTools in this API. Do not
+    // turn an omitted field into evidence that no preload was installed.
+    preload: reported.preload ?? 'not-reported',
+  };
+}
 
 export function readNativeSmokeConfig(argv: ReadonlyArray<string>): NativeSmokeConfig | null {
   const userDataPath = argumentValue(argv, USER_DATA_ARG);
@@ -72,7 +119,11 @@ async function runRendererSmoke(window: BrowserWindow): Promise<unknown> {
 }
 
 async function finishNativeSmoke(
-  input: { readonly app: App; readonly config: NativeSmokeConfig | null },
+  input: {
+    readonly app: App;
+    readonly window: BrowserWindow;
+    readonly config: NativeSmokeConfig | null;
+  },
   failures: ReadonlyArray<string>,
   renderer: unknown,
   rendererOk: boolean,
@@ -84,14 +135,25 @@ async function finishNativeSmoke(
   const isolated =
     input.app.getPath('userData') === config.userDataPath &&
     input.app.getPath('sessionData') === config.userDataPath;
+  const devToolsOpened = rendererOk
+    ? await probeNativeSmokeDevTools(input.window.webContents)
+    : 'not-probed';
   const result = {
-    ok: rendererOk && windowVisible && input.app.isPackaged && isolated && failures.length === 0,
+    ok:
+      rendererOk &&
+      windowVisible &&
+      input.app.isPackaged &&
+      isolated &&
+      failures.length === 0 &&
+      devToolsOpened === false,
     isPackaged: input.app.isPackaged,
     isolated,
     windowVisible,
     userData: input.app.getPath('userData'),
     sessionData: input.app.getPath('sessionData'),
     failures,
+    webPreferences: readNativeSmokeWebPreferences(input.window.webContents),
+    devToolsProbe: { method: 'openDevTools', opened: devToolsOpened },
     renderer,
     ...(error === undefined ? {} : { error }),
   };

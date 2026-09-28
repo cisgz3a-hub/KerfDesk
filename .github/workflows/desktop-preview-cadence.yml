@@ -6,7 +6,8 @@ name: Desktop Preview cadence
 # main commit that CI, Browser smoke and the Desktop package check all passed
 # on, the commands to tag it and the drafted release notes. The issue closes
 # once a newer Preview exists, and any second open issue with that title is
-# closed as a duplicate.
+# closed as a duplicate. Published immutable release metadata defines the
+# baseline; a failed or pending tag does not count as a shipped Preview.
 #
 # Tagging stays with the maintainer: the v* tag ruleset lets only the
 # maintainer create release tags (ADR-248). This workflow reads the repository
@@ -57,10 +58,17 @@ jobs:
               --limit 200 --json headSha --jq '.[].headSha' > "${RUNNER_TEMP}/green-${workflow%.yml}.txt"
           done
 
+      - name: Read published release metadata
+        run: |
+          set -euo pipefail
+          gh api --paginate --slurp "repos/${GH_REPO}/releases?per_page=100" \
+            > "${RUNNER_TEMP}/preview-releases.json"
+
       - name: Draft the next Preview
         id: cadence
         run: >-
           node scripts/desktop-preview-cadence.mjs
+          --releases="${RUNNER_TEMP}/preview-releases.json"
           --green="${RUNNER_TEMP}/green-ci.txt"
           --green="${RUNNER_TEMP}/green-e2e.txt"
           --green="${RUNNER_TEMP}/green-desktop-package-check.txt"

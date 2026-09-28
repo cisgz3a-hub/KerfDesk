@@ -43,6 +43,8 @@ export type DesktopProjectOpens = {
 
 export type DesktopProjectOpenOptions = {
   readonly isTrustedRenderer: (url: string) => boolean;
+  /** Recreate a closed macOS window once application startup is complete. */
+  readonly reopenWindow: () => void;
 };
 
 export function installDesktopProjectOpens(
@@ -58,10 +60,17 @@ export function installDesktopProjectOpens(
   }
   const queue = createDesktopProjectOpenQueue();
   queue.add(launchPaths);
-  const signal = (): void => signalRenderer(BrowserWindow.getAllWindows()[0], options);
-  app.on('second-instance', (_event, argv, workingDirectory, additionalData) => {
+  const signal = (): void => {
     const primary = BrowserWindow.getAllWindows()[0];
-    if (primary !== undefined) revealPrimaryWindow(primary);
+    if (primary === undefined || primary.isDestroyed()) {
+      options.reopenWindow();
+      // A new renderer drains the queue when it subscribes after loading.
+      return;
+    }
+    revealPrimaryWindow(primary);
+    signalRenderer(primary, options);
+  };
+  app.on('second-instance', (_event, argv, workingDirectory, additionalData) => {
     queue.add(
       projectPathsFromLaunchData(additionalData) ??
         projectPathsFromArgv(argv, { defaultApp: process.defaultApp === true, workingDirectory }),

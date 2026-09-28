@@ -185,9 +185,19 @@ describe('Desktop Preview release workflow gate (ADR-248/249)', () => {
 
   it('publishes changelog notes with every Preview and only reminds about tagging (ADR-522)', () => {
     const cadence = repoFile('.github/workflows/desktop-preview-cadence.yml');
+    expect(workflow).toContain('node scripts/desktop-release-notes.mjs release-body "${VERSION}"');
     expect(workflow).toContain(
-      'node scripts/desktop-release-notes.mjs release-body "${VERSION}" >> release-notes.md',
+      '--releases="${RUNNER_TEMP}/preview-releases.json" >> release-notes.md',
     );
+    expect(cadence).toContain('--releases="${RUNNER_TEMP}/preview-releases.json"');
+    for (const source of [workflow, cadence]) {
+      const metadataCommands = source
+        .replace(/\\\r?\n/g, ' ')
+        .split('\n')
+        .filter((line) => line.includes('gh api') && line.includes('--slurp'));
+      expect(metadataCommands).toHaveLength(1);
+      expect(metadataCommands[0]).not.toMatch(/--jq|--template/);
+    }
     expect(workflow.indexOf('release-body')).toBeLessThan(workflow.indexOf('gh release create'));
     expect(repoFile('CHANGELOG.md')).toMatch(/^## Unreleased$/m);
     // The v* tag ruleset keeps release tags with the maintainer; the cadence only drafts.

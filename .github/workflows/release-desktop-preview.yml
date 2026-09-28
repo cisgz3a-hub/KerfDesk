@@ -341,7 +341,11 @@ jobs:
           VERSION: ${{ steps.release.outputs.version }}
           SOURCE_SHA: ${{ steps.release.outputs.source_sha }}
           SIGNER_WORKFLOW: ${{ steps.release.outputs.signer_workflow }}
+          GH_TOKEN: ${{ github.token }}
         run: |
+          set -euo pipefail
+          gh api --paginate --slurp "repos/${GITHUB_REPOSITORY}/releases?per_page=100" \
+            > "${RUNNER_TEMP}/preview-releases.json"
           cat > release-notes.md <<EOF
           # KerfDesk ${VERSION} Preview
 
@@ -358,9 +362,10 @@ jobs:
           ## What changed since the last Preview
 
           EOF
-          # CHANGELOG.md's section for this version, or its Unreleased highlights
-          # plus every pull request since the previous Preview tag (ADR-522).
-          node scripts/desktop-release-notes.mjs release-body "${VERSION}" >> release-notes.md
+          # Preserve curated highlights, regenerating changes since the preceding
+          # published immutable Preview. Failed tags never hide unshipped changes.
+          node scripts/desktop-release-notes.mjs release-body "${VERSION}" \
+            --releases="${RUNNER_TEMP}/preview-releases.json" >> release-notes.md
 
       - name: Attest release companions
         uses: actions/attest@36051bcae73b7c2a8a6945a48cbf80953c6baa35 # v4

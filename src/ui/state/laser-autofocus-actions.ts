@@ -12,6 +12,7 @@ import { pendingTransportWriteCount } from './laser-start-queue-fence';
 import { controllerUnlockedPatch } from './laser-console-completion';
 import { resetRequiredBlockMessage } from './controller-reset-required';
 import { startControllerCommand } from './laser-interactive-command';
+import { continueControllerOperation } from './laser-controller-operation';
 
 type SetFn = (
   partial: Partial<LaserState> | ((state: LaserState) => Partial<LaserState> | LaserState),
@@ -86,7 +87,13 @@ async function runOwnedAutofocus(
       command,
       confirmFreshIdle: () => confirmFreshAutofocusIdle({ get, refs, write }),
       onDispatch: () =>
-        set({ controllerOperation: { kind: 'autofocus', phase: 'command', idleReports: 0 } }),
+        set((state) => ({
+          controllerOperation: continueControllerOperation(state.controllerOperation, {
+            kind: 'autofocus',
+            phase: 'command',
+            idleReports: 0,
+          }),
+        })),
       refs,
       write,
     });
@@ -155,7 +162,11 @@ function completionPatch(
   return {
     statusReport: null,
     statusObservation: null,
-    controllerOperation: { kind: 'autofocus', phase: 'motion-uncertain', idleReports: 0 },
+    controllerOperation: continueControllerOperation(state.controllerOperation, {
+      kind: 'autofocus',
+      phase: 'motion-uncertain',
+      idleReports: 0,
+    }),
     lastWriteError: message,
     log: pushLog(state, `[lf2] ${message}`),
   };

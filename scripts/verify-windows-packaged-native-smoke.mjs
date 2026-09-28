@@ -23,9 +23,42 @@ export function validateNativeSmokeResult(result, expectedUserData) {
       ? []
       : ['project save was not observed']),
     ...(renderer?.url === 'app://app/index.html' ? [] : ['unexpected renderer URL']),
+    ...nativeSmokeSecurityProblems(result),
+    ...(renderer?.fileAccess?.openPicker === 'stubbed' &&
+    renderer?.fileAccess?.savePicker === 'stubbed' &&
+    renderer?.fileAccess?.writeTarget === 'memory'
+      ? []
+      : ['file access evidence must identify stubbed pickers and an in-memory save']),
   ];
   if (problems.length > 0) throw new Error(problems.join('; '));
   return result;
+}
+
+function nativeSmokeSecurityProblems(result) {
+  const preferences = object(result?.webPreferences);
+  const primitives = object(result?.renderer?.nodePrimitives);
+  const problems = [];
+  if (preferences?.available !== true) problems.push('runtime webPreferences were unavailable');
+  for (const [name, expected] of Object.entries({
+    sandbox: true,
+    contextIsolation: true,
+    nodeIntegration: false,
+    webSecurity: true,
+  })) {
+    if (preferences?.[name] !== expected) problems.push(`runtime ${name} was not ${expected}`);
+  }
+  if (result?.devToolsProbe?.method !== 'openDevTools' || result?.devToolsProbe?.opened !== false) {
+    problems.push('runtime DevTools did not reject the open attempt');
+  }
+  if (preferences?.preload !== 'not-reported') {
+    problems.push('runtime preload evidence was unexpected or missing');
+  }
+  for (const name of ['require', 'process', 'module', 'Buffer']) {
+    if (primitives?.[name] !== 'undefined') {
+      problems.push(`renderer Node primitive ${name} was exposed or not inspected`);
+    }
+  }
+  return problems;
 }
 
 async function runCli() {

@@ -6,7 +6,8 @@
 // Tagging stays with the maintainer (the v* tag ruleset, ADR-248); this never
 // tags, pushes or publishes anything.
 //
-// usage: node scripts/desktop-preview-cadence.mjs --green=<file> [--green=<file>...]
+// usage: node scripts/desktop-preview-cadence.mjs --releases=<file>
+//          --green=<file> [--green=<file>...]
 //          --issue=<file> [--github-output=<file>] [--now=<ISO date>]
 // Each --green file lists the main commits one workflow passed on, one per line.
 
@@ -18,19 +19,23 @@ import {
   REPOSITORY_URL,
   classifyChange,
   parseFirstParentLog,
-  previewTagBefore,
   renderNotes,
 } from './desktop-release-notes.mjs';
+import {
+  compareTags,
+  nextUnusedPreviewTag,
+  publishedPreviews,
+  versionParts,
+} from './desktop-preview-releases.mjs';
+export {
+  nextPreviewTag,
+  nextUnusedPreviewTag,
+  publishedPreviews,
+} from './desktop-preview-releases.mjs';
 
 export const MIN_DAYS_BETWEEN_PREVIEWS = 7;
 export const ISSUE_TITLE_PREFIX = 'Desktop Preview due';
 const DAY_MS = 24 * 60 * 60 * 1000;
-
-export function nextPreviewTag(tag) {
-  const match = /^v(\d+\.\d+\.\d+)-preview\.(\d+)$/.exec(tag);
-  if (match === null) throw new Error(`not a Preview tag: ${tag}`);
-  return `v${match[1]}-preview.${Number(match[2]) + 1}`;
-}
 
 /** The newest first-parent commit that every workflow passed on, or null. */
 export function newestGreenCommit(firstParentShas, greenSets) {
@@ -42,7 +47,15 @@ export function previewDue({ userFacingChanges, lastPreviewAt, now }) {
   return { due: userFacingChanges > 0 && days >= MIN_DAYS_BETWEEN_PREVIEWS, days };
 }
 
-export function cadenceIssue({ lastTag, days, nextTag, commit, userFacingChanges, notes }) {
+export function cadenceIssue({
+  lastTag,
+  days,
+  nextTag,
+  commit,
+  userFacingChanges,
+  notes,
+  unpublishedTags = [],
+}) {
   const version = nextTag.slice(1);
   const [base, number] = version.split('-preview.');
   const commitLink = `[\`${commit.slice(0, 9)}\`](${REPOSITORY_URL}/commit/${commit})`;
@@ -51,9 +64,17 @@ export function cadenceIssue({ lastTag, days, nextTag, commit, userFacingChanges
     '',
     `CI, Browser smoke and the Desktop package check all passed on main at ${commitLink}, so that is the commit to tag.`,
     '',
+    ...(unpublishedTags.length === 0
+      ? []
+      : [
+          `These newer tags exist without a published immutable Preview: ${unpublishedTags.map((tag) => `\`${tag}\``).join(', ')}. They are reserved and do not reset the release date or remove changes from these notes.`,
+          '',
+          'Check their release workflow runs first. Wait for an active run, or investigate a failed run and decide whether to retry that release before creating another. The commands below use the next unused tag; never move or recreate an existing release tag.',
+          '',
+        ]),
     'To publish it:',
     '',
-    `1. Optional: ask Claude to stamp the changelog (\`node scripts/desktop-release-notes.mjs stamp ${version}\`) and merge that; then tag its merge commit once its checks pass. Without a stamp the Preview still gets these notes.`,
+    `1. Optional: fetch release metadata with \`gh api --paginate --slurp repos/cisgz3a-hub/KerfDesk/releases > preview-releases.json\`, then stamp the changelog with \`node scripts/desktop-release-notes.mjs stamp ${version} --releases=preview-releases.json\` and merge it. Tag that merge commit once its checks pass. Without a stamp the Preview still gets these notes.`,
     '2. From a clone of main:',
     '',
     '```sh',
@@ -62,7 +83,7 @@ export function cadenceIssue({ lastTag, days, nextTag, commit, userFacingChanges
     `git push origin ${nextTag}`,
     '```',
     '',
-    '3. The Preview release lane builds, checks and publishes the Windows and macOS downloads with these notes. This issue closes itself once the Preview exists.',
+    '3. The Preview release lane builds, checks and publishes the Windows and macOS downloads with these notes. This issue closes itself only after a newer immutable Preview is published.',
     '',
     '<details><summary>Release notes draft</summary>',
     '',
@@ -84,21 +105,37 @@ function runCli(argv) {
   const [issuePath] = values('issue');
   const [githubOutput] = values('github-output');
   const [nowArg] = values('now');
+  const [releasesPath] = values('releases');
   const greenFiles = values('green');
-  if (issuePath === undefined || greenFiles.length === 0) {
-    throw new Error('usage: desktop-preview-cadence.mjs --green=<file>... --issue=<file>');
+  if (issuePath === undefined || releasesPath === undefined || greenFiles.length === 0) {
+    throw new Error(
+      'usage: desktop-preview-cadence.mjs --releases=<file> --green=<file>... --issue=<file>',
+    );
   }
   const outputs = {};
-  const lastTag = previewTagBefore('HEAD');
-  if (lastTag === null) throw new Error('no Preview tag is reachable from HEAD');
+  const releases = publishedPreviews(JSON.parse(readFileSync(releasesPath, 'utf8')));
+  const lastRelease = releases[0];
+  if (lastRelease === undefined) {
+    throw new Error(
+      'no published immutable Preview release; a release baseline must be established',
+    );
+  }
+  const lastTag = lastRelease.tagName;
+  git('merge-base', '--is-ancestor', `${lastTag}^{commit}`, 'HEAD');
+  const tags = git('tag', '--list', 'v*-preview.*').split(/\s+/).filter(Boolean);
+  const publishedTags = new Set(releases.map((release) => release.tagName));
+  const unpublishedTags = tags.filter(
+    (tag) => versionParts(tag) !== null && compareTags(tag, lastTag) > 0 && !publishedTags.has(tag),
+  );
   const entries = parseFirstParentLog(
     git('log', '--first-parent', '--format=%H%x1f%s%x1f%b%x1e', `${lastTag}..HEAD`),
   );
   const userFacingChanges = entries.filter(
     (entry) => classifyChange(entry.title).kind !== 'maintenance',
   ).length;
-  const lastPreviewAt = new Date(git('log', '-1', '--format=%cI', lastTag));
+  const lastPreviewAt = new Date(lastRelease.publishedAt);
   const now = nowArg === undefined ? new Date() : new Date(nowArg);
+  if (!Number.isFinite(now.getTime())) throw new Error('now must be a valid date');
   const { due, days } = previewDue({ userFacingChanges, lastPreviewAt, now });
   const greenSets = greenFiles.map(
     (file) => new Set(readFileSync(file, 'utf8').split(/\s+/).filter(Boolean)),
@@ -107,7 +144,7 @@ function runCli(argv) {
     entries.map((entry) => entry.sha),
     greenSets,
   );
-  const nextTag = nextPreviewTag(lastTag);
+  const nextTag = nextUnusedPreviewTag(lastTag, tags);
   Object.assign(outputs, { last_tag: lastTag, next_tag: nextTag, commit: commit ?? '' });
   if (!due) {
     outputs.due = 'false';
@@ -125,7 +162,15 @@ function runCli(argv) {
     const notes = renderNotes(tagged);
     writeFileSync(
       issuePath,
-      cadenceIssue({ lastTag, days, nextTag, commit, userFacingChanges: listed.length, notes }),
+      cadenceIssue({
+        lastTag,
+        days,
+        nextTag,
+        commit,
+        userFacingChanges: listed.length,
+        notes,
+        unpublishedTags,
+      }),
     );
     outputs.due = 'true';
     outputs.title = `${ISSUE_TITLE_PREFIX}: ${nextTag}`;
