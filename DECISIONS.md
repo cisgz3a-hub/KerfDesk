@@ -21584,8 +21584,9 @@ ADR-341's amendments are separate decision files (ADR-344):
 `docs/decisions/ADR-341-amendment-2-controller-families.md`,
 `docs/decisions/ADR-341-amendment-3-resume-and-painted-pass-fidelity.md`,
 `docs/decisions/ADR-341-amendment-4-second-pass-only-for-the-job-that-just-finished.md`,
-`docs/decisions/ADR-341-amendment-5-recovery-restores-the-saved-origin.md` and
-`docs/decisions/ADR-341-amendment-6-continue-from-where-the-head-stopped.md`.
+`docs/decisions/ADR-341-amendment-5-recovery-restores-the-saved-origin.md`,
+`docs/decisions/ADR-341-amendment-6-continue-from-where-the-head-stopped.md` and
+`docs/decisions/ADR-341-amendment-8-oversized-jobs-keep-a-short-record.md`.
 Amendment 1 was first appended here on 2026-09-22 and was moved there verbatim.
 
 ---

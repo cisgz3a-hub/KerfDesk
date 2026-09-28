@@ -1,5 +1,14 @@
 export const MAX_EXECUTION_ARTIFACT_ESTIMATED_BYTES = 64 * 1024 * 1024;
 
+/** Thrown when a job and its data outgrow the archive budget; a laser recovery
+ * of such a job runs without an archive (ADR-341 Amendment 8). */
+export class ExecutionArtifactTooLargeError extends Error {
+  constructor() {
+    super('Execution artifact exceeds the safe archive size.');
+    this.name = 'ExecutionArtifactTooLargeError';
+  }
+}
+
 const OBJECT_OVERHEAD_BYTES = 16;
 const ENTRY_OVERHEAD_BYTES = 8;
 const PRIMITIVE_BYTES = 24;
@@ -229,12 +238,12 @@ export function measureExecutionArtifactBytesWithinBudget(
     additionalBinaryBytes < 0 ||
     additionalBinaryBytes > MAX_EXECUTION_ARTIFACT_ESTIMATED_BYTES
   ) {
-    throw new Error('Execution artifact exceeds the safe archive size.');
+    throw new ExecutionArtifactTooLargeError();
   }
   const remaining = MAX_EXECUTION_ARTIFACT_ESTIMATED_BYTES - additionalBinaryBytes;
   const bytes = estimateExecutionArtifactBytes(value, remaining, allowTransientFunctions);
   if (bytes > remaining) {
-    throw new Error('Execution artifact exceeds the safe archive size.');
+    throw new ExecutionArtifactTooLargeError();
   }
   return bytes;
 }

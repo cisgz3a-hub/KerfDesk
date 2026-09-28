@@ -112,7 +112,7 @@ function artifactPlacement(artifact: RecoveryArtifactV1, atIso: string): RunPlac
     ...(artifact.jobOrigin === undefined ? {} : { jobOrigin: artifact.jobOrigin }),
     fingerprint: artifact.fingerprint,
     atIso,
-    savedOffsetMm: artifact.kind === 'exact-execution' ? savedWorkOffsetMm(artifact) : null,
+    savedOffsetMm: savedWorkOffsetMm(artifact),
   };
 }
 

@@ -391,7 +391,7 @@ describe('isolated execution recovery ownership', () => {
     expect(repository.getSnapshot().activeRun).toBeNull();
     expect(useToastStore.getState().toasts.at(-1)).toMatchObject({
       variant: 'warning',
-      message: expect.stringContaining('recovery is unavailable'),
+      message: expect.stringContaining('could not keep the full recovery archive'),
     });
   });
 });
