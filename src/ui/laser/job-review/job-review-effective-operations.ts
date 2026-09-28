@@ -11,6 +11,7 @@ import {
   type CompiledReliefFacts,
   type PlungingReliefStage,
 } from './job-review-detail-facts';
+import { tabSpanGroupLabel } from './job-review-laser-tabs';
 
 import { cncCuttingStageLabel } from '../../../core/scene/cnc-stage-recipe';
 import { nominalChiploadMm } from '../../../core/cnc/nominal-chipload';
@@ -194,7 +195,7 @@ function laserGroupSummary(
       }
     | undefined,
 ): string {
-  const kind = group.kind === 'cut' ? 'Line' : group.kind === 'fill' ? 'Fill' : 'Image';
+  const kind = laserGroupKindLabel(group);
   const powerMode =
     group.kind !== 'raster' && group.powerMode !== undefined ? ` · ${group.powerMode} power` : '';
   const speed =
@@ -215,6 +216,15 @@ function laserGroupSummary(
     ` · ${group.passes} ${plural(group.passes, 'pass', 'passes')}` +
     ` · air ${group.airAssist ? 'on' : 'off'}${powerMode}${contourEntry}${overrideFacts}`
   );
+}
+
+function laserGroupKindLabel(group: Exclude<Group, CncGroup>): string {
+  if (group.kind === 'fill') return 'Fill';
+  if (group.kind === 'raster') return 'Image';
+  // ADR-494: the group that burns a Line operation's tab spans.
+  return group.tabSpanPowerPercent === undefined
+    ? 'Line'
+    : tabSpanGroupLabel(group.tabSpanPowerPercent);
 }
 
 function reportsGeometryDerivedDepth(cutType: string): boolean {

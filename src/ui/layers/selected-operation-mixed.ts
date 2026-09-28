@@ -34,6 +34,10 @@ const OPERATION_SETTING_KEYS = [
   'perforationSkipMm',
   'overcutMm',
   'imageOverscanMm',
+  'tabLayout',
+  'tabSpacingMm',
+  'tabMaxPerShape',
+  'tabCutPowerPercent',
 ] as const satisfies ReadonlyArray<keyof LayerOperationSettings>;
 
 export function mixedOperationFields(

@@ -551,7 +551,8 @@ Project
       power, speed, passes, visible, output
       fill settings: hatch angle, spacing, overscan, cross-hatch, offset fill
       image settings: dither, lines/mm, dot-width correction, overscan (default 5 mm, ADR-415)
-      cut settings: kerf, tabs, perforation, overcut, pass-through, air assist
+      cut settings: kerf, tabs (count or spacing, tab power, ADR-494), perforation, overcut,
+      pass-through, air assist
   material libraries and presets
 ```
 
@@ -699,11 +700,12 @@ Reject any of these mid-development without a `PROJECT.md` revision and a `DECIS
   own model/license/runtime/privacy ADR. Externally produced relative-depth maps are accepted input
   under ADR-291/P2R.1 once their provenance and relative-not-metric UI lands; today's ADR-290 path
   imports qualified files only as explicit height maps and makes no AI or metric-depth claim.
-- Manual tabs / bridges, lead-in / lead-out, advanced fill patterns. Several
+- Lead-in / lead-out, advanced fill patterns. Several
   narrow parity features have since shipped and are no longer out of scope:
   Line-mode kerf compensation (`core/geometry/kerf-offset.ts`, per-layer
   `kerfOffsetMm`), automatic Line-mode hard-skip tabs
-  (`core/geometry/tabs-bridges.ts`), simple Cross-Hatch fill (per-layer
+  (`core/geometry/tabs-bridges.ts`; by spacing, with a tab cut power and
+  placed by hand since ADR-494), simple Cross-Hatch fill (per-layer
   `fillCrossHatch`), simple Offset Fill output (`core/job/offset-fill.ts`), and
   CNC profile arc/line lead-in/out (`core/cnc/profile-lead.ts`, ADR-250;
   profile-outside/inside only — laser lead-in/out stays out of scope);

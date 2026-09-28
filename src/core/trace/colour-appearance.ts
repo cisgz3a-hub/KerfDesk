@@ -1,14 +1,18 @@
-// Colour layers trace visible sRGB over white, with alpha=0 remaining void.
-// The decoder already composites RGB and tags it; straight RGBA needs exactly
-// one composite. Normalize before averaging so alpha is never applied twice.
-// Large images read this appearance on demand into a bounded two-row cache,
-// avoiding an additional full-source RGBA allocation before the working cap.
+// Colour layers trace visible sRGB over white. Pixels under a quarter opacity
+// (soft drop shadows, glows, faint halos) stay void, like alpha=0 (ADR-461
+// Amendment 1). The decoder already composites RGB and tags it; straight RGBA
+// needs exactly one composite. Normalize before averaging so alpha is never
+// applied twice. Large images read this appearance on demand into a bounded
+// two-row cache, avoiding an additional full-source RGBA allocation before
+// the working cap.
 
 import { axisContributions, type AxisTap } from '../image-resample/resample-axis';
 import type { RawImageData } from './trace-image';
 
 const CHANNELS = 4;
 const MAX_BYTE = 255;
+/** Lowest alpha a colour layer traces; below it a pixel is void. */
+export const VISIBLE_ALPHA_MIN = 64;
 
 /** Native-resolution appearance; opaque/void-only inputs need no new buffer. */
 export function colourAppearance(source: RawImageData): RawImageData {
@@ -17,6 +21,10 @@ export function colourAppearance(source: RawImageData): RawImageData {
     const alpha = source.data[offset + 3] as number;
     if (alpha === 0 || alpha === MAX_BYTE) continue;
     data ??= source.data.slice();
+    if (alpha < VISIBLE_ALPHA_MIN) {
+      data[offset + 3] = 0;
+      continue;
+    }
     for (let channel = 0; channel < 3; channel += 1) {
       data[offset + channel] = visibleChannel(source, offset, channel, alpha);
     }
@@ -92,15 +100,16 @@ function horizontalRow(
     for (const tap of taps) {
       const src = (y * source.width + tap.index) * CHANNELS;
       const alpha = source.data[src + 3] as number;
+      const visible = alpha >= VISIBLE_ALPHA_MIN;
       // Coverage is binary here: partial alpha has already contributed to the
       // visible RGB. Weighting it again would disagree with flattened artwork.
       // A void source pixel contributes white to a mixed cell's appearance,
       // never its hidden RGB; a wholly void output cell remains transparent.
       for (let channel = 0; channel < 3; channel += 1) {
-        const value = alpha === 0 ? MAX_BYTE : visibleChannel(source, src, channel, alpha);
+        const value = visible ? visibleChannel(source, src, channel, alpha) : MAX_BYTE;
         row[out + channel] = (row[out + channel] as number) + value * tap.weight;
       }
-      if (alpha > 0) row[out + 3] = (row[out + 3] as number) + tap.weight;
+      if (visible) row[out + 3] = (row[out + 3] as number) + tap.weight;
     }
   });
 }

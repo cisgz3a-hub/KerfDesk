@@ -188,6 +188,16 @@ function splitImportedSvg(
               )
               .map((anchor) => ({ ...anchor, pathIndex: 0, polylineIndex: 0 })),
           }),
+      ...(object.laserTabAnchors === undefined
+        ? {}
+        : {
+            laserTabAnchors: object.laserTabAnchors
+              .filter(
+                (anchor) =>
+                  anchor.pathIndex === pathIndex && anchor.polylineIndex === polylineIndex,
+              )
+              .map((anchor) => ({ ...anchor, pathIndex: 0, polylineIndex: 0 })),
+          }),
     });
   }
   return parts;

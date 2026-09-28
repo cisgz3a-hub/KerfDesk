@@ -52,7 +52,8 @@ drawing (1254 x 1254 px) the mode took 14 to 19 s and emitted 80,860 subpaths.
    - **Alpha appearance (2026-09-27 correction).** Colour layers compare visible sRGB over white.
      Straight RGBA is composited once; decoder-tagged `rgbCompositedOnWhite` pixels already contain
      that appearance and are not composited again. Every nonzero-alpha pixel participates, so the
-     former alpha-128 cutoff cannot discard a visible grey shape. Alpha-zero pixels remain void
+     former alpha-128 cutoff cannot discard a visible grey shape (Amendment 1 lowers the cutoff to
+     a quarter opacity rather than removing it). Alpha-zero pixels remain void
      regardless of hidden RGB. Palette selection and sub-pixel boundary placement read the same
      normalized appearance. Working-grid downsampling averages these visible bytes, with a bounded
      two-row cache rather than a second full-source image; entirely transparent cells stay void.
@@ -62,7 +63,7 @@ drawing (1254 x 1254 px) the mode took 14 to 19 s and emitted 80,860 subpaths.
    shares most edge with. Specks go smallest first and a merged region is re-measured as a whole
    (union-find), so two touching specks are judged together and neither is left behind as an
    orphaned speck. The 2026-09-27 correction counts a coherent diagonal as one component, without
-   changing corner-touching boundary topology. At Remove specks zero (or a scaled working-grid
+   changing corner-touching boundary topology; Amendment 1 keeps dither out of that rule. At Remove specks zero (or a scaled working-grid
    area at most one), all three label-reassignment passes are disabled: a deliberate dot, counter,
    or requested intermediate-colour seam is retained. Palette selection still applies, and shared
    edge extraction and sub-pixel finishing still run. Transparent pixels are never traced.
@@ -187,3 +188,48 @@ drawing (1254 x 1254 px) the mode took 14 to 19 s and emitted 80,860 subpaths.
 
 Not part of this decision: removing imagetracerjs's multi-colour mode; keeping shared seams through
 CNC fairing; per-colour operation names; importing a palette from the operator's materials.
+
+### Amendment 1 - dither cleans up again and near-invisible pixels stay void (2026-09-27)
+
+The 2026-09-27 corrections shipped two regressions, found by an audit with synthetic images:
+
+- **Dither became one outline per pixel.** Clean-up moved from 4- to 8-connected regions so that
+  1-px diagonal hairlines survive. A checkerboard, or an ordered or error-diffused dither, is then
+  one 8-connected region per colour, so neither the mode filter nor speck removal touched it, while
+  shared edges are still extracted 4-connected. Two 60 x 60 checkerboard patches beside a black bar
+  traced as 1,801 polygons (9,129 points) instead of 1; a Bayer-dithered gradient as 1,082 instead
+  of 1; a Floyd-Steinberg gradient as 758 instead of 3. Each is a slow, blotchy laser job.
+- **Faint shadows became layers.** With every nonzero-alpha pixel counted, a logo with a soft
+  black drop shadow (alpha 60 or less) traced four layers instead of two, adding #f2f2f2 and
+  #d5d5d5. Both are dark enough to be created with output on, so the shadow burns.
+
+Decision:
+
+1. **Linked diagonals** (`colour-label-cleanup.ts`, `linkedNeighbour8`). Edge neighbours always
+   link. A same-label diagonal neighbour links when a same-label edge pixel already joins the two,
+   or when the contact is corner-only and neither pixel is dither. A pixel is dither when it has
+   corner-only same-label contacts along both diagonals (NW or SE, and NE or SW). A 1-px diagonal
+   hairline has them along one diagonal only, also where it crosses or meets a straight line, so it
+   stays one region and survives as the 2026-09-27 correction intended. The mode filter, speck
+   removal and component flood fill all use this relation, so a dithered area becomes solid again
+   (the 60 x 60 checkerboards and the Bayer gradient trace as 1 polygon, the Floyd-Steinberg
+   gradient as 10).
+2. **Quarter-opacity cutoff** (`colour-appearance.ts`, `VISIBLE_ALPHA_MIN = 64`). A pixel under a
+   quarter opacity is void, like alpha zero, at native size and when the working grid is
+   downsampled (a void pixel adds nothing to a cell's coverage). From a quarter opacity up the
+   composited appearance is used as before. Black at a quarter opacity over white is #bfbfbf, a
+   visible light grey, so the grey shapes the removed alpha-128 cutoff lost are still traced, while
+   the drop shadow above traces two layers again. Straight and decoder-tagged RGBA agree.
+
+Limits: a soft shadow whose core is above a quarter opacity still traces as a light layer; delete
+that layer or turn its output off. Dither coarser than one pixel (2 x 2 clusters, halftone dots
+larger than Remove specks) is real artwork to the tracer and still traces as dots, as it did before
+the 2026-09-27 corrections.
+
+Regressions: `colour-label-cleanup.test.ts` (checkerboard and Bayer 6/16 and 7/16 patches clean up
+to one label; a diagonal hairline crossing a straight one keeps all its pixels),
+`colour-layer-detail.test.ts` (a checkerboard and a Bayer gradient beside a bar trace to at most 3
+outlines; they traced 4,001 and 908 before this amendment; the hairline cases above still pass),
+`colour-layer-alpha.test.ts` (alpha 1 and 63 stay untraced, straight or tagged; 64 to 255 agree)
+and `colour-appearance.test.ts` (the cutoff at native size and when resampled). These are
+software tracing checks, not a material cut.
