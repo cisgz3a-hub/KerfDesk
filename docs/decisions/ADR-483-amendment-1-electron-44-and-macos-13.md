@@ -32,6 +32,10 @@ including the file grant check that arrives with no window, are unchanged.
   macOS refuses to open the app on 12 with a clear message instead of a crash. The download page,
   `PROJECT.md` and `WORKFLOW.md` say macOS 13 or newer, and the Monterey-only Gatekeeper wording
   (System Preferences) is gone.
+- The Preview package check (`scripts/verify-macos-preview-package.sh`) requires
+  `LSMinimumSystemVersion` 13.0 in both DMGs, and the Preview workflow gate test fails if that
+  value and the config's floor ever differ. Without this the next Mac Preview tag would have
+  failed its own package check.
 - Windows 10 and 11 and 64-bit Linux are unchanged.
 
 ### Consequences

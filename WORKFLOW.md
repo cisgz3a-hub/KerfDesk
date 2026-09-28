@@ -7503,7 +7503,7 @@ cache, rollback, and installed upgrade tests remain release qualification work.
 - [ ] **Mac permission metadata:** both DMGs contain accurate
       `NSCameraUsageDescription` and `NSLocalNetworkUsageDescription` strings,
       `CFBundleIdentifier=com.kerfdesk.app`, and
-      `LSMinimumSystemVersion=12.0`; first-use prompts match USB camera and
+      `LSMinimumSystemVersion=13.0`; first-use prompts match USB camera and
       private-network JPEG discovery/capture workflows. The bundle identifier
       names the app but is not represented as durable TCC identity for unsigned
       builds.
