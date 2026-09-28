@@ -7649,6 +7649,39 @@ desktop artifact stays **CLAIMED** under `PROJECT.md` Desktop Preview acceptance
   `Could not open <name>: it is not a KerfDesk or LightBurn project file.`
 - Unreadable: `Could not open <name>: KerfDesk could not read it.`
 
+### F-DESK5. Regular desktop Previews and the changelog (ADR-521)
+
+1. Every pull request runs the **Desktop package check** on Linux, Windows and macOS (Apple
+   silicon and Intel). Windows builds the Preview installer as the release lane does, runs its
+   package contract, installs it, launches the installed app (SVG import and project save),
+   uninstalls it and checks nothing is left. macOS builds the Preview DMG, runs its package
+   contract and launches the app from inside the DMG. Both check that a modified `app.asar`
+   stops the app. A red desktop job means the next Preview would fail or ship broken.
+2. When `main` has user-facing changes the newest Preview lacks and that Preview is at least a
+   week old, the daily **Desktop Preview cadence** workflow keeps one issue open:
+   `Desktop Preview due: v<next>`. It names the newest `main` commit that CI, Browser smoke and
+   the Desktop package check all passed on, the tag commands and the drafted notes.
+3. Optional, before tagging: stamp the changelog so the release carries the hand-written
+   highlights under its own version, then tag the stamp's merge commit once its checks pass.
+
+   ```sh
+   node scripts/desktop-release-notes.mjs stamp 0.2.0-preview.14
+   ```
+
+4. The maintainer tags that commit exactly as the issue shows (F-DESK3):
+   `git tag -a v0.2.0-preview.14 -m "KerfDesk v0.2.0 Preview 14" <commit>`, then
+   `git push origin v0.2.0-preview.14`. The workflow never tags; the `v*` tag ruleset keeps that
+   with the maintainer.
+5. The Preview release lane publishes the downloads. Its notes are the version's `CHANGELOG.md`
+   section, or, without a stamp, the Unreleased highlights plus every pull request since the
+   previous Preview. The issue closes on the next daily run.
+
+#### Keeping the changelog
+- `node scripts/desktop-release-notes.mjs draft` prints the notes since the last Preview.
+- `node scripts/desktop-release-notes.mjs refresh` rewrites the generated list under Unreleased.
+- Highlights under Unreleased are written by hand and are optional; nothing blocks a pull
+  request without one.
+
 ### F-CNC-PROBE. Owned and settlement-qualified probe cycle
 
 1. Before an XYZ request reaches the controller, the operator enters the

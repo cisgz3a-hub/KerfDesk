@@ -58,7 +58,7 @@ export function cadenceIssue({ lastTag, days, nextTag, commit, userFacingChanges
     '',
     '```sh',
     'git fetch origin main --tags',
-    `git tag -a ${nextTag} -m "KerfDesk ${base} Preview ${number}" ${commit}`,
+    `git tag -a ${nextTag} -m "KerfDesk v${base} Preview ${number}" ${commit}`,
     `git push origin ${nextTag}`,
     '```',
     '',

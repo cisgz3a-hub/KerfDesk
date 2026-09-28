@@ -47,7 +47,9 @@ test('the issue gives the exact annotated tag for the green commit and the notes
   });
   assert.match(body, /v0\.2\.0-preview\.13, is 66 days old/);
   assert.match(body, /492 user-facing changes/);
-  assert.ok(body.includes(`git tag -a v0.2.0-preview.14 -m "KerfDesk 0.2.0 Preview 14" ${commit}`));
+  assert.ok(
+    body.includes(`git tag -a v0.2.0-preview.14 -m "KerfDesk v0.2.0 Preview 14" ${commit}`),
+  );
   assert.ok(body.includes('git push origin v0.2.0-preview.14'));
   assert.ok(body.includes('stamp 0.2.0-preview.14'));
   assert.ok(body.includes('- **Laser:** Fans stay on'));
