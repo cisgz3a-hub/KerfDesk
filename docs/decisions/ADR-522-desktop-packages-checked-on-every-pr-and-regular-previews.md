@@ -84,11 +84,17 @@ evidence, and the reminder is an issue.
 
 ### Consequences
 
-- Every pull request now waits for four desktop jobs. Public-repository runners are free, but
-  macOS runners have a small concurrency limit, so desktop results can arrive later than CI's
-  when many branches push at once. Superseded pull request runs are cancelled.
+- Every pull request now waits for four desktop jobs. On their first green run they took
+  2.7 minutes (Linux), 5.8 (macOS Apple silicon), 7.6 (Windows) and 8.6 (macOS Intel), all in
+  parallel with CI's 45 to 75 minutes, and GitHub billed 0 minutes for them: runners are free
+  for this public repository. macOS runners have a small per-account concurrency limit, so
+  desktop results can queue when many branches push at once. Superseded pull request runs are
+  cancelled.
 - A change that breaks the Windows or macOS Preview package fails on its own pull request, not
-  on the next tag.
+  on the next tag. The first run proved it: the Preview package contract had failed on every
+  commit since 24 Sep 2026, because the Smoothieware firmware banner (`Build version:`, #868)
+  put the Build badge's marker into four more renderer chunks. The contract now finds the badge
+  by its class name, `lf-menu-build`.
 - The weekly Windows native smoke (`packaged-native-smoke.yml`) stays: it feeds the release
   readiness evidence lane, which the per-PR check does not.
 - Cutting a Preview is two commands from the issue. Releases still depend on the maintainer
@@ -122,5 +128,12 @@ evidence, and the reminder is an issue.
 - The tamper check ran against a Linux package of Electron 44: it changed and restored the
   archive (same SHA-256 afterwards) and correctly reported that Linux ran the modified archive.
 - The PowerShell changes parse under PowerShell 7.5, and the new receipt fields were exercised.
-- Not verified here: the Windows and macOS jobs themselves, including whether each refuses a
-  modified `app.asar`, until they run on this pull request.
+- The pull request's own run (Desktop package check run 36379625608) passed all four jobs.
+  Windows installed the Preview per-user, passed the registration, shortcut, installed-file,
+  metadata and `.lf2` checks, launched the installed app (SVG import and project save),
+  uninstalled it cleanly, and refused a modified `app.asar` ("Integrity check failed for asar
+  archive"). Both macOS jobs passed the package contract, launched the app from the mounted DMG
+  and refused a modified `app.asar` the same way.
+- electron-builder 26.16.1 writes the `.lf2` open command with the executable path unquoted
+  (`<exe> "%1"`); Windows resolves it, and the installer check accepts that form or the quoted
+  one, as long as it names the installed executable.
