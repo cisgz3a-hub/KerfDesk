@@ -162,8 +162,10 @@ the Measure tool, takes midpoints on the true curve and keeps the drawn grid on 
 - No G-code, schema or project-format change, and no output snapshot changes.
 - Snapping reaches farther or nearer than before depending on zoom, since 2 mm became 8 pixels,
   and the canvas grid follows the grid spacing.
-- Not tried in a browser by hand: the hover highlight, handle dragging, snapping markers and the
-  settings popover are covered by unit and component tests only.
+- `e2e/design-tools-batch-8.e2e.ts` runs Cut Shapes, Trim Shapes, Warp, Copy Along Path and the
+  snap settings in Chromium through the real menus and canvas. Screenshots of the Trim highlight,
+  a Deform drag, a node snap marker and the settings popover were checked by eye once; nothing
+  here has been tried on real artwork or a machine.
 
 ### Verification
 
