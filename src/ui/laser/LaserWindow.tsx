@@ -25,6 +25,7 @@ import { StatusDisplay } from './StatusDisplay';
 import { JogPad } from './JogPad';
 import { MoveToPositionSection } from './MoveToPositionSection';
 import { JobControls } from './JobControls';
+import { MachineHoursSection } from './MachineHoursSection';
 import { ProbePanel } from './ProbePanel';
 import { runStartJobFlow } from './start-job-flow';
 import { jobAwareConfirm } from '../state/job-aware-dialogs';
@@ -115,6 +116,7 @@ export function LaserWindow({
         onConfigureHoming={openHomingSetup}
         onStartJob={() => void runStartJobFlow()}
       />
+      <MachineHoursSection />
       <MachineConsoleSection />
     </aside>
   );

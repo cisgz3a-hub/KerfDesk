@@ -1936,6 +1936,21 @@ response, spindle-at-speed behavior, and real material/machine pacing remain har
 limits rather than software proof. This display model changes no emitted output, Start
 authorization, Frame proof, controller command, or safety boundary.
 
+### F-B11a. Machine hours and maintenance reminders (ADR-502)
+
+1. Each started job adds the time it spent running to the machine it started on: wall-clock time
+   from Start to its end, without pauses and tool changes. A stopped job counts the time it ran.
+   Frames, jogs, console moves and Preview are not jobs and add nothing.
+2. The machine rail's **Machine hours** section shows the machine's hours and jobs, and its
+   reminders: laser machines start with lens (20 h), air assist and fans (50 h), and belts, wheels
+   and rails (100 h); CNC machines with collet and bit (20 h), rails and lead screws (50 h), and
+   spindle mount and belts (100 h). Each shows when it is due. Intervals can be changed, reminders
+   added and removed, and **Done** counts the interval again from the machine's current hours.
+3. When a job's time makes a reminder due, a warning toast names the machine and the task. The
+   section heading shows how many are due. Nothing is blocked and nothing waits.
+4. Hours are kept in browser storage per machine setup (profile, bed and controller; laser and
+   CNC apart), not in projects. A machine left on the generic starter profile shares one record.
+
 ### F-B12. Disconnect during job (cable yank)
 
 #### Error — physical transport lost

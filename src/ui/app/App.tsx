@@ -30,6 +30,7 @@ import { useCncLibraryPersistence } from './use-cnc-library-persistence';
 import { useGlobalErrorHandlers } from './use-global-error-handlers';
 import { useJobCheckpoint } from './use-job-checkpoint';
 import { useLayerDefaultsPersistence } from './use-layer-defaults-persistence';
+import { useMachineHoursTracking } from './use-machine-hours-tracking';
 import { useMaterialLibraryPersistence } from './use-material-library-persistence';
 import { usePolylineFairingUpgrade } from './use-polyline-fairing-upgrade';
 import { useShortcuts } from './use-shortcuts';
@@ -117,6 +118,7 @@ function AppLifecycle(): null {
   useActiveJobWakeLock();
   useAutoConnectController();
   useJobCheckpoint();
+  useMachineHoursTracking();
   useUnloadStop();
   useUnsavedChangesGuard();
   useWindowTitle();
