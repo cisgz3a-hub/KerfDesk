@@ -109,9 +109,13 @@ const __dirname = path.dirname(__filename);
 
 // A build that sells licences never loads its renderer under remote debugging
 // (ADR-544). This runs before any window, route or single-instance handoff.
+// Nor does it open DevTools or a development renderer, whatever `app.isPackaged`
+// says: on Windows that only means the executable is not named electron.exe, and
+// a per-user install folder is writable (ADR-544 Amendment 1).
+const SELLS_LICENCES = readLicensingConfig(app.getAppPath()).channel !== 'free';
+const LOCKED_DOWN = app.isPackaged || SELLS_LICENCES;
 const REFUSED_DEBUG_SWITCH = refusedDebugSwitch({
-  packaged: app.isPackaged,
-  sellsLicences: readLicensingConfig(app.getAppPath()).channel !== 'free',
+  sellsLicences: SELLS_LICENCES,
   argv: process.argv,
   hasSwitch: (name) => app.commandLine.hasSwitch(name),
 });
@@ -171,7 +175,7 @@ const { autoUpdater } = electronUpdater;
 
 const RENDERER_RUNTIME = resolveRendererRuntime({
   devUrl: process.env['LASERFORGE_DEV_URL'],
-  isPackaged: app.isPackaged,
+  isPackaged: LOCKED_DOWN,
 });
 const TRUSTED_RENDERER_ORIGINS = RENDERER_RUNTIME.trustedOrigins;
 const IS_DEV_SERVER_RENDERER = RENDERER_RUNTIME.rendererUrl !== PACKAGED_RENDERER_URL;
@@ -268,7 +272,7 @@ function createMainWindow(bounds: ReturnType<typeof loadWindowPlacement>['bounds
     autoHideMenuBar: true,
     backgroundColor: '#fafafa',
     title: DESKTOP_PRODUCT_NAME,
-    webPreferences: mainWindowWebPreferences(shouldEnableDesktopDevTools(app.isPackaged)),
+    webPreferences: mainWindowWebPreferences(shouldEnableDesktopDevTools(LOCKED_DOWN)),
   });
 }
 
@@ -372,7 +376,7 @@ async function loadRenderer(window: BrowserWindow): Promise<void> {
 }
 
 function installDevTools(window: BrowserWindow): void {
-  if (app.isPackaged) return;
+  if (LOCKED_DOWN) return;
   window.webContents.on('console-message', ({ level, message, lineNumber, sourceId }) => {
     console.log(`[renderer ${level}] ${sourceId}:${lineNumber}  ${message}`);
   });
@@ -489,8 +493,8 @@ async function createWindow(): Promise<void> {
   await loadRenderer(window);
 
   // Surface renderer console output to the main process stdout so dev runs
-  // can see errors without having to open DevTools manually. Removed in the
-  // packaged build via the app.isPackaged guard.
+  // can see errors without having to open DevTools manually. Skipped in
+  // packaged and licence-selling builds (LOCKED_DOWN).
   installDevTools(window);
 }
 

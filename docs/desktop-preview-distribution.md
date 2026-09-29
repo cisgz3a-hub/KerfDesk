@@ -78,7 +78,7 @@ The release workflow uses these values only in its final publication step:
 | `DESKTOP_PREVIEW_MANIFEST_PRIVATE_KEY` | Secret | Ed25519 PKCS#8 PEM signing key; never commit or bundle it |
 | `DESKTOP_PREVIEW_MANIFEST_KEY_ID` | Variable | Matching checked-in Preview key ID |
 | `PREVIEW_CLOUDFLARE_ACCOUNT_ID` | Variable | Verified account owning the download bucket |
-| `PREVIEW_R2_API_TOKEN` | Secret | Bucket-scoped object read/write access and bucket read access |
+| `PREVIEW_R2_API_TOKEN` | Secret | Token value (not the S3 key pair) of an R2 API token with Admin Read & Write; the REST API reads the bucket and does not accept Object Read & Write tokens |
 
 Before the first release, configure the bucket's production custom domain and
 GET/HEAD CORS for `https://kerfdesk.com` (and any explicitly supported alternate

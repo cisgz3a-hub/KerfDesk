@@ -88,7 +88,9 @@ support once it is switched on:
    - `GET /v1/public/health` makes one Durable Object round trip with one
      database read. It answers 200 `{ok:true}`, or 503 `{ok:false}`. Like the
      public configuration, it skips the rate limit and answers while licensing is
-     switched off. It is not cached, so each call is one Durable Object request.
+     switched off. Each Worker isolate reuses its last answer for ten seconds, so a
+     client polling it in a loop cannot queue ahead of licence calls in the one
+     Durable Object (added after the pre-merge re-audit, before any deploy).
 5. **Administration is audited, and its token can rotate.**
    - Every admin change writes `audit:<time>:<sequence>` in its own transaction:
      the route, the target, the outcome, which token was used and the time. The
@@ -127,7 +129,10 @@ support once it is switched on:
   that, check that rate-limit namespace IDs `1002` and `1003` are unused in the
   account. The `LicenseAuthority` class, its `v1` migration and
   `REQUEST_RATE_LIMITER` with `1001` are unchanged, so the redeploy needs no
-  migration. `LICENSING_ENABLED` and `PAYMENTS_ENABLED` stay `"false"`.
+  migration. `LICENSING_ENABLED` and `PAYMENTS_ENABLED` stay `"false"`. The first
+  deploy set `SIGNING_KEY_ID` only in the dashboard, which a deploy from the file
+  deletes, so `wrangler.jsonc` now carries it (`entitlement-2026-09`) and
+  `deploy-config.test.mjs` checks it against the key the desktop app pins.
 - The desktop app needs messages for `payment_rejected` (409) and
   `checkout_failed` (502). After `checkout_failed` or `invalid_provider_response`,
   a retry with the same checkout request ID creates a new order and a new Paddle

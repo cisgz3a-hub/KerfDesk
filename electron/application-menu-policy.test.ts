@@ -44,9 +44,10 @@ describe('Electron application menu ownership', () => {
     );
   });
 
+  // LOCKED_DOWN is app.isPackaged or a build that sells licences (ADR-544 Amendment 1).
   it('uses an explicit packaged DevTools policy when creating the main window', () => {
     expect(mainProcessSource()).toContain(
-      'webPreferences: mainWindowWebPreferences(shouldEnableDesktopDevTools(app.isPackaged))',
+      'webPreferences: mainWindowWebPreferences(shouldEnableDesktopDevTools(LOCKED_DOWN))',
     );
   });
 });

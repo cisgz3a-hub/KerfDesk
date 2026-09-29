@@ -2,7 +2,9 @@
 // The window tells the main process whether a job runs, and how far a streamed
 // job is for the taskbar button (ADR-553). Main asks Windows to wait and tells
 // the window, which says so in a notice; when Windows ends the session anyway,
-// the window sends the same Abort as closing KerfDesk.
+// the window tries to send the same Abort as closing KerfDesk. Windows can end
+// KerfDesk before that Abort reaches the machine, so the notice never promises it
+// (ADR-548 Amendment 1).
 
 import { create } from 'zustand';
 import type { StreamerState } from '../../core/controllers/grbl';
@@ -23,10 +25,13 @@ export const SESSION_END_EVENT = 'kerfdesk:session-end';
 export const SESSION_END_MESSAGES: Readonly<Record<SessionEndPhase, string>> = {
   asked:
     'Windows wants to restart, shut down or sign out while a job runs, and KerfDesk asked it to wait. ' +
-    'Let the job finish or Abort it before you restart. If Windows restarts anyway, KerfDesk sends Abort first.',
+    'Let the job finish or Abort it before you restart. If Windows restarts anyway, it can close KerfDesk ' +
+    'before an Abort reaches the machine, and a spindle or constant-power laser can stay on until the ' +
+    'controller is reset.',
   ending:
-    'Windows is ending this session during the job, so KerfDesk sent Abort. A sent Abort does not confirm ' +
-    'the machine stopped: use the physical E-stop or power cutoff if it may still be running.',
+    'Windows is ending this session during the job. KerfDesk is sending Abort, but Windows can close ' +
+    'KerfDesk before it reaches the machine: use the physical E-stop or power cutoff if the machine may ' +
+    'still be running.',
 };
 
 type SessionEndState = {

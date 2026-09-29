@@ -121,6 +121,15 @@ describe('the window side of a Windows session end (ADR-548)', () => {
     expect(stop).toHaveBeenCalledExactlyOnceWith('app-closing');
   });
 
+  // Windows can end KerfDesk before the window's Abort leaves (ADR-548 Amendment 1).
+  it('never promises that the Abort reached the machine', () => {
+    expect(SESSION_END_MESSAGES.asked).toContain('before an Abort reaches the machine');
+    expect(SESSION_END_MESSAGES.ending).toContain('Windows can close KerfDesk before it reaches');
+    expect(SESSION_END_MESSAGES.ending).toContain('physical E-stop');
+    for (const message of Object.values(SESSION_END_MESSAGES))
+      expect(message).not.toMatch(/sends Abort first|sent Abort/);
+  });
+
   it('ignores a malformed event', () => {
     dispose = installDesktopSessionEnd(window, async () => undefined);
     window.dispatchEvent(new CustomEvent('kerfdesk:session-end', { detail: { phase: 'later' } }));

@@ -115,6 +115,43 @@ test('health checks the Durable Object without the rate limit, even while licens
   }
 });
 
+test('health reuses its answer for ten seconds, so polling cannot queue ahead of licence calls', async (t) => {
+  captureLogs(t);
+  t.mock.timers.enable({ apis: ['Date'], now: 1_000_000 });
+  let pings = 0;
+  let up = true;
+  const binding = {
+    idFromName: () => 'id',
+    get: () => ({
+      fetch: async () => {
+        pings += 1;
+        return up ? json({ ok: true }) : json({}, 503);
+      },
+    }),
+  };
+  const env = { ...limiters([]), LICENSE_AUTHORITY: binding };
+  const health = () => worker.fetch(new Request('https://licensing.example/v1/public/health'), env);
+  for (let call = 0; call < 5; call += 1) assert.equal((await health()).status, 200);
+  assert.equal(pings, 1);
+  up = false;
+  t.mock.timers.tick(9_999);
+  assert.equal((await health()).status, 200);
+  assert.equal(pings, 1);
+  t.mock.timers.tick(1);
+  const down = await health();
+  assert.deepEqual([down.status, await down.json()], [503, { ok: false }]);
+  assert.equal(pings, 2);
+  // A failure is remembered as briefly, and another binding asks for itself.
+  assert.equal((await health()).status, 503);
+  const other = { ...env, LICENSE_AUTHORITY: { ...binding } };
+  up = true;
+  assert.equal(
+    (await worker.fetch(new Request('https://licensing.example/v1/public/health'), other)).status,
+    200,
+  );
+  assert.equal(pings, 3);
+});
+
 test('one log line per request with route, status, code and time, and never a secret', async (t) => {
   const lines = captureLogs(t);
   const f = await fixture();
