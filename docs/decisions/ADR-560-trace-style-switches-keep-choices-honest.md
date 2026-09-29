@@ -27,7 +27,7 @@ and wording fixes. Re-measured on main `e5f0a266b` with ADR-559's port applied:
 - Smooth's description ("Clean curves and quieter outlines for rough or noisy artwork. Very fine
   gaps may close.") named no real difference from Line Art: both use Smoothness 1. Smooth differs
   by cutting at a threshold it sets from the image (Otsu) and by a median that repairs isolated
-  noise pixels only when more than 0.4% of the image is such noise, leaving connected ink alone
+  noise pixels only when at least 0.4% of the image is such noise, leaving connected ink alone
   (`autoMedianFilter`).
 
 ### Decision
