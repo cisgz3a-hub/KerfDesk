@@ -22,7 +22,7 @@ import { bridgeNearbyEndsSteps, pairThroughJunctionsSteps, type Chain } from './
 import { LOOP_TOUCH_GAP_PX, type LoopClosureOptions } from './loop-closure';
 import { radiusAtPosition } from './polyline-window';
 import { repairJunctionSeams, weldBranchEndsSteps } from './seam-repair';
-import { sharpenChainBendsSteps } from './sharpen-bends';
+import { sharpenChainBendsSteps, type SharpenOptions } from './sharpen-bends';
 import { arcLength } from './spur-pruning';
 import type { StrokeGraph } from './stroke-graph';
 import { strokeOutput, type StrokeCurvePolicy } from './stroke-output';
@@ -50,7 +50,15 @@ export type ChainAssemblyOptions = {
   /** Output curve policy (ADR-405): corner angle and fit tolerance. Omitted
    *  fields keep the neutral defaults (Smoothness 1, Optimize 0.2). */
   readonly curve?: StrokeCurvePolicy;
+  /** Place strokes on the pen's path (ADR-558, the Centerline lane): a bend
+   *  drawn round keeps its curve, each corner is rebuilt once, and the tip
+   *  walk reads the ridge between pixel centres. Default off (Line + fill). */
+  readonly penPath?: boolean;
 };
+
+// A bend the pen drew round keeps its curve, and a rebuilt corner is not
+// built a second time from one of its own legs.
+const PEN_PATH_SHARPENING: SharpenOptions = { keepRoundedBends: true, oneCornerPerBend: true };
 
 const SMOOTHING_PASSES = 2;
 const SIMPLIFY_EPSILON_PX = 0.45;
@@ -81,9 +89,11 @@ export function* assembleStrokePathsSteps(
   const alignedFactor = Math.max(1, options.alignedJoinFactor ?? 1);
   const closure = closureOptionsFor(options.joinGapPx, alignedFactor);
   const junctions = graph.nodes.filter((n) => n.kind === 'junction').map((n) => n.pos);
+  const penPath = options.penPath === true;
   yield* joinChainsSteps(chains, graph, junctions, distSq, mask, closure, {
     joinGapPx: options.joinGapPx,
     alignedFactor,
+    penPath,
   });
   // Junction centroids dent every through-path (the medial axis genuinely
   // bends toward a T branch): rebuild those seams on ALL chains, then snap
@@ -107,14 +117,11 @@ export function* assembleStrokePathsSteps(
     if (chain.alive && !chain.closed) applyChainLoopClosure(chain, closure, attachments.get(chain));
   }
   const simplifyEpsilonPx = SIMPLIFY_EPSILON_PX * Math.max(0.1, options.simplifyTolerance ?? 1);
-  return yield* finalizeChainsSteps(
-    chains,
-    distSq,
-    mask,
+  return yield* finalizeChainsSteps(chains, distSq, mask, attachments, {
     simplifyEpsilonPx,
-    attachments,
-    options.curve ?? {},
-  );
+    curvePolicy: options.curve ?? {},
+    sharpening: penPath ? PEN_PATH_SHARPENING : undefined,
+  });
 }
 
 // Pair through junctions, extend tips, then bridge gaps and close rings.
@@ -131,13 +138,17 @@ function* joinChainsSteps(
   distSq: Float64Array,
   mask: InkMask,
   closure: LoopClosureOptions,
-  join: { readonly joinGapPx: number; readonly alignedFactor: number },
+  join: {
+    readonly joinGapPx: number;
+    readonly alignedFactor: number;
+    readonly penPath: boolean;
+  },
 ): TraceSteps<void> {
   const cooperate = yield;
   yield* pairThroughJunctionsSteps(chains, graph);
   for (const chain of chains) {
     if (cooperate) yield;
-    closeOrExtend(chain, junctions, distSq, mask, closure);
+    closeOrExtend(chain, junctions, distSq, mask, closure, join.penPath);
   }
   yield* bridgeNearbyEndsSteps(chains, join.joinGapPx, join.alignedFactor, BRIDGE_PIECE_GAP_RATIO);
   // A bridge can join a stroke to itself through another piece; close any
@@ -188,6 +199,7 @@ function closeOrExtend(
   distSq: Float64Array,
   mask: InkMask,
   closure: LoopClosureOptions,
+  penPath: boolean,
 ): void {
   if (!chain.alive || chain.closed) return;
   // Close cycles FIRST — a ring's two ends meet at a junction, and extending
@@ -196,21 +208,27 @@ function closeOrExtend(
   applyChainLoopClosure(chain, closure);
   if (chain.closed) return;
   if (isTrueTip(chain, 'start', junctions, distSq, mask.width)) {
-    extendTip(chain, 'start', distSq, mask);
+    extendTip(chain, 'start', distSq, mask, penPath);
   }
   if (isTrueTip(chain, 'end', junctions, distSq, mask.width)) {
-    extendTip(chain, 'end', distSq, mask);
+    extendTip(chain, 'end', distSq, mask, penPath);
   }
 }
+
+type ChainFinish = {
+  readonly simplifyEpsilonPx: number;
+  readonly curvePolicy: StrokeCurvePolicy;
+  readonly sharpening: SharpenOptions | undefined;
+};
 
 function* finalizeChainsSteps(
   chains: ReadonlyArray<Chain>,
   distSq: Float64Array,
   mask: InkMask,
-  simplifyEpsilonPx: number,
   attachments: ReadonlyMap<Chain, ReadonlySet<Vec2>>,
-  curvePolicy: StrokeCurvePolicy,
+  finish: ChainFinish,
 ): TraceSteps<Polyline[]> {
+  const { simplifyEpsilonPx, curvePolicy } = finish;
   const cooperate = yield;
   const result: Polyline[] = [];
   for (const chain of chains) {
@@ -219,8 +237,7 @@ function* finalizeChainsSteps(
     if (chain.closed && isJunctionArtifactLoop(chain, distSq, mask.width)) continue;
     // Thinning chamfers drawn corners and round nibs round them; rebuild the
     // vertices before simplification eats the dense points the tangent
-    // estimates need. A bend the pen drew round keeps its curve, and a
-    // rebuilt corner is not built a second time from one of its own legs.
+    // estimates need.
     const attached = attachments.get(chain);
     const sharpened = yield* sharpenChainBendsSteps(
       chain.points,
@@ -229,7 +246,7 @@ function* finalizeChainsSteps(
       mask.width,
       attached,
       undefined,
-      { keepRoundedBends: true, oneCornerPerBend: true },
+      finish.sharpening,
     );
     const pinned =
       attached === undefined ? sharpened.corners : new Set([...sharpened.corners, ...attached]);

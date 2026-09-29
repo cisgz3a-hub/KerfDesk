@@ -40,6 +40,7 @@ export function extendTip(
   which: 'start' | 'end',
   distSq: Float64Array,
   mask: InkMask,
+  ridgeBetweenPixels = false,
 ): void {
   const pts = chain.points;
   if (pts.length < 2) return;
@@ -51,7 +52,13 @@ export function extendTip(
   if (dir0 === null) return;
   const radius = radiusAtPosition(tip, distSq, mask.width);
   if (radius <= TIP_STEP_PX) return;
-  const added = walkRidge(tip, dir0, radius, distSq, mask);
+  // The pen path (ADR-558) reads the ridge between pixel centres: the nearest
+  // pixel's radius jumps a whole lattice step between neighbouring candidates
+  // and turned the walk 22.5° off a round cap's axis.
+  const ridgeAt = ridgeBetweenPixels
+    ? (p: Vec2) => interpolatedRadius(distSq, mask.width, p.x, p.y)
+    : (p: Vec2) => radiusAtPosition(p, distSq, mask.width);
+  const added = walkRidge(tip, dir0, radius, ridgeAt, mask);
   if (added.length === 0) return;
   if (fromStart) pts.unshift(...added.reverse());
   else pts.push(...added);
@@ -61,7 +68,7 @@ function walkRidge(
   tip: Vec2,
   dir0: Vec2,
   radius: number,
-  distSq: Float64Array,
+  ridgeAt: (p: Vec2) => number,
   mask: InkMask,
 ): Vec2[] {
   const maxSteps = Math.ceil((radius * 3) / TIP_STEP_PX);
@@ -69,7 +76,7 @@ function walkRidge(
   let cur = tip;
   let dir = dir0;
   for (let step = 0; step < maxSteps; step += 1) {
-    const next = bestForwardStep(cur, dir, dir0, distSq, mask);
+    const next = bestForwardStep(cur, dir, dir0, ridgeAt, mask);
     if (next === null) break;
     added.push(next);
     const stepped = normalize(next.x - cur.x, next.y - cur.y);
@@ -102,7 +109,7 @@ function bestForwardStep(
   cur: Vec2,
   dir: Vec2,
   dir0: Vec2,
-  distSq: Float64Array,
+  ridgeAt: (p: Vec2) => number,
   mask: InkMask,
 ): Vec2 | null {
   let best: Vec2 | null = null;
@@ -123,11 +130,7 @@ function bestForwardStep(
     // Prefer straight continuation (current heading AND initial tangent — the
     // tangent term makes ties resolve straight instead of drifting), tie-broken
     // toward the distance ridge so the extension stays centred into the cap.
-    // The ridge is read between pixel centres: the nearest pixel's radius
-    // jumps a whole lattice step between neighbouring candidates and turned
-    // the walk 22.5° off a round cap's axis.
-    const ridge = interpolatedRadius(distSq, mask.width, candidate.x, candidate.y);
-    const score = forward + alignment + ridge * 0.2;
+    const score = forward + alignment + ridgeAt(candidate) * 0.2;
     if (score > bestScore) {
       bestScore = score;
       best = candidate;

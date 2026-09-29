@@ -1,8 +1,8 @@
 // Centerline trace entry point (from-scratch rewrite). Pipeline:
 //   preprocess (shared threshold/despeckle) → ink mask → exact distance
 //   field → distance-ordered thinning → stroke graph → radius-aware spur
-//   pruning → sub-pixel ridge centring → junction pairing + tip extension +
-//   gap bridging + smoothing →
+//   pruning → sub-pixel ridge centring (Centerline only) → junction pairing +
+//   tip extension + gap bridging + smoothing →
 //   compact cubic strokes, with round dots as circular marks (ADR-405).
 // Produces ONE open path down the middle of every stroke — the whole point
 // of centerline mode — instead of imagetracer-style double outlines.
@@ -48,7 +48,9 @@ export function* traceCenterlineStrokePathsSteps(
   const mask = inkMaskFromPrepared(prepared);
   if (!hasInk(mask)) return [];
   const distSq = yield* squaredDistanceFieldSteps(mask);
-  const { polylines } = yield* centerlineStrokesFromMaskSteps(mask, distSq, options);
+  const { polylines } = yield* centerlineStrokesFromMaskSteps(mask, distSq, options, {
+    penPath: true,
+  });
   // Rings closed at a corner keep their endpoints a gap apart; make them
   // return to start so a stroked/engraved closed loop has no seam gap.
   const closed = closeRingEndpoints(polylines);
@@ -56,6 +58,14 @@ export function* traceCenterlineStrokePathsSteps(
     ? []
     : withCanonicalTraceCurves([{ color: CENTERLINE_COLOR, polylines: closed }]);
 }
+
+/** How the lane asking for strokes places them. The Centerline lane puts each
+ *  stroke on the pen's path (ADR-558): centred on the sub-pixel ridge, a bend
+ *  drawn round kept round, each corner rebuilt once, and each tip walked
+ *  along its cap's axis. Line + fill recentres its width-carrying strokes on
+ *  their measured cross-sections (ADR-454) and keeps the strokes its width
+ *  groups and region borders were tuned on, so it leaves this off. */
+export type CenterlineStrokeLane = { readonly penPath: boolean };
 
 /** The centreline strokes of an ink mask, before ring closure, in output
  *  order; `marks` names the concentric circles among them that burn round
@@ -65,6 +75,7 @@ export function* centerlineStrokesFromMaskSteps(
   mask: InkMask,
   distSq: Float64Array,
   options: TraceOptions,
+  lane: CenterlineStrokeLane,
 ): TraceSteps<{ readonly polylines: Polyline[]; readonly marks: ReadonlySet<Polyline> }> {
   const cooperate = yield;
   const skeleton = yield* thinToMedialAxisSteps(mask, distSq);
@@ -81,9 +92,10 @@ export function* centerlineStrokesFromMaskSteps(
   const condensed = condenseJunctions(pruned, distSq, mask.width);
   if (cooperate) yield;
   // Thinning keeps whole pixels, so an even-width stroke's skeleton runs half
-  // a pixel to one side; move it onto the distance field's sub-pixel ridge.
-  const centered = centerGraphOnRidge(condensed, distSq, mask.width);
-  const polylines = yield* assembleStrokePathsSteps(centered, distSq, mask, {
+  // a pixel to one side; the pen path moves it onto the distance field's
+  // sub-pixel ridge.
+  const placed = lane.penPath ? centerGraphOnRidge(condensed, distSq, mask.width) : condensed;
+  const polylines = yield* assembleStrokePathsSteps(placed, distSq, mask, {
     // Assembly measures the working grid; the option is a source-pixel
     // distance, so automatic enlargement must enlarge its allowance too.
     joinGapPx: (options.centerlineJoinGapPx ?? DEFAULT_JOIN_GAP_PX) * effectivePixelScale(options),
@@ -91,6 +103,7 @@ export function* centerlineStrokesFromMaskSteps(
     // the preset default of 1 leaves the tuned epsilon unchanged.
     simplifyTolerance: options.lineTolerance,
     curve: strokeCurvePolicy(options),
+    penPath: lane.penPath,
   });
   // Dots (round, unelongated ink whose own skeleton is degenerate) have no
   // stroke to follow; they become concentric circles that burn them solid
