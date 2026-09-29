@@ -97,36 +97,54 @@ describe('a ring that meets many others', () => {
     ],
   });
 
-  // A long bar whose top edge crosses `count` small squares that cannot move.
-  // Its retry and weaker refinements keep the crossing; its baseline clears it.
-  function repairBar(count: number) {
+  // A long bar whose top edge crosses `count` small squares that cannot move
+  // (the first `tall` of them also reach down past its baseline). Its retry
+  // and weaker refinements keep the crossing; its baseline clears the short
+  // squares and its source clears them all.
+  function repairBar(count: number, tall = 0) {
+    const source = box(0, 0, 400, 2);
     const baseline = box(0, 0, 400, 5);
+    const alternateBaseline = box(0, 0, 400, 5);
     const refine = vi.fn((_amount: number) => box(0, 0, 400, 10.25));
+    const retry = vi.fn(() => ({
+      polyline: box(0, 0, 400, 10.5),
+      baseline: alternateBaseline,
+      refine,
+    }));
     const bar: FinishedContour = {
-      source: baseline,
+      source,
       baseline,
       polyline: box(0, 0, 400, 10),
       refine: () => box(0, 0, 400, 10),
-      withoutRebuiltCorners: () => ({ polyline: box(0, 0, 400, 10.5), baseline, refine }),
+      withoutRebuiltCorners: retry,
     };
     const squares = Array.from({ length: count }, (_, index) => {
-      const square = box(10 + 20 * index, 8, 14 + 20 * index, 12);
+      const square = box(10 + 20 * index, index < tall ? 4 : 8, 14 + 20 * index, 12);
       return { source: square, baseline: square, polyline: square, refine: () => square };
     });
     const result = runTraceSteps(preserveContourTopologySteps([bar, ...squares]));
-    return { result, baseline, refine, squares };
+    return { result, source, baseline, alternateBaseline, refine, retry, squares };
   }
 
-  it('takes its baseline after the retry without the weaker refinements', () => {
-    const { result, baseline, refine, squares } = repairBar(8);
+  it('goes straight to its baseline, without the retry or the weaker refinements', () => {
+    const { result, baseline, retry, refine, squares } = repairBar(8);
     expect(result[0]).toBe(baseline);
+    expect(retry).not.toHaveBeenCalled();
     expect(refine).not.toHaveBeenCalled();
     squares.forEach((square, index) => expect(result[index + 1]).toBe(square.polyline));
   });
 
-  it('still tries the weaker refinements when it meets fewer', () => {
-    const { result, baseline, refine } = repairBar(7);
-    expect(result[0]).toBe(baseline);
+  it('never takes the retry later, which would move it back up from its baseline', () => {
+    // Its baseline still meets three squares, too few to be crowded.
+    const { result, source, retry } = repairBar(8, 3);
+    expect(result[0]).toBe(source);
+    expect(retry).not.toHaveBeenCalled();
+  });
+
+  it('still takes the retry and the weaker refinements when it meets fewer', () => {
+    const { result, alternateBaseline, retry, refine } = repairBar(7);
+    expect(result[0]).toBe(alternateBaseline);
+    expect(retry).toHaveBeenCalledTimes(1);
     expect(refine.mock.calls.map(([amount]) => amount)).toEqual([0.5, 0.25, 0.125, 0.0625]);
   });
 });

@@ -28,11 +28,12 @@ export type FinishedContour = ContourRefinement & {
 // curve, yet each one costs a full check of the drawing.
 const REFINEMENT_ATTEMPTS = 4;
 const REFINEMENT_REDUCTION = 0.5;
-// A ring that meets at least this many other rings in a round takes its
-// baseline without the weaker refinements (ADR-530, Amendment 9). A weaker
-// refinement would have to clear every one of those contacts at once, and it
-// costs a whole fit of what is usually a large ring. On uniform noise every
-// such ring ended at its source anyway.
+// A ring that meets at least this many other rings in a round goes straight to
+// its baseline (ADR-530, Amendment 9): no retry without rebuilt corners, no
+// weaker refinements. Each of those would have to clear every one of the
+// contacts at once, and each costs a whole finish or fit of what is usually a
+// large ring. On uniform noise nearly every such ring ended at its source
+// anyway, and its neighbours keep more of their curves when it moves sooner.
 const CROWDED_PARTNERS = 8;
 
 /** Keep a final curve candidate together with the geometry it refines. */
@@ -85,9 +86,10 @@ export function* preserveContourTopologySteps(
       if (contour !== undefined && backOffContour(contour, index, repair, crowded)) changed = true;
     }
     // Each conflicting contour moves only toward its source boundary: the
-    // finish without rebuilt corners, weaker refinements (skipped by a ring
-    // that meets many others), the smoothed baseline, then the source. Once
-    // source boundaries are reached, any inherited source contact is kept.
+    // finish without rebuilt corners, weaker refinements (both skipped by a
+    // ring that meets many others), the smoothed baseline, then the source.
+    // Once source boundaries are reached, any inherited source contact is
+    // kept.
     if (!changed) return current;
   }
 }
@@ -105,7 +107,7 @@ type TopologyRepair = {
  *  has is passed over: it cannot resolve the conflict, and each round costs a
  *  check of the whole drawing. The tracer's refinements are always new, so
  *  this only shortens callers with fixed steps, like the laser commit guard.
- *  A crowded contour passes over the weaker refinements too. */
+ *  A crowded contour goes straight to its baseline. */
 function backOffContour(
   contour: FinishedContour,
   index: number,
@@ -115,18 +117,21 @@ function backOffContour(
   const finish = repair.finishes[index] ?? contour;
   const attempt = repair.attempts[index] ?? 0;
   if (attempt > REFINEMENT_ATTEMPTS + 1) return false;
-  // Retry this contour alone without its rebuilt corners, keeping full
-  // smoothing. Stepping the smoothing down first would strip it from both
-  // contours of the pair and, after the halvings, from each whole outline.
-  if (finish === contour && contour.withoutRebuiltCorners !== undefined) {
+  // On its first conflict, retry this contour alone without its rebuilt
+  // corners, keeping full smoothing. Stepping the smoothing down first would
+  // strip it from both contours of the pair and, after the halvings, from each
+  // whole outline. A contour that skipped the retry never takes it later: that
+  // would move it back up from its baseline.
+  const first = attempt === 0 && finish === contour;
+  if (first && !crowded && contour.withoutRebuiltCorners !== undefined) {
     const alternate = contour.withoutRebuiltCorners();
     repair.finishes[index] = alternate;
     repair.current[index] = alternate.polyline;
     return true;
   }
   const current = repair.current[index];
-  const first = crowded ? Math.max(attempt, REFINEMENT_ATTEMPTS) + 1 : attempt + 1;
-  for (let next = first; next <= REFINEMENT_ATTEMPTS + 2; next += 1) {
+  const from = crowded ? Math.max(attempt, REFINEMENT_ATTEMPTS) + 1 : attempt + 1;
+  for (let next = from; next <= REFINEMENT_ATTEMPTS + 2; next += 1) {
     repair.attempts[index] = next;
     const step = backOffStep(contour, finish, next);
     if (step !== current) {

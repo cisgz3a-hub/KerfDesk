@@ -629,32 +629,45 @@ The audit measured noise1024 at 116.6 s before and 94.4 s after, against main's 
 still about 1.9x main, above the 1.46x target. The rest of the back-off is the whole-ring retry
 without rebuilt corners, plus the refits of the few large rings that meet many others.
 
-### Amendment 9 - a ring that meets many others skips the weaker refits (2026-09-29)
+### Amendment 9 - a ring that meets many others goes straight to its baseline (2026-09-29)
 
 After Amendment 8, most of the back-off on uniform noise is a few large rings that meet many
-others. On noise512 Line Art, 5 rings of 15k to 40k samples each met 11 to 39 other rings in the
-first round. Every one of them was refitted at 1/2 and at 1/4 and still ended at its source.
-Rings that met 2 to 7 others often cleared: of 13 on noise512, 7 cleared at the retry without
-rebuilt corners and 1 at 1/2.
+others. On noise512 Line Art, 5 rings of 15k to 40k samples met 11 to 39 other rings in the first
+round. Each was retried without its rebuilt corners, refitted at 1/2 and at 1/4, and still ended
+at its source. The retries of the rings that met 8 or more others took 1.15 s of the trace's
+1.9 s of retries. Of the 9 rings on noise192 (Line Art and Sharp) and noise512 that met 8 or more
+others, 8 ended at their source and 1 cleared at the retry. Rings that met 2 to 7 others often
+cleared: of 13 on noise512, 7 cleared at the retry and 1 at 1/2.
 
 Change: each repair round counts, for every conflicting ring, the other rings it meets in the
 sample crossing test, the curve guard (ADR-531) or the nesting check. A ring that meets 8 or more
-(`CROWDED_PARTNERS`, `contour-topology.ts`) passes over the weaker refinements and takes its
-baseline next. It still gets its retry without rebuilt corners first. A weaker refinement would
-have to clear every one of those contacts at once, and it costs a whole fit of what is usually a
-large ring. The laser commit guard's steps are all the source, so it is unaffected.
+(`CROWDED_PARTNERS`, `contour-topology.ts`) takes its baseline next: no retry without rebuilt
+corners and no weaker refinements. Each of those steps would have to clear every one of the
+contacts at once, and each costs a whole finish or fit of what is usually a large ring. The retry
+is only ever a ring's first step, so a ring that skipped it never moves back up from its baseline
+to take it later. The laser commit guard's steps are all the source, so it is unaffected.
 
 Output: the whole-trace hash is unchanged on the astronaut (Line Art and Sharp), the 1254 px
 stress-test drawing, the arch house (Line Art) and text-sans-96. In the first three, no ring met
-more than one other in the first round. On noise, the crowded ring reaches its baseline sooner, so fewer of its neighbours back
-off. Against Amendment 8, 63 of 3,271 rings change on noise512 Line Art, 8 of 455 on noise192
-Line Art and 7 of 931 on noise192 Sharp. No ring goes from a curve to a polyline, and 31, 3 and 3
-rings go from a polyline to a curve. Of noise512's rings, 3,227 are curves instead of 3,196.
+more than one other in the first round. On noise, the crowded ring moves out of the way sooner, so
+fewer of its neighbours back off, and more of them keep a curve:
+
+| Case | Rings changed | Curves before | Curves after |
+|---|---|---|---|
+| noise192, Line Art | 16 of 455 | 447 | 454 |
+| noise192, Sharp | 24 of 931 | 556 | 558 |
+| noise512, Line Art | 97 of 3,271 | 3,196 | 3,254 |
+
+One ring on noise192 Sharp goes from a curve to a polyline: it had cleared at the retry.
 
 Measured as in Amendment 8, against it, 2 rounds, with another benchmark sharing the machine:
 
 | Case | Amendment 8 | After |
 |---|---|---|
-| noise512, Line Art | 18.2 s, 932 MB | 14.9 s, 916 MB |
-| noise192, Line Art | 2.26 s | 1.87 s |
-| noise192, Sharp | 1.56 s | 1.39 s |
+| noise512, Line Art | 16.95 s, 932 MB | 12.24 s, 864 MB |
+| noise192, Line Art | 2.21 s | 1.53 s |
+| noise192, Smooth | 2.11 s | 1.64 s |
+| noise192, Sharp | 1.51 s | 1.33 s |
+
+Uniform noise at 1024 px, measured before the retry was skipped, took 69.3 s against main's
+40.5 s (1.71x), with a peak of 3.15 GB against main's 2.32 GB.
