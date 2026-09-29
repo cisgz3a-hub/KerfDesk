@@ -15,7 +15,7 @@ import {
 } from '../scene';
 import type { CncPass } from '../job';
 import { compileCncJob } from './compile-cnc-job';
-import { cutCanFreePart } from './cnc-tabs';
+import { cutCanFreePart, stockLimitedTabHeightMm } from './cnc-tabs';
 
 const TAB_HEIGHT_MM = 2;
 
@@ -59,14 +59,18 @@ function tabRiseCount(depthMm: number, stockThicknessMm: number): number {
   );
 }
 
-function compiledPasses(depthMm: number, stockThicknessMm: number): ReadonlyArray<CncPass> {
+function compiledPasses(
+  depthMm: number,
+  stockThicknessMm: number,
+  tabHeightMm = TAB_HEIGHT_MM,
+): ReadonlyArray<CncPass> {
   const cnc: CncLayerSettings = {
     ...DEFAULT_CNC_LAYER_SETTINGS,
     cutType: 'profile-outside',
     depthMm,
     depthPerPassMm: 2,
     tabsEnabled: true,
-    tabHeightMm: TAB_HEIGHT_MM,
+    tabHeightMm,
     tabsPerShape: 4,
   };
   const layer = { ...createLayer({ id: 'L1', color: '#ff0000' }), cnc };
@@ -145,3 +149,70 @@ describe('tabs measured from the stock bottom (ADR-258 amendment 3)', () => {
     expect(tabTopZ(stock + 0.5, stock)).toBeCloseTo(-(stock + 0.5 - TAB_HEIGHT_MM), 6);
   });
 });
+
+// ADR-258 amendment 4 (second CNC audit P2-toolpath-2): a tab at least as thick
+// as the set stock reached the stock top, so passNeedsTabs dropped it and a part
+// cut through thin sheet under the default 2 mm tab came free. Such a tab is now
+// cut half the stock thick, standing on the stock bottom whatever the cut depth.
+describe('tabs no thinner than the stock (ADR-258 amendment 4)', () => {
+  it.each([
+    { stockMm: 2, depthMm: 2, tabMm: 2 },
+    { stockMm: 2, depthMm: 2.3, tabMm: 2 },
+    { stockMm: 3, depthMm: 3.2, tabMm: 3 },
+    { stockMm: 1.5, depthMm: 1.7, tabMm: 2 },
+  ])(
+    'keeps 4 bridges half the stock thick: $stockMm mm stock, $depthMm mm cut, $tabMm mm tabs',
+    ({ stockMm, depthMm, tabMm }) => {
+      const passes = compiledPasses(depthMm, stockMm, tabMm);
+      const deepest = deepestPass(passes);
+      // The loop still cuts through to the full depth between the bridges...
+      expect(lowestZ(deepest)).toBeCloseTo(-depthMm, 9);
+      // ...and rises in place onto each of the four tabs at half the stock.
+      const walls = tabWallTops(deepest);
+      expect(walls).toHaveLength(4);
+      for (const topZ of walls) expect(topZ).toBeCloseTo(-stockMm / 2, 9);
+    },
+  );
+
+  it('keeps the thinned tab the same height above the stock bottom at any depth', () => {
+    for (const depthMm of [1.6, 2, 2.3, 3]) {
+      expect(tabTopZ(depthMm, 2)).toBeCloseTo(-1, 9);
+    }
+  });
+
+  it('leaves a floor at least as thick as the thinned tab to hold the part', () => {
+    expect(tabRiseCount(1, 2)).toBe(0);
+    expect(cutCanFreePart(1, TAB_HEIGHT_MM, 2)).toBe(false);
+    expect(cutCanFreePart(1.1, TAB_HEIGHT_MM, 2)).toBe(true);
+  });
+
+  it('thins only a tab that would reach the stock top on a set stock', () => {
+    expect(stockLimitedTabHeightMm(2, 2)).toBe(1);
+    expect(stockLimitedTabHeightMm(3, 2)).toBe(1);
+    expect(stockLimitedTabHeightMm(1.9, 2)).toBe(1.9);
+    const shipped = DEFAULT_CNC_MACHINE_CONFIG.stock.thicknessMm;
+    expect(stockLimitedTabHeightMm(8, shipped)).toBe(8);
+  });
+});
+
+function deepestPass(passes: ReadonlyArray<CncPass>): CncPass {
+  const deepest = [...passes].sort((a, b) => lowestZ(a) - lowestZ(b))[0];
+  if (deepest === undefined) throw new Error('Expected compiled passes.');
+  return deepest;
+}
+
+function lowestZ(pass: CncPass): number {
+  return pass.kind === 'path3d' ? Math.min(...pass.points.map((point) => point.z)) : pass.zMm;
+}
+
+/** The tops of the vertical walls a pass climbs in place: one per tab. */
+function tabWallTops(pass: CncPass): ReadonlyArray<number> {
+  if (pass.kind !== 'path3d') return [];
+  const tops: number[] = [];
+  for (let index = 1; index < pass.points.length; index += 1) {
+    const from = pass.points[index - 1]!;
+    const to = pass.points[index]!;
+    if (from.x === to.x && from.y === to.y && to.z > from.z) tops.push(to.z);
+  }
+  return tops;
+}
