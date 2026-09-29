@@ -4,8 +4,12 @@ import { join, resolve } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { stableArtifactNames } from './stable-release-artifacts.mjs';
 import { createStableReleaseStore } from './stable-release-store.mjs';
-import { verifyCommercialEnvelope } from './commercial-release-manifest.mjs';
 import {
+  CommercialReleaseError,
+  verifyCommercialEnvelope,
+} from './commercial-release-manifest.mjs';
+import {
+  commercialToolEnvironment,
   readCommercialPackage,
   createCommercialInstallerVerifier,
   readCommercialInput,
@@ -14,6 +18,36 @@ import { publishCommercialRelease } from './commercial-release-publisher.mjs';
 
 const USAGE =
   'Usage: publish-commercial-release.mjs --expected-catalog-sha256 <64-hex|none> <release-directory> <commercial-release-identity.json> <packaged-resources-directory>';
+const GENERIC_FAILURE =
+  'Commercial publication failed. Check the signed identity, native signer, clean source checkout, immutable artifacts and protected R2 configuration.';
+const SECRET_NAME = /KEY|TOKEN|SECRET|PASSWORD|CREDENTIAL|ACCOUNT/iu;
+
+/**
+ * The line printed when publication fails. Only refusals raised by this
+ * repository's own publisher and verifiers are specific; any other error (a
+ * network, process or parser failure) can quote a URL, a command line or input
+ * bytes, so it gets the generic line. Even an own message is withheld when it
+ * contains an environment value (or one line of it), a URL, PEM armour or a
+ * control character. A value shorter than eight characters counts only under a
+ * secret-looking name: values such as `true` or `x64` are not secrets and would
+ * withhold almost every message.
+ */
+export function publicationFailureMessage(error, env = process.env) {
+  if (!(error instanceof CommercialReleaseError)) return GENERIC_FAILURE;
+  const message = String(error.message);
+  const values = Object.entries(env).flatMap(([name, value]) =>
+    typeof value === 'string'
+      ? [value, ...value.split(/\r?\n/u)]
+          .map((part) => part.trim())
+          .filter((part) => part.length >= 8 || (part !== '' && SECRET_NAME.test(name)))
+      : [],
+  );
+  const unsafe =
+    /:\/\/|-----(?:BEGIN|END) /u.test(message) ||
+    Array.from(message).some((c) => c.charCodeAt(0) < 32 || c.charCodeAt(0) === 127) ||
+    values.some((value) => message.includes(value));
+  return unsafe ? GENERIC_FAILURE : `Commercial publication failed: ${message}`;
+}
 
 // The expected catalogue is the reviewed live catalog.json: the SHA-256 the
 // previous publication printed, or `none` before the first commercial release.
@@ -27,7 +61,7 @@ export function parsePublicationArguments(args) {
     paths.length !== 3 ||
     paths.some((path) => path === '' || path.startsWith('--'))
   )
-    throw new Error(USAGE);
+    throw new CommercialReleaseError(USAGE);
   const [releaseDirectory, identityPath, resourcesDirectory] = paths;
   return { releaseDirectory, identityPath, resourcesDirectory, expectedCatalogSha256 };
 }
@@ -41,19 +75,25 @@ export function requireCommercialPublishContext(env, identity, platform = proces
     'DESKTOP_WINDOWS_PUBLISHER_NAME',
   ];
   if (required.some((name) => typeof env[name] !== 'string' || env[name].trim() === ''))
-    throw new Error(
+    throw new CommercialReleaseError(
       'Commercial publication requires signing key, pinned key ID, explicit publisher and R2 configuration.',
     );
   if (!/^[a-f0-9]{32}$/u.test(env.COMMERCIAL_CLOUDFLARE_ACCOUNT_ID))
-    throw new Error('Invalid commercial R2 account ID.');
+    throw new CommercialReleaseError('Invalid commercial R2 account ID.');
   if (platform !== 'win32' || identity.sourceRef !== `refs/tags/v${identity.version}`)
-    throw new Error(
+    throw new CommercialReleaseError(
       'Commercial publication requires Windows and a versioned signed source identity.',
     );
 }
 
 export async function requireCommercialSource(identity, root, execute = promisify(execFile)) {
-  const options = { cwd: root, windowsHide: true, timeout: 30_000, maxBuffer: 1024 * 1024 };
+  const options = {
+    cwd: root,
+    env: commercialToolEnvironment(),
+    windowsHide: true,
+    timeout: 30_000,
+    maxBuffer: 1024 * 1024,
+  };
   const { stdout: head } = await execute('git', ['rev-parse', '--verify', 'HEAD'], options);
   const { stdout: changes } = await execute(
     'git',
@@ -61,7 +101,7 @@ export async function requireCommercialSource(identity, root, execute = promisif
     options,
   );
   if (head.trim() !== identity.sourceSha || changes.trim() !== '')
-    throw new Error(
+    throw new CommercialReleaseError(
       'Publication checkout must be clean and match the signed source SHA; use ignored or external build outputs.',
     );
   // The signed identity names the release tag; it must exist here and resolve to
@@ -76,7 +116,7 @@ export async function requireCommercialSource(identity, root, execute = promisif
     throw error;
   });
   if (tagged.trim() !== identity.sourceSha)
-    throw new Error(
+    throw new CommercialReleaseError(
       `Release tag v${identity.version} must exist in this checkout and point at the signed source SHA.`,
     );
 }
@@ -140,9 +180,7 @@ async function main() {
   );
 }
 if (process.argv[1] && import.meta.url === pathToFileURL(resolve(process.argv[1])).href)
-  main().catch(() => {
-    console.error(
-      'Commercial publication failed. Check the signed identity, native signer, clean source checkout, immutable artifacts and protected R2 configuration.',
-    );
+  main().catch((error) => {
+    console.error(publicationFailureMessage(error));
     process.exitCode = 1;
   });

@@ -8,6 +8,7 @@ import { extractFile } from '@electron/asar';
 import { JSON_SCHEMA, load } from 'js-yaml';
 import { updatePublisherProblems } from './verify-update-publisher.mjs';
 import {
+  CommercialReleaseError,
   digest,
   stablePublicKeys,
   verifyCommercialEnvelope,
@@ -15,12 +16,33 @@ import {
 import { verifyCommercialMetadata } from './prepare-commercial-desktop.mjs';
 
 const executeFile = promisify(execFile);
+// Only what these Windows tools need to start and to find their files; the
+// signing key, R2 token and every other operator secret stay in this process.
+const TOOL_ENVIRONMENT = new Set([
+  'SYSTEMROOT',
+  'WINDIR',
+  'PATH',
+  'PATHEXT',
+  'TEMP',
+  'TMP',
+  'COMSPEC',
+]);
+export function commercialToolEnvironment(extra = {}, env = process.env) {
+  return {
+    ...Object.fromEntries(
+      Object.entries(env).filter(
+        ([name, value]) => TOOL_ENVIRONMENT.has(name.toUpperCase()) && typeof value === 'string',
+      ),
+    ),
+    ...extra,
+  };
+}
 export async function readCommercialInput(path, limit) {
   const handle = await open(path, 'r');
   try {
     const stat = await handle.stat();
     if (!stat.isFile() || stat.size < 1 || stat.size > limit)
-      throw new Error('Commercial input file size is invalid.');
+      throw new CommercialReleaseError('Commercial input file size is invalid.');
     const bytes = Buffer.alloc(stat.size + 1);
     let length = 0;
     while (length < bytes.length) {
@@ -28,7 +50,8 @@ export async function readCommercialInput(path, limit) {
       if (bytesRead === 0) break;
       length += bytesRead;
     }
-    if (length !== stat.size) throw new Error('Commercial input changed while being read.');
+    if (length !== stat.size)
+      throw new CommercialReleaseError('Commercial input changed while being read.');
     return bytes.subarray(0, length);
   } finally {
     await handle.close();
@@ -40,7 +63,7 @@ function ownedTemporary(directory) {
     dirname(owned) !== resolve(tmpdir()) ||
     !owned.slice(dirname(owned).length + 1).startsWith('kerfdesk-commercial-signature-')
   )
-    throw new Error('Signature probe directory escaped the owned temporary root.');
+    throw new CommercialReleaseError('Signature probe directory escaped the owned temporary root.');
   return owned;
 }
 export function requireCommercialUpdateConfig(text, expectedPublisher) {
@@ -51,13 +74,15 @@ export function requireCommercialUpdateConfig(text, expectedPublisher) {
     expectedPublisher.length > 500 ||
     /[\r\n\0]/u.test(expectedPublisher)
   )
-    throw new Error('Explicit Windows signing publisher is required.');
+    throw new CommercialReleaseError('Explicit Windows signing publisher is required.');
   if (typeof text !== 'string' || Buffer.byteLength(text) > 16 * 1024)
-    throw new Error('Packaged updater config is required.');
+    throw new CommercialReleaseError('Packaged updater config is required.');
   const config = load(text, { schema: JSON_SCHEMA });
   const allowed = new Set(['provider', 'url', 'publisherName', 'updaterCacheDirName']);
   if (!config || typeof config !== 'object' || Object.keys(config).some((key) => !allowed.has(key)))
-    throw new Error('Commercial updater config contains unsupported options or credentials.');
+    throw new CommercialReleaseError(
+      'Commercial updater config contains unsupported options or credentials.',
+    );
   const names =
     typeof config?.publisherName === 'string' ? [config.publisherName] : config?.publisherName;
   if (
@@ -71,7 +96,7 @@ export function requireCommercialUpdateConfig(text, expectedPublisher) {
     typeof names[0] !== 'string' ||
     names[0].trim() === ''
   )
-    throw new Error(
+    throw new CommercialReleaseError(
       'Commercial updater config must pin the commercial feed and one signing publisher.',
     );
   return config;
@@ -89,9 +114,11 @@ export function verifyCommercialPackage(metadata, identityEnvelope, keySet, enti
     configured.apiOrigin !== 'https://license.kerfdesk.com' ||
     !isDeepStrictEqual(configured.release, identityEnvelope)
   )
-    throw new Error('Packaged commercial identity does not match the approved release.');
+    throw new CommercialReleaseError(
+      'Packaged commercial identity does not match the approved release.',
+    );
   if (!isDeepStrictEqual(configured.releaseKeys, stablePublicKeys(keySet)))
-    throw new Error(
+    throw new CommercialReleaseError(
       'Packaged commercial release keys differ from the independent stable trust anchors.',
     );
   return identity;
@@ -161,7 +188,7 @@ export async function verifyInstallerResources(
         !/^[a-f0-9]{64}$/u.test(item.sha256),
     )
   )
-    throw new Error('Verified packaged resource digests are mandatory.');
+    throw new CommercialReleaseError('Verified packaged resource digests are mandatory.');
   const tool = await archiveTool();
   for (const expected of resourceDigests) {
     // Stream exactly the named embedded file; no archive path is written to disk.
@@ -169,14 +196,20 @@ export async function verifyInstallerResources(
     const { stdout } = await execute(
       tool,
       ['e', '-so', '-bd', '-y', '--', executable, expected.name],
-      { encoding: 'buffer', windowsHide: true, timeout: 120_000, maxBuffer: expected.bytes + 1 },
+      {
+        encoding: 'buffer',
+        env: commercialToolEnvironment(),
+        windowsHide: true,
+        timeout: 120_000,
+        maxBuffer: expected.bytes + 1,
+      },
     );
     if (
       !Buffer.isBuffer(stdout) ||
       stdout.length !== expected.bytes ||
       digest(stdout) !== expected.sha256
     )
-      throw new Error(
+      throw new CommercialReleaseError(
         `Installer resources do not match the verified commercial package: ${expected.name}`,
       );
   }
@@ -207,7 +240,7 @@ export function createCommercialInstallerVerifier({
           '$ErrorActionPreference = "Stop"; $signature = Get-AuthenticodeSignature -LiteralPath $env:KERFDESK_RELEASE_VERIFY_PATH; if ($signature.Status -ne "Valid" -or $signature.SignatureType -ne "Authenticode" -or [string]::IsNullOrWhiteSpace($signature.SignerCertificate.Subject)) { throw "Commercial installer Authenticode verification failed." }; @{ status = [string]$signature.Status; type = [string]$signature.SignatureType; subject = $signature.SignerCertificate.Subject } | ConvertTo-Json -Compress',
         ],
         {
-          env: { ...process.env, KERFDESK_RELEASE_VERIFY_PATH: executable },
+          env: commercialToolEnvironment({ KERFDESK_RELEASE_VERIFY_PATH: executable }),
           windowsHide: true,
           timeout: 120_000,
           maxBuffer: 16 * 1024,
@@ -220,7 +253,9 @@ export function createCommercialInstallerVerifier({
         typeof signature.subject !== 'string' ||
         signature.subject.trim() === ''
       )
-        throw new Error('Commercial signature verifier returned invalid evidence.');
+        throw new CommercialReleaseError(
+          'Commercial signature verifier returned invalid evidence.',
+        );
       const problems = [
         ...updatePublisherProblems(updateConfigText, signature.subject),
         ...updatePublisherProblems(
@@ -229,7 +264,9 @@ export function createCommercialInstallerVerifier({
         ),
       ];
       if (problems.length > 0)
-        throw new Error(`Commercial installer publisher mismatch: ${problems.join('; ')}`);
+        throw new CommercialReleaseError(
+          `Commercial installer publisher mismatch: ${problems.join('; ')}`,
+        );
       await verifyInstallerResources(executable, resourceDigests, { execute, archiveTool });
     } catch (error) {
       failure = error;

@@ -18,8 +18,14 @@ const IDENTITY_FIELDS = [
 const record = (value) => value !== null && typeof value === 'object' && !Array.isArray(value);
 const exact = (value, keys) =>
   record(value) && Object.keys(value).sort().join(',') === [...keys].sort().join(',');
+/**
+ * A refusal raised by the commercial release tooling itself. Its message is
+ * written here, never copied from a secret or a provider response, so the
+ * operator CLI may print it.
+ */
+export class CommercialReleaseError extends Error {}
 function requireValue(condition, message) {
-  if (!condition) throw new Error(`Invalid commercial release: ${message}`);
+  if (!condition) throw new CommercialReleaseError(`Invalid commercial release: ${message}`);
 }
 export const digest = (bytes, algorithm = 'sha256') =>
   createHash(algorithm)

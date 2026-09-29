@@ -3,14 +3,18 @@ import { mkdir, open, readFile, realpath, writeFile } from 'node:fs/promises';
 import { dirname, isAbsolute, join, relative, resolve } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { extractFile } from '@electron/asar';
-import { validateCommercialPayload } from './commercial-release-manifest.mjs';
+import {
+  CommercialReleaseError,
+  validateCommercialPayload,
+} from './commercial-release-manifest.mjs';
 
 const ROOT = fileURLToPath(new URL('..', import.meta.url));
 const API_ORIGIN = 'https://license.kerfdesk.com';
 const CONFIG_NAME = 'electron-builder.commercial.generated.json';
 const IDENTITY_NAME = 'commercial-release-identity.json';
 const VERSION = /^(0|[1-9]\d{0,15})\.(0|[1-9]\d{0,15})\.(0|[1-9]\d{0,15})$/u;
-class PreparationError extends Error {}
+// Its own secret-free refusals; the publish CLI also prints them.
+class PreparationError extends CommercialReleaseError {}
 const requireInput = (condition, message) => {
   if (!condition) throw new PreparationError(message);
 };
@@ -112,6 +116,7 @@ function requirePublishableIdentity(payload, now) {
   try {
     validateCommercialPayload(payload, 'release-identity', now);
   } catch (error) {
+    if (!(error instanceof CommercialReleaseError)) throw error;
     throw new PreparationError(
       `The publisher would refuse this identity (${error.message}): the source ref must be refs/tags/v${payload.version} and publishedAt no more than five minutes ahead.`,
     );

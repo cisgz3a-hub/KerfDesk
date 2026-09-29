@@ -8,6 +8,7 @@ import {
 import {
   COMMERCIAL_PREFIX,
   COMMERCIAL_CATALOG_KEY,
+  CommercialReleaseError,
   catalogBytes,
   digest,
   readCommercialCatalog,
@@ -39,7 +40,7 @@ function requireExpectedCatalog(initial, keySet, payload, expected) {
   const before =
     others.length === 0 && expected === 'none' ? 'none' : catalogState(catalogBytes(others));
   if (others.length === entries.length || before !== expected)
-    throw new Error(
+    throw new CommercialReleaseError(
       `Live commercial catalogue (${live === 'none' ? 'missing' : `SHA-256 ${live}`}) is not the expected catalogue; review it before publishing.`,
     );
 }
@@ -51,7 +52,9 @@ export function commercialReleaseFiles(release, identity) {
     release.files.length !== names.length ||
     new Set(release.files.map((file) => file.name)).size !== names.length
   )
-    throw new Error('Commercial release requires exactly three Windows update files.');
+    throw new CommercialReleaseError(
+      'Commercial release requires exactly three Windows update files.',
+    );
   const files = new Map(release.files.map((file) => [file.name, file.bytes]));
   for (const name of names)
     if (
@@ -59,7 +62,7 @@ export function commercialReleaseFiles(release, identity) {
       files.get(name).length < 1 ||
       files.get(name).length > 300_000_000
     )
-      throw new Error(`Invalid commercial artifact: ${name}`);
+      throw new CommercialReleaseError(`Invalid commercial artifact: ${name}`);
   const feed = parseStableFeed(files.get('latest.yml'));
   if (
     feed.version !== identity.version ||
@@ -67,7 +70,9 @@ export function commercialReleaseFiles(release, identity) {
     (feed.files[0].isAdminRightsRequired !== undefined &&
       feed.files[0].isAdminRightsRequired !== false)
   )
-    throw new Error('Commercial feed version, elevation or web-installer contract mismatch.');
+    throw new CommercialReleaseError(
+      'Commercial feed version, elevation or web-installer contract mismatch.',
+    );
   validateFeedInstaller(feed, files.get(names[0]));
   return files;
 }
@@ -82,12 +87,14 @@ export async function publishCommercialRelease({
   expectedCatalogSha256,
 }) {
   if (typeof verifyInstaller !== 'function')
-    throw new Error('Native installer publisher verification is mandatory.');
+    throw new CommercialReleaseError('Native installer publisher verification is mandatory.');
   if (
     typeof expectedCatalogSha256 !== 'string' ||
     !/^(?:none|[a-f0-9]{64})$/u.test(expectedCatalogSha256)
   )
-    throw new Error('The expected commercial catalogue SHA-256, or none, is mandatory.');
+    throw new CommercialReleaseError(
+      'The expected commercial catalogue SHA-256, or none, is mandatory.',
+    );
   const identity = verifyCommercialEnvelope(release.identity, keySet, 'release-identity');
   const files = commercialReleaseFiles(release, identity);
   const payload = updatePayload(identity, files);
@@ -101,20 +108,24 @@ export async function publishCommercialRelease({
   const prior = readCommercialCatalog(initial, keySet);
   const latest = prior[0]?.payload;
   if (latest && compareStableVersions(latest.version, identity.version) > 0)
-    throw new Error('Refusing commercial catalogue rollback.');
+    throw new CommercialReleaseError('Refusing commercial catalogue rollback.');
   if (latest && Date.parse(identity.publishedAt) < Date.parse(latest.publishedAt))
-    throw new Error('Commercial publication date cannot precede the current release.');
+    throw new CommercialReleaseError(
+      'Commercial publication date cannot precede the current release.',
+    );
   const current = prior.find((item) => item.payload.version === identity.version);
   if (current && !isDeepStrictEqual(current.payload, payload))
-    throw new Error('Published commercial version conflicts with this build.');
+    throw new CommercialReleaseError('Published commercial version conflicts with this build.');
   const prefix = `${COMMERCIAL_PREFIX}/releases/${identity.version}`;
   const reservationKey = `${prefix}/publication-reservation.json`;
   const reserved = await store.get(reservationKey);
   const envelope = reserved === null ? generated : JSON.parse(reserved.toString('utf8'));
   if (!isDeepStrictEqual(verifyCommercialEnvelope(envelope, keySet), payload))
-    throw new Error('Immutable commercial reservation conflicts with this release.');
+    throw new CommercialReleaseError(
+      'Immutable commercial reservation conflicts with this release.',
+    );
   if (current && !isDeepStrictEqual(current.envelope, envelope))
-    throw new Error('Commercial catalogue conflicts with its reserved manifest.');
+    throw new CommercialReleaseError('Commercial catalogue conflicts with its reserved manifest.');
   const next = current ? initial : catalogBytes([{ envelope, payload }, ...prior]);
   // Validate the final catalogue before writing any immutable object. Keep every
   // prior eligible version; reaching 64 requires reviewed pagination, not pruning.
@@ -129,7 +140,7 @@ export async function publishCommercialRelease({
   for (const item of plan) {
     const bytes = await store.get(item.key);
     if (bytes !== null && !bytes.equals(item.bytes))
-      throw new Error(`Immutable commercial object conflict: ${item.key}`);
+      throw new CommercialReleaseError(`Immutable commercial object conflict: ${item.key}`);
     if (bytes !== null) present.add(item.key);
   }
   for (const item of plan) {
@@ -144,13 +155,13 @@ export async function publishCommercialRelease({
       });
     const readback = await store.get(item.key);
     if (!same(readback, item.bytes))
-      throw new Error(`Commercial object readback failed: ${item.key}`);
+      throw new CommercialReleaseError(`Commercial object readback failed: ${item.key}`);
     if (item.key.endsWith('-setup.exe')) await verifyInstaller(readback, 'remote');
   }
   // The shared workflow must serialize writers. This comparison is not a
   // distributed lock against an administrator writing directly to the bucket.
   if (!same(initial, await store.get(COMMERCIAL_CATALOG_KEY)))
-    throw new Error('Commercial catalogue changed during publication.');
+    throw new CommercialReleaseError('Commercial catalogue changed during publication.');
   // The catalogue SHA-256 is what the operator states for the next publication.
   const result = { version: identity.version, catalogSha256: catalogState(next) };
   if (current) return { status: 'already-published', ...result };
@@ -159,6 +170,6 @@ export async function publishCommercialRelease({
     cacheControl: 'no-store',
   });
   if (!same(next, await store.get(COMMERCIAL_CATALOG_KEY)))
-    throw new Error('Commercial catalogue readback failed.');
+    throw new CommercialReleaseError('Commercial catalogue readback failed.');
   return { status: 'published', ...result };
 }

@@ -1,10 +1,13 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
+import { spawnSync } from 'node:child_process';
 import { mkdtemp, mkdir, writeFile, rm } from 'node:fs/promises';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
+import { fileURLToPath } from 'node:url';
 import { createPackage } from '@electron/asar';
 import {
+  commercialToolEnvironment,
   requireCommercialUpdateConfig,
   verifyCommercialPackage,
   readCommercialPackage,
@@ -13,15 +16,20 @@ import {
 } from './commercial-release-package.mjs';
 import {
   parsePublicationArguments,
+  publicationFailureMessage,
   requireCommercialPublishContext,
   requireCommercialSource,
 } from './publish-commercial-release.mjs';
-import { digest } from './commercial-release-manifest.mjs';
+import { publishCommercialRelease } from './commercial-release-publisher.mjs';
+import { CommercialReleaseError, digest } from './commercial-release-manifest.mjs';
 import {
   fixture,
   keySet,
+  keyId,
   entitlementKeySet,
   context,
+  memoryStore,
+  privateKeyPem,
   updateConfigText,
 } from './commercial-release-test-support.mjs';
 
@@ -266,4 +274,157 @@ test('local operator publication requires explicit Windows signing/account input
     requireCommercialSource(identity, 'repo', exec(identity.sourceSha, ' M electron/main.ts')),
     /clean/u,
   );
+});
+
+const SECRETS = {
+  DESKTOP_STABLE_MANIFEST_PRIVATE_KEY:
+    '-----BEGIN PRIVATE KEY-----\nMC4CAQAwBQYDK2VwBCIEIHN5bnRoZXRpYy1rZXktZm9yLWVudi10ZXN0cy1vbmx5\n-----END PRIVATE KEY-----\n',
+  COMMERCIAL_R2_API_TOKEN: 'synthetic-r2-token-for-environment-tests',
+  COMMERCIAL_CLOUDFLARE_ACCOUNT_ID: 'f'.repeat(32),
+};
+const TOOL_NAMES = ['SYSTEMROOT', 'WINDIR', 'PATH', 'PATHEXT', 'TEMP', 'TMP', 'COMSPEC'];
+const GENERIC_FAILURE =
+  'Commercial publication failed. Check the signed identity, native signer, clean source checkout, immutable artifacts and protected R2 configuration.';
+async function withEnvironment(values, run) {
+  const original = Object.fromEntries(Object.keys(values).map((name) => [name, process.env[name]]));
+  try {
+    Object.assign(process.env, values);
+    return await run();
+  } finally {
+    for (const [name, value] of Object.entries(original))
+      if (value === undefined) Reflect.deleteProperty(process.env, name);
+      else process.env[name] = value;
+  }
+}
+
+test('pwsh, 7za and git receive a minimal environment without the signing key or R2 token', async () => {
+  const windows = {
+    Path: 'C:\\Tools',
+    SystemRoot: 'C:\\Windows',
+    windir: 'C:\\Windows',
+    PATHEXT: '.COM;.EXE',
+    TEMP: 'C:\\Temp',
+    TMP: 'C:\\Temp',
+    ComSpec: 'C:\\Windows\\system32\\cmd.exe',
+  };
+  assert.deepEqual(
+    commercialToolEnvironment(
+      { KERFDESK_RELEASE_VERIFY_PATH: 'installer.exe' },
+      { ...windows, ...SECRETS, USERPROFILE: 'C:\\Users\\operator', NODE_OPTIONS: '--inspect' },
+    ),
+    { ...windows, KERFDESK_RELEASE_VERIFY_PATH: 'installer.exe' },
+  );
+  const identity = JSON.parse(Buffer.from(fixture().identity.payload, 'base64').toString());
+  const environments = await withEnvironment(SECRETS, async () => {
+    const probe = signatureProbe();
+    await createCommercialInstallerVerifier(probe.options)(Buffer.from('exe'));
+    const git = [];
+    await requireCommercialSource(identity, 'repo', async (_command, args, options) => {
+      git.push(options.env);
+      return { stdout: args[0] === 'status' ? '' : identity.sourceSha };
+    });
+    assert.equal(
+      probe.calls[0].options.env.KERFDESK_RELEASE_VERIFY_PATH,
+      join(`${join(tmpdir(), 'kerfdesk-commercial-signature-')}test`, 'installer.exe'),
+    );
+    return [...probe.calls.map((call) => call.options.env), ...git];
+  });
+  assert.equal(environments.length, 6);
+  for (const env of environments) {
+    assert.notEqual(env, process.env);
+    for (const name of Object.keys(env))
+      assert.ok(TOOL_NAMES.includes(name.toUpperCase()) || name === 'KERFDESK_RELEASE_VERIFY_PATH');
+    for (const secret of Object.values(SECRETS))
+      assert.equal(
+        Object.values(env).some((value) => value.includes(secret)),
+        false,
+      );
+  }
+});
+
+test('failure output shows only own refusals, never an environment value, key or URL', async () => {
+  const env = { ...SECRETS, DESKTOP_WINDOWS_PUBLISHER_NAME: 'Example Publisher', CI: 'true' };
+  const refusal = await publishCommercialRelease({
+    release: fixture(),
+    store: memoryStore().store,
+    keySet,
+    privateKeyPem,
+    keyId,
+    verifyInstaller: async () => undefined,
+    expectedCatalogSha256: 'a'.repeat(64),
+  }).catch((error) => error);
+  assert.equal(
+    publicationFailureMessage(refusal, env),
+    'Commercial publication failed: Live commercial catalogue (missing) is not the expected catalogue; review it before publishing.',
+  );
+  const verifier = (() => {
+    try {
+      requireCommercialUpdateConfig(updateConfigText, '');
+    } catch (error) {
+      return error;
+    }
+  })();
+  assert.equal(
+    publicationFailureMessage(verifier, env),
+    'Commercial publication failed: Explicit Windows signing publisher is required.',
+  );
+  // Short values such as CI=true are not secrets and do not hide a refusal.
+  assert.equal(
+    publicationFailureMessage(new CommercialReleaseError('Channel trust must be true.'), env),
+    'Commercial publication failed: Channel trust must be true.',
+  );
+  for (const error of [
+    new Error(`R2 request failed: https://api.cloudflare.com/client/v4/accounts/${'f'.repeat(32)}`),
+    Object.assign(new Error('Command failed: pwsh -NoProfile'), { code: 1 }),
+    new SyntaxError('Unexpected token < in JSON at position 0'),
+    'a thrown string',
+    new CommercialReleaseError(`R2 token ${SECRETS.COMMERCIAL_R2_API_TOKEN} was refused`),
+    new CommercialReleaseError(`key ${SECRETS.DESKTOP_STABLE_MANIFEST_PRIVATE_KEY.split('\n')[1]}`),
+    new CommercialReleaseError(`account ${SECRETS.COMMERCIAL_CLOUDFLARE_ACCOUNT_ID}`),
+    new CommercialReleaseError('publisherName (Example Publisher) does not match'),
+    new CommercialReleaseError('fetch https://operator:hunter2@r2.example.invalid/bucket'),
+    new CommercialReleaseError('-----BEGIN PRIVATE KEY-----'),
+    new CommercialReleaseError('first line\nsecond line'),
+  ])
+    assert.equal(publicationFailureMessage(error, env), GENERIC_FAILURE);
+  assert.equal(
+    publicationFailureMessage(new CommercialReleaseError('code k7'), { SIGNING_KEY: 'k7' }),
+    GENERIC_FAILURE,
+  );
+});
+
+test('the publication CLI prints its own refusal, and a generic line for anything else', async () => {
+  const script = fileURLToPath(new URL('./publish-commercial-release.mjs', import.meta.url));
+  const directory = await mkdtemp(join(tmpdir(), 'kerfdesk-commercial-cli-test-'));
+  try {
+    // Signed by a test key that the repository's stable trust anchors do not pin.
+    const identityPath = join(directory, 'identity.json');
+    await writeFile(identityPath, JSON.stringify(fixture().identity));
+    const expected = ['--expected-catalog-sha256', 'none'];
+    for (const [args, line] of [
+      [
+        [],
+        'Commercial publication failed: Usage: publish-commercial-release.mjs --expected-catalog-sha256 <64-hex|none> <release-directory> <commercial-release-identity.json> <packaged-resources-directory>',
+      ],
+      [
+        [...expected, directory, identityPath, directory],
+        'Commercial publication failed: Invalid commercial release: untrusted signing key',
+      ],
+      [[...expected, directory, join(directory, 'absent.json'), directory], GENERIC_FAILURE],
+    ]) {
+      const result = spawnSync(process.execPath, [script, ...args], {
+        env: { ...commercialToolEnvironment(), ...SECRETS },
+        encoding: 'utf8',
+        windowsHide: true,
+        timeout: 60_000,
+      });
+      assert.equal(result.status, 1);
+      assert.equal(result.stdout, '');
+      assert.equal(result.stderr.trim(), line);
+      for (const secret of [...Object.values(SECRETS), directory])
+        assert.equal(result.stderr.includes(secret), false);
+    }
+  } finally {
+    await rm(directory, { recursive: true, force: true });
+  }
 });
