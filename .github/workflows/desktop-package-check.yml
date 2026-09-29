@@ -33,11 +33,18 @@ on:
       native:
         type: boolean
         default: true
+      # The release train passes the commit it is about to release, which can
+      # be older than the newest commit on main (ADR-541).
+      ref:
+        type: string
+        default: ''
 
 concurrency:
   # A fixed prefix: when the release train calls this workflow, github.workflow
-  # names the caller, and sharing its group would deadlock the call.
-  group: desktop-package-check-${{ github.ref }}
+  # names the caller, and sharing its group would deadlock the call. The train's
+  # call is grouped by the commit it checks, so it never waits behind, or is
+  # replaced by, a run for a push to main.
+  group: desktop-package-check-${{ inputs.ref || github.ref }}
   cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
 
 permissions:
@@ -52,6 +59,8 @@ jobs:
       - name: Checkout
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
+          # Empty except when the release train calls: then the release commit.
+          ref: ${{ inputs.ref }}
           persist-credentials: false
 
       - name: Set up pnpm
@@ -97,7 +106,7 @@ jobs:
         if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
         with:
-          name: desktop-package-check-${{ github.sha }}
+          name: desktop-package-check-${{ inputs.ref || github.sha }}
           path: artifacts/native-smoke/
           if-no-files-found: warn
           retention-days: 14
@@ -116,6 +125,8 @@ jobs:
       - name: Checkout
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
+          # Empty except when the release train calls: then the release commit.
+          ref: ${{ inputs.ref }}
           persist-credentials: false
 
       - name: Set up pnpm
@@ -172,11 +183,14 @@ jobs:
       - name: Install, launch, import, save and uninstall
         shell: pwsh
         run: |
+          # The installed app shows the commit it was built from: the checked-out
+          # one, which is not GITHUB_SHA when the release train names a commit.
+          $sourceCommit = (git rev-parse HEAD).Trim()
           & ./scripts/qualify-windows-installer.ps1 `
             -Scenario Launch `
             -Installer "$env:GITHUB_WORKSPACE/release/$env:VERSION/KerfDesk-$env:VERSION-windows-x64-setup.exe" `
             -Version $env:VERSION `
-            -SourceCommit $env:GITHUB_SHA `
+            -SourceCommit $sourceCommit `
             -EvidenceRoot "$env:GITHUB_WORKSPACE/artifacts/installed-launch"
 
       - name: Check that a modified app.asar stops the app
@@ -189,7 +203,7 @@ jobs:
         if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
         with:
-          name: desktop-package-check-windows-${{ github.sha }}
+          name: desktop-package-check-windows-${{ inputs.ref || github.sha }}
           path: artifacts/installed-launch/
           if-no-files-found: warn
           retention-days: 14
@@ -214,6 +228,8 @@ jobs:
       - name: Checkout
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
+          # Empty except when the release train calls: then the release commit.
+          ref: ${{ inputs.ref }}
           persist-credentials: false
 
       - name: Set up pnpm
@@ -274,7 +290,7 @@ jobs:
         if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
         with:
-          name: desktop-package-check-macos-${{ matrix.arch }}-${{ github.sha }}
+          name: desktop-package-check-macos-${{ matrix.arch }}-${{ inputs.ref || github.sha }}
           path: artifacts/native-smoke/
           if-no-files-found: warn
           retention-days: 14
