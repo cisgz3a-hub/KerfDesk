@@ -1,3 +1,4 @@
+import { DEFAULT_DEVICE_PROFILE, type DeviceProfile } from '../../core/devices';
 import { createLayer, type ImportedSvg, type Layer, type Project } from '../../core/scene';
 import { createProject } from '../../core/scene/project';
 import { lightBurnSceneFrame } from './lbrn-frame';
@@ -24,22 +25,27 @@ export type LbrnImportResult =
   | { readonly ok: true; readonly project: Project; readonly report: LbrnImportReport }
   | { readonly ok: false; readonly reason: string };
 
+// A LightBurn project carries no KerfDesk machine, so it opens on `device`:
+// the machine already open in KerfDesk, as when opening any artwork (ADR-388).
+// Its bed also places the project (lightBurnSceneFrame).
 export function importLightBurnProject(
   xmlText: string,
   sourceName: string,
   parseXml: (text: string) => Document = defaultParseXml,
+  device: DeviceProfile = DEFAULT_DEVICE_PROFILE,
 ): LbrnImportResult {
   if (!/\.lbrn2?$/i.test(sourceName))
     return { ok: false, reason: 'Expected a .lbrn or .lbrn2 project.' };
   if (/<!DOCTYPE|<!ENTITY/i.test(xmlText)) {
     return { ok: false, reason: 'Active XML declarations are not allowed.' };
   }
-  return importLightBurnProjectDocument(parseXml(xmlText), sourceName);
+  return importLightBurnProjectDocument(parseXml(xmlText), sourceName, device);
 }
 
 export function importLightBurnProjectDocument(
   document: Document,
   sourceName: string,
+  device: DeviceProfile = DEFAULT_DEVICE_PROFILE,
 ): LbrnImportResult {
   if (!/\.lbrn2?$/i.test(sourceName))
     return { ok: false, reason: 'Expected a .lbrn or .lbrn2 project.' };
@@ -53,7 +59,7 @@ export function importLightBurnProjectDocument(
   }
   if (xmlDepth(root) > MAX_XML_DEPTH)
     return { ok: false, reason: 'LightBurn XML nesting is too deep.' };
-  const base = createProject();
+  const base = createProject(device);
   const frame = lightBurnSceneFrame(root, {
     width: base.device.bedWidth,
     height: base.device.bedHeight,

@@ -38,6 +38,12 @@ and the thumbnail LightBurn embeds in each file, which is its own drawing of the
    (ADR-211: artwork order decides which operation runs first). Drawing order is kept inside a
    layer and for canvas stacking. A part is no longer cut free before it is engraved because its
    outline was drawn first.
+4. **The machine it opens on.** A LightBurn project names no KerfDesk machine, so it opens on the
+   machine already open in KerfDesk, as imported artwork does, and that machine's bed places it
+   (decision 2). File > Open, `Ctrl+O`, Recent Projects and the operating system all pass it,
+   on the main thread and in the import worker. No machine-change banner appears, and the bed,
+   S range, homing and start placement stay the machine's own. Opening still replaces the job, so
+   a Frame completed before it does not carry over: the opened project is framed afresh.
 
 ### Limits
 
@@ -46,7 +52,10 @@ and the thumbnail LightBurn embeds in each file, which is its own drawing of the
 - Only the layer order is mapped. A project whose Cut Planner (`UIPrefs`) does not rank layer
   ordering first (`Optimize_ByLayer` other than 0) still runs layer by layer here, and the import
   report says so. The rest of `UIPrefs` (inner shapes first, travel, direction) is not read;
-  the project takes KerfDesk's optimization defaults, which match LightBurn's.
+  the project takes KerfDesk's optimization defaults.
+- The machine is read when the file starts to open. If it is changed while a large file is still
+  being read, the project arrives on the earlier machine and the usual machine-change banner
+  offers the choice.
 - Code and test evidence only. The corpus is five LightBurn 2.0.05 projects from one machine
   (rear-right origin); the front-left rule is the same mapping with no flags set.
 
@@ -54,7 +63,8 @@ and the thumbnail LightBurn embeds in each file, which is its own drawing of the
 
 - LightBurn projects open right way up, at LightBurn's position, with curves intact, and run
   layer by layer in LightBurn's order. The Run order view shows one run per layer.
-- Existing `.lf2` files are unaffected; only opening a LightBurn file changes.
+- Existing `.lf2` files are unaffected; only opening a LightBurn file changes. A `.lf2` still
+  brings its own machine and the banner that goes with it.
 
 ### Tests
 
@@ -62,4 +72,6 @@ and the thumbnail LightBurn embeds in each file, which is its own drawing of the
 arcs along their whole length); `lbrn-frame.test.ts` (each MirrorX/MirrorY corner, rotated groups
 and text through the same frame, the backplane fixture laid out as its thumbnail shows);
 `lbrn-run-order.test.ts` (engrave before cut whatever the drawing order, interleaved shapes run
-once per layer, priority over index, the Cut Planner warning).
+once per layer, priority over index, the Cut Planner warning); `lbrn-open-machine.test.ts`,
+`open-project-command.test.ts`, `shortcuts.test.ts` and `document-import-lightburn-stream.test.ts`
+(the open machine is kept, and places the project, through every open route).
