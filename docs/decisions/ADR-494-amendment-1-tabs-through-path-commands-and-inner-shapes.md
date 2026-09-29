@@ -1,11 +1,13 @@
-## ADR-494 Amendment 1 - Placed tabs stay where they were through path commands (2026-09-29)
+## ADR-494 Amendment 1 - Tabs stay put through path commands, and inner shapes are found without testing every pair (2026-09-29)
 
 **Status:** Accepted; software-verified through unit tests. | **Date:** 2026-09-29
 
 Amends ADR-494 item 4 ("Move, rotate, scale, copy and paste, break apart, recolour, path join and
 text re-edits carry them as they carry `cncTabAnchors`"), which did not name the path commands of
-ADR-480. Output changes only for artwork that has tabs placed by hand. No project schema change,
-no new guard or refusal (ADR-228).
+ADR-480, and the automatic rule of item 2 ("a closed contour the automatic rule picks"), whose
+"skip inner shapes" test ran on every pair of contours. Output changes only where a command below
+used to move tabs placed by hand or lose a corner; the automatic rule decides exactly as before.
+No project schema change, no new guard or refusal (ADR-228).
 
 ### Context
 
@@ -29,6 +31,11 @@ The 2026-09-28 weakness audit (finding E-3) found commands that did neither.
   straight line (a closed DXF spline, or a closed polyline without its start repeated), the same
   two commands also lost a corner: Start at the third corner of a rectangle cut a diagonal in
   place of the first corner, and Break at the start dropped the last corner.
+- **Skip inner shapes** (finding E-7). With it on, a closed contour takes automatic Line tabs only
+  when it lies strictly inside an even number of the layer's other closed contours, so parts take
+  tabs and their holes do not. Each contour was tested against every other one, so the exact
+  containment test ran n × (n − 1) times: 8,997,000 times, about 15 to 20 s, for a sheet of 3000
+  parts on one layer.
 
 ### Decision
 
@@ -50,6 +57,16 @@ The 2026-09-28 weakness audit (finding E-3) found commands that did neither.
    again with the straight line Break removed (for example with **Close Path**) puts every tab
    back at its place. A contour closed by an implied straight line keeps that line as a
    segment when it is restarted or broken, so no corner is lost.
+4. **Inner shapes in one pass.** The rule is unchanged: a closed contour of at least three distinct
+   points takes automatic tabs when it lies strictly inside an even number of the layer's other
+   such contours. The layer's contours go into a box index (`ContourBoxIndex`, which tracing and
+   CNC nesting already use), and the exact test, moved unchanged to `tab-contour-containment.ts`,
+   runs only on pairs where one contour's box holds the other's (`tab-inner-shapes.ts`). A contour
+   strictly inside another passes the even-odd test at every vertex, which keeps its box inside the
+   other's box up to the rounding of one crossing, about 1e-15 of the largest coordinate. Boxes
+   grow by 1e-9 of the largest coordinate (at least 1e-9 mm), so no pair the exact test would
+   accept is skipped. A layer with a coordinate that is not a finite number, or larger than 1e150,
+   tests every pair as before.
 
 ### Consequences
 
@@ -58,8 +75,13 @@ The 2026-09-28 weakness audit (finding E-3) found commands that did neither.
 - Reverse Direction changes only the cutting direction of a tabbed part; its laser tabs stay put.
 - Start changes only where a tabbed contour starts; its laser and CNC tabs stay put. This changes
   CNC output as well as laser output: CNC tabs placed by hand no longer move when the start does.
-- Start and Break keep every corner of a contour closed by an implied line; contours whose last
-  segment returns to the start are unchanged.
+- Start and Break keep every corner of a contour closed by an implied line, on laser and CNC
+  artwork alike; contours whose last segment returns to the start are unchanged.
+- Skip inner shapes gives the same answer as before for every layout, and the tab output is
+  unchanged. A sheet of 3000 separate parts runs the exact test no times instead of 8,997,000 and
+  decides in well under a second; a part with a hole runs it once. Layouts of deeply nested
+  contours still test every nested pair, since each one counts. CNC tabs, which never skip inner
+  shapes, are unaffected.
 
 ### Verification
 
@@ -77,3 +99,10 @@ The 2026-09-28 weakness audit (finding E-3) found commands that did neither.
   through a contour that passes back through its start, and the wrap of the moved fractions.
 - `src/core/scene/curve-edit.test.ts`: Start and Break keep every corner of a rectangle closed by
   an implied line.
+- `src/core/geometry/tab-inner-shapes.test.ts`: the one-pass rule and the tab output equal a frozen
+  copy of the every-pair rule (`tab-inner-shapes.test-support.ts`) on nested sheets (parts, holes,
+  islands and holes in islands), shapes whose boxes touch, match or share edges, concave, crossing
+  and self-crossing shapes, open and degenerate contours, far and tiny shapes, shapes too large for
+  the index, points that are not numbers and two random layouts of 400 shapes. Counting the exact
+  test: none for 3000 separate parts or 3000 squares sharing edges, and 1500 for 1500 parts with a
+  hole each, where the every-pair rule ran it 8,997,000 times.
