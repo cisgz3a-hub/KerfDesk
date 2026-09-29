@@ -40,7 +40,8 @@ name, his own legal name: Johannes Stephanus Stolk, selling as an individual (14
 3. **Menus reach every page.** Each generated page, the download page and the support page carry
    a menu with Pricing, Download and Support and a footer with the three policies; the checkout
    page's footer links the three policies. The app's Help menu gains Pricing, Terms of Service
-   and Privacy Policy.
+   and Privacy Policy, and the web app's status bar links Pricing, Terms, Privacy and Refunds
+   whenever the bar is wide enough, so a visitor who lands on the app sees them without a menu.
 4. **The pricing page links no checkout.** Purchases start in the desktop app (ADR-524 Amendment
    2), so the page says purchase opens soon until `salesOpen`, then sends buyers to Help > Licence.
 

@@ -1,7 +1,8 @@
 // StatusBar — WORKFLOW.md F-A16. Bottom bar with cursor position, selection
 // summary, object / layer counts, device name, bed dimensions, and the
-// right-aligned Update button when a new version is ready (ADR-227). Job
-// estimate is Phase C. Also hosts the canvas motion status slot (see
+// right-aligned Update button when a new version is ready (ADR-227). In the web
+// app the action rail also links the pricing and policy pages (ADR-524
+// Amendment 3). Job estimate is Phase C. Also hosts the canvas motion status slot (see
 // `status-bar-slots.ts`) so machine-status text lands here instead of on the
 // canvas.
 
@@ -11,6 +12,7 @@ import { useUiStore } from '../state/ui-store';
 import { selectedOpenFillContourCount } from './fill-diagnostics';
 import { DesktopPreviewUpdateButton } from './DesktopPreviewUpdateButton';
 import { PwaUpdateButton } from './PwaUpdateButton';
+import { SiteLinks } from './SiteLinks';
 import { EditionStatusButton } from '../licensing/EditionStatusButton';
 import { UpdateReadyButton } from '../licensing/UpdateReadyButton';
 import { CANVAS_MOTION_SLOT_ID } from './status-bar-slots';
@@ -63,6 +65,7 @@ export function StatusBar(): JSX.Element {
         <span id={CANVAS_MOTION_SLOT_ID} style={slotStyle} />
       </div>
       <div className="lf-status-bar__actions" style={actionsStyle}>
+        <SiteLinks />
         <EditionStatusButton />
         <UpdateReadyButton />
         <DesktopPreviewUpdateButton />

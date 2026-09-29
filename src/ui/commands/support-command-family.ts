@@ -1,21 +1,18 @@
-// support-command-family — Help-menu commands that open KerfDesk's support
-// page on kerfdesk.com. The source repository is private, so customers can no
-// longer reach GitHub Issues or Discussions. The page, not the app, names the
-// current contact route, so it can change without a new release. The invokes
-// open a URL (not a store action), so these builders need no AppCommandContext.
-// The command ids keep their original names so saved shortcuts still resolve.
+// support-command-family — Help-menu commands that open KerfDesk's support,
+// pricing and policy pages on kerfdesk.com. The source repository is private,
+// so customers can no longer reach GitHub Issues or Discussions. The page, not
+// the app, names the current contact route, so it can change without a new
+// release. The invokes open a URL (not a store action), so these builders need
+// no AppCommandContext. The command ids keep their original names so saved
+// shortcuts still resolve.
 
+import { PRICING_URL, PRIVACY_URL, TERMS_URL } from '../common/site-page-urls';
 import { CHECK_UPDATES_EVENT } from '../licensing/update-status-text';
 import { SUPPORT_REPORT_EVENT } from '../support/support-report-event';
 import { enabled, type AppCommand } from './command-types';
 
 export const SUPPORT_URL = 'https://kerfdesk.com/support.html';
 export const REPORT_PROBLEM_URL = `${SUPPORT_URL}#report`;
-// The pricing and policy pages that ship with the web app (ADR-524 Amendment 3).
-// Every page's footer links the three policies, the Refund Policy among them.
-export const PRICING_URL = 'https://kerfdesk.com/pricing/';
-export const TERMS_URL = 'https://kerfdesk.com/terms/';
-export const PRIVACY_URL = 'https://kerfdesk.com/privacy/';
 
 // Open a link in a new browser tab the same way DownloadDesktopLink's anchor
 // does: a detached <a target="_blank" rel="noopener noreferrer"> click. rel

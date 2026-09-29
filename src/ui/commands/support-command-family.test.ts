@@ -1,10 +1,8 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
+import { PRICING_URL, PRIVACY_URL, TERMS_URL } from '../common/site-page-urls';
 import {
-  PRICING_URL,
-  PRIVACY_URL,
   REPORT_PROBLEM_URL,
   SUPPORT_URL,
-  TERMS_URL,
   discussionsCommand,
   openExternalUrl,
   pricingCommand,
