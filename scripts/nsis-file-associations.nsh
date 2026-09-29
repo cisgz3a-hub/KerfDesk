@@ -6,3 +6,11 @@
   WriteRegStr SHELL_CONTEXT "Software\Classes\KerfDesk.Project\shell\open\command" "" '"$appExe" "%1"'
   !insertmacro UPDATEFILEASSOC
 !macroend
+
+; KerfDesk installs for the current user only (ADR-545). The assisted installer
+; otherwise offers "Anyone who uses this computer", an untested mode whose
+; updates would need administrator approval that shop accounts often lack.
+; electron-builder calls this before its install-mode page and skips the page.
+!macro customInstallMode
+  StrCpy $isForceCurrentInstall "1"
+!macroend
