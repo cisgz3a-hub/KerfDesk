@@ -1,4 +1,5 @@
 import type { RawImageData } from './trace-image';
+import { isTonedMonochrome } from './toned-monochrome';
 
 export type AutoSketchTraceOptions = {
   readonly sketchTrace?: boolean;
@@ -16,6 +17,28 @@ export function shouldUseSketchTrace(
   // colour-pixel floor is a count, so a crop, and its 4x-pixel supersample,
   // can cross it where the whole image did not (ADR-435).
   return options.sourceAutoSketch ?? hasEnoughColourForAutoSketch(image);
+}
+
+/**
+ * `options` with the auto-sketch verdict of `image` carried in
+ * sourceAutoSketch, so every later reader (the scale plan, the upscale input
+ * and the working-grid lanes) takes the route the source took. The veto for
+ * toned monochrome (ADR-532) reads stroke widths through a 3x3 window, so a
+ * resampled grid can otherwise reach a different verdict than the source.
+ * Unchanged when auto-sketch is off, forced, or already carried.
+ */
+export function withSourceAutoSketch<T extends AutoSketchTraceOptions>(
+  image: RawImageData,
+  options: T,
+): T {
+  if (
+    options.autoSketchTrace !== true ||
+    options.sketchTrace === true ||
+    options.sourceAutoSketch !== undefined
+  ) {
+    return options;
+  }
+  return { ...options, sourceAutoSketch: hasEnoughColourForAutoSketch(image) };
 }
 
 /** The auto-sketch verdict on exactly this image, ignoring any carried one. */
@@ -41,6 +64,8 @@ const MEDIAN_ABS_CHROMA_DIFFERENCE_PER_SIGMA = 0.6745 * 2;
 // Colour promotes only when it is spatially coherent (ADR-401): each counted
 // pixel must be chromatic itself and sit in a 3×3 neighbourhood whose MEAN
 // colour is chromatic beyond what the image's own per-channel noise explains.
+// Coherent colour that is only one weak tint of the artwork's tones on
+// paper-light paper (sepia, duotone) does not promote (ADR-532).
 function hasEnoughColourForAutoSketch(image: RawImageData): boolean {
   const pixelCount = image.width * image.height;
   if (pixelCount === 0) return false;
@@ -48,17 +73,23 @@ function hasEnoughColourForAutoSketch(image: RawImageData): boolean {
     MIN_NEIGHBOURHOOD_SPREAD,
     (NOISE_DEVIATIONS * channelNoiseSigma(image)) / 3,
   );
-  let colourPixels = 0;
-  const required = Math.max(32, Math.ceil(pixelCount * 0.002));
-  for (let pixel = 0; pixel < pixelCount; pixel += 1) {
+  const coherent = (pixel: number, mean: Float64Array): boolean => {
     const offset = pixel * 4;
     const r = image.data[offset] ?? 255;
     const g = image.data[offset + 1] ?? 255;
     const b = image.data[offset + 2] ?? 255;
-    if (!isChromatic(r, g, b, MIN_PIXEL_SPREAD)) continue;
-    if (!chromaticNeighbourhood(image, pixel, minSpread)) continue;
+    return (
+      isChromatic(r, g, b, MIN_PIXEL_SPREAD) &&
+      chromaticNeighbourhood(image, pixel, minSpread, mean)
+    );
+  };
+  const mean = new Float64Array(3);
+  let colourPixels = 0;
+  const required = Math.max(32, Math.ceil(pixelCount * 0.002));
+  for (let pixel = 0; pixel < pixelCount; pixel += 1) {
+    if (!coherent(pixel, mean)) continue;
     colourPixels += 1;
-    if (colourPixels >= required) return true;
+    if (colourPixels >= required) return !isTonedMonochrome(image, required, coherent);
   }
   return false;
 }
@@ -101,8 +132,14 @@ function isChromatic(r: number, g: number, b: number, minSpread: number): boolea
 }
 
 /** Whether the mean colour of the 3×3 window (edge-clamped, like the
- *  local-contrast blur) is itself chromatic with at least `minSpread`. */
-function chromaticNeighbourhood(image: RawImageData, pixel: number, minSpread: number): boolean {
+ *  local-contrast blur) is itself chromatic with at least `minSpread`; the
+ *  mean is written to `mean` for the toned-monochrome veto. */
+function chromaticNeighbourhood(
+  image: RawImageData,
+  pixel: number,
+  minSpread: number,
+  mean: Float64Array,
+): boolean {
   const { width, height, data } = image;
   const x = pixel % width;
   const y = (pixel - x) / width;
@@ -118,6 +155,9 @@ function chromaticNeighbourhood(image: RawImageData, pixel: number, minSpread: n
       b += data[offset + 2] ?? 255;
     }
   }
+  mean[0] = r / 9;
+  mean[1] = g / 9;
+  mean[2] = b / 9;
   return isChromatic(r / 9, g / 9, b / 9, minSpread);
 }
 

@@ -8,9 +8,9 @@ export function traceNumberTitle(label: string): string {
     case 'Ignore Less Than':
       return 'Remove shapes and holes below this pixel area. Use 0 to keep the smallest gaps.';
     case 'Remove ink specks':
-      return 'Remove ink marks below this pixel area; holes stay intact. A value you type, 0 included, is used exactly (0 removes none). Line Art and Smooth show 0 until you type one and judge small marks automatically meanwhile: stipple and small text stay; faint specks, lone specks and dust go, though a dark speck inside a texture may stay.';
+      return 'Remove ink marks below this pixel area; holes stay intact. A value you type, 0 included, is used exactly (0 removes none). Auto judges each small mark instead: stipple and small text stay; faint specks, lone specks and dust go, though a dark speck inside a texture may stay.';
     case 'Smoothness':
-      return 'Smooth traced edges to reduce jagged vector paths.';
+      return 'Low keeps sharp pixel corners; high rounds corners and smooths jagged edges.';
     case 'Optimize':
       return 'Simplify traced paths while preserving shape.';
     case 'Sensitivity':

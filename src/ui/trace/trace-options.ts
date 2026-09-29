@@ -33,8 +33,10 @@ export type LightBurnTraceSettingOverrides = ColourLayerSettingOverrides & {
   readonly cutoffLuma?: number;
   readonly thresholdLuma?: number;
   readonly ignoreLessThanPixels?: number;
-  readonly despeckleMinPixels?: number;
-  readonly fillPinholeCracks?: boolean;
+  // 'auto' = the automatic small-mark policy for that stage (ADR-434); a
+  // number / boolean is exact. Absent = the preset's own choice.
+  readonly despeckleMinPixels?: number | 'auto';
+  readonly fillPinholeCracks?: boolean | 'auto';
   readonly smoothness?: number;
   readonly optimize?: number;
   readonly traceTransparency?: boolean;
@@ -64,12 +66,7 @@ export function mergeLightBurnTraceSettings(
   if (settings.ignoreLessThanPixels !== undefined) {
     out['ignoreLessThanPixels'] = Math.max(0, Math.round(settings.ignoreLessThanPixels));
   }
-  if (settings.despeckleMinPixels !== undefined) {
-    out['despeckleMinPixels'] = Math.max(0, Math.round(settings.despeckleMinPixels));
-  }
-  if (settings.fillPinholeCracks !== undefined && preset.traceMode !== 'edge') {
-    out['fillPinholeCracks'] = settings.fillPinholeCracks;
-  }
+  applySmallMarkSettings(out, preset, settings);
   if (settings.smoothness !== undefined) out['smoothness'] = clampMin(settings.smoothness, 0);
   if (settings.optimize !== undefined) out['optimize'] = clampMin(settings.optimize, 0);
   if (settings.traceTransparency !== undefined) {
@@ -86,6 +83,53 @@ export function mergeLightBurnTraceSettings(
 // Diagonal contacts (ADR-455); ignored by the lanes that do not resolve corners.
 function turnPolicySetting(settings: LightBurnTraceSettingOverrides): Partial<TraceOptions> {
   return settings.turnPolicy === undefined ? {} : { turnPolicy: settings.turnPolicy };
+}
+
+// Each small-mark stage is Auto (no explicit value, policy on) or exact
+// (ADR-434 Amendment 1). Auto on one stage leaves the other stage's value in
+// force. The engine automates every stage without an explicit value, so when
+// Auto switches the policy on for a preset that has none (Sharp), the other
+// stage is pinned to the fixed value the preset ran with (Sharp's unset holes
+// stage = fill nothing) instead of silently passing to the policy.
+function applySmallMarkSettings(
+  out: Record<string, unknown>,
+  preset: TraceOptions,
+  settings: LightBurnTraceSettingOverrides,
+): void {
+  const ink = settings.despeckleMinPixels;
+  if (ink === 'auto') {
+    delete out['despeckleMinPixels'];
+    out['smallMarkPolicy'] = 'auto';
+  } else if (ink !== undefined) {
+    out['despeckleMinPixels'] = Math.max(0, Math.round(ink));
+  }
+  const holes = preset.traceMode === 'edge' ? undefined : settings.fillPinholeCracks;
+  if (holes === 'auto') {
+    delete out['fillPinholeCracks'];
+    out['smallMarkPolicy'] = 'auto';
+  } else if (holes !== undefined) {
+    out['fillPinholeCracks'] = holes;
+  }
+  if (out['smallMarkPolicy'] !== 'auto' || preset.smallMarkPolicy === 'auto') return;
+  if (ink !== 'auto' && out['despeckleMinPixels'] === undefined) out['despeckleMinPixels'] = 0;
+  if (holes !== 'auto' && out['fillPinholeCracks'] === undefined) out['fillPinholeCracks'] = false;
+}
+
+/** What a small-mark control shows for these merged options: Auto when the
+ *  engine judges that stage automatically, else the exact value it uses. */
+export function smallMarkControlState(options: TraceOptions): {
+  readonly inkAuto: boolean;
+  readonly inkMinPixels: number;
+  readonly holesAuto: boolean;
+  readonly fillHoles: boolean;
+} {
+  const policy = options.smallMarkPolicy === 'auto';
+  return {
+    inkAuto: policy && options.despeckleMinPixels === undefined,
+    inkMinPixels: options.despeckleMinPixels ?? 0,
+    holesAuto: policy && options.fillPinholeCracks === undefined,
+    fillHoles: options.fillPinholeCracks === true,
+  };
 }
 
 function mergePhotoSettings(

@@ -342,10 +342,11 @@ is still John's. Step 4 is his separate call. §16.2 now names the 29 September 
    minutes stop being free (ADR-247 §4), public-repository build attestations stop, and existing
    forks and clones stay with their holders.
 5. **Relicense in one commit after the tag**, inside the private repository:
-   - move the MIT text to `LICENSE-MIT`;
+   - move the MIT text out of `LICENSE` (done: it is `docs/licensing/mit-final-terms.txt`, outside the
+     repository root so GitHub doesn't label the repository MIT);
    - replace `LICENSE` with: "Copyright (c) 2026 Johann Stolk. All rights reserved. Versions
      released on or after [date] are licensed under the KerfDesk Licence Agreement. Versions up to
-     the `mit-final` tag remain under the MIT License in `LICENSE-MIT`.";
+     the `mit-final` tag remain under the MIT License in `docs/licensing/mit-final-terms.txt`.";
    - set `package.json` to `"license": "SEE LICENSE IN LICENSE"`;
    - update `CONTRIBUTING.md`: no outside contributions without a signed contributor agreement;
    - replace `public/eula.txt` with the safety notice and a pointer to the agreement;

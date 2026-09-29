@@ -4,6 +4,9 @@
 // this module's switch arms. `assertNever` enforces exhaustiveness at compile
 // time so the missing arm is the only compile error when a new variant lands.
 
+import type { ColoredPath } from './colored-path';
+export type { ColoredPath, SubpathNesting } from './colored-path';
+
 import type { VariableTemplate } from './variable-template';
 import type { ReliefHeightfield } from './relief/relief-heightfield';
 import type { LayerPowerMode, TabLayoutMode } from './layer';
@@ -56,26 +59,6 @@ export type StrokeTransform = {
   readonly b: number;
   readonly c: number;
   readonly d: number;
-};
-
-export type ColoredPath = {
-  // Lowercase 6-digit source-artwork color, e.g. '#ff0000'. Schema-v3
-  // operation bindings are explicit; color remains a legacy fallback.
-  readonly color: string;
-  readonly operationIds?: ReadonlyArray<string>;
-  readonly polylines: ReadonlyArray<Polyline>;
-  // Local-coordinate width of a trusted round-stroke source. Ordinary line
-  // operations keep the centerline; filled-region CAM may materialize the
-  // visible stroke outline without changing laser/engrave geometry.
-  readonly strokeWidthMm?: number;
-  readonly strokeTransform?: StrokeTransform;
-  // Preserve an outlined font's winding semantics after Convert to Path.
-  // Absent follows the object's family (text: nonzero; other vectors: evenodd).
-  readonly fillRule?: 'nonzero' | 'evenodd';
-  // Schema-v2 canonical geometry. `polylines` remains a deterministic
-  // compatibility view while preview and compilation migrate subsystem by
-  // subsystem; serializers always materialize this field for saved projects.
-  readonly curves?: ReadonlyArray<CurveSubpath>;
 };
 
 export type Transform = {

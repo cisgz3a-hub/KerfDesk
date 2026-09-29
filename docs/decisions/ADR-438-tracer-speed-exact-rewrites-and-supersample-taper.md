@@ -114,3 +114,249 @@ three noise images, in all six presets. The intended differences are:
   added there belongs in `bridgeGap`. The tip-extension junction test now asks the shared point
   grid (`landmarkGrid`).
 - `centerline/endpoint-grid.ts` is removed: the bridge queue keeps its own cells.
+
+### Amendment 1 (2026-09-27): the speed gate, an alternating bench and trace independence
+
+The second speed wave only takes output-identical changes, so it first needs a gate that can see
+any output change and a benchmark that is not fooled by machine load.
+
+**Parity oracle.** `src/__fixtures__/perceptual/trace-parity-oracle.ts` serialises the whole trace
+result canonically: every `ColoredPath` field including `curves`, object keys sorted, numbers in
+their round-trip decimal form with `-0` kept distinct, and array and path order kept. It hashes the
+text with SHA-256. The corpus is the five perceptual fixtures, seeded uniform noise at 192² and
+1024², seeded value noise at 1024² (cell 3, seed 7) and, from the lab folder outside the
+repository, the owl and the hummingbird, each in Line Art, Photo shading, Centerline, Edge
+Detection, Smooth and Sharp (60 cases). `trace-parity-oracle.test.ts` compares the hashes with a
+base file recorded from the untouched base commit (952fb13e3). It runs only with
+`TRACE_PARITY=1`; the real art and the 1024² noise also need `TRACE_PARITY_HEAVY=1`.
+
+Proof that the gate works:
+
+- It passes on the unchanged code: the 36 light cases passed twice, all 60 cases were recorded,
+  and the full 60-case compare passes on the branch head that adds the gate.
+- A fitted ring whose cubics are no longer registered, so that its curves fall back to straight
+  segments, fails 4 cases: noise192 in Line Art, Edge Detection, Smooth and Sharp.
+- Reversing the order of the corner Set in `contour-trace.ts` (the union of bend corners and feature
+  anchors) still passes all 36 light cases. That Set is only used to test membership, so its order
+  is not part of the output.
+- `trace-parity-canonical.test.ts` checks that the hash changes when paths are reordered, a curve
+  is dropped, a point moves by one ulp, `0` becomes `-0`, or a typed array is permuted.
+
+**Alternating bench.** `scripts/trace-bench.mjs` bundles the tracer of two source trees into two
+independent modules, loaded in one process. The trees can be two worktrees, or a detached
+worktree of a commit. Each round alternates which side runs first. The script reports best of N,
+the median, the new/base ratio, and whether both sides produced the same canonical hash. An A/A
+run (the same code on both sides, best of 3, machine under load) gave new/base ratios from 0.86
+to 1.33. So a claimed speed-up needs at least 5 alternating rounds, and must show in the best and
+in the median.
+
+**Trace independence (the 187-against-69 question).** The speed study saw owl Line Art's first
+repair round report 187 conflicts after a noise trace in the same process, and 69 in a fresh
+process. Findings:
+
+- Neither the base nor tl-geometry-core has trace state at module level in the contour, topology
+  or finishing path. Every topology cache (membership, contacts, measurements, nesting relations,
+  pair cache) is created inside `preserveContourTopologySteps` for each trace. The only
+  module-level tables are WeakMaps keyed by arrays that each trace allocates for itself: the
+  fitted-ring curves in `trace-curves.ts` and the landmark grid in `centerline/point-grid.ts`.
+  Their entries cannot be reached from a later trace. The remaining module-level value,
+  `tracerPromise`, is a loader.
+- The two rows came from the geometry-core worktree at 841d2e49a, which also carried another
+  agent's uncommitted edits, measured through a `vi.mock` probe. The 69 row was written by a later
+  version of that probe (it has fields the 187 row lacks), so it comes from a separate run.
+  "Same final loops" compared only the loop count, not the output.
+- On this base the effect does not reproduce. Owl in Line Art gives the same hash and the same
+  conflicts in every round (310, 36, 26, 17, 12, 1, 1, 0) fresh, after noise192, after the
+  hummingbird, and traced twice in a row. Owl in Sharp gives the same (329, 8, 5, 2, 2, 2, 0)
+  fresh and after noise192. The oracle's owl hashes match as well, although there the owl runs
+  after ten traces of other images.
+- `src/core/trace/trace-independence.test.ts` keeps this true. It traces a seeded noise image in a
+  fresh module instance, then again after Sharp, Centerline and Smooth traces of other images, and
+  twice in a row, in all six presets. It requires the same hash every time and, in the four presets
+  that run the topology repair (Line Art, Edge Detection, Smooth and Sharp), the same conflicts in
+  every round. Photo shading and Centerline run no repair rounds.
+- Nothing accumulates across traces in one process, as it would in the long-lived trace worker.
+  Twenty light Line Art traces in one process (five fixtures alternating with noise192, twice
+  round) keep the heap live after a forced GC flat: noise192 rows go from 56.8 to 57.5 MB and the
+  others from 44.1 to 46.6 MB, settling after the first few traces, with every hash unchanged.
+  Owl traced twice keeps 83.9 then 84.1 MB. Owl and hummingbird alternated three times in Line
+  Art keep 83.9, 79.9 and 80.1 MB after each owl and 66.0, 66.2 and 66.4 MB after each
+  hummingbird, and every owl and hummingbird trace repeats its hash and its repair conflicts.
+
+No code change was needed, and none was made. The 187 against 69 difference is put down to
+measuring different code, not to state leaking between traces.
+
+### Amendment 2 (2026-09-27): output-identical cuts, speed wave 2
+
+Each cut below leaves the serialised trace byte-identical: the Amendment 1 parity oracle
+(`TRACE_PARITY=1`, plus `TRACE_PARITY_HEAVY=1` when the machine has 4 GB free) matches the hashes
+frozen from 952fb13e3 in all six presets, and each cut has its own differential proof against a
+frozen copy of the code it replaces. The frozen copies live in `*.test-support.ts` files, never
+in production code. Shared fuzz masks come from `src/core/trace/mask-fuzz.test-support.ts`
+(dense and sparse noise, blobs and rings, 1 px lines, ink on the border, checkerboard saddles,
+all-ink, all-paper, 1xN and Nx1 shapes).
+
+**Rank 2, whole-grid distance field (`centerline/distance-field.ts`).** The column pass
+transforms a 0/INF indicator, and the lower envelope of parabolas that are all rooted at 0 is
+exactly the squared distance to the nearest background pixel in the column (INF when the column
+has none). Two row-major integer sweeps (down, then up, keeping a per-column run length) now give
+those values, which removes the strided per-column envelope. The row envelope is unchanged in
+operation order; it no longer needs a max(width, height) scratch, and the virtual border clamp
+is folded into its write-back. Proof: `distance-field-parity.test.ts` compares every element with
+`Object.is` against the frozen field on 3000 fuzzed masks, 300 px all-ink, all-paper, border and
+blob grids, degenerate grids (0x0, 0x5, 1x40, 40x1) and masks holding values other than 0 and 1;
+`src/__fixtures__/perceptual/trace-parity-distance-field.test.ts` (gated on `TRACE_PARITY=1`)
+does the same for every mask the tracer builds from the oracle corpus in all six presets. A
+mutation (border clamp off by one) fails both. Oracle: 60/60 heavy before a lint-only split of
+the function into per-row helpers, and 36/36 light plus the corpus-mask check after it.
+
+**Rank 4, boundary walk as direction bits (`contour-boundary.ts`).** `Map<vertex, Set<dir>>` is
+replaced by a `Uint8Array` of four direction bits per lattice vertex plus the list of vertices in
+the order their first edge was found. Loops start at vertices in that order, each with its
+earliest-inserted remaining direction. Raster order inserts a vertex's edges W, N, S, E (from
+pixels (x-1,y-1), (x,y-1), (x-1,y), (x,y)), so the new walker reproduces the Map and Set
+iteration exactly, including after deletions, which never reorder either structure. Only
+`collectBoundaryEdges`, `walkLoop`, `nextDirection` and the two-line start loop in
+`traceBoundaryLoops` changed, so geometry-core's nesting-forest edit should merge cleanly. Proof:
+`contour-boundary-parity.test.ts` deep-equals the loops (order, start, points, area) against the
+frozen Map walker on 10 000 fuzzed masks with the default saddle rule, 3000 more with
+paper-joining, ink-joining and position-hashed saddle resolvers, large 160 px masks, non-0/1
+mask values and short ink arrays. Mutations: walking the vertices in raster order instead of
+first-insertion order fails 3 of 5 tests. Swapping the per-vertex direction order (E before W,
+or S before N) does NOT fail: by the time the outer loop reaches a saddle vertex, one of its two
+out-edges has always been consumed by a loop that started at an earlier vertex, so that order
+is not observable on any fuzzed mask. The exact order is kept anyway.
+
+**Rank 5, thinning mechanics (`centerline/medial-thinning.ts`, `centerline/erosion-queue.ts`).**
+Pop order is the thinning algorithm, so the queue still returns the least (squared distance,
+neighbour tie, pixel index) every time. What changed is how it finds that entry:
+- Keys are direct-addressed. Each distinct distance in the field gets a dense rank (an
+  `Int32Array` table when the largest distance is below 2^23, otherwise a binary search over the
+  sorted distinct values). The ranks are computed once per thinning and shared by both passes.
+  Buckets live at `[rank][tie]`, and a cursor finds the least non-empty key. The cursor only
+  moves back when a push lands below it. This replaces the per-push `Map` lookup and the key heap.
+- An entry pushed while an identical (pixel, tie) entry is still pending is dropped. It would pop
+  straight after its twin. If the first pop erodes the pixel, the second finds it gone, and
+  eroded pixels never come back. If the first pop refuses, nothing has changed before the second
+  pop, so it refuses too. Either way the second pop does nothing.
+- Ring configurations, neighbour requeues and the maximal-disc test read interior pixels through
+  per-width index deltas. Border pixels use flat `Int8Array` offset tables. This replaces
+  destructuring the offset tuples.
+
+Lazy seeding was dropped because it is not output-identical. A pixel seeded with a full ring
+(tie 0) can become erodable after lower-distance neighbours erode. Its seed entry then pops
+before its re-queued, higher-tie entries. Skipping or deferring that seed changes the erosion
+order. Seeding stays one pass through the cheaper push.
+
+Proof:
+- `medial-thinning-parity.test.ts` compares skeletons byte for byte against the frozen 952fb13e3
+  thinning and queue (`medial-thinning-reference.test-support.ts`,
+  `erosion-queue-reference.test-support.ts`). It covers 4000 fuzzed masks, 1000 stroke ribbons of
+  width 1 to 6 (even widths leave the 2 px ridge that the neighbour tie exists for), 160 px
+  blob, border, line, dense and all-ink grids, fields scaled by 2^22 (the binary-search rank
+  path), arbitrary small-integer keys, and non-integer keys (the comparator-heap path).
+- `erosion-queue.test.ts` checks the pop sequence against a comparator model that keeps one
+  pending copy per exact duplicate.
+- `src/__fixtures__/perceptual/trace-parity-thinning.test.ts` (gated on `TRACE_PARITY=1`) checks
+  every mask the tracer thins from the oracle corpus.
+- Mutations:
+  - Swapping two interior ring bits fails all 5 skeleton tests.
+  - Deduplicating by pixel alone, ignoring the tie, fails 8 tests.
+  - Never clearing the pending bit fails the 3 queue tests. The thinning never re-pushes an
+    identical entry after its pop in a way that changes the skeleton, so the skeleton tests
+    still pass.
+  - A cursor that never moves back fails the queue tests and hangs the thinning.
+- Oracle: 36/36 light cases plus the corpus thinning check (62/62 with the unit parity tests).
+  On the final code (ranks 2, 4 and 5 together) the heavy gate passed 76/76. That covers the 60
+  oracle cases, the corpus distance-field and thinning checks, and the distance-field, boundary
+  walk and thinning fuzz suites. It also covers rank 2 after its lint-only helper split.
+
+**Measurements (speed wave 2).** All numbers come from `scripts/trace-bench.mjs`: 5 alternating
+rounds, with the side that runs first switching each round, on one heavily shared machine. Other
+agents' vitest runs were active, so absolute times are inflated 2-10x and swing from run to run.
+An earlier A/A smoke (same code on both sides) gave ratios between 0.857 and 1.333, so a single
+ratio inside that band is noise. The table gives new/base of the best times, with the median
+ratio in brackets. Every row reported `identical true`: the serialised trace hash matched on
+both sides.
+
+| Comparison                  | Case        | Line Art      | Sharp         | Centerline    |
+| --------------------------- | ----------- | ------------- | ------------- | ------------- |
+| 952fb13e3 -> rank 2         | owl         | 1.036 (0.962) | 1.070 (1.143) | 0.974 (0.960) |
+|                             | hummingbird | 0.988 (0.975) | 1.050 (0.976) | 0.996 (1.042) |
+|                             | noise1024   | 1.004 (0.954) | 1.222 (1.093) | 1.006 (1.079) |
+|                             | sparse4096  | 0.898 (0.828) | 0.631 (0.624) | 0.936 (0.912) |
+| rank 2 -> rank 4            | owl         | 0.891 (0.890) | 0.865 (0.904) | not run       |
+|                             | hummingbird | 0.978 (0.969) | 0.890 (0.902) | not run       |
+|                             | noise1024   | 0.873 (0.895) | 0.887 (0.970) | not run       |
+|                             | sparse4096  | 0.981 (0.920) | 0.971 (1.051) | not run       |
+| 952fb13e3 -> rank 5 (all)   | owl         |               |               | 0.937 (0.965) |
+|                             | hummingbird |               |               | 0.965 (0.965) |
+|                             | noise1024   |               |               | 0.904 (0.951) |
+|                             | sparse4096  |               |               | 0.828 (0.809) |
+| rank 4 -> rank 5            | owl         |               |               | 0.971 (0.898) |
+|                             | hummingbird |               |               | 0.932 (0.928) |
+|                             | noise1024   |               |               | 0.930 (1.007) |
+|                             | sparse4096  |               |               | 0.915 (0.976) |
+| 952fb13e3 -> ba7157fab      | owl         | 0.930 (0.907) | 0.837 (0.715) | see rank 5    |
+|                             | hummingbird | 0.953 (0.861) | 0.796 (0.860) | see rank 5    |
+
+Reading:
+- The rank 2 distance field clearly pays only where it dominates, on the sparse 4096 page
+  (Sharp 0.63). On owl, hummingbird and noise1024 it is within noise. The noise1024 Sharp row
+  (1.22) is inside the A/A band, and the rank 4 and rank 5 rows re-ran rank 2's code as their
+  base without a comparable slowdown.
+- The rank 4 boundary walk gives a consistent 0.87-0.98 on the contour presets. That is
+  suggestive, not proven: each row is inside the A/A band on its own.
+- Rank 5 moves Centerline by 0.91-0.97 (best) end to end. The thinning is only part of a
+  Centerline trace. Isolated, in one process, alternating best-of-9 against the frozen copy, the
+  thinning takes 0.75x the time on a 1200 px stroke page (median 0.75x). Log:
+  `lfbake/speed2/thin-bench-r5.log`, outside the repo.
+- End to end, base to the finished wave (ba7157fab, ranks 2, 4 and 5; run with 6.6-7.4 GB free),
+  Line Art takes 0.93-0.95x and Sharp 0.80-0.84x (best). Each ratio is again inside the A/A band
+  on its own; the medians (0.72-0.91) point the same way.
+- None of this changes the size of the gap to Potrace. Owl Line Art is still seconds, not a
+  quarter-second. The remaining plan ranks, workers and topology repair are where that gap
+  lives.
+
+**Allocations (speed wave 2).** The wave adds full-grid typed buffers that the base did not
+have, all freed when their stage returns:
+- The thinning's pending-tie mask is a `Uint16Array` of 2 bytes per pixel (32 MiB at
+  4096x4096). One mask serves both passes, because a pass drains its queue to empty and leaves
+  the mask all zero.
+- The dense distance-rank table is an `Int32Array` of (largest squared distance + 1) entries,
+  capped at 2^23 entries (32 MiB); a larger field ranks by binary search over its distinct values
+  instead. A stroke of radius r needs about r^2 entries, so real masks stay far below the cap
+  (the sparse 4096 page: about 0.4 MB).
+- The boundary walk's direction bits are a `Uint8Array` of one byte per lattice vertex
+  ((width + 1) x (height + 1)), allocated once per mask. It replaces a `Map` of `Set`s sized to
+  the boundary. Photo shading walks one mask per layer, one after another.
+
+Measured on the bench's sparse 4096 page with `process.resourceUsage().maxRSS`, one process per
+run, three alternating runs per side (scratch probe, outside the repo): the thinning stage grows
+peak RSS by 160-164 MB against 232-233 MB on 952fb13e3, and the boundary walk by 21-22 MB
+against 33-34 MB. A whole Centerline trace of that page peaks at 758 MB on both sides, and a Line
+Art trace at 778-789 MB against 774-777 MB, so an earlier stage sets the trace's peak and these
+buffers do not raise it.
+
+**Review follow-up (speed wave 2).**
+- The two thinning passes share one pending mask (above); light oracle byte-identical.
+- The `ErosionQueue` type now states that an implementation may drop an exact duplicate while it
+  is pending (the bucket queue does, the comparator heap does not), so callers may rely only on
+  the order of pops, never on `size()` or on the number of pops.
+- The light oracle corpus gains five cheap edge shapes: 37x113 noise, 1x50 and 50x1 stripes, an
+  alpha-faded disc on transparent paper, and a 200x150 page with ink on every border. Their base
+  hashes were recorded from 952fb13e3 (the oracle files copied into a detached 952fb13e3
+  worktree). The light gate is now 66 cases. The 1 px stripes trace to nothing in Centerline and
+  Edge Detection on both sides; they still guard the degenerate path. The oracle still hashes
+  only `traceImageToColoredPaths` with preset options; worker bounds, frozen source decisions and
+  non-default sliders remain outside it.
+- The canonical serialiser throws on a `Map`, `Set`, `Date` or class instance instead of writing
+  it as `{}`, so a future non-plain trace field cannot hide from the gate.
+- `trace-independence.test.ts` now also abandons a Sharp and a Centerline trace half way through
+  their cooperative steps, steps a Line Art and a Centerline trace alternately with `next(true)`,
+  then retraces all three, and compares every hash with a fresh module instance. A mutation that
+  caches the pending mask at module level fails only this new case.
+- Gate on the final code: the heavy oracle (90 cases: 66 light plus owl, hummingbird, noise1024
+  and value1024 in all six presets) matched the 952fb13e3 hashes, together with the corpus
+  distance-field and thinning checks and the distance-field, boundary-walk, thinning, queue,
+  canonical and independence suites (371/371).

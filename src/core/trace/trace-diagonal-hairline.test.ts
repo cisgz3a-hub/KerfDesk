@@ -103,6 +103,16 @@ type PresetName = (typeof PRESETS)[number];
 //    ribbon as a coarse polygon (13 points for 69 px) that cuts the
 //    staircase's outer pixels. Potrace 1.16 measures 0.870 binary and
 //    0.863 / 0.887 AA. Owner: the contour finishing tail.
+// Since ADR-530 every measured (anti-aliased) ribbon ends in the compact fit
+// instead of the simplify + spline tail, whose spline bowed each edge ~0.3 px
+// outward. Binary cells now all reach recall 1.000 (Line Art, Smooth) or
+// 0.942 (Sharp). The AA cells follow the measured iso-line itself, which on a
+// 1-px ribbon sits inside the 128-cut truth pixels: Line Art 30°/60° measure
+// 0.938 / 0.875 recall at precision 0.987 / 1.000 (IoU 0.926 / 0.875, was
+// 0.597 / 0.619 at precision 0.611 / 0.629), and Smooth's Otsu level beside
+// the square leaves a 0.6-px ribbon, 0.775 / 0.887 recall at precision 1.000
+// (was 0.887 / 0.887). Their floors are 0.85 and 0.75 with a precision floor,
+// so a fatter outline cannot buy the recall back.
 function recallFloor(
   preset: PresetName,
   antialiased: boolean,
@@ -111,8 +121,14 @@ function recallFloor(
 ): number {
   if (degrees === 45) return 0.9;
   if (preset === 'Line Art' && !antialiased) return 0.8;
-  if (preset === 'Smooth' && sq) return 0.85;
+  if (preset === 'Line Art') return 0.85;
+  if (preset === 'Smooth' && sq) return antialiased ? 0.75 : 0.85;
   return 0.9;
+}
+
+function precisionFloor(preset: PresetName, antialiased: boolean, sq: boolean): number {
+  if (!antialiased) return 0;
+  return preset === 'Line Art' || (preset === 'Smooth' && sq) ? 0.95 : 0;
 }
 
 function hairlineOutlines(polylines: ReadonlyArray<Polyline>): Polyline[] {
@@ -123,7 +139,12 @@ async function traceCell(
   preset: PresetName,
   fixture: Fixture,
   extra: Partial<TraceOptions> = {},
-): Promise<{ readonly outlines: Polyline[]; readonly all: Polyline[]; readonly recall: number }> {
+): Promise<{
+  readonly outlines: Polyline[];
+  readonly all: Polyline[];
+  readonly recall: number;
+  readonly precision: number;
+}> {
   const options: TraceOptions = { ...(TRACE_PRESETS[preset] as TraceOptions), ...extra };
   const paths = await traceImageToColoredPaths(fixture.image, options);
   const all = paths.flatMap((path) => path.polylines);
@@ -131,10 +152,12 @@ async function traceCell(
   // Score only the hairline's half of the canvas.
   for (let y = 0; y < SIZE; y += 1)
     for (let x = 0; x < SIZE / 2; x += 1) rendered.data[y * SIZE + x] = 0;
+  const scores = compareMasks(rendered, fixture.truth);
   return {
     outlines: hairlineOutlines(all),
     all,
-    recall: compareMasks(rendered, fixture.truth).recall,
+    recall: scores.recall,
+    precision: scores.precision,
   };
 }
 
@@ -151,9 +174,10 @@ describe('1-px diagonal hairlines trace as one connected outline (ADR-403)', () 
     '$preset aa=$antialiased $degrees° square=$withSquare',
     async ({ preset, antialiased, degrees, withSquare }) => {
       const fixture = hairline(degrees, antialiased, withSquare);
-      const { outlines, all, recall } = await traceCell(preset, fixture);
+      const { outlines, all, recall, precision } = await traceCell(preset, fixture);
       expect(outlines).toHaveLength(1);
       expect(recall).toBeGreaterThanOrEqual(recallFloor(preset, antialiased, degrees, withSquare));
+      expect(precision).toBeGreaterThanOrEqual(precisionFloor(preset, antialiased, withSquare));
       if (withSquare) expect(all.length - outlines.length).toBe(1);
       // The topology stage's guarantee holds for the pinched ribbon too.
       expect(runTraceSteps(intersectingContourLoopsSteps(all)).size).toBe(0);

@@ -486,8 +486,9 @@ test('imports a generated bitmap and traces it through the production worker wor
   const threshold = dialog.getByRole('spinbutton', { name: 'Trace Threshold', exact: true });
   await expect(detection).toHaveValue('preset');
   await expect(threshold).toHaveCount(0);
-  // Unset: Line Art judges small marks automatically (ADR-434).
-  await expect(dialog.getByRole('spinbutton', { name: 'Remove ink specks' })).toHaveValue('0');
+  // Line Art judges small marks automatically: the control says Auto (ADR-434 Amendment 1).
+  await expect(dialog.getByRole('spinbutton', { name: 'Remove ink specks' })).toHaveValue('');
+  await expect(dialog.getByRole('checkbox', { name: 'Remove ink specks: Auto' })).toBeChecked();
   await expect(dialog.getByRole('spinbutton', { name: 'Ignore Less Than' })).toHaveValue('2');
   await dialog.screenshot({ path: testInfo.outputPath('trace-automatic.png') });
 

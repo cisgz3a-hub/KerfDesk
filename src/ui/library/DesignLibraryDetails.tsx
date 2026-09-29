@@ -175,7 +175,9 @@ function machineLabel(entry: LibraryEntry): string {
 
 function licenseLabel(entry: LibraryEntry): string {
   const provenance = entry.provenance;
-  return provenance.license === provenance.licenseId
+  // A LicenseRef- id names KerfDesk's own terms, which the label already spells out.
+  return provenance.license === provenance.licenseId ||
+    provenance.licenseId.startsWith('LicenseRef-')
     ? provenance.license
     : `${provenance.license} (${provenance.licenseId})`;
 }

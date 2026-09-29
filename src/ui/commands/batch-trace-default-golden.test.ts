@@ -9,7 +9,9 @@ import { writeTracedDrawing } from '../../io/vector-formats/traced-drawing';
 // Golden bytes for Multi-File Trace's default output (rank 33 acceptance):
 // the hashes were taken on the batch's base commit 7a644d486, before paper
 // pages, per-side margins, the Size row, streaming writes and per-file skips,
-// and must not move. A change here changes files users already export.
+// and must not move. A change here changes files users already export. They
+// were taken again for ADR-530 only, whose compact curves change the traced
+// paths themselves; the page, the headers and every writer are unchanged.
 
 function ringImage(): RawImageData {
   const width = 64;
@@ -54,18 +56,18 @@ async function defaultHashes(page?: {
 }
 
 const IMAGE_PAGE_GOLDEN: Record<string, string> = {
-  svg: '2bc0ca008144ee89',
-  pdf: 'dfbda31d90fa0f8d',
-  eps: '74886c87d1a15575',
-  dxf: '21e38ecf282a0e51',
-  geojson: '714361673f2b5059',
+  svg: '92123a1e4f0ec8f7',
+  pdf: '5b7f7013a83f133e',
+  eps: 'defaaf4d16a1f5db',
+  dxf: 'ab4146e47b672719',
+  geojson: 'd9ba29739d87f384',
 };
 const ARTWORK_PAGE_GOLDEN: Record<string, string> = {
-  svg: 'c60afbf2f79b8203',
-  pdf: 'e60dc51bfb34b07c',
-  eps: 'c270b2ce9031f66b',
-  dxf: 'edcb205044d485c2',
-  geojson: '61a1cad1befbdf0f',
+  svg: '9c4f9cd8d32ed6e3',
+  pdf: '59ba1a00a78ac892',
+  eps: '05a53444023dfe23',
+  dxf: 'beec7a6bfbd5907f',
+  geojson: '99a01c90866a8c4c',
 };
 
 describe('Multi-File Trace default output is byte-identical to the base commit', () => {

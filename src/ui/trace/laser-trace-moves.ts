@@ -18,6 +18,7 @@ import {
   type Polyline,
   type Transform,
 } from '../../core/scene';
+import { carrySubpathNesting } from '../../core/scene/subpath-nesting';
 import { simplifyToolpathPolyline, type ToolpathSimplifyOptions } from '../../core/toolpath';
 import { preserveLaserTraceTopology } from './laser-trace-topology';
 
@@ -59,7 +60,11 @@ export function simplifyTracedPathsForLaser(
         : null,
   };
   const candidates = paths.map((path) => conditionPath(path, moves));
-  return preserveLaserTraceTopology(paths, candidates, placement);
+  // The topology check keeps every crossing and nesting relation of the
+  // source, subpath for subpath, so a traced forest (ADR-531) carries.
+  return preserveLaserTraceTopology(paths, candidates, placement).map((path, index) =>
+    path === paths[index] ? path : carrySubpathNesting(paths[index] as ColoredPath, path),
+  );
 }
 
 function conditionPath(path: ColoredPath, moves: LaserMoves): ColoredPath {

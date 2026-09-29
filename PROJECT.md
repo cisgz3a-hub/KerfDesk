@@ -741,7 +741,7 @@ Reject any of these mid-development without a `PROJECT.md` revision and a `DECIS
 | `DECISIONS.md` | Architecturally significant decisions with rationale. |
 | `CLAUDE.md` | Operating manual for Claude Code: file-size limits, naming, anti-patterns, checklists. |
 | `RESEARCH_LOG.md` | External claims and library adoptions, with source, version, license, date. |
-| `LICENSE` | All rights reserved from ADR-543. `LICENSE-MIT` holds the MIT License for versions up to and including the `mit-final` tag (ADR-120, clarified by ADR-247/248); those grants persist. |
+| `LICENSE` | All rights reserved from ADR-543. `docs/licensing/mit-final-terms.txt` holds the MIT License for versions up to and including the `mit-final` tag (ADR-120, clarified by ADR-247/248); those grants persist. |
 
 External authorities:
 - **GRBL v1.1h wire protocol** — defined in the `gnea/grbl` wiki, which has been archived since Aug 2019. The 1.1h streaming protocol (simple send-response, character-counted buffer) remains the de-facto wire authority; actively maintained protocol-compatible forks are **grblHAL**, **FluidNC**, and **µCNC**.

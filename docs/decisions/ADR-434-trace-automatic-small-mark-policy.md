@@ -173,12 +173,58 @@ tests for all of these are in `small-mark-policy.test.ts`.
   would repeat the same cleanup. `hasAggressivePreprocessing` counts the policy as a lever.
   Small-mark-only art that the policy empties (a sparse grid of 3x2 dots) recovers on the retry, as it did under the
   fixed rule.
-- The Trace dialog still shows the unset controls as "Remove ink specks 0" and an unchecked "Fill
-  tiny holes". The tooltips now say what each state does. A typed value, 0 included, is exact. Line
-  Art and Smooth show 0 or unticked until the user sets a value and judge automatically meanwhile.
-  The dialog cannot yet show or restore an "Auto" state (tri-state control). That belongs to the
-  dialog owners and should land before or with this default.
+- The Trace dialog first shipped this default showing the unset controls as "Remove ink specks 0"
+  and an unchecked "Fill tiny holes". Amendment 1 replaces that with an Auto choice.
 - Tests that pinned the fixed-area erasure are updated: the Line Art and Smooth 2-px checkerboard is
   now kept at half the board (never welded), the Centerline connectivity test pins the fixed rule
   with an explicit 12 and asserts the automatic result separately, and the dialog tests expect the
   unset controls.
+
+### Amendment 1 - the dialog shows Auto, and a preset switch resets what the new preset defines (2026-09-27)
+
+**Auto is a control state, not a stand-in number.** "Remove ink specks" and "Fill tiny holes" each
+carry an Auto checkbox (`TraceAreaControls.tsx`, `TraceNumberRow.tsx`, `TraceCheckboxRow.tsx`).
+The controls read the merged options (`smallMarkControlState`), so they show what the engine
+receives:
+
+- Auto ticked: the stage has no explicit value and `smallMarkPolicy` is `'auto'`. The number input
+  is empty, disabled and says "Auto"; the Fill checkbox is indeterminate and disabled.
+- Auto unticked: the value is exact. A typed 0 removes nothing; Off fills nothing; On fills every
+  candidate. Leaving Auto on a preset whose own choice is Auto (Line Art, Smooth) starts "Remove
+  ink specks" at 12 px² (`AUTO_CANDIDATE_AREA_PX`, Auto's candidate ceiling and Line Art's former
+  fixed cut) and "Fill tiny holes" at Off. Leaving Auto on a fixed-cleanup preset (Centerline,
+  Sharp) removes the override, so the preset's own value returns (Sharp's 1 px², Centerline's
+  Fill On) and "Settings edited" clears.
+- Auto is offered on every preset that shows the controls. On a preset whose own choice is Auto
+  ticking it removes the override; elsewhere it stores the override `'auto'`, which the merge
+  turns into "no explicit value, policy on" for that stage only. The engine automates every stage
+  without an explicit value, so when `'auto'` switches the policy on for a preset that has none,
+  the merge pins the other stage to the fixed value the preset ran with if the operator has not
+  set it (`despeckleMinPixels` 0, `fillPinholeCracks` false when the preset leaves them unset).
+  Ticking ink Auto on Sharp therefore leaves its holes stage at "fill nothing"; it never starts
+  auto-filling cracks the preset exists to keep.
+
+The engine and its model are unchanged.
+
+**Persistence (ADR-408).** The override keys keep their names; their values widen to
+`number | 'auto'` and `boolean | 'auto'`. `TRACE_OVERRIDE_RULES` marks both rules `auto: true`,
+so `'auto'` restores as Auto, and records written before this amendment (plain numbers and
+booleans) restore as the exact values they held. `'auto'` is rejected for every other control.
+Colour layers' "Remove specks" shares `despeckleMinPixels` and reads `'auto'` as its preset area.
+
+**Preset switch.** Overrides used to carry silently into the next preset, so a Smoothness tuned
+for contours became Centerline's corner angle and an exact 12 px² from Centerline replaced Line
+Art's Auto. Switching preset now drops an override of a shared control that the new preset
+defines itself (`trace-preset-switch.ts`, applied by `useTraceDialogSettings.selectPreset`):
+Smoothness, Optimize, Ignore Less Than, Remove ink specks (defined by an explicit value, the
+automatic policy, or Colour layers' own speck rule), Fill tiny holes, and line Invert. Smoothness
+and Optimize are also dropped whenever the switch crosses the Centerline boundary, where they
+change role (ADR-405). An `'auto'` small-mark override is a switch that turns the policy on, not a
+value, so every line preset counts as defining it: a Centerline Auto never carries into Sharp,
+which chose fixed cleanup. Everything else still carries: settings the new preset leaves to the engine
+default, detection choices and the alpha mask (they describe the source), and style-exclusive
+controls (Photo, Colour layers, Edge), which only apply to their own style.
+
+Tests: `TraceSmallMarkControls.semantic.test.tsx` (Auto and exact values through the real
+controls and the engine, the switch rule, the Re-trace round trip, pre-amendment records) and
+`use-trace-dialog-settings.test.tsx` (the dialog hook applies the switch rule to what it records).

@@ -19,6 +19,7 @@ import {
   type Polyline,
   type Vec2,
 } from '../scene';
+import { carrySubpathNesting } from '../scene/subpath-nesting';
 import type { RawImageData } from './trace-image';
 
 // Above this source area we do NOT supersample. Rationale: quadrupling an
@@ -301,17 +302,20 @@ export function scaleTracedPathsUniform(
   scale: number,
 ): ColoredPath[] {
   if (!Number.isFinite(scale) || scale <= 0) return paths.map((path) => ({ ...path }));
-  return paths.map((path) => ({
-    color: path.color,
-    polylines: path.polylines.map((polyline) => scalePolyline(polyline, scale)),
-    // A Line + fill stroke's pen width lives in the same local units.
-    ...(path.strokeWidthMm === undefined ? {} : { strokeWidthMm: path.strokeWidthMm * scale }),
-    ...(path.curves === undefined
-      ? {}
-      : {
-          curves: path.curves.map((curve) => transformCurveSubpathUniform(curve, { scale })),
-        }),
-  }));
+  return paths.map((path) =>
+    // A uniform positive scale keeps every containment, so the forest carries.
+    carrySubpathNesting(path, {
+      color: path.color,
+      polylines: path.polylines.map((polyline) => scalePolyline(polyline, scale)),
+      // A Line + fill stroke's pen width lives in the same local units.
+      ...(path.strokeWidthMm === undefined ? {} : { strokeWidthMm: path.strokeWidthMm * scale }),
+      ...(path.curves === undefined
+        ? {}
+        : {
+            curves: path.curves.map((curve) => transformCurveSubpathUniform(curve, { scale })),
+          }),
+    }),
+  );
 }
 
 function scalePolyline(polyline: Polyline, scale: number): Polyline {

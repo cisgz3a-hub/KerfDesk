@@ -144,7 +144,7 @@ export function buildThirdPartyNotice(rootDir = REPO_ROOT) {
     'Third-Party Notices',
     '===================',
     '',
-    'This application bundles the open-source components listed below. Each',
+    'This application bundles the third-party components listed below. Each',
     'remains under its own license, reproduced here as those licenses require.',
     "The application's own first-party software and documentation are",
     'proprietary, all rights reserved (see LICENSE and eula.txt). This file',

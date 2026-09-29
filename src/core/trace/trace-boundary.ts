@@ -1,5 +1,6 @@
 import { clamp } from '../math';
 import { transformCurveSubpathUniform, type Bounds, type ColoredPath } from '../scene';
+import { carrySubpathNesting } from '../scene/subpath-nesting';
 import type { RawImageData } from './trace-image';
 
 export type TraceBoundary = {
@@ -55,27 +56,30 @@ export function offsetColoredPaths(
   offsetX: number,
   offsetY: number,
 ): ColoredPath[] {
-  return paths.map((path) => ({
-    ...path,
-    polylines: path.polylines.map((polyline) => ({
-      ...polyline,
-      points: polyline.points.map((point) => ({
-        x: point.x + offsetX,
-        y: point.y + offsetY,
+  // A translation keeps every containment, so the forest carries.
+  return paths.map((path) =>
+    carrySubpathNesting(path, {
+      ...path,
+      polylines: path.polylines.map((polyline) => ({
+        ...polyline,
+        points: polyline.points.map((point) => ({
+          x: point.x + offsetX,
+          y: point.y + offsetY,
+        })),
       })),
-    })),
-    ...(path.curves === undefined
-      ? {}
-      : {
-          curves: path.curves.map((curve) =>
-            transformCurveSubpathUniform(curve, {
-              scale: 1,
-              translateX: offsetX,
-              translateY: offsetY,
-            }),
-          ),
-        }),
-  }));
+      ...(path.curves === undefined
+        ? {}
+        : {
+            curves: path.curves.map((curve) =>
+              transformCurveSubpathUniform(curve, {
+                scale: 1,
+                translateX: offsetX,
+                translateY: offsetY,
+              }),
+            ),
+          }),
+    }),
+  );
 }
 
 export function offsetBounds(bounds: Bounds, offsetX: number, offsetY: number): Bounds {

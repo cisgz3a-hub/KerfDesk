@@ -58,8 +58,10 @@ const GRBL_ARC_TOLERANCE_MM = 0.002;
 const ARCS: DeviceProfile = { ...DEFAULT_DEVICE_PROFILE, controllerKind: 'grbl-v1.1' };
 // Measured 1,605 burn moves against 2,946 for the G1 program (ratio 0.54).
 // ADR-453's near-fewest chords cut the G1 program to 2,205 moves while the
-// arc program keeps 1,600 (ratio 0.73).
-const MAX_MOVE_RATIO = 0.8;
+// arc program keeps 1,600 (ratio 0.73). ADR-530's compact contour curves
+// then cut the G1 program to 2,011 moves while the arc program burns 1,622
+// (ratio 0.81): the fitted cubics already carry most of the saving arcs made.
+const MAX_MOVE_RATIO = 0.85;
 
 function burnMoves(gcode: string): number {
   return gcode.split('\n').filter((line) => /^G[123] .*X/.test(line)).length;

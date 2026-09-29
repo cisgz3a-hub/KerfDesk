@@ -13,17 +13,25 @@ type ContourEdge = ContourBox & {
 };
 const EDGE_CHECKPOINT_INTERVAL = 256;
 
-/** Loop owners of all nonadjacent crossings, contacts and collinear overlaps. */
+/** Loop owners of all nonadjacent crossings, contacts and collinear overlaps.
+ *  `onPair` hears the two loops of each contact between different loops. */
 export function* intersectingContourLoopsSteps(
   polylines: ReadonlyArray<Polyline>,
   cache = new ContourContactCache(),
+  onPair?: ContourPairListener,
 ): TraceSteps<Set<number>> {
   yield;
-  const cached = yield* cache.findSteps(polylines);
-  return cached ?? (yield* uncachedIntersectionsSteps(polylines));
+  const cached = yield* cache.findSteps(polylines, onPair);
+  return cached ?? (yield* uncachedIntersectionsSteps(polylines, onPair));
 }
 
-function* uncachedIntersectionsSteps(polylines: ReadonlyArray<Polyline>): TraceSteps<Set<number>> {
+/** Hears two different loops, by position, that meet. */
+export type ContourPairListener = (a: number, b: number) => void;
+
+function* uncachedIntersectionsSteps(
+  polylines: ReadonlyArray<Polyline>,
+  onPair: ContourPairListener | undefined,
+): TraceSteps<Set<number>> {
   const cooperate = yield;
   const orientation = new ContourOrientation();
   const edges: ContourEdge[] = [];
@@ -47,6 +55,7 @@ function* uncachedIntersectionsSteps(polylines: ReadonlyArray<Polyline>): TraceS
     if (!segmentsMeet(a, b, orientation)) return;
     conflicts.add(a.loop);
     conflicts.add(b.loop);
+    if (a.loop !== b.loop) onPair?.(a.loop, b.loop);
   });
   return conflicts;
 }

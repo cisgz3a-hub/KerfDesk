@@ -264,3 +264,13 @@ Regressions: `wide-stroke-runs.test.ts` (a 5/4 px wobble is one run at 1x, 2x an
 neck separates, a 3.6 px neck joins; a near-gate tail stays out of the run) and
 `trace-hybrid-local-width.test.ts` (a line wobbling between 5 and 4 px traces as one fill with no
 stroke at 1x, 2x and 4x). These are software classification checks, not a material cut.
+
+### Amendment 4 - a cut end closes against the finished outline (2026-09-27)
+
+With the corner dial (ADR-439) the contour finisher can smooth more of the junction bump off the fill
+outline than the one-pixel reach covers: a 4 px pen line meeting a block at 20 degrees left its
+reached end 0.6 px outside the square outline. After the fill is traced, each cut end still outside
+the outline walks on along its arrival direction in 0.25 px steps, over ink only and at most the
+gate radius, and stops at the first point inside (`hybrid/junction-close.ts`). The seam rule is
+unchanged: no paper between stroke and fill, and the end burns at most one step past the outline
+beyond the reach.
