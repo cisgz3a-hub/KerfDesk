@@ -2,33 +2,21 @@ import { useState } from 'react';
 import {
   SURFACING_DEFAULT_STEPOVER_PCT,
   SURFACING_DEFAULT_TOTAL_DEPTH_MM,
-  surfacingStarterValues,
 } from '../../core/cnc/surfacing';
-import { cncMaxFeedMmPerMin } from '../../core/cnc/cnc-head-feeds';
-import { activeCncTool, type CncMachineConfig, type Project } from '../../core/scene';
+import type { CncMachineConfig, Project } from '../../core/scene';
 import { NumberField as ClearableNumberField } from '../common/NumberField';
 import { useSourceTrackedState } from '../common/use-source-tracked-state';
-import { materialFeedsPatch } from '../state/cnc-project-material';
 import { useStore } from '../state/store';
+import { surfacingSeed } from './surfacing-seed';
 export function useSurfacingValues(
   machine: CncMachineConfig,
   project: Project,
   projectDocumentEpoch: number,
 ) {
   const liveCaps = useStore((s) => s.cncLiveCaps);
-  const tool = activeCncTool(machine);
-  const starter =
-    machine.stock.materialKey === undefined
-      ? null
-      : materialFeedsPatch({
-          materialKey: machine.stock.materialKey,
-          tool,
-          spindleRpm: machine.params.spindleMaxRpm,
-          profile: project.device,
-          machineParams: machine.params,
-          liveCaps,
-        });
-  const maxFeed = cncMaxFeedMmPerMin(project.device, machine.params);
+  // The calculator may lower a surfacing starter value but never raise it past
+  // the conservative surfacing defaults (ADR-457 Amd 1).
+  const { tool, starter, maxFeed, seed } = surfacingSeed(machine, project, liveCaps);
   const recipeKey = JSON.stringify([
     projectDocumentEpoch,
     tool,
@@ -37,9 +25,6 @@ export function useSurfacingValues(
     maxFeed,
     machine.params.spindleMaxRpm,
   ]);
-  // The calculator may lower a surfacing starter value but never raise it past
-  // the conservative surfacing defaults (ADR-457 Amd 1).
-  const seed = surfacingStarterValues(starter, maxFeed);
   const [feedMmPerMin, setFeed] = useSourceTrackedState(seed.feedMmPerMin, recipeKey);
   const [plungeMmPerMin, setPlunge] = useSourceTrackedState(seed.plungeMmPerMin, recipeKey);
   const [spindleRpm, setRpm] = useSourceTrackedState(

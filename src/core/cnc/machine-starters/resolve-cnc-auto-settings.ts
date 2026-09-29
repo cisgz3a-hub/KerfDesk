@@ -32,6 +32,10 @@ export type CncMaterialFeedInput = {
   readonly machineSpindleMaxRpm: number;
   readonly fluteCount: number;
   readonly liveCaps?: CncMachineStarterLiveCaps;
+  // The machine starter is a recipe for its own cutter (ADR-256: a 3.175 mm
+  // two-flute end mill). A caller seeding a different kind of cut, such as
+  // spoilboard surfacing with a facing cutter, leaves its ceilings out.
+  readonly ignoreMachineStarter?: boolean;
 };
 
 export type CncStarterFeedInput = {
@@ -93,7 +97,7 @@ export function resolveCncMaterialFeedPatch(
   input: CncMaterialFeedInput,
 ): Partial<CncLayerSettings> | null {
   if (!isChiploadMaterialKey(input.materialKey)) return null;
-  const starter = materialMachineStarter(input);
+  const starter = input.ignoreMachineStarter === true ? null : materialMachineStarter(input);
   const spindleRpm = materialSpindleRpm(input, starter?.spindleRpm);
   if (spindleRpm === undefined) return null;
   const maxFeedMmPerMin = materialFeedCeiling(input, starter?.feedMmPerMin);

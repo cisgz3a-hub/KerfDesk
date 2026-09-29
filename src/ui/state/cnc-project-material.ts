@@ -60,6 +60,7 @@ export function materialFeedsPatch(input: {
   readonly machineParams: CncMachineParams;
   readonly liveCaps?: CncMachineStarterLiveCaps | null;
   readonly fluteCount?: number;
+  readonly ignoreMachineStarter?: boolean;
 }): Partial<CncLayerSettings> | null {
   return resolveCncMaterialFeedPatch({
     profile: cncHeadDevice(input.profile, input.machineParams),
@@ -71,6 +72,7 @@ export function materialFeedsPatch(input: {
     ...(input.liveCaps === null || input.liveCaps === undefined
       ? {}
       : { liveCaps: input.liveCaps }),
+    ...(input.ignoreMachineStarter === true ? { ignoreMachineStarter: true } : {}),
   });
 }
 
