@@ -166,11 +166,12 @@ describe('hold-to-jog after an Unlock without Home on stock GRBL with $20=1', ()
       expect(useLaserStore.getState().lastError).toBeNull();
       expect(sim.state().mpos.x).toBeCloseTo(-399.99, 6);
       expect(towardFarEdge).toBeCloseTo(-349.99, 6);
-      // ...and the homing edge stops at the $27 rest point, clear of the switch.
+      // ...and the homing edge stops the same margin inside the $27 rest
+      // point, clear of the switch.
       const towardSwitch = await holdX(host, 'Jog +X 10 mm', true);
       expect(useLaserStore.getState().lastError).toBeNull();
-      expect(sim.state().mpos.x).toBeCloseTo(-2, 6);
-      expect(towardSwitch).toBeCloseTo(397.99, 6);
+      expect(sim.state().mpos.x).toBeCloseTo(-2.01, 6);
+      expect(towardSwitch).toBeCloseTo(397.98, 6);
     } finally {
       await unmount();
     }
@@ -186,7 +187,7 @@ describe('hold-to-jog after an Unlock without Home on stock GRBL with $20=1', ()
     expect(useLaserStore.getState().statusReport?.state).toBe('Idle');
     const { host, unmount } = await renderPad();
     try {
-      expect(await holdX(host, 'Jog -X 10 mm', false)).toBeCloseTo(-397.99, 6);
+      expect(await holdX(host, 'Jog -X 10 mm', false)).toBeCloseTo(-397.98, 6);
     } finally {
       await unmount();
     }

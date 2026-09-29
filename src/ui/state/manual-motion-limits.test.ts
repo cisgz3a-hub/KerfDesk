@@ -19,7 +19,7 @@ const DEVICE = {
 };
 const HOMING_OFF_DEVICE = { ...DEVICE, homing: { ...DEVICE.homing, enabled: false } };
 
-/** Current-session stock GRBL 1.1h: $20=1 $21=1 $23=0 $27=2 $130=400 $131=300. */
+/** Current-session stock GRBL 1.1h: $20=1 $21=1 $23=0 $27=2 $100=$101=250 $130=400 $131=300. */
 function softLimitedGrbl(patch: Partial<NativeBedEvidence> = {}): NativeBedEvidence {
   const base = stockNativeEvidence(DEVICE, false, 0);
   return {
@@ -29,6 +29,8 @@ function softLimitedGrbl(patch: Partial<NativeBedEvidence> = {}): NativeBedEvide
       softLimitsEnabled: true,
       hardLimitsEnabled: true,
       homingPullOffMm: 2,
+      stepsPerMmX: 250,
+      stepsPerMmY: 250,
     },
     ...patch,
   };
@@ -38,7 +40,7 @@ function limitsFor(device: typeof DEVICE, evidence: NativeBedEvidence) {
   return resolveManualMotionLimits(resolveNativeBedFrame(device, evidence), evidence);
 }
 
-const GRBL_LIMITS = { minX: -399.99, maxX: -2, minY: -299.99, maxY: -2 };
+const GRBL_LIMITS = { minX: -399.99, maxX: -2.01, minY: -299.99, maxY: -2.01 };
 
 describe('manual-motion limits without a verified bed frame', () => {
   it('bounds a profile with homing off by the firmware envelope once $20=1 was read', () => {
@@ -75,9 +77,9 @@ describe('manual-motion limits without a verified bed frame', () => {
     const base = softLimitedGrbl();
     const settings = { ...base.controllerSettings, homingDirectionMask: 3 };
     expect(limitsFor(HOMING_OFF_DEVICE, { ...base, controllerSettings: settings })).toEqual({
-      minX: -398,
+      minX: -397.99,
       maxX: -0.01,
-      minY: -298,
+      minY: -297.99,
       maxY: -0.01,
     });
     const staleBuild = { controllerBuildInfoObservation: { sessionEpoch: 6, observedAt: 1 } };
@@ -95,11 +97,19 @@ describe('manual-motion limits without a verified bed frame', () => {
       limitsFor(HOMING_OFF_DEVICE, softLimitedGrbl({ ...grblHal, homingState: 'unknown' })),
     ).toBeNull();
     expect(limitsFor(HOMING_OFF_DEVICE, softLimitedGrbl(grblHal))).toEqual({
-      minX: -398,
-      maxX: -2,
-      minY: -298,
-      maxY: -2,
+      minX: -397.99,
+      maxX: -2.01,
+      minY: -297.99,
+      maxY: -2.01,
     });
+  });
+
+  it('keeps half a step of room on a coarse axis from this session $100', () => {
+    const base = softLimitedGrbl();
+    const coarse = { ...base.controllerSettings, stepsPerMmX: 40 };
+    const limits = limitsFor(HOMING_OFF_DEVICE, { ...base, controllerSettings: coarse });
+    expect(limits?.minX).toBeCloseTo(-399.9855, 9);
+    expect(limits?.minY).toBe(-299.99);
   });
 
   it('treats a GrblHAL banner behind a GRBL profile as grblHAL', () => {

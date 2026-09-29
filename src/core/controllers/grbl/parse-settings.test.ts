@@ -147,6 +147,18 @@ describe('settingsMapToProfilePatch', () => {
     expect(settingsMapToProfilePatch(new Map([[384, '0']]))).toEqual({});
   });
 
+  // One step's length bounds how far a reported MPos sits from the firmware's
+  // own position, so the jog clamp keeps that much room (ADR-375).
+  it('keeps $100 and $101 so the jog clamp can size its margin', () => {
+    const map = new Map([
+      [100, '40.000'],
+      [101, '80'],
+      [102, '0'],
+    ]);
+    expect(settingsMapToControllerSettings(map)).toEqual({ stepsPerMmX: 40, stepsPerMmY: 80 });
+    expect(settingsMapToProfilePatch(map)).toEqual({});
+  });
+
   it('takes the max of $110/$111 for maxFeed (vector reach)', () => {
     const map = new Map([
       [110, '3000'],

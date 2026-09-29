@@ -84,6 +84,7 @@ function jogTravelSettings(evidence: NativeBedEvidence): JogTravelSettings | nul
     hardLimits: settings.hardLimitsEnabled,
     pullOffMm: settings.homingPullOffMm,
     softLimitsEnforced: settings.softLimitsEnabled === true,
+    stepsPerMm: { x: settings.stepsPerMmX, y: settings.stepsPerMmY },
   };
 }
 

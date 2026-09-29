@@ -90,7 +90,8 @@ async function renderPad(): Promise<{ host: HTMLDivElement; unmount: () => Promi
 
 /** A homed stock GRBL 1.1 session whose current $$ and $I prove the native
  *  travel: homing toward +X/+Y ($23=0), so machine space is [-400,0]x[-300,0],
- *  with soft and hard limits on and a 2 mm pull-off ($20=1 $21=1 $27=2). */
+ *  with soft and hard limits on, a 2 mm pull-off and 250 steps/mm
+ *  ($20=1 $21=1 $27=2 $100=$101=250). */
 function homedStockGrblEvidence(): void {
   useStore.setState((state) => ({
     project: {
@@ -125,6 +126,8 @@ function stockGrblSettings(
       homingPullOffMm: 2,
       ...travel,
       homingDirectionMask: 0,
+      stepsPerMmX: 250,
+      stepsPerMmY: 250,
     },
     controllerSettingsObservation: observed,
     controllerBuildInfo: {
@@ -168,13 +171,13 @@ describe('hold-to-jog in native travel', () => {
     useLaserStore.setState({ statusReport: idleAt(-200, -150) });
     const { host, unmount } = await renderPad();
     try {
-      // Toward the +X/+Y switches the hold ends at the $27 rest point (MPos
-      // -2), not on the trip point at MPos 0 where a hard limit can fire.
-      expect((await holdAndRelease(host, 'Jog +X 10 mm')).dx).toBeCloseTo(198, 6);
-      // The far edge keeps a rounding margin: the report rounds MPos to 3
-      // decimals and GRBL rejects a target even microns past -$130.
+      // Toward the +X/+Y switches the hold ends a margin inside the $27 rest
+      // point (MPos -2), not on the trip point at MPos 0 where a hard limit
+      // can fire. Every enforced edge keeps that margin: the report rounds
+      // MPos to 3 decimals and GRBL rejects a target even microns past -$130.
+      expect((await holdAndRelease(host, 'Jog +X 10 mm')).dx).toBeCloseTo(197.99, 6);
       expect((await holdAndRelease(host, 'Jog -X 10 mm')).dx).toBeCloseTo(-199.99, 6);
-      expect((await holdAndRelease(host, 'Jog +Y 10 mm')).dy).toBeCloseTo(148, 6);
+      expect((await holdAndRelease(host, 'Jog +Y 10 mm')).dy).toBeCloseTo(147.99, 6);
     } finally {
       await unmount();
     }
@@ -203,9 +206,9 @@ describe('hold-to-jog in native travel', () => {
     useLaserStore.setState({ statusReport: idleAt(-200, -200) });
     const { host, unmount } = await renderPad();
     try {
-      expect((await holdAndRelease(host, 'Jog +X 10 mm')).dx).toBeCloseTo(198, 6);
+      expect((await holdAndRelease(host, 'Jog +X 10 mm')).dx).toBeCloseTo(197.99, 6);
       expect((await holdAndRelease(host, 'Jog -X 10 mm')).dx).toBeCloseTo(-199.99, 6);
-      expect((await holdAndRelease(host, 'Jog +Y 10 mm')).dy).toBeCloseTo(198, 6);
+      expect((await holdAndRelease(host, 'Jog +Y 10 mm')).dy).toBeCloseTo(197.99, 6);
       expect((await holdAndRelease(host, 'Jog -Y 10 mm')).dy).toBeCloseTo(-199.99, 6);
     } finally {
       await unmount();
@@ -221,7 +224,7 @@ describe('hold-to-jog in native travel', () => {
     useLaserStore.setState({ statusReport: idleAt(-10, 0) });
     const { host, unmount } = await renderPad();
     try {
-      expect((await holdAndRelease(host, 'Jog +X 10 mm')).dx).toBeCloseTo(8, 6);
+      expect((await holdAndRelease(host, 'Jog +X 10 mm')).dx).toBeCloseTo(7.99, 6);
       expect((await holdAndRelease(host, 'Jog -X 10 mm')).dx).toBeCloseTo(-389.99, 6);
     } finally {
       await unmount();

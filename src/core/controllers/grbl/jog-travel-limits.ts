@@ -34,6 +34,8 @@ export type JogTravelSettings = {
   readonly pullOffMm: number | undefined;
   /** The firmware rejects a target outside its envelope right now. */
   readonly softLimitsEnforced: boolean;
+  /** `$100` / `$101`; undefined when not read. */
+  readonly stepsPerMm: { readonly x: number | undefined; readonly y: number | undefined };
 };
 
 export type JogTravelLimits = { readonly x: AxisBounds; readonly y: AxisBounds };
@@ -41,11 +43,21 @@ export type JogTravelLimits = { readonly x: AxisBounds; readonly y: AxisBounds }
 // Hard limits on but `$27` unread: gSender keeps the same 1 mm off the edge
 // (https://github.com/Sienci-Labs/gsender/blob/14c7084c1091dbd500d675d0dabda885484bf12e/src/server/controllers/Grbl/GrblController.js#L2119-L2133).
 const UNKNOWN_PULL_OFF_MM = 1;
-// The status report rounds MPos to 3 decimals while the firmware adds the jog
-// distance to its unrounded position, so a target aimed exactly at an enforced
-// edge can land a few microns past it and be rejected:
+// A jog's distance is measured from the reported MPos, but the firmware adds
+// it to its own position: the status report rounds MPos to 3 decimals, and
+// after a move that ran to its end the firmware holds that move's unrounded
+// target while MPos shows the step the motors reached, up to half a step away
+// (only a jog cancel syncs the two). A target aimed exactly at an enforced
+// edge can land past it and be refused, so every edge keeps this margin on top
+// of its switch inset: 0.01 mm, or where a step is coarser half a step plus
+// 0.002 mm for the report's rounding (0.0005 mm, or 0.00005 in with `$13=1`).
 // https://github.com/gnea/grbl/blob/bfb67f0c7963fe3ce4aaf8a97f9009ea5a8db36e/grbl/config.h#L142-L143
+// https://github.com/gnea/grbl/blob/bfb67f0c7963fe3ce4aaf8a97f9009ea5a8db36e/grbl/gcode.c#L863-L864
+// https://github.com/gnea/grbl/blob/bfb67f0c7963fe3ce4aaf8a97f9009ea5a8db36e/grbl/protocol.c#L385-L390
 const ROUNDING_MARGIN_MM = 0.01;
+const REPORT_ROUNDING_MM = 0.002;
+// `$100` or `$101` unread: room for axes down to about 10 steps/mm.
+const UNKNOWN_STEP_MARGIN_MM = 0.05;
 
 /** The XY machine box a manual move may target, or null when the envelope is
  *  not known from these settings. */
@@ -65,8 +77,8 @@ export function jogTravelLimits(settings: JogTravelSettings): JogTravelLimits | 
     xyMask,
     settings.forceOrigin === true,
   );
-  const x = insetAxis(settings, envelope.x, (xyMask & 1) !== 0);
-  const y = insetAxis(settings, envelope.y, (xyMask & 2) !== 0);
+  const x = insetAxis(settings, envelope.x, (xyMask & 1) !== 0, settings.stepsPerMm.x);
+  const y = insetAxis(settings, envelope.y, (xyMask & 2) !== 0, settings.stepsPerMm.y);
   return x === null || y === null ? null : { x, y };
 }
 
@@ -74,18 +86,26 @@ function insetAxis(
   settings: JogTravelSettings,
   envelope: AxisBounds,
   homesNegative: boolean,
+  stepsPerMm: number | undefined,
 ): AxisBounds | null {
   const pullOff = switchPullOffMm(settings);
   // With force origin the homing edge is where the head rests after the
   // pull-off, already clear of the switch.
   const homingEdgeInset = settings.forceOrigin === true ? 0 : pullOff;
+  // grblHAL's own envelope already ends a pull-off short of both edges, so the
+  // margin goes on top of the inset rather than inside it.
   const farEdgeInset = settings.firmware === 'grblhal' ? pullOff : 0;
-  const margin = settings.softLimitsEnforced ? ROUNDING_MARGIN_MM : 0;
+  const margin = settings.softLimitsEnforced ? positionMarginMm(stepsPerMm) : 0;
   const minInset = homesNegative ? homingEdgeInset : farEdgeInset;
   const maxInset = homesNegative ? farEdgeInset : homingEdgeInset;
-  const minMm = envelope.minMm + Math.max(minInset, margin);
-  const maxMm = envelope.maxMm - Math.max(maxInset, margin);
+  const minMm = envelope.minMm + minInset + margin;
+  const maxMm = envelope.maxMm - maxInset - margin;
   return maxMm > minMm ? { minMm, maxMm } : null;
+}
+
+function positionMarginMm(stepsPerMm: number | undefined): number {
+  if (stepsPerMm === undefined || !isPositiveFinite(stepsPerMm)) return UNKNOWN_STEP_MARGIN_MM;
+  return Math.max(ROUNDING_MARGIN_MM, 0.5 / stepsPerMm + REPORT_ROUNDING_MM);
 }
 
 // An unknown `$21` keeps the inset: the narrower box suits either value.

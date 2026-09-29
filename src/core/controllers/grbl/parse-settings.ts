@@ -78,6 +78,10 @@ export type ControllerSettingsSnapshot = Partial<
   // G92 origin (Set origin here) and restores it at power-up. Read, never
   // written, so Job Review can say which (ADR-375).
   readonly g92PersistenceDisabled?: boolean;
+  // `$100` / `$101`: one step's length bounds how far the machine position a
+  // status report shows can sit from the firmware's own (ADR-375).
+  readonly stepsPerMmX?: number;
+  readonly stepsPerMmY?: number;
 };
 
 export type SettingsCollectorState =
@@ -192,6 +196,7 @@ export function settingsMapToControllerSettings(
     ...(maxFeedY === undefined ? {} : { maxFeedY }),
     ...machineModeField(map),
     ...g92PersistenceField(map),
+    ...stepsPerMmFields(map),
   };
 }
 
@@ -214,6 +219,17 @@ function g92PersistenceField(
 ): Pick<ControllerSettingsSnapshot, 'g92PersistenceDisabled'> {
   const g92PersistenceDisabled = parseBooleanSetting(map, 384);
   return g92PersistenceDisabled === undefined ? {} : { g92PersistenceDisabled };
+}
+
+function stepsPerMmFields(
+  map: ReadonlyMap<number, string>,
+): Pick<ControllerSettingsSnapshot, 'stepsPerMmX' | 'stepsPerMmY'> {
+  const stepsPerMmX = parsePositiveNumber(map.get(100));
+  const stepsPerMmY = parsePositiveNumber(map.get(101));
+  return {
+    ...(stepsPerMmX === undefined ? {} : { stepsPerMmX }),
+    ...(stepsPerMmY === undefined ? {} : { stepsPerMmY }),
+  };
 }
 
 /**
