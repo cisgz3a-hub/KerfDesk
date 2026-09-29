@@ -8,6 +8,7 @@ import {
   type Vec2,
 } from '../../core/scene';
 import { parametricEllipseCurve } from '../../core/geometry';
+import { parseLbrnVertexList, type LbrnVertex } from './lbrn-vertex-list';
 
 export type LbrnGeometryResult = {
   readonly objects: ReadonlyArray<ImportedSvg>;
@@ -23,11 +24,10 @@ type Matrix = {
   readonly e: number;
   readonly f: number;
 };
-type ParsedVertex = { readonly point: Vec2; readonly left?: Vec2; readonly right?: Vec2 };
 type Primitive = { readonly kind: 'L' | 'B'; readonly from: number; readonly to: number };
 type BuildingPath = { startIndex: number; endIndex: number; segments: PathSegment[] };
 type PathTables = {
-  readonly vertices: ReadonlyMap<number, ReadonlyArray<ParsedVertex>>;
+  readonly vertices: ReadonlyMap<number, ReadonlyArray<LbrnVertex>>;
   readonly primitives: ReadonlyMap<number, ReadonlyArray<Primitive>>;
 };
 const IDENTITY: Matrix = { a: 1, b: 0, c: 0, d: 1, e: 0, f: 0 };
@@ -178,9 +178,9 @@ function pathCurves(shape: Element, pathTables: PathTables): CurveSubpath[] {
   return curves;
 }
 
-function pathVertices(shape: Element, pathTables: PathTables): ReadonlyArray<ParsedVertex> {
+function pathVertices(shape: Element, pathTables: PathTables): ReadonlyArray<LbrnVertex> {
   const list = directChild(shape, 'vertlist');
-  if (list !== null) return parseVertices(list.textContent ?? '');
+  if (list !== null) return parseLbrnVertexList(list.textContent ?? '');
   return pathTables.vertices.get(integerAttribute(shape, 'VertID') ?? -1) ?? [];
 }
 
@@ -191,13 +191,13 @@ function pathPrimitives(shape: Element, pathTables: PathTables): ReadonlyArray<P
 }
 
 function buildPathTables(root: Element): PathTables {
-  const vertices = new Map<number, ReadonlyArray<ParsedVertex>>();
+  const vertices = new Map<number, ReadonlyArray<LbrnVertex>>();
   const primitives = new Map<number, ReadonlyArray<Primitive>>();
   for (const element of [...root.querySelectorAll('*')]) {
     const vertexId = integerAttribute(element, 'VertID');
     const vertexList = directChild(element, 'vertlist');
     if (vertexId !== null && vertexList !== null) {
-      vertices.set(vertexId, parseVertices(vertexList.textContent ?? ''));
+      vertices.set(vertexId, parseLbrnVertexList(vertexList.textContent ?? ''));
     }
     const primitiveId = integerAttribute(element, 'PrimID');
     const primitiveList = directChild(element, 'primlist');
@@ -211,10 +211,10 @@ function buildPathTables(root: Element): PathTables {
 function appendPrimitive(
   current: BuildingPath | null,
   primitive: Primitive,
-  from: ParsedVertex,
-  to: ParsedVertex,
+  from: LbrnVertex,
+  to: LbrnVertex,
   curves: CurveSubpath[],
-  vertices: ReadonlyArray<ParsedVertex>,
+  vertices: ReadonlyArray<LbrnVertex>,
 ): BuildingPath {
   let path = current;
   if (path === null || path.endIndex !== primitive.from) {
@@ -226,8 +226,9 @@ function appendPrimitive(
       ? { kind: 'line', to: to.point }
       : {
           kind: 'cubic',
-          control1: from.right ?? from.point,
-          control2: to.left ?? to.point,
+          // `B i j` leaves V[i] along its c0 handle and arrives at V[j] along its c1.
+          control1: from.outgoing ?? from.point,
+          control2: to.incoming ?? to.point,
           to: to.point,
         },
   );
@@ -241,36 +242,13 @@ function finishPath(
     readonly endIndex: number;
     readonly segments: PathSegment[];
   },
-  vertices: ReadonlyArray<ParsedVertex>,
+  vertices: ReadonlyArray<LbrnVertex>,
 ): CurveSubpath {
   return {
-    start: (vertices[path.startIndex] as ParsedVertex).point,
+    start: (vertices[path.startIndex] as LbrnVertex).point,
     segments: path.segments,
     closed: path.startIndex === path.endIndex,
   };
-}
-
-function parseVertices(text: string): ParsedVertex[] {
-  const vertices: ParsedVertex[] = [];
-  const pattern = /V(-?(?:\d+\.?\d*|\.\d+))\s+(-?(?:\d+\.?\d*|\.\d+))([\s\S]*?)(?=V|$)/g;
-  for (const match of text.matchAll(pattern)) {
-    const point = { x: Number(match[1]), y: Number(match[2]) };
-    const controls = match[3] ?? '';
-    const left = controlPoint(controls, 'c0');
-    const right = controlPoint(controls, 'c1');
-    vertices.push({
-      point,
-      ...(left === null ? {} : { left }),
-      ...(right === null ? {} : { right }),
-    });
-  }
-  return vertices;
-}
-
-function controlPoint(text: string, prefix: 'c0' | 'c1'): Vec2 | null {
-  const x = new RegExp(`${prefix}x(-?(?:\\d+\\.?\\d*|\\.\\d+))`).exec(text)?.[1];
-  const y = new RegExp(`${prefix}y(-?(?:\\d+\\.?\\d*|\\.\\d+))`).exec(text)?.[1];
-  return x === undefined || y === undefined ? null : { x: Number(x), y: Number(y) };
 }
 
 function parsePrimitives(text: string): Primitive[] {
