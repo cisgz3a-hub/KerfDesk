@@ -6,7 +6,19 @@ import {
   type ImportedSvg,
   type Polyline,
 } from '../../core/scene';
-import type { ColoredPolyline, ExpandOutcome } from './dxf-expand';
+import {
+  SKIPPED_IN_PAPER_SPACE,
+  SKIPPED_ON_HIDDEN_LAYERS,
+  type ColoredPolyline,
+  type ExpandOutcome,
+} from './dxf-expand';
+
+// Content CAD does not display is listed after the skipped entity types, in
+// this order, since its label reads on its own ("2 on hidden layers").
+const HIDDEN_CONTENT_LABELS: ReadonlyArray<string> = [
+  SKIPPED_ON_HIDDEN_LAYERS,
+  SKIPPED_IN_PAPER_SPACE,
+];
 
 export type ParseDxfResult =
   | { readonly kind: 'error'; readonly reason: string }
@@ -23,7 +35,7 @@ export function buildDxfResult(
   expanded: ExpandOutcome,
   metadataNotes: ReadonlyArray<string>,
 ): ParseDxfResult {
-  const notes = [...metadataNotes, ...expanded.notes];
+  const notes = distinctNotes([...metadataNotes, ...expanded.notes]);
   const skippedSummary = formatSkipped(expanded.skipped);
   const paths = normalizeAndGroup(expanded.polylines);
   if (paths.length === 0) {
@@ -122,8 +134,20 @@ function pathsBounds(paths: ReadonlyArray<ColoredPath>): ImportedSvg['bounds'] {
 
 function formatSkipped(skipped: ReadonlyMap<string, number>): string | null {
   if (skipped.size === 0) return null;
-  return [...skipped.entries()]
-    .sort(([a], [b]) => a.localeCompare(b))
-    .map(([type, count]) => `${count} ${type}`)
-    .join(', ');
+  const byType = [...skipped.entries()]
+    .filter(([label]) => !HIDDEN_CONTENT_LABELS.includes(label))
+    .sort(([a], [b]) => a.localeCompare(b));
+  const hidden = HIDDEN_CONTENT_LABELS.flatMap((label) => {
+    const count = skipped.get(label);
+    return count === undefined ? [] : [[label, count] as const];
+  });
+  return [...byType, ...hidden].map(([label, count]) => `${count} ${label}`).join(', ');
+}
+
+// A file can repeat one problem on thousands of entities; the operator needs
+// to read it once, with the count in the house "12×" style.
+function distinctNotes(notes: ReadonlyArray<string>): ReadonlyArray<string> {
+  const counts = new Map<string, number>();
+  for (const note of notes) counts.set(note, (counts.get(note) ?? 0) + 1);
+  return [...counts].map(([note, count]) => (count === 1 ? note : `${count}× ${note}`));
 }
