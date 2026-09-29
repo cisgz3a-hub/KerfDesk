@@ -10,14 +10,18 @@ const h = vi.hoisted(() => ({
   setNeedRefresh: vi.fn(),
   updateServiceWorker: vi.fn(),
   pushToast: vi.fn(),
+  registerOptions: null as { readonly onNeedReload?: () => void } | null,
 }));
 
 vi.mock('virtual:pwa-register/react', () => ({
-  useRegisterSW: () => ({
-    offlineReady: [h.swState.offlineReady, h.setOfflineReady],
-    needRefresh: [h.swState.needRefresh, h.setNeedRefresh],
-    updateServiceWorker: h.updateServiceWorker,
-  }),
+  useRegisterSW: (options: { readonly onNeedReload?: () => void }) => {
+    h.registerOptions = options;
+    return {
+      offlineReady: [h.swState.offlineReady, h.setOfflineReady],
+      needRefresh: [h.swState.needRefresh, h.setNeedRefresh],
+      updateServiceWorker: h.updateServiceWorker,
+    };
+  },
 }));
 vi.mock('../state/toast-store', () => ({
   useToastStore: (sel: (s: { pushToast: typeof h.pushToast }) => unknown) =>
@@ -27,7 +31,7 @@ const promptedReload = vi.hoisted(() => ({ applyPromptedReload: vi.fn() }));
 vi.mock('./pwa-prompted-reload', () => promptedReload);
 
 import { usePwaUpdateStore } from '../state/pwa-update-store';
-import { PwaUpdateWatcher } from './PwaUpdateWatcher';
+import { PwaUpdateWatcher, UPDATED_IN_ANOTHER_WINDOW_MESSAGE } from './PwaUpdateWatcher';
 
 (
   globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT?: boolean }
@@ -45,17 +49,33 @@ async function render(): Promise<{ readonly host: HTMLDivElement; readonly root:
   return { host, root };
 }
 
+const originalLocation = window.location;
+let reload: ReturnType<typeof vi.fn>;
+
 beforeEach(() => {
   h.swState.offlineReady = false;
   h.swState.needRefresh = false;
+  h.registerOptions = null;
   usePwaUpdateStore.setState({ availability: { kind: 'none' } });
   vi.clearAllMocks();
   promptedReload.applyPromptedReload.mockResolvedValue(undefined);
+  reload = vi.fn();
+  Object.defineProperty(window, 'location', {
+    configurable: true,
+    value: { ...originalLocation, href: originalLocation.href, reload },
+  });
 });
 
 afterEach(() => {
   document.body.innerHTML = '';
+  Object.defineProperty(window, 'location', { configurable: true, value: originalLocation });
 });
+
+function needReload(): void {
+  const onNeedReload = h.registerOptions?.onNeedReload;
+  if (onNeedReload === undefined) throw new Error('onNeedReload was not passed to useRegisterSW');
+  act(() => onNeedReload());
+}
 
 describe('PwaUpdateWatcher', () => {
   it('publishes ready availability to the store when an update is waiting', async () => {
@@ -134,6 +154,42 @@ describe('PwaUpdateWatcher', () => {
     );
     await availability.applyUpdate();
     expect(promptedReload.applyPromptedReload).toHaveBeenCalledTimes(2);
+  });
+
+  it('keeps this window open when the update was applied from another window', async () => {
+    // The service worker is shared by every tab. Without onNeedReload the plugin
+    // reloads each window that saw the update when any one of them clicks Update,
+    // and a reload stops a job streaming there (ADR-060).
+    h.swState.needRefresh = true;
+    await render();
+    needReload();
+    needReload();
+    expect(reload).not.toHaveBeenCalled();
+    expect(h.pushToast).toHaveBeenCalledTimes(1);
+    expect(h.pushToast).toHaveBeenCalledWith(UPDATED_IN_ANOTHER_WINDOW_MESSAGE, 'info');
+    expect(usePwaUpdateStore.getState().availability.kind).toBe('ready');
+  });
+
+  it('reloads the window whose operator clicked Update once the new worker takes over', async () => {
+    h.swState.needRefresh = true;
+    await render();
+    const availability = usePwaUpdateStore.getState().availability;
+    if (availability.kind !== 'ready') throw new Error('expected ready availability');
+    await availability.applyUpdate();
+    needReload();
+    expect(reload).toHaveBeenCalledTimes(1);
+    expect(h.pushToast).not.toHaveBeenCalled();
+  });
+
+  it('stops treating this window as the one that asked once its update attempt failed', async () => {
+    h.swState.needRefresh = true;
+    promptedReload.applyPromptedReload.mockRejectedValueOnce(new Error('update failed'));
+    await render();
+    const availability = usePwaUpdateStore.getState().availability;
+    if (availability.kind !== 'ready') throw new Error('expected ready availability');
+    await availability.applyUpdate();
+    needReload();
+    expect(reload).not.toHaveBeenCalled();
   });
 
   it('fires a one-time offline-ready toast', async () => {

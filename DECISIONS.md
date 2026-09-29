@@ -4031,7 +4031,15 @@ direct Web Serial control is a genuine gap.
    Update button (`PwaUpdateWatcher` publishes to `pwa-update-store`,
    `PwaUpdateButton` renders it), the "Later" dismissal persistence and its
    `updatefound` re-arm are removed, and the click path through
-   `pwa-prompted-reload.ts` is unchanged.)
+   `pwa-prompted-reload.ts` is unchanged.) (Corrected 2026-09-29: the service
+   worker is shared by every tab and window, so one window's Update click
+   activates the new worker under all of them, and vite-plugin-pwa's prompt
+   mode then reloads every window that had seen the update unless
+   `onNeedReload` is given. A window streaming a job reloaded with no click in
+   it and its unload stop aborted the burn. `PwaUpdateWatcher` now passes
+   `onNeedReload`, reloads only the window whose operator clicked, and tells
+   any other window that it was updated elsewhere; that window keeps its build
+   and its Update button.)
 3. **`injectRegister: false`; register via the `virtual:pwa-register/react`
    hook.** A bundled hook is same-origin, satisfying the strict CSP
    (`script-src 'self'`, `public/_headers`) where the inline registration form is
