@@ -98,11 +98,20 @@ its original end date. A new trial after it ends is not available; offer the
 purchase instead. Reinstalling Windows creates a new installation identity, and
 this service does not claim to prevent that.
 
-### "The computer clock is earlier than the last licence check"
+### A wrong computer clock
 
-The clock moved backwards by more than five minutes. Ask the customer to set the
-correct date and time (automatic time is best) and relaunch. A successful online
-refresh or activation also resets the check.
+Only a trial watches the clock (ADR-523 Amendment 2). A paid or developer licence
+keeps Pro whatever the clock says.
+
+- "This computer's clock is earlier than the last licence check, so the Pro tools
+  in your trial are locked...": the clock moved back more than five minutes during
+  a trial. Ask the customer to turn on **Set time automatically** in Windows' Date
+  & time settings, then choose **Refresh licence** in Help > Licence.
+- "This computer's clock is about N minutes (or hours, or days) ahead (or behind),
+  so the licence could not be confirmed...": an activation, trial start, refresh or
+  Check payment met a clock more than five minutes from the licence service's, for
+  any licence. The saved licence is kept, and updates wait until a check succeeds.
+  Ask for automatic time and the right time zone, then try again.
 
 ### "This licence already has three active devices"
 
@@ -115,11 +124,35 @@ frees one. Confirm which seat with the customer by activation date. The customer
 never has to send the key in a ticket if they can do this on a working computer
 instead.
 
-### Deactivation says "signed out locally" or "Retry device deactivation"
+### Deactivation says "retry deactivation to free its seat"
 
-The computer removed its local licence but could not reach the service. It keeps
-retrying when the customer selects Retry while online. Until then the seat still
-counts as active; the operator can free it as above.
+The computer signed itself out but could not reach the service to free its seat.
+Help > Licence offers **Retry device deactivation** (online) and **Reset saved
+licence**, which stops trying. Until the seat is freed it still counts as one of
+the three devices; the operator can free it as above.
+
+The computer stops retrying by itself when the service gives a definite answer:
+
+- The seat was already free: the deactivation counts as done.
+- The service no longer knows the seat or the licence (`invalid_credentials`,
+  `activation_not_found`, a revoked or inactive licence), or the saved credential
+  no longer verifies: "This computer is signed out of its licence, but its seat
+  could not be freed from here, so it may still count as one of your three
+  devices." Free the seat as above if the customer needs it.
+- `release_limit_reached`: the licence has used its deactivations for now, and
+  the computer keeps its licence, as it did at the first attempt.
+
+A customer who chose Reset while it was pending sees "This computer stopped trying
+to free its licence seat, so the seat may still count..."; handle it the same way.
+Entering the licence key on that computer again reuses its seat.
+
+### "The licence saved on this computer can't be read"
+
+Usually after a Windows account or password reset, which loses the key that
+encrypted the licence. **Reset saved licence** in Help > Licence renames the file
+to `commercial-licence.v1.unreadable-<time>` in the data folder (Help > Open Data
+Folder); the newest three are kept. The customer then enters the licence key again,
+and the computer keeps its seat. Reset never touches a licence that can be read.
 
 ### The customer needs their licence key for another computer
 
@@ -154,6 +187,10 @@ that computer holds the order's claim credentials.
   Licence, which starts a fresh order and checkout next time. Only suggest that
   after confirming in Paddle that the old order was not paid; if it was, look up
   its licence by order number instead.
+- The customer entered a licence key after starting a purchase: the app removed
+  the unfinished order and said "If you did pay for order <id>, email
+  support@kerfdesk.com with that order number." Look that order up; if it was
+  paid, its licence is separate from the key they entered.
 - The checkout started on a computer that has since been reinstalled or lost: the
   claim credentials are gone with it. Reconcile the order with
   `POST /v1/admin/orders`, claim it with `POST /v1/orders/claim`, and send the

@@ -120,6 +120,8 @@ For each version, from a clean checkout at the tagged source:
 - [ ] Set the clock back more than five minutes before the last check: the app
       still opens, as Free, and Help > Licence reports a clock problem. Only Pro
       tools are locked. Restore the clock and relaunch.
+- [ ] With a paid or developer licence instead of the trial, set the clock back
+      the same way: Pro stays unlocked (ADR-523 Amendment 2). Restore the clock.
 - [ ] Uninstall and reinstall N in the same account, then start the trial again:
       the original end date is kept, not a new 30 days.
 
