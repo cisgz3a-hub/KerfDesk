@@ -58,8 +58,7 @@ This policy adds to your rights under the law where you live. It does not reduce
 
 ## Contact
 
-KerfDesk is sold by Johann Stolk, trading as KerfDesk [PLACEHOLDER: legal status, and company name
-and registration number if different], [PLACEHOLDER: physical address], South Africa.
+KerfDesk is sold by Johannes Stephanus Stolk, [PLACEHOLDER: physical address], South Africa.
 
 - Support: https://kerfdesk.com/support.html
 - Email: support@kerfdesk.com

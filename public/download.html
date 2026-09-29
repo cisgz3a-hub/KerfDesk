@@ -155,9 +155,49 @@
         max-width: 26rem;
         margin: 1rem 0;
       }
+      .site-header,
+      .site-footer {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 0.5rem 1.5rem;
+        align-items: baseline;
+        justify-content: space-between;
+        width: min(64rem, 100%);
+        margin: 0 auto;
+        padding: 1.25rem 1.25rem 0;
+      }
+      .site-footer {
+        padding: 1.25rem 1.25rem 2.5rem;
+      }
+      .site-header nav,
+      .site-footer nav {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 0.35rem 1.1rem;
+      }
+      .brand {
+        color: #111827;
+        font-size: 1.2rem;
+        font-weight: 700;
+        text-decoration: none;
+      }
+      [aria-current='page'] {
+        color: #111827;
+        font-weight: 600;
+        text-decoration: none;
+      }
     </style>
   </head>
   <body>
+    <header class="site-header">
+      <a class="brand" href="/">KerfDesk</a>
+      <nav aria-label="KerfDesk">
+        <a href="/pricing/">Pricing</a>
+        <a href="/download.html" aria-current="page">Download</a>
+        <a href="/support.html">Support</a>
+        <a href="/">Open the web app</a>
+      </nav>
+    </header>
     <main>
       <h1>Download KerfDesk</h1>
       <p class="intro">
@@ -314,5 +354,12 @@
         features and can be installed from the browser.
       </footer>
     </main>
+    <footer class="site-footer">
+      <nav aria-label="Policies">
+        <a href="/terms/">Terms of Service</a>
+        <a href="/privacy/">Privacy Policy</a>
+        <a href="/refunds/">Refund Policy</a>
+      </nav>
+    </footer>
   </body>
 </html>

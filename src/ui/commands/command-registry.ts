@@ -15,6 +15,8 @@ import {
   discussionsCommand,
   licenceCommand,
   openDataFolderCommand,
+  policiesCommand,
+  pricingCommand,
   reportBugCommand,
   supportReportCommand,
 } from './support-command-family';
@@ -51,6 +53,8 @@ export function buildAppCommands(ctx: AppCommandContext): ReadonlyArray<AppComma
       supportReportCommand(),
       ...(ctx.openDataFolder === undefined ? [] : [openDataFolderCommand(ctx.openDataFolder)]),
       discussionsCommand(),
+      pricingCommand(),
+      policiesCommand(),
       ...(ctx.licensing === true ? [licenceCommand()] : []),
       checkForUpdatesCommand(),
     ],

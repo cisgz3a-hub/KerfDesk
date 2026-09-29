@@ -13,10 +13,9 @@ KerfDesk Pro licence. The rest of our privacy page covers the website and the ap
 
 ## Who we are
 
-Johann Stolk, trading as KerfDesk [PLACEHOLDER: legal status, and company name and registration
-number if different], of [PLACEHOLDER: physical address], South Africa, is responsible for your
-information ("we", "us"). Johann Stolk is our Information Officer [PLACEHOLDER: Information
-Regulator registration number]. Contact us through https://kerfdesk.com/support.html or at
+Johannes Stephanus Stolk, of [PLACEHOLDER: physical address], South Africa, is responsible for
+your information ("we", "us") and is our Information Officer [PLACEHOLDER: Information Regulator
+registration number]. Contact us through https://kerfdesk.com/support.html or at
 support@kerfdesk.com.
 
 ## What we never collect

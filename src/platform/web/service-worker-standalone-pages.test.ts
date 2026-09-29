@@ -20,7 +20,7 @@ function answeredByAppShell(pathAndQuery: string): boolean {
   );
 }
 
-describe('standalone checkout, download and support pages under the service worker', () => {
+describe('standalone checkout, download, support, pricing and policy pages under the service worker', () => {
   it.each([
     '/buy.html?_ptxn=txn_01h8zzzzzzzzzzzzzzzzzzzzzz',
     '/buy?_ptxn=txn_01h8zzzzzzzzzzzzzzzzzzzzzz',
@@ -30,6 +30,12 @@ describe('standalone checkout, download and support pages under the service work
     '/download.html',
     '/support.html',
     '/support',
+    '/pricing/',
+    '/pricing',
+    '/terms/',
+    '/terms/index.html',
+    '/privacy/#who-we-are',
+    '/refunds/',
   ])('never answers %s with the workspace', (page) => {
     expect(answeredByAppShell(page)).toBe(false);
   });
@@ -41,6 +47,8 @@ describe('standalone checkout, download and support pages under the service work
     '/buyer-guide',
     '/downloads/help',
     '/supported-machines',
+    '/pricing-guide',
+    '/terms-of-trade/',
   ])('keeps the offline app shell for %s', (page) => {
     expect(answeredByAppShell(page)).toBe(true);
   });
@@ -52,6 +60,7 @@ describe('standalone checkout, download and support pages under the service work
         'download.html',
         'support.html',
         'desktop-*.{mjs,json,css}',
+        '{pricing,privacy,refunds,terms}/**',
       ]),
     );
   });

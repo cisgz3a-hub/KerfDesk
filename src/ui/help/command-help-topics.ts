@@ -387,4 +387,14 @@ export const COMMAND_HELP: Readonly<Record<CommandId, CommandHelpTopic>> = {
     family: 'help',
     tooltip: 'Open KerfDesk support in your browser for questions, ideas and feedback.',
   },
+  'help.pricing': {
+    family: 'help',
+    tooltip:
+      'Open the KerfDesk pricing page in your browser: what Free and Pro include, what Pro costs and how a licence works.',
+  },
+  'help.policies': {
+    family: 'help',
+    tooltip:
+      'Open the KerfDesk Terms of Service in your browser. Its page links the Privacy Policy and the Refund Policy.',
+  },
 };

@@ -32,10 +32,9 @@ This summary helps you find your way. The numbered sections below are the agreem
 
 ## 1. About this agreement
 
-**1.1** This agreement is between Johann Stolk, trading as KerfDesk [PLACEHOLDER: confirm the
-trading name; if a company will sell KerfDesk, use its registered name and registration number
-instead], of [PLACEHOLDER: physical address], South Africa ("we", "us", "our"), and you, the person
-or organisation that installs, opens or uses KerfDesk ("you").
+**1.1** This agreement is between Johannes Stephanus Stolk, of [PLACEHOLDER: physical address],
+South Africa ("we", "us", "our"), and you, the person or organisation that installs, opens or uses
+KerfDesk ("you").
 
 **1.2** You accept this agreement when you tick the box or click to accept it, or when you install,
 activate or use KerfDesk. If you do not accept it, do not install or use KerfDesk.
@@ -472,8 +471,7 @@ providers.
 
 ## 24. Contact details
 
-- **Seller:** Johann Stolk, trading as KerfDesk [PLACEHOLDER: legal status; trading or company
-  name and registration number, if different]
+- **Seller:** Johannes Stephanus Stolk, an individual
 - **Physical address, and address for legal documents:** [PLACEHOLDER: street address, South
   Africa]
 - **Telephone:** [PLACEHOLDER: telephone number]

@@ -138,7 +138,9 @@ export type CommandId =
   | 'help.licence'
   | 'help.check-updates'
   | 'help.open-data-folder'
-  | 'help.discussions';
+  | 'help.discussions'
+  | 'help.pricing'
+  | 'help.policies';
 
 export type AppCommand = {
   readonly id: CommandId;

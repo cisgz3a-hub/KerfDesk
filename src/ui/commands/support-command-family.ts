@@ -11,6 +11,10 @@ import { enabled, type AppCommand } from './command-types';
 
 export const SUPPORT_URL = 'https://kerfdesk.com/support.html';
 export const REPORT_PROBLEM_URL = `${SUPPORT_URL}#report`;
+// The pricing and policy pages that ship with the web app (ADR-524 Amendment 3).
+// The Terms page links the privacy and refund policies from every page's footer.
+export const PRICING_URL = 'https://kerfdesk.com/pricing/';
+export const POLICIES_URL = 'https://kerfdesk.com/terms/';
 
 // Open a link in a new browser tab the same way DownloadDesktopLink's anchor
 // does: a detached <a target="_blank" rel="noopener noreferrer"> click. rel
@@ -64,6 +68,26 @@ export function discussionsCommand(): AppCommand {
     'Get Help',
     'Open KerfDesk support for questions, ideas and feedback',
     () => openExternalUrl(SUPPORT_URL),
+  );
+}
+
+export function pricingCommand(): AppCommand {
+  return enabled(
+    'help.pricing',
+    'help',
+    'Pricing',
+    'Open the KerfDesk Free and Pro prices, and what each edition includes',
+    () => openExternalUrl(PRICING_URL),
+  );
+}
+
+export function policiesCommand(): AppCommand {
+  return enabled(
+    'help.policies',
+    'help',
+    'Terms and Policies',
+    'Open the KerfDesk Terms of Service, Privacy Policy and Refund Policy',
+    () => openExternalUrl(POLICIES_URL),
   );
 }
 

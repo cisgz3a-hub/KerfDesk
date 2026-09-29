@@ -1,9 +1,13 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import {
+  POLICIES_URL,
+  PRICING_URL,
   REPORT_PROBLEM_URL,
   SUPPORT_URL,
   discussionsCommand,
   openExternalUrl,
+  policiesCommand,
+  pricingCommand,
   reportBugCommand,
   supportReportCommand,
 } from './support-command-family';
@@ -18,6 +22,17 @@ describe('support commands', () => {
     expect(REPORT_PROBLEM_URL).toBe('https://kerfdesk.com/support.html#report');
     for (const command of [reportBugCommand(), discussionsCommand()])
       expect(`${command.label} ${command.title}`).not.toMatch(/github/i);
+  });
+
+  it('opens the pricing and policy pages that ship with the web app', () => {
+    expect(PRICING_URL).toBe('https://kerfdesk.com/pricing/');
+    expect(POLICIES_URL).toBe('https://kerfdesk.com/terms/');
+    expect(pricingCommand().id).toBe('help.pricing');
+    expect(policiesCommand().id).toBe('help.policies');
+    for (const command of [pricingCommand(), policiesCommand()]) {
+      expect(command.family).toBe('help');
+      expect(command.enabled).toBe(true);
+    }
   });
 
   it('registers enabled Help-family commands with stable ids', () => {
