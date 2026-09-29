@@ -127,3 +127,13 @@ it('offers nothing where the app takes no commercial updates', async () => {
   expect(checkbox()).toBeNull();
   expect(preview.earlyUpdates).not.toHaveBeenCalled();
 });
+
+it('offers Reset beside Retry while a deactivation is stuck (ADR-523 Amendment 2)', async () => {
+  const adapter = client(offered(false));
+  await show(adapter, { ...free, deactivationPending: true });
+  const buttons = [...host.querySelectorAll('button')];
+  const named = (label: string) => buttons.find((item) => item.textContent === label);
+  expect(named('Retry device deactivation')).toBeDefined();
+  await act(async () => named('Reset saved licence')?.click());
+  expect(adapter.resetStore).toHaveBeenCalledOnce();
+});

@@ -1,5 +1,5 @@
 import { randomUUID } from 'node:crypto';
-import { mkdir, open, rename, unlink, writeFile } from 'node:fs/promises';
+import { mkdir, open, readdir, rename, unlink } from 'node:fs/promises';
 import { join } from 'node:path';
 import { record, type SignedEntitlement } from './licensing-verification.js';
 import { validLicencePayment, type LicencePayment } from './licensing-commerce.js';
@@ -22,9 +22,17 @@ export type LicenceRecord = {
 export type LicensingStore = {
   readonly read: () => Promise<LicenceRecord | null>;
   readonly write: (value: LicenceRecord) => Promise<void>;
-  /** Removes an unreadable record without needing the keychain that failed to open it. */
+  /**
+   * Sets an unreadable record aside without needing the keychain that failed to
+   * open it. The newest few are kept for support; nothing is deleted outright.
+   */
   readonly reset: () => Promise<void>;
 };
+
+const FILE_NAME = 'commercial-licence.v1';
+const SET_ASIDE = `${FILE_NAME}.unreadable-`;
+/** How many unreadable records are kept beside the licence file; the oldest go first. */
+const SET_ASIDE_KEPT = 3;
 
 /** The saved record exists but cannot be decrypted or parsed; resetting it is safe. */
 export class LicenceStoreUnreadableError extends Error {
@@ -94,7 +102,7 @@ export function createLicensingStore(options: {
   readonly secureStorage: SecureStorage;
   readonly platform: string;
 }): LicensingStore {
-  const file = join(options.userDataPath, 'commercial-licence.v1');
+  const file = join(options.userDataPath, FILE_NAME);
   const secure = options.secureStorage;
   const check = async (): Promise<void> => {
     if (
@@ -115,7 +123,7 @@ export function createLicensingStore(options: {
     await mkdir(options.userDataPath, { recursive: true });
     const temporary = `${file}.${randomUUID()}.tmp`;
     try {
-      await writeFile(temporary, encrypted, { flag: 'wx', mode: 0o600 });
+      await writeDurably(temporary, encrypted);
       await rename(temporary, file);
     } finally {
       await unlink(temporary).catch(() => undefined);
@@ -145,12 +153,37 @@ export function createLicensingStore(options: {
       if (decrypted.shouldReEncrypt) await write(value);
       return value;
     },
-    reset: async () => {
-      await unlink(file).catch((error: unknown) => {
-        if (!(record(error) && error.code === 'ENOENT')) throw error;
-      });
-    },
+    reset: () => setAside(options.userDataPath),
   };
+}
+
+/** Writes and flushes to disk, so a power cut after the rename cannot leave a torn licence. */
+async function writeDurably(path: string, data: Buffer): Promise<void> {
+  const handle = await open(path, 'wx', 0o600);
+  try {
+    await handle.writeFile(data);
+    await handle.sync();
+  } finally {
+    await handle.close();
+  }
+}
+
+/**
+ * Renames an unreadable licence to `commercial-licence.v1.unreadable-<time>`.
+ * If the operating-system key comes back, support can still read it. Room is
+ * made first, so the copy just set aside survives even with a wrong clock.
+ */
+async function setAside(directory: string): Promise<void> {
+  const names: string[] = await readdir(directory).catch((error: unknown) => {
+    if (record(error) && error.code === 'ENOENT') return [];
+    throw error;
+  });
+  if (!names.includes(FILE_NAME)) return;
+  const older = names.filter((name) => name.startsWith(SET_ASIDE)).sort();
+  for (const name of older.slice(0, Math.max(0, older.length - (SET_ASIDE_KEPT - 1))))
+    await unlink(join(directory, name)).catch(() => undefined);
+  const time = new Date().toISOString().replace(/[:.]/g, '-');
+  await rename(join(directory, FILE_NAME), join(directory, `${SET_ASIDE}${time}`));
 }
 
 async function readBoundedCredential(file: string): Promise<Buffer> {

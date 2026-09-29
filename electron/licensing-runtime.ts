@@ -2,27 +2,41 @@ import type { LicensingConfig } from './licensing-config.js';
 import {
   LicenceStoreUnreadableError,
   validLicenceKey,
-  type LicenceCredential,
   type LicenceRecord,
   type LicensingStore,
 } from './licensing-store.js';
-import { record, verifyEntitlement, type LicenceClaims } from './licensing-verification.js';
+import type { LicenceClaims } from './licensing-verification.js';
 
 import { evaluateLicence, licenceSummary, type LicenceStatus } from './licensing-status.js';
 import { LicenceServiceError, licensingRequest } from './licensing-http.js';
 import {
   checkoutFailureMessage,
-  displayDeviceName,
-  ERRORS,
+  errorMessage,
   MESSAGES,
   paymentFailureMessage,
   refreshFailureMessage,
   RELEASED,
   requestFailureMessage,
   REVOKED,
+  staleOrderMessage,
 } from './licensing-messages.js';
 import { prepareLicenceCheckout, claimLicencePayment } from './licensing-commerce.js';
 import { LicensingUpdateCache } from './licensing-update-cache.js';
+import { clockErrorMessage, LicenceClockError, nextClockMark } from './licensing-clock.js';
+import {
+  activationBody,
+  grantedRecord,
+  grantRequest,
+  requireActivationBody,
+  verifyGrant,
+  type GrantAction,
+  type VerifiedGrant,
+} from './licensing-grant.js';
+import {
+  deactivateDevice,
+  resetSavedLicence,
+  type DeactivationAccess,
+} from './licensing-signout.js';
 export type { LicenceStatus } from './licensing-status.js';
 
 type RuntimeOptions = {
@@ -102,11 +116,21 @@ class LicensingService {
     if (this.config.channel === 'invalid') return this.evaluate(EMPTY, '');
     const { saved, device } = await this.load();
     const result = this.evaluate(saved, device);
-    // Remember checks at every read: an expired trial must not become valid again
-    // by winding the clock back before the next launch.
-    if (result.tier !== null && this.now() > saved.lastSeenAt)
-      await this.write({ ...saved, lastSeenAt: this.now() }, device);
+    await this.rememberClock(saved, device, result);
     return result;
+  };
+  /**
+   * Saves how far a trial's clock has got, so an ended trial cannot come back by
+   * winding the clock back before the next launch. Paid rights ignore the clock,
+   * and a mark that has barely moved is not rewritten.
+   */
+  private readonly rememberClock = async (
+    saved: LicenceRecord,
+    device: string,
+    status: LicenceStatus,
+  ): Promise<void> => {
+    const mark = nextClockMark(status, saved.lastSeenAt, this.now());
+    if (mark !== null) await this.write({ ...saved, lastSeenAt: mark }, device);
   };
   private readonly safe = (work: () => Promise<LicenceStatus>, mutation = false) => {
     if (mutation) this.updateCache.beginMutation();
@@ -129,51 +153,26 @@ class LicensingService {
     if (this.config.channel !== 'commercial') throw new Error('Commercial licensing unavailable');
     return licensingRequest(this.config.apiOrigin, this.options.fetch)(path, body);
   };
-  private readonly credentialBody = (credential: LicenceCredential, deviceId: string) => {
-    if (this.config.channel !== 'commercial') throw new Error('Commercial licensing unavailable');
-    const claims = verifyEntitlement(credential.entitlement, this.config.entitlementKeys, deviceId);
-    if (claims === null) throw new Error('Invalid saved licence');
-    return {
-      licenseId: claims.licenseId,
-      activationId: claims.activationId,
-      deviceId,
-      activationToken: credential.activationToken,
-    };
-  };
-  private readonly acquireRequest = (
-    action: 'activate' | 'trial' | 'refresh',
-    saved: LicenceRecord,
-    device: string,
-    licenseKey?: string,
-  ): { readonly path: string; readonly body: unknown } | null => {
-    if (action === 'refresh')
-      return saved.credential === undefined
-        ? null
-        : {
-            path: '/v1/activations/refresh',
-            body: this.credentialBody(saved.credential, device),
-          };
-    return {
-      path: action === 'trial' ? '/v1/trials/start' : '/v1/licenses/activate',
-      body: {
-        deviceId: device,
-        deviceName: displayDeviceName(this.options.deviceName),
-        ...(action === 'activate' ? { licenseKey } : {}),
-      },
-    };
-  };
   private readonly acquire = async (
-    action: 'activate' | 'trial' | 'refresh',
+    action: GrantAction,
     licenseKey?: string,
     onAccepted?: () => void,
   ): Promise<LicenceStatus> => {
     if (this.config.channel !== 'commercial') return this.readStatus();
     const { saved, device } = await this.load();
     const current = this.evaluate(saved, device);
+    // A pending deactivation no longer blocks an explicit activation or trial;
+    // the new grant replaces it (ADR-523 Amendment 2).
     const call =
-      current.state === 'unavailable' || saved.pendingDeactivation !== undefined
+      current.state === 'unavailable'
         ? null
-        : this.acquireRequest(action, saved, device, licenseKey);
+        : grantRequest(this.config, {
+            action,
+            saved,
+            device,
+            deviceName: this.options.deviceName,
+            licenseKey,
+          });
     if (call === null) return current;
     let value: unknown;
     try {
@@ -184,19 +183,33 @@ class LicensingService {
         return this.dropRevokedRights(saved, device, error.code);
       return { ...this.evaluate(saved, device), message: requestFailureMessage(error) };
     }
-    const next: LicenceRecord = {
-      ...saved,
-      schemaVersion: 1,
-      // A freshly signed online grant can recover a corrected system clock.
-      lastSeenAt: this.now(),
-      refreshedAt: this.now(),
-      credential: this.verifyGrant(value, device),
-      ...(action === 'activate' && validLicenceKey(licenseKey) ? { licenseKey } : {}),
-    };
+    return this.acceptGrant(action, value, { saved, device }, licenseKey, onAccepted);
+  };
+  private readonly acceptGrant = async (
+    action: GrantAction,
+    value: unknown,
+    { saved, device }: { readonly saved: LicenceRecord; readonly device: string },
+    licenseKey?: string,
+    onAccepted?: () => void,
+  ): Promise<LicenceStatus> => {
+    // Invalid responses must not re-arm a pending update using older cached rights.
+    this.updateCache.failAuthentication();
+    let grant: VerifiedGrant;
+    try {
+      grant = verifyGrant(this.config, value, device, this.now());
+    } catch (error) {
+      if (!(error instanceof LicenceClockError)) throw error;
+      // The service answered, but this computer's clock is too far off to trust it.
+      const kept = this.evaluate(saved, device);
+      return { ...kept, state: 'clock-error', message: clockErrorMessage(error.offset) };
+    }
+    const { next, droppedOrder } = grantedRecord(action, saved, grant, this.now(), licenseKey);
     await this.write(next, device);
     this.updateCache.acceptAuthentication();
     onAccepted?.();
-    return this.evaluate(next, device);
+    const status = this.evaluate(next, device);
+    if (droppedOrder === null) return status;
+    return { ...status, message: staleOrderMessage(droppedOrder.order?.orderId ?? null) };
   };
   /** A refresh that the server answers definitively removes rights it no longer grants. */
   private readonly dropRevokedRights = async (
@@ -216,26 +229,21 @@ class LicensingService {
       ...(revoked || licenseKey === undefined ? {} : { licenseKey }),
     };
     await this.write(next, device);
-    return { ...this.evaluate(next, device), message: ERRORS[code] ?? null };
+    return { ...this.evaluate(next, device), message: errorMessage(code) };
   };
-  private readonly verifyGrant = (value: unknown, device: string): LicenceCredential => {
-    // Invalid responses must not re-arm a pending update using older cached rights.
-    this.updateCache.failAuthentication();
-    if (
-      this.config.channel !== 'commercial' ||
-      !record(value) ||
-      typeof value.activationToken !== 'string' ||
-      !/^[A-Za-z0-9_-]{43}$/.test(value.activationToken)
-    )
-      throw new Error('Invalid activation');
-    const claims = verifyEntitlement(value.entitlement, this.config.entitlementKeys, device);
-    if (claims === null || Math.abs(claims.issuedAt - this.now()) > 300)
-      throw new Error('Invalid entitlement');
-    return {
-      entitlement: value.entitlement as LicenceCredential['entitlement'],
-      activationToken: value.activationToken,
-    };
-  };
+  /** What deactivation and reset use of this runtime (licensing-signout.ts). */
+  private readonly access = (): DeactivationAccess => ({
+    load: this.load,
+    write: this.write,
+    evaluate: this.evaluate,
+    status: this.readStatus,
+    now: this.now,
+    request: this.request,
+    credentialBody: (credential, device) => activationBody(this.config, credential, device),
+    lockPro: () => {
+      this.proLatched = false;
+    },
+  });
   readonly status = () => this.safe(this.readStatus);
   readonly activate = (licenseKey: string) =>
     this.safe(() => {
@@ -248,7 +256,11 @@ class LicensingService {
     }, true);
   readonly startTrial = () => this.safe(() => this.acquire('trial'), true);
   readonly refresh = () => this.safe(() => this.acquire('refresh'), true);
-  /** Quietly confirms saved rights about once a week; never blocks or interrupts work. */
+  /**
+   * Quietly confirms saved rights about once a week, and otherwise moves a
+   * trial's clock mark on. Runs at launch and every 30 minutes while KerfDesk is
+   * open; it never blocks or interrupts work.
+   */
   readonly refreshInBackground = () =>
     this.safe(async () => {
       if (this.config.channel !== 'commercial') return this.readStatus();
@@ -257,56 +269,20 @@ class LicensingService {
       const due =
         ['ready', 'updates-expired', 'clock-error'].includes(current.state) &&
         this.now() - (saved.refreshedAt ?? 0) >= REFRESH_INTERVAL;
-      return due ? this.acquire('refresh') : current;
+      if (due) return this.acquire('refresh');
+      await this.rememberClock(saved, device, current);
+      return current;
     }, true);
   readonly deactivate = () =>
     this.safe(async () => {
       if (this.config.channel !== 'commercial') return this.readStatus();
-      const { saved, device } = await this.load();
-      const credential = saved.pendingDeactivation ?? saved.credential;
-      if (credential === undefined) return this.evaluate(saved, device);
-      const pending: LicenceRecord = {
-        schemaVersion: 1,
-        lastSeenAt: Math.max(saved.lastSeenAt, this.now()),
-        pendingDeactivation: credential,
-        ...(saved.payment === undefined ? {} : { payment: saved.payment }),
-      };
-      await this.write(pending, device);
-      // The owner asked to sign this device out, so Pro locks now.
-      this.proLatched = false;
-      try {
-        const result = await this.request(
-          '/v1/activations/deactivate',
-          this.credentialBody(credential, device),
-        );
-        if (!record(result) || result.deactivated !== true)
-          throw new Error('Deactivation was not confirmed');
-      } catch (error) {
-        if (error instanceof LicenceServiceError && error.code === 'release_limit_reached') {
-          // The seat stays here, so the device keeps its rights.
-          await this.write(saved, device);
-          return { ...this.evaluate(saved, device), message: ERRORS[error.code] ?? null };
-        }
-        return this.evaluate(pending, device);
-      }
-      const cleared: LicenceRecord = {
-        schemaVersion: 1,
-        lastSeenAt: pending.lastSeenAt,
-        ...(saved.payment === undefined ? {} : { payment: saved.payment }),
-      };
-      await this.write(cleared, device);
-      return {
-        ...this.evaluate(cleared, device),
-        message:
-          'This device has been deactivated and its licence seat is free for another device.',
-      };
+      return deactivateDevice(this.access());
     }, true);
-  /** Clears an unreadable saved record; the server still holds this device's seat. */
+  /** Clears what blocks this device: an unreadable record or a stuck deactivation. */
   readonly resetStore = () =>
     this.safe(async () => {
       if (this.config.channel !== 'commercial') return this.readStatus();
-      await this.options.store.reset();
-      return { ...(await this.readStatus()), message: MESSAGES.reset };
+      return resetSavedLicence(this.access(), this.options.store);
     }, true);
   readonly checkout = (operation: 'purchase' | 'renewal', licenseKey?: string) =>
     this.safe(async () => {
@@ -405,7 +381,7 @@ class LicensingService {
   readonly proUnlocked = (): boolean => this.config.channel === 'free' || this.proLatched;
   private readonly renewalIdentity = (operation: string, saved: LicenceRecord, device: string) =>
     operation === 'renewal' && saved.credential !== undefined
-      ? this.credentialBody(saved.credential, device)
+      ? requireActivationBody(this.config, saved.credential, device)
       : undefined;
 }
 

@@ -1,4 +1,4 @@
-import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
+import { mkdtemp, open, readdir, readFile, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { afterEach, describe, expect, it, vi } from 'vitest';
@@ -8,7 +8,7 @@ import {
   validLicenceKey,
   type LicenceRecord,
 } from './licensing-store';
-import { licensingDeviceId } from './licensing-device';
+import { licensingDeviceId, rememberDeviceId } from './licensing-device';
 import { withLicensingRoutes } from './licensing-routes';
 import { createLicensingRuntime } from './licensing-runtime';
 import { licensingRequest } from './licensing-http';
@@ -81,12 +81,48 @@ describe('main-process protected credential storage', () => {
   it('reports a record the OS key can no longer decrypt as unreadable, and resets it', async () => {
     const h = await storage();
     await h.store.write({ schemaVersion: 1, lastSeenAt: 10 });
+    const unreadable = await readFile(h.file);
     h.secureStorage.decryptStringAsync.mockRejectedValueOnce(new Error('key changed'));
     await expect(h.store.read()).rejects.toBeInstanceOf(LicenceStoreUnreadableError);
     await h.store.reset();
     await expect(readFile(h.file)).rejects.toMatchObject({ code: 'ENOENT' });
     expect(await h.store.read()).toBeNull();
+    // Set aside for support, not deleted, in case the OS key comes back.
+    const aside = (await readdir(dirname(h.file))).filter((name) =>
+      /^commercial-licence\.v1\.unreadable-\d{4}-\d\d-\d\dT[\d-]+Z$/.test(name),
+    );
+    expect(aside).toHaveLength(1);
+    expect(await readFile(join(dirname(h.file), aside[0] ?? ''))).toEqual(unreadable);
     await h.store.reset();
+    expect(await readdir(dirname(h.file))).toHaveLength(1);
+  });
+  it('keeps only the newest few unreadable records, including the one just set aside', async () => {
+    const h = await storage();
+    const folder = dirname(h.file);
+    const older = ['2020-01-01', '2020-01-02', '2020-01-03', '2020-01-04'].map(
+      (day) => `commercial-licence.v1.unreadable-${day}T00-00-00-000Z`,
+    );
+    for (const name of older) await writeFile(join(folder, name), name);
+    await writeFile(h.file, 'unreadable');
+    await h.store.reset();
+    const kept = (await readdir(folder)).sort();
+    expect(kept).toHaveLength(3);
+    expect(kept.slice(0, 2)).toEqual(older.slice(2));
+    expect(await readFile(join(folder, kept[2] ?? ''), 'utf8')).toBe('unreadable');
+  });
+  it('flushes the new record to disk before it replaces the old one', async () => {
+    const h = await storage();
+    const probe = await open(join(dirname(h.file), 'probe'), 'w');
+    const prototype = Object.getPrototypeOf(probe) as { sync: () => Promise<void> };
+    await probe.close();
+    const sync = vi.spyOn(prototype, 'sync');
+    try {
+      await h.store.write({ schemaVersion: 1, lastSeenAt: 10 });
+      expect(sync).toHaveBeenCalledOnce();
+      expect((await readdir(dirname(h.file))).filter((name) => name.endsWith('.tmp'))).toEqual([]);
+    } finally {
+      sync.mockRestore();
+    }
   });
   it('keeps a saved licence key only when it is a printable bounded key', async () => {
     const h = await storage();
@@ -119,6 +155,17 @@ describe('stable private device binding', () => {
         execute: vi.fn(),
       }),
     ).rejects.toThrow('stable device identity');
+  });
+  it('reads the identity once per process, but tries a failed read again', async () => {
+    const read = vi
+      .fn<() => Promise<string>>()
+      .mockRejectedValueOnce(new Error('reg.exe timed out'))
+      .mockResolvedValue('device-digest');
+    const deviceId = rememberDeviceId(read);
+    await expect(deviceId()).rejects.toThrow('timed out');
+    expect(await Promise.all([deviceId(), deviceId()])).toEqual(['device-digest', 'device-digest']);
+    expect(await deviceId()).toBe('device-digest');
+    expect(read).toHaveBeenCalledTimes(2);
   });
 });
 

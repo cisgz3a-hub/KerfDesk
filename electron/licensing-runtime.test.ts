@@ -113,6 +113,14 @@ function saved(claim: LicenceClaims = claims()): LicenceRecord {
     credential: { entitlement: envelope(claim), activationToken: token },
   };
 }
+function trialClaims(patch: Partial<LicenceClaims> = {}): LicenceClaims {
+  const issuedAt = patch.issuedAt ?? NOW / 1000;
+  const expiry = issuedAt + 20 * 86_400;
+  return claims({ tier: 'trial', accessExpiresAt: expiry, updatesUntil: expiry, ...patch });
+}
+function grant(claim: LicenceClaims = claims()): Response {
+  return Response.json({ entitlement: envelope(claim), activationToken: token });
+}
 
 describe('offline Ed25519 entitlement verification', () => {
   it('rejects tampering, an unknown key, wrong device and malformed rights', () => {
@@ -186,19 +194,18 @@ describe('commercial edition (ADR-540)', () => {
       edition: 'free',
     });
   });
-  it('reanchors a corrected clock only from a newly issued authenticated grant', async () => {
-    const h = harness({ ...saved(), lastSeenAt: NOW / 1000 + 86_400 });
+  it('reanchors a corrected trial clock only from a newly issued authenticated grant', async () => {
+    const h = harness({ ...saved(trialClaims()), lastSeenAt: NOW / 1000 + 86_400 });
+    h.fetch.mockResolvedValue(grant(trialClaims()));
     expect(await h.runtime.status()).toMatchObject({ state: 'clock-error', edition: 'free' });
     expect(await h.runtime.refresh()).toMatchObject({ state: 'ready', edition: 'pro' });
     expect(h.saved()?.lastSeenAt).toBe(NOW / 1000);
     const original = h.saved()?.credential;
-    h.fetch.mockResolvedValueOnce(
-      Response.json({
-        entitlement: envelope(claims({ issuedAt: NOW / 1000 - 600 })),
-        activationToken: token,
-      }),
-    );
-    expect(await h.runtime.refresh()).toMatchObject({ state: 'unavailable' });
+    h.fetch.mockResolvedValueOnce(grant(trialClaims({ issuedAt: NOW / 1000 - 600 })));
+    const skewed = await h.runtime.refresh();
+    // The service answered: the clock is the problem, not the connection.
+    expect(skewed).toMatchObject({ state: 'clock-error', tier: 'trial' });
+    expect(skewed.message).toContain('about 10 minutes ahead');
     expect(h.saved()?.credential).toEqual(original);
     await h.runtime.status();
     expect(h.runtime.isReleaseEligibleCached(release('update-manifest'), '1.0.0')).toBe(false);
@@ -255,10 +262,22 @@ describe('commercial edition (ADR-540)', () => {
       edition: 'free',
     });
   });
-  it('locks Pro after a clock rollback and in a version newer than the licence covers', async () => {
-    const h = harness(saved());
-    h.clock(NOW - 600_000);
-    expect(await h.runtime.status()).toMatchObject({ state: 'clock-error', edition: 'free' });
+  it('holds only a trial to the clock, and locks Pro in a version newer than the licence covers', async () => {
+    const covered = release('update-manifest', '2026-09-28T00:00:00.000Z', '1.1.0');
+    const paid = harness({ ...saved(), lastSeenAt: NOW / 1000 + 30 * 86_400 });
+    paid.clock(NOW - 600_000);
+    expect(await paid.runtime.status()).toMatchObject({ state: 'ready', edition: 'pro' });
+    expect(await paid.runtime.isReleaseEligible(covered, '1.1.0')).toBe(true);
+    const developer = harness({
+      ...saved(claims({ tier: 'developer', perpetualUpdates: true, updatesUntil: null })),
+      lastSeenAt: NOW / 1000 + 30 * 86_400,
+    });
+    expect(await developer.runtime.status()).toMatchObject({ state: 'ready', edition: 'pro' });
+    const trial = harness(saved(trialClaims()));
+    trial.clock(NOW - 600_000);
+    expect(await trial.runtime.status()).toMatchObject({ state: 'clock-error', edition: 'free' });
+    expect((await trial.runtime.status()).message).toContain('Set time automatically');
+    expect(await trial.runtime.isReleaseEligible(covered, '1.1.0')).toBe(false);
     const old = harness(
       saved(claims({ updatesUntil: Date.parse('2026-08-01T00:00:00.000Z') / 1000 })),
     );
@@ -331,7 +350,9 @@ describe('licence key and recovery (ADR-523 Amendment 1)', () => {
   });
   it('falls back to Free with a reset when the saved licence cannot be read', async () => {
     const h = harness(saved());
-    h.store.read.mockRejectedValueOnce(new LicenceStoreUnreadableError());
+    h.store.read
+      .mockRejectedValueOnce(new LicenceStoreUnreadableError())
+      .mockRejectedValueOnce(new LicenceStoreUnreadableError());
     expect(await h.runtime.status()).toMatchObject({
       state: 'invalid-licence',
       edition: 'free',
@@ -501,7 +522,7 @@ describe('main-owned payment proof', () => {
           currency: 'USD',
         });
       if (url.endsWith('/v1/orders/claim')) return Response.json({ licenseKey: 'KD1.test-secret' });
-      return Response.json({ error: { code: 'device_limit' } }, { status: 409 });
+      return Response.json({ error: { code: 'device_limit_reached' } }, { status: 409 });
     });
     await h.runtime.checkout('purchase');
     expect(await h.runtime.claimPayment()).toMatchObject({ paymentPending: true, tier: 'trial' });
@@ -569,5 +590,181 @@ describe('synchronous eligibility at update installation', () => {
     await h.runtime.refresh();
     await h.runtime.status();
     expect(h.runtime.isReleaseEligibleCached(release('update-manifest'), '1.0.0')).toBe(false);
+  });
+});
+
+describe('clock checks and the saved clock mark (ADR-523 Amendment 2)', () => {
+  it('reports a clock more than five minutes off as a clock problem, not an outage', async () => {
+    const h = harness();
+    h.fetch.mockResolvedValue(grant(claims({ issuedAt: NOW / 1000 + 2 * 3600 })));
+    const activated = await h.runtime.activate('KD1.test-secret');
+    expect(activated).toMatchObject({ state: 'clock-error', edition: 'free', tier: null });
+    expect(activated.message).toContain('about 2 hours behind');
+    expect(activated.message).toContain('Set time automatically');
+    expect(h.saved()).toBeNull();
+    const trial = harness();
+    trial.fetch.mockResolvedValue(grant(trialClaims({ issuedAt: NOW / 1000 - 3 * 86_400 })));
+    expect((await trial.runtime.startTrial()).message).toContain('about 3 days ahead');
+    expect(trial.saved()).toBeNull();
+  });
+  it('saves the clock mark only for a trial, and only once it has moved a minute', async () => {
+    const paid = harness(saved());
+    paid.clock(NOW + 3_600_000);
+    await paid.runtime.status();
+    expect(paid.store.write).not.toHaveBeenCalled();
+    const trial = harness(saved(trialClaims()));
+    trial.clock(NOW + 30_000);
+    await trial.runtime.status();
+    expect(trial.store.write).not.toHaveBeenCalled();
+    trial.clock(NOW + 61_000);
+    await trial.runtime.status();
+    expect(trial.saved()?.lastSeenAt).toBe(NOW / 1000 + 61);
+  });
+  it('moves a trial clock mark on at each quiet check without calling the service', async () => {
+    const trial = harness({ ...saved(trialClaims()), refreshedAt: NOW / 1000 });
+    trial.clock(NOW + 30 * 60_000);
+    expect(await trial.runtime.refreshInBackground()).toMatchObject({ state: 'ready' });
+    expect(trial.fetch).not.toHaveBeenCalled();
+    expect(trial.saved()?.lastSeenAt).toBe(NOW / 1000 + 1800);
+    const paid = harness({ ...saved(), refreshedAt: NOW / 1000 });
+    paid.clock(NOW + 30 * 60_000);
+    await paid.runtime.refreshInBackground();
+    expect(paid.store.write).not.toHaveBeenCalled();
+  });
+});
+
+describe('a deactivation the service refuses (ADR-523 Amendment 2)', () => {
+  const order = { requestId: token, operation: 'purchase' as const };
+  function pending(claim: LicenceClaims = claims(), extra: Partial<LicenceRecord> = {}) {
+    const credential = { entitlement: envelope(claim), activationToken: token };
+    return {
+      schemaVersion: 1 as const,
+      lastSeenAt: NOW / 1000,
+      pendingDeactivation: credential,
+      ...extra,
+    };
+  }
+  function refuse(h: ReturnType<typeof harness>, code: string, status: number) {
+    h.fetch.mockResolvedValue(Response.json({ error: { code } }, { status }));
+  }
+  it('signs this computer out when the service no longer knows its seat, keeping any order', async () => {
+    const h = harness(pending(claims(), { payment: order }));
+    refuse(h, 'invalid_credentials', 401);
+    const status = await h.runtime.deactivate();
+    expect(status).toMatchObject({
+      state: 'activation-required',
+      edition: 'free',
+      deactivationPending: false,
+      paymentPending: true,
+    });
+    expect(status.message).toContain('may still count as one of your three devices');
+    expect(h.saved()?.pendingDeactivation).toBeUndefined();
+    expect(h.saved()?.payment).toEqual(order);
+  });
+  it('signs out without a request when the saved credential no longer verifies here', async () => {
+    const h = harness(pending(claims({ deviceId: 'b'.repeat(43) })));
+    const status = await h.runtime.deactivate();
+    expect(h.fetch).not.toHaveBeenCalled();
+    expect(status).toMatchObject({ deactivationPending: false, edition: 'free' });
+    expect(status.message).toContain('could not be freed');
+    expect(h.saved()?.pendingDeactivation).toBeUndefined();
+  });
+  it('keeps retrying after an outage, a rate limit or an unclear answer', async () => {
+    for (const [code, status] of [
+      ['rate_limited', 429],
+      ['service_unavailable', 503],
+      ['invalid_request', 400],
+    ] as const) {
+      const h = harness(pending());
+      refuse(h, code, status);
+      expect(await h.runtime.deactivate()).toMatchObject({ deactivationPending: true });
+      expect(h.saved()?.pendingDeactivation).toBeDefined();
+    }
+  });
+  it('gives the licence back when a retried deactivation is refused for too many moves', async () => {
+    const h = harness(pending());
+    refuse(h, 'release_limit_reached', 429);
+    const status = await h.runtime.deactivate();
+    expect(status).toMatchObject({ state: 'ready', edition: 'pro', deactivationPending: false });
+    expect(status.message).toContain('too often');
+    expect(h.saved()?.credential).toBeDefined();
+    expect(h.saved()?.pendingDeactivation).toBeUndefined();
+  });
+  it('lets an explicit activation or trial replace a pending deactivation', async () => {
+    const activated = harness(pending());
+    expect(await activated.runtime.activate('KD1.test-secret')).toMatchObject({
+      state: 'ready',
+      edition: 'pro',
+      deactivationPending: false,
+    });
+    expect(String(activated.fetch.mock.calls[0]?.[0])).toContain('/v1/licenses/activate');
+    expect(activated.saved()?.pendingDeactivation).toBeUndefined();
+    expect(activated.saved()?.licenseKey).toBe('KD1.test-secret');
+    const trial = harness(pending());
+    trial.fetch.mockResolvedValue(grant(trialClaims()));
+    expect(await trial.runtime.startTrial()).toMatchObject({ tier: 'trial', edition: 'pro' });
+    expect(trial.saved()?.pendingDeactivation).toBeUndefined();
+    const refused = harness(pending());
+    refuse(refused, 'invalid_credentials', 401);
+    expect(await refused.runtime.activate('KD1.wrong-secret')).toMatchObject({
+      deactivationPending: true,
+    });
+  });
+  it('offers Reset for a pending deactivation, keeping the saved order', async () => {
+    const h = harness(pending(claims(), { payment: order }));
+    const status = await h.runtime.resetStore();
+    expect(h.store.reset).not.toHaveBeenCalled();
+    expect(status).toMatchObject({ deactivationPending: false, paymentPending: true });
+    expect(status.message).toContain('stopped trying');
+    expect(h.saved()?.payment).toEqual(order);
+  });
+  it('never resets a saved licence that can be read', async () => {
+    const h = harness(saved());
+    const status = await h.runtime.resetStore();
+    expect(h.store.reset).not.toHaveBeenCalled();
+    expect(status).toMatchObject({ state: 'ready', edition: 'pro' });
+    expect(status.message).toContain('nothing was reset');
+    expect(h.saved()?.credential).toBeDefined();
+  });
+});
+
+describe('orders and checkout links (ADR-523 Amendment 2)', () => {
+  it('drops an unfinished purchase when a licence key unlocks paid Pro, so Renew shows', async () => {
+    const h = harness({
+      schemaVersion: 1,
+      lastSeenAt: NOW / 1000,
+      payment: {
+        requestId: token,
+        operation: 'purchase',
+        order: { orderId: 'order-1', claimToken: token, checkoutUrl },
+      },
+    });
+    const status = await h.runtime.activate('KD1.test-secret');
+    expect(status).toMatchObject({ tier: 'paid', edition: 'pro', paymentPending: false });
+    expect(status.message).toContain('order-1');
+    expect(h.saved()?.payment).toBeUndefined();
+    // Paying a saved renewal still renews the licence on the service, so it stays.
+    const renewal = harness({
+      ...saved(),
+      payment: { requestId: token, operation: 'renewal', licenseKey: 'KD1.test-secret' },
+    });
+    expect(await renewal.runtime.activate('KD1.test-secret')).toMatchObject({
+      paymentPending: true,
+    });
+  });
+  it('refuses a checkout link whose transaction ID is not lower case', async () => {
+    const h = harness();
+    h.fetch.mockResolvedValue(
+      Response.json({
+        orderId: 'order-1',
+        claimToken: token,
+        checkoutUrl: `https://kerfdesk.com/buy.html?_ptxn=txn_${'A'.repeat(26)}`,
+        amount: 4950,
+        currency: 'USD',
+      }),
+    );
+    await h.runtime.checkout('purchase');
+    expect(h.openCheckout).not.toHaveBeenCalled();
+    expect(h.saved()?.payment?.order).toBeUndefined();
   });
 });

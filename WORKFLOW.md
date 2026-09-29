@@ -7803,6 +7803,10 @@ behavior or create a second product implementation.
    recoverable and must not encourage a duplicate purchase.
 4. Deactivation removes the local grant before contacting the server. If offline,
    the app truthfully shows that freeing the seat is pending and retries later.
+   A definite refusal, or a saved grant that no longer verifies, signs the computer
+   out and says the seat may still count. While freeing the seat is pending,
+   **Reset saved licence** beside Retry stops trying, so the key or the trial can be
+   used again (ADR-523 Amendment 2).
    Developer grants for Johann and Father are separate private keys with normal
    computer-transfer behaviour and unlimited update coverage.
 5. Trusted signed Windows commercial builds use only the separate commercial

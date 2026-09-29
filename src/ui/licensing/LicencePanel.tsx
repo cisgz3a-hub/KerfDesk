@@ -99,14 +99,14 @@ function SavedLicence({
   return (
     <>
       {status.licenseKey === null ? null : <LicenceKeyDisplay licenseKey={status.licenseKey} />}
-      {status.storeUnreadable ? (
+      {status.storeUnreadable || status.deactivationPending ? (
         <div style={licenceButtons}>
           <button
             type="button"
             className="lf-btn"
             disabled={busy}
             onClick={() => void run(client.resetStore)}
-            title="Clear the unreadable saved licence so you can activate again with your key"
+            title="Clear the stuck saved licence so you can activate again with your key"
           >
             Reset saved licence
           </button>

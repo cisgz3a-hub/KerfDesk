@@ -20,10 +20,18 @@ type RenewalIdentity = {
   readonly activationToken: string;
 };
 
+const CHECKOUT_PAGE = 'https://kerfdesk.com/buy.html?_ptxn=';
+
+/** A Paddle transaction ID, lower case only, exactly as the licence service accepts it. */
+export function isTransactionId(value: string): boolean {
+  return /^txn_[a-z0-9]{26}$/.test(value);
+}
+
 export function isLicenceCheckoutUrl(value: unknown): value is string {
   return (
     typeof value === 'string' &&
-    /^https:\/\/kerfdesk\.com\/buy\.html\?_ptxn=txn_[A-Za-z0-9]{26}$/.test(value)
+    value.startsWith(CHECKOUT_PAGE) &&
+    isTransactionId(value.slice(CHECKOUT_PAGE.length))
   );
 }
 
