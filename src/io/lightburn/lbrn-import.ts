@@ -1,5 +1,11 @@
 import { DEFAULT_DEVICE_PROFILE, type DeviceProfile } from '../../core/devices';
-import { createLayer, type ImportedSvg, type Layer, type Project } from '../../core/scene';
+import {
+  createLayer,
+  nextOperationColor,
+  type ImportedSvg,
+  type Layer,
+  type Project,
+} from '../../core/scene';
 import { createProject } from '../../core/scene/project';
 import { lightBurnSceneFrame } from './lbrn-frame';
 import { colorForCutIndex, importLbrnGeometry } from './lbrn-geometry';
@@ -12,6 +18,15 @@ import { resolveLightBurnOverscan } from './lbrn-overscan';
 const MAX_XML_DEPTH = 64;
 // The range the Kerf Offset field takes (CutSettingsCommonFields).
 const KERF_OFFSET_LIMIT_MM = 10;
+
+type LayerKind = 'line' | 'fill' | 'fill+line';
+// A CutSetting's `type` is LightBurn's layer mode: Line is "Cut", Fill is
+// "Scan" and Fill+Line is "Scan+Cut" (ADR-388).
+const LIGHTBURN_LAYER_KINDS: ReadonlyMap<string, LayerKind> = new Map([
+  ['cut', 'line'],
+  ['scan', 'fill'],
+  ['scan+cut', 'fill+line'],
+]);
 
 export type LbrnImportReport = {
   readonly sourceName: string;
@@ -75,12 +90,11 @@ export function importLightBurnProjectDocument(
     geometry.objects.flatMap((object) => object.paths.map((path) => path.color)),
   );
   const layers = layerImport.layers;
-  const operationIdByColor = new Map(layers.map((operation) => [operation.color, operation.id]));
   const objects = geometry.objects.map((object) => ({
     ...object,
     paths: object.paths.map((path) => {
-      const operationId = operationIdByColor.get(path.color);
-      return operationId === undefined ? path : { ...path, operationIds: [operationId] };
+      const operationIds = layerImport.operationIdsByColor.get(path.color);
+      return operationIds === undefined ? path : { ...path, operationIds };
     }),
   }));
   const project: Project = {
@@ -110,7 +124,11 @@ export function importLightBurnProjectDocument(
 function importedLayers(
   root: Element,
   usedColors: ReadonlyArray<string>,
-): { readonly layers: Layer[]; readonly warnings: ReadonlyArray<string> } {
+): {
+  readonly layers: Layer[];
+  readonly operationIdsByColor: ReadonlyMap<string, ReadonlyArray<string>>;
+  readonly warnings: ReadonlyArray<string>;
+} {
   const settings = new Map<number, Element>();
   for (const element of [...root.children]) {
     if (normalized(element.tagName) !== 'cutsetting') continue;
@@ -122,8 +140,26 @@ function importedLayers(
     .sort((left, right) => left.rank[0] - right.rank[0] || left.rank[1] - right.rank[1])
     .map((entry) => entry.color);
   const warnings: string[] = [];
-  const layers = colors.map((color) => importedLayer(color, settings, warnings));
-  return { layers, warnings: [...new Set(warnings)].sort() };
+  const imported = colors.map((color) => importedLayer(color, settings, warnings));
+  const layers: Layer[] = [];
+  const operationIdsByColor = new Map<string, ReadonlyArray<string>>();
+  for (const { layer, outline } of imported) {
+    layers.push(layer);
+    if (outline === null) {
+      operationIdsByColor.set(layer.color, [layer.id]);
+      continue;
+    }
+    // Fill+Line fills the shapes, then cuts their outlines: a Line operation
+    // on the same artwork, listed right after the fill so it runs second.
+    const color = nextOperationColor([...imported.map((entry) => entry.layer), ...layers]);
+    const line = {
+      ...createLayer({ id: `${layer.id}-line`, name: `${layer.name} (Line)`, color }),
+      ...outline,
+    };
+    layers.push(line);
+    operationIdsByColor.set(layer.color, [layer.id, line.id]);
+  }
+  return { layers, operationIdsByColor, warnings: [...new Set(warnings)].sort() };
 }
 
 // LightBurn runs a project layer by layer in its Cuts / Layers list order,
@@ -168,11 +204,12 @@ function layerByLayerArtworkOrder(
     .map((entry) => entry.id);
 }
 
+/** A layer, and for Fill+Line the settings of the Line operation that follows it. */
 function importedLayer(
   color: string,
   settings: ReadonlyMap<number, Element>,
   warnings: string[],
-): Layer {
+): { readonly layer: Layer; readonly outline: Partial<Layer> | null } {
   const index = findColorIndex(color);
   const setting = settings.get(index);
   const importedName = setting === undefined ? '' : textField(setting, ['name', 'label']).trim();
@@ -180,17 +217,34 @@ function importedLayer(
     importedName ||
     (index >= 0 ? `LightBurn C${index.toString().padStart(2, '0')}` : `Imported ${color}`);
   const base = createLayer({ id: color, name, color });
-  if (setting === undefined) return base;
-  const mode = textField(setting, ['type', 'mode']).toLowerCase();
-  const isScan = mode.includes('scan') || mode.includes('fill');
+  if (setting === undefined) return { layer: base, outline: null };
+  const kind = lightBurnLayerKind(setting, name, warnings);
+  const common = importedCommonLayerFields(setting);
+  const line = (): Partial<Layer> => ({
+    mode: 'line',
+    ...common,
+    ...importedKerf(setting, name, warnings),
+  });
+  if (kind === 'line') return { layer: { ...base, ...line() }, outline: null };
+  const fill: Layer = { ...base, mode: 'fill', ...common };
   return {
-    ...base,
-    mode: isScan ? 'fill' : 'line',
-    ...importedCommonLayerFields(setting),
-    ...(isScan
-      ? importedScanSettings(setting, name, warnings)
-      : importedKerf(setting, name, warnings)),
+    layer: { ...fill, ...importedScanSettings(setting, name, kind, warnings) },
+    outline: kind === 'fill+line' ? line() : null,
   };
+}
+
+// A setting without a type keeps LightBurn's default mode, Line. A type
+// KerfDesk has no operation for is named, and opens as Line to be reviewed.
+function lightBurnLayerKind(setting: Element, name: string, warnings: string[]): LayerKind {
+  const type = textField(setting, ['type', 'mode']).trim();
+  const kind = LIGHTBURN_LAYER_KINDS.get(type.toLowerCase());
+  if (kind !== undefined) return kind;
+  if (type !== '') {
+    warnings.push(
+      `${name}: LightBurn layer mode “${type}” has no KerfDesk equivalent, so it opened as a Line operation. Check its settings before cutting.`,
+    );
+  }
+  return 'line';
 }
 
 // LightBurn's Kerf Offset moves a Cut layer's closed shapes out by the offset
@@ -214,14 +268,21 @@ function importedKerf(setting: Element, name: string, warnings: string[]): Parti
   return {};
 }
 
-function importedScanSettings(setting: Element, name: string, warnings: string[]): Partial<Layer> {
+function importedScanSettings(
+  setting: Element,
+  name: string,
+  kind: LayerKind,
+  warnings: string[],
+): Partial<Layer> {
   const overscan = resolveLightBurnOverscan(
     booleanField(setting, ['overscan']),
     numericField(setting, ['overscanpercent']),
     numericField(setting, ['speed', 'speedmmsec']),
     name,
   );
-  warnings.push(...unsupportedScanSettingWarnings(setting, name), ...overscan.warnings);
+  // Fill+Line's kerf opens on its Line operation.
+  const imported = kind === 'fill+line' ? ['kerf'] : [];
+  warnings.push(...unsupportedScanSettingWarnings(setting, name, imported), ...overscan.warnings);
   return {
     ...importedScanLayerFields(setting),
     ...(overscan.distanceMm === null ? {} : { fillOverscanMm: overscan.distanceMm }),
@@ -255,14 +316,17 @@ function importedScanLayerFields(setting: Element): Partial<Layer> {
 function unsupportedScanSettingWarnings(
   setting: Element,
   layerName: string,
+  alsoImported: ReadonlyArray<string>,
 ): ReadonlyArray<string> {
   const warnings: string[] = [];
   const supported = new Set([
+    ...alsoImported,
     'index',
     'name',
     'label',
     'type',
     'mode',
+    'priority',
     'speed',
     'speedmmsec',
     'maxpower',

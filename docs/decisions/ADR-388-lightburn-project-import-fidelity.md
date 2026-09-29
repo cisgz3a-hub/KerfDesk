@@ -57,6 +57,14 @@ and the thumbnail LightBurn embeds in each file, which is its own drawing of the
    field cannot hold (outside -10 to 10 mm, or not a number) is not applied, and the import report
    names the layer and the value. A Scan layer's kerf is named as a field not imported, because
    KerfDesk offsets only Line cuts. Nothing is dropped without a line in the report.
+7. **Layer modes by name.** A `<CutSetting>`'s `type` is read as a whole name, not searched for
+   "scan" or "fill": `Cut` is a Line operation, `Scan` a Fill operation, and `Scan+Cut`
+   (LightBurn's Fill+Line) a Fill operation followed by a Line operation named "<layer> (Line)"
+   on the same artwork, with the layer's speed, power and passes, and its kerf on the Line.
+   Listed right after the fill, the Line runs second and finishes the edge. A setting with no
+   type is LightBurn's default, Line. Any other type is named in the report and opens as a Line
+   operation to be reviewed. A Scan layer's `priority` is not reported as a field left behind,
+   since decision 3 reads it.
 
 ### Limits
 
@@ -74,6 +82,10 @@ and the thumbnail LightBurn embeds in each file, which is its own drawing of the
 - Decision 6 rests on LightBurn's own description of Kerf Offset (a path offset, outward on outer
   shapes and inward on holes), which could not be rechecked here: no corpus file carries a kerf,
   and no LightBurn cut was compared.
+- The corpus has only `Cut` layers. `Scan` and `Scan+Cut` as Fill and Fill+Line follow the Fill
+  mapping already shipped and a third-party generator's table of LightBurn's mode names; LightBurn's
+  names for its other modes (such as Offset Fill) are not known here, so they are reported.
+  LightBurn's own order inside a Fill+Line layer was not observed.
 - No corpus file has a rounded `Rect`, a `LineClosed` or `LineOpen` list, or a legacy `.lbrn`
   path. Decision 5 follows the audit's repro files and LightBurn files published with
   third-party converters (a LightBurn 1.7 text outline written as `LineClosed`, `Cr` written on
@@ -98,4 +110,6 @@ once per layer, priority over index, the Cut Planner warning); `lbrn-open-machin
 through every open route); `lbrn-shapes.test.ts` (rounded and over-rounded Rects are true arcs,
 `LineClosed` / `LineOpen` lists, shared by `PrimID` too, and legacy `<V>` / `<P>` circles and
 lines); `lbrn-kerf.test.ts` (a Cut layer's kerf grows the plate and shrinks its hole in the
-compiled job; out-of-range, unreadable and Scan kerfs are named).
+compiled job; out-of-range, unreadable and Scan kerfs are named); `lbrn-layer-modes.test.ts`
+(each type name, Fill+Line as a fill then a line on the same artwork, an unknown mode named, a
+Scan priority not reported).
