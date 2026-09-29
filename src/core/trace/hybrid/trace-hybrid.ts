@@ -85,7 +85,8 @@ export function* traceHybridPathsSteps(
     height: mask.height,
     radiusSq: wideCoreRadii(mask, distSq, gateRadius, maxWidthPx),
   });
-  const centre = yield* centerlineStrokesFromMaskSteps(mask, distSq, options);
+  // Line + fill recentres its width-carrying strokes itself (strokePaths).
+  const centre = yield* centerlineStrokesFromMaskSteps(mask, distSq, options, { penPath: false });
   if (cooperate) yield;
   const { wide, strokes } = yield* withOverwideStrokesFilled(centre, mask, distSq, cores, {
     gateRadius,
