@@ -1,21 +1,28 @@
-MIT License
+KerfDesk
+Copyright (c) 2026 Johann Stolk. All rights reserved.
 
-Copyright (c) 2026 Johann Stolk
+This repository holds the source code, documentation and assets of
+KerfDesk, a laser and CNC application (the "Software"). Except as set
+out below, or where a file or component states its own licence, no
+permission is granted to use, copy, modify, merge, publish, distribute,
+sublicense or sell the Software, in whole or in part.
 
-Permission is hereby granted, free of charge, to any person obtaining a copy
-of this software and associated documentation files (the "Software"), to deal
-in the Software without restriction, including without limitation the rights
-to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
-copies of the Software, and to permit persons to whom the Software is
-furnished to do so, subject to the following conditions:
+Using the app. The KerfDesk web app and desktop builds come with their
+own terms: the License & Safety Notice shown in the app and by the
+installer (public/eula.txt) or, for a commercial build, the KerfDesk
+Licence Agreement supplied with it. Those terms say how you may use the
+app.
 
-The above copyright notice and this permission notice shall be included in all
-copies or substantial portions of the Software.
+Earlier versions stay under the MIT License. Versions of the Software
+that were published under the MIT License, including every commit on
+the main branch before this file replaced the MIT License (the last of
+them is tagged "mit-final"), remain under the MIT License for anyone
+who received them. The MIT License text is in LICENSE-MIT. This file
+does not change the permissions that came with those versions.
 
-THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
-IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
-FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
-AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
-LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
-OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
-SOFTWARE.
+Third-party components remain under their own licences. See
+THIRD_PARTY_NOTICES.md and public/third-party-notices.txt.
+
+While this repository is public, GitHub's Terms of Service let GitHub
+users view and fork it on GitHub. That gives no other right to use,
+copy, modify or distribute the Software.

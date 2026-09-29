@@ -63,8 +63,8 @@ nsis:
   perMachine: false
   allowToChangeInstallationDirectory: true
   shortcutName: KerfDesk
-  # NSIS displays the MIT License & Safety Notice before installation; this
-  # adds no restriction and does not authorize future commercial terms.
+  # NSIS displays the License & Safety Notice before installation: the free
+  # use terms and safety warnings (ADR-543). It sets no commercial terms.
   license: public/eula.txt
 
 # Double-clicking a KerfDesk project opens it in KerfDesk (ADR-378). Only the
