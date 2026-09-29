@@ -55,7 +55,7 @@ export function copyAlongPathMutation(
   request: CopyAlongPathRequest,
   idFactory: () => string = () => crypto.randomUUID(),
 ): AppState | Partial<AppState> {
-  const plan = planCopyAlongPath(selectedSceneObjects(state), request);
+  const plan = planCopyAlongPath(selectedSceneObjects(state), request, state.project.scene);
   if (plan.kind === 'problem') {
     useToastStore.getState().pushToast(plan.message, 'warning');
     return state;
@@ -96,13 +96,18 @@ function copiesAlongPath(
   const artworkIds = new Set(selection.artwork.map((object) => object.id));
   const sources = sceneObjectCopyClosure(scene.objects, artworkIds);
   const sourceIds = new Set(sources.map((object) => object.id));
+  // Only the groups that travel whole are copied, so find them once rather
+  // than scanning every group in the project for every copy.
+  const travelling = (scene.groups ?? []).filter((group) =>
+    group.objectIds.every((id) => sourceIds.has(id)),
+  );
   const objects: SceneObject[] = [];
   const groups: SceneGroup[] = [];
   const selectedIds: string[] = [];
   for (const placement of placements) {
     const copied = copyObjectsAtArrayPlacement(sources, placement, idFactory);
     objects.push(...copied.objects);
-    groups.push(...cloneSelectedGroups(scene.groups ?? [], sourceIds, copied.ids, idFactory));
+    groups.push(...cloneSelectedGroups(travelling, sourceIds, copied.ids, idFactory));
     for (const object of selection.artwork) {
       const id = copied.ids.get(object.id);
       if (id !== undefined) selectedIds.push(id);

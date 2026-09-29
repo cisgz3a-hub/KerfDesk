@@ -596,7 +596,11 @@ destination and cannot overwrite the template source.
    single path (or the path picked under Guide path): by number of copies, spacing between centres
    or gap between copies, from the start offset to the end offset, turned to follow the path unless
    that box is cleared. A closed guide gets copies all the way round with none doubled at the seam.
-   The status line says what Apply will do. The guide stays and the copies are selected.
+   The status line says what Apply will do, and is worked out without laying the copies out, so a
+   large count stays quick to type. The guide stays and the copies are selected. Apply places every
+   copy asked for, in one undo step, up to the project's own limit of 10,000 objects (a copy counts
+   everything it carries, such as an image's mask); a count, spacing or gap that would place more
+   is refused with how many fit, and nothing changes. Nothing else caps the number of copies.
 5. When a selection gives a tool nothing to do, a notice says what to select, and nothing changes.
    None of these tools operates a machine or changes how other artwork compiles.
 

@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import type { ArrayPlacement } from '../scene/array-layout';
 import type { Bounds, Vec2 } from '../scene/scene-object';
 import {
+  copyAlongPathCount,
   copyAlongPathLayout,
   tangentAtDistance,
   type CopyAlongPathGuidePath,
@@ -245,5 +246,88 @@ describe('gap between copies', () => {
   it('explains artwork with no size along the guide and no gap', () => {
     const sliver = { minX: 0, minY: 0, maxX: 0, maxY: 8 };
     expect(layout(LINE, { mode: 'gap', spacingMm: 0 }, sliver)).toEqual({ kind: 'no-step' });
+  });
+});
+
+describe('a bound on the copies', () => {
+  const BOUND = 1_000;
+
+  it('refuses a count past the bound before laying anything out', () => {
+    for (const count of [BOUND + 1, 1e12, 1e300]) {
+      const spec = { ...SPEC, count };
+      expect(copyAlongPathLayout(LINE, SOURCE, spec, BOUND)).toEqual({ kind: 'too-many' });
+      expect(copyAlongPathLayout(SQUARE, SOURCE, spec, BOUND)).toEqual({ kind: 'too-many' });
+    }
+  });
+
+  it('takes exactly as many copies as the bound allows, and none when there is no room', () => {
+    for (const path of [LINE, SQUARE]) {
+      const atBound = copyAlongPathLayout(path, SOURCE, { ...SPEC, count: BOUND }, BOUND);
+      expect(placed(atBound)).toHaveLength(BOUND);
+    }
+    const spacing = { ...SPEC, mode: 'spacing', spacingMm: 25 } as const;
+    expect(copyAlongPathLayout(LINE, SOURCE, { ...SPEC, count: 1 }, 0)).toEqual({
+      kind: 'too-many',
+    });
+    expect(copyAlongPathLayout(LINE, SOURCE, spacing, 0)).toEqual({ kind: 'too-many' });
+    // 100 mm at 25 mm: five copies, so a bound of five holds them and four does not.
+    expect(placed(copyAlongPathLayout(LINE, SOURCE, spacing, 5))).toHaveLength(5);
+    expect(copyAlongPathLayout(LINE, SOURCE, spacing, 4)).toEqual({ kind: 'too-many' });
+  });
+
+  it('stops stepping at the bound however long the guide is', () => {
+    // Half a metre of guide at 0.002 mm is 250,000 copies, and the ring 400,000.
+    const long = guide([
+      [0, 0],
+      [500, 0],
+    ]);
+    const ring = guide(
+      [
+        [0, 0],
+        [200, 0],
+        [200, 200],
+        [0, 200],
+        [0, 0],
+      ],
+      true,
+    );
+    const tiny = { ...SPEC, mode: 'spacing', spacingMm: 0.002 } as const;
+    // Upright specks a hair apart: each one's reach depends on where it lands.
+    const speck = { minX: 0, minY: 0, maxX: 0.001, maxY: 0.001 };
+    const gap = { ...tiny, mode: 'gap', rotateCopies: false } as const;
+    for (const path of [long, ring]) {
+      expect(copyAlongPathLayout(path, SOURCE, tiny, 500)).toEqual({ kind: 'too-many' });
+      expect(copyAlongPathLayout(path, speck, gap, 500)).toEqual({ kind: 'too-many' });
+    }
+  });
+
+  it('counts the copies without laying them out, to the same answer as the layout', () => {
+    const specs: ReadonlyArray<Partial<CopyAlongPathSpec>> = [
+      { count: 1 },
+      { count: 7, startOffsetMm: 10, endOffsetMm: 20 },
+      { mode: 'spacing', spacingMm: 30 },
+      { mode: 'gap', spacingMm: 5 },
+      { mode: 'gap', spacingMm: 6, rotateCopies: false },
+      { mode: 'spacing', spacingMm: 0 },
+      { startOffsetMm: 60, endOffsetMm: 50 },
+    ];
+    for (const path of [LINE, SQUARE]) {
+      for (const patch of specs) {
+        const spec = { ...SPEC, ...patch };
+        const laid = copyAlongPathLayout(path, SOURCE, spec);
+        const counted = copyAlongPathCount(path, SOURCE, spec);
+        expect(counted).toEqual(
+          laid.kind === 'placed'
+            ? { kind: 'counted', count: laid.placements.length, stepMm: laid.stepMm }
+            : laid,
+        );
+      }
+    }
+  });
+
+  it('counts however many copies are asked for as quickly as it counts one', () => {
+    const counted = copyAlongPathCount(LINE, SOURCE, { ...SPEC, count: 5_000_000_000 });
+    expect(counted).toMatchObject({ kind: 'counted', count: 5_000_000_000 });
+    expect(counted.kind === 'counted' ? counted.stepMm : null).toBeCloseTo(100 / 4_999_999_999, 15);
   });
 });
