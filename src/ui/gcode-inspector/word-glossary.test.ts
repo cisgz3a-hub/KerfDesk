@@ -36,6 +36,11 @@ describe('explainLine', () => {
     expect(explainLine('%')).toEqual([]);
   });
 
+  it('explains the words before an unclosed "(", which GRBL still runs', () => {
+    const words = explainLine('G1 X10 (left open');
+    expect(words.map((word) => word.text)).toEqual(['G1', 'X10']);
+  });
+
   it('ignores an inline comment but still explains the code before it', () => {
     const words = explainLine('G0 X1 ; rapid over');
     expect(words.map((word) => word.text)).toEqual(['G0', 'X1']);

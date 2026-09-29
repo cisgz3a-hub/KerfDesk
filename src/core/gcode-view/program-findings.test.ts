@@ -84,6 +84,17 @@ describe('findProgramIssues', () => {
     expect(ids).toContain('lines-after-end');
   });
 
+  it('says lines after M2/M30 still run, counting only lines a controller acts on', () => {
+    const after = findProgramIssues(
+      model(['G21 G90', 'M3 S1', 'G1 X10 F100', 'M30', '', '(next)', 'G0 X0', 'M3 S1'].join('\n')),
+    ).find((finding) => finding.id === 'lines-after-end');
+    expect(after).toMatchObject({ severity: 'notice', line: 6, count: 2 });
+    expect(after?.detail).toContain('still run on GRBL');
+    expect(idsOf([...CLEAN.split('\n'), '', '(end)', '%'].join('\n'))).not.toContain(
+      'lines-after-end',
+    );
+  });
+
   it('reports unsupported words and undrawable moves', () => {
     const findings = findProgramIssues(
       model(['G21 G90', 'M3 S1', 'G64 P0.1', 'G1 X10 F100', 'G2 X20 Y5', 'M2'].join('\n')),

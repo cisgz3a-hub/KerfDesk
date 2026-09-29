@@ -4790,7 +4790,10 @@ and lifts the command's CNC-only gate.)*
 
 #### Edge — relative arcs / early end / huge files / other planes
 1. G91 relative coordinates apply to XY, Z, and arc targets alike.
-2. M2 / M30 ends the program mid-file; later lines are ignored.
+2. M2 / M30 mid-file does not end the preview: GRBL resets G1, G90,
+   spindle and coolant there and runs the lines that follow, and KerfDesk
+   streams every line, so later moves are drawn and timed too, and Program
+   Health notes them.
 3. The parser reads the complete program and the 2D renderer retains every
    parsed step. Above 250,000 steps a visible pressure advisory states the
    exact count and warns that drawing may use substantial memory or respond

@@ -7,6 +7,14 @@ import { LINE_CATEGORY, SEG_KIND, SEG_MOTION, type GcodeRenderModel } from './re
 
 /** A rapid this far below Z0 is genuinely below the work surface, not noise. */
 const BELOW_SURFACE_EPSILON_MM = 0.001;
+const JUNK_LINES: ReadonlySet<number> = new Set([LINE_CATEGORY.junk]);
+/** Lines a controller acts on: all but blanks, comments, markers and junk. */
+const RUNNABLE_LINES: ReadonlySet<number> = new Set([
+  LINE_CATEGORY.motion,
+  LINE_CATEGORY.modalOnly,
+  LINE_CATEGORY.event,
+  LINE_CATEGORY.unsupported,
+]);
 
 export function unsupportedWordFindings(model: GcodeRenderModel): ReadonlyArray<ProgramFinding> {
   return model.unsupportedWords.map((entry) => ({
@@ -33,7 +41,7 @@ export function skippedMotionFinding(model: GcodeRenderModel): ProgramFinding | 
 }
 
 export function junkLineFinding(model: GcodeRenderModel): ProgramFinding | null {
-  const tally = countCategory(model, LINE_CATEGORY.junk);
+  const tally = countCategory(model, JUNK_LINES);
   if (tally === null) return null;
   return {
     id: 'junk-line',
@@ -45,14 +53,18 @@ export function junkLineFinding(model: GcodeRenderModel): ProgramFinding | null 
   };
 }
 
+/** GRBL resets some modes at M2/M30 but keeps running the lines after it, and
+ * the streamer sends every line, so the model draws and times them too. */
 export function afterEndFinding(model: GcodeRenderModel): ProgramFinding | null {
-  const tally = countCategory(model, LINE_CATEGORY.afterEnd);
+  const end = model.events.find((event) => event.kind === 'program-end');
+  if (end === undefined) return null;
+  const tally = countCategory(model, RUNNABLE_LINES, end.line + 1);
   if (tally === null) return null;
   return {
     id: 'lines-after-end',
     severity: 'notice',
     title: 'Lines after the program end',
-    detail: `${tally.count} line(s) follow M2/M30 and will not run.`,
+    detail: `${tally.count} line(s) follow M2/M30 and still run on GRBL. The program end switches the spindle and coolant off and resets some modes (G1, G17, G90), then the following lines execute, so their moves are drawn and timed.`,
     line: tally.firstLine,
     count: tally.count,
   };
@@ -230,12 +242,13 @@ function isCutting(model: GcodeRenderModel, index: number): boolean {
 
 function countCategory(
   model: GcodeRenderModel,
-  category: number,
+  categories: ReadonlySet<number>,
+  fromLine = 0,
 ): { readonly count: number; readonly firstLine: number } | null {
   let count = 0;
   let firstLine = -1;
-  for (let line = 0; line < model.lineCount; line += 1) {
-    if (model.lineCategories[line] !== category) continue;
+  for (let line = fromLine; line < model.lineCount; line += 1) {
+    if (!categories.has(model.lineCategories[line] ?? LINE_CATEGORY.blank)) continue;
     count += 1;
     if (firstLine < 0) firstLine = line;
   }

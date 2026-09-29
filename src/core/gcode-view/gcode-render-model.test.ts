@@ -78,7 +78,7 @@ describe('buildGcodeRenderModel — events and accountability', () => {
       'G43 H1', // 11 unsupported words only
       '!!!???', // 12 junk
       'M2', // 13 event (program end)
-      'G1 X9', // 14 after end
+      'G1 X9', // 14 motion: GRBL runs lines after M2
     ].join('\n');
     const model = okModel(text);
     const kinds = model.events.map((event) => event.kind);
@@ -106,7 +106,7 @@ describe('buildGcodeRenderModel — events and accountability', () => {
     expect(model.lineCategories[11]).toBe(LINE_CATEGORY.unsupported);
     expect(model.lineCategories[12]).toBe(LINE_CATEGORY.junk);
     expect(model.lineCategories[13]).toBe(LINE_CATEGORY.event);
-    expect(model.lineCategories[14]).toBe(LINE_CATEGORY.afterEnd);
+    expect(model.lineCategories[14]).toBe(LINE_CATEGORY.motion);
 
     // Accountability: every category value is a known one, and every segment
     // points at a motion-categorized line.

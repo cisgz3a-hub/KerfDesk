@@ -10,8 +10,9 @@ import {
   ijArcCenter,
   PROGRAM_PARSE_REASON,
   rArcGeometry,
-  stripInlineComments,
 } from '../gcode';
+// Deep import: the core/gcode barrel is at its public-export cap (ADR-015).
+import { stripControllerComments } from '../gcode/word-scan';
 import { timingArcPoints } from './controller-arc-points';
 import {
   createLaserRenderState,
@@ -151,10 +152,9 @@ export function createGcodeRenderModelBuilder(
 
 function processLine(context: BuildContext, raw: string, line: number): number {
   if (raw.trim() === '') return LINE_CATEGORY.blank;
-  const stripped = stripInlineComments(raw);
+  const stripped = stripControllerComments(raw);
   if (stripped === '') return LINE_CATEGORY.comment;
   if (stripped === '%') return LINE_CATEGORY.marker;
-  if (context.modal.ended) return LINE_CATEGORY.afterEnd;
   if (isNativeLaserConsoleLine(context.laser, stripped)) {
     context.recognizedWords += 1;
     return LINE_CATEGORY.modalOnly;
