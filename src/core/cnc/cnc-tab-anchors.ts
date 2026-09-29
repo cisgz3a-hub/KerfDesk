@@ -2,8 +2,10 @@ import {
   DEFAULT_MACHINE_CURVE_TOLERANCE_MM,
   applyTransform,
   flattenColoredPathCurves,
+  flattenCurveSubpath,
   type ColoredPath,
   type CncTabAnchor,
+  type CurveSubpath,
   type Polyline,
   type SceneObject,
   type Vec2,
@@ -107,6 +109,43 @@ export function redistributeCncTabAnchors(
   if (replaced.size === 0) return original;
   const next = [...original.filter((anchor) => !replaced.has(anchor)), ...seeded];
   return JSON.stringify(next) === JSON.stringify(original) ? original : next;
+}
+
+/** How far along closed `curve` its node `nodeIndex` lies, as the fraction of
+ * the contour's length that a tab anchor's `pathT` measures. Null for an open
+ * curve, a missing node or a contour without length. */
+export function closedCurveNodeFraction(curve: CurveSubpath, nodeIndex: number): number | null {
+  if (!curve.closed || !Number.isInteger(nodeIndex) || nodeIndex < 0) return null;
+  if (nodeIndex > curve.segments.length) return null;
+  const whole = flattenAsTabsResolve(curve);
+  const measure = whole === null ? null : measurePolyline(whole);
+  // Flattening works segment by segment, so the lead-in to the node flattens
+  // to the same points as the start of the whole contour, and its length is
+  // the same running sum pointAtFraction walks.
+  const lead = flattenAsTabsResolve({
+    start: curve.start,
+    segments: curve.segments.slice(0, nodeIndex),
+    closed: false,
+  });
+  if (measure === null || lead === null) return null;
+  return Math.min(1, openLength(lead.points) / measure.total);
+}
+
+/** Anchors after one closed contour is redrawn from the point `startFraction`
+ * of its length along it (the node tool's Start and Break): each tab of that
+ * contour keeps its place, and anchors on other contours are unchanged. */
+export function restartedTabAnchors<A extends CncTabAnchor>(
+  anchors: ReadonlyArray<A>,
+  pathIndex: number,
+  polylineIndex: number,
+  startFraction: number,
+): ReadonlyArray<A> {
+  return anchors.map((anchor) => {
+    if (anchor.pathIndex !== pathIndex || anchor.polylineIndex !== polylineIndex) return anchor;
+    const shifted = Math.max(0, Math.min(1, anchor.pathT)) - startFraction;
+    const pathT = shifted - Math.floor(shifted);
+    return { ...anchor, pathT: pathT >= 1 ? 0 : pathT };
+  });
 }
 
 export function projectCncTabAnchor(
@@ -220,6 +259,28 @@ function projectPointToEdge(point: Vec2, start: Vec2, end: Vec2): EdgeProjection
 
 function interpolate(start: Vec2, end: Vec2, t: number): Vec2 {
   return { x: start.x + (end.x - start.x) * t, y: start.y + (end.y - start.y) * t };
+}
+
+// A curve flattened as resolvedPolylines flattens a path's curves.
+function flattenAsTabsResolve(curve: CurveSubpath): Polyline | null {
+  const flattened = flattenCurveSubpath(curve, {
+    toleranceMm: DEFAULT_MACHINE_CURVE_TOLERANCE_MM,
+    segmentBudget: Number.MAX_SAFE_INTEGER,
+  });
+  return flattened.kind === 'ok' ? flattened.polyline : null;
+}
+
+// The edges measurePolyline counts, without closing the run.
+function openLength(points: ReadonlyArray<Vec2>): number {
+  let total = 0;
+  for (let index = 1; index < points.length; index += 1) {
+    const start = points[index - 1];
+    const end = points[index];
+    if (start === undefined || end === undefined) continue;
+    const length = Math.hypot(end.x - start.x, end.y - start.y);
+    if (length > EPS) total += length;
+  }
+  return total;
 }
 
 function resolvedPolylines(path: ColoredPath): ReadonlyArray<Polyline> {

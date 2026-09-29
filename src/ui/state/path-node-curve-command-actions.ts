@@ -1,3 +1,4 @@
+import { closedCurveNodeFraction, restartedTabAnchors } from '../../core/cnc/cnc-tab-anchors';
 import {
   breakCurveAtNode,
   convertCurveSegment,
@@ -5,6 +6,7 @@ import {
   flattenCurveSubpath,
   setCurveStartNode,
   smoothCurveNode,
+  type CncTabAnchor,
   type ColoredPath,
   type CurveSubpath,
   type Project,
@@ -43,8 +45,10 @@ export function pathNodeCurveCommandActions(set: Setter): PathNodeCurveCommandAc
       set((state) =>
         mutateSelected(state, (curve, nodeIndex) => convertCurveSegment(curve, nodeIndex, kind)),
       ),
-    setSelectedCurveStart: () => set((state) => mutateSelected(state, setCurveStartNode)),
-    breakSelectedCurve: () => set((state) => mutateSelected(state, breakCurveAtNode)),
+    setSelectedCurveStart: () =>
+      set((state) => mutateSelected(state, setCurveStartNode, withRestartedTabs)),
+    breakSelectedCurve: () =>
+      set((state) => mutateSelected(state, breakCurveAtNode, withRestartedTabs)),
     joinSelectedCurveNodes: () => {
       let outcome: CurveJoinCommandOutcome = { kind: 'unchanged' };
       const notification = { present: false, text: '', success: false };
@@ -81,27 +85,66 @@ export function pathNodeCurveCommandActions(set: Setter): PathNodeCurveCommandAc
   };
 }
 
+// Keeps an edited object's tabs placed by hand in place, given the edited
+// path's curves before the edit.
+type TabFollow = (
+  edited: SceneObject,
+  ref: PathNodeRef,
+  curvesBefore: ReadonlyArray<CurveSubpath>,
+) => SceneObject;
+
 function mutateSelected(
   state: AppState,
   mutate: (curve: CurveSubpath, nodeIndex: number) => CurveSubpath | null,
+  followTabs?: TabFollow,
 ): AppState | Partial<AppState> {
   const ref = state.selectedPathNode;
   if (!isAnchorRef(ref)) return state;
-  return mutateObjectCurve(state, ref, (curves) => {
-    const curve = curves[ref.polylineIndex];
-    if (curve === undefined) return null;
-    const next = mutate(curve, ref.pointIndex);
-    if (next === null || next === curve) return null;
-    const updated = [...curves];
-    updated[ref.polylineIndex] = next;
-    return updated;
-  });
+  return mutateObjectCurve(
+    state,
+    ref,
+    (curves) => {
+      const curve = curves[ref.polylineIndex];
+      if (curve === undefined) return null;
+      const next = mutate(curve, ref.pointIndex);
+      if (next === null || next === curve) return null;
+      const updated = [...curves];
+      updated[ref.polylineIndex] = next;
+      return updated;
+    },
+    followTabs,
+  );
+}
+
+// Start and Break redraw a closed contour from the selected node. A tab placed
+// by hand, CNC or laser, is a fraction of its contour from the start, so each
+// one on that contour moves back by the node's fraction and stays where it was
+// (ADR-494 Amendment 1). After Break the contour is open and holds no tab until
+// it is closed again.
+function withRestartedTabs(
+  edited: SceneObject,
+  ref: PathNodeRef,
+  curvesBefore: ReadonlyArray<CurveSubpath>,
+): SceneObject {
+  const curve = curvesBefore[ref.polylineIndex];
+  const fraction = curve === undefined ? null : closedCurveNodeFraction(curve, ref.pointIndex);
+  if (fraction === null || fraction === 0) return edited;
+  const restart = <A extends CncTabAnchor>(anchors: ReadonlyArray<A>) =>
+    restartedTabAnchors(anchors, ref.pathIndex, ref.polylineIndex, fraction);
+  return {
+    ...edited,
+    ...(edited.cncTabAnchors === undefined ? {} : { cncTabAnchors: restart(edited.cncTabAnchors) }),
+    ...(edited.laserTabAnchors === undefined
+      ? {}
+      : { laserTabAnchors: restart(edited.laserTabAnchors) }),
+  };
 }
 
 function mutateObjectCurve(
   state: AppState,
   ref: PathNodeRef,
   mutate: (curves: ReadonlyArray<CurveSubpath>) => ReadonlyArray<CurveSubpath> | null,
+  followTabs?: TabFollow,
 ): AppState | Partial<AppState> {
   let changed = false;
   const objects = state.project.scene.objects.map((object) => {
@@ -124,7 +167,7 @@ function mutateObjectCurve(
         : { ...object, paths, bounds };
     if (updated === null) return object;
     changed = true;
-    return updated;
+    return followTabs === undefined ? updated : followTabs(updated, ref, path.curves);
   });
   if (!changed) return state;
   const project: Project = { ...state.project, scene: { ...state.project.scene, objects } };

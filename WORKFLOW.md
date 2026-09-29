@@ -902,7 +902,8 @@ marks later edits as unapproved without changing the existing Frame/Start policy
    the automatic tabs they replace draw hollow. **Done** or Esc returns to Select.
 4. Placed tabs replace the automatic tabs on their shape only, and only while tabs are on. They
    move, rotate and scale with the artwork and survive copy and paste and break apart. **Reverse
-   Direction** keeps them where they were on the shape, and **Delete Duplicates** keeps a copy
+   Direction** and the Edit nodes **Start** keep them where they were on the shape, a shape opened
+   with **Break** holds them until it is closed again, and **Delete Duplicates** keeps a copy
    whose placed tabs differ (ADR-494 Amendment 1). **Clear placed tabs** (in Cut Settings or in
    the canvas hint) returns the artwork to automatic tabs.
 5. Job Review's detail line reads e.g. "tabs every 50 mm (at most 6) × 0.5 mm, cut at 20%" or
