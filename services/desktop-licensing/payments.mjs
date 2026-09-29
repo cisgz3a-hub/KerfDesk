@@ -1,11 +1,13 @@
 import { nextUpdateYear } from './authority.mjs';
+import { writeAudit } from './audit.mjs';
+import { ROUTE } from './routes.mjs';
 import { identifier, requireValue, secret } from './validation.mjs';
 
 export const CATALOG = Object.freeze({ purchase: 4950, renewal: 2000 });
 
 // Called only by authenticated administration or a future, reviewed checkout
 // adapter. An order never grants access until an authenticated payment matches it.
-export async function prepareOrder(authority, body) {
+export async function prepareOrder(authority, body, admin) {
   const orderId = identifier(body.orderId);
   const provider = identifier(body.provider);
   const providerOrderId = identifier(body.providerOrderId);
@@ -31,6 +33,11 @@ export async function prepareOrder(authority, body) {
         409,
         'idempotency_conflict',
       );
+      writeAudit(tx, authority, admin, {
+        route: ROUTE.orders,
+        target: orderId,
+        outcome: 'existing',
+      });
       return previous;
     }
     requireValue(
@@ -53,6 +60,7 @@ export async function prepareOrder(authority, body) {
     };
     tx.put(`order:${orderId}`, created);
     tx.put(`provider-order:${provider}:${providerOrderId}`, { orderId });
+    writeAudit(tx, authority, admin, { route: ROUTE.orders, target: orderId, outcome: 'created' });
     return created;
   });
   return { orderId, claimToken, amount: order.amount, currency: order.currency };
@@ -179,6 +187,13 @@ export async function claimOrder(authority, body) {
     401,
     'invalid_credentials',
   );
+  // Paddle took the money but the service refused the payment and recorded why. The
+  // buyer must not pay again; support refunds or reconciles it (ADR-523 Amendment 3).
+  requireValue(order.status !== 'rejected', 409, 'payment_rejected');
   requireValue(order.status === 'fulfilled', 409, 'payment_pending');
-  return { licenseId: order.licenseId, licenseKey: await authority.licenseKey(order.licenseId) };
+  const license = authority.records.get(`license:${order.licenseId}`);
+  return {
+    licenseId: order.licenseId,
+    licenseKey: await authority.licenseKey(order.licenseId, license?.keyVersion),
+  };
 }

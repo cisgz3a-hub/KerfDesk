@@ -1,4 +1,4 @@
-/* global Request, ReadableStream, TextEncoder */
+/* global console, Request, ReadableStream, TextEncoder */
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import worker from './worker.mjs';
@@ -74,10 +74,12 @@ test('JSON content, streamed bytes, malformed UTF8, query credentials, origin an
   assert.equal(canceled, true);
 });
 
-test('worker fails closed for disabled service, missing rate limiter, rate exceedance and unavailable storage', async () => {
+test('worker fails closed for disabled service, missing rate limiter, rate exceedance and unavailable storage', async (t) => {
+  for (const method of ['log', 'warn', 'error']) t.mock.method(console, method, () => undefined);
   const input = () => request('/v1/trials/start', {}, { 'cf-connecting-ip': '192.0.2.1' });
   assert.equal((await worker.fetch(input(), { LICENSING_ENABLED: 'false' })).status, 503);
   assert.equal((await worker.fetch(input(), { LICENSING_ENABLED: 'true' })).status, 503);
+  const refuse = () => ({ limit: async () => ({ success: false }) });
   const env = {
     LICENSING_ENABLED: 'true',
     LICENSE_AUTHORITY: {
@@ -88,16 +90,23 @@ test('worker fails closed for disabled service, missing rate limiter, rate excee
         },
       }),
     },
-    REQUEST_RATE_LIMITER: { limit: async () => ({ success: false }) },
+    REQUEST_RATE_LIMITER: refuse(),
+    WEBHOOK_RATE_LIMITER: refuse(),
   };
+  // Trial starts have their own limiter; without it the worker fails closed.
+  assert.equal((await worker.fetch(input(), env)).status, 503);
+  env.TRIAL_RATE_LIMITER = refuse();
   assert.equal((await worker.fetch(input(), env)).status, 429);
-  env.REQUEST_RATE_LIMITER.limit = async () => ({ success: true });
+  env.TRIAL_RATE_LIMITER.limit = async () => ({ success: true });
   const result = await worker.fetch(input(), env);
   assert.equal(result.status, 503);
   assert.deepEqual(await result.json(), { error: { code: 'service_unavailable' } });
+  // The error's type reaches the log line only, never the caller.
+  assert.equal(result.headers.get('x-licensing-fault'), null);
 });
 
-test('public config reveals only public token after full payment configuration and exact-origin CORS', async () => {
+test('public config reveals only public token after full payment configuration and exact-origin CORS', async (t) => {
+  t.mock.method(console, 'log', () => undefined);
   const f = await fixture();
   const input = () =>
     new Request('https://licensing.example/v1/public/config', {

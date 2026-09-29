@@ -81,9 +81,14 @@ Ask what **Help > Check for Updates** says (ADR-547).
 ### The trial will not start
 
 The first registration needs the internet. "Unable to reach the licence service"
-means no connection or the service is down. "Too many attempts" is the per-IP
-rate limit (30 requests a minute); waiting a minute clears it. If the service is
-healthy and the customer is online, check the service status before anything else.
+means no connection or the service is down. "Too many attempts" is the trial rate
+limit: 5 trial starts a minute from one internet address (for IPv6, one /64
+network, which is usually one home or office). Waiting a minute clears it. A
+shared connection (an office, a school, a mobile carrier) can meet it sooner.
+
+Check the service first: `https://license.kerfdesk.com/v1/public/health` answers
+`{"ok":true}` when the service and its database are up, and `{"ok":false}` with
+status 503 when they are not. It answers even while licensing is switched off.
 
 ### The trial was already used on this computer
 
@@ -105,7 +110,7 @@ The customer deactivates a computer they still use from Help > Licence >
 Deactivate this device. If that computer is gone (failed disk, sold, reinstalled
 Windows), the operator can free the seat with the customer's licence key:
 `POST /v1/licenses/activations` lists the active seats (each is labelled only
-`win32 computer` with its activation date), and `POST /v1/licenses/deactivate`
+`Windows computer` with its activation date), and `POST /v1/licenses/deactivate`
 frees one. Confirm which seat with the customer by activation date. The customer
 never has to send the key in a ticket if they can do this on a working computer
 instead.
@@ -124,8 +129,9 @@ to three computers; a fourth needs one of the others deactivated first.
 
 If no activated computer remains, find the licence with
 `POST /v1/admin/licenses/lookup` using the order number (shown in the app while
-the order was pending) or the licence ID, and send the key privately to the
-purchaser only.
+the order was pending), Paddle's transaction ID (`txn_...`, from the Paddle
+receipt or dashboard) or the licence ID, and send the key privately to the
+purchaser only. The lookup is audited as a key disclosure.
 
 ### Paid, but the app still says payment is pending
 
@@ -136,8 +142,10 @@ that computer holds the order's claim credentials.
 - `payment_pending`: Paddle has not reported the completed payment yet. Check the
   transaction in Paddle and the webhook delivery log. Redeliver the webhook from
   Paddle if it failed; duplicates are safe.
+- `payment_rejected`: Paddle took the money but the service refused the payment.
+  See "The payment was refused" below.
 - `checkout_pending`: the service could not confirm that Paddle created the
-  transaction. Find the transaction in Paddle by the customer's email and time.
+  transaction (Paddle timed out or answered with a server error). Find the transaction in Paddle by the customer's email and time.
   **Never ask the customer to pay again.** If Paddle shows a completed payment, its
   webhook reconciles the order and Check payment then works. If Paddle has no
   transaction for the order, the app keeps reporting "Checkout is still being
@@ -150,6 +158,50 @@ that computer holds the order's claim credentials.
   claim credentials are gone with it. Reconcile the order with
   `POST /v1/admin/orders`, claim it with `POST /v1/orders/claim`, and send the
   returned licence key privately to the purchaser.
+
+### The payment was refused (`payment_rejected`)
+
+Paddle charged the customer, but the payment did not match what the service sold,
+so it granted nothing and recorded why. The app tells the customer not to pay
+again and to email support@kerfdesk.com with the order number. Paddle stops
+retrying the webhook, because the service answered it.
+
+Look up the order number, or the Paddle transaction ID, with
+`POST /v1/admin/licenses/lookup`. The `rejection` field gives the code, the
+transaction and the amounts Paddle reported. Then act on the code:
+
+| Code | What happened | What to do |
+| --- | --- | --- |
+| `payment_mismatch` | The charge differed from the fixed price: a discount, a quantity other than 1, another price or currency, totals that don't add up, a subscription, or a payment without the order's proof | Refund it in Paddle. Check both Paddle prices allow quantity 1 only and that no discount applies. After the refund the customer can check out again, as a new order. |
+| `payment_not_completed` | The transaction was not in the completed state | Check it in Paddle. Refund it if money was taken. |
+| `order_already_paid` | A second, different payment for an order that already has its licence | Refund the second payment. The licence from the first payment is unaffected. |
+| `renewal_requires_paid_license` | A renewal was paid for a licence that was revoked, or is not a paid licence | If the licence should be active, restore it (`status: "active"`), then redeliver the webhook from Paddle: the renewal is then applied. Otherwise refund it. |
+| `unknown_order` | The payment names an order this service does not hold: a restored database, a sandbox order paid in live, or an order deleted on request | If the payment is genuine, record the order with `POST /v1/admin/orders` (the order number from the transaction's `kerfdesk_order_id`, `provider: "paddle"`, the `txn_` ID, the operation), redeliver the webhook, then claim the order and send the key privately. Otherwise refund it. |
+| `license_already_exists`, `provider_order_reused`, `payment_reused` | The payment collides with a record that already exists | Rare, and a sign of a restored or edited database. Check the lookup for each ID involved before refunding. |
+
+A redelivery changes nothing unless the cause is fixed, so redelivering is always
+safe. A payment that only names an order (without the order's proof, or bound to
+another transaction) is recorded but never blocks that order: its own payment
+still fulfils it.
+
+A completed Paddle transaction without a KerfDesk order number, such as one made
+by hand in the Paddle dashboard, is acknowledged and ignored. It never grants a
+licence and leaves no record in the service: sell only through the app's checkout.
+
+### Checkout could not start (`checkout_failed`)
+
+Paddle refused to create the transaction (`checkout_failed`), or answered with
+something the service will not hand out (`invalid_provider_response`): the wrong
+price or amount, or a missing or unapproved checkout link. **Nothing was charged**:
+no customer ever received a link to pay. The order is marked failed, and the
+customer's next attempt starts a fresh order.
+
+This is a configuration problem, not the customer's. Look up the order number: its
+`failure` field gives the code, and for `checkout_failed` Paddle's HTTP status and
+error code. Typical causes are an archived or wrong price ID, a Paddle API key
+without permission to create transactions, or no approved default payment link
+(`https://kerfdesk.com/buy.html`). Fix it in Paddle or the Worker configuration,
+then ask the customer to try again.
 
 ### Renewal
 
@@ -167,13 +219,38 @@ at once, and connected computers drop Pro at their next weekly check. A computer
 kept offline keeps its signed rights until it reconnects, so do not promise more
 than that. Restore with `status: "active"` if a chargeback is reversed.
 
+### A licence key leaked
+
+Rekey the licence instead of revoking it: `POST /v1/admin/licenses/rekey` with
+`{licenseId}` returns a new key, and the old key stops activating at once. Add
+`releaseSeats: true` when unknown computers hold seats: every seat is freed
+(without using up the customer's six moves), and each computer loses Pro at its
+next weekly check. Send the new key privately to the purchaser, who activates
+their own computers with it. A later lookup returns the new key too.
+
 ### Privacy or deletion request
 
 The licensing service holds hashed credentials and device digests, licence,
-activation and order IDs, generic device labels and dates. Paddle holds the
-payment and contact details. There is no automated deletion tool: an operator
-removes the customer's licence, activation and order records from the authority
-database after confirming identity, and keeps only what law or the terms require.
+activation and order IDs, generic device labels, dates, and for a refused payment
+its amounts. It holds no name, email or address. Paddle holds the payment and
+contact details, and its own deletion process covers them.
+
+1. Confirm the requester's identity from the Paddle receipt or the email that
+   bought the licence, and ask for the order number or Paddle transaction ID. If
+   they have only their key, ask for just the licence ID, the middle part of the
+   key (`KD1.<licence ID>.<...>`), never the whole key.
+2. Look it up (`POST /v1/admin/licenses/lookup`) to find the licence.
+3. Revoke a paid or developer licence (`status: "revoked"`); the deletion refuses
+   an active one with `license_not_revoked`. A trial needs no revoke.
+4. `POST /v1/admin/customers/delete` with `{licenseId}` or `{orderId}` deletes the
+   licence, its seats, grant, orders and their payment records in one step, and
+   returns how many records went. Delete each other order number the customer
+   gives you the same way: the service cannot tell which orders belong to one
+   person, because it holds no contact details.
+5. Keep what law or the terms require in Paddle; the service's audit records keep
+   only the random IDs and what was done.
+
+Deleting a trial frees that Windows installation to start a new 30-day trial.
 
 ## Operator procedures
 
@@ -181,13 +258,28 @@ database after confirming identity, and keeps only what law or the terms require
   displayName: "Johann"}` or `{grantId: "father", displayName: "Father"}`. Repeating
   the request returns the same licence. Store each key privately and give it only
   to its owner. There is no universal unlock key.
-- **Reissuing a lost key.** Licence keys are derived from the licence ID with the
-  service's derivation secret, so the same key can be reproduced but never
-  changed. `POST /v1/admin/licenses/lookup` returns it; never paste the key into
-  a shared system.
+- **Reissuing a lost key.** Licence keys are derived from the licence ID and its
+  key version with the service's derivation secret, so the same key can be
+  reproduced until the licence is rekeyed. `POST /v1/admin/licenses/lookup`
+  returns it; never paste the key into a shared system.
+- **Audit.** Every administration call, including a refused one, adds an
+  `audit:<time>:<sequence>` record with the route, the licence, order or grant
+  involved, the outcome, which administrator token was used and the time. The
+  export includes them. Review them after anything unexpected, and at least after
+  every token rotation.
+- **Rotating the administrator token.** Set a new random value as the Worker
+  secret `ADMIN_TOKEN_NEXT`; both tokens then work. Move your tools to the new one,
+  set it as `ADMIN_TOKEN`, then delete `ADMIN_TOKEN_NEXT`: the old token stops
+  working. Rotate after anyone who knew the token leaves, or if it may have leaked.
+- **Health monitor.** Point an uptime monitor at
+  `https://license.kerfdesk.com/v1/public/health`, expecting status 200 and
+  `{"ok":true}`. Each check is one Durable Object request, so a check every minute
+  or two stays well inside Cloudflare's free allowance.
 - **Backups.** The Durable Object database and the signing, hashing, derivation
-  and administrator secrets must be backed up together. Restoring an old database
-  can resurrect old seats and orders and needs manual reconciliation.
+  and administrator secrets must be backed up together. `POST /v1/admin/export`
+  returns every record as JSON Lines, a page at a time; keep the pages as private
+  as the database. There is no restore route yet. Restoring an old database can
+  resurrect old seats and orders and needs manual reconciliation.
 
 ## Known gaps to close before scale
 
@@ -195,7 +287,11 @@ database after confirming identity, and keeps only what law or the terms require
   computer they are using.
 - A customer who forgets an order that was in fact paid needs support to look up
   its licence; the app warns before forgetting and shows the order number.
-- No administrator endpoint to delete a customer's records.
+- Records are deleted only on request. Nothing yet deletes deactivated devices
+  after 90 days or trial records three years after the trial ends, as the draft
+  privacy notice promises; that needs a scheduled job the owner must approve.
+- An export can be read but not restored; there is no restore to a point in time.
+- A refused payment always needs a person: a refund, or a fix and a redelivery.
 - A paid licence can move seats at most six times in 30 days; support cannot yet
   lift that for one customer.
 - Device labels are generic, so seat lists identify computers only by date.

@@ -1,3 +1,6 @@
+import { lookup } from './admin.mjs';
+import { writeAudit } from './audit.mjs';
+import { ROUTE } from './routes.mjs';
 import { device, identifier, requireValue, secret, text } from './validation.mjs';
 
 const DAY = 86_400;
@@ -29,8 +32,14 @@ export class LicensingAuthority {
     this.now = now;
   }
 
-  async licenseKey(licenseId) {
-    return `KD1.${licenseId}.${await this.crypto.derive('license-key', licenseId)}`;
+  /**
+   * A licence key is derived, never stored. Version 0 (a missing `keyVersion`) is every
+   * key issued before rekeying existed, so those keys keep working; a rekey moves the
+   * licence to the next version (ADR-523 Amendment 3).
+   */
+  async licenseKey(licenseId, keyVersion = 0) {
+    const input = keyVersion ? `${licenseId}:${keyVersion}` : licenseId;
+    return `KD1.${licenseId}.${await this.crypto.derive('license-key', input)}`;
   }
 
   async activationToken(activationId) {
@@ -51,7 +60,7 @@ export class LicensingAuthority {
     return license;
   }
 
-  async developerGrant(body) {
+  async developerGrant(body, admin) {
     const grantId = identifier(body.grantId);
     const displayName = text(body.displayName, 1, 100);
     const licenseId = this.crypto.id();
@@ -60,6 +69,12 @@ export class LicensingAuthority {
       const existing = tx.get(`grant:${grantId}`);
       if (existing) {
         requireValue(existing.displayName === displayName, 409, 'idempotency_conflict');
+        writeAudit(tx, this, admin, {
+          route: ROUTE.developerGrants,
+          target: grantId,
+          outcome: 'existing',
+          licenseId: existing.licenseId,
+        });
         return tx.get(`license:${existing.licenseId}`);
       }
       const created = {
@@ -75,11 +90,17 @@ export class LicensingAuthority {
       };
       tx.put(`license:${licenseId}`, created);
       tx.put(`grant:${grantId}`, { licenseId, displayName });
+      writeAudit(tx, this, admin, {
+        route: ROUTE.developerGrants,
+        target: grantId,
+        outcome: 'created',
+        licenseId,
+      });
       return created;
     });
     return {
       licenseId: license.licenseId,
-      licenseKey: await this.licenseKey(license.licenseId),
+      licenseKey: await this.licenseKey(license.licenseId, license.keyVersion),
       displayName,
     };
   }
@@ -249,40 +270,28 @@ export class LicensingAuthority {
    * Devices lose Pro at their next online refresh; an offline copy keeps its
    * signed rights until it reconnects (ADR-523 Amendment 1).
    */
-  setLicenseStatus(body) {
+  setLicenseStatus(body, admin) {
     const licenseId = identifier(body.licenseId);
     requireValue(LICENSE_STATUSES.has(body.status));
     return this.records.transaction((tx) => {
       const license = tx.get(`license:${licenseId}`);
       requireValue(license && license.tier !== 'trial', 404, 'license_not_found');
+      const previousStatus = license.status;
       license.status = body.status;
       tx.put(`license:${licenseId}`, license);
+      writeAudit(tx, this, admin, {
+        route: ROUTE.licenseStatus,
+        target: licenseId,
+        outcome: body.status,
+        previousStatus,
+      });
       return { licenseId, status: license.status };
     });
   }
 
-  /** Finds a licence by its ID or its order so support can resend a lost key. */
-  async lookupLicense(body) {
-    const keys = Object.keys(body);
-    requireValue(keys.length === 1 && ['licenseId', 'orderId'].includes(keys[0]));
-    let licenseId;
-    if (body.orderId === undefined) licenseId = identifier(body.licenseId);
-    else {
-      const order = this.records.get(`order:${identifier(body.orderId)}`);
-      requireValue(order, 404, 'order_not_found');
-      requireValue(order.status === 'fulfilled', 409, 'payment_pending');
-      licenseId = order.licenseId;
-    }
-    const license = this.records.get(`license:${licenseId}`);
-    requireValue(license && license.tier !== 'trial', 404, 'license_not_found');
-    return {
-      licenseId,
-      licenseKey: await this.licenseKey(licenseId),
-      tier: license.tier,
-      status: license.status,
-      updatesUntil: license.updatesUntil,
-      activeDevices: license.active.length,
-    };
+  /** Finds a licence, an order or a Paddle transaction for support (admin.mjs). */
+  lookupLicense(body, admin) {
+    return lookup(this, body, admin);
   }
 
   async issue(license, activation, deviceId) {
