@@ -131,3 +131,15 @@ export function reportUnitsStayUnconfirmed(set: SetFn, error: unknown): void {
     ),
   }));
 }
+
+/** The `$$` re-read after another console setting write failed. The write was
+ *  acknowledged, so only the read-back is missing (ADR-375, C-4). */
+export function settingWriteStaysUnverified(set: SetFn, written: string, error: unknown): void {
+  const reason = error instanceof Error ? error.message : String(error);
+  set((state) => ({
+    log: pushLog(
+      state,
+      `[lf2] The controller acknowledged ${written}, but reading its settings back failed (${reason}). Read controller settings ($$) to see the stored value.`,
+    ),
+  }));
+}

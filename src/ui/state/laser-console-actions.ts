@@ -32,6 +32,7 @@ import {
   finishConsoleSettingsRead,
   releaseConsoleSettingsRead,
   reportUnitsStayUnconfirmed,
+  settingWriteStaysUnverified,
 } from './laser-console-completion';
 import type { LaserSafetyAction } from './laser-safety-notice';
 import { hasPendingControllerWrite } from './laser-start-queue-fence';
@@ -207,26 +208,34 @@ async function dispatchPreparedConsoleCommand(
   await trackConsoleWcs(set, get, refs, command, (line, action, next) =>
     write(line, action, next ?? 'system'),
   );
-  if (reportUnitsWrite) await rereadSettingsAfterReportUnitsWrite(set, get, refs, write);
+  if (command.kind === 'setting-write' || reportUnitsWrite) {
+    await rereadSettingsAfterWrite(set, get, refs, write, command.normalized, reportUnitsWrite);
+  }
 }
 
-// A `$13=` write leaves machine position hidden until a settings dump confirms
-// the report units, so the Console reads `$$` itself, as the settings dialog
-// verifies its writes (audit regressions-1).
-async function rereadSettingsAfterReportUnitsWrite(
+// The Console reads `$$` back after a setting write, as the settings dialog
+// verifies its writes: the write dropped the settings the app knew, and the
+// controller's own dump is the proof of what it stored (ADR-375, C-4). A `$13=`
+// write also leaves machine position hidden until the dump confirms the report
+// units (audit regressions-1). A profile without a settings query (the Falcon
+// contract) is not read.
+async function rereadSettingsAfterWrite(
   set: SetFn,
   get: GetFn,
   refs: ConsoleActionRefs,
   write: ConsoleWriteFn,
+  written: string,
+  reportUnitsWrite: boolean,
 ): Promise<void> {
-  const settingsRead = refs.driver.prepareConsoleCommand(
-    refs.driver.commands.settingsQuery ?? '$$',
-  );
+  const query = refs.driver.commands.settingsQuery ?? (reportUnitsWrite ? '$$' : null);
+  if (query === null) return;
+  const settingsRead = refs.driver.prepareConsoleCommand(query);
   try {
     if (!settingsRead.ok) throw new Error(settingsRead.reason);
     await dispatchPreparedConsoleCommand(set, get, refs, write, settingsRead.command, 'system');
   } catch (error) {
-    reportUnitsStayUnconfirmed(set, error);
+    if (reportUnitsWrite) reportUnitsStayUnconfirmed(set, error);
+    else settingWriteStaysUnverified(set, written, error);
   }
 }
 

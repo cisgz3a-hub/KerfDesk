@@ -186,8 +186,13 @@ describe('Console setting writes', () => {
     const settingWrite = useLaserStore.getState().sendConsoleCommand('$32=1', { confirmed: true });
     await vi.waitFor(() => expect(writes).toContain('$32=1\n'), { timeout: 4000 });
     connection.emitLine('ok');
+    // Every acknowledged Console setting write is read back with `$$`: GRBL
+    // answers ok even when it stores another value (grbl/settings.c#L229,
+    // ADR-375 C-4). A bare ok answers the read here.
+    await vi.waitFor(() => expect(writes).toContain('$$\n'));
+    connection.emitLine('ok');
     await settingWrite;
-    expect(writes.slice(-2)).toEqual(['?', '$32=1\n']);
+    expect(writes.slice(-3)).toEqual(['?', '$32=1\n', '$$\n']);
     await flushConnect();
     writes.length = 0;
 
@@ -219,9 +224,11 @@ describe('Console setting writes', () => {
     const secondWrite = useLaserStore.getState().sendConsoleCommand('$32=1', { confirmed: true });
     await vi.waitFor(() => expect(writes).toContain('$32=1\n'), { timeout: 4000 });
     connection.emitLine('ok');
+    await vi.waitFor(() => expect(writes).toContain('$$\n'));
+    connection.emitLine('ok');
     await secondWrite;
 
-    expect(writes.at(-1)).toBe('$32=1\n');
+    expect(writes.slice(-2)).toEqual(['$32=1\n', '$$\n']);
     expect(useLaserStore.getState()).toMatchObject({
       controllerSettings: null,
       detectedSettings: null,

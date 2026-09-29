@@ -421,8 +421,11 @@ describe('laser-store machine settings', () => {
     const cncWrite = useLaserStore.getState().sendConsoleCommand('$32=0', { confirmed: true });
     await vi.waitFor(() => expect(writes).toEqual(['$32=0\n']));
     connection.emitLine('ok');
+    // The Console reads every setting write back (ADR-375, C-4).
+    await vi.waitFor(() => expect(writes).toEqual(['$32=0\n', '$$\n']));
+    connection.emitLine('ok');
     await cncWrite;
-    expect(writes).toEqual(['$32=0\n']);
+    expect(writes).toEqual(['$32=0\n', '$$\n']);
   });
 
   it('rejects every non-canonical laser $32 Console value before serial write', async () => {

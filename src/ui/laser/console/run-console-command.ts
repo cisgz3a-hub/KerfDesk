@@ -1,4 +1,5 @@
 import type { ControllerDriver } from '../../../core/controllers';
+import { consoleSettingWriteIssue } from '../../../core/controllers/console-setting-writes';
 import type { ConsoleCommandOptions } from '../../state/laser-console-actions';
 import type { ConsoleCommandProvenance } from '../../state/console-command-provenance';
 import { jobAwareConfirm } from '../../state/job-aware-dialogs';
@@ -29,6 +30,10 @@ export async function runConsoleCommand(
   }
 
   const command = prepared.command.normalized;
+  // A setting value the store would refuse is refused before the operator is
+  // asked to confirm it (ADR-375, C-4); the store still re-checks it.
+  const settingIssue = consoleSettingWriteIssue(driver, prepared.command);
+  if (settingIssue !== null) return { status: 'rejected', command, reason: settingIssue };
   if (
     prepared.command.requiresConfirmation &&
     !jobAwareConfirm(`Send persistent controller setting?\n\n${command}`)
