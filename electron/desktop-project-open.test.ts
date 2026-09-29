@@ -58,9 +58,10 @@ async function projectFile(name: string, contents = '{"schemaVersion":7}'): Prom
   return file;
 }
 
-function install(app: ReturnType<typeof fakeApp>['app']) {
+function install(app: ReturnType<typeof fakeApp>['app'], reopenWindow = vi.fn()) {
   return installDesktopProjectOpens(app as never, {
     isTrustedRenderer: (url) => url.startsWith('app://app/'),
+    reopenWindow,
   });
 }
 
@@ -171,5 +172,39 @@ describe('installDesktopProjectOpens', () => {
     await expect(drain(opens)).resolves.toEqual([
       { kind: 'unavailable', name: 'gone.lf2', reason: 'missing' },
     ]);
+  });
+
+  it.each(['open-file', 'second-instance'])(
+    '%s reopens a closed window without losing its project',
+    async (eventName) => {
+      process.argv = ['KerfDesk'];
+      const { app, listeners } = fakeApp();
+      const reopenWindow = vi.fn();
+      const opens = install(app, reopenWindow);
+      const file = await projectFile('Reopened.lf2');
+
+      if (eventName === 'open-file') listeners.get(eventName)?.({ preventDefault: vi.fn() }, file);
+      else listeners.get(eventName)?.({}, ['KerfDesk'], root, { kerfdeskProjectPaths: [file] });
+
+      expect(reopenWindow).toHaveBeenCalledOnce();
+      await expect(drain(opens)).resolves.toEqual([
+        expect.objectContaining({ kind: 'file', name: 'Reopened.lf2' }),
+      ]);
+    },
+  );
+
+  it('Finder opens reveal and signal an existing window without making a second one', () => {
+    process.argv = ['KerfDesk'];
+    const { app, listeners } = fakeApp();
+    const window = fakeWindow();
+    windows.push(window);
+    const reopenWindow = vi.fn();
+    install(app, reopenWindow);
+
+    listeners.get('open-file')?.({ preventDefault: vi.fn() }, path.join(root, 'Finder.lf2'));
+
+    expect(window.focus).toHaveBeenCalledOnce();
+    expect(window.webContents.executeJavaScript).toHaveBeenCalledWith(DESKTOP_PROJECT_OPEN_SIGNAL);
+    expect(reopenWindow).not.toHaveBeenCalled();
   });
 });

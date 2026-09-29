@@ -1,5 +1,6 @@
 import type { StatusReport } from '../../core/controllers/grbl';
 import type { LaserState } from './laser-store';
+import { continueControllerOperation } from './laser-controller-operation';
 
 export function framedRunInterruptionPatch(
   state: LaserState,
@@ -19,11 +20,11 @@ export function framedRunInterruptionPatch(
     state.controllerOperation.phase === 'queue-fence'
   ) {
     return {
-      controllerOperation: {
+      controllerOperation: continueControllerOperation(state.controllerOperation, {
         ...state.controllerOperation,
         ownedRunStatusSequence: state.statusSequence + 1,
         ownedRunPermit: state.framedRun,
-      },
+      }),
     };
   }
   // A permit is a one-way authorization. Any controller-owned motion/hold/

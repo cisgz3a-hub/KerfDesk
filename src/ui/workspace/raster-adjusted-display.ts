@@ -12,6 +12,7 @@
 // shows.
 
 import { applyLumaAdjustments, type LumaAdjustments } from '../../core/raster';
+import { releaseDisplayLevels } from './raster-display-levels';
 
 const BYTE_MAX = 255;
 const RGBA = 4;
@@ -134,6 +135,7 @@ export function pruneAdjustedRasterDisplays(live: ReadonlyMap<string, ReadonlySe
       if (liveTokens?.has(token) === true) continue;
       copies.delete(token);
       cachedPixels -= canvas.width * canvas.height;
+      releaseDisplayLevels(canvas);
     }
     if (copies.size === 0) adjustedDisplayCache.delete(sourceKey);
   }

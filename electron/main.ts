@@ -39,9 +39,7 @@ import {
   protocol,
   session,
   shell,
-  type Event as ElectronEvent,
   type Session,
-  type WebContents,
 } from 'electron';
 import * as path from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
@@ -90,15 +88,40 @@ import { installWindowReadinessPolicy } from './window-readiness-policy.js';
 import { installDesktopWindowClose } from './desktop-window-close.js';
 import { sessionPermissionsOnce } from './session-permissions-once.js';
 import { installDesktopProjectOpens } from './desktop-project-open.js';
-import { handleSelectSerialPort, type ElectronSerialPort } from './desktop-serial-chooser.js';
+import { installDesktopSerialPorts } from './desktop-serial-ports.js';
 import { externalBrowserUrl } from './external-links.js';
 import { installDesktopContextMenu } from './desktop-context-menu.js';
 import { loadWindowPlacement, rememberWindowPlacement } from './desktop-window-placement.js';
 import { installRendererCrashRecovery } from './renderer-crash-recovery.js';
 import { rendererContentSecurityPolicy } from './renderer-content-security-policy.js';
+import { createDesktopWindowReopener } from './desktop-window-reopen.js';
+import { createDesktopLicensing } from './desktop-licensing.js';
+import { readLicensingConfig } from './licensing-config.js';
+import { refusedDebugSwitch } from './debug-switch-policy.js';
+import { startDesktopSupportLog } from './support-log.js';
+import { installSessionEndGuard, withDesktopActivityRoute } from './session-end-guard.js';
+import { installTaskbarJobProgress } from './taskbar-job-progress.js';
+import { withSupportRoutes } from './support-routes.js';
+import { withDesktopWindowCommands } from './desktop-window-commands.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
+
+// A build that sells licences never loads its renderer under remote debugging
+// (ADR-544). This runs before any window, route or single-instance handoff.
+const REFUSED_DEBUG_SWITCH = refusedDebugSwitch({
+  packaged: app.isPackaged,
+  sellsLicences: readLicensingConfig(app.getAppPath()).channel !== 'free',
+  argv: process.argv,
+  hasSwitch: (name) => app.commandLine.hasSwitch(name),
+});
+if (REFUSED_DEBUG_SWITCH !== null) {
+  dialog.showErrorBox(
+    'KerfDesk',
+    `KerfDesk does not start with the ${REFUSED_DEBUG_SWITCH} debugging option. Open KerfDesk from its shortcut instead.`,
+  );
+  app.exit(1);
+}
 
 // Public rename without a data migration: pin both Chromium/application roots
 // before Electron's ready event so existing projects and recovery state remain.
@@ -110,14 +133,30 @@ app.setPath('userData', DESKTOP_DATA_PATH);
 app.setPath('sessionData', DESKTOP_DATA_PATH);
 if (process.platform === 'win32') app.setAppUserModelId(DESKTOP_APP_USER_MODEL_ID);
 
+let desktopWindowReady = false;
+let quitRequested = false;
+let prepareLicenceQuit: (() => void) | null = null;
+const reopenDesktopWindow = createDesktopWindowReopener({
+  isReady: () => desktopWindowReady,
+  isQuitting: () => quitRequested,
+  hasWindow: () => BrowserWindow.getAllWindows().some((window) => !window.isDestroyed()),
+  createWindow,
+  onError: (error: unknown) => console.error('Failed to reopen window:', error),
+});
+
 // One process owns the shared Chromium profile and the serial-capable UI. A
 // second launch raises that primary window and hands over any project file it
 // was asked to open (ADR-378).
 const DESKTOP_PROJECT_OPENS = installDesktopProjectOpens(app, {
   isTrustedRenderer: (url) => shouldAllowNavigation(url, TRUSTED_RENDERER_ORIGINS),
+  reopenWindow: reopenDesktopWindow,
 });
 const HAS_SINGLE_INSTANCE_LOCK = DESKTOP_PROJECT_OPENS.hasSingleInstanceLock;
 if (!HAS_SINGLE_INSTANCE_LOCK) app.quit();
+
+// A packaged app has no console: problems go to a local log that Help > Save
+// Support Report reads (ADR-546). Only the primary instance writes it.
+const SUPPORT_LOG = startDesktopSupportLog(app, DESKTOP_DATA_PATH, HAS_SINGLE_INSTANCE_LOCK);
 
 function installApplicationMenu(): void {
   const template = desktopApplicationMenuTemplate(process.platform);
@@ -167,8 +206,8 @@ const CSP_POLICY = [
   "frame-ancestors 'none'",
 ].join('; ');
 let cameraBridge: RtspCameraBridgeHandle | null = null;
-let quitRequested = false;
 app.on('before-quit', () => {
+  prepareLicenceQuit?.();
   quitRequested = true;
 });
 const installSessionPermissions = sessionPermissionsOnce(installPermissionHandlers);
@@ -265,15 +304,6 @@ function installPermissionHandlers(ses: Session): void {
       TRUSTED_RENDERER_ORIGINS,
     );
   });
-  // No setDevicePermissionHandler, deliberately (ADR-366). With any handler
-  // installed, Electron asks it about every serial port it can persist (on
-  // Windows, every port with a device instance ID) and no longer records the
-  // port the operator picks, so a handler that trusts the origin grants every
-  // attached adapter. Electron's own store keeps only the picked ports, matched
-  // on Windows by device instance ID. getPorts() in the window and in the
-  // background-streaming worker (ADR-354) then lists the picked adapter and not
-  // an identical twin, and Forget revokes it. Only the trusted origin reaches
-  // the picker: requestPort is gated by the permission check handler above.
   ses.setPermissionRequestHandler((wc, permission, cb, details) => {
     const mediaTypes =
       'mediaTypes' in details && details.mediaTypes !== undefined ? details.mediaTypes : undefined;
@@ -290,18 +320,13 @@ function installPermissionHandlers(ses: Session): void {
       ),
     );
   });
-  const onSelectSerialPort = (
-    event: ElectronEvent,
-    portList: ReadonlyArray<ElectronSerialPort>,
-    webContents: WebContents,
-    callback: (portId: string) => void,
-  ): void => {
-    handleSelectSerialPort(event, portList, webContents, callback);
-  };
-  (ses.on as unknown as (e: 'select-serial-port', l: typeof onSelectSerialPort) => void)(
-    'select-serial-port',
-    onSelectSerialPort,
-  );
+  // Only the picked port is granted, never every attached adapter (ADR-366);
+  // Windows remembers the picks across restarts (ADR-552). Only the trusted
+  // origin reaches the picker: requestPort is gated by the check handler above.
+  installDesktopSerialPorts(ses, {
+    trustedOrigins: TRUSTED_RENDERER_ORIGINS,
+    userDataPath: DESKTOP_DATA_PATH,
+  });
 }
 
 function installNavigationPolicy(window: BrowserWindow): void {
@@ -373,6 +398,10 @@ async function createWindow(): Promise<void> {
     },
     quit: () => app.quit(),
   });
+  // Windows restarting or shutting down mid-job waits, or gets Abort (ADR-548),
+  // and the taskbar button shows the job's progress (ADR-553).
+  installSessionEndGuard(window);
+  installTaskbarJobProgress(window);
   installRendererCrashRecovery(window, {
     isClosing: () => closeGuard.isClosing(),
     askToReload: async (prompt) => {
@@ -429,9 +458,9 @@ async function createWindow(): Promise<void> {
   // silently or never shows a picker:
   //   1) setPermissionCheckHandler   - accept 'serial' so the API isn't
   //      gated out before requestPort even fires.
-  //   2) select-serial-port event    - pick which port to return. Electron
-  //      grants that port alone; there is deliberately no device permission
-  //      handler, which would grant every port (ADR-366).
+  //   2) select-serial-port event    - pick which port to return. Only that
+  //      port is granted (ADR-366); on Windows the device permission handler
+  //      grants the ports picked before and not forgotten (ADR-552).
   //   3) setPermissionRequestHandler - accept 'serial' explicitly.
   //
   // File System Access (Phase A: SVG import, .lf2 save/open) is gated
@@ -474,7 +503,7 @@ async function startCameraBridgeSafely(): Promise<void> {
   }
 }
 
-if (HAS_SINGLE_INSTANCE_LOCK)
+if (HAS_SINGLE_INSTANCE_LOCK && REFUSED_DEBUG_SWITCH === null)
   void app
     .whenReady()
     .then(async () => {
@@ -482,7 +511,29 @@ if (HAS_SINGLE_INSTANCE_LOCK)
       // window. createWindow() will call loadURL('app://app/index.html'),
       // which fails fast if this handler isn't installed yet.
       const distRoot = path.join(__dirname, '..', 'dist', 'web');
-      protocol.handle('app', DESKTOP_PROJECT_OPENS.routes(makeAppProtocolHandler(distRoot)));
+      autoUpdater.on('error', () => console.warn('Desktop updater reported an error.'));
+      const licence = createDesktopLicensing({
+        appPath: app.getAppPath(),
+        userDataPath: DESKTOP_DATA_PATH,
+        version: app.getVersion(),
+        packaged: app.isPackaged,
+        trustedUpdates: IS_DESKTOP_UPDATE_CHANNEL_TRUSTED,
+        updater: autoUpdater,
+      });
+      prepareLicenceQuit = licence.prepareQuit;
+      // The workspace, projects, serial ports and camera never wait on a licence:
+      // every build opens, and Pro tools unlock only in the renderer (ADR-540).
+      protocol.handle(
+        'app',
+        withDesktopWindowCommands(
+          withDesktopActivityRoute(
+            withSupportRoutes(
+              licence.routes(DESKTOP_PROJECT_OPENS.routes(makeAppProtocolHandler(distRoot))),
+              SUPPORT_LOG,
+            ),
+          ),
+        ),
+      );
       // A Session survives macOS window closure; install its listeners once,
       // before the first renderer, rather than adding another picker on reopen.
       installSessionPermissions(session.defaultSession);
@@ -493,10 +544,12 @@ if (HAS_SINGLE_INSTANCE_LOCK)
       // the machine physically stopped. Check errors are never fatal to startup.
       configureAutoUpdater(autoUpdater, {
         isPackaged: app.isPackaged,
-        isChannelTrusted: IS_DESKTOP_UPDATE_CHANNEL_TRUSTED,
+        isChannelTrusted: IS_DESKTOP_UPDATE_CHANNEL_TRUSTED && licence.config.channel === 'free',
         onError: (error: unknown) => console.warn('Desktop update check failed:', error),
       });
-      return createWindow();
+      await createWindow();
+      desktopWindowReady = true;
+      licence.start();
     })
     .catch((err: unknown) => {
       console.error('Failed to create window:', err);
@@ -511,8 +564,4 @@ installApplicationFinalCleanup(app, () => cameraBridge?.close(), {
   reportFailure: (error: unknown) => console.warn('RTSP camera bridge cleanup failed:', error),
 });
 
-app.on('activate', () => {
-  if (BrowserWindow.getAllWindows().length === 0) {
-    void createWindow();
-  }
-});
+app.on('activate', reopenDesktopWindow);

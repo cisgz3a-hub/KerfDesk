@@ -7,6 +7,7 @@ import { ConfirmSaveDialog, SaveFilenamePanel, StatusBar, Toasts } from '../comm
 import { CommandShell } from '../commands';
 import { CanvasGcodeView, CanvasViewSwitch } from '../gcode-inspector';
 import { useCanvasViewStore } from '../state/canvas-view-store';
+import { useEdition } from '../licensing/edition';
 import { LiveMotionBar, useJobShortcuts } from '../laser';
 import { MachineSetupDialogHost } from '../laser/device-setup';
 import { BoardCapturePanel } from '../laser/board-capture';
@@ -46,14 +47,17 @@ import { ProjectBedReconciliationBanner } from './ProjectBedReconciliationBanner
 import { MachineSetupBanner } from './MachineSetupBanner';
 import { ExternalGcodePreviewBanner } from './ExternalGcodePreviewBanner';
 import { DesktopCloseNotice } from './DesktopCloseNotice';
+import { DesktopSessionEndNotice } from './DesktopSessionEndNotice';
 import { TutorialHost } from '../tutorials/TutorialHost';
 import { RecentProjectsHost } from '../recent-projects/RecentProjectsHost';
+import { SupportReportHost } from '../support/SupportReportHost';
 
 export function App(): JSX.Element {
   return (
     <div className="lf-app-shell" style={shellStyle}>
       <CommandShell />
       <DesktopCloseNotice />
+      <DesktopSessionEndNotice />
       <AutosaveRecoveryBanner />
       <ProjectBedReconciliationBanner />
       <ExternalGcodePreviewBanner />
@@ -93,6 +97,7 @@ export function App(): JSX.Element {
       <ImageEditorHost />
       <DesignStudioHost />
       <TutorialHost />
+      <SupportReportHost />
       <AppLifecycle />
     </div>
   );
@@ -135,6 +140,12 @@ function AppLifecycle(): null {
 function CanvasArea(): JSX.Element {
   const showGcode = useCanvasViewStore((store) => store.showGcode);
   const setShowGcode = useCanvasViewStore((store) => store.setShowGcode);
+  const { requestPro } = useEdition();
+  // The G-code 3D view is the G-code Inspector's, a Pro tool (ADR-540).
+  const changeView = (next: boolean): void => {
+    if (next) requestPro('gcode-inspector', () => setShowGcode(true));
+    else setShowGcode(false);
+  };
   const accessories = (
     <>
       <WorkspaceCameraOverlay />
@@ -147,7 +158,7 @@ function CanvasArea(): JSX.Element {
   );
   return (
     <WorkspaceViewport
-      controls={<CanvasViewSwitch showGcode={showGcode} onChange={setShowGcode} />}
+      controls={<CanvasViewSwitch showGcode={showGcode} onChange={changeView} />}
       content={
         showGcode ? (
           <div className="lf-workspace-stage">

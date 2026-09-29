@@ -26,6 +26,8 @@ import {
   hasLumaAdjustments,
   pruneAdjustedRasterDisplays,
 } from './raster-adjusted-display';
+import { decodedRasterDisplay, pruneDecodedRasterDisplays } from './raster-display-bitmap';
+import { displayLevel, releaseDisplayLevels } from './raster-display-levels';
 import type { ViewTransform } from './view-transform';
 
 type RasterImageCacheEntry = {
@@ -47,37 +49,53 @@ const DEG_TO_RAD = Math.PI / 180;
 const TRACE_SOURCE_TINT_COLOR = canvasTheme.traceSourceTint;
 const TRACE_SOURCE_TINT_ALPHA = 0.4;
 
+/** The display copies live objects still draw. */
+export type LiveRasterDisplayKeys = {
+  /** Sources drawn as they are, from a decoded copy (ADR-359 Amendment 1). */
+  readonly plain: ReadonlySet<string>;
+  /** Adjustments each source bitmap is still drawn with (ADR-359). */
+  readonly adjusted: ReadonlyMap<string, ReadonlySet<string>>;
+};
+
+const NO_LIVE_DISPLAYS: LiveRasterDisplayKeys = { plain: new Set(), adjusted: new Map() };
+
 export function pruneRasterImageCaches(
   liveDataUrls: ReadonlySet<string>,
-  liveAdjusted: ReadonlyMap<string, ReadonlySet<string>> = new Map(),
+  liveDisplays: LiveRasterDisplayKeys = NO_LIVE_DISPLAYS,
 ): void {
   for (const [dataUrl, entry] of rasterImageCache) {
     if (liveDataUrls.has(dataUrl)) continue;
     entry.onReady.clear();
     rasterImageCache.delete(dataUrl);
   }
-  for (const dataUrl of tintedTraceSourceCache.keys()) {
-    if (!liveDataUrls.has(dataUrl)) tintedTraceSourceCache.delete(dataUrl);
+  for (const [dataUrl, canvas] of tintedTraceSourceCache) {
+    if (liveDataUrls.has(dataUrl)) continue;
+    releaseDisplayLevels(canvas);
+    tintedTraceSourceCache.delete(dataUrl);
   }
-  pruneAdjustedRasterDisplays(liveAdjusted);
+  pruneAdjustedRasterDisplays(liveDisplays.adjusted);
+  pruneDecodedRasterDisplays(liveDisplays.plain);
 }
 
-/** Adjustments each source bitmap is still drawn with (ADR-359). */
-export function liveAdjustedDisplayKeys(
+export function liveRasterDisplayKeys(
   objects: ReadonlyArray<{ readonly kind: string }>,
   layerByColor: ReadonlyMap<string, Layer>,
-): Map<string, Set<string>> {
-  const live = new Map<string, Set<string>>();
+): LiveRasterDisplayKeys {
+  const plain = new Set<string>();
+  const adjusted = new Map<string, Set<string>>();
   for (const obj of objects) {
     if (!isRasterImage(obj) || obj.role === 'trace-source') continue;
     const adjustments = burnedImageAdjustments(obj, layerByColor);
-    if (!hasLumaAdjustments(adjustments)) continue;
     const sourceKey = rasterDisplayDataUrl(obj);
-    const tokens = live.get(sourceKey) ?? new Set<string>();
+    if (!hasLumaAdjustments(adjustments)) {
+      plain.add(sourceKey);
+      continue;
+    }
+    const tokens = adjusted.get(sourceKey) ?? new Set<string>();
     tokens.add(adjustmentToken(adjustments));
-    live.set(sourceKey, tokens);
+    adjusted.set(sourceKey, tokens);
   }
-  return live;
+  return { plain, adjusted };
 }
 
 function isRasterImage(obj: { readonly kind: string }): obj is RasterImage {
@@ -161,7 +179,7 @@ export function drawRasterImage(
 
   drawBitmapAtTransform(
     ctx,
-    rasterPaint(obj, displayDataUrl, img, options.adjustments ?? obj),
+    rasterPaint(obj, displayDataUrl, img, options.adjustments ?? obj, options.onBitmapReady),
     obj.bounds,
     obj.transform,
     view,
@@ -171,16 +189,20 @@ export function drawRasterImage(
 
 // Trace-source backings draw tinted so the operator can tell the deletable
 // original apart from the trace stacked on top (ADR-026). An adjusted image
-// draws the grey tone that burns (ADR-359); an unadjusted one, its source.
+// draws the grey tone that burns (ADR-359); an unadjusted one, its source,
+// from a copy decoded off the main thread once it lands (ADR-359 Amendment 1).
 function rasterPaint(
   obj: Parameters<typeof drawRasterImage>[1],
   displayDataUrl: string,
   img: HTMLImageElement,
   adjustments: LumaAdjustments,
+  onDecoded: (() => void) | undefined,
 ): CanvasImageSource {
   if (obj.role === 'trace-source') return tintedTraceSource(displayDataUrl, img) ?? img;
-  if (!hasLumaAdjustments(adjustments)) return img;
-  return adjustedRasterDisplay(displayDataUrl, img, adjustments) ?? img;
+  if (hasLumaAdjustments(adjustments)) {
+    return adjustedRasterDisplay(displayDataUrl, img, adjustments) ?? img;
+  }
+  return decodedRasterDisplay(displayDataUrl, img, onDecoded) ?? img;
 }
 
 /**
@@ -217,6 +239,10 @@ export function rasterDisplayDataUrl(obj: Pick<RasterImage, 'dataUrl' | 'imageAs
 // in register even when fitObjectToBed scales the import down (an
 // earlier version translated to the centre and drew at -w/2,-h/2, which
 // drifted under non-unit scale).
+//
+// The blit reads the halved copy of the bitmap that is nearest its size on
+// screen (raster-display-levels.ts), so zooming never makes the browser
+// rescale it on the main thread; the destination rectangle is unchanged.
 export function drawBitmapAtTransform(
   ctx: CanvasRenderingContext2D,
   bitmap: CanvasImageSource,
@@ -235,7 +261,8 @@ export function drawBitmapAtTransform(
   const sy = (t.mirrorY ? -1 : 1) * t.scaleY * view.scale;
   ctx.scale(sx, sy);
   if (imageClip !== undefined) clipRasterImage(ctx, imageClip);
-  ctx.drawImage(bitmap, bounds.minX, bounds.minY, w, h);
+  const drawn = displayLevel(bitmap, Math.abs(w * sx), Math.abs(h * sy));
+  ctx.drawImage(drawn, bounds.minX, bounds.minY, w, h);
   ctx.restore();
 }
 

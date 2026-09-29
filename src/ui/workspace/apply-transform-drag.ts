@@ -6,6 +6,7 @@ import {
   type Transform,
   type Vec2,
 } from '../../core/scene';
+import { useToastStore } from '../state/toast-store';
 import { transformUpdatesForMoveDrag, type DragState } from './drag-state';
 import { transformDragWithSnap } from './drag-snap';
 import { rotateSelectionByDrag } from './rotate-handle';
@@ -117,8 +118,21 @@ function applySelectionScaleDrag(args: {
   const result = buildSelectionTransformEdit(objects, edit);
   if (result.kind === 'ok') {
     for (const update of result.transforms) args.setObjectTransform(update.id, update.transform);
+  } else if (result.reason === 'non-uniform-rotated-selection') {
+    reportObliqueStretch();
   }
   return true;
+}
+
+const OBLIQUE_STRETCH_MESSAGE =
+  'An object in the selection is turned at an angle that is not a multiple of 90°, so the selection can only be scaled evenly: drag a corner handle without Shift.';
+
+// The handle would otherwise do nothing at all. Every pointer move meets the
+// same refusal, so one copy is shown at a time.
+function reportObliqueStretch(): void {
+  const toasts = useToastStore.getState();
+  if (toasts.toasts.some((toast) => toast.message === OBLIQUE_STRETCH_MESSAGE)) return;
+  toasts.pushToast(OBLIQUE_STRETCH_MESSAGE, 'info');
 }
 
 function applySelectionRotateDrag(args: {

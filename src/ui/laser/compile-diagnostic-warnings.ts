@@ -11,6 +11,7 @@
 
 import type { compileJob } from '../../core/job';
 import { assertNever } from '../../core/scene';
+import { formatFeatureMm } from './job-review/min-feature-warnings';
 
 type CompiledJob = ReturnType<typeof compileJob>;
 type CompileDiagnostic = NonNullable<CompiledJob['diagnostics']>[number];
@@ -19,7 +20,34 @@ const FILL_COLLAPSED_AT_PRECISION_WARNING = (layerName: string): string =>
   `Fill on layer "${layerName}" is missing from the job because every hatch sweep rounds to a stationary point at emitted G-code precision. Check the preview, and enlarge the artwork or use a Line operation if this microscopic detail must remain visible.`;
 
 export function compileDiagnosticWarnings(job: CompiledJob): ReadonlyArray<string> {
-  return (job.diagnostics ?? []).map(diagnosticWarning);
+  return mergeClosedUpCounts(job.diagnostics ?? []).map(diagnosticWarning);
+}
+
+// A layer compiled one object at a time (objects with their own power scale)
+// reports a count per object; the operator needs one line per layer.
+function mergeClosedUpCounts(
+  diagnostics: ReadonlyArray<CompileDiagnostic>,
+): ReadonlyArray<CompileDiagnostic> {
+  const merged: CompileDiagnostic[] = [];
+  for (const diagnostic of diagnostics) {
+    const index = merged.findIndex((earlier) => sameClosedUpLayer(earlier, diagnostic));
+    const earlier = merged[index];
+    if (earlier?.kind === 'kerf-offset-closed-up' && diagnostic.kind === 'kerf-offset-closed-up') {
+      merged[index] = { ...earlier, count: earlier.count + diagnostic.count };
+    } else {
+      merged.push(diagnostic);
+    }
+  }
+  return merged;
+}
+
+function sameClosedUpLayer(a: CompileDiagnostic, b: CompileDiagnostic): boolean {
+  return (
+    a.kind === 'kerf-offset-closed-up' &&
+    b.kind === 'kerf-offset-closed-up' &&
+    a.layerName === b.layerName &&
+    a.kerfOffsetMm === b.kerfOffsetMm
+  );
 }
 
 function diagnosticWarning(diagnostic: CompileDiagnostic): string {
@@ -30,6 +58,8 @@ function diagnosticWarning(diagnostic: CompileDiagnostic): string {
       return offsetFillPassLimitWarning(diagnostic.layerName, diagnostic.passLimit);
     case 'kerf-offset-failed':
       return kerfOffsetFailedWarning(diagnostic.layerName);
+    case 'kerf-offset-closed-up':
+      return kerfClosedUpWarning(diagnostic.layerName, diagnostic.count, diagnostic.kerfOffsetMm);
     case 'fill-collapsed-at-precision':
       return FILL_COLLAPSED_AT_PRECISION_WARNING(diagnostic.layerName);
     case 'image-scan-angle-rotary':
@@ -58,4 +88,18 @@ function offsetFillPassLimitWarning(layerName: string, passLimit: number): strin
 // nothing or cuts only its open paths.
 function kerfOffsetFailedWarning(layerName: string): string {
   return `Kerf offset on layer "${layerName}" could not be generated: the geometry engine failed, so this layer's closed contours are missing from the job and will NOT be cut. Only its open paths remain. Check the preview before running, and try a smaller kerf offset, or set kerf to 0 to cut the contours uncompensated.`;
+}
+
+// The engine succeeded, but a hole or slot narrower than the kerf has no inside
+// left once it shrinks by the offset (a part, when the offset is negative).
+// The minimum-feature check may flag the same spot as a narrow gap; this says
+// what actually happened to it.
+function kerfClosedUpWarning(layerName: string, count: number, kerfOffsetMm: number): string {
+  const one = count === 1;
+  const kerf = `the ${formatFeatureMm(2 * Math.abs(kerfOffsetMm))} mm kerf (twice its Kerf Offset)`;
+  const lost = `so ${one ? 'it is' : 'they are'} missing from the job and will NOT be cut. Check the preview before running, and widen ${one ? 'it' : 'them'}`;
+  if (kerfOffsetMm < 0) {
+    return `Kerf offset on layer "${layerName}" shrank ${count} ${one ? 'part' : 'parts'} narrower than ${kerf} to nothing, ${lost} or use a kerf offset closer to 0.`;
+  }
+  return `Kerf offset on layer "${layerName}" closed up ${count} ${one ? 'hole or slot' : 'holes or slots'} narrower than ${kerf}, ${lost} or use a smaller kerf offset.`;
 }

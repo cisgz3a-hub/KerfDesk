@@ -131,7 +131,7 @@ import {
   sceneActions,
   viewActions,
 } from './store-actions';
-import { saveTrackingActions } from './store-save-tracking-actions';
+import { saveTrackingActions, type MarkLoadedOptions } from './store-save-tracking-actions';
 import { variableDataActions, type VariableDataActions } from './variable-data-actions';
 import { arrayActions, type ArrayActions } from './array-actions';
 import { nestActions, type NestActions } from './nest-actions';
@@ -243,7 +243,7 @@ export type AppState = ObjectPropertiesActions &
     // action; flips false on a successful save. `savedName` is the file the
     // project was last saved as — drives the window title. `lastSaveTarget`
     // holds the platform's SaveTarget so Ctrl+S after a first save writes
-    // through without re-prompting; cleared by New/Open.
+    // through without re-prompting; cleared by New, set by Open (ADR-550).
     readonly dirty: boolean;
     readonly savedName: string | null;
     readonly lastSaveTarget: SaveTarget | null;
@@ -387,7 +387,7 @@ export type AppState = ObjectPropertiesActions &
       expectedProjectSavedRequestEpoch: number,
       target: SaveTarget,
     ) => Promise<boolean>;
-    readonly markLoaded: (filename: string, options?: { readonly dirty?: boolean }) => void;
+    readonly markLoaded: (filename: string, options?: MarkLoadedOptions) => void;
   };
 
 function initialState(

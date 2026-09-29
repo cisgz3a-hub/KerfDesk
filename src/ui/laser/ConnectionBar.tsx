@@ -33,6 +33,8 @@ type Props = {
   readonly onChoosePort?: () => void;
   readonly autoConnect?: boolean;
   readonly onAutoConnectChange?: (enabled: boolean) => void;
+  /** The desktop app on macOS and Linux forgets its chosen ports when it closes (ADR-366). */
+  readonly portChoiceEndsOnRestart?: boolean;
   /** The machine line: its name, work area and controller. */
   readonly machine?: ReactNode;
   /** The Machine Setup entry, beside the primary action. */
@@ -105,11 +107,25 @@ function connectButton(props: Props, label: string, disabled: boolean): JSX.Elem
       className="lf-btn lf-btn--primary"
       onClick={props.onConnect}
       disabled={disabled}
-      title={`Connect to your ${props.machineNoun} controller on the USB port it used last time. The first time, choose its port.`}
+      title={connectTitle(props)}
     >
       {label}
     </button>
   );
+}
+
+function connectTitle(props: Props): string {
+  return props.portChoiceEndsOnRestart === true
+    ? `Connect to your ${props.machineNoun} controller. Choose its USB port the first time after KerfDesk starts; until KerfDesk closes, Connect uses that port.`
+    : `Connect to your ${props.machineNoun} controller on the USB port it used last time. The first time, choose its port.`;
+}
+
+// Desktop picks on macOS and Linux last until KerfDesk closes (ADR-366), so the
+// app there reconnects by itself only when the machine is plugged back in.
+function autoConnectTitle(props: Props): string {
+  return props.portChoiceEndsOnRestart === true
+    ? `Connect by itself when the ${props.machineNoun} is plugged back in, to the port chosen since KerfDesk started. After each start, choose the port once with Connect. Connecting only reads settings; nothing moves.`
+    : `Connect by itself when KerfDesk starts or the ${props.machineNoun} is plugged in, to the port it used last time. Connecting only reads settings; nothing moves.`;
 }
 
 function ConnectionMenu(props: Props): JSX.Element {
@@ -160,7 +176,7 @@ function ConnectionMenu(props: Props): JSX.Element {
           {props.onAutoConnectChange === undefined ? null : (
             <MenuItem
               label="Connect automatically"
-              title={`Connect by itself when KerfDesk starts or the ${props.machineNoun} is plugged in, to the port it used last time. Connecting only reads settings; nothing moves.`}
+              title={autoConnectTitle(props)}
               checked={props.autoConnect === true}
               onClick={() => run(() => props.onAutoConnectChange?.(props.autoConnect !== true))}
             />

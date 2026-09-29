@@ -10,6 +10,7 @@ import studioIcon from 'lucide-static/icons/shapes.svg?raw';
 
 import { IconButton, type IconName } from '../kit';
 import { useDesignStudioStore } from '../design-studio';
+import { requestProFeature } from '../licensing/edition';
 import { TOOL_HELP, toolHelpId, type ToolHelpKey } from '../help/help-topics';
 import { useUiStore, type ToolMode } from '../state/ui-store';
 import { useStore } from '../state/store';
@@ -85,7 +86,9 @@ export function ToolStrip(): JSX.Element {
         type="button"
         aria-label="Open Design Studio"
         title="Draw a part to size by hand — precision tools, snapping, and dimensions in a full window (ADR-272)."
-        onClick={() => useDesignStudioStore.getState().openStudio()}
+        onClick={() =>
+          requestProFeature('design-studio', () => useDesignStudioStore.getState().openStudio())
+        }
         className="lf-btn lf-iconbtn lf-toolstrip__launcher"
       >
         <span aria-hidden="true" dangerouslySetInnerHTML={{ __html: studioIcon }} />

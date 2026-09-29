@@ -119,7 +119,8 @@ update and explicitly queued firmware-write behavior. The live connection stays 
   click on Connect after a replug or browser restart; that is Chrome's grant rule, not a choice.
 - In the desktop app, Connect is one click within a run and shows the picker after a restart.
   Installing a device permission handler that grants the remembered adapter across runs would
-  lift that, and is left for a decision that amends ADR-366.
+  lift that, and is left for a decision that amends ADR-366 (amended by ADR-552: the Windows
+  desktop app remembers picks as Chrome does; macOS and Linux still ask after a restart).
 - A first-time setup is: open Machine Setup, press **Find my machine**, pick the port once, check
   the filled values, Next. The capability cards and catalog stay below for the offline path.
 - `DeviceSetupAutoDetect` is deleted; its readback list and apply action live in

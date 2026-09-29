@@ -48,6 +48,7 @@ import { errorMessage, suggestedGcodeName } from './file-action-formatters';
 import {
   completeLightBurnProjectOpen,
   completeNativeProjectOpen,
+  openedProjectSaveTarget,
   type ProjectOpenCompletionContext,
 } from './project-open-completion';
 import { claimProjectOpenRequest } from './project-open-request-owner';
@@ -417,6 +418,11 @@ function completeOpenedFile(
   const opened =
     parsed.kind === 'lightburn'
       ? completeLightBurnProjectOpen(ctx, file.name, parsed.result)
-      : completeNativeProjectOpen(ctx, file.name, parsed.result);
+      : completeNativeProjectOpen(
+          ctx,
+          file.name,
+          parsed.result,
+          openedProjectSaveTarget(ctx.platform, file.recentRef),
+        );
   rememberOpenedProject(ctx.platform, file, opened);
 }

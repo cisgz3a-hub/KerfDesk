@@ -46,6 +46,7 @@ import type { CutGroup, CutSegment, Group, Job, JobDiagnostic } from './job';
 import { placedTabPointsForContour } from './laser-tab-anchors';
 import {
   kerfArcSourceRings,
+  layerKerfDiagnostics,
   withLayerKerf,
   type KerfSource,
   type PendingKerfGroup,
@@ -66,14 +67,14 @@ type VectorCompilation = {
   readonly diagnostics: ReadonlyArray<JobDiagnostic>;
 };
 
-// Line-mode segments plus whether the kerf offset lost any of them. A failed
-// offset and a layer with no closed contours both yield fewer segments, so
-// without the flag a dropped cut is indistinguishable from a layer that never
-// had one.
+// Line-mode segments plus what the kerf offset lost of them. A failed offset,
+// a hole it closed up and a layer with no closed contours all yield fewer
+// segments, so without these diagnostics a dropped cut is indistinguishable
+// from a layer that never had one.
 type LineSegmentCollection = {
   readonly segments: ReadonlyArray<CutSegment>;
   readonly tabSpans: ReadonlyArray<CutSegment>;
-  readonly kerfOffsetFailed: boolean;
+  readonly kerfDiagnostics: ReadonlyArray<JobDiagnostic>;
 };
 
 // Line segments as collected, with the machine-space centres of any tabs
@@ -266,9 +267,7 @@ function vectorGroupsForLayer(
   // Reported even when no segments survived: a failed kerf offset takes every
   // closed contour on the layer with it, which is precisely the case where the
   // layer would otherwise vanish from the job without a trace.
-  const diagnostics: ReadonlyArray<JobDiagnostic> = line.kerfOffsetFailed
-    ? [{ kind: 'kerf-offset-failed', layerName: layer.name }]
-    : NO_DIAGNOSTICS;
+  const diagnostics = line.kerfDiagnostics;
   if (line.segments.length === 0 && line.tabSpans.length === 0) return { groups: [], diagnostics };
   const common = commonVectorGroupFields(layer, device, powerSource, sourceObjectId);
   const entryRunwayMm = contourEntryRunwayMm(device, layer.fillOverscanMm);
@@ -355,7 +354,7 @@ function collectLineSegmentsForLayer(
   return {
     segments: perforateLineSegments(tabbed.segments, layer),
     tabSpans: tabbed.tabSpans,
-    kerfOffsetFailed: kerfed.failed,
+    kerfDiagnostics: layerKerfDiagnostics(kerfed, layer),
   };
 }
 

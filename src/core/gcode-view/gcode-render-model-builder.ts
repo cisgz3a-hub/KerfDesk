@@ -4,13 +4,7 @@
 // Composes the shared engine (core/gcode); forgiving by design — bad arcs and
 // unknown words become findings, never failures (ADR-255 §5).
 
-import {
-  ARC_EPSILON,
-  arcSweepAngle,
-  ijArcCenter,
-  PROGRAM_PARSE_REASON,
-  rArcGeometry,
-} from '../gcode';
+import { ARC_EPSILON, arcSweepAngle, PROGRAM_PARSE_REASON } from '../gcode';
 // Deep import: the core/gcode barrel is at its public-export cap (ADR-015).
 import { stripControllerComments } from '../gcode/word-scan';
 import { timingArcPoints } from './controller-arc-points';
@@ -32,6 +26,8 @@ import {
   scanControllerRenderWords,
 } from './native-laser-render-words';
 import { computeProgramStats } from './program-stats';
+import { createProgramBoundsTracker, type ProgramBoundsTracker } from './program-bounds';
+import { ARC_RADIUS_TOLERANCE_MM, renderArcCenter } from './render-model-arc-center';
 import { createSegmentBuilder, type SegmentBuilder } from './segment-builder';
 import {
   countUnsupported,
@@ -49,8 +45,6 @@ import {
 } from './render-model-types';
 
 const AXIS_EPSILON = 1e-9;
-// GRBL validates R-form/IJ arcs to ~0.005 in (mirrors the F-CNC10 parser).
-const ARC_RADIUS_TOLERANCE_MM = 0.127;
 const XY_PLANE = 17;
 
 type BuildContext = {
@@ -59,6 +53,8 @@ type BuildContext = {
   readonly laser: LaserRenderState;
   readonly modal: RenderModal;
   readonly segments: SegmentBuilder;
+  // The program's own extent, without the assumed start (ADR-255 amendment 2).
+  readonly program: ProgramBoundsTracker;
   readonly events: ProgramEvent[];
   readonly skipped: SkippedMotion[];
   readonly unsupported: UnsupportedWordMap;
@@ -84,6 +80,7 @@ export function createGcodeRenderModelBuilder(
     laser: createLaserRenderState(options),
     modal: freshRenderModal(options.initialPositionMm),
     segments,
+    program: createProgramBoundsTracker(options.initialPositionMm),
     events: [],
     skipped: [],
     unsupported: new Map(),
@@ -127,6 +124,7 @@ export function createGcodeRenderModelBuilder(
       };
     }
     const finished = context.segments.finish();
+    const stats = computeProgramStats(finished);
     const renderPressure =
       options.renderPressureThreshold !== undefined &&
       finished.segmentCount > options.renderPressureThreshold
@@ -142,7 +140,7 @@ export function createGcodeRenderModelBuilder(
         events: context.events,
         unsupportedWords: unsupportedList(context.unsupported),
         skippedMotions: context.skipped,
-        stats: computeProgramStats(finished),
+        stats: { ...stats, programBounds: context.program.result(stats.motionBounds) },
       },
     };
   };
@@ -227,6 +225,7 @@ function emitHome(context: BuildContext, axes: ReadonlyArray<'X' | 'Y' | 'Z'>, l
   modal.x = target.x;
   modal.y = target.y;
   modal.z = target.z;
+  context.program.forget(axes);
 }
 
 function emitMotion(
@@ -247,6 +246,7 @@ function emitMotion(
   } else {
     emitLinear(context, target, line);
   }
+  context.program.moveTo(target, axisWords, modal.absolute);
   modal.x = target.x;
   modal.y = target.y;
   modal.z = target.z;
@@ -288,6 +288,7 @@ function emitCannedCycle(
     modal.y = move.to.y;
     modal.z = move.to.z;
   }
+  context.program.cycle(moves, from, axisWords, modal.absolute);
   if (parameters.dwellSeconds !== null) {
     context.events.push({ kind: 'dwell', line, seconds: Math.max(0, parameters.dwellSeconds) });
   }
@@ -337,8 +338,12 @@ function emitArc(
   }
   const clockwise = modal.motion === 2;
   const from = { x: modal.x, y: modal.y };
-  const center = solveArcCenter(context, axisWords, from, target, clockwise, line);
-  if (center === null) return false;
+  const solved = renderArcCenter(axisWords, from, target, clockwise, modal.unitScale);
+  if ('skipped' in solved) {
+    context.skipped.push({ line, reason: solved.skipped });
+    return false;
+  }
+  const { center } = solved;
   const radius = Math.hypot(from.x - center.x, from.y - center.y);
   const endRadius = Math.hypot(target.x - center.x, target.y - center.y);
   if (Math.abs(radius - endRadius) > ARC_RADIUS_TOLERANCE_MM) {
@@ -360,36 +365,6 @@ function emitArc(
   points[points.length - 1] = { x: target.x, y: target.y };
   pushArcPairs(context, points, target, sweep * radius, line, clockwise);
   return true;
-}
-
-function solveArcCenter(
-  context: BuildContext,
-  axisWords: ReadonlyMap<string, number>,
-  from: { x: number; y: number },
-  to: { x: number; y: number },
-  clockwise: boolean,
-  line: number,
-): { x: number; y: number } | null {
-  const i = axisWords.get('I');
-  const j = axisWords.get('J');
-  if (i !== undefined || j !== undefined) {
-    return ijArcCenter(from, i, j, context.modal.unitScale);
-  }
-  const r = axisWords.get('R');
-  if (r === undefined) {
-    context.skipped.push({ line, reason: 'arc needs I/J or R' });
-    return null;
-  }
-  const solved = rArcGeometry(from, to, r, clockwise, context.modal.unitScale);
-  if (solved === null) {
-    context.skipped.push({ line, reason: 'R-form arc cannot start and end at the same point' });
-    return null;
-  }
-  if (solved.halfChordGapSq < -ARC_RADIUS_TOLERANCE_MM * solved.chordMm) {
-    context.skipped.push({ line, reason: 'arc radius too small for its chord' });
-    return null;
-  }
-  return solved.center;
 }
 
 // Distributes the arc-true length (3D-helix-true when Z moves) across the
@@ -436,5 +411,7 @@ function pushArcPairs(
       lengthMm: trueLength * share,
     });
     previous = { x: point.x, y: point.y, z };
+    // An arc is drawn about its start, so it counts where its start does.
+    context.program.include(previous);
   }
 }

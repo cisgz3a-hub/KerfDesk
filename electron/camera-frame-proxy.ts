@@ -12,6 +12,7 @@ import type { ServerResponse } from 'node:http';
 import { writeJson } from './bridge-json.js';
 import { cameraFrameUrlPolicy } from './camera-frame-proxy-policy.js';
 import { cancelCameraFrameBody, readCameraFrameBody } from './camera-frame-body.js';
+import { FFMPEG_MISSING_REASON } from './ffmpeg-path.js';
 import { captureRtspFrameJpeg, hasFfmpeg } from './rtsp-camera-stream.js';
 
 // Timeouts sized to the real hardware (ADR-116 hardware pass): the Falcon's
@@ -106,7 +107,7 @@ export async function serveHttpFrame(url: URL, res: ServerResponse): Promise<voi
 
 async function serveRtspFrame(url: URL, res: ServerResponse): Promise<void> {
   if (!(await hasFfmpeg())) {
-    writeJson(res, { kind: 'unavailable', reason: 'FFmpeg is not available on this computer.' });
+    writeJson(res, { kind: 'unavailable', reason: FFMPEG_MISSING_REASON });
     return;
   }
   const result = await captureRtspFrameJpeg(url);

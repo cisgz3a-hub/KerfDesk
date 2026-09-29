@@ -1,6 +1,10 @@
 import { useStore } from '../state';
 import { useLaserStore } from '../state/laser-store';
 import { isActiveJob } from '../state/laser-store-helpers';
+import {
+  controllerOperationOwner,
+  isUnsafeControllerOperation,
+} from '../state/laser-controller-operation';
 import { createAutosaveProjectSnapshot } from '../state/autosave-project-snapshot';
 import { DesktopCloseController, type DesktopCloseReply } from './desktop-close-controller';
 
@@ -17,6 +21,8 @@ export const desktopCloseController = new DesktopCloseController(() => {
   return {
     active: isActiveJob(laser.streamer),
     fireLatched: laser.fireActive,
+    motionOwner: laser.motionOperation?.operationId ?? null,
+    controllerOwner: controllerOwner(laser),
     epoch: laser.streamerEpoch,
     dirty: useStore.getState().dirty,
     document: documentSnapshot(useStore.getState()),
@@ -30,9 +36,23 @@ export const desktopCloseController = new DesktopCloseController(() => {
 async function stopBeforeClose(): Promise<void> {
   if (useLaserStore.getState().fireActive) await useLaserStore.getState().setFireActive(false);
   // Recovery records this stop as the app closing, not as an operator Abort.
-  if (isActiveJob(useLaserStore.getState().streamer)) {
-    await useLaserStore.getState().stopJob('app-closing');
+  const laser = useLaserStore.getState();
+  if (
+    isActiveJob(laser.streamer) ||
+    laser.motionOperation !== null ||
+    isUnsafeControllerOperation(laser.controllerOperation)
+  ) {
+    await laser.stopJob('app-closing');
   }
+}
+
+function controllerOwner(laser: ReturnType<typeof useLaserStore.getState>): object | string | null {
+  const operation = laser.controllerOperation;
+  if (!isUnsafeControllerOperation(operation) || operation === null) return null;
+  // Status/phase updates replace these records while preserving their owner.
+  if (operation.kind === 'home') return `home:${operation.operationId}`;
+  if (operation.kind === 'probe') return `probe:${operation.transactionId}`;
+  return controllerOperationOwner(operation);
 }
 
 function closeWarning(laser: ReturnType<typeof useLaserStore.getState>): string | null {
@@ -45,7 +65,7 @@ function closeWarning(laser: ReturnType<typeof useLaserStore.getState>): string 
 }
 
 interface CloseRequest {
-  readonly operation: 'prepare' | 'approve' | 'cancel';
+  readonly operation: 'prepare' | 'save' | 'approve' | 'cancel';
   readonly requestId: number;
   readonly respond: (reply: DesktopCloseReply) => void;
 }
@@ -54,7 +74,7 @@ function isCloseRequest(value: unknown): value is CloseRequest {
   if (typeof value !== 'object' || value === null) return false;
   return (
     'operation' in value &&
-    ['prepare', 'approve', 'cancel'].includes(String(value.operation)) &&
+    ['prepare', 'save', 'approve', 'cancel'].includes(String(value.operation)) &&
     'requestId' in value &&
     typeof value.requestId === 'number' &&
     Number.isSafeInteger(value.requestId) &&
@@ -64,18 +84,24 @@ function isCloseRequest(value: unknown): value is CloseRequest {
 }
 
 /**
- * Main invokes these three fixed renderer operations. This DOM event grants no
+ * Main invokes these four fixed renderer operations. This DOM event grants no
  * main-process capability: no preload, ipcRenderer, filesystem or shell API is
  * exposed. Ordinary web unload keeps the existing best-effort fallback until
- * the desktop main process requests ownership of a close attempt.
+ * the desktop main process requests ownership of a close attempt. `save` runs
+ * the project's own Save (ADR-549); without it, Save before closing cancels.
  */
-export function installDesktopCloseReceiver(target: Window): () => void {
+export function installDesktopCloseReceiver(
+  target: Window,
+  saveProject: () => Promise<boolean> = async () => false,
+): () => void {
   const receive = (event: Event): void => {
     if (!(event instanceof CustomEvent) || !isCloseRequest(event.detail)) return;
     event.preventDefault();
     const request = event.detail;
     if (request.operation === 'prepare') {
       void desktopCloseController.prepare(request.requestId).then(request.respond);
+    } else if (request.operation === 'save') {
+      void desktopCloseController.save(request.requestId, saveProject).then(request.respond);
     } else if (request.operation === 'approve') {
       request.respond(desktopCloseController.approve(request.requestId));
     } else {

@@ -1,8 +1,13 @@
 import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, describe, expect, it, vi } from 'vitest';
+import { mockPlatform, projectWithLine } from '../../__fixtures__/file-actions';
+import { serializeProject } from '../../io/project';
+import type { PlatformAdapter } from '../../platform/types';
 import { useStore } from '../state';
+import { clearAutosave } from '../state/autosave';
 import { useToastStore } from '../state/toast-store';
+import { PlatformProvider } from './platform-context';
 import { useImportDragDrop } from './use-import-drag-drop';
 import type { GcodeInspectionSource } from '../gcode-inspector';
 
@@ -26,7 +31,10 @@ function Harness(props: { readonly openGcodeInspector: OpenGcodeInspector }): nu
   return null;
 }
 
-async function renderHarness(openGcodeInspector: OpenGcodeInspector = vi.fn()): Promise<{
+async function renderHarness(
+  openGcodeInspector: OpenGcodeInspector = vi.fn(),
+  platform: PlatformAdapter | null = null,
+): Promise<{
   readonly openGcodeInspector: OpenGcodeInspector;
   readonly unmount: () => Promise<void>;
 }> {
@@ -34,8 +42,15 @@ async function renderHarness(openGcodeInspector: OpenGcodeInspector = vi.fn()): 
   document.body.appendChild(host);
   const root = createRoot(host);
   roots.add(root);
+  const harness = <Harness openGcodeInspector={openGcodeInspector} />;
   await act(async () => {
-    root.render(<Harness openGcodeInspector={openGcodeInspector} />);
+    root.render(
+      platform === null ? (
+        harness
+      ) : (
+        <PlatformProvider adapter={platform}>{harness}</PlatformProvider>
+      ),
+    );
   });
   return {
     openGcodeInspector,
@@ -77,7 +92,9 @@ afterEach(async () => {
   });
   document.body.replaceChildren();
   imageMocks.importImageFile.mockClear();
+  clearAutosave();
   useStore.getState().newProject();
+  useStore.setState({ dirty: false });
   for (const toast of useToastStore.getState().toasts) {
     useToastStore.getState().dismissToast(toast.id);
   }
@@ -229,6 +246,29 @@ describe('useImportDragDrop G-code Inspector routing (LF-CANVAS-GCODE-DROP-001)'
     });
     expect(openGcodeInspector).toHaveBeenCalledTimes(1);
     expect(toastMessages()).toContain('Ignored 2 additional G-code files: second.gcode, third.tap');
+
+    await unmount();
+  });
+});
+
+describe('useImportDragDrop project files (ADR-378 Amendment 1)', () => {
+  it('opens a dropped project instead of rejecting it as unsupported', async () => {
+    const openGcodeInspector = vi.fn<OpenGcodeInspector>();
+    const { unmount } = await renderHarness(openGcodeInspector, mockPlatform());
+    const text = serializeProject({ ...projectWithLine(), notes: 'dropped on the window' });
+    const project = new File([text], 'job.lf2');
+    // jsdom's File has no text(); a browser's does.
+    Object.defineProperty(project, 'text', { value: async () => text });
+
+    await dropFiles([project]);
+
+    await vi.waitFor(() => expect(useStore.getState().savedName).toBe('job.lf2'));
+    expect(useStore.getState().project.notes).toBe('dropped on the window');
+    expect(toastMessages()).toContain('Opened job.lf2');
+    expect(toastMessages().some((m) => m.includes('Drop ignored') || m.startsWith('Ignored'))).toBe(
+      false,
+    );
+    expect(openGcodeInspector).not.toHaveBeenCalled();
 
     await unmount();
   });

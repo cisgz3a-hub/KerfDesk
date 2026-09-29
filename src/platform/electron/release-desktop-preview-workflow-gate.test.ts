@@ -152,11 +152,19 @@ describe('Desktop Preview release workflow gate (ADR-248/249)', () => {
     expect(workflow).toContain('Release verification and legal-closure gate');
   });
 
-  it('builds and checks the Windows and macOS Preview on every pull request (ADR-522)', () => {
+  it('builds and checks the Windows and macOS Preview in the release train, Linux on every pull request (ADR-522 Amendment 1)', () => {
     expect(packageCheck).toMatch(/^ {2}pull_request:$/m);
+    expect(packageCheck).toMatch(/^ {2}workflow_call:$/m);
+    expect(packageCheck).toMatch(/^ {2}workflow_dispatch:$/m);
     expect(packageCheck).toContain('runs-on: windows-latest');
     expect(packageCheck).toMatch(/runner: macos-15\n/);
     expect(packageCheck).toContain('runner: macos-15-intel');
+    // Paid 2x/10x runners: only the train or a manual run sets `native`.
+    const gatedJobs = packageCheck.match(/^ {4}if: \$\{\{ inputs\.native == true \}\}$/gm) ?? [];
+    expect(gatedJobs).toHaveLength(2);
+    expect(
+      packageCheck.split('\n  linux-package:')[1]?.split('\n  windows-package:')[0],
+    ).not.toMatch(/^ {4}if:/m);
     // A pull request builds the Preview exactly as the tag does, so the contract means the same.
     const releaseBuilds = previewBuildFlags(workflow);
     const pullRequestBuilds = previewBuildFlags(packageCheck);
@@ -185,9 +193,18 @@ describe('Desktop Preview release workflow gate (ADR-248/249)', () => {
 
   it('publishes changelog notes with every Preview and only reminds about tagging (ADR-522)', () => {
     const cadence = repoFile('.github/workflows/desktop-preview-cadence.yml');
+    expect(workflow).toContain('node scripts/desktop-release-notes.mjs release-body "${VERSION}"');
     expect(workflow).toContain(
-      'node scripts/desktop-release-notes.mjs release-body "${VERSION}" >> release-notes.md',
+      '--releases="${RUNNER_TEMP}/preview-releases.json" >> release-notes.md',
     );
+    expect(cadence).toContain('--releases="${RUNNER_TEMP}/preview-releases.json"');
+    for (const source of [workflow, cadence]) {
+      expect(source).toContain('node scripts/filter-completed-previews.mjs --fetch');
+    }
+    const metadataFetcher = repoFile('scripts/filter-completed-previews.mjs');
+    expect(metadataFetcher).toContain("'--paginate', '--slurp'");
+    expect(metadataFetcher).not.toMatch(/--jq|--template/);
+    expect(workflow).toContain('actions: read');
     expect(workflow.indexOf('release-body')).toBeLessThan(workflow.indexOf('gh release create'));
     expect(repoFile('CHANGELOG.md')).toMatch(/^## Unreleased$/m);
     // The v* tag ruleset keeps release tags with the maintainer; the cadence only drafts.
@@ -204,7 +221,7 @@ describe('Desktop Preview release workflow gate (ADR-248/249)', () => {
     expect(cadence).toContain('for extra in "${open_issues[@]:1}"; do');
   });
 
-  it('cannot publish Preview updater metadata, R2 objects, or secret-backed output', () => {
+  it('publishes signed Preview metadata and keeps executable updater trust disabled', () => {
     const windowsBuild = workflow.indexOf('Build unsigned Windows Preview');
     const windowsCleanup = workflow.indexOf(
       'Remove local Windows Preview updater metadata before verification',
@@ -220,9 +237,15 @@ describe('Desktop Preview release workflow gate (ADR-248/249)', () => {
     expect(`${windowsVerifier}\n${macVerifier}`).toContain("-name 'latest*.yml'");
     expect(`${workflow}\n${macVerifier}`).toContain("-name '*.blockmap'");
     expect(workflow).not.toContain('wrangler r2');
-    expect(workflow).not.toContain('dl.kerfdesk.com');
-    expect(workflow).not.toContain('${{ secrets.');
-    expect(workflow).not.toContain('environment:');
+    expect(workflow).toContain('dl.kerfdesk.com');
+    expect(workflow).toContain('DESKTOP_PREVIEW_MANIFEST_PRIVATE_KEY:');
+    expect(workflow).toContain('group: kerfdesk-preview-publication');
+    expect(workflow).toContain('node scripts/publish-preview-release.mjs');
+    expect(workflow).toContain('SOURCE_REPOSITORY_PRIVATE:');
+    expect(workflow.match(/if: github.event.repository.private == false/g)).toHaveLength(5);
+    expect(workflow.indexOf('Sign and publish verified Preview')).toBeGreaterThan(
+      workflow.indexOf('Verify the published immutable release'),
+    );
   });
 
   it('generates all integrity companions from the three built binaries', () => {

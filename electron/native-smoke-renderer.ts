@@ -4,7 +4,17 @@
 // src/ui/common/Toolbar.native-smoke-reach.test.tsx pins the toolbar side of
 // the contract (accessible names, More items as menuitems) in the fast suite.
 
+export const RENDERER_NODE_PRIMITIVES_SOURCE = String.raw`({
+    require: typeof globalThis.require,
+    process: typeof globalThis.process,
+    module: typeof globalThis.module,
+    Buffer: typeof globalThis.Buffer,
+})`;
+
 export const RENDERER_SMOKE_SOURCE = String.raw`(async () => {
+  // Read the actual main-world globals before installing the picker stubs.
+  // This deliberately performs no Node access, network request or device I/O.
+  const nodePrimitives = ${RENDERER_NODE_PRIMITIVES_SOURCE};
   const delay = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
   const labelled = (selector, label) =>
     [...document.querySelectorAll(selector)].find(
@@ -75,6 +85,8 @@ export const RENDERER_SMOKE_SOURCE = String.raw`(async () => {
     saved: Number.isSafeInteger(savedSchemaVersion) && savedSchemaVersion > 0,
     savedSchemaVersion,
     savedBytes: saved.length,
+    nodePrimitives,
+    fileAccess: { openPicker: 'stubbed', savePicker: 'stubbed', writeTarget: 'memory' },
     title: document.title,
     url: location.href,
   };

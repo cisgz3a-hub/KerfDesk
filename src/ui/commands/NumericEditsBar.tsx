@@ -346,7 +346,7 @@ function formatNumber(value: number | null): string {
 
 function messageForError(reason: string): string {
   if (reason === 'non-uniform-rotated-selection') {
-    return 'Unlocked width/height edits are disabled for rotated selections.';
+    return 'Unlocked width/height edits need every selected object turned by a multiple of 90°. Lock the aspect ratio to scale evenly.';
   }
   if (reason === 'multi-rotation') return 'Rotate one object at a time in Numeric Edits.';
   if (reason === 'invalid-dimension') return 'Width and height must be greater than 0.';

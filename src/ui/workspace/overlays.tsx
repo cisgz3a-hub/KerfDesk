@@ -15,7 +15,7 @@ import { computeView } from './view-transform';
 export function DragOverlay(): JSX.Element {
   return (
     <div style={dragOverlayStyle} aria-hidden="true">
-      <span style={dragOverlayLabelStyle}>Drop to import</span>
+      <span style={dragOverlayLabelStyle}>Drop to open or import</span>
     </div>
   );
 }

@@ -1,6 +1,8 @@
 import { useState } from 'react';
 import { machineKindOf, type MachineKind } from '../../core/scene';
 import type { ProcessRecipe } from '../../core/material-library/process-recipe';
+import { useEdition } from '../licensing/edition';
+import type { ProFeature } from '../licensing/pro-features';
 import { useStore } from '../state';
 
 export type ProcessRecipeControls = {
@@ -25,6 +27,7 @@ export function useProcessRecipeControls(): ProcessRecipeControls {
   const saveRecipe = useStore((state) => state.saveSelectedProcessRecipe);
   const applyRecipe = useStore((state) => state.applyProcessRecipeToSelection);
   const deleteRecipe = useStore((state) => state.deleteProcessRecipe);
+  const edition = useEdition();
   const [name, setName] = useState('');
   const [chosenId, select] = useState('');
   const [status, setStatus] = useState('');
@@ -46,12 +49,18 @@ export function useProcessRecipeControls(): ProcessRecipeControls {
   };
   const apply = (): void => {
     if (recipe === undefined) return;
-    const result = applyRecipe(recipe.id);
-    setStatus(
-      result.kind === 'invalid'
-        ? result.reason
-        : `Applied ${recipe.name} to ${result.value} artwork${result.value === 1 ? '' : 's'}.`,
-    );
+    const run = (): void => {
+      const result = applyRecipe(recipe.id);
+      setStatus(
+        result.kind === 'invalid'
+          ? result.reason
+          : `Applied ${recipe.name} to ${result.value} artwork${result.value === 1 ? '' : 's'}.`,
+      );
+    };
+    // A recipe that sets up a Pro operation is a way into that tool (ADR-540).
+    const feature = recipeProFeature(recipe);
+    if (feature === null) run();
+    else edition.requestPro(feature, run);
   };
   const remove = (): void => {
     if (recipe === undefined) return;
@@ -59,4 +68,11 @@ export function useProcessRecipeControls(): ProcessRecipeControls {
     setStatus(`Deleted ${recipe.name}.`);
   };
   return { kind, name, setName, count, recipes, recipe, select, status, save, apply, remove };
+}
+
+function recipeProFeature(recipe: ProcessRecipe): ProFeature | null {
+  if (recipe.steps.some((step) => step.cnc?.cutType === 'v-carve')) return 'vcarve';
+  if (recipe.steps.some((step) => step.cnc?.pocketStrategy === 'adaptive'))
+    return 'adaptive-clearing';
+  return null;
 }
