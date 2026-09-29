@@ -400,13 +400,25 @@ export function vertexHugsChain(
   to: number,
   maxOffsetPx: number,
 ): boolean {
+  const nearest = vertexOffset(vertex, pts, from, to);
+  return nearest >= MIN_VERTEX_GAIN_PX && nearest <= maxOffsetPx;
+}
+
+/** How far a rebuilt vertex stands from the chain it replaces: its distance
+ *  to the nearest point of `pts[from - 1 .. to]`. */
+export function vertexOffset(
+  vertex: Vec2,
+  pts: ReadonlyArray<Vec2>,
+  from: number,
+  to: number,
+): number {
   let nearest = Infinity;
   for (let k = Math.max(0, from - 1); k <= Math.min(pts.length - 1, to); k += 1) {
     const p = pts[k];
     if (p === undefined) continue;
     nearest = Math.min(nearest, Math.hypot(p.x - vertex.x, p.y - vertex.y));
   }
-  return nearest >= MIN_VERTEX_GAIN_PX && nearest <= maxOffsetPx;
+  return nearest;
 }
 
 // Ink-support gate for rebuilt apexes. The rebuilt corner claims "the drawn
@@ -479,13 +491,37 @@ function chordAnchorIn(
   high: number,
 ): Vec2 | undefined {
   if (high - low < 1) return undefined;
+  return points[chordAnchorIndex(seg, startIdx, step, low, high)];
+}
+
+/** Index range of every point `bendVertexAt` reads for the window
+ *  `headEnd`..`tailStart`: both tangent chords and the points between. */
+export function bendVertexSpan(
+  points: ReadonlyArray<Vec2>,
+  seg: Float64Array,
+  headEnd: number,
+  tailStart: number,
+): { readonly from: number; readonly to: number } {
+  return {
+    from: chordAnchorIndex(seg, headEnd - 1, -1, 0, headEnd - 1),
+    to: chordAnchorIndex(seg, tailStart, 1, tailStart, points.length - 1),
+  };
+}
+
+function chordAnchorIndex(
+  seg: Float64Array,
+  startIdx: number,
+  step: -1 | 1,
+  low: number,
+  high: number,
+): number {
   let cum = 0;
   let idx = startIdx;
   while (idx + step >= low && idx + step <= high && cum < TANGENT_CHORD_PX) {
     cum += stepLength(seg, idx, step);
     idx += step;
   }
-  return points[idx];
+  return idx;
 }
 
 function unit(x: number, y: number): Vec2 | null {
