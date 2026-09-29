@@ -74,6 +74,18 @@ and the thumbnail LightBurn embeds in each file, which is its own drawing of the
    keeps the layer out of the job. It opens as the operation's Output, on both operations of a
    Fill+Line layer, so a layer LightBurn would not run does not run here either. A setting without
    it keeps the default, on.
+10. **Every setting left behind is named.** The import report has a line for each `<CutSetting>`
+    setting a layer opens without whenever it changes what LightBurn would cut: Perforation Mode,
+    Tabs, Overcut, Ramp, Dot Mode, Cut Through, Z Offset, Z Step Per Pass, start and end delays,
+    PPI, Frequency, Laser 2 (and Laser 1 switched off), the air assist speed and automatic air
+    assist, Constant Power Mode, a Min Power other than 0 or the Max Power, Hide, and on a Fill its
+    Kerf Offset, Flood Fill and a Fill Grouping other than all shapes at once. Each line names the
+    layer and the fields as LightBurn wrote them. A setting is left out only while LightBurn itself
+    does not use it: its switch is off (a tab size with tabs off), it is a Fill setting on a Line
+    layer, or an Image setting on a vector layer. A field this list does not know is named whenever
+    it holds anything but 0, off or nothing, and a nested block of settings (a sub-layer, say) is
+    named as a whole. The same rules hold for every layer mode, so a Fill no longer lists fields
+    LightBurn writes at rest: a Fill with the fields of the corpus layers reported six before.
 
 ### Limits
 
@@ -101,6 +113,12 @@ and the thumbnail LightBurn embeds in each file, which is its own drawing of the
 - `doOutput` is written as `0` or `1` in the same LightBurn 0.9 projects, and a third-party
   converter's notes call it LightBurn's output toggle, separate from the layer's `hide`. The
   corpus leaves it out, at its default.
+- Decision 10 reads which settings are in use from the fields and values LightBurn 0.9 and 2.0.05
+  projects write (third-party projects and the corpus); LightBurn's own documentation could not
+  be read here. A switch LightBurn did not write is taken as off, its default. Perforation,
+  overcut and tabs have KerfDesk equivalents (ADR-415, ADR-494) but are named rather than mapped:
+  their LightBurn behaviour was not compared here, and KerfDesk's perforation deliberately differs
+  at a closed shape's seam.
 - No corpus file has a rounded `Rect`, a `LineClosed` or `LineOpen` list, or a legacy `.lbrn`
   path. Decision 5 follows the audit's repro files and LightBurn files published with
   third-party converters (a LightBurn 1.7 text outline written as `LineClosed`, `Cr` written on
@@ -128,4 +146,7 @@ lines); `lbrn-kerf.test.ts` (a Cut layer's kerf grows the plate and shrinks its 
 compiled job; out-of-range, unreadable and Scan kerfs are named); `lbrn-layer-modes.test.ts`
 (each type name, Fill+Line as a fill then a line on the same artwork, an unknown mode named, a
 Scan priority not reported, `runBlower` on every operation, `doOutput` 0 keeps every operation of
-the layer out of the job); `clb-import.test.ts` (`runBlower` in a library).
+the layer out of the job); `lbrn-setting-report.test.ts` (each setting a Cut layer uses is named,
+none of a LightBurn 0.9 Cut layer or a 2.0.05 Fill at rest, Fill settings on a Fill only, one line
+for a Fill+Line layer, unknown fields and nested blocks); `clb-import.test.ts` (`runBlower` in a
+library).

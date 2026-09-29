@@ -10,6 +10,7 @@ import { createProject } from '../../core/scene/project';
 import { lightBurnSceneFrame } from './lbrn-frame';
 import { colorForCutIndex, importLbrnGeometry } from './lbrn-geometry';
 import { resolveLightBurnOverscan } from './lbrn-overscan';
+import { lightBurnSettingsNotImported, type LayerKind } from './lbrn-setting-report';
 
 // MAX_XML_DEPTH is an integrity bound, not a policy cap: unbounded nesting
 // overflows the recursive walker. It stays. The former 20 MB byte ceiling and
@@ -19,7 +20,6 @@ const MAX_XML_DEPTH = 64;
 // The range the Kerf Offset field takes (CutSettingsCommonFields).
 const KERF_OFFSET_LIMIT_MM = 10;
 
-type LayerKind = 'line' | 'fill' | 'fill+line';
 // A CutSetting's `type` is LightBurn's layer mode: Line is "Cut", Fill is
 // "Scan" and Fill+Line is "Scan+Cut" (ADR-388).
 const LIGHTBURN_LAYER_KINDS: ReadonlyMap<string, LayerKind> = new Map([
@@ -219,6 +219,7 @@ function importedLayer(
   const base = createLayer({ id: color, name, color });
   if (setting === undefined) return { layer: base, outline: null };
   const kind = lightBurnLayerKind(setting, name, warnings);
+  warnings.push(...lightBurnSettingsNotImported(setting, name, kind));
   const common = importedCommonLayerFields(setting);
   const line = (): Partial<Layer> => ({
     mode: 'line',
@@ -228,7 +229,7 @@ function importedLayer(
   if (kind === 'line') return { layer: { ...base, ...line() }, outline: null };
   const fill: Layer = { ...base, mode: 'fill', ...common };
   return {
-    layer: { ...fill, ...importedScanSettings(setting, name, kind, warnings) },
+    layer: { ...fill, ...importedScanSettings(setting, name, warnings) },
     outline: kind === 'fill+line' ? line() : null,
   };
 }
@@ -268,21 +269,14 @@ function importedKerf(setting: Element, name: string, warnings: string[]): Parti
   return {};
 }
 
-function importedScanSettings(
-  setting: Element,
-  name: string,
-  kind: LayerKind,
-  warnings: string[],
-): Partial<Layer> {
+function importedScanSettings(setting: Element, name: string, warnings: string[]): Partial<Layer> {
   const overscan = resolveLightBurnOverscan(
     booleanField(setting, ['overscan']),
     numericField(setting, ['overscanpercent']),
     numericField(setting, ['speed', 'speedmmsec']),
     name,
   );
-  // Fill+Line's kerf opens on its Line operation.
-  const imported = kind === 'fill+line' ? ['kerf'] : [];
-  warnings.push(...unsupportedScanSettingWarnings(setting, name, imported), ...overscan.warnings);
+  warnings.push(...overscan.warnings);
   return {
     ...importedScanLayerFields(setting),
     ...(overscan.distanceMm === null ? {} : { fillOverscanMm: overscan.distanceMm }),
@@ -317,78 +311,6 @@ function importedScanLayerFields(setting: Element): Partial<Layer> {
     ...(crossHatch === null ? {} : { fillCrossHatch: crossHatch }),
     ...(bidirectional === null ? {} : { fillBidirectional: bidirectional }),
   };
-}
-
-function unsupportedScanSettingWarnings(
-  setting: Element,
-  layerName: string,
-  alsoImported: ReadonlyArray<string>,
-): ReadonlyArray<string> {
-  const warnings: string[] = [];
-  const supported = new Set([
-    ...alsoImported,
-    'index',
-    'name',
-    'label',
-    'type',
-    'mode',
-    'priority',
-    'runblower',
-    'dooutput',
-    'speed',
-    'speedmmsec',
-    'maxpower',
-    'minpower',
-    'minpower2',
-    'power',
-    'numpasses',
-    'passes',
-    'interval',
-    'lineinterval',
-    'scanangle',
-    'angle',
-    'crosshatch',
-    'bidirectional',
-    'bidir',
-    'overscan',
-    'overscanpercent',
-  ]);
-  for (const field of directFields(setting)) {
-    if (supported.has(field.name) || !meaningfulLightBurnValue(field.value)) continue;
-    warnings.push(
-      `${layerName}: unsupported LightBurn Scan field “${field.name}” was not imported.`,
-    );
-  }
-  const minPower = numericField(setting, ['minpower', 'minpower2']);
-  if (minPower !== null && minPower !== 0) {
-    warnings.push(
-      `${layerName}: LightBurn Scan minimum power is not equivalent to LaserForge image grayscale minimum power and was not imported.`,
-    );
-  }
-  return warnings;
-}
-
-function directFields(
-  element: Element,
-): ReadonlyArray<{ readonly name: string; readonly value: string }> {
-  return [
-    ...[...element.attributes].map((attribute) => ({
-      name: normalized(attribute.name),
-      value: attribute.value,
-    })),
-    ...[...element.children].map((child) => ({
-      name: normalized(child.tagName),
-      value: child.getAttribute('Value') ?? child.textContent ?? '',
-    })),
-  ];
-}
-
-function meaningfulLightBurnValue(value: string): boolean {
-  const trimmed = value.trim().toLowerCase();
-  if (trimmed === '' || trimmed === 'false' || trimmed === 'off' || trimmed === 'none')
-    return false;
-  const numeric = Number(trimmed);
-  return !Number.isFinite(numeric) || numeric !== 0;
 }
 
 function booleanField(element: Element, names: ReadonlyArray<string>): boolean | null {

@@ -55,7 +55,9 @@ describe('LightBurn kerf offset', () => {
 
   it('names a Scan layer kerf, which KerfDesk does not apply to fills', () => {
     const { report } = opened(cutSetting('Scan', '0.1'));
-    expect(report.warnings).toEqual([expect.stringContaining('“kerf” was not imported')]);
+    expect(report.warnings).toEqual([
+      expect.stringMatching(/^Plate: LightBurn Kerf Offset was not imported \(kerf 0\.1\)/),
+    ]);
   });
 });
 
