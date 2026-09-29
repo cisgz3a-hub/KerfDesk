@@ -163,8 +163,8 @@ export function settingsMapToControllerSettings(
   map: ReadonlyMap<number, string>,
 ): ControllerSettingsSnapshot {
   const softLimitsEnabled = parseBooleanSetting(map, 20);
-  const hardLimitsEnabled = parseBooleanSetting(map, 21);
-  const homingEnabled = parseBooleanSetting(map, 22);
+  const hardLimitsEnabled = grblEnableBit(parseFiniteNumber(map.get(21)));
+  const homingEnabled = grblEnableBit(parseFiniteNumber(map.get(22)));
   const homingDirectionMask = parseNonNegativeInteger(map.get(23));
   const statusReportMask = parseNonNegativeInteger(map.get(10));
   const reportInches = parseBooleanSetting(map, 13);
@@ -197,6 +197,26 @@ function machineModeField(
 ): Pick<ControllerSettingsSnapshot, 'machineMode'> {
   const machineMode = parseGrblMachineMode(map.get(32));
   return machineMode === undefined ? {} : { machineMode };
+}
+
+/**
+ * The "Enable" bit of a GRBL-family `$21` (hard limits) or `$22` (homing)
+ * value, or `undefined` when the value is not a non-negative integer.
+ *
+ * grblHAL reports both as bitfields whose bit 0 is "Enable" (`$21` "Enable,
+ * Strict mode"; `$22` "Enable,Enable single axis commands,Homing on startup
+ * required,...") and prints the whole flags value, so `$22=5` is homing
+ * enabled (ADR-375):
+ * https://github.com/grblHAL/core/blob/d7aaee3d84b1e7010f075d395206afff038d7379/settings.c#L2377-L2385
+ * https://github.com/grblHAL/core/blob/d7aaee3d84b1e7010f075d395206afff038d7379/settings.c#L473
+ * https://github.com/grblHAL/core/blob/d7aaee3d84b1e7010f075d395206afff038d7379/settings.c#L1765-L1780
+ * Stock GRBL and FluidNC print 0 or 1, which is the same bit:
+ * https://github.com/gnea/grbl/blob/bfb67f0c7963fe3ce4aaf8a97f9009ea5a8db36e/grbl/report.c#L197-L198
+ * https://github.com/bdring/FluidNC/blob/fdc17a2c9c0367b07345c16da3937ff0739d4702/FluidNC/src/SettingsDefinitions.cpp#L151-L152
+ */
+export function grblEnableBit(value: number | null): boolean | undefined {
+  if (value === null || !Number.isInteger(value) || value < 0) return undefined;
+  return value % 2 === 1;
 }
 
 function parseBooleanSetting(map: ReadonlyMap<number, string>, id: number): boolean | undefined {

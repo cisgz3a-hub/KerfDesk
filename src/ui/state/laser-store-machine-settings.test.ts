@@ -322,7 +322,10 @@ describe('laser-store machine settings', () => {
     expect(useLaserStore.getState().controllerOperation).toBeNull();
   });
 
-  it('blocks guarded writes without a current settings backup', async () => {
+  // The gate proves a settings read in this connection, which the write checks
+  // against and re-reads to verify. Export records nothing, so the gate cannot
+  // see a backup and its message must not claim one (audit C-8, ADR-375).
+  it('blocks guarded writes until the controller settings are read', async () => {
     const connection = makeConnection(async () => undefined);
     await connectWith(connection);
     useLaserStore.setState({
@@ -332,7 +335,7 @@ describe('laser-store machine settings', () => {
     });
 
     await expect(useLaserStore.getState().writeGrblSetting(30, '1000')).rejects.toThrow(
-      /read and export/i,
+      'Read the controller settings before writing firmware settings.',
     );
   });
 

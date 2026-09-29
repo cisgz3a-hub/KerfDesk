@@ -92,6 +92,41 @@ describe('settingsMapToProfilePatch', () => {
     expect(settingsMapToProfilePatch(map)).toEqual({ zTravelMm: 75 });
   });
 
+  // grblHAL reports $21 and $22 as bitfields whose bit 0 is "Enable" and prints
+  // the whole value (grblHAL core settings.c#L2377-L2385, #L473, #L1765-L1780),
+  // so `$22=5` is homing enabled; stock GRBL prints that bit alone as 0 or 1
+  // (grbl report.c#L197-L198). ADR-375.
+  it('reads grblHAL $21/$22 bitfields by their Enable bit', () => {
+    const enabled = new Map([
+      [20, '1'],
+      [21, '3'],
+      [22, '5'],
+    ]);
+    expect(settingsMapToControllerSettings(enabled)).toEqual({
+      softLimitsEnabled: true,
+      hardLimitsEnabled: true,
+      homingEnabled: true,
+    });
+    const optionsWithoutEnable = new Map([
+      [21, '2'],
+      [22, '4'],
+    ]);
+    expect(settingsMapToControllerSettings(optionsWithoutEnable)).toEqual({
+      hardLimitsEnabled: false,
+      homingEnabled: false,
+    });
+  });
+
+  it('leaves a $21/$22 value that is not a non-negative integer unknown', () => {
+    for (const value of ['-1', '0.5', '1.5', 'on']) {
+      const map = new Map([
+        [21, value],
+        [22, value],
+      ]);
+      expect(settingsMapToControllerSettings(map)).toEqual({});
+    }
+  });
+
   it('preserves a stock-valid zero homing pull-off for later product policy', () => {
     expect(settingsMapToControllerSettings(new Map([[27, '0']]))).toEqual({
       homingPullOffMm: 0,
