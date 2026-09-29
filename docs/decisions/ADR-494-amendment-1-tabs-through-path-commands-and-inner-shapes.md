@@ -1,0 +1,148 @@
+## ADR-494 Amendment 1 - Tabs stay put through path commands, and inner shapes are found without testing every pair (2026-09-29)
+
+**Status:** Accepted; software-verified through unit tests. | **Date:** 2026-09-29
+
+Amends ADR-494 item 4 ("Move, rotate, scale, copy and paste, break apart, recolour, path join and
+text re-edits carry them as they carry `cncTabAnchors`"), which did not name the path commands of
+ADR-480, and the automatic rule of item 2 ("a closed contour the automatic rule picks"), whose
+"skip inner shapes" test ran on every pair of contours. Output changes only where a command below
+used to move tabs placed by hand or lose a corner; the automatic rule decides exactly as before.
+No project schema change, no new guard or refusal (ADR-228).
+
+### Context
+
+A tab placed by hand, laser (`laserTabAnchors`) or CNC (`cncTabAnchors`), is stored as a fraction
+`pathT` of one source contour's length, measured from that contour's start in the artwork's own
+coordinates (ADR-156). Any command that changes where a contour starts, which way it runs, or
+which object carries it must keep each tab at the same physical place, or deliberately handle it.
+The 2026-09-28 weakness audit (finding E-3) found commands that did neither.
+
+- **Delete Duplicates** (ADR-480 item 5) compared placed CNC tabs but not placed laser tabs, so a
+  copy carrying laser tabs matched an untabbed copy and could be the one deleted, and two copies
+  with the same fractions on contours that start at different corners, which put the tabs at
+  different places, counted as one.
+- **Reverse Direction** (ADR-480 item 6) moved CNC tabs with the reversed contour (`t` becomes
+  `1 − t`) but left laser tabs at their old fraction, so each laser tab landed somewhere else on
+  the part: a tab 12 mm along the bottom edge of a 40 × 20 mm part moved about 17 mm.
+- **Start** and **Break** in the Edit nodes toolbar redraw a closed contour from the selected
+  node but left every placed tab, laser and CNC, at its old fraction, so each tab moved round the
+  part by the node's share of the outline: after Start at the third corner of a 40 × 20 mm part, a
+  tab 12 mm along the bottom edge landed on the top edge. On a contour closed by an implied
+  straight line (a closed DXF spline, or a closed polyline without its start repeated), the same
+  two commands also lost a corner: Start at the third corner of a rectangle cut a diagonal in
+  place of the first corner, and Break at the start dropped the last corner.
+- **Skip inner shapes** (finding E-7). With it on, a closed contour takes automatic Line tabs only
+  when it lies strictly inside an even number of the layer's other closed contours, so parts take
+  tabs and their holes do not. Each contour was tested against every other one, so the exact
+  containment test ran n × (n − 1) times: 8,997,000 times, about 15 to 20 s, for a sheet of 3000
+  parts on one layer.
+
+### Decision
+
+1. **Delete Duplicates.** Two objects are duplicates only when they cut the same thing, placed
+   tabs included. Laser tabs join the comparison exactly as CNC tabs did: objects whose
+   `laserTabAnchors` differ are kept, and an object carrying placed laser tabs is compared with
+   its authored transform, contour order, start point and direction, as ADR-480 item 5 already did
+   for CNC tabs. Laser and CNC tabs at the same fractions are different output and are kept apart.
+   When a copy is deleted, the kept copy has the same tabs at the same places. Only anchors that
+   place a tab count: an empty list (which Break Apart, Join and Trim can leave) is the same as
+   none, and so is an anchor whose path has since changed colour, which output skips. Anchors held
+   on an open contour (item 3) still count, since closing the contour puts those tabs back.
+2. **Reverse Direction.** Laser tabs follow each reversed contour exactly as CNC tabs do: `t`
+   becomes `1 − t` (0, the start, stays 0), and anchors on contours the command leaves unchanged
+   keep their fraction. An open contour (after Break, item 3) holds its tabs for the straight line
+   that closes it again, measured along the contour and then that line; reversed, it starts at its
+   old end, so `t` becomes `1 − g − t`, wrapped into 0 to 1, where `g` is that closing line's share
+   of the closed length. Before, laser and CNC tabs of a broken contour that was reversed and
+   closed again moved by the closing line's length.
+3. **Start and Break (Edit nodes).** Start moves each placed tab on the restarted contour, laser
+   and CNC, back by the new start's fraction `f` of that contour (`t` becomes `t − f`, wrapped into
+   0 to 1), measured on the same flattened outline that places the tabs, so every tab stays where
+   it was. Tabs on other contours keep their fraction. Break opens the contour at the node by
+   removing the segment that leads into it, a line or a curve. An open contour holds no placed tab
+   (ADR-494 tabs are for closed shapes), so while it is open its tabs do nothing. They are kept for
+   the straight line from its end back to its start that closes it again (**Close Path**, or
+   **Join** of its two ends), so Break measures them from the node along the open contour and then
+   that line, on the same flattened outline. With `u = t − f` (wrapped into 0 to 1), `k` the share
+   of the old length the open contour keeps and `c` the closing line's length as a share of the old
+   length, a tab on the kept outline (`u` up to `k`) becomes `u / (k + c)`, and closing the contour
+   puts it back at its place, whether a line or a curve led into the node. A tab on the removed
+   segment (`u` above `k`) has no place on the open contour, so it takes the same share of the
+   closing line, `(k + c · (u − k) / (1 − k)) / (k + c)`, and the tabs of that edge keep their
+   order and relative spacing. That is its old place only when the removed segment was straight
+   (then `k + c` is 1 and Break moves tabs exactly as Start does); after a curve, the tab moves
+   across onto the line. A contour closed by an implied straight line keeps that line as a segment
+   when it is restarted or broken, so no corner is lost.
+4. **Inner shapes in one pass.** The rule is unchanged: a closed contour of at least three distinct
+   points takes automatic tabs when it lies strictly inside an even number of the layer's other
+   such contours. The layer's contours go into a box index (`ContourBoxIndex`, which tracing and
+   CNC nesting already use), and the exact test, moved unchanged to `tab-contour-containment.ts`,
+   runs only on pairs where one contour's box holds the other's (`tab-inner-shapes.ts`). A contour
+   strictly inside another passes the even-odd test at every vertex, which keeps its box inside the
+   other's box up to the rounding of one crossing, about 1e-15 of the largest coordinate. Boxes
+   grow by 1e-9 of the largest coordinate (at least 1e-9 mm), so no pair the exact test would
+   accept is skipped. A layer with a coordinate that is not a finite number, or larger than 1e150,
+   tests every pair as before.
+
+### Consequences
+
+- Delete Duplicates deletes fewer objects only where copies differ in placed laser tabs, or where
+  tabbed copies start or run differently.
+- Reverse Direction changes only the cutting direction of a tabbed part; its laser tabs stay put,
+  and a broken contour reversed before it is closed again puts its laser and CNC tabs where
+  closing it unreversed would.
+- Start changes only where a tabbed contour starts; its laser and CNC tabs stay put. This changes
+  CNC output as well as laser output: CNC tabs placed by hand no longer move when the start does.
+- Break and then Close Path (or Join of the two ends) put every laser and CNC tab back at its
+  place, to within rounding (under 1e-13 mm measured), except a tab on a curve Break removed,
+  which lands on the straight closing line at the same share. On the 30 × 40 mm D part broken
+  where its first bulge ends, that bulge stands up to 7.3 mm off the closing line, and tabs placed
+  on it at 5%, 20% and 30% of the outline move 3.1, 7.3 and 3.1 mm.
+- Start and Break keep every corner of a contour closed by an implied line, on laser and CNC
+  artwork alike; contours whose last segment returns to the start are unchanged.
+- Unchanged: Smooth, Corner, and Curve or Line on a segment (Edit nodes), like dragging a node or a
+  handle, keep each tab's fraction of the reshaped outline, so a tab on an untouched edge shifts by
+  its fraction of the change in length; Join of two open paths keeps the first path's fractions
+  and drops the second's. These reshape a contour rather than restart it, and are left to a
+  deliberate remap (ADR-156).
+- Skip inner shapes gives the same answer as before for every layout, and the tab output is
+  unchanged. A sheet of 3000 separate parts runs the exact test no times instead of 8,997,000 and
+  decides in well under a second; a part with a hole runs it once. Layouts of deeply nested
+  contours still test every nested pair, since each one counts. CNC tabs, which never skip inner
+  shapes, are unaffected.
+
+### Verification
+
+- `src/core/geometry/duplicate-shapes.test.ts`: a tabbed and an untabbed copy are both kept in
+  either order and burn different outlines; copies whose start point or authored scale moves the
+  same fraction are kept while a true copy, which burns the same outline, is deleted; laser and
+  CNC tabs at the same fraction are kept apart; a copy whose laser or CNC tab list is empty, or
+  whose only tab is on a path that changed colour, burns the same outline as a plain copy and is
+  deleted.
+- `src/ui/state/path-cleanup-actions.test.ts`: after Reverse Direction every laser and CNC tab is
+  at its old place, a tab at the start keeps 0, and a path the command skips keeps its fractions.
+- `src/ui/state/path-node-curve-command-tabs.test.ts`: after Start on a polyline part, a curved
+  part and a part closed by an implied line, every laser and CNC tab is at its old place (rotated,
+  scaled and moved artwork) and a hole's tabs keep their fractions; after Break the open contour
+  has no tab, and after Close Path, or Reverse Direction and then Close Path (on a polyline part
+  and on a curved one), every tab is back at its old place. Broken where either bulge of the D
+  part ends and closed, with or without Reverse Direction first, broken there and closed by Join
+  of its two ends, or broken at the start of a rounded part whose last quarter is a curve and
+  closed, every tab the outline kept is back within 1e-9 mm; a tab on the removed bulge is on the
+  closing line at its share of the bulge.
+- `src/core/cnc/cnc-tab-anchors.test.ts`: the node fraction on straight and implied closing lines,
+  through a contour that passes back through its start, the wrap of the moved fractions, and the
+  closing line's share of an open contour; Break's kept share and closing line, which Reverse
+  Direction's share for the open contour matches, and where Break moves tabs on the kept outline
+  and on the removed segment, as Start does where a line led into the node.
+- `src/core/scene/curve-edit.test.ts`: Start and Break keep every corner of a rectangle closed by
+  an implied line.
+- `src/core/geometry/tab-inner-shapes.test.ts`: the one-pass rule and the tab output equal a frozen
+  copy of the every-pair rule (`tab-inner-shapes.test-support.ts`) on nested sheets (parts, holes,
+  islands and holes in islands), shapes whose boxes touch, match or share edges, concave, crossing
+  and self-crossing shapes, open and degenerate contours, far and tiny shapes, shapes too large for
+  the index, points that are not numbers and two random layouts of 400 shapes. Counting the exact
+  test: once for 3000 separate parts and one hole, once for 3000 squares sharing edges and one
+  hole, and 1500 times for 1500 parts with a hole each, where the every-pair rule ran it 9,003,000,
+  9,003,000 and 8,997,000 times. Each layout holds a real hole, so a counter that stopped seeing
+  the exact test would fail rather than pass.

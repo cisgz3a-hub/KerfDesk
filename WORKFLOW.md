@@ -37,8 +37,10 @@
 The startup loading screen uses a charcoal-and-copper KerfDesk wordmark over sculpted timber
 artwork, with **Created by Ons Houtkombuis** visible below. Its text and indeterminate activity
 bar paint before the artwork loads, and remain readable if the image is unavailable. Reduced
-motion uses a static indicator. The screen fades away once the workspace canvas has had a paint
-opportunity, without an extra branding delay. It introduces no startup interaction or modal.
+motion uses a static indicator. In the web app the screen fades away once the workspace canvas
+has had a paint opportunity. The desktop app keeps it up until at least two seconds after launch
+and fades it over half a second, so a fast local start does not flash (ADR-049 Amendment 1). A
+startup crash is shown at once. It introduces no startup interaction or modal.
 
 1. App opens to **empty workspace** state (see F-A2).
 2. Status bar shows: `Ready · No device configured · Empty workspace`.
@@ -72,8 +74,12 @@ opportunity, without an extra branding delay. It introduces no startup interacti
 #### Edge — close an idle window with unsaved changes
 1. The existing renderer dirty predicate requests the ordinary Leave/Stay decision only while no job
    is active. It does not widen to clean documents or active jobs.
-2. Browsers use their native leave-site prompt. Electron shows **Leave** and **Stay** for that exact
-   renderer request; **Leave** permits the close and **Stay** keeps the window and project unchanged.
+2. Browsers use their native leave-site prompt. Closing the Electron window or quitting asks "Save
+   your changes before closing KerfDesk?" with **Save** (the default), **Don't Save** and
+   **Cancel** (ADR-549). **Save** runs File > Save (the Save dialog for a new project) and closes
+   only once the save finishes; a cancelled or failed save keeps the window open. **Don't Save**
+   permits the close and **Cancel** keeps the window and project unchanged. A page navigation in
+   Electron still asks **Leave** or **Stay**.
 3. Active-job unload retains its independent stop-and-recovery behavior and does not show this dirty
    prompt. This flow does not create, change, or consume a Frame permit.
 
@@ -138,7 +144,7 @@ opportunity, without an extra branding delay. It introduces no startup interacti
 
 #### Success — single valid SVG
 1. User drags an SVG file from desktop / Finder / Explorer into the app window.
-2. On `dragenter`, viewport shows a dashed-blue overlay with text "Drop to import" centered.
+2. On `dragenter`, viewport shows a dashed-blue overlay with text "Drop to open or import" centered.
 3. On `drop`:
    1. Overlay disappears.
    2. A normal file-backed SVG is UTF-8-decoded incrementally in the import Worker, validated while
@@ -162,6 +168,15 @@ opportunity, without an extra branding delay. It introduces no startup interacti
 3. Each is offset 10mm right + 10mm down from the previous to avoid full overlap.
 4. After import, all imported objects are multi-selected.
 5. Toast: `Imported 3 designs · 3 artwork operations`.
+
+#### Success — a project file dropped on the window (ADR-378 Amendment 1)
+1. User drops a KerfDesk project (`.lf2`) or a LightBurn project (`.lbrn`, `.lbrn2`).
+2. It opens exactly like a project double-clicked in Explorer (ADR-378): the Save / Don't Save /
+   Cancel question comes first when the current project has unsaved changes, and during a job or
+   with a dialog open the file waits in the banner instead.
+3. Only the first project in a drop opens. The drop's other files are not imported; toast
+   (warning): `Opening <filename>. Ignored <n> other dropped file(s); drop artwork again once the
+   project opens.`
 
 #### Success — SVG with embedded raster image
 1. Embedded PNG, JPEG, BMP and WebP pixels are decoded into raster artwork, preserving the SVG
@@ -491,7 +506,8 @@ destination and cannot overwrite the template source.
 
 1. Select one or more visible, unlocked artwork objects and choose **Arrange → Array...**.
 2. Choose **Grid**, **Point Rotation**, or **Circular**. Grid and Circular retain their existing
-   placement fields; every valid requested placement is materialized without a policy count cap.
+   placement fields; every requested placement the project can hold is materialized, without a
+   policy count cap (item 10).
 3. For **Point Rotation**, enter **Copies (includes original)** and **Total angle (deg)**. The original
    selection is the zero-degree instance. Instance `i` rotates by `i * total angle / copies`, so a
    360-degree array stops before a duplicate endpoint.
@@ -515,6 +531,18 @@ destination and cannot overwrite the template source.
    more objects selected, one of them, which stays put and is not copied. **Spread copies** evenly
    all the way round, from a start to an end angle (both ends included), or by a step angle. 0° is
    to the right and angles run clockwise. The status line says what Apply will do.
+10. **The project's room (ADR-307 amendment 1).** A project holds at most 10,000 objects and cannot
+    be opened again above that, so that is the one limit on how many copies an array makes. A copy
+    is the selection and everything it carries (an image's mask, a path text's guide); a circle's
+    centre object is not copied. A request that fits is placed whole, in one undo step. One that
+    does not is not applied and nothing changes: the status line says how many more copies fit ("This
+    project has room for at most 18 more copies of this selection (project limit 10000 objects). Use
+    fewer rows or columns."), and **Create array** stays off, and Enter does nothing, until it fits.
+    A project with no room says to delete some objects. The check is made from the numbers alone,
+    so typing a huge count is as quick as typing a small one, and it comes before the first render
+    of Advance variables. Place selection on each piece (ADR-442) is held to the same room and says
+    "Nothing was placed" when it is refused. A saved file whose groups nest can reach the group or
+    group member limits first; that is refused too, naming the limit.
 
 ---
 
@@ -540,7 +568,8 @@ destination and cannot overwrite the template source.
 2. Set **Offset distance (mm)**, then **Direction** (**Outward**, **Inward**, **Both**) and
    **Corner style** (**Round**, **Bevel**, **Corner**). **Outer shapes only** ignores holes and
    shapes inside other shapes. **Delete original objects** removes the selection once the offset
-   is added.
+   is added. Round corners and end caps are chorded within the 0.025 mm machine curve tolerance
+   at any distance (ADR-410 amendment 1); so are the round corners of the properties-panel offset.
 3. The dialog draws the selection in grey, the outward result in the accent colour and the inward
    result in green, and lists each result's size. The selection is offset as one design.
 4. Open lines offset outward into a closed outline around the line, with caps that follow the
@@ -571,13 +600,15 @@ destination and cannot overwrite the template source.
    closed. Text and drawn rectangles, ellipses and polygons keep their own paths; the notice says
    to convert them to paths first.
 3. **Tools → Vector → Reverse Direction** reverses the same kinds of paths. Open paths swap ends;
-   closed paths keep their start point and run the other way round. CNC tabs stay where they were
-   on the shape. When Cut Planner may cut open paths from either end, the notice says to set Path
-   direction to Preserve direction to keep the new direction.
+   closed paths keep their start point and run the other way round. Tabs placed by hand, CNC and
+   laser, stay where they were on the shape (ADR-494 Amendment 1). When Cut Planner may cut open
+   paths from either end, the notice says to set Path direction to Preserve direction to keep the
+   new direction.
 4. **Edit → Delete Duplicates** (`Alt+D`) deletes later copies of artwork drawn twice in the same
    place on the same operation: moved-back copies, and closed shapes starting at another corner or
-   drawn the other way, count. Copies on another operation, or with another power scale or
-   override, are kept. Locked artwork, image masks and path-text guides are never deleted.
+   drawn the other way, count. Copies on another operation, or with another power scale,
+   override or tabs placed by hand (CNC or laser), are kept. Locked artwork, image masks and
+   path-text guides are never deleted.
 5. **Tools → Image → Flatten Image Mask** bakes the mask into the selected image and crops it, as
    **Crop Image** does, then deletes the mask shape. The shape stays when it is locked or another
    image or path text uses it; the notice says which.
@@ -593,7 +624,8 @@ destination and cannot overwrite the template source.
 2. **Tools → Vector → Cut Shapes** splits every selected shape along the top-most selected closed
    shape into an inside piece and an outside piece, removes that cutter and selects the pieces.
    Pieces keep their operations. Shapes the cutter does not cross are left as they were, and the
-   notice counts them.
+   notice counts them. A cut that would take the project past its limit of 10,000 objects is
+   refused with a notice, and nothing changes (F-A11).
 3. **Tools → Vector → Warp** (four corner handles) and **Deform** (a grid of 16 handles) bend the
    selected vector artwork. The artwork previews live while the handles are dragged; Enter or Apply
    applies it as one undo step, Esc or Cancel leaves it as it was, and Reset handles starts again.
@@ -603,7 +635,11 @@ destination and cannot overwrite the template source.
    single path (or the path picked under Guide path): by number of copies, spacing between centres
    or gap between copies, from the start offset to the end offset, turned to follow the path unless
    that box is cleared. A closed guide gets copies all the way round with none doubled at the seam.
-   The status line says what Apply will do. The guide stays and the copies are selected.
+   The status line says what Apply will do, and is worked out without laying the copies out, so a
+   large count stays quick to type. The guide stays and the copies are selected. Apply places every
+   copy asked for, in one undo step, up to the project's own limit of 10,000 objects (a copy counts
+   everything it carries, such as an image's mask); a count, spacing or gap that would place more
+   is refused with how many fit, and nothing changes. Nothing else caps the number of copies.
 5. When a selection gives a tool nothing to do, a notice says what to select, and nothing changes.
    None of these tools operates a machine or changes how other artwork compiles.
 
@@ -904,8 +940,13 @@ marks later edits as unapproved without changing the existing Frame/Start policy
    a tab to remove it, or drag a tab to move it; each is one undo step. Placed tabs draw filled and
    the automatic tabs they replace draw hollow. **Done** or Esc returns to Select.
 4. Placed tabs replace the automatic tabs on their shape only, and only while tabs are on. They
-   move, rotate and scale with the artwork and survive copy and paste and break apart. **Clear
-   placed tabs** (in Cut Settings or in the canvas hint) returns the artwork to automatic tabs.
+   move, rotate and scale with the artwork and survive copy and paste and break apart. **Reverse
+   Direction** and the Edit nodes **Start** keep them where they were on the shape, and **Delete
+   Duplicates** keeps a copy whose placed tabs differ. A shape opened with **Break** holds them
+   until a straight line closes it again (**Close Path**), which puts each one back where it was,
+   except a tab on a curve that led into the break node: Break removes that curve, and its tab
+   moves to the same share of the straight line (ADR-494 Amendment 1). **Clear placed tabs** (in
+   Cut Settings or in the canvas hint) returns the artwork to automatic tabs.
 5. Job Review's detail line reads e.g. "tabs every 50 mm (at most 6) × 0.5 mm, cut at 20%" or
    "tabs 4 × 0.5 mm, 3 placed by hand". With none of this set, output is unchanged.
 6. Material presets do not store these settings; applying a preset keeps what the operation has.
@@ -1232,6 +1273,18 @@ the completed physical Frame is the spatial source of truth.
 2. **No dialog.** File written to known path.
 3. Toast briefly: `Saved`.
 
+#### Success — Save after Open (ADR-550)
+1. After `File → Open`, a recent project, or double-clicking a `.lf2` in Explorer, `File → Save`
+   writes over that file with no dialog. Toast: `Saved`.
+2. In a browser the first Save asks once whether KerfDesk may change the file. Refusing shows
+   `Could not save project: KerfDesk may not change <name>. Use Save As to save a copy.` and writes
+   nothing. The desktop app allows it without asking.
+3. A LightBurn project (`.lbrn`, `.lbrn2`) opens as an import and is never written; its first Save
+   asks where to save the `.lf2`, as it does for a template or a project dropped on the window.
+4. The desktop app replaces an Explorer-opened file whole: it writes the new bytes beside it and
+   then swaps them in, so a failed save leaves the old file as it was. A file that has gone, become
+   read-only or stays held by another program reports why and stays unsaved; Save As still works.
+
 #### Success — Save As
 1. `File → Save As` (`Cmd/Ctrl+Shift+S`).
 2. Always shows dialog. Default name: current project name.
@@ -1262,6 +1315,23 @@ the completed physical Frame is the spatial source of truth.
 - Only the latest request for the current document may publish the remembered target/name, clear
   dirty/autosave state, or show ordinary success/failure feedback. A stale selected write still runs.
 
+#### Edge — a project the file limits cannot hold (ADR-307 amendment 1)
+- A project file holds at most 10,000 objects, 10,000 groups, 50,000 group members and 256
+  operations; a larger one cannot be opened again (F-A12). The commands that can add many objects
+  in one step keep to these limits. Array and Copy Along Path say how many copies fit (F-A6a,
+  F-A6f).
+- **Duplicate** adds what is selected, **Paste** and **Paste in Place** add what the clipboard
+  holds (with its operations, when it came from another project), **Break Apart** makes each
+  shape of the selection its own object, **Cut Shapes** makes two pieces of each shape it crosses,
+  **Array on board** tiles copies of one design across the placed board (F-BC2), and **Design
+  Studio Apply** adds the drawing (F-DS8). Each is refused whole when the result would pass a
+  limit: a warning names the limit and says what to change (duplicate fewer objects, copy fewer
+  objects to paste, break apart fewer objects, cut fewer shapes, array fewer copies on the board,
+  apply a smaller drawing, or delete some first), and nothing changes. The clipboard, and the
+  Studio's drawing, are kept. Everything that fits is made exactly as before; nothing is ever made
+  in part.
+- A project already over a limit can still be changed in any way that adds nothing to it.
+
 ---
 
 ### F-A12. Open Project (.lf2)
@@ -1272,11 +1342,13 @@ the completed physical Frame is the spatial source of truth.
 3. On confirm, file is read and parsed.
 4. Schema version checked against current.
 5. If equal: project loaded. Window title updates.
+6. Save writes over the opened file (F-A11, ADR-550).
 
 #### Success — schema older
 1. Migration runs to current version.
 2. Toast (info) identifies the migration, for example: `Project migrated from v1 to v2.`
-3. Project saved-as does not auto-trigger; user can save to persist migration.
+3. Nothing is written until the user saves. Save then writes the migrated project over the file
+   (ADR-550); earlier KerfDesk versions report it as newer instead of misreading it.
 
 > **Current note:** project schema v7 stores canonical curves, artwork-to-operation bindings, canonical relief heightfields, operation-owned overrides, tile registration plans, and converted text/stroke semantics. The registered v1→v2 migration promotes legacy polylines to line-segment curves; v2→v3 promotes color membership, object overrides, and sub-layers to named operations; v3→v4 promotes relief meshes where exact conversion is available. The v4→v5→v6→v7 migrations preserve existing settings, bindings and geometry (ADR-159, ADR-211, ADR-292, ADR-317, ADR-318, ADR-319). Earlier readers report a newer schema instead of silently discarding cutting semantics.
 
@@ -1316,6 +1388,13 @@ the completed physical Frame is the spatial source of truth.
 3. A browser that cannot keep file handles remembers names only. Reopening one shows
    `<name> can't be reopened directly in this browser. Choose it in the file picker.` and opens
    the picker.
+
+#### Edge — this computer's storage refuses the list (ADR-378 Amendment 1)
+1. The next Recent Projects action tries storage again. Meanwhile the list stays shown, and
+   projects opened or saved are listed and stored once storage works again.
+2. After 3 refusals in a row the list is kept until KerfDesk closes, and one warning says
+   `Recent Projects could not be saved for next session (browser storage is full or blocked).
+   The list is kept until KerfDesk closes.`
 
 #### Success — open from the operating system
 - Desktop: F-DESK4. Installed web app on a Chromium desktop browser: opening a `.lf2` with
@@ -1488,8 +1567,9 @@ Status bar messages (toasts that appear in the bar for 3 s) for non-blocking eve
    or a controller operation, and does nothing for a file-only controller.
 3. Chrome keeps a port grant across restarts on Windows, and on macOS and Linux only for adapters
    that report a USB serial number; a CH340 there needs one Connect after each replug or browser
-   restart. The desktop app grants a pick for the run only (ADR-366), so after a restart the
-   first Connect shows the picker.
+   restart. The Windows desktop app remembers picks the same way (ADR-552). The desktop app on
+   macOS and Linux grants a pick for the run only (ADR-366), so after a restart the first Connect
+   shows the picker.
 4. Turning it off in the **⋯** menu is remembered in this browser.
 
 #### Background streaming (ADR-354)
@@ -1509,8 +1589,8 @@ Status bar messages (toasts that appear in the bar for 3 s) for non-blocking eve
 6. The desktop app, like Chrome, lets the window and the worker see only the ports picked in
    its Select dialog, so an identical second adapter (a laser controller and an Arduino that
    both use a CH340, for example) no longer stops background streaming. A pick lasts until
-   Forget Controller or an app restart; picking both identical adapters in one run is still
-   ambiguous and uses the window port (ADR-366).
+   Forget Controller, and on macOS and Linux also until an app restart; picking both identical
+   adapters is still ambiguous and uses the window port (ADR-366, ADR-552).
 
 #### Error — WebSerial not supported
 1. Connection button is disabled, with a red hint above: "Your browser doesn't support WebSerial. Use Chrome, Edge, Brave (may require enabling under Brave Shields/flags), or Arc, or install the Windows desktop app."
@@ -3123,6 +3203,8 @@ settings and Job Review keep their existing read-only setup references.
 
 - Missing data or failed text materialization identifies the affected copy and leaves the project
   and cursor unchanged. Creation cancelled or made stale by an intervening edit consumes nothing.
+- A request the project has no room for (10,000 objects, F-A6a item 10) is refused before any copy
+  is rendered, with how many more copies fit, and the project and cursor are unchanged.
 - Failed writes, a cancelled save, partial tile saves, stale source identity and a mismatched
   advancement policy leave the cursor unchanged. Re-prepare the current source before retrying.
 - Distinct serial and date/time fields can be used without CSV; CSV fields require their addressed
@@ -3139,12 +3221,15 @@ settings and Job Review keep their existing read-only setup references.
 2. Set the error correction (QR Code only), the size by module or by overall width (quiet zones
    included), the bar height and text (1D only), the quiet zone in modules, and **Invert** for
    stock that marks lighter than its surface, such as anodised aluminium or slate.
-3. The preview re-encodes on every change, black on white, with the type, version or module
-   count and the finished size underneath; it can be scanned from the screen. Quiet zones below
-   the standard and modules under 0.2 mm show a warning.
+3. The preview re-encodes on every change and shows the code as it reads on the finished piece:
+   engraving black on white, or with **Invert** white on dark stock, so dark modules always show
+   dark on a light quiet zone. The type, version or module count and the finished size are
+   underneath; it can be scanned from the screen. Quiet zones below the standard and modules
+   under 0.2 mm show a warning.
 4. For serials or CSV data, tick **Variable data** and insert fields as for variable text. The
    preview encodes the value the next output would use; each array copy and each output
-   re-encodes its own value.
+   re-encodes its own value. The canvas draws each code, with its text, for the current value
+   and redraws it when the serial, record or data changes (ADR-386 Amendment 2).
 5. **Insert** places the code centred on the bed on its own Fill operation, selected, as one undo
    step. Double-click a barcode, or use **Edit barcode...** in the artwork panel, to change it;
    **Apply** re-encodes it in place and keeps its position, rotation and operation.
@@ -3157,6 +3242,11 @@ settings and Job Review keep their existing read-only setup references.
   much data) shows the reason under the preview and disables **Insert** or **Apply**.
 - A variable value that cannot be encoded fails Save G-code, Start or SVG export with the barcode
   and the value named; nothing is engraved in its place.
+- The dialog makes a Data Matrix up to 132 × 132: longer text is refused under the preview. A
+  variable value that grows past it by output is still engraved, as a 144 × 144 code, and Job
+  Review and Save G-code's warnings name the barcode: 144 × 144 Data Matrix codes may not scan in
+  common readers, so test-scan one before a run. Only a value longer than 144 × 144 holds fails
+  the output (ADR-386 Amendment 2).
 - If the text under a 1D code cannot be drawn, the dialog stays open with the reason.
 
 ## Phase E flows
@@ -3945,7 +4035,9 @@ selected.
 **Edge / empty / error.** No board, or zero/several designs selected → both
 controls are disabled ("Select exactly one design…"). A design larger than the
 board tiles as a single centered copy. A runaway count (huge rows, or a tiny
-design under "fit as many as fit") is capped per axis.
+design under "fit as many as fit") is capped per axis. An array that would take
+the project past its limit of 10,000 objects is refused with a notice, and
+nothing changes (F-A11).
 
 ---
 
@@ -7542,6 +7634,13 @@ as the pane's design record.
   existing explicit FFmpeg-missing error path when a Finder launch cannot
   discover `ffmpeg`; the Preview does not bundle FFmpeg or add a
   platform-specific gate.
+- **Edge / where FFmpeg comes from (ADR-551).** The bridge runs FFmpeg only by
+  the full path of the first `ffmpeg.exe` (or `ffmpeg`) in an absolute PATH
+  folder, found once per run; the current folder and relative PATH entries are
+  never searched. Without one, RTSP previews say: "Network cameras need FFmpeg,
+  which is not installed. Install FFmpeg, add its bin folder to PATH, then
+  restart KerfDesk." A blocked USB camera points to Windows Settings, Privacy &
+  security, Camera.
 
 ### F-CAM7. Click-to-position the laser head (ADR-122)
 
@@ -7587,7 +7686,10 @@ as the pane's design record.
 - **Edge / piece partly out of view.** It is listed and outlined but starts unticked, with the
   reason; ticking it includes it.
 - **Edge / different piece.** A piece of another shape, or more than 3 mm longer or wider than the
-  design's own piece, is flagged and stays ticked. Place is never refused.
+  design's own piece, is flagged and stays ticked. Place is never refused because of it.
+- **Edge / project full.** Place is refused only when the project cannot hold the copies (10,000
+  objects, ADR-307 amendment 1): nothing is placed, the panel says "Nothing was placed" and a
+  notice says how many more copies fit and to untick some pieces.
 - **Edge / raised pieces.** Pieces on a box are found at the box's height when a height area
   covers it (F-CAM3).
 - **Edge / Frame.** Frame traces the rectangle around all the copies, not each piece; the panel
@@ -7715,13 +7817,11 @@ behavior or create a second product implementation.
 ### F-DESK1. Download and install an unsigned Preview (ADR-248)
 
 1. In the web app, the operator opens the Camera panel and clicks **Download
-   desktop app** to open the public KerfDesk GitHub Releases page directly. The
-   explanatory `https://kerfdesk.com/download` page remains available manually.
-2. The download page is static, scriptless, and opens the public
-   **cisgz3a-hub/KerfDesk** Releases list for each platform. It names the exact
-   asset pattern the operator must choose from the newest immutable prerelease.
-   It does not send Preview users through a `latest` alias, a dynamic resolver,
-   or the stable R2 update feed:
+   desktop app** to open `https://kerfdesk.com/download.html`.
+2. The download page verifies a bounded, publisher-signed public manifest against
+   the website's public key anchor before exposing exact-version R2 links (ADR-523).
+   Missing, invalid or unreachable metadata leaves download links unavailable.
+   A requested `?version=` never silently changes to another version. Assets are:
    - **Windows 10/11, x64:** `KerfDesk-<version>-windows-x64-setup.exe`
      (NSIS, per-user, `oneClick:false`, user-selectable install directory).
    - **macOS 13+, Intel x64:** `KerfDesk-<version>-macos-x64.dmg`.
@@ -7758,6 +7858,14 @@ behavior or create a second product implementation.
 1. The download page links Linux users to the web app. Linux desktop packaging
    remains out of scope for ADR-248.
 
+#### Edge — KerfDesk is open while an installer or uninstaller runs (ADR-555)
+1. The installer and uninstaller never close KerfDesk: it may be streaming a job. A hand-run one
+   asks the operator to close KerfDesk themselves (closing stops a running job and asks about
+   unsaved work), then **Retry**; **Cancel** stops. A silent or managed install stops with an
+   error instead.
+2. An update installing at quit waits up to a minute for KerfDesk to finish closing; if it is
+   still open, the update waits for the next close.
+
 #### Edge — inside the desktop app the download/install affordances vanish
 1. When running under Electron (`adapter.id === 'electron'`), the Camera panel's
    `DownloadDesktopLink` returns `null`. The Toolbar's PWA **Install app** button
@@ -7765,39 +7873,29 @@ behavior or create a second product implementation.
    installed desktop app does not download or PWA-install itself.
 
 #### Edge — Preview is free to launch without an account or gate
-1. Preview shows no account, sign-in, activation, license-key, trial-renewal,
-   subscription, or paywall flow. Launch continues directly to F-A1. Any future
-   commercial entitlement flow is not authorized by this workflow. It first
-   requires the maintainer's explicit prior permission and coordinated
-   supersession of the no-new-guard governance where applicable; only then may a
-   new ADR, workflow, and implementation be proposed.
+1. Preview launches directly into F-A1 without activation. Help → Licence explains
+   that this is the free edition. The separately requested commercial channel is
+   governed by ADR-523 and F-DESK-LIC below; ordinary free/Preview updates cannot
+   migrate the user into paid access.
 
 ### F-DESK2. Desktop updates and ordinary shutdown
 
 1. On each packaged unsigned Preview launch, KerfDesk makes at most one anonymous
-   metadata request to the fixed public `cisgz3a-hub/KerfDesk` GitHub Actions
-   endpoint for successful runs of
-   `.github/workflows/release-desktop-preview.yml` (ADR-249). Main accepts only a
-   completed successful push run with a strict newer `vX.Y.Z-preview.N` tag and
-   exact workflow path. A green run means the workflow's final job verified the
-   immutable prerelease, canonical six-asset set, checksums, source manifest, and
-   attestations. Dev, web, stable-version, unsupported-platform, malformed,
-   failed/cancelled/in-progress, downgrade, offline, rate-limited, and failed
-   requests produce no visible control and never block startup.
+   metadata request to `https://dl.kerfdesk.com/desktop/previews/latest.json`.
+   Main verifies the signed envelope against its packaged Preview public keys and
+   accepts only a newer strict Preview version. The publisher exposes this pointer
+   only after every versioned artifact has passed readback verification. Malformed,
+   tampered, oversized, stale, offline or failed responses never block startup.
 2. When a newer Preview exists, a passive **Download update** control appears at
    the right edge of the status bar and a polite live region announces its exact
    version. There is no popup and the control receives no automatic focus. It
    remains available during a job because it cannot reload, download, execute,
    install, restart, or change machine state.
-3. Clicking **Download update** opens only the fixed public
-   `https://github.com/cisgz3a-hub/KerfDesk/releases/tag/v<version>` page for the
-   exact announced version in the system browser. This bypasses any legacy
-   service-worker copy of the first-party landing page and cannot drift to a
-   newer-by-date but lower semantic version.
-   The Electron child window is denied. API-provided URLs are ignored, Preview
-   updater trust stays false, and the app never consumes
-   `latest.yml`, a `latest` redirect, R2 update metadata, or installer bytes.
-   The operator selects an exact GitHub prerelease asset and installs it manually.
+3. Clicking **Download update** opens only the fixed first-party download page
+   with the exact announced version in the system browser. The page verifies that
+   version's manifest before exposing its immutable artifact links. The Electron
+   child window is denied. API-provided destinations are ignored; Preview never
+   consumes an automatic-install feed or installer bytes inside the app.
 4. The signed stable Windows path remains governed by ADR-024, ADR-135, and
    ADR-142. Once production signing is enabled and verified, each signed stable
    packaged launch checks the R2 feed's `latest.yml` (`electron/auto-update.ts`).
@@ -7808,7 +7906,7 @@ behavior or create a second product implementation.
    notarized macOS stable updater remains out of scope.
 
 #### Error — offline or feed unreachable
-1. Preview GitHub metadata failures are silent and non-fatal; the status control
+1. Preview signed-metadata failures are silent and non-fatal; the status control
    remains absent and the installed version continues normally. Signed stable R2
    failures are also logged only through `onError` and never block startup.
 
@@ -7818,7 +7916,7 @@ behavior or create a second product implementation.
 2. An ordinary desktop close or quit keeps the renderer alive while its active-job
    `stopJob()` handoff is pending. Repeated close requests share that attempt. A
    failed preparation keeps the window available for recovery, and unsaved edits
-   still require the existing Leave/Stay decision before teardown.
+   still get the Save, Don't Save or Cancel question (ADR-549) before teardown.
 3. A settled transport write does not prove that controller buffers are empty or
    the laser/spindle is off. Controllers without a realtime reset can retain queued
    motion; follow the displayed stop-unconfirmed guidance. Forced termination,
@@ -7829,6 +7927,76 @@ behavior or create a second product implementation.
    unreachable window, with a warning that Abort and saving are unconfirmed.
    Keeping the app open invalidates late close replies. Close approval is tied to
    the reviewed document identity and the displayed stop warning.
+
+#### Edge — Windows restarts, shuts down or signs out during a job (ADR-548)
+1. The window tells the main process whenever a job starts or ends, or Fire is latched or
+   released. A page that reloads or crashes counts as no job.
+2. When Windows asks to end the session while a job runs, KerfDesk asks it to wait. Windows shows
+   that KerfDesk is preventing the restart, shutdown or sign-out, and the app shows a notice: let
+   the job finish or Abort it first; if Windows goes ahead anyway, KerfDesk sends Abort first.
+3. When the session ends anyway, or Windows marks the request critical, the window sends the
+   close handoff's Abort (Fire off first; recovery records the app closing). The notice says a
+   sent Abort does not confirm the machine stopped and names the physical E-stop.
+4. Without a job, KerfDesk never delays Windows. Each request and what KerfDesk did goes to the
+   support log (ADR-546).
+
+#### Success — the job on the taskbar button (ADR-553)
+1. While a job streams, the KerfDesk button on the Windows taskbar fills with the share of the
+   job's lines the controller has acknowledged. It turns yellow while the job is paused or waits
+   at a tool change, and red when it stopped on an error. macOS fills the Dock icon.
+2. When the job ends, the fill clears. If KerfDesk is in the background, its taskbar button
+   flashes until the operator brings KerfDesk to the front. A latched Fire shows nothing.
+3. The window reports a change in the job's state at once and its progress, in whole percent, at
+   most once a second. Nothing here touches the machine.
+
+#### Success — File > Exit and Help > Open Data Folder (ADR-554)
+1. In the desktop app, **File > Exit** closes KerfDesk exactly as the window's X does: unsaved
+   changes get Save, Don't Save or Cancel (ADR-549), a running job gets the Abort handoff, and
+   Cancel keeps KerfDesk open. The web app has no Exit; the browser closes its tab.
+2. **Help > Open Data Folder** opens the folder with KerfDesk's settings, licence record and
+   support log in Explorer (on Windows `%APPDATA%\laserforge`). If it cannot be opened, an error
+   toast names the folder. Projects are saved wherever the operator chooses, not there.
+
+### F-DESK-LIC. Commercial admission, payment and updates (ADR-523)
+
+1. An explicitly prepared commercial package checks its signed saved licence before
+   mounting the workspace. A fresh install offers a full 30-day trial or activation
+   with a licence key. It must not expose project routes, camera or serial permission
+   before admission. Closing this initial screen needs no workspace stop handoff;
+   admission racing with close causes the normal handoff to run instead.
+2. Help → Licence manages activation, trial, refresh, deactivation, purchase and
+   optional update renewal. Paid versions remain usable after update coverage ends.
+   Admission stays latched until this app session closes; licence changes never
+   interrupt the workspace or an ongoing job. The panel is nonmodal and dismissible.
+3. Purchase and renewal create a fixed-price server transaction. The main process
+   saves its pending claim securely before opening the approved checkout URL.
+   After payment the operator returns to the app and selects **Check payment**.
+   A browser success event cannot issue a licence. Pending/ambiguous payments stay
+   recoverable and must not encourage a duplicate purchase.
+4. Deactivation removes the local grant before contacting the server. If offline,
+   the app truthfully shows that freeing the seat is pending and retries later.
+   A definite refusal, or a saved grant that no longer verifies, signs the computer
+   out and says the seat may still count. While freeing the seat is pending,
+   **Reset saved licence** beside Retry stops trying, so the key or the trial can be
+   used again (ADR-523 Amendment 2).
+   Developer grants for Johann and Father are separate private keys with normal
+   computer-transfer behaviour and unlimited update coverage.
+5. Trusted signed Windows commercial builds use only the separate commercial
+   catalog: the stable ring, or the beta ring when **Get new versions early (beta)**
+   is ticked in Help → Licence (ADR-541). Beta lists every stable release plus the
+   newest builds a few quiet days before stable; the choice applies from the next
+   update check, and unticking it never downgrades. **Help → Check for Updates**
+   shows the installed version and where updates stand (checking, downloading,
+   ready to install when KerfDesk closes, not covered by the licence, failed),
+   offers Check now and the beta choice, and the status bar shows **Update ready**
+   once a version has downloaded (ADR-547). The newest eligible
+   signed release is selected by immutable release date and version; an ineligible
+   newer release cannot replace an older eligible one. Manifest hashes, native
+   publisher validation and actual updater availability
+   must all pass before download. Eligibility is rechecked at download completion
+   and natural quit. No forced quit is issued and the ordinary close handoff remains.
+6. Live payment, hosted service and genuine signed upgrade qualification remain
+   pending. Follow `docs/desktop-commercial-launch.md` before customer publication.
 
 ### F-DESK3. Release + manual verification checklist (load-bearing)
 
@@ -7897,6 +8065,8 @@ recorded below, and only step 4 remains deliberately open:
    to be in current `main` history and re-resolves the remote annotated tag
    immediately before draft creation and publication.
 
+The legacy stable lane below is off while commercial releases own `vX.Y.Z` tags (ADR-556); it
+runs only when the owner sets the repository variable `KERFDESK_LEGACY_STABLE_LANE` to `on`.
 Only after the later stable setup is recorded do stable tag semantics resume:
 create an annotated tag with
 `git tag -a vX.Y.Z -m "KerfDesk vX.Y.Z"`, then push only that tag with
@@ -8086,12 +8256,15 @@ desktop artifact stays **CLAIMED** under `PROJECT.md` Desktop Preview acceptance
 
 ### F-DESK5. Regular desktop Previews and the changelog (ADR-522)
 
-1. Every pull request runs the **Desktop package check** on Linux, Windows and macOS (Apple
-   silicon and Intel). Windows builds the Preview installer as the release lane does, runs its
-   package contract, installs it, launches the installed app (SVG import and project save),
-   uninstalls it and checks nothing is left. macOS builds the Preview DMG, runs its package
-   contract and launches the app from inside the DMG. Both check that a modified `app.asar`
-   stops the app. A red desktop job means the next Preview would fail or ship broken.
+1. Every pull request runs the **Desktop package check** on Linux. The release train, or a
+   manual run of that workflow, also runs it on Windows and macOS (Apple silicon and Intel);
+   those runners bill at 2x and 10x in the private repository, so they no longer run on every
+   pull request (ADR-522 Amendment 1). Windows builds the Preview installer as the release lane
+   does, runs its package contract, installs it, launches the installed app (SVG import and
+   project save), uninstalls it and checks nothing is left. macOS builds the Preview DMG, runs
+   its package contract and launches the app from inside the DMG. Both check that a modified
+   `app.asar` stops the app. A red desktop job means the next Preview would fail or ship broken;
+   start the workflow by hand before merging a change to packaging or the installer.
 2. When `main` has user-facing changes the newest Preview lacks and that Preview is at least a
    week old, the daily **Desktop Preview cadence** workflow keeps one issue open:
    `Desktop Preview due: v<next>`. It names the newest `main` commit that CI, Browser smoke and
@@ -8593,6 +8766,13 @@ again.
 
 1. An empty sketch, or one containing only construction guides, applies nothing and
    leaves the project untouched. Apply is inert rather than refusing.
+
+#### Error — the project is full
+
+1. An Apply that would take the project past its limit of 10,000 objects or 256 operations
+   (F-A11) is refused with a notice naming the limit, and nothing changes. The drawing stays
+   unapplied and Apply stays on, to apply once there is room. A refused Apply & Close leaves the
+   Studio open on the drawing.
 
 #### Empty — first Apply of a session
 

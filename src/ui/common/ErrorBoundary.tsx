@@ -19,6 +19,7 @@
 // never sent automatically.
 
 import { Component, useState, type ReactNode } from 'react';
+import { recordRendererProblem } from '../support/renderer-problems';
 import { SOFTWARE_ABORT_LABEL, SOFTWARE_ABORT_TITLE } from './software-abort-copy';
 
 // A generic emergency-stop hook the app root wires to the machine store. A render
@@ -49,6 +50,8 @@ export class ErrorBoundary extends Component<Props, State> {
     // Surfacing to the dev console for debugging; production users see
     // the CrashScreen UI which gives them the same data + copy button.
     console.error('[lf2:ErrorBoundary]', error, info);
+    // Kept for Help > Save Support Report after Try again (ADR-546).
+    recordRendererProblem('crash', error);
   }
 
   private readonly handleRetry = (): void => {

@@ -4,10 +4,7 @@
 
 import { useEffect } from 'react';
 import { usePlatformOptional } from '../app/platform-context';
-import { useLaserStore } from '../state/laser-store';
-import { isActiveJob } from '../state/laser-store-helpers';
-import { useToastStore } from '../state/toast-store';
-import { useUiStore } from '../state/ui-store';
+import { appProjectOpenDeps } from './dropped-project-open';
 import { subscribeExternalProjectOpens } from './external-project-open';
 import { PendingProjectOpenBanner } from './PendingProjectOpenBanner';
 import { RecentProjectsDialog } from './RecentProjectsDialog';
@@ -27,12 +24,7 @@ export function RecentProjectsHost(): JSX.Element | null {
   useEffect(() => {
     const source = platform?.externalFileOpens;
     if (platform === null || source === undefined) return undefined;
-    return subscribeExternalProjectOpens(source, {
-      platform,
-      pushToast: (message, variant) => useToastStore.getState().pushToast(message, variant),
-      jobActive: () => isActiveJob(useLaserStore.getState().streamer),
-      dialogOpen: () => useUiStore.getState().modalDepth > 0,
-    });
+    return subscribeExternalProjectOpens(source, appProjectOpenDeps(platform));
   }, [platform]);
 
   if (platform === null) return null;

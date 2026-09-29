@@ -10,7 +10,7 @@ const MAX_RAW_LINES = 600;
 // `max-lines`. So this relaxes a proxy metric, not the limit that matters.
 const TEST_MAX_RAW_LINES = 900;
 const testFilePattern = /\.test\.[cm]?[jt]sx?$/;
-const checkedRoots = ['src', 'electron', 'scripts', join('audit', 'scripts')];
+const checkedRoots = ['src', 'electron', 'scripts', 'website', join('audit', 'scripts')];
 const checkedRootFiles = [
   'eslint.config.mjs',
   'eslint.electron.config.mjs',

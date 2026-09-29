@@ -12,6 +12,8 @@ import { importStlFiles } from './stl-import-action';
 import { importSvgFiles } from './svg-import-action';
 import { requestPagedArtwork } from '../import/request-paged-artwork';
 import { describeImportBedFit } from './import-bed-fit-notice';
+import { proFeaturesUnlocked, requestProFeature } from '../licensing/edition';
+import type { ProFeature } from '../licensing/pro-features';
 
 export const ARTWORK_IMPORT_EXTENSIONS = [
   '.svg',
@@ -302,16 +304,32 @@ async function dispatchOneFile(
     return;
   }
   if (kind === 'stl') {
-    await importStlFiles([file], {
-      importObject: actions.importSvgObject,
-      pushToast: actions.pushToast,
-      nextSuccessIndex,
-    });
+    // An STL becomes a 3D relief, a Pro tool (ADR-540); the Pro dialog can
+    // unlock it and import the file then.
+    await whenPro('relief', () =>
+      importStlFiles([file], {
+        importObject: actions.importSvgObject,
+        pushToast: actions.pushToast,
+        nextSuccessIndex,
+      }),
+    );
     return;
   }
-  if (actions.openGcodeInspector !== undefined) {
-    await openGcodeFileInInspector(file, actions.openGcodeInspector, actions.pushToast);
+  const openInspector = actions.openGcodeInspector;
+  if (openInspector !== undefined) {
+    await whenPro('gcode-inspector', () =>
+      openGcodeFileInInspector(file, openInspector, actions.pushToast),
+    );
   }
+}
+
+async function whenPro(feature: ProFeature, work: () => Promise<unknown>): Promise<void> {
+  if (proFeaturesUnlocked()) {
+    await work();
+    return;
+  }
+  // Both imports report their own failures as toasts.
+  requestProFeature(feature, () => void work().catch(() => undefined));
 }
 
 async function fileFromPlatformHandle(handle: FileHandle): Promise<File> {

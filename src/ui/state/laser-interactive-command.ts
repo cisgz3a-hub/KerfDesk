@@ -18,6 +18,7 @@ import {
   type ControllerResetWaitRefs,
 } from './laser-controller-reset-wait';
 import { armSilenceTimer, type StatusPollScheduleRefs } from './laser-status-poll-schedule';
+import { continueControllerOperation } from './laser-controller-operation';
 
 export {
   observeControllerResetBoundary,
@@ -446,5 +447,7 @@ function updateOperationIdleReports(
   ) {
     return {};
   }
-  return { controllerOperation: { ...operation, idleReports } };
+  return {
+    controllerOperation: continueControllerOperation(operation, { ...operation, idleReports }),
+  };
 }

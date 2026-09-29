@@ -121,7 +121,21 @@ export default defineConfig({
         ],
         // Optional lesson pictures must never join the install-time app download.
         // Keep Workbox's default node_modules exclusion when adding our own.
-        globIgnores: ['**/node_modules/**/*', '**/tutorial-images/**'],
+        // The standalone checkout, download and support pages, and the modules
+        // and key sets they load, always come from the network (ADR-523): a
+        // cached copy could show an outdated price, trust anchor, release or
+        // support contact.
+        globIgnores: [
+          '**/node_modules/**/*',
+          '**/tutorial-images/**',
+          'buy.html',
+          'download.html',
+          'support.html',
+          'desktop-*.{mjs,json,css}',
+        ],
+        // Their query strings (?_ptxn=, ?version=) never match the precache, and
+        // the app-shell fallback would otherwise answer them with the workspace.
+        navigateFallbackDenylist: [/^[/](?:buy|download|support)(?:[.]html)?(?:[?#]|$)/],
         // The plugin's navigateFallback answers a navigation the precache
         // cannot with index.html. Only the entry at the deploy root, with or
         // without a query string, may get it, as on the server, which has no SPA

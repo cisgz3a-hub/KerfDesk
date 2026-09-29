@@ -1,0 +1,49 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="referrer" content="no-referrer" />
+    <meta
+      http-equiv="Content-Security-Policy"
+      content="default-src 'none'; script-src 'self' https://cdn.paddle.com; style-src 'self' 'unsafe-inline'; img-src 'self' data: https://*.paddle.com; connect-src https://license.kerfdesk.com https://*.paddle.com; frame-src https://*.paddle.com; base-uri 'none'; form-action 'none'"
+    />
+    <title>KerfDesk — Licence checkout</title>
+    <link rel="stylesheet" href="/desktop-checkout.css" />
+    <script type="module" src="/desktop-checkout.mjs"></script>
+  </head>
+  <body>
+    <main>
+      <a class="brand" href="https://kerfdesk.com">KerfDesk</a>
+      <p class="eyebrow">DESKTOP LICENCE</p>
+      <h1>Make it yours.</h1>
+      <p>One licence. Three computers. Keep using the versions you own.</p>
+      <div class="prices">
+        <div>
+          <span>KerfDesk licence</span><strong>US$49.50</strong
+          ><small>Includes one year of updates</small>
+        </div>
+        <div>
+          <span>Optional update renewal</span><strong>US$20</strong
+          ><small>Adds one year of updates</small>
+        </div>
+      </div>
+      <p class="tax">
+        Applicable taxes are shown at checkout. There is no automatic subscription renewal.
+      </p>
+      <section aria-labelledby="checkout-heading">
+        <h2 id="checkout-heading">Complete your purchase</h2>
+        <p id="checkout-status" role="status" aria-live="polite">Checking checkout availability…</p>
+        <button id="checkout-open" type="button" hidden>Open secure checkout</button>
+        <p>
+          After payment, return to KerfDesk and select <strong>Check payment</strong>. The app
+          confirms your purchase with the licence service.
+        </p>
+      </section>
+      <footer>
+        <a href="/download.html">Desktop downloads</a> ·
+        <a href="https://kerfdesk.com">Back to KerfDesk</a>
+      </footer>
+    </main>
+  </body>
+</html>

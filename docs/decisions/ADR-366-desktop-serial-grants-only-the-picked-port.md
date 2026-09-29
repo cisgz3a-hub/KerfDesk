@@ -2,7 +2,8 @@
 
 **Status:** Accepted. Verified against the Electron 42.11.5 source and with a no-hardware
 Electron probe that opened no port. Hardware qualification remains separate (PROJECT.md,
-Desktop Preview item 7). | **Date:** 2026-09-24
+Desktop Preview item 7). Decision 1 amended by ADR-552: on Windows, main records the picks
+and a handler grants only those, across restarts. | **Date:** 2026-09-24
 
 Makes ADR-354's identity rule work on the desktop app. It changes none of ADR-354's decisions.
 

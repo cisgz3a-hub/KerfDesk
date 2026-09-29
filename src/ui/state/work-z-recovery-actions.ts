@@ -1,7 +1,10 @@
 import { parseOwnedWorkOffsetReadback } from '../../core/controllers/grbl/work-offset-readback';
 import type { ControllerDriver } from '../../core/controllers';
 import { activeCncTool } from '../../core/scene';
-import { controllerOperationCommandBlockMessage } from './laser-controller-operation';
+import {
+  continueControllerOperation,
+  controllerOperationCommandBlockMessage,
+} from './laser-controller-operation';
 import { startControllerCommand, type ControllerLifecycleRefs } from './laser-interactive-command';
 import { mpgCommandBlockMessage, pushLog, setupCommandBlockMessage } from './laser-store-helpers';
 import type { LaserState } from './laser-store';
@@ -46,9 +49,19 @@ async function recoverWorkZ(
   set({ controllerOperation: { kind: 'work-z-recovery', phase: 'modal-state' } });
   try {
     const beforeModal = await query(get, refs, write, context.modalQuery, 'active WCS');
-    set({ controllerOperation: { kind: 'work-z-recovery', phase: 'offsets' } });
+    set((state) => ({
+      controllerOperation: continueControllerOperation(state.controllerOperation, {
+        kind: 'work-z-recovery',
+        phase: 'offsets',
+      }),
+    }));
     const offsets = await query(get, refs, write, context.offsetsQuery, 'work offsets');
-    set({ controllerOperation: { kind: 'work-z-recovery', phase: 'modal-state' } });
+    set((state) => ({
+      controllerOperation: continueControllerOperation(state.controllerOperation, {
+        kind: 'work-z-recovery',
+        phase: 'modal-state',
+      }),
+    }));
     const afterModal = await query(get, refs, write, context.modalQuery, 'active WCS recheck');
     const before = parseOwnedWorkOffsetReadback(beforeModal, offsets);
     const after = parseOwnedWorkOffsetReadback(afterModal, offsets);

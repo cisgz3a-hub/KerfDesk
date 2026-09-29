@@ -89,7 +89,10 @@ describe('repository policy enforcement contract', () => {
       'node scripts/check-file-size-policy.mjs',
     );
     expect(releaseCheck).toContain('pnpm check:file-size');
-    expect(ciWorkflow).toContain('run: pnpm release:check');
+    // CI runs release:check as parallel jobs (ADR-557);
+    // scripts/ci-parallel-gate.test.mjs checks that every one of its commands
+    // still runs there.
+    expect(ciWorkflow).toContain('run: pnpm check:file-size');
     expect(deployWorkflow).toContain('run: pnpm release:check');
   });
 

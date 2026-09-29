@@ -29,6 +29,7 @@ function routes(overrides: Partial<DesktopProjectRouteDeps> = {}) {
     check: vi.fn(async () => present),
     read: vi.fn(() => new Response('{"project":1}', { headers: DESKTOP_PROJECT_FILE_HEADERS })),
     drainOpens: vi.fn(async () => []),
+    save: vi.fn(async () => 'saved' as const),
     ...overrides,
   };
   return { handler: withDesktopProjectRoutes(fallback, deps), fallback, deps };

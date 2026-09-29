@@ -5,6 +5,7 @@
 
 import { create } from 'zustand';
 import type { RecentFileAdapter, RecentFileRef } from '../../platform/types';
+import { useToastStore } from '../state/toast-store';
 import {
   clampRecentProjectLimit,
   clearUnpinnedRecentProjects,
@@ -57,11 +58,19 @@ type RecentProjectsState = {
   readonly closeDialog: () => void;
 };
 
+/** Shown once, when this computer's storage keeps refusing the list. */
+export const RECENT_PROJECTS_UNSAVED_MESSAGE =
+  'Recent Projects could not be saved for next session (browser storage is full or blocked). ' +
+  'The list is kept until KerfDesk closes.';
+
 let storage: RecentProjectStorage | null = null;
 let pending: Promise<unknown> = Promise.resolve();
 
 function currentStorage(): RecentProjectStorage {
-  storage ??= defaultRecentProjectStorage();
+  storage ??= defaultRecentProjectStorage({
+    onUnavailable: () =>
+      useToastStore.getState().pushToast(RECENT_PROJECTS_UNSAVED_MESSAGE, 'warning'),
+  });
   return storage;
 }
 

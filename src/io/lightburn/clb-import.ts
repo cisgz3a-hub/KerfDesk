@@ -151,7 +151,8 @@ function importedRecipe(
   overscanMm: number,
 ): MaterialRecipe {
   const interval = numberField(setting, ['interval', 'lineinterval']) ?? 0.1;
-  const airAssist = booleanField(setting, ['airassist', 'airassistenable']);
+  // LightBurn writes Air Assist as `runBlower`, in libraries as in projects.
+  const airAssist = booleanField(setting, ['runblower', 'airassist', 'airassistenable']);
   return normalizeMaterialRecipe({
     mode,
     minPower: numberField(setting, ['minpower']) ?? 0,
@@ -187,6 +188,7 @@ const KNOWN_SETTING_FIELDS = new Set([
   'passcount',
   'interval',
   'lineinterval',
+  'runblower',
   'airassist',
   'airassistenable',
   'scanangle',

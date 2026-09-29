@@ -2,6 +2,14 @@
 // 144x144. Text is encoded with ASCII encodation — digit pairs share one
 // codeword and Latin-1 characters above 127 use Upper Shift — which every
 // reader supports. The smallest square symbol that holds the codewords wins.
+//
+// Insert and Edit stop at 132x132 (ADR-386 Amendment 2). Readers such as ZXing
+// expect the ten check blocks of 144x144 in another order than the one
+// ISO/IEC 16022 describes, and nothing in this repository pins that order, so
+// a 144x144 code built here may not scan in them. Output still builds it, in
+// the standard's order as before: the code can be built, so refusing it would
+// be policy, which may only warn (PROJECT.md non-negotiable 21). Job Review
+// names each such code and asks for a test scan.
 
 import { DATA_MATRIX_FIELD, reedSolomonGenerator, reedSolomonRemainder } from './reed-solomon';
 import {
@@ -44,6 +52,12 @@ export const DATA_MATRIX_SIZES: readonly DataMatrixSize[] = SIZES.map(
   }),
 );
 
+/** What a code is built for: only output builds 144x144 (see above). */
+export type BarcodeUse = 'edit' | 'output';
+
+// Every size up to 132x132, the largest Insert and Edit make (see above).
+const EDIT_SIZES = DATA_MATRIX_SIZES.filter((entry) => entry.size <= 132);
+
 export type DataMatrixSymbol = {
   readonly size: number;
   /** Row-major, 1 = dark. */
@@ -57,7 +71,7 @@ export type DataMatrixEncodeResult =
 const PAD = 129;
 const UPPER_SHIFT = 235;
 
-export function encodeDataMatrix(text: string): DataMatrixEncodeResult {
+export function encodeDataMatrix(text: string, use: BarcodeUse = 'edit'): DataMatrixEncodeResult {
   const data = dataMatrixAsciiCodewords(text);
   if (data === null) {
     return {
@@ -65,19 +79,41 @@ export function encodeDataMatrix(text: string): DataMatrixEncodeResult {
       message: 'Data Matrix here supports Latin-1 text only. Use QR Code for other characters.',
     };
   }
-  const size = DATA_MATRIX_SIZES.find((candidate) => candidate.dataCodewords >= data.length);
-  if (size === undefined) {
-    return {
-      ok: false,
-      message: `Too much data for a Data Matrix (${data.length} of ${maxCapacity()} codewords). Shorten the text.`,
-    };
-  }
+  const size = smallestSize(data.length, use);
+  if (size === undefined) return { ok: false, message: tooMuchData(data.length, use) };
   const codewords = dataMatrixCodewords(padDataMatrix(data, size.dataCodewords), size);
   return { ok: true, symbol: assembleSymbol(codewords, size), codewords };
 }
 
-function maxCapacity(): number {
-  return DATA_MATRIX_SIZES[DATA_MATRIX_SIZES.length - 1]?.dataCodewords ?? 0;
+/**
+ * True when output builds `text` as 144x144, the size whose reader layout
+ * nothing here pins (see above); Job Review warns about such codes.
+ */
+export function dataMatrixNeedsUnverifiedSize(text: string): boolean {
+  const data = dataMatrixAsciiCodewords(text);
+  if (data === null) return false;
+  return (
+    smallestSize(data.length, 'edit') === undefined &&
+    smallestSize(data.length, 'output') !== undefined
+  );
+}
+
+function sizesFor(use: BarcodeUse): readonly DataMatrixSize[] {
+  return use === 'output' ? DATA_MATRIX_SIZES : EDIT_SIZES;
+}
+
+function smallestSize(codewords: number, use: BarcodeUse): DataMatrixSize | undefined {
+  return sizesFor(use).find((candidate) => candidate.dataCodewords >= codewords);
+}
+
+function tooMuchData(codewords: number, use: BarcodeUse): string {
+  const largest = sizesFor(use).at(-1);
+  const edge = largest?.size ?? 0;
+  return (
+    `Too much data for a Data Matrix: this text needs ${codewords} codewords and the largest ` +
+    `size KerfDesk makes, ${edge} × ${edge}, holds ${largest?.dataCodewords ?? 0}. ` +
+    'Shorten the text or use a QR Code.'
+  );
 }
 
 /** ASCII encodation, or null when a character is outside Latin-1. */

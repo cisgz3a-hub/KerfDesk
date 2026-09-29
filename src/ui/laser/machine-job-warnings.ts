@@ -26,6 +26,7 @@ import { detectCncStockWarnings } from './cnc-stock-warnings';
 import { detectCncThroughCutTabWarnings } from './cnc-through-cut-tab-warnings';
 import { detectCncUnmodeledBitLayoutWarnings } from './cnc-unmodeled-bit-layout-warnings';
 import { detectCncZTravelWarnings } from './cnc-z-travel-warnings';
+import { detectDataMatrixScanWarnings } from './data-matrix-scan-warnings';
 import { detectJobIntentWarnings } from './job-intent-warnings';
 import { detectLaserFinishSetAsideWarnings } from './laser-finish-set-aside-warnings';
 import { detectLaserReliefWarnings } from './laser-relief-warnings';
@@ -77,7 +78,12 @@ export function detectMachineJobWarnings(
           // A saved Smoothieware profile above S 2 (controller audit SM-7).
           ...warningList(smoothiePowerScaleWarning(project.device)),
         ];
-  return [...detectActiveWcsMismatchWarnings(activeWcs), ...machineWarnings];
+  return [
+    ...detectActiveWcsMismatchWarnings(activeWcs),
+    ...machineWarnings,
+    // Machine-agnostic like the WCS check: a code either machine engraves.
+    ...detectDataMatrixScanWarnings(project),
+  ];
 }
 
 function warningList(warning: string | null): ReadonlyArray<string> {

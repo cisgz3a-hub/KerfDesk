@@ -6,6 +6,7 @@ import { finishedJobStateReset } from './laser-session-reset';
 import type { LaserState } from './laser-store';
 import { pushLog } from './laser-store-helpers';
 import type { TranscriptSource } from './laser-transcript';
+import { continueControllerOperation } from './laser-controller-operation';
 import {
   completeLiveCanvasRun,
   liveCanvasFinishingPatch,
@@ -77,11 +78,11 @@ async function runPostJobSettle(
     set((state) =>
       state.controllerOperation?.kind === 'post-job-settle'
         ? {
-            controllerOperation: {
+            controllerOperation: continueControllerOperation(state.controllerOperation, {
               kind: 'post-job-settle',
               phase: 'awaiting-idle',
               idleReports: 0,
-            },
+            }),
             ...liveCanvasFinishingPatch(state),
           }
         : {},

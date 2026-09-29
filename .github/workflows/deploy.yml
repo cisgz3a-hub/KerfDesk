@@ -46,7 +46,7 @@ jobs:
     runs-on: ubuntu-latest
     # workflow_run fires for EVERY CI completion (success + failure).
     # Manual dispatches are production deploys, so the selected ref must
-    # be main and the job still re-runs the shared release gate below.
+    # be main and the job runs the shared release gate below itself.
     # Only a push to main is a production candidate: `branches: [main]`
     # matches a triggering run's head branch, which a fork PR can also name
     # main (ADR-360).
@@ -180,8 +180,18 @@ jobs:
 
       - name: Release verification gate
         id: release_check
-        if: ${{ steps.deployment_identity.outputs.eligible == 'true' }}
+        # A manual dispatch has no CI run behind it, so it runs the whole gate
+        # here (release:check ends by building dist/web).
+        if: ${{ steps.deployment_identity.outputs.eligible == 'true' && github.event_name == 'workflow_dispatch' }}
         run: pnpm release:check
+
+      - name: Build the web bundle CI verified
+        id: build_web
+        # A workflow_run candidate is the exact commit whose push CI just
+        # passed the whole release gate, so this job only builds it rather than
+        # running that gate a second time (ADR-557).
+        if: ${{ steps.deployment_identity.outputs.eligible == 'true' && github.event_name == 'workflow_run' }}
+        run: pnpm build:web
 
       - name: Confirm the verified commit is still on main before publication
         id: pre_publish_identity
@@ -195,10 +205,10 @@ jobs:
           set -euo pipefail
           git fetch --no-tags origin +refs/heads/main:refs/remotes/origin/main
           # Still ON main is the question here, not still THE TIP of main. A tip
-          # test at this point cannot be satisfied in practice: the gate above
-          # runs ~50 minutes while main merges every ~60-85, so publication was
-          # skipped on almost every run and production fell further behind than
-          # the commit being refused.
+          # test at this point could not be satisfied in practice: the gate
+          # above ran ~50 minutes on every deploy while main merged every
+          # ~60-85, so publication was skipped on almost every run and
+          # production fell further behind than the commit being refused.
           if git merge-base --is-ancestor "${DEPLOY_SHA}" refs/remotes/origin/main; then
             checkout_on_main=true
           else
@@ -256,8 +266,12 @@ jobs:
       - name: Record SHA-correlated readiness lanes
         if: ${{ always() && steps.deployment_identity.outputs.eligible == 'true' }}
         env:
-          CI_STATE: ${{ steps.release_check.outcome }}
-          DEPLOY_STATE: ${{ steps.publish.outcome }}
+          # A workflow_run candidate's release gate ran in the CI run that
+          # triggered this deploy; a manual dispatch ran it in this job.
+          CI_STATE: ${{ github.event_name == 'workflow_run' && github.event.workflow_run.conclusion || steps.release_check.outcome }}
+          GATE_RAN_IN: ${{ github.event_name == 'workflow_run' && 'validated-run' || 'deploy-run' }}
+          # A build that failed skips the publish step; report the failure.
+          DEPLOY_STATE: ${{ steps.build_web.outcome == 'failure' && 'failure' || steps.publish.outcome }}
           DEPLOY_SHA: ${{ steps.deployment_identity.outputs.sha }}
           FRESHNESS_REASON: ${{ steps.pre_publish_identity.outputs.reason || steps.deployment_identity.outputs.reason }}
           TRIGGER_RUN_URL: ${{ github.event.workflow_run.html_url }}
@@ -271,7 +285,7 @@ jobs:
           --state=packaged-runtime=not-run
           --state=perceptual-reference-cam=not-run
           --state=hardware=not-run
-          "--evidence=ci=validated-run=${TRIGGER_RUN_URL}; release-check=${CI_STATE}; deploy-run=${WORKFLOW_RUN_URL}"
+          "--evidence=ci=validated-run=${TRIGGER_RUN_URL}; release-check=${CI_STATE}; gate-ran-in=${GATE_RAN_IN}; deploy-run=${WORKFLOW_RUN_URL}"
           "--evidence=deploy=publish=${DEPLOY_STATE}; freshness=${FRESHNESS_REASON}; run=${WORKFLOW_RUN_URL}"
 
       - name: Upload readiness report

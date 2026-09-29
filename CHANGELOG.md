@@ -65,6 +65,37 @@ release before it is tagged.
   outside links open in the browser, and a crashed window offers to reload
   ([#984](https://github.com/cisgz3a-hub/KerfDesk/pull/984)). Serial access is granted only to the
   port you pick ([#884](https://github.com/cisgz3a-hub/KerfDesk/pull/884)).
+- **Support reports.** Help > Save Support Report saves a file with your version, machine, recent
+  problems and, in the desktop app, its log, for you to read and send to KerfDesk support. Large
+  pictures zoom smoothly ([#1021](https://github.com/cisgz3a-hub/KerfDesk/pull/1021)).
+- **Desktop updates you can see.** Help > Check for Updates shows your version and whether a newer
+  one is downloading or ready, checks now, and offers new versions early; the status bar says
+  Update ready when one will install as KerfDesk closes
+  ([#1021](https://github.com/cisgz3a-hub/KerfDesk/pull/1021)).
+- **Drop a project to open it.** Dragging a KerfDesk or LightBurn project onto the window opens it,
+  after the usual question about unsaved changes
+  ([#1021](https://github.com/cisgz3a-hub/KerfDesk/pull/1021)).
+- **Windows restarts wait for the job.** In the desktop app, a Windows restart, shutdown or
+  sign-out during a job is asked to wait, and one that goes ahead anyway gets Abort first. Help's
+  connection guide explains USB power saving and Windows Update's Active hours
+  ([#1021](https://github.com/cisgz3a-hub/KerfDesk/pull/1021)).
+- **Save when closing.** Closing the desktop app with unsaved changes asks Save, Don't Save or
+  Cancel, and Save is the default, so pressing Enter keeps your work
+  ([#1021](https://github.com/cisgz3a-hub/KerfDesk/pull/1021)).
+- **Save over the project you opened.** After opening a project, Save writes back to that file
+  instead of asking where to save, including projects double-clicked in Explorer. LightBurn files
+  are never overwritten ([#1021](https://github.com/cisgz3a-hub/KerfDesk/pull/1021)).
+- **Safer network cameras.** The desktop app starts FFmpeg only from the folders on PATH, never
+  from the current folder, and says how to install it when it is missing
+  ([#1021](https://github.com/cisgz3a-hub/KerfDesk/pull/1021)).
+- **Job progress on the taskbar.** In the Windows desktop app the taskbar button fills as a job
+  runs, turns yellow when it is paused and red when it stops on an error, and flashes when the
+  job ends while KerfDesk is in the background
+  ([#1021](https://github.com/cisgz3a-hub/KerfDesk/pull/1021)).
+- **The desktop app remembers your machine's port.** On Windows, a port picked once stays picked
+  after KerfDesk restarts, so Connect automatically connects when the app opens, as it does in
+  Chrome. Forget Controller removes it
+  ([#1021](https://github.com/cisgz3a-hub/KerfDesk/pull/1021)).
 
 ### All changes
 

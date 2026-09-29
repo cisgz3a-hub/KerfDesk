@@ -15,6 +15,7 @@ import {
   type ReadyCopyAlongPathSelection,
 } from './copy-along-path-plan';
 import { repairDanglingObjectDependencies, reportDependencyRepairs } from './object-delete-actions';
+import { sceneLimitOverrun } from './scene-copy-room';
 import { removeObjectIdsFromGroups, selectedObjectIds } from './scene-group-actions';
 import { sceneObjectCopyClosure } from './scene-object-copy-dependencies';
 import { pruneOrphanLayers, pushUndo } from './scene-mutations';
@@ -55,7 +56,7 @@ export function copyAlongPathMutation(
   request: CopyAlongPathRequest,
   idFactory: () => string = () => crypto.randomUUID(),
 ): AppState | Partial<AppState> {
-  const plan = planCopyAlongPath(selectedSceneObjects(state), request);
+  const plan = planCopyAlongPath(selectedSceneObjects(state), request, state.project.scene);
   if (plan.kind === 'problem') {
     useToastStore.getState().pushToast(plan.message, 'warning');
     return state;
@@ -67,7 +68,15 @@ export function copyAlongPathMutation(
     objects: [...scene0.objects, ...copies.objects],
     groups: [...(scene0.groups ?? []), ...copies.groups],
   };
-  const scene = request.keepOriginal ? placed : withoutOriginals(placed, plan.selection.artwork);
+  const replaced = request.keepOriginal ? null : withoutOriginals(placed, plan.selection.artwork);
+  const scene = replaced?.scene ?? placed;
+  // The room counted objects; groups the copies carry are held to their limits here.
+  const overrun = sceneLimitOverrun(scene0, scene);
+  if (overrun !== null) {
+    useToastStore.getState().pushToast(overrun, 'warning');
+    return state;
+  }
+  if (replaced !== null) reportDependencyRepairs(replaced);
   useToastStore.getState().pushToast(placedMessage(plan.placements.length, request), 'success');
   return {
     project: { ...state.project, scene },
@@ -96,13 +105,18 @@ function copiesAlongPath(
   const artworkIds = new Set(selection.artwork.map((object) => object.id));
   const sources = sceneObjectCopyClosure(scene.objects, artworkIds);
   const sourceIds = new Set(sources.map((object) => object.id));
+  // Only the groups that travel whole are copied, so find them once rather
+  // than scanning every group in the project for every copy.
+  const travelling = (scene.groups ?? []).filter((group) =>
+    group.objectIds.every((id) => sourceIds.has(id)),
+  );
   const objects: SceneObject[] = [];
   const groups: SceneGroup[] = [];
   const selectedIds: string[] = [];
   for (const placement of placements) {
     const copied = copyObjectsAtArrayPlacement(sources, placement, idFactory);
     objects.push(...copied.objects);
-    groups.push(...cloneSelectedGroups(scene.groups ?? [], sourceIds, copied.ids, idFactory));
+    groups.push(...cloneSelectedGroups(travelling, sourceIds, copied.ids, idFactory));
     for (const object of selection.artwork) {
       const id = copied.ids.get(object.id);
       if (id !== undefined) selectedIds.push(id);
@@ -111,14 +125,16 @@ function copiesAlongPath(
   return { objects, groups, selectedIds };
 }
 
-// As Delete does: a mask or text guide left without its artwork is let go,
-// with a notice.
-function withoutOriginals(scene: Scene, artwork: ReadonlyArray<SceneObject>): Scene {
+// As Delete does: a mask or text guide left without its artwork is let go. Its
+// notice waits until the copies are placed, so a refusal shows only itself.
+function withoutOriginals(
+  scene: Scene,
+  artwork: ReadonlyArray<SceneObject>,
+): ReturnType<typeof repairDanglingObjectDependencies> {
   const ids = new Set(artwork.map((object) => object.id));
   const remaining = { ...scene, objects: scene.objects.filter((object) => !ids.has(object.id)) };
   const repaired = repairDanglingObjectDependencies(removeObjectIdsFromGroups(remaining, ids));
-  reportDependencyRepairs(repaired);
-  return pruneOrphanLayers(repaired.scene);
+  return { ...repaired, scene: pruneOrphanLayers(repaired.scene) };
 }
 
 function placedMessage(count: number, request: CopyAlongPathRequest): string {

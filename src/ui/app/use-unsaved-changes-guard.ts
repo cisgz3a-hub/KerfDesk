@@ -14,7 +14,8 @@
 // prompt only fires when no unload-stop fires (idle), where the laser-off would
 // be a no-op anyway. Browser mid-job unload retains that best-effort behavior.
 // Desktop close instead retains the renderer for its application stop handoff,
-// then prompts for dirty state before arming a one-use unload approval. Neither
+// then asks Save, Don't Save or Cancel for dirty state (ADR-549) before arming a
+// one-use unload approval. Neither
 // path claims that software Abort proves the machine physically stopped.
 
 import { useEffect } from 'react';
@@ -32,7 +33,7 @@ export function shouldWarnBeforeUnload(args: {
 
 export function installUnsavedChangesGuard(target: Window): () => void {
   const onBeforeUnload = (e: BeforeUnloadEvent): void => {
-    // Desktop close already made its idle Leave/Stay decision before arming
+    // Desktop close already asked Save, Don't Save or Cancel before arming
     // this one-use unload. Active-job close has its separate Abort handoff.
     if (desktopCloseController.handleBeforeUnload(e)) return;
     const dirty = useStore.getState().dirty;

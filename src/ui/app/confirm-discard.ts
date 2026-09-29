@@ -22,7 +22,7 @@ export async function confirmDiscardAsync(
   const choice = await requestChoice(state.savedName ?? 'this project', action);
   if (choice === 'cancel') return false;
   if (choice === 'discard') return true;
-  const outcome = await saveNow(platform);
+  const outcome = await saveProjectNow(platform);
   return outcome === 'saved';
 }
 
@@ -34,8 +34,8 @@ function requestChoice(projectName: string, action: string): Promise<ConfirmSave
 
 // Re-read the store after the dialog resolves: the project must be
 // serialized as it exists at Save-click time, not as captured when the
-// guard was invoked.
-async function saveNow(platform: PlatformAdapter): Promise<SaveProjectOutcome> {
+// guard was invoked. Closing the desktop app saves through here too (ADR-549).
+export async function saveProjectNow(platform: PlatformAdapter): Promise<SaveProjectOutcome> {
   const state = useStore.getState();
   return handleSaveProject({
     platform,

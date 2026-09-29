@@ -1,3 +1,4 @@
+import type { DeviceProfile } from '../../core/devices';
 import type { DeserializeResult as DeserializeProjectResult } from '../../io/project';
 import type { ParseSvgResult } from '../../io/svg';
 import type { ClbImportResult, LbrnImportResult } from '../../io/lightburn';
@@ -53,8 +54,13 @@ export function parseLightBurnProjectOffThread(
   blob: Blob,
   source: string,
   options: DocumentImportRequestOptions = {},
+  device?: DeviceProfile,
 ): Promise<LbrnImportResult> | null {
-  return request({ kind: 'lightburn-project', blob, source }, 'lightburn-project', options);
+  return request(
+    { kind: 'lightburn-project', blob, source, ...(device === undefined ? {} : { device }) },
+    'lightburn-project',
+    options,
+  );
 }
 
 export function parseMaterialLibraryOffThread(

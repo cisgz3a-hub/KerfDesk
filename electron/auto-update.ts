@@ -22,6 +22,7 @@
 export type DesktopUpdater = {
   autoDownload: boolean;
   autoInstallOnAppQuit: boolean;
+  disableWebInstaller: boolean;
   readonly checkForUpdatesAndNotify: () => Promise<unknown>;
 };
 
@@ -43,6 +44,10 @@ export function configureAutoUpdater(
   options: ConfigureAutoUpdateOptions,
 ): void {
   if (!options.isPackaged || !options.isChannelTrusted) return;
+  // KerfDesk distributes full NSIS installers only. Reject web-installer
+  // metadata before checking the feed: its separate package payload is not
+  // covered by the ordinary installer publisher-signature verification.
+  updater.disableWebInstaller = true;
   updater.autoDownload = true;
   updater.autoInstallOnAppQuit = true;
   void updater.checkForUpdatesAndNotify().catch((error: unknown) => {

@@ -14,11 +14,14 @@ import {
   type Scene,
   type SceneObject,
   type TextObject,
+  type Vec2,
 } from '../../core/scene';
+import type { LaserTabAnchor } from '../../core/scene/scene-object';
 import { useStore } from './store';
 import { resetStore } from './test-helpers';
 import { useToastStore } from './toast-store';
 import { cncTabAnchorPosition } from '../../core/cnc/cnc-tab-anchors';
+import { laserTabAnchorPosition } from '../../core/job/laser-tab-anchors';
 
 type Point = readonly [number, number];
 
@@ -147,6 +150,21 @@ function select(...ids: ReadonlyArray<string>): void {
 
 function undoCount(): number {
   return useStore.getState().undoStack.length;
+}
+
+// Every tab is still on the part, at the place it had before.
+function expectSamePlaces(
+  actual: ReadonlyArray<Vec2 | null>,
+  expected: ReadonlyArray<Vec2 | null>,
+): void {
+  expect(actual).toHaveLength(expected.length);
+  actual.forEach((point, index) => {
+    const want = expected[index];
+    if (point === null || want === null || want === undefined) {
+      throw new Error(`tab ${index} is not on its contour`);
+    }
+    expect(Math.hypot(point.x - want.x, point.y - want.y)).toBeLessThan(1e-9);
+  });
 }
 
 function lastToast(): { readonly message: string; readonly variant: string } | undefined {
@@ -299,6 +317,50 @@ describe('Reverse Direction', () => {
     expect(after.cncTabAnchors?.map((entry) => entry.pathT)).toEqual([0.125, 0.875]);
     expect(after.cncTabAnchors?.map((entry) => cncTabAnchorPosition(after, entry))).toEqual(
       positions,
+    );
+  });
+
+  it('keeps laser tabs placed by hand where they were, with the CNC tabs (ADR-494)', () => {
+    // A 40 x 20 part drawn from (0, 0): pathT 0.1 of 120 mm is (12, 0) on the bottom edge.
+    const tabs = (pathIndex: number, ...pathTs: number[]): LaserTabAnchor[] =>
+      pathTs.map((pathT) => ({ layerColor: '#000000', pathIndex, polylineIndex: 0, pathT }));
+    const square: CurveSubpath = {
+      start: { x: 0, y: 0 },
+      closed: true,
+      segments: [
+        { x: 10, y: 0 },
+        { x: 10, y: 10 },
+        { x: 0, y: 10 },
+        { x: 0, y: 0 },
+      ].map((to) => ({ kind: 'line', to })),
+    };
+    // Curves that do not pair with the polylines make Reverse leave the path alone.
+    const skipped = { color: '#000000', polylines: [rect(10, 10)], curves: [square, square] };
+    const before = art('part', [rect(40, 20)], {
+      paths: [{ color: '#000000', polylines: [rect(40, 20)] }, skipped],
+      laserTabAnchors: [...tabs(0, 0.1, 0.5, 0), ...tabs(1, 0.2)],
+      cncTabAnchors: tabs(0, 0.3),
+    });
+    load([before], ['part']);
+    const laserPlaces = before.laserTabAnchors!.map((entry) =>
+      laserTabAnchorPosition(before, entry),
+    );
+    const cncPlaces = before.cncTabAnchors!.map((entry) => cncTabAnchorPosition(before, entry));
+    expect(laserPlaces[0]).toEqual({ x: 12, y: 0 });
+
+    useStore.getState().reverseSelectedPaths();
+
+    const after = objectById('part') as ImportedSvg;
+    expect(after.paths[0]?.polylines[0]?.points[1]).toEqual({ x: 0, y: 20 });
+    expect(after.paths[1]).toBe(skipped);
+    expect(after.laserTabAnchors?.map((entry) => entry.pathT)).toEqual([0.9, 0.5, 0, 0.2]);
+    expectSamePlaces(
+      after.laserTabAnchors!.map((entry) => laserTabAnchorPosition(after, entry)),
+      laserPlaces,
+    );
+    expectSamePlaces(
+      after.cncTabAnchors!.map((entry) => cncTabAnchorPosition(after, entry)),
+      cncPlaces,
     );
   });
 

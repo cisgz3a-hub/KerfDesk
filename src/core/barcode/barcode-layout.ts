@@ -5,7 +5,7 @@
 // and quiet zone instead, for stock that marks light (anodised aluminium,
 // slate); the marks then sit inside the box as holes under even-odd fill.
 
-import type { Polyline } from '../scene';
+import type { Bounds, Polyline } from '../scene';
 import type { BarcodeShape } from '../scene/scene-object';
 import {
   encodeBarcodeSymbol,
@@ -13,6 +13,7 @@ import {
   type MatrixBarcodeSymbol,
 } from './barcode-symbol';
 import { MIN_QUIET_ZONE } from './barcode-spec';
+import type { BarcodeUse } from './data-matrix-encode';
 import { moduleContours } from './module-contours';
 
 export type BarcodeCaption = {
@@ -28,6 +29,8 @@ export type BarcodeLayout = {
   readonly marks: readonly Polyline[];
   /** Inverted 1D codes add a box rectangle around marks and captions. */
   readonly background: boolean;
+  /** Invert: the marks are the light modules and quiet zone, for stock that marks light. */
+  readonly inverted: boolean;
   readonly widthMm: number;
   readonly heightMm: number;
   readonly paddingMm: number;
@@ -52,8 +55,13 @@ const DIGIT_INK = 0.75;
 const TEXT_INK = 1;
 const APPROX_ADVANCE = 0.6;
 
-export function layoutBarcode(spec: BarcodeShape, data: string): BarcodeLayoutResult {
-  const encoded = encodeBarcodeSymbol(spec.symbology, data, spec.errorCorrection);
+/** `use` 'output' also lays out a 144x144 Data Matrix, which editing refuses. */
+export function layoutBarcode(
+  spec: BarcodeShape,
+  data: string,
+  use: BarcodeUse = 'edit',
+): BarcodeLayoutResult {
+  const encoded = encodeBarcodeSymbol(spec.symbology, data, spec.errorCorrection, use);
   if (!encoded.ok) return encoded;
   const symbol = encoded.symbol;
   const across =
@@ -71,13 +79,19 @@ export function layoutBarcode(spec: BarcodeShape, data: string): BarcodeLayoutRe
     symbol.kind === 'matrix'
       ? matrixLayout(spec, symbol, moduleMm)
       : linearLayout(spec, symbol, moduleMm);
-  return { ok: true, layout: { ...layout, warnings } };
+  return { ok: true, layout: { ...layout, inverted: spec.invert, warnings } };
 }
 
-/** Closed outlines to engrave for a final box height (captions may deepen it). */
-export function layoutPolylines(layout: BarcodeLayout, heightMm = layout.heightMm): Polyline[] {
+/**
+ * Closed outlines to engrave. An inverted 1D code's plate fills `box`, the
+ * object's final box, which captions may deepen or widen.
+ */
+export function layoutPolylines(
+  layout: BarcodeLayout,
+  box: Bounds = { minX: 0, minY: 0, maxX: layout.widthMm, maxY: layout.heightMm },
+): Polyline[] {
   if (!layout.background) return [...layout.marks];
-  return [rectangle(0, 0, layout.widthMm, heightMm), ...layout.marks];
+  return [rectangle(box.minX, box.minY, box.maxX, box.maxY), ...layout.marks];
 }
 
 function layoutWarnings(spec: BarcodeShape, moduleMm: number): string[] {
@@ -94,7 +108,7 @@ function layoutWarnings(spec: BarcodeShape, moduleMm: number): string[] {
   return warnings;
 }
 
-type PartialLayout = Omit<BarcodeLayout, 'warnings'>;
+type PartialLayout = Omit<BarcodeLayout, 'inverted' | 'warnings'>;
 
 function matrixLayout(
   spec: BarcodeShape,

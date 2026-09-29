@@ -36,9 +36,13 @@ export function unreleasedHighlights(changelog) {
  * A Preview's release notes: its CHANGELOG section when it was stamped, else
  * the Unreleased highlights and the `generated` list of every pull request.
  */
-export function releaseBody(changelog, version, generated) {
+export function releaseBody(changelog, version, generated, { regenerateChanges = false } = {}) {
   const section = changelogSection(changelog, version);
-  if (section !== null) return section;
+  if (section !== null) {
+    if (!regenerateChanges) return section;
+    const curated = section.split(/^### All changes\s*$/m)[0].trim();
+    return [curated, `### All changes\n\n${generated}`].filter(Boolean).join('\n\n');
+  }
   const highlights = unreleasedHighlights(changelog);
   return [
     highlights === '' ? '' : `### Highlights\n\n${highlights}`,

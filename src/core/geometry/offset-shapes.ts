@@ -26,6 +26,7 @@ import {
   type VectorOpError,
   type VectorSceneObject,
 } from './vector-path-tools';
+import { offsetArcToleranceMm } from './offset-arc-tolerance';
 import { canonicalizeVectorPaths } from './vector-path-canonical';
 import { VECTOR_PATH_PRECISION_DECIMALS } from './vector-path-regions';
 
@@ -158,6 +159,7 @@ function inflate(
         endType,
         cornerStyle === 'corner' ? CORNER_MITER_LIMIT : DEFAULT_MITER_LIMIT,
         VECTOR_PATH_PRECISION_DECIMALS,
+        offsetArcToleranceMm(delta),
       ),
     ),
   );

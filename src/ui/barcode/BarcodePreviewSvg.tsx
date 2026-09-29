@@ -1,15 +1,18 @@
 // BarcodePreviewSvg — the dialog's live preview: the outlines to engrave,
-// filled black on white exactly as laid out, so the preview can also be
-// scanned from the screen. Captions use SVG text as a stand-in for the
-// outlined glyphs placed at insert time. The last valid code stays visible,
-// dimmed, while the current settings are invalid.
+// exactly as laid out, shown as they read on the finished piece. Engraving is
+// black on white stock; with Invert, for stock that marks lighter than its
+// surface, it is white on black stock. Dark modules therefore always show
+// dark on a light quiet zone, and the preview can be scanned from the screen.
+// Captions use SVG text as a stand-in for the outlined glyphs placed at
+// insert time. The last valid code stays visible, dimmed, while the current
+// settings are invalid.
 
 import type { CSSProperties } from 'react';
 import { layoutPolylines, type BarcodeLayout } from '../../core/barcode';
 import type { Polyline } from '../../core/scene';
 
-/* eslint-disable no-restricted-syntax -- deliberate always-light literals: an
-   engraving preview in black on white stays scannable in either theme
+/* eslint-disable no-restricted-syntax -- deliberate fixed literals: an
+   engraving preview in black and white stays scannable in either theme
    (ADR-047 exception, as BoxPreview). */
 const PAPER = '#ffffff';
 const INK = '#000000';
@@ -31,13 +34,15 @@ export function BarcodePreviewSvg(props: {
   const margin = Math.max(layout.widthMm, layout.heightMm) * 0.04;
   const width = layout.widthMm + 2 * margin;
   const height = layout.heightMm + 2 * margin;
+  const stock = layout.inverted ? INK : PAPER;
+  const engraved = layout.inverted ? PAPER : INK;
   return (
     <svg
       role="img"
       aria-label={`Barcode preview: ${layout.description}`}
       viewBox={`${-margin} ${-margin} ${width} ${height}`}
       preserveAspectRatio="xMidYMid meet"
-      style={{ ...svgStyle, opacity: props.stale ? 0.35 : 1 }}
+      style={{ ...svgStyle, background: stock, opacity: props.stale ? 0.35 : 1 }}
     >
       <rect
         x={0}
@@ -49,7 +54,7 @@ export function BarcodePreviewSvg(props: {
         strokeDasharray="2 2"
         vectorEffect="non-scaling-stroke"
       />
-      <path d={pathData(layoutPolylines(layout))} fill={INK} fillRule="evenodd" />
+      <path d={pathData(layoutPolylines(layout))} fill={engraved} fillRule="evenodd" />
       {layout.captions.map((caption, index) => (
         <text
           key={`${index}-${caption.text}`}
@@ -59,8 +64,8 @@ export function BarcodePreviewSvg(props: {
           textAnchor="middle"
           dominantBaseline="hanging"
           fontFamily="Roboto, var(--lf-font)"
-          // Captions are holes in an inverted plate.
-          fill={layout.background ? PAPER : INK}
+          // Captions are holes in an inverted plate, so they show the stock.
+          fill={layout.background ? stock : engraved}
         >
           {caption.text}
         </text>

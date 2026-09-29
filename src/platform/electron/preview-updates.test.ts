@@ -14,7 +14,7 @@ describe('desktop Preview update adapter', () => {
       version: '1.2.3-preview.4',
     });
     expect(adapter.downloadPageUrl('1.2.3-preview.4')).toBe(
-      'https://github.com/cisgz3a-hub/KerfDesk/releases/tag/v1.2.3-preview.4',
+      'https://kerfdesk.com/download.html?version=1.2.3-preview.4',
     );
   });
 

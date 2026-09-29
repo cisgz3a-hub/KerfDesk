@@ -10,6 +10,8 @@ import {
   type VariableTextRenderer,
 } from '../../io/gcode/prepare-output-snapshot';
 import { arraySelectionIds, type ArrayMaterialization } from './array-actions';
+import { arraySpecRoomProblem } from './array-room';
+import { copiesThatFit } from './scene-copy-room';
 import { sceneObjectCopyClosure } from './scene-object-copy-dependencies';
 import { variableArrayMaterialization } from './variable-array-placement';
 import type { AppState } from './store';
@@ -43,6 +45,11 @@ export async function prepareVariableArray(
       ok: false,
       message: 'This design has no variable text or barcode. Create an ordinary array instead.',
     };
+  // Every copy is rendered in turn, so a request the project has no room for is
+  // refused before the first one, not after a render for each (ADR-307 amendment 1).
+  const room = copiesThatFit(state.project.scene.objects.length, sources.length);
+  const tooMany = arraySpecRoomProblem(room, spec);
+  if (tooMany !== null) return { ok: false, message: tooMany };
   const stride = copyStride(offsets);
   const seeds = arrayPlacements(bounds, spec);
   const now = options.clock();

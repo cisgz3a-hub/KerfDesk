@@ -12,6 +12,7 @@ export {
   isMatrixSymbology,
 } from './barcode-spec';
 export { BARCODE_SYMBOLOGY_LABELS } from './barcode-symbol';
+export { dataMatrixNeedsUnverifiedSize } from './data-matrix-encode';
 export { layoutBarcode, layoutPolylines, type BarcodeLayout } from './barcode-layout';
 export {
   BARCODE_CAPTION_FONT_KEY,

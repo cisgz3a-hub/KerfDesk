@@ -130,7 +130,8 @@ it('starts USB through the adapter, reports denial, starts a fake stream and sto
   await clickControl(host, 'Start USB camera');
   expect(openStream).toHaveBeenCalledTimes(1);
   expect(camera.getState().sourceState.kind).toBe('denied');
-  expect(host.textContent).toContain('Permission denied');
+  expect(host.textContent).toContain('Camera access was blocked');
+  expect(host.textContent).toContain('let desktop apps use the camera');
   await clickControl(host, 'Start USB camera');
   expect(camera.getState().sourceState).toMatchObject({ kind: 'live', source: { kind: 'usb' } });
   await clickControl(host, 'Stop camera');

@@ -23,9 +23,13 @@ concurrency:
 permissions:
   contents: read
 
+# The development suite runs in shards on separate runners, each still with
+# one Playwright worker and its own Vite server, beside one job for the checks
+# that run once. The last job keeps the "Chrome UX smoke" check name and passes
+# only when every other job passed (ADR-557).
 jobs:
-  chrome:
-    name: Chrome UX smoke
+  checks:
+    name: Browser test checks and production-bundle smoke
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
@@ -53,19 +57,115 @@ jobs:
         run: pnpm check:e2e-discovery
 
       - name: Check cold startup and viewer responsiveness
-        id: browser_preflight
         # Check viewer responsiveness early so its failure trace is available
-        # without waiting for the full suite. The complete suite still follows.
+        # without waiting for the full suite. The suite's shards still run it.
         run: pnpm test:e2e:cold && pnpm test:e2e e2e/connected-script-gcode-viewer.e2e.ts
 
-      - name: Run development and production-bundle browser smoke
+      - name: Run the production-bundle browser smoke
+        run: pnpm test:e2e:production-bundle
+
+      - name: Upload browser artifacts
+        if: failure()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        with:
+          name: playwright-report-checks
+          path: |
+            playwright-report/
+            test-results/
+          if-no-files-found: ignore
+          retention-days: 7
+
+  suite:
+    name: Chrome UX smoke (${{ matrix.shard }}/${{ strategy.job-total }})
+    runs-on: ubuntu-latest
+    strategy:
+      # Every shard reports, so one failure does not hide another shard's.
+      fail-fast: false
+      matrix:
+        # Playwright splits the suite's files into shards of about the same
+        # number of tests. Keep the list 1..N: the job total is the shard count.
+        shard: [1, 2, 3, 4]
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+
+      - name: Set up pnpm
+        uses: pnpm/action-setup@0ebf47130e4866e96fce0953f49152a61190b271 # v6
+
+      - name: Set up Node.js
+        uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Install Chrome
+        run: pnpm exec playwright install --with-deps chrome
+
+      - name: Check cold startup
+        # Also leaves Vite's dependency cache warm, as it was for the whole
+        # suite when one job ran it after this check.
+        run: pnpm test:e2e:cold
+
+      - name: Run this shard of the development browser suite
+        run: pnpm test:e2e --shard=${{ matrix.shard }}/${{ strategy.job-total }}
+
+      - name: Upload browser artifacts
+        if: failure()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        with:
+          name: playwright-report-${{ matrix.shard }}
+          path: |
+            playwright-report/
+            test-results/
+          if-no-files-found: ignore
+          retention-days: 7
+
+  chrome:
+    name: Chrome UX smoke
+    needs: [checks, suite]
+    # Runs whatever the jobs above did, so a failed or cancelled job fails
+    # this check instead of skipping it: GitHub counts a skipped required
+    # check as passed.
+    if: always()
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+
+      - name: Set up pnpm
+        uses: pnpm/action-setup@0ebf47130e4866e96fce0953f49152a61190b271 # v6
+
+      - name: Set up Node.js
+        uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - name: Install dependencies
+        # pnpm installs the dependencies before it runs a script in a checkout
+        # without them, so the readiness report below would install uncached.
+        run: pnpm install --frozen-lockfile
+
+      - name: Require every browser job to pass
         id: browser_smoke
-        run: pnpm test:e2e && pnpm test:e2e:production-bundle
+        env:
+          NEEDS: ${{ toJSON(needs) }}
+        run: |
+          not_passed="$(jq -r 'to_entries[] | select(.value.result != "success") | "\(.key): \(.value.result)"' <<< "${NEEDS}")"
+          if [ -n "${not_passed}" ]; then
+            echo "Browser smoke passes only when every browser job passed. Not passed:"
+            echo "${not_passed}"
+            exit 1
+          fi
+          echo "Every browser job passed."
 
       - name: Record SHA-correlated readiness lanes
         if: always()
         env:
-          BROWSER_STATE: ${{ steps.browser_preflight.outcome == 'success' && steps.browser_smoke.outcome || steps.browser_preflight.outcome }}
+          BROWSER_STATE: ${{ steps.browser_smoke.outcome }}
           WORKFLOW_RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
         run: >-
           pnpm report:release-readiness
@@ -75,7 +175,7 @@ jobs:
           --state=packaged-runtime=not-run
           --state=perceptual-reference-cam=not-run
           --state=hardware=not-run
-          "--evidence=browser=4 checks: cold dev start, viewer responsiveness, full dev suite, production dist/web bundle; result=${BROWSER_STATE}; run=${WORKFLOW_RUN_URL}"
+          "--evidence=browser=4 checks: cold dev start, viewer responsiveness, full dev suite in shards, production dist/web bundle; result=${BROWSER_STATE}; run=${WORKFLOW_RUN_URL}"
 
       - name: Upload readiness report
         if: always()
@@ -84,14 +184,3 @@ jobs:
           name: release-readiness-browser-${{ github.sha }}
           path: artifacts/release-readiness/
           retention-days: 30
-
-      - name: Upload browser artifacts
-        if: failure()
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
-        with:
-          name: playwright-report
-          path: |
-            playwright-report/
-            test-results/
-          if-no-files-found: ignore
-          retention-days: 7

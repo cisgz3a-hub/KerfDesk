@@ -3,6 +3,8 @@
 // Renders only for pocket layers.
 
 import type { CncLayerSettings, Layer } from '../../core/scene';
+import { useEdition } from '../licensing/edition';
+import { proChoiceLabel } from '../licensing/pro-features';
 
 type PocketStrategy = NonNullable<CncLayerSettings['pocketStrategy']>;
 
@@ -18,8 +20,15 @@ export function PocketFillRow(props: {
   readonly settings: CncLayerSettings;
   readonly onCommit: (patch: Partial<CncLayerSettings>) => void;
 }): JSX.Element | null {
+  const edition = useEdition();
   if (props.settings.cutType !== 'pocket') return null;
   const value = props.settings.pocketStrategy ?? 'offset';
+  // Adaptive clearing is a Pro tool (ADR-540): only choosing it anew asks.
+  const choose = (next: PocketStrategy): void => {
+    const apply = (): void => props.onCommit({ pocketStrategy: next });
+    if (next === 'adaptive' && value !== 'adaptive') edition.requestPro('adaptive-clearing', apply);
+    else apply();
+  };
   return (
     <label style={rowStyle}>
       <span style={labelStyle}>Fill method</span>
@@ -29,12 +38,12 @@ export function PocketFillRow(props: {
         value={value}
         onChange={(e) => {
           const next = OPTIONS.find((option) => option.value === e.target.value);
-          if (next !== undefined) props.onCommit({ pocketStrategy: next.value });
+          if (next !== undefined) choose(next.value);
         }}
       >
         {OPTIONS.map((option) => (
           <option key={option.value} value={option.value}>
-            {option.label}
+            {proChoiceLabel(option.label, option.value === 'adaptive' && !edition.pro)}
           </option>
         ))}
       </select>

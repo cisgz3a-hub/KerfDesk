@@ -40,7 +40,7 @@ import { drawCncRemoval } from './draw-cnc-removal';
 import {
   burnedImageAdjustments,
   drawRasterImage,
-  liveAdjustedDisplayKeys,
+  liveRasterDisplayKeys,
   pruneRasterImageCaches,
   rasterDisplayDataUrl,
 } from './draw-raster';
@@ -124,10 +124,7 @@ export function drawScene(
   ctx.clearRect(0, 0, canvasW, canvasH);
   pruneRasterImageCaches(
     liveRasterDataUrls(project),
-    liveAdjustedDisplayKeys(
-      project.scene.objects,
-      sceneLayerVisibility.lookup(project.scene.layers),
-    ),
+    liveRasterDisplayKeys(project.scene.objects, sceneLayerVisibility.lookup(project.scene.layers)),
   );
   const view = computeView(
     canvasW,

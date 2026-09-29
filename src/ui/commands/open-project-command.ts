@@ -35,6 +35,7 @@ export async function openProjectCommand(
       claimProjectOpenRequest: state.claimProjectOpenRequest,
       getProjectOpenRequestEpoch: () => useStore.getState().projectOpenRequestEpoch,
       getProjectDocumentEpoch: () => useStore.getState().projectDocumentEpoch,
+      currentDevice: () => useStore.getState().project.device,
       ...(options.stillAllowed === undefined ? {} : { stillAllowed: options.stillAllowed }),
     },
     options.file,

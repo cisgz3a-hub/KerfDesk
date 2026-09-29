@@ -131,7 +131,7 @@ import {
   sceneActions,
   viewActions,
 } from './store-actions';
-import { saveTrackingActions } from './store-save-tracking-actions';
+import { saveTrackingActions, type MarkLoadedOptions } from './store-save-tracking-actions';
 import { variableDataActions, type VariableDataActions } from './variable-data-actions';
 import { arrayActions, type ArrayActions } from './array-actions';
 import { nestActions, type NestActions } from './nest-actions';
@@ -243,7 +243,7 @@ export type AppState = ObjectPropertiesActions &
     // action; flips false on a successful save. `savedName` is the file the
     // project was last saved as — drives the window title. `lastSaveTarget`
     // holds the platform's SaveTarget so Ctrl+S after a first save writes
-    // through without re-prompting; cleared by New/Open.
+    // through without re-prompting; cleared by New, set by Open (ADR-550).
     readonly dirty: boolean;
     readonly savedName: string | null;
     readonly lastSaveTarget: SaveTarget | null;
@@ -292,11 +292,12 @@ export type AppState = ObjectPropertiesActions &
     // core may not generate identity. `previous` names the artwork an earlier
     // Apply from the same session created, which this one REPLACES rather than
     // duplicating; the returned record is what the next Apply passes back.
+    // 'refused': the project could not hold it (ADR-307 amendment 1).
     readonly applyDesignSketch: (
       sketch: Sketch,
       ids: ReadonlyArray<string>,
       previous: DesignApplyRecord | null,
-    ) => DesignApplyRecord | null;
+    ) => DesignApplyRecord | 'refused' | null;
     // ADR-057: add (or replace) the registration jig box on the reserved
     // registration layer. Width/height in mm; a new box centers on the bed, a
     // replace keeps the existing box's position and lock state.
@@ -386,7 +387,7 @@ export type AppState = ObjectPropertiesActions &
       expectedProjectSavedRequestEpoch: number,
       target: SaveTarget,
     ) => Promise<boolean>;
-    readonly markLoaded: (filename: string, options?: { readonly dirty?: boolean }) => void;
+    readonly markLoaded: (filename: string, options?: MarkLoadedOptions) => void;
   };
 
 function initialState(
