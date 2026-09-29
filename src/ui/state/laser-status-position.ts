@@ -3,6 +3,7 @@ import { normalizeReportedMPosToMm } from '../../core/controllers/grbl/machine-e
 import type { LaserState } from './laser-store';
 import { hostRecordedWorkOffset } from './host-recorded-origin';
 import { hasCustomXyOrigin, type WorkCoordinateOffset } from './origin-actions';
+import { originAtConnectPatch } from './work-origin-state';
 
 // The controller's own MPos from a report whose position KerfDesk withholds
 // (after Unlock, Release motors, a failed Home or an origin write that ended
@@ -33,6 +34,7 @@ export function statusPositionPatch(
       | 'airAssistOn'
       | 'workOriginActive'
       | 'workOriginSource'
+      | 'originAtConnect'
     >
   > {
   // Ov: is reported on the same intermittent cadence as WCO — cache the
@@ -85,6 +87,9 @@ export function statusPositionPatch(
     wcoCache: unchangedOr(state.wcoCache, frameWco),
     workOriginActive: active,
     workOriginSource: active ? knownOrUnknownOriginSource(state.workOriginSource) : 'none',
+    // An origin this first report of a connection shows was not set in it:
+    // Job Review names it until an origin action (work-origin-state.ts).
+    ...originAtConnectPatch(state, active, frameWco),
   };
 }
 

@@ -19,6 +19,7 @@
 import { createFakeSerialPort, type FakeSerialPort } from './fake-serial-port';
 import { createBackpressureFeeder } from './grbl-sim-backpressure';
 import { createDelayedParseFeeder, flushInputOnJogCancel } from './grbl-sim-jog-cancel-flush';
+import type { SimVec3 } from './grbl-sim-gcode';
 import {
   DEFAULT_GRBL_SIM_OPTIONS,
   UNLOCK_MESSAGE,
@@ -78,6 +79,13 @@ export type CreateGrblSimulatorOptions = Partial<GrblSimOptions> & {
    * false: stock GRBL. Not modelled together with `plannerBlocks`.
    */
   readonly jogCancelFlushesInput?: boolean;
+  /**
+   * Work offsets an earlier session left in non-volatile storage. Power-up
+   * loads G54 on every firmware, and G92 only as grblHAL with `$384` off, its
+   * default; machine position still starts at zero (grblHAL gcode.c:833-838,
+   * grbllib.c:358; ADR-375).
+   */
+  readonly storedOffsets?: { readonly g54?: SimVec3; readonly g92?: SimVec3 };
 };
 
 export type GrblSimulator = {
@@ -177,6 +185,7 @@ export function createGrblSimulator(options: CreateGrblSimulatorOptions = {}): G
     blockRetireMs,
     rxBufferBytes,
     jogCancelFlushesInput,
+    storedOffsets,
     ...optionOverrides
   } = options;
   if (jogCancelFlushesInput === true && plannerBlocks !== undefined) {
@@ -187,7 +196,7 @@ export function createGrblSimulator(options: CreateGrblSimulatorOptions = {}): G
   for (const [id, value] of settingOverrides ?? []) settings.set(id, value);
 
   const port = createFakeSerialPort();
-  let state = powerUpState(settings, homingInitLock === true);
+  let state = powerUpState(settings, homingInitLock === true, storedOffsets, opts.firmware);
 
   const runEffect = (effect: GrblSimEffect): void => {
     if (effect.kind === 'emit') {
@@ -286,8 +295,15 @@ export function createGrblSimulator(options: CreateGrblSimulatorOptions = {}): G
 function powerUpState(
   settings: ReadonlyMap<number, string>,
   homingInitLock: boolean,
+  stored: CreateGrblSimulatorOptions['storedOffsets'],
+  firmware: GrblSimOptions['firmware'],
 ): GrblSimState {
-  const booted = initialGrblSimState(settings);
+  const restoresG92 = firmware === 'grblhal' && settings.get(384) !== '1';
+  const booted: GrblSimState = {
+    ...initialGrblSimState(settings),
+    g54: stored?.g54 ?? null,
+    g92: restoresG92 ? (stored?.g92 ?? null) : null,
+  };
   return homingInitLock && settings.get(22) === '1'
     ? { ...booted, machine: 'Alarm', locked: true }
     : booted;

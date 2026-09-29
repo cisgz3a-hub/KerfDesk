@@ -1,9 +1,10 @@
 // Where a recovered job will land (ADR-341 Amendment 3). Recovery replays the
 // saved program in the controller's current work coordinates, so the rest of
 // the job lands on the finished part only if the work origin is where it was.
-// A controller reset clears a temporary G92 origin, and on Windows opening the
-// port can reset an Arduino-class controller, so the review shows the saved and
-// current origin side by side and can trace the remaining area. When they
+// A controller reset clears a temporary G92 origin on stock GRBL and FluidNC
+// (grblHAL keeps it; ADR-375), and on Windows opening the port can reset an
+// Arduino-class controller, so the review shows the saved and current origin
+// side by side and can trace the remaining area. When they
 // differ, Restore saved origin puts the saved one back without moving the head
 // (Amendment 5), and after a lost link Continue from where the head stopped
 // sets it from the head's stop point instead (Amendment 6). Nothing here gates
@@ -13,7 +14,12 @@ import { useState } from 'react';
 import type { ExecutionArtifactV1, RecoveryCapsule } from '../state/recovery';
 import type { WorkCoordinateOffset } from '../state/origin-actions';
 import { describeJobOrigin, formatMm } from './job-review/job-review-format';
-import { formatOriginMm, sameRecoveryOrigin, savedWorkOffsetMm } from './laser-recovery-origin';
+import {
+  formatOriginMm,
+  sameRecoveryOrigin,
+  savedWorkOffsetMm,
+  SET_ORIGIN_LIFETIME,
+} from './laser-recovery-origin';
 import { ContinueFromHeadStop, type HeadStopContinue } from './LaserRecoveryHeadStop';
 import { MoveToJobPoints } from './LaserRecoveryMoveTo';
 import {
@@ -26,7 +32,7 @@ export type LaserRecoveryPlacementProps = {
   readonly capsule: RecoveryCapsule;
   /** The controller's current work offset in mm; null until it is reported. */
   readonly liveWorkOffsetMm: WorkCoordinateOffset | null | undefined;
-  /** False when the controller has no work origin set (a reset cleared it). */
+  /** False when the controller has no work origin set (a stock GRBL reset clears it). */
   readonly liveOriginSet?: boolean;
   readonly restartLine: number | undefined;
   readonly disabled: boolean;
@@ -206,9 +212,8 @@ function OriginComparison(props: {
   if (props.originGone) {
     return (
       <p role="note" style={warningStyle}>
-        The controller has no work origin set now, so recovery has nowhere to place this job. A
-        controller reset or power loss clears an origin made with Set origin here. Put the saved
-        origin back first.
+        The controller has no work origin set now, so recovery has nowhere to place this job.{' '}
+        {SET_ORIGIN_LIFETIME} Put the saved origin back first.
       </p>
     );
   }

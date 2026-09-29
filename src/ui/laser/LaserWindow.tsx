@@ -271,8 +271,9 @@ function SleepBanner({ onWake }: { readonly onWake: () => void }): JSX.Element {
     <div style={sleepStyle} role="alert">
       <strong>Controller is asleep</strong>
       <p style={alarmDetailStyle}>
-        GRBL is ignoring normal jog, frame, and start commands. Wake sends Ctrl-X soft reset, clears
-        the temporary work origin, and waits for the controller to report Idle again.
+        GRBL is ignoring normal jog, frame, and start commands. Wake sends Ctrl-X soft reset and
+        waits for the controller to report Idle again. The reset clears Set origin here on stock
+        GRBL and FluidNC, while grblHAL keeps it; set it again if the head moved.
       </p>
       <button type="button" onClick={onWake} title="Send Ctrl-X soft reset to wake GRBL.">
         Wake (Ctrl-X)

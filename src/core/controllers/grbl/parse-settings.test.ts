@@ -133,6 +133,20 @@ describe('settingsMapToProfilePatch', () => {
     });
   });
 
+  // grblHAL `$384` "Disable G92 persistence" (Format_Bool): off, the default,
+  // grblHAL saves a G92 origin and restores it at power-up (core
+  // settings.c#L2475-L2477, gcode.c#L833-L838). Read only, never written. ADR-375.
+  it('reads grblHAL $384 so KerfDesk can say whether Set origin here survives power-off', () => {
+    expect(settingsMapToControllerSettings(new Map([[384, '0']]))).toEqual({
+      g92PersistenceDisabled: false,
+    });
+    expect(settingsMapToControllerSettings(new Map([[384, '1']]))).toEqual({
+      g92PersistenceDisabled: true,
+    });
+    expect(settingsMapToControllerSettings(new Map([[384, '2']]))).toEqual({});
+    expect(settingsMapToProfilePatch(new Map([[384, '0']]))).toEqual({});
+  });
+
   it('takes the max of $110/$111 for maxFeed (vector reach)', () => {
     const map = new Map([
       [110, '3000'],

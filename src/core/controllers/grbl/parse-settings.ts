@@ -74,6 +74,10 @@ export type ControllerSettingsSnapshot = Partial<
   // "is laser mode on?"; this distinguishes a grblHAL lathe ($32=2) from a
   // controller that never reported $32, which the boolean alone cannot.
   readonly machineMode?: GrblMachineMode;
+  // grblHAL `$384` "Disable G92 persistence". Off, its default, grblHAL saves a
+  // G92 origin (Set origin here) and restores it at power-up. Read, never
+  // written, so Job Review can say which (ADR-375).
+  readonly g92PersistenceDisabled?: boolean;
 };
 
 export type SettingsCollectorState =
@@ -187,6 +191,7 @@ export function settingsMapToControllerSettings(
     ...(maxFeedX === undefined ? {} : { maxFeedX }),
     ...(maxFeedY === undefined ? {} : { maxFeedY }),
     ...machineModeField(map),
+    ...g92PersistenceField(map),
   };
 }
 
@@ -197,6 +202,18 @@ function machineModeField(
 ): Pick<ControllerSettingsSnapshot, 'machineMode'> {
   const machineMode = parseGrblMachineMode(map.get(32));
   return machineMode === undefined ? {} : { machineMode };
+}
+
+// grblHAL lists `$384` (Format_Bool) only at COMPATIBILITY_LEVEL <= 1, where a
+// warm reset keeps G92 whatever it says; it decides whether G92 is also saved
+// and restored at power-up:
+// https://github.com/grblHAL/core/blob/d7aaee3d84b1e7010f075d395206afff038d7379/settings.c#L2475-L2477
+// https://github.com/grblHAL/core/blob/d7aaee3d84b1e7010f075d395206afff038d7379/gcode.c#L833-L838
+function g92PersistenceField(
+  map: ReadonlyMap<number, string>,
+): Pick<ControllerSettingsSnapshot, 'g92PersistenceDisabled'> {
+  const g92PersistenceDisabled = parseBooleanSetting(map, 384);
+  return g92PersistenceDisabled === undefined ? {} : { g92PersistenceDisabled };
 }
 
 /**

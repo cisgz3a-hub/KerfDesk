@@ -96,7 +96,7 @@ function ReleaseMotorsButton(props: {
       disabled={props.busy || blockedReason !== null}
       title={
         blockedReason ??
-        'Release the motors ($SLP) so you can move the head by hand. Clears the work origin; Wake and Set origin again afterward.'
+        'Release the motors ($SLP) so you can move the head by hand, which invalidates the work origin; Wake and Set origin again afterward.'
       }
     >
       Release motors

@@ -37,7 +37,6 @@ import {
 import type { HomingState } from '../state/laser-store';
 import type { SessionObservationStamp } from '../state/laser-controller-observation';
 import type { NativeBedEvidence } from '../state/native-bed-frame';
-import { UNKNOWN_NATIVE_BED_MESSAGE } from '../state/native-bed-frame';
 import { cncWorkZeroToolStartIssue } from './cnc-start-advisories';
 import { requiredFrameIssueFromPrepared } from './required-frame-readiness';
 import { canvasPlanRetentionKey, type CanvasMotionPlan } from '../state/canvas-motion-plan';
@@ -66,6 +65,7 @@ import { controllerIdentityWarnings } from './controller-identity-warnings';
 import { detectCompiledVCarveDepthWarningsForJob } from './cnc-compiled-depth-warnings';
 import { findMachineStartIssues, prepareStartInput } from './start-job-input';
 import { workOffsetAssumptionWarnings } from './work-offset-assumption';
+import { unknownNativeBedWarning } from './restored-origin-warning';
 import type { LaserSecondPassChain } from '../state/recovery/laser-second-pass-lineage';
 import { frameBoundsPreviewOf, type FrameBoundsPreview } from './frame-bounds-preview';
 
@@ -110,6 +110,9 @@ export type MachineStartSnapshot = {
   readonly controllerOperationActive?: boolean;
   readonly autofocusBusy?: boolean;
   readonly workOriginActive?: boolean;
+  // The origin in effect was already on the controller when KerfDesk
+  // connected (work-origin-state.ts); Job Review says so (ADR-375).
+  readonly workOriginRestored?: boolean;
   readonly workZZeroEvidence?: WorkZZeroEvidence | null;
   readonly workZReferenceEpoch?: number;
   readonly controllerSessionEpoch?: number;
@@ -402,7 +405,7 @@ function coordinatePreflightContext(options: FinalizeStartPreparationOptions) {
   if (options.motionOffset === undefined)
     return {
       emitOptions: { preflightCoordinateMode: 'relative-origin' as const },
-      warnings: [UNKNOWN_NATIVE_BED_MESSAGE],
+      warnings: [unknownNativeBedWarning(options.placement.jobOrigin, options.machine)],
     };
   return {
     emitOptions: {
