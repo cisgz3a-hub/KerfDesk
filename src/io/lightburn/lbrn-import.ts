@@ -10,6 +10,8 @@ import { resolveLightBurnOverscan } from './lbrn-overscan';
 // 50 000 shape ceiling were policy caps and are gone (rule 7 / ADR-228) — the
 // UI advises on size at the picker instead.
 const MAX_XML_DEPTH = 64;
+// The range the Kerf Offset field takes (CutSettingsCommonFields).
+const KERF_OFFSET_LIMIT_MM = 10;
 
 export type LbrnImportReport = {
   readonly sourceName: string;
@@ -185,8 +187,31 @@ function importedLayer(
     ...base,
     mode: isScan ? 'fill' : 'line',
     ...importedCommonLayerFields(setting),
-    ...(isScan ? importedScanSettings(setting, name, warnings) : {}),
+    ...(isScan
+      ? importedScanSettings(setting, name, warnings)
+      : importedKerf(setting, name, warnings)),
   };
+}
+
+// LightBurn's Kerf Offset moves a Cut layer's closed shapes out by the offset
+// and the holes inside them in, as KerfDesk's Kerf Offset does (ADR-486), so it
+// opens as the layer's own. One the field cannot hold is named, never dropped
+// (ADR-388).
+function importedKerf(setting: Element, name: string, warnings: string[]): Partial<Layer> {
+  const text = textField(setting, ['kerf']).trim();
+  const kerf = finiteNumber(text);
+  if (kerf !== null && Math.abs(kerf) <= KERF_OFFSET_LIMIT_MM)
+    return kerf === 0 ? {} : { kerfOffsetMm: kerf };
+  if (text !== '') {
+    const problem =
+      kerf === null
+        ? 'is not a number'
+        : `is outside KerfDesk's Kerf Offset range (-${KERF_OFFSET_LIMIT_MM} to ${KERF_OFFSET_LIMIT_MM} mm)`;
+    warnings.push(
+      `${name}: LightBurn kerf offset “${text}” ${problem} and was not imported. Set this layer's Kerf Offset before cutting.`,
+    );
+  }
+  return {};
 }
 
 function importedScanSettings(setting: Element, name: string, warnings: string[]): Partial<Layer> {

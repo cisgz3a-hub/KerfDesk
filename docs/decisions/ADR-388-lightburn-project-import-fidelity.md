@@ -51,6 +51,12 @@ and the thumbnail LightBurn embeds in each file, which is its own drawing of the
    `.lbrn` path writes each vertex as `<V vx vy c0x c0y c1x c1y/>` and each primitive as
    `<P T="L|B" p0 p1/>`; its handles mean what they do in a `<VertList>` (decision 1), and a
    handle coordinate left out reads as zero.
+6. **Kerf offset.** LightBurn's Kerf Offset moves a Cut layer's closed shapes out by the offset
+   and the holes inside them in, which is what KerfDesk's Kerf Offset does (ADR-486). A Cut
+   layer's `kerf` therefore opens as the layer's `kerfOffsetMm`, value for value. A kerf the
+   field cannot hold (outside -10 to 10 mm, or not a number) is not applied, and the import report
+   names the layer and the value. A Scan layer's kerf is named as a field not imported, because
+   KerfDesk offsets only Line cuts. Nothing is dropped without a line in the report.
 
 ### Limits
 
@@ -65,6 +71,9 @@ and the thumbnail LightBurn embeds in each file, which is its own drawing of the
   offers the choice.
 - Code and test evidence only. The corpus is five LightBurn 2.0.05 projects from one machine
   (rear-right origin); the front-left rule is the same mapping with no flags set.
+- Decision 6 rests on LightBurn's own description of Kerf Offset (a path offset, outward on outer
+  shapes and inward on holes), which could not be rechecked here: no corpus file carries a kerf,
+  and no LightBurn cut was compared.
 - No corpus file has a rounded `Rect`, a `LineClosed` or `LineOpen` list, or a legacy `.lbrn`
   path. Decision 5 follows the audit's repro files and LightBurn files published with
   third-party converters (a LightBurn 1.7 text outline written as `LineClosed`, `Cr` written on
@@ -88,4 +97,5 @@ once per layer, priority over index, the Cut Planner warning); `lbrn-open-machin
 `document-import-lightburn-stream.test.ts` (the open machine is kept, and places the project,
 through every open route); `lbrn-shapes.test.ts` (rounded and over-rounded Rects are true arcs,
 `LineClosed` / `LineOpen` lists, shared by `PrimID` too, and legacy `<V>` / `<P>` circles and
-lines).
+lines); `lbrn-kerf.test.ts` (a Cut layer's kerf grows the plate and shrinks its hole in the
+compiled job; out-of-range, unreadable and Scan kerfs are named).
