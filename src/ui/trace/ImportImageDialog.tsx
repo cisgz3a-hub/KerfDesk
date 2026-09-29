@@ -22,7 +22,7 @@ import { rasterDisplayDataUrl } from '../workspace/draw-raster';
 import type { PendingPreparedTrace, PreparedTrace } from './prepared-trace';
 import { TraceDialogView } from './TraceDialogView';
 import type { BoundaryMode } from './region-enhance-trace';
-import { BoundaryModePicker } from './BoundaryModePicker';
+import { BoundaryModePicker, cropOnlyNote } from './BoundaryModePicker';
 import type { BoundarySelection } from './use-boundary-selection';
 import { TracePreview } from './TracePreview';
 import { conditionTracedImageForMachine } from './trace-machine-conditioning';
@@ -179,7 +179,7 @@ function DialogBody(props: DialogBodyProps): JSX.Element {
           preview={preview}
           seed={seed}
           boundarySelection={boundarySelection}
-          wholeContours={options.photoDetail !== undefined || options.colourLayers !== undefined}
+          cropOnlyNote={cropOnlyNote(options)}
           submission={{ busy, output: effectiveTraceOutput }}
         />
       }
@@ -218,8 +218,8 @@ function isFilledContourTraceOptions(options: TraceOptions): boolean {
 
 function TracePreviewPanel(props: {
   readonly submission: { readonly busy: boolean; readonly output: TraceOutput };
-  /** Enhance replaces whole contours; photo ribbons and colour regions need Crop. */
-  readonly wholeContours: boolean;
+  /** Why the selected style can only crop, or null when it offers Enhance. */
+  readonly cropOnlyNote: string | null;
   readonly preview: ReturnType<typeof useTracePreview>;
   readonly seed: RasterImage;
   readonly boundarySelection: BoundarySelection;
@@ -245,7 +245,7 @@ function TracePreviewPanel(props: {
         <BoundaryModePicker
           value={selection.boundaryMode}
           onChange={selection.setBoundaryMode}
-          allowEnhance={!props.wholeContours}
+          cropOnlyNote={props.cropOnlyNote}
           disabled={props.submission.busy}
         />
       ) : null}

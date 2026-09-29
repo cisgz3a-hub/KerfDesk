@@ -63,6 +63,7 @@ export function TraceAreaControls(props: TraceAreaControlsProps): JSX.Element {
           min={0}
           max={10000}
           step={1}
+          snapToStep // the tracer rounds the area to whole pixels
           value={props.overrides.ignoreLessThanPixels ?? props.preset.ignoreLessThanPixels ?? 0}
           onChange={(ignoreLessThanPixels) => set({ ignoreLessThanPixels })}
         />

@@ -5,17 +5,31 @@
 // a boundary is set — mirrors the Fill-style picker's Field + select + hint
 // shape from dialog-parts.tsx.
 
+import type { TraceOptions } from '../../core/trace';
 import type { BoundaryMode } from './region-enhance-trace';
 
 const BOUNDARY_MODE_HINT =
   'Crop keeps only the boxed region (like LightBurn). Enhance re-traces the box at 2× and patches it into the full trace to recover small features.';
 
+/** Why a style traces only the boxed region, or null when it offers Enhance.
+ *  Enhance replaces whole contours; ribbons spanning a photo and colour
+ *  regions sharing boundaries need Crop. */
+export function cropOnlyNote(options: TraceOptions | undefined): string | null {
+  if (options?.photoDetail !== undefined) {
+    return 'Photo shading traces only the boxed region. Use Detail to refine its shading.';
+  }
+  return options?.colourLayers === undefined ? null : 'Colour layers trace only the boxed region.';
+}
+
 export function BoundaryModePicker(props: {
-  readonly allowEnhance?: boolean;
+  /** Set when the selected style can only crop (cropOnlyNote). */
+  readonly cropOnlyNote?: string | null;
   readonly disabled?: boolean;
   readonly value: BoundaryMode;
   readonly onChange: (next: BoundaryMode) => void;
 }): JSX.Element {
+  const note = props.cropOnlyNote ?? BOUNDARY_MODE_HINT;
+  const allowEnhance = props.cropOnlyNote == null;
   return (
     <label className="lf-field">
       <span className="lf-field-label lf-field-label--sm">Boundary</span>
@@ -27,20 +41,12 @@ export function BoundaryModePicker(props: {
           className="lf-select"
           style={selectStyle}
           aria-label="Trace boundary mode"
-          title={
-            props.allowEnhance === false
-              ? 'Trace only the selected photo region.'
-              : BOUNDARY_MODE_HINT
-          }
+          title={note}
         >
           <option value="crop">Crop region</option>
-          {props.allowEnhance !== false ? <option value="enhance">Enhance region</option> : null}
+          {allowEnhance ? <option value="enhance">Enhance region</option> : null}
         </select>
-        <span style={hintStyle}>
-          {props.allowEnhance === false
-            ? 'Photo shading traces only the boxed region. Use Detail to refine its shading.'
-            : BOUNDARY_MODE_HINT}
-        </span>
+        <span style={hintStyle}>{note}</span>
       </span>
     </label>
   );

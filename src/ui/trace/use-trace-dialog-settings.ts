@@ -16,6 +16,7 @@ import { mergeLightBurnTraceSettings, type LightBurnTraceSettingOverrides } from
 import { overridesForPresetSwitch } from './trace-preset-switch';
 import { captureTraceSettings, restoreTraceSettings } from './trace-settings-snapshot';
 import { useBoundarySelection, type BoundarySelection } from './use-boundary-selection';
+import { cropOnlyNote } from './BoundaryModePicker';
 import { useTracePreset } from './use-trace-preset';
 
 export type TraceDialogSettingsState = {
@@ -55,11 +56,10 @@ export function useTraceDialogSettings(
     }),
   );
   const retrace = request.replaceTraceId !== undefined;
-  const boundarySelection = useBoundarySelection(initial);
-  const { preset, selectPreset: choosePreset } = useTracePreset(
-    machineKind,
-    boundarySelection.setBoundaryMode,
-    initial.presetName,
+  const { preset, selectPreset: choosePreset } = useTracePreset(machineKind, initial.presetName);
+  const boundarySelection = useBoundarySelection(
+    initial,
+    cropOnlyNote(TRACE_PRESETS[preset]) !== null,
   );
   const device = useStore((s) => s.project.device);
   const [traceSettings, setTraceSettings] = useState<LightBurnTraceSettingOverrides>(
