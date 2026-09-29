@@ -47,16 +47,31 @@ export class LicensingUpdateCache {
     )
       return false;
     const { saved, device } = this.value;
-    if (saved.credential === undefined || saved.pendingDeactivation !== undefined) return false;
+    const release = verifyLicenceRelease(envelope, this.config.releaseKeys, 'update-manifest');
+    if (release === null || release.version !== expectedVersion) return false;
+    if (saved.pendingDeactivation !== undefined) return false;
+    // A device with no licence runs the Free edition, which every release
+    // includes, so it always takes the newest signed release (ADR-540).
+    if (saved.credential === undefined) return true;
     const claims = verifyEntitlement(
       saved.credential.entitlement,
       this.config.entitlementKeys,
       device,
     );
-    const release = verifyLicenceRelease(envelope, this.config.releaseKeys, 'update-manifest');
-    if (claims === null || release === null || release.version !== expectedVersion) return false;
-    return validTime(claims, saved.lastSeenAt, this.now()) && licenceCoversRelease(claims, release);
+    return claims !== null && claimsTakeRelease(claims, saved.lastSeenAt, this.now(), release);
   }
+}
+
+function claimsTakeRelease(
+  claims: LicenceClaims,
+  lastSeenAt: number,
+  now: number,
+  release: NonNullable<ReturnType<typeof verifyLicenceRelease>>,
+): boolean {
+  // An ended trial leaves a Free device too. A paid licence whose updates have
+  // ended keeps its covered version, so its Pro tools stay unlocked.
+  if (claims.accessExpiresAt !== null && now >= claims.accessExpiresAt) return true;
+  return validTime(claims, lastSeenAt, now) && licenceCoversRelease(claims, release);
 }
 
 function validTime(claims: LicenceClaims, lastSeenAt: number, now: number): boolean {

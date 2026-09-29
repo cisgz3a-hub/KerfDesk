@@ -99,7 +99,6 @@ import { rendererContentSecurityPolicy } from './renderer-content-security-polic
 import { createDesktopWindowReopener } from './desktop-window-reopen.js';
 import { createDesktopLicensing } from './desktop-licensing.js';
 import { withLicensingRoutes } from './licensing-routes.js';
-import type { LicensingRuntime } from './licensing-runtime.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -116,7 +115,6 @@ if (process.platform === 'win32') app.setAppUserModelId(DESKTOP_APP_USER_MODEL_I
 
 let desktopWindowReady = false;
 let quitRequested = false;
-let desktopLicensing: LicensingRuntime | null = null;
 let prepareLicenceQuit: (() => void) | null = null;
 const reopenDesktopWindow = createDesktopWindowReopener({
   isReady: () => desktopWindowReady,
@@ -265,7 +263,6 @@ function installContentSecurityPolicy(ses: Session): void {
 
 function installPermissionHandlers(ses: Session): void {
   ses.setPermissionCheckHandler((wc, permission, requestingOrigin, details) => {
-    if (desktopLicensing !== null && !desktopLicensing.sessionAuthorized()) return false;
     const baseInput = {
       permission: String(permission),
       requestingOrigin,
@@ -293,10 +290,6 @@ function installPermissionHandlers(ses: Session): void {
   // an identical twin, and Forget revokes it. Only the trusted origin reaches
   // the picker: requestPort is gated by the permission check handler above.
   ses.setPermissionRequestHandler((wc, permission, cb, details) => {
-    if (desktopLicensing !== null && !desktopLicensing.sessionAuthorized()) {
-      cb(false);
-      return;
-    }
     const mediaTypes =
       'mediaTypes' in details && details.mediaTypes !== undefined ? details.mediaTypes : undefined;
     cb(
@@ -318,11 +311,6 @@ function installPermissionHandlers(ses: Session): void {
     webContents: WebContents,
     callback: (portId: string) => void,
   ): void => {
-    if (desktopLicensing !== null && !desktopLicensing.sessionAuthorized()) {
-      event.preventDefault();
-      callback('');
-      return;
-    }
     handleSelectSerialPort(event, portList, webContents, callback);
   };
   (ses.on as unknown as (e: 'select-serial-port', l: typeof onSelectSerialPort) => void)(
@@ -394,7 +382,6 @@ async function createWindow(): Promise<void> {
   installDesktopContextMenu(window);
   const closeGuard = installDesktopWindowClose(window, {
     isTrustedRenderer: (url) => shouldAllowNavigation(url, TRUSTED_RENDERER_ORIGINS),
-    isWorkspaceAdmitted: () => desktopLicensing?.sessionAuthorized() ?? true,
     isQuitRequested: () => quitRequested,
     cancelQuit: () => {
       quitRequested = false;
@@ -518,27 +505,21 @@ if (HAS_SINGLE_INSTANCE_LOCK)
         packaged: app.isPackaged,
         trustedUpdates: IS_DESKTOP_UPDATE_CHANNEL_TRUSTED,
         updater: autoUpdater,
-        onAuthorized: () => {
-          if (NATIVE_SMOKE_CONFIG === null) void startCameraBridgeSafely();
-        },
       });
-      desktopLicensing = licence.runtime;
       prepareLicenceQuit = licence.prepareQuit;
-      const staticRoutes = makeAppProtocolHandler(distRoot);
-      const projectRoutes = DESKTOP_PROJECT_OPENS.routes(staticRoutes);
+      // The workspace, projects, serial ports and camera never wait on a licence:
+      // every build opens, and Pro tools unlock only in the renderer (ADR-540).
       protocol.handle(
         'app',
         withLicensingRoutes(
-          (request) =>
-            licence.runtime.sessionAuthorized() ? projectRoutes(request) : staticRoutes(request),
+          DESKTOP_PROJECT_OPENS.routes(makeAppProtocolHandler(distRoot)),
           licence.runtime,
         ),
       );
       // A Session survives macOS window closure; install its listeners once,
       // before the first renderer, rather than adding another picker on reopen.
       installSessionPermissions(session.defaultSession);
-      if (NATIVE_SMOKE_CONFIG === null && licence.config.channel === 'free')
-        await startCameraBridgeSafely();
+      if (NATIVE_SMOKE_CONFIG === null) await startCameraBridgeSafely();
       // Background auto-update against our self-hosted feed (ADR-024/135). This is
       // inert until production artifacts are code-signed; once trusted, updates
       // install on quit after the application close handoff. This does not prove
@@ -550,6 +531,7 @@ if (HAS_SINGLE_INSTANCE_LOCK)
       });
       await createWindow();
       desktopWindowReady = true;
+      licence.start();
     })
     .catch((err: unknown) => {
       console.error('Failed to create window:', err);

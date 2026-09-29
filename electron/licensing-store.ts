@@ -11,14 +11,37 @@ export type LicenceCredential = {
 export type LicenceRecord = {
   readonly schemaVersion: 1;
   readonly lastSeenAt: number;
+  /** Last time the licence service confirmed this device's rights. */
+  readonly refreshedAt?: number;
   readonly credential?: LicenceCredential;
+  /** Kept with the credential so a buyer can read it back for their other devices. */
+  readonly licenseKey?: string;
   readonly pendingDeactivation?: LicenceCredential;
   readonly payment?: LicencePayment;
 };
 export type LicensingStore = {
   readonly read: () => Promise<LicenceRecord | null>;
   readonly write: (value: LicenceRecord) => Promise<void>;
+  /** Removes an unreadable record without needing the keychain that failed to open it. */
+  readonly reset: () => Promise<void>;
 };
+
+/** The saved record exists but cannot be decrypted or parsed; resetting it is safe. */
+export class LicenceStoreUnreadableError extends Error {
+  constructor() {
+    super('The saved licence could not be read.');
+  }
+}
+
+export function validLicenceKey(value: unknown): value is string {
+  return (
+    typeof value === 'string' &&
+    value.length >= 8 &&
+    value.length <= 256 &&
+    value.trim() === value &&
+    !/[\p{Cc}\p{Cf}\s]/u.test(value)
+  );
+}
 type SecureStorage = {
   readonly isAsyncEncryptionAvailable: () => Promise<boolean>;
   readonly getSelectedStorageBackend: () => string;
@@ -43,12 +66,20 @@ function parseRecord(value: unknown): LicenceRecord {
     value.schemaVersion !== 1 ||
     !Number.isSafeInteger(value.lastSeenAt) ||
     (value.lastSeenAt as number) < 0 ||
+    !validSavedExtras(value) ||
     !validCredentialState(value) ||
     (value.payment !== undefined && !validLicencePayment(value.payment))
   ) {
     throw new Error('The saved licence could not be read. Contact KerfDesk support.');
   }
   return value as LicenceRecord;
+}
+
+function validSavedExtras(value: Record<string, unknown>): boolean {
+  const refreshed = value.refreshedAt;
+  if (refreshed !== undefined && (!Number.isSafeInteger(refreshed) || (refreshed as number) < 0))
+    return false;
+  return value.licenseKey === undefined || validLicenceKey(value.licenseKey);
 }
 
 function validCredentialState(value: Record<string, unknown>): boolean {
@@ -101,11 +132,23 @@ export function createLicensingStore(options: {
         if (record(error) && error.code === 'ENOENT') return null;
         throw error;
       }
-      if (encrypted.length > 131_072) throw new Error('The saved licence is invalid.');
-      const decrypted = await secure.decryptStringAsync(encrypted);
-      const value = parseRecord(JSON.parse(decrypted.result));
+      let decrypted: { result: string; shouldReEncrypt: boolean };
+      let value: LicenceRecord;
+      try {
+        decrypted = await secure.decryptStringAsync(encrypted);
+        value = parseRecord(JSON.parse(decrypted.result));
+      } catch {
+        // A changed OS account key, a corrupt file or an older format. The
+        // caller offers a reset; the server keeps this device's seat for reuse.
+        throw new LicenceStoreUnreadableError();
+      }
       if (decrypted.shouldReEncrypt) await write(value);
       return value;
+    },
+    reset: async () => {
+      await unlink(file).catch((error: unknown) => {
+        if (!(record(error) && error.code === 'ENOENT')) throw error;
+      });
     },
   };
 }
@@ -120,7 +163,7 @@ async function readBoundedCredential(file: string): Promise<Buffer> {
       if (bytesRead === 0) break;
       length += bytesRead;
     }
-    if (length > 131_072) throw new Error('The saved licence is invalid.');
+    if (length > 131_072) throw new LicenceStoreUnreadableError();
     return buffer.subarray(0, length);
   } finally {
     await handle.close();

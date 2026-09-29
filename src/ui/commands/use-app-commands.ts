@@ -47,6 +47,7 @@ import {
   selectionUnitCount,
 } from './selection-command-state';
 import { controllerActionFailureHandler } from '../laser/report-controller-action-failure';
+import { useEdition } from '../licensing/edition';
 
 export type { CommandShellCallbacks } from './app-command-context-types';
 
@@ -69,6 +70,7 @@ export function useAppCommands(callbacks: CommandShellCallbacks): ReadonlyArray<
   const printAndCutFeatureEnabled = useExperimentalLaserFeatures((s) => s.features.printAndCut);
   const appTheme = useAppThemePreference();
   const wireframeActive = useUiStore((s) => s.wireframeView);
+  const edition = useEdition();
   return buildAppCommands(
     appCommandContext(callbacks, platform, app, laser, pushToast, {
       openImageDialog,
@@ -93,6 +95,7 @@ export function useAppCommands(callbacks: CommandShellCallbacks): ReadonlyArray<
       appTheme,
       setAppTheme: setAppThemePreference,
       wireframeActive,
+      licensing: platform.id === 'electron' || edition.licensed,
     }),
   );
 }
@@ -121,7 +124,7 @@ function appCommandContext(
     ...editingToolsCommandContext(app, callbacks, selectedIds, dialogs.wireframeActive),
     ...arrangeCommandContext(app, callbacks),
     ...laserCommandContext(platform, laser),
-    ...windowHelpCommandContext(callbacks, app, platform.id === 'electron'),
+    ...windowHelpCommandContext(callbacks, app, dialogs.licensing),
     ...connectionCommandContext(app, laser, platform, activeStreamer),
     hasSelection: selectedIds.length > 0,
     registrationPanelOpen: dialogs.registrationPanelOpen,
@@ -304,7 +307,7 @@ function laserCommandContext(
 function windowHelpCommandContext(
   callbacks: CommandShellCallbacks,
   app: ReturnType<typeof useStore.getState>,
-  desktopLicensing: boolean,
+  licensing: boolean,
 ): Pick<
   AppCommandContext,
   | 'togglePreview'
@@ -314,10 +317,10 @@ function windowHelpCommandContext(
   | 'showAbout'
   | 'showConnectionHelp'
   | 'showSafety'
-  | 'desktopLicensing'
+  | 'licensing'
 > {
   return {
-    desktopLicensing,
+    licensing,
     togglePreview: app.togglePreview,
     resetView: useUiStore.getState().resetView,
     projectNotes: callbacks.requestProjectNotes,

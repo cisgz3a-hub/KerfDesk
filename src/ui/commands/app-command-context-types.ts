@@ -65,6 +65,8 @@ export type CommandDialogs = {
   readonly printAndCutProfileSupported: boolean;
   readonly printAndCut: () => void;
   readonly wireframeActive: boolean;
+  /** Help > Licence is offered: the desktop app, or a build that sells licences. */
+  readonly licensing: boolean;
 };
 
 export type CommandSelection = {

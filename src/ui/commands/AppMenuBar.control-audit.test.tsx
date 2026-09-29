@@ -205,7 +205,7 @@ function availableContext(id: CommandId): AppCommandContext {
   return baseCtx({
     ...eligibility,
     connected: id !== 'laser.connect',
-    desktopLicensing: true,
+    licensing: true,
     printAndCutFeatureEnabled: true,
     printAndCutProfileSupported: true,
     printAndCut: vi.fn(),

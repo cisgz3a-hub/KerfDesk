@@ -98,14 +98,18 @@ For each version, from a clean checkout at the tagged source:
 
 - [ ] Install N from the downloaded file in the disposable account. The
       installer shows the commercial terms, not the free MIT notice.
-- [ ] First launch shows the activation screen. No workspace, project, camera or
-      serial access is available before admission.
-- [ ] Closing the activation screen exits cleanly.
-- [ ] Start the trial. The workspace opens; Help > Licence shows
-      `30-day trial · Ends <date>` exactly 30 days after the server registration.
-- [ ] Quit and relaunch offline. The trial still admits the workspace.
+- [ ] First launch opens the workspace as KerfDesk Free with no activation screen
+      (ADR-540). The status bar shows `Free · Try Pro`; projects, camera and serial
+      work without a licence.
+- [ ] Open a Pro tool (Tools > Box Generator). The Pro prompt names it and offers
+      the trial, Buy Pro and "I have a licence key". Not now leaves it closed.
+- [ ] Start the trial from that prompt. The tool opens, the status bar shows
+      `Pro trial · 30 days left`, and Help > Licence shows
+      `30-day Pro trial · Ends <date>` exactly 30 days after the server registration.
+- [ ] Quit and relaunch offline. Pro stays unlocked.
 - [ ] Set the clock back more than five minutes before the last check: the app
-      reports a clock problem and does not admit. Restore the clock and relaunch.
+      still opens, as Free, and Help > Licence reports a clock problem. Only Pro
+      tools are locked. Restore the clock and relaunch.
 - [ ] Uninstall and reinstall N in the same account, then start the trial again:
       the original end date is kept, not a new 30 days.
 
@@ -113,7 +117,8 @@ For each version, from a clean checkout at the tagged source:
 
 - [ ] Issue the `johann` developer grant through the private admin API, store the
       key privately, and activate it on the test machine. Help > Licence shows
-      `Developer licence · Permanent access and updates`.
+      `Developer licence · Every Pro tool and every update`, and Show key reveals
+      the same key.
 - [ ] Repeating the same grant request returns the same licence; a different
       display name for the same grant ID is refused.
 - [ ] The key never appears in logs, URLs, screenshots kept as evidence, or the
@@ -136,8 +141,10 @@ For each version, from a clean checkout at the tagged source:
 - [ ] Quit KerfDesk normally. N+1 installs, and on relaunch Help > About shows
       N+1. Projects, recent files and settings created in N are unchanged.
 - [ ] A licence whose update coverage ends before N+1's release date stays on N:
-      nothing downloads, N keeps working, and N+1 installed manually reports that
-      the release is newer than the included updates.
+      nothing downloads, N keeps working, and N+1 installed manually opens as Free
+      and reports that the release is newer than the included updates.
+- [ ] A device with no licence, or whose trial ended, takes N+1 at quit and
+      opens it as Free.
 - [ ] Tampered or wrong-publisher installers are refused (swap the served
       installer on a private staging bucket only, never production).
 

@@ -11,6 +11,7 @@ import { useUiStore } from '../state/ui-store';
 import { selectedOpenFillContourCount } from './fill-diagnostics';
 import { DesktopPreviewUpdateButton } from './DesktopPreviewUpdateButton';
 import { PwaUpdateButton } from './PwaUpdateButton';
+import { EditionStatusButton } from '../licensing/EditionStatusButton';
 import { CANVAS_MOTION_SLOT_ID } from './status-bar-slots';
 import './status-bar.css';
 
@@ -61,6 +62,7 @@ export function StatusBar(): JSX.Element {
         <span id={CANVAS_MOTION_SLOT_ID} style={slotStyle} />
       </div>
       <div className="lf-status-bar__actions" style={actionsStyle}>
+        <EditionStatusButton />
         <DesktopPreviewUpdateButton />
         <PwaUpdateButton />
       </div>

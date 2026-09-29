@@ -24,7 +24,7 @@ import '../theme/tokens.css';
 import { initAppTheme } from '../theme/app-theme';
 import { App } from './App';
 import { PlatformProvider } from './platform-context';
-import { CommercialLicenceGate } from '../licensing/CommercialLicenceGate';
+import { EditionProvider } from '../licensing/EditionProvider';
 
 const rootElement = document.getElementById('app-root');
 if (rootElement === null) {
@@ -79,11 +79,11 @@ createRoot(rootElement).render(
   <StrictMode>
     <ErrorBoundary softwareAbort={softwareAbort}>
       <PlatformProvider adapter={adapter}>
-        <CommercialLicenceGate
+        <EditionProvider
           {...(desktopLicenceClient === undefined ? {} : { client: desktopLicenceClient })}
         >
           <App />
-        </CommercialLicenceGate>
+        </EditionProvider>
       </PlatformProvider>
     </ErrorBoundary>
   </StrictMode>,
@@ -123,11 +123,10 @@ function dismissWhenBoardReady(): void {
   const boardPainted =
     document.querySelector('#app-root canvas[data-workspace-painted="true"]') !== null;
   const startupCrashed = document.querySelector('#app-root > [role="alert"]') !== null;
-  const licenceReady = document.querySelector('[data-licence-gate]') !== null;
   const timedOut = performance.now() - splashStartedAt > SPLASH_MAX_WAIT_MS;
   // performance.now() counts from navigation, when the static splash first paints.
   const heldLongEnough = performance.now() >= SPLASH_MIN_VISIBLE_MS;
-  if (startupCrashed || ((boardPainted || licenceReady || timedOut) && heldLongEnough)) {
+  if (startupCrashed || ((boardPainted || timedOut) && heldLongEnough)) {
     requestAnimationFrame(fadeOutSplash);
     return;
   }

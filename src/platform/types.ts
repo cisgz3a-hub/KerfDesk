@@ -3,9 +3,15 @@
 // fs). Injected at React root per ADR-011. Phase A scope: file-pick (open) +
 // file-pick (save). Phase B adds serial-port connection methods.
 
-/** Commercial desktop launch admission; never a machine-operation policy. */
-export type DesktopLicenceStatus = {
+/**
+ * A device's licence as the app sees it (ADR-540). The app always opens;
+ * `edition` says whether the Pro tools are unlocked for this session. It is
+ * never a machine-operation policy: no licence state stops a running job.
+ */
+export type LicenceStatus = {
+  /** 'free' is a Preview or source build with every feature and no licensing. */
   readonly channel: 'free' | 'commercial';
+  readonly edition: 'pro' | 'free';
   readonly state:
     | 'ready'
     | 'activation-required'
@@ -14,28 +20,32 @@ export type DesktopLicenceStatus = {
     | 'invalid-licence'
     | 'unavailable'
     | 'clock-error';
-  readonly sessionAuthorized: boolean;
   readonly tier: 'trial' | 'paid' | 'developer' | null;
   readonly accessExpiresAt: number | null;
   readonly updatesUntil: number | null;
   readonly perpetualUpdates: boolean;
+  /** The saved licence key, shown so a buyer can activate their other devices. */
+  readonly licenseKey: string | null;
   readonly deactivationPending: boolean;
   readonly paymentPending: boolean;
+  readonly paymentOrderId: string | null;
+  readonly storeUnreadable: boolean;
   readonly message: string | null;
 };
 
-export type DesktopLicenceAdapter = {
-  readonly status: () => Promise<DesktopLicenceStatus>;
-  readonly activate: (licenseKey: string) => Promise<DesktopLicenceStatus>;
-  readonly startTrial: () => Promise<DesktopLicenceStatus>;
-  readonly refresh: () => Promise<DesktopLicenceStatus>;
-  readonly deactivate: () => Promise<DesktopLicenceStatus>;
-  readonly launch: () => Promise<DesktopLicenceStatus>;
+export type LicenceAdapter = {
+  readonly status: () => Promise<LicenceStatus>;
+  readonly activate: (licenseKey: string) => Promise<LicenceStatus>;
+  readonly startTrial: () => Promise<LicenceStatus>;
+  readonly refresh: () => Promise<LicenceStatus>;
+  readonly deactivate: () => Promise<LicenceStatus>;
+  readonly resetStore: () => Promise<LicenceStatus>;
   readonly checkout: (
     operation: 'purchase' | 'renewal',
     licenseKey?: string,
-  ) => Promise<DesktopLicenceStatus>;
-  readonly claimPayment: () => Promise<DesktopLicenceStatus>;
+  ) => Promise<LicenceStatus>;
+  readonly claimPayment: () => Promise<LicenceStatus>;
+  readonly discardPayment: () => Promise<LicenceStatus>;
 };
 
 export type FileHandle = {

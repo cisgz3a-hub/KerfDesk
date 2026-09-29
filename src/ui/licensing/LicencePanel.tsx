@@ -1,21 +1,24 @@
 import { useState, type FormEvent } from 'react';
-import type { DesktopLicenceAdapter, DesktopLicenceStatus } from '../../platform/types';
+import type { LicenceAdapter, LicenceStatus } from '../../platform/types';
 import {
   LicenceActivationForm,
   LicenceDeviceActions,
+  LicenceKeyDisplay,
   LicencePaymentActions,
+  licenceButtons,
   licenceMuted,
 } from './LicenceControls';
 
 type Props = {
-  readonly client: DesktopLicenceAdapter;
-  readonly status: DesktopLicenceStatus | null;
+  readonly client: LicenceAdapter;
+  readonly status: LicenceStatus | null;
   readonly failure: string | null;
-  readonly onStatus: (status: DesktopLicenceStatus) => Promise<void>;
+  readonly onStatus: (status: LicenceStatus) => Promise<void>;
   readonly onRetry: () => Promise<void>;
-  readonly onClose?: () => void;
+  readonly onClose: () => void;
 };
 
+/** Help > Licence: the edition, the saved key and every licence action (ADR-540). */
 export function LicencePanel({
   client,
   status,
@@ -27,7 +30,7 @@ export function LicencePanel({
   const [key, setKey] = useState('');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const run = async (work: () => Promise<DesktopLicenceStatus>): Promise<void> => {
+  const run = async (work: () => Promise<LicenceStatus>): Promise<void> => {
     if (busy) return;
     setBusy(true);
     setError(null);
@@ -44,64 +47,114 @@ export function LicencePanel({
     event.preventDefault();
     void run(() => client.activate(key.trim()));
   };
-  if (status?.channel === 'free')
-    return (
-      <section style={panel}>
-        <LicenceHeading onClose={onClose} />
-        <p>Free desktop edition</p>
-        <p style={licenceMuted}>
-          This Preview or source build is free to use. No licence or activation is required.
-        </p>
-      </section>
-    );
-  const message = error ?? failure ?? status?.message;
+  if (status?.channel === 'free') return <EveryFeaturePanel onClose={onClose} />;
   return (
     <section style={panel} aria-busy={busy}>
       <LicenceHeading onClose={onClose} />
-      <p style={licenceMuted}>Commercial desktop edition</p>
+      <p style={{ margin: '12px 0 4px', fontWeight: 600 }}>{editionTitle(status)}</p>
       <LicenceNotice
         status={status}
         failure={failure}
-        message={message}
+        message={error ?? failure ?? status?.message}
         busy={busy}
         onRetry={onRetry}
       />
-      {status?.deactivationPending === true ? null : (
+      <SavedLicence client={client} status={status} busy={busy} run={run} />
+      {offersActivation(status) ? (
         <LicenceActivationForm value={key} setValue={setKey} busy={busy} submit={activate} />
-      )}
+      ) : null}
       <LicenceDeviceActions client={client} status={status} busy={busy} run={run} />
       <LicencePaymentActions client={client} status={status} busy={busy} run={run} />
+      <EditionSummary />
+    </section>
+  );
+}
+
+function EveryFeaturePanel({ onClose }: { readonly onClose: () => void }): JSX.Element {
+  return (
+    <section style={panel}>
+      <LicenceHeading onClose={onClose} />
+      <p>Every feature included</p>
       <p style={licenceMuted}>
-        A paid licence covers three devices and keeps working with eligible versions after its first
-        year of updates. Developer licences include ongoing access and updates.
-      </p>
-      <p style={licenceMuted}>
-        Licence changes take effect at the next launch. They never stop an open workspace or an
-        ongoing machine operation.
+        This Preview or source build includes every tool. No licence or activation is needed.
       </p>
     </section>
   );
 }
 
-function LicenceHeading({ onClose }: { readonly onClose: (() => void) | undefined }): JSX.Element {
+function SavedLicence({
+  client,
+  status,
+  busy,
+  run,
+}: {
+  readonly client: LicenceAdapter;
+  readonly status: LicenceStatus | null;
+  readonly busy: boolean;
+  readonly run: (work: () => Promise<LicenceStatus>) => Promise<void>;
+}): JSX.Element | null {
+  if (status === null) return null;
+  return (
+    <>
+      {status.licenseKey === null ? null : <LicenceKeyDisplay licenseKey={status.licenseKey} />}
+      {status.storeUnreadable ? (
+        <div style={licenceButtons}>
+          <button
+            type="button"
+            className="lf-btn"
+            disabled={busy}
+            onClick={() => void run(client.resetStore)}
+            title="Clear the unreadable saved licence so you can activate again with your key"
+          >
+            Reset saved licence
+          </button>
+        </div>
+      ) : null}
+    </>
+  );
+}
+
+function EditionSummary(): JSX.Element {
+  return (
+    <>
+      <p style={licenceMuted}>
+        Free covers drawing, text, import, basic trace, laser cut and engrave, 2D CNC cuts and all
+        machine control. Pro adds V-carve, 3D relief, adaptive clearing, advanced tracing, camera
+        alignment, the box generator, Design Studio and the G-code Inspector.
+      </p>
+      <p style={licenceMuted}>
+        A Pro licence runs on three devices at a time and keeps working with every version released
+        during its year of updates. Licence changes never stop a job that is running.
+      </p>
+    </>
+  );
+}
+
+function editionTitle(status: LicenceStatus | null): string {
+  if (status === null) return 'KerfDesk';
+  return status.edition === 'pro' ? 'KerfDesk Pro' : 'KerfDesk Free';
+}
+
+function offersActivation(status: LicenceStatus | null): boolean {
+  if (status === null || status.deactivationPending) return false;
+  return status.tier === null || status.state !== 'ready';
+}
+
+function LicenceHeading({ onClose }: { readonly onClose: () => void }): JSX.Element {
   return (
     <div
       style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 16 }}
     >
-      <h1 style={{ margin: 0, fontSize: 24 }}>
-        {onClose === undefined ? 'Welcome to KerfDesk' : 'Your KerfDesk licence'}
-      </h1>
-      {onClose === undefined ? null : (
-        <button
-          type="button"
-          className="lf-btn"
-          onClick={onClose}
-          aria-label="Close licence settings"
-          title="Close licence settings"
-        >
-          Close
-        </button>
-      )}
+      <h1 style={{ margin: 0, fontSize: 24 }}>Your KerfDesk licence</h1>
+      <button
+        type="button"
+        className="lf-btn"
+        onClick={onClose}
+        aria-label="Close licence settings"
+        title="Close licence settings"
+      >
+        Close
+      </button>
     </div>
   );
 }
@@ -145,11 +198,11 @@ function LicenceNotice({
 function date(seconds: number): string {
   return new Date(seconds * 1000).toLocaleDateString();
 }
-function licenceDescription(status: DesktopLicenceStatus): string {
-  if (status.tier === 'developer') return 'Developer licence · Permanent access and updates';
+export function licenceDescription(status: LicenceStatus): string {
+  if (status.tier === 'developer') return 'Developer licence · Every Pro tool and every update';
   if (status.tier === 'trial')
-    return `30-day trial${status.accessExpiresAt === null ? '' : ` · Ends ${date(status.accessExpiresAt)}`}`;
-  return `Perpetual licence${status.updatesUntil === null ? '' : ` · Updates through ${date(status.updatesUntil)}`}`;
+    return `30-day Pro trial${status.accessExpiresAt === null ? '' : ` · Ends ${date(status.accessExpiresAt)}`}`;
+  return `Pro licence${status.updatesUntil === null ? '' : ` · Updates through ${date(status.updatesUntil)}`}`;
 }
 const panel = {
   width: '100%',

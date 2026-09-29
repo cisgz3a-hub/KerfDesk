@@ -122,12 +122,29 @@ describe('commercial signed and licence-aware updates', () => {
       commercialUpdateCandidate(manifest('1.2.0', undefined, 'release-identity'), keys, now),
     ).toBeNull();
   });
-  it('rejects duplicate versions and unsigned catalog entries', async () => {
+  it('never installs an ambiguous duplicate version or an unsigned entry', async () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
     for (const releases of [[manifest(), manifest()], [{}]]) {
       const { updater, options } = fixture(releases);
-      await expect(checkCommercialUpdates(updater, options)).rejects.toThrow();
+      await checkCommercialUpdates(updater, options);
+      expect(updater.setFeedURL).not.toHaveBeenCalled();
       expect(updater.downloadUpdate).not.toHaveBeenCalled();
     }
+    warn.mockRestore();
+  });
+  it('skips one damaged or future-dated entry instead of stopping every update', async () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
+    const damaged = { ...manifest('1.4.0'), signature: Buffer.alloc(64).toString('base64') };
+    const future = manifest('1.3.0', '2027-01-01T00:00:00.000Z');
+    const { updater, options } = fixture([damaged, future, {}, manifest('1.2.0')]);
+    await checkCommercialUpdates(updater, options);
+    expect(updater.setFeedURL).toHaveBeenCalledExactlyOnceWith({
+      provider: 'generic',
+      url: 'https://dl.kerfdesk.com/desktop/commercial/releases/1.2.0',
+    });
+    expect(updater.downloadUpdate).toHaveBeenCalledTimes(1);
+    expect(warn).toHaveBeenCalledWith('Skipped 3 unverifiable update catalogue entries.');
+    warn.mockRestore();
   });
   it.each(['url', 'hash', 'size', 'version', 'web-installer', 'elevation'])(
     'rejects substituted feed %s',

@@ -40,7 +40,7 @@ export function buildAppCommands(ctx: AppCommandContext): ReadonlyArray<AppComma
       connectionHelpCommand(ctx),
       reportBugCommand(),
       discussionsCommand(),
-      ...(ctx.desktopLicensing === true ? [licenceCommand()] : []),
+      ...(ctx.licensing === true ? [licenceCommand()] : []),
     ],
     ctx.machineKind,
   );

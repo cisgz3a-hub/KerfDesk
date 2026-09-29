@@ -5,6 +5,13 @@ import { createLicensingStore } from './licensing-store.js';
 import { createLicensingRuntime } from './licensing-runtime.js';
 import { checkCommercialUpdates, type CommercialUpdater } from './commercial-update.js';
 
+// A plain label for the device list; the computer's own name is never sent.
+const DEVICE_NAMES: Readonly<Record<string, string>> = {
+  win32: 'Windows computer',
+  darwin: 'Mac',
+  linux: 'Linux computer',
+};
+
 export function createDesktopLicensing(options: {
   readonly appPath: string;
   readonly userDataPath: string;
@@ -12,7 +19,6 @@ export function createDesktopLicensing(options: {
   readonly packaged: boolean;
   readonly trustedUpdates: boolean;
   readonly updater: CommercialUpdater;
-  readonly onAuthorized: () => void;
 }) {
   const config = readLicensingConfig(options.appPath);
   let pendingUpdate: { envelope: unknown; version: string } | null = null;
@@ -25,7 +31,7 @@ export function createDesktopLicensing(options: {
       platform: process.platform,
     }),
     deviceId: licensingDeviceId,
-    deviceName: `${process.platform} computer`,
+    deviceName: DEVICE_NAMES[process.platform] ?? 'KerfDesk device',
     fetch: (url, init) => net.fetch(url, init),
     openCheckout: async (url) => {
       const target = new URL(url);
@@ -42,32 +48,40 @@ export function createDesktopLicensing(options: {
       }
       await shell.openExternal(target.href);
     },
-    onSessionAuthorized: () => {
-      options.onAuthorized();
-      if (config.channel !== 'commercial') return;
-      void checkCommercialUpdates(options.updater, {
-        isPackaged: options.packaged,
-        isChannelTrusted: options.trustedUpdates,
-        platform: process.platform,
-        currentVersion: options.version,
-        releaseKeys: config.releaseKeys,
-        fetch: (url, init) => net.fetch(url, init),
-        isEligible: runtime.isReleaseEligible,
-        isEligibleCached: runtime.isReleaseEligibleCached,
-        onVerifiedDownload: (envelope, version) => {
-          pendingUpdate = { envelope, version };
-          if (Notification.isSupported())
-            new Notification({
-              title: 'KerfDesk update ready',
-              body: `KerfDesk ${version} has downloaded. It will install when you close the app if your licence still covers it.`,
-            }).show();
-        },
-      }).catch(() => console.warn('Commercial update check could not complete.'));
-    },
   });
+  const checkUpdates = (): Promise<void> =>
+    checkCommercialUpdates(options.updater, {
+      isPackaged: options.packaged,
+      isChannelTrusted: options.trustedUpdates,
+      platform: process.platform,
+      currentVersion: options.version,
+      releaseKeys: config.channel === 'commercial' ? config.releaseKeys : {},
+      fetch: (url, init) => net.fetch(url, init),
+      isEligible: runtime.isReleaseEligible,
+      isEligibleCached: runtime.isReleaseEligibleCached,
+      onVerifiedDownload: (envelope, version) => {
+        pendingUpdate = { envelope, version };
+        if (Notification.isSupported())
+          new Notification({
+            title: 'KerfDesk update ready',
+            body: `KerfDesk ${version} has downloaded and will install when you close KerfDesk.`,
+          }).show();
+      },
+    }).catch(() => console.warn('Commercial update check could not complete.'));
   return {
     runtime,
     config,
+    /**
+     * Runs once the window is open: a quiet weekly licence confirmation, then
+     * the signed update check. The workspace never waits for either (ADR-540).
+     */
+    start: (): void => {
+      if (config.channel !== 'commercial') return;
+      void runtime
+        .refreshInBackground()
+        .catch(() => undefined)
+        .then(checkUpdates);
+    },
     prepareQuit: () => {
       if (config.channel !== 'commercial') return;
       options.updater.autoInstallOnAppQuit =

@@ -82,9 +82,10 @@ owner. Their names are not activation codes. No universal development bypass shi
 
 On disposable user profiles, install the signed commercial build, start a trial,
 restart offline, activate a developer licence, exercise the three-seat limit and
-transfer, and verify expired trials and expired update periods separately. Open
-and save projects, close the activation screen before admission, and verify the
-normal active-job close handoff with a simulator. Do not operate hardware without
+transfer, and verify expired trials and expired update periods separately. Confirm
+the app opens as Free with no licence and that only Pro tools ask for one
+(ADR-540). Open and save projects, and verify the normal active-job close handoff
+with a simulator. Do not operate hardware without
 an explicit request.
 
 Publish two genuinely signed test versions through the commercial publisher, then

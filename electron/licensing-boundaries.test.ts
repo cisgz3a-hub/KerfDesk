@@ -2,7 +2,12 @@ import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { createLicensingStore, type LicenceRecord } from './licensing-store';
+import {
+  createLicensingStore,
+  LicenceStoreUnreadableError,
+  validLicenceKey,
+  type LicenceRecord,
+} from './licensing-store';
 import { licensingDeviceId } from './licensing-device';
 import { withLicensingRoutes } from './licensing-routes';
 import { createLicensingRuntime } from './licensing-runtime';
@@ -68,10 +73,31 @@ describe('main-process protected credential storage', () => {
   it('bounds stored data before decrypting and fails closed on corrupt encrypted data', async () => {
     const h = await storage();
     await writeFile(h.file, Buffer.alloc(131_073));
-    await expect(h.store.read()).rejects.toThrow('invalid');
+    await expect(h.store.read()).rejects.toBeInstanceOf(LicenceStoreUnreadableError);
     expect(h.secureStorage.decryptStringAsync).not.toHaveBeenCalled();
     await writeFile(h.file, Buffer.from('corrupt'));
-    await expect(h.store.read()).rejects.toThrow();
+    await expect(h.store.read()).rejects.toBeInstanceOf(LicenceStoreUnreadableError);
+  });
+  it('reports a record the OS key can no longer decrypt as unreadable, and resets it', async () => {
+    const h = await storage();
+    await h.store.write({ schemaVersion: 1, lastSeenAt: 10 });
+    h.secureStorage.decryptStringAsync.mockRejectedValueOnce(new Error('key changed'));
+    await expect(h.store.read()).rejects.toBeInstanceOf(LicenceStoreUnreadableError);
+    await h.store.reset();
+    await expect(readFile(h.file)).rejects.toMatchObject({ code: 'ENOENT' });
+    expect(await h.store.read()).toBeNull();
+    await h.store.reset();
+  });
+  it('keeps a saved licence key only when it is a printable bounded key', async () => {
+    const h = await storage();
+    await h.store.write({ schemaVersion: 1, lastSeenAt: 10, licenseKey: 'KD1.license.secret' });
+    expect((await h.store.read())?.licenseKey).toBe('KD1.license.secret');
+    await expect(
+      h.store.write({ schemaVersion: 1, lastSeenAt: 10, licenseKey: 'KD1 with space' }),
+    ).rejects.toThrow();
+    expect(validLicenceKey('KD1.license.secret')).toBe(true);
+    expect(validLicenceKey('short')).toBe(false);
+    expect(validLicenceKey('KD1.line\nbreak')).toBe(false);
   });
 });
 
@@ -100,7 +126,7 @@ function routes() {
   const runtime = createLicensingRuntime({
     config: { channel: 'free' },
     currentVersion: '1.0.0',
-    store: { read: vi.fn(), write: vi.fn() },
+    store: { read: vi.fn(), write: vi.fn(), reset: vi.fn() },
     deviceId: vi.fn(),
     deviceName: 'test',
     fetch: vi.fn(),
@@ -137,6 +163,17 @@ describe('licensing custom protocol capability boundary', () => {
       400,
     );
     expect(h.activate).toHaveBeenCalledTimes(1);
+  });
+  it('routes the recovery actions and no longer offers a launch gate', async () => {
+    const h = routes();
+    const reset = vi.spyOn(h.runtime, 'resetStore');
+    const discard = vi.spyOn(h.runtime, 'discardPayment');
+    const handle = withLicensingRoutes(async () => new Response('asset'), h.runtime);
+    expect((await handle(request('reset', {}, {}))).status).toBe(200);
+    expect((await handle(request('discard-payment', {}, {}))).status).toBe(200);
+    expect(reset).toHaveBeenCalledOnce();
+    expect(discard).toHaveBeenCalledOnce();
+    expect((await handle(request('launch', {}, {}))).status).toBe(404);
   });
   it.each([
     { Origin: 'https://evil.example' },

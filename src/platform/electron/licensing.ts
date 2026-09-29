@@ -1,7 +1,7 @@
-import type { DesktopLicenceAdapter, DesktopLicenceStatus } from '../types';
+import type { LicenceAdapter, LicenceStatus } from '../types';
 
 type FetchLicence = (input: string, init: RequestInit) => Promise<Response>;
-const STATES: ReadonlyArray<DesktopLicenceStatus['state']> = [
+const STATES: ReadonlyArray<LicenceStatus['state']> = [
   'ready',
   'activation-required',
   'trial-expired',
@@ -11,26 +11,33 @@ const STATES: ReadonlyArray<DesktopLicenceStatus['state']> = [
   'clock-error',
 ];
 
-function parseStatus(value: unknown): DesktopLicenceStatus {
+function nullableText(value: unknown, max: number): boolean {
+  return value === null || (typeof value === 'string' && value.length <= max);
+}
+
+export function parseLicenceStatus(value: unknown): LicenceStatus {
   if (typeof value !== 'object' || value === null) throw new Error('Invalid licence response.');
-  const status = value as DesktopLicenceStatus;
+  const status = value as LicenceStatus;
   if (
     !['free', 'commercial'].includes(status.channel) ||
+    !['pro', 'free'].includes(status.edition) ||
     !STATES.includes(status.state) ||
     ![
-      status.sessionAuthorized,
       status.perpetualUpdates,
       status.deactivationPending,
       status.paymentPending,
+      status.storeUnreadable,
     ].every((flag) => typeof flag === 'boolean') ||
     !validRights(status) ||
-    (status.message !== null && typeof status.message !== 'string')
+    !nullableText(status.licenseKey, 256) ||
+    !nullableText(status.paymentOrderId, 160) ||
+    !nullableText(status.message, 1000)
   )
     throw new Error('Invalid licence response.');
   return status;
 }
 
-function validRights(status: DesktopLicenceStatus): boolean {
+function validRights(status: LicenceStatus): boolean {
   return (
     (status.tier === null || ['trial', 'paid', 'developer'].includes(status.tier)) &&
     [status.accessExpiresAt, status.updatesUntil].every(
@@ -41,8 +48,8 @@ function validRights(status: DesktopLicenceStatus): boolean {
 
 export function createDesktopLicenceAdapter(
   fetchLicence: FetchLicence = (input, init) => fetch(input, init),
-): DesktopLicenceAdapter {
-  const request = async (action: string, body?: unknown): Promise<DesktopLicenceStatus> => {
+): LicenceAdapter {
+  const request = async (action: string, body?: unknown): Promise<LicenceStatus> => {
     const response = await fetchLicence(`./api/licensing/${action}`, {
       method: body === undefined ? 'GET' : 'POST',
       cache: 'no-store',
@@ -56,7 +63,7 @@ export function createDesktopLicenceAdapter(
     });
     if (!response.ok)
       throw new Error('The desktop licence service is unavailable. Please restart KerfDesk.');
-    return parseStatus(await response.json());
+    return parseLicenceStatus(await response.json());
   };
   return {
     status: () => request('status'),
@@ -64,9 +71,10 @@ export function createDesktopLicenceAdapter(
     startTrial: () => request('trial', {}),
     refresh: () => request('refresh', {}),
     deactivate: () => request('deactivate', {}),
-    launch: () => request('launch', {}),
+    resetStore: () => request('reset', {}),
     checkout: (operation, licenseKey) =>
       request('checkout', { operation, ...(licenseKey === undefined ? {} : { licenseKey }) }),
     claimPayment: () => request('claim-payment', {}),
+    discardPayment: () => request('discard-payment', {}),
   };
 }

@@ -349,7 +349,8 @@ export const COMMAND_HELP: Readonly<Record<CommandId, CommandHelpTopic>> = {
   },
   'help.licence': {
     family: 'help',
-    tooltip: 'Manage your desktop trial, licence, computer activation and update coverage.',
+    tooltip:
+      'See your Free or Pro edition, start the Pro trial, and manage your licence key, devices and updates.',
   },
   'help.tutorials': {
     family: 'help',

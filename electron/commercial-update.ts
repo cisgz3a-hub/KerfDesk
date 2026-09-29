@@ -171,6 +171,29 @@ function installerFileMatches(file: unknown, expected: Artifact): boolean {
   );
 }
 
+/**
+ * Each catalogue entry carries its own signature, so one damaged, unsigned or
+ * not-yet-published entry is skipped instead of stopping every update
+ * (ADR-523 Amendment 1). Two entries for one version are ambiguous, so that
+ * version is skipped too. Newest first.
+ */
+export function trustedCandidates(
+  envelopes: ReadonlyArray<unknown>,
+  options: Pick<Options, 'releaseKeys' | 'now'>,
+): Candidate[] {
+  const candidates = envelopes
+    .map((value) => commercialUpdateCandidate(value, options.releaseKeys, options.now?.()))
+    .filter((value): value is Candidate => value !== null);
+  const skipped = envelopes.length - candidates.length;
+  if (skipped > 0) console.warn(`Skipped ${skipped} unverifiable update catalogue entries.`);
+  const counts = new Map<string, number>();
+  for (const candidate of candidates)
+    counts.set(candidate.version, (counts.get(candidate.version) ?? 0) + 1);
+  return candidates
+    .filter((candidate) => counts.get(candidate.version) === 1)
+    .sort((a, b) => compare(b.version, a.version));
+}
+
 function canCheck(options: Options): boolean {
   return (
     options.isPackaged &&
@@ -201,14 +224,7 @@ export async function checkCommercialUpdates(
       headers: { Accept: 'application/json' },
     }),
   );
-  const candidates = envelopes.map((value) =>
-    commercialUpdateCandidate(value, options.releaseKeys, options.now?.()),
-  );
-  if (candidates.some((value) => value === null)) throw new Error('Untrusted update catalog');
-  const valid = candidates.filter((value): value is Candidate => value !== null);
-  if (new Set(valid.map((value) => value.version)).size !== valid.length)
-    throw new Error('Duplicate update versions');
-  valid.sort((a, b) => compare(b.version, a.version));
+  const valid = trustedCandidates(envelopes, options);
   for (const candidate of valid) {
     if (
       compare(candidate.version, options.currentVersion) <= 0 ||

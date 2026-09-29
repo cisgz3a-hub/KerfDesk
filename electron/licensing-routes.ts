@@ -54,8 +54,9 @@ async function dispatch(
     trial: runtime.startTrial,
     refresh: runtime.refresh,
     deactivate: runtime.deactivate,
-    launch: runtime.launch,
+    reset: runtime.resetStore,
     'claim-payment': runtime.claimPayment,
+    'discard-payment': runtime.discardPayment,
   };
   return Object.hasOwn(actions, action)
     ? response(await actions[action as keyof typeof actions]())
