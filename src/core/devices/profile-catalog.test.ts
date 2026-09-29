@@ -72,7 +72,9 @@ describe('GRBL_MACHINE_PROFILE_CATALOG', () => {
     // Creality's rated 600 mm/s. The vendor contract cannot read $110/$111, so
     // a 10000 ceiling capped every layer at 28% of the rating (audit speed-1).
     expect(specific.profile.maxFeed).toBe(36000);
-    expect(specific.profile.catalogVersion).toBe('2026-09-24');
+    // 2026-09-28: the 20 W blue module fitted, swappable for the 2 W infrared (ADR-503).
+    expect(specific.profile.catalogVersion).toBe('2026-09-28');
+    expect(specific.profile.laserSubProfile?.opticalPowerW).toBe(20);
     expect(specific.profile.framingFeedMmPerMin).toBe(10000);
     expect(profileConfidenceLabel(specific.profile)).toBe('Public-spec starter');
     expect(fallback.profile.name).toBe('Creality Falcon-compatible GRBL diode');

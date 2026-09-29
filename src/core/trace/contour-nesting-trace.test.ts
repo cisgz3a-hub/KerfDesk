@@ -171,7 +171,7 @@ describe('traced containment forest (ADR-531)', () => {
     expectFillRulesAgree(path, 60, 60);
   });
 
-  it('a thin hollow C: the bounds-centre probe misses the hole, the carried forest does not', () => {
+  it('a thin hollow C: the vertex probe and the carried forest both find the hole', () => {
     // An outlined C: a C-shaped ink band whose C-shaped hole ends inside it.
     const angleOk = (x: number, y: number, mouthDeg: number): boolean =>
       Math.abs((Math.atan2(y - 32, x - 32) * 180) / Math.PI) > mouthDeg;
@@ -188,9 +188,10 @@ describe('traced containment forest (ADR-531)', () => {
       polyline: polyline.points,
       closed: true,
     }));
-    // Today's probe: the hole's bounds centre lies in the C's mouth, outside
-    // the outline, so the hole reads as a second outer (depth 0).
-    expect(containmentDepths(segments)).toEqual([0, 0]);
+    // The hole's bounds centre lies in the C's mouth, outside the outline, so
+    // the old bounds-centre probe read the hole as a second outer. The probe
+    // now uses a vertex of the hole, which is inside the outline.
+    expect(containmentDepths(segments)).toEqual([0, 1]);
     // With the carried forest the hole is inside its outline.
     const carried = segments.map((segment, index) => ({
       ...segment,

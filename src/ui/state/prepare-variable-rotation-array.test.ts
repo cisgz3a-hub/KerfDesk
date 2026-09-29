@@ -185,7 +185,6 @@ describe('distinct variable Circular and Point Rotation arrays', () => {
       expect(useStore.getState().project).toBe(before.project);
       useStore.getState().redo();
       expect(useStore.getState().project).toBe(result.project);
-      useStore.getState().advanceVariablesAfter(before.project, 'successful-export');
       useStore.getState().advanceVariablesAfter(result.project, 'successful-stream');
       expect(useStore.getState().project).toBe(result.project);
       useStore.getState().advanceVariablesAfter(result.project, 'successful-export', {

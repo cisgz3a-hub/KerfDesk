@@ -1,5 +1,6 @@
 import type { Polyline, Vec2 } from '../scene';
 import type { AdaptivePocketPlan } from './adaptive-pocket';
+import { AdaptiveCutterContact } from './adaptive-pocket-contact';
 import {
   createAdaptivePocketStockGrid,
   type AdaptivePocketGrid as Grid,
@@ -21,7 +22,13 @@ export type AdaptivePocketVerification =
     };
 
 const COVERAGE_TARGET = 0.985;
-const CONTACT_BINS = 180;
+
+// The cutter path run since the contact was last evaluated. Every move at
+// least a quarter cell long is evaluated at each of its half-cell samples;
+// along a run of shorter moves, such as a dense curve's fillet slivers, it is
+// evaluated once the path has run a quarter cell. The contact is so evaluated
+// at least every half cell of path, while every sample still clears the grid.
+type ContactGauge = { runMm: number };
 
 export function verifyAdaptivePocket(
   contours: ReadonlyArray<Polyline>,
@@ -34,6 +41,8 @@ export function verifyAdaptivePocket(
   const grid = gridResult.grid;
   const initialStock = countOccupied(grid.occupied);
   if (initialStock === 0) return { ok: false, reason: 'Adaptive verification found no stock.' };
+  // The grid measures coverage; the contact, and so the engagement, is exact.
+  const contact = new AdaptiveCutterContact(toolDiameterMm / 2);
   let maxSimulatedEngagementMm = 0;
   for (const sequence of plan.sequences) {
     const entryEnd = clearEntrySweep(
@@ -42,17 +51,19 @@ export function verifyAdaptivePocket(
       sequence.entryRadiusMm,
       toolDiameterMm / 2,
     );
+    contact.addEntry(sequence.entryCenter, sequence.entryRadiusMm);
     let previous = entryEnd;
+    const gauge: ContactGauge = { runMm: Number.POSITIVE_INFINITY };
     for (const ring of sequence.rings) {
       const first = ring.points[0];
       if (first === undefined) continue;
-      const connectorEngagement = cutSegment(grid, previous, first, toolDiameterMm / 2);
+      const connectorEngagement = cutSegment(grid, contact, previous, first, gauge);
       maxSimulatedEngagementMm = Math.max(maxSimulatedEngagementMm, connectorEngagement);
       for (let index = 1; index < ring.points.length; index += 1) {
         const start = ring.points[index - 1];
         const end = ring.points[index];
         if (start !== undefined && end !== undefined) {
-          const segmentEngagement = cutSegment(grid, start, end, toolDiameterMm / 2);
+          const segmentEngagement = cutSegment(grid, contact, start, end, gauge);
           maxSimulatedEngagementMm = Math.max(maxSimulatedEngagementMm, segmentEngagement);
         }
       }
@@ -71,6 +82,10 @@ function verificationResult(
   engagementLimitMm: number,
 ): AdaptivePocketVerification {
   const coverageRatio = (initialStock - countOccupied(grid.occupied)) / initialStock;
+  // One cell diagonal above the limit is allowed, as when the grid measured
+  // the contact. The contact is exact now, so this is margin, not measurement
+  // error; it is kept so that no verdict moves except through the measurement
+  // (ADR-154 Amendment 3).
   const toleranceMm = grid.cellMm * Math.SQRT2;
   if (maxSimulatedEngagementMm > engagementLimitMm + toleranceMm) {
     return {
@@ -113,16 +128,30 @@ function clearEntrySweep(
   return end;
 }
 
-function cutSegment(grid: Grid, start: Vec2, end: Vec2, toolRadiusMm: number): number {
+function cutSegment(
+  grid: Grid,
+  contact: AdaptiveCutterContact,
+  start: Vec2,
+  end: Vec2,
+  gauge: ContactGauge,
+): number {
   const length = Math.hypot(end.x - start.x, end.y - start.y);
   const samples = Math.max(1, Math.ceil(length / (grid.cellMm / 2)));
+  const everySample = length >= grid.cellMm / 4;
   let maximum = 0;
   for (let index = 0; index <= samples; index += 1) {
     const t = index / samples;
     const center = { x: start.x + (end.x - start.x) * t, y: start.y + (end.y - start.y) * t };
-    maximum = Math.max(maximum, simulatedRadialEngagement(grid, center, toolRadiusMm));
-    clearDisk(grid, center, toolRadiusMm);
+    if (index > 0) gauge.runMm += length / samples;
+    // A move's first sample repeats the last one's end, and is evaluated
+    // only if that end was not.
+    if (gauge.runMm > 0 && (everySample || gauge.runMm >= grid.cellMm / 4)) {
+      maximum = Math.max(maximum, contact.engagementMm(center, start));
+      gauge.runMm = 0;
+    }
+    clearDisk(grid, center, contact.toolRadiusMm);
   }
+  contact.addMove(start, end);
   return maximum;
 }
 
@@ -153,41 +182,6 @@ function cutSegmentWithoutMeasurement(
       toolRadiusMm,
     );
   }
-}
-
-function simulatedRadialEngagement(grid: Grid, center: Vec2, toolRadiusMm: number): number {
-  const contact = new Uint8Array(CONTACT_BINS);
-  const cellHalfDiagonalMm = (grid.cellMm * Math.SQRT2) / 2;
-  const radialBandMm = cellHalfDiagonalMm * 1.1;
-  visitDiskCells(grid, center, toolRadiusMm, (index, distance) => {
-    if (grid.occupied[index] !== 1 || distance < toolRadiusMm - radialBandMm) return;
-    const point = cellCenter(grid, index % grid.width, Math.floor(index / grid.width));
-    const angle = Math.atan2(point.y - center.y, point.x - center.x);
-    const bin = Math.floor((((angle + Math.PI) / (2 * Math.PI)) * CONTACT_BINS) % CONTACT_BINS);
-    const angularFootprint = Math.ceil(
-      Math.asin(Math.min(1, cellHalfDiagonalMm / Math.max(distance, cellHalfDiagonalMm))) /
-        ((2 * Math.PI) / CONTACT_BINS),
-    );
-    for (let offset = -angularFootprint; offset <= angularFootprint; offset += 1) {
-      contact[(bin + offset + CONTACT_BINS) % CONTACT_BINS] = 1;
-    }
-  });
-  const span = largestCircularRun(contact) * ((2 * Math.PI) / CONTACT_BINS);
-  return toolRadiusMm * (1 - Math.cos(Math.min(Math.PI, span) / 2));
-}
-
-function largestCircularRun(contact: Uint8Array): number {
-  let maximum = 0;
-  let current = 0;
-  for (let index = 0; index < contact.length * 2; index += 1) {
-    if (contact[index % contact.length] === 1) {
-      current = Math.min(contact.length, current + 1);
-      maximum = Math.max(maximum, current);
-    } else {
-      current = 0;
-    }
-  }
-  return maximum;
 }
 
 function clearDisk(grid: Grid, center: Vec2, radiusMm: number): void {

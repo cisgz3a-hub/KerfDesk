@@ -42,7 +42,9 @@ describe('OFL CNC single-line text rendering', () => {
       const unsupported = await render(fontKey, '\u{1F642}', 10);
       const fallback = await render(fontKey, '?', 10);
 
-      expect(unsupported).toEqual(fallback);
+      expect(unsupported.paths).toEqual(fallback.paths);
+      expect(unsupported.bounds).toEqual(fallback.bounds);
+      expect(unsupported.missingCharacters).toEqual(['\u{1F642}']);
     },
   );
 

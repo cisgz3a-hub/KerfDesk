@@ -36,6 +36,8 @@ export function compiledInlayGroups(
     polylines,
     settings,
     config,
+    // Neither the pocket nor the insert ramps, so neither records the layer's
+    // ramp angle (ADR-273 Amendment 2).
     (groupSettings, tool, passes) =>
       cncGroupForPasses(
         layer,
@@ -43,15 +45,25 @@ export function compiledInlayGroups(
         tool,
         applyProfileLeadPasses(
           passes,
-          groupSettings,
+          settingsWithoutRamp(groupSettings),
           tool.diameterMm,
           machineBoundsForDevice(device),
         ),
         device,
         config,
+        { includeRampEntry: false },
       ),
     jogAxisSignsForOrigin(device.origin).x,
   );
+}
+
+// The pair compiles without applyRampEntry, so no ramp owns the insert's
+// entry. An angle left on the layer from an earlier cut type (inlay layers
+// hide the Ramp entry row) must not take the insert's lead and leave a plunge
+// onto its fit wall (ADR-250 Amendment 2).
+function settingsWithoutRamp(settings: CncLayerSettings): CncLayerSettings {
+  const { rampEntryDeg: _unused, ...unramped } = settings;
+  return unramped;
 }
 
 export function secondaryClearingGroups(

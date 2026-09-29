@@ -244,6 +244,24 @@ pnpm preview:web
 
 Serves the built bundle on **http://localhost:4173**.
 
+### Headless trace command
+
+```bash
+pnpm trace --preset "Line Art" --format svg -o art.svg art.png
+cat art.png | pnpm -s trace -f dxf > art.dxf
+```
+
+Traces one PNG, JPEG, BMP, TIFF or PBM/PGM/PPM image to SVG, DXF, PDF, EPS or GeoJSON with the
+app's own tracer, presets, Trace dialog settings and relaxed-settings retry (ADR-477). For 8-bit
+sRGB PNG and BMP images up to 2048 px on the long edge the file is byte for byte what Multi-File
+Trace writes. The app has no Netpbm import, so PBM/PGM/PPM trace the pixels they hold as an app
+import of the same pixels would; GIF, which the app opens at its first frame, is refused here.
+Larger images trace at full resolution with pixel-unit settings scaled as the app scales them for
+its finer commit grid, and JPEG (a different decoder than the browser's) or images with colour
+profiles can trace slightly differently at edges. Warnings such as a relaxed-settings retry go to
+standard error. The package also exposes it as the `kerfdesk-trace` bin. `pnpm trace --help`
+lists every flag; the exit status is 0 traced, 1 failed, 2 invalid options, 3 nothing to draw.
+
 ### Desktop (Electron)
 
 ```bash
@@ -478,7 +496,10 @@ PR titles follow Conventional Commits (`feat:`, `fix:`, `refactor:`, `test:`, `d
 
 ## License
 
-[MIT](LICENSE) © 2026 Johann Stolk.
+© 2026 Johann Stolk. All rights reserved; see [`LICENSE`](LICENSE). The app is free to use under
+its [License & Safety Notice](public/eula.txt), except features marked Pro, which need a trial or a
+paid licence. Versions up to and including the `mit-final` tag were released under the MIT License
+([`LICENSE-MIT`](LICENSE-MIT)), and anyone who received them keeps those rights (ADR-543).
 
 Bundled dependencies, fonts and assets remain under their own licenses — see
 [`THIRD_PARTY_NOTICES.md`](THIRD_PARTY_NOTICES.md) for the readable summary and

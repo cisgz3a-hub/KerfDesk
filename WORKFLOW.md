@@ -43,6 +43,10 @@ opportunity, without an extra branding delay. It introduces no startup interacti
 1. App opens to **empty workspace** state (see F-A2).
 2. Status bar shows: `Ready · No device configured · Empty workspace`.
 3. **No** welcome modal, **no** onboarding tour, **no** "what's new" dialog. Just the workspace.
+   A card over the canvas's top right corner says the machine is the generic starter (ADR-500):
+   **Set up machine** opens Machine Setup, or, once a machine was saved there, **Use *name***
+   applies it as one undo step. **Not now** hides it until the next launch. It blocks nothing,
+   takes no focus or canvas room, and goes as soon as the project's machine changes by any route.
 4. Default device profile is auto-loaded:
    - Name: `Default 400×400`
    - Bed: 400 × 400 mm
@@ -95,7 +99,7 @@ opportunity, without an extra branding delay. It introduces no startup interacti
 - **Numeric transforms**: X, Y, width, height, rotation, and the aspect-ratio lock remain directly available. **Anchor** opens the existing nine-point transform reference selector in a keyboard-accessible popover. Changing its presentation does not change the X/Y reference, resize anchor, or rotation centre.
 - **Artwork / Operations panel**: docked right with **Settings**, **Run order**, and **Materials** views in Laser mode; CNC keeps Settings and Run order. Settings is the default. Run order shares the same docked rail at the same width while the canvas remains on the left; it is not a modal or a third sidebar, and switching views never resizes the rail (ADR-348). Materials owns reusable preset and saved-library management without displacing the active job workflow. A header chevron collapses the rail to a narrow named strip; the same strip expands it.
 - **Laser artwork settings (ADR-430)**: the selected artwork's name heads the Settings view, with the Operation | Artwork switch under it. The Operation view leads with the operation's colour and name, then one scope line only when an edit reaches other artwork (with **Make unique**). **Line**, **Fill** and **Image** are three buttons; Power, Speed and Passes share one row; Fill adds Line spacing and Angle, and Image adds Dither, Line interval and (Grayscale) Min power. Scan both ways and Air assist are one-line switches whose explanations are tooltips. **More cut settings** opens Cut Settings for everything else and names what it holds. Include in output, Show on canvas and **Add operation** close the view.
-- **CNC artwork settings (ADR-481)**: the same header, scope line and footer lead and close the CNC Operation view. **Cut type** comes first (its explanation is the tooltip), then **Bit** with a **Manage bits** link to the Machine Setup bit library, the second bit the cut type uses (Pocket roughing, Floor clearing or Relief finishing) and **Material**. Cut depth and Depth per pass share one row with **Set to stock thickness** under it; Feed, Plunge and Spindle speed share the next, with the machine maximum under Spindle speed opening Machine Setup. **Traced edges** appears only for imported or traced outlines. Collapsed sections follow only for the cut types they serve, each naming its state (Holding tabs "4 per shape", Clearing strategy "Offset · 40 %", Entry & travel "Climb · Plunge"). Stock, tiling, spin-up, coolant, safe Z and park are edited in Machine Setup only.
+- **CNC artwork settings (ADR-481)**: the same header, scope line and footer lead and close the CNC Operation view. **Cut type** comes first (its explanation is the tooltip), then **Bit** with a **Manage bits** link to the Machine Setup bit library, the second bit the cut type uses (Pocket roughing, Floor clearing or Relief finishing) and **Material**. Cut depth and Depth per pass share one row with **Set to stock thickness** under it; Feed, Plunge and Spindle speed share the next, with the machine maximum under Spindle speed opening Machine Setup. **Traced edges** appears only for imported or traced outlines. Collapsed sections follow only for the cut types they serve, each naming its state (Holding tabs "4 per shape", Clearing strategy "Offset · 40 %", Entry & travel "Climb · Plunge"). An adaptive pocket's Entry & travel names its own helix ("Climb · Adaptive helix"), and names the Ramp entry angle only as the entry of reliefs on the same operation ("Relief ramp 5°", ADR-481 Amendment 1). Stock, tiling, spin-up, coolant, safe Z and park are edited in Machine Setup only.
 - **Operation cards**: the list comes before the artwork inspector, with the selected operation's process fields before secondary artwork properties. Each card keeps its visibility toggle on the face. Its **•••** disclosure contains order, output, artwork selection, settings clipboard, and delete controls.
 - **Machine controls panel**: in Spacious layout it is docked at the far right with the same collapse/expand pattern. Both panels can be resized or hidden independently. It may be collapsed during a job because active run controls live independently in the Live Motion bar.
 - **Toasts**: share the canvas's available space (lower left of the workspace, above the live controls) or a reserved row inside the open modal — never the rails, where they hid Start/Job and the layer list. Only the newest three render. The toast body does not take pointer input, so a click or drag through it reaches the canvas; the × control dismisses it early. Success confirmations dismiss after 4 s; advisories and failures after 8 s.
@@ -164,8 +168,13 @@ opportunity, without an extra branding delay. It introduces no startup interacti
    image bounds, rotation, unequal scale and mirroring. Bitmap DPI does not change SVG placement.
 2. KerfDesk-exported image clips and holes remain owned by the image, with no extra mask artwork
    or cutting operation. Image clips intersect an independently assigned image mask.
-3. Unsupported image presentation or clipping reports its reason. Decode failure, Esc cancellation
-   and document replacement leave the complete file uninserted and release staged image assets.
+3. An image KerfDesk cannot place faithfully is skipped and the rest of the file imports; a
+   warning toast counts the skipped images for each reason: GIF or SVG image data, opacity, a
+   filter or mask, an unusable position or size, a `slice` that crops, or a skew (ADR-358
+   Amendment 3). `preserveAspectRatio` `meet` fits the bitmap in its box as SVG draws it. An image
+   clip KerfDesk cannot read still rejects the file with its reason. Decode failure, Esc
+   cancellation and document replacement leave the complete file uninserted and release staged
+   image assets.
 
 #### Edge — SVG with a vector clip, mask or filter
 1. Clipped artwork imports as the part its clip keeps (ADR-358 Amendment 2). Filled shapes are
@@ -186,8 +195,8 @@ opportunity, without an extra branding delay. It introduces no startup interacti
    CSS, or a clip transform that cannot be read.
 5. Vector masks and filters no longer reject the file. The artwork imports without them, and a
    warning toast says how many elements were imported without their masks (areas the masks hide
-   are included) or without their filter effects. Masks, filters and opacity on embedded images
-   still reject the file.
+   are included) or without their filter effects. An embedded image with a mask, filter or
+   opacity is skipped with a warning instead (ADR-358 Amendment 3).
 6. Image clips follow the same rules: a missing `clipPathUnits` is `userSpaceOnUse` and a missing
    `clip-rule` is `nonzero`. KerfDesk's own exported image clips keep their curves.
 
@@ -195,9 +204,14 @@ opportunity, without an extra branding delay. It introduces no startup interacti
 1. A path's `A` arcs import as cubic curves of at most a quarter turn each. Each curve's midpoint
    lies on the arc, and nowhere does a curve stray more than 0.027% of the arc's larger radius,
    always outward: 0.027 mm on a 100 mm radius (ADR-159 Amendment 2). `<circle>`, `<ellipse>` and
-   rounded `<rect>` elements import as outlines sampled on the true curve.
+   rounded `<rect>` elements import as their SVG 2 equivalent paths, so their arcs stay curves the
+   same way.
 2. Artwork imported before that amendment keeps its arcs, up to 0.196% of the radius inside the arc
    (0.2 mm on a 100 mm radius), until **Re-import source** replaces them.
+3. A path or `<polyline>` whose last point returns to its first (within 0.0001 mm) imports as a
+   closed shape, as a `Z` or a `<polygon>` would, so kerf, tabs and overcut treat it as closed.
+4. Path data stops at its first error, as SVG 2 and browsers read it: the complete segments before
+   it import and nothing is invented after it.
 
 #### Error — file is not an SVG
 1. On drop, file type is checked by MIME and by content sniff (first 200 bytes).
@@ -1516,6 +1530,17 @@ Status bar messages (toasts that appear in the bar for 3 s) for non-blocking eve
 #### Edge — Brave with WebSerial behind a flag
 1. Same as "not supported"; Brave issue #24404 is noted in `PROJECT.md` delivery targets.
 
+#### Success — pick the fitted laser module (ADR-503)
+1. On a machine whose laser modules swap on one carriage (the Falcon A1 Pro's 20 W blue and
+   2 W infrared), the machine rail shows **Laser module** under the status readout. It names the
+   fitted module by power and colour; the preset ships with the blue one fitted.
+2. After swapping the module on the machine, pick it here. The profile's laser head becomes that
+   module, as one undoable machine change: recipes, the spot-size checks, tracing and the burn
+   preview follow it. The G-code does not change.
+3. Job Review names the module the job was prepared for and asks to check it is fitted. A Falcon
+   saved before it had a head shows "Pick the fitted module" here and a "Not chosen" warning row
+   in the review. Neither stops Start.
+
 ### F-B2. Disconnect
 
 #### Success
@@ -2031,6 +2056,21 @@ response, spindle-at-speed behavior, and real material/machine pacing remain har
 limits rather than software proof. This display model changes no emitted output, Start
 authorization, Frame proof, controller command, or safety boundary.
 
+### F-B11a. Machine hours and maintenance reminders (ADR-502)
+
+1. Each started job adds the time it spent running to the machine it started on: wall-clock time
+   from Start to its end, without pauses and tool changes. A stopped job counts the time it ran.
+   Frames, jogs, console moves and Preview are not jobs and add nothing.
+2. The machine rail's **Machine hours** section shows the machine's hours and jobs, and its
+   reminders: laser machines start with lens (20 h), air assist and fans (50 h), and belts, wheels
+   and rails (100 h); CNC machines with collet and bit (20 h), rails and lead screws (50 h), and
+   spindle mount and belts (100 h). Each shows when it is due. Intervals can be changed, reminders
+   added and removed, and **Done** counts the interval again from the machine's current hours.
+3. When a job's time makes a reminder due, a warning toast names the machine and the task. The
+   section heading shows how many are due. Nothing is blocked and nothing waits.
+4. Hours are kept in browser storage per machine setup (profile, bed and controller; laser and
+   CNC apart), not in projects. A machine left on the generic starter profile shares one record.
+
 ### F-B12. Disconnect during job (cable yank)
 
 #### Error — physical transport lost
@@ -2445,7 +2485,9 @@ authorization, Frame proof, controller command, or safety boundary.
   list of older jobs, and a later job that is aborted or interrupted removes the button
   rather than bringing back an older one (ADR-341 Amendment 4). A job too large for the
   execution archive is offered too: the page keeps its program until another job starts or
-  KerfDesk is closed or reloaded, and the prompt says so (ADR-341 Amendment 7). When the finished run
+  KerfDesk is closed or reloaded, and the prompt says so (ADR-341 Amendment 7). A storage failure
+  while activating an already staged run uses the same page-only fallback after a clean finish
+  (ADR-341 Amendment 9); it does not claim that the archive succeeded. When the finished run
   was a recovery or a painted pass, the preview follows its independently verified retained
   ancestor so the original full engraving is available where that archive still exists.
   The current artwork document is never replaced or recompiled by this workflow.
@@ -2453,33 +2495,37 @@ authorization, Frame proof, controller command, or safety boundary.
   a selected-area second pass repeats chosen parts of an already completed engraving.
 - Use **Paintbrush**, set its diameter in millimetres and paint areas to repeat. **Eraser**
   removes areas; **Hand**, Alt-drag and wheel zoom support detailed marking. Several strokes
-  can have different power. Select a painted stroke to edit its power, delete individual
+  can have different power. Select a painted stroke in the list to highlight it on the canvas
+  and edit its power, delete individual
   strokes, or use Undo/Redo and Clear areas. The most recent stroke wins in overlaps. A
   painted overlap never adds an extra pass; any deliberate repeated passes in the source
   program remain repeated inside the mask.
 - **Power (% of original)** is a multiplier of every saved S value, preserving grayscale:
   100% repeats the source power and 150% multiplies it by 1.5. Values that exceed the saved
-  profile's maximum S are capped and disclosed. Speed, beam mode, scan direction, scan
-  offsets, pixel-width correction and useful unpowered runways remain as emitted originally.
+  profile's maximum S are capped and disclosed after Preview as well as in Job Review.
+  Programmed feed, beam mode, scan direction, scan offsets, pixel-width correction and
+  unpowered approach/departure motion are retained.
   The mask does not crop/reprocess the source image or restart its dithering.
 - **Preview second pass** compiles off the UI thread. Its coloured burn paths show the
   actual selected output; faint paths show the saved engraving for context. The painted
-  mask is a selection, not a physical prediction of material darkness. Entire unselected
-  sweeps are omitted. A sweep ends at a rapid, a beam or air word, a feed change, or a
-  laser-off feed move that leaves the current line (a controlled-dark row change, even when it
-  runs at the engraving feed); a laser-off move that continues the line is a runway and stays
-  with its burn. A selected sweep is replayed only from its first painted point less the
-  sweep's own lead-in to its last painted point plus its own lead-out, crossing unpainted parts
-  in between at S0, so the head passes each painted point at the speed the original reached
-  there; a side with no lead-in (or lead-out) keeps the sweep's full approach on that side. A
-  small painted spot on a wide image row no longer replays the whole row. Repeated `G1` and
-  unchanged S words are left out (ADR-341 Amendment 3); saved passes record which writer built
-  them and replay with it. Every repositioning command carries S0 while the beam mode stays
-  armed; the mode word is written only when the mode changes and the program ends with one M5,
-  so the controller does not stop and drain around every selected sweep. Painted passes
+  mask is a selection, not a physical prediction of material darkness. New passes use writer 3
+  (ADR-341 Amendment 9). They retain the continuous motion context around a selected area,
+  including rapid travel and changes of feed and direction, and cross unpainted parts with S0. A short original
+  overscan is not proof that a shortened approach would reach the original speed. This can
+  retain several rows or a longer route of connected moves; entirely unselected
+  contexts can be omitted between actual synchronising state changes. Exact physical speed and material darkness still require
+  controller and material qualification. Repeated `G1` and unchanged S words are left out.
+  Every repositioning command carries S0. Air or beam-mode changes after constant-power cutting
+  occur only after real dark motion, including when the next cut shares the previous endpoint.
+  Saved passes record which writer built them; writers 1 and 2 remain available for exact
+  historical replay. Painted passes
   archived before 2026-09-22 were emitted with per-sweep beam words; they stay in history but
   no longer reproduce byte-exactly, so recovering them or painting from them is refused with the
   lineage message. The original engravings they came from are unaffected.
+- Dense previews reuse a display bitmap while panning or zooming and redraw the exact visible
+  paths after interaction settles. This changes only the display; pointer selection and output
+  keep their original coordinates. On short viewports the workbench body scrolls while its
+  action buttons remain reachable.
 - **Frame second pass** traces the exact derived motion bounds and returns to its captured
   position. **Start second pass** opens one immutable Job Review with current controller
   facts, selected-pass metrics and acknowledgements. Editing the painted output invalidates
@@ -2502,10 +2548,11 @@ authorization, Frame proof, controller command, or safety boundary.
   different: the **Execution archive** under History & recovery still retains at most 20
   terminal runs within 100 MiB for export and recovery, with its existing protected slots.
 - Supported inputs are the flat XY laser image, fill and vector programs KerfDesk generates
-  for GRBL, grblHAL and FluidNC. Marlin and Smoothieware programs are refused with a message
-  naming the controller, and their completed runs get no darkening prompt and no Machine-panel
-  entry; where older completions remain, the panel says so and keeps the selector. Native
-  external arcs, coordinate-changing commands, Z/rotary motion, dwell and stationary M3
+  for GRBL, grblHAL and FluidNC. G17 XY arcs using I/J centres are read as chords at the stock
+  GRBL arc tolerance of 0.002 mm (ADR-432); this does not establish equality with a controller
+  using a different arc setting. Marlin, Smoothieware and rotary completions get no darkening
+  prompt or Machine-panel entry. Other arc forms, coordinate-changing commands, Z motion,
+  dwell and stationary M3
   exposure cannot yet be transformed faithfully and produce a specific preparation error.
   No physical result, browser-minimisation behaviour or Falcon qualification follows from
   the software tests alone.
@@ -2703,6 +2750,10 @@ the lock when the owning window closes, reloads or crashes, so crash recovery is
    disabled while it has no effect. A chuck never stores a roller diameter.
 4. The preview shows the surface circumference, the machine travel for one revolution (the wrap
    limit the bounds preflight enforces), the Y scale, and the tallest artwork one revolution holds.
+5. **Rotary preset** (ADR-503) shows when the machine's family has a rotary whose maker publishes
+   its settings (today the Creality Rotary Kit Pro as a chuck, 40 mm per rotation, for Falcon
+   machines). Picking it fills in the type and Motion per turn, keeps the object's diameter and
+   the toggles, and shows where the figures come from. Test rotation still checks them.
 
 #### Success — test rotation
 1. With the controller connected, Idle, unalarmed, no job or other motion, auto-focus idle and
@@ -4282,7 +4333,7 @@ explicitly marked below; the remaining controls and user-facing flows are planne
    thickness (ADR-258 Amendment 2). A value left from thicker stock would otherwise free the
    parts on the final pass with no tabs. The warning never blocks save or Start.
 
-#### Edge — tabs on a cut that reaches or passes the stock bottom (ADR-258 Amendment 3)
+#### Edge — tabs on a cut that reaches or passes the stock bottom (ADR-258 Amendments 3 and 4)
 1. With Stock thickness set, a kept tab is one tab height of material above the stock bottom,
    however far the cut runs on into the spoilboard. On 6 mm stock, 2 mm tabs top out at Z-4 for a
    6.5 mm and an 8.15 mm cut alike, and for a 5.5 mm cut that stops just short of the bottom. Job
@@ -4292,6 +4343,14 @@ explicitly marked below; the remaining controls and user-facing flows are planne
    stock, or that the tabs sit below it and the part comes free, and asks for Stock thickness. With
    Stock thickness set, it says the tabs stay full height and that this relies on the thickness
    being right.
+3. A tab at least as thick as the set Stock thickness would reach the stock top, so it is cut half
+   the stock thick instead (Amendment 4): 2 mm tabs on 2 mm sheet are 1 mm bridges for a 2 mm or
+   2.3 mm cut. The layer line and the spoilboard warning say the tab was thinned. Both read which
+   operations cut tabs from the compiled passes, so an open path, which takes no tab, is never
+   said to have one.
+4. On the shipped Stock thickness, a through cut whose tabs are no shorter than the cut gets none.
+   Job Review warns that its parts come free and asks for a lower Tab height; the warning never
+   blocks save or Start.
 
 #### Empty
 1. An operation with no bound geometry compiles to no passes and is skipped; no G-code group is
@@ -4449,8 +4508,10 @@ explicitly marked below; the remaining controls and user-facing flows are planne
    and the G-code header and Job Review say so (F-CNC18, ADR-424
    Amendment 1). Below the first level, the bit rapids down from safe Z to
    1 mm above the stock the level above left (its depth plus the bit's rise
-   at full radius) and feeds only the rest; the first level, a level below
-   one that stopped short, and recovery jobs plunge from safe Z (ADR-489).
+   at full radius) and feeds only the rest, on each pass that repeats an
+   earlier cut's complete path with the same output primitive (ADR-489
+   Amendment 1); the first level, a level below one that stopped short, and
+   recovery jobs plunge from safe Z (ADR-489).
    Each straight run of a ring is one G-code move, however many cells it
    was traced across; the path is the same (ADR-488).
 3. Emitted G-code passes the plunged-travel invariant; scale is resolved
@@ -4754,7 +4815,10 @@ and lifts the command's CNC-only gate.)*
 
 #### Edge — relative arcs / early end / huge files / other planes
 1. G91 relative coordinates apply to XY, Z, and arc targets alike.
-2. M2 / M30 ends the program mid-file; later lines are ignored.
+2. M2 / M30 mid-file does not end the preview: GRBL resets G1, G90,
+   spindle and coolant there and runs the lines that follow, and KerfDesk
+   streams every line, so later moves are drawn and timed too, and Program
+   Health notes them.
 3. The parser reads the complete program and the 2D renderer retains every
    parsed step. Above 250,000 steps a visible pressure advisory states the
    exact count and warns that drawing may use substantial memory or respond
@@ -5193,10 +5257,16 @@ and lifts the command's CNC-only gate.)*
    Ramp entry owns entry motion when requested, while the lead settings stay
    stored. Tabbed profile ramps retain the raised tab windows and intentional
    vertical tab walls, then finish the original complete contour.
+   An inlay pair never ramps, so its insert keeps its lead even when the
+   layer carries a Ramp entry angle left from an earlier cut type, which an
+   inlay layer does not show (ADR-250 Amendment 2).
 
 #### Advisory — invalid or unrepresentable V-carve entry
-1. Ordinary profile/pocket/engrave ramp angles retain their [0.5°, 45°]
-   behavior. A V-carve uses the separate `vCarveRampEntryDeg` stored request,
+1. Ordinary profile/pocket/engrave and relief roughing retain positive requested
+   angles up to 45° without raising requests below 0.5°. Descent is budgeted in
+   0.001 mm Z steps against placed XY segment lengths, allowing for output rounding.
+   Its commanded Z component is capped to the selected plunge rate. A V-carve
+   uses the separate `vCarveRampEntryDeg` stored request,
    so a generic ramp retained from an older cut type cannot activate it. The
    requested value is preserved in Job Review and G-code provenance, while
    the medial variable-depth profile governs actual motion. This is advisory
@@ -5220,6 +5290,15 @@ and lifts the command's CNC-only gate.)*
    header says `; cnc entry-advisory: N passes plunge: path shorter than one
    cut width`, and Job Review lists it as an advisory, naming Helical entry
    for a pocket (ADR-471).
+3. If no source segment can represent a descent at the requested angle, the
+   original contour or tabbed path keeps its plunge. Job Review and the exported
+   header identify coordinate precision as the reason. Vertices are not removed
+   to obtain a ramp. The finding remains advisory; Frame is the ordinary Start gate.
+4. Headers label the requested angle as `requested-max-angle-deg`. Only marked
+   ramp paths claim `contour-ramp`; drill, adaptive pocket and inlay paths do not
+   inherit that claim from a stored setting. Adaptive entry is named in the card
+   and review. Intentional tab walls and clipped tile entries are separate from
+   the contour entry-angle bound.
 
 #### Edge — reliefs on a layer with a ramp angle
 1. Relief roughing ramps with the layer's angle (F-CNC17, ADR-424) and its
@@ -5227,12 +5306,26 @@ and lifts the command's CNC-only gate.)*
    starts, so the finishing group's header carries no entry line, and Job
    Review's operation line names the relief stages that plunge, for example
    `ramp entry 5° (relief finishing plunges)` (ADR-273 Amendment 1).
+2. Roughing uses the final machine-space XY placement when budgeting its entry.
+   Its actual ramps and retained short-loop or precision plunges carry distinct
+   markers. A later-depth start below stock top is not labelled as a tiled entry
+   unless the job was actually tiled.
 2. A roughing run whose first ring is shorter than one cut width still
    plunges. The roughing header adds the same `; cnc entry-advisory: N
    passes plunge: path shorter than one cut width` line, and Job Review lists
    an advisory naming the relief roughing passes and the field that sets
    their ramp: Ramp entry on a profile, pocket or engrave layer, Roughing
    ramp on any other (ADR-424 Amendment 1). No ramp angle, no notice.
+
+#### Edge — operations that enter their own way
+1. Adaptive clearing enters on its own helix and plunges its finishing
+   rings, a helical pocket enters on its helix, drilling pecks straight down,
+   and an inlay pair plunges its pocket and insert. None of them ramps with
+   the layer's angle, so their G-code headers carry no entry line, and Job
+   Review's operation line says so, for example
+   `ramp entry 5° (not used by adaptive clearing)` (ADR-273 Amendment 2).
+   Drill and inlay layers do not show the Ramp entry row; an angle they
+   carry is left over from an earlier cut type.
 
 ### F-CNC19. Tile a job larger than the bed — Phase H.10
 
@@ -5244,6 +5337,10 @@ and lifts the command's CNC-only gate.)*
    (clipped at boundaries, Z interpolated), translated so the tile's
    corner is the machine origin: cut tile 1, slide the stock, re-zero
    XY on the next tile frame, cut tile 2, and so on.
+   A ramp entry kept as a plunge because its source path is shorter than one
+   cut width or cannot descend at coordinate precision remains disclosed in
+   each affected tile's G-code header, including tabbed path3d output. Split
+   fragments count separately in that tile's plunge advisory.
 3. With registration holes on, **Configure registration** starts a separate
    saved plan from the current default cutter and operation cutting values.
    Review its cutter, hole diameter, depth, depth per pass, feed, plunge and
@@ -7194,7 +7291,7 @@ as the pane's design record.
 - **Edge / camera without its own calibration.** The setup steps say to calibrate it, the canvas
   says the saved calibration belongs to another camera, and calibrating it keeps the others.
 
-### F-CAM2. One-photo camera calibration (ADR-441, Amendments 1 and 3)
+### F-CAM2. One-photo camera calibration (ADR-441, Amendments 1, 3 and 4)
 
 - **Success / calibrated.** **Calibrate camera…** opens the wizard. The operator covers the bed
   with one flat sheet, enters its thickness and, optionally, the camera lens height by tape
@@ -7206,7 +7303,11 @@ as the pane's design record.
   photo flattened onto the bed with each ring coloured by its error. **Save calibration** stores
   the camera model on the machine profile (undoable) and turns the overlay on.
 - **Reuse / target already engraved.** **Target already engraved** skips the job and goes to the
-  photo, using the same margins.
+  photo. It looks for the target last engraved from this computer on this machine while the
+  margin (or head target size) still matches, and otherwise for the layout the settings describe.
+  The setup and photo steps name the layout it looks for: its size, margin, bed and where it came
+  from. A target engraved with another margin is described by entering that margin first
+  (Amendment 4).
 - **Edge / small bed.** When the usual grid of 10 mm rings 40 mm apart does not fit inside the
   margins, the rings and spacing shrink together so every ring stays on the bed. The grid keeps
   rings around all three solid anchors. Engrave a new target if an older one ran off the bed or
@@ -7214,7 +7315,18 @@ as the pane's design record.
 - **Error / engrave not started or stopped.** If review, preflight or confirmation stops the job,
   or the stream errors, is cancelled or disconnects, the wizard returns to setup with the reason.
 - **Error / rings not found.** No rings, anchors covered, a mirrored picture or too few rings each
-  give a plain message saying what to fix; nothing is saved. A long solve can be cancelled.
+  give a plain message saying what to fix; nothing is saved. A long solve can be cancelled. A
+  target that fills the picture edge to edge says to move the camera back or engrave a smaller
+  target, and a lens the rings cannot model out to the picture's edges asks for a larger target
+  (Amendment 4).
+- **Edge / target smaller than the picture.** The fit keeps only the lens terms the rings pin
+  down. When a quarter or more of what the camera sees lies outside the target, the result says
+  that the accuracy is measured on the rings and the rest of the picture is estimated
+  (Amendment 4).
+- **Edge / target engraved with other settings.** When the rings found form a complete grid
+  smaller than the layout looked for, and the camera sees where the missing rings would be, the
+  result is rough and names the setting to correct. A check then suggests keeping the saved
+  calibration (Amendment 4).
 - **Edge / rough fit.** A fit with a large error is described with what to check (sheet moved,
   not flat, out of focus) and can still be saved; the operator decides.
 - **Edge / camera straight down.** When one photo cannot pin the camera height down and none was
@@ -7390,7 +7502,7 @@ as the pane's design record.
 - **Empty / no feed.** **Find pieces** is disabled without a live camera; without a calibration
   the section is absent.
 
-### F-CAM10. Print and Cut marks found by the camera (ADR-443)
+### F-CAM10. Print and Cut marks found by the camera (ADR-443, Amendment 1)
 
 - **Success / register a printed sheet.** With Print and Cut on in Labs, a saved calibration and a
   live camera, the operator lays the printed sheet on the bed and sets the material height in the
@@ -7399,7 +7511,11 @@ as the pane's design record.
   x, y**, and the dialog reports the measured spacing, print scale and turn. **Apply
   registration** registers the design on the sheet. The head never moves.
 - **Success / mixed.** **Capture head** still works on either target, so a camera point can be
-  replaced by jogging onto that mark.
+  replaced by jogging onto that mark. Head captures report the same spacing, print scale and turn.
+- **Edge / unusual registration.** When the targets or the captures are closer than 10 mm, the
+  print scale is more than 2 % off, or the turn is near 180°, the dialog says why and applies it
+  only once **Use this registration anyway** is ticked. Job Review repeats the note at Start and
+  never refuses (Amendment 1).
 - **Edge / repeated marks.** When other pairs of marks are the same distance apart, the pair
   nearest the design's targets is used and the dialog says how many others fitted.
 - **Edge / no pair.** When no two marks are the design's spacing apart (within 2 %), the points

@@ -34,7 +34,13 @@ export function TextFormattingFields(props: {
           onChange={fields.setFontKey}
         />
         <FontImportButton importFont={fields.importFont} />
-        <FontUsageHint fontKey={values.fontKey} />
+        <FontUsageHint
+          fontKey={values.fontKey}
+          embeddedFonts={values.embeddedFonts}
+          content={values.content}
+          variable={values.variableTemplate !== undefined}
+          fontAvailable={fields.fontAvailable}
+        />
       </Field>
       <Field label="Alignment">
         <AlignmentRadio value={values.alignment} onChange={fields.setAlignment} />

@@ -3,6 +3,7 @@ import type { CncLayerSettings, Polyline, Vec2 } from '../scene';
 import { passNeedsTabs, tabTopZMm } from './cnc-tabs';
 import { tabFractionsFromReference, tabRampedPoints } from './cnc-tab-ramp';
 import { manualTabCentersForToolpaths, type CollectedCncContour } from './cnc-manual-tab-mapping';
+import { roughingReach } from './finish-allowance-coverage';
 import { bucketFinishAllowanceParts } from './finish-allowance-part-buckets';
 import type { FrameHandedness } from './machine-frame-handedness';
 import { enforceCutDirection } from './motion-polish';
@@ -101,12 +102,9 @@ function finishingPasses(
   zMm: number,
   ctx: FinishingPassesContext,
 ): ReadonlyArray<CncPass> {
-  const depths =
-    ctx.finishingSettings === undefined
-      ? [zMm]
-      : zPassDepths(-zMm, ctx.finishingSettings.depthPerPassMm);
+  const depthsFor = finishingDepths(toolpaths, zMm, ctx);
   return toolpaths.flatMap((toolpath) =>
-    depths.flatMap((depth) => {
+    depthsFor(toolpath).flatMap((depth) => {
       const pass = finishingPass(toolpath, depth, {
         settings: ctx.settings,
         toolDiameterMm: ctx.toolDiameterMm,
@@ -118,6 +116,28 @@ function finishingPasses(
         : [ctx.finishingSettings === undefined ? pass : profileFinishStagePass(pass)];
     }),
   );
+}
+
+// A Wall finishing recipe sets the finishing depth per pass. Without one the
+// finishing contour is a single full-depth pass beside a roughed wall, and
+// follows the layer's depth ladder where roughing never reached it
+// (ADR-140 Amendment 1).
+function finishingDepths(
+  toolpaths: ReadonlyArray<Polyline>,
+  zMm: number,
+  ctx: FinishingPassesContext,
+): (toolpath: Polyline) => ReadonlyArray<number> {
+  if (ctx.finishingSettings !== undefined) {
+    const depths = zPassDepths(-zMm, ctx.finishingSettings.depthPerPassMm);
+    return () => depths;
+  }
+  if (toolpaths.length === 0) return () => [zMm];
+  const reach = roughingReach(
+    ctx.roughingToolpaths,
+    ctx.toolDiameterMm / 2 + profileFinishAllowanceMm(ctx.settings),
+  );
+  const ladder = zPassDepths(-zMm, ctx.settings.depthPerPassMm);
+  return (toolpath) => (reach.covers(toolpath) ? [zMm] : ladder);
 }
 
 function appendUnassignedParts(

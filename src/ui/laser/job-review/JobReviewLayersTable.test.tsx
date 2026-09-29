@@ -411,4 +411,14 @@ describe('JobReviewLayersTable', () => {
       'relief roughing 2 levels to 2.5 mm · 1 pass on the other shapes · stepover 40% · tabs 4 per shape (6 × 2 mm), none on reliefs · Manual feeds',
     );
   });
+
+  it('says when the compiled shapes do not use the layer ramp', async () => {
+    const base = createLayer({ id: 'holes', color: '#2e8b57' });
+    const settings = { ...DEFAULT_CNC_LAYER_SETTINGS, cutType: 'drill' as const, rampEntryDeg: 5 };
+    seedLayers([{ ...base, cnc: settings }], 'cnc');
+    await render('cnc', [{ layerId: 'holes', summaries: [], unrampedShapes: true }]);
+
+    // ADR-273 Amendment 2: a drill layer can keep a ramp from an earlier cut type.
+    expect(host.textContent).toContain('ramp entry 5° (not used by drilling)');
+  });
 });

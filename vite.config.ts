@@ -122,6 +122,14 @@ export default defineConfig({
         // Optional lesson pictures must never join the install-time app download.
         // Keep Workbox's default node_modules exclusion when adding our own.
         globIgnores: ['**/node_modules/**/*', '**/tutorial-images/**'],
+        // The plugin's navigateFallback answers a navigation the precache
+        // cannot with index.html. Only the entry at the deploy root, with or
+        // without a query string, may get it, as on the server, which has no SPA
+        // fallback either (public/404.html). index.html fetches its chunks
+        // through relative URLs (base './'), so served at a nested path, such as
+        // a mistyped deep link, it asked for them under that path and hung on a
+        // blank splash; the server now answers those with its 404 page.
+        navigateFallbackAllowlist: [/^\/(?:index\.html)?(?:\?.*)?$/],
         runtimeCaching: [
           {
             urlPattern: ({ request, url, sameOrigin }) =>

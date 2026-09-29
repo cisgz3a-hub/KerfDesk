@@ -24,13 +24,19 @@ const parsers: readonly (readonly [string, Parser])[] = [
   ],
 ];
 
+// ADR-358 Amendment 3: an image KerfDesk cannot engrave as drawn is skipped
+// with a warning, and the rest of the file still imports.
+const vector = '<path d="M0 0H5" stroke="red"/>';
+const skippedForOpacity =
+  'SVG presentation: Skipped 1 embedded image(s) because they have opacity, a filter or a mask, which an engraved image cannot reproduce; the rest of the file imported.';
+
 describe.each(parsers)('SVG image opacity through %s', (_name, parse) => {
   it.each(['0.5', '50%', '0.5%', '5e1%', ' 50% '])(
-    'rejects unrepresentable opacity %s',
+    'skips an image with unrepresentable opacity %s and imports the rest',
     async (opacity) => {
-      await expect(
-        Promise.resolve().then(() => parse(svg(`${image} opacity="${opacity}"/>`))),
-      ).rejects.toThrow(/image opacity/);
+      const parsed = await parse(svg(`${vector}${image} opacity="${opacity}"/>`));
+      expect(parsed.fragment?.entries.map((entry) => entry.kind)).toEqual(['imported-svg']);
+      expect(parsed.notes).toContain(skippedForOpacity);
     },
   );
 
@@ -38,10 +44,10 @@ describe.each(parsers)('SVG image opacity through %s', (_name, parse) => {
     `${image} opacity="1" style="opacity:50% !important"/>`,
     `<g opacity="50%">${image}/></g>`,
     `<g style="opacity:50%"><g opacity="100%">${image}/></g></g>`,
-  ])('rejects percentage opacity from style or ancestor groups', async (content) => {
-    await expect(Promise.resolve().then(() => parse(svg(content)))).rejects.toThrow(
-      /image opacity/,
-    );
+  ])('skips images under percentage opacity from style or ancestor groups', async (content) => {
+    const parsed = await parse(svg(`${vector}${content}`));
+    expect(parsed.fragment?.entries.map((entry) => entry.kind)).toEqual(['imported-svg']);
+    expect(parsed.notes).toContain(skippedForOpacity);
   });
 
   it.each([

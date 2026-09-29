@@ -13,9 +13,10 @@ import {
   type CameraPose,
   type LensModel,
 } from '../model/camera-model';
-import { fitCameraModel, type CameraFitFailure } from '../model/fit-camera-model';
+import type { CameraFitFailure } from '../model/fit-camera-model';
+import { fitDeterminedLens, type LensFitFailure } from '../model/fit-determined-lens';
 import type { BedTargetLayout } from './bed-target';
-import { detectRingMarks } from './ring-detect';
+import { detectRingMarks, type RingMark } from './ring-detect';
 import { matchBedTarget, type TargetMatchFailure } from './target-match';
 
 export type BedCalibrationInput = {
@@ -61,11 +62,19 @@ export type BedCalibration = {
 };
 
 export type BedCalibrationFailure =
-  | { readonly kind: 'failed'; readonly reason: 'no-marks' | TargetMatchFailure }
-  | { readonly kind: 'failed'; readonly reason: CameraFitFailure['reason'] };
+  | {
+      readonly kind: 'failed';
+      /** 'target-too-large': the rings seen run edge to edge (see targetOverfillsPicture). */
+      readonly reason: 'no-marks' | 'target-too-large' | TargetMatchFailure;
+    }
+  | {
+      readonly kind: 'failed';
+      readonly reason: CameraFitFailure['reason'] | LensFitFailure['reason'];
+    };
 
-// Rings the matcher found this share of the target, or better, are enough to
-// fit four distortion terms; fewer fit the two dominant ones only.
+// Rings the matcher found this share of the target, or better, may fit up to
+// four distortion terms; fewer fit the two dominant ones at most. Either way
+// the fit keeps only the terms the rings pin down (fitDeterminedLens).
 const FULL_DISTORTION_MIN_MARKS = 30;
 const PRINCIPAL_POINT_SIGMA_SHARE = 0.08;
 // How far off a tape-measure reading of the camera height can be, mm.
@@ -77,14 +86,19 @@ export function calibrateFromBedTarget(
   const rings = detectRingMarks(input.frame);
   if (rings.length === 0) return { kind: 'failed', reason: 'no-marks' };
   const match = matchBedTarget(rings, input.layout);
-  if (match.kind === 'failed') return match;
+  if (match.kind === 'failed') {
+    const overfills = targetOverfillsPicture(rings, input.frame.width, input.frame.height);
+    return match.reason === 'anchors-not-found' && overfills
+      ? { kind: 'failed', reason: 'target-too-large' }
+      : match;
+  }
   const height = input.sheetThicknessMm;
   const points = match.correspondences.map((c) => ({
     world: bedPoint(c.mark.x, c.mark.y, height),
     pixel: c.pixel,
   }));
   const { width, height: imageHeight } = input.frame;
-  const fit = fitCameraModel([{ points }], {
+  const fit = fitDeterminedLens([{ points }], {
     imageWidth: width,
     imageHeight,
     distortionTerms: points.length >= FULL_DISTORTION_MIN_MARKS ? 4 : 2,
@@ -113,7 +127,11 @@ export function calibrateFromBedTarget(
       rejected: Number.isNaN(residuals[i] ?? Number.NaN),
     };
   });
-  const kept = markErrors.filter((e) => !e.rejected).map((e) => Math.hypot(e.dxMm, e.dyMm));
+  // A ring the model gives no bed point has no error to average.
+  const kept = markErrors
+    .filter((e) => !e.rejected)
+    .map((e) => Math.hypot(e.dxMm, e.dyMm))
+    .filter(Number.isFinite);
   return {
     kind: 'ok',
     lens: fit.lens,
@@ -127,4 +145,33 @@ export function calibrateFromBedTarget(
     cameraHeightMm: -cameraCentre(pose).z,
     cameraHeightSigmaMm: fit.cameraHeightSigmaMm,
   };
+}
+
+// The anchors are told apart by the rings around them, so when the target is
+// too large for the picture they go unfound however clear the photo: the
+// rings next to them are cut off at its edges. The rings seen then reach two
+// opposite edges of the picture, within a ring diameter.
+function targetOverfillsPicture(
+  marks: ReadonlyArray<RingMark>,
+  width: number,
+  height: number,
+): boolean {
+  let left = Infinity;
+  let top = Infinity;
+  let right = Infinity;
+  let bottom = Infinity;
+  let diameters = 0;
+  let rings = 0;
+  for (const mark of marks) {
+    if (mark.anchor) continue;
+    const radius = Math.sqrt(mark.area / Math.PI);
+    left = Math.min(left, mark.x - radius);
+    top = Math.min(top, mark.y - radius);
+    right = Math.min(right, width - 1 - mark.x - radius);
+    bottom = Math.min(bottom, height - 1 - mark.y - radius);
+    diameters += 2 * radius;
+    rings += 1;
+  }
+  const near = rings === 0 ? 0 : diameters / rings;
+  return (left < near && right < near) || (top < near && bottom < near);
 }

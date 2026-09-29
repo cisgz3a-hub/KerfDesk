@@ -53,6 +53,48 @@ describe('PrintAndCutDialog', () => {
     expect(onApply).not.toHaveBeenCalled();
   });
 
+  it('shows the captured scale and turn, and applies an unusual one only once confirmed', () => {
+    const onApply = vi.fn();
+    const render = (second: { x: number; y: number }) =>
+      act(() =>
+        root.render(
+          <PrintAndCutDialog
+            initialTargets={{ first: { x: 0, y: 0 }, second: { x: 100, y: 0 } }}
+            firstMachinePoint={{ x: 20, y: 30 }}
+            secondMachinePoint={second}
+            captureEnabled={true}
+            onCapture={vi.fn()}
+            onCancel={vi.fn()}
+            onApply={onApply}
+            onDisable={vi.fn()}
+          />,
+        ),
+      );
+    render({ x: 120, y: 30 });
+    expect(host.textContent).toContain(
+      'The captured points are 100.0 mm apart (designed 100.0 mm, print scale +0.00 %), turned 0.0°.',
+    );
+    expect(host.querySelector('input[type="checkbox"]')).toBeNull();
+
+    // A jog that slipped 3 mm: 3 % larger than designed.
+    render({ x: 123, y: 30 });
+    const apply = buttonByText(host, 'Apply registration');
+    expect(host.textContent).toContain('print scale +3.00 %');
+    expect(host.textContent).toContain('A print scale more than 2 % off is not the printer');
+    expect(apply.disabled).toBe(true);
+    const confirm = host.querySelector<HTMLInputElement>('input[type="checkbox"]');
+    if (confirm === null) throw new Error('confirmation missing');
+    act(() => confirm.click());
+    expect(apply.disabled).toBe(false);
+
+    // Another capture asks again.
+    render({ x: 124, y: 30 });
+    expect(buttonByText(host, 'Apply registration').disabled).toBe(true);
+    act(() => host.querySelector<HTMLInputElement>('input[type="checkbox"]')?.click());
+    act(() => buttonByText(host, 'Apply registration').click());
+    expect(onApply).toHaveBeenCalledWith({ first: { x: 0, y: 0 }, second: { x: 100, y: 0 } });
+  });
+
   it('keeps Apply disabled until both machine points are captured', () => {
     act(() =>
       root.render(

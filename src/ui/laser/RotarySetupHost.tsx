@@ -1,4 +1,5 @@
 import type { RotarySetup } from '../../core/devices';
+import { rotaryPresetsFor } from '../../core/devices/rotary-presets';
 import { generateRotaryCalibrationPattern } from '../../core/job';
 import { useStore } from '../state';
 import { jobAwareConfirm } from '../state/job-aware-dialogs';
@@ -7,6 +8,7 @@ import { RotarySetupDialog } from './RotarySetupDialog';
 
 export function RotarySetupHost(props: { readonly onClose: () => void }): JSX.Element {
   const setup = useStore((s) => s.project.device.rotary);
+  const machineFamily = useStore((s) => s.project.device.machineFamily);
   const dirty = useStore((s) => s.dirty);
   const updateDeviceProfile = useStore((s) => s.updateDeviceProfile);
   const replaceScene = useStore((s) => s.replaceSceneWithGeneratedScene);
@@ -38,6 +40,7 @@ export function RotarySetupHost(props: { readonly onClose: () => void }): JSX.El
       onCancel={props.onClose}
       onApply={apply}
       onGenerateCalibration={generate}
+      presets={rotaryPresetsFor(machineFamily === undefined ? {} : { machineFamily })}
     />
   );
 }

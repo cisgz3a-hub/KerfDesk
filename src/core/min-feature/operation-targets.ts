@@ -22,6 +22,7 @@ import { toMachineCoords, type DeviceProfile } from '../devices';
 import { artworkOperationRuns } from '../artwork-order';
 import { collectLayerContours, layerPolylinesFromContours } from '../cnc/collect-cnc-contours';
 import { lineArtContoursForLayer } from '../cnc/compile-cnc-layer-passes';
+import { cncLayoutCutWidths } from '../cnc/layout-cut-widths';
 import { compilationPolylines } from '../job/compilation-polylines';
 import {
   applyTransform,
@@ -61,6 +62,9 @@ export type MinFeatureTarget = {
   readonly cutIntent: MinFeatureCutIntent;
   readonly cutType?: CncCutType;
   readonly toolName?: string;
+  /** Set when the bit cuts narrower than its stored diameter at this depth
+   * (V-bit, ball nose, tapered ball nose): the threshold is that cut width. */
+  readonly cutDepthMm?: number;
   readonly request: MinFeatureRequest;
   readonly paths: ReadonlyArray<MinFeaturePath>;
 };
@@ -210,6 +214,10 @@ function cncTarget(
   if (sides === undefined) return null;
   const tool = layerCncTool(machine, settings);
   const paths = cncMachinedPaths(objects, layer, project, tool.diameterMm, objectIds);
+  // The compiler lays a bit that narrows toward its tip out by what it cuts
+  // at the operation's full depth (ADR-368 Amendment 3), so only a feature
+  // narrower than that width is left uncut (second CNC audit P2-toolpath-4).
+  const { wallDiameterMm } = cncLayoutCutWidths(tool, settings.depthMm, settings.depthPerPassMm);
   return {
     layerId: layer.id,
     layerName: layer.name,
@@ -218,7 +226,8 @@ function cncTarget(
     cutIntent: 'declared',
     cutType: settings.cutType,
     toolName: tool.name,
-    request: { thresholdMm: tool.diameterMm, ...sides },
+    ...(wallDiameterMm < tool.diameterMm ? { cutDepthMm: settings.depthMm } : {}),
+    request: { thresholdMm: wallDiameterMm, ...sides },
     paths,
   };
 }

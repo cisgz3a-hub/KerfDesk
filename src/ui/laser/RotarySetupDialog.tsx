@@ -8,6 +8,7 @@ import {
   rotaryYScale,
   type RotarySetup,
 } from '../../core/devices/rotary';
+import type { RotaryPreset } from '../../core/devices/rotary-presets';
 import { Button, Dialog, DialogActions } from '../kit';
 import { errorStyle, previewStyle } from './rotary-setup-dialog.styles';
 import { startRotaryEdit } from './rotary-setup-edit';
@@ -20,6 +21,8 @@ export function RotarySetupDialog(props: {
   readonly onCancel: () => void;
   readonly onApply: (setup: RotarySetup) => void;
   readonly onGenerateCalibration: (setup: RotarySetup) => void;
+  /** Published rotaries for this machine (ADR-503). */
+  readonly presets?: ReadonlyArray<RotaryPreset>;
 }): JSX.Element {
   const [edit, setEdit] = useState(() => startRotaryEdit(props.setup ?? DEFAULT_ROTARY_SETUP));
   const test = useRotaryTestRotation();
@@ -27,7 +30,11 @@ export function RotarySetupDialog(props: {
   const valid = rotaryMeasurementsValid(setup);
   return (
     <Dialog title="Rotary Setup" size="md" onClose={props.onCancel}>
-      <RotarySetupFields edit={edit} onEdit={setEdit} />
+      <RotarySetupFields
+        edit={edit}
+        onEdit={setEdit}
+        {...(props.presets === undefined ? {} : { presets: props.presets })}
+      />
       <RotaryPreview setup={setup} valid={valid} />
       {!valid ? (
         <p style={errorStyle}>Diameters and motion per turn must be greater than zero.</p>

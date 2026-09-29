@@ -24,6 +24,7 @@ import { DEFAULT_CNC_MACHINE_CONFIG, type Project } from '../../core/scene';
 import { useStore } from '../state';
 import { useLaserStore } from '../state/laser-store';
 import { initialLaserState } from '../state/laser-store-helpers';
+import type { RecoveryCapsule } from '../state/recovery';
 import { frameVerificationForProject } from './frame-verification-testing';
 
 const RECOVERY_WARNING_FIXTURE_COUNT = 130;
@@ -197,4 +198,21 @@ export function expectRecoveryWarningEvidence(
   expect(shownWarnings.filter((message) => expectedSet.has(message))).toEqual(expectedMessages);
   expect(new Set(shownWarnings).size).toBe(shownWarnings.length);
   expect(archivedWarnings).toEqual(shownWarnings);
+}
+
+// A boundary at the very first pass replays the entire sealed program, less
+// its rapids down to the last cut (ADR-520): every G0 to a Z below safe Z.
+// Recovery plunges every pass from safe Z (ADR-489).
+export function expectWholeProgramReplay(recoveryGcode: string, capsule: RecoveryCapsule): void {
+  const sealed = capsule.artifact.kind === 'exact-execution' ? capsule.artifact.gcode : '';
+  const safeZ = DEFAULT_CNC_MACHINE_CONFIG.params.safeZMm;
+  const plunged = sealed
+    .split('\n')
+    .filter((line) => {
+      const z = /^G0 Z(-?\d+\.\d+)$/.exec(line)?.[1];
+      return z === undefined || Number(z) >= safeZ;
+    })
+    .join('\n');
+  expect(plunged).not.toBe(sealed);
+  expect(recoveryGcode).toBe(plunged);
 }

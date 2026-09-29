@@ -1,19 +1,32 @@
 // The burn a laser program leaves, for the burn preview (ADR-487). It runs in
 // its own worker (burn-worker.ts), as playback runs. Every move the laser is
 // on for lays its beam's width of burn along it. How dark a pass burns
-// depends on its power alone, as LightBurn's preview shades by power: the
-// same power at another speed burns the same here. Passes over the same
-// place darken it further. Each cell keeps the burn's optical density, so a
-// cell one pass at full power covers is left with 8% of the surface's light,
-// a pass at half power about half, and beams narrower than a cell darken it
-// by the share of it they cover.
+// depends on the energy it puts into each square millimetre, its power and
+// speed on the laser's watts and beam, against the material's full burn
+// (ADR-501, burn-energy.ts); or on its power alone, as LightBurn's preview
+// shades. Passes over the same place darken it further. Each cell keeps the
+// burn's optical density, so a cell one pass at the full burn covers is left
+// with 8% of the surface's light, and beams narrower than a cell darken it by
+// the share of it they cover.
 //
 // On a rotary, program Y turns the work: one revolution is `wrapYMm` of Y,
 // and the grid's rows go once round it, so a job longer than one turn burns
 // over its own start, as it would on the machine.
 
 import { SEG_KIND } from '../../core/gcode-view';
+import { doseDensity, passDoseJPerMm2, powerDensity } from './burn-energy';
 import type { StockChange, StockTarget } from './stock-carving';
+
+/** What decides how dark a pass burns (ADR-501). */
+export type BurnShading =
+  | { readonly by: 'power' }
+  | {
+      readonly by: 'energy';
+      /** The laser head's optical power. */
+      readonly opticalPowerW: number;
+      /** Joules per mm² that burn the material fully. */
+      readonly fullDoseJPerMm2: number;
+    };
 
 /** The laser the program runs on, and the work it burns. */
 export type BurnLaser = {
@@ -21,8 +34,12 @@ export type BurnLaser = {
   readonly maxPowerS: number;
   /** The beam's width on the work. */
   readonly spotMm: number;
+  /** Surface mm per machine Y mm; independent of whether the view wraps. */
+  readonly surfaceYScale?: number;
   /** Machine Y that turns the work once round a rotary; absent on a flat bed. */
   readonly wrapYMm?: number;
+  /** By power alone when absent. */
+  readonly shading?: BurnShading;
 };
 
 export type BurnMoves = {
@@ -30,6 +47,8 @@ export type BurnMoves = {
   readonly positions: Float32Array;
   readonly segKind: Uint8Array;
   readonly segPower: Float32Array;
+  /** Each move's programmed feed, mm/min. */
+  readonly segFeed: Float32Array;
 };
 
 /** Where the burn is: its first cell's corner, its cells and the surface's height. */
@@ -52,8 +71,6 @@ export type Burner = {
   readonly burnTo: (target: StockTarget) => StockChange | null;
 };
 
-// A pass at full power leaves this share of the surface's light.
-const FULL_POWER_LIGHT = 0.08;
 const MAX_CELLS = 4_000_000;
 // The darkness goes to the GPU as one texture; every WebGL 2 takes this many a side.
 const MAX_CELLS_A_SIDE = 2048;
@@ -72,6 +89,23 @@ export function burnsAnything(moves: BurnMoves): boolean {
     if (burnsAt(moves, index)) return true;
   }
   return false;
+}
+
+/** The least and most energy the program's burning moves put in, J/mm². */
+export function burnDoseRange(
+  moves: BurnMoves,
+  laser: BurnLaser,
+  opticalPowerW: number,
+): { readonly min: number; readonly max: number } | null {
+  let range: { min: number; max: number } | null = null;
+  for (let index = 0; index < moves.segmentCount; index += 1) {
+    if (!burnsAt(moves, index)) continue;
+    const dose = moveDoseJPerMm2(moves, laser, index, opticalPowerW);
+    range ??= { min: dose, max: dose };
+    range.min = Math.min(range.min, dose);
+    range.max = Math.max(range.max, dose);
+  }
+  return range;
 }
 
 export function burnLayout(moves: BurnMoves, laser: BurnLaser): BurnLayout | null {
@@ -152,17 +186,53 @@ function burnRange(
     const start = index === from.index ? from.fraction : 0;
     const end = index < to.index ? 1 : to.fraction;
     if (end <= start || !burnsAt(moves, index)) continue;
-    const power = Math.min(1, (moves.segPower[index] ?? 0) / Math.max(laser.maxPowerS, 1e-9));
     const at = index * FLOATS_PER_MOVE;
     const a = { x: moves.positions[at] ?? 0, y: moves.positions[at + 1] ?? 0 };
     const b = { x: moves.positions[at + 3] ?? 0, y: moves.positions[at + 4] ?? 0 };
-    burnLine(canvas, lerp(a, b, start), lerp(a, b, end), passDensity(power), laser.spotMm, rows);
+    const density = passDensity(moves, laser, index);
+    burnLine(canvas, lerp(a, b, start), lerp(a, b, end), density, laser.spotMm, rows);
   }
 }
 
-// The optical density one pass at this share of full power leaves.
-function passDensity(power: number): number {
-  return -Math.log(1 - (1 - FULL_POWER_LIGHT) * power);
+/** The share of full power a move burns at. */
+export function movePower(moves: BurnMoves, laser: BurnLaser, index: number): number {
+  return Math.min(1, (moves.segPower[index] ?? 0) / Math.max(laser.maxPowerS, 1e-9));
+}
+
+/** Joules per mm² a move puts in, on a laser of this optical power. */
+export function moveDoseJPerMm2(
+  moves: BurnMoves,
+  laser: BurnLaser,
+  index: number,
+  opticalPowerW: number,
+): number {
+  const pass = {
+    power: movePower(moves, laser, index),
+    feedMmPerMin: surfaceFeed(moves, laser, index),
+  };
+  return passDoseJPerMm2({ opticalPowerW, beamMm: laser.spotMm }, pass);
+}
+
+// F measures commanded XYZ travel per minute. Energy covers the surface XY
+// strip, whose Y travel can differ on a rotary. Z contributes time, not area.
+function surfaceFeed(moves: BurnMoves, laser: BurnLaser, index: number): number {
+  const at = index * FLOATS_PER_MOVE;
+  const dx = (moves.positions[at + 3] ?? 0) - (moves.positions[at] ?? 0);
+  const dy = (moves.positions[at + 4] ?? 0) - (moves.positions[at + 1] ?? 0);
+  const dz = (moves.positions[at + 5] ?? 0) - (moves.positions[at + 2] ?? 0);
+  const machineLength = Math.hypot(dx, dy, dz);
+  const surfaceLength = Math.hypot(dx, dy * (laser.surfaceYScale ?? 1));
+  return machineLength > 0 ? ((moves.segFeed[index] ?? 0) * surfaceLength) / machineLength : 0;
+}
+
+// The optical density one pass of this move leaves.
+function passDensity(moves: BurnMoves, laser: BurnLaser, index: number): number {
+  const shading = laser.shading;
+  if (shading === undefined || shading.by === 'power') {
+    return powerDensity(movePower(moves, laser, index));
+  }
+  const dose = moveDoseJPerMm2(moves, laser, index, shading.opticalPowerW);
+  return doseDensity(dose, shading.fullDoseJPerMm2);
 }
 
 // Lays a beam `spotMm` wide along a line, in steps of half a cell, and across

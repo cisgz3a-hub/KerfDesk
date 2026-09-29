@@ -75,7 +75,12 @@ export function buildProgramTime(
   let feedTravelSeconds = 0;
   for (const span of motionSpans(model, blocks.length)) {
     const spanBlocks = blocks.slice(span.startIndex, span.endIndex);
-    const plan = planVelocities(spanBlocks, limits.accelMmPerSec2, limits.junctionDeviationMm);
+    const plan = planVelocities(
+      spanBlocks,
+      limits.accelMmPerSec2,
+      limits.junctionDeviationMm,
+      context.plannerBlocks,
+    );
     for (let localIndex = 0; localIndex < spanBlocks.length; localIndex += 1) {
       const index = span.startIndex + localIndex;
       const block = spanBlocks[localIndex];
@@ -131,6 +136,7 @@ function motionContext(
     travelTimeScale: validTimeScale(
       options.travelTimeScale ?? options.timeCalibration?.travelTimeScale,
     ),
+    plannerBlocks: options.plannerBlocks,
   };
 }
 
@@ -169,7 +175,9 @@ function synchronizationBoundaries(
 ): ReadonlyArray<SynchronizationBoundary> {
   const boundaries = new Map<number, boolean>();
   for (const event of model.events) {
-    if (event.kind === 'dwell' || event.kind === 'pause') {
+    // GRBL drains the planner at M2/M30 after the block's motion (gcode.c,
+    // protocol_buffer_synchronize) and then runs any lines that follow.
+    if (event.kind === 'dwell' || event.kind === 'pause' || event.kind === 'program-end') {
       if (!boundaries.has(event.line)) boundaries.set(event.line, false);
       continue;
     }

@@ -10,9 +10,11 @@ import {
   SURFACING_DEFAULT_PLUNGE_MM_PER_MIN,
   surfacingStarterValues,
 } from '../../core/cnc/surfacing';
+import { NEOTRONICS_4040_MAX_LT4LDS_V2_PROFILE } from '../../core/devices';
 import { DEFAULT_DEVICE_PROFILE } from '../../core/devices/device-profile';
-import { DEFAULT_CNC_MACHINE_CONFIG, type CncTool } from '../../core/scene';
+import { DEFAULT_CNC_MACHINE_CONFIG, type CncMachineConfig, type CncTool } from '../../core/scene';
 import { materialFeedsPatch } from '../state/cnc-project-material';
+import { surfacingSeed } from './surfacing-seed';
 
 const SURFACING_BIT: CncTool = {
   id: 'surfacing-25',
@@ -63,6 +65,41 @@ describe('surfacingStarterValues', () => {
   it('never exceeds the machine max feed', () => {
     const seed = surfacingStarterValues(null, 400);
     expect(seed.feedMmPerMin).toBe(400);
+    expect(seed.plungeMmPerMin).toBe(400);
+  });
+});
+
+describe('surfacingSeed', () => {
+  const machine: CncMachineConfig = {
+    ...DEFAULT_CNC_MACHINE_CONFIG,
+    tools: [...DEFAULT_CNC_MACHINE_CONFIG.tools, SURFACING_BIT],
+    toolId: SURFACING_BIT.id,
+    stock: { ...DEFAULT_CNC_MACHINE_CONFIG.stock, materialKey: 'plywood-mdf' },
+  };
+  const device = NEOTRONICS_4040_MAX_LT4LDS_V2_PROFILE;
+
+  it('keeps the 4040 starter, a recipe for a 3.175 mm cutter, out of a facing pass', () => {
+    // Layers still take the starter's 300 mm/min ceiling (ADR-256).
+    const layerValues = materialFeedsPatch({
+      materialKey: 'plywood-mdf',
+      tool: SURFACING_BIT,
+      spindleRpm: machine.params.spindleMaxRpm,
+      profile: device,
+      machineParams: machine.params,
+    });
+    expect(layerValues?.feedMmPerMin).toBe(300);
+
+    expect(surfacingSeed(machine, { device }, null).seed).toEqual({
+      feedMmPerMin: SURFACING_DEFAULT_FEED_MM_PER_MIN,
+      plungeMmPerMin: SURFACING_DEFAULT_PLUNGE_MM_PER_MIN,
+      depthPerPassMm: SURFACING_DEFAULT_DEPTH_PER_PASS_MM,
+    });
+  });
+
+  it('still honours the live machine limits', () => {
+    const liveCaps = { xMaxFeedMmPerMin: 1800, yMaxFeedMmPerMin: 1800, zMaxFeedMmPerMin: 400 };
+    const { seed } = surfacingSeed(machine, { device }, liveCaps);
+    expect(seed.feedMmPerMin).toBe(1800);
     expect(seed.plungeMmPerMin).toBe(400);
   });
 });

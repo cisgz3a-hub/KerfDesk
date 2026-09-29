@@ -1,4 +1,5 @@
 import type { CncGroup, CncPass, Group, Job } from '../../../core/job';
+import { tabbedProfileLayerIds } from '../../../core/cnc/compiled-tab-rises';
 import { cncGroupMaximumDepth, cncPassCanEmit } from '../../../core/cnc/output-representation';
 import {
   type CncCoordinateRepresentation,
@@ -23,6 +24,12 @@ export type JobReviewEffectiveOperation = {
   readonly cncActualMaxDepthMm?: number;
   readonly plungingReliefStages?: ReadonlyArray<PlungingReliefStage>;
   readonly relief?: CompiledReliefFacts;
+  // Set when the operation asks for a ramp and compiled shapes other than
+  // reliefs, none of whose groups records one (ADR-273 Amendment 2).
+  readonly unrampedShapes?: true;
+  // Set when a compiled profile pass of the operation rises into a holding
+  // tab, so its line names only tabs the passes carry (ADR-258 Amendment 4).
+  readonly tabbedShapes?: true;
 };
 
 /** Summarize selected values from the exact prepared Job. Matching displayed
@@ -51,6 +58,8 @@ export function buildEffectiveOperationReview(
   }
   const plungingReliefByLayer = plungingReliefStagesByLayer(job);
   const reliefByLayer = compiledReliefFactsByLayer(job);
+  const unrampedShapeLayers = unrampedShapeLayerIds(job, scene?.layers ?? []);
+  const tabbedLayers = tabbedProfileLayerIds(job);
   return [...summariesByLayer].map(([layerId, summaries]) => {
     const cncActualMaxDepth = vCarveDepthByLayer.get(layerId);
     const plungingReliefStages = plungingReliefByLayer.get(layerId);
@@ -61,6 +70,8 @@ export function buildEffectiveOperationReview(
       ...(cncActualMaxDepth === undefined ? {} : { cncActualMaxDepthMm: cncActualMaxDepth.value }),
       ...(plungingReliefStages === undefined ? {} : { plungingReliefStages }),
       ...(relief === undefined ? {} : { relief }),
+      ...(unrampedShapeLayers.has(layerId) ? { unrampedShapes: true as const } : {}),
+      ...(tabbedLayers.has(layerId) ? { tabbedShapes: true as const } : {}),
     };
   });
 }
@@ -140,6 +151,34 @@ function passLevelZMm(pass: CncPass): number {
   let lowestZMm = Number.POSITIVE_INFINITY;
   for (const point of pass.points) lowestZMm = Math.min(lowestZMm, point.z);
   return lowestZMm;
+}
+
+// Every other group records a ramp only where its passes ramp too (ADR-273
+// Amendment 2). An operation that asks for a ramp, none of whose shape groups
+// records one, enters its adaptive, drilled, inlay or helical passes without it.
+function unrampedShapeLayerIds(job: Job, layers: ReadonlyArray<Layer>): ReadonlySet<string> {
+  const shapeLayers = new Set<string>();
+  const rampedLayers = new Set<string>();
+  for (const group of job.groups) {
+    if (group.kind !== 'cnc') continue;
+    if (group.cutType === 'relief-rough' || group.cutType === 'relief-finish') continue;
+    shapeLayers.add(group.layerId);
+    if (group.rampEntryDeg !== undefined) rampedLayers.add(group.layerId);
+  }
+  return new Set(
+    layers
+      .filter((layer) => requestsRamp(layer) && shapeLayers.has(layer.id))
+      .filter((layer) => !rampedLayers.has(layer.id))
+      .map((layer) => layer.id),
+  );
+}
+
+// A V-carve's own entry request is disclosed apart (ADR-285 item 6).
+function requestsRamp(layer: Layer): boolean {
+  const settings = layer.cnc;
+  return (
+    settings !== undefined && settings.cutType !== 'v-carve' && settings.rampEntryDeg !== undefined
+  );
 }
 
 function effectiveGroupSummary(

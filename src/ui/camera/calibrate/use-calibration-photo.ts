@@ -7,6 +7,7 @@ import { useStore } from '../../state';
 import { useCameraStore } from '../../state/camera-store';
 import { cameraSourceIdentity } from '../frame-source';
 import { headPositionNow } from '../head/head-position';
+import { currentAssumedTarget } from './assumed-target';
 import { photographTarget } from './calibration-actions';
 import {
   useCameraCalibrationStore,
@@ -80,7 +81,8 @@ export function useCalibrationPhoto(): CalibrationPhotoControls {
         settings: wizard.settings,
         bedWidthMm: app.project.device.bedWidth,
         bedHeightMm: app.project.device.bedHeight,
-        ...(wizard.targetArea === null ? {} : { area: wizard.targetArea }),
+        // The layout the wizard shows as assumed, remembered from the engraving when known.
+        area: currentAssumedTarget().area,
         ...(saved === undefined ? {} : { saved }),
         headMm: wizard.settings.headCamera ? headPositionNow() : null,
         signal: run.controller.signal,

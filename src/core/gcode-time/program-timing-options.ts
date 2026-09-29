@@ -2,6 +2,7 @@ import { selectControllerDriver } from '../controllers';
 import { isEstimateTimeScale, type ControllerKind, type DeviceProfile } from '../devices';
 import { laserPowerControlForDevice, type BuildRenderModelOptions } from '../gcode-view';
 import { GRBL_DEFAULT_ARC_TOLERANCE_MM } from '../gcode-view/controller-arc-points';
+import { DEFAULT_PLANNER_BLOCKS } from '../motion-planner/controller-planner-blocks';
 
 export type ProgramTimeCalibration = {
   readonly cutTimeScale: number;
@@ -23,6 +24,10 @@ export type ProgramTimingOptions = {
   readonly fanPower?: boolean;
   /** GRBL-family laser timing interpolates arcs as mc_arc does (ADR-432). */
   readonly controllerArcToleranceMm?: number;
+  /** Blocks the controller's planner holds, counting the one executing
+   * (ADR-525). Omit to plan with unlimited lookahead, as for a program with
+   * no controller to run it. */
+  readonly plannerBlocks?: number;
 };
 
 export function validTimeScale(value: number | undefined): number {
@@ -38,6 +43,7 @@ export function deviceProgramTimingOptions(
   const baudRate = device.baudRate ?? selectControllerDriver(controllerKind).defaultBaudRate;
   const laserPowerControl =
     machineKind === 'laser' ? laserPowerControlForDevice(device) : undefined;
+  const plannerBlocks = devicePlannerBlocks(device, controllerKind);
   return {
     cutTimeScale: validTimeScale(device.estimateCutTimeScale),
     travelTimeScale: validTimeScale(device.estimateTravelTimeScale),
@@ -52,7 +58,18 @@ export function deviceProgramTimingOptions(
       : {}),
     ...(laserPowerControl === undefined ? {} : { laserPowerControl }),
     ...(controllerKind === 'ruida' ? {} : { baudRate }),
+    ...(plannerBlocks === undefined ? {} : { plannerBlocks }),
   };
+}
+
+/** The device's planner size for timing (ADR-525). A profile that names no
+ * controller times as GRBL 1.1, as the rest of its timing does; Ruida runs an
+ * uploaded job rather than a stream, so it has none. */
+export function devicePlannerBlocks(
+  device: DeviceProfile,
+  controllerKind: ControllerKind = device.controllerKind ?? 'grbl-v1.1',
+): number | undefined {
+  return DEFAULT_PLANNER_BLOCKS[controllerKind];
 }
 
 function isGrblController(controllerKind: ControllerKind): boolean {

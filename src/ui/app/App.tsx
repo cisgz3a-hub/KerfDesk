@@ -31,6 +31,7 @@ import { useCncLibraryPersistence } from './use-cnc-library-persistence';
 import { useGlobalErrorHandlers } from './use-global-error-handlers';
 import { useJobCheckpoint } from './use-job-checkpoint';
 import { useLayerDefaultsPersistence } from './use-layer-defaults-persistence';
+import { useMachineHoursTracking } from './use-machine-hours-tracking';
 import { useMaterialLibraryPersistence } from './use-material-library-persistence';
 import { usePolylineFairingUpgrade } from './use-polyline-fairing-upgrade';
 import { useShortcuts } from './use-shortcuts';
@@ -42,6 +43,7 @@ import { useWindowTitle } from './use-window-title';
 import { WorkspaceSidePanels } from './WorkspaceSidePanels';
 import './workspace-layout.css';
 import { ProjectBedReconciliationBanner } from './ProjectBedReconciliationBanner';
+import { MachineSetupBanner } from './MachineSetupBanner';
 import { ExternalGcodePreviewBanner } from './ExternalGcodePreviewBanner';
 import { DesktopCloseNotice } from './DesktopCloseNotice';
 import { TutorialHost } from '../tutorials/TutorialHost';
@@ -118,6 +120,7 @@ function AppLifecycle(): null {
   useJobWatch();
   useAutoConnectController();
   useJobCheckpoint();
+  useMachineHoursTracking();
   useUnloadStop();
   useUnsavedChangesGuard();
   useWindowTitle();
@@ -139,6 +142,7 @@ function CanvasArea(): JSX.Element {
       <CameraPanel />
       <BoardCapturePanel />
       {!showGcode ? <CncStockCanvasHud /> : null}
+      <MachineSetupBanner />
     </>
   );
   return (

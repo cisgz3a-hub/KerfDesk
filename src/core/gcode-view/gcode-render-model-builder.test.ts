@@ -3,6 +3,7 @@ import { PROGRAM_PARSE_REASON } from '../gcode';
 import { iterateLines } from '../util';
 import { buildGcodeRenderModel } from './gcode-render-model';
 import { createGcodeRenderModelBuilder } from './gcode-render-model-builder';
+import { LINE_CATEGORY } from './render-model-types';
 
 function reasonFor(text: string): string {
   const builder = createGcodeRenderModelBuilder();
@@ -19,6 +20,15 @@ describe('createGcodeRenderModelBuilder', () => {
     for (const line of iterateLines(text)) builder.pushLine(line);
 
     expect(builder.finish()).toEqual(buildGcodeRenderModel(text, { renderPressureThreshold: 2 }));
+  });
+
+  // GRBL runs the words before an unclosed "(" and ignores the rest of the line.
+  it('draws the move before an unclosed comment instead of dropping the line', () => {
+    const result = buildGcodeRenderModel('G21 G90\nG1 X10 Y10 F1000 (no close\nG1 X20 Y10\n');
+    if (result.kind !== 'ok') throw new Error(result.reason);
+    expect(result.model.segmentCount).toBe(2);
+    expect(Array.from(result.model.positions.subarray(0, 6))).toEqual([0, 0, 0, 10, 10, 0]);
+    expect(result.model.lineCategories[1]).toBe(LINE_CATEGORY.motion);
   });
 
   // A comment-only program is well-formed G-code that commands nothing — the

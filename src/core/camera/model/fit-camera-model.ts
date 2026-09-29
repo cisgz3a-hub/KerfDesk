@@ -7,7 +7,7 @@
 // repeated so one mis-detected dot cannot bend the whole model. Pure core.
 
 import type { FisheyeDistortion } from '../fisheye';
-import { undistortPixel } from '../fisheye';
+import { fisheyeAngleLimit, undistortPixel } from '../fisheye';
 import { choleskySolve, inverseDiagonal } from './cholesky';
 import {
   cameraCentre,
@@ -19,7 +19,11 @@ import {
 } from './camera-model';
 import { solveLeastSquares } from './least-squares';
 import { dropOutliers, remapResiduals } from './fit-outliers';
-import { fitPlaneHomography, poseFromPlaneHomography } from './plane-pose';
+import {
+  fitPlaneHomography,
+  poseFromPlaneHomography,
+  type PlaneCorrespondence,
+} from './plane-pose';
 import { rodriguesToMatrix } from '../rodrigues';
 
 export type ObservedPoint = { readonly world: Vec3; readonly pixel: Vec2 };
@@ -30,8 +34,8 @@ export type FitOptions = {
   readonly imageHeight: number;
   /** Keep this lens fixed and fit only the poses. */
   readonly fixedLens?: LensModel;
-  /** Distortion terms left free: 0, 2 (k1,k2) or 4 (k1..k4). Default 4. */
-  readonly distortionTerms?: 0 | 2 | 4;
+  /** Distortion terms left free, from k1 up (the rest held at 0): 0 to 4. Default 4. */
+  readonly distortionTerms?: 0 | 1 | 2 | 3 | 4;
   /**
    * Standard deviation (px) of a prior pulling the principal point toward the
    * image centre. A single flat view cannot separate it from camera tilt, so
@@ -202,10 +206,14 @@ function initialVector(views: ReadonlyArray<ObservedView>, lens: LensModel): Flo
 
 function initialPose(view: ObservedView, lens: LensModel): CameraPose | null {
   const planeZ = view.points[0]?.world.z ?? 0;
-  const pairs = view.points.map((p) => ({
-    plane: { x: p.world.x, y: p.world.y },
-    ray: undistortPixel(p.pixel.x, p.pixel.y, lens.intrinsics, lens.distortion),
-  }));
+  const angleLimit = fisheyeAngleLimit(lens.distortion);
+  // A short focal seed can put a far point past a right angle from the axis,
+  // where it has no ray; the seed pose is taken from the points that do.
+  const pairs: PlaneCorrespondence[] = [];
+  for (const p of view.points) {
+    const ray = undistortPixel(p.pixel.x, p.pixel.y, lens.intrinsics, lens.distortion, angleLimit);
+    if (ray !== null) pairs.push({ plane: { x: p.world.x, y: p.world.y }, ray });
+  }
   const h = fitPlaneHomography(pairs);
   return h === null ? null : poseFromPlaneHomography(h, planeZ);
 }

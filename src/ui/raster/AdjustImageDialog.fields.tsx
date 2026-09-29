@@ -3,8 +3,6 @@ import {
   lineIntervalMmToLinesPerMm,
   linesPerMmToDpi,
   linesPerMmToLineIntervalMm,
-  MAX_RASTER_LINES_PER_MM,
-  MIN_RASTER_LINES_PER_MM,
 } from '../../core/raster';
 import { DITHER_ALGORITHMS, type Layer } from '../../core/scene';
 import {
@@ -17,9 +15,12 @@ import { type ImagePresetId, PresetField } from './AdjustImageDialog.presets';
 import * as styles from './AdjustImageDialog.styles';
 import type { AdjustImageDraft } from './AdjustImageDialog.types';
 import type { UserImagePreset } from './AdjustImageDialog.user-presets';
+import { imageDensityBounds, type NumberBounds } from './image-density-bounds';
 
 export function AdjustFields(props: {
   readonly draft: AdjustImageDraft;
+  /** The layer's density when the dialog opened, kept even outside the recommended range. */
+  readonly storedLinesPerMm: number;
   readonly maxPower: number;
   readonly update: (patch: Partial<AdjustImageDraft>) => void;
   readonly applyPreset: (presetId: ImagePresetId) => void;
@@ -71,7 +72,12 @@ export function AdjustFields(props: {
         step={0.05}
         onChange={(gamma) => update({ gamma })}
       />
-      <RasterSettingsFields draft={draft} maxPower={props.maxPower} update={update} />
+      <RasterSettingsFields
+        draft={draft}
+        storedLinesPerMm={props.storedLinesPerMm}
+        maxPower={props.maxPower}
+        update={update}
+      />
       <RasterToggleFields draft={draft} update={update} />
     </div>
   );
@@ -79,10 +85,12 @@ export function AdjustFields(props: {
 
 function RasterSettingsFields(props: {
   readonly draft: AdjustImageDraft;
+  readonly storedLinesPerMm: number;
   readonly maxPower: number;
   readonly update: (patch: Partial<AdjustImageDraft>) => void;
 }): JSX.Element {
   const { draft, update } = props;
+  const densityBounds = imageDensityBounds(props.storedLinesPerMm);
   return (
     <>
       <SelectField
@@ -99,8 +107,12 @@ function RasterSettingsFields(props: {
         unit="%"
         onChange={(minPower) => update({ minPower })}
       />
-      <LineIntervalField linesPerMm={draft.linesPerMm} update={update} />
-      <DpiField linesPerMm={draft.linesPerMm} update={update} />
+      <LineIntervalField
+        linesPerMm={draft.linesPerMm}
+        bounds={densityBounds.intervalMm}
+        update={update}
+      />
+      <DpiField linesPerMm={draft.linesPerMm} bounds={densityBounds.dpi} update={update} />
       <NumberField
         name="dotWidthCorrectionMm"
         label="Dot Width"
@@ -117,6 +129,7 @@ function RasterSettingsFields(props: {
 
 function LineIntervalField(props: {
   readonly linesPerMm: number;
+  readonly bounds: NumberBounds;
   readonly update: (patch: Partial<AdjustImageDraft>) => void;
 }): JSX.Element {
   return (
@@ -124,8 +137,8 @@ function LineIntervalField(props: {
       name="lineIntervalMm"
       label="Line Interval"
       value={displayNumber(linesPerMmToLineIntervalMm(props.linesPerMm), 4)}
-      min={linesPerMmToLineIntervalMm(MAX_RASTER_LINES_PER_MM)}
-      max={linesPerMmToLineIntervalMm(MIN_RASTER_LINES_PER_MM)}
+      min={props.bounds.min}
+      max={props.bounds.max}
       step={0.001}
       unit="mm"
       onChange={(lineIntervalMm) =>
@@ -137,6 +150,7 @@ function LineIntervalField(props: {
 
 function DpiField(props: {
   readonly linesPerMm: number;
+  readonly bounds: NumberBounds;
   readonly update: (patch: Partial<AdjustImageDraft>) => void;
 }): JSX.Element {
   return (
@@ -144,8 +158,8 @@ function DpiField(props: {
       name="imageDpi"
       label="DPI"
       value={displayNumber(linesPerMmToDpi(props.linesPerMm), 2)}
-      min={linesPerMmToDpi(MIN_RASTER_LINES_PER_MM)}
-      max={linesPerMmToDpi(MAX_RASTER_LINES_PER_MM)}
+      min={props.bounds.min}
+      max={props.bounds.max}
       step={1}
       unit="dpi"
       onChange={(dpi) => props.update({ linesPerMm: dpiToLinesPerMm(dpi) })}

@@ -3,7 +3,8 @@
 // by design: the main compiler dispatches, this file owns the relief branch.
 //
 // Per relief on the layer: rebuild the heightmap from the embedded mesh
-// (coarsened to tool-diameter/8 cells for roughing), apply XY scale before
+// (coarsened to tool-diameter/8 cells for roughing, each cell holding the
+// highest point of the mesh over it), apply XY scale before
 // physical cutter dilation and spacing, then map every vertex through only
 // the residual mirror/rotation/translation and the device origin. Cutter
 // geometry therefore stays in machine millimetres under uniform and
@@ -180,8 +181,8 @@ function reliefGroup(
     // per-pass retract mode does not apply (ADR-253).
     retractBetweenPasses: false,
     // Roughing ramps into each level from the one above (ADR-424); recorded
-    // as the group's entry. Its ramps carry no entryRamp marker: they start
-    // on stock the level above has cleared, not below an uncut top.
+    // as the group's requested entry. Actual ramps and retained short-loop
+    // plunges carry separate markers; a lower start alone is not a tiled entry.
     ...(cutType === 'relief-rough' && settings.rampEntryDeg !== undefined
       ? { rampEntryDeg: settings.rampEntryDeg }
       : {}),
@@ -224,6 +225,8 @@ function reliefFinishingGroup(
       targetScaleX: machineSpace.targetScaleX,
       targetScaleY: machineSpace.targetScaleY,
       mmPerCell: finishingCellSizeMm(rowSpacingMm, finishTool),
+      // ADR-412 Amendment 1: each cell holds the highest point it covers.
+      sampling: 'footprint-max',
     });
     // Both maps share the relief's heightmap millimetres, so the roughing
     // grid's finished flats read directly at finishing coordinates.
@@ -338,6 +341,8 @@ function reliefLadderFor(
     targetScaleX: machineSpace.targetScaleX,
     targetScaleY: machineSpace.targetScaleY,
     mmPerCell: tool.diameterMm / ROUGHING_CELL_TOOL_FRACTION,
+    // ADR-412 Amendment 1: a detail narrower than a cell still lifts its cells.
+    sampling: 'footprint-max',
   });
   if (heightmap.kind === 'error') {
     return reliefMaterializationFailure(relief.source, heightmap.reason);
@@ -438,6 +443,8 @@ function appendReliefPasses(
   const motion = reliefRoughingMotion(result.ladder.levels, {
     stockOnRight: materialOnRightInMap(residualTransform, device, settings),
     cutWidthMm: result.ladder.cutWidthMm,
+    rampOutputPoint: place,
+    cutterRadiusMm: tool.diameterMm / 2,
     ...(settings.rampEntryDeg === undefined ? {} : { rampAngleDeg: settings.rampEntryDeg }),
   });
   for (const pass of motion) {

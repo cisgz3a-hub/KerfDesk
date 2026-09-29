@@ -5,6 +5,7 @@ import {
   type DeviceProfile,
 } from '../../core/devices';
 import type { MotionLimits } from '../../core/gcode-time';
+import { devicePlannerBlocks } from '../../core/gcode-time/program-timing-options';
 import { laserPowerControlForDevice, type BuildRenderModelOptions } from '../../core/gcode-view';
 import type { Project } from '../../core/scene';
 // Deep import: the viewer3d barrel is capped at 20 exports by its index contract.
@@ -21,6 +22,8 @@ export type GcodeInspectionTiming = {
   readonly limits: MotionLimits;
   readonly cutTimeScale?: number;
   readonly travelTimeScale?: number;
+  /** Blocks the device's planner holds, so fine moves are timed as it runs them (ADR-525). */
+  readonly plannerBlocks?: number;
   readonly deviceName: string;
 };
 
@@ -45,6 +48,8 @@ export type GcodeInspectionLaser = {
   readonly maxPowerS: number;
   /** The beam's width on the work: the head's spot, or 0.1 mm without one. */
   readonly spotMm: number;
+  /** The head's optical power, when the machine profile states it (ADR-501). */
+  readonly opticalPowerW?: number;
   /** A rotary set up and on: the work's diameter and the Y that turns it once. */
   readonly rotary?: { readonly diameterMm: number; readonly wrapYMm: number };
 };
@@ -100,10 +105,12 @@ export function deviceInspectionContext(
 /** The device's laser as the burn preview draws it. */
 export function deviceInspectionLaser(device: DeviceProfile): GcodeInspectionLaser {
   const spot = device.laserSubProfile?.spotSizeMm;
+  const opticalPowerW = device.laserSubProfile?.opticalPowerW;
   const rotary = isRotaryActive(device.rotary) ? device.rotary : undefined;
   return {
     maxPowerS: device.maxPowerS,
     spotMm: spot === undefined ? DEFAULT_SPOT_MM : (spot.x + spot.y) / 2,
+    ...(opticalPowerW === undefined ? {} : { opticalPowerW }),
     ...(rotary === undefined
       ? {}
       : { rotary: { diameterMm: rotary.objectDiameterMm, wrapYMm: rotaryYLimitMm(rotary) } }),
@@ -112,6 +119,7 @@ export function deviceInspectionLaser(device: DeviceProfile): GcodeInspectionLas
 
 /** The same limits and calibration Job Review times the device's jobs with. */
 export function deviceInspectionTiming(device: DeviceProfile): GcodeInspectionTiming {
+  const plannerBlocks = devicePlannerBlocks(device);
   return {
     limits: {
       accelMmPerSec2: device.accelMmPerSec2,
@@ -124,6 +132,7 @@ export function deviceInspectionTiming(device: DeviceProfile): GcodeInspectionTi
     ...(device.estimateTravelTimeScale === undefined
       ? {}
       : { travelTimeScale: device.estimateTravelTimeScale }),
+    ...(plannerBlocks === undefined ? {} : { plannerBlocks }),
     deviceName: device.name,
   };
 }

@@ -22,6 +22,7 @@ import {
 } from '../frame-source';
 import { calibrationFailureMessage, cameraModelFromCalibration } from './calibration-result';
 import type { CalibrationResult, CalibrationSettings } from './camera-calibration-store';
+import { rememberEngravedTarget } from './engraved-target-memory';
 import { runBedCalibration } from './run-bed-calibration';
 import { checkSavedCalibration } from './saved-calibration-check';
 import { runTransientCameraJob } from './transient-camera-job';
@@ -63,14 +64,32 @@ export async function engraveCalibrationTarget(
   startTransientJob: (project: Project) => Promise<boolean> = runTransientCameraJob,
 ): Promise<boolean> {
   const { project } = useStore.getState();
+  const { device } = project;
+  const area = calibrationTargetArea(device.bedWidth, device.bedHeight, settings);
   const pattern = generateCameraBedTarget({
-    area: calibrationTargetArea(project.device.bedWidth, project.device.bedHeight, settings),
+    area,
     power: settings.powerPercent,
     speed: settings.speedMmPerMin,
   });
   // A laser engraving in either canvas mode (ADR-416): the rings mark where
   // the laser fires, and the wizard's power and speed are laser settings.
-  return startTransientJob({ ...project, machine: { kind: 'laser' }, scene: pattern.scene });
+  const started = await startTransientJob({
+    ...project,
+    machine: { kind: 'laser' },
+    scene: pattern.scene,
+  });
+  // Remember where these rings went, so a later "Target already engraved"
+  // labels them from this layout, not from whatever the settings say then.
+  if (started) {
+    rememberEngravedTarget(device, settings.headCamera, {
+      area,
+      bedWidthMm: device.bedWidth,
+      bedHeightMm: device.bedHeight,
+      layoutMm: settings.headCamera ? settings.headTargetSizeMm : settings.marginMm,
+      engravedAt: new Date().toISOString(),
+    });
+  }
+  return started;
 }
 
 export type PhotoOutcome =

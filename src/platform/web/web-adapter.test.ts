@@ -24,6 +24,23 @@ afterEach(() => {
 });
 
 describe('webAdapter save target', () => {
+  it.each(['NotAllowedError', 'NotReadableError'])(
+    'propagates %s from a directory existence probe',
+    async (name) => {
+      const error = new DOMException('Cannot inspect directory', name);
+      Object.defineProperty(window, 'showDirectoryPicker', {
+        configurable: true,
+        value: vi.fn(async () => ({
+          getFileHandle: vi.fn(async () => {
+            throw error;
+          }),
+        })),
+      });
+      const directory = await webAdapter.reserveSaveDirectory?.();
+      await expect(directory?.exists?.('a-trace.svg')).rejects.toBe(error);
+    },
+  );
+
   it('does not open or truncate the file until prepared data is written', async () => {
     const writable = writableStreamMock();
     const createWritable = installSavePicker(writable);

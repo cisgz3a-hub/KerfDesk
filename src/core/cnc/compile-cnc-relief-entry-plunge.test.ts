@@ -108,7 +108,8 @@ describe('relief roughing plunges under a ramp (ADR-424 Amendment 1)', () => {
     expect(passes).toHaveLength(2);
     for (const pass of passes) expect(pass).toMatchObject({ kind: 'contour', entryPlunge: true });
     expect(lines.filter((line) => line.startsWith('; cnc entry'))).toEqual([
-      '; cnc entry: contour-ramp; max-angle-deg: 5.000',
+      '; cnc entry: requested-only; requested-max-angle-deg: 5.000',
+      '; cnc entry-advisory: requested contour ramp is not applied to these passes',
       '; cnc entry-advisory: 2 passes plunge: path shorter than one cut width',
     ]);
     // Neither level ramps: both enter the hole straight down, which the

@@ -7,6 +7,8 @@ import { noteStyle } from './wizard-styles';
 
 export function SavedCalibrationCheckNote(props: {
   readonly check: SavedCalibrationCheck;
+  /** The new photo looks like a target engraved with other settings. */
+  readonly layoutSuspect?: boolean;
 }): JSX.Element {
   const { check } = props;
   if (check.kind === 'not-comparable') {
@@ -16,7 +18,7 @@ export function SavedCalibrationCheckNote(props: {
       </section>
     );
   }
-  const verdict = savedCalibrationVerdict(check);
+  const verdict = savedCalibrationVerdict(check, props.layoutSuspect ?? false);
   return (
     <section style={sectionStyle} aria-label="Saved calibration">
       <p style={{ margin: 0, fontWeight: 600, color: verdict.moved ? MOVED : UNCHANGED }}>

@@ -107,6 +107,7 @@ function repositoryWithSlots(slots: readonly AutosaveIndexedDbSlot[]): AutosaveD
   return {
     readAllSlots: async () => slots,
     readEpoch: async () => 0,
+    holdsReplaceableSnapshot: async () => false,
     commit: async () => {
       throw new Error('Unexpected commit.');
     },

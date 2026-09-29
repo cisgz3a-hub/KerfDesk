@@ -2,6 +2,8 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import { IDENTITY_TRANSFORM, type RasterImage } from '../../core/scene';
 import { createRgbaBuffer } from '../../core/image-edit/rgba-buffer';
 import * as imageLoader from '../trace/image-loader';
+import { createSession } from './editor-session';
+import { compositeSession } from './editor-session-layers';
 import { bakeBufferToBitmapFields, decodeRasterToBuffer } from './image-editor-decode';
 
 afterEach(() => {
@@ -86,4 +88,54 @@ describe('decodeRasterToBuffer', () => {
 
     await expect(decodeRasterToBuffer(IMAGE)).resolves.toMatchObject({ width: 2, height: 1 });
   });
+
+  it('hands the editor straight colour so Apply keeps the imported tone of partly transparent pixels', async () => {
+    // Straight RGBA as a browser decodes it: black at 50% and 30% coverage, a
+    // colour at 78%, a nearly and a fully transparent pixel, one opaque grey.
+    const straight = new Uint8ClampedArray([
+      0, 0, 0, 128, 0, 0, 0, 77, 90, 140, 200, 200, 0, 0, 0, 1, 12, 34, 56, 0, 30, 30, 30, 255,
+    ]);
+    // The loader hands back RGB composited on white with alpha kept: the tone import burns.
+    const imported = imageLoader.compositeRgbOverWhitePreservingAlpha({
+      width: 6,
+      height: 1,
+      data: straight,
+    });
+    const importedLuma = lumaBytes(imported);
+    vi.spyOn(imageLoader, 'loadImageAsRawData').mockResolvedValue(imported);
+
+    const doc = await decodeRasterToBuffer({ ...IMAGE, pixelWidth: 6, pixelHeight: 1 });
+    const baked = compositeSession(createSession('image-1', 'source.png', doc, IMAGE.bounds));
+
+    expect(alphaBytes(doc)).toEqual([128, 77, 200, 1, 0, 255]);
+    expect(importedLuma[0]).toBe(127);
+    const bakedLuma = lumaBytes(baked);
+    bakedLuma.forEach((luma, index) => {
+      expect(Math.abs(luma - (importedLuma[index] ?? -1))).toBeLessThanOrEqual(1);
+    });
+  });
+
+  it('keeps an opaque decode byte for byte', async () => {
+    const opaque = {
+      width: 2,
+      height: 1,
+      data: new Uint8ClampedArray([9, 99, 199, 255, 0, 0, 0, 255]),
+    };
+    vi.spyOn(imageLoader, 'loadImageAsRawData').mockResolvedValue({
+      ...opaque,
+      rgbCompositedOnWhite: true,
+    });
+
+    const doc = await decodeRasterToBuffer(IMAGE);
+
+    expect([...doc.data]).toEqual([9, 99, 199, 255, 0, 0, 0, 255]);
+  });
 });
+
+function lumaBytes(image: { width: number; height: number; data: Uint8ClampedArray }): number[] {
+  return [...atob(imageLoader.extractLumaBase64(image))].map((char) => char.charCodeAt(0));
+}
+
+function alphaBytes(image: { data: Uint8ClampedArray }): number[] {
+  return [...image.data].filter((_, index) => index % 4 === 3);
+}

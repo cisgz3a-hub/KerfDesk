@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { compileCncJob } from '../cnc';
 import { DEFAULT_DEVICE_PROFILE } from '../devices';
 import {
   DEFAULT_CNC_LAYER_SETTINGS,
@@ -7,6 +8,7 @@ import {
   createLayer,
   createProject,
   type CncCutType,
+  type CncLayerSettings,
   type Layer,
   type Polyline,
   type Project,
@@ -61,11 +63,15 @@ function laserProject(layer: Partial<Layer>, polylines: ReadonlyArray<Polyline>)
   };
 }
 
-function cncProject(cutType: CncCutType, polylines: ReadonlyArray<Polyline>): Project {
+function cncProject(
+  cutType: CncCutType,
+  polylines: ReadonlyArray<Polyline>,
+  settings: Partial<CncLayerSettings> = {},
+): Project {
   const layer: Layer = {
     ...createLayer({ id: 'cnc', color: '#000000' }),
     name: 'Router',
-    cnc: { ...DEFAULT_CNC_LAYER_SETTINGS, cutType, toolId: 'em-3000' },
+    cnc: { ...DEFAULT_CNC_LAYER_SETTINGS, cutType, toolId: 'em-3000', ...settings },
   };
   return {
     ...createProject(),
@@ -109,6 +115,29 @@ describe('checkProjectMinimumFeatures', () => {
     expect(report?.toolName).toBe('3 mm end mill');
     expect(report?.analysis.widths.count).toBe(1);
     expect(report?.analysis.widths.minWidthMm).toBeCloseTo(2, 9);
+  });
+
+  // Second CNC audit P2-toolpath-4: a V-bit is laid out by what it cuts at the
+  // operation's depth (ADR-368 Amendment 3), not by its stored diameter.
+  it('checks a V-bit pocket against the width the bit cuts at its depth', () => {
+    const vbit = { toolId: 'vb-90', depthMm: 2, depthPerPassMm: 1 };
+    const wide = cncProject('pocket', [rectangle(10, 10, 5, 20)], vbit);
+    const narrow = cncProject('pocket', [rectangle(10, 10, 3, 20)], vbit);
+    const passes = (project: Project) =>
+      compileCncJob(project.scene, project.device, DEFAULT_CNC_MACHINE_CONFIG).groups.length;
+
+    const [wideReport] = checkProjectMinimumFeatures(wide);
+    expect(wideReport?.cutDepthMm).toBe(2);
+    expect(wideReport?.request.thresholdMm).toBeCloseTo(4, 9);
+    expect(wideReport?.analysis.widths.count).toBe(0);
+    expect(passes(wide)).toBeGreaterThan(0);
+
+    const [narrowReport] = checkProjectMinimumFeatures(narrow);
+    expect(narrowReport?.analysis.widths.count).toBe(1);
+    expect(passes(narrow)).toBe(0);
+
+    const [endMill] = checkProjectMinimumFeatures(cncProject('pocket', [rectangle(10, 10, 2, 20)]));
+    expect(endMill?.cutDepthMm).toBeUndefined();
   });
 
   it('checks gaps, not widths, for an outside profile', () => {

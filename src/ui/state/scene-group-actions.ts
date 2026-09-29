@@ -1,5 +1,6 @@
 import { sceneObjectHasVisibleLayer, type Scene, type SceneGroup } from '../../core/scene';
 import { pushUndo } from './scene-mutations';
+import { carriedSelectionReference } from './selection-reference';
 import type { AppState } from './store';
 
 const MIN_GROUP_MEMBERS = 2;
@@ -75,12 +76,14 @@ function groupSelectionInState(state: AppState): AppState | Partial<AppState> {
     name: nextGroupName(state.project.scene.groups ?? []),
     objectIds,
   };
+  const selection = selectionStateFromIds(state.project.scene, objectIds);
   return {
     project: {
       ...state.project,
       scene: { ...state.project.scene, groups: [...keptGroups, group] },
     },
-    ...selectionStateFromIds(state.project.scene, objectIds),
+    ...selection,
+    selectionReference: carriedSelectionReference(state, selection),
     undoStack: pushUndo(state.project, state.undoStack),
     redoStack: [],
     dirty: true,
@@ -94,9 +97,11 @@ function ungroupSelectionInState(state: AppState): AppState | Partial<AppState> 
   const groups = state.project.scene.groups ?? [];
   const kept = groups.filter((group) => !group.objectIds.some((id) => selectedSet.has(id)));
   if (kept.length === groups.length) return state;
+  const selection = selectionStateFromIds(state.project.scene, selected);
   return {
     project: { ...state.project, scene: { ...state.project.scene, groups: kept } },
-    ...selectionStateFromIds(state.project.scene, selected),
+    ...selection,
+    selectionReference: carriedSelectionReference(state, selection),
     undoStack: pushUndo(state.project, state.undoStack),
     redoStack: [],
     dirty: true,

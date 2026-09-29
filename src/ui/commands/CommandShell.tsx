@@ -25,6 +25,7 @@ import { CloseOpenFillContoursDialog } from './CloseOpenFillContoursDialog';
 import { ConvertBitmapDialogHost } from './ConvertBitmapDialogHost';
 import { runImagePickAction } from './image-pick-action';
 import { MultiFileTraceDialogHost } from './MultiFileTraceDialog';
+import { MultiFileTraceProgressPanel } from './MultiFileTraceProgress';
 import { NumericEditsBar } from './NumericEditsBar';
 import { ProjectNotesDialog } from './ProjectNotesDialog';
 import { selectedConvertibleVectors, selectedObjectIds } from './selection-command-state';
@@ -211,6 +212,8 @@ function GeneratorDialogs(props: {
       {props.materialOpen ? <MaterialDialog onClose={props.onMaterialClose} /> : null}
       {props.intervalOpen ? <IntervalDialog onClose={props.onIntervalClose} /> : null}
       {props.scanOffsetOpen ? <ScanOffsetCommandDialog onClose={props.onScanOffsetClose} /> : null}
+      {/* Outlives the Multi-File Trace dialog while its batch runs. */}
+      <MultiFileTraceProgressPanel />
     </>
   );
 }
@@ -354,7 +357,8 @@ function aboutText(): string {
     `Commit ${__GIT_SHA__}`,
     `Built ${__BUILD_TIME__}`,
     '',
-    'Free and open-source under the MIT License (/eula.txt).',
+    'Copyright © 2026 Johann Stolk. All rights reserved.',
+    'Terms of use: License & Safety Notice (/eula.txt).',
     'Bundled open-source components: see /third-party-notices.txt.',
     '',
     'SAFETY: this software drives laser and CNC machinery. Verify every',

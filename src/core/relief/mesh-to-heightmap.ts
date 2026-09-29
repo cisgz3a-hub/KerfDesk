@@ -7,6 +7,14 @@
 // carves them away to −reliefDepthMm so the model stands proud; 'top'
 // leaves them at stock height.
 //
+// Sampling: 'center' (the default, for previews) reads each cell at its centre.
+// Relief CAM asks for 'footprint-max' (ADR-412 Amendment 1): each cell holds the
+// mesh's highest point over its whole footprint, as a depth map's CAM cell
+// holds the highest of its pixels, so no raised detail narrower than a cell
+// drops out between centres. Under 'top' a cell whose centre no triangle
+// covers still stays at stock height, so the CAM map is never below the
+// preview map anywhere.
+//
 // Pure and deterministic: triangles in file order, max-Z accumulation is
 // order-independent, indexed loops only.
 
@@ -18,13 +26,19 @@ import {
 } from '../grid';
 import { DEFAULT_HEIGHTMAP_CELL_MM, heightmapCellSize, type Heightmap } from './heightmap';
 import { meshBounds, FLOATS_PER_TRIANGLE, type TriangleMesh } from './triangle-mesh';
+import { rasterizeTriangleFootprintMaxZ } from './triangle-footprint-raster';
 import { rasterizeTriangleMaxZ, type RasterTarget } from './triangle-raster';
+
+/** How a cell reads the mesh: at its centre, or its highest point over the whole cell. */
+export type MeshSampling = 'center' | 'footprint-max';
 
 export type MeshHeightmapOptions = {
   readonly targetWidthMm: number;
   readonly reliefDepthMm: number;
   readonly mmPerCell?: number;
   readonly emptyCells?: 'floor' | 'top';
+  /** Relief CAM passes 'footprint-max'; previews keep the 'center' default. */
+  readonly sampling?: MeshSampling;
   /** Positive XY scale applied before rasterization into square physical-mm cells. */
   readonly targetScaleX?: number;
   readonly targetScaleY?: number;
@@ -50,6 +64,14 @@ const DEFAULT_RUNTIME: MeshHeightmapRuntime = {
 const MIN_EXTENT = 1e-9;
 
 type ZRasterMode = 'native' | 'normalized' | 'flat-normalized';
+
+// Where the mesh lands in the nominal cell frame, and how its Z is read.
+type MeshPlacement = {
+  readonly bounds: NonNullable<ReturnType<typeof meshBounds>>;
+  readonly cellsPerModelX: number;
+  readonly cellsPerModelY: number;
+  readonly zRasterMode: ZRasterMode;
+};
 
 export function meshToHeightmap(
   mesh: TriangleMesh,
@@ -81,18 +103,18 @@ export function meshToHeightmap(
   }
   maxZ.fill(Number.NEGATIVE_INFINITY);
   const target: RasterTarget = { ...grid, maxZ };
-  rasterizeMesh(
-    target,
-    mesh,
+  const placement: MeshPlacement = {
     bounds,
-    cellsPerModelUnit(grid, 'x', xExtent),
-    cellsPerModelUnit(grid, 'y', yExtent),
+    cellsPerModelX: cellsPerModelUnit(grid, 'x', xExtent),
+    cellsPerModelY: cellsPerModelUnit(grid, 'y', yExtent),
     zRasterMode,
-  );
+  };
+  rasterizeMesh(target, mesh, placement, options.sampling);
   const depth = allocateFloat32(runtime, cellCount);
   if (depth === null) {
     return { kind: 'error', reason: 'Relief mesh heightmap does not fit in this runtime.' };
   }
+  keepCenterBackground(target, depth, mesh, placement, options);
   normalizeDepths(maxZ, depth, bounds, options, zRasterMode);
   return {
     kind: 'ok',
@@ -179,14 +201,15 @@ function positiveFinite(value: number): boolean {
 function rasterizeMesh(
   target: RasterTarget,
   mesh: TriangleMesh,
-  bounds: NonNullable<ReturnType<typeof meshBounds>>,
-  cellsPerModelX: number,
-  cellsPerModelY: number,
-  zRasterMode: ZRasterMode,
+  placement: MeshPlacement,
+  sampling: MeshSampling | undefined,
 ): void {
+  const { bounds, cellsPerModelX, cellsPerModelY, zRasterMode } = placement;
+  const rasterize =
+    sampling === 'footprint-max' ? rasterizeTriangleFootprintMaxZ : rasterizeTriangleMaxZ;
   const p = mesh.positions;
   for (let t = 0; t + FLOATS_PER_TRIANGLE <= p.length; t += FLOATS_PER_TRIANGLE) {
-    rasterizeTriangleMaxZ(
+    rasterize(
       target,
       ((p[t] ?? 0) - bounds.minX) * cellsPerModelX,
       ((p[t + 1] ?? 0) - bounds.minY) * cellsPerModelY,
@@ -198,6 +221,25 @@ function rasterizeMesh(
       ((p[t + 7] ?? 0) - bounds.minY) * cellsPerModelY,
       rasterZ(p[t + 8] ?? 0, bounds, zRasterMode),
     );
+  }
+}
+
+// Under 'top' the background is the stock top, the highest level there is. A
+// footprint-sampled cell whose centre no triangle covers keeps that background,
+// decided as centre sampling decides it, instead of dropping to the part of the
+// mesh it touches. The depth buffer is still free, so it holds the centre pass.
+function keepCenterBackground(
+  target: RasterTarget,
+  scratch: Float32Array,
+  mesh: TriangleMesh,
+  placement: MeshPlacement,
+  options: MeshHeightmapOptions,
+): void {
+  if (options.sampling !== 'footprint-max' || options.emptyCells !== 'top') return;
+  scratch.fill(Number.NEGATIVE_INFINITY);
+  rasterizeMesh({ ...target, maxZ: scratch }, mesh, placement, 'center');
+  for (let i = 0; i < scratch.length; i += 1) {
+    if (scratch[i] === Number.NEGATIVE_INFINITY) target.maxZ[i] = Number.NEGATIVE_INFINITY;
   }
 }
 

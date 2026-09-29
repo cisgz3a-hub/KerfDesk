@@ -1,5 +1,10 @@
 import { describe, expect, it } from 'vitest';
-import { scanCompleteGcodeWords, scanGcodeWords, stripInlineComments } from './word-scan';
+import {
+  scanCompleteGcodeWords,
+  scanGcodeWords,
+  stripControllerComments,
+  stripInlineComments,
+} from './word-scan';
 
 describe('scanGcodeWords', () => {
   it('scans letters, signed values, and spacing variants', () => {
@@ -44,5 +49,20 @@ describe('stripInlineComments', () => {
 
   it('leaves an unclosed paren in place (junk downstream — pinned behavior)', () => {
     expect(stripInlineComments('G1 (oops X5')).toBe('G1 (oops X5');
+  });
+});
+
+// GRBL protocol.c: "(" hides everything up to ")" or the end of the line,
+// ";" hides the rest of the line, and the words before either still run.
+describe('stripControllerComments', () => {
+  it.each([
+    ['G1 (feed) X5 ; end', 'G1   X5'],
+    ['G1 X5 (oops Y6', 'G1 X5'],
+    ['G1 X5 (a) Y6 (b', 'G1 X5   Y6'],
+    ['G1 X5 (a;b) Y6', 'G1 X5   Y6'],
+    ['G1 X5 ; note (x', 'G1 X5'],
+    ['(whole line never closed', ''],
+  ])('reads %j as %j', (line, expected) => {
+    expect(stripControllerComments(line)).toBe(expected);
   });
 });

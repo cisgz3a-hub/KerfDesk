@@ -1,3 +1,4 @@
+import type { DeviceProfile } from '../../core/devices';
 import { deviceProfileWithInteractivePatch } from '../../core/devices/device-profile-patch';
 import {
   moveLayer as moveSceneLayer,
@@ -10,8 +11,18 @@ import { jobPlacementAfterDeviceChange, jobPlacementAfterProfileSelection } from
 import { fitToSelection } from './viewport-actions';
 import { applyDuplicate, HISTORY_DEPTH, pushUndo } from './scene-mutations';
 import { selectionFromIds, toggleSelectionFromId } from './scene-group-actions';
+import {
+  carriedSelectionReference,
+  clickedSelectionReference,
+  toggledSelectionReference,
+} from './selection-reference';
 import type { AppState } from './store';
-import { projectAfterDeviceProfileChange } from './cnc-machine-setup-scene';
+import {
+  cncMachineForProfile,
+  projectAfterDeviceProfileChange,
+  projectAfterDeviceProfileReplacement,
+} from './cnc-machine-setup-scene';
+import { projectWithParkedCnc } from './parked-cnc-machine';
 import { captureSetupHistoryContext, setupHistoryContextFor } from './setup-history-context';
 import { machineSetupActions } from './machine-setup-actions';
 import { synchronizeCncTabCount } from './cnc-tab-count-sync';
@@ -86,25 +97,30 @@ export function sceneActions(
           dirty: true,
         };
       }),
-    replaceDeviceProfile: (profile) =>
-      set((s) => {
-        captureSetupHistoryContext(s.project, s);
-        return {
-          ...nextProbeSetupState(
-            projectAfterDeviceProfileChange(s.project, profile, s.cncLiveCaps),
-            s.probeSetupEpoch,
-          ),
-          jobPlacement: jobPlacementAfterProfileSelection(
-            s.jobPlacement,
-            s.project.device,
-            profile,
-          ),
-          undoStack: pushUndo(s.project, s.undoStack),
-          redoStack: [],
-          dirty: true,
-        };
-      }),
+    replaceDeviceProfile: (profile) => set((s) => deviceProfileReplacementState(s, profile)),
     ...machineSetupActions(set),
+  };
+}
+
+// The picked machine's saved router values replace the CNC params, cached and
+// parked copies included, in the same undo step as the profile (ADR-500).
+function deviceProfileReplacementState(s: AppState, profile: DeviceProfile): Partial<AppState> {
+  captureSetupHistoryContext(s.project, s);
+  const cachedCncMachine =
+    s.cachedCncMachine === null ? null : cncMachineForProfile(s.cachedCncMachine, profile);
+  const replaced = projectAfterDeviceProfileReplacement(s.project, profile, s.cncLiveCaps);
+  return {
+    ...nextProbeSetupState(
+      cachedCncMachine === s.cachedCncMachine
+        ? replaced
+        : projectWithParkedCnc(replaced, cachedCncMachine),
+      s.probeSetupEpoch,
+    ),
+    cachedCncMachine,
+    jobPlacement: jobPlacementAfterProfileSelection(s.jobPlacement, s.project.device, profile),
+    undoStack: pushUndo(s.project, s.undoStack),
+    redoStack: [],
+    dirty: true,
   };
 }
 
@@ -135,7 +151,7 @@ export function historyActions(set: Setter): Pick<AppState, 'undo' | 'redo'> {
           // drag mutation in the project.
           return {
             ...s.pendingUndo,
-            additionalSelectedIds: new Set(s.pendingUndo.additionalSelectedIds),
+            ...restoredDragSelection(s, s.pendingUndo),
             pendingUndo: null,
           };
         }
@@ -151,7 +167,7 @@ export function historyActions(set: Setter): Pick<AppState, 'undo' | 'redo'> {
           // Keep the selection whose ids still resolve to a live object in the
           // restored scene (CNV-13); node selection is cleared because its
           // indices reference the pre-restore geometry.
-          ...visibleSelectionState(s, prev),
+          ...withCarriedReference(s, visibleSelectionState(s, prev)),
           selectedPathNode: null,
           selectedPathNodes: [],
           registrationArtworkOutputSnapshot: null,
@@ -172,7 +188,7 @@ export function historyActions(set: Setter): Pick<AppState, 'undo' | 'redo'> {
           undoStack: [...s.undoStack, s.project].slice(-HISTORY_DEPTH),
           // Symmetric with undo: keep the selection that still resolves in the
           // restored scene (CNV-13); node selection is cleared (stale indices).
-          ...visibleSelectionState(s, next),
+          ...withCarriedReference(s, visibleSelectionState(s, next)),
           selectedPathNode: null,
           selectedPathNodes: [],
           registrationArtworkOutputSnapshot: null,
@@ -181,6 +197,28 @@ export function historyActions(set: Setter): Pick<AppState, 'undo' | 'redo'> {
         };
       }),
   };
+}
+
+type SelectionState = Pick<AppState, 'selectedObjectId' | 'additionalSelectedIds'>;
+
+// Undo, redo and a cancelled drag rebuild the selection they keep, so Align's
+// clicked reference moves to it while its object is still selected.
+function withCarriedReference(
+  state: AppState,
+  selection: SelectionState,
+): SelectionState & Pick<AppState, 'selectionReference'> {
+  return { ...selection, selectionReference: carriedSelectionReference(state, selection) };
+}
+
+// The selection a drag started from, as a fresh set the snapshot never shares.
+function restoredDragSelection(
+  state: AppState,
+  snapshot: SelectionState,
+): SelectionState & Pick<AppState, 'selectionReference'> {
+  return withCarriedReference(state, {
+    selectedObjectId: snapshot.selectedObjectId,
+    additionalSelectedIds: new Set(snapshot.additionalSelectedIds),
+  });
 }
 
 function probeSetupEpochAfterHistoryRestore(state: AppState, restored: Project): number {
@@ -204,22 +242,28 @@ export function viewActions(
 > {
   return {
     selectObject: (id) =>
-      set((s) => ({
-        ...scopedSelectionProjectPatch(
-          s,
+      set((s) => {
+        const selection =
           id === null
-            ? { selectedObjectId: null, additionalSelectedIds: new Set() }
-            : selectionFromIds(s, [id], false),
-        ),
-        selectedPathNode: null,
-        selectedPathNodes: [],
-      })),
+            ? { selectedObjectId: null, additionalSelectedIds: new Set<string>() }
+            : selectionFromIds(s, [id], false);
+        return {
+          ...scopedSelectionProjectPatch(s, selection),
+          selectionReference: id === null ? null : clickedSelectionReference(id, selection),
+          selectedPathNode: null,
+          selectedPathNodes: [],
+        };
+      }),
     toggleSelectObject: (id) =>
-      set((s) => ({
-        ...scopedSelectionProjectPatch(s, toggleSelectionFromId(s, id)),
-        selectedPathNode: null,
-        selectedPathNodes: [],
-      })),
+      set((s) => {
+        const selection = toggleSelectionFromId(s, id);
+        return {
+          ...scopedSelectionProjectPatch(s, selection),
+          selectionReference: toggledSelectionReference(s, id, selection),
+          selectedPathNode: null,
+          selectedPathNodes: [],
+        };
+      }),
     selectAllObjects: () =>
       set((s) => {
         const ids = s.project.scene.objects
@@ -290,11 +334,7 @@ export function interactionActions(
       set((s) =>
         s.pendingUndo === null
           ? {}
-          : {
-              ...s.pendingUndo,
-              additionalSelectedIds: new Set(s.pendingUndo.additionalSelectedIds),
-              pendingUndo: null,
-            },
+          : { ...s.pendingUndo, ...restoredDragSelection(s, s.pendingUndo), pendingUndo: null },
       ),
     endInteraction: () =>
       set((s) => {

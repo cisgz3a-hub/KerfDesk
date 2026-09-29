@@ -158,3 +158,80 @@ travel and open contours; and Centerline, filled-contour and per-path Hybrid con
 inspect actual SVG paint, PDF/EPS paint operators and GeoJSON geometry/paint, not just injected
 writer options (`traced-paint-intent.test.ts`). The core batch and page tests also cover the
 writer handoff, nonempty travel and stroke padding. Preview paint remains unchanged.
+
+### Amendment: Multi-File Trace skips bad files, writes as it goes and can be cancelled (2026-09-27)
+
+A gap audit against LightBurn's batch trace and Potrace's many-file CLI found four Multi-File
+Trace gaps: one unreadable file aborted the whole batch, every export was held in memory until
+the last file was traced and then offered through one save dialog each, there was no progress or
+Cancel, TIFF and Netpbm inputs were refused, and the batch always used a preset's defaults. This
+changes the batch command only; no scene, compile, G-code, Frame or Start path reads it, so the
+Frame-first contract (PROJECT.md non-negotiable 21, ADRs 228, 230, 232 and 237) is untouched.
+
+1. **Per-file failures are skips.** A file whose decode or trace still fails after its fallback
+   (the preview grid of ADR-409) becomes a `decode-failed` or `trace-failed` skip carrying the
+   error message, and the other files are still traced and written. The batch notice names them
+   ("Could not read 1 image (b.png: <message>); it was skipped.") and uses the error style only when nothing
+   was written. The batch's own Cancel still ends the whole batch. Trace notices are keyed by the
+   file's position, so a skipped file cannot move a notice onto its neighbour.
+   The batch shares the one trace worker with the Trace Image dialog, whose live preview
+   supersedes every pending trace. A trace superseded by another caller while the batch's own
+   signal is not aborted is retried twice; a file still interrupted then becomes a
+   `trace-failed` skip ("Another trace (such as a Trace Image preview) kept interrupting this
+   file."), so ordinary editor use cannot end the batch. Only one batch runs at a time: starting
+   a second says "A Multi-File Trace is already running." and starts nothing, and each batch's
+   progress panel carries a token so a batch closes only its own panel.
+2. **One folder, written as each file finishes.** The dialog has two steps: *Choose Images...*
+   opens the image picker, and the primary *Trace...* button reserves the output folder with
+   `reserveSaveDirectory` as its first await (as Save Tiled G-code does), because each
+   file-system picker needs its own user activation. Each export is written into that folder as
+   soon as it is traced and then dropped, so at most one export is held in memory. Without a
+   folder picker (the platform has none, or the web adapter throws its `NotSupportedError`
+   because `showDirectoryPicker` is missing) each file is offered through its own save dialog, as
+   before. Any other folder-picker failure (a `NotAllowedError`, a `SecurityError`) is reported
+   as "Could not trace images: <message>" and starts nothing, as Save Tiled G-code does.
+   Cancelling the folder picker starts nothing. An export never replaces a file already in the
+   folder: the directory target's `exists` check moves it to the next free
+   `<stem>-trace-2.<ext>`, `-3` and so on.
+3. **Progress and Cancel.** A non-modal *Multi-File Trace progress* status panel shows "Tracing i
+   of N" with a *Cancel Multi-File Trace* button. Cancel aborts an `AbortController` whose signal
+   is checked before each file and passed into `traceImagesToVectorFiles` and the trace worker.
+   Nothing is written after Cancel, not even a file that finished tracing, and the notice says how
+   many files were written. The worker answers its signal's abort with a superseded rejection
+   rather than an `AbortError`, so the batch treats any failure after its own signal aborted as
+   the cancel.
+4. **TIFF and Netpbm input.** The picker also accepts `.tif`/`.tiff` (page 1, through
+   `io/tiff`'s `decodeTiffPage`, sized by its resolution tags) and `.pbm`/`.pgm`/`.ppm`/`.pnm`
+   (P1 to P6, `io/pnm/decode-pnm.ts`, sized at the default DPI). Each is decoded once and resampled
+   to the planned maximum edge, as the browser loader does for other images. They decode on the
+   main thread, unlike the worker-based TIFF import. A Netpbm file is held to the TIFF import's
+   16384 px edge limit, and its raster length is checked against the file before any pixel
+   buffer is allocated, so a corrupt header cannot allocate a gigabyte. A multi-page TIFF is
+   traced from page 1 and the notice says so ("Only page 1 was traced of scan.tif (3 pages).").
+5. **Settings choice.** A *Trace settings* select offers *Preset defaults* (the previous
+   behaviour, byte for byte) or *Last Trace Image settings*, shown only when the scene holds a
+   trace that recorded its dialog settings (ADR-408). The topmost such snapshot in the scene
+   (a commit adds its trace on top, so this is the latest commit unless objects were reordered;
+   the scene keeps no commit time) is restored as
+   Re-trace restores it and merged with `mergeLightBurnTraceSettings`, turn policy included, as the
+   Trace dialog merges it; a recorded preset that is no longer known starts from the machine's
+   default preset (Line Art, or Smooth on CNC), as the Trace dialog opens. Line + fill's millimetre stroke width is converted on each file's
+   preview grid (ADR-454). The snapshot's crop boundary, fill style and raster or vector output
+   belong to that one image and are not applied. The batch notice names the settings used.
+
+Evidence: `src/core/trace/batch-trace-skip.test.ts`, `multi-file-trace-action-skip.test.ts`
+(a middle file that cannot be decoded, a trace failure after the fallback, cancel still fails the
+batch); `multi-file-trace-action-stream.test.ts` (in-order writes holding one export, nothing
+written after Cancel, the written count); `MultiFileTraceProgress.test.tsx`;
+`MultiFileTraceDialog.test.tsx` (each picker inside its own click);
+`MultiFileTraceDialog.fallback.test.tsx` (per-file save dialogs only when there is no folder
+picker, any other picker failure reported, nothing started when the folder picker is cancelled or
+a batch is running, no existing file replaced); `multi-file-trace-action-cancel.test.ts` (Cancel
+during a worker trace is a cancel, a superseded trace is retried, then skipped);
+`multi-file-trace-action-pages.test.ts` (the paper-edge and TIFF page notices);
+`multi-file-trace-action-formats.test.ts` and `src/io/pnm/decode-pnm.test.ts` (TIFF and PBM in
+one batch, resampling to the planned edge, a corrupt TIFF skipped, P1 to P6 decoding, a
+truncated huge header refused before allocation);
+`multi-file-trace-settings.test.ts` (newest record, the Trace dialog's merge, the machine
+default for an unknown preset, unchanged preset defaults, the notice). The whole vitest run over `src/ui/commands`, `src/core/trace` and
+`src/io` passes.

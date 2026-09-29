@@ -1,3 +1,4 @@
+import type { PngTransparentKey } from './png-chunk-metadata';
 import { consumePngFilteredRows } from './png-filtered-row-reader';
 import { consumePngLumaRows, type QualifiedPngHeader } from './png-row-luma-sampler';
 
@@ -15,6 +16,8 @@ type DecodeFormat = Format & {
 type RowOptions = {
   readonly signal?: AbortSignal;
   readonly onRow: (row: Uint8Array) => void | Promise<void>;
+  /** Display luma paints the tRNS colour as paper; exact lanes publish it instead. */
+  readonly transparentKey?: () => PngTransparentKey | undefined;
 };
 
 /** Route reconstructed PNG bytes through display luma or an exact heightfield lane. */
@@ -30,6 +33,7 @@ export function consumeDecodedPngRows(
     const header: QualifiedPngHeader = {
       ...source,
       channels: format.colorType === 0 ? 1 : format.colorType === 6 ? 4 : 3,
+      ...(options.transparentKey === undefined ? {} : { transparentKey: options.transparentKey }),
     };
     return consumePngLumaRows(readable, header, target, options.signal, options.onRow);
   }

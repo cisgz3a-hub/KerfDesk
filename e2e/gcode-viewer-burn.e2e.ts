@@ -80,7 +80,7 @@ function watchProblems(page: Page): string[] {
   return problems;
 }
 
-test('the Inspector burns a laser program onto its sheet as playback runs (ADR-487)', async ({
+test('the Inspector burns a laser program onto its sheet as playback runs (ADR-487, ADR-501)', async ({
   page,
   kerfdesk,
 }) => {
@@ -103,7 +103,10 @@ test('the Inspector burns a laser program onto its sheet as playback runs (ADR-4
     .poll(() => countPixels(page, view, 'wood'), { timeout: 30_000 })
     .toBeGreaterThan(without + 20_000);
   const bare = await countPixels(page, view, 'wood');
-  await expect(dialog.getByText(/S 1000 darkest/)).toBeVisible();
+  // It shades by energy (ADR-501): the default machine states no laser power,
+  // so 10 W is taken; S1000 at 3000 mm/min on a 0.1 mm beam is 2 J/mm², S300 0.6.
+  await expect(dialog.getByText(/this program puts in 0\.6 J\/mm² to 2 J\/mm²/)).toBeVisible();
+  await expect(dialog.getByText(/10 W \(taken/)).toBeVisible();
 
   // At the end the full-power square is charred and no longer wood; the 30%
   // square is only scorched, still a wood brown.
@@ -128,6 +131,17 @@ test('the Inspector burns a laser program onto its sheet as playback runs (ADR-4
     .poll(() => countPixels(page, view, 'pale'), { timeout: 30_000 })
     .toBeGreaterThan(capped + 5_000);
   await material.selectOption('wood');
+
+  // Power only is LightBurn's shading, as ADR-487 drew it.
+  const shadeBy = dialog.getByLabel('Shade the burn by');
+  await shadeBy.selectOption('power');
+  await expect(dialog.getByText(/S 1000 darkest/)).toBeVisible();
+  await view.focus();
+  await page.keyboard.press('End');
+  await expect
+    .poll(() => countPixels(page, view, 'wood'), { timeout: 30_000 })
+    .toBeGreaterThan(without + 10_000);
+  await shadeBy.selectOption('energy');
 
   await show.uncheck();
   await expect

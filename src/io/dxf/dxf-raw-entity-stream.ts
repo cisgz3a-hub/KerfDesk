@@ -46,7 +46,10 @@ export function createRawEntityStream(onEntity: (entity: RawEntity) => void): Ra
       polylineTags = [];
       return;
     }
-    currentType = type;
+    // Any other SEQEND ends an INSERT's ATTRIB list and draws nothing, so it
+    // is not reported as skipped geometry: a null type collects its tags and
+    // drops them when the next entity begins.
+    currentType = type === 'SEQEND' ? null : type;
     currentTags = [];
   };
 

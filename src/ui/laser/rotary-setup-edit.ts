@@ -10,6 +10,7 @@ import {
   type RotarySetup,
   type RotaryType,
 } from '../../core/devices/rotary';
+import type { RotaryPreset } from '../../core/devices/rotary-presets';
 
 // Only the field's starting value; nothing scales until the operator turns
 // roller scaling on and measures the driven roller.
@@ -54,6 +55,15 @@ export function editRotaryType(edit: RotaryEdit, type: RotaryType): RotaryEdit {
     ...edit,
     setup: scaled ? { ...edit.setup, type, rollerDiameterMm: diameterMm } : { ...edit.setup, type },
   };
+}
+
+/** A published rotary's type and motion per turn; the work and the toggles stay (ADR-503). */
+export function editRotaryPreset(
+  edit: RotaryEdit,
+  preset: Pick<RotaryPreset, 'setup'>,
+): RotaryEdit {
+  const typed = editRotaryType(edit, preset.setup.type);
+  return editRotaryFields(typed, { mmPerRotation: preset.setup.mmPerRotation });
 }
 
 export function editRollerScaling(edit: RotaryEdit, scaled: boolean): RotaryEdit {

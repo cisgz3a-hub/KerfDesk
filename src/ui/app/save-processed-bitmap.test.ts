@@ -1,4 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
+import type { RasterGroup } from '../../core/job';
+import { compileJob } from '../../core/job/compile-job';
 import { createLayer, createProject, IDENTITY_TRANSFORM, type Project } from '../../core/scene';
 import type { FileSaveRequest, PlatformAdapter, SaveTarget } from '../../platform/types';
 import { handleSaveProcessedBitmap } from './save-processed-bitmap';
@@ -45,6 +47,36 @@ describe('handleSaveProcessedBitmap', () => {
       2,
       1,
     );
+  });
+
+  it("exports the image's own settings as the job burns them, not its layer's", async () => {
+    // The layer passes greys through; this image alone is a thresholded negative
+    // on a 2 lines/mm grid, which is what compile burns.
+    const project = withRaster(rasterProject(), {
+      operationOverride: { passThrough: false, negativeImage: true, linesPerMm: 2 },
+    });
+    const job = compileJob(
+      { objects: project.scene.objects, layers: project.scene.layers },
+      project.device,
+    );
+    const group = job.groups.find(
+      (candidate): candidate is RasterGroup => candidate.kind === 'raster',
+    );
+    if (group === undefined) throw new Error('missing compiled raster');
+    const exported = await exportedBitmap(project);
+
+    expect({ width: exported.width, height: exported.height }).toEqual({ width: 4, height: 2 });
+    expect({ width: group.pixelWidth, height: group.pixelHeight }).toEqual({ width: 4, height: 2 });
+    expect(burnPattern(exported.rgba)).toEqual(Array.from(group.sValues, (s) => s > 0));
+    expect(burnPattern(exported.rgba)).toContain(true);
+  });
+
+  it('exports nothing burned for an image whose power scale is zero', async () => {
+    const project = withRaster(rasterProject(), { powerScale: 0 });
+
+    const exported = await exportedBitmap(project);
+
+    expect(burnPattern(exported.rgba)).toEqual([false, false]);
   });
 
   it('saves the selected image as a PNG blob', async () => {
@@ -161,6 +193,41 @@ function rasterProject(): Project {
       ],
     },
   };
+}
+
+function withRaster(project: Project, overrides: Record<string, unknown>): Project {
+  return {
+    ...project,
+    scene: {
+      ...project.scene,
+      objects: project.scene.objects.map((object) =>
+        object.kind === 'raster-image' ? ({ ...object, ...overrides } as typeof object) : object,
+      ),
+    },
+  };
+}
+
+async function exportedBitmap(
+  project: Project,
+): Promise<{ readonly rgba: Uint8ClampedArray; readonly width: number; readonly height: number }> {
+  let exported: { rgba: Uint8ClampedArray; width: number; height: number } | undefined;
+  await handleSaveProcessedBitmap({
+    platform: mockPlatform(async () => ({ displayName: 'x.png', write: async () => undefined })),
+    project,
+    selectedObjectId: 'R1',
+    pushToast: vi.fn(),
+    encodePng: async (rgba, width, height) => {
+      exported = { rgba, width, height };
+      return new Blob(['png'], { type: 'image/png' });
+    },
+  });
+  if (exported === undefined) throw new Error('nothing was exported');
+  return exported;
+}
+
+// True where the exported pixel is darker than paper, i.e. where the laser fires.
+function burnPattern(rgba: Uint8ClampedArray): boolean[] {
+  return Array.from({ length: rgba.length / 4 }, (_, index) => (rgba[index * 4] ?? 255) < 255);
 }
 
 function overBudgetRasterProject(): Project {

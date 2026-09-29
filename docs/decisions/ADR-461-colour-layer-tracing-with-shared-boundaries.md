@@ -233,3 +233,22 @@ outlines; they traced 4,001 and 908 before this amendment; the hairline cases ab
 `colour-layer-alpha.test.ts` (alpha 1 and 63 stay untraced, straight or tagged; 64 to 255 agree)
 and `colour-appearance.test.ts` (the cutoff at native size and when resampled). These are
 software tracing checks, not a material cut.
+
+### Amendment 2 - anti-aliased transparency edges (2026-09-28)
+
+Keep Amendment 1's quarter-opacity floor and junction-aware speck cleanup. A proposed
+replacement cleanup erased 17 of 39 pixels in the crossing-hairline regression, so it
+is not adopted. The error-diffused ramp retains 49 outlines (the earlier broken cleanup
+created 620); the more aggressive proposal gave 21 but damaged intersections.
+
+Above the existing alpha floor, partial edge pixels connected to transparent background
+and below half the opacity of nearby same-colour ink remain void. Retained edge pixels
+use the nearby ink plateau's appearance, preventing a second grey crumb layer. At the
+working-grid limit, cells need half visible area and use visible-pixel colour only.
+Uniform faint shadows below alpha 64 remain untraced. An alpha-64 disc keeps its ink
+but its antialiased rim remains below the floor, with measured area error 5.4 percent;
+this is an explicit consequence of Amendment 1, not a half-coverage claim for faint ink.
+
+Coverage includes straight/tagged alpha, discs and rings at Auto and fixed colour counts,
+translucent halos, angled and intersecting hairlines, and an 8.4 MP resampled ring.
+These are software geometry checks, not physical qualification.

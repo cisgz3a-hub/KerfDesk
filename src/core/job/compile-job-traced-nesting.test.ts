@@ -16,8 +16,9 @@ import { optimizePaths } from './optimize-paths';
 
 // ADR-531: inside-first cutting reads a traced path's carried forest. A
 // hollow C (a C-shaped band whose C-shaped hole ends inside it) is the case
-// the bounds-centre probe gets wrong: the hole's bounds centre lies in the
-// C's mouth, outside the outline, so the hole was ordered as an outer.
+// the old bounds-centre probe got wrong: the hole's bounds centre lies in the
+// C's mouth, outside the outline, so the hole was ordered as an outer. The
+// probe now uses a vertex of the target, so both routes cut the hole first.
 
 const color = '#000000';
 const layer = { ...createLayer({ id: 'cut', color }), mode: 'line' as const };
@@ -66,12 +67,11 @@ function firstCut(path: ColoredPath): number {
 }
 
 describe('inside-first ordering of a traced path (ADR-531)', () => {
-  it('cuts the hole of a hollow C before its outline only with the carried forest', () => {
+  it('cuts the hole of a hollow C before its outline, with or without the carried forest', () => {
     const plain: ColoredPath = { color, polylines: [outline, hole] };
     expect(outline.points.length).not.toBe(hole.points.length);
-    // Without the forest the probe misses the hole: both read as outers and
-    // nearest-neighbour order from the origin reaches the outline first.
-    expect(firstCut(plain)).toBe(outline.points.length);
+    // Without the forest the vertex probe finds the hole inside the outline.
+    expect(firstCut(plain)).toBe(hole.points.length);
     const nested = withSubpathNesting(plain, [-1, 0]);
     expect(nested.subpathNesting).toBeDefined();
     expect(firstCut(nested)).toBe(hole.points.length);

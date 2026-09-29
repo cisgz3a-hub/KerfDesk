@@ -3,10 +3,19 @@
 // CNC strategy settings, and the material each operation is bound to. The
 // table renders these as a muted detail line under each row.
 
-import { CHIPLOAD_MATERIALS, isProfileCutType, zPassDepths } from '../../../core/cnc';
+import {
+  CHIPLOAD_MATERIALS,
+  isProfileCutType,
+  passNeedsTabs,
+  zPassDepths,
+} from '../../../core/cnc';
 // Deep import: core/cnc's barrel is a ratcheted over-cap legacy barrel
 // (scripts/index-export-baseline.json) and may only shrink.
-import { cutCanFreePart } from '../../../core/cnc/cnc-tabs';
+import {
+  cutCanFreePart,
+  settingsWithStockTabGate,
+  stockLimitedTabHeightMm,
+} from '../../../core/cnc/cnc-tabs';
 import { findCncMachineStarterById } from '../../../core/cnc/machine-starters';
 import {
   imageOverscanMmFor,
@@ -170,12 +179,17 @@ export type CompiledReliefFacts = {
 
 /** The read-only strategy a CNC operation cuts with, joined for one line.
  * `plungingReliefStages` comes from the compiled job (ADR-273 Amendment 1), as
- * does `relief` when the operation cut relief objects (ADR-224 Amendment 3). */
+ * do `relief` when the operation cut relief objects (ADR-224 Amendment 3),
+ * `unrampedShapes` when none of its shape groups records the ramp it asks for
+ * (ADR-273 Amendment 2) and `compiledTabs`, whether any of its passes rises
+ * into a holding tab (ADR-258 Amendment 4); undefined when no job is known. */
 export function cncOperationDetail(
   settings: CncLayerSettings,
   stockThicknessMm?: number,
   plungingReliefStages: ReadonlyArray<PlungingReliefStage> = [],
   relief?: CompiledReliefFacts,
+  unrampedShapes = false,
+  compiledTabs?: boolean,
 ): string {
   // A relief roughs to its own depth, level by level, and takes no tabs. An
   // operation that cut only reliefs cut no shape of its cut type, so that
@@ -190,8 +204,10 @@ export function cncOperationDetail(
     ...(shapes ? cncDepthParts(settings, relief !== undefined) : []),
     ...cncStepoverPart(settings, shapes, relief),
     ...cncDirectionPart(settings),
-    ...(shapes ? cncProfileTabsPart(settings, stockThicknessMm, relief !== undefined) : []),
-    ...cncEntryPart(settings, plungingReliefStages, shapes),
+    ...(shapes
+      ? cncProfileTabsPart(settings, stockThicknessMm, relief !== undefined, compiledTabs)
+      : []),
+    ...cncEntryPart(settings, plungingReliefStages, shapes, unrampedShapes),
     ...(shapes ? cncVCarveClearPart(settings) : []),
     ...cncFinishAllowancePart(settings),
     ...(shapes ? cncPocketStrategyPart(settings) : []),
@@ -239,12 +255,27 @@ function cncProfileTabsPart(
   settings: CncLayerSettings,
   stockThicknessMm: number | undefined,
   besideReliefs: boolean,
+  compiledTabs: boolean | undefined,
 ): ReadonlyArray<string> {
+  if (!isProfileCutType(settings.cutType)) return [];
+  // ADR-258 Amendment 4: a closed shape cut this deep rises into tabs, so passes
+  // that carry none cut only open paths, which take no tab, or loops the tab
+  // windows swallow whole, which the full tab coverage advisory reports.
+  if (compiledTabs === false && closedShapesGetTabs(settings, stockThicknessMm)) return [];
   // Relief passes take no tabs, so kept tabs belong to the other shapes alone.
   const keptNote = besideReliefs ? ', none on reliefs' : '';
-  return isProfileCutType(settings.cutType)
-    ? [cncTabsPart(settings, stockThicknessMm, keptNote)]
-    : [];
+  return [cncTabsPart(settings, stockThicknessMm, keptNote)];
+}
+
+// The compiler's own rule (cnc-tabs.ts): whether a closed shape of this
+// operation gets tabs on its deepest pass.
+function closedShapesGetTabs(settings: CncLayerSettings, stockThicknessMm?: number): boolean {
+  if (!settings.tabsEnabled) return false;
+  const tabs = settingsWithStockTabGate(
+    settings,
+    stockThicknessMm ?? DEFAULT_CNC_STOCK.thicknessMm,
+  );
+  return tabs.tabsEnabled && passNeedsTabs(-tabs.depthMm, tabs.depthMm, tabs.tabHeightMm);
 }
 
 function cncVCarveClearPart(settings: CncLayerSettings): ReadonlyArray<string> {
@@ -329,18 +360,26 @@ function cncTabsPart(
   if (!cutCanFreePart(settings.depthMm, settings.tabHeightMm, stockThicknessMm)) {
     return `${configured}, skipped: the ${formatMm(stockThicknessMm - settings.depthMm)} mm floor holds the part`;
   }
-  // Amendment 3: a set stock thickness measures a kept tab from the stock bottom.
-  return stockThicknessMm === DEFAULT_CNC_STOCK.thicknessMm
-    ? `${configured}${keptNote}`
-    : `${configured} above the stock bottom${keptNote}`;
+  if (stockThicknessMm === DEFAULT_CNC_STOCK.thicknessMm) return `${configured}${keptNote}`;
+  // Amendment 3: a set stock thickness measures a kept tab from the stock bottom,
+  // and amendment 4 cuts a tab no thinner than the stock half the stock thick.
+  const keptMm = stockLimitedTabHeightMm(settings.tabHeightMm, stockThicknessMm);
+  const thinned =
+    keptMm < settings.tabHeightMm
+      ? `, thinned to ${formatMm(keptMm)} mm (half the ${formatMm(stockThicknessMm)} mm stock)`
+      : '';
+  return `${configured} above the stock bottom${thinned}${keptNote}`;
 }
 
 function cncEntryPart(
   settings: CncLayerSettings,
   plungingReliefStages: ReadonlyArray<PlungingReliefStage>,
   shapes: boolean,
+  unrampedShapes: boolean,
 ): ReadonlyArray<string> {
-  const entry = shapes ? requestedCncEntry(settings) : reliefRoughingEntry(settings);
+  const entry = shapes
+    ? requestedCncEntry(settings, unrampedShapes)
+    : reliefRoughingEntry(settings);
   if (entry === null) return [];
   const notes = [...entry.notes, ...reliefPlungeNote(plungingReliefStages)];
   return [notes.length === 0 ? entry.label : `${entry.label} (${notes.join('; ')})`];
@@ -359,17 +398,35 @@ function reliefRoughingEntry(
 
 function requestedCncEntry(
   settings: CncLayerSettings,
+  unrampedShapes: boolean,
 ): { readonly label: string; readonly notes: ReadonlyArray<string> } | null {
   const rampEntryDeg =
     settings.cutType === 'v-carve' ? settings.vCarveRampEntryDeg : settings.rampEntryDeg;
   if (rampEntryDeg !== undefined) {
     return settings.cutType === 'v-carve'
       ? { label: `requested entry ${rampEntryDeg}°`, notes: ['medial depth profile governs'] }
-      : { label: `ramp entry ${rampEntryDeg}°`, notes: [] };
+      : {
+          label: `ramp entry ${rampEntryDeg}°`,
+          notes: unrampedShapes ? [unrampedShapesNote(settings)] : [],
+        };
   }
   if (settings.cutType === 'v-carve') return null;
   if (settings.helixEntry !== undefined) return { label: 'helix entry', notes: [] };
   return null;
+}
+
+// Shapes whose passes never ramp record no ramp (ADR-273 Amendment 2), so an
+// operation whose compiled shapes carry none names what its angle misses.
+function unrampedShapesNote(settings: CncLayerSettings): string {
+  if (settings.cutType === 'drill') return 'not used by drilling';
+  if (settings.cutType === 'inlay-pair') return 'not used by the inlay pocket or insert';
+  if (settings.cutType === 'pocket' && settings.pocketStrategy === 'adaptive') {
+    return 'not used by adaptive clearing';
+  }
+  if (settings.cutType === 'pocket' && settings.helixEntry !== undefined) {
+    return 'not used by the helical pocket';
+  }
+  return 'not used by these shapes';
 }
 
 // A relief group that records no ramp plunges at every start, whatever entry

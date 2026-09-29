@@ -2,6 +2,8 @@ import { describe, expect, it } from 'vitest';
 import { DEFAULT_DEVICE_PROFILE, NEOTRONICS_4040_MAX_LT4LDS_V2_PROFILE } from '../../core/devices';
 import { createProject } from '../../core/scene';
 import { deserializeProject } from './deserialize-project';
+import { prepareProjectForAutosave } from './prepare-project-autosave';
+import { prepareProjectForPersistence } from './prepare-project-persistence';
 import { serializeProject } from './serialize-project';
 
 describe('project device profile metadata persistence', () => {
@@ -186,17 +188,46 @@ describe('project device profile metadata persistence', () => {
     expect(result.reason).toMatch(/device\.capabilities/);
   });
 
-  it('replaces legacy Neotronics 4040 frame feed with the safer built-in feed', () => {
+  it('gives a Neotronics 4040 saved without a frame feed its own preset feed', () => {
     const raw = JSON.parse(serializeProject(createProject(NEOTRONICS_4040_MAX_LT4LDS_V2_PROFILE)));
-    raw.device.framingFeedMmPerMin = 6000;
+    delete raw.device.framingFeedMmPerMin;
 
     const result = deserializeProject(JSON.stringify(raw));
 
     expect(result.kind).toBe('ok');
     if (result.kind !== 'ok') return;
-    expect(result.project.device.framingFeedMmPerMin).toBe(
-      NEOTRONICS_4040_MAX_LT4LDS_V2_PROFILE.framingFeedMmPerMin,
-    );
+    expect(result.project.device.framingFeedMmPerMin).toBe(2000);
+  });
+
+  it('keeps an explicit Neotronics 4040 frame feed, the generic default included', () => {
+    const raw = JSON.parse(serializeProject(createProject(NEOTRONICS_4040_MAX_LT4LDS_V2_PROFILE)));
+    raw.device.framingFeedMmPerMin = DEFAULT_DEVICE_PROFILE.framingFeedMmPerMin;
+
+    const result = deserializeProject(JSON.stringify(raw));
+
+    expect(result.kind).toBe('ok');
+    if (result.kind !== 'ok') return;
+    expect(result.project.device.framingFeedMmPerMin).toBe(6000);
+  });
+
+  it('saves and recovers a Neotronics 4040 project framing at 6000 mm/min', () => {
+    const base = createProject(NEOTRONICS_4040_MAX_LT4LDS_V2_PROFILE);
+    const project = { ...base, device: { ...base.device, framingFeedMmPerMin: 6000 } };
+
+    const saved = prepareProjectForPersistence(project);
+    expect(saved.kind).toBe('ok');
+    if (saved.kind !== 'ok') return;
+    expect(deserializeProject(saved.json)).toMatchObject({
+      kind: 'ok',
+      project: { device: { framingFeedMmPerMin: 6000 } },
+    });
+    const autosaved = prepareProjectForAutosave(project);
+    expect(autosaved.kind).toBe('ok');
+    if (autosaved.kind !== 'ok') return;
+    expect(deserializeProject(autosaved.json)).toMatchObject({
+      kind: 'ok',
+      project: { device: { framingFeedMmPerMin: 6000 } },
+    });
   });
 
   it('clears stale Z travel confirmation when loaded profile has no positive Z travel', () => {

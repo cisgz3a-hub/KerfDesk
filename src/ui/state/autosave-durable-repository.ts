@@ -15,5 +15,6 @@ export interface AutosaveDurableRepository {
     readonly expectedEpoch: number;
   }): Promise<AutosaveIndexedDbMutation>;
   readEpoch(storageKey: string): Promise<number>;
+  holdsReplaceableSnapshot(storageKey: string): Promise<boolean>;
   readAllSlots(): Promise<ReadonlyArray<AutosaveIndexedDbSlot>>;
 }

@@ -21,6 +21,10 @@ import {
   type AutosaveUnreadableSlot,
 } from './autosave-durable-read';
 import type { AutosaveDurableRepository } from './autosave-durable-repository';
+import {
+  durableSlotHoldsReplaceableSnapshot,
+  localSlotHoldsReplaceableSnapshot,
+} from './autosave-inherited-slot';
 import { AutosaveSessionLocks, type AutosaveSessionGuard } from './autosave-session-lock';
 
 export type { AutosaveDurableRepository } from './autosave-durable-repository';
@@ -66,6 +70,8 @@ export class AutosaveDurableService {
   private readonly rotateSessionId: () => string;
   private readonly epochs = new Map<string, number>();
   private sessionIdHint: string;
+  // Only the first claim can meet a slot left by an earlier page (claimSession).
+  private inheritedSlotUnchecked = true;
   private sessionPromise: Promise<AutosaveOwnedSession> | null = null;
   private tail: Promise<void> = Promise.resolve();
 
@@ -101,6 +107,11 @@ export class AutosaveDurableService {
   }
 
   clearCurrent(): Promise<AutosaveDurableClearResult> {
+    // Start the claim first. If this page inherited a local backup from an
+    // earlier page, the claim moves it to a fresh session synchronously, so
+    // the immediate clear below cannot delete that backup. A failed claim
+    // reaches the queued clear, which awaits the same promise.
+    this.session().catch(() => undefined);
     const localClears = [clearAutosave()];
     return this.enqueue(async () => {
       const session = await this.session();
@@ -276,7 +287,40 @@ export class AutosaveDurableService {
     return stored;
   }
 
+  // A reload of the same tab keeps the session ID, so this page can inherit a
+  // slot that still holds the previous page's unsaved work. Recovery offers
+  // that work, and this page's first write or clear must not replace it, so
+  // the page moves to a fresh slot. The old slot is then an abandoned session
+  // like any closed window's: offered until it is restored or discarded.
   private async claimSession(): Promise<AutosaveOwnedSession> {
+    const inherited = this.inheritedSessionToInspect();
+    const session = await this.claimAvailableSession();
+    if (session.sessionId !== inherited) return session;
+    const storageKey = autosaveStorageKeyForSession(inherited);
+    if (!(await durableSlotHoldsReplaceableSnapshot(this.repository, storageKey))) return session;
+    // Publish and claim the new identity before giving up the old guard, as
+    // write() does. Synchronous unload and clear calls must never reuse it.
+    this.sessionIdHint = this.rotateSessionId();
+    const fresh = await this.claimAvailableSession();
+    await session.guard?.release();
+    return fresh;
+  }
+
+  // Checks the inherited local slot synchronously, before any synchronous
+  // clear or unload write can reach it through sessionStorage. Returns the
+  // inherited session when its IndexedDB slot still needs checking.
+  private inheritedSessionToInspect(): string | undefined {
+    if (!this.inheritedSlotUnchecked) return undefined;
+    this.inheritedSlotUnchecked = false;
+    const inherited = this.sessionIdHint;
+    if (!localSlotHoldsReplaceableSnapshot(autosaveStorageKeyForSession(inherited))) {
+      return inherited;
+    }
+    this.sessionIdHint = this.rotateSessionId();
+    return undefined;
+  }
+
+  private async claimAvailableSession(): Promise<AutosaveOwnedSession> {
     let sessionId = this.sessionIdHint;
     for (;;) {
       const claim = await this.locks.claim(sessionId);

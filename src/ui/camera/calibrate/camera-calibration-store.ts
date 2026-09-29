@@ -1,7 +1,8 @@
 // camera-calibration-store — the one-photo camera calibration wizard
 // (ADR-441): engrave the ring target as a temporary job, take one photo, fit
 // the camera, review the result in millimetres, save it to the machine
-// profile. Ephemeral like the camera store; only the saved model persists.
+// profile. Ephemeral like the camera store; only the saved model persists,
+// and the layout of the last target engraved (engraved-target-memory.ts).
 
 import { create } from 'zustand';
 import type { BedArea } from '../../../core/camera/model/camera-model-accuracy';
@@ -9,6 +10,8 @@ import type { CameraModelRecord } from '../../../core/camera/model/camera-model-
 import type { MarkError } from '../../../core/camera/target/bed-calibration';
 import type { RgbaImage } from '../../../core/camera/rgba-image';
 import type { StreamerState } from '../../../core/controllers/grbl';
+import { useStore } from '../../state';
+import { rememberedLayoutSettings } from './engraved-target-memory';
 import type { SavedCalibrationCheck } from './saved-calibration-check';
 
 export type PhotoStatus =
@@ -60,6 +63,10 @@ export type CalibrationSettings = {
 // the saved calibration still holds (ADR-441 Amendment 1).
 export type CalibrationMode = 'calibrate' | 'check';
 
+// The margin and square size of the targets last engraved on this machine
+// (ADR-441 Amendment 4), filled in when the wizard opens.
+type RememberedLayout = Partial<Pick<CalibrationSettings, 'marginMm' | 'headTargetSizeMm'>>;
+
 export type CameraCalibrationStore = {
   readonly open: boolean;
   readonly mode: CalibrationMode;
@@ -103,7 +110,14 @@ export const useCameraCalibrationStore = create<CameraCalibrationStore>((set) =>
   settings: DEFAULT_CALIBRATION_SETTINGS,
   targetArea: null,
   openWizard: () =>
-    set({ open: true, mode: 'calibrate', minimized: false, step: INITIAL_STEP, targetArea: null }),
+    set((s) => ({
+      open: true,
+      mode: 'calibrate',
+      minimized: false,
+      step: INITIAL_STEP,
+      targetArea: null,
+      settings: withRemembered(s.settings),
+    })),
   // Check needs the target that was actually engraved. Older records remain
   // usable, but current bed/margin settings cannot stand in for their layout.
   openCheck: (saved) =>
@@ -116,7 +130,7 @@ export const useCameraCalibrationStore = create<CameraCalibrationStore>((set) =>
           ? { kind: 'setup', note: MISSING_TARGET_LAYOUT_NOTE }
           : { kind: 'photo', status: { kind: 'idle' } },
       settings: {
-        ...s.settings,
+        ...withRemembered(s.settings),
         sheetThicknessMm: saved.accuracy.targetHeightMm,
         headCamera: saved.mount?.kind === 'head',
       },
@@ -136,6 +150,16 @@ export const useCameraCalibrationStore = create<CameraCalibrationStore>((set) =>
     })),
   setStep: (step) => set({ step }),
 }));
+
+// The wizard starts from the layout of the last target engraved on the open
+// project's machine, so "Target already engraved" finds that target after a
+// restart.
+function withRemembered(settings: CalibrationSettings): CalibrationSettings {
+  const remembered: RememberedLayout = rememberedLayoutSettings(useStore.getState().project.device);
+  return Object.keys(remembered).length === 0
+    ? settings
+    : sanitized({ ...settings, ...remembered });
+}
 
 // Inputs arrive from number fields: a blank or non-numeric entry keeps the
 // previous meaning instead of becoming NaN. Nothing the machine can do is
