@@ -7,6 +7,7 @@ import { ConfirmSaveDialog, SaveFilenamePanel, StatusBar, Toasts } from '../comm
 import { CommandShell } from '../commands';
 import { CanvasGcodeView, CanvasViewSwitch } from '../gcode-inspector';
 import { useCanvasViewStore } from '../state/canvas-view-store';
+import { useEdition } from '../licensing/edition';
 import { LiveMotionBar, useJobShortcuts } from '../laser';
 import { MachineSetupDialogHost } from '../laser/device-setup';
 import { BoardCapturePanel } from '../laser/board-capture';
@@ -135,6 +136,12 @@ function AppLifecycle(): null {
 function CanvasArea(): JSX.Element {
   const showGcode = useCanvasViewStore((store) => store.showGcode);
   const setShowGcode = useCanvasViewStore((store) => store.setShowGcode);
+  const { requestPro } = useEdition();
+  // The G-code 3D view is the G-code Inspector's, a Pro tool (ADR-540).
+  const changeView = (next: boolean): void => {
+    if (next) requestPro('gcode-inspector', () => setShowGcode(true));
+    else setShowGcode(false);
+  };
   const accessories = (
     <>
       <WorkspaceCameraOverlay />
@@ -147,7 +154,7 @@ function CanvasArea(): JSX.Element {
   );
   return (
     <WorkspaceViewport
-      controls={<CanvasViewSwitch showGcode={showGcode} onChange={setShowGcode} />}
+      controls={<CanvasViewSwitch showGcode={showGcode} onChange={changeView} />}
       content={
         showGcode ? (
           <div className="lf-workspace-stage">

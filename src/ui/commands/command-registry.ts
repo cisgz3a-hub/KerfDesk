@@ -16,6 +16,7 @@ import { editCommands } from './edit-command-family';
 import { arrangeCommands } from './arrange-command-family';
 import { laserCommands } from './laser-command-family';
 import { gateCommandsForMachineKind } from './machine-command-gate';
+import { gateCommandsForEdition } from './edition-command-gate';
 import { commandUndoStepName } from './command-undo-step-name';
 import { withUndoStepName } from '../state/undo-step-names';
 import type { AppCommand, AppCommandContext, CommandId } from './command-types';
@@ -25,8 +26,9 @@ export type { AppCommand, AppCommandContext, CommandFamily, CommandId } from './
 
 export function buildAppCommands(ctx: AppCommandContext): ReadonlyArray<AppCommand> {
   // ADR-101: hide laser-only commands in CNC mode at the single choke
-  // point, so every command surface stays machine-correct for free.
-  return gateCommandsForMachineKind(
+  // point, so every command surface stays machine-correct for free. The same
+  // choke point sends the Pro commands through the edition check (ADR-540).
+  const commands = gateCommandsForMachineKind(
     [
       ...fileCommands(ctx),
       ...editCommands(ctx),
@@ -44,6 +46,7 @@ export function buildAppCommands(ctx: AppCommandContext): ReadonlyArray<AppComma
     ],
     ctx.machineKind,
   );
+  return gateCommandsForEdition(commands);
 }
 
 export function commandById(commands: ReadonlyArray<AppCommand>, id: CommandId): AppCommand {

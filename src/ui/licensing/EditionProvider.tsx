@@ -1,8 +1,11 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import type { LicenceAdapter, LicenceStatus } from '../../platform/types';
 import { EditionContext, setActiveEdition, type EditionValue } from './edition';
+import { UNLICENSED_BUILDS_RUN_FREE } from './edition-policy';
+import { FreeOnlyEdition, useProInDesktop } from './FreeOnlyEdition';
 import { LicencePanel } from './LicencePanel';
 import { ProFeatureDialog } from './ProFeatureDialog';
+import { ProInDesktopDialog } from './ProInDesktopDialog';
 import type { ProFeature } from './pro-features';
 
 export const LICENCE_SETTINGS_EVENT = 'kerfdesk:licence-settings';
@@ -12,27 +15,40 @@ type PendingPro = { readonly feature: ProFeature; readonly onAllowed?: (() => vo
 /**
  * Supplies the Free/Pro edition to the app (ADR-540). The workspace always
  * mounts at once: a licence never blocks opening KerfDesk, a project or a
- * machine. Without a licence adapter every feature is available.
+ * machine. A build that cannot take a licence keeps every tool until sales
+ * open, then runs KerfDesk Free (ADR-544).
  */
 export function EditionProvider({
   client,
+  unlicensedRunsFree = UNLICENSED_BUILDS_RUN_FREE,
   children,
 }: {
   readonly client?: LicenceAdapter;
+  readonly unlicensedRunsFree?: boolean;
   readonly children: ReactNode;
 }): JSX.Element {
-  if (client === undefined) return <>{children}</>;
-  return <LicensedEdition client={client}>{children}</LicensedEdition>;
+  if (client === undefined)
+    return unlicensedRunsFree ? <FreeOnlyEdition>{children}</FreeOnlyEdition> : <>{children}</>;
+  return (
+    <LicensedEdition client={client} unlicensedRunsFree={unlicensedRunsFree}>
+      {children}
+    </LicensedEdition>
+  );
 }
 
 function LicensedEdition({
   client,
+  unlicensedRunsFree,
   children,
 }: {
   readonly client: LicenceAdapter;
+  readonly unlicensedRunsFree: boolean;
   readonly children: ReactNode;
 }): JSX.Element {
-  const session = useLicenceSession(client);
+  const session = useLicenceSession(client, unlicensedRunsFree);
+  const desktop = useProInDesktop();
+  // A desktop build without commercial metadata cannot take a licence.
+  const freeBuild = unlicensedRunsFree && session.status?.channel === 'free';
   const [managing, setManaging] = useState(false);
   const { load } = session;
   useEffect(() => {
@@ -53,10 +69,10 @@ function LicensedEdition({
       status: session.status,
       licensed: session.status?.channel === 'commercial',
       pro: session.status?.edition === 'pro',
-      requestPro: session.requestPro,
+      requestPro: freeBuild ? desktop.request : session.requestPro,
       openLicence,
     }),
-    [openLicence, session.requestPro, session.status],
+    [desktop.request, freeBuild, openLicence, session.requestPro, session.status],
   );
   useEffect(() => {
     setActiveEdition(value);
@@ -78,20 +94,30 @@ function LicensedEdition({
         </div>
       ) : null}
       {session.pending !== null && !managing ? (
-        <ProFeatureDialog
-          feature={session.pending.feature}
-          client={client}
-          status={session.status}
-          onStatus={session.accept}
-          onClose={() => session.settle(null)}
-        />
+        freeBuild ? (
+          <ProInDesktopDialog
+            feature={session.pending.feature}
+            onClose={() => session.settle(null)}
+          />
+        ) : (
+          <ProFeatureDialog
+            feature={session.pending.feature}
+            client={client}
+            status={session.status}
+            onStatus={session.accept}
+            onClose={() => session.settle(null)}
+          />
+        )
       ) : null}
+      {desktop.feature === null ? null : (
+        <ProInDesktopDialog feature={desktop.feature} onClose={desktop.close} />
+      )}
     </EditionContext.Provider>
   );
 }
 
 /** The saved licence, and the Pro request waiting on it, for one running app. */
-function useLicenceSession(client: LicenceAdapter) {
+function useLicenceSession(client: LicenceAdapter, unlicensedRunsFree: boolean) {
   const [status, setStatus] = useState<LicenceStatus | null>(null);
   const [failure, setFailure] = useState<string | null>(null);
   const [pending, setPending] = useState<PendingPro | null>(null);
@@ -102,7 +128,12 @@ function useLicenceSession(client: LicenceAdapter) {
     setPending(next);
   }, []);
   const accept = useCallback(
-    async (result: LicenceStatus): Promise<void> => {
+    async (reported: LicenceStatus): Promise<void> => {
+      // Once sales open, a free desktop build runs Free: it has no Pro to unlock.
+      const result: LicenceStatus =
+        unlicensedRunsFree && reported.channel === 'free'
+          ? { ...reported, edition: 'free' }
+          : reported;
       statusRef.current = result;
       setStatus(result);
       setFailure(null);
@@ -113,7 +144,7 @@ function useLicenceSession(client: LicenceAdapter) {
         waiting.onAllowed?.();
       }
     },
-    [settle],
+    [settle, unlicensedRunsFree],
   );
   const load = useCallback(async (): Promise<void> => {
     try {

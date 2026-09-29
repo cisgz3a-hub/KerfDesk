@@ -31,7 +31,8 @@ export const PRO_FEATURES: Readonly<
   },
   'advanced-trace': {
     name: 'Advanced tracing',
-    summary: 'Centerline, colour, photo and batch tracing beyond the basic outline trace.',
+    summary:
+      'Centerline, colour-layer, photo-shading and multi-file tracing, beyond the outline presets.',
   },
   'camera-alignment': {
     name: 'Camera alignment',
@@ -43,13 +44,19 @@ export const PRO_FEATURES: Readonly<
   },
   'design-studio': {
     name: 'Design Studio',
-    summary: 'Build finished designs from templates and generators.',
+    summary:
+      'Draw parts to size by hand in a full window, with precision tools, snapping and dimensions.',
   },
   'gcode-inspector': {
     name: 'G-code Inspector',
-    summary: 'Open, read and check any G-code file line by line against its toolpath.',
+    summary: 'Open any G-code file, or this project’s own, and check it move by move in 3D.',
   },
 };
+
+/** Marks a Pro choice in a list while Pro is locked, as "V-carve (Pro)". */
+export function proChoiceLabel(label: string, locked: boolean): string {
+  return locked ? `${label} (Pro)` : label;
+}
 
 export const PRO_PRICE_LABEL = 'US$49.50';
 export const RENEWAL_PRICE_LABEL = 'US$20';

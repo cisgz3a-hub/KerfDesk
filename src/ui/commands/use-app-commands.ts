@@ -48,6 +48,7 @@ import {
 } from './selection-command-state';
 import { controllerActionFailureHandler } from '../laser/report-controller-action-failure';
 import { useEdition } from '../licensing/edition';
+import { labelProCommands } from './edition-command-gate';
 
 export type { CommandShellCallbacks } from './app-command-context-types';
 
@@ -71,7 +72,7 @@ export function useAppCommands(callbacks: CommandShellCallbacks): ReadonlyArray<
   const appTheme = useAppThemePreference();
   const wireframeActive = useUiStore((s) => s.wireframeView);
   const edition = useEdition();
-  return buildAppCommands(
+  const commands = buildAppCommands(
     appCommandContext(callbacks, platform, app, laser, pushToast, {
       openImageDialog,
       textTool: () => setToolMode({ kind: 'text' }),
@@ -98,6 +99,7 @@ export function useAppCommands(callbacks: CommandShellCallbacks): ReadonlyArray<
       licensing: platform.id === 'electron' || edition.licensed,
     }),
   );
+  return edition.pro ? commands : labelProCommands(commands);
 }
 
 function appCommandContext(

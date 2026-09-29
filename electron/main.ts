@@ -99,9 +99,27 @@ import { rendererContentSecurityPolicy } from './renderer-content-security-polic
 import { createDesktopWindowReopener } from './desktop-window-reopen.js';
 import { createDesktopLicensing } from './desktop-licensing.js';
 import { withLicensingRoutes } from './licensing-routes.js';
+import { readLicensingConfig } from './licensing-config.js';
+import { refusedDebugSwitch } from './debug-switch-policy.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
+
+// A build that sells licences never loads its renderer under remote debugging
+// (ADR-544). This runs before any window, route or single-instance handoff.
+const REFUSED_DEBUG_SWITCH = refusedDebugSwitch({
+  packaged: app.isPackaged,
+  sellsLicences: readLicensingConfig(app.getAppPath()).channel !== 'free',
+  argv: process.argv,
+  hasSwitch: (name) => app.commandLine.hasSwitch(name),
+});
+if (REFUSED_DEBUG_SWITCH !== null) {
+  dialog.showErrorBox(
+    'KerfDesk',
+    `KerfDesk does not start with the ${REFUSED_DEBUG_SWITCH} debugging option. Open KerfDesk from its shortcut instead.`,
+  );
+  app.exit(1);
+}
 
 // Public rename without a data migration: pin both Chromium/application roots
 // before Electron's ready event so existing projects and recovery state remain.
@@ -489,7 +507,7 @@ async function startCameraBridgeSafely(): Promise<void> {
   }
 }
 
-if (HAS_SINGLE_INSTANCE_LOCK)
+if (HAS_SINGLE_INSTANCE_LOCK && REFUSED_DEBUG_SWITCH === null)
   void app
     .whenReady()
     .then(async () => {

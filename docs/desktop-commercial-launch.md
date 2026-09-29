@@ -94,3 +94,11 @@ ineligible release is skipped. Verify installer publisher, hashes, installed
 version, retained projects/settings, and public download/CORS/cache behaviour.
 Record the exact source, artifact and hosted identity. Only then enable customer
 checkout and advertise automatic commercial updates.
+
+The same change that enables checkout sets `UNLICENSED_BUILDS_RUN_FREE = true` in
+`src/ui/licensing/edition-policy.ts` (ADR-544). From that deploy, the web app and
+the free Preview builds run KerfDesk Free and send Pro tools to the desktop app.
+Before merging it, confirm the owner's own machines run the commercial build with
+a developer licence, since the free builds stop offering Pro to him too. On the
+signed commercial build, confirm that starting KerfDesk with
+`--remote-debugging-port=9222` shows the refusal and opens no window.

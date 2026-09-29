@@ -46,10 +46,11 @@ still holds.
    releases its update period covers, so an automatic update never takes its Pro
    tools away. Installed by hand, a newer release opens as Free with a message
    naming the update date.
-6. **Builds without licensing keep every tool.** Preview, source and web builds
-   have no licence adapter, so `requestProFeature` always allows. The web app
-   keeps every tool until web licensing ships; locking Pro on the web before a
-   licence service is live would leave nobody able to unlock it.
+6. **Builds without licensing keep every tool until sales open.** Preview, source
+   and web builds have no licence adapter, so `requestProFeature` allows. The
+   launch that enables checkout switches them to KerfDesk Free, with Pro tools
+   pointing to the desktop app (ADR-544 item 1); locking them before a licence can
+   be bought would leave nobody able to unlock Pro.
 7. **Planned web licensing.** When it ships, a browser counts as one of the
    licence's three devices, its Pro tools work while the licence's update period
    is active (the web app is always the newest version), and a web trial is per

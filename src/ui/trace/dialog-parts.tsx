@@ -4,6 +4,8 @@ import type { RasterImage } from '../../core/scene';
 import { TRACE_PRESETS } from '../../core/trace';
 import { Button, DialogActions as KitDialogActions } from '../kit';
 import { TutorialButton } from '../tutorials/TutorialButton';
+import { useEdition } from '../licensing/edition';
+import { proChoiceLabel } from '../licensing/pro-features';
 
 export const VISIBLE_TRACE_PRESET_NAMES = [
   'Line Art',
@@ -15,6 +17,12 @@ export const VISIBLE_TRACE_PRESET_NAMES = [
   'Edge Detection',
   'Colour layers',
 ] as const;
+// Advanced tracing is a Pro tool (ADR-540); the other presets are the basic trace.
+export const ADVANCED_TRACE_PRESET_NAMES: ReadonlySet<string> = new Set([
+  'Photo shading',
+  'Centerline',
+  'Colour layers',
+]);
 export const DEFAULT_TRACE_PRESET_NAME = 'Line Art';
 // CNC starts on Smooth; every other preset remains available.
 export const CNC_TRACE_PRESET_NAME = 'Smooth';
@@ -74,6 +82,12 @@ export function PresetPicker(props: {
   readonly onChange: (next: string) => void;
   readonly hasOverrides?: boolean;
 }): JSX.Element {
+  const edition = useEdition();
+  const choose = (next: string): void => {
+    if (ADVANCED_TRACE_PRESET_NAMES.has(next))
+      edition.requestPro('advanced-trace', () => props.onChange(next));
+    else props.onChange(next);
+  };
   return (
     <section className="lf-trace-preset" aria-label="Trace style">
       <div className="lf-trace-section-heading">
@@ -87,12 +101,12 @@ export function PresetPicker(props: {
           aria-label="Trace preset"
           title="Choose a starting style for tracing this image."
           value={props.value}
-          onChange={(e) => props.onChange(e.target.value)}
+          onChange={(e) => choose(e.target.value)}
         >
           {VISIBLE_TRACE_PRESET_NAMES.filter((name) => TRACE_PRESETS[name] !== undefined).map(
             (name) => (
               <option key={name} value={name}>
-                {name}
+                {proChoiceLabel(name, ADVANCED_TRACE_PRESET_NAMES.has(name) && !edition.pro)}
               </option>
             ),
           )}
