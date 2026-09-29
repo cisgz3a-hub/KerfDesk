@@ -12,7 +12,7 @@ type Outcome = {
   readonly args?: ReadonlyArray<string | number>;
   readonly guard?: string;
   readonly url?: string;
-  readonly special?: 'tutorials' | 'unavailable' | 'licence';
+  readonly special?: 'tutorials' | 'unavailable' | 'licence' | 'support-report';
 };
 
 // Independent command-to-action expectations. Each command is clicked through
@@ -174,6 +174,7 @@ const OUTCOMES: Record<CommandId, Outcome> = {
   'help.connection': { callback: 'showConnectionHelp' },
   'help.safety': { callback: 'showSafety' },
   'help.report-bug': { url: 'https://kerfdesk.com/support.html#report' },
+  'help.support-report': { special: 'support-report' },
   'help.discussions': { url: 'https://kerfdesk.com/support.html' },
 };
 
@@ -242,7 +243,9 @@ describe('every registered application menu action', () => {
     async ({ id, outcome }) => {
       const context = availableContext(id);
       const licenceEvent = vi.fn();
+      const supportReportEvent = vi.fn();
       window.addEventListener('kerfdesk:licence-settings', licenceEvent, { once: true });
+      window.addEventListener('kerfdesk:support-report', supportReportEvent, { once: true });
       const opened: Array<{ href: string; target: string; rel: string }> = [];
       vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(function (
         this: HTMLAnchorElement,
@@ -251,7 +254,11 @@ describe('every registered application menu action', () => {
       });
       const button = await clickCommand(id, context);
       expect(licenceEvent).toHaveBeenCalledTimes(Number(outcome.special === 'licence'));
+      expect(supportReportEvent).toHaveBeenCalledTimes(
+        Number(outcome.special === 'support-report'),
+      );
       window.removeEventListener('kerfdesk:licence-settings', licenceEvent);
+      window.removeEventListener('kerfdesk:support-report', supportReportEvent);
       if (outcome.special === 'unavailable') {
         expect(button.disabled).toBe(true);
         expect(button.title).toContain('Z-motion generator');

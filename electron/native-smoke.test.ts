@@ -1,7 +1,10 @@
-import { resolve } from 'node:path';
+import { join, resolve } from 'node:path';
 import { EventEmitter } from 'node:events';
+import { mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
 import { describe, expect, it, vi } from 'vitest';
 import {
+  nativeSmokeSupportLogRecordedLaunch,
   probeNativeSmokeDevTools,
   readNativeSmokeConfig,
   readNativeSmokeWebPreferences,
@@ -119,4 +122,27 @@ describe('native smoke DevTools runtime probe', () => {
       }
     });
   }
+});
+
+describe('native smoke support log evidence', () => {
+  it('needs the installed launch recorded in the smoke profile', async () => {
+    const userData = await mkdtemp(join(tmpdir(), 'kerfdesk-smoke-log-'));
+    try {
+      await expect(nativeSmokeSupportLogRecordedLaunch(userData)).resolves.toBe(false);
+      await mkdir(join(userData, 'logs'));
+      const log = join(userData, 'logs', 'kerfdesk.log');
+      await writeFile(
+        log,
+        '2026-09-29T07:00:00.000Z INFO  [app] KerfDesk 0.9.1 started (development build) on Linux.\n',
+      );
+      await expect(nativeSmokeSupportLogRecordedLaunch(userData)).resolves.toBe(false);
+      await writeFile(
+        log,
+        '2026-09-29T07:00:00.000Z INFO  [app] KerfDesk 0.9.1 started (installed build) on Linux.\n',
+      );
+      await expect(nativeSmokeSupportLogRecordedLaunch(userData)).resolves.toBe(true);
+    } finally {
+      await rm(userData, { recursive: true, force: true });
+    }
+  });
 });

@@ -61,6 +61,9 @@ release before it is tagged.
   outside links open in the browser, and a crashed window offers to reload
   ([#984](https://github.com/cisgz3a-hub/KerfDesk/pull/984)). Serial access is granted only to the
   port you pick ([#884](https://github.com/cisgz3a-hub/KerfDesk/pull/884)).
+- **Support reports.** Help > Save Support Report saves a file with your version, machine, recent
+  problems and, in the desktop app, its log, for you to read and send to KerfDesk support. Large
+  pictures zoom smoothly ([#1021](https://github.com/cisgz3a-hub/KerfDesk/pull/1021)).
 
 ### All changes
 

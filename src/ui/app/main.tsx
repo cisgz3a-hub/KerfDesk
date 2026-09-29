@@ -9,6 +9,7 @@ import {
   createDesktopPreviewUpdateAdapter,
   createDesktopLicenceAdapter,
   createDesktopProjectFiles,
+  createDesktopSupportLogReader,
   isElectronRenderer,
 } from '../../platform/electron';
 import type { PlatformAdapter } from '../../platform/types';
@@ -47,6 +48,10 @@ const adapter: PlatformAdapter = isElectronRenderer()
       id: 'electron',
       desktopUpdates: createDesktopPreviewUpdateAdapter(),
       ...createDesktopProjectFiles(webAdapter.recentFiles),
+      // The main process serves its support log only on app:// (ADR-546).
+      ...(window.location.protocol === 'app:'
+        ? { readSupportLog: createDesktopSupportLogReader() }
+        : {}),
     }
   : webAdapter;
 const desktopLicenceClient =

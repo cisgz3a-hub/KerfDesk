@@ -187,9 +187,9 @@ as §), `kerfdesk-refund-policy.md` and `kerfdesk-privacy-notice.md`. Prepared 2
 - **Extension dates:** the year is added to the current update end date, or runs from the payment
   date if updates have lapsed. This matches `nextUpdateYear(Math.max(now, updatesUntil))` in
   `services/desktop-licensing/payments.mjs`.
-- **Web app after the update end date:** Pro locks in the hosted web app, which always runs the
-  current version, until updates are extended. Covered desktop versions keep Pro. This is the only
-  honest option unless old web versions are hosted.
+- **Web app:** it has the Free features only, because Pro is desktop only (the owner's choice of
+  29 September 2026, ADR-540 item 7), so the update end date matters only in the desktop app.
+  Covered desktop versions keep Pro.
 - **Downloads:** covered desktop versions stay downloadable while the download service runs.
 - **Licensing shutdown:** we promise reasonable efforts to let covered versions activate on new
   devices.
@@ -225,8 +225,11 @@ as §), `kerfdesk-refund-policy.md` and `kerfdesk-privacy-notice.md`. Prepared 2
   business, without reducing customers' rights.
 - **Privacy retention:** licence and active-device records while the licence exists;
   deactivated devices 90 days; trial records 3 years after the trial ends; order information 5
-  years after the tax return covering it; support messages 2 years; IP addresses not stored.
-  Deletion on request, with its effect explained.
+  years after the tax return covering it; support messages 2 years, including any support report
+  the customer attaches; IP addresses not stored. Deletion on request, with its effect explained.
+- **Support reports:** the desktop app keeps a local problem log, and Help > Save Support Report
+  writes a file the customer reads and sends themselves (ADR-546). Nothing is uploaded, so the
+  privacy notice still says there is no automatic crash reporting.
 - **Marketing:** no marketing emails unless the customer asks.
 - **Developer licences:** one sentence only, as in the draft.
 - **Name and logo:** neither the agreement nor MIT licenses the KerfDesk name or logo.

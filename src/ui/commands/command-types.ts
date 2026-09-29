@@ -133,6 +133,7 @@ export type CommandId =
   | 'help.connection'
   | 'help.safety'
   | 'help.report-bug'
+  | 'help.support-report'
   | 'help.licence'
   | 'help.discussions';
 

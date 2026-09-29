@@ -91,13 +91,27 @@
         If a machine does anything unexpected, stop it with the machine's own emergency stop first.
         Abort in KerfDesk is a software stop, not an emergency stop.
       </p>
-      <p>Then include:</p>
+      <p>
+        Then choose <strong>Help &gt; Save Support Report</strong> in KerfDesk and attach the file
+        it saves. It lists your KerfDesk version, your computer, your machine and its controller,
+        the machine console and the app's recent problems, and in the desktop app its log. It never
+        includes your licence key. Open it first to see exactly what you are sending.
+      </p>
+      <p>Also tell us:</p>
+      <ol>
+        <li>What you did, what you expected, and what happened instead.</li>
+        <li>The project file, if you are happy to share it.</li>
+      </ol>
+      <p>If your KerfDesk has no Save Support Report, or will not open, include instead:</p>
       <ol>
         <li>Your KerfDesk version, from <strong>Help &gt; About KerfDesk</strong>.</li>
         <li>Whether you use the web app or the desktop app, and your operating system.</li>
         <li>Your machine and its controller (for example GRBL 1.1 or grblHAL).</li>
-        <li>What you did, what you expected, and what happened instead.</li>
-        <li>The project file, if you are happy to share it.</li>
+        <li>
+          If the desktop app will not open, its log files: on Windows the <code>logs</code> folder
+          in <code>%APPDATA%\laserforge</code>, and on a Mac the <code>logs</code> folder in
+          <code>~/Library/Application Support/laserforge</code>.
+        </li>
       </ol>
       <p>
         Never include your licence key, passwords or payment details. KerfDesk support will never

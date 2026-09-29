@@ -101,6 +101,8 @@ import { createDesktopLicensing } from './desktop-licensing.js';
 import { withLicensingRoutes } from './licensing-routes.js';
 import { readLicensingConfig } from './licensing-config.js';
 import { refusedDebugSwitch } from './debug-switch-policy.js';
+import { startDesktopSupportLog } from './support-log.js';
+import { withSupportRoutes } from './support-routes.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -151,6 +153,10 @@ const DESKTOP_PROJECT_OPENS = installDesktopProjectOpens(app, {
 });
 const HAS_SINGLE_INSTANCE_LOCK = DESKTOP_PROJECT_OPENS.hasSingleInstanceLock;
 if (!HAS_SINGLE_INSTANCE_LOCK) app.quit();
+
+// A packaged app has no console: problems go to a local log that Help > Save
+// Support Report reads (ADR-546). Only the primary instance writes it.
+const SUPPORT_LOG = startDesktopSupportLog(app, DESKTOP_DATA_PATH, HAS_SINGLE_INSTANCE_LOCK);
 
 function installApplicationMenu(): void {
   const template = desktopApplicationMenuTemplate(process.platform);
@@ -529,9 +535,12 @@ if (HAS_SINGLE_INSTANCE_LOCK && REFUSED_DEBUG_SWITCH === null)
       // every build opens, and Pro tools unlock only in the renderer (ADR-540).
       protocol.handle(
         'app',
-        withLicensingRoutes(
-          DESKTOP_PROJECT_OPENS.routes(makeAppProtocolHandler(distRoot)),
-          licence.runtime,
+        withSupportRoutes(
+          withLicensingRoutes(
+            DESKTOP_PROJECT_OPENS.routes(makeAppProtocolHandler(distRoot)),
+            licence.runtime,
+          ),
+          SUPPORT_LOG,
         ),
       );
       // A Session survives macOS window closure; install its listeners once,

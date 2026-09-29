@@ -401,4 +401,8 @@ export type PlatformAdapter = {
   // Project files handed over by the operating system: the desktop file
   // association, or an installed web app's file handler.
   readonly externalFileOpens?: ExternalFileOpenSource;
+
+  // The desktop app's local support log (ADR-546): its newest part, for Help >
+  // Save Support Report. Absent in the web app, which keeps no log.
+  readonly readSupportLog?: () => Promise<string>;
 };

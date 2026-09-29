@@ -5,6 +5,7 @@
 // open a URL (not a store action), so these builders need no AppCommandContext.
 // The command ids keep their original names so saved shortcuts still resolve.
 
+import { SUPPORT_REPORT_EVENT } from '../support/support-report-event';
 import { enabled, type AppCommand } from './command-types';
 
 export const SUPPORT_URL = 'https://kerfdesk.com/support.html';
@@ -30,6 +31,17 @@ export function reportBugCommand(): AppCommand {
     'Report a Problem',
     'Open KerfDesk support and see what to include in a problem report',
     () => openExternalUrl(REPORT_PROBLEM_URL),
+  );
+}
+
+// Saves a text file the customer reads and sends themselves (ADR-546).
+export function supportReportCommand(): AppCommand {
+  return enabled(
+    'help.support-report',
+    'help',
+    'Save Support Report...',
+    'Save a file with your version, machine and recent problems to send to KerfDesk support',
+    () => window.dispatchEvent(new Event(SUPPORT_REPORT_EVENT)),
   );
 }
 

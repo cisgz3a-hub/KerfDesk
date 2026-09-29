@@ -36,6 +36,19 @@ the single command that needs it.
 
 ## Situations
 
+### Something went wrong
+
+Ask for **Help > Save Support Report** (ADR-546). The customer saves a text file
+and attaches it: version and build, web or desktop app, edition (never the key),
+computer, machine profile, connection and controller check, machine state, `$$`
+settings, the last 100 machine console lines, the window's recent errors and, in
+the desktop app, the newest part of its log. If the app will not open, ask for the
+log files instead: `%APPDATA%\laserforge\logs\kerfdesk.log` and `kerfdesk.1.log` on
+Windows. Each log line gives the time, level and source (`app`, `main` for the
+main process, `window` for the app window). A startup line without a `KerfDesk
+quit.` line before it usually means the previous session ended abnormally: a
+crash, a forced close or a power cut.
+
 ### The trial will not start
 
 The first registration needs the internet. "Unable to reach the licence service"

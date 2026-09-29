@@ -1,6 +1,6 @@
 import type { App, BrowserWindow, WebPreferences } from 'electron';
-import { mkdir, writeFile } from 'node:fs/promises';
-import { dirname, isAbsolute, resolve } from 'node:path';
+import { mkdir, readFile, writeFile } from 'node:fs/promises';
+import { dirname, isAbsolute, join, resolve } from 'node:path';
 import { createNativeSmokeTerminalClaim } from './native-smoke-terminal-claim.js';
 import { RENDERER_SMOKE_SOURCE } from './native-smoke-renderer.js';
 
@@ -138,6 +138,7 @@ async function finishNativeSmoke(
   const devToolsOpened = rendererOk
     ? await probeNativeSmokeDevTools(input.window.webContents)
     : 'not-probed';
+  const supportLogRecordedLaunch = await nativeSmokeSupportLogRecordedLaunch(config.userDataPath);
   const result = {
     ok:
       rendererOk &&
@@ -145,7 +146,8 @@ async function finishNativeSmoke(
       input.app.isPackaged &&
       isolated &&
       failures.length === 0 &&
-      devToolsOpened === false,
+      devToolsOpened === false &&
+      supportLogRecordedLaunch,
     isPackaged: input.app.isPackaged,
     isolated,
     windowVisible,
@@ -154,6 +156,7 @@ async function finishNativeSmoke(
     failures,
     webPreferences: readNativeSmokeWebPreferences(input.window.webContents),
     devToolsProbe: { method: 'openDevTools', opened: devToolsOpened },
+    supportLog: { recordedLaunch: supportLogRecordedLaunch },
     renderer,
     ...(error === undefined ? {} : { error }),
   };
@@ -164,6 +167,16 @@ async function finishNativeSmoke(
   process.stdout.write(`USER_DATA=${result.userData}\n`);
   if (result.ok) input.app.quit();
   else input.app.exit(1);
+}
+
+/** The packaged app records its own launch in the support log (ADR-546). */
+export async function nativeSmokeSupportLogRecordedLaunch(userDataPath: string): Promise<boolean> {
+  try {
+    const log = await readFile(join(userDataPath, 'logs', 'kerfdesk.log'), 'utf8');
+    return /\[app\] KerfDesk \S+ started \(installed build\)/.test(log);
+  } catch {
+    return false;
+  }
 }
 
 function argumentValue(argv: ReadonlyArray<string>, prefix: string): string | null {

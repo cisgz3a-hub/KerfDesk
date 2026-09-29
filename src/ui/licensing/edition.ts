@@ -54,6 +54,11 @@ export function setActiveEdition(value: EditionValue | null): void {
   active = value ?? UNRESTRICTED_EDITION;
 }
 
+/** The edition this window runs as right now, for callers outside React. */
+export function activeEdition(): EditionValue {
+  return active;
+}
+
 /** The same gate as `useEdition().requestPro`, for command handlers and stores. */
 export function requestProFeature(feature: ProFeature, onAllowed?: () => void): boolean {
   return active.requestPro(feature, onAllowed);

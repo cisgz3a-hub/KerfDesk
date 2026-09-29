@@ -49,6 +49,7 @@ import { ExternalGcodePreviewBanner } from './ExternalGcodePreviewBanner';
 import { DesktopCloseNotice } from './DesktopCloseNotice';
 import { TutorialHost } from '../tutorials/TutorialHost';
 import { RecentProjectsHost } from '../recent-projects/RecentProjectsHost';
+import { SupportReportHost } from '../support/SupportReportHost';
 
 export function App(): JSX.Element {
   return (
@@ -94,6 +95,7 @@ export function App(): JSX.Element {
       <ImageEditorHost />
       <DesignStudioHost />
       <TutorialHost />
+      <SupportReportHost />
       <AppLifecycle />
     </div>
   );

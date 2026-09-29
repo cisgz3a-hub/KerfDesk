@@ -10,7 +10,12 @@ import {
   toolsCommands,
   windowCommands,
 } from './command-families';
-import { discussionsCommand, reportBugCommand, licenceCommand } from './support-command-family';
+import {
+  discussionsCommand,
+  licenceCommand,
+  reportBugCommand,
+  supportReportCommand,
+} from './support-command-family';
 import { tutorialsCommand } from './help-command-family';
 import { editCommands } from './edit-command-family';
 import { arrangeCommands } from './arrange-command-family';
@@ -41,6 +46,7 @@ export function buildAppCommands(ctx: AppCommandContext): ReadonlyArray<AppComma
       safetyHelpCommand(ctx),
       connectionHelpCommand(ctx),
       reportBugCommand(),
+      supportReportCommand(),
       discussionsCommand(),
       ...(ctx.licensing === true ? [licenceCommand()] : []),
     ],

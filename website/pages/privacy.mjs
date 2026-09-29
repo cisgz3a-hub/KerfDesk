@@ -25,7 +25,7 @@ const AT_A_GLANCE = [
   {
     icon: 'eye-off',
     title: 'No telemetry',
-    body: 'The app has no analytics, no error reporting and no cloud sync.',
+    body: 'The app has no analytics, no automatic error reporting and no cloud sync. A support report is a file you save and send yourself.',
   },
   {
     icon: 'hard-drive',

@@ -368,6 +368,11 @@ export const COMMAND_HELP: Readonly<Record<CommandId, CommandHelpTopic>> = {
     family: 'help',
     tooltip: 'Open KerfDesk support in your browser and see what to include in a problem report.',
   },
+  'help.support-report': {
+    family: 'help',
+    tooltip:
+      'Save a text file with your KerfDesk version, machine, recent problems and, in the desktop app, its log. Read it, then attach it to your message to KerfDesk support. It never includes your licence key.',
+  },
   'help.discussions': {
     family: 'help',
     tooltip: 'Open KerfDesk support in your browser for questions, ideas and feedback.',

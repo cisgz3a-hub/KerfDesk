@@ -22,8 +22,11 @@ Regulator registration number]. Contact us through https://kerfdesk.com/support.
 ## What we never collect
 
 - KerfDesk does not upload your projects, drawings, toolpaths, or machine or job data.
-- KerfDesk has no analytics, telemetry, crash reporting, advertising or tracking.
+- KerfDesk has no analytics, telemetry, automatic crash reporting, advertising or tracking.
 - Licensing needs no account or password.
+- The desktop app keeps a log of its own problems on your computer. It stays there unless you
+  choose Help > Save Support Report and send us the file, which never includes your licence key.
+  We use a report you send only to answer your request.
 
 ## What licensing sends, and why
 
