@@ -89,10 +89,14 @@ describe('website copy', () => {
       assert.doesNotMatch(flat, /open[- ]source|free software|source code/i, file);
       if (file !== 'license/index.html') assert.doesNotMatch(flat, /\bMIT\b/, file);
     }
+    // ADR-543: all rights reserved after the mit-final cutoff.
+    const license = pageText('license/index.html');
+    assert.match(license, /© 2026 Johann Stolk\. All rights reserved/);
     assert.match(
-      pageText('license/index.html'),
-      /released so far are published under the MIT License/,
+      license,
+      /up to and including the one tagged “mit-final” in KerfDesk’s source history were published under the MIT License/,
     );
+    assert.match(license, /Later versions are all rights reserved/);
   });
 
   // The source repository is private (ADR-524 Amendment 1), so no download,

@@ -97,7 +97,7 @@ For each version, from a clean checkout at the tagged source:
 ## 4. Fresh install and trial
 
 - [ ] Install N from the downloaded file in the disposable account. The
-      installer shows the commercial terms, not the free MIT notice.
+      installer shows the commercial terms, not the free License & Safety Notice.
 - [ ] First launch opens the workspace as KerfDesk Free with no activation screen
       (ADR-540). The status bar shows `Free · Try Pro`; projects, camera and serial
       work without a licence.

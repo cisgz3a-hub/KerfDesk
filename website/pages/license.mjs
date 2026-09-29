@@ -1,7 +1,7 @@
 // License. Plain facts only: KerfDesk comes in a Free and a Pro edition (the
-// owner's settled offer, commerce.config.mjs, ADR-524 Amendment 1); the license
-// of the versions released so far is named in one sentence
-// (currentLicenseSection) and nowhere else on the site, with no link to the
+// owner's settled offer, commerce.config.mjs, ADR-524 Amendment 1); the MIT
+// License of the versions up to the mit-final cutoff (ADR-543) is named in
+// currentLicenseSection and nowhere else on the site, with no link to the
 // private source repository; bundled parts keep their own licenses. No sale, no
 // sale terms (they are published before sales open) and no selling points about
 // source access. The app's License & Safety Notice is public/eula.txt.
@@ -45,21 +45,28 @@ function todaySection() {
   });
 }
 
-// The only place the website names the license of the released versions.
+// The only place the website names the MIT License of the earlier versions
+// (ADR-543).
 function currentLicenseSection() {
   return section({
     id: 'current-license',
     tone: 'alt',
     narrow: true,
     eyebrow: 'Current license',
-    title: 'The terms for versions released so far',
+    title: 'Who owns KerfDesk, and the earlier MIT versions',
     content: html`<div class="prose">
-      <p>The versions of KerfDesk released so far are published under the MIT License.</p>
-      <p>Versions already released keep the terms they were released under.</p>
+      <p>KerfDesk is © 2026 Johann Stolk. All rights reserved, except as set out here.</p>
       <p>
-        KerfDesk is © 2026 Johann Stolk. The full license text is also printed at the end of the
-        License &amp; Safety Notice in the app.
+        You may use the web app and the free desktop builds free of charge, for personal or business
+        work, under the License &amp; Safety Notice that comes with them. KerfDesk Pro in the
+        desktop app comes with the KerfDesk Licence Agreement, which is published before sales open.
       </p>
+      <p>
+        Versions up to and including the one tagged “mit-final” in KerfDesk’s source history were
+        published under the MIT License, and they stay under it for anyone who has them. Later
+        versions are all rights reserved.
+      </p>
+      <p>Versions already released keep the terms they were released under.</p>
     </div>`,
   });
 }

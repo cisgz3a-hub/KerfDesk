@@ -17,7 +17,8 @@ extraMetadata:
 
 nsis:
   # Seller terms are not yet approved. Preparation requires an explicit external
-  # terms file and overrides this sentinel; never inherit the free MIT EULA.
+  # terms file and overrides this sentinel; never inherit the free License &
+  # Safety Notice (public/eula.txt).
   license: COMMERCIAL-TERMS-MUST-BE-PROVIDED.txt
 
 win:

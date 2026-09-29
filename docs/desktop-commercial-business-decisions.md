@@ -35,7 +35,7 @@ qualified professional in the relevant country before launch.
 
 ## 2. Customer licence terms (**adviser**)
 
-The installer requires an explicit terms file; the free MIT notice is never
+The installer requires an explicit terms file; the free License & Safety Notice is never
 reused for the commercial edition. The terms must match these facts:
 
 - A licence permits Pro in every version released on or before its update

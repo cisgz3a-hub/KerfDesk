@@ -15,7 +15,9 @@ been issued to either person.
 
 The repository was already private when this implementation began. That does not
 revoke existing MIT grants, relicense third-party code, or settle ownership of
-contributions. `LICENSE` remains unchanged. Final commercial terms, seller details,
+contributions. `LICENSE` remains unchanged (amended by ADR-543: `LICENSE` reserves all
+rights after the `mit-final` cutoff, and the repository was public again from
+2026-09-29). Final commercial terms, seller details,
 privacy disclosures and the release-specific distribution rights must be resolved
 before paid publication. Commercial packaging requires an explicit terms file;
 the existing free-app installer notice is inappropriate for that offer.

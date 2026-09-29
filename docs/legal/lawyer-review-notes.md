@@ -315,6 +315,11 @@ settled decisions and on section B.
 - So what Pro can protect is the work done after the cutoff, plus official signed builds, updates
   and support. It cannot give exclusive rights over code that is already public.
 
+**Status, 29 September 2026:** John confirmed step 1 at 05:29 UTC: `stolkjohannjohann-sudo` is his
+own older account. Steps 3, 5 and 6 are draft PR #1022 (ADR-543), which waits for his merge; he
+tags `mit-final` after it. Step 4 is his separate call. After #1022 merges, fill §16.2's date from
+ADR-543's cutoff record.
+
 **Recommended path, in order:**
 
 1. **Confirm authorship.** John confirms in a dated note, kept with his business records, that

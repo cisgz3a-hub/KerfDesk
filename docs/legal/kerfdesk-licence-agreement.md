@@ -349,11 +349,11 @@ https://kerfdesk.com/privacy/ explains what we keep, for how long, and your righ
 their own licences. The third-party notices shipped with KerfDesk list them. Those licences govern
 those components, and nothing in this agreement limits your rights under them.
 
-**16.2** KerfDesk versions released before [PLACEHOLDER: the relicensing date and the first version
-number under this agreement, as recorded in the relicensing ADR] were released under the MIT
-License. Your rights in those versions come from the MIT License, not from this agreement, and this
-agreement does not reduce them. This agreement covers KerfDesk versions released on or after that
-date.
+**16.2** KerfDesk versions released up to and including the version tagged "mit-final" in the
+KerfDesk source repository [PLACEHOLDER: its date, from the cutoff record in ADR-543] were released
+under the MIT License. Your rights in those versions come from the MIT License, not from this
+agreement, and this agreement does not reduce them. This agreement covers KerfDesk versions released
+after that version.
 
 **16.3** The KerfDesk name and logo are ours. Neither this agreement nor the MIT License gives you
 any right to use them, except to refer accurately to KerfDesk.
