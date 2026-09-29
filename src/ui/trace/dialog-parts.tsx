@@ -6,6 +6,7 @@ import { Button, DialogActions as KitDialogActions } from '../kit';
 import { TutorialButton } from '../tutorials/TutorialButton';
 import { useEdition } from '../licensing/edition';
 import { proChoiceLabel } from '../licensing/pro-features';
+import type { TraceSettingEdits } from './trace-setting-edits';
 
 export const VISIBLE_TRACE_PRESET_NAMES = [
   'Line Art',
@@ -34,7 +35,8 @@ const PRESET_DESCRIPTIONS: Readonly<Record<string, string>> = {
     'For portraits and real photographs. Fine filled lines vary in width to keep highlights, midtones and shadows.',
   'Line Art':
     'A balanced start for logos, lettering and drawings. Traces brightness 0–128 as ink and, in colour artwork, adds pale details.',
-  Smooth: 'Clean curves and quieter outlines for rough or noisy artwork. Very fine gaps may close.',
+  Smooth:
+    'For scans and noisy artwork. Sets its threshold from the image and removes isolated noise dots when the image has many of them.',
   Sharp:
     'Crisp corners, fine lines and tiny marks. Keeps more detail, including small source specks.',
   Centerline:
@@ -80,9 +82,11 @@ export function PresetPicker(props: {
   readonly machineKind: 'laser' | 'cnc';
   readonly value: string;
   readonly onChange: (next: string) => void;
-  readonly hasOverrides?: boolean;
+  readonly edits?: TraceSettingEdits;
 }): JSX.Element {
   const edition = useEdition();
+  const edited = props.edits?.edited === true;
+  const unused = props.edits?.unused ?? [];
   const choose = (next: string): void => {
     if (ADVANCED_TRACE_PRESET_NAMES.has(next))
       edition.requestPro('advanced-trace', () => props.onChange(next));
@@ -92,7 +96,7 @@ export function PresetPicker(props: {
     <section className="lf-trace-preset" aria-label="Trace style">
       <div className="lf-trace-section-heading">
         <h3>Trace style</h3>
-        {props.hasOverrides ? <span className="lf-trace-edited">Settings edited</span> : null}
+        {edited ? <span className="lf-trace-edited">Settings edited</span> : null}
       </div>
       <label className="lf-trace-preset-select">
         <span>Preset</span>
@@ -121,10 +125,11 @@ export function PresetPicker(props: {
           Smooth is the CNC starting preset. All styles are available.
         </p>
       ) : null}
-      {props.hasOverrides ? (
+      {edited || unused.length > 0 ? (
         <p className="lf-trace-hint">
-          Your adjustments stay when you switch styles. Reset trace settings to use the selected
-          preset’s defaults.
+          Adjustments carry over when you switch styles, except those the new style sets itself.
+          Reset trace settings restores the selected preset’s defaults.
+          {unused.length > 0 ? ` Kept but not used here: ${unused.join(', ')}.` : null}
         </p>
       ) : null}
     </section>

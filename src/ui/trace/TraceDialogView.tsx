@@ -10,6 +10,7 @@ import {
 } from './dialog-parts';
 import { TraceSettingsControls } from './TraceSettingsControls';
 import { PhotoOutputGuidance } from './PhotoOutputGuidance';
+import { traceSettingEdits } from './trace-setting-edits';
 import './tracer-dialog.css';
 
 // Slots keep this layout independent of worker state and commit ownership.
@@ -50,7 +51,11 @@ export function TraceDialogView(props: {
               machineKind={props.output.machineKind}
               value={props.presetName}
               onChange={props.onPresetChange}
-              hasOverrides={Object.keys(props.settings.overrides).length > 0}
+              edits={traceSettingEdits(
+                props.settings.preset,
+                props.settings.overrides,
+                props.settings.sourceHasTransparency,
+              )}
             />
             <TraceSettingsControls {...props.settings} />
             <section className="lf-trace-output" aria-label="Trace output options">

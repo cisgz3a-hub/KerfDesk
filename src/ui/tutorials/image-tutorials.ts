@@ -126,7 +126,7 @@ export const IMAGE_TUTORIALS: readonly Tutorial[] = [
       {
         title: 'Choose a trace style',
         instruction:
-          'Open Trace Image. Start with Line Art for a logo or drawing. Try Smooth for smoother outlines or Sharp to keep fine detail.',
+          'Open Trace Image. Start with Line Art for a logo or drawing. Try Smooth for a noisy scan, or Sharp to keep single-pixel marks and tiny holes.',
         focus: 'Trace preset',
         result: 'The preview shows the traced outlines.',
       },

@@ -3344,7 +3344,10 @@ settings and Job Review keep their existing read-only setup references.
    Auto again restores the preset's own value. Sliders and numeric fields stay in sync. Switching presets keeps manual
    adjustments except those the new preset sets itself (its Smoothness, Optimize, Ignore Less
    Than, speck and hole choices; Smoothness and Optimize also reset when entering or leaving
-   Centerline); detection choices carry over. **Settings edited** identifies this state, and
+   Centerline); detection choices carry over. **Settings edited** shows when the kept
+   adjustments change what the selected style traces, and the hint under the preset names kept
+   adjustments the style, its detection mode or the image does not use, such as Sensitivity after
+   leaving Edge Detection or a manual band while automatic detection runs (ADR-560).
    **Reset trace settings** restores the selected preset's defaults. Automatic Line Art detail
    recovery retains the preset's brightness-selected solid ink and, in colour artwork, adds
    locally darker detail.
@@ -4222,7 +4225,10 @@ node-editing); the divergence is maintainer-sanctioned.
 Drag a box on the preview to set a region; a **Boundary** dropdown
 appears under the preview with **Crop region** (default) and **Enhance
 region**. The dropdown is hidden until a region exists, and **Clear
-Boundary** removes the region and resets the mode to Crop.
+Boundary** removes the region and resets the mode to Crop. Photo shading
+and Colour layers trace the region with Crop only, and the dropdown's note
+names the selected style; an Enhance choice returns with the next style
+that offers it (ADR-560).
 
 **Success.** Box the feature → choose **Enhance region**. The preview
 re-runs: the full image is traced, the boxed source region is re-traced
