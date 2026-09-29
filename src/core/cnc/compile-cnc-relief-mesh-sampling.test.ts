@@ -165,11 +165,8 @@ function ballClearanceMm(point: Point3, box: Rect, radiusMm: number): number {
   return Math.hypot(dx, dy, dz) - radiusMm;
 }
 
-function worst(
-  passes: ReadonlyArray<CncPass>,
-  box: Rect,
-  clearance: (point: Point3) => number,
-): number {
+// The least clearance over every tool position along the passes.
+function worst(passes: ReadonlyArray<CncPass>, clearance: (point: Point3) => number): number {
   return toolPositions(passes, 0.02).reduce(
     (low, point) => Math.min(low, clearance(point)),
     Number.POSITIVE_INFINITY,
@@ -189,7 +186,7 @@ describe('relief CAM reads an STL rib narrower than a cell', () => {
 
     // Centre sampling never saw the rib and cut into it (clearance 0); the
     // rib now keeps the whole 0.5 mm allowance.
-    const clearance = worst(passes, box, (p) => flatClearanceMm(p, box, cutter.diameterMm / 2));
+    const clearance = worst(passes, (p) => flatClearanceMm(p, box, cutter.diameterMm / 2));
     expect(clearance).toBeGreaterThanOrEqual(ALLOWANCE_MM - 1e-6);
   });
 
@@ -206,7 +203,7 @@ describe('relief CAM reads an STL rib narrower than a cell', () => {
     // Centre sampling ran the ball through the rib at floor height (-1.59 mm);
     // the ball now rides over it, touching its top within the finishing
     // path's contact tolerance (-0.0002 mm measured).
-    const clearance = worst(groupPasses(job, 'relief-finish'), box, (p) =>
+    const clearance = worst(groupPasses(job, 'relief-finish'), (p) =>
       ballClearanceMm(p, box, ball.diameterMm / 2),
     );
     expect(clearance).toBeGreaterThanOrEqual(-FINISHING_CONTACT_TOLERANCE_MM);

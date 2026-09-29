@@ -46,16 +46,36 @@ boss's walls kept 0.40 mm of a 0.5 mm allowance. Finishing (P2-relief-finish-1) 
 
 ### Consequences
 
-- A raised detail narrower than a cell now lifts every cell it touches, so roughing keeps the
-  allowance around it and finishing rides over it instead of through it.
-- The map is a small dilation of the mesh. Each sample is at most half a cell (per axis) outside
-  the feature it carries, and on a smooth slope a cell rises by at most `(|gx| + |gy|)` times half
-  a cell above its centre value. Roughing keeps that as extra stock. Finishing leaves it on
-  slopes, as it already did for depth maps.
+- Measured through the real compiler, sweeping every move against the true model (scratch audit
+  probes, not committed):
+
+  | Case | Centre sampling | Highest point |
+  |---|---|---|
+  | Rough, 1/4" end mill, 0.5 mm allowance: 40 mm STL, 3 bosses, 5 ribs 0.4 x 4 mm | a rib cut 3.5 mm deep; boss walls 0.40 mm; two ribs 0.19 and 0.23 mm | nothing closer than 0.455 mm (a rib's corner); boss walls 0.89 mm or more |
+  | Rough, 1/8" end mill, same model | nothing closer than 0.265 mm | nothing closer than 0.47 mm |
+  | Finish, 1/8" ball, default scallop: vertical-walled STL boss at 8 sub-cell offsets | wall tops cut 0.18 to 0.35 mm | wall tops cut 0.04 to 0.18 mm |
+  | Finish, 1/8" ball, 0.025 mm scallop: R12 hemisphere STL | cut up to 0.065 mm into the model | no cut |
+
+- A raised detail narrower than a cell now lifts every cell it touches, so roughing no longer cuts
+  into it and finishing rides over it instead of through it. Next to the detail's edge the
+  planning surface still slopes down from the raised sample, so the allowance there can come up a
+  little short, as at the rib corner above.
 - Finishing a wall that stands between samples is better, not exact. The planning surface between
   a raised sample and its lower neighbour can still pass under the wall's top edge, now by at most
   half a cell horizontally instead of a whole cell. ADR-412's qualification boundary for subcell
   detail still applies to what is left.
+- The map is a small dilation of the mesh. Each sample is at most half a cell (per axis) outside
+  the feature it carries, and on a smooth slope a cell rises above its centre value by up to
+  `(|gx| + |gy|)` times half a cell. Roughing keeps that as extra stock. Finishing leaves it on
+  slopes, as it already did for depth maps: on the hemisphere, measured normal to the surface at
+  the emitted points, a 1/8" ball at 0.025 mm scallop leaves a median 0.06 / 0.12 / 0.16 mm on
+  slopes under 30 / 30 to 56 / 56 to 73 degrees (p95 0.18 mm), and a 1/4" ball at 0.05 mm scallop
+  0.12 / 0.24 / 0.32 mm (p95 0.36 mm). Centre sampling left about nothing there, and cut into the
+  model elsewhere (table above). A finer scallop shrinks the finishing cell and this stock with it.
+- Rasterizing is not slower. For an 80 x 60 mm sculpted STL (239k triangles) the highest-point
+  raster takes 86 ms at 0.79 mm cells and 133 ms at 0.28 mm cells, against 132 and 187 ms for the
+  centre raster. The whole relief compile took 6.5 s instead of 7.8 s (one run each, on a loaded
+  machine), and roughing emitted 53 passes instead of 81.
 - Every legacy-mesh relief emits different roughing and finishing G-code. The emitter revision is
   not advanced by this change alone; it is advanced once for the audit's fix set.
 - The pyramid G-code snapshot in `relief-roughing.test.ts` changed. Its 0.4-slope faces rise by
@@ -80,4 +100,7 @@ boss's walls kept 0.40 mm of a 0.5 mm allowance. Finishing (P2-relief-finish-1) 
   before, cut into it). Finishing with a 1/8" ball rides over a 0.2 mm rib within the finishing
   path's 0.002 mm contact tolerance (worst -0.0002 mm; before, the ball ran through the rib at floor
   height, -1.59 mm). Both fail with centre sampling.
+- The existing relief tests under `src/core/relief`, the relief compile tests under `src/core/cnc`,
+  and the preflight, recovery, Job Review and G-code tests that compile reliefs pass; only the
+  pyramid snapshot above changed.
 - No hardware result is claimed.
