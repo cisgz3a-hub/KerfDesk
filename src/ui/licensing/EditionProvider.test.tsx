@@ -53,6 +53,8 @@ function client(status: LicenceStatus = free): LicenceAdapter {
     checkout: vi.fn(async () => ({ ...status, paymentPending: true })),
     claimPayment: vi.fn(async () => status),
     discardPayment: vi.fn(async () => ({ ...status, paymentPending: false })),
+    earlyUpdates: vi.fn(async () => ({ available: true, enabled: false })),
+    setEarlyUpdates: vi.fn(async (enabled: boolean) => ({ available: true, enabled })),
   };
 }
 function button(text: string): HTMLButtonElement {

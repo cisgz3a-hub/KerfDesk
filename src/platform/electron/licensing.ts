@@ -1,4 +1,4 @@
-import type { LicenceAdapter, LicenceStatus } from '../types';
+import type { EarlyUpdates, LicenceAdapter, LicenceStatus } from '../types';
 
 type FetchLicence = (input: string, init: RequestInit) => Promise<Response>;
 const STATES: ReadonlyArray<LicenceStatus['state']> = [
@@ -46,10 +46,22 @@ function validRights(status: LicenceStatus): boolean {
   );
 }
 
+export function parseEarlyUpdates(value: unknown): EarlyUpdates {
+  if (typeof value !== 'object' || value === null) throw new Error('Invalid update setting.');
+  const setting = value as EarlyUpdates;
+  if (
+    typeof setting.available !== 'boolean' ||
+    typeof setting.enabled !== 'boolean' ||
+    (!setting.available && setting.enabled)
+  )
+    throw new Error('Invalid update setting.');
+  return { available: setting.available, enabled: setting.enabled };
+}
+
 export function createDesktopLicenceAdapter(
   fetchLicence: FetchLicence = (input, init) => fetch(input, init),
 ): LicenceAdapter {
-  const request = async (action: string, body?: unknown): Promise<LicenceStatus> => {
+  const send = async (action: string, body?: unknown): Promise<unknown> => {
     const response = await fetchLicence(`./api/licensing/${action}`, {
       method: body === undefined ? 'GET' : 'POST',
       cache: 'no-store',
@@ -63,8 +75,10 @@ export function createDesktopLicenceAdapter(
     });
     if (!response.ok)
       throw new Error('The desktop licence service is unavailable. Please restart KerfDesk.');
-    return parseLicenceStatus(await response.json());
+    return response.json() as Promise<unknown>;
   };
+  const request = async (action: string, body?: unknown): Promise<LicenceStatus> =>
+    parseLicenceStatus(await send(action, body));
   return {
     status: () => request('status'),
     activate: (licenseKey) => request('activate', { licenseKey }),
@@ -76,5 +90,7 @@ export function createDesktopLicenceAdapter(
       request('checkout', { operation, ...(licenseKey === undefined ? {} : { licenseKey }) }),
     claimPayment: () => request('claim-payment', {}),
     discardPayment: () => request('discard-payment', {}),
+    earlyUpdates: async () => parseEarlyUpdates(await send('early-updates')),
+    setEarlyUpdates: async (enabled) => parseEarlyUpdates(await send('early-updates', { enabled })),
   };
 }

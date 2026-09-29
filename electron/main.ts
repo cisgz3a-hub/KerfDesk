@@ -532,6 +532,7 @@ if (HAS_SINGLE_INSTANCE_LOCK && REFUSED_DEBUG_SWITCH === null)
         withLicensingRoutes(
           DESKTOP_PROJECT_OPENS.routes(makeAppProtocolHandler(distRoot)),
           licence.runtime,
+          licence.earlyUpdates,
         ),
       );
       // A Session survives macOS window closure; install its listeners once,

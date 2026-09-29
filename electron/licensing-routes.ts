@@ -1,5 +1,6 @@
 import type { LicensingRuntime } from './licensing-runtime.js';
 import { record } from './licensing-verification.js';
+import type { EarlyUpdates } from './update-ring-store.js';
 
 const PREFIX = '/api/licensing/';
 const HEADERS = { 'Cache-Control': 'no-store', 'X-Content-Type-Options': 'nosniff' };
@@ -8,19 +9,46 @@ type ProtocolHandler = (request: Request) => Promise<Response>;
 export function withLicensingRoutes(
   fallback: ProtocolHandler,
   runtime: LicensingRuntime,
+  earlyUpdates?: EarlyUpdates,
 ): ProtocolHandler {
   return async (request) => {
     const url = new URL(request.url);
     if (!url.pathname.startsWith(PREFIX)) return fallback(request);
     if (!exactUrl(url) || !sameOriginHeaders(request)) return missing();
     const action = url.pathname.slice(PREFIX.length);
+    if (action === 'early-updates') return earlyUpdateRoute(request, earlyUpdates);
     if (action === 'status' && request.method === 'GET') return response(await runtime.status());
-    if (request.method !== 'POST' || request.headers.get('Content-Type') !== 'application/json')
-      return missing();
+    if (!jsonPost(request)) return missing();
     const body = await readBody(request);
     if (!record(body)) return response({ error: 'invalid_request' }, 400);
     return dispatch(action, body, runtime);
   };
+}
+
+function jsonPost(request: Request): boolean {
+  return request.method === 'POST' && request.headers.get('Content-Type') === 'application/json';
+}
+
+/**
+ * Help > Licence's "Get new versions early (beta)" (ADR-541). A build without
+ * commercial updates reports it unavailable and refuses to change it.
+ */
+async function earlyUpdateRoute(
+  request: Request,
+  earlyUpdates: EarlyUpdates | undefined,
+): Promise<Response> {
+  if (earlyUpdates === undefined) return missing();
+  const current = await earlyUpdates.read();
+  if (request.method === 'GET') return response(current);
+  if (!current.available || !jsonPost(request)) return missing();
+  const body = await readBody(request);
+  if (!record(body) || Object.keys(body).length !== 1 || typeof body.enabled !== 'boolean')
+    return response({ error: 'invalid_request' }, 400);
+  try {
+    return response(await earlyUpdates.write(body.enabled));
+  } catch {
+    return response({ error: 'unavailable' }, 503);
+  }
 }
 
 function exactUrl(url: URL): boolean {

@@ -46,6 +46,18 @@ export type LicenceAdapter = {
   ) => Promise<LicenceStatus>;
   readonly claimPayment: () => Promise<LicenceStatus>;
   readonly discardPayment: () => Promise<LicenceStatus>;
+  readonly earlyUpdates: () => Promise<EarlyUpdates>;
+  readonly setEarlyUpdates: (enabled: boolean) => Promise<EarlyUpdates>;
+};
+
+/**
+ * Whether this device takes new versions early, from the beta ring, a few
+ * quiet days before everyone else (ADR-541). Stable unless the owner opts in.
+ */
+export type EarlyUpdates = {
+  /** False in builds that do not take commercial updates. */
+  readonly available: boolean;
+  readonly enabled: boolean;
 };
 
 export type FileHandle = {

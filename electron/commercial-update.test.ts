@@ -193,6 +193,32 @@ describe('commercial signed and licence-aware updates', () => {
     expect(updater.downloadUpdate).toHaveBeenCalled();
     expect(updater.autoInstallOnAppQuit).toBe(false);
   });
+  it('reads the beta catalogue only on a device that asked for early versions (ADR-541)', async () => {
+    const stable = fixture();
+    await checkCommercialUpdates(stable.updater, stable.options);
+    const beta = fixture([manifest('1.3.0', '2026-09-27T07:17:00.000Z', 'update-manifest')]);
+    beta.updater.checkForUpdates.mockResolvedValue({
+      isUpdateAvailable: true,
+      updateInfo: feed('1.3.0'),
+    });
+    beta.updater.downloadUpdate.mockImplementation(async () => {
+      beta.events.emit('update-downloaded', feed('1.3.0'));
+      return ['installer.exe'];
+    });
+    await checkCommercialUpdates(beta.updater, { ...beta.options, ring: 'beta' });
+    expect(stable.options.fetch.mock.calls.map((call: unknown[]) => call[0])).toEqual([
+      'https://dl.kerfdesk.com/desktop/commercial/catalog.json',
+    ]);
+    expect(beta.options.fetch.mock.calls.map((call: unknown[]) => call[0])).toEqual([
+      'https://dl.kerfdesk.com/desktop/commercial/beta/catalog.json',
+    ]);
+    // Both rings point at the same release files; only the list differs.
+    expect(beta.updater.setFeedURL).toHaveBeenCalledWith({
+      provider: 'generic',
+      url: 'https://dl.kerfdesk.com/desktop/commercial/releases/1.3.0',
+    });
+    expect(beta.updater.autoInstallOnAppQuit).toBe(true);
+  });
   it('bounds chunked untrusted catalog bodies', async () => {
     const { updater, options } = fixture();
     options.fetch.mockResolvedValue(new Response(new Uint8Array(256 * 1024 + 1)));

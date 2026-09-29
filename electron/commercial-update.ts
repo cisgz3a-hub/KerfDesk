@@ -37,7 +37,17 @@ type Options = {
   readonly isEligibleCached: (envelope: unknown, version: string) => boolean;
   readonly now?: () => number;
   readonly onVerifiedDownload?: (envelope: unknown, version: string) => void;
+  /** The beta ring only when this device's owner asked for it (ADR-541). */
+  readonly ring?: 'stable' | 'beta';
 };
+
+/**
+ * The catalogue this device reads. The beta ring lists every beta and every
+ * stable release; both list the same signed envelopes and release files.
+ */
+export function commercialCatalogUrl(ring: Options['ring']): string {
+  return ring === 'beta' ? `${ORIGIN}/beta/catalog.json` : `${ORIGIN}/catalog.json`;
+}
 
 function compare(left: string, right: string): number {
   const a = left.split('.').map(BigInt);
@@ -215,7 +225,7 @@ export async function checkCommercialUpdates(
   // Whole-file SHA-512 from the signed manifest is the authority for this lane.
   updater.disableDifferentialDownload = true;
   const envelopes = await readCatalog(
-    await options.fetch(`${ORIGIN}/catalog.json`, {
+    await options.fetch(commercialCatalogUrl(options.ring), {
       method: 'GET',
       credentials: 'omit',
       redirect: 'error',
