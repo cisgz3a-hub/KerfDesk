@@ -74,12 +74,12 @@ describe('artwork sprite cache', () => {
     expect(drawArtworkSprite(request)).toBe(true);
     expect(paints).toHaveLength(1);
     // The sprite's own view maps the region origin (object space, before
-    // translation) onto (PAD, PAD): offset = PAD - (translation + region.min) * scale.
-    expect(paints[0]).toEqual({
-      scale: 2,
-      offsetX: SPRITE_PAD_PX - 10,
-      offsetY: SPRITE_PAD_PX - 14,
-    });
+    // translation) onto (PAD, PAD) plus the fraction of a pixel the origin
+    // sits past its blit pixel on screen: 20.4 px (0.4 past 20) and 34.6 px
+    // (0.4 short of 35), so offset = PAD + fraction - (translation + region.min) * scale.
+    expect(paints[0]?.scale).toBe(2);
+    expect(paints[0]?.offsetX).toBeCloseTo(SPRITE_PAD_PX + 0.4 - 10, 9);
+    expect(paints[0]?.offsetY).toBeCloseTo(SPRITE_PAD_PX - 0.4 - 14, 9);
     const [sprite, x, y] = lastBlit(calls) as [HTMLCanvasElement, number, number];
     expect(sprite.width).toBe(Math.ceil(10 * 2) + 2 * SPRITE_PAD_PX);
     expect(sprite.height).toBe(Math.ceil(10 * 2) + 2 * SPRITE_PAD_PX);
@@ -100,7 +100,9 @@ describe('artwork sprite cache', () => {
     const panned = harness(ctx, { key, view: { scale: 2, offsetX: -300.2, offsetY: 44 } });
     expect(drawArtworkSprite(panned.request)).toBe(true);
     expect(panned.paints).toHaveLength(0);
-    expect(lastBlit(calls)[1]).toBe(Math.round(-300.2 + 10) - SPRITE_PAD_PX);
+    // The bitmap already holds the 0.4 px it was painted past its pixel, so the
+    // corner, due at -290.2 px, lands at -291 + 0.4: within half a pixel.
+    expect(lastBlit(calls)[1]).toBe(Math.round(-300.2 + 10 - 0.4) - SPRITE_PAD_PX);
 
     const moved = harness(ctx, { key, transform: { ...IDENTITY_TRANSFORM, x: 50, y: 7 } });
     expect(drawArtworkSprite(moved.request)).toBe(true);
@@ -141,10 +143,11 @@ describe('artwork sprite cache', () => {
     expect(drawArtworkSprite(zoomed.request)).toBe(true);
     expect(zoomed.paints).toHaveLength(0);
     const placeholder = lastBlit(calls);
-    // Five-argument drawImage: the old 26 px bitmap stretched by 3/2.
+    // Five-argument drawImage: the old 26 px bitmap stretched by 3/2, its
+    // corner (at PAD + 0.4 in the bitmap) put exactly at 10.4 + 5 * 3 px.
     expect(placeholder).toHaveLength(5);
     expect(placeholder[3]).toBeCloseTo(26 * 1.5, 9);
-    expect(placeholder[1]).toBeCloseTo(10.4 + 5 * 3 - SPRITE_PAD_PX * 1.5, 9);
+    expect(placeholder[1]).toBeCloseTo(10.4 + 5 * 3 - (SPRITE_PAD_PX + 0.4) * 1.5, 9);
     expect(zoomed.requestRedraw).not.toHaveBeenCalled();
 
     vi.advanceTimersByTime(SPRITE_SETTLE_MS - 1);
@@ -200,6 +203,71 @@ describe('artwork sprite cache', () => {
     expect(drawArtworkSprite(outside.request)).toBe(true);
     expect(outside.paints).toHaveLength(1);
     expect(outside.paints[0]?.offsetX).toBe(SPRITE_PAD_PX - 200);
+  });
+
+  // ADR-359 Amendment 2: the placeholder used to skip the coverage check, so
+  // zooming out of a clipped sprite left artwork missing until the settle.
+  it('renders at once when a clipped sprite zoomed out no longer covers the view', () => {
+    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout', 'performance'] });
+    const { ctx } = workspaceContext(800, 600);
+    const key = {};
+    const bounds = { minX: 0, minY: 0, maxX: 100_000, maxY: 100_000 };
+    // Zooming about the canvas centre (400, 300 px) keeps scene (400, 300) mm under it.
+    const zoomedTo = (scale: number) =>
+      harness(ctx, {
+        key,
+        bounds,
+        transform: IDENTITY_TRANSFORM,
+        view: { scale, offsetX: 400 - 400 * scale, offsetY: 300 - 300 * scale },
+      });
+    const first = zoomedTo(1);
+    expect(drawArtworkSprite(first.request)).toBe(true);
+    expect(first.paints).toHaveLength(1);
+    // The sprite holds 0..1000 x 0..750 mm, the view plus a 25% margin. At
+    // 1/1.25 the view shows 0..900 x 0..675 mm: the scaled bitmap stands in.
+    const inside = zoomedTo(1 / 1.25);
+    expect(drawArtworkSprite(inside.request)).toBe(true);
+    expect(inside.paints).toHaveLength(0);
+    // At 1/2 it shows 0..1200 x 0..900 mm, past the bitmap: render now.
+    const outside = zoomedTo(1 / 2);
+    expect(drawArtworkSprite(outside.request)).toBe(true);
+    expect(outside.paints).toHaveLength(1);
+    expect(outside.paints[0]?.scale).toBe(0.5);
+  });
+
+  it('repaints after the settle window exactly where the placeholder showed the artwork', () => {
+    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout', 'performance'] });
+    const { ctx, calls } = workspaceContext();
+    const key = {};
+    const settled = harness(ctx, { key });
+    drawArtworkSprite(settled.request);
+    const view = { scale: 3, offsetX: 10.4, offsetY: 20.6 };
+    drawArtworkSprite(harness(ctx, { key, view }).request);
+    const [, placeholderX, placeholderY, width] = lastBlit(calls) as [
+      unknown,
+      number,
+      number,
+      number,
+    ];
+    const ratio = width / (Math.ceil(10 * 2) + 2 * SPRITE_PAD_PX);
+    const old = settled.paints[0]!;
+    // Where each blit puts the object's corner, at (5, 7) mm in the scene.
+    const placeholderCorner = {
+      x: placeholderX + (old.offsetX + 5 * old.scale) * ratio,
+      y: placeholderY + (old.offsetY + 7 * old.scale) * ratio,
+    };
+    vi.advanceTimersByTime(SPRITE_SETTLE_MS);
+    const exact = harness(ctx, { key, view });
+    drawArtworkSprite(exact.request);
+    expect(exact.paints).toHaveLength(1);
+    const [, x, y] = lastBlit(calls) as [unknown, number, number];
+    const painted = exact.paints[0]!;
+    const exactCorner = { x: x + painted.offsetX + 5 * 3, y: y + painted.offsetY + 7 * 3 };
+    // Both where a direct paint puts it, so the repaint does not shift the artwork.
+    for (const corner of [placeholderCorner, exactCorner]) {
+      expect(corner.x).toBeCloseTo(10.4 + 5 * 3, 9);
+      expect(corner.y).toBeCloseTo(20.6 + 7 * 3, 9);
+    }
   });
 
   it('declines contexts that are not backed by a canvas element', () => {

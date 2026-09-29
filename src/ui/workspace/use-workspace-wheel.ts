@@ -13,34 +13,48 @@ import { useStore } from '../state';
 import { useUiStore } from '../state/ui-store';
 import { clientToCanvasPx, zoomAtCursorPx } from './view-transform';
 
-// Matches the 1.25× keyboard/Ctrl-wheel notch feel used elsewhere is 1.1 per
-// wheel tick here — one physical notch is a smaller step than a button click.
-const WHEEL_ZOOM_IN_FACTOR = 1.1;
+// One wheel notch zooms 1.1x, a smaller step than a zoom button click.
+const WHEEL_ZOOM_STEP = 1.1;
 // One notch as Chromium reports it in pixel mode and Firefox in line mode.
 const PIXELS_PER_NOTCH = 100;
 const LINES_PER_NOTCH = 3;
+const DOM_DELTA_PIXEL = 0;
 const DOM_DELTA_LINE = 1;
 const DOM_DELTA_PAGE = 2;
 const MAX_STEPS_PER_EVENT = 10;
+// Chromium sends a trackpad pinch as a ctrl+wheel event in pixel mode whose
+// deltaY is -100 ln(scale), a few px per event. Below this size a ctrl+wheel
+// is taken as a pinch, as in the trace preview (ADR-407); a Ctrl+mouse notch
+// is larger and zooms one step like any notch.
+const PINCH_MAX_PX = 50;
+// Makes 1.1 ** steps equal the pinch's own scale, so the zoom follows the fingers.
+const PINCH_GAIN = 1 / Math.log(WHEEL_ZOOM_STEP);
+
+export type WheelZoomInput = Pick<WheelEvent, 'deltaY' | 'deltaMode' | 'ctrlKey'>;
 
 /**
- * Zoom steps one wheel event carries. Chromium merges the wheel events that
- * queue while a frame paints into one event with their summed delta, so one
- * event can hold several notches. Counting only its sign dropped them: ten
- * notches spun over a canvas busy with a large picture zoomed six steps, so
- * the zoom speed depended on paint time. A delta smaller than a notch (a
- * trackpad, a high-resolution wheel) still zooms one step, as before.
+ * Signed 1.1x zoom steps one wheel event carries, positive zooming in
+ * (ADR-359 Amendment 2). A notch is 100 px, 3 lines or a page, and an event
+ * zooms by the notches it carries: Chromium merges the notches that queue
+ * during a slow frame into one event, and each still counts (Amendment 1).
+ * A smaller delta zooms by its fraction of a notch, with no minimum, so a
+ * trackpad's stream of small deltas no longer zooms a full step per event.
+ * A pinch zooms by the scale the trackpad measured.
  */
-export function wheelZoomSteps(event: Pick<WheelEvent, 'deltaY' | 'deltaMode'>): number {
-  const perNotch =
-    event.deltaMode === DOM_DELTA_LINE
-      ? LINES_PER_NOTCH
-      : event.deltaMode === DOM_DELTA_PAGE
-        ? 1
-        : PIXELS_PER_NOTCH;
-  const notches = Math.round(Math.abs(event.deltaY) / perNotch);
-  if (!Number.isFinite(notches)) return 1;
-  return Math.min(MAX_STEPS_PER_EVENT, Math.max(1, notches));
+export function wheelZoomSteps(event: WheelZoomInput): number {
+  const pixels = wheelPixels(event);
+  if (pixels === 0 || Number.isNaN(pixels)) return 0;
+  const pinch =
+    event.ctrlKey && event.deltaMode === DOM_DELTA_PIXEL && Math.abs(pixels) < PINCH_MAX_PX;
+  const steps = (-pixels / PIXELS_PER_NOTCH) * (pinch ? PINCH_GAIN : 1);
+  return Math.max(-MAX_STEPS_PER_EVENT, Math.min(MAX_STEPS_PER_EVENT, steps));
+}
+
+function wheelPixels({ deltaY, deltaMode }: WheelZoomInput): number {
+  // Multiplied first so that whole notches of lines come out exact.
+  if (deltaMode === DOM_DELTA_LINE) return (deltaY * PIXELS_PER_NOTCH) / LINES_PER_NOTCH;
+  if (deltaMode === DOM_DELTA_PAGE) return deltaY * PIXELS_PER_NOTCH;
+  return deltaY;
 }
 
 export function useWorkspaceWheelZoom(ref: React.RefObject<HTMLCanvasElement | null>): void {
@@ -49,23 +63,21 @@ export function useWorkspaceWheelZoom(ref: React.RefObject<HTMLCanvasElement | n
     if (canvas === null) return undefined;
     const onWheel = (e: WheelEvent): void => {
       e.preventDefault();
-      if (e.deltaY === 0) return;
+      const steps = wheelZoomSteps(e);
+      if (steps === 0) return;
       const ui = useUiStore.getState();
       ui.closeWorkspaceContextBar();
       const cursorPx = clientToCanvasPx(e, canvas);
       if (cursorPx === null) return;
       const project = useStore.getState().project;
-      const notch = e.deltaY < 0 ? WHEEL_ZOOM_IN_FACTOR : 1 / WHEEL_ZOOM_IN_FACTOR;
-      const factor = notch ** wheelZoomSteps(e);
       const next = zoomAtCursorPx({
         cursorPx,
-        factor,
+        factor: WHEEL_ZOOM_STEP ** steps,
         canvas: { width: canvas.width, height: canvas.height },
         bed: { width: project.device.bedWidth, height: project.device.bedHeight },
         view: { zoomFactor: ui.zoomFactor, panX: ui.panX, panY: ui.panY },
       });
-      ui.setZoom(next.zoomFactor);
-      ui.setPan(next.panX, next.panY);
+      ui.setView(next.zoomFactor, next.panX, next.panY);
     };
     canvas.addEventListener('wheel', onWheel, { passive: false });
     return () => canvas.removeEventListener('wheel', onWheel);
