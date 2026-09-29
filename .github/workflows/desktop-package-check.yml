@@ -1,16 +1,19 @@
 name: Desktop package check
 
-# Packages the desktop app on Linux, Windows and macOS (Apple silicon and Intel)
-# on every pull request and push to main, checks what shipped, and launches it
-# (ADR-483, ADR-522). Unit tests cannot see what electron-builder actually
-# packs: its file patterns and fuse flips apply silently, and the release
-# lanes' own package checks otherwise ran only when a release was tagged.
+# Packages the desktop app, checks what shipped, and launches it (ADR-483,
+# ADR-522). Unit tests cannot see what electron-builder actually packs: its
+# file patterns and fuse flips apply silently, and the release lanes' own
+# package checks otherwise ran only when a release was tagged.
 #
-# - Linux packages the stable config as an unpacked app.
+# - Linux packages the stable config as an unpacked app, on every pull request
+#   and push to main.
 # - Windows and macOS build the unsigned Preview exactly as the Preview release
 #   lane does, and run that lane's package contract. Windows then installs it,
 #   launches the installed app and uninstalls it; macOS launches the app from
-#   inside its DMG. Both prove a modified app.asar stops the app.
+#   inside its DMG. Both prove a modified app.asar stops the app. The repository
+#   is private, so these runners bill at 2x and 10x Linux minutes: they run when
+#   the release train calls this workflow or on a manual run, not on every pull
+#   request (ADR-522 Amendment 1).
 # - Every launch is the packaged native smoke: launch, SVG import, project
 #   save, on a throwaway profile.
 #
@@ -19,9 +22,22 @@ on:
   push:
     branches: [main]
   pull_request:
+  workflow_dispatch:
+    inputs:
+      native:
+        description: Also package, install and launch on Windows and macOS
+        type: boolean
+        default: true
+  workflow_call:
+    inputs:
+      native:
+        type: boolean
+        default: true
 
 concurrency:
-  group: ${{ github.workflow }}-${{ github.ref }}
+  # A fixed prefix: when the release train calls this workflow, github.workflow
+  # names the caller, and sharing its group would deadlock the call.
+  group: desktop-package-check-${{ github.ref }}
   cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
 
 permissions:
@@ -88,6 +104,9 @@ jobs:
 
   windows-package:
     name: Package, install and launch the Windows desktop app
+    # Only the release train and manual runs set `native`; pull requests and
+    # pushes to main leave the inputs context empty, so this job is skipped.
+    if: ${{ inputs.native == true }}
     runs-on: windows-latest
     timeout-minutes: 45
     env:
@@ -177,6 +196,7 @@ jobs:
 
   macos-package:
     name: Package and launch the macOS desktop app (${{ matrix.arch }})
+    if: ${{ inputs.native == true }}
     runs-on: ${{ matrix.runner }}
     timeout-minutes: 45
     strategy:

@@ -152,11 +152,19 @@ describe('Desktop Preview release workflow gate (ADR-248/249)', () => {
     expect(workflow).toContain('Release verification and legal-closure gate');
   });
 
-  it('builds and checks the Windows and macOS Preview on every pull request (ADR-522)', () => {
+  it('builds and checks the Windows and macOS Preview in the release train, Linux on every pull request (ADR-522 Amendment 1)', () => {
     expect(packageCheck).toMatch(/^ {2}pull_request:$/m);
+    expect(packageCheck).toMatch(/^ {2}workflow_call:$/m);
+    expect(packageCheck).toMatch(/^ {2}workflow_dispatch:$/m);
     expect(packageCheck).toContain('runs-on: windows-latest');
     expect(packageCheck).toMatch(/runner: macos-15\n/);
     expect(packageCheck).toContain('runner: macos-15-intel');
+    // Paid 2x/10x runners: only the train or a manual run sets `native`.
+    const gatedJobs = packageCheck.match(/^ {4}if: \$\{\{ inputs\.native == true \}\}$/gm) ?? [];
+    expect(gatedJobs).toHaveLength(2);
+    expect(
+      packageCheck.split('\n  linux-package:')[1]?.split('\n  windows-package:')[0],
+    ).not.toMatch(/^ {4}if:/m);
     // A pull request builds the Preview exactly as the tag does, so the contract means the same.
     const releaseBuilds = previewBuildFlags(workflow);
     const pullRequestBuilds = previewBuildFlags(packageCheck);

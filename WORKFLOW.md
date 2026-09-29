@@ -7951,12 +7951,15 @@ desktop artifact stays **CLAIMED** under `PROJECT.md` Desktop Preview acceptance
 
 ### F-DESK5. Regular desktop Previews and the changelog (ADR-522)
 
-1. Every pull request runs the **Desktop package check** on Linux, Windows and macOS (Apple
-   silicon and Intel). Windows builds the Preview installer as the release lane does, runs its
-   package contract, installs it, launches the installed app (SVG import and project save),
-   uninstalls it and checks nothing is left. macOS builds the Preview DMG, runs its package
-   contract and launches the app from inside the DMG. Both check that a modified `app.asar`
-   stops the app. A red desktop job means the next Preview would fail or ship broken.
+1. Every pull request runs the **Desktop package check** on Linux. The release train, or a
+   manual run of that workflow, also runs it on Windows and macOS (Apple silicon and Intel);
+   those runners bill at 2x and 10x in the private repository, so they no longer run on every
+   pull request (ADR-522 Amendment 1). Windows builds the Preview installer as the release lane
+   does, runs its package contract, installs it, launches the installed app (SVG import and
+   project save), uninstalls it and checks nothing is left. macOS builds the Preview DMG, runs
+   its package contract and launches the app from inside the DMG. Both check that a modified
+   `app.asar` stops the app. A red desktop job means the next Preview would fail or ship broken;
+   start the workflow by hand before merging a change to packaging or the installer.
 2. When `main` has user-facing changes the newest Preview lacks and that Preview is at least a
    week old, the daily **Desktop Preview cadence** workflow keeps one issue open:
    `Desktop Preview due: v<next>`. It names the newest `main` commit that CI, Browser smoke and
