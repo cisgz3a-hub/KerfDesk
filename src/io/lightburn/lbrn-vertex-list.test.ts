@@ -39,6 +39,37 @@ describe('parseLbrnVertexList', () => {
       { point: { x: 0, y: 0 }, outgoing: { x: 1, y: 2 } },
     ]);
   });
+
+  it('reads numbers written with an exponent, as float noise near zero is', () => {
+    expect(
+      parseLbrnVertexList('V-1.1368684e-13 5c0x2.5E-7c0y1e+2c1x1V10 4.2632564e-14c0x1c1x1V10 10'),
+    ).toEqual([
+      { point: { x: -1.1368684e-13, y: 5 }, outgoing: { x: 2.5e-7, y: 100 } },
+      { point: { x: 10, y: 4.2632564e-14 } },
+      { point: { x: 10, y: 10 } },
+    ]);
+  });
+});
+
+describe('LightBurn 2 paths with float noise', () => {
+  it('keeps every corner of a square whose corner is written with an exponent', () => {
+    const result = importLightBurnProject(
+      `<LightBurnProject><Shape Type="Path" CutIndex="0"><XForm>1 0 0 1 0 0</XForm>
+        <VertList>V-1.1368684e-13 0c0x1c1x1V10 0c0x1c1x1V10 10c0x1c1x1V0 10c0x1c1x1</VertList>
+        <PrimList>L0 1L1 2L2 3L3 0</PrimList></Shape></LightBurnProject>`,
+      'noise.lbrn2',
+    );
+    if (!result.ok) throw new Error(result.reason);
+    const [square] = result.project.scene.objects;
+    const curve = square?.kind === 'imported-svg' ? square.paths[0]?.curves?.[0] : undefined;
+    expect([curve?.closed, curve?.segments.length]).toEqual([true, 4]);
+    expect(square?.kind === 'imported-svg' && square.bounds).toEqual({
+      minX: -1.1368684e-13,
+      minY: 390,
+      maxX: 10,
+      maxY: 400,
+    });
+  });
 });
 
 describe('LightBurn 2 Bezier paths from a real project', () => {

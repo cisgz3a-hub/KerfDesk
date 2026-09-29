@@ -20,7 +20,9 @@ export type LbrnVertex = {
   readonly incoming?: Vec2;
 };
 
-const NUMBER = String.raw`-?(?:\d+\.?\d*|\.\d+)`;
+// A number may carry an exponent (`-1.1368684e-13`), the shortest way a float
+// formatter writes noise this close to zero.
+const NUMBER = String.raw`-?(?:\d+\.?\d*|\.\d+)(?:[eE][-+]?\d+)?`;
 const VERTEX_PATTERN = new RegExp(String.raw`V(${NUMBER})\s+(${NUMBER})([\s\S]*?)(?=V|$)`, 'g');
 
 export function parseLbrnVertexList(text: string): LbrnVertex[] {

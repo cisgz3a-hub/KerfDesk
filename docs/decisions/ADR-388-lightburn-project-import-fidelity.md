@@ -20,7 +20,8 @@ and the thumbnail LightBurn embeds in each file, which is its own drawing of the
    V[j]. LightBurn leaves out a handle coordinate that is zero (`c0x-2.2385712` alone is the handle
    (-2.2385712, 0)), and writes a bare `x1` (`c0x1`, `c1x1`) where a vertex has no handle. Read this
    way, every circle and fillet in the corpus is a true arc to within 0.003 mm along its whole
-   length.
+   length. A number may carry an exponent (`-1.1368684e-13`); before, such a vertex was skipped
+   and every later primitive joined the wrong vertices.
 2. **Where a project lands.** LightBurn saves coordinates in the saving machine's own frame:
    millimetres from its origin corner, +X along the width away from that corner, +Y along the depth
    away from it. The root's `MirrorX` puts that origin on the right and `MirrorY` at the rear; no
@@ -100,8 +101,8 @@ and the thumbnail LightBurn embeds in each file, which is its own drawing of the
 
 ### Tests
 
-`lbrn-vertex-list.test.ts` (handle forms; the keypad fixture's circles and eight fillets are
-arcs along their whole length); `lbrn-frame.test.ts` (each MirrorX/MirrorY corner, rotated groups
+`lbrn-vertex-list.test.ts` (handle forms and exponent numbers; the keypad fixture's circles and
+eight fillets are arcs along their whole length); `lbrn-frame.test.ts` (each MirrorX/MirrorY corner, rotated groups
 and text through the same frame, the backplane fixture laid out as its thumbnail shows);
 `lbrn-run-order.test.ts` (engrave before cut whatever the drawing order, interleaved shapes run
 once per layer, priority over index, the Cut Planner warning); `lbrn-open-machine.test.ts`,
