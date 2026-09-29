@@ -83,6 +83,26 @@ describe('detectStreamThroughputWarnings buffered motion (ADR-331)', () => {
     expect(warnings[0]).toContain('raise the RX window in Machine Setup');
   });
 
+  it('never asks to raise the window on the strength of an oversized Bf report', () => {
+    // grblHAL's uint16 free count reads 65535 on the Falcon A1 Pro; it proves
+    // only the default 1024-byte ring (core/grbl-streaming.ts, audit P-3).
+    const warnings = detectStreamThroughputWarnings(
+      input({
+        window: {
+          ...GRBLHAL,
+          bytes: 120,
+          requestedBytes: 120,
+          source: 'oversized-report',
+          provenBytes: 1016,
+        },
+      }),
+    );
+
+    expect(warnings[0]).toContain("proves only grblHAL's default 1024-byte buffer");
+    expect(warnings[0]).toContain('1016 usable bytes');
+    expect(warnings[0]).not.toContain('raise the RX window');
+  });
+
   it('tells a stock GRBL operator that the firmware cannot hold more', () => {
     const warnings = detectStreamThroughputWarnings(
       input({ window: STOCK, controllerKind: 'grbl-v1.1' }),

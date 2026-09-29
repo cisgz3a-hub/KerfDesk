@@ -13,6 +13,11 @@ function report(line: string) {
   return parsed;
 }
 
+// The latch keeps the controller's raw report. 65535 is the largest value
+// grblHAL's uint16 free count can print
+// (https://github.com/grblHAL/core/blob/d7aaee3d84b1e7010f075d395206afff038d7379/stream.h#L211-L214),
+// so the Start window counts it only as the default 1024-byte ring
+// (core/grbl-streaming.ts; controller audit P-3/S-2), not as 4096 bytes.
 const IDLE_FALCON = report('<Idle|MPos:0.000,0.000,0.000,0.000|Bf:512,65535|FS:0,0>');
 const QUIET = { streamer: null, pendingUntrackedAcks: 0, controllerSessionEpoch: 3 };
 

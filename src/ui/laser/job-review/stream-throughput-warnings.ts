@@ -21,6 +21,8 @@
 
 import { createStreamer, findOversizedLine } from '../../../core/controllers/grbl';
 import type { ControllerKind } from '../../../core/devices';
+// Deep import: the devices barrel is at its public-export ratchet.
+import { GRBLHAL_DEFAULT_RX_BUFFER_BYTES } from '../../../core/grbl-streaming';
 import type { StartStreamWindow } from '../../state/laser-job-effective-stream-options';
 
 export type StreamThroughputInput = {
@@ -128,6 +130,12 @@ function windowProvenance(input: StreamThroughputInput): string {
     return input.controllerKind === 'grblhal'
       ? `The controller has not reported its receive buffer this session (grblHAL status-report mask $10 buffer-state bit), so the stock ${window.bytes}-byte window is in use; enable that report or reconnect to widen it.`
       : 'Stock GRBL cannot hold more than its 128-byte receive buffer.';
+  }
+  if (window.source === 'oversized-report') {
+    // grblHAL's Bf field is a uint16, so 65535 says nothing about the real ring;
+    // widening the profile request past it would stream on no evidence
+    // (core/grbl-streaming.ts, controller audit P-3/S-2, ADR-375).
+    return `The controller's receive-buffer report is larger than any buffer KerfDesk streams to, so it proves only grblHAL's default ${GRBLHAL_DEFAULT_RX_BUFFER_BYTES}-byte buffer (${window.provenBytes} usable bytes).`;
   }
   if (window.provenBytes !== null && window.bytes < window.requestedBytes) {
     return `The controller reported a ${window.provenBytes}-byte usable buffer, below this machine profile's ${window.requestedBytes}-byte request.`;

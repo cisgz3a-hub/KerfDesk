@@ -84,7 +84,12 @@ describe('effectiveStartStreamOptions', () => {
     },
   );
 
-  it('lets a grblHAL profile stream its 1024-byte request once a Bf report proves the ring', () => {
+  it('counts a Bf report above any usable ring as grblHAL default 1024-byte ring', () => {
+    // 65535 is the largest value grblHAL's uint16 `Bf:` free count can print
+    // (https://github.com/grblHAL/core/blob/d7aaee3d84b1e7010f075d395206afff038d7379/report.c#L1342-L1347,
+    // stream.h#L211-L214); it proves no ring above the core default of 1024
+    // (stream.h#L52-L53). This case used to prove 4096 bytes and stream the
+    // full 1024-byte request (controller audit P-3/S-2).
     const window = resolveStartStreamWindow(
       { streamingMode: 'char-counted', rxBufferBytes: 1024 },
       { ...noBuildInfo, rxCapacityEvidence: falconEvidence },
@@ -92,11 +97,33 @@ describe('effectiveStartStreamOptions', () => {
     );
     expect(window).toEqual({
       streamingMode: 'char-counted',
-      bytes: 1024,
+      bytes: 1016,
       requestedBytes: 1024,
-      source: 'controller-reported',
-      provenBytes: 4096,
+      source: 'oversized-report',
+      provenBytes: 1016,
     });
+    // A request the default ring covers is unchanged, and still only 1016 is proven.
+    const narrow = resolveStartStreamWindow(
+      { streamingMode: 'char-counted', rxBufferBytes: 120 },
+      { ...noBuildInfo, rxCapacityEvidence: falconEvidence },
+      'grblhal',
+    );
+    expect(narrow).toMatchObject({ bytes: 120, source: 'oversized-report', provenBytes: 1016 });
+  });
+
+  it('trusts a Bf report up to the streamer cap plus its margin', () => {
+    const atCap = resolveStartStreamWindow(
+      { streamingMode: 'char-counted', rxBufferBytes: 4096 },
+      { ...noBuildInfo, rxCapacityEvidence: { ...falconEvidence, rxBytesFree: 4104 } },
+      'grblhal',
+    );
+    expect(atCap).toMatchObject({ bytes: 4096, source: 'controller-reported', provenBytes: 4096 });
+    const past = resolveStartStreamWindow(
+      { streamingMode: 'char-counted', rxBufferBytes: 4096 },
+      { ...noBuildInfo, rxCapacityEvidence: { ...falconEvidence, rxBytesFree: 4105 } },
+      'grblhal',
+    );
+    expect(past).toMatchObject({ bytes: 1016, source: 'oversized-report', provenBytes: 1016 });
   });
 
   it('narrows a grblHAL request to a smaller reported ring, margin included', () => {

@@ -14,6 +14,16 @@ export const GRBLHAL_DEFAULT_RX_BUFFER_BYTES = 1024;
 // margin CNCjs keeps under stock GRBL's 128-byte ring (120 usable), so a stock
 // `Bf:15,128` report resolves to exactly the historical default window.
 export const RX_WINDOW_SAFETY_MARGIN_BYTES = 8;
+// A reported receive capacity above this is not a ring size KerfDesk can use.
+// grblHAL prints its stream's free count as a uint16, so 65535 is just the
+// largest value the field holds (a Falcon A1 Pro idles at `Bf:512,65535`), and
+// a stream may report a fixed size whatever its buffer holds
+// (https://github.com/grblHAL/core/blob/d7aaee3d84b1e7010f075d395206afff038d7379/report.c#L1342-L1347,
+// stream.h#L211-L214, stream.c#L865-L868). Such a report proves no more than
+// grblHAL's default 1024-byte ring (stream.h#L52-L53), not 4096 bytes
+// (controller audit P-3/S-2, ADR-375).
+export const MAX_PLAUSIBLE_REPORTED_RX_BYTES =
+  MAX_GRBL_RX_BUFFER_BYTES + RX_WINDOW_SAFETY_MARGIN_BYTES;
 
 export type GrblStreamingMode = 'char-counted' | 'ping-pong';
 
@@ -38,15 +48,24 @@ export function normalizeGrblRxBufferBytes(value: unknown): number {
   return isGrblRxBufferBytes(value) ? value : DEFAULT_GRBL_RX_BUFFER_BYTES;
 }
 
+/** True for a reported capacity too large to be a usable ring size. */
+export function isOversizedRxCapacityReport(reportedBytes: number): boolean {
+  return reportedBytes > MAX_PLAUSIBLE_REPORTED_RX_BYTES;
+}
+
 /**
  * Usable character-counting window for a receive capacity the controller
  * reported itself: the status `Bf:` free-byte count observed while the host
  * had nothing in flight, or the RX size in a stock `$I` OPT response. Keeps
  * the safety margin below the report and never exceeds the streamer's hard
- * cap. Null when the value cannot bound a window at all.
+ * cap; an oversized report counts as grblHAL's default ring. Null when the
+ * value cannot bound a window at all.
  */
 export function rxWindowFromReportedCapacity(reportedBytes: unknown): number | null {
   if (typeof reportedBytes !== 'number' || !Number.isInteger(reportedBytes)) return null;
-  const usable = Math.min(MAX_GRBL_RX_BUFFER_BYTES, reportedBytes - RX_WINDOW_SAFETY_MARGIN_BYTES);
+  const capacity = isOversizedRxCapacityReport(reportedBytes)
+    ? GRBLHAL_DEFAULT_RX_BUFFER_BYTES
+    : reportedBytes;
+  const usable = Math.min(MAX_GRBL_RX_BUFFER_BYTES, capacity - RX_WINDOW_SAFETY_MARGIN_BYTES);
   return usable > 0 ? usable : null;
 }
