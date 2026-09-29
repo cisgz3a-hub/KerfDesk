@@ -55,8 +55,14 @@ export type SavedCalibrationVerdict = {
   readonly detail: string;
 };
 
+/**
+ * `layoutSuspect`: the new photo's rings look like a target engraved with
+ * other settings (targetLayoutMismatch), so a difference may be the layout's
+ * and is never a reason to save over the saved calibration.
+ */
 export function savedCalibrationVerdict(
   check: Extract<SavedCalibrationCheck, { kind: 'measured' }>,
+  layoutSuspect = false,
 ): SavedCalibrationVerdict {
   const { drift, saved } = check;
   const allowed = Math.max(UNCHANGED_FLOOR_MM, UNCHANGED_RATIO * saved.accuracy.rmsErrorMm);
@@ -66,6 +72,13 @@ export function savedCalibrationVerdict(
       moved: false,
       headline: 'The camera has not moved since it was calibrated.',
       detail: `The saved calibration still places the rings within ${figures}.`,
+    };
+  }
+  if (layoutSuspect) {
+    return {
+      moved: true,
+      headline: `This photo and the saved calibration disagree by about ${drift.rmsMm.toFixed(1)} mm.`,
+      detail: `The saved calibration places the rings ${figures} from where the assumed layout puts them.${shiftSentence(drift)} This photo's rings look like a target engraved with other settings, so the difference may be the layout rather than the camera. Keep the saved calibration unless you are sure of the target settings.`,
     };
   }
   return {

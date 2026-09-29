@@ -31,7 +31,7 @@ import {
   overridesAreBaseline,
 } from './job-review-format';
 import { frameMotionFeeds } from '../../state/frame-feed-limits';
-import { parkLabel } from './job-review-park-label';
+import { parkFacts } from './job-review-park-label';
 import { buildContourEntryReviewFacts } from './job-review-contour-entry-facts';
 import { rotaryReviewSummary } from '../rotary-summary';
 import { laserModuleFacts } from './job-review-laser-module';
@@ -123,7 +123,7 @@ export function buildMachineReviewFacts(
         `max ${machine.params.spindleMaxRpm} RPM · spin-up ${machine.params.spindleSpinupSec} s`,
       ),
       fact('Coolant', machine.params.coolant ?? 'off'),
-      fact('Park after job', parkLabel(machine.params, startFrom)),
+      ...parkFacts(machine.params, startFrom, project.device.zTravelMm),
     ];
   }
   // The G-code dialect and the raster scan-offset table shape laser output

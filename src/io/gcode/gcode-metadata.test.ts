@@ -41,7 +41,7 @@ function laserAssumptions(
 
 describe('gcodeMetadataHeader', () => {
   it('tracks the latest safety-relevant emitter revision', () => {
-    expect(EMITTER_REVISION).toBe('cnc-entry-clearance-relief-adaptive-audited-20260928-v15');
+    expect(EMITTER_REVISION).toBe('cnc-finish-ladder-thin-stock-tabs-mesh-footprint-20260929-v16');
   });
 
   it('emits provenance as GRBL comment lines and ends with a newline', () => {

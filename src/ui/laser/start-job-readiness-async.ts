@@ -59,7 +59,7 @@ export async function prepareStartJobAsync(
     motionOffset: input.motionOffset,
     inspected,
     canvasPlanKey,
-    printCutRegistrationActive: false,
+    printCutRegistration: undefined,
     sourceGeometryChecks: 'full',
   });
 }

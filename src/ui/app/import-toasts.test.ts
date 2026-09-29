@@ -59,7 +59,11 @@ describe('describeImportResult', () => {
       'mixed.svg',
       baseResult({ ignoredTextElements: 4, ignoredImageElements: 1 }),
     );
-    expect(toasts.some((t) => t.message.includes('4 text elements'))).toBe(true);
+    expect(toasts).toContainEqual({
+      message:
+        'mixed.svg: 4 text elements ignored — convert text to paths in your editor before exporting',
+      variant: 'info',
+    });
     expect(
       toasts.some((t) => t.message.includes('1 image ignored — no embedded bitmap data')),
     ).toBe(true);

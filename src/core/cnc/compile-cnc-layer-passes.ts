@@ -95,7 +95,9 @@ export function passesForCncLayerWithEvidence(
 
   const toolpaths = directedToolpaths(raw.toolpaths, settings, handedness);
   const depths = zPassDepths(settings.depthMm, settings.depthPerPassMm);
-  if (toolpaths.length === 0 || depths.length === 0) {
+  // With a finish allowance, a hole too narrow to rough can still be finished
+  // down the depth ladder (ADR-140 Amendment 1).
+  if ((toolpaths.length === 0 && allowanceMm === 0) || depths.length === 0) {
     return { ...raw, passes: [], rampedEntry: false };
   }
 

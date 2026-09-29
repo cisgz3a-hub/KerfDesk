@@ -15,6 +15,12 @@ describe('invalid headless raster input', () => {
   it('rejects a missing binary header delimiter', () => {
     expect(() => decodePnm(bytes('P5 1 1 255X0'))).toThrow('malformed');
   });
+  it('takes the newline ending a comment after maxval as the delimiter (pbm(5))', () => {
+    const file = new Uint8Array([...bytes('P5\n2 1\n255# made by scanner\n'), 0, 200]);
+    const decoded = decodePnm(file);
+    expect([decoded.data[0], decoded.data[4]]).toEqual([0, 200]);
+    expect(() => decodePnm(bytes('P5 1 1 255# no raster follows'))).toThrow('malformed');
+  });
   it('rejects a BMP palette that overlaps pixel data', () => {
     const input = new Uint8Array(58);
     const view = new DataView(input.buffer);

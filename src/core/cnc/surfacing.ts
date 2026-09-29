@@ -11,7 +11,7 @@ export type SurfacingParams = {
   readonly widthMm: number;
   readonly heightMm: number;
   readonly bitDiameterMm: number;
-  /** Positive row spacing as a percentage of bit diameter. */
+  /** Row spacing as a percentage of bit diameter: above 0 and at most 100. */
   readonly stepoverPct: number;
   readonly depthPerPassMm: number;
   readonly totalDepthMm: number;
@@ -41,6 +41,9 @@ export type SurfacingProgramResult =
   | { readonly ok: false; readonly reason: string };
 
 export const SURFACING_DEFAULT_STEPOVER_PCT = 40;
+// Rows farther apart than the bit is wide leave strips of the old surface
+// standing between them, so no larger stepover can face the whole area.
+export const SURFACING_MAX_STEPOVER_PCT = 100;
 export const SURFACING_DEFAULT_DEPTH_PER_PASS_MM = 0.5;
 export const SURFACING_DEFAULT_TOTAL_DEPTH_MM = 0.5;
 export const SURFACING_DEFAULT_FEED_MM_PER_MIN = 2500;
@@ -207,6 +210,7 @@ function validateSurfacingParams(params: SurfacingParams): string | null {
     positiveFiniteReason('height', params.heightMm) ??
     positiveFiniteReason('bit diameter', params.bitDiameterMm) ??
     positiveFiniteReason('stepover', params.stepoverPct) ??
+    stepoverCeilingReason(params.stepoverPct) ??
     positiveFiniteReason('depth per pass', params.depthPerPassMm) ??
     positiveFiniteReason('total depth', params.totalDepthMm) ??
     positiveFiniteReason('feed', params.feedMmPerMin) ??
@@ -221,6 +225,12 @@ function positiveFiniteReason(label: string, value: number): string | null {
   return Number.isFinite(value) && value > 0
     ? null
     : `Surfacing ${label} ${POSITIVE_FINITE_REASON}`;
+}
+
+function stepoverCeilingReason(stepoverPct: number): string | null {
+  return stepoverPct <= SURFACING_MAX_STEPOVER_PCT
+    ? null
+    : `Surfacing stepover ${String(stepoverPct)}% puts the rows farther apart than the bit is wide and leaves uncut strips between them. Use ${String(SURFACING_MAX_STEPOVER_PCT)}% or less.`;
 }
 
 function spindleSpinupReason(value: number): string | null {

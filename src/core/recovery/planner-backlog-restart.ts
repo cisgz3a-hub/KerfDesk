@@ -18,30 +18,14 @@
 // Without a status report that shows the backlog, the stop may have discarded
 // a whole planner of acknowledged moves, so the restart steps back by the
 // controller's planner size (controller audit OR-3). `$I` or an idle `Bf`
-// gives that size when the session saw one; otherwise these usable-block
-// defaults apply:
-//  - GRBL 1.1h: BLOCK_BUFFER_SIZE 16, one kept free (planner.h:31, planner.c:500);
-//  - grblHAL: `$398` default 100 (config.h:906), all usable (planner.c:697-702);
-//  - FluidNC v4.0.3: planner_blocks default 16, one kept free
-//    (Machine/MachineConfig.h:98, Planner.cpp:445);
-//  - Smoothieware: planner_queue_size default 32 (Conveyor.cpp:77), flushed
-//    by the ^X halt Abort sends (Conveyor.cpp:89-96);
-//  - Marlin 2.1.2.8: BLOCK_BUFFER_SIZE 16 (Configuration_adv.h:2393-2399), one
-//    kept free (planner.h:765), all dropped by the M410 quick stop that Abort
-//    sends (planner.cpp:1688-1689; ADR-395).
-// Ruida is never streamed.
+// gives that size when the session saw one; otherwise the controller family's
+// usable-block default applies. The defaults and their firmware sources live
+// in core/motion-planner, which the time estimate shares (ADR-525).
 
 import { isSendableGcodeLine } from '../controllers/grbl';
-import type { ControllerKind } from '../devices';
 import type { PlannerBacklog } from './job-interruption';
 
-export const DEFAULT_PLANNER_BLOCKS: Readonly<Partial<Record<ControllerKind, number>>> = {
-  'grbl-v1.1': 15,
-  grblhal: 100,
-  fluidnc: 15,
-  smoothieware: 32,
-  marlin: 15,
-};
+export { DEFAULT_PLANNER_BLOCKS } from '../motion-planner/controller-planner-blocks';
 
 const COMMENT = /\([^)]*\)|;.*$/g;
 const AXIS_WORD = /[XYZ]\s*[-+]?(?:\d|\.\d)/i;

@@ -7,6 +7,8 @@ import {
   createLayer,
   createProject,
   type CncLayerSettings,
+  type ImportedSvg,
+  type Polyline,
   type Project,
   type ReliefObject,
   type SceneObject,
@@ -20,6 +22,50 @@ function cncProjectWithLayerCnc(cnc: CncLayerSettings | undefined): Project {
     ...createProject(),
     machine: DEFAULT_CNC_MACHINE_CONFIG,
     scene: { objects: [], layers: [layer] },
+  };
+}
+
+// Artwork on L1, for the warnings that read what the compiled passes cut.
+function artwork(polyline: Polyline): ImportedSvg {
+  return {
+    kind: 'imported-svg',
+    id: polyline.closed ? 'square' : 'line',
+    source: 'shape.svg',
+    bounds: { minX: 50, minY: 50, maxX: 90, maxY: 90 },
+    transform: IDENTITY_TRANSFORM,
+    paths: [{ color: '#ff0000', polylines: [polyline] }],
+  };
+}
+
+const SQUARE: Polyline = {
+  closed: true,
+  points: [
+    { x: 50, y: 50 },
+    { x: 90, y: 50 },
+    { x: 90, y: 90 },
+    { x: 50, y: 90 },
+  ],
+};
+
+const OPEN_LINE: Polyline = {
+  closed: false,
+  points: [
+    { x: 50, y: 70 },
+    { x: 90, y: 70 },
+  ],
+};
+
+function projectWithStock(
+  stockThicknessMm: number,
+  cnc: CncLayerSettings,
+  objects: ReadonlyArray<SceneObject> = [],
+): Project {
+  const project = cncProjectWithLayerCnc(cnc);
+  const stock = { ...DEFAULT_CNC_MACHINE_CONFIG.stock, thicknessMm: stockThicknessMm };
+  return {
+    ...project,
+    machine: { ...DEFAULT_CNC_MACHINE_CONFIG, stock },
+    scene: { ...project.scene, objects: [...objects] },
   };
 }
 
@@ -260,10 +306,10 @@ describe('tabs skipped because of the stock thickness (ADR-258 amendment 2)', ()
 // bottom, and the shipped default still loses tab height to the overcut.
 describe('tab thickness in the spoilboard overcut warning (ADR-258 amendment 3)', () => {
   const tabs = { ...DEFAULT_CNC_LAYER_SETTINGS, tabsEnabled: true };
+  // Amendment 4: the note describes the tabs the compiled passes carry, so the
+  // operation cuts a closed square that takes them.
   function projectWith(stockThicknessMm: number, cnc: CncLayerSettings): Project {
-    const project = cncProjectWithLayerCnc(cnc);
-    const stock = { ...DEFAULT_CNC_MACHINE_CONFIG.stock, thicknessMm: stockThicknessMm };
-    return { ...project, machine: { ...DEFAULT_CNC_MACHINE_CONFIG, stock } };
+    return projectWithStock(stockThicknessMm, cnc, [artwork(SQUARE)]);
   }
 
   it('says a set stock keeps the tabs full height above the stock bottom', () => {
@@ -293,5 +339,78 @@ describe('tab thickness in the spoilboard overcut warning (ADR-258 amendment 3)'
       expect(warning).not.toContain('holding tabs stay');
       expect(warning).not.toContain('measured from the cut floor');
     }
+  });
+});
+
+// ADR-258 amendment 4 (second CNC audit P2-toolpath-2): what the warnings say
+// about tabs comes from the compiled passes. A tab no thinner than the set stock
+// is cut half the stock thick and the overcut note says so; an open path takes
+// no tab, so nothing promises one; a through cut whose tabs are no shorter than
+// the cut frees its parts even with Tabs on.
+describe('tab statements built from the compiled passes (ADR-258 amendment 4)', () => {
+  const outside: CncLayerSettings = {
+    ...DEFAULT_CNC_LAYER_SETTINGS,
+    cutType: 'profile-outside',
+    depthPerPassMm: 1,
+    tabsEnabled: true,
+  };
+
+  it('says a tab no thinner than the stock is cut half the stock thick', () => {
+    const [warning] = detectCncThroughCutTabWarnings(
+      projectWithStock(2, { ...outside, depthMm: 2.3 }, [artwork(SQUARE)]),
+    );
+    expect(warning).toContain('0.30 mm past the bottom, into the spoilboard');
+    expect(warning).toContain(
+      'Its holding tabs are 1 mm thick above the stock bottom, thinned from the 2 mm set to half the 2 mm stock',
+    );
+    const [thick] = detectCncThroughCutTabWarnings(
+      projectWithStock(3, { ...outside, depthMm: 3.2, tabHeightMm: 3 }, [artwork(SQUARE)]),
+    );
+    expect(thick).toContain('are 1.5 mm thick above the stock bottom, thinned from the 3 mm set');
+  });
+
+  it('stays silent on a cut that stops on the stock bottom, whose thinned tabs hold the part', () => {
+    const project = projectWithStock(2, { ...outside, depthMm: 2 }, [artwork(SQUARE)]);
+    expect(detectCncThroughCutTabWarnings(project)).toEqual([]);
+  });
+
+  it('names no tabs for an open path cut through the stock', () => {
+    const onPath = { ...DEFAULT_CNC_LAYER_SETTINGS, depthMm: 6.6, tabsEnabled: true };
+    const warnings = detectCncThroughCutTabWarnings(
+      projectWithStock(6, onPath, [artwork(OPEN_LINE)]),
+    );
+    expect(warnings).toHaveLength(1);
+    expect(warnings[0]).toContain('0.60 mm past the bottom, into the spoilboard');
+    expect(warnings[0]).not.toMatch(/tab/i);
+  });
+
+  it('reads the tabs from the compiled job it is given', () => {
+    const project = projectWithStock(6, { ...outside, depthMm: 6.5 }, [artwork(SQUARE)]);
+    expect(detectCncThroughCutTabWarnings(project)[0]).toContain('Its holding tabs stay 2 mm');
+    // A job whose passes rise into no tab: the settings alone promise nothing.
+    const [warning] = detectCncThroughCutTabWarnings(project, { groups: [] });
+    expect(warning).toContain('into the spoilboard');
+    expect(warning).not.toContain('holding tabs');
+  });
+
+  it('warns that a through cut frees its parts when its tabs are no shorter than the cut', () => {
+    const shipped = DEFAULT_CNC_MACHINE_CONFIG.stock.thicknessMm;
+    const tall = { ...outside, depthMm: shipped, tabHeightMm: 8 };
+    const [warning] = detectCncThroughCutTabWarnings(
+      projectWithStock(shipped, tall, [artwork(SQUARE)]),
+    );
+    expect(warning).toContain('cuts through the stock (6.35 mm ≥ 6.35 mm) with no holding tabs');
+    expect(warning).toContain('its 8 mm tabs are no shorter than the cut');
+    // An open path takes no tab at any height, so its tab height frees nothing.
+    const open = { ...tall, cutType: 'profile-on-path' as const };
+    expect(
+      detectCncThroughCutTabWarnings(projectWithStock(shipped, open, [artwork(OPEN_LINE)])),
+    ).toEqual([]);
+    // On a set stock such a tab is thinned instead, so the part stays held.
+    expect(
+      detectCncThroughCutTabWarnings(
+        projectWithStock(6, { ...tall, depthMm: 6 }, [artwork(SQUARE)]),
+      ),
+    ).toEqual([]);
   });
 });

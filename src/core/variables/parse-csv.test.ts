@@ -15,6 +15,7 @@ describe('parseVariableCsv', () => {
         headers: ['name', 'note', 'city'],
         records: [['Doe, Jane', 'said "hello"', 'New\nYork']],
       },
+      delimiter: ',',
     });
   });
 
@@ -37,6 +38,7 @@ describe('parseVariableCsv', () => {
         headers: ['Caf\u00e9', 'Cafe\u0301'],
         records: [['Caf\u00e9', 'Cafe\u0301']],
       },
+      delimiter: ',',
     });
   });
 
@@ -53,6 +55,75 @@ describe('parseVariableCsv', () => {
     expect(parseVariableCsv('bad.csv', 'a\n"closed"junk')).toMatchObject({
       ok: false,
       message: expect.stringContaining('closing quote'),
+    });
+  });
+});
+
+describe('parseVariableCsv spreadsheet exports', () => {
+  it('skips blank lines instead of making empty records or uneven rows', () => {
+    expect(parseVariableCsv('names.csv', 'name\nAlice\nBob\n\n')).toMatchObject({
+      ok: true,
+      dataset: { records: [['Alice'], ['Bob']] },
+    });
+    expect(
+      parseVariableCsv('names.csv', '\nname,number\r\nAlice,1\r\n\r\nBob,2\r\n'),
+    ).toMatchObject({
+      ok: true,
+      dataset: {
+        headers: ['name', 'number'],
+        records: [
+          ['Alice', '1'],
+          ['Bob', '2'],
+        ],
+      },
+    });
+  });
+
+  it('keeps an explicitly quoted empty value as a record', () => {
+    expect(parseVariableCsv('names.csv', 'name\nAlice\n""\nBob')).toMatchObject({
+      ok: true,
+      dataset: { records: [['Alice'], [''], ['Bob']] },
+    });
+  });
+
+  it('numbers error rows as the spreadsheet shows them, blank lines included', () => {
+    expect(parseVariableCsv('bad.csv', 'a,b\n\n1\n')).toMatchObject({
+      ok: false,
+      row: 3,
+      message: 'CSV row 3 has 1 fields; expected 2.',
+    });
+  });
+
+  it('reads semicolon- and tab-separated exports by their header row', () => {
+    expect(parseVariableCsv('eu.csv', '"last, first";number\n"Doe; Jane";1,5\n')).toMatchObject({
+      ok: true,
+      dataset: { headers: ['last, first', 'number'], records: [['Doe; Jane', '1,5']] },
+      delimiter: ';',
+    });
+    expect(parseVariableCsv('tabs.csv', 'name\tnumber\nAlice\t1\n')).toMatchObject({
+      ok: true,
+      dataset: { headers: ['name', 'number'], records: [['Alice', '1']] },
+      delimiter: '\t',
+    });
+  });
+
+  it('keeps commas as the separator when the header row has one or has no separator', () => {
+    expect(parseVariableCsv('names.csv', 'name,note\nAlice,a;b\n')).toMatchObject({
+      ok: true,
+      dataset: { records: [['Alice', 'a;b']] },
+      delimiter: ',',
+    });
+    expect(parseVariableCsv('names.csv', 'name\nAl;ice\n')).toMatchObject({
+      ok: true,
+      dataset: { records: [['Al;ice']] },
+      delimiter: ',',
+    });
+  });
+
+  it('stores a line break inside a quoted cell as LF only', () => {
+    expect(parseVariableCsv('names.csv', 'name\r\n"Anna\r\nBen"\r\n"C\rD"\r\n')).toMatchObject({
+      ok: true,
+      dataset: { records: [['Anna\nBen'], ['C\nD']] },
     });
   });
 });

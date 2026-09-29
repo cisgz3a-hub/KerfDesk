@@ -39,7 +39,7 @@ export function describeImportResult(
   if (result.ignoredTextElements > 0) {
     const n = result.ignoredTextElements;
     out.push({
-      message: `${filename}: ${n} text element${n === 1 ? '' : 's'} ignored — convert to paths, or wait for Phase D`,
+      message: `${filename}: ${n} text element${n === 1 ? '' : 's'} ignored — convert text to paths in your editor before exporting`,
       variant: 'info',
     });
   }

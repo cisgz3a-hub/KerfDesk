@@ -22,8 +22,16 @@ export type CameraIntrinsics = {
 
 type Vec2 = { readonly x: number; readonly y: number };
 
-const NEWTON_ITERATIONS = 12;
 const RADIUS_EPSILON = 1e-9;
+// The inverse stops once a step moves theta by less than this (radians); at
+// any real focal length that is far below a millionth of a pixel.
+const THETA_TOLERANCE = 1e-12;
+// Enough for bisection alone to close the bracket to the tolerance; Newton
+// normally settles in a handful of steps.
+const MAX_INVERSE_STEPS = 64;
+// Samples of the polynomial's slope when looking for its first turning point.
+const TURN_SCAN_STEPS = 512;
+const HALF_PI = Math.PI / 2;
 
 // theta_d = theta * (1 + k1 t^2 + k2 t^4 + k3 t^6 + k4 t^8), with t = theta.
 function distortedAngle(theta: number, d: FisheyeDistortion): number {
@@ -68,26 +76,94 @@ export function projectFisheye(
 }
 
 /**
+ * The widest ray angle theta (radians from the optical axis) at which the lens
+ * can be inverted: the polynomial's first turning point, where theta_d stops
+ * increasing, or pi/2 when it keeps rising (a wider ray has no (X/Z, Y/Z)).
+ * Past a turning point one distorted radius belongs to two rays, so a pixel
+ * there has no single answer.
+ */
+export function fisheyeAngleLimit(d: FisheyeDistortion): number {
+  let rising = 0;
+  for (let i = 1; i <= TURN_SCAN_STEPS; i += 1) {
+    const theta = (HALF_PI * i) / TURN_SCAN_STEPS;
+    if (distortedAngleDerivative(theta, d) <= 0) return firstTurn(rising, theta, d);
+    rising = theta;
+  }
+  return HALF_PI;
+}
+
+/**
+ * The distorted radius at which the lens turns back (theta_d's peak before
+ * pi/2), or null when theta_d keeps rising to pi/2. A pixel at or beyond it
+ * has no ray, and a wider ray is drawn back inside it.
+ */
+export function fisheyeFoldRadius(d: FisheyeDistortion): number | null {
+  const limit = fisheyeAngleLimit(d);
+  return limit < HALF_PI ? distortedAngle(limit, d) : null;
+}
+
+// Bisect between a rising angle and a later one where the slope is no longer
+// positive, down to the tolerance.
+function firstTurn(rising: number, falling: number, d: FisheyeDistortion): number {
+  let lo = rising;
+  let hi = falling;
+  while (hi - lo > THETA_TOLERANCE) {
+    const mid = (lo + hi) / 2;
+    if (distortedAngleDerivative(mid, d) > 0) lo = mid;
+    else hi = mid;
+  }
+  return lo;
+}
+
+/**
  * Recover the undistorted ray (a, b) = (X/Z, Y/Z) from a distorted pixel — the
  * inverse of {@link projectFisheye}. The distorted normalized radius equals
- * theta_d; theta_d -> theta has no closed form, so a few Newton steps solve it,
- * then r = tan(theta) rescales along the preserved direction.
+ * theta_d; theta_d -> theta has no closed form, so Newton steps solve it, then
+ * r = tan(theta) rescales along the preserved direction.
+ *
+ * Null when the pixel has no ray: it lies beyond the widest distorted radius
+ * the lens produces, or the solve did not settle. OpenCV's
+ * cv::fisheye::undistortPoints marks such points invalid for the same reasons
+ * rather than returning a ray on the wrong side of the curve or of the axis.
+ * `angleLimit` is {@link fisheyeAngleLimit} of `d`, passed in by callers that
+ * invert many pixels of one lens.
  */
 export function undistortPixel(
   u: number,
   v: number,
   k: CameraIntrinsics,
   d: FisheyeDistortion,
-): Vec2 {
+  angleLimit = fisheyeAngleLimit(d),
+): Vec2 | null {
   const px = (u - k.cx) / k.fx;
   const py = (v - k.cy) / k.fy;
   const thetaD = Math.hypot(px, py);
   if (thetaD < RADIUS_EPSILON) return { x: 0, y: 0 };
-  let theta = thetaD;
-  for (let i = 0; i < NEWTON_ITERATIONS; i += 1) {
-    const residual = distortedAngle(theta, d) - thetaD;
-    theta -= residual / distortedAngleDerivative(theta, d);
-  }
+  const theta = solveTheta(thetaD, d, angleLimit);
+  if (theta === null) return null;
   const scale = Math.tan(theta) / thetaD;
   return { x: px * scale, y: py * scale };
+}
+
+// theta_d(theta) rises from 0 to its peak over (0, limit), so exactly one
+// theta there gives `thetaD` when thetaD is below the peak. Newton steps are
+// kept inside a bracket around that root and fall back to bisection when a
+// step would leave it, so the answer is never negative (a ray flipped through
+// the axis) or past the turning point.
+function solveTheta(thetaD: number, d: FisheyeDistortion, limit: number): number | null {
+  if (!(thetaD < distortedAngle(limit, d))) return null;
+  let lo = 0;
+  let hi = limit;
+  let theta = thetaD < limit ? thetaD : limit / 2;
+  for (let i = 0; i < MAX_INVERSE_STEPS; i += 1) {
+    const residual = distortedAngle(theta, d) - thetaD;
+    if (residual === 0) return theta;
+    if (residual > 0) hi = theta;
+    else lo = theta;
+    let next = theta - residual / distortedAngleDerivative(theta, d);
+    if (!(next > lo && next < hi)) next = (lo + hi) / 2;
+    if (Math.abs(next - theta) < THETA_TOLERANCE) return next;
+    theta = next;
+  }
+  return null;
 }

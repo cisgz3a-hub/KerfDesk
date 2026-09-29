@@ -1,6 +1,6 @@
 import { decode, type TiffIfd } from 'tiff';
 import { validateTiffPixelLayout } from './tiff-pixel-layout';
-import { tiffPageCount, topLeftTiffBytes } from './tiff-structure';
+import { tiffPageCount, topLeftTiffBytes, withDefaultBitsPerSample } from './tiff-structure';
 
 export type TiffPixels = {
   readonly width: number;
@@ -18,12 +18,17 @@ export function decodeTiffPage(bytes: Uint8Array, pageNumber: number): TiffPixel
     throw new Error('This TIFF page does not exist.');
   }
   const options = { pages: [pageNumber - 1] };
-  const header = decode(bytes, { ...options, ignoreImageData: true })[0];
+  // Validation and decoding both read the page with its spec defaults stated.
+  const source = withDefaultBitsPerSample(bytes, pageNumber);
+  const header = decode(source, { ...options, ignoreImageData: true })[0];
   if (header === undefined) throw new Error('This TIFF page does not exist.');
   validateHeader(header);
   validateTiffPixelLayout(header, bytes.byteLength);
   const orientation = header.orientation || 1;
-  const page = decode(orientation === 1 ? bytes : topLeftTiffBytes(bytes, pageNumber), options)[0];
+  const page = decode(
+    orientation === 1 ? source : topLeftTiffBytes(source, pageNumber),
+    options,
+  )[0];
   if (page === undefined) throw new Error('Could not decode this TIFF page.');
   page.fields.set(274, orientation);
   return pixelsForPage(page);
@@ -31,8 +36,34 @@ export function decodeTiffPage(bytes: Uint8Array, pageNumber: number): TiffPixel
 
 function validateHeader(page: TiffIfd): void {
   validateDimensions(page);
+  validateCompression(page);
   validateChannels(page);
   validateSamples(page);
+}
+
+// The decoder reads only uncompressed, LZW and Deflate data. It refuses the
+// rest, TIFF 6.0 baseline CCITT 1-D and PackBits included, with a bare
+// "Unsupported Compression: 4", so name the scheme and the way out instead.
+const DECODABLE_COMPRESSIONS: readonly unknown[] = [1, 5, 8, 32946];
+const COMPRESSION_NAMES: Readonly<Record<number, string>> = {
+  2: 'CCITT fax',
+  3: 'CCITT fax',
+  4: 'CCITT fax',
+  6: 'JPEG',
+  7: 'JPEG',
+  32773: 'PackBits',
+  34712: 'JPEG 2000',
+};
+
+function validateCompression(page: TiffIfd): void {
+  const code: unknown = page.compression;
+  if (DECODABLE_COMPRESSIONS.includes(code)) return;
+  const name = typeof code === 'number' ? COMPRESSION_NAMES[code] : undefined;
+  const scheme =
+    name === undefined
+      ? `a compression KerfDesk can't read (type ${String(code)})`
+      : `${name} compression, which KerfDesk can't read`;
+  throw new Error(`This TIFF uses ${scheme}. Re-save it as LZW or uncompressed.`);
 }
 
 function validateDimensions(page: TiffIfd): void {

@@ -108,6 +108,12 @@ export function intersectFilledRings(
 
 /** A subpath in document millimetres, curves flattened at the machine tolerance. */
 export function machineDocumentPoints(subpath: SubPath, matrix: SvgMatrix): PathD {
+  // The display points hold the control points of any curve past the
+  // coordinate limit (flatten-within-limit.ts), so checking them first refuses
+  // such a curve before flattening it at the machine tolerance stalls or
+  // overflows the stack (A-07).
+  const points = subpath.points.map((point) => applySvgMatrix(matrix, point));
+  assertSvgImportPoints(points);
   if (subpath.curve !== undefined) {
     const flattened = flattenCurveSubpath(transformSvgCurveSubpath(subpath.curve, matrix), {
       toleranceMm: DEFAULT_MACHINE_CURVE_TOLERANCE_MM,
@@ -118,8 +124,6 @@ export function machineDocumentPoints(subpath: SubPath, matrix: SvgMatrix): Path
       return flattened.polyline.points.map((point) => ({ x: point.x, y: point.y }));
     }
   }
-  const points = subpath.points.map((point) => applySvgMatrix(matrix, point));
-  assertSvgImportPoints(points);
   return points;
 }
 

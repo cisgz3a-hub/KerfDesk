@@ -118,6 +118,115 @@ describe('parsePathD — Z close', () => {
     expect(subs).toHaveLength(2);
     expect(subs[1]?.points[0]).toEqual({ x: 20, y: 20 });
   });
+
+  // SVG 2 closepath: a command straight after Z starts its subpath at the
+  // closed subpath's initial point, so a line after Z keeps its full length.
+  it.each([
+    ['l', 'M10 10 l10 0 l0 10 z l5 5', { x: 15, y: 15 }],
+    ['L', 'M10 10 L20 10 L20 20 Z L30 30', { x: 30, y: 30 }],
+    ['h', 'M10 10 h10 v10 z h5', { x: 15, y: 10 }],
+    ['V', 'M10 10 h10 v10 z V40', { x: 10, y: 40 }],
+  ])('draws a %s command after Z from the closed subpath start', (_cmd, d, end) => {
+    const subs = parsePathD(d);
+    expect(subs).toHaveLength(2);
+    expect(subs[1]?.points).toEqual([{ x: 10, y: 10 }, end]);
+    expect(subs[1]?.curve?.start).toEqual({ x: 10, y: 10 });
+    expect(subs[1]?.curve?.segments).toEqual([{ kind: 'line', to: end }]);
+  });
+});
+
+// A-17: SVG 2 renders a path "up to (but not including) the path command
+// containing the first error", as browsers do, rather than inventing segments.
+describe('parsePathD — error handling', () => {
+  it.each([
+    ['garbage inside a lineto', 'M0 0 L10 10 L20 # 30 30'],
+    ['an unknown letter', 'M0 0 L10 10 X 20 20'],
+    ['an incomplete tuple', 'M0 0 L10 10 20 L30 30'],
+    ['a command with no arguments', 'M0 0 L10 10 L M20 20 L30 30'],
+    ['a malformed arc flag', 'M0 0 L10 10 A5 5 0 2 1 20 0 L30 30'],
+  ])('stops before %s', (_label, d) => {
+    expect(parsePathD(d)).toEqual(parsePathD('M0 0 L10 10'));
+  });
+
+  it('keeps the complete tuples of a command before its error', () => {
+    expect(parsePathD('M0 0 L10 0 20 0 30')).toEqual(parsePathD('M0 0 L10 0 L20 0'));
+    expect(parsePathD('M0 0 C1 1 2 2 3 3 4 4 #')).toEqual(parsePathD('M0 0 C1 1 2 2 3 3'));
+  });
+
+  it('keeps a closepath followed by stray numbers, and nothing after', () => {
+    expect(parsePathD('M0 0 L10 0 L10 10 Z 5 5 L20 20')).toEqual(parsePathD('M0 0 L10 0 L10 10 Z'));
+  });
+
+  it('draws nothing when the data does not open with a moveto', () => {
+    expect(parsePathD('L10 10 L20 20')).toEqual([]);
+    expect(parsePathD('10 10 L20 20')).toEqual([]);
+    expect(parsePathD('M10')).toEqual([]);
+  });
+
+  it('still reads whitespace, commas and compact numbers as before', () => {
+    expect(parsePathD(' \n\tM0,0 L10,10, L20-5\n')).toEqual(parsePathD('M0 0 L10 10 L20 -5'));
+  });
+});
+
+// E-2: exporters often close an outline by returning to its start without Z.
+// Fill already treats that as closed, so the importer flags it closed too.
+describe('parsePathD — ends that meet without Z', () => {
+  it('stores a path that returns to its start exactly as Z would', () => {
+    expect(parsePathD('M0 0 L10 0 L10 10 L0 10 L0 0')).toEqual(
+      parsePathD('M0 0 L10 0 L10 10 L0 10 Z'),
+    );
+  });
+
+  it('closes a subpath that the next moveto ends', () => {
+    const subs = parsePathD('M0 0 L10 0 L10 10 L0 0 M20 20 L30 30');
+    expect(subs.map((sub) => [sub.closed, sub.curve?.closed])).toEqual([
+      [true, true],
+      [false, false],
+    ]);
+  });
+
+  it('lands an end within CLOSURE_EPS_MM on the start, keeping one closing point', () => {
+    const sub = parsePathD('M0 0 L10 0 L10 10 L0.00005 -0.00005')[0];
+    expect(sub?.closed).toBe(true);
+    expect(sub?.points).toEqual([
+      { x: 0, y: 0 },
+      { x: 10, y: 0 },
+      { x: 10, y: 10 },
+      { x: 0, y: 0 },
+    ]);
+    expect(sub?.curve?.segments.at(-1)).toEqual({ kind: 'line', to: { x: 0, y: 0 } });
+  });
+
+  it('closes a curve that returns to its start, ending that curve on the start', () => {
+    const sub = parsePathD('M0 0 C10 0 10 10 0.00001 0')[0];
+    expect(sub?.closed).toBe(true);
+    expect(sub?.points.at(-1)).toEqual({ x: 0, y: 0 });
+    expect(sub?.curve).toEqual({
+      start: { x: 0, y: 0 },
+      segments: [
+        {
+          kind: 'cubic',
+          control1: { x: 10, y: 0 },
+          control2: { x: 10, y: 10 },
+          to: { x: 0, y: 0 },
+        },
+      ],
+      closed: true,
+    });
+  });
+
+  it('leaves a wider gap, a two-point line and an open shape alone', () => {
+    const gap = parsePathD('M0 0 L10 0 L10 10 L0.001 0')[0];
+    expect(gap?.closed).toBe(false);
+    expect(gap?.points.at(-1)).toEqual({ x: 0.001, y: 0 });
+    expect(parsePathD('M5 5 L5 5')[0]?.closed).toBe(false);
+    expect(parsePathD('M0 0 L10 0 L10 10')[0]?.closed).toBe(false);
+  });
+
+  it('compares the gap in millimetres after the caller scale', () => {
+    // At 10 mm per user unit a 5e-5 unit gap is 5e-4 mm, so it stays open.
+    expect(parsePathD('M0 0 L10 0 L10 10 L0.00005 0', 0.025, 10)[0]?.closed).toBe(false);
+  });
 });
 
 describe('parsePathD — non-finite coordinate rejection (S04-001)', () => {
@@ -136,6 +245,56 @@ describe('parsePathD — non-finite coordinate rejection (S04-001)', () => {
   it('still accepts ordinary in-range scientific notation', () => {
     // 1e3 = 1000 is finite and valid SVG; the guard must not reject it.
     expect(parsePathD('M 1e3 0')[0]?.points[0]).toEqual({ x: 1000, y: 0 });
+  });
+});
+
+// A-07: flattening an absurdly large curve stalled or overflowed the stack
+// before the importer's magnitude check could refuse it. Such a segment is
+// left unflattened, with its control points standing in for the refusal.
+describe('parsePathD — curves past the coordinate limit', () => {
+  const extreme = (point: { x: number; y: number }): boolean =>
+    !(Math.abs(point.x) <= 1e6 && Math.abs(point.y) <= 1e6);
+
+  it('keeps a far-reaching cubic unflattened, with its control points in the polyline', () => {
+    const sub = parsePathD('M0 0 C1e10 1e10 -1e10 1e10 0 0')[0];
+    expect(sub?.points).toEqual([
+      { x: 0, y: 0 },
+      { x: 1e10, y: 1e10 },
+      { x: -1e10, y: 1e10 },
+      { x: 0, y: 0 },
+    ]);
+    expect(sub?.curve?.segments).toEqual([
+      {
+        kind: 'cubic',
+        control1: { x: 1e10, y: 1e10 },
+        control2: { x: -1e10, y: 1e10 },
+        to: { x: 0, y: 0 },
+      },
+    ]);
+  });
+
+  it('leaves the reach of huge arcs, quadratics and smooth curves for the refusal to see', () => {
+    for (const d of [
+      'M0 0 A1e9 1e9 0 1 1 10 0',
+      'M0 0 Q5 1e9 10 0 T20 0',
+      'M0 0 C0 1e9 10 1e9 10 0 S20 -1e9 20 0',
+    ]) {
+      const points = parsePathD(d)[0]?.points ?? [];
+      expect(points.length).toBeLessThan(20);
+      expect(points.some(extreme)).toBe(true);
+    }
+  });
+
+  it('keeps a coordinate that overflowed to Infinity for the refusal to see', () => {
+    const points = parsePathD('M1e308 0 c1e308 0 0 1 0 2')[0]?.points ?? [];
+    expect(points.some((point) => !Number.isFinite(point.x))).toBe(true);
+  });
+
+  it('compares the limit in millimetres after the caller scale', () => {
+    const d = 'M0 0 C1e5 1e5 -1e5 1e5 0 0';
+    // 1e5 user units is 1e5 mm at scale 1 (flattened) but 1e7 mm at scale 100.
+    expect(parsePathD(d, 0.25, 1)[0]?.points.length).toBeGreaterThan(100);
+    expect(parsePathD(d, 0.25 / 100, 100)[0]?.points).toHaveLength(4);
   });
 });
 

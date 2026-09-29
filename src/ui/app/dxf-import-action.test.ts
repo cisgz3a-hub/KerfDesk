@@ -3,6 +3,7 @@ import type { SceneObject } from '../../core/scene';
 import { nestedMinsertDxf } from '../../__fixtures__/nested-minsert';
 import { resetImportWorkerForTests } from '../import/import-worker-client';
 import type { ImportWorkerRequest } from '../import/import-worker-protocol';
+import type { ImportOutcome } from '../state/store';
 import { importDxfFiles, isDxfFile } from './dxf-import-action';
 
 function dxfLine(): string {
@@ -216,5 +217,93 @@ describe('importDxfFiles', () => {
 
     expect(imported).toHaveLength(1);
     expect(pushToast).toHaveBeenCalledWith(expect.stringContaining('unreadable'), 'error');
+  });
+});
+
+describe('importDxfFiles parser notes', () => {
+  function dxfTags(...pairs: ReadonlyArray<readonly [number, string | number]>): string {
+    return pairs.map(([code, value]) => `${code}\n${value}`).join('\n');
+  }
+
+  // A LINE plus one INSERT per named block; none of the blocks exist.
+  function dxfWithUnknownBlocks(names: ReadonlyArray<string>, header = ''): string {
+    return [
+      header,
+      dxfTags([0, 'SECTION'], [2, 'ENTITIES']),
+      dxfTags([0, 'LINE'], [10, 0], [20, 0], [11, 10], [21, 0]),
+      ...names.map((name) => dxfTags([0, 'INSERT'], [2, name], [10, 0], [20, 0])),
+      dxfTags([0, 'ENDSEC'], [0, 'EOF']),
+    ]
+      .filter((part) => part !== '')
+      .join('\n');
+  }
+
+  const MICROINCH_HEADER = dxfTags(
+    [0, 'SECTION'],
+    [2, 'HEADER'],
+    [9, '$INSUNITS'],
+    [70, 8],
+    [0, 'ENDSEC'],
+  );
+
+  async function toastsFor(
+    content: string,
+    outcome: ImportOutcome = { kind: 'added' },
+  ): Promise<ReadonlyArray<readonly [string, string | undefined]>> {
+    const toasts: [string, string | undefined][] = [];
+    await importDxfFiles([file('part.dxf', content)], {
+      importObject: () => outcome,
+      pushToast: (message, variant) => toasts.push([message, variant]),
+    });
+    return toasts;
+  }
+
+  it('warns with each note after the summary and keeps the bed-fit notice last', async () => {
+    const toasts = await toastsFor(dxfWithUnknownBlocks(['HOLES'], MICROINCH_HEADER), {
+      kind: 'added',
+      bedFit: { scale: 0.5, widthMm: 800, heightMm: 10, bedWidthMm: 400, bedHeightMm: 400 },
+    });
+    expect(toasts).toEqual([
+      ['Imported 1 path from part.dxf — skipped 1 INSERT.', 'success'],
+      ['part.dxf: Unrecognized $INSUNITS 8 — assuming millimeters.', 'warning'],
+      ['part.dxf: INSERT references unknown block "HOLES"', 'warning'],
+      [expect.stringContaining('scaled to 50%'), 'warning'],
+    ]);
+  });
+
+  it('warns with the notes after a re-import too', async () => {
+    const toasts = await toastsFor(dxfWithUnknownBlocks(['HOLES']), {
+      kind: 'replaced',
+      source: 'part.dxf',
+      kept: 1,
+      added: 0,
+      removed: 0,
+    });
+    expect(toasts.map(([message]) => message)).toEqual([
+      expect.stringContaining('Re-imported part.dxf'),
+      'part.dxf: INSERT references unknown block "HOLES"',
+    ]);
+  });
+
+  it('explains an empty import with its notes', async () => {
+    const content = [
+      dxfTags([0, 'SECTION'], [2, 'ENTITIES']),
+      dxfTags([0, 'INSERT'], [2, 'HOLES'], [10, 0], [20, 0]),
+      dxfTags([0, 'ENDSEC'], [0, 'EOF']),
+    ].join('\n');
+    expect(await toastsFor(content)).toEqual([
+      ['part.dxf: no supported geometry — skipped 1 INSERT.', 'warning'],
+      ['part.dxf: INSERT references unknown block "HOLES"', 'warning'],
+    ]);
+  });
+
+  it('caps the note toasts and counts the rest', async () => {
+    const toasts = await toastsFor(dxfWithUnknownBlocks(['A', 'B', 'C', 'D', 'E']));
+    expect(toasts.map(([message]) => message)).toEqual([
+      'Imported 1 path from part.dxf — skipped 5 INSERT.',
+      'part.dxf: INSERT references unknown block "A"',
+      'part.dxf: INSERT references unknown block "B"',
+      'part.dxf: 3 more import warnings.',
+    ]);
   });
 });

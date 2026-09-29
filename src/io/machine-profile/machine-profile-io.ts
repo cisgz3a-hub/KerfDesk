@@ -60,8 +60,16 @@ export function serializeCanonicalDeviceProfile(profile: DeviceProfile): string 
   return `${JSON.stringify(canonicalProfile(profile), null, 2)}\n`;
 }
 
+/** Whether the text is a file being imported ('import', the default) or the
+ * machine the app saved for itself being restored ('restore', ADR-500's last
+ * machine). Both are validated the same way. Only an import marks scan offsets
+ * pending, because a file is not bound to this physical machine and laser head;
+ * a restore keeps the calibration status the machine was saved with. */
+export type MachineProfileReadMode = 'import' | 'restore';
+
 export function deserializeMachineProfileDocument(
   jsonText: string,
+  mode?: MachineProfileReadMode,
 ): DeserializeMachineProfileDocumentResult {
   let raw: unknown;
   try {
@@ -95,7 +103,7 @@ export function deserializeMachineProfileDocument(
   const reviewNotes = parseReviewNotes(raw['reviewNotes']);
   if (reviewNotes.kind === 'invalid') return reviewNotes;
 
-  const profile = parseProfile(raw['profile']);
+  const profile = parseProfile(raw['profile'], mode);
   if (profile.kind === 'invalid') return profile;
 
   return {
@@ -152,7 +160,10 @@ function parseReviewNotes(
   return { kind: 'ok', reviewNotes: value };
 }
 
-function parseProfile(value: unknown):
+function parseProfile(
+  value: unknown,
+  mode: MachineProfileReadMode | undefined,
+):
   | {
       readonly kind: 'ok';
       readonly profile: DeviceProfile;
@@ -193,7 +204,8 @@ function parseProfile(value: unknown):
     scanningOffsets: normalizeScanOffsetTable(recoveredValue['scanningOffsets']),
     noGoZones: noGoZones.noGoZones,
   });
-  const profile = profileWithImportedCalibrationPending(canonical);
+  const calibration = scanOffsetCalibrationOnRead(canonical, mode);
+  const profile = calibration.profile;
   const validationErrors = validateMachineProfile(profile);
   if (validationErrors.length > 0) {
     return { kind: 'invalid', reason: `profile is invalid: ${validationErrors.join('; ')}` };
@@ -212,23 +224,24 @@ function parseProfile(value: unknown):
         (issue) =>
           `CNC settings recovery: ${issue}; a default was applied. Review in Device Setup.`,
       ),
-      ...importedCalibrationRecoveryNotes(canonical),
+      ...calibration.notes,
     ],
   };
 }
 
-function profileWithImportedCalibrationPending(profile: DeviceProfile): DeviceProfile {
-  return profile.scanningOffsets.length > 0
-    ? { ...profile, scanOffsetCalibrationStatus: 'pending' }
-    : profile;
-}
-
-function importedCalibrationRecoveryNotes(profile: DeviceProfile): ReadonlyArray<string> {
-  return profile.scanningOffsets.length > 0
-    ? [
-        'Imported scan-offset values were kept but marked verification pending because the file does not bind them to this physical machine and laser head.',
-      ]
-    : [];
+// An import keeps a file's scan offsets but marks them verification pending
+// (see MachineProfileReadMode); a restore keeps the saved status.
+function scanOffsetCalibrationOnRead(
+  profile: DeviceProfile,
+  mode: MachineProfileReadMode | undefined,
+): { readonly profile: DeviceProfile; readonly notes: ReadonlyArray<string> } {
+  if (mode === 'restore' || profile.scanningOffsets.length === 0) return { profile, notes: [] };
+  return {
+    profile: { ...profile, scanOffsetCalibrationStatus: 'pending' },
+    notes: [
+      'Imported scan-offset values were kept but marked verification pending because the file does not bind them to this physical machine and laser head.',
+    ],
+  };
 }
 
 function validatedDeviceProfile(value: Record<string, unknown>): DeviceProfile {

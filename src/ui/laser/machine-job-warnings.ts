@@ -25,6 +25,7 @@ import { detectCncReliefPlanningWarnings } from './cnc-relief-planning-warnings'
 import { detectCncStockWarnings } from './cnc-stock-warnings';
 import { detectCncThroughCutTabWarnings } from './cnc-through-cut-tab-warnings';
 import { detectCncUnmodeledBitLayoutWarnings } from './cnc-unmodeled-bit-layout-warnings';
+import { detectCncZTravelWarnings } from './cnc-z-travel-warnings';
 import { detectJobIntentWarnings } from './job-intent-warnings';
 import { detectLaserFinishSetAsideWarnings } from './laser-finish-set-aside-warnings';
 import { detectLaserReliefWarnings } from './laser-relief-warnings';
@@ -48,13 +49,14 @@ export function detectMachineJobWarnings(
     project.machine?.kind === 'cnc'
       ? [
           ...detectCncStockWarnings(project, prepared),
-          ...detectCncThroughCutTabWarnings(project),
+          ...detectCncThroughCutTabWarnings(project, job),
           ...detectCncOnPathSizeWarnings(project),
           ...detectCncFullTabCoverageWarnings(project, job),
           ...detectCncDefaultFeedWarnings(project),
           ...detectCncAngledToolFeedWarnings(project),
           ...detectCncUnmodeledBitLayoutWarnings(project),
-          ...detectCncMachineLimitWarnings(project, controllerSettings),
+          ...detectCncMachineLimitWarnings(project, controllerSettings, job),
+          ...detectCncZTravelWarnings(project, controllerSettings, job),
           ...detectCncMissingPrimaryToolWarnings(project),
           ...(prepared === undefined
             ? []

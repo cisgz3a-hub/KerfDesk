@@ -5,6 +5,7 @@ import { jobAwareConfirm } from '../state/job-aware-dialogs';
 import type { AppState } from '../state/store';
 import type { ProjectSaveWriteOwner } from '../state/project-save-write-coordinator';
 import { errorMessage } from './file-action-formatters';
+import { requestPersistentStorageOnce } from './persistent-storage-request';
 import {
   completeProjectSave,
   failProjectSave,
@@ -67,6 +68,10 @@ function rememberSavedProject(
 ): void {
   if (outcome !== 'saved' && outcome !== 'saved-with-newer-edits') return;
   rememberRecentProject(platform, { name: target.displayName, recentRef: target.recentRef });
+  // The operator saved on purpose, so ask the browser to keep the local stores
+  // their work leans on (autosave, Recent Projects). Once per page session, and
+  // nothing here waits for its answer.
+  requestPersistentStorageOnce();
 }
 
 async function reportProjectSaveRestoreFailure(

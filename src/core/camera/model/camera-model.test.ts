@@ -55,6 +55,24 @@ describe('camera model', () => {
     expect(map(pixel, 5)).toEqual(pixelToBed(lens, pose, pixel, 5));
   });
 
+  it('places no bed point for a pixel beyond what a folding lens can produce', () => {
+    // theta_d(theta) of this lens peaks at about 0.674: a pixel farther out has
+    // no ray, where it used to land on a plausible bed point such as (32.4, 6.5).
+    const folding = { ...lens, distortion: [-0.041, 0.046, 0.581, -1.966] as const };
+    const { fx, fy, cx, cy } = folding.intrinsics;
+    const at = (radius: number) => ({
+      x: cx - (radius * fx) / Math.SQRT2,
+      y: cy - (radius * fy) / Math.SQRT2,
+    });
+    expect(pixelToBed(folding, pose, at(0.72), 3)).toBeNull();
+    expect(bedMapper(folding, pose)(at(0.8), 3)).toBeNull();
+    // Inside the range the same lens still maps a pixel and back exactly.
+    const seen = pixelToBed(folding, pose, at(0.6), 3);
+    const pixel = projectWorldPoint(folding, pose, bedPoint(seen?.x ?? 0, seen?.y ?? 0, 3));
+    expect(pixel?.x).toBeCloseTo(at(0.6).x, 6);
+    expect(pixel?.y).toBeCloseTo(at(0.6).y, 6);
+  });
+
   it('rescales a lens to a resized frame about the pixel grid', () => {
     const half = scaleLens(lens, 640, 360);
     const full = projectWorldPoint(lens, pose, bedPoint(100, 250));

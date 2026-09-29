@@ -12,6 +12,7 @@ import {
   resolveVariableSequence,
 } from '../../core/variables';
 import { pushUndo } from './scene-mutations';
+import { useToastStore } from './toast-store';
 
 export type VariableAdvanceTrigger = 'successful-export' | 'successful-stream';
 
@@ -85,11 +86,19 @@ export function variableDataActions(
         const variables = state.project.variables ?? DEFAULT_PROJECT_VARIABLE_DATA;
         return variableMutation(state, advanceVariableSequence(variables, 'reset'));
       }),
-    advanceVariablesAfter: (expectedProject, trigger, outputScope) =>
+    advanceVariablesAfter: (expectedProject, trigger, outputScope) => {
+      const outcome = { skipped: false };
       set((state) => {
-        if (state.project !== expectedProject) return {};
-        const variables = state.project.variables ?? DEFAULT_PROJECT_VARIABLE_DATA;
+        const variables = expectedProject.variables ?? DEFAULT_PROJECT_VARIABLE_DATA;
         if (!policyMatches(variables.advancement, trigger)) return {};
+        // The output was made from the values captured when it started, so
+        // editing the design meanwhile does not make it stale. Only a change
+        // to the values themselves (Next, Reset, a new CSV, another file)
+        // means this advance would skip or repeat a record.
+        if (state.project.variables !== expectedProject.variables) {
+          outcome.skipped = true;
+          return {};
+        }
         const advanced = nextProjectVariableSequence(expectedProject, outputScope);
         if (advanced === variables) return {};
         return {
@@ -101,8 +110,21 @@ export function variableDataActions(
           redoStack: [],
           dirty: true,
         };
-      }),
+      });
+      if (outcome.skipped) {
+        useToastStore.getState().pushToast(skippedAdvanceMessage(trigger), 'warning');
+      }
+    },
   };
+}
+
+function skippedAdvanceMessage(trigger: VariableAdvanceTrigger): string {
+  const [output, during] =
+    trigger === 'successful-stream' ? ['job', 'it ran'] : ['export', 'the G-code was saved'];
+  return (
+    `The serial number and CSV record were not advanced after this ${output}, because ` +
+    `variable data was changed while ${during}. Check them before the next job.`
+  );
 }
 
 function variableMutation(state: VariableDataState, patch: VariablePatch): VariableDataMutation {

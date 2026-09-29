@@ -7,6 +7,7 @@ import type { StreamerState } from '../../../core/controllers/grbl';
 import { useCameraStore } from '../../state/camera-store';
 import { useLaserStore } from '../../state/laser-store';
 import { CameraSourceView } from '../CameraSourceView';
+import { useAssumedTarget } from './assumed-target';
 import { useCameraCalibrationStore, type PhotoStatus } from './camera-calibration-store';
 import { columnStyle, errStyle, noteStyle, rowStyle } from './wizard-styles';
 
@@ -66,6 +67,7 @@ export function PhotoStep(props: {
   const setStep = useCameraCalibrationStore((s) => s.setStep);
   const checking = useCameraCalibrationStore((s) => s.mode) === 'check';
   const headCamera = useCameraCalibrationStore((s) => s.settings.headCamera);
+  const assumed = useAssumedTarget();
   const { take, cancel } = props;
   const running = props.status.kind === 'running';
 
@@ -75,6 +77,7 @@ export function PhotoStep(props: {
         {checking ? CHECK_GUIDANCE : 'Leave the engraved sheet exactly where it is. '}
         {headCamera ? HEAD_GUIDANCE : FIXED_GUIDANCE}
       </p>
+      <p style={noteStyle}>Looking for {assumed.description}.</p>
       {sourceState.kind === 'live' ? (
         <CameraSourceView source={sourceState.source} />
       ) : (

@@ -1,4 +1,5 @@
 import type { PlatformAdapter } from '../../platform/types';
+import { effectiveOperationForObject } from '../../core/effective-output';
 import {
   primaryOperationForObject,
   type Layer,
@@ -35,7 +36,12 @@ export async function handleSaveProcessedBitmap(ctx: SaveProcessedBitmapCtx): Pr
     return;
   }
   const layer = layerForRaster(ctx.project, selected);
-  if (layer === null || layer.mode !== 'image' || !layer.output) {
+  // The image's own settings can change its mode, as they do when it compiles.
+  if (
+    layer === null ||
+    effectiveOperationForObject(layer, selected).mode !== 'image' ||
+    !layer.output
+  ) {
     ctx.pushToast('The selected image needs an enabled Image layer before export.', 'error');
     return;
   }

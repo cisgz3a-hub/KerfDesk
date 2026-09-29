@@ -1,8 +1,10 @@
 import { pngSamplingTarget } from './png-row-luma-sampler';
 import {
   grayscaleTransparencyFromChunk,
+  truecolourTransparencyFromChunk,
   validateHeightfieldTransparencyForColorType,
   validatePaletteForColorType,
+  type PngTransparentKey,
 } from './png-chunk-metadata';
 import {
   consumeDecodedPngRows,
@@ -144,13 +146,22 @@ async function decodeIdat(
   }
   const decompressor = new DecompressionStream('deflate');
   const writer = decompressor.writable.getWriter();
+  const metadata: ChunkMetadata = { grayKey: undefined, colourKey: undefined, density: null };
+  // Read as rows decode; tRNS must precede IDAT (checked when read), so it is final by then.
+  const transparentKey = (): PngTransparentKey | undefined =>
+    metadata.grayKey === undefined ? metadata.colourKey : [metadata.grayKey];
   const rows = settledRows(
-    consumeDecodedPngRows(decompressor.readable, source, target, format, options, mode),
+    consumeDecodedPngRows(
+      decompressor.readable,
+      source,
+      target,
+      format,
+      { ...options, transparentKey },
+      mode,
+    ),
   );
   let sawIdat = false;
   let idatEnded = false;
-  let transparentGraySample: number | undefined;
-  let density: ImageDensity | null = null;
   try {
     while (true) {
       throwIfAborted(options.signal);
@@ -163,21 +174,13 @@ async function decodeIdat(
       }
       if (sawIdat) idatEnded = true;
       const data = await readChunkData(reader, chunk);
-      validatePaletteForColorType(chunk.type, format.colorType);
-      validateHeightfieldTransparencyForColorType(
-        chunk.type,
-        format.colorType,
-        mode === 'exact-heightfield',
-      );
-      transparentGraySample = await grayscaleTransparencyFromChunk(
-        chunk,
+      await readMetadataChunk(
+        { chunk, data, afterImageData: sawIdat },
         format,
-        sawIdat,
-        data,
-        transparentGraySample,
-        options.onTransparency,
+        options,
+        mode,
+        metadata,
       );
-      density = densityFromChunk(chunk.type, sawIdat, data, density);
       if (chunk.type === 'IEND') {
         if (chunk.length !== 0) throw new Error('PNG IEND chunk must be empty.');
         if (!sawIdat) throw new Error('PNG is missing IDAT image data.');
@@ -198,13 +201,57 @@ async function decodeIdat(
       sampledHeight: target.height,
       bitDepth: format.bitDepth,
       colorType: format.colorType,
-      density,
+      density: metadata.density,
     };
   } catch (error) {
     await writer.abort(error).catch(() => undefined);
     await rows;
     throw error;
   }
+}
+
+// What the chunks read so far say about the image: its tRNS key and density.
+type ChunkMetadata = {
+  grayKey: number | undefined;
+  colourKey: PngTransparentKey | undefined;
+  density: ImageDensity | null;
+};
+
+// Validate one chunk other than IDAT and record what it says.
+async function readMetadataChunk(
+  read: {
+    readonly chunk: ChunkHeader;
+    readonly data: Uint8Array;
+    readonly afterImageData: boolean;
+  },
+  format: Pick<PngHeader, 'bitDepth' | 'colorType'>,
+  options: IncrementalPngOptions,
+  mode: DecodeMode,
+  metadata: ChunkMetadata,
+): Promise<void> {
+  const { chunk, data, afterImageData } = read;
+  validatePaletteForColorType(chunk.type, format.colorType);
+  validateHeightfieldTransparencyForColorType(
+    chunk.type,
+    format.colorType,
+    mode === 'exact-heightfield',
+  );
+  metadata.grayKey = await grayscaleTransparencyFromChunk(
+    chunk,
+    format,
+    afterImageData,
+    data,
+    metadata.grayKey,
+    options.onTransparency,
+  );
+  metadata.colourKey = truecolourTransparencyFromChunk(
+    chunk,
+    format,
+    afterImageData,
+    data,
+    metadata.colourKey,
+  );
+  metadata.density = densityFromChunk(chunk.type, afterImageData, data, metadata.density);
 }
 
 type SettledRows = { readonly ok: true } | { readonly ok: false; readonly error: unknown };

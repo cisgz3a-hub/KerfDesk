@@ -1,26 +1,36 @@
 // Mount point for the Design Studio (ADR-272). App renders this always; the
 // heavy overlay chunk loads lazily only once a session opens, so a user who
 // never opens the Studio pays nothing at cold start (the ADR-102 lazy-import
-// precedent, and the same shape as ImageEditorHost).
+// precedent, and the same shape as ImageEditorHost). If that chunk can no
+// longer be fetched (a window left on the previous build), the boundary shows a
+// notice instead of crashing the app; Close stashes the drawing through the
+// store's own closeStudio.
 
 import { lazy, Suspense } from 'react';
+import { rejectAsLoadFailure } from '../common/lazy-load-failure';
+import { LazyOverlayBoundary } from '../common/LazyOverlayBoundary';
 import { useDesignStudioStore } from './design-studio-store';
 import { useDesignSessionPersistence } from './use-design-session-persistence';
 
 const LazyOverlay = lazy(() =>
-  import('./DesignStudioOverlay').then((m) => ({ default: m.DesignStudioOverlay })),
+  import('./DesignStudioOverlay')
+    .then((m) => ({ default: m.DesignStudioOverlay }))
+    .catch(rejectAsLoadFailure),
 );
 
 export function DesignStudioHost(): JSX.Element | null {
   const hasSession = useDesignStudioStore((state) => state.session !== null);
+  const closeStudio = useDesignStudioStore((state) => state.closeStudio);
   // Mounted on the host rather than the overlay: the drawing must keep being
   // saved while the Studio is closed and living in the stash.
   useDesignSessionPersistence();
   if (!hasSession) return null;
   return (
-    <Suspense fallback={<LoadingCard />}>
-      <LazyOverlay />
-    </Suspense>
+    <LazyOverlayBoundary toolName="Design Studio" onClose={closeStudio}>
+      <Suspense fallback={<LoadingCard />}>
+        <LazyOverlay />
+      </Suspense>
+    </LazyOverlayBoundary>
   );
 }
 

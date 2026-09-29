@@ -154,6 +154,33 @@ describe('Job Review machine facts', () => {
       'Not set · program X0 Y0, or a Current Position job start',
     );
   });
+
+  // Second CNC audit P2-gcode-1: the ADR-491 park height was never shown.
+  it('shows the park height and flags one at or above the recorded Z travel', () => {
+    const cnc = (parkZMm?: number) => ({
+      ...createProject({ ...DEFAULT_DEVICE_PROFILE, zTravelMm: 75 }),
+      machine: {
+        ...DEFAULT_CNC_MACHINE_CONFIG,
+        params: {
+          ...DEFAULT_CNC_MACHINE_CONFIG.params,
+          ...(parkZMm === undefined ? {} : { parkZMm }),
+        },
+      },
+    });
+    const heightFact = (project: ReturnType<typeof cnc>) =>
+      buildMachineReviewFacts(project).find((f) => f.label === 'Park height');
+
+    expect(heightFact(cnc())).toEqual({
+      label: 'Park height',
+      value: '3.8 mm above stock top · job end and bit changes',
+      tone: 'default',
+    });
+    expect(heightFact(cnc(120))).toEqual({
+      label: 'Park height',
+      value: '120 mm above stock top · job end and bit changes · at or above the 75 mm Z travel',
+      tone: 'warning',
+    });
+  });
 });
 
 describe('Job Review override facts (ADR-355)', () => {

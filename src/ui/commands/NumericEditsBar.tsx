@@ -237,7 +237,8 @@ function NumberField(props: {
   readonly entry: EntrySpec;
   readonly onCommit: (value: number) => void;
 }): JSX.Element {
-  const [draft, setDraft] = useState(formatNumber(props.value));
+  const shown = formatNumber(props.value);
+  const [draft, setDraft] = useState(shown);
   const [draftIsValid, setDraftIsValid] = useState(true);
   // Re-snap on every commit ATTEMPT, not only when the value moved. A commit
   // the store rejects (resizing a rotated selection, a zero dimension) or
@@ -267,6 +268,12 @@ function NumberField(props: {
     // back without a toast. Anything else they typed deserves a reason.
     if (text.trim() !== '') pushEntryError(text, result.message, props.entry);
   };
+  // Tabbing or clicking through a box leaves its text as shown, which is no
+  // edit. Committing it anyway rounded the value to the shown decimals, added
+  // an undo step and could warn about a rotated selection for nothing.
+  const commitIfEdited = (text: string): void => {
+    if (text.trim() !== shown) commit(text);
+  };
   const onKeyDown = (event: React.KeyboardEvent<HTMLInputElement>): void => {
     if (event.key === 'Enter') {
       commit(event.currentTarget.value);
@@ -293,7 +300,7 @@ function NumberField(props: {
         aria-invalid={!draftIsValid}
         onInput={(event) => updateDraft(event.currentTarget.value)}
         onChange={(event) => updateDraft(event.currentTarget.value)}
-        onBlur={(event) => commit(event.currentTarget.value)}
+        onBlur={(event) => commitIfEdited(event.currentTarget.value)}
         onKeyDown={onKeyDown}
       />
       {!props.hideUnit && <span className="lf-numeric-edit-unit">{props.unit}</span>}

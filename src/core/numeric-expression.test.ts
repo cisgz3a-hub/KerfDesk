@@ -77,6 +77,27 @@ describe('evaluateNumericEntry', () => {
     expect(valueOf('-1IN')).toBe(-25.4);
   });
 
+  it('applies a unit on the last factor alone to the whole product', () => {
+    expect(valueOf('1/2in')).toBeCloseTo(12.7, 10);
+    expect(valueOf('3/4in')).toBeCloseTo(19.05, 10);
+    expect(valueOf('3/4"')).toBeCloseTo(19.05, 10);
+    expect(valueOf('1in+1/2in')).toBeCloseTo(38.1, 10);
+    expect(valueOf('1/-2in')).toBeCloseTo(-12.7, 10);
+    expect(valueOf('-1/2 in')).toBeCloseTo(-12.7, 10);
+    expect(valueOf('3/2cm')).toBeCloseTo(15, 10);
+    expect(valueOf('1/2%', SIZE)).toBeCloseTo(0.4, 10);
+  });
+
+  it('keeps a unit on its own number when another factor has one or it is not last', () => {
+    expect(valueOf('3*2mm')).toBe(6);
+    expect(valueOf('3*2in')).toBeCloseTo(152.4, 10);
+    expect(valueOf('10mm/2')).toBe(5);
+    expect(valueOf('1in/2')).toBeCloseTo(12.7, 10);
+    expect(valueOf('(1/2)in')).toBeCloseTo(12.7, 10);
+    expect(valueOf('2in/4in')).toBe(0.5);
+    expect(messageFor('1/0in')).toBe('it divides by zero');
+  });
+
   it('reads angles in degrees', () => {
     expect(valueOf('90', ANGLE)).toBe(90);
     expect(valueOf('45deg', ANGLE)).toBe(45);

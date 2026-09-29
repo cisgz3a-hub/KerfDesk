@@ -62,6 +62,25 @@ describe('vector clips that hide nothing', () => {
   });
 });
 
+// A-07: flattening a clipped curve far past the coordinate limit overflowed the
+// stack before the importer's own refusal could run.
+describe('clipped curves past the coordinate limit', () => {
+  const CURVE = 'M0 0 C1e9 1e9 -1e9 1e9 0 0';
+
+  it("refuses a clipped curve with the importer's message", () => {
+    const body = `<path clip-path="url(#c)" d="${CURVE}" stroke="red"/>`;
+    expect(() =>
+      parse(svg('<clipPath id="c"><rect width="50" height="100"/></clipPath>', body)),
+    ).toThrow(/extreme coordinates/);
+  });
+
+  it('refuses a clip whose own curve reaches past the limit', () => {
+    expect(clipped(`<clipPath id="c"><path d="${CURVE}"/></clipPath>`)).toThrow(
+      /extreme coordinates/,
+    );
+  });
+});
+
 describe('image clip units', () => {
   it("reads an image clip without clipPathUnits as userSpaceOnUse, SVG's default", () => {
     const result = parse(
