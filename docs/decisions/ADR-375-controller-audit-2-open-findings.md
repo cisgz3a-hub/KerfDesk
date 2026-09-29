@@ -159,11 +159,15 @@ therefore sent moves the firmware refuses, or trusted values the controller had 
      flushes its input buffer ([protocol.c L896-L899](https://github.com/grblHAL/core/blob/d7aaee3d84b1e7010f075d395206afff038d7379/protocol.c#L896-L899)), so a `$J=` it had
      not parsed yet was never answered, Cancel timed out, and Jog, Frame and Disconnect stayed
      locked until ABORT MOTION. The grblHAL driver now declares that its jog-cancel byte drops
-     unparsed lines, and on such a driver Cancel first waits for every owed reply and pending
-     write, up to its existing 8 s deadline, then writes `0x85`. If a reply is still owed at the
-     deadline the byte goes anyway, because stopping motion comes first, and the missing reply is
-     reported as before. Stock GRBL, which acts on `0x85` only while jogging, FluidNC and the
-     Falcon command set are unchanged. Not seen on hardware.
+     unparsed lines, and on such a driver Cancel first waits briefly, at most 250 ms, for every
+     owed reply and pending write, then writes `0x85`. Jog and Frame keep at most one line in
+     flight, and an idle main loop parses it within a serial round trip. A reply still owed after
+     the grace belongs to a line already parsed, which the flush cannot drop, so the byte goes
+     anyway: stopping motion comes first, grblHAL builds with the kinematics API (CoreXY among
+     them) cancel a jog from the byte at once
+     ([protocol.c L900-L903](https://github.com/grblHAL/core/blob/d7aaee3d84b1e7010f075d395206afff038d7379/protocol.c#L900-L903)), and the settlement then waits for that
+     reply as before. Stock GRBL, which acts on `0x85` only while jogging, FluidNC and the Falcon
+     command set are unchanged. Not seen on hardware.
    - No new refusal.
 
 7. **The Falcon command set and the identity advice** (P-1, P-4).

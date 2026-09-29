@@ -1662,8 +1662,8 @@ Status bar messages (toasts that appear in the bar for 3 s) for non-blocking eve
 #### Edge — cancel mid-frame
 1. **Cancel** records permanent cancel intent and writes real-time jog-cancel (`0x85`); pending Frame
    lines are dropped immediately. On grblHAL, whose `0x85` also discards any line it has not parsed
-   yet without answering it, Cancel first waits (up to 8 s) for the replies owed to lines already
-   sent, then writes `0x85` (ADR-375). After the old command handoff settles, the app queries state. If
+   yet without answering it, Cancel first waits briefly (at most 250 ms) for the replies owed to
+   lines already sent, then writes `0x85` (ADR-375). After the old command handoff settles, the app queries state. If
    GRBL reports `Jog`, the first byte lost the Idle-to-Jog race, so `0x85` is sent again. No queued
    settlement marker is written until a fresh `Idle`; a second post-marker `Idle` releases ownership.
 2. An owned G54 selection remains active after cancellation; the stored G55-G59 offsets remain

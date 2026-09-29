@@ -18,6 +18,9 @@ import { cancelPendingManualMotions } from './manual-motion-intent';
 
 const CANCEL_QUEUE_TIMEOUT_MS = 8_000;
 const CANCEL_QUEUE_POLL_MS = 10;
+// How long Cancel lets a controller whose jog-cancel byte drops unparsed lines
+// parse the line it was just sent, before writing the byte anyway.
+const JOG_CANCEL_PARSE_GRACE_MS = 250;
 const CONTROLLER_STATE_TIMEOUT_MESSAGE = 'Timed out waiting for controller state after Cancel.';
 // Disconnect and Reconnect are disabled while a motion owner exists, so the
 // guidance names what the operator can actually do: KerfDesk settles and
@@ -49,7 +52,9 @@ export async function runCancelJog(
   }));
   if (operationId !== undefined) markMotionOperationCancelling(context, operationId);
   try {
-    if (jogCancelDropsUnparsedLines(context)) await owedRepliesSettled(context);
+    if (jogCancelDropsUnparsedLines(context)) {
+      await owedRepliesSettled(context, JOG_CANCEL_PARSE_GRACE_MS);
+    }
     const cancelError = await writeJogCancel(context);
     try {
       await settleCancelledMotion(context, operationId);
@@ -150,7 +155,7 @@ async function waitForCancelledMotionQueue(
   operationId: LaserMotionOperationId | undefined,
 ): Promise<void> {
   if (operationId === undefined) return;
-  if (await owedRepliesSettled(context)) return;
+  if (await owedRepliesSettled(context, CANCEL_QUEUE_TIMEOUT_MS)) return;
   throw new Error(
     'Cancel is waiting for the previous motion command acknowledgement. Reconnect if the controller does not respond.',
   );
@@ -160,19 +165,26 @@ async function waitForCancelledMotionQueue(
 // it has received but not parsed, and never answers those lines. When the
 // jog's `$J=` was one of them its owed reply never came: Cancel timed out and
 // the jog kept Jog, Frame and Disconnect locked until ABORT MOTION (controller
-// audit M-6, ADR-375). So on such a driver the byte waits for every owed reply
-// first; a reply still owed at the deadline no longer holds it back, since
-// stopping motion comes first and the settlement then reports that reply. A
-// jog still running afterwards stops on this byte or on the re-send after a
-// fresh Jog report. Other drivers keep writing the byte at once.
+// audit M-6, ADR-375). Jog and Frame keep at most one line in flight, and an
+// idle main loop parses it within a serial round trip, so on such a driver
+// the byte first waits briefly for every owed reply. A reply still owed after
+// that grace belongs to a line already parsed, most likely one waiting for
+// planner room, which the flush cannot drop; waiting for it would only delay
+// the stop, and grblHAL builds with the kinematics API (CoreXY among them)
+// cancel a jog from the byte at once
+// (https://github.com/grblHAL/core/blob/d7aaee3d84b1e7010f075d395206afff038d7379/protocol.c#L900-L903).
+// So the byte goes anyway: stopping motion comes first, and the settlement
+// then waits for that reply as before. A jog still running afterwards stops on
+// this byte or on the re-send after a fresh Jog report. Other drivers keep
+// writing the byte at once.
 function jogCancelDropsUnparsedLines(context: CancelContext): boolean {
   const realtime = context.refs.driver.realtime;
   return realtime.jogCancel !== null && realtime.jogCancelDropsUnparsedLines === true;
 }
 
-/** Polls until no reply is owed and no write is pending; false at the deadline. */
-async function owedRepliesSettled(context: CancelContext): Promise<boolean> {
-  const deadline = Date.now() + CANCEL_QUEUE_TIMEOUT_MS;
+/** Polls until no reply is owed and no write is pending; false after `timeoutMs`. */
+async function owedRepliesSettled(context: CancelContext, timeoutMs: number): Promise<boolean> {
+  const deadline = Date.now() + timeoutMs;
   while (Date.now() <= deadline) {
     assertCancelContext(context);
     if (motionQueueSettled(context.get())) return true;

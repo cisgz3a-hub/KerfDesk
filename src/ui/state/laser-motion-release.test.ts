@@ -260,4 +260,45 @@ describe('a Cancel that gives up does not wedge the motion owner', () => {
     expect(sim.state().machine).toBe('Idle');
     expect(sim.outbound()).not.toContain(SOFT_RESET);
   });
+
+  it('grblHAL: a reply still owed after a short grace does not hold 0x85 back', async () => {
+    // A line whose reply is still owed after a serial round trip was already
+    // parsed (for example one a segmenting kinematics build is still planning),
+    // so grblHAL's flush cannot drop it, and a build with the kinematics API
+    // cancels the jog from the byte at once
+    // (https://github.com/grblHAL/core/blob/d7aaee3d84b1e7010f075d395206afff038d7379/protocol.c#L900-L903).
+    // Waiting the full 8 s cancel deadline for that reply let the jog run on.
+    const sim = await connectIdle(
+      { firmware: 'grblhal', firmwareBanner: GRBL_HAL_BANNER, motionMs: 5_000 },
+      { controllerKind: 'grblhal' },
+    );
+    const jog = useLaserStore
+      .getState()
+      .jog({ dx: 50, feed: 1000 })
+      .catch(() => undefined);
+    await pump(100);
+    expect(sim.state().machine).toBe('Jog');
+    // Stand-in for that late reply: one more acknowledgement stays owed.
+    useLaserStore.setState((state) => ({ pendingUntrackedAcks: state.pendingUntrackedAcks + 1 }));
+    const before = sim.outbound().length;
+
+    const cancel = useLaserStore
+      .getState()
+      .cancelJog()
+      .then(
+        () => null,
+        (error: unknown) => (error instanceof Error ? error.message : String(error)),
+      );
+    await pump(200);
+    expect(writesSince(sim, before)).not.toContain(JOG_CANCEL);
+    await pump(100);
+    expect(writesSince(sim, before)).toContain(JOG_CANCEL);
+    expect(sim.state().machine).toBe('Idle');
+
+    // The settlement still waits for the owed reply and reports it as before.
+    await pump(10_000);
+    await jog;
+    expect(await cancel).toMatch(/waiting for the previous motion command acknowledgement/);
+    expect(sim.outbound()).not.toContain(SOFT_RESET);
+  });
 });
