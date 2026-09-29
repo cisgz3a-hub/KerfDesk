@@ -112,8 +112,9 @@ and the thumbnail LightBurn embeds in each file, which is its own drawing of the
   partly off a smaller one, as it would on that machine in LightBurn. It is not moved or scaled.
 - Only the layer order is mapped. A project whose Cut Planner (`UIPrefs`) does not rank layer
   ordering first (`Optimize_ByLayer` other than 0) still runs layer by layer here, and the import
-  report says so. The rest of `UIPrefs` (inner shapes first, travel, direction) is not read;
-  the project takes KerfDesk's optimization defaults.
+  report says so. The rest of `UIPrefs` (inner shapes first, travel, direction, overlapping
+  lines, start points, Start From and the job origin) is not read and has no line in the report;
+  the project takes KerfDesk's optimization defaults and the machine's placement (decision 4).
 - The machine is read when the file starts to open. If it is changed while a large file is still
   being read, the project arrives on the earlier machine and the usual machine-change banner
   offers the choice.
