@@ -4,8 +4,6 @@ import {
   lineIntervalMmToLinesPerMm,
   linesPerMmToDpi,
   linesPerMmToLineIntervalMm,
-  MAX_RASTER_LINES_PER_MM,
-  MIN_RASTER_LINES_PER_MM,
 } from '../../core/raster';
 import {
   accelerationDistanceMm,
@@ -14,6 +12,7 @@ import {
 } from '../../core/job/operation-cut-extras';
 import { DITHER_ALGORITHMS, type Layer } from '../../core/scene';
 import { useStore } from '../state';
+import { imageDensityBounds } from '../raster/image-density-bounds';
 import { dotWidthCorrectionMax } from './cut-settings-draft';
 import { ImageScanPatternFields } from './CutSettingsScanPatternFields';
 import { AutoOverscanSwitch, automaticOverscanNote } from './CutSettingsAutoOverscan';
@@ -278,30 +277,6 @@ function ImageDensityFields(props: {
       </Field>
     </>
   );
-}
-
-type NumberBounds = { readonly min: number; readonly max: number };
-
-// New entries keep the recommended range: the change handlers clamp into it. A
-// stored density outside that range (a LightBurn recipe at a 0.5 mm interval
-// stores 2 lines/mm) still burns as stored, so the bounds also admit its shown
-// value, or the browser's range check would block Apply for an unrelated edit.
-function imageDensityBounds(storedLinesPerMm: number): {
-  readonly intervalMm: NumberBounds;
-  readonly dpi: NumberBounds;
-} {
-  const storedIntervalMm = displayNumber(linesPerMmToLineIntervalMm(storedLinesPerMm), 4);
-  const storedDpi = displayNumber(linesPerMmToDpi(storedLinesPerMm), 2);
-  return {
-    intervalMm: {
-      min: Math.min(linesPerMmToLineIntervalMm(MAX_RASTER_LINES_PER_MM), storedIntervalMm),
-      max: Math.max(linesPerMmToLineIntervalMm(MIN_RASTER_LINES_PER_MM), storedIntervalMm),
-    },
-    dpi: {
-      min: Math.min(linesPerMmToDpi(MIN_RASTER_LINES_PER_MM), storedDpi),
-      max: Math.max(linesPerMmToDpi(MAX_RASTER_LINES_PER_MM), storedDpi),
-    },
-  };
 }
 
 function NumberInput(props: {

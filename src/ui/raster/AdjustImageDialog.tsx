@@ -1,5 +1,5 @@
 import { type Dispatch, type SetStateAction, useEffect, useRef, useState } from 'react';
-import { MAX_RASTER_LINES_PER_MM } from '../../core/raster';
+import { MAX_RASTER_LINES_PER_MM, MIN_RASTER_LINES_PER_MM } from '../../core/raster';
 import type { Layer, RasterImage } from '../../core/scene';
 import { jobAwareAlert, jobAwarePrompt } from '../state/job-aware-dialogs';
 import { Button, Dialog, DialogActions as KitDialogActions } from '../kit';
@@ -49,13 +49,16 @@ export function AdjustImageDialog(props: {
 }): JSX.Element {
   const sourceRef = useRef<HTMLCanvasElement>(null);
   const processedRef = useRef<HTMLCanvasElement>(null);
+  const storedLinesPerMm = props.layer.linesPerMm;
+  const normalize = (next: AdjustImageDraft): AdjustImageDraft =>
+    normalizeDraft(next, storedLinesPerMm);
   const [draft, setDraft] = useState<AdjustImageDraft>(() =>
     initialDraft(props.image, props.layer),
   );
-  const presetControls = useImagePresetControls(draft, setDraft);
+  const presetControls = useImagePresetControls(draft, setDraft, normalize);
   usePreviewEffects(sourceRef, processedRef, props.image, draft, props.layer.power);
   const update = (patch: Partial<AdjustImageDraft>): void =>
-    setDraft((prev) => normalizeDraft({ ...prev, ...patch }));
+    setDraft((prev) => normalize({ ...prev, ...patch }));
   const submit = (event: React.FormEvent): void => {
     event.preventDefault();
     props.onApply(patchFromDraft(draft));
@@ -67,6 +70,7 @@ export function AdjustImageDialog(props: {
       <PreviewGrid sourceRef={sourceRef} processedRef={processedRef} />
       <AdjustFields
         draft={draft}
+        storedLinesPerMm={storedLinesPerMm}
         maxPower={props.layer.power}
         update={update}
         applyPreset={presetControls.applyPreset}
@@ -82,6 +86,7 @@ export function AdjustImageDialog(props: {
 function useImagePresetControls(
   draft: AdjustImageDraft,
   setDraft: Dispatch<SetStateAction<AdjustImageDraft>>,
+  normalize: (next: AdjustImageDraft) => AdjustImageDraft,
 ): {
   readonly userPresets: readonly UserImagePreset[];
   readonly applyPreset: (presetId: ImagePresetId) => void;
@@ -94,7 +99,7 @@ function useImagePresetControls(
   const applyPreset = (presetId: ImagePresetId): void =>
     setDraft((prev) => {
       const userPreset = findUserImagePreset(userPresets, presetId);
-      return normalizeDraft(
+      return normalize(
         userPreset === null
           ? applyBuiltInImagePreset(prev, presetId)
           : applyUserImagePreset(prev, userPreset),
@@ -114,9 +119,7 @@ function useImagePresetControls(
       return;
     }
     setUserPresets(saveResult.presets);
-    setDraft((prev) =>
-      normalizeDraft({ ...prev, presetId: userImagePresetId(saveResult.preset.name) }),
-    );
+    setDraft((prev) => normalize({ ...prev, presetId: userImagePresetId(saveResult.preset.name) }));
   };
   const deletePreset = (): void => {
     const preset = findUserImagePreset(userPresets, draft.presetId);
@@ -128,7 +131,7 @@ function useImagePresetControls(
       return;
     }
     setUserPresets(nextPresets);
-    setDraft((prev) => normalizeDraft({ ...prev, presetId: 'custom' }));
+    setDraft((prev) => normalize({ ...prev, presetId: 'custom' }));
   };
   return { userPresets, applyPreset, savePreset, deletePreset };
 }
@@ -232,23 +235,32 @@ function PreviewPane(props: {
 }
 
 function initialDraft(image: RasterImage, layer: Layer): AdjustImageDraft {
-  return normalizeDraft({
-    presetId: 'custom',
-    brightness: image.brightness ?? 0,
-    contrast: image.contrast ?? 0,
-    gamma: image.gamma ?? 1,
-    ditherAlgorithm: layer.ditherAlgorithm,
-    minPower: layer.minPower,
-    linesPerMm: layer.linesPerMm,
-    dotWidthCorrectionMm: layer.dotWidthCorrectionMm,
-    negativeImage: layer.negativeImage,
-    passThrough: layer.passThrough,
-    invertDisplay: false,
-  });
+  return normalizeDraft(
+    {
+      presetId: 'custom',
+      brightness: image.brightness ?? 0,
+      contrast: image.contrast ?? 0,
+      gamma: image.gamma ?? 1,
+      ditherAlgorithm: layer.ditherAlgorithm,
+      minPower: layer.minPower,
+      linesPerMm: layer.linesPerMm,
+      dotWidthCorrectionMm: layer.dotWidthCorrectionMm,
+      negativeImage: layer.negativeImage,
+      passThrough: layer.passThrough,
+      invertDisplay: false,
+    },
+    layer.linesPerMm,
+  );
 }
 
-function normalizeDraft(draft: AdjustImageDraft): AdjustImageDraft {
-  const linesPerMm = numberValue(String(draft.linesPerMm), 5, MAX_RASTER_LINES_PER_MM);
+// A stored density outside the recommended range (a LightBurn recipe at a
+// 0.5 mm interval stores 2 lines/mm) is what compiles, so it is kept until a
+// new density is entered; only a new entry is held to the range (C-6).
+function normalizeDraft(draft: AdjustImageDraft, storedLinesPerMm: number): AdjustImageDraft {
+  const linesPerMm =
+    draft.linesPerMm === storedLinesPerMm
+      ? storedLinesPerMm
+      : numberValue(String(draft.linesPerMm), MIN_RASTER_LINES_PER_MM, MAX_RASTER_LINES_PER_MM);
   return {
     ...draft,
     presetId: parseImagePresetId(draft.presetId),
