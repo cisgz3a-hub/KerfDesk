@@ -166,6 +166,7 @@ it.each([false, true])(
   'restores persisted dirty=%s and enables only pending replacement Apply',
   async (dirty) => {
     const first = useStore.getState().applyDesignSketch(drawing, ['owned'], null);
+    if (first === 'refused') throw new Error('expected the drawing applied');
     writePersistedSession({
       sketch: drawing,
       activeLayerId: DEFAULT_DESIGN_LAYER.id,

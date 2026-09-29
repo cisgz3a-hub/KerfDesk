@@ -1,3 +1,4 @@
+import type { DeviceProfile } from '../../core/devices';
 import { importLightBurnProject } from '../../io/lightburn';
 import { deserializeProject } from '../../io/project';
 import type { RecentFileRef } from '../../platform/types';
@@ -15,10 +16,13 @@ export type OpenProjectFile = BlobSourceFile & { readonly recentRef?: RecentFile
 
 type PushToast = (message: string, variant?: ToastVariant) => void;
 
+/** `currentDevice` reads the machine open now: a LightBurn project carries
+ * none of its own, so it opens on that one (ADR-388). A `.lf2` brings its own. */
 export async function parseOpenedProjectFile(
   file: OpenProjectFile,
   options: DocumentImportRequestOptions,
   pushToast: PushToast,
+  currentDevice?: () => DeviceProfile,
 ): Promise<
   | { readonly kind: 'native'; readonly result: ReturnType<typeof deserializeProject> }
   | { readonly kind: 'lightburn'; readonly result: ReturnType<typeof importLightBurnProject> }
@@ -27,7 +31,7 @@ export async function parseOpenedProjectFile(
   if (/\.lbrn2?$/i.test(file.name)) {
     return {
       kind: 'lightburn',
-      result: await parseLightBurnProjectFile(file, blob, options, pushToast),
+      result: await parseLightBurnProjectFile(file, blob, options, pushToast, currentDevice?.()),
     };
   }
   return { kind: 'native', result: await parseNativeProjectFile(file, blob, options, pushToast) };
@@ -38,12 +42,13 @@ async function parseLightBurnProjectFile(
   blob: Blob | null,
   options: DocumentImportRequestOptions,
   pushToast: PushToast,
+  device: DeviceProfile | undefined,
 ): Promise<ReturnType<typeof importLightBurnProject>> {
-  if (blob === null) return importLightBurnProject(await file.text(), file.name);
-  const pending = parseLightBurnProjectOffThread(blob, file.name, options);
+  if (blob === null) return importLightBurnProject(await file.text(), file.name, undefined, device);
+  const pending = parseLightBurnProjectOffThread(blob, file.name, options, device);
   if (pending !== null) return pending;
   pushToast(mainThreadImportFallbackAdvisory(file.name), 'warning');
-  return importLightBurnProject(await file.text(), file.name);
+  return importLightBurnProject(await file.text(), file.name, undefined, device);
 }
 
 async function parseNativeProjectFile(

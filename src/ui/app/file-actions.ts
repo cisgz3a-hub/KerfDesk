@@ -6,6 +6,7 @@ import type { SvgArtworkFragment } from '../state/svg-fragment-mutation';
 // anywhere.
 
 import { selectControllerDriver } from '../../core/controllers';
+import type { DeviceProfile } from '../../core/devices';
 import type { ActiveWorkCoordinateSystem } from '../../core/controllers/grbl/work-offset-readback';
 import type {
   ControllerSettingsSnapshot,
@@ -339,6 +340,9 @@ export type OpenProjectCtx = ProjectOpenCompletionContext & {
   readonly getProjectDocumentEpoch: () => number;
   /** Rechecked after asynchronous reading/parsing, immediately before replacing the document. */
   readonly stillAllowed?: () => boolean;
+  /** The machine open now. A LightBurn project opens on it (ADR-388); without
+   * it, on the default machine. */
+  readonly currentDevice?: () => DeviceProfile;
 };
 
 /** Open a project from the picker, or `chosenFile` when the operator already
@@ -385,7 +389,12 @@ export async function handleOpenProject(
   const controls = createImportWorkerControls(file.name, ownedCtx.pushToast);
   let parsed: Awaited<ReturnType<typeof parseOpenedProjectFile>>;
   try {
-    parsed = await parseOpenedProjectFile(file, controls.options, ownedCtx.pushToast);
+    parsed = await parseOpenedProjectFile(
+      file,
+      controls.options,
+      ownedCtx.pushToast,
+      ctx.currentDevice,
+    );
   } catch (err) {
     ownedCtx.pushToast(
       isImportCancellation(err)

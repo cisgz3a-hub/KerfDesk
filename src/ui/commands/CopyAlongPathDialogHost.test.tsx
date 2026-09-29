@@ -2,6 +2,8 @@ import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { Simulate } from 'react-dom/test-utils';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { copyAlongPathLayout } from '../../core/geometry/copy-along-path';
+import type * as CopyAlongPath from '../../core/geometry/copy-along-path';
 import { createLayer } from '../../core/scene/layer';
 import { createProject } from '../../core/scene/project';
 import { IDENTITY_TRANSFORM, type ImportedSvg, type Polyline } from '../../core/scene/scene-object';
@@ -14,12 +16,19 @@ import {
 } from './copy-along-path-dialog-store';
 import { CopyAlongPathDialogHost, resetCopyAlongPathDialogMemory } from './CopyAlongPathDialogHost';
 
+// Counts how often the copies are laid out; the real layout still runs.
+vi.mock('../../core/geometry/copy-along-path', async (importOriginal) => {
+  const actual = await importOriginal<typeof CopyAlongPath>();
+  return { ...actual, copyAlongPathLayout: vi.fn(actual.copyAlongPathLayout) };
+});
+
 let host: HTMLDivElement;
 let root: Root;
 
 beforeEach(() => {
   resetStore();
   resetCopyAlongPathDialogMemory();
+  vi.mocked(copyAlongPathLayout).mockClear();
   useCopyAlongPathDialogStore.setState({ open: false });
   useToastStore.setState({ toasts: [] });
   vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
@@ -204,6 +213,56 @@ describe('Copy Along Path dialog', () => {
     expect(objects.filter((object) => object.id !== 'rail' && object.id !== 'ring')).toHaveLength(
       5,
     );
+  });
+
+  it('lays nothing out while a big count is typed, then places every copy once on Copy', async () => {
+    await open([LOGO, LINE]);
+    vi.mocked(copyAlongPathLayout).mockClear();
+
+    for (const count of ['4', '40', '400', '4000']) {
+      await change(field('Copies'), count);
+      expect(status()).toMatch(
+        new RegExp(`^Places ${count} copies along the 100 mm guide, [\\d.]+ mm apart`),
+      );
+    }
+    expect(copyAlongPathLayout).not.toHaveBeenCalled();
+
+    await act(async () => submit().click());
+
+    expect(copyAlongPathLayout).toHaveBeenCalledTimes(1);
+    const laidOut = vi.mocked(copyAlongPathLayout).mock.results[0]?.value;
+    expect(laidOut?.kind === 'placed' ? laidOut.placements : []).toHaveLength(4000);
+    expect(useStore.getState().project.scene.objects).toHaveLength(2 + 4000);
+    expect(useStore.getState().undoStack).toHaveLength(1);
+  });
+
+  it('explains a count no project could hold, without laying anything out', async () => {
+    await open([LOGO, LINE]);
+    vi.mocked(copyAlongPathLayout).mockClear();
+
+    await change(field('Copies'), '1000000000000');
+
+    expect(status()).toBe(
+      'This project has room for at most 9998 more copies of this artwork (project limit 10000 objects). Ask for fewer copies.',
+    );
+    expect(submit().disabled).toBe(true);
+    expect(copyAlongPathLayout).not.toHaveBeenCalled();
+  });
+
+  it('explains a spacing so small it would place more copies than the project holds', async () => {
+    await open([LOGO, LINE]);
+
+    await change(field('Place copies by'), 'spacing');
+    await change(field('Spacing (mm)'), '0.002');
+
+    expect(status()).toBe(
+      'This project has room for at most 9998 more copies of this artwork (project limit 10000 objects), and that spacing places more. Set a larger spacing.',
+    );
+    expect(submit().disabled).toBe(true);
+
+    await change(field('Spacing (mm)'), '0.05');
+    expect(status()).toMatch(/^Places 2001 copies along the 100 mm guide, 0\.05 mm apart/);
+    expect(submit().disabled).toBe(false);
   });
 
   it('reopens with the settings last applied', async () => {

@@ -141,6 +141,7 @@ const FILE_DISPATCH: Readonly<Record<string, (c: FileCtx) => void>> = {
         claimProjectOpenRequest: useStore.getState().claimProjectOpenRequest,
         getProjectOpenRequestEpoch: () => useStore.getState().projectOpenRequestEpoch,
         getProjectDocumentEpoch: () => useStore.getState().projectDocumentEpoch,
+        currentDevice: () => useStore.getState().project.device,
       });
     });
   },

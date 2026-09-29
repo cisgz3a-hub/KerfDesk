@@ -122,6 +122,38 @@ describe('barcode dialog form', () => {
     });
   });
 
+  // ADR-386 Amendment 2: the dialog makes Data Matrix codes up to 132 x 132.
+  // Output also builds 144 x 144 with a Job Review warning; editing does not.
+  it('inserts a variable Data Matrix whose current value fits 132 x 132', () => {
+    // At serial 41: 1301 letters and three digit pairs, the 1304 codewords 132 x 132 holds.
+    const source = `${'A'.repeat(1301)}{{serial:6}}`;
+    const ready = preview({ symbology: 'data-matrix', data: source, variable: true });
+    expect(ready.kind === 'ready' ? ready.layout.description : ready.message).toBe(
+      'Data Matrix ECC 200 (132 × 132 modules)',
+    );
+    expect(ready).toMatchObject({ value: `${'A'.repeat(1301)}000041` });
+  });
+
+  it('refuses a Data Matrix value that needs 144 x 144 while editing', () => {
+    const tooLong = 'Z'.repeat(1305);
+    const message =
+      'Too much data for a Data Matrix: this text needs 1305 codewords and the largest size ' +
+      'KerfDesk makes, 132 × 132, holds 1304. Shorten the text or use a QR Code.';
+    expect(preview({ symbology: 'data-matrix', data: tooLong })).toEqual({
+      kind: 'invalid',
+      message,
+    });
+    const variable = preview({
+      symbology: 'data-matrix',
+      data: `${'A'.repeat(1302)}{{serial:6}}`,
+      variable: true,
+    });
+    expect(variable).toEqual({
+      kind: 'invalid',
+      message: `The current value "${'A'.repeat(1302)}000041" cannot be encoded. ${message}`,
+    });
+  });
+
   it('previews sample data while a variable field cannot be evaluated yet', () => {
     const ready = preview({ data: '{{csv:Part}}', variable: true });
     expect(ready).toMatchObject({ kind: 'ready', value: 'https://example.com' });

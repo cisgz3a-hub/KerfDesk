@@ -60,6 +60,7 @@ export function ArrayDialogHost(props: { readonly onClose: () => void }): JSX.El
   return (
     <ArrayDialog
       selectionBounds={bounds}
+      scene={project.scene}
       selected={selected}
       {...(initial === null ? {} : { initial })}
       onSubmitForm={(form) => {

@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { arrayPlacements } from './array-layout';
+import { arrayPlacementCount, arrayPlacements } from './array-layout';
+import type { ArraySpec } from './array-layout-types';
 
 const bounds = { minX: 10, minY: 20, maxX: 30, maxY: 30 };
 
@@ -128,5 +129,49 @@ describe('arrayPlacements', () => {
     });
     expect(placements).toHaveLength(3);
     expect(placements.every((placement) => Number.isFinite(placement.dx))).toBe(true);
+  });
+});
+
+describe('arrayPlacementCount', () => {
+  const GRID = { kind: 'grid', rows: 3, columns: 4, spacingX: 1, spacingY: 1 } as const;
+  const CIRCLE = {
+    kind: 'circular',
+    count: 7,
+    centerX: 100,
+    centerY: 100,
+    radius: 20,
+    startAngleDeg: 0,
+    rotateCopies: false,
+  } as const;
+  const specs: ReadonlyArray<ArraySpec> = [
+    GRID,
+    { ...GRID, rows: 2.9, columns: 0 },
+    { ...GRID, rows: Number.NaN, columns: Number.POSITIVE_INFINITY },
+    { ...GRID, rows: 1, columns: 25, reverseColumns: true, mirrorRows: 'both' },
+    CIRCLE,
+    { ...CIRCLE, count: 5, arc: { kind: 'end', endAngleDeg: 90 } },
+    { ...CIRCLE, count: 3, arc: { kind: 'step', stepAngleDeg: 10 } },
+    { ...CIRCLE, count: -4 },
+    { kind: 'point-rotation', count: 6, totalAngleDeg: 90 },
+    { kind: 'point-rotation', count: 1, totalAngleDeg: 360 },
+    { kind: 'point-rotation', count: Number.NaN, totalAngleDeg: 360 },
+  ];
+
+  it('says how many placements arrayPlacements makes without making them', () => {
+    for (const spec of specs) {
+      expect(arrayPlacementCount(spec)).toBe(arrayPlacements(bounds, spec).length);
+    }
+  });
+
+  it('counts a request no project could hold as the number it asks for', () => {
+    expect(arrayPlacementCount({ ...GRID, rows: 1e6, columns: 1e6 })).toBe(1e12);
+    expect(arrayPlacementCount({ ...CIRCLE, count: 1e12 })).toBe(1e12);
+    expect(arrayPlacementCount({ kind: 'point-rotation', count: 1e300, totalAngleDeg: 90 })).toBe(
+      1e300,
+    );
+    // A product past the largest number is still more than any room.
+    expect(arrayPlacementCount({ ...GRID, rows: 1e200, columns: 1e200 })).toBe(
+      Number.POSITIVE_INFINITY,
+    );
   });
 });

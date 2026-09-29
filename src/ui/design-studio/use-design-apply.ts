@@ -15,6 +15,9 @@ import { survivingObjectIds } from '../state/design-apply-record';
 import { sessionSketch } from './design-session';
 import { useDesignStudioStore } from './design-studio-store';
 
+// 'refused': the project could not hold the drawing (ADR-307 amendment 1).
+type ApplyOutcome = 'applied' | 'nothing' | 'refused';
+
 export type DesignApplyHandlers = {
   // True when there is output geometry that has changed since the last Apply.
   readonly canApply: boolean;
@@ -29,15 +32,15 @@ export function useDesignApply(): DesignApplyHandlers {
   const applyDesignSketch = useStore((state) => state.applyDesignSketch);
   const scene = useStore((state) => state.project.scene);
 
-  const apply = useCallback((): boolean => {
+  const apply = useCallback((): ApplyOutcome => {
     const current = useDesignStudioStore.getState().session;
-    if (current === null) return false;
+    if (current === null) return 'nothing';
     const sketch = sessionSketch(current);
     if (
       !hasOutputGeometry(sketch) &&
       survivingObjectIds(useStore.getState().project.scene, current.applied).size === 0
     )
-      return false;
+      return 'nothing';
     // Handing back what the last Apply created is what makes a second Apply an
     // EDIT of that artwork rather than a duplicate of it.
     const record = applyDesignSketch(
@@ -45,12 +48,16 @@ export function useDesignApply(): DesignApplyHandlers {
       sketch.entities.map(() => crypto.randomUUID()),
       current.applied,
     );
+    // Refused, with a notice: the drawing stays unapplied, and Apply stays on
+    // for when there is room.
+    if (record === 'refused') return 'refused';
     markApplied(record);
-    return true;
+    return 'applied';
   }, [applyDesignSketch, markApplied]);
 
   const applyAndClose = useCallback((): void => {
-    apply();
+    // A refused Apply keeps the Studio open on the drawing it could not add.
+    if (apply() === 'refused') return;
     closeStudio();
   }, [apply, closeStudio]);
 

@@ -20,6 +20,7 @@ import {
   type VectorOpError,
   type VectorSceneObject,
 } from './vector-path-tools';
+import { offsetArcToleranceMm } from './offset-arc-tolerance';
 import { canonicalizeVectorPaths, compareCanonicalVectorPaths } from './vector-path-canonical';
 import {
   normalizeVectorObjectRegion,
@@ -121,6 +122,7 @@ export function offsetVectorObjects(
         EndType.Polygon,
         2,
         VECTOR_PATH_PRECISION_DECIMALS,
+        offsetArcToleranceMm(deltaMm),
       ),
     ),
   );

@@ -6,11 +6,11 @@
 import type { Polyline, Vec2 } from '../scene';
 import {
   burnSegmentsBetweenTabs,
-  isTabEligible,
   mergeTabIntervals,
   nearestDistanceOnClosedPolyline,
   sampleTabInterval,
   splitTabInterval,
+  tabEligibility,
   tabSplitContext,
   type AutomaticTabsSettings,
   type TabInterval,
@@ -38,9 +38,7 @@ export function automaticTabEligibility(
   polylines: ReadonlyArray<Polyline>,
   settings: AutomaticTabsSettings,
 ): ReadonlyArray<boolean> {
-  return polylines.map(
-    (polyline, index) => polyline.closed && isTabEligible(polyline, polylines, index, settings),
-  );
+  return tabEligibility(polylines, settings);
 }
 
 /** `count` centres spread evenly, the first half a gap from the start. */

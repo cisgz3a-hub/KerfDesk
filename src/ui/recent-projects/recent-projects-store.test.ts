@@ -1,9 +1,11 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { RecentFileAdapter, RecentFileProbe, RecentFileRef } from '../../platform/types';
+import { useToastStore } from '../state/toast-store';
 import { rememberRecentProject } from './recent-project-record';
 import { createMemoryRecentProjectStorage } from './recent-project-storage';
 import {
   configureRecentProjectsForTests,
+  RECENT_PROJECTS_UNSAVED_MESSAGE,
   reloadRecentProjects,
   useRecentProjectsStore,
 } from './recent-projects-store';
@@ -48,8 +50,11 @@ beforeEach(() => {
 
 afterEach(() => {
   vi.useRealTimers();
+  vi.unstubAllGlobals();
   localStorage.removeItem(LIMIT_KEY);
   configureRecentProjectsForTests(null);
+  const toasts = useToastStore.getState();
+  for (const toast of toasts.toasts) toasts.dismissToast(toast.id);
 });
 
 async function recordAt(
@@ -166,6 +171,26 @@ describe('Recent Projects store', () => {
     expect(names()).toEqual(['b.lf2']);
     await store().clearAll();
     expect(store().entries).toEqual([]);
+  });
+
+  it('keeps the list for the session and warns once when storage keeps refusing', async () => {
+    vi.stubGlobal('indexedDB', {
+      open: () => {
+        throw new DOMException('Blocked by policy', 'SecurityError');
+      },
+    });
+    configureRecentProjectsForTests(null);
+    const files = fakeFiles();
+    await store().refresh();
+    await recordAt(files, 'a.lf2', handle('a.lf2'), 1_000);
+    await recordAt(files, 'b.lf2', handle('b.lf2'), 2_000);
+    await store().refresh();
+
+    expect(names()).toEqual(['b.lf2', 'a.lf2']);
+    const warnings = useToastStore.getState().toasts;
+    expect(warnings).toEqual([
+      expect.objectContaining({ message: RECENT_PROJECTS_UNSAVED_MESSAGE, variant: 'warning' }),
+    ]);
   });
 
   it('applies overlapping changes one after another', async () => {

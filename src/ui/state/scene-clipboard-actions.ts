@@ -11,6 +11,7 @@ import {
   type SceneObject,
 } from '../../core/scene';
 import { removeSceneObjectsFromState } from './object-delete-actions';
+import { refuseSceneLimitOverrun } from './scene-copy-room';
 import {
   remapSceneObjectCopyDependencies,
   sceneObjectCopyDependencyIds,
@@ -20,6 +21,7 @@ import { pushUndo } from './scene-mutations';
 import type { AppState } from './store';
 
 const PASTE_OFFSET_MM = 10;
+const PASTE_FEWER = 'Copy fewer objects to paste, or delete some objects first.';
 
 export type SceneClipboard = {
   readonly objects: ReadonlyArray<SceneObject>;
@@ -77,6 +79,9 @@ function pasteFromClipboard(state: AppState, offsetMm: number): AppState | Parti
   if (prepared.groups.length > 0) {
     scene = { ...scene, groups: [...(scene.groups ?? []), ...prepared.groups] };
   }
+  // A project past its limits saves but cannot be opened again (ADR-307
+  // amendment 1): such a Paste is refused whole, never made in part.
+  if (refuseSceneLimitOverrun(state.project.scene, scene, PASTE_FEWER)) return state;
   const [primary, ...rest] = prepared.selectedObjectIds;
   return {
     project: { ...state.project, scene },

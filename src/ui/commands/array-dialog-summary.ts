@@ -1,6 +1,8 @@
 // The Array dialog's status line: what Create array will make, worked out
 // from the same request and layout maths the store action uses. It only
-// explains; nothing here stops an array from being created (ADR-228).
+// explains; nothing here stops an array from being created (ADR-228). The one
+// thing that does is a request the project has no room for, which the dialog
+// puts in this line's place (array-room.ts, ADR-307 amendment 1).
 
 import { circularSweep, isWholeTurns } from '../../core/scene/array-circular-layout';
 import { gridSteps } from '../../core/scene/array-grid-layout';
