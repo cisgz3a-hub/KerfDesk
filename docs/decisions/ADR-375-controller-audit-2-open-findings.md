@@ -58,7 +58,34 @@ therefore sent moves the firmware refuses, or trusted values the controller had 
      that later drops a G92 Z already voids work-Z evidence.
    - No new refusal.
 
-2. **Manual motion inside the firmware's limits** (M-3, M-5).
+2. **Work offsets not reported yet** (R-2, R-3).
+   - GRBL puts `WCO:` in only some status reports: the first after a reset, the next after an
+     offset change, then every 10th Idle or 30th busy report
+     ([interface.md L561-L568](https://github.com/gnea/grbl/blob/bfb67f0c7963fe3ce4aaf8a97f9009ea5a8db36e/doc/markdown/interface.md#L561-L568)).
+     Before the first one, an Absolute or single-position Current Position placement assumed a
+     zero offset, and a Frame's `$J=G90` work-coordinate targets traced somewhere else when the
+     controller held a stored G54 or a G92 grblHAL kept through a reset
+     ([jogging.md L23](https://github.com/gnea/grbl/blob/bfb67f0c7963fe3ce4aaf8a97f9009ea5a8db36e/doc/markdown/jogging.md#L23),
+     [grblHAL gcode.c L787](https://github.com/grblHAL/core/blob/d7aaee3d84b1e7010f075d395206afff038d7379/gcode.c#L787)).
+     Frame now runs the existing bounded status burst (`?` every 100 ms, at most 3 s), homed or
+     not, when the driver's reports carry WCO (GRBL, grblHAL, FluidNC), none has arrived, no custom
+     origin is known, reported positions are not being discarded and the placement would assume
+     zero. A WCO that arrives is used for the placement. When none does, nothing is refused: the
+     Frame proceeds at the assumed zero, Job Review warns that zero was assumed, and the status
+     row reads "Origin: not reported yet" instead of "machine 0,0". Start never runs a Frame
+     (ADR-372), so it has nothing to wait for. No new refusal.
+   - A first WCO report equal to the zero a Frame was placed with no longer throws away the
+     finished Frame, its permit or the Start handoff, because GRBL reports any offset change in
+     the very next report
+     ([system.c L280-L286](https://github.com/gnea/grbl/blob/bfb67f0c7963fe3ce4aaf8a97f9009ea5a8db36e/grbl/system.c#L280-L286)).
+     Frame completion, the split-Frame trace (ADR-353), the final Start handoff and the verified
+     Frame now compare the effective offset: the reported WCO or, before any report and while no
+     custom origin is known, that assumed zero. This extends to completion and the handoff the
+     equivalence ADR-343 Amendment 1 gave preparation, and replaces its sentence that "completion
+     and the final Start handoff retain their existing exact-offset contract". A first non-zero
+     report, Z-only included, still voids them as an inconsistent handoff (NN21 (c)).
+
+3. **Manual motion inside the firmware's limits** (M-3, M-5).
    - With `$20=1`, stock GRBL checks every jog target against its travel whether or not it is
      homed, from its own machine position, and refuses the whole line with `error:15`
      ([jog.c L35-L37](https://github.com/gnea/grbl/blob/bfb67f0c7963fe3ce4aaf8a97f9009ea5a8db36e/grbl/jog.c#L35-L37),
@@ -96,6 +123,10 @@ therefore sent moves the firmware refuses, or trusted values the controller had 
 - The GRBL simulator models more stock GRBL behaviour: `G10 L20` with an active G92, a failed
   `G38.2` (`probeFailure`), and, both off by default, the power-up lock into Alarm with homing on
   (`homingInitLock`) and the `error:15` check of a `$J=` target once `$20=1`.
+- Still open for work offsets: transient Frames (the camera calibration target, the recovery
+  area, the second pass) get no burst; a controller whose reports never carry WCO waits 3 s at
+  every Frame while no offset is known, and with a real offset it cannot earn a permit (the
+  existing return check fails, as before).
 - Still open for the origin: FluidNC enters Alarm before it prints the alarm line, so an
   `<Alarm|>` report that arrives before `ALARM:5` still drops a G92 origin; a Console `$X` with
   no alarm active still hides the position.

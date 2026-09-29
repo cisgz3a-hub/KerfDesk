@@ -3483,7 +3483,8 @@ streaming controls. Two buttons:
 - **Set origin here** — on GRBL-family controllers sends `G54 G92 X0 Y0`. Declares the current head
   position as work-coord (0, 0). Toast confirms the controller's `ok`
   acknowledgement (not merely USB write completion); the status
-  bar's `Origin:` row flips from "machine 0,0" (muted) to
+  bar's `Origin:` row flips from "machine 0,0" (muted; "not reported yet"
+  until the controller's first WCO report) to
   "X… Y… (custom)" (accent-red, bold) within ~0.25–7.5 s as GRBL's
   next WCO-bearing status frame arrives. Set Origin upgrades an Absolute
   Coordinates placement to User Origin after that `ok` and its bounded
@@ -3537,10 +3538,14 @@ Absolute Coordinates compensates a reported G54/G92 work offset instead of requi
 origin after Home. The program, Preview and Frame use the same offset; no offset-clearing command
 is sent. Home invalidates old coordinate observations and waits for the controller to establish
 its machine reference. Frame allows the fresh Idle/work-offset report to arrive before compiling
-an unresolved Absolute placement. A missing report is described as missing coordinate data,
-not as a requirement to erase the work origin. Equivalent MPos/WPos reports and the first zero
-WCO report do not cancel unchanged preparation; actual movement, changed offsets, report units,
-controller sessions and output edits still invalidate it.
+an unresolved Absolute placement. Before the controller has reported any WCO, Frame also asks for
+it (a bounded burst of status queries, at most 3 s), homed or not, whenever Absolute or Current
+Position would otherwise assume a zero offset; if none arrives the Frame proceeds at that assumed
+zero and Job Review says so (ADR-375). A missing report is described as missing coordinate data,
+not as a requirement to erase the work origin. Equivalent MPos/WPos reports and a first WCO
+report equal to the assumed zero do not cancel unchanged preparation, a Frame in progress, its
+permit or the Start handoff. Actual movement, changed offsets (a first non-zero WCO, Z-only
+included), report units, controller sessions and output edits still invalidate them.
 
 Contour entry moves use the prepared program's explicit physical envelope, including centred
 origins and translated work origins. If that envelope is unknown, the optional contour entry is
@@ -3588,10 +3593,14 @@ work-Z evidence, but it cannot enable User Origin or Verified Origin.
    resets it. Reset/disconnect or replacement operation state remains intact
    when an older transaction completes or fails later.
 4. **Alarm clears origin mid-session.** Operator sets origin, then a
-   limit switch triggers (or `\x18` is sent). GRBL clears G92
-   internally; the alarm branch in `laser-line-handler.ts` clears
-   `wcoCache`; the status row reverts to "Origin: machine 0,0". User
-   re-jogs and re-sets if they want the offset back.
+   limit switch triggers (or `\x18` is sent). Stock GRBL clears G92
+   on the reset (grblHAL keeps it); the alarm handling
+   (`laser-alarm-line.ts`, and the reset branch in `laser-line-handler.ts`)
+   clears `wcoCache`; the status row reads "Origin: not reported yet" until
+   the next WCO-bearing report shows what remains ("machine 0,0" unless a
+   G54 offset is stored or grblHAL kept the G92). A failed probe
+   (ALARM:4 or 5) keeps the origin (ADR-375). User re-jogs and re-sets if
+   they want the offset back.
 5. **Off-bed risk.** Operator sets origin near the bed edge, then
    runs a job whose scene-mm bounds *fit the bed* but extend off the
    *machine* once the offset is applied. When WCO is known, the Start-time
