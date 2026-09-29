@@ -38,13 +38,17 @@ protect is work first published after it, plus official builds, updates and supp
    users view and fork a public repository on GitHub without any further right. The unchanged MIT
    text moves to `LICENSE-MIT`. `package.json` declares `"license": "SEE LICENSE IN LICENSE"`,
    npm's form for custom terms, and its description drops "MIT licensed.".
-3. **The app stays free to use.** `public/eula.txt` §1 replaces the MIT grant with a free
-   licence to install and use the app for personal or business work, with the usual limits on
-   selling, redistributing, hosting for others and reverse engineering, "except as the law
-   allows". Its safety, warranty and liability sections are unchanged. A commercial build supplied
-   with the KerfDesk Licence Agreement (ADR-523) is governed by that agreement instead. The About
-   dialog, the Help safety notice, `docs/safety.md`, the NSIS config comment and the notices
-   headers say the same.
+3. **Free use, except Pro.** `public/eula.txt` §1 replaces the MIT grant with a free licence to
+   install and use the app for personal or business work. That free use does not cover features
+   the app marks as Pro, which need an active trial or a paid licence under the KerfDesk Licence
+   Agreement (ADR-523), and the notice forbids bypassing or disabling the licence checks. It keeps
+   the usual limits on selling, redistributing, hosting for others and reverse engineering,
+   "except as the law allows". Its safety, warranty and liability sections are unchanged. A
+   commercial build supplied with the KerfDesk Licence Agreement is governed by that agreement
+   instead. The About dialog names the notice as the terms of use; the Help safety notice,
+   `docs/safety.md`, the NSIS config comment and the notices headers point to it too. The Pro
+   exception was written in on 2026-09-29, after the maintainer asked whether "free to use" meant
+   nothing could be sold: the free licence covers the Free tier only, and Pro stays paid.
 4. **Not open source.** While the repository is public its source is visible but all rights
    reserved. It must not be described as open source (ADR-247 §2). Whether it stays public is the
    maintainer's separate choice. Making it private stops new work from being published; it does

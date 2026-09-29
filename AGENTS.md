@@ -43,6 +43,12 @@ Keep this file small. It defines durable repository rules; task-specific details
 - Do not repeat passing checks without a new change or unresolved reason.
 - Do not merge, deploy, publish, or change provider or hardware state unless the user requests it.
 
+## Licence
+
+- KerfDesk is proprietary, all rights reserved (`LICENSE`, ADR-543). Only versions up to the `mit-final` tag stay MIT (`LICENSE-MIT`). Never describe KerfDesk as open source or MIT-licensed, and change `LICENSE`, `LICENSE-MIT` or `public/eula.txt` only when the user asks.
+- Before pushing a branch, check that `LICENSE` says "All rights reserved". If it still holds the MIT License, merge `origin/main` and check again; do not push until it passes. While the repository is public, a push under the MIT `LICENSE` releases that work under MIT for good.
+- Add outside code, fonts or assets only under a licence that allows a paid, closed-source app, and list them in `THIRD_PARTY_NOTICES.md`. New dependencies must pass `pnpm license-check`, which rejects GPL-family licences.
+
 ## Delegation and communication
 
 - Use subagents for clearly independent, bounded work when parallel execution can materially improve speed or quality. Keep one owner responsible for integrating and reconciling the result.

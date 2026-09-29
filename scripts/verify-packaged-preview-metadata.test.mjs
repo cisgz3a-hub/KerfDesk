@@ -50,7 +50,7 @@ const PREVIEW_VERSION = '0.2.0-preview.14';
 const NEAR_COLLISION_RENDERER_VERSION = '0.2.0-preview.140';
 const WRONG_RENDERER_VERSION = '0.1.822';
 const PACKAGE_AUTHOR_NAME = 'Johann Stolk';
-const ABOUT_MARKER = 'Free to use under the License & Safety Notice';
+const ABOUT_MARKER = 'Terms of use: License & Safety Notice';
 const BUILD_BADGE_MARKER = 'lf-menu-build';
 // The Smoothieware firmware banner prefix, bundled into the core chunk and the
 // job workers alongside the Build badge's own "Build version" label.
