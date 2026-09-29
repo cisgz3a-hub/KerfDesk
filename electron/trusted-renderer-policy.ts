@@ -128,6 +128,14 @@ function isAllowedNonMediaAppPermission(permission: string): boolean {
   );
 }
 
+/** A serialized origin, as Electron's device permission handler reports it. */
+export function isTrustedRendererOrigin(
+  origin: string,
+  trustedOrigins: ReadonlySet<string>,
+): boolean {
+  return isTrustedRendererUrl(origin, trustedOrigins);
+}
+
 function isTrustedOptionalEmbeddingOrigin(
   embeddingOrigin: string | undefined,
   trustedOrigins: ReadonlySet<string>,

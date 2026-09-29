@@ -39,9 +39,7 @@ import {
   protocol,
   session,
   shell,
-  type Event as ElectronEvent,
   type Session,
-  type WebContents,
 } from 'electron';
 import * as path from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
@@ -90,7 +88,7 @@ import { installWindowReadinessPolicy } from './window-readiness-policy.js';
 import { installDesktopWindowClose } from './desktop-window-close.js';
 import { sessionPermissionsOnce } from './session-permissions-once.js';
 import { installDesktopProjectOpens } from './desktop-project-open.js';
-import { handleSelectSerialPort, type ElectronSerialPort } from './desktop-serial-chooser.js';
+import { installDesktopSerialPorts } from './desktop-serial-ports.js';
 import { externalBrowserUrl } from './external-links.js';
 import { installDesktopContextMenu } from './desktop-context-menu.js';
 import { loadWindowPlacement, rememberWindowPlacement } from './desktop-window-placement.js';
@@ -304,15 +302,6 @@ function installPermissionHandlers(ses: Session): void {
       TRUSTED_RENDERER_ORIGINS,
     );
   });
-  // No setDevicePermissionHandler, deliberately (ADR-366). With any handler
-  // installed, Electron asks it about every serial port it can persist (on
-  // Windows, every port with a device instance ID) and no longer records the
-  // port the operator picks, so a handler that trusts the origin grants every
-  // attached adapter. Electron's own store keeps only the picked ports, matched
-  // on Windows by device instance ID. getPorts() in the window and in the
-  // background-streaming worker (ADR-354) then lists the picked adapter and not
-  // an identical twin, and Forget revokes it. Only the trusted origin reaches
-  // the picker: requestPort is gated by the permission check handler above.
   ses.setPermissionRequestHandler((wc, permission, cb, details) => {
     const mediaTypes =
       'mediaTypes' in details && details.mediaTypes !== undefined ? details.mediaTypes : undefined;
@@ -329,18 +318,13 @@ function installPermissionHandlers(ses: Session): void {
       ),
     );
   });
-  const onSelectSerialPort = (
-    event: ElectronEvent,
-    portList: ReadonlyArray<ElectronSerialPort>,
-    webContents: WebContents,
-    callback: (portId: string) => void,
-  ): void => {
-    handleSelectSerialPort(event, portList, webContents, callback);
-  };
-  (ses.on as unknown as (e: 'select-serial-port', l: typeof onSelectSerialPort) => void)(
-    'select-serial-port',
-    onSelectSerialPort,
-  );
+  // Only the picked port is granted, never every attached adapter (ADR-366);
+  // Windows remembers the picks across restarts (ADR-552). Only the trusted
+  // origin reaches the picker: requestPort is gated by the check handler above.
+  installDesktopSerialPorts(ses, {
+    trustedOrigins: TRUSTED_RENDERER_ORIGINS,
+    userDataPath: DESKTOP_DATA_PATH,
+  });
 }
 
 function installNavigationPolicy(window: BrowserWindow): void {
@@ -470,9 +454,9 @@ async function createWindow(): Promise<void> {
   // silently or never shows a picker:
   //   1) setPermissionCheckHandler   - accept 'serial' so the API isn't
   //      gated out before requestPort even fires.
-  //   2) select-serial-port event    - pick which port to return. Electron
-  //      grants that port alone; there is deliberately no device permission
-  //      handler, which would grant every port (ADR-366).
+  //   2) select-serial-port event    - pick which port to return. Only that
+  //      port is granted (ADR-366); on Windows the device permission handler
+  //      grants the ports picked before and not forgotten (ADR-552).
   //   3) setPermissionRequestHandler - accept 'serial' explicitly.
   //
   // File System Access (Phase A: SVG import, .lf2 save/open) is gated

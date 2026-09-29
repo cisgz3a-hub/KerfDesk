@@ -10,6 +10,7 @@ import {
   createDesktopLicenceAdapter,
   createDesktopProjectFiles,
   createDesktopJobActivityReporter,
+  createDesktopSerialAdapter,
   createDesktopSupportLogReader,
   isElectronRenderer,
 } from '../../platform/electron';
@@ -47,6 +48,7 @@ const adapter: PlatformAdapter = isElectronRenderer()
   ? {
       ...webAdapter,
       id: 'electron',
+      serial: createDesktopSerialAdapter(webAdapter.serial),
       desktopUpdates: createDesktopPreviewUpdateAdapter(),
       ...createDesktopProjectFiles(webAdapter.recentFiles, {
         handleSaveTarget: webAdapter.openedProjectSaveTarget,

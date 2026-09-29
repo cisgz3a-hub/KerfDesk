@@ -281,6 +281,10 @@ export type SerialAdapter = {
   // A picked port was plugged in or unplugged. The handler re-reads
   // grantedPorts(); it never opens a port by itself.
   readonly onGrantedPortsChange?: (handler: () => void) => () => void;
+  // True where a pick lasts only until the app closes, so every start begins
+  // with no granted port: the desktop app on macOS and Linux (ADR-366). Chrome
+  // and the Windows desktop app remember picks (ADR-420, ADR-552).
+  readonly picksEndOnRestart?: boolean;
 };
 
 // --- Camera (Camera Mode, ADR-107) ---

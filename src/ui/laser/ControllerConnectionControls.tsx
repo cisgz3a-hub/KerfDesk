@@ -64,7 +64,7 @@ export function ControllerConnectionControls(props: Props): JSX.Element {
         onChoosePort={() => void choosePort().catch(controllerActionFailureHandler('Connect'))}
         autoConnect={autoConnect.enabled}
         onAutoConnectChange={autoConnect.change}
-        portChoiceEndsOnRestart={platform.id === 'electron'}
+        portChoiceEndsOnRestart={platform.serial.picksEndOnRestart === true}
         connection={connection}
         machineNoun={machineNoun(props.machineKind)}
         onConnect={connect}

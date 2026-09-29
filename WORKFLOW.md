@@ -1506,8 +1506,9 @@ Status bar messages (toasts that appear in the bar for 3 s) for non-blocking eve
    or a controller operation, and does nothing for a file-only controller.
 3. Chrome keeps a port grant across restarts on Windows, and on macOS and Linux only for adapters
    that report a USB serial number; a CH340 there needs one Connect after each replug or browser
-   restart. The desktop app grants a pick for the run only (ADR-366), so after a restart the
-   first Connect shows the picker.
+   restart. The Windows desktop app remembers picks the same way (ADR-552). The desktop app on
+   macOS and Linux grants a pick for the run only (ADR-366), so after a restart the first Connect
+   shows the picker.
 4. Turning it off in the **⋯** menu is remembered in this browser.
 
 #### Background streaming (ADR-354)
@@ -1527,8 +1528,8 @@ Status bar messages (toasts that appear in the bar for 3 s) for non-blocking eve
 6. The desktop app, like Chrome, lets the window and the worker see only the ports picked in
    its Select dialog, so an identical second adapter (a laser controller and an Arduino that
    both use a CH340, for example) no longer stops background streaming. A pick lasts until
-   Forget Controller or an app restart; picking both identical adapters in one run is still
-   ambiguous and uses the window port (ADR-366).
+   Forget Controller, and on macOS and Linux also until an app restart; picking both identical
+   adapters is still ambiguous and uses the window port (ADR-366, ADR-552).
 
 #### Error — WebSerial not supported
 1. Connection button is disabled, with a red hint above: "Your browser doesn't support WebSerial. Use Chrome, Edge, Brave (may require enabling under Brave Shields/flags), or Arc, or install the Windows desktop app."

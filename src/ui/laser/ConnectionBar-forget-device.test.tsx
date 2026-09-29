@@ -73,8 +73,8 @@ describe('ConnectionBar device permission actions', () => {
     expect(onChoosePort).toHaveBeenCalledOnce();
   });
 
-  // Desktop picks end when KerfDesk closes (ADR-366), so the desktop app must
-  // not promise a connection at start (desktop gap audit item 7).
+  // On macOS and Linux desktop picks end when KerfDesk closes (ADR-366), so the
+  // app must not promise a connection at start (desktop gap audit item 7).
   it('tells desktop users the port is chosen once after each start', async () => {
     const web = await renderBar({
       connection: { kind: 'disconnected' },

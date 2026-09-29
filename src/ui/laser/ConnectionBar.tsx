@@ -33,7 +33,7 @@ type Props = {
   readonly onChoosePort?: () => void;
   readonly autoConnect?: boolean;
   readonly onAutoConnectChange?: (enabled: boolean) => void;
-  /** The desktop app forgets its chosen ports when it closes (ADR-366). */
+  /** The desktop app on macOS and Linux forgets its chosen ports when it closes (ADR-366). */
   readonly portChoiceEndsOnRestart?: boolean;
   /** The machine line: its name, work area and controller. */
   readonly machine?: ReactNode;
@@ -120,8 +120,8 @@ function connectTitle(props: Props): string {
     : `Connect to your ${props.machineNoun} controller on the USB port it used last time. The first time, choose its port.`;
 }
 
-// Desktop picks last until KerfDesk closes (ADR-366), so the desktop app
-// reconnects by itself only when the machine is plugged back in.
+// Desktop picks on macOS and Linux last until KerfDesk closes (ADR-366), so the
+// app there reconnects by itself only when the machine is plugged back in.
 function autoConnectTitle(props: Props): string {
   return props.portChoiceEndsOnRestart === true
     ? `Connect by itself when the ${props.machineNoun} is plugged back in, to the port chosen since KerfDesk started. After each start, choose the port once with Connect. Connecting only reads settings; nothing moves.`
