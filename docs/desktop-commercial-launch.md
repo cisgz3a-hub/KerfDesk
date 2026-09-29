@@ -27,7 +27,10 @@ Abort and controller workflows intact.
    using its README for the exact secrets and durable bindings. Bind
    `license.kerfdesk.com` only after the target account is confirmed. Initial
    licensing and payment flags are disabled. Keep the SQLite authority and its
-   signing/HMAC secrets backed up together.
+   signing/HMAC secrets backed up together. Service changes take effect only when
+   the Worker is redeployed from the owner's PC; before the first redeploy with
+   the webhook and trial limits, check that rate-limit namespace IDs `1002` and
+   `1003` are not already used by another binding in the account.
 3. Provision `kerfdesk-downloads` and `dl.kerfdesk.com` with the CORS/cache contract
    in `desktop-preview-distribution.md`. R2 billing activation and any plan upgrade
    are external account decisions; source tests do not establish that they exist.
@@ -37,7 +40,16 @@ Abort and controller workflows intact.
    sandbox purchase/claim, renewal, duplicate-delivery and interrupted-checkout
    scenarios. Set live credentials only after these pass. Never put private API or
    webhook keys in the browser or app package.
-5. Finalize seller identity, customer terms, privacy, refunds/chargebacks and support
+5. In Paddle, set both prices, purchase and renewal, to quantity minimum 1 and
+   maximum 1, and apply no discount to them. The checkout page hides the discount
+   field, and the service refuses any payment with another quantity or a discount.
+   It records such a payment as refused, and support must refund it by hand
+   (`desktop-commercial-support.md`). Include one refused sandbox payment in the
+   scenarios above and check that the app shows the refusal and the lookup finds it.
+6. Point an uptime monitor at `https://license.kerfdesk.com/v1/public/health`,
+   expecting status 200 and `{"ok":true}`. It answers while licensing is switched
+   off, so it can run from now on.
+7. Finalize seller identity, customer terms, privacy, refunds/chargebacks and support
    recovery before accepting money. Retain the existing MIT and third-party rights;
    private source visibility does not revoke earlier grants. Supply the reviewed
    commercial installer terms explicitly during package preparation.

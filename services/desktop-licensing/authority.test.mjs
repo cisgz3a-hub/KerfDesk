@@ -237,6 +237,7 @@ test('an administrator can revoke and restore a licence and look up a lost key',
   assert.deepEqual(await f.authority.lookupLicense({ licenseId }), {
     licenseId,
     licenseKey,
+    keyVersion: 0,
     tier: 'paid',
     status: 'active',
     updatesUntil: NOW + 365 * 86_400,

@@ -3,6 +3,7 @@ import { DatabaseSync } from 'node:sqlite';
 import { createHmac } from 'node:crypto';
 import { Buffer } from 'node:buffer';
 import { LicensingAuthority } from './authority.mjs';
+import { createCheckout } from './checkout.mjs';
 import { base64url, createCryptography } from './crypto.mjs';
 import { SqliteRecords } from './storage.mjs';
 
@@ -138,7 +139,7 @@ export function signedPaddle(env, data, eventId = 'evt_test', timestamp = NOW) {
   return { raw, headers: new Headers({ 'paddle-signature': `ts=${timestamp};h1=${signature}` }) };
 }
 
-export function paddleFetcher(env, observe = () => undefined) {
+export function paddleFetcher(env, observe = () => undefined, id = `txn_${'c'.repeat(26)}`) {
   return async (_url, options) => {
     const body = JSON.parse(options.body);
     observe(body, options);
@@ -147,8 +148,50 @@ export function paddleFetcher(env, observe = () => undefined) {
       orderProof: body.custom_data.kerfdesk_order_proof,
       operation: body.custom_data.kerfdesk_operation,
     };
-    return new Response(JSON.stringify({ data: paddleTransaction(env, intent) }), {
+    const data = paddleTransaction(env, intent, {
+      id,
+      checkout: { url: `https://kerfdesk.com/buy.html?_ptxn=${id}` },
+    });
+    return new Response(JSON.stringify({ data }), {
       headers: { 'content-type': 'application/json' },
     });
   };
+}
+
+export function webhookRequest(signed) {
+  return new Request('https://licensing.example/v1/payments/webhook', {
+    method: 'POST',
+    headers: {
+      'content-type': 'application/json',
+      'paddle-signature': signed.headers.get('paddle-signature'),
+    },
+    body: signed.raw,
+  });
+}
+
+export function adminRequest(path, body, token) {
+  return request(path, body, { authorization: `Bearer ${token}` });
+}
+
+/**
+ * A real server-created checkout order, with the proof Paddle would carry back.
+ * `transactionId` is the Paddle transaction the fake provider creates for it.
+ */
+export async function checkoutOrder(
+  f,
+  requestId,
+  body = { operation: 'purchase' },
+  transactionId = `txn_${'c'.repeat(26)}`,
+) {
+  let intent;
+  const observe = (data) => {
+    intent = {
+      orderId: data.custom_data.kerfdesk_order_id,
+      orderProof: data.custom_data.kerfdesk_order_proof,
+      operation: data.custom_data.kerfdesk_operation,
+    };
+  };
+  const fetcher = paddleFetcher(f.env, observe, transactionId);
+  const checkout = await createCheckout(f.authority, f.env, { requestId, ...body }, fetcher);
+  return { checkout, intent };
 }

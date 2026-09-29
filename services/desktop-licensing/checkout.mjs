@@ -1,6 +1,10 @@
 import { CATALOG } from './payments.mjs';
 import { createPaddleTransaction, paddleConfiguration } from './paddle.mjs';
-import { requireValue, secret } from './validation.mjs';
+import { requireValue, secret, ServiceError } from './validation.mjs';
+
+// Answers after which nobody can pay the order: Paddle refused to create the
+// transaction, or created one whose link this service will never hand out.
+const FINAL_FAILURES = new Set(['checkout_failed', 'invalid_provider_response']);
 
 export async function createCheckout(authority, env, body, fetcher) {
   const config = paddleConfiguration(env);
@@ -45,13 +49,23 @@ export async function createCheckout(authority, env, body, fetcher) {
     return { order, created: true };
   });
   if (!selected.created) {
-    if (!selected.order.checkoutUrl && selected.order.status === 'fulfilled') {
+    // A paid order whose checkout answer was lost still hands back its order, so the app
+    // can claim it: a licence, or `payment_rejected` with the order number to quote.
+    const paid = ['fulfilled', 'rejected'].includes(selected.order.status);
+    if (!selected.order.checkoutUrl && paid && selected.order.providerOrderId) {
       selected.order.checkoutUrl = `${config.checkout}?_ptxn=${selected.order.providerOrderId}`;
     }
     requireValue(selected.order.checkoutUrl, 409, 'checkout_pending');
     return checkoutResult(authority, selected.order);
   }
-  const result = await createPaddleTransaction(env, { ...selected.order, orderProof }, fetcher);
+  let result;
+  try {
+    result = await createPaddleTransaction(env, { ...selected.order, orderProof }, fetcher);
+  } catch (error) {
+    if (error instanceof ServiceError && FINAL_FAILURES.has(error.code))
+      failOrder(authority, id, requestHash, error);
+    throw error;
+  }
   const attached = authority.records.transaction((tx) => {
     const order = tx.get(`order:${id}`);
     requireValue(
@@ -67,6 +81,30 @@ export async function createCheckout(authority, env, body, fetcher) {
     return next;
   });
   return checkoutResult(authority, attached);
+}
+
+/**
+ * Marks an order nobody can pay as failed and frees its checkout request ID in one
+ * transaction, so the same request ID starts a fresh order next time instead of
+ * answering `checkout_pending` forever (ADR-523 Amendment 3).
+ */
+function failOrder(authority, orderId, requestHash, error) {
+  try {
+    authority.records.transaction((tx) => {
+      const order = tx.get(`order:${orderId}`);
+      if (order?.status !== 'pending') return;
+      tx.put(`order:${orderId}`, {
+        ...order,
+        status: 'failed',
+        failedAt: authority.now(),
+        failure: { code: error.code, provider: error.provider ?? null },
+      });
+      if (tx.get(`checkout-request:${requestHash}`)?.orderId === orderId)
+        tx.delete(`checkout-request:${requestHash}`);
+    });
+  } catch {
+    /* The order then stays pending, as before; the caller still gets the refusal. */
+  }
 }
 
 async function renewalLicense(authority, body) {

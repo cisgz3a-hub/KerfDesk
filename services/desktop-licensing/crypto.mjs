@@ -79,3 +79,18 @@ export async function authenticateAdmin(header, configured) {
   const expected = await crypto.subtle.sign('HMAC', key, encoder.encode(`Bearer ${configured}`));
   return crypto.subtle.verify('HMAC', key, expected, encoder.encode(header ?? ''));
 }
+
+/**
+ * Which administrator token the header carries: `ADMIN_TOKEN` or the optional
+ * `ADMIN_TOKEN_NEXT`, so the token can be rotated without downtime. Both are always
+ * compared, each in constant time (ADR-523 Amendment 3). Null when neither matches.
+ */
+export async function adminCredential(header, env) {
+  const [current, next] = await Promise.all([
+    authenticateAdmin(header, env.ADMIN_TOKEN),
+    authenticateAdmin(header, env.ADMIN_TOKEN_NEXT),
+  ]);
+  if (current) return { credential: 'ADMIN_TOKEN' };
+  if (next) return { credential: 'ADMIN_TOKEN_NEXT' };
+  return null;
+}

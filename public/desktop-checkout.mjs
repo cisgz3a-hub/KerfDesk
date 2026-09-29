@@ -113,7 +113,10 @@ export async function startCheckoutPage(window, fetcher = fetch) {
             'Return to KerfDesk and select Check payment to confirm and activate your purchase.';
       },
     });
-    const open = () => paddle.Checkout.open({ transactionId: transaction });
+    // No discount field: the licence service refuses a discounted payment, so a code
+    // entered here would take money without issuing a licence (ADR-523 Amendment 3).
+    const open = () =>
+      paddle.Checkout.open({ transactionId: transaction, settings: { showAddDiscounts: false } });
     button.addEventListener('click', open);
     button.hidden = false;
     status.textContent =

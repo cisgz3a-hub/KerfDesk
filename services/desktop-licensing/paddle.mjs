@@ -3,6 +3,9 @@ import { CATALOG } from './payments.mjs';
 import { identifier, parseBody, readBody, requireValue, ServiceError } from './validation.mjs';
 
 const encoder = new TextEncoder();
+// Refusal statuses that do not prove Paddle created nothing: a timeout, a conflict or
+// a rate limit may hide a transaction, like any server error (ADR-523 Amendment 3).
+const AMBIGUOUS = new Set([408, 409, 429]);
 
 export function paddleConfiguration(env) {
   requireValue(
@@ -130,6 +133,41 @@ export function validatePaddleTransaction(data, config, operation) {
   return amount;
 }
 
+/**
+ * The facts a refused payment's record keeps: amounts, currency, items and any
+ * discount. No customer, address or payment-method details (ADR-523 Amendment 3).
+ */
+function paymentFacts(data) {
+  const short = (value) => (typeof value === 'string' && value.length <= 64 ? value : null);
+  const totals = data.details?.totals ?? {};
+  return {
+    currency: short(data.currency_code),
+    subtotal: short(totals.subtotal),
+    discount: short(totals.discount),
+    tax: short(totals.tax),
+    total: short(totals.total),
+    discountId: short(data.discount_id),
+    items: Array.isArray(data.items)
+      ? data.items.slice(0, 5).map((item) => ({
+          priceId: short(item?.price?.id),
+          quantity: Number.isSafeInteger(item?.quantity) ? item.quantity : null,
+        }))
+      : [],
+  };
+}
+
+/** The reason a completed KerfDesk transaction cannot fulfil its order, or null. */
+function paymentProblem(data, config, operation) {
+  if (data.status !== 'completed') return 'payment_not_completed';
+  if (!Object.hasOwn(CATALOG, operation)) return 'payment_mismatch';
+  try {
+    validatePaddleTransaction(data, config, operation);
+    return null;
+  } catch {
+    return 'payment_mismatch';
+  }
+}
+
 export function paddleVerifier(env) {
   const config = paddleConfiguration(env);
   return async (headers, raw, now) => {
@@ -146,21 +184,29 @@ export function paddleVerifier(env) {
     const event = parseBody(raw);
     if (event.event_type !== 'transaction.completed') return { ignored: true };
     const data = event.data;
-    requireValue(data?.status === 'completed', 409, 'payment_not_completed');
-    const operation = data.custom_data?.kerfdesk_operation;
-    requireValue(Object.hasOwn(CATALOG, operation), 409, 'payment_mismatch');
-    const amount = validatePaddleTransaction(data, config, operation);
+    const orderId = data?.custom_data?.kerfdesk_order_id;
+    // A transaction made in the Paddle dashboard or for another product carries no
+    // KerfDesk order: acknowledge it so Paddle stops retrying (ADR-523 Amendment 3).
+    if (typeof orderId !== 'string' || !/^[A-Za-z0-9_-]{1,100}$/u.test(orderId))
+      return { ignored: true };
+    const operation = data.custom_data.kerfdesk_operation;
+    const known = Object.hasOwn(CATALOG, operation);
+    // From here on the payment belongs to a KerfDesk order. A problem is reported as
+    // `rejection` and recorded for support, never bounced back for Paddle to retry.
     return {
       eventId: identifier(event.event_id),
       paymentId: identifier(data.id),
-      orderId: identifier(data.custom_data.kerfdesk_order_id),
+      orderId,
       orderProof: data.custom_data.kerfdesk_order_proof,
       provider: 'paddle',
       providerOrderId: data.id,
-      priceId: config.prices[operation],
-      amount,
+      operation: known ? operation : null,
+      priceId: known ? config.prices[operation] : null,
+      amount: known ? CATALOG[operation] : null,
       currency: 'USD',
       status: 'paid',
+      facts: paymentFacts(data),
+      rejection: paymentProblem(data, config, operation),
     };
   };
 }
@@ -194,9 +240,14 @@ export async function createPaddleTransaction(env, intent, fetcher = fetch) {
   } catch {
     throw new ServiceError(409, 'checkout_pending');
   }
-  // Even an error response can be ambiguous after a proxy timeout. Keep the
-  // durable intent rather than issuing a second chargeable checkout automatically.
-  requireValue(response.ok, 409, 'checkout_pending');
+  if (!response.ok) {
+    // Paddle refused outright, so no transaction exists and a fresh order is safe.
+    if (response.status >= 400 && response.status < 500 && !AMBIGUOUS.has(response.status))
+      throw await providerRefusal(response);
+    // A timeout, conflict, rate limit or server error may hide a created transaction.
+    // Keep the durable intent rather than issuing a second chargeable checkout.
+    throw new ServiceError(409, 'checkout_pending');
+  }
   let result;
   try {
     result = parseBody(await readBody(response, 131_072));
@@ -205,8 +256,40 @@ export async function createPaddleTransaction(env, intent, fetcher = fetch) {
   }
   const data = result.data;
   requireValue(/^txn_[a-z0-9]{26}$/u.test(data?.id ?? ''), 503, 'invalid_provider_response');
-  validatePaddleTransaction(data, config, intent.operation);
-  const checkout = new URL(data.checkout?.url);
+  try {
+    validatePaddleTransaction(data, config, intent.operation);
+  } catch {
+    throw new ServiceError(503, 'invalid_provider_response');
+  }
+  return { providerOrderId: data.id, checkoutUrl: checkoutLink(data, config) };
+}
+
+async function providerRefusal(response) {
+  const error = new ServiceError(502, 'checkout_failed');
+  let code = null;
+  try {
+    code = parseBody(await readBody(response, 16_384)).error?.code;
+  } catch {
+    /* Paddle's own error code is a diagnostic extra; the status is enough. */
+  }
+  // Kept on the failed order for support: Paddle's status and its error code only.
+  error.provider = {
+    status: response.status,
+    code: typeof code === 'string' && /^[a-z0-9_]{1,80}$/u.test(code) ? code : null,
+  };
+  return error;
+}
+
+function checkoutLink(data, config) {
+  const link = data.checkout?.url;
+  let checkout;
+  try {
+    requireValue(typeof link === 'string');
+    checkout = new URL(link);
+  } catch {
+    // Paddle answered without a usable checkout link (ADR-523 Amendment 3).
+    throw new ServiceError(503, 'invalid_provider_response');
+  }
   const expected = new URL(config.checkout);
   requireValue(
     checkout.origin === expected.origin &&
@@ -219,5 +302,5 @@ export async function createPaddleTransaction(env, intent, fetcher = fetch) {
     503,
     'invalid_provider_response',
   );
-  return { providerOrderId: data.id, checkoutUrl: checkout.href };
+  return checkout.href;
 }

@@ -6,6 +6,8 @@ import { startCheckoutPage } from '../public/desktop-checkout.mjs';
 
 const html = await readFile(new URL('../public/buy.html', import.meta.url), 'utf8');
 const transaction = `txn_${'a'.repeat(26)}`;
+// The server-created transaction, with no field for adding a discount code.
+const opened = { transactionId: transaction, settings: { showAddDiscounts: false } };
 const configuration = {
   enabled: true,
   provider: 'paddle',
@@ -105,7 +107,7 @@ test('verified configuration opens the exact transaction; browser success never 
   assert.deepEqual(calls, [
     ['environment', 'sandbox'],
     ['initialize', configuration.clientToken],
-    ['open', { transactionId: transaction }],
+    ['open', opened],
   ]);
   callback({ name: 'checkout.completed', data: { license: 'forged-client-result' } });
   assert.equal(requests, 1);
@@ -114,6 +116,6 @@ test('verified configuration opens the exact transaction; browser success never 
     /Return to KerfDesk.*Check payment/u,
   );
   window.document.getElementById('checkout-open').click();
-  assert.deepEqual(calls.at(-1), ['open', { transactionId: transaction }]);
+  assert.deepEqual(calls.at(-1), ['open', opened]);
   window.close();
 });

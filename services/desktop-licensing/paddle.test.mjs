@@ -136,11 +136,18 @@ test('authenticated completion can recover a durable intent after provider respo
   assert.match((await claimOrder(f.authority, recovered)).licenseKey, /^KD1\./u);
 });
 
-test('Paddle completion rejects altered catalog, currency, recurring plans, discounts and unpaid states', async () => {
+test('Paddle completion refuses altered catalog, currency, recurring plans, discounts and unpaid states', async () => {
   const f = await fixture();
   f.env.PAYMENTS_ENABLED = 'true';
   const intent = { orderId: 'example', orderProof: deviceId(4), operation: 'purchase' };
   const original = paddleTransaction(f.env, intent);
+  const verify = async (data) => {
+    const signed = signedPaddle(f.env, data);
+    return paddleVerifier(f.env)(signed.headers, signed.raw, NOW);
+  };
+  const accepted = await verify(original);
+  assert.equal(accepted.rejection, null);
+  assert.equal(accepted.amount, 4950);
   const changes = [
     (d) => {
       d.currency_code = 'ZAR';
@@ -161,18 +168,26 @@ test('Paddle completion rejects altered catalog, currency, recurring plans, disc
       d.details.totals.discount = '1';
     },
     (d) => {
+      d.discount_id = 'dsc_example';
+    },
+    (d) => {
       d.details.totals.total = '1';
     },
     (d) => {
-      d.status = 'paid';
+      d.items.push(structuredClone(d.items[0]));
+    },
+    (d) => {
+      d.custom_data.kerfdesk_operation = 'upgrade';
     },
   ];
+  // A KerfDesk order's refused payment is reported for recording, not thrown back
+  // for Paddle to retry (ADR-523 Amendment 3).
   for (const change of changes) {
     const data = structuredClone(original);
     change(data);
-    const signed = signedPaddle(f.env, data);
-    await assert.rejects(paddleVerifier(f.env)(signed.headers, signed.raw, NOW));
+    assert.equal((await verify(data)).rejection, 'payment_mismatch');
   }
+  assert.equal((await verify({ ...original, status: 'paid' })).rejection, 'payment_not_completed');
 });
 
 test('checkout rejects provider redirects to other hosts or a replaced transaction', async () => {
@@ -225,5 +240,16 @@ test('provider response is bounded while streaming and a failed response cannot 
   assert.equal(canceled, true);
   const rows = f.database.prepare("SELECT value FROM records WHERE key LIKE 'order:%'").all();
   assert.equal(rows.length, 1);
-  assert.equal(JSON.parse(rows[0].value).status, 'pending');
+  // Nobody was given this order's link, so it can never be paid: it is failed, not
+  // left pending forever, and its request ID is free (ADR-523 Amendment 3).
+  const order = JSON.parse(rows[0].value);
+  assert.equal(order.status, 'failed');
+  assert.equal(order.checkoutUrl, null);
+  assert.equal(order.failure.code, 'invalid_provider_response');
+  assert.equal(
+    f.database
+      .prepare("SELECT COUNT(*) AS n FROM records WHERE key LIKE 'checkout-request:%'")
+      .get().n,
+    0,
+  );
 });
