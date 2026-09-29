@@ -209,6 +209,7 @@ function UnusualRegistrationRow(props: {
           type="checkbox"
           className="lf-checkbox"
           checked={props.confirmed}
+          title="Apply the captured points although they look like a capture mistake. Job Review repeats the note at Start."
           onChange={(event) => props.onConfirm(event.currentTarget.checked)}
         />
         <span>Use this registration anyway</span>
