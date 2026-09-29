@@ -149,4 +149,52 @@ describe('dispatchPositionLaser', () => {
     expect(jogToMachinePosition).toHaveBeenCalledTimes(1);
     expect(useToastStore.getState().toasts[0]?.message).toContain('mapping is unverified');
   });
+
+  // GRBL homing trips the switch on the envelope's homing edge and rests $27
+  // inside it so the switch does not trip again
+  // (https://github.com/gnea/grbl/blob/bfb67f0c7963fe3ce4aaf8a97f9009ea5a8db36e/grbl/limits.c#L366-L384);
+  // with $21=1 a move back onto that edge can close it and reset the
+  // controller into ALARM:1 (grbl/limits.c#L110-L128). Front-left origin:
+  // scene (999, -999) is the back-right bed corner, (-999, 999) the front-left.
+  const W = DEFAULT_DEVICE_PROFILE.bedWidth;
+  const H = DEFAULT_DEVICE_PROFILE.bedHeight;
+  it.each([
+    ['toward +X/+Y ($23=0), back-right click', 0, { x: 999, y: -999 }, { x: -2, y: -2 }],
+    ['toward -X/-Y ($23=3), front-left click', 3, { x: -999, y: 999 }, { x: 2 - W, y: 2 - H }],
+    ['toward +X/+Y ($23=0), far front-left click', 0, { x: -999, y: 999 }, { x: -W, y: -H }],
+  ])('keeps the homing edge the pull-off clear of the switch: %s', (_name, mask, click, native) => {
+    const device = {
+      ...deviceWith('front-left'),
+      homing: { ...DEFAULT_DEVICE_PROFILE.homing, enabled: true },
+    };
+    const evidence = stockNativeEvidence(device, false, mask);
+    const jogToMachinePosition = vi.fn(async () => undefined);
+    useLaserStore.setState({
+      ...evidence,
+      controllerSettings: {
+        ...evidence.controllerSettings,
+        hardLimitsEnabled: true,
+        homingPullOffMm: 2,
+      },
+      connection: { kind: 'connected' },
+      streamer: null,
+      motionOperation: null,
+      statusReport: {
+        state: 'Idle',
+        subState: null,
+        mPos: null,
+        wPos: null,
+        feed: null,
+        spindle: null,
+        wco: null,
+      },
+      jogToMachinePosition,
+    });
+    dispatchPositionLaser(click, device);
+    expect(jogToMachinePosition).toHaveBeenCalledWith(
+      native.x,
+      native.y,
+      positionLaserFeed(device.maxFeed),
+    );
+  });
 });
