@@ -1,4 +1,4 @@
-## ADR-375 - Controller audit 2: origins kept through a failed probe, unreported work offsets, and motion inside the firmware's limits (2026-09-29)
+## ADR-375 - Controller audit 2: the controller faults main still had (2026-09-29)
 
 **Status:** Accepted. | **Date:** 2026-09-29
 
@@ -118,11 +118,94 @@ therefore sent moves the firmware refuses, or trusted values the controller had 
    - Both only shorten a move KerfDesk already sends. Step jogs, typed head moves and Frame corners
      are unchanged (ADR-232 leaves those limits to the controller). No new refusal.
 
+4. **Fire at the power it shows** (P-2).
+   - GRBL and grblHAL scale every S word by the spindle override, and an override raised during a
+     job stays set until a reset
+     ([spindle_control.c L195](https://github.com/gnea/grbl/blob/bfb67f0c7963fe3ce4aaf8a97f9009ea5a8db36e/grbl/spindle_control.c#L195),
+     [grblHAL spindle_control.c L867-L868](https://github.com/grblHAL/core/blob/d7aaee3d84b1e7010f075d395206afff038d7379/spindle_control.c#L867-L868)), so the low-power Fire
+     dot ran at 7.5% or 10% after a 150% or 200% override. When the controller has overrides and
+     its last `Ov:` power value is unknown or not 100%, Fire now writes the override reset byte
+     `0x99` before the Fire-on line, the rule Start already applies (ADR-355), for that one
+     override. Both firmwares apply pending realtime commands before they run the next line
+     ([protocol.c L81](https://github.com/gnea/grbl/blob/bfb67f0c7963fe3ce4aaf8a97f9009ea5a8db36e/grbl/protocol.c#L81)). A release, a lost Idle or a failed write during the
+     reset keeps Fire-on off the wire. With a known 100% the press is unchanged.
+   - The capped Fire S now rounds down, so the absolute 5% ceiling (ADR-162) holds on small S
+     ranges: 5% of S255 is S12, not S13.
+   - No new refusal.
+
+5. **What the receive buffer and the line buffer can take** (P-3/S-2, S-3).
+   - grblHAL prints the free receive count as a 16-bit number, so the Falcon A1 Pro's idle
+     `Bf:512,65535` is only the field's largest value, and a stream may report a fixed size
+     whatever it buffers ([report.c L1342-L1347](https://github.com/grblHAL/core/blob/d7aaee3d84b1e7010f075d395206afff038d7379/report.c#L1342-L1347)). KerfDesk had counted it
+     as 4096 proven bytes, and Job Review told the operator to raise the RX window. A `Bf:` receive
+     report above 4104 bytes (the 4096-byte streamer cap plus its 8-byte margin) now proves only
+     grblHAL's default 1024-byte ring ([stream.h L52-L53](https://github.com/grblHAL/core/blob/d7aaee3d84b1e7010f075d395206afff038d7379/stream.h#L52-L53)), so 1016 usable
+     bytes, recorded as the window source `oversized-report`, and Job Review names that ring
+     instead of suggesting a larger window. A stock `$I` ring size still wins. The window only
+     narrows.
+   - Stock GRBL keeps 79 significant characters of a line and grblHAL 256, and both answer a
+     longer line with `error:11` without running it
+     ([protocol.c L141-L143](https://github.com/gnea/grbl/blob/bfb67f0c7963fe3ce4aaf8a97f9009ea5a8db36e/grbl/protocol.c#L141-L143)); KerfDesk checked lines only against the RX
+     window and FluidNC's own limit. For a connected stock GRBL or grblHAL driver, such a line is
+     now refused at Frame preparation, beside the RX-window refusal, and again at Start before a
+     byte is sent, which also covers resume and recovery streams. The message names the line, its
+     count and the limit. This is refusal kind (a): the controller cannot take the line. The
+     limits are the stock builds' sizes, because no report names a custom build's own, and the
+     count can only err low. KerfDesk's own lines stay under 60 characters today, so this is a
+     latent guard.
+
+6. **Jog cancel on grblHAL** (M-6).
+   - grblHAL handles the jog-cancel byte `0x85` in every state: it drops the partial line and
+     flushes its input buffer ([protocol.c L896-L899](https://github.com/grblHAL/core/blob/d7aaee3d84b1e7010f075d395206afff038d7379/protocol.c#L896-L899)), so a `$J=` it had
+     not parsed yet was never answered, Cancel timed out, and Jog, Frame and Disconnect stayed
+     locked until ABORT MOTION. The grblHAL driver now declares that its jog-cancel byte drops
+     unparsed lines, and on such a driver Cancel first waits for every owed reply and pending
+     write, up to its existing 8 s deadline, then writes `0x85`. If a reply is still owed at the
+     deadline the byte goes anyway, because stopping motion comes first, and the missing reply is
+     reported as before. Stock GRBL, which acts on `0x85` only while jogging, FluidNC and the
+     Falcon command set are unchanged. Not seen on hardware.
+   - No new refusal.
+
+7. **The Falcon command set and the identity advice** (P-1, P-4).
+   - Connect binds the driver and its command set from the profile (ADR-322), but Job Review
+     compared only the controller family. A Falcon A1 Pro profile on a connection made with the
+     generic grblHAL commands passed silently, and a saved A1 Pro copy made before the preset had
+     its vendor command set always connected that way. The generic Frame ends with `M5` then `M9`
+     just before Start, and `M9` turns off every coolant output
+     ([grblHAL gcode.c L1865-L1866](https://github.com/grblHAL/core/blob/d7aaee3d84b1e7010f075d395206afff038d7379/gcode.c#L1865-L1866)), which on the A1 Pro left the first
+     air-assisted operation without air (ADR-323). Job Review now warns when the profile's command
+     set differs from the one the connection bound, with reconnect advice, and names a saved copy
+     of a built-in preset that lacks the preset's command set, with re-apply advice. Machine Setup
+     shows such a copy's card unselected with a notice, so one click re-applies the preset. Nothing
+     migrates without that click.
+   - grblHAL's banner is fixed when the firmware is built
+     ([report.c L311-L315](https://github.com/grblHAL/core/blob/d7aaee3d84b1e7010f075d395206afff038d7379/report.c#L311-L315)), so the advice "Reconnect using the selected
+     profile" could never clear a difference in the banner alone. Job Review now says the banner is
+     identity evidence and advises choosing that firmware in Machine Setup if the machine runs it.
+     Find my machine separates a driver or command-set mismatch (Reconnect) from a banner-only
+     difference (no Reconnect; Read again stays available). **Use detected** lists every other
+     draft value the choice changes (RX window, streaming, output dialect, vendor commands, baud,
+     power range, and a scan-offset calibration it clears) and applies them only on
+     **Apply to draft**.
+   - No new refusal.
+
+8. **grblHAL settings bitfields and the settings write gate** (C-7, C-8).
+   - grblHAL prints `$21` and `$22` as bitfields whose bit 0 is Enable
+     ([settings.c L2377-L2385](https://github.com/grblHAL/core/blob/d7aaee3d84b1e7010f075d395206afff038d7379/settings.c#L2377-L2385)), so a grblHAL `$22=5` read as unknown.
+     Both are now read by bit 0 of a non-negative integer. Stock GRBL and FluidNC print 0 or 1 and
+     read as before.
+   - The Machine Settings write gate checks only that the settings were read in this connection,
+     but its message asked the operator to read and export a backup. The message now says what the
+     gate checks, and the panel no longer calls itself read-only. Requiring an export first would
+     be a new refusal outside NN21, so none was added. Each `$x=` is stored at once with no
+     firmware undo ([settings.c L301](https://github.com/gnea/grbl/blob/bfb67f0c7963fe3ce4aaf8a97f9009ea5a8db36e/grbl/settings.c#L301)), so the copy still asks for an export.
+
 ### Consequences
 
 - The GRBL simulator models more stock GRBL behaviour: `G10 L20` with an active G92, a failed
   `G38.2` (`probeFailure`), and, both off by default, the power-up lock into Alarm with homing on
-  (`homingInitLock`) and the `error:15` check of a `$J=` target once `$20=1`.
+  (`homingInitLock`) and the `error:15` check of a `$J=` target once `$20=1`. An opt-in
+  `jogCancelFlushesInput` mode plays grblHAL's `0x85`, which discards lines not parsed yet.
 - Still open for work offsets: transient Frames (the camera calibration target, the recovery
   area, the second pass) get no burst; a controller whose reports never carry WCO waits 3 s at
   every Frame while no offset is known, and with a real offset it cannot earn a permit (the
@@ -132,3 +215,7 @@ therefore sent moves the firmware refuses, or trusted values the controller had 
   no alarm active still hides the position.
 - Still open: grblHAL keeps an axis homed through `$X` and resets, but KerfDesk clamps only after
   this session's Home; per-axis pull-off settings in some grblHAL builds are not modelled.
+- Still open for the Falcon and settings work: the camera calibration's one-off review lacks the
+  command-set warnings; the automatic fill for a new machine (ADR-420) names only the controller
+  it sets, not the RX window, command set or calibration the same choice changes (its Undo covers
+  them); the settings reference still labels `$21` and `$22` "0/1".

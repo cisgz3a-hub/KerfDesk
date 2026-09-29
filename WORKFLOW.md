@@ -1580,8 +1580,11 @@ Status bar messages (toasts that appear in the bar for 3 s) for non-blocking eve
    G55-G59 offsets.
 4. App compiles one exact executable artifact through the shared
    `prepareOutput` pipeline, and computes its generated motion bounds (including overscan).
-   Unstreamable/empty output refuses; homing, camera, accessory, override, dialect, tool, and other
-   non-Frame-validity policy findings remain warnings.
+   Unstreamable or empty output refuses: no sendable line, a line longer than the RX window, or a
+   line longer than the connected controller's line buffer (stock GRBL keeps 79 significant
+   characters and grblHAL 256, and either answers a longer line with `error:11`; ADR-375). Homing,
+   camera, accessory, override, dialect, tool, and other non-Frame-validity policy findings remain
+   warnings.
    Dense programs above the optional analysis budget keep their complete G-code and motion route
    while omitting duplicate executable-plan analysis. Frame bounds and Start authorization are
    unchanged. GRBL-compatible position reports with extra axes retain their reported XYZ values;
@@ -1658,7 +1661,9 @@ Status bar messages (toasts that appear in the bar for 3 s) for non-blocking eve
 
 #### Edge — cancel mid-frame
 1. **Cancel** records permanent cancel intent and writes real-time jog-cancel (`0x85`); pending Frame
-   lines are dropped immediately. After the old command handoff settles, the app queries state. If
+   lines are dropped immediately. On grblHAL, whose `0x85` also discards any line it has not parsed
+   yet without answering it, Cancel first waits (up to 8 s) for the replies owed to lines already
+   sent, then writes `0x85` (ADR-375). After the old command handoff settles, the app queries state. If
    GRBL reports `Jog`, the first byte lost the Idle-to-Jog race, so `0x85` is sent again. No queued
    settlement marker is written until a fresh `Idle`; a second post-marker `Idle` releases ownership.
 2. An owned G54 selection remains active after cancellation; the stored G55-G59 offsets remain
@@ -1743,10 +1748,12 @@ Status bar messages (toasts that appear in the bar for 3 s) for non-blocking eve
    window is the profile's `rxBufferBytes` request (stock GRBL 120 bytes; grblHAL profiles 1024)
    bounded by the receive capacity the controller proved this session — a stock `$I` ring size
    or the free bytes of a status `Bf:` report taken while nothing was in flight — and falls back
-   to the stock 120 bytes when a GRBL-family controller proved nothing (ADR-331). Job Review
-   warns, never refuses, when that window buffers too little motion for ordinary host latency
-   or the program outruns the serial link. Every `ok` advances one line and progress reflects
-   `completed / total`.
+   to the stock 120 bytes when a GRBL-family controller proved nothing (ADR-331). A `Bf:` report
+   above 4104 bytes, such as the Falcon A1 Pro's `65535`, proves only grblHAL's default 1024-byte
+   ring (1016 usable bytes), and Job Review never suggests raising the window on its strength
+   (ADR-375). Job Review warns, never refuses, when that window buffers too little motion for
+   ordinary host latency or the program outruns the serial link. Every `ok` advances one line and
+   progress reflects `completed / total`.
 11. While the job is active the app holds a screen wake lock so OS
    display-sleep can't suspend the stream (ADR-117; re-acquired on tab
    visibility changes, released when the job ends). If the platform
@@ -2879,7 +2886,11 @@ saving an ordinary software profile disconnects the controller.
    holds a value a correction replaced (the xTool D1 Pro's front-left origin, the Sculpfun S30's
    410 x 400 mm bed), Job Review names the old and corrected values as an advisory (ADR-322
    Amendment 1), and Machine Setup shows a **Preset correction** row under Origin with one click
-   to use the corrected value (ADR-322 Amendment 2). Nothing is applied on its own. A preset's
+   to use the corrected value (ADR-322 Amendment 2). Nothing is applied on its own. A saved copy
+   of the Creality Falcon A1 Pro preset made before the preset had its vendor command set connects
+   with the generic grblHAL commands: Machine Setup shows its card unselected at the head of the
+   preview with a notice, one click re-applies the preset into the draft, and Job Review names the
+   copy and why it matters, since Frame then sends `M9` just before Start (ADR-375). A preset's
    content is pinned to its `catalogVersion`, so a preset change has to bump the version. Detected
    matches are
    prioritised among the remaining profiles and explain their evidence under **Profile details**,
@@ -2890,8 +2901,15 @@ saving an ordinary software profile disconnects the controller.
    controller choice unchanged. Controller notes and sources remain visible beside the selected
    preset. Onefinity entries require an external controller/postprocessor integration and do not
    claim compatible KerfDesk output.
-   A connection that does not match the draft's controller shows the driver-mismatch resolution
-   inside the Find card. Ruida remains file-only. CNC readback labels `$30` as a configured S maximum. Copying it into spindle RPM requires
+   A connection whose driver or command set differs from the draft's shows **The connection does
+   not match this setup** with **Reconnect using selected profile**, and **Read again** waits for
+   the reconnect. When only the banner names other firmware, the card reads **The firmware banner
+   differs from this setup**: reconnecting cannot change a banner, so there is no Reconnect and
+   **Read again** stays available. Either card offers **Use detected** (for example **Use detected
+   GRBL v1.1 in draft**). When that choice changes anything else (RX window, streaming, output
+   dialect, vendor commands, baud, power range, or a scan-offset calibration it clears), the card
+   lists each change as old → new and applies them only on **Apply to draft** (ADR-375).
+   Ruida remains file-only. CNC readback labels `$30` as a configured S maximum. Copying it into spindle RPM requires
    **Use S maximum as spindle RPM** and a reported CNC mode; otherwise the spindle ceiling stays
    unchanged. Configured travel is not measured usable travel.
 2. **Essentials** — review the name, usable work area, max/frame feed, origin, homing policy, and
@@ -3654,7 +3672,12 @@ work-Z evidence, but it cannot enable User Origin or Verified Origin.
     Air output `M8` and "Air restart" ticked. A Falcon A1 Pro profile
     saved before the preset gained `M8` (2026-09-19) still reads
     Disabled and sends no air command at all; the Air output row then
-    offers **Use preset air settings** (ADR-370), which sets both. With
+    offers **Use preset air settings** (ADR-370), which sets both. A
+    copy saved before the preset had its vendor command set also
+    connects with the generic grblHAL commands, so its Frame still
+    sends `M9` just before Start; Job Review names it. Choose the
+    Falcon A1 Pro card in Machine Setup to re-apply the preset, save,
+    then reconnect (ADR-375). With
     an operation's Air on, Frame
     then Start: the pump must be running at the first burn line. Frame
     no longer sends `M9` on the Falcon command set, so a pump the
@@ -6795,6 +6818,14 @@ as the pane's design record.
 #### Edge — banner disagrees with the profile
 1. Log line: "Controller banner looks like X, but the profile selected Y.
    Check the device profile's controller setting." Nothing switches silently.
+2. Job Review warns (advisory). The banner is identity evidence that a
+   reconnect with the same profile hears again, so the advice is to choose X
+   as the machine's controller in Machine Setup if the machine runs X, then
+   reconnect. A "Grbl 1.1f" banner on the grblHAL driver is grblHAL's
+   compatibility banner and raises nothing (#923).
+3. A profile whose command set differs from the one the connection bound
+   (for example a Falcon A1 Pro profile on a generic grblHAL connection) gets
+   its own Job Review warning with reconnect advice (ADR-375).
 
 ### F-H2. Run a job on Marlin (no realtime bytes)
 
