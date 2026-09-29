@@ -6,7 +6,9 @@
 // intersection sits close to the chain (a chamfer hugs its vertex; a real
 // arc's tangent intersection stands far off), replace the bend window with
 // the intersection vertex. Deliberate fillets (roundings ≳ 2 stroke radii)
-// keep their distance and stay round.
+// keep their distance and stay round; centreline strokes also keep tighter
+// roundings round unless the ink shows a drawn corner (round-bend-guard.ts),
+// and never build a second corner out of one already rebuilt.
 //
 // This file is the ORCHESTRATION (the scan, the per-candidate attempt, the
 // in-place splice); the pure geometric predicates it calls live in
@@ -22,6 +24,7 @@ import {
   arcTrimIndexOn,
   bendGateReachPx,
   bendVertexAt,
+  bendVertexSpan,
   bendWindow,
   edgeLength,
   edgeLengths,
@@ -31,8 +34,10 @@ import {
   quickTurnAt,
   turnIsConcentrated,
   vertexHugsChain,
+  type BendVertex,
 } from './bend-geometry';
 import { sharpenRingSteps, type RingBend, type RingBendJudge } from './ring-bend-scan';
+import { bendIsRounded } from './round-bend-guard';
 
 const QUICK_TURN_GATE_RAD = (20 * Math.PI) / 180;
 // One corner per physical corner: after a rebuild, nearby candidates (the
@@ -70,6 +75,16 @@ export function createBendBudget(workingPixels: number): BendBudget {
   };
 }
 
+export type SharpenOptions = {
+  /** Centreline strokes: rebuild a corner only where the ink holds the
+   *  stroke's full width at the rebuilt vertex, so a rounded bend in a
+   *  thick stroke keeps its curve. */
+  readonly keepRoundedBends?: boolean;
+  /** Centreline strokes: build no corner from points that take in a corner
+   *  already rebuilt on the chain (see `readsRebuiltCorner`). */
+  readonly oneCornerPerBend?: boolean;
+};
+
 export type SharpenedChain = {
   readonly points: Vec2[];
   /** The rebuilt drawn-corner vertices, by object reference. Output
@@ -88,8 +103,11 @@ export function sharpenChainBends(
   distSq: Float64Array,
   width: number,
   anchors?: ReadonlySet<Vec2>,
+  options?: SharpenOptions,
 ): SharpenedChain {
-  return runTraceSteps(sharpenChainBendsSteps(points, closed, distSq, width, anchors));
+  return runTraceSteps(
+    sharpenChainBendsSteps(points, closed, distSq, width, anchors, undefined, options),
+  );
 }
 
 // Open chains take one forward pass: an accepted bend is spliced into the
@@ -105,6 +123,7 @@ export function* sharpenChainBendsSteps(
   width: number,
   anchors?: ReadonlySet<Vec2>,
   budget?: BendBudget,
+  options?: SharpenOptions,
 ): TraceSteps<SharpenedChain> {
   yield;
   const corners = new Set<Vec2>();
@@ -116,15 +135,35 @@ export function* sharpenChainBendsSteps(
     corners.add(bend.corner);
     return true;
   };
+  const ink: ChainInk = {
+    distSq,
+    width,
+    keepRounded: options?.keepRoundedBends === true,
+    rebuilt: options?.oneCornerPerBend === true ? corners : undefined,
+  };
+  const attempt: BendAttempt = (pts, seg, i, maxArm) => trySharpenOpen(pts, seg, i, ink, maxArm);
   const sharpened = closed
-    ? yield* sharpenRingSteps(points, ringJudge(distSq, width, addCorner, budget), replacements)
-    : yield* sharpenOpenSteps([...points], distSq, width, addCorner, replacements, budget);
+    ? yield* sharpenRingSteps(
+        points,
+        ringJudge(distSq, width, attempt, addCorner, budget),
+        replacements,
+      )
+    : yield* sharpenOpenSteps([...points], attempt, addCorner, replacements, budget);
   return { points: sharpened, corners };
 }
+
+// One bend attempt at chain position `i`, with the options of this chain.
+type BendAttempt = (
+  pts: ReadonlyArray<Vec2>,
+  seg: Float64Array,
+  i: number,
+  maxArm?: number,
+) => BendResult | null;
 
 function ringJudge(
   distSq: Float64Array,
   width: number,
+  attempt: BendAttempt,
   accept: (pts: ReadonlyArray<Vec2>, bend: BendResult) => boolean,
   budget: BendBudget | undefined,
 ): RingBendJudge {
@@ -133,15 +172,14 @@ function ringJudge(
     admits: (pts, i) => quickTurnAt(pts, i, true) >= QUICK_TURN_GATE_RAD,
     reachPx: (pts, i) => bendGateReachPx(pts, i, distSq, width, MAX_GATE_ARM_PX),
     maxGateArmPx: MAX_GATE_ARM_PX,
-    attempt: (stretch, seg, at, maxArm) => trySharpenOpen(stretch, seg, at, distSq, width, maxArm),
+    attempt,
     accept,
   };
 }
 
 function* sharpenOpenSteps(
   pts: Vec2[],
-  distSq: Float64Array,
-  width: number,
+  attempt: BendAttempt,
   accept: (pts: ReadonlyArray<Vec2>, bend: BendResult) => boolean,
   replacements: number,
   budget: BendBudget | undefined,
@@ -157,7 +195,7 @@ function* sharpenOpenSteps(
       continue;
     }
     if (!spend(budget)) break;
-    const bent = trySharpenOpen(pts, seg, i, distSq, width);
+    const bent = attempt(pts, seg, i);
     if (bent === null || !accept(pts, bent)) {
       i += 1;
       continue;
@@ -266,13 +304,13 @@ function trySharpenOpen(
   pts: ReadonlyArray<Vec2>,
   seg: Float64Array,
   i: number,
-  distSq: Float64Array,
-  width: number,
+  ink: ChainInk,
   maxArm = Infinity,
 ): BendResult | null {
-  const window = bendWindow(pts, seg, i, distSq, width);
+  const window = bendWindow(pts, seg, i, ink.distSq, ink.width);
   const baseArm = Math.min(window.arm, maxArm);
-  const base = attemptBend(pts, seg, i, baseArm, window.maxRadius, distSq, width);
+  const gates: BendGates = { ...ink, maxRadius: window.maxRadius };
+  const base = attemptBend(pts, seg, i, baseArm, gates);
   if (base !== null) return base;
   const nearTurn = netTurnAcross(pts, seg, i, RETRY_NEAR_SPAN_PX);
   if (nearTurn === null || nearTurn < RETRY_MIN_NEAR_TURN_RAD) return null;
@@ -282,20 +320,32 @@ function trySharpenOpen(
     if (!legsAreStraight(pts, seg, i, armPx)) continue;
     const turn = netTurnAcross(pts, seg, i, armPx);
     if (turn === null || turn < RETRY_MIN_TURN_RAD) continue;
-    const bent = attemptBend(pts, seg, i, armPx, window.maxRadius, distSq, width, true);
+    const bent = attemptBend(pts, seg, i, armPx, gates, true);
     if (bent !== null) return bent;
   }
   return null;
 }
+
+// What every attempt on one chain reads besides the chain: the ink, whether a
+// rounded bend keeps its curve, and, under oneCornerPerBend, the live set of
+// corners rebuilt so far.
+type ChainInk = {
+  readonly distSq: Float64Array;
+  readonly width: number;
+  readonly keepRounded: boolean;
+  readonly rebuilt: ReadonlySet<Vec2> | undefined;
+};
+
+// One attempt's gates: the chain's ink and the stroke's largest radius near
+// the candidate.
+type BendGates = ChainInk & { readonly maxRadius: number };
 
 function attemptBend(
   pts: ReadonlyArray<Vec2>,
   seg: Float64Array,
   i: number,
   arm: number,
-  maxRadius: number,
-  distSq: Float64Array,
-  width: number,
+  gates: BendGates,
   legsChecked = false,
 ): BendResult | null {
   const p = pts[i];
@@ -315,17 +365,73 @@ function attemptBend(
   if (!turnIsConcentrated(pts, seg, i, arm)) return null;
   const bend = bendVertexAt(pts, seg, headEnd, tailStart);
   if (bend === null) return null;
-  const wedge = wedgeInkSupport(pts, headEnd, tailStart, bend.vertex, distSq, width);
-  if (wedge === null) return null;
-  const { legStart, legEnd } = wedge;
-  const maxOffset = maxRadius * MAX_VERTEX_OFFSET_FACTOR * apexReachScale(bend.turnRad);
-  if (!vertexHugsChain(bend.vertex, pts, headEnd, tailStart, maxOffset)) return null;
-  if (
-    !replacementCoversRemoved(pts, headEnd, tailStart, legStart, bend.vertex, legEnd, maxOffset)
-  ) {
-    return null;
-  }
+  if (!wedgeFitsWindow(pts, headEnd, tailStart, bend, gates)) return null;
+  if (strokeRulesReject(pts, seg, headEnd, tailStart, bend, gates)) return null;
   return { from: headEnd, to: tailStart, corner: bend.vertex };
+}
+
+// The centreline-only rules: one corner per bend, and a rounded bend keeps
+// its curve.
+function strokeRulesReject(
+  pts: ReadonlyArray<Vec2>,
+  seg: Float64Array,
+  headEnd: number,
+  tailStart: number,
+  bend: BendVertex,
+  gates: BendGates,
+): boolean {
+  const { rebuilt, keepRounded, distSq, width } = gates;
+  if (rebuilt !== undefined && readsRebuiltCorner(pts, seg, headEnd, tailStart, rebuilt)) {
+    return true;
+  }
+  return keepRounded && bendIsRounded(pts, headEnd, tailStart, bend, distSq, width);
+}
+
+// A corner rebuilt earlier on this chain is where the chain turns. A candidate
+// that takes it in, inside the window it would replace or in a leg's tangent
+// chord, is that corner seen again from one of its legs. Its vertex comes from
+// a tangent read further down the other leg and lands beside the first: a
+// second corner 3 px from the first, 1.5 px off a 12 px stroke's 45° bend.
+function readsRebuiltCorner(
+  pts: ReadonlyArray<Vec2>,
+  seg: Float64Array,
+  headEnd: number,
+  tailStart: number,
+  rebuilt: ReadonlySet<Vec2>,
+): boolean {
+  if (rebuilt.size === 0) return false;
+  const { from, to } = bendVertexSpan(pts, seg, headEnd, tailStart);
+  for (let k = from; k <= to; k += 1) {
+    const p = pts[k];
+    if (p !== undefined && rebuilt.has(p)) return true;
+  }
+  return false;
+}
+
+// The wedge (leg, vertex, leg) may replace the bend window only where ink
+// carries both legs to the vertex, the vertex hugs the chain, and the wedge
+// passes near every point it drops.
+function wedgeFitsWindow(
+  pts: ReadonlyArray<Vec2>,
+  headEnd: number,
+  tailStart: number,
+  bend: BendVertex,
+  gates: BendGates,
+): boolean {
+  const wedge = wedgeInkSupport(pts, headEnd, tailStart, bend.vertex, gates.distSq, gates.width);
+  if (wedge === null) return false;
+  const { legStart, legEnd } = wedge;
+  const maxOffset = gates.maxRadius * MAX_VERTEX_OFFSET_FACTOR * apexReachScale(bend.turnRad);
+  if (!vertexHugsChain(bend.vertex, pts, headEnd, tailStart, maxOffset)) return false;
+  return replacementCoversRemoved(
+    pts,
+    headEnd,
+    tailStart,
+    legStart,
+    bend.vertex,
+    legEnd,
+    maxOffset,
+  );
 }
 
 function legsAreStraight(

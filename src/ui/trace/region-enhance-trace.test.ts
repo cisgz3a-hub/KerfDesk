@@ -231,6 +231,23 @@ describe('traceImageWithBoundaryMode — enhance mode', () => {
     // right: one survivor + one replacement = two, not three).
     expect(polylines).toHaveLength(2);
   });
+
+  it('shows the full trace report, not the region re-trace report', async () => {
+    const trace = (automaticThresholdLuma: number) => ({
+      paths: [],
+      bounds: { minX: 0, minY: 0, maxX: 0, maxY: 0 },
+      width: 20,
+      height: 20,
+      report: { automaticThresholdLuma },
+    });
+    vi.mocked(traceImageWithFallback)
+      .mockResolvedValueOnce(trace(120))
+      .mockResolvedValueOnce(trace(90));
+
+    const result = await traceImageWithBoundaryMode(image, options, region, 'enhance');
+
+    expect(result.report).toEqual({ automaticThresholdLuma: 120 });
+  });
 });
 
 describe('traceImageWithBoundaryMode � frozen decisions stay off the UI thread (ADR-435)', () => {

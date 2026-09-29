@@ -207,7 +207,8 @@ describe('Trace Image workflow controls', () => {
       for (const label of [
         'Refine detail',
         'Detection',
-        'Automatic (preserve pale details)',
+        'Automatic (band + pale colour detail)',
+        'Band in use: Cutoff 0, Threshold 128.',
         'Ignore Less Than',
         'Remove ink specks',
         'Smoothness',
@@ -215,7 +216,7 @@ describe('Trace Image workflow controls', () => {
         'Trace alpha mask',
         // Line Art offers Invert for light artwork on a dark background.
         'Invert',
-        'Line Art automatically preserves pale logo details.',
+        'Choose Manual brightness band to set Cutoff and Threshold.',
         'Fade Image',
         'Delete Image After trace',
       ]) {

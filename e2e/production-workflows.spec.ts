@@ -496,8 +496,12 @@ test('imports a generated bitmap and traces it through the production worker wor
   await expect(threshold).toHaveCount(0);
   await expect(dialog.getByRole('spinbutton', { name: 'Remove ink specks' })).toHaveValue('1');
   await expect(dialog.getByRole('spinbutton', { name: 'Ignore Less Than' })).toHaveValue('0');
+  // Manual starts from the band Sharp's automatic threshold used on this image.
+  const band = dialog.getByText(/^Band in use: Cutoff 0, Threshold \d+, set from this image\.$/);
+  await expect(band).toBeVisible({ timeout: 15_000 });
+  const automaticThreshold = /Threshold (\d+)/.exec((await band.textContent()) ?? '')?.[1];
   await detection.selectOption('manual');
-  await expect(threshold).toHaveValue('128');
+  await expect(threshold).toHaveValue(automaticThreshold ?? 'not reported');
   await threshold.fill('137');
   await expect(threshold).toHaveValue('137');
   await dialog.screenshot({ path: testInfo.outputPath('trace-manual.png') });

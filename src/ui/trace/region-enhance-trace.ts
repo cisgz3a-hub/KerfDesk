@@ -95,5 +95,7 @@ export async function traceImageWithBoundaryMode(
     width: full.width,
     height: full.height,
     ...(notices.size === 0 ? {} : { notices: [...notices] }),
+    // The full trace sets detection for most of the image; show its report.
+    ...(full.report === undefined ? {} : { report: full.report }),
   };
 }

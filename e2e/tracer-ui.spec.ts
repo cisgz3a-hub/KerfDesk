@@ -66,13 +66,16 @@ test('inspects a trace without restarting the worker, edits with sliders, and co
   await page.waitForTimeout(450);
   expect(await requests(page)).toBe(requestCount);
 
+  // Manual starts from the band Sharp's automatic threshold used on this image.
+  const band = dialog.getByText(/^Band in use: Cutoff 0, Threshold \d+, set from this image\.$/);
+  const automatic = Number(/Threshold (\d+)/.exec((await band.textContent()) ?? '')?.[1]);
   await dialog.getByRole('combobox', { name: 'Trace detection' }).selectOption('manual');
   const slider = dialog.getByRole('slider', { name: 'Trace Threshold slider', exact: true });
   await slider.focus();
   await slider.press('ArrowRight');
   await expect(
     dialog.getByRole('spinbutton', { name: 'Trace Threshold', exact: true }),
-  ).toHaveValue('129');
+  ).toHaveValue(String(Math.min(255, automatic + 1)));
   await expect(dialog.getByText('Settings edited', { exact: true })).toBeVisible();
   await dialog.getByText('Curve finishing', { exact: true }).click();
   await expect(

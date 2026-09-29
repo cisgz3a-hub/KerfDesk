@@ -177,10 +177,11 @@ export function* traceImageToContourColoredPathsSteps(
   preparedInput?: ContourTraceInput,
 ): TraceSteps<ColoredPath[]> {
   const cooperate = yield;
-  const { prepared, crackField } =
+  const { prepared, crackField, report } =
     preparedInput !== undefined && contourTraceInputMatches(preparedInput, image, options)
       ? preparedInput
       : prepareTraceForContour(image, options);
+  if (report !== undefined) yield report;
   if (cooperate) yield;
   const mask = inkMaskFromPrepared(prepared);
   // Sub-pixel crack interpolation: vertex POSITIONS come from the

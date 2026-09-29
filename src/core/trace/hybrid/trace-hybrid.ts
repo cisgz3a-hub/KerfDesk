@@ -22,7 +22,7 @@ import type { ColoredPath, CurveSubpath, Polyline, Vec2 } from '../../scene';
 import { registerTraceCurve, withCanonicalTraceCurves } from '../trace-curves';
 import {
   effectivePixelScale,
-  preprocessForTrace,
+  prepareTraceForContour,
   type RawImageData,
   type TraceOptions,
 } from '../trace-image';
@@ -64,7 +64,11 @@ export function* traceHybridPathsSteps(
   options: TraceOptions,
 ): TraceSteps<ColoredPath[]> {
   const cooperate = yield;
-  const prepared = preprocessForTrace(image, { ...options, traceMode: 'centerline' });
+  const { prepared, report } = prepareTraceForContour(image, {
+    ...options,
+    traceMode: 'centerline',
+  });
+  if (report !== undefined) yield report;
   if (cooperate) yield;
   const mask = inkMaskFromPrepared(prepared);
   if (!mask.ink.includes(1)) return [];
@@ -81,7 +85,8 @@ export function* traceHybridPathsSteps(
     height: mask.height,
     radiusSq: wideCoreRadii(mask, distSq, gateRadius, maxWidthPx),
   });
-  const centre = yield* centerlineStrokesFromMaskSteps(mask, distSq, options);
+  // Line + fill recentres its width-carrying strokes itself (strokePaths).
+  const centre = yield* centerlineStrokesFromMaskSteps(mask, distSq, options, { penPath: false });
   if (cooperate) yield;
   const { wide, strokes } = yield* withOverwideStrokesFilled(centre, mask, distSq, cores, {
     gateRadius,

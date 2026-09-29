@@ -49,6 +49,7 @@ commit grid scales them.
   --edge-detail <value>         Edge Detection detail (0 to 100)
   --edge-min-line <value>       Edge Detection shortest line in px (0 to 1000)
   --max-stroke-width <value>    Line + fill max stroke in mm (0.05 to 3)
+  --join-gaps <value>           Centerline and Line + fill join gap in px (0 to 50)
   --photo-detail <value>        Photo shading detail (0 to 100)
   --photo-brightness <value>    Photo shading brightness (-100 to 100)
   --photo-contrast <value>      Photo shading contrast (-100 to 100)

@@ -4,6 +4,8 @@
 import { act } from 'react';
 import { createRoot } from 'react-dom/client';
 import { TRACE_PRESETS, type TraceOptions } from '../../core/trace';
+import type { TraceReport } from '../../core/trace/trace-steps';
+import type { TraceGrid } from './trace-boundary-grid';
 import { TraceSettingsControls } from './TraceSettingsControls';
 import { mergeLightBurnTraceSettings, type LightBurnTraceSettingOverrides } from './trace-options';
 import { overridesForPresetSwitch } from './trace-preset-switch';
@@ -22,6 +24,13 @@ export type Controls = {
   readonly selectPreset: (name: string) => Promise<void>;
   readonly reset: () => Promise<void>;
   readonly overrides: () => LightBurnTraceSettingOverrides;
+  /** What a matching finished preview found (the dialog's preview facts). */
+  readonly setPreviewFacts: (facts: PreviewFacts) => Promise<void>;
+};
+
+type PreviewFacts = {
+  readonly report?: TraceReport | undefined;
+  readonly previewGrid?: TraceGrid | undefined;
 };
 
 export async function withControls(
@@ -36,12 +45,15 @@ export async function withControls(
   document.body.append(host);
   const root = createRoot(host);
   let settings: LightBurnTraceSettingOverrides = {};
+  let facts: PreviewFacts = {};
   const render = (): void =>
     root.render(
       <TraceSettingsControls
         preset={preset}
         overrides={settings}
         sourceHasTransparency={sourceHasTransparency}
+        report={facts.report}
+        previewGrid={facts.previewGrid}
         onChange={(next) => {
           settings = next;
           render();
@@ -59,6 +71,10 @@ export async function withControls(
       host,
       options: () => mergeLightBurnTraceSettings(preset, settings),
       overrides: () => settings,
+      setPreviewFacts: async (next) => {
+        facts = next;
+        await act(async () => render());
+      },
       number,
       check: async (label, checked) => {
         const input = host.querySelector(`[aria-label="${label}"]`);
@@ -72,13 +88,7 @@ export async function withControls(
         preset = next;
         await act(async () => render());
       },
-      reset: async () => {
-        const button = [...host.querySelectorAll('button')].find(
-          (node) => node.textContent === 'Reset trace settings',
-        );
-        if (button === undefined) throw new Error('Missing reset button');
-        await act(async () => button.click());
-      },
+      reset: () => clickButton(host, 'Reset trace settings'),
       change: async (label, value) => {
         await act(async () => {
           const input = number(label);
@@ -89,17 +99,25 @@ export async function withControls(
           input.dispatchEvent(new Event('input', { bubbles: true }));
         });
       },
-      detect: async (mode) => {
-        await act(async () => {
-          const select = host.querySelector('[aria-label="Trace detection"]');
-          if (!(select instanceof HTMLSelectElement)) throw new Error('Missing detection selector');
-          select.value = mode;
-          select.dispatchEvent(new Event('change', { bubbles: true }));
-        });
-      },
+      detect: (mode) => selectDetection(host, mode),
     });
   } finally {
     await act(async () => root.unmount());
     host.remove();
   }
+}
+
+async function clickButton(host: HTMLElement, text: string): Promise<void> {
+  const button = [...host.querySelectorAll('button')].find((node) => node.textContent === text);
+  if (button === undefined) throw new Error(`Missing button ${text}`);
+  await act(async () => button.click());
+}
+
+async function selectDetection(host: HTMLElement, mode: string): Promise<void> {
+  await act(async () => {
+    const select = host.querySelector('[aria-label="Trace detection"]');
+    if (!(select instanceof HTMLSelectElement)) throw new Error('Missing detection selector');
+    select.value = mode;
+    select.dispatchEvent(new Event('change', { bubbles: true }));
+  });
 }
