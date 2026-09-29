@@ -209,6 +209,14 @@ test('local operator publication requires explicit Windows signing/account input
   for (const name of Object.keys(env))
     assert.throws(() => requireCommercialPublishContext({ ...env, [name]: '' }, identity, 'win32'));
   assert.throws(() => requireCommercialPublishContext(env, identity, 'linux'), /Windows/u);
+  // The release train publishes a main commit; no other branch may publish.
+  const train = { ...identity, sourceRef: 'refs/heads/main' };
+  assert.doesNotThrow(() => requireCommercialPublishContext(env, train, 'win32'));
+  for (const sourceRef of ['refs/heads/feature', 'refs/tags/v9.9.9'])
+    assert.throws(
+      () => requireCommercialPublishContext(env, { ...identity, sourceRef }, 'win32'),
+      /versioned signed source/u,
+    );
   const exec = (head, status) => async (_command, args) => ({
     stdout: args[0] === 'rev-parse' ? head : status,
   });

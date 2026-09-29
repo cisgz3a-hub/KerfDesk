@@ -38,9 +38,9 @@ function responses(manifest = rawEnvelope()) {
   };
 }
 // Catalogue bytes produced by the real operator publisher code, not a browser-side fixture.
-function publishedCatalog(versions) {
+function publishedCatalog(versions, source = {}) {
   const entries = versions.map((version) => {
-    const release = stable.fixture(version);
+    const release = stable.fixture(version, source);
     const identity = verifyCommercialEnvelope(release.identity, stable.keySet, 'release-identity');
     const payload = updatePayload(identity, commercialReleaseFiles(release, identity));
     const envelope = signCommercialManifest(
@@ -262,6 +262,27 @@ test('unverifiable entries are skipped, and nothing unverified is ever offered',
     throw new Error('offline');
   });
   assert.match(offline.querySelector('#commercial-status').textContent, /^No verified download/u);
+});
+
+test('a release train build of main is offered, and no other branch ever is', async () => {
+  const { entries, text } = publishedCatalog(['2026.40.0'], { sourceRef: 'refs/heads/main' });
+  assert.deepEqual(
+    (await verifyCommercialCatalog(text, anchors)).map((release) => release.sourceRef),
+    ['refs/heads/main'],
+  );
+  // A genuine stable-key signature over a build of any other branch.
+  const feature = stable.signed({ ...entries[0].payload, sourceRef: 'refs/heads/feature' });
+  const catalogOf = (releases) => JSON.stringify({ schemaVersion: 1, releases });
+  assert.deepEqual(
+    (await verifyCommercialCatalog(catalogOf([feature, entries[0].envelope]), anchors)).map(
+      (release) => release.sourceRef,
+    ),
+    ['refs/heads/main'],
+  );
+  await assert.rejects(
+    verifyCommercialCatalog(catalogOf([feature]), anchors),
+    /no verifiable release/u,
+  );
 });
 
 test('stable and Preview anchors authorize only their own channel', async () => {

@@ -7694,9 +7694,13 @@ behavior or create a second product implementation.
    Developer grants for Johann and Father are separate private keys with normal
    computer-transfer behaviour and unlimited update coverage.
 5. Trusted signed Windows commercial builds use only the separate commercial
-   catalog. The newest eligible signed release is selected by immutable release
-   date and version; an ineligible newer release cannot replace an older eligible
-   one. Manifest hashes, native publisher validation and actual updater availability
+   catalog: the stable ring, or the beta ring when **Get new versions early (beta)**
+   is ticked in Help → Licence (ADR-541). Beta lists every stable release plus the
+   newest builds a few quiet days before stable; the choice applies from the next
+   launch's update check, and unticking it never downgrades. The newest eligible
+   signed release is selected by immutable release date and version; an ineligible
+   newer release cannot replace an older eligible one. Manifest hashes, native
+   publisher validation and actual updater availability
    must all pass before download. Eligibility is rechecked at download completion
    and natural quit. No forced quit is issued and the ordinary close handoff remains.
 6. Live payment, hosted service and genuine signed upgrade qualification remain

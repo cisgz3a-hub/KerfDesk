@@ -4,6 +4,7 @@ import { licensingDeviceId } from './licensing-device.js';
 import { createLicensingStore } from './licensing-store.js';
 import { createLicensingRuntime } from './licensing-runtime.js';
 import { checkCommercialUpdates, type CommercialUpdater } from './commercial-update.js';
+import { createUpdateRingStore, earlyUpdateSetting } from './update-ring-store.js';
 
 // A plain label for the device list; the computer's own name is never sent.
 const DEVICE_NAMES: Readonly<Record<string, string>> = {
@@ -11,6 +12,14 @@ const DEVICE_NAMES: Readonly<Record<string, string>> = {
   darwin: 'Mac',
   linux: 'Linux computer',
 };
+
+function announceDownloadedUpdate(version: string): void {
+  if (Notification.isSupported())
+    new Notification({
+      title: 'KerfDesk update ready',
+      body: `KerfDesk ${version} has downloaded and will install when you close KerfDesk.`,
+    }).show();
+}
 
 export function createDesktopLicensing(options: {
   readonly appPath: string;
@@ -49,28 +58,33 @@ export function createDesktopLicensing(options: {
       await shell.openExternal(target.href);
     },
   });
+  const rings = createUpdateRingStore(options.userDataPath);
   const checkUpdates = (): Promise<void> =>
-    checkCommercialUpdates(options.updater, {
-      isPackaged: options.packaged,
-      isChannelTrusted: options.trustedUpdates,
-      platform: process.platform,
-      currentVersion: options.version,
-      releaseKeys: config.channel === 'commercial' ? config.releaseKeys : {},
-      fetch: (url, init) => net.fetch(url, init),
-      isEligible: runtime.isReleaseEligible,
-      isEligibleCached: runtime.isReleaseEligibleCached,
-      onVerifiedDownload: (envelope, version) => {
-        pendingUpdate = { envelope, version };
-        if (Notification.isSupported())
-          new Notification({
-            title: 'KerfDesk update ready',
-            body: `KerfDesk ${version} has downloaded and will install when you close KerfDesk.`,
-          }).show();
-      },
-    }).catch(() => console.warn('Commercial update check could not complete.'));
+    rings
+      .read()
+      .then((ring) =>
+        checkCommercialUpdates(options.updater, {
+          isPackaged: options.packaged,
+          isChannelTrusted: options.trustedUpdates,
+          platform: process.platform,
+          currentVersion: options.version,
+          releaseKeys: config.channel === 'commercial' ? config.releaseKeys : {},
+          fetch: (url, init) => net.fetch(url, init),
+          isEligible: runtime.isReleaseEligible,
+          isEligibleCached: runtime.isReleaseEligibleCached,
+          ring,
+          onVerifiedDownload: (envelope, version) => {
+            pendingUpdate = { envelope, version };
+            announceDownloadedUpdate(version);
+          },
+        }),
+      )
+      .catch(() => console.warn('Commercial update check could not complete.'));
   return {
     runtime,
     config,
+    /** Help > Licence's "Get new versions early (beta)" setting (ADR-541). */
+    earlyUpdates: earlyUpdateSetting(config.channel === 'commercial', rings),
     /**
      * Runs once the window is open: a quiet weekly licence confirmation, then
      * the signed update check. The workspace never waits for either (ADR-540).

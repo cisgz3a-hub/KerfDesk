@@ -2,7 +2,16 @@ import { createHash, createPrivateKey, createPublicKey, sign, verify } from 'nod
 import { compareStableVersions, stableArtifactNames } from './stable-release-artifacts.mjs';
 
 export const COMMERCIAL_PREFIX = 'desktop/commercial';
+// The stable ring: what shipped clients and the download page read.
 export const COMMERCIAL_CATALOG_KEY = `${COMMERCIAL_PREFIX}/catalog.json`;
+// The beta ring holds every beta and stable release (ADR-541). Devices that
+// opted into early updates read it; every publication lands here first.
+export const COMMERCIAL_BETA_CATALOG_KEY = `${COMMERCIAL_PREFIX}/beta/catalog.json`;
+// The weekly release train builds a main commit and never creates a tag
+// (ADR-248), so its signed identity names main. Operator releases name their tag.
+export const TRAIN_SOURCE_REF = 'refs/heads/main';
+export const commercialSourceRef = (version, ref) =>
+  ref === `refs/tags/v${version}` || ref === TRAIN_SOURCE_REF;
 export const CATALOG_LIMIT = 256 * 1024;
 const VERSION = /^(0|[1-9]\d{0,15})\.(0|[1-9]\d{0,15})\.(0|[1-9]\d{0,15})$/u;
 const IDENTITY_FIELDS = [
@@ -77,7 +86,7 @@ export function validateCommercialPayload(value, kind, now = Date.now()) {
   requireValue(
     typeof value.sourceSha === 'string' &&
       /^[a-f0-9]{40}$/u.test(value.sourceSha) &&
-      value.sourceRef === `refs/tags/v${value.version}`,
+      commercialSourceRef(value.version, value.sourceRef),
     'source',
   );
   const time = typeof value.publishedAt === 'string' ? Date.parse(value.publishedAt) : NaN;

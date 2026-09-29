@@ -51,6 +51,8 @@ function client(status: LicenceStatus): LicenceAdapter {
     checkout: vi.fn(async () => status),
     claimPayment: vi.fn(async () => status),
     discardPayment: vi.fn(async () => status),
+    earlyUpdates: vi.fn(async () => ({ available: false, enabled: false })),
+    setEarlyUpdates: vi.fn(async () => ({ available: false, enabled: false })),
   };
 }
 function VcarveTool({ onOpen }: { readonly onOpen: () => void }): JSX.Element {

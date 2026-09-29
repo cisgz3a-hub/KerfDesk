@@ -73,6 +73,13 @@ eligible commercial versions available for customers whose update period ended.
 The catalog is bounded; reaching its capacity requires a reviewed archival/index
 design, not silently evicting old entitlements' last eligible download.
 
+The feed has two rings (ADR-541). A publication lists the release in the beta
+catalogue (`desktop/commercial/beta/catalog.json`) only. Devices whose owner ticked
+"Get new versions early (beta)" in Help > Licence read that one. Every other device,
+and the download page, read the stable catalogue (`desktop/commercial/catalog.json`),
+which changes only when a beta is promoted: its identical signed entry is copied
+across, and nothing is signed again.
+
 ## Pilot verification
 
 After the service is live and its public keys match the package, privately issue
@@ -90,8 +97,13 @@ an explicit request.
 
 Publish two genuinely signed test versions through the commercial publisher, then
 prove an eligible update downloads and installs on natural quit while an
-ineligible release is skipped. Verify installer publisher, hashes, installed
-version, retained projects/settings, and public download/CORS/cache behaviour.
+ineligible release is skipped. Each publication reaches the beta ring only, and the
+download page shows a version once `node scripts/promote-commercial-release.mjs
+<version>` has promoted it. Before promoting N+1, prove that a device running N with
+"Get new versions early (beta)" ticked takes N+1 and an unticked one does not; after
+promotion, the unticked one takes it too. Verify installer publisher, hashes,
+installed version, retained projects/settings, and public download/CORS/cache
+behaviour.
 Record the exact source, artifact and hosted identity. Only then enable customer
 checkout and advertise automatic commercial updates.
 
@@ -102,3 +114,93 @@ Before merging it, confirm the owner's own machines run the commercial build wit
 a developer licence, since the free builds stop offering Pro to him too. On the
 signed commercial build, confirm that starting KerfDesk with
 `--remote-debugging-port=9222` shows the refusal and opens no window.
+
+## Weekly release train
+
+`.github/workflows/release-train.yml` (ADR-541) builds, signs and publishes the
+commercial Windows app every week. It is off until the owner switches it on, and
+while off its only job writes a short summary of what switching it on needs.
+Switch it on only once billing, Cloudflare R2 (`kerfdesk-downloads` behind
+`dl.kerfdesk.com`) and Windows signing are in place and the pilot above has passed.
+
+Once on, it works like this:
+
+- **Tuesdays, 07:17 UTC.** If main has a user-facing change since the newest
+  release, and CI, Browser smoke and the Desktop package check have all passed on a
+  commit that includes it, the train checks its secrets on Linux, runs the Windows
+  and macOS package checks on that commit, then builds, signs and publishes it to the
+  beta ring as `<ISO week-year>.<ISO week>.<patch>`, for example `2026.40.0`. A week
+  with nothing user-facing builds nothing and uses only Linux minutes.
+- **Every day, 09:43 UTC.** Once the newest beta has stayed the newest for 4 days,
+  and nothing holds it, it reaches everyone: the stable ring and the download page.
+  A Tuesday beta is promoted from Saturday.
+- It never tags, pushes or uploads to GitHub. Customers download only from
+  `dl.kerfdesk.com`, and licensed devices still install updates only when they quit.
+
+### Switching it on
+
+1. In the repository's Settings > Environments, create `desktop-commercial` and
+   limit its deployment branches to `main`.
+2. Add these secrets to that environment. The workflow names them; their values
+   never appear in logs.
+   - `COMMERCIAL_ESIGNER_USERNAME`, `COMMERCIAL_ESIGNER_PASSWORD` and
+     `COMMERCIAL_ESIGNER_TOTP_SECRET`: the SSL.com eSigner account holding the
+     Windows code-signing certificate. The TOTP secret is shown at enrolment
+     (ADR-142 Amendment 1).
+   - `DESKTOP_STABLE_MANIFEST_PRIVATE_KEY`: the Ed25519 PKCS8 PEM of the pinned
+     stable release key.
+   - `COMMERCIAL_R2_API_TOKEN`: a Cloudflare API token scoped to `kerfdesk-downloads`,
+     with object read and write and bucket read access, like the Preview's token
+     (`desktop-preview-distribution.md`).
+   - `COMMERCIAL_CLOUDFLARE_ACCOUNT_ID`: the 32-character ID of the account that
+     owns that bucket and `dl.kerfdesk.com`.
+3. Add these variables, to the environment or the repository:
+   - `DESKTOP_STABLE_MANIFEST_KEY_ID`: `stable-2026-09`, the key the private key
+     must match.
+   - `DESKTOP_WINDOWS_PUBLISHER_NAME`: the certificate's publisher name, exactly as
+     Windows shows it.
+   - `KERFDESK_COMMERCIAL_TERMS_SHA256`: the lowercase SHA-256 of the approved
+     installer terms. First upload those terms to the bucket as
+     `desktop/commercial/terms/<sha256>.txt`; the train fetches them from
+     `dl.kerfdesk.com` and refuses any other bytes.
+4. Create the issue label `release-hold`.
+5. Last, add the repository variable `KERFDESK_RELEASE_TRAIN` with the value `on`
+   (Settings > Secrets and variables > Actions > Variables). It must be a
+   repository variable, because the deciding job has no environment.
+6. Run the workflow by hand with `status`. It reads both rings from `dl.kerfdesk.com`
+   and changes nothing.
+
+To switch the train off, delete `KERFDESK_RELEASE_TRAIN` or set it to anything but
+`on`. A run already in progress finishes.
+
+Before a Windows runner starts, a Linux preflight checks that every secret and
+variable above is set, that the private key is the one `stable-2026-09` pins, that
+the bucket answers and that the terms match their hash. A mistake there costs a
+Linux job, not a Windows build.
+
+### Holding a release
+
+- To stop the newest beta reaching everyone, open an issue that says why and label
+  it `release-hold`, or set the repository variable `KERFDESK_RELEASE_HOLD` to `on`.
+  Promotion waits while either holds.
+- Closing the last labelled issue, or removing the variable, releases the hold. The
+  next daily run promotes the beta if it is still the newest and has had its 4
+  quiet days.
+- A published beta cannot be withdrawn: its files are immutable, and beta devices
+  may already have installed it. Fix forward: merge the fix, then run the workflow
+  with `cut` rather than waiting for Tuesday. The new beta replaces the held one,
+  which is then never promoted.
+
+### Running it by hand
+
+In Actions > Release train > Run workflow, on `main`:
+
+- `status` (the default) reports both rings and whether promotion is due, without
+  secrets.
+- `cut` makes the Tuesday decision now, and builds only if a beta is due.
+- `promote` makes the daily decision now; the quiet days and holds still apply.
+
+To put one release on the stable ring at once, for example an urgent fix, run
+`node scripts/promote-commercial-release.mjs <version>` with the two R2 inputs
+(`scripts/commercial-release-README.md`). Do it only while no train run is in
+progress.

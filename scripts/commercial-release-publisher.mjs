@@ -3,10 +3,10 @@ import {
   parseStableFeed,
   validateFeedInstaller,
   stableArtifactNames,
-  compareStableVersions,
 } from './stable-release-artifacts.mjs';
 import {
   COMMERCIAL_PREFIX,
+  COMMERCIAL_BETA_CATALOG_KEY,
   COMMERCIAL_CATALOG_KEY,
   catalogBytes,
   readCommercialCatalog,
@@ -14,9 +14,9 @@ import {
   updatePayload,
   verifyCommercialEnvelope,
 } from './commercial-release-manifest.mjs';
+import { everyRelease, requireForwardRelease, sameBytes } from './commercial-release-rings.mjs';
 
 const IMMUTABLE = 'public, max-age=31536000, immutable';
-const same = (a, b) => (a === null ? b === null : b !== null && a.equals(b));
 export function commercialReleaseFiles(release, identity) {
   const names = stableArtifactNames(identity.version);
   if (
@@ -45,6 +45,10 @@ export function commercialReleaseFiles(release, identity) {
   return files;
 }
 
+/**
+ * Publishes a signed Windows release into the beta ring (ADR-541). Stable
+ * clients see it only once promotion copies the same envelope to stable.
+ */
 export async function publishCommercialRelease({
   release,
   store,
@@ -63,13 +67,13 @@ export async function publishCommercialRelease({
   const generated = signCommercialManifest(payload, privateKeyPem, keyId, keySet);
   const installer = files.get(stableArtifactNames(identity.version)[0]);
   await verifyInstaller(installer, 'local');
-  const initial = await store.get(COMMERCIAL_CATALOG_KEY);
-  const prior = readCommercialCatalog(initial, keySet);
-  const latest = prior[0]?.payload;
-  if (latest && compareStableVersions(latest.version, identity.version) > 0)
-    throw new Error('Refusing commercial catalogue rollback.');
-  if (latest && Date.parse(identity.publishedAt) < Date.parse(latest.publishedAt))
-    throw new Error('Commercial publication date cannot precede the current release.');
+  const initial = await store.get(COMMERCIAL_BETA_CATALOG_KEY);
+  // Beta also lists every stable release, so both rings bound this one.
+  const prior = everyRelease(
+    readCommercialCatalog(initial, keySet),
+    readCommercialCatalog(await store.get(COMMERCIAL_CATALOG_KEY), keySet),
+  );
+  requireForwardRelease(prior[0]?.payload, identity, 'catalogue');
   const current = prior.find((item) => item.payload.version === identity.version);
   if (current && !isDeepStrictEqual(current.payload, payload))
     throw new Error('Published commercial version conflicts with this build.');
@@ -81,16 +85,35 @@ export async function publishCommercialRelease({
     throw new Error('Immutable commercial reservation conflicts with this release.');
   if (current && !isDeepStrictEqual(current.envelope, envelope))
     throw new Error('Commercial catalogue conflicts with its reserved manifest.');
-  const next = current ? initial : catalogBytes([{ envelope, payload }, ...prior]);
+  const next = catalogBytes(current ? prior : [{ envelope, payload }, ...prior]);
   // Validate the final catalogue before writing any immutable object. Keep every
   // prior eligible version; reaching 64 requires reviewed pagination, not pruning.
   readCommercialCatalog(next, keySet);
   const manifestBytes = Buffer.from(`${JSON.stringify(envelope)}\n`);
-  const plan = [
-    { key: reservationKey, bytes: reserved ?? manifestBytes },
-    ...[...files].map(([name, bytes]) => ({ key: `${prefix}/${name}`, bytes })),
-    { key: `${prefix}/update-manifest.json`, bytes: manifestBytes },
-  ];
+  await writeImmutableObjects(
+    store,
+    [
+      { key: reservationKey, bytes: reserved ?? manifestBytes },
+      ...[...files].map(([name, bytes]) => ({ key: `${prefix}/${name}`, bytes })),
+      { key: `${prefix}/update-manifest.json`, bytes: manifestBytes },
+    ],
+    verifyInstaller,
+  );
+  // The shared workflow must serialize writers. This comparison is not a
+  // distributed lock against an administrator writing directly to the bucket.
+  if (!sameBytes(initial, await store.get(COMMERCIAL_BETA_CATALOG_KEY)))
+    throw new Error('Commercial catalogue changed during publication.');
+  if (sameBytes(initial, next)) return { status: 'already-published', version: identity.version };
+  await store.put(COMMERCIAL_BETA_CATALOG_KEY, next, {
+    contentType: 'application/json',
+    cacheControl: 'no-store',
+  });
+  if (!sameBytes(next, await store.get(COMMERCIAL_BETA_CATALOG_KEY)))
+    throw new Error('Commercial catalogue readback failed.');
+  return { status: current ? 'already-published' : 'published', version: identity.version };
+}
+
+async function writeImmutableObjects(store, plan, verifyInstaller) {
   const present = new Set();
   for (const item of plan) {
     const bytes = await store.get(item.key);
@@ -109,20 +132,8 @@ export async function publishCommercialRelease({
         cacheControl: IMMUTABLE,
       });
     const readback = await store.get(item.key);
-    if (!same(readback, item.bytes))
+    if (!sameBytes(readback, item.bytes))
       throw new Error(`Commercial object readback failed: ${item.key}`);
     if (item.key.endsWith('-setup.exe')) await verifyInstaller(readback, 'remote');
   }
-  // The shared workflow must serialize writers. This comparison is not a
-  // distributed lock against an administrator writing directly to the bucket.
-  if (!same(initial, await store.get(COMMERCIAL_CATALOG_KEY)))
-    throw new Error('Commercial catalogue changed during publication.');
-  if (current) return { status: 'already-published', version: identity.version };
-  await store.put(COMMERCIAL_CATALOG_KEY, next, {
-    contentType: 'application/json',
-    cacheControl: 'no-store',
-  });
-  if (!same(next, await store.get(COMMERCIAL_CATALOG_KEY)))
-    throw new Error('Commercial catalogue readback failed.');
-  return { status: 'published', version: identity.version };
 }

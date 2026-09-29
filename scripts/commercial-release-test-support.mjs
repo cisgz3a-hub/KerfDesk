@@ -41,7 +41,12 @@ export function signed(payload) {
     signature: sign(null, bytes, pair.privateKey).toString('base64'),
   };
 }
-export function fixture(version = '1.2.3') {
+// A maintainer's tagged release by default; the release train passes
+// { sourceRef: 'refs/heads/main' } and its own release time.
+export function fixture(
+  version = '1.2.3',
+  { sourceRef = `refs/tags/v${version}`, publishedAt = '2026-01-01T00:00:00.000Z' } = {},
+) {
   const identity = signed({
     schemaVersion: 1,
     product: 'kerfdesk-desktop',
@@ -49,8 +54,8 @@ export function fixture(version = '1.2.3') {
     channel: 'stable',
     version,
     sourceSha: 'a'.repeat(40),
-    sourceRef: `refs/tags/v${version}`,
-    publishedAt: '2026-01-01T00:00:00.000Z',
+    sourceRef,
+    publishedAt,
   });
   const [name, blockmap] = stableArtifactNames(version);
   const bytes = Buffer.from(`signed executable fixture ${version}`);

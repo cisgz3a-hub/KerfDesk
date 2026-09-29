@@ -68,10 +68,12 @@ export function validateCommercialRelease(value, now = Date.now()) {
     'payload identity',
   );
   const names = commercialArtifactNames(value.version);
+  // A maintainer's release names its vX.Y.Z tag; the weekly release train
+  // builds main and never tags (ADR-541).
   requireValue(
     typeof value.sourceSha === 'string' &&
       /^[a-f0-9]{40}$/u.test(value.sourceSha) &&
-      value.sourceRef === `refs/tags/v${value.version}`,
+      (value.sourceRef === `refs/tags/v${value.version}` || value.sourceRef === 'refs/heads/main'),
     'source',
   );
   const time = typeof value.publishedAt === 'string' ? Date.parse(value.publishedAt) : NaN;

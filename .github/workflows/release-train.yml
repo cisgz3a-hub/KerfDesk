@@ -1,0 +1,476 @@
+name: Release train
+
+# The weekly commercial release train (ADR-541). It is inert until the owner
+# sets the repository variable KERFDESK_RELEASE_TRAIN to `on`. Until then its
+# only job is one Linux step that says what switching it on would need.
+#
+# - Tuesdays (Linux): find the newest main commit that CI, Browser smoke and
+#   the Desktop package check all passed on. A beta is due when a user-facing
+#   change lies between the newest release's source and that commit.
+# - Only when one is due do the paid runners start (Windows bills at 2x Linux,
+#   macOS at 10x): the Desktop package check's native jobs run on that exact
+#   commit, then one Windows job builds, signs, checks and publishes it to the
+#   beta ring on dl.kerfdesk.com.
+# - Daily (Linux): the newest beta reaches the stable ring after 4 quiet days,
+#   unless a newer beta replaced it, an open issue is labelled release-hold or
+#   the repository variable KERFDESK_RELEASE_HOLD is `on`.
+#
+# The train never tags (release tags stay with the maintainer, ADR-248), never
+# pushes, and never uploads to GitHub: installers and update files go only to
+# the kerfdesk-downloads bucket served at https://dl.kerfdesk.com.
+on:
+  schedule:
+    # Tuesdays 07:17 UTC, off the hour: GitHub delays runs scheduled on the hour.
+    - cron: '17 7 * * 2'
+    # Every day 09:43 UTC.
+    - cron: '43 9 * * *'
+  workflow_dispatch:
+    inputs:
+      action:
+        description: status reports both rings; cut builds a beta if one is due; promote moves a quiet beta to everyone
+        type: choice
+        options: [status, cut, promote]
+        default: status
+
+# One cut, one promotion and one report at a time; a newer run waits and is
+# never cancelled. Publishing jobs also share kerfdesk-commercial-publication.
+concurrency:
+  group: release-train-${{ inputs.action || (github.event.schedule == '17 7 * * 2' && 'cut') || 'promote' }}
+  cancel-in-progress: false
+
+permissions: {}
+
+jobs:
+  off:
+    name: Release train is off
+    if: vars.KERFDESK_RELEASE_TRAIN != 'on'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Say what switching the train on needs
+        run: |
+          cat >> "${GITHUB_STEP_SUMMARY}" <<'SUMMARY'
+          ## The release train is off
+
+          Nothing was built, signed or published. The owner switches the train on by
+          setting the repository variable `KERFDESK_RELEASE_TRAIN` to `on`, once billing,
+          Cloudflare R2 and Windows signing are in place. It then needs:
+
+          - The `desktop-commercial` environment, limited to `main`, with the secrets
+            `COMMERCIAL_ESIGNER_USERNAME`, `COMMERCIAL_ESIGNER_PASSWORD`,
+            `COMMERCIAL_ESIGNER_TOTP_SECRET`, `DESKTOP_STABLE_MANIFEST_PRIVATE_KEY`,
+            `COMMERCIAL_R2_API_TOKEN` and `COMMERCIAL_CLOUDFLARE_ACCOUNT_ID`.
+          - The variables `DESKTOP_STABLE_MANIFEST_KEY_ID`, `DESKTOP_WINDOWS_PUBLISHER_NAME`
+            and `KERFDESK_COMMERCIAL_TERMS_SHA256`.
+          - A `release-hold` label: any open issue with it holds promotion.
+
+          See docs/desktop-commercial-launch.md, "Weekly release train".
+          SUMMARY
+
+  decide:
+    name: Decide whether a beta is due
+    if: >-
+      vars.KERFDESK_RELEASE_TRAIN == 'on' && github.ref == 'refs/heads/main' &&
+      (inputs.action == 'cut' || github.event.schedule == '17 7 * * 2')
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: read
+      # Reads which main commits the three workflows passed on.
+      actions: read
+    outputs:
+      due: ${{ steps.decide.outputs.due }}
+      sha: ${{ steps.decide.outputs.sha }}
+      version: ${{ steps.decide.outputs.version }}
+      published_at: ${{ steps.decide.outputs.published_at }}
+    steps:
+      - name: Checkout main with its history
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Set up pnpm
+        uses: pnpm/action-setup@0ebf47130e4866e96fce0953f49152a61190b271 # v6
+
+      - name: Set up Node.js
+        uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: List the main commits each workflow passed on
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          for workflow in ci.yml e2e.yml desktop-package-check.yml; do
+            gh run list --workflow "${workflow}" --branch main --event push --status success \
+              --limit 200 --json headSha --jq '.[].headSha' > "${RUNNER_TEMP}/green-${workflow%.yml}.txt"
+          done
+
+      - name: Decide from the public catalogues and main's history
+        id: decide
+        run: >-
+          node scripts/release-train.mjs decide
+          --green="${RUNNER_TEMP}/green-ci.txt"
+          --green="${RUNNER_TEMP}/green-e2e.txt"
+          --green="${RUNNER_TEMP}/green-desktop-package-check.txt"
+          --github-output="${GITHUB_OUTPUT}"
+          --summary="${GITHUB_STEP_SUMMARY}"
+
+  preflight:
+    name: Check the train's secrets, key, bucket and terms
+    needs: decide
+    if: needs.decide.outputs.due == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    environment: desktop-commercial
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout the release commit
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          ref: ${{ needs.decide.outputs.sha }}
+          persist-credentials: false
+
+      - name: Set up pnpm
+        uses: pnpm/action-setup@0ebf47130e4866e96fce0953f49152a61190b271 # v6
+
+      - name: Set up Node.js
+        uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      # Runs before any paid runner starts. The eSigner credentials only work on
+      # Windows, so this Linux job learns only whether each one is set.
+      - name: Check every secret and variable the Windows job needs
+        env:
+          COMMERCIAL_ESIGNER_USERNAME: ${{ secrets.COMMERCIAL_ESIGNER_USERNAME != '' && 'set' || '' }}
+          COMMERCIAL_ESIGNER_PASSWORD: ${{ secrets.COMMERCIAL_ESIGNER_PASSWORD != '' && 'set' || '' }}
+          COMMERCIAL_ESIGNER_TOTP_SECRET: ${{ secrets.COMMERCIAL_ESIGNER_TOTP_SECRET != '' && 'set' || '' }}
+          DESKTOP_STABLE_MANIFEST_PRIVATE_KEY: ${{ secrets.DESKTOP_STABLE_MANIFEST_PRIVATE_KEY }}
+          COMMERCIAL_R2_API_TOKEN: ${{ secrets.COMMERCIAL_R2_API_TOKEN }}
+          COMMERCIAL_CLOUDFLARE_ACCOUNT_ID: ${{ secrets.COMMERCIAL_CLOUDFLARE_ACCOUNT_ID }}
+          DESKTOP_STABLE_MANIFEST_KEY_ID: ${{ vars.DESKTOP_STABLE_MANIFEST_KEY_ID }}
+          DESKTOP_WINDOWS_PUBLISHER_NAME: ${{ vars.DESKTOP_WINDOWS_PUBLISHER_NAME }}
+          KERFDESK_COMMERCIAL_TERMS_SHA256: ${{ vars.KERFDESK_COMMERCIAL_TERMS_SHA256 }}
+        run: node scripts/release-train.mjs preflight --output="${RUNNER_TEMP}/kerfdesk-terms.txt"
+
+  native-check:
+    name: Desktop package check on the release commit
+    needs: [decide, preflight]
+    if: needs.decide.outputs.due == 'true'
+    permissions:
+      contents: read
+    # The same Windows and macOS package checks a manual run does (ADR-522
+    # Amendment 1), on exactly the commit the Windows job will build.
+    uses: ./.github/workflows/desktop-package-check.yml
+    with:
+      native: true
+      ref: ${{ needs.decide.outputs.sha }}
+
+  build:
+    name: Build, sign and publish the beta on Windows
+    needs: [decide, preflight, native-check]
+    if: needs.decide.outputs.due == 'true'
+    runs-on: windows-latest
+    timeout-minutes: 75
+    environment: desktop-commercial
+    # Shared with every commercial publisher and never cancelled mid-publication.
+    concurrency:
+      group: kerfdesk-commercial-publication
+      cancel-in-progress: false
+    permissions:
+      contents: read
+    env:
+      VERSION: ${{ needs.decide.outputs.version }}
+      SOURCE_SHA: ${{ needs.decide.outputs.sha }}
+      PUBLISHED_AT: ${{ needs.decide.outputs.published_at }}
+    steps:
+      - name: Checkout the release commit
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          ref: ${{ needs.decide.outputs.sha }}
+          persist-credentials: false
+
+      - name: Set up pnpm
+        uses: pnpm/action-setup@0ebf47130e4866e96fce0953f49152a61190b271 # v6
+
+      - name: Set up Node.js
+        uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Verify canonical release repository
+        run: pnpm guard:repo
+
+      - name: Fetch the owner-approved installer terms
+        shell: bash
+        env:
+          TERMS_SHA256: ${{ vars.KERFDESK_COMMERCIAL_TERMS_SHA256 }}
+        run: >-
+          node scripts/release-train.mjs terms --sha256="${TERMS_SHA256}"
+          --output="${RUNNER_TEMP}/kerfdesk-terms.txt"
+
+      # The signed identity names main: the train builds main and never tags.
+      - name: Sign the release identity and generate the build configuration
+        shell: bash
+        env:
+          DESKTOP_STABLE_MANIFEST_PRIVATE_KEY: ${{ secrets.DESKTOP_STABLE_MANIFEST_PRIVATE_KEY }}
+          KEY_ID: ${{ vars.DESKTOP_STABLE_MANIFEST_KEY_ID }}
+        run: >-
+          node scripts/prepare-commercial-desktop.mjs
+          --output-dir "${RUNNER_TEMP}/commercial-release"
+          --terms-file "${RUNNER_TEMP}/kerfdesk-terms.txt"
+          --version "${VERSION}"
+          --source-sha "${SOURCE_SHA}"
+          --source-ref refs/heads/main
+          --published-at "${PUBLISHED_AT}"
+          --key-id "${KEY_ID}"
+
+      # Not build:web: its notices step rewrites a tracked file, and the
+      # publisher requires a clean checkout of the release commit.
+      - name: Build the renderer and Electron main at the release version
+        shell: bash
+        env:
+          KERFDESK_DESKTOP_VERSION: ${{ needs.decide.outputs.version }}
+        run: pnpm build:electron-main && pnpm build:bundle
+
+      # eSigner CKA presents the cloud certificate to Windows as an ordinary
+      # certificate in CurrentUser\My, so signtool signs with it by thumbprint
+      # (ADR-142 Amendment 1). The installer is pinned by URL and SHA-256.
+      - name: Load the eSigner signing certificate
+        id: signing-certificate
+        shell: pwsh
+        env:
+          ESIGNER_CKA_URL: https://github.com/SSLcom/eSignerCKA/releases/download/v1.1.2/SSL.COM-eSigner-CKA_1.1.2.zip
+          ESIGNER_CKA_SHA256: 071ca52986795e7a00dfbd87cc5818d03af74daac32dfe32afd4171b676c4d13
+          ESIGNER_USERNAME: ${{ secrets.COMMERCIAL_ESIGNER_USERNAME }}
+          ESIGNER_PASSWORD: ${{ secrets.COMMERCIAL_ESIGNER_PASSWORD }}
+          ESIGNER_TOTP_SECRET: ${{ secrets.COMMERCIAL_ESIGNER_TOTP_SECRET }}
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $zip = Join-Path $env:RUNNER_TEMP 'esigner-cka.zip'
+          Invoke-WebRequest -Uri $env:ESIGNER_CKA_URL -OutFile $zip
+          $hash = (Get-FileHash -Algorithm SHA256 -LiteralPath $zip).Hash.ToLowerInvariant()
+          if ($hash -ne $env:ESIGNER_CKA_SHA256) {
+            throw "eSigner CKA download has SHA-256 $hash, expected $env:ESIGNER_CKA_SHA256."
+          }
+          $setupDir = Join-Path $env:RUNNER_TEMP 'esigner-cka-setup'
+          Expand-Archive -LiteralPath $zip -DestinationPath $setupDir -Force
+          $setup = @(Get-ChildItem -LiteralPath $setupDir -Recurse -Filter '*.exe')
+          if ($setup.Count -ne 1) { throw "Expected one eSigner CKA installer, found $($setup.Count)." }
+          $installDir = Join-Path $env:USERPROFILE 'eSignerCKA'
+          Start-Process -FilePath $setup[0].FullName -Wait -ArgumentList @(
+            '/CURRENTUSER', '/VERYSILENT', '/SUPPRESSMSGBOXES', "/DIR=`"$installDir`"")
+          foreach ($helper in 'RegisterKSP.exe', 'eSignerCSP.Config.exe') {
+            $helperPath = Join-Path $installDir $helper
+            if (Test-Path -LiteralPath $helperPath) { & $helperPath | Out-Null }
+          }
+          $tool = Join-Path $installDir 'eSignerCKATool.exe'
+          if (-not (Test-Path -LiteralPath $tool)) { throw "eSigner CKA did not install $tool." }
+          & $tool config -mode product -user $env:ESIGNER_USERNAME -pass $env:ESIGNER_PASSWORD `
+            -totp $env:ESIGNER_TOTP_SECRET -key (Join-Path $installDir 'master.key') -r
+          & $tool unload
+          & $tool load
+          $certificates = @(Get-ChildItem Cert:\CurrentUser\My -CodeSigningCert)
+          if ($certificates.Count -ne 1) {
+            throw ("Expected one eSigner code-signing certificate, found $($certificates.Count). " +
+              'Check the eSigner username, password and TOTP secret.')
+          }
+          $signtool = Get-ChildItem -Path "${env:ProgramFiles(x86)}\Windows Kits\10\bin\*\x64\signtool.exe" |
+            Sort-Object { [version]$_.Directory.Parent.Name } -Descending |
+            Select-Object -First 1
+          if ($null -eq $signtool) { throw 'No Windows SDK signtool.exe on this runner.' }
+          "Signing as $($certificates[0].Subject) with $($signtool.FullName)"
+          "thumbprint=$($certificates[0].Thumbprint)" >> $env:GITHUB_OUTPUT
+          "signtool=$($signtool.FullName)" >> $env:GITHUB_OUTPUT
+
+      # The generated configuration extends electron-builder.commercial.yml,
+      # which forces signing and checks the packaged metadata after packing.
+      # `--publish never`: the publisher below is the only thing that uploads.
+      - name: Build the signed commercial Windows installer
+        shell: bash
+        env:
+          CONFIG: ${{ runner.temp }}/commercial-release/electron-builder.commercial.generated.json
+          WIN_CERTIFICATE_SHA1: ${{ steps.signing-certificate.outputs.thumbprint }}
+          SIGNTOOL_PATH: ${{ steps.signing-certificate.outputs.signtool }}
+          CSC_IDENTITY_AUTO_DISCOVERY: 'true'
+        run: |
+          pnpm exec electron-builder --win --x64 \
+            --config "${CONFIG}" \
+            --config.win.signtoolOptions.certificateSha1="${WIN_CERTIFICATE_SHA1}" \
+            --publish never
+
+      - name: Check the installer signature and update publisher
+        shell: pwsh
+        run: |
+          $release = "release/commercial/$env:VERSION"
+          $installer = "$release/KerfDesk-$env:VERSION-windows-x64-setup.exe"
+          $signature = Get-AuthenticodeSignature -LiteralPath $installer
+          if ($signature.Status -ne 'Valid') {
+            throw "Installer Authenticode signature is not valid: $($signature.StatusMessage)"
+          }
+          # Without a timestamp the signature stops validating when the
+          # certificate expires, and installed copies would refuse the update.
+          if ($null -eq $signature.TimeStamperCertificate) { throw 'Installer signature has no timestamp.' }
+          & ./scripts/verify-windows-package-identity.ps1 -Executable $installer -Kind Installer
+          $executable = "$release/win-unpacked/KerfDesk.exe"
+          & ./scripts/verify-windows-package-identity.ps1 -Executable $executable
+          $appSignature = Get-AuthenticodeSignature -LiteralPath $executable
+          if ($appSignature.Status -ne 'Valid' -or
+              $appSignature.SignerCertificate.Thumbprint -ne $signature.SignerCertificate.Thumbprint) {
+            throw 'KerfDesk.exe is not validly signed by the installer certificate.'
+          }
+          node scripts/verify-update-publisher.mjs `
+            "$release/win-unpacked/resources/app-update.yml" `
+            $signature.SignerCertificate.Subject
+          if ($LASTEXITCODE -ne 0) { throw 'app-update.yml does not name the installer signer.' }
+          "Verified publisher: $($signature.SignerCertificate.Subject)"
+
+      - name: Check fuses and app.asar contents
+        shell: pwsh
+        run: |
+          $unpacked = "release/commercial/$env:VERSION/win-unpacked"
+          node scripts/verify-packaged-desktop.mjs "$unpacked/KerfDesk.exe" "$unpacked/resources/app.asar" electron-builder.yml
+          if ($LASTEXITCODE -ne 0) { throw 'The packaged fuses or app.asar contents are wrong.' }
+
+      - name: Check that a modified app.asar stops the app
+        shell: pwsh
+        run: |
+          $unpacked = (Resolve-Path "release/commercial/$env:VERSION/win-unpacked").Path
+          node scripts/verify-asar-integrity-enforced.mjs "$unpacked\KerfDesk.exe" "$unpacked\resources\app.asar"
+          if ($LASTEXITCODE -ne 0) { throw 'A modified app.asar did not stop the app.' }
+
+      # Reserves the version, uploads the three files and the signed update
+      # manifest to dl.kerfdesk.com, reads each one back, and lists the release
+      # in the beta catalogue only. Stable clients see it once it is promoted.
+      - name: Publish to the beta ring on dl.kerfdesk.com
+        shell: bash
+        env:
+          DESKTOP_STABLE_MANIFEST_PRIVATE_KEY: ${{ secrets.DESKTOP_STABLE_MANIFEST_PRIVATE_KEY }}
+          DESKTOP_STABLE_MANIFEST_KEY_ID: ${{ vars.DESKTOP_STABLE_MANIFEST_KEY_ID }}
+          DESKTOP_WINDOWS_PUBLISHER_NAME: ${{ vars.DESKTOP_WINDOWS_PUBLISHER_NAME }}
+          COMMERCIAL_R2_API_TOKEN: ${{ secrets.COMMERCIAL_R2_API_TOKEN }}
+          COMMERCIAL_CLOUDFLARE_ACCOUNT_ID: ${{ secrets.COMMERCIAL_CLOUDFLARE_ACCOUNT_ID }}
+        run: >-
+          node scripts/publish-commercial-release.mjs
+          "release/commercial/${VERSION}"
+          "${RUNNER_TEMP}/commercial-release/commercial-release-identity.json"
+          "release/commercial/${VERSION}/win-unpacked/resources"
+
+  promote:
+    name: Promote the newest beta once it has been quiet
+    if: >-
+      vars.KERFDESK_RELEASE_TRAIN == 'on' && github.ref == 'refs/heads/main' &&
+      (inputs.action == 'promote' ||
+      (github.event_name == 'schedule' && github.event.schedule != '17 7 * * 2'))
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    environment: desktop-commercial
+    concurrency:
+      group: kerfdesk-commercial-publication
+      cancel-in-progress: false
+    permissions:
+      contents: read
+      # Counts open issues labelled release-hold.
+      issues: read
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: false
+
+      - name: Set up pnpm
+        uses: pnpm/action-setup@0ebf47130e4866e96fce0953f49152a61190b271 # v6
+
+      - name: Set up Node.js
+        uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Count open release holds
+        id: holds
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          open="$(gh issue list --state open --label release-hold --limit 1000 --json number --jq length)"
+          echo "open=${open}" >> "${GITHUB_OUTPUT}"
+
+      # Copies the beta's signed entry, byte for byte, into the stable
+      # catalogue. It needs the bucket, never the signing key.
+      - name: Promote the newest beta after its quiet days
+        env:
+          COMMERCIAL_R2_API_TOKEN: ${{ secrets.COMMERCIAL_R2_API_TOKEN }}
+          COMMERCIAL_CLOUDFLARE_ACCOUNT_ID: ${{ secrets.COMMERCIAL_CLOUDFLARE_ACCOUNT_ID }}
+          HOLD_VARIABLE: ${{ vars.KERFDESK_RELEASE_HOLD }}
+          OPEN_HOLDS: ${{ steps.holds.outputs.open }}
+        run: >-
+          node scripts/release-train.mjs promote
+          --hold-variable="${HOLD_VARIABLE}"
+          --open-holds="${OPEN_HOLDS}"
+          --summary="${GITHUB_STEP_SUMMARY}"
+
+  status:
+    name: Report both rings
+    if: vars.KERFDESK_RELEASE_TRAIN == 'on' && inputs.action == 'status'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+      issues: read
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: false
+
+      - name: Set up pnpm
+        uses: pnpm/action-setup@0ebf47130e4866e96fce0953f49152a61190b271 # v6
+
+      - name: Set up Node.js
+        uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Count open release holds
+        id: holds
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          open="$(gh issue list --state open --label release-hold --limit 1000 --json number --jq length)"
+          echo "open=${open}" >> "${GITHUB_OUTPUT}"
+
+      # Reads both public catalogues; no secrets.
+      - name: Report both rings and the promotion decision
+        env:
+          HOLD_VARIABLE: ${{ vars.KERFDESK_RELEASE_HOLD }}
+          OPEN_HOLDS: ${{ steps.holds.outputs.open }}
+        run: >-
+          node scripts/release-train.mjs status
+          --hold-variable="${HOLD_VARIABLE}"
+          --open-holds="${OPEN_HOLDS}"
+          --summary="${GITHUB_STEP_SUMMARY}"

@@ -1,5 +1,6 @@
 import { useState, type FormEvent } from 'react';
 import type { LicenceAdapter, LicenceStatus } from '../../platform/types';
+import { EarlyUpdatesOption } from './EarlyUpdatesOption';
 import {
   LicenceActivationForm,
   LicenceDeviceActions,
@@ -65,6 +66,7 @@ export function LicencePanel({
       ) : null}
       <LicenceDeviceActions client={client} status={status} busy={busy} run={run} />
       <LicencePaymentActions client={client} status={status} busy={busy} run={run} />
+      <EarlyUpdatesOption client={client} />
       <EditionSummary />
     </section>
   );
