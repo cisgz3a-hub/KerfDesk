@@ -174,3 +174,97 @@ test('SQLite transaction rolls back a failed partial write and leap-year renewal
     '2029-02-28T12:00:00.000Z',
   );
 });
+
+async function paidLicense(f) {
+  const licenseId = f.authority.crypto.id();
+  const licenseKey = await f.authority.licenseKey(licenseId);
+  const keyHash = await f.authority.crypto.hash('license-key', licenseKey);
+  f.records.transaction((tx) =>
+    tx.put(`license:${licenseId}`, {
+      licenseId,
+      tier: 'paid',
+      status: 'active',
+      issuedAt: NOW,
+      accessExpiresAt: null,
+      updatesUntil: NOW + 365 * 86_400,
+      perpetualUpdates: false,
+      keyHash,
+      active: [],
+    }),
+  );
+  return { licenseId, licenseKey };
+}
+
+test('a paid licence frees at most six seats in any 30 days; retries and developers are not counted', async () => {
+  const f = await fixture();
+  const { licenseKey } = await paidLicense(f);
+  const body = { licenseKey, deviceId: deviceId(20), deviceName: 'PC' };
+  for (let move = 0; move < 6; move += 1) {
+    const activation = await f.authority.activate(body);
+    await f.authority.deactivate(credentials(activation));
+    // A retry after a lost response frees nothing and is not counted.
+    await f.authority.deactivate(credentials(activation));
+  }
+  const kept = await f.authority.activate(body);
+  await assert.rejects(f.authority.deactivate(credentials(kept)), {
+    code: 'release_limit_reached',
+  });
+  await assert.rejects(
+    f.authority.releaseWithKey({ licenseKey, activationId: claims(kept).activationId }),
+    { code: 'release_limit_reached' },
+  );
+  assert.equal(
+    claims(await f.authority.refresh(credentials(kept))).activationId,
+    claims(kept).activationId,
+  );
+  f.setNow(NOW + 30 * 86_400 + 1);
+  assert.deepEqual(await f.authority.deactivate(credentials(kept)), { deactivated: true });
+  const grant = await f.authority.developerGrant({ grantId: 'mover', displayName: 'Developer' });
+  for (let move = 0; move < 8; move += 1) {
+    const activation = await f.authority.activate({ ...body, licenseKey: grant.licenseKey });
+    await f.authority.deactivate(credentials(activation));
+  }
+});
+
+test('an administrator can revoke and restore a licence and look up a lost key', async () => {
+  const f = await fixture();
+  const { licenseId, licenseKey } = await paidLicense(f);
+  const activation = await f.authority.activate({
+    licenseKey,
+    deviceId: deviceId(21),
+    deviceName: 'PC',
+  });
+  assert.deepEqual(await f.authority.lookupLicense({ licenseId }), {
+    licenseId,
+    licenseKey,
+    tier: 'paid',
+    status: 'active',
+    updatesUntil: NOW + 365 * 86_400,
+    activeDevices: 1,
+  });
+  assert.deepEqual(await f.authority.setLicenseStatus({ licenseId, status: 'revoked' }), {
+    licenseId,
+    status: 'revoked',
+  });
+  await assert.rejects(f.authority.refresh(credentials(activation)), { code: 'license_revoked' });
+  await assert.rejects(
+    f.authority.activate({ licenseKey, deviceId: deviceId(22), deviceName: 'PC' }),
+    { code: 'license_revoked' },
+  );
+  await f.authority.setLicenseStatus({ licenseId, status: 'active' });
+  assert.equal(claims(await f.authority.refresh(credentials(activation))).tier, 'paid');
+  assert.throws(() => f.authority.setLicenseStatus({ licenseId, status: 'gone' }), {
+    code: 'invalid_request',
+  });
+  const trial = await f.authority.startTrial({ deviceId: deviceId(23), deviceName: 'PC' });
+  assert.throws(
+    () => f.authority.setLicenseStatus({ licenseId: claims(trial).licenseId, status: 'revoked' }),
+    { code: 'license_not_found' },
+  );
+  await assert.rejects(f.authority.lookupLicense({ orderId: 'missing-order' }), {
+    code: 'order_not_found',
+  });
+  await assert.rejects(f.authority.lookupLicense({ licenseId, orderId: 'x' }), {
+    code: 'invalid_request',
+  });
+});

@@ -17,7 +17,8 @@ qualified professional in the relevant country before launch.
 | Price | US$49.50 per licence, before any tax Paddle adds at checkout |
 | Included | Perpetual use of eligible versions, three active computers, one year of updates |
 | Renewal | Optional US$20 for another year of updates; never automatic |
-| Trial | Full features for 30 days from the first online registration |
+| Trial | Every Pro tool for 30 days from the first online registration |
+| Editions | KerfDesk Free and Pro on the web and desktop (ADR-540). The app always opens; only Pro tools need a licence |
 | Developer access | Separate free licences for Johann and Father, three computers each, unlimited updates |
 | Seller | South Africa; customers expected mainly in the USA |
 | Payment provider | Paddle (subject to its own seller approval) |
@@ -37,9 +38,10 @@ qualified professional in the relevant country before launch.
 The installer requires an explicit terms file; the free MIT notice is never
 reused for the commercial edition. The terms must match these facts:
 
-- A licence permits use of every version released on or before its update
-  cutoff, forever. After the cutoff, newer versions refuse to start until the
-  licence is renewed; older eligible versions keep working and stay downloadable.
+- A licence permits Pro in every version released on or before its update
+  cutoff, forever. After the cutoff, newer versions open as KerfDesk Free with the
+  Pro tools locked until the licence is renewed; older eligible versions keep Pro
+  and stay downloadable.
 - Three computers can be active at once. Customers move a seat by deactivating a
   computer in Help > Licence. Offline use continues after activation.
 - The trial lasts 30 days from the first online registration and is tied to the
@@ -57,11 +59,11 @@ Decide the refund window (for example none after purchase except where law
 requires, or a fixed number of days) and write it into the terms and checkout
 page. Facts that constrain it:
 
-- Refunds and chargebacks do not revoke anything automatically. A licence that is
-  already active keeps working offline; the service has no revoke operation yet.
-- If revocation is wanted, it needs a new administrator operation that marks the
-  licence inactive. That stops new activations and online refreshes, but can
-  never stop an offline copy that was already activated. Do not promise more.
+- Refunds and chargebacks do not revoke anything automatically. The operator
+  revokes the licence (ADR-523 Amendment 1): its key stops activating and
+  connected computers drop Pro at their next weekly check, but an offline copy
+  that was already activated keeps its rights until it reconnects. Do not promise
+  more.
 - Never tell a customer to pay a second time to fix an uncertain checkout; the
   support playbook reconciles the original order.
 

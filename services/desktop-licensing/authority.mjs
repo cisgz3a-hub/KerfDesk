@@ -2,6 +2,16 @@ import { device, identifier, requireValue, secret, text } from './validation.mjs
 
 const DAY = 86_400;
 const MAX_DEVICES = 3;
+// A paid licence can free at most this many seats in any 30 days, so one key
+// cannot serve any number of computers in turn (ADR-523 Amendment 1).
+const MAX_RELEASES = 6;
+const RELEASE_WINDOW = 30 * DAY;
+const LICENSE_STATUSES = new Set(['active', 'revoked']);
+
+function requireUsableStatus(license) {
+  requireValue(license?.status !== 'revoked', 403, 'license_revoked');
+  requireValue(license?.status === 'active', 403, 'license_inactive');
+}
 
 export function nextUpdateYear(seconds) {
   const date = new Date(seconds * 1000);
@@ -37,7 +47,7 @@ export class LicensingAuthority {
       401,
       'invalid_credentials',
     );
-    requireValue(license.status === 'active', 403, 'license_inactive');
+    requireUsableStatus(license);
     return license;
   }
 
@@ -140,7 +150,7 @@ export class LicensingAuthority {
   }
 
   usable(license, now) {
-    requireValue(license?.status === 'active', 403, 'license_inactive');
+    requireUsableStatus(license);
     requireValue(
       license.accessExpiresAt === null || license.accessExpiresAt > now,
       403,
@@ -197,12 +207,23 @@ export class LicensingAuthority {
   }
 
   release(licenseId, activationId) {
+    const now = this.now();
     return this.records.transaction((tx) => {
       const activation = tx.get(`activation:${activationId}`);
       requireValue(activation?.licenseId === licenseId, 404, 'activation_not_found');
+      // A repeated deactivation (a retry after a lost response) frees nothing
+      // and is not counted.
+      if (!activation.active) return { deactivated: true };
       const license = tx.get(`license:${licenseId}`);
+      const releases = (license.releases ?? []).filter((at) => at > now - RELEASE_WINDOW);
+      requireValue(
+        license.tier !== 'paid' || releases.length < MAX_RELEASES,
+        429,
+        'release_limit_reached',
+      );
       activation.active = false;
       license.active = license.active.filter((id) => id !== activationId);
+      license.releases = license.tier === 'paid' ? [...releases, now] : [];
       tx.put(`activation:${activationId}`, activation);
       tx.put(`license:${licenseId}`, license);
       return { deactivated: true };
@@ -220,6 +241,47 @@ export class LicensingAuthority {
           createdAt: activation.createdAt,
         };
       }),
+    };
+  }
+
+  /**
+   * Revokes a licence (a refund, a chargeback or a leaked key) or restores it.
+   * Devices lose Pro at their next online refresh; an offline copy keeps its
+   * signed rights until it reconnects (ADR-523 Amendment 1).
+   */
+  setLicenseStatus(body) {
+    const licenseId = identifier(body.licenseId);
+    requireValue(LICENSE_STATUSES.has(body.status));
+    return this.records.transaction((tx) => {
+      const license = tx.get(`license:${licenseId}`);
+      requireValue(license && license.tier !== 'trial', 404, 'license_not_found');
+      license.status = body.status;
+      tx.put(`license:${licenseId}`, license);
+      return { licenseId, status: license.status };
+    });
+  }
+
+  /** Finds a licence by its ID or its order so support can resend a lost key. */
+  async lookupLicense(body) {
+    const keys = Object.keys(body);
+    requireValue(keys.length === 1 && ['licenseId', 'orderId'].includes(keys[0]));
+    let licenseId;
+    if (body.orderId === undefined) licenseId = identifier(body.licenseId);
+    else {
+      const order = this.records.get(`order:${identifier(body.orderId)}`);
+      requireValue(order, 404, 'order_not_found');
+      requireValue(order.status === 'fulfilled', 409, 'payment_pending');
+      licenseId = order.licenseId;
+    }
+    const license = this.records.get(`license:${licenseId}`);
+    requireValue(license && license.tier !== 'trial', 404, 'license_not_found');
+    return {
+      licenseId,
+      licenseKey: await this.licenseKey(licenseId),
+      tier: license.tier,
+      status: license.status,
+      updatesUntil: license.updatesUntil,
+      activeDevices: license.active.length,
     };
   }
 

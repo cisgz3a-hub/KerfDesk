@@ -21,12 +21,16 @@ the single command that needs it.
 
 - Help > Licence shows the tier, the trial end or the "Updates through" date, and
   the actions available on that computer.
-- A version released after the update cutoff refuses to start with "This release
-  is newer than your included updates". Older eligible versions keep working and
-  stay downloadable under **Earlier versions** on the download page.
-- Admission is decided at launch and then latched. Nothing a licence does can stop
-  an open workspace or a running job; changes apply at the next launch.
-- The web app and the free Preview builds never need a licence.
+- KerfDesk always opens (ADR-540). Without Pro it runs KerfDesk Free: only the
+  Pro tools (V-carve, 3D relief, adaptive clearing, advanced tracing, camera
+  alignment, box generator, Design Studio, G-code Inspector) ask for a licence.
+  Existing projects that use them still preview, frame, start and save G-code.
+- A version released after the update cutoff opens as Free with "This version is
+  newer" and the update date in Help > Licence. Older eligible versions keep Pro
+  and stay downloadable under **Earlier versions** on the download page.
+- Pro stays unlocked for the rest of a running session even if a trial ends.
+  Nothing a licence does can stop a running job.
+- The web app and the free Preview builds never need a licence yet.
 
 ## Situations
 
@@ -70,13 +74,14 @@ counts as active; the operator can free it as above.
 
 ### The customer needs their licence key for another computer
 
-The key is shown in Help > Licence > Show licence key on any computer that was
+The key is shown in Help > Licence (Show key, Copy key) on any computer that was
 activated with it or bought it, and right after a purchase. The key activates up
 to three computers; a fourth needs one of the others deactivated first.
 
-If no activated computer remains, identify the licence from the Paddle
-transaction and the customer's order, then reissue the key through the operator
-procedure below. Deliver it privately to the purchaser only.
+If no activated computer remains, find the licence with
+`POST /v1/admin/licenses/lookup` using the order number (shown in the app while
+the order was pending) or the licence ID, and send the key privately to the
+purchaser only.
 
 ### Paid, but the app still says payment is pending
 
@@ -93,9 +98,10 @@ that computer holds the order's claim credentials.
   webhook reconciles the order and Check payment then works. If Paddle has no
   transaction for the order, the app keeps reporting "Checkout is still being
   prepared" for that saved order, because retrying the same order never creates a
-  second transaction. There is no operator tool yet to release such an order (see
-  Known gaps); until there is, record the case and do not improvise database edits
-  while payments are live.
+  second transaction. The customer can choose **Forget this order** in Help >
+  Licence, which starts a fresh order and checkout next time. Only suggest that
+  after confirming in Paddle that the old order was not paid; if it was, look up
+  its licence by order number instead.
 - The checkout started on a computer that has since been reinstalled or lost: the
   claim credentials are gone with it. Reconcile the order with
   `POST /v1/admin/orders`, claim it with `POST /v1/orders/claim`, and send the
@@ -111,10 +117,11 @@ customer renews from Help > Licence on an activated computer, pays, then selects
 
 ### Refund or chargeback
 
-Follow the refund policy in the published terms. The software does not revoke
-anything automatically: an activated paid licence keeps working offline after a
-refund, and the service currently has no operation to mark a licence inactive.
-Record the case; do not promise the customer or Paddle that access was removed.
+Follow the refund policy in the published terms, then revoke the licence with
+`POST /v1/admin/licenses/status` (`status: "revoked"`). Its key stops activating
+at once, and connected computers drop Pro at their next weekly check. A computer
+kept offline keeps its signed rights until it reconnects, so do not promise more
+than that. Restore with `status: "active"` if a chargeback is reversed.
 
 ### Privacy or deletion request
 
@@ -132,9 +139,8 @@ database after confirming identity, and keeps only what law or the terms require
   to its owner. There is no universal unlock key.
 - **Reissuing a lost key.** Licence keys are derived from the licence ID with the
   service's derivation secret, so the same key can be reproduced but never
-  changed. Until an administrator endpoint for this exists, treat it as a
-  secret-handling task for the owner alone, done on the operator machine, and
-  never paste the derivation secret or the key into a shared system.
+  changed. `POST /v1/admin/licenses/lookup` returns it; never paste the key into
+  a shared system.
 - **Backups.** The Durable Object database and the signing, hashing, derivation
   and administrator secrets must be backed up together. Restoring an old database
   can resurrect old seats and orders and needs manual reconciliation.
@@ -143,11 +149,9 @@ database after confirming identity, and keeps only what law or the terms require
 
 - No self-service remote seat management: customers can only deactivate the
   computer they are using.
-- No operator tool to release an order stuck in `checkout_pending` after Paddle
-  confirms no transaction exists. Design it before live payments: mark the order
-  abandoned only after checking Paddle, so the customer's next checkout creates a
-  new transaction without any risk of a double charge.
-- No administrator endpoint to revoke a licence after a refund or chargeback.
-- No administrator endpoint to reissue a lost licence key or to delete a
-  customer's records.
+- A customer who forgets an order that was in fact paid needs support to look up
+  its licence; the app warns before forgetting and shows the order number.
+- No administrator endpoint to delete a customer's records.
+- A paid licence can move seats at most six times in 30 days; support cannot yet
+  lift that for one customer.
 - Device labels are generic, so seat lists identify computers only by date.

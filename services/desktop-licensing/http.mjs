@@ -55,6 +55,8 @@ export async function authorityRequest(request, env, authority, options = {}) {
       '/v1/activations/deactivate': () => authority.deactivate(body),
       '/v1/admin/developer-grants': () => authority.developerGrant(body),
       '/v1/admin/orders': () => prepareOrder(authority, body),
+      '/v1/admin/licenses/status': () => authority.setLicenseStatus(body),
+      '/v1/admin/licenses/lookup': () => authority.lookupLicense(body),
       '/v1/orders/claim': () => claimOrder(authority, body),
       '/v1/checkout': () => createCheckout(authority, env, body, options.fetcher),
     };
