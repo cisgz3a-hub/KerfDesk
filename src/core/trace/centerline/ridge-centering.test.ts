@@ -1,4 +1,4 @@
-// Sub-pixel ridge centring (ADR-394): an even-width stroke's skeleton runs
+// Sub-pixel ridge centring (ADR-558): an even-width stroke's skeleton runs
 // half a pixel to one side of the two-pixel ridge; centring moves it onto
 // the true centre without touching junctions.
 

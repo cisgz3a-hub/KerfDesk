@@ -1,7 +1,7 @@
 // A drawn corner in a centreline stroke is rebuilt once. After the rebuild,
 // the next candidate along the chain sees the new corner inside its own
 // window and used to build a second one from a tangent read further down the
-// other leg (ADR-394).
+// other leg (ADR-558).
 
 import { describe, expect, it } from 'vitest';
 import type { Polyline, Vec2 } from '../../scene';
