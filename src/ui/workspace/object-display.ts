@@ -20,6 +20,7 @@ import { artworkStrokeWidthPx, countPolylineSegments } from './draw-complexity';
 import {
   buildDisplayPolylines,
   buildFillDisplayPolylines,
+  displayCurveToleranceMm,
   type DisplayPolylineCache,
   type DisplayPolylines,
 } from './display-polylines';
@@ -240,7 +241,9 @@ function displayPathFor(
     Math.abs(object.transform.scaleX),
     Math.abs(object.transform.scaleY),
   );
-  const toleranceMm = 0.25 / Math.max(1e-9, view.scale * objectScale);
+  // Bucketed by powers of two, so a wheel zoom reuses the cached flattening
+  // for about seven notches instead of flattening every curve on each one.
+  const toleranceMm = displayCurveToleranceMm(view.scale * objectScale);
   if (cache !== undefined) {
     return fill ? cache.getFillPath(path, toleranceMm) : cache.getPath(path, toleranceMm);
   }

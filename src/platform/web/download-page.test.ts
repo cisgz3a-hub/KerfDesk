@@ -54,7 +54,10 @@ describe('desktop Preview download page', () => {
       page.indexOf('aria-labelledby="preview-heading"'),
     );
 
-    expect(commercial).toContain('Licensed edition · 30-day full trial');
+    expect(commercial).toContain('Free, with a 30-day Pro trial');
+    // ADR-540: the app always runs Free; only the Pro tools need the trial or a licence.
+    expect(commercial).toContain('KerfDesk Free has no time limit.');
+    expect(commercial).not.toContain('Every feature is included for 30 days');
     expect(commercial).toContain('id="commercial-status" role="status"');
     expect(commercial).toMatch(/<a class="download" id="commercial-download" hidden>/);
     expect(commercial).not.toContain('data-preview-suffix');

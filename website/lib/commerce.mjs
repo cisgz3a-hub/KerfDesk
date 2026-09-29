@@ -1,7 +1,7 @@
 // Validation for website/commerce.config.mjs. The build calls
-// `assertValidCommerce` first, so the settled offer always renders complete, a
-// closed store never carries a checkout URL, and an open store can never ship
-// half-configured.
+// `assertValidCommerce` first, so the settled offer always renders complete, no
+// plan ever carries a checkout URL (purchases start in the desktop app, ADR-524
+// Amendment 2), and an open store can never ship half-configured.
 
 const BILLING = new Set(['one-time', 'yearly']);
 const PLAN_ID = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
@@ -48,7 +48,7 @@ function planTermErrors(plan, at) {
   return errors;
 }
 
-function planErrors(plan, index, salesOpen) {
+function planErrors(plan, index) {
   const at = `plans[${index}]`;
   const errors = [];
   if (!plan || typeof plan !== 'object') return [`${at} must be an object`];
@@ -58,11 +58,10 @@ function planErrors(plan, index, salesOpen) {
   if (!BILLING.has(plan.billing)) errors.push(`${at}.billing must be one-time or yearly`);
   if (!isStringList(plan.includes)) errors.push(`${at}.includes must be a list of strings`);
   errors.push(...planTermErrors(plan, at));
-  if (salesOpen && !isHttpsUrl(plan.checkoutUrl)) {
-    errors.push(`${at}.checkoutUrl must be an https URL before sales open`);
-  }
-  if (!salesOpen && plan.checkoutUrl != null) {
-    errors.push(`${at}.checkoutUrl must stay empty while sales are closed`);
+  // The licence service fulfils only the Paddle checkouts it creates for the
+  // desktop app, so a payment link here would take money without a license.
+  if ('checkoutUrl' in plan) {
+    errors.push(`${at}.checkoutUrl is not allowed: purchases start in the desktop app`);
   }
   return errors;
 }
@@ -78,15 +77,19 @@ function freeEditionErrors(free) {
 export function commerceErrors(commerce) {
   const errors = [];
   if (typeof commerce?.salesOpen !== 'boolean') return ['salesOpen must be true or false'];
+  if (typeof commerce.trialOpen !== 'boolean') return ['trialOpen must be true or false'];
   if (!Array.isArray(commerce.plans)) return ['plans must be a list'];
   if (!CURRENCY.test(commerce.currency ?? '')) errors.push('currency must be an ISO 4217 code');
   errors.push(...freeEditionErrors(commerce.free));
   commerce.plans.forEach((plan, index) => {
-    errors.push(...planErrors(plan, index, commerce.salesOpen));
+    errors.push(...planErrors(plan, index));
   });
   const ids = commerce.plans.map((plan) => plan?.id);
   if (new Set(ids).size !== ids.length) errors.push('plan ids must be unique');
   if (commerce.salesOpen) {
+    if (!commerce.trialOpen) {
+      errors.push('trialOpen must be true before sales open: buyers purchase in the desktop app');
+    }
     if (!ADR_ID.test(commerce.authorizingAdr ?? '')) {
       errors.push('authorizingAdr must name the commercial ADR that authorizes sales (ADR-247)');
     }
@@ -104,12 +107,6 @@ export function assertValidCommerce(commerce) {
   if (errors.length > 0) {
     throw new Error(`commerce.config.mjs is invalid:\n  - ${errors.join('\n  - ')}`);
   }
-}
-
-// The only way a page gets a checkout link: none while sales are closed, even
-// if a URL was pasted in early.
-export function checkoutUrlFor(commerce, plan) {
-  return commerce.salesOpen && isHttpsUrl(plan.checkoutUrl) ? plan.checkoutUrl : null;
 }
 
 // en-GB writes US dollars as "US$49.50", which reads unambiguously worldwide

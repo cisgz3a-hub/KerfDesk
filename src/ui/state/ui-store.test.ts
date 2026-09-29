@@ -1,7 +1,7 @@
-import { beforeEach, describe, expect, it } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { createRectangle } from '../../core/shapes/primitives';
 import { DEFAULT_SNAP_SETTINGS, type SnapGuide } from '../workspace/snapping';
-import { useUiStore } from './ui-store';
+import { MAX_ZOOM, useUiStore } from './ui-store';
 
 const ONE_VERTEX = { vertices: [{ x: 1, y: 2 }], cursor: null };
 const MEASURE_DRAFT = { start: { x: 0, y: 0 }, end: { x: 12, y: 8 } };
@@ -153,6 +153,29 @@ describe('ui-store pen draft lifecycle (ADR-051 B6)', () => {
     useUiStore.getState().closeWorkspaceContextBar();
 
     expect(useUiStore.getState().workspaceContextBar).toBeNull();
+  });
+
+  it('closes an already-closed quick bar without notifying subscribers', () => {
+    const listener = vi.fn();
+    const unsubscribe = useUiStore.subscribe(listener);
+
+    useUiStore.getState().closeWorkspaceContextBar();
+    unsubscribe();
+
+    expect(listener).not.toHaveBeenCalled();
+    expect(useUiStore.getState().workspaceContextBar).toBeNull();
+  });
+
+  it('sets zoom and pan in one update, clamping the zoom like setZoom', () => {
+    const listener = vi.fn();
+    const unsubscribe = useUiStore.subscribe(listener);
+
+    useUiStore.getState().setView(1_000, 12, -7);
+    unsubscribe();
+
+    expect(listener).toHaveBeenCalledTimes(1);
+    expect(useUiStore.getState()).toMatchObject({ zoomFactor: MAX_ZOOM, panX: 12, panY: -7 });
+    useUiStore.getState().resetView();
   });
 
   it('tracks snapping settings and transient guides outside project history', () => {

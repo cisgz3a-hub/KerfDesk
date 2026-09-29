@@ -17,9 +17,12 @@
 // pixel cap (zoomed far in) are rendered for the visible viewport plus a
 // margin and re-rendered when the view leaves that region.
 //
-// Placement is rounded to whole device pixels at blit time (at most half a
-// pixel from the fractional position a direct paint would use); geometry,
-// hit-testing and output never read a sprite.
+// A sprite is painted with the sub-pixel remainder of its on-screen position
+// and blitted at whole device pixels, so it lands exactly where a direct
+// paint would at the view it was painted for, and within half a pixel after
+// a pan by a fraction of one. The scaled placeholder is placed at the same
+// fractional position, so the settle repaint does not shift the artwork
+// (ADR-359 Amendment 2). Geometry, hit-testing and output never read a sprite.
 
 import type { AABB, Transform } from '../../core/scene';
 import type { ViewTransform } from './view-transform';
@@ -50,6 +53,9 @@ type Entry = {
   bounds: Region;
   region: Region;
   clipped: boolean;
+  /** Fraction of a pixel, -0.5 to 0.5, the region corner was painted offset by. */
+  subpixelX: number;
+  subpixelY: number;
   pendingScale: number | null;
   pendingAt: number;
   lastUsed: number;
@@ -93,11 +99,13 @@ export function drawArtworkSprite(request: SpriteRequest): boolean {
     entry.lastUsed = useCounter;
     if (entry.scale === view.scale) {
       entry.pendingScale = null;
-      if (!entry.clipped || coversViewport(entry, request)) {
+      if (showsViewport(entry, request)) {
         blit(ctx, entry, request, 1);
         return true;
       }
-    } else if (holdPlaceholder(entry, request)) {
+      // A clipped bitmap zoomed out past its margin no longer covers the view:
+      // render now rather than leave artwork missing until the settle repaint.
+    } else if (showsViewport(entry, request) && holdPlaceholder(entry, request)) {
       blit(ctx, entry, request, view.scale / entry.scale);
       return true;
     }
@@ -160,6 +168,11 @@ function armSettle(requestRedraw: (() => void) | undefined, delayMs: number): vo
   );
 }
 
+// An unclipped sprite holds the whole object; a clipped one only its region.
+function showsViewport(entry: Entry, request: SpriteRequest): boolean {
+  return !entry.clipped || coversViewport(entry, request);
+}
+
 function coversViewport(entry: Entry, request: SpriteRequest): boolean {
   const needed = intersect(viewportRegion(request, 0), entry.bounds);
   if (needed === null) return true;
@@ -194,12 +207,16 @@ function render(
   } else {
     entry.context.clearRect(0, 0, width, height);
   }
+  // The corner's remainder past the whole pixel it will be blitted at.
+  const origin = regionOrigin(request, chosen.region);
+  const subpixelX = origin.x - Math.round(origin.x);
+  const subpixelY = origin.y - Math.round(origin.y);
   entry.context.save();
   entry.context.globalAlpha = alpha;
   request.paint(entry.context, {
     scale: view.scale,
-    offsetX: SPRITE_PAD_PX - (transform.x + chosen.region.minX) * view.scale,
-    offsetY: SPRITE_PAD_PX - (transform.y + chosen.region.minY) * view.scale,
+    offsetX: SPRITE_PAD_PX + subpixelX - (transform.x + chosen.region.minX) * view.scale,
+    offsetY: SPRITE_PAD_PX + subpixelY - (transform.y + chosen.region.minY) * view.scale,
   });
   entry.context.restore();
   entry.linearKey = linearKey;
@@ -209,6 +226,8 @@ function render(
   entry.bounds = bounds;
   entry.region = chosen.region;
   entry.clipped = chosen.clipped;
+  entry.subpixelX = subpixelX;
+  entry.subpixelY = subpixelY;
   entry.pendingScale = null;
   entry.lastUsed = useCounter;
   if (existing === undefined) {
@@ -233,6 +252,8 @@ function createEntry(): Entry | null {
     bounds: { minX: 0, minY: 0, maxX: 0, maxY: 0 },
     region: { minX: 0, minY: 0, maxX: 0, maxY: 0 },
     clipped: false,
+    subpixelX: 0,
+    subpixelY: 0,
     pendingScale: null,
     pendingAt: 0,
     lastUsed: 0,
@@ -284,28 +305,38 @@ function intersect(a: Region, b: Region): Region | null {
   return region.minX <= region.maxX && region.minY <= region.maxY ? region : null;
 }
 
+// Where the region's corner falls on screen, in fractional device pixels.
+function regionOrigin(request: SpriteRequest, region: Region): { x: number; y: number } {
+  const { view, transform } = request;
+  return {
+    x: view.offsetX + (transform.x + region.minX) * view.scale,
+    y: view.offsetY + (transform.y + region.minY) * view.scale,
+  };
+}
+
+// The corner sits at (PAD + subpixel) in the bitmap, so both blits put it at
+// its fractional screen position: exactly when scaled, and to the nearest
+// whole pixel otherwise, which is exact at the view the sprite was painted for.
 function blit(
   ctx: CanvasRenderingContext2D,
   entry: Entry,
   request: SpriteRequest,
   ratio: number,
 ): void {
-  const { view, transform } = request;
-  const originX = view.offsetX + (transform.x + entry.region.minX) * view.scale;
-  const originY = view.offsetY + (transform.y + entry.region.minY) * view.scale;
+  const origin = regionOrigin(request, entry.region);
   ctx.save();
   ctx.globalAlpha = 1;
   if (ratio === 1) {
     ctx.drawImage(
       entry.canvas,
-      Math.round(originX) - SPRITE_PAD_PX,
-      Math.round(originY) - SPRITE_PAD_PX,
+      Math.round(origin.x - entry.subpixelX) - SPRITE_PAD_PX,
+      Math.round(origin.y - entry.subpixelY) - SPRITE_PAD_PX,
     );
   } else {
     ctx.drawImage(
       entry.canvas,
-      originX - SPRITE_PAD_PX * ratio,
-      originY - SPRITE_PAD_PX * ratio,
+      origin.x - (SPRITE_PAD_PX + entry.subpixelX) * ratio,
+      origin.y - (SPRITE_PAD_PX + entry.subpixelY) * ratio,
       entry.canvas.width * ratio,
       entry.canvas.height * ratio,
     );

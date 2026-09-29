@@ -17,6 +17,7 @@
 //    released by an explicit sweep rather than left to GC.
 
 import type { RasterImage } from '../../core/scene';
+import { releaseDisplayLevels } from './raster-display-levels';
 
 /** Distinguishes "nothing cached" from a cached decision not to draw. */
 export type CachedPreviewCanvas =
@@ -86,8 +87,18 @@ export function storePreviewCanvas(
 
 /** Releases every canvas whose raster is no longer previewed. */
 export function retainPreviewCanvases(liveRasterIds: ReadonlySet<string>): void {
-  for (const id of recordsById.keys()) {
-    if (!liveRasterIds.has(id)) recordsById.delete(id);
+  for (const [id, record] of recordsById) {
+    if (liveRasterIds.has(id)) continue;
+    recordsById.delete(id);
+    releaseRecordLevels(record);
+  }
+}
+
+// A preview drawn shrunk keeps halved copies of its canvas
+// (draw-raster-preview-bitmap.ts); free them with the record.
+function releaseRecordLevels(record: PreviewCacheRecord): void {
+  for (const canvas of record.canvases.values()) {
+    if (canvas !== null) releaseDisplayLevels(canvas);
   }
 }
 
@@ -104,6 +115,8 @@ function recordFor(obj: RasterImage): PreviewCacheRecord | undefined {
 }
 
 function registerRecord(obj: RasterImage): PreviewCacheRecord {
+  const replaced = recordsById.get(obj.id);
+  if (replaced !== undefined) releaseRecordLevels(replaced);
   const record: PreviewCacheRecord = { content: rasterContentToken(obj), canvases: new Map() };
   recordsById.set(obj.id, record);
   recordsByObject.set(obj, record);

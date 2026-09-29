@@ -144,6 +144,43 @@ describe('object display resolution', () => {
     expect(orphan.paths[0]?.paint).toEqual({ kind: 'stroke', color: '#000000', output: true });
   });
 
+  it('keeps one flattening of a curved trace while wheel notches stay inside a zoom bucket', () => {
+    const object = traced([square(10)], {
+      transform: { ...IDENTITY_TRANSFORM, scaleX: 2, scaleY: -2 },
+      paths: [
+        {
+          color: '#000000',
+          polylines: [square(10)],
+          curves: [
+            {
+              start: { x: 0, y: 0 },
+              closed: false,
+              segments: [
+                {
+                  kind: 'cubic',
+                  control1: { x: 0, y: 9 },
+                  control2: { x: 9, y: 9 },
+                  to: { x: 9, y: 0 },
+                },
+              ],
+            },
+          ],
+        },
+      ],
+    });
+    const cache = createDisplayPolylineCache();
+    const displayAt = (scale: number) =>
+      resolveObjectDisplay(object, layers('line'), { ...view, scale }, cache, 'design').paths[0]
+        ?.display;
+    // The object's own scale of 2 puts 2 to 3.9 view px/mm in the 4 to 8 px/mm bucket.
+    const first = displayAt(2);
+    expect(displayAt(2 * 1.1 ** 7)).toBe(first);
+    const finer = displayAt(2 * 1.1 ** 8);
+    expect(finer).not.toBe(first);
+    expect(finer?.segmentCount).toBeGreaterThan(first?.segmentCount ?? Infinity);
+    expect(displayAt(3)).toBe(first);
+  });
+
   it("measures the display extent under the object's scale and rotation but not its translation", () => {
     const object = traced([square(10)], {
       transform: { ...IDENTITY_TRANSFORM, x: 100, y: 200, scaleX: 2, scaleY: 3, rotationDeg: 90 },

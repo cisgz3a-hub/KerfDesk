@@ -40,21 +40,39 @@ function authorityObject(env) {
   return env.LICENSE_AUTHORITY.get(env.LICENSE_AUTHORITY.idFromName('licensing-authority-v1'));
 }
 
+// Every licence call goes through the one Durable Object, so a client polling the
+// health check in a loop must not queue ahead of them: each isolate reuses its last
+// answer for a binding this long. An uptime monitor asks far less often.
+const HEALTH_ANSWER_MS = 10_000;
+const recentHealth = new WeakMap();
+
 /**
  * One round trip to the Durable Object and its SQLite store, for an uptime monitor.
  * Like the public configuration it skips the rate limit and works while licensing is
  * switched off (ADR-523 Amendment 3).
  */
 async function health(request, env) {
+  const binding = env.LICENSE_AUTHORITY;
+  if (!binding) return json({ ok: false }, 503);
+  const now = Date.now();
+  let recent = recentHealth.get(binding);
+  // An answer from the future (a clock that stepped back) counts as stale.
+  if (!recent || now < recent.at || now - recent.at >= HEALTH_ANSWER_MS) {
+    recent = { at: now, ok: await pingAuthority(request, env) };
+    recentHealth.set(binding, recent);
+  }
+  return recent.ok ? json({ ok: true }) : json({ ok: false }, 503);
+}
+
+async function pingAuthority(request, env) {
   try {
-    requireValue(env.LICENSE_AUTHORITY, 503, 'service_unavailable');
     const response = await authorityObject(env).fetch(
       new Request(new URL(ROUTE.health, request.url), { method: 'GET' }),
     );
     const body = response.ok ? await response.json() : null;
-    return body?.ok === true ? json({ ok: true }) : json({ ok: false }, 503);
+    return body?.ok === true;
   } catch {
-    return json({ ok: false }, 503);
+    return false;
   }
 }
 
