@@ -70,6 +70,18 @@ describe('LightBurn layer modes', () => {
     ]);
   });
 
+  it("opens LightBurn's air assist (runBlower) on each operation of the layer", () => {
+    const airAssist = (type: string, value: string) => {
+      const { project, report } = opened(cutSetting(type, `<runBlower Value="${value}"/>`));
+      expect(report.warnings).toEqual([]);
+      return project.scene.layers.map((layer) => layer.airAssist);
+    };
+    expect(airAssist('Cut', '1')).toEqual([true]);
+    expect(airAssist('Scan', '1')).toEqual([true]);
+    expect(airAssist('Scan+Cut', '1')).toEqual([true, true]);
+    expect(airAssist('Cut', '0')).toEqual([false]);
+  });
+
   it('does not report a Scan layer priority, which sets the run order', () => {
     expect(opened(cutSetting('Scan', '<priority Value="3"/>')).report.warnings).toEqual([]);
   });
