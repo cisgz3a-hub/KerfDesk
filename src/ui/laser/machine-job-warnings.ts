@@ -49,7 +49,7 @@ export function detectMachineJobWarnings(
     project.machine?.kind === 'cnc'
       ? [
           ...detectCncStockWarnings(project, prepared),
-          ...detectCncThroughCutTabWarnings(project),
+          ...detectCncThroughCutTabWarnings(project, job),
           ...detectCncOnPathSizeWarnings(project),
           ...detectCncFullTabCoverageWarnings(project, job),
           ...detectCncDefaultFeedWarnings(project),
