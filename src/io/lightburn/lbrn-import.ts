@@ -234,6 +234,10 @@ function importedLayer(
   if (setting === undefined) return { layer: base, outline: null };
   const kind = lightBurnLayerKind(setting, name, warnings);
   warnings.push(...lightBurnSettingsNotImported(setting, name, kind));
+  if (isHiddenLayer(setting))
+    warnings.push(
+      `${name}: hidden in LightBurn, which does not cut a hidden layer, so it opened with Output off. Switch Output on to cut it.`,
+    );
   const common = importedCommonLayerFields(setting);
   const line = (): Partial<Layer> => ({
     mode: 'line',
@@ -315,9 +319,10 @@ function importedCommonLayerFields(setting: Element): Partial<Layer> {
   const power = numericField(setting, ['maxpower', 'power']);
   const passes = numericField(setting, ['numpasses', 'passes']);
   // LightBurn writes a layer's Air Assist as `runBlower`, and its Output
-  // switch, which keeps the layer out of the job when off, as `doOutput`.
+  // switch, which keeps the layer out of the job when off, as `doOutput`. A
+  // layer it hides (`hide`) is not cut either, so it opens with Output off.
   const airAssist = booleanField(setting, ['runblower']);
-  const output = booleanField(setting, ['dooutput']);
+  const output = isHiddenLayer(setting) ? false : booleanField(setting, ['dooutput']);
   return {
     ...(speedMmSec === null ? {} : { speed: Math.max(1, speedMmSec * 60) }),
     ...(power === null ? {} : { power: Math.max(0, Math.min(100, power)) }),
@@ -325,6 +330,10 @@ function importedCommonLayerFields(setting: Element): Partial<Layer> {
     ...(airAssist === null ? {} : { airAssist }),
     ...(output === null ? {} : { output }),
   };
+}
+
+function isHiddenLayer(setting: Element): boolean {
+  return booleanField(setting, ['hide']) === true;
 }
 
 function importedScanLayerFields(setting: Element): Partial<Layer> {

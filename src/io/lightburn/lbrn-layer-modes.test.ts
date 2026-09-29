@@ -100,4 +100,29 @@ describe('LightBurn layer modes', () => {
     const { project } = opened(cutSetting('Cut', '<doOutput Value="0"/>'));
     expect(compileJob(project.scene, project.device).groups).toEqual([]);
   });
+
+  it('keeps a layer LightBurn hides out of the job, and says so', () => {
+    const hidden = (type: string, fields: string) => {
+      const { project, report } = opened(cutSetting(type, fields));
+      return {
+        output: project.scene.layers.map((layer) => layer.output),
+        warnings: report.warnings,
+      };
+    };
+    const line =
+      'Badge: hidden in LightBurn, which does not cut a hidden layer, so it opened with Output off. Switch Output on to cut it.';
+    expect(hidden('Cut', '<hide Value="1"/>')).toEqual({ output: [false], warnings: [line] });
+    expect(hidden('Scan+Cut', '<hide Value="1"/>')).toEqual({
+      output: [false, false],
+      warnings: [line],
+    });
+    // Hiding wins over an Output switch left on.
+    expect(hidden('Scan', '<hide Value="1"/><doOutput Value="1"/>')).toEqual({
+      output: [false],
+      warnings: [line],
+    });
+    expect(hidden('Cut', '<hide Value="0"/>')).toEqual({ output: [true], warnings: [] });
+    const { project } = opened(cutSetting('Cut', '<hide Value="1"/>'));
+    expect(compileJob(project.scene, project.device).groups).toEqual([]);
+  });
 });

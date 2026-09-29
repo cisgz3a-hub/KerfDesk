@@ -80,7 +80,6 @@ const FEATURES: ReadonlyArray<Feature> = [
     on: minPowerApplies,
     note: 'KerfDesk gives the operation one power, its Max Power',
   },
-  { label: 'Hide', switches: ['hide'], note: 'the layer opened visible' },
   // A Line operation's kerf opens as its Kerf Offset (lbrn-import.ts importedKerf).
   {
     label: 'Kerf Offset',
@@ -114,6 +113,7 @@ const NOT_REPORTED = new Set([
   'passes',
   'runblower',
   'dooutput',
+  'hide',
   // Fill settings: read on a Fill, ignored by LightBurn on a Line.
   'interval',
   'lineinterval',

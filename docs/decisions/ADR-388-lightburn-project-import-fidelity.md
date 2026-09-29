@@ -73,12 +73,14 @@ and the thumbnail LightBurn embeds in each file, which is its own drawing of the
 9. **Output.** `doOutput` is the layer's Output switch in LightBurn's Cuts / Layers list; `0`
    keeps the layer out of the job. It opens as the operation's Output, on both operations of a
    Fill+Line layer, so a layer LightBurn would not run does not run here either. A setting without
-   it keeps the default, on.
+   it keeps the default, on. A layer LightBurn hides (`hide` `1`) is not cut there either, so it
+   opens with Output off too, whatever `doOutput` says, and the report says so and how to cut it.
+   Its shapes stay visible on the canvas so the import can be checked.
 10. **Every setting left behind is named.** The import report has a line for each `<CutSetting>`
     setting a layer opens without whenever it changes what LightBurn would cut: Perforation Mode,
     Tabs, Overcut, Ramp, Dot Mode, Cut Through, Z Offset, Z Step Per Pass, start and end delays,
     PPI, Frequency, Laser 2 (and Laser 1 switched off), the air assist speed and automatic air
-    assist, Constant Power Mode, a Min Power other than 0 or the Max Power, Hide, and on a Fill its
+    assist, Constant Power Mode, a Min Power other than 0 or the Max Power, and on a Fill its
     Kerf Offset, Flood Fill and a Fill Grouping other than all shapes at once. Each line names the
     layer and the fields as LightBurn wrote them. A setting is left out only while LightBurn itself
     does not use it: its switch is off (a tab size with tabs off), it is a Fill setting on a Line
@@ -132,7 +134,9 @@ and the thumbnail LightBurn embeds in each file, which is its own drawing of the
   without it keeps KerfDesk's default, off; LightBurn's own default is not known here.
 - `doOutput` is written as `0` or `1` in the same LightBurn 0.9 projects, and a third-party
   converter's notes call it LightBurn's output toggle, separate from the layer's `hide`. The
-  corpus leaves it out, at its default.
+  corpus leaves it out, at its default. That LightBurn does not cut a hidden layer is not shown
+  by any file here; decision 9 takes the side that never cuts by surprise, and the report line
+  tells the user how to cut the layer if they want it.
 - Decision 10 reads which settings are in use from the fields and values LightBurn 0.9 and 2.0.05
   projects write (third-party projects and the corpus); LightBurn's own documentation could not
   be read here. A switch LightBurn did not write is taken as off, its default. Perforation,
@@ -169,8 +173,8 @@ through every open route); `lbrn-shapes.test.ts` (rounded and over-rounded Rects
 lines); `lbrn-kerf.test.ts` (a Cut layer's kerf grows the plate and shrinks its hole in the
 compiled job; out-of-range, unreadable and Scan kerfs are named); `lbrn-layer-modes.test.ts`
 (each type name, Fill+Line as a fill then a line on the same artwork, an unknown mode named, a
-Scan priority not reported, `runBlower` on every operation, `doOutput` 0 keeps every operation of
-the layer out of the job); `lbrn-setting-report.test.ts` (each setting a Cut layer uses is named,
+Scan priority not reported, `runBlower` on every operation, `doOutput` 0 and `hide` 1 keep every
+operation of the layer out of the job); `lbrn-setting-report.test.ts` (each setting a Cut layer uses is named,
 none for a LightBurn 0.9 Cut layer at rest or a Fill with the corpus layers' fields, Fill settings
 on a Fill only, one line for a Fill+Line layer, unknown fields and nested blocks); `clb-import.test.ts` (`runBlower` in a
 library); `lbrn-shape-report.test.ts` (each kind of shape left out is named with how many,
