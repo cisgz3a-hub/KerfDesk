@@ -36,6 +36,10 @@ function square(minX: number, minY: number, size: number): Polyline {
   };
 }
 
+function polygon(...points: ReadonlyArray<readonly [number, number]>): Polyline {
+  return { points: points.map(([x, y]) => ({ x, y })), closed: true };
+}
+
 function path(...polylines: Polyline[]): ColoredPath {
   return { color: COLOR, polylines };
 }
@@ -132,6 +136,32 @@ describe('layer-wide kerf sides (ADR-486)', () => {
     expect(widths(segments)).toEqual([22, 22]);
   });
 
+  it('shrinks a hole inside a U-shaped plate, though the hole’s bounds centre is in the notch', () => {
+    const plate = polygon(
+      [0, 0],
+      [100, 0],
+      [100, 100],
+      [70, 100],
+      [70, 40],
+      [30, 40],
+      [30, 100],
+      [0, 100],
+    );
+    // The plate inset by 3 mm, 94 mm wide: a hole everywhere inside the material.
+    const hole = polygon(
+      [3, 3],
+      [97, 3],
+      [97, 97],
+      [73, 97],
+      [73, 37],
+      [27, 37],
+      [27, 97],
+      [3, 97],
+    );
+    const segments = cutSegments([object('plate', path(plate)), object('hole', path(hole))]);
+    expect(widths(segments)).toEqual([102, 92]);
+  });
+
   it('keeps two coincident copies of a shape as outlines', () => {
     const segments = cutSegments([object('a', path(HOLE)), object('b', path(HOLE))]);
     expect(widths(segments)).toEqual([22, 22]);
@@ -193,6 +223,22 @@ function circleObject(): ImportedSvg {
     curves: [curve],
   });
 }
+
+describe('where a kerf contour starts', () => {
+  it('starts next to the drawn start, whichever corner the shape was drawn from', () => {
+    const corners = square(10, 10, 40).points;
+    for (const index of corners.keys()) {
+      const drawn = { points: [...corners.slice(index), ...corners.slice(0, index)], closed: true };
+      const [plain] = cutSegments([object('part', path(drawn))], kerfLayer(0));
+      const [kerfed] = cutSegments([object('part', path(drawn))]);
+      const start = plain?.polyline[0];
+      const kerfStart = kerfed?.polyline[0];
+      if (start === undefined || kerfStart === undefined) throw new Error('expected both cuts');
+      // The mitred corner of a 1 mm kerf sits √2 mm out from the drawn corner.
+      expect(Math.hypot(kerfStart.x - start.x, kerfStart.y - start.y)).toBeCloseTo(Math.SQRT2, 6);
+    }
+  });
+});
 
 describe('kerf-offset contours keep arcs (ADR-486)', () => {
   it('fits a kerf-offset circle with a few arcs on an arc-capable machine', () => {
