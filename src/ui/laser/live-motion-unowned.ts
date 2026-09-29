@@ -20,6 +20,7 @@ const HOLD_RELEASE = 'Release it with cycle start, or Abort to clear it with a c
 export function describeUnownedMotion(
   motion: UnownedControllerMotion,
   hold: ControllerHold,
+  homingStateStuck = false,
 ): UnownedMotionDescription {
   switch (motion) {
     case 'Run':
@@ -33,10 +34,17 @@ export function describeUnownedMotion(
         'The controller reports a jog no operation here started, such as a Console $J= command',
       );
     case 'Home':
-      return unowned(
-        'HOMING',
-        'The controller reports a homing cycle no operation here started. Abort stops it with a controller reset',
-      );
+      // Stock GRBL that refused a single-axis Home reports Home with no cycle
+      // running until a reset; the Alarm banner explains it (ADR-375 A-7).
+      return homingStateStuck
+        ? unowned(
+            'HOMING STATE',
+            'The controller reports Home with no homing cycle running, as stock GRBL does after refusing a single-axis Home such as $HX. Abort clears it with a controller reset',
+          )
+        : unowned(
+            'HOMING',
+            'The controller reports a homing cycle no operation here started. Abort stops it with a controller reset',
+          );
     case 'Hold':
       return unowned(
         'CONTROLLER HOLD',

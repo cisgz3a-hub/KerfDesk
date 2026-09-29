@@ -51,6 +51,7 @@ afterEach(() => {
     statusReport: null,
     motionOperation: null,
     mpgActive: null,
+    resetRequired: false,
     stopJob: realStopJob,
   });
   document.body.innerHTML = '';
@@ -76,6 +77,24 @@ describe('LiveMotionBar with motion the controller reports and nothing here owns
       expect(buttonByText(host, 'Pause')).toBeUndefined();
       await act(async () => abort?.click());
       expect(stopJob).toHaveBeenCalledTimes(1);
+    } finally {
+      await act(async () => root.unmount());
+    }
+  });
+
+  // Stock GRBL that refused `$HX` stays in its homing state with no cycle
+  // running; the popup must not call that a homing cycle (ADR-375 A-7).
+  it('names the homing state a refused $HX left, with ABORT MOTION', async () => {
+    useLaserStore.setState({
+      connection: { kind: 'connected' },
+      statusReport: report('Home'),
+      resetRequired: 'homing-state',
+    });
+    const { host, root } = await render();
+    try {
+      expect(host.textContent).toContain('HOMING STATE');
+      expect(host.textContent).toContain('no homing cycle running');
+      expect(buttonByText(host, 'ABORT MOTION')).toBeInstanceOf(HTMLButtonElement);
     } finally {
       await act(async () => root.unmount());
     }
