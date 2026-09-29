@@ -10,10 +10,12 @@ import { beforeEach, expect, it, vi } from 'vitest';
 import { lookAt, savedCameraModel } from '../../../core/camera/model/model-fixtures';
 import type { DetectedPiece } from '../../../core/camera/pieces/find-pieces';
 import { createLayer } from '../../../core/scene';
+import { PROJECT_SCENE_LIMITS } from '../../../io/project/project-scene-integrity-validator';
 import { clickControl, control, mountControl } from '../../image-editor/control-audit-test-support';
 import { useStore } from '../../state';
 import { useCameraStore as camera } from '../../state/camera-store';
 import { resetStore, svgObj } from '../../state/test-helpers';
+import { useToastStore } from '../../state/toast-store';
 import { PiecesControl } from './PiecesControl';
 import { usePieceScanStore } from './piece-scan-store';
 
@@ -164,6 +166,28 @@ it('places a copy on a piece once it is ticked', async () => {
   await act(async () => third?.click());
   await clickControl(host, 'Place selection on each piece');
   expect(useStore.getState().project.scene.objects).toHaveLength(3);
+});
+
+it('says nothing was placed, and why, when the project has no room for the copies', async () => {
+  const limit = PROJECT_SCENE_LIMITS.objects;
+  const full = useStore.getState().project;
+  const filler = Array.from({ length: limit - 1 }, (_, index) =>
+    svgObj(`filler-${index}`, ['#000000']),
+  );
+  useStore.setState({
+    project: { ...full, scene: { ...full.scene, objects: [...full.scene.objects, ...filler] } },
+  });
+  useToastStore.setState({ toasts: [] });
+  const host = await mountControl(<PiecesControl />);
+  await findPieces(host);
+  const before = useStore.getState().project;
+  await clickControl(host, 'Place selection on each piece');
+  expect(useStore.getState().project).toBe(before);
+  expect(host.textContent).toContain('Nothing was placed.');
+  expect(host.textContent).not.toContain('Placed on');
+  expect(useToastStore.getState().toasts.at(-1)?.message).toBe(
+    `This project has no room for another copy of this selection (project limit ${limit} objects). Delete some objects first.`,
+  );
 });
 
 it('asks for a selection instead of placing nothing', async () => {

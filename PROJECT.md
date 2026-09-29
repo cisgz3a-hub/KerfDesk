@@ -126,7 +126,9 @@ invalid, or oversized inputs.
 
 Array extension (ADR-307): **Arrange → Array...** adds Point Rotation beside Grid and Circular. It
 rotates overlapping instances around the transformed combined selection center in one undoable
-document mutation. Valid requested counts materialize without the former 500-copy policy cap.
+document mutation. Requested counts materialize without the former 500-copy policy cap, up to the
+room the project has: it holds at most 10,000 objects and cannot be reopened above that, so a
+request for more is refused with the number that fits (ADR-307 amendment 1).
 
 Open library evaluation at Phase C kickoff: `simplify-js` (BSD-2-Clause) or `flatten-svg` (ISC) for path simplification.
 

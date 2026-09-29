@@ -1,0 +1,116 @@
+## ADR-307 Amendment 1 - Array copies are limited only by the project, and a request it cannot hold is refused (2026-09-29)
+
+**Status:** Accepted. | **Date:** 2026-09-29
+
+### Context
+
+ADR-307 decision 5 removed the 500-copy policy cap from Array and put nothing in its place, and
+ADR-499 added the grid and circular extras and the dialog's status line. Array then had no bound of
+any kind (the 2026-09-28 weakness audit, found while fixing H-5, ADR-498 amendment 1):
+
+- **A request could make a project that cannot be opened again.** The project file loader refuses
+  a scene of more than `PROJECT_SCENE_LIMITS.objects` (10,000) objects (`validateSceneBudgets`,
+  called from `project-shape-validator.ts`), and the registration jig editor (ADR-316 item 3), the
+  SVG fragment insert and the personal-artwork insert keep to the same figure. An array of 10,002
+  instances saved as a 6 MB file, and opening it said "invalid `scene.objects`: count 10002
+  exceeds 10000". That is lost work, and it is a fact about the file format, not a policy about
+  what is sensible to cut.
+- **A count too large for an array reached the layout.** A grid of a million by a million looped
+  a trillion times, growing a list of placements until memory ran out (under a 1 GB heap the test
+  worker died of a JavaScript heap overflow in about twenty seconds). A circular or point rotation
+  array of 1e12 threw `Invalid array length` out of the store action, uncaught.
+- **Variable copies rendered every copy first.** With Advance variables on, one render per copy
+  was awaited for the whole count before any copy was placed.
+- **Find pieces reported success it had not had.** Place selection on each piece shares the store
+  action (ADR-442) and said "Placed on N pieces" whether or not anything was placed.
+
+ADR-307 decision 5 says every valid requested placement is materialized. This amendment says what
+valid means: one the project can hold. It is not the policy cap decision 5 removed, because the
+figure is the loader's and not a judgement, and every request that fits is still placed in full.
+
+### Decision
+
+1. **One limit: the project's own.** A copy is the selection and everything it carries with it (an
+   image's mask, a path text's guide: `sceneObjectCopyClosure`). The original moves to the first
+   placement and is not a copy, and the object a circle is centred on (ADR-499 item 2) is neither
+   copied nor moved, so it is not counted. The project has room for `floor((10,000 - objects in
+   the project) / objects per copy)` more copies, and every request up to that many, with the
+   original, is placed in one undo step. A request for more is refused, never clamped, and nothing
+   changes. The message says how many fit and what to change: "This project has room for at most
+   18 more copies of this selection (project limit 10000 objects). Use fewer rows or columns."
+   (Grid; "Use fewer copies." for Circular and Point Rotation, "Untick some pieces." for Find
+   pieces.) A project with no room at all says so and to delete some objects. An array of one
+   instance adds nothing, so it always fits.
+2. **The count is compared with the room before anything is laid out.** `arrayPlacementCount`
+   (`src/core/scene/array-layout.ts`) gives the number of instances from the same rounding the
+   layouts use, so 1e12 and 1e300 are refused as too many exactly as 10,001 is. A count that is
+   not finite or is below 1 still reads as 1, and a fraction rounds down, as before.
+3. **The dialog says so, and Apply is off.** The status line shows the message in place of the
+   summary, Create array is disabled, and Enter does nothing, so the store is not asked. The
+   request is counted from the numbers alone, without laying any copy out, so typing 1e300 costs
+   what typing 4 costs. With Advance variables on, the same check runs before the first render
+   (`prepareVariableArray`), not after one for each copy.
+4. **The room counts objects; the scene is then checked exactly.** Two things make the object
+   count alone inexact at the edge. The first placement copies rather than moves whatever another
+   object depends on, whatever sits on the edge of a group, and locked objects the selection
+   needs (`planArrayFirstPlacement`), which adds objects the room did not count. And a saved file
+   can nest or overlap groups, so a copy's groups or group members reach their limits (10,000
+   groups, 50,000 members) before its objects reach 10,000. So after the copies are built, the
+   scene is refused if any of the objects, groups or group members counts both passes its limit
+   and is larger than it was: "This would take the project past its limit of 50000 group members.
+   Ask for fewer copies, or delete some objects first." A project that is already over a limit
+   still moves things about, because an array that adds nothing grows nothing.
+5. **Everything that copies the selection shares one working.** `scene-copy-room.ts` holds the
+   room (`copiesThatFit`, `sceneCopyRoom`, which lets originals that are not kept give their
+   places back), the two messages and the exact check (`sceneLimitOverrun`). Copy Along Path
+   (ADR-498 amendment 1) now uses it instead of a working of its own, and gets the exact check for
+   groups too. Find pieces (`placeSelectionCopies`) reports whether it placed anything, and its
+   panel says "Nothing was placed" when it did not, instead of "Placed on N pieces".
+6. **No small cap, and nothing is clamped.** A request that fits is placed whole. The largest a
+   project can hold, one object made into 10,000, was applied in about a quarter of a second in
+   the test run, saved, and opened again.
+
+### Alternatives
+
+- **A small fixed cap (500, 1,000).** Rejected: it is the policy cap decision 5 removed.
+- **Clamp to the room.** Rejected: the operator asked for a number of copies, and a different
+  number placed silently is the truncation decision 5 removed. A refusal that names the number
+  that fits lets them choose.
+- **Warn, then place anyway.** Rejected: the result could not be opened again.
+- **Check in the dialog only.** Rejected: Find pieces, variable copies and any direct call reach
+  the store action without the dialog, and a dialog can be stale by the time Create array is
+  pressed.
+- **Count the first placement's extra copies in the room.** Rejected: they depend on where the
+  first copy lands, which needs the placements laid out. The exact check covers them, and they
+  matter only within a few objects of the limit.
+
+### Consequences
+
+- Array never takes a project over the limit it can be reopened with. A project that is already
+  over it (Array could make one until now) gets "no room" until objects are deleted.
+- Applying a large array still costs what its copies cost, and no more. Typing one costs nothing.
+- Other commands that add objects in one step (Duplicate, Paste, Break Apart, Cut Shapes, Design
+  Studio, tiling into a board) do not check the limit and are not covered here; each is a
+  separate decision.
+- No schema change and no change to G-code.
+
+### Verification
+
+- `src/core/scene/array-layout.test.ts`: the count equals the length `arrayPlacements` returns for
+  every mode, including malformed input, and answers 1e12, 1e300 and Infinity without allocating.
+- `src/ui/state/array-limits.test.ts`: a million by a million grid, a grid past the largest number,
+  a circle of a trillion and a point rotation of 1e300 place nothing and say what fits; exactly the
+  room, and one more, for each mode; masks, several selected objects and a circle's centre object
+  counted correctly; no room at all; explicit placements refused with the pieces wording; 10,000
+  instances placed in one undo step and saved and reopened; group members past their limit
+  refused though the objects fit; the first placement's extra copy refused at the limit; a project
+  already over the limit still moves things.
+- `src/ui/state/scene-copy-room.test.ts`: the room, the messages, and the exact check against the
+  loader's own `validateSceneBudgets`.
+- `src/ui/state/prepare-variable-array-limits.test.ts`: no render for a refused request, exactly
+  the room prepared and applied, absurd counts refused.
+- `src/ui/commands/ArrayDialogHost.limits.test.tsx`: the status line and Create array for all
+  three modes, the centre object, absurd counts and no room.
+- `src/ui/camera/pieces/PiecesControl.test.tsx`: "Nothing was placed" with the reason in a notice.
+- `src/ui/state/copy-along-path-group-limits.test.ts`: Copy Along Path refuses group members past
+  their limit.

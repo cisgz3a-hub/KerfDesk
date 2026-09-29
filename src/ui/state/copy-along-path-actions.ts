@@ -15,6 +15,7 @@ import {
   type ReadyCopyAlongPathSelection,
 } from './copy-along-path-plan';
 import { repairDanglingObjectDependencies, reportDependencyRepairs } from './object-delete-actions';
+import { sceneLimitOverrun } from './scene-copy-room';
 import { removeObjectIdsFromGroups, selectedObjectIds } from './scene-group-actions';
 import { sceneObjectCopyClosure } from './scene-object-copy-dependencies';
 import { pruneOrphanLayers, pushUndo } from './scene-mutations';
@@ -68,6 +69,12 @@ export function copyAlongPathMutation(
     groups: [...(scene0.groups ?? []), ...copies.groups],
   };
   const scene = request.keepOriginal ? placed : withoutOriginals(placed, plan.selection.artwork);
+  // The room counted objects; groups the copies carry are held to their limits here.
+  const overrun = sceneLimitOverrun(scene0, scene);
+  if (overrun !== null) {
+    useToastStore.getState().pushToast(overrun, 'warning');
+    return state;
+  }
   useToastStore.getState().pushToast(placedMessage(plan.placements.length, request), 'success');
   return {
     project: { ...state.project, scene },

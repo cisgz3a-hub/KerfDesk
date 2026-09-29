@@ -19,7 +19,8 @@ Whatever the count, the result has to be a project KerfDesk can save and open ag
 file loader refuses a scene of more than `PROJECT_SCENE_LIMITS.objects` (10,000) objects, and the
 registration jig editor (ADR-316 item 3), the SVG fragment insert and the personal-artwork insert
 all keep to that same figure. That is a fact about the file format, not a policy about what is
-sensible to cut. Array (ADR-307) does not check it, and this amendment leaves Array as it is.
+sensible to cut. Array (ADR-307) had no such check either; ADR-307 amendment 1 gives it the same
+one, sharing this amendment's working.
 
 ### Decision
 
@@ -30,9 +31,10 @@ sensible to cut. Array (ADR-307) does not check it, and this amendment leaves Ar
    more, by count or by a spacing or gap that would place more, is refused, never clamped, and
    nothing changes. The message says how many fit and what to change: "This project has room for
    at most 18 more copies of this artwork (project limit 10000 objects). Ask for fewer copies." A
-   project with no room at all says so and to delete some objects. Groups follow the objects: a
-   copied group has two or more objects, so groups and group members stay well inside their own
-   limits.
+   project with no room at all says so and to delete some objects. The room counts objects, so
+   groups are checked exactly on the scene the copies make: a saved file can nest groups so that a
+   copy's groups or group members pass their limits before its objects do, and that is refused
+   too, naming the limit (`sceneLimitOverrun`, shared with Array, ADR-307 amendment 1).
 2. **Nothing that is not a copy reaches the layout.** The count is compared with the room before
    anything is laid out, so 1e12 and 1e300 are refused as too many, exactly as 10,000 is. A count
    that is not finite or is below 1 still reads as 1, and a fraction rounds down, as before. A
@@ -67,10 +69,12 @@ sensible to cut. Array (ADR-307) does not check it, and this amendment leaves Ar
 ### Consequences
 
 - Copy Along Path never takes a project over the limit it can be reopened with. A project that is
-  already over it (Array can make one) gets "no room" until objects are deleted.
+  already over it (Array could make one before ADR-307 amendment 1) gets "no room" until objects
+  are deleted.
 - Typing a large count or a small spacing is as quick as typing a small one. Applying a large count
   still costs what its copies cost, and no more.
-- Array's own lack of a project-limit check is unchanged and is a separate decision.
+- Array is held to the same room by ADR-307 amendment 1. The room, its two messages and the exact
+  check are one working (`src/ui/state/scene-copy-room.ts`), not one for each command.
 
 ### Verification
 
@@ -85,3 +89,7 @@ sensible to cut. Array (ADR-307) does not check it, and this amendment leaves Ar
 - `src/ui/commands/CopyAlongPathDialogHost.test.tsx`: typing 4, 40, 400 and 4,000 lays nothing out
   and Copy lays out once with 4,000 placements; a count and a spacing no project could hold are
   explained in the status line and disable Copy.
+- `src/ui/state/copy-along-path-group-limits.test.ts`: copies whose group members would pass the
+  limit though their objects fit are refused, and the ones that fit are placed.
+- `src/ui/state/scene-copy-room.test.ts`: the shared room, including originals that give their
+  places back, and the exact check against the loader's own `validateSceneBudgets`.

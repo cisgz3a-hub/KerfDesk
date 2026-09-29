@@ -481,7 +481,8 @@ destination and cannot overwrite the template source.
 
 1. Select one or more visible, unlocked artwork objects and choose **Arrange → Array...**.
 2. Choose **Grid**, **Point Rotation**, or **Circular**. Grid and Circular retain their existing
-   placement fields; every valid requested placement is materialized without a policy count cap.
+   placement fields; every requested placement the project can hold is materialized, without a
+   policy count cap (item 10).
 3. For **Point Rotation**, enter **Copies (includes original)** and **Total angle (deg)**. The original
    selection is the zero-degree instance. Instance `i` rotates by `i * total angle / copies`, so a
    360-degree array stops before a duplicate endpoint.
@@ -505,6 +506,18 @@ destination and cannot overwrite the template source.
    more objects selected, one of them, which stays put and is not copied. **Spread copies** evenly
    all the way round, from a start to an end angle (both ends included), or by a step angle. 0° is
    to the right and angles run clockwise. The status line says what Apply will do.
+10. **The project's room (ADR-307 amendment 1).** A project holds at most 10,000 objects and cannot
+    be opened again above that, so that is the one limit on how many copies an array makes. A copy
+    is the selection and everything it carries (an image's mask, a path text's guide); a circle's
+    centre object is not copied. A request that fits is placed whole, in one undo step. One that
+    does not is not applied and nothing changes: the status line says how many more copies fit ("This
+    project has room for at most 18 more copies of this selection (project limit 10000 objects). Use
+    fewer rows or columns."), and **Create array** stays off, and Enter does nothing, until it fits.
+    A project with no room says to delete some objects. The check is made from the numbers alone,
+    so typing a huge count is as quick as typing a small one, and it comes before the first render
+    of Advance variables. Place selection on each piece (ADR-442) is held to the same room and says
+    "Nothing was placed" when it is refused. A saved file whose groups nest can reach the group or
+    group member limits first; that is refused too, naming the limit.
 
 ---
 
@@ -3074,6 +3087,8 @@ settings and Job Review keep their existing read-only setup references.
 
 - Missing data or failed text materialization identifies the affected copy and leaves the project
   and cursor unchanged. Creation cancelled or made stale by an intervening edit consumes nothing.
+- A request the project has no room for (10,000 objects, F-A6a item 10) is refused before any copy
+  is rendered, with how many more copies fit, and the project and cursor are unchanged.
 - Failed writes, a cancelled save, partial tile saves, stale source identity and a mismatched
   advancement policy leave the cursor unchanged. Re-prepare the current source before retrying.
 - Distinct serial and date/time fields can be used without CSV; CSV fields require their addressed
@@ -7468,7 +7483,10 @@ as the pane's design record.
 - **Edge / piece partly out of view.** It is listed and outlined but starts unticked, with the
   reason; ticking it includes it.
 - **Edge / different piece.** A piece of another shape, or more than 3 mm longer or wider than the
-  design's own piece, is flagged and stays ticked. Place is never refused.
+  design's own piece, is flagged and stays ticked. Place is never refused because of it.
+- **Edge / project full.** Place is refused only when the project cannot hold the copies (10,000
+  objects, ADR-307 amendment 1): nothing is placed, the panel says "Nothing was placed" and a
+  notice says how many more copies fit and to untick some pieces.
 - **Edge / raised pieces.** Pieces on a box are found at the box's height when a height area
   covers it (F-CAM3).
 - **Edge / Frame.** Frame traces the rectangle around all the copies, not each piece; the panel

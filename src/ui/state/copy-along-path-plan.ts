@@ -5,7 +5,8 @@
 // How many copies there can be is limited only by the project: a project holds
 // at most PROJECT_SCENE_LIMITS.objects objects and cannot be reopened above
 // that, so a request for more than fit is explained and not applied
-// (ADR-498 amendment 1). Nothing else caps the count.
+// (ADR-498 amendment 1; the room is shared with Array, scene-copy-room.ts).
+// Nothing else caps the count.
 
 import {
   copyAlongPathCount,
@@ -21,9 +22,8 @@ import type { ArrayPlacement } from '../../core/scene/array-layout';
 import { combinedBBox } from '../../core/scene/hit-test';
 import type { Scene } from '../../core/scene/scene';
 import type { Bounds, SceneObject } from '../../core/scene/scene-object';
-import { PROJECT_SCENE_LIMITS } from '../../io/project/project-scene-integrity-validator';
 import { formatDisplayMillimetres } from '../format-display-millimetres';
-import { sceneObjectCopyClosure } from './scene-object-copy-dependencies';
+import { noRoomMessage, roomHolds, sceneCopyRoom } from './scene-copy-room';
 
 export type CopyAlongPathRequest = CopyAlongPathSpec & {
   /** One of the selected single paths; the top-most one when absent. */
@@ -115,8 +115,8 @@ export function previewForSelection(
  * the object limit it can be saved and reopened with, the limit the jig editor
  * and the SVG and library inserts keep to. A copy is the artwork and whatever
  * it needs with it, and the originals give their places back when they are not
- * kept. Groups and group members follow: a copied group has two or more
- * objects, and an object is in one group at most.
+ * kept (`sceneCopyRoom`, shared with Array). Groups are checked exactly, on the
+ * scene the copies make, when they are applied.
  */
 export function copyAlongPathRoom(
   scene: Scene,
@@ -125,10 +125,7 @@ export function copyAlongPathRoom(
 ): number {
   if (selection.kind !== 'ok') return 0;
   const artworkIds = new Set(selection.artwork.map((object) => object.id));
-  const perCopy = sceneObjectCopyClosure(scene.objects, artworkIds).length;
-  const retained = scene.objects.length - (keepOriginal ? 0 : artworkIds.size);
-  const free = PROJECT_SCENE_LIMITS.objects - retained;
-  return Math.max(0, Math.floor(free / Math.max(1, perCopy)));
+  return sceneCopyRoom(scene, artworkIds, keepOriginal ? 0 : artworkIds.size);
 }
 
 /** Why this selection cannot be copied along a path, or null when it can. */
@@ -185,12 +182,8 @@ function shortfallMessage(
 }
 
 function tooManyMessage(request: CopyAlongPathRequest, room: number): string {
-  const limit = `project limit ${PROJECT_SCENE_LIMITS.objects} objects`;
-  if (room < 1) {
-    return `This project has no room for another copy of this artwork (${limit}). Delete some objects first.`;
-  }
-  const copies = room === 1 ? '1 more copy' : `${room} more copies`;
-  const holds = `This project has room for at most ${copies} of this artwork (${limit})`;
+  if (room < 1) return noRoomMessage('artwork');
+  const holds = roomHolds(room, 'artwork');
   if (request.mode === 'count') return `${holds}. Ask for fewer copies.`;
   const setting = settingName(request);
   return `${holds}, and that ${setting} places more. Set a larger ${setting}.`;

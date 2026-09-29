@@ -2,6 +2,7 @@ import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { Simulate } from 'react-dom/test-utils';
 import { afterEach, describe, expect, it, vi } from 'vitest';
+import { createProject } from '../../core/scene/project';
 import { IDENTITY_TRANSFORM, type SceneObject } from '../../core/scene/scene-object';
 import { ArrayDialog } from './ArrayDialog';
 
@@ -138,6 +139,7 @@ async function renderDialog(props: {
     root?.render(
       <ArrayDialog
         selectionBounds={{ minX: 10, minY: 20, maxX: 30, maxY: 40 }}
+        scene={createProject().scene}
         {...(props.selected === undefined ? {} : { selected: props.selected })}
         onCancel={props.onCancel ?? vi.fn()}
         onApply={props.onApply}
