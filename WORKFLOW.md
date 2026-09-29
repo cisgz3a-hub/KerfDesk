@@ -3315,12 +3315,20 @@ settings and Job Review keep their existing read-only setup references.
    **Faint lines (keep solid areas)**, or **Sketch (local contrast)**. Faint lines adds coherent
    pale strokes to the preset's solid ink while rejecting isolated pale specks. Sketch uses
    local contrast alone and can remove dark shadow backgrounds. Cutoff/Threshold appear when the band is actually used, including
-   alpha-mask tracing. Returning to preset detection restores its policy. **Remove ink specks**
+   alpha-mask tracing. In automatic and Faint lines modes, Detection shows the band in use,
+   read-only: Line Art's Cutoff 0, Threshold 128, and once the preview has traced, the band an
+   automatic threshold chose from the image (or that uneven lighting was evened out first, so no
+   single band matches). Line Art also says whether this image's colour check added locally
+   darker detail. The first switch to **Manual brightness band** on an automatic-threshold style
+   starts Threshold one level below the automatic threshold, so the same pixels stay ink; a band
+   set earlier is kept, and before a preview finishes the band starts at 0 to 128 (ADR-559).
+   Returning to preset detection restores its policy. **Remove ink specks**
    controls connected ink area; **Ignore Less Than** controls closed-contour and hole area. Both
    use pixels of the decoded image grid supplied to the tracing core and preserve their separate
    preset values. If dense artwork is traced on a smaller working grid, both area thresholds are
    converted using the actual width and height ratios, without rounding the internal values.
-   The preceding UI decode cap still defines that source grid. Smooth's automatic noise cleanup
+   The preceding UI decode cap still defines that source grid; when it is smaller than the image,
+   the settings panel names it. Smooth's automatic noise cleanup
    also judges one-pixel specks on that grid, before any supersampling, so a small image drops the
    same specks it would at full size. Isolated one-pixel dots, such as a fine halftone screen,
    look exactly like noise. Smooth and Line Art already drop them through **Remove ink specks**
@@ -3338,7 +3346,8 @@ settings and Job Review keep their existing read-only setup references.
    Than, speck and hole choices; Smoothness and Optimize also reset when entering or leaving
    Centerline); detection choices carry over. **Settings edited** identifies this state, and
    **Reset trace settings** restores the selected preset's defaults. Automatic Line Art detail
-   recovery retains the preset's brightness-selected solid ink and adds locally darker detail.
+   recovery retains the preset's brightness-selected solid ink and, in colour artwork, adds
+   locally darker detail.
    Changes are debounced; the
    newest request supersedes and cancels any older trace still running.
 3. The preview displays only the newest completed result. A late response from
@@ -3358,7 +3367,8 @@ settings and Job Review keep their existing read-only setup references.
    tones; a 16%-opacity shadow still outlines at Sensitivity 0. Centerline follows stroke centres.
    Both commit as Line layers, so their preview draws every outline and stroke as a hairline that
    stays one screen pixel wide at any zoom, rather than filling Edge outlines.
-   Centerline's separate-end gap bridge uses source-grid distance (preset/default 3 pixels),
+   Centerline's separate-end gap bridge (**Join gaps** on Centerline and Line + fill, 0 to 50;
+   ADR-559) joins facing ends closer than its source-grid distance (preset/default 3 pixels),
    converted once on enlarged working rasters, including Enhance regions. Zero disables that
    gap bridge; true-junction repairs and ring closure keep their existing separate policies.
    Centerline removes corner spurs before condensing junctions, then carries shared junction
