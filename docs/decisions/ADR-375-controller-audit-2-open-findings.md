@@ -247,6 +247,10 @@ therefore sent moves the firmware refuses, or trusted values the controller had 
       opened while idle, so the popup now names that state until cycle start or Abort. Stock GRBL
       answers no status query while it homes, so a Console `$H` there still shows nothing until
       homing ends.
+    - This narrows ADR-207's "Software Abort remains an immediate controller-specific
+      reset/de-energize request" for motion nothing in KerfDesk started only: a jog ends with jog
+      cancel and no reset, and a run's reset waits for its feed hold to complete, at most 2 s. Abort
+      of a job or of an operation KerfDesk owns still resets at once.
     - No new refusal.
 
 11. **Origins the controller restored, and which origin is active** (M-4/A-6, M-8, A-3).
