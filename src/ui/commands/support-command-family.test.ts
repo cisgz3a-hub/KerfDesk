@@ -1,15 +1,17 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import {
-  POLICIES_URL,
   PRICING_URL,
+  PRIVACY_URL,
   REPORT_PROBLEM_URL,
   SUPPORT_URL,
+  TERMS_URL,
   discussionsCommand,
   openExternalUrl,
-  policiesCommand,
   pricingCommand,
+  privacyCommand,
   reportBugCommand,
   supportReportCommand,
+  termsCommand,
 } from './support-command-family';
 
 afterEach(() => {
@@ -26,10 +28,12 @@ describe('support commands', () => {
 
   it('opens the pricing and policy pages that ship with the web app', () => {
     expect(PRICING_URL).toBe('https://kerfdesk.com/pricing/');
-    expect(POLICIES_URL).toBe('https://kerfdesk.com/terms/');
+    expect(TERMS_URL).toBe('https://kerfdesk.com/terms/');
+    expect(PRIVACY_URL).toBe('https://kerfdesk.com/privacy/');
     expect(pricingCommand().id).toBe('help.pricing');
-    expect(policiesCommand().id).toBe('help.policies');
-    for (const command of [pricingCommand(), policiesCommand()]) {
+    expect(termsCommand().id).toBe('help.terms');
+    expect(privacyCommand().id).toBe('help.privacy');
+    for (const command of [pricingCommand(), termsCommand(), privacyCommand()]) {
       expect(command.family).toBe('help');
       expect(command.enabled).toBe(true);
     }

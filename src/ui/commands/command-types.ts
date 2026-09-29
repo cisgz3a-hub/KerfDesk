@@ -140,7 +140,8 @@ export type CommandId =
   | 'help.open-data-folder'
   | 'help.discussions'
   | 'help.pricing'
-  | 'help.policies';
+  | 'help.terms'
+  | 'help.privacy';
 
 export type AppCommand = {
   readonly id: CommandId;

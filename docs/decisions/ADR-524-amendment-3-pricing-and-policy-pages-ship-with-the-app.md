@@ -18,8 +18,8 @@ standalone `public/` pages (`download.html`, `support.html`, `buy.html`). On 202
 `/pricing/`, `/terms/`, `/privacy/` and `/refunds/` answered 404.
 
 The owner decided to publish the documents without a lawyer's review and asked Claude to check
-them against the law instead (2026-09-29, 14:15). He gave the seller's name, his own legal name:
-Johannes Stephanus Stolk, selling as an individual (14:42).
+them against the law instead (2026-09-29, 14:15 UTC; ADR-247 Amendment 2). He gave the seller's
+name, his own legal name: Johannes Stephanus Stolk, selling as an individual (14:42 UTC).
 
 ### Decision
 
@@ -39,8 +39,8 @@ Johannes Stephanus Stolk, selling as an individual (14:42).
    `scripts/generate-site-pages.test.mjs` fails when a committed page differs from its sources.
 3. **Menus reach every page.** Each generated page, the download page and the support page carry
    a menu with Pricing, Download and Support and a footer with the three policies; the checkout
-   page's footer links the three policies. The app's Help menu gains Pricing and Terms and
-   Policies.
+   page's footer links the three policies. The app's Help menu gains Pricing, Terms of Service
+   and Privacy Policy.
 4. **The pricing page links no checkout.** Purchases start in the desktop app (ADR-524 Amendment
    2), so the page says purchase opens soon until `salesOpen`, then sends buyers to Help > Licence.
 

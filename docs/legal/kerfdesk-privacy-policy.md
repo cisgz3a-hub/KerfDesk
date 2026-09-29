@@ -3,21 +3,24 @@
 > Published at https://kerfdesk.com/privacy/ as the first part of that page, followed by
 > `kerfdesk-privacy-notice.md` (licensing and purchases). `scripts/generate-site-pages.mjs` builds
 > the page; blockquotes like this one are never published. The network facts come from
-> `website/pages/privacy.mjs`, which cites the app source. Keep the two consistent.
+> `website/pages/privacy.mjs`, which cites the app source. Keep the two consistent. Claude checked
+> this part against POPIA, the EU and UK GDPR, US state law and Paddle's rules on 29 September 2026
+> (`privacy-policy-legal-check.md`, ADR-247 Amendment 2); re-check it after any change.
 
 Last updated: 29 September 2026.
 
 This policy covers kerfdesk.com, the KerfDesk web app and the KerfDesk desktop app: what each one
-sends over the network, and what stays on your computer. The licensing and purchases part below
-covers Pro trials, licences and buying Pro, and says who we are and what your rights are.
+sends over the network, what stays on your computer, and why. The licensing and purchases part below
+covers Pro trials, licences and buying Pro.
 
 ## At a glance
 
 - **No account.** KerfDesk has no sign-up or sign-in.
 - **No tracking.** KerfDesk has no analytics, telemetry, automatic error reporting or advertising,
-  and it sets no cookies.
+  and it sets no cookies of its own.
 - **Your work stays with you.** Your projects, machine details and jobs stay on your computer.
   KerfDesk does not upload them.
+- **Nothing sold.** We do not sell your personal information or share it for advertising.
 
 ## What stays on your computer
 
@@ -61,9 +64,65 @@ browser's site settings at any time.
 
 ## Our web pages
 
-The pricing, download, support and policy pages on kerfdesk.com set no cookies and run no analytics
-or advertising. The download page runs a script that checks the publisher's signature on the list of
+The pricing, download, support and policy pages on kerfdesk.com set no cookies of their own and run
+no analytics or advertising. The download page runs a script that checks the publisher's signature on the list of
 desktop releases from dl.kerfdesk.com before it shows a download link. Like any website, our web
 server receives your IP address, which browser you use, the page you asked for and the time. We add
 no tracking of our own. The checkout page, where you pay for Pro, loads Paddle's code, as the
 licensing and purchases part below explains.
+
+If Cloudflare, which runs our servers, needs to check that a visitor is a person and not an
+automated program, it may set a security cookie for that check alone.
+
+## Why we use your information, and for how long
+
+- **Connection details.** Every connection above, and every visit to our pages, gives our servers
+  your IP address, your browser or app version, what you asked for and the time. We use them only
+  to deliver what you asked for and to protect our services from attacks and abuse, which is our
+  legitimate interest. Without them, the page, the app or the update cannot reach you. We keep no
+  logs of these connections ourselves. Cloudflare handles them for us as our service provider and
+  keeps them only as long as it needs them to deliver and protect our services. It shows us overall
+  totals, such as how many requests our sites received and from which countries, and details only
+  of requests it blocked or challenged to protect our sites.
+- **Emails you send us.** When you email support@kerfdesk.com, we receive your email address and
+  whatever you write or attach. We use them only to answer you, which is our legitimate interest,
+  or to provide your licence under our agreement with you. We keep support messages for 2 years
+  after our last exchange.
+
+## Who else handles your information
+
+- **Cloudflare, Inc.** runs kerfdesk.com, dl.kerfdesk.com and license.kerfdesk.com for us, and
+  forwards email sent to support@kerfdesk.com.
+- **Google** hosts the mailbox that receives our support email.
+- **Paddle** takes payments on our checkout page, as the licensing and purchases part below
+  explains.
+
+We are in South Africa. Cloudflare and Google are based in the United States and handle
+information in many countries. Both take part in the EU-U.S. Data Privacy Framework and its UK
+extension, which the European Commission and the UK government recognise as protecting information
+sent to the United States (https://www.dataprivacyframework.gov). Cloudflare also handles our
+information under data processing terms that include the European Commission's standard
+contractual clauses. You can ask us for a copy of those terms.
+
+## Tracking signals and children
+
+We do not track you over time or across other websites, and apart from Paddle on our checkout page,
+no other company can use our pages or apps to do so. So we treat every visit the same way, whether
+or not your browser sends a Do Not Track or Global Privacy Control signal.
+
+KerfDesk is not directed at children, and we do not knowingly collect personal information from
+anyone under 18. If you believe a child has sent us personal information, email
+support@kerfdesk.com and we will delete it.
+
+## Who is responsible, and your rights
+
+Johannes Stephanus Stolk, of [PLACEHOLDER: physical address], South Africa, is responsible for your
+information ("we", "us"). Contact us at support@kerfdesk.com.
+
+You can ask to see the personal information we hold about you, and ask us to correct or delete it,
+to limit how we use it, or to send it to you in a portable form. You can object to how we use it.
+We may ask you to show that the information is yours, and we will reply within 30 days. If you are
+not satisfied, you can complain to South Africa's Information Regulator
+(https://inforegulator.org.za) or to the data protection authority where you live.
+
+When this policy changes, we update this page and the date at the top.
