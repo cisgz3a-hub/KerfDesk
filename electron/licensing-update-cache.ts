@@ -1,3 +1,4 @@
+import { clockRolledBack } from './licensing-clock.js';
 import type { LicensingConfig } from './licensing-config.js';
 import type { LicenceRecord } from './licensing-store.js';
 import {
@@ -75,8 +76,9 @@ function claimsTakeRelease(
 }
 
 function validTime(claims: LicenceClaims, lastSeenAt: number, now: number): boolean {
+  // Paid and developer rights never expire, so the clock cannot block their updates.
   return (
-    now + 300 >= Math.max(lastSeenAt, claims.issuedAt) &&
+    !clockRolledBack(claims, lastSeenAt, now) &&
     (claims.accessExpiresAt === null || now < claims.accessExpiresAt)
   );
 }

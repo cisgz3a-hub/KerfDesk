@@ -1,9 +1,11 @@
-import { net, Notification, safeStorage, shell } from 'electron';
+import { app, net, Notification, safeStorage, shell } from 'electron';
 import { readLicensingConfig, type LicensingConfig } from './licensing-config.js';
-import { licensingDeviceId } from './licensing-device.js';
+import { isTransactionId } from './licensing-commerce.js';
+import { licensingDeviceId, rememberDeviceId } from './licensing-device.js';
 import { withLicensingRoutes, type ProtocolHandler } from './licensing-routes.js';
 import { createLicensingStore } from './licensing-store.js';
 import { createLicensingRuntime, type LicensingRuntime } from './licensing-runtime.js';
+import { scheduleLicenceChecks } from './licensing-schedule.js';
 import {
   checkCommercialUpdates,
   commercialUpdatesOffered,
@@ -43,6 +45,7 @@ type Options = {
 export function createDesktopLicensing(options: Options) {
   const config = readLicensingConfig(options.appPath);
   let pendingUpdate: { envelope: unknown; version: string } | null = null;
+  let stopChecks: (() => void) | null = null;
   const runtime = createLicensingRuntime({
     config,
     currentVersion: options.version,
@@ -51,7 +54,8 @@ export function createDesktopLicensing(options: Options) {
       secureStorage: safeStorage,
       platform: process.platform,
     }),
-    deviceId: licensingDeviceId,
+    // reg.exe runs once per process, not on every licence read (ADR-523 Amendment 2).
+    deviceId: rememberDeviceId(() => licensingDeviceId()),
     deviceName: DEVICE_NAMES[process.platform] ?? 'KerfDesk device',
     fetch: (url, init) => net.fetch(url, init),
     openCheckout: async (url) => {
@@ -63,7 +67,7 @@ export function createDesktopLicensing(options: Options) {
         target.password ||
         target.hash ||
         [...target.searchParams.keys()].join(',') !== '_ptxn' ||
-        !/^txn_[a-z0-9]{26}$/.test(target.searchParams.get('_ptxn') ?? '')
+        !isTransactionId(target.searchParams.get('_ptxn') ?? '')
       ) {
         throw new Error('Invalid checkout destination');
       }
@@ -87,15 +91,18 @@ export function createDesktopLicensing(options: Options) {
     /**
      * Runs once the window is open: a quiet weekly licence confirmation, then
      * the signed update check. The workspace never waits for either (ADR-540).
+     * The quiet check then repeats every 30 minutes until KerfDesk quits.
      */
     start: (): void => {
-      if (config.channel !== 'commercial') return;
+      if (config.channel !== 'commercial' || stopChecks !== null) return;
       void runtime
         .refreshInBackground()
         .catch(() => undefined)
         .then(() => {
           updates.check();
         });
+      stopChecks = scheduleLicenceChecks(runtime.refreshInBackground);
+      app.once('will-quit', () => stopChecks?.());
     },
     prepareQuit: () => {
       if (config.channel !== 'commercial') return;

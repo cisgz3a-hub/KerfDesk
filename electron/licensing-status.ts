@@ -1,3 +1,4 @@
+import { clockRolledBack } from './licensing-clock.js';
 import type { LicensingConfig } from './licensing-config.js';
 import type { LicenceRecord } from './licensing-store.js';
 import {
@@ -123,7 +124,7 @@ export function evaluateLicence(
     return summary(
       'activation-required',
       null,
-      'This computer is signed out of its licence. Connect to the internet and retry deactivation to free its seat.',
+      'This computer is signed out of its licence. Connect to the internet and retry deactivation to free its seat, or choose Reset saved licence to stop trying.',
     );
   if (saved.credential === undefined) return summary('activation-required');
   const claims = verifyEntitlement(saved.credential.entitlement, config.entitlementKeys, device);
@@ -133,11 +134,12 @@ export function evaluateLicence(
       null,
       'The saved licence cannot be used on this computer. Enter your licence key to activate it again.',
     );
-  if (now + 300 < Math.max(saved.lastSeenAt, claims.issuedAt))
+  // Only a trial is held to the clock; paid and developer rights never expire.
+  if (clockRolledBack(claims, saved.lastSeenAt, now))
     return summary(
       'clock-error',
       claims,
-      'This computer’s clock is earlier than the last licence check, so Pro tools are locked. Correct the clock, then refresh your licence.',
+      'This computer’s clock is earlier than the last licence check, so the Pro tools in your trial are locked. Turn on Set time automatically in Windows’ Date & time settings, then choose Refresh licence.',
     );
   if (claims.accessExpiresAt !== null && now >= claims.accessExpiresAt)
     return summary(

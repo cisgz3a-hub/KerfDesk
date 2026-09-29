@@ -59,3 +59,19 @@ export async function licensingDeviceId(deps: DeviceDependencies = dependencies)
     .update(`kerfdesk-desktop:device:v1:${deps.platform}:${installation.toLowerCase()}`)
     .digest('base64url');
 }
+
+/**
+ * Reads the device identity once per process instead of starting reg.exe for
+ * every licence read, action and update candidate. A failed read is not kept,
+ * so the next request tries again (ADR-523 Amendment 2).
+ */
+export function rememberDeviceId(read: () => Promise<string>): () => Promise<string> {
+  let known: Promise<string> | null = null;
+  return () => {
+    known ??= read().catch((error: unknown) => {
+      known = null;
+      throw error;
+    });
+    return known;
+  };
+}
