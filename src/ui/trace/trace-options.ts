@@ -8,6 +8,7 @@
 // Image-level tone edits stay in Adjust Image.
 
 import type { TraceOptions } from '../../core/trace';
+import type { TraceReport } from '../../core/trace/trace-steps';
 import {
   EDGE_CONTRAST_DELTA_MAX,
   edgeBlurSigmaForRadius,
@@ -47,6 +48,9 @@ export type LightBurnTraceSettingOverrides = ColourLayerSettingOverrides & {
   // Line + fill (ADR-454), in placed millimetres. The dialog converts it to
   // hybridMaxStrokeWidthPx through the placement (hybrid-stroke-width.ts).
   readonly hybridMaxStrokeWidthMm?: number;
+  // Centerline and Line + fill: facing line ends closer than this many pixels
+  // are joined; 0 leaves every gap open.
+  readonly centerlineJoinGapPx?: number;
   // Diagonal contacts (ADR-455): the filled-contour lane's turn policy.
   readonly turnPolicy?: TraceOptions['turnPolicy'];
 };
@@ -54,6 +58,8 @@ export type LightBurnTraceSettingOverrides = ColourLayerSettingOverrides & {
 export type TraceDetectionMode = 'preset' | 'manual' | 'sketch' | 'faint-lines';
 
 export const DEFAULT_EDGE_MINIMUM_LINE_PX = 3;
+// The centreline tracer's own gap when options omit it (trace-centerline.ts).
+export const DEFAULT_CENTERLINE_JOIN_GAP_PX = 3;
 
 export function mergeLightBurnTraceSettings(
   preset: TraceOptions,
@@ -73,7 +79,7 @@ export function mergeLightBurnTraceSettings(
     out['traceTransparency'] = settings.traceTransparency;
   }
   if (settings.invert !== undefined) out['invert'] = settings.invert;
-  Object.assign(out, turnPolicySetting(settings));
+  Object.assign(out, turnPolicySetting(settings), joinGapSetting(preset, settings));
   if (preset.traceMode === 'edge') {
     applyEdgeTraceSettings(out, preset, settings);
   }
@@ -83,6 +89,21 @@ export function mergeLightBurnTraceSettings(
 // Diagonal contacts (ADR-455); ignored by the lanes that do not resolve corners.
 function turnPolicySetting(settings: LightBurnTraceSettingOverrides): Partial<TraceOptions> {
   return settings.turnPolicy === undefined ? {} : { turnPolicy: settings.turnPolicy };
+}
+
+// Join gaps: only the lanes that assemble centre lines read it.
+function joinGapSetting(
+  preset: TraceOptions,
+  settings: LightBurnTraceSettingOverrides,
+): Partial<TraceOptions> {
+  const gap = settings.centerlineJoinGapPx;
+  if (gap === undefined || !joinsLineEnds(preset)) return {};
+  return { centerlineJoinGapPx: clampMin(gap, 0) };
+}
+
+/** Whether a style assembles centre lines, and so offers Join gaps. */
+export function joinsLineEnds(preset: TraceOptions): boolean {
+  return preset.traceMode === 'centerline' || preset.traceMode === 'hybrid';
 }
 
 // Each small-mark stage is Auto (no explicit value, policy on) or exact
@@ -163,6 +184,30 @@ export function traceDetectionMode(
   return settings.cutoffLuma !== undefined || settings.thresholdLuma !== undefined
     ? 'manual'
     : 'preset';
+}
+
+/** The overrides after the operator picks a Detection mode. The first manual
+ * band on an automatic-threshold preset starts at the band the preview's
+ * automatic threshold used, so switching to Manual keeps the same ink. */
+export function overridesForDetectionMode(
+  preset: TraceOptions,
+  settings: LightBurnTraceSettingOverrides,
+  detectionMode: TraceDetectionMode,
+  report: TraceReport | undefined,
+): LightBurnTraceSettingOverrides {
+  const next = { ...settings, detectionMode };
+  const automatic = report?.automaticThresholdLuma;
+  if (detectionMode !== 'manual' || automatic === undefined) return next;
+  const firstBand = settings.cutoffLuma === undefined && settings.thresholdLuma === undefined;
+  return firstBand && preset.useOtsuThreshold === true
+    ? { ...next, thresholdLuma: automaticBandThreshold(automatic) }
+    : next;
+}
+
+/** The automatic threshold inks brightness below it, while the manual band
+ * includes its Threshold, so the matching band ends one level lower. */
+export function automaticBandThreshold(automaticThresholdLuma: number): number {
+  return clampByte(automaticThresholdLuma - 1);
 }
 
 function applyDetectionSettings(

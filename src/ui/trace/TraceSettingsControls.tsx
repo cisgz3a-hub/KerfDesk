@@ -15,6 +15,8 @@ import { PhotoTraceSettingsControls } from './PhotoTraceSettingsControls';
 import { TraceAreaControls } from './TraceAreaControls';
 import { ColourLayerTraceSettingsControls } from './ColourLayerTraceSettingsControls';
 import { DiagonalContactsControl } from './DiagonalContactsControl';
+import type { TraceReport } from '../../core/trace/trace-steps';
+import type { TraceGrid } from './trace-boundary-grid';
 
 type TraceSettingsControlsProps = {
   readonly preset: TraceOptions;
@@ -23,6 +25,10 @@ type TraceSettingsControlsProps = {
   readonly onChange: (next: LightBurnTraceSettingOverrides) => void;
   /** Colours of the current preview trace (Colour layers swatches). */
   readonly previewColours?: ReadonlyArray<string> | undefined;
+  /** What the matching finished preview's automatic detection chose. */
+  readonly report?: TraceReport | undefined;
+  /** The grid the preview traced, when it is not the image's own size. */
+  readonly previewGrid?: TraceGrid | undefined;
 };
 
 export function TraceSettingsControls(props: TraceSettingsControlsProps): JSX.Element {
@@ -45,6 +51,7 @@ function EdgeTraceSettingsControls(props: TraceSettingsControlsProps): JSX.Eleme
   return (
     <fieldset className="lf-trace-settings">
       <legend>Refine detail</legend>
+      <PreviewGridNote grid={props.previewGrid} />
       <div className="lf-trace-settings-group">
         <NumberRow
           label="Sensitivity"
@@ -96,6 +103,7 @@ function FilledTraceSettingsControls(props: TraceSettingsControlsProps): JSX.Ele
   return (
     <fieldset className="lf-trace-settings">
       <legend>Refine detail</legend>
+      <PreviewGridNote grid={props.previewGrid} />
       <div className="lf-trace-settings-group">
         <TraceDetectionControls {...props} alphaMask={alpha.checked}>
           <BrightnessBandControls {...props} />
@@ -288,6 +296,19 @@ function ResetTraceSettingsButton(props: {
         Reset trace settings
       </button>
     </div>
+  );
+}
+
+// Large images are decoded at most 2048 px on a side for the preview, and
+// every px and px² setting counts pixels of that decoded grid; the commit
+// keeps their size on its own grid (ADR-409).
+function PreviewGridNote(props: { readonly grid: TraceGrid | undefined }): JSX.Element | null {
+  if (props.grid === undefined) return null;
+  return (
+    <p className="lf-trace-hint lf-trace-preview-grid">
+      The preview traces this image at {props.grid.width} × {props.grid.height} px; pixel sizes here
+      count those pixels.
+    </p>
   );
 }
 

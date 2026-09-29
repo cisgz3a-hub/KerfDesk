@@ -74,6 +74,7 @@ export function NumberRow(props: {
 const NUMBER_ROW_UNITS: Readonly<Record<string, string>> = {
   'Minimum line': 'px',
   'Max stroke width': 'mm',
+  'Join gaps': 'px',
 };
 
 function clamp(value: number, min: number, max: number): number {

@@ -1,6 +1,8 @@
 import type { TraceOptions } from '../../core/trace';
 import { AUTO_CANDIDATE_AREA_PX } from '../../core/trace/small-mark-policy';
 import {
+  DEFAULT_CENTERLINE_JOIN_GAP_PX,
+  joinsLineEnds,
   mergeLightBurnTraceSettings,
   smallMarkControlState,
   type LightBurnTraceSettingOverrides,
@@ -66,6 +68,7 @@ export function TraceAreaControls(props: TraceAreaControlsProps): JSX.Element {
         />
       ) : null}
       {props.preset.traceMode === 'hybrid' ? <HybridStrokeWidthRow {...props} /> : null}
+      {joinsLineEnds(props.preset) ? <JoinGapsRow {...props} /> : null}
       <TraceCheckboxRow
         label="Fill tiny holes"
         checked={state.fillHoles}
@@ -99,6 +102,27 @@ function HybridStrokeWidthRow(props: TraceAreaControlsProps): JSX.Element {
       value={hybridMaxStrokeWidthMm(props.overrides, device, machineKind)}
       onChange={(hybridMaxStrokeWidthMm) =>
         props.onChange({ ...props.overrides, hybridMaxStrokeWidthMm })
+      }
+    />
+  );
+}
+
+// Centerline and Line + fill bridge facing line ends across small gaps; 0
+// leaves every gap open.
+function JoinGapsRow(props: TraceAreaControlsProps): JSX.Element {
+  return (
+    <NumberRow
+      label="Join gaps"
+      min={0}
+      max={50}
+      step={1}
+      value={
+        props.overrides.centerlineJoinGapPx ??
+        props.preset.centerlineJoinGapPx ??
+        DEFAULT_CENTERLINE_JOIN_GAP_PX
+      }
+      onChange={(centerlineJoinGapPx) =>
+        props.onChange({ ...props.overrides, centerlineJoinGapPx })
       }
     />
   );

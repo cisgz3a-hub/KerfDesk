@@ -26,8 +26,9 @@ import {
   traceImageToColoredPaths,
 } from '../../core/trace';
 import { resolveFrozenTraceSourceOptions } from '../../core/trace/trace-source-decisions';
-import type { TraceSteps } from '../../core/trace/trace-steps';
+import type { TraceReport, TraceSteps } from '../../core/trace/trace-steps';
 import type { TracePhase, TraceProgress } from '../../core/trace/trace-progress';
+import { collectTraceReports } from './trace-report-collector';
 
 export type TraceWorkerRequest = {
   readonly id: number;
@@ -70,6 +71,8 @@ export type TraceWorkerResponse =
       // The options this trace ran with, present when the request asked for
       // freezeSourceDecisions.
       readonly sourceOptions?: TraceOptions;
+      // What automatic detection chose, for display (see TraceReport).
+      readonly report?: TraceReport;
     }
   | { readonly id: number; readonly kind: 'error'; readonly message: string };
 
@@ -87,10 +90,11 @@ self.onmessage = (e: MessageEvent<TraceWorkerRequest>): void => {
     try {
       const traced =
         freezeSourceDecisions === true ? resolveFrozenTraceSourceOptions(image, options) : options;
+      const reports = collectTraceReports();
       const paths = await traceImageToColoredPaths(
         image,
         traced,
-        heartbeatRunner(id),
+        heartbeatRunner(id, reports.add),
         phaseReporter(id),
       );
       const bounds = boundsFromColoredPaths(paths);
@@ -102,6 +106,7 @@ self.onmessage = (e: MessageEvent<TraceWorkerRequest>): void => {
         width: image.width,
         height: image.height,
         ...(freezeSourceDecisions === true ? { sourceOptions: traced } : {}),
+        ...reports.entry(),
       };
       self.postMessage(response);
     } catch (err) {
@@ -135,12 +140,16 @@ function phaseReporter(id: number): TraceProgress {
  * Nothing here awaits, so the worker's event loop stays blocked as before; a
  * blocked worker can still post, because delivery does not need it to yield.
  */
-function heartbeatRunner(id: number): <T>(steps: TraceSteps<T>) => T {
+function heartbeatRunner(
+  id: number,
+  onReport: (report: TraceReport) => void,
+): <T>(steps: TraceSteps<T>) => T {
   let due = performance.now() + HEARTBEAT_INTERVAL_MS;
   return <T>(steps: TraceSteps<T>): T => {
     for (;;) {
       const step = steps.next(false);
       if (step.done) return step.value;
+      if (step.value !== undefined) onReport(step.value);
       const now = performance.now();
       if (now < due) continue;
       due = now + HEARTBEAT_INTERVAL_MS;

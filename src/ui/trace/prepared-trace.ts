@@ -43,7 +43,7 @@ export function sameTracePreparationRequest(
   );
 }
 
-function sameBoundary(a: TraceBoundary | null, b: TraceBoundary | null): boolean {
+export function sameBoundary(a: TraceBoundary | null, b: TraceBoundary | null): boolean {
   if (a === null || b === null) return a === b;
   return a.x === b.x && a.y === b.y && a.width === b.width && a.height === b.height;
 }
