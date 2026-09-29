@@ -5,7 +5,7 @@
 // and quiet zone instead, for stock that marks light (anodised aluminium,
 // slate); the marks then sit inside the box as holes under even-odd fill.
 
-import type { Polyline } from '../scene';
+import type { Bounds, Polyline } from '../scene';
 import type { BarcodeShape } from '../scene/scene-object';
 import {
   encodeBarcodeSymbol,
@@ -74,10 +74,16 @@ export function layoutBarcode(spec: BarcodeShape, data: string): BarcodeLayoutRe
   return { ok: true, layout: { ...layout, warnings } };
 }
 
-/** Closed outlines to engrave for a final box height (captions may deepen it). */
-export function layoutPolylines(layout: BarcodeLayout, heightMm = layout.heightMm): Polyline[] {
+/**
+ * Closed outlines to engrave. An inverted 1D code's plate fills `box`, the
+ * object's final box, which captions may deepen or widen.
+ */
+export function layoutPolylines(
+  layout: BarcodeLayout,
+  box: Bounds = { minX: 0, minY: 0, maxX: layout.widthMm, maxY: layout.heightMm },
+): Polyline[] {
   if (!layout.background) return [...layout.marks];
-  return [rectangle(0, 0, layout.widthMm, heightMm), ...layout.marks];
+  return [rectangle(box.minX, box.minY, box.maxX, box.maxY), ...layout.marks];
 }
 
 function layoutWarnings(spec: BarcodeShape, moduleMm: number): string[] {

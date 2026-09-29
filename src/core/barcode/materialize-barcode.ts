@@ -56,7 +56,11 @@ export async function materializeBarcode(
   if (!laid.ok) return laid;
   const layout = laid.layout;
   const glyphs: { polylines: Polyline[]; curves: CurveSubpath[] } = { polylines: [], curves: [] };
-  let bottom = layout.heightMm;
+  // The object's box is the quiet zone, grown to hold every caption with the
+  // padding kept under the text: an EAN or UPC digit set in a quiet zone below
+  // the standard reaches past it. Selection, hit testing, arranging and an
+  // inverted plate then all cover the text (ADR-386 Amendment 2).
+  const box = { minX: 0, minY: 0, maxX: layout.widthMm, maxY: layout.heightMm };
   for (const caption of layout.captions) {
     if (caption.text.trim() === '') continue;
     let rendered: RenderedCaption;
@@ -69,17 +73,18 @@ export async function materializeBarcode(
     const dx = caption.centerXMm - (rendered.bounds.minX + rendered.bounds.maxX) / 2;
     const dy = caption.topMm - rendered.bounds.minY;
     appendTranslated(glyphs, rendered, dx, dy);
-    bottom = Math.max(bottom, rendered.bounds.maxY + dy + layout.paddingMm);
+    box.minX = Math.min(box.minX, rendered.bounds.minX + dx - layout.paddingMm);
+    box.maxX = Math.max(box.maxX, rendered.bounds.maxX + dx + layout.paddingMm);
+    box.maxY = Math.max(box.maxY, rendered.bounds.maxY + dy + layout.paddingMm);
   }
-  const marks = layoutPolylines(layout, bottom);
+  const marks = layoutPolylines(layout, box);
   const path: ColoredPath = {
     color,
     polylines: [...marks, ...glyphs.polylines],
     curves: [...marks.map(polylineToCurveSubpath), ...glyphs.curves],
     fillRule: 'evenodd',
   };
-  const bounds = { minX: 0, minY: 0, maxX: layout.widthMm, maxY: bottom };
-  return { ok: true, barcode: { paths: [path], bounds, layout } };
+  return { ok: true, barcode: { paths: [path], bounds: box, layout } };
 }
 
 /** A new barcode shape object, or the reason its data cannot be encoded. */

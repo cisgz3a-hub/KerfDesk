@@ -2,6 +2,15 @@ import { describe, expect, it, vi } from 'vitest';
 
 import { decodeQrModules } from '../../__fixtures__/barcode/qr-decoder';
 import { insideEvenOdd, sampleGrid } from '../../__fixtures__/barcode/sample-geometry';
+import {
+  addObject,
+  createLayer,
+  EMPTY_SCENE,
+  hitTest,
+  transformedBBox,
+  type Bounds,
+  type Polyline,
+} from '../scene';
 import type { BarcodeShape } from '../scene/scene-object';
 import { defaultBarcodeSpec } from './barcode-spec';
 import {
@@ -27,6 +36,18 @@ const boxCaptions: BarcodeCaptionRenderer = async ({ text, sizeMm }) => {
     bounds: { minX: 100, minY: 50, maxX: 100 + width, maxY: 50 + height },
   };
 };
+
+function inkBounds(polylines: readonly Polyline[]): Bounds {
+  const points = polylines.flatMap((polyline) => polyline.points);
+  const xs = points.map((point) => point.x);
+  const ys = points.map((point) => point.y);
+  return {
+    minX: Math.min(...xs),
+    minY: Math.min(...ys),
+    maxX: Math.max(...xs),
+    maxY: Math.max(...ys),
+  };
+}
 
 describe('materializeBarcode', () => {
   it('keeps matrix codes in one even-odd path with paired curves and never asks for text', async () => {
@@ -95,6 +116,55 @@ describe('materializeBarcode', () => {
       insideEvenOdd(polylines, { x: caption?.centerXMm ?? 0, y: (caption?.topMm ?? 0) + 1 }),
     ).toBe(false);
     expect(insideEvenOdd(polylines, { x: 0.1, y: bounds.maxY - 0.1 })).toBe(true);
+  });
+
+  // EAN-13 sets its first digit in the quiet zone, left of the start guard;
+  // below the standard quiet zone that digit reaches past the code's box.
+  it('widens the bounds to hold every caption, with the padding kept under the text', async () => {
+    const spec: BarcodeShape = { ...defaultBarcodeSpec('ean13'), quietZoneModules: 3 };
+    const result = await materializeBarcode(spec, '5901234123457', '#000000', boxCaptions);
+    if (!result.ok) throw new Error(result.message);
+    const { layout, bounds, paths } = result.barcode;
+    const ink = inkBounds((paths[0]?.polylines ?? []).slice(layout.marks.length));
+    expect(ink.minX).toBeLessThan(0);
+    expect(bounds.minX).toBeCloseTo(ink.minX - layout.paddingMm, 9);
+    expect(bounds.maxX).toBe(layout.widthMm);
+    expect(bounds.maxY).toBeGreaterThanOrEqual(ink.maxY + layout.paddingMm);
+  });
+
+  it('selects the code from a click on a digit past the quiet zone', async () => {
+    const spec: BarcodeShape = { ...defaultBarcodeSpec('ean13'), quietZoneModules: 0 };
+    const created = await createBarcodeObject({
+      id: 'ean',
+      color: '#000000',
+      spec,
+      value: '5901234123457',
+      renderCaption: boxCaptions,
+    });
+    if (!created.ok) throw new Error(created.message);
+    const polylines = created.object.paths[0]?.polylines ?? [];
+    const digit = inkBounds(polylines.filter((polyline) => polyline.points.some((p) => p.x < 0)));
+    const layer = createLayer({ id: 'fill', color: '#000000', mode: 'fill' });
+    const scene = addObject({ ...EMPTY_SCENE, layers: [layer] }, created.object);
+    const point = { x: digit.minX + 0.05, y: (digit.minY + digit.maxY) / 2 };
+    expect(hitTest(scene, point)).toBe('ean');
+    expect(transformedBBox(created.object).minX).toBeLessThanOrEqual(digit.minX);
+  });
+
+  it('keeps a caption past the quiet zone knocked out of an inverted plate', async () => {
+    const spec: BarcodeShape = { ...defaultBarcodeSpec('upca'), quietZoneModules: 3, invert: true };
+    const result = await materializeBarcode(spec, '036000291452', '#000000', boxCaptions);
+    if (!result.ok) throw new Error(result.message);
+    const { layout, bounds, paths } = result.barcode;
+    const polylines = paths[0]?.polylines ?? [];
+    // UPC-A's last digit sits right of the stop guard.
+    const last = inkBounds(polylines.slice(-1));
+    expect(last.maxX).toBeGreaterThan(layout.widthMm);
+    // The digit stays a hole in the plate rather than an engraved mark.
+    const middle = { x: (last.minX + last.maxX) / 2, y: (last.minY + last.maxY) / 2 };
+    expect(insideEvenOdd(polylines, middle)).toBe(false);
+    expect(bounds.maxX).toBeCloseTo(last.maxX + layout.paddingMm, 9);
+    expect(insideEvenOdd(polylines, { x: bounds.maxX - 0.01, y: middle.y })).toBe(true);
   });
 
   it('reports caption failures and invalid data without geometry', async () => {

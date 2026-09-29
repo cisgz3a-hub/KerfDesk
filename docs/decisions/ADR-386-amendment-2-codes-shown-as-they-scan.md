@@ -16,6 +16,11 @@ what it engraves or what a scanner reads.
   144 x 144 symbol, built to the letter of ISO/IEC 16022. ZXing could not read it: readers expect
   the ten check blocks of that one size in another order than the standard's text gives. No test
   vector or reader in the repository pins that order, so it cannot be verified offline.
+- **Text could sit outside the code's box.** EAN-13 and UPC-A set their outer digits in the quiet
+  zone. With a quiet zone below the standard, which draws with a warning, those digits reached
+  past the object's bounds: the selection box and click target missed them, arranging and nesting
+  could overlap them, and an inverted plate stopped short of them, so part of a digit was
+  engraved instead of left as a hole.
 
 ### Decision
 
@@ -39,6 +44,10 @@ what it engraves or what a scanner reads.
    Insert or Apply; a variable value that long stops output with the barcode and value named, as
    any value that cannot be encoded does. The size table still lists 144 x 144 so its placement
    stays tested; offering it again needs a verified reference for the reader order.
+3. **A barcode's box holds its text.** The bounds are the quiet-zone box grown to hold every
+   caption as drawn, with the padding kept under the text also kept beside it. An inverted 1D
+   plate fills the same box, so all of its text stays knocked out. Codes whose text stays within
+   the quiet zone, as at the standard quiet zones, keep the box they had.
 
 ### Consequences
 
@@ -50,8 +59,12 @@ what it engraves or what a scanner reads.
   edited. Convert to Path still converts the stored code.
 - A 144 x 144 code saved by an earlier build keeps its stored outlines until it is edited; Edit
   barcode then shows the message. Text that long needs a QR Code or shorter text.
+- An EAN or UPC code with a narrow quiet zone is as wide as its digits, and the selected code's
+  size shows that. A code saved by an earlier build keeps its stored box until it is edited.
 - Tests: `src/ui/workspace/use-canvas-display-barcode.test.tsx` (the canvas after Next, QR Code
   and Code 128 with its text, project untouched) and `variable-barcode-display.test.ts`
   (bindings, the last value while encoding, values that cannot be encoded or evaluated);
-  `src/core/barcode/data-matrix-encode.test.ts` (132 x 132 at most, the message) and
-  `src/ui/barcode/BarcodeDialog.test.tsx` (the message in the dialog, Insert disabled).
+  `src/core/barcode/data-matrix-encode.test.ts` (132 x 132 at most, the message);
+  `src/ui/barcode/BarcodeDialog.test.tsx` (the message in the dialog, Insert disabled);
+  `src/core/barcode/materialize-barcode.test.ts` (the box holds the text, an inverted plate keeps
+  it a hole).
