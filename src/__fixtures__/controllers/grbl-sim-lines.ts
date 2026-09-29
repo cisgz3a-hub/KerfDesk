@@ -235,7 +235,27 @@ function reduceGcodeLine(state: GrblSimState, line: string, opts: GrblSimOptions
   if (hasGWord(line, 10)) return { state: applyG10(state, line), effects: [emit('ok', opts)] };
   if (PROGRAM_PAUSE_RE.test(line)) return beginProgramPause(state);
   if (hasGWord(line, 4)) return beginDwell(state, line);
+  if (opts.probeFailure !== undefined && hasGWord(line, 38.2)) {
+    return failProbe(state, opts.probeFailure, opts);
+  }
   return reduceMotionOrModalLine(state, line, opts);
+}
+
+// A failed G38.2 raises its alarm without a reset, so G92 and G54 stay, and the
+// line itself still answers ok (motion_control.c:273-298, gcode.c:1132). The
+// travel before ALARM:5 is not modeled.
+function failProbe(state: GrblSimState, code: 4 | 5, opts: GrblSimOptions): GrblSimReaction {
+  return {
+    state: {
+      ...state,
+      machine: 'Alarm',
+      locked: true,
+      pendingMotions: 0,
+      pendingLine: null,
+      resetEpoch: state.resetEpoch + 1,
+    },
+    effects: [emit(`ALARM:${code}`, opts), emit('ok', opts)],
+  };
 }
 
 function reduceMotionOrModalLine(

@@ -86,6 +86,9 @@ export type GrblSimOptions = {
   /** grblHAL only: "report when homing", bit 12 of `$10`, off by default
    *  (config.h:751-753). With it on grblHAL answers `?` while it homes. */
   readonly reportWhenHoming?: boolean;
+  /** Fail every G38.2 with ALARM:4 (probe already triggered) or ALARM:5 (no
+   *  contact within the travel); unset, a G38.2 touches at once (grbl-sim-lines). */
+  readonly probeFailure?: 4 | 5;
 };
 
 export function emit(line: string, opts: GrblSimOptions): GrblSimEffect {

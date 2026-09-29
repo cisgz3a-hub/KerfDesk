@@ -87,6 +87,38 @@ describe('Console command completion', () => {
     expect(useLaserStore.getState().alarmCode).toBeNull();
   });
 
+  // Controller audit 2, M-1: a failed probe stops only the probe move, so `$X`
+  // after it keeps the Set origin and the reported position
+  // (probe-failure-alarm.ts), even when the first Idle report clears the alarm
+  // latch before the `ok` is handled.
+  it('keeps the Set origin when $X clears a failed probe', async () => {
+    const { connection, wire } = await connectedIdle();
+    useLaserStore.setState({
+      workOriginActive: true,
+      workOriginSource: 'g92',
+      wcoCache: { x: 25, y: 15, z: 0 },
+      positionEvidenceSuppressed: false,
+    });
+    connection.emitLine('ALARM:4');
+    connection.emitLine('<Alarm|MPos:26.000,17.000,0.000|FS:0,0>');
+    await flushConnect();
+    wire.length = 0;
+
+    await sendAndAnswer(connection, wire, '$X', [
+      '[MSG:Caution: Unlocked]',
+      '<Idle|MPos:26.000,17.000,0.000|FS:0,0|WCO:25.000,15.000,0.000>',
+      'ok',
+    ]);
+
+    expect(useLaserStore.getState()).toMatchObject({
+      alarmCode: null,
+      workOriginActive: true,
+      workOriginSource: 'g92',
+      positionEvidenceSuppressed: false,
+      wcoCache: { x: 25, y: 15, z: 0 },
+    });
+  });
+
   it('keeps the alarm latch when the controller refuses $X', async () => {
     const { connection, wire } = await connectedIdle();
     useLaserStore.setState({ alarmCode: 5 });

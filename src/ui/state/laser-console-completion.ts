@@ -17,6 +17,7 @@ import { interactiveControllerOperation } from './laser-controller-operation';
 import { retainControllerReportUnits } from './controller-report-units';
 import { pushLog } from './laser-store-helpers';
 import type { LaserState } from './laser-store';
+import { isProbeFailureAlarm } from './probe-failure-alarm';
 
 type SetFn = (
   partial: Partial<LaserState> | ((state: LaserState) => Partial<LaserState> | LaserState),
@@ -74,22 +75,25 @@ export function isSettingsReadOperation(operation: LaserState['controllerOperati
 }
 
 /** The controller acknowledged `$X`: the same state the Alarm banner's Unlock
- *  leaves. Positions and references taken before the alarm no longer hold.
- *  The alarm code stays until a report that is not Alarm clears it: FluidNC
- *  acknowledges `$X` in its Critical state without unlocking, and its next
- *  report still reads Alarm (controller audit 2026-09-25 HF-2). */
-export function controllerUnlockedPatch(state: LaserState): Partial<LaserState> {
-  const persistentOrUnknown =
-    state.workOriginSource === 'g54-persistent' || state.workOriginSource === 'unknown';
+ *  leaves. Positions and references taken before the alarm no longer hold,
+ *  except after a failed probe: `unlockedAlarm`, the alarm this Unlock cleared,
+ *  read before its reply, is ALARM:4 or 5, which stopped only the probe move,
+ *  so the machine position and the XY origin still stand and the next reports
+ *  carry them (probe-failure-alarm.ts). Work Z is void either way. The alarm
+ *  code stays until a report that is not Alarm clears it: FluidNC acknowledges
+ *  `$X` in its Critical state without unlocking, and its next report still
+ *  reads Alarm (controller audit 2026-09-25 HF-2). */
+export function controllerUnlockedPatch(
+  state: LaserState,
+  unlockedAlarm: number | null,
+): Partial<LaserState> {
+  const probeFailed = isProbeFailureAlarm(unlockedAlarm);
   return {
     homingState: 'unknown',
     homingProof: null,
-    positionEvidenceSuppressed: true,
+    ...(probeFailed ? {} : positionLostAtUnlockPatch(state)),
     statusReport: null,
     statusObservation: null,
-    wcoCache: null,
-    workOriginActive: persistentOrUnknown,
-    workOriginSource: persistentOrUnknown ? 'unknown' : 'none',
     workZZeroEvidence: null,
     workZReferenceEpoch: state.workZReferenceEpoch + 1,
     frameVerification: null,
@@ -98,8 +102,21 @@ export function controllerUnlockedPatch(state: LaserState): Partial<LaserState> 
     trustedPositionEpoch: (state.trustedPositionEpoch ?? 0) + 1,
     log: pushLog(
       state,
-      '[lf2] Controller unlocked. Cleared stale position, origin, Z, Home, and Frame evidence.',
+      probeFailed
+        ? '[lf2] Controller unlocked after a failed probe. Kept position and XY origin evidence; cleared Z, Home, and Frame evidence.'
+        : '[lf2] Controller unlocked. Cleared stale position, origin, Z, Home, and Frame evidence.',
     ),
+  };
+}
+
+function positionLostAtUnlockPatch(state: LaserState): Partial<LaserState> {
+  const persistentOrUnknown =
+    state.workOriginSource === 'g54-persistent' || state.workOriginSource === 'unknown';
+  return {
+    positionEvidenceSuppressed: true,
+    wcoCache: null,
+    workOriginActive: persistentOrUnknown,
+    workOriginSource: persistentOrUnknown ? 'unknown' : 'none',
   };
 }
 

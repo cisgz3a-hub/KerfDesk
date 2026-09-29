@@ -191,6 +191,8 @@ async function dispatchPreparedConsoleCommand(
   const settingsQuery = command.kind === 'settings-query';
   if (reportUnitsWrite) set(beginReportUnitsWrite());
   if (settingsQuery) beginConsoleSettingsRead(set, get, refs);
+  // The alarm a `$X` clears, read before its reply (controllerUnlockedPatch).
+  const unlockedAlarm = get().alarmCode;
   try {
     await writeConsoleCommand(refs, write, command, source);
   } catch (error) {
@@ -198,7 +200,10 @@ async function dispatchPreparedConsoleCommand(
     throw error;
   }
   if (settingsQuery) finishConsoleSettingsRead(set, get, refs);
-  applyConsoleStateEffect(set, command);
+  // An acknowledged `$X` leaves exactly what the Alarm banner's Unlock does
+  // (audit cnc-controller-1).
+  if (command.kind === 'unlock') set((state) => controllerUnlockedPatch(state, unlockedAlarm));
+  else applyConsoleStateEffect(set, command);
   await trackConsoleWcs(set, get, refs, command, (line, action, next) =>
     write(line, action, next ?? 'system'),
   );
@@ -226,9 +231,6 @@ async function rereadSettingsAfterReportUnitsWrite(
 }
 
 function applyConsoleStateEffect(set: SetFn, command: PreparedConsoleCommand): void {
-  // An acknowledged `$X` leaves exactly what the Alarm banner's Unlock does,
-  // alarm cleared included (audit cnc-controller-1).
-  if (command.kind === 'unlock') return set(controllerUnlockedPatch);
   const stateEffect = command.stateEffect;
   if (stateEffect === 'read-only') return;
   set((state) => consoleStateEffectPatch(state, stateEffect, command.normalized));
