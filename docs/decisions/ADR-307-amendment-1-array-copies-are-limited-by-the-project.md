@@ -85,9 +85,9 @@ figure is the loader's and not a judgement, and every request that fits is still
    builds the scene it would make and holds it to the exact check of item 4
    (`refuseSceneLimitOverrun`, which shows `sceneLimitOverrun`'s message as a warning notice). A
    result that would take a count past its limit, and grow it, is refused whole and nothing
-   changes: no undo step, no change to the selection, and never a part of it made. Everything that
-   fits is made exactly as before. The notice names the limit and says what to change in the
-   command's own words:
+   changes: no undo step, no change to the selection or to the names in the Undo and Redo lists,
+   and never a part of it made. Everything that fits is made exactly as before. The notice names
+   the limit and says what to change in the command's own words:
    - **Duplicate:** "This would take the project past its limit of 10000 objects. Duplicate fewer
      objects, or delete some objects first."
    - **Paste and Paste in Place:** "... Copy fewer objects to paste, or delete some objects
@@ -140,8 +140,8 @@ figure is the loader's and not a judgement, and every request that fits is still
 - Applying a large array still costs what its copies cost, and no more. Typing one costs nothing.
 - Duplicate, Paste, Break Apart, Cut Shapes, Array on board and Design Studio Apply keep to the
   same limits (item 7). Commands that add one object or a few at a time, such as drawing a shape
-  or Offset Shapes, do not check them, so at the very limit they can still take a project a few
-  objects past it.
+  or Offset Shapes (two objects, on operations of their own), do not check them, so at the very
+  limit they can still take a project just past one.
 - No schema change and no change to G-code.
 
 ### Verification
@@ -168,7 +168,7 @@ figure is the loader's and not a judgement, and every request that fits is still
   were before, and the file did not reopen); 5,000 duplicated to exactly 10,000 in one undo step,
   saved and reopened; an image's mask counted, to the last object; group members past their limit
   refused though the objects fit, and exactly 50,000 accepted; a project already over the limit
-  not grown.
+  not grown; a refused Duplicate leaves the name of the step waiting to be redone as it was.
 - `src/ui/state/paste-limits.test.ts`: Paste and Paste in Place of 6,000 into 6,000 refused with
   the clipboard kept; 5,000 into 5,000 pasted in one undo step and reopened; one object past the
   limit refused; 200 operations from another project refused in a project of 100 and pasted, to

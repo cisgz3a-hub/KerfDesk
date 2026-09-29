@@ -17,6 +17,7 @@ import {
   clickedSelectionReference,
   toggledSelectionReference,
 } from './selection-reference';
+import { saveUndoStepName } from './undo-step-names';
 import type { AppState } from './store';
 import {
   cncMachineForProfile,
@@ -131,13 +132,15 @@ export function duplicateAction(set: Setter): Pick<AppState, 'duplicateSelection
   return {
     duplicateSelection: () =>
       set((s) => {
+        const restoreUndoName = saveUndoStepName(s.project);
         const result = applyDuplicate(s, () => crypto.randomUUID());
         if (result === null) return s;
         // A project past its limits saves but cannot be opened again (ADR-307
         // amendment 1): such a Duplicate is refused whole, never made in part.
-        return refuseSceneLimitOverrun(s.project.scene, result.project.scene, DUPLICATE_FEWER)
-          ? s
-          : result;
+        if (!refuseSceneLimitOverrun(s.project.scene, result.project.scene, DUPLICATE_FEWER))
+          return result;
+        restoreUndoName();
+        return s;
       }),
   };
 }

@@ -23,8 +23,11 @@ import {
   pastTheLimit,
   rect,
   rects,
+  redoNames,
+  undoNamedStep,
 } from './testing/scene-limit-fixtures';
 import { useToastStore } from './toast-store';
+import { namedUndoAction } from './undo-step-names';
 
 const ASK = 'Duplicate fewer objects, or delete some objects first.';
 
@@ -130,6 +133,18 @@ describe('Duplicate and the project limits', () => {
       message: pastTheLimit('group members', PROJECT_SCENE_LIMITS.groupMembers, ASK),
       variant: 'warning',
     });
+  });
+
+  it('leaves the name of the step waiting to be redone as it was', () => {
+    // The Duplicate shortcut names the step it makes; a refused one makes none.
+    const objects = rects(6_000);
+    loadScene(objects, ids(objects));
+    undoNamedStep('Tidy up');
+
+    namedUndoAction('Duplicate', useStore.getState().duplicateSelection)();
+
+    expect(lastToast()?.message).toBe(pastTheLimit('objects', OBJECT_LIMIT, ASK));
+    expect(redoNames()).toEqual(['Tidy up']);
   });
 
   it('refuses to grow a project that is already over the limit', () => {
