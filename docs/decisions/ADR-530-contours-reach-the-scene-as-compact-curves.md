@@ -248,16 +248,23 @@ tail and follow that staircase; see Known gaps.
     against 87, stars scan 172 against 132. Compile flattens cubics by midpoint subdivision
     (ADR-391, ADR-405), which emits more chords than the tolerance needs; chord-optimal flattening
     is the follow-up that closes this.
-  - Trace time is still 1.5 to 1.9x the ADR-439 base on large art (table above) and 2.9x main on
-    uniform noise. Faster candidate proposal (coarse early exits, capped spans, fewer Newton passes,
-    giving up after one pass) was measured and rejected: each changed the candidate joints enough
-    to fail the R=900 commit-grid, filled-disc Optimize, Edge-dial or hairline instruments.
-    Incremental span evaluation (reusing the previous extension's parameters) is the next lever;
-    the exact part of it is done (Amendment 1), and the fit is no longer where most of the gap is.
-    The topology repair's exact savings are Amendment 2, and its memory and the corner legs are
-    Amendments 3 and 4; Amendment 5 counts where the fit's work goes, and Amendment 6 takes the
-    pow calls out of the arm solve. What remains is the sample count and the proposal's Newton
-    passes.
+  - Trace time is still above main's. The table above predates the amendments. Measured on
+    2026-09-29 against main `1ff88ad5a` (esbuild bundles, one cold trace per process, 2
+    interleaved rounds, medians): real art 1.0x (the arch house) to 1.5x (the astronaut with Line
+    Art, and the 1254 px stress-test drawing at 5.9 s against 4.0 s), with text-sans-96 at 1.3x;
+    uniform noise 1.24x (noise512), 1.29x (noise1024, 49.7 s against 38.5 s, one run each) and
+    1.25x and 1.55x on noise192 (Line Art, Sharp). The 1.46x noise target is met; the real-art
+    target of about 1.15x is not. Since ADR-531 Amendment 2, peak memory on these cases is from 7%
+    below main's (the stress test) to 9% above (noise192 Line Art); noise1024 is 1.05x. Faster candidate proposal (coarse early exits, capped
+    spans, fewer Newton passes, giving up after one pass) was measured and rejected: each changed
+    the candidate joints enough to fail the R=900 commit-grid, filled-disc Optimize, Edge-dial or
+    hairline instruments. The exact savings so far are Amendments 1 to 6 (the fit, the topology
+    repair, its memory and the corner legs), Amendments 8 and 9 (the repair's back-off on noise)
+    and ADR-531's Amendments 1 and 2 (the curve guard). On the stress-test drawing most of what
+    remains is the corner dial (about 1.3 s) and the fit's span projection (about 0.8 s); on noise
+    the live heap as the repair starts is 191 MB against main's 110 MB at 512 px, the 0.02 px
+    samples and the finished contours. Follow-up owner: the tracer audit, in a pull request after
+    this branch merges (real-art time first, then that memory).
 - Node editing, SVG export, bounds and the laser commit read the carried cubics; the downscale and
   Region Enhance routes no longer lose them.
 

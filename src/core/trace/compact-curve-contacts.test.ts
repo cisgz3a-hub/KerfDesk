@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import type { CurveSubpath, Polyline, Vec2 } from '../scene';
 import { CurveContactCache } from './compact-curve-contacts';
 import { pieceMeetsItself, piecesMeet } from './compact-curve-meet';
+import { ringPiecesSteps, straightRingBox } from './compact-curve-pieces';
 import { sampleCompactCurve } from './compact-curve-fit';
 import { intersectingContourLoopsSteps } from './contour-intersections';
 import { curvedTraceRing } from './trace-curves';
@@ -271,6 +272,20 @@ describe('the crossing guard on the fitted curves (ADR-531)', () => {
     expect(curveConflicts([ring(circle(0, 0, 10)), apart]).size).toBe(0);
   });
 
+  it('finds a straight ring of many edges through its index, and a near miss is none', () => {
+    // A 400-edge ring beside a fitted circle: past 16 straight pieces the ring
+    // indexes them and makes each into a piece only when a query finds it.
+    const band = (offset: number): Polyline => ({
+      closed: true,
+      points: [
+        ...Array.from({ length: 200 }, (_, i) => ({ x: 10 + offset, y: -10 + i * 0.1 })),
+        ...Array.from({ length: 200 }, (_, i) => ({ x: 12 + offset, y: 9.9 - i * 0.1 })),
+      ],
+    });
+    expect([...curveConflicts([ring(circle(0, 0, 10)), band(-0.5)])].sort()).toEqual([0, 1]);
+    expect(curveConflicts([ring(circle(0, 0, 10)), band(0.01)]).size).toBe(0);
+  });
+
   it('re-tests only changed rings across rounds, with the same result as from scratch', () => {
     let state = 11;
     const next = (): number => {
@@ -331,5 +346,33 @@ describe('the crossing guard on the fitted curves (ADR-531)', () => {
       p3: { x: 3, y: 0.001 },
     };
     expect(piecesMeet(a, above, false)).toBe(false);
+  });
+
+  // A ring without a fitted curve keeps only its box until a curved ring
+  // near it needs its pieces, so that box must be its pieces' box.
+  it('boxes a straight ring as its pieces do, and has none where they have none', () => {
+    let state = 7;
+    const next = (): number => {
+      state = (Math.imul(state, 1103515245) + 12345) >>> 0;
+      return state / 4294967296;
+    };
+    for (let trial = 0; trial < 200; trial += 1) {
+      const points: Vec2[] = [];
+      const count = 1 + Math.floor(next() * 6);
+      for (let k = 0; k < count; k += 1) {
+        // Repeated points and one-point rings, as backed-off rings can have.
+        const repeat = points.length > 0 && next() < 0.3;
+        points.push(repeat ? { ...points[points.length - 1]! } : { x: next() * 9, y: next() * 9 });
+      }
+      const polyline: Polyline = { closed: next() < 0.7, points };
+      const pieces = runTraceSteps(ringPiecesSteps(polyline, 0));
+      const box = straightRingBox(points);
+      if (pieces === null) {
+        expect(box).toBeNull();
+      } else {
+        const { minX, minY, maxX, maxY } = pieces;
+        expect(box).toEqual({ minX, minY, maxX, maxY });
+      }
+    }
   });
 });

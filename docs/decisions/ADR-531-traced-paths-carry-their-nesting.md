@@ -322,3 +322,54 @@ on noise512 are near only through edges two apart, mostly because the edge betwe
 than 0.045 px (median 0.04 px), which puts its two neighbours that close by itself. Testing only
 the pieces around the near edges, or a flag that ignores edges two apart, would need its own
 argument and is not attempted here.
+
+### Amendment 2 - the curve guard keeps pieces only while a pair test needs them, same output (2026-09-29)
+
+On uniform noise the repair's live heap grew by about 100 MB a round on noise512 (Line Art), all
+of it in the curve guard. Measured with a full collection as each round's guard ends, rounds 1 to
+3: 268, 381 and 465 MB, against main's 159, 235 and 241 MB at the same point of each round (main
+has no curve guard). A heap snapshot of noise192 at round 3 (87 MB) put 30 MB in the guard's
+rings. Two copies of the background ring, neither with a fitted curve, held 11.6 MB each, 10.5 MB
+of it in the index of their straight pieces, which made one object per edge. Most of the rest were
+pieces of rings the repair had already replaced, which it never tests again.
+
+- `CurveContactCache` now keeps, per ring, its box, whether it has cubic pieces and its self-test
+  result (`RingSummary`). A fitted ring is cut into pieces for its self-test and the pieces are
+  dropped. A ring without a fitted curve (`piecesCurve` undefined) is not cut at all: its box comes
+  from its points (`straightRingBox`). A ring's pieces are cut again the first time a pair test
+  needs them and kept on its summary until the repair replaces the ring, when they are dropped.
+- A ring with more than 16 straight pieces indexes them through `ContourBoxIndex.overBoundsSteps`
+  over their boxes, making each into a piece only when a query finds it.
+
+Why no verdict can change: `ringPiecesSteps` is a pure function of the ring, so pieces cut again
+are the same pieces, and dropping them only costs a later cut. A straight ring's pieces' box is
+the box of its points, because halving adds only midpoints, and it has no pieces exactly when
+every point is the same, which `straightRingBox` reports as null. The straight index is built over
+the same boxes in the same order as before, so its tree and query order are the same and each
+query returns equal pieces. A replaced ring never returns: a ring only moves on toward its source,
+and if it did return, its pieces would be cut again. Tests pin the straight box against the
+pieces' on random rings with repeated points, and the straight index on a 400-edge ring beside a
+fitted circle.
+
+Whole-output hashes are unchanged against `144593dab` on noise192 (Line Art, Sharp), noise512 and
+noise1024 (Line Art), the astronaut (Line Art, Sharp), the centerline stress test, the arch house
+and text-sans-96 (Line Art).
+
+Measured (node bundles, one process per run, interleaved; the live heap under `--expose-gc` with a
+collection at each mark):
+
+| noise512 Line Art | Main | Before | After |
+|---|---|---|---|
+| Live heap as the guard ends, rounds 1, 2 and 3 | 159, 235, 241 MB | 268, 381, 465 MB | 236, 256, 259 MB |
+| Peak RSS | 681 to 734 MB (4 runs) | 870 to 913 MB (4 runs) | 692, 719 MB |
+| Time | 7.5 to 8.7 s | 10.0 to 11.7 s | 10.0, 10.7 s |
+
+Peak RSS on noise1024 Line Art was 2,230 MB against main's 2,120 MB (one run each, 1.05x), on
+noise192 Line Art 189 and 198 MB against main's 175 and 181 MB, and on the real images in the set
+between 7% below main's (the stress test, 372 and 373 MB against 396 and 401 MB) and 3% above (the
+arch house). Time is unchanged within run-to-run noise: over 3 interleaved rounds the stress test
+took 5.63 to 5.99 s after against 5.76 to 6.02 s before.
+
+What still separates the branch from main on noise is the repair's input: the live heap as the
+repair starts is 191 MB against main's 110 MB (the samples at 0.02 px and the finished contours).
+That is a follow-up the tracer work owns (ADR-530, Known gaps).

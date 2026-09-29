@@ -17,6 +17,11 @@
 // that index was built are matched among themselves; when they become many,
 // the index is rebuilt.
 //
+// Between rounds a ring keeps only its box and its self-test result. Its
+// pieces are cut again when a pair test first needs them, and kept from then
+// on: the pieces of every ring would be the largest part of the trace's memory
+// on dense noise, and after the skips below few rings are tested in pairs.
+//
 // Nearly all of this work proves that pieces do not meet, and the sample test
 // that runs just before (contour-contact-cache.ts) already knows where they
 // cannot: next to its contacts it records whether two rings' sample edges, or
@@ -53,10 +58,12 @@ import type { Polyline, Vec2 } from '../scene';
 import { type ContourBox } from './contour-bounds';
 import { ContourBoxIndex } from './contour-box-index';
 import {
+  piecesCurve,
   ringMeetsItself,
   ringMeetsNeighbours,
   ringPiecesSteps,
   ringsMeet,
+  straightRingBox,
   type RingPieces,
 } from './compact-curve-pieces';
 import { traceRingCurve } from './trace-curves';
@@ -70,6 +77,14 @@ export type SampleProximity = {
   readonly nearItself: (points: ReadonlyArray<Vec2>) => boolean | undefined;
 };
 
+// A ring between rounds: its box, whether it has curved pieces and meets
+// itself, and its pieces once a pair test cut them.
+type RingSummary = ContourBox & {
+  readonly id: number;
+  readonly curved: boolean;
+  readonly meetsItself: boolean;
+  pieces: RingPieces | undefined;
+};
 type Slot = ContourBox & { readonly slot: number; readonly id: number };
 // Two rings, by position, whose curves met when last tested.
 type Meeting = { readonly a: number; readonly b: number };
@@ -79,9 +94,9 @@ const REINDEX_SHARE = 1 / 8;
 
 /** Rings whose canonical curves cross or touch, themselves or each other. */
 export class CurveContactCache {
-  private readonly rings = new WeakMap<Polyline, RingPieces | null>();
+  private readonly rings = new WeakMap<Polyline, RingSummary | null>();
   private nextId = 0;
-  private current: (RingPieces | null)[] = [];
+  private current: (RingSummary | null)[] = [];
   private polylines: ReadonlyArray<Polyline> = [];
   private index: ContourBoxIndex<Slot> | null = null;
   private indexedIds: number[] = [];
@@ -102,18 +117,21 @@ export class CurveContactCache {
     // test already saw everything.
     if (!rings.some((ring) => traceRingCurve(ring) !== undefined)) return conflicts;
     const previous = this.current;
-    const geometries: (RingPieces | null)[] = [];
+    const summaries: (RingSummary | null)[] = [];
     const changed: number[] = [];
     this.polylines = rings;
     for (const [slot, polyline] of rings.entries()) {
       if (cooperate) yield;
-      const geometry = yield* this.piecesSteps(polyline);
-      geometries.push(geometry);
-      if (geometry?.id !== previous[slot]?.id) changed.push(slot);
-      if (this.meetsItself(geometry, polyline)) conflicts.add(slot);
+      const summary = yield* this.summarySteps(polyline);
+      summaries.push(summary);
+      if (summary?.id !== previous[slot]?.id) {
+        changed.push(slot);
+        release(previous[slot]);
+      }
+      if (meetsItself(summary)) conflicts.add(slot);
     }
-    this.current = geometries;
-    if (this.index === null || previous.length !== geometries.length) {
+    this.current = summaries;
+    if (this.index === null || previous.length !== summaries.length) {
       yield* this.fullRoundSteps();
     } else {
       yield* this.changedRoundSteps(changed);
@@ -126,15 +144,39 @@ export class CurveContactCache {
     return conflicts;
   }
 
-  private *piecesSteps(polyline: Polyline): TraceSteps<RingPieces | null> {
+  // A ring seen for the first time: a fitted one is cut into pieces and
+  // tested against itself, and only the result is kept; one cut into its
+  // straight edges needs only its box, since straight pieces never meet each
+  // other here.
+  private *summarySteps(polyline: Polyline): TraceSteps<RingSummary | null> {
     yield;
-    let pieces = this.rings.get(polyline);
-    if (pieces === undefined) {
-      pieces = yield* ringPiecesSteps(polyline, this.nextId);
+    let summary = this.rings.get(polyline);
+    if (summary === undefined) {
+      const id = this.nextId;
       this.nextId += 1;
-      this.rings.set(polyline, pieces);
+      if (piecesCurve(polyline) === undefined) {
+        const box = straightRingBox(polyline.points);
+        summary = box === null ? null : ringSummary(box, id, false, false);
+      } else {
+        const pieces = yield* ringPiecesSteps(polyline, id);
+        summary =
+          pieces === null
+            ? null
+            : ringSummary(pieces, id, pieces.cubics.length > 0, this.selfTest(pieces, polyline));
+      }
+      this.rings.set(polyline, summary);
     }
-    return pieces;
+    return summary;
+  }
+
+  // A ring's pieces for a pair test, cut again the first time.
+  private *piecesSteps(summary: RingSummary, polyline: Polyline): TraceSteps<RingPieces> {
+    yield;
+    if (summary.pieces === undefined) {
+      const pieces = yield* ringPiecesSteps(polyline, summary.id);
+      summary.pieces = pieces as RingPieces;
+    }
+    return summary.pieces;
   }
 
   // Every pair of rings whose boxes meet.
@@ -145,7 +187,9 @@ export class CurveContactCache {
     for (const slot of this.slots()) {
       if (cooperate) yield;
       for (const other of index.query(slot)) {
-        if (other.slot > slot.slot) this.test(slot.slot, other.slot);
+        if (other.slot > slot.slot && this.mayMeet(slot.slot, other.slot)) {
+          yield* this.testSteps(slot.slot, other.slot);
+        }
       }
     }
   }
@@ -154,7 +198,7 @@ export class CurveContactCache {
   // its result.
   private *changedRoundSteps(changed: ReadonlyArray<number>): TraceSteps<void> {
     const cooperate = yield;
-    const ids = this.current.map((geometry) => geometry?.id ?? -1);
+    const ids = this.current.map((summary) => summary?.id ?? -1);
     const isChanged = new Set(changed);
     this.meetings = this.meetings.filter((m) => !isChanged.has(m.a) && !isChanged.has(m.b));
     const moved = yield* this.movedSteps();
@@ -162,17 +206,19 @@ export class CurveContactCache {
     // A pair of two rings changed this round is tested once, from the lower.
     const once = (slot: number, other: number): boolean =>
       other !== slot && (!isChanged.has(other) || other > slot);
+    const test = (slot: number, other: number): boolean =>
+      once(slot, other) && this.mayMeet(slot, other);
     for (const slot of changed) {
       if (cooperate) yield;
-      const geometry = this.current[slot];
-      if (geometry === null || geometry === undefined) continue;
+      const summary = this.current[slot];
+      if (summary === null || summary === undefined) continue;
       // Rings still on the index are found there, the others among `moved`.
-      for (const other of index.query(geometry)) {
+      for (const other of index.query(summary)) {
         const onIndex = this.indexedIds[other.slot] === ids[other.slot];
-        if (onIndex && once(slot, other.slot)) this.test(slot, other.slot);
+        if (onIndex && test(slot, other.slot)) yield* this.testSteps(slot, other.slot);
       }
-      for (const other of moved?.query(geometry) ?? []) {
-        if (once(slot, other.slot)) this.test(slot, other.slot);
+      for (const other of moved?.query(summary) ?? []) {
+        if (test(slot, other.slot)) yield* this.testSteps(slot, other.slot);
       }
     }
   }
@@ -194,41 +240,70 @@ export class CurveContactCache {
     yield;
     const slots = this.slots();
     this.index = yield* ContourBoxIndex.createSteps(slots);
-    this.indexedIds = this.current.map((geometry) => geometry?.id ?? -1);
+    this.indexedIds = this.current.map((summary) => summary?.id ?? -1);
     return this.index;
   }
 
   private slots(): Slot[] {
     const slots: Slot[] = [];
-    this.current.forEach((geometry, slot) => {
-      if (geometry === null) return;
-      const { minX, minY, maxX, maxY, id } = geometry;
+    this.current.forEach((summary, slot) => {
+      if (summary === null) return;
+      const { minX, minY, maxX, maxY, id } = summary;
       slots.push({ minX, minY, maxX, maxY, slot, id });
     });
     return slots;
   }
 
-  private test(a: number, b: number): void {
+  // Whether two rings' pieces need testing: one of them is curved, and the
+  // sample test did not find their samples apart (the header).
+  private mayMeet(a: number, b: number): boolean {
     const first = this.current[a];
     const second = this.current[b];
-    if (first === null || first === undefined || second === null || second === undefined) return;
-    if (first.cubics.length === 0 && second.cubics.length === 0) return;
-    // Rings whose samples stay apart have curves that do (the header).
+    if (first === null || first === undefined || second === null || second === undefined) {
+      return false;
+    }
+    if (!first.curved && !second.curved) return false;
     const pointsA = (this.polylines[a] as Polyline).points;
     const pointsB = (this.polylines[b] as Polyline).points;
-    if (this.samples?.near(pointsA, pointsB) === false) return;
-    if (ringsMeet(first, second)) this.meetings.push({ a, b });
+    return this.samples?.near(pointsA, pointsB) !== false;
   }
 
-  // Whether a ring's curves meet themselves (tested once per ring). Only
-  // pieces close along the ring can meet when its samples that are not
-  // neighbours stay apart, unless its pieces were halved (the header).
-  private meetsItself(geometry: RingPieces | null, polyline: Polyline): boolean {
-    if (geometry === null || geometry.cubics.length === 0) return false;
-    geometry.meetsItself ??=
-      !geometry.halved && this.samples?.nearItself(polyline.points) === false
-        ? ringMeetsNeighbours(geometry)
-        : ringMeetsItself(geometry);
-    return geometry.meetsItself;
+  private *testSteps(a: number, b: number): TraceSteps<void> {
+    yield;
+    const first = this.current[a] as RingSummary;
+    const second = this.current[b] as RingSummary;
+    const piecesA = yield* this.piecesSteps(first, this.polylines[a] as Polyline);
+    const piecesB = yield* this.piecesSteps(second, this.polylines[b] as Polyline);
+    if (ringsMeet(piecesA, piecesB)) this.meetings.push({ a, b });
   }
+
+  // Whether a ring's curves meet themselves. Only pieces close along the ring
+  // can meet when its samples that are not neighbours stay apart, unless its
+  // pieces were halved (the header).
+  private selfTest(pieces: RingPieces, polyline: Polyline): boolean {
+    if (pieces.cubics.length === 0) return false;
+    return !pieces.halved && this.samples?.nearItself(polyline.points) === false
+      ? ringMeetsNeighbours(pieces)
+      : ringMeetsItself(pieces);
+  }
+}
+
+// A ring the repair replaced is never tested again (a ring only moves on
+// toward its source), so its pieces go; they would be cut again if it were.
+function release(summary: RingSummary | null | undefined): void {
+  if (summary !== null && summary !== undefined) summary.pieces = undefined;
+}
+
+function meetsItself(summary: RingSummary | null): boolean {
+  return summary?.meetsItself === true;
+}
+
+function ringSummary(
+  box: ContourBox,
+  id: number,
+  curved: boolean,
+  selfMeeting: boolean,
+): RingSummary {
+  const { minX, minY, maxX, maxY } = box;
+  return { minX, minY, maxX, maxY, id, curved, meetsItself: selfMeeting, pieces: undefined };
 }

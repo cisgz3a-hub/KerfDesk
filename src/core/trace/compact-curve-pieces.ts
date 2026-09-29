@@ -20,7 +20,7 @@ import {
   type CurvePiece,
 } from './compact-curve-meet';
 import { traceRingCurve } from './trace-curves';
-import type { TraceSteps } from './trace-steps';
+import { runTraceSteps, type TraceSteps } from './trace-steps';
 
 /** A piece and its position along its ring. */
 export type Piece = ContourBox & CurvePiece & { readonly index: number };
@@ -38,8 +38,6 @@ export type RingPieces = ContourBox & {
   readonly halved: boolean;
   cubicIndex?: ContourBoxIndex<Piece>;
   straightIndex?: ContourBoxIndex<Piece>;
-  /** Whether the ring meets itself, once tested. */
-  meetsItself?: boolean;
 };
 
 // A cubic is cut into pieces about this long (control polygon, px).
@@ -52,13 +50,40 @@ const INDEXED_PIECES = 16;
 const STRIDE = 5;
 const CHECKPOINT_PIECES = 256;
 
+/** The fitted curve a ring's pieces are cut from, or undefined when they are
+ *  its straight edges. */
+export function piecesCurve(polyline: Polyline): CurveSubpath | undefined {
+  const curve = traceRingCurve(polyline);
+  const cuttable =
+    curve !== undefined && curve.segments.every((segment) => segment.kind !== 'elliptical-arc');
+  return cuttable ? curve : undefined;
+}
+
+/** The box of a ring whose pieces are its straight edges (no piecesCurve),
+ *  which is its pieces' box, or null when it has no pieces: every point is
+ *  the same. */
+export function straightRingBox(points: ReadonlyArray<Vec2>): ContourBox | null {
+  const first = points[0];
+  if (first === undefined) return null;
+  let minX = first.x;
+  let minY = first.y;
+  let maxX = first.x;
+  let maxY = first.y;
+  for (const point of points) {
+    if (point.x < minX) minX = point.x;
+    if (point.x > maxX) maxX = point.x;
+    if (point.y < minY) minY = point.y;
+    if (point.y > maxY) maxY = point.y;
+  }
+  return minX === maxX && minY === maxY ? null : { minX, minY, maxX, maxY };
+}
+
 /** The pieces of a ring, or null when it has none. */
 export function* ringPiecesSteps(polyline: Polyline, id: number): TraceSteps<RingPieces | null> {
   const cooperate = yield;
-  const curve = traceRingCurve(polyline);
-  const curved =
-    curve !== undefined && curve.segments.every((segment) => segment.kind !== 'elliptical-arc');
-  const cut = curved ? curvePieces(curve) : straightPieces(polyline.points, polyline.closed);
+  const curve = piecesCurve(polyline);
+  const cut =
+    curve !== undefined ? curvePieces(curve) : straightPieces(polyline.points, polyline.closed);
   const raw = polyline.closed ? atLeastPieces(cut, MIN_RING_PIECES) : cut;
   if (raw.length === 0) return null;
   const cubics: Piece[] = [];
@@ -189,10 +214,29 @@ function straightsNear(ring: RingPieces, box: ContourBox): ReadonlyArray<Piece> 
     }
     return near;
   }
-  ring.straightIndex ??= ContourBoxIndex.create(
-    Array.from({ length: packed.length / STRIDE }, (_, k) => straightPiece(packed, k * STRIDE)),
-  );
+  ring.straightIndex ??= straightIndex(packed);
   return ring.straightIndex.query(box);
+}
+
+// The straight pieces indexed by their boxes, each made into a piece only when
+// a query finds it: a long ring beside a few curves holds numbers, not one
+// object per edge. The boxes are pieceBox's for a line.
+function straightIndex(packed: ReadonlyArray<number>): ContourBoxIndex<Piece> {
+  const count = packed.length / STRIDE;
+  const bounds = new Float64Array(4 * count);
+  for (let k = 0; k < count; k += 1) {
+    const ax = packed[k * STRIDE] as number;
+    const ay = packed[k * STRIDE + 1] as number;
+    const bx = packed[k * STRIDE + 2] as number;
+    const by = packed[k * STRIDE + 3] as number;
+    bounds[4 * k] = Math.min(ax, bx);
+    bounds[4 * k + 1] = Math.min(ay, by);
+    bounds[4 * k + 2] = Math.max(ax, bx);
+    bounds[4 * k + 3] = Math.max(ay, by);
+  }
+  return runTraceSteps(
+    ContourBoxIndex.overBoundsSteps(bounds, (k) => straightPiece(packed, k * STRIDE)),
+  );
 }
 
 function straightPiece(packed: ReadonlyArray<number>, at: number): Piece {
