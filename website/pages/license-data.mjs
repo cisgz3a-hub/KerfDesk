@@ -8,12 +8,12 @@
 import { formatPrice } from '../lib/commerce.mjs';
 import { html } from '../lib/html.mjs';
 
-// public/eula.txt sections 1-5. Part 1 is summarized neutrally on purpose: the
-// license of the released versions is named once, in the Current license section.
+// public/eula.txt sections 1-5. Part 1 leaves out the MIT License of the earlier
+// versions on purpose: it is named once, in the Current license section.
 export const NOTICE_PARTS = [
   [
     '1. License',
-    'Names the license the app is released under. The full license text is printed at the end of the notice.',
+    'KerfDesk is proprietary. You may use it free of charge for personal or business work, except the tools marked Pro, which need an active trial or a paid license. You may not sell, rent or pass the app on, host it for others, change or reverse engineer it, or bypass or disable its license checks, except as the law allows.',
   ],
   [
     '2. Machine safety',
@@ -116,7 +116,7 @@ export function faqItems(site, commerce) {
       question: 'Is this page legal advice?',
       answer: html`<p>
         No. It’s a plain-language summary. The texts themselves are what count: the License &amp;
-        Safety Notice that ships with the app, with the full license text at its end, and the
+        Safety Notice that ships with the app and the
         <a href="${site.noticesUrl}">third-party notices</a>.
       </p>`,
     },

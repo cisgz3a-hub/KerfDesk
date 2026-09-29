@@ -25,7 +25,7 @@ function todaySection() {
     id: 'today',
     eyebrow: 'Using KerfDesk',
     title: 'The notice that comes with the app',
-    lead: 'KerfDesk Free runs in the browser and on the desktop, and Pro comes with the Windows desktop app. The app comes with a short License & Safety Notice about machine safety and liability. The Windows installer shows it during setup, and Help > About KerfDesk in the app points to it.',
+    lead: 'KerfDesk Free runs in the browser and on the desktop, and Pro comes with the Windows desktop app. The app comes with a short License & Safety Notice about its license, machine safety and liability. The Windows installer shows it during setup, and Help > About KerfDesk in the app points to it.',
     content: html`${table({
       caption: 'What the five parts of the notice say',
       head: ['Part', 'In plain words'],
