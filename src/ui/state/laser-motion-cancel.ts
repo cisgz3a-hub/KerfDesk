@@ -19,7 +19,8 @@ import { cancelPendingManualMotions } from './manual-motion-intent';
 const CANCEL_QUEUE_TIMEOUT_MS = 8_000;
 const CANCEL_QUEUE_POLL_MS = 10;
 // How long Cancel lets a controller whose jog-cancel byte drops unparsed lines
-// parse the line it was just sent, before writing the byte anyway.
+// parse the line it was just sent, counted from when that line has left the
+// transport, before writing the byte anyway.
 const JOG_CANCEL_PARSE_GRACE_MS = 250;
 const CONTROLLER_STATE_TIMEOUT_MESSAGE = 'Timed out waiting for controller state after Cancel.';
 // Disconnect and Reconnect are disabled while a motion owner exists, so the
@@ -53,6 +54,9 @@ export async function runCancelJog(
   if (operationId !== undefined) markMotionOperationCancelling(context, operationId);
   try {
     if (jogCancelDropsUnparsedLines(context)) {
+      // A line still being written has not reached the controller, so its
+      // parse grace starts only once it is out (ADR-375 re-audit).
+      await settledWithin(context, CANCEL_QUEUE_TIMEOUT_MS, transportWritesDone);
       await owedRepliesSettled(context, JOG_CANCEL_PARSE_GRACE_MS);
     }
     const cancelError = await writeJogCancel(context);
@@ -183,19 +187,30 @@ function jogCancelDropsUnparsedLines(context: CancelContext): boolean {
 }
 
 /** Polls until no reply is owed and no write is pending; false after `timeoutMs`. */
-async function owedRepliesSettled(context: CancelContext, timeoutMs: number): Promise<boolean> {
+function owedRepliesSettled(context: CancelContext, timeoutMs: number): Promise<boolean> {
+  return settledWithin(context, timeoutMs, motionQueueSettled);
+}
+
+async function settledWithin(
+  context: CancelContext,
+  timeoutMs: number,
+  settled: (state: LaserState) => boolean,
+): Promise<boolean> {
   const deadline = Date.now() + timeoutMs;
   while (Date.now() <= deadline) {
     assertCancelContext(context);
-    if (motionQueueSettled(context.get())) return true;
+    if (settled(context.get())) return true;
     await sleep(CANCEL_QUEUE_POLL_MS);
   }
   return false;
 }
 
 function motionQueueSettled(state: LaserState): boolean {
+  return state.pendingUntrackedAcks === 0 && transportWritesDone(state);
+}
+
+function transportWritesDone(state: LaserState): boolean {
   return (
-    state.pendingUntrackedAcks === 0 &&
     pendingTransportWriteCount(state) === 0 &&
     (state.motionOperation?.pendingMotionTransportWrites ?? 0) === 0
   );
