@@ -130,6 +130,11 @@ const MIN_OPTIMIZE_TOLERANCE_SCALE = optimizationToleranceScaleFromOptimize(0);
 const CANDIDATE_TOLERANCE_SHARE = 0.75;
 // Joint tangents of the compact fit are estimated over this arc, source px.
 const TANGENT_WINDOW_PX = 2;
+// The topology repair refits a ring at no less than this share of its
+// tolerance; a weaker step takes the ring's baseline instead (ADR-530,
+// Amendment 8). Below a quarter a refit mostly chases the chain's own noise
+// and rarely clears the conflict, and each costs a whole fit of the ring.
+const MIN_REFIT_AMOUNT = 0.25;
 // Spline samples inside each simplified edge of the binary tail's resample
 // (the count the centreline refine step uses).
 const SPLINE_SAMPLES_PER_SEGMENT = 3;
@@ -563,6 +568,9 @@ function compactRefinement(
   return {
     polyline,
     baseline,
-    refine: (amount) => (amount === 1 ? polyline : (ring(amount) ?? baseline)),
+    refine: (amount) => {
+      if (amount === 1) return polyline;
+      return amount < MIN_REFIT_AMOUNT ? baseline : (ring(amount) ?? baseline);
+    },
   };
 }

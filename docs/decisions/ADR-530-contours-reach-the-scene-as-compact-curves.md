@@ -593,3 +593,38 @@ Measured:
 - Speed: over 8.4e6 uniform cubes (best of 5, Node 24), the new version took 159 ms, Amendment
   6's version 249 ms, pow 372 ms and `x * x * x` 140 ms. The gain comes from the fallback, which
   called pow 8% of the time and now almost never runs.
+
+### Amendment 8 - the repair refits a ring no finer than a quarter of its tolerance (2026-09-29)
+
+The 2026-09-29 audit of this decision's branch timed the topology repair on seeded uniform noise
+(the parity oracle's generator; the perf-noise images were not available). On the 1024 px image,
+1,405 whole-ring refits took 34.9 s of a 116.6 s trace. Each halving cost more than the one
+before it (5.6, 7.5, 9.3 and 12.7 s) and cleared fewer rings: 578 rings reached 1/2, 338 reached
+1/4, 266 reached 1/8, 223 reached 1/16 and 202 the baseline, and 187 ended at their source.
+
+Change: `compactRefinement` (`contour-trace.ts`) refits a ring at 1/2 and 1/4 of its tolerance
+only. Below `MIN_REFIT_AMOUNT` (1/4) it returns the ring's baseline, which the repair then passes
+over as geometry the ring already has. A ring that still conflicts after 1/4 goes to its
+baseline, then to its source. Below a quarter a refit mostly follows the chain's own noise, and
+each one costs a whole fit of the ring.
+
+Output: a ring changes only if it used to clear at 1/8 or 1/16. Such a ring now keeps its
+baseline, the smoothed chain as a polyline, instead of a tight curve. The audit counted 1 of 455
+rings on noise192 Line Art, 2 of 931 on Sharp and 16 of 3,271 on noise512. The whole-trace hash
+is unchanged on the astronaut (Line Art and Sharp), the 1254 px Centerline stress-test drawing,
+the arch house (Line Art) and text-sans-96.
+
+Measured with esbuild bundles of `traceImageToColoredPaths`, one process per run, interleaved with
+main (`01c49d2f5`), medians of 2 rounds on a 4-core machine. Warm runs were used where a process
+traced more than once.
+
+| Case | Before (`9fdc73cd0`) | After | main |
+|---|---|---|---|
+| noise512, Line Art | 23.1 s, 1,021 MB | 16.9 s, 932 MB | 8.3 to 8.9 s, 680 MB |
+| noise192, Line Art | 2.71 s | 2.25 s | 1.08 to 1.12 s |
+| noise192, Sharp | 1.91 s | 1.51 s | 0.84 s |
+| stress-test 1254, Line Art (same output) | 6.76 s | 6.85 s | 4.18 to 4.27 s |
+
+The audit measured noise1024 at 116.6 s before and 94.4 s after, against main's 40.4 s. Noise is
+still about 1.9x main, above the 1.46x target. The rest of the back-off is the whole-ring retry
+without rebuilt corners, plus the refits of the few large rings that meet many others.
