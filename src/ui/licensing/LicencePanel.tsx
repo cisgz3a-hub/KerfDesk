@@ -97,6 +97,7 @@ function LicenceHeading({ onClose }: { readonly onClose: (() => void) | undefine
           className="lf-btn"
           onClick={onClose}
           aria-label="Close licence settings"
+          title="Close licence settings"
         >
           Close
         </button>
@@ -127,7 +128,13 @@ function LicenceNotice({
         </p>
       )}
       {failure === null ? null : (
-        <button type="button" className="lf-btn" disabled={busy} onClick={() => void onRetry()}>
+        <button
+          type="button"
+          className="lf-btn"
+          disabled={busy}
+          onClick={() => void onRetry()}
+          title="Try reading your saved licence again"
+        >
           Retry licence check
         </button>
       )}

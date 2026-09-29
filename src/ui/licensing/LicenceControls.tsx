@@ -24,6 +24,7 @@ export function LicenceActivationForm({
       <label htmlFor="kerfdesk-licence-key">Licence key</label>
       <input
         id="kerfdesk-licence-key"
+        title="Paste the licence key from your purchase, or the key you were given"
         className="lf-input"
         value={value}
         onChange={(event) => setValue(event.currentTarget.value)}
@@ -38,6 +39,7 @@ export function LicenceActivationForm({
       <button
         type="submit"
         className="lf-btn lf-btn--primary"
+        title="Activate KerfDesk on this computer with the licence key"
         disabled={busy || value.trim().length < 8}
       >
         Activate licence
@@ -54,6 +56,7 @@ export function LicenceDeviceActions({ client, status, busy, run }: ActionProps)
         className="lf-btn"
         disabled={busy}
         onClick={() => void run(client.deactivate)}
+        title="Try again to release this computer's licence seat"
       >
         Retry device deactivation
       </button>
@@ -66,6 +69,7 @@ export function LicenceDeviceActions({ client, status, busy, run }: ActionProps)
           className="lf-btn"
           disabled={busy}
           onClick={() => void run(client.refresh)}
+          title="Check the licence service for renewals and other changes"
         >
           Refresh licence
         </button>
@@ -74,6 +78,7 @@ export function LicenceDeviceActions({ client, status, busy, run }: ActionProps)
           className="lf-btn"
           disabled={busy}
           onClick={() => void run(client.deactivate)}
+          title="Sign this computer out of the licence and free its seat"
         >
           Deactivate this device
         </button>
@@ -87,6 +92,7 @@ export function LicenceDeviceActions({ client, status, busy, run }: ActionProps)
           className="lf-btn"
           disabled={busy || status === null || status.state === 'unavailable'}
           onClick={() => void run(client.startTrial)}
+          title="Start 30 days of every feature on this computer"
         >
           Start free 30-day trial
         </button>
@@ -113,6 +119,7 @@ export function LicencePaymentActions({
           className="lf-btn lf-btn--primary"
           disabled={busy}
           onClick={() => void run(client.claimPayment)}
+          title="Ask the licence service whether your payment has completed"
         >
           Check payment
         </button>
@@ -121,6 +128,7 @@ export function LicencePaymentActions({
           className="lf-btn"
           disabled={busy}
           onClick={() => void run(() => client.checkout('purchase'))}
+          title="Open the saved checkout again without creating a new order"
         >
           Reopen checkout
         </button>
@@ -142,6 +150,7 @@ export function LicencePaymentActions({
         onClick={() =>
           void run(() => client.checkout(status?.tier === 'paid' ? 'renewal' : 'purchase'))
         }
+        title={status?.tier === 'paid' ? 'Buy another year of updates' : 'Buy a KerfDesk licence'}
       >
         {status?.tier === 'paid' ? 'Renew updates · US$20' : 'Buy licence · US$49.50'}
       </button>
