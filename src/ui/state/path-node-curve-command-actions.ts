@@ -1,4 +1,9 @@
-import { closedCurveNodeFraction, restartedTabAnchors } from '../../core/cnc/cnc-tab-anchors';
+import {
+  brokenTabAnchors,
+  closedCurveBreak,
+  closedCurveNodeFraction,
+  restartedTabAnchors,
+} from '../../core/cnc/cnc-tab-anchors';
 import {
   breakCurveAtNode,
   convertCurveSegment,
@@ -48,7 +53,7 @@ export function pathNodeCurveCommandActions(set: Setter): PathNodeCurveCommandAc
     setSelectedCurveStart: () =>
       set((state) => mutateSelected(state, setCurveStartNode, withRestartedTabs)),
     breakSelectedCurve: () =>
-      set((state) => mutateSelected(state, breakCurveAtNode, withRestartedTabs)),
+      set((state) => mutateSelected(state, breakCurveAtNode, withBrokenTabs)),
     joinSelectedCurveNodes: () => {
       let outcome: CurveJoinCommandOutcome = { kind: 'unchanged' };
       const notification = { present: false, text: '', success: false };
@@ -116,11 +121,10 @@ function mutateSelected(
   );
 }
 
-// Start and Break redraw a closed contour from the selected node. A tab placed
-// by hand, CNC or laser, is a fraction of its contour from the start, so each
-// one on that contour moves back by the node's fraction and stays where it was
-// (ADR-494 Amendment 1). After Break the contour is open and holds no tab until
-// it is closed again.
+// Start redraws a closed contour from the selected node. A tab placed by hand,
+// CNC or laser, is a fraction of its contour from the start, so each one on
+// that contour moves back by the node's fraction and stays where it was
+// (ADR-494 Amendment 1).
 function withRestartedTabs(
   edited: SceneObject,
   ref: PathNodeRef,
@@ -129,14 +133,40 @@ function withRestartedTabs(
   const curve = curvesBefore[ref.polylineIndex];
   const fraction = curve === undefined ? null : closedCurveNodeFraction(curve, ref.pointIndex);
   if (fraction === null || fraction === 0) return edited;
-  const restart = <A extends CncTabAnchor>(anchors: ReadonlyArray<A>) =>
-    restartedTabAnchors(anchors, ref.pathIndex, ref.polylineIndex, fraction);
+  return withFollowedTabs(edited, (anchors) =>
+    restartedTabAnchors(anchors, ref.pathIndex, ref.polylineIndex, fraction),
+  );
+}
+
+// Break opens a closed contour at the selected node and drops the segment that
+// arrived there. The open contour holds no tab until a straight line closes it
+// again, so its tabs are measured from the node along it and that line: Close
+// Path puts every tab on the kept outline back where it was, and a tab on the
+// dropped segment on the same share of the line (ADR-494 Amendment 1).
+function withBrokenTabs(
+  edited: SceneObject,
+  ref: PathNodeRef,
+  curvesBefore: ReadonlyArray<CurveSubpath>,
+): SceneObject {
+  const curve = curvesBefore[ref.polylineIndex];
+  const cut = curve === undefined ? null : closedCurveBreak(curve, ref.pointIndex);
+  if (cut === null) return edited;
+  return withFollowedTabs(edited, (anchors) =>
+    brokenTabAnchors(anchors, ref.pathIndex, ref.polylineIndex, cut),
+  );
+}
+
+function withFollowedTabs(
+  edited: SceneObject,
+  follow: <A extends CncTabAnchor>(anchors: ReadonlyArray<A>) => ReadonlyArray<A>,
+): SceneObject {
+  if (edited.cncTabAnchors === undefined && edited.laserTabAnchors === undefined) return edited;
   return {
     ...edited,
-    ...(edited.cncTabAnchors === undefined ? {} : { cncTabAnchors: restart(edited.cncTabAnchors) }),
+    ...(edited.cncTabAnchors === undefined ? {} : { cncTabAnchors: follow(edited.cncTabAnchors) }),
     ...(edited.laserTabAnchors === undefined
       ? {}
-      : { laserTabAnchors: restart(edited.laserTabAnchors) }),
+      : { laserTabAnchors: follow(edited.laserTabAnchors) }),
   };
 }
 

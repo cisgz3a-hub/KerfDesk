@@ -1,10 +1,12 @@
 // The node tool's Start and Break redraw a closed contour from the selected
-// node. Tabs placed by hand, laser and CNC, stay where they were on the part
-// (ADR-494 Amendment 1).
+// node. Tabs placed by hand, laser and CNC, stay where they were on the part,
+// except a tab on a curve Break removes: closing the part again puts it on the
+// straight line that replaces the curve (ADR-494 Amendment 1).
 import { beforeEach, describe, expect, it } from 'vitest';
-import { cncTabAnchorPosition } from '../../core/cnc/cnc-tab-anchors';
+import { closedCurveNodeFraction, cncTabAnchorPosition } from '../../core/cnc/cnc-tab-anchors';
 import { laserTabAnchorPosition } from '../../core/job/laser-tab-anchors';
 import {
+  applyTransform,
   createLayer,
   createProject,
   flattenCurveSubpath,
@@ -152,10 +154,102 @@ describe('node tool Break re-measures tabs placed by hand from the break', () =>
     expect(reclosed.paths[0]?.curves?.[0]?.start).toEqual(p(0, 40));
     expectTabsInPlace(before, reclosed);
   });
+
+  // Break drops the segment that arrives at the node; Close Path adds a straight
+  // line in its place, shorter than a curve, so the tabs wait measured along the
+  // open outline plus that line.
+  it.each([
+    { node: 1, reverse: false },
+    { node: 1, reverse: true },
+    { node: 2, reverse: false },
+    { node: 2, reverse: true },
+  ])(
+    'puts back every tab the outline keeps after Break at curve end $node (reversed: $reverse)',
+    ({ node, reverse }) => {
+      // Node 1 ends the first bulge, a third of the way round; node 2 the second.
+      const kept = node === 1 ? [0.6, 0.85, 0.35, 0.95] : [0.05, 0.3, 0.7, 0.85];
+      const before = curvedPart(dPart(), tabs(0, 0, ...kept), tabs(0, 0, ...kept));
+      load(before, { pathIndex: 0, polylineIndex: 0, pointIndex: node, geometry: 'curve' });
+
+      useStore.getState().breakSelectedCurve();
+      if (reverse) useStore.getState().reverseSelectedPaths();
+      useStore.getState().closeSelectedPaths();
+
+      expectTabsInPlace(before, current());
+    },
+  );
+
+  it.each([false, true])(
+    'moves a tab on the dropped curve to the same share of the closing line (reversed: %s)',
+    (reverse) => {
+      const curve = dPart();
+      const before = curvedPart(curve, tabs(0, 0, 0.05, 0.3, 0.6), tabs(0, 0, 0.2));
+      load(before, { pathIndex: 0, polylineIndex: 0, pointIndex: 1, geometry: 'curve' });
+
+      useStore.getState().breakSelectedCurve();
+      if (reverse) useStore.getState().reverseSelectedPaths();
+      useStore.getState().closeSelectedPaths();
+
+      // The first bulge, from (0, 0) to (30, 20), took this share of the outline.
+      const bulge = closedCurveNodeFraction(curve, 1)!;
+      const onLine = (pathT: number) =>
+        applyTransform(lerp(p(0, 0), p(30, 20), pathT / bulge), before.transform);
+      const after = current();
+      expectNear(laserTabAnchorPosition(after, after.laserTabAnchors![0]!), onLine(0.05));
+      expectNear(laserTabAnchorPosition(after, after.laserTabAnchors![1]!), onLine(0.3));
+      expectNear(cncTabAnchorPosition(after, after.cncTabAnchors![0]!), onLine(0.2));
+      // The tab on the second bulge, which Break kept, is where it was.
+      expectNear(
+        laserTabAnchorPosition(after, after.laserTabAnchors![2]!),
+        laserTabAnchorPosition(before, before.laserTabAnchors![2]!),
+      );
+    },
+  );
+
+  it('puts back every tab the outline keeps when Join closes a part broken after a curve', () => {
+    const before = curvedPart(dPart(), tabs(0, 0, 0.6, 0.85), tabs(0, 0, 0.35, 0.95));
+    load(before, { pathIndex: 0, polylineIndex: 0, pointIndex: 1, geometry: 'curve' });
+
+    useStore.getState().breakSelectedCurve();
+    // The open outline runs (30, 20), (0, 40), (0, 0): Join its two ends.
+    const end = (pointIndex: number) => ({
+      objectId: before.id,
+      pathIndex: 0,
+      polylineIndex: 0,
+      pointIndex,
+      geometry: 'curve' as const,
+    });
+    useStore.setState({ selectedPathNode: end(2), selectedPathNodes: [end(0), end(2)] });
+
+    expect(useStore.getState().joinSelectedCurveNodes()).toEqual({ kind: 'closed' });
+    expectTabsInPlace(before, current());
+  });
+
+  it('puts back every tab the outline keeps after Break at a start a curve reaches', () => {
+    const curve = roundedPart();
+    // The last quarter, from (0, 20) round to the start, takes the last share.
+    const kept = [0.05, 0.3, 0.62];
+    const before = curvedPart(curve, tabs(0, 0, ...kept), tabs(0, 0, 0.7));
+    load(before, { pathIndex: 0, polylineIndex: 0, pointIndex: 0, geometry: 'curve' });
+
+    useStore.getState().breakSelectedCurve();
+    useStore.getState().closeSelectedPaths();
+
+    expectTabsInPlace(before, current());
+  });
 });
 
 function p(x: number, y: number): Vec2 {
   return { x, y };
+}
+
+function lerp(from: Vec2, to: Vec2, share: number): Vec2 {
+  return { x: from.x + (to.x - from.x) * share, y: from.y + (to.y - from.y) * share };
+}
+
+function expectNear(point: Vec2 | null, want: Vec2 | null): void {
+  if (point === null || want === null) throw new Error('the tab is not on its contour');
+  expect(Math.hypot(point.x - want.x, point.y - want.y)).toBeLessThan(1e-9);
 }
 
 function closed(points: ReadonlyArray<Vec2>) {
@@ -202,6 +296,20 @@ function dPart(): CurveSubpath {
       { kind: 'line', to: p(0, 0) },
     ],
   };
+}
+
+function curvedPart(
+  curve: CurveSubpath,
+  laserTabAnchors: ReadonlyArray<LaserTabAnchor>,
+  cncTabAnchors: ReadonlyArray<CncTabAnchor>,
+): ImportedSvg {
+  const flattened = flattenCurveSubpath(curve, { toleranceMm: 0.05 });
+  if (flattened.kind !== 'ok') throw new Error('the outline did not flatten');
+  return part(
+    [{ color: COLOR, curves: [curve], polylines: [flattened.polyline] }],
+    laserTabAnchors,
+    cncTabAnchors,
+  );
 }
 
 function part(
