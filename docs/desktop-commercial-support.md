@@ -30,7 +30,9 @@ the single command that needs it.
   and stay downloadable under **Earlier versions** on the download page.
 - Pro stays unlocked for the rest of a running session even if a trial ends.
   Nothing a licence does can stop a running job.
-- The web app and the free Preview builds never need a licence yet.
+- The web app and the free Preview builds never need a licence. Pro is sold only for the
+  desktop app (ADR-540 item 7); once sales open, those builds run KerfDesk Free and send Pro
+  tools to the desktop app.
 
 ## Situations
 

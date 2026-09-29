@@ -45,7 +45,8 @@ function paidPlan(plan, commerce) {
     <p class="plan__price">
       ${formatPrice(plan.price, commerce.currency)} <small>${cadence}</small>
     </p>
-    ${plan.summary && html`<p>${plan.summary}</p>`} ${ticks(plan.includes)}
+    ${plan.where && html`<p>In ${plan.where}.</p>`} ${plan.summary && html`<p>${plan.summary}</p>`}
+    ${ticks(plan.includes)}
     <p class="plan__fine">${planFacts(plan)}</p>
     ${checkoutUrl
       ? button(checkoutUrl, `Buy ${plan.name}`)
@@ -87,10 +88,15 @@ function licenseTerms(plan, currency) {
       title: 'More updates only if you want them',
       body: `After the year, ${formatPrice(plan.updateYearPrice, currency)} adds another year of updates. It’s optional, it isn’t a subscription and it never renews automatically.`,
     },
+    plan.where && {
+      icon: 'monitor',
+      title: `${plan.name} is in the desktop app`,
+      body: `${plan.name} works in ${plan.where}. KerfDesk in the browser is the Free edition.`,
+    },
     plan.deviceLimit && {
       icon: 'monitor-smartphone',
       title: `Up to ${plan.deviceLimit} devices at a time`,
-      body: 'Each desktop app installation or browser counts as one device. To move the license, deactivate it on one device, then activate it on another.',
+      body: 'Each installation of the desktop app counts as one device. To move the license, deactivate it on one device, then activate it on another.',
     },
     plan.trialDays && {
       icon: 'hourglass',
@@ -145,10 +151,15 @@ function faq(commerce, plan) {
         automatically.`}
       </p>`,
     },
+    plan?.where && {
+      id: 'pro-browser',
+      question: 'Can I use Pro in the browser?',
+      answer: `No. ${plan.name} works in ${plan.where}. KerfDesk in the browser is the Free edition, with no time limit.`,
+    },
     {
       id: 'devices',
       question: 'How many devices can I use Pro on?',
-      answer: `Up to ${devices} at a time. Each desktop app installation or browser counts as one device. To move the license, deactivate it on one device, then activate it on the other. In the desktop app, that’s under Help > Licence.`,
+      answer: `Up to ${devices} at a time. Each installation of the desktop app counts as one device. To move the license, deactivate it on one device, then activate it on the other. In the desktop app, that’s under Help > Licence.`,
     },
     {
       id: 'tax',
@@ -179,13 +190,13 @@ export const page = {
   nav: 'pricing',
   title: 'Pricing',
   description:
-    'KerfDesk Free has no time limit. Pro adds advanced tools for US$49.50, paid once, with a year of updates and a 30-day trial. Purchase opens soon.',
+    'KerfDesk Free has no time limit. Pro adds advanced tools to the Windows desktop app for US$49.50, paid once, with a year of updates and a 30-day trial.',
   render: ({ site, commerce }) => {
     const [plan] = commerce.plans;
     const lead = [
-      'KerfDesk comes in two editions, in the browser and on the desktop. Free has no time limit.',
+      'KerfDesk Free runs in the browser and on the desktop, with no time limit.',
       plan &&
-        `${plan.name} adds advanced tools for ${formatPrice(plan.price, commerce.currency)}, paid once.`,
+        `${plan.name} adds advanced tools${plan.where ? ` to ${plan.where}` : ''} for ${formatPrice(plan.price, commerce.currency)}, paid once.`,
       !commerce.salesOpen && 'Purchase opens soon.',
     ]
       .filter(Boolean)

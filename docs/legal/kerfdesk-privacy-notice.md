@@ -27,15 +27,16 @@ Regulator registration number]. Contact us through https://kerfdesk.com/support.
 
 ## What licensing sends, and why
 
-The app contacts our licensing service at https://license.kerfdesk.com only to register a trial, to
-activate, check or deactivate a licence, or to complete a purchase. It sends only:
+The desktop app contacts our licensing service at https://license.kerfdesk.com only to register a
+trial, to activate, check or deactivate a licence, or to complete a purchase. The web app has no
+licence and never contacts it. The desktop app sends only:
 
 - **Your licence key and activation credential,** which prove that you hold a licence. We store
   only a keyed one-way hash of each, never the key itself.
 - **An installation digest.** The desktop app makes a one-way hash, specific to KerfDesk, of your
   operating system's installation ID. It does this on your computer, and the raw ID never leaves
-  it. In the web app, the digest is made from a random identifier stored in your browser. We store
-  a keyed hash of the digest to count your active devices and to allow one trial per device.
+  it. We store a keyed hash of the digest to count your active devices and to allow one trial per
+  device.
 - **A generic device label,** such as "win32 computer", so that your active devices can be listed.
   Your computer's real name is not sent.
 - **Order details:** your Paddle transaction ID, and one-time codes that link a purchase to your

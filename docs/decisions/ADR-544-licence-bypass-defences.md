@@ -59,6 +59,10 @@ The research found four weaker places:
    the Preview.
 4. **Pro work after the licence cutoff stays private** (ADR-543, with the owner
    making the repository private).
+5. **Pro stays out of the browser.** Every browser lets its user open developer
+   tools, so a web Pro check cannot be protected like the desktop one. On
+   2026-09-29 the owner chose "Desktop only": Pro is sold for the desktop app, and
+   after launch the web app runs KerfDesk Free (ADR-540 item 7).
 
 ### What is accepted
 
@@ -83,9 +87,6 @@ says. The research confirmed it:
 - A new Windows installation gets a new trial.
 - Project files are not signed, and Free runs Pro operations saved in a project
   (ADR-540 item 3), so a project edited by hand can carry one.
-- Planned web licensing (ADR-540 item 7) cannot be protected like the desktop:
-  every browser lets its user open developer tools. It waits for the owner's
-  decision; after launch the browser stays Free.
 
 The goal is that paying is the easiest path, casual sharing fails and leaked keys
 can be revoked. Signed updates, support and the terms carry the value.

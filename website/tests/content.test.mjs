@@ -138,7 +138,7 @@ describe('website copy', () => {
     assert.match(pricing, /Free has no time limit/);
     assert.match(
       pricing,
-      /Pro adds advanced tools for US\$49\.50, paid once\. Purchase opens soon\./,
+      /Pro adds advanced tools to the Windows desktop app for US\$49\.50, paid once\. Purchase opens soon\./,
     );
   });
 

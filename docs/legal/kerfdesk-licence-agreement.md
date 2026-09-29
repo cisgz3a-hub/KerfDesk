@@ -16,8 +16,9 @@ This summary helps you find your way. The numbered sections below are the agreem
 
 - **Free** has no time limit and no device limit, for personal or business work. It includes all
   machine control.
-- **Pro** costs US$49.50 once, plus any tax. You may use every version released during your update
-  period for as long as you like.
+- **Pro** comes with the KerfDesk desktop app for Windows and costs US$49.50 once, plus any tax.
+  You may use every version released during your update period for as long as you like. The web
+  app is Free.
 - Your purchase includes **one year of updates**. Another year costs US$20. Nothing renews
   automatically.
 - Use Pro on **3 devices at a time**. Deactivate one to move to another.
@@ -59,8 +60,7 @@ Paddle's buyer terms govern the payment. This agreement governs your use of Kerf
 - **KerfDesk** means the KerfDesk desktop app, the KerfDesk web app at kerfdesk.com, and their
   updates, documentation and bundled content. It does not include third-party components, which
   have their own licences (section 16).
-- A **device** is one installation of the desktop app, or one web browser in which you use the web
-  app.
+- A **device** is one installation of the desktop app.
 - A version's **release date** is the date we publish for it when we release it. Downloading or
   installing a version later does not change its release date.
 - Your **update end date** is the last day of your update period. The app's licence screen shows
@@ -82,7 +82,8 @@ whether or not you use KerfDesk. You get one trial per device.
 
 **3.3 Pro licence.** A Pro licence unlocks the Pro features: V-carve, 3D relief, adaptive clearing,
 advanced tracing, camera alignment, the box generator, Design Studio and the G-code Inspector, and
-any other features we mark as Pro. Section 4 explains how long it lasts.
+any other features we mark as Pro. Pro works in the KerfDesk desktop app for Windows. The web app
+includes the Free features only. Section 4 explains how long a licence lasts.
 
 **3.4 Developer licence.** A developer licence is a free Pro licence that we issue privately to
 named people. It is not sold.
@@ -113,9 +114,8 @@ features stay locked until you extend your updates. Your covered versions keep w
 **4.5 Desktop downloads.** We keep covered desktop versions available for you to download for as
 long as we run the KerfDesk download service. Keep a copy of any installer you rely on.
 
-**4.6 The web app.** We host only the current version of the web app. When the version we host was
-released after your update end date, its Pro features stay locked until you extend your updates. You
-can keep using Pro in your covered desktop versions.
+**4.6 The web app.** The web app includes the Free features only, and we host only its current
+version. Pro works in your covered desktop versions.
 
 **4.7 When a trial or update period ends,** only Pro tools lock, and only for new work. Free keeps
 working. Your licence status never blocks machine control and never stops a running job. We never
@@ -145,8 +145,8 @@ needs an internet connection once. After that, the device keeps working offline.
 online, the app may check your licence with our licensing service, for example to pick up an update
 extension.
 
-**6.2** Up to 3 devices can be active on one licence at the same time. Each desktop installation and
-each web browser counts as one device.
+**6.2** Up to 3 devices can be active on one licence at the same time. Each installation of the
+desktop app counts as one device.
 
 **6.3** To move your licence, deactivate a device in the app (in the desktop app: Help > Licence,
 then **Deactivate this device**), then activate the new device. If a device is lost, stolen or

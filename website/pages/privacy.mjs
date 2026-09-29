@@ -152,8 +152,9 @@ function previewCheck(site) {
 function licensing(site) {
   return html`<h3 id="licensing">Pro trials and licenses</h3>
     <p>
-      When you start a Pro trial, or activate or move a license, KerfDesk contacts the KerfDesk
-      licensing service at ${site.licensingHost}. It sends only:
+      When you start a Pro trial, or activate or move a license, the KerfDesk desktop app contacts
+      the KerfDesk licensing service at ${site.licensingHost}. The web app has no license and never
+      contacts it. The desktop app sends only:
     </p>
     <ul>
       <li>

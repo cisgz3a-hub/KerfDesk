@@ -42,15 +42,18 @@ export const commerce = {
     ],
   },
   // License plan shape: { id, name, price, billing: 'one-time' | 'yearly',
-  //   summary, includes: string[], updateYearPrice, deviceLimit, trialDays,
-  //   checkoutUrl }. `updateYearPrice` buys one more year of updates after the
-  //   included year; it is optional and never renews automatically.
+  //   where, summary, includes: string[], updateYearPrice, deviceLimit,
+  //   trialDays, checkoutUrl }. `where` names the app the plan's tools run in.
+  //   `updateYearPrice` buys one more year of updates after the included year;
+  //   it is optional and never renews automatically.
   plans: [
     {
       id: 'pro',
       name: 'Pro',
       price: 49.5,
       billing: 'one-time',
+      // Pro is desktop only: the owner's choice of 2026-09-29 (ADR-540 item 7).
+      where: 'the Windows desktop app',
       summary: 'Everything in Free, plus:',
       includes: [
         'V-carve',

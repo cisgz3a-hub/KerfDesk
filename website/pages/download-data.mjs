@@ -54,7 +54,7 @@ export const WEB_APP_POINTS = [
 ];
 
 export const SAME_APP_POINTS = [
-  'The same Free and Pro editions',
+  'KerfDesk Free, with no time limit',
   'No account or sign-in',
   'Your projects are saved as files on your own computer',
   'No analytics, error reporting or cloud sync',

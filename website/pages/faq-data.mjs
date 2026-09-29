@@ -262,6 +262,7 @@ function pricingAndLicense(commerce) {
           you want it; it never renews automatically.
         </p>
         <p>
+          ${plan.where && `${plan.name} works in ${plan.where}; KerfDesk in the browser is Free.`}
           One license is active on up to ${plan.deviceLimit} devices at a time, and each device can
           try ${plan.name} free for ${plan.trialDays} days with no card. When a trial ends, only the
           ${plan.name} tools lock, and a license never stops a job from running. Purchase opens

@@ -1,6 +1,6 @@
 ## ADR-540 - KerfDesk Free and Pro: the app always opens, only Pro tools need a licence (2026-09-29)
 
-**Status:** Implemented for the commercial desktop build; web licensing planned | **Date:** 2026-09-29 | **Amends:** ADR-523 (launch admission and update eligibility)
+**Status:** Implemented for the commercial desktop build; Pro is desktop only | **Date:** 2026-09-29 | **Amends:** ADR-523 (launch admission and update eligibility)
 
 ### Context
 
@@ -51,10 +51,12 @@ still holds.
    launch that enables checkout switches them to KerfDesk Free, with Pro tools
    pointing to the desktop app (ADR-544 item 1); locking them before a licence can
    be bought would leave nobody able to unlock Pro.
-7. **Planned web licensing.** When it ships, a browser counts as one of the
-   licence's three devices, its Pro tools work while the licence's update period
-   is active (the web app is always the newest version), and a web trial is per
-   browser profile.
+7. **Pro is desktop only.** On 2026-09-29 the owner chose to keep Pro out of the
+   browser: every browser lets its user open developer tools and change the page,
+   so a Pro check in the web app could be switched off in seconds (ADR-544). The
+   web app is KerfDesk Free, a browser never counts as one of the licence's three
+   devices, and web licensing is not built. Pro is sold for the desktop app, which
+   is Windows only for now (`electron/commercial-update.ts`).
 8. **The status bar names the edition** ("Free · Try Pro", "Pro trial · N days
    left", "Pro", "Free") in commercial builds and opens Help > Licence.
 

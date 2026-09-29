@@ -372,9 +372,9 @@ for a paid product.
    licence admission, and business decisions §2 still says newer versions "refuse to start until
    the licence is renewed". Build the Free/Pro split first (Pro tools lock; Free and machine
    control keep working), and update business decisions §2.
-2. **Browser licensing.** §6.2 and the privacy notice count each browser as a device and describe a
-   browser digest made from a random identifier. Web licensing is not built yet (ADR-523 covers
-   Windows desktop). Build it to match, or change those lines.
+2. **Browser licensing.** Resolved: on 2026-09-29 the owner chose to sell Pro only in the desktop
+   app (ADR-540 item 7). §2, §3.3, §4.6 and §6.2 and the privacy notice now say the web app is Free
+   and only desktop installations count as devices.
 3. **Blocking refunded keys.** §8.4 relies on being able to block a key, but the service has no
    revoke operation yet (business decisions §3). Add an admin operation that marks a licence
    inactive.

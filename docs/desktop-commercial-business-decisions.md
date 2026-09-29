@@ -18,7 +18,7 @@ qualified professional in the relevant country before launch.
 | Included | Perpetual use of eligible versions, three active computers, one year of updates |
 | Renewal | Optional US$20 for another year of updates; never automatic |
 | Trial | Every Pro tool for 30 days from the first online registration |
-| Editions | KerfDesk Free and Pro on the web and desktop (ADR-540). The app always opens; only Pro tools need a licence |
+| Editions | KerfDesk Free on the web and desktop; Pro only in the Windows desktop app (ADR-540, owner's choice 2026-09-29). The app always opens; only Pro tools need a licence |
 | Developer access | Separate free licences for Johann and Father, three computers each, unlimited updates |
 | Seller | South Africa; customers expected mainly in the USA |
 | Payment provider | Paddle (subject to its own seller approval) |

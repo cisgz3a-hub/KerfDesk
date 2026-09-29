@@ -106,8 +106,8 @@ function chooseSection(site) {
       title: 'Using Linux?',
       body: html`<p>
         There is no Linux desktop app yet, and no date for one. Use the
-        <a href="${site.appUrl}">web app</a> in Chrome or Edge. It has the same design and toolpath
-        features as the desktop app, and you can install it from the browser.
+        <a href="${site.appUrl}">web app</a> in Chrome or Edge. It has the same Free design and
+        toolpath features as the desktop app, and you can install it from the browser.
       </p>`,
     })}`,
   });
@@ -118,7 +118,7 @@ function sameAppSection(ctx) {
     tone: 'alt',
     content: split({
       title: 'One app, wherever you run it',
-      body: 'The desktop app is built from the same code as the web app. Packaging doesn’t change any design, toolpath, G-code or machine-control behavior. A few extras exist only on the desktop, such as the network-camera helper and the update link.',
+      body: 'The desktop app is built from the same code as the web app. Packaging doesn’t change any design, toolpath, G-code or machine-control behavior. A few extras exist only on the desktop, such as the network-camera helper and the update link, and Pro is sold only for the Windows desktop app.',
       points: SAME_APP_POINTS,
       media: shot(ctx, 'workspace'),
     }),
@@ -249,7 +249,7 @@ export const page = {
     return html`${pageHero({
       eyebrow: 'Download',
       title: 'Get KerfDesk',
-      lead: 'Use KerfDesk in your browser, or install the desktop app on Windows or macOS. Both come in the same Free and Pro editions, and neither needs an account.',
+      lead: 'Use KerfDesk in your browser, or install the desktop app on Windows or macOS. KerfDesk Free runs in both, Pro comes with the Windows desktop app, and neither needs an account.',
       extra: actions(
         button(site.appUrl, 'Open KerfDesk in your browser', { iconName: 'arrow-right' }),
         button(site.downloadPageUrl, 'Desktop downloads', {

@@ -52,6 +52,7 @@ describe('commerce configuration', () => {
     assert.equal(PRO.updateYearPrice, 20);
     assert.equal(PRO.deviceLimit, 3);
     assert.equal(PRO.trialDays, 30);
+    assert.equal(PRO.where, 'the Windows desktop app', 'Pro is desktop only (ADR-540 item 7)');
     assert.deepEqual(PRO.includes, [
       'V-carve',
       '3D relief',
@@ -118,7 +119,10 @@ describe('commerce configuration', () => {
     assert.match(text, /Every version released during that year keeps working forever/);
     assert.match(text, /isn’t a subscription and it never renews automatically/);
     assert.match(text, /Up to 3 devices at a time/);
-    assert.match(text, /Each desktop app installation or browser counts as one device/);
+    assert.match(text, /Each installation of the desktop app counts as one device/);
+    assert.match(text, /In the Windows desktop app\./);
+    assert.match(text, /Can I use Pro in the browser\? No\. Pro works in the Windows desktop app/);
+    assert.doesNotMatch(text, /browser counts as (?:one|a) device/);
     assert.match(text, /free 30-day Pro trial\. No card needed/);
     assert.match(text, /only the Pro tools lock, and everything in Free keeps working/);
     assert.match(text, /A license never stops a job from running/);
