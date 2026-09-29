@@ -34,7 +34,9 @@ one, sharing this amendment's working.
    project with no room at all says so and to delete some objects. The room counts objects, so
    groups are checked exactly on the scene the copies make: a saved file can nest groups so that a
    copy's groups or group members pass their limits before its objects do, and that is refused
-   too, naming the limit (`sceneLimitOverrun`, shared with Array, ADR-307 amendment 1).
+   too, naming the limit (`sceneLimitOverrun`, shared with Array, ADR-307 amendment 1). A refused
+   request shows only its refusal: the notice that a mask or text guide was let go, when the
+   copies replace the original, comes only once the copies are placed.
 2. **Nothing that is not a copy reaches the layout.** The count is compared with the room before
    anything is laid out, so 1e12 and 1e300 are refused as too many, exactly as 10,000 is. A count
    that is not finite or is below 1 still reads as 1, and a fraction rounds down, as before. A
@@ -90,6 +92,7 @@ one, sharing this amendment's working.
   and Copy lays out once with 4,000 placements; a count and a spacing no project could hold are
   explained in the status line and disable Copy.
 - `src/ui/state/copy-along-path-group-limits.test.ts`: copies whose group members would pass the
-  limit though their objects fit are refused, and the ones that fit are placed.
+  limit though their objects fit are refused, and the ones that fit are placed; with the original
+  not kept, a refusal says nothing about the mask it kept, and placed copies say it was let go.
 - `src/ui/state/scene-copy-room.test.ts`: the shared room, including originals that give their
   places back, and the exact check against the loader's own `validateSceneBudgets`.

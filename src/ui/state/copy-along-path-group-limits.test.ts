@@ -75,11 +75,31 @@ const NESTED: ReadonlyArray<SceneGroup> = Array.from({ length: 12 }, (_, index) 
   objectIds: PARTS.slice(0, index + 2).map((part) => part.id),
 }));
 
-function load(): Project {
+// An image masked by the first part, left out of the selection: replacing the
+// parts lets go of its mask, with a notice.
+const MASKED_IMAGE: SceneObject = {
+  kind: 'raster-image',
+  id: 'image',
+  source: 'image.png',
+  dataUrl: 'data:image/png;base64,AA==',
+  pixelWidth: 1,
+  pixelHeight: 1,
+  bounds: { minX: 0, minY: 0, maxX: 10, maxY: 4 },
+  transform: IDENTITY_TRANSFORM,
+  color: '#000000',
+  dither: 'grayscale',
+  linesPerMm: 1,
+  lumaBase64: 'AA==',
+  imageMaskId: 'part-0',
+};
+const MASK_LET_GO =
+  '1 image mask reference was removed because its mask artwork was deleted. The image remains editable and unmasked.';
+
+function load(extra: ReadonlyArray<SceneObject> = []): Project {
   const layers = [createLayer({ id: 'cut', name: 'cut', color: '#000000' })];
   const project = {
     ...createProject(),
-    scene: { objects: [...PARTS, GUIDE], layers, groups: NESTED },
+    scene: { objects: [...PARTS, GUIDE, ...extra], layers, groups: NESTED },
   };
   useStore.setState({
     project,
@@ -109,6 +129,35 @@ describe('Copy Along Path and group limits', () => {
       variant: 'warning',
     });
     expect(useStore.getState().undoStack).toEqual([]);
+  });
+
+  it('says nothing about a mask it did not let go when it is refused', () => {
+    const before = load([MASKED_IMAGE]);
+
+    expect(useStore.getState().copyAlongPath({ ...REQUEST, count: 700, keepOriginal: false })).toBe(
+      false,
+    );
+
+    expect(useStore.getState().project).toBe(before);
+    expect(useToastStore.getState().toasts.map((toast) => toast.message)).toEqual([
+      `This would take the project past its limit of ${PROJECT_SCENE_LIMITS.groupMembers} group members. Ask for fewer copies, or delete some objects first.`,
+    ]);
+  });
+
+  it('lets go of the mask, and says so, when the copies replace the parts', () => {
+    load([MASKED_IMAGE]);
+
+    expect(useStore.getState().copyAlongPath({ ...REQUEST, count: 500, keepOriginal: false })).toBe(
+      true,
+    );
+
+    const image = useStore.getState().project.scene.objects.find((object) => object.id === 'image');
+    expect(image).toBeDefined();
+    expect(image).not.toHaveProperty('imageMaskId');
+    expect(useToastStore.getState().toasts.map((toast) => toast.message)).toEqual([
+      MASK_LET_GO,
+      'Placed 500 copies along the guide path in place of the original.',
+    ]);
   });
 
   it('places the copies that fit when their groups stay inside the limits', () => {

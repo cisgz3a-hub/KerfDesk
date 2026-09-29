@@ -68,13 +68,15 @@ export function copyAlongPathMutation(
     objects: [...scene0.objects, ...copies.objects],
     groups: [...(scene0.groups ?? []), ...copies.groups],
   };
-  const scene = request.keepOriginal ? placed : withoutOriginals(placed, plan.selection.artwork);
+  const replaced = request.keepOriginal ? null : withoutOriginals(placed, plan.selection.artwork);
+  const scene = replaced?.scene ?? placed;
   // The room counted objects; groups the copies carry are held to their limits here.
   const overrun = sceneLimitOverrun(scene0, scene);
   if (overrun !== null) {
     useToastStore.getState().pushToast(overrun, 'warning');
     return state;
   }
+  if (replaced !== null) reportDependencyRepairs(replaced);
   useToastStore.getState().pushToast(placedMessage(plan.placements.length, request), 'success');
   return {
     project: { ...state.project, scene },
@@ -123,14 +125,16 @@ function copiesAlongPath(
   return { objects, groups, selectedIds };
 }
 
-// As Delete does: a mask or text guide left without its artwork is let go,
-// with a notice.
-function withoutOriginals(scene: Scene, artwork: ReadonlyArray<SceneObject>): Scene {
+// As Delete does: a mask or text guide left without its artwork is let go. Its
+// notice waits until the copies are placed, so a refusal shows only itself.
+function withoutOriginals(
+  scene: Scene,
+  artwork: ReadonlyArray<SceneObject>,
+): ReturnType<typeof repairDanglingObjectDependencies> {
   const ids = new Set(artwork.map((object) => object.id));
   const remaining = { ...scene, objects: scene.objects.filter((object) => !ids.has(object.id)) };
   const repaired = repairDanglingObjectDependencies(removeObjectIdsFromGroups(remaining, ids));
-  reportDependencyRepairs(repaired);
-  return pruneOrphanLayers(repaired.scene);
+  return { ...repaired, scene: pruneOrphanLayers(repaired.scene) };
 }
 
 function placedMessage(count: number, request: CopyAlongPathRequest): string {
