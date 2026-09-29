@@ -123,7 +123,7 @@ function clock(seconds: number): string {
 }
 
 function boundsSize(stats: ProgramStats): string {
-  const bounds = stats.motionBounds;
+  const bounds = stats.programBounds;
   if (bounds === null) return '—';
   return `${num(bounds.maxX - bounds.minX)} × ${num(bounds.maxY - bounds.minY)} × ${num(
     bounds.maxZ - bounds.minZ,
