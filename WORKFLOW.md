@@ -2722,6 +2722,8 @@ the lock when the owning window closes, reloads or crashes, so crash recovery is
    stream). Frame offers Home (homing enabled) or Unlock in place before refusing an
    Alarm (ADR-367), except a grblHAL E-stop alarm, which must be released first; after Unlock
    the operator sets the origin again, since Unlock does not restore the machine position.
+   After a failed probe (ALARM:4 or 5) nothing was lost, so the Frame unlocks and continues
+   once the controller reports Idle (ADR-375).
    A job placed at the head's current position does not frame on after Home, because the cycle
    parks the head at the switches: the Frame stops and asks the operator to jog the head back
    into place and Frame again (ADR-367 Amendment 1).
@@ -8000,16 +8002,22 @@ desktop artifact stays **CLAIMED** under `PROJECT.md` Desktop Preview acceptance
    evidence, sends `M5` and `M9`, expands the audited GRBL probe builder, and
    owns every terminal response before awaiting transport completion.
 5. A corner request leaves the previous WCS unchanged through all six contacts,
-   then commits X, Y, and Z together in one `G10 L20 P0` block before parking.
+   then clears any temporary G92 origin with `G92.1` and commits X, Y, and Z together
+   in one `G10 L20 P0` block before parking, so the stored corner does not move when a
+   reset later drops G92. The probed corner is then a saved G54 origin, and status
+   reports are trusted again, as after Set origin here. A Z-only probe keeps any G92
+   (ADR-375).
 6. Success requires the complete sequence, a FIFO dwell marker, two fresh Idle
    reports, and unchanged connection/transaction identity. Plate-removal state
    is then shown as a Job Review warning; it does not block ordinary Frame/Start.
 
 #### Error — alarm or partial probe failure
 
-1. A probe alarm enters global GRBL alarm handling and clears affected setup
-   evidence. It never establishes work zero from a partial response sequence;
-   a corner failure before the combined commit leaves the prior WCS unchanged.
+1. A probe alarm (ALARM:4 or 5) enters global GRBL alarm handling and clears work-Z,
+   Home and Frame evidence. It keeps the XY origin and, after Unlock, the reported
+   position, because the firmware resets nothing and `$X` only returns to Idle
+   (ADR-375). It never establishes work zero from a partial response sequence; a
+   corner failure before the combined commit leaves the prior WCS unchanged.
 2. Any uncertain non-alarm failure sends soft reset and keeps the controller
    operation locked until a reboot banner and two subsequent Idle reports are
    observed. Missing proof remains locked until disconnect.

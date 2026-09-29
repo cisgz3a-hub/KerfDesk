@@ -25,7 +25,40 @@ therefore sent moves the firmware refuses, or trusted values the controller had 
 
 ### Decision
 
-1. **Manual motion inside the firmware's limits** (M-3, M-5).
+1. **Origins that outlive a failed probe and a corner probe** (M-1, M-2).
+   - A failed probe, `ALARM:4` (the probe was already triggered, or on grblHAL is not connected) or
+     `ALARM:5` (no contact within the travel), stops only the probe move and resets nothing: GRBL
+     and grblHAL do not count either as critical, FluidNC only enters Alarm, and `$X` only returns
+     to Idle, so the machine position and every work offset, a G92 included, still hold
+     ([motion_control.c L273-L298](https://github.com/gnea/grbl/blob/bfb67f0c7963fe3ce4aaf8a97f9009ea5a8db36e/grbl/motion_control.c#L273-L298),
+     [system.c L160-L165](https://github.com/gnea/grbl/blob/bfb67f0c7963fe3ce4aaf8a97f9009ea5a8db36e/grbl/system.c#L160-L165)).
+     These two alarms now keep the XY origin, and an Unlock that clears one of them (the Alarm
+     banner's or a Console `$X`) no longer hides the reported position or drops the origin. Work Z,
+     Home and Frame evidence are still cleared, as for every alarm, and a position that was already
+     untrusted before the probe stays untrusted. The alarm an Unlock clears is read before `$X` is
+     sent, because the first report out of Alarm clears `alarmCode` and can be handled before the
+     `ok`. Frame's blocked-start Unlock offer then says the position and origin were kept and
+     continues the Frame once the controller reports Idle.
+   - Other probe alarms still count as a reset: grblHAL's `ALARM:13` (probe protection) marks the
+     position lost when the motors were stepping, and FluidNC's `ALARM:18` (probe hard limit)
+     stops stepping at once
+     ([grblHAL protocol.c L568-L571](https://github.com/grblHAL/core/blob/d7aaee3d84b1e7010f075d395206afff038d7379/protocol.c#L568-L571),
+     [FluidNC MotionControl.cpp L439-L445](https://github.com/bdring/FluidNC/blob/fdc17a2c9c0367b07345c16da3937ff0739d4702/FluidNC/src/MotionControl.cpp#L439-L445)).
+     A text alarm (Smoothieware) names no code and keeps the reset behaviour.
+   - `G10 L20` stores the work offset as MPos - G92 - WPos
+     ([gcode.c L550-L553](https://github.com/gnea/grbl/blob/bfb67f0c7963fe3ce4aaf8a97f9009ea5a8db36e/grbl/gcode.c#L550-L553)),
+     so a corner probe run while Set origin here's G92 was active stored a corner that moved by
+     that G92 at the next reset on stock GRBL and FluidNC. The corner cycle now sends `G92.1` right
+     before its single `G10 L20 P0` commit, after the sixth contact, so a failed contact still
+     leaves the operator's origin as it was. A settled corner cycle is recorded as a saved G54
+     origin and trusts status reports again, as Set origin here does; its start makes anything
+     bound to the old origin, such as a Place Board registration, stale.
+   - The Z touch-off keeps any G92: `G10 L20` works per axis and Set origin here writes only
+     `G92 X Y`, so a `G92.1` there would drop the operator's XY origin, and every reset or `G92.1`
+     that later drops a G92 Z already voids work-Z evidence.
+   - No new refusal.
+
+2. **Manual motion inside the firmware's limits** (M-3, M-5).
    - With `$20=1`, stock GRBL checks every jog target against its travel whether or not it is
      homed, from its own machine position, and refuses the whole line with `error:15`
      ([jog.c L35-L37](https://github.com/gnea/grbl/blob/bfb67f0c7963fe3ce4aaf8a97f9009ea5a8db36e/grbl/jog.c#L35-L37),
@@ -60,8 +93,11 @@ therefore sent moves the firmware refuses, or trusted values the controller had 
 
 ### Consequences
 
-- The GRBL simulator models two more stock GRBL behaviours, both off by default: the power-up
-  lock into Alarm with homing on (`homingInitLock`) and the `error:15` check of a `$J=` target
-  once `$20=1`.
+- The GRBL simulator models more stock GRBL behaviour: `G10 L20` with an active G92, a failed
+  `G38.2` (`probeFailure`), and, both off by default, the power-up lock into Alarm with homing on
+  (`homingInitLock`) and the `error:15` check of a `$J=` target once `$20=1`.
+- Still open for the origin: FluidNC enters Alarm before it prints the alarm line, so an
+  `<Alarm|>` report that arrives before `ALARM:5` still drops a G92 origin; a Console `$X` with
+  no alarm active still hides the position.
 - Still open: grblHAL keeps an axis homed through `$X` and resets, but KerfDesk clamps only after
   this session's Home; per-axis pull-off settings in some grblHAL builds are not modelled.
