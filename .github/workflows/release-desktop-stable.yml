@@ -14,6 +14,11 @@ name: Release Desktop Stable
 # before a future stable tag, not for the free Preview-governance merge.
 #
 # Tag releases are fail-closed signed builds (ADR-135/142).
+#
+# Retired while commercial releases own vX.Y.Z tags (ADR-556): a commercial
+# tag must not also build and publish this free installer, which has the same
+# version and app ID. The lane runs only when the owner sets the repository
+# variable KERFDESK_LEGACY_STABLE_LANE to on.
 on:
   push:
     # Keep prerelease tags out of the signed stable lane. The negative pattern
@@ -33,6 +38,8 @@ permissions:
 jobs:
   validate-stable-tag:
     name: Validate stable release tag
+    # Every later job needs this one, so the whole lane is skipped when it is off.
+    if: vars.KERFDESK_LEGACY_STABLE_LANE == 'on'
     runs-on: ubuntu-latest
     steps:
       - name: Checkout tag

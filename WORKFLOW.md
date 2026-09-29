@@ -7849,6 +7849,8 @@ recorded below, and only step 4 remains deliberately open:
    to be in current `main` history and re-resolves the remote annotated tag
    immediately before draft creation and publication.
 
+The legacy stable lane below is off while commercial releases own `vX.Y.Z` tags (ADR-556); it
+runs only when the owner sets the repository variable `KERFDESK_LEGACY_STABLE_LANE` to `on`.
 Only after the later stable setup is recorded do stable tag semantics resume:
 create an annotated tag with
 `git tag -a vX.Y.Z -m "KerfDesk vX.Y.Z"`, then push only that tag with

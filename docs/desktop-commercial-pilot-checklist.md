@@ -42,10 +42,9 @@ Result: passed / failed at step __ (link the failing evidence)
 - [ ] A Windows code-signing certificate or signing service is available, and its
       publisher name is recorded above.
 - [ ] Reviewed commercial installer terms exist as a file outside the repository.
-- [ ] The legacy stable lane cannot publish the same version. Pushing `vX.Y.Z`
-      also starts `release-desktop-stable.yml`; confirm `STABLE_APPROVED_RELEASE_SHA`
-      does not name the commercial source (that workflow then stops before signing),
-      or disable that workflow for the pilot.
+- [ ] The legacy stable lane cannot publish the same version. It is off
+      (ADR-556): confirm the repository variable `KERFDESK_LEGACY_STABLE_LANE`
+      is not set to `on`, so pushing `vX.Y.Z` skips `release-desktop-stable.yml`.
 - [ ] The test machine is disposable: a separate local Windows account or a VM
       snapshot. The installer is per-user and shares the application ID with
       Preview builds, so it replaces any KerfDesk installed for the same Windows
