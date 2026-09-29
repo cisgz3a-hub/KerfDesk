@@ -609,7 +609,8 @@ destination and cannot overwrite the template source.
 2. **Tools → Vector → Cut Shapes** splits every selected shape along the top-most selected closed
    shape into an inside piece and an outside piece, removes that cutter and selects the pieces.
    Pieces keep their operations. Shapes the cutter does not cross are left as they were, and the
-   notice counts them.
+   notice counts them. A cut that would take the project past its limit of 10,000 objects is
+   refused with a notice, and nothing changes (F-A11).
 3. **Tools → Vector → Warp** (four corner handles) and **Deform** (a grid of 16 handles) bend the
    selected vector artwork. The artwork previews live while the handles are dragged; Enter or Apply
    applies it as one undo step, Esc or Cancel leaves it as it was, and Reset handles starts again.
@@ -1291,11 +1292,12 @@ the completed physical Frame is the spatial source of truth.
   in one step keep to these limits. Array and Copy Along Path say how many copies fit (F-A6a,
   F-A6f).
 - **Duplicate** adds what is selected, **Paste** and **Paste in Place** add what the clipboard
-  holds (with its operations, when it came from another project), and **Break Apart** makes each
-  shape of the selection its own object. Each is refused whole when the result would pass a limit:
-  a warning names the limit and says what to change (duplicate fewer objects, copy fewer objects
-  to paste, break apart fewer objects, or delete some first), and nothing changes. The clipboard
-  is kept. Everything that fits is made exactly as before; nothing is ever made in part.
+  holds (with its operations, when it came from another project), **Break Apart** makes each
+  shape of the selection its own object, and **Cut Shapes** makes two pieces of each shape it
+  crosses. Each is refused whole when the result would pass a limit: a warning names the limit and
+  says what to change (duplicate fewer objects, copy fewer objects to paste, break apart fewer
+  objects, cut fewer shapes, or delete some first), and nothing changes. The clipboard is kept.
+  Everything that fits is made exactly as before; nothing is ever made in part.
 - A project already over a limit can still be changed in any way that adds nothing to it.
 
 ---

@@ -28,7 +28,8 @@ any kind (the 2026-09-28 weakness audit, found while fixing H-5, ADR-498 amendme
   count 12000 exceeds 10000". Paste and Paste in Place did the same from a clipboard of 6,000,
   and a paste from another project brought its operations with it: 200 copied into a project of
   100 made 300, past the loader's 256 ("invalid `scene.layers`"). Break Apart made one imported
-  artwork of 12,000 strokes (a stipple, a sheet of parts) into 12,000 objects.
+  artwork of 12,000 strokes (a stipple, a sheet of parts) into 12,000 objects. Cut Shapes adds a
+  piece for every shape it crosses: three shapes cut in a project of 9,999 objects made 10,001.
 
 ADR-307 decision 5 says every valid requested placement is materialized. This amendment says what
 valid means: one the project can hold. It is not the policy cap decision 5 removed, because the
@@ -89,6 +90,8 @@ figure is the loader's and not a judgement, and every request that fits is still
    - **Break Apart:** "... Break apart fewer objects, or delete some objects first." A group
      takes all of an artwork's parts in the artwork's place, so its members are held to their
      limit too. A refused Break Apart lets go of no image mask, so it says nothing about masks.
+   - **Cut Shapes:** "... Cut fewer shapes, or delete some objects first." A refused cut does not
+     say how many pieces it made.
 
    These commands add what the selection or the clipboard holds, not a number the operator typed,
    so no room is worked out in advance and there is nothing to lay out first. No cap below the
@@ -122,7 +125,7 @@ figure is the loader's and not a judgement, and every request that fits is still
 - Array never takes a project over the limit it can be reopened with. A project that is already
   over it (Array could make one until now) gets "no room" until objects are deleted.
 - Applying a large array still costs what its copies cost, and no more. Typing one costs nothing.
-- Duplicate, Paste and Break Apart keep to the same limits (item 7). Cut Shapes, Design Studio
+- Duplicate, Paste, Break Apart and Cut Shapes keep to the same limits (item 7). Design Studio
   Apply and tiling into a board do not check them yet.
 - No schema change and no change to G-code.
 
@@ -160,3 +163,6 @@ figure is the loader's and not a judgement, and every request that fits is still
   step and reopened, and 12 refused; group members past their limit refused though the objects
   fit, and exactly 50,000 accepted; a refused Break Apart of an image's mask says nothing about
   the mask.
+- `src/ui/state/cut-shapes-limits.test.ts`: a cut that would make 10,001 objects is refused with
+  the refusal alone for a notice (it was made before); one that makes exactly 10,000 is made in
+  one undo step, says so, and reopens.
