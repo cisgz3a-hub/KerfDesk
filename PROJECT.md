@@ -35,7 +35,7 @@ The 1.0 codebase shipped a working app but had a coupling problem: fixes in one 
 
 ## Users and roles
 
-Single role: **operator**. Free/web/Preview builds need no activation. The explicitly prepared commercial desktop channel admits a signed trial, paid or developer licence before mounting its workspace (ADR-523). Once admitted, that running session keeps its controls throughout expiry, deactivation and payment errors; machine Start policy is unchanged.
+Single role: **operator**. Free/web/Preview builds need no activation. The explicitly prepared commercial desktop channel always opens and runs KerfDesk Free; only opening a Pro tool asks for a signed trial, paid or developer licence (ADR-540, amending ADR-523's admission). Pro stays for the running session even if a trial ends, and a licence never gates Frame, Start or output or stops a running job; machine Start policy is unchanged.
 
 User profile:
 - Owns a GRBL-based diode or CO₂ laser (xTool, Sculpfun, Ortur, Atomstack, NEJE, OpenBuilds, FluidNC retrofits).
@@ -473,7 +473,7 @@ phase; tracked here so they don't get lost.
 
 ### Maintainer authority
 
-21. **Frame is the only Start guard, and the physical Frame is the spatial source of truth** (ADR-228, ADR-230, ADR-232). A clean completed Frame for the exact current job is the sole ordinary Start authorization on laser and CNC; Start only claims that one-use permit plus unavoidable live transport/handoff facts, and Job Review remains the single warning surface. Calculated bed overhang, configured no-go zones, and controller-setting policy may inform that review but may not refuse Frame or Start. Factual transport inability, an unconstructable executable artifact, and exact-handoff inconsistency remain refusals because no valid command or matching stream can exist. No policy finding may be relabeled as one of those factual categories.
+21. **Frame is the only Start guard, and the physical Frame is the spatial source of truth** (ADR-228, ADR-230, ADR-232). A clean completed Frame for the exact current job is the sole ordinary Start authorization on laser and CNC; Start only claims that one-use permit plus unavoidable live transport/handoff facts, and Job Review remains the single warning surface. Calculated bed overhang, configured no-go zones, and controller-setting policy may inform that review but may not refuse Frame or Start. Factual transport inability, an unconstructable executable artifact, and exact-handoff inconsistency remain refusals because no valid command or matching stream can exist. No policy finding may be relabeled as one of those factual categories. The Pro licence check (ADR-540, recorded under ADR-247 by its Amendment 1) is not a Start guard: it never gates Frame, Start, output or a running job.
 
 ---
 
@@ -694,7 +694,7 @@ Reject any of these mid-development without a `PROJECT.md` revision and a `DECIS
   `LinkPath` synchronization. Bounded `.clb` import and refreshable native
   preset-to-layer bindings have shipped under Phase F.5 and ADR-164.
 - Multi-machine, networked control.
-- Cloud, accounts, sharing, sync, activation, entitlement, trials, subscriptions, device binding, paywalls, and dormant monetization code.
+- Cloud, accounts, sharing, sync, subscriptions, and dormant monetization code. Activation, entitlement, trials, device binding and the Pro paywall exist only as the maintainer-approved commercial desktop channel (ADR-523, ADR-540, ADR-247 Amendment 1); anything beyond it needs its own ADR and the maintainer's explicit permission.
 - DXF, PDF/PDF-compatible AI, HPGL/PLT and BMP/GIF/TIFF import are in scope
   under ADR-098 and ADR-357. PDF uses explicit page selection and complete-path
   conversion or a whole-page rendered image. Legacy non-PDF AI, unsupported
