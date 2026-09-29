@@ -232,11 +232,15 @@ describe('connect handshake while the controller is still busy (audit TC-1)', ()
 
 // Opening the port asserts DTR, which resets an Arduino-class GRBL board; GRBL
 // prints its banner from the init loop after it clears RX (grbl main.c#L88,
-// #L102). A banner that lands after the 2 s silent-controller verdict must
-// still end qualified: the welcome handler re-schedules qualification and the
-// status poll that starts after the handshake supplies the fresh Idle.
+// #L102). A banner that lands after the 2 s handshake window must still end
+// qualified: the welcome handler re-schedules qualification and the status
+// poll that starts after the handshake supplies the fresh Idle. This test used
+// to expect a failed qualification at 2.1 s and the baud-rate advice for a
+// board that was only still starting; the silence now stays a neutral note
+// until 10 s pass (controller audit T-4, ADR-375).
+// https://github.com/gnea/grbl/blob/bfb67f0c7963fe3ce4aaf8a97f9009ea5a8db36e/grbl/main.c#L102
 describe('a reset banner later than the 2 s handshake window', () => {
-  it('still qualifies once the late banner and a fresh Idle arrive', async () => {
+  it('keeps qualification pending, then qualifies once the late banner and a fresh Idle arrive', async () => {
     const bannerAtMs = 2_600;
     const controller = scriptedController({
       status: () => '<Idle|MPos:0.000,0.000,0.000|FS:0,0>',
@@ -245,12 +249,12 @@ describe('a reset banner later than the 2 s handshake window', () => {
     });
     await useLaserStore.getState().connect(adapter(controller.connection));
     await vi.advanceTimersByTimeAsync(2_100);
-    expect(useLaserStore.getState().controllerQualification.kind).toBe('failed');
+    expect(useLaserStore.getState().controllerQualification.kind).toBe('qualifying');
 
     await vi.advanceTimersByTimeAsync(4_000);
     const state = useLaserStore.getState();
     expect(state.detectedControllerKind).toBe('grbl-v1.1');
     expect(state.controllerQualification).toMatchObject({ kind: 'qualified' });
-    expect(state.log.some((line) => line.includes('No controller response'))).toBe(true);
+    expect(state.log.some((line) => line.includes('Check baud rate'))).toBe(false);
   });
 });
