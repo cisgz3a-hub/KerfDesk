@@ -1308,6 +1308,13 @@ the completed physical Frame is the spatial source of truth.
    `<name> can't be reopened directly in this browser. Choose it in the file picker.` and opens
    the picker.
 
+#### Edge — this computer's storage refuses the list (ADR-378 Amendment 1)
+1. The next Recent Projects action tries storage again. Meanwhile the list stays shown, and
+   projects opened or saved are listed and stored once storage works again.
+2. After 3 refusals in a row the list is kept until KerfDesk closes, and one warning says
+   `Recent Projects could not be saved for next session (browser storage is full or blocked).
+   The list is kept until KerfDesk closes.`
+
 #### Success — open from the operating system
 - Desktop: F-DESK4. Installed web app on a Chromium desktop browser: opening a `.lf2` with
   KerfDesk from the file manager focuses the open window and opens the file there, with the same

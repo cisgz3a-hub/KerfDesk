@@ -39,6 +39,34 @@ function rawPut(factory: IDBFactory, value: unknown): Promise<void> {
   });
 }
 
+/** The browser's IndexedDB, installed as the global, that can refuse the way a
+ * busy or briefly locked profile does: `refuse()` drops every open connection
+ * and refuses new ones until `allow()`. */
+function unreliableIndexedDb(factory: IDBFactory) {
+  let refusing = false;
+  const connections: IDBDatabase[] = [];
+  vi.stubGlobal('indexedDB', {
+    open: (name: string, version?: number) => {
+      if (refusing) throw new DOMException('Storage is busy', 'UnknownError');
+      const request = factory.open(name, version);
+      request.addEventListener('success', () => connections.push(request.result));
+      return request;
+    },
+  });
+  return {
+    connections,
+    refuse: () => {
+      refusing = true;
+      for (const connection of connections) connection.close();
+    },
+    allow: () => {
+      refusing = false;
+    },
+  };
+}
+
+const stored = (factory: IDBFactory) => createIndexedDbRecentProjectStorage(factory).load();
+
 afterEach(() => {
   vi.unstubAllGlobals();
   localStorage.removeItem(LIMIT_KEY);
@@ -111,6 +139,70 @@ describe('Recent Projects storage', () => {
     expect(await storage.load()).toEqual([]);
     await storage.update(() => [entry('session')]);
     expect(await storage.load()).toEqual([entry('session')]);
+  });
+
+  it('tries IndexedDB again after a refusal and stores what was recorded meanwhile', async () => {
+    const factory = new FakeIDBFactory();
+    await createIndexedDbRecentProjectStorage(factory).update(() => [entry('saved')]);
+    const indexedDb = unreliableIndexedDb(factory);
+    const storage = defaultRecentProjectStorage();
+
+    indexedDb.refuse();
+    expect(await storage.load()).toEqual([]);
+    await storage.update((entries) => [entry('meanwhile'), ...entries]);
+
+    indexedDb.allow();
+    expect(await storage.load()).toEqual([entry('meanwhile'), entry('saved')]);
+    // A reload finds both: nothing recorded during the refusal was lost.
+    expect(await stored(factory)).toEqual([entry('meanwhile'), entry('saved')]);
+  });
+
+  it('keeps showing the list when the browser drops the connection, then merges', async () => {
+    const factory = new FakeIDBFactory();
+    const indexedDb = unreliableIndexedDb(factory);
+    const storage = defaultRecentProjectStorage();
+    await storage.update(() => [entry('a')]);
+
+    indexedDb.connections[0]?.close();
+    expect(await storage.update((entries) => [entry('b'), ...entries])).toEqual([
+      entry('b'),
+      entry('a'),
+    ]);
+    // Another window records a project before this one can store again.
+    await createIndexedDbRecentProjectStorage(factory).update((e) => [entry('other'), ...e]);
+
+    expect(await storage.load()).toEqual([entry('b'), entry('other'), entry('a')]);
+    expect(await stored(factory)).toEqual([entry('b'), entry('other'), entry('a')]);
+    expect(indexedDb.connections).toHaveLength(2);
+  });
+
+  it('reports once, and stops trying, only when IndexedDB keeps refusing', async () => {
+    const factory = new FakeIDBFactory();
+    const indexedDb = unreliableIndexedDb(factory);
+    const onUnavailable = vi.fn();
+    const storage = defaultRecentProjectStorage({ onUnavailable });
+
+    indexedDb.refuse();
+    await storage.load();
+    indexedDb.allow();
+    await storage.update(() => [entry('a')]);
+    indexedDb.refuse();
+    await storage.load();
+    await storage.update((entries) => [entry('b'), ...entries]);
+    expect(onUnavailable).not.toHaveBeenCalled();
+
+    await storage.load();
+    expect(onUnavailable).toHaveBeenCalledTimes(1);
+    indexedDb.allow();
+    // The list still lasts for this session; IndexedDB is left alone.
+    expect(await storage.update((entries) => [entry('c'), ...entries])).toEqual([
+      entry('c'),
+      entry('b'),
+      entry('a'),
+    ]);
+    expect(await storage.load()).toEqual([entry('c'), entry('b'), entry('a')]);
+    expect(onUnavailable).toHaveBeenCalledTimes(1);
+    expect(await stored(factory)).toEqual([entry('a')]);
   });
 
   it('works in memory for hosts without IndexedDB', async () => {
