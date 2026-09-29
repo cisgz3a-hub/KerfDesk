@@ -3,11 +3,13 @@ import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { sessionEndScript } from '../../../electron/session-end-guard';
 import { createStreamer, step } from '../../core/controllers/grbl';
-import type { PlatformAdapter } from '../../platform/types';
+import type { DesktopJobReport, PlatformAdapter } from '../../platform/types';
 import { useLaserStore } from '../state/laser-store';
 import { desktopCloseController } from './desktop-close-runtime';
 import {
+  desktopJobReport,
   installDesktopSessionEnd,
+  JOB_PROGRESS_REPORT_MS,
   SESSION_END_MESSAGES,
   useSessionEndStore,
 } from './desktop-session-end';
@@ -41,7 +43,7 @@ afterEach(() => {
 
 describe('the window side of a Windows session end (ADR-548)', () => {
   it('tells main each time a job starts and ends', async () => {
-    const report = vi.fn(async (_busy: boolean) => undefined);
+    const report = vi.fn(async (_report: DesktopJobReport) => undefined);
     dispose = installDesktopSessionEnd(window, report);
     expect(report).not.toHaveBeenCalled();
 
@@ -50,14 +52,58 @@ describe('the window side of a Windows session end (ADR-548)', () => {
     useLaserStore.setState({ streamer: null });
     useLaserStore.setState({ fireActive: true });
 
-    expect(report.mock.calls).toEqual([[true], [false], [true]]);
+    expect(report.mock.calls).toEqual([
+      [{ busy: true, job: { progress: 0, state: 'running' } }],
+      [{ busy: false }],
+      [{ busy: true }],
+    ]);
   });
 
   it('reports a job already running when it starts listening', () => {
     running();
-    const report = vi.fn(async (_busy: boolean) => undefined);
+    const report = vi.fn(async (_report: DesktopJobReport) => undefined);
     dispose = installDesktopSessionEnd(window, report);
-    expect(report).toHaveBeenCalledExactlyOnceWith(true);
+    expect(report).toHaveBeenCalledExactlyOnceWith({
+      busy: true,
+      job: { progress: 0, state: 'running' },
+    });
+  });
+
+  it('reports progress in whole percent at most once a second, and a hold at once (ADR-553)', () => {
+    vi.useFakeTimers();
+    try {
+      const report = vi.fn(async (_report: DesktopJobReport) => undefined);
+      dispose = installDesktopSessionEnd(window, report);
+      const streamer = { ...step(createStreamer('G1 X1')).state, total: 1000 };
+      const at = (completed: number, status = streamer.status): void =>
+        useLaserStore.setState({ streamer: { ...streamer, completed, status } });
+
+      at(0);
+      at(4);
+      at(15);
+      at(19);
+      expect(report).toHaveBeenCalledOnce();
+
+      vi.advanceTimersByTime(JOB_PROGRESS_REPORT_MS);
+      at(19, 'paused');
+      at(19, 'paused');
+
+      expect(report.mock.calls.map(([sent]) => sent)).toEqual([
+        { busy: true, job: { progress: 0, state: 'running' } },
+        { busy: true, job: { progress: 0.019, state: 'running' } },
+        { busy: true, job: { progress: 0.019, state: 'paused' } },
+      ]);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('reports an errored job as stopped on an error', () => {
+    const errored = { ...step(createStreamer('G1 X1\nG1 X2')).state, status: 'errored' as const };
+    expect(desktopJobReport({ ...useLaserStore.getState(), streamer: errored })).toEqual({
+      busy: true,
+      job: { progress: 0, state: 'error' },
+    });
   });
 
   it('only shows a notice while Windows waits, and sends Abort when it will not', () => {
@@ -99,7 +145,7 @@ describe('the session-end notice', () => {
   });
 
   it('says what KerfDesk did, and the operator can dismiss it', async () => {
-    const reportJobActivity = vi.fn(async (_busy: boolean) => undefined);
+    const reportJobActivity = vi.fn(async (_report: DesktopJobReport) => undefined);
     const platform = { reportJobActivity } as unknown as PlatformAdapter;
     await act(async () =>
       root.render(
@@ -109,7 +155,10 @@ describe('the session-end notice', () => {
       ),
     );
     await act(async () => running());
-    expect(reportJobActivity).toHaveBeenCalledExactlyOnceWith(true);
+    expect(reportJobActivity).toHaveBeenCalledExactlyOnceWith({
+      busy: true,
+      job: { progress: 0, state: 'running' },
+    });
 
     await act(async () => fromMain('asked'));
     expect(host.querySelector('[role="alert"]')?.textContent).toContain(SESSION_END_MESSAGES.asked);

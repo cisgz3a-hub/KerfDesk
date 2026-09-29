@@ -22,7 +22,7 @@ function sessionEvent(...reasons: string[]) {
 function guarded(busy: boolean) {
   const window = fakeWindow();
   const activity = createDesktopJobActivity();
-  activity.set(busy);
+  activity.set({ busy });
   const log = vi.fn();
   installSessionEndGuard(window, activity, log);
   return { window, activity, log };
@@ -81,7 +81,7 @@ describe('Windows ending the session during a job (ADR-548)', () => {
     const { window, activity } = guarded(true);
     window.webContents.emit('render-process-gone');
     expect(activity.busy()).toBe(false);
-    activity.set(true);
+    activity.set({ busy: true });
     window.webContents.emit('did-finish-load');
     expect(activity.busy()).toBe(false);
   });
@@ -118,6 +118,22 @@ describe('the window job report route', () => {
     expect(activity.busy()).toBe(false);
   });
 
+  it("passes on a running job's progress (ADR-553)", async () => {
+    const activity = createDesktopJobActivity();
+    const reports: unknown[] = [];
+    activity.subscribe((report) => reports.push(report));
+    const handle = withDesktopActivityRoute(async () => new Response('asset'), activity);
+
+    const body = '{"busy":true,"job":{"progress":0.25,"state":"paused"}}';
+    expect((await handle(activityRequest(body))).status).toBe(204);
+    await handle(activityRequest('{"busy":false}'));
+
+    expect(reports).toEqual([
+      { busy: true, job: { progress: 0.25, state: 'paused' } },
+      { busy: false },
+    ]);
+  });
+
   it('answers only KerfDesk itself with a well-formed report', async () => {
     const activity = createDesktopJobActivity();
     const handle = withDesktopActivityRoute(async () => new Response('asset'), activity);
@@ -125,6 +141,11 @@ describe('the window job report route', () => {
       [
         activityRequest('{"busy":"yes"}'),
         activityRequest('{"busy":true,"extra":1}'),
+        activityRequest('{"busy":false,"job":{"progress":0.5,"state":"running"}}'),
+        activityRequest('{"busy":true,"job":{"progress":1.5,"state":"running"}}'),
+        activityRequest('{"busy":true,"job":{"progress":0.5,"state":"stopped"}}'),
+        activityRequest('{"busy":true,"job":{"progress":0.5,"state":"running","x":1}}'),
+        activityRequest('{"busy":true,"job":null}'),
         activityRequest('[true]'),
         activityRequest('not json'),
         activityRequest('{"busy":true}', { 'X-KerfDesk-Desktop': '0' }),
@@ -135,7 +156,9 @@ describe('the window job report route', () => {
       ].map(async (request) => (await handle(request)).status),
     );
 
-    expect(statuses).toEqual([400, 400, 400, 400, 404, 404, 404, 404, 404]);
+    expect(statuses).toEqual([
+      400, 400, 400, 400, 400, 400, 400, 400, 400, 404, 404, 404, 404, 404,
+    ]);
     expect(activity.busy()).toBe(false);
     expect(await (await handle(new Request('app://app/index.html'))).text()).toBe('asset');
   });

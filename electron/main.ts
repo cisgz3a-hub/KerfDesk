@@ -100,6 +100,7 @@ import { readLicensingConfig } from './licensing-config.js';
 import { refusedDebugSwitch } from './debug-switch-policy.js';
 import { startDesktopSupportLog } from './support-log.js';
 import { installSessionEndGuard, withDesktopActivityRoute } from './session-end-guard.js';
+import { installTaskbarJobProgress } from './taskbar-job-progress.js';
 import { withSupportRoutes } from './support-routes.js';
 
 const __filename = fileURLToPath(import.meta.url);
@@ -396,8 +397,10 @@ async function createWindow(): Promise<void> {
     },
     quit: () => app.quit(),
   });
-  // Windows restarting or shutting down mid-job waits, or gets Abort (ADR-548).
+  // Windows restarting or shutting down mid-job waits, or gets Abort (ADR-548),
+  // and the taskbar button shows the job's progress (ADR-553).
   installSessionEndGuard(window);
+  installTaskbarJobProgress(window);
   installRendererCrashRecovery(window, {
     isClosing: () => closeGuard.isClosing(),
     askToReload: async (prompt) => {

@@ -24,7 +24,8 @@ wants the answer at once, so it has to know beforehand whether a job runs.
    close handoff stops, counts. Each change goes to the main process through a same-origin
    `POST app://app/api/desktop/activity` with `{ "busy": true }` or `{ "busy": false }` and the
    `X-KerfDesk-Desktop` header, under the same checks as the licensing and support routes. A page
-   that reloads or crashes counts as no job.
+   that reloads or crashes counts as no job. ADR-553 adds the running job's progress to the
+   report, for the taskbar button.
 2. **Windows is asked to wait.** When Windows asks to end the session while a job runs, KerfDesk
    asks it to wait, and Windows shows its own screen saying KerfDesk is preventing the restart,
    shutdown or sign-out. The app shows a notice: let the job finish or Abort it first, and if

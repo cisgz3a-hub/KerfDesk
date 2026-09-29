@@ -7720,6 +7720,15 @@ behavior or create a second product implementation.
 4. Without a job, KerfDesk never delays Windows. Each request and what KerfDesk did goes to the
    support log (ADR-546).
 
+#### Success — the job on the taskbar button (ADR-553)
+1. While a job streams, the KerfDesk button on the Windows taskbar fills with the share of the
+   job's lines the controller has acknowledged. It turns yellow while the job is paused or waits
+   at a tool change, and red when it stopped on an error. macOS fills the Dock icon.
+2. When the job ends, the fill clears. If KerfDesk is in the background, its taskbar button
+   flashes until the operator brings KerfDesk to the front. A latched Fire shows nothing.
+3. The window reports a change in the job's state at once and its progress, in whole percent, at
+   most once a second. Nothing here touches the machine.
+
 ### F-DESK-LIC. Commercial admission, payment and updates (ADR-523)
 
 1. An explicitly prepared commercial package checks its signed saved licence before

@@ -88,6 +88,10 @@ release before it is tagged.
 - **Safer network cameras.** The desktop app starts FFmpeg only from the folders on PATH, never
   from the current folder, and says how to install it when it is missing
   ([#1021](https://github.com/cisgz3a-hub/KerfDesk/pull/1021)).
+- **Job progress on the taskbar.** In the Windows desktop app the taskbar button fills as a job
+  runs, turns yellow when it is paused and red when it stops on an error, and flashes when the
+  job ends while KerfDesk is in the background
+  ([#1021](https://github.com/cisgz3a-hub/KerfDesk/pull/1021)).
 - **The desktop app remembers your machine's port.** On Windows, a port picked once stays picked
   after KerfDesk restarts, so Connect automatically connects when the app opens, as it does in
   Chrome. Forget Controller removes it
