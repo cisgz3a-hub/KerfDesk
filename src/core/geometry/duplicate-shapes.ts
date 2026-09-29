@@ -4,7 +4,8 @@
 // is a separate object with the same transform baked in, still counts. Unlike
 // LightBurn, a closed shape that starts at a different point or runs the other
 // way is the same shape, which is how double outlines arrive from DXF files.
-// Copies on different operations are deliberate (score and cut) and are kept.
+// Copies on different operations are deliberate (score and cut) and are kept,
+// as are copies whose tabs placed by hand (CNC or laser) differ.
 
 import {
   isClosedEnough,
@@ -51,12 +52,13 @@ export function duplicateSignature(
   layers: ReadonlyArray<Layer>,
 ): string | null {
   if (!isVectorPathObject(object)) return null;
-  const anchored = (object.cncTabAnchors?.length ?? 0) > 0;
+  const anchored = hasPlacedTabs(object);
   const binding = JSON.stringify([
     [...operationIdsForObject(object, layers)].sort(),
     object.powerScale ?? null,
     object.operationOverride ?? null,
     object.cncTabAnchors ?? null,
+    object.laserTabAnchors ?? null,
     // A tab fraction is measured in local space before the transform. Equal
     // world outlines need not put that fraction at the same physical point
     // when one copy has a different non-uniform scale. Keep its authored basis.
@@ -79,6 +81,12 @@ export function duplicateSignature(
     ].join('|'),
   );
   return paths.length === 0 ? null : `${binding}#${paths.join('#')}`;
+}
+
+// Tabs placed by hand, CNC and laser (ADR-494 Amendment 1), are part of what a
+// copy cuts, so copies whose placed tabs differ are not duplicates.
+function hasPlacedTabs(object: SceneObject): boolean {
+  return (object.cncTabAnchors?.length ?? 0) > 0 || (object.laserTabAnchors?.length ?? 0) > 0;
 }
 
 function orderedKeys(keys: string[], anchored: boolean): string[] {

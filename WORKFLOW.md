@@ -567,8 +567,9 @@ destination and cannot overwrite the template source.
    direction to Preserve direction to keep the new direction.
 4. **Edit → Delete Duplicates** (`Alt+D`) deletes later copies of artwork drawn twice in the same
    place on the same operation: moved-back copies, and closed shapes starting at another corner or
-   drawn the other way, count. Copies on another operation, or with another power scale or
-   override, are kept. Locked artwork, image masks and path-text guides are never deleted.
+   drawn the other way, count. Copies on another operation, or with another power scale,
+   override or tabs placed by hand (CNC or laser), are kept. Locked artwork, image masks and
+   path-text guides are never deleted.
 5. **Tools → Image → Flatten Image Mask** bakes the mask into the selected image and crops it, as
    **Crop Image** does, then deletes the mask shape. The shape stays when it is locked or another
    image or path text uses it; the notice says which.
@@ -895,8 +896,9 @@ marks later edits as unapproved without changing the existing Frame/Start policy
    a tab to remove it, or drag a tab to move it; each is one undo step. Placed tabs draw filled and
    the automatic tabs they replace draw hollow. **Done** or Esc returns to Select.
 4. Placed tabs replace the automatic tabs on their shape only, and only while tabs are on. They
-   move, rotate and scale with the artwork and survive copy and paste and break apart. **Clear
-   placed tabs** (in Cut Settings or in the canvas hint) returns the artwork to automatic tabs.
+   move, rotate and scale with the artwork and survive copy and paste and break apart. **Delete
+   Duplicates** keeps a copy whose placed tabs differ (ADR-494 Amendment 1). **Clear placed
+   tabs** (in Cut Settings or in the canvas hint) returns the artwork to automatic tabs.
 5. Job Review's detail line reads e.g. "tabs every 50 mm (at most 6) × 0.5 mm, cut at 20%" or
    "tabs 4 × 0.5 mm, 3 placed by hand". With none of this set, output is unchanged.
 6. Material presets do not store these settings; applying a preset keeps what the operation has.
