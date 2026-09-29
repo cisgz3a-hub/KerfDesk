@@ -20,7 +20,7 @@ function answeredByAppShell(pathAndQuery: string): boolean {
   );
 }
 
-describe('standalone checkout and download pages under the service worker', () => {
+describe('standalone checkout, download and support pages under the service worker', () => {
   it.each([
     '/buy.html?_ptxn=txn_01h8zzzzzzzzzzzzzzzzzzzzzz',
     '/buy?_ptxn=txn_01h8zzzzzzzzzzzzzzzzzzzzzz',
@@ -28,20 +28,31 @@ describe('standalone checkout and download pages under the service worker', () =
     '/download.html?version=0.2.0-preview.14',
     '/download?version=0.2.0-preview.14',
     '/download.html',
+    '/support.html',
+    '/support',
   ])('never answers %s with the workspace', (page) => {
     expect(answeredByAppShell(page)).toBe(false);
   });
 
-  it.each(['/', '/index.html', '/?project=recent', '/buyer-guide', '/downloads/help'])(
-    'keeps the offline app shell for %s',
-    (page) => {
-      expect(answeredByAppShell(page)).toBe(true);
-    },
-  );
+  it.each([
+    '/',
+    '/index.html',
+    '/?project=recent',
+    '/buyer-guide',
+    '/downloads/help',
+    '/supported-machines',
+  ])('keeps the offline app shell for %s', (page) => {
+    expect(answeredByAppShell(page)).toBe(true);
+  });
 
   it('keeps the pages and the modules and keys they load out of the precache', () => {
     expect(workbox().globIgnores).toEqual(
-      expect.arrayContaining(['buy.html', 'download.html', 'desktop-*.{mjs,json,css}']),
+      expect.arrayContaining([
+        'buy.html',
+        'download.html',
+        'support.html',
+        'desktop-*.{mjs,json,css}',
+      ]),
     );
   });
 });

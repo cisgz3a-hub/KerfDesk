@@ -173,8 +173,8 @@ const OUTCOMES: Record<CommandId, Outcome> = {
   'help.tutorials': { special: 'tutorials' },
   'help.connection': { callback: 'showConnectionHelp' },
   'help.safety': { callback: 'showSafety' },
-  'help.report-bug': { url: 'https://github.com/cisgz3a-hub/KerfDesk/issues/new/choose' },
-  'help.discussions': { url: 'https://github.com/cisgz3a-hub/KerfDesk/discussions' },
+  'help.report-bug': { url: 'https://kerfdesk.com/support.html#report' },
+  'help.discussions': { url: 'https://kerfdesk.com/support.html' },
 };
 
 let host: HTMLDivElement;

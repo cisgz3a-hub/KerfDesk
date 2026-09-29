@@ -365,10 +365,10 @@ export const COMMAND_HELP: Readonly<Record<CommandId, CommandHelpTopic>> = {
   },
   'help.report-bug': {
     family: 'help',
-    tooltip: 'Open a pre-filled KerfDesk bug report on GitHub Issues.',
+    tooltip: 'Open KerfDesk support in your browser and see what to include in a problem report.',
   },
   'help.discussions': {
     family: 'help',
-    tooltip: 'Open KerfDesk Discussions on GitHub for feature ideas, questions, and feedback.',
+    tooltip: 'Open KerfDesk support in your browser for questions, ideas and feedback.',
   },
 };
