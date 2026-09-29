@@ -7,12 +7,16 @@ import test from 'node:test';
 import {
   COMMERCIAL_BETA_CATALOG_KEY,
   COMMERCIAL_CATALOG_KEY,
+  CommercialReleaseError,
+  digest,
 } from './commercial-release-manifest.mjs';
 import { publishCommercialRelease } from './commercial-release-publisher.mjs';
-import { promoteFromCli } from './promote-commercial-release.mjs';
+import { catalogState } from './commercial-release-rings.mjs';
+import { promoteFromCli, promotionFailureMessage } from './promote-commercial-release.mjs';
 import {
   TRAIN_SECRETS,
   TRAIN_VARIABLES,
+  cutOutputs,
   cutSummary,
   decideCut,
   fetchApprovedTerms,
@@ -46,6 +50,7 @@ async function publishedStore(...releases) {
       privateKeyPem,
       keyId,
       verifyInstaller: async () => undefined,
+      expectedCatalogSha256: catalogState(f.objects.get(COMMERCIAL_BETA_CATALOG_KEY) ?? null),
     });
   return f;
 }
@@ -111,6 +116,12 @@ test('the first cut builds the newest fully checked commit as the first version 
   );
   assert.match(summary, /Builds 2026\.40\.0 from c{40}, released 2026-09-29T07:17:00\.000Z/u);
   assert.match(summary, /Add a chamfer tool/u);
+  // The publisher must still find the beta catalogue the cut was decided from.
+  assert.match(summary, /- Beta catalogue SHA-256: none\n/u);
+  assert.equal(
+    cutOutputs(cut),
+    `due=true\nsha=${'c'.repeat(40)}\nversion=2026.40.0\npublished_at=2026-09-29T07:17:00.000Z\nbeta_catalog_sha256=none\n`,
+  );
 });
 
 test('later cuts count from the newest release and never reuse a reserved version', async () => {
@@ -129,6 +140,7 @@ test('later cuts count from the newest release and never reuse a reserved versio
   });
   assert.equal(cut.version, '2026.40.1');
   assert.equal(cut.newest.version, '1.2.3');
+  assert.equal(cut.betaCatalogSha256, digest(f.objects.get(COMMERCIAL_BETA_CATALOG_KEY)));
   assert.deepEqual(calls[0], ['merge-base', '--is-ancestor', 'a'.repeat(40), 'HEAD']);
   assert.equal(calls[1].at(-1), `${'a'.repeat(40)}..HEAD`);
   const notDue = await decideCut({
@@ -140,6 +152,10 @@ test('later cuts count from the newest release and never reuse a reserved versio
   });
   assert.deepEqual([notDue.due, notDue.version, notDue.publishedAt], [false, null, null]);
   assert.match(cutSummary(notDue), /Not due: No main commit since the newest release/u);
+  assert.match(
+    cutOutputs(notDue),
+    /^due=false\nsha=\nversion=\npublished_at=\nbeta_catalog_sha256=[a-f0-9]{64}\n$/u,
+  );
   await assert.rejects(
     decideCut({
       greenSets: [new Set()],
@@ -295,7 +311,11 @@ test('the daily promotion moves the newest beta once it has been quiet, and repo
   assert.equal(held.result, null);
   assert.equal(f.objects.has(COMMERCIAL_CATALOG_KEY), false);
   const due = await runPromotion({ store: f.store, keySet, now: NOW, held: null });
-  assert.deepEqual(due.result, { status: 'promoted', version: '1.2.3' });
+  assert.deepEqual(due.result, {
+    status: 'promoted',
+    version: '1.2.3',
+    catalogSha256: digest(f.objects.get(COMMERCIAL_CATALOG_KEY)),
+  });
   assert.deepEqual(
     f.objects.get(COMMERCIAL_CATALOG_KEY),
     f.objects.get(COMMERCIAL_BETA_CATALOG_KEY),
@@ -303,6 +323,17 @@ test('the daily promotion moves the newest beta once it has been quiet, and repo
   const summary = ringsSummary('Release train: promotion', due);
   assert.match(summary, /^## Release train: promotion\n\n1\.2\.3: promoted to the stable ring\./u);
   assert.match(summary, /- Newest beta: 1\.2\.3, released 2026-01-01T00:00:00\.000Z, from a{9}/u);
+  // The SHA-256s an operator states to publish or promote by hand next.
+  const shas = digest(f.objects.get(COMMERCIAL_BETA_CATALOG_KEY));
+  assert.match(summary, new RegExp(`- Beta catalogue SHA-256: ${shas}\n`, 'u'));
+  assert.match(
+    summary,
+    new RegExp(`- Stable catalogue SHA-256: ${due.result.catalogSha256}$`, 'u'),
+  );
+  assert.match(
+    ringsSummary('Release train: promotion', early),
+    /- Stable catalogue SHA-256: none$/u,
+  );
   // Status reads both rings from the public host, with no credentials at all.
   const status = await ringStatus({
     keySet,
@@ -314,6 +345,10 @@ test('the daily promotion moves the newest beta once it has been quiet, and repo
     }).fetchImpl,
   });
   assert.equal(status.decision.reason, '1.2.3 is already on the stable ring.');
+  assert.deepEqual(status.catalogs, {
+    beta: digest(f.objects.get(COMMERCIAL_BETA_CATALOG_KEY)),
+    stable: digest(f.objects.get(COMMERCIAL_CATALOG_KEY)),
+  });
 });
 
 test('the operator promotes one named version by hand, and the CLIs refuse bad input', async () => {
@@ -327,17 +362,44 @@ test('the operator promotes one named version by hand, and the CLIs refuse bad i
     inputs.push(input);
     return f.store;
   };
-  assert.deepEqual(await promoteFromCli(['1.2.3'], { env, createStore, keySet }), {
+  const expected = ['--expected-catalog-sha256', 'none'];
+  assert.deepEqual(await promoteFromCli([...expected, '1.2.3'], { env, createStore, keySet }), {
     status: 'promoted',
     version: '1.2.3',
+    catalogSha256: digest(f.objects.get(COMMERCIAL_CATALOG_KEY)),
   });
   assert.deepEqual(inputs, [{ accountId: 'b'.repeat(32), apiToken: 'token' }]);
-  await assert.rejects(promoteFromCli([], { env, createStore, keySet }), /Usage/u);
-  await assert.rejects(promoteFromCli(['1.2.3', 'extra'], { env, createStore, keySet }), /Usage/u);
+  for (const args of [
+    [],
+    ['1.2.3'],
+    [...expected],
+    [...expected, '1.2'],
+    [...expected, '1.2.3', 'extra'],
+    ['--expected-catalog-sha256', 'latest', '1.2.3'],
+  ])
+    await assert.rejects(promoteFromCli(args, { env, createStore, keySet }), /Usage/u);
+  // Stable is now `none` plus 1.2.3, so the same promotion resumes as a no-op.
+  assert.equal(
+    (await promoteFromCli([...expected, '1.2.3'], { env, createStore, keySet })).status,
+    'already-promoted',
+  );
   await assert.rejects(
-    promoteFromCli(['1.2.3'], { env: {}, createStore, keySet }),
+    promoteFromCli([...expected, '1.2.3'], { env: {}, createStore, keySet }),
     /COMMERCIAL_CLOUDFLARE_ACCOUNT_ID/u,
   );
+  // Own refusals print; anything else, which may quote a URL, gets one generic line.
+  assert.equal(
+    promotionFailureMessage(
+      new CommercialReleaseError('Commercial 1.2.4 is not in the beta catalogue.'),
+      env,
+    ),
+    'Commercial promotion failed: Commercial 1.2.4 is not in the beta catalogue.',
+  );
+  for (const error of [
+    new Error(`R2 request failed: https://api.cloudflare.com/client/v4/accounts/${'b'.repeat(32)}`),
+    new CommercialReleaseError(`account ${'b'.repeat(32)}`),
+  ])
+    assert.match(promotionFailureMessage(error, env), /^Commercial promotion failed\. Check/u);
   await assert.rejects(runCli(['tag']), /usage: release-train\.mjs/u);
   await assert.rejects(runCli(['decide']), /--green=<file>/u);
   await assert.rejects(runCli(['status', '--now=yesterday']), /valid date/u);

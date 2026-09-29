@@ -36,6 +36,13 @@ Amendment 1).
      concurrency group. A release must be newer than the newest release in either ring, and the
      publisher stops if the rings disagree about a version. An exact retry of a release published
      before the rings existed fills in its beta entry.
+   - **Each command states the catalogue it replaces.** ADR-523's publisher now requires
+     `--expected-catalog-sha256`, the SHA-256 of the catalogue the operator reviewed (the one the
+     previous run printed), or `none` before the first. Publication replaces the beta catalogue,
+     so it states beta's; promotion replaces the stable catalogue, so it states stable's. A
+     deleted, truncated or replaced catalogue is refused before any write instead of being made
+     permanent. An identical retry whose own catalogue write landed still resumes. Each run prints
+     the catalogue it left.
    - **Promotion** copies the beta entry, byte for byte, into the stable catalogue
      (`promoteCommercialRelease` in `scripts/commercial-release-rings.mjs`, or
      `scripts/promote-commercial-release.mjs <version>` by hand). Nothing is signed again, so
@@ -77,14 +84,21 @@ Amendment 1).
    - **Manual runs.** `workflow_dispatch` offers `status` (the default: both rings and the
      promotion decision, with no secrets), `cut` and `promote`. A manual cut still builds only when
      a beta is due.
+   - The cut records the beta catalogue's SHA-256, and the Windows job publishes with it as the
+     expected catalogue, so a beta catalogue that changed after the decision stops publication.
+     The daily promotion states the stable catalogue it read. The train only states catalogues it
+     read itself, so it cannot catch a catalogue damaged before a run: `status` prints both
+     SHA-256s for review, and a hand publication or promotion states a reviewed one.
    - The build and promote jobs share `kerfdesk-commercial-publication` with
      `cancel-in-progress: false`, so a publication is never cancelled midway. Top-level permissions
      are empty and each job asks only for what it reads. Every action is pinned by SHA. Secrets are
      named only in the jobs that use them, and the Linux preflight learns only whether each eSigner
      secret is set.
    - The train never tags, pushes, or uploads to GitHub Releases. Its signed release identity names
-     `refs/heads/main`. The publisher and the download page accept that or the matching
-     `refs/tags/v<version>` and refuse every other ref. The desktop client already accepts any
+     `refs/heads/main`. Preparation, the publisher and the download page accept that or the
+     matching `refs/tags/v<version>` and refuse every other ref. The publisher also checks the
+     ref against the checkout: a tag must point at the signed commit, and a train build's commit
+     must be on `origin/main`, so the Windows job checks out main's full history. The desktop client already accepts any
      signed source ref, so it needed no change for train releases.
 
 4. **Versions are `<ISO week-year>.<ISO week>.<patch>`**: `2026.40.0` is the first build of the
@@ -159,7 +173,8 @@ Amendment 1).
 ### Tests
 
 `scripts/commercial-release-publisher.test.mjs` and `scripts/commercial-release-promotion.test.mjs`
-cover publishing to beta, promotion and their refusals. `scripts/release-train-policy.test.mjs`
+cover publishing to beta, promotion, their expected catalogues and their refusals.
+`scripts/commercial-release-package.test.mjs` covers the source checks for a tag and for main. `scripts/release-train-policy.test.mjs`
 covers versions, cuts, holds and quiet days, and `scripts/release-train.test.mjs` covers the command
 line against fake hosts. `src/platform/electron/release-train-workflow-gate.test.ts` pins the
 workflow: off by default, triggers, Linux decisions, Windows only when due, the native check on the

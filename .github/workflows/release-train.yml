@@ -83,6 +83,7 @@ jobs:
       sha: ${{ steps.decide.outputs.sha }}
       version: ${{ steps.decide.outputs.version }}
       published_at: ${{ steps.decide.outputs.published_at }}
+      beta_catalog_sha256: ${{ steps.decide.outputs.beta_catalog_sha256 }}
     steps:
       - name: Checkout main with its history
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
@@ -196,10 +197,13 @@ jobs:
       SOURCE_SHA: ${{ needs.decide.outputs.sha }}
       PUBLISHED_AT: ${{ needs.decide.outputs.published_at }}
     steps:
+      # With the full history, origin/main is present: the publisher checks that
+      # the signed source SHA is a commit on main.
       - name: Checkout the release commit
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
           ref: ${{ needs.decide.outputs.sha }}
+          fetch-depth: 0
           persist-credentials: false
 
       - name: Set up pnpm
@@ -358,6 +362,7 @@ jobs:
       # Reserves the version, uploads the three files and the signed update
       # manifest to dl.kerfdesk.com, reads each one back, and lists the release
       # in the beta catalogue only. Stable clients see it once it is promoted.
+      # The beta catalogue must still be the one the cut was decided from.
       - name: Publish to the beta ring on dl.kerfdesk.com
         shell: bash
         env:
@@ -366,8 +371,10 @@ jobs:
           DESKTOP_WINDOWS_PUBLISHER_NAME: ${{ vars.DESKTOP_WINDOWS_PUBLISHER_NAME }}
           COMMERCIAL_R2_API_TOKEN: ${{ secrets.COMMERCIAL_R2_API_TOKEN }}
           COMMERCIAL_CLOUDFLARE_ACCOUNT_ID: ${{ secrets.COMMERCIAL_CLOUDFLARE_ACCOUNT_ID }}
+          BETA_CATALOG_SHA256: ${{ needs.decide.outputs.beta_catalog_sha256 }}
         run: >-
           node scripts/publish-commercial-release.mjs
+          --expected-catalog-sha256 "${BETA_CATALOG_SHA256}"
           "release/commercial/${VERSION}"
           "${RUNNER_TEMP}/commercial-release/commercial-release-identity.json"
           "release/commercial/${VERSION}/win-unpacked/resources"

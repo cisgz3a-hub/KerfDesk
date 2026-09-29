@@ -1,8 +1,8 @@
 # Commercial Windows publication
 
-The publisher is an operator CLI, and the weekly release train (`.github/workflows/release-train.yml`, ADR-541) runs the same CLI. The train is off until the owner sets the repository variable `KERFDESK_RELEASE_TRAIN` to `on`; see "Weekly release train" in `docs/desktop-commercial-launch.md`. Neither creates GitHub releases, tags, accounts or signing credentials. Run the publisher by hand on Windows from a clean checkout whose HEAD matches the approved signed source SHA. Build outputs and generated preparation files must be ignored or outside that checkout.
+The publisher is an operator CLI, and the weekly release train (`.github/workflows/release-train.yml`, ADR-541) runs the same CLI. The train is off until the owner sets the repository variable `KERFDESK_RELEASE_TRAIN` to `on`; see "Weekly release train" in `docs/desktop-commercial-launch.md`. Neither creates GitHub releases, tags, accounts or signing credentials. Run the publisher by hand on Windows from a clean checkout whose HEAD matches the approved signed source SHA and whose `vX.Y.Z` tag resolves to that same commit. A train build names `refs/heads/main` instead, and its signed commit must be on the checkout's `origin/main`. Build outputs and generated preparation files must be ignored or outside that checkout.
 
-First run `prepare-commercial-desktop.mjs` with the explicit release timestamp, approved external seller terms and the protected stable signing key. Its `--source-ref` is the release tag (`refs/tags/vX.Y.Z`) for a hand release; the train, which never tags, uses `refs/heads/main`. Build with its generated configuration and retain its `commercial-release-identity.json`. The build must use a valid Windows Authenticode certificate and the approved publisher name.
+First run `prepare-commercial-desktop.mjs` with the explicit release timestamp, approved external seller terms and the protected stable signing key. It refuses any identity the publisher would refuse: `--source-ref` must be the release tag `refs/tags/vX.Y.Z` for the version, or `refs/heads/main` for the train, which never tags, and `--published-at` no more than five minutes ahead. Build with its generated configuration and retain its `commercial-release-identity.json`. The build must use a valid Windows Authenticode certificate and the approved publisher name.
 
 Set these protected environment inputs without putting their values in command history:
 
@@ -13,10 +13,12 @@ Set these protected environment inputs without putting their values in command h
 - `COMMERCIAL_R2_API_TOKEN`: restricted R2 access to that account and bucket.
 
 ```text
-node scripts/publish-commercial-release.mjs <release-directory> <commercial-release-identity.json> <packaged-resources-directory>
+node scripts/publish-commercial-release.mjs --expected-catalog-sha256 <64-hex|none> <release-directory> <commercial-release-identity.json> <packaged-resources-directory>
 ```
 
-The resources directory must contain the actual packaged `app.asar` and `app-update.yml`. The CLI verifies independently pinned release and entitlement keys, the exact signed prebuild identity, Authenticode status and publisher, and both resources streamed directly from the installer with electron-builder's pinned 7za. It repeats the native signer and embedded-resource checks on uploaded bytes. It does not install the application.
+`--expected-catalog-sha256` states the catalogue you reviewed. Publication replaces the beta catalogue, so it is the SHA-256 of the live `desktop/commercial/beta/catalog.json`, which the previous publication printed, or `none` only when no beta catalogue exists yet. The release train's `status` report also prints both catalogues' SHA-256s. The publisher refuses before any write when the live catalogue differs, so a truncated, deleted or replaced catalogue is never accepted and then made permanent. The one exception is an identical retry after its own catalogue write landed: the live catalogue is then exactly the expected one plus that release, and the retry reports `already-published`. Each run prints the resulting beta catalogue SHA-256; record it for the next publication.
+
+The resources directory must contain the actual packaged `app.asar` and `app-update.yml`. The CLI verifies independently pinned release and entitlement keys, the exact signed prebuild identity, Authenticode status and publisher, and both resources streamed directly from the installer with electron-builder's pinned 7za. It repeats the native signer and embedded-resource checks on uploaded bytes. It does not install the application. `pwsh`, 7za and `git` run with a minimal Windows environment (`SystemRoot`, `windir`, `PATH`, `PATHEXT`, `TEMP`, `TMP`, `ComSpec`), never the signing key or R2 token. A failure prints the publisher's own refusal when it contains no environment value, URL or key material, and otherwise one generic line.
 
 ## Two rings: beta first, then stable
 
@@ -27,10 +29,10 @@ The beta catalogue lists every beta and every stable release. A new release must
 Promotion copies one beta entry, byte for byte, into the stable catalogue. Nothing is signed again, so it needs only the two R2 inputs above, never the signing key:
 
 ```text
-node scripts/promote-commercial-release.mjs <version>
+node scripts/promote-commercial-release.mjs --expected-catalog-sha256 <64-hex|none> <version>
 ```
 
-It first proves that the release's `update-manifest.json` is that exact entry and that each artifact still matches its signed size and hashes. It refuses a version beta does not list, a different envelope already on stable, a rollback, a backdated release, a full stable catalogue and a stable catalogue that moved while it ran. It prints `promoted`, or `already-promoted` when stable already lists that exact entry. A hand promotion skips the train's quiet days, so use it for an urgent fix or a pilot release.
+Its `--expected-catalog-sha256` names the stable catalogue you reviewed, which promotion replaces: the SHA-256 the previous promotion printed, or `none` before the first release reaches stable. Any other live stable catalogue stops promotion before it writes, with the same exception for an identical retry. It first proves that the release's `update-manifest.json` is that exact entry and that each artifact still matches its signed size and hashes. It refuses a version beta does not list, a different envelope already on stable, a rollback, a backdated release, a full stable catalogue and a stable catalogue that moved while it ran. It prints `promoted`, or `already-promoted` when stable already lists that exact entry, and the resulting stable catalogue SHA-256. A failure prints the promotion's own refusal under the same rules as publication. A hand promotion skips the train's quiet days, so use it for an urgent fix or a pilot release.
 
 Do not run two publishers or promotions concurrently. The train's build and promote jobs share the `kerfdesk-commercial-publication` concurrency group, so do not publish or promote by hand while a train run is in progress. The final comparison detects observed concurrent changes but is not a distributed lock against direct bucket administrators.
 
@@ -38,11 +40,13 @@ Do not run two publishers or promotions concurrently. The train's build and prom
 
 `node scripts/release-train.mjs <command>` holds the train's decisions; the workflow runs it.
 
-- `decide` (Tuesdays): is a beta due, from which green main commit, as which `<ISO week-year>.<ISO week>.<patch>` version.
+- `decide` (Tuesdays): is a beta due, from which green main commit, as which `<ISO week-year>.<ISO week>.<patch>` version. It records the beta catalogue's SHA-256, and the Windows job publishes with it as the expected catalogue, so a beta catalogue that changed after the decision stops publication.
 - `preflight`: every secret and variable is set, the signing key is the pinned one, the bucket answers and the approved terms match `KERFDESK_COMMERCIAL_TERMS_SHA256`.
 - `terms`: fetches the approved terms from `https://dl.kerfdesk.com/desktop/commercial/terms/<sha256>.txt` and checks their hash.
-- `promote` (daily): promotes the newest beta after 4 quiet days unless a newer beta replaced it, an open issue is labelled `release-hold` or `KERFDESK_RELEASE_HOLD` is `on`.
-- `status`: reports both rings and the promotion decision from the public catalogues. It needs no secrets.
+- `promote` (daily): promotes the newest beta after 4 quiet days unless a newer beta replaced it, an open issue is labelled `release-hold` or `KERFDESK_RELEASE_HOLD` is `on`. It states the stable catalogue it read.
+- `status`: reports both rings, both catalogue SHA-256s and the promotion decision from the public catalogues. It needs no secrets.
+
+The train states catalogues it read itself, so it guards against changes during its own run. A catalogue damaged before a run is caught by review: compare the SHA-256s each run prints with those recorded before.
 
 ## Limits and evidence
 

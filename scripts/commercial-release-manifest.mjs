@@ -27,8 +27,42 @@ const IDENTITY_FIELDS = [
 const record = (value) => value !== null && typeof value === 'object' && !Array.isArray(value);
 const exact = (value, keys) =>
   record(value) && Object.keys(value).sort().join(',') === [...keys].sort().join(',');
+/**
+ * A refusal raised by the commercial release tooling itself. Its message is
+ * written here, never copied from a secret or a provider response, so the
+ * operator CLI may print it.
+ */
+export class CommercialReleaseError extends Error {}
+const SECRET_NAME = /KEY|TOKEN|SECRET|PASSWORD|CREDENTIAL|ACCOUNT/iu;
+
+/**
+ * The message an operator CLI may print for a failure, or null for its generic
+ * line. Only refusals raised by this repository's own publisher and verifiers
+ * are specific; any other error (a network, process or parser failure) can
+ * quote a URL, a command line or input bytes. Even an own message is withheld
+ * when it contains an environment value (or one line of it), a URL, PEM armour
+ * or a control character. A value shorter than eight characters counts only
+ * under a secret-looking name: values such as `true` or `x64` are not secrets
+ * and would withhold almost every message.
+ */
+export function printableRefusal(error, env = process.env) {
+  if (!(error instanceof CommercialReleaseError)) return null;
+  const message = String(error.message);
+  const values = Object.entries(env).flatMap(([name, value]) =>
+    typeof value === 'string'
+      ? [value, ...value.split(/\r?\n/u)]
+          .map((part) => part.trim())
+          .filter((part) => part.length >= 8 || (part !== '' && SECRET_NAME.test(name)))
+      : [],
+  );
+  const unsafe =
+    /:\/\/|-----(?:BEGIN|END) /u.test(message) ||
+    Array.from(message).some((c) => c.charCodeAt(0) < 32 || c.charCodeAt(0) === 127) ||
+    values.some((value) => message.includes(value));
+  return unsafe ? null : message;
+}
 function requireValue(condition, message) {
-  if (!condition) throw new Error(`Invalid commercial release: ${message}`);
+  if (!condition) throw new CommercialReleaseError(`Invalid commercial release: ${message}`);
 }
 export const digest = (bytes, algorithm = 'sha256') =>
   createHash(algorithm)

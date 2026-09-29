@@ -85,19 +85,25 @@ For each version, from a clean checkout at the tagged source:
 
 ## 3. Publish version N
 
-- [ ] `node scripts/publish-commercial-release.mjs <release-dir> <identity.json> <resources-dir>`
-      prints `published` for N. Only one publisher runs at a time, and never while a
-      release train run is in progress.
+- [ ] `node scripts/publish-commercial-release.mjs --expected-catalog-sha256 <sha256|none> <release-dir> <identity.json> <resources-dir>`
+      prints `published` for N. State the beta catalogue SHA-256 recorded after
+      the previous publication, or `none` only when no beta catalogue exists yet;
+      any other live beta catalogue stops publication before it writes. Only one
+      publisher runs at a time, and never while a release train run is in progress.
 - [ ] N is listed in `desktop/commercial/beta/catalog.json` only, and the download
       page does not show it yet (ADR-541).
-- [ ] `node scripts/promote-commercial-release.mjs N` reports `promoted`, and
+- [ ] `node scripts/promote-commercial-release.mjs --expected-catalog-sha256 <sha256|none> N`
+      reports `promoted`, stating the stable catalogue SHA-256 recorded after the
+      previous promotion or `none` before the first, and
       `desktop/commercial/catalog.json` now lists N with the same entry as beta.
 - [ ] From an ordinary browser without GitHub access, `https://kerfdesk.com/download.html`
       shows `KerfDesk N · Released <date> · Publisher signature verified.` and the
       SHA-256 printed there equals the local installer.
 - [ ] The installer downloaded from that page is byte-identical to the local one.
 - [ ] Both catalogues are served with `Cache-Control: no-store`; versioned objects
-      are immutable. Record both catalogue SHA-256s.
+      are immutable. Record both catalogue SHA-256s the commands printed, check
+      them against the served files, and state them when publishing or promoting
+      the next version.
 
 ## 4. Fresh install and trial
 

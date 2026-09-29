@@ -99,9 +99,10 @@ Publish two genuinely signed test versions through the commercial publisher, the
 prove an eligible update downloads and installs on natural quit while an
 ineligible release is skipped. Each publication reaches the beta ring only, and the
 download page shows a version once `node scripts/promote-commercial-release.mjs
-<version>` has promoted it. Before promoting N+1, prove that a device running N with
-"Get new versions early (beta)" ticked takes N+1 and an unticked one does not; after
-promotion, the unticked one takes it too. Verify installer publisher, hashes,
+--expected-catalog-sha256 <sha256|none> <version>` has promoted it. Before
+promoting N+1, prove that a device running N with "Get new versions early (beta)"
+ticked takes N+1 and an unticked one does not; after promotion, the unticked one
+takes it too. Verify installer publisher, hashes,
 installed version, retained projects/settings, and public download/CORS/cache
 behaviour.
 Record the exact source, artifact and hosted identity. Only then enable customer
@@ -201,6 +202,7 @@ In Actions > Release train > Run workflow, on `main`:
 - `promote` makes the daily decision now; the quiet days and holds still apply.
 
 To put one release on the stable ring at once, for example an urgent fix, run
-`node scripts/promote-commercial-release.mjs <version>` with the two R2 inputs
-(`scripts/commercial-release-README.md`). Do it only while no train run is in
-progress.
+`node scripts/promote-commercial-release.mjs --expected-catalog-sha256 <sha256> <version>`
+with the two R2 inputs (`scripts/commercial-release-README.md`), stating the stable
+catalogue SHA-256 that the last `status` run printed after you reviewed it. Do it only
+while no train run is in progress.

@@ -29,9 +29,14 @@ import {
   CATALOG_LIMIT,
   COMMERCIAL_BETA_CATALOG_KEY,
   COMMERCIAL_CATALOG_KEY,
+  CommercialReleaseError,
   readCommercialCatalog,
 } from './commercial-release-manifest.mjs';
-import { everyRelease, promoteCommercialRelease } from './commercial-release-rings.mjs';
+import {
+  catalogState,
+  everyRelease,
+  promoteCommercialRelease,
+} from './commercial-release-rings.mjs';
 import { publicKeyRecord } from './prepare-commercial-desktop.mjs';
 import { createStableReleaseStore } from './stable-release-store.mjs';
 import {
@@ -69,11 +74,11 @@ export function readReleaseKeys(
 export function commercialStoreInput(env) {
   const accountId = env.COMMERCIAL_CLOUDFLARE_ACCOUNT_ID ?? '';
   if (!/^[a-f0-9]{32}$/u.test(accountId))
-    throw new Error(
+    throw new CommercialReleaseError(
       'COMMERCIAL_CLOUDFLARE_ACCOUNT_ID must be the 32-character Cloudflare account ID.',
     );
   if (typeof env.COMMERCIAL_R2_API_TOKEN !== 'string' || env.COMMERCIAL_R2_API_TOKEN.trim() === '')
-    throw new Error('COMMERCIAL_R2_API_TOKEN is required.');
+    throw new CommercialReleaseError('COMMERCIAL_R2_API_TOKEN is required.');
   return { accountId, apiToken: env.COMMERCIAL_R2_API_TOKEN };
 }
 
@@ -109,19 +114,24 @@ async function boundedBody(response, limit) {
   return Buffer.concat(chunks, size);
 }
 
-/** A catalogue as customers read it from dl.kerfdesk.com; no catalogue yet is empty. */
-export async function readPublicCatalogue(key, keySet, fetchImpl = fetch) {
+/** A catalogue's bytes as customers read them from dl.kerfdesk.com; null when there is none yet. */
+export async function readPublicCatalogueBytes(key, fetchImpl = fetch) {
   const url = `${DOWNLOAD_ORIGIN}/${key}`;
   const response = await fromHost(url, 'GET', 'application/json', fetchImpl);
   if (response.status === 404) {
     await response.body?.cancel();
-    return [];
+    return null;
   }
   if (response.status !== 200) {
     await response.body?.cancel();
     throw new Error(`${url} answered HTTP ${response.status}.`);
   }
-  return readCommercialCatalog(await boundedBody(response, CATALOG_LIMIT), keySet);
+  return boundedBody(response, CATALOG_LIMIT);
+}
+
+/** A catalogue as customers read it from dl.kerfdesk.com; no catalogue yet is empty. */
+export async function readPublicCatalogue(key, keySet, fetchImpl = fetch) {
+  return readCommercialCatalog(await readPublicCatalogueBytes(key, fetchImpl), keySet);
 }
 
 /** An interrupted publication leaves its reservation; that version is never reused. */
@@ -150,11 +160,17 @@ export function gitCommand(...args) {
   return execFileSync('git', args, { encoding: 'utf8', maxBuffer: 64 * 1024 * 1024 }).trim();
 }
 
-/** The cut: a due beta names its main commit, version and signed release time. */
+/**
+ * The cut: a due beta names its main commit, version and signed release time,
+ * and the beta catalogue it was decided from, which the publisher must still
+ * find when it lists the build (ADR-541).
+ */
 export async function decideCut({ greenSets, now, keySet, fetchImpl = fetch, git = gitCommand }) {
+  const beta = await readPublicCatalogueBytes(COMMERCIAL_BETA_CATALOG_KEY, fetchImpl);
+  const betaCatalogSha256 = catalogState(beta);
   // Beta lists every stable release too, except any published before the rings.
   const releases = everyRelease(
-    await readPublicCatalogue(COMMERCIAL_BETA_CATALOG_KEY, keySet, fetchImpl),
+    readCommercialCatalog(beta, keySet),
     await readPublicCatalogue(COMMERCIAL_CATALOG_KEY, keySet, fetchImpl),
   );
   const newest = releases[0]?.payload ?? null;
@@ -171,13 +187,14 @@ export async function decideCut({ greenSets, now, keySet, fetchImpl = fetch, git
     git('log', '--first-parent', '--format=%H%x1f%s%x1f%b%x1e', range),
   );
   const decision = cutDecision({ entries, greenSets, baseline });
-  if (!decision.due) return { ...decision, newest, version: null, publishedAt: null };
+  if (!decision.due)
+    return { ...decision, newest, version: null, publishedAt: null, betaCatalogSha256 };
   const version = await freeTrainVersion(
     now,
     releases.map((entry) => entry.payload.version),
     (candidate) => publicationReserved(candidate, fetchImpl),
   );
-  return { ...decision, newest, version, publishedAt: now.toISOString() };
+  return { ...decision, newest, version, publishedAt: now.toISOString(), betaCatalogSha256 };
 }
 
 export async function fetchApprovedTerms({ sha256, output, fetchImpl = fetch }) {
@@ -240,20 +257,40 @@ export async function preflight({
   });
 }
 
+function ringsOf(betaBytes, stableBytes, keySet) {
+  return {
+    beta: readCommercialCatalog(betaBytes, keySet),
+    stable: readCommercialCatalog(stableBytes, keySet),
+    catalogs: { beta: catalogState(betaBytes), stable: catalogState(stableBytes) },
+  };
+}
+
 export async function runPromotion({ store, keySet, now, held }) {
-  const beta = readCommercialCatalog(await store.get(COMMERCIAL_BETA_CATALOG_KEY), keySet);
-  const stable = readCommercialCatalog(await store.get(COMMERCIAL_CATALOG_KEY), keySet);
-  const decision = promotionDecision({ beta, stable, now, held });
+  const rings = ringsOf(
+    await store.get(COMMERCIAL_BETA_CATALOG_KEY),
+    await store.get(COMMERCIAL_CATALOG_KEY),
+    keySet,
+  );
+  const decision = promotionDecision({ ...rings, now, held });
+  // The train states the stable catalogue it decided from.
   const result = decision.due
-    ? await promoteCommercialRelease({ store, keySet, version: decision.version })
+    ? await promoteCommercialRelease({
+        store,
+        keySet,
+        version: decision.version,
+        expectedCatalogSha256: rings.catalogs.stable,
+      })
     : null;
-  return { beta, stable, decision, result };
+  return { ...rings, decision, result };
 }
 
 export async function ringStatus({ keySet, now, held, fetchImpl = fetch }) {
-  const beta = await readPublicCatalogue(COMMERCIAL_BETA_CATALOG_KEY, keySet, fetchImpl);
-  const stable = await readPublicCatalogue(COMMERCIAL_CATALOG_KEY, keySet, fetchImpl);
-  return { beta, stable, decision: promotionDecision({ beta, stable, now, held }), result: null };
+  const rings = ringsOf(
+    await readPublicCatalogueBytes(COMMERCIAL_BETA_CATALOG_KEY, fetchImpl),
+    await readPublicCatalogueBytes(COMMERCIAL_CATALOG_KEY, fetchImpl),
+    keySet,
+  );
+  return { ...rings, decision: promotionDecision({ ...rings, now, held }), result: null };
 }
 
 const describe = (entry) =>
@@ -261,7 +298,8 @@ const describe = (entry) =>
     ? 'none yet'
     : `${entry.payload.version}, released ${entry.payload.publishedAt}, from ${entry.payload.sourceSha.slice(0, 9)}`;
 
-export function ringsSummary(title, { beta, stable, decision, result }) {
+// The catalogue SHA-256s are what an operator states to publish or promote by hand.
+export function ringsSummary(title, { beta, stable, catalogs, decision, result }) {
   const outcome =
     result === null
       ? `Nothing promoted: ${decision.reason}`
@@ -275,6 +313,20 @@ export function ringsSummary(title, { beta, stable, decision, result }) {
     `- Newest stable: ${describe(stable[0])}`,
     `- Promotion: ${decision.due ? 'due' : 'not due'}. ${decision.reason}`,
     `- Quiet days before promotion: ${QUIET_DAYS}`,
+    `- Beta catalogue SHA-256: ${catalogs.beta}`,
+    `- Stable catalogue SHA-256: ${result?.catalogSha256 ?? catalogs.stable}`,
+  ].join('\n');
+}
+
+/** The decide step's outputs, which the workflow's later jobs read. */
+export function cutOutputs(cut) {
+  return [
+    `due=${cut.due}`,
+    `sha=${cut.due ? cut.commit : ''}`,
+    `version=${cut.version ?? ''}`,
+    `published_at=${cut.publishedAt ?? ''}`,
+    `beta_catalog_sha256=${cut.betaCatalogSha256}`,
+    '',
   ].join('\n');
 }
 
@@ -285,6 +337,7 @@ export function cutSummary(cut) {
     `${cut.due ? 'Due' : 'Not due'}: ${cut.reason}`,
   ];
   lines.push('', `- Newest release: ${cut.newest === null ? 'none yet' : cut.newest.version}`);
+  lines.push(`- Beta catalogue SHA-256: ${cut.betaCatalogSha256}`);
   if (!cut.due) return lines.join('\n');
   lines.push(`- Builds ${cut.version} from ${cut.commit}, released ${cut.publishedAt}`);
   let notes = renderNotes(cut.shipped);
@@ -314,11 +367,7 @@ const COMMANDS = {
     if (greenSets.length === 0) throw new Error('decide needs --green=<file> for each workflow.');
     const cut = await decideCut({ greenSets, now, keySet });
     const [githubOutput] = options('github-output');
-    if (githubOutput !== undefined)
-      appendFileSync(
-        githubOutput,
-        `due=${cut.due}\nsha=${cut.due ? cut.commit : ''}\nversion=${cut.version ?? ''}\npublished_at=${cut.publishedAt ?? ''}\n`,
-      );
+    if (githubOutput !== undefined) appendFileSync(githubOutput, cutOutputs(cut));
     report(options, cutSummary(cut));
   },
   async preflight({ options, keySet }) {

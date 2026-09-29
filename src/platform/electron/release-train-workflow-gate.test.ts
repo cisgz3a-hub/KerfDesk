@@ -109,6 +109,7 @@ describe('Release train workflow gate (ADR-541)', () => {
       'sha',
       'version',
       'published_at',
+      'beta_catalog_sha256',
     ]);
     for (const name of ['preflight', 'native-check', 'build']) {
       expect(jobs[name]?.if, name).toBe(DUE);
@@ -132,6 +133,8 @@ describe('Release train workflow gate (ADR-541)', () => {
     expect(packageCheckText).toContain('$sourceCommit = (git rev-parse HEAD).Trim()');
     const build = jobs.build!;
     expect(build.steps?.[0]?.with?.ref).toBe('${{ needs.decide.outputs.sha }}');
+    // origin/main must be present: the publisher checks the commit is on main.
+    expect(build.steps?.[0]?.with?.['fetch-depth']).toBe(0);
     expect(jobs.preflight?.steps?.[0]?.with?.ref).toBe('${{ needs.decide.outputs.sha }}');
   });
 
@@ -151,6 +154,14 @@ describe('Release train workflow gate (ADR-541)', () => {
     expect(order.every((index) => index >= 0)).toBe(true);
     expect([...order].sort((a, b) => a - b)).toEqual(order);
     expect(runs.join('\n')).toContain('--source-ref refs/heads/main');
+    // The beta catalogue must still be the one the cut was decided from.
+    const publish = (jobs.build?.steps ?? []).find((step) =>
+      (step.run ?? '').includes('node scripts/publish-commercial-release.mjs'),
+    );
+    expect(publish?.run).toContain('--expected-catalog-sha256 "${BETA_CATALOG_SHA256}"');
+    expect(publish?.env?.BETA_CATALOG_SHA256).toBe(
+      '${{ needs.decide.outputs.beta_catalog_sha256 }}',
+    );
     expect(runs.join('\n')).toContain('--config "${CONFIG}"');
     expect(runs.join('\n')).toContain('--publish never');
     expect(stepText(jobs.build!)).toContain('electron-builder.commercial.generated.json');
